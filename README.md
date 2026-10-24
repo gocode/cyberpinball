@@ -20,7 +20,7 @@ You describe your cabinet once: its screens, buttons and speakers. Cyber Pinball
 - **Find a table.** A catalogue of the VPS database shows every game, its versions and what this cabinet needs to play it, plus a download queue for the files you download yourself. Cyber Pinball never downloads tables or ROMs on your behalf.
 - **Game media.** Logos, playfield videos, backglasses, DMD, topper, loading videos, music, flyers and rules can be imported from PinUP Popper or PinballX, or downloaded on demand from [VPinMediaDB](https://github.com/superhac/vpinmediadb). When a media file is missing, a built-in fallback is drawn instead. There is also an attract mode.
 - **Alongside PinUP Popper, PinballX or PinballY.** Cyber Pinball keeps everything in its own folder, with its own copy of VPX and its own `VPinballX.ini`, and registers nothing in Windows. If another frontend is running, it waits for it to close instead of fighting over the screens; it warns before flipping a screen in Windows, and only restores the taskbars it hid itself.
-- **VPX settings without the `.ini`.** All VPX settings, read from VPX's own source code, are editable globally or per table. An "Adjust view" screen frames each table with the cabinet buttons.
+- **VPX settings without the `.ini`.** All VPX settings, read from VPX's own source code, are editable globally or per table. Visual settings (each table's framing, the position of the backglass, DMD and topper) are made on the running table: "Adjust display in game" opens VPX's menu mid-game.
 - **In-app updates.** System menu > "Cyber Pinball update" checks GitHub on demand, shows what's new, then downloads and installs the new version. Every release is signed: the cabinet refuses anything that was not signed with the publisher's key. Your tables, media and settings are kept.
 - **English or French.** Every screen follows the language you choose in the system menu ("Language / Langue"), with dates and numbers to match. By default, Cyber Pinball speaks French if Windows does, and English otherwise.
 
@@ -29,9 +29,9 @@ You describe your cabinet once: its screens, buttons and speakers. Cyber Pinball
 Every screenshot is taken off-screen by [`docs/demo-captures.ps1`](docs/demo-captures.ps1) on a simulated cabinet (4K playfield lying flat, backglass, DMD and topper). The games are made up and their artwork is drawn by the script.
 
 <p align="center">
-  <img src="docs/images/en/game-page.webp" width="270" alt="The game page of Neon Abyss: play statistics, files, and the actions Play, Flyer, Rules, Edit info, Game media, Adjust view, Settings for this table, Diagnose and fix, Remove table.">
+  <img src="docs/images/en/game-page.webp" width="270" alt="The game page of Neon Abyss: play statistics, files, and the actions Play, Flyer, Rules, Edit info, Game media, Settings for this table, Diagnose and fix, Remove table.">
   <img src="docs/images/en/system-menu.webp" width="270" alt="The system menu, Menu and setup: add a table, VPX settings, cabinet setup, VPS catalog, download queue, table updates, site accounts, ROM library, media import and download, media, sound and attract mode.">
-  <img src="docs/images/en/update.webp" width="270" alt="An update is available: Cyber Pinball 0.2.0, its release date, what's new, and the size of the signed installer.">
+  <img src="docs/images/en/update.webp" width="270" alt="An update is available: Cyber Pinball 0.2.0, its release date, what's new, the size of the signed installer, and the Update now and Later buttons.">
 </p>
 
 <p align="center"><img src="docs/images/en/wizard.webp" width="880" alt="The setup wizard, screens and roles step: each of the four screens shows its number, and the playfield screen asks “Playfield?” with the flipper and Start hints."></p>
@@ -108,7 +108,7 @@ The [technical manual](docs/manual.md) describes every part in detail: the files
 
 ### Publishing a release (maintainers)
 
-`npm run publier` checks that nothing personal or secret is about to be published, builds both installers, signs the update feed and pushes a snapshot of the code to `main`. It then creates the GitHub release `v<version>` with the installers and the feed. Release notes come from [CHANGELOG.md](CHANGELOG.md) (French, shown on the cabinet) and [CHANGELOG.en.md](CHANGELOG.en.md) (English, added to the GitHub release). It needs a fine-grained GitHub token (`CYBERPINBALL_GITHUB_TOKEN`) and the publication key, which never lives in the repository. See [Updating from the cabinet](docs/manual.md#updating-from-the-cabinet) in the technical manual.
+`npm run publier` checks that nothing personal or secret is about to be published, builds both installers, signs the update feed and pushes a snapshot of the code to `main`. It then creates the GitHub release `v<version>` with the installers and the feed. Release notes come from [CHANGELOG.md](CHANGELOG.md) (French, shown on the cabinet) and [CHANGELOG.en.md](CHANGELOG.en.md) (English, added to the GitHub release). It needs a fine-grained GitHub token (`CYBERPINBALL_GITHUB_TOKEN`) and the publication key, which never lives in the repository. The repository description and topics come from `package.json` and are set at each release, or with `npm run decrire` (the token then also needs the "Administration" permission). See [Updating from the cabinet](docs/manual.md#updating-from-the-cabinet) in the technical manual.
 
 ## Third-party components and licences
 

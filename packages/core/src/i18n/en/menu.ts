@@ -17,7 +17,6 @@ export const messages: Record<string, string> = {
   '{key} : commandes': '{key}: controls',
   '{key} : réglages': '{key}: settings',
   'Exit : menu': 'Exit: menu',
-  'Essayer la table dans VPX': 'Trying the table in VPX',
   'Son, vue, performances, pour toutes les tables': 'Sound, view, performance, for every table',
   'Configuration de la borne': 'Cabinet setup',
   'Boutons, écrans, playfield, disposition, son : chaque étape seule, ou l’assistant complet': 'Buttons, screens, playfield, layout, sound: one step at a time, or the full wizard',
@@ -248,4 +247,6 @@ export const messages: Record<string, string> = {
   'Fermez {names} depuis son menu (Quitter), puis relancez la partie.': 'Close {names} from its menu (Quit), then start the game again.',
   'Fermez {names} depuis leur menu (Quitter), puis relancez la partie.': 'Close {names} from their menus (Quit), then start the game again.',
   'Start : jouer quand même · Exit : revenir au menu': 'Start: play anyway · Exit: back to the menu',
+  // app/src/frontend.ts : réglage de l’affichage en partie
+  'Réglage de l’affichage': 'Display adjustment',
 };

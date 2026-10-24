@@ -26,6 +26,7 @@ import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { auditRepository } from './audit-publication.mjs';
 import { loadPrivateKey } from './cle-publication.mjs';
+import { describeRepository } from './decrire-github.mjs';
 import { snapshotAndPush } from './envoyer-github.mjs';
 import { bulletPoints, changelogNotes } from './traductions.mjs';
 
@@ -182,3 +183,8 @@ if (argv.includes('--brouillon')) {
   if (check instanceof Error) console.log(`Attention : le flux n'est pas encore lisible par les bornes (${check.message}).`);
   else console.log(`Flux lu comme une borne : version ${check.latest.version}${version.includes('-') ? ' (préversion : les bornes restent sur la dernière version finale)' : ''}.`);
 }
+
+// Description et sujets du dépôt, d'après package.json. Sans la permission « Administration »,
+// la release est faite quand même : seul ce point reste à refaire (npm run decrire).
+step('Description et sujets du dépôt');
+await describeRepository().catch((error) => console.log(`Non appliqués : ${error.message}`));

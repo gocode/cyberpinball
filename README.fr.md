@@ -20,7 +20,7 @@ On décrit la borne une fois : ses écrans, ses boutons, ses haut-parleurs. Cybe
 - **Trouver une table.** Un catalogue de la base VPS montre chaque jeu, ses versions et ce qu'il faut à cette borne pour y jouer, avec une liste d'attente des fichiers que l'on télécharge soi-même. Cyber Pinball ne télécharge jamais de tables ni de ROM à votre place.
 - **Les médias des jeux.** Logos, vidéos du plateau, frontons, afficheur, topper, vidéos de chargement, musique, prospectus et règles se reprennent de PinUP Popper ou de PinballX, ou se téléchargent à la demande depuis [VPinMediaDB](https://github.com/superhac/vpinmediadb). Quand un média manque, un repli dessiné par Cyber Pinball prend sa place. Un mode attente est prévu.
 - **À côté de PinUP Popper, PinballX ou PinballY.** Cyber Pinball garde tout dans son propre dossier, avec sa copie de VPX et son `VPinballX.ini`, et n'enregistre rien dans Windows. Si un autre menu est ouvert, il attend qu'il soit fermé au lieu de lui disputer les écrans ; il prévient avant de retourner un écran dans Windows, et ne réaffiche que les barres des tâches qu'il a lui-même masquées.
-- **Les réglages de VPX sans le `.ini`.** Tous les réglages de VPX, lus dans son propre code source, se changent pour toutes les tables ou pour une seule. L'écran « Ajuster la vue » cadre chaque table aux boutons.
+- **Les réglages de VPX sans le `.ini`.** Tous les réglages de VPX, lus dans son propre code source, se changent pour toutes les tables ou pour une seule. Les réglages visuels (cadrage de chaque table, place du fronton, du DMD et du topper) se font sur la table lancée : « Régler l'affichage en partie » ouvre le menu de VPX en pleine partie.
 - **La mise à jour depuis la borne.** Menu système > « Mise à jour de Cyber Pinball » cherche la dernière version sur GitHub quand on le demande, montre ses nouveautés, puis la télécharge et l'installe. Chaque version est signée : la borne refuse tout ce qui n'a pas été signé avec la clé de l'éditeur. Tables, médias et réglages restent en place.
 - **En français ou en anglais.** Chaque écran suit la langue choisie dans le menu système (« Langue / Language »), dates et nombres compris. Par défaut, Cyber Pinball parle français si Windows le parle, anglais sinon.
 
@@ -29,9 +29,9 @@ On décrit la borne une fois : ses écrans, ses boutons, ses haut-parleurs. Cybe
 Chaque capture est prise hors écran par [`docs/demo-captures.ps1`](docs/demo-captures.ps1), sur une borne simulée (playfield 4K couché, fronton, DMD et topper). Les jeux sont inventés et leurs visuels dessinés par le script.
 
 <p align="center">
-  <img src="docs/images/fr/game-page.webp" width="270" alt="La fiche de Neon Abyss : statistiques de parties, fichiers, et les actions Jouer, Prospectus, Règles, Modifier les informations, Médias du jeu, Ajuster la vue, Réglages pour cette table, Diagnostiquer et réparer, Retirer la table.">
+  <img src="docs/images/fr/game-page.webp" width="270" alt="La fiche de Neon Abyss : statistiques de parties, fichiers, et les actions Jouer, Prospectus, Règles, Modifier les informations, Médias du jeu, Réglages de cette table, Diagnostiquer et réparer, Supprimer la table.">
   <img src="docs/images/fr/system-menu.webp" width="270" alt="Le menu système, Menu et configuration : ajouter une table, réglages de VPX, configuration de la borne, catalogue VPS, liste d'attente, mises à jour des tables, comptes des sites, bibliothèque de ROM, import et téléchargement des médias, médias, son et attente.">
-  <img src="docs/images/fr/update.webp" width="270" alt="Une mise à jour est disponible : Cyber Pinball 0.2.0, sa date de publication, ses nouveautés et la taille de l'installeur signé.">
+  <img src="docs/images/fr/update.webp" width="270" alt="Une mise à jour est disponible : Cyber Pinball 0.2.0, sa date de publication, ses nouveautés, la taille de l'installeur signé, et les boutons Mettre à jour maintenant et Plus tard.">
 </p>
 
 <p align="center"><img src="docs/images/fr/wizard.webp" width="880" alt="L'assistant, étape des écrans et des rôles : chacun des quatre écrans affiche son numéro, et celui du playfield demande « Playfield ? » avec les commandes des flippers et de Start."></p>
@@ -108,7 +108,7 @@ Le [manuel technique](docs/manuel.md) décrit chaque partie en détail : les fic
 
 ### Publier une version (mainteneurs)
 
-`npm run publier` vérifie que rien de personnel ni de secret ne va partir, fabrique les deux installeurs, signe le flux de mise à jour et envoie un instantané du code sur `main`. Il crée ensuite la release GitHub `v<version>` avec les installeurs et le flux. Les nouveautés viennent de [CHANGELOG.md](CHANGELOG.md) (affichées sur la borne) et de sa traduction [CHANGELOG.en.md](CHANGELOG.en.md) (ajoutée à la release GitHub). Il faut un jeton GitHub à grain fin (`CYBERPINBALL_GITHUB_TOKEN`) et la clé de publication, qui n'est jamais dans le dépôt. Voir [Mise à jour depuis la borne](docs/manuel.md#mise-à-jour-depuis-la-borne) dans le manuel technique.
+`npm run publier` vérifie que rien de personnel ni de secret ne va partir, fabrique les deux installeurs, signe le flux de mise à jour et envoie un instantané du code sur `main`. Il crée ensuite la release GitHub `v<version>` avec les installeurs et le flux. Les nouveautés viennent de [CHANGELOG.md](CHANGELOG.md) (affichées sur la borne) et de sa traduction [CHANGELOG.en.md](CHANGELOG.en.md) (ajoutée à la release GitHub). Il faut un jeton GitHub à grain fin (`CYBERPINBALL_GITHUB_TOKEN`) et la clé de publication, qui n'est jamais dans le dépôt. La description et les sujets du dépôt viennent du `package.json` et sont appliqués à chaque release, ou par `npm run decrire` (le jeton a alors besoin de la permission « Administration »). Voir [Mise à jour depuis la borne](docs/manuel.md#mise-à-jour-depuis-la-borne) dans le manuel technique.
 
 ## Composants tiers et licences
 

@@ -11,6 +11,7 @@ import {
   withDefaultButtons,
   describeMapping,
   gameKeys,
+  displayKeys,
   keyLabel,
   navigationKeys,
   refusedKey,
@@ -141,6 +142,14 @@ test('aide-mémoire de la partie : les boutons affectés seulement', () => {
   assert.ok(gameKeys(undefined).some(([title, keys]) => title === 'Tremblements' && keys === 'Z · / · Espace'));
 });
 
+test('aide-mémoire du réglage de l’affichage : les boutons du menu de VPX', () => {
+  const rows = Object.fromEntries(displayKeys(undefined));
+  assert.equal(rows['Changer de ligne'], 'Ctrl gauche / Ctrl droit');
+  assert.equal(rows['Régler'], 'Maj gauche / Maj droite');
+  assert.equal(rows['Enregistrer : cette table ou toutes'], '1');
+  assert.equal(rows['Rouvrir le menu'], 'Ctrl gauche + Ctrl droit');
+});
+
 test('valeurs Mapping.* : touches du clavier remplacées, manettes gardées', () => {
   assert.equal(withKeyboardKeys('', [225]), 'Key;225');
   assert.equal(withKeyboardKeys('Key;225', [4]), 'Key;4');
@@ -154,11 +163,17 @@ test('valeurs Mapping.* : touches du clavier remplacées, manettes gardées', ()
   assert.equal(describeMapping('', 'GenTournament'), 'aucune touche');
 });
 
-test('sans étape « Boutons », [Input] reste tel quel', () => {
+test('sans étape « Boutons », [Input] reste tel quel, sauf le menu de VPX en partie', () => {
   const plan = planVpxSync(cabinetWith(), devPcDisplays(), VPX_FIRST_RUN);
   assert.equal(input(plan.nextIni!, 'LeftFlipper'), '');
-  assert.ok(!plan.changes.some((c) => c.section === 'Input'));
-  assert.ok(!Object.keys(plan.memory).some((id) => id.startsWith('Input.')));
+  // Touches par défaut des encodeurs : les deux MagnaSave (Ctrl gauche et droit), F12 gardée.
+  assert.deepEqual(
+    plan.changes.filter((c) => c.section === 'Input').map((c) => `${c.key}=${c.value}`),
+    ['Mapping.InGameUI=Key;69 | Key;224 & Key;228'],
+  );
+  assert.deepEqual(Object.keys(plan.memory).filter((id) => id.startsWith('Input.')), ['Input.Mapping.InGameUI']);
+  const again = planVpxSync(cabinetWith(), devPcDisplays(), plan.nextIni!, undefined, { memory: plan.memory });
+  assert.deepEqual(again.changes, []);
 });
 
 test('touches par défaut des encodeurs : écrites telles que VPX les écrit, rien de retiré', () => {

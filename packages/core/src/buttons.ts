@@ -366,12 +366,32 @@ export function gameKeys(buttons: CabinetButtons | undefined): [string, string][
 }
 
 /**
+ * Aide-mémoire du réglage de l'affichage en partie (fiche > « Régler l'affichage en
+ * partie ») : les boutons du menu de VPX, d'après InputManager.cpp (actions UIUp, UIDown,
+ * UILeft, UIRight, puis Start, Credit1 et LaunchBall quand le menu est ouvert).
+ */
+export function displayKeys(buttons: CabinetButtons | undefined): [string, string][] {
+  const keys = buttonKeys(buttons);
+  const label = (id: ButtonId) => keyLabel(keys[id]);
+  return [
+    [t('Changer de ligne'), `${label('leftMagna')} / ${label('rightMagna')}`],
+    [t('Régler'), `${label('leftFlipper')} / ${label('rightFlipper')}`],
+    [t('Enregistrer : cette table ou toutes'), label('start')],
+    [t('Annuler les changements'), label('credit')],
+    [t('Valeur par défaut'), label('plunger')],
+    [t('Page précédente, puis fermer'), label('exit')],
+    [t('Rouvrir le menu'), inGameMenuButtons(keys).map(label).join(' + ')],
+    [t('Quitter, menu fermé'), label('exit')],
+  ];
+}
+
+/**
  * Boutons qui, appuyés ensemble, ouvrent le menu de VPX pendant une partie (action
  * InGameUI, F12 au clavier) : les deux MagnaSave, qui y choisissent ensuite la ligne
  * (UIUp, UIDown) ; sans eux, Crédit et Start. Dans ce menu, « Display Settings » place
  * et redimensionne en direct le fronton, le DMD et le topper, puis les enregistre pour
- * toutes les tables ou pour celle-ci seulement (docs/manuel.md, « Placer les écrans
- * pendant une partie »). Exit seul quitterait la partie : il n'entre dans aucune
+ * toutes les tables ou pour celle-ci seulement (docs/manuel.md, « Régler l'affichage en
+ * partie »). Exit seul quitterait la partie : il n'entre dans aucune
  * combinaison.
  */
 export function inGameMenuButtons(keys: CabinetButtons): ButtonId[] {
@@ -618,7 +638,7 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
     const keys = keyboardKeys(ours ? undefined : current, action);
     const kept = free(action, keys);
     if (action === IN_GAME_MENU) {
-      settings.push({ section: VPX_INPUT_SECTION, key, value: inGameMenuMapping(buttons, current ?? '', before, kept) });
+      settings.push(inGameMenuSetting(buttons, doc, written, kept));
       continue;
     }
     if (kept.length < keys.length) put(action, kept);
@@ -643,6 +663,22 @@ function inGameMenuMapping(buttons: CabinetButtons, current: string, before: str
   const others = parseMapping(current).filter((alt) => !stale.has(formatMapping([alt])));
   const base = parseMapping(withKeyboardKeys(formatMapping(others), keys)).filter((alt) => singleKey(alt) !== NO_KEY);
   return formatMapping([...base, combo]);
+}
+
+/**
+ * [Input] Mapping.InGameUI pour ces boutons. Sans étape « Boutons », c'est la seule clé de
+ * [Input] que Cyber Pinball écrit, avec les touches par défaut des encodeurs : régler
+ * l'affichage en partie ne doit pas attendre le relevé des boutons (octobre 2026, borne
+ * sans relevé : la combinaison n'était jamais écrite). `keys` : touches seules du clavier
+ * gardées (F12, sauf si un bouton l'a prise) ; par défaut, celles de la valeur actuelle.
+ */
+export function inGameMenuSetting(buttons: CabinetButtons, doc: IniDocument, written: Record<string, string> = {}, keys?: number[]): VpxSetting {
+  const key = mappingKey(IN_GAME_MENU);
+  const current = doc.get(VPX_INPUT_SECTION, key);
+  const before = written[`${VPX_INPUT_SECTION}.${key}`];
+  const ours = before !== undefined && current === before;
+  const kept = keys ?? keyboardKeys(ours ? undefined : current, IN_GAME_MENU);
+  return { section: VPX_INPUT_SECTION, key, value: inGameMenuMapping(buttons, current ?? '', before, kept) };
 }
 
 /** Clés [Input] que Cyber Pinball écrit pour ces boutons, hors actions privées de leur touche (qui varient avec le fichier). */

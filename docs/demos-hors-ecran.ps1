@@ -2,11 +2,11 @@
 # l'autre, en arrière-plan : rien n'apparaît sur les écrans du poste ni ne lui prend le
 # focus (docs\hors-ecran.ps1). Sortie de chacune dans tmp\demos\<démo>.txt, bilan à la fin ;
 # le script échoue si l'une d'elles échoue (mise en page, guet des fenêtres, vérifications).
-#   .\docs\demos-hors-ecran.ps1 [-Demos zones, vue] [-Ecrans borne]
+#   .\docs\demos-hors-ecran.ps1 [-Demos zones, tables] [-Ecrans borne]
 # Restent réservées aux écrans du poste ($env:CYBERPINBALL_A_L_ECRAN = '1') : demo-barre-taches,
-# demo-fenetres et demo-vue-essai (parties de VPX, captures du bureau entier), l'endurance.
+# demo-fenetres (parties de VPX, captures du bureau entier), l'endurance.
 param(
-  [string[]]$Demos = @('boutons', 'medias', 'mise-en-page', 'plugins', 'pup', 'roms', 'tables', 'vps', 'vue', 'vue-portrait', 'zones'),
+  [string[]]$Demos = @('boutons', 'medias', 'mise-en-page', 'plugins', 'pup', 'roms', 'tables', 'vps', 'zones'),
   [string]$Ecrans = 'pc-dev'
 )
 $ErrorActionPreference = 'Stop'
@@ -27,7 +27,6 @@ $results = foreach ($name in $Demos) {
   # medias : ses propres jeux d'écrans (borne type, poste à deux écrans).
   if ($script -ne 'medias') { $arguments += '-Ecrans', $Ecrans }
   if ($script -notin 'mise-en-page', 'zones', 'medias') { $arguments += '-Run' }
-  if ($name -eq 'vue-portrait') { $arguments += '-Portrait' }
   $started = Get-Date
   Write-Host "== $name" -ForegroundColor Cyan
   # Une console à part par démonstration : leurs variables d'environnement ne se mêlent pas.

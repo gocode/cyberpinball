@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { VPX_INPUT_DEFAULTS } from '../buttons';
 import { detectHardwareDmds, findGlobalDmdFolders, vpxDmdSettings } from '../dmd';
 import { toPhysicalScreen } from '../fingerprint';
 import { IniDocument } from '../ini';
@@ -323,9 +324,11 @@ test('chaque clé écrite pour VPX 10.8.1-5436 existe dans son schéma', () => {
   const known = new Set(SCHEMA.settings.map((s) => `${s.section}/${s.key}`.toLowerCase()));
   const written = IniDocument.parse(plan.nextIni!).entries();
   assert.ok(written.length > 40);
-  for (const e of written) assert.ok(known.has(`${e.section}/${e.key}`.toLowerCase()), `[${e.section}] ${e.key}`);
+  // [Input] Mapping.<action> : déclarées par VPX au démarrage (InputAction::LoadMapping), absentes du schéma.
+  const action = (e: { section: string; key: string }) => (e.section === 'Input' ? /^Mapping\.(\w+)$/.exec(e.key)?.[1] : undefined);
+  for (const e of written) assert.ok(known.has(`${e.section}/${e.key}`.toLowerCase()) || (action(e) ?? '') in VPX_INPUT_DEFAULTS, `[${e.section}] ${e.key}`);
   // Et l'écran des réglages les montre toutes comme gérées, sauf les valeurs proposées.
-  const owned = vpxOwnedKeys(PROFILE, [], false, { roles: ['playfield', 'backglass', 'dmd', 'topper'], dmdKeys: ['Enable', 'ZeDMD', 'PIN2DMD', 'Pixelcade'] });
+  const owned = vpxOwnedKeys(PROFILE, [], false, { roles: ['playfield', 'backglass', 'dmd', 'topper'], dmdKeys: ['Enable', 'ZeDMD', 'PIN2DMD', 'Pixelcade'], inputKeys: Object.keys(plan.memory).filter((id) => id.startsWith('Input.')).map((id) => id.slice('Input.'.length)) });
   const proposed = ['CabinetAutofitMode', 'ScoreViewDMDOverlay', 'ScoreViewDMDAutoPos', 'PinMAMEPath', 'VniPath'];
   for (const e of written) if (!proposed.includes(e.key)) assert.ok(isOwned(owned, e.section, e.key), `[${e.section}] ${e.key}`);
 });

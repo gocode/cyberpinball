@@ -98,6 +98,27 @@ export function isTableOnly(def: Pick<VpxSettingDef, 'section'>): boolean {
   return def.section.toLowerCase() === 'tableoverride';
 }
 
+/**
+ * Réglages visuels qu'on ne juge que sur l'image réelle : cadrage et caméra de la table,
+ * fenêtres du fronton, du DMD et du topper, aspect des afficheurs (DMD, alphanumériques),
+ * place du DMD dans l'image du fronton (B2S) et marges des écrans d'un PuP-Pack. Pour une
+ * table, ils se règlent pendant la partie, dans le menu de VPX (fiche > « Régler
+ * l'affichage en partie ») : hors partie, une valeur se choisirait à l'aveugle (octobre
+ * 2026). Les mesures du meuble (ScreenWidth, Lockbar…) ne sont pas visuelles.
+ */
+const LIVE_VISUAL: [RegExp, RegExp][] = [
+  [/^Player$/i, /^(BGSet|CabinetAutofit(Mode|Pos)|ScreenPlayer[XYZ]|ScreenInclination|Playfield(Display|FullScreen|WndX|WndY|Width|Height))$/i],
+  [/^(TableOverride|DefaultCamera)$/i, /./],
+  [/^(Backglass|ScoreView|Topper)$/i, /(Output|Display|FullScreen|WndX|WndY|Width|Height)$/i],
+  [/^(DMD|Alpha)$/i, /./],
+  [/^Plugin\.(B2S|B2SLegacy)$/i, /DMD(Overlay|AutoPos|X|Y|W|H)$/i],
+  [/^Plugin\.PUP$/i, /Pad(Left|Right|Top|Bottom)$/i],
+];
+
+export function isLiveVisual(def: Pick<VpxSettingDef, 'section' | 'key'>): boolean {
+  return LIVE_VISUAL.some(([section, key]) => section.test(def.section) && key.test(def.key));
+}
+
 // ---------------------------------------------------------------------------
 // Lecture et écriture d'une valeur
 

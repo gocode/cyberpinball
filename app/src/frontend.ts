@@ -13,6 +13,7 @@ import {
   buttonProblems,
   formatManualEdit,
   gameKeys,
+  displayKeys,
   keyLabel,
   navigationKeys,
   withoutButtonKeys,
@@ -224,11 +225,9 @@ const library = createLibrary({
     void play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined);
   },
   tableSettings: (table) => openVpxSettings(table),
-  tryTable: async (table, tableIni) => {
-    const refused = refuseOffscreen(t('Essayer la table dans VPX'));
-    if (refused) return { ok: false, message: refused };
+  adjustDisplay: async (table) => {
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
-    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, { tableIni });
+    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, 'display');
     return report?.result;
   },
   vpxLogFile: () => {
@@ -712,10 +711,11 @@ export interface PlayReport {
 }
 
 /**
- * Partie d'une table. Un essai (`trial`) lit un autre .ini de table et ne compte pas dans
- * les statistiques ; à la fin, l'écran qui l'a demandé reprend la main.
+ * Partie d'une table. En mode réglage de l'affichage (`display`), VPX démarre son menu ouvert
+ * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
+ * l'a demandée (la fiche) reprend la main.
  */
-async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { tableIni: string }): Promise<PlayReport | undefined> {
+async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display'): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
   if (!install) return undefined;
   // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
@@ -732,7 +732,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { table
   const others = unacceptedFrontends();
   if (others.length) {
     const names = frontendNames(others);
-    pendingPlay = { frontends: others, play: () => play(table, autoStopAfterMs, trial) };
+    pendingPlay = { frontends: others, play: () => play(table, autoStopAfterMs, mode) };
     state = {
       ...state,
       phase: 'message',
@@ -762,6 +762,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { table
     return undefined;
   }
 
+  // Dès le chargement : son écran rappelle les boutons du menu de VPX, pas ceux du jeu.
+  displayMode = mode === 'display';
   state = { ...state, phase: 'loading', help: false };
   launchCount++;
   broadcast();
@@ -772,6 +774,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { table
 
   // Les écrans ont pu bouger depuis le démarrage du menu, la configuration de la borne aussi.
   const { problem, choose, selection } = syncScreens();
+  if (choose || problem) displayMode = false;
   if (choose) {
     configurations.openChooser(t('Avant de jouer, choisissez la configuration branchée : elle décide des écrans de VPX.'));
     return undefined;
@@ -797,13 +800,14 @@ async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { table
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying })
-      : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: table.file, tableIni: trial?.tableIni, vpxPrefDir: vpxPrefDir(install.version), onPlaying });
+      : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: table.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying });
   // Une partie simulée ne prend aucun raccourci global au poste.
   if (simulated === undefined) globalShortcut.register(FORCE_STOP_SHORTCUT, () => game.stop());
   const result = await game.done;
   if (simulated === undefined) globalShortcut.unregister(FORCE_STOP_SHORTCUT);
   stopWatchOccupied();
   playing = undefined;
+  displayMode = false;
 
   // Les barres des tâches reviennent avant que le menu reprenne le premier plan : redevenu
   // fenêtre plein écran active, il les fait repasser derrière lui.
@@ -813,7 +817,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { table
   // pour le joueur, mais le signe qu'un réglage ou une version de VPX a changé.
   for (const notice of result.notices) console.log(`VPX (${table.id}) : ${notice}`);
 
-  if (trial) return { result, focusReturned };
+  if (mode === 'display') return { result, focusReturned };
   if (result.ok) {
     // Les parties du test automatique ne comptent pas dans les statistiques.
     if (!autoStopAfterMs) recordPlay(table, startedAt, result.seconds);
@@ -831,6 +835,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { table
 
 /** Table en cours de partie : chaque fenêtre affiche son fond de partie. */
 let playing: TableEntry | undefined;
+/** Partie lancée pour régler l'affichage : le chargement rappelle les boutons du menu de VPX. */
+let displayMode = false;
 
 /** Partie retenue par l'avertissement « autre menu ouvert », lancée sur Start. */
 let pendingPlay: { frontends: OtherFrontend[]; play: () => Promise<PlayReport | undefined> } | undefined;
@@ -1110,6 +1116,7 @@ function viewFor(role: RoleId) {
     // Le son du menu ne sort que d'une fenêtre : celle du playfield.
     sound: role === 'playfield' ? soundView() : undefined,
     gameKeys: gameKeys(buttons),
+    loadingKeys: displayMode ? { title: t('Réglage de l’affichage'), rows: displayKeys(buttons) } : { title: t('Commandes de la partie'), rows: gameKeys(buttons) },
     menuKeys: menuKeys(),
     footer: menuFooter(),
     nav: { confirm: KEYS.confirm[0], exit: KEYS.exit[0], help: KEYS.help[0], helpLabel: KEYS.help.length ? keyLabel(KEYS.help[0]) : undefined },

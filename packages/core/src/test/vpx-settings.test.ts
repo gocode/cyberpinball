@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { isLiveVisual } from '../vpx-settings';
 import { IniDocument } from '../ini';
 import { writeWithBackup } from '../store';
 import { VPX_ESSENTIALS } from '../vpx-essentials';
@@ -177,4 +178,19 @@ test('IniDocument : retrait d’une clé et de sa section devenue vide, énumér
   assert.equal(doc.remove('player', 'bgset'), true);
   assert.equal(doc.toString(), '[TableOverride]\nDifficulty = 0.8\n');
   assert.equal(doc.remove('Player', 'BGSet'), false);
+});
+
+test('réglages visuels d’une table : réservés à la partie, pas les mesures du meuble', () => {
+  const live = (section: string, key: string) => isLiveVisual({ section, key });
+  assert.ok(live('Player', 'CabinetAutofitPos'));
+  assert.ok(live('Player', 'ScreenPlayerZ'));
+  assert.ok(live('TableOverride', 'ViewCabVOfs'));
+  assert.ok(live('ScoreView', 'ScoreViewWndX'));
+  assert.ok(live('DMD', 'Profile2DotSize'));
+  assert.ok(live('Plugin.B2S', 'ScoreViewDMDX'));
+  assert.ok(live('Plugin.PUP', 'BGPadTop'));
+  assert.ok(!live('Player', 'ScreenWidth'), 'mesure du meuble');
+  assert.ok(!live('Player', 'MusicVolume'));
+  assert.ok(!live('ScoreView', 'Priority.PUP'), 'qui dessine, pas où');
+  assert.ok(!live('Plugin.PUP', 'MainVol'));
 });

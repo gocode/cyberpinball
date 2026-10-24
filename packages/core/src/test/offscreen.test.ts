@@ -125,6 +125,19 @@ test('application : tout outil en ligne de commande est lancé avec windowsHide'
   assert.deepEqual(found, []);
 });
 
+// Windows PowerShell 5.1 lit en ANSI un fichier UTF-8 sans BOM (ceux qu'écrit l'application) :
+// « Aucun problème » n'y correspondait plus à son motif, et demo-captures.ps1 échouait à tort.
+test('scripts : un fichier lu pour y chercher un texte accentué l’est en UTF-8', () => {
+  const scripts = [path.join(REPO, 'lanceur.ps1'), ...fs.readdirSync(path.join(REPO, 'docs')).filter((f) => f.endsWith('.ps1')).map((f) => path.join(REPO, 'docs', f))];
+  const found = scripts.flatMap((file) =>
+    fs
+      .readFileSync(file, 'utf8')
+      .split('\n')
+      .flatMap((line, i) => (/Get-Content\b/.test(line) && !/-Encoding\b/.test(line) && /-(not)?match\b/.test(line) && /[^\x00-\x7F]/.test(line) ? [`${path.basename(file)}:${i + 1} ${line.trim()}`] : [])),
+  );
+  assert.deepEqual(found, []);
+});
+
 // PowerShell ignore la casse : une variable locale $ecrans écrasait le paramètre [string]$Ecrans
 // (et devenait une seule chaîne au lieu d'une liste de touches).
 test('scripts : aucun paramètre réaffecté dans le corps du script', () => {

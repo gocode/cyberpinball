@@ -228,19 +228,17 @@ Ce que les tests automatiques ne couvrent pas : les fenêtres que VPX ouvre vrai
 
 Démonstration sans opérateur des scénarios 81, 83 et 84 : `.\docs\demo-fenetres.ps1 -Run`, dans un bac à sable `tmp\demo-fenetres` (copie de Terminator 2 1.25 et du `VPinballX.ini` réel). Résultat sur le PC de développement : partie réussie et aucune autre fenêtre avec l'INI tel quel ; parties arrêtées sur le bon message avec `SecurityLevel = 1` puis `AskToTurnOn = 0`, valeurs gardées ; vrai `VPinballX.ini` inchangé.
 
-# Tests manuels de la vue par table (« Ajuster la vue »)
+# Tests manuels du réglage de l'affichage en partie
 
-Ce que les captures sans opérateur ne couvrent pas : la vraie borne, sa vitre et l'œil du joueur. Prérequis : assistant fait (vue borne, `BGSet = 1`, cadrage automatique), boutons relevés. Choisir une table dont le bas est tronqué : flippers collés au bord de l'écran, tablier (cartes d'instructions, bas des couloirs) coupé. Avant de commencer, noter si `<table>.ini` existe à côté du .vpx.
+Ce que les essais sans opérateur ne couvrent pas : la vraie borne, VPX lancé en `-PovEdit`, sa vitre et l'œil du joueur. Prérequis : assistant fait (vue borne, `BGSet = 1`, cadrage automatique) ; une table dont le bas est tronqué (flippers collés au bord de l'écran, tablier coupé).
 
 | # | Scénario | Comment | Résultat attendu |
 | --- | --- | --- | --- |
-| 86 | Bas de table tronqué corrigé | Fiche de la table > « Ajuster la vue ». « Hauteur de la table » : flipper droit, trois ou quatre crans. Exit > « Essayer sur la table » ; regarder le bas de la table, quitter la partie (Exit maintenu). Recommencer jusqu'à voir le tablier entier, puis Exit > « Enregistrer pour cette table ». Enfin « Jouer ». | À chaque essai, le bas de la table est plus haut à l'écran, le haut d'autant plus coupé ; au-delà d'un certain cran, plus rien ne bouge (la table touche un bord). Retour sur l'écran après chaque essai, mêmes valeurs, « Essai terminé ». Après « Enregistrer » : la fiche dit « Vue enregistrée pour cette table », `<table>.ini` contient `[Player] CabinetAutofitPos = 0.0x` (et rien d'autre de nouveau) ; « Jouer » montre la vue corrigée ; les autres tables n'ont pas changé. Pendant les essais, aucun `<table>.ini` n'est créé ni modifié. |
-| 87 | Remplir l'écran | Même écran, Start jusqu'à « Cadrage », flipper droit : « Remplir l'écran ». Exit > Essayer. | « Hauteur de la table » barrée, « Sans effet en Remplir l'écran ». En jeu, toute la longueur de la table est visible, un peu tassée ou étirée. Noter si c'est acceptable sur cette table. |
-| 88 | Hauteur des yeux | Start jusqu'à « Hauteur des yeux » : essayer 50 cm, puis 90 cm. | Le plateau paraît plus profond et un peu plus petit à 50 cm, plus plat à 90 cm ; la vitre reste ajustée à l'écran. Noter la valeur la plus naturelle vue depuis la place du joueur. |
-| 89 | Revenir au réglage général | Après le scénario 86 : « Ajuster la vue », Exit > « Revenir au réglage général », puis Exit > « Retour à la fiche ». | « Réglage général rétabli ». Les trois clés ont disparu de `<table>.ini` ; le fichier est supprimé s'il ne contenait qu'elles ; une sauvegarde est dans `data\backups\tables`. La partie suivante retrouve le bas tronqué. |
-| 90 | Table livrée avec une vue manuelle | Une table dont le `.ini` contient `[Player] CabinetAutofitMode = 0` (sinon, ajouter cette ligne dans une copie du `.ini`). Fiche > « Diagnostiquer et réparer ». | Constat « Cadrage manuel imposé par la table » ; « Rendre le cadrage automatique à la table » retire la clé (le reste du `.ini` gardé, l'ancien dans `trash\`). « Ajuster la vue » affiche alors « Ajuster la table » et, si le `.ini` a des clés `ViewCab…`, la note « VPX l'ignore tant que le cadrage est automatique ». |
-
-Démonstrations : `.\docs\demo-vue.ps1 -Run` (sans VPX, captures dans `tmp\captures\vue`) ; `.\docs\demo-vue-essai.ps1 -Table <fichier .vpx>` (deux essais avec le vrai VPX sur une copie de la table).
+| 86 | Bas de table tronqué corrigé | Fiche de la table > « Régler l'affichage en partie ». Sur « Point Of View », « Fit Table », hauteur montée aux flippers jusqu'à voir le tablier entier ; Start > « Save as Table Override » ; Exit jusqu'à fermer le menu, puis Exit. Relancer la table par « Jouer ». | Écran de chargement « Réglage de l'affichage » avec les boutons du menu de VPX ; la table démarre menu ouvert sur le cadrage et bouge en direct. Retour sur la fiche : « Affichage enregistré pour cette table (<table>.ini) ». La partie suivante garde ce cadrage, et elle compte dans les statistiques, pas celle du réglage. |
+| 87 | Menu sans relevé des boutons | Borne sans étape « Boutons » (pas de `buttons` dans `cabinet.json`). Démarrer Cyber Pinball, puis lancer une table. En partie, les deux MagnaSave ensemble. | `VPinballX.ini` contient `Mapping.InGameUI = Key;69 \| Key;224 & Key;228`, et aucune autre clé de `[Input]` n'a changé. Le menu de VPX s'ouvre sans que la partie s'arrête. |
+| 88 | Réglages visuels hors partie | Après le scénario 86 : fiche > « Réglages de cette table », onglet Essentiels, puis Avancé > « Surcharges de cette table ». | Les essentiels ne montrent plus le cadrage ni les profils du DMD. Dans les surcharges, `CabinetAutofitPos` porte le badge « En partie » ; Start renvoie vers « Régler l'affichage en partie » et propose « Retirer la valeur de cette table ». |
+| 89 | Revenir au réglage général | Scénario 88, « Retirer la valeur de cette table ». Relancer la table. | La clé a disparu de `<table>.ini` (fichier supprimé s'il ne contenait qu'elle, sauvegarde dans `data\backups\tables`) ; la table reprend le cadrage général. |
+| 90 | Table livrée avec une vue manuelle | Une table dont le `.ini` contient `[Player] CabinetAutofitMode = 0` (sinon, ajouter cette ligne dans une copie du `.ini`). Fiche > « Diagnostiquer et réparer ». | Constat « Cadrage manuel imposé par la table » ; « Rendre le cadrage automatique à la table » retire la clé, l'ancien fichier part à la corbeille. |
 
 # Tests manuels des fenêtres plein écran (barre des tâches)
 
@@ -262,7 +260,7 @@ Le cadre de l'élément choisi est tracé à l'intérieur de l'élément (`outli
 
 | # | Scénario | Comment | Résultat attendu |
 | --- | --- | --- | --- |
-| 100 | Cadres entiers | Réglages de VPX : premier réglage de la liste (« Mode d'affichage »), puis Start et « Retour » dans la boîte ; onglet Avancé, section Version, première ligne ; dernier élément d'une liste qui défile. Même chose dans le menu système, la fiche et « Ajuster la vue ». | Le cadre de l'élément choisi est entier sur ses quatre côtés, coins arrondis compris, en haut comme en bas de la liste. |
+| 100 | Cadres entiers | Réglages de VPX : premier réglage de la liste (« Mode d'affichage »), puis Start et « Retour » dans la boîte ; onglet Avancé, section Version, première ligne ; dernier élément d'une liste qui défile. Même chose dans le menu système et la fiche. | Le cadre de l'élément choisi est entier sur ses quatre côtés, coins arrondis compris, en haut comme en bas de la liste. |
 
 # Tests manuels des zones (plusieurs rôles sur un écran)
 

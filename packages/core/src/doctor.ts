@@ -415,7 +415,7 @@ function manualViewFinding(tableFile: string): Finding | undefined {
     severity: 'warning',
     title: t('Cadrage manuel imposé par la table'),
     detail: t(
-      '{name} règle [Player] CabinetAutofitMode = 0 : VPX ne cadre pas cette table et reprend une vue réglée à la main, peut-être pour un autre écran (table tronquée ou qui déborde). Ensuite, « Ajuster la vue » dans la fiche la règle aux boutons.',
+      '{name} règle [Player] CabinetAutofitMode = 0 : VPX ne cadre pas cette table et reprend une vue réglée à la main, peut-être pour un autre écran (table tronquée ou qui déborde). Ensuite, « Régler l’affichage en partie » dans la fiche la cadre sur la table lancée.',
       { name },
     ),
     fix: {

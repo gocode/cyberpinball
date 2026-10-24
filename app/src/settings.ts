@@ -23,6 +23,7 @@ import {
   findTableIni,
   IniDocument,
   isEditorSection,
+  isLiveVisual,
   isOwned,
   isTableOnly,
   loadOwnedMemory,
@@ -303,6 +304,8 @@ function rows(): Row[] {
     return VPX_ESSENTIALS.flatMap((group) => {
       const settings = group.settings.flatMap((e) => {
         const def = s.defs.get(settingId(e.section, e.key));
+        // Pour une table, les réglages visuels se font en partie (isLiveVisual) : pas ici.
+        if (def && s.target.scope === 'table' && isLiveVisual(def)) return [];
         return def ? [{ kind: 'setting' as const, def, essential: e }] : [];
       });
       return settings.length ? [{ kind: 'group' as const, title: group.title }, ...settings] : [];
@@ -365,10 +368,12 @@ function firstSelectable(list: Row[], from: number, direction: 1 | -1): number {
 // ---------------------------------------------------------------------------
 // Ce qu'on peut faire d'un réglage
 
-type Lock = 'owned' | 'tableOnly' | 'editor' | undefined;
+type Lock = 'owned' | 'tableOnly' | 'editor' | 'live' | undefined;
 
 function lockOf(def: VpxSettingDef): Lock {
   const s = session!;
+  // Pour une table, un réglage visuel se fait en partie, même si Cyber Pinball le gère pour toutes.
+  if (s.target.scope === 'table' && isLiveVisual(def)) return 'live';
   if (isOwned(s.owned, def.section, def.key)) return 'owned';
   if (s.target.scope === 'global' && isTableOnly(def)) return 'tableOnly';
   if (s.target.scope === 'table' && isEditorSection(def.section)) return 'editor';
@@ -437,6 +442,18 @@ function openRow(row: Row): void {
   }
   if (lock === 'editor') {
     s.panel = info(label(row), [t('Réglage de l’éditeur de tables de VPX : une valeur propre à une table n’aurait aucun effet pendant une partie.')], [], id);
+    return;
+  }
+  if (lock === 'live') {
+    s.panel = info(
+      label(row),
+      [
+        t('Réglage visuel : il se juge sur la table lancée. Fiche de la table > « Régler l’affichage en partie » (ou, pendant une partie, les deux MagnaSave ensemble), puis enregistrer pour cette table.'),
+        ...(state.table !== undefined ? [t('Cette table a sa propre valeur ; la retirer lui rend le réglage général.')] : []),
+      ],
+      state.table !== undefined ? [{ label: t('Retirer la valeur de cette table'), run: () => save(def, undefined) }] : [],
+      id,
+    );
     return;
   }
   if (def.type === 'string' || def.color) {
@@ -515,7 +532,7 @@ function save(def: VpxSettingDef, value: SettingValue | undefined): void {
 
 /**
  * Écrit le .ini de la table ; s'il ne contient plus rien, il est supprimé (comme VPX),
- * après sauvegarde. Sert aussi à l'écran « Ajuster la vue » (view-adjust.ts).
+ * après sauvegarde.
  */
 export function writeTableIni(location: TableIniLocation, doc: IniDocument): void {
   const target = location.writePath;
@@ -774,6 +791,7 @@ function badgesOf(def: VpxSettingDef, state: SettingState): Badge[] {
   if (lock === 'owned') badges.push({ text: t('Gérée par Cyber Pinball'), tone: 'owned' });
   if (lock === 'tableOnly') badges.push({ text: t('Par table'), tone: 'locked' });
   if (lock === 'editor') badges.push({ text: t('Éditeur seulement'), tone: 'locked' });
+  if (lock === 'live') badges.push({ text: t('En partie'), tone: 'locked' });
   if (state.table !== undefined) badges.push({ text: t('Surchargé pour cette table'), tone: lock === 'owned' ? 'warning' : 'table' });
   else if (isModified(state) && lock !== 'owned') badges.push({ text: t('Modifié'), tone: 'modified' });
   if (state.invalid) badges.push({ text: t('Valeur illisible, ignorée par VPX'), tone: 'warning' });

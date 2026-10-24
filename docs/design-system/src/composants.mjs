@@ -192,7 +192,7 @@ C.Bouton = {
   <span class="cp-btn primary is-focus">${i('play')}Jouer</span>
   <span class="cp-btn primary">${i('download')}Installer</span>
   <span class="cp-btn">${i('book')}Prospectus</span>
-  <span class="cp-btn">${i('eye')}Ajuster la vue</span>
+  <span class="cp-btn">${i('eye')}Régler l’affichage</span>
   <span class="cp-btn danger">${i('trash')}Supprimer la table</span>
   <span class="cp-btn small">${i('update')}Analyser à nouveau</span>
 </div>`),

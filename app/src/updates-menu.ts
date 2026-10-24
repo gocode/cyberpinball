@@ -67,6 +67,8 @@ export function createUpdatesMenu(host: UpdatesHost) {
    * sinon (npm start, déploiement de développement), on peut chercher mais pas installer.
    */
   function installedRoot(): string | undefined {
+    // Captures et essais, dans un bac à sable seulement : sa racine passe pour une installation.
+    if (process.env.CYBERPINBALL_HOME && process.env.CYBERPINBALL_MAJ_INSTALLEE === '1') return host.loc.root;
     if (path.basename(host.exeDir).toLowerCase() !== 'app' || !fs.existsSync(path.join(host.exeDir, 'installation.ini'))) return undefined;
     return path.dirname(host.exeDir);
   }

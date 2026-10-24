@@ -3,6 +3,8 @@
 #   navigation : musique de chaque jeu, volume relatif d'un jeu, son de la vidéo du plateau
 #                quand le jeu n'a pas de musique, écran « Médias, son et attente » et ses listes ;
 #   silence    : réglages par défaut (musique coupée, vidéos muettes) : rien ne joue ;
+#   reglage    : fiche > « Régler l'affichage en partie » : chargement avec les boutons du menu
+#                de VPX, partie simulée, retour sur la fiche ;
 #   partie     : partie simulée (CYBERPINBALL_PARTIE_SIMULEE, VPX jamais lancé) de trois tables :
 #                vidéo de chargement et son de lancement, écran de chargement de secours au
 #                titre très long, vidéo de chargement en portrait avec son ; pendant la partie,
@@ -25,7 +27,7 @@
 #   .\docs\demo-moments.ps1 [-Scenarios navigation, silence, partie] [-Ecrans pc-dev]
 # VPX n'est jamais lancé ; ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont touchés.
 param(
-  [string[]]$Scenarios = @('navigation', 'silence', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'pivotee', 'attente'),
+  [string[]]$Scenarios = @('navigation', 'silence', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'attente'),
   [string]$Source = 'D:\CyberPinball',
   [string]$Ecrans = 'pc-dev'
 )
@@ -149,7 +151,7 @@ $scenes = @{
     Attendu = @{
       '04-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu' }
       '06-Digit1' = @{ musique = $null; video = 0; lancement = '(AudioLaunch) Neon Galaxy (Williams 1992).wav'; phase = 'loading' }
-      '07-wait_1500' = @{ musique = $null; video = 0; phase = 'loading'; couches = @{ 'playfield/playfield' = 'vidéo en lecture'; 'backglass/backglass' = 'vidéo en lecture'; 'topper/topper' = 'vidéo en lecture' } }
+      '07-wait_1500' = @{ musique = $null; video = 0; phase = 'loading'; commandes = 'Commandes de la partie'; couches = @{ 'playfield/playfield' = 'vidéo en lecture'; 'backglass/backglass' = 'vidéo en lecture'; 'topper/topper' = 'vidéo en lecture' } }
       '08-until_playing' = @{ musique = $null; video = 0; lancement = $null; phase = 'playing'; couches = @{ 'playfield/playfield' = 'image figée'; 'backglass/backglass' = 'image figée'; 'topper/topper' = 'vidéo en lecture'; 'dmd/dmd' = 'image' } }
       '09-until_menu' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu' }
       '12-Digit1' = @{ phase = 'loading' }
@@ -158,6 +160,25 @@ $scenes = @{
       '19-Digit1' = @{ musique = $null; video = 0.8; lancement = $null; phase = 'loading' }
       '20-wait_1500' = @{ phase = 'loading' }
       '21-until_menu' = @{ musique = $null; video = 0; phase = 'menu' }
+    }
+  }
+  # Fiche > « Régler l'affichage en partie » : chargement avec les boutons du menu de VPX
+  # (« Réglage de l'affichage »), partie simulée, puis retour sur la fiche, pas au menu.
+  reglage = @{
+    Reglages = @{ music = $false; game = 'still' }
+    Simulee = 'backglass'
+    Etapes = @(
+      $Down, $Down, $Down, 'wait:1000', # 04 Neon Galaxy
+      $Start,                     # 05 sa fiche
+      'action:affichage en partie', # 06 réglage de l'affichage : chargement
+      'wait:1500',                # 07 toujours le chargement, boutons du menu de VPX
+      'until:playing',            # 08 partie simulée
+      'until:library'             # 09 retour sur la fiche
+    )
+    Attendu = @{
+      '07-wait_1500' = @{ phase = 'loading'; commandes = "Réglage de l’affichage" }
+      '08-until_playing' = @{ phase = 'playing' }
+      '09-until_library' = @{ phase = 'library' }
     }
   }
   pivotee = @{
@@ -281,6 +302,7 @@ foreach ($name in $Scenarios) {
     # Phase du menu attendue (loading, playing, menu) : une étape tombée dans la phase voisine
     # se voit ici, et non par une couche ou un son qui ne correspond pas.
     if ($want.phase) { $ok = $ok -and $menu.phase -eq $want.phase; if ($menu.phase -ne $want.phase) { $state += " (phase attendue : $($want.phase))" } }
+    if ($want.commandes) { $ok = $ok -and $menu.commandes -eq $want.commandes; $state += " · aide-mémoire : $($menu.commandes)" }
     if ($want.etat) {
       $ok = $ok -and [bool]$menu.attente -eq $want.etat.attente -and $menu.phase -eq $want.etat.phase -and $menu.position -eq $want.etat.position
     }

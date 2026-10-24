@@ -445,4 +445,11 @@ export const messages: Record<string, string> = {
     'Start: rotate the screen anyway · Exit: keep the Windows orientation (tables upside down in Cyber Pinball)',
   'Orientation de Windows gardée : {names} n’est pas touché. Dans Cyber Pinball, les tables seront à l’envers pour vous. Start : continuer.':
     'Windows orientation kept: {names} is left untouched. In Cyber Pinball, the tables will be upside down for you. Start: continue.',
+  // packages/core/src/buttons.ts : boutons du menu de VPX
+  'Changer de ligne': 'Change line',
+  'Régler': 'Adjust',
+  'Enregistrer : cette table ou toutes': 'Save: this table or all',
+  'Page précédente, puis fermer': 'Previous page, then close',
+  'Rouvrir le menu': 'Reopen the menu',
+  'Quitter, menu fermé': 'Quit, menu closed',
 };

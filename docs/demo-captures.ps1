@@ -93,7 +93,7 @@ function Invoke-Capture([string]$Langue, [string]$Nom, [string[]]$Touches, [stri
   Assert-HorsEcran $env:CYBERPINBALL_CAPTURE
   $report = "$env:CYBERPINBALL_CAPTURE\mise-en-page.txt"
   if (-not (Test-Path $report)) { $script:failures += "$Langue/$Nom : relevé de mise en page absent" }
-  elseif ((Get-Content $report -Raw) -notmatch '^Aucun problème') { $script:failures += "$Langue/$Nom : mise en page, voir $report" }
+  elseif ((Get-Content $report -Raw -Encoding UTF8) -notmatch '^Aucun problème') { $script:failures += "$Langue/$Nom : mise en page, voir $report" }
 }
 
 try {
@@ -110,6 +110,8 @@ try {
     $env:CYBERPINBALL_ROOT = $root
     $env:CYBERPINBALL_MAJ_URL = "http://127.0.0.1:$Port/cyberpinball-maj.json"
     $env:CYBERPINBALL_MAJ_CLE = "$site\cle.pem"
+    # Lancé depuis les sources, mais montré comme sur une borne installée : « Update now ».
+    $env:CYBERPINBALL_MAJ_INSTALLEE = '1'
 
     if ($Etapes -contains 'menu') {
       # VPX n'est pas installé : Exit (plus tard) ; quatre tables plus loin, « Neon Abyss ».
@@ -139,7 +141,7 @@ try {
   }
 } finally {
   Stop-Process -Id $serveur.Id -Force -ErrorAction SilentlyContinue
-  Remove-Item Env:CYBERPINBALL_LANGUE, Env:CYBERPINBALL_AUTOPILOT, Env:CYBERPINBALL_CAPTURE, Env:CYBERPINBALL_HOME, Env:CYBERPINBALL_ROOT, Env:CYBERPINBALL_MAJ_URL, Env:CYBERPINBALL_MAJ_CLE -ErrorAction SilentlyContinue
+  Remove-Item Env:CYBERPINBALL_LANGUE, Env:CYBERPINBALL_AUTOPILOT, Env:CYBERPINBALL_CAPTURE, Env:CYBERPINBALL_HOME, Env:CYBERPINBALL_ROOT, Env:CYBERPINBALL_MAJ_URL, Env:CYBERPINBALL_MAJ_CLE, Env:CYBERPINBALL_MAJ_INSTALLEE -ErrorAction SilentlyContinue
 }
 
 if ($failures.Count) { throw "Captures en échec :`n  $($failures -join "`n  ")" }

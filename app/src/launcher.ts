@@ -47,8 +47,11 @@ export interface LaunchOptions {
   exe: string;
   ini: string;
   table: string;
-  /** .ini de table à lire à la place de <table>.ini (-TableIni, VPX 10.8.1 : AppCommands.cpp). Il doit exister. */
-  tableIni?: string;
+  /**
+   * Réglage de l'affichage : -PovEdit au lieu de -Play (VPX 10.8.1, AppCommands.cpp) : la
+   * même partie, son menu ouvert d'emblée sur « Point Of View » (cadrage de la table).
+   */
+  display?: boolean;
   /** Dossier des réglages de cette version de VPX, pour lire son journal (…\VPinballX\10.8). */
   vpxPrefDir: string;
   timeoutMs?: number;
@@ -68,7 +71,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   const t0 = Date.now();
   // VPX doit pouvoir prendre le premier plan même si Windows hésite.
   allowAnyForeground();
-  const args = ['-Ini', opts.ini, ...(opts.tableIni ? ['-TableIni', opts.tableIni] : []), '-Play', opts.table];
+  const args = ['-Ini', opts.ini, opts.display ? '-PovEdit' : '-Play', opts.table];
   const child = spawn(opts.exe, args, {
     cwd: path.dirname(opts.exe),
     windowsHide: false,

@@ -26,8 +26,6 @@ function renderLibrary(v) {
     'div',
     v.pages
       ? 'lib-body lib-pages'
-      : v.adjust
-      ? `lib-body adjust-body${v.adjust.menu ? '' : ' no-actions'}`
       : v.media
         ? `lib-body lib-media${v.media.large ? ' large' : ''}`
         : v.sections.length
@@ -35,7 +33,6 @@ function renderLibrary(v) {
           : 'lib-body only-actions',
   );
   if (v.pages) body.append(renderPages(v.pages));
-  else if (v.adjust) body.append(renderAdjust(v.adjust));
   else if (v.media || v.sections.length) {
     const content = libEl('div', 'lib-content');
     // Médias : le message du moment, puis les cartes, puis les sections titrées.
@@ -82,8 +79,7 @@ function renderLibrary(v) {
     if (a.detail) li.append(libEl('span', 'detail', a.detail));
     actions.append(li);
   });
-  // Ajuster la vue : les actions n’apparaissent qu’avec le menu d’Exit.
-  if (!v.adjust || v.adjust.menu) body.append(actions);
+  body.append(actions);
   o.append(body, libEl('footer', 'lib-hint', v.hint));
 
   if (v.editor) o.append(renderEditor(v.editor));
@@ -259,44 +255,6 @@ function renderMediaCards(m, cursor) {
   return list;
 }
 
-// « Ajuster la vue » : un réglage par carte, la carte choisie montre sa jauge et son aide.
-function renderAdjust(a) {
-  const box = libEl('div', `lib-content adjust${a.menu ? ' dimmed' : ''}`);
-  if (a.notice) box.append(libEl('p', `adjust-notice tone-${a.notice.tone}`, a.notice.text));
-  for (const note of a.notes) box.append(libEl('p', `adjust-notice tone-${note.tone}`, note.text));
-  const list = libEl('ol', 'adjust-items');
-  a.items.forEach((item, i) => {
-    const li = actOn(libEl('li', `adjust-item${item.active ? ' active' : ''}${item.inactive ? ' inactive' : ''}`), { type: 'adjust', index: i });
-    const top = libEl('div', 'adjust-top');
-    top.append(libEl('span', 'adjust-label', item.label), libEl('span', `badge state-${item.stateId}`, item.state));
-    li.append(top);
-    const line = libEl('div', 'adjust-line');
-    if (item.active) line.append(actOn(libEl('button', 'adjust-step', '−'), { type: 'key', code: a.keys.previous }));
-    line.append(libEl('span', 'adjust-value', item.value));
-    if (item.active) line.append(actOn(libEl('button', 'adjust-step', '+'), { type: 'key', code: a.keys.next }));
-    li.append(line);
-    if (item.options) {
-      const options = libEl('div', 'adjust-options');
-      item.options.forEach((label, k) => options.append(libEl('span', `adjust-option${k === item.at ? ' current' : ''}`, label)));
-      li.append(options);
-    } else {
-      const gauge = libEl('div', 'adjust-gauge');
-      const knob = libEl('span', 'knob');
-      knob.style.left = `${(item.at / Math.max(1, item.steps - 1)) * 100}%`;
-      gauge.append(knob);
-      const ends = libEl('div', 'adjust-ends');
-      ends.append(libEl('span', '', item.min), libEl('span', '', item.max));
-      li.append(gauge, ends);
-    }
-    li.append(libEl('div', 'adjust-general', t('Réglage général : {value}', { value: item.general })));
-    if (item.inactive) li.append(libEl('p', 'adjust-help warn', item.inactive));
-    if (item.active) li.append(libEl('p', 'adjust-help', item.help));
-    list.append(li);
-  });
-  box.append(list, libEl('div', 'adjust-file', a.file));
-  return box;
-}
-
 function renderEditor(e) {
   const box = libEl('div', `lib-editor editor-${e.kind}`);
   const panel = libEl('div', 'panel');
@@ -347,7 +305,7 @@ document.addEventListener('drop', (event) => {
 
 /** Garde visible l'élément choisi quand la liste dépasse de l'écran. */
 function revealSelection() {
-  for (const node of document.querySelectorAll('.lib-row.selected, .lib-action.current, .key.current, .adjust-item.active, .media-card.selected')) {
+  for (const node of document.querySelectorAll('.lib-row.selected, .lib-action.current, .key.current, .media-card.selected')) {
     node.scrollIntoView({ block: 'nearest' });
   }
 }

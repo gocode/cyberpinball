@@ -249,7 +249,8 @@ window.paint = (kind, spec) => {
  * appliqués avant de placer l'image dans son cadre ; `crop` : [x, y, w, h] de l'image source.
  */
 async function board(file) {
-  const spec = JSON.parse(fs.readFileSync(file, 'utf8'));
+  // Écrit par PowerShell : avec un BOM sous Windows PowerShell 5.1, sans sous PowerShell 7.
+  const spec = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
   const win = new BrowserWindow({ show: false, focusable: false, skipTaskbar: true, width: 400, height: 300, webPreferences: { offscreen: true, backgroundThrottling: false } });
   await win.loadURL('data:text/html,<meta charset=utf-8><title>planche</title>');
   const layers = spec.layers.map((l) => ({ ...l, data: `data:image/png;base64,${fs.readFileSync(l.src).toString('base64')}` }));

@@ -58,7 +58,7 @@ function Invoke-Review([string]$name, [string]$home_, [string[]]$codes, [string[
   npx electron app @arguments 2>&1 | Where-Object { "$_" -match '^Mise en page' } | ForEach-Object { "   $_" }
   $report = "$captures\$name\mise-en-page.txt"
   if (-not (Test-Path $report)) { $script:failures += "$name : relevé absent" }
-  elseif ((Get-Content $report -Raw) -notmatch '^Aucun problème') { $script:failures += "$name : voir $report" }
+  elseif ((Get-Content $report -Raw -Encoding UTF8) -notmatch '^Aucun problème') { $script:failures += "$name : voir $report" }
   Assert-HorsEcran "$captures\$name"
 }
 

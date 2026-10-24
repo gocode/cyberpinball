@@ -33,7 +33,6 @@ export const messages: Record<string, string> = {
   'Le titre, le fabricant et l’année sont devinés d’après le nom des fichiers. Le fichier .info les fixe et les partage avec les autres frontends.': 'Title, manufacturer and year are guessed from the file names. The .info file sets them and shares them with other frontends.',
   'Créer « {name} »': 'Create “{name}”',
   'Cadrage manuel imposé par la table': 'Manual view forced by the table',
-  '{name} règle [Player] CabinetAutofitMode = 0 : VPX ne cadre pas cette table et reprend une vue réglée à la main, peut-être pour un autre écran (table tronquée ou qui déborde). Ensuite, « Ajuster la vue » dans la fiche la règle aux boutons.': '{name} sets [Player] CabinetAutofitMode = 0: VPX doesn’t fit this table and uses a hand-tuned view, maybe made for another screen (table cut off or overflowing). Then “Adjust view” on the game page tunes it with the buttons.',
   'Rendre le cadrage automatique à la table': 'Give the table back automatic fitting',
   'PuP-Pack rangé un dossier trop bas': 'PuP-Pack one folder too deep',
   'Le plugin PUP lit screens.pup à la racine de pupvideos\\{pack} ; le pack est dans « {where} ».': 'The PUP plugin reads screens.pup at the root of pupvideos\\{pack}; the pack is in “{where}”.',
@@ -363,4 +362,6 @@ export const messages: Record<string, string> = {
   '{file} place {windows} pour cette table seulement, par-dessus la disposition de la borne (menu de VPX, « Display Settings », enregistré pour la table). Après un changement d’écran, revenez à la disposition générale.':
     '{file} places {windows} for this table only, over the cabinet layout (VPX menu, “Display Settings”, saved for the table). After a screen change, go back to the general layout.',
   'Revenir à la disposition générale': 'Back to the general layout',
+  // packages/core/src/doctor.ts : cadrage manuel
+  '{name} règle [Player] CabinetAutofitMode = 0 : VPX ne cadre pas cette table et reprend une vue réglée à la main, peut-être pour un autre écran (table tronquée ou qui déborde). Ensuite, « Régler l’affichage en partie » dans la fiche la cadre sur la table lancée.': '{name} sets [Player] CabinetAutofitMode = 0: VPX does not frame this table and uses a hand-set view, perhaps made for another screen (table cut off or overflowing). Then “Adjust display in game” on the table page frames it on the running table.',
 };

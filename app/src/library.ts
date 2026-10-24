@@ -10,6 +10,8 @@ import * as path from 'node:path';
 import { dialog, type BrowserWindow, type Input } from 'electron';
 import {
   CONFIG_KEY,
+  findTableIni,
+  readTextIfExists,
   applyImport,
   applyOps,
   applyRomImport,
@@ -43,14 +45,8 @@ import {
   romSpace,
   romsToTidy,
   sameFile,
-  sameValue,
-  savedValue,
   sheetPages,
   SHEET_PAGE_TYPES,
-  stepViewValue,
-  isViewAdjustChanged,
-  viewAdjustInactive,
-  viewChoices,
   samePath,
   scanRomLibrary,
   sizeOf,
@@ -98,7 +94,6 @@ import { createMediaSearch } from './media-search';
 import { createMediaImport } from './media-import';
 import { createMedias, type MediaView } from './library-medias';
 import { isShown, refuseOffscreen } from './offscreen';
-import { iniTarget, openViewAdjust, refreshNotes, saveViewAdjust, writeTrialIni, type ViewAdjust } from './view-adjust';
 
 const MANUFACTURERS = [
   'Williams', 'Bally', 'Gottlieb', 'Stern', 'Data East', 'Sega', 'Midway', 'Capcom', 'Atari', 'Zaccaria',
@@ -146,10 +141,11 @@ export interface LibraryHost {
   /** Réglages de VPX propres à cette table (écran des réglages, settings.ts). */
   tableSettings?(table: TableEntry): void;
   /**
-   * Partie d'essai sur un autre .ini de table (« Ajuster la vue »), sans statistiques ;
-   * undefined si elle n'a pas démarré pour une raison que le menu affiche (écrans à revoir).
+   * Partie de réglage de l'affichage (« Régler l'affichage en partie ») : VPX démarre la table
+   * menu ouvert sur le cadrage, sans statistiques ; undefined si elle n'a pas démarré pour une
+   * raison que le menu affiche (écrans à revoir).
    */
-  tryTable?(table: TableEntry, tableIni: string): Promise<{ ok: boolean; message?: string } | undefined>;
+  adjustDisplay?(table: TableEntry): Promise<{ ok: boolean; message?: string } | undefined>;
   /** Journal de VPX (vpinball.log), lu par le médecin pour les PuP-Packs. */
   vpxLogFile?(): string | undefined;
   quit(): void;
@@ -171,8 +167,6 @@ export interface SystemItem {
 export type UiAction =
   | { type: 'activate'; index: number }
   | { type: 'editor'; index: number }
-  /** Choix d'un réglage de l'écran « Ajuster la vue ». */
-  | { type: 'adjust'; index: number }
   | { type: 'drop'; paths: string[] }
   | { type: 'key'; code: string }
   /** Roue dentée du menu : menu et configuration, quels que soient les boutons. */
@@ -228,8 +222,6 @@ type Screen =
   | { kind: 'edit'; file: string; fields: { Title: string; Manufacturer: string; Year?: number }; editor?: Editor }
   | { kind: 'doctor'; file: string; findings?: Finding[]; script?: ScriptResult; log: string[]; queue: string[]; afterImport: boolean }
   | { kind: 'remove'; file: string }
-  /** « Ajuster la vue » : les flippers changent la valeur ; Exit ouvre le menu (`menu`) pour enregistrer, essayer ou annuler. */
-  | { kind: 'view'; file: string; adjust: ViewAdjust; menu: boolean; notice?: { text: string; tone: Tone } }
   | { kind: 'addSource' }
   | {
       kind: 'addPlan';
@@ -266,7 +258,6 @@ type Screen =
 type EditorScreen = Extract<Screen, { kind: 'edit' | 'prompt' }>;
 
 type AddPlan = Extract<Screen, { kind: 'addPlan' }>;
-type ViewScreen = Extract<Screen, { kind: 'view' }>;
 type PagesScreen = Extract<Screen, { kind: 'pages' }>;
 
 export function createLibrary(host: LibraryHost) {
@@ -608,8 +599,6 @@ export function createLibrary(host: LibraryHost) {
         return buildDoctor(screen as Extract<Screen, { kind: 'doctor' }>);
       case 'remove':
         return buildRemove(screen as Extract<Screen, { kind: 'remove' }>);
-      case 'view':
-        return buildView(screen as ViewScreen);
       case 'addSource':
         return buildAddSource();
       case 'addPlan':
@@ -711,9 +700,11 @@ export function createLibrary(host: LibraryHost) {
         ...SHEET_PAGE_TYPES.map((type) => pagesAction(table, type)),
         { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), run: () => openEdit(table) },
         { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), run: () => medias.open(table) },
-        { label: t('Ajuster la vue'), detail: t('Monter, descendre ou cadrer la table à l’écran'), run: () => openView(table) },
+        ...(host.adjustDisplay && host.vpxExe()
+          ? [{ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), run: () => adjustDisplay(table) }]
+          : []),
         ...(host.tableSettings
-          ? [{ label: t('Réglages de cette table'), detail: t('Vue, son… pour cette table seulement'), run: () => host.tableSettings!(table) }]
+          ? [{ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), run: () => host.tableSettings!(table) }]
           : []),
         { label: t('Diagnostiquer et réparer'), run: () => openDoctor(table.file) },
         { label: t('Supprimer la table'), detail: t('Mise à la corbeille'), tone: 'error', run: () => go({ kind: 'remove', file: table.file }) },
@@ -808,148 +799,21 @@ export function createLibrary(host: LibraryHost) {
     };
   }
 
-  // ---------- Ajuster la vue ----------
+  // ---------- Régler l'affichage en partie ----------
 
-  function openView(table: TableEntry): void {
-    const adjust = openViewAdjust(table);
-    if ('problem' in adjust) return go({ kind: 'notice', heading: t('Ajuster la vue'), lines: [adjust.problem], then: () => openSheet(table) });
-    go({ kind: 'view', file: table.file, adjust, menu: false });
-  }
-
-  function buildView(s: ViewScreen): Built {
-    const table = find(s.file);
-    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), run: leave }], back: leave };
-    const changed = isViewAdjustChanged(s.adjust.items);
-    const resume = () => {
-      s.menu = false;
-    };
-    const actions: Action[] = s.menu
-      ? [
-          {
-            label: t('Enregistrer pour cette table'),
-            detail: changed ? path.basename(s.adjust.location.writePath) : t('Rien n’a changé'),
-            tone: 'ok',
-            run: () => saveView(s, table),
-          },
-          ...(host.tryTable && host.vpxExe()
-            ? [{ label: t('Essayer sur la table'), detail: t('Une partie avec ces valeurs, puis retour ici ; rien n’est enregistré'), run: () => tryView(s, table) }]
-            : []),
-          { label: t('Revenir au réglage général'), detail: t('Retire la vue propre à cette table'), run: () => resetView(s, table) },
-          { label: t('Continuer le réglage'), run: resume },
-          changed ? { label: t('Quitter sans enregistrer'), tone: 'error', run: () => openSheet(table) } : { label: t('Retour à la fiche'), run: () => openSheet(table) },
-        ]
-      : [];
-    return {
-      heading: t('Ajuster la vue'),
-      subheading: table.title,
-      lead: t('Pour cette table seulement ; les autres gardent le réglage général.'),
-      sections: [],
-      actions,
-      back: s.menu
-        ? resume
-        : () => {
-            s.menu = true;
-            s.notice = undefined;
-            cursor = 0;
-          },
-    };
-  }
-
-  function viewKey(s: ViewScreen, input: Input): boolean {
-    const KEYS = host.keys();
-    const is = (group: string[]) => group.includes(input.code);
-    const adjust = s.adjust;
-    // Flipper droit (ou flèche haut) : la valeur augmente, la table monte.
-    const delta = is(KEYS.next) ? (input.code === 'ArrowDown' ? -1 : 1) : is(KEYS.previous) ? (input.code === 'ArrowUp' ? 1 : -1) : 0;
-    if (delta) {
-      const item = adjust.items[adjust.index]!;
-      item.value = stepViewValue(item, delta);
-      refreshNotes(adjust);
-      s.notice = undefined;
-    } else if (is(KEYS.confirm)) {
-      adjust.index = (adjust.index + 1) % adjust.items.length;
-      s.notice = undefined;
-    } else if (is(KEYS.exit)) build().back();
-    else return false;
-    host.broadcast();
-    return true;
-  }
-
-  function saveView(s: ViewScreen, table: TableEntry): void {
-    try {
-      const changed = saveViewAdjust(s.adjust);
-      openSheet(table, changed ? t('Vue enregistrée pour cette table.') : t('Vue inchangée.'));
-    } catch (error) {
-      s.menu = false;
-      s.notice = { tone: 'error', text: t('Enregistrement impossible : {message}', { message: (error as Error).message }) };
-    }
-  }
-
-  function resetView(s: ViewScreen, table: TableEntry): void {
-    for (const item of s.adjust.items) item.value = item.general;
-    s.menu = false;
-    try {
-      const changed = saveViewAdjust(s.adjust);
-      const reread = openViewAdjust(table, s.adjust.index);
-      if (!('problem' in reread)) s.adjust = reread;
-      s.notice = changed
-        ? { tone: 'ok', text: t('Réglage général rétabli : cette table n’a plus de vue propre.') }
-        : { tone: 'ok', text: t('Cette table suivait déjà le réglage général.') };
-    } catch (error) {
-      s.notice = { tone: 'error', text: t('Enregistrement impossible : {message}', { message: (error as Error).message }) };
-    }
-  }
-
-  /** Partie sur un .ini d'essai, puis retour sur l'écran avec les mêmes valeurs. */
-  async function tryView(s: ViewScreen, table: TableEntry): Promise<void> {
-    s.menu = false;
-    let trial: string;
-    try {
-      trial = writeTrialIni(s.adjust);
-    } catch (error) {
-      s.notice = { tone: 'error', text: t('Essai impossible : {message}', { message: (error as Error).message }) };
-      return;
-    }
-    const result = await host.tryTable!(table, trial);
-    fs.rmSync(trial, { force: true });
+  /**
+   * La table lancée en mode réglage (VPX -PovEdit : son menu ouvert sur le cadrage), puis
+   * retour à la fiche. Ce que VPX a enregistré pour la table seule se lit dans son .ini ;
+   * ce qu'il a enregistré pour toutes les tables, le démarrage suivant le signale.
+   */
+  async function adjustDisplay(table: TableEntry): Promise<void> {
+    const ini = findTableIni(table.file).path;
+    const before = readTextIfExists(ini);
+    const result = await host.adjustDisplay!(table);
     if (!result) return;
-    s.notice = result.ok
-      ? { tone: 'info', text: t('Essai terminé. Enregistrer (Exit) pour garder ces valeurs, ou continuer à les changer.') }
-      : { tone: 'error', text: t('L’essai n’a pas pu se dérouler : {message}', { message: result.message ?? t('erreur inconnue') }) };
-    go(s);
-  }
-
-  function adjustView(s: ViewScreen) {
-    const adjust = s.adjust;
-    const KEYS = host.keys();
-    return {
-      menu: s.menu,
-      notice: s.notice,
-      notes: adjust.notes,
-      file: iniTarget(adjust),
-      keys: { previous: KEYS.previous[0], next: KEYS.next[0] },
-      items: adjust.items.map((item, index) => {
-        const choices = viewChoices(item);
-        const own = item.table !== undefined && !sameValue(item.def, item.table, item.general);
-        const stateId = !sameValue(item.def, item.value, savedValue(item)) ? 'changed' : own ? 'own' : 'general';
-        return {
-          label: item.spec.label,
-          help: item.spec.help,
-          value: item.spec.format(item.value),
-          general: item.spec.format(item.general),
-          stateId,
-          state: { changed: t('modifié, pas enregistré'), own: t('propre à cette table'), general: t('réglage général') }[stateId],
-          active: index === adjust.index,
-          inactive: viewAdjustInactive(item, adjust.items),
-          at: Math.max(0, choices.findIndex((v) => sameValue(item.def, v, item.value))),
-          steps: choices.length,
-          // Peu de choix : on les montre tous ; sinon une jauge entre les bornes.
-          options: choices.length <= 3 ? choices.map((v) => item.spec.format(v)) : undefined,
-          min: item.spec.format(choices[0]!),
-          max: item.spec.format(choices.at(-1)!),
-        };
-      }),
-    };
+    if (!result.ok) return openSheet(table, t('Le réglage de l’affichage n’a pas pu se dérouler : {message}', { message: result.message ?? t('erreur inconnue') }));
+    const after = readTextIfExists(ini);
+    openSheet(table, after !== before ? t('Affichage enregistré pour cette table ({file}).', { file: path.basename(ini) }) : t('Rien n’a été enregistré pour cette table seule.'));
   }
 
   function openEdit(table: TableEntry): void {
@@ -1884,7 +1748,6 @@ export function createLibrary(host: LibraryHost) {
       host.broadcast();
       return true;
     }
-    if (screen.kind === 'view' && !screen.menu) return viewKey(screen, input);
     if (screen.kind === 'pages') return pagesKey(screen, input);
     const built = build();
     const n = built.actions.length;
@@ -1996,11 +1859,6 @@ export function createLibrary(host: LibraryHost) {
     if (action.type === 'editor' && (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
       pressKey(screen, action.index);
       host.broadcast();
-    } else if (action.type === 'adjust' && screen.kind === 'view') {
-      if (!screen.adjust.items[action.index]) return;
-      screen.adjust.index = action.index;
-      screen.menu = false;
-      host.broadcast();
     } else if (action.type === 'activate') {
       const built = build();
       if (!built.actions[action.index]) return;
@@ -2028,11 +1886,8 @@ export function createLibrary(host: LibraryHost) {
       cursor,
       busy,
       editor: editorView,
-      adjust: screen.kind === 'view' ? adjustView(screen) : undefined,
       pages: screen.kind === 'pages' ? pagesView(screen) : undefined,
-      hint: screen.kind === 'view' && !screen.menu
-        ? t('Flippers : changer la valeur · Start : réglage suivant · Exit : enregistrer, essayer ou annuler')
-        : screen.kind === 'pages'
+      hint: screen.kind === 'pages'
         ? built.actions.length > 1
           ? t('Flippers : page précédente ou suivante · Start : page suivante · Exit : retour à la fiche')
           : t('Start ou Exit : retour à la fiche')

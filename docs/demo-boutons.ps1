@@ -68,7 +68,7 @@ function Invoke-Autopilot([string]$home_, [string[]]$codes, [string]$dir, [strin
   Assert-HorsEcran $env:CYBERPINBALL_CAPTURE
   # Garde-fou de mise en page (layout-check.ts) : chevauchements, débordements, textes coupés.
   $report = "$env:CYBERPINBALL_CAPTURE\mise-en-page.txt"
-  if (-not (Test-Path $report) -or (Get-Content $report -Raw) -notmatch '^Aucun problème') { $script:layoutFailures += "$dir : voir $report" }
+  if (-not (Test-Path $report) -or (Get-Content $report -Raw -Encoding UTF8) -notmatch '^Aucun problème') { $script:layoutFailures += "$dir : voir $report" }
 }
 $layoutFailures = @()
 

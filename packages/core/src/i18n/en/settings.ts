@@ -106,9 +106,6 @@ export const messages: Record<string, string> = {
   'retour aux sections': 'back to sections',
   fermer: 'close',
 
-  // app/src/view-adjust.ts
-  'VPX {version} ne connaît aucun des réglages de cadrage automatique.': 'VPX {version} has none of the autofit settings.',
-  '{file} (bac à sable ; VPX lit {name} à côté de la table)': '{file} (sandbox; VPX reads {name} next to the table)',
 
   // app/renderer/settings.js
   'Aucun réglage.': 'No settings.',
@@ -262,24 +259,9 @@ export const messages: Record<string, string> = {
   'Jour / nuit': 'Day/night',
   'Lumière ambiante, de la nuit (0 %) au plein jour (100 %), si le niveau de lumière est imposé.': 'Ambient light, from night (0%) to full daylight (100%), when the light level is overridden.',
 
-  // packages/core/src/viewadjust.ts
-  'Manuel (vue enregistrée)': 'Manual (saved view)',
-  'Hauteur de la table': 'Table height',
-  'Position des flippers du bas sur l’écran. Plus haut, le bas de la table (tablier, flippers) remonte dans l’écran, au prix du haut. VPX s’arrête de lui-même quand un bord de la table atteint le bord de l’écran.':
-    'Position of the lower flippers on screen. Higher moves the bottom of the table (apron, flippers) up the screen, at the expense of the top. VPX stops by itself when a table edge reaches the screen edge.',
-  '{value} %': '{value}%',
-  Cadrage: 'Fit mode',
-  '« Ajuster la table » garde ses proportions : toute la largeur, le haut ou le bas peut dépasser. « Remplir l’écran » montre toute la longueur, en étirant ou en tassant la table.':
-    '“Fit table” keeps its proportions: full width, the top or bottom may be cut off. “Fit screen” shows the full length, stretching or squashing the table.',
-  'Hauteur des yeux': 'Eye height',
-  'Hauteur des yeux du joueur au-dessus du bas de l’écran. Plus bas, le plateau paraît plus petit et plus profond ; plus haut, plus grand et plus plat. La vitre reste ajustée à l’écran.':
-    'Height of the player’s eyes above the bottom of the screen. Lower makes the playfield look smaller and deeper; higher, bigger and flatter. The glass stays matched to the screen.',
-  'Sans effet en « Remplir l’écran » : toute la longueur est déjà à l’écran.': 'No effect in “Fit screen”: the full length is already on screen.',
-  'Sans effet en cadrage manuel.': 'No effect with manual fit.',
-  'Les tables ne sont pas affichées en vue borne (BGSet ≠ 1) : ces réglages ne servent qu’en vue borne. Relancez l’assistant d’écrans si le playfield est bien plus haut que large.':
-    'Tables aren’t shown in cabinet view (BGSet ≠ 1): these settings only work in cabinet view. Run the screen wizard again if the playfield is taller than wide.',
-  'Le .ini de la table contient aussi une vue réglée à la main ({n} clé ViewCab…) : VPX l’ignore tant que le cadrage est automatique.':
-    'The table’s .ini also holds a hand-tuned view ({n} ViewCab… key): VPX ignores it while autofit is on.',
-  'Le .ini de la table contient aussi une vue réglée à la main ({n} clés ViewCab…) : VPX l’ignore tant que le cadrage est automatique.':
-    'The table’s .ini also holds a hand-tuned view ({n} ViewCab… keys): VPX ignores it while autofit is on.',
+  // app/src/settings.ts : réglages visuels, en partie
+  'Réglage visuel : il se juge sur la table lancée. Fiche de la table > « Régler l’affichage en partie » (ou, pendant une partie, les deux MagnaSave ensemble), puis enregistrer pour cette table.': 'Visual setting: it is judged on the running table. Table page > “Adjust display in game” (or, during a game, both MagnaSave buttons together), then save it for this table.',
+  'Cette table a sa propre valeur ; la retirer lui rend le réglage général.': 'This table has its own value; removing it gives the table the general setting back.',
+  'Retirer la valeur de cette table': 'Remove this table’s value',
+  'En partie': 'In game',
 };

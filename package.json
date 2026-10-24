@@ -2,7 +2,21 @@
   "name": "cyberpinball",
   "version": "0.1.0",
   "private": true,
-  "description": "Cyber Pinball : frontend open source de borne de flipper virtuel qui configure toute la borne à partir d'un seul modèle.",
+  "description": "Open-source frontend for virtual pinball cabinets on Windows. Describe your cabinet once (screens, buttons, sound) and Cyber Pinball configures and maintains Visual Pinball X for you: screens recognised by EDID, a wizard driven by the cabinet buttons, table and media management, signed in-app updates.",
+  "keywords": [
+    "virtual-pinball",
+    "visual-pinball",
+    "visual-pinball-x",
+    "vpx",
+    "pinball",
+    "pinball-cabinet",
+    "pincab",
+    "pinball-frontend",
+    "frontend",
+    "electron",
+    "typescript",
+    "windows"
+  ],
   "repository": {
     "type": "git",
     "url": "https://github.com/gocode/cyberpinball.git"
@@ -26,7 +40,8 @@
     "installeur": "node scripts/fabriquer.mjs --installeur",
     "deployer": "node scripts/fabriquer.mjs --deployer",
     "publier": "node scripts/publier.mjs",
-    "envoyer": "node scripts/envoyer-github.mjs"
+    "envoyer": "node scripts/envoyer-github.mjs",
+    "decrire": "node scripts/decrire-github.mjs"
   },
   "devDependencies": {
     "@types/node": "22.20.5",

@@ -50,7 +50,7 @@ function Invoke-Wizard([string]$name, [string]$home_, [string[]]$codes, [string[
   Assert-HorsEcran $env:CYBERPINBALL_CAPTURE
   $report = "$env:CYBERPINBALL_CAPTURE\mise-en-page.txt"
   if (-not (Test-Path $report)) { $script:failures += "$name : relevé de mise en page absent" }
-  elseif ((Get-Content $report -Raw) -notmatch '^Aucun problème') { $script:failures += "$name : mise en page, voir $report" }
+  elseif ((Get-Content $report -Raw -Encoding UTF8) -notmatch '^Aucun problème') { $script:failures += "$name : mise en page, voir $report" }
   $log
 }
 

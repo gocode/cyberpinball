@@ -1,5 +1,5 @@
 import { vpxAudioSettings } from './audio';
-import { buttonInfo, buttonProblems, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, type SilencedAction } from './buttons';
+import { buttonInfo, buttonProblems, DEFAULT_BUTTONS, inGameMenuSetting, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, type SilencedAction } from './buttons';
 import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxFolderDefaults, type DetectedDmd, type GlobalDmdFolders } from './dmd';
 import { t } from './i18n';
 import { IniDocument } from './ini';
@@ -274,7 +274,8 @@ export function planVpxSync(
     if (written !== undefined && memory[id] === undefined) memory[id] = written;
   }
 
-  // Boutons : touches de l'étape « Boutons » seulement ; sans elle, [Input] reste tel quel.
+  // Boutons : touches de l'étape « Boutons » ; sans elle, [Input] reste tel quel, sauf la
+  // combinaison qui ouvre le menu de VPX en partie (touches par défaut des encodeurs).
   let silenced: SilencedAction[] = [];
   const buttonIssues = cabinet.buttons ? buttonProblems(cabinet.buttons) : [];
   if (buttonIssues.length) {
@@ -287,7 +288,9 @@ export function planVpxSync(
       ),
     });
     for (const [id, written] of Object.entries(options.memory ?? {})) if (isInputKey(id)) memory[id] = written;
-  } else if (cabinet.buttons) {
+  } else if (!cabinet.buttons) {
+    applyOwned([inGameMenuSetting(DEFAULT_BUTTONS, doc, options.memory)]);
+  } else {
     const plan = vpxInputSettings(cabinet.buttons, doc, options.memory);
     silenced = plan.silenced;
     applyOwned(plan.settings);

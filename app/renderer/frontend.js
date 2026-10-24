@@ -416,7 +416,8 @@ function dropLoadingFallback() {
  * et les commandes sur fond noir.
  */
 function loadingScreen(s) {
-  const keys = keysGrid(t('Commandes de la partie'), s.gameKeys);
+  // Partie normale : ses commandes ; réglage de l'affichage : les boutons du menu de VPX.
+  const keys = keysGrid(s.loadingKeys.title, s.loadingKeys.rows);
   if (s.loading?.url) {
     dropLoadingFallback();
     const o = el('section', 'overlay over-video');
@@ -427,7 +428,7 @@ function loadingScreen(s) {
   }
   const kit = window.CyberFallback;
   if (typeof kit?.loading === 'function') {
-    const key = JSON.stringify([s.table.title, s.table.manufacturer, s.table.year, s.gameKeys]);
+    const key = JSON.stringify([s.table.title, s.table.manufacturer, s.table.year, s.loadingKeys]);
     if (loadingFallback?.key !== key) {
       dropLoadingFallback();
       const box = el('section', 'overlay loading-fallback');
@@ -649,6 +650,8 @@ window.cyberEtat = () => ({
   phase: lastState?.phase,
   position: lastState?.position,
   attente: lastState?.attract?.title,
+  // Titre de l'aide-mémoire du chargement : commandes de la partie, ou réglage de l'affichage.
+  commandes: lastState?.phase === 'loading' ? lastState.loadingKeys?.title : undefined,
   // Gestion des tables (fiche, prospectus et règles, médias du jeu) : l'écran et la page montrés.
   fiche: lastState?.library && {
     ecran: lastState.library.screen,
