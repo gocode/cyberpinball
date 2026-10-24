@@ -532,6 +532,18 @@ Avec ses propres comptes VPForums et VPUniverse (gratuits). La démonstration ho
 | 244 | Deux sites à la fois | Start sur un pack de VPForums pendant l'attente de VPUniverse. | Le pack se télécharge sans attendre VPUniverse ; une fois reçu, ses fichiers sont proposés sur les écrans du logo, du topper, du son de lancement… Le dernier choix fait pour le topper reste dans le brouillon. |
 | 245 | Arrêter, plafond | Mettre trois fichiers de VPUniverse en file, puis « Arrêter la file » ; recommencer jusqu'au plafond du compte, s'il est atteint. | Arrêt : plus rien en file, aucun fichier partiel gardé. Plafond : la carte dit « plafond de téléchargements du compte atteint », les suivants de ce site s'arrêtent. |
 | 246 | Garder ce qui est reçu | Quitter les médias sans enregistrer, relancer Cyber Pinball, revenir aux propositions. | Les fichiers reçus sont toujours proposés (« Reçu de … »), sans nouveau téléchargement ; « Enregistrer » les range dans `medias\` avec leur provenance. |
+| 250 | Afficheur et décompte | Sur une borne dont l'écran DMD est large (16:9), fiche de Game of Thrones > « Médias du jeu » > « Afficheur » > « Voir les propositions ». | En tête, « Pas montré sur votre borne » ; chaque site dit « n résultats (aucun pour ce média ; les autres : … Afficheur large n …) ». « Propositions : Afficheur large » ouvre celles de l'afficheur large, où les fiches FullDMD des sites apparaissent. Start sur la carte « Actuel » : « C'est déjà le média actuel », rien dans le brouillon. |
+| 251 | Chercher sur le web | Sur un média sans proposition qui convienne, « Chercher sur le web… » ; dans la fenêtre « Récupérer », trouver un fichier (zip ou vidéo) et le télécharger, puis Fermer (Échap). | La recherche porte le titre du jeu et l'écran en anglais. Le fichier reçu apparaît en tête des propositions (« Téléchargé du web »), déjà dans le brouillon s'il est seul pour ce média ; « Enregistrer » le range dans `medias\` avec sa provenance. Une autre table ne le propose pas. |
+
+## Retour en tête d'écran
+
+Sur un PC, à la souris. La preuve hors écran (clics du bouton sur le menu système, la bibliothèque de ROM, l'ajout, la fiche, le médecin, la modification, en français, en anglais, menu tourné, réglages de VPX) passe par l'autopilote : `click:.lib-back`, et `click:.back` avec `--reglages`.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 247 | Sous-menus | Roue dentée ⚙ > « Configuration de la borne » > « Configurations », puis cliquer « ‹ Retour… » au-dessus de chaque titre jusqu'au menu des tables. | Chaque clic remonte d'un écran, comme Exit ; le libellé dit où l'on va (« Retour aux tables », « Retour à la fiche »…). Rien à faire défiler. |
+| 248 | Fiche et clavier à l'écran | Fiche d'une table > « Modifier les informations » > « Titre » : le clavier s'ouvre ; Exit, puis « ‹ Annuler ». | Le titre ne bouge pas à l'ouverture du clavier ; « ‹ Annuler » revient à la fiche sans rien enregistrer. |
+| 249 | Réglages de VPX | Menu système > « Réglages de VPX » > « Avancé » > une section ; « ‹ Retour aux sections », puis « ‹ Fermer ». | Retour à la liste des sections, puis fermeture des réglages et retour au menu. |
 
 ## Ce qui ne peut pas encore être testé
 

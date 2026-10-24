@@ -24,7 +24,16 @@ function header(s) {
   const titles = el('div', 'titles');
   const brand = el('div', 'brand', 'CYBER ');
   brand.append(el('span', 'pin', 'PINBALL'));
-  titles.append(brand, el('h1', '', s.title), el('div', 'scope', s.scope));
+  titles.append(brand);
+  // Retour en tête : à la souris, sans chercher Exit ni le fil d'Ariane.
+  if (s.back) {
+    const back = el('button', 'back');
+    back.type = 'button';
+    back.append(el('span', 'back-arrow', '‹'), el('span', '', s.back));
+    back.addEventListener('click', () => act({ type: 'back' }));
+    titles.append(back);
+  }
+  titles.append(el('h1', '', s.title), el('div', 'scope', s.scope));
   const file = el('div', 'file', s.file);
   if (s.fileNote) file.append(el('span', 'file-note', s.fileNote));
   titles.append(file);
@@ -43,9 +52,8 @@ function header(s) {
 function list(s) {
   const box = el('section', 'list');
   if (s.breadcrumb) {
-    const crumb = el('button', 'crumb', `‹ Sections  /  ${s.breadcrumb}`);
-    crumb.addEventListener('click', () => act({ type: 'back' }));
-    box.append(crumb);
+    // Où l'on est ; le retour aux sections est le bouton de l'en-tête.
+    box.append(el('div', 'crumb', `${t('Sections')}  /  ${s.breadcrumb}`));
   }
   const ul = el('ul');
   s.rows.forEach((row, index) => {

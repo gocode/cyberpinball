@@ -9,6 +9,13 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.2
+
+- Mise à jour : la recherche part dès le démarrage, puis toutes les 6 heures ; la pastille rouge s'affiche sans ouvrir le menu.
+- Mise à jour : l'installation ne bloque plus quand Cyber Pinball est lancé depuis son raccourci, et un échec relance Cyber Pinball sans clic.
+- Bouton « ‹ Retour » au-dessus du titre de chaque menu, et dans les réglages de VPX.
+- Médias proposés par les sites : afficheur que la borne ne montre pas signalé, nombre de sites par média, recherche sur le web.
+
 ## 0.1.1
 
 - Mise à jour depuis la borne, aussi pour une borne copiée sans l'installeur : ses raccourcis restent ceux qui existent.

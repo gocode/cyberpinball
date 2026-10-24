@@ -160,8 +160,10 @@ export function createAcquirer(events: AcquireEvents) {
   function sendBar(): void {
     if (!open || open.win.isDestroyed()) return;
     const v = open.view.webContents;
+    // Le destinataire (fonctions, signal d'arrêt) ne passe pas l'IPC : le bandeau n'en a pas besoin.
+    const { claim: _claim, ...request } = open.request;
     open.win.webContents.send('acquire:state', {
-      ...open.request,
+      ...request,
       status: open.status,
       warn: open.warn === true,
       address: v.getURL(),
@@ -262,10 +264,21 @@ export function createAcquirer(events: AcquireEvents) {
     else claims.delete(id);
   }
 
+  /**
+   * Vues cachées ouvertes. Une vue qu'aucune fenêtre ne porte et que plus rien ne
+   * référence est détruite par le ramasse-miettes, sa page avec : au hasard d'un GC, un
+   * minuteur perdait sa page et la fermeture d'une vue après son téléchargement levait
+   * « Object has been destroyed », exception qui fige le processus principal derrière la
+   * boîte modale d'Electron. Elles restent donc ici jusqu'à closeHidden.
+   */
+  const hiddenViews = new Set<WebContentsView>();
+
   /** Vue cachée de la session, sans son, qui ouvre les nouveaux onglets en elle-même. */
   function hiddenView(): WebContentsView {
     const view = new WebContentsView({ webPreferences: { session: acquireSession(), contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: true } });
+    hiddenViews.add(view);
     const contents = view.webContents;
+    contents.once('destroyed', () => hiddenViews.delete(view));
     contents.setAudioMuted(true);
     // Un nouvel onglet (lien de téléchargement) : dans la même vue.
     contents.setWindowOpenHandler(({ url: next }) => {
@@ -273,6 +286,12 @@ export function createAcquirer(events: AcquireEvents) {
       return { action: 'deny' };
     });
     return view;
+  }
+
+  /** Ferme une vue cachée (sa page, si elle vit encore) et la laisse partir. */
+  function closeHidden(view: WebContentsView): void {
+    hiddenViews.delete(view);
+    if (!view.webContents.isDestroyed()) view.webContents.close();
   }
 
   /** Attend la fin du chargement de la page (ou le délai). */
@@ -307,7 +326,7 @@ export function createAcquirer(events: AcquireEvents) {
       await loaded;
       return await contents.executeJavaScript(script, true);
     } finally {
-      contents.close();
+      closeHidden(view);
     }
   }
 
@@ -372,8 +391,8 @@ export function createAcquirer(events: AcquireEvents) {
       // Le destinataire n'a servi qu'à l'événement will-download, déjà passé.
       claims.delete(contents.id);
       // La vue reste ouverte jusqu'à la fin du téléchargement, puis se ferme.
-      if (item && item.getState() === 'progressing') item.once('done', () => contents.close());
-      else contents.close();
+      if (item && item.getState() === 'progressing') item.once('done', () => closeHidden(view));
+      else closeHidden(view);
     };
     try {
       let next = url;

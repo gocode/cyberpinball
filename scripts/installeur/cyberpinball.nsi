@@ -424,12 +424,29 @@ Section "Cyber Pinball" SEC_APP
   ; app\ est remplacé en entier, comme au déploiement : rien d'autre n'y vit. L'ancien
   ; dossier devient app.precedente jusqu'à la fin de l'installation : remis en place si
   ; elle échoue (.onInstFailed), supprimé si elle réussit (.onInstSuccess).
+  ; Hors de app\ : un dossier de travail ne se renomme pas (le nôtre, s'il était dans app\).
+  SetOutPath "$TEMP"
   RMDir /r "$Racine\app.precedente"
   ${If} ${FileExists} "$Racine\app\${EXE}"
     DetailPrint "Remplacement de la version installée"
+    ; Un antivirus ou l'Explorateur peut tenir un fichier un instant : jusqu'à 10 s d'essais.
+    StrCpy $2 0
+    renommer:
     ClearErrors
     Rename "$Racine\app" "$Racine\app.precedente"
     ${If} ${Errors}
+      ${If} $2 < 20
+        IntOp $2 $2 + 1
+        Sleep 500
+        Goto renommer
+      ${EndIf}
+      ${If} $Maj == "1"
+        ; Mise à jour : rien n'a changé ; Cyber Pinball repart tel quel, sans clic à faire.
+        DetailPrint "Des fichiers de $Racine\app sont encore utilisés : rien n'a été modifié, Cyber Pinball redémarre."
+        Call Relancer
+        SetErrorLevel 3
+        Quit
+      ${EndIf}
       Abort "Des fichiers de $Racine\app sont encore utilisés : rien n'a été modifié."
     ${EndIf}
   ${EndIf}

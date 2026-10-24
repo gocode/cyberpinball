@@ -9,7 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
 import { test } from 'node:test';
-import { hitGameName, hitTypes, MEDIA_SITES, receivedMedias, siteMediaChoices, siteOffers, siteQuery, siteSearchUrl, SITE_SEARCH_PROBES, type SiteHit, type SiteReceipt } from '../mediasites';
+import { hitGameName, hitTypes, MEDIA_SITES, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchUrl, SITE_SEARCH_PROBES, webHost, webMediaChoices, webSearchUrl, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
 import { WAIT_PROBES } from '../sitesessions';
 import { createVpsDb, type VpsGame } from '../vps';
 
@@ -148,4 +148,51 @@ test('fenêtres sans catalogue de traduction (processus principal muet) : le tex
     const text = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', preload), 'utf8');
     assert.match(text, /sendSync\('i18n'\) \?\? \{\}/, preload);
   }
+});
+
+test('décompte : combien de résultats servent au média ouvert, et où vont les autres', () => {
+  const sum = siteHitSummary(HITS, [T2], db);
+  assert.deepEqual(sum.byType, { Topper: 1, Wheel: 2, GameHelp: 1 });
+  assert.equal(sum.packs, 0);
+  // Terminator 3 (deux fiches) et Salvation : d'autres jeux.
+  assert.equal(sum.elsewhere, 3);
+  // Un afficheur 4:1 sans fiche à côté de fiches FullDMD : le décompte le montre.
+  const fulldmd = vpu('12517', 'Terminator 2 (Williams 1991) Full DMD animated', ['143', 'FullDMD Videos']);
+  const got = siteHitSummary([fulldmd], [T2], db);
+  assert.equal(got.byType.DMD, undefined);
+  assert.equal(got.byType.FullDMD, 1);
+  // Un pack complet se compte à part : il ne gonfle pas chaque écran.
+  const pack: SiteHit = { site: 'vpforums', id: '7001', url: 'u', title: 'Terminator 2 (Williams 1991) (FS) (Media Pack)', category: { id: '35', label: 'Complete Media Packs' } };
+  assert.deepEqual(siteHitSummary([pack, fulldmd], [T2], db), { byType: { FullDMD: 1 }, packs: 1, elsewhere: 0 });
+});
+
+test('recherche sur le web : le titre sans édition, l’écran en anglais, sur DuckDuckGo', () => {
+  const u = new URL(webSearchUrl('Game of Thrones (Limited Edition)', 'FullDMD'));
+  assert.equal(u.hostname, 'duckduckgo.com');
+  assert.equal(u.searchParams.get('q'), 'Game of Thrones FullDMD video vpinball');
+  assert.equal(new URL(webSearchUrl('Terminator 2 - Judgment Day', 'Wheel')).searchParams.get('q'), 'Terminator 2 wheel logo vpinball');
+  assert.equal(webHost('https://www.vpforums.org/index.php?app=downloads'), 'vpforums.org');
+});
+
+test('fichiers reçus du web : proposés à leur table seulement, pour leur média, le plus récent d’abord', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mediasites-'));
+  const put = (name: string) => {
+    const p = path.join(dir, name);
+    fs.writeFileSync(p, 'x');
+    return p;
+  };
+  const old = put('ancien.mp4');
+  const fresh = put('nouveau.mp4');
+  const wheel = put('logo.png');
+  const table = path.join(dir, 'GoT.vpx');
+  const receipts: WebReceipt[] = [
+    { key: 'web:1', table, type: 'FullDMD', url: 'https://vpuniverse.com/a', filename: 'a.zip', date: '2026-10-24T10:00:00Z', files: [{ file: old, kind: 'video' }] },
+    { key: 'web:2', table, type: 'FullDMD', url: 'https://www.vpforums.org/b', filename: 'b.zip', date: '2026-10-24T11:00:00Z', files: [{ file: fresh, kind: 'video' }, { file: wheel, type: 'Wheel', kind: 'image' }] },
+  ];
+  assert.deepEqual(webMediaChoices('FullDMD', receipts, table).map((c) => path.basename(c.file!)), ['nouveau.mp4', 'ancien.mp4']);
+  assert.deepEqual(webMediaChoices('Wheel', receipts, table).map((c) => path.basename(c.file!)), ['logo.png'], 'un type reconnu va à son média');
+  assert.deepEqual(webMediaChoices('DMD', receipts, table), [], 'un fichier sans type ne sert qu’au média d’où on l’a cherché');
+  assert.deepEqual(webMediaChoices('FullDMD', receipts, path.join(dir, 'T2.vpx')), [], 'pas pour une autre table');
+  assert.equal(webMediaChoices('FullDMD', receipts, table)[0]!.source, 'web');
+  fs.rmSync(dir, { recursive: true, force: true });
 });

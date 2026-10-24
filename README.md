@@ -108,6 +108,8 @@ The [technical manual](docs/manual.md) describes every part in detail: the files
 
 ### Publishing a release (maintainers)
 
+Every step below is an action of `lanceur.cmd` (section "Fabrication et publication sur GitHub"): see the [cheat sheet](docs/manual.md#cheat-sheet-publishing-a-release) in the technical manual.
+
 `npm run publier` checks that nothing personal or secret is about to be published, builds both installers, signs the update feed and pushes a snapshot of the code to `main`. It then creates the GitHub release `v<version>` with the installers and the feed. Release notes come from [CHANGELOG.md](CHANGELOG.md) (French, shown on the cabinet) and [CHANGELOG.en.md](CHANGELOG.en.md) (English, added to the GitHub release). It needs a fine-grained GitHub token, saved once in `%USERPROFILE%\.cyberpinball\jeton-github.txt` (or the `CYBERPINBALL_GITHUB_TOKEN` variable), and the publication key: neither ever lives in the repository, and `.gitignore` plus the publication check keep secret files out of it. The repository description and topics come from `package.json` and are set at each release, or with `npm run decrire` (the token then also needs the "Administration" permission). See [Updating from the cabinet](docs/manual.md#updating-from-the-cabinet) in the technical manual.
 
 ## Third-party components and licences

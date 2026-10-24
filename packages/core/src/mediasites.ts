@@ -422,6 +422,125 @@ export interface SiteReceipt {
   files: ReceivedMedia[];
 }
 
+/** Ce que les résultats d'un site donnent, média par média, pour les jeux retenus. */
+export interface SiteHitSummary {
+  /** Fiches propres à un type de média (packs à part). */
+  byType: Partial<Record<MediaType, number>>;
+  /** Packs complets : ils servent à tous les écrans. */
+  packs: number;
+  /** Fiches d'autres jeux, ou sans média que le menu montre (patchs, outils). */
+  elsewhere: number;
+}
+
+/**
+ * Décompte des résultats d'un site : « 25 résultats » ne dit pas combien servent au
+ * média ouvert. Sans ce détail, un écran sans proposition à côté de 25 résultats
+ * passe pour une panne (afficheur 4:1 quand le site n'a que des FullDMD).
+ */
+export function siteHitSummary(hits: SiteHit[], games: VpsGame[], vps?: VpsDb): SiteHitSummary {
+  const byType: Partial<Record<MediaType, number>> = {};
+  const placed = new Set<string>();
+  const packs = new Set<string>();
+  for (const [type, list] of Object.entries(siteOffers(hits, games, vps)) as [MediaType, SiteOffer[]][]) {
+    const ids = new Set(list.filter((o) => !o.pack).map((o) => o.hit.id));
+    if (ids.size) byType[type] = ids.size;
+    for (const o of list) (o.pack ? packs : placed).add(o.hit.id);
+  }
+  for (const id of packs) placed.add(id);
+  return { byType, packs: packs.size, elsewhere: new Set(hits.map((h) => h.id)).size - placed.size };
+}
+
+// ---------------------------------------------------------------------------
+// Recherche sur le web, dans la fenêtre « Récupérer »
+
+/** Mots que les auteurs de médias mettent dans leurs titres, par écran (en anglais : VPUniverse, VPForums, YouTube). */
+const WEB_SEARCH_WORDS: Partial<Record<MediaType, string>> = {
+  Wheel: 'wheel logo',
+  Playfield: 'playfield video',
+  Backglass: 'backglass video',
+  DMD: 'DMD video',
+  FullDMD: 'FullDMD video',
+  Topper: 'topper video',
+  Loading: 'loading video',
+  Audio: 'table music',
+  AudioLaunch: 'launch audio',
+  GameInfo: 'flyer',
+  GameHelp: 'instruction card',
+};
+
+/**
+ * Page de recherche pour un média d'un jeu, quand les sources branchées n'ont rien :
+ * DuckDuckGo, sans compte ni bandeau de consentement à accepter. Le titre sans
+ * sous-titre ni édition (« Game of Thrones » pour « Game of Thrones (Limited
+ * Edition) »), puis l'écran, puis « vpinball » pour rester chez les flippers virtuels.
+ */
+export function webSearchUrl(game: string, type: MediaType): string {
+  const title = game.replace(/\s*\([^)]*\)\s*/g, ' ').split(/\s+-\s+|:\s*/)[0]!.replace(/\s+/g, ' ').trim();
+  const q = [title, WEB_SEARCH_WORDS[type] ?? type, 'vpinball'].filter(Boolean).join(' ');
+  return `https://duckduckgo.com/?q=${encodeURIComponent(q)}`;
+}
+
+/**
+ * Fichier téléchargé par l'utilisateur dans la fenêtre « Récupérer », depuis
+ * « Chercher sur le web… » : il revient au média et à la table d'où il l'a cherché.
+ */
+export interface WebReceipt {
+  /** « web:<horodatage> » */
+  key: string;
+  /** Table (fichier .vpx) d'où la recherche est partie : le fichier n'est proposé qu'à elle. */
+  table: string;
+  /** Média d'où la recherche est partie : un fichier sans type reconnu n'est proposé que pour lui. */
+  type: MediaType;
+  /** Adresse du téléchargement (première de la chaîne de redirections). */
+  url: string;
+  /** Nom du fichier reçu (l'archive, avant déballage). */
+  filename: string;
+  /** Date de réception (ISO). */
+  date: string;
+  files: ReceivedMedia[];
+}
+
+/** Hôte d'une adresse, sans « www. » : « vpuniverse.com ». */
+export function webHost(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '');
+  } catch {
+    return url;
+  }
+}
+
+/**
+ * Propositions venues du web pour un média d'une table, la plus récente d'abord : les
+ * fichiers d'un type reconnu (pack rangé à la manière de Popper) vont à leur média,
+ * les autres au média d'où la recherche est partie, s'ils en ont le format.
+ */
+export function webMediaChoices(type: MediaType, receipts: WebReceipt[], table: string): MediaChoice[] {
+  const out: MediaChoice[] = [];
+  const mine = receipts.filter((r) => path.resolve(r.table).toLowerCase() === path.resolve(table).toLowerCase());
+  for (const r of [...mine].sort((a, b) => b.date.localeCompare(a.date))) {
+    for (const f of r.files) {
+      if (f.type ? f.type !== type : r.type !== type || !isAcceptedFormat(type, f.file)) continue;
+      let bytes: number;
+      try {
+        bytes = fs.statSync(f.file).size;
+      } catch {
+        continue;
+      }
+      out.push({
+        id: f.file,
+        type,
+        kind: f.kind,
+        source: 'web',
+        label: path.basename(f.file),
+        detail: t('reçu de {host} : {file}', { host: webHost(r.url), file: r.filename }),
+        file: f.file,
+        bytes,
+      });
+    }
+  }
+  return out;
+}
+
 /** Clé d'une fiche : « vpuniverse:27996 ». */
 export const siteHitKey = (hit: Pick<SiteHit, 'site' | 'id'>) => `${hit.site}:${hit.id}`;
 

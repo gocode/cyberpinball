@@ -2,9 +2,11 @@
 // publiée, ses nouveautés, puis, à la demande seulement, téléchargement vérifié et
 // installation (packages/core/src/update.ts).
 //
-// Une recherche discrète part aussi en arrière-plan (30 s après le démarrage, puis toutes les
-// 6 h) : elle ne télécharge rien, elle signale seulement une version disponible par une
-// pastille rouge sur la roue dentée et sur cette entrée (attention). Sans réseau, rien ne s'affiche.
+// Une recherche discrète part aussi en arrière-plan : dès le démarrage, puis toutes les 6 h
+// tant que Cyber Pinball tourne (toutes les 5 min tant qu'elle échoue : réseau pas encore prêt
+// au démarrage de la borne). Elle ne télécharge rien, elle signale seulement une version
+// disponible par une pastille rouge sur la roue dentée et sur cette entrée (attention), sans
+// qu'il faille ouvrir le menu. Sans réseau, rien ne s'affiche.
 //
 // L'installeur, lancé en mode /MAJ, attend que Cyber Pinball se ferme, remplace app\
 // puis le relance : au démarrage suivant, le menu dit si la nouvelle version est là.
@@ -63,9 +65,11 @@ const leadInstall = () =>
 
 /** Délai entre l'écran « Installation » et la fermeture : le temps de le lire. */
 const QUIT_DELAY_MS = 2500;
-/** Première recherche en arrière-plan : après le démarrage, pour ne pas le ralentir. */
-const FIRST_CHECK_MS = 30_000;
+/** Première recherche en arrière-plan : dès que le menu est affiché. */
+const FIRST_CHECK_MS = 2_000;
+/** Puis toutes les 6 h tant que l'application tourne ; toutes les 5 min tant qu'elle échoue. */
 const CHECK_EVERY_MS = 6 * 3600_000;
+const RETRY_MS = 5 * 60_000;
 /** Un résultat plus récent que cela s'affiche tel quel à l'ouverture de l'entrée. */
 const FRESH_MS = 10 * 60_000;
 
@@ -119,29 +123,39 @@ export function createUpdatesMenu(host: UpdatesHost) {
     else show();
   }
 
-  /** Recherche discrète : aucun écran, aucune erreur affichée ; seul l'état (et la pastille) change. */
-  async function checkQuietly(): Promise<void> {
-    if (state.kind !== 'idle' && state.kind !== 'up-to-date' && state.kind !== 'available') return;
+  /** Une recherche discrète peut remplacer l'état : rien n'est en cours (recherche, téléchargement, installation). */
+  const quietAllowed = () => state.kind === 'idle' || state.kind === 'up-to-date' || state.kind === 'available' || state.kind === 'error';
+
+  /**
+   * Recherche discrète : aucun écran, aucune erreur affichée ; seul l'état (et la pastille)
+   * change. Vrai si elle a abouti, ou si elle n'avait pas à se faire (opération en cours).
+   * Une erreur d'une recherche faite à la main ne l'arrête pas : elle la remplace si elle aboutit.
+   */
+  async function checkQuietly(): Promise<boolean> {
+    if (!quietAllowed()) return true;
     try {
       const result = await checkForUpdate({ current: host.version });
-      // L'utilisateur a pu ouvrir l'écran entre-temps : son état prime.
-      if (state.kind !== 'idle' && state.kind !== 'up-to-date' && state.kind !== 'available') return;
+      // L'utilisateur a pu lancer une opération entre-temps : son état prime.
+      if (!quietAllowed()) return true;
       state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
       checkedAt = Date.now();
       console.log(`Mise à jour (arrière-plan) : ${describe()}`);
       host.broadcast();
+      return true;
     } catch (error) {
-      console.log(`Mise à jour (arrière-plan) : pas de réponse (${(error as Error).message})`); // i18n-ignore : journal
+      console.log(`Mise à jour (arrière-plan) : pas de réponse (${(error as Error).message}) ; nouvel essai dans 5 min`); // i18n-ignore : journal
+      return false;
     }
   }
 
-  /** Recherches en arrière-plan, du démarrage à la fermeture. */
+  /** Recherches en arrière-plan, du démarrage à la fermeture : chacune programme la suivante. */
   function startBackgroundChecks(): void {
     if (!host.background) return;
-    const first = setTimeout(() => void checkQuietly(), FIRST_CHECK_MS);
-    const every = setInterval(() => void checkQuietly(), CHECK_EVERY_MS);
-    first.unref?.();
-    every.unref?.();
+    const next = (ms: number) => {
+      const timer = setTimeout(async () => next((await checkQuietly()) ? CHECK_EVERY_MS : RETRY_MS), ms);
+      timer.unref?.();
+    };
+    next(FIRST_CHECK_MS);
   }
 
   async function check(): Promise<void> {
@@ -197,6 +211,9 @@ export function createUpdatesMenu(host: UpdatesHost) {
       const child = spawn(installer, args, {
         detached: true,
         stdio: 'ignore',
+        // Hors de app\ : un dossier de travail ne se renomme pas, et Cyber Pinball tourne souvent
+        // depuis app\ (raccourci). L'installeur hériterait de ce dossier et ne pourrait plus le remplacer.
+        cwd: path.dirname(installer),
         // Hors écran, l'installeur est silencieux (/S) : aucune fenêtre ne s'ouvre.
         // L'installeur relance Cyber Pinball avec les mêmes arguments (données de Chromium, configuration…).
         env: { ...process.env, CYBERPINBALL_MAJ_ARGS: relaunchArguments(process.argv.slice(1)) },

@@ -176,6 +176,8 @@ export type UiAction =
   | { type: 'editor'; index: number }
   | { type: 'drop'; paths: string[] }
   | { type: 'key'; code: string }
+  /** Bouton « ‹ Retour » de l'en-tête : comme Exit, sans redescendre au bas de la liste. */
+  | { type: 'back' }
   /** Roue dentée du menu : menu et configuration, quels que soient les boutons. */
   | { type: 'config' }
   | { type: 'wheel'; offset: number };
@@ -1975,6 +1977,10 @@ export function createLibrary(host: LibraryHost) {
     if (action.type === 'editor' && (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
       pressKey(screen, action.index);
       host.broadcast();
+    } else if (action.type === 'back') {
+      if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) closeEditor(screen, false);
+      else build().back();
+      host.broadcast();
     } else if (action.type === 'activate') {
       const built = build();
       if (!built.actions[action.index]) return;
@@ -1997,6 +2003,7 @@ export function createLibrary(host: LibraryHost) {
       subheading: built.subheading,
       lead: built.lead,
       sections: built.sections,
+      back: backLabel(built),
       actions: built.actions.map(({ label, detail, tone, attention }) => ({ label, detail, tone, attention: attention || undefined })),
       media: built.media,
       cursor,
@@ -2013,6 +2020,17 @@ export function createLibrary(host: LibraryHost) {
           : t('Flippers : choisir une touche · Start : la taper · Exit : annuler · ou tapez au clavier, Entrée pour valider')
         : t('Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris'),
     };
+  }
+
+  /**
+   * Libellé du bouton de retour en tête d'écran : celui de l'action qui fait la même chose
+   * qu'Exit (« Retour à la fiche », « Annuler »…), sinon « Retour ». Aucun quand cette action
+   * est la seule de l'écran (un message à lire, « Continuer ») : elle est déjà sous la main.
+   */
+  function backLabel(built: Built): string | undefined {
+    const same = built.actions.find((a) => a.run === built.back);
+    if (same && built.actions.length === 1) return undefined;
+    return same?.label ?? t('Retour');
   }
 
   function viewEditor(e: Editor) {
@@ -2140,7 +2158,8 @@ export function createLibrary(host: LibraryHost) {
 }
 
 /** Clic de souris au centre de l'élément désigné, comme le ferait l'utilisateur. */
-async function click(win: BrowserWindow, selector: string): Promise<void> {
+/** Vrai clic de souris au centre de l'élément (autopilote du menu et des réglages de VPX). */
+export async function click(win: BrowserWindow, selector: string): Promise<void> {
   const center = (await win.webContents.executeJavaScript(
     // Une ligne hors de la vue (liste qui défile) y est d'abord ramenée, comme à la molette.
     `(() => { const el = document.querySelector(${JSON.stringify(selector)}); el?.scrollIntoView({ block: 'nearest' }); const r = el?.getBoundingClientRect(); return r ? [r.x + r.width / 2, r.y + r.height / 2] : null; })()`,

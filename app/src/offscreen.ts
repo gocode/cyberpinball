@@ -21,6 +21,17 @@ export const OFFSCREEN = offscreenMode(process.env);
 // facteur d'échelle de l'écran principal du poste.
 if (OFFSCREEN) app.commandLine.appendSwitch('force-device-scale-factor', '1');
 
+// Une exception non rattrapée du processus principal ouvre d'ordinaire la boîte modale
+// d'Electron (« A JavaScript error occurred in the main process ») : sur le bureau caché,
+// personne ne la ferme et tout se fige, minuteries comprises. Hors écran, l'essai s'arrête
+// en échec avec l'erreur dans la console.
+if (OFFSCREEN) {
+  process.on('uncaughtException', (error) => {
+    console.error(`Hors écran : exception non rattrapée, essai arrêté.\n${error?.stack ?? String(error)}`); // i18n-ignore : console d'un essai hors écran
+    app.exit(1);
+  });
+}
+
 /**
  * Hors écran, l'application ne tourne que sur le bureau Windows caché (packages/win-displays/
  * src/desktop.ts), quel que soit le lanceur (scripts, npx electron à la main, autre session) :

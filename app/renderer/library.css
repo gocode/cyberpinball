@@ -59,6 +59,49 @@ body.dragging #root::after {
   background-color: var(--bg);
 }
 
+/*
+ * Retour en tête d'écran (Exit à la souris), au-dessus du titre comme le « ‹ » d'une barre de
+ * navigation : petit bouton du design system (Bouton, variante small), jamais en vert signal
+ * au repos, réservé au choix courant ; il s'éclaire au survol.
+ */
+.lib-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.2cqmin;
+  max-width: 100%;
+  min-height: 5.2cqmin;
+  margin: 0 0 1.6cqmin;
+  padding: 0 2.2cqmin 0 1.6cqmin;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 0.75cqmin;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 1.9cqmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lib-back > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-back-arrow {
+  font-size: 3.2cqmin;
+  line-height: 1;
+  margin-top: -0.3cqmin;
+  letter-spacing: 0;
+}
+
+body.mouse .lib-back:hover {
+  border-color: var(--signal);
+  box-shadow: var(--glow-signal);
+}
+
 .lib-head h1 {
   margin: 0;
   font-size: 6.5cqmin;

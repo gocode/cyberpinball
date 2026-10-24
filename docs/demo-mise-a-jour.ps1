@@ -111,7 +111,9 @@ try {
     $env:CYBERPINBALL_MAJ_URL = "http://127.0.0.1:$Port/$Flux/cyberpinball-maj.json"
     $env:CYBERPINBALL_AUTOPILOT = $Etapes
     $env:CYBERPINBALL_CAPTURE = $Dossier
-    $b = Start-Process $exe -ArgumentList "--user-data-dir=$base\electron" -WorkingDirectory $wt -NoNewWindow -PassThru
+    # Depuis app\, comme le raccourci de la borne : l'installeur ne doit pas hériter de ce dossier,
+    # qu'il ne pourrait plus renommer (défaut vu sur une vraie borne, invisible lancé d'ailleurs).
+    $b = Start-Process $exe -ArgumentList "--user-data-dir=$base\electron" -WorkingDirectory "$racine\app" -NoNewWindow -PassThru
     if (-not $b.WaitForExit(180000)) { Stop-Borne; throw "Cyber Pinball ne s'est pas fermé ($Dossier)." }
   }
 
@@ -158,7 +160,8 @@ if (Test-Path "$home_\mise-a-jour.json") { $problemes += 'suivi mise-a-jour.json
 if (-not (Test-Path "$racine\downloads\cyberpinball\CyberPinball-Setup-$nouvelle.exe")) { $problemes += 'installeur téléchargé absent' }
 $requetes = Get-Content $journal
 $requetes | ForEach-Object { "  site : $_" }
-if (($requetes | Select-String 'site-falsifie/cyberpinball-maj.json 200').Count -ne 1) { $problemes += 'flux falsifié non demandé' }
+# Au moins une fois : la recherche de démarrage, puis celle de l'entrée « Mise à jour ».
+if (($requetes | Select-String 'site-falsifie/cyberpinball-maj.json 200').Count -lt 1) { $problemes += 'flux falsifié non demandé' }
 if ($requetes | Select-String 'site-falsifie/CyberPinball-Setup') { $problemes += 'installeur téléchargé malgré le flux falsifié' }
 if (($requetes | Select-String '/site/CyberPinball-Setup.exe 200').Count -ne 1) { $problemes += 'installeur non téléchargé une fois' }
 foreach ($d in 'falsifie', 'disponible', 'ancienne', 'nouvelle') {

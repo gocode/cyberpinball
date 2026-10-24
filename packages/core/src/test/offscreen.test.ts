@@ -94,6 +94,30 @@ test('la visibilité d’une fenêtre se lit par isShown : hors écran, aucune n
   assert.deepEqual(offenders(/\.isVisible\(\)/, 'offscreen.ts'), [], 'utiliser isShown(win) de app/src/offscreen.ts');
 });
 
+// Une WebContentsView qu'aucune fenêtre ne porte et que plus rien ne référence est détruite
+// par le ramasse-miettes : le téléchargement direct de VPForums fermait ensuite une page
+// déjà détruite (« Object has been destroyed »), exception qui figeait le processus
+// principal derrière la boîte modale d'Electron, sur la borne comme sur le bureau caché.
+test('une vue sans fenêtre est gardée jusqu’à sa fermeture, et une page détruite ne se referme pas', () => {
+  const kept = appSources().flatMap((s) => {
+    const lines = s.text.split('\n');
+    return lines.flatMap((line, i) =>
+      /new WebContentsView\(/.test(line) && !/addChildView\(|hiddenViews\.add\(/.test(lines.slice(i, i + 6).join(' ')) ? [`${s.file}:${i + 1} ${line.trim()}`] : [],
+    );
+  });
+  assert.deepEqual(kept, [], 'ajouter la vue à une fenêtre (addChildView) ou la garder (hiddenViews) jusqu’à sa fermeture');
+  assert.deepEqual(
+    offenders(/[cC]ontents\.close\(/, '').filter((l) => !/isDestroyed\(\)/.test(l)),
+    [],
+    'fermer une vue cachée par closeHidden, ou vérifier isDestroyed() avant close()',
+  );
+});
+
+test('hors écran, une exception non rattrapée arrête l’essai au lieu d’ouvrir une boîte modale', () => {
+  const text = fs.readFileSync(path.join(SOURCES, 'offscreen.ts'), 'utf8');
+  assert.match(text, /if \(OFFSCREEN\) \{\s*process\.on\('uncaughtException'[\s\S]*?app\.exit\(1\)/);
+});
+
 // Nouvelle console : Windows la confie au Terminal, qui s'ouvre sur le bureau de l'utilisateur,
 // même depuis le bureau caché. Les scripts lancent les outils en ligne de commande dans leur
 // propre console, et l'application avec windowsHide.

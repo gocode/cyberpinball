@@ -9,7 +9,14 @@
 // - les sites communautaires, avec le compte de l'utilisateur (media-sites.ts) :
 //   VPForums, puis VPUniverse en dernier recours (environ 45 s d'attente par fichier).
 //   Une fiche choisie part dans la file de son site ; reçue, elle se choisit comme un
-//   fichier de la borne, et la carte qui l'a demandée la met d'elle-même dans le brouillon.
+//   fichier de la borne, et la carte qui l'a demandée la met d'elle-même dans le brouillon ;
+// - le web, quand rien de tout cela ne convient : « Chercher sur le web… » ouvre la
+//   fenêtre « Récupérer » sur une recherche, et ce que l'utilisateur y télécharge revient
+//   ici (media-sites.ts), en tête des propositions.
+//
+// Chaque site dit combien de ses résultats servent à ce média, et à quels autres écrans
+// vont les autres. Un afficheur que la borne ne montre pas (Afficheur 4:1 sur un écran
+// 16:9) le dit, avec un passage direct aux propositions de l'autre.
 //
 // « Autres jeux… » montre les jeux possibles avec leurs raisons et leur logo, pour en
 // ajouter ou en retirer, et permet de chercher un autre titre au clavier. Le choix va
@@ -26,8 +33,14 @@ import {
   localMediaChoices,
   MEDIA_SITES,
   mediaSite,
+  siteHitSummary,
   siteMediaChoices,
   siteQuery,
+  webHost,
+  webMediaChoices,
+  webSearchUrl,
+  type MediaPlacement,
+  type WebReceipt,
   type MediaSiteId,
   type SiteHit,
   type SiteState,
@@ -98,6 +111,8 @@ export interface ProposalsContext {
   sites?: MediaSites;
   /** Le gestionnaire des médias est ouvert sur cette table (son brouillon existe). */
   active(table: TableEntry): boolean;
+  /** Où ce média s'affiche sur la borne, et s'il s'y voit (l'autre afficheur passe avant lui). */
+  placement(type: MediaType): MediaPlacement;
 }
 
 /** Ce qu'un site a donné pour les jeux retenus. */
@@ -227,7 +242,9 @@ export function createProposals(ctx: ProposalsContext) {
           (key) => ctx.sites!.receipt(key),
         )
       : [];
-    return [...(mergeMediaChoices(mediadb, st.local)[type] ?? []), ...sites, ...(mergeMediaChoices(vpsImageChoices(vpsGames), vpsMusicChoices(vpsGames))[type] ?? [])];
+    // Téléchargés par l'utilisateur depuis la recherche web : en tête, il les a cherchés exprès.
+    const web = ctx.sites ? webMediaChoices(type, ctx.sites.webReceipts(), st.file) : [];
+    return [...web, ...(mergeMediaChoices(mediadb, st.local)[type] ?? []), ...sites, ...(mergeMediaChoices(vpsImageChoices(vpsGames), vpsMusicChoices(vpsGames))[type] ?? [])];
   }
 
   /** Textes à chercher sur les sites : le titre (sans sous-titre) de chaque jeu retenu, ou la saisie. */
@@ -413,6 +430,7 @@ export function createProposals(ctx: ProposalsContext) {
       facts = [choice.detail, d ? `${d.width} × ${d.height}` : undefined, size === undefined ? t('taille inconnue') : formatSize(size)].filter(Boolean).join(' · ');
     } else facts = ctx.facts(choice.file!);
     const extra: string[] = [];
+    if (current) extra.push(t('C’est le fichier que le menu montre aujourd’hui : le reprendre ne changerait rien.'));
     if (lead) extra.push(t('Jeu retenu : {reasons}.', { reasons: lead.reasons.slice(0, 2).join(t(' ; ')) }));
     if (choice.source === 'vps') extra.push(t('Basse définition : vignette de la base VPS, à défaut d’autre chose.'));
     else if (choice.source === 'vps-music') {
@@ -421,9 +439,11 @@ export function createProposals(ctx: ProposalsContext) {
           ? t('Lien mort : Dropbox a renvoyé une page au lieu du fichier.')
           : t('Lien de partage Dropbox donné par la base VPS ; la musique s’écoute dès que la carte est choisie.'),
       );
-    } else if (choice.offer?.kind === 'video') extra.push(t('Aperçu : image du même jeu ; la vidéo arrive au téléchargement.'));
+    } else if (choice.offer?.kind === 'video' && !current) extra.push(t('Aperçu : image du même jeu ; la vidéo arrive au téléchargement.'));
     else if (choice.offer?.quality === '4k') extra.push(t('Aperçu : la même image en 1k ; le fichier 4k arrive au téléchargement.'));
-    if (choice.site?.received) {
+    if (choice.source === 'web') {
+      extra.push(t('Téléchargé dans la fenêtre « Récupérer » ; gardé dans les téléchargements, copié dans medias\\ à l’enregistrement.'));
+    } else if (choice.site?.received) {
       const hit = choice.site.hit;
       extra.push(hit.author ? t('De « {title} », par {author}.', { title: hit.title, author: hit.author }) : t('De « {title} ».', { title: hit.title }));
       extra.push(t('Reçu du site, gardé dans les téléchargements ; copié dans medias\\ à l’enregistrement.'));
@@ -444,7 +464,8 @@ export function createProposals(ctx: ProposalsContext) {
       state: chosen ? { label: t('Choisi, à enregistrer'), tone: 'warning' } : current ? { label: t('Actuel'), tone: 'ok' } : choice.site?.received ? { label: t('Reçu'), tone: 'ok' } : undefined,
       facts,
       extra,
-      thumb: choice.offer ? remoteThumb(st, choice) : ctx.thumb(table, choice.type, choice.file!),
+      // Le fichier actuel se montre lui-même (la vidéo, pas l'image d'aperçu du site) : on voit que c'est le même.
+      thumb: current && choice.offer ? ctx.thumb(table, choice.type, ctx.current(table, choice.type)[0]!) : choice.offer ? remoteThumb(st, choice) : ctx.thumb(table, choice.type, choice.file!),
     };
   }
 
@@ -462,6 +483,17 @@ export function createProposals(ctx: ProposalsContext) {
     }));
     const cards = choices.map((choice, i) => cardFor(st, table, choice, i));
     const games = includedGames(st).length;
+    // Afficheur que la borne ne montre pas (4:1 sur un écran 16:9) : passage direct à l'autre.
+    const placement = ctx.placement(type);
+    const partner: MediaType | undefined = type === 'DMD' ? 'FullDMD' : type === 'FullDMD' ? 'DMD' : undefined;
+    if (partner && !placement.shown && ctx.placement(partner).shown) {
+      actions.push({
+        label: t('Propositions : {label}', { label: mediaTypeInfo(partner).label }),
+        detail: t('Le média que votre borne montre'),
+        tone: 'ok',
+        run: () => open(table, partner),
+      });
+    }
     // Sites où se connecter : avant le reste, la recherche ou le téléchargement en dépend.
     for (const site of MEDIA_SITES) {
       const found = st.sites[site.id];
@@ -485,6 +517,17 @@ export function createProposals(ctx: ProposalsContext) {
         },
       });
     }
+    if (ctx.sites) {
+      const loading = ctx.sites.webProgress();
+      actions.push({
+        label: t('Chercher sur le web…'),
+        detail: loading
+          ? t('Téléchargement : {got}', { got: loading.total ? t('{got} sur {total}', { got: formatSize(loading.received), total: formatSize(loading.total) }) : formatSize(loading.received) })
+          : t('Navigateur intégré : ce que vous y téléchargez revient ici'),
+        tone: choices.length ? undefined : 'ok',
+        run: () => openWeb(table, type),
+      });
+    }
     actions.push(
       {
         label: t('Autres jeux…'),
@@ -499,13 +542,14 @@ export function createProposals(ctx: ProposalsContext) {
     );
     const rows: Row[] = [];
     if (st.notice) rows.push({ text: st.notice.text, tone: st.notice.tone });
-    rows.push(...siteRows(st));
+    if (!placement.shown && placement.note) rows.push({ text: t('Pas montré sur votre borne'), detail: placement.note, tone: 'warning' });
+    rows.push(...siteRows(st, type));
     if (st.problem) rows.push({ text: t('VPinMediaDB indisponible'), detail: t('{problem}. Restent les médias déjà sur la borne, et les vignettes VPS déjà reçues.', { problem: st.problem }), tone: 'warning' });
     if (!choices.length) {
       rows.push({
         text: t('Aucune proposition pour ce média'),
         detail: st.games.length
-          ? t('Les jeux retenus n’ont pas de {label}, et la table n’en a pas dans son PuP-Pack ni son dossier du DMD. « Autres jeux… » pour en retenir d’autres.', { label: lowerFirst(info.label) })
+          ? t('Les jeux retenus n’ont pas de {label}, et la table n’en a pas dans son PuP-Pack ni son dossier du DMD. « Chercher sur le web… » pour le trouver vous-même, ou « Autres jeux… » pour en retenir d’autres.', { label: lowerFirst(info.label) })
           : t('Aucun jeu de la base VPS ne correspond : « Chercher un autre titre… », ou prenez un fichier dans le dossier d’import.'),
         tone: 'quiet',
       });
@@ -532,8 +576,18 @@ export function createProposals(ctx: ProposalsContext) {
   function pick(table: TableEntry, type: MediaType, choice: MediaChoice): void {
     if (isChosen(table, choice)) return ctx.back(type, { text: t('Cette proposition est déjà dans le brouillon.'), tone: 'info' });
     if (choice.site && !choice.site.received) return pickSite(table, type, choice);
+    // Le fichier montré aujourd'hui, sans autre choix en attente : l'enregistrer réécrirait le même.
+    if (isCurrent(table, choice) && !ctx.pages(table, type).some((e) => 'from' in e)) {
+      state!.notice = { text: t('C’est déjà le média actuel : rien ne changerait. Choisissez une autre proposition.'), tone: 'info' };
+      return ctx.show(() => build(type), ctx.cursor());
+    }
     // Choix fait maintenant : un fichier d'un site qui arriverait ensuite ne le remplace pas.
     lastPick.set(`${table.file}|${type}`, ++picks);
+    if (choice.source === 'web') {
+      const receipt = ctx.sites?.webReceipts().find((r) => r.files.some((f) => samePath(f.file, choice.file!)));
+      const text = ctx.place(table, type, { from: choice.file!, mode: 'copy', origin: receipt ? { origin: webHost(receipt.url), url: receipt.url } : undefined });
+      return ctx.back(type, { text, tone: 'info' });
+    }
     if (choice.site?.received) {
       const hit = choice.site.hit;
       const text = ctx.place(table, type, { from: choice.file!, mode: 'copy', origin: { origin: mediaSite(hit.site).name, url: hit.url, vpsId: choice.vpsId } });
@@ -577,7 +631,7 @@ export function createProposals(ctx: ProposalsContext) {
   // ---------- Sites communautaires ----------
 
   /** Une ligne par site : connexion, résultats, attente ; puis la file, s'il y a quelque chose dedans. */
-  function siteRows(st: State): Row[] {
+  function siteRows(st: State, type: MediaType): Row[] {
     const rows: Row[] = [];
     for (const site of MEDIA_SITES) {
       const found = st.sites[site.id];
@@ -591,7 +645,7 @@ export function createProposals(ctx: ProposalsContext) {
         detail = t('Recherche impossible : {problem}.', { problem: found.problem });
         tone = 'warning';
       } else {
-        const n = tn(found.hits.length, '{n} résultat', '{n} résultats');
+        const n = `${tn(found.hits.length, '{n} résultat', '{n} résultats')}${found.hits.length ? ` (${hitSplit(st, found.hits, type)})` : ''}`;
         const wait = site.wait ? ` · ${t('environ {n} s d’attente par fichier (compte gratuit)', { n: site.wait })}` : '';
         if (found.account.connected) detail = t('Connecté · {n}', { n }) + wait;
         else {
@@ -621,6 +675,66 @@ export function createProposals(ctx: ProposalsContext) {
     }
     return rows;
   }
+
+  /** « aucun pour ce média ; 1 pack complet, pour tous les écrans ; les autres : Afficheur large 2, Logo 16 ; 3 d’autres jeux ou sans média reconnu » */
+  function hitSplit(st: State, hits: SiteHit[], type: MediaType): string {
+    const sum = siteHitSummary(hits, includedGames(st).map((g) => g.lead.game), st.deep?.vps);
+    const mine = sum.byType[type] ?? 0;
+    const others = (Object.entries(sum.byType) as [MediaType, number][])
+      .filter(([k]) => k !== type)
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, n]) => `${mediaTypeInfo(k).label} ${n}`);
+    return [
+      mine ? tn(mine, '{n} pour ce média', '{n} pour ce média') : t('aucun pour ce média'),
+      sum.packs ? tn(sum.packs, '{n} pack complet, pour tous les écrans', '{n} packs complets, pour tous les écrans') : undefined,
+      others.length ? t('les autres : {list}', { list: others.join(t(', ')) }) : undefined,
+      sum.elsewhere ? tn(sum.elsewhere, '{n} d’un autre jeu ou sans média reconnu', '{n} d’autres jeux ou sans média reconnu') : undefined,
+    ]
+      .filter(Boolean)
+      .join(t(' ; '));
+  }
+
+  // ---------- Recherche sur le web ----------
+
+  /** Média et table d'où la recherche web est partie, et le choix qu'elle représente. */
+  let webWanted: { file: string; type: MediaType; pick: number } | undefined;
+
+  function openWeb(table: TableEntry, type: MediaType): void {
+    const st = state!;
+    const name = st.query ?? includedGames(st)[0]?.lead.game.name ?? table.title;
+    const pick = ++picks;
+    lastPick.set(`${table.file}|${type}`, pick);
+    webWanted = { file: table.file, type, pick };
+    ctx.sites!.openWeb({ url: webSearchUrl(name, type), table: table.file, title: table.title, type, label: mediaTypeInfo(type).label });
+    st.notice = { text: t('Recherche ouverte dans la fenêtre « Récupérer » : téléchargez-y le fichier voulu, il revient ici. Fermer (Échap) pour revenir.'), tone: 'info' };
+    ctx.show(() => build(type), ctx.cursor());
+  }
+
+  // Un fichier reçu de la recherche web : seul pour ce média, il va dans le brouillon,
+  // comme une proposition choisie ; sinon il attend parmi les propositions.
+  ctx.sites?.onWebReceived((receipt: WebReceipt) => {
+    if (!state || state.file !== receipt.table) return;
+    const table = ctx.find(receipt.table);
+    if (!table || !ctx.active(table)) return;
+    const host = webHost(receipt.url);
+    if (!receipt.files.length) {
+      state.notice = { text: t('Reçu de {host} : « {file} », mais rien dedans que le menu sache montrer.', { host, file: receipt.filename }), tone: 'warning' };
+      return;
+    }
+    const files = webMediaChoices(receipt.type, [receipt], receipt.table);
+    const wanted = webWanted && webWanted.file === receipt.table && webWanted.type === receipt.type && lastPick.get(`${receipt.table}|${receipt.type}`) === webWanted.pick;
+    if (files.length !== 1 || !wanted) {
+      state.notice = {
+        text: files.length
+          ? tn(files.length, 'Reçu de {host} : {n} fichier pour ce média, à choisir.', 'Reçu de {host} : {n} fichiers pour ce média, à choisir.', { host })
+          : t('Reçu de {host} : « {file} », rien pour ce média ; les autres écrans le proposent.', { host, file: receipt.filename }),
+        tone: 'info',
+      };
+      return;
+    }
+    const text = ctx.place(table, receipt.type, { from: files[0]!.file!, mode: 'copy', origin: { origin: host, url: receipt.url } });
+    state.notice = { text: `${t('Reçu de {host}.', { host })} ${text}`, tone: 'ok' };
+  });
 
   function signIn(table: TableEntry, type: MediaType, site: MediaSiteId): void {
     ctx.sites!.signIn(site);

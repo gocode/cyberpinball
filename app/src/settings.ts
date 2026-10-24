@@ -63,6 +63,7 @@ import { describeReset, resetButtons } from './buttons-reset';
 import { coverDisplay } from './cover-display';
 import { createWindow, primaryRect } from './offscreen';
 import { LayoutReport } from './layout-check';
+import { click } from './library';
 import { relaunchCovered } from './screen-guard';
 
 export type SettingsTarget = { scope: 'global' } | { scope: 'table'; table: TableEntry };
@@ -1003,6 +1004,8 @@ function view() {
       { id: 'advanced', label: t('Avancé'), active: s.tab === 'advanced' },
     ],
     tabsFocused: s.cursor === -1,
+    // Bouton de retour en tête (Exit à la souris) : sortir d'une section, ou fermer les réglages.
+    back: s.tab === 'advanced' && s.section !== undefined ? t('Retour aux sections') : t('Fermer'),
     breadcrumb: s.tab === 'advanced' && s.section !== undefined ? (s.section === OVERRIDES ? t('Surcharges de cette table') : s.section) : undefined,
     rows: list.map(rowView),
     cursor: s.cursor,
@@ -1058,10 +1061,12 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
   const layout = new LayoutReport(captureDir);
   for (const [step, code] of ['start', ...codes].entries()) {
     if (!session) break;
-    if (step > 0) handleKey({ code, control: false });
+    // « click:<sélecteur> » : vrai clic de souris, qui passe par le rendu (bouton de retour…).
+    if (step > 0 && code.startsWith('click:')) await click(s.win, code.slice(6));
+    else if (step > 0) handleKey({ code, control: false });
     await delay(500);
     if (!session) continue;
-    const name = `reglages-${String(step).padStart(2, '0')}-${code}`;
+    const name = `reglages-${String(step).padStart(2, '0')}-${code.replace(/[^\w-]+/g, '_').slice(0, 40)}`;
     await layout.check(session.win.webContents, name);
     if (captureDir) fs.writeFileSync(path.join(captureDir, `${name}.png`), (await session.win.webContents.capturePage()).toPNG());
   }

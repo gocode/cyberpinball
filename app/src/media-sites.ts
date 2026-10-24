@@ -12,6 +12,10 @@
 // - Reçus : rangés dans <téléchargements>\sites\<site>-<fiche>\, archive déballée, et
 //   notés dans sites\recus.json : un fichier reçu reste proposé aux visites suivantes,
 //   pour ce média comme pour les autres écrans d'un pack.
+// - Web : « Chercher sur le web… » ouvre la fenêtre « Récupérer » sur une recherche ;
+//   ce que l'utilisateur y télécharge est rangé dans <téléchargements>\sites\web\, noté
+//   dans sites\web.json avec la table et le média d'où il l'a cherché, et revient à ses
+//   propositions.
 
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
@@ -33,6 +37,7 @@ import {
   type SiteReceipt,
   type SiteSearchResult,
   type SiteState,
+  type WebReceipt,
 } from '@cyberpinball/core';
 import type { Acquirer } from './acquire-window';
 import { unpackArchive } from './archives';
@@ -84,6 +89,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
   const listeners: ((job: SiteJob) => void)[] = [];
   const stops = new Map<MediaSiteId, AbortController>();
   let receipts: Map<string, SiteReceipt> | undefined;
+  let webReceipts: WebReceipt[] | undefined;
+  const webListeners: ((receipt: WebReceipt) => void)[] = [];
 
   const root = () => {
     const dir = ctx.downloadsDir();
@@ -397,6 +404,95 @@ export function createMediaSites(ctx: MediaSitesContext) {
     ctx.changed();
   }
 
+  // ---------- Web ----------
+
+  const webFile = () => (root() ? path.join(root()!, 'web.json') : undefined);
+
+  function loadWeb(): WebReceipt[] {
+    if (webReceipts) return webReceipts;
+    webReceipts = [];
+    const file = webFile();
+    try {
+      if (file && fs.existsSync(file)) {
+        for (const r of JSON.parse(fs.readFileSync(file, 'utf8')) as WebReceipt[]) {
+          // Un fichier effacé depuis n'est plus proposé.
+          const files = r.files.filter((f) => fs.existsSync(f.file));
+          if (files.length) webReceipts.push({ ...r, files });
+        }
+      }
+    } catch {
+      // Relevé illisible : on repart de rien, les fichiers restent sur le disque.
+    }
+    return webReceipts;
+  }
+
+  function saveWeb(): void {
+    const file = webFile();
+    if (!file || !webReceipts) return;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, `${JSON.stringify(webReceipts, null, 2)}\n`, 'utf8');
+  }
+
+  /** Téléchargements en cours depuis la recherche web (octets reçus, total). */
+  let webProgress: { received: number; total?: number } | undefined;
+
+  /**
+   * Fenêtre « Récupérer » sur une recherche web, quand les sources branchées n'ont pas
+   * ce qu'il faut : l'utilisateur cherche, se connecte si le site le demande et
+   * télécharge lui-même. Chaque fichier reçu est déballé et revient à ce média.
+   */
+  function openWeb(request: { url: string; table: string; title: string; type: MediaType; label: string }): void {
+    const dir = root();
+    if (!dir) return;
+    const web = path.join(dir, 'web');
+    const incoming = path.join(web, 'recu');
+    ctx.acquirer.show({
+      url: request.url,
+      game: request.title,
+      expected: t('Média : {label}', { label: request.label }),
+      host: t('Recherche sur le web · fichiers que vous choisissez'),
+      status: t('Cherchez, ouvrez une page, téléchargez : le fichier revient aux propositions ({label}). Fermer (Échap) pour revenir.', { label: request.label }),
+      claim: {
+        dir: incoming,
+        progress: (received, total) => {
+          webProgress = { received, total };
+          ctx.changed();
+        },
+        done: (r) => {
+          webProgress = undefined;
+          if ('error' in r) return ctx.changed();
+          void completeWeb(r.file, r.filename, r.urls, request, web);
+        },
+      },
+    });
+  }
+
+  async function completeWeb(file: string, filename: string, urls: string[], request: { table: string; type: MediaType }, web: string): Promise<void> {
+    const stamp = new Date();
+    const key = `web:${stamp.getTime().toString(36)}`;
+    const files = path.join(web, key.slice(4), 'fichiers');
+    fs.rmSync(files, { recursive: true, force: true });
+    try {
+      if (await unpackArchive(file, files)) fs.rmSync(file, { force: true });
+      else {
+        fs.mkdirSync(files, { recursive: true });
+        fs.renameSync(file, path.join(files, path.basename(file)));
+      }
+    } catch {
+      // Archive illisible : rien à proposer ; l'utilisateur voit que rien n'est arrivé.
+      fs.rmSync(file, { force: true });
+      return ctx.changed();
+    }
+    const medias = receivedMedias(files, { types: [request.type] });
+    const receipt: WebReceipt = { key, table: request.table, type: request.type, url: urls[0] ?? '', filename, date: stamp.toISOString(), files: medias };
+    if (medias.length) {
+      loadWeb().push(receipt);
+      saveWeb();
+    } else fs.rmSync(path.dirname(files), { recursive: true, force: true });
+    for (const listener of webListeners) listener(receipt);
+    ctx.changed();
+  }
+
   /** « 18,4 Mo sur 40 Mo », « 64 % ». */
   function progressText(job: SiteJob): string | undefined {
     if (job.received === undefined) return undefined;
@@ -424,6 +520,11 @@ export function createMediaSites(ctx: MediaSitesContext) {
     jobs: () => [...jobs.values()],
     receipt: (key: string) => loadReceipts().get(key),
     progressText,
+    openWeb,
+    webReceipts: () => loadWeb(),
+    webProgress: () => webProgress,
+    /** Appelé à chaque fichier reçu de la recherche web (sans média dedans : `files` vide). */
+    onWebReceived: (listener: (receipt: WebReceipt) => void) => void webListeners.push(listener),
   };
 }
 

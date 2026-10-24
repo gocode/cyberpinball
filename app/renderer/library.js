@@ -17,6 +17,13 @@ function actOn(node, action) {
 function renderLibrary(v) {
   const o = libEl('section', `lib lib-${v.screen}`);
   const head = libEl('header', 'lib-head');
+  // Retour en tête : à la souris, inutile de descendre au bas de la liste chercher « Retour ».
+  if (v.back) {
+    const back = actOn(libEl('button', 'lib-back'), { type: 'back' });
+    back.type = 'button';
+    back.append(libEl('span', 'lib-back-arrow', '‹'), libEl('span', '', v.back));
+    head.append(back);
+  }
   head.append(libEl('h1', '', v.heading));
   if (v.subheading) head.append(libEl('div', 'lib-sub', v.subheading));
   if (v.lead) head.append(libEl('p', 'lib-lead', v.lead));

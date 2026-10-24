@@ -16,6 +16,12 @@
 //    minuteur de 20 s qui se déroule dans la page comme sur le site (appel au serveur,
 //    décompte, puis le fichier) ; un pack complet sur VPForums, rangé à la manière de
 //    Popper ; réception, mise dans le brouillon, logo du pack proposé sur l'écran du logo.
+// 3. (Avant la file.) Afficheur : la borne de démonstration a un écran DMD 16:9, elle montre l'Afficheur
+//    large ; l'écran de l'Afficheur (4:1) le dit et mène à l'autre. Chaque site dit
+//    combien de ses résultats servent au média ouvert. « Chercher sur le web… » ouvre la
+//    fenêtre « Récupérer » sur une fausse page de DuckDuckGo ; le fichier qu'on y
+//    télécharge revient dans le brouillon. Enregistré, il devient l'actuel : le reprendre
+//    ne change rien, l'écran le dit au lieu de le réécrire.
 
 const fs = require('node:fs');
 const path = require('node:path');
@@ -43,7 +49,16 @@ const WAIT = 20;
 const LOG = [];
 let servedDirs = () => [];
 
+// Ramasse-miettes appelé pendant chaque attente : une vue cachée que plus rien ne garde
+// (téléchargement direct, lecture d'une page) disparaîtrait au hasard d'un GC ; ici, à coup sûr.
+require('node:v8').setFlagsFromString('--expose-gc');
+const gc = require('node:vm').runInNewContext('gc');
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
+/** Étapes au fil de l'eau (trace.txt) : une démonstration bloquée dit où. */
+function trace(text) {
+  fs.mkdirSync(BASE, { recursive: true });
+  fs.appendFileSync(path.join(BASE, 'trace.txt'), `${new Date().toISOString().slice(11, 19)} ${text}\n`);
+}
 function offscreen(width, height, extra = {}) {
   const win = new BrowserWindow({ show: false, width, height, useContentSize: true, enableLargerThanScreen: true, webPreferences: { offscreen: true, ...extra } });
   win.setContentSize(width, height);
@@ -117,6 +132,7 @@ function fakeSites(acq, counters, videos) {
           ${item('27996', 't2-chrome-topper', 'Terminator 2 - Judgment Day Chrome Edition Topper', '160-topper-videos', 'Topper Videos', 'Hanibal2001', 88)}
           ${item('29322', 't2-animated-wheel', 'Terminator 2 (Williams 1991) Animated Wheel APNG', '149-animated-wheel-images-apng', 'Animated Wheel Images (APNG)', 'Tarcisio', 412)}
           ${item('28887', 't3-topper', 'Terminator 3 (Stern 2003) Topper Video', '160-topper-videos', 'Topper Videos', 'Jonny', 241)}
+          ${item('12517', 't2-full-dmd', 'Terminator 2 (Williams 1991) Full DMD animated', '143-fulldmd-videos', 'FullDMD Videos', 'Wizball', 530)}
           </ol>`,
           logged,
         );
@@ -196,6 +212,12 @@ function fakeSites(acq, counters, videos) {
         return html(`<div id="user_link">demo</div><h1>Media Pack</h1><a class="download_button" href="${url.origin}/index.php?app=downloads&module=display&section=download&do=confirm_download&hash=0123456789abcdef0123456789abcdef">Download</a>`, true);
       }
     }
+    // Fausse recherche sur le web : un résultat qui mène à un fichier, comme un lien direct trouvé par l'utilisateur.
+    if (host === 'duckduckgo.com') {
+      counters.webSearch = url.searchParams.get('q');
+      return html('<h1>Résultats</h1><a id="r" href="https://medias.exemple.org/t2-fulldmd.zip">Terminator 2 FullDMD video (zip)</a>', false);
+    }
+    if (host === 'medias.exemple.org') return attachment('t2-fulldmd.zip', zipStored({ 'T2 FullDMD.webm': videos.fulldmd }));
     return new Response('Page de démonstration absente', { status: 404 });
   };
 }
@@ -286,7 +308,7 @@ async function run(report, sc) {
 
   const acq = session.fromPartition(ACQUIRE_PARTITION);
   const counters = { vpuSearch: 0, vpfSearch: 0, waitAsked: 0, tooEarly: 0, allowedAt: 0 };
-  const videos = { chrome: await video('T2 CHROME TOPPER', '#8a8f99', '#1b1d22'), pack: await video('T2 TOPPER DU PACK', '#7a1010', '#120607') };
+  const videos = { chrome: await video('T2 CHROME TOPPER', '#8a8f99', '#1b1d22'), pack: await video('T2 TOPPER DU PACK', '#7a1010', '#120607'), fulldmd: await video('T2 FULLDMD DU WEB', '#0d6b5e', '#04201c') };
   // Chaque orientation repart de zéro : pas connecté, rien reçu.
   await acq.clearStorageData({ storages: ['cookies'] });
   if (acq.protocol.isProtocolHandled('https')) acq.protocol.unhandle('https');
@@ -297,6 +319,7 @@ async function run(report, sc) {
   const log = LOG;
   const view = () => library.view();
   async function shot(name) {
+    trace(`capture ${sc.name}/${name}`);
     send();
     await delay(250);
     for (let i = 0; i < 60; i++) {
@@ -312,6 +335,7 @@ async function run(report, sc) {
     log.push(`${sc.name}/${label} : ${v.heading} | ${(v.sections ?? []).flatMap((s) => s.rows.map((r) => `[${r.text}${r.detail ? ` : ${r.detail}` : ''}]`)).join(' ')} | ${(v.media?.cards ?? []).map((c) => `${c.title} (${c.code ?? ''}${c.state ? ` · ${c.state.label}` : ''})`).join(' | ')} | actions : ${v.actions.map((a) => a.label).join(' | ')}`);
   }
   const act = (label) => {
+    trace(`action ${label}`);
     const i = view().actions.findIndex((a) => a.label === label || a.label.startsWith(label));
     if (i < 0) throw new Error(`pas d’action « ${label} » (${view().actions.map((a) => a.label).join(' | ')})`);
     library.handleAction({ type: 'activate', index: i });
@@ -323,12 +347,17 @@ async function run(report, sc) {
     if (view().busy) throw new Error(`toujours occupé (${view().busy})`);
   }
   async function until(what, test, timeout = 60_000) {
+    trace(`attente : ${what}`);
     const end = Date.now() + timeout;
-    while (!test() && Date.now() < end) await delay(200);
+    while (!test() && Date.now() < end) {
+      gc();
+      await delay(200);
+    }
     if (!test()) throw new Error(`attendu en vain : ${what}`);
   }
   const card = (title) => view().media.cards.find((c) => c.title.startsWith(title));
   const pickCard = (title) => {
+    trace(`carte ${title}`);
     const c = card(title);
     if (!c) throw new Error(`pas de carte « ${title} » (${view().media.cards.map((x) => x.title).join(' | ')})`);
     library.handleAction({ type: 'activate', index: c.action });
@@ -356,6 +385,55 @@ async function run(report, sc) {
   act('Voir les propositions');
   await idle();
   await shot('topper-connecte');
+
+  // ---------- Afficheur 4:1 sur une borne qui montre l'afficheur large ----------
+  const exact = (label) => {
+    const i = view().actions.findIndex((a) => a.label === label);
+    if (i < 0) throw new Error(`pas d’action « ${label} » (${view().actions.map((a) => a.label).join(' | ')})`);
+    library.handleAction({ type: 'activate', index: i });
+  };
+  act('Retour : Topper');
+  act('Retour aux médias');
+  exact('Afficheur');
+  act('Voir les propositions');
+  await idle();
+  await shot('afficheur-pas-montre');
+  act('Propositions : Afficheur large');
+  await idle();
+  await shot('afficheur-large-propositions');
+
+  // ---------- Recherche sur le web : le fichier téléchargé revient dans le brouillon ----------
+  act('Chercher sur le web');
+  await until('la fausse page de recherche', () => require('electron').webContents.getAllWebContents().some((w) => /duckduckgo\.com/.test(w.getURL()) && !w.isLoading()));
+  const page = require('electron').webContents.getAllWebContents().find((w) => /duckduckgo\.com/.test(w.getURL()));
+  log.push(`Recherche web : « ${counters.webSearch} »`);
+  await page.executeJavaScript("document.getElementById('r').click()");
+  await until('le fichier du web dans le brouillon', () => (view().sections ?? []).some((sec) => sec.rows.some((r) => /^Reçu de medias\.exemple\.org\./.test(r.text))));
+  for (const w of BrowserWindow.getAllWindows()) if (w !== win) w.close();
+  await delay(1000);
+  await shot('afficheur-large-recu-du-web');
+  act('Retour : Afficheur large');
+  act('Retour aux médias');
+  act('Enregistrer');
+  act('Enregistrer');
+  await idle();
+  log.push(`medias (après le web) = ${fs.readdirSync(path.join(L.tables, FOLDER, 'medias')).sort().join(' | ')}`);
+  log.push(`provenance FullDMD = ${JSON.stringify(core.mediaMemory(core.readInfo(path.join(L.tables, FOLDER, `${FOLDER}.info`))).sources?.FullDMD)}`);
+  const web = path.join(L.downloads, 'sites', 'web.json');
+  log.push(`web.json : ${fs.existsSync(web) ? JSON.parse(fs.readFileSync(web, 'utf8')).map((r) => `${r.key} ${r.type} ${r.url} → ${r.files.map((f) => path.basename(f.file)).join(', ')}`).join(' ; ') : 'absent'}`);
+
+  // ---------- Reprendre le fichier actuel : rien à réécrire, l'écran le dit ----------
+  exact('Afficheur large');
+  act('Voir les propositions');
+  await idle();
+  pickCard('T2 FullDMD.webm');
+  await shot('afficheur-large-deja-actuel');
+  // Retour au topper, pour la file.
+  act('Retour : Afficheur large');
+  act('Retour aux médias');
+  act('Topper');
+  act('Voir les propositions');
+  await idle();
 
   // ---------- File : vidéo de VPUniverse (minuteur), pack de VPForums ----------
   pickCard('Terminator 2 - Judgment Day Chrome Edition Topper');
@@ -400,6 +478,7 @@ async function run(report, sc) {
   log.push(`sources = ${JSON.stringify(core.mediaMemory(core.readInfo(path.join(L.tables, FOLDER, `${FOLDER}.info`))).sources)}`);
   const receipts = path.join(L.downloads, 'sites', 'recus.json');
   log.push(`recus.json : ${fs.existsSync(receipts) ? JSON.parse(fs.readFileSync(receipts, 'utf8')).map((r) => `${r.key} → ${r.files.map((f) => `${path.basename(f.file)} (${f.type ?? 'sans type'})`).join(', ')}`).join(' ; ') : 'absent'}`);
+
   ipcMain.removeListener('action', onAction);
   win.destroy();
 }

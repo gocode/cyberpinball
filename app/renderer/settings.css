@@ -113,6 +113,39 @@ header {
   color: var(--signal);
 }
 
+/* Retour en tête (Exit à la souris), sous la marque : petit bouton du design system (Bouton small). */
+.back {
+  display: inline-flex;
+  align-items: center;
+  gap: 1vmin;
+  margin-top: 1.4vmin;
+  min-height: 4.6vmin;
+  padding: 0 2vmin 0 1.4vmin;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 0.7vmin;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 1.85vmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.back-arrow {
+  font-size: 3vmin;
+  line-height: 1;
+  margin-top: -0.3vmin;
+  letter-spacing: 0;
+}
+
+.back:hover {
+  border-color: var(--signal);
+  box-shadow: var(--glow-signal);
+}
+
 h1 {
   margin: 0.6vmin 0 0;
   font-size: 5vmin;
@@ -211,11 +244,8 @@ h1 {
 .crumb {
   align-self: flex-start;
   margin-bottom: 1.2vmin;
-  border: 0;
-  background: transparent;
-  color: var(--accent);
+  color: var(--meta);
   font-size: 2.2vmin;
-  padding: 0;
 }
 
 .list ul {

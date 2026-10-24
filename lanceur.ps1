@@ -1,4 +1,5 @@
-﻿# Lanceur Cyber Pinball : les commandes courantes du prototype dans un menu.
+﻿# Lanceur Cyber Pinball : les commandes courantes du prototype dans un menu, par rubrique
+# (borne, essais, fabrication et publication sur GitHub, dossiers).
 #   .\lanceur.cmd              menu interactif
 #   .\lanceur.cmd sync         une action directement (voir $Actions plus bas)
 
@@ -59,8 +60,18 @@ function Show-Ini {
   if (Test-Path $ini) { Get-Content $ini -Encoding UTF8 } else { Write-Host '(fichier pas encore écrit)' }
 }
 
+# Avant une publication : la version, ses nouveautés, et une confirmation (rien ne part sans « o »).
+function Confirm-Publication {
+  Build
+  $version = (Get-Content (Join-Path $PSScriptRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
+  Invoke-Checked { node scripts/version-suivante.mjs --verifier } "La vérification des nouveautés (action « version » pour les écrire)"
+  $answer = Read-Host "Publier la version $version sur GitHub ? (o/N)"
+  if ($answer -notmatch '^[oOyY]') { throw 'Publication annulée : rien n''est parti.' }
+}
+
 $Actions = [ordered]@{
   'jouer' = @{
+    Section = 'Borne et réglages'
     Label = 'Jouer : menu des tables (assistant au premier démarrage)'
     Run   = { Build; Step 'Cyber Pinball'; npx electron app }
   }
@@ -151,6 +162,7 @@ $Actions = [ordered]@{
     Run   = { Show-Ini }
   }
   'endurance' = @{
+    Section = 'Essai à l''écran'
     Label = "Test d'endurance (nécessite les écrans du poste) : lancements répétés d'une table, avec retour du focus"
     Run   = {
       Build
@@ -170,6 +182,7 @@ $Actions = [ordered]@{
     }
   }
   'deployer' = @{
+    Section = 'Fabrication et publication sur GitHub'
     Label = "Fabriquer l'exécutable et le déployer dans la racine (app\CyberPinball.exe)"
     Run   = { Invoke-Checked { node scripts/fabriquer.mjs --deployer } 'La fabrication' }
   }
@@ -180,7 +193,68 @@ $Actions = [ordered]@{
       explorer.exe (Join-Path $PSScriptRoot 'release')
     }
   }
+  'jeton' = @{
+    Label = 'Ranger le jeton GitHub (une fois ; la publication le lit toute seule)'
+    Run   = {
+      $file = Join-Path $env:USERPROFILE '.cyberpinball\jeton-github.txt'
+      Write-Host 'Jeton à grain fin, créé sur https://github.com/settings/personal-access-tokens/new :'
+      Write-Host '  dépôt gocode/cyberpinball seulement ; Contents et Administration en lecture et écriture.'
+      $secure = Read-Host 'Collez le jeton (il ne s''affiche pas)' -AsSecureString
+      $token = [Runtime.InteropServices.Marshal]::PtrToStringBSTR([Runtime.InteropServices.Marshal]::SecureStringToBSTR($secure)).Trim()
+      if ($token -notmatch '^(github_pat_|ghp_)') { throw 'Ce n''est pas un jeton GitHub (il commence par github_pat_) : rien n''est rangé.' }
+      New-Item -ItemType Directory -Force (Split-Path $file) | Out-Null
+      [IO.File]::WriteAllText($file, $token)
+      Step "Jeton rangé dans $file, hors du dépôt. À refaire à son expiration."
+    }
+  }
+  'version' = @{
+    Label = 'Passer à la version suivante et écrire ses nouveautés (CHANGELOG), puis l''enregistrer'
+    Run   = {
+      $kind = Read-Host 'Correctif : Entrée ; sinon « mineure » ou « majeure »'
+      Invoke-Checked { node scripts/version-suivante.mjs $kind } 'Le changement de version'
+      Step 'Nouveautés en français, puis les mêmes en anglais : une ligne « - » par point sous la nouvelle version ; enregistrez, puis fermez le Bloc-notes'
+      Start-Process notepad (Join-Path $PSScriptRoot 'CHANGELOG.md') -Wait
+      Start-Process notepad (Join-Path $PSScriptRoot 'CHANGELOG.en.md') -Wait
+      Invoke-Checked { node scripts/version-suivante.mjs --verifier } 'La vérification des nouveautés (relancez « version » pour les compléter)'
+      $version = (Get-Content (Join-Path $PSScriptRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
+      Invoke-Checked { git add package.json package-lock.json CHANGELOG.md CHANGELOG.en.md } 'git add'
+      Invoke-Checked { git commit -m "Version $version" } "L'enregistrement (git commit)"
+      Step "Version $version enregistrée. « Publier » la met en ligne."
+    }
+  }
+  'verifier' = @{
+    Label = 'Vérifier avant de publier (tests, contrôle de publication, nouveautés de la version)'
+    Run   = {
+      Invoke-Checked { npm test } 'Les tests'
+      Invoke-Checked { node scripts/version-suivante.mjs --verifier } 'La vérification des nouveautés'
+    }
+  }
+  'publier' = @{
+    Label = 'Publier la version sur GitHub, avec les deux installeurs (15 à 20 min) : les bornes la voient'
+    Run   = { Confirm-Publication; Invoke-Checked { node scripts/publier.mjs } 'La publication' }
+  }
+  'publier-leger' = @{
+    Label = 'Publier avec l''installeur léger seulement (deux fois plus rapide ; sans la version complète avec VPX)'
+    Run   = { Confirm-Publication; Invoke-Checked { node scripts/publier.mjs --leger } 'La publication' }
+  }
+  'publier-brouillon' = @{
+    Label = 'Publier en brouillon (invisible des bornes, à rendre public ensuite sur GitHub)'
+    Run   = { Confirm-Publication; Invoke-Checked { node scripts/publier.mjs --brouillon } 'La publication' }
+  }
+  'envoyer' = @{
+    Label = 'Envoyer seulement le code sur GitHub (instantané, sans nouvelle version)'
+    Run   = { Build; Invoke-Checked { node scripts/envoyer-github.mjs } "L'envoi" }
+  }
+  'decrire' = @{
+    Label = 'Appliquer la description et les sujets du dépôt GitHub (depuis package.json)'
+    Run   = { Invoke-Checked { node scripts/decrire-github.mjs } 'La description du dépôt' }
+  }
+  'essai-maj' = @{
+    Label = 'Essai complet de la mise à jour, hors écran (deux versions fabriquées ; 15 min environ)'
+    Run   = { Build; & (Join-Path $PSScriptRoot 'docs\demo-mise-a-jour.ps1') }
+  }
   'tests' = @{
+    Section = 'Essais sans opérateur'
     Label = 'Tests automatiques du cœur'
     Run   = { Invoke-Checked { npm test } 'Les tests' }
   }
@@ -218,6 +292,7 @@ $Actions = [ordered]@{
     Run   = { Build; Step 'Démonstrations hors écran'; & (Join-Path $PSScriptRoot 'docs\demos-hors-ecran.ps1') }
   }
   'donnees' = @{
+    Section = 'Dossiers'
     Label = 'Ouvrir le dossier de données (modèle de borne, sauvegardes)'
     Run   = {
       $dir = Get-DataDir; New-Item -ItemType Directory -Force $dir | Out-Null
@@ -244,6 +319,7 @@ $keys = @($Actions.Keys)
 while ($true) {
   Write-Host "`n=== Cyber Pinball : lanceur du prototype ===" -ForegroundColor Magenta
   for ($i = 0; $i -lt $keys.Count; $i++) {
+    if ($Actions[$keys[$i]].Section) { Write-Host "`n  -- $($Actions[$keys[$i]].Section) --" -ForegroundColor DarkCyan }
     Write-Host ("  {0}. {1}" -f ($i + 1), $Actions[$keys[$i]].Label)
   }
   Write-Host '  0. Quitter'

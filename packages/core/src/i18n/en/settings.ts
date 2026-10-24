@@ -2,6 +2,9 @@
 export const messages: Record<string, string> = {
   // app/src/settings.ts (et app/renderer/settings.html, titre de la page)
   'Cyber Pinball — Réglages': 'Cyber Pinball — Settings',
+  'Retour aux sections': 'Back to sections',
+  Fermer: 'Close',
+  Sections: 'Sections',
   'Aucun schéma de réglages pour cette version de VPX : lancez « npm run vpx-schema ».': 'No settings schema for this VPX version: run “npm run vpx-schema”.',
   '{name} : {value}': '{name}: {value}',
   '(vide : touche par défaut de VPX)': '(empty: VPX default key)',

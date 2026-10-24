@@ -532,6 +532,18 @@ With your own VPForums and VPUniverse accounts (free). The off-screen demo (`.\d
 | 244 | Two sites at once | Start on a VPForums pack while VPUniverse is waiting. | The pack downloads without waiting for VPUniverse; once received, its files are suggested on the logo, topper, launch sound... screens. The last choice made for the topper stays in the draft. |
 | 245 | Stop, download cap | Queue three VPUniverse files, then "Arrêter la file" (Stop the queue); start again until the account's cap, if it is reached. | Stop: nothing left queued, no partial file kept. Cap: the card says "plafond de téléchargements du compte atteint" (account download cap reached), the next ones from that site stop. |
 | 246 | Keeping what was received | Leave the media screen without saving, restart Cyber Pinball, go back to the suggestions. | Received files are still suggested ("Reçu de …" (Received from …)), with no new download; "Enregistrer" (Save) stores them in `medias\` with their source. |
+| 250 | Display and count | On a cabinet whose DMD screen is wide (16:9), Game of Thrones details > "Médias du jeu" (Game media) > "Afficheur" (DMD) > "Voir les propositions" (See suggestions). | At the top, "Pas montré sur votre borne" (Not shown on your cabinet); each site says "n résultats (aucun pour ce média ; les autres : … Afficheur large n …)" (n results (none for this media; the others: … FullDMD n …)). "Propositions : Afficheur large" (Suggestions: FullDMD) opens the FullDMD ones, where the sites' FullDMD entries appear. Start on the "Actuel" (Current) card: "C'est déjà le média actuel" (This is already the current media), nothing in the draft. |
+| 251 | Search the web | On a media item with no suitable suggestion, "Chercher sur le web…" (Search the web...); in the "Récupérer" (Get) window, find a file (zip or video) and download it, then Close (Esc). | The search carries the game title and the screen in English. The file received appears first in the suggestions ("Téléchargé du web", Downloaded from the web), already in the draft if it is the only one for this media; "Enregistrer" (Save) stores it in `medias\` with its origin. Another table does not offer it. |
+
+## Back at the top of the screen
+
+On a PC, with the mouse. The off-screen proof (clicks on the button in the system menu, the ROM library, adding, the game page, the doctor, editing, in French, in English, rotated menu, VPX settings) goes through the autopilot: `click:.lib-back`, and `click:.back` with `--reglages`.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 247 | Submenus | Gear ⚙ > "Configuration de la borne" (Cabinet configuration) > "Configurations", then click "‹ Retour…" (Back) above each title until the table menu. | Each click goes up one screen, like Exit; the label says where it goes ("Retour aux tables" (Back to tables), "Retour à la fiche" (Back to game page)…). Nothing to scroll. |
+| 248 | Game page and on-screen keyboard | A table's game page > "Modifier les informations" (Edit details) > "Titre" (Title): the keyboard opens; Exit, then "‹ Annuler" (Cancel). | The title does not move when the keyboard opens; "‹ Annuler" (Cancel) goes back to the game page without saving anything. |
+| 249 | VPX settings | System menu > "Réglages de VPX" (VPX settings) > "Avancé" (Advanced) > a section; "‹ Retour aux sections" (Back to sections), then "‹ Fermer" (Close). | Back to the list of sections, then the settings close and the menu is back. |
 
 ## What cannot be tested yet
 

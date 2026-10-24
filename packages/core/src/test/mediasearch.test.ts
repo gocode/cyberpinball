@@ -8,7 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { isAudioFile, localMediaChoices, mediaDbChoices, mergeMediaChoices, vpsImageChoices, vpsMusicChoices } from '../mediachoices';
+import { isAudioFile, localMediaChoices, sameFileContent, mediaDbChoices, mergeMediaChoices, vpsImageChoices, vpsMusicChoices } from '../mediachoices';
 import { matchMediaDb, parseMediaDbIndex, type MediaDb } from '../mediadb';
 import { emptyMediaDraft, planMediaChanges } from '../mediaedit';
 import { applyOps } from '../fileops';
@@ -573,4 +573,20 @@ test('brouillon : un fichier téléchargé note sa provenance ; remplacé à la 
   applyOps(plan2.ops, { trashDir: path.join(root, 'trash') });
   assert.equal(mediaMemory(readInfo(table2.infoFile)).sources, undefined);
   assert.equal(readInfo(table2.infoFile).Info?.Title, 'GOTG', 'les autres champs restent');
+});
+
+test('même contenu : le fichier repris de VPinMediaDB est l’actuel, une autre version ne l’est pas', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'samecontent-'));
+  const a = path.join(dir, '(FullDMD) GoT.mp4');
+  const b = path.join(dir, 'dmd.mp4');
+  const c = path.join(dir, 'autre.mp4');
+  fs.writeFileSync(a, Buffer.alloc(3 << 20, 7));
+  fs.writeFileSync(b, Buffer.alloc(3 << 20, 7));
+  const other = Buffer.alloc(3 << 20, 7);
+  other[(2 << 20) + 5] = 8;
+  fs.writeFileSync(c, other);
+  assert.equal(sameFileContent(a, b), true, 'copie octet pour octet, au-delà du premier morceau lu');
+  assert.equal(sameFileContent(a, c), false, 'même taille, un octet différent');
+  assert.equal(sameFileContent(a, path.join(dir, 'absent.mp4')), false);
+  fs.rmSync(dir, { recursive: true, force: true });
 });

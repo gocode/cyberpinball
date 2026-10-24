@@ -108,6 +108,8 @@ Le [manuel technique](docs/manuel.md) décrit chaque partie en détail : les fic
 
 ### Publier une version (mainteneurs)
 
+Chaque étape ci-dessous est une action de `lanceur.cmd` (rubrique « Fabrication et publication sur GitHub ») : voir l'[aide-mémoire](docs/manuel.md#aide-mémoire--publier-une-version) du manuel technique.
+
 `npm run publier` vérifie que rien de personnel ni de secret ne va partir, fabrique les deux installeurs, signe le flux de mise à jour et envoie un instantané du code sur `main`. Il crée ensuite la release GitHub `v<version>` avec les installeurs et le flux. Les nouveautés viennent de [CHANGELOG.md](CHANGELOG.md) (affichées sur la borne) et de sa traduction [CHANGELOG.en.md](CHANGELOG.en.md) (ajoutée à la release GitHub). Il faut un jeton GitHub à grain fin, rangé une fois pour toutes dans `%USERPROFILE%\.cyberpinball\jeton-github.txt` (ou la variable `CYBERPINBALL_GITHUB_TOKEN`), et la clé de publication : aucun des deux n'est jamais dans le dépôt, et le `.gitignore` comme le contrôle de publication en écartent les fichiers de secrets. La description et les sujets du dépôt viennent du `package.json` et sont appliqués à chaque release, ou par `npm run decrire` (le jeton a alors besoin de la permission « Administration »). Voir [Mise à jour depuis la borne](docs/manuel.md#mise-à-jour-depuis-la-borne) dans le manuel technique.
 
 ## Composants tiers et licences

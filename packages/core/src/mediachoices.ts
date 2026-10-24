@@ -30,7 +30,7 @@ import type { SiteHit } from './mediasites';
 import type { TableEntry } from './tables';
 import { vpsLabel, type VpsGame } from './vps';
 
-export type MediaChoiceSource = 'mediadb' | 'vps' | 'vps-music' | 'pup' | 'dmd-folder' | 'b2s' | 'vpx' | 'vpforums' | 'vpuniverse';
+export type MediaChoiceSource = 'mediadb' | 'vps' | 'vps-music' | 'pup' | 'dmd-folder' | 'b2s' | 'vpx' | 'vpforums' | 'vpuniverse' | 'web';
 
 export const MEDIA_CHOICE_SOURCE_LABELS: Record<MediaChoiceSource, string> = {
   mediadb: 'VPinMediaDB',
@@ -54,7 +54,36 @@ export const MEDIA_CHOICE_SOURCE_LABELS: Record<MediaChoiceSource, string> = {
   },
   vpforums: 'VPForums',
   vpuniverse: 'VPUniverse',
+  get web() {
+    return t('Téléchargé du web');
+  },
 };
+
+/** Empreinte MD5 d'un fichier, lu par morceaux (une vidéo 4k pèse des centaines de Mo). */
+function fileMd5(file: string): string {
+  const hash = crypto.createHash('md5');
+  const fd = fs.openSync(file, 'r');
+  try {
+    const buf = Buffer.alloc(1 << 20);
+    for (let n; (n = fs.readSync(fd, buf, 0, buf.length, null)) > 0; ) hash.update(buf.subarray(0, n));
+  } finally {
+    fs.closeSync(fd);
+  }
+  return hash.digest('hex');
+}
+
+/**
+ * Même contenu, octet pour octet (taille, puis MD5) : prendre l'un à la place de
+ * l'autre ne change rien à ce que le menu montre. Un fichier illisible n'est pas le même.
+ */
+export function sameFileContent(a: string, b: string): boolean {
+  try {
+    if (fs.statSync(a).size !== fs.statSync(b).size) return false;
+    return fileMd5(a) === fileMd5(b);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Musiques pour la table que la base VPS donne (soundFiles), sur Dropbox seulement :

@@ -50,6 +50,7 @@ import {
   playfieldMediaRotation,
   resolveMedia,
   samePath,
+  sameFileContent,
   scanTableMedias,
   t,
   tableMediaDir,
@@ -297,6 +298,7 @@ export function createMedias(ctx: MediasContext) {
         place: (table, type, entry) => place(session!, table, type, entry, mediaTypeInfo(type).pages ? { kind: 'add' } : { kind: 'set' }),
         b2s: (table) => b2sSources(session!, table),
         active: (table) => session?.file === table.file,
+        placement: (type) => mediaPlacement(type, cabinet()),
         back: (type, message) => {
           if (!session) return;
           session.next = message;
@@ -477,6 +479,20 @@ export function createMedias(ctx: MediasContext) {
   function place(s: Session, table: TableEntry, type: MediaType, entry: MediaPageEntry, target: Target): string {
     const pages = [...draftPages(s.draft, type, current(s, table, type))];
     const info = mediaTypeInfo(type);
+    // Le même contenu que ce qui est déjà là (même fichier de VPinMediaDB repris, copie d'un
+    // fichier rangé) : l'enregistrer réécrirait l'ancien à l'identique, l'utilisateur croirait
+    // que rien n'a marché. Le brouillon revient à l'état d'aujourd'hui pour ce média.
+    if ('from' in entry) {
+      const now = current(s, table, type);
+      const same = (f: string | undefined) => f !== undefined && sameFileContent(entry.from, f);
+      if (!info.pages && same(now[0])) {
+        setPages(s, table, type, now.map((file) => ({ file })));
+        return t('« {file} » est identique au média {label} actuel : rien ne changerait à l’enregistrement.', { file: entryName(entry), label: info.label });
+      }
+      if (info.pages && target.kind === 'add' && pages.some((e) => same(entrySource(e)))) {
+        return t('« {file} » est déjà l’une des pages : rien d’ajouté.', { file: entryName(entry) });
+      }
+    }
     if (target.kind === 'replace') pages[target.index] = entry;
     else if (target.kind === 'add') pages.push(entry);
     else pages.splice(0, pages.length, entry);

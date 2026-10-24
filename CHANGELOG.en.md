@@ -7,6 +7,13 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.2
+
+- Updates: the check runs right at start-up, then every 6 hours; the red dot appears without opening the menu.
+- Updates: installing no longer gets stuck when Cyber Pinball is started from its shortcut, and a failure restarts Cyber Pinball with no click needed.
+- A "‹ Back" button above the title of every menu, and in the VPX settings.
+- Media suggested by sites: displays the cabinet does not show are flagged, number of sites per media item, web search.
+
 ## 0.1.1
 
 - Updating from the cabinet also works on a cabinet copied without the installer: its shortcuts stay as they are.

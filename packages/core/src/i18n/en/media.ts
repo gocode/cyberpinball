@@ -165,8 +165,8 @@ export const messages: Record<string, string> = {
   'VPinMediaDB indisponible': 'VPinMediaDB unavailable',
   '{problem}. Restent les médias déjà sur la borne, et les vignettes VPS déjà reçues.': '{problem}. The media already on the cabinet and the VPS thumbnails already received remain.',
   'Aucune proposition pour ce média': 'No suggestion for this media',
-  'Les jeux retenus n’ont pas de {label}, et la table n’en a pas dans son PuP-Pack ni son dossier du DMD. « Autres jeux… » pour en retenir d’autres.':
-    'The selected games have no {label}, and the table has none in its PuP-Pack or DMD folder. “Other games…” to select more.',
+  'Les jeux retenus n’ont pas de {label}, et la table n’en a pas dans son PuP-Pack ni son dossier du DMD. « Chercher sur le web… » pour le trouver vous-même, ou « Autres jeux… » pour en retenir d’autres.':
+    'The selected games have no {label}, and the table has none in its PuP-Pack or DMD folder. “Search the web…” to find it yourself, or “Other games…” to select more.',
   'Aucun jeu de la base VPS ne correspond : « Chercher un autre titre… », ou prenez un fichier dans le dossier d’import.': 'No game in the VPS database matches: “Search for another title…”, or take a file from the import folder.',
   '{n} proposition': '{n} suggestion',
   '{n} propositions': '{n} suggestions',
@@ -445,4 +445,37 @@ export const messages: Record<string, string> = {
     'about 24,000 media: logos, playfield, backglass, DMD and topper videos, cards, launch sounds',
   'reçu : {title}': 'received: {title}',
   'pack de médias': 'media pack',
+  // Afficheur que la borne ne montre pas, décompte des résultats par média, recherche sur le web
+  '« {file} » est identique au média {label} actuel : rien ne changerait à l’enregistrement.': '“{file}” is identical to the current {label}: saving would change nothing.',
+  '« {file} » est déjà l’une des pages : rien d’ajouté.': '“{file}” is already one of the pages: nothing added.',
+  'C’est le fichier que le menu montre aujourd’hui : le reprendre ne changerait rien.': 'This is the file the menu shows today: taking it again would change nothing.',
+  'Téléchargé dans la fenêtre « Récupérer » ; gardé dans les téléchargements, copié dans medias\\ à l’enregistrement.':
+    'Downloaded in the “Get” window; kept in the downloads, copied into medias\\ when saving.',
+  'Propositions : {label}': 'Suggestions: {label}',
+  'Le média que votre borne montre': 'The media your cabinet shows',
+  'Chercher sur le web…': 'Search the web…',
+  'Téléchargement : {got}': 'Downloading: {got}',
+  'Navigateur intégré : ce que vous y téléchargez revient ici': 'Built-in browser: what you download there comes back here',
+  'Pas montré sur votre borne': 'Not shown on your cabinet',
+  'C’est déjà le média actuel : rien ne changerait. Choisissez une autre proposition.': 'This is already the current media: nothing would change. Choose another suggestion.',
+  '{n} pour ce média': '{n} for this media',
+  'aucun pour ce média': 'none for this media',
+  '{n} pack complet, pour tous les écrans': '{n} complete pack, for every screen',
+  '{n} packs complets, pour tous les écrans': '{n} complete packs, for every screen',
+  'les autres : {list}': 'the others: {list}',
+  '{n} d’un autre jeu ou sans média reconnu': '{n} for another game or with no recognised media',
+  '{n} d’autres jeux ou sans média reconnu': '{n} for other games or with no recognised media',
+  'Recherche ouverte dans la fenêtre « Récupérer » : téléchargez-y le fichier voulu, il revient ici. Fermer (Échap) pour revenir.':
+    'Search opened in the “Get” window: download the file you want there, it comes back here. Close (Esc) to return.',
+  'Reçu de {host} : « {file} », mais rien dedans que le menu sache montrer.': 'Received from {host}: “{file}”, but nothing in it the menu can show.',
+  'Reçu de {host} : {n} fichier pour ce média, à choisir.': 'Received from {host}: {n} file for this media, to choose.',
+  'Reçu de {host} : {n} fichiers pour ce média, à choisir.': 'Received from {host}: {n} files for this media, to choose.',
+  'Reçu de {host} : « {file} », rien pour ce média ; les autres écrans le proposent.': 'Received from {host}: “{file}”, nothing for this media; the other screens offer it.',
+  'Reçu de {host}.': 'Received from {host}.',
+  'Média : {label}': 'Media: {label}',
+  'Recherche sur le web · fichiers que vous choisissez': 'Web search · files you choose',
+  'Cherchez, ouvrez une page, téléchargez : le fichier revient aux propositions ({label}). Fermer (Échap) pour revenir.':
+    'Search, open a page, download: the file comes back to the suggestions ({label}). Close (Esc) to return.',
+  'Téléchargé du web': 'Downloaded from the web',
+  'reçu de {host} : {file}': 'received from {host}: {file}',
 };
