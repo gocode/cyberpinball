@@ -364,4 +364,8 @@ export const messages: Record<string, string> = {
   'Revenir à la disposition générale': 'Back to the general layout',
   // packages/core/src/doctor.ts : cadrage manuel
   '{name} règle [Player] CabinetAutofitMode = 0 : VPX ne cadre pas cette table et reprend une vue réglée à la main, peut-être pour un autre écran (table tronquée ou qui déborde). Ensuite, « Régler l’affichage en partie » dans la fiche la cadre sur la table lancée.': '{name} sets [Player] CabinetAutofitMode = 0: VPX does not frame this table and uses a hand-set view, perhaps made for another screen (table cut off or overflowing). Then “Adjust display in game” on the table page frames it on the running table.',
+  // packages/core/src/doctor.ts : option du PuP-Pack inadaptée
+  'Option du PuP-Pack inadaptée à la borne': 'PuP-Pack option unsuited to the cabinet',
+  'pupvideos\\{pack} applique « {applied} » ({appliedTraits}) ; pour cette borne ({cabinet}), « {best} » ({bestTraits}) convient mieux. Fiche > « PuP-Pack » pour voir et choisir les options.': 'pupvideos\\{pack} applies “{applied}” ({appliedTraits}); for this cabinet ({cabinet}), “{best}” ({bestTraits}) suits better. Table page > “PuP-Pack” to see and choose the options.',
+  'Appliquer « {option} »': 'Apply “{option}”',
 };

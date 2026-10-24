@@ -127,8 +127,8 @@ export function probeReasonText(probe: { reason: ProbeReason; count?: number }):
   }
 }
 
-/** Partie commune : vérification de Cloudflare, site en panne, lien hors du site. */
-const COMMON = String.raw`
+/** Partie commune des scripts de page : vérification de Cloudflare, site en panne, lien hors du site. */
+export const COMMON_PROBE = String.raw`
   const text = (document.body && document.body.innerText) || '';
   if (document.querySelector('#challenge-form, #cf-challenge-running, .cf-turnstile, iframe[src*="challenges.cloudflare.com"]') || /^Just a moment/i.test(document.title))
     return { kind: 'show', reason: 'challenge' };
@@ -139,7 +139,7 @@ const COMMON = String.raw`
 `;
 
 /** Invision Community (vpuniverse.com, pinsound-community.org). */
-const INVISION = /* i18n-ignore : script de la page du site, commentaires et motifs */ String.raw`(() => {${COMMON}
+const INVISION = /* i18n-ignore : script de la page du site, commentaires et motifs */ String.raw`(() => {${COMMON_PROBE}
   if ((window.ipsSettings && window.ipsSettings.memberID === 0) || document.querySelector('#elUserSignIn')) return { kind: 'login' };
   if (/download_no_perm|You do not have permission/i.test(text)) return { kind: 'show', reason: 'forbidden' };
   // Page de choix : une ligne par fichier.
@@ -161,7 +161,7 @@ const INVISION = /* i18n-ignore : script de la page du site, commentaires et mot
 })()`;
 
 /** IP.Board 3 (vpforums.org). */
-const IPBOARD3 = /* i18n-ignore : script de la page du site, motifs de recherche */ String.raw`(() => {${COMMON}
+const IPBOARD3 = /* i18n-ignore : script de la page du site, motifs de recherche */ String.raw`(() => {${COMMON_PROBE}
   if (/Attention Proxy Users/i.test(text)) return { kind: 'show', reason: 'proxy' };
   if (document.querySelector('#sign_in, a[href*="section=login"]') && !document.querySelector('#user_link')) return { kind: 'login' };
   if (document.querySelector('a#agree_disclaimer')) return { kind: 'show', reason: 'terms' };
@@ -175,7 +175,7 @@ const IPBOARD3 = /* i18n-ignore : script de la page du site, motifs de recherche
 })()`;
 
 /** XenForo 2 avec le module de ressources (pinballnirvana.com). */
-const XENFORO = String.raw`(() => {${COMMON}
+const XENFORO = String.raw`(() => {${COMMON_PROBE}
   if (document.documentElement.getAttribute('data-logged-in') === 'false') return { kind: 'login' };
   if ([...document.querySelectorAll('span.is-disabled')].some((s) => /permission/i.test(s.textContent || ''))) return { kind: 'show', reason: 'forbidden' };
   const files = [...document.querySelectorAll('a[href*="/download?file="]')];
@@ -206,3 +206,27 @@ export function siteOfUrl(url: string): SourceSite | undefined {
   }
   return SOURCE_SITES.find((s) => host === s.domain || host.endsWith(`.${s.domain}`));
 }
+
+/**
+ * Minuteur d'un site (VPUniverse : environ 45 s par fichier pour un compte gratuit),
+ * pour un téléchargement que l'utilisateur a demandé en acceptant d'attendre : `click`
+ * clique le lien comme un membre (la page demande l'attente au serveur, puis décompte
+ * et lance le fichier d'elle-même) et renvoie true s'il l'a trouvé ; `counter` lit les
+ * secondes affichées. Le serveur tient l'attente : rien n'est raccourci. Relevé dans le
+ * script du site (downloads.front.view.download, doDownload) le 24/10/2026.
+ */
+export const WAIT_PROBES: Partial<Record<SourceSite['engine'], { click: string; counter: string }>> = {
+  invision: {
+    click: String.raw`(() => {
+      const links = [...document.querySelectorAll('a[data-action="download"][data-wait], a[href*="do=download"][data-wait]')];
+      if (links.length !== 1) return false;
+      links[0].click();
+      return true;
+    })()`,
+    counter: String.raw`(() => {
+      const c = document.querySelector('[data-role="downloadCounter"]');
+      const n = c ? parseInt(c.textContent || '', 10) : NaN;
+      return Number.isFinite(n) ? n : null;
+    })()`,
+  },
+};

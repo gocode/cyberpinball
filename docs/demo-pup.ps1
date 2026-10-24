@@ -1,7 +1,7 @@
 ﻿# Démonstration sans opérateur des PuP-Packs : prépare un bac à sable dans tmp\demo-pup
 # avec deux tables factices et un pack factice, puis (avec -Run) rejoue l'ajout du pack
-# (choix de l'option, plan, installation, vérification) et le médecin sur une table dont
-# le pack est mal rangé ; captures dans tmp\captures\pup (et tmp\captures\pup-deux-ecrans :
+# (choix de l'option, plan, installation, vérification), le médecin sur une table dont
+# le pack est mal rangé, puis fiche > « PuP-Pack » (options, une autre appliquée) ; captures dans tmp\captures\pup (et tmp\captures\pup-deux-ecrans :
 # le même ajout sur une borne simulée à deux écrans). Aucune vraie table n'est touchée,
 # aucun .bat n'est exécuté : les packs sont faits de petits fichiers texte.
 #   .\docs\demo-pup.ps1 -Run
@@ -149,9 +149,12 @@ Invoke-Autopilot $root $home_ "$wt\tmp\captures\pup" @(
   'Digit1',                                    # plan : Installer
   'Escape',                                    # vérification après l'ajout, puis la fiche
   'Escape', 'ShiftLeft', 'Digit1',             # menu, Attack from Mars, fiche
-  'click:.lib-action:nth-child(4)',            # Diagnostiquer et réparer
+  'action:Diagnostiquer',                      # Diagnostiquer et réparer (par son libellé : la fiche gagne des actions)
   'ShiftLeft', 'ShiftLeft', 'ShiftLeft', 'Digit1', # Tout réparer : pack remonté, ancien pack à la corbeille
   'ShiftLeft', 'ShiftLeft', 'ShiftLeft', 'Digit1', # l'analyse suivante propose l'option : l'appliquer
+  'Escape',                                    # retour à la fiche : « PuP-Pack » montre l'option appliquée
+  'action:PuP-Pack',                           # les options du pack, l'appliquée et la conseillée
+  'action:Option 2 - FullDMD on Backglass',    # une autre option, choisie ici : appliquée et retenue
   'Escape', 'Escape'
 )
 Invoke-Autopilot $root2 $home2 "$wt\tmp\captures\pup-deux-ecrans" @(

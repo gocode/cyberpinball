@@ -5,7 +5,13 @@
 // les pages sont traduits ici, au chargement. Sans préchargement (page de démonstration
 // ouverte seule), le texte français reste.
 
-const I18N = window.cyberI18n ?? { language: 'fr', locale: 'fr-FR', messages: {} };
+// Un catalogue incomplet (processus principal qui ne répond pas : sendSync rend alors {}) vaut
+// aussi le français ; sinon chaque texte lirait un catalogue absent et la page resterait vide.
+const I18N_GIVEN = window.cyberI18n;
+const I18N =
+  I18N_GIVEN && typeof I18N_GIVEN.language === 'string' && I18N_GIVEN.messages && typeof I18N_GIVEN.messages === 'object'
+    ? I18N_GIVEN
+    : { language: 'fr', locale: 'fr-FR', messages: {} };
 const I18N_MISSING = new Set();
 
 /** Remplace {nom} par params.nom ; une accolade sans paramètre reste telle quelle. */

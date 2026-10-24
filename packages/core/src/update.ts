@@ -42,6 +42,23 @@ export interface UpdateManifest {
   /** Nouveautés dans une autre langue (CHANGELOG.en.md), affichées par une borne réglée dans cette langue. */
   notesByLanguage?: Partial<Record<Language, string[]>>;
   installer: { name: string; url: string; size: number; sha256: string };
+  /**
+   * Nouveautés des versions précédentes (CHANGELOG), la plus récente d'abord : une borne qui a
+   * sauté des versions voit tout ce qui a changé depuis la sienne. Absent des flux plus anciens.
+   */
+  history?: UpdateHistoryEntry[];
+}
+
+export interface UpdateHistoryEntry {
+  version: string;
+  notes: string[];
+  notesByLanguage?: Partial<Record<Language, string[]>>;
+}
+
+/** Nouveautés d'une version, telles qu'à afficher. */
+export interface ReleaseNotes {
+  version: string;
+  notes: string[];
 }
 
 /** Flux tel que publié : le manifeste exact, en texte, et sa signature. */
@@ -155,6 +172,11 @@ function checkManifest(m: UpdateManifest): void {
   if (!Array.isArray(m.notes) || m.notes.some((n) => typeof n !== 'string')) fail(t('nouveautés absentes'));
   const translated = Object.values(m.notesByLanguage ?? {});
   if (translated.some((notes) => !Array.isArray(notes) || notes.some((n) => typeof n !== 'string'))) fail(t('nouveautés absentes'));
+  if (m.history !== undefined) {
+    const lists = (e: UpdateHistoryEntry) => [e.notes, ...Object.values(e.notesByLanguage ?? {})];
+    const bad = !Array.isArray(m.history) || m.history.some((e) => typeof e?.version !== 'string' || !isVersion(e.version) || lists(e).some((l) => !Array.isArray(l) || l.some((n) => typeof n !== 'string')));
+    if (bad) fail(t('historique des nouveautés illisible'));
+  }
   const i = m.installer;
   if (!i || typeof i.name !== 'string' || !/^[\w.-]+\.exe$/i.test(i.name)) fail(t('nom de l’installeur absent'));
   if (typeof i.url !== 'string' || !/^https?:\/\//.test(i.url)) fail(t('adresse de l’installeur absente'));
@@ -163,9 +185,22 @@ function checkManifest(m: UpdateManifest): void {
 }
 
 /** Nouveautés dans la langue de l'interface, sinon en français (flux d'avant les traductions). */
-export function updateNotes(manifest: UpdateManifest, lang: Language = language()): string[] {
+export function updateNotes(manifest: UpdateManifest | UpdateHistoryEntry, lang: Language = language()): string[] {
   const translated = manifest.notesByLanguage?.[lang];
   return translated?.length ? translated : manifest.notes;
+}
+
+/**
+ * Nouveautés de chaque version plus récente que celle qui tourne, la plus récente d'abord :
+ * la dernière publiée, puis celles de l'historique du flux qu'elle a sautées.
+ */
+export function missedReleases(manifest: UpdateManifest, current: string, lang: Language = language()): ReleaseNotes[] {
+  const seen = new Set([manifest.version]);
+  const older = (manifest.history ?? [])
+    .filter((e) => !seen.has(e.version) && (seen.add(e.version), true))
+    .filter((e) => compareAppVersions(e.version, current) > 0 && compareAppVersions(e.version, manifest.version) < 0)
+    .sort((a, b) => compareAppVersions(b.version, a.version));
+  return [{ version: manifest.version, notes: updateNotes(manifest, lang) }, ...older.map((e) => ({ version: e.version, notes: updateNotes(e, lang) }))];
 }
 
 /** Cherche la dernière version publiée et la compare à celle qui tourne. */

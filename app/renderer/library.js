@@ -75,7 +75,14 @@ function renderLibrary(v) {
     const li = actOn(libEl('li', `lib-action tone-${a.tone ?? 'none'}${i === v.cursor && !v.pages ? ' current' : ''}`), { type: 'activate', index: i });
     // Libellé en attribut : une démonstration clique une action par son nom, pas par son rang.
     li.dataset.label = a.label;
-    li.append(libEl('span', 'label', a.label));
+    const label = libEl('span', 'label', a.label);
+    // Pastille rouge : cette entrée attend l'utilisateur (une mise à jour disponible…).
+    if (a.attention) {
+      const dot = libEl('span', 'lib-attention');
+      dot.title = t('Attend votre intervention');
+      label.append(dot);
+    }
+    li.append(label);
     if (a.detail) li.append(libEl('span', 'detail', a.detail));
     actions.append(li);
   });
@@ -247,6 +254,13 @@ function renderMediaCards(m, cursor) {
     if (c.note) line('media-note', '', c.note);
     if (c.description) line('media-desc', t('Rôle'), c.description);
     if (c.facts) line('media-facts', '', c.facts);
+    if (typeof c.progress === 'number') {
+      const bar = libEl('div', 'media-progress');
+      const fill = libEl('span', '');
+      fill.style.width = `${Math.round(Math.max(0, Math.min(1, c.progress)) * 100)}%`;
+      bar.append(fill);
+      text.append(bar);
+    }
     if (c.pending) line('media-pending', '', c.pending);
     for (const extra of c.extra ?? []) line('media-extra', '', extra);
     li.append(text);

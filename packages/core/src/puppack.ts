@@ -6,7 +6,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AncillaryRoleId, Cabinet, RoleId } from './model';
-import { t } from './i18n';
+import { formatList, t } from './i18n';
 import { roleZone, zoneRatio } from './zones';
 
 export const PUP_FILES = ['screens.pup', 'playlists.pup', 'triggers.pup'] as const;
@@ -436,7 +436,18 @@ export function traitsOf(root: string, variant: Omit<PupVariant, 'traits'>): Var
     if (traits.topper === undefined && screens.some((s) => s.num === 0)) traits.topper = Boolean(shown(0));
     const dmd = shown(5) ?? shown(1);
     if (traits.dmd === undefined && screens.length) {
-      traits.dmd = !dmd ? 'none' : dmd.parent !== undefined && dmd.parent !== dmd.num && screenRole(dmd.parent) === 'backglass' ? 'backglass' : 'separate';
+      if (screens.some((s) => s.num === 1 || s.num === 5)) {
+        traits.dmd = !dmd ? 'none' : dmd.parent !== undefined && dmd.parent !== dmd.num && screenRole(dmd.parent) === 'backglass' ? 'backglass' : 'separate';
+      } else {
+        // Pas d'écran DMD (1) ni FullDMD (5) : le pack n'occupe pas la fenêtre du DMD, ce
+        // qui ne dit pas que la borne n'en a pas. Un écran « DMD » posé sur le backglass dit
+        // où va le DMD : allumé, le pack y met ses propres animations (le vrai DMD reste sur
+        // son écran) ; éteint, le cadre reste vide pour y poser le DMD. Sinon, rien à en
+        // déduire (Star Trek LE, octobre 2026 : l'option faite pour une borne à DMD notée
+        // « sans DMD », derrière celle qui laisse le cadre vide).
+        const frame = screens.find((s) => s.parent !== undefined && s.parent !== s.num && screenRole(s.parent) === 'backglass' && /dmd/i.test(`${s.description} ${s.playlist ?? ''}`));
+        if (frame) traits.dmd = isVisible(frame) ? 'separate' : 'backglass';
+      }
     }
     if (!traits.desktop && shown(3) && !shown(2) && !shown(6)) traits.desktop = true;
   }
@@ -484,6 +495,20 @@ export function pupCabinet(cabinet: Cabinet | undefined): PupCabinet | undefined
     backglassRatio: ratio('backglass'),
     aspects,
   };
+}
+
+/** « topper · DMD séparé · 16:9 » : ce que vise une option de PuP-Pack. */
+export function variantTraitsLabel(v: PupVariant): string {
+  const traits = v.traits;
+  const parts: string[] = [];
+  if (traits.desktop) parts.push(t('bureau, un seul écran'));
+  if (traits.unsupported) parts.push(t('non géré par le plugin PUP'));
+  if (traits.topper !== undefined) parts.push(traits.topper ? 'topper' : t('sans topper'));
+  if (traits.dmd) parts.push({ separate: t('DMD sur son écran'), backglass: t('DMD dans le backglass'), none: t('sans DMD') }[traits.dmd]);
+  if (traits.fullDmd !== undefined) parts.push(traits.fullDmd ? 'FullDMD' : t('DMD réel'));
+  const ratios: Record<string, string> = { '1.78': '16:9', '2.33': '21:9', '1.33': '4:3', '1.25': '5:4', '1.00': '1:1' };
+  if (traits.ratios.length) parts.push(formatList(traits.ratios.map((r) => ratios[r.toFixed(2)] ?? r.toFixed(2)), 'or'));
+  return parts.join(' · ') || t('disposition non décrite');
 }
 
 /** Description courte de la borne, pour dire pourquoi une option est retenue. */

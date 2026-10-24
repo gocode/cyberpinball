@@ -6,11 +6,12 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { diagnose, FINDING_CODES, pupMemory, scriptFacts, type DoctorContext, type Finding } from '../doctor';
+import { diagnose, FINDING_CODES, pupMemory, pupOptionOps, scriptFacts, setPupMemory, tablePupPacks, type DoctorContext, type Finding } from '../doctor';
 import type { PupCabinet } from '../puppack';
-import { applyOps, sameFile } from '../fileops';
+import { applyOps, sameFile, type FileOp } from '../fileops';
 import { mediaErrorsFile, readMediaErrors, recordMediaError } from '../mediaerrors';
-import { readInfo, scanTables } from '../tables';
+import { readInfo, scanTables, type TableEntry } from '../tables';
+import { starTrekPack } from './fixtures';
 
 const SCRIPT = 'Const cGameName="afm_113b"\r\nLoadVPM "01560000", "WPC.VBS", 3.26\r\nController.GameName = cGameName\r\n';
 const TABLE = 'Attack from Mars (Bally 1995)';
@@ -211,6 +212,16 @@ const TRAPS: Trap[] = [
     arm: (folder) => {
       const pack = healthyPack(folder);
       for (const f of ['screens.pup', 'triggers.pup']) fs.rmSync(path.join(pack, f));
+    },
+    script: scriptFacts(PUP_SCRIPT),
+  },
+  {
+    // Option appliquée faite pour une borne sans DMD (encart vide), alors que la borne en a un.
+    code: 'pupOptionUnsuited',
+    arm: (folder) => {
+      const pack = path.join(folder, 'pupvideos', 'afm_113b');
+      fs.mkdirSync(pack, { recursive: true });
+      starTrekPack(pack);
     },
     script: scriptFacts(PUP_SCRIPT),
   },
@@ -462,6 +473,38 @@ test('corrections des PuP-Packs : appliquées, le constat disparaît', () => {
     fs.rmSync(trashDir, { recursive: true, force: true });
   }
 });
+
+test('option inadaptée à la borne : proposée d’office, jamais contre un choix fait dans la fiche', () => {
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-traps-'));
+  const folder = healthyTable(tablesDir);
+  TRAPS.find((t) => t.code === 'pupOptionUnsuited')!.arm(folder, tablesDir);
+  const ctx = () => ({ tablesDir, script: scriptFacts(PUP_SCRIPT), cabinet: CABINET });
+  const entry = () => scanTables(tablesDir)[0]!;
+  const finding = diagnose(entry(), ctx()).find((f) => f.code === 'pupOptionUnsuited')!;
+  assert.match(finding.detail, /applique « Option 1 - DMD on BG No Topper » \(sans topper · DMD dans le backglass\)/);
+  assert.equal(finding.fix!.label, 'Appliquer « Option 3 - BG and Topper Seperate »');
+  // La fiche liste les options, l'appliquée et la conseillée.
+  const [pack] = tablePupPacks(entry(), CABINET);
+  assert.deepEqual([pack!.applied?.label, pack!.recommended?.label], ['Option 1 - DMD on BG No Topper', 'Option 3 - BG and Topper Seperate']);
+  // Choix fait dans la fiche : l'option 1 gardée, le médecin ne la remet plus en cause.
+  const trashDir = `${tablesDir}-corbeille`;
+  applyOps(pupOptionOps(entry(), pack!.root, pack!.pack, pack!.applied!, { chosen: 'user' }), { trashDir });
+  assert.equal(pupMemory(readInfo(entry().infoFile), 'afm_113b')?.chosen, 'user');
+  assert.ok(!diagnose(entry(), ctx()).some((f) => f.code === 'pupOptionUnsuited'));
+  // Correction du médecin : l'option 3 appliquée et retenue, le constat disparaît.
+  applyOps(pupMemoryReset(entry()), { trashDir });
+  applyOps(diagnose(entry(), ctx()).find((f) => f.code === 'pupOptionUnsuited')!.fix!.ops, { trashDir });
+  assert.equal(tablePupPacks(entry(), CABINET)[0]!.applied?.label, 'Option 3 - BG and Topper Seperate');
+  assert.equal(pupMemory(readInfo(entry().infoFile), 'afm_113b')?.option, 'Option 3 - BG and Topper Seperate');
+  assert.ok(!diagnose(entry(), ctx()).some((f) => f.code === 'pupOptionUnsuited'));
+  fs.rmSync(tablesDir, { recursive: true });
+  fs.rmSync(trashDir, { recursive: true, force: true });
+});
+
+/** Le .info sans le choix fait dans la fiche : le médecin juge de nouveau l'option. */
+function pupMemoryReset(entry: TableEntry): FileOp[] {
+  return [{ op: 'write', path: entry.infoFile, content: JSON.stringify(setPupMemory(readInfo(entry.infoFile), 'afm_113b', {}), null, 2) }];
+}
 
 test('« Tout réparer » sur un pack imbriqué sans option : remonté, puis l’option appliquée à l’analyse suivante', () => {
   const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-traps-'));

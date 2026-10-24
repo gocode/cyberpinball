@@ -187,6 +187,8 @@ export const messages: Record<string, string> = {
   'Chargement de la table…': 'Loading table…',
   'Appuyez sur un bouton pour revenir au menu': 'Press any button to return to the menu',
   'Menu et configuration (Tab)': 'Menu and setup (Tab)',
+  'Menu et configuration (Tab) : un élément attend votre intervention': 'Menu and setup (Tab): something needs your attention',
+  'Attend votre intervention': 'Needs your attention',
   Commandes: 'Controls',
   'Dans le menu': 'In the menu',
   'Pendant une partie': 'During a game',

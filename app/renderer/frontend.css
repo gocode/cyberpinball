@@ -935,6 +935,23 @@ body.mouse .gear {
   background: var(--surface-raised);
 }
 
+/* Un élément du menu système attend l'utilisateur : la roue n'est plus estompée, pastille rouge. */
+.gear.has-attention {
+  opacity: 1;
+}
+
+.gear-dot {
+  position: absolute;
+  top: 0.6cqmin;
+  right: 0.6cqmin;
+  width: 0.85cqmin;
+  height: 0.85cqmin;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 0.2cqmin var(--bg), 0 0 0.8cqmin var(--danger);
+  pointer-events: none;
+}
+
 /* ---------- Superpositions ---------- */
 
 .overlay {

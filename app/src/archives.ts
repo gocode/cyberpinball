@@ -67,6 +67,17 @@ async function unpackNested(dir: string): Promise<void> {
   }
 }
 
+/**
+ * Déballe une archive dans `dest`, avec les archives qu'elle contient ; false si le
+ * fichier n'est pas une archive (il reste alors tel quel).
+ */
+export async function unpackArchive(file: string, dest: string): Promise<boolean> {
+  if (!isArchive(file)) return false;
+  await extractArchive(file, dest);
+  await unpackNested(dest);
+  return true;
+}
+
 function isArchive(p: string): boolean {
   return ARCHIVE_EXT.has(path.extname(p).toLowerCase()) && fs.statSync(p).isFile();
 }

@@ -26,10 +26,11 @@ import { t, tn } from './i18n';
 import { mediaDbOfferLabel, mediaDbOffers, type MediaDbCandidate, type MediaDbOffer, type MediaDbQuality } from './mediadb';
 import { isAcceptedFormat, mediaKind, MEDIA_TYPES, type MediaKind, type MediaType } from './medias';
 import { isJunkName, parseCsvLine, parseScreens, screenRole } from './puppack';
+import type { SiteHit } from './mediasites';
 import type { TableEntry } from './tables';
 import { vpsLabel, type VpsGame } from './vps';
 
-export type MediaChoiceSource = 'mediadb' | 'vps' | 'vps-music' | 'pup' | 'dmd-folder' | 'b2s' | 'vpx';
+export type MediaChoiceSource = 'mediadb' | 'vps' | 'vps-music' | 'pup' | 'dmd-folder' | 'b2s' | 'vpx' | 'vpforums' | 'vpuniverse';
 
 export const MEDIA_CHOICE_SOURCE_LABELS: Record<MediaChoiceSource, string> = {
   mediadb: 'VPinMediaDB',
@@ -51,6 +52,8 @@ export const MEDIA_CHOICE_SOURCE_LABELS: Record<MediaChoiceSource, string> = {
   get vpx() {
     return t('Image rangée dans la table');
   },
+  vpforums: 'VPForums',
+  vpuniverse: 'VPUniverse',
 };
 
 /**
@@ -132,6 +135,11 @@ export interface MediaChoice {
   file?: string;
   /** Poids sur le disque (fichier local). */
   bytes?: number;
+  /**
+   * Site communautaire (mediasites.ts) : la fiche du site ; `received` quand le fichier
+   * est déjà arrivé (`file` le désigne alors), sinon il reste à télécharger.
+   */
+  site?: { hit: SiteHit; pack: boolean; received?: boolean };
 }
 
 export type MediaChoices = Partial<Record<MediaType, MediaChoice[]>>;

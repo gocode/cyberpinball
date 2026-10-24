@@ -21,6 +21,7 @@ import {
   type PupCabinet,
 } from '../puppack';
 import { applyImport, planImport } from '../tableimport';
+import { starTrekPack } from './fixtures';
 import { readInfo } from '../tables';
 
 function write(file: string, content: string | Buffer = ''): string {
@@ -194,6 +195,25 @@ test('choix de l’option d’après la borne, ou celle de l’installation pré
   assert.equal(none.confident, false);
   const kept = chooseVariant(variants, CABINET_3, 'option 2 - fulldmd on backglass');
   assert.deepEqual([kept.chosen?.label, kept.reason], ['Option 2 - FullDMD on Backglass', 'remembered']);
+  fs.rmSync(root, { recursive: true });
+});
+
+
+
+test('encart DMD sur le backglass : allumé, le pack l’occupe (DMD sur son écran) ; éteint, il attend le DMD', () => {
+  const root = tmp();
+  starTrekPack(root);
+  const { variants } = analysePack(root);
+  const dmd = Object.fromEntries(variants.map((v) => [v.label, v.traits.dmd]));
+  assert.deepEqual(dmd, { 'Option 1 - DMD on BG No Topper': 'backglass', 'Option 2 - Topper on BG No DMD': 'none', 'Option 3 - BG and Topper Seperate': 'separate' });
+  // Borne à quatre écrans (fronton, DMD 4:1, topper) : l'option 3, sans hésiter.
+  const four: PupCabinet = { backglass: true, dmd: true, topper: true, dmdRatio: 4, backglassRatio: 16 / 9 };
+  const chosen = chooseVariant(variants, four);
+  assert.deepEqual([chosen.chosen?.label, chosen.confident], ['Option 3 - BG and Topper Seperate', true]);
+  // Borne à deux écrans (fronton seul) : l'option 1, dont l'encart reçoit le DMD.
+  const two: PupCabinet = { backglass: true, dmd: false, topper: false, backglassRatio: 16 / 9 };
+  assert.equal(chooseVariant(variants, two).chosen?.label, 'Option 1 - DMD on BG No Topper');
+  assert.equal(appliedVariant(analysePack(root))?.label, 'Option 1 - DMD on BG No Topper');
   fs.rmSync(root, { recursive: true });
 });
 

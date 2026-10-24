@@ -1,0 +1,492 @@
+// Médias des sites communautaires, avec le compte de l'utilisateur (docs/recherche/
+// sources-medias.md § 6) : VPForums, puis VPUniverse en dernier recours. PinUP Popper
+// n'est pas sur la machine : ces deux sites portent la bibliothèque que son serveur
+// réserve à Popper Setup (wheels, vidéos du plateau, du fronton, du DMD et du topper,
+// cartes, sons de lancement, packs complets).
+//
+// La recherche se fait sur demande, une page de résultats par site et par titre, dans la
+// session de la fenêtre « Récupérer » (persist:acquisition) : jamais en tâche de fond, ni
+// fiche par fiche. Le script de la page (SITE_SEARCH_PROBES) relève chaque résultat : titre,
+// catégorie, auteur, vignette. Ici, sans Electron : catégories des sites, adresses de
+// recherche, rapprochement des résultats avec les jeux de la base VPS, type de média
+// de chaque résultat, ordre des propositions.
+//
+// Les téléchargements respectent le site : un fichier à la fois, à la demande, après la
+// connexion de l'utilisateur. Le minuteur de VPUniverse (environ 45 s par fichier pour
+// un compte gratuit) se déroule dans la page, comme pour un membre qui clique : Cyber
+// Pinball attend, ne le contourne pas.
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { t } from './i18n';
+import { scanInstallation } from './mediaimport';
+import { isAcceptedFormat, mediaKind, type MediaKind, type MediaType } from './medias';
+import type { MediaChoice } from './mediachoices';
+import { isJunkName } from './puppack';
+import { COMMON_PROBE } from './sitesessions';
+import { matchVps, vpsKey, vpsWords, type VpsCandidate, type VpsDb, type VpsGame } from './vps';
+
+export type MediaSiteId = 'vpforums' | 'vpuniverse';
+
+export interface MediaSite {
+  id: MediaSiteId;
+  /** « VPForums » */
+  name: string;
+  /** Domaine des cookies et des liens (sitesessions.ts). */
+  domain: string;
+  /** Attente imposée avant chaque téléchargement avec un compte gratuit, en secondes (0 : aucune connue). */
+  wait: number;
+  /** La recherche est réservée aux membres connectés. */
+  searchNeedsLogin: boolean;
+  /** Ce que le site a, pour le dire avant la connexion. */
+  holdings: string;
+}
+
+/** Dans l'ordre où leurs propositions passent : VPUniverse, lent, en dernier. */
+export const MEDIA_SITES: readonly MediaSite[] = [
+  {
+    id: 'vpforums',
+    name: 'VPForums',
+    domain: 'vpforums.org',
+    wait: 0,
+    searchNeedsLogin: true,
+    get holdings() {
+      return t('808 packs de médias complets, 4 153 logos, 1 829 vidéos');
+    },
+  },
+  {
+    id: 'vpuniverse',
+    name: 'VPUniverse',
+    domain: 'vpuniverse.com',
+    wait: 45,
+    searchNeedsLogin: false,
+    get holdings() {
+      return t('environ 24 000 médias : logos, vidéos du plateau, du fronton, du DMD et du topper, cartes, sons de lancement');
+    },
+  },
+];
+
+export function mediaSite(id: MediaSiteId): MediaSite {
+  return MEDIA_SITES.find((s) => s.id === id)!;
+}
+
+/** Catégorie de téléchargement d'un site, et les médias qu'elle range. */
+export interface SiteCategory {
+  /** Identifiant dans l'adresse (« 160 » de /files/category/160-topper-videos/, « 35 » de showcat=35). */
+  id: string;
+  /** Types de média possibles ; un pack complet les a tous. */
+  types: MediaType[];
+  /** Nature du fichier attendu ; absent : selon le titre (vidéos de VPForums) ou pack. */
+  kind?: MediaKind;
+  /** Pack complet : une archive avec les médias de plusieurs écrans. */
+  pack?: boolean;
+}
+
+const VIDEO_TYPES: MediaType[] = ['Playfield', 'Backglass', 'DMD', 'FullDMD', 'Topper', 'Loading'];
+const PACK_TYPES: MediaType[] = ['Wheel', 'Playfield', 'Backglass', 'DMD', 'FullDMD', 'Topper', 'Loading', 'Audio', 'AudioLaunch', 'GameInfo', 'GameHelp'];
+
+/** Catégories des médias de menu, relevées le 24/10/2026 (sources-medias.md § 6.2 et § 6.3). */
+export const SITE_CATEGORIES: Record<MediaSiteId, readonly SiteCategory[]> = {
+  vpuniverse: [
+    { id: '70', types: ['Wheel'], kind: 'image' }, // Wheel Images
+    { id: '127', types: ['Wheel'], kind: 'image' }, // Tarcisio Style Wheels
+    { id: '149', types: ['Wheel'], kind: 'image' }, // Animated Wheel Images (APNG)
+    { id: '111', types: ['Loading'], kind: 'video' }, // Loading Animations
+    { id: '160', types: ['Topper'], kind: 'video' }, // Topper Videos
+    { id: '93', types: ['Topper'], kind: 'image' }, // Topper Images
+    { id: '91', types: ['GameHelp'], kind: 'image' }, // Instruction Cards
+    { id: '141', types: ['Backglass'], kind: 'video' }, // Backglass Videos
+    { id: '140', types: ['Playfield'], kind: 'video' }, // Playfield Videos
+    { id: '71', types: ['Playfield'], kind: 'image' }, // Table Images
+    { id: '168', types: ['AudioLaunch'], kind: 'audio' }, // Launch Audio
+    { id: '167', types: ['DMD'], kind: 'video' }, // DMD Video
+    { id: '143', types: ['FullDMD'], kind: 'video' }, // FullDMD Videos
+    { id: '92', types: ['GameInfo'], kind: 'image' }, // Pinball Flyers
+  ],
+  vpforums: [
+    { id: '35', types: PACK_TYPES, pack: true }, // Complete Media Packs
+    { id: '27', types: ['Wheel'], kind: 'image' }, // Wheel Logos
+    { id: '33', types: VIDEO_TYPES, kind: 'video' }, // Videos (tous les écrans, le titre dit lequel)
+    { id: '55', types: ['Topper'], kind: 'image' }, // Topper Images
+  ],
+};
+
+// ---------------------------------------------------------------------------
+// Recherche
+
+/** Petits mots que les moteurs de recherche des forums comptent mal (recherche « et »). */
+const QUERY_STOP = new Set(['the', 'of', 'and', 'a', 'an', 'de', 'la', 'le', 'les', 'du', 'des']);
+
+/**
+ * Texte à chercher pour un jeu : le titre avant son sous-titre, sans petits mots, en
+ * quatre mots au plus. « Terminator 2: Judgment Day » donne « terminator 2 » (le
+ * sous-titre s'écrit aussi « Judgement ») ; le rapprochement trie ensuite.
+ */
+export function siteQuery(name: string): string {
+  const main = name.replace(/\s*\([^)]*\)\s*/g, ' ').split(/\s+-\s+|:\s*/)[0]!;
+  const words = vpsWords(main).filter((w) => !QUERY_STOP.has(w));
+  return (words.length ? words : vpsWords(main)).slice(0, 4).join(' ');
+}
+
+/** Page de résultats pour un texte, limitée aux catégories des médias de menu. */
+export function siteSearchUrl(site: MediaSiteId, query: string): string {
+  const q = encodeURIComponent(query.trim());
+  if (site === 'vpuniverse') {
+    const nodes = SITE_CATEGORIES.vpuniverse.map((c) => c.id).join(',');
+    return `https://vpuniverse.com/search/?q=${q}&type=downloads_file&nodes=${nodes}&search_and_or=and&sortby=relevancy`;
+  }
+  return `https://www.vpforums.org/index.php?app=core&module=search&do=search&search_term=${q}&search_app=downloads`;
+}
+
+/** Un résultat de recherche, tel que la page le montre. */
+export interface SiteHit {
+  site: MediaSiteId;
+  /** Identifiant de la fiche sur le site. */
+  id: string;
+  /** Adresse de la fiche, sans identifiant de session. */
+  url: string;
+  title: string;
+  /** Catégorie de la fiche, si la page la donne. */
+  category?: { id: string; label: string };
+  author?: string;
+  /** Vignette publiée par l'auteur (image fixe, même pour une vidéo). */
+  thumb?: string;
+  /** Date de publication (ISO). */
+  date?: string;
+  downloads?: number;
+  version?: string;
+}
+
+/** Ce que le script de recherche a vu dans la page. */
+export type SiteSearchResult =
+  | { kind: 'hits'; hits: SiteHit[] }
+  /** La recherche est réservée aux membres. */
+  | { kind: 'login' }
+  /** Vérification de Cloudflare, site en panne, page illisible : à montrer. */
+  | { kind: 'show'; reason: 'challenge' | 'down' | 'captcha' | 'unreadable' };
+
+/**
+ * Script de la page de résultats d'Invision Community (VPUniverse) : un élément
+ * ipsStreamItem par fiche, avec son titre, sa catégorie, son auteur, sa vignette.
+ */
+const INVISION_SEARCH = /* i18n-ignore : script de la page du site, motifs de recherche */ String.raw`(() => {${COMMON_PROBE}
+  const hits = [];
+  const seen = new Set();
+  for (const item of document.querySelectorAll('li.ipsStreamItem, .ipsStreamItem')) {
+    const link = item.querySelector('.ipsStreamItem_title a[href*="/files/file/"], h2 a[href*="/files/file/"]');
+    if (!link) continue;
+    const m = /\/files\/file\/(\d+)-/.exec(link.href);
+    if (!m || seen.has(m[1])) continue;
+    seen.add(m[1]);
+    const cat = item.querySelector('a[href*="/files/category/"]');
+    const cm = cat && /\/files\/category\/(\d+)-/.exec(cat.href);
+    const img = item.querySelector('img[src*="/screenshots/"]');
+    const authors = [...item.querySelectorAll('.ipsStreamItem_status a[href*="/profile/"]')].map((a) => a.textContent.trim()).filter(Boolean);
+    const time = item.querySelector('time[datetime]');
+    const dl = /(\d[\d,]*)\s+downloads?/i.exec(item.textContent || '');
+    const version = /Version\s+([^\s<]+)/i.exec(item.textContent || '');
+    hits.push({
+      id: m[1],
+      url: link.href.split('?')[0],
+      title: link.textContent.replace(/\s+/g, ' ').trim(),
+      category: cm ? { id: cm[1], label: cat.textContent.trim() } : undefined,
+      author: authors[0],
+      thumb: img ? img.src : undefined,
+      date: time ? time.getAttribute('datetime') : undefined,
+      downloads: dl ? Number(dl[1].replace(/[^\d]/g, '')) : undefined,
+      version: version ? version[1] : undefined,
+    });
+  }
+  if (!hits.length && document.querySelector('#elUserSignIn') && /sign in|log in/i.test(document.title)) return { kind: 'login' };
+  return { kind: 'hits', hits };
+})()`;
+
+/**
+ * Script de la page de résultats d'IP.Board 3 avec IP.Downloads (VPForums) : chaque lien
+ * vers une fiche (showfile=…), avec la ligne qui le porte (catégorie, auteur, vignette).
+ * Réservée aux membres : un visiteur reçoit le formulaire de connexion.
+ */
+const IPBOARD3_SEARCH = /* i18n-ignore : script de la page du site, motifs de recherche */ String.raw`(() => {${COMMON_PROBE}
+  if (/Attention Proxy Users/i.test(text)) return { kind: 'show', reason: 'unreadable' };
+  const member = document.querySelector('#user_link');
+  if (!member && document.querySelector('#login, form[action*="section=login"], #sign_in')) return { kind: 'login' };
+  const hits = [];
+  const seen = new Map();
+  for (const link of document.querySelectorAll('a[href*="showfile="]')) {
+    const m = /[?&]showfile=(\d+)/.exec(link.href);
+    if (!m || /#/.test(link.getAttribute('href') || '')) continue;
+    const row = link.closest('.idm_category_row, tr, li, .result_info, .ipsBox_container, div.row') || link.parentElement;
+    if (row && row.closest('#primary_nav, .megamenu, #community_app_menu, #footer_utilities')) continue;
+    const named = (link.getAttribute('title') || '').replace(/^View file named\s+/i, '').trim();
+    const own = link.querySelector('img') ? '' : link.childNodes[0] ? (link.childNodes[0].textContent || '').trim() : '';
+    const title = (named || own).replace(/\s+/g, ' ').trim();
+    let hit = seen.get(m[1]);
+    if (!hit) {
+      hit = { id: m[1], url: 'https://www.vpforums.org/index.php?app=downloads&showfile=' + m[1], title: '' };
+      seen.set(m[1], hit);
+      hits.push(hit);
+    }
+    if (title && title.length > hit.title.length && !/^\d+ reviews?$/i.test(title)) hit.title = title;
+    if (!row) continue;
+    const img = row.querySelector('img.screenshot, img[src*="section=screenshot"]');
+    if (img && !hit.thumb) hit.thumb = img.src.replace(/([?&])s=[0-9a-f]+&(amp;)?/i, '$1');
+    const cat = row.querySelector('a[href*="showcat="]');
+    const cm = cat && /[?&]showcat=(\d+)/.exec(cat.href);
+    if (cm && !hit.category) hit.category = { id: cm[1], label: cat.textContent.trim() };
+    const user = row.querySelector('a[href*="showuser="]');
+    if (user && !hit.author) hit.author = user.textContent.trim();
+  }
+  return { kind: 'hits', hits: hits.filter((h) => h.title) };
+})()`;
+
+/** Script à exécuter dans la page de résultats de ce site ; il renvoie un SiteSearchResult (sans `site`). */
+export const SITE_SEARCH_PROBES: Record<MediaSiteId, string> = {
+  vpuniverse: INVISION_SEARCH,
+  vpforums: IPBOARD3_SEARCH,
+};
+
+// ---------------------------------------------------------------------------
+// Rapprochement et types
+
+/** Mots des titres qui disent le média, pas le jeu : retirés avant le rapprochement. */
+const MEDIA_WORDS =
+  /\b(wheels?|logos?|tarcisio|style|animated|apng|topper|toppers|videos?|images?|imgs?|backglass(es)?|bg|playfield|pf|table|dmd|full ?dmd|fulldmd|loading|animations?|launch|audio|mp3s?|instructions?|cards?|rules|flyers?|media|pack|hp|pinballx|popper|pup|hd|4k|1080p?|upscaled|cleaned|chrome edition|alt(ernate)?|static|v?\d+(\.\d+)+)\b/gi;
+
+/** Titre d'un résultat réduit au nom du jeu : « Terminator 2 (Williams 1991) Topper Video » → « Terminator 2 (Williams 1991) ». */
+export function hitGameName(title: string): string {
+  return title
+    .replace(/\[[^\]]*\]/g, ' ')
+    .replace(MEDIA_WORDS, ' ')
+    .replace(/\s+-\s*$/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/** Types de média d'un résultat : selon sa catégorie, et pour les vidéos mêlées de VPForums, selon son titre. */
+export function hitTypes(hit: SiteHit): {
+  types: MediaType[];
+  kind?: MediaKind;
+  pack: boolean;
+} {
+  const category = hit.category ? SITE_CATEGORIES[hit.site].find((c) => c.id === hit.category!.id) : undefined;
+  const title = hit.title.toLowerCase();
+  if (/media ?pack|complete media/.test(title) || category?.pack) return { types: PACK_TYPES, pack: true };
+  if (category && category.types.length === 1) return { types: category.types, kind: category.kind, pack: false };
+  // Catégorie mêlée (vidéos de VPForums) ou inconnue (résultat sans catégorie) : le titre.
+  const said: [RegExp, MediaType, MediaKind][] = [
+    [/full ?dmd/, 'FullDMD', 'video'],
+    [/\bdmd\b/, 'DMD', 'video'],
+    [/topper/, 'Topper', category?.kind ?? 'video'],
+    [/backglass|\bbg\b/, 'Backglass', 'video'],
+    [/playfield|\bpf\b|table video/, 'Playfield', 'video'],
+    [/loading/, 'Loading', 'video'],
+    [/wheel|logo/, 'Wheel', 'image'],
+    [/instruction|card|rules/, 'GameHelp', 'image'],
+    [/flyer/, 'GameInfo', 'image'],
+    [/launch/, 'AudioLaunch', 'audio'],
+  ];
+  const found = said.filter(([re]) => re.test(title));
+  if (found.length) {
+    const types = [...new Set(found.map(([, type]) => type))].filter((type) => !category || category.types.includes(type));
+    if (types.length) return { types, kind: found[0]![2], pack: false };
+  }
+  return category ? { types: category.types, kind: category.kind, pack: false } : { types: [], pack: false };
+}
+
+/** Un résultat proposé pour un média d'un jeu. */
+export interface SiteOffer {
+  hit: SiteHit;
+  type: MediaType;
+  kind?: MediaKind;
+  pack: boolean;
+  /** Jeu de la base VPS que désigne le titre. */
+  game: VpsGame;
+  /** Entre 0 et 1 : à quel point le titre désigne ce jeu. */
+  score: number;
+}
+
+/**
+ * Rapprochement d'un titre avec toute la base VPS, gardé par base : les propositions se
+ * redessinent à chaque appui de bouton, et un rapprochement approfondi parcourt
+ * 2 600 jeux (de l'ordre d'une dizaine de millisecondes par titre).
+ */
+const matchedTitles = new WeakMap<VpsDb, Map<string, VpsCandidate[]>>();
+function hitCandidates(vps: VpsDb, name: string): VpsCandidate[] {
+  let known = matchedTitles.get(vps);
+  if (!known) matchedTitles.set(vps, (known = new Map()));
+  let found = known.get(name);
+  if (!found) known.set(name, (found = matchVps(vps, { names: [name] }, { deep: true, max: 6 }).candidates));
+  return found;
+}
+
+/**
+ * Résultats qui désignent l'un des jeux retenus, rangés par type. Le titre de chaque
+ * résultat, débarrassé des mots du média, est rapproché de toute la base VPS : un
+ * résultat « Terminator 3 » ne passe pas pour Terminator 2 parce qu'il en contient le
+ * premier mot. Sans base VPS, il faut que le nom du jeu soit dans le titre.
+ */
+export function siteOffers(hits: SiteHit[], games: VpsGame[], vps?: VpsDb): Partial<Record<MediaType, SiteOffer[]>> {
+  const wanted = new Map(games.map((g) => [g.id, g]));
+  const out: Partial<Record<MediaType, SiteOffer[]>> = {};
+  for (const hit of hits) {
+    const name = hitGameName(hit.title);
+    if (!name) continue;
+    let game: VpsGame | undefined;
+    let score = 0;
+    if (vps) {
+      const candidates = hitCandidates(vps, name);
+      const best = candidates[0];
+      const mine = candidates.find((c) => wanted.has(c.game.id));
+      // Le jeu retenu en tête, ou presque aussi probable que le premier (éditions Pro et Premium).
+      if (best && mine && mine.score >= 0.6 && mine.score >= best.score - 0.05) [game, score] = [wanted.get(mine.game.id)!, mine.score];
+    } else {
+      const key = vpsKey(name);
+      const g = games.find((x) => {
+        // Le titre sans sous-titre : « Terminator 3 » pour « Terminator 3 - Rise of the Machines ».
+        const k = vpsKey(x.name.replace(/\s*\([^)]*\)\s*/g, ' ').split(/\s+-\s+|:\s*/)[0]!);
+        return k.length >= 3 && key.includes(k);
+      });
+      if (g) [game, score] = [g, 0.7];
+    }
+    if (!game) continue;
+    const { types, kind, pack } = hitTypes(hit);
+    for (const type of types) (out[type] ??= []).push({ hit, type, kind, pack, game, score });
+  }
+  // Le jeu le mieux désigné d'abord ; à égalité, un fichier propre au média avant un pack, puis le plus téléchargé.
+  for (const list of Object.values(out)) {
+    list!.sort((a, b) => b.score - a.score || Number(a.pack) - Number(b.pack) || (b.hit.downloads ?? 0) - (a.hit.downloads ?? 0));
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Fichiers reçus
+
+/** Un média trouvé dans ce qu'un site a envoyé (fichier seul ou archive déballée). */
+export interface ReceivedMedia {
+  file: string;
+  /** Type reconnu (dossier à la manière de Popper ou de PinballX, nom « (Type) … ») ou dit par la catégorie. */
+  type?: MediaType;
+  kind: MediaKind;
+}
+
+/**
+ * Médias d'un envoi déballé dans `root` : un pack rangé à la manière de Popper ou de
+ * PinballX dit le type de chaque fichier par son dossier ; un fichier d'une catégorie
+ * à un seul type (« Topper Videos ») prend ce type s'il en a le format. Les autres
+ * restent sans type : ils ne sont proposés que pour le média d'où on les a demandés.
+ */
+export function receivedMedias(root: string, offered: { types: MediaType[]; kind?: MediaKind }): ReceivedMedia[] {
+  const known = new Map<string, MediaType>();
+  for (const f of scanInstallation(root).files) known.set(path.resolve(f.from).toLowerCase(), f.media.type);
+  const out: ReceivedMedia[] = [];
+  const walk = (dir: string) => {
+    let dirents: fs.Dirent[];
+    try {
+      dirents = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const d of dirents) {
+      if (isJunkName(d.name)) continue;
+      const p = path.join(dir, d.name);
+      if (d.isDirectory()) {
+        walk(p);
+        continue;
+      }
+      const kind = d.isFile() ? mediaKind(d.name) : undefined;
+      if (!kind) continue;
+      let type: MediaType | undefined = known.get(path.resolve(p).toLowerCase());
+      // Fichier d'une catégorie à un seul type, de sa nature (une image n'est pas une « Topper Video »).
+      if (!type && offered.types.length === 1 && (!offered.kind || offered.kind === kind)) type = offered.types[0];
+      if (type && !isAcceptedFormat(type, p)) type = undefined;
+      out.push({ file: p, type, kind });
+    }
+  };
+  walk(root);
+  return out.sort((a, b) => a.file.localeCompare(b.file));
+}
+
+/** Ce qu'un site a envoyé pour une fiche, une fois déballé ; gardé d'une visite à l'autre. */
+export interface SiteReceipt {
+  /** « vpuniverse:27996 » */
+  key: string;
+  site: MediaSiteId;
+  title: string;
+  url: string;
+  author?: string;
+  /** Média d'où il a été demandé : un fichier sans type reconnu n'est proposé que pour lui. */
+  type: MediaType;
+  /** Date de réception (ISO). */
+  date: string;
+  files: ReceivedMedia[];
+}
+
+/** Clé d'une fiche : « vpuniverse:27996 ». */
+export const siteHitKey = (hit: Pick<SiteHit, 'site' | 'id'>) => `${hit.site}:${hit.id}`;
+
+/** Nature par défaut d'un média, pour une fiche dont la catégorie ne la dit pas (pack). */
+function defaultKind(type: MediaType): MediaKind {
+  if (type === 'Audio' || type === 'AudioLaunch') return 'audio';
+  if (type === 'Wheel' || type === 'GameInfo' || type === 'GameHelp') return 'image';
+  return 'video';
+}
+
+/**
+ * Propositions des sites pour un média, VPForums d'abord puis VPUniverse : pour chaque
+ * fiche qui désigne un jeu retenu, ses fichiers déjà reçus de ce type (prêts à prendre),
+ * sinon la fiche elle-même (à télécharger). Une fiche reçue sans rien pour ce média
+ * reste montrée : sa carte le dit.
+ */
+export function siteMediaChoices(
+  type: MediaType,
+  results: { site: MediaSiteId; hits: SiteHit[] }[],
+  games: VpsGame[],
+  vps: VpsDb | undefined,
+  receipt: (key: string) => SiteReceipt | undefined,
+): MediaChoice[] {
+  const out: MediaChoice[] = [];
+  for (const site of MEDIA_SITES) {
+    const hits = results.filter((r) => r.site === site.id).flatMap((r) => r.hits);
+    const seen = new Set<string>();
+    for (const offer of siteOffers(hits, games, vps)[type] ?? []) {
+      const key = siteHitKey(offer.hit);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const got = receipt(key);
+      const files = got?.files.filter((f) => (f.type ? f.type === type : got.type === type && isAcceptedFormat(type, f.file))) ?? [];
+      for (const f of files) {
+        let bytes: number | undefined;
+        try {
+          bytes = fs.statSync(f.file).size;
+        } catch {
+          continue;
+        }
+        out.push({
+          id: f.file,
+          type,
+          kind: f.kind,
+          source: site.id,
+          label: path.basename(f.file),
+          detail: t('reçu : {title}', { title: offer.hit.title }),
+          file: f.file,
+          bytes,
+          vpsId: offer.game.id,
+          site: { hit: offer.hit, pack: offer.pack, received: true },
+        });
+      }
+      if (files.length) continue;
+      out.push({
+        id: key,
+        type,
+        kind: offer.kind ?? defaultKind(type),
+        source: site.id,
+        label: offer.hit.title,
+        detail: offer.hit.category?.label ?? (offer.pack ? t('pack de médias') : site.name),
+        vpsId: offer.game.id,
+        site: { hit: offer.hit, pack: offer.pack },
+      });
+    }
+  }
+  return out;
+}

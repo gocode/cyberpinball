@@ -220,6 +220,7 @@ export const messages: Record<string, string> = {
   '{installed} · chercher une version plus récente': '{installed} · check for a newer version',
   'L’installeur n’a pas démarré : {message}': 'The installer didn’t start: {message}',
   'Pas de liste des nouveautés pour cette version.': 'No what’s new list for this version.',
+  'Nouveautés de la {version}': 'What’s new in {version}',
   'Version installée : {version}': 'Installed version: {version}',
   'Recherche de la dernière version publiée…': 'Looking for the latest published version…',
   'Cyber Pinball est à jour': 'Cyber Pinball is up to date',
@@ -334,6 +335,7 @@ export const messages: Record<string, string> = {
   'version absente ou illisible': 'version missing or unreadable',
   'date absente': 'date missing',
   'nouveautés absentes': 'what’s new missing',
+  'historique des nouveautés illisible': 'unreadable release history',
   'nom de l’installeur absent': 'installer name missing',
   'adresse de l’installeur absente': 'installer URL missing',
   'taille de l’installeur absente': 'installer size missing',
@@ -348,4 +350,8 @@ export const messages: Record<string, string> = {
   'Installeur incomplet ({size} octets reçus sur {total}) : fichier supprimé.': 'Incomplete installer ({size} of {total} bytes received): file deleted.',
   'Empreinte SHA-256 de l’installeur incorrecte (attendu {expected}, obtenu {actual}) : fichier supprimé.': 'Wrong installer SHA-256 hash (expected {expected}, got {actual}): file deleted.',
   '{size} Mio': '{size} MiB',
+
+  // app/src/acquire-window.ts
+  'Reçu : {file}, rendu aux propositions du média. Fermer (Échap) pour revenir.': 'Received: {file}, handed back to the media suggestions. Close (Esc) to go back.',
+  arrêté: 'stopped',
 };

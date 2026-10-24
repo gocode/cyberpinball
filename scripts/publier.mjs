@@ -28,7 +28,7 @@ import { auditRepository } from './audit-publication.mjs';
 import { loadPrivateKey } from './cle-publication.mjs';
 import { describeRepository } from './decrire-github.mjs';
 import { snapshotAndPush } from './envoyer-github.mjs';
-import { bulletPoints, changelogNotes } from './traductions.mjs';
+import { bulletPoints, changelogNotes, changelogSections } from './traductions.mjs';
 
 const require = createRequire(import.meta.url);
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -109,6 +109,16 @@ if (!notes.length && !local) fail(`aucune nouveauté pour ${version} : ajoutez u
 for (const n of notes) console.log(`  - ${n}`);
 for (const n of notesEn) console.log(`  - (en) ${n}`);
 if (!notesFile && !notesEn.length) console.log(`  (pas de section « ## ${version} » dans CHANGELOG.en.md : release sans les nouveautés en anglais)`);
+// Nouveautés des versions précédentes (les 20 dernières) : une borne qui en a sauté les voit toutes.
+const readText = (file) => (fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '');
+const sectionsFr = changelogSections(readText(path.join(repo, 'CHANGELOG.md')));
+const sectionsEn = changelogSections(readText(path.join(repo, 'CHANGELOG.en.md')));
+const history = [...sectionsFr.keys()]
+  .filter((v) => update.isVersion(v) && update.compareAppVersions(v, version) < 0)
+  .sort((a, b) => update.compareAppVersions(b, a))
+  .slice(0, 20)
+  .map((v) => ({ version: v, notes: sectionsFr.get(v), ...(sectionsEn.get(v)?.length && { notesByLanguage: { en: sectionsEn.get(v) } }) }));
+if (history.length) console.log(`  Versions précédentes dans le flux : ${history.map((h) => h.version).join(', ')}`);
 
 step('Flux signé');
 const urlBase = option('--url');
@@ -118,6 +128,7 @@ const manifest = {
   date: new Date().toISOString(),
   notes,
   ...(notesEn.length && { notesByLanguage: { en: notesEn } }),
+  ...(history.length && { history }),
   installer: {
     name: update.UPDATE_INSTALLER_NAME,
     url: local ? `${urlBase.replace(/\/$/, '')}/${update.UPDATE_INSTALLER_NAME}` : update.releaseAssetUrl(version, update.UPDATE_INSTALLER_NAME),

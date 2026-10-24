@@ -237,9 +237,29 @@ export class LayoutReport {
   /** Dernier relevé des zones stables de chaque page (par identifiant de WebContents). */
   private readonly stable = new Map<number, Stable>();
 
+  /** Erreurs non rattrapées de chaque page suivie, pas encore relevées. */
+  private readonly errors = new Map<number, string[]>();
+
   constructor(private readonly captureDir: string | undefined) {}
 
+  /**
+   * Erreurs non rattrapées de la page : une page qui plante peut rester vide sans que la
+   * mise en page y trouve rien à redire (catalogue de traduction absent, par exemple).
+   */
+  private watch(contents: WebContents): string[] {
+    let list = this.errors.get(contents.id);
+    if (list) return list;
+    const errors: string[] = [];
+    list = errors;
+    this.errors.set(contents.id, errors);
+    contents.on('console-message', (event) => {
+      if (event.level === 'error' && /^Uncaught\b/.test(event.message)) errors.push(`erreur de la page : ${event.message}`); // i18n-ignore : rapport de mise en page, pour le développeur
+    });
+    return list;
+  }
+
   async check(contents: WebContents, where: string): Promise<void> {
+    const errors = this.watch(contents);
     let now: Stable | undefined;
     try {
       now = (await contents.executeJavaScript(STABLE)) as Stable;
@@ -248,7 +268,7 @@ export class LayoutReport {
     }
     const shifts = now ? moved(this.stable.get(contents.id), now) : [];
     if (now) this.stable.set(contents.id, now);
-    for (const problem of [...(await checkLayout(contents)), ...shifts]) {
+    for (const problem of [...errors.splice(0), ...(await checkLayout(contents)), ...shifts]) {
       const line = `${where} : ${problem}`;
       console.log(`Mise en page : ${line}`);
       this.lines.push(line);

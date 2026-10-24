@@ -13,7 +13,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ipcMain, session, shell, WebContentsView, type BrowserWindow, type DownloadItem, type Session } from 'electron';
-import { DIRECT_MAX_STEPS, DOWNLOAD_PROBES, probeReasonText, t, type ProbeResult, type SiteCookie, type SourceSite } from '@cyberpinball/core';
+import { DIRECT_MAX_STEPS, DOWNLOAD_PROBES, probeReasonText, t, WAIT_PROBES, type ProbeResult, type SiteCookie, type SourceSite } from '@cyberpinball/core';
 import { coverDisplay, fillBelow } from './cover-display';
 import { createWindow, OFFSCREEN, primaryRect } from './offscreen';
 
@@ -32,6 +32,20 @@ export interface AcquireRequest {
   status?: string;
   /** Hôte, et s'il faut un compte : « vpuniverse.com, compte nécessaire » */
   host: string;
+  /** Ce que la page téléchargera revient à ce destinataire (un média), pas à la liste d'attente. */
+  claim?: DownloadClaim;
+}
+
+/**
+ * Destinataire d'un téléchargement qui n'est pas pour la liste d'attente : un média
+ * demandé depuis ses propositions. Il dit où ranger le fichier et reçoit la suite.
+ */
+export interface DownloadClaim {
+  dir: string;
+  /** Arrêt demandé par l'utilisateur : le téléchargement en cours est annulé. */
+  signal?: AbortSignal;
+  progress?(received: number, total: number | undefined): void;
+  done(result: { file: string; filename: string; urls: string[] } | { error: 'cancelled' | 'interrupted' }): void;
 }
 
 export interface AcquireEvents {
@@ -67,6 +81,21 @@ function freeName(dir: string, name: string): string {
   return candidate;
 }
 
+export interface DirectOptions {
+  /** Le fichier revient à ce destinataire (un média), pas à la liste d'attente. */
+  claim?: DownloadClaim;
+  /**
+   * Accepte d'attendre le minuteur du site (VPUniverse) : appelé chaque seconde avec
+   * les secondes que la page affiche. Sans lui, un minuteur renvoie à la page visible.
+   */
+  onWait?(seconds: number): void;
+  /** Arrêt demandé par l'utilisateur pendant l'attente. */
+  signal?: AbortSignal;
+}
+
+/** Au plus, attente d'un minuteur de site avant d'abandonner (le site annonce environ 45 s). */
+const WAIT_MAX_MS = 150_000;
+
 export function createAcquirer(events: AcquireEvents) {
   let open: AcquireOpen | undefined;
   let prepared: Session | undefined;
@@ -78,25 +107,42 @@ export function createAcquirer(events: AcquireEvents) {
     // Un navigateur ordinaire : sans les mentions de l'application et d'Electron, que des sites refusent.
     s.setUserAgent(s.getUserAgent().replace(/\s(cyberpinball|Electron)\/\S+/gi, ''));
     s.on('will-download', (_event, item, contents) => {
+      const id = contents?.id ?? -1;
       // Téléchargement direct : la vue cachée qui l'a déclenché l'attend.
-      directWaiters.get(contents?.id ?? -1)?.(item);
-      const dir = events.dir();
+      directWaiters.get(id)?.(item);
+      // Un média demandé depuis ses propositions : rangé à part, rendu à qui l'a demandé.
+      const claim = claims.get(id);
+      const visible = Boolean(open && contents === open.view.webContents);
+      const dir = claim?.dir ?? events.dir();
       fs.mkdirSync(dir, { recursive: true });
       const target = freeName(dir, item.getFilename());
       item.setSavePath(target);
       const filename = path.basename(target);
-      setStatus(t('Téléchargement de {file}…', { file: filename }));
+      if (!claim || visible) setStatus(t('Téléchargement de {file}…', { file: filename }));
+      if (claim?.signal) {
+        if (claim.signal.aborted) item.cancel();
+        else claim.signal.addEventListener('abort', () => item.getState() === 'progressing' && item.cancel(), { once: true });
+      }
       item.on('updated', (_e, state) => {
-        if (state === 'progressing') events.progress(filename, item.getReceivedBytes(), item.getTotalBytes() || undefined);
+        if (state !== 'progressing') return;
+        if (claim) claim.progress?.(item.getReceivedBytes(), item.getTotalBytes() || undefined);
+        else events.progress(filename, item.getReceivedBytes(), item.getTotalBytes() || undefined);
       });
       item.once('done', (_e, state) => {
         if (state === 'completed') {
+          if (claim) {
+            if (visible) setStatus(t('Reçu : {file}, rendu aux propositions du média. Fermer (Échap) pour revenir.', { file: filename }));
+            claim.done({ file: target, filename, urls: item.getURLChain() });
+            return;
+          }
           setStatus(t('Reçu : {file}, rangé dans la liste d’attente. Fermer (Échap) pour revenir, ou téléchargez autre chose.', { file: filename }));
           events.received(target, { urls: item.getURLChain(), filename });
         } else {
-          setStatus(state === 'cancelled' ? t('Téléchargement annulé : {file}', { file: filename }) : t('Téléchargement interrompu : {file}', { file: filename }), true);
+          if (!claim || visible) setStatus(state === 'cancelled' ? t('Téléchargement annulé : {file}', { file: filename }) : t('Téléchargement interrompu : {file}', { file: filename }), true);
           fs.rmSync(target, { force: true });
-          events.failed(filename, state === 'cancelled' ? 'cancelled' : 'interrupted');
+          const error = state === 'cancelled' ? 'cancelled' : 'interrupted';
+          if (claim) claim.done({ error });
+          else events.failed(filename, error);
         }
       });
     });
@@ -145,6 +191,7 @@ export function createAcquirer(events: AcquireEvents) {
     registerIpc();
     const s = acquireSession();
     if (open && !open.win.isDestroyed()) {
+      claimFor(open.view.webContents.id, request.claim);
       open.request = request;
       open.status = request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.');
       open.warn = request.status !== undefined;
@@ -171,6 +218,7 @@ export function createAcquirer(events: AcquireEvents) {
     win.contentView.addChildView(view);
     open = { win, view, request, status: request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.'), warn: request.status !== undefined };
     const contents = view.webContents;
+    claimFor(contents.id, request.claim);
     // Une page qui ouvre un nouvel onglet (lien de téléchargement, MEGA) : dans la même vue.
     contents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/i.test(url)) void contents.loadURL(url);
@@ -189,7 +237,9 @@ export function createAcquirer(events: AcquireEvents) {
     };
     contents.on('before-input-event', escape);
     win.webContents.on('before-input-event', escape);
+    const viewId = contents.id;
     win.on('closed', () => {
+      claims.delete(viewId);
       open = undefined;
       events.closed();
     });
@@ -204,15 +254,16 @@ export function createAcquirer(events: AcquireEvents) {
 
   /** Vues cachées en cours de téléchargement direct : identifiant de leur page -> qui attend le fichier. */
   const directWaiters = new Map<number, (item: DownloadItem) => void>();
+  /** Pages dont les téléchargements reviennent à un média : identifiant de la page -> destinataire. */
+  const claims = new Map<number, DownloadClaim>();
 
-  /**
-   * Téléchargement direct, sur demande de l'utilisateur déjà connecté : la fiche est
-   * chargée dans une vue cachée de sa session, la sonde du site (sitesessions.ts) dit
-   * quel lien suivre, au plus quatre pages. Résout dès que le téléchargement commence
-   * (la suite passe par les événements habituels : progression, reçu, échec) ; sinon,
-   * dit pourquoi il faut montrer la page.
-   */
-  async function direct(url: string, site: SourceSite, timeoutMs = 45_000): Promise<{ ok: true; filename: string } | { ok: false; reason: string; login?: boolean }> {
+  function claimFor(id: number, claim: DownloadClaim | undefined): void {
+    if (claim) claims.set(id, claim);
+    else claims.delete(id);
+  }
+
+  /** Vue cachée de la session, sans son, qui ouvre les nouveaux onglets en elle-même. */
+  function hiddenView(): WebContentsView {
     const view = new WebContentsView({ webPreferences: { session: acquireSession(), contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: true } });
     const contents = view.webContents;
     contents.setAudioMuted(true);
@@ -221,6 +272,78 @@ export function createAcquirer(events: AcquireEvents) {
       if (/^https?:/i.test(next)) void contents.loadURL(next).catch(() => undefined);
       return { action: 'deny' };
     });
+    return view;
+  }
+
+  /** Attend la fin du chargement de la page (ou le délai). */
+  function settled(contents: Electron.WebContents, timeoutMs: number): Promise<void> {
+    return new Promise<void>((resolve) => {
+      const done = () => {
+        clearTimeout(timer);
+        contents.off('did-stop-loading', done);
+        contents.off('did-fail-load', failed);
+        resolve();
+      };
+      const failed = (_e: unknown, code: number, _d: string, _u: string, main: boolean) => {
+        if (main && code !== -3) done();
+      };
+      const timer = setTimeout(done, timeoutMs);
+      contents.on('did-stop-loading', done);
+      contents.on('did-fail-load', failed);
+    });
+  }
+
+  /**
+   * Lit une page du site dans une vue cachée de la session de l'utilisateur, à sa
+   * demande (une page de résultats de recherche) : le script dit ce que la page
+   * montre. Rien n'est cliqué ni suivi.
+   */
+  async function readPage(url: string, script: string, timeoutMs = 30_000): Promise<unknown> {
+    const view = hiddenView();
+    const contents = view.webContents;
+    try {
+      const loaded = settled(contents, timeoutMs);
+      contents.loadURL(url).catch(() => undefined);
+      await loaded;
+      return await contents.executeJavaScript(script, true);
+    } finally {
+      contents.close();
+    }
+  }
+
+  /**
+   * Image d'une adresse du site (vignette d'un résultat), avec les cookies de la
+   * session ; undefined si le site répond autre chose qu'une image.
+   */
+  async function fetchImage(url: string, file: string, timeoutMs = 20_000): Promise<string | undefined> {
+    try {
+      const response = await acquireSession().fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      const type = response.headers.get('content-type') ?? '';
+      if (!response.ok || !/^image\//i.test(type)) return undefined;
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, Buffer.from(await response.arrayBuffer()));
+      return file;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
+   * Téléchargement direct, sur demande de l'utilisateur déjà connecté : la fiche est
+   * chargée dans une vue cachée de sa session, la sonde du site (sitesessions.ts) dit
+   * quel lien suivre, au plus quatre pages. Résout dès que le téléchargement commence
+   * (la suite passe par les événements habituels : progression, reçu, échec) ; sinon,
+   * dit pourquoi il faut montrer la page.
+   */
+  async function direct(
+    url: string,
+    site: SourceSite,
+    timeoutMs = 45_000,
+    opts: DirectOptions = {},
+  ): Promise<{ ok: true; filename: string } | { ok: false; reason: string; login?: boolean; quota?: boolean }> {
+    const view = hiddenView();
+    const contents = view.webContents;
+    if (opts.claim) claims.set(contents.id, opts.claim);
     let started: DownloadItem | undefined;
     let wake: (() => void) | undefined;
     directWaiters.set(contents.id, (item) => {
@@ -246,6 +369,8 @@ export function createAcquirer(events: AcquireEvents) {
       });
     const finish = (item?: DownloadItem) => {
       directWaiters.delete(contents.id);
+      // Le destinataire n'a servi qu'à l'événement will-download, déjà passé.
+      claims.delete(contents.id);
       // La vue reste ouverte jusqu'à la fin du téléchargement, puis se ferme.
       if (item && item.getState() === 'progressing') item.once('done', () => contents.close());
       else contents.close();
@@ -270,9 +395,41 @@ export function createAcquirer(events: AcquireEvents) {
           finish();
           return { ok: false, login: true, reason: t('vous n’êtes plus connecté à {site}', { site: site.label }) };
         }
+        if (probe.kind === 'show' && probe.reason === 'delay' && opts.onWait && WAIT_PROBES[site.engine]) {
+          // Minuteur du site : on clique comme un membre, la page décompte elle-même puis
+          // lance le téléchargement. On attend ; on ne raccourcit rien.
+          const wait = WAIT_PROBES[site.engine]!;
+          let clicked = false;
+          try {
+            clicked = (await contents.executeJavaScript(wait.click, true)) === true;
+          } catch {
+            clicked = false;
+          }
+          if (clicked) {
+            const deadline = Date.now() + WAIT_MAX_MS;
+            while (!started && Date.now() < deadline && !opts.signal?.aborted) {
+              await new Promise((r) => setTimeout(r, 1000));
+              let left: unknown;
+              try {
+                left = await contents.executeJavaScript(wait.counter, true);
+              } catch {
+                left = undefined;
+              }
+              if (typeof left === 'number') opts.onWait(left);
+            }
+            // Commencé pendant l'attente (le rappel de will-download l'a posé).
+            const item = started as DownloadItem | undefined;
+            if (item) {
+              finish(item);
+              return { ok: true, filename: item.getFilename() };
+            }
+          }
+          finish();
+          return { ok: false, reason: opts.signal?.aborted ? t('arrêté') : probeReasonText(probe) };
+        }
         if (probe.kind === 'show') {
           finish();
-          return { ok: false, reason: probeReasonText(probe) };
+          return { ok: false, reason: probeReasonText(probe), quota: probe.reason === 'quota' };
         }
         next = probe.href;
       }
@@ -322,6 +479,8 @@ export function createAcquirer(events: AcquireEvents) {
     siteCookies,
     signOut,
     direct,
+    readPage,
+    fetchImage,
     isOpen: () => Boolean(open && !open.win.isDestroyed()),
     /** Pour les essais : fenêtre et page affichées. */
     current: () => open,

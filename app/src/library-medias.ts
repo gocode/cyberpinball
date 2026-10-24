@@ -68,6 +68,7 @@ import {
 import type { Action, Built, LibraryHost, Row, Section, Tone } from './library';
 import { allowPreview } from './media-protocol';
 import { createProposals } from './media-proposals';
+import type { MediaSites } from './media-sites';
 import type { MediaSearch } from './media-search';
 
 export interface MediasContext {
@@ -90,6 +91,8 @@ export interface MediasContext {
     progress(message: string): void;
     prompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
     withNotice(then: () => void, back: () => void): void;
+    /** Sites communautaires, avec le compte de l'utilisateur. */
+    sites?: MediaSites;
   };
 }
 
@@ -118,6 +121,8 @@ export interface MediaCard {
   /** Lignes discrètes : formats, repli, orientation. */
   extra?: string[];
   thumb: MediaThumb;
+  /** Avancement d'une attente ou d'un téléchargement, de 0 à 1 (barre sous les faits). */
+  progress?: number;
 }
 
 export interface MediaView {
@@ -291,6 +296,7 @@ export function createMedias(ctx: MediasContext) {
         current: (table, type) => current(session!, table, type),
         place: (table, type, entry) => place(session!, table, type, entry, mediaTypeInfo(type).pages ? { kind: 'add' } : { kind: 'set' }),
         b2s: (table) => b2sSources(session!, table),
+        active: (table) => session?.file === table.file,
         back: (type, message) => {
           if (!session) return;
           session.next = message;

@@ -1,6 +1,10 @@
 // Menu système > « Mise à jour de Cyber Pinball » : recherche de la dernière version
 // publiée, ses nouveautés, puis, à la demande seulement, téléchargement vérifié et
-// installation. Rien ne se fait d'office (packages/core/src/update.ts).
+// installation (packages/core/src/update.ts).
+//
+// Une recherche discrète part aussi en arrière-plan (30 s après le démarrage, puis toutes les
+// 6 h) : elle ne télécharge rien, elle signale seulement une version disponible par une
+// pastille rouge sur la roue dentée et sur cette entrée (attention). Sans réseau, rien ne s'affiche.
 //
 // L'installeur, lancé en mode /MAJ, attend que Cyber Pinball se ferme, remplace app\
 // puis le relance : au démarrage suivant, le menu dit si la nouvelle version est là.
@@ -20,11 +24,11 @@ import {
   takeUpdateOutcome,
   updateDownloadsDir,
   updateInstallerArguments,
-  updateNotes,
+  missedReleases,
   type Locations,
   type UpdateManifest,
 } from '@cyberpinball/core';
-import type { Action, Built, Row, SystemItem } from './library';
+import type { Action, Built, Row, Section, SystemItem } from './library';
 
 export interface UpdatesHost {
   loc: Locations;
@@ -41,6 +45,8 @@ export interface UpdatesHost {
   broadcast(): void;
   /** Ferme Cyber Pinball pour laisser l'installeur remplacer ses fichiers. */
   quit(): void;
+  /** Recherche en arrière-plan : faux pendant les essais hors écran sans site d'essai. */
+  background: boolean;
 }
 
 type State =
@@ -57,9 +63,16 @@ const leadInstall = () =>
 
 /** Délai entre l'écran « Installation » et la fermeture : le temps de le lire. */
 const QUIT_DELAY_MS = 2500;
+/** Première recherche en arrière-plan : après le démarrage, pour ne pas le ralentir. */
+const FIRST_CHECK_MS = 30_000;
+const CHECK_EVERY_MS = 6 * 3600_000;
+/** Un résultat plus récent que cela s'affiche tel quel à l'ouverture de l'entrée. */
+const FRESH_MS = 10 * 60_000;
 
 export function createUpdatesMenu(host: UpdatesHost) {
   let state: State = { kind: 'idle' };
+  /** Heure du dernier résultat (à jour ou disponible). */
+  let checkedAt = 0;
   const date = (iso: string) => formatDate(iso);
 
   /**
@@ -77,6 +90,10 @@ export function createUpdatesMenu(host: UpdatesHost) {
     get label() {
       return t('Mise à jour de Cyber Pinball');
     },
+    /** Pastille rouge : une version plus récente attend l'utilisateur. */
+    get attention() {
+      return state.kind === 'available';
+    },
     get detail() {
       const installed = t('Version {version} installée', { version: host.version });
       if (state.kind === 'available' || state.kind === 'downloading') return t('{installed} · {version} disponible', { installed, version: state.latest.version });
@@ -90,10 +107,40 @@ export function createUpdatesMenu(host: UpdatesHost) {
     host.library.openCustom(build, at);
   }
 
-  /** Ouvre l'écran ; une recherche part si l'on n'en a pas déjà le résultat (ou si on le demande). */
+  /**
+   * Ouvre l'écran. Un résultat récent (recherche en arrière-plan) s'affiche aussitôt : une
+   * version disponible montre ses nouveautés et « Mettre à jour maintenant », à un bouton.
+   * Sinon, une recherche part.
+   */
   function open(search: boolean): void {
-    if (search && state.kind !== 'downloading' && state.kind !== 'installing' && state.kind !== 'checking') void check();
+    const fresh = (state.kind === 'available' || state.kind === 'up-to-date') && Date.now() - checkedAt < FRESH_MS;
+    if (search && !fresh && state.kind !== 'downloading' && state.kind !== 'installing' && state.kind !== 'checking') void check();
     else show();
+  }
+
+  /** Recherche discrète : aucun écran, aucune erreur affichée ; seul l'état (et la pastille) change. */
+  async function checkQuietly(): Promise<void> {
+    if (state.kind !== 'idle' && state.kind !== 'up-to-date' && state.kind !== 'available') return;
+    try {
+      const result = await checkForUpdate({ current: host.version });
+      // L'utilisateur a pu ouvrir l'écran entre-temps : son état prime.
+      if (state.kind !== 'idle' && state.kind !== 'up-to-date' && state.kind !== 'available') return;
+      state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
+      checkedAt = Date.now();
+      console.log(`Mise à jour (arrière-plan) : ${describe()}`);
+      host.broadcast();
+    } catch (error) {
+      console.log(`Mise à jour (arrière-plan) : pas de réponse (${(error as Error).message})`); // i18n-ignore : journal
+    }
+  }
+
+  /** Recherches en arrière-plan, du démarrage à la fermeture. */
+  function startBackgroundChecks(): void {
+    if (!host.background) return;
+    const first = setTimeout(() => void checkQuietly(), FIRST_CHECK_MS);
+    const every = setInterval(() => void checkQuietly(), CHECK_EVERY_MS);
+    first.unref?.();
+    every.unref?.();
   }
 
   async function check(): Promise<void> {
@@ -102,6 +149,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
     try {
       const result = await checkForUpdate({ current: host.version });
       state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
+      checkedAt = Date.now();
     } catch (error) {
       state = { kind: 'error', message: (error as Error).message };
     }
@@ -182,9 +230,13 @@ export function createUpdatesMenu(host: UpdatesHost) {
     }
   }
 
-  function notesRows(latest: UpdateManifest): Row[] {
-    const notes = updateNotes(latest);
-    return notes.length ? notes.map((text) => ({ text })) : [{ text: t('Pas de liste des nouveautés pour cette version.'), tone: 'quiet' }];
+  /** Nouveautés de chaque version manquée, la plus récente d'abord : une section par version. */
+  function notesSections(latest: UpdateManifest): Section[] {
+    const releases = missedReleases(latest, host.version);
+    return releases.map((release) => ({
+      title: releases.length > 1 ? t('Nouveautés de la {version}', { version: release.version }) : t('Nouveautés'),
+      rows: release.notes.length ? release.notes.map((text) => ({ text })) : [{ text: t('Pas de liste des nouveautés pour cette version.'), tone: 'quiet' as const }],
+    }));
   }
 
   function build(): Built {
@@ -240,10 +292,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
           heading: t('Cyber Pinball {version} est disponible', { version: latest.version }),
           subheading: t('{subheading} · publiée le {date}', { subheading, date: date(latest.date) }),
           lead: root ? leadInstall() : undefined,
-          sections: [
-            { title: t('Nouveautés'), rows: notesRows(latest) },
-            { title: t('Téléchargement'), rows: download_ },
-          ],
+          sections: [...notesSections(latest), { title: t('Téléchargement'), rows: download_ }],
           actions,
           back,
         };
@@ -298,5 +347,5 @@ export function createUpdatesMenu(host: UpdatesHost) {
     return text;
   }
 
-  return { systemItem, startupNotice };
+  return { systemItem, startupNotice, startBackgroundChecks };
 }

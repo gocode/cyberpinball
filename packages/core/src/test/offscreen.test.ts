@@ -125,6 +125,17 @@ test('application : tout outil en ligne de commande est lancé avec windowsHide'
   assert.deepEqual(found, []);
 });
 
+// Dans un worktree neuf, packages\*\dist n'existe pas encore : demo-mise-a-jour.ps1 s'arrêtait
+// sur un module introuvable avant d'avoir compilé quoi que ce soit.
+test('scripts : une démonstration qui lit le code compilé le compile d’abord', () => {
+  const scripts = [path.join(REPO, 'lanceur.ps1'), ...fs.readdirSync(path.join(REPO, 'docs')).filter((f) => f.endsWith('.ps1')).map((f) => path.join(REPO, 'docs', f))];
+  const found = scripts.filter((file) => {
+    const text = fs.readFileSync(file, 'utf8');
+    return /[\\/]dist[\\/]/.test(text) && !/npm run build|Assert-Compile|tsc -b/.test(text);
+  });
+  assert.deepEqual(found.map((f) => path.basename(f)), []);
+});
+
 // Windows PowerShell 5.1 lit en ANSI un fichier UTF-8 sans BOM (ceux qu'écrit l'application) :
 // « Aucun problème » n'y correspondait plus à son motif, et demo-captures.ps1 échouait à tort.
 test('scripts : un fichier lu pour y chercher un texte accentué l’est en UTF-8', () => {

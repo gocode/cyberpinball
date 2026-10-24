@@ -27,9 +27,11 @@ export function loadPrivateKey() {
   const file = privateKeyPath();
   if (!fs.existsSync(file)) throw new Error(`Clé de publication introuvable : ${file}. Restaurez-la depuis sa sauvegarde (ou CYBERPINBALL_MAJ_CLE_PRIVEE).`);
   const pem = fs.readFileSync(file, 'utf8');
-  const derived = createPublicKey(createPrivateKey(pem)).export({ type: 'spki', format: 'pem' }).toString().trim();
-  const shipped = /`([^`]+)`/.exec(fs.readFileSync(publicKeyModule, 'utf8'))?.[1].trim();
-  if (derived !== shipped) throw new Error(`La clé ${file} ne correspond pas à la clé publique livrée (${publicKeyModule}) : les bornes refuseraient ce flux.`);
+  // Comparées en binaire (DER) : le texte du module peut avoir des fins de ligne Windows (git).
+  const derived = createPublicKey(createPrivateKey(pem)).export({ type: 'spki', format: 'der' });
+  const text = /`([^`]+)`/.exec(fs.readFileSync(publicKeyModule, 'utf8'))?.[1];
+  const shipped = text ? createPublicKey(text).export({ type: 'spki', format: 'der' }) : undefined;
+  if (!shipped || !derived.equals(shipped)) throw new Error(`La clé ${file} ne correspond pas à la clé publique livrée (${publicKeyModule}) : les bornes refuseraient ce flux.`);
   return pem;
 }
 

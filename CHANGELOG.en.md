@@ -11,7 +11,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 - First public release: screen, button and sound setup wizard, table menu driven by the cabinet buttons.
 - Adding tables, ROM library, PuP-Packs, VPS catalog and download queue.
-- Game media: import from PinUP Popper or PinballX, download from VPinMediaDB, attract mode.
-- Updates from the system menu: "Cyber Pinball update".
+- Game media: import from PinUP Popper or PinballX, download from VPinMediaDB, then VPForums and VPUniverse with your account, attract mode.
+- Updates from the system menu: "Cyber Pinball update", flagged by a red dot on the gear when a new version is out.
 - English or French interface, chosen in the system menu: "Language / Langue".
 - Installs alongside PinUP Popper, PinballX or PinballY: waits for another running frontend to close, warns before flipping a screen in Windows.

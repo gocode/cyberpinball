@@ -15,6 +15,20 @@
 # (Get-ModeleBorne, Copy-ModeleBorne), quels que soient les boutons relevés sur la vraie borne.
 
 Set-Location (Split-Path $PSScriptRoot -Parent)
+# Les démonstrations choisissent leurs actions par leur libellé français (action:…) : l'interface
+# est donc en français, quelle que soit la langue de Windows (sauf langue imposée par le script).
+if (-not $env:CYBERPINBALL_LANGUE) { $env:CYBERPINBALL_LANGUE = 'fr' }
+
+# Le code compilé (packages\*\dist, app\dist) que lisent les démonstrations : dans un worktree
+# neuf, il n'existe pas encore. Toute démonstration qui s'en sert passe par ici, ou compile
+# elle-même (npm run build) ; packages\core\src\test\offscreen.test.ts le vérifie.
+function Assert-Compile {
+  $repo = Split-Path $PSScriptRoot -Parent
+  if (Test-Path (Join-Path $repo 'packages\core\dist\index.js')) { return }
+  Push-Location $repo
+  try { npm run build | Out-Null } finally { Pop-Location }
+  if ($LASTEXITCODE -ne 0) { throw 'Compilation impossible (npm run build).' }
+}
 
 function Use-HorsEcran([string]$Ecrans = 'pc-dev') {
   if ($env:CYBERPINBALL_A_L_ECRAN -eq '1') {
@@ -43,6 +57,7 @@ function Use-HorsEcran([string]$Ecrans = 'pc-dev') {
 # (Start sur 1, Exit sur Échap…) sont celles que les démonstrations rejouent.
 function Get-ModeleBorne([string]$Fichier, [switch]$AvecBoutons) {
   $core = Join-Path (Split-Path $PSScriptRoot -Parent) 'packages\core\dist\index.js'
+  Assert-Compile
   $script = @'
 const [core, file, displaysFile, keep] = process.argv.slice(1);
 const fs = require('fs');

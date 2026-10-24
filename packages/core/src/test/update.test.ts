@@ -10,6 +10,7 @@ import {
   checkForUpdate,
   compareAppVersions,
   downloadUpdate,
+  missedReleases,
   openEnvelope,
   recordPendingUpdate,
   relaunchArguments,
@@ -177,4 +178,36 @@ test('clé publique livrée : Ed25519 ; remplacée pour un essai seulement dans 
   assert.equal(updatePublicKey({ CYBERPINBALL_MAJ_CLE: file }), UPDATE_PUBLIC_KEY);
   assert.equal(updatePublicKey({ CYBERPINBALL_MAJ_CLE: file, CYBERPINBALL_HOME: dir }), k.pub);
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('nouveautés de chaque version manquée, la plus récente d’abord, dans la langue de la borne', () => {
+  const k = keys();
+  const m: UpdateManifest = {
+    ...manifestFor(Buffer.from('exe'), 'https://example.org/x.exe', '0.4.0'),
+    notes: ['quatre'],
+    notesByLanguage: { en: ['four'] },
+    history: [
+      { version: '0.2.0', notes: ['deux'] },
+      { version: '0.3.0', notes: ['trois'], notesByLanguage: { en: ['three'] } },
+      { version: '0.1.0', notes: ['un'] },
+      { version: '0.4.0', notes: ['doublon de la dernière'] },
+    ],
+  };
+  // Passe la signature et la relecture : l'historique fait partie du manifeste signé.
+  const read = openEnvelope(JSON.stringify(signManifest(m, k.priv)), k.pub);
+  assert.deepEqual(missedReleases(read, '0.1.0', 'fr'), [
+    { version: '0.4.0', notes: ['quatre'] },
+    { version: '0.3.0', notes: ['trois'] },
+    { version: '0.2.0', notes: ['deux'] },
+  ]);
+  assert.deepEqual(missedReleases(read, '0.2.0', 'en'), [
+    { version: '0.4.0', notes: ['four'] },
+    { version: '0.3.0', notes: ['three'] },
+  ]);
+  // Un flux d'avant l'historique : la dernière version seule.
+  const { history: _, ...old } = read;
+  assert.deepEqual(missedReleases(old, '0.1.0', 'fr'), [{ version: '0.4.0', notes: ['quatre'] }]);
+  // Un historique mal formé n'est même pas signé.
+  assert.throws(() => signManifest({ ...m, history: [{ version: 'v2', notes: [] }] }, k.priv), /historique/);
+  assert.throws(() => signManifest({ ...m, history: [{ version: '0.2.0', notes: 'deux' as unknown as string[] }] }, k.priv), /historique/);
 });

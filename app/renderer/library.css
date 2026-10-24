@@ -242,6 +242,18 @@ body.dragging #root::after {
   color: var(--ink);
 }
 
+/* Pastille rouge d'une entrée qui attend l'utilisateur ; l'anneau sombre la détache de l'aplat vert. */
+.lib-action .lib-attention {
+  display: inline-block;
+  width: 1.4cqmin;
+  height: 1.4cqmin;
+  margin-left: 1.2cqmin;
+  border-radius: 50%;
+  vertical-align: 0.2em;
+  background: var(--danger);
+  box-shadow: 0 0 0 0.3cqmin var(--void);
+}
+
 .lib-action .detail {
   display: block;
   margin-top: 0.3cqmin;
@@ -587,6 +599,30 @@ body.mouse .media-card[data-act]:hover {
 
 .badge.media-state.tone-info {
   color: var(--meta);
+}
+
+.badge.media-state.tone-error {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.badge.media-state.tone-quiet {
+  color: var(--ink-muted);
+}
+
+/* Attente d'un site ou téléchargement en cours : barre sous les faits. */
+.media-progress {
+  height: 0.6vmin;
+  margin: 0.5vmin 0 0.3vmin;
+  border-radius: 0.3vmin;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.media-progress > span {
+  display: block;
+  height: 100%;
+  background: var(--meta);
 }
 
 .media-where,

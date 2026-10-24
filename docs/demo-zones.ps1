@@ -31,6 +31,7 @@ $wt = Split-Path $PSScriptRoot -Parent
 # Tout le reste tourne sur un bureau Windows caché : rien ne peut apparaître sur les écrans du poste.
 if (Enter-BureauCache $PSCommandPath $PSBoundParameters) { exit $LASTEXITCODE }
 Use-HorsEcran $Ecrans
+Assert-Compile
 $base = "$wt\tmp\demo-zones"
 $realHash = (Get-FileHash "$Source\config\VPinballX.ini").Hash
 $realModel = (Get-FileHash "$Source\data\cabinet.json").Hash

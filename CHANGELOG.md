@@ -13,7 +13,7 @@ son interface).
 
 - Première version publique : assistant d'écrans, de boutons et de son, menu des tables aux boutons de la borne.
 - Ajout de tables, bibliothèque de ROM, PuP-Packs, catalogue VPS et liste d'attente.
-- Médias des jeux : import depuis PinUP Popper ou PinballX, téléchargement depuis VPinMediaDB, mode attente.
-- Mise à jour depuis le menu système : « Mise à jour de Cyber Pinball ».
+- Médias des jeux : import depuis PinUP Popper ou PinballX, téléchargement depuis VPinMediaDB, puis VPForums et VPUniverse avec votre compte, mode attente.
+- Mise à jour depuis le menu système : « Mise à jour de Cyber Pinball », signalée par une pastille rouge sur la roue dentée quand une version est disponible.
 - Interface en français ou en anglais, au choix dans le menu système : « Langue / Language ».
 - S'installe à côté de PinUP Popper, PinballX ou PinballY : attend qu'un autre menu ouvert soit fermé, prévient avant de retourner un écran dans Windows.

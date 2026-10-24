@@ -10,6 +10,10 @@ import * as path from 'node:path';
 import { dialog, type BrowserWindow, type Input } from 'electron';
 import {
   CONFIG_KEY,
+  variantTraitsLabel,
+  tablePupPacks,
+  pupOptionOps,
+  type TablePupPack,
   findTableIni,
   readTextIfExists,
   applyImport,
@@ -91,6 +95,7 @@ import { LayoutReport } from './layout-check';
 import { createCatalog } from './catalog';
 import { createMediaDownload } from './media-download';
 import { createMediaSearch } from './media-search';
+import { createMediaSites } from './media-sites';
 import { createMediaImport } from './media-import';
 import { createMedias, type MediaView } from './library-medias';
 import { isShown, refuseOffscreen } from './offscreen';
@@ -161,6 +166,8 @@ export interface LibraryHost {
 export interface SystemItem {
   label: string;
   detail?: string;
+  /** Quelque chose attend l'utilisateur ici (une mise à jour disponible…) : pastille rouge, jusque sur la roue dentée. */
+  attention?: boolean;
   run: () => void;
 }
 
@@ -191,6 +198,8 @@ export interface Action {
   label: string;
   detail?: string;
   tone?: Tone;
+  /** Pastille rouge à côté du libellé : cette action attend l'utilisateur. */
+  attention?: boolean;
   run: () => void | Promise<void>;
 }
 /** Écran décrit : titre, sections, actions (flippers pour choisir, Start pour valider) et retour (Exit). */
@@ -216,7 +225,9 @@ type Editor =
 
 type Screen =
   | { kind: 'system' }
-  | { kind: 'sheet'; file: string; flash?: string }
+  | { kind: 'sheet'; file: string; flash?: string; pup?: TablePupPack[] }
+  /** Options des PuP-Packs de la table (fiche > « PuP-Pack »). */
+  | { kind: 'pupOptions'; file: string; flash?: string; pup?: TablePupPack[] }
   /** Prospectus ou règles de la table, page par page (flippers : page précédente ou suivante). */
   | { kind: 'pages'; file: string; type: SheetPageType; index: number }
   | { kind: 'edit'; file: string; fields: { Title: string; Manufacturer: string; Year?: number }; editor?: Editor }
@@ -387,8 +398,9 @@ export function createLibrary(host: LibraryHost) {
 
   // ---------- Ouvertures ----------
 
+  /** Menu système ; la sélection va d'office sur la première entrée qui attend l'utilisateur (pastille rouge). */
   function openSystem(): void {
-    go({ kind: 'system' });
+    go({ kind: 'system' }, Math.max(0, systemItems.findIndex((i) => i.attention)));
   }
 
   /** Écran fourni par l'appelant (configurations de la borne) ; ses actions ouvrent les écrans suivants. */
@@ -437,6 +449,9 @@ export function createLibrary(host: LibraryHost) {
   });
   if (layout()) catalogUi.start();
 
+  // Médias des sites communautaires (VPForums, VPUniverse), dans la session de « Récupérer ».
+  const mediaSites = createMediaSites({ acquirer: catalogUi.acquirer, downloadsDir: () => layout()?.downloads, changed: () => host.broadcast() });
+
   // Téléchargement depuis VPinMediaDB, depuis l'écran « Médias » ou le menu système.
   const mediaDownload = createMediaDownload({
     host,
@@ -470,6 +485,7 @@ export function createLibrary(host: LibraryHost) {
       progress,
       prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
       withNotice: (then, back) => mediaDownload.withNotice(then, back),
+      sites: mediaSites,
     },
   });
 
@@ -586,11 +602,13 @@ export function createLibrary(host: LibraryHost) {
         return {
           heading: t('Menu et configuration'),
           sections: [],
-          actions: [...systemItems.map((i) => ({ label: i.label, detail: i.detail, run: i.run })), { label: t('Retour aux tables'), run: leave }],
+          actions: [...systemItems.map((i) => ({ label: i.label, detail: i.detail, attention: i.attention, run: i.run })), { label: t('Retour aux tables'), run: leave }],
           back: leave,
         };
       case 'sheet':
         return buildSheet(screen as Extract<Screen, { kind: 'sheet' }>);
+      case 'pupOptions':
+        return buildPupOptions(screen as Extract<Screen, { kind: 'pupOptions' }>);
       case 'pages':
         return buildPages(screen as PagesScreen);
       case 'edit':
@@ -700,6 +718,7 @@ export function createLibrary(host: LibraryHost) {
         ...SHEET_PAGE_TYPES.map((type) => pagesAction(table, type)),
         { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), run: () => openEdit(table) },
         { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), run: () => medias.open(table) },
+        ...pupAction(table, s),
         ...(host.adjustDisplay && host.vpxExe()
           ? [{ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), run: () => adjustDisplay(table) }]
           : []),
@@ -797,6 +816,103 @@ export function createLibrary(host: LibraryHost) {
       detail: own ? t('{own} sur {count} fournis par le jeu ; replis pour les autres', { own, count: MANAGED_MEDIA_TYPES.length }) : t('aucun : le menu montre ses replis'),
       tone: own ? 'ok' : 'quiet',
     };
+  }
+
+  // ---------- Options des PuP-Packs ----------
+
+  /**
+   * PuP-Packs de la table qui ont des options, lus une fois par écran (l'analyse d'un pack
+   * parcourt ses dossiers) : la fiche montre l'option appliquée, signale celle qui
+   * conviendrait mieux à la borne, et ouvre l'écran des options.
+   */
+  function pupPacksOf(table: TableEntry, s: { pup?: TablePupPack[] }): TablePupPack[] {
+    s.pup ??= tablePupPacks(table, pupCabinet(loadCabinet(host.dataDir)));
+    return s.pup;
+  }
+
+  function pupAction(table: TableEntry, s: { pup?: TablePupPack[] }): Action[] {
+    const packs = pupPacksOf(table, s);
+    if (!packs.length) return [];
+    const unsuited = packs.some((p) => p.recommended && p.applied !== p.recommended && p.memory?.chosen !== 'user');
+    const applied = packs.map((p) => p.applied?.label ?? t('aucune option appliquée')).join(' · ');
+    return [
+      {
+        label: 'PuP-Pack', // i18n-ignore : nom propre
+        detail: unsuited ? t('{applied} · une autre option convient mieux à la borne', { applied }) : applied,
+        tone: unsuited ? 'warning' : undefined,
+        run: () => go({ kind: 'pupOptions', file: table.file }),
+      },
+    ];
+  }
+
+  function buildPupOptions(s: Extract<Screen, { kind: 'pupOptions' }>): Built {
+    const table = find(s.file);
+    const back = () => (table ? openSheet(table) : leave());
+    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), run: leave }], back: leave };
+    const packs = pupPacksOf(table, s);
+    const cabinet = pupCabinet(loadCabinet(host.dataDir));
+    const sections: Section[] = packs.map((p) => ({
+      title: packs.length > 1 ? p.pack : t('Options du pack {pack}', { pack: p.pack }),
+      rows: [
+        { text: t('Appliquée'), detail: p.applied ? p.applied.label : t('aucune : les .pup de la racine ne sont ceux d’aucune option') },
+        {
+          text: t('Pour cette borne'),
+          detail: !cabinet ? t('borne pas encore configurée') : p.recommended ? t('{option} ({cabinet})', { option: p.recommended.label, cabinet: describePupCabinet(cabinet) }) : t('pas de choix net : à essayer'),
+          tone: p.recommended && p.recommended !== p.applied ? 'warning' : 'ok',
+        },
+      ],
+    }));
+    const actions: Action[] = packs.flatMap((p) =>
+      p.variants.map((v) => {
+        const state = v === p.applied ? t('appliquée') : v === p.recommended ? t('conseillée pour la borne') : undefined;
+        return {
+          label: packs.length > 1 ? `${p.pack} : ${v.label}` : v.label,
+          detail: [traitsLabel(v), state].filter(Boolean).join(' · '),
+          tone: v === p.applied ? ('ok' as const) : undefined,
+          run: () => applyPupOption(s, table, p, v),
+        };
+      }),
+    );
+    actions.push(
+      {
+        label: t('Jouer'),
+        detail: t('Voir l’option appliquée sur la borne'),
+        run: () => {
+          screen = undefined;
+          host.play(table);
+        },
+      },
+      { label: t('Retour à la fiche'), run: back },
+    );
+    return {
+      heading: 'PuP-Pack', // i18n-ignore : nom propre
+      subheading: table.title,
+      lead: s.flash ?? t('Chaque option est une disposition des écrans prévue par l’auteur du pack. Start l’applique ; elle sert dès la prochaine partie.'),
+      sections,
+      actions,
+      back,
+    };
+  }
+
+  /**
+   * Applique une option : ses fichiers recopiés (les anciens .pup à la corbeille), le choix
+   * retenu dans le .info, marqué comme choisi ici (le médecin ne le remet plus en cause).
+   */
+  function applyPupOption(s: Extract<Screen, { kind: 'pupOptions' }>, table: TableEntry, pack: TablePupPack, variant: PupVariant): void {
+    if (variant === pack.applied && pack.memory?.chosen === 'user') {
+      s.flash = t('« {option} » est déjà appliquée.', { option: variant.label });
+      return host.broadcast();
+    }
+    try {
+      const trashDir = trashDirFor(layout()!.trash, `PuP-Pack ${path.basename(table.folder)}`); // i18n-ignore : nom de dossier
+      applyOps(pupOptionOps(table, pack.root, pack.pack, variant, { ...(pack.memory ?? {}), chosen: 'user' }), { trashDir });
+      s.flash = t('« {option} » appliquée : elle sert dès la prochaine partie. « Jouer » pour la voir.', { option: variant.label });
+    } catch (error) {
+      s.flash = t('Option non appliquée : {message}', { message: (error as Error).message });
+    }
+    s.pup = undefined;
+    host.reload(table.file);
+    host.broadcast();
   }
 
   // ---------- Régler l'affichage en partie ----------
@@ -1881,7 +1997,7 @@ export function createLibrary(host: LibraryHost) {
       subheading: built.subheading,
       lead: built.lead,
       sections: built.sections,
-      actions: built.actions.map(({ label, detail, tone }) => ({ label, detail, tone })),
+      actions: built.actions.map(({ label, detail, tone, attention }) => ({ label, detail, tone, attention: attention || undefined })),
       media: built.media,
       cursor,
       busy,
@@ -2018,6 +2134,8 @@ export function createLibrary(host: LibraryHost) {
     /** Catalogue et fenêtre « Récupérer » (démonstrations). */
     catalog: catalogUi,
     isActive: () => screen !== undefined,
+    /** Une entrée du menu système attend l'utilisateur : pastille rouge sur la roue dentée. */
+    attention: () => systemItems.some((i) => i.attention),
   };
 }
 
@@ -2052,19 +2170,8 @@ function readLog(file: string | undefined): string | undefined {
   }
 }
 
-/** « topper · DMD séparé · 16:9 » : ce que vise une option de PuP-Pack. */
-function traitsLabel(v: PupVariant): string {
-  const traits = v.traits;
-  const parts: string[] = [];
-  if (traits.desktop) parts.push(t('bureau, un seul écran'));
-  if (traits.unsupported) parts.push(t('non géré par le plugin PUP'));
-  if (traits.topper !== undefined) parts.push(traits.topper ? 'topper' : t('sans topper'));
-  if (traits.dmd) parts.push({ separate: t('DMD sur son écran'), backglass: t('DMD dans le backglass'), none: t('sans DMD') }[traits.dmd]);
-  if (traits.fullDmd !== undefined) parts.push(traits.fullDmd ? 'FullDMD' : t('DMD réel'));
-  const ratios: Record<string, string> = { '1.78': '16:9', '2.33': '21:9', '1.33': '4:3', '1.25': '5:4', '1.00': '1:1' };
-  if (traits.ratios.length) parts.push(formatList(traits.ratios.map((r) => ratios[r.toFixed(2)] ?? r.toFixed(2)), 'or'));
-  return parts.join(' · ') || t('disposition non décrite');
-}
+/** « topper · DMD séparé · 16:9 » : ce que vise une option de PuP-Pack (packages/core). */
+const traitsLabel = variantTraitsLabel;
 
 function scriptNote(script: ScriptResult | undefined): string | undefined {
   if (!script) return t('ROM non vérifiée : VPX n’est pas installé.');

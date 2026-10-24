@@ -268,6 +268,10 @@ library.systemItems.splice(
     get detail() {
       return t('Boutons, écrans, playfield, disposition, son : chaque étape seule, ou l’assistant complet');
     },
+    // Le sous-menu porte la pastille de ses entrées.
+    get attention() {
+      return cabinetSetupItems().some((i) => i.attention);
+    },
     run: () => openCabinetSetup(),
   },
 );
@@ -291,9 +295,10 @@ function openCabinetSetup(): void {
     heading: t('Configuration de la borne'),
     lead: t('Chaque étape se refait seule, puis revient au menu des tables. « Quitter sans enregistrer » (ou Exit maintenu 2 s) en sort sans rien changer.'),
     sections: [],
-    actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, run: i.run })), { label: t('Retour'), run: () => library.openSystem() }],
+    actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, attention: i.attention, run: i.run })), { label: t('Retour'), run: () => library.openSystem() }],
     back: () => library.openSystem(),
-  }));
+    // La sélection va d'office sur l'entrée qui attend l'utilisateur (pastille rouge).
+  }), Math.max(0, cabinetSetupItems().findIndex((i) => i.attention)));
 }
 // Médias, son et attente (musique, volumes, mode attente, médias pendant la partie) : un écran à part.
 library.systemItems.splice(
@@ -317,7 +322,7 @@ library.systemItems.splice(
 );
 // Langue de l'interface : le choix relance le menu, comme un changement de configuration.
 library.systemItems.splice(library.systemItems.length - 1, 0, createLanguageMenu({ library, relaunch: () => relaunchMenu() }));
-// Mise à jour de Cyber Pinball, à la demande seulement : recherche, nouveautés, installation.
+// Mise à jour de Cyber Pinball : recherche discrète en arrière-plan (pastille rouge), installation à la demande.
 const updates = createUpdatesMenu({
   loc,
   version: app.getVersion(),
@@ -326,6 +331,8 @@ const updates = createUpdatesMenu({
   library,
   broadcast: () => broadcast(),
   quit: () => quit(),
+  // Essais hors écran : seulement vers leur site d'essai, jamais vers GitHub.
+  background: !OFFSCREEN || Boolean(process.env.CYBERPINBALL_MAJ_URL),
 });
 library.systemItems.splice(library.systemItems.length - 1, 0, updates.systemItem);
 // Juste avant « Quitter Cyber Pinball ».
@@ -415,6 +422,7 @@ export function startFrontend(): void {
   if (selection?.previous && selection.configuration) showBanner(t('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }));
   // Après une mise à jour : la nouvelle version est-elle là ?
   const updateNotice = updates.startupNotice();
+  updates.startBackgroundChecks();
   if (updateNotice) showBanner(updateNotice);
   if (choose) configurations.openChooser();
   else if (problem) state = { ...state, phase: 'message', message: problem };
@@ -1096,6 +1104,8 @@ function viewFor(role: RoleId) {
     backglass: role === 'playfield' && medias && table && !shown ? medias.typeMedia(table, 'backglass', 'Backglass') : undefined,
     message: state.message,
     banner: state.banner,
+    /** Pastille rouge sur la roue dentée : une entrée du menu système attend l'utilisateur. */
+    attention: library.attention(),
     library: state.phase === 'library' ? library.view() : undefined,
     // Mode attente : la table montrée, son logo, et l'invite du playfield.
     attract: shown ? { ...describe(shown), wheel: medias?.wheel(shown) } : undefined,

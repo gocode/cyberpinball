@@ -503,6 +503,12 @@ function renderPlayfield(s) {
   const gear = el('button', 'gear', '⚙');
   gear.title = t('Menu et configuration (Tab)');
   gear.dataset.act = JSON.stringify({ type: 'config' });
+  // Pastille rouge : une entrée du menu système attend l'utilisateur (mise à jour disponible…).
+  if (s.attention) {
+    gear.classList.add('has-attention');
+    gear.title = t('Menu et configuration (Tab) : un élément attend votre intervention');
+    gear.append(el('span', 'gear-dot'));
+  }
   nodes.push(gear);
 
   if (s.table) {

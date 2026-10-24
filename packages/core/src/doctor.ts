@@ -39,8 +39,11 @@ import {
   isVisible,
   pupScriptFacts,
   screenRole,
+  scoreVariant,
+  variantTraitsLabel,
   type PupCabinet,
   type PupScriptFacts,
+  type PupVariant,
 } from './puppack';
 import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
@@ -79,6 +82,7 @@ export const FINDING_CODES = [
   'pupNested',
   'pupOrphan',
   'pupOptionNotApplied',
+  'pupOptionUnsuited',
   'pupScreenAbsent',
   'pupPlayfieldScreen',
   'pupScriptDriven',
@@ -148,6 +152,8 @@ export interface DoctorContext {
 export interface PupMemory {
   option?: string;
   origin?: string;
+  /** L'option a été choisie dans la fiche (« PuP-Pack ») : le médecin ne propose plus d'en changer. */
+  chosen?: 'user';
 }
 
 export function pupMemory(info: { [key: string]: unknown }, pack: string): PupMemory | undefined {
@@ -166,6 +172,60 @@ export function setPupMemory<T extends { [key: string]: unknown }>(info: T, pack
 
 function withPupMemory(info: { [key: string]: unknown }, pack: string, memory: PupMemory): string {
   return JSON.stringify(setPupMemory(info, pack, memory), null, 2) + '\n';
+}
+
+/**
+ * Opérations qui appliquent une option d'un pack installé : ses fichiers recopiés à la
+ * racine (les .pup remplacés partent à la corbeille avec la copie), ceux que son .bat
+ * supprime à la corbeille, et l'option retenue dans le .info pour les mises à jour.
+ * Rien n'est exécuté : le .bat n'a été que lu (analysePack).
+ */
+export function pupOptionOps(entry: TableEntry, root: string, pack: string, variant: PupVariant, memory: PupMemory): FileOp[] {
+  return [
+    ...variant.copies.map((c) => ({ op: 'copy' as const, from: path.join(root, c.from), to: path.join(root, c.to) })),
+    ...variant.deletes.map((d) => ({ op: 'trash' as const, path: path.join(root, d) })),
+    ...(fs.existsSync(entry.infoFile) ? [{ op: 'write' as const, path: entry.infoFile, content: withPupMemory(entry.info, pack, { ...memory, option: variant.label }) }] : []),
+  ];
+}
+
+export interface TablePupPack {
+  /** Nom du dossier dans pupvideos. */
+  pack: string;
+  /** Racine du pack (screens.pup). */
+  root: string;
+  variants: PupVariant[];
+  /** Option dont les .pup sont à la racine. */
+  applied?: PupVariant;
+  /** Option la plus proche de la borne, si le choix est net. */
+  recommended?: PupVariant;
+  memory?: PupMemory;
+}
+
+/**
+ * PuP-Packs d'une table qui ont des options (variantes lues dans leurs .bat ou leurs
+ * dossiers d'options), avec celle appliquée et celle qui convient à la borne : la fiche
+ * les propose (« PuP-Pack »), le médecin compare les deux.
+ */
+export function tablePupPacks(entry: TableEntry, cabinet?: PupCabinet): TablePupPack[] {
+  const pupName = listSafe(entry.folder).find((f) => f.toLowerCase() === 'pupvideos');
+  if (!pupName) return [];
+  const pupvideos = path.join(entry.folder, pupName);
+  return listDirs(pupvideos).flatMap((pack) => {
+    const dir = path.join(pupvideos, pack);
+    const info = analysePack(findPackRoot(dir) ?? dir);
+    if (!info.variants.length) return [];
+    const best = cabinet ? chooseVariant(info.variants, cabinet) : undefined;
+    return [
+      {
+        pack,
+        root: info.root,
+        variants: info.variants,
+        applied: appliedVariant(info),
+        recommended: best?.confident ? best.chosen : undefined,
+        memory: pupMemory(entry.info, pack),
+      },
+    ];
+  });
 }
 
 /** Nom du dossier d'une table : « Terminator 2 (Williams 1991) ». */
@@ -597,13 +657,35 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
         fix: {
           label: t('Appliquer « {option} » ({why})', { option: v.label, why }),
           ops: [
-            ...v.copies.map((c) => ({ op: 'copy' as const, from: path.join(info.root, c.from), to: path.join(info.root, c.to) })),
-            ...v.deletes.map((d) => ({ op: 'trash' as const, path: path.join(info.root, d) })),
             // L'option est retenue pour la prochaine mise à jour du pack.
-            ...(fs.existsSync(entry.infoFile) ? [{ op: 'write' as const, path: entry.infoFile, content: withPupMemory(entry.info, pack, { ...memory, option: v.label }) }] : []),
+            ...pupOptionOps(entry, info.root, pack, v, memory ?? {}),
           ],
         },
       });
+    }
+
+    // Option appliquée moins adaptée à la borne qu'une autre (borne changée depuis
+    // l'installation, ou choix d'office d'une autre époque) : sauf si elle a été choisie
+    // dans la fiche, la meilleure est proposée, nettement meilleure seulement.
+    const applied = appliedVariant(info);
+    if (ctx.cabinet && applied && memory?.chosen !== 'user' && info.variants.length > 1) {
+      const best = chooseVariant(info.variants, ctx.cabinet);
+      if (best.confident && best.chosen && best.chosen !== applied && scoreVariant(best.chosen.traits, ctx.cabinet) - scoreVariant(applied.traits, ctx.cabinet) >= 4) {
+        findings.push({
+          code: 'pupOptionUnsuited',
+          severity: 'warning',
+          title: t('Option du PuP-Pack inadaptée à la borne'),
+          detail: t('pupvideos\\{pack} applique « {applied} » ({appliedTraits}) ; pour cette borne ({cabinet}), « {best} » ({bestTraits}) convient mieux. Fiche > « PuP-Pack » pour voir et choisir les options.', {
+            pack,
+            applied: applied.label,
+            appliedTraits: variantTraitsLabel(applied),
+            cabinet: describePupCabinet(ctx.cabinet),
+            best: best.chosen.label,
+            bestTraits: variantTraitsLabel(best.chosen),
+          }),
+          fix: { label: t('Appliquer « {option} »', { option: best.chosen.label }), ops: pupOptionOps(entry, info.root, pack, best.chosen, { ...(memory ?? {}), chosen: undefined }) },
+        });
+      }
     }
 
     // Écrans demandés que la borne n'a pas, et écran Playfield que le plugin ne rend pas.

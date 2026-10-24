@@ -45,6 +45,7 @@ export * from './mediasearch';
 export * from './mediachoices';
 export * from './acquisition';
 export * from './sitesessions';
+export * from './mediasites';
 export * from './wizardsteps';
 export * from './update';
 export * from './i18n';

@@ -1,3 +1,5 @@
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import type { Cabinet, EdidInfo, ObservedDisplay, Rect } from '../model';
 
 /** Construit un EDID de base valide (128 octets) avec les champs utiles aux tests. */
@@ -111,4 +113,40 @@ export function cabinetDisplays(): ObservedDisplay[] {
     display('\\.\DISPLAY2', 'LG FULL HD', { x: 3840, y: 0, width: 1920, height: 1080 }, LG, '4&2f0e1c&0&UID4353'),
     display('\\.\DISPLAY3', 'LCD 12.3', { x: 5760, y: 0, width: 1920, height: 720 }, DMD, '4&2f0e1c&0&UID4354'),
   ];
+}
+
+/**
+ * Pack de Star Trek LE (Stern 2013), tel qu'installé sur la borne de développement : trois
+ * options, aucune n'a d'écran DMD (1) ni FullDMD (5). L'écran 13 « BGdmdText » est un encart
+ * posé sur le backglass (26 %, 79 %, 48 % × 21 %) : éteint, il attend le DMD (option 1) ;
+ * allumé, il montre les animations DMD du pack (option 3) ; l'option 2 y met le topper.
+ */
+export function starTrekPack(root: string): void {
+  const lines = (dmdText: string, topper: string, topper2: string) =>
+    [
+      'ScreenNum,ScreenDes,PlayList,PlayFile,Loopit,Active,Priority,CustomPos',
+      '11,backglassunderlay,bgumain,bgmain.mp4,0,ForceBack,,"2,0,0,100,100"',
+      '14,Backglassvideo,bg,,0,ForceBack,,"2,4,6,92,70.4"',
+      '12,otherbackglass,,,0,ForcePopBack,,"2,4,6,92,70.4"',
+      `13,BGdmdText,dmd,dmdmain.mp4,0,${dmdText},,"2,26,79,48,21"`,
+      topper,
+      topper2,
+      '4,Music,musikmain,,0,MusicOnly,90,',
+      '2,PuPOverlays,,,0,ForceOn,,',
+      '7,transbg,,,1,ForcePop,,',
+      '',
+    ].join('\r\n');
+  const options: [string, string][] = [
+    ['Option 1 - DMD on BG No Topper', lines('off', '0,Topper,topper,topperlogo.mp4,0,off,0,', '15,Other2/Topper2,,,0,off,,"0,0,0,100,100"')],
+    ['Option 2 - Topper on BG No DMD', lines('off', '0,Topper,topper,topperlogo.mp4,0,show,0,"2,26,79,48,21"', '15,Other2/Topper2,,,0,ForcePop,,"2,26,79,48,21"')],
+    ['Option 3 - BG and Topper Seperate', lines('ForceBack', '0,Topper,topper,topperlogo.mp4,0,show,0,', '15,Other2/Topper2,,,0,ForcePopBack,,"0,0,0,100,100"')],
+  ];
+  for (const [name, screens] of options) {
+    fs.mkdirSync(path.join(root, 'PuP-Pack_Options', name), { recursive: true });
+    fs.writeFileSync(path.join(root, 'PuP-Pack_Options', name, 'screens.pup'), screens);
+    fs.writeFileSync(path.join(root, 'PuP-Pack_Options', name, 'triggers.pup'), 'triggers');
+    fs.writeFileSync(path.join(root, `${name}.bat`), `rem echo off\r\nxcopy /y "PuP-Pack_Options\\${name}\\*.pup"\r\n`);
+  }
+  // Option 1 appliquée à la racine, comme sur la borne.
+  for (const f of ['screens.pup', 'triggers.pup']) fs.copyFileSync(path.join(root, 'PuP-Pack_Options', options[0]![0], f), path.join(root, f));
 }

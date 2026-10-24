@@ -35,6 +35,10 @@ function Stop-Borne { Get-Process CyberPinball -ErrorAction SilentlyContinue | W
 Stop-Borne
 foreach ($d in $home_, $racine, $site, $faux, $captures, "$base\electron") { if (Test-Path $d) { Remove-Item -Recurse -Force $d } }
 New-Item -ItemType Directory -Force $home_, $site, $faux, "$base\installeurs" | Out-Null
+# Le modèle de borne ci-dessous se fabrique avec packages\core\dist : compilé d'abord (worktree neuf).
+Push-Location $wt
+try { npm run build | Out-Null } finally { Pop-Location }
+if ($LASTEXITCODE -ne 0) { throw 'Compilation impossible.' }
 # Modèle de borne fait pour les écrans simulés (comme demo-medias.ps1) : le menu s'ouvre sur les
 # tables, sans demander quelle configuration est branchée. L'installeur le reprend du bac à sable.
 New-Item -ItemType Directory -Force "$home_\sandbox" | Out-Null
@@ -96,7 +100,8 @@ try {
   Start-Borne 'site-falsifie' 'Tab,action:Mise à jour de Cyber Pinball,wait:2500' "$captures\falsifie"
 
   "`n=== Version disponible"
-  Start-Borne 'site' 'Tab,action:Mise à jour de Cyber Pinball,wait:2500' "$captures\disponible"
+  # Puis « Plus tard » : retour au menu système, pastille rouge sur l'entrée et sur la roue dentée.
+  Start-Borne 'site' 'Tab,action:Mise à jour de Cyber Pinball,wait:2500,action:Plus tard,wait:800' "$captures\disponible"
 
   "`n=== Mise à jour $ancienne -> $nouvelle"
   # L'installeur relance Cyber Pinball avec le même autopilote, qui écrit dans le même dossier :
