@@ -1,0 +1,8 @@
+{
+  "name": "@cyberpinball/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Cœur de Cyber Pinball : modèle de borne, empreintes d'écrans, générateurs de configuration. Ne dépend ni d'Electron ni de Windows.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts"
+}

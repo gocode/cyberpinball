@@ -1,0 +1,17 @@
+/* 01 — Verre fumé. Aucun vert signal dans le décor. */
+.fond-ambiance {
+  background-color:var(--void);
+  background-image:
+    linear-gradient(115deg,transparent 48%,#102b263b 48.15%,transparent 66%),
+    radial-gradient(ellipse at 92% 15%,#143d35 0%,transparent 58%),
+    linear-gradient(150deg,var(--surface-raised),var(--void) 65%);
+}
+.fond-media {
+  background-color:var(--void);
+  background-image:
+    linear-gradient(118deg,transparent 34%,#24504a24 34.2%,transparent 55%),
+    radial-gradient(ellipse at 80% 5%,#102e28,transparent 65%),
+    linear-gradient(var(--surface),var(--void));
+  border:1px solid var(--line-strong);
+  box-shadow:inset 0 0 0 12px var(--void),inset 0 0 0 13px #17302b;
+}

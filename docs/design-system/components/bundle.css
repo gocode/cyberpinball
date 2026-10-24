@@ -1,0 +1,250 @@
+/* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
+   1080 px ; dans l'application, n px s'écrivent n/10.8 cqmin (ou vmin). */
+/* Saira : locale si installée, sinon repli explicite Segoe UI. Voir README. */
+@font-face{font-family:Saira;src:local("Saira");font-weight:100 900;font-stretch:50% 125%;font-display:swap}
+
+.cp-root, .cp-root * { box-sizing: border-box }
+.cp-root {
+  font-family: var(--font-ui); color: var(--ink); background: var(--void);
+  font-size: 24px; line-height: 1.45; font-variant-numeric: tabular-nums;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Icônes : masque SVG, couleur = currentColor. <i class="cp-i cp-i-play"></i> */
+.cp-i { display: inline-block; width: 1em; height: 1em; flex: none; background: currentColor;
+  -webkit-mask: var(--i) center / contain no-repeat; mask: var(--i) center / contain no-repeat }
+
+/* Marque */
+.cp-wordmark { font-family: var(--font-ui); font-weight: 300; font-stretch: 125%;
+  letter-spacing: .5em; text-transform: uppercase; line-height: 1.15; color: var(--ink);
+  font-size: 64px; margin: 0 }
+.cp-wordmark span { display: block }
+.cp-wordmark .pin { color: var(--signal); text-shadow: 0 0 18px var(--signal-haze) }
+.cp-wordmark.inline span { display: inline } .cp-wordmark.inline .pin { margin-left: .5em }
+.cp-wordmark.small { font-size: 22px; letter-spacing: .42em }
+
+/* Titres et textes */
+.cp-kicker { font-size:20px; font-weight: 500; font-stretch: 118%; letter-spacing: .38em; text-transform: uppercase; color: var(--ink-muted) }
+.cp-kicker .pin { color: var(--signal) }
+.cp-title { font-size: 34px; font-weight: 400; font-stretch: 112%; letter-spacing: .12em; text-transform: uppercase; line-height: 1.15; margin: 0 }
+.cp-display { font-size: 60px; font-weight: 600; line-height: 1.02; letter-spacing: -.005em; margin: 0; text-wrap: balance }
+.cp-meta { font-size: 24px; color: var(--meta); letter-spacing: .02em }
+.cp-meta .sep { color: var(--ink-faint); margin: 0 .45em }
+.cp-body { font-size: 24px; line-height: 1.5; color: var(--ink); max-width: 34em }
+.cp-muted { color: var(--ink-muted) }
+.cp-label { font-size:20px; font-weight: 600; font-stretch: 112%; letter-spacing: .24em; text-transform: uppercase; color: var(--signal); margin: 0 }
+
+/* Panneau : cadre d'un écran ou d'un bloc */
+.cp-panel { background: linear-gradient(180deg, var(--surface-raised), var(--surface) 140px);
+  border: 1px solid var(--line-strong); border-radius: var(--radius-md); box-shadow: var(--halo-panel);
+  padding: var(--space-6) }
+.cp-panel-head { display: flex; align-items: center; gap: var(--space-5); padding-bottom: var(--space-5);
+  margin-bottom: var(--space-5); border-bottom: 1px solid var(--line) }
+.cp-panel-head > .cp-i { font-size: 52px; color: var(--signal); filter: drop-shadow(0 0 10px var(--signal-haze)) }
+.cp-panel-head .cp-title { font-size: 30px }
+.cp-step { font-size: 28px; font-stretch: 112%; letter-spacing: .1em; text-transform: uppercase; color: var(--ink) }
+.cp-step b { color: var(--signal); font-weight: 600; margin-right: .35em }
+
+/* Entrée de menu : la sélection est une barre verte qui s'éteint vers la droite */
+.cp-menu { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1) }
+.cp-menu-item { display: flex; align-items: center; gap: var(--space-5); padding: 14px var(--space-5);
+  font-size: 28px; font-weight: 500; font-stretch: 112%; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--ink); border-radius: var(--radius-sm); position: relative }
+.cp-menu-item .cp-i { font-size: 30px; color: var(--ink-muted) }
+.cp-menu-item small { display: block; font-size: 20px; font-weight: 400; letter-spacing: .02em; text-transform: none; color: var(--ink-muted); font-stretch: 100%; margin-top: 2px }
+.cp-menu-item.is-focus { color: var(--on-signal);
+  background: linear-gradient(90deg, var(--signal) 0%, var(--signal) 55%, var(--signal-fade) 100%);
+  box-shadow: 0 0 28px var(--signal-haze) }
+.cp-menu-item.is-focus .cp-i, .cp-menu-item.is-focus small { color: var(--on-signal) }
+.cp-menu-item.is-quiet { color: var(--ink-muted) }
+
+/* Ligne : libellé, valeur en pastille, chevron. Pour les réglages, boutons, plans. */
+.cp-rows { display: grid; gap: var(--space-2) }
+.cp-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-4);
+  min-height: 64px; padding: 8px var(--space-3) 8px var(--space-4); border-radius: var(--radius-sm);
+  background: var(--surface-raised); border: 1px solid transparent; font-size: 24px }
+.cp-row > .cp-i { font-size: 28px; color: var(--ink-muted) }
+.cp-row .detail { display: block; font-size: 20px; color: var(--ink-muted); line-height: 1.3 }
+.cp-value { display: inline-flex; align-items: center; gap: var(--space-3); min-width: 180px; justify-content: space-between;
+  padding: 6px 10px 6px 16px; border-radius: var(--radius-sm); background: var(--surface-sunken);
+  border: 1px solid var(--line); font-size: 21px; color: var(--ink) }
+.cp-value .cp-i { font-size: 22px; color: var(--ink-muted) }
+.cp-value.is-empty { color: var(--ink-muted) }
+.cp-row.is-focus { border-color: var(--signal); background: var(--signal-wash); box-shadow: var(--glow-signal) }
+.cp-row.is-focus > .cp-i { color: var(--signal) }
+.cp-row.is-focus .cp-value { border-color: var(--signal-line) }
+.cp-row.is-locked { opacity: .62 }
+
+/* États : un mot et un signe, jamais la couleur seule */
+.cp-status { display: grid; grid-template-columns: auto 1fr 190px 130px; align-items: center; gap: var(--space-4);
+  padding: 12px var(--space-4); border-bottom: 1px solid var(--line); font-size: 24px }
+.cp-status > .cp-i { font-size: 28px; color: var(--ink-muted) }
+.cp-status .detail { display: block; font-size: 20px; color: var(--ink-muted); line-height: 1.35 }
+.cp-state { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; font-size: 21px; letter-spacing: .08em; text-transform: uppercase }
+.cp-state .cp-i { font-size: 22px }
+.cp-state.ok { color: var(--signal) } .cp-state.warn { color: var(--warning) } .cp-state.bad { color: var(--danger) } .cp-state.info { color: var(--meta) }
+.cp-status .num { color: var(--ink-muted); font-size: 21px; min-width: 8em; text-align: right }
+
+/* Onglets segmentés (texte) et barre d'onglets à icônes */
+.cp-tabs { display: flex; gap: var(--space-2); flex-wrap: wrap }
+.cp-tab { padding: 10px 22px; border-radius: var(--radius-sm); border: 1px solid var(--line-strong); background: var(--surface-raised);
+  font-size:20px; font-weight: 600; font-stretch: 112%; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-muted) }
+.cp-tab.is-active { background: var(--signal); border-color: var(--signal); color: var(--on-signal); box-shadow: 0 0 18px var(--signal-haze) }
+.cp-tab.is-focus:not(.is-active) { border-color: var(--signal); color: var(--ink) }
+.cp-iconbar { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--space-2) }
+.cp-iconbar > * { display: grid; justify-items: center; gap: 8px; padding: 14px 6px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--line-strong); background: var(--surface-raised); color: var(--ink-muted);
+  font-size:20px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; font-stretch: 106% }
+.cp-iconbar .cp-i { font-size: 36px; color: var(--ink) }
+.cp-iconbar > .is-focus { border-color: var(--signal); color: var(--signal); background: var(--signal-wash); box-shadow: var(--glow-signal) }
+.cp-iconbar > .is-focus .cp-i { color: var(--signal) }
+
+/* Boutons */
+.cp-btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-4); min-height: 76px; padding: 0 var(--space-6);
+  border-radius: var(--radius-md); border: 1.5px solid var(--line-strong); background: var(--surface-raised); color: var(--ink);
+  font-family: inherit; font-size: 22px; font-weight: 600; font-stretch: 112%; letter-spacing: .16em; text-transform: uppercase }
+.cp-btn .cp-i { font-size: 30px }
+.cp-btn.primary { border-color: var(--signal); color: var(--ink); background: linear-gradient(180deg, var(--signal-wash), transparent) }
+.cp-btn.primary .cp-i { color: var(--signal) }
+.cp-btn.is-focus { border-color: var(--signal); box-shadow: var(--glow-signal) }
+.cp-btn.primary.is-focus { background: var(--signal); color: var(--on-signal) } .cp-btn.primary.is-focus .cp-i { color: var(--on-signal) }
+.cp-btn.danger { border-color: var(--danger-line); color: var(--danger) }
+.cp-btn.small { min-height: 56px; font-size:20px; padding: 0 var(--space-5) }
+
+/* Roue des tables : logos ronds, la table choisie au centre dans un anneau vert */
+.cp-wheel { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-3) }
+.cp-wheel-track { display: flex; align-items: center; justify-content: center; gap: var(--space-3) }
+.cp-logo { width: 116px; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: radial-gradient(circle at 50% 35%, var(--surface-raised), var(--void) 75%); border: 2px solid var(--line-strong);
+  font-family: var(--font-logo); color: var(--ink); text-align: center; font-size: 26px; line-height: 1; padding: 14px; overflow: hidden; opacity: .78 }
+.cp-logo.near { width: 140px; opacity: .92; font-size: 30px }
+.cp-logo.is-focus { width: 220px; opacity: 1; border: 4px solid var(--signal); font-size: 28px;
+  box-shadow: 0 0 0 6px var(--void), 0 0 0 8px var(--signal-line), 0 0 44px var(--signal-haze) }
+.cp-arrow { width: 64px; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; background: var(--surface-raised);
+  border: 1px solid var(--line-strong); color: var(--signal); font-size: 34px }
+.cp-count { font-size: 22px; letter-spacing: .12em; color: var(--ink-muted); text-align: center }
+.cp-count b { color: var(--ink); font-weight: 600 }
+
+/* Carte de table : vignette, titre, fabricant et année */
+.cp-card { display: grid; grid-template-columns: 132px 1fr; gap: var(--space-4); align-items: center; padding: var(--space-3);
+  border-radius: var(--radius-sm); background: var(--surface-raised); border: 1px solid var(--line) }
+.cp-thumb { aspect-ratio: 4 / 3; border-radius: var(--radius-sm); overflow: hidden; background: var(--surface); border: 1px solid var(--line) }
+.cp-card .t { font-size: 25px; font-weight: 600; line-height: 1.2 }
+.cp-card .cp-meta { font-size: 20px }
+.cp-card .tags { display: flex; gap: 8px; margin-top: 6px; flex-wrap: wrap }
+.cp-tag { font-size:20px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; padding: 3px 8px; border-radius: var(--radius-xs);
+  border: 1px solid var(--line-strong); color: var(--ink-muted) }
+.cp-tag.ok { border-color: var(--signal-line); color: var(--signal) } .cp-tag.warn { border-color: var(--warning-line); color: var(--warning) }
+.cp-card.is-focus { border-color: var(--signal); background: var(--signal-wash); box-shadow: var(--glow-signal) }
+
+/* Recherche et clavier à l'écran */
+.cp-search { display: flex; align-items: center; gap: var(--space-4); height: 72px; padding: 0 var(--space-5);
+  border-radius: var(--radius-sm); background: var(--surface-sunken); border: 1px solid var(--line-strong); font-size: 26px }
+.cp-search .cp-i { font-size: 28px; color: var(--ink-muted) }
+.cp-search .q { flex: 1 } .cp-search .caret { display: inline-block; width: 2px; height: 1.1em; background: var(--signal); vertical-align: -.15em; margin-left: 2px }
+.cp-keys { display: grid; grid-template-columns: repeat(10, 1fr); gap: 10px }
+.cp-key { height: 72px; display: grid; place-items: center; border-radius: var(--radius-sm); border: 1.5px solid var(--signal-line);
+  color: var(--ink); font-size: 28px; font-weight: 500; background: var(--surface) }
+.cp-key.wide { grid-column: span 3; font-size: 20px; letter-spacing: .16em; text-transform: uppercase; font-stretch: 112% }
+.cp-key.is-focus { background: var(--signal); color: var(--on-signal); border-color: var(--signal); box-shadow: 0 0 22px var(--signal-haze) }
+
+/* Bandeau d'aide : ce que fait chaque bouton de la borne sur cet écran */
+.cp-hints { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2) var(--space-6); padding: 14px var(--space-6);
+  border-top: 1px solid var(--line); background: var(--scrim); font-size: 20px; color: var(--ink-muted); letter-spacing: .02em }
+.cp-hint { display: inline-flex; align-items: center; gap: 10px }
+.cp-cap { display: inline-flex; align-items: center; justify-content: center; min-width: 40px; height: 34px; padding: 0 10px; border-radius: var(--radius-xs);
+  border: 1px solid var(--line-strong); background: var(--surface-raised); color: var(--ink); font-size:20px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase }
+.cp-cap.start { border-color: var(--signal-line); color: var(--signal) }
+
+/* Question : bloque l'écran, une réponse par défaut, un délai visible */
+.cp-scrim { position: absolute; inset: 0; background: var(--scrim-strong); display: grid; place-items: center }
+.cp-dialog { width: min(1040px, 92%); padding: var(--space-7); border-radius: var(--radius-md); background: var(--surface);
+  border: 1px solid var(--warning-line); box-shadow: 0 0 0 1px var(--void), 0 0 60px var(--warning-haze); text-align: center; display: grid; gap: var(--space-5) }
+.cp-dialog h2 { font-size: 46px; font-weight: 600; color: var(--warning); margin: 0; line-height: 1.1 }
+.cp-dialog .lost { font-size: 24px } .cp-dialog .lost b { display: block; color: var(--ink-muted); font-weight: 600; font-size: 20px; letter-spacing: .14em; text-transform: uppercase; margin-bottom: 6px }
+.cp-dialog .choices { display: flex; gap: var(--space-4); justify-content: center; flex-wrap: wrap }
+.cp-dialog .cp-btn.is-focus { background: var(--warning); border-color: var(--warning); color: var(--on-warning); box-shadow: 0 0 26px var(--warning-haze) }
+.cp-timer { height: 4px; border-radius: 2px; background: var(--line); overflow: hidden } .cp-timer i { display: block; height: 100%; width: 62%; background: var(--warning) }
+
+
+/* Révision DA — neutres, sélection unique, lumière contenue. */
+.cp-kicker{font-size:20px;letter-spacing:.18em}.cp-label{color:var(--signal);font-size:20px;letter-spacing:.16em}
+.cp-wordmark .pin{text-shadow:none}.cp-panel-head > .cp-i{color:var(--ink-muted);filter:none}.cp-step b{color:var(--ink)}
+.cp-menu-item{min-height:76px;padding:18px 24px;border:1px solid transparent;font-size:26px;letter-spacing:.075em}
+.cp-menu-item.is-focus{background:var(--signal);box-shadow:0 0 24px var(--signal-haze);color:var(--on-signal)}
+.cp-menu-item small{font-size:22px;letter-spacing:0}
+.cp-row{min-height:76px;grid-template-columns:auto minmax(0,1fr) auto;padding:12px 16px}.cp-row.is-locked{opacity:1;color:var(--ink-muted)}
+.cp-status{grid-template-columns:32px minmax(0,1fr) 168px 160px;gap:16px;padding:20px 8px;min-height:96px}.cp-status .num{min-width:0;font-size:20px}.cp-status .detail{overflow-wrap:anywhere;margin-top:5px}
+.cp-state{font-size:20px;letter-spacing:.035em;white-space:nowrap}.cp-state.ok{color:var(--signal)}.cp-state.warn{color:var(--warning)}.cp-state.bad{color:var(--danger)}.cp-state.info{color:var(--meta)}
+.cp-state.bad{font-weight:700}.cp-tag.ok,.cp-tag.warn{color:var(--ink-muted);border-color:var(--line-strong)}
+.cp-tag{font-size:20px;letter-spacing:.025em}.cp-key{border-color:var(--line-strong)}
+.cp-iconbar{grid-template-columns:repeat(3,minmax(0,1fr));grid-auto-flow:row;gap:8px}.cp-iconbar > *{font-size:20px;letter-spacing:.05em;padding:14px 12px;display:flex;justify-content:center;align-items:center;gap:12px;min-height:64px}.cp-iconbar .cp-i{font-size:28px}
+.cp-tab{font-size:20px;letter-spacing:.06em}.cp-tab.is-active:not(.is-focus){background:var(--surface-raised);color:var(--ink);border-color:var(--ink-muted);box-shadow:none}
+.cp-btn.small{font-size:20px;min-height:60px;letter-spacing:.08em}.cp-btn{font-size:22px;letter-spacing:.1em}
+.cp-btn.primary:not(.is-focus){border-color:var(--line-strong);background:var(--surface-raised)}.cp-btn.primary:not(.is-focus) .cp-i{color:var(--ink)}
+.cp-btn.danger{color:var(--ink);border-color:var(--line-strong)}
+.cp-arrow{color:var(--ink-muted)}.cp-logo{opacity:1;font-family:var(--font-ui);font-weight:600}.cp-logo.near{opacity:1}.cp-logo.is-focus{box-shadow:0 0 0 6px var(--void),0 0 0 7px var(--signal),0 0 26px var(--signal-haze)}
+.cp-cap{font-size:20px;letter-spacing:.04em;height:38px}.cp-cap.start{color:var(--ink);border-color:var(--line-strong)}.cp-hints{gap:12px 24px;background:var(--void);min-height:76px}
+.cp-dialog{border-color:var(--line-strong);box-shadow:var(--halo-panel)}.cp-dialog h2{color:var(--ink)}.cp-dialog .cp-btn.is-focus{color:var(--on-signal);background:var(--signal);border-color:var(--signal);box-shadow:var(--glow-signal)}.cp-timer i{background:var(--ink-muted)}
+.cp-art{position:relative;overflow:hidden;background-color:var(--void);background-image:linear-gradient(118deg,transparent 34%,#24504a24 34.2%,transparent 55%),radial-gradient(ellipse at 80% 5%,#102e28,transparent 65%),linear-gradient(var(--surface),var(--void));border:1px solid var(--line-strong)}
+.cp-art:before{content:"";position:absolute;inset:24px;border:1px solid var(--line);pointer-events:none}
+.cp-art:after{content:attr(data-label);position:absolute;inset:50% 32px auto;text-align:center;color:var(--ink-muted);font-size:20px;letter-spacing:.12em;text-transform:uppercase;line-height:1.5;transform:translateY(-50%)}
+.cp-thumb:before{inset:10px}.cp-thumb:after{content:"";width:28px;height:20px;inset:50% auto auto 50%;transform:translate(-50%,-50%);border:1px solid var(--line-strong)}
+.cp-root :focus-visible{outline:2px solid var(--signal);outline-offset:5px}
+.cp-search .caret{background:var(--ink)}
+
+/* 01 — Verre fumé. Aucun vert signal dans le décor. */
+.fond-ambiance {
+  background-color:var(--void);
+  background-image:
+    linear-gradient(115deg,transparent 48%,#102b263b 48.15%,transparent 66%),
+    radial-gradient(ellipse at 92% 15%,#143d35 0%,transparent 58%),
+    linear-gradient(150deg,var(--surface-raised),var(--void) 65%);
+}
+.fond-media {
+  background-color:var(--void);
+  background-image:
+    linear-gradient(118deg,transparent 34%,#24504a24 34.2%,transparent 55%),
+    radial-gradient(ellipse at 80% 5%,#102e28,transparent 65%),
+    linear-gradient(var(--surface),var(--void));
+  border:1px solid var(--line-strong);
+  box-shadow:inset 0 0 0 12px var(--void),inset 0 0 0 13px #17302b;
+}
+
+/* Icônes */
+.cp-i-play { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7.5%204.8v14.4L19%2012z%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-tables { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%206h16M4%2012h16M4%2018h16%22%2F%3E%3Cpath%20d%3D%22M4%206h.01M4%2012h.01M4%2018h.01%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-plus { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206.5A1.5%201.5%200%200%201%204.5%205H9l2%202.5h8.5A1.5%201.5%200%200%201%2021%209v9.5a1.5%201.5%200%200%201-1.5%201.5h-15A1.5%201.5%200%200%201%203%2018.5z%22%2F%3E%3Cpath%20d%3D%22M12%2011v6M9%2014h6%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-search { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2210.5%22%20cy%3D%2210.5%22%20r%3D%226.5%22%2F%3E%3Cpath%20d%3D%22M15.5%2015.5%2020.5%2020.5%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-download { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%204v11M7%2010l5%205%205-5M5%2020h14%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-list { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M9%206h11M9%2012h11M9%2018h11%22%2F%3E%3Cpath%20d%3D%22M4%205.5l1%201%201.8-2M4%2011.5l1%201%201.8-2%22%2F%3E%3Ccircle%20cx%3D%225%22%20cy%3D%2218%22%20r%3D%221%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-update { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M20%2011a8%208%200%200%200-14.3-4.6L4%208M4%204v4h4%22%2F%3E%3Cpath%20d%3D%22M4%2013a8%208%200%200%200%2014.3%204.6L20%2016M20%2020v-4h-4%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-user { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%228.5%22%20r%3D%223.5%22%2F%3E%3Cpath%20d%3D%22M5%2020c.8-3.6%203.6-5.5%207-5.5s6.2%201.9%207%205.5%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-chip { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%226%22%20y%3D%226%22%20width%3D%2212%22%20height%3D%2212%22%20rx%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M9.5%202.5v3.5M14.5%202.5v3.5M9.5%2018v3.5M14.5%2018v3.5M2.5%209.5H6M2.5%2014.5H6M18%209.5h3.5M18%2014.5h3.5%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-image { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%225%22%20width%3D%2218%22%20height%3D%2214%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2016l5-5%204%204%203-3%206%206%22%2F%3E%3Ccircle%20cx%3D%2215.5%22%20cy%3D%229%22%20r%3D%221.2%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-sliders { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207h9M17%207h3M4%2017h3M11%2017h9%22%2F%3E%3Ccircle%20cx%3D%2215%22%20cy%3D%227%22%20r%3D%222%22%2F%3E%3Ccircle%20cx%3D%229%22%20cy%3D%2217%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-cabinet { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10l1%207H6z%22%2F%3E%3Cpath%20d%3D%22M6%2010h12l1.5%2011h-15z%22%2F%3E%3Cpath%20d%3D%22M9.5%2015h5%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-sound { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%209.5v5h3.5L12%2018.5v-13L7.5%209.5z%22%2F%3E%3Cpath%20d%3D%22M15.5%209a4.2%204.2%200%200%201%200%206M18%206.5a8%208%200%200%201%200%2011%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-desktop { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%224%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M8.5%2020h7M12%2016v4%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-power { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203.5v8%22%2F%3E%3Cpath%20d%3D%22M6.6%207.2a7.5%207.5%200%201%200%2010.8%200%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-pulse { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%2012h4l2.5-6%205%2012%202.5-6h4%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-gamepad { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%208.5h10a4.5%204.5%200%200%201%204.4%205.4l-.5%202.4a2.6%202.6%200%200%201-4.6%201.1L14.8%2015H9.2l-1.5%202.4a2.6%202.6%200%200%201-4.6-1.1l-.5-2.4A4.5%204.5%200%200%201%207%208.5z%22%2F%3E%3Cpath%20d%3D%22M8%2011v3M6.5%2012.5h3M15.5%2012h.01M17.5%2013.5h.01%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-info { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%229%22%2F%3E%3Cpath%20d%3D%22M12%2011v5.5M12%207.8v.01%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-book { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%205.5C6.5%204.2%209.5%204.2%2012%206c2.5-1.8%205.5-1.8%208-.5v13c-2.5-1.3-5.5-1.3-8%20.5-2.5-1.8-5.5-1.8-8-.5z%22%2F%3E%3Cpath%20d%3D%22M12%206v13.5%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-rules { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h7.5L19%207.5V21H7z%22%2F%3E%3Cpath%20d%3D%22M14.5%203v4.5H19M10%2012h6M10%2016h6%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-eye { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2.5%2012S6%205.5%2012%205.5%2021.5%2012%2021.5%2012%2018%2018.5%2012%2018.5%202.5%2012%202.5%2012z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-edit { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020h4L19%209l-4-4L4%2016z%22%2F%3E%3Cpath%20d%3D%22M13.5%206.5l4%204%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-trash { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%207h16M10%2011v6M14%2011v6M6%207l1%2013h10l1-13M9%207V4h6v3%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-check { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M5%2012.5l4.5%204.5L19%207.5%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-alert { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203.8%2021%2019.5H3z%22%2F%3E%3Cpath%20d%3D%22M12%2010v4.5M12%2017.2v.01%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-close { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M6%206l12%2012M18%206%206%2018%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-chevron-right { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M9%205l7%207-7%207%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-chevron-left { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M15%205l-7%207%207%207%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-monitor { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%224%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%221.5%22%2F%3E%3Cpath%20d%3D%22M8.5%2020h7M12%2016v4%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-flipper { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4.5%2015.5%2017%209.5a2.5%202.5%200%201%201%201.5%204.5L6%2018.3a1.6%201.6%200%201%201-1.5-2.8z%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-start { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%228.5%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223.5%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-exit { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%204h4.5A1.5%201.5%200%200%201%2020%205.5v13a1.5%201.5%200%200%201-1.5%201.5H14%22%2F%3E%3Cpath%20d%3D%22M10%208l-4%204%204%204M6%2012h10%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-coin { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%228.5%22%2F%3E%3Cpath%20d%3D%22M12%207.5v9M9.5%2010a2.5%202%200%200%201%205%200c0%202.5-5%201.5-5%204a2.5%202%200%200%200%205%200%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-plunger { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203v11M9%2014h6M10%2014v4.5a2%202%200%200%200%204%200V14%22%2F%3E%3Cpath%20d%3D%22M8%203h8%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-folder { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206.5A1.5%201.5%200%200%201%204.5%205H9l2%202.5h8.5A1.5%201.5%200%200%201%2021%209v9.5a1.5%201.5%200%200%201-1.5%201.5h-15A1.5%201.5%200%200%201%203%2018.5z%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-usb { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.75%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203v14%22%2F%3E%3Cpath%20d%3D%22M9.5%205.5%2012%203l2.5%202.5%22%2F%3E%3Cpath%20d%3D%22M7%209v2.5l5%203%205-3V8%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2219%22%20r%3D%222%22%2F%3E%3Crect%20x%3D%2215.5%22%20y%3D%226%22%20width%3D%223%22%20height%3D%222.5%22%2F%3E%3Ccircle%20cx%3D%227%22%20cy%3D%228%22%20r%3D%221.3%22%2F%3E%3C%2Fsvg%3E") }

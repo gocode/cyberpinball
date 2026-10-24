@@ -1,0 +1,1543 @@
+:root {
+  /* Noms historiques de cette feuille, rebranchés sur le thème (theme.css). */
+  --bg: var(--void);
+  --panel: var(--surface-raised);
+  --quiet: var(--ink-muted);
+  --accent: var(--signal);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--fond-ambiance);
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  cursor: none;
+  user-select: none;
+}
+
+/*
+ * La racine occupe la zone du playfield sur son écran (--pf-* : fractions de l'écran,
+ * posées par frontend.js ; tout l'écran par défaut). Les tailles de la page sont en
+ * cqmin : relatives à cette zone, pas à la fenêtre.
+ */
+#root {
+  position: fixed;
+  left: calc(var(--pf-x, 0) * 100vw);
+  top: calc(var(--pf-y, 0) * 100vh);
+  width: calc(var(--pf-w, 1) * 100vw);
+  height: calc(var(--pf-h, 1) * 100vh);
+  /* Les mises en page portrait suivent la racine, pivotée ou non (voir plus bas). */
+  container-type: size;
+}
+
+/*
+ * Écran du playfield couché et tourné, Windows resté en paysage : la mise en page
+ * pivote dans les dimensions vues du joueur (largeur et hauteur échangées à 90° et
+ * 270°). La fenêtre garde les bornes de l'écran ; souris et glisser-déposer suivent
+ * la rotation. data-rotation est posé par le rendu, d'après le processus principal.
+ */
+html[data-rotation='90'] {
+  --turned: 90deg;
+  --turned-width: calc(var(--pf-h, 1) * 100vh);
+  --turned-height: calc(var(--pf-w, 1) * 100vw);
+}
+
+html[data-rotation='180'] {
+  --turned: 180deg;
+  --turned-width: calc(var(--pf-w, 1) * 100vw);
+  --turned-height: calc(var(--pf-h, 1) * 100vh);
+}
+
+html[data-rotation='270'] {
+  --turned: 270deg;
+  --turned-width: calc(var(--pf-h, 1) * 100vh);
+  --turned-height: calc(var(--pf-w, 1) * 100vw);
+}
+
+html[data-rotation='90'] #root,
+html[data-rotation='180'] #root,
+html[data-rotation='270'] #root {
+  position: fixed;
+  top: calc((var(--pf-y, 0) + var(--pf-h, 1) / 2) * 100vh);
+  left: calc((var(--pf-x, 0) + var(--pf-w, 1) / 2) * 100vw);
+  width: var(--turned-width);
+  height: var(--turned-height);
+  transform: translate(-50%, -50%) rotate(var(--turned));
+}
+
+/*
+ * Marque : capitales très espacées et larges, PINBALL en vert signal. Toujours au même
+ * endroit de la zone du playfield (3cqmin du haut, 4cqmin du bord). Dans un écran plein
+ * (fiche, aide, message, attente), elle ouvre la page, dans le flux : ce qui suit se range
+ * dessous, rien ne la recouvre. Ses marges la ramènent à sa place malgré les marges
+ * intérieures de l'écran (--pad-top, --pad-side, posées par chaque écran).
+ */
+.brand {
+  flex: none;
+  align-self: flex-start;
+  margin: calc(3cqmin - var(--pad-top, 3cqmin)) 0 0 calc(4cqmin - var(--pad-side, 4cqmin));
+  font-size: 2.1cqmin;
+  font-weight: 300;
+  font-stretch: 125%;
+  letter-spacing: 0.42em;
+  color: var(--ink);
+}
+
+.brand .pin {
+  color: var(--signal);
+}
+
+/*
+ * Au menu des tables, posée sur les zones fixes, au-dessus du menu et de son voile qui
+ * viennent après elle dans la page. Seul le menu la met là : un écran plein porte la sienne.
+ */
+#root > .brand {
+  position: absolute;
+  top: 3cqmin;
+  left: 4cqmin;
+  z-index: 1;
+  margin: 0;
+}
+
+/* Constat bref sous le titre, entre lui et le menu ; s'efface seul. */
+.banner {
+  position: absolute;
+  top: 6.4vmin;
+  left: 4vmin;
+  right: 4vmin;
+  text-align: center;
+  font-size: 2vmin;
+  color: var(--meta);
+}
+
+/* Le même constat dans le flux d'un écran opaque (message, menu système), au-dessus de son
+   titre : centré dans un message, aligné à gauche dans l'en-tête du menu système. */
+.banner.banner-inline {
+  position: static;
+  font-size: 2.4cqmin;
+  text-align: inherit;
+}
+
+/* ---------- Playfield : menu des tables ---------- */
+
+/*
+ * Mise en page des maquettes de Codex, en pixels de référence d'un petit côté de 1080
+ * (--u). Zones de taille fixe : en changeant de table, seul leur contenu change, rien ne
+ * bouge. Borne (zone en hauteur, html.menu-cab) : le média du plateau prend tout l'écran ;
+ * la roue, le nom et fabricant · année sont posés en bas, sur un voile. Bureau (zone en
+ * largeur, html.menu-desktop) : le média est dans un cadre 9:16 à gauche (#media-bg, plus
+ * bas), la roue, les informations et le bandeau d'aide à droite.
+ */
+#root {
+  --u: calc(100cqmin / 1080);
+}
+
+.menu {
+  position: absolute;
+  inset: 0;
+  /* Contexte d'empilement propre : le voile (z-index -1) passe sous les zones, au-dessus du média. */
+  isolation: isolate;
+}
+
+/* Voiles de lecture sur le média, en borne : sous la marque, sur les bords et en pied. */
+/* Positionné, il se dessinerait au-dessus des zones (éléments non positionnés) : z-index -1. */
+.menu-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(to bottom, rgba(3, 8, 7, 0.92), rgba(3, 8, 7, 0)) top / 100% calc(170 * var(--u)) no-repeat,
+    linear-gradient(to bottom, rgba(3, 8, 7, 0), rgba(3, 8, 7, 0.32) 25%, rgba(3, 8, 7, 0.84) 68%, rgba(3, 8, 7, 0.99)) bottom / 100% calc(510 * var(--u)) no-repeat,
+    linear-gradient(to right, rgba(3, 8, 7, 0.65), rgba(3, 8, 7, 0) 12%, rgba(3, 8, 7, 0) 88%, rgba(3, 8, 7, 0.65));
+}
+
+.menu-nav {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(96 * var(--u));
+}
+
+.menu.layout-list .menu-nav {
+  left: calc(50 * var(--u));
+  right: calc(50 * var(--u));
+  bottom: calc(200 * var(--u));
+  height: calc(560 * var(--u));
+}
+
+/* Libellé et compteur : au bureau seulement. */
+.menu-label,
+.menu-count {
+  display: none;
+}
+
+/* Titre : calé en bas de sa zone ; un titre long prend un corps plus petit dans la même zone. */
+.menu-title {
+  position: absolute;
+  left: calc(40 * var(--u));
+  right: calc(40 * var(--u));
+  bottom: calc(88 * var(--u));
+  height: calc(90 * var(--u));
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  text-align: center;
+  overflow: hidden;
+}
+
+.menu-title .title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: calc(56 * var(--u));
+  font-weight: 600;
+  letter-spacing: calc(0.3 * var(--u));
+  line-height: 1.1;
+  color: var(--ink);
+}
+
+.menu-title .title[data-size='m'] {
+  -webkit-line-clamp: 2;
+  font-size: calc(40 * var(--u));
+}
+
+.menu-title .title[data-size='s'] {
+  -webkit-line-clamp: 2;
+  font-size: calc(36 * var(--u));
+}
+
+.menu-meta {
+  position: absolute;
+  left: calc(40 * var(--u));
+  right: calc(40 * var(--u));
+  bottom: calc(44 * var(--u));
+  height: calc(40 * var(--u));
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: center;
+  font-size: calc(28 * var(--u));
+  line-height: calc(40 * var(--u));
+  letter-spacing: calc(0.6 * var(--u));
+  color: var(--meta);
+}
+
+/* Bureau : roue à droite du cadre, informations dessous, bandeau d'aide en bas (maquettes). */
+html.menu-desktop .menu-scrim {
+  display: none;
+}
+
+html.menu-desktop .menu-nav {
+  top: calc(264 * var(--u));
+  left: calc(710 * var(--u));
+  right: auto;
+  bottom: auto;
+  width: min(calc(1080 * var(--u)), 100% - calc(822 * var(--u)));
+}
+
+html.menu-desktop .menu.layout-list .menu-nav {
+  top: calc(110 * var(--u));
+  left: calc(790 * var(--u));
+  right: calc(112 * var(--u));
+  width: auto;
+  height: calc(520 * var(--u));
+}
+
+html.menu-desktop .menu-label {
+  display: block;
+  position: absolute;
+  top: calc(670 * var(--u));
+  left: calc(790 * var(--u));
+  font-size: calc(20 * var(--u));
+  font-weight: 500;
+  letter-spacing: calc(5 * var(--u));
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+html.menu-desktop .menu-title {
+  top: calc(702 * var(--u));
+  left: calc(784 * var(--u));
+  right: calc(112 * var(--u));
+  bottom: auto;
+  height: calc(104 * var(--u));
+  justify-content: flex-start;
+  text-align: left;
+}
+
+html.menu-desktop .menu-title .title {
+  font-size: calc(82 * var(--u));
+  letter-spacing: calc(-1.6 * var(--u));
+}
+
+html.menu-desktop .menu-title .title[data-size='m'],
+html.menu-desktop .menu-title .title[data-size='s'] {
+  font-size: calc(46 * var(--u));
+  letter-spacing: 0;
+}
+
+html.menu-desktop .menu-meta {
+  top: calc(806 * var(--u));
+  left: calc(790 * var(--u));
+  right: calc(112 * var(--u));
+  bottom: auto;
+  text-align: left;
+  font-size: calc(30 * var(--u));
+  letter-spacing: calc(0.5 * var(--u));
+}
+
+html.menu-desktop .menu-count {
+  display: flex;
+  align-items: center;
+  position: absolute;
+  top: calc(932 * var(--u));
+  right: calc(112 * var(--u));
+  height: calc(100 * var(--u));
+  font-size: calc(22 * var(--u));
+  font-weight: 500;
+  letter-spacing: calc(2 * var(--u));
+  color: var(--ink-muted);
+}
+
+.menu-count b {
+  font-weight: 500;
+  color: var(--ink);
+}
+
+/* ---------- Roues : logos qui glissent d'une place à l'autre (frontend.js, wheelStage) ---------- */
+
+/*
+ * Scène de la roue (--w : un pixel de son repère de 1080 de large), décor fixe en image
+ * (roues/*.svg). Seuls transform et opacity s'animent : rien n'est recalculé pendant le
+ * glissement.
+ */
+.wheel-stage {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1080 / 360;
+  container-type: inline-size;
+  --w: calc(100cqw / 1080);
+  background: center / 100% 100% no-repeat;
+  --wheel-time: 340ms;
+  --wheel-ease: cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+/* Les logos sortent par les bords de la roue, pas de l'écran. */
+.wheel-items {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(-12% 2.78% 0 2.78%);
+}
+
+.wheel-item {
+  position: absolute;
+  left: 0;
+  top: 0;
+  opacity: var(--o);
+  transition: opacity var(--wheel-time) var(--wheel-ease);
+}
+
+/*
+ * Boîte fixe (celle du centre), placée par son centre et mise à l'échelle de sa place.
+ */
+.wheel-logo {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: calc(var(--fw, 296) * var(--w));
+  height: calc(var(--fh, 180) * var(--w));
+  transform: translate(calc(var(--x) * var(--w) - 50%), calc(var(--y) * var(--w) - 50%)) scale(var(--s));
+  transition: transform var(--wheel-time) var(--wheel-ease);
+}
+
+/* Zone cliquable : le cœur du logo (--hit, part de la boîte) ; le logo déborde autour. */
+.wheel-hit {
+  position: absolute;
+  inset: calc(50% - 50% * var(--hit, 1));
+}
+
+.wheel-tilt {
+  position: absolute;
+  left: calc(50% - 50% / var(--hit, 1));
+  top: calc(50% - 50% / var(--hit, 1));
+  display: grid;
+  place-items: center;
+  width: calc(100% / var(--hit, 1));
+  height: calc(100% / var(--hit, 1));
+  /* Contexte d'empilement : le disque d'un logo sans médaillon (::before) reste derrière lui. */
+  isolation: isolate;
+}
+
+.wheel-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+/* Sans logo lisible : le titre, en texte. */
+.wheel-name {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  max-width: calc(280 * var(--w));
+  text-align: center;
+  font-size: calc(40 * var(--w));
+  font-weight: 600;
+  font-stretch: 112%;
+  line-height: 1.05;
+  text-transform: uppercase;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Roues à bandeau : Médaillons, Bandeau, Minimaliste, Arche (roues/<nom>.svg) ---------- */
+
+/*
+ * Le bandeau (1080 × 540) porte la roue, le titre et la barre d'aide. Borne : en bas de
+ * l'écran, sur la table ; bureau : sous le fronton du jeu, à droite du cadre du plateau.
+ * Ses textes (menu et bandeau d'aide, ce dernier hors du menu) se placent d'après son coin
+ * bas-gauche, aux cotes propres à chaque roue (--t-* titre, --m-* fabricant · année,
+ * --c-* compteur, en pixels de référence depuis le bas du bandeau). --b : un pixel du
+ * bandeau, agrandi au bureau (--k) : il dépasse un peu du cadre du fronton, bords fondus.
+ */
+html[data-menu-band] #root {
+  --k: 1;
+  --b: calc(var(--k) * var(--u));
+  --band-left: calc(50% - 540 * var(--b));
+  --band-bottom: 0px;
+  --t-l: 262;
+  --t-w: 556;
+  --t-b: 126;
+  --t-h: 58;
+  --t-fs: 36;
+  --t-color: var(--signal);
+  --t-glow: rgba(139, 226, 58, 0.7);
+  --m-b: 92;
+  --m-color: var(--ink);
+  --c-l: 910;
+  --c-w: 130;
+  --c-b: 112;
+  --c-align: flex-end;
+}
+
+html.menu-desktop[data-menu-band] #root {
+  /* Le bandeau dépasse de 30 de chaque côté du cadre du fronton (1176), bords fondus ; la barre d'aide finit au bas du cadre du plateau. */
+  --k: calc(1236 / 1080);
+  --band-left: calc(100% - 1270 * var(--u));
+  --band-bottom: calc(28 * var(--u));
+}
+
+/* Bandeau, Minimaliste, Arche : titre blanc sans plaque, fabricant · année en vert, compteur centré dessous. */
+html[data-menu-band='bandeau'] #root,
+html[data-menu-band='minimal'] #root,
+html[data-menu-band='arche'] #root {
+  --t-l: 240;
+  --t-w: 600;
+  --t-h: 46;
+  --t-fs: 32;
+  --t-color: var(--ink);
+  --t-glow: rgba(0, 0, 0, 0.9);
+  --m-color: var(--signal);
+  --c-l: 390;
+  --c-w: 300;
+  --c-align: center;
+}
+
+/* Textes sous le bas des médaillons (logo du jeu compris), au-dessus de la barre d'aide. */
+html[data-menu-band='bandeau'] #root {
+  --t-b: 158;
+  --m-b: 126;
+  --c-b: 94;
+}
+
+html[data-menu-band='minimal'] #root {
+  --t-b: 166;
+  --m-b: 134;
+  --c-b: 102;
+}
+
+html[data-menu-band='arche'] #root {
+  --t-l: 290;
+  --t-w: 500;
+  --t-b: 160;
+  --m-b: 128;
+  --c-b: 96;
+}
+
+.wheel-stage.roue-medaillons,
+.wheel-stage.roue-bandeau,
+.wheel-stage.roue-minimal,
+.wheel-stage.roue-arche {
+  aspect-ratio: 1080 / 540;
+  --fw: 275;
+  --fh: 275;
+  --hit: 0.7;
+  --wheel-time: 320ms;
+  --wheel-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  /* Anneau de la table choisie : centre et diamètre dans le repère du bandeau. */
+  --ring-x: 540;
+  --ring-y: 150;
+  --ring-d: 252;
+}
+
+.wheel-stage.roue-medaillons {
+  background-image: url('roues/medaillons.svg');
+}
+
+.wheel-stage.roue-bandeau {
+  background-image: url('roues/bandeau.svg');
+  --ring-y: 160;
+  --ring-d: 256;
+}
+
+.wheel-stage.roue-minimal {
+  background-image: url('roues/minimal.svg');
+  --ring-y: 170;
+  --ring-d: 230;
+}
+
+.wheel-stage.roue-arche {
+  background-image: url('roues/arche.svg');
+  --ring-y: 190;
+  --ring-d: 232;
+}
+
+/* Au bureau, les bords du bandeau, qui débordent du fronton, se fondent en dégradé. */
+html.menu-desktop .menu-band .wheel-stage {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 3%, #000 97%, transparent);
+}
+
+.menu.menu-band .menu-nav,
+html.menu-desktop .menu.menu-band .menu-nav {
+  top: auto;
+  right: auto;
+  left: var(--band-left);
+  bottom: var(--band-bottom);
+  width: calc(1080 * var(--b));
+}
+
+/* Anneau vert de la table choisie : fixe, entre elle (devant) et ses voisines (derrière). */
+.wheel-ring {
+  display: none;
+}
+
+.menu-band .wheel-ring {
+  display: block;
+  position: absolute;
+  left: calc((var(--ring-x) - var(--ring-d) / 2) * var(--w));
+  top: calc((var(--ring-y) - var(--ring-d) / 2) * var(--w));
+  width: calc(var(--ring-d) * var(--w));
+  height: calc(var(--ring-d) * var(--w));
+  z-index: 19;
+  border-radius: 50%;
+  border: calc(5 * var(--w)) solid var(--signal);
+  box-shadow:
+    0 0 calc(8 * var(--w)) var(--signal),
+    0 0 calc(28 * var(--w)) rgba(139, 226, 58, 0.6),
+    0 0 calc(70 * var(--w)) rgba(139, 226, 58, 0.25),
+    inset 0 0 calc(16 * var(--w)) rgba(139, 226, 58, 0.55);
+  pointer-events: none;
+}
+
+/* Liseré clair au cœur du néon. */
+.menu-band .wheel-ring::after {
+  content: '';
+  position: absolute;
+  inset: calc(1 * var(--w));
+  border-radius: 50%;
+  border: calc(1.5 * var(--w)) solid rgba(225, 255, 190, 0.85);
+}
+
+/* Sans logo, ou logo large détouré : un médaillon sombre cerclé de chrome derrière, le titre ou le logo dedans. */
+.menu-band .wheel-item.disc .wheel-tilt::before {
+  content: '';
+  position: absolute;
+  left: calc(50% - 112.5 * var(--w));
+  top: calc(50% - 112.5 * var(--w));
+  z-index: -1;
+  width: calc(225 * var(--w));
+  height: calc(225 * var(--w));
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: calc(9 * var(--w)) solid #8fa39d;
+  background: radial-gradient(circle at 50% 35%, #12342c, #030807 75%);
+  box-shadow: inset 0 0 0 calc(2 * var(--w)) #e6f0ec, 0 calc(6 * var(--w)) calc(16 * var(--w)) rgba(0, 0, 0, 0.7);
+}
+
+.menu-band .wheel-item.disc .wheel-img {
+  width: 70%;
+  height: 70%;
+}
+
+.menu-band .wheel-name {
+  max-width: calc(160 * var(--w));
+  font-size: calc(28 * var(--w));
+}
+
+html .menu.menu-band .menu-label {
+  display: none;
+}
+
+/* Titre (sur la plaque des Médaillons), fabricant · année dessous, compteur. */
+.menu.menu-band .menu-title,
+html.menu-desktop .menu.menu-band .menu-title {
+  top: auto;
+  right: auto;
+  left: calc(var(--band-left) + var(--t-l) * var(--b));
+  bottom: calc(var(--band-bottom) + var(--t-b) * var(--b));
+  width: calc(var(--t-w) * var(--b));
+  height: calc(var(--t-h) * var(--b));
+  justify-content: center;
+  text-align: center;
+}
+
+.menu.menu-band .menu-title .title,
+html.menu-desktop .menu.menu-band .menu-title .title {
+  font-size: calc(var(--t-fs) * var(--b));
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  color: var(--t-color);
+  text-shadow: 0 0 calc(10 * var(--b)) var(--t-glow), 0 0 calc(26 * var(--b)) var(--t-glow);
+}
+
+.menu.menu-band .menu-title .title[data-size='m'],
+html.menu-desktop .menu.menu-band .menu-title .title[data-size='m'] {
+  font-size: calc(26 * var(--b));
+}
+
+.menu.menu-band .menu-title .title[data-size='s'],
+html.menu-desktop .menu.menu-band .menu-title .title[data-size='s'] {
+  font-size: calc(24 * var(--b));
+}
+
+.menu.menu-band .menu-meta,
+html.menu-desktop .menu.menu-band .menu-meta {
+  top: auto;
+  right: auto;
+  left: calc(var(--band-left) + var(--t-l) * var(--b));
+  bottom: calc(var(--band-bottom) + var(--m-b) * var(--b));
+  width: calc(var(--t-w) * var(--b));
+  height: calc(32 * var(--b));
+  text-align: center;
+  font-size: calc(22 * var(--b));
+  line-height: calc(32 * var(--b));
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--m-color);
+  text-shadow: 0 0 calc(8 * var(--b)) rgba(0, 0, 0, 0.9);
+}
+
+.menu.menu-band .menu-count,
+html.menu-desktop .menu.menu-band .menu-count {
+  display: flex;
+  justify-content: var(--c-align);
+  align-items: center;
+  position: absolute;
+  top: auto;
+  right: auto;
+  left: calc(var(--band-left) + var(--c-l) * var(--b));
+  bottom: calc(var(--band-bottom) + var(--c-b) * var(--b));
+  width: calc(var(--c-w) * var(--b));
+  height: calc(32 * var(--b));
+  font-size: calc(22 * var(--b));
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  color: var(--ink-muted);
+  text-shadow: 0 0 calc(8 * var(--b)) rgba(0, 0, 0, 0.9);
+}
+
+/* Barre d'aide en pied du bandeau (borne comme bureau). */
+html[data-menu-band] #root > .footer.menu-help {
+  display: flex;
+  top: auto;
+  right: auto;
+  left: calc(var(--band-left) + 40 * var(--b));
+  bottom: var(--band-bottom);
+  width: calc(1000 * var(--b));
+  height: calc(62 * var(--b));
+  flex-wrap: nowrap;
+  justify-content: center;
+  align-items: center;
+  gap: calc(22 * var(--b));
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: calc(20 * var(--b));
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+html[data-menu-band] #root > .footer.menu-help .cap {
+  min-width: calc(34 * var(--b));
+  height: calc(34 * var(--b));
+  padding: 0 calc(8 * var(--b));
+  border: calc(2 * var(--b)) solid var(--signal);
+  border-radius: calc(17 * var(--b));
+  background: rgba(139, 226, 58, 0.08);
+  box-shadow: 0 0 calc(10 * var(--b)) rgba(139, 226, 58, 0.45);
+  font-size: calc(20 * var(--b));
+  color: var(--signal);
+}
+
+/*
+ * Bureau : le fronton du jeu en fond, à droite du plateau ; un cadre de métal teinté vert
+ * (roues/cadre.svg : biseau brossé, filet vert ; reflets et halo) autour de chacun, leurs hauts et
+ * le bas du plateau alignés avec la barre d'aide. Cotes du plateau : #media-bg, plus bas.
+ */
+.menu-backglass,
+.menu-frame {
+  display: none;
+}
+
+html.menu-desktop .menu-band .menu-backglass {
+  display: block;
+  position: absolute;
+  z-index: -1;
+  right: calc(80 * var(--u));
+  top: calc(92 * var(--u));
+  width: calc(1144 * var(--u));
+  height: calc(643.5 * var(--u));
+  overflow: hidden;
+  background: var(--surface-sunken);
+}
+
+.menu-backglass img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Le bas du fronton s'assombrit sous le bandeau. */
+.menu-backglass::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(to bottom, rgba(3, 8, 7, 0) 45%, rgba(3, 8, 7, 0.85) 100%);
+}
+
+/* Tranche de 16 autour de l'image ; le reste de la découpe (32) mord, transparent, sur elle. Halo sarcelle autour. */
+html.menu-desktop .menu-band .menu-frame {
+  display: block;
+  position: absolute;
+  z-index: -1;
+  box-sizing: border-box;
+  border: calc(32 * var(--u)) solid transparent;
+  border-image: url('roues/cadre.svg') 32 / calc(32 * var(--u)) stretch;
+  filter: drop-shadow(0 0 calc(3 * var(--u)) rgba(139, 226, 58, 0.45)) drop-shadow(0 0 calc(14 * var(--u)) rgba(42, 209, 182, 0.4));
+  pointer-events: none;
+}
+
+/* Reflets obliques qui balaient le métal (le centre du cadre est évidé). */
+html.menu-desktop .menu-band .menu-frame::after {
+  content: '';
+  position: absolute;
+  inset: calc(-32 * var(--u));
+  padding: calc(16 * var(--u));
+  border-radius: calc(14 * var(--u));
+  background:
+    linear-gradient(115deg, transparent 14%, rgba(245, 255, 250, 0.75) 21%, transparent 27%, transparent 58%, rgba(245, 255, 250, 0.45) 64%, transparent 69%),
+    linear-gradient(to bottom, rgba(245, 255, 250, 0.28), transparent 18%, transparent 82%, rgba(0, 0, 0, 0.25));
+  mix-blend-mode: screen;
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+}
+
+html.menu-desktop .menu-band .menu-frame.plateau {
+  left: calc(64 * var(--u));
+  top: calc(76 * var(--u));
+  width: calc(563 * var(--u));
+  height: calc(976 * var(--u));
+}
+
+html.menu-desktop .menu-band .menu-frame.fronton {
+  right: calc(64 * var(--u));
+  top: calc(76 * var(--u));
+  width: calc(1176 * var(--u));
+  height: calc(675.5 * var(--u));
+}
+
+/* Passage d'un bord à l'autre (peu de tables) : repositionné d'un coup, hors champ (wheelStage). */
+.wheel-item.jump,
+.wheel-item.jump * {
+  transition: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wheel-item,
+  .wheel-logo {
+    transition: none;
+  }
+}
+
+/* ---------- Liste : sept lignes fixes, la table choisie sur celle du milieu ---------- */
+
+.wheel {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: repeat(7, minmax(0, 1fr));
+  gap: 0.8cqmin;
+}
+
+.wheel li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  padding: 0 2.4cqmin;
+  border-radius: 0.5cqmin;
+  font-size: 3cqmin;
+  color: var(--ink);
+  background: var(--scrim);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.wheel li .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* La table choisie : un aplat vert signal, texte sombre ; c'est la seule chose allumée du menu. */
+.wheel li.current {
+  color: var(--on-signal);
+  background: var(--signal);
+  box-shadow: 0 0 2.6cqmin var(--signal-haze);
+  font-weight: 600;
+}
+
+.wheel li.current .v {
+  color: var(--on-signal);
+  opacity: 0.75;
+}
+
+.wheel li .v {
+  margin-left: 1.5cqmin;
+  font-size: 0.75em;
+  color: var(--quiet);
+  font-weight: 400;
+}
+
+/* ---------- Bandeau d'aide : une touche cerclée par bouton de la borne ---------- */
+
+.footer {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.2cqmin 3cqmin;
+  padding: 2.2cqmin 4cqmin;
+  border-top: 1px solid var(--line-soft);
+  background: var(--scrim-strong);
+  font-size: 2.1cqmin;
+  color: var(--quiet);
+}
+
+.footer .hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 1cqmin;
+}
+
+.footer .cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4cqmin;
+  height: 3.4cqmin;
+  padding: 0 1cqmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.3cqmin;
+  background: var(--surface-raised);
+  font-size: 1.85cqmin;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.footer .cap.start {
+  border-color: rgba(139, 226, 58, 0.55);
+  color: var(--signal);
+}
+
+/* Menu des tables : pas de bandeau en borne (la table reste la vedette) ; au bureau, sous les informations, le compteur à droite. */
+html.menu-cab .footer.menu-help {
+  display: none;
+}
+
+html.menu-desktop .footer.menu-help {
+  top: calc(932 * var(--u));
+  left: calc(790 * var(--u));
+  right: calc(112 * var(--u));
+  bottom: auto;
+  height: calc(100 * var(--u));
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  align-items: center;
+  gap: calc(34 * var(--u));
+  padding: 0 calc(170 * var(--u)) 0 0;
+  border-top: 1px solid rgba(36, 80, 74, 0.65);
+  background: none;
+  font-size: calc(22 * var(--u));
+  font-weight: 500;
+  color: var(--ink-muted);
+}
+
+html.menu-desktop .footer.menu-help .cap {
+  min-width: calc(40 * var(--u));
+  height: calc(32 * var(--u));
+  padding: 0 calc(8 * var(--u));
+  font-size: calc(18 * var(--u));
+}
+
+/* Roue dentée de la configuration : discrète, dans le coin, cliquable par-dessus tout. */
+.gear {
+  position: absolute;
+  top: 1.6cqmin;
+  right: 2cqmin;
+  z-index: 100;
+  padding: 0.4cqmin 0.9cqmin;
+  font: inherit;
+  font-size: 3.2cqmin;
+  line-height: 1;
+  color: var(--quiet);
+  background: transparent;
+  border: none;
+  border-radius: 0.5cqmin;
+  opacity: 0.55;
+}
+
+body.mouse .gear {
+  opacity: 1;
+  cursor: pointer;
+}
+
+.gear:hover {
+  color: var(--signal);
+  background: var(--surface-raised);
+}
+
+/* ---------- Superpositions ---------- */
+
+.overlay {
+  --pad-top: 6cqmin;
+  --pad-side: 6cqmin;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3cqmin;
+  padding: var(--pad-top) var(--pad-side);
+  background: var(--fond-ambiance);
+  background-color: var(--bg);
+}
+
+/*
+ * Écran plein, dans le flux : la marque en haut, le bandeau d'aide en bas sur toute la
+ * largeur, le contenu centré entre les deux (marges automatiques : un contenu trop haut
+ * les ramène à zéro et se range sous la marque, au lieu de passer dessous).
+ */
+.overlay > .brand {
+  margin-bottom: auto;
+}
+
+.overlay > .brand ~ :last-child:not(.footer) {
+  margin-bottom: auto;
+}
+
+.overlay > .footer {
+  position: static;
+  flex: none;
+  align-self: stretch;
+  margin: auto calc(-1 * var(--pad-side)) calc(-1 * var(--pad-top));
+}
+
+.overlay h1 {
+  margin: 0;
+  font-size: 6cqmin;
+  font-weight: 600;
+}
+
+/* Intertitres : capitales espacées en vert signal, comme dans la DA. */
+.overlay h2 {
+  margin: 0 0 1.5cqmin;
+  font-size: 2.4cqmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.overlay .lead {
+  font-size: 3cqmin;
+  color: var(--quiet);
+}
+
+.keys {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(48cqmin, 1fr));
+  gap: 4cqmin;
+  width: min(100%, 140cqmin);
+}
+
+.keys table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 2.6cqmin;
+}
+
+.keys td {
+  padding: 0.9cqmin 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.keys td:last-child {
+  text-align: right;
+  font-weight: 700;
+}
+
+.message {
+  max-width: 130cqmin;
+  font-size: 2.6cqmin;
+  line-height: 1.5;
+}
+
+.message p {
+  margin: 0.6cqmin 0;
+  word-break: break-word;
+}
+
+.message p.log {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 1.8cqmin;
+  color: var(--quiet);
+}
+
+/* ---------- Écrans secondaires ---------- */
+
+/*
+ * Rôles qui partagent un écran : chacun dans sa zone, en fractions de l'écran. Les
+ * tailles des écrans secondaires suivent leur zone (cqmin), ou l'écran entier
+ * (#root est aussi un conteneur). Sur le playfield, les incrustations ne pivotent
+ * pas avec le menu : VPX ne les tourne pas non plus.
+ */
+#zones {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+.zone {
+  position: absolute;
+  overflow: hidden;
+  container-type: size;
+  background: var(--bg);
+}
+
+.secondary {
+  position: relative;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 6cqmin;
+  gap: 2cqmin;
+}
+
+.secondary .title {
+  font-size: 11cqmin;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.secondary .subtitle {
+  font-size: 5cqmin;
+  color: var(--meta);
+}
+
+.dmd .title {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  color: var(--dmd);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 2cqmin rgba(255, 138, 31, 0.6);
+}
+
+.dmd .subtitle {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  color: var(--dmd);
+  opacity: 0.7;
+}
+
+/*
+ * DMD dans une bande (4:1 sous le backglass, incrusté dans le playfield) : le texte
+ * suit la hauteur de la bande, sans dépasser sa largeur. Sur un écran entier, mêmes
+ * tailles qu'avant (11 et 5 % du petit côté d'un écran 16:9).
+ */
+.zone .dmd .title {
+  font-size: min(28cqh, 6.2cqw);
+}
+
+.zone .dmd .subtitle {
+  font-size: min(12cqh, 2.8cqw);
+}
+
+/* Trame de points façon afficheur à matrice. */
+.dmd::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(0, 0, 0, 0.55) 35%, transparent 36%);
+  background-size: 0.9cqmin 0.9cqmin;
+}
+
+.topper .title {
+  letter-spacing: 0.3em;
+  color: var(--signal);
+}
+
+
+/* ---------- Chargement d'une table ---------- */
+
+/* Vidéo de chargement du jeu : pleine, sans le voile du menu ; les commandes dans un bandeau en bas. */
+html.loading-video #media-bg::after {
+  display: none;
+}
+
+.overlay.over-video {
+  justify-content: flex-end;
+  background: linear-gradient(to bottom, transparent 45%, var(--scrim));
+}
+
+.loading-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2vmin;
+  width: min(100%, 170vmin);
+  padding: 2.4vmin 3.5vmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.8vmin;
+  background: var(--scrim-strong);
+  box-shadow: var(--halo-panel);
+}
+
+.loading-panel .lead {
+  font-size: 2.4vmin;
+}
+
+/* Commandes de la partie au chargement : grille compacte, trois colonnes sur un écran large. */
+.game-keys {
+  width: 100%;
+  font-size: 2vmin;
+}
+
+.game-keys h2 {
+  margin: 0 0 0.8vmin;
+  font-size: 2.2vmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  text-align: center;
+}
+
+.game-keys-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24em), 1fr));
+  column-gap: 2.5em;
+}
+
+.game-key {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0 1em;
+  padding: 0.4em 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.game-key-name {
+  margin-left: auto;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* Un titre très long tient sur deux lignes, puis « … ». */
+.loading-panel h1 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  text-align: center;
+  line-height: 1.15;
+}
+
+/* Écran de chargement de secours (fallback.js) : il remplit le playfield, les commandes dessous. */
+.overlay.loading-fallback {
+  display: block;
+  padding: 0;
+}
+
+/* Les commandes prennent toute la largeur de l'écran de secours, sous la barre d'attente. */
+.loading-fallback .cp-ld-slot {
+  width: 100%;
+}
+
+/* ---------- Mode attente ---------- */
+
+/* Le média du plateau se voit mieux qu'au menu : rien à lire dessous, sauf l'invite. */
+html.attract-mode #media-bg::after {
+  background: rgba(3, 8, 7, 0.3);
+}
+
+/* La marque à sa place habituelle, en haut à gauche, dans le flux (règle .brand). */
+.attract {
+  --pad-top: 3vmin;
+  --pad-side: 6vmin;
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--pad-top) var(--pad-side) 6vmin;
+  text-align: center;
+}
+
+.attract-middle {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3vmin;
+}
+
+.attract-logo {
+  position: relative;
+  width: min(100%, 110vmin);
+  height: 36vmin;
+}
+
+.attract-image {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.6vmin 1.6vmin rgba(0, 0, 0, 0.85));
+}
+
+/* Sans fallback.js : le titre, deux lignes au plus. */
+.attract-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  font-size: 8vmin;
+  font-weight: 600;
+  line-height: 1.1;
+}
+
+.attract-subtitle {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 3.4vmin;
+  color: var(--meta);
+  text-shadow: 0 0.2vmin 0.8vmin rgba(0, 0, 0, 0.95);
+}
+
+.attract-hint {
+  padding: 1vmin 3vmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.5vmin;
+  font-size: 2.6vmin;
+  color: var(--ink);
+  background: var(--scrim-strong);
+  /* Seul le texte pulse : le fond reste opaque, pour rester lisible sur un média clair. */
+  animation: attract-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes attract-pulse {
+  50% {
+    color: rgba(230, 240, 236, 0.5);
+  }
+}
+
+/* ---------- Fond de partie (derrière VPX) ---------- */
+
+html.in-game,
+html.in-game body {
+  background: #000;
+}
+
+.game {
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 4vmin;
+}
+
+/* Discret : seul un écran que VPX n'occupe pas le laisse voir. */
+.game-title {
+  text-align: center;
+  font-size: 3vmin;
+  letter-spacing: 0.06em;
+  color: #2a2f3a;
+}
+/* ---------- Médias des jeux (media.js) ---------- */
+
+/* Fond du playfield, sous la liste ; dans le repère de l'écran, comme les incrustations. */
+#media-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Assombri derrière le menu, pour que les textes restent lisibles ; intact en partie. */
+html:not(.in-game) #media-bg::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(3, 8, 7, 0.62);
+}
+
+/* Menu des tables en borne : le média se voit en entier, le voile est celui du menu (.menu-scrim, tourné avec le joueur). */
+html.menu-cab:not(html.in-game):not(html.attract-mode) #media-bg::after {
+  background: rgba(3, 8, 7, 0.08);
+}
+
+/*
+ * Menu des tables au bureau : la table dans un cadre au format d'un playfield (9:16), à
+ * gauche (média de 531 × 944 en x 80, y 92, pour un petit côté de 1080) ; un
+ * média en largeur y est tourné par media.js, flippers en bas, et le remplit sans être rogné
+ * en paysage. Le cadre (bord sombre, chant sarcelle, ombre) est dessiné par des ombres.
+ */
+html.menu-desktop:not(html.in-game):not(html.attract-mode) #media-bg {
+  --px: calc(var(--pf-h, 1) * 100vh / 1080);
+  inset: auto;
+  top: calc(var(--pf-y, 0) * 100vh + 92 * var(--px));
+  left: calc(var(--pf-x, 0) * 100vw + 80 * var(--px));
+  width: calc(531 * var(--px));
+  height: calc(944 * var(--px));
+  overflow: hidden;
+  border-radius: calc(5 * var(--px));
+  outline: 1px solid rgba(178, 219, 205, 0.18);
+  outline-offset: -1px;
+  box-shadow:
+    0 0 0 calc(4 * var(--px)) var(--void),
+    0 0 0 calc(15 * var(--px)) #102a24,
+    0 0 0 calc(16 * var(--px)) var(--line-strong),
+    0 0 0 calc(20 * var(--px)) rgba(0, 0, 0, 0.6),
+    var(--halo-panel);
+}
+
+html.menu-desktop:not(html.in-game):not(html.attract-mode) #media-bg::after {
+  background: transparent;
+}
+
+.media-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: size;
+  background: #000;
+}
+
+.media-layer.background {
+  background: transparent;
+}
+
+/* Fondu enchaîné au changement de table : la nouvelle couche passe par-dessus l'ancienne. */
+.media-slot {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 280ms ease-out;
+}
+
+.media-slot.visible {
+  opacity: 1;
+}
+
+.media-slot.instant {
+  transition: none;
+}
+
+/* Média tourné dans le repère de l'écran : à 90° et 270°, largeur et hauteur s'échangent. */
+.media-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 100cqw;
+  height: 100cqh;
+  transform: translate(-50%, -50%) rotate(var(--media-turn, 0deg));
+}
+
+.media-frame[data-rotation='90'],
+.media-frame[data-rotation='270'] {
+  width: 100cqh;
+  height: 100cqw;
+}
+
+.media-frame[data-rotation='90'] {
+  --media-turn: 90deg;
+}
+
+.media-frame[data-rotation='180'] {
+  --media-turn: 180deg;
+}
+
+.media-frame[data-rotation='270'] {
+  --media-turn: 270deg;
+}
+
+/* On ne déforme jamais une image : object-fit (cover ou contain) est posé par media.js. */
+.media-element,
+.media-still {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.media-fallback {
+  position: absolute;
+  inset: 0;
+}
+
+/*
+ * Repli « en partie » du fond du playfield (titre, fabricant, année) : tourné pour le
+ * joueur comme la racine, sinon ses textes restent couchés sur une borne au playfield
+ * pivoté. Le fond animé du menu, sans texte, reste dans le repère de l'écran.
+ */
+html.in-game[data-rotation='90'] #media-bg .media-fallback,
+html.in-game[data-rotation='180'] #media-bg .media-fallback,
+html.in-game[data-rotation='270'] #media-bg .media-fallback {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: var(--turned-width);
+  height: var(--turned-height);
+  transform: translate(-50%, -50%) rotate(var(--turned));
+}
+
+/* Les textes du menu sur un fond animé : ombre portée, liste sur un fond translucide. */
+html.has-backdrop .brand,
+html.has-backdrop .banner,
+html.has-backdrop .menu-count,
+html.has-backdrop .menu-label,
+html.has-backdrop .menu-title,
+html.has-backdrop .menu-meta {
+  text-shadow: 0 0.2vmin 0.8vmin rgba(0, 0, 0, 0.95);
+}
+
+html.has-backdrop .wheel li:not(.current) {
+  background: var(--scrim);
+}
+
+/* Case du logo dans la liste : toujours la même taille, les titres restent alignés. */
+.logo-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.4em;
+  height: 1.4em;
+  margin-right: 0.6em;
+  vertical-align: middle;
+}
+
+.list-logo {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.logo-slot .initial {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6em;
+  height: 1.6em;
+  border-radius: 0.35em;
+  font-size: 0.8em;
+  font-weight: 700;
+  color: var(--meta);
+  background: var(--surface-raised);
+}
+
+img.broken {
+  display: none;
+}
+
+/* Fond de partie : zones en noir pur, masquées quand les médias sont éteints. */
+html.in-game .zone {
+  background: #000;
+}
+
+#zones.off {
+  display: none;
+}
+
+/*
+ * Repli minimal d'un écran annexe : un titre long ne sort jamais de sa zone. Trois lignes
+ * au plus sur le fronton et le topper, deux dans une bande DMD, puis « … ».
+ */
+.zone .secondary .title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  width: 100%;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  /* Assez d'interligne pour qu'aucun accent de la ligne coupée ne dépasse. */
+  line-height: 1.2;
+}
+
+.zone .dmd .title {
+  -webkit-line-clamp: 2;
+  /* L'espacement des lettres suit aussi le dernier caractère (« … ») : de la place pour lui. */
+  padding-inline: 0.1em;
+}
+
+.zone .secondary .subtitle {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

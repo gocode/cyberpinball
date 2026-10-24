@@ -1,0 +1,12 @@
+{
+  "name": "@cyberpinball/win-displays",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Écrans sous Windows : détection par DisplayConfig (nom, position, rotation) et EDID lu dans le registre, orientation, fenêtres et premier plan.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "dependencies": {
+    "@cyberpinball/core": "0.1.0",
+    "koffi": "3.3.2"
+  }
+}

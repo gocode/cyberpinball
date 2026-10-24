@@ -1,0 +1,779 @@
+:root {
+  /* Noms historiques de cette feuille, rebranchés sur le thème (theme.css). La couleur
+     propre à chaque écran (--screen-color, posée par screen.js) ne colore que son numéro. */
+  --accent: var(--signal);
+  --bg: var(--void);
+  --quiet: var(--ink-muted);
+  --blocking: var(--danger);
+  --tile: var(--surface-raised);
+  --tile-line: var(--line-strong);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--fond-ambiance);
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  cursor: none;
+  user-select: none;
+}
+
+/*
+ * Tout est dans le flux, rien en position absolue : en-tête, contenu (centré dans la
+ * place qui reste), pied, puis la bande des flippers. Un contenu trop haut repousse le
+ * pied au lieu de passer dessous ; le garde-fou de l'autopilote (layout-check.ts) le
+ * signale. Les tailles en vmin suivent l'écran, du 1366 × 768 au 1920 × 1080.
+ */
+#screen {
+  --screen-height: 100vh;
+  --pad: 3vmin;
+  position: relative;
+  width: 100vw;
+  height: var(--screen-height);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  row-gap: 1.5vmin;
+  padding: var(--pad) 4vmin;
+  border: 1.2vmin solid transparent;
+  transition: border-color 150ms;
+  container-type: size;
+}
+
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: safe center;
+  gap: 1.5vmin;
+  min-height: 0;
+  text-align: center;
+}
+
+#screen.highlight {
+  border-color: var(--accent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+#screen.dim .number,
+#screen.dim .name {
+  opacity: 0.35;
+}
+
+/*
+ * Playfield vu d'un côté : tout l'écran pivote pour être droit pour le joueur.
+ * À 90° et 270°, la largeur et la hauteur s'échangent avant la rotation.
+ */
+#screen.rot-90,
+#screen.rot-270 {
+  --screen-height: 100vw;
+  width: 100vh;
+  transform-origin: top left;
+}
+
+#screen.rot-90 {
+  transform: rotate(90deg) translateY(-100%);
+}
+
+#screen.rot-180 {
+  transform: rotate(180deg);
+}
+
+#screen.rot-270 {
+  transform: rotate(-90deg) translateX(-100%);
+}
+
+/* Étape d'orientation : la bande désigne le bord où se tient le joueur. */
+.edge {
+  margin: 0 -4vmin calc(-1 * var(--pad));
+  padding: 1.6vmin;
+  background: var(--accent);
+  color: var(--on-signal);
+  font-size: 3.4vmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.2em;
+  text-align: center;
+}
+
+#screen.orient .number {
+  font-size: 22vmin;
+}
+
+#screen.measuring .number {
+  display: none;
+}
+
+.measure {
+  font-size: 14vmin;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--accent);
+  text-shadow: 0 0 3vmin var(--signal-haze);
+}
+
+/* Étape « Boutons » : le nom du bouton demandé, assez petit pour tenir sur un écran en portrait. */
+#screen.buttons .measure {
+  font-size: 9vmin;
+  text-align: center;
+}
+
+#screen.buttons .number {
+  display: none;
+}
+
+#screen.buttons .prompt {
+  font-size: 6vmin;
+}
+
+/* Tous les boutons : relevés, en cours, à venir. Deux colonnes sur un écran en hauteur. */
+.buttons-list {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  text-align: left;
+  gap: 0.8vmin 1.2vmin;
+  width: min(94%, 150vmin);
+  margin: 1vmin 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 2.2vmin;
+}
+
+/* Un nom long et sa touche passent sur deux lignes plutôt que de déborder. */
+.buttons-list li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  column-gap: 1vmin;
+  padding: 0.9vmin 1.4vmin;
+  border: 0.3vmin solid transparent;
+  border-radius: 0.5vmin;
+  background: var(--tile);
+}
+
+.buttons-list li b {
+  margin-left: auto;
+}
+
+.buttons-list li.todo {
+  color: var(--quiet);
+}
+
+/* En cours de relevé, ou choisie aux flippers au récapitulatif pour être refaite. */
+.buttons-list li.current,
+.buttons-list li.selected {
+  border-color: var(--accent);
+  background: var(--signal-wash);
+  color: var(--ink);
+  box-shadow: 0 0 1.6vmin var(--signal-haze);
+}
+
+.buttons-list li.done b {
+  color: var(--accent);
+}
+
+.buttons-list li.tried b::after {
+  content: ' ✓';
+  color: var(--signal);
+}
+
+@container (max-aspect-ratio: 1 / 1) {
+  .buttons-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 1.5vmin;
+}
+
+.actions button {
+  font: inherit;
+  font-size: 2.2vmin;
+  font-weight: 500;
+  font-stretch: 112%;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 0.8vmin 2vmin;
+  color: var(--ink);
+  background: var(--tile);
+  border: 0.2vmin solid var(--tile-line);
+  border-radius: 0.5vmin;
+}
+
+.actions button.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-signal);
+  font-weight: 600;
+  box-shadow: 0 0 2vmin var(--signal-haze);
+}
+
+/* Souris : le pointeur apparaît quand on la bouge, les lignes et actions se cliquent. */
+body.pointer {
+  cursor: default;
+}
+
+body.pointer [data-act] {
+  cursor: pointer;
+}
+
+/* Étape « Son » : les notes (une par bip) ou le nom de la paire de haut-parleurs. */
+#screen.sound .measure {
+  font-size: 10vmin;
+  line-height: 1.3;
+}
+
+@keyframes pulse {
+  50% {
+    box-shadow: inset 0 0 6vmin var(--accent);
+  }
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2vmin;
+}
+
+/* Marque : capitales très espacées et larges, PINBALL en vert signal. */
+.brand {
+  font-size: 2vmin;
+  font-weight: 300;
+  font-stretch: 125%;
+  letter-spacing: 0.42em;
+  color: var(--ink);
+}
+
+.brand .pin {
+  color: var(--signal);
+}
+
+/* Toujours là, à chaque étape : sortir sans rien écrire. */
+.quit {
+  font: inherit;
+  font-size: 2vmin;
+  font-stretch: 112%;
+  letter-spacing: 0.06em;
+  padding: 0.6vmin 1.6vmin;
+  color: var(--ink);
+  background: var(--tile);
+  border: 0.2vmin solid var(--tile-line);
+  border-radius: 0.5vmin;
+}
+
+.quit.holding {
+  border-color: var(--warning);
+  color: var(--warning);
+  font-weight: 700;
+}
+
+/*
+ * « Quitter sans enregistrer ? » : seul élément posé par-dessus le reste, sur un fond
+ * opaque (le garde-fou de mise en page n'y voit donc pas de chevauchement).
+ */
+.quit-dialog {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5vmin;
+  padding: 6vmin 8vmin;
+  background: rgba(3, 8, 7, 0.96);
+  text-align: center;
+  font-size: 2.6vmin;
+}
+
+.quit-dialog h2 {
+  margin: 0;
+  font-size: 5vmin;
+  font-weight: 600;
+  color: var(--warning);
+}
+
+.quit-dialog ul {
+  margin: 0.6vmin 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.quit-dialog div > h2 {
+  font-size: 2.2vmin;
+  font-stretch: 112%;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--quiet);
+}
+
+.quit-destination {
+  margin: 0;
+  max-width: 80%;
+}
+
+.quit-choices {
+  display: flex;
+  gap: 2vmin;
+}
+
+.quit-choices button {
+  font: inherit;
+  padding: 1vmin 3vmin;
+  color: var(--ink);
+  background: var(--tile);
+  border: 0.2vmin solid var(--tile-line);
+  border-radius: 0.5vmin;
+}
+
+/* Réponse choisie d'une question : aplat ambre, texte sombre. */
+.quit-choices button.primary {
+  border-color: var(--warning);
+  background: var(--warning);
+  color: var(--on-warning);
+  font-weight: 600;
+}
+
+.quit-hint {
+  margin: 0;
+  color: var(--quiet);
+  font-size: 2.2vmin;
+}
+
+/* Numéro de l'écran, dans sa couleur propre : c'est ce qui distingue les écrans entre eux. */
+.number {
+  font-size: 34vmin;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--screen-color, var(--accent));
+}
+
+.prompt {
+  font-size: 9vmin;
+  font-weight: 600;
+  min-height: 1em;
+}
+
+.name {
+  font-size: 4vmin;
+}
+
+.details {
+  font-size: 2vmin;
+  color: var(--quiet);
+}
+
+/* Récapitulatif et résultat : le numéro cède la place au panneau. */
+#screen.report .content {
+  justify-content: flex-start;
+}
+
+/* Le panneau dit déjà quel écran tient quel rôle : toute la place va à ses lignes. */
+#screen.report .number,
+#screen.report .name,
+#screen.report .details {
+  display: none;
+}
+
+#screen.report .prompt {
+  font-size: 5vmin;
+}
+
+.panel {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  column-gap: 4vmin;
+  align-content: start;
+  flex: 0 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  width: min(94%, 170vmin);
+  text-align: left;
+  font-size: 2.4vmin;
+  line-height: 1.5;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 0.8vmin;
+  box-shadow: var(--halo-panel);
+  padding: 2.5vmin 3vmin;
+}
+
+.panel.dense {
+  font-size: 2vmin;
+  line-height: 1.35;
+}
+
+.panel.denser {
+  font-size: 1.65vmin;
+  line-height: 1.3;
+}
+
+.panel h2 {
+  margin: 0 0 1vmin;
+  font-size: 2.4vmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.panel ul {
+  margin: 0 0 2vmin;
+  padding-left: 1.2em;
+}
+
+.panel p {
+  grid-column: 1 / -1;
+  margin: 0.5vmin 0 0;
+}
+
+.panel code {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.9em;
+  word-break: break-all;
+}
+
+.finding-warning {
+  color: var(--warning);
+}
+
+.finding-blocking {
+  color: var(--blocking);
+}
+
+.finding-info {
+  color: var(--quiet);
+}
+
+footer {
+  text-align: center;
+}
+
+.notice {
+  max-width: 90%;
+  margin: 0 auto 1.5vmin;
+  font-size: 2.8vmin;
+  font-weight: 600;
+  color: var(--warning);
+}
+
+.step {
+  font-size: 3vmin;
+  margin-bottom: 1vmin;
+}
+
+.hint {
+  font-size: 2.2vmin;
+  color: var(--quiet);
+}
+
+/* ---------- Parts d'écran (rôles qui partagent cet écran) ---------- */
+
+/*
+ * Sous le contenu de l'écran (#screen passe devant) : la question et les commandes
+ * restent lisibles par-dessus. L'étiquette du rôle est un décor en filigrane
+ * (::before), pas un texte de la page.
+ */
+#zones {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+#screen {
+  z-index: 1;
+}
+
+.zone {
+  position: absolute;
+  border: 0.5vmin solid rgba(255, 255, 255, 0.3);
+}
+
+.zone::before {
+  content: attr(data-label);
+  position: absolute;
+  top: 0.8vmin;
+  left: 1.2vmin;
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 2.2vmin;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.zone.candidate {
+  border: 0.6vmin dashed var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+.zone.candidate::before {
+  color: var(--accent);
+}
+
+/* ---------- Étape « Disposition » ---------- */
+
+/*
+ * Les zones de chaque écran se tirent à la souris : la page laisse passer le
+ * pointeur partout, sauf sur le panneau.
+ */
+body.arranging #screen {
+  pointer-events: none;
+}
+
+body.arranging #arrange,
+body.arranging #quit,
+body.arranging #quit-dialog {
+  pointer-events: auto;
+}
+
+body.arranging .zone.editable {
+  pointer-events: auto;
+  cursor: move;
+}
+
+.zone.selected {
+  border: 0.6vmin solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.zone.selected::before {
+  color: var(--accent);
+}
+
+.zone .handle {
+  position: absolute;
+  width: 2.6vmin;
+  height: 2.6vmin;
+  background: var(--accent);
+  opacity: 0;
+}
+
+/* Les coins se voient sur toutes les zones qu'on peut tirer : le geste se devine sans aide. */
+.zone.editable .handle {
+  opacity: 0.45;
+}
+
+.zone.selected .handle {
+  opacity: 1;
+}
+
+.zone .handle.nw {
+  left: -1.3vmin;
+  top: -1.3vmin;
+  cursor: nwse-resize;
+}
+
+.zone .handle.ne {
+  right: -1.3vmin;
+  top: -1.3vmin;
+  cursor: nesw-resize;
+}
+
+.zone .handle.sw {
+  left: -1.3vmin;
+  bottom: -1.3vmin;
+  cursor: nesw-resize;
+}
+
+.zone .handle.se {
+  right: -1.3vmin;
+  bottom: -1.3vmin;
+  cursor: nwse-resize;
+}
+
+/* Sur l'écran du panneau, le grand numéro et le nom laissent la place au panneau. */
+#screen.arrange-step.highlight .number,
+#screen.arrange-step.highlight .name,
+#screen.arrange-step.highlight .details,
+#screen.arrange-step.highlight .prompt {
+  display: none;
+}
+
+.arrange {
+  width: min(96%, 150vmin);
+  padding: 1.6vmin 2.2vmin;
+  border-radius: 0.8vmin;
+  background: rgba(7, 17, 15, 0.94);
+  border: 1px solid var(--line-strong);
+  box-shadow: var(--halo-panel);
+  font-size: 2.1vmin;
+  text-align: left;
+}
+
+.arrange h2 {
+  margin: 0;
+  font-size: 2.4vmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.arrange p {
+  margin: 0.6vmin 0;
+}
+
+.arrange-detail {
+  color: var(--quiet);
+}
+
+.arrange-items {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.6vmin 1.2vmin;
+  margin: 1vmin 0;
+  padding: 0;
+  list-style: none;
+}
+
+@container (max-aspect-ratio: 1 / 1) {
+  .arrange-items {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.arrange-items li {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  column-gap: 1vmin;
+  padding: 0.6vmin 1.2vmin;
+  border: 0.3vmin solid transparent;
+  border-radius: 0.5vmin;
+  background: var(--tile);
+}
+
+.arrange-items li b {
+  margin-left: auto;
+  color: var(--quiet);
+}
+
+.arrange-items li.selected {
+  border-color: var(--accent);
+}
+
+.arrange-items li.open {
+  background: var(--signal-wash);
+}
+
+.arrange-items li.open b {
+  color: var(--ink);
+}
+
+.arrange-items li.disabled {
+  color: var(--quiet);
+}
+
+.arrange-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1vmin;
+}
+
+.arrange-controls span {
+  font-weight: 700;
+}
+
+.arrange-controls button {
+  font: inherit;
+  padding: 0.5vmin 1.6vmin;
+  border: 0.2vmin solid var(--tile-line);
+  border-radius: 0.5vmin;
+  color: var(--ink);
+  background: var(--tile);
+}
+
+.arrange-controls button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-signal);
+}
+
+.arrange-notice {
+  color: var(--warning);
+}
+
+.arrange-hint {
+  color: var(--ink);
+}
+
+.arrange-order {
+  color: var(--quiet);
+  font-size: 1.8vmin;
+}
+
+.arrange ul {
+  margin: 0.4vmin 0 0;
+  padding-left: 2.4vmin;
+}
+
+.arrange h2 + ul,
+.arrange div > h2 {
+  font-size: 2.2vmin;
+}
+
+.arrange-mouse {
+  color: var(--ink);
+}
+
+/* Le geste à la souris, en haut de chaque écran qui n'a pas le panneau. */
+.arrange-coach {
+  position: fixed;
+  top: 1.2vmin;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2;
+  max-width: 70vw;
+  padding: 0.6vmin 1.6vmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.5vmin;
+  background: rgba(7, 17, 15, 0.92);
+  color: var(--ink);
+  font-size: 1.9vmin;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* Écran large : trois colonnes, le panneau reste bas et laisse voir les zones. */
+@container (min-aspect-ratio: 3 / 2) {
+  .arrange-items {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* Panneau rangé en haut ou en bas de l'écran, à l'opposé de la zone choisie. */
+.arrange.dock-top,
+.arrange.dock-bottom {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.arrange.dock-top {
+  top: 6vmin;
+}
+
+.arrange.dock-bottom {
+  bottom: 4vmin;
+}

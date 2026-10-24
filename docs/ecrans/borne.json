@@ -1,0 +1,111 @@
+[
+  {
+    "gdiName": "\\\\.\\DISPLAY1",
+    "friendlyName": "LG TV SSCR2",
+    "monitorDescription": "Generic PnP Monitor",
+    "devicePath": "\\\\?\\DISPLAY#GSM7750#5&1a2b3c4d&0&UID4352#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}",
+    "bounds": {
+      "x": 0,
+      "y": 0,
+      "width": 3840,
+      "height": 2160
+    },
+    "rotation": 0,
+    "primary": true,
+    "scale": 1,
+    "edid": {
+      "manufacturer": "GSM",
+      "productCode": 30544,
+      "serialNumber": 0,
+      "serialText": "107NTAB4K123",
+      "monitorName": "LG TV SSCR2",
+      "widthCm": 95,
+      "heightCm": 54,
+      "imageMm": {
+        "width": 941,
+        "height": 529
+      }
+    }
+  },
+  {
+    "gdiName": "\\\\.\\DISPLAY2",
+    "friendlyName": "DELL P2722H",
+    "monitorDescription": "Generic PnP Monitor",
+    "devicePath": "\\\\?\\DISPLAY#DELA1A4#5&1a2b3c4d&0&UID4353#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}",
+    "bounds": {
+      "x": 3840,
+      "y": 0,
+      "width": 1920,
+      "height": 1080
+    },
+    "rotation": 0,
+    "primary": false,
+    "scale": 1,
+    "edid": {
+      "manufacturer": "DEL",
+      "productCode": 41380,
+      "serialNumber": 1112627279,
+      "serialText": "9H2LKN3",
+      "monitorName": "DELL P2722H",
+      "widthCm": 60,
+      "heightCm": 34,
+      "imageMm": {
+        "width": 598,
+        "height": 336
+      }
+    }
+  },
+  {
+    "gdiName": "\\\\.\\DISPLAY3",
+    "friendlyName": "",
+    "monitorDescription": "Generic PnP Monitor",
+    "devicePath": "\\\\?\\DISPLAY#RTK2C20#7&2c3d4e5f&0&UID256#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}",
+    "bounds": {
+      "x": 3840,
+      "y": 1080,
+      "width": 1920,
+      "height": 480
+    },
+    "rotation": 0,
+    "primary": false,
+    "scale": 1,
+    "edid": {
+      "manufacturer": "RTK",
+      "productCode": 11296,
+      "serialNumber": 0,
+      "widthCm": 31,
+      "heightCm": 8,
+      "imageMm": {
+        "width": 311,
+        "height": 78
+      }
+    }
+  },
+  {
+    "gdiName": "\\\\.\\DISPLAY4",
+    "friendlyName": "BAR LCD",
+    "monitorDescription": "Generic PnP Monitor",
+    "devicePath": "\\\\?\\DISPLAY#RTK1400#7&2c3d4e5f&0&UID257#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}",
+    "bounds": {
+      "x": 5760,
+      "y": 0,
+      "width": 1920,
+      "height": 540
+    },
+    "rotation": 0,
+    "primary": false,
+    "scale": 1,
+    "edid": {
+      "manufacturer": "RTK",
+      "productCode": 5120,
+      "serialNumber": 0,
+      "monitorName": "BAR LCD",
+      "widthCm": 35,
+      "heightCm": 10,
+      "imageMm": {
+        "width": 350,
+        "height": 98
+      }
+    }
+  }
+]

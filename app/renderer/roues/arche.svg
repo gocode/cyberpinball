@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="540" viewBox="0 0 1080 540">
+<!-- Roue Arche : arche de métal et de verre. Repère 1080 × 540 du bandeau ; image fixe, rien ne s'anime ici. -->
+<defs>
+  <filter id="halo" x="-10%" y="-60%" width="120%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
+  <filter id="haloLarge" x="-10%" y="-80%" width="120%" height="260%"><feGaussianBlur stdDeviation="16"/></filter>
+  <filter id="ombre" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>
+  <linearGradient id="neon" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1080" y2="0">
+    <stop offset="0" stop-color="#2ad1b6" stop-opacity=".25"/><stop offset=".22" stop-color="#2ad1b6"/>
+    <stop offset=".5" stop-color="#5ff2d6"/><stop offset=".78" stop-color="#2ad1b6"/><stop offset="1" stop-color="#2ad1b6" stop-opacity=".25"/>
+  </linearGradient>
+  <linearGradient id="filet" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1080" y2="0">
+    <stop offset="0" stop-color="#24504a" stop-opacity="0"/><stop offset=".2" stop-color="#2a8f80"/>
+    <stop offset=".5" stop-color="#3ad0b8"/><stop offset=".8" stop-color="#2a8f80"/><stop offset="1" stop-color="#24504a" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="vert" gradientUnits="userSpaceOnUse" x1="300" y1="0" x2="780" y2="0">
+    <stop offset="0" stop-color="#8be23a" stop-opacity="0"/><stop offset=".5" stop-color="#8be23a"/><stop offset="1" stop-color="#8be23a" stop-opacity="0"/>
+  </linearGradient>
+  <linearGradient id="chrome" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#f4f7f8"/><stop offset=".2" stop-color="#8d989c"/><stop offset=".45" stop-color="#e9eef0"/>
+    <stop offset=".7" stop-color="#5b666b"/><stop offset="1" stop-color="#d5dde0"/>
+  </linearGradient>
+  <linearGradient id="pied" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#030807" stop-opacity="0"/><stop offset=".45" stop-color="#030807" stop-opacity=".82"/><stop offset="1" stop-color="#010403" stop-opacity=".96"/>
+  </linearGradient>
+  <radialGradient id="lueur"><stop offset="0" stop-color="#8be23a" stop-opacity=".42"/><stop offset=".45" stop-color="#8be23a" stop-opacity=".14"/><stop offset="1" stop-color="#8be23a" stop-opacity="0"/></radialGradient>
+  <pattern id="trame" width="18" height="31.2" patternUnits="userSpaceOnUse">
+    <path d="M9 0 L18 5.2 L18 15.6 L9 20.8 L0 15.6 L0 5.2 Z M9 20.8 L9 31.2" fill="none" stroke="#3ad0b8" stroke-width=".7" opacity=".1"/>
+  </pattern>
+</defs>
+<rect y="300" width="1080" height="240" fill="url(#pied)"/>
+<path d="M 40,478 H 1040" stroke="url(#filet)" stroke-width="1.2" opacity=".7"/>
+<path d="M -20,300 Q 540,-40 1100,300 L 1100,420 Q 540,80 -20,420 Z" fill="#06221c" opacity=".88"/>
+<path d="M -20,300 Q 540,-40 1100,300 L 1100,420 Q 540,80 -20,420 Z" fill="url(#trame)"/>
+<path d="M -20,318 Q 540,-14 1100,318 L 1100,330 Q 540,0 -20,330 Z" fill="#bff7ea" opacity=".06"/>
+<ellipse cx="540" cy="190" rx="240" ry="140" fill="url(#lueur)"/>
+<path d="M -20,300 Q 540,-40 1100,300" fill="none" stroke="url(#chrome)" stroke-width="12"/>
+<path d="M -20,420 Q 540,80 1100,420" fill="none" stroke="url(#chrome)" stroke-width="10"/>
+<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="#1c8f80" stroke-width="12" filter="url(#haloLarge)" opacity=".85"/>
+<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="url(#neon)" stroke-width="4" filter="url(#halo)"/>
+<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="url(#neon)" stroke-width="2.2"/>
+<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="#e6fff9" stroke-width=".9" opacity=".8"/>
+<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="#f2fffb" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="0 180 50 330 30 2000" filter="url(#halo)"/>
+<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="#f2fffb" stroke-width="2" stroke-linecap="round" stroke-dasharray="0 180 50 330 30 2000"/>
+<path d="M -20,408 Q 540,64 1100,408" fill="none" stroke="#1c8f80" stroke-width="12" filter="url(#haloLarge)" opacity=".85"/>
+<path d="M -20,408 Q 540,64 1100,408" fill="none" stroke="url(#neon)" stroke-width="4" filter="url(#halo)"/>
+<path d="M -20,408 Q 540,64 1100,408" fill="none" stroke="url(#neon)" stroke-width="2.2"/>
+<path d="M -20,408 Q 540,64 1100,408" fill="none" stroke="#e6fff9" stroke-width=".9" opacity=".8"/>
+
+
+</svg>

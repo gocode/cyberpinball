@@ -1,0 +1,87 @@
+[
+  {
+    "gdiName": "\\\\.\\DISPLAY18",
+    "friendlyName": "PL2294H",
+    "monitorDescription": "Generic PnP Monitor",
+    "devicePath": "\\\\?\\DISPLAY#IVM563B#8&20834467&0&UID257#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}",
+    "bounds": {
+      "width": 1920,
+      "height": 1080,
+      "x": -1920,
+      "y": 0
+    },
+    "rotation": 0,
+    "primary": false,
+    "scale": 1,
+    "edid": {
+      "manufacturer": "IVM",
+      "productCode": 22075,
+      "serialNumber": 1084,
+      "widthCm": 48,
+      "heightCm": 27,
+      "imageMm": {
+        "width": 476,
+        "height": 268
+      },
+      "serialText": "1172903211084",
+      "monitorName": "PL2294H"
+    },
+    "containerId": "{A8F3BDCF-1F27-41AF-94C1-3AB26DBFE791}"
+  },
+  {
+    "gdiName": "\\\\.\\DISPLAY1",
+    "friendlyName": "",
+    "monitorDescription": "Generic PnP Monitor",
+    "devicePath": "\\\\?\\DISPLAY#AUO139D#5&253a7f23&0&UID4357#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}",
+    "bounds": {
+      "width": 1920,
+      "height": 1080,
+      "x": 0,
+      "y": 0
+    },
+    "rotation": 0,
+    "primary": true,
+    "scale": 1,
+    "edid": {
+      "manufacturer": "AUO",
+      "productCode": 5021,
+      "serialNumber": 0,
+      "widthCm": 38,
+      "heightCm": 21,
+      "imageMm": {
+        "width": 381,
+        "height": 214
+      }
+    },
+    "containerId": "{00000000-0000-0000-FFFF-FFFFFFFFFFFF}"
+  },
+  {
+    "gdiName": "\\\\.\\DISPLAY17",
+    "friendlyName": "PL2294H",
+    "monitorDescription": "Generic PnP Monitor",
+    "devicePath": "\\\\?\\DISPLAY#IVM563B#8&20834467&0&UID256#{e6f07b5f-ee97-4a90-b076-33f57bf4eaa7}",
+    "bounds": {
+      "width": 1920,
+      "height": 1080,
+      "x": 1920,
+      "y": 7
+    },
+    "rotation": 0,
+    "primary": false,
+    "scale": 1,
+    "edid": {
+      "manufacturer": "IVM",
+      "productCode": 22075,
+      "serialNumber": 1937,
+      "widthCm": 48,
+      "heightCm": 27,
+      "imageMm": {
+        "width": 476,
+        "height": 268
+      },
+      "serialText": "1172903211937",
+      "monitorName": "PL2294H"
+    },
+    "containerId": "{04C7EFD9-B50A-4582-904E-430D40566C16}"
+  }
+]

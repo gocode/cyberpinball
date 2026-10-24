@@ -1,0 +1,27 @@
+{
+  "components": [
+    {
+      "id": "vpx",
+      "kind": "emulator",
+      "distribution": "automatic",
+      "name": "Visual Pinball X",
+      "homepage": "https://github.com/vpinball/vpinball/releases",
+      "version": "10.8.1-5436",
+      "channel": "préversion",
+      "platform": "windows-x64",
+      "variant": "BGFX",
+      "installDir": "emulators/vpx",
+      "url": "https://github.com/vpinball/vpinball/releases/download/v10.8.1-5436-af26b2d93/VPinballX_BGFX-10.8.1-5436-af26b2d93-windows-x64-Release.zip",
+      "sha256": "0a5973ea4597c7819583c7379ebe99dee12af4d526a54438f8c121796cc68232",
+      "size": 172566470,
+      "executablePattern": "^VPinballX.*64\\.exe$",
+      "adapterSettings": {
+        "displayIdFormat": "name",
+        "enabledPlugins": ["PinMAME", "AlphaDMD", "B2S", "ScoreView", "PUP", "AltSound", "Serum", "VNI", "FlexDMD", "WMP"]
+      },
+      "license": "GPLv3+ pour la majorité des fichiers, licence dérivée de MAME pour le reste : redistribution gratuite, sans usage commercial, avec la licence jointe.",
+      "source": "https://github.com/vpinball/vpinball/tree/af26b2d93",
+      "sourceCommit": "af26b2d93"
+    }
+  ]
+}

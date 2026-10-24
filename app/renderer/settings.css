@@ -1,0 +1,550 @@
+:root {
+  /* Noms historiques de cette feuille, rebranchés sur le thème (theme.css). */
+  --bg: var(--void);
+  --panel: var(--surface);
+  --panel-2: var(--surface-raised);
+  --line: var(--line-soft);
+  --quiet: var(--ink-muted);
+  --accent: var(--signal);
+  --accent-2: var(--meta);
+  --ok: var(--signal);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  background: var(--fond-ambiance);
+  background-color: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  overflow: hidden;
+  user-select: none;
+}
+
+/* Listes longues (surtout en portrait) : barre discrète, comme la gestion des tables. */
+::-webkit-scrollbar {
+  width: 0.8vmin;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 0.4vmin;
+  background: var(--line-strong);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+#root {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  height: 100%;
+  padding: 3vmin 4vmin 2.5vmin;
+  gap: 2.5vmin;
+  /* Les mises en page portrait suivent la racine, pivotée ou non (voir plus bas). */
+  container-type: size;
+}
+
+/*
+ * Écran du playfield couché et tourné, Windows resté en paysage : la mise en page
+ * pivote dans les dimensions vues du joueur (largeur et hauteur échangées à 90° et
+ * 270°). La fenêtre garde les bornes de l'écran ; la souris et la molette suivent
+ * la rotation. data-rotation est posé par le rendu, d'après le processus principal.
+ */
+html[data-rotation='90'] {
+  --turned: 90deg;
+  --turned-width: 100vh;
+  --turned-height: 100vw;
+}
+
+html[data-rotation='180'] {
+  --turned: 180deg;
+  --turned-width: 100vw;
+  --turned-height: 100vh;
+}
+
+html[data-rotation='270'] {
+  --turned: 270deg;
+  --turned-width: 100vh;
+  --turned-height: 100vw;
+}
+
+html[data-rotation='90'] #root,
+html[data-rotation='180'] #root,
+html[data-rotation='270'] #root {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: var(--turned-width);
+  height: var(--turned-height);
+  transform: translate(-50%, -50%) rotate(var(--turned));
+}
+
+/* ---------- En-tête ---------- */
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 4vmin;
+}
+
+/* Marque : capitales très espacées et larges, PINBALL en vert signal. */
+.brand {
+  font-size: 1.9vmin;
+  font-weight: 300;
+  font-stretch: 125%;
+  letter-spacing: 0.42em;
+  color: var(--ink);
+}
+
+.brand .pin {
+  color: var(--signal);
+}
+
+h1 {
+  margin: 0.6vmin 0 0;
+  font-size: 5vmin;
+  font-weight: 600;
+}
+
+.scope {
+  font-size: 2.6vmin;
+  color: var(--meta);
+}
+
+.file {
+  margin-top: 0.6vmin;
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 1.85vmin;
+  color: var(--quiet);
+  word-break: break-all;
+}
+
+.file-note {
+  margin-left: 1.5vmin;
+  white-space: nowrap;
+  color: var(--warning);
+  font-family: var(--font-ui);
+}
+
+.head-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1vmin;
+}
+
+.tabs {
+  display: flex;
+  gap: 1vmin;
+  padding: 0.6vmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.8vmin;
+  background: var(--panel);
+}
+
+/* Contours tracés à l'intérieur de l'élément (outline-offset négatif) : tracés autour, une liste qui défile les rognerait à gauche, en haut ou en bas. */
+.tabs.focused {
+  outline: 0.4vmin solid var(--accent);
+  outline-offset: -0.4vmin;
+}
+
+/* Onglets : capitales espacées ; l'onglet ouvert est un aplat vert signal. */
+.tab {
+  border: 0;
+  background: transparent;
+  padding: 1.2vmin 3vmin;
+  border-radius: 0.5vmin;
+  font-size: 2.2vmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--quiet);
+}
+
+.tab.active {
+  background: var(--accent);
+  color: var(--on-signal);
+  box-shadow: 0 0 1.8vmin var(--signal-haze);
+}
+
+.vpx {
+  font-size: 1.85vmin;
+  color: var(--quiet);
+}
+
+/* ---------- Corps : liste et détail ---------- */
+
+.body {
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  gap: 3vmin;
+  min-height: 0;
+}
+
+@container (orientation: portrait) {
+  .body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1.6fr) minmax(0, 1fr);
+  }
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.crumb {
+  align-self: flex-start;
+  margin-bottom: 1.2vmin;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font-size: 2.2vmin;
+  padding: 0;
+}
+
+.list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0 1vmin 0 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.list li.group {
+  margin: 2.4vmin 0 0.8vmin;
+  font-size: 2vmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.list li.group:first-child {
+  margin-top: 0;
+}
+
+.list li.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 2vmin;
+  padding: 1.2vmin 2vmin;
+  border-radius: 0.5vmin;
+  font-size: 2.4vmin;
+  cursor: pointer;
+}
+
+.list li.row:hover {
+  background: var(--panel);
+}
+
+.list li.row.selected {
+  background: var(--signal-wash);
+  outline: 0.35vmin solid var(--accent);
+  outline-offset: -0.35vmin;
+}
+
+.list li.empty {
+  color: var(--quiet);
+  font-size: 2.2vmin;
+}
+
+.name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4vmin 1.4vmin;
+  min-width: 0;
+}
+
+.sub {
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 1.85vmin;
+  color: var(--quiet);
+}
+
+.value {
+  flex-shrink: 0;
+  max-width: 45%;
+  text-align: right;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row.section .value {
+  font-weight: 400;
+  color: var(--quiet);
+}
+
+.badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.8vmin;
+}
+
+.badge {
+  padding: 0.2vmin 1vmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.3vmin;
+  font-size: 1.85vmin;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.badge.owned {
+  border-color: rgba(139, 226, 58, 0.45);
+  background: var(--signal-wash);
+  color: var(--accent);
+}
+
+.badge.table {
+  border-color: rgba(95, 180, 207, 0.45);
+  background: rgba(95, 180, 207, 0.1);
+  color: var(--accent-2);
+}
+
+.badge.modified {
+  border-color: rgba(242, 179, 61, 0.45);
+  background: rgba(242, 179, 61, 0.1);
+  color: var(--warning);
+}
+
+.badge.locked {
+  background: var(--panel);
+  color: var(--quiet);
+}
+
+.badge.warning {
+  border-color: rgba(242, 179, 61, 0.45);
+  background: rgba(242, 179, 61, 0.1);
+  color: var(--warning);
+}
+
+.detail {
+  padding: 2.4vmin 3vmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.8vmin;
+  background: var(--panel);
+  box-shadow: var(--halo-panel);
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.detail h2 {
+  margin: 0 0 1.4vmin;
+  font-size: 3.2vmin;
+  font-weight: 600;
+}
+
+.help {
+  margin: 0 0 1.2vmin;
+  font-size: 2.2vmin;
+  line-height: 1.45;
+}
+
+.owned-note {
+  margin: 0 0 1.4vmin;
+  padding: 1.2vmin 1.6vmin;
+  border-radius: 0.5vmin;
+  background: var(--signal-wash);
+  color: var(--accent);
+  font-size: 2vmin;
+  line-height: 1.4;
+}
+
+dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.8vmin 2vmin;
+  margin: 1.6vmin 0;
+  font-size: 2vmin;
+}
+
+dt {
+  color: var(--quiet);
+}
+
+dd {
+  margin: 0;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.original {
+  margin-top: 1.6vmin;
+  padding-top: 1.4vmin;
+  border-top: 1px solid var(--line);
+  font-size: 1.85vmin;
+  color: var(--quiet);
+}
+
+.original-title {
+  margin-bottom: 0.6vmin;
+  font-size: 1.85vmin;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.original p {
+  margin: 0 0 0.6vmin;
+  line-height: 1.4;
+}
+
+footer {
+  text-align: center;
+  font-size: 2vmin;
+  color: var(--quiet);
+}
+
+.notice {
+  position: absolute;
+  left: 50%;
+  bottom: 7vmin;
+  transform: translateX(-50%);
+  max-width: 80%;
+  padding: 1.4vmin 3vmin;
+  border-radius: 0.5vmin;
+  font-size: 2.2vmin;
+  font-weight: 600;
+  background: var(--panel-2);
+  box-shadow: 0 1vmin 4vmin rgba(0, 0, 0, 0.6);
+}
+
+.notice.ok {
+  color: var(--ok);
+  outline: 0.25vmin solid var(--ok);
+  outline-offset: -0.25vmin;
+}
+
+.notice.error {
+  color: var(--warning);
+  outline: 0.25vmin solid var(--warning);
+  outline-offset: -0.25vmin;
+}
+
+/* ---------- Fenêtre de modification ---------- */
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--scrim-strong);
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: min(90%, 90vmin);
+  max-height: 80%;
+  padding: 3vmin 4vmin;
+  border-radius: 0.8vmin;
+  background: var(--panel);
+  outline: 1px solid var(--line-strong);
+  outline-offset: -1px;
+  box-shadow: var(--halo-panel);
+}
+
+.panel h2 {
+  margin: 0 0 2vmin;
+  font-size: 3.6vmin;
+  font-weight: 600;
+}
+
+.choices {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  min-height: 0;
+}
+
+.choices li {
+  display: flex;
+  justify-content: space-between;
+  gap: 2vmin;
+  padding: 1.3vmin 2vmin;
+  border-radius: 0.5vmin;
+  font-size: 2.6vmin;
+  cursor: pointer;
+}
+
+.choices li:hover {
+  background: var(--panel-2);
+}
+
+.choices li.selected {
+  background: var(--signal-wash);
+  outline: 0.35vmin solid var(--accent);
+  outline-offset: -0.35vmin;
+  font-weight: 700;
+}
+
+.choices .note {
+  color: var(--quiet);
+  font-size: 1.85vmin;
+  font-weight: 400;
+  align-self: center;
+}
+
+.wheel {
+  max-height: 52vmin;
+}
+
+input.text {
+  width: 100%;
+  padding: 1.4vmin 2vmin;
+  border: 0;
+  border-radius: 0.5vmin;
+  background: var(--surface-sunken);
+  color: var(--ink);
+  font-family: 'Cascadia Mono', Consolas, monospace;
+  font-size: 2.8vmin;
+  outline: 0.3vmin solid var(--accent);
+  outline-offset: -0.3vmin;
+  user-select: text;
+}
+
+.buttons {
+  display: flex;
+  gap: 1.6vmin;
+  margin-top: 1vmin;
+}
+
+.buttons button {
+  padding: 1.2vmin 2.6vmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.5vmin;
+  background: var(--panel-2);
+  font-size: 2.2vmin;
+  font-stretch: 112%;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.buttons button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-signal);
+  font-weight: 600;
+}

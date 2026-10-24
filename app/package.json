@@ -1,0 +1,12 @@
+{
+  "name": "@cyberpinball/app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Application Electron de Cyber Pinball : assistant d'écrans (prototype du jalon 1).",
+  "main": "dist/main.js",
+  "dependencies": {
+    "@cyberpinball/core": "0.1.0",
+    "@cyberpinball/win-displays": "0.1.0",
+    "@cyberpinball/installer": "0.1.0"
+  }
+}

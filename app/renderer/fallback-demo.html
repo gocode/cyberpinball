@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+    <title>Cyber Pinball : replis intégrés</title>
+    <!--
+      Démonstration des replis (fallback.js). Ouverte seule, c'est une galerie de tous
+      les composants à plusieurs proportions (← → : jeu suivant, A : animé ou figé).
+      Avec ?composant=…, un seul composant occupe la fenêtre : c'est ce que capture
+      docs/demo-replis.ps1. Paramètres : composant (backglass, dmd, fulldmd, topper,
+      wheel, playfield, loading, ingame), jeu (numéro de l'exemple), anime=0 (figé),
+      style (logo : chrome, neon, arcade), page (afficheur : page de départ),
+      rotation (90, 180, 270 : vue pivotée).
+    -->
+    <link rel="stylesheet" href="fallback.css" />
+    <link rel="stylesheet" href="fallback-demo.css" />
+  </head>
+  <body>
+    <main id="stage"></main>
+    <script src="fallback.js"></script>
+    <script src="fallback-demo.js"></script>
+  </body>
+</html>

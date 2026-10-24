@@ -1,0 +1,14 @@
+<!-- @dsCard height=288 -->
+<!doctype html><html lang="fr"><head><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira:wdth,wght@50..125,100..900&display=swap"><meta charset="utf-8"><title>Cyber Pinball</title><style>
+:root { --void:#030807; --ink:#e6f0ec; --signal:#8be23a }
+*{box-sizing:border-box}html,body{margin:0;width:960px;height:288px;overflow:hidden;background:var(--void)}
+/* Bannière : l'image (bille et flippers sarcelle) à droite, la marque sur sa partie sombre à gauche.
+   composants.mjs incorpore l'image dans la page générée ; ouverte seule, la page la lit dans ../assets. */
+.cover{position:relative;width:960px;height:288px;overflow:hidden;color:var(--ink);font-family:Saira,"Segoe UI",sans-serif;
+  background:var(--void) url('../assets/fond-banniere.webp') right center / auto 100% no-repeat}
+.cover::after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,var(--void) 0%,rgba(3,8,7,.85) 30%,transparent 55%);pointer-events:none}
+.cover-copy{position:absolute;z-index:1;left:48px;top:50%;transform:translateY(-50%)}
+.cover h1{margin:0;font-size:44px;line-height:1.35;font-weight:300;font-stretch:125%;letter-spacing:.28em;text-transform:uppercase}
+.cover h1 span{display:block;color:var(--signal)}
+.cover p{margin:20px 0 0;font-size:20px;font-weight:400;letter-spacing:.06em;color:var(--ink)}
+</style></head><body><main class="cover"><div class="cover-copy"><h1>Cyber <span>Pinball</span></h1><p>Next pinball generation</p></div></main></body></html>

@@ -1,0 +1,1058 @@
+// Menu des tables : une fenêtre par écran de la borne, pilotée aux boutons.
+// Lancer une table : écran de chargement avec les commandes, VPX en -Play par-dessus
+// les fenêtres du menu (qui restent derrière lui, en fond de partie), puis retour au
+// menu avec reprise du premier plan.
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { app, globalShortcut, ipcMain, session, type BrowserWindow, type Input } from 'electron';
+import {
+  CONFIG_KEY,
+  WIZARD_STEPS,
+  buttonKeys,
+  buttonProblems,
+  formatManualEdit,
+  gameKeys,
+  keyLabel,
+  navigationKeys,
+  withoutButtonKeys,
+  keepManualEdits,
+  layoutOf,
+  loadCabinet,
+  readInfo,
+  readTextIfExists,
+  recordPlay,
+  ROLES,
+  saveCabinet,
+  scanTables,
+  cabinetZones,
+  screenSurfaces,
+  zoneRect,
+  mediaErrorsFile,
+  recordMediaError as logMediaError,
+  MenuMedias,
+  isServedMedia,
+  loadMenuMediaSettings,
+  mediaPathFromUrl,
+  menuAudioOutput,
+  menuSound,
+  AttractMode,
+  attractMemory,
+  momentScreen,
+  pickAttractTable,
+  occupiedRoles,
+  saveMenuMediaSettings,
+  tableMediaVolume,
+  type MenuMediaSettings,
+  type MenuMoment,
+  type RoleRect,
+  type AncillaryRoleId,
+  type CabinetButtons,
+  type ConfigurationSelection,
+  type ManualEdit,
+  type ObservedDisplay,
+  type RoleId,
+  type Rotation,
+  type ScreenSurface,
+  type ScreenZone,
+  type TableEntry,
+  type MediaTarget,
+  type MediaType,
+} from '@cyberpinball/core';
+import { bringToFront, foregroundWindow, listWindows, visibleWindowsOf } from '@cyberpinball/win-displays';
+import { observedDisplays } from './displays';
+import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, windowRect } from './offscreen';
+import { installVpx, vpxArchivePresent } from './install-vpx';
+import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
+import { createLibrary, type SystemItem, type UiAction } from './library';
+import { locations, vpxInstall, vpxProfile } from './paths';
+import { activeVpxIni, syncConfiguration } from './vpx-ini';
+import { createConfigurationsMenu } from './configurations-menu';
+import { coverDisplay } from './cover-display';
+import { allowDesktop, hideTaskbars, nameScreen, relaunchCovered, restoreTaskbars, takeCoverIncidents } from './screen-guard';
+import { describeReset, resetButtons } from './buttons-reset';
+import { menuRotation, openSettings } from './settings';
+import { serveMedias } from './media-protocol';
+import { createMenuSettings } from './menu-settings';
+import { createUpdatesMenu } from './updates-menu';
+
+/**
+ * Touches du menu : celles des boutons de la borne (étape « Boutons » de
+ * l'assistant, sinon les touches par défaut des encodeurs), les flèches, Entrée et
+ * Échap d'un clavier, et H et R tant qu'aucun bouton ne les envoie.
+ */
+function menuKeysFor(buttons: CabinetButtons | undefined) {
+  return { ...navigationKeys(buttons), help: withoutButtonKeys(['KeyH', 'F1'], buttons), settings: withoutButtonKeys(['KeyR'], buttons) };
+}
+
+/** Boutons de la borne, relus au démarrage du menu (l'étape « Boutons » relance l'application). */
+let buttons: CabinetButtons | undefined;
+let KEYS = menuKeysFor(undefined);
+
+/** Aide-mémoire « Dans le menu », avec les touches de cette borne. */
+function menuKeys(): [string, string][] {
+  const keys = buttonKeys(buttons);
+  const or = (codes: string[]) => codes.map(keyLabel).join(' ou ');
+  return [
+    ['Choisir une table', `Flippers (${keyLabel(keys.leftFlipper)} / ${keyLabel(keys.rightFlipper)}) ou flèches`],
+    ['Fiche de la table (Jouer, Modifier…)', `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`],
+    ...(KEYS.help.length ? [['Afficher les commandes', or(KEYS.help)] as [string, string]] : []),
+    ['Réglages de VPX', `${KEYS.settings.length ? `${or(KEYS.settings)}, ou ` : ''}Exit puis « Réglages de VPX »`],
+    ['Menu et configuration (tables, réglages, boutons, écrans, Bureau Windows, quitter)', `Exit (${or(KEYS.exit)}), Tab, ou clic sur ⚙ en haut à droite`],
+    ['Arrêter une partie bloquée', 'Ctrl+Maj+K'],
+  ];
+}
+
+/** Pied du menu : chaque commande est aussi cliquable (code de la touche équivalente). */
+function menuFooter(): [string, string?][] {
+  return [
+    ['Flippers : choisir'],
+    ['Start : fiche', KEYS.confirm[0]],
+    ...(KEYS.help.length ? [[`${keyLabel(KEYS.help[0])} : commandes`, KEYS.help[0]] as [string, string]] : []),
+    ...(KEYS.settings.length ? [[`${keyLabel(KEYS.settings[0])} : réglages`, KEYS.settings[0]] as [string, string]] : []),
+    ['Exit : menu', KEYS.exit[0]],
+  ];
+}
+
+const FORCE_STOP_SHORTCUT = 'Control+Shift+K';
+const PLAYFIELD_TITLE = 'Cyber Pinball — Playfield';
+
+type Phase = 'menu' | 'loading' | 'playing' | 'message' | 'confirmQuit' | 'library';
+
+interface Message {
+  title: string;
+  lines: string[];
+  /** Ce que fait Start sur ce message. */
+  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons';
+}
+
+interface State {
+  phase: Phase;
+  index: number;
+  help: boolean;
+  message?: Message;
+  /** Constat bref en haut du menu (configuration de la borne changée), effacé après quelques secondes. */
+  banner?: string;
+}
+
+const loc = locations();
+const { profile } = vpxProfile(loc);
+let tables: TableEntry[] = [];
+let windows = new Map<RoleId, BrowserWindow>();
+/** Rotation des fenêtres du playfield, pour un joueur placé au bord des flippers. */
+let rotation: Rotation = 0;
+let state: State = { phase: 'menu', index: 0, help: false };
+/** Rôles dessinés par chaque fenêtre : le sien (playfield) et ceux de ses zones. */
+let windowRoles = new Map<RoleId, RoleId[]>();
+/** Zone de chaque rôle à l'écran, en pixels physiques : pour savoir lesquels VPX occupe pendant la partie. */
+let roleRects: RoleRect[] = [];
+/** Rôles que VPX occupe pendant la partie (sa fenêtre passe devant la nôtre) : figés, quel que soit le réglage. */
+let occupied = new Set<RoleId>();
+let occupiedWatch: NodeJS.Timeout | undefined;
+/** Relecture des fenêtres pendant la partie : B2S, DMD et PuP s'ouvrent après la fenêtre de jeu. */
+const OCCUPIED_CHECK_MS = 2000;
+
+// Médias des jeux (docs/recherche/medias.md, § 5) : résolus au démarrage du menu, quand
+// le modèle de la borne et la rotation du playfield sont connus.
+let medias: MenuMedias | undefined;
+let mediaSettings: MenuMediaSettings = loadMenuMediaSettings(loc.dataDir);
+const mediaErrorLog = mediaErrorsFile(path.join(loc.dataDir, 'logs'));
+/** Tables voisines dont les médias sont préchargés par chaque fenêtre. */
+const PRELOAD_OFFSETS = [1, -1, 2, -2];
+/** Nom Windows de la sortie audio du menu (celle du fronton), relu au démarrage du menu. */
+let audioOutput: string | undefined;
+/** Numéro du lancement en cours : le son de lancement est joué une fois par lancement. */
+let launchCount = 0;
+
+/**
+ * Mode attente (§ 5.2) : après le délai réglé sans bouton, une table tirée au hasard toutes
+ * les N secondes, avec ses médias, au volume réduit ou coupé. Le premier bouton (ou clic) y
+ * met fin sans rien faire d'autre : la sélection reste celle d'avant, rien n'est lancé.
+ */
+const attract = new AttractMode({
+  delayMs: () => mediaSettings.attractDelay * 1000,
+  intervalMs: () => mediaSettings.attractInterval * 1000,
+  onEnter: () => showAttractTable(),
+  onNext: () => showAttractTable(),
+});
+/** Table montrée en attente, et les dernières montrées (évitées au tirage). */
+let attractIndex: number | undefined;
+let attractRecent: number[] = [];
+
+function showAttractTable(): void {
+  if (!tables.length) return;
+  attractIndex = pickAttractTable(tables.length, [state.index, ...attractRecent]);
+  attractRecent = [...attractRecent, attractIndex].slice(-attractMemory(tables.length));
+  broadcast();
+}
+
+/** Premier bouton en attente : retour au menu tel qu'il était, le bouton n'a pas d'autre effet. */
+function leaveAttract(): boolean {
+  attractIndex = undefined;
+  attractRecent = [];
+  broadcast();
+  return true;
+}
+
+/** Table montrée en mode attente, s'il est en cours. */
+function attractTable(): TableEntry | undefined {
+  return attract.active && attractIndex !== undefined ? tables[attractIndex] : undefined;
+}
+
+// Fiche, ajout, médecin et suppression des tables (library.ts).
+const library = createLibrary({
+  root: loc.root,
+  dataDir: loc.dataDir,
+  vpxExe: () => vpxInstall(loc)?.exe,
+  tables: () => tables,
+  reload: (file) => reloadTables(file),
+  enter: () => (state = { ...state, phase: 'library', help: false, message: undefined }),
+  leave: () => (state = tables.length ? { ...state, phase: 'menu' } : { ...state, phase: 'message', message: noTables() }),
+  play: (table) => {
+    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
+    // Sans opérateur, la partie s'arrête seule après 10 s (et ne compte pas dans les statistiques).
+    void play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined);
+  },
+  tableSettings: (table) => openVpxSettings(table),
+  tryTable: async (table, tableIni) => {
+    const refused = refuseOffscreen('Essayer la table dans VPX');
+    if (refused) return { ok: false, message: refused };
+    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
+    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, { tableIni });
+    return report?.result;
+  },
+  vpxLogFile: () => {
+    const install = vpxInstall(loc);
+    return install ? path.join(vpxPrefDir(install.version), 'vpinball.log') : undefined;
+  },
+  quit: () => void quit(),
+  keys: () => KEYS,
+  windows: () => windows,
+  broadcast: () => broadcast(),
+});
+// Configurations de la borne : la configuration active est nommée dans le sous-menu.
+const configurations = createConfigurationsMenu({
+  loc,
+  displays: () => observedDisplays(),
+  // Son « Retour » ramène au sous-menu « Configuration de la borne », d'où l'on vient.
+  library: { ...library, openSystem: () => openCabinetSetup() },
+  relaunch: (newConfiguration) => (newConfiguration ? relaunchWizard(undefined, true) : relaunchMenu()),
+});
+// Le menu système (Exit) donne aussi accès aux réglages de VPX et à la configuration de la borne.
+// Les démonstrations désignent les entrées par leur libellé (data-label), pas par leur rang.
+library.systemItems.splice(
+  1,
+  0,
+  { label: 'Réglages de VPX', detail: 'Son, vue, performances, pour toutes les tables', run: () => openVpxSettings() },
+  { label: 'Configuration de la borne', detail: 'Boutons, écrans, playfield, disposition, son : chaque étape seule, ou l’assistant complet', run: () => openCabinetSetup() },
+);
+
+/**
+ * Sous-menu « Configuration de la borne » : chaque étape de l'assistant se refait
+ * seule (WIZARD_STEPS, core) et revient au menu, enregistrée ou non ; puis l'assistant
+ * complet, les touches par défaut et les configurations de la borne.
+ */
+function cabinetSetupItems(): SystemItem[] {
+  return [
+    ...WIZARD_STEPS.map((step) => ({ label: step.label, detail: step.detail, run: () => relaunchWizard(step.flag) })),
+    { label: 'Assistant complet', detail: 'Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son', run: () => relaunchWizard() },
+    { label: 'Touches par défaut des encodeurs', detail: 'Si les boutons ne répondent plus comme prévu (aussi à la souris)', run: () => resetButtonsFromMenu() },
+    configurations.systemItem,
+  ];
+}
+
+function openCabinetSetup(): void {
+  library.openCustom(() => ({
+    heading: 'Configuration de la borne',
+    lead: 'Chaque étape se refait seule, puis revient au menu des tables. « Quitter sans enregistrer » (ou Exit maintenu 2 s) en sort sans rien changer.',
+    sections: [],
+    actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, run: i.run })), { label: 'Retour', run: () => library.openSystem() }],
+    back: () => library.openSystem(),
+  }));
+}
+// Médias, son et attente (musique, volumes, mode attente, médias pendant la partie) : un écran à part.
+library.systemItems.splice(
+  library.systemItems.length - 1,
+  0,
+  createMenuSettings({
+    library,
+    settings: () => mediaSettings,
+    save: (next) => {
+      mediaSettings = next;
+      attract.reschedule();
+      try {
+        saveMenuMediaSettings(loc.dataDir, mediaSettings);
+      } catch (error) {
+        console.log(`Médias : réglage non enregistré (${(error as Error).message}).`);
+      }
+      broadcast();
+    },
+    output: () => audioOutput,
+  }),
+);
+// Mise à jour de Cyber Pinball, à la demande seulement : recherche, nouveautés, installation.
+const updates = createUpdatesMenu({
+  loc,
+  version: app.getVersion(),
+  exeDir: path.dirname(process.execPath),
+  silent: OFFSCREEN,
+  library,
+  broadcast: () => broadcast(),
+  quit: () => quit(),
+});
+library.systemItems.splice(library.systemItems.length - 1, 0, updates.systemItem);
+// Juste avant « Quitter Cyber Pinball ».
+library.systemItems.splice(library.systemItems.length - 1, 0, {
+  label: 'Bureau Windows',
+  detail: 'Réduit Cyber Pinball ; son bouton dans la barre des tâches le rouvre',
+  run: () => showDesktop(),
+});
+
+/**
+ * Menu système > « Bureau Windows » : toutes les fenêtres se réduisent, le bureau et la
+ * barre des tâches reviennent. Le bouton du playfield dans la barre des tâches (ou Alt+Tab)
+ * rouvre le menu sur tous les écrans (restoreFromDesktop).
+ */
+function showDesktop(): void {
+  library.leave();
+  onDesktop = true;
+  allowDesktop('Bureau Windows');
+  for (const win of windows.values()) win.minimize();
+}
+
+/** Fenêtres réduites par « Bureau Windows », en attente du retour du playfield. */
+let onDesktop = false;
+
+/** Le playfield revient du bureau : les autres écrans le suivent, le menu reprend la main. */
+function restoreFromDesktop(): void {
+  if (!onDesktop) return;
+  onDesktop = false;
+  allowDesktop(undefined);
+  for (const win of windows.values()) if (win.isMinimized()) win.restore();
+  windows.get('playfield')?.focus();
+}
+
+/** Menu système > « Touches par défaut des encodeurs » : le menu suit aussitôt ces touches. */
+function resetButtonsFromMenu(): void {
+  const reset = resetButtons();
+  if (!reset) return;
+  buttons = reset.cabinet.buttons;
+  KEYS = menuKeysFor(buttons);
+  library.leave();
+  state = { ...state, phase: 'message', message: { title: 'Touches par défaut des encodeurs remises', lines: describeReset(reset) } };
+  broadcast();
+}
+
+export function startFrontend(): void {
+  // Chromium ne donne le nom des sorties audio, et n'autorise setSinkId (sortie du fronton
+  // pour la musique du menu), qu'avec ces permissions ; les pages du menu sont locales.
+  session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media' || permission === 'speaker-selection');
+  ipcMain.on('ready', () => broadcast());
+  ipcMain.on('media-error', (_event, error: MediaErrorReport) => recordMediaError(error));
+  ipcMain.on('action', (_event, action: UiAction) => {
+    // Un clic en mode attente y met fin, sans autre effet.
+    if (attract.activity()) return void leaveAttract();
+    if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
+    else if (action.type === 'config') openConfig();
+    else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
+      if (action.offset === 0) library.openSheet(tables[state.index]!);
+      else state = { ...state, index: (state.index + action.offset + tables.length * 10) % tables.length };
+      broadcast();
+    } else library.handleAction(action);
+  });
+
+  const install = vpxInstall(loc);
+  const { assignments, problem, manual, choose, selection } = syncScreens();
+  tables = loc.root ? scanTables(layoutOf(loc.root).tables) : [];
+  // Configuration à choisir : le menu s'ouvre droit sur l'écran principal, avec les boutons de la dernière utilisée.
+  const cabinet = loadCabinet(loc.dataDir);
+  // Rotation d'après l'écran du playfield tel que Windows le décrit maintenant : une
+  // orientation changée hors de l'assistant fait aussi tourner le menu.
+  rotation = menuRotation(choose ? undefined : cabinet, choose ? undefined : assignments.playfield);
+  buttons = cabinet?.buttons;
+  KEYS = menuKeysFor(buttons);
+  audioOutput = choose ? undefined : menuAudioOutput(cabinet)?.friendlyName;
+  medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, onChange: () => broadcast() });
+  serveMedias(() => medias!.allowedDirs(tables));
+  app.on('before-quit', () => {
+    medias?.save();
+    attract.dispose();
+  });
+
+  openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
+  for (const f of selection?.findings ?? []) console.log(`Configuration de la borne : ${f.message}`);
+  if (selection?.previous && selection.configuration) showBanner(`Configuration « ${selection.configuration.name} » reconnue (avant : « ${selection.previous.name} »).`);
+  // Après une mise à jour : la nouvelle version est-elle là ?
+  const updateNotice = updates.startupNotice();
+  if (updateNotice) showBanner(updateNotice);
+  if (choose) configurations.openChooser();
+  else if (problem) state = { ...state, phase: 'message', message: problem };
+  else if (manual) state = { ...state, phase: 'message', message: manual };
+  else if (buttons && buttonProblems(buttons).length) {
+    // Relevé inutilisable : le menu suit déjà les touches par défaut (buttonKeys).
+    state = {
+      ...state,
+      phase: 'message',
+      message: {
+        title: 'Boutons de la borne à refaire',
+        lines: [...buttonProblems(buttons), 'Les touches par défaut des encodeurs servent en attendant.', 'Start : refaire l’étape « Boutons » · Exit : menu'],
+        action: 'buttons',
+      },
+    };
+  }
+  else if (!install) {
+    state = {
+      ...state,
+      phase: 'message',
+      message: loc.root
+        ? {
+            title: "VPX n'est pas installé",
+            lines: [
+              vpxArchivePresent(loc.root)
+                ? 'Cyber Pinball a besoin de Visual Pinball X pour jouer. Son archive est déjà sur la borne : l’installation se passe de connexion.'
+                : 'Cyber Pinball a besoin de Visual Pinball X pour jouer (téléchargement d’environ 173 Mo).',
+              'Start : l’installer maintenant · Exit : plus tard',
+            ],
+            action: 'install-vpx',
+          }
+        : { title: "VPX n'est pas installé", lines: ['Lancez « Installer » depuis le lanceur, puis revenez ici.'] },
+    };
+  } else if (tables.length === 0) {
+    state = { ...state, phase: 'message', message: noTables() };
+  }
+
+  const stress = process.env.CYBERPINBALL_STRESS;
+  // L'endurance lance de vraies parties : jamais hors écran.
+  if (stress && refuseOffscreen('Le test d’endurance')) {
+    process.exitCode = 1;
+    return void quit();
+  }
+  if (stress && install) void runStress(stress, process.env.CYBERPINBALL_TABLE);
+  const autopilot = process.env.CYBERPINBALL_AUTOPILOT;
+  if (autopilot && !stress) void library.autopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE, (input) => handleKey(input), () => state.phase);
+}
+
+function noTables(): Message {
+  return { title: 'Aucune table', lines: ['Start : ajouter une table.', 'Exit : menu.'], action: 'addTable' };
+}
+
+/** Relit les tables après un ajout, une réparation ou une suppression, en gardant la sélection. */
+function reloadTables(selectFile?: string): void {
+  const current = tables[state.index]?.file;
+  tables = loc.root ? scanTables(layoutOf(loc.root).tables) : [];
+  // Médias ajoutés, remplacés ou supprimés avec les tables : tout est recherché à nouveau.
+  medias?.invalidate();
+  const wanted = selectFile ?? current;
+  const index = tables.findIndex((t) => t.file.toLowerCase() === wanted?.toLowerCase());
+  state = { ...state, index: index >= 0 ? index : Math.min(state.index, Math.max(0, tables.length - 1)) };
+}
+
+/**
+ * Relit les écrans et remet VPinballX.ini d'accord avec eux : c'est ce qui rend
+ * la borne insensible aux renumérotations de Windows.
+ */
+function syncScreens(overwriteManual = false): {
+  assignments: Partial<Record<RoleId, ObservedDisplay>>;
+  problem?: Message;
+  manual?: Message;
+  /** La configuration de la borne est à choisir : rien n'a été écrit. */
+  choose?: boolean;
+  selection?: ConfigurationSelection;
+} {
+  // Reconnaît d'abord la configuration branchée, puis synchronise son VPinballX.ini.
+  const { selection, sync } = syncConfiguration(observedDisplays(), profile, overwriteManual);
+  if (!sync) return { assignments: {}, choose: true, selection };
+  const { plan } = sync;
+  const blocking = plan.findings.filter((f) => f.severity === 'blocking');
+  if (blocking.length) {
+    return {
+      assignments: plan.assignments,
+      selection,
+      problem: {
+        title: 'Écrans à revoir',
+        lines: [...blocking.map((f) => f.message), `Configuration ${selection!.summary}`, 'Start : relancer l’assistant d’écrans · Exit : menu (Configurations de la borne pour en changer).'],
+        action: 'wizard',
+      },
+    };
+  }
+  pendingManualEdits = plan.manualEdits;
+  if (plan.manualEdits.length === 0) return { assignments: plan.assignments, selection };
+  return {
+    assignments: plan.assignments,
+    selection,
+    manual: {
+      title: 'VPinballX.ini modifié à la main',
+      lines: [
+        ...plan.manualEdits.map(formatManualEdit),
+        'Cyber Pinball n’a rien écrasé.',
+        'Start : garder ces valeurs · Exit : remettre celles de Cyber Pinball',
+      ],
+      action: 'manualEdits',
+    },
+  };
+}
+
+/** Clés gérées changées à la main, en attente du choix de l'utilisateur. */
+let pendingManualEdits: ManualEdit[] = [];
+
+/** Start : la taille revient dans le modèle, le reste est laissé à l'utilisateur. Exit : on réécrit. */
+function resolveManualEdits(keep: boolean): void {
+  if (keep) {
+    const cabinet = loadCabinet(loc.dataDir)!;
+    saveCabinet(loc.dataDir, keepManualEdits(cabinet, pendingManualEdits, readTextIfExists(activeVpxIni(loc))));
+    syncScreens();
+  } else syncScreens(true);
+  pendingManualEdits = [];
+}
+
+/**
+ * Une fenêtre par écran de la borne. Les rôles qui partagent un écran (backglass
+ * et DMD sur le fronton, DMD incrusté dans le playfield) sont dessinés dans la
+ * même fenêtre, chacun dans sa zone, là où VPX les affichera pendant la partie.
+ */
+function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zones: Partial<Record<RoleId, ScreenZone>>): void {
+  windows = new Map();
+  windowRoles = new Map();
+  const surfaces = screenSurfaces(assignments, zones);
+  roleRects = surfaces.flatMap((s) => {
+    const d = s.display.bounds;
+    const own = s.role === 'playfield' ? [{ role: s.role, rect: { ...d } }] : [];
+    const parts = s.parts.map((p) => {
+      const r = zoneRect(p.zone, d);
+      return { role: p.role, rect: { x: d.x + r.x, y: d.y + r.y, width: r.width, height: r.height } };
+    });
+    return [...own, ...parts];
+  });
+  // Sans playfield retrouvé, le menu s'affiche quand même sur l'écran principal.
+  const pages = [
+    ...(assignments.playfield ? [] : [{ role: 'playfield' as RoleId, bounds: primaryRect(), parts: [] as ScreenSurface['parts'], playfield: undefined }]),
+    ...surfaces.map((s) => ({ role: s.role, bounds: windowRect(s.display.bounds), parts: s.parts, playfield: s.playfield })),
+  ];
+  for (const { role: id, bounds, parts, playfield } of pages) {
+    const role = ROLES.find((r) => r.id === id)!;
+    const win = createWindow({
+      title: `Cyber Pinball — ${[role, ...parts.filter((p) => p.role !== id).map((p) => ROLES.find((r) => r.id === p.role)!)].map((r) => r.label).join(' et ')}`,
+      frame: false,
+      show: false,
+      skipTaskbar: role.id !== 'playfield',
+      backgroundColor: '#030807',
+      webPreferences: {
+        preload: path.join(__dirname, 'preload.js'),
+        contextIsolation: true,
+        sandbox: true,
+        // Les boutons passent par le processus principal : la page ne voit jamais de geste du
+        // joueur, et la musique du menu ne démarrerait pas sans cela.
+        autoplayPolicy: 'no-user-gesture-required',
+      },
+    });
+    coverDisplay(win, bounds);
+    nameScreen(bounds, role.label);
+    win.on('page-title-updated', (e) => e.preventDefault());
+    win.webContents.on('before-input-event', (event, input) => {
+      if (input.type === 'keyDown' && handleKey(input)) event.preventDefault();
+    });
+    // Seule la mise en page du playfield pivote : la fenêtre garde les bornes de l'écran.
+    const turn = role.id === 'playfield' ? rotation : 0;
+    win.loadFile(path.join(__dirname, '..', 'renderer', 'frontend.html'), { query: { role: role.id, rotation: String(turn), zones: JSON.stringify(parts), ...(playfield && { playfield: JSON.stringify(playfield) }) } });
+    win.once('ready-to-show', () => {
+      win.show();
+      if (role.id === 'playfield') win.focus();
+    });
+    // Une fenêtre en plein écran qui revient de la barre des tâches émet « enter-full-screen »,
+    // pas « restore » (Electron, Windows).
+    if (role.id === 'playfield') {
+      win.on('restore', () => restoreFromDesktop());
+      win.on('enter-full-screen', () => restoreFromDesktop());
+    }
+    windows.set(role.id, win);
+    windowRoles.set(role.id, [...(role.id === 'playfield' ? (['playfield'] as RoleId[]) : []), ...parts.map((p) => p.role)]);
+  }
+}
+
+/** Erreur de lecture envoyée par media.js : rien n'y est fiable avant vérification. */
+interface MediaErrorReport {
+  url?: unknown;
+  role?: unknown;
+  type?: unknown;
+  message?: unknown;
+  /** MediaError.code d'une vidéo ou d'un son. */
+  code?: unknown;
+  /** true pour une image illisible. */
+  image?: unknown;
+}
+
+/**
+ * Erreur de lecture d'un média, remontée par une fenêtre (media.js) : gardée pour le
+ * médecin. Seule une adresse du protocole des médias, vers un dossier autorisé, est retenue.
+ */
+function recordMediaError(error: MediaErrorReport): void {
+  const file = typeof error?.url === 'string' ? mediaPathFromUrl(error.url) : undefined;
+  if (!file || !medias || !isServedMedia(file, medias.allowedDirs(tables))) return;
+  const message = typeof error.message === 'string' ? error.message : 'Erreur de lecture';
+  try {
+    const entry = logMediaError(mediaErrorLog, {
+      file,
+      role: typeof error.role === 'string' ? (error.role as MediaTarget) : undefined,
+      type: typeof error.type === 'string' ? (error.type as MediaType) : undefined,
+      code: typeof error.code === 'number' ? error.code : undefined,
+      image: error.image === true,
+      message,
+    });
+    if (entry?.count === 1) console.log(`Médias : ${message} : ${file}`);
+  } catch {
+    // Dossier de données en lecture seule : l'erreur n'est pas gardée.
+  }
+}
+
+function handleKey(input: Input): boolean {
+  const is = (group: string[]) => group.includes(input.code);
+  if (input.control && input.code === 'KeyQ') return quit();
+  // N'importe quel bouton en mode attente y met fin, sans autre effet ; sinon il remet le compte à zéro.
+  if (attract.activity()) return leaveAttract();
+
+  // Tab : menu et configuration, quels que soient les boutons relevés (dans le menu, Tab s'y déplace).
+  if (input.code === CONFIG_KEY && ['menu', 'message', 'confirmQuit'].includes(state.phase)) return openConfig();
+
+  switch (state.phase) {
+    case 'loading':
+    case 'playing':
+      return true;
+    case 'library':
+      return library.handleKey(input);
+    case 'message':
+      if (!is(KEYS.confirm) && !is(KEYS.exit)) return false;
+      if (is(KEYS.confirm) && state.message?.action === 'wizard') return relaunchWizard();
+      if (is(KEYS.confirm) && state.message?.action === 'install-vpx') return startVpxInstall();
+      if (is(KEYS.confirm) && state.message?.action === 'buttons') return relaunchWizard('--boutons');
+      if (state.message?.action === 'manualEdits') {
+        resolveManualEdits(is(KEYS.confirm));
+        state = { ...state, phase: tables.length ? 'menu' : 'message', message: tables.length ? undefined : noTables() };
+        break;
+      }
+      if (state.message?.action === 'addTable') {
+        if (is(KEYS.confirm)) library.openAdd();
+        else library.openSystem();
+        return true;
+      }
+      if (tables.length) state = { ...state, phase: 'menu', message: undefined };
+      // « Plus tard » sur l'installation de VPX, sans table : l'invite d'ajout, sinon le Start suivant lancerait le téléchargement.
+      else if (state.message?.action === 'install-vpx') state = { ...state, message: noTables() };
+      break;
+    case 'confirmQuit':
+      if (is(KEYS.confirm)) return quit();
+      state = { ...state, phase: 'menu' };
+      break;
+    case 'menu':
+      if (is(KEYS.help)) state = { ...state, help: !state.help };
+      else if (state.help && is(KEYS.exit)) state = { ...state, help: false };
+      else if (is(KEYS.previous)) state = { ...state, index: (state.index - 1 + tables.length) % tables.length };
+      else if (is(KEYS.next)) state = { ...state, index: (state.index + 1) % tables.length };
+      else if (is(KEYS.confirm)) library.openSheet(tables[state.index]!);
+      else if (is(KEYS.settings)) openVpxSettings();
+      else if (is(KEYS.exit)) library.openSystem();
+      else return false;
+      break;
+  }
+  broadcast();
+  return true;
+}
+
+export interface PlayReport {
+  result: LaunchResult;
+  focusReturned: boolean;
+}
+
+/**
+ * Partie d'une table. Un essai (`trial`) lit un autre .ini de table et ne compte pas dans
+ * les statistiques ; à la fin, l'écran qui l'a demandé reprend la main.
+ */
+async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { tableIni: string }): Promise<PlayReport | undefined> {
+  const install = vpxInstall(loc);
+  if (!install) return undefined;
+  // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
+  // « backglass,dmd », ou vide) montre chargement, partie et retour sans lancer VPX.
+  const simulated = OFFSCREEN ? process.env.CYBERPINBALL_PARTIE_SIMULEE : undefined;
+  const refused = simulated === undefined ? refuseOffscreen('Lancer une partie de VPX') : undefined;
+  if (refused) {
+    state = { ...state, phase: 'message', help: false, message: { title: 'Partie impossible hors écran', lines: [refused, 'Start ou Exit : revenir au menu.'] } };
+    broadcast();
+    return undefined;
+  }
+
+  state = { ...state, phase: 'loading', help: false };
+  launchCount++;
+  broadcast();
+  const loadingMs = Number(process.env.CYBERPINBALL_LOADING_MS ?? 2500);
+  await delay(Math.min(400, loadingMs));
+  await capture('chargement');
+  await delay(Math.max(0, loadingMs - 400));
+
+  // Les écrans ont pu bouger depuis le démarrage du menu, la configuration de la borne aussi.
+  const { problem, choose, selection } = syncScreens();
+  if (choose) {
+    configurations.openChooser('Avant de jouer, choisissez la configuration branchée : elle décide des écrans de VPX.');
+    return undefined;
+  }
+  if (problem) {
+    state = { ...state, phase: 'message', message: problem };
+    broadcast();
+    return undefined;
+  }
+
+  // Les fenêtres du menu restent derrière VPX, sans jamais lui prendre le focus : l'écran de
+  // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque
+  // écran (viewFor). Celui que VPX n'occupe pas (topper, backglass sans .directb2s) reste couvert.
+  playing = table;
+  hideTaskbars();
+  const startedAt = new Date();
+  const onPlaying = () => {
+    state = { ...state, phase: 'playing' };
+    watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)));
+    broadcast();
+    if (autoStopAfterMs) setTimeout(() => game.stop(), autoStopAfterMs);
+  };
+  const game =
+    simulated !== undefined
+      ? simulateVpx({ onPlaying })
+      : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: table.file, tableIni: trial?.tableIni, vpxPrefDir: vpxPrefDir(install.version), onPlaying });
+  // Une partie simulée ne prend aucun raccourci global au poste.
+  if (simulated === undefined) globalShortcut.register(FORCE_STOP_SHORTCUT, () => game.stop());
+  const result = await game.done;
+  if (simulated === undefined) globalShortcut.unregister(FORCE_STOP_SHORTCUT);
+  stopWatchOccupied();
+  playing = undefined;
+
+  // Les barres des tâches reviennent avant que le menu reprenne le premier plan : redevenu
+  // fenêtre plein écran active, il les fait repasser derrière lui.
+  restoreTaskbars();
+  const focusReturned = await showMenuAgain();
+  // Fenêtres de l'éditeur de VPX masquées ou fermées pendant la partie : rien à faire
+  // pour le joueur, mais le signe qu'un réglage ou une version de VPX a changé.
+  for (const notice of result.notices) console.log(`VPX (${table.id}) : ${notice}`);
+
+  if (trial) return { result, focusReturned };
+  if (result.ok) {
+    // Les parties du test automatique ne comptent pas dans les statistiques.
+    if (!autoStopAfterMs) recordPlay(table, startedAt, result.seconds);
+    tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
+    state = { ...state, phase: 'menu' };
+  } else {
+    state = { ...state, phase: 'message', message: explain(result) };
+  }
+  // Configuration de la borne changée juste avant la partie : VPX avait déjà les bons
+  // écrans, le menu les reprend en redémarrant.
+  if (selection?.previous && result.ok) relaunchMenu();
+  broadcast();
+  return { result, focusReturned };
+}
+
+/** Table en cours de partie : chaque fenêtre affiche son fond de partie. */
+let playing: TableEntry | undefined;
+
+/**
+ * Pendant la partie, relit la pile des fenêtres de Windows toutes les 2 s : un rôle dont la
+ * zone passe sous une fenêtre d'un autre processus (VPX, son B2S, PinMAME, PuP) est occupé,
+ * et son fond de partie reste figé. Partie simulée : les rôles donnés. Rien n'est montré
+ * ni mis au premier plan : seul l'état des fenêtres change.
+ */
+function watchOccupied(simulated: RoleId[] | undefined): void {
+  const update = (roles: RoleId[]) => {
+    const next = new Set(roles);
+    if (next.size === occupied.size && [...next].every((r) => occupied.has(r))) return;
+    occupied = next;
+    console.log(`Partie : écrans occupés par VPX : ${[...occupied].join(', ') || 'aucun'}.`);
+    broadcast();
+  };
+  if (simulated) return update(simulated);
+  const check = () => {
+    try {
+      update(occupiedRoles(roleRects, listWindows((w) => w.visible), process.pid));
+    } catch {
+      // Pile des fenêtres illisible un instant : le dernier constat reste.
+    }
+  };
+  check();
+  occupiedWatch = setInterval(check, OCCUPIED_CHECK_MS);
+}
+
+function stopWatchOccupied(): void {
+  if (occupiedWatch) clearInterval(occupiedWatch);
+  occupiedWatch = undefined;
+  occupied = new Set();
+}
+
+/** Le menu, resté derrière VPX, reprend le premier plan ; renvoie true s'il est bien revenu. */
+async function showMenuAgain(): Promise<boolean> {
+  for (const win of windows.values()) if (!isShown(win)) win.show();
+  const playfield = windows.get('playfield');
+  playfield?.focus();
+  // Hors écran, aucune fenêtre n'a de premier plan à reprendre.
+  if (OFFSCREEN) return true;
+  const ours = () => foregroundWindow()?.pid === process.pid;
+  for (let attempt = 0; attempt < 10 && !ours(); attempt++) {
+    await delay(150);
+    const target = visibleWindowsOf(process.pid).find((w) => w.title === PLAYFIELD_TITLE);
+    if (target) bringToFront(target);
+  }
+  return ours();
+}
+
+function explain(result: LaunchResult): Message {
+  const lines = [result.message ?? 'Erreur inconnue.'];
+  if (result.message && /can't start game/i.test(result.message)) {
+    lines.push('La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.');
+  }
+  lines.push(...result.notices);
+  if (result.logTail.length) lines.push('Fin du journal de VPX :', ...result.logTail.slice(-5));
+  return { title: 'La partie n’a pas pu se dérouler', lines: [...lines, 'Start ou Exit : revenir au menu.'] };
+}
+
+/**
+ * Test sans opérateur du critère du jalon 2 : N lancements d'affilée, chacun
+ * arrêté après S secondes de jeu, en vérifiant que le menu reprend le premier plan.
+ * CYBERPINBALL_STRESS="N,S", CYBERPINBALL_TABLE = morceau du nom de la table.
+ */
+async function runStress(spec: string, tableFilter?: string): Promise<void> {
+  const [count = 5, seconds = 10] = spec.split(',').map(Number);
+  const index = tableFilter ? tables.findIndex((t) => t.id.toLowerCase().includes(tableFilter.toLowerCase())) : 0;
+  if (index < 0) {
+    console.log(`Aucune table ne correspond à « ${tableFilter} ».`);
+    return void quit();
+  }
+  await delay(2000);
+  state = { ...state, index };
+  broadcast();
+  await delay(300);
+  await capture('menu');
+  state = { ...state, help: true };
+  broadcast();
+  await delay(300);
+  await capture('commandes');
+  state = { ...state, help: false };
+  const runs: { run: number; ok: boolean; failure?: string; load?: number; played: number; focus: boolean; notices: string[]; uncovered: string[] }[] = [];
+  takeCoverIncidents();
+  for (let run = 1; run <= count; run++) {
+    const report = await play(tables[index]!, seconds * 1000);
+    const r = report?.result;
+    runs.push({
+      run,
+      ok: Boolean(r?.ok),
+      failure: r?.failure,
+      load: r?.loadSeconds,
+      played: r?.seconds ?? 0,
+      focus: Boolean(report?.focusReturned),
+      notices: r?.notices ?? [],
+      // Constats du gardien des écrans pendant ce lancement (chargement, partie, retour).
+      uncovered: takeCoverIncidents(),
+    });
+    const last = runs.at(-1)!;
+    console.log(
+      `#${run} ${last.ok ? 'ok' : `ÉCHEC (${last.failure}: ${r?.message ?? ''})`} chargement ${last.load?.toFixed(1) ?? '-'} s, jeu ${last.played.toFixed(1)} s, retour du focus : ${last.focus ? 'oui' : 'NON'}, autres fenêtres de VPX : ${last.notices.length || 'aucune'}, écrans découverts : ${last.uncovered.length || 'aucun'}`,
+    );
+    if (state.phase === 'message') state = { ...state, phase: 'menu', message: undefined };
+    await delay(1500);
+  }
+  const okRuns = runs.filter((r) => r.ok && r.focus).length;
+  console.log(`Bilan : ${okRuns}/${count} lancements réussis avec retour du focus.`);
+  const uncovered = runs.filter((r) => r.uncovered.length).length;
+  console.log(`Écrans : ${uncovered ? `${uncovered}/${count} lancements avec un écran découvert` : 'toujours couverts'}.`);
+  const logDir = path.join(loc.dataDir, 'logs');
+  fs.mkdirSync(logDir, { recursive: true });
+  fs.writeFileSync(path.join(logDir, `stress-${new Date().toISOString().replace(/[:.]/g, '-')}.json`), JSON.stringify(runs, null, 2));
+  quit();
+}
+
+/** Captures d'écran pour les tests sans opérateur (CYBERPINBALL_CAPTURE = dossier). */
+async function capture(step: string): Promise<void> {
+  const dir = process.env.CYBERPINBALL_CAPTURE;
+  if (!dir) return;
+  fs.mkdirSync(dir, { recursive: true });
+  for (const [role, win] of windows) {
+    if (!isShown(win)) continue;
+    const image = await win.webContents.capturePage();
+    fs.writeFileSync(path.join(dir, `${step}-${role}.png`), image.toPNG());
+  }
+}
+
+/** Téléchargement de VPX depuis l'écran, avec la progression sur le playfield. */
+function startVpxInstall(): boolean {
+  const root = loc.root!;
+  const show = (lines: string[], action?: Message['action']) => {
+    state = { ...state, phase: 'message', message: { title: 'Installation de VPX', lines, action } };
+    broadcast();
+  };
+  show(['Préparation…']);
+  installVpx(root, (p) => show([`Téléchargement : ${p.percent} % (${p.receivedMb} / ${p.totalMb} Mo)`, 'Ne débranchez pas la borne.']))
+    .then((version) => {
+      reloadTables();
+      const done = `Visual Pinball X ${version} est installé et vérifié.`;
+      if (tables.length) show([done, 'Start ou Exit : aller aux tables.']);
+      else {
+        // Pas encore de table : on enchaîne sur l'ajout.
+        state = { ...state, phase: 'message', message: { ...noTables(), lines: [done, ...noTables().lines] } };
+        broadcast();
+      }
+    })
+    .catch((error: Error) => show([`L’installation a échoué : ${error.message}`, 'Start : réessayer · Exit : plus tard'], 'install-vpx'));
+  return true;
+}
+
+/**
+ * Réglages de VPX par-dessus le menu (ou la fiche) : généraux, ou propres à une
+ * table. Le focus revient au playfield à la fermeture.
+ */
+function openVpxSettings(table?: TableEntry): void {
+  const playfield = windows.get('playfield');
+  const target = table ? ({ scope: 'table', table } as const) : ({ scope: 'global' } as const);
+  // À la fermeture de l'application, le playfield peut être détruit avant les réglages.
+  void openSettings(target, { bounds: playfield?.getBounds(), rotation, onClose: () => playfield && !playfield.isDestroyed() && playfield.focus() });
+}
+
+/**
+ * Roue dentée ou Tab : menu et configuration, depuis le menu des tables et ses
+ * messages, même quand les boutons relevés ne répondent plus comme prévu.
+ */
+function openConfig(): boolean {
+  if (state.phase === 'loading' || state.phase === 'playing') return true;
+  state = { ...state, help: false };
+  library.openSystem();
+  return true;
+}
+
+/** Assistant complet, ou seulement l'une de ses étapes (option de WIZARD_STEPS : --boutons, --son…) ; ou une nouvelle configuration. */
+function relaunchWizard(stepFlag?: string, newConfiguration = false): boolean {
+  relaunchCovered([...process.argv.slice(1), '--assistant', ...(stepFlag ? [stepFlag] : []), ...(newConfiguration ? ['--nouvelle-configuration'] : [])]);
+  return true;
+}
+
+/** Relance le menu : une autre configuration de la borne rouvre ses fenêtres sur ses écrans. */
+function relaunchMenu(): void {
+  // Par le gardien des écrans, comme toute relance : aucun écran ne montre le bureau entre les deux.
+  relaunchCovered(process.argv.slice(1));
+}
+
+/** Constat bref en haut du menu, qui s'efface seul : il ne demande aucun bouton. */
+function showBanner(text: string): void {
+  state = { ...state, banner: text };
+  broadcast();
+  setTimeout(() => {
+    state = { ...state, banner: undefined };
+    broadcast();
+  }, 12_000);
+}
+
+function quit(): boolean {
+  app.quit();
+  return true;
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function viewFor(role: RoleId) {
+  // En mode attente, chaque écran montre la table tirée au hasard ; la sélection ne bouge pas.
+  const shown = attractTable();
+  const table = shown ?? tables[state.index];
+  // Le logo n'est cherché que pour la liste, dessinée par le playfield.
+  const wheel = (t: TableEntry) => (role === 'playfield' ? medias?.wheel(t) : undefined);
+  const describe = (t: TableEntry) => ({
+    title: t.title,
+    manufacturer: t.manufacturer,
+    year: t.year,
+    subtitle: [t.manufacturer, t.year].filter(Boolean).join(' · '),
+    version: t.version,
+    plays: t.info.User?.StartCount ?? 0,
+    lastRun: t.info.User?.LastRun,
+    wheel: wheel(t),
+  });
+  // Voisines de la table choisie, pour la liste et la roue : identité stable (le fichier),
+  // titre, fabricant et année (logo de repli de la roue), version et logo.
+  const neighbor = (t: TableEntry, offset: number) => ({ offset, key: t.file, title: t.title, manufacturer: t.manufacturer, year: t.year, version: t.version, wheel: wheel(t) });
+  // Neuf places : sept visibles (roue Médaillons), et une de chaque côté d'où les logos entrent.
+  const neighbors = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
+    .filter(() => tables.length > 0)
+    .map((offset) => neighbor(tables[(state.index + offset + tables.length * 10) % tables.length]!, offset));
+  // Média de chaque rôle de cette fenêtre (le sien et ceux de ses zones), et ceux des voisines à précharger.
+  const roles = windowRoles.get(role) ?? [role];
+  const mediasOf = (t: TableEntry) => (medias ? Object.fromEntries(roles.map((r) => [r, medias!.roleMedia(t, r)])) : {});
+  const preload =
+    !shown && table && medias && tables.length > 1
+      ? [...new Set(PRELOAD_OFFSETS.map((o) => tables[(state.index + o + tables.length * 10) % tables.length]!))]
+          .filter((t) => t !== table)
+          .flatMap((t) => roles.map((r) => medias!.roleMedia(t, r)))
+          .filter((v) => v.url)
+      : [];
+  return {
+    role,
+    phase: state.phase,
+    help: state.help,
+    count: tables.length,
+    position: state.index + 1,
+    table: table ? describe(table) : undefined,
+    // Moins de neuf tables : chacune une seule fois (aucune répétée pour remplir), réparties de
+    // part et d'autre de la table choisie, en boucle comme la liste : la roue reste centrée.
+    neighbors: tables.length >= 9 ? neighbors : tables.map((t, i) => neighbor(t, ((i - state.index + tables.length * 2 + Math.floor((tables.length - 1) / 2)) % tables.length) - Math.floor((tables.length - 1) / 2))),
+    menuLayout: mediaSettings.menuLayout,
+    medias: table ? mediasOf(table) : {},
+    preload,
+    // Chargement : la vidéo Loading du jeu sous les commandes de la partie, sur le playfield.
+    loading: state.phase === 'loading' && role === 'playfield' && medias && table ? medias.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
+    // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
+    backglass: role === 'playfield' && medias && table && !shown ? medias.typeMedia(table, 'backglass', 'Backglass') : undefined,
+    message: state.message,
+    banner: state.banner,
+    library: state.phase === 'library' ? library.view() : undefined,
+    // Mode attente : la table montrée, son logo, et l'invite du playfield.
+    attract: shown ? { ...describe(shown), wheel: medias?.wheel(shown) } : undefined,
+    // Partie en cours (fenêtre de jeu de VPX à l'écran) : fond de partie de chaque rôle de
+    // l'écran, selon « médias pendant la partie » et ce que VPX occupe. Avant, au chargement,
+    // les écrans gardent les médias du jeu, animés, jusqu'à ce que VPX les recouvre.
+    game:
+      playing && state.phase === 'playing'
+        ? {
+            role,
+            table: describe(playing),
+            file: playing.file,
+            mode: mediaSettings.game,
+            medias: mediasOf(playing),
+            play: Object.fromEntries(roles.map((r) => [r, momentScreen('game', r, { game: mediaSettings.game, occupied: occupied.has(r) }).play])),
+          }
+        : undefined,
+    // Le son du menu ne sort que d'une fenêtre : celle du playfield.
+    sound: role === 'playfield' ? soundView() : undefined,
+    gameKeys: gameKeys(buttons),
+    menuKeys: menuKeys(),
+    footer: menuFooter(),
+    nav: { confirm: KEYS.confirm[0], exit: KEYS.exit[0], help: KEYS.help[0], helpLabel: KEYS.help.length ? keyLabel(KEYS.help[0]) : undefined },
+  };
+}
+
+/** Moment du menu, pour le son : chargement, partie, ou navigation (fiche et messages compris). */
+function moment(): MenuMoment {
+  if (attractTable()) return 'attract';
+  return state.phase === 'playing' ? 'game' : state.phase === 'loading' ? 'loading' : 'browse';
+}
+
+/**
+ * Ce que joue la fenêtre du playfield (app/renderer/menu-audio.js) : musique du jeu choisi,
+ * son de lancement, volume du son de sa vidéo, sur la sortie du fronton.
+ */
+function soundView() {
+  const table = playing ?? attractTable() ?? tables[state.index];
+  const now = moment();
+  const plan =
+    table && medias
+      ? menuSound(now, mediaSettings, { music: medias.sound(table, 'Audio'), launch: now === 'loading' ? medias.sound(table, 'AudioLaunch') : undefined }, tableMediaVolume(table))
+      : { video: 0 };
+  return { ...plan, launchId: plan.launch ? launchCount : undefined, output: audioOutput };
+}
+
+function broadcast(): void {
+  // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).
+  attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !onDesktop);
+  if (!attract.active) attractIndex = undefined;
+  for (const [role, win] of windows) {
+    if (!win.isDestroyed()) win.webContents.send('state', viewFor(role));
+  }
+}

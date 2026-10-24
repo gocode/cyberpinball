@@ -1,0 +1,131 @@
+/* Page de démonstration des replis (fallback-demo.html). */
+
+html,
+body {
+  margin: 0;
+  background: #030807;
+  color: #e6f0ec;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+}
+
+/* Un composant plein cadre : la fenêtre entière, sans défilement. */
+.demo-single,
+html:has(.demo-single) {
+  height: 100%;
+  overflow: hidden;
+}
+
+.demo-single #stage {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+}
+
+/* Vue pivotée comme le playfield du menu (frontend.css). */
+html[data-rotation='90'] .demo-single #stage,
+html[data-rotation='270'] .demo-single #stage {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 100vh;
+  height: 100vw;
+}
+
+html[data-rotation='90'] .demo-single #stage {
+  transform: translate(-50%, -50%) rotate(90deg);
+}
+
+html[data-rotation='270'] .demo-single #stage {
+  transform: translate(-50%, -50%) rotate(270deg);
+}
+
+html[data-rotation='180'] .demo-single #stage {
+  transform: rotate(180deg);
+}
+
+/* Contenu glissé par l'appelant dans l'emplacement du chargement. */
+.demo-keys {
+  padding: 1.6cqmin 3cqmin;
+  border-radius: 1.4cqmin;
+  background: rgba(16, 19, 28, 0.85);
+  font-size: 2.3cqmin;
+}
+
+.demo-keys h2 {
+  margin: 0 0 1cqmin;
+  font-size: 1em;
+  color: #36c9b4;
+  font-weight: 600;
+}
+
+.demo-keys table {
+  border-collapse: collapse;
+}
+
+.demo-keys td {
+  padding: 0.3cqmin 1.4cqmin;
+}
+
+.demo-keys td:last-child {
+  color: #9bada7;
+}
+
+/* ---------- Galerie ---------- */
+
+.demo-head {
+  padding: 20px 28px 4px;
+}
+
+.demo-head h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+}
+
+.demo-head p {
+  margin: 0 0 4px;
+  color: #c9cfdc;
+}
+
+.demo-hint {
+  color: #9bada7 !important;
+  font-size: 13px;
+}
+
+.demo-grid {
+  padding: 8px 28px 40px;
+}
+
+.demo-row h2 {
+  margin: 22px 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #36c9b4;
+}
+
+.demo-frames {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  align-items: flex-end;
+}
+
+.demo-frame {
+  margin: 0;
+}
+
+.demo-box {
+  position: relative;
+  outline: 1px solid #262b3a;
+  outline-offset: -1px;
+}
+
+.demo-frame figcaption {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #9bada7;
+}
+
+/* Fond en damier sous le logo, pour montrer sa transparence. */
+.demo-checker {
+  background: repeating-conic-gradient(#1a1e2a 0 25%, #10131c 0 50%) 0 0 / 20px 20px;
+}

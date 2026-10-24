@@ -1,0 +1,802 @@
+/*
+ * Replis intégrés (fallback.js). Tout est mesuré dans le composant lui-même
+ * (container-type: size, unités cq*) : il se met en page dans sa zone, quelle que
+ * soit la fenêtre, et suit la rotation du playfield faite par son parent.
+ * Les animations ne touchent que transform et opacity, pour rester sur le GPU.
+ *
+ * Direction artistique du 22 octobre 2026 (docs/design-system) : verre fumé noir
+ * sarcelle, filets sarcelle, Saira, fabricant et année en bleu des métadonnées,
+ * PINBALL en vert signal dans la marque. Un repli reste plus calme que l'interface :
+ * lumière statique et peu étendue, un seul reflet qui passe lentement. L'orange
+ * n'appartient qu'aux afficheurs à points.
+ */
+
+@font-face {
+  font-family: 'CP Saira';
+  src: url('polices/saira/Saira-wdth-wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-stretch: 50% 125%;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'CP Orbitron';
+  src: url('polices/orbitron/Orbitron-wght.ttf') format('truetype');
+  font-weight: 400 900;
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'CP Bebas Neue';
+  src: url('polices/bebas-neue/BebasNeue-Regular.ttf') format('truetype');
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'CP Press Start';
+  src: url('polices/press-start-2p/PressStart2P-Regular.ttf') format('truetype');
+  font-display: block;
+}
+
+@font-face {
+  font-family: 'CP Audiowide';
+  src: url('polices/audiowide/Audiowide-Regular.ttf') format('truetype');
+  font-display: block;
+}
+
+.cp-fb {
+  /* Jetons du design system (tokens.json), repris ici : le composant se suffit à lui-même. */
+  --cp-void: #030807;
+  --cp-surface: #07110f;
+  --cp-raised: #0c1a17;
+  --cp-line: #17302b;
+  --cp-line-strong: #24504a;
+  --cp-halo: #1c8f80;
+  --cp-ink: #e6f0ec;
+  --cp-muted: #9bada7;
+  --cp-meta: #5fb4cf;
+  --cp-signal: #8be23a;
+  /* Sarcelle lumineuse des filets et des reflets (celle de l'image de la bannière). */
+  --cp-primary: #36c9b4;
+  --cp-secondary: #5fb4cf;
+  --cp-bg: var(--cp-void);
+  --cp-font: 'CP Saira', 'Segoe UI', system-ui, sans-serif;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  container-type: size;
+  box-sizing: border-box;
+  background: var(--cp-bg);
+  color: var(--cp-ink);
+  font-family: var(--cp-font);
+  user-select: none;
+}
+
+.cp-fb *,
+.cp-fb *::before,
+.cp-fb *::after {
+  box-sizing: border-box;
+}
+
+/* Figé (options.animate = false) ; en pause quand la fenêtre est cachée. */
+.cp-fb-static *,
+.cp-fb-static *::before,
+.cp-fb-static *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+html.cp-fb-hidden .cp-fb *,
+html.cp-fb-hidden .cp-fb *::before,
+html.cp-fb-hidden .cp-fb *::after {
+  animation-play-state: paused !important;
+}
+
+/*
+ * Boîte de texte ajustée par fallback.js (fitText) : la police prend la plus grande
+ * taille qui tient dans la boîte, sans couper de mot. La boîte doit avoir une taille
+ * fixée par la mise en page, jamais par son contenu.
+ */
+.cp-fit {
+  display: grid;
+  place-items: center;
+  min-width: 0;
+  min-height: 0;
+}
+
+.cp-fit > span {
+  display: block;
+  max-width: 100%;
+  text-align: center;
+  line-height: 1.1;
+  text-wrap: balance;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: manual;
+}
+
+.cp-fit.cp-one-line > span {
+  white-space: nowrap;
+}
+
+/* Dégradé repris à chaque ligne d'un texte sur plusieurs lignes. */
+.cp-ink {
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* ---------- Matière commune : verre fumé, rails, reflet ---------- */
+
+/* Verre fumé (docs/design-system/src/fonds.css) : reflet oblique et lueur sarcelle sur le noir. */
+.cp-glass {
+  position: absolute;
+  inset: 0;
+  background-color: var(--cp-void);
+  background-image:
+    linear-gradient(115deg, transparent 48%, rgba(16, 43, 38, 0.23) 48.15%, transparent 66%),
+    radial-gradient(ellipse at 92% 12%, #143d35 0%, transparent 58%),
+    radial-gradient(ellipse 80% 55% at 10% 108%, rgba(28, 143, 128, 0.16) 0%, transparent 70%),
+    linear-gradient(150deg, var(--cp-raised), var(--cp-void) 65%);
+}
+
+/*
+ * Rails de lumière, comme sur l'image de la bannière : le bord haut d'une grande
+ * ellipse, effilé à ses extrémités par l'arrondi, dont seul un arc entre dans le cadre.
+ */
+.cp-rail {
+  position: absolute;
+  border-radius: 50%;
+  border: solid transparent;
+  border-top-color: color-mix(in srgb, var(--cp-primary) 70%, transparent);
+  border-width: max(1px, 0.32cqmin) 0 0;
+  filter: drop-shadow(0 0 0.8cqmin color-mix(in srgb, var(--cp-primary) 70%, transparent));
+}
+
+.cp-rail-a {
+  left: -46cqw;
+  top: 58cqh;
+  width: 110cqw;
+  height: 120cqh;
+  rotate: -14deg;
+  opacity: 0.55;
+}
+
+.cp-rail-b {
+  left: 52cqw;
+  top: 30cqh;
+  width: 100cqw;
+  height: 150cqh;
+  rotate: 18deg;
+  opacity: 0.4;
+}
+
+/* Reflet qui traverse le verre de temps en temps (transform seulement). */
+.cp-sweep {
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  left: -50%;
+  width: 60%;
+  background: linear-gradient(105deg, transparent 30%, color-mix(in srgb, var(--cp-primary) 9%, transparent) 50%, transparent 70%);
+  transform: translateX(-60%);
+  animation: cp-sweep 18s ease-in-out infinite;
+}
+
+@keyframes cp-sweep {
+  0% {
+    transform: translateX(-60%);
+  }
+  40%,
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+/* Cadre : filet sarcelle, lueur douce, coins plus clairs. */
+.cp-frame {
+  position: absolute;
+  inset: 2.4cqmin;
+  border: max(1px, 0.16cqmin) solid var(--cp-line-strong);
+  border-radius: 1.2cqmin;
+  box-shadow:
+    0 0 2.4cqmin rgba(28, 143, 128, 0.16),
+    inset 0 0 2.4cqmin rgba(28, 143, 128, 0.12);
+}
+
+.cp-corners {
+  position: absolute;
+  inset: 2.4cqmin;
+  border: max(1.5px, 0.3cqmin) solid var(--cp-primary);
+  border-radius: 1.2cqmin;
+  filter: drop-shadow(0 0 0.6cqmin color-mix(in srgb, var(--cp-primary) 60%, transparent));
+  --corner: 6cqmin;
+  -webkit-mask:
+    linear-gradient(#000 0 0) top left / var(--corner) var(--corner) no-repeat,
+    linear-gradient(#000 0 0) top right / var(--corner) var(--corner) no-repeat,
+    linear-gradient(#000 0 0) bottom left / var(--corner) var(--corner) no-repeat,
+    linear-gradient(#000 0 0) bottom right / var(--corner) var(--corner) no-repeat;
+  mask:
+    linear-gradient(#000 0 0) top left / var(--corner) var(--corner) no-repeat,
+    linear-gradient(#000 0 0) top right / var(--corner) var(--corner) no-repeat,
+    linear-gradient(#000 0 0) bottom left / var(--corner) var(--corner) no-repeat,
+    linear-gradient(#000 0 0) bottom right / var(--corner) var(--corner) no-repeat;
+}
+
+/* Filet qui sépare le titre de ses métadonnées : sarcelle, éteint vers les bords. */
+.cp-rule {
+  flex: 0 0 auto;
+  width: min(56%, 60cqmin);
+  height: max(1px, 0.28cqmin);
+  background: linear-gradient(90deg, transparent, var(--cp-primary) 30%, var(--cp-primary) 70%, transparent);
+  box-shadow: 0 0 1cqmin color-mix(in srgb, var(--cp-primary) 55%, transparent);
+}
+
+/* Fabricant et année : capitales espacées, bleu des métadonnées. */
+.cp-meta-text > span {
+  font-family: var(--cp-font);
+  font-weight: 500;
+  font-stretch: 112%;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  margin-right: -0.28em;
+  color: var(--cp-meta);
+}
+
+/*
+ * Marque : « CYBER PINBALL » en capitales légères très espacées, PINBALL en vert
+ * signal (docs/design-system/components/Marque).
+ */
+.cp-wordmark > span {
+  font-family: var(--cp-font);
+  font-weight: 300;
+  font-stretch: 125%;
+  text-transform: uppercase;
+  letter-spacing: 0.5em;
+  margin-right: -0.5em;
+  color: var(--cp-ink);
+}
+
+.cp-wordmark .cp-pin {
+  color: var(--cp-signal);
+}
+
+/* Titre d'un jeu dessiné : Saira resserrée, capitales, blanc légèrement éclairé de sarcelle. */
+.cp-game-title > span {
+  font-family: var(--cp-font);
+  font-weight: 600;
+  font-stretch: 84%;
+  text-transform: uppercase;
+  letter-spacing: 0.015em;
+  line-height: 1.02;
+  color: var(--cp-ink);
+  text-shadow:
+    0 0 0.1em color-mix(in srgb, var(--cp-primary) 24%, transparent),
+    0 0.015em 0 #000;
+}
+
+/* ---------- Fronton ---------- */
+
+.cp-bg-body {
+  position: absolute;
+  inset: 11cqmin 9cqmin;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3.2cqmin;
+}
+
+.cp-bg-title {
+  flex: 1 1 0;
+  align-self: stretch;
+}
+
+.cp-bg-meta {
+  flex: 0 0 9cqh;
+  align-self: stretch;
+}
+
+.cp-no-meta .cp-bg-body {
+  gap: 0;
+}
+
+/* Bande très large (3:1, 4:1) : le titre garde la hauteur, le fabricant se resserre. */
+@container (min-aspect-ratio: 5 / 2) {
+  .cp-bg-body {
+    inset: 13cqh 8cqw;
+    gap: 3cqh;
+  }
+
+  .cp-bg-meta {
+    flex-basis: 13cqh;
+  }
+
+  /* Moins d'espace entre les lettres : un fabricant long garde une taille lisible. */
+  .cp-bg-meta > span {
+    letter-spacing: 0.14em;
+    margin-right: -0.14em;
+    font-stretch: 100%;
+  }
+}
+
+/* Portrait : plus de hauteur, fabricant plus bas. */
+@container (max-aspect-ratio: 4 / 5) {
+  .cp-bg-body {
+    inset: 14cqmin 8cqmin;
+  }
+
+  .cp-bg-meta {
+    flex-basis: 7cqh;
+  }
+
+  .cp-bg-meta > span {
+    letter-spacing: 0.14em;
+    margin-right: -0.14em;
+    font-stretch: 100%;
+  }
+}
+
+/* ---------- Afficheurs à points ---------- */
+
+.cp-fb-dmd,
+.cp-fb-fulldmd {
+  background: #000;
+}
+
+.cp-dmd-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Logo de Cyber Pinball (bille et flippers, comme l'icône) ---------- */
+
+.cp-logo {
+  position: relative;
+  aspect-ratio: 1;
+  flex: 0 0 auto;
+}
+
+.cp-logo > * {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.cp-logo-frame {
+  filter: drop-shadow(0 0 0.04em rgba(54, 201, 180, 0.45));
+  font-size: 4cqmin;
+}
+
+/* Bille noire chromée : reflet blanc en haut à gauche, liseré sarcelle en bas. */
+.cp-logo-ball {
+  left: 30%;
+  top: 21%;
+  width: 40%;
+  height: 40%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 26%, #fff 0 4%, rgba(255, 255, 255, 0.5) 7%, transparent 15%),
+    radial-gradient(ellipse 70% 32% at 50% 100%, rgba(54, 201, 180, 0.95) 0%, rgba(54, 201, 180, 0.25) 60%, transparent 100%),
+    linear-gradient(180deg, #4a5654 0%, #1a2321 44%, #020504 52%, #030a08 100%);
+  box-shadow:
+    0 0 0 max(1px, 0.22cqmin) rgba(80, 214, 194, 0.8),
+    0 0 1.6cqmin rgba(54, 201, 180, 0.3);
+  animation: cp-ball 14.4s cubic-bezier(0.3, 0, 0.4, 1) infinite;
+}
+
+.cp-logo-flip path {
+  fill: #0e1d1a;
+  stroke: #36c9b4;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+.cp-logo-flip-l {
+  transform-origin: 23.5% 70.5%;
+  animation: cp-flip-l 14.4s ease-out infinite;
+}
+
+.cp-logo-flip-r {
+  transform-origin: 76.5% 70.5%;
+  animation: cp-flip-r 14.4s ease-out infinite;
+}
+
+/*
+ * Les flippers frappent, la bille saute puis retombe (1,7 s), puis un long repos :
+ * un coup toutes les 14,4 s, pour qu'un repli ne prenne pas plus de place qu'un média.
+ */
+@keyframes cp-ball {
+  0%,
+  2.7% {
+    transform: translateY(0);
+  }
+  7.3% {
+    transform: translateY(-21%);
+  }
+  12%,
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes cp-flip-l {
+  0%,
+  1.3%,
+  4.7%,
+  100% {
+    transform: rotate(0);
+  }
+  2.7% {
+    transform: rotate(-24deg);
+  }
+}
+
+@keyframes cp-flip-r {
+  0%,
+  1.3%,
+  4.7%,
+  100% {
+    transform: rotate(0);
+  }
+  2.7% {
+    transform: rotate(24deg);
+  }
+}
+
+/* ---------- Topper ---------- */
+
+.cp-tp-body {
+  position: absolute;
+  inset: 12cqh 6cqw;
+  display: flex;
+  align-items: center;
+  gap: 4.5cqw;
+}
+
+.cp-tp-body .cp-logo {
+  height: 76cqh;
+}
+
+.cp-tp-text {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4cqh;
+}
+
+.cp-tp-word {
+  flex: 0 0 34cqh;
+  align-self: stretch;
+}
+
+.cp-no-meta .cp-tp-word {
+  flex-basis: 44cqh;
+}
+
+.cp-tp-text .cp-rule {
+  width: 70%;
+}
+
+.cp-tp-meta {
+  flex: 0 0 17cqh;
+  align-self: stretch;
+}
+
+/* Topper 16:9, carré ou en hauteur : logo au-dessus du texte ; en ligne seulement dans une bande. */
+@container (max-aspect-ratio: 11 / 5) {
+  .cp-tp-body {
+    inset: 8cqh 7cqw;
+    flex-direction: column;
+    justify-content: center;
+    gap: min(5cqh, 6cqw);
+  }
+
+  .cp-tp-body .cp-logo {
+    height: min(44cqh, 62cqw);
+  }
+
+  /* Le texte suit la largeur : ses boîtes n'ont pas plus de hauteur qu'il ne lui en faut. */
+  .cp-tp-text {
+    width: 100%;
+    flex: 0 0 auto;
+    height: auto;
+    gap: min(2.5cqh, 3cqw);
+  }
+
+  .cp-tp-word {
+    flex: 0 0 auto;
+    height: min(12cqh, 9cqw);
+  }
+
+  .cp-no-meta .cp-tp-word {
+    flex-basis: auto;
+    height: min(15cqh, 10cqw);
+  }
+
+  .cp-tp-meta {
+    flex: 0 0 auto;
+    height: min(8cqh, 10cqw);
+  }
+}
+
+/* ---------- Logo du jeu (liste) ---------- */
+
+.cp-fb-wheel {
+  background: transparent;
+}
+
+.cp-wh-title {
+  position: absolute;
+  inset: 6cqmin;
+}
+
+/* Chrome : capitales resserrées, métal clair à l'horizon sarcelle. */
+.cp-wh-chrome > span {
+  font-family: 'CP Bebas Neue', 'Segoe UI', sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  line-height: 1.02;
+  filter: drop-shadow(0 0 0.03em color-mix(in srgb, var(--cp-primary) 80%, transparent)) drop-shadow(0 0.05em 0.03em rgba(0, 0, 0, 0.9));
+}
+
+.cp-wh-chrome .cp-ink {
+  background: linear-gradient(180deg, #fff 0%, #dbe7e3 40%, #4f6f68 52%, #b9d3cc 70%, #ffffff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Néon : tube sarcelle. */
+.cp-wh-neon > span {
+  font-family: 'CP Audiowide', 'Segoe UI', sans-serif;
+  line-height: 1.15;
+  color: color-mix(in srgb, var(--cp-primary) 25%, #fff);
+  text-shadow:
+    0 0 0.04em var(--cp-primary),
+    0 0 0.1em color-mix(in srgb, var(--cp-primary) 65%, transparent),
+    0 0.04em 0.02em rgba(0, 0, 0, 0.9);
+}
+
+/* Arcade : capitales larges, du blanc à la sarcelle, ombre portée vert-noir. */
+.cp-wh-arcade > span {
+  font-family: 'CP Orbitron', 'Segoe UI', sans-serif;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  filter: drop-shadow(0.05em 0.05em 0 #0b2a25) drop-shadow(0 0 0.02em #000);
+}
+
+.cp-wh-arcade .cp-ink {
+  background: linear-gradient(180deg, #ffffff 0%, color-mix(in srgb, var(--cp-primary) 45%, #fff) 50%, var(--cp-primary) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ---------- Fond du plateau (aussi sous le chargement) ---------- */
+
+.cp-fb-playfield,
+.cp-fb-loading {
+  background: var(--cp-void);
+}
+
+/* Une nappe sarcelle immobile sous le verre fumé ; seul le reflet passe. */
+.cp-pf-haze {
+  position: absolute;
+  left: -30cqmax;
+  top: -35cqmax;
+  width: 100cqmax;
+  height: 100cqmax;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(28, 143, 128, 0.22) 0%, transparent 62%);
+}
+
+.cp-pf-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%, transparent 45%, rgba(3, 8, 7, 0.72) 100%);
+}
+
+/* ---------- Chargement ---------- */
+
+.cp-ld-body {
+  position: absolute;
+  inset: 8cqmin 7cqmin;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2.4cqmin;
+}
+
+.cp-ld-brand {
+  flex: 0 0 3.4cqmin;
+  width: 100%;
+  margin-bottom: 2cqmin;
+}
+
+.cp-ld-title {
+  flex: 0 1 30cqh;
+  width: 100%;
+}
+
+.cp-ld-meta {
+  flex: 0 0 4.4cqmin;
+  width: 100%;
+}
+
+.cp-ld-bar {
+  position: relative;
+  flex: 0 0 auto;
+  width: min(60cqw, 70cqmin);
+  height: max(2px, 0.5cqmin);
+  margin-top: 2.6cqmin;
+  border-radius: 1cqmin;
+  overflow: hidden;
+  background: var(--cp-line);
+}
+
+.cp-ld-run {
+  position: absolute;
+  inset: 0;
+  width: 35%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--cp-primary), transparent);
+  animation: cp-run 1.8s ease-in-out infinite;
+}
+
+@keyframes cp-run {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+.cp-ld-label {
+  flex: 0 0 3.2cqmin;
+  width: 100%;
+}
+
+.cp-ld-label > span {
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--cp-muted);
+}
+
+.cp-ld-slot {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-width: 100%;
+  margin-top: 2cqmin;
+}
+
+.cp-ld-slot:empty {
+  display: none;
+}
+
+/* Bande très large : les tailles suivent la hauteur, le petit côté. */
+@container (min-aspect-ratio: 5 / 2) {
+  .cp-ld-body {
+    inset: 5cqh 5cqw;
+    gap: 2.5cqh;
+  }
+
+  .cp-ld-brand {
+    flex-basis: 8cqh;
+    margin-bottom: 0;
+  }
+
+  .cp-ld-title {
+    flex-basis: 30cqh;
+  }
+
+  .cp-ld-meta {
+    flex-basis: 10cqh;
+  }
+
+  .cp-ld-bar {
+    height: 1.2cqh;
+    margin-top: 1cqh;
+  }
+
+  .cp-ld-label {
+    flex-basis: 8cqh;
+  }
+
+  .cp-ld-slot {
+    margin-top: 1cqh;
+  }
+}
+
+/* ---------- En partie ---------- */
+
+.cp-fb-ingame {
+  background: var(--cp-void);
+}
+
+.cp-ig-card {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 56cqw;
+  height: 46cqh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4%;
+  opacity: 0.55;
+}
+
+.cp-ig-card.cp-ig-slide {
+  transition: transform 8s ease-in-out;
+}
+
+.cp-ig-brand {
+  flex: 0 0 8%;
+  align-self: stretch;
+}
+
+.cp-ig-title {
+  flex: 0 0 44%;
+  align-self: stretch;
+}
+
+/* Sans éclat : l'écran reste allumé toute la partie. */
+.cp-ig-title > span {
+  color: #c4d2cd;
+  text-shadow: none;
+}
+
+.cp-ig-meta {
+  flex: 0 0 11%;
+  align-self: stretch;
+}
+
+.cp-ig-card .cp-rule {
+  width: 40%;
+  box-shadow: none;
+  opacity: 0.7;
+}
+
+.cp-ig-state {
+  flex: 0 0 8%;
+  align-self: stretch;
+}
+
+.cp-ig-state > span {
+  color: var(--cp-muted);
+  letter-spacing: 0.08em;
+}
+
+@container (min-aspect-ratio: 5 / 2) {
+  .cp-ig-card {
+    width: 60cqw;
+    height: 82cqh;
+  }
+
+  .cp-ig-title {
+    flex-basis: 40%;
+  }
+
+  .cp-ig-meta {
+    flex-basis: 16%;
+  }
+}
+
+@container (max-aspect-ratio: 4 / 5) {
+  .cp-ig-card {
+    width: 82cqw;
+    height: 32cqh;
+  }
+}

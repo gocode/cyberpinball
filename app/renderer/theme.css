@@ -1,0 +1,57 @@
+/*
+ * Thème commun de Cyber Pinball (docs/design-system) : police, couleurs, lumière.
+ * Chargé avant la feuille de chaque page ; les feuilles gardent leurs propres noms de
+ * variables (--bg, --accent…), rebranchés sur ces jetons.
+ */
+
+@font-face {
+  font-family: 'Saira';
+  src: url('polices/saira/Saira-wdth-wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-stretch: 50% 125%;
+  font-display: block;
+}
+
+:root {
+  --void: #030807;
+  --surface: #07110f;
+  --surface-raised: #0c1a17;
+  --surface-sunken: #040b0a;
+  --line-soft: #17302b;
+  --line-strong: #24504a;
+  --ink: #e6f0ec;
+  --ink-muted: #9bada7;
+  --ink-faint: #62776f;
+  --signal: #8be23a;
+  --signal-wash: rgba(139, 226, 58, 0.1);
+  --signal-haze: rgba(139, 226, 58, 0.28);
+  --on-signal: #071204;
+  --meta: #5fb4cf;
+  --warning: #f2b33d;
+  --on-warning: #1a1203;
+  --danger: #ff6b6b;
+  --halo: #1c8f80;
+  --dmd: #ff8a1f;
+  --scrim: rgba(3, 8, 7, 0.72);
+  --scrim-strong: rgba(3, 8, 7, 0.88);
+  --halo-panel: 0 0 0 1px rgba(28, 143, 128, 0.1), 0 0 32px rgba(28, 143, 128, 0.16);
+  --glow-signal: 0 0 0 1px var(--signal), 0 0 18px rgba(139, 226, 58, 0.22);
+  --font-ui: 'Saira', 'Segoe UI', system-ui, sans-serif;
+  /* Fond « verre fumé » : un reflet oblique sarcelle sur le noir, quand aucun média ne remplit l'écran. */
+  --fond-ambiance:
+    linear-gradient(115deg, transparent 48%, rgba(16, 43, 38, 0.23) 48.15%, transparent 66%),
+    radial-gradient(ellipse at 92% 15%, #143d35 0%, transparent 58%),
+    linear-gradient(150deg, var(--surface-raised), var(--void) 65%);
+}
+
+/*
+ * Hauteur de ligne imposée : celle que Saira choisirait d'elle-même (1,57 fois la taille)
+ * est 18 % plus haute que celle de Segoe UI (1,33), pour laquelle toutes les mises en
+ * page ont été réglées. Les éléments qui fixent la leur la gardent.
+ */
+html,
+body {
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.33;
+}
