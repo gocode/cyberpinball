@@ -16,8 +16,12 @@
 # Captures dans tmp\demo-mise-a-jour\home\captures : dans le bac à sable, seul endroit où la
 # version relancée par l'installeur a le droit d'écrire.
 #   .\docs\demo-mise-a-jour.ps1                 # -SansFabrication : reprend les installeurs déjà faits
+#   .\docs\demo-mise-a-jour.ps1 -Deploye        # ancienne version copiée comme par npm run deployer
+#                                               (sans l'installeur, donc sans installation.ini),
+#                                               avec un raccourci de démarrage déjà là
 param(
   [switch]$SansFabrication,
+  [switch]$Deploye,
   [int]$Port = 8765,
   [string]$Source = 'D:\CyberPinball'
 )
@@ -57,6 +61,10 @@ try {
     node scripts\fabriquer.mjs --installeur --leger | Select-Object -Last 1
     if ($LASTEXITCODE -ne 0) { throw 'Fabrication de l''ancienne version impossible.' }
     Copy-Item "$wt\release\CyberPinball-Setup.exe" $ancien
+    # L'application elle-même, pour -Deploye : ce que copie npm run deployer.
+    $copie = "$base\installeurs\app-ancienne"
+    if (Test-Path $copie) { Remove-Item -Recurse -Force $copie }
+    Copy-Item -Recurse "$wt\release\win-unpacked" $copie
   }
   "`n=== Publication locale de $nouvelle"
   Set-Content "$base\nouveautes.md" "- Version d'essai de la mise à jour`n- Deuxième point des nouveautés" -Encoding UTF8
@@ -75,11 +83,22 @@ $feed | ConvertTo-Json | Set-Content "$faux\cyberpinball-maj.json" -Encoding UTF
 
 "`n=== Installation de $ancienne dans le bac à sable"
 $env:CYBERPINBALL_HOME = $home_
-$p = Start-Process $ancien -ArgumentList '/S', '/DEMARRAGE', '/SANSBUREAU', "/D=$racine" -NoNewWindow -PassThru
-# Sans ce handle gardé, PowerShell ne donne pas le code de sortie.
-$null = $p.Handle
-$p.WaitForExit()
-if ($p.ExitCode -ne 0 -or -not (Test-Path $exe)) { throw "Installation de $ancienne impossible (code $($p.ExitCode))." }
+if ($Deploye) {
+  # Comme npm run deployer : app\ copié dans la racine, ni journal ni désinstalleur ; le
+  # raccourci de démarrage existe déjà (créé à la main), pas celui du bureau.
+  if (-not (Test-Path "$base\installeurs\app-ancienne")) { throw 'Copie de l''ancienne version absente : relancer sans -SansFabrication.' }
+  foreach ($d in 'tables', 'media', 'data', 'config', 'downloads', 'import', 'emulators') { New-Item -ItemType Directory -Force "$racine\$d" | Out-Null }
+  Copy-Item -Recurse "$base\installeurs\app-ancienne" "$racine\app"
+  New-Item -ItemType Directory -Force "$home_\Démarrage" | Out-Null
+  Set-Content "$home_\Démarrage\Cyber Pinball.lnk" 'raccourci de démarrage existant'
+  if (-not (Test-Path $exe) -or (Test-Path "$racine\app\installation.ini")) { throw 'Déploiement de l''ancienne version impossible.' }
+} else {
+  $p = Start-Process $ancien -ArgumentList '/S', '/DEMARRAGE', '/SANSBUREAU', "/D=$racine" -NoNewWindow -PassThru
+  # Sans ce handle gardé, PowerShell ne donne pas le code de sortie.
+  $null = $p.Handle
+  $p.WaitForExit()
+  if ($p.ExitCode -ne 0 -or -not (Test-Path $exe)) { throw "Installation de $ancienne impossible (code $($p.ExitCode))." }
+}
 
 # Le site : flux et installeur, chaque requête notée.
 $journal = "$base\site.txt"; Remove-Item $journal -ErrorAction SilentlyContinue

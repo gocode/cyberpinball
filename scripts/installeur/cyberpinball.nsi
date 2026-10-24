@@ -639,6 +639,15 @@ Function .onInit
     ${If} $R1 == "1"
       !insertmacro SelectSection ${SEC_DEMARRAGE}
     ${EndIf}
+  ${ElseIf} $Maj == "1"
+    ; Mise à jour d'une borne déployée sans l'installeur (npm run deployer) : pas de journal,
+    ; les raccourcis restent ceux qui existent.
+    ${IfNot} ${FileExists} "$BureauDir\${PRODUIT}.lnk"
+      !insertmacro UnselectSection ${SEC_BUREAU}
+    ${EndIf}
+    ${If} ${FileExists} "$DemarrageDir\${PRODUIT}.lnk"
+      !insertmacro SelectSection ${SEC_DEMARRAGE}
+    ${EndIf}
   ${EndIf}
   ClearErrors
   ${GetOptions} $R0 "/DEMARRAGE" $R1

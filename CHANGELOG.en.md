@@ -7,6 +7,11 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.1
+
+- Updating from the cabinet also works on a cabinet copied without the installer: its shortcuts stay as they are.
+- A subtler red dot on the gear; the system menu opens on the entry that needs you.
+
 ## 0.1.0
 
 - First public release: screen, button and sound setup wizard, table menu driven by the cabinet buttons.

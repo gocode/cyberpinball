@@ -76,13 +76,14 @@ export function createUpdatesMenu(host: UpdatesHost) {
   const date = (iso: string) => formatDate(iso);
 
   /**
-   * L'application tourne depuis une installation (app\ d'une racine, posé par l'installeur) ;
-   * sinon (npm start, déploiement de développement), on peut chercher mais pas installer.
+   * L'application tourne installée : CyberPinball.exe dans le dossier app\ d'une racine, qu'il
+   * y ait été posé par l'installeur ou par npm run deployer (sans installation.ini). Lancée
+   * depuis les sources (npm start), on peut chercher mais pas installer.
    */
   function installedRoot(): string | undefined {
     // Captures et essais, dans un bac à sable seulement : sa racine passe pour une installation.
     if (process.env.CYBERPINBALL_HOME && process.env.CYBERPINBALL_MAJ_INSTALLEE === '1') return host.loc.root;
-    if (path.basename(host.exeDir).toLowerCase() !== 'app' || !fs.existsSync(path.join(host.exeDir, 'installation.ini'))) return undefined;
+    if (path.basename(host.exeDir).toLowerCase() !== 'app' || !fs.existsSync(path.join(host.exeDir, 'CyberPinball.exe'))) return undefined;
     return path.dirname(host.exeDir);
   }
 

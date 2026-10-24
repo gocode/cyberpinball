@@ -12,6 +12,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { auditText } from './audit-publication.mjs';
+import { githubToken, missingTokenMessage } from './jeton-github.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -36,8 +37,8 @@ export async function describeRepository({ dryRun = false } = {}) {
   if (profile.problems.length) throw new Error(profile.problems.join(' ; '));
   console.log(`Dépôt : github.com/${profile.repository}\nDescription (${profile.description.length} caractères) : ${profile.description}\nSujets : ${profile.topics.join(', ')}`);
   if (dryRun) return console.log('Essai : rien n’est envoyé.');
-  const token = process.env.CYBERPINBALL_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
-  if (!token) throw new Error('jeton GitHub absent (CYBERPINBALL_GITHUB_TOKEN).');
+  const token = githubToken()?.token;
+  if (!token) throw new Error(missingTokenMessage());
   const api = async (method, url, body) => {
     const response = await fetch(`https://api.github.com/repos/${profile.repository}${url}`, {
       method,

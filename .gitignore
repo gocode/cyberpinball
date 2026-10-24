@@ -5,3 +5,12 @@ tmp/
 build/
 release/
 cache/
+
+# Secrets : jamais suivis par git (le dépôt est public ; scripts/audit-publication.mjs les refuse aussi).
+jeton-github.txt
+.env
+.env.*
+*.pem
+*.pfx
+*.p12
+*.key

@@ -49,6 +49,9 @@ function privateLinks(file, text) {
   return found;
 }
 
+/** Fichiers de secrets : jamais suivis par git, même vides (exclus aussi par .gitignore). */
+const SECRET_FILES = /(^|\/)(jeton-github\.txt|\.env(\..+)?)$|\.(pem|pfx|p12|key)$/i;
+
 const RULES = [
   { what: 'clé privée', re: /-----BEGIN [A-Z ]*PRIVATE KEY-----/ },
   { what: 'jeton GitHub', re: /\b(ghp|gho|ghu|ghs|ghr)_[A-Za-z0-9]{30,}|\bgithub_pat_[A-Za-z0-9_]{20,}/ },
@@ -85,6 +88,7 @@ export function auditRepository({ commits } = {}) {
   const problems = [];
   const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: repo, encoding: 'utf8' }).split('\0').filter(Boolean);
   // Seuls les fichiers publiés comptent : les documents internes ne partent pas.
+  for (const f of tracked.filter((x) => SECRET_FILES.test(x))) problems.push(`${f} : fichier de secret suivi par git (à retirer : git rm --cached)`);
   const files = tracked.filter((f) => !isPrivate(f));
   for (const file of files) {
     if (BINARY.test(file)) continue;

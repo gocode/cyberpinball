@@ -16,8 +16,8 @@
 // Une version avec préversion (0.2.0-beta.1) est publiée en
 // « pre-release » : GitHub ne la donne pas pour « latest », les bornes ne la voient pas.
 //
-// Jeton GitHub : CYBERPINBALL_GITHUB_TOKEN (sinon GITHUB_TOKEN, GH_TOKEN), à grain fin, limité
-// au dépôt, permission « Contents : read and write ». Jamais dans le dépôt ni sur la ligne de commande.
+// Jeton GitHub : voir scripts/jeton-github.mjs (%USERPROFILE%\.cyberpinball\jeton-github.txt, ou
+// CYBERPINBALL_GITHUB_TOKEN). Jamais dans le dépôt ni sur la ligne de commande.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -27,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { auditRepository } from './audit-publication.mjs';
 import { loadPrivateKey } from './cle-publication.mjs';
 import { describeRepository } from './decrire-github.mjs';
+import { githubToken, missingTokenMessage } from './jeton-github.mjs';
 import { snapshotAndPush } from './envoyer-github.mjs';
 import { bulletPoints, changelogNotes, changelogSections } from './traductions.mjs';
 
@@ -65,7 +66,8 @@ console.log(`${audit.files} fichiers suivis : rien de personnel ni de secret.`);
 
 // GitHub : la release est posée sur l'instantané du commit local (scripts/envoyer-github.mjs :
 // le dépôt public n'a pas l'historique détaillé), ou sur --commit, déjà sur GitHub.
-const token = process.env.CYBERPINBALL_GITHUB_TOKEN || process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+const found = githubToken();
+const token = found?.token;
 const api = async (method, url, body, headers = {}) => {
   const response = await fetch(url.startsWith('https://') ? url : `https://api.github.com/repos/${repository}${url}`, {
     method,
@@ -76,7 +78,8 @@ const api = async (method, url, body, headers = {}) => {
   return { status: response.status, json: text ? JSON.parse(text) : undefined };
 };
 if (!local) {
-  if (!token) fail('jeton GitHub absent (CYBERPINBALL_GITHUB_TOKEN).');
+  if (!token) fail(missingTokenMessage());
+  console.log(`Jeton GitHub : ${found.source}.`);
   if (!option('--commit') && execFileSync('git', ['status', '--porcelain', '--untracked-files=no'], { cwd: repo, encoding: 'utf8' }).trim()) {
     fail('des modifications ne sont pas enregistrées (git status) : la version publiée doit correspondre à un commit.');
   }

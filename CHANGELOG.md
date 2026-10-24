@@ -9,6 +9,11 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.1
+
+- Mise à jour depuis la borne, aussi pour une borne copiée sans l'installeur : ses raccourcis restent ceux qui existent.
+- Pastille rouge plus discrète sur la roue dentée ; le menu système s'ouvre sur l'entrée qui attend.
+
 ## 0.1.0
 
 - Première version publique : assistant d'écrans, de boutons et de son, menu des tables aux boutons de la borne.
