@@ -189,5 +189,18 @@ if ($Etapes -contains 'images') {
     )
     Write-Planche "$out\vpx-settings.webp" 1600 900 @(@{ src = "$c\reglages\reglages-01-ArrowDown.png"; x = 0; y = 0; w = 1600; h = 900 })
   }
+  # Chaque image change d'adresse quand son contenu change (?v=<empreinte>) : un navigateur ou
+  # GitHub ne montre jamais l'ancienne image gardée en cache sous le même nom.
+  foreach ($pair in @(@('en', 'README.md'), @('fr', 'README.fr.md'))) {
+    $readme = "$wt\$($pair[1])"
+    $text = [IO.File]::ReadAllText($readme)
+    $text = [regex]::Replace($text, "docs/images/$($pair[0])/([\w-]+)\.webp(\?v=[0-9a-f]+)?", {
+        param($m)
+        $file = "$wt\docs\images\$($pair[0])\$($m.Groups[1].Value).webp"
+        $hash = (Get-FileHash $file -Algorithm SHA256).Hash.Substring(0, 10).ToLower()
+        "docs/images/$($pair[0])/$($m.Groups[1].Value).webp?v=$hash"
+      })
+    [IO.File]::WriteAllText($readme, $text, [Text.UTF8Encoding]::new($false))
+  }
 }
 "Captures dans $base\<langue>\captures (version annoncée : $next)."

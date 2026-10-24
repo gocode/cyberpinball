@@ -8,7 +8,7 @@ You describe your cabinet once: its screens, buttons and speakers. Cyber Pinball
 
 > **Status: early prototype (0.1.0).** Windows only, built around Visual Pinball X 10.8.1 in plugin mode. Expect rough edges, and back up your tables before trying it.
 
-<p align="center"><img src="docs/images/en/cabinet.webp" width="880" alt="The table menu on a four-screen cabinet: the playfield screen, shown upright, with the selected table's playfield image, the wheel of table logos and the button hints; next to it the topper, the backglass and the DMD showing the same game, Neon Abyss."></p>
+<p align="center"><img src="docs/images/en/cabinet.webp?v=7a6c78df66" width="880" alt="The table menu on a four-screen cabinet: the playfield screen, shown upright, with the selected table's playfield image, the wheel of table logos and the button hints; next to it the topper, the backglass and the DMD showing the same game, Neon Abyss."></p>
 
 ## Features
 
@@ -29,14 +29,14 @@ You describe your cabinet once: its screens, buttons and speakers. Cyber Pinball
 Every screenshot is taken off-screen by [`docs/demo-captures.ps1`](docs/demo-captures.ps1) on a simulated cabinet (4K playfield lying flat, backglass, DMD and topper). The games are made up: their playfields, backglasses and toppers are original illustrations generated with an image model for these screenshots ([`docs/demo-captures-medias`](docs/demo-captures-medias)), and the rest is drawn by the script.
 
 <p align="center">
-  <img src="docs/images/en/game-page.webp" width="270" alt="The game page of Neon Abyss: play statistics, files, and the actions Play, Flyer, Rules, Edit info, Game media, Settings for this table, Diagnose and fix, Remove table.">
-  <img src="docs/images/en/system-menu.webp" width="270" alt="The system menu, Menu and setup: add a table, VPX settings, cabinet setup, VPS catalog, download queue, table updates, site accounts, ROM library, media import and download, media, sound and attract mode.">
-  <img src="docs/images/en/update.webp" width="270" alt="An update is available: Cyber Pinball 0.2.0, its release date, what's new, the size of the signed installer, and the Update now and Later buttons.">
+  <img src="docs/images/en/game-page.webp?v=7ba374c8d0" width="270" alt="The game page of Neon Abyss: play statistics, files, and the actions Play, Flyer, Rules, Edit info, Game media, Settings for this table, Diagnose and fix, Remove table.">
+  <img src="docs/images/en/system-menu.webp?v=395397ca9f" width="270" alt="The system menu, Menu and setup: add a table, VPX settings, cabinet setup, VPS catalog, download queue, table updates, site accounts, ROM library, media import and download, media, sound and attract mode.">
+  <img src="docs/images/en/update.webp?v=94e1b361a1" width="270" alt="An update is available: Cyber Pinball 0.2.0, its release date, what's new, the size of the signed installer, and the Update now and Later buttons.">
 </p>
 
-<p align="center"><img src="docs/images/en/wizard.webp" width="880" alt="The setup wizard, screens and roles step: each of the four screens shows its number, and the playfield screen asks “Playfield?” with the flipper and Start hints."></p>
+<p align="center"><img src="docs/images/en/wizard.webp?v=6d53e1887b" width="880" alt="The setup wizard, screens and roles step: each of the four screens shows its number, and the playfield screen asks “Playfield?” with the flipper and Start hints."></p>
 
-<p align="center"><img src="docs/images/en/vpx-settings.webp" width="880" alt="The VPX settings screen: the Essentials tab with table view and sound settings, the values managed by Cyber Pinball, and the description of the selected setting."></p>
+<p align="center"><img src="docs/images/en/vpx-settings.webp?v=133ac0549e" width="880" alt="The VPX settings screen: the Essentials tab with table view and sound settings, the values managed by Cyber Pinball, and the description of the selected setting."></p>
 
 ## Requirements
 

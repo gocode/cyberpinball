@@ -8,7 +8,7 @@ On décrit la borne une fois : ses écrans, ses boutons, ses haut-parleurs. Cybe
 
 > **État : premier prototype (0.1.0).** Windows seulement, pensé pour Visual Pinball X 10.8.1 en mode plugins. Tout n'est pas encore poli : sauvegardez vos tables avant d'essayer.
 
-<p align="center"><img src="docs/images/fr/cabinet.webp" width="880" alt="Le menu des tables sur une borne à quatre écrans : l'écran du playfield, remis debout, avec l'image du plateau de la table choisie, la roue des logos et les commandes ; à côté, le topper, le fronton et l'afficheur DMD du même jeu, Neon Abyss."></p>
+<p align="center"><img src="docs/images/fr/cabinet.webp?v=8ecc538129" width="880" alt="Le menu des tables sur une borne à quatre écrans : l'écran du playfield, remis debout, avec l'image du plateau de la table choisie, la roue des logos et les commandes ; à côté, le topper, le fronton et l'afficheur DMD du même jeu, Neon Abyss."></p>
 
 ## Ce qu'il fait
 
@@ -29,14 +29,14 @@ On décrit la borne une fois : ses écrans, ses boutons, ses haut-parleurs. Cybe
 Chaque capture est prise hors écran par [`docs/demo-captures.ps1`](docs/demo-captures.ps1), sur une borne simulée (playfield 4K couché, fronton, DMD et topper). Les jeux sont inventés : leurs playfields, frontons et toppers sont des illustrations originales générées par un modèle d'images pour ces captures ([`docs/demo-captures-medias`](docs/demo-captures-medias)), le reste est dessiné par le script.
 
 <p align="center">
-  <img src="docs/images/fr/game-page.webp" width="270" alt="La fiche de Neon Abyss : statistiques de parties, fichiers, et les actions Jouer, Prospectus, Règles, Modifier les informations, Médias du jeu, Réglages de cette table, Diagnostiquer et réparer, Supprimer la table.">
-  <img src="docs/images/fr/system-menu.webp" width="270" alt="Le menu système, Menu et configuration : ajouter une table, réglages de VPX, configuration de la borne, catalogue VPS, liste d'attente, mises à jour des tables, comptes des sites, bibliothèque de ROM, import et téléchargement des médias, médias, son et attente.">
-  <img src="docs/images/fr/update.webp" width="270" alt="Une mise à jour est disponible : Cyber Pinball 0.2.0, sa date de publication, ses nouveautés, la taille de l'installeur signé, et les boutons Mettre à jour maintenant et Plus tard.">
+  <img src="docs/images/fr/game-page.webp?v=3ab4ce8d10" width="270" alt="La fiche de Neon Abyss : statistiques de parties, fichiers, et les actions Jouer, Prospectus, Règles, Modifier les informations, Médias du jeu, Réglages de cette table, Diagnostiquer et réparer, Supprimer la table.">
+  <img src="docs/images/fr/system-menu.webp?v=97616d0825" width="270" alt="Le menu système, Menu et configuration : ajouter une table, réglages de VPX, configuration de la borne, catalogue VPS, liste d'attente, mises à jour des tables, comptes des sites, bibliothèque de ROM, import et téléchargement des médias, médias, son et attente.">
+  <img src="docs/images/fr/update.webp?v=662e1ddbcd" width="270" alt="Une mise à jour est disponible : Cyber Pinball 0.2.0, sa date de publication, ses nouveautés, la taille de l'installeur signé, et les boutons Mettre à jour maintenant et Plus tard.">
 </p>
 
-<p align="center"><img src="docs/images/fr/wizard.webp" width="880" alt="L'assistant, étape des écrans et des rôles : chacun des quatre écrans affiche son numéro, et celui du playfield demande « Playfield ? » avec les commandes des flippers et de Start."></p>
+<p align="center"><img src="docs/images/fr/wizard.webp?v=09d1ab2806" width="880" alt="L'assistant, étape des écrans et des rôles : chacun des quatre écrans affiche son numéro, et celui du playfield demande « Playfield ? » avec les commandes des flippers et de Start."></p>
 
-<p align="center"><img src="docs/images/fr/vpx-settings.webp" width="880" alt="L'écran des réglages de VPX : l'onglet Essentiels avec la vue de la table et le son, les valeurs gérées par Cyber Pinball, et la description du réglage choisi."></p>
+<p align="center"><img src="docs/images/fr/vpx-settings.webp?v=c9656649ad" width="880" alt="L'écran des réglages de VPX : l'onglet Essentiels avec la vue de la table et le son, les valeurs gérées par Cyber Pinball, et la description du réglage choisi."></p>
 
 ## Prérequis
 
