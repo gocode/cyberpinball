@@ -5,7 +5,7 @@
 // DEVMODEW est lu et écrit octet par octet, comme les structures de index.ts.
 
 import * as koffi from 'koffi';
-import type { Rotation } from '@cyberpinball/core';
+import { t, type Rotation } from '@cyberpinball/core';
 
 const ENUM_CURRENT_SETTINGS = 0xffffffff;
 const CDS_UPDATEREGISTRY = 0x1;
@@ -27,13 +27,27 @@ const DMDO: Record<Rotation, number> = { 0: 0, 90: 1, 180: 2, 270: 3 };
 
 // Codes DISP_CHANGE_* (winuser.h).
 const DISP_CHANGE: Record<number, string> = {
-  1: 'redémarrage nécessaire',
-  [-1]: 'le pilote a refusé',
-  [-2]: 'mode non pris en charge',
-  [-3]: 'réglage non enregistré',
-  [-4]: 'options invalides',
-  [-5]: 'paramètre invalide',
-  [-6]: 'mode double écran refusé',
+  get 1() {
+    return t('redémarrage nécessaire');
+  },
+  get [-1]() {
+    return t('le pilote a refusé');
+  },
+  get [-2]() {
+    return t('mode non pris en charge');
+  },
+  get [-3]() {
+    return t('réglage non enregistré');
+  },
+  get [-4]() {
+    return t('options invalides');
+  },
+  get [-5]() {
+    return t('paramètre invalide');
+  },
+  get [-6]() {
+    return t('mode double écran refusé');
+  },
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -64,7 +78,7 @@ function currentMode(w: Api, gdiName: string): Buffer {
   const mode = Buffer.alloc(DEVMODE_SIZE);
   mode.writeUInt16LE(DEVMODE_SIZE, OFFSET_SIZE);
   if (!w.EnumDisplaySettingsExW(gdiName, ENUM_CURRENT_SETTINGS, mode, 0)) {
-    throw new Error(`Écran ${gdiName} introuvable : Windows ne donne pas son mode d'affichage.`);
+    throw new Error(t("Écran {name} introuvable : Windows ne donne pas son mode d'affichage.", { name: gdiName }));
   }
   return mode;
 }
@@ -93,12 +107,12 @@ function change(w: Api, gdiName: string, mode: Buffer, flags: number): number {
 }
 
 function describe(code: number): string {
-  return `${DISP_CHANGE[code] ?? 'erreur inconnue'}, code ${code}`;
+  return t('{reason}, code {code}', { reason: Object.hasOwn(DISP_CHANGE, code) ? DISP_CHANGE[code]! : t('erreur inconnue'), code });
 }
 
 /** Orientation actuelle d'un écran, désigné par son nom GDI (« \\.\DISPLAY13 »). */
 export function displayOrientation(gdiName: string): Rotation {
-  if (process.platform !== 'win32') throw new Error("L'orientation des écrans ne se règle que sous Windows.");
+  if (process.platform !== 'win32') throw new Error(t("L'orientation des écrans ne se règle que sous Windows."));
   return orientationOf(currentMode(loadApi(), gdiName));
 }
 
@@ -109,7 +123,7 @@ export function displayOrientation(gdiName: string): Rotation {
  * d'origine et une erreur explique pourquoi.
  */
 export function setDisplayOrientation(gdiName: string, rotation: Rotation): Rotation {
-  if (process.platform !== 'win32') throw new Error("L'orientation des écrans ne se règle que sous Windows.");
+  if (process.platform !== 'win32') throw new Error(t("L'orientation des écrans ne se règle que sous Windows."));
   const w = loadApi();
   const original = currentMode(w, gdiName);
   const before = orientationOf(original);
@@ -117,7 +131,7 @@ export function setDisplayOrientation(gdiName: string, rotation: Rotation): Rota
 
   const wanted = modeFor(original, rotation);
   const tested = change(w, gdiName, wanted, CDS_TEST);
-  if (tested !== 0) throw new Error(`Windows refuse de tourner l'écran ${gdiName} (${describe(tested)}).`);
+  if (tested !== 0) throw new Error(t("Windows refuse de tourner l'écran {name} ({reason}).", { name: gdiName, reason: describe(tested) }));
 
   const applied = change(w, gdiName, wanted, CDS_UPDATEREGISTRY);
   const after = orientationOf(currentMode(w, gdiName));
@@ -125,7 +139,7 @@ export function setDisplayOrientation(gdiName: string, rotation: Rotation): Rota
 
   // Windows a refusé ou fait autre chose : on remet l'écran comme il était.
   const restored = after === before ? 0 : change(w, gdiName, modeFor(currentMode(w, gdiName), before), CDS_UPDATEREGISTRY);
-  const reason = applied !== 0 ? describe(applied) : `orientation relue : ${after}° au lieu de ${rotation}°`;
-  const state = restored === 0 ? `orientation d'origine (${before}°) rétablie` : `orientation d'origine non rétablie (${describe(restored)})`;
-  throw new Error(`Windows n'a pas tourné l'écran ${gdiName} (${reason}) ; ${state}.`);
+  const reason = applied !== 0 ? describe(applied) : t('orientation relue : {after}° au lieu de {wanted}°', { after, wanted: rotation });
+  const state = restored === 0 ? t("orientation d'origine ({before}°) rétablie", { before }) : t("orientation d'origine non rétablie ({reason})", { reason: describe(restored) });
+  throw new Error(t("Windows n'a pas tourné l'écran {name} ({reason}) ; {state}.", { name: gdiName, reason, state }));
 }

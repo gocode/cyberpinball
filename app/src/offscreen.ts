@@ -207,14 +207,14 @@ function check(): void {
   };
   for (const win of BrowserWindow.getAllWindows()) {
     created.add(win.id);
-    if (win.isVisible()) note(`fenêtre visible « ${win.getTitle()} »`);
-    if (win.isFocused()) note(`fenêtre au premier plan « ${win.getTitle()} »`);
+    if (win.isVisible()) note(`fenêtre visible « ${win.getTitle()} »`); // i18n-ignore : guet hors écran, console et rapport
+    if (win.isFocused()) note(`fenêtre au premier plan « ${win.getTitle()} »`); // i18n-ignore : guet hors écran, console et rapport
   }
   // Fenêtres natives du processus (boîtes de dialogue comprises), vues par Windows.
   try {
     for (const w of visibleWindowsOf(process.pid)) {
       if (SYSTEM_OVERLAYS.has(w.className)) continue;
-      note(`fenêtre native visible « ${w.title} » (${w.className})`);
+      note(`fenêtre native visible « ${w.title} » (${w.className})`); // i18n-ignore : guet hors écran, console et rapport
     }
   } catch {
     // Hors de Windows, ou API indisponible : le relevé d'Electron suffit.
@@ -232,8 +232,8 @@ function reportFile(): string | undefined {
  */
 function report(final: boolean): void {
   const lines = incidents.size
-    ? [`Fenêtres apparues sur les écrans du poste (${incidents.size}) :`, ...[...incidents].map(([what, at]) => `  ${at} ${what}`)]
-    : [`Aucune fenêtre visible ni au premier plan (${created.size} fenêtre${created.size > 1 ? 's' : ''}, ${checks} contrôles${final ? '' : ', guet en cours'}).`];
+    ? [`Fenêtres apparues sur les écrans du poste (${incidents.size}) :`, ...[...incidents].map(([what, at]) => `  ${at} ${what}`)] // i18n-ignore : guet hors écran, console et rapport
+    : [`Aucune fenêtre visible ni au premier plan (${created.size} fenêtre${created.size > 1 ? 's' : ''}, ${checks} contrôles${final ? '' : ', guet en cours'}).`]; // i18n-ignore : guet hors écran, console et rapport
   if (final) console.log(`Hors écran : ${lines.join('\n')}`);
   const file = reportFile();
   if (!file) return;

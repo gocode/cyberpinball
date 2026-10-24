@@ -10,6 +10,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { t } from './i18n';
 import { parseTableName } from './tables';
 
 export const VPS_DB_URL = 'https://raw.githubusercontent.com/VirtualPinballSpreadsheet/vps-db/main/db/vpsdb.json';
@@ -261,7 +262,7 @@ export async function refreshVpsDb(downloadsDir: string, opts: VpsRefreshOptions
   if (cached && !opts.force && meta.checkedAt && now.getTime() - Date.parse(meta.checkedAt) < CHECK_EVERY_MS) return { status: 'fresh' };
   const get = async (url: string) => {
     const response = await doFetch(url, { redirect: 'follow', signal: AbortSignal.timeout(opts.timeoutMs ?? 60_000) });
-    if (!response.ok) throw new Error(`HTTP ${response.status} pour ${url}`);
+    if (!response.ok) throw new Error(t('HTTP {status} pour {url}', { status: response.status, url }));
     return response.text();
   };
   try {
@@ -274,7 +275,7 @@ export async function refreshVpsDb(downloadsDir: string, opts: VpsRefreshOptions
     const text = await get(VPS_DB_URL);
     const games = JSON.parse(text) as unknown;
     if (!Array.isArray(games) || !games.length || !games.every((g) => g && typeof g.id === 'string' && typeof g.name === 'string')) {
-      throw new Error('la base téléchargée n’a pas le format attendu');
+      throw new Error(t('la base téléchargée n’a pas le format attendu'));
     }
     fs.mkdirSync(downloadsDir, { recursive: true });
     const part = `${file}.part`;
@@ -284,7 +285,7 @@ export async function refreshVpsDb(downloadsDir: string, opts: VpsRefreshOptions
     return { status: 'updated' };
   } catch (error) {
     const err = error as Error;
-    return { status: 'offline', message: err.name === 'TimeoutError' ? 'GitHub ne répond pas' : err.message };
+    return { status: 'offline', message: err.name === 'TimeoutError' ? t('GitHub ne répond pas') : err.message };
   }
 }
 

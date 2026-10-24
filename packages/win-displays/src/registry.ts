@@ -64,7 +64,7 @@ export function hklmSubkeys(path: string): string[] {
       const length = [buffer.length / 2];
       const rc = w.RegEnumKeyExW(handle[0], index, buffer, length, null, null, null, null);
       if (rc === ERROR_NO_MORE_ITEMS) break;
-      if (rc !== ERROR_SUCCESS) throw new Error(`RegEnumKeyExW a échoué (code Win32 ${rc}).`);
+      if (rc !== ERROR_SUCCESS) throw new Error(`RegEnumKeyExW a échoué (code Win32 ${rc}).`); // i18n-ignore : erreur technique d'un appel Win32
       names.push(buffer.toString('utf16le', 0, length[0]! * 2));
     }
   } finally {

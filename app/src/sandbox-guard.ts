@@ -17,7 +17,7 @@ function check(target: FsModule.PathLike | number): void {
   if (typeof target === 'number' || !policy) return;
   const file = target.toString();
   if (isWriteAllowed(policy, file, process.cwd())) return;
-  const message = `Garde-fou du bac à sable : écriture refusée hors du bac à sable (${file}). Autorisé : ${policy.allowed.join(', ')}`;
+  const message = `Garde-fou du bac à sable : écriture refusée hors du bac à sable (${file}). Autorisé : ${policy.allowed.join(', ')}`; // i18n-ignore : garde-fou des essais sans opérateur, message pour le développeur
   console.error(message);
   throw new Error(message);
 }

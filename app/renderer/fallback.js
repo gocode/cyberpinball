@@ -21,6 +21,11 @@
 (() => {
   'use strict';
 
+  // Langue de l'interface (i18n.js, chargé avant ce script dans frontend.html). La page de
+  // démonstration fallback-demo.html le charge sans i18n.js : les textes y restent en français.
+  const t = typeof window.t === 'function' ? window.t : (source, params) => source.replace(/\{(\w+)\}/g, (whole, name) => (params && Object.hasOwn(params, name) ? String(params[name]) : whole));
+  const uiLocale = typeof window.uiLocale === 'function' ? window.uiLocale : () => 'fr-FR';
+
   /**
    * Couleurs de la direction artistique (docs/design-system) : sarcelle lumineuse des
    * filets et bleu des métadonnées. Les mêmes pour tous les jeux : un repli reste calme
@@ -62,12 +67,12 @@
 
   /** « Williams · 1991 », « Williams », « 1991 » ou rien ; le point reste avec le fabricant. */
   const metaOf = (g) => [g.manufacturer, g.year].filter(Boolean).join('\u00a0· ');
-  const upper = (text) => text.toLocaleUpperCase('fr-FR');
+  const upper = (text) => text.toLocaleUpperCase(uiLocale());
 
   // Chargement des polices dès le départ : les afficheurs dessinent sur canvas, où
   // une police pas encore chargée serait remplacée sans prévenir.
   const FONTS = ['"CP Saira"', '"CP Bebas Neue"', '"CP Press Start"', '"CP Orbitron"', '"CP Audiowide"'];
-  const fontsReady = Promise.all(FONTS.map((f) => document.fonts.load(`16px ${f}`, 'AÉé'))).catch(() => {});
+  const fontsReady = Promise.all(FONTS.map((f) => document.fonts.load(`16px ${f}`, 'AÉé'))).catch(() => {}); // i18n-ignore : glyphes d'essai des polices
 
   // ---------- Minuteries, arrêtées quand la fenêtre est cachée ----------
 
@@ -233,7 +238,7 @@
       failures = [];
       for (const [box, text, limits] of fits) {
         const max = typeof limits?.max === 'function' ? limits.max() : limits?.max;
-        if (!fitText(box, text, { ...limits, max })) failures.push(`texte trop long pour sa place : « ${text.textContent} »`);
+        if (!fitText(box, text, { ...limits, max })) failures.push(`texte trop long pour sa place : « ${text.textContent} »`); // i18n-ignore : diagnostic des essais de mise en page
       }
     }
     const render = setup(ctx);
@@ -396,7 +401,7 @@
   const inkCtx = inkCanvas.getContext('2d', { willReadFrequently: true });
   /** Sous SHARP points de haut, les lettres sont espacées de 2 points et posées en 2 nuances (voir rasterize). */
   const SHARP = 24;
-  const BEBAS = (size) => ({ family: '"CP Bebas Neue", "Segoe UI", sans-serif', size, spacing: size < SHARP ? 2 : 1 });
+  const BEBAS = (size) => ({ family: '"CP Bebas Neue", "Segoe UI", sans-serif', size, spacing: size < SHARP ? 2 : 1 }); // i18n-ignore : noms de polices
   const PIXEL = { family: '"CP Press Start", Consolas, monospace', size: 8, spacing: 0, crisp: true };
 
   function setFont(ctx, f) {
@@ -580,9 +585,9 @@
     return {
       hold: (travel / speed) * 1000,
       scroll: true,
-      paint(t) {
+      paint(elapsed) {
         matrix.clear();
-        matrix.blit(bmp, matrix.cols - Math.floor((t / 1000) * speed), Math.floor((matrix.rows - bmp.h) / 2));
+        matrix.blit(bmp, matrix.cols - Math.floor((elapsed / 1000) * speed), Math.floor((matrix.rows - bmp.h) / 2));
       },
     };
   }
@@ -607,7 +612,7 @@
     let lay2 = layoutCut(text, area, { maxSize: 12, minSize: 9, maxLines: 3 });
     if (!lay2) {
       lay2 = layoutPixel(text, area);
-      if (lay2.truncated) problems.push(`texte tronqué sur l'afficheur figé : « ${text} »`);
+      if (lay2.truncated) problems.push(`texte tronqué sur l'afficheur figé : « ${text} »`); // i18n-ignore : diagnostic des essais de mise en page
     }
     const ras = rasterLayout(lay2);
     return still(matrix, hold, () => blitLayout(matrix, ras, area));
@@ -650,44 +655,48 @@
   }
 
   /**
-   * Logo de Cyber Pinball en points (comme l'icône) : bille cerclée, reflet en haut à
-   * gauche, deux flippers dessous. Image de points { w, h, px } de h lignes.
+   * Logo de Cyber Pinball en points, comme l'icône (icone.svg) : plaque au filet faible,
+   * bille cerclée avec son reflet en bas à gauche, traînée qui passe par-dessus le filet
+   * jusqu'au coin haut droit. Image de points { w, h, px } carrée de h lignes.
    */
   function logoBitmap(h) {
-    const w = Math.round(h * 0.9);
+    const w = h;
     const px = new Uint8Array(w * h);
-    const r = h * 0.3;
-    const cx = (w - 1) / 2;
-    const cy = r + 0.5;
+    const set = (x, y, v) => {
+      if (x >= 0 && y >= 0 && x < w && y < h) px[y * w + x] = Math.max(px[y * w + x], v);
+    };
+    // Plaque : un point sur deux le long du bord, coins arrondis, au plus faible.
+    const inset = 2;
+    for (let i = inset + 2; i <= w - 1 - inset - 2; i += 2) {
+      set(i, inset, 1);
+      set(i, h - 1 - inset, 1);
+      set(inset, i, 1);
+      set(w - 1 - inset, i, 1);
+    }
+    const r = h * 0.27;
+    const cx = w * 0.4;
+    const cy = h * 0.6;
+    // Traînée : un fuseau de la bille au coin haut droit, plus lumineux près de la bille.
+    const tx = w - 1;
+    const ty = 0;
+    const len = Math.hypot(tx - cx, ty - cy);
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const t = ((x - cx) * (tx - cx) + (y - cy) * (ty - cy)) / (len * len);
+        if (t <= 0 || t > 1) continue;
+        const dist = Math.abs((x - cx) * (ty - cy) - (y - cy) * (tx - cx)) / len;
+        if (dist <= r * 0.75 * (1 - t) + 0.3) set(x, y, t < 0.55 ? 2 : 1);
+      }
+    }
+    // Bille : cercle plein au-dessus de la traînée, filet clair, reflet en haut à gauche.
     for (let y = 0; y < h; y++) {
       for (let x = 0; x < w; x++) {
         const d = Math.hypot(x - cx, y - cy);
-        let v = 0;
-        if (d <= r) v = d > r - 1 ? 3 : 1;
-        if (Math.hypot(x - (cx - r * 0.4), y - (cy - r * 0.4)) < r * 0.2) v = 3;
-        px[y * w + x] = v;
+        if (d > r) continue;
+        px[y * w + x] = d > r - 1 ? 3 : 0;
+        if (Math.hypot(x - (cx - r * 0.4), y - (cy - r * 0.4)) < r * 0.24) px[y * w + x] = 3;
       }
     }
-    // Flippers : segments épais du pivot (bord) vers la pointe (centre), un peu plus bas.
-    const flipper = (ax, ay, bx, by) => {
-      const steps = Math.ceil(Math.hypot(bx - ax, by - ay) * 2);
-      for (let i = 0; i <= steps; i++) {
-        const t = i / steps;
-        const x = ax + (bx - ax) * t;
-        const y = ay + (by - ay) * t;
-        const thick = 1.4 - 0.8 * t;
-        for (let yy = Math.floor(y - thick); yy <= Math.ceil(y + thick); yy++) {
-          for (let xx = Math.floor(x - thick); xx <= Math.ceil(x + thick); xx++) {
-            if (xx < 0 || yy < 0 || xx >= w || yy >= h || Math.hypot(xx - x, yy - y) > thick + 0.2) continue;
-            px[yy * w + xx] = Math.max(px[yy * w + xx], t < 0.15 ? 3 : 2);
-          }
-        }
-      }
-    };
-    const top = h * 0.74;
-    const tip = h - 2;
-    flipper(1.5, top, cx - 2, tip);
-    flipper(w - 2.5, top, cx + 2, tip);
     return { w, h, px };
   }
 
@@ -743,11 +752,11 @@
       const now = performance.now();
       // Fenêtre cachée puis revenue : on reprend où l'on en était.
       if (now - expected > 250) start += now - expected;
-      const t = now - start;
+      const elapsed = now - start;
       let delay = FRAME;
       if (mode === 'page') {
         const page = pages[index];
-        if (t >= page.hold) {
+        if (elapsed >= page.hold) {
           if (pages.length === 1) {
             start = now;
             page.paint(0);
@@ -762,11 +771,11 @@
             transition(matrix, from, to, 0, kind);
           }
         } else {
-          page.paint(t);
-          if (!page.scroll) delay = page.hold - t;
+          page.paint(elapsed);
+          if (!page.scroll) delay = page.hold - elapsed;
         }
       } else {
-        const k = t / TRANSITION;
+        const k = elapsed / TRANSITION;
         if (k >= 1) {
           mode = 'page';
           start = now;
@@ -829,7 +838,7 @@
           let meta = null;
           if (metaText) {
             const lay = layoutCut(metaText, { w: inner.w, h: 36 }, { maxSize: 18, minSize: 10, maxLines: 3 }) ?? layoutPixel(metaText, { w: inner.w, h: 38 });
-            if (lay.truncated) problems.push(`fabricant tronqué : « ${metaText} »`);
+            if (lay.truncated) problems.push(`fabricant tronqué : « ${metaText} »`); // i18n-ignore : diagnostic des essais de mise en page
             meta = rasterLayout(lay);
           }
           const reserved = meta ? meta.h + 7 : 0;
@@ -838,7 +847,7 @@
           let lay = layoutCut(title, titleArea, { maxSize: 64, minSize: 12, maxLines: 3 });
           if (!lay) {
             lay = layoutPixel(title, titleArea);
-            if (lay.truncated) problems.push(`titre tronqué : « ${title} »`);
+            if (lay.truncated) problems.push(`titre tronqué : « ${title} »`); // i18n-ignore : diagnostic des essais de mise en page
           }
           const ras = rasterLayout(lay);
           // Titre, filet et fabricant forment un bloc centré verticalement.
@@ -910,48 +919,29 @@
   }
 
   /**
-   * Logo de Cyber Pinball, celui de l'icône (scripts/icone.mjs) : bille noire chromée et
-   * deux flippers sombres à liseré sarcelle, dans un cadre de verre fumé ; en couches
-   * animées par le GPU.
+   * Logo de Cyber Pinball : l'icône de l'application (icone.svg, rendue en .ico par
+   * scripts/icone.mjs), bille comète dans sa plaque. Fixe : le reflet du verre suffit.
    */
   function brandLogo() {
-    const ns = 'http://www.w3.org/2000/svg';
-    const logo = el('div', 'cp-logo');
-    logo.setAttribute('aria-hidden', 'true');
-    const svg = (cls, inner) => {
-      const s = document.createElementNS(ns, 'svg');
-      s.setAttribute('viewBox', '0 0 100 100');
-      s.setAttribute('class', cls);
-      s.innerHTML = inner;
-      return s;
-    };
-    logo.append(
-      svg(
-        'cp-logo-frame',
-        '<defs><linearGradient id="cp-logo-bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#10241f"/><stop offset="0.7" stop-color="#030807"/></linearGradient>' +
-          '<linearGradient id="cp-logo-trail" x1="1" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#36c9b4" stop-opacity="0"/><stop offset="1" stop-color="#7fe3d4" stop-opacity="0.95"/></linearGradient></defs>' +
-          '<rect x="8.8" y="8.8" width="82.4" height="82.4" rx="15.5" fill="url(#cp-logo-bg)" stroke="#2f7f72" stroke-width="2.4"/>' +
-          // Traînée de la bille, venue du coin haut droit.
-          '<path d="M84 14 Q72 28 60 38 L50 27 Q66 20 84 14 Z" fill="url(#cp-logo-trail)"/>',
-      ),
-      el('div', 'cp-logo-ball'),
-      // Flippers effilés de l'icône : pivot (23,5 ; 70,5) de rayon 5,8, pointe (44,5 ; 79) de rayon 3.
-      svg('cp-logo-flip cp-logo-flip-l', '<path d="M25.68 65.12 L45.63 76.22 A3 3 0 0 1 43.37 81.78 L21.32 75.88 A5.8 5.8 0 0 1 25.68 65.12 Z"/>'),
-      svg('cp-logo-flip cp-logo-flip-r', '<path d="M74.32 65.12 L54.37 76.22 A3 3 0 0 0 56.63 81.78 L78.68 75.88 A5.8 5.8 0 0 0 74.32 65.12 Z"/>'),
-    );
+    const logo = el('img', 'cp-logo');
+    logo.src = 'icone.svg';
+    logo.alt = '';
+    logo.decoding = 'sync';
     return logo;
   }
 
-  /** Topper : logo animé et marque de Cyber Pinball, avec le fabricant et l'année du jeu. */
+  /**
+   * Topper : logo et marque de Cyber Pinball, avec le titre du jeu (le fabricant et l'année
+   * sont déjà sur le fronton et dans le menu ; au-dessus de la borne, c'est le jeu qu'on cherche).
+   */
   function topper(container, game, options) {
     return component(container, 'topper', game, options, (ctx) => (g) => {
       const body = el('div', 'cp-tp-body');
       const text = el('div', 'cp-tp-text');
       const word = ctx.fit(wordmarkBox('cp-tp-word'));
       text.append(word);
-      const meta = metaOf(g);
-      if (meta) text.append(el('div', 'cp-rule'), ctx.fit(fitBox('cp-tp-meta cp-meta-text', meta), { max: () => 0.75 * sizeOf(word) }));
-      ctx.root.classList.toggle('cp-no-meta', !meta);
+      if (g.title) text.append(el('div', 'cp-rule'), ctx.fit(fitBox('cp-tp-title cp-game-title', g.title), { breakable: true, max: () => 1.4 * sizeOf(word) }));
+      ctx.root.classList.toggle('cp-no-meta', !g.title);
       body.append(brandLogo(), text);
       ctx.root.replaceChildren(...glass(), body);
     });
@@ -994,11 +984,11 @@
         const body = el('div', 'cp-ld-body');
         const bar = el('div', 'cp-ld-bar');
         bar.append(el('div', 'cp-ld-run'));
-        const title = ctx.fit(fitBox('cp-ld-title cp-game-title', g.title || 'Table sans titre'), { breakable: true });
+        const title = ctx.fit(fitBox('cp-ld-title cp-game-title', g.title || t('Table sans titre')), { breakable: true });
         body.append(ctx.fit(wordmarkBox('cp-ld-brand')), title);
         const meta = metaOf(g);
         if (meta) body.append(ctx.fit(fitBox('cp-ld-meta cp-meta-text', meta), { max: () => 0.36 * sizeOf(title) }));
-        body.append(bar, ctx.fit(fitBox('cp-ld-label cp-one-line', 'Chargement de la table…')), slot);
+        body.append(bar, ctx.fit(fitBox('cp-ld-label cp-one-line', t('Chargement de la table…'))), slot);
         ctx.root.append(body);
       };
     });
@@ -1013,11 +1003,11 @@
   function inGame(container, game, options) {
     return component(container, 'ingame', game, options, (ctx) => (g) => {
       const card = el('div', 'cp-ig-card');
-      const title = ctx.fit(fitBox('cp-ig-title cp-game-title', g.title || 'Partie en cours'), { breakable: true });
+      const title = ctx.fit(fitBox('cp-ig-title cp-game-title', g.title || t('Partie en cours')), { breakable: true });
       card.append(ctx.fit(wordmarkBox('cp-ig-brand')), title);
       const meta = metaOf(g);
       if (meta) card.append(ctx.fit(fitBox('cp-ig-meta cp-meta-text', meta), { max: () => 0.45 * sizeOf(title) }));
-      if (g.title) card.append(ctx.fit(fitBox('cp-ig-state cp-one-line', 'Partie en cours')));
+      if (g.title) card.append(ctx.fit(fitBox('cp-ig-state cp-one-line', t('Partie en cours'))));
       ctx.root.replaceChildren(card);
       let fx = 0.5;
       let fy = 0.5;
@@ -1053,6 +1043,6 @@
     inGame,
     palette,
     /** Pour les essais : minuteries en cours et trames dessinées depuis le chargement. */
-    stats: () => ({ tasks: tasks.size, scheduled: [...tasks].filter((t) => t.id).length, frames }),
+    stats: () => ({ tasks: tasks.size, scheduled: [...tasks].filter((task) => task.id).length, frames }),
   };
 })();

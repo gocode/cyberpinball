@@ -8,6 +8,8 @@ On décrit la borne une fois : ses écrans, ses boutons, ses haut-parleurs. Cybe
 
 > **État : premier prototype (0.1.0).** Windows seulement, pensé pour Visual Pinball X 10.8.1 en mode plugins. Tout n'est pas encore poli : sauvegardez vos tables avant d'essayer.
 
+<p align="center"><img src="docs/images/fr/cabinet.webp" width="880" alt="Le menu des tables sur une borne à quatre écrans : l'écran du playfield, remis debout, avec l'image du plateau de la table choisie, la roue des logos et les commandes ; à côté, le topper, le fronton et l'afficheur DMD du même jeu, Neon Abyss."></p>
+
 ## Ce qu'il fait
 
 - **Les écrans, reconnus.** Chaque écran est reconnu par l'empreinte de son EDID, pas par son numéro dans Windows. Un assistant, piloté entièrement aux boutons de la borne, attribue les rôles (playfield, backglass, DMD, topper), le bord des flippers et la diagonale du playfield. `VPinballX.ini` est réécrit à chaque démarrage : la borne résiste aux écrans échangés, renumérotés ou réveillés dans un autre ordre.
@@ -17,8 +19,24 @@ On décrit la borne une fois : ses écrans, ses boutons, ses haut-parleurs. Cybe
 - **Les tables gérées depuis la borne.** On ajoute des tables depuis un dossier d'import, une clé USB ou le PC ; chacune est nommée d'après la base [Virtual Pinball Spreadsheet](https://github.com/VirtualPinballSpreadsheet/vps-db). Une bibliothèque de ROM range chaque ROM une seule fois, liée dans chaque table qui la joue. L'option de PuP-Pack qui convient aux écrans est choisie d'office, et un « médecin » explique pourquoi une table ne marche pas.
 - **Trouver une table.** Un catalogue de la base VPS montre chaque jeu, ses versions et ce qu'il faut à cette borne pour y jouer, avec une liste d'attente des fichiers que l'on télécharge soi-même. Cyber Pinball ne télécharge jamais de tables ni de ROM à votre place.
 - **Les médias des jeux.** Logos, vidéos du plateau, frontons, afficheur, topper, vidéos de chargement, musique, prospectus et règles se reprennent de PinUP Popper ou de PinballX, ou se téléchargent à la demande depuis [VPinMediaDB](https://github.com/superhac/vpinmediadb). Quand un média manque, un repli dessiné par Cyber Pinball prend sa place. Un mode attente est prévu.
+- **À côté de PinUP Popper, PinballX ou PinballY.** Cyber Pinball garde tout dans son propre dossier, avec sa copie de VPX et son `VPinballX.ini`, et n'enregistre rien dans Windows. Si un autre menu est ouvert, il attend qu'il soit fermé au lieu de lui disputer les écrans ; il prévient avant de retourner un écran dans Windows, et ne réaffiche que les barres des tâches qu'il a lui-même masquées.
 - **Les réglages de VPX sans le `.ini`.** Tous les réglages de VPX, lus dans son propre code source, se changent pour toutes les tables ou pour une seule. L'écran « Ajuster la vue » cadre chaque table aux boutons.
 - **La mise à jour depuis la borne.** Menu système > « Mise à jour de Cyber Pinball » cherche la dernière version sur GitHub quand on le demande, montre ses nouveautés, puis la télécharge et l'installe. Chaque version est signée : la borne refuse tout ce qui n'a pas été signé avec la clé de l'éditeur. Tables, médias et réglages restent en place.
+- **En français ou en anglais.** Chaque écran suit la langue choisie dans le menu système (« Langue / Language »), dates et nombres compris. Par défaut, Cyber Pinball parle français si Windows le parle, anglais sinon.
+
+## Captures d'écran
+
+Chaque capture est prise hors écran par [`docs/demo-captures.ps1`](docs/demo-captures.ps1), sur une borne simulée (playfield 4K couché, fronton, DMD et topper). Les jeux sont inventés et leurs visuels dessinés par le script.
+
+<p align="center">
+  <img src="docs/images/fr/game-page.webp" width="270" alt="La fiche de Neon Abyss : statistiques de parties, fichiers, et les actions Jouer, Prospectus, Règles, Modifier les informations, Médias du jeu, Ajuster la vue, Réglages pour cette table, Diagnostiquer et réparer, Retirer la table.">
+  <img src="docs/images/fr/system-menu.webp" width="270" alt="Le menu système, Menu et configuration : ajouter une table, réglages de VPX, configuration de la borne, catalogue VPS, liste d'attente, mises à jour des tables, comptes des sites, bibliothèque de ROM, import et téléchargement des médias, médias, son et attente.">
+  <img src="docs/images/fr/update.webp" width="270" alt="Une mise à jour est disponible : Cyber Pinball 0.2.0, sa date de publication, ses nouveautés et la taille de l'installeur signé.">
+</p>
+
+<p align="center"><img src="docs/images/fr/wizard.webp" width="880" alt="L'assistant, étape des écrans et des rôles : chacun des quatre écrans affiche son numéro, et celui du playfield demande « Playfield ? » avec les commandes des flippers et de Start."></p>
+
+<p align="center"><img src="docs/images/fr/vpx-settings.webp" width="880" alt="L'écran des réglages de VPX : l'onglet Essentiels avec la vue de la table et le son, les valeurs gérées par Cyber Pinball, et la description du réglage choisi."></p>
 
 ## Prérequis
 
@@ -86,11 +104,11 @@ npm run installeur  # fabrique release\CyberPinball-Setup.exe et CyberPinball-Se
 | `app` | L'application Electron : assistant, menu des tables, réglages de VPX, gestion des tables, lancement des parties. |
 | `docs` | Manuel technique, scénarios de tests manuels, notes de recherche, design system. |
 
-Le [manuel technique](docs/manuel.md) décrit chaque partie en détail : les fichiers écrits, les commandes, les essais hors écran et les limites connues.
+Le [manuel technique](docs/manuel.md) décrit chaque partie en détail : les fichiers écrits, les commandes, les essais hors écran et les limites connues. Les [scénarios de tests manuels](docs/tests-manuels.md) couvrent ce qui demande une vraie borne. Les deux existent aussi en anglais.
 
 ### Publier une version (mainteneurs)
 
-`npm run publier` vérifie que rien de personnel ni de secret ne va partir, fabrique les deux installeurs, signe le flux de mise à jour et envoie un instantané du code sur `main`. Il crée ensuite la release GitHub `v<version>` avec les installeurs et le flux. Les nouveautés viennent de [CHANGELOG.md](CHANGELOG.md). Il faut un jeton GitHub à grain fin (`CYBERPINBALL_GITHUB_TOKEN`) et la clé de publication, qui n'est jamais dans le dépôt. Voir « Mise à jour depuis la borne » dans le [manuel technique](docs/manuel.md).
+`npm run publier` vérifie que rien de personnel ni de secret ne va partir, fabrique les deux installeurs, signe le flux de mise à jour et envoie un instantané du code sur `main`. Il crée ensuite la release GitHub `v<version>` avec les installeurs et le flux. Les nouveautés viennent de [CHANGELOG.md](CHANGELOG.md) (affichées sur la borne) et de sa traduction [CHANGELOG.en.md](CHANGELOG.en.md) (ajoutée à la release GitHub). Il faut un jeton GitHub à grain fin (`CYBERPINBALL_GITHUB_TOKEN`) et la clé de publication, qui n'est jamais dans le dépôt. Voir [Mise à jour depuis la borne](docs/manuel.md#mise-à-jour-depuis-la-borne) dans le manuel technique.
 
 ## Composants tiers et licences
 

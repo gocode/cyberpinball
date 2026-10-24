@@ -15,6 +15,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { moveToTrash, samePath, type OpContext } from './fileops';
+import { t } from './i18n';
 import {
   isAcceptedFormat,
   mediaKind,
@@ -37,7 +38,9 @@ export const FRONTEND_LABELS: Record<MediaFrontend, string> = {
   popper: 'PinUP Popper',
   pinballx: 'PinballX',
   vpinfe: 'VPinFE',
-  vpx: 'nom « (Type) »',
+  get vpx() {
+    return t('nom « (Type) »');
+  },
 };
 
 /** Dossier rencontré en parcourant une arborescence, qui dit comment lire les fichiers qu'il contient. */
@@ -221,10 +224,10 @@ export function arrangeMedias(dest: MediaDestination, incoming: IncomingMedia[])
     const { media } = m;
     const info = mediaTypeInfo(media.type);
     const skip = (reason: string, unreadable = false) => skipped.push({ from: m.from, source: m.source, type: media.type, reason, ...(unreadable ? { unreadable } : {}) });
-    if (media.foreign) skip(`Média de « ${media.emulator} », un autre émulateur que Visual Pinball : non repris.`);
+    if (media.foreign) skip(t('Média de « {emulator} », un autre émulateur que Visual Pinball : non repris.', { emulator: media.emulator ?? '' }));
     else if (UNREADABLE_FORMATS.includes(media.ext)) {
-      skip(`Format ${media.ext} : le menu ne sait pas le lire. Non rangé ; convertissez-le en mp4 (ou webm) puis importez-le de nouveau.`, true);
-    } else if (!isAcceptedFormat(media.type, `x.${media.ext}`)) skip(`Format ${media.ext} non prévu pour « ${info.label} » (attendu : ${info.formats.join(', ')}). Non rangé.`);
+      skip(t('Format {ext} : le menu ne sait pas le lire. Non rangé ; convertissez-le en mp4 (ou webm) puis importez-le de nouveau.', { ext: media.ext }), true);
+    } else if (!isAcceptedFormat(media.type, `x.${media.ext}`)) skip(t('Format {ext} non prévu pour « {type} » (attendu : {formats}). Non rangé.', { ext: media.ext, type: info.label, formats: info.formats.join(', ') }));
     else byType.set(media.type, [...(byType.get(media.type) ?? []), m]);
   }
 
@@ -241,7 +244,7 @@ export function arrangeMedias(dest: MediaDestination, incoming: IncomingMedia[])
       const sorted = [...list].sort((a, b) => emulatorRank(a) - emulatorRank(b) || rank(a) - rank(b) || a.media.order - b.media.order || byName(a, b));
       kept = sorted.slice(0, 1);
       for (const m of sorted.slice(1)) {
-        skipped.push({ from: m.from, source: m.source, type, reason: `Doublon : « ${path.basename(sorted[0]!.from)} » est gardé pour « ${info.label} ».` });
+        skipped.push({ from: m.from, source: m.source, type, reason: t('Doublon : « {file} » est gardé pour « {type} ».', { file: path.basename(sorted[0]!.from), type: info.label }) });
       }
     }
     const targets = kept.map((m, i) => mediaTargetName(dest.name, type, m.media.ext, i + 1));
@@ -252,7 +255,7 @@ export function arrangeMedias(dest: MediaDestination, incoming: IncomingMedia[])
     });
     kept.forEach((m, i) => {
       const to = path.join(dest.dir, targets[i]!);
-      const trash = i === 0 ? replaced.filter((f) => !targets.some((t) => samePath(t, f))).map((f) => path.join(dest.dir, f)) : [];
+      const trash = i === 0 ? replaced.filter((f) => !targets.some((target) => samePath(target, f))).map((f) => path.join(dest.dir, f)) : [];
       planned.push({
         from: m.from,
         source: m.source,
@@ -344,10 +347,16 @@ export function installedTables(entries: TableEntry[], romsOf: (t: TableEntry) =
 export type MediaMatchHow = 'name' | 'rom' | 'title' | 'vps';
 
 export const MATCH_LABELS: Record<MediaMatchHow, string> = {
-  name: 'nom de la table',
+  get name() {
+    return t('nom de la table');
+  },
   rom: 'ROM',
-  title: 'titre',
-  vps: 'base VPS',
+  get title() {
+    return t('titre');
+  },
+  get vps() {
+    return t('base VPS');
+  },
 };
 
 export type MediaGameMatch = { table: InstalledTable; how: MediaMatchHow } | { ambiguous: InstalledTable[] } | undefined;
@@ -438,7 +447,7 @@ export function scanInstallation(root: string, maxDepth = 6): InstallationScan {
       const source = path.relative(abs, p) || d.name;
       if (media.foreign) {
         const key = `${media.frontend}:${media.emulator}`;
-        const entry = foreign.get(key) ?? { source: media.emulator!, reason: `${FRONTEND_LABELS[media.frontend]} : autre émulateur que Visual Pinball, non repris.`, count: 0 };
+        const entry = foreign.get(key) ?? { source: media.emulator!, reason: t('{frontend} : autre émulateur que Visual Pinball, non repris.', { frontend: FRONTEND_LABELS[media.frontend] }), count: 0 };
         entry.count++;
         foreign.set(key, entry);
         continue;
@@ -499,8 +508,8 @@ export function planInstallationMedias(scan: InstallationScan, tables: Installed
     const label = mediaGameNames(game).at(-1) ?? game;
     const reason =
       match && 'ambiguous' in match
-        ? `Plusieurs tables possibles (${match.ambiguous.map((t) => path.basename(t.folder)).join(', ')}) : rien n’est copié.`
-        : 'Aucune table installée ne porte ce nom : rien n’est copié.';
+        ? t('Plusieurs tables possibles ({tables}) : rien n’est copié.', { tables: match.ambiguous.map((a) => path.basename(a.folder)).join(', ') })
+        : t('Aucune table installée ne porte ce nom : rien n’est copié.');
     const entry = unmatched.get(label.toLowerCase()) ?? { game: label, sources: [], reason };
     entry.sources.push(file.source);
     unmatched.set(label.toLowerCase(), entry);

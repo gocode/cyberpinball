@@ -180,13 +180,17 @@ html[data-rotation='270'] #root {
   display: none;
 }
 
-/* Titre : calé en bas de sa zone ; un titre long prend un corps plus petit dans la même zone. */
+/*
+ * Titre : calé en bas de sa zone ; un titre long prend un corps plus petit dans la même zone.
+ * Interligne 1,2 : Saira dépasse sa ligne de 0,24 em vers le haut, et à 1,1 l'accent d'une
+ * capitale de la ligne masquée (« É ») remontait sous la dernière ligne gardée.
+ */
 .menu-title {
   position: absolute;
   left: calc(40 * var(--u));
   right: calc(40 * var(--u));
   bottom: calc(88 * var(--u));
-  height: calc(90 * var(--u));
+  height: calc(96 * var(--u));
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -203,7 +207,7 @@ html[data-rotation='270'] #root {
   font-size: calc(56 * var(--u));
   font-weight: 600;
   letter-spacing: calc(0.3 * var(--u));
-  line-height: 1.1;
+  line-height: 1.2;
   color: var(--ink);
 }
 
@@ -283,7 +287,7 @@ html.menu-desktop .menu-title .title {
 
 html.menu-desktop .menu-title .title[data-size='m'],
 html.menu-desktop .menu-title .title[data-size='s'] {
-  font-size: calc(46 * var(--u));
+  font-size: calc(43 * var(--u));
   letter-spacing: 0;
 }
 
@@ -396,7 +400,7 @@ html.menu-desktop .menu-count {
   font-size: calc(40 * var(--w));
   font-weight: 600;
   font-stretch: 112%;
-  line-height: 1.05;
+  line-height: 1.2;
   text-transform: uppercase;
   color: var(--ink);
   overflow-wrap: anywhere;
@@ -439,14 +443,21 @@ html.menu-desktop[data-menu-band] #root {
   --band-bottom: calc(28 * var(--u));
 }
 
-/* Bandeau, Minimaliste, Arche : titre blanc sans plaque, fabricant · année en vert, compteur centré dessous. */
+/*
+ * Bandeau, Minimaliste, Arche : titre blanc sans plaque, fabricant · année en vert, compteur
+ * centré dessous. Le bloc descend jusqu'au filet de la barre d'aide (478 depuis le haut, soit
+ * 62 depuis le bas) ; la zone du titre tient ses deux lignes au corps des titres longs (2 × 24 × 1,2).
+ */
 html[data-menu-band='bandeau'] #root,
 html[data-menu-band='minimal'] #root,
 html[data-menu-band='arche'] #root {
   --t-l: 240;
   --t-w: 600;
-  --t-h: 46;
+  --t-b: 134;
+  --t-h: 58;
   --t-fs: 32;
+  --m-b: 102;
+  --c-b: 70;
   --t-color: var(--ink);
   --t-glow: rgba(0, 0, 0, 0.9);
   --m-color: var(--signal);
@@ -455,25 +466,9 @@ html[data-menu-band='arche'] #root {
   --c-align: center;
 }
 
-/* Textes sous le bas des médaillons (logo du jeu compris), au-dessus de la barre d'aide. */
-html[data-menu-band='bandeau'] #root {
-  --t-b: 158;
-  --m-b: 126;
-  --c-b: 94;
-}
-
-html[data-menu-band='minimal'] #root {
-  --t-b: 166;
-  --m-b: 134;
-  --c-b: 102;
-}
-
 html[data-menu-band='arche'] #root {
   --t-l: 290;
   --t-w: 500;
-  --t-b: 160;
-  --m-b: 128;
-  --c-b: 96;
 }
 
 .wheel-stage.roue-medaillons,
@@ -609,7 +604,7 @@ html.menu-desktop .menu.menu-band .menu-title .title {
   font-size: calc(var(--t-fs) * var(--b));
   font-weight: 700;
   letter-spacing: 0.06em;
-  line-height: 1.1;
+  line-height: 1.2;
   text-transform: uppercase;
   color: var(--t-color);
   text-shadow: 0 0 calc(10 * var(--b)) var(--t-glow), 0 0 calc(26 * var(--b)) var(--t-glow);
@@ -617,12 +612,12 @@ html.menu-desktop .menu.menu-band .menu-title .title {
 
 .menu.menu-band .menu-title .title[data-size='m'],
 html.menu-desktop .menu.menu-band .menu-title .title[data-size='m'] {
-  font-size: calc(26 * var(--b));
+  font-size: calc(24 * var(--b));
 }
 
 .menu.menu-band .menu-title .title[data-size='s'],
 html.menu-desktop .menu.menu-band .menu-title .title[data-size='s'] {
-  font-size: calc(24 * var(--b));
+  font-size: calc(22 * var(--b));
 }
 
 .menu.menu-band .menu-meta,
@@ -1201,7 +1196,7 @@ html.loading-video #media-bg::after {
   overflow: hidden;
   overflow-wrap: anywhere;
   text-align: center;
-  line-height: 1.15;
+  line-height: 1.2;
 }
 
 /* Écran de chargement de secours (fallback.js) : il remplit le playfield, les commandes dessous. */
@@ -1269,7 +1264,7 @@ html.attract-mode #media-bg::after {
   overflow-wrap: anywhere;
   font-size: 8vmin;
   font-weight: 600;
-  line-height: 1.1;
+  line-height: 1.2;
 }
 
 .attract-subtitle {

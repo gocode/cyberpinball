@@ -18,6 +18,7 @@ import {
   takeUpdateOutcome,
   updateFeedUrl,
   updateInstallerArguments,
+  updateNotes,
   updatePublicKey,
   UPDATE_REPOSITORY,
   type UpdateManifest,
@@ -62,6 +63,18 @@ test('versions : numérique, préversion avant la version finale', () => {
   assert.ok(compareAppVersions('0.2.0-beta.2', '0.2.0-beta.10') < 0);
   assert.ok(compareAppVersions('0.2.0-beta', '0.2.0-alpha') > 0);
   assert.throws(() => compareAppVersions('v0.2', '0.2.0'), /illisible/);
+});
+
+test('nouveautés dans la langue de la borne, en français à défaut ; traductions vérifiées', () => {
+  const k = keys();
+  const m = { ...manifestFor(Buffer.from('exe'), 'https://example.org/CyberPinball-Setup.exe'), notesByLanguage: { en: ['Update from the system menu'] } };
+  const read = openEnvelope(JSON.stringify(signManifest(m, k.priv)), k.pub);
+  assert.deepEqual(updateNotes(read, 'en'), ['Update from the system menu']);
+  assert.deepEqual(updateNotes(read, 'fr'), ['Mise à jour depuis le menu système']);
+  // Flux d'avant les traductions, ou langue sans nouveautés : celles en français.
+  assert.deepEqual(updateNotes({ ...read, notesByLanguage: undefined }, 'en'), ['Mise à jour depuis le menu système']);
+  assert.deepEqual(updateNotes({ ...read, notesByLanguage: { en: [] } }, 'en'), ['Mise à jour depuis le menu système']);
+  assert.throws(() => signManifest({ ...m, notesByLanguage: { en: [3] as unknown as string[] } }, k.priv), /nouveautés/);
 });
 
 test('flux signé : lu avec la bonne clé, refusé s’il est modifié ou signé par une autre clé', () => {

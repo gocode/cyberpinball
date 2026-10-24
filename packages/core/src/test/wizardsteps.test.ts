@@ -231,7 +231,7 @@ test('les écrans de l’assistant affichent toujours le bouton « Quitter sans 
 
 test('menu système : chaque étape seule dans « Configuration de la borne »', () => {
   const frontend = read('app', 'src', 'frontend.ts');
-  assert.match(frontend, /label: 'Configuration de la borne'/);
+  assert.match(frontend, /return t\('Configuration de la borne'\)/);
   assert.match(frontend, /WIZARD_STEPS\.map\(\(step\) => \(\{ label: step\.label, detail: step\.detail, run: \(\) => relaunchWizard\(step\.flag\) \}\)\)/);
   // Plus d'entrée d'étape directement dans le menu système.
   assert.doesNotMatch(frontend, /relaunchWizard\('(boutons|disposition)'\)/);

@@ -14,6 +14,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { HISTORIC_ROM_ALIASES } from './vpmalias';
+import { t } from './i18n';
 
 export const ALIAS_FILE = 'alias.txt';
 
@@ -55,7 +56,7 @@ export function aliasFor(lines: AliasLine[], name: string): AliasLine | undefine
   return lines.find((l) => l.alias.toLowerCase() === name.toLowerCase());
 }
 
-const HEADER = '# Alias de ROM de cette table, écrits par Cyber Pinball : « nom demandé par le script,jeu chargé ».';
+const HEADER = '# Alias de ROM de cette table, écrits par Cyber Pinball : « nom demandé par le script,jeu chargé ».'; // i18n-ignore : écrit dans alias.txt
 
 /** Contenu du fichier avec la ligne `alias,rom` (remplace une ligne du même alias). */
 export function withAlias(text: string, alias: string, rom: string, comment?: string): string {
@@ -122,5 +123,8 @@ export function neighbourRom(wanted: string, available: Iterable<string>): strin
 }
 
 /** Ce qu'il faut savoir avant d'accepter une révision voisine. */
-export const NEIGHBOUR_WARNING =
-  'Une autre révision du programme du même jeu : elle joue en général pareil, mais des lampes, des bobines ou des contacts peuvent différer, les réglages et records (NVRAM) ne sont pas repris, et les sons remasterisés ou les couleurs du DMD rangés sous l’autre nom ne seront plus trouvés.';
+export function neighbourWarning(): string {
+  return t(
+    'Une autre révision du programme du même jeu : elle joue en général pareil, mais des lampes, des bobines ou des contacts peuvent différer, les réglages et records (NVRAM) ne sont pas repris, et les sons remasterisés ou les couleurs du DMD rangés sous l’autre nom ne seront plus trouvés.',
+  );
+}

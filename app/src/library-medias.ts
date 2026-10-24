@@ -30,9 +30,11 @@ import {
   isAcceptedFormat,
   isTypeChanged,
   loadCabinet,
+  lowerFirst,
   MANAGED_MEDIA_TYPES,
   MediaDimensionCache,
   mediaFileName,
+  mediaFallbackName,
   mediaKind,
   mediaMemory,
   mediaOriginLabel,
@@ -49,7 +51,9 @@ import {
   resolveMedia,
   samePath,
   scanTableMedias,
+  t,
   tableMediaDir,
+  tn,
   trashDirFor,
   type B2sImages,
   type Layout,
@@ -137,7 +141,17 @@ interface Session {
   dims?: MediaDimensionCache;
 }
 
-const KIND_LABELS = { image: 'image', video: 'vidéo', audio: 'son' } as const;
+const KIND_LABELS = {
+  get image() {
+    return t('image');
+  },
+  get video() {
+    return t('vidéo');
+  },
+  get audio() {
+    return t('son');
+  },
+};
 
 export function createMedias(ctx: MediasContext) {
   const { host } = ctx;
@@ -200,12 +214,14 @@ export function createMedias(ctx: MediasContext) {
   function afterRemoval(s: Session, table: TableEntry, type: MediaType): string {
     const info = mediaTypeInfo(type);
     const partner = type === 'DMD' ? 'FullDMD' : type === 'FullDMD' ? 'DMD' : undefined;
-    if (partner && draftPages(s.draft, partner, current(s, table, partner)).length) return `${mediaTypeInfo(partner).label} réduit à cet écran`;
+    if (partner && draftPages(s.draft, partner, current(s, table, partner)).length) return t('{label} réduit à cet écran', { label: mediaTypeInfo(partner).label });
     // Même recherche, sans le dossier medias\ du jeu.
     const bare = { ...table, folder: path.join(table.folder, '.sans-medias') };
     const r = resolveMedia(bare, root(), type, { b2sImage: b2sImage(s) });
     const state = mediaStateLabel(r, root());
-    return r.source === 'fallback' ? (info.fallback === 'none' ? 'rien' : `repli intégré : ${info.fallbackLabel.toLowerCase()}`) : `${state.label.replace(/^Repli : /, '').toLowerCase()} (${state.detail})`;
+    if (r.source === 'fallback') return info.fallback === 'none' ? t('rien') : t('repli intégré : {what}', { what: lowerFirst(info.fallbackLabel) });
+    // Le repli seul (sans « Repli : »), repris dans la phrase.
+    return `${lowerFirst(mediaFallbackName(r) ?? state.label)} (${state.detail})`;
   }
 
   function changes(s: Session, table: TableEntry): number {
@@ -220,7 +236,7 @@ export function createMedias(ctx: MediasContext) {
   function halfTurnPending(s: Session, table: TableEntry, type: MediaType): string | undefined {
     const wanted = s.draft.halfTurn[type];
     if (wanted === undefined || wanted === (mediaMemory(table.info).halfTurn?.[type] === true)) return undefined;
-    return wanted ? 'Demi-tour ajouté à l’enregistrement.' : 'Demi-tour retiré à l’enregistrement.';
+    return wanted ? t('Demi-tour ajouté à l’enregistrement.') : t('Demi-tour retiré à l’enregistrement.');
   }
 
   /** Rotation de l'aperçu, vu du joueur (flippers en bas) : celle que le menu appliquera. */
@@ -232,7 +248,7 @@ export function createMedias(ctx: MediasContext) {
     if (!file) return { kind: 'fallback', rotation: 0, text: fallbackText };
     const kind = mediaKind(file);
     if (kind === 'audio') return { kind: 'audio', rotation: 0, text: '♪' };
-    if (!kind || !isAcceptedFormat(type, file) || !fs.existsSync(file)) return { kind: 'fallback', rotation: 0, text: 'Format illisible' };
+    if (!kind || !isAcceptedFormat(type, file) || !fs.existsSync(file)) return { kind: 'fallback', rotation: 0, text: t('Format illisible') };
     // Par le protocole des médias, comme le menu : la CSP de la fenêtre n'autorise rien d'autre.
     allowPreview(file);
     const url = mediaUrl(file);
@@ -247,9 +263,9 @@ export function createMedias(ctx: MediasContext) {
     try {
       size = formatSize(fs.statSync(file).size);
     } catch {
-      return 'fichier introuvable';
+      return t('fichier introuvable');
     }
-    const what = kind === 'image' && d?.animated ? 'image animée' : kind ? KIND_LABELS[kind] : 'format inconnu';
+    const what = kind === 'image' && d?.animated ? t('image animée') : kind ? KIND_LABELS[kind] : t('format inconnu');
     return [d ? `${what} ${d.width} × ${d.height}` : what, size].join(' · ');
   }
 
@@ -300,7 +316,7 @@ export function createMedias(ctx: MediasContext) {
       session = undefined;
       ctx.leave();
     };
-    return { heading: 'Table introuvable', sections: [], actions: [{ label: 'Retour', run: back }], back };
+    return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour'), run: back }], back };
   }
 
   // ---------- Vue d'ensemble ----------
@@ -314,14 +330,14 @@ export function createMedias(ctx: MediasContext) {
     const card: MediaCard = { action, title: info.label, code: `(${info.type})`, where: place.where, note: place.note, description: info.description, thumb: { kind: 'fallback', rotation: 0 } };
     if (changed) {
       const first = wanted[0] ? entrySource(wanted[0]) : undefined;
-      card.thumb = thumbOf(s, table, type, first, `Après : ${afterRemoval(s, table, type)}`);
-      card.state = { label: 'À enregistrer', tone: 'warning' };
+      card.thumb = thumbOf(s, table, type, first, t('Après : {what}', { what: afterRemoval(s, table, type) }));
+      card.state = { label: t('À enregistrer'), tone: 'warning' };
       card.facts = first ? `${entryName(wanted[0]!)} · ${factsOf(s, first)}` : undefined;
       const what = !wanted.length
-        ? `Mis à la corbeille à l’enregistrement ; ensuite : ${afterRemoval(s, table, type)}.`
+        ? t('Mis à la corbeille à l’enregistrement ; ensuite : {after}.', { after: afterRemoval(s, table, type) })
         : info.pages
-          ? `${wanted.length} page${wanted.length > 1 ? 's' : ''} à l’enregistrement, numérotées dans l’ordre choisi.`
-          : `Rangé sous « ${mediaFileName(table, type, path.extname(first!).slice(1))} » à l’enregistrement.`;
+          ? tn(wanted.length, '{n} page à l’enregistrement, numérotées dans l’ordre choisi.', '{n} pages à l’enregistrement, numérotées dans l’ordre choisi.')
+          : t('Rangé sous « {name} » à l’enregistrement.', { name: mediaFileName(table, type, path.extname(first!).slice(1)) });
       card.pending = [what, halfTurnPending(s, table, type)].filter(Boolean).join(' ');
       return card;
     }
@@ -329,14 +345,14 @@ export function createMedias(ctx: MediasContext) {
     const state = mediaStateLabel(r, root());
     card.state = { label: state.label, tone: state.present ? 'ok' : r.source === 'fallback' && info.fallback === 'none' ? 'quiet' : 'info' };
     card.thumb = thumbOf(s, table, type, r.file, info.fallbackLabel);
-    const pages = info.pages && r.files.length > 1 ? ` · ${r.files.length} pages` : '';
+    const pages = info.pages && r.files.length > 1 ? ` · ${tn(r.files.length, '{n} page', '{n} pages')}` : '';
     card.facts = r.file ? `${state.detail} · ${factsOf(s, r.file)}${pages}` : state.detail;
-    if (r.skipped.length) card.pending = `Ignoré : ${r.skipped.map((f) => path.basename(f)).join(', ')} (format que le menu ne lit pas).`;
-    if (mediaOriginOf(table, type, r.file)) card.facts += ` · de ${mediaOriginOf(table, type, r.file)!.origin}`;
-    if (halfTurnOf(s, table, type)) card.facts += ' · demi-tour';
+    if (r.skipped.length) card.pending = t('Ignoré : {files} (format que le menu ne lit pas).', { files: r.skipped.map((f) => path.basename(f)).join(', ') });
+    if (mediaOriginOf(table, type, r.file)) card.facts += ` · ${t('de {origin}', { origin: mediaOriginOf(table, type, r.file)!.origin })}`;
+    if (halfTurnOf(s, table, type)) card.facts += ` · ${t('demi-tour')}`;
     const turn = halfTurnPending(s, table, type);
     if (turn) {
-      card.state = { label: 'À enregistrer', tone: 'warning' };
+      card.state = { label: t('À enregistrer'), tone: 'warning' };
       card.pending = turn;
     }
     return card;
@@ -348,11 +364,11 @@ export function createMedias(ctx: MediasContext) {
     for (const f of scanTableMedias(table)) {
       const name = path.basename(f.file);
       if (name.startsWith('.')) continue;
-      if (!f.type) rows.push({ text: name, detail: 'Nom sans « (Type) » : le menu ne sait pas à quoi il sert.', tone: 'quiet' });
+      if (!f.type) rows.push({ text: name, detail: t('Nom sans « (Type) » : le menu ne sait pas à quoi il sert.'), tone: 'quiet' });
       else if (!MANAGED_MEDIA_TYPES.includes(f.type)) rows.push({ text: name, detail: `${mediaTypeInfo(f.type).description}`, tone: 'quiet' });
-      else if (f.match === 'other-name') rows.push({ text: name, detail: `Porte le nom d’un autre jeu ou d’une autre version : ce jeu ne s’en sert pas.`, tone: 'quiet' });
-      else if (!f.accepted) rows.push({ text: name, detail: `Format .${path.extname(name).slice(1).toLowerCase()} que le menu ne lit pas pour ${mediaTypeInfo(f.type).label}.`, tone: 'warning' });
-      else if (f.page && f.page > 1 && !mediaTypeInfo(f.type).pages) rows.push({ text: name, detail: `${mediaTypeInfo(f.type).label} n’a qu’une page : ce fichier n’est pas montré.`, tone: 'quiet' });
+      else if (f.match === 'other-name') rows.push({ text: name, detail: t('Porte le nom d’un autre jeu ou d’une autre version : ce jeu ne s’en sert pas.'), tone: 'quiet' });
+      else if (!f.accepted) rows.push({ text: name, detail: t('Format .{ext} que le menu ne lit pas pour {label}.', { ext: path.extname(name).slice(1).toLowerCase(), label: mediaTypeInfo(f.type).label }), tone: 'warning' });
+      else if (f.page && f.page > 1 && !mediaTypeInfo(f.type).pages) rows.push({ text: name, detail: t('{label} n’a qu’une page : ce fichier n’est pas montré.', { label: mediaTypeInfo(f.type).label }), tone: 'quiet' });
     }
     return rows;
   }
@@ -366,32 +382,32 @@ export function createMedias(ctx: MediasContext) {
     for (const [i, c] of cards.entries()) actions[i]!.detail = c.state?.label;
     const memory = nextMemory(mediaMemory(table.info), s.draft);
     const volume = memory.volume ?? 100;
-    actions.push({ label: 'Volume de ce jeu', detail: volume === 100 ? '100 % : comme les autres jeux' : `${volume} % du réglage général`, run: () => openVolume(s) });
+    actions.push({ label: t('Volume de ce jeu'), detail: volume === 100 ? t('100 % : comme les autres jeux') : t('{volume} % du réglage général', { volume }), run: () => openVolume(s) });
     const n = changes(s, table);
     if (ctx.download) {
       actions.push({
-        label: 'Chercher les médias',
-        detail: n ? 'Enregistrez ou annulez d’abord les changements en cours' : 'Sur VPinMediaDB : logo, plateau, fronton, afficheur… avec un plan à valider',
-        run: () => (n ? notify(s, 'Enregistrez ou annulez d’abord les changements en cours : « Chercher les médias » a son propre plan.') : searchOnline(s, table)),
+        label: t('Chercher les médias'),
+        detail: n ? t('Enregistrez ou annulez d’abord les changements en cours') : t('Sur VPinMediaDB : logo, plateau, fronton, afficheur… avec un plan à valider'),
+        run: () => (n ? notify(s, t('Enregistrez ou annulez d’abord les changements en cours : « Chercher les médias » a son propre plan.')) : searchOnline(s, table)),
       });
     }
     if (n) {
       actions.push(
-        { label: 'Enregistrer', detail: `${n} changement${n > 1 ? 's' : ''} : voir le plan avant d’écrire`, tone: 'ok', run: () => openPlan(s) },
-        { label: 'Annuler les changements', tone: 'error', run: () => discard(s) },
+        { label: t('Enregistrer'), detail: tn(n, '{n} changement : voir le plan avant d’écrire', '{n} changements : voir le plan avant d’écrire'), tone: 'ok', run: () => openPlan(s) },
+        { label: t('Annuler les changements'), tone: 'error', run: () => discard(s) },
       );
     }
     const leave = () => (n ? openLeave(s) : close(table));
-    actions.push({ label: 'Retour à la fiche', run: leave });
+    actions.push({ label: t('Retour à la fiche'), run: leave });
     const sections: Section[] = [];
     if (s.notice) sections.push({ rows: [{ text: s.notice.text, tone: s.notice.tone }] });
     const stray = strayRows(table);
-    if (stray.length) sections.push({ title: 'Autres fichiers dans medias\\', rows: stray });
+    if (stray.length) sections.push({ title: t('Autres fichiers dans medias\\'), rows: stray });
     dims(s).save();
     return {
-      heading: 'Médias du jeu',
+      heading: t('Médias du jeu'),
       subheading: table.title,
-      lead: 'Ce que le menu montre pour ce jeu, écran par écran. Choisissez un média pour le remplacer, le retirer ou le régler, ou glissez un fichier sur cette fenêtre. Rien n’est écrit avant « Enregistrer ».',
+      lead: t('Ce que le menu montre pour ce jeu, écran par écran. Choisissez un média pour le remplacer, le retirer ou le régler, ou glissez un fichier sur cette fenêtre. Rien n’est écrit avant « Enregistrer ».'),
       sections,
       actions,
       back: leave,
@@ -421,7 +437,7 @@ export function createMedias(ctx: MediasContext) {
 
   function discard(s: Session): void {
     s.draft = emptyMediaDraft();
-    s.next = { text: 'Changements annulés : rien n’a été écrit.', tone: 'info' };
+    s.next = { text: t('Changements annulés : rien n’a été écrit.'), tone: 'info' };
     toOverview(s, MANAGED_MEDIA_TYPES[0]);
   }
 
@@ -430,14 +446,14 @@ export function createMedias(ctx: MediasContext) {
     if (!table) return;
     const n = changes(s, table);
     nav(s, () => ({
-      heading: 'Quitter sans enregistrer ?',
+      heading: t('Quitter sans enregistrer ?'),
       subheading: table.title,
-      lead: `${n} changement${n > 1 ? 's' : ''} pas encore enregistré${n > 1 ? 's' : ''}. Rien n’a été écrit.`,
+      lead: tn(n, '{n} changement pas encore enregistré. Rien n’a été écrit.', '{n} changements pas encore enregistrés. Rien n’a été écrit.'),
       sections: [],
       actions: [
-        { label: 'Voir le plan et enregistrer', tone: 'ok', run: () => openPlan(s) },
-        { label: 'Quitter sans enregistrer', tone: 'error', run: () => close(table) },
-        { label: 'Continuer', run: () => toOverview(s) },
+        { label: t('Voir le plan et enregistrer'), tone: 'ok', run: () => openPlan(s) },
+        { label: t('Quitter sans enregistrer'), tone: 'error', run: () => close(table) },
+        { label: t('Continuer'), run: () => toOverview(s) },
       ],
       back: () => toOverview(s),
     }));
@@ -461,7 +477,9 @@ export function createMedias(ctx: MediasContext) {
     setPages(s, table, type, pages);
     const page = info.pages ? (target.kind === 'replace' ? target.index + 1 : pages.length) : 1;
     const name = mediaFileName(table, type, path.extname(entrySource(entry)).slice(1), page);
-    return `« ${entryName(entry)} » sera ${info.pages ? `la page ${page} : ${info.label}` : `le média ${info.label}`}, rangé sous « ${name} » à l’enregistrement.`;
+    return info.pages
+      ? t('« {file} » sera la page {page} : {label}, rangé sous « {name} » à l’enregistrement.', { file: entryName(entry), page, label: info.label, name })
+      : t('« {file} » sera le média {label}, rangé sous « {name} » à l’enregistrement.', { file: entryName(entry), label: info.label, name });
   }
 
   function openType(s: Session, type: MediaType, at = 0): void {
@@ -480,56 +498,67 @@ export function createMedias(ctx: MediasContext) {
     const actions: Action[] = [];
     const cards: MediaCard[] = [];
     const importCount = importFiles(type).accepted.length;
-    const importDetail = importCount ? `${importCount} fichier${importCount > 1 ? 's' : ''} qui convien${importCount > 1 ? 'nent' : 't'}` : `vide pour ce média (${info.formats.join(', ')})`;
+    const importDetail = importCount ? tn(importCount, '{n} fichier qui convient', '{n} fichiers qui conviennent') : t('vide pour ce média ({formats})', { formats: info.formats.join(', ') });
 
     if (info.pages) {
       pages.forEach((entry, i) => {
         const file = entrySource(entry);
-        actions.push({ label: `Page ${i + 1}`, detail: entryName(entry), run: () => openPage(s, type, i) });
-        cards.push({ action: i, title: `Page ${i + 1}`, facts: `${entryName(entry)} · ${factsOf(s, file)}`, pending: pagePending(table, type, entry, i), thumb: thumbOf(s, table, type, file) });
+        actions.push({ label: t('Page {page}', { page: i + 1 }), detail: entryName(entry), run: () => openPage(s, type, i) });
+        cards.push({ action: i, title: t('Page {page}', { page: i + 1 }), facts: `${entryName(entry)} · ${factsOf(s, file)}`, pending: pagePending(table, type, entry, i), thumb: thumbOf(s, table, type, file) });
       });
       if (proposals) actions.push(proposalsAction(s, table, type));
       actions.push(
-        { label: 'Ajouter une page depuis le dossier d’import', detail: importDetail, run: () => openPick(s, type, { kind: 'add' }) },
-        { label: 'Ajouter une page depuis ce PC…', detail: 'Ou glissez le fichier sur cette fenêtre', run: () => void pickOnPc(s, type, { kind: 'add' }) },
+        { label: t('Ajouter une page depuis le dossier d’import'), detail: importDetail, run: () => openPick(s, type, { kind: 'add' }) },
+        { label: t('Ajouter une page depuis ce PC…'), detail: t('Ou glissez le fichier sur cette fenêtre'), run: () => void pickOnPc(s, type, { kind: 'add' }) },
       );
-      if (pages.length) actions.push({ label: pages.length > 1 ? 'Mettre toutes les pages à la corbeille' : 'Mettre la page à la corbeille', detail: `Ensuite : ${afterRemoval(s, table, type)}`, tone: 'error', run: () => remove(s, table, type) });
+      if (pages.length) {
+        actions.push({
+          label: pages.length > 1 ? t('Mettre toutes les pages à la corbeille') : t('Mettre la page à la corbeille'),
+          detail: t('Ensuite : {after}', { after: afterRemoval(s, table, type) }),
+          tone: 'error',
+          run: () => remove(s, table, type),
+        });
+      }
       if (!pages.length) {
         const r = resolved(s, table, type);
-        cards.push({ title: 'Aucune page', facts: `Repli : ${mediaStateLabel(r, root()).detail}`, thumb: thumbOf(s, table, type, r.file, info.fallbackLabel) });
+        cards.push({ title: t('Aucune page'), facts: t('Repli : {what}', { what: mediaStateLabel(r, root()).detail }), thumb: thumbOf(s, table, type, r.file, info.fallbackLabel) });
       }
     } else {
       const file = pages[0] ? entrySource(pages[0]) : undefined;
       const r = changed ? undefined : resolved(s, table, type);
       const state = r ? mediaStateLabel(r, root()) : undefined;
       const turn = halfTurnPending(s, table, type);
-      const what = changed ? (file ? `Rangé sous « ${mediaFileName(table, type, path.extname(file).slice(1))} » ; l’ancien fichier va à la corbeille.` : 'Mis à la corbeille à l’enregistrement.') : undefined;
+      const what = changed
+        ? file
+          ? t('Rangé sous « {name} » ; l’ancien fichier va à la corbeille.', { name: mediaFileName(table, type, path.extname(file).slice(1)) })
+          : t('Mis à la corbeille à l’enregistrement.')
+        : undefined;
       cards.push({
-        title: file ? entryName(pages[0]!) : r?.file ? path.basename(r.file) : changed ? `Après l’enregistrement : ${afterRemoval(s, table, type)}` : 'Aucun fichier pour ce jeu',
-        state: changed || turn ? { label: 'À enregistrer', tone: 'warning' } : state && { label: state.label, tone: state.present ? 'ok' : 'info' },
+        title: file ? entryName(pages[0]!) : r?.file ? path.basename(r.file) : changed ? t('Après l’enregistrement : {after}', { after: afterRemoval(s, table, type) }) : t('Aucun fichier pour ce jeu'),
+        state: changed || turn ? { label: t('À enregistrer'), tone: 'warning' } : state && { label: state.label, tone: state.present ? 'ok' : 'info' },
         facts: file ? factsOf(s, file) : r?.file ? `${r.source === 'b2s' || r.foundType !== type ? `${state!.detail} · ` : ''}${factsOf(s, r.file)}` : state?.detail,
         pending: [what, turn].filter(Boolean).join(' ') || undefined,
-        thumb: thumbOf(s, table, type, file ?? r?.file, `Repli intégré : ${info.fallbackLabel}`),
+        thumb: thumbOf(s, table, type, file ?? r?.file, t('Repli intégré : {what}', { what: info.fallbackLabel })),
         note: placeInfo.note,
         extra: [
-          `Formats : ${info.formats.join(', ')}.`,
-          `Sans fichier : ${info.fallbackLabel.charAt(0).toLowerCase()}${info.fallbackLabel.slice(1)}.`,
-          ...(info.orientable ? ['Un fichier en hauteur a les flippers en bas, en largeur à droite : le menu le tourne. L’aperçu le montre tel qu’il apparaîtra, vu du joueur.'] : []),
+          t('Formats : {formats}.', { formats: info.formats.join(', ') }),
+          t('Sans fichier : {what}.', { what: lowerFirst(info.fallbackLabel) }),
+          ...(info.orientable ? [t('Un fichier en hauteur a les flippers en bas, en largeur à droite : le menu le tourne. L’aperçu le montre tel qu’il apparaîtra, vu du joueur.')] : []),
           ...sourceLines(table, type, changed ? undefined : r?.file),
         ],
       });
       if (proposals) actions.push(proposalsAction(s, table, type));
       actions.push(
-        { label: file ? 'Remplacer depuis le dossier d’import' : 'Prendre dans le dossier d’import', detail: importDetail, run: () => openPick(s, type, { kind: 'set' }) },
-        { label: file ? 'Remplacer depuis ce PC…' : 'Choisir sur ce PC…', detail: 'Ou glissez le fichier sur cette fenêtre', run: () => void pickOnPc(s, type, { kind: 'set' }) },
+        { label: file ? t('Remplacer depuis le dossier d’import') : t('Prendre dans le dossier d’import'), detail: importDetail, run: () => openPick(s, type, { kind: 'set' }) },
+        { label: file ? t('Remplacer depuis ce PC…') : t('Choisir sur ce PC…'), detail: t('Ou glissez le fichier sur cette fenêtre'), run: () => void pickOnPc(s, type, { kind: 'set' }) },
       );
-      if (file) actions.push({ label: 'Mettre à la corbeille', detail: `Ensuite : ${afterRemoval(s, table, type)}`, tone: 'error', run: () => remove(s, table, type) });
+      if (file) actions.push({ label: t('Mettre à la corbeille'), detail: t('Ensuite : {after}', { after: afterRemoval(s, table, type) }), tone: 'error', run: () => remove(s, table, type) });
     }
     if (info.orientable) {
       const on = halfTurnOf(s, table, type);
       actions.push({
-        label: on ? 'Demi-tour : oui' : 'Demi-tour : non',
-        detail: on ? 'Retirer le demi-tour ajouté à ce média' : 'Si l’aperçu montre les flippers en haut',
+        label: on ? t('Demi-tour : oui') : t('Demi-tour : non'),
+        detail: on ? t('Retirer le demi-tour ajouté à ce média') : t('Si l’aperçu montre les flippers en haut'),
         run: () => {
           const saved = mediaMemory(table.info).halfTurn?.[type] === true;
           if (!on === saved) delete s.draft.halfTurn[type];
@@ -539,18 +568,20 @@ export function createMedias(ctx: MediasContext) {
         },
       });
     }
-    if (changed) actions.push({ label: 'Annuler le changement de ce média', run: () => { delete s.draft.pages[type]; host.broadcast(); } });
-    actions.push({ label: 'Retour aux médias', run: back });
+    if (changed) actions.push({ label: t('Annuler le changement de ce média'), run: () => { delete s.draft.pages[type]; host.broadcast(); } });
+    actions.push({ label: t('Retour aux médias'), run: back });
 
     const sections: Section[] = [];
     if (s.notice) sections.push({ rows: [{ text: s.notice.text, tone: s.notice.tone }] });
     // Pages : ce que remplace la liste vide est dit sur « Mettre à la corbeille ».
-    if (info.pages && placeInfo.note) sections.push({ rows: [{ text: 'Sur cette borne', detail: placeInfo.note, tone: 'warning' }] });
+    if (info.pages && placeInfo.note) sections.push({ rows: [{ text: t('Sur cette borne'), detail: placeInfo.note, tone: 'warning' }] });
     return {
       heading: info.label,
       subheading: `(${info.type}) · ${table.title}`,
       // À quoi il sert et où il s'affiche, toujours visibles en haut de l'écran.
-      lead: `${info.description} Où : ${placeInfo.where.charAt(0).toLowerCase()}${placeInfo.where.slice(1)}.${info.pages ? ' Choisissez une page pour la déplacer, la remplacer ou la retirer.' : ''}`,
+      lead: info.pages
+        ? t('{description} Où : {where}. Choisissez une page pour la déplacer, la remplacer ou la retirer.', { description: info.description, where: lowerFirst(placeInfo.where) })
+        : t('{description} Où : {where}.', { description: info.description, where: lowerFirst(placeInfo.where) }),
       sections,
       actions,
       back,
@@ -563,8 +594,8 @@ export function createMedias(ctx: MediasContext) {
   function proposalsAction(s: Session, table: TableEntry, type: MediaType): Action {
     const n = proposals!.count(table, type);
     return {
-      label: 'Voir les propositions',
-      detail: n === undefined ? 'Toutes les versions trouvées : VPinMediaDB (jeu reconnu et proches), PuP-Pack, DMD, .directb2s' : `${n} proposition${n > 1 ? 's' : ''} avec aperçu`,
+      label: t('Voir les propositions'),
+      detail: n === undefined ? t('Toutes les versions trouvées : VPinMediaDB (jeu reconnu et proches), PuP-Pack, DMD, .directb2s') : tn(n, '{n} proposition avec aperçu', '{n} propositions avec aperçu'),
       tone: 'ok',
       run: () => proposals!.open(table, type),
     };
@@ -573,15 +604,20 @@ export function createMedias(ctx: MediasContext) {
   /** Provenance d'un fichier téléchargé, citée sur sa fiche : source, date, adresse. */
   function sourceLines(table: TableEntry, type: MediaType, file: string | undefined): string[] {
     const origin = mediaOriginOf(table, type, file);
-    return origin ? [`Source : ${mediaOriginLabel(origin)}.`, `Adresse : ${origin.url}`] : [];
+    return origin ? [t('Source : {source}.', { source: mediaOriginLabel(origin) }), t('Adresse : {url}', { url: origin.url })] : [];
   }
 
   /** Ce qui arrivera à une page à l'enregistrement : rangée sous un nom, ou renommée parce qu'elle a changé de place. */
   function pagePending(table: TableEntry, type: MediaType, entry: MediaPageEntry, index: number): string | undefined {
     const file = entrySource(entry);
     const target = mediaFileName(table, type, path.extname(file).slice(1), index + 1);
-    if ('from' in entry) return `Nouvelle, ${entry.origin ? `téléchargée depuis ${entry.origin.origin}` : entry.mode === 'move' ? 'prise dans le dossier d’import' : 'copiée, l’original reste en place'} : rangée sous « ${target} » à l’enregistrement.`;
-    return path.basename(file) === target ? undefined : `Renommée « ${target} » à l’enregistrement.`;
+    if ('from' in entry) {
+      if (entry.origin) return t('Nouvelle, téléchargée depuis {origin} : rangée sous « {name} » à l’enregistrement.', { origin: entry.origin.origin, name: target });
+      return entry.mode === 'move'
+        ? t('Nouvelle, prise dans le dossier d’import : rangée sous « {name} » à l’enregistrement.', { name: target })
+        : t('Nouvelle, copiée, l’original reste en place : rangée sous « {name} » à l’enregistrement.', { name: target });
+    }
+    return path.basename(file) === target ? undefined : t('Renommée « {name} » à l’enregistrement.', { name: target });
   }
 
   function remove(s: Session, table: TableEntry, type: MediaType): void {
@@ -602,7 +638,7 @@ export function createMedias(ctx: MediasContext) {
     const pages = draftPages(s.draft, type, current(s, table, type));
     const back = () => openType(s, type, Math.min(index, Math.max(0, pages.length - 1)));
     const entry = pages[index];
-    if (!entry) return { heading: 'Page introuvable', sections: [], actions: [{ label: 'Retour', run: back }], back };
+    if (!entry) return { heading: t('Page introuvable'), sections: [], actions: [{ label: t('Retour'), run: back }], back };
     const file = entrySource(entry);
     const move = (to: number) => {
       const next = [...pages];
@@ -612,26 +648,26 @@ export function createMedias(ctx: MediasContext) {
       openPage(s, type, to, ctx.cursor());
     };
     const actions: Action[] = [];
-    if (index > 0) actions.push({ label: 'Monter', detail: `Devient la page ${index}`, run: () => move(index - 1) });
-    if (index < pages.length - 1) actions.push({ label: 'Descendre', detail: `Devient la page ${index + 2}`, run: () => move(index + 1) });
+    if (index > 0) actions.push({ label: t('Monter'), detail: t('Devient la page {page}', { page: index }), run: () => move(index - 1) });
+    if (index < pages.length - 1) actions.push({ label: t('Descendre'), detail: t('Devient la page {page}', { page: index + 2 }), run: () => move(index + 1) });
     actions.push(
-      { label: 'Remplacer depuis le dossier d’import', run: () => openPick(s, type, { kind: 'replace', index }) },
-      { label: 'Remplacer depuis ce PC…', detail: 'Ou glissez le fichier sur cette fenêtre', run: () => void pickOnPc(s, type, { kind: 'replace', index }) },
+      { label: t('Remplacer depuis le dossier d’import'), run: () => openPick(s, type, { kind: 'replace', index }) },
+      { label: t('Remplacer depuis ce PC…'), detail: t('Ou glissez le fichier sur cette fenêtre'), run: () => void pickOnPc(s, type, { kind: 'replace', index }) },
       {
-        label: 'Mettre cette page à la corbeille',
-        detail: pages.length > 1 ? 'Les pages suivantes remontent' : undefined,
+        label: t('Mettre cette page à la corbeille'),
+        detail: pages.length > 1 ? t('Les pages suivantes remontent') : undefined,
         tone: 'error',
         run: () => {
           setPages(s, table, type, pages.filter((_, i) => i !== index));
           openType(s, type, Math.max(0, index - 1));
         },
       },
-      { label: 'Retour aux pages', run: back },
+      { label: t('Retour aux pages'), run: back },
     );
     return {
-      heading: `${info.label}, page ${index + 1} sur ${pages.length}`,
+      heading: t('{label}, page {page} sur {count}', { label: info.label, page: index + 1, count: pages.length }),
       subheading: table.title,
-      lead: 'Les pages sont montrées dans l’ordre ; le nom du fichier suit le numéro de la page.',
+      lead: t('Les pages sont montrées dans l’ordre ; le nom du fichier suit le numéro de la page.'),
       sections: [],
       actions,
       back,
@@ -691,14 +727,28 @@ export function createMedias(ctx: MediasContext) {
       },
     }));
     const cards: MediaCard[] = accepted.map((file, i) => ({ action: i, title: path.relative(dir, file), facts: factsOf(s, file), thumb: thumbOf(s, table, type, file) }));
-    actions.push({ label: 'Actualiser', detail: 'Après avoir copié un fichier dans le dossier d’import', run: () => host.broadcast() }, { label: 'Retour', run: back });
+    actions.push({ label: t('Actualiser'), detail: t('Après avoir copié un fichier dans le dossier d’import'), run: () => host.broadcast() }, { label: t('Retour'), run: back });
     const rows: Row[] = [];
-    if (!accepted.length) rows.push({ text: 'Aucun fichier qui convienne', detail: `Copiez dans ${dir} un fichier ${info.formats.join(', ')}, depuis une clé USB par exemple, puis « Actualiser ».`, tone: 'quiet' });
-    if (others) rows.push({ text: `${others} autre${others > 1 ? 's' : ''} fichier${others > 1 ? 's' : ''} ignoré${others > 1 ? 's' : ''}`, detail: `Format que le menu ne lit pas pour ${info.label} (${info.formats.join(', ')}).`, tone: 'quiet' });
+    if (!accepted.length) {
+      rows.push({
+        text: t('Aucun fichier qui convienne'),
+        detail: t('Copiez dans {dir} un fichier {formats}, depuis une clé USB par exemple, puis « Actualiser ».', { dir, formats: info.formats.join(', ') }),
+        tone: 'quiet',
+      });
+    }
+    if (others) {
+      rows.push({
+        text: tn(others, '{n} autre fichier ignoré', '{n} autres fichiers ignorés'),
+        detail: t('Format que le menu ne lit pas pour {label} ({formats}).', { label: info.label, formats: info.formats.join(', ') }),
+        tone: 'quiet',
+      });
+    }
     return {
-      heading: `${info.label} : prendre dans le dossier d’import`,
+      heading: t('{label} : prendre dans le dossier d’import', { label: info.label }),
       subheading: dir,
-      lead: `Le fichier choisi quittera le dossier d’import à l’enregistrement, et sera rangé sous « ${mediaFileName(table, type, 'ext', page).replace(/\.ext$/, '')} » avec son extension.`,
+      lead: t('Le fichier choisi quittera le dossier d’import à l’enregistrement, et sera rangé sous « {name} » avec son extension.', {
+        name: mediaFileName(table, type, 'ext', page).replace(/\.ext$/, ''),
+      }),
       sections: rows.length ? [{ rows }] : [],
       actions,
       back,
@@ -711,7 +761,7 @@ export function createMedias(ctx: MediasContext) {
     const info = mediaTypeInfo(type);
     const win = host.windows().get('playfield');
     const options: Electron.OpenDialogOptions = {
-      title: `${info.label} : choisir un fichier`,
+      title: t('{label} : choisir un fichier', { label: info.label }),
       properties: ['openFile'],
       filters: [{ name: info.label, extensions: [...info.formats] }],
     };
@@ -731,7 +781,7 @@ export function createMedias(ctx: MediasContext) {
       s.next = { text: place(s, table, type, { from: file, mode: 'copy' }, target), tone: 'info' };
       returnTo(s, type, target);
     } else {
-      s.notice = { text: `Aucun fichier ${info.formats.join(', ')} dans ce dépôt : ${info.label} ne peut pas s’en servir.`, tone: 'error' };
+      s.notice = { text: t('Aucun fichier {formats} dans ce dépôt : {label} ne peut pas s’en servir.', { formats: info.formats.join(', '), label: info.label }), tone: 'error' };
       host.broadcast();
     }
   }
@@ -751,12 +801,12 @@ export function createMedias(ctx: MediasContext) {
         continue;
       }
       place(s, table, type, { from: p, mode: 'copy' }, mediaTypeInfo(type).pages ? { kind: 'add' } : { kind: 'set' });
-      placed.push(`« ${path.basename(p)} » : ${mediaTypeInfo(type).label}`);
+      placed.push(t('« {name} » : {label}', { name: path.basename(p), label: mediaTypeInfo(type).label }));
     }
     const parts = [];
-    if (placed.length) parts.push(`${placed.join(' ; ')}, à enregistrer.`);
-    if (refused.length) parts.push(`Non reconnu : ${refused.join(', ')}. Choisissez d’abord le média, puis déposez le fichier.`);
-    s.notice = { text: parts.join(' ') || 'Aucun fichier dans ce dépôt.', tone: refused.length ? 'warning' : 'info' };
+    if (placed.length) parts.push(t('{files}, à enregistrer.', { files: placed.join(t(' ; ')) }));
+    if (refused.length) parts.push(t('Non reconnu : {files}. Choisissez d’abord le média, puis déposez le fichier.', { files: refused.join(', ') }));
+    s.notice = { text: parts.join(' ') || t('Aucun fichier dans ce dépôt.'), tone: refused.length ? 'warning' : 'info' };
     host.broadcast();
   }
 
@@ -770,14 +820,14 @@ export function createMedias(ctx: MediasContext) {
     nav(
       s,
       () => ({
-        heading: 'Volume de ce jeu',
+        heading: t('Volume de ce jeu'),
         subheading: table.title,
-        lead: 'Vidéos et musique de ce jeu dans le menu, par rapport au réglage général : pour une vidéo enregistrée trop fort ou trop bas.',
+        lead: t('Vidéos et musique de ce jeu dans le menu, par rapport au réglage général : pour une vidéo enregistrée trop fort ou trop bas.'),
         sections: [],
         actions: [
           ...MEDIA_VOLUME_STEPS.map((v) => ({
-            label: v === 100 ? '100 % : comme les autres jeux' : v === 0 ? '0 % : muet' : `${v} %`,
-            detail: [v === now ? 'choix actuel' : undefined, v === saved && v !== now ? 'enregistré' : undefined].filter(Boolean).join(' · ') || undefined,
+            label: v === 100 ? t('100 % : comme les autres jeux') : v === 0 ? t('0 % : muet') : t('{percent} %', { percent: v }),
+            detail: [v === now ? t('choix actuel') : undefined, v === saved && v !== now ? t('enregistré') : undefined].filter(Boolean).join(' · ') || undefined,
             tone: v === now ? ('ok' as const) : undefined,
             run: () => {
               if (v === saved) delete s.draft.volume;
@@ -786,7 +836,7 @@ export function createMedias(ctx: MediasContext) {
               toOverview(s, MANAGED_MEDIA_TYPES.length);
             },
           })),
-          { label: 'Retour', run: () => toOverview(s, MANAGED_MEDIA_TYPES.length) },
+          { label: t('Retour'), run: () => toOverview(s, MANAGED_MEDIA_TYPES.length) },
         ],
         back: () => toOverview(s, MANAGED_MEDIA_TYPES.length),
       }),
@@ -823,9 +873,19 @@ export function createMedias(ctx: MediasContext) {
       const steps = plan.steps.filter((st) => st.type === type);
       if (!steps.length) continue;
       const kinds = new Set(steps.map((st) => st.kind));
-      const badge = kinds.has('add') ? (kinds.has('trash') ? 'remplacé' : 'ajouté') : kinds.has('trash') ? 'corbeille' : kinds.has('rename') ? (mediaTypeInfo(type ?? 'Other').pages ? 'pages réordonnées' : 'renommé') : 'réglage';
+      const badge = kinds.has('add')
+        ? kinds.has('trash')
+          ? t('remplacé')
+          : t('ajouté')
+        : kinds.has('trash')
+          ? t('corbeille')
+          : kinds.has('rename')
+            ? mediaTypeInfo(type ?? 'Other').pages
+              ? t('pages réordonnées')
+              : t('renommé')
+            : t('réglage');
       rows.push({
-        text: type ? mediaTypeInfo(type).label : 'Ce jeu',
+        text: type ? mediaTypeInfo(type).label : t('Ce jeu'),
         // Pages renumérotées : le numéro suffit, les noms suivent.
         detail: steps.map((st) => (st.kind === 'rename' && type && mediaTypeInfo(type).pages ? st.detail : `${st.text} (${st.detail})`)).join(' · '),
         badges: [badge],
@@ -833,21 +893,28 @@ export function createMedias(ctx: MediasContext) {
       });
     }
     const sections: Section[] = [];
-    if (plan.problems.length) sections.push({ title: 'À corriger avant d’enregistrer', rows: plan.problems.map((text) => ({ text, tone: 'error' as const })) });
-    sections.push({ title: `Dans ${path.relative(ctx.tablesDir(), tableMediaDir(table)) || 'medias'}`, rows: rows.length ? rows : [{ text: 'Rien à écrire', tone: 'quiet' }] });
+    if (plan.problems.length) sections.push({ title: t('À corriger avant d’enregistrer'), rows: plan.problems.map((text) => ({ text, tone: 'error' as const })) });
+    sections.push({ title: t('Dans {dir}', { dir: path.relative(ctx.tablesDir(), tableMediaDir(table)) || 'medias' }), rows: rows.length ? rows : [{ text: t('Rien à écrire'), tone: 'quiet' }] });
     const notes: string[] = [];
     const others = otherVersions(table);
     if (others.length && plan.steps.some((st) => st.kind === 'add' || st.kind === 'rename')) {
-      notes.push(`Rangés au nom du dossier, ils servent aussi ${others.length > 1 ? `aux ${others.length} autres versions` : 'à l’autre version'} de la table (${others.map((t) => t.version ?? path.basename(t.file)).join(', ')}).`);
+      notes.push(
+        tn(
+          others.length,
+          'Rangés au nom du dossier, ils servent aussi à l’autre version de la table ({versions}).',
+          'Rangés au nom du dossier, ils servent aussi aux {n} autres versions de la table ({versions}).',
+          { versions: others.map((o) => o.version ?? path.basename(o.file)).join(', ') },
+        ),
+      );
     }
-    if (plan.infoFile) notes.push(`Réglages écrits dans ${path.basename(plan.infoFile)}, ses autres informations conservées.`);
+    if (plan.infoFile) notes.push(t('Réglages écrits dans {file}, ses autres informations conservées.', { file: path.basename(plan.infoFile) }));
     if (notes.length) sections.push({ rows: [{ text: notes.join(' '), tone: 'quiet' }] });
-    const actions: Action[] = plan.problems.length || !plan.ops.length ? [] : [{ label: 'Enregistrer', detail: `${plan.steps.length} opération${plan.steps.length > 1 ? 's' : ''}`, tone: 'ok', run: () => apply(s) }];
-    actions.push({ label: 'Revenir aux médias', detail: 'Le brouillon est gardé', run: back });
+    const actions: Action[] = plan.problems.length || !plan.ops.length ? [] : [{ label: t('Enregistrer'), detail: tn(plan.steps.length, '{n} opération', '{n} opérations'), tone: 'ok', run: () => apply(s) }];
+    actions.push({ label: t('Revenir aux médias'), detail: t('Le brouillon est gardé'), run: back });
     return {
-      heading: 'Plan d’enregistrement des médias',
+      heading: t('Plan d’enregistrement des médias'),
       subheading: table.title,
-      lead: 'Voici ce qui va être fait, et rien d’autre. Ce qui est remplacé ou retiré part dans la corbeille de Cyber Pinball (dossier trash), d’où l’on peut le récupérer.',
+      lead: t('Voici ce qui va être fait, et rien d’autre. Ce qui est remplacé ou retiré part dans la corbeille de Cyber Pinball (dossier trash), d’où l’on peut le récupérer.'),
       sections,
       actions,
       back,
@@ -859,11 +926,14 @@ export function createMedias(ctx: MediasContext) {
     if (!table) return;
     const plan = planFor(s, table);
     if (plan.problems.length) return openPlan(s);
-    const trashDir = trashDirFor(ctx.layout()!.trash, `Médias ${path.basename(table.folder)}`);
+    const trashDir = trashDirFor(ctx.layout()!.trash, `Médias ${path.basename(table.folder)}`); // i18n-ignore : nom de dossier de la corbeille
     try {
       applyOps(plan.ops, { trashDir });
     } catch (error) {
-      s.next = { text: `Enregistrement interrompu : ${(error as Error).message}. Ce qui a déjà été fait est resté ; les fichiers retirés sont dans ${path.relative(root(), trashDir)}.`, tone: 'error' };
+      s.next = {
+        text: t('Enregistrement interrompu : {error}. Ce qui a déjà été fait est resté ; les fichiers retirés sont dans {dir}.', { error: (error as Error).message, dir: path.relative(root(), trashDir) }),
+        tone: 'error',
+      };
       host.reload(table.file);
       s.draft = emptyMediaDraft();
       return toOverview(s, MANAGED_MEDIA_TYPES[0]);
@@ -872,7 +942,9 @@ export function createMedias(ctx: MediasContext) {
     s.draft = emptyMediaDraft();
     const n = plan.steps.length;
     s.next = {
-      text: `Médias enregistrés : ${n} opération${n > 1 ? 's' : ''}.${fs.existsSync(trashDir) ? ` Anciens fichiers dans la corbeille : ${path.relative(root(), trashDir)}.` : ''}`,
+      text: [tn(n, 'Médias enregistrés : {n} opération.', 'Médias enregistrés : {n} opérations.'), fs.existsSync(trashDir) ? t('Anciens fichiers dans la corbeille : {dir}.', { dir: path.relative(root(), trashDir) }) : '']
+        .filter(Boolean)
+        .join(' '),
       tone: 'ok',
     };
     toOverview(s, MANAGED_MEDIA_TYPES[0]);

@@ -1,3 +1,5 @@
+[English](manual-tests.md) · Français
+
 # Tests manuels du jalon 1 (écrans)
 
 Ce que les tests automatiques ne couvrent pas : le vrai matériel, le vrai clavier et les réactions de Windows. Chaque scénario se lance depuis `lanceur.cmd` (double-clic, ou `.\lanceur.cmd <action>` dans un terminal).
@@ -276,6 +278,8 @@ Ce que les tests automatiques ne couvrent pas : le rendu réel dans VPX 10.8.1. 
 | 106 | Assistant à deux écrans | Débrancher (ou ne pas affecter) l'écran du DMD : assistant complet, playfield puis backglass sur leurs écrans. À l'étape du DMD, flippers jusqu'à « en bas, sous le Backglass (4:1) », Start, puis enregistrer. Relancer l'assistant. | À l'étape du DMD, chaque disposition se dessine sur son écran en pointillés : bande 4:1, puis bande 16:9 plus étroite sous le backglass, puis rectangle en haut du playfield (au bord opposé aux flippers). Le récapitulatif donne la zone en pixels de chaque rôle. Après l'enregistrement : `zones` dans `cabinet.json`, clés du scénario 101 dans `VPinballX.ini`, et le menu dessine le titre du backglass en haut et le DMD dans la bande. Au second passage, la bande 4:1 est proposée d'office. |
 | 144 | Éditeur de disposition | Menu système > « Configuration de la borne » > « Disposition des écrans ». Flippers jusqu'à « Zone », Start, choisir le DMD, Start. « Format conservé » : 4:1. « Placer » : en dessous du Backglass. Puis à la souris : tirer un coin du DMD, puis tirer la zone ailleurs. « Taille précise » : 960, Entrée. « Enregistrer ». Lancer une table. | À chaque cran, la zone bouge sur son écran ; le coin tiré garde le format 4:1 et le coin opposé ne bouge pas ; la zone ne sort jamais de l'écran. Le panneau donne la taille, la position et « fenêtre sur une partie de l'écran ». Après « Enregistrer » : « Disposition enregistrée » avec les clés `[ScoreView]` changées seulement (et `[Backglass]` si elle a bougé) ; en jeu, le DMD est à l'endroit choisi, 960 × 240. |
 | 145 | Poste de bureau | Un seul écran. « Disposition des écrans » : Playfield, format 9:16, plein écran (la plus grande zone 9:16, centrée), puis « Aligner » à gauche ; Backglass sur le même écran (« Écran »), placé à droite du playfield ; DMD incrusté en haut du playfield. Enregistrer, puis jouer une table. | Le menu se tient dans la zone du playfield, le backglass à côté. En jeu : la table dans sa fenêtre à gauche, cadrée en vue borne (fenêtre plus haute que large) et à l'échelle ; le backglass dans sa fenêtre à droite ; le DMD dans l'image de la table. Aucune barre de titre, rien ne se recouvre. Noter si la fenêtre du playfield reste derrière celle du backglass après un clic. |
+| 225 | DMD dans le cadre d'un PuP-Pack | Fronton et DMD sur le même écran (zone du DMD en bas). Lancer une table dont le PuP-Pack dessine un cadre pour le DMD (Star Trek LE, par exemple). En partie : les deux MagnaSave ensemble (ou Crédit + Start), « Display Settings » > « ScoreView Display » ; régler la position et la taille aux boutons, puis à la souris ; Start > « Save as Table Override ». Quitter, relancer la table, puis une autre table. | Le menu de VPX s'ouvre sans que la partie s'arrête ; le DMD bouge en direct. Au lancement suivant, le DMD est dans le cadre ; sur l'autre table, il reprend la place de la borne. La fiche de la table montre « Écrans placés pour cette table » (DMD, taille et position). Noter si le DMD passe devant le fronton ou derrière (ordre laissé à Windows). |
+| 226 | Revenir à la disposition générale | Après le scénario 225 : fiche de la table > médecin > « Revenir à la disposition générale » ; relancer la table. | Le `.ini` de la table ne garde que ses autres réglages (ou part à la corbeille s'il n'avait que ceux-là) ; le DMD reprend la place de la borne. |
 
 # Tests manuels des écrans couverts (jamais le bureau Windows)
 
@@ -503,6 +507,18 @@ Sur une vraie borne installée par l'installeur, avec une version plus récente 
 | 222 | Sans réseau | Câble ou Wi-Fi coupé, ouvrir l'entrée. | « Mise à jour impossible », « la borne est-elle connectée à Internet ? », « Réessayer » ; rien ne bloque le menu. |
 | 223 | Annuler le téléchargement | « Mettre à jour maintenant », puis « Annuler » (Start) pendant le téléchargement. | Retour à « x.y.z est disponible » ; aucun fichier `.part` ne reste dans `downloads\cyberpinball`. |
 | 224 | Installation qui échoue | Pendant la page de progression, débrancher le disque de la racine si c'est un disque externe (ou remplir le disque). | L'ancien `app\` revient (depuis `app.precedente`), Cyber Pinball redémarre sur l'ancienne version avec « La mise à jour vers x.y.z n'a pas abouti ». |
+
+## Cohabitation avec PinUP Popper
+
+Sur une borne où PinUP Popper est installé et fonctionne. Avant de commencer, noter l'orientation de chaque écran (Paramètres > Affichage) et faire une partie dans Popper. L'essai sans opérateur (`docs\demo-autre-menu.ps1`) couvre les écrans de Cyber Pinball, avec un Popper simulé.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 231 | Popper ouvert au démarrage | Popper lancé (son menu à l'écran), démarrer Cyber Pinball. | Seul l'écran principal affiche « PinUP Popper est ouvert » ; les autres écrans restent à Popper. Quitter Popper depuis son menu : Cyber Pinball démarre seul en une à deux secondes. |
+| 232 | Continuer ou quitter | Même départ ; Exit, puis relancer et Start. | Exit : Cyber Pinball se ferme sans rien avoir couvert. Start : le menu démarre ; avant la première partie, pas de nouvelle question. |
+| 233 | Popper ouvert pendant le menu | Menu de Cyber Pinball ouvert, lancer Popper depuis le bureau (« Bureau Windows »), revenir au menu, jouer une table. | « PinUP Popper est ouvert » avant la partie ; Exit : retour au menu ; Start : la partie se joue. |
+| 234 | Barres des tâches | Popper réglé pour masquer la barre des tâches ; le fermer (barre restée masquée), jouer une partie dans Cyber Pinball, quitter. | À la fin de la partie et à la fermeture, la barre masquée avant reste masquée ; une barre visible avant revient. |
+| 235 | Popper intact | Après les essais, relancer Popper, faire une partie, comparer l'orientation des écrans à celle notée. | Popper, ses tables, son DMD, son PuP et son orientation sont comme avant ; si l'assistant a proposé de retourner l'écran, l'avertissement « Retourner l'écran dans Windows ? » est apparu d'abord. |
 
 ## Ce qui ne peut pas encore être testé
 

@@ -13,6 +13,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Cabinet } from './model';
+import { formatDate, formatList, t, tn } from './i18n';
 import { dmdMediaType } from './medias';
 import type { TableInfoFile } from './tables';
 import { matchVps, searchVps, vpsKey, type VpsDb, type VpsGame, type VpsLink, type VpsTableFile } from './vps';
@@ -126,17 +127,33 @@ export interface CatalogFilter {
 }
 
 export const CATALOG_KIND_LABELS: Record<CatalogKind, string> = {
-  all: 'tous les jeux',
-  ss: 'électroniques',
-  em: 'électromécaniques',
-  original: 'créations originales',
-  norom: 'sans ROM à trouver',
+  get all() {
+    return t('tous les jeux');
+  },
+  get ss() {
+    return t('électroniques');
+  },
+  get em() {
+    return t('électromécaniques');
+  },
+  get original() {
+    return t('créations originales');
+  },
+  get norom() {
+    return t('sans ROM à trouver');
+  },
 };
 
 export const CATALOG_STATE_LABELS: Record<CatalogState, string> = {
-  all: 'installés ou non',
-  missing: 'pas encore installés',
-  installed: 'déjà installés',
+  get all() {
+    return t('installés ou non');
+  },
+  get missing() {
+    return t('pas encore installés');
+  },
+  get installed() {
+    return t('déjà installés');
+  },
 };
 
 /**
@@ -213,22 +230,22 @@ export function recommendVersion(game: VpsGame): VersionAdvice | undefined {
   const score = (f: VpsTableFile) => (hasFeature(f, 'MOD') ? -2 : 0) + (isVpw(f) ? 1 : 0);
   const best = [...versions].sort((a, b) => score(b) - score(a) || (b.updatedAt ?? 0) - (a.updatedAt ?? 0))[0]!;
   const reasons: string[] = [];
-  if (isVpw(best)) reasons.push('table de VPW (VPin Workshop), refaite à fond');
-  if (!hasFeature(best, 'MOD')) reasons.push('version d’origine, pas un MOD');
-  if (best === versions[0]) reasons.push('la plus récemment mise à jour');
-  else if (best.updatedAt) reasons.push(`mise à jour le ${formatDay(best.updatedAt)}`);
-  if (versions.length > 1) reasons.push(`${versions.length - 1} autre${versions.length > 2 ? 's' : ''} version${versions.length > 2 ? 's' : ''} au choix`);
+  if (isVpw(best)) reasons.push(t('table de VPW (VPin Workshop), refaite à fond'));
+  if (!hasFeature(best, 'MOD')) reasons.push(t('version d’origine, pas un MOD'));
+  if (best === versions[0]) reasons.push(t('la plus récemment mise à jour'));
+  else if (best.updatedAt) reasons.push(t('mise à jour le {date}', { date: formatDay(best.updatedAt) }));
+  if (versions.length > 1) reasons.push(tn(versions.length - 1, '{n} autre version au choix', '{n} autres versions au choix'));
   return { file: best, reasons };
 }
 
 export function formatDay(ms: number): string {
-  return new Date(ms).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  return formatDate(ms, { day: '2-digit', month: '2-digit', year: 'numeric' });
 }
 
 /** « VPW, Sixtoe 1.25 » */
 export function versionLabel(file: { authors?: string[]; version?: string }): string {
   const authors = (file.authors ?? []).slice(0, 3).join(', ') + ((file.authors?.length ?? 0) > 3 ? '…' : '');
-  return [authors, file.version].filter(Boolean).join(' ') || 'version sans auteur';
+  return [authors, file.version].filter(Boolean).join(' ') || t('version sans auteur');
 }
 
 // ---------------------------------------------------------------------------
@@ -237,15 +254,27 @@ export function versionLabel(file: { authors?: string[]; version?: string }): st
 export type NeedKind = 'table' | 'b2s' | 'rom' | 'pup' | 'altsound' | 'altcolor' | 'music' | 'topper' | 'pov';
 
 export const NEED_LABELS: Record<NeedKind, string> = {
-  table: 'Table',
-  b2s: 'Fronton (.directb2s)',
+  get table() {
+    return t('Table');
+  },
+  get b2s() {
+    return t('Fronton (.directb2s)');
+  },
   rom: 'ROM',
   pup: 'PuP-Pack',
-  altsound: 'Sons remasterisés (altsound)',
-  altcolor: 'Couleurs du DMD (altcolor)',
-  music: 'Musique',
+  get altsound() {
+    return t('Sons remasterisés (altsound)');
+  },
+  get altcolor() {
+    return t('Couleurs du DMD (altcolor)');
+  },
+  get music() {
+    return t('Musique');
+  },
   topper: 'Topper',
-  pov: 'Point de vue (POV)',
+  get pov() {
+    return t('Point de vue (POV)');
+  },
 };
 
 export type NeedState = 'have' | 'included' | 'todo' | 'optional' | 'useless' | 'unavailable';
@@ -299,7 +328,11 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
     kind: 'table',
     required: true,
     state: ctx.installed ? 'have' : liveLinks(version).length ? 'todo' : 'unavailable',
-    detail: ctx.installed ? 'déjà installée sur cette borne' : liveLinks(version).length ? `${versionLabel(version)}, à récupérer` : 'aucun lien vivant pour cette version : choisissez-en une autre',
+    detail: ctx.installed
+      ? t('déjà installée sur cette borne')
+      : liveLinks(version).length
+        ? t('{version}, à récupérer', { version: versionLabel(version) })
+        : t('aucun lien vivant pour cette version : choisissez-en une autre'),
     files: [version],
   });
 
@@ -307,24 +340,28 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
   const b2s = withLinks(game.b2sFiles).map((f) => f as VpsTableFile);
   const fits = (f: VpsTableFile) => (ctx.screens.dmd === 'full' ? hasFeature(f, 'FullDMD') || hasFeature(f, '3Screens') : ctx.screens.dmd === 'small' ? hasFeature(f, '3Screens') : hasFeature(f, '2Screens'));
   b2s.sort((a, b) => Number(fits(b)) - Number(fits(a)) || recent(a, b));
-  if (hasFeature(version, 'incl. B2S')) needs.push({ kind: 'b2s', required: false, state: 'included', detail: 'fourni avec la table', files: [] });
-  else if (!ctx.screens.backglass) needs.push({ kind: 'b2s', required: false, state: 'useless', detail: 'cette borne n’a pas d’écran de fronton', files: b2s });
-  else if (b2s.length) needs.push({ kind: 'b2s', required: false, state: 'todo', detail: `conseillé : ${b2s.length} fronton${b2s.length > 1 ? 's' : ''}, ${fits(b2s[0]!) ? 'le premier va avec les écrans de la borne' : 'aucun annoncé pour les écrans de la borne'}`, files: b2s });
-  else needs.push({ kind: 'b2s', required: false, state: 'unavailable', detail: 'aucun fronton connu de VPS : le menu en dessinera un', files: [] });
+  if (hasFeature(version, 'incl. B2S')) needs.push({ kind: 'b2s', required: false, state: 'included', detail: t('fourni avec la table'), files: [] });
+  else if (!ctx.screens.backglass) needs.push({ kind: 'b2s', required: false, state: 'useless', detail: t('cette borne n’a pas d’écran de fronton'), files: b2s });
+  else if (b2s.length) {
+    const detail = fits(b2s[0]!)
+      ? tn(b2s.length, 'conseillé : {n} fronton, le premier va avec les écrans de la borne', 'conseillé : {n} frontons, le premier va avec les écrans de la borne')
+      : tn(b2s.length, 'conseillé : {n} fronton, aucun annoncé pour les écrans de la borne', 'conseillé : {n} frontons, aucun annoncé pour les écrans de la borne');
+    needs.push({ kind: 'b2s', required: false, state: 'todo', detail, files: b2s });
+  } else needs.push({ kind: 'b2s', required: false, state: 'unavailable', detail: t('aucun fronton connu de VPS : le menu en dessinera un'), files: [] });
 
   // ROM.
   if (!versionWithoutRom(game, version)) {
     const roms = [...new Set((game.romFiles ?? []).map((r) => (r.version ?? '').trim()).filter(Boolean))];
     const present = roms.filter((r) => ctx.roms.has(r.toLowerCase()));
-    if (hasFeature(version, 'incl. ROM')) needs.push({ kind: 'rom', required: true, state: 'included', detail: 'fournie avec la table', files: [], roms });
-    else if (present.length) needs.push({ kind: 'rom', required: true, state: 'have', detail: `${present.join(', ')} : déjà sur la borne`, files: [], roms });
+    if (hasFeature(version, 'incl. ROM')) needs.push({ kind: 'rom', required: true, state: 'included', detail: t('fournie avec la table'), files: [], roms });
+    else if (present.length) needs.push({ kind: 'rom', required: true, state: 'have', detail: t('{roms} : déjà sur la borne', { roms: present.join(', ') }), files: [], roms });
     else {
       const files = withLinks(game.romFiles).map((r) => ({ ...r, id: r.id ?? `rom:${r.version}` }) as VpsTableFile).sort(recent);
       needs.push({
         kind: 'rom',
         required: true,
         state: files.length ? 'todo' : 'unavailable',
-        detail: roms.length ? `${roms.join(' ou ')} : à récupérer, si vous y avez droit` : 'nom inconnu de VPS : le script de la table le dira une fois installée',
+        detail: roms.length ? t('{roms} : à récupérer, si vous y avez droit', { roms: formatList(roms, 'or') }) : t('nom inconnu de VPS : le script de la table le dira une fois installée'),
         files,
         roms,
       });
@@ -333,16 +370,16 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
 
   // Compléments facultatifs.
   const optional = (kind: NeedKind, files: VpsTableFile[] | undefined, detail: string, included?: string) => {
-    if (included && hasFeature(version, included)) return needs.push({ kind, required: false, state: 'included', detail: 'fourni avec la table', files: [] });
+    if (included && hasFeature(version, included)) return needs.push({ kind, required: false, state: 'included', detail: t('fourni avec la table'), files: [] });
     const usable = withLinks(files).sort(recent);
     if (usable.length) needs.push({ kind, required: false, state: 'optional', detail, files: usable });
   };
-  optional('pup', game.pupPackFiles, 'facultatif : vidéos sur le fronton et l’afficheur pendant la partie', 'incl. PuP');
-  optional('altsound', game.altSoundFiles, 'facultatif : sons du jeu remasterisés');
-  if (ctx.screens.dmd !== 'none') optional('altcolor', game.altColorFiles, 'facultatif : DMD en couleurs');
-  optional('music', game.soundFiles, 'facultatif : musique pour la table');
-  if (ctx.screens.topper) optional('topper', game.topperFiles, 'facultatif : animation du topper');
-  optional('pov', game.povFiles, 'facultatif : réglage du point de vue de la caméra');
+  optional('pup', game.pupPackFiles, t('facultatif : vidéos sur le fronton et l’afficheur pendant la partie'), 'incl. PuP');
+  optional('altsound', game.altSoundFiles, t('facultatif : sons du jeu remasterisés'));
+  if (ctx.screens.dmd !== 'none') optional('altcolor', game.altColorFiles, t('facultatif : DMD en couleurs'));
+  optional('music', game.soundFiles, t('facultatif : musique pour la table'));
+  if (ctx.screens.topper) optional('topper', game.topperFiles, t('facultatif : animation du topper'));
+  optional('pov', game.povFiles, t('facultatif : réglage du point de vue de la caméra'));
   return needs;
 }
 
@@ -387,8 +424,11 @@ export interface WaitList {
 }
 
 /** Avertissement montré au premier usage du catalogue. */
-export const ACQUISITION_NOTICE =
-  'Les tables appartiennent à leurs auteurs, les ROM aux fabricants des jeux. Cyber Pinball ne télécharge rien à votre place : il ouvre les pages, vous vous connectez et téléchargez vous-même, puis il range ce que vous avez récupéré. Aucun fabricant n’autorise la diffusion de ses ROM pour l’émulation : ne récupérez une ROM que si vous y avez droit.';
+export function acquisitionNotice(): string {
+  return t(
+    'Les tables appartiennent à leurs auteurs, les ROM aux fabricants des jeux. Cyber Pinball ne télécharge rien à votre place : il ouvre les pages, vous vous connectez et téléchargez vous-même, puis il range ce que vous avez récupéré. Aucun fabricant n’autorise la diffusion de ses ROM pour l’émulation : ne récupérez une ROM que si vous y avez droit.',
+  );
+}
 
 /** <données>\acquisition.json */
 export function waitListFile(dataDir: string): string {
@@ -565,9 +605,9 @@ export function tableUpdate(vps: VpsDb, from: { source?: TableSource; vpsGameId?
   if (!game || !latest) return undefined;
   const version = from.source?.version ?? from.version;
   const cmp = version && latest.version ? compareVersions(latest.version, version) : Number.NaN;
-  if (cmp > 0) return { game, installed: { version, updatedAt: from.source?.updatedAt }, latest, reason: `version ${version} → ${latest.version}` };
+  if (cmp > 0) return { game, installed: { version, updatedAt: from.source?.updatedAt }, latest, reason: t('version {from} → {to}', { from: version ?? '', to: latest.version ?? '' }) };
   if (Number.isNaN(cmp) && from.source?.updatedAt && latest.updatedAt && latest.updatedAt > from.source.updatedAt) {
-    return { game, installed: { version, updatedAt: from.source.updatedAt }, latest, reason: `mise à jour chez VPS le ${formatDay(latest.updatedAt)}` };
+    return { game, installed: { version, updatedAt: from.source.updatedAt }, latest, reason: t('mise à jour chez VPS le {date}', { date: formatDay(latest.updatedAt) }) };
   }
   return undefined;
 }

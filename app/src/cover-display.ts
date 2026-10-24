@@ -62,7 +62,7 @@ export function coverProblem(state: { fullScreen: boolean; bounds: Rectangle }, 
   const covers = bounds.x <= wanted.x && bounds.y <= wanted.y && bounds.x + bounds.width >= wanted.x + wanted.width && bounds.y + bounds.height >= wanted.y + wanted.height;
   if (state.fullScreen && covers) return undefined;
   const where = (r: Rectangle) => `${r.width} × ${r.height} en ${r.x}, ${r.y}`;
-  return `${state.fullScreen ? 'en plein écran' : 'pas en plein écran'}, ${where(bounds)} au lieu de ${where(wanted)}`;
+  return `${state.fullScreen ? 'en plein écran' : 'pas en plein écran'}, ${where(bounds)} au lieu de ${where(wanted)}`; // i18n-ignore : constat pour la console
 }
 
 

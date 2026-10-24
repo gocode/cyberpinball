@@ -6,7 +6,7 @@
 // ouvrent chaque port et envoient une poignée de main).
 
 import * as koffi from 'koffi';
-import type { ObservedUsbDevice } from '@cyberpinball/core';
+import { t, type ObservedUsbDevice } from '@cyberpinball/core';
 import { hklmValue } from './registry';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -45,17 +45,17 @@ export function presentDeviceIds(enumerator = 'USB'): string[] {
   for (let attempt = 0; attempt < 3; attempt++) {
     const length = [0];
     let rc = w.sizeOf(length, enumerator, flags);
-    if (rc !== CR_SUCCESS) throw new Error(`CM_Get_Device_ID_List_SizeW a échoué (CONFIGRET ${rc}).`);
+    if (rc !== CR_SUCCESS) throw new Error(`CM_Get_Device_ID_List_SizeW a échoué (CONFIGRET ${rc}).`); // i18n-ignore : erreur technique d'un appel Win32
     const buffer = Buffer.alloc((length[0]! + 1) * 2);
     rc = w.list(enumerator, buffer, length[0]! + 1, flags);
     if (rc === CR_BUFFER_SMALL) continue;
-    if (rc !== CR_SUCCESS) throw new Error(`CM_Get_Device_ID_ListW a échoué (CONFIGRET ${rc}).`);
+    if (rc !== CR_SUCCESS) throw new Error(`CM_Get_Device_ID_ListW a échoué (CONFIGRET ${rc}).`); // i18n-ignore : erreur technique d'un appel Win32
     return buffer
       .toString('utf16le')
       .split('\0')
       .filter((id) => id.length > 0);
   }
-  throw new Error('La liste des périphériques USB change sans cesse : réessayez.');
+  throw new Error(t('La liste des périphériques USB change sans cesse : réessayez.'));
 }
 
 /**
@@ -63,7 +63,7 @@ export function presentDeviceIds(enumerator = 'USB'): string[] {
  * d'un périphérique composite (…&MI_00) est une instance à part.
  */
 export function probeUsbDevices(): ObservedUsbDevice[] {
-  if (process.platform !== 'win32') throw new Error('La détection des périphériques USB ne fonctionne que sous Windows pour le moment.');
+  if (process.platform !== 'win32') throw new Error(t('La détection des périphériques USB ne fonctionne que sous Windows pour le moment.'));
   const devices: ObservedUsbDevice[] = [];
   for (const instanceId of presentDeviceIds('USB')) {
     const ids = /VID_([0-9A-F]{4})&PID_([0-9A-F]{4})/i.exec(instanceId);

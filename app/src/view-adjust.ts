@@ -12,6 +12,7 @@ import {
   readTextIfExists,
   safeName,
   settingId,
+  t,
   trialIniText,
   viewAdjustItems,
   viewAdjustNotes,
@@ -41,14 +42,14 @@ const loc = locations();
 /** Relit VPinballX.ini et le .ini de la table ; garde le réglage choisi. */
 export function openViewAdjust(table: TableEntry, index = 0): ViewAdjust | { problem: string } {
   const schema = currentSchema();
-  if (!schema) return { problem: 'Aucun schéma de réglages pour cette version de VPX : lancez « npm run vpx-schema ».' };
+  if (!schema) return { problem: t('Aucun schéma de réglages pour cette version de VPX : lancez « npm run vpx-schema ».') };
   const defs = new Map(schema.settings.map((d) => [settingId(d.section, d.key).toLowerCase(), d]));
   const lookup: SettingLookup = (section, key) => defs.get(settingId(section, key).toLowerCase());
   const location = tableIniLocation(table);
   const globalIni = IniDocument.parse(readTextIfExists(activeVpxIni(loc)));
   const tableIni = IniDocument.parse(readTextIfExists(location.file));
   const items = viewAdjustItems(lookup, globalIni, tableIni);
-  if (!items.length) return { problem: `VPX ${schema.vpx} ne connaît aucun des réglages de cadrage automatique.` };
+  if (!items.length) return { problem: t('VPX {version} ne connaît aucun des réglages de cadrage automatique.', { version: schema.vpx }) };
   const notes = viewAdjustNotes(lookup, globalIni, tableIni, items);
   return { table, location, globalIni, tableIni, lookup, items, index: Math.min(index, items.length - 1), notes };
 }
@@ -80,5 +81,5 @@ export function writeTrialIni(v: ViewAdjust): string {
 /** Fichier écrit, et où VPX le lit quand ce n'est pas le même (bac à sable). */
 export function iniTarget(v: ViewAdjust): string {
   const { writePath, vpxPath } = v.location;
-  return writePath === vpxPath ? writePath : `${writePath} (bac à sable ; VPX lit ${path.basename(vpxPath)} à côté de la table)`;
+  return writePath === vpxPath ? writePath : t('{file} (bac à sable ; VPX lit {name} à côté de la table)', { file: writePath, name: path.basename(vpxPath) });
 }

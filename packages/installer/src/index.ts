@@ -6,6 +6,7 @@ import {
   componentPaths,
   layoutOf,
   configIniPath,
+  t,
   updateCabinetSet,
   writeRootPointer,
   type Locations,
@@ -40,7 +41,7 @@ export function setupRoot(root: string, locations: Locations): SetupReport {
   }
   const free = freeBytes(root);
   if (free !== undefined && free < MIN_FREE_BYTES) {
-    throw new Error(`Il reste ${(free / 1024 ** 3).toFixed(1)} Go sur ce disque ; il en faut au moins 2 pour VPX et quelques tables.`);
+    throw new Error(t('Il reste {free} Go sur ce disque ; il en faut au moins 2 pour VPX et quelques tables.', { free: (free / 1024 ** 3).toFixed(1) }));
   }
 
   const migrated: string[] = [];
@@ -115,7 +116,7 @@ export async function installComponent(root: string, component: Component, onPro
 
   if (!status.installed && component.distribution === 'manual') {
     throw new Error(
-      `${component.name} ne peut pas être redistribué : téléchargez-le depuis ${component.homepage} et décompressez-le dans ${paths.version}.`,
+      t('{name} ne peut pas être redistribué : téléchargez-le depuis {homepage} et décompressez-le dans {folder}.', { name: component.name, homepage: component.homepage, folder: paths.version }),
     );
   }
 
@@ -127,7 +128,7 @@ export async function installComponent(root: string, component: Component, onPro
     flattenSingleFolder(staging);
     if (!findExecutable(staging, component.executablePattern)) {
       fs.rmSync(staging, { recursive: true, force: true });
-      throw new Error(`Aucun exécutable correspondant à ${component.executablePattern} dans l'archive de ${component.name}.`);
+      throw new Error(t("Aucun exécutable correspondant à {pattern} dans l'archive de {name}.", { pattern: component.executablePattern, name: component.name }));
     }
     fs.writeFileSync(
       path.join(staging, MARKER),

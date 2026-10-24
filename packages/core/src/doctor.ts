@@ -6,6 +6,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { formatSize, isInside, safeName, sameVolume, sizeOf, type FileOp } from './fileops';
+import { formatDate, formatDateTime, formatList, formatNumber, t, tn } from './i18n';
 import { IniDocument } from './ini';
 import { isCurrentMediaError, mediaErrorsFile, readMediaErrors, type MediaErrorEntry, type MediaErrorKind } from './mediaerrors';
 import {
@@ -41,7 +42,7 @@ import {
   type PupCabinet,
   type PupScriptFacts,
 } from './puppack';
-import { aliasFor, historicAlias, neighbourRom, NEIGHBOUR_WARNING, readTableAliases, tableAliasFile, withAlias, withoutAlias } from './romalias';
+import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { companion, nameKey } from './tablefiles';
 import { parseTableName, type TableEntry } from './tables';
@@ -84,6 +85,7 @@ export const FINDING_CODES = [
   'pupCaptureRom',
   'pupLog',
   'manualView',
+  'tableWindows',
   'mediaUnreadable',
   'mediaMisnamed',
   'mediaStray',
@@ -255,10 +257,13 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'outsideFolder',
       severity: 'warning',
-      title: 'Table hors de son propre dossier',
-      detail: `VPX range chaque table dans son dossier, avec sa ROM, son backglass et ses vidéos. Celle-ci est en vrac dans ${ctx.tablesDir}.`,
+      title: t('Table hors de son propre dossier'),
+      detail: t('VPX range chaque table dans son dossier, avec sa ROM, son backglass et ses vidéos. Celle-ci est en vrac dans {dir}.', { dir: ctx.tablesDir }),
       fix: {
-        label: `Déplacer ${moved.length > 1 ? `ses ${moved.length} fichiers` : 'la table'} dans « ${path.basename(target)} »`,
+        label:
+          moved.length > 1
+            ? t('Déplacer ses {n} fichiers dans « {folder} »', { n: moved.length, folder: path.basename(target) })
+            : t('Déplacer la table dans « {folder} »', { folder: path.basename(target) }),
         ops: moved.map((f) => ({ op: 'move', from: path.join(folder, f), to: path.join(target, f) })),
       },
     });
@@ -270,9 +275,9 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'scriptOverride',
       severity: 'warning',
-      title: 'Script de la table remplacé',
-      detail: `${vbs} remplace le script contenu dans la table. C'est parfois voulu (correctif), souvent un reste d'extraction qui rend la table injouable après une mise à jour.`,
-      fix: { label: `Mettre ${vbs} à la corbeille`, ops: [{ op: 'trash', path: path.join(folder, vbs) }] },
+      title: t('Script de la table remplacé'),
+      detail: t("{file} remplace le script contenu dans la table. C'est parfois voulu (correctif), souvent un reste d'extraction qui rend la table injouable après une mise à jour.", { file: vbs }),
+      fix: { label: t('Mettre {file} à la corbeille', { file: vbs }), ops: [{ op: 'trash', path: path.join(folder, vbs) }] },
     });
   }
 
@@ -291,34 +296,35 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'backglassMisnamed',
       severity: 'warning',
-      title: 'Backglass mal nommé',
-      detail: `VPX cherche « ${base}.directb2s » ou « ${wanted} » : « ${best} » ne sera pas affiché.`,
-      fix: { label: `Renommer en « ${wanted} »`, ops: [{ op: 'move', from: path.join(folder, best), to: path.join(folder, wanted) }] },
+      title: t('Backglass mal nommé'),
+      detail: t('VPX cherche « {base}.directb2s » ou « {wanted} » : « {best} » ne sera pas affiché.', { base, wanted, best }),
+      fix: { label: t('Renommer en « {name} »', { name: wanted }), ops: [{ op: 'move', from: path.join(folder, best), to: path.join(folder, wanted) }] },
     });
   } else if (!backglass) {
     findings.push({
       code: 'backglassMissing',
       severity: 'info',
-      title: 'Pas de backglass',
-      detail: 'Le second écran restera sur l’image de Cyber Pinball. Ajoutez un fichier .directb2s avec « Ajouter une table » pour l’animer.',
+      title: t('Pas de backglass'),
+      detail: t('Le second écran restera sur l’image de Cyber Pinball. Ajoutez un fichier .directb2s avec « Ajouter une table » pour l’animer.'),
     });
   } else if (strays.length) {
     const size = strays.reduce((sum, f) => sum + sizeOf(path.join(folder, f)), 0);
+    const params = { shown: path.basename(backglass), list: strays.map(quote).join(', '), size: formatSize(size) };
     findings.push({
       code: 'backglassStray',
       severity: 'info',
-      title: strays.length > 1 ? 'Backglass inutilisés' : 'Backglass inutilisé',
-      detail: `VPX affiche « ${path.basename(backglass)} » ; ${strays.map((f) => `« ${f} »`).join(', ')} ne ${strays.length > 1 ? 'servent' : 'sert'} à rien (${formatSize(size)}).`,
-      fix: { label: `Mettre ${strays.length > 1 ? 'les fichiers inutilisés' : 'le fichier inutilisé'} à la corbeille`, ops: strays.map((f) => ({ op: 'trash', path: path.join(folder, f) })) },
+      title: tn(strays.length, 'Backglass inutilisé', 'Backglass inutilisés'),
+      detail: tn(strays.length, 'VPX affiche « {shown} » ; {list} ne sert à rien ({size}).', 'VPX affiche « {shown} » ; {list} ne servent à rien ({size}).', params),
+      fix: { label: tn(strays.length, 'Mettre le fichier inutilisé à la corbeille', 'Mettre les fichiers inutilisés à la corbeille'), ops: strays.map((f) => ({ op: 'trash', path: path.join(folder, f) })) },
     });
   }
 
   // 4. ROM attendue par le script.
   if (ownFolder && ctx.script) {
     if ('error' in ctx.script) {
-      findings.push({ code: 'scriptUnreadable', severity: 'warning', title: 'Script illisible', detail: `La ROM n’a pas pu être vérifiée : ${ctx.script.error}` });
+      findings.push({ code: 'scriptUnreadable', severity: 'warning', title: t('Script illisible'), detail: t('La ROM n’a pas pu être vérifiée : {error}', { error: ctx.script.error }) });
     } else if (ctx.script.usesPinmame && ctx.script.roms.length === 0) {
-      findings.push({ code: 'romUnknown', severity: 'info', title: 'ROM non vérifiée', detail: 'La table utilise PinMAME, mais le nom de sa ROM n’apparaît pas clairement dans son script.' });
+      findings.push({ code: 'romUnknown', severity: 'info', title: t('ROM non vérifiée'), detail: t('La table utilise PinMAME, mais le nom de sa ROM n’apparaît pas clairement dans son script.') });
     } else if (ctx.script.usesPinmame) {
       findings.push(...checkRom(folder, ctx.script.roms, ctx.romLibrary));
     }
@@ -346,9 +352,16 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'crashReport',
       severity: 'warning',
-      title: 'Rapport de plantage de VPX',
-      detail: `VPX a planté sur cette table le ${when.toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })}${reason ? ` (${reason})` : ''}. ${crashes.join(' et ')} : ${formatSize(size)}.`,
-      fix: { label: `Supprimer ${crashes.length > 1 ? 'les rapports' : 'le rapport'} (libère ${formatSize(size)})${txt && ctx.logsDir ? ', crash.txt est gardé dans les journaux' : ''}`, ops },
+      title: t('Rapport de plantage de VPX'),
+      detail: reason
+        ? t('VPX a planté sur cette table le {date} ({reason}). {files} : {size}.', { date: formatDateTime(when), reason, files: formatList(crashes), size: formatSize(size) })
+        : t('VPX a planté sur cette table le {date}. {files} : {size}.', { date: formatDateTime(when), files: formatList(crashes), size: formatSize(size) }),
+      fix: {
+        label:
+          tn(crashes.length, 'Supprimer le rapport (libère {size})', 'Supprimer les rapports (libère {size})', { size: formatSize(size) }) +
+          (txt && ctx.logsDir ? t(', crash.txt est gardé dans les journaux') : ''),
+        ops,
+      },
     });
   }
 
@@ -359,15 +372,19 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'infoMissing',
       severity: 'info',
-      title: 'Pas de fichier d’informations',
-      detail: 'Le titre, le fabricant et l’année sont devinés d’après le nom des fichiers. Le fichier .info les fixe et les partage avec les autres frontends.',
-      fix: { label: `Créer « ${path.basename(infoFile)} »`, ops: [{ op: 'write', path: infoFile, content: JSON.stringify(info, null, 2) + '\n' }] },
+      title: t('Pas de fichier d’informations'),
+      detail: t('Le titre, le fabricant et l’année sont devinés d’après le nom des fichiers. Le fichier .info les fixe et les partage avec les autres frontends.'),
+      fix: { label: t('Créer « {name} »', { name: path.basename(infoFile) }), ops: [{ op: 'write', path: infoFile, content: JSON.stringify(info, null, 2) + '\n' }] },
     });
   }
 
   // 7. Cadrage manuel imposé par le .ini de la table (souvent livré avec elle).
   const manual = manualViewFinding(entry.file);
   if (manual) findings.push(manual);
+
+  // 7 bis. Écrans placés pour cette table seulement (menu de VPX, « Save as Table Override »).
+  const windows = tableWindowsFinding(entry.file);
+  if (windows) findings.push(windows);
 
   // 8. PuP-Pack (mode plugins de VPX 10.8.1).
   if (ownFolder) findings.push(...checkPup(entry, ctx));
@@ -396,10 +413,67 @@ function manualViewFinding(tableFile: string): Finding | undefined {
   return {
     code: 'manualView',
     severity: 'warning',
-    title: 'Cadrage manuel imposé par la table',
-    detail: `${name} règle [Player] CabinetAutofitMode = 0 : VPX ne cadre pas cette table et reprend une vue réglée à la main, peut-être pour un autre écran (table tronquée ou qui déborde). Ensuite, « Ajuster la vue » dans la fiche la règle aux boutons.`,
+    title: t('Cadrage manuel imposé par la table'),
+    detail: t(
+      '{name} règle [Player] CabinetAutofitMode = 0 : VPX ne cadre pas cette table et reprend une vue réglée à la main, peut-être pour un autre écran (table tronquée ou qui déborde). Ensuite, « Ajuster la vue » dans la fiche la règle aux boutons.',
+      { name },
+    ),
     fix: {
-      label: 'Rendre le cadrage automatique à la table',
+      label: t('Rendre le cadrage automatique à la table'),
+      ops: doc.entries().length ? [{ op: 'write', path: ini.path, content: doc.toString() }] : [{ op: 'trash', path: ini.path }],
+    },
+  };
+}
+
+/** Fenêtres annexes de VPX que le .ini d'une table peut placer pour elle seule. */
+const TABLE_WINDOWS = [
+  { section: 'Backglass', prefix: 'Backglass', get label() { return t('Fronton'); } },
+  { section: 'ScoreView', prefix: 'ScoreView', label: 'DMD' },
+  { section: 'Topper', prefix: 'Topper', label: 'Topper' },
+] as const;
+const WINDOW_KEY = /^(Output|Display|FullScreen|WndX|WndY|Width|Height)$/i;
+
+/**
+ * Fronton, DMD ou topper placés pour cette table seulement : le menu de VPX (« Display
+ * Settings », enregistré par « Save as Table Override ») écrit leur fenêtre dans le .ini
+ * de la table, par-dessus la disposition de la borne. C'est voulu (le DMD posé dans le
+ * cadre que dessine un PuP-Pack) ; le constat le montre et permet d'y revenir, par
+ * exemple après un changement d'écran. La réparation retire ces clés et rien d'autre.
+ */
+function tableWindowsFinding(tableFile: string): Finding | undefined {
+  const ini = findTableIni(tableFile);
+  if (!ini.exists) return undefined;
+  const doc = IniDocument.parse(fs.readFileSync(ini.path, 'utf8'));
+  const placed: string[] = [];
+  for (const w of TABLE_WINDOWS) {
+    const keys = doc
+      .entries()
+      .filter((e) => e.section.toLowerCase() === w.section.toLowerCase() && e.key.toLowerCase().startsWith(w.prefix.toLowerCase()) && WINDOW_KEY.test(e.key.slice(w.prefix.length)) && e.value.trim() !== '');
+    if (!keys.length) continue;
+    const value = (suffix: string) => keys.find((e) => e.key.toLowerCase() === `${w.prefix}${suffix}`.toLowerCase())?.value.trim();
+    const [x, y, width, height] = ['WndX', 'WndY', 'Width', 'Height'].map(value);
+    const where = [width && height ? `${width} × ${height}` : undefined, x !== undefined && y !== undefined ? t('en {x}, {y}', { x, y }) : undefined].filter(Boolean).join(' ');
+    const output = value('Output');
+    const state =
+      output === '0'
+        ? t('éteint')
+        : output === '2'
+          ? where
+            ? t('incrusté dans le plateau, {where}', { where })
+            : t('incrusté dans le plateau')
+          : where || keys.map((e) => e.key).join(', ');
+    placed.push(t('{window} ({state})', { window: w.label, state }));
+    for (const e of keys) doc.remove(e.section, e.key);
+  }
+  if (!placed.length) return undefined;
+  const name = path.basename(ini.path);
+  return {
+    code: 'tableWindows',
+    severity: 'info',
+    title: t('Écrans placés pour cette table'),
+    detail: t('{file} place {windows} pour cette table seulement, par-dessus la disposition de la borne (menu de VPX, « Display Settings », enregistré pour la table). Après un changement d’écran, revenez à la disposition générale.', { file: name, windows: placed.join(', ') }),
+    fix: {
+      label: t('Revenir à la disposition générale'),
       ops: doc.entries().length ? [{ op: 'write', path: ini.path, content: doc.toString() }] : [{ op: 'trash', path: ini.path }],
     },
   };
@@ -433,10 +507,10 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'pupNested',
       severity: 'warning',
-      title: 'PuP-Pack rangé un dossier trop bas',
-      detail: `Le plugin PUP lit screens.pup à la racine de pupvideos\\${pack} ; le pack est dans « ${path.relative(pupvideos, root)} ».`,
+      title: t('PuP-Pack rangé un dossier trop bas'),
+      detail: t('Le plugin PUP lit screens.pup à la racine de pupvideos\\{pack} ; le pack est dans « {where} ».', { pack, where: path.relative(pupvideos, root) }),
       fix: {
-        label: `Remonter le pack dans pupvideos\\${pack}`,
+        label: t('Remonter le pack dans pupvideos\\{pack}', { pack }),
         ops: [
           { op: 'move', from: root, to: tmp },
           { op: 'trash', path: dir },
@@ -453,27 +527,32 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'pupMissing',
       severity: 'warning',
-      title: `PuP-Pack « ${wanted} » introuvable`,
+      title: t('PuP-Pack « {name} » introuvable', { name: wanted }),
       detail: [
-        `Le plugin PUP cherche pupvideos\\${expected.join(' ou pupvideos\\')} à côté de la table.`,
+        t('Le plugin PUP cherche {paths} à côté de la table.', { paths: formatList(expected.map((e) => `pupvideos\\${e}`), 'or') }),
         candidate
-          ? `« ${candidate} » ne sera pas chargé sous ce nom.`
+          ? t('« {name} » ne sera pas chargé sous ce nom.', { name: candidate })
           : packs.length
-            ? `Présents : ${packs.join(', ')}.`
-            : 'Ajoutez le pack avec « Ajouter une table » : il sera rangé et nommé comme il faut.',
-        'La table se joue sans ses vidéos.',
+            ? t('Présents : {list}.', { list: packs.join(', ') })
+            : t('Ajoutez le pack avec « Ajouter une table » : il sera rangé et nommé comme il faut.'),
+        t('La table se joue sans ses vidéos.'),
       ].join(' '),
-      fix: candidate ? { label: `Renommer « ${candidate} » en « ${wanted} »`, ops: [{ op: 'move', from: path.join(pupvideos, candidate), to: path.join(pupvideos, wanted) }] } : undefined,
+      fix: candidate ? { label: t('Renommer « {from} » en « {to} »', { from: candidate, to: wanted }), ops: [{ op: 'move', from: path.join(pupvideos, candidate), to: path.join(pupvideos, wanted) }] } : undefined,
     });
   } else if (matching.length && othersKnown && others.length) {
     const size = others.reduce((sum, p) => sum + sizeOf(path.join(pupvideos, p)), 0);
     findings.push({
       code: 'pupOrphan',
       severity: 'info',
-      title: others.length > 1 ? 'PuP-Packs inutilisés' : 'PuP-Pack inutilisé',
-      detail: `Le plugin charge pupvideos\\${matching[0]} ; ${others.map((p) => `« ${p} »`).join(', ')} ne ${others.length > 1 ? 'servent' : 'sert'} à aucune table du dossier (${formatSize(size)}).`,
+      title: tn(others.length, 'PuP-Pack inutilisé', 'PuP-Packs inutilisés'),
+      detail: tn(
+        others.length,
+        'Le plugin charge pupvideos\\{pack} ; {list} ne sert à aucune table du dossier ({size}).',
+        'Le plugin charge pupvideos\\{pack} ; {list} ne servent à aucune table du dossier ({size}).',
+        { pack: matching[0]!, list: others.map(quote).join(', '), size: formatSize(size) },
+      ),
       fix: {
-        label: `Mettre ${others.length > 1 ? 'les dossiers inutilisés' : 'le dossier inutilisé'} à la corbeille`,
+        label: tn(others.length, 'Mettre le dossier inutilisé à la corbeille', 'Mettre les dossiers inutilisés à la corbeille'),
         ops: others.map((p) => ({ op: 'trash' as const, path: path.join(pupvideos, p) })),
       },
     });
@@ -492,29 +571,31 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
       const failed = info.bats.filter((b) => !b.ok);
       const why =
         choice.reason === 'remembered'
-          ? 'option choisie à l’installation'
+          ? t('option choisie à l’installation')
           : choice.reason === 'cabinet' && ctx.cabinet
-            ? `d’après la borne : ${describePupCabinet(ctx.cabinet)}`
+            ? t('d’après la borne : {cabinet}', { cabinet: describePupCabinet(ctx.cabinet) })
             : choice.reason === 'only'
-              ? 'seule option du pack'
-              : 'à vérifier : la borne n’est pas configurée';
+              ? t('seule option du pack')
+              : t('à vérifier : la borne n’est pas configurée');
       findings.push({
         code: 'pupOptionNotApplied',
         severity: info.pupFiles.length ? 'info' : 'warning',
-        title: info.pupFiles.length ? 'Option du PuP-Pack modifiée ou inconnue' : 'Option du PuP-Pack non appliquée',
+        title: info.pupFiles.length ? t('Option du PuP-Pack modifiée ou inconnue') : t('Option du PuP-Pack non appliquée'),
         detail: [
           info.pupFiles.length
-            ? `Les fichiers .pup de pupvideos\\${pack} ne sont ceux d’aucune option (modifiés à la main, ou mélange après une mise à jour).`
-            : `pupvideos\\${pack} n’a pas de screens.pup : il faut y recopier une des ${info.variants.length} options du pack.`,
-          `Options : ${info.variants.map((x) => x.label).join(', ')}.`,
+            ? t('Les fichiers .pup de pupvideos\\{pack} ne sont ceux d’aucune option (modifiés à la main, ou mélange après une mise à jour).', { pack })
+            : t('pupvideos\\{pack} n’a pas de screens.pup : il faut y recopier une des {n} options du pack.', { pack, n: info.variants.length }),
+          t('Options : {list}.', { list: info.variants.map((x) => x.label).join(', ') }),
           failed.length
-            ? `${failed.map((b) => `« ${b.bat} » (${b.reason})`).join(', ')} : lu${failed.length > 1 ? 's' : ''} sans succès, jamais exécuté${failed.length > 1 ? 's' : ''}.`
+            ? tn(failed.length, '{list} : lu sans succès, jamais exécuté.', '{list} : lus sans succès, jamais exécutés.', {
+                list: failed.map((b) => t('« {name} » ({reason})', { name: b.bat, reason: b.reason ?? '' })).join(', '),
+              })
             : '',
         ]
           .filter(Boolean)
           .join(' '),
         fix: {
-          label: `Appliquer « ${v.label} » (${why})`,
+          label: t('Appliquer « {option} » ({why})', { option: v.label, why }),
           ops: [
             ...v.copies.map((c) => ({ op: 'copy' as const, from: path.join(info.root, c.from), to: path.join(info.root, c.to) })),
             ...v.deletes.map((d) => ({ op: 'trash' as const, path: path.join(info.root, d) })),
@@ -528,7 +609,7 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
     // Écrans demandés que la borne n'a pas, et écran Playfield que le plugin ne rend pas.
     if (ctx.cabinet) {
       const has = { topper: ctx.cabinet.topper, backglass: ctx.cabinet.backglass, dmd: ctx.cabinet.dmd };
-      const labels = { topper: 'le topper', backglass: 'le backglass', dmd: 'le DMD' } as const;
+      const labels = { topper: t('le topper'), backglass: t('le backglass'), dmd: t('le DMD') };
       const lost = new Set<'topper' | 'backglass' | 'dmd'>();
       for (const s of info.screens.filter(isVisible)) {
         // Un écran placé dans un autre (CustomPos) s'affiche là où est son parent.
@@ -539,8 +620,11 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
         findings.push({
           code: 'pupScreenAbsent',
           severity: 'info',
-          title: 'Écrans du PuP-Pack absents de la borne',
-          detail: `Le pack montre des vidéos sur ${[...lost].map((r) => labels[r]).join(' et ')}, que la borne n’a pas : elles ne seront pas vues. Une autre option du pack les place peut-être ailleurs.`,
+          title: t('Écrans du PuP-Pack absents de la borne'),
+          detail: t(
+            'Le pack montre des vidéos sur {screens}, que la borne n’a pas : elles ne seront pas vues. Une autre option du pack les place peut-être ailleurs.',
+            { screens: formatList([...lost].map((r) => labels[r])) },
+          ),
         });
       }
     }
@@ -548,8 +632,8 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
       findings.push({
         code: 'pupPlayfieldScreen',
         severity: 'info',
-        title: 'Vidéos sur le plateau non affichées',
-        detail: 'Le pack utilise l’écran Playfield (3), que le plugin PUP de VPX 10.8.1 n’affiche pas : ces vidéos par-dessus le plateau ne seront pas vues.',
+        title: t('Vidéos sur le plateau non affichées'),
+        detail: t('Le pack utilise l’écran Playfield (3), que le plugin PUP de VPX 10.8.1 n’affiche pas : ces vidéos par-dessus le plateau ne seront pas vues.'),
       });
     }
 
@@ -558,8 +642,11 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
       findings.push({
         code: 'pupScriptDriven',
         severity: 'info',
-        title: 'PuP-Pack piloté par le script',
-        detail: `pupvideos\\${pack} n’a aucun fichier .pup : c’est le script de la table qui déclare ses playlists (playlistadd). Le plugin PUP le gère en grande partie ; si des vidéos manquent, le journal de VPX dira quelles fonctions ne sont pas prises en charge.`,
+        title: t('PuP-Pack piloté par le script'),
+        detail: t(
+          'pupvideos\\{pack} n’a aucun fichier .pup : c’est le script de la table qui déclare ses playlists (playlistadd). Le plugin PUP le gère en grande partie ; si des vidéos manquent, le journal de VPX dira quelles fonctions ne sont pas prises en charge.',
+          { pack },
+        ),
       });
     }
 
@@ -572,15 +659,18 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
         findings.push({
           code: 'pupCaptureRom',
           severity: 'warning',
-          title: 'PuP-Pack prévu pour une autre ROM',
-          detail: `Le pack reconnaît les images du DMD (PuPCapture) de la ROM « ${origin} », la table joue « ${rom} » : certaines vidéos ne se déclencheront pas.`,
+          title: t('PuP-Pack prévu pour une autre ROM'),
+          detail: t('Le pack reconnaît les images du DMD (PuPCapture) de la ROM « {origin} », la table joue « {rom} » : certaines vidéos ne se déclencheront pas.', { origin, rom }),
         });
       } else if (language) {
         findings.push({
           code: 'pupCaptureRom',
           severity: 'info',
-          title: 'ROM d’une autre langue',
-          detail: `La table joue « ${rom} », semble-t-il une ROM ${language}. Le pack reconnaît les images du DMD (PuPCapture) : s’il a été fait pour la ROM anglaise, certaines vidéos ne se déclencheront pas.`,
+          title: t('ROM d’une autre langue'),
+          detail: t(
+            'La table joue « {rom} », semble-t-il une ROM {language}. Le pack reconnaît les images du DMD (PuPCapture) : s’il a été fait pour la ROM anglaise, certaines vidéos ne se déclencheront pas.',
+            { rom, language },
+          ),
         });
       }
     }
@@ -594,7 +684,16 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
 export function romLanguage(rom: string): string | undefined {
   const m = /_\d{2,3}[a-z]([fgis])$/i.exec(rom);
   if (!m) return undefined;
-  return { f: 'française', g: 'allemande', i: 'italienne', s: 'espagnole' }[m[1]!.toLowerCase() as 'f' | 'g' | 'i' | 's'];
+  switch (m[1]!.toLowerCase()) {
+    case 'f':
+      return t('française');
+    case 'g':
+      return t('allemande');
+    case 'i':
+      return t('italienne');
+    default:
+      return t('espagnole');
+  }
 }
 
 /** Ce que vpinball.log dit du pack à la dernière partie de cette table. */
@@ -614,16 +713,16 @@ function checkPupLog(entry: TableEntry, log: string, expected: string[], found: 
       findings.push({
         code: 'pupLog',
         severity: 'warning',
-        title: 'Journal de VPX : pack sans screens.pup',
-        detail: `À la dernière partie, VPX a chargé « ${pupPath} » mais n’y a pas trouvé de screens.pup : les écrans du pack sont restés éteints.`,
+        title: t('Journal de VPX : pack sans screens.pup'),
+        detail: t('À la dernière partie, VPX a chargé « {path} » mais n’y a pas trouvé de screens.pup : les écrans du pack sont restés éteints.', { path: pupPath }),
       });
     }
   } else if (!pupPath && expected.length && !found.some((f) => f.code === 'pupMissing')) {
     findings.push({
       code: 'pupLog',
       severity: 'warning',
-      title: 'Journal de VPX : pack non chargé',
-      detail: `À la dernière partie, le plugin PUP n’a chargé aucun pack (il cherchait pupvideos\\${expected[0]}). Si le pack a été ajouté ou réparé depuis, relancez une partie.`,
+      title: t('Journal de VPX : pack non chargé'),
+      detail: t('À la dernière partie, le plugin PUP n’a chargé aucun pack (il cherchait pupvideos\\{pack}). Si le pack a été ajouté ou réparé depuis, relancez une partie.', { pack: expected[0]! }),
     });
   }
   const missing = [
@@ -637,8 +736,10 @@ function checkPupLog(entry: TableEntry, log: string, expected: string[], found: 
     findings.push({
       code: 'pupLog',
       severity: 'info',
-      title: 'Journal de VPX : fonctions PuP non prises en charge',
-      detail: `La table a demandé au plugin PUP des fonctions qu’il ne gère pas encore (${missing.slice(0, 4).join(', ')}${missing.length > 4 ? '…' : ''}) : une partie du pack peut manquer.`,
+      title: t('Journal de VPX : fonctions PuP non prises en charge'),
+      detail: t('La table a demandé au plugin PUP des fonctions qu’il ne gère pas encore ({list}) : une partie du pack peut manquer.', {
+        list: missing.slice(0, 4).join(', ') + (missing.length > 4 ? '…' : ''),
+      }),
     });
   }
   return findings;
@@ -723,10 +824,14 @@ function shownMedia(items: MediaItem[], type: MediaType, names: string[]): Media
 
 /** « « a », « b » et 3 autres ». */
 function quoteList(names: string[], max = 4): string {
-  const shown = names.slice(0, max).map((n) => `« ${n} »`);
+  const shown = names.slice(0, max).map(quote);
   const rest = names.length - shown.length;
-  if (rest > 0) return `${shown.join(', ')} et ${rest} autre${rest > 1 ? 's' : ''}`;
-  return shown.length > 1 ? `${shown.slice(0, -1).join(', ')} et ${shown.at(-1)}` : (shown[0] ?? '');
+  return formatList(rest > 0 ? [...shown, tn(rest, '{n} autre', '{n} autres')] : shown);
+}
+
+/** « nom » (guillemets de la langue). */
+function quote(name: string): string {
+  return t('« {name} »', { name });
 }
 
 /** Proportions lisibles : « 16:9 », « 9:16 », « 4:1 », sinon « 2,35:1 ». */
@@ -736,18 +841,41 @@ export function ratioLabel(widthOverHeight: number): string {
   const known: [number, number][] = [[1, 1], [5, 4], [4, 3], [3, 2], [16, 10], [16, 9], [2, 1], [21, 9], [3, 1], [4, 1]];
   const near = known.find(([w, h]) => Math.abs(Math.log(r / (w / h))) < 0.02);
   if (near) return portrait ? `${near[1]}:${near[0]}` : `${near[0]}:${near[1]}`;
-  const value = r.toLocaleString('fr-FR', { maximumFractionDigits: 2 });
+  const value = formatNumber(r, { maximumFractionDigits: 2 });
   return portrait ? `1:${value}` : `${value}:1`;
 }
 
-const ROLE_LABELS: Record<RoleId, string> = { playfield: 'le plateau', backglass: 'le fronton', dmd: 'le DMD', topper: 'le topper' };
+const ROLE_LABELS: Record<RoleId, string> = {
+  get playfield() {
+    return t('le plateau');
+  },
+  get backglass() {
+    return t('le fronton');
+  },
+  get dmd() {
+    return t('le DMD');
+  },
+  get topper() {
+    return t('le topper');
+  },
+};
 
 const MEDIA_ERROR_LABELS: Record<MediaErrorKind, string> = {
-  decode: 'décodage impossible (fichier abîmé, ou codec non pris en charge)',
-  unsupported: 'format ou codec refusé',
-  image: 'image illisible',
-  network: 'fichier illisible sur le disque (verrouillé, ou disque en erreur)',
-  other: 'erreur de lecture',
+  get decode() {
+    return t('décodage impossible (fichier abîmé, ou codec non pris en charge)');
+  },
+  get unsupported() {
+    return t('format ou codec refusé');
+  },
+  get image() {
+    return t('image illisible');
+  },
+  get network() {
+    return t('fichier illisible sur le disque (verrouillé, ou disque en erreur)');
+  },
+  get other() {
+    return t('erreur de lecture');
+  },
 };
 
 /** Erreurs dues au fichier lui-même : il ne sera pas mieux lu la fois suivante. */
@@ -842,20 +970,28 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'mediaUnreadable',
       severity: 'warning',
-      title: unreadable.length > 1 ? 'Médias dans un format que le menu ne lit pas' : 'Média dans un format que le menu ne lit pas',
+      title: tn(unreadable.length, 'Média dans un format que le menu ne lit pas', 'Médias dans un format que le menu ne lit pas'),
       detail: [
         old.length
-          ? `${quoteList(old.map((i) => i.name))} : ${[...new Set(old.map((i) => i.ext))].join(', ')}, ${new Set(old.map((i) => i.ext)).size > 1 ? 'anciens formats' : 'ancien format'} de PinUP Popper que le menu (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.`
+          ? tn(
+              new Set(old.map((i) => i.ext)).size,
+              '{files} : {exts}, ancien format de PinUP Popper que le menu (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.',
+              '{files} : {exts}, anciens formats de PinUP Popper que le menu (Chromium) ne lit pas. Convertissez en mp4 (H.264) ou en webm, par exemple avec HandBrake.',
+              { files: quoteList(old.map((i) => i.name)), exts: [...new Set(old.map((i) => i.ext))].join(', ') },
+            )
           : '',
-        ...wrong.map((i) => `« ${i.name} » : un média « ${label(i.type!)} » se lit en ${mediaTypeInfo(i.type!).formats.join(', ')}.`),
-        redundant.length ? `${quoteList(redundant.map((i) => i.name))} : une version lisible porte le même nom, c’est elle qui est montrée.` : '',
-        redundant.length < unreadable.length ? 'En attendant, le menu passe au média suivant ou à son repli.' : '',
+        ...wrong.map((i) => t('« {name} » : un média « {type} » se lit en {formats}.', { name: i.name, type: label(i.type!), formats: mediaTypeInfo(i.type!).formats.join(', ') })),
+        redundant.length ? t('{files} : une version lisible porte le même nom, c’est elle qui est montrée.', { files: quoteList(redundant.map((i) => i.name)) }) : '',
+        redundant.length < unreadable.length ? t('En attendant, le menu passe au média suivant ou à son repli.') : '',
       ]
         .filter(Boolean)
         .join(' '),
       fix: redundant.length
         ? {
-            label: `Mettre ${redundant.length > 1 ? `les ${redundant.length} fichiers en double` : `« ${redundant[0]!.name} »`} à la corbeille (une version lisible existe)`,
+            label:
+              redundant.length > 1
+                ? t('Mettre les {n} fichiers en double à la corbeille (une version lisible existe)', { n: redundant.length })
+                : t('Mettre « {name} » à la corbeille (une version lisible existe)', { name: redundant[0]!.name }),
             ops: redundant.map((i) => ({ op: 'trash' as const, path: i.file })),
           }
         : undefined,
@@ -884,17 +1020,26 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'mediaDmdSwapped',
       severity: 'warning',
-      title: swapped.length > 1 ? 'Afficheurs rangés sous le mauvais type' : 'Afficheur rangé sous le mauvais type',
+      title: tn(swapped.length, 'Afficheur rangé sous le mauvais type', 'Afficheurs rangés sous le mauvais type'),
       detail: [
-        ...swapped.map(
-          (s) =>
-            `« ${s.item.name} » est en ${ratioLabel(s.ratio)} : c’est un média « ${label(s.actual)} » (${s.actual}), pas « ${label(s.item.type!)} ».${s.to ? '' : ` Un fichier (${s.actual}) de ce nom existe déjà : gardez l’un des deux.`}`,
-        ),
-        'Le menu montre le DMD 4:1 sur un écran proche du 4:1, et le FullDMD 16:9 sur un écran large.',
+        ...swapped.flatMap((s) => [
+          t('« {name} » est en {ratio} : c’est un média « {actual} » ({type}), pas « {wrong} ».', {
+            name: s.item.name,
+            ratio: ratioLabel(s.ratio),
+            actual: label(s.actual),
+            type: s.actual,
+            wrong: label(s.item.type!),
+          }),
+          ...(s.to ? [] : [t('Un fichier ({type}) de ce nom existe déjà : gardez l’un des deux.', { type: s.actual })]),
+        ]),
+        t('Le menu montre le DMD 4:1 sur un écran proche du 4:1, et le FullDMD 16:9 sur un écran large.'),
       ].join(' '),
       fix: fixable.length
         ? {
-            label: fixable.length > 1 ? `Renommer les ${fixable.length} fichiers selon leurs proportions` : `Renommer en « ${path.basename(fixable[0]!.to!)} »`,
+            label:
+              fixable.length > 1
+                ? t('Renommer les {n} fichiers selon leurs proportions', { n: fixable.length })
+                : t('Renommer en « {name} »', { name: path.basename(fixable[0]!.to!) }),
             ops: fixable.map((s) => move(s.item.file, s.to!)),
           }
         : undefined,
@@ -934,22 +1079,40 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'mediaMisnamed',
       severity: misnamed.length ? 'warning' : 'info',
-      title: misnamed.length + typeless.length > 1 ? 'Médias mal nommés' : 'Média mal nommé',
+      title: tn(misnamed.length + typeless.length, 'Média mal nommé', 'Médias mal nommés'),
       detail: [
         misnamed.length
-          ? `Le menu cherche les médias sous le nom du .vpx (« ${own[0]} »)${own[1] ? ` ou du dossier (« ${own[1]} »)` : ''} : ${quoteList(misnamed.map((i) => i.name))} ${misnamed.length > 1 ? 'ne sont pas montrés' : 'n’est pas montré'}.`
+          ? own[1]
+            ? tn(
+                misnamed.length,
+                'Le menu cherche les médias sous le nom du .vpx (« {vpx} ») ou du dossier (« {folder} ») : {files} n’est pas montré.',
+                'Le menu cherche les médias sous le nom du .vpx (« {vpx} ») ou du dossier (« {folder} ») : {files} ne sont pas montrés.',
+                { vpx: own[0]!, folder: own[1], files: quoteList(misnamed.map((i) => i.name)) },
+              )
+            : tn(
+                misnamed.length,
+                'Le menu cherche les médias sous le nom du .vpx (« {vpx} ») : {files} n’est pas montré.',
+                'Le menu cherche les médias sous le nom du .vpx (« {vpx} ») : {files} ne sont pas montrés.',
+                { vpx: own[0]!, files: quoteList(misnamed.map((i) => i.name)) },
+              )
           : '',
-        ...kept.map((k) => `« ${k.item.name} » : « ${k.shown.name} » porte déjà le bon nom et c’est lui qui est montré ; gardez l’un des deux.`),
-        blocked.length ? `${quoteList(blocked.map((i) => i.name))} : le nom attendu est déjà pris dans medias\\.` : '',
+        ...kept.map((k) => t('« {name} » : « {shown} » porte déjà le bon nom et c’est lui qui est montré ; gardez l’un des deux.', { name: k.item.name, shown: k.shown.name })),
+        blocked.length ? t('{files} : le nom attendu est déjà pris dans medias\\.', { files: quoteList(blocked.map((i) => i.name)) }) : '',
         typeless.length
-          ? `${quoteList(typeless.map((i) => i.name))} : type inconnu. Le nom doit commencer par le type entre parenthèses, « (Backglass) ${folderName}.mp4 » par exemple.`
+          ? t('{files} : type inconnu. Le nom doit commencer par le type entre parenthèses, « (Backglass) {folder}.mp4 » par exemple.', {
+              files: quoteList(typeless.map((i) => i.name)),
+              folder: folderName,
+            })
           : '',
       ]
         .filter(Boolean)
         .join(' '),
       fix: renames.length
         ? {
-            label: renames.length > 1 ? `Renommer les ${renames.length} fichiers « (Type) ${folderName} »` : `Renommer en « ${path.basename(renames[0]!.to)} »`,
+            label:
+              renames.length > 1
+                ? t('Renommer les {n} fichiers « (Type) {folder} »', { n: renames.length, folder: folderName })
+                : t('Renommer en « {name} »', { name: path.basename(renames[0]!.to) }),
             ops: renames.map((r) => move(r.item.file, r.to)),
           }
         : undefined,
@@ -1004,19 +1167,30 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
       code: 'mediaStray',
       // Rien à ranger : la table a déjà ses médias, ce ne sont que des restes.
       severity: moved.length ? 'warning' : 'info',
-      title: strays.length > 1 ? 'Médias rangés hors de medias\\' : 'Média rangé hors de medias\\',
+      title: tn(strays.length, 'Média rangé hors de medias\\', 'Médias rangés hors de medias\\'),
       detail: [
-        `Le menu ne cherche les médias que dans medias\\, sous le nom « (Type) ${folderName} » : ${quoteList(strays.map(rel))} ${strays.length > 1 ? 'ne sont pas montrés' : 'n’est pas montré'} (rangement de PinUP Popper ou de PinballX, ou fichier posé à côté de la table).`,
+        tn(
+          strays.length,
+          'Le menu ne cherche les médias que dans medias\\, sous le nom « (Type) {folder} » : {files} n’est pas montré (rangement de PinUP Popper ou de PinballX, ou fichier posé à côté de la table).',
+          'Le menu ne cherche les médias que dans medias\\, sous le nom « (Type) {folder} » : {files} ne sont pas montrés (rangement de PinUP Popper ou de PinballX, ou fichier posé à côté de la table).',
+          { folder: folderName, files: quoteList(strays.map(rel)) },
+        ),
         ...left.map((l) =>
           l.shown
-            ? `« ${rel(l.s)} » : medias\\ montre déjà « ${l.shown} » ; gardez l’un des deux, rien n’est déplacé.`
-            : `« ${rel(l.s)} » : le nom attendu est déjà pris dans medias\\, il n’est pas déplacé.`,
+            ? t('« {file} » : medias\\ montre déjà « {shown} » ; gardez l’un des deux, rien n’est déplacé.', { file: rel(l.s), shown: l.shown })
+            : t('« {file} » : le nom attendu est déjà pris dans medias\\, il n’est pas déplacé.', { file: rel(l.s) }),
         ),
       ]
         .filter(Boolean)
         .join(' '),
       fix: moved.length
-        ? { label: `Ranger ${moved.length > 1 ? `les ${moved.length} médias` : 'le média'} dans medias\\ sous le nom « (Type) ${folderName} »`, ops }
+        ? {
+            label:
+              moved.length > 1
+                ? t('Ranger les {n} médias dans medias\\ sous le nom « (Type) {folder} »', { n: moved.length, folder: folderName })
+                : t('Ranger le média dans medias\\ sous le nom « (Type) {folder} »', { folder: folderName }),
+            ops,
+          }
         : undefined,
     });
   }
@@ -1041,19 +1215,49 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
         const lost = Math.round((1 - Math.min(rm, rs) / Math.max(rm, rs)) * 100);
         const orientation =
           rm < 1.1
-            ? ' Presque carré : le menu ne peut pas savoir où sont les flippers, il le montre tel quel.'
+            ? t('Presque carré : le menu ne peut pas savoir où sont les flippers, il le montre tel quel.')
             : d.width > d.height
-              ? ' En paysage, les flippers sont supposés à droite : le menu le tourne ; s’il apparaît à l’envers, « Demi-tour » dans les médias de la table.'
+              ? t('En paysage, les flippers sont supposés à droite : le menu le tourne ; s’il apparaît à l’envers, « Demi-tour » dans les médias de la table.')
               : '';
-        lines.push(`« ${item.name} » (${size}, ${ratioLabel(rm)}) sur le plateau (${ratioLabel(rs)}) : le menu le recadre, ${lost} % de l’image coupés.${orientation}`);
+        lines.push(
+          [
+            t('« {name} » ({size}, {ratio}) sur le plateau ({screen}) : le menu le recadre, {lost} % de l’image coupés.', {
+              name: item.name,
+              size,
+              ratio: ratioLabel(rm),
+              screen: ratioLabel(rs),
+              lost,
+            }),
+            orientation,
+          ]
+            .filter(Boolean)
+            .join(' '),
+        );
         return true;
       }
       const am = d.width / d.height;
       if (Math.abs(Math.log(am / screen)) <= tolerance) return true;
       const lost = Math.round((1 - Math.min(am, screen) / Math.max(am, screen)) * 100);
       const turned = am > 1.1 !== screen > 1.1 && Math.abs(Math.log(am)) > 0.1 && Math.abs(Math.log(screen)) > 0.1;
-      const how = turned ? (am < 1 ? 'en portrait sur un écran en paysage' : 'en paysage sur un écran en portrait') : am > screen ? 'bandes noires en haut et en bas' : 'bandes noires sur les côtés';
-      lines.push(`« ${item.name} » (${size}, ${ratioLabel(am)}) sur ${ROLE_LABELS[role]} (${ratioLabel(screen)})${note} : ${how}, ${lost} % de l’écran inutilisé.`);
+      const how = turned
+        ? am < 1
+          ? t('en portrait sur un écran en paysage')
+          : t('en paysage sur un écran en portrait')
+        : am > screen
+          ? t('bandes noires en haut et en bas')
+          : t('bandes noires sur les côtés');
+      lines.push(
+        t('« {name} » ({size}, {ratio}) sur {role} ({screen}){note} : {how}, {lost} % de l’écran inutilisé.', {
+          name: item.name,
+          size,
+          ratio: ratioLabel(am),
+          role: ROLE_LABELS[role],
+          screen: ratioLabel(screen),
+          note,
+          how,
+          lost,
+        }),
+      );
       return true;
     };
     check('Playfield', 'playfield');
@@ -1063,14 +1267,14 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     if (aspects.dmd) {
       const wanted = dmdTypeForRatio(ctx.cabinet?.dmdRatio ?? Math.max(aspects.dmd, 1 / aspects.dmd));
       const partner: MediaType = wanted === 'DMD' ? 'FullDMD' : 'DMD';
-      if (!check(wanted, 'dmd')) check(partner, 'dmd', `, faute de média « ${label(wanted)} » (${wanted})`);
+      if (!check(wanted, 'dmd')) check(partner, 'dmd', t(', faute de média « {type} » ({code})', { type: label(wanted), code: wanted }));
     }
     if (lines.length) {
       findings.push({
         code: 'mediaRatio',
         severity: 'info',
-        title: lines.length > 1 ? 'Proportions des médias différentes de leurs écrans' : 'Proportions du média différentes de son écran',
-        detail: `${lines.join(' ')} Le menu ne déforme jamais un média ; un fichier aux proportions de l’écran l’occupe en entier.`,
+        title: tn(lines.length, 'Proportions du média différentes de son écran', 'Proportions des médias différentes de leurs écrans'),
+        detail: t('{lines} Le menu ne déforme jamais un média ; un fichier aux proportions de l’écran l’occupe en entier.', { lines: lines.join(' ') }),
       });
     }
   }
@@ -1083,18 +1287,23 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     const size = sizeOf(item.file);
     const d = kind === 'image' ? dimsOf(item.file) : undefined;
     if (size > MEDIA_SIZE_LIMITS[kind]) {
-      const kindLabel = { image: 'image', video: 'vidéo', audio: 'son' }[kind];
-      heavy.push(`« ${item.name} » : ${formatSize(size)} (${kindLabel}, seuil ${formatSize(MEDIA_SIZE_LIMITS[kind])}).`);
+      const kindLabel = kind === 'image' ? t('image') : kind === 'video' ? t('vidéo') : t('son');
+      heavy.push(t('« {name} » : {size} ({kind}, seuil {limit}).', { name: item.name, size: formatSize(size), kind: kindLabel, limit: formatSize(MEDIA_SIZE_LIMITS[kind]) }));
     } else if (d && d.width * d.height > MEDIA_MAX_PIXELS) {
-      heavy.push(`« ${item.name} » : ${d.width} × ${d.height} pixels, ${formatSize(d.width * d.height * 4)} une fois décodée en mémoire.`);
+      heavy.push(t('« {name} » : {width} × {height} pixels, {size} une fois décodée en mémoire.', { name: item.name, width: d.width, height: d.height, size: formatSize(d.width * d.height * 4) }));
     }
   }
   if (heavy.length) {
     findings.push({
       code: 'mediaHuge',
       severity: 'info',
-      title: heavy.length > 1 ? 'Médias très lourds' : 'Média très lourd',
-      detail: `${heavy.join(' ')} Le menu relit ${heavy.length > 1 ? 'ces fichiers' : 'ce fichier'} à chaque passage sur la table, ce qui ralentit la navigation : une vidéo en 1080p ou en 4K (réencodée avec HandBrake, par exemple), une image en 4K au plus et un son en mp3 ou en ogg suffisent.`,
+      title: tn(heavy.length, 'Média très lourd', 'Médias très lourds'),
+      detail: tn(
+        heavy.length,
+        '{list} Le menu relit ce fichier à chaque passage sur la table, ce qui ralentit la navigation : une vidéo en 1080p ou en 4K (réencodée avec HandBrake, par exemple), une image en 4K au plus et un son en mp3 ou en ogg suffisent.',
+        '{list} Le menu relit ces fichiers à chaque passage sur la table, ce qui ralentit la navigation : une vidéo en 1080p ou en 4K (réencodée avec HandBrake, par exemple), une image en 4K au plus et un son en mp3 ou en ogg suffisent.',
+        { list: heavy.join(' ') },
+      ),
     });
   }
 
@@ -1114,9 +1323,9 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     const other = unused.filter((u) => !sameKind.includes(u));
     duplicateLines.push(
       [
-        `${info.label} : ${quoteList(shown.map((s) => s.name))} ${shown.length > 1 ? 'sont montrés' : 'est montré'}`,
-        sameKind.length ? `, ${quoteList(sameKind.map((u) => u.name))} ne ${sameKind.length > 1 ? 'servent' : 'sert'} pas` : '',
-        other.length ? ` ; ${quoteList(other.map((u) => u.name))} : le menu prend la vidéo quand il y en a une` : '',
+        tn(shown.length, '{type} : {files} est montré', '{type} : {files} sont montrés', { type: info.label, files: quoteList(shown.map((s) => s.name)) }),
+        sameKind.length ? tn(sameKind.length, ', {files} ne sert pas', ', {files} ne servent pas', { files: quoteList(sameKind.map((u) => u.name)) }) : '',
+        other.length ? t(' ; {files} : le menu prend la vidéo quand il y en a une', { files: quoteList(other.map((u) => u.name)) }) : '',
         '.',
       ].join(''),
     );
@@ -1130,11 +1339,14 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     findings.push({
       code: 'mediaDuplicate',
       severity: 'info',
-      title: 'Médias en double',
+      title: t('Médias en double'),
       detail: duplicateLines.join(' '),
       fix: duplicateOps.length
         ? {
-            label: `Mettre ${duplicateOps.length > 1 ? `les ${duplicateOps.length} fichiers jamais montrés` : 'le fichier jamais montré'} à la corbeille (libère ${formatSize(size)})`,
+            label:
+              duplicateOps.length > 1
+                ? t('Mettre les {n} fichiers jamais montrés à la corbeille (libère {size})', { n: duplicateOps.length, size: formatSize(size) })
+                : t('Mettre le fichier jamais montré à la corbeille (libère {size})', { size: formatSize(size) }),
             ops: duplicateOps,
           }
         : undefined,
@@ -1147,21 +1359,23 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
   );
   if (errors.length) {
     const broken = errors.filter((e) => FILE_ERRORS.includes(e.kind) && free(e.file));
-    const date = (iso: string) => new Date(iso).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' });
     findings.push({
       code: 'mediaPlaybackError',
       severity: 'warning',
-      title: errors.length > 1 ? 'Médias que le menu n’a pas pu lire' : 'Média que le menu n’a pas pu lire',
+      title: tn(errors.length, 'Média que le menu n’a pas pu lire', 'Médias que le menu n’a pas pu lire'),
       detail: [
-        ...errors.map(
-          (e) =>
-            `« ${path.relative(folder, e.file)} » : ${MEDIA_ERROR_LABELS[e.kind]}, ${e.count > 1 ? `${e.count} fois, la dernière le` : 'le'} ${date(e.last)}${e.message ? ` (${e.message})` : ''}.`,
-        ),
-        'Le menu passe alors au média suivant, ou à son repli. Remplacez le fichier par un mp4 (H.264) ou un webm, ou réencodez-le.',
+        ...errors.map((e) => {
+          const params = { file: path.relative(folder, e.file), error: MEDIA_ERROR_LABELS[e.kind], count: e.count, date: formatDateTime(e.last), message: e.message ? ` (${e.message})` : '' };
+          return e.count > 1 ? t('« {file} » : {error}, {count} fois, la dernière le {date}{message}.', params) : t('« {file} » : {error}, le {date}{message}.', params);
+        }),
+        t('Le menu passe alors au média suivant, ou à son repli. Remplacez le fichier par un mp4 (H.264) ou un webm, ou réencodez-le.'),
       ].join(' '),
       fix: broken.length
         ? {
-            label: `Mettre ${broken.length > 1 ? `les ${broken.length} fichiers illisibles` : `« ${path.basename(broken[0]!.file)} »`} à la corbeille`,
+            label:
+              broken.length > 1
+                ? t('Mettre les {n} fichiers illisibles à la corbeille', { n: broken.length })
+                : t('Mettre « {name} » à la corbeille', { name: path.basename(broken[0]!.file) }),
             ops: broken.map((e) => ({ op: 'trash' as const, path: e.file })),
           }
         : undefined,
@@ -1210,9 +1424,12 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
     findings.push({
       code: 'romAliasObsolete',
       severity: 'warning',
-      title: `Alias inutile : ${r} est là, mais ${line.rom} est chargée`,
-      detail: `pinmame\\alias.txt fait charger ${line.rom} quand le script demande ${r} ; PinMAME lit l’alias avant la ROM, si bien que ${r}.zip, maintenant dans pinmame\\roms, ne sert pas.`,
-      fix: { label: `Revenir à la ROM demandée (retirer la ligne « ${line.alias},${line.rom} »)`, ops: [writeAliases(withoutAlias(aliasText, line.alias))] },
+      title: t('Alias inutile : {rom} est là, mais {loaded} est chargée', { rom: r, loaded: line.rom }),
+      detail: t('pinmame\\alias.txt fait charger {loaded} quand le script demande {rom} ; PinMAME lit l’alias avant la ROM, si bien que {rom}.zip, maintenant dans pinmame\\roms, ne sert pas.', {
+        rom: r,
+        loaded: line.rom,
+      }),
+      fix: { label: t('Revenir à la ROM demandée (retirer la ligne « {line} »)', { line: `${line.alias},${line.rom}` }), ops: [writeAliases(withoutAlias(aliasText, line.alias))] },
     });
   }
 
@@ -1230,8 +1447,12 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
         findings.push({
           code: 'romAlias',
           severity: 'info',
-          title: `Révision voisine : ${alias.rom} au lieu de ${alias.alias}`,
-          detail: `pinmame\\alias.txt fait charger ${alias.rom}, la table demande ${alias.alias}. ${NEIGHBOUR_WARNING} Quand ${alias.alias}.zip arrivera, le médecin proposera de retirer l’alias.`,
+          title: t('Révision voisine : {rom} au lieu de {asked}', { rom: alias.rom, asked: alias.alias }),
+          detail: t('pinmame\\alias.txt fait charger {rom}, la table demande {asked}. {warning} Quand {asked}.zip arrivera, le médecin proposera de retirer l’alias.', {
+            rom: alias.rom,
+            asked: alias.alias,
+            warning: neighbourWarning(),
+          }),
         });
       }
       return findings;
@@ -1242,16 +1463,19 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
         ? {
             code: 'romNotLinked',
             severity: 'error',
-            title: `ROM « ${alias.rom} » pas liée dans la table`,
-            detail: `pinmame\\alias.txt fait charger ${alias.rom} pour ${alias.alias} ; elle est dans la bibliothèque, mais pas dans pinmame\\roms.`,
-            fix: { label: 'Lier la ROM de la bibliothèque dans pinmame\\roms', ops },
+            title: t('ROM « {rom} » pas liée dans la table', { rom: alias.rom }),
+            detail: t('pinmame\\alias.txt fait charger {rom} pour {asked} ; elle est dans la bibliothèque, mais pas dans pinmame\\roms.', { rom: alias.rom, asked: alias.alias }),
+            fix: { label: t('Lier la ROM de la bibliothèque dans pinmame\\roms'), ops },
           }
         : {
             code: 'romMissing',
             severity: 'error',
-            title: `ROM « ${alias.rom} » absente`,
-            detail: `pinmame\\alias.txt fait charger ${alias.rom} quand le script demande ${alias.alias}, mais ${alias.rom}.zip n’est nulle part. Ajoutez-la (dossier d’import, puis « Ajouter une table »), ou retirez l’alias.`,
-            fix: { label: `Retirer l’alias « ${alias.alias},${alias.rom} »`, ops: [writeAliases(withoutAlias(aliasText, alias.alias))] },
+            title: t('ROM « {rom} » absente', { rom: alias.rom }),
+            detail: t(
+              'pinmame\\alias.txt fait charger {rom} quand le script demande {asked}, mais {rom}.zip n’est nulle part. Ajoutez-la (dossier d’import, puis « Ajouter une table »), ou retirez l’alias.',
+              { rom: alias.rom, asked: alias.alias },
+            ),
+            fix: { label: t('Retirer l’alias « {line} »', { line: `${alias.alias},${alias.rom}` }), ops: [writeAliases(withoutAlias(aliasText, alias.alias))] },
           },
     );
     return findings;
@@ -1265,10 +1489,21 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
     findings.push({
       code: 'romAliasHistoric',
       severity: 'error',
-      title: `« ${asked} » : ancien nom de la ROM ${real}`,
-      detail: `Le script demande ${asked}, que VPinMAME traduisait de lui-même en ${real} ; le plugin PinMAME de VPX 10.8.1 ne connaît plus ces anciens noms : sans alias, la table ne démarre pas.${available ? '' : ` Il faut aussi ${real}.zip : ajoutez-la (dossier d’import, puis « Ajouter une table »).`}`,
+      title: t('« {asked} » : ancien nom de la ROM {rom}', { asked, rom: real }),
+      detail: [
+        t('Le script demande {asked}, que VPinMAME traduisait de lui-même en {rom} ; le plugin PinMAME de VPX 10.8.1 ne connaît plus ces anciens noms : sans alias, la table ne démarre pas.', {
+          asked,
+          rom: real,
+        }),
+        available ? '' : t('Il faut aussi {rom}.zip : ajoutez-la (dossier d’import, puis « Ajouter une table »).', { rom: real }),
+      ]
+        .filter(Boolean)
+        .join(' '),
       fix: available
-        ? { label: `Écrire l’alias « ${asked},${real} » dans pinmame\\alias.txt`, ops: [...linkOp(real), { op: 'write', path: aliasFile, content: withAlias(aliasText, asked, real, `ancien nom de VPinMAME (release/VPMAlias.txt)`) }] }
+        ? {
+            label: t('Écrire l’alias « {line} » dans pinmame\\alias.txt', { line: `${asked},${real}` }),
+            ops: [...linkOp(real), { op: 'write', path: aliasFile, content: withAlias(aliasText, asked, real, `ancien nom de VPinMAME (release/VPMAlias.txt)`) }], // i18n-ignore : commentaire écrit dans alias.txt
+          }
         : undefined,
     });
     return findings;
@@ -1283,12 +1518,22 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
       code: 'romNotLinked',
       // Sans pinmame\roms, PinMAME la trouve dans son dossier commun ; avec, il ne regarde que là.
       severity: dirExists ? 'error' : 'info',
-      title: dirExists ? `ROM « ${name.replace(/.zip$/i, '')} » absente de pinmame\\roms` : `ROM « ${name.replace(/.zip$/i, '')} » pas liée dans la table`,
+      title: dirExists
+        ? t('ROM « {rom} » absente de pinmame\\roms', { rom: name.replace(/.zip$/i, '') })
+        : t('ROM « {rom} » pas liée dans la table', { rom: name.replace(/.zip$/i, '') }),
       detail: dirExists
-        ? `Elle est dans la bibliothèque de ROM (${path.dirname(stored.path)}), mais la table a son propre dossier pinmame\\roms, sans elle : PinMAME ne cherche alors que là, jamais dans son dossier commun. La table ne démarre pas.`
-        : `Elle est dans la bibliothèque de ROM (${path.dirname(stored.path)}) : la table la trouve par le dossier commun de PinMAME. Un lien dans pinmame\\roms la rend autonome (copie de la table, autre configuration).`,
+        ? t(
+            'Elle est dans la bibliothèque de ROM ({dir}), mais la table a son propre dossier pinmame\\roms, sans elle : PinMAME ne cherche alors que là, jamais dans son dossier commun. La table ne démarre pas.',
+            { dir: path.dirname(stored.path) },
+          )
+        : t(
+            'Elle est dans la bibliothèque de ROM ({dir}) : la table la trouve par le dossier commun de PinMAME. Un lien dans pinmame\\roms la rend autonome (copie de la table, autre configuration).',
+            { dir: path.dirname(stored.path) },
+          ),
       fix: {
-        label: copy ? `Copier la ROM dans pinmame\\roms (${formatSize(stored.size)}, la table est sur un autre disque)` : 'Lier la ROM de la bibliothèque dans pinmame\\roms (aucune place en plus)',
+        label: copy
+          ? t('Copier la ROM dans pinmame\\roms ({size}, la table est sur un autre disque)', { size: formatSize(stored.size) })
+          : t('Lier la ROM de la bibliothèque dans pinmame\\roms (aucune place en plus)'),
         ops: [{ op: 'link', from: stored.path, to: path.join(romsDir, name) }],
       },
     });
@@ -1300,9 +1545,9 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
     findings.push({
       code: 'romMisplaced',
       severity: 'error',
-      title: 'ROM mal rangée',
-      detail: `PinMAME cherche la ROM dans pinmame\\roms ; « ${path.relative(folder, stray)} » n’y est pas.`,
-      fix: { label: 'Ranger la ROM dans pinmame\\roms', ops: [{ op: 'move', from: stray, to: path.join(romsDir, path.basename(stray)) }] },
+      title: t('ROM mal rangée'),
+      detail: t('PinMAME cherche la ROM dans pinmame\\roms ; « {file} » n’y est pas.', { file: path.relative(folder, stray) }),
+      fix: { label: t('Ranger la ROM dans pinmame\\roms'), ops: [{ op: 'move', from: stray, to: path.join(romsDir, path.basename(stray)) }] },
     });
     return findings;
   }
@@ -1310,25 +1555,38 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
   const libraryNames = library ? [...listRoms(library).keys()] : [];
   const neighbour = neighbourRom(rom, [...files, ...libraryNames]);
   if (neighbour) {
-    const where = here(neighbour) ? 'dans pinmame\\roms de la table' : 'dans la bibliothèque de ROM';
+    const where = here(neighbour) ? t('dans pinmame\\roms de la table') : t('dans la bibliothèque de ROM');
     findings.push({
       code: 'romAlias',
       severity: 'error',
-      title: `ROM « ${rom} » absente, révision voisine ${neighbour} sur la borne`,
-      detail: `La table ne démarrera pas sans ${rom}.zip. ${neighbour}.zip, du même jeu, est ${where} : un alias peut la faire charger à sa place. ${NEIGHBOUR_WARNING}`,
+      title: t('ROM « {rom} » absente, révision voisine {neighbour} sur la borne', { rom, neighbour }),
+      detail: t('La table ne démarrera pas sans {rom}.zip. {neighbour}.zip, du même jeu, est {where} : un alias peut la faire charger à sa place. {warning}', {
+        rom,
+        neighbour,
+        where,
+        warning: neighbourWarning(),
+      }),
       fix: {
-        label: `Jouer avec ${neighbour} (alias « ${rom},${neighbour} » dans pinmame\\alias.txt)`,
-        ops: [...linkOp(neighbour), { op: 'write', path: aliasFile, content: withAlias(aliasText, rom, neighbour, `révision voisine choisie le ${new Date().toLocaleDateString('fr-FR')}`) }],
+        label: t('Jouer avec {neighbour} (alias « {line} » dans pinmame\\alias.txt)', { neighbour, line: `${rom},${neighbour}` }),
+        ops: [...linkOp(neighbour), { op: 'write', path: aliasFile, content: withAlias(aliasText, rom, neighbour, `révision voisine choisie le ${new Date().toLocaleDateString('fr-FR')}`) }], // i18n-ignore : commentaire écrit dans alias.txt
       },
     });
     return findings;
   }
-  const others = roms.length > 1 ? ` (ou ${roms.slice(1).map((r) => `${r}.zip`).join(', ')})` : '';
+  const others = roms.length > 1 ? ` ${t('(ou {list})', { list: roms.slice(1).map((r) => `${r}.zip`).join(', ') })}` : '';
   findings.push({
     code: 'romMissing',
     severity: 'error',
-    title: `ROM « ${rom} » absente`,
-    detail: `La table ne démarrera pas sans ${rom}.zip${others}. Mettez le fichier dans le dossier d’import (ou glissez-le sur cette fenêtre) puis « Ajouter une table » : il sera rangé dans la bibliothèque de ROM et lié dans pinmame\\roms. Pour la trouver : menu système > « Trouver une table ».${dirExists && !files.length ? ' Le dossier pinmame\\roms de la table est vide : tant qu’il existe, PinMAME ne cherche pas ailleurs.' : ''}`,
+    title: t('ROM « {rom} » absente', { rom }),
+    detail: [
+      t(
+        'La table ne démarrera pas sans {rom}.zip{others}. Mettez le fichier dans le dossier d’import (ou glissez-le sur cette fenêtre) puis « Ajouter une table » : il sera rangé dans la bibliothèque de ROM et lié dans pinmame\\roms. Pour la trouver : menu système > « Trouver une table ».',
+        { rom, others },
+      ),
+      dirExists && !files.length ? t('Le dossier pinmame\\roms de la table est vide : tant qu’il existe, PinMAME ne cherche pas ailleurs.') : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
   });
   return findings;
 }
@@ -1342,22 +1600,24 @@ function checkRomCopy(file: string, library: string): Finding[] {
   const identical = sameRomContent(own, stored);
   // D'un disque à l'autre, une copie identique est la seule possibilité.
   if (identical && !sameVolume(stored.path, file)) return [];
-  const date = (ms: number) => new Date(ms).toLocaleDateString('fr-FR', { dateStyle: 'long' });
   return [
     identical
       ? {
           code: 'romCopy',
           severity: 'info',
-          title: 'Copie de ROM au lieu d’un lien',
-          detail: `pinmame\\roms\\${name} est une copie de la ROM de la bibliothèque : ${formatSize(own.size)} de trop sur le disque.`,
-          fix: { label: `Remplacer la copie par un lien vers la bibliothèque (libère ${formatSize(own.size)})`, ops: [{ op: 'link', from: stored.path, to: file }] },
+          title: t('Copie de ROM au lieu d’un lien'),
+          detail: t('pinmame\\roms\\{name} est une copie de la ROM de la bibliothèque : {size} de trop sur le disque.', { name, size: formatSize(own.size) }),
+          fix: { label: t('Remplacer la copie par un lien vers la bibliothèque (libère {size})', { size: formatSize(own.size) }), ops: [{ op: 'link', from: stored.path, to: file }] },
         }
       : {
           code: 'romCopy',
           severity: 'warning',
-          title: 'Autre version de la ROM que celle de la bibliothèque',
-          detail: `pinmame\\roms\\${name} (${formatSize(own.size)}, ${date(own.mtimeMs)}) n’a pas le même contenu que celle de la bibliothèque (${formatSize(stored.size)}, ${date(stored.mtimeMs)}). Pour garder plutôt celle de la table, « Ranger les ROM » dans le menu laisse choisir.`,
-          fix: { label: 'Utiliser la ROM de la bibliothèque (celle de la table va à la corbeille)', ops: [{ op: 'link', from: stored.path, to: file }] },
+          title: t('Autre version de la ROM que celle de la bibliothèque'),
+          detail: t(
+            'pinmame\\roms\\{name} ({size}, {date}) n’a pas le même contenu que celle de la bibliothèque ({librarySize}, {libraryDate}). Pour garder plutôt celle de la table, « Ranger les ROM » dans le menu laisse choisir.',
+            { name, size: formatSize(own.size), date: formatDate(own.mtimeMs), librarySize: formatSize(stored.size), libraryDate: formatDate(stored.mtimeMs) },
+          ),
+          fix: { label: t('Utiliser la ROM de la bibliothèque (celle de la table va à la corbeille)'), ops: [{ op: 'link', from: stored.path, to: file }] },
         },
   ];
 }
@@ -1365,9 +1625,10 @@ function checkRomCopy(file: string, library: string): Finding[] {
 function checkDmdFolder(folder: string, dmdFolder: string): Finding | undefined {
   const dirs = readDirents(folder).filter((d) => d.isDirectory()).map((d) => d.name);
   if (dirs.some((d) => d.toLowerCase() === dmdFolder.toLowerCase())) return undefined;
-  const intro =
-    `Le DMD de cette table est dessiné par son script, avec les images, vidéos et polices du dossier « ${dmdFolder} ». ` +
-    'Sans lui, le script s’arrête au démarrage (« Type incompatible ») : la table s’affiche, mais la partie ne commence pas. ';
+  const intro = t(
+    'Le DMD de cette table est dessiné par son script, avec les images, vidéos et polices du dossier « {folder} ». Sans lui, le script s’arrête au démarrage (« Type incompatible ») : la table s’affiche, mais la partie ne commence pas.',
+    { folder: dmdFolder },
+  );
   // Contenu vidé à la racine par un import qui aplatissait les sous-dossiers : on le range.
   const own = [path.basename(folder), ...readDirents(folder).filter((d) => d.isFile() && /\.vpx$/i.test(d.name)).map((d) => d.name.slice(0, -4))].map((n) =>
     n.toLowerCase(),
@@ -1380,10 +1641,10 @@ function checkDmdFolder(folder: string, dmdFolder: string): Finding | undefined 
     return {
       code: 'dmdFolderMissing',
       severity: 'error',
-      title: `Dossier « ${dmdFolder} » absent, son contenu est en vrac`,
-      detail: `${intro}${loose.length} image${loose.length > 1 ? 's' : ''} ou police${loose.length > 1 ? 's' : ''} du DMD sont à la racine du dossier de la table.`,
+      title: t('Dossier « {folder} » absent, son contenu est en vrac', { folder: dmdFolder }),
+      detail: `${intro} ${tn(loose.length, '{n} image ou police du DMD sont à la racine du dossier de la table.', '{n} images ou polices du DMD sont à la racine du dossier de la table.')}`,
       fix: {
-        label: `Ranger ${loose.length > 1 ? `ces ${loose.length} fichiers` : 'ce fichier'} dans « ${dmdFolder} »`,
+        label: loose.length > 1 ? t('Ranger ces {n} fichiers dans « {folder} »', { n: loose.length, folder: dmdFolder }) : t('Ranger ce fichier dans « {folder} »', { folder: dmdFolder }),
         ops: loose.map((f) => ({ op: 'move', from: path.join(folder, f), to: path.join(folder, dmdFolder, f) })),
       },
     };
@@ -1391,8 +1652,8 @@ function checkDmdFolder(folder: string, dmdFolder: string): Finding | undefined 
   return {
     code: 'dmdFolderMissing',
     severity: 'error',
-    title: `Dossier « ${dmdFolder} » absent`,
-    detail: `${intro}Ce dossier est fourni avec la table d’origine ; mettez-le dans le dossier d’import puis « Ajouter une table ».`,
+    title: t('Dossier « {folder} » absent', { folder: dmdFolder }),
+    detail: `${intro} ${t('Ce dossier est fourni avec la table d’origine ; mettez-le dans le dossier d’import puis « Ajouter une table ».')}`,
   };
 }
 

@@ -25,10 +25,10 @@ import {
   MEDIADB_CITATION,
   MEDIADB_HOW_LABELS,
   MEDIADB_NAME,
-  MEDIADB_NOTICE,
   MEDIADB_REPO,
   MEDIADB_REPO_URL,
   MEDIADB_TYPES,
+  mediaDbNotice,
   mediaDbNoticeAccepted,
   mediaDbOfferLabel,
   mediaFileName,
@@ -38,6 +38,8 @@ import {
   proposeMediaDb,
   readMediaDimensions,
   samePath,
+  t,
+  tn,
   trashDirFor,
   vpsLabel,
   type Layout,
@@ -95,7 +97,12 @@ interface Offer {
 
 /** Lignes montrées par section ; le reste est compté. */
 const MAX_ROWS = 40;
-const HEADING = 'Médias de VPinMediaDB';
+const heading = () => t('Médias de VPinMediaDB');
+
+/** « a ; b ; c », à la façon de la langue (« a; b; c » en anglais). */
+function joinSemi(items: readonly string[]): string {
+  return items.length ? items.reduce((a, b) => t('{a} ; {b}', { a, b })) : '';
+}
 
 export function createMediaDownload(ctx: MediaDownloadContext) {
   const { host } = ctx;
@@ -107,10 +114,14 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
 
   function noticeRows(): Row[] {
     return [
-      { text: 'Aucune licence', detail: MEDIADB_NOTICE, tone: 'warning' },
+      { text: t('Aucune licence'), detail: mediaDbNotice(), tone: 'warning' },
       {
-        text: 'Source',
-        detail: `${MEDIADB_NAME}, dépôt ${MEDIADB_REPO} sur GitHub : ${MEDIADB_REPO_URL}. L’adresse et la date de chaque fichier téléchargé sont notées dans le .info de la table.`,
+        text: t('Source'),
+        detail: t('{name}, dépôt {repo} sur GitHub : {url}. L’adresse et la date de chaque fichier téléchargé sont notées dans le .info de la table.', {
+          name: MEDIADB_NAME,
+          repo: MEDIADB_REPO,
+          url: MEDIADB_REPO_URL,
+        }),
         tone: 'info',
       },
     ];
@@ -119,16 +130,16 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   function withNotice(then: () => void, back: () => void): void {
     if (mediaDbNoticeAccepted(host.dataDir)) return then();
     ctx.openCustom(() => ({
-      heading: HEADING,
+      heading: heading(),
       subheading: MEDIADB_CITATION,
-      lead: 'À lire une fois, avant le premier téléchargement.',
+      lead: t('À lire une fois, avant le premier téléchargement.'),
       sections: [
         {
           rows: [
             ...noticeRows(),
             {
-              text: 'Ce que fait Cyber Pinball',
-              detail: 'Il ne livre aucun de ces médias : il les télécharge à votre demande, après un plan à valider. Un média que vous avez déjà n’est remplacé que si vous le demandez, et l’ancien part à la corbeille.',
+              text: t('Ce que fait Cyber Pinball'),
+              detail: t('Il ne livre aucun de ces médias : il les télécharge à votre demande, après un plan à valider. Un média que vous avez déjà n’est remplacé que si vous le demandez, et l’ancien part à la corbeille.'),
               tone: 'quiet',
             },
           ],
@@ -136,14 +147,14 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       ],
       actions: [
         {
-          label: 'J’ai compris : chercher les médias',
+          label: t('J’ai compris : chercher les médias'),
           tone: 'ok',
           run: () => {
             acceptMediaDbNotice(host.dataDir);
             then();
           },
         },
-        { label: 'Retour', run: back },
+        { label: t('Retour'), run: back },
       ],
       back,
     }));
@@ -204,7 +215,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
 
   function sizeLabel(o: Offer, offer: MediaDbOffer): string {
     const size = o.sizes.get(offer.file.url);
-    return size === undefined ? 'taille inconnue' : formatSize(size);
+    return size === undefined ? t('taille inconnue') : formatSize(size);
   }
 
   function totalLabel(offers: Offer[]): string {
@@ -215,14 +226,16 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       bytes += b.bytes;
       unknown += b.unknown;
     }
-    return `${formatSize(bytes)}${unknown ? ` (et ${unknown} fichier${unknown > 1 ? 's' : ''} de taille inconnue)` : ''}`;
+    return unknown
+      ? tn(unknown, '{size} (et {n} fichier de taille inconnue)', '{size} (et {n} fichiers de taille inconnue)', { size: formatSize(bytes) })
+      : formatSize(bytes);
   }
 
   // ---------- Un jeu (gestionnaire des médias) ----------
 
   /** Cherche les médias de ce jeu ; `back` revient au gestionnaire, avec un message éventuel. */
   function openTable(table: TableEntry, back: (message?: { text: string; tone: 'ok' | 'info' | 'warning' | 'error' }) => void): void {
-    if (!ctx.layout()) return ctx.openNotice('Cyber Pinball n’est pas installé', ['Lancez « Installer » depuis le lanceur : il crée le dossier des téléchargements.']);
+    if (!ctx.layout()) return ctx.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lancez « Installer » depuis le lanceur : il crée le dossier des téléchargements.')]);
     withNotice(() => search(table, back), () => back());
   }
 
@@ -232,7 +245,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
    * (`query`), la recherche approfondie classe les jeux possibles avec leurs raisons.
    */
   function search(table: TableEntry, back: Parameters<typeof openTable>[1], pick: number | MediaDbMatch = 0, query?: string): void {
-    void ctx.task(query ? `Recherche de « ${query} »…` : 'Recherche sur VPinMediaDB…', async () => {
+    void ctx.task(query ? t('Recherche de « {query} »…', { query }) : t('Recherche sur VPinMediaDB…'), async () => {
       cleanMediaDbStaging(staging());
       const { db: found, problem } = await index();
       if (!found) return showUnavailable(problem, () => back());
@@ -240,13 +253,13 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       let match = typeof pick === 'object' ? pick : query ? undefined : matchMediaDb(found, table, await ctx.search.vps());
       let deep: DeepResult | undefined;
       if (typeof pick !== 'object' && !match?.confident) {
-        ctx.progress('Recherche approfondie : nom écrit dans la table, ROM, PuP-Pack…');
+        ctx.progress(t('Recherche approfondie : nom écrit dans la table, ROM, PuP-Pack…'));
         deep = await ctx.search.deep(table, found, query);
         if (deep.candidates.length) {
           match = { candidates: deep.candidates.map(({ entry, game, lead }) => ({ entry, game, reasons: lead.reasons })), how: match?.how === 'vps-sibling' ? 'vps-sibling' : 'deep', confident: false, vpsId: match?.vpsId };
         }
       }
-      if (!match?.candidates.length) return showNothing(table, match?.reason ?? 'Aucun jeu de la base VPS ne ressemble à ce titre.', deep, back);
+      if (!match?.candidates.length) return showNothing(table, match?.reason ?? t('Aucun jeu de la base VPS ne ressemble à ce titre.'), deep, back);
       const at = typeof pick === 'object' ? 0 : Math.min(pick, match.candidates.length - 1);
       const o = prepare(table, match, at, false);
       o.query = query;
@@ -259,20 +272,30 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   /** Saisie d'un titre, puis recherche avec lui ; Annuler revient à `cancel`. */
   function askTitle(table: TableEntry, back: Parameters<typeof openTable>[1], cancel: () => void, value = ''): void {
     ctx.prompt(
-      'Chercher un autre titre',
-      'Titre du jeu',
+      t('Chercher un autre titre'),
+      t('Titre du jeu'),
       value,
       (text) => (text?.trim() ? search(table, back, 0, text.trim()) : cancel()),
-      'Le titre en anglais, tel que le fabricant l’a sorti (« Guardians of the Galaxy »), ses initiales (« GOTG ») ou le nom de sa ROM (« t2_l8 »).',
+      t('Le titre en anglais, tel que le fabricant l’a sorti (« Guardians of the Galaxy »), ses initiales (« GOTG ») ou le nom de sa ROM (« t2_l8 »).'),
     );
   }
 
   function showUnavailable(problem: string | undefined, back: () => void): void {
     ctx.openCustom(() => ({
-      heading: HEADING,
-      lead: 'L’index de VPinMediaDB n’a jamais été téléchargé, et GitHub ne répond pas.',
-      sections: [{ rows: [{ text: 'Sans réseau', detail: `${problem ?? 'GitHub injoignable'}. Réessayez quand la borne est reliée à Internet : l’index est ensuite gardé et sert sans réseau.`, tone: 'warning' }] }],
-      actions: [{ label: 'Retour', run: back }],
+      heading: heading(),
+      lead: t('L’index de VPinMediaDB n’a jamais été téléchargé, et GitHub ne répond pas.'),
+      sections: [
+        {
+          rows: [
+            {
+              text: t('Sans réseau'),
+              detail: t('{problem}. Réessayez quand la borne est reliée à Internet : l’index est ensuite gardé et sert sans réseau.', { problem: problem ?? t('GitHub injoignable') }),
+              tone: 'warning',
+            },
+          ],
+        },
+      ],
+      actions: [{ label: t('Retour'), run: back }],
       back,
     }));
   }
@@ -281,31 +304,31 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     const leave = () => back();
     const known = (deep?.leads ?? []).slice(0, 5);
     ctx.openCustom(() => ({
-      heading: 'Rien sur VPinMediaDB pour ce jeu',
+      heading: t('Rien sur VPinMediaDB pour ce jeu'),
       subheading: table.title,
-      lead: `${reason} La recherche approfondie a lu le nom écrit dans la table, son script et ses fichiers.`,
+      lead: t('{reason} La recherche approfondie a lu le nom écrit dans la table, son script et ses fichiers.', { reason }),
       sections: [
         ...(known.length
           ? [
               {
-                title: 'Jeux de la base VPS qui ressemblent, sans médias sur VPinMediaDB',
-                rows: known.map((l) => ({ text: vpsLabel(l.game), detail: l.reasons.slice(0, 2).join(' ; '), tone: 'quiet' as const })),
+                title: t('Jeux de la base VPS qui ressemblent, sans médias sur VPinMediaDB'),
+                rows: known.map((l) => ({ text: vpsLabel(l.game), detail: joinSemi(l.reasons.slice(0, 2)), tone: 'quiet' as const })),
               },
             ]
           : []),
         {
           rows: [
             {
-              text: 'Autres sources',
-              detail: 'Chaque média propose aussi ce que la table a déjà (PuP-Pack, dossier du DMD, .directb2s) : Médias du jeu, puis le média, puis « Voir les propositions ». Les médias de VPUniverse se téléchargent depuis leur site (connexion obligatoire) ; déposez ensuite le fichier dans le dossier d’import, ou glissez-le sur l’écran des médias.',
+              text: t('Autres sources'),
+              detail: t('Chaque média propose aussi ce que la table a déjà (PuP-Pack, dossier du DMD, .directb2s) : Médias du jeu, puis le média, puis « Voir les propositions ». Les médias de VPUniverse se téléchargent depuis leur site (connexion obligatoire) ; déposez ensuite le fichier dans le dossier d’import, ou glissez-le sur l’écran des médias.'),
               tone: 'quiet',
             },
           ],
         },
       ],
       actions: [
-        { label: 'Chercher un autre titre…', detail: 'Titre en anglais, initiales ou nom de ROM', tone: 'ok', run: () => askTitle(table, back, () => showNothing(table, reason, deep, back)) },
-        { label: 'Retour aux médias', run: leave },
+        { label: t('Chercher un autre titre…'), detail: t('Titre en anglais, initiales ou nom de ROM'), tone: 'ok', run: () => askTitle(table, back, () => showNothing(table, reason, deep, back)) },
+        { label: t('Retour aux médias'), run: leave },
       ],
       back: leave,
     }));
@@ -320,7 +343,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   function previewOf(o: Offer, offer: MediaDbOffer): MediaThumb {
     if (offer.kind === 'audio') return { kind: 'audio', rotation: 0, text: '♪' };
     const file = offer.preview && o.previews.get(offer.preview.url);
-    if (!file || !fs.existsSync(file)) return { kind: 'fallback', rotation: 0, text: 'Aperçu indisponible' };
+    if (!file || !fs.existsSync(file)) return { kind: 'fallback', rotation: 0, text: t('Aperçu indisponible') };
     // Vu du joueur, flippers en bas : la rotation que le menu appliquera.
     const rotation = mediaTypeInfo(offer.type).orientable ? playfieldMediaRotation(readMediaDimensions(file), 'bottom') : 0;
     // Par le protocole des médias, comme tout média : jamais d'adresse directe vers le disque.
@@ -332,37 +355,42 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     const info = mediaTypeInfo(p.type);
     const i = o.chosen.get(p.type);
     const shown = p.variants[i ?? 0]!;
-    const names = p.replaces.map((f) => `« ${path.basename(f)} »`).join(', ');
+    const names = p.replaces.map((f) => t('« {name} »', { name: path.basename(f) })).join(', ');
     let state: MediaCard['state'];
     let pending: string;
     if (i !== undefined) {
-      state = p.update ? { label: 'Nouvelle version', tone: 'ok' } : p.replaces.length ? { label: 'Remplace l’actuel', tone: 'warning' } : { label: 'À télécharger', tone: 'ok' };
-      const target = table ? `rangé sous « ${mediaFileName(table, p.type, shown.ext)} »` : 'rangé dans medias\\';
+      state = p.update ? { label: t('Nouvelle version'), tone: 'ok' } : p.replaces.length ? { label: t('Remplace l’actuel'), tone: 'warning' } : { label: t('À télécharger'), tone: 'ok' };
+      const target = table ? t('rangé sous « {file} »', { file: mediaFileName(table, p.type, shown.ext) }) : t('rangé dans medias\\');
       pending = p.replaces.length
-        ? `Remplace ${names} : ${p.replaces.length > 1 ? 'ils partent' : 'il part'} à la corbeille. Le nouveau est ${target}.`
-        : `Nouveau pour ce jeu, ${target}.`;
+        ? tn(p.replaces.length, 'Remplace {names} : il part à la corbeille. Le nouveau est {target}.', 'Remplace {names} : ils partent à la corbeille. Le nouveau est {target}.', { names, target })
+        : t('Nouveau pour ce jeu, {target}.', { target });
     } else if (p.upToDate) {
-      state = { label: 'À jour', tone: 'quiet' };
-      pending = `Déjà là : ${names}, le même fichier que sur VPinMediaDB.`;
+      state = { label: t('À jour'), tone: 'quiet' };
+      pending = t('Déjà là : {names}, le même fichier que sur VPinMediaDB.', { names });
     } else if (p.current.length) {
-      state = { label: 'Gardé', tone: 'quiet' };
-      pending = `Gardé : ${names} reste${p.replaces.length > 1 ? 'nt' : ''}. Start pour le remplacer par celui de VPinMediaDB.`;
+      state = { label: t('Gardé'), tone: 'quiet' };
+      pending = tn(
+        p.replaces.length,
+        'Gardé : {names} reste. Start pour le remplacer par celui de VPinMediaDB.',
+        'Gardé : {names} restent. Start pour le remplacer par celui de VPinMediaDB.',
+        { names },
+      );
     } else {
-      state = { label: 'Pas téléchargé', tone: 'quiet' };
-      pending = 'Rien ne change pour ce média.';
+      state = { label: t('Pas téléchargé'), tone: 'quiet' };
+      pending = t('Rien ne change pour ce média.');
     }
     const extra: string[] = [];
-    if (shown.kind === 'video') extra.push('Aperçu : image du même jeu ; la vidéo arrive avec le téléchargement.');
-    if (shown.quality === '4k') extra.push('Aperçu : la même image en 1k ; le fichier 4k arrive avec le téléchargement.');
-    if (info.orientable) extra.push('En largeur, les flippers sont à droite : le menu le tourne d’après l’écran du plateau. L’aperçu le montre vu du joueur.');
-    extra.push(`Source : ${shown.file.url}`);
+    if (shown.kind === 'video') extra.push(t('Aperçu : image du même jeu ; la vidéo arrive avec le téléchargement.'));
+    if (shown.quality === '4k') extra.push(t('Aperçu : la même image en 1k ; le fichier 4k arrive avec le téléchargement.'));
+    if (info.orientable) extra.push(t('En largeur, les flippers sont à droite : le menu le tourne d’après l’écran du plateau. L’aperçu le montre vu du joueur.'));
+    extra.push(t('Source : {url}', { url: shown.file.url }));
     return {
       action,
       title: info.label,
       code: `(${info.type})`,
       state,
       note: mediaPlacement(p.type, loadCabinet(host.dataDir)).note,
-      facts: `${mediaDbOfferLabel(shown)} · ${sizeLabel(o, shown)}${p.variants.length > 1 ? ` · ${p.variants.length} variantes` : ''}`,
+      facts: `${mediaDbOfferLabel(shown)} · ${sizeLabel(o, shown)}${p.variants.length > 1 ? ` · ${t('{n} variantes', { n: p.variants.length })}` : ''}`,
       pending,
       extra,
       thumb: previewOf(o, shown),
@@ -376,7 +404,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   }
 
   function choiceLabel(p: MediaDbProposal, i: number | undefined): string {
-    if (i === undefined) return p.current.length ? 'garder l’actuel' : 'ne pas télécharger';
+    if (i === undefined) return p.current.length ? t('garder l’actuel') : t('ne pas télécharger');
     return mediaDbOfferLabel(p.variants[i]!);
   }
 
@@ -387,8 +415,8 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   function buildTablePlan(o: Offer, mode: PlanMode): Built {
     const table = ctx.find(o.file);
     const actions: Action[] = o.proposals.map((p) => ({
-      label: `${mediaTypeInfo(p.type).label} : ${choiceLabel(p, o.chosen.get(p.type))}`,
-      detail: `Start : ${choiceLabel(p, nextChoice(p, o.chosen.get(p.type)))}`,
+      label: t('{type} : {choice}', { type: mediaTypeInfo(p.type).label, choice: choiceLabel(p, o.chosen.get(p.type)) }),
+      detail: t('Start : {choice}', { choice: choiceLabel(p, nextChoice(p, o.chosen.get(p.type))) }),
       run: () => {
         o.chosen.set(p.type, nextChoice(p, o.chosen.get(p.type)));
         host.broadcast();
@@ -404,20 +432,28 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       const free = freeSpace(ctx.tablesDir());
       const { bytes } = bytesOf(o);
       if (free !== undefined && bytes > free) {
-        actions.push({ label: 'Place insuffisante', detail: `Il faut ${formatSize(bytes)}, il reste ${formatSize(free)} sur le disque des tables.`, tone: 'error', run: () => undefined });
+        actions.push({
+          label: t('Place insuffisante'),
+          detail: t('Il faut {need}, il reste {free} sur le disque des tables.', { need: formatSize(bytes), free: formatSize(free) }),
+          tone: 'error',
+          run: () => undefined,
+        });
       } else {
-        actions.push({ label: 'Télécharger et ranger', detail: `${n} média${n > 1 ? 's' : ''} · ${totalLabel([o])}`, tone: 'ok', run: () => applyTable(o, mode) });
+        actions.push({ label: t('Télécharger et ranger'), detail: `${tn(n, '{n} média', '{n} médias')} · ${totalLabel([o])}`, tone: 'ok', run: () => applyTable(o, mode) });
       }
     }
     if (mode.single) {
       const n = o.match.candidates.length;
       actions.push({
-        label: 'Pas le bon jeu ?',
-        detail: o.match.how === 'deep' || n > 1 ? `${n} jeu${n > 1 ? 'x' : ''} de VPinMediaDB ressemble${n > 1 ? 'nt' : ''} à cette table` : 'Recherche approfondie, ou un autre titre',
+        label: t('Pas le bon jeu ?'),
+        detail:
+          o.match.how === 'deep' || n > 1
+            ? tn(n, '{n} jeu de VPinMediaDB ressemble à cette table', '{n} jeux de VPinMediaDB ressemblent à cette table')
+            : t('Recherche approfondie, ou un autre titre'),
         run: () => openCandidates(o, mode),
       });
     }
-    actions.push({ label: mode.single ? 'Annuler' : 'Retour au plan général', detail: mode.single ? 'Rien n’est téléchargé' : undefined, run: cancel });
+    actions.push({ label: mode.single ? t('Annuler') : t('Retour au plan général'), detail: mode.single ? t('Rien n’est téléchargé') : undefined, run: cancel });
 
     // Une seule ligne avant les cartes : le jeu reconnu et la qualité. L'avertissement est dans l'en-tête,
     // toujours visible, même quand la liste défile jusqu'à la dernière carte.
@@ -427,7 +463,12 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
         rows: [
           {
             text: `${gameLabel(o)} · ${o.quality.quality}`,
-            detail: `Reconnu par ${o.match.how ? MEDIADB_HOW_LABELS[o.match.how] : '—'} (${c.entry.id})${o.match.confident ? '' : ', à vérifier sur les aperçus'}. Qualité ${o.quality.quality} : ${o.quality.reason} ; seule l’image du plateau existe en 4k.`,
+            detail: [
+              o.match.confident
+                ? t('Reconnu par {how} ({id}).', { how: o.match.how ? MEDIADB_HOW_LABELS[o.match.how] : '—', id: c.entry.id })
+                : t('Reconnu par {how} ({id}), à vérifier sur les aperçus.', { how: o.match.how ? MEDIADB_HOW_LABELS[o.match.how] : '—', id: c.entry.id }),
+              t('Qualité {quality} : {reason} ; seule l’image du plateau existe en 4k.', { quality: o.quality.quality, reason: o.quality.reason }),
+            ].join(' '),
             tone: o.match.confident ? 'info' : 'warning',
           },
         ],
@@ -435,16 +476,16 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     ];
     const absent = MEDIADB_TYPES.filter((t) => !o.proposals.some((p) => p.type === t)).map((t) => mediaTypeInfo(t).label);
     sections.push({
-      title: 'Ce que VPinMediaDB n’a pas',
+      title: t('Ce que VPinMediaDB n’a pas'),
       rows: [
-        ...(absent.length ? [{ text: `Pour ce jeu : ${absent.join(', ')}`, tone: 'quiet' as const }] : []),
-        { text: 'Jamais : Afficheur (4:1), Topper, Chargement, Son de lancement, Règles', detail: 'À prendre ailleurs, puis à déposer dans le dossier d’import.', tone: 'quiet' },
+        ...(absent.length ? [{ text: t('Pour ce jeu : {types}', { types: absent.join(', ') }), tone: 'quiet' as const }] : []),
+        { text: t('Jamais : Afficheur (4:1), Topper, Chargement, Son de lancement, Règles'), detail: t('À prendre ailleurs, puis à déposer dans le dossier d’import.'), tone: 'quiet' },
       ],
     });
     return {
-      heading: mode.single ? 'Médias proposés par VPinMediaDB' : `Détail : ${o.title}`,
+      heading: mode.single ? t('Médias proposés par VPinMediaDB') : t('Détail : {title}', { title: o.title }),
       subheading: `${o.title} · ${MEDIADB_CITATION}`,
-      lead: `${MEDIADB_NOTICE} Start sur un média : vidéo, image ou rien. Rien n’est téléchargé avant « Télécharger et ranger ».`,
+      lead: `${mediaDbNotice()} ${t('Start sur un média : vidéo, image ou rien. Rien n’est téléchargé avant « Télécharger et ranger ».')}`,
       sections,
       actions,
       back: cancel,
@@ -458,12 +499,12 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     if (o.match.how !== 'deep' && !o.query) {
       const table = ctx.find(o.file);
       if (!table) return back();
-      void ctx.task('Recherche approfondie : nom écrit dans la table, ROM, PuP-Pack…', async () => {
+      void ctx.task(t('Recherche approfondie : nom écrit dans la table, ROM, PuP-Pack…'), async () => {
         const { db: found } = await index();
         const deep = await ctx.search.deep(table, found);
         const current = entryOf(o);
         const others = deep.candidates.filter((c) => c.entry.id !== current.entry.id).map(({ entry, game, lead }) => ({ entry, game, reasons: lead.reasons }));
-        const reasons = current.reasons ?? deep.candidates.find((c) => c.entry.id === current.entry.id)?.lead.reasons ?? [o.match.how ? `reconnu par ${MEDIADB_HOW_LABELS[o.match.how]}` : ''];
+        const reasons = current.reasons ?? deep.candidates.find((c) => c.entry.id === current.entry.id)?.lead.reasons ?? [o.match.how ? t('reconnu par {how}', { how: MEDIADB_HOW_LABELS[o.match.how] }) : ''];
         o.match = { ...o.match, candidates: [{ ...current, reasons }, ...others], how: 'deep' };
         o.pick = 0;
         openCandidates(o, mode);
@@ -472,16 +513,16 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     }
     ctx.openCustom(
       () => ({
-        heading: 'Quel jeu est-ce ?',
+        heading: t('Quel jeu est-ce ?'),
         subheading: o.title,
         lead: o.query
-          ? `Jeux de la base VPS qui ressemblent à « ${o.query} » et ont des médias sur VPinMediaDB.`
-          : 'Jeux de la base VPS que désignent le nom de la table, le nom écrit dedans par son auteur, sa ROM ou son PuP-Pack, et qui ont des médias sur VPinMediaDB. Les raisons sont sous chaque jeu.',
+          ? t('Jeux de la base VPS qui ressemblent à « {query} » et ont des médias sur VPinMediaDB.', { query: o.query })
+          : t('Jeux de la base VPS que désignent le nom de la table, le nom écrit dedans par son auteur, sa ROM ou son PuP-Pack, et qui ont des médias sur VPinMediaDB. Les raisons sont sous chaque jeu.'),
         sections: [],
         actions: [
           ...o.match.candidates.map((c, i) => ({
             label: c.game ? vpsLabel(c.game) : c.entry.id,
-            detail: [i === o.pick ? 'choix actuel' : undefined, ...(c.reasons?.slice(0, 2) ?? [`identifiant VPS ${c.entry.id}`])].filter(Boolean).join(' · '),
+            detail: [i === o.pick ? t('choix actuel') : undefined, ...(c.reasons?.slice(0, 2) ?? [t('identifiant VPS {id}', { id: c.entry.id })])].filter(Boolean).join(' · '),
             tone: i === o.pick ? ('ok' as const) : undefined,
             run: () => {
               const table = ctx.find(o.file);
@@ -493,8 +534,8 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
             },
           })),
           {
-            label: 'Chercher un autre titre…',
-            detail: 'Titre en anglais, initiales ou nom de ROM',
+            label: t('Chercher un autre titre…'),
+            detail: t('Titre en anglais, initiales ou nom de ROM'),
             run: () => {
               const table = ctx.find(o.file);
               if (!table) return back();
@@ -504,7 +545,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
               }, () => openCandidates(o, mode), o.query ?? '');
             },
           },
-          { label: 'Retour', run: back },
+          { label: t('Retour'), run: back },
         ],
         back,
       }),
@@ -512,37 +553,40 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     );
   }
 
-  /** Message de progression, au plus quatre fois par seconde. */
-  function progressReporter(prefix: () => string) {
+  /** Message de progression, au plus quatre fois par seconde ; `line` habille l'étape (« Téléchargement : … »). */
+  function progressReporter(line: (step: string) => string) {
     let last = 0;
     return (p: { index: number; total: number; type: MediaType; received: number; size?: number }) => {
       const now = Date.now();
       if (p.received && now - last < 250) return;
       last = now;
-      const amount = p.size ? `${formatSize(p.received)} sur ${formatSize(p.size)}` : p.received ? formatSize(p.received) : '';
-      ctx.progress(`${prefix()}${mediaTypeInfo(p.type).label} (${p.index + 1} sur ${p.total})${amount ? ` : ${amount}` : ''}…`);
+      const amount = p.size ? t('{received} sur {size}', { received: formatSize(p.received), size: formatSize(p.size) }) : p.received ? formatSize(p.received) : '';
+      const params = { type: mediaTypeInfo(p.type).label, index: p.index + 1, total: p.total, amount };
+      ctx.progress(line(amount ? t('{type} ({index} sur {total}) : {amount}…', params) : t('{type} ({index} sur {total})…', params)));
     };
   }
 
   function applyTable(o: Offer, mode: PlanMode): void {
-    void ctx.task('Téléchargement depuis VPinMediaDB…', async () => {
+    void ctx.task(t('Téléchargement depuis VPinMediaDB…'), async () => {
       const table = ctx.find(o.file);
-      if (!table) return mode.back({ text: 'Cette table n’existe plus.', tone: 'error' });
-      const trashDir = trashDirFor(ctx.layout()!.trash, `Médias ${path.basename(table.folder)} (VPinMediaDB)`);
+      if (!table) return mode.back({ text: t('Cette table n’existe plus.'), tone: 'error' });
+      const trashDir = trashDirFor(ctx.layout()!.trash, `Médias ${path.basename(table.folder)} (VPinMediaDB)`); // i18n-ignore : nom de dossier de la corbeille
       const result = await installMediaDb(table, choicesOf(o), {
         infoFile: infoFileFor(table, ctx.tablesDir()),
         trashDir,
         stagingDir: staging(),
         entry: entryOf(o).entry,
-        onProgress: progressReporter(() => 'Téléchargement : '),
+        onProgress: progressReporter((step) => t('Téléchargement : {step}', { step })),
       });
       forget([o]);
       host.reload(table.file);
       const ok = result.installed.length;
-      const parts = [`${ok} média${ok > 1 ? 's' : ''} de ${MEDIADB_NAME} rangé${ok > 1 ? 's' : ''}, source notée dans le .info.`];
+      const parts = [tn(ok, '{n} média de {source} rangé, source notée dans le .info.', '{n} médias de {source} rangés, source notée dans le .info.', { source: MEDIADB_NAME })];
       const trashed = result.installed.flatMap((i) => i.trashed).length;
-      if (trashed) parts.push(`Anciens fichiers dans la corbeille : ${path.relative(ctx.layout()!.root, trashDir)}.`);
-      if (result.failed.length) parts.push(`Non téléchargé (rien n’a été laissé) : ${result.failed.map((f) => `${mediaTypeInfo(f.type).label}, ${f.reason}`).join(' ; ')}.`);
+      if (trashed) parts.push(t('Anciens fichiers dans la corbeille : {folder}.', { folder: path.relative(ctx.layout()!.root, trashDir) }));
+      if (result.failed.length) {
+        parts.push(t('Non téléchargé (rien n’a été laissé) : {list}.', { list: joinSemi(result.failed.map((f) => `${mediaTypeInfo(f.type).label}, ${f.reason}`)) }));
+      }
       mode.back({ text: parts.join(' '), tone: result.failed.length ? (ok ? 'warning' : 'error') : 'ok' });
     });
   }
@@ -559,10 +603,10 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   }
 
   function openMissing(): void {
-    if (!ctx.layout()) return ctx.openNotice('Cyber Pinball n’est pas installé', ['Lancez « Installer » depuis le lanceur : il crée le dossier des tables.']);
+    if (!ctx.layout()) return ctx.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lancez « Installer » depuis le lanceur : il crée le dossier des tables.')]);
     withNotice(
       () =>
-        void ctx.task('Recherche des médias manquants…', async () => {
+        void ctx.task(t('Recherche des médias manquants…'), async () => {
           cleanMediaDbStaging(staging());
           const { db: found, problem } = await index();
           if (!found) return showUnavailable(problem, () => ctx.openSystem());
@@ -590,7 +634,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     const vps = await ctx.search.vps();
     const survey: Survey = { offers: [], doubtful: [], absent: [], complete: 0 };
     for (const [i, table] of tables.entries()) {
-      ctx.progress(`Recherche des médias manquants : table ${i + 1} sur ${tables.length}…`);
+      ctx.progress(t('Recherche des médias manquants : table {i} sur {total}…', { i: i + 1, total: tables.length }));
       const match = matchMediaDb(found, table, vps);
       if (!match.candidates.length) {
         // Nom changé ou abrégé : la recherche approfondie (sans lancer VPX pour lire les scripts)
@@ -598,7 +642,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
         const deep = await ctx.search.deep(table, found, undefined, false);
         const first = deep.candidates[0];
         if (first) survey.doubtful.push({ table, label: first.game ? vpsLabel(first.game) : first.entry.id });
-        else survey.absent.push({ table, reason: match.reason ?? 'Pas sur VPinMediaDB.' });
+        else survey.absent.push({ table, reason: match.reason ?? t('Pas sur VPinMediaDB.') });
         continue;
       }
       if (!match.confident) {
@@ -620,8 +664,11 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     const unreadable = choices.flatMap((c) => c.replaces).length;
     return {
       text: o.title,
-      detail: `${types} · ${formatSize(bytes)}${unknown ? ' et plus' : ''}`,
-      badges: [o.match.how === 'vps-id' ? 'identifiant VPS' : 'titre', ...(unreadable ? [`remplace ${unreadable} fichier${unreadable > 1 ? 's' : ''} illisible${unreadable > 1 ? 's' : ''}`] : [])],
+      detail: unknown ? t('{types} · {size} et plus', { types, size: formatSize(bytes) }) : `${types} · ${formatSize(bytes)}`,
+      badges: [
+        o.match.how === 'vps-id' ? t('identifiant VPS') : t('titre'),
+        ...(unreadable ? [tn(unreadable, 'remplace {n} fichier illisible', 'remplace {n} fichiers illisibles')] : []),
+      ],
       tone: unreadable ? 'warning' : undefined,
       action,
     };
@@ -637,19 +684,32 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     const quality = qualityChoice();
     const sections: Section[] = [
       { rows: noticeRows() },
-      { rows: [{ text: `Qualité : ${quality.quality}`, detail: `${quality.reason}. Seule l’image du plateau existe en 4k.`, tone: 'quiet' }] },
+      { rows: [{ text: t('Qualité : {quality}', { quality: quality.quality }), detail: t('{reason}. Seule l’image du plateau existe en 4k.', { reason: quality.reason }), tone: 'quiet' }] },
     ];
-    if (active.length) sections.push(capped(`${active.length} table${active.length > 1 ? 's reçoivent' : ' reçoit'} des médias`, active.map((o) => surveyRow(o))));
+    if (active.length) sections.push(capped(tn(active.length, '{n} table reçoit des médias', '{n} tables reçoivent des médias'), active.map((o) => surveyRow(o))));
     if (survey.doubtful.length) {
       sections.push(
         capped(
-          `À vérifier : ${survey.doubtful.length} table${survey.doubtful.length > 1 ? 's reconnues' : ' reconnue'} au titre seulement`,
-          survey.doubtful.map((d) => ({ text: d.table.title, detail: `Peut-être ${d.label} : rien n’est téléchargé d’office. Fiche > Médias du jeu > Chercher les médias, pour voir les aperçus et choisir.`, tone: 'quiet' as const })),
+          tn(survey.doubtful.length, 'À vérifier : {n} table reconnue au titre seulement', 'À vérifier : {n} tables reconnues au titre seulement'),
+          survey.doubtful.map((d) => ({
+            text: d.table.title,
+            detail: t('Peut-être {game} : rien n’est téléchargé d’office. Fiche > Médias du jeu > Chercher les médias, pour voir les aperçus et choisir.', { game: d.label }),
+            tone: 'quiet' as const,
+          })),
         ),
       );
     }
-    if (survey.absent.length) sections.push(capped(`Pas sur VPinMediaDB : ${survey.absent.length} table${survey.absent.length > 1 ? 's' : ''}`, survey.absent.map((a) => ({ text: a.table.title, detail: a.reason, tone: 'quiet' as const }))));
-    if (survey.complete) sections.push({ rows: [{ text: `${survey.complete} table${survey.complete > 1 ? 's ont' : ' a'} déjà tout ce que VPinMediaDB propose.`, tone: 'quiet' }] });
+    if (survey.absent.length) {
+      sections.push(
+        capped(
+          tn(survey.absent.length, 'Pas sur VPinMediaDB : {n} table', 'Pas sur VPinMediaDB : {n} tables'),
+          survey.absent.map((a) => ({ text: a.table.title, detail: a.reason, tone: 'quiet' as const })),
+        ),
+      );
+    }
+    if (survey.complete) {
+      sections.push({ rows: [{ text: tn(survey.complete, '{n} table a déjà tout ce que VPinMediaDB propose.', '{n} tables ont déjà tout ce que VPinMediaDB propose.'), tone: 'quiet' }] });
+    }
     const back = () => {
       forget(survey.offers);
       ctx.openSystem();
@@ -658,17 +718,26 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     if (count) {
       const bytes = active.reduce((n, o) => n + bytesOf(o).bytes, 0);
       const free = freeSpace(ctx.tablesDir());
-      if (free !== undefined && bytes > free) actions.push({ label: 'Place insuffisante', detail: `Il faut ${formatSize(bytes)}, il reste ${formatSize(free)} sur le disque des tables.`, tone: 'error', run: () => undefined });
-      else actions.push({ label: 'Télécharger et ranger', detail: `${count} média${count > 1 ? 's' : ''} pour ${active.length} table${active.length > 1 ? 's' : ''} · ${totalLabel(active)}`, tone: 'ok', run: () => applySurvey(survey) });
-      actions.push({ label: 'Voir une table et ses aperçus…', detail: 'Changer ce qui est téléchargé pour une table', run: () => openSurveyTables(survey) });
+      if (free !== undefined && bytes > free) {
+        actions.push({
+          label: t('Place insuffisante'),
+          detail: t('Il faut {need}, il reste {free} sur le disque des tables.', { need: formatSize(bytes), free: formatSize(free) }),
+          tone: 'error',
+          run: () => undefined,
+        });
+      } else {
+        const what = t('{media} pour {tables}', { media: tn(count, '{n} média', '{n} médias'), tables: tn(active.length, '{n} table', '{n} tables') });
+        actions.push({ label: t('Télécharger et ranger'), detail: `${what} · ${totalLabel(active)}`, tone: 'ok', run: () => applySurvey(survey) });
+      }
+      actions.push({ label: t('Voir une table et ses aperçus…'), detail: t('Changer ce qui est téléchargé pour une table'), run: () => openSurveyTables(survey) });
     }
-    actions.push({ label: count ? 'Annuler' : 'Retour', detail: count ? 'Rien n’est téléchargé' : undefined, run: back });
+    actions.push({ label: count ? t('Annuler') : t('Retour'), detail: count ? t('Rien n’est téléchargé') : undefined, run: back });
     return {
-      heading: count ? 'Plan de téléchargement des médias manquants' : 'Aucun média à télécharger',
+      heading: count ? t('Plan de téléchargement des médias manquants') : t('Aucun média à télécharger'),
       subheading: MEDIADB_CITATION,
       lead: count
-        ? 'Seuls les médias qui manquent sont téléchargés : un média déjà là n’est jamais remplacé d’ici. Rien n’est téléchargé avant « Télécharger et ranger ».'
-        : 'VPinMediaDB n’a rien de plus pour les tables de cette borne.',
+        ? t('Seuls les médias qui manquent sont téléchargés : un média déjà là n’est jamais remplacé d’ici. Rien n’est téléchargé avant « Télécharger et ranger ».')
+        : t('VPinMediaDB n’a rien de plus pour les tables de cette borne.'),
       sections,
       actions,
       back,
@@ -680,21 +749,21 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     ctx.openCustom(() => {
       const offers = survey.offers;
       return {
-        heading: 'Voir une table',
+        heading: t('Voir une table'),
         subheading: MEDIADB_CITATION,
-        lead: 'Choisissez une table pour voir les aperçus de ses médias et changer ce qui est téléchargé.',
+        lead: t('Choisissez une table pour voir les aperçus de ses médias et changer ce qui est téléchargé.'),
         sections: [{ rows: offers.map((o, i) => surveyRow(o, i)) }],
         actions: [
           ...offers.map((o, i) => ({
             label: o.title,
-            detail: `${choicesOf(o).length} média${choicesOf(o).length > 1 ? 's' : ''}`,
+            detail: tn(choicesOf(o).length, '{n} média', '{n} médias'),
             run: () =>
-              void ctx.task('Aperçus…', async () => {
+              void ctx.task(t('Aperçus…'), async () => {
                 await previews(o);
                 showTablePlan(o, { single: false, back: () => openSurveyTables(survey, i) });
               }),
           })),
-          { label: 'Retour au plan général', run: back },
+          { label: t('Retour au plan général'), run: back },
         ],
         back,
       };
@@ -703,8 +772,8 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
 
   function applySurvey(survey: Survey): void {
     const active = survey.offers.filter((o) => choicesOf(o).length);
-    void ctx.task('Téléchargement depuis VPinMediaDB…', async () => {
-      const trashDir = trashDirFor(ctx.layout()!.trash, 'Remplacé par les médias de VPinMediaDB');
+    void ctx.task(t('Téléchargement depuis VPinMediaDB…'), async () => {
+      const trashDir = trashDirFor(ctx.layout()!.trash, 'Remplacé par les médias de VPinMediaDB'); // i18n-ignore : nom de dossier de la corbeille
       let installed = 0;
       let bytes = 0;
       let trashed = 0;
@@ -717,22 +786,39 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
           trashDir,
           stagingDir: staging(),
           entry: entryOf(o).entry,
-          onProgress: progressReporter(() => `Table ${i + 1} sur ${active.length}, ${o.title} : `),
+          onProgress: progressReporter((step) => t('Table {i} sur {total}, {title} : {step}', { i: i + 1, total: active.length, title: o.title, step })),
         });
         installed += result.installed.length;
         trashed += result.installed.reduce((n, x) => n + x.trashed.length, 0);
         bytes += result.installed.reduce((n, x) => n + x.size, 0);
-        for (const f of result.failed) failed.push(`${o.title}, ${mediaTypeInfo(f.type).label} : ${f.reason}`);
+        for (const f of result.failed) failed.push(t('{title}, {type} : {reason}', { title: o.title, type: mediaTypeInfo(f.type).label, reason: f.reason }));
       }
       forget(survey.offers);
       host.reload();
       ctx.openNotice(
-        'Médias téléchargés',
+        t('Médias téléchargés'),
         [
-          `${installed} média${installed > 1 ? 's' : ''} (${formatSize(bytes)}) de ${MEDIADB_CITATION} rangé${installed > 1 ? 's' : ''} dans ${active.length} table${active.length > 1 ? 's' : ''} ; la source de chacun est notée dans le .info.`,
-          ...(trashed ? [`${trashed} fichier${trashed > 1 ? 's' : ''} illisible${trashed > 1 ? 's' : ''} du même type, remplacé${trashed > 1 ? 's' : ''} : dans la corbeille, ${path.basename(trashDir)}.`] : []),
-          ...(failed.length ? [`Non téléchargé (rien n’a été laissé) : ${failed.slice(0, 10).join(' ; ')}${failed.length > 10 ? ` ; et ${failed.length - 10} autres` : ''}.`] : []),
-          MEDIADB_NOTICE,
+          tn(
+            installed,
+            '{n} média ({size}) de {source} rangé dans {tables} ; la source de chacun est notée dans le .info.',
+            '{n} médias ({size}) de {source} rangés dans {tables} ; la source de chacun est notée dans le .info.',
+            { size: formatSize(bytes), source: MEDIADB_CITATION, tables: tn(active.length, '{n} table', '{n} tables') },
+          ),
+          ...(trashed
+            ? [
+                tn(trashed, '{n} fichier illisible du même type, remplacé : dans la corbeille, {folder}.', '{n} fichiers illisibles du même type, remplacés : dans la corbeille, {folder}.', {
+                  folder: path.basename(trashDir),
+                }),
+              ]
+            : []),
+          ...(failed.length
+            ? [
+                t('Non téléchargé (rien n’a été laissé) : {list}.', {
+                  list: failed.length > 10 ? t('{list} ; et {n} autres', { list: joinSemi(failed.slice(0, 10)), n: failed.length - 10 }) : joinSemi(failed),
+                }),
+              ]
+            : []),
+          mediaDbNotice(),
         ],
         () => ctx.openSystem(),
       );

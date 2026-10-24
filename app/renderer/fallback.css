@@ -350,100 +350,14 @@ html.cp-fb-hidden .cp-fb *::after {
   height: 100%;
 }
 
-/* ---------- Logo de Cyber Pinball (bille et flippers, comme l'icône) ---------- */
+/* ---------- Logo de Cyber Pinball (l'icône, icone.svg) ---------- */
 
 .cp-logo {
-  position: relative;
+  display: block;
   aspect-ratio: 1;
   flex: 0 0 auto;
-}
-
-.cp-logo > * {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.cp-logo-frame {
-  filter: drop-shadow(0 0 0.04em rgba(54, 201, 180, 0.45));
-  font-size: 4cqmin;
-}
-
-/* Bille noire chromée : reflet blanc en haut à gauche, liseré sarcelle en bas. */
-.cp-logo-ball {
-  left: 30%;
-  top: 21%;
-  width: 40%;
-  height: 40%;
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 32% 26%, #fff 0 4%, rgba(255, 255, 255, 0.5) 7%, transparent 15%),
-    radial-gradient(ellipse 70% 32% at 50% 100%, rgba(54, 201, 180, 0.95) 0%, rgba(54, 201, 180, 0.25) 60%, transparent 100%),
-    linear-gradient(180deg, #4a5654 0%, #1a2321 44%, #020504 52%, #030a08 100%);
-  box-shadow:
-    0 0 0 max(1px, 0.22cqmin) rgba(80, 214, 194, 0.8),
-    0 0 1.6cqmin rgba(54, 201, 180, 0.3);
-  animation: cp-ball 14.4s cubic-bezier(0.3, 0, 0.4, 1) infinite;
-}
-
-.cp-logo-flip path {
-  fill: #0e1d1a;
-  stroke: #36c9b4;
-  stroke-width: 1.6;
-  stroke-linejoin: round;
-}
-
-.cp-logo-flip-l {
-  transform-origin: 23.5% 70.5%;
-  animation: cp-flip-l 14.4s ease-out infinite;
-}
-
-.cp-logo-flip-r {
-  transform-origin: 76.5% 70.5%;
-  animation: cp-flip-r 14.4s ease-out infinite;
-}
-
-/*
- * Les flippers frappent, la bille saute puis retombe (1,7 s), puis un long repos :
- * un coup toutes les 14,4 s, pour qu'un repli ne prenne pas plus de place qu'un média.
- */
-@keyframes cp-ball {
-  0%,
-  2.7% {
-    transform: translateY(0);
-  }
-  7.3% {
-    transform: translateY(-21%);
-  }
-  12%,
-  100% {
-    transform: translateY(0);
-  }
-}
-
-@keyframes cp-flip-l {
-  0%,
-  1.3%,
-  4.7%,
-  100% {
-    transform: rotate(0);
-  }
-  2.7% {
-    transform: rotate(-24deg);
-  }
-}
-
-@keyframes cp-flip-r {
-  0%,
-  1.3%,
-  4.7%,
-  100% {
-    transform: rotate(0);
-  }
-  2.7% {
-    transform: rotate(24deg);
-  }
+  object-fit: contain;
+  filter: drop-shadow(0 0 1.2cqmin rgba(28, 143, 128, 0.35));
 }
 
 /* ---------- Topper ---------- */
@@ -484,8 +398,9 @@ html.cp-fb-hidden .cp-fb *::after {
   width: 70%;
 }
 
-.cp-tp-meta {
-  flex: 0 0 17cqh;
+/* Titre du jeu : deux lignes au plus dans la bande, ajusté à sa boîte (fallback.js). */
+.cp-tp-title {
+  flex: 0 0 26cqh;
   align-self: stretch;
 }
 
@@ -520,9 +435,9 @@ html.cp-fb-hidden .cp-fb *::after {
     height: min(15cqh, 10cqw);
   }
 
-  .cp-tp-meta {
+  .cp-tp-title {
     flex: 0 0 auto;
-    height: min(8cqh, 10cqw);
+    height: min(16cqh, 14cqw);
   }
 }
 

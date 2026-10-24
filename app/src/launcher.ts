@@ -11,7 +11,7 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { classifyVpxWindow, DIALOG_CLASS } from '@cyberpinball/core';
+import { classifyVpxWindow, DIALOG_CLASS, t } from '@cyberpinball/core';
 import {
   allowAnyForeground,
   bringToFront,
@@ -128,7 +128,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
           opts.onPlaying?.();
         } else if (Date.now() - t0 > timeoutMs && !failure) {
           failure = 'timeout';
-          message = `La fenêtre de jeu n'est pas apparue après ${Math.round(timeoutMs / 1000)} s.`;
+          message = t("La fenêtre de jeu n'est pas apparue après {n} s.", { n: Math.round(timeoutMs / 1000) });
           child.kill();
         }
       }
@@ -140,10 +140,10 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
       const crash = newCrashReport(opts.table, t0);
       if (!failure && crash) {
         failure = 'crash';
-        message = `VPX s'est arrêté brutalement (rapport : ${crash}).`;
+        message = t("VPX s'est arrêté brutalement (rapport : {file}).", { file: crash });
       } else if (!failure && exitCode !== 0 && exitCode !== null && !killTimer) {
         failure = 'crash';
-        message = `VPX s'est terminé avec le code ${exitCode}.`;
+        message = t("VPX s'est terminé avec le code {code}.", { code: exitCode });
       }
       resolve({
         ok: !failure,
@@ -159,7 +159,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
     child.on('exit', (code) => finish(code));
     child.on('error', (error) => {
       failure = 'spawn';
-      message = `Impossible de lancer VPX : ${error.message}`;
+      message = t('Impossible de lancer VPX : {error}', { error: error.message });
       finish(null);
     });
   });

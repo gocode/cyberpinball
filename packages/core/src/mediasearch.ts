@@ -16,6 +16,7 @@
 // d'un jeu retenu (Pro, Premium, LE) suivent : elles ont souvent les mêmes images.
 
 import * as path from 'node:path';
+import { t } from './i18n';
 import type { MediaDb, MediaDbCandidate } from './mediadb';
 import type { TableEntry } from './tables';
 import type { VpxTableInfo } from './vpxinfo';
@@ -30,14 +31,30 @@ export interface TableClue {
 }
 
 const CLUE_LABELS: Record<ClueKind, string> = {
-  info: 'titre de la fiche',
-  'vpx-file': 'nom du fichier .vpx',
-  folder: 'nom du dossier',
-  'b2s-file': 'nom du .directb2s',
-  'vpx-info': 'nom écrit dans la table par son auteur',
-  pup: 'nom du PuP-Pack',
-  'dmd-folder': 'dossier du DMD',
-  query: 'recherche saisie',
+  get info() {
+    return t('titre de la fiche');
+  },
+  get 'vpx-file'() {
+    return t('nom du fichier .vpx');
+  },
+  get folder() {
+    return t('nom du dossier');
+  },
+  get 'b2s-file'() {
+    return t('nom du .directb2s');
+  },
+  get 'vpx-info'() {
+    return t('nom écrit dans la table par son auteur');
+  },
+  get pup() {
+    return t('nom du PuP-Pack');
+  },
+  get 'dmd-folder'() {
+    return t('dossier du DMD');
+  },
+  get query() {
+    return t('recherche saisie');
+  },
 };
 
 /** Ce que la table dit d'elle-même, au-delà de son nom : lu dans le .vpx et dans son script. */
@@ -56,9 +73,9 @@ export interface TableEvidence {
 export function tableClues(table: TableEntry, evidence: TableEvidence = {}): TableClue[] {
   const out: TableClue[] = [];
   const add = (kind: ClueKind, text: string | undefined) => {
-    const t = text?.trim();
-    if (!t || t.length < 2 || out.some((c) => vpsKey(c.text) === vpsKey(t))) return;
-    out.push({ kind, text: t });
+    const clue = text?.trim();
+    if (!clue || clue.length < 2 || out.some((c) => vpsKey(c.text) === vpsKey(clue))) return;
+    out.push({ kind, text: clue });
   };
   add('vpx-info', evidence.vpxInfo?.name);
   add('info', table.manufacturer && table.year ? `${table.title} (${table.manufacturer} ${table.year})` : table.title);
@@ -94,9 +111,15 @@ export interface DeepSearchOptions {
 }
 
 const HOW_LABELS: Record<VpsHow, string> = {
-  title: 'titre',
-  acronym: 'initiales',
-  words: 'mots proches',
+  get title() {
+    return t('titre');
+  },
+  get acronym() {
+    return t('initiales');
+  },
+  get words() {
+    return t('mots proches');
+  },
   rom: 'ROM',
 };
 
@@ -123,24 +146,24 @@ export function deepSearchGames(vps: VpsDb, table: TableEntry, evidence: TableEv
 
   if (opts.vpsId) {
     const game = vps.games.find((g) => g.id === opts.vpsId);
-    if (game) hit(game, 1, 'vps-id', `identifiant VPS du .info (${opts.vpsId})`);
+    if (game) hit(game, 1, 'vps-id', t('identifiant VPS du .info ({id})', { id: opts.vpsId }));
   }
   const query = opts.query?.trim();
   if (query) {
-    for (const c of searchVps(vps, query)) hit(c.game, c.score, 'query', `recherche « ${query} » (${HOW_LABELS[c.how ?? 'title']})`);
+    for (const c of searchVps(vps, query)) hit(c.game, c.score, 'query', t('recherche « {query} » ({how})', { query, how: HOW_LABELS[c.how ?? 'title'] }));
   }
   for (const clue of tableClues(table, evidence)) {
     for (const c of matchVps(vps, { names: [clue.text] }, { deep: true }).candidates) {
-      hit(c.game, c.score, clue.kind, `${HOW_LABELS[c.how ?? 'title']} : ${CLUE_LABELS[clue.kind]}, « ${clue.text} »`);
+      hit(c.game, c.score, clue.kind, t('{how} : {clue}, « {text} »', { how: HOW_LABELS[c.how ?? 'title'], clue: CLUE_LABELS[clue.kind], text: clue.text }));
     }
   }
   const roms = evidence.script?.roms ?? [];
   if (roms.length) {
-    for (const c of matchVps(vps, { names: [], roms }, { deep: true }).candidates) hit(c.game, c.score, 'rom', `ROM du script : ${roms.join(', ')}`);
+    for (const c of matchVps(vps, { names: [], roms }, { deep: true }).candidates) hit(c.game, c.score, 'rom', t('ROM du script : {roms}', { roms: roms.join(', ') }));
   }
   // L'auteur cite souvent la fiche IPDB dans la description : « IPDB No. 2524 ».
   for (const id of ipdbIdsIn(evidence.vpxInfo)) {
-    for (const game of vps.games.filter((g) => ipdbIdOf(g) === id)) hit(game, 0.95, 'ipdb', `fiche IPDB n° ${id} citée par l’auteur de la table`);
+    for (const game of vps.games.filter((g) => ipdbIdOf(g) === id)) hit(game, 0.95, 'ipdb', t('fiche IPDB n° {id} citée par l’auteur de la table', { id }));
   }
   // Auteur et version de la table : la recréation exacte chez VPS, donc son jeu.
   const authors = authorKeys(evidence.vpxInfo?.author);
@@ -154,7 +177,14 @@ export function deepSearchGames(vps: VpsDb, table: TableEntry, evidence: TableEv
         // L'auteur seul fait de nombreuses tables : il confirme un jeu déjà trouvé ; avec la version, c'est une piste
         // faible (beaucoup de tables sont en 1.0 ou 2.0).
         if (!known && !sameVersion) continue;
-        hit(game, sameVersion ? 0.4 : 0, 'author', `table de ${evidence.vpxInfo!.author}${sameVersion ? `, version ${evidence.vpxInfo!.version}` : ''} chez VPS`);
+        hit(
+          game,
+          sameVersion ? 0.4 : 0,
+          'author',
+          sameVersion
+            ? t('table de {author}, version {version} chez VPS', { author: evidence.vpxInfo!.author!, version: evidence.vpxInfo!.version! })
+            : t('table de {author} chez VPS', { author: evidence.vpxInfo!.author! }),
+        );
         const lead = leads.get(game.id)!;
         if (sameVersion || !lead.tableFileId) lead.tableFileId = file.id;
       }
@@ -179,7 +209,7 @@ export function deepSearchGames(vps: VpsDb, table: TableEntry, evidence: TableEv
     if (lead.score < 0.5) continue;
     for (const sibling of vpsSiblings(vps, lead.game)) {
       if (out.some((o) => o.game.id === sibling.id)) continue;
-      out.push({ game: sibling, score: round(Math.max(0, lead.score - 0.1)), reasons: [`autre édition de ${vpsLabel(lead.game)}`], siblingOf: lead.game.id });
+      out.push({ game: sibling, score: round(Math.max(0, lead.score - 0.1)), reasons: [t('autre édition de {game}', { game: vpsLabel(lead.game) })], siblingOf: lead.game.id });
     }
   }
   out.sort((a, b) => b.score - a.score);

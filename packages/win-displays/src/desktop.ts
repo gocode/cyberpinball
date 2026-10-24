@@ -1,3 +1,4 @@
+// i18n-ignore-file : bureau caché des essais sans opérateur, ses erreurs ne servent qu’au développeur.
 // Bureau Windows caché des essais sans opérateur : un bureau à part (CreateDesktopW) sur
 // lequel un processus est lancé (CreateProcessW, STARTUPINFO.lpDesktop). L'utilisateur ne
 // le voit jamais : quoi que fassent ses fenêtres, rien n'apparaît sur ses écrans ni ne lui

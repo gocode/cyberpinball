@@ -26,6 +26,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { applyOps, samePath, type FileOp } from './fileops';
+import { formatDate, formatNumber, t } from './i18n';
 import type { Cabinet } from './model';
 import { mediaCompetitors, ownMediaPages } from './mediaedit';
 import {
@@ -54,9 +55,17 @@ export const MEDIADB_REPO = 'superhac/vpinmediadb';
 export const MEDIADB_REPO_URL = 'https://github.com/superhac/vpinmediadb';
 export const MEDIADB_INDEX_URL = 'https://raw.githubusercontent.com/superhac/vpinmediadb/main/vpinmdb.json';
 
-/** Avertissement montré au premier usage et en tête de chaque plan. */
+/**
+ * Avertissement en français, tel qu'il est noté dans <données>\mediadb.json avec la date
+ * d'acceptation (texte de référence, qui ne suit pas la langue). À l'écran : mediaDbNotice().
+ */
 export const MEDIADB_NOTICE =
-  'VPinMediaDB ne déclare aucune licence : ses médias appartiennent à leurs auteurs, et les images des jeux à leurs fabricants. Usage personnel, sur votre borne seulement : ne les redistribuez pas.';
+  'VPinMediaDB ne déclare aucune licence : ses médias appartiennent à leurs auteurs, et les images des jeux à leurs fabricants. Usage personnel, sur votre borne seulement : ne les redistribuez pas.'; // i18n-ignore : texte de référence noté dans mediadb.json ; à l'écran, mediaDbNotice()
+
+/** Avertissement montré au premier usage et en tête de chaque plan, dans la langue de l'interface. */
+export function mediaDbNotice(): string {
+  return t('VPinMediaDB ne déclare aucune licence : ses médias appartiennent à leurs auteurs, et les images des jeux à leurs fabricants. Usage personnel, sur votre borne seulement : ne les redistribuez pas.');
+}
 
 /** « VPinMediaDB (github.com/superhac/vpinmediadb) », pour citer la source. */
 export const MEDIADB_CITATION = `${MEDIADB_NAME} (${MEDIADB_REPO_URL.replace(/^https:\/\//, '')})`;
@@ -231,9 +240,9 @@ export async function refreshMediaDb(downloadsDir: string, opts: MediaDbRefreshO
       writeJsonAtomic(path.join(downloadsDir, META_FILE), { ...meta, checkedAt: now.toISOString() });
       return { status: 'unchanged' };
     }
-    if (!response.ok) throw new Error(`HTTP ${response.status} pour ${source.indexUrl}`);
+    if (!response.ok) throw new Error(t('HTTP {status} pour {url}', { status: response.status, url: source.indexUrl }));
     const text = await response.text();
-    if (!parseMediaDbIndex(JSON.parse(text), source)) throw new Error('l’index téléchargé n’a pas le format attendu');
+    if (!parseMediaDbIndex(JSON.parse(text), source)) throw new Error(t('l’index téléchargé n’a pas le format attendu'));
     fs.mkdirSync(downloadsDir, { recursive: true });
     const part = `${file}.part`;
     fs.writeFileSync(part, text, 'utf8');
@@ -247,7 +256,7 @@ export async function refreshMediaDb(downloadsDir: string, opts: MediaDbRefreshO
     return { status: 'updated' };
   } catch (error) {
     const err = error as Error;
-    return { status: 'offline', message: err.name === 'TimeoutError' ? 'GitHub ne répond pas' : err.message };
+    return { status: 'offline', message: err.name === 'TimeoutError' ? t('GitHub ne répond pas') : err.message };
   }
 }
 
@@ -282,7 +291,9 @@ export type MediaDbQualitySetting = 'auto' | MediaDbQuality;
 export const MEDIADB_QUALITY_SETTINGS: readonly MediaDbQualitySetting[] = ['auto', '1k', '4k'];
 
 export const MEDIADB_QUALITY_LABELS: Record<MediaDbQualitySetting, string> = {
-  auto: 'automatique',
+  get auto() {
+    return t('automatique');
+  },
   '1k': '1k',
   '4k': '4k',
 };
@@ -301,15 +312,15 @@ export interface MediaDbQualityChoice {
  * configuration active, de la zone du rôle playfield (seul le plateau existe en 4k).
  */
 export function mediaDbQuality(setting: MediaDbQualitySetting, cabinet?: Cabinet): MediaDbQualityChoice {
-  if (setting === '1k' || setting === '4k') return { quality: setting, reason: 'imposé par le réglage « Qualité téléchargée »' };
+  if (setting === '1k' || setting === '4k') return { quality: setting, reason: t('imposé par le réglage « Qualité téléchargée »') };
   const fingerprint = cabinet?.roles.playfield;
   const screen = fingerprint ? cabinet!.screens.find((s) => s.fingerprint === fingerprint) : undefined;
-  if (!screen) return { quality: '1k', reason: 'pas d’écran du plateau dans le modèle de borne' };
+  if (!screen) return { quality: '1k', reason: t('pas d’écran du plateau dans le modèle de borne') };
   const zone = roleZone(cabinet!, 'playfield');
   const width = Math.round(screen.widthPx * zone.width);
   const height = Math.round(screen.heightPx * zone.height);
-  const size = `écran du plateau ${width.toLocaleString('fr-FR')} × ${height.toLocaleString('fr-FR')}`;
-  return Math.max(width, height) > MEDIADB_4K_ABOVE ? { quality: '4k', reason: size } : { quality: '1k', reason: `${size} : le 1k suffit` };
+  const size = t('écran du plateau {width} × {height}', { width: formatNumber(width), height: formatNumber(height) });
+  return Math.max(width, height) > MEDIADB_4K_ABOVE ? { quality: '4k', reason: size } : { quality: '1k', reason: t('{size} : le 1k suffit', { size }) };
 }
 
 // ---------------------------------------------------------------------------
@@ -318,10 +329,18 @@ export function mediaDbQuality(setting: MediaDbQualitySetting, cabinet?: Cabinet
 export type MediaDbHow = 'vps-id' | 'vps-sibling' | 'vps-title' | 'deep';
 
 export const MEDIADB_HOW_LABELS: Record<MediaDbHow, string> = {
-  'vps-id': 'l’identifiant VPS du .info',
-  'vps-sibling': 'une autre édition du jeu de l’identifiant VPS',
-  'vps-title': 'le nom de la table (titre, initiales, fabricant, année)',
-  deep: 'la recherche approfondie',
+  get 'vps-id'() {
+    return t('l’identifiant VPS du .info');
+  },
+  get 'vps-sibling'() {
+    return t('une autre édition du jeu de l’identifiant VPS');
+  },
+  get 'vps-title'() {
+    return t('le nom de la table (titre, initiales, fabricant, année)');
+  },
+  get deep() {
+    return t('la recherche approfondie');
+  },
 };
 
 export interface MediaDbCandidate {
@@ -355,11 +374,11 @@ export function matchMediaDb(db: MediaDb, table: TableEntry, vps?: VpsDb): Media
     const game = vps?.games.find((g) => g.id === vpsId);
     if (entry) return { candidates: [{ entry, game }], how: 'vps-id', confident: true, vpsId };
     // Pas de médias pour cette édition : les autres éditions du même jeu (Pro, Premium, LE) ont souvent les mêmes images.
-    const siblings = game && vps ? vpsSiblings(vps, game).flatMap((g) => (db.entries.has(g.id) ? [{ entry: db.entries.get(g.id)!, game: g, reasons: [`autre édition de ${vpsLabel(game)}`] }] : [])) : [];
+    const siblings = game && vps ? vpsSiblings(vps, game).flatMap((g) => (db.entries.has(g.id) ? [{ entry: db.entries.get(g.id)!, game: g, reasons: [t('autre édition de {game}', { game: vpsLabel(game) })] }] : [])) : [];
     if (siblings.length) return { candidates: siblings, how: 'vps-sibling', confident: false, vpsId };
-    return { candidates: [], confident: false, vpsId, reason: `VPinMediaDB n’a pas de médias pour ce jeu (identifiant VPS ${vpsId}).` };
+    return { candidates: [], confident: false, vpsId, reason: t('VPinMediaDB n’a pas de médias pour ce jeu (identifiant VPS {id}).', { id: vpsId }) };
   }
-  if (!vps) return { candidates: [], confident: false, reason: 'Ce jeu n’a pas d’identifiant VPS, et la base VPS n’est pas disponible pour le reconnaître à son titre.' };
+  if (!vps) return { candidates: [], confident: false, reason: t('Ce jeu n’a pas d’identifiant VPS, et la base VPS n’est pas disponible pour le reconnaître à son titre.') };
   const label = table.manufacturer && table.year ? `${table.title} (${table.manufacturer} ${table.year})` : table.title;
   const names = [label, path.basename(table.file), ...(table.id.includes('/') ? [path.basename(table.folder)] : [])];
   const m = matchVps(vps, { names });
@@ -371,7 +390,7 @@ export function matchMediaDb(db: MediaDb, table: TableEntry, vps?: VpsDb): Media
     return {
       candidates,
       confident: false,
-      reason: m.candidates.length ? `VPinMediaDB n’a pas de médias pour ${vpsLabel(m.candidates[0]!.game)}.` : 'Aucun jeu de la base VPS ne ressemble à ce titre.',
+      reason: m.candidates.length ? t('VPinMediaDB n’a pas de médias pour {game}.', { game: vpsLabel(m.candidates[0]!.game) }) : t('Aucun jeu de la base VPS ne ressemble à ce titre.'),
     };
   }
   return { candidates, how: 'vps-title', confident: m.confident && candidates[0]!.entry.id === m.candidates[0]!.game.id };
@@ -456,7 +475,7 @@ export function mediaDbOffers(entry: MediaDbEntry, quality: MediaDbQuality): { t
 
 /** « vidéo », « image 4k », « son », pour le plan. */
 export function mediaDbOfferLabel(offer: MediaDbOffer): string {
-  const kind = offer.kind === 'video' ? 'vidéo' : offer.kind === 'audio' ? 'son' : 'image';
+  const kind = offer.kind === 'video' ? t('vidéo') : offer.kind === 'audio' ? t('son') : t('image');
   return offer.quality ? `${kind} ${offer.quality}` : kind;
 }
 
@@ -529,9 +548,9 @@ export function mediaOriginOf(table: TableEntry, type: MediaType, file: string |
 /** « VPinMediaDB (github.com/superhac/vpinmediadb), téléchargé le 21/10/2026 » */
 export function mediaOriginLabel(origin: MediaOrigin): string {
   const date = new Date(origin.date);
-  const when = Number.isNaN(date.getTime()) ? '' : `, téléchargé le ${date.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
   const source = origin.origin === MEDIADB_NAME ? MEDIADB_CITATION : origin.origin;
-  return `${source}${when}`;
+  if (Number.isNaN(date.getTime())) return source;
+  return t('{source}, téléchargé le {date}', { source, date: formatDate(date, { day: '2-digit', month: '2-digit', year: 'numeric' }) });
 }
 
 // ---------------------------------------------------------------------------
@@ -636,7 +655,7 @@ export async function downloadMediaDbFile(file: MediaDbFile, dest: string, opts:
   let timer: NodeJS.Timeout | undefined;
   const arm = () => {
     clearTimeout(timer);
-    timer = setTimeout(() => stall.abort(new MediaDbDownloadError('plus rien ne vient de GitHub', 'network')), opts.stallMs ?? STALL_MS);
+    timer = setTimeout(() => stall.abort(new MediaDbDownloadError(t('plus rien ne vient de GitHub'), 'network')), opts.stallMs ?? STALL_MS);
   };
   let handle: fs.promises.FileHandle | undefined;
   try {
@@ -669,9 +688,9 @@ export async function downloadMediaDbFile(file: MediaDbFile, dest: string, opts:
     }
     await handle.close();
     handle = undefined;
-    if (total !== undefined && received !== total) throw new MediaDbDownloadError(`reçu ${received} octets sur ${total}`, 'size');
+    if (total !== undefined && received !== total) throw new MediaDbDownloadError(t('reçu {received} octets sur {total}', { received: formatNumber(received), total: formatNumber(total) }), 'size');
     const md5 = hash.digest('hex');
-    if (file.md5 && md5 !== file.md5) throw new MediaDbDownloadError('somme MD5 différente de celle de l’index : fichier abîmé ou modifié sur le dépôt', 'md5');
+    if (file.md5 && md5 !== file.md5) throw new MediaDbDownloadError(t('somme MD5 différente de celle de l’index : fichier abîmé ou modifié sur le dépôt'), 'md5');
     fs.rmSync(dest, { force: true });
     fs.renameSync(part, dest);
     return { size: received, md5 };
@@ -687,7 +706,7 @@ export async function downloadMediaDbFile(file: MediaDbFile, dest: string, opts:
 function toDownloadError(error: unknown, signal: AbortSignal): MediaDbDownloadError {
   if (error instanceof MediaDbDownloadError) return error;
   if (signal.aborted && signal.reason instanceof MediaDbDownloadError) return signal.reason;
-  if (signal.aborted) return new MediaDbDownloadError('téléchargement annulé', 'aborted');
+  if (signal.aborted) return new MediaDbDownloadError(t('téléchargement annulé'), 'aborted');
   return new MediaDbDownloadError((error as Error)?.message ?? String(error), 'network');
 }
 
@@ -815,7 +834,7 @@ export async function installMediaDb(table: TableEntry, choices: MediaDbChoice[]
       applyOps(ops, { trashDir: ctx.trashDir });
     } catch (error) {
       fs.rmSync(staged.path, { force: true });
-      failed.push({ type: offer.type, reason: `rangement impossible : ${(error as Error).message}` });
+      failed.push({ type: offer.type, reason: t('rangement impossible : {message}', { message: (error as Error).message }) });
       continue;
     }
     installed.push({ type: offer.type, file: target, size: staged.size, trashed: ops.filter((o) => o.op === 'trash').map((o) => (o as { path: string }).path) });

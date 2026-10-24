@@ -7,6 +7,7 @@
 
 import * as path from 'node:path';
 import { describeDisplay, fingerprintOf, modelKeyOfScreen } from './fingerprint';
+import { formatList, t, tn } from './i18n';
 import { matchScreens } from './match';
 import type { Cabinet, ObservedDisplay, PhysicalScreen } from './model';
 
@@ -49,7 +50,13 @@ export interface CabinetSet {
   updatedAt: string;
 }
 
-export const FIRST_CONFIGURATION = { id: 'borne', name: 'Borne' } as const;
+export const FIRST_CONFIGURATION = {
+  id: 'borne',
+  /** Nom donné à la première configuration, dans la langue de l'interface (renommable ensuite). */
+  get name() {
+    return t('Borne');
+  },
+} as const;
 const REMEMBERED_KEPT = 10;
 
 /**
@@ -189,45 +196,56 @@ export function chosenId(choice: ConfigurationChoice): string | undefined {
 export function explainScore(score: ConfigurationScore): string {
   const found = score.serial + score.port + score.model;
   const how = [
-    score.serial && `${score.serial} par numéro de série`,
-    score.port && `${score.port} par modèle et port`,
-    score.model && `${score.model} par modèle et taille`,
+    score.serial && t('{n} par numéro de série', { n: score.serial }),
+    score.port && t('{n} par modèle et port', { n: score.port }),
+    score.model && t('{n} par modèle et taille', { n: score.model }),
   ].filter(Boolean);
-  const parts = [`${found} écran${found > 1 ? 's' : ''} sur ${score.total} retrouvé${found > 1 ? 's' : ''}${how.length ? ` (${how.join(', ')})` : ''}`];
+  const parts = [`${tn(found, '{n} écran sur {total} retrouvé', '{n} écrans sur {total} retrouvés', { total: score.total })}${how.length ? ` (${how.join(', ')})` : ''}`];
   if (score.missing.length) {
-    parts.push(`introuvable${score.missing.length > 1 ? 's' : ''} : ${score.missing.map((s) => `« ${s.label} »`).join(', ')}${score.similar ? ' (le même modèle est branché, mais pas cet exemplaire)' : ''}`);
+    const names = score.missing.map((s) => quoted(s.label)).join(', ');
+    const similar = score.similar ? ` ${t('(le même modèle est branché, mais pas cet exemplaire)')}` : '';
+    parts.push(`${tn(score.missing.length, 'introuvable : {names}', 'introuvables : {names}', { names })}${similar}`);
   }
-  if (score.extra.length) parts.push(`${score.extra.length} écran${score.extra.length > 1 ? 's' : ''} branché${score.extra.length > 1 ? 's' : ''} en plus`);
-  return `${parts.join(' ; ')} — score ${score.points}`;
+  if (score.extra.length) parts.push(tn(score.extra.length, '{n} écran branché en plus', '{n} écrans branchés en plus'));
+  return t('{parts} — score {points}', { parts: parts.join(t(' ; ')), points: score.points });
+}
+
+/** Nom (d'une configuration, d'un écran) entre guillemets, à la façon de la langue. */
+function quoted(name: string): string {
+  return t('« {name} »', { name });
 }
 
 /** Une phrase par choix, pour le menu, la synchronisation et la console. */
 export function explainChoice(set: CabinetSet, choice: ConfigurationChoice): string {
-  const name = (id: string) => `« ${set.configurations.find((c) => c.id === id)?.name ?? id} »`;
+  const name = (id: string) => quoted(set.configurations.find((c) => c.id === id)?.name ?? id);
   const scoreOf = (id: string) => choice.scores.find((s) => s.id === id)!;
   const runnerUp = (id: string) => choice.scores.find((s) => s.id !== id);
   switch (choice.status) {
     case 'forced':
-      return `${name(choice.id)} imposée depuis le menu (reconnaissance automatique suspendue) : ${explainScore(scoreOf(choice.id))}.`;
+      return t('{name} imposée depuis le menu (reconnaissance automatique suspendue) : {score}.', { name: name(choice.id), score: explainScore(scoreOf(choice.id)) });
     case 'recognized': {
       const other = runnerUp(choice.id);
-      const versus = other ? `, devant « ${other.name} » (score ${other.points})` : '';
-      return `${name(choice.id)} ${choice.partial ? 'retrouvée en partie' : 'reconnue'} : ${explainScore(scoreOf(choice.id))}${versus}.`;
+      const params = {
+        name: name(choice.id),
+        score: explainScore(scoreOf(choice.id)),
+        versus: other ? t(', devant {name} (score {points})', { name: quoted(other.name), points: other.points }) : '',
+      };
+      return choice.partial ? t('{name} retrouvée en partie : {score}{versus}.', params) : t('{name} reconnue : {score}{versus}.', params);
     }
     case 'remembered':
-      return `${name(choice.id)}, choisie pour ces mêmes écrans la dernière fois : ${explainScore(scoreOf(choice.id))}.`;
+      return t('{name}, choisie pour ces mêmes écrans la dernière fois : {score}.', { name: name(choice.id), score: explainScore(scoreOf(choice.id)) });
     case 'ambiguous':
-      return `${choice.tied.map(name).join(' et ')} correspondent autant aux écrans branchés (score ${scoreOf(choice.tied[0]!).points}).`;
+      return t('{names} correspondent autant aux écrans branchés (score {points}).', { names: formatList(choice.tied.map(name)), points: scoreOf(choice.tied[0]!).points });
     case 'unknown':
       return choice.scores.length
-        ? `Aucune configuration ne correspond aux écrans branchés (la plus proche : ${name(choice.scores[0]!.id)}, ${explainScore(choice.scores[0]!)}).`
-        : 'Aucune configuration enregistrée.';
+        ? t('Aucune configuration ne correspond aux écrans branchés (la plus proche : {name}, {score}).', { name: name(choice.scores[0]!.id), score: explainScore(choice.scores[0]!) })
+        : t('Aucune configuration enregistrée.');
   }
 }
 
 /** « S22E450 (1920 × 1080), PLX2283HSU (1920 × 1080) » : les écrans branchés, pour l'écran de choix. */
 export function describeDisplays(observed: ObservedDisplay[]): string {
-  return observed.map(describeDisplay).join(', ') || 'aucun';
+  return observed.map(describeDisplay).join(', ') || t('aucun');
 }
 
 // ---------- Modifications ----------
@@ -299,8 +317,7 @@ export function addConfiguration(set: CabinetSet | undefined, cabinet: Cabinet, 
 
 /** « Poste à 3 écrans » : nom proposé à une nouvelle configuration, à renommer dans le menu. */
 function defaultName(cabinet: Cabinet): string {
-  const n = cabinet.screens.length;
-  return `Poste à ${n} écran${n > 1 ? 's' : ''}`;
+  return tn(cabinet.screens.length, 'Poste à {n} écran', 'Poste à {n} écrans');
 }
 
 function uniqueName(set: CabinetSet, name: string, id: string): string {

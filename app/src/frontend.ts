@@ -58,6 +58,10 @@ import {
   type TableEntry,
   type MediaTarget,
   type MediaType,
+  formatList,
+  frontendNames,
+  t,
+  type OtherFrontend,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -69,11 +73,13 @@ import { locations, vpxInstall, vpxProfile } from './paths';
 import { activeVpxIni, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
 import { coverDisplay } from './cover-display';
+import { acceptFrontends, unacceptedFrontends } from './frontend-gate';
 import { allowDesktop, hideTaskbars, nameScreen, relaunchCovered, restoreTaskbars, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
 import { menuRotation, openSettings } from './settings';
 import { serveMedias } from './media-protocol';
 import { createMenuSettings } from './menu-settings';
+import { createLanguageMenu } from './language-menu';
 import { createUpdatesMenu } from './updates-menu';
 
 /**
@@ -92,30 +98,34 @@ let KEYS = menuKeysFor(undefined);
 /** Aide-mémoire « Dans le menu », avec les touches de cette borne. */
 function menuKeys(): [string, string][] {
   const keys = buttonKeys(buttons);
-  const or = (codes: string[]) => codes.map(keyLabel).join(' ou ');
+  const or = (codes: string[]) => formatList(codes.map(keyLabel), 'or');
   return [
-    ['Choisir une table', `Flippers (${keyLabel(keys.leftFlipper)} / ${keyLabel(keys.rightFlipper)}) ou flèches`],
-    ['Fiche de la table (Jouer, Modifier…)', `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`],
-    ...(KEYS.help.length ? [['Afficher les commandes', or(KEYS.help)] as [string, string]] : []),
-    ['Réglages de VPX', `${KEYS.settings.length ? `${or(KEYS.settings)}, ou ` : ''}Exit puis « Réglages de VPX »`],
-    ['Menu et configuration (tables, réglages, boutons, écrans, Bureau Windows, quitter)', `Exit (${or(KEYS.exit)}), Tab, ou clic sur ⚙ en haut à droite`],
-    ['Arrêter une partie bloquée', 'Ctrl+Maj+K'],
+    [t('Choisir une table'), t('Flippers ({left} / {right}) ou flèches', { left: keyLabel(keys.leftFlipper), right: keyLabel(keys.rightFlipper) })],
+    [t('Fiche de la table (Jouer, Modifier…)'), `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`],
+    ...(KEYS.help.length ? [[t('Afficher les commandes'), or(KEYS.help)] as [string, string]] : []),
+    [t('Réglages de VPX'), KEYS.settings.length ? t('{keys}, ou Exit puis « Réglages de VPX »', { keys: or(KEYS.settings) }) : t('Exit puis « Réglages de VPX »')],
+    [t('Menu et configuration (tables, réglages, boutons, écrans, Bureau Windows, quitter)'), t('Exit ({keys}), Tab, ou clic sur ⚙ en haut à droite', { keys: or(KEYS.exit) })],
+    [t('Arrêter une partie bloquée'), t('Ctrl+Maj+K')],
   ];
 }
 
 /** Pied du menu : chaque commande est aussi cliquable (code de la touche équivalente). */
 function menuFooter(): [string, string?][] {
   return [
-    ['Flippers : choisir'],
-    ['Start : fiche', KEYS.confirm[0]],
-    ...(KEYS.help.length ? [[`${keyLabel(KEYS.help[0])} : commandes`, KEYS.help[0]] as [string, string]] : []),
-    ...(KEYS.settings.length ? [[`${keyLabel(KEYS.settings[0])} : réglages`, KEYS.settings[0]] as [string, string]] : []),
-    ['Exit : menu', KEYS.exit[0]],
+    [t('Flippers : choisir')],
+    [t('Start : fiche'), KEYS.confirm[0]],
+    ...(KEYS.help.length ? [[t('{key} : commandes', { key: keyLabel(KEYS.help[0]) }), KEYS.help[0]] as [string, string]] : []),
+    ...(KEYS.settings.length ? [[t('{key} : réglages', { key: keyLabel(KEYS.settings[0]) }), KEYS.settings[0]] as [string, string]] : []),
+    [t('Exit : menu'), KEYS.exit[0]],
   ];
 }
 
 const FORCE_STOP_SHORTCUT = 'Control+Shift+K';
-const PLAYFIELD_TITLE = 'Cyber Pinball — Playfield';
+/**
+ * Titre de la fenêtre du playfield, tel qu'openWindows l'a donné (rôles qu'elle dessine,
+ * dans la langue de l'interface) : showMenuAgain la retrouve par lui.
+ */
+let playfieldTitle = 'Cyber Pinball';
 
 type Phase = 'menu' | 'loading' | 'playing' | 'message' | 'confirmQuit' | 'library';
 
@@ -123,7 +133,7 @@ interface Message {
   title: string;
   lines: string[];
   /** Ce que fait Start sur ce message. */
-  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons';
+  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'otherFrontend';
 }
 
 interface State {
@@ -215,7 +225,7 @@ const library = createLibrary({
   },
   tableSettings: (table) => openVpxSettings(table),
   tryTable: async (table, tableIni) => {
-    const refused = refuseOffscreen('Essayer la table dans VPX');
+    const refused = refuseOffscreen(t('Essayer la table dans VPX'));
     if (refused) return { ok: false, message: refused };
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
     const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, { tableIni });
@@ -243,8 +253,24 @@ const configurations = createConfigurationsMenu({
 library.systemItems.splice(
   1,
   0,
-  { label: 'Réglages de VPX', detail: 'Son, vue, performances, pour toutes les tables', run: () => openVpxSettings() },
-  { label: 'Configuration de la borne', detail: 'Boutons, écrans, playfield, disposition, son : chaque étape seule, ou l’assistant complet', run: () => openCabinetSetup() },
+  {
+    get label() {
+      return t('Réglages de VPX');
+    },
+    get detail() {
+      return t('Son, vue, performances, pour toutes les tables');
+    },
+    run: () => openVpxSettings(),
+  },
+  {
+    get label() {
+      return t('Configuration de la borne');
+    },
+    get detail() {
+      return t('Boutons, écrans, playfield, disposition, son : chaque étape seule, ou l’assistant complet');
+    },
+    run: () => openCabinetSetup(),
+  },
 );
 
 /**
@@ -255,18 +281,18 @@ library.systemItems.splice(
 function cabinetSetupItems(): SystemItem[] {
   return [
     ...WIZARD_STEPS.map((step) => ({ label: step.label, detail: step.detail, run: () => relaunchWizard(step.flag) })),
-    { label: 'Assistant complet', detail: 'Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son', run: () => relaunchWizard() },
-    { label: 'Touches par défaut des encodeurs', detail: 'Si les boutons ne répondent plus comme prévu (aussi à la souris)', run: () => resetButtonsFromMenu() },
+    { label: t('Assistant complet'), detail: t('Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son'), run: () => relaunchWizard() },
+    { label: t('Touches par défaut des encodeurs'), detail: t('Si les boutons ne répondent plus comme prévu (aussi à la souris)'), run: () => resetButtonsFromMenu() },
     configurations.systemItem,
   ];
 }
 
 function openCabinetSetup(): void {
   library.openCustom(() => ({
-    heading: 'Configuration de la borne',
-    lead: 'Chaque étape se refait seule, puis revient au menu des tables. « Quitter sans enregistrer » (ou Exit maintenu 2 s) en sort sans rien changer.',
+    heading: t('Configuration de la borne'),
+    lead: t('Chaque étape se refait seule, puis revient au menu des tables. « Quitter sans enregistrer » (ou Exit maintenu 2 s) en sort sans rien changer.'),
     sections: [],
-    actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, run: i.run })), { label: 'Retour', run: () => library.openSystem() }],
+    actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, run: i.run })), { label: t('Retour'), run: () => library.openSystem() }],
     back: () => library.openSystem(),
   }));
 }
@@ -290,6 +316,8 @@ library.systemItems.splice(
     output: () => audioOutput,
   }),
 );
+// Langue de l'interface : le choix relance le menu, comme un changement de configuration.
+library.systemItems.splice(library.systemItems.length - 1, 0, createLanguageMenu({ library, relaunch: () => relaunchMenu() }));
 // Mise à jour de Cyber Pinball, à la demande seulement : recherche, nouveautés, installation.
 const updates = createUpdatesMenu({
   loc,
@@ -303,8 +331,12 @@ const updates = createUpdatesMenu({
 library.systemItems.splice(library.systemItems.length - 1, 0, updates.systemItem);
 // Juste avant « Quitter Cyber Pinball ».
 library.systemItems.splice(library.systemItems.length - 1, 0, {
-  label: 'Bureau Windows',
-  detail: 'Réduit Cyber Pinball ; son bouton dans la barre des tâches le rouvre',
+  get label() {
+    return t('Bureau Windows');
+  },
+  get detail() {
+    return t('Réduit Cyber Pinball ; son bouton dans la barre des tâches le rouvre');
+  },
   run: () => showDesktop(),
 });
 
@@ -316,7 +348,7 @@ library.systemItems.splice(library.systemItems.length - 1, 0, {
 function showDesktop(): void {
   library.leave();
   onDesktop = true;
-  allowDesktop('Bureau Windows');
+  allowDesktop('Bureau Windows'); // i18n-ignore : raison gardée par le gardien des écrans, jamais affichée
   for (const win of windows.values()) win.minimize();
 }
 
@@ -339,7 +371,7 @@ function resetButtonsFromMenu(): void {
   buttons = reset.cabinet.buttons;
   KEYS = menuKeysFor(buttons);
   library.leave();
-  state = { ...state, phase: 'message', message: { title: 'Touches par défaut des encodeurs remises', lines: describeReset(reset) } };
+  state = { ...state, phase: 'message', message: { title: t('Touches par défaut des encodeurs remises'), lines: describeReset(reset) } };
   broadcast();
 }
 
@@ -381,7 +413,7 @@ export function startFrontend(): void {
 
   openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
   for (const f of selection?.findings ?? []) console.log(`Configuration de la borne : ${f.message}`);
-  if (selection?.previous && selection.configuration) showBanner(`Configuration « ${selection.configuration.name} » reconnue (avant : « ${selection.previous.name} »).`);
+  if (selection?.previous && selection.configuration) showBanner(t('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }));
   // Après une mise à jour : la nouvelle version est-elle là ?
   const updateNotice = updates.startupNotice();
   if (updateNotice) showBanner(updateNotice);
@@ -394,8 +426,8 @@ export function startFrontend(): void {
       ...state,
       phase: 'message',
       message: {
-        title: 'Boutons de la borne à refaire',
-        lines: [...buttonProblems(buttons), 'Les touches par défaut des encodeurs servent en attendant.', 'Start : refaire l’étape « Boutons » · Exit : menu'],
+        title: t('Boutons de la borne à refaire'),
+        lines: [...buttonProblems(buttons), t('Les touches par défaut des encodeurs servent en attendant.'), t('Start : refaire l’étape « Boutons » · Exit : menu')],
         action: 'buttons',
       },
     };
@@ -406,16 +438,16 @@ export function startFrontend(): void {
       phase: 'message',
       message: loc.root
         ? {
-            title: "VPX n'est pas installé",
+            title: t("VPX n'est pas installé"),
             lines: [
               vpxArchivePresent(loc.root)
-                ? 'Cyber Pinball a besoin de Visual Pinball X pour jouer. Son archive est déjà sur la borne : l’installation se passe de connexion.'
-                : 'Cyber Pinball a besoin de Visual Pinball X pour jouer (téléchargement d’environ 173 Mo).',
-              'Start : l’installer maintenant · Exit : plus tard',
+                ? t('Cyber Pinball a besoin de Visual Pinball X pour jouer. Son archive est déjà sur la borne : l’installation se passe de connexion.')
+                : t('Cyber Pinball a besoin de Visual Pinball X pour jouer (téléchargement d’environ 173 Mo).'),
+              t('Start : l’installer maintenant · Exit : plus tard'),
             ],
             action: 'install-vpx',
           }
-        : { title: "VPX n'est pas installé", lines: ['Lancez « Installer » depuis le lanceur, puis revenez ici.'] },
+        : { title: t("VPX n'est pas installé"), lines: [t('Lancez « Installer » depuis le lanceur, puis revenez ici.')] },
     };
   } else if (tables.length === 0) {
     state = { ...state, phase: 'message', message: noTables() };
@@ -423,7 +455,7 @@ export function startFrontend(): void {
 
   const stress = process.env.CYBERPINBALL_STRESS;
   // L'endurance lance de vraies parties : jamais hors écran.
-  if (stress && refuseOffscreen('Le test d’endurance')) {
+  if (stress && refuseOffscreen(t('Le test d’endurance'))) {
     process.exitCode = 1;
     return void quit();
   }
@@ -433,7 +465,7 @@ export function startFrontend(): void {
 }
 
 function noTables(): Message {
-  return { title: 'Aucune table', lines: ['Start : ajouter une table.', 'Exit : menu.'], action: 'addTable' };
+  return { title: t('Aucune table'), lines: [t('Start : ajouter une table.'), t('Exit : menu.')], action: 'addTable' };
 }
 
 /** Relit les tables après un ajout, une réparation ou une suppression, en gardant la sélection. */
@@ -469,8 +501,12 @@ function syncScreens(overwriteManual = false): {
       assignments: plan.assignments,
       selection,
       problem: {
-        title: 'Écrans à revoir',
-        lines: [...blocking.map((f) => f.message), `Configuration ${selection!.summary}`, 'Start : relancer l’assistant d’écrans · Exit : menu (Configurations de la borne pour en changer).'],
+        title: t('Écrans à revoir'),
+        lines: [
+          ...blocking.map((f) => f.message),
+          t('Configuration {summary}', { summary: selection!.summary }),
+          t('Start : relancer l’assistant d’écrans · Exit : menu (Configurations de la borne pour en changer).'),
+        ],
         action: 'wizard',
       },
     };
@@ -481,11 +517,11 @@ function syncScreens(overwriteManual = false): {
     assignments: plan.assignments,
     selection,
     manual: {
-      title: 'VPinballX.ini modifié à la main',
+      title: t('VPinballX.ini modifié à la main'),
       lines: [
         ...plan.manualEdits.map(formatManualEdit),
-        'Cyber Pinball n’a rien écrasé.',
-        'Start : garder ces valeurs · Exit : remettre celles de Cyber Pinball',
+        t('Cyber Pinball n’a rien écrasé.'),
+        t('Start : garder ces valeurs · Exit : remettre celles de Cyber Pinball'),
       ],
       action: 'manualEdits',
     },
@@ -530,8 +566,10 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
   ];
   for (const { role: id, bounds, parts, playfield } of pages) {
     const role = ROLES.find((r) => r.id === id)!;
+    const title = `Cyber Pinball — ${formatList([role, ...parts.filter((p) => p.role !== id).map((p) => ROLES.find((r) => r.id === p.role)!)].map((r) => r.label))}`;
+    if (role.id === 'playfield') playfieldTitle = title;
     const win = createWindow({
-      title: `Cyber Pinball — ${[role, ...parts.filter((p) => p.role !== id).map((p) => ROLES.find((r) => r.id === p.role)!)].map((r) => r.label).join(' et ')}`,
+      title,
       frame: false,
       show: false,
       skipTaskbar: role.id !== 'playfield',
@@ -588,7 +626,7 @@ interface MediaErrorReport {
 function recordMediaError(error: MediaErrorReport): void {
   const file = typeof error?.url === 'string' ? mediaPathFromUrl(error.url) : undefined;
   if (!file || !medias || !isServedMedia(file, medias.allowedDirs(tables))) return;
-  const message = typeof error.message === 'string' ? error.message : 'Erreur de lecture';
+  const message = typeof error.message === 'string' ? error.message : t('Erreur de lecture');
   try {
     const entry = logMediaError(mediaErrorLog, {
       file,
@@ -627,6 +665,17 @@ function handleKey(input: Input): boolean {
       if (state.message?.action === 'manualEdits') {
         resolveManualEdits(is(KEYS.confirm));
         state = { ...state, phase: tables.length ? 'menu' : 'message', message: tables.length ? undefined : noTables() };
+        break;
+      }
+      if (state.message?.action === 'otherFrontend') {
+        const run = pendingPlay;
+        pendingPlay = undefined;
+        state = { ...state, phase: 'menu', message: undefined };
+        if (is(KEYS.confirm) && run) {
+          acceptFrontends(run.frontends);
+          void run.play();
+          return true;
+        }
         break;
       }
       if (state.message?.action === 'addTable') {
@@ -672,9 +721,43 @@ async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { table
   // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
   // « backglass,dmd », ou vide) montre chargement, partie et retour sans lancer VPX.
   const simulated = OFFSCREEN ? process.env.CYBERPINBALL_PARTIE_SIMULEE : undefined;
-  const refused = simulated === undefined ? refuseOffscreen('Lancer une partie de VPX') : undefined;
+  const refused = simulated === undefined ? refuseOffscreen(t('Lancer une partie de VPX')) : undefined;
   if (refused) {
-    state = { ...state, phase: 'message', help: false, message: { title: 'Partie impossible hors écran', lines: [refused, 'Start ou Exit : revenir au menu.'] } };
+    state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible hors écran'), lines: [refused, t('Start ou Exit : revenir au menu.')] } };
+    broadcast();
+    return undefined;
+  }
+
+  // Un autre menu de borne ouvert depuis (PinUP Popper…) réagirait aussi aux boutons pendant la partie.
+  const others = unacceptedFrontends();
+  if (others.length) {
+    const names = frontendNames(others);
+    pendingPlay = { frontends: others, play: () => play(table, autoStopAfterMs, trial) };
+    state = {
+      ...state,
+      phase: 'message',
+      help: false,
+      message:
+        others.length > 1
+          ? {
+              title: t('{names} sont ouverts', { names }),
+              lines: [
+                t('Pendant la partie, {names} réagiraient aussi aux boutons de la borne et pourraient prendre les écrans ou l’afficheur DMD.', { names }),
+                t('Fermez {names} depuis leur menu (Quitter), puis relancez la partie.', { names }),
+                t('Start : jouer quand même · Exit : revenir au menu'),
+              ],
+              action: 'otherFrontend',
+            }
+          : {
+              title: t('{names} est ouvert', { names }),
+              lines: [
+                t('Pendant la partie, {names} réagirait aussi aux boutons de la borne et pourrait prendre les écrans ou l’afficheur DMD.', { names }),
+                t('Fermez {names} depuis son menu (Quitter), puis relancez la partie.', { names }),
+                t('Start : jouer quand même · Exit : revenir au menu'),
+              ],
+              action: 'otherFrontend',
+            },
+    };
     broadcast();
     return undefined;
   }
@@ -690,7 +773,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { table
   // Les écrans ont pu bouger depuis le démarrage du menu, la configuration de la borne aussi.
   const { problem, choose, selection } = syncScreens();
   if (choose) {
-    configurations.openChooser('Avant de jouer, choisissez la configuration branchée : elle décide des écrans de VPX.');
+    configurations.openChooser(t('Avant de jouer, choisissez la configuration branchée : elle décide des écrans de VPX.'));
     return undefined;
   }
   if (problem) {
@@ -749,6 +832,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, trial?: { table
 /** Table en cours de partie : chaque fenêtre affiche son fond de partie. */
 let playing: TableEntry | undefined;
 
+/** Partie retenue par l'avertissement « autre menu ouvert », lancée sur Start. */
+let pendingPlay: { frontends: OtherFrontend[]; play: () => Promise<PlayReport | undefined> } | undefined;
+
 /**
  * Pendant la partie, relit la pile des fenêtres de Windows toutes les 2 s : un rôle dont la
  * zone passe sous une fenêtre d'un autre processus (VPX, son B2S, PinMAME, PuP) est occupé,
@@ -791,20 +877,20 @@ async function showMenuAgain(): Promise<boolean> {
   const ours = () => foregroundWindow()?.pid === process.pid;
   for (let attempt = 0; attempt < 10 && !ours(); attempt++) {
     await delay(150);
-    const target = visibleWindowsOf(process.pid).find((w) => w.title === PLAYFIELD_TITLE);
+    const target = visibleWindowsOf(process.pid).find((w) => w.title === playfieldTitle);
     if (target) bringToFront(target);
   }
   return ours();
 }
 
 function explain(result: LaunchResult): Message {
-  const lines = [result.message ?? 'Erreur inconnue.'];
+  const lines = [result.message ?? t('Erreur inconnue.')];
   if (result.message && /can't start game/i.test(result.message)) {
-    lines.push('La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.');
+    lines.push(t('La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.'));
   }
   lines.push(...result.notices);
-  if (result.logTail.length) lines.push('Fin du journal de VPX :', ...result.logTail.slice(-5));
-  return { title: 'La partie n’a pas pu se dérouler', lines: [...lines, 'Start ou Exit : revenir au menu.'] };
+  if (result.logTail.length) lines.push(t('Fin du journal de VPX :'), ...result.logTail.slice(-5));
+  return { title: t('La partie n’a pas pu se dérouler'), lines: [...lines, t('Start ou Exit : revenir au menu.')] };
 }
 
 /**
@@ -878,22 +964,24 @@ async function capture(step: string): Promise<void> {
 function startVpxInstall(): boolean {
   const root = loc.root!;
   const show = (lines: string[], action?: Message['action']) => {
-    state = { ...state, phase: 'message', message: { title: 'Installation de VPX', lines, action } };
+    state = { ...state, phase: 'message', message: { title: t('Installation de VPX'), lines, action } };
     broadcast();
   };
-  show(['Préparation…']);
-  installVpx(root, (p) => show([`Téléchargement : ${p.percent} % (${p.receivedMb} / ${p.totalMb} Mo)`, 'Ne débranchez pas la borne.']))
+  show([t('Préparation…')]);
+  installVpx(root, (p) =>
+    show([t('Téléchargement : {percent} % ({received} / {total} Mo)', { percent: p.percent, received: p.receivedMb, total: p.totalMb }), t('Ne débranchez pas la borne.')]),
+  )
     .then((version) => {
       reloadTables();
-      const done = `Visual Pinball X ${version} est installé et vérifié.`;
-      if (tables.length) show([done, 'Start ou Exit : aller aux tables.']);
+      const done = t('Visual Pinball X {version} est installé et vérifié.', { version });
+      if (tables.length) show([done, t('Start ou Exit : aller aux tables.')]);
       else {
         // Pas encore de table : on enchaîne sur l'ajout.
         state = { ...state, phase: 'message', message: { ...noTables(), lines: [done, ...noTables().lines] } };
         broadcast();
       }
     })
-    .catch((error: Error) => show([`L’installation a échoué : ${error.message}`, 'Start : réessayer · Exit : plus tard'], 'install-vpx'));
+    .catch((error: Error) => show([t('L’installation a échoué : {error}', { error: error.message }), t('Start : réessayer · Exit : plus tard')], 'install-vpx'));
   return true;
 }
 

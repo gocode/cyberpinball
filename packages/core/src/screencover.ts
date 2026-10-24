@@ -57,7 +57,7 @@ export function screenCover(display: CoverRect, stack: StackedWindow[], coverPid
 
 /** Constat en clair pour la console ; undefined si l'écran est couvert. */
 export function coverNotice(cover: ScreenCover): string | undefined {
-  if (cover.state === 'taskbar') return 'la barre des tâches de Windows passe devant';
-  if (cover.state === 'uncovered') return 'aucune fenêtre de Cyber Pinball ne le couvre, le bureau Windows se voit';
+  if (cover.state === 'taskbar') return 'la barre des tâches de Windows passe devant'; // i18n-ignore : constat pour la console
+  if (cover.state === 'uncovered') return 'aucune fenêtre de Cyber Pinball ne le couvre, le bureau Windows se voit'; // i18n-ignore : constat pour la console
   return undefined;
 }

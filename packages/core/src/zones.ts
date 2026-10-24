@@ -15,6 +15,7 @@
 // deux fenêtres qui se chevauchent sont empilées par Windows. Les zones se placent
 // donc côte à côte, et un chevauchement est signalé.
 
+import { formatNumber, t, tn } from './i18n';
 import { currentFlipperEdge, EDGE_LABELS, type SizeCm } from './layout';
 import { ROLES, type AncillaryRoleId, type Cabinet, type FlipperEdge, type ObservedDisplay, type Rect, type RoleId, type ScreenZone } from './model';
 import type { SyncFinding } from './sync';
@@ -185,7 +186,7 @@ export const MIN_PX = 16;
 
 /** Formats proposés ; « Libre » n'en impose aucun. */
 export const ZONE_FORMATS: readonly { label: string; aspect?: number }[] = [
-  { label: 'Libre' },
+  { get label() { return t('Libre'); } },
   { label: '16:9', aspect: 16 / 9 },
   { label: '16:10', aspect: 16 / 10 },
   { label: '4:3', aspect: 4 / 3 },
@@ -198,9 +199,9 @@ export const ZONE_FORMATS: readonly { label: string; aspect?: number }[] = [
 
 /** Nom du format verrouillé : « 16:9 », ou « 1,85:1 » pour un format hors liste. */
 export function formatLabel(aspect: number | undefined): string {
-  if (aspect === undefined) return 'Libre';
+  if (aspect === undefined) return t('Libre');
   const known = ZONE_FORMATS.find((f) => f.aspect !== undefined && Math.abs(f.aspect - aspect) < 1e-3);
-  return known?.label ?? `${(Math.round(aspect * 100) / 100).toString().replace('.', ',')}:1`;
+  return known?.label ?? `${formatNumber(Math.round(aspect * 100) / 100)}:1`;
 }
 
 interface PxRect {
@@ -558,7 +559,7 @@ export function zoneFindings(cabinet: Cabinet, assignments: Partial<Record<RoleI
     if (zone && !isValidZone(zone)) {
       findings.push({
         severity: 'warning',
-        message: `${label(role)} : zone d'écran invalide dans cabinet.json (${JSON.stringify(zone)}). L'écran entier est utilisé ; refaites la disposition des écrans.`,
+        message: t("{role} : zone d'écran invalide dans cabinet.json ({zone}). L'écran entier est utilisé ; refaites la disposition des écrans.", { role: label(role), zone: JSON.stringify(zone) }),
       });
     }
   }
@@ -571,16 +572,16 @@ export function zoneFindings(cabinet: Cabinet, assignments: Partial<Record<RoleI
       const screen = assignments[a]!.friendlyName || assignments[a]!.gdiName;
       const both = placement(a) === 'embedded' && placement(b) === 'embedded';
       const front = both
-        ? `VPX dessine le ${label(EMBEDDED_ORDER.indexOf(b as AncillaryRoleId) > EMBEDDED_ORDER.indexOf(a as AncillaryRoleId) ? b : a)} par-dessus`
-        : "Windows décide lequel passe devant (VPX n'a pas de réglage)";
+        ? t('VPX dessine le {role} par-dessus', { role: label(EMBEDDED_ORDER.indexOf(b as AncillaryRoleId) > EMBEDDED_ORDER.indexOf(a as AncillaryRoleId) ? b : a) })
+        : t("Windows décide lequel passe devant (VPX n'a pas de réglage)");
       // Deux rôles sur un écran sans zone ni l'un ni l'autre : un oubli. Des zones posées qui se
       // chevauchent : peut-être voulu (un DMD sur le bas du backglass), seulement signalé.
       const accidental = !cabinet.zones?.[a] && !cabinet.zones?.[b];
       findings.push({
         severity: accidental ? 'warning' : 'info',
         message: accidental
-          ? `${label(a)} et ${label(b)} se recouvrent sur l'écran « ${screen} » : ${front}. Refaites la disposition des écrans pour leur donner chacun sa zone.`
-          : `${label(a)} et ${label(b)} se chevauchent sur l'écran « ${screen} » : ${front}.`,
+          ? t("{first} et {second} se recouvrent sur l'écran « {screen} » : {front}. Refaites la disposition des écrans pour leur donner chacun sa zone.", { first: label(a), second: label(b), screen, front })
+          : t("{first} et {second} se chevauchent sur l'écran « {screen} » : {front}.", { first: label(a), second: label(b), screen, front }),
       });
     }
   }
@@ -590,7 +591,7 @@ export function zoneFindings(cabinet: Cabinet, assignments: Partial<Record<RoleI
     if (sameZone(zones[role], zones.playfield)) {
       findings.push({
         severity: 'warning',
-        message: `${label(role)} incrusté sur tout le playfield : la table sera cachée derrière. Refaites la disposition des écrans pour lui donner une zone.`,
+        message: t('{role} incrusté sur tout le playfield : la table sera cachée derrière. Refaites la disposition des écrans pour lui donner une zone.', { role: label(role) }),
       });
     }
   }
@@ -598,7 +599,12 @@ export function zoneFindings(cabinet: Cabinet, assignments: Partial<Record<RoleI
   if (edge && edge !== 'bottom') {
     findings.push({
       severity: 'warning',
-      message: `${embedded.map(label).join(', ')} incrusté${embedded.length > 1 ? 's' : ''} dans le playfield, joueur ${EDGE_LABELS[edge]} de l'image : VPX ne tourne pas les incrustations, le joueur les verra ${edge === 'top' ? "à l'envers" : 'couchées'}.`,
+      message: tn(
+        embedded.length,
+        "{roles} incrusté dans le playfield, joueur {edge} de l'image : VPX ne tourne pas les incrustations, le joueur les verra {how}.",
+        "{roles} incrustés dans le playfield, joueur {edge} de l'image : VPX ne tourne pas les incrustations, le joueur les verra {how}.",
+        { roles: embedded.map(label).join(', '), edge: EDGE_LABELS[edge], how: edge === 'top' ? t("à l'envers") : t('couchées') },
+      ),
     });
   }
   return findings;

@@ -9,6 +9,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { b2sCacheDir, b2sImages } from './b2simage';
+import { t } from './i18n';
 import { layoutOf } from './locations';
 import { MEDIADB_QUALITY_SETTINGS, type MediaDbQualitySetting } from './mediadb';
 import {
@@ -380,9 +381,15 @@ export type GameMediaMode = 'animated' | 'still' | 'off';
 export const GAME_MEDIA_MODES: readonly GameMediaMode[] = ['still', 'animated', 'off'];
 
 export const GAME_MEDIA_LABELS: Record<GameMediaMode, string> = {
-  animated: 'animés',
-  still: 'figés',
-  off: 'éteints',
+  get animated() {
+    return t('animés');
+  },
+  get still() {
+    return t('figés');
+  },
+  get off() {
+    return t('éteints');
+  },
 };
 
 /** Son du mode attente : coupé, ou réduit (ATTRACT_SOUND_FACTOR de menumoments.ts). */
@@ -397,11 +404,21 @@ export type MenuLayout = 'medaillons' | 'bandeau' | 'minimal' | 'arche' | 'list'
 export const MENU_LAYOUTS: readonly MenuLayout[] = ['medaillons', 'bandeau', 'minimal', 'arche', 'list'];
 
 export const MENU_LAYOUT_LABELS: Record<MenuLayout, string> = {
-  medaillons: 'roue Médaillons',
-  bandeau: 'roue Bandeau',
-  minimal: 'roue Minimaliste',
-  arche: 'roue Arche',
-  list: 'liste',
+  get medaillons() {
+    return t('roue Médaillons');
+  },
+  get bandeau() {
+    return t('roue Bandeau');
+  },
+  get minimal() {
+    return t('roue Minimaliste');
+  },
+  get arche() {
+    return t('roue Arche');
+  },
+  get list() {
+    return t('liste');
+  },
 };
 
 /**

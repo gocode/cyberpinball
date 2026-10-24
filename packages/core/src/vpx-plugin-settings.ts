@@ -111,7 +111,7 @@ export function parsePluginSettings(plugin: PluginInfo, files: SourceFile[]): Vp
     for (const d of macroDeclarations(code, plugin, constants, arrays, file.path)) {
       const known = declarations.get(d.variable);
       if (known && known.def.key !== d.def.key) {
-        throw new SettingsParseError(`${file.path} : variable ${d.variable} déclarée deux fois avec des clés différentes`);
+        throw new SettingsParseError(`${file.path} : variable ${d.variable} déclarée deux fois avec des clés différentes`); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
       }
       declarations.set(d.variable, d);
     }
@@ -121,7 +121,7 @@ export function parsePluginSettings(plugin: PluginInfo, files: SourceFile[]): Vp
   const seen = new Set<string>();
   for (const variable of registered) {
     const d = declarations.get(variable);
-    if (!d) throw new SettingsParseError(`plugin ${plugin.id} : RegisterSetting(&${variable}) sans déclaration MSGPI_*_SETTING`);
+    if (!d) throw new SettingsParseError(`plugin ${plugin.id} : RegisterSetting(&${variable}) sans déclaration MSGPI_*_SETTING`); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
     // VPX enregistre une clé par section : un second enregistrement remplace le premier sans en créer un autre.
     const id = d.def.key.toLowerCase();
     if (seen.has(id)) continue;
@@ -150,7 +150,7 @@ function* macroDeclarations(
     const names = MACRO_ARGS[kind];
     const expected = 5 + names.length + (m[2] ? 0 : 2);
     if (args.length !== expected) {
-      throw new SettingsParseError(`${file} : ${m[0]}…) a ${args.length} arguments au lieu de ${expected}`, line);
+      throw new SettingsParseError(`${file} : ${m[0]}…) a ${args.length} arguments au lieu de ${expected}`, line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
     }
     const [variable, idSrc, labelSrc, descSrc] = args as [string, string, string, string];
     const named = Object.fromEntries(names.map((name, i) => [name, args[5 + i]!]));

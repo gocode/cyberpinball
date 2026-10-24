@@ -6,10 +6,13 @@
 import './sandbox-guard';
 // Puis, avant le démarrage d'Electron : le mode hors écran des essais sans opérateur.
 import { relaunchOnHiddenDesktop } from './offscreen';
+// Puis la langue de l'interface, avant les modules qui affichent quelque chose.
+import './language';
 import { app } from 'electron';
 import { layoutOf, loadCabinet, scanTables, wizardStepOf } from '@cyberpinball/core';
 import { startFrontend } from './frontend';
 import { locations } from './paths';
+import { otherFrontendsGate } from './frontend-gate';
 import { guardScreens } from './screen-guard';
 import { startSettingsAlone } from './settings';
 import { startWizard } from './wizard';
@@ -20,12 +23,17 @@ const wantsWizard = !wantsSettings && (process.argv.includes('--assistant') || w
 
 // Essai sans opérateur lancé sur le bureau de l'utilisateur : il se refait sur le bureau caché.
 if (!relaunchOnHiddenDesktop()) {
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    // Un autre menu de borne ouvert (PinUP Popper…) : aucun écran n'est pris avant qu'il soit
+    // fermé, ou que l'utilisateur choisisse de continuer quand même.
+    const gate = await otherFrontendsGate();
+    if (!gate.proceed) return app.quit();
     // Avant toute autre fenêtre : chaque écran de la borne est couvert dès maintenant.
     guardScreens();
     if (wantsSettings) void startSettingsAlone(loc.root ? scanTables(layoutOf(loc.root).tables) : []);
     else if (wantsWizard) startWizard();
     else startFrontend();
+    gate.close();
   });
   app.on('window-all-closed', () => app.quit());
 }

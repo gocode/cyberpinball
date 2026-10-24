@@ -82,10 +82,17 @@
     }
   }
 
+  /** Message de l'erreur, montré par le médecin (constat de la table). */
   function videoError(video) {
     const e = video.error;
-    const codes = { 1: 'lecture interrompue', 2: 'erreur réseau', 3: 'décodage impossible', 4: 'format non pris en charge' };
-    return `Vidéo illisible : ${codes[e?.code] ?? 'erreur inconnue'}${e?.message ? ` (${e.message})` : ''}`;
+    const codes = {
+      1: t('lecture interrompue'),
+      2: t('erreur réseau'),
+      3: t('décodage impossible'),
+      4: t('format non pris en charge'),
+    };
+    const reason = codes[e?.code] ?? t('erreur inconnue');
+    return e?.message ? t('Vidéo illisible : {reason} ({message})', { reason, message: e.message }) : t('Vidéo illisible : {reason}', { reason });
   }
 
   // ---------- Réserve d'éléments (préchargement) ----------
@@ -233,7 +240,7 @@
 
     function keyOf(view, opts) {
       if (!view) return 'vide';
-      const still = opts.still ? ':figé' : '';
+      const still = opts.still ? ':figé' : ''; // i18n-ignore : clé interne
       if (view.url) return `${view.url}${still}`;
       const card = view.card ?? {};
       return `repli:${opts.game ? 'partie' : view.fallback}:${view.type}:${card.title}:${card.manufacturer}:${card.year}${still}`;
@@ -342,7 +349,7 @@
       const failed = () => {
         if (!slots.has(slot)) return;
         if (media.tagName === 'VIDEO') report(view, videoError(media), { code: media.error?.code });
-        else report(view, 'Image illisible (fichier abîmé ou format non pris en charge)', { image: true });
+        else report(view, t('Image illisible (fichier abîmé ou format non pris en charge)'), { image: true });
         // Repli, sans garder l'élément illisible en réserve.
         slot.media = undefined;
         unload(media);
@@ -392,7 +399,7 @@
         const node = slot?.media;
         const tag = node?.tagName;
         return {
-          element: tag === 'VIDEO' ? 'vidéo' : tag === 'IMG' ? 'image' : tag === 'CANVAS' ? 'image figée' : slot?.view ? 'repli' : 'vide',
+          element: tag === 'VIDEO' ? 'vidéo' : tag === 'IMG' ? 'image' : tag === 'CANVAS' ? 'image figée' : slot?.view ? 'repli' : 'vide', // i18n-ignore : état lu par les essais
           fichier: slot?.url ? decodeURIComponent(slot.url).replace(/^.*[\\/]/, '').replace(/\?v=.*$/, '') : undefined,
           lecture: tag === 'VIDEO' ? (node.paused ? 'en pause' : 'en lecture') : undefined,
         };
@@ -447,7 +454,7 @@
       img.src = url;
       img.addEventListener('error', () => {
         img.dataset.broken = '1';
-        report({ url, role: 'playfield', type: 'Wheel' }, 'Logo illisible (fichier abîmé ou format non pris en charge)');
+        report({ url, role: 'playfield', type: 'Wheel' }, t('Logo illisible (fichier abîmé ou format non pris en charge)'));
         document.querySelectorAll(`img[data-logo="${CSS.escape(url)}"]`).forEach((n) => n.classList.add('broken'));
       });
       img.dataset.logo = url;

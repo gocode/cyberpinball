@@ -6,7 +6,7 @@
 import { execFile } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ARCHIVE_EXT, classifyArchive, type ImportSource } from '@cyberpinball/core';
+import { ARCHIVE_EXT, classifyArchive, t, type ImportSource } from '@cyberpinball/core';
 
 const TAR = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
 
@@ -29,7 +29,7 @@ export async function prepareImport(paths: string[], mode: 'move' | 'copy', stag
   for (const [i, p] of paths.entries()) {
     const name = path.basename(p);
     if (!fs.existsSync(p)) {
-      result.errors.push(`${name} : introuvable.`);
+      result.errors.push(t('{name} : introuvable.', { name }));
       continue;
     }
     if (!isArchive(p)) {
@@ -48,7 +48,7 @@ export async function prepareImport(paths: string[], mode: 'move' | 'copy', stag
       result.sources.push({ path: dest, label: name, mode: 'move', unpacked: true });
       result.archives.push({ path: p, mode });
     } catch (error) {
-      result.errors.push(`${name} : archive illisible (${(error as Error).message.split('\n')[0]}).`);
+      result.errors.push(t('{name} : archive illisible ({error}).', { name, error: (error as Error).message.split('\n')[0]! }));
     }
   }
   return result;

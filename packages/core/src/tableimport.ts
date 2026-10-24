@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { bestMatch, pupMemory, setPupMemory, tableFolderName, type ScriptFacts } from './doctor';
 import { applyOps, isInside, moveToTrash, pruneEmptyDirs, samePath, sameVolume, type FileOp, type OpContext } from './fileops';
+import { t } from './i18n';
 import {
   arrangeMedias,
   mediaFolder,
@@ -268,7 +269,7 @@ export function planImport(sources: ImportSource[], opts: PlanOptions): ImportPl
     const game = assign(item, games, packages, opts.vps);
     if (opts.romLibrary && item.kind === 'rom' && !item.isDir) romItems.push({ item, owner: game });
     else if (game) game.others.push(item);
-    else leftovers.push({ source: item.source, reason: 'Je ne sais pas à quelle table il appartient : il reste où il est.' });
+    else leftovers.push({ source: item.source, reason: t('Je ne sais pas à quelle table il appartient : il reste où il est.') });
   }
 
   const planned = games.filter((g) => g.vpx.length || g.others.length);
@@ -305,7 +306,7 @@ function planRoms(romItems: { item: Item; owner?: Game }[], games: Game[], plann
     const name = storedFile ? path.basename(storedFile.path) : path.basename(incoming[0]!.item.path);
     const to = path.join(library, name);
     const versions: RomImportVersion[] = [];
-    if (storedFile) versions.push({ hash: romHash(storedFile), size: storedFile.size, mtimeMs: storedFile.mtimeMs, label: 'bibliothèque', inLibrary: true });
+    if (storedFile) versions.push({ hash: romHash(storedFile), size: storedFile.size, mtimeMs: storedFile.mtimeMs, label: t('bibliothèque'), inLibrary: true });
     for (const { item } of incoming) {
       const file = romFile(item.path);
       if (!file) continue;
@@ -620,7 +621,7 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
   const add = (item: Item, target: string, from = item.path): ImportStep | undefined => {
     const to = path.join(game.folder, target);
     if (steps.some((s) => samePath(s.to, to))) {
-      warnings.push(`${item.source} : un autre fichier va déjà à « ${target} », celui-ci reste où il est.`);
+      warnings.push(t('{source} : un autre fichier va déjà à « {target} », celui-ci reste où il est.', { source: item.source, target }));
       return undefined;
     }
     const base = path.basename(from);
@@ -646,7 +647,7 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
       .sort((a, b) => b.parents.length - a.parents.length)[0];
     if (home) return path.join(...item.parents.slice(home.parents.length), name);
     if (item.parents.length) {
-      warnings.push(`« ${name} » était dans « ${item.parents.join('\\')} » : il est rangé à la racine de la table. Si la table ne le trouve pas, rangez-le à la main.`);
+      warnings.push(t('« {name} » était dans « {folder} » : il est rangé à la racine de la table. Si la table ne le trouve pas, rangez-le à la main.', { name, folder: item.parents.join('\\') }));
     }
     return name;
   };
@@ -671,7 +672,7 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
     const best = rest.find((i) => path.basename(i.path) === bestName)!;
     if (!named.length) add(best, `${game.folderName}.directb2s`);
     for (const item of rest.filter((i) => named.length || i !== best)) {
-      warnings.push(`Backglass supplémentaire « ${path.basename(item.path)} » : VPX ne l'affichera pas, il est rangé quand même.`);
+      warnings.push(t("Backglass supplémentaire « {name} » : VPX ne l'affichera pas, il est rangé quand même.", { name: path.basename(item.path) }));
       add(item, path.basename(item.path));
     }
   }
@@ -715,7 +716,7 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
       case 'script':
         if (!item.isDir && vpxBases.includes(stem.toLowerCase())) {
           item.kind = 'scriptOverride';
-          warnings.push(`« ${name} » remplace le script de la table : gardez-le seulement si l'auteur le demande.`);
+          warnings.push(t("« {name} » remplace le script de la table : gardez-le seulement si l'auteur le demande.", { name }));
           add(item, name);
         } else add(item, item.isDir ? 'scripts' : path.join('scripts', name));
         break;
@@ -754,7 +755,7 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
       step.media = { type: m.type, page: m.page, frontend: m.frontend, trash: m.trash };
       step.replaces = m.replaces;
     }
-    for (const s of skipped) warnings.push(`${s.source} : ${s.reason}`);
+    for (const s of skipped) warnings.push(t('{source} : {reason}', { source: s.source, reason: s.reason }));
   }
 
   for (const src of infoSources) {
@@ -782,9 +783,9 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
   const romsPresent = [...steps.filter((s) => s.kind === 'rom').map((s) => path.basename(s.to, '.zip').toLowerCase()), ...linkedRoms];
   const romsInstalled = listSafe(path.join(game.folder, 'pinmame', 'roms')).map((f) => f.replace(/\.zip$/i, '').toLowerCase());
   if (game.roms.length && !game.roms.some((r) => romsPresent.includes(r.toLowerCase()) || romsInstalled.includes(r.toLowerCase()))) {
-    warnings.push(`La ROM « ${game.roms[0]} » n'est pas dans l'import : la table ne démarrera pas sans elle.`);
+    warnings.push(t("La ROM « {rom} » n'est pas dans l'import : la table ne démarrera pas sans elle.", { rom: game.roms[0]! }));
   }
-  if (!game.isNew && !game.vpx.length && !steps.length) warnings.push('Rien à ajouter à cette table.');
+  if (!game.isNew && !game.vpx.length && !steps.length) warnings.push(t('Rien à ajouter à cette table.'));
 
   return {
     title: info.Info.Title ?? game.title,

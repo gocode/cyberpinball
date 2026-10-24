@@ -25,6 +25,7 @@ import {
   refreshMediaDb,
   samePath,
   stageMediaDbFile,
+  t,
   type GameLead,
   type Layout,
   type MediaDb,
@@ -95,7 +96,7 @@ export function createMediaSearch(ctx: MediaSearchContext) {
       void refresh();
       return { db };
     }
-    ctx.progress('Téléchargement de l’index de VPinMediaDB (environ 2 Mo, une seule fois)…');
+    ctx.progress(t('Téléchargement de l’index de VPinMediaDB (environ 2 Mo, une seule fois)…'));
     const r = await refresh();
     loaded = false;
     return load() ? { db } : { problem: r.message };
@@ -126,7 +127,7 @@ export function createMediaSearch(ctx: MediaSearchContext) {
     let script = cachedScript(table.file, host.dataDir);
     const exe = host.vpxExe();
     if (!script && read && exe) {
-      ctx.progress('Lecture du script de la table…');
+      ctx.progress(t('Lecture du script de la table…'));
       const r = await readScript(exe, table.file, host.dataDir);
       if (!('error' in r)) script = r;
     }
@@ -143,7 +144,7 @@ export function createMediaSearch(ctx: MediaSearchContext) {
       // Sans base VPS, seul l'identifiant du .info mène à VPinMediaDB.
       const id = table.info.Info?.VPSId?.trim();
       const entry = id ? found?.entries.get(id) : undefined;
-      return { leads: [], candidates: entry ? [{ entry, lead: { game: { id: entry.id, name: table.title }, score: 1, reasons: ['identifiant VPS du .info'] } }] : [] };
+      return { leads: [], candidates: entry ? [{ entry, lead: { game: { id: entry.id, name: table.title }, score: 1, reasons: [t('identifiant VPS du .info')] } }] : [] };
     }
     const leads = deepSearchGames(vps, table, await evidence(table, readScripts), { vpsId: table.info.Info?.VPSId?.trim() || undefined, query });
     return { vps, leads, candidates: found ? mediaDbLeads(found, leads) : [] };
@@ -181,7 +182,8 @@ export function createMediaSearch(ctx: MediaSearchContext) {
   /**
    * Images rangées dans le .vpx qui peuvent servir de médias (readVpxImages) : plateau à
    * plat, carte de règles, fronton et logo de la pièce VR. Écrites une fois dans le
-   * cache des médias, avec un sommaire (vpx-<clé>-images.json) pour ne pas relire la table.
+   * cache des médias, avec un sommaire (vpx-<clé>-images2.json) pour ne pas relire la table.
+   * Le sommaire garde d'où vient chaque image, pas son libellé : celui-ci suit la langue.
    */
   function vpxImages(table: TableEntry): { type: MediaType; file: string; label: string }[] {
     let stat: fs.Stats;
@@ -192,28 +194,29 @@ export function createMediaSearch(ctx: MediaSearchContext) {
     }
     const dir = b2sCacheDir(host.dataDir);
     const key = crypto.createHash('md5').update(`${table.file.toLowerCase()}|${stat.size}|${stat.mtimeMs}`).digest('hex').slice(0, 16);
-    const summary = path.join(dir, `vpx-${key}-images.json`);
+    // Sommaire 2 : d'où vient l'image et ses dimensions, au lieu d'un libellé figé dans la langue du moment.
+    const summary = path.join(dir, `vpx-${key}-images2.json`);
     try {
-      const known = JSON.parse(fs.readFileSync(summary, 'utf8')) as { type: MediaType; file: string; label: string }[];
-      if (known.every((k) => fs.existsSync(k.file))) return known;
+      const known = JSON.parse(fs.readFileSync(summary, 'utf8')) as VpxImageEntry[];
+      if (known.every((k) => VPX_IMAGE_FROM.includes(k.from) && fs.existsSync(k.file))) return known.map(withLabel);
     } catch {
       // Jamais lu, ou fichiers effacés : on relit la table.
     }
     const images = readVpxImages(table.file, vpxInfo(table.file)?.rules);
     if (!images) return [];
     fs.mkdirSync(dir, { recursive: true });
-    const out: { type: MediaType; file: string; label: string }[] = [];
-    const write = (type: MediaType, img: VpxImage, n: number, label: string) => {
+    const out: VpxImageEntry[] = [];
+    const write = (type: MediaType, img: VpxImage, n: number, from: VpxImageFrom) => {
       const file = path.join(dir, `vpx-${key}-${type.toLowerCase()}${n}.${img.ext}`);
       fs.writeFileSync(file, img.data);
-      out.push({ type, file, label: `${label} « ${img.name} », ${img.width} × ${img.height}` });
+      out.push({ type, file, from, name: img.name, width: img.width, height: img.height });
     };
-    if (images.playfield) write('Playfield', images.playfield, 0, 'Plateau à plat, rangé dans la table :');
-    if (images.rules) write('GameHelp', images.rules, 0, 'Carte de règles rangée dans la table :');
-    images.backglass.forEach((img, i) => write('Backglass', img, i, 'Fronton de la pièce VR de la table :'));
-    images.logos.forEach((img, i) => write('Wheel', img, i, 'Logo de la pièce VR de la table :'));
+    if (images.playfield) write('Playfield', images.playfield, 0, 'playfield');
+    if (images.rules) write('GameHelp', images.rules, 0, 'rules');
+    images.backglass.forEach((img, i) => write('Backglass', img, i, 'vr-backglass'));
+    images.logos.forEach((img, i) => write('Wheel', img, i, 'vr-logo'));
     fs.writeFileSync(summary, JSON.stringify(out, null, 2) + '\n');
-    return out;
+    return out.map(withLabel);
   }
 
   function quality(): MediaDbQualityChoice {
@@ -221,13 +224,13 @@ export function createMediaSearch(ctx: MediaSearchContext) {
   }
 
   /** Aperçus reçus et vérifiés dans downloads\vpinmediadb ; ceux qui manquent (réseau) sont absents. */
-  async function stagePreviews(files: MediaDbFile[], into: Map<string, string>, label = 'Aperçus'): Promise<void> {
+  async function stagePreviews(files: MediaDbFile[], into: Map<string, string>, label = t('Aperçus')): Promise<void> {
     const wanted = [...new Map(files.map((f) => [f.url, f])).values()]
       // Un aperçu déjà reçu peut avoir été rangé dans medias\ entre-temps (même fichier que le téléchargement) : on le reprend.
       .filter((f) => !into.has(f.url) || !fs.existsSync(into.get(f.url)!));
     let n = 0;
     for (const file of wanted) {
-      ctx.progress(`${label} : ${++n} sur ${wanted.length}…`);
+      ctx.progress(t('{label} : {n} sur {total}…', { label, n: ++n, total: wanted.length }));
       try {
         into.set(file.url, (await stageMediaDbFile(staging(), file)).path);
       } catch {
@@ -237,7 +240,7 @@ export function createMediaSearch(ctx: MediaSearchContext) {
   }
 
   async function sizes(files: MediaDbFile[]): Promise<Map<string, number>> {
-    return mediaDbSizes(files, { downloadsDir: downloads(), onProgress: (done, total) => ctx.progress(`Poids des fichiers : ${done} sur ${total}…`) });
+    return mediaDbSizes(files, { downloadsDir: downloads(), onProgress: (done, total) => ctx.progress(t('Poids des fichiers : {done} sur {total}…', { done, total })) });
   }
 
   /** Télécharge un fichier dans le dossier de réception, vérifié par MD5 ; renvoie son chemin. */
@@ -249,3 +252,31 @@ export function createMediaSearch(ctx: MediaSearchContext) {
 }
 
 export type MediaSearch = ReturnType<typeof createMediaSearch>;
+
+/** D'où vient une image rangée dans le .vpx. */
+type VpxImageFrom = 'playfield' | 'rules' | 'vr-backglass' | 'vr-logo';
+const VPX_IMAGE_FROM: readonly VpxImageFrom[] = ['playfield', 'rules', 'vr-backglass', 'vr-logo'];
+
+/** Image du .vpx telle que le sommaire du cache la garde. */
+interface VpxImageEntry {
+  type: MediaType;
+  file: string;
+  from: VpxImageFrom;
+  name: string;
+  width: number;
+  height: number;
+}
+
+/** Libellé d'une image du .vpx, dans la langue de l'interface. */
+function withLabel(img: VpxImageEntry): { type: MediaType; file: string; label: string } {
+  const params = { name: img.name, width: img.width, height: img.height };
+  const label =
+    img.from === 'playfield'
+      ? t('Plateau à plat, rangé dans la table : « {name} », {width} × {height}', params)
+      : img.from === 'rules'
+        ? t('Carte de règles rangée dans la table : « {name} », {width} × {height}', params)
+        : img.from === 'vr-backglass'
+          ? t('Fronton de la pièce VR de la table : « {name} », {width} × {height}', params)
+          : t('Logo de la pièce VR de la table : « {name} », {width} × {height}', params);
+  return { type: img.type, file: img.file, label };
+}

@@ -10,6 +10,7 @@ import {
   audioFormatFromProperty,
   audioFriendlyName,
   guidFromProperty,
+  t,
   type ObservedAudioOutput,
 } from '@cyberpinball/core';
 import { hklmSubkeys, hklmValue } from './registry';
@@ -20,7 +21,7 @@ const RENDER_FLOW = '{0.0.0.00000000}';
 
 /** Sorties audio actives (DeviceState = 1), dans l'ordre du registre. */
 export function probeAudioOutputs(): ObservedAudioOutput[] {
-  if (process.platform !== 'win32') throw new Error('La détection des sorties audio ne fonctionne que sous Windows pour le moment.');
+  if (process.platform !== 'win32') throw new Error(t('La détection des sorties audio ne fonctionne que sous Windows pour le moment.'));
   const outputs: (ObservedAudioOutput & { level: bigint })[] = [];
   for (const guid of hklmSubkeys(RENDER)) {
     const key = `${RENDER}\\${guid}`;

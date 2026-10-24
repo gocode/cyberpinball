@@ -5,6 +5,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { t } from './i18n';
 import { readJsonFile } from './store';
 
 export interface Layout {
@@ -58,12 +59,12 @@ export function componentPaths(root: string, installDir: string, version: string
 /** Problèmes qui empêchent d'utiliser ce dossier comme racine. */
 export function checkRoot(root: string, env: NodeJS.ProcessEnv = process.env): string[] {
   const problems: string[] = [];
-  if (!path.isAbsolute(root)) problems.push('Le dossier doit être un chemin complet, par exemple D:\\CyberPinball.');
-  if (root.startsWith('\\\\')) problems.push('Un dossier réseau ne convient pas : VPX doit lire ses fichiers en local.');
+  if (!path.isAbsolute(root)) problems.push(t('Le dossier doit être un chemin complet, par exemple D:\\CyberPinball.'));
+  if (root.startsWith('\\\\')) problems.push(t('Un dossier réseau ne convient pas : VPX doit lire ses fichiers en local.'));
   const protectedDirs = [env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramW6432, env.SystemRoot].filter(Boolean) as string[];
   for (const dir of protectedDirs) {
     if (isInside(root, dir)) {
-      problems.push(`${dir} est protégé en écriture ; VPX et les tables ont besoin d'écrire à côté d'eux (scores, réglages).`);
+      problems.push(t("{dir} est protégé en écriture ; VPX et les tables ont besoin d'écrire à côté d'eux (scores, réglages).", { dir }));
     }
   }
   return problems;

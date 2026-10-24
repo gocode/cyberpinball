@@ -7,6 +7,7 @@
 // et réécrit le nom courant à chaque synchronisation, comme pour les écrans.
 
 import { fingerprintOf } from './fingerprint';
+import { t } from './i18n';
 import { AUDIO_ROLES } from './model';
 import type {
   AudioOutput,
@@ -104,9 +105,9 @@ export const SPEAKER = {
 export type SpeakerPair = 'front' | 'rear' | 'side';
 
 export const SPEAKER_PAIRS: readonly { id: SpeakerPair; label: string; left: number; right: number }[] = [
-  { id: 'front', label: 'Avant', left: SPEAKER.FL, right: SPEAKER.FR },
-  { id: 'rear', label: 'Arrière', left: SPEAKER.BL, right: SPEAKER.BR },
-  { id: 'side', label: 'Côté', left: SPEAKER.SL, right: SPEAKER.SR },
+  { id: 'front', get label() { return t('Avant'); }, left: SPEAKER.FL, right: SPEAKER.FR },
+  { id: 'rear', get label() { return t('Arrière'); }, left: SPEAKER.BL, right: SPEAKER.BR },
+  { id: 'side', get label() { return t('Côté'); }, left: SPEAKER.SL, right: SPEAKER.SR },
 ];
 
 /** Rang d'un haut-parleur dans le flux : le nombre de bits du masque placés avant le sien. */
@@ -167,7 +168,7 @@ export function describeAudioOutput(output: ObservedAudioOutput): string {
 }
 
 export function channelsLabel(channels: number): string {
-  return channels === 8 ? '7.1' : channels === 6 ? '5.1' : channels === 2 ? 'stéréo' : channels === 1 ? 'mono' : `${channels} canaux`;
+  return channels === 8 ? '7.1' : channels === 6 ? '5.1' : channels === 2 ? t('stéréo') : channels === 1 ? 'mono' : t('{n} canaux', { n: channels });
 }
 
 // ---------------------------------------------------------------------------
@@ -239,7 +240,7 @@ export function channelsNeeded(sound3D: number): number {
 }
 
 export const PLAYFIELD_MODE_LABELS: Record<PlayfieldAudioMode, string> = {
-  stereo: 'stéréo',
+  get stereo() { return t('stéréo'); },
   surround: 'surround',
   ssf: 'SSF',
 };
@@ -248,10 +249,10 @@ export const PLAYFIELD_MODE_LABELS: Record<PlayfieldAudioMode, string> = {
 export type SpeakerPlace = 'lockbar' | 'top' | 'backglass' | 'none';
 
 export const SPEAKER_PLACE_LABELS: Record<SpeakerPlace, string> = {
-  lockbar: 'plateau, côté joueur',
-  top: 'plateau, côté fronton',
-  backglass: 'fronton',
-  none: 'rien entendu',
+  get lockbar() { return t('plateau, côté joueur'); },
+  get top() { return t('plateau, côté fronton'); },
+  get backglass() { return t('fronton'); },
+  get none() { return t('rien entendu'); },
 };
 
 export interface ChannelTestResult {
@@ -275,9 +276,9 @@ export function playfieldModeFromTest(places: Partial<Record<SpeakerPair, Speake
   if (!onPlayfield('front') && back) {
     // Guide Pinscape : exciters côté joueur sur la prise arrière, côté fronton sur la prise latérale.
     if (places.rear === 'top' && places.side === 'lockbar') {
-      notices.push('Haut-parleurs arrière près du fronton et latéraux côté joueur : en SSF, VPX les attend dans l’autre sens. Échangez les prises « arrière » et « côté » de la carte son.');
+      notices.push(t('Haut-parleurs arrière près du fronton et latéraux côté joueur : en SSF, VPX les attend dans l’autre sens. Échangez les prises « arrière » et « côté » de la carte son.'));
     }
-    if (places.front === 'none') notices.push('Rien entendu sur l’avant : en SSF, VPX y envoie seulement le son du fronton si la même carte le joue.');
+    if (places.front === 'none') notices.push(t('Rien entendu sur l’avant : en SSF, VPX y envoie seulement le son du fronton si la même carte le joue.'));
     return { playfieldMode: 'ssf', notices };
   }
   if (onPlayfield('front') && back) {
@@ -334,7 +335,9 @@ export function vpxAudioSettings(audio: CabinetAudio, observed: ObservedAudioOut
       untouched.push(`Player.${key}`);
       findings.push({
         severity: 'warning',
-        message: `${role.label} : la sortie « ${saved?.label ?? id} » est introuvable. ${saved?.screen ? 'Son écran est-il allumé, sur la bonne entrée ?' : 'Est-elle branchée ?'} VPX jouera ce son sur la sortie par défaut de Windows.`,
+        message: saved?.screen
+          ? t('{role} : la sortie « {name} » est introuvable. Son écran est-il allumé, sur la bonne entrée ? VPX jouera ce son sur la sortie par défaut de Windows.', { role: role.label, name: saved.label })
+          : t('{role} : la sortie « {name} » est introuvable. Est-elle branchée ? VPX jouera ce son sur la sortie par défaut de Windows.', { role: role.label, name: saved?.label ?? id }),
       });
       continue;
     }
@@ -343,7 +346,7 @@ export function vpxAudioSettings(audio: CabinetAudio, observed: ObservedAudioOut
     if (match.approximate.includes(id)) {
       findings.push({
         severity: 'info',
-        message: `${role.label} : sortie « ${output.friendlyName} » retrouvée par son écran (le pilote l’a recréée).`,
+        message: t('{role} : sortie « {name} » retrouvée par son écran (le pilote l’a recréée).', { role: role.label, name: output.friendlyName }),
       });
     }
     // VPX garde la dernière sortie qui porte ce nom : deux homonymes sont indiscernables pour lui.
@@ -351,7 +354,7 @@ export function vpxAudioSettings(audio: CabinetAudio, observed: ObservedAudioOut
     if (sameName.length > 1) {
       findings.push({
         severity: 'warning',
-        message: `${role.label} : ${sameName.length} sorties s’appellent « ${output.friendlyName} ». VPX prendra la dernière de sa liste, peut-être pas la bonne : renommez l’une d’elles dans le panneau Son de Windows (Propriétés), puis relancez l’assistant.`,
+        message: t('{role} : {n} sorties s’appellent « {name} ». VPX prendra la dernière de sa liste, peut-être pas la bonne : renommez l’une d’elles dans le panneau Son de Windows (Propriétés), puis relancez l’assistant.', { role: role.label, n: sameName.length, name: output.friendlyName }),
       });
     }
   }
@@ -365,7 +368,12 @@ export function vpxAudioSettings(audio: CabinetAudio, observed: ObservedAudioOut
     if (playfield && channels > 0 && channels < needed) {
       findings.push({
         severity: 'warning',
-        message: `Son du plateau : mixage ${PLAYFIELD_MODE_LABELS[audio.playfieldMode]}, mais « ${playfield.friendlyName} » est réglée en ${channelsLabel(channels)} dans Windows. VPX retombera en stéréo : réglez-la en ${needed === 8 ? '7.1' : '5.1 ou 7.1'} (Panneau de configuration > Son > Configurer).`,
+        message: t('Son du plateau : mixage {mode}, mais « {name} » est réglée en {channels} dans Windows. VPX retombera en stéréo : réglez-la en {needed} (Panneau de configuration > Son > Configurer).', {
+          mode: PLAYFIELD_MODE_LABELS[audio.playfieldMode],
+          name: playfield.friendlyName,
+          channels: channelsLabel(channels),
+          needed: needed === 8 ? '7.1' : t('5.1 ou 7.1'),
+        }),
       });
     }
   } else {

@@ -29,9 +29,9 @@ function header(s) {
   if (s.fileNote) file.append(el('span', 'file-note', s.fileNote));
   titles.append(file);
   const tabs = el('nav', `tabs${s.tabsFocused ? ' focused' : ''}`);
-  for (const t of s.tabs) {
-    const b = el('button', `tab${t.active ? ' active' : ''}`, t.label);
-    b.addEventListener('click', () => act({ type: 'tab', tab: t.id }));
+  for (const tab of s.tabs) {
+    const b = el('button', `tab${tab.active ? ' active' : ''}`, tab.label);
+    b.addEventListener('click', () => act({ type: 'tab', tab: tab.id }));
     tabs.append(b);
   }
   const side = el('div', 'head-side');
@@ -62,7 +62,7 @@ function list(s) {
     li.addEventListener('click', () => act({ type: 'row', index }));
     ul.append(li);
   });
-  if (!s.rows.length) ul.append(el('li', 'empty', 'Aucun réglage.'));
+  if (!s.rows.length) ul.append(el('li', 'empty', t('Aucun réglage.')));
   box.append(ul);
   return box;
 }
@@ -75,7 +75,7 @@ function detail(d) {
   for (const line of d.lines ?? []) box.append(el('p', 'help', line));
   if (d.owned) {
     const owned = el('p', 'owned-note');
-    owned.append(el('strong', '', 'Gérée par Cyber Pinball. '), document.createTextNode(d.owned));
+    owned.append(el('strong', '', `${t('Gérée par Cyber Pinball.')} `), document.createTextNode(d.owned));
     box.append(owned);
   }
   if (d.facts) {
@@ -85,7 +85,7 @@ function detail(d) {
   }
   if (d.original) {
     const orig = el('div', 'original');
-    orig.append(el('div', 'original-title', 'Description d’origine (VPX)'));
+    orig.append(el('div', 'original-title', t('Description d’origine (VPX)')));
     for (const line of d.original.split('\n')) orig.append(el('p', '', line));
     box.append(orig);
   }
@@ -126,11 +126,11 @@ function panel(p) {
     input.addEventListener('input', () => act({ type: 'text', text: input.value }));
     box.append(input, el('p', 'help', p.hint));
     const buttons = el('div', 'buttons');
-    const ok = el('button', 'primary', 'Enregistrer');
+    const ok = el('button', 'primary', t('Enregistrer'));
     ok.addEventListener('click', () => act({ type: 'text', text: input.value, submit: true }));
-    const reset = el('button', '', 'Valeur par défaut');
+    const reset = el('button', '', t('Valeur par défaut'));
     reset.addEventListener('click', () => act({ type: 'reset' }));
-    const cancel = el('button', '', 'Annuler');
+    const cancel = el('button', '', t('Annuler'));
     cancel.addEventListener('click', () => act({ type: 'cancel' }));
     buttons.append(ok, reset, cancel);
     box.append(buttons);

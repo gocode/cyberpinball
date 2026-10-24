@@ -97,7 +97,7 @@ export function parseSettingsProperties(source: string, options: ParseOptions): 
     if (!shape) throw new SettingsParseError(`macro inconnue ${call.name}`, call.line);
     const def = toSetting(call, shape, options);
     const id = `${def.section}\u0000${def.key}`.toLowerCase();
-    if (seen.has(id)) throw new SettingsParseError(`réglage déclaré deux fois : [${def.section}] ${def.key}`, call.line);
+    if (seen.has(id)) throw new SettingsParseError(`réglage déclaré deux fois : [${def.section}] ${def.key}`, call.line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
     seen.add(id);
     settings.push(def);
   }
@@ -138,7 +138,7 @@ function endOfQuoted(text: string, start: number): number {
   let i = start + 1;
   while (i < text.length && text[i] !== quote) {
     if (text[i] === '\\') i++;
-    if (text[i] === '\n') throw new SettingsParseError('chaîne non terminée');
+    if (text[i] === '\n') throw new SettingsParseError('chaîne non terminée'); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
     i++;
   }
   return i + 1;
@@ -175,7 +175,7 @@ export function preprocess(text: string, defines: Set<string>): string {
         }
         case 'elif': {
           const top = stack.at(-1);
-          if (!top) throw new SettingsParseError('#elif sans #if', line);
+          if (!top) throw new SettingsParseError('#elif sans #if', line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
           const cond = !top.taken && evalCondition(rest, defines, line);
           top.active = top.parentActive && cond;
           top.taken ||= cond;
@@ -183,16 +183,16 @@ export function preprocess(text: string, defines: Set<string>): string {
         }
         case 'else': {
           const top = stack.at(-1);
-          if (!top) throw new SettingsParseError('#else sans #if', line);
+          if (!top) throw new SettingsParseError('#else sans #if', line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
           top.active = top.parentActive && !top.taken;
           top.taken = true;
           break;
         }
         case 'endif':
-          if (!stack.pop()) throw new SettingsParseError('#endif sans #if', line);
+          if (!stack.pop()) throw new SettingsParseError('#endif sans #if', line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
           break;
         default:
-          if (active()) throw new SettingsParseError(`directive non gérée #${directive}`, line);
+          if (active()) throw new SettingsParseError(`directive non gérée #${directive}`, line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
       }
       return '';
     })
@@ -204,7 +204,7 @@ function evalCondition(expr: string, defines: Set<string>, line: number): boolea
   const tokens = expr.match(/defined\s*\(\s*\w+\s*\)|defined\s+\w+|&&|\|\||!|\(|\)|\w+/g) ?? [];
   let pos = 0;
   const fail = (): never => {
-    throw new SettingsParseError(`condition de préprocesseur non gérée : ${expr}`, line);
+    throw new SettingsParseError(`condition de préprocesseur non gérée : ${expr}`, line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
   };
   const primary = (): boolean => {
     const t = tokens[pos++];
@@ -290,7 +290,7 @@ export function splitArguments(code: string, open: number, line: number): { args
       current += c;
     }
   }
-  throw new SettingsParseError('parenthèse non fermée', line);
+  throw new SettingsParseError('parenthèse non fermée', line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
 }
 
 function toSetting(call: MacroCall, shape: MacroShape, options: ParseOptions): VpxSettingDef {
@@ -302,12 +302,12 @@ function toSetting(call: MacroCall, shape: MacroShape, options: ParseOptions): V
   let values: string[] | undefined;
   shape.args.forEach((name, i) => {
     if (name === '...') values = rest.slice(i).map((v) => parseString(v, call.line));
-    else if (rest[i] === undefined) throw new SettingsParseError(`${call.name}(${group}, ${key}) : argument ${name} manquant`, call.line);
+    else if (rest[i] === undefined) throw new SettingsParseError(`${call.name}(${group}, ${key}) : argument ${name} manquant`, call.line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
     else named[name] = rest[i]!;
   });
   const variadic = shape.args.includes('...');
   if (!variadic && rest.length !== shape.args.length) {
-    throw new SettingsParseError(`${call.name}(${group}, ${key}) : ${rest.length} arguments au lieu de ${shape.args.length}`, call.line);
+    throw new SettingsParseError(`${call.name}(${group}, ${key}) : ${rest.length} arguments au lieu de ${shape.args.length}`, call.line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
   }
 
   const num = (src: string) => evalNumber(src, options.constants, call.line);
@@ -345,14 +345,14 @@ function toSetting(call: MacroCall, shape: MacroShape, options: ParseOptions): V
       def.default = toFloat(num(named.def!));
       break;
     case 'enum': {
-      if (!values?.length) throw new SettingsParseError(`${call.name}(${group}, ${key}) : énumération sans valeurs`, call.line);
+      if (!values?.length) throw new SettingsParseError(`${call.name}(${group}, ${key}) : énumération sans valeurs`, call.line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
       const min = named.min !== undefined ? num(named.min) : shape.minDefault!;
       def.min = min;
       def.max = min + values.length - 1;
       def.values = values;
       def.default = num(named.def!);
       if (def.default < def.min || def.default > def.max) {
-        throw new SettingsParseError(`${call.name}(${group}, ${key}) : défaut ${def.default} hors de ${def.min}..${def.max}`, call.line);
+        throw new SettingsParseError(`${call.name}(${group}, ${key}) : défaut ${def.default} hors de ${def.min}..${def.max}`, call.line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
       }
       break;
     }
@@ -386,13 +386,13 @@ export function iniSection(group: string): string {
 export function parseString(src: string, line?: number): string {
   let out = '';
   let rest = src.trim();
-  if (!rest.startsWith('"')) throw new SettingsParseError(`chaîne attendue : ${src}`, line);
+  if (!rest.startsWith('"')) throw new SettingsParseError(`chaîne attendue : ${src}`, line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
   while (rest.startsWith('"')) {
     const end = endOfQuoted(rest, 0);
     out += unescape(rest.slice(1, end - 1));
     rest = rest.slice(end).replace(/^s\b/, '').trim();
   }
-  if (rest) throw new SettingsParseError(`chaîne attendue : ${src}`, line);
+  if (rest) throw new SettingsParseError(`chaîne attendue : ${src}`, line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
   return out;
 }
 
@@ -420,12 +420,12 @@ export function evalNumber(src: string, constants: Record<string, number>, line?
   const tokens = src.match(/0[xX][0-9a-fA-F]+[uUlL]*|\d+\.\d*(?:[eE][-+]?\d+)?[fF]?|\.\d+(?:[eE][-+]?\d+)?[fF]?|\d+(?:[eE][-+]?\d+)?[fFuUlL]*|\w+|<<|>>|\S/g) ?? [];
   let pos = 0;
   const fail = (why: string): never => {
-    throw new SettingsParseError(`expression non gérée (${why}) : ${src}`, line);
+    throw new SettingsParseError(`expression non gérée (${why}) : ${src}`, line); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
   };
   const peek = () => tokens[pos];
   const take = (expected?: string) => {
     const t = tokens[pos++];
-    if (t === undefined || (expected !== undefined && t !== expected)) fail(`attendu ${expected ?? 'un terme'}`);
+    if (t === undefined || (expected !== undefined && t !== expected)) fail(`attendu ${expected ?? 'un terme'}`); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
     return t!;
   };
   const CASTS = /^(int|float|double|unsigned|uint32_t|int32_t|long)$/;
@@ -506,7 +506,7 @@ export function evalNumber(src: string, constants: Record<string, number>, line?
     return cond !== 0 ? a : b;
   };
   const value = ternary();
-  if (pos !== tokens.length) fail(`reste « ${tokens.slice(pos).join(' ')} »`);
+  if (pos !== tokens.length) fail(`reste « ${tokens.slice(pos).join(' ')} »`); // i18n-ignore : erreur de l’outil npm run vpx-schema, pour le développeur
   return value;
 }
 

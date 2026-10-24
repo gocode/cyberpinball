@@ -17,8 +17,10 @@ import {
   VOLUME_CHOICES,
   attractDelayLabel,
   durationLabel,
+  formatNumber,
   nearestChoice,
   nextGameMediaMode,
+  t,
   volumeLabel,
   type MenuLayout,
   type MenuMediaSettings,
@@ -37,16 +39,29 @@ export interface MenuSettingsHost {
   output(): string | undefined;
 }
 
-const HEADING = 'Médias, son et attente';
+const heading = () => t('Médias, son et attente');
 // La présentation du menu (une des quatre roues, ou la liste) est rangée ici aussi : c'est un réglage du menu, gardé dans medias.json.
 
 const LAYOUT_DETAILS: Record<MenuLayout, string> = {
-  medaillons: 'Médaillons sur un bandeau de verre éclairé au néon, la table choisie au centre dans un anneau vert',
-  bandeau: 'Cinq médaillons sur une lame de verre droite bordée de néon, le titre dessous',
-  minimal: 'Cinq médaillons sur un simple filet lumineux : la table reste dégagée',
-  arche: 'Cinq médaillons le long d’une arche de métal et de verre, comme un fronton',
-  list: 'Titres des tables les uns sous les autres, la table choisie au milieu',
+  get medaillons() {
+    return t('Médaillons sur un bandeau de verre éclairé au néon, la table choisie au centre dans un anneau vert');
+  },
+  get bandeau() {
+    return t('Cinq médaillons sur une lame de verre droite bordée de néon, le titre dessous');
+  },
+  get minimal() {
+    return t('Cinq médaillons sur un simple filet lumineux : la table reste dégagée');
+  },
+  get arche() {
+    return t('Cinq médaillons le long d’une arche de métal et de verre, comme un fronton');
+  },
+  get list() {
+    return t('Titres des tables les uns sous les autres, la table choisie au milieu');
+  },
 };
+
+/** Libellé d'une présentation en tête de ligne : « roue Médaillons » devient « Roue Médaillons ». */
+const capitalized = (text: string) => text.charAt(0).toLocaleUpperCase() + text.slice(1);
 
 type VolumeKey = 'musicVolume' | 'videoVolume' | 'launchVolume';
 type ChoiceKey = 'attractDelay' | 'attractInterval';
@@ -58,51 +73,63 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
   function gameDetail(): string {
     const mode = s().game;
     return mode === 'still'
-      ? 'Première image du jeu sur les écrans que VPX n’occupe pas (Start : changer)'
+      ? t('Première image du jeu sur les écrans que VPX n’occupe pas (Start : changer)')
       : mode === 'animated'
-        ? 'Vidéos du jeu sur les écrans que VPX n’occupe pas ; plus de travail pour la carte graphique (Start : changer)'
-        : 'Écrans que VPX n’occupe pas laissés noirs (Start : changer)';
+        ? t('Vidéos du jeu sur les écrans que VPX n’occupe pas ; plus de travail pour la carte graphique (Start : changer)')
+        : t('Écrans que VPX n’occupe pas laissés noirs (Start : changer)');
   }
 
   function actions(): Action[] {
     const v = s();
     return [
       {
-        label: `Présentation du menu : ${MENU_LAYOUT_LABELS[v.menuLayout]}`,
-        detail: `${LAYOUT_DETAILS[v.menuLayout]} (Start : choisir)`,
+        label: t('Présentation du menu : {layout}', { layout: MENU_LAYOUT_LABELS[v.menuLayout] }),
+        detail: t('{detail} (Start : choisir)', { detail: LAYOUT_DETAILS[v.menuLayout] }),
         run: () => openLayout(),
       },
       {
-        label: `Musique des jeux : ${v.music ? 'jouée' : 'coupée'}`,
-        detail: v.music ? 'Musique du jeu choisi pendant la navigation (Start : couper)' : 'Borne silencieuse dans le menu (Start : jouer la musique de chaque jeu)',
+        label: v.music ? t('Musique des jeux : jouée') : t('Musique des jeux : coupée'),
+        detail: v.music ? t('Musique du jeu choisi pendant la navigation (Start : couper)') : t('Borne silencieuse dans le menu (Start : jouer la musique de chaque jeu)'),
         run: () => set({ music: !v.music }),
       },
-      { label: `Volume de la musique : ${volumeLabel(v.musicVolume)}`, detail: v.music ? undefined : 'Musique coupée pour l’instant', run: () => openVolume('musicVolume', 1) },
-      { label: `Son des vidéos du menu : ${volumeLabel(v.videoVolume)}`, detail: 'Vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée', run: () => openVolume('videoVolume', 2) },
-      { label: `Volume du lancement : ${volumeLabel(v.launchVolume)}`, detail: 'Son de lancement du jeu, sinon son de sa vidéo de chargement', run: () => openVolume('launchVolume', 3) },
       {
-        label: `Mode attente : ${attractDelayLabel(v.attractDelay)}`,
-        detail: 'Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu',
-        run: () => openChoice('attractDelay', ATTRACT_DELAY_CHOICES, (x) => (x ? `Après ${durationLabel(x)} sans bouton` : 'Jamais'), 4),
+        label: t('Volume de la musique : {volume}', { volume: volumeLabel(v.musicVolume) }),
+        detail: v.music ? undefined : t('Musique coupée pour l’instant'),
+        run: () => openVolume('musicVolume', 1),
       },
       {
-        label: `Table suivante en attente : toutes les ${durationLabel(v.attractInterval)}`,
-        run: () => openChoice('attractInterval', ATTRACT_INTERVAL_CHOICES, (x) => `Toutes les ${durationLabel(x)}`, 5),
+        label: t('Son des vidéos du menu : {volume}', { volume: volumeLabel(v.videoVolume) }),
+        detail: t('Vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée'),
+        run: () => openVolume('videoVolume', 2),
       },
       {
-        label: `Son en attente : ${v.attractSound === 'reduced' ? 'réduit' : 'coupé'}`,
-        detail: v.attractSound === 'reduced' ? 'Musique et vidéos à 30 % de leur volume (Start : couper)' : 'Rien ne joue en attente (Start : son réduit)',
+        label: t('Volume du lancement : {volume}', { volume: volumeLabel(v.launchVolume) }),
+        detail: t('Son de lancement du jeu, sinon son de sa vidéo de chargement'),
+        run: () => openVolume('launchVolume', 3),
+      },
+      {
+        label: t('Mode attente : {delay}', { delay: attractDelayLabel(v.attractDelay) }),
+        detail: t('Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu'),
+        run: () => openChoice('attractDelay', ATTRACT_DELAY_CHOICES, (x) => (x ? t('Après {duration} sans bouton', { duration: durationLabel(x) }) : t('Jamais')), 4),
+      },
+      {
+        label: t('Table suivante en attente : toutes les {duration}', { duration: durationLabel(v.attractInterval) }),
+        run: () => openChoice('attractInterval', ATTRACT_INTERVAL_CHOICES, (x) => t('Toutes les {duration}', { duration: durationLabel(x) }), 5),
+      },
+      {
+        label: v.attractSound === 'reduced' ? t('Son en attente : réduit') : t('Son en attente : coupé'),
+        detail: v.attractSound === 'reduced' ? t('Musique et vidéos à 30 % de leur volume (Start : couper)') : t('Rien ne joue en attente (Start : son réduit)'),
         run: () => set({ attractSound: v.attractSound === 'reduced' ? 'muted' : 'reduced' }),
       },
-      { label: `Médias pendant la partie : ${GAME_MEDIA_LABELS[v.game]}`, detail: gameDetail(), run: () => set({ game: nextGameMediaMode(v.game) }) },
+      { label: t('Médias pendant la partie : {mode}', { mode: GAME_MEDIA_LABELS[v.game] }), detail: gameDetail(), run: () => set({ game: nextGameMediaMode(v.game) }) },
       {
-        label: `Qualité téléchargée (VPinMediaDB) : ${MEDIADB_QUALITY_LABELS[v.downloadQuality]}`,
+        label: t('Qualité téléchargée (VPinMediaDB) : {quality}', { quality: MEDIADB_QUALITY_LABELS[v.downloadQuality] }),
         detail:
           v.downloadQuality === 'auto'
-            ? `4k si l’écran du plateau dépasse ${MEDIADB_4K_ABOVE.toLocaleString('fr-FR')} points, 1k sinon ; seule l’image du plateau existe en 4k (Start : changer)`
+            ? t('4k si l’écran du plateau dépasse {pixels} points, 1k sinon ; seule l’image du plateau existe en 4k (Start : changer)', { pixels: formatNumber(MEDIADB_4K_ABOVE) })
             : v.downloadQuality === '4k'
-              ? 'Image du plateau en 4k, environ 4 fois plus lourde (Start : changer)'
-              : 'Image du plateau en 1k, la plus légère (Start : changer)',
+              ? t('Image du plateau en 4k, environ 4 fois plus lourde (Start : changer)')
+              : t('Image du plateau en 1k, la plus légère (Start : changer)'),
         run: () => set({ downloadQuality: MEDIADB_QUALITY_SETTINGS[(MEDIADB_QUALITY_SETTINGS.indexOf(v.downloadQuality) + 1) % MEDIADB_QUALITY_SETTINGS.length]! }),
       },
     ];
@@ -111,10 +138,12 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
   function build(): Built {
     const output = host.output();
     return {
-      heading: HEADING,
-      lead: `Sortie du son : ${output ?? 'sortie par défaut de Windows (aucune sortie affectée au fronton par l’assistant)'}. Volume propre à un jeu : sa fiche, « Médias du jeu ».`,
+      heading: heading(),
+      lead: t('Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ».', {
+        output: output ?? t('sortie par défaut de Windows (aucune sortie affectée au fronton par l’assistant)'),
+      }),
       sections: [],
-      actions: [...actions(), { label: 'Retour', run: () => host.library.openSystem() }],
+      actions: [...actions(), { label: t('Retour'), run: () => host.library.openSystem() }],
       back: () => host.library.openSystem(),
     };
   }
@@ -123,30 +152,34 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
     host.library.openCustom(build, at);
   }
 
-  const VOLUME_TITLES: Record<VolumeKey, { heading: string; lead: string }> = {
-    musicVolume: { heading: 'Volume de la musique', lead: 'Musique du jeu choisi pendant la navigation, avant le volume propre à chaque jeu.' },
-    videoVolume: { heading: 'Son des vidéos du menu', lead: 'Son de la vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée. 0 % : vidéos muettes.' },
-    launchVolume: { heading: 'Volume du lancement', lead: 'Son joué au lancement d’une table, ou son de sa vidéo de chargement. Rien pendant la partie : VPX a la parole.' },
-  };
+  function volumeTitles(key: VolumeKey): { heading: string; lead: string } {
+    switch (key) {
+      case 'musicVolume':
+        return { heading: t('Volume de la musique'), lead: t('Musique du jeu choisi pendant la navigation, avant le volume propre à chaque jeu.') };
+      case 'videoVolume':
+        return { heading: t('Son des vidéos du menu'), lead: t('Son de la vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée. 0 % : vidéos muettes.') };
+      case 'launchVolume':
+        return { heading: t('Volume du lancement'), lead: t('Son joué au lancement d’une table, ou son de sa vidéo de chargement. Rien pendant la partie : VPX a la parole.') };
+    }
+  }
 
   function openVolume(key: VolumeKey, back: number): void {
     const now = s()[key];
     host.library.openCustom(
       () => ({
-        heading: VOLUME_TITLES[key].heading,
-        lead: VOLUME_TITLES[key].lead,
+        ...volumeTitles(key),
         sections: [],
         actions: [
           ...VOLUME_CHOICES.map((value) => ({
             label: volumeLabel(value),
-            detail: value === s()[key] ? 'choix actuel' : undefined,
+            detail: value === s()[key] ? t('choix actuel') : undefined,
             tone: value === s()[key] ? ('ok' as const) : undefined,
             run: () => {
               set({ [key]: value });
               open(back);
             },
           })),
-          { label: 'Retour', run: () => open(back) },
+          { label: t('Retour'), run: () => open(back) },
         ],
         back: () => open(back),
       }),
@@ -157,20 +190,20 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
   function openLayout(): void {
     host.library.openCustom(
       () => ({
-        heading: 'Présentation du menu',
-        lead: 'Comment les tables défilent dans le menu. Les roues font glisser les logos d’une place à l’autre ; la liste montre les titres.',
+        heading: t('Présentation du menu'),
+        lead: t('Comment les tables défilent dans le menu. Les roues font glisser les logos d’une place à l’autre ; la liste montre les titres.'),
         sections: [],
         actions: [
           ...MENU_LAYOUTS.map((layout) => ({
-            label: MENU_LAYOUT_LABELS[layout].replace(/^roue /, 'Roue ').replace(/^liste$/, 'Liste'),
-            detail: layout === s().menuLayout ? `${LAYOUT_DETAILS[layout]} · choix actuel` : LAYOUT_DETAILS[layout],
+            label: capitalized(MENU_LAYOUT_LABELS[layout]),
+            detail: layout === s().menuLayout ? t('{detail} · choix actuel', { detail: LAYOUT_DETAILS[layout] }) : LAYOUT_DETAILS[layout],
             tone: layout === s().menuLayout ? ('ok' as const) : undefined,
             run: () => {
               set({ menuLayout: layout });
               open(0);
             },
           })),
-          { label: 'Retour', run: () => open(0) },
+          { label: t('Retour'), run: () => open(0) },
         ],
         back: () => open(0),
       }),
@@ -178,29 +211,29 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
     );
   }
 
-  const CHOICE_TITLES: Record<ChoiceKey, { heading: string; lead: string }> = {
-    attractDelay: { heading: 'Mode attente', lead: 'Après ce temps sans bouton sur le menu des tables, la borne présente des tables au hasard. Le premier bouton revient au menu, sans rien lancer.' },
-    attractInterval: { heading: 'Table suivante en attente', lead: 'Temps passé sur chaque table tirée au hasard.' },
-  };
+  function choiceTitles(key: ChoiceKey): { heading: string; lead: string } {
+    return key === 'attractDelay'
+      ? { heading: t('Mode attente'), lead: t('Après ce temps sans bouton sur le menu des tables, la borne présente des tables au hasard. Le premier bouton revient au menu, sans rien lancer.') }
+      : { heading: t('Table suivante en attente'), lead: t('Temps passé sur chaque table tirée au hasard.') };
+  }
 
   function openChoice(key: ChoiceKey, choices: readonly number[], label: (value: number) => string, back: number): void {
     const now = s()[key];
     host.library.openCustom(
       () => ({
-        heading: CHOICE_TITLES[key].heading,
-        lead: CHOICE_TITLES[key].lead,
+        ...choiceTitles(key),
         sections: [],
         actions: [
           ...choices.map((value) => ({
             label: label(value),
-            detail: value === s()[key] ? 'choix actuel' : undefined,
+            detail: value === s()[key] ? t('choix actuel') : undefined,
             tone: value === s()[key] ? ('ok' as const) : undefined,
             run: () => {
               set({ [key]: value });
               open(back);
             },
           })),
-          { label: 'Retour', run: () => open(back) },
+          { label: t('Retour'), run: () => open(back) },
         ],
         back: () => open(back),
       }),
@@ -209,10 +242,15 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
   }
 
   return {
-    label: HEADING,
+    get label() {
+      return heading();
+    },
     get detail() {
       const v = s();
-      return `Musique ${v.music ? `jouée (${v.musicVolume} %)` : 'coupée'} · attente : ${attractDelayLabel(v.attractDelay)} · médias pendant la partie : ${GAME_MEDIA_LABELS[v.game]}`;
+      const params = { delay: attractDelayLabel(v.attractDelay), mode: GAME_MEDIA_LABELS[v.game] };
+      return v.music
+        ? t('Musique jouée ({volume} %) · attente : {delay} · médias pendant la partie : {mode}', { ...params, volume: v.musicVolume })
+        : t('Musique coupée · attente : {delay} · médias pendant la partie : {mode}', params);
     },
     run: () => open(),
   };

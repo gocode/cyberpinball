@@ -1,3 +1,4 @@
+// i18n-ignore-file : outil en ligne de commande, ses sorties restent en français.
 // npm run vpx-schema -- [version] [--check] [--ini <VPinballX.ini>]
 //
 // Génère le schéma des réglages d'une version de VPX à partir de son code source :

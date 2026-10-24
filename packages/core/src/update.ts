@@ -20,6 +20,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { formatNumber, language, t, type Language } from './i18n';
 import { UPDATE_PUBLIC_KEY } from './update-key';
 
 /** Dépôt GitHub des releases ; le même que « repository » du package.json racine (vérifié par les tests). */
@@ -36,8 +37,10 @@ export interface UpdateManifest {
   version: string;
   /** Date de publication (ISO 8601). */
   date: string;
-  /** Nouveautés, une ligne par point. */
+  /** Nouveautés, une ligne par point (en français : la borne les affiche si sa langue n'a pas les siennes). */
   notes: string[];
+  /** Nouveautés dans une autre langue (CHANGELOG.en.md), affichées par une borne réglée dans cette langue. */
+  notesByLanguage?: Partial<Record<Language, string[]>>;
   installer: { name: string; url: string; size: number; sha256: string };
 }
 
@@ -89,7 +92,7 @@ export function isVersion(value: string): boolean {
 export function compareAppVersions(a: string, b: string): number {
   const pa = VERSION.exec(a);
   const pb = VERSION.exec(b);
-  if (!pa || !pb) throw new Error(`Version illisible : ${!pa ? a : b}`);
+  if (!pa || !pb) throw new Error(t('Version illisible : {version}', { version: !pa ? a : b }));
   for (let i = 1; i <= 3; i++) {
     const d = Number(pa[i]) - Number(pb[i]);
     if (d) return d;
@@ -131,13 +134,13 @@ export function openEnvelope(raw: string, publicKeyPem: string): UpdateManifest 
   try {
     envelope = JSON.parse(raw.replace(/^﻿/, ''));
   } catch {
-    throw new Error('Flux de mise à jour illisible (JSON invalide).');
+    throw new Error(t('Flux de mise à jour illisible (JSON invalide).'));
   }
   if (envelope.format !== 1 || typeof envelope.manifest !== 'string' || typeof envelope.signature !== 'string') {
-    throw new Error('Flux de mise à jour d’un format inconnu : cette version de Cyber Pinball est peut-être trop ancienne pour le lire.');
+    throw new Error(t('Flux de mise à jour d’un format inconnu : cette version de Cyber Pinball est peut-être trop ancienne pour le lire.'));
   }
   const ok = verify(null, Buffer.from(envelope.manifest, 'utf8'), createPublicKey(publicKeyPem), Buffer.from(envelope.signature, 'base64'));
-  if (!ok) throw new Error('Signature du flux de mise à jour invalide : il ne vient pas de l’éditeur de Cyber Pinball. Rien n’a été téléchargé.');
+  if (!ok) throw new Error(t('Signature du flux de mise à jour invalide : il ne vient pas de l’éditeur de Cyber Pinball. Rien n’a été téléchargé.'));
   const manifest = JSON.parse(envelope.manifest) as UpdateManifest;
   checkManifest(manifest);
   return manifest;
@@ -145,16 +148,24 @@ export function openEnvelope(raw: string, publicKeyPem: string): UpdateManifest 
 
 function checkManifest(m: UpdateManifest): void {
   const fail = (what: string): never => {
-    throw new Error(`Flux de mise à jour incomplet : ${what}.`);
+    throw new Error(t('Flux de mise à jour incomplet : {what}.', { what }));
   };
-  if (typeof m?.version !== 'string' || !isVersion(m.version)) fail('version absente ou illisible');
-  if (typeof m.date !== 'string' || Number.isNaN(Date.parse(m.date))) fail('date absente');
-  if (!Array.isArray(m.notes) || m.notes.some((n) => typeof n !== 'string')) fail('nouveautés absentes');
+  if (typeof m?.version !== 'string' || !isVersion(m.version)) fail(t('version absente ou illisible'));
+  if (typeof m.date !== 'string' || Number.isNaN(Date.parse(m.date))) fail(t('date absente'));
+  if (!Array.isArray(m.notes) || m.notes.some((n) => typeof n !== 'string')) fail(t('nouveautés absentes'));
+  const translated = Object.values(m.notesByLanguage ?? {});
+  if (translated.some((notes) => !Array.isArray(notes) || notes.some((n) => typeof n !== 'string'))) fail(t('nouveautés absentes'));
   const i = m.installer;
-  if (!i || typeof i.name !== 'string' || !/^[\w.-]+\.exe$/i.test(i.name)) fail('nom de l’installeur absent');
-  if (typeof i.url !== 'string' || !/^https?:\/\//.test(i.url)) fail('adresse de l’installeur absente');
-  if (!Number.isInteger(i.size) || i.size <= 0) fail('taille de l’installeur absente');
-  if (typeof i.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(i.sha256)) fail('empreinte de l’installeur absente');
+  if (!i || typeof i.name !== 'string' || !/^[\w.-]+\.exe$/i.test(i.name)) fail(t('nom de l’installeur absent'));
+  if (typeof i.url !== 'string' || !/^https?:\/\//.test(i.url)) fail(t('adresse de l’installeur absente'));
+  if (!Number.isInteger(i.size) || i.size <= 0) fail(t('taille de l’installeur absente'));
+  if (typeof i.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(i.sha256)) fail(t('empreinte de l’installeur absente'));
+}
+
+/** Nouveautés dans la langue de l'interface, sinon en français (flux d'avant les traductions). */
+export function updateNotes(manifest: UpdateManifest, lang: Language = language()): string[] {
+  const translated = manifest.notesByLanguage?.[lang];
+  return translated?.length ? translated : manifest.notes;
 }
 
 /** Cherche la dernière version publiée et la compare à celle qui tourne. */
@@ -172,10 +183,10 @@ export async function checkForUpdate(opts: {
     response = await get(url, { redirect: 'follow', signal: opts.signal ?? AbortSignal.timeout(20_000), headers: { 'cache-control': 'no-cache' } });
   } catch (error) {
     if ((error as Error).name === 'AbortError' && opts.signal?.aborted) throw error;
-    throw new Error(`Pas de réponse du site des mises à jour : la borne est-elle connectée à Internet ? (${(error as Error).message})`);
+    throw new Error(t('Pas de réponse du site des mises à jour : la borne est-elle connectée à Internet ? ({message})', { message: (error as Error).message }));
   }
-  if (response.status === 404) throw new Error('Aucune version publiée pour l’instant sur le site des mises à jour.');
-  if (!response.ok) throw new Error(`Le site des mises à jour répond HTTP ${response.status}.`);
+  if (response.status === 404) throw new Error(t('Aucune version publiée pour l’instant sur le site des mises à jour.'));
+  if (!response.ok) throw new Error(t('Le site des mises à jour répond HTTP {status}.', { status: response.status }));
   const latest = openEnvelope(await response.text(), opts.publicKey ?? updatePublicKey());
   return { status: compareAppVersions(latest.version, opts.current) > 0 ? 'available' : 'up-to-date', current: opts.current, latest };
 }
@@ -224,10 +235,10 @@ export async function downloadUpdate(
   try {
     response = await get(manifest.installer.url, { redirect: 'follow', signal: opts.signal });
   } catch (error) {
-    if (opts.signal?.aborted) throw new Error('Téléchargement annulé.');
-    throw new Error(`Téléchargement impossible : ${(error as Error).message}`);
+    if (opts.signal?.aborted) throw new Error(t('Téléchargement annulé.'));
+    throw new Error(t('Téléchargement impossible : {message}', { message: (error as Error).message }));
   }
-  if (!response.ok || !response.body) throw new Error(`Téléchargement impossible (HTTP ${response.status}) : ${manifest.installer.url}`);
+  if (!response.ok || !response.body) throw new Error(t('Téléchargement impossible (HTTP {status}) : {url}', { status: response.status, url: manifest.installer.url }));
   const total = manifest.installer.size;
   let received = 0;
   const body = Readable.fromWeb(response.body as import('node:stream/web').ReadableStream);
@@ -239,8 +250,8 @@ export async function downloadUpdate(
     await pipeline(body, fs.createWriteStream(part), { signal: opts.signal });
   } catch (error) {
     fs.rmSync(part, { force: true });
-    if (opts.signal?.aborted) throw new Error('Téléchargement annulé.');
-    throw new Error(`Téléchargement interrompu : ${(error as Error).message}`);
+    if (opts.signal?.aborted) throw new Error(t('Téléchargement annulé.'));
+    throw new Error(t('Téléchargement interrompu : {message}', { message: (error as Error).message }));
   }
   const size = fs.statSync(part).size;
   const actual = size === total ? await sha256File(part) : undefined;
@@ -248,8 +259,8 @@ export async function downloadUpdate(
     fs.rmSync(part, { force: true });
     throw new Error(
       size !== total
-        ? `Installeur incomplet (${size} octets reçus sur ${total}) : fichier supprimé.`
-        : `Empreinte SHA-256 de l’installeur incorrecte (attendu ${manifest.installer.sha256}, obtenu ${actual}) : fichier supprimé.`,
+        ? t('Installeur incomplet ({size} octets reçus sur {total}) : fichier supprimé.', { size, total })
+        : t('Empreinte SHA-256 de l’installeur incorrecte (attendu {expected}, obtenu {actual}) : fichier supprimé.', { expected: manifest.installer.sha256, actual: String(actual) }),
     );
   }
   fs.renameSync(part, file);
@@ -308,8 +319,8 @@ export function takeUpdateOutcome(dataDir: string, current: string): UpdateOutco
   return current === pending.to ? { kind: 'installed', from: pending.from, to: pending.to } : { kind: 'failed', from: pending.from, to: pending.to, current };
 }
 
-/** 111 Mio, 2,4 Mio. */
+/** 111 Mio, 2,4 Mio (111 MiB, 2.4 MiB). */
 export function formatMebibytes(bytes: number): string {
   const value = bytes / 1024 ** 2;
-  return `${value.toLocaleString('fr-FR', { maximumFractionDigits: value < 10 ? 1 : 0 })} Mio`;
+  return t('{size} Mio', { size: formatNumber(value, { maximumFractionDigits: value < 10 ? 1 : 0 }) });
 }

@@ -16,7 +16,7 @@
   "scripts": {
     "build": "tsc -b",
     "clean": "tsc -b --clean",
-    "test": "npm run build && node scripts/audit-publication.mjs && node --test \"packages/core/dist/test/*.test.js\"",
+    "test": "npm run build && node scripts/audit-publication.mjs && node scripts/traductions.mjs && node --test \"packages/core/dist/test/*.test.js\"",
     "vpx-schema": "npm run build && node packages/installer/dist/vpx-schema-cli.js",
     "probe": "npm run build && node packages/win-displays/dist/cli.js",
     "sync": "npm run build && node app/dist/sync-cli.js",

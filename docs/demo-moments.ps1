@@ -21,6 +21,7 @@
 # Captures, son.txt et mise-en-page.txt (garde-fou layout-check : doit être vide) dans
 # tmp\captures\moments\<scénario>. Le script échoue sur un problème de mise en page ou
 # si le son relevé n'est pas celui attendu.
+# La partie et le retour au menu s'attendent par leur phase (étape until: de l'autopilote).
 #   .\docs\demo-moments.ps1 [-Scenarios navigation, silence, partie] [-Ecrans pc-dev]
 # VPX n'est jamais lancé ; ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont touchés.
 param(
@@ -68,15 +69,16 @@ $scenes = @{
       $Down, $Down, $Down, 'wait:1500', # 05 Neon Galaxy : sa musique à 60 %
       $Down, 'wait:1500',         # 07 Pharaoh's Gold : sa musique à 30 % (volume du jeu : 50 %)
       $Down, 'wait:1500',         # 09 Rocket Rally : pas de musique, le son de sa vidéo à 40 %
-      $Exit, $Up, $Up, $Up, $Up,  # 14 menu système, sur « Médias, son et attente »
-      $Start,                     # 15 l'écran des réglages
-      # Réglages désignés par leur libellé : leur rang change quand l'écran gagne une ligne.
+      # Menu système et réglages désignés par leur libellé : leur rang change quand l'écran
+      # gagne une ligne (« son et attente » : pas de virgule dans une étape, elles en sont séparées).
       # Les attentes gardent à chaque étape son numéro (captures attendues ci-dessous).
+      $Exit, 'wait:200', 'wait:200', 'wait:200', 'wait:200', # 14 menu système
+      'action:son et attente',    # 15 l'écran « Médias, son et attente »
       'action:Musique des jeux', 'wait:1000',     # 17 musique coupée (le fond du menu, caché par l'écran, est en pause)
       'wait:200', 'wait:200', 'action:Son des vidéos du menu', # 20 liste « Son des vidéos du menu », sur 40 %
       $Down, $Start, 'wait:1000', # 23 50 %
       $Exit, $Exit, 'wait:1500',  # 26 retour aux tables : la vidéo de Rocket Rally s'entend à 50 %
-      $Exit, $Up, $Up, $Up, $Up, $Start, # 32 de nouveau l'écran des réglages
+      $Exit, 'wait:200', 'wait:200', 'wait:200', 'wait:200', 'action:son et attente', # 32 de nouveau l'écran des réglages
       'action:Présentation du menu', # 33 la liste des roues et de la liste, sur Médaillons
       'action:Roue Arche', 'wait:800', # 35 Arche choisie, retour aux réglages
       $Exit, $Exit, 'wait:1500'   # 38 les tables, sur la roue Arche
@@ -128,29 +130,34 @@ $scenes = @{
   partie = @{
     Reglages = @{ music = $true; musicVolume = 60; videoVolume = 0; launchVolume = 80; game = 'animated' }
     # La fausse partie occupe l'écran du fronton (comme un .directb2s) ; elle s'arrête seule après 10 s.
+    # La partie et le retour au menu s'attendent par leur phase (until:) ; seul le chargement
+    # parie sur la durée des étapes (voir CYBERPINBALL_LOADING_MS plus bas).
     Simulee = 'backglass'
     Etapes = @(
       $Down, $Down, $Down, 'wait:1000', # 04 Neon Galaxy : sa musique
       $Start, $Start,             # 06 Jouer : vidéo de chargement, son de lancement, musique éteinte
       'wait:1500',                # 07 toujours le chargement
-      'wait:4000',                # 08 partie : silence, fronton figé (occupé), topper animé
-      'wait:11000',               # 09 retour au menu : la musique reprend
+      'until:playing',            # 08 partie : silence, fronton figé (occupé), topper animé
+      'until:menu',               # 09 retour au menu : la musique reprend
       $Up, $Start, $Start,        # 12 titre très long, sans média : écran de chargement de secours
-      'wait:6000',                # 13 partie : repli « en partie » sur les écrans libres
-      'wait:10000',               # 14 retour
+      'until:playing',            # 13 partie : repli « en partie » sur les écrans libres
+      'until:menu',               # 14 retour
       $Down, $Down, $Down, $Start, $Start, # 19 Rocket Rally : vidéo de chargement en portrait, avec son
       'wait:1500',                # 20 chargement
-      'wait:15000'                # 21 retour
+      'until:menu'                # 21 retour
     )
     Attendu = @{
-      '04-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0 }
-      '06-Digit1' = @{ musique = $null; video = 0; lancement = '(AudioLaunch) Neon Galaxy (Williams 1992).wav' }
-      '07-wait_1500' = @{ musique = $null; video = 0; couches = @{ 'playfield/playfield' = 'vidéo en lecture'; 'backglass/backglass' = 'vidéo en lecture'; 'topper/topper' = 'vidéo en lecture' } }
-      '08-wait_4000' = @{ musique = $null; video = 0; lancement = $null; couches = @{ 'playfield/playfield' = 'image figée'; 'backglass/backglass' = 'image figée'; 'topper/topper' = 'vidéo en lecture'; 'dmd/dmd' = 'image' } }
-      '09-wait_11000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0 }
-      '13-wait_6000' = @{ musique = $null; video = 0; couches = @{ 'backglass/backglass' = 'repli'; 'topper/topper' = 'image' } }
-      '19-Digit1' = @{ musique = $null; video = 0.8; lancement = $null }
-      '21-wait_15000' = @{ musique = $null; video = 0 }
+      '04-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu' }
+      '06-Digit1' = @{ musique = $null; video = 0; lancement = '(AudioLaunch) Neon Galaxy (Williams 1992).wav'; phase = 'loading' }
+      '07-wait_1500' = @{ musique = $null; video = 0; phase = 'loading'; couches = @{ 'playfield/playfield' = 'vidéo en lecture'; 'backglass/backglass' = 'vidéo en lecture'; 'topper/topper' = 'vidéo en lecture' } }
+      '08-until_playing' = @{ musique = $null; video = 0; lancement = $null; phase = 'playing'; couches = @{ 'playfield/playfield' = 'image figée'; 'backglass/backglass' = 'image figée'; 'topper/topper' = 'vidéo en lecture'; 'dmd/dmd' = 'image' } }
+      '09-until_menu' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu' }
+      '12-Digit1' = @{ phase = 'loading' }
+      '13-until_playing' = @{ musique = $null; video = 0; phase = 'playing'; couches = @{ 'backglass/backglass' = 'repli'; 'topper/topper' = 'image' } }
+      '14-until_menu' = @{ phase = 'menu' }
+      '19-Digit1' = @{ musique = $null; video = 0.8; lancement = $null; phase = 'loading' }
+      '20-wait_1500' = @{ phase = 'loading' }
+      '21-until_menu' = @{ musique = $null; video = 0; phase = 'menu' }
     }
   }
   pivotee = @{
@@ -161,19 +168,22 @@ $scenes = @{
     Etapes = @(
       $Down, $Down, $Down, 'wait:1000', # 04 Neon Galaxy, menu tourné
       $Start, $Start, 'wait:1500', # 07 chargement : vidéo tournée, bandeau des commandes
-      'wait:4000',                # 08 partie : tout figé (réglage par défaut)
-      'wait:11000',               # 09 retour
+      'until:playing',            # 08 partie : tout figé (réglage par défaut)
+      'until:menu',               # 09 retour
       $Up, $Start, $Start, 'wait:1500', # 13 chargement de secours, titre très long, tourné
-      'wait:24000',               # 14 retour, puis mode attente tourné (6 s sans bouton)
-      $Up                         # 15 un flipper : retour au menu, sélection inchangée
+      'until:menu',               # 14 retour : le délai du mode attente part du retour au menu
+      'wait:7000',                # 15 mode attente tourné (6 s sans bouton, comptées depuis 14)
+      $Up                         # 16 un flipper : retour au menu, sélection inchangée
     )
     Attendu = @{
-      '04-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0 }
-      '07-wait_1500' = @{ musique = $null; video = 0; couches = @{ 'playfield/playfield' = 'vidéo en lecture'; 'backglass/backglass' = 'vidéo en lecture'; 'backglass/dmd' = 'image' } }
-      '08-wait_4000' = @{ musique = $null; video = 0; couches = @{ 'playfield/playfield' = 'image figée'; 'backglass/backglass' = 'image figée'; 'backglass/dmd' = 'image figée'; 'topper/topper' = 'image figée' } }
-      '09-wait_11000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0 }
-      '14-wait_24000' = @{ etat = @{ attente = $true; phase = 'menu'; position = 3 } }
-      '15-ArrowUp' = @{ etat = @{ attente = $false; phase = 'menu'; position = 3 } }
+      '04-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu' }
+      '07-wait_1500' = @{ musique = $null; video = 0; phase = 'loading'; couches = @{ 'playfield/playfield' = 'vidéo en lecture'; 'backglass/backglass' = 'vidéo en lecture'; 'backglass/dmd' = 'image' } }
+      '08-until_playing' = @{ musique = $null; video = 0; phase = 'playing'; couches = @{ 'playfield/playfield' = 'image figée'; 'backglass/backglass' = 'image figée'; 'backglass/dmd' = 'image figée'; 'topper/topper' = 'image figée' } }
+      '09-until_menu' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu' }
+      '13-wait_1500' = @{ phase = 'loading' }
+      '14-until_menu' = @{ etat = @{ attente = $false; phase = 'menu'; position = 3 } }
+      '15-wait_7000' = @{ etat = @{ attente = $true; phase = 'menu'; position = 3 } }
+      '16-ArrowUp' = @{ etat = @{ attente = $false; phase = 'menu'; position = 3 } }
     }
   }
   attente = @{
@@ -239,10 +249,10 @@ foreach ($name in $Scenarios) {
   $env:CYBERPINBALL_AUTOPILOT = $scene.Etapes -join ','
   $env:CYBERPINBALL_CAPTURE = $captures
   if ($scene.Simulee) { $env:CYBERPINBALL_PARTIE_SIMULEE = $scene.Simulee } else { Remove-Item Env:CYBERPINBALL_PARTIE_SIMULEE -ErrorAction SilentlyContinue }
-  # Chargement de 6 s (2,5 s par défaut) puis 1,5 s avant la partie simulée : une étape avec
-  # ses captures prend déjà 3 s ou plus ; « toujours le chargement » (07, 20) et « partie »
-  # (08, 13) tombaient sinon d'un côté ou de l'autre selon la charge du poste.
-  if ($scene.Simulee) { $env:CYBERPINBALL_LOADING_MS = '6000' } else { Remove-Item Env:CYBERPINBALL_LOADING_MS -ErrorAction SilentlyContinue }
+  # Chargement de 16 s (2,5 s par défaut) puis 1,5 s avant la partie simulée : il couvre les deux
+  # étapes qui le vérifient (Start, puis wait:1500) et leurs captures, jusqu'à 10 s chacune sur la
+  # borne aux quatre écrans 4K. La partie et le retour au menu s'attendent par leur phase (until:).
+  if ($scene.Simulee) { $env:CYBERPINBALL_LOADING_MS = '16000' } else { Remove-Item Env:CYBERPINBALL_LOADING_MS -ErrorAction SilentlyContinue }
   if ($scene.Flippers) { $env:CYBERPINBALL_FLIPPERS = $scene.Flippers } else { Remove-Item Env:CYBERPINBALL_FLIPPERS -ErrorAction SilentlyContinue }
   "`n=== $name"
   $line = "`"$electron`" app --user-data-dir=`"$dir\chromium`" > `"$captures\sortie.txt`" 2> `"$captures\erreurs.txt`""
@@ -268,6 +278,9 @@ foreach ($name in $Scenarios) {
     if ($want.ContainsKey('video')) { $ok = $ok -and [math]::Abs($video - $want.video) -lt 0.001 }
     $menu = $got.ecrans.playfield
     $state = "attente : $(if ($menu.attente) { $menu.attente } else { 'non' }) · $($menu.phase) · table $($menu.position)"
+    # Phase du menu attendue (loading, playing, menu) : une étape tombée dans la phase voisine
+    # se voit ici, et non par une couche ou un son qui ne correspond pas.
+    if ($want.phase) { $ok = $ok -and $menu.phase -eq $want.phase; if ($menu.phase -ne $want.phase) { $state += " (phase attendue : $($want.phase))" } }
     if ($want.etat) {
       $ok = $ok -and [bool]$menu.attente -eq $want.etat.attente -and $menu.phase -eq $want.etat.phase -and $menu.position -eq $want.etat.position
     }
@@ -296,6 +309,8 @@ foreach ($name in $Scenarios) {
   }
   Get-ChildItem $captures -Recurse -Filter *.png | Measure-Object | ForEach-Object { "  $($_.Count) captures dans $captures" }
   Select-String -Path "$captures\sortie.txt", "$captures\erreurs.txt" -Pattern 'Médias :|Error' | ForEach-Object { "  ATTENTION : $($_.Line)" }
+  # Une étape until: dont la phase n'est jamais venue, une action introuvable : échec.
+  Select-String -Path "$captures\sortie.txt" -Pattern '^Autopilote : ' | ForEach-Object { $failures += "$name : $($_.Line)" }
   Select-String -Path "$captures\sortie.txt" -Pattern '^Partie :' | ForEach-Object { "  $($_.Line)" }
 }
 

@@ -1,8 +1,13 @@
+[English](CHANGELOG.en.md) · Français
+
 # Nouveautés de Cyber Pinball
 
 Une section par version, `## <version>` puis une ligne `- ` par point : `npm run publier` en tire
 les nouveautés du flux de mise à jour, affichées sur la borne avant l'installation, et de la
-release GitHub. Des phrases courtes, pour l'utilisateur de la borne.
+release GitHub. Des phrases courtes, pour l'utilisateur de la borne. Chaque section a sa
+traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié par `npm test`) ;
+le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
+son interface).
 
 ## 0.1.0
 
@@ -10,3 +15,5 @@ release GitHub. Des phrases courtes, pour l'utilisateur de la borne.
 - Ajout de tables, bibliothèque de ROM, PuP-Packs, catalogue VPS et liste d'attente.
 - Médias des jeux : import depuis PinUP Popper ou PinballX, téléchargement depuis VPinMediaDB, mode attente.
 - Mise à jour depuis le menu système : « Mise à jour de Cyber Pinball ».
+- Interface en français ou en anglais, au choix dans le menu système : « Langue / Language ».
+- S'installe à côté de PinUP Popper, PinballX ou PinballY : attend qu'un autre menu ouvert soit fermé, prévient avant de retourner un écran dans Windows.

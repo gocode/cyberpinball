@@ -1,6 +1,7 @@
 // Géométrie du playfield : où se tient le joueur, et taille réelle de l'image.
 // Le cadrage des tables par VPX en dépend (ScreenWidth, ScreenHeight, vue borne).
 
+import { t } from './i18n';
 import { edgeRotation, type Cabinet, type EdidInfo, type FlipperEdge, type ObservedDisplay, type Rotation } from './model';
 
 const CM_PER_INCH = 2.54;
@@ -9,10 +10,10 @@ const CM_PER_INCH = 2.54;
 export const FLIPPER_EDGES: readonly FlipperEdge[] = ['bottom', 'left', 'top', 'right'];
 
 export const EDGE_LABELS: Record<FlipperEdge, string> = {
-  bottom: 'en bas',
-  left: 'à gauche',
-  top: 'en haut',
-  right: 'à droite',
+  get bottom() { return t('en bas'); },
+  get left() { return t('à gauche'); },
+  get top() { return t('en haut'); },
+  get right() { return t('à droite'); },
 };
 
 /**

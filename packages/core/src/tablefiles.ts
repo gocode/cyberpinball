@@ -4,6 +4,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { t } from './i18n';
 import { findPackRoot, isJunkName } from './puppack';
 
 export type FileKind =
@@ -30,27 +31,65 @@ export type FileKind =
   | 'ignored';
 
 export const KIND_LABELS: Record<FileKind, string> = {
-  table: 'Table VPX',
+  get table() {
+    return t('Table VPX');
+  },
   backglass: 'Backglass',
   rom: 'ROM',
-  nvram: 'Sauvegarde PinMAME',
-  pinmame: 'Réglages PinMAME',
-  pup: 'Vidéos PuP',
-  serum: 'Couleurs DMD (Serum)',
-  vni: 'Couleurs DMD (VNI)',
-  altsound: 'Sons alternatifs',
-  music: 'Musique',
-  tableIni: 'Réglages de la table',
-  pov: 'Point de vue',
-  scriptOverride: 'Script de remplacement',
-  script: 'Script complémentaire',
-  info: 'Informations',
-  media: 'Médias du frontend',
-  dmdFolder: 'Contenu FlexDMD / UltraDMD',
-  user: 'Données enregistrées',
-  doc: 'Documentation',
-  other: 'Autre fichier',
-  ignored: 'Ignoré',
+  get nvram() {
+    return t('Sauvegarde PinMAME');
+  },
+  get pinmame() {
+    return t('Réglages PinMAME');
+  },
+  get pup() {
+    return t('Vidéos PuP');
+  },
+  get serum() {
+    return t('Couleurs DMD (Serum)');
+  },
+  get vni() {
+    return t('Couleurs DMD (VNI)');
+  },
+  get altsound() {
+    return t('Sons alternatifs');
+  },
+  get music() {
+    return t('Musique');
+  },
+  get tableIni() {
+    return t('Réglages de la table');
+  },
+  get pov() {
+    return t('Point de vue');
+  },
+  get scriptOverride() {
+    return t('Script de remplacement');
+  },
+  get script() {
+    return t('Script complémentaire');
+  },
+  get info() {
+    return t('Informations');
+  },
+  get media() {
+    return t('Médias du frontend');
+  },
+  get dmdFolder() {
+    return t('Contenu FlexDMD / UltraDMD');
+  },
+  get user() {
+    return t('Données enregistrées');
+  },
+  get doc() {
+    return t('Documentation');
+  },
+  get other() {
+    return t('Autre fichier');
+  },
+  get ignored() {
+    return t('Ignoré');
+  },
 };
 
 const DOC_EXT = new Set(['.txt', '.pdf', '.md', '.rtf', '.doc', '.docx', '.htm', '.html', '.url']);

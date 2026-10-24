@@ -3,7 +3,8 @@
 // - deux textes ou commandes qui se chevauchent à l'écran (le compte à rebours
 //   dessiné sur les boutons d'action, par exemple) ;
 // - un texte ou une commande qui sort de la fenêtre ;
-// - un texte coupé par un conteneur qui masque ce qui dépasse (overflow: hidden) ;
+// - un texte coupé par un conteneur qui masque ce qui dépasse (overflow: hidden),
+//   lui-même compris ;
 // - une image ou une vidéo qui ne se charge pas (protocole des médias non branché,
 //   fichier absent, format illisible) : l'aperçu montrerait une icône cassée.
 // Une superposition voulue (aide, menu par-dessus le menu des tables) n'est pas un
@@ -11,6 +12,9 @@
 // Une coupure voulue non plus : « … » posé par le texte ou par le conteneur qui le coupe
 // (text-overflow n'est pas hérité), ou nombre de lignes limité (-webkit-line-clamp) ;
 // seule la partie visible d'un texte compte alors (les lignes masquées ne chevauchent rien).
+// Un texte limité en lignes qui coupe vraiment doit avoir un interligne d'au moins 1,2 :
+// plus serré, l'accent d'une capitale de la ligne masquée dépasse sous la dernière ligne
+// gardée (Saira dépasse sa ligne de 0,24 em vers le haut).
 // Un voile décoratif (data-veil) ne doit jamais passer au-dessus d'un texte : le texte
 // resterait là, mais assombri (menu en borne, octobre 2026).
 // Enfin, les zones marquées data-stable (menu des tables) ne doivent pas bouger d'une
@@ -23,7 +27,7 @@ import * as path from 'node:path';
 import type { WebContents } from 'electron';
 
 /** Exécuté dans la page : renvoie la liste des problèmes, en clair. */
-const SCRIPT = String.raw`(() => {
+const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au rapport du développeur */ String.raw`(() => {
   const T = 2;
   const vw = innerWidth, vh = innerHeight;
   const label = (el) => {
@@ -136,25 +140,41 @@ const SCRIPT = String.raw`(() => {
   }
   boxes.forEach(({ el, r }, i) => {
     let scrolled = false;
-    // Coupure voulue : « … » sur le texte, ou sur un ancêtre qui le coupe (jusqu'à lui).
-    let intended = truncates(el);
-    for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) {
+    // Coupure voulue : « … » ou lignes limitées, par le texte lui-même ou par le premier
+    // conteneur qui le coupe. Elle n'excuse que ce conteneur : ce qui en reste visible (les
+    // lignes gardées) ne doit être rogné par aucun autre. Un titre limité à deux lignes dans
+    // une zone haute d'une seule perdait sa première ligne sans être signalé (octobre 2026).
+    let kept = { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    let excuse = truncates(el);
+    for (let e = el; e && e !== document.body; e = e.parentElement) {
       const s = getComputedStyle(e);
       const clip = [s.overflowX, s.overflowY];
       if (clip.some((o) => o === 'auto' || o === 'scroll')) { scrolled = true; break; }
-      if (clip.some((o) => o === 'hidden' || o === 'clip')) {
-        intended = intended || truncates(e);
-        const c = e.getBoundingClientRect();
-        if (!intended && (r.left < c.left - T || r.right > c.right + T || r.top < c.top - T || r.bottom > c.bottom + T)) {
-          problems.add('coupé : ' + label(el) + ' par ' + label(e).slice(0, 60));
-          break;
-        }
+      if (!clip.some((o) => o === 'hidden' || o === 'clip')) continue;
+      const c = e.getBoundingClientRect();
+      if (excuse || truncates(e)) {
+        kept = { left: Math.max(kept.left, c.left), right: Math.min(kept.right, c.right), top: Math.max(kept.top, c.top), bottom: Math.min(kept.bottom, c.bottom) };
+        excuse = false;
+        if (kept.right - kept.left <= T || kept.bottom - kept.top <= T) break; // ligne masquée par la coupure voulue
+        continue;
+      }
+      if (kept.left < c.left - T || kept.right > c.right + T || kept.top < c.top - T || kept.bottom > c.bottom + T) {
+        problems.add('coupé : ' + label(el) + ' par ' + label(e).slice(0, 60));
+        break;
       }
     }
     // Hors de la fenêtre : la partie visible seulement (un texte coupé avec « … » reste dedans).
     const v = seen[i];
     if (!scrolled && v.right - v.left > T && v.bottom - v.top > T && (v.left < -T || v.top < -T || v.right > vw + T || v.bottom > vh + T)) problems.add('hors de la fenêtre : ' + label(el));
   });
+  // Lignes limitées avec un interligne trop serré : l'encre de la ligne masquée dépasse.
+  for (const el of document.querySelectorAll('*')) {
+    const s = getComputedStyle(el);
+    if (!s.webkitLineClamp || s.webkitLineClamp === 'none' || !shown(el)) continue;
+    if (el.scrollHeight <= el.clientHeight + 1) continue;
+    const ratio = parseFloat(s.lineHeight) / parseFloat(s.fontSize);
+    if (ratio < 1.19) problems.add('interligne trop serré (' + ratio.toFixed(2) + ') pour des lignes limitées : ' + label(el));
+  }
   // Voile décoratif (data-veil) dessiné au-dessus d'un texte : le texte est là mais
   // assombri. Le voile, sans pointeur, est rendu « touchable » le temps de la mesure.
   const veils = [...document.querySelectorAll('[data-veil]')];
@@ -197,7 +217,7 @@ function moved(before: Stable | undefined, now: Stable): string[] {
   const out: string[] = [];
   for (const [name, box] of Object.entries(now.zones)) {
     const old = before.zones[name];
-    if (old && old.some((v, i) => Math.abs(v - box[i]!) > 0.5)) out.push(`zone déplacée : ${name} [${old.join(', ')}] → [${box.join(', ')}]`);
+    if (old && old.some((v, i) => Math.abs(v - box[i]!) > 0.5)) out.push(`zone déplacée : ${name} [${old.join(', ')}] → [${box.join(', ')}]`); // i18n-ignore : rapport de mise en page, pour le développeur
   }
   return out;
 }
@@ -239,7 +259,7 @@ export class LayoutReport {
   save(): void {
     if (!this.captureDir) return;
     fs.mkdirSync(this.captureDir, { recursive: true });
-    const text = this.lines.length ? this.lines.join('\n') : 'Aucun problème de mise en page.';
+    const text = this.lines.length ? this.lines.join('\n') : 'Aucun problème de mise en page.'; // i18n-ignore : rapport de mise en page, pour le développeur
     fs.writeFileSync(path.join(this.captureDir, 'mise-en-page.txt'), `${text}\n`, 'utf8');
     console.log(`Mise en page : ${this.lines.length} problème${this.lines.length > 1 ? 's' : ''}.`);
   }

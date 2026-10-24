@@ -1,5 +1,9 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 
+// Langue de l'interface et son catalogue (language.ts), lus par renderer/i18n.js ; en français
+// quand le processus principal ne les fournit pas (démonstrations qui chargent la page seule).
+contextBridge.exposeInMainWorld('cyberI18n', ipcRenderer.sendSync('i18n') ?? { language: 'fr', locale: 'fr-FR', messages: {} });
+
 // Chaque fenêtre d'écran reçoit son propre état ; les touches sont captées côté
 // processus principal (before-input-event). Le rendu n'envoie que les clics de
 // souris et les fichiers glissés sur la fenêtre.

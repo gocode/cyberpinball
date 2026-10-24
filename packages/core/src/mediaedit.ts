@@ -16,6 +16,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { FileOp } from './fileops';
 import { isInside, samePath } from './fileops';
+import { t } from './i18n';
 import { type Cabinet } from './model';
 import {
   dmdMediaType,
@@ -54,20 +55,48 @@ export const MEDIA_VOLUME_STEPS: readonly number[] = [0, 25, 50, 75, 100, 125, 1
  * sans savoir sur quel écran ni quand.
  */
 const WHERE: Record<MediaType, string> = {
-  Wheel: 'Écran du plateau, dans la liste des tables, et en mode attente',
-  Playfield: 'Écran du plateau, en fond derrière la liste des tables, et en mode attente',
-  Backglass: 'Écran du fronton, tant que la table est choisie, au chargement, en mode attente, et en partie si VPX laisse l’écran libre',
-  DMD: 'Écran de l’afficheur s’il est étroit (4:1), tant que la table est choisie, au chargement, en mode attente, et en partie si VPX laisse l’écran libre',
-  FullDMD: 'Écran de l’afficheur s’il est large (16:9), tant que la table est choisie, au chargement, en mode attente, et en partie si VPX laisse l’écran libre',
-  Topper: 'Écran du topper, au-dessus du fronton, tant que la table est choisie, au chargement, en mode attente, et en partie si VPX laisse l’écran libre',
-  Loading: 'Écran du plateau, pendant que VPX charge la table, sous les commandes de la partie',
-  Audio: 'Haut-parleurs, tant que la table est choisie dans la liste (si « Musique des jeux » est activée) et en mode attente (si son son est réduit)',
-  AudioLaunch: 'Haut-parleurs, une fois, au lancement de la partie',
-  GameInfo: 'Écran du plateau, depuis la fiche de la table, page par page',
-  GameHelp: 'Écran du plateau, depuis la fiche de la table, page par page',
-  Other: 'Nulle part : Cyber Pinball n’a pas d’écran « autre »',
-  RealDMD: 'Nulle part : Cyber Pinball ne pilote pas de DMD physique',
-  RealColorDMD: 'Nulle part : Cyber Pinball ne pilote pas de DMD physique',
+  get Wheel() {
+    return t('Écran du plateau, dans la liste des tables, et en mode attente');
+  },
+  get Playfield() {
+    return t('Écran du plateau, en fond derrière la liste des tables, et en mode attente');
+  },
+  get Backglass() {
+    return t('Écran du fronton, tant que la table est choisie, au chargement, en mode attente, et en partie si VPX laisse l’écran libre');
+  },
+  get DMD() {
+    return t('Écran de l’afficheur s’il est étroit (4:1), tant que la table est choisie, au chargement, en mode attente, et en partie si VPX laisse l’écran libre');
+  },
+  get FullDMD() {
+    return t('Écran de l’afficheur s’il est large (16:9), tant que la table est choisie, au chargement, en mode attente, et en partie si VPX laisse l’écran libre');
+  },
+  get Topper() {
+    return t('Écran du topper, au-dessus du fronton, tant que la table est choisie, au chargement, en mode attente, et en partie si VPX laisse l’écran libre');
+  },
+  get Loading() {
+    return t('Écran du plateau, pendant que VPX charge la table, sous les commandes de la partie');
+  },
+  get Audio() {
+    return t('Haut-parleurs, tant que la table est choisie dans la liste (si « Musique des jeux » est activée) et en mode attente (si son son est réduit)');
+  },
+  get AudioLaunch() {
+    return t('Haut-parleurs, une fois, au lancement de la partie');
+  },
+  get GameInfo() {
+    return t('Écran du plateau, depuis la fiche de la table, page par page');
+  },
+  get GameHelp() {
+    return t('Écran du plateau, depuis la fiche de la table, page par page');
+  },
+  get Other() {
+    return t('Nulle part : Cyber Pinball n’a pas d’écran « autre »');
+  },
+  get RealDMD() {
+    return t('Nulle part : Cyber Pinball ne pilote pas de DMD physique');
+  },
+  get RealColorDMD() {
+    return t('Nulle part : Cyber Pinball ne pilote pas de DMD physique');
+  },
 };
 
 export interface MediaPlacement {
@@ -79,11 +108,12 @@ export interface MediaPlacement {
   note?: string;
 }
 
-const ROLE_SCREEN: Record<string, string> = {
-  backglass: 'fronton',
-  dmd: 'afficheur',
-  topper: 'topper',
-};
+/** Ce type n'a pas d'écran sur cette borne. */
+function noScreenNote(target: string): string {
+  if (target === 'backglass') return t('Cette borne n’a pas d’écran fronton : ce média n’est montré nulle part.');
+  if (target === 'dmd') return t('Cette borne n’a pas d’écran afficheur : ce média n’est montré nulle part.');
+  return t('Cette borne n’a pas d’écran topper : ce média n’est montré nulle part.');
+}
 
 /** Où s'affiche ce type de média, et s'il apparaît sur la borne décrite par `cabinet`. */
 export function mediaPlacement(type: MediaType, cabinet?: Cabinet): MediaPlacement {
@@ -92,7 +122,7 @@ export function mediaPlacement(type: MediaType, cabinet?: Cabinet): MediaPlaceme
   if (!info.target) return { where, shown: false };
   if (!cabinet || info.target === 'playfield' || info.target === 'audio') return { where, shown: true };
   if (!cabinet.roles[info.target]) {
-    return { where, shown: false, note: `Cette borne n’a pas d’écran ${ROLE_SCREEN[info.target]} : ce média n’est montré nulle part.` };
+    return { where, shown: false, note: noScreenNote(info.target) };
   }
   if (type === 'DMD' || type === 'FullDMD') {
     const used = dmdMediaType(cabinet);
@@ -102,8 +132,8 @@ export function mediaPlacement(type: MediaType, cabinet?: Cabinet): MediaPlaceme
         shown: false,
         note:
           used === 'DMD'
-            ? 'L’afficheur de cette borne est étroit (4:1) : il montre l’Afficheur ; celui-ci ne sert que si l’Afficheur manque.'
-            : 'L’afficheur de cette borne est large (16:9) : il montre l’Afficheur large ; celui-ci ne sert que si l’Afficheur large manque.',
+            ? t('L’afficheur de cette borne est étroit (4:1) : il montre l’Afficheur ; celui-ci ne sert que si l’Afficheur manque.')
+            : t('L’afficheur de cette borne est large (16:9) : il montre l’Afficheur large ; celui-ci ne sert que si l’Afficheur large manque.'),
       };
     }
   }
@@ -266,7 +296,7 @@ export function planMediaChanges(table: TableEntry, draft: MediaDraft, context: 
     const now = current(type);
     if (sameEntries(wanted, now.map((file) => ({ file })))) continue;
     const info = mediaTypeInfo(type);
-    if (!info.pages && wanted.length > 1) problems.push(`${info.label} : une seule image ou vidéo possible.`);
+    if (!info.pages && wanted.length > 1) problems.push(t('{label} : une seule image ou vidéo possible.', { label: info.label }));
     const kept = wanted.filter((e): e is { file: string } => 'file' in e).map((e) => e.file);
 
     // 1. Ce qui n'est pas gardé : la page d'aujourd'hui et ses concurrents.
@@ -274,7 +304,7 @@ export function planMediaChanges(table: TableEntry, draft: MediaDraft, context: 
     for (const file of leaving) {
       if (kept.some((k) => samePath(k, file))) continue;
       trash.push({ op: 'trash', path: file });
-      steps.push({ kind: 'trash', type, text: `${path.basename(file)} → corbeille`, detail: now.some((n) => samePath(n, file)) ? 'montré aujourd’hui' : 'même type, au nom de ce jeu' });
+      steps.push({ kind: 'trash', type, text: t('{name} → corbeille', { name: path.basename(file) }), detail: now.some((n) => samePath(n, file)) ? t('montré aujourd’hui') : t('même type, au nom de ce jeu') });
     }
 
     // 2 et 3. Pages dans l'ordre voulu, sous le nom « (Type) <dossier>[ N].ext ».
@@ -285,31 +315,32 @@ export function planMediaChanges(table: TableEntry, draft: MediaDraft, context: 
       const target = path.join(dir, mediaFileName(table, type, extOf(source), page));
       placed.get(type)!.push({ entry, target });
       if (!isAcceptedFormat(type, source)) {
-        problems.push(`${path.basename(source)} : format .${extOf(source)} non lu pour ${info.label} (${info.formats.join(', ')}).`);
+        problems.push(t('{name} : format .{ext} non lu pour {label} ({formats}).', { name: path.basename(source), ext: extOf(source), label: info.label, formats: info.formats.join(', ') }));
         return;
       }
       if ('file' in entry) {
         if (path.basename(entry.file) === path.basename(target) && samePath(entry.file, target)) return;
-        if (!fs.existsSync(entry.file)) problems.push(`${path.basename(entry.file)} a disparu de medias\\.`);
-        const t = tempName(dir, temp++, entry.file);
-        toTemp.push({ op: 'move', from: entry.file, to: t });
-        fromTemp.push({ op: 'move', from: t, to: target });
+        if (!fs.existsSync(entry.file)) problems.push(t('{name} a disparu de medias\\.', { name: path.basename(entry.file) }));
+        const tmp = tempName(dir, temp++, entry.file);
+        toTemp.push({ op: 'move', from: entry.file, to: tmp });
+        fromTemp.push({ op: 'move', from: tmp, to: target });
         const was = now.findIndex((n) => samePath(n, entry.file));
         steps.push({
           kind: 'rename',
           type,
           text: `${path.basename(entry.file)} → ${path.basename(target)}`,
-          detail: info.pages && was >= 0 && was !== i ? `la page ${was + 1} devient la page ${page}` : 'renommé au nom du dossier',
+          detail: info.pages && was >= 0 && was !== i ? t('la page {from} devient la page {to}', { from: was + 1, to: page }) : t('renommé au nom du dossier'),
         });
         return;
       }
-      if (!fs.existsSync(entry.from)) problems.push(`${path.basename(entry.from)} a disparu (${path.dirname(entry.from)}).`);
+      if (!fs.existsSync(entry.from)) problems.push(t('{name} a disparu ({dir}).', { name: path.basename(entry.from), dir: path.dirname(entry.from) }));
       incoming.push({ op: entry.mode, from: entry.from, to: target });
+      const how = entry.origin ? t('téléchargé depuis {origin}', { origin: entry.origin.origin }) : entry.mode === 'move' ? t('déplacé depuis le dossier d’import') : t('copié, l’original reste en place');
       steps.push({
         kind: 'add',
         type,
         text: `${entry.origin ? [entry.origin.origin, entry.origin.vpsId, entry.origin.key].filter(Boolean).join(' ') : path.basename(entry.from)} → ${path.basename(target)}`,
-        detail: `${info.pages ? `page ${page}, ` : ''}${entry.origin ? `téléchargé depuis ${entry.origin.origin}` : entry.mode === 'move' ? 'déplacé depuis le dossier d’import' : 'copié, l’original reste en place'}`,
+        detail: info.pages ? t('page {page}, {how}', { page, how }) : how,
       });
     });
   }
@@ -328,7 +359,7 @@ export function planMediaChanges(table: TableEntry, draft: MediaDraft, context: 
     const first = pages[0];
     if (pages.length === 1 && first && 'from' in first.entry && first.entry.origin) {
       sources[type] = { ...first.entry.origin, date: (context.now ?? new Date()).toISOString(), file: path.basename(first.target) };
-      infoSteps.push({ kind: 'info', type, text: `Provenance notée : ${first.entry.origin.origin}`, detail: first.entry.origin.url });
+      infoSteps.push({ kind: 'info', type, text: t('Provenance notée : {origin}', { origin: first.entry.origin.origin }), detail: first.entry.origin.url });
       // Fichier téléchargé : au standard (paysage, flippers à droite), le demi-tour de l'ancien ne vaut plus.
       if (mediaTypeInfo(type).orientable && draft.halfTurn[type] === undefined) delete turns[type];
       continue;
@@ -343,10 +374,14 @@ export function planMediaChanges(table: TableEntry, draft: MediaDraft, context: 
   else delete after.halfTurn;
   for (const [type, on] of Object.entries(draft.halfTurn) as [MediaType, boolean][]) {
     if ((before.halfTurn?.[type] === true) === on) continue;
-    infoSteps.push({ kind: 'info', type, text: `Demi-tour ${on ? 'ajouté' : 'retiré'}`, detail: on ? 'le menu tourne ce média d’un demi-tour de plus' : 'le menu tourne ce média d’après ses proportions seulement' });
+    infoSteps.push({ kind: 'info', type, text: on ? t('Demi-tour ajouté') : t('Demi-tour retiré'), detail: on ? t('le menu tourne ce média d’un demi-tour de plus') : t('le menu tourne ce média d’après ses proportions seulement') });
   }
   if (draft.volume !== undefined && (before.volume ?? 100) !== draft.volume) {
-    infoSteps.push({ kind: 'info', text: `Volume de ce jeu : ${before.volume ?? 100} % → ${draft.volume} %`, detail: draft.volume === 100 ? 'comme les autres jeux' : 'vidéos et musique de ce jeu dans le menu, par rapport au réglage général' });
+    infoSteps.push({
+      kind: 'info',
+      text: t('Volume de ce jeu : {before} % → {after} %', { before: before.volume ?? 100, after: draft.volume }),
+      detail: draft.volume === 100 ? t('comme les autres jeux') : t('vidéos et musique de ce jeu dans le menu, par rapport au réglage général'),
+    });
   }
   const ops = [...trash, ...toTemp, ...fromTemp, ...incoming];
   let infoFile: string | undefined;
@@ -387,30 +422,52 @@ export function draftChangeCount(draft: MediaDraft, current: (type: MediaType) =
 // ---------------------------------------------------------------------------
 // État d'un type, pour l'écran
 
+/** Première lettre en minuscule, pour un libellé repris dans une phrase (« Afficheur large » → « afficheur large ») ; un sigle (« DMD ») reste tel quel. */
+export function lowerFirst(text: string): string {
+  return /^\p{Lu}\p{Lu}/u.test(text) ? text : text.charAt(0).toLocaleLowerCase() + text.slice(1);
+}
+
+/**
+ * Le repli montré à la place du fichier du jeu, sans « Repli : », à reprendre dans une
+ * phrase (« ensuite : image du .directb2s ») ; undefined si le jeu a son fichier, ou
+ * pour le repli intégré (fallbackLabel du type).
+ */
+export function mediaFallbackName(resolved: ResolvedMedia): string | undefined {
+  const partner = resolved.foundType && resolved.foundType !== resolved.type ? mediaTypeInfo(resolved.foundType) : undefined;
+  switch (resolved.source) {
+    case 'vpx-name':
+    case 'folder-name':
+    case 'vpinfe':
+      return partner?.label;
+    case 'b2s':
+      return resolved.type === 'Backglass' ? t('image du .directb2s') : t('afficheur du .directb2s');
+    case 'default':
+      return partner ? t('défaut de la borne ({label})', { label: partner.label }) : t('défaut de la borne');
+    case 'fallback':
+      return undefined;
+  }
+}
+
 /** « Présent », ou le repli utilisé et lequel, en clair. */
 export function mediaStateLabel(resolved: ResolvedMedia, root?: string): { label: string; detail: string; present: boolean } {
   const info = mediaTypeInfo(resolved.type);
-  const partner = resolved.foundType && resolved.foundType !== resolved.type ? mediaTypeInfo(resolved.foundType) : undefined;
+  const what = mediaFallbackName(resolved);
   const name = resolved.file ? path.basename(resolved.file) : '';
   switch (resolved.source) {
     case 'vpx-name':
     case 'folder-name':
     case 'vpinfe':
-      if (partner) return { label: `Repli : ${partner.label}`, detail: `${name}, adapté à cet écran`, present: false };
+      if (what) return { label: t('Repli : {what}', { what }), detail: t('{name}, adapté à cet écran', { name }), present: false };
       return {
-        label: 'Présent',
-        detail: resolved.source === 'vpinfe' ? `${name} (nom de VPinFE)` : resolved.source === 'vpx-name' ? `${name} (nom de ce .vpx)` : name,
+        label: t('Présent'),
+        detail: resolved.source === 'vpinfe' ? t('{name} (nom de VPinFE)', { name }) : resolved.source === 'vpx-name' ? t('{name} (nom de ce .vpx)', { name }) : name,
         present: true,
       };
     case 'b2s':
-      return { label: resolved.type === 'Backglass' ? 'Repli : image du .directb2s' : 'Repli : afficheur du .directb2s', detail: 'Image tirée du fichier du backglass de la table', present: false };
+      return { label: t('Repli : {what}', { what: what! }), detail: t('Image tirée du fichier du backglass de la table'), present: false };
     case 'default':
-      return {
-        label: `Repli : défaut de la borne${partner ? ` (${partner.label})` : ''}`,
-        detail: root ? path.relative(root, resolved.file!) : name,
-        present: false,
-      };
+      return { label: t('Repli : {what}', { what: what! }), detail: root ? path.relative(root, resolved.file!) : name, present: false };
     case 'fallback':
-      return { label: info.fallback === 'none' ? 'Absent' : 'Repli intégré', detail: info.fallbackLabel, present: false };
+      return { label: info.fallback === 'none' ? t('Absent') : t('Repli intégré'), detail: info.fallbackLabel, present: false };
   }
 }

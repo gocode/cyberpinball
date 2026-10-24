@@ -11,7 +11,7 @@
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { scriptFacts, type ScriptFacts } from '@cyberpinball/core';
+import { scriptFacts, t, type ScriptFacts } from '@cyberpinball/core';
 
 export type ScriptResult = ScriptFacts | { error: string };
 
@@ -52,7 +52,7 @@ export async function readScript(exe: string, table: string, dataDir: string): P
     }
     await run(exe, ['-Ini', path.join(work, 'VPinballX.ini'), '-ExtractVBS', copy]);
     const vbs = path.join(work, 'table.vbs');
-    if (!fs.existsSync(vbs)) return { error: 'VPX n’a pas extrait le script de la table.' };
+    if (!fs.existsSync(vbs)) return { error: t('VPX n’a pas extrait le script de la table.') };
     const facts = scriptFacts(fs.readFileSync(vbs, 'latin1'));
     cache[key] = { size: stat.size, mtimeMs: stat.mtimeMs, facts, v: FACTS_VERSION };
     saveCache(cacheFile, cache);
@@ -69,7 +69,7 @@ function run(exe: string, args: string[]): Promise<void> {
     const child = spawn(exe, args, { cwd: path.dirname(exe), windowsHide: true, stdio: 'ignore' });
     const timer = setTimeout(() => {
       child.kill();
-      reject(new Error(`VPX ne s’est pas terminé après ${TIMEOUT_MS / 1000} s.`));
+      reject(new Error(t('VPX ne s’est pas terminé après {n} s.', { n: TIMEOUT_MS / 1000 })));
     }, TIMEOUT_MS);
     child.on('error', (error) => {
       clearTimeout(timer);
@@ -78,7 +78,7 @@ function run(exe: string, args: string[]): Promise<void> {
     child.on('exit', (code) => {
       clearTimeout(timer);
       if (code === 0) resolve();
-      else reject(new Error(`VPX s’est terminé avec le code ${code}.`));
+      else reject(new Error(t('VPX s’est terminé avec le code {code}.', { code: String(code) })));
     });
   });
 }

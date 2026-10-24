@@ -100,14 +100,14 @@ async function loadOrExtract(file: string, cacheDir: string): Promise<B2sImages>
   let stat: fs.Stats;
   try {
     stat = await fs.promises.stat(file);
-    if (!stat.isFile()) return { problems: [`${file} n'est pas un fichier.`] };
+    if (!stat.isFile()) return { problems: [`${file} n'est pas un fichier.`] }; // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
   } catch (err) {
-    return { problems: [`${file} est illisible : ${(err as Error).message}`] };
+    return { problems: [`${file} est illisible : ${(err as Error).message}`] }; // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
   }
   const tableDir = sourceKey(path.dirname(file));
   const cache = sourceKey(cacheDir);
   if (cache === tableDir || cache.startsWith(tableDir + path.sep)) {
-    return { problems: [`Le cache ${cacheDir} est dans le dossier de la table : rien n'est écrit à côté d'une table.`] };
+    return { problems: [`Le cache ${cacheDir} est dans le dossier de la table : rien n'est écrit à côté d'une table.`] }; // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
   }
 
   const base = hash(sourceKey(file), 16);
@@ -140,9 +140,9 @@ async function loadOrExtract(file: string, cacheDir: string): Promise<B2sImages>
       const image = await extract(file, dmd, path.join(cacheDir, `${stamp}.dmd`), problems);
       if (image) result.dmd = image;
     }
-    if (!result.backglass && !backglass.length && !problems.length) problems.push(`${path.basename(file)} ne contient aucune image de fronton.`);
+    if (!result.backglass && !backglass.length && !problems.length) problems.push(`${path.basename(file)} ne contient aucune image de fronton.`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
   } catch (err) {
-    problems.push(`Extraction impossible depuis ${path.basename(file)} : ${(err as Error).message}`);
+    problems.push(`Extraction impossible depuis ${path.basename(file)} : ${(err as Error).message}`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
   }
   if (problems.length) result.problems = problems;
 
@@ -269,7 +269,7 @@ export async function scanB2s(file: string): Promise<{ values: Map<B2sElement, V
       if (first) {
         first = false;
         if ((chunk[0] === 0xff && chunk[1] === 0xfe) || (chunk[0] === 0xfe && chunk[1] === 0xff)) {
-          problems.push(`${path.basename(file)} est en UTF-16, encodage non pris en charge.`);
+          problems.push(`${path.basename(file)} est en UTF-16, encodage non pris en charge.`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
           done = true;
           break;
         }
@@ -352,12 +352,12 @@ export async function scanB2s(file: string): Promise<{ values: Map<B2sElement, V
       offset += chunk.length;
     }
   } catch (err) {
-    problems.push(`Lecture de ${path.basename(file)} interrompue : ${(err as Error).message}`);
+    problems.push(`Lecture de ${path.basename(file)} interrompue : ${(err as Error).message}`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
   } finally {
     stream.destroy();
   }
   if (state === 'value' && element && attr === 'Value' && !values.has(element)) {
-    problems.push(`${element} est tronqué dans ${path.basename(file)} (fin de fichier dans la valeur).`);
+    problems.push(`${element} est tronqué dans ${path.basename(file)} (fin de fichier dans la valeur).`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
   }
   return { values, bulbs: await readBulbs(file, bulbRanges), problems };
 }
@@ -439,7 +439,7 @@ const EXTENSION: Record<B2sImageFormat, string> = { png: 'png', jpeg: 'jpg', gif
 async function extract(file: string, range: ValueRange, target: string, problems: string[]): Promise<B2sImage | undefined> {
   const label = `${range.element} de ${path.basename(file)}`;
   if (range.end <= range.start) {
-    problems.push(`${label} est vide.`);
+    problems.push(`${label} est vide.`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
     return undefined;
   }
   const temp = `${target}${TEMP_MARK}${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
@@ -455,7 +455,7 @@ async function extract(file: string, range: ValueRange, target: string, problems
     });
     ok = true;
   } catch (err) {
-    problems.push(`${label} est illisible : ${(err as Error).message}`);
+    problems.push(`${label} est illisible : ${(err as Error).message}`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
   } finally {
     await out.close();
   }
@@ -463,12 +463,12 @@ async function extract(file: string, range: ValueRange, target: string, problems
     if (!ok) return undefined;
     const format = detectFormat(head);
     if (!format) {
-      problems.push(`${label} n'est ni PNG, ni JPEG, ni GIF, ni BMP, ni WebP.`);
+      problems.push(`${label} n'est ni PNG, ni JPEG, ni GIF, ni BMP, ni WebP.`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
       return undefined;
     }
     const size = await imageSize(temp, format);
     if (!size) {
-      problems.push(`${label} est une image ${format} dont les dimensions sont illisibles (fichier abîmé ?).`);
+      problems.push(`${label} est une image ${format} dont les dimensions sont illisibles (fichier abîmé ?).`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
       return undefined;
     }
     const final = `${target}.${EXTENSION[format]}`;
@@ -492,7 +492,7 @@ async function decodeBase64(file: string, range: ByteRange, sink: (data: Buffer)
   const stream = fs.createReadStream(file, { start: range.start, end: range.end - 1, highWaterMark: CHUNK });
   for await (const chunk of stream as AsyncIterable<Buffer>) {
     // Un « < » dans la valeur : le guillemet fermant manque, la suite est du XML.
-    if (chunk.indexOf(LT) >= 0) throw new Error('valeur mal fermée');
+    if (chunk.indexOf(LT) >= 0) throw new Error('valeur mal fermée'); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
     let text = carry + chunk.toString('latin1');
     carry = '';
     const amp = text.lastIndexOf('&');
@@ -660,7 +660,7 @@ export async function b2sLitImages(file: string, cacheDir: string): Promise<B2sL
   try {
     stat = await fs.promises.stat(file);
   } catch (err) {
-    return { problems: [`${file} est illisible : ${(err as Error).message}`] };
+    return { problems: [`${file} est illisible : ${(err as Error).message}`] }; // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
   }
   const base = hash(sourceKey(file), 16);
   const manifestFile = path.join(cacheDir, base + LIT_SUFFIX);
@@ -694,7 +694,7 @@ export async function b2sLitImages(file: string, cacheDir: string): Promise<B2sL
       if (!ground || !mine.length) continue;
       const canvas = ground.format === 'png' ? decodePng(await fs.promises.readFile(ground.file)) : undefined;
       if (!canvas) {
-        problems.push(`${ground.element} de ${path.basename(file)} n'est pas un PNG lisible : ampoules non composées.`);
+        problems.push(`${ground.element} de ${path.basename(file)} n'est pas un PNG lisible : ampoules non composées.`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
         continue;
       }
       let posed = 0;
@@ -707,12 +707,12 @@ export async function b2sLitImages(file: string, cacheDir: string): Promise<B2sL
             parts.push(data);
           });
         } catch (err) {
-          problems.push(`Ampoule « ${bulb.name} » de ${path.basename(file)} illisible : ${(err as Error).message}`);
+          problems.push(`Ampoule « ${bulb.name} » de ${path.basename(file)} illisible : ${(err as Error).message}`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
           continue;
         }
         let layer = decodePng(Buffer.concat(parts));
         if (!layer) {
-          problems.push(`Ampoule « ${bulb.name} » de ${path.basename(file)} : image qui n'est pas un PNG lisible.`);
+          problems.push(`Ampoule « ${bulb.name} » de ${path.basename(file)} : image qui n'est pas un PNG lisible.`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
           continue;
         }
         if (bulb.width > 0 && bulb.height > 0) layer = resizeRgba(layer, bulb.width, bulb.height);
@@ -728,7 +728,7 @@ export async function b2sLitImages(file: string, cacheDir: string): Promise<B2sL
       result[kind] = { file: target, width: canvas.width, height: canvas.height, bytes: png.length, base: ground.element, bulbs: posed };
     }
   } catch (err) {
-    problems.push(`Composition impossible depuis ${path.basename(file)} : ${(err as Error).message}`);
+    problems.push(`Composition impossible depuis ${path.basename(file)} : ${(err as Error).message}`); // i18n-ignore : diagnostic gardé dans le cache, jamais affiché
   }
   if (problems.length) result.problems = problems;
   try {

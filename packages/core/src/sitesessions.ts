@@ -6,6 +6,7 @@
 // jusqu'à quand.
 
 import type { LinkHostId } from './acquisition';
+import { t, tn } from './i18n';
 
 /** Cookie tel que la session d'Electron le donne (cookies.get). */
 export interface SiteCookie {
@@ -81,72 +82,108 @@ export function siteState(site: SourceSite, cookies: SiteCookie[], now = new Dat
 // tout cela revient à l'utilisateur, dans la fenêtre visible. Parcours relevés le
 // 22 octobre 2026 (docs/recherche/acquisition.md, § 14).
 
+/**
+ * Pourquoi montrer la page : un code, que probeReasonText dit dans la langue de
+ * l'interface (la sonde tourne dans la page du site, sans le catalogue).
+ */
+export type ProbeReason = 'challenge' | 'down' | 'captcha' | 'forbidden' | 'choice' | 'delay' | 'elsewhere' | 'terms' | 'no-button' | 'proxy' | 'quota' | 'unreadable';
+
 /** Ce que la sonde a vu dans la page. */
 export type ProbeResult =
   /** Suivre ce lien, que le site donne au membre. */
   | { kind: 'follow'; href: string }
-  /** Montrer la page à l'utilisateur, et pourquoi. */
-  | { kind: 'show'; reason: string }
+  /** Montrer la page à l'utilisateur, et pourquoi (count : fichiers au choix). */
+  | { kind: 'show'; reason: ProbeReason; count?: number }
   /** La page dit que l'utilisateur n'est pas connecté. */
   | { kind: 'login' };
+
+/** Raison de montrer la page, en clair, sans majuscule ni point final. */
+export function probeReasonText(probe: { reason: ProbeReason; count?: number }): string {
+  switch (probe.reason) {
+    case 'challenge':
+      return t('le site fait une vérification (Cloudflare) : à faire vous-même');
+    case 'down':
+      return t('le site ne répond pas pour l’instant');
+    case 'captcha':
+      return t('le site demande un CAPTCHA : à faire vous-même');
+    case 'forbidden':
+      return t('votre compte n’a pas le droit de télécharger ce fichier');
+    case 'choice':
+      return tn(probe.count ?? 2, '{n} fichier au choix : choisissez celui qu’il faut', '{n} fichiers au choix : choisissez celui qu’il faut');
+    case 'delay':
+      return t('le site impose un délai avant le téléchargement');
+    case 'elsewhere':
+      return t('le fichier est sur un autre site');
+    case 'terms':
+      return t('des conditions sont à accepter : à faire vous-même');
+    case 'no-button':
+      return t('pas de bouton de téléchargement reconnu sur la page');
+    case 'proxy':
+      return t('le site refuse les connexions par proxy ou VPN');
+    case 'quota':
+      return t('plafond de téléchargements du compte atteint');
+    case 'unreadable':
+      return t('page illisible');
+  }
+}
 
 /** Partie commune : vérification de Cloudflare, site en panne, lien hors du site. */
 const COMMON = String.raw`
   const text = (document.body && document.body.innerText) || '';
   if (document.querySelector('#challenge-form, #cf-challenge-running, .cf-turnstile, iframe[src*="challenges.cloudflare.com"]') || /^Just a moment/i.test(document.title))
-    return { kind: 'show', reason: 'le site fait une vérification (Cloudflare) : à faire vous-même' };
-  if (/\b52[0-9]\b/.test(document.title) && /cloudflare/i.test(text)) return { kind: 'show', reason: 'le site ne répond pas pour l’instant' };
+    return { kind: 'show', reason: 'challenge' };
+  if (/\b52[0-9]\b/.test(document.title) && /cloudflare/i.test(text)) return { kind: 'show', reason: 'down' };
   if (/captcha/i.test(document.body ? document.body.innerHTML.slice(0, 200000) : '') && document.querySelector('iframe[src*="captcha"], .g-recaptcha, .h-captcha'))
-    return { kind: 'show', reason: 'le site demande un CAPTCHA : à faire vous-même' };
+    return { kind: 'show', reason: 'captcha' };
   const same = (a) => { try { return new URL(a.href, location.href).hostname.replace(/^www\./, '') === location.hostname.replace(/^www\./, ''); } catch (e) { return false; } };
 `;
 
 /** Invision Community (vpuniverse.com, pinsound-community.org). */
-const INVISION = String.raw`(() => {${COMMON}
+const INVISION = /* i18n-ignore : script de la page du site, commentaires et motifs */ String.raw`(() => {${COMMON}
   if ((window.ipsSettings && window.ipsSettings.memberID === 0) || document.querySelector('#elUserSignIn')) return { kind: 'login' };
-  if (/download_no_perm|You do not have permission/i.test(text)) return { kind: 'show', reason: 'votre compte n’a pas le droit de télécharger ce fichier' };
+  if (/download_no_perm|You do not have permission/i.test(text)) return { kind: 'show', reason: 'forbidden' };
   // Page de choix : une ligne par fichier.
   const rows = [...document.querySelectorAll('.ipsDataItem')].filter((r) => r.querySelector('a[href*="do=download"]'));
-  if (rows.length > 1) return { kind: 'show', reason: rows.length + ' fichiers au choix : choisissez celui qu’il faut' };
+  if (rows.length > 1) return { kind: 'show', reason: 'choice', count: rows.length };
   if (rows.length === 1) {
     const a = rows[0].querySelector('a[href*="do=download"]');
-    if (a.dataset.wait === 'true' || a.getAttribute('data-wait') === 'true') return { kind: 'show', reason: 'le site impose un délai avant le téléchargement' };
-    return same(a) ? { kind: 'follow', href: a.href } : { kind: 'show', reason: 'le fichier est sur un autre site' };
+    if (a.dataset.wait === 'true' || a.getAttribute('data-wait') === 'true') return { kind: 'show', reason: 'delay' };
+    return same(a) ? { kind: 'follow', href: a.href } : { kind: 'show', reason: 'elsewhere' };
   }
-  if (document.querySelector('form [name="agree"], #elDownloadTerms, .ipsType_richText + .ipsButton[href*="agree"]')) return { kind: 'show', reason: 'des conditions sont à accepter : à faire vous-même' };
+  if (document.querySelector('form [name="agree"], #elDownloadTerms, .ipsType_richText + .ipsButton[href*="agree"]')) return { kind: 'show', reason: 'terms' };
   // Fiche : le bouton de téléchargement.
   const button = [...document.querySelectorAll('a[href*="do=download"]')].find((a) => !/[?&]r=/.test(a.href));
   if (button) {
-    if (button.dataset.wait === 'true') return { kind: 'show', reason: 'le site impose un délai avant le téléchargement' };
-    return same(button) ? { kind: 'follow', href: button.href } : { kind: 'show', reason: 'le fichier est sur un autre site' };
+    if (button.dataset.wait === 'true') return { kind: 'show', reason: 'delay' };
+    return same(button) ? { kind: 'follow', href: button.href } : { kind: 'show', reason: 'elsewhere' };
   }
-  return { kind: 'show', reason: 'pas de bouton de téléchargement reconnu sur la page' };
+  return { kind: 'show', reason: 'no-button' };
 })()`;
 
 /** IP.Board 3 (vpforums.org). */
-const IPBOARD3 = String.raw`(() => {${COMMON}
-  if (/Attention Proxy Users/i.test(text)) return { kind: 'show', reason: 'le site refuse les connexions par proxy ou VPN' };
+const IPBOARD3 = /* i18n-ignore : script de la page du site, motifs de recherche */ String.raw`(() => {${COMMON}
+  if (/Attention Proxy Users/i.test(text)) return { kind: 'show', reason: 'proxy' };
   if (document.querySelector('#sign_in, a[href*="section=login"]') && !document.querySelector('#user_link')) return { kind: 'login' };
-  if (document.querySelector('a#agree_disclaimer')) return { kind: 'show', reason: 'des conditions sont à accepter : à faire vous-même' };
+  if (document.querySelector('a#agree_disclaimer')) return { kind: 'show', reason: 'terms' };
   const files = [...document.querySelectorAll('#files li a[href]')];
-  if (files.length > 1) return { kind: 'show', reason: files.length + ' fichiers au choix : choisissez celui qu’il faut' };
-  if (files.length === 1) return same(files[0]) ? { kind: 'follow', href: files[0].href } : { kind: 'show', reason: 'le fichier est sur un autre site' };
-  if (/download limit|limite de téléchargement/i.test(text)) return { kind: 'show', reason: 'plafond de téléchargements du compte atteint' };
+  if (files.length > 1) return { kind: 'show', reason: 'choice', count: files.length };
+  if (files.length === 1) return same(files[0]) ? { kind: 'follow', href: files[0].href } : { kind: 'show', reason: 'elsewhere' };
+  if (/download limit|limite de téléchargement/i.test(text)) return { kind: 'show', reason: 'quota' };
   const button = document.querySelector('a.download_button');
-  if (button) return same(button) ? { kind: 'follow', href: button.href } : { kind: 'show', reason: 'le fichier est sur un autre site' };
-  return { kind: 'show', reason: 'pas de bouton de téléchargement reconnu sur la page' };
+  if (button) return same(button) ? { kind: 'follow', href: button.href } : { kind: 'show', reason: 'elsewhere' };
+  return { kind: 'show', reason: 'no-button' };
 })()`;
 
 /** XenForo 2 avec le module de ressources (pinballnirvana.com). */
 const XENFORO = String.raw`(() => {${COMMON}
   if (document.documentElement.getAttribute('data-logged-in') === 'false') return { kind: 'login' };
-  if ([...document.querySelectorAll('span.is-disabled')].some((s) => /permission/i.test(s.textContent || ''))) return { kind: 'show', reason: 'votre compte n’a pas le droit de télécharger ce fichier' };
+  if ([...document.querySelectorAll('span.is-disabled')].some((s) => /permission/i.test(s.textContent || ''))) return { kind: 'show', reason: 'forbidden' };
   const files = [...document.querySelectorAll('a[href*="/download?file="]')];
-  if (files.length > 1) return { kind: 'show', reason: files.length + ' fichiers au choix : choisissez celui qu’il faut' };
-  if (files.length === 1) return same(files[0]) ? { kind: 'follow', href: files[0].href } : { kind: 'show', reason: 'le fichier est sur un autre site' };
+  if (files.length > 1) return { kind: 'show', reason: 'choice', count: files.length };
+  if (files.length === 1) return same(files[0]) ? { kind: 'follow', href: files[0].href } : { kind: 'show', reason: 'elsewhere' };
   const button = document.querySelector('.p-title-pageAction a[href*="/download"]');
-  if (button) return same(button) ? { kind: 'follow', href: button.href } : { kind: 'show', reason: 'le fichier est sur un autre site' };
-  return { kind: 'show', reason: 'pas de bouton de téléchargement reconnu sur la page' };
+  if (button) return same(button) ? { kind: 'follow', href: button.href } : { kind: 'show', reason: 'elsewhere' };
+  return { kind: 'show', reason: 'no-button' };
 })()`;
 
 /** Script à exécuter dans la page pour ce moteur ; il renvoie un ProbeResult. */

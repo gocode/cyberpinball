@@ -4,6 +4,7 @@
 // construit l'état de chaque fenêtre avec ces fonctions, app/renderer/menu-audio.js
 // et media.js jouent ce qu'elles décident.
 
+import { t } from './i18n';
 import type { AudioRole, Cabinet, RoleId } from './model';
 import type { GameMediaMode, MenuMediaSettings } from './mediaview';
 import { mediaMemory } from './medias';
@@ -200,9 +201,9 @@ export interface AttractTimers {
 const REAL_TIMERS: AttractTimers = {
   now: () => Date.now(),
   set: (fn, ms) => {
-    const t = setTimeout(fn, ms);
-    t.unref?.();
-    return t;
+    const timer = setTimeout(fn, ms);
+    timer.unref?.();
+    return timer;
   },
   clear: (h) => clearTimeout(h as NodeJS.Timeout),
 };
@@ -321,11 +322,11 @@ export function durationLabel(seconds: number): string {
 }
 
 export function attractDelayLabel(seconds: number): string {
-  return seconds > 0 ? `après ${durationLabel(seconds)} sans bouton` : 'jamais';
+  return seconds > 0 ? t('après {duration} sans bouton', { duration: durationLabel(seconds) }) : t('jamais');
 }
 
 export function volumeLabel(percent: number): string {
-  return percent === 0 ? '0 % : muet' : `${percent} %`;
+  return percent === 0 ? t('0 % : muet') : t('{percent} %', { percent });
 }
 
 /** Valeur la plus proche parmi les choix, pour placer le curseur sur une valeur écrite à la main. */

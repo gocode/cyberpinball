@@ -7,7 +7,8 @@
 // 2. Une relance de l'application (menu ↔ assistant) passe le relais sans trou : l'ancien
 //    processus garde ses fenêtres jusqu'à ce que le nouveau ait montré les siennes.
 // 3. Pendant une partie, les barres des tâches de Windows sont masquées : quand VPX prend le
-//    premier plan, Windows les remet un instant devant les écrans qu'il n'occupe pas.
+//    premier plan, Windows les remet un instant devant les écrans qu'il n'occupe pas. À la
+//    fin, seules celles que Cyber Pinball a masquées reviennent (coexistence.ts).
 // 4. Deux fois par seconde, la pile des fenêtres de Windows est relue (screenCover) : un
 //    écran qui reste découvert, ou sous la barre des tâches, est signalé dans la console.
 
@@ -15,7 +16,7 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow, screen, type Display, type Rectangle } from 'electron';
-import { coverNotice, screenCover } from '@cyberpinball/core';
+import { coverNotice, parseTaskbarMarker, screenCover, taskbarMarkerText, taskbarsToRestore, type HiddenTaskbar } from '@cyberpinball/core';
 import { allowAnyForeground, hideWindow, listWindows, showWindowInactive, taskbarWindows, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { createWindow, desktopDisplays, OFFSCREEN } from './offscreen';
 import { coverDisplay, coverProblem } from './cover-display';
@@ -52,8 +53,8 @@ export function guardScreens(): void {
   // écrans ni aux barres des tâches du poste.
   if (OFFSCREEN) return;
   // Barres des tâches restées masquées par une partie interrompue (plantage, arrêt forcé).
-  if (fs.existsSync(taskbarMarker())) restoreTaskbars();
-  process.on('exit', () => taskbarsHidden && restoreTaskbars());
+  if (fs.existsSync(taskbarMarker())) restoreTaskbars(parseTaskbarMarker(fs.readFileSync(taskbarMarker(), 'utf8')));
+  process.on('exit', () => hiddenTaskbars.length > 0 && restoreTaskbars());
   placeVeils();
   // Un écran rebranché (ou réveillé) n'est pas toujours prêt à l'événement : un voile mis en
   // plein écran trop tôt atterrit sur l'écran principal. Il est replacé un peu plus tard.
@@ -127,11 +128,28 @@ function sameRect(a: Rectangle, b: Rectangle): boolean {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }
 
-let taskbarsHidden = false;
+/**
+ * Barres des tâches masquées par Cyber Pinball pendant la partie en cours. Seules celles-là
+ * reviennent à la fin : une barre déjà masquée avant (par un autre menu de borne, comme
+ * PinUP Popper, ou par un outil) le reste.
+ */
+let hiddenTaskbars: HiddenTaskbar[] = [];
+/** Barres déjà masquées au début de la partie : pas les nôtres, même réaffichées par Windows entre-temps. */
+let notOurs = new Set<bigint>();
 
 /** Témoin des barres des tâches masquées, pour les rétablir au démarrage suivant si l'application s'arrête en pleine partie. */
 function taskbarMarker(): string {
   return path.join(locations().dataDir, 'barres-des-taches-masquees');
+}
+
+function writeTaskbarMarker(): boolean {
+  try {
+    fs.mkdirSync(path.dirname(taskbarMarker()), { recursive: true });
+    fs.writeFileSync(taskbarMarker(), taskbarMarkerText(hiddenTaskbars));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -141,35 +159,47 @@ function taskbarMarker(): string {
  */
 export function hideTaskbars(): void {
   if (OFFSCREEN) return;
-  const shown = taskbarWindows().filter((w) => w.visible);
+  const all = taskbarWindows();
+  const shown = all.filter((w) => w.visible);
   if (!shown.length) return;
-  try {
-    fs.mkdirSync(path.dirname(taskbarMarker()), { recursive: true });
-    fs.writeFileSync(taskbarMarker(), shown.map((w) => w.className).join('\n'));
-  } catch {
-    // Sans témoin, une partie interrompue laisserait les barres masquées : on ne les masque pas.
+  notOurs = new Set(all.filter((w) => !w.visible).map((w) => w.handle));
+  hiddenTaskbars = shown.map((w) => ({ handle: w.handle, className: w.className }));
+  // Sans témoin, une partie interrompue laisserait les barres masquées : on ne les masque pas.
+  if (!writeTaskbarMarker()) {
+    hiddenTaskbars = [];
     return;
   }
-  taskbarsHidden = true;
   for (const w of shown) hideWindow(w);
   // Windows réaffiche parfois lui-même une barre masquée quand VPX prend le premier plan
   // (une fois sur onze parties, sur l'écran du DMD) : elle est aussitôt masquée de nouveau.
+  // Une barre apparue pendant la partie (écran branché) devient l'une des nôtres.
   taskbarWatch ??= setInterval(() => {
     for (const w of taskbarWindows()) {
       if (!w.visible) continue;
       hideWindow(w);
+      if (!notOurs.has(w.handle) && !hiddenTaskbars.some((h) => h.handle === w.handle)) {
+        hiddenTaskbars.push({ handle: w.handle, className: w.className });
+        writeTaskbarMarker();
+      }
       console.log(`Barre des tâches (${w.className}) réaffichée par Windows pendant la partie : masquée de nouveau.`);
     }
   }, TASKBAR_WATCH_MS);
 }
 
-/** Fin d'une partie (ou démarrage après une partie interrompue) : les barres des tâches reviennent. */
-export function restoreTaskbars(): void {
+/**
+ * Fin d'une partie (ou démarrage après une partie interrompue, d'après le témoin) : les
+ * barres des tâches que Cyber Pinball a masquées reviennent, et seulement elles.
+ */
+export function restoreTaskbars(hidden: HiddenTaskbar[] = hiddenTaskbars): void {
   if (OFFSCREEN) return;
   if (taskbarWatch) clearInterval(taskbarWatch);
   taskbarWatch = undefined;
-  for (const w of taskbarWindows()) if (!w.visible) showWindowInactive(w);
-  taskbarsHidden = false;
+  for (const t of taskbarsToRestore(hidden, taskbarWindows())) {
+    const w = taskbarWindows().find((x) => x.handle === t.handle);
+    if (w) showWindowInactive(w);
+  }
+  hiddenTaskbars = [];
+  notOurs = new Set();
   fs.rmSync(taskbarMarker(), { force: true });
 }
 
@@ -213,7 +243,7 @@ function checkScreens(): void {
     uncoveredSince.set(d.id, since);
     if (now - since < REPORT_AFTER_MS || reported.get(d.id) === notice) continue;
     reported.set(d.id, notice);
-    const line = `Écran « ${name} » : ${notice}.`;
+    const line = `Écran « ${name} » : ${notice}.`; // i18n-ignore : constat pour la console et le bilan d’endurance
     incidents.push(line);
     console.warn(line);
   }

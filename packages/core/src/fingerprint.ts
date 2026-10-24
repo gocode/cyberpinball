@@ -1,3 +1,4 @@
+import { t } from './i18n';
 import type { FingerprintStrength, ObservedDisplay, PhysicalScreen } from './model';
 
 // Valeurs de série binaires que certains fabricants mettent par défaut : inutilisables.
@@ -53,7 +54,7 @@ export function modelKeyOfScreen(screen: PhysicalScreen): string {
 
 /** Libellé lisible pour l'assistant et le médecin. */
 export function describeDisplay(display: ObservedDisplay): string {
-  const name = display.friendlyName || display.edid?.monitorName || display.monitorDescription || 'Écran sans nom';
+  const name = display.friendlyName || display.edid?.monitorName || display.monitorDescription || t('Écran sans nom');
   return `${name} (${display.bounds.width} × ${display.bounds.height})`;
 }
 

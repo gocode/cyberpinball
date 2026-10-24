@@ -29,7 +29,7 @@
   /** Sortie demandée (nom Windows) et identifiant Chromium trouvé ; '' : sortie par défaut. */
   let wantedOutput;
   let sinkId = '';
-  let sinkLabel = 'sortie par défaut';
+  let sinkLabel = 'sortie par défaut'; // i18n-ignore : état lu par les essais (status), jamais affiché
   let sinkProblem;
 
   /** Pistes en cours : { el, url, kind, target, timer, settle }. */
@@ -66,7 +66,9 @@
     el.addEventListener('error', () => {
       try {
         const e = el.error;
-        window.cyber?.mediaError?.({ url, role: 'audio', type: kind, code: e?.code, message: `Son illisible${e?.message ? ` (${e.message})` : ''}` });
+        // Message montré par le médecin (constat de la table).
+        const message = e?.message ? t('Son illisible ({message})', { message: e.message }) : t('Son illisible');
+        window.cyber?.mediaError?.({ url, role: 'audio', type: kind, code: e?.code, message });
       } catch {
         // Hors de l'application : rien à remonter.
       }
@@ -139,14 +141,14 @@
         const outputs = devices.filter((d) => d.kind === 'audiooutput' && d.deviceId !== 'default' && d.deviceId !== 'communications');
         const hit = outputs.find((d) => d.label === name || d.label.replace(USB_IDS, '') === name);
         if (hit) id = hit.deviceId;
-        else sinkProblem = `sortie « ${name} » introuvable : sortie par défaut`;
+        else sinkProblem = `sortie « ${name} » introuvable : sortie par défaut`; // i18n-ignore : état lu par les essais (status), jamais affiché
       } catch (error) {
-        sinkProblem = `sorties illisibles (${error.message}) : sortie par défaut`;
+        sinkProblem = `sorties illisibles (${error.message}) : sortie par défaut`; // i18n-ignore : état lu par les essais (status), jamais affiché
       }
     }
     if (wantedOutput !== name) return;
     sinkId = id;
-    sinkLabel = id ? name : 'sortie par défaut';
+    sinkLabel = id ? name : 'sortie par défaut'; // i18n-ignore : état lu par les essais (status), jamais affiché
     for (const track of [music, launch, ...fading]) track?.el.setSinkId(sinkId).catch(() => {});
     window.CyberMedia?.setSink?.(sinkId);
   }
@@ -169,7 +171,7 @@
     track && {
       fichier: decodeURIComponent(track.url).replace(/^.*[\\/]/, '').replace(/\?v=.*$/, ''),
       volume: Math.round(track.target * 1000) / 1000,
-      lecture: track.settle ? 'en attente' : track.el.paused ? 'en pause' : 'en lecture',
+      lecture: track.settle ? 'en attente' : track.el.paused ? 'en pause' : 'en lecture', // i18n-ignore : état lu par les essais (status), jamais affiché
     };
 
   let videoLayer;

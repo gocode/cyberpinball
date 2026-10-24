@@ -1,5 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { t } from '@cyberpinball/core';
 
 /**
  * emulator : un moteur de tables (VPX, plus tard Future Pinball…), branché à un adaptateur du même id.
@@ -53,6 +54,6 @@ export function loadManifest(file = MANIFEST_FILE): Component[] {
 
 export function findComponent(id: string, file = MANIFEST_FILE): Component {
   const component = loadManifest(file).find((c) => c.id === id);
-  if (!component) throw new Error(`Composant inconnu dans le manifeste : ${id}`);
+  if (!component) throw new Error(t('Composant inconnu dans le manifeste : {id}', { id }));
   return component;
 }

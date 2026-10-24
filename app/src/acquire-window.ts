@@ -13,7 +13,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { ipcMain, session, shell, WebContentsView, type BrowserWindow, type DownloadItem, type Session } from 'electron';
-import { DIRECT_MAX_STEPS, DOWNLOAD_PROBES, type ProbeResult, type SiteCookie, type SourceSite } from '@cyberpinball/core';
+import { DIRECT_MAX_STEPS, DOWNLOAD_PROBES, probeReasonText, t, type ProbeResult, type SiteCookie, type SourceSite } from '@cyberpinball/core';
 import { coverDisplay, fillBelow } from './cover-display';
 import { createWindow, OFFSCREEN, primaryRect } from './offscreen';
 
@@ -42,7 +42,7 @@ export interface AcquireEvents {
   /** Progression d'un téléchargement (octets reçus, total s'il est connu). */
   progress(filename: string, received: number, total: number | undefined): void;
   /** Téléchargement interrompu ou annulé. */
-  failed(filename: string, reason: string): void;
+  failed(filename: string, reason: 'cancelled' | 'interrupted'): void;
   /** La fenêtre s'est fermée. */
   closed(): void;
 }
@@ -85,18 +85,18 @@ export function createAcquirer(events: AcquireEvents) {
       const target = freeName(dir, item.getFilename());
       item.setSavePath(target);
       const filename = path.basename(target);
-      setStatus(`Téléchargement de ${filename}…`);
+      setStatus(t('Téléchargement de {file}…', { file: filename }));
       item.on('updated', (_e, state) => {
         if (state === 'progressing') events.progress(filename, item.getReceivedBytes(), item.getTotalBytes() || undefined);
       });
       item.once('done', (_e, state) => {
         if (state === 'completed') {
-          setStatus(`Reçu : ${filename}, rangé dans la liste d’attente. Fermer (Échap) pour revenir, ou téléchargez autre chose.`);
+          setStatus(t('Reçu : {file}, rangé dans la liste d’attente. Fermer (Échap) pour revenir, ou téléchargez autre chose.', { file: filename }));
           events.received(target, { urls: item.getURLChain(), filename });
         } else {
-          setStatus(`Téléchargement ${state === 'cancelled' ? 'annulé' : 'interrompu'} : ${filename}`, true);
+          setStatus(state === 'cancelled' ? t('Téléchargement annulé : {file}', { file: filename }) : t('Téléchargement interrompu : {file}', { file: filename }), true);
           fs.rmSync(target, { force: true });
-          events.failed(filename, state === 'cancelled' ? 'annulé' : 'interrompu');
+          events.failed(filename, state === 'cancelled' ? 'cancelled' : 'interrupted');
         }
       });
     });
@@ -146,7 +146,7 @@ export function createAcquirer(events: AcquireEvents) {
     const s = acquireSession();
     if (open && !open.win.isDestroyed()) {
       open.request = request;
-      open.status = request.status ?? 'Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.';
+      open.status = request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.');
       open.warn = request.status !== undefined;
       void open.view.webContents.loadURL(request.url);
       sendBar();
@@ -154,7 +154,7 @@ export function createAcquirer(events: AcquireEvents) {
       return;
     }
     const win = createWindow({
-      title: `Récupérer : ${request.game}`,
+      title: t('Récupérer : {game}', { game: request.game }),
       show: false,
       frame: false,
       autoHideMenuBar: true,
@@ -169,7 +169,7 @@ export function createAcquirer(events: AcquireEvents) {
       webPreferences: { session: s, contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: OFFSCREEN },
     });
     win.contentView.addChildView(view);
-    open = { win, view, request, status: request.status ?? 'Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.', warn: request.status !== undefined };
+    open = { win, view, request, status: request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.'), warn: request.status !== undefined };
     const contents = view.webContents;
     // Une page qui ouvre un nouvel onglet (lien de téléchargement, MEGA) : dans la même vue.
     contents.setWindowOpenHandler(({ url }) => {
@@ -178,7 +178,7 @@ export function createAcquirer(events: AcquireEvents) {
     });
     for (const event of ['did-navigate', 'did-navigate-in-page', 'did-stop-loading'] as const) contents.on(event as 'did-stop-loading', () => sendBar());
     contents.on('did-fail-load', (_e, code, description, url, isMainFrame) => {
-      if (isMainFrame && code !== -3) setStatus(`Page inaccessible (${description}) : ${url}. Lien mort ? « Retour à la fiche » ou une autre source.`, true);
+      if (isMainFrame && code !== -3) setStatus(t('Page inaccessible ({error}) : {url}. Lien mort ? « Retour à la fiche » ou une autre source.', { error: description, url }), true);
     });
     // Échap ferme, comme Exit partout ailleurs.
     const escape = (e: Electron.Event, input: Electron.Input) => {
@@ -264,20 +264,20 @@ export function createAcquirer(events: AcquireEvents) {
         try {
           probe = (await contents.executeJavaScript(DOWNLOAD_PROBES[site.engine], true)) as ProbeResult;
         } catch {
-          probe = { kind: 'show', reason: 'page illisible' };
+          probe = { kind: 'show', reason: 'unreadable' };
         }
         if (probe.kind === 'login') {
           finish();
-          return { ok: false, login: true, reason: `vous n’êtes plus connecté à ${site.label}` };
+          return { ok: false, login: true, reason: t('vous n’êtes plus connecté à {site}', { site: site.label }) };
         }
         if (probe.kind === 'show') {
           finish();
-          return { ok: false, reason: probe.reason };
+          return { ok: false, reason: probeReasonText(probe) };
         }
         next = probe.href;
       }
       finish(started);
-      return started ? { ok: true, filename: started.getFilename() } : { ok: false, reason: 'trop de pages avant le fichier' };
+      return started ? { ok: true, filename: started.getFilename() } : { ok: false, reason: t('trop de pages avant le fichier') };
     } catch (error) {
       finish(started);
       return { ok: false, reason: (error as Error).message };

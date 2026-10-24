@@ -9,6 +9,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { t } from './i18n';
 import type { ObservedUsbDevice } from './model';
 import type { SyncFinding } from './sync';
 import type { VpxSetting } from './vpx';
@@ -33,7 +34,13 @@ interface UsbId {
  */
 export const HARDWARE_DMD_IDS: Record<HardwareDmdModel, UsbId[]> = {
   ZeDMD: [
-    { vid: 0x303a, pid: 0x1001, label: 'ESP32-S3, USB natif' },
+    {
+      vid: 0x303a,
+      pid: 0x1001,
+      get label() {
+        return t('ESP32-S3, USB natif');
+      },
+    },
     { vid: 0x1a86, pid: 0x55d3, label: 'QinHeng CH343, ESP32-S3' },
     { vid: 0x1a86, pid: 0x7523, label: 'QinHeng CH340', generic: true },
     { vid: 0x10c4, pid: 0xea60, label: 'Silicon Labs CP210x', generic: true },
@@ -109,12 +116,15 @@ export function vpxDmdSettings(devices: ObservedUsbDevice[]): VpxDmdPlan {
     const where = [d.device.name, d.device.port].filter(Boolean).join(', ');
     findings.push({
       severity: 'info',
-      message: `DMD réel : ${d.model} reconnu à son identifiant USB (${d.usb}${where ? ` ; ${where}` : ''}). VPX l'alimente par le plugin DMDUtil.`,
+      message: t("DMD réel : {model} reconnu à son identifiant USB ({usb}). VPX l'alimente par le plugin DMDUtil.", { model: d.model, usb: where ? `${d.usb}${t(' ; ')}${where}` : d.usb }),
     });
     if (d.generic) {
       findings.push({
         severity: 'info',
-        message: `${d.model} : ${usbIdLabel(d.device.vid, d.device.pid)} est un convertisseur USB-série courant. Si ce n'est pas un ${d.model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : passez [Plugin.DMDUtil] ${d.model} à 0 et gardez cette valeur.`,
+        message: t(
+          "{model} : {usb} est un convertisseur USB-série courant. Si ce n'est pas un {model} (carte Arduino, contrôleur de boutons…), DMDUtil lui enverra quand même sa demande de connexion : passez [Plugin.DMDUtil] {model} à 0 et gardez cette valeur.",
+          { model: d.model, usb: usbIdLabel(d.device.vid, d.device.pid) },
+        ),
       });
     }
   }

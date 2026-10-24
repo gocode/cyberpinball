@@ -7,7 +7,7 @@
 
 import { execFileSync } from 'node:child_process';
 import * as koffi from 'koffi';
-import { edidFromHex, parseEdid, type EdidInfo, type ObservedDisplay, type Rotation } from '@cyberpinball/core';
+import { edidFromHex, parseEdid, t, type EdidInfo, type ObservedDisplay, type Rotation } from '@cyberpinball/core';
 import { monitorContainerId } from './audio';
 
 const QDC_ONLY_ACTIVE_PATHS = 0x2;
@@ -79,7 +79,7 @@ interface Luid {
 
 /** Liste les écrans actifs, triés de gauche à droite puis de haut en bas. */
 export function probeDisplays(): ObservedDisplay[] {
-  if (process.platform !== 'win32') throw new Error('La détection des écrans ne fonctionne que sous Windows pour le moment.');
+  if (process.platform !== 'win32') throw new Error(t('La détection des écrans ne fonctionne que sous Windows pour le moment.'));
   const w = loadApi();
   const { paths, modes, pathCount } = queryActivePaths(w);
   const displays: ObservedDisplay[] = [];
@@ -136,7 +136,7 @@ function queryActivePaths(w: Api) {
     check(rc, 'QueryDisplayConfig');
     return { paths, modes, pathCount: numPath[0]! };
   }
-  throw new Error('QueryDisplayConfig : la configuration des écrans change en continu.');
+  throw new Error(t('QueryDisplayConfig : la configuration des écrans change en continu.'));
 }
 
 function header(type: number, size: number, adapter: Luid, id: number): Buffer {
@@ -178,7 +178,8 @@ function readScale(w: Api, cx: number, cy: number): number | undefined {
   const dpiX = [0];
   const dpiY = [0];
   if (w.GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, dpiX, dpiY) !== 0) return undefined;
-  return dpiX[0]! / 96;
+  const dpi = dpiX[0]!;
+  return dpi / 96;
 }
 
 /**
@@ -205,10 +206,11 @@ function wideString(buf: Buffer, offset: number, length: number): string {
 }
 
 function check(rc: number, what: string): void {
-  if (rc !== 0) throw new Error(`${what} a échoué (code Win32 ${rc}).`);
+  if (rc !== 0) throw new Error(`${what} a échoué (code Win32 ${rc}).`); // i18n-ignore : erreur technique d'un appel Win32
 }
 export * from './windows';
 export * from './orientation';
 export * from './audio';
 export * from './usb';
 export * from './desktop';
+export * from './processes';

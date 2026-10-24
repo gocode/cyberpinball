@@ -22,6 +22,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
 import type { B2sElement, B2sImages, B2sLitImages } from './b2simage';
+import { t, tn } from './i18n';
 import { mediaDbOfferLabel, mediaDbOffers, type MediaDbCandidate, type MediaDbOffer, type MediaDbQuality } from './mediadb';
 import { isAcceptedFormat, mediaKind, MEDIA_TYPES, type MediaKind, type MediaType } from './medias';
 import { isJunkName, parseCsvLine, parseScreens, screenRole } from './puppack';
@@ -32,12 +33,24 @@ export type MediaChoiceSource = 'mediadb' | 'vps' | 'vps-music' | 'pup' | 'dmd-f
 
 export const MEDIA_CHOICE_SOURCE_LABELS: Record<MediaChoiceSource, string> = {
   mediadb: 'VPinMediaDB',
-  vps: 'Vignette VPS',
-  'vps-music': 'Musique (base VPS, Dropbox)',
-  pup: 'PuP-Pack de la table',
-  'dmd-folder': 'Dossier du DMD de la table',
-  b2s: 'Fichier .directb2s de la table',
-  vpx: 'Image rangée dans la table',
+  get vps() {
+    return t('Vignette VPS');
+  },
+  get 'vps-music'() {
+    return t('Musique (base VPS, Dropbox)');
+  },
+  get pup() {
+    return t('PuP-Pack de la table');
+  },
+  get 'dmd-folder'() {
+    return t('Dossier du DMD de la table');
+  },
+  get b2s() {
+    return t('Fichier .directb2s de la table');
+  },
+  get vpx() {
+    return t('Image rangée dans la table');
+  },
 };
 
 /**
@@ -68,7 +81,7 @@ export function vpsMusicChoices(games: VpsGame[]): MediaChoices {
           kind: 'audio',
           source: 'vps-music',
           label: vpsLabel(game),
-          detail: `musique pour la table${by ? ` de ${by}` : ''}`,
+          detail: by ? t('musique pour la table de {by}', { by }) : t('musique pour la table'),
           offer: { type: 'Audio', key: `vps/sound/${f.id}`, file, kind: 'audio', ext },
           vpsId: game.id,
         });
@@ -166,9 +179,9 @@ export function vpsImageChoices(games: VpsGame[]): MediaChoices {
   const out: MediaChoices = {};
   const seen = new Set<string>();
   for (const game of games) {
-    for (const [type, files, what] of [
-      ['Playfield', game.tableFiles ?? [], 'plateau'],
-      ['Backglass', game.b2sFiles ?? [], 'fronton'],
+    for (const [type, files] of [
+      ['Playfield', game.tableFiles ?? []],
+      ['Backglass', game.b2sFiles ?? []],
     ] as const) {
       const usable = files
         .filter((f) => typeof f.imgUrl === 'string' && f.imgUrl.startsWith(VPS_IMAGE_PREFIX) && !f.imgUrl.includes('..') && /\.(webp|png|jpe?g)$/i.test(f.imgUrl))
@@ -186,7 +199,14 @@ export function vpsImageChoices(games: VpsGame[]): MediaChoices {
           kind: 'image',
           source: 'vps',
           label: vpsLabel(game),
-          detail: `vignette du ${what}${by ? ` de ${by}` : ''}`,
+          detail:
+            type === 'Playfield'
+              ? by
+                ? t('vignette du plateau de {by}', { by })
+                : t('vignette du plateau')
+              : by
+                ? t('vignette du fronton de {by}', { by })
+                : t('vignette du fronton'),
           offer: { type, key: `vps/${type === 'Playfield' ? 'table' : 'b2s'}/${f.id}`, file, kind: 'image', ext, preview: file },
           vpsId: game.id,
         });
@@ -218,13 +238,19 @@ export interface B2sSource {
 }
 
 const B2S_ELEMENT_LABELS: Record<B2sElement, string> = {
-  BackglassOnImage: 'Image allumée du fronton',
-  BackglassImage: 'Image du fronton',
-  BackglassOffImage: 'Image éteinte du fronton',
-  DMDImage: 'Image de l’afficheur',
+  get BackglassOnImage() {
+    return t('Image allumée du fronton');
+  },
+  get BackglassImage() {
+    return t('Image du fronton');
+  },
+  get BackglassOffImage() {
+    return t('Image éteinte du fronton');
+  },
+  get DMDImage() {
+    return t('Image de l’afficheur');
+  },
 };
-
-const lamps = (n: number) => (n > 1 ? `${n} lampes posées` : '1 lampe posée');
 
 /**
  * Les .directb2s dont l'image extraite diffère : une copie du même fichier sous un autre
@@ -354,25 +380,25 @@ export function localMediaChoices(table: TableEntry, opts: LocalChoiceOptions = 
   const local = (type: MediaType, file: string, bytes: number, source: MediaChoiceSource, label: string): MediaChoice | undefined => {
     const kind = mediaKind(file);
     if (!kind) return undefined;
-    return { id: file, type, kind, source, label, detail: kind === 'video' ? 'vidéo' : kind === 'audio' ? 'son' : 'image', file, bytes };
+    return { id: file, type, kind, source, label, detail: kind === 'video' ? t('vidéo') : kind === 'audio' ? t('son') : t('image'), file, bytes };
   };
 
   // .directb2s : le fronton allumé et l'afficheur, déjà extraits pour le repli, puis les mêmes
   // avec toutes leurs ampoules allumées ; un second fichier du dossier est un autre fronton.
   const sources = distinctB2s(opts.b2s ?? []);
   for (const src of sources) {
-    const from = src.loaded ? (sources.length > 1 ? ` (${src.name})` : '') : ` (${src.name}, que VPX ne charge pas)`;
+    const from = src.loaded ? (sources.length > 1 ? ` (${src.name})` : '') : t(' ({name}, que VPX ne charge pas)', { name: src.name });
     const { backglass, dmd } = src.images;
     if (backglass) push(local('Backglass', backglass.file, backglass.bytes, 'b2s', `${B2S_ELEMENT_LABELS[backglass.element]}${from}`)!);
-    if (src.lit?.backglass) push(local('Backglass', src.lit.backglass.file, src.lit.backglass.bytes, 'b2s', `Fronton tout allumé : ${lamps(src.lit.backglass.bulbs)} sur l’image${from}`)!);
+    if (src.lit?.backglass) push(local('Backglass', src.lit.backglass.file, src.lit.backglass.bytes, 'b2s', tn(src.lit.backglass.bulbs, 'Fronton tout allumé : {n} lampe posée sur l’image', 'Fronton tout allumé : {n} lampes posées sur l’image') + from)!);
     for (const type of ['FullDMD', 'DMD'] as const) {
-      if (dmd) push(local(type, dmd.file, dmd.bytes, 'b2s', `Image de l’afficheur${from}`)!);
-      if (src.lit?.dmd) push(local(type, src.lit.dmd.file, src.lit.dmd.bytes, 'b2s', `Afficheur tout allumé : ${lamps(src.lit.dmd.bulbs)} sur l’image${from}`)!);
+      if (dmd) push(local(type, dmd.file, dmd.bytes, 'b2s', t('Image de l’afficheur') + from)!);
+      if (src.lit?.dmd) push(local(type, src.lit.dmd.file, src.lit.dmd.bytes, 'b2s', tn(src.lit.dmd.bulbs, 'Afficheur tout allumé : {n} lampe posée sur l’image', 'Afficheur tout allumé : {n} lampes posées sur l’image') + from)!);
     }
   }
 
   // Capture de la table rangée dans le .vpx par son auteur : souvent le plateau entier.
-  if (opts.screenshot && fs.existsSync(opts.screenshot)) push(local('Playfield', opts.screenshot, fs.statSync(opts.screenshot).size, 'vpx', 'Capture de la table, choisie par son auteur')!);
+  if (opts.screenshot && fs.existsSync(opts.screenshot)) push(local('Playfield', opts.screenshot, fs.statSync(opts.screenshot).size, 'vpx', t('Capture de la table, choisie par son auteur'))!);
   // Autres images de la table : plateau à plat, carte de règles, fronton et logo de la pièce VR.
   for (const img of opts.vpxImages ?? []) {
     if (fs.existsSync(img.file)) push(local(img.type, img.file, fs.statSync(img.file).size, 'vpx', img.label)!);
@@ -417,27 +443,27 @@ export function localMediaChoices(table: TableEntry, opts: LocalChoiceOptions = 
       const file = path.join(pupRoot, pack, screen.playlist, screen.playFile);
       if (!fs.existsSync(file)) continue;
       declare(file, typesOf(role));
-      for (const type of typesOf(role)) add(type, -1, local(type, file, fs.statSync(file).size, 'pup', `${pack} : écran ${screen.description || screen.num}, fichier par défaut du pack`));
+      for (const type of typesOf(role)) add(type, -1, local(type, file, fs.statSync(file).size, 'pup', t('{pack} : écran {screen}, fichier par défaut du pack', { pack, screen: screen.description || screen.num })));
     }
     // Déclencheurs du pack : le fond posé au démarrage (D0) ou en attente (E454), et la musique
     // des écrans « MusicOnly ». Les fonds posés par les modes de jeu sont des scènes de partie.
     const musicScreens = new Set(screens.filter((s) => /^musiconly$/i.test(s.mode)).map((s) => s.num));
-    for (const t of readTriggers(path.join(pupRoot, pack, 'triggers.pup'))) {
-      if (!t.playlist) continue;
-      const dir = path.join(pupRoot, pack, t.playlist);
-      const files = t.playFile ? [{ file: path.join(dir, t.playFile), bytes: sizeOf(path.join(dir, t.playFile)) }] : listFiles(dir, 0);
-      if (musicScreens.has(t.screen)) {
-        for (const f of files) if (mediaKind(f.file) === 'audio' && f.bytes >= MIN_MUSIC_BYTES) add('Audio', -1, local('Audio', f.file, f.bytes, 'pup', `${pack} \\ ${t.playlist}\\${path.basename(f.file)} (musique du pack)`));
+    for (const trig of readTriggers(path.join(pupRoot, pack, 'triggers.pup'))) {
+      if (!trig.playlist) continue;
+      const dir = path.join(pupRoot, pack, trig.playlist);
+      const files = trig.playFile ? [{ file: path.join(dir, trig.playFile), bytes: sizeOf(path.join(dir, trig.playFile)) }] : listFiles(dir, 0);
+      if (musicScreens.has(trig.screen)) {
+        for (const f of files) if (mediaKind(f.file) === 'audio' && f.bytes >= MIN_MUSIC_BYTES) add('Audio', -1, local('Audio', f.file, f.bytes, 'pup', t('{path} (musique du pack)', { path: `${pack} \\ ${trig.playlist}\\${path.basename(f.file)}` })));
         continue;
       }
-      const role = screenRole(t.screen);
-      if (!role || !t.playFile || !/^(D0|E454)$/i.test(t.trigger)) continue;
+      const role = screenRole(trig.screen);
+      if (!role || !trig.playFile || !/^(D0|E454)$/i.test(trig.trigger)) continue;
       const [f] = files;
       if (!f) continue;
       declare(f.file, typesOf(role));
       if (f.bytes < MIN_SCREEN_BYTES || /^@|blank/i.test(path.basename(f.file))) continue;
-      const when = /^D0$/i.test(t.trigger) ? 'au démarrage' : 'en attente';
-      for (const type of typesOf(role)) add(type, -1, local(type, f.file, f.bytes, 'pup', `${pack} \\ ${t.playlist}\\${t.playFile} (écran ${t.screen}, ${when})`));
+      const when = /^D0$/i.test(trig.trigger) ? t('au démarrage') : t('en attente');
+      for (const type of typesOf(role)) add(type, -1, local(type, f.file, f.bytes, 'pup', t('{path} (écran {screen}, {when})', { path: `${pack} \\ ${trig.playlist}\\${trig.playFile}`, screen: trig.screen, when })));
     }
     // Images de cadre à la proportion d'un fronton (« GOTG-4x3.png », « -5x4.png »).
     for (const f of listFiles(path.join(pupRoot, pack, 'PupImages'), 0)) {

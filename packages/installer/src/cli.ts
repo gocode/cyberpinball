@@ -1,3 +1,4 @@
+// i18n-ignore-file : outil en ligne de commande, ses sorties restent en français.
 // node packages/installer/dist/cli.js <commande>
 //   setup <racine>     choisir la racine (vérification, dossiers, reprise des données)
 //   install [id]       installer un composant du manifeste, ou tous les composants automatiques

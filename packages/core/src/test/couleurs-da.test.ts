@@ -1,6 +1,6 @@
 // Couleurs de la direction artistique (docs/design-system, 22 octobre 2026) dans ce qui
 // est dessiné sans média : replis intégrés (app/renderer/fallback.*) et icône de
-// l'application (scripts/icone.mjs). L'ancienne palette cyan, rose, jaune et violet ne
+// l'application (app/renderer/icone.svg, rendue par scripts/icone.mjs). L'ancienne palette cyan, rose, jaune et violet ne
 // doit revenir nulle part dans l'interface ; les dessins n'emploient que les teintes
 // de la DA : neutres et surfaces noir sarcelle, sarcelle, bleu des métadonnées, vert
 // signal, orange des afficheurs, ambre et rouge des états.
@@ -11,7 +11,7 @@ import { test } from 'node:test';
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 const RENDERER = path.join(REPO, 'app', 'renderer');
-const DRAWN = [path.join(RENDERER, 'fallback.css'), path.join(RENDERER, 'fallback.js'), path.join(REPO, 'scripts', 'icone.mjs')];
+const DRAWN = [path.join(RENDERER, 'fallback.css'), path.join(RENDERER, 'fallback.js'), path.join(RENDERER, 'icone.svg'), path.join(REPO, 'scripts', 'icone.mjs')];
 
 /** Palette d'avant la DA : cyan, rose, jaune, violet, vert menthe, fonds bleu nuit. */
 const RETIRED = ['#22d3ee', '#ff3d7f', '#facc15', '#a78bfa', '#34d399', '#05060a', '#161b2a', '#0c1020', '#eef1f8', '#8b93a7', '#5fe1f4'];
@@ -43,7 +43,7 @@ function hueSat([r, g, b]: [number, number, number]): { hue: number; sat: number
 }
 
 test('DA : l’ancienne palette ne revient nulle part dans l’interface ni dans l’icône', () => {
-  const files = [...fs.readdirSync(RENDERER).filter((f) => /\.(css|js|html)$/.test(f)).map((f) => path.join(RENDERER, f)), path.join(REPO, 'scripts', 'icone.mjs')];
+  const files = [...fs.readdirSync(RENDERER).filter((f) => /\.(css|js|html|svg)$/.test(f)).map((f) => path.join(RENDERER, f)), path.join(REPO, 'scripts', 'icone.mjs')];
   for (const file of files) {
     const text = fs.readFileSync(file, 'utf8').toLowerCase();
     for (const color of RETIRED) assert.ok(!text.includes(color), `${path.relative(REPO, file)} : ${color} appartient à l'ancienne palette`);
@@ -65,6 +65,6 @@ test('DA : replis et icône n’emploient que des neutres et les teintes de la D
 test('DA : l’orange des afficheurs reste aux afficheurs à points', () => {
   const css = fs.readFileSync(path.join(RENDERER, 'fallback.css'), 'utf8');
   assert.ok(!/#ff8a1f/i.test(css), 'fallback.css : l’orange dmd n’habille aucun composant HTML');
-  const icon = fs.readFileSync(path.join(REPO, 'scripts', 'icone.mjs'), 'utf8');
-  assert.ok(!/#ff8a1f/i.test(icon), 'icone.mjs : l’icône n’emploie pas l’orange dmd');
+  const icon = fs.readFileSync(path.join(RENDERER, 'icone.svg'), 'utf8');
+  assert.ok(!/#ff8a1f/i.test(icon), 'icone.svg : l’icône n’emploie pas l’orange dmd');
 });

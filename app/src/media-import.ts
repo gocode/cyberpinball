@@ -7,6 +7,7 @@
 import * as path from 'node:path';
 import {
   copyPlannedMedias,
+  formatList,
   formatSize,
   freeSpace,
   FRONTEND_LABELS,
@@ -16,6 +17,8 @@ import {
   mediaTypeInfo,
   planInstallationMedias,
   scanInstallation,
+  t,
+  tn,
   trashDirFor,
   type InstallationPlan,
   type InstallationTablePlan,
@@ -44,28 +47,33 @@ export interface MediaImportHost {
   reload(): void;
 }
 
-const TITLE = 'Reprendre les médias de PinUP Popper / PinballX';
+const title = () => t('Reprendre les médias de PinUP Popper / PinballX');
 /** Lignes montrées par section ; le reste est compté. */
 const MAX_ROWS = 40;
 
 export function createMediaImport(host: MediaImportHost) {
   function open(): void {
     if (!host.tablesDir()) {
-      host.openNotice('Cyber Pinball n’est pas installé', ['Lancez « Installer » depuis le lanceur : il crée le dossier des tables.']);
+      host.openNotice(t('Cyber Pinball n’est pas installé'), [t('Lancez « Installer » depuis le lanceur : il crée le dossier des tables.')]);
       return;
     }
     const found = knownInstallations();
     host.openCustom(() => {
       const rows: Row[] = found.map((f, i) => ({ text: FRONTEND_LABELS[f.frontend], detail: f.path, action: i }));
-      const actions: Action[] = found.map((f) => ({ label: `${FRONTEND_LABELS[f.frontend]} : ${f.path}`, run: () => analyse(f.path) }));
+      const actions: Action[] = found.map((f) => ({ label: t('{frontend} : {path}', { frontend: FRONTEND_LABELS[f.frontend], path: f.path }), run: () => analyse(f.path) }));
       actions.push(
-        { label: 'Choisir un dossier sur ce PC…', detail: 'PinUPSystem, POPMedia, PinballX ou son dossier Media', run: () => void choose() },
-        { label: 'Retour', run: () => host.openSystem() },
+        { label: t('Choisir un dossier sur ce PC…'), detail: t('PinUPSystem, POPMedia, PinballX ou son dossier Media'), run: () => void choose() },
+        { label: t('Retour'), run: () => host.openSystem() },
       );
       return {
-        heading: TITLE,
-        lead: 'Les médias d’une installation existante (logos, vidéos de plateau, frontons, afficheurs, règles…) sont copiés dans le dossier de chaque table, sous les noms que lit Cyber Pinball. L’installation d’origine n’est pas modifiée. Rien n’est copié avant que vous ayez validé le plan.',
-        sections: [{ title: 'Installations trouvées sur ce PC', rows: rows.length ? rows : [{ text: 'Aucune aux emplacements habituels', detail: 'Choisissez le dossier de l’installation.', tone: 'quiet' }] }],
+        heading: title(),
+        lead: t('Les médias d’une installation existante (logos, vidéos de plateau, frontons, afficheurs, règles…) sont copiés dans le dossier de chaque table, sous les noms que lit Cyber Pinball. L’installation d’origine n’est pas modifiée. Rien n’est copié avant que vous ayez validé le plan.'),
+        sections: [
+          {
+            title: t('Installations trouvées sur ce PC'),
+            rows: rows.length ? rows : [{ text: t('Aucune aux emplacements habituels'), detail: t('Choisissez le dossier de l’installation.'), tone: 'quiet' }],
+          },
+        ],
         actions,
         back: () => host.openSystem(),
       };
@@ -78,9 +86,9 @@ export function createMediaImport(host: MediaImportHost) {
   }
 
   function analyse(root: string): void {
-    void host.task('Recherche des médias…', async () => {
+    void host.task(t('Recherche des médias…'), async () => {
       const scan = scanInstallation(root);
-      host.progress('Rapprochement avec les tables installées…');
+      host.progress(t('Rapprochement avec les tables installées…'));
       const tables = installedTables(host.tables(), host.romsOf);
       // La base VPS ne sert qu'aux noms qui ne ressemblent à aucune table : chargée seulement alors.
       const quick = planInstallationMedias(scan, tables);
@@ -97,17 +105,21 @@ export function createMediaImport(host: MediaImportHost) {
     host.openCustom(() => {
       const sections: Section[] = [];
       if (tooBig) {
-        sections.push({ rows: [{ text: 'Place insuffisante', detail: `Il faut ${formatSize(plan.bytes)}, il reste ${formatSize(free!)} sur le disque des tables.`, tone: 'error' }] });
+        sections.push({
+          rows: [{ text: t('Place insuffisante'), detail: t('Il faut {need}, il reste {free} sur le disque des tables.', { need: formatSize(plan.bytes), free: formatSize(free!) }), tone: 'error' }],
+        });
       }
       if (plan.tables.length) {
-        sections.push(capped(`${plan.tables.length} table${plan.tables.length > 1 ? 's reçoivent' : ' reçoit'} des médias`, plan.tables.map(tableRow)));
+        sections.push(capped(tn(plan.tables.length, '{n} table reçoit des médias', '{n} tables reçoivent des médias'), plan.tables.map(tableRow)));
       }
       const skipped = plan.tables.flatMap((t) => t.skipped);
       if (skipped.length) {
         const unreadable = skipped.filter((s) => s.unreadable).length;
         sections.push(
           capped(
-            unreadable ? `Non copié : ${unreadable} vidéo${unreadable > 1 ? 's' : ''} dans un format que le menu ne lit pas` : 'Non copié',
+            unreadable
+              ? tn(unreadable, 'Non copié : {n} vidéo dans un format que le menu ne lit pas', 'Non copié : {n} vidéos dans un format que le menu ne lit pas')
+              : t('Non copié'),
             skipped.map((s) => ({ text: s.source, detail: s.reason, badges: s.type ? [mediaTypeInfo(s.type).label] : undefined, tone: s.unreadable ? 'warning' : 'quiet' })),
           ),
         );
@@ -115,29 +127,29 @@ export function createMediaImport(host: MediaImportHost) {
       if (plan.unmatched.length) {
         sections.push(
           capped(
-            `Sans table : ${plan.unmatched.length} jeu${plan.unmatched.length > 1 ? 'x' : ''}`,
-            plan.unmatched.map((u) => ({ text: u.game, detail: `${u.sources.length} média${u.sources.length > 1 ? 's' : ''} · ${u.reason}`, tone: 'quiet' })),
+            tn(plan.unmatched.length, 'Sans table : {n} jeu', 'Sans table : {n} jeux'),
+            plan.unmatched.map((u) => ({ text: u.game, detail: `${tn(u.sources.length, '{n} média', '{n} médias')} · ${u.reason}`, tone: 'quiet' })),
           ),
         );
       }
       if (plan.ignored.length) {
-        sections.push({ title: 'Autres émulateurs', rows: plan.ignored.map((i) => ({ text: i.source, detail: `${i.count} fichier${i.count > 1 ? 's' : ''} · ${i.reason}`, tone: 'quiet' })) });
+        sections.push({ title: t('Autres émulateurs'), rows: plan.ignored.map((i) => ({ text: i.source, detail: `${tn(i.count, '{n} fichier', '{n} fichiers')} · ${i.reason}`, tone: 'quiet' })) });
       }
       const back = () => open();
       const actions: Action[] =
         plan.count && !tooBig
           ? [
-              { label: 'Copier', detail: `${plan.count} média${plan.count > 1 ? 's' : ''} · ${formatSize(plan.bytes)}`, tone: 'ok', run: () => apply(plan) },
-              { label: 'Annuler', run: back },
+              { label: t('Copier'), detail: `${tn(plan.count, '{n} média', '{n} médias')} · ${formatSize(plan.bytes)}`, tone: 'ok', run: () => apply(plan) },
+              { label: t('Annuler'), run: back },
             ]
-          : [{ label: 'Retour', run: back }];
-      const frontends = plan.frontends.map((f) => FRONTEND_LABELS[f]).join(' et ');
+          : [{ label: t('Retour'), run: back }];
+      const frontends = formatList(plan.frontends.map((f) => FRONTEND_LABELS[f]));
       return {
-        heading: plan.count ? 'Plan de reprise des médias' : 'Aucun média à reprendre',
-        subheading: `${frontends || 'Aucun média de PinUP Popper ni de PinballX'} · ${plan.root}`,
+        heading: plan.count ? t('Plan de reprise des médias') : t('Aucun média à reprendre'),
+        subheading: `${frontends || t('Aucun média de PinUP Popper ni de PinballX')} · ${plan.root}`,
         lead: plan.count
-          ? 'Les fichiers sont copiés : l’installation d’origine n’est pas modifiée. Un média du même type déjà présent dans la table va à la corbeille.'
-          : 'Aucun média de ce dossier ne correspond à une table installée.',
+          ? t('Les fichiers sont copiés : l’installation d’origine n’est pas modifiée. Un média du même type déjà présent dans la table va à la corbeille.')
+          : t('Aucun média de ce dossier ne correspond à une table installée.'),
         sections,
         actions,
         back,
@@ -146,30 +158,32 @@ export function createMediaImport(host: MediaImportHost) {
   }
 
   /** Une ligne par table : les types reçus, la taille, comment elle a été reconnue. */
-  function tableRow(t: InstallationTablePlan): Row {
+  function tableRow(plan: InstallationTablePlan): Row {
     const counts = new Map<string, number>();
-    for (const m of t.planned) counts.set(mediaTypeInfo(m.type).label, (counts.get(mediaTypeInfo(m.type).label) ?? 0) + 1);
-    const types = [...counts].map(([label, n]) => (n > 1 ? `${label} (${n} pages)` : label)).join(', ');
-    const replaced = t.planned.filter((m) => m.replaces).length;
+    for (const m of plan.planned) counts.set(mediaTypeInfo(m.type).label, (counts.get(mediaTypeInfo(m.type).label) ?? 0) + 1);
+    const types = [...counts].map(([label, n]) => (n > 1 ? t('{type} ({n} pages)', { type: label, n }) : label)).join(', ');
+    const replaced = plan.planned.filter((m) => m.replaces).length;
     return {
-      text: t.table.dest.name,
-      detail: `${types} · ${formatSize(t.bytes)}`,
-      badges: [...t.how.map((h) => MATCH_LABELS[h]), ...(replaced ? [`remplace ${replaced} média${replaced > 1 ? 's' : ''}`] : [])],
+      text: plan.table.dest.name,
+      detail: `${types} · ${formatSize(plan.bytes)}`,
+      badges: [...plan.how.map((h) => MATCH_LABELS[h]), ...(replaced ? [tn(replaced, 'remplace {n} média', 'remplace {n} médias')] : [])],
       tone: replaced ? 'warning' : undefined,
     };
   }
 
   function apply(plan: InstallationPlan): void {
     const planned = plan.tables.flatMap((t) => t.planned);
-    void host.task('Copie des médias…', async () => {
-      const trashDir = trashDirFor(host.trashRoot()!, 'Remplacé par la reprise des médias');
-      await copyPlannedMedias(planned, { trashDir }, (done, total) => host.progress(`Copie des médias : ${done} sur ${total}…`));
+    void host.task(t('Copie des médias…'), async () => {
+      const trashDir = trashDirFor(host.trashRoot()!, 'Remplacé par la reprise des médias'); // i18n-ignore : nom de dossier de la corbeille
+      await copyPlannedMedias(planned, { trashDir }, (done, total) => host.progress(t('Copie des médias : {done} sur {total}…', { done, total })));
       const replaced = planned.filter((m) => m.replaces).length;
       host.reload();
-      host.openNotice('Médias repris', [
-        `${planned.length} média${planned.length > 1 ? 's' : ''} copié${planned.length > 1 ? 's' : ''} dans ${plan.tables.length} table${plan.tables.length > 1 ? 's' : ''}.`,
-        ...(replaced ? [`${replaced > 1 ? `Les ${replaced} médias remplacés sont` : 'Le média remplacé est'} dans la corbeille : ${path.basename(trashDir)}.`] : []),
-        'L’installation d’origine n’a pas été modifiée.',
+      host.openNotice(t('Médias repris'), [
+        t('{media} dans {tables}.', { media: tn(planned.length, '{n} média copié', '{n} médias copiés'), tables: tn(plan.tables.length, '{n} table', '{n} tables') }),
+        ...(replaced
+          ? [tn(replaced, 'Le média remplacé est dans la corbeille : {folder}.', 'Les {n} médias remplacés sont dans la corbeille : {folder}.', { folder: path.basename(trashDir) })]
+          : []),
+        t('L’installation d’origine n’a pas été modifiée.'),
       ]);
     });
   }

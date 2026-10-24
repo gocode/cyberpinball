@@ -54,11 +54,11 @@ export function vpxProfile(loc: Locations): { profile: VpxProfile; source: strin
   const active = loc.root ? activeComponent(loc.root, 'vpx') : undefined;
   const entry = active ? active.entry : loadManifest().find((c) => c.id === 'vpx');
   if (active && !active.entry) {
-    return { profile: DEFAULT_VPX_PROFILE, source: `VPX ${active.version}, absent du manifeste : profil par défaut` };
+    return { profile: DEFAULT_VPX_PROFILE, source: `VPX ${active.version}, absent du manifeste : profil par défaut` }; // i18n-ignore : sortie console de npm run sync
   }
   const settings = (entry?.adapterSettings ?? {}) as Partial<VpxProfile>;
   return {
     profile: { ...DEFAULT_VPX_PROFILE, ...settings },
-    source: `VPX ${entry?.version ?? '?'}${active ? '' : ' (pas encore installé)'}`,
+    source: `VPX ${entry?.version ?? '?'}${active ? '' : ' (pas encore installé)'}`, // i18n-ignore : sortie console de npm run sync
   };
 }

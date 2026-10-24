@@ -3,24 +3,25 @@
   <head>
     <meta charset="utf-8" />
     <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
-    <title>Récupérer</title>
+    <title data-i18n>Récupérer</title>
     <link rel="stylesheet" href="theme.css" />
     <link rel="stylesheet" href="acquire.css" />
   </head>
   <body>
     <header class="bar">
       <div class="what">
-        <div class="line"><span class="brand">RÉCUPÉRER</span><span class="game" id="game"></span></div>
+        <div class="line"><span class="brand" data-i18n>RÉCUPÉRER</span><span class="game" id="game"></span></div>
         <div class="line"><span class="expected" id="expected"></span><span class="host" id="host"></span></div>
         <div class="status" id="status"></div>
       </div>
       <nav class="buttons">
-        <button type="button" id="back">← Précédent</button>
-        <button type="button" id="home">Retour à la fiche</button>
-        <button type="button" id="browser">Ouvrir dans mon navigateur</button>
-        <button type="button" id="close" class="close">Fermer (Échap)</button>
+        <button type="button" id="back" data-i18n>← Précédent</button>
+        <button type="button" id="home" data-i18n="Retour à la fiche (page du fichier sur le site)">Retour à la fiche</button>
+        <button type="button" id="browser" data-i18n>Ouvrir dans mon navigateur</button>
+        <button type="button" id="close" class="close" data-i18n>Fermer (Échap)</button>
       </nav>
     </header>
+    <script src="i18n.js"></script>
     <script src="acquire.js"></script>
   </body>
 </html>

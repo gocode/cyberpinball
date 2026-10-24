@@ -3,7 +3,8 @@
 //   npm run publier                       -> release GitHub v<version> de package.json
 //   npm run publier -- --brouillon        -> release laissée en brouillon (invisible des bornes)
 //   npm run publier -- --sans-fabrication -> reprend release\ tel qu'il est
-//   npm run publier -- --notes <fichier>  -> nouveautés (sinon : section « ## <version> » de CHANGELOG.md)
+//   npm run publier -- --notes <fichier>  -> nouveautés (sinon : section « ## <version> » de CHANGELOG.md,
+//                                            et de CHANGELOG.en.md pour la release GitHub)
 //   npm run publier -- --local <dossier> --url <adresse> -> flux et installeur dans un dossier
 //                                            servi à cette adresse, sans GitHub (essais ;
 //                                            --leger : sans fabriquer la version complète)
@@ -26,6 +27,7 @@ import { fileURLToPath } from 'node:url';
 import { auditRepository } from './audit-publication.mjs';
 import { loadPrivateKey } from './cle-publication.mjs';
 import { snapshotAndPush } from './envoyer-github.mjs';
+import { bulletPoints, changelogNotes } from './traductions.mjs';
 
 const require = createRequire(import.meta.url);
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -98,20 +100,14 @@ const complete = path.join(release, 'CyberPinball-Setup-complet.exe');
 if (!fs.existsSync(installer)) fail(`${installer} manque.`);
 
 step('Nouveautés');
-let notesText;
 const notesFile = option('--notes');
-if (notesFile) notesText = fs.readFileSync(notesFile, 'utf8');
-else if (fs.existsSync(path.join(repo, 'CHANGELOG.md'))) {
-  const changelog = fs.readFileSync(path.join(repo, 'CHANGELOG.md'), 'utf8').replace(/\r\n/g, '\n');
-  const section = new RegExp(`^## ${version.replace(/[.]/g, '\\.')}\\b.*\\n([\\s\\S]*?)(?=^## |$(?![\\s\\S]))`, 'm').exec(changelog);
-  notesText = section?.[1];
-}
-const notes = (notesText ?? '')
-  .split(/\r?\n/)
-  .filter((l) => /^\s*[-*] /.test(l))
-  .map((l) => l.replace(/^\s*[-*] /, '').trim());
+const notes = notesFile ? bulletPoints(fs.readFileSync(notesFile, 'utf8')) : changelogNotes(path.join(repo, 'CHANGELOG.md'), version);
+// Version anglaise : dans la release GitHub, et dans le flux pour les bornes réglées en anglais.
+const notesEn = notesFile ? [] : changelogNotes(path.join(repo, 'CHANGELOG.en.md'), version);
 if (!notes.length && !local) fail(`aucune nouveauté pour ${version} : ajoutez une section « ## ${version} » à CHANGELOG.md (une ligne « - » par point), ou --notes <fichier>.`);
 for (const n of notes) console.log(`  - ${n}`);
+for (const n of notesEn) console.log(`  - (en) ${n}`);
+if (!notesFile && !notesEn.length) console.log(`  (pas de section « ## ${version} » dans CHANGELOG.en.md : release sans les nouveautés en anglais)`);
 
 step('Flux signé');
 const urlBase = option('--url');
@@ -120,6 +116,7 @@ const manifest = {
   version,
   date: new Date().toISOString(),
   notes,
+  ...(notesEn.length && { notesByLanguage: { en: notesEn } }),
   installer: {
     name: update.UPDATE_INSTALLER_NAME,
     url: local ? `${urlBase.replace(/\/$/, '')}/${update.UPDATE_INSTALLER_NAME}` : update.releaseAssetUrl(version, update.UPDATE_INSTALLER_NAME),
@@ -149,6 +146,7 @@ step(`Release v${version} sur github.com/${repository}`);
 const body = [
   ...notes.map((n) => `- ${n}`),
   '',
+  ...(notesEn.length ? ['**English**', '', ...notesEn.map((n) => `- ${n}`), ''] : []),
   `**${update.UPDATE_INSTALLER_NAME}** : installeur léger (Visual Pinball X téléchargé au premier lancement). Les bornes déjà installées se mettent à jour depuis le menu système, « Mise à jour de Cyber Pinball ».`,
   '',
   '**CyberPinball-Setup-complet.exe** : avec l’archive officielle de Visual Pinball X, pour une borne sans Internet. Redistribution gratuite seulement : ni vendue, ni livrée avec une borne vendue ou exploitée commercialement (licence de VPX).',

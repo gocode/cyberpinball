@@ -1,6 +1,8 @@
 // Modèle de borne : la seule source de vérité. Tous les fichiers des outils
 // tiers (VPinballX.ini, plus tard ScreenRes.txt, PinUP, dmddevice.ini) en sont dérivés.
 
+import { t } from './i18n';
+
 export type RoleId = 'playfield' | 'backglass' | 'dmd' | 'topper';
 
 export interface RoleInfo {
@@ -227,8 +229,8 @@ export interface ObservedAudioOutput {
 export type AudioRole = 'backglass' | 'playfield';
 
 export const AUDIO_ROLES: readonly { id: AudioRole; label: string }[] = [
-  { id: 'backglass', label: 'Son du fronton' },
-  { id: 'playfield', label: 'Son du plateau' },
+  { id: 'backglass', get label() { return t('Son du fronton'); } },
+  { id: 'playfield', get label() { return t('Son du plateau'); } },
 ];
 
 /**

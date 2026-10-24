@@ -3,6 +3,7 @@
 // relevés dans le code source de VPX : src/core/Settings_properties.inl,
 // src/renderer/Window.cpp, src/core/player.cpp et plugins/.
 
+import { t } from './i18n';
 import { IniDocument } from './ini';
 import { edgeAfterRotation, isCabinetView, rotatedDisplay, type SizeCm } from './layout';
 import type { FlipperEdge, ObservedDisplay, RoleId, Rotation, ScreenZone } from './model';
@@ -307,5 +308,5 @@ export function applyVpxSettings(doc: IniDocument, settings: VpxSetting[]): VpxC
 
 /** Diff lisible, une ligne par clé modifiée. */
 export function formatChanges(changes: VpxChange[]): string[] {
-  return changes.map((c) => `[${c.section}] ${c.key} : ${c.before ?? '(absent)'} → ${c.value}`);
+  return changes.map((c) => t('[{section}] {key} : {before} → {value}', { section: c.section, key: c.key, before: c.before ?? t('(absent)'), value: c.value }));
 }

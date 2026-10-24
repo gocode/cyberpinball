@@ -132,6 +132,10 @@ test('aide-mémoire de la partie : les boutons affectés seulement', () => {
   assert.deepEqual(rows[0], ['Flippers', 'Maj gauche / Maj droite']);
   assert.deepEqual(rows.at(-1), ['Tilt', 'T']);
   assert.ok(!rows.some(([title]) => title === 'MagnaSave'));
+  // VPX 10.8.1 quitte dès l'appui sur Exit ; son menu s'ouvre par deux boutons ensemble.
+  assert.ok(rows.some(([title, keys]) => title === 'Quitter la partie' && keys === 'Échap'));
+  assert.ok(rows.some(([title, keys]) => title === 'Menu de VPX' && keys === '5 + 1'), 'sans MagnaSave : Crédit et Start');
+  assert.ok(gameKeys(undefined).some(([title, keys]) => title === 'Menu de VPX' && keys === 'Ctrl gauche + Ctrl droit'));
   assert.ok(gameKeys(undefined).some(([title, keys]) => title === 'Volume' && keys === '- / ='));
   // Touche « / » (tremblement à droite par défaut) : séparateur « · », sinon « Z / / / Espace ».
   assert.ok(gameKeys(undefined).some(([title, keys]) => title === 'Tremblements' && keys === 'Z · / · Espace'));
@@ -171,6 +175,8 @@ test('touches par défaut des encodeurs : écrites telles que VPX les écrit, ri
   assert.deepEqual(plan.silenced, []);
   assert.equal(input(plan.nextIni!, 'Pause'), '');
   assert.equal(plan.memory['Input.Mapping.Start'], 'Key;30');
+  // Menu de VPX : F12 au clavier, les deux MagnaSave sur la borne.
+  assert.equal(input(plan.nextIni!, 'InGameUI'), 'Key;69 | Key;224 & Key;228');
   // Deuxième passage : rien à écrire.
   const again = planVpxSync(cabinetWith({ ...DEFAULT_BUTTONS }), devPcDisplays(), plan.nextIni!, undefined, { memory: plan.memory });
   assert.deepEqual(again.changes, []);
@@ -198,6 +204,22 @@ test('encodeur sur d’autres touches : chaque action suit son bouton', () => {
   // MagnaSave passés : touches de VPX par défaut.
   assert.equal(input(ini, 'LeftMagna'), 'Key;224');
   assert.equal(input(ini, 'UIUp'), 'Key;224');
+});
+
+test('menu de VPX pendant la partie : combinaison de boutons suivie, ajouts de VPX gardés', () => {
+  const noMagna: CabinetButtons = { ...DEFAULT_BUTTONS };
+  delete noMagna.leftMagna;
+  delete noMagna.rightMagna;
+  const first = planVpxSync(cabinetWith({ ...DEFAULT_BUTTONS }), devPcDisplays(), VPX_FIRST_RUN);
+  // MagnaSave retirés de la borne : l'ancienne combinaison part, Crédit + Start la remplace.
+  const next = planVpxSync(cabinetWith(noMagna), devPcDisplays(), first.nextIni!, undefined, { memory: first.memory });
+  assert.equal(input(next.nextIni!, 'InGameUI'), 'Key;69 | Key;34 & Key;30');
+  // Une manette ajoutée dans VPX reste ; F12 pris par un bouton : la combinaison seule.
+  const doc = IniDocument.parse(['[Input]', 'Mapping.InGameUI = Key;69 | Key;34 & Key;30 | SDLJoy_0300_1;9', ''].join('\n'));
+  const joy = vpxInputSettings({ ...noMagna, extraBall: 'F12' }, doc, { 'Input.Mapping.InGameUI': 'Key;69 | Key;34 & Key;30' });
+  const value = joy.settings.find((x) => x.key === 'Mapping.InGameUI')!.value;
+  assert.equal(value, 'SDLJoy_0300_1;9 | Key;34 & Key;30');
+  assert.equal(describeMapping(value, 'InGameUI'), 'bouton de manette ou 5 + 1');
 });
 
 test('un bouton facultatif sur la touche d’une autre action la fait taire, puis la lui rend', () => {

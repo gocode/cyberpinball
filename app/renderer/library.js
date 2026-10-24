@@ -62,7 +62,7 @@ function renderLibrary(v) {
         if (row.detail) li.append(libEl('div', 'lib-row-detail', row.detail));
         list.append(li);
       }
-      if (section.more > 0) list.append(libEl('li', 'lib-row more', `… et ${section.more} autre${section.more > 1 ? 's' : ''}`));
+      if (section.more > 0) list.append(libEl('li', 'lib-row more', tn(section.more, '… et {n} autre', '… et {n} autres')));
       box.append(list);
       content.append(box);
     }
@@ -133,27 +133,27 @@ function renderInfoSheet(card) {
   }
   sheet.append(infoCard.box);
   const facts = libEl('dl', 'info-facts');
-  for (const [label, value] of [['Fabricant', card.manufacturer], ['Année', card.year], ['Auteurs', card.authors], ['Version', card.version]]) {
+  for (const [label, value] of [[t('Fabricant'), card.manufacturer], [t('Année'), card.year], [t('Auteurs'), card.authors], [t('Version'), card.version]]) {
     if (value === undefined || value === '') continue;
     facts.append(libEl('dt', '', label), libEl('dd', '', String(value)));
   }
   if (facts.childElementCount) sheet.append(facts);
   if (card.description) sheet.append(libEl('p', 'info-desc', card.description));
-  sheet.append(libEl('p', 'pages-note', 'Pas de prospectus pour ce jeu : « Médias du jeu », sur la fiche, permet d’en ajouter.'));
+  sheet.append(libEl('p', 'pages-note', t('Pas de prospectus pour ce jeu : « Médias du jeu », sur la fiche, permet d’en ajouter.')));
   return sheet;
 }
 
 /** Règles absentes : les commandes de la partie, comme au chargement. */
 function renderGameKeys(rows) {
   const box = libEl('div', 'game-keys pages-keys');
-  box.append(libEl('h2', '', 'Commandes de la partie'));
+  box.append(libEl('h2', '', t('Commandes de la partie')));
   const list = libEl('div', 'game-keys-list');
   for (const [label, key] of rows) {
     const row = libEl('div', 'game-key');
     row.append(libEl('span', '', label), libEl('span', 'game-key-name', key));
     list.append(row);
   }
-  box.append(list, libEl('p', 'pages-note', 'Pas de carte de règles pour ce jeu : « Médias du jeu », sur la fiche, permet d’en ajouter.'));
+  box.append(list, libEl('p', 'pages-note', t('Pas de carte de règles pour ce jeu : « Médias du jeu », sur la fiche, permet d’en ajouter.')));
   return box;
 }
 
@@ -247,9 +247,9 @@ function renderMediaCards(m, cursor) {
       div.append(value);
       text.append(div);
     };
-    if (c.where) line('media-where', 'Où', c.where);
+    if (c.where) line('media-where', t('Où'), c.where);
     if (c.note) line('media-note', '', c.note);
-    if (c.description) line('media-desc', 'Rôle', c.description);
+    if (c.description) line('media-desc', t('Rôle'), c.description);
     if (c.facts) line('media-facts', '', c.facts);
     if (c.pending) line('media-pending', '', c.pending);
     for (const extra of c.extra ?? []) line('media-extra', '', extra);
@@ -288,7 +288,7 @@ function renderAdjust(a) {
       ends.append(libEl('span', '', item.min), libEl('span', '', item.max));
       li.append(gauge, ends);
     }
-    li.append(libEl('div', 'adjust-general', `Réglage général : ${item.general}`));
+    li.append(libEl('div', 'adjust-general', t('Réglage général : {value}', { value: item.general })));
     if (item.inactive) li.append(libEl('p', 'adjust-help warn', item.inactive));
     if (item.active) li.append(libEl('p', 'adjust-help', item.help));
     list.append(li);
@@ -309,7 +309,7 @@ function renderEditor(e) {
   const keys = libEl('div', 'keys-grid');
   e.keys.forEach((k, i) => {
     const wide = k.length > 1 ? ' wide' : '';
-    const button = actOn(libEl('button', `key${wide}${i === e.cursor ? ' current' : ''}${k === 'Maj' && e.shift ? ' on' : ''}`, k), { type: 'editor', index: i });
+    const button = actOn(libEl('button', `key${wide}${i === e.cursor ? ' current' : ''}${i === e.shiftKey && e.shift ? ' on' : ''}`, k), { type: 'editor', index: i });
     keys.append(button);
   });
   panel.append(keys);

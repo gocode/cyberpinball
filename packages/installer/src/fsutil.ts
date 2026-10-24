@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { t } from '@cyberpinball/core';
 
 export function sha256OfFile(file: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -46,7 +47,7 @@ export function findExecutable(dir: string, pattern: string): string | undefined
  */
 export function pointJunction(junction: string, target: string): void {
   if (fs.existsSync(junction) || isLink(junction)) {
-    if (!isLink(junction)) throw new Error(`${junction} est un vrai dossier, pas une jonction : je ne le remplace pas.`);
+    if (!isLink(junction)) throw new Error(t('{path} est un vrai dossier, pas une jonction : je ne le remplace pas.', { path: junction }));
     // Sur une jonction, rmdir supprime le lien sans toucher au dossier cible.
     fs.rmdirSync(junction);
   }

@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { formatNumber, t } from './i18n';
 
 export type FileOp =
   | { op: 'move'; from: string; to: string }
@@ -229,17 +230,17 @@ export function sizeOf(target: string): number {
 /** « 1,0 Go », « 64 Mo », « 4,8 ko ». */
 export function formatSize(bytes: number): string {
   const units: [number, string][] = [
-    [1024 ** 3, 'Go'],
-    [1024 ** 2, 'Mo'],
-    [1024, 'ko'],
+    [1024 ** 3, t('Go')],
+    [1024 ** 2, t('Mo')],
+    [1024, t('ko')],
   ];
   for (const [size, unit] of units) {
     if (bytes >= size) {
       const value = bytes / size;
-      return `${value.toLocaleString('fr-FR', { maximumFractionDigits: value < 10 ? 1 : 0 })} ${unit}`;
+      return `${formatNumber(value, { maximumFractionDigits: value < 10 ? 1 : 0 })} ${unit}`;
     }
   }
-  return `${bytes} octets`;
+  return t('{n} octets', { n: bytes });
 }
 
 /** Supprime les dossiers vides restés derrière un déplacement, jusqu'à stop exclu. */

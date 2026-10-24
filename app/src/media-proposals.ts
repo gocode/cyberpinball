@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import {
   formatSize,
   localMediaChoices,
+  lowerFirst,
   MEDIA_CHOICE_SOURCE_LABELS,
   MEDIADB_NAME,
   isAudioFile,
@@ -35,6 +36,8 @@ import {
   playfieldMediaRotation,
   readMediaDimensions,
   samePath,
+  t,
+  tn,
   vpsLabel,
   type B2sSource,
   type MediaChoice,
@@ -135,13 +138,13 @@ export function createProposals(ctx: ProposalsContext) {
     if (state && state.file === table.file && query === undefined) return state;
     const previous = state?.file === table.file ? state : undefined;
     const evidence = await ctx.search.evidence(table);
-    ctx.progress('Médias déjà sur la borne : .directb2s (fronton allumé, ampoules), PuP-Pack, DMD, images du .vpx…');
+    ctx.progress(t('Médias déjà sur la borne : .directb2s (fronton allumé, ampoules), PuP-Pack, DMD, images du .vpx…'));
     const local = localMediaChoices(table, { b2s: await ctx.b2s(table), dmdFolder: evidence.script?.dmdFolder, screenshot: ctx.search.screenshot(table), vpxImages: ctx.search.vpxImages(table) });
     const next: State = { file: table.file, games: [], included: [], quality: ctx.search.quality(), local, previews: previous?.previews ?? new Map(), sizes: previous?.sizes ?? new Map(), dead: previous?.dead ?? new Set(), query };
-    ctx.progress('Recherche sur VPinMediaDB…');
+    ctx.progress(t('Recherche sur VPinMediaDB…'));
     const { db, problem } = await ctx.search.index();
-    if (!db) next.problem = problem ?? 'GitHub injoignable';
-    ctx.progress(query ? `Recherche de « ${query} »…` : 'Recherche approfondie : nom écrit dans la table, ROM, PuP-Pack…');
+    if (!db) next.problem = problem ?? t('GitHub injoignable');
+    ctx.progress(query ? t('Recherche de « {query} »…', { query }) : t('Recherche approfondie : nom écrit dans la table, ROM, PuP-Pack…'));
     next.deep = await ctx.search.deep(table, db, query);
     const entries = new Map(next.deep.candidates.map((c) => [c.entry.id, c.entry]));
     next.games = next.deep.leads.flatMap((lead) => {
@@ -191,7 +194,7 @@ export function createProposals(ctx: ProposalsContext) {
   // ---------- Écran des propositions ----------
 
   function open(table: TableEntry, type: MediaType, at = 0): void {
-    void ctx.task('Recherche des propositions…', async () => {
+    void ctx.task(t('Recherche des propositions…'), async () => {
       const st = await ensure(table);
       await prepareType(st, type);
       ctx.show(() => build(type), at);
@@ -200,7 +203,7 @@ export function createProposals(ctx: ProposalsContext) {
 
   /** Après un changement de jeux ou une recherche : les aperçus de ce type, puis l'écran. */
   function reopen(table: TableEntry, type: MediaType, at = 0): void {
-    void ctx.task('Aperçus…', async () => {
+    void ctx.task(t('Aperçus…'), async () => {
       await prepareType(await ensure(table), type);
       ctx.show(() => build(type), at);
     });
@@ -209,14 +212,14 @@ export function createProposals(ctx: ProposalsContext) {
   function remoteThumb(st: State, choice: MediaChoice): MediaThumb {
     const offer = choice.offer!;
     if (offer.kind === 'audio') {
-      if (st.dead.has(offer.file.url)) return { kind: 'fallback', rotation: 0, text: 'Lien mort' };
+      if (st.dead.has(offer.file.url)) return { kind: 'fallback', rotation: 0, text: t('Lien mort') };
       const file = st.previews.get(offer.file.url);
       if (!file || !fs.existsSync(file)) return { kind: 'audio', rotation: 0, text: '♪' };
       allowPreview(file);
       return { kind: 'audio', url: mediaUrl(file), rotation: 0, text: '♪' };
     }
     const file = offer.preview && st.previews.get(offer.preview.url);
-    if (!file || !fs.existsSync(file)) return { kind: 'fallback', rotation: 0, text: 'Aperçu indisponible' };
+    if (!file || !fs.existsSync(file)) return { kind: 'fallback', rotation: 0, text: t('Aperçu indisponible') };
     allowPreview(file);
     // Vu du joueur, flippers en bas : la rotation que le menu appliquera.
     const rotation = mediaTypeInfo(choice.type).orientable ? playfieldMediaRotation(readMediaDimensions(file), 'bottom') : 0;
@@ -255,29 +258,34 @@ export function createProposals(ctx: ProposalsContext) {
       const size = st.sizes.get(choice.offer.file.url);
       const preview = choice.source === 'vps' ? st.previews.get(choice.offer.file.url) : undefined;
       const d = preview ? readMediaDimensions(preview) : undefined;
-      facts = [choice.detail, d ? `${d.width} × ${d.height}` : undefined, size === undefined ? 'taille inconnue' : formatSize(size)].filter(Boolean).join(' · ');
+      facts = [choice.detail, d ? `${d.width} × ${d.height}` : undefined, size === undefined ? t('taille inconnue') : formatSize(size)].filter(Boolean).join(' · ');
     } else facts = ctx.facts(choice.file!);
     const extra: string[] = [];
-    if (lead) extra.push(`Jeu retenu : ${lead.reasons.slice(0, 2).join(' ; ')}.`);
-    if (choice.source === 'vps') extra.push('Basse définition : vignette de la base VPS, à défaut d’autre chose.');
-    else if (choice.source === 'vps-music') extra.push(choice.offer && st.dead.has(choice.offer.file.url) ? 'Lien mort : Dropbox a renvoyé une page au lieu du fichier.' : 'Lien de partage Dropbox donné par la base VPS ; la musique s’écoute dès que la carte est choisie.');
-    else if (choice.offer?.kind === 'video') extra.push('Aperçu : image du même jeu ; la vidéo arrive au téléchargement.');
-    else if (choice.offer?.quality === '4k') extra.push('Aperçu : la même image en 1k ; le fichier 4k arrive au téléchargement.');
+    if (lead) extra.push(t('Jeu retenu : {reasons}.', { reasons: lead.reasons.slice(0, 2).join(t(' ; ')) }));
+    if (choice.source === 'vps') extra.push(t('Basse définition : vignette de la base VPS, à défaut d’autre chose.'));
+    else if (choice.source === 'vps-music') {
+      extra.push(
+        choice.offer && st.dead.has(choice.offer.file.url)
+          ? t('Lien mort : Dropbox a renvoyé une page au lieu du fichier.')
+          : t('Lien de partage Dropbox donné par la base VPS ; la musique s’écoute dès que la carte est choisie.'),
+      );
+    } else if (choice.offer?.kind === 'video') extra.push(t('Aperçu : image du même jeu ; la vidéo arrive au téléchargement.'));
+    else if (choice.offer?.quality === '4k') extra.push(t('Aperçu : la même image en 1k ; le fichier 4k arrive au téléchargement.'));
     if (!choice.offer) {
       const rel = path.relative(table.folder, choice.file!);
       if (rel.startsWith('..') || path.isAbsolute(rel)) {
         // Image extraite du .vpx ou du .directb2s, gardée dans le cache des médias : pas un fichier de la table.
-        extra.push(`Extraite du ${choice.source === 'b2s' ? '.directb2s' : '.vpx'} de la table, gardée dans le cache des médias ; copiée dans medias\\ à l’enregistrement.`);
+        extra.push(t('Extraite du {file} de la table, gardée dans le cache des médias ; copiée dans medias\\ à l’enregistrement.', { file: choice.source === 'b2s' ? '.directb2s' : '.vpx' }));
       } else {
-        extra.push(`Fichier : ${rel}`);
-        extra.push('Copié dans medias\\ ; l’original reste à sa place, la table en a besoin.');
+        extra.push(t('Fichier : {file}', { file: rel }));
+        extra.push(t('Copié dans medias\\ ; l’original reste à sa place, la table en a besoin.'));
       }
     }
     return {
       action,
       title: choice.label,
       code: sourceName(choice),
-      state: chosen ? { label: 'Choisi, à enregistrer', tone: 'warning' } : current ? { label: 'Actuel', tone: 'ok' } : undefined,
+      state: chosen ? { label: t('Choisi, à enregistrer'), tone: 'warning' } : current ? { label: t('Actuel'), tone: 'ok' } : undefined,
       facts,
       extra,
       thumb: choice.offer ? remoteThumb(st, choice) : ctx.thumb(table, choice.type, choice.file!),
@@ -287,7 +295,7 @@ export function createProposals(ctx: ProposalsContext) {
   function build(type: MediaType): Built {
     const table = state && ctx.find(state.file);
     const back = () => ctx.back(type);
-    if (!state || !table) return { heading: 'Table introuvable', sections: [], actions: [{ label: 'Retour', run: back }], back };
+    if (!state || !table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour'), run: back }], back };
     const st = state;
     const info = mediaTypeInfo(type);
     const choices = choicesFor(st, type);
@@ -300,30 +308,38 @@ export function createProposals(ctx: ProposalsContext) {
     const games = includedGames(st).length;
     actions.push(
       {
-        label: 'Autres jeux…',
-        detail: `${games} jeu${games > 1 ? 'x' : ''} retenu${games > 1 ? 's' : ''} sur ${st.games.length} trouvé${st.games.length > 1 ? 's' : ''} avec des médias`,
+        label: t('Autres jeux…'),
+        detail: t('{kept} sur {found} avec des médias', {
+          kept: tn(games, '{n} jeu retenu', '{n} jeux retenus'),
+          found: tn(st.games.length, '{n} trouvé', '{n} trouvés'),
+        }),
         run: () => openGames(table, type),
       },
-      { label: 'Chercher un autre titre…', detail: 'Titre en anglais, initiales ou nom de ROM', run: () => askTitle(table, type, () => ctx.show(() => build(type))) },
-      { label: `Retour : ${info.label}`, run: back },
+      { label: t('Chercher un autre titre…'), detail: t('Titre en anglais, initiales ou nom de ROM'), run: () => askTitle(table, type, () => ctx.show(() => build(type))) },
+      { label: t('Retour : {label}', { label: info.label }), run: back },
     );
     const rows: Row[] = [];
-    if (st.problem) rows.push({ text: 'VPinMediaDB indisponible', detail: `${st.problem}. Restent les médias déjà sur la borne, et les vignettes VPS déjà reçues.`, tone: 'warning' });
+    if (st.problem) rows.push({ text: t('VPinMediaDB indisponible'), detail: t('{problem}. Restent les médias déjà sur la borne, et les vignettes VPS déjà reçues.', { problem: st.problem }), tone: 'warning' });
     if (!choices.length) {
       rows.push({
-        text: 'Aucune proposition pour ce média',
+        text: t('Aucune proposition pour ce média'),
         detail: st.games.length
-          ? `Les jeux retenus n’ont pas de ${info.label.toLowerCase()}, et la table n’en a pas dans son PuP-Pack ni son dossier du DMD. « Autres jeux… » pour en retenir d’autres.`
-          : 'Aucun jeu de la base VPS ne correspond : « Chercher un autre titre… », ou prenez un fichier dans le dossier d’import.',
+          ? t('Les jeux retenus n’ont pas de {label}, et la table n’en a pas dans son PuP-Pack ni son dossier du DMD. « Autres jeux… » pour en retenir d’autres.', { label: lowerFirst(info.label) })
+          : t('Aucun jeu de la base VPS ne correspond : « Chercher un autre titre… », ou prenez un fichier dans le dossier d’import.'),
         tone: 'quiet',
       });
     }
     const sections: Section[] = rows.length ? [{ rows }] : [];
     const source = [...new Set(choices.map(sourceName))].join(', ');
+    const howMany = tn(choices.length, '{n} proposition', '{n} propositions') + (source ? ` (${source})` : '');
+    const how = info.pages
+      ? t('Start ajoute la proposition comme nouvelle page dans le brouillon ; rien n’est écrit avant « Enregistrer ».')
+      : t('Start remplace le média par la proposition dans le brouillon ; rien n’est écrit avant « Enregistrer ».');
+    const online = choices.some((c) => c.offer) ? ` ${t('Médias en ligne : sans licence déclarée, pour un usage personnel sur votre borne.')}` : '';
     return {
-      heading: `${info.label} : propositions`,
-      subheading: `${table.title}${st.query ? ` · recherche « ${st.query} »` : ''}`,
-      lead: `${choices.length} proposition${choices.length > 1 ? 's' : ''}${source ? ` (${source})` : ''}. ${info.pages ? 'Start ajoute la proposition comme nouvelle page' : 'Start remplace le média par la proposition'} dans le brouillon ; rien n’est écrit avant « Enregistrer ».${choices.some((c) => c.offer) ? ' Médias en ligne : sans licence déclarée, pour un usage personnel sur votre borne.' : ''}`,
+      heading: t('{label} : propositions', { label: info.label }),
+      subheading: `${table.title}${st.query ? ` · ${t('recherche « {query} »', { query: st.query })}` : ''}`,
+      lead: `${howMany}. ${how}${online}`,
       sections,
       actions,
       back,
@@ -332,7 +348,7 @@ export function createProposals(ctx: ProposalsContext) {
   }
 
   function pick(table: TableEntry, type: MediaType, choice: MediaChoice): void {
-    if (isChosen(table, choice)) return ctx.back(type, { text: 'Cette proposition est déjà dans le brouillon.', tone: 'info' });
+    if (isChosen(table, choice)) return ctx.back(type, { text: t('Cette proposition est déjà dans le brouillon.'), tone: 'info' });
     if (!choice.offer) {
       const text = ctx.place(table, type, { from: choice.file!, mode: 'copy' });
       return ctx.back(type, { text, tone: 'info' });
@@ -342,25 +358,26 @@ export function createProposals(ctx: ProposalsContext) {
     const st = state!;
     const origin = choice.source === 'mediadb' ? MEDIADB_NAME : VPS_IMAGE_ORIGIN;
     const download = () =>
-      void ctx.task(`Téléchargement depuis ${sourceName(choice)}…`, async () => {
+      void ctx.task(t('Téléchargement depuis {source}…', { source: sourceName(choice) }), async () => {
         let last = 0;
         let file: string;
         try {
           file = await ctx.search.stage(offer.file, (received, total) => {
             if (Date.now() - last < 250) return;
             last = Date.now();
-            ctx.progress(`${mediaTypeInfo(type).label} : ${formatSize(received)}${total ? ` sur ${formatSize(total)}` : ''}…`);
+            const label = mediaTypeInfo(type).label;
+            ctx.progress(total ? t('{label} : {received} sur {total}…', { label, received: formatSize(received), total: formatSize(total) }) : t('{label} : {received}…', { label, received: formatSize(received) }));
           });
         } catch (error) {
-          return ctx.back(type, { text: `Téléchargement impossible : ${(error as Error).message}. Rien n’a été laissé.`, tone: 'error' });
+          return ctx.back(type, { text: t('Téléchargement impossible : {error}. Rien n’a été laissé.', { error: (error as Error).message }), tone: 'error' });
         }
         if (offer.kind === 'audio' && !isAudioFile(file)) {
           fs.rmSync(file, { force: true });
           st.dead.add(offer.file.url);
-          return ctx.back(type, { text: 'Lien mort : le site a renvoyé une page au lieu du fichier. Rien n’a été gardé.', tone: 'error' });
+          return ctx.back(type, { text: t('Lien mort : le site a renvoyé une page au lieu du fichier. Rien n’a été gardé.'), tone: 'error' });
         }
         const text = ctx.place(table, type, { from: file, mode: 'move', origin: { origin, url: offer.file.url, vpsId: choice.vpsId, key: offer.key, md5: offer.file.md5 } });
-        ctx.back(type, { text: `${text} Téléchargé${offer.file.md5 ? ' et vérifié' : ''}.`, tone: 'info' });
+        ctx.back(type, { text: `${text} ${offer.file.md5 ? t('Téléchargé et vérifié.') : t('Téléchargé.')}`, tone: 'info' });
       });
     // L'avertissement de VPinMediaDB (aucune licence) est lu une fois avant son premier téléchargement.
     if (choice.source === 'mediadb') ctx.withNotice(download, () => ctx.show(() => build(type), at));
@@ -371,18 +388,18 @@ export function createProposals(ctx: ProposalsContext) {
 
   function askTitle(table: TableEntry, type: MediaType, cancel: () => void): void {
     ctx.prompt(
-      'Chercher un autre titre',
-      'Titre du jeu',
+      t('Chercher un autre titre'),
+      t('Titre du jeu'),
       state?.query ?? '',
       (text) => {
         if (!text?.trim()) return cancel();
-        void ctx.task(`Recherche de « ${text.trim()} »…`, async () => {
+        void ctx.task(t('Recherche de « {query} »…', { query: text.trim() }), async () => {
           const st = await ensure(table, text.trim());
           await prepareType(st, type);
           ctx.show(() => build(type));
         });
       },
-      'Le titre en anglais, tel que le fabricant l’a sorti (« Guardians of the Galaxy »), ses initiales (« GOTG ») ou le nom de sa ROM (« t2_l8 »). Le premier jeu trouvé s’ajoute aux propositions ; « Autres jeux… » pour choisir.',
+      t('Le titre en anglais, tel que le fabricant l’a sorti (« Guardians of the Galaxy »), ses initiales (« GOTG ») ou le nom de sa ROM (« t2_l8 »). Le premier jeu trouvé s’ajoute aux propositions ; « Autres jeux… » pour choisir.'),
     );
   }
 
@@ -394,9 +411,9 @@ export function createProposals(ctx: ProposalsContext) {
   }
 
   function openGames(table: TableEntry, type: MediaType, at = 0): void {
-    void ctx.task('Logos des jeux…', async () => {
+    void ctx.task(t('Logos des jeux…'), async () => {
       const st = await ensure(table);
-      await ctx.search.stagePreviews(st.games.flatMap((g) => faceOf(g) ?? []), st.previews, 'Logos');
+      await ctx.search.stagePreviews(st.games.flatMap((g) => faceOf(g) ?? []), st.previews, t('Logos'));
       ctx.show(() => buildGames(type), at);
     });
   }
@@ -404,14 +421,14 @@ export function createProposals(ctx: ProposalsContext) {
   function buildGames(type: MediaType): Built {
     const table = state && ctx.find(state.file);
     const back = () => (table ? reopen(table, type) : ctx.back(type));
-    if (!state || !table) return { heading: 'Table introuvable', sections: [], actions: [{ label: 'Retour', run: back }], back };
+    if (!state || !table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour'), run: back }], back };
     const st = state;
     const actions: Action[] = st.games.map((g) => {
       const id = g.lead.game.id;
       const on = st.included.includes(id);
       return {
         label: vpsLabel(g.lead.game),
-        detail: on ? 'Proposé : Start pour le retirer' : 'Start pour proposer ses médias',
+        detail: on ? t('Proposé : Start pour le retirer') : t('Start pour proposer ses médias'),
         tone: on ? 'ok' : undefined,
         run: () => {
           st.included = on ? st.included.filter((x) => x !== id) : [...st.included, id];
@@ -423,39 +440,44 @@ export function createProposals(ctx: ProposalsContext) {
       const on = st.included.includes(g.lead.game.id);
       const face = faceOf(g);
       const file = face && st.previews.get(face.url);
-      let thumb: MediaThumb = { kind: 'fallback', rotation: 0, text: 'Pas d’image' };
+      let thumb: MediaThumb = { kind: 'fallback', rotation: 0, text: t('Pas d’image') };
       if (file && fs.existsSync(file)) {
         allowPreview(file);
         thumb = { kind: 'image', url: mediaUrl(file), rotation: 0 };
       }
-      const types = g.entry ? mediaDbOffers(g.entry, st.quality.quality).map((o) => mediaTypeInfo(o.type).label.toLowerCase()) : [];
+      const types = g.entry ? mediaDbOffers(g.entry, st.quality.quality).map((o) => lowerFirst(mediaTypeInfo(o.type).label)) : [];
       const thumbs = vpsImageCount(g.lead.game);
       return {
         action: i,
         title: vpsLabel(g.lead.game),
-        state: on ? { label: 'Proposé', tone: 'ok' } : undefined,
-        facts: [types.length ? `${MEDIADB_NAME} : ${types.join(', ')}` : undefined, thumbs ? `${thumbs} vignette${thumbs > 1 ? 's' : ''} VPS` : undefined].filter(Boolean).join(' · '),
+        state: on ? { label: t('Proposé'), tone: 'ok' } : undefined,
+        facts: [
+          types.length ? t('{source} : {types}', { source: MEDIADB_NAME, types: types.join(', ') }) : undefined,
+          thumbs ? tn(thumbs, '{n} vignette VPS', '{n} vignettes VPS') : undefined,
+        ]
+          .filter(Boolean)
+          .join(' · '),
         extra: g.lead.reasons.slice(0, 3),
         thumb,
       };
     });
     const without = (st.deep?.leads ?? []).filter((l) => !st.games.some((g) => g.lead.game.id === l.game.id)).slice(0, 6);
     const sections: Section[] = [];
-    if (!st.games.length) sections.push({ rows: [{ text: 'Aucun jeu avec des médias', detail: 'Cherchez un autre titre : en anglais, ses initiales ou le nom de sa ROM.', tone: 'quiet' }] });
+    if (!st.games.length) sections.push({ rows: [{ text: t('Aucun jeu avec des médias'), detail: t('Cherchez un autre titre : en anglais, ses initiales ou le nom de sa ROM.'), tone: 'quiet' }] });
     if (without.length) {
       sections.push({
-        title: 'Reconnus aussi, sans aucun média en ligne',
-        rows: without.map((l) => ({ text: vpsLabel(l.game), detail: l.reasons.slice(0, 2).join(' ; '), tone: 'quiet' as const })),
+        title: t('Reconnus aussi, sans aucun média en ligne'),
+        rows: without.map((l) => ({ text: vpsLabel(l.game), detail: l.reasons.slice(0, 2).join(t(' ; ')), tone: 'quiet' as const })),
       });
     }
     actions.push(
-      { label: 'Chercher un autre titre…', detail: 'Titre en anglais, initiales ou nom de ROM', run: () => askTitle(table, type, () => ctx.show(() => buildGames(type))) },
-      { label: 'Retour aux propositions', tone: 'ok', run: back },
+      { label: t('Chercher un autre titre…'), detail: t('Titre en anglais, initiales ou nom de ROM'), run: () => askTitle(table, type, () => ctx.show(() => buildGames(type))) },
+      { label: t('Retour aux propositions'), tone: 'ok', run: back },
     );
     return {
-      heading: 'Jeux dont les médias sont proposés',
-      subheading: `${table.title}${st.query ? ` · recherche « ${st.query} »` : ''}`,
-      lead: 'Jeux de la base VPS que désignent le nom de la table, le nom écrit dedans par son auteur, sa ROM, son PuP-Pack ou votre recherche, le plus probable d’abord, avec leurs raisons. Start ajoute ou retire un jeu des propositions.',
+      heading: t('Jeux dont les médias sont proposés'),
+      subheading: `${table.title}${st.query ? ` · ${t('recherche « {query} »', { query: st.query })}` : ''}`,
+      lead: t('Jeux de la base VPS que désignent le nom de la table, le nom écrit dedans par son auteur, sa ROM, son PuP-Pack ou votre recherche, le plus probable d’abord, avec leurs raisons. Start ajoute ou retire un jeu des propositions.'),
       sections,
       actions,
       back,

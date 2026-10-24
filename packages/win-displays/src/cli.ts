@@ -1,3 +1,4 @@
+// i18n-ignore-file : outil en ligne de commande, ses sorties restent en français.
 // npm run probe [-- --json] : affiche les écrans détectés et leur empreinte,
 // les sorties audio actives et le nom que VPX attend pour chacune, puis les DMD
 // réels reconnus à leur identifiant USB (lecture seule, aucun port ouvert).

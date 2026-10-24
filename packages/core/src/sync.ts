@@ -1,6 +1,7 @@
 import { vpxAudioSettings } from './audio';
 import { buttonInfo, buttonProblems, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, type SilencedAction } from './buttons';
 import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxFolderDefaults, type DetectedDmd, type GlobalDmdFolders } from './dmd';
+import { t } from './i18n';
 import { IniDocument } from './ini';
 import { loadOwnedMemory, readTextIfExists, saveOwnedMemory, writeWithBackup, type WriteReport } from './store';
 import { currentFlipperEdge, EDGE_LABELS, playfieldSize } from './layout';
@@ -114,13 +115,16 @@ export function planVpxSync(
       if (match.approximate.includes(fp)) {
         findings.push({
           severity: 'warning',
-          message: `${role.label} : écran « ${screen?.label} » retrouvé par son modèle seulement (pas de numéro de série). Vérifiez qu'il s'agit bien du bon écran.`,
+          message: t("{role} : écran « {screen} » retrouvé par son modèle seulement (pas de numéro de série). Vérifiez qu'il s'agit bien du bon écran.", {
+            role: role.label,
+            screen: screen?.label ?? fp,
+          }),
         });
       }
     } else {
       findings.push({
         severity: role.required ? 'blocking' : 'warning',
-        message: `${role.label} : l'écran « ${screen?.label ?? fp} » est introuvable. Est-il allumé et branché ?`,
+        message: t("{role} : l'écran « {screen} » est introuvable. Est-il allumé et branché ?", { role: role.label, screen: screen?.label ?? fp }),
       });
     }
   }
@@ -129,13 +133,16 @@ export function planVpxSync(
     if (d.scale !== undefined && d.scale !== 1) {
       findings.push({
         severity: 'warning',
-        message: `${d.friendlyName || d.gdiName} est mis à l'échelle à ${Math.round(d.scale * 100)} %. VPX repère les écrans en coordonnées logiques : gardez 100 % sur une borne.`,
+        message: t("{name} est mis à l'échelle à {scale} %. VPX repère les écrans en coordonnées logiques : gardez 100 % sur une borne.", {
+          name: d.friendlyName || d.gdiName,
+          scale: Math.round(d.scale * 100),
+        }),
       });
     }
     if (!d.friendlyName) {
       findings.push({
         severity: 'info',
-        message: `${d.gdiName} n'a pas de nom convivial : VPX le nommera « ${vpxDisplayName(d)} », un libellé générique que plusieurs écrans peuvent partager.`,
+        message: t("{name} n'a pas de nom convivial : VPX le nommera « {vpxName} », un libellé générique que plusieurs écrans peuvent partager.", { name: d.gdiName, vpxName: vpxDisplayName(d) }),
       });
     }
   }
@@ -151,7 +158,10 @@ export function planVpxSync(
       if (sameName.length > 1) {
         findings.push({
           severity: 'warning',
-          message: `${role.label} : ${sameName.length} écrans s'appellent « ${name} ». Cette version de VPX repère les écrans par leur seul nom et prendra le premier ; le ${role.label} peut s'ouvrir sur le mauvais écran.`,
+          message: t(
+            "{role} : {n} écrans s'appellent « {name} ». Cette version de VPX repère les écrans par leur seul nom et prendra le premier ; le {role} peut s'ouvrir sur le mauvais écran.",
+            { role: role.label, n: sameName.length, name },
+          ),
         });
       }
     }
@@ -215,20 +225,23 @@ export function planVpxSync(
     if (!size) {
       findings.push({
         severity: 'warning',
-        message: "Playfield : taille de l'écran inconnue. Relancez l'assistant d'écrans et indiquez sa diagonale pour que VPX cadre les tables à la bonne échelle.",
+        message: t("Playfield : taille de l'écran inconnue. Relancez l'assistant d'écrans et indiquez sa diagonale pour que VPX cadre les tables à la bonne échelle."),
       });
     }
     const expected = vpxFlipperEdge(playfield, edge);
     if (edge !== expected) {
       findings.push({
         severity: 'warning',
-        message: `Playfield : flippers ${EDGE_LABELS[edge]} de l'image, mais VPX les place toujours ${EDGE_LABELS[expected]}. Les tables s'afficheront à l'envers : relancez l'assistant d'écrans, il tournera l'écran du playfield dans Windows pour VPX.`,
+        message: t(
+          "Playfield : flippers {edge} de l'image, mais VPX les place toujours {expected}. Les tables s'afficheront à l'envers : relancez l'assistant d'écrans, il tournera l'écran du playfield dans Windows pour VPX.",
+          { edge: EDGE_LABELS[edge], expected: EDGE_LABELS[expected] },
+        ),
       });
     }
   } else {
     findings.push({
       severity: 'info',
-      message: "Playfield : orientation non renseignée. Relancez l'assistant d'écrans pour que les tables soient cadrées automatiquement.",
+      message: t("Playfield : orientation non renseignée. Relancez l'assistant d'écrans pour que les tables soient cadrées automatiquement."),
     });
   }
 
@@ -268,7 +281,10 @@ export function planVpxSync(
     // Relevé incohérent : l'interface suit les touches par défaut, [Input] reste tel quel.
     findings.push({
       severity: 'warning',
-      message: `Boutons de la borne incohérents dans cabinet.json (${buttonIssues.join(' ; ')}) : l'interface suit les touches par défaut des encodeurs et [Input] n'est pas touché. Refaites l'étape « Boutons » ou remettez les touches par défaut.`,
+      message: t(
+        "Boutons de la borne incohérents dans cabinet.json ({issues}) : l'interface suit les touches par défaut des encodeurs et [Input] n'est pas touché. Refaites l'étape « Boutons » ou remettez les touches par défaut.",
+        { issues: buttonIssues.join(t(' ; ')) },
+      ),
     });
     for (const [id, written] of Object.entries(options.memory ?? {})) if (isInputKey(id)) memory[id] = written;
   } else if (cabinet.buttons) {
@@ -279,7 +295,9 @@ export function planVpxSync(
     if (silenced.length) {
       findings.push({
         severity: 'info',
-        message: `Touches de VPX reprises par les boutons de la borne : ${silenced.map((s) => `${s.label} (${keyLabel(codeOfScancode(s.scancode))}, désormais ${buttonInfo(s.button).label})`).join(', ')}.`,
+        message: t('Touches de VPX reprises par les boutons de la borne : {list}.', {
+          list: silenced.map((s) => t('{action} ({key}, désormais {button})', { action: s.label, key: keyLabel(codeOfScancode(s.scancode)), button: buttonInfo(s.button).label })).join(', '),
+        }),
       });
     }
   }
@@ -290,7 +308,10 @@ export function planVpxSync(
       if (iniBool(doc.get(`Plugin.${plugin}`, 'Enable')) && iniBool(doc.get(`Plugin.${other}`, 'Enable'))) {
         findings.push({
           severity: 'warning',
-          message: `${plugin} et ${other} activés ensemble dans VPinballX.ini : les deux répondent aux tables qui demandent ${plugin === 'B2S' ? 'B2S.Server' : 'le même objet'}, et le dernier chargé l'emporte. Remettez [Plugin.${other}] Enable = 0.`,
+          message: t(
+            "{plugin} et {other} activés ensemble dans VPinballX.ini : les deux répondent aux tables qui demandent {object}, et le dernier chargé l'emporte. Remettez [Plugin.{other}] Enable = 0.",
+            { plugin, other, object: plugin === 'B2S' ? 'B2S.Server' : t('le même objet') },
+          ),
         });
       }
     }
@@ -302,7 +323,7 @@ export function planVpxSync(
   if (manualEdits.length) {
     findings.push({
       severity: 'warning',
-      message: `VPinballX.ini modifié à la main : ${manualEdits.map(formatManualEdit).join(' ; ')}. Cyber Pinball n'y a pas touché : gardez ces valeurs ou remettez les siennes.`,
+      message: t("VPinballX.ini modifié à la main : {edits}. Cyber Pinball n'y a pas touché : gardez ces valeurs ou remettez les siennes.", { edits: manualEdits.map(formatManualEdit).join(t(' ; ')) }),
     });
   }
 
@@ -346,7 +367,7 @@ function sameValue(a: string | undefined, b: string): boolean {
 }
 
 export function formatManualEdit(e: ManualEdit): string {
-  return `[${e.section}] ${e.key} = ${e.current ?? '(absent)'} au lieu de ${e.value}`;
+  return t('[{section}] {key} = {current} au lieu de {value}', { section: e.section, key: e.key, current: e.current ?? t('(absent)'), value: e.value });
 }
 
 const SIZE_KEYS = [ownedId('Player', 'ScreenWidth'), ownedId('Player', 'ScreenHeight')];

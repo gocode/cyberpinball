@@ -6,13 +6,15 @@
 
 // En premier : refuse toute écriture hors du bac à sable pendant un essai sans opérateur.
 import './sandbox-guard';
-import { describeDisplays, explainScore, formatChanges, loadCabinet, loadCabinetSet, rememberChoice, updateCabinetSet } from '@cyberpinball/core';
+import { describeDisplays, explainScore, formatChanges, loadCabinet, loadCabinetSet, rememberChoice, resolveLanguage, setLanguage, updateCabinetSet } from '@cyberpinball/core';
 import { observedDisplays } from './displays';
 import { locations, vpxProfile } from './paths';
 import { syncConfiguration } from './vpx-ini';
 import { describeReset, resetButtons } from './buttons-reset';
 
 const loc = locations();
+// Constats de la synchronisation dans la langue de l'interface (language.ts, sans Electron ici).
+setLanguage(resolveLanguage({ env: process.env, dataDir: loc.dataDir, system: [Intl.DateTimeFormat().resolvedOptions().locale] }));
 const cabinet = loadCabinet(loc.dataDir);
 if (!cabinet) {
   console.log(`Aucune borne configurée dans ${loc.dataDir}. Lancez d'abord l'assistant d'écrans.`);

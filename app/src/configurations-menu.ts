@@ -10,11 +10,15 @@ import {
   explainChoice,
   explainScore,
   forceConfiguration,
+  formatDateTime,
+  formatList,
   loadCabinetSet,
   rememberChoice,
   renameConfiguration,
   restoreConfiguration,
   ROLES,
+  t,
+  tn,
   trashConfiguration,
   updateCabinetSet,
   type CabinetConfiguration,
@@ -38,7 +42,9 @@ export interface ConfigurationsHost {
   relaunch(newConfiguration?: boolean): void;
 }
 
-const LEAD = 'Chaque configuration a ses écrans, ses rôles, son son, ses boutons et son VPinballX.ini ; les tables, les ROM et les médias sont communs.';
+const lead = () => t('Chaque configuration a ses écrans, ses rôles, son son, ses boutons et son VPinballX.ini ; les tables, les ROM et les médias sont communs.');
+/** Nom d'une configuration entre guillemets, à la façon de la langue. */
+const quoted = (name: string) => t('« {name} »', { name });
 
 export function createConfigurationsMenu(host: ConfigurationsHost) {
   const set = () => loadCabinetSet(host.loc.dataDir)!;
@@ -48,12 +54,17 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
 
   /** Entrée du menu système ; son détail nomme la configuration active. */
   const systemItem: SystemItem = {
-    label: 'Configurations de la borne',
+    get label() {
+      return t('Configurations de la borne');
+    },
     get detail() {
       const s = loadCabinetSet(host.loc.dataDir);
       const current = s && active(s);
-      if (!current) return 'Aucune configuration';
-      return `Active : « ${current.name} »${s.forced === current.id ? ' (forcée)' : ''} · ${s.configurations.length} configuration${s.configurations.length > 1 ? 's' : ''}`;
+      if (!current) return t('Aucune configuration');
+      const count = s.configurations.length;
+      return s.forced === current.id
+        ? tn(count, 'Active : « {name} » (forcée) · {n} configuration', 'Active : « {name} » (forcée) · {n} configurations', { name: current.name })
+        : tn(count, 'Active : « {name} » · {n} configuration', 'Active : « {name} » · {n} configurations', { name: current.name });
     },
     run: () => openManager(),
   };
@@ -68,7 +79,7 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
       const s = set();
       const choice = chooseConfiguration(s, host.displays());
       const actions: Action[] = choice.scores.map((score) => ({
-        label: `« ${score.name} »`,
+        label: quoted(score.name),
         detail: explainScore(score),
         tone: score.candidate ? 'ok' : 'quiet',
         run: () => {
@@ -76,12 +87,12 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
           host.relaunch();
         },
       }));
-      actions.push({ label: 'Nouvelle configuration', detail: 'Assistant complet pour les écrans branchés', run: () => host.relaunch(true) });
-      actions.push({ label: 'Plus tard', detail: 'Le menu reste sur l’écran principal ; une partie redemandera la configuration', run: () => host.library.leave() });
+      actions.push({ label: t('Nouvelle configuration'), detail: t('Assistant complet pour les écrans branchés'), run: () => host.relaunch(true) });
+      actions.push({ label: t('Plus tard'), detail: t('Le menu reste sur l’écran principal ; une partie redemandera la configuration'), run: () => host.library.leave() });
       return {
-        heading: 'Quelle configuration est branchée ?',
+        heading: t('Quelle configuration est branchée ?'),
         lead: reason ?? explainChoice(s, choice),
-        sections: [{ title: 'Écrans branchés', rows: [{ text: describeDisplays(host.displays()) }] }],
+        sections: [{ title: t('Écrans branchés'), rows: [{ text: describeDisplays(host.displays()) }] }],
         actions,
         back: () => host.library.leave(),
       };
@@ -100,31 +111,37 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
           text: c.name,
           detail: score ? explainScore(score) : undefined,
           tone: c.id === current?.id ? 'ok' : score?.candidate ? 'info' : 'quiet',
-          badges: [...(c.id === current?.id ? ['active'] : []), ...(s.forced === c.id ? ['forcée'] : [])],
+          badges: [...(c.id === current?.id ? [t('active')] : []), ...(s.forced === c.id ? [t('forcée')] : [])],
           action: i,
         };
       });
-      const actions: Action[] = s.configurations.map((c) => ({ label: `« ${c.name} »`, detail: 'Utiliser, forcer, renommer, supprimer', run: () => openConfiguration(c.id) }));
-      actions.push({ label: 'Nouvelle configuration', detail: 'Assistant complet pour les écrans branchés', run: () => host.relaunch(true) });
+      const actions: Action[] = s.configurations.map((c) => ({ label: quoted(c.name), detail: t('Utiliser, forcer, renommer, supprimer'), run: () => openConfiguration(c.id) }));
+      actions.push({ label: t('Nouvelle configuration'), detail: t('Assistant complet pour les écrans branchés'), run: () => host.relaunch(true) });
       if (s.forced) {
         actions.push({
-          label: 'Reconnaissance automatique',
-          detail: `Ne plus forcer « ${nameOf(s, s.forced)} » : la configuration suivra les écrans branchés`,
+          label: t('Reconnaissance automatique'),
+          detail: t('Ne plus forcer « {name} » : la configuration suivra les écrans branchés', { name: nameOf(s, s.forced) }),
           run: () => {
             updateCabinetSet(host.loc.dataDir, (x) => forceConfiguration(x, undefined));
             host.relaunch();
           },
         });
       }
-      if (s.trash?.length) actions.push({ label: 'Corbeille', detail: `${s.trash.length} configuration${s.trash.length > 1 ? 's' : ''} supprimée${s.trash.length > 1 ? 's' : ''}`, run: () => openTrash() });
-      actions.push({ label: 'Retour', run: () => host.library.openSystem() });
+      if (s.trash?.length) {
+        actions.push({ label: t('Corbeille'), detail: tn(s.trash.length, '{n} configuration supprimée', '{n} configurations supprimées'), run: () => openTrash() });
+      }
+      actions.push({ label: t('Retour'), run: () => host.library.openSystem() });
       return {
-        heading: 'Configurations de la borne',
-        subheading: current ? `Active : « ${current.name} »${s.forced === current.id ? ', forcée depuis ce menu' : ''}` : undefined,
-        lead: LEAD,
+        heading: t('Configurations de la borne'),
+        subheading: current
+          ? s.forced === current.id
+            ? t('Active : « {name} », forcée depuis ce menu', { name: current.name })
+            : t('Active : « {name} »', { name: current.name })
+          : undefined,
+        lead: lead(),
         sections: [
-          { title: 'Configurations', rows },
-          { title: 'Écrans branchés', rows: [{ text: describeDisplays(host.displays()) }] },
+          { title: t('Configurations'), rows },
+          { title: t('Écrans branchés'), rows: [{ text: describeDisplays(host.displays()) }] },
         ],
         actions,
         back: () => host.library.openSystem(),
@@ -136,15 +153,15 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
     host.library.openCustom(() => {
       const s = set();
       const c = s.configurations.find((x) => x.id === id);
-      if (!c) return { heading: 'Configuration introuvable', sections: [], actions: [{ label: 'Retour', run: () => openManager() }], back: () => openManager() };
+      if (!c) return { heading: t('Configuration introuvable'), sections: [], actions: [{ label: t('Retour'), run: () => openManager() }], back: () => openManager() };
       const index = s.configurations.indexOf(c);
       const score = scoreOf(scores(s), id);
       const isActive = active(s)?.id === id;
       const actions: Action[] = [];
       if (!isActive) {
         actions.push({
-          label: 'Utiliser avec ces écrans',
-          detail: 'Retenue pour les écrans branchés ; la reconnaissance reste automatique',
+          label: t('Utiliser avec ces écrans'),
+          detail: t('Retenue pour les écrans branchés ; la reconnaissance reste automatique'),
           run: () => {
             updateCabinetSet(host.loc.dataDir, (x) => rememberChoice(x, host.displays(), id));
             host.relaunch();
@@ -153,8 +170,8 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
       }
       if (s.forced !== id) {
         actions.push({
-          label: 'Toujours utiliser celle-ci',
-          detail: 'Forcée, quels que soient les écrans branchés',
+          label: t('Toujours utiliser celle-ci'),
+          detail: t('Forcée, quels que soient les écrans branchés'),
           run: () => {
             updateCabinetSet(host.loc.dataDir, (x) => forceConfiguration(x, id));
             host.relaunch();
@@ -162,23 +179,23 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
         });
       }
       actions.push({
-        label: 'Renommer',
+        label: t('Renommer'),
         detail: c.name,
         run: () =>
-          host.library.openPrompt('Renommer la configuration', 'Nom', c.name, (name) => {
+          host.library.openPrompt(t('Renommer la configuration'), t('Nom'), c.name, (name) => {
             if (name) updateCabinetSet(host.loc.dataDir, (x) => renameConfiguration(x, id, name));
             openConfiguration(id);
           }),
       });
       if (s.configurations.length > 1) {
-        actions.push({ label: 'Supprimer', detail: 'Mise à la corbeille, restaurable ; son VPinballX.ini reste sur le disque', tone: 'warning', run: () => confirmTrash(id) });
+        actions.push({ label: t('Supprimer'), detail: t('Mise à la corbeille, restaurable ; son VPinballX.ini reste sur le disque'), tone: 'warning', run: () => confirmTrash(id) });
       }
-      actions.push({ label: 'Retour', run: () => openManager(index) });
+      actions.push({ label: t('Retour'), run: () => openManager(index) });
       return {
-        heading: `« ${c.name} »`,
-        subheading: [isActive && 'active', s.forced === id && 'forcée'].filter(Boolean).join(' · ') || undefined,
+        heading: quoted(c.name),
+        subheading: [isActive && t('active'), s.forced === id && t('forcée')].filter(Boolean).join(' · ') || undefined,
         lead: score ? explainScore(score) : undefined,
-        sections: [{ title: 'Écrans', rows: screenRows(c, score) }, { title: 'Fichiers', rows: [{ text: 'VPinballX.ini', detail: configIniPath(host.loc.vpxIni, c) }] }],
+        sections: [{ title: t('Écrans'), rows: screenRows(c, score) }, { title: t('Fichiers'), rows: [{ text: 'VPinballX.ini', detail: configIniPath(host.loc.vpxIni, c) }] }],
         actions,
         back: () => openManager(index),
       };
@@ -190,13 +207,15 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
       const s = set();
       const isActive = active(s)?.id === id;
       return {
-        heading: `Supprimer « ${nameOf(s, id)} » ?`,
-        lead: `Elle va dans la corbeille des configurations, d'où elle se restaure telle quelle.${isActive ? ' C’est la configuration active : le menu redémarre et reconnaît celle qui correspond aux écrans branchés.' : ''}`,
+        heading: t('Supprimer « {name} » ?', { name: nameOf(s, id) }),
+        lead: isActive
+          ? t("Elle va dans la corbeille des configurations, d'où elle se restaure telle quelle. C’est la configuration active : le menu redémarre et reconnaît celle qui correspond aux écrans branchés.")
+          : t("Elle va dans la corbeille des configurations, d'où elle se restaure telle quelle."),
         sections: [],
         actions: [
-          { label: 'Annuler', run: () => openConfiguration(id) },
+          { label: t('Annuler'), run: () => openConfiguration(id) },
           {
-            label: 'Supprimer',
+            label: t('Supprimer'),
             tone: 'warning',
             run: () => {
               updateCabinetSet(host.loc.dataDir, (x) => trashConfiguration(x, id));
@@ -215,15 +234,21 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
       const s = set();
       const trash = s.trash ?? [];
       const actions: Action[] = trash.map((c) => ({
-        label: `Restaurer « ${c.name} »`,
-        detail: `Supprimée le ${new Date(c.deletedAt).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' })}`,
+        label: t('Restaurer « {name} »', { name: c.name }),
+        detail: t('Supprimée le {date}', { date: formatDateTime(c.deletedAt) }),
         run: () => {
           updateCabinetSet(host.loc.dataDir, (x) => restoreConfiguration(x, c.id));
           openManager();
         },
       }));
-      actions.push({ label: 'Retour', run: () => openManager() });
-      return { heading: 'Corbeille des configurations', lead: 'Une configuration restaurée reprend ses écrans, ses réglages et son VPinballX.ini.', sections: [], actions, back: () => openManager() };
+      actions.push({ label: t('Retour'), run: () => openManager() });
+      return {
+        heading: t('Corbeille des configurations'),
+        lead: t('Une configuration restaurée reprend ses écrans, ses réglages et son VPinballX.ini.'),
+        sections: [],
+        actions,
+        back: () => openManager(),
+      };
     });
   }
 
@@ -237,7 +262,7 @@ function screenRows(c: CabinetConfiguration, score: ConfigurationScore | undefin
     const missing = score?.missing.some((m) => m.fingerprint === screen.fingerprint);
     return {
       text: screen.label,
-      detail: `${roles.length ? roles.join(' et ') : 'sans rôle'} · ${missing ? 'introuvable' : 'branché'}`,
+      detail: `${roles.length ? formatList(roles) : t('sans rôle')} · ${missing ? t('introuvable') : t('branché')}`,
       tone: missing ? (roles.length ? 'warning' : 'quiet') : 'ok',
     };
   });

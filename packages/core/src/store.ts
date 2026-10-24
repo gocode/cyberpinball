@@ -17,6 +17,7 @@ import {
   type CabinetSet,
   type ConfigurationChoice,
 } from './configurations';
+import { t } from './i18n';
 import type { Cabinet, ObservedDisplay } from './model';
 import type { OwnedMemory, SyncFinding } from './sync';
 
@@ -128,16 +129,16 @@ export function selectConfiguration(home: string, observed: ObservedDisplay[]): 
   const summary = explainChoice(set, choice);
   const configuration = set.configurations.find((c) => c.id === chosenId(choice));
   if (!configuration) {
-    return { choice, summary, findings: [{ severity: 'blocking', message: `Configuration de la borne à choisir. ${summary}` }] };
+    return { choice, summary, findings: [{ severity: 'blocking', message: t('Configuration de la borne à choisir. {summary}', { summary }) }] };
   }
   const before = activeConfiguration(set);
   const previous = before && before.id !== configuration.id ? before : undefined;
   if (set.active !== configuration.id) saveCabinetSet(home, { ...set, active: configuration.id });
   const score = choice.scores.find((s) => s.id === configuration.id)!;
   const findings: SyncFinding[] = [];
-  if (previous) findings.push({ severity: 'warning', message: `Configuration changée : « ${configuration.name} » à la place de « ${previous.name} ». ${summary}` });
-  else if (score.missing.length) findings.push({ severity: 'warning', message: `Configuration ${summary}` });
-  else findings.push({ severity: 'info', message: `Configuration ${summary}` });
+  if (previous) {
+    findings.push({ severity: 'warning', message: t('Configuration changée : « {name} » à la place de « {previous} ». {summary}', { name: configuration.name, previous: previous.name, summary }) });
+  } else findings.push({ severity: score.missing.length ? 'warning' : 'info', message: t('Configuration {summary}', { summary }) });
   return { choice, configuration, previous, findings, summary };
 }
 
@@ -204,7 +205,7 @@ export function writeWithBackup(file: string, content: string, backupDir: string
   }
   writeAtomic(file, content);
   if (fs.readFileSync(file, 'utf8') !== content) {
-    throw new Error(`Relecture de ${file} : le contenu ne correspond pas à ce qui a été écrit.`);
+    throw new Error(t('Relecture de {file} : le contenu ne correspond pas à ce qui a été écrit.', { file }));
   }
   return { path: file, backup };
 }

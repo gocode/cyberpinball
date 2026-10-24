@@ -4,6 +4,7 @@
 // [TableOverride] ViewCab* n'y figurent pas : le cadrage automatique les écrase.
 
 import { IniDocument } from './ini';
+import { formatNumber, t, tn } from './i18n';
 import { formatIniValue, parseIniValue, sameValue, type VpxSettingDef } from './vpx-settings';
 
 export type ViewAdjustId = 'height' | 'fit' | 'eyes';
@@ -24,34 +25,49 @@ export const AUTOFIT_MANUAL = 0;
 export const AUTOFIT_FIT = 1;
 export const AUTOFIT_FILL = 2;
 
-const FIT_LABELS = ['Manuel (vue enregistrée)', 'Ajuster la table', 'Remplir l’écran'];
+/** Libellé d'un mode de cadrage (à l'affichage : rien ne se traduit au chargement du module). */
+function fitLabel(mode: number): string | undefined {
+  return [t('Manuel (vue enregistrée)'), t('Ajuster la table'), t('Remplir l’écran')][mode];
+}
 
 export const VIEW_ADJUST: ViewAdjustSpec[] = [
   {
     id: 'height',
     section: 'Player',
     key: 'CabinetAutofitPos',
-    label: 'Hauteur de la table',
-    help: 'Position des flippers du bas sur l’écran. Plus haut, le bas de la table (tablier, flippers) remonte dans l’écran, au prix du haut. VPX s’arrête de lui-même quand un bord de la table atteint le bord de l’écran.',
+    get label() {
+      return t('Hauteur de la table');
+    },
+    get help() {
+      return t('Position des flippers du bas sur l’écran. Plus haut, le bas de la table (tablier, flippers) remonte dans l’écran, au prix du haut. VPX s’arrête de lui-même quand un bord de la table atteint le bord de l’écran.');
+    },
     choices: (include) => grid(0, 0.2, 0.01, include),
-    format: (v) => `${decimal(v * 100)} %`,
+    format: (v) => t('{value} %', { value: decimal(v * 100) }),
   },
   {
     id: 'fit',
     section: 'Player',
     key: 'CabinetAutofitMode',
-    label: 'Cadrage',
-    help: '« Ajuster la table » garde ses proportions : toute la largeur, le haut ou le bas peut dépasser. « Remplir l’écran » montre toute la longueur, en étirant ou en tassant la table.',
+    get label() {
+      return t('Cadrage');
+    },
+    get help() {
+      return t('« Ajuster la table » garde ses proportions : toute la largeur, le haut ou le bas peut dépasser. « Remplir l’écran » montre toute la longueur, en étirant ou en tassant la table.');
+    },
     // Le cadrage manuel n'est proposé que s'il est en vigueur (.ini livré avec la table…), pour pouvoir y revenir.
     choices: (include) => (include.includes(AUTOFIT_MANUAL) ? [AUTOFIT_MANUAL, AUTOFIT_FIT, AUTOFIT_FILL] : [AUTOFIT_FIT, AUTOFIT_FILL]),
-    format: (v) => FIT_LABELS[v] ?? String(v),
+    format: (v) => fitLabel(v) ?? String(v),
   },
   {
     id: 'eyes',
     section: 'Player',
     key: 'ScreenPlayerZ',
-    label: 'Hauteur des yeux',
-    help: 'Hauteur des yeux du joueur au-dessus du bas de l’écran. Plus bas, le plateau paraît plus petit et plus profond ; plus haut, plus grand et plus plat. La vitre reste ajustée à l’écran.',
+    get label() {
+      return t('Hauteur des yeux');
+    },
+    get help() {
+      return t('Hauteur des yeux du joueur au-dessus du bas de l’écran. Plus bas, le plateau paraît plus petit et plus profond ; plus haut, plus grand et plus plat. La vitre reste ajustée à l’écran.');
+    },
     choices: (include) => grid(30, 100, 5, include),
     format: (v) => `${decimal(v)} cm`,
   },
@@ -72,7 +88,7 @@ function round(value: number): number {
 }
 
 function decimal(value: number): string {
-  return value.toLocaleString('fr-FR', { maximumFractionDigits: 1 });
+  return formatNumber(value, { maximumFractionDigits: 1 });
 }
 
 export interface ViewAdjustItem {
@@ -156,8 +172,8 @@ export function trialIniText(tableIni: IniDocument, items: ViewAdjustItem[]): st
 export function viewAdjustInactive(item: ViewAdjustItem, items: ViewAdjustItem[]): string | undefined {
   if (item.spec.id !== 'height') return undefined;
   const fit = items.find((i) => i.spec.id === 'fit')?.value;
-  if (fit === AUTOFIT_FILL) return 'Sans effet en « Remplir l’écran » : toute la longueur est déjà à l’écran.';
-  if (fit === AUTOFIT_MANUAL) return 'Sans effet en cadrage manuel.';
+  if (fit === AUTOFIT_FILL) return t('Sans effet en « Remplir l’écran » : toute la longueur est déjà à l’écran.');
+  if (fit === AUTOFIT_MANUAL) return t('Sans effet en cadrage manuel.');
   return undefined;
 }
 
@@ -180,12 +196,17 @@ export function viewAdjustNotes(lookup: SettingLookup, globalIni: IniDocument, t
   };
   const view = effective('BGSet');
   if (view !== undefined && view !== 1) {
-    notes.push({ tone: 'warning', text: 'Les tables ne sont pas affichées en vue borne (BGSet ≠ 1) : ces réglages ne servent qu’en vue borne. Relancez l’assistant d’écrans si le playfield est bien plus haut que large.' });
+    notes.push({ tone: 'warning', text: t('Les tables ne sont pas affichées en vue borne (BGSet ≠ 1) : ces réglages ne servent qu’en vue borne. Relancez l’assistant d’écrans si le playfield est bien plus haut que large.') });
   }
   const fit = items.find((i) => i.spec.id === 'fit')?.value;
   const manual = tableIni.entries().filter((e) => e.section.toLowerCase() === 'tableoverride' && /^ViewCab/i.test(e.key) && e.value.trim() !== '');
   if (manual.length && fit !== AUTOFIT_MANUAL) {
-    notes.push({ tone: 'info', text: `Le .ini de la table contient aussi une vue réglée à la main (${manual.length} clé${manual.length > 1 ? 's' : ''} ViewCab…) : VPX l’ignore tant que le cadrage est automatique.` });
+    notes.push({ tone: 'info', text: tn(
+        manual.length,
+        'Le .ini de la table contient aussi une vue réglée à la main ({n} clé ViewCab…) : VPX l’ignore tant que le cadrage est automatique.',
+        'Le .ini de la table contient aussi une vue réglée à la main ({n} clés ViewCab…) : VPX l’ignore tant que le cadrage est automatique.',
+      ),
+    });
   }
   return notes;
 }

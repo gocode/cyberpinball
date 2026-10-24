@@ -8,6 +8,7 @@
 // fenêtre de progression. La reconnaissance des fenêtres de l'éditeur sert de
 // filet pour une autre version de VPX qui en ouvrirait une malgré tout.
 
+import { t, tn } from './i18n';
 import { VPX_PLAY_SETTINGS } from './vpx';
 
 /** Fenêtres de jeu de VPX (Window.cpp). */
@@ -41,14 +42,22 @@ export type VpxWindowVerdict =
 
 /** Fenêtres de l'éditeur reconnues à leur classe : les fermer quitterait VPX ou poserait une question. */
 const EDITOR_CLASSES: Record<string, string> = {
-  VPinball: 'éditeur de tables',
-  CVFrame: 'éditeur de script',
+  get VPinball() {
+    return t('éditeur de tables');
+  },
+  get CVFrame() {
+    return t('éditeur de script');
+  },
 };
 
 /** Boîtes de l'éditeur reconnues à leur titre (vpinball_eng.rc) : sans question, la partie peut continuer. */
 const EDITOR_DIALOGS: Record<string, string> = {
-  'Preparing Table': 'progression du chargement',
-  'Debugger and Interactive Editor': 'débogueur',
+  get 'Preparing Table'() {
+    return t('progression du chargement');
+  },
+  get 'Debugger and Interactive Editor'() {
+    return t('débogueur');
+  },
 };
 
 /** Boutons d'une boîte de dialogue, à ne pas mêler au message. */
@@ -68,17 +77,20 @@ export function classifyVpxWindow(w: ObservedVpxWindow): VpxWindowVerdict {
   const title = w.title.trim();
   if ((VPX_GAME_TITLES as readonly string[]).includes(title) && className !== DIALOG_CLASS) return { kind: 'game' };
 
-  const editor = EDITOR_CLASSES[className];
-  if (editor) return { kind: 'editor', action: 'hide', notice: `Fenêtre de l'${editor} de VPX masquée (« ${title} »).` };
+  const editor = Object.hasOwn(EDITOR_CLASSES, className) ? EDITOR_CLASSES[className] : undefined;
+  if (editor) return { kind: 'editor', action: 'hide', notice: t("Fenêtre de l'{editor} de VPX masquée (« {title} »).", { editor, title }) };
 
   if (className !== DIALOG_CLASS) {
-    return { kind: 'unknown', notice: `Fenêtre inattendue de VPX laissée à l'écran : « ${title || 'sans titre'} » (classe ${className || 'inconnue'}).` };
+    return {
+      kind: 'unknown',
+      notice: t("Fenêtre inattendue de VPX laissée à l'écran : « {title} » (classe {className}).", { title: title || t('sans titre'), className: className || t('inconnue') }),
+    };
   }
 
-  const texts = (w.texts ?? []).map((t) => t.trim()).filter((t) => t && !BUTTON_TEXT.test(t));
+  const texts = (w.texts ?? []).map((s) => s.trim()).filter((s) => s && !BUTTON_TEXT.test(s));
   const body = texts.join(' ');
-  const dialog = EDITOR_DIALOGS[title];
-  if (dialog) return { kind: 'editor', action: 'hide', notice: `Fenêtre de ${dialog} de l'éditeur de VPX masquée (« ${title} »).` };
+  const dialog = Object.hasOwn(EDITOR_DIALOGS, title) ? EDITOR_DIALOGS[title] : undefined;
+  if (dialog) return { kind: 'editor', action: 'hide', notice: t("Fenêtre de {dialog} de l'éditeur de VPX masquée (« {title} »).", { dialog, title }) };
   // Audit de la table (InfoDialog de WinEditor : titre « Dialog », texte « Table audit: » ou
   // « This table contains error(s)… ») : une simple information, fermée par son bouton OK.
   if (/^Table audit:|This table contains error\(s\)/.test(body)) {
@@ -86,7 +98,9 @@ export function classifyVpxWindow(w: ObservedVpxWindow): VpxWindowVerdict {
     return {
       kind: 'editor',
       action: 'close',
-      notice: `Fenêtre « Table audit » de VPX fermée${errors ? ` (${errors} erreur${errors > 1 ? 's' : ''} signalée${errors > 1 ? 's' : ''} par VPX)` : ''}.`,
+      notice: errors
+        ? tn(errors, 'Fenêtre « Table audit » de VPX fermée ({n} erreur signalée par VPX).', 'Fenêtre « Table audit » de VPX fermée ({n} erreurs signalées par VPX).')
+        : t('Fenêtre « Table audit » de VPX fermée.'),
     };
   }
 
@@ -95,13 +109,19 @@ export function classifyVpxWindow(w: ObservedVpxWindow): VpxWindowVerdict {
   if (activeX) {
     return {
       kind: 'dialog',
-      message: `VPX demande s'il peut créer l'objet ActiveX « ${activeX[1]} » dont la table a besoin : son réglage [Player] SecurityLevel n'est pas à 0. Remettez ${setting('SecurityLevel')} dans VPinballX.ini (au démarrage, Cyber Pinball propose de reprendre sa valeur).`,
+      message: t(
+        "VPX demande s'il peut créer l'objet ActiveX « {object} » dont la table a besoin : son réglage [Player] SecurityLevel n'est pas à 0. Remettez {setting} dans VPinballX.ini (au démarrage, Cyber Pinball propose de reprendre sa valeur).",
+        { object: activeX[1]!, setting: setting('SecurityLevel') },
+      ),
     };
   }
   if (/Connection to VR headset failed|VR mode activated but OpenXR/i.test(text)) {
     return {
       kind: 'dialog',
-      message: `VPX cherche un casque de réalité virtuelle : la VR est forcée ([PlayerVR] AskToTurnOn = 0). Remettez ${setting('AskToTurnOn')} dans VPinballX.ini, et dans le .ini de la table s'il la surcharge.`,
+      message: t(
+        "VPX cherche un casque de réalité virtuelle : la VR est forcée ([PlayerVR] AskToTurnOn = 0). Remettez {setting} dans VPinballX.ini, et dans le .ini de la table s'il la surcharge.",
+        { setting: setting('AskToTurnOn') },
+      ),
     };
   }
   return { kind: 'dialog', message: text };

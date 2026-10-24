@@ -9,6 +9,7 @@
 // « Key;<scancode SDL> » ; une manette « SDLJoy_<GUID SDL>_<n>;<bouton> ». Une
 // valeur vide vaut la touche par défaut de VPX.
 
+import { formatList, t } from './i18n';
 import { IniDocument } from './ini';
 import type { ButtonId, Cabinet, CabinetButtons } from './model';
 import type { VpxSetting } from './vpx';
@@ -28,19 +29,19 @@ export interface ButtonInfo {
 export const BUTTONS: readonly ButtonInfo[] = [
   // Les flippers déplacent aussi le curseur du menu de VPX (UILeft, UIRight) et
   // tiennent les flippers « en deux temps » des tables qui en ont.
-  { id: 'leftFlipper', label: 'Flipper gauche', required: true, default: 'ShiftLeft', vpx: ['LeftFlipper', 'LeftStagedFlipper', 'UILeft'] },
-  { id: 'rightFlipper', label: 'Flipper droit', required: true, default: 'ShiftRight', vpx: ['RightFlipper', 'RightStagedFlipper', 'UIRight'] },
+  { id: 'leftFlipper', get label() { return t('Flipper gauche'); }, required: true, default: 'ShiftLeft', vpx: ['LeftFlipper', 'LeftStagedFlipper', 'UILeft'] },
+  { id: 'rightFlipper', get label() { return t('Flipper droit'); }, required: true, default: 'ShiftRight', vpx: ['RightFlipper', 'RightStagedFlipper', 'UIRight'] },
   { id: 'start', label: 'Start', required: true, default: 'Digit1', vpx: ['Start'] },
   { id: 'exit', label: 'Exit', required: true, default: 'Escape', vpx: ['ExitGame'] },
-  { id: 'credit', label: 'Crédit', required: true, default: 'Digit5', vpx: ['Credit1'] },
-  { id: 'plunger', label: 'Lanceur', required: true, default: 'Enter', vpx: ['LaunchBall'] },
-  { id: 'leftMagna', label: 'MagnaSave gauche', required: false, default: 'ControlLeft', vpx: ['LeftMagna', 'UIUp'] },
-  { id: 'rightMagna', label: 'MagnaSave droit', required: false, default: 'ControlRight', vpx: ['RightMagna', 'UIDown'] },
+  { id: 'credit', get label() { return t('Crédit'); }, required: true, default: 'Digit5', vpx: ['Credit1'] },
+  { id: 'plunger', get label() { return t('Lanceur'); }, required: true, default: 'Enter', vpx: ['LaunchBall'] },
+  { id: 'leftMagna', get label() { return t('MagnaSave gauche'); }, required: false, default: 'ControlLeft', vpx: ['LeftMagna', 'UIUp'] },
+  { id: 'rightMagna', get label() { return t('MagnaSave droit'); }, required: false, default: 'ControlRight', vpx: ['RightMagna', 'UIDown'] },
   { id: 'extraBall', label: 'Extra Ball', required: false, default: 'KeyB', vpx: ['ExtraBall'] },
-  { id: 'tilt', label: 'Tilt (balancier)', required: false, default: 'KeyT', vpx: ['Tilt'] },
-  { id: 'nudgeLeft', label: 'Tremblement à gauche', required: false, default: 'KeyZ', vpx: ['LeftNudge'] },
-  { id: 'nudgeRight', label: 'Tremblement à droite', required: false, default: 'Slash', vpx: ['RightNudge'] },
-  { id: 'nudgeCenter', label: 'Tremblement vers l’avant', required: false, default: 'Space', vpx: ['CenterNudge'] },
+  { id: 'tilt', get label() { return t('Tilt (balancier)'); }, required: false, default: 'KeyT', vpx: ['Tilt'] },
+  { id: 'nudgeLeft', get label() { return t('Tremblement à gauche'); }, required: false, default: 'KeyZ', vpx: ['LeftNudge'] },
+  { id: 'nudgeRight', get label() { return t('Tremblement à droite'); }, required: false, default: 'Slash', vpx: ['RightNudge'] },
+  { id: 'nudgeCenter', get label() { return t('Tremblement vers l’avant'); }, required: false, default: 'Space', vpx: ['CenterNudge'] },
   { id: 'volumeDown', label: 'Volume −', required: false, default: 'Minus', vpx: ['VolumeDown'] },
   { id: 'volumeUp', label: 'Volume +', required: false, default: 'Equal', vpx: ['VolumeUp'] },
 ];
@@ -72,13 +73,13 @@ export function buttonProblems(buttons: CabinetButtons): string[] {
   for (const b of BUTTONS) {
     const code = buttons[b.id];
     if (!code) {
-      if (b.required) problems.push(`${b.label} : aucune touche`);
+      if (b.required) problems.push(t('{button} : aucune touche', { button: b.label }));
       continue;
     }
     const refused = refusedKey(code);
-    if (refused) problems.push(`${b.label} : ${refused}`);
+    if (refused) problems.push(t('{button} : {problem}', { button: b.label, problem: refused }));
     const other = holders.get(code);
-    if (other) problems.push(`${other.label} et ${b.label} : même touche (${keyLabel(code)})`);
+    if (other) problems.push(t('{first} et {second} : même touche ({key})', { first: other.label, second: b.label, key: keyLabel(code) }));
     else holders.set(code, b);
   }
   return problems;
@@ -204,35 +205,35 @@ export function codeOfScancode(scancode: number): string | undefined {
 }
 
 const KEY_LABELS: Record<string, string> = {
-  ShiftLeft: 'Maj gauche',
-  ShiftRight: 'Maj droite',
-  ControlLeft: 'Ctrl gauche',
-  ControlRight: 'Ctrl droit',
+  get ShiftLeft() { return t('Maj gauche'); },
+  get ShiftRight() { return t('Maj droite'); },
+  get ControlLeft() { return t('Ctrl gauche'); },
+  get ControlRight() { return t('Ctrl droit'); },
   AltLeft: 'Alt',
   AltRight: 'Alt Gr',
-  MetaLeft: 'Windows gauche',
-  MetaRight: 'Windows droite',
-  Enter: 'Entrée',
-  NumpadEnter: 'Entrée du pavé',
-  Escape: 'Échap',
-  Backspace: 'Retour arrière',
+  get MetaLeft() { return t('Windows gauche'); },
+  get MetaRight() { return t('Windows droite'); },
+  get Enter() { return t('Entrée'); },
+  get NumpadEnter() { return t('Entrée du pavé'); },
+  get Escape() { return t('Échap'); },
+  get Backspace() { return t('Retour arrière'); },
   Tab: 'Tab',
-  Space: 'Espace',
-  CapsLock: 'Verr. Maj',
-  ArrowLeft: 'Flèche gauche',
-  ArrowRight: 'Flèche droite',
-  ArrowUp: 'Flèche haut',
-  ArrowDown: 'Flèche bas',
-  PageUp: 'Page haut',
-  PageDown: 'Page bas',
-  Home: 'Origine',
-  End: 'Fin',
-  Insert: 'Inser',
-  Delete: 'Suppr',
-  PrintScreen: 'Impr écran',
-  ScrollLock: 'Arrêt défil',
+  get Space() { return t('Espace'); },
+  get CapsLock() { return t('Verr. Maj'); },
+  get ArrowLeft() { return t('Flèche gauche'); },
+  get ArrowRight() { return t('Flèche droite'); },
+  get ArrowUp() { return t('Flèche haut'); },
+  get ArrowDown() { return t('Flèche bas'); },
+  get PageUp() { return t('Page haut'); },
+  get PageDown() { return t('Page bas'); },
+  get Home() { return t('Origine'); },
+  get End() { return t('Fin'); },
+  get Insert() { return t('Inser'); },
+  get Delete() { return t('Suppr'); },
+  get PrintScreen() { return t('Impr écran'); },
+  get ScrollLock() { return t('Arrêt défil'); },
   Pause: 'Pause',
-  NumLock: 'Verr. Num',
+  get NumLock() { return t('Verr. Num'); },
   ContextMenu: 'Menu',
   Minus: '-',
   Equal: '=',
@@ -246,16 +247,16 @@ const KEY_LABELS: Record<string, string> = {
   Period: '.',
   Slash: '/',
   IntlBackslash: '< >',
-  NumpadDivide: '/ du pavé',
-  NumpadMultiply: '* du pavé',
-  NumpadSubtract: '- du pavé',
-  NumpadAdd: '+ du pavé',
-  NumpadDecimal: '. du pavé',
-  NumpadEqual: '= du pavé',
-  NumpadComma: ', du pavé',
-  AudioVolumeMute: 'Muet',
-  AudioVolumeUp: 'Volume + (multimédia)',
-  AudioVolumeDown: 'Volume − (multimédia)',
+  get NumpadDivide() { return t('/ du pavé'); },
+  get NumpadMultiply() { return t('* du pavé'); },
+  get NumpadSubtract() { return t('- du pavé'); },
+  get NumpadAdd() { return t('+ du pavé'); },
+  get NumpadDecimal() { return t('. du pavé'); },
+  get NumpadEqual() { return t('= du pavé'); },
+  get NumpadComma() { return t(', du pavé'); },
+  get AudioVolumeMute() { return t('Muet'); },
+  get AudioVolumeUp() { return t('Volume + (multimédia)'); },
+  get AudioVolumeDown() { return t('Volume − (multimédia)'); },
 };
 
 /**
@@ -263,12 +264,12 @@ const KEY_LABELS: Record<string, string> = {
  * comme dans VPX) : « Maj gauche », « 1 », « A », « Échap ».
  */
 export function keyLabel(code: string | undefined): string {
-  if (!code) return 'aucune';
+  if (!code) return t('aucune');
   if (KEY_LABELS[code]) return KEY_LABELS[code]!;
   const m = /^(?:Key|Digit)(.)$/.exec(code) ?? /^(F\d+)$/.exec(code);
   if (m) return m[1]!;
   const pad = /^Numpad(\d)$/.exec(code);
-  if (pad) return `${pad[1]} du pavé`;
+  if (pad) return t('{n} du pavé', { n: pad[1]! });
   return code;
 }
 
@@ -287,10 +288,10 @@ export const PREVIOUS_KEY = 'Backspace';
  * Cyber Pinball (Tab pour la configuration, Retour arrière pour corriger un relevé).
  */
 export function refusedKey(code: string): string | undefined {
-  if (code === 'MetaLeft' || code === 'MetaRight') return 'La touche Windows ouvre le menu Démarrer : réglez ce bouton de l’encodeur sur une autre touche.';
-  if (code === CONFIG_KEY) return 'Tab est réservée à l’accès à la configuration : réglez ce bouton de l’encodeur sur une autre touche.';
-  if (code === PREVIOUS_KEY) return 'Retour arrière est réservée pour corriger un relevé : réglez ce bouton de l’encodeur sur une autre touche.';
-  if (sdlScancode(code) === undefined) return `Touche « ${code} » inconnue de VPX : réglez ce bouton de l’encodeur sur une autre touche.`;
+  if (code === 'MetaLeft' || code === 'MetaRight') return t('La touche Windows ouvre le menu Démarrer : réglez ce bouton de l’encodeur sur une autre touche.');
+  if (code === CONFIG_KEY) return t('Tab est réservée à l’accès à la configuration : réglez ce bouton de l’encodeur sur une autre touche.');
+  if (code === PREVIOUS_KEY) return t('Retour arrière est réservée pour corriger un relevé : réglez ce bouton de l’encodeur sur une autre touche.');
+  if (sdlScancode(code) === undefined) return t('Touche « {code} » inconnue de VPX : réglez ce bouton de l’encodeur sur une autre touche.', { code });
   return undefined;
 }
 
@@ -342,13 +343,15 @@ export function gameKeys(buttons: CabinetButtons | undefined): [string, string][
     const labels = ids.map(label);
     return labels.join(labels.some((l) => l.includes('/')) ? ' · ' : ' / ');
   };
+  // VPX 10.8.1 quitte la partie dès qu'Exit est appuyé (ExitGame, InputManager.cpp) ;
+  // son menu (réglages, placement des écrans) s'ouvre par la combinaison de inGameMenuButtons.
   const rows: [string, string][] = [
     ['Flippers', list(['leftFlipper', 'rightFlipper'])],
-    ['Lanceur', label('plunger')],
-    ['Crédit', label('credit')],
+    [t('Lanceur'), label('plunger')],
+    [t('Crédit'), label('credit')],
     ['Start', label('start')],
-    ['Pause et menu de VPX', label('exit')],
-    ['Quitter la partie', `maintenir ${label('exit')}`],
+    [t('Quitter la partie'), label('exit')],
+    [t('Menu de VPX'), inGameMenuButtons(keys).map(label).join(' + ')],
   ];
   const optional = (title: string, ids: ButtonId[]) => {
     const present = ids.filter((id) => keys[id]);
@@ -357,9 +360,22 @@ export function gameKeys(buttons: CabinetButtons | undefined): [string, string][
   optional('MagnaSave', ['leftMagna', 'rightMagna']);
   optional('Extra Ball', ['extraBall']);
   optional('Tilt', ['tilt']);
-  optional('Tremblements', ['nudgeLeft', 'nudgeRight', 'nudgeCenter']);
+  optional(t('Tremblements'), ['nudgeLeft', 'nudgeRight', 'nudgeCenter']);
   optional('Volume', ['volumeDown', 'volumeUp']);
   return rows;
+}
+
+/**
+ * Boutons qui, appuyés ensemble, ouvrent le menu de VPX pendant une partie (action
+ * InGameUI, F12 au clavier) : les deux MagnaSave, qui y choisissent ensuite la ligne
+ * (UIUp, UIDown) ; sans eux, Crédit et Start. Dans ce menu, « Display Settings » place
+ * et redimensionne en direct le fronton, le DMD et le topper, puis les enregistre pour
+ * toutes les tables ou pour celle-ci seulement (docs/manuel.md, « Placer les écrans
+ * pendant une partie »). Exit seul quitterait la partie : il n'entre dans aucune
+ * combinaison.
+ */
+export function inGameMenuButtons(keys: CabinetButtons): ButtonId[] {
+  return keys.leftMagna && keys.rightMagna ? ['leftMagna', 'rightMagna'] : ['credit', 'start'];
 }
 
 // ---------------------------------------------------------------------------
@@ -422,28 +438,28 @@ export const VPX_INPUT_DEFAULTS: Readonly<Record<string, number>> = {
 
 /** Libellés de VPX des actions qu'une touche de bouton peut faire taire. */
 const VPX_ACTION_LABELS: Record<string, string> = {
-  LeftStagedFlipper: 'Flipper gauche en deux temps',
-  RightStagedFlipper: 'Flipper droit en deux temps',
-  UIUp: 'Menu de VPX : élément suivant',
-  UIDown: 'Menu de VPX : élément précédent',
-  UILeft: 'Menu de VPX : diminuer',
-  UIRight: 'Menu de VPX : augmenter',
-  Credit2: 'Crédit 2',
-  Credit3: 'Crédit 3',
-  Credit4: 'Crédit 4',
-  Lockbar: 'Bouton de la lockbar',
+  get LeftStagedFlipper() { return t('Flipper gauche en deux temps'); },
+  get RightStagedFlipper() { return t('Flipper droit en deux temps'); },
+  get UIUp() { return t('Menu de VPX : élément suivant'); },
+  get UIDown() { return t('Menu de VPX : élément précédent'); },
+  get UILeft() { return t('Menu de VPX : diminuer'); },
+  get UIRight() { return t('Menu de VPX : augmenter'); },
+  get Credit2() { return t('Crédit 2'); },
+  get Credit3() { return t('Crédit 3'); },
+  get Credit4() { return t('Crédit 4'); },
+  get Lockbar() { return t('Bouton de la lockbar'); },
   Pause: 'Pause',
-  PerfOverlay: 'Statistiques d’affichage',
-  InGameUI: 'Menu de VPX',
+  get PerfOverlay() { return t('Statistiques d’affichage'); },
+  get InGameUI() { return t('Menu de VPX'); },
   SlamTilt: 'Slam Tilt',
-  CoinDoor: 'Porte du monnayeur',
+  get CoinDoor() { return t('Porte du monnayeur'); },
   Reset: 'Reset',
-  VRCenter: 'Recentrer la VR',
-  VRUp: 'Monter la vue VR',
-  VRDown: 'Descendre la vue VR',
-  DebugBalls: 'Billes de débogage',
-  Debugger: 'Débogueur',
-  ToggleStereo: 'Mode stéréo',
+  get VRCenter() { return t('Recentrer la VR'); },
+  get VRUp() { return t('Monter la vue VR'); },
+  get VRDown() { return t('Descendre la vue VR'); },
+  get DebugBalls() { return t('Billes de débogage'); },
+  get Debugger() { return t('Débogueur'); },
+  get ToggleStereo() { return t('Mode stéréo'); },
 };
 
 export function vpxActionLabel(action: string): string {
@@ -601,6 +617,10 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
     const ours = before !== undefined && current === before;
     const keys = keyboardKeys(ours ? undefined : current, action);
     const kept = free(action, keys);
+    if (action === IN_GAME_MENU) {
+      settings.push({ section: VPX_INPUT_SECTION, key, value: inGameMenuMapping(buttons, current ?? '', before, kept) });
+      continue;
+    }
     if (kept.length < keys.length) put(action, kept);
     // Plus de conflit : la touche de VPX revient.
     else if (ours) released.push({ section: VPX_INPUT_SECTION, key, value: '' });
@@ -608,9 +628,26 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
   return { settings, silenced, released };
 }
 
+/** Action de VPX qui ouvre son menu pendant une partie. */
+const IN_GAME_MENU = 'InGameUI';
+
+/**
+ * Valeur de [Input] Mapping.InGameUI : ses touches seules du clavier (F12, sauf si un
+ * bouton l'a prise), puis la combinaison des boutons de inGameMenuButtons. La combinaison
+ * écrite la dernière fois (`before`) est retirée, pour qu'un changement de boutons ne
+ * laisse pas l'ancienne ; manettes et combinaisons ajoutées dans VPX sont gardées.
+ */
+function inGameMenuMapping(buttons: CabinetButtons, current: string, before: string | undefined, keys: number[]): string {
+  const combo = inGameMenuButtons(buttons).map((id) => `Key;${sdlScancode(buttons[id]!)}`);
+  const stale = new Set([formatMapping([combo]), ...parseMapping(before ?? '').filter((alt) => alt.length > 1).map((alt) => formatMapping([alt]))]);
+  const others = parseMapping(current).filter((alt) => !stale.has(formatMapping([alt])));
+  const base = parseMapping(withKeyboardKeys(formatMapping(others), keys)).filter((alt) => singleKey(alt) !== NO_KEY);
+  return formatMapping([...base, combo]);
+}
+
 /** Clés [Input] que Cyber Pinball écrit pour ces boutons, hors actions privées de leur touche (qui varient avec le fichier). */
 export function vpxInputOwnedKeys(): string[] {
-  return BUTTONS.flatMap((b) => b.vpx.map(mappingKey));
+  return [...BUTTONS.flatMap((b) => b.vpx.map(mappingKey)), mappingKey(IN_GAME_MENU)];
 }
 
 /** Texte d'une valeur Mapping.* pour l'écran : « Maj gauche », « Maj gauche ou bouton de manette ». */
@@ -618,10 +655,10 @@ export function describeMapping(value: string | undefined, action: string): stri
   const text = value?.trim() ? value : VPX_INPUT_DEFAULTS[action] !== undefined ? `Key;${VPX_INPUT_DEFAULTS[action]}` : '';
   const parts = parseMapping(text).map((alt) => {
     const key = singleKey(alt);
-    if (key === NO_KEY) return 'aucune touche';
+    if (key === NO_KEY) return t('aucune touche');
     if (key !== undefined) return keyLabel(codeOfScancode(key) ?? `scancode ${key}`);
     if (alt.every((p) => KEY_TOKEN.test(p))) return alt.map((p) => keyLabel(codeOfScancode(Number(KEY_TOKEN.exec(p)![1])))).join(' + ');
-    return alt.some((p) => p.startsWith('SDLJoy_')) ? 'bouton de manette' : alt.join(' + ');
+    return alt.some((p) => p.startsWith('SDLJoy_')) ? t('bouton de manette') : alt.join(' + ');
   });
-  return parts.length ? parts.join(' ou ') : 'aucune touche';
+  return parts.length ? formatList(parts, 'or') : t('aucune touche');
 }

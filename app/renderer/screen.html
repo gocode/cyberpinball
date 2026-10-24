@@ -11,7 +11,7 @@
     <main id="screen">
       <header class="top">
         <span class="brand">CYBER <span class="pin">PINBALL</span></span>
-        <button class="quit" id="quit" type="button" data-act='{"type":"quit","op":"ask"}' hidden>Quitter sans enregistrer</button>
+        <button class="quit" id="quit" type="button" data-act='{"type":"quit","op":"ask"}' hidden data-i18n>Quitter sans enregistrer</button>
       </header>
       <div class="content">
         <div class="number" id="number"></div>
@@ -29,11 +29,12 @@
         <div class="step" id="step"></div>
         <div class="hint" id="hint"></div>
       </footer>
-      <div class="edge" id="edge" hidden>▼ FLIPPERS · VOUS ÊTES ICI ▼</div>
+      <div class="edge" id="edge" hidden data-i18n>▼ FLIPPERS · VOUS ÊTES ICI ▼</div>
       <section class="quit-dialog" id="quit-dialog" hidden></section>
     </main>
     <div id="zones"></div>
     <div class="arrange-coach" id="arrange-coach" hidden></div>
+    <script src="i18n.js"></script>
     <script src="sound.js"></script>
     <script src="screen.js"></script>
   </body>

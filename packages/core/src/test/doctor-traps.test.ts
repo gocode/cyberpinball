@@ -270,6 +270,11 @@ const TRAPS: Trap[] = [
     code: 'manualView',
     arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[Player]\r\nCabinetAutofitMode = 0\r\n\r\n[TableOverride]\r\nViewCabVOfs = 12\r\n'),
   },
+  // DMD posé dans le cadre d'un PuP-Pack, enregistré pour la table par le menu de VPX.
+  {
+    code: 'tableWindows',
+    arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[ScoreView]\r\nScoreViewWndX = 760\r\nScoreViewWndY = 860\r\nScoreViewWidth = 400\r\nScoreViewHeight = 100\r\n\r\n[Player]\r\nCabinetAutofitPos = 0.1\r\n'),
+  },
   // Médias (docs/recherche/medias.md, § 5.5, tâche T11).
   { code: 'mediaUnreadable', arm: (folder) => write(media(folder, `(Backglass) ${TABLE}.flv`), 'flv') },
   { code: 'mediaMisnamed', arm: (folder) => write(media(folder, '(Wheel) Attack From Mars.png'), png(512, 512)) },
@@ -501,6 +506,28 @@ test('cadrage manuel imposé par la table : la clé est retirée, le reste du .i
   // Cadrage automatique choisi pour cette table : rien à signaler.
   write(ini, '[Player]\r\nCabinetAutofitMode = 2\r\n');
   assert.deepEqual(diagnose(scanTables(tablesDir)[0]!, ctx()), []);
+  fs.rmSync(tablesDir, { recursive: true });
+  fs.rmSync(trashDir, { recursive: true, force: true });
+});
+
+test('écrans placés pour la table : constat lisible, retour à la disposition générale sans toucher au reste', () => {
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-traps-'));
+  const folder = healthyTable(tablesDir);
+  const ini = path.join(folder, `${TABLE}.ini`);
+  const ctx = () => ({ tablesDir, script: scriptFacts(SCRIPT) });
+  const trashDir = `${tablesDir}-corbeille`;
+  TRAPS.find((t) => t.code === 'tableWindows')!.arm(folder, tablesDir);
+  const finding = diagnose(scanTables(tablesDir)[0]!, ctx()).find((f) => f.code === 'tableWindows')!;
+  assert.match(finding.detail, /place DMD \(400 × 100 en 760, 860\) pour cette table seulement/);
+  applyOps(finding.fix!.ops, { trashDir });
+  assert.equal(fs.readFileSync(ini, 'utf8'), '[Player]\r\nCabinetAutofitPos = 0.1\r\n');
+  assert.deepEqual(diagnose(scanTables(tablesDir)[0]!, ctx()), []);
+  // Topper éteint et DMD incrusté : dits comme tels ; seules ces clés : le fichier part à la corbeille.
+  write(ini, '[Topper]\nTopperOutput = 0\n[ScoreView]\nScoreViewOutput = 2\nScoreViewWidth = 300\nScoreViewHeight = 75\n');
+  const again = diagnose(scanTables(tablesDir)[0]!, ctx()).find((f) => f.code === 'tableWindows')!;
+  assert.match(again.detail, /place DMD \(incrusté dans le plateau, 300 × 75\), Topper \(éteint\)/);
+  applyOps(again.fix!.ops, { trashDir });
+  assert.ok(!fs.existsSync(ini));
   fs.rmSync(tablesDir, { recursive: true });
   fs.rmSync(trashDir, { recursive: true, force: true });
 });

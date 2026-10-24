@@ -4,7 +4,7 @@
 const $ = (id) => document.getElementById(id);
 
 // Étapes où un seul écran porte la question, les autres restent en retrait.
-const STEP_PHASES = ['buttons', 'buttonsSummary', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels'];
+const STEP_PHASES = ['buttons', 'buttonsSummary', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'gate'];
 
 function text(id, value) {
   $(id).textContent = value ?? '';
@@ -164,7 +164,7 @@ function renderArrange(state) {
   // Sur chaque écran, le geste à la souris dès l'ouverture de l'étape.
   const coach = $('arrange-coach');
   coach.hidden = state.phase !== 'arrange' || Boolean(a);
-  coach.textContent = coach.hidden ? '' : 'Tirez une zone pour la déplacer, jusque sur un autre écran · tirez un coin pour la redimensionner';
+  coach.textContent = coach.hidden ? '' : t('Tirez une zone pour la déplacer, jusque sur un autre écran · tirez un coin pour la redimensionner');
   box.hidden = !a;
   box.replaceChildren();
   box.classList.toggle('dock-top', a?.dock === 'top');
@@ -200,7 +200,7 @@ function renderArrange(state) {
       span.textContent = current.label;
       controls.append(span);
     }
-    controls.append(actButton('▶', { type: 'arrange', op: 'step', delta: 1 }), actButton('Valider', { type: 'arrange', op: 'confirm' }, 'primary'), actButton('Annuler', { type: 'arrange', op: 'cancel' }));
+    controls.append(actButton('▶', { type: 'arrange', op: 'step', delta: 1 }), actButton(t('Valider'), { type: 'arrange', op: 'confirm' }, 'primary'), actButton(t('Annuler'), { type: 'arrange', op: 'cancel' }));
     box.append(controls);
   }
   for (const [text, className] of [[a.notice, 'arrange-notice'], [a.hint, 'arrange-hint'], [a.mouse, 'arrange-mouse'], [a.order, 'arrange-order']]) {
@@ -210,7 +210,7 @@ function renderArrange(state) {
     p.textContent = text;
     box.append(p);
   }
-  if (a.findings?.length) box.append(list('Points à vérifier', a.findings, (f) => `finding-${f.severity}`));
+  if (a.findings?.length) box.append(list(t('Points à vérifier'), a.findings, (f) => `finding-${f.severity}`));
 }
 
 /**
@@ -236,14 +236,14 @@ function renderQuit(state) {
   button.textContent = q?.button ?? '';
   button.classList.toggle('holding', Boolean(q?.holding));
   const box = $('quit-dialog');
-  const shown = q?.dialog ?? (q?.leaving && { title: 'Sortie sans enregistrer', destination: q.leaving });
+  const shown = q?.dialog ?? (q?.leaving && { title: t('Sortie sans enregistrer'), destination: q.leaving });
   box.hidden = !shown;
   box.replaceChildren();
   if (!shown) return;
   const title = document.createElement('h2');
   title.textContent = shown.title;
   box.append(title);
-  if (shown.lines) box.append(list(shown.lead || 'Changements', shown.lines));
+  if (shown.lines) box.append(list(shown.lead || t('Changements'), shown.lines));
   const destination = document.createElement('p');
   destination.className = 'quit-destination';
   destination.textContent = shown.destination;
@@ -251,7 +251,7 @@ function renderQuit(state) {
   if (!q.dialog) return;
   const choices = document.createElement('div');
   choices.className = 'quit-choices';
-  choices.append(actButton('Quitter sans enregistrer', { type: 'quit', op: 'yes' }, 'primary'), actButton('Continuer', { type: 'quit', op: 'no' }));
+  choices.append(actButton(t('Quitter sans enregistrer'), { type: 'quit', op: 'yes' }, 'primary'), actButton(t('Continuer'), { type: 'quit', op: 'no' }));
   const hint = document.createElement('p');
   hint.className = 'quit-hint';
   hint.textContent = q.dialog.hint;
@@ -269,7 +269,7 @@ function render(state) {
   root.classList.toggle('dim', STEP_PHASES.includes(state.phase) && !state.highlight);
   root.classList.toggle('measuring', state.measure !== undefined);
   // Panneau (récapitulatif, résultat) : sur le playfield, sauf quand l'état en décide (étape « Boutons »).
-  const report = state.report ?? (['summary', 'done'].includes(state.phase) && state.assignedRole === 'Playfield');
+  const report = state.report ?? (['summary', 'done'].includes(state.phase) && state.assignedRole === 'playfield');
   root.classList.toggle('report', report);
   root.classList.toggle('buttons', ['buttons', 'buttonsSummary'].includes(state.phase));
   renderButtons(state);
@@ -291,8 +291,8 @@ function render(state) {
     text('prompt', state.highlight ? state.prompt : (state.assignedLabel ?? ''));
     text('step', state.step);
   } else {
-    text('prompt', state.title ?? state.assignedLabel ?? 'Aucun rôle');
-    text('step', state.phase === 'summary' ? 'Récapitulatif' : 'Configuration enregistrée');
+    text('prompt', state.title ?? state.assignedLabel ?? t('Aucun rôle'));
+    text('step', state.phase === 'summary' ? t('Récapitulatif') : t('Configuration enregistrée'));
   }
 
   // Le récapitulatif et le résultat s'affichent sur l'écran du playfield, qui est
@@ -304,20 +304,20 @@ function render(state) {
     // Colonne de gauche : rôles et points à vérifier ; à droite : le diff.
     const columns = state.columns ?? {};
     const left = document.createElement('div');
-    left.append(list(columns.left ?? 'Rôles', state.summary));
+    left.append(list(columns.left ?? t('Rôles'), state.summary));
     if (state.findings.length) {
-      left.append(list('Points à vérifier', state.findings, (f) => `finding-${f.severity}`));
+      left.append(list(t('Points à vérifier'), state.findings, (f) => `finding-${f.severity}`));
     }
-    panel.append(left, list(columns.right ?? (state.phase === 'summary' ? 'Modifications prévues' : 'Modifications écrites'), state.lines));
+    panel.append(left, list(columns.right ?? (state.phase === 'summary' ? t('Modifications prévues') : t('Modifications écrites')), state.lines));
     if (state.target) {
       const target = document.createElement('p');
-      target.innerHTML = 'Fichier : <code></code>';
+      target.innerHTML = t('Fichier : <code></code>');
       target.querySelector('code').textContent = state.target;
       panel.append(target);
     }
     if (state.backup) {
       const backup = document.createElement('p');
-      backup.innerHTML = 'Ancienne version : <code></code>';
+      backup.innerHTML = t('Ancienne version : <code></code>');
       backup.querySelector('code').textContent = state.backup;
       panel.append(backup);
     }

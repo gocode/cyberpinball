@@ -32,6 +32,10 @@ import {
   sameValue,
   settingId,
   settingState,
+  formatNumber,
+  language,
+  t,
+  tn,
   VPX_AUDIO_OWNED_KEYS,
   VPX_ESSENTIALS,
   VPX_PLAY_SETTINGS,
@@ -199,7 +203,7 @@ export function openSettings(target: SettingsTarget, options: OpenSettingsOption
   KEYS = settingsKeys(loadCabinet(loc.dataDir)?.buttons);
   const schema = currentSchema();
   const win = createWindow({
-    title: 'Cyber Pinball — Réglages',
+    title: t('Cyber Pinball — Réglages'),
     frame: false,
     show: false,
     backgroundColor: '#030807',
@@ -232,7 +236,7 @@ export function openSettings(target: SettingsTarget, options: OpenSettingsOption
   session = s;
   reload();
   s.cursor = firstSelectable(rows(), 0, 1);
-  if (!schema) s.notice = { text: 'Aucun schéma de réglages pour cette version de VPX : lancez « npm run vpx-schema ».', tone: 'error' };
+  if (!schema) s.notice = { text: t('Aucun schéma de réglages pour cette version de VPX : lancez « npm run vpx-schema ».'), tone: 'error' };
 
   win.on('closed', () => {
     if (session === s) session = undefined;
@@ -389,16 +393,16 @@ function openRow(row: Row): void {
     const mapping = inputMapping(row);
     s.panel = mapping
       ? info(
-          `${mapping.label} : ${mapping.keys}`,
-          [`[${row.section}] ${row.key} = ${row.value === '' ? '(vide : touche par défaut de VPX)' : row.value}`, mapping.why],
+          t('{name} : {value}', { name: mapping.label, value: mapping.keys }),
+          [`[${row.section}] ${row.key} = ${row.value === '' ? t('(vide : touche par défaut de VPX)') : row.value}`, mapping.why],
           [
-            { label: 'Affecter les boutons de la borne', run: () => relaunchWizard(true) },
-            { label: 'Remettre les touches par défaut des encodeurs', run: () => resetButtonsHere() },
+            { label: t('Affecter les boutons de la borne'), run: () => relaunchWizard(true) },
+            { label: t('Remettre les touches par défaut des encodeurs'), run: () => resetButtonsHere() },
           ],
         )
       : info(`[${row.section}] ${row.key}`, [
-          `Valeur : ${row.value === '' ? '(vide)' : row.value}`,
-          'Ce réglage a été enregistré par un plugin ou par une table ; le schéma de VPX ne le décrit pas, il n’est donc pas modifiable ici.',
+          t('Valeur : {value}', { value: row.value === '' ? t('(vide)') : row.value }),
+          t('Ce réglage a été enregistré par un plugin ou par une table ; le schéma de VPX ne le décrit pas, il n’est donc pas modifiable ici.'),
         ]);
     return;
   }
@@ -409,13 +413,17 @@ function openRow(row: Row): void {
   const lock = lockOf(def);
   if (lock === 'owned') {
     const origin = ownedOrigin(def);
-    const actions = origin.wizard ? [{ label: origin.wizard, run: relaunchWizard }] : [];
-    if (state.table !== undefined) actions.unshift({ label: 'Retirer la surcharge de cette table', run: () => save(def, undefined) });
+    const actions = origin.wizard ? [{ label: wizardLabel(origin.wizard), run: relaunchWizard }] : [];
+    if (state.table !== undefined) actions.unshift({ label: t('Retirer la surcharge de cette table'), run: () => save(def, undefined) });
+    const overridden =
+      origin.wizard === 'screens'
+        ? t('Attention : cette table le surcharge, ce qui peut envoyer VPX sur le mauvais écran.')
+        : t('Attention : cette table le surcharge.');
     s.panel = info(
       label(row),
       [
-        `Réglage géré par Cyber Pinball : ${origin.why.charAt(0).toLowerCase()}${origin.why.slice(1)}`,
-        ...(state.table !== undefined ? [`Attention : cette table le surcharge${origin.wizard === WIZARD_SCREENS ? ', ce qui peut envoyer VPX sur le mauvais écran' : ''}.`] : []),
+        t('Réglage géré par Cyber Pinball : {why}', { why: afterColon(origin.why) }),
+        ...(state.table !== undefined ? [overridden] : []),
         origin.how,
       ],
       actions,
@@ -424,11 +432,11 @@ function openRow(row: Row): void {
     return;
   }
   if (lock === 'tableOnly') {
-    s.panel = info(label(row), ['Ce réglage se règle table par table : ouvrez la fiche d’une table, puis ses réglages.'], [], id);
+    s.panel = info(label(row), [t('Ce réglage se règle table par table : ouvrez la fiche d’une table, puis ses réglages.')], [], id);
     return;
   }
   if (lock === 'editor') {
-    s.panel = info(label(row), ['Réglage de l’éditeur de tables de VPX : une valeur propre à une table n’aurait aucun effet pendant une partie.'], [], id);
+    s.panel = info(label(row), [t('Réglage de l’éditeur de tables de VPX : une valeur propre à une table n’aurait aucun effet pendant une partie.')], [], id);
     return;
   }
   if (def.type === 'string' || def.color) {
@@ -447,9 +455,9 @@ function choicesFor(def: VpxSettingDef, state: SettingState, essential?: Essenti
   const fallback =
     s.target.scope === 'table'
       ? isTableOnly(def)
-        ? { label: 'Valeur prévue par la table', note: 'retire la surcharge' }
-        : { label: `Comme le réglage général : ${format(def, state.global ?? def.default, essential)}`, note: 'retire la surcharge' }
-      : { label: `Valeur par défaut : ${format(def, def.default, essential)}`, note: 'laisse VPX décider' };
+        ? { label: t('Valeur prévue par la table'), note: t('retire la surcharge') }
+        : { label: t('Comme le réglage général : {value}', { value: format(def, state.global ?? def.default, essential) }), note: t('retire la surcharge') }
+      : { label: t('Valeur par défaut : {value}', { value: format(def, def.default, essential) }), note: t('laisse VPX décider') };
   const first: Choice = { label: fallback.label, value: undefined, note: fallback.note };
   let values: SettingValue[];
   if (def.type === 'bool') values = [false, true];
@@ -460,14 +468,14 @@ function choicesFor(def: VpxSettingDef, state: SettingState, essential?: Essenti
     ...values.map((v) => ({
       label: format(def, v, essential),
       value: v,
-      note: sameValue(def, v, def.default) ? 'défaut de VPX' : undefined,
+      note: sameValue(def, v, def.default) ? t('défaut de VPX') : undefined,
     })),
   ];
 }
 
 function info(title: string, lines: string[], actions: { label: string; run: () => void }[] = [], id?: string): Panel {
   // « Retour » est présélectionné : un Start par mégarde ne déclenche rien.
-  return { kind: 'info', id, title, lines, actions: [...actions, { label: 'Retour', run: () => undefined }], index: actions.length };
+  return { kind: 'info', id, title, lines, actions: [...actions, { label: t('Retour'), run: () => undefined }], index: actions.length };
 }
 
 function save(def: VpxSettingDef, value: SettingValue | undefined): void {
@@ -491,13 +499,17 @@ function save(def: VpxSettingDef, value: SettingValue | undefined): void {
     s.notice = {
       tone: 'ok',
       text: !changed
-        ? `${name} : déjà à cette valeur.`
+        ? t('{name} : déjà à cette valeur.', { name })
         : value === undefined
-          ? `${name} : ${s.target.scope === 'table' ? 'surcharge retirée' : 'valeur par défaut rétablie'}.`
-          : `${name} : ${format(def, now.effective ?? value, shown)}, enregistré ${s.target.scope === 'table' ? 'pour cette table' : 'dans VPinballX.ini'}.`,
+          ? s.target.scope === 'table'
+            ? t('{name} : surcharge retirée.', { name })
+            : t('{name} : valeur par défaut rétablie.', { name })
+          : s.target.scope === 'table'
+            ? t('{name} : {value}, enregistré pour cette table.', { name, value: format(def, now.effective ?? value, shown) })
+            : t('{name} : {value}, enregistré dans VPinballX.ini.', { name, value: format(def, now.effective ?? value, shown) }),
     };
   } catch (err) {
-    s.notice = { tone: 'error', text: `Enregistrement impossible : ${(err as Error).message}` };
+    s.notice = { tone: 'error', text: t('Enregistrement impossible : {error}', { error: (err as Error).message }) };
   }
 }
 
@@ -526,7 +538,7 @@ function resetButtonsHere(): void {
   KEYS = settingsKeys(reset.cabinet.buttons);
   s.owned = ownedKeys();
   reload();
-  s.notice = { tone: 'ok', text: `Touches par défaut des encodeurs remises. ${describeReset(reset).join(' ')}` };
+  s.notice = { tone: 'ok', text: t('Touches par défaut des encodeurs remises. {details}', { details: describeReset(reset).join(' ') }) };
 }
 
 /** Assistant complet, ou seulement l'étape « Boutons ». */
@@ -637,7 +649,7 @@ function submitText(text: string): void {
   if (def.color) {
     const m = /^#?([0-9a-f]{6})$/i.exec(trimmed);
     if (!m) {
-      s.notice = { tone: 'error', text: 'Couleur attendue au format RRVVBB, par exemple FF8A1F.' };
+      s.notice = { tone: 'error', text: t('Couleur attendue au format RRVVBB, par exemple FF8A1F.') };
       return;
     }
     s.panel = undefined;
@@ -723,23 +735,25 @@ function hex(bgr: number): string {
   return rgb.toString(16).toUpperCase().padStart(6, '0');
 }
 
-const NUMBER = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 3 });
-
 function format(def: VpxSettingDef, value: SettingValue | undefined, essential?: EssentialSetting): string {
-  if (value === undefined) return 'valeur prévue par la table';
+  if (value === undefined) return t('valeur prévue par la table');
   switch (def.type) {
     case 'bool':
-      return essential?.values?.[value ? 1 : 0] ?? (value ? 'Activé' : 'Désactivé');
+      return essential?.values?.[value ? 1 : 0] ?? (value ? t('Activé') : t('Désactivé'));
     case 'enum': {
       const i = Number(value) - def.min!;
       return essential?.values?.[i] ?? def.values![i] ?? String(value);
     }
     case 'string':
-      return value === '' ? '(vide)' : String(value);
+      return value === '' ? t('(vide)') : String(value);
     default: {
       if (def.color) return `#${hex(Number(value))}`;
-      const shown = NUMBER.format(Number(value) * (essential?.scale ?? 1));
-      return essential?.unit ? `${shown} ${essential.unit}` : shown;
+      // Locale de l'interface, lue à l'affichage (et non au chargement du module).
+      const shown = formatNumber(Number(value) * (essential?.scale ?? 1), { maximumFractionDigits: 3 });
+      if (!essential?.unit) return shown;
+      // Espace fine insécable avant l'unité en français ; collés en anglais pour % et ° (5%, 45°).
+      const gap = language() === 'en' && (essential.unit === '%' || essential.unit === '°') ? '' : ' ';
+      return `${shown}${gap}${essential.unit}`;
     }
   }
 }
@@ -757,17 +771,25 @@ interface Badge {
 function badgesOf(def: VpxSettingDef, state: SettingState): Badge[] {
   const badges: Badge[] = [];
   const lock = lockOf(def);
-  if (lock === 'owned') badges.push({ text: 'Gérée par Cyber Pinball', tone: 'owned' });
-  if (lock === 'tableOnly') badges.push({ text: 'Par table', tone: 'locked' });
-  if (lock === 'editor') badges.push({ text: 'Éditeur seulement', tone: 'locked' });
-  if (state.table !== undefined) badges.push({ text: 'Surchargé pour cette table', tone: lock === 'owned' ? 'warning' : 'table' });
-  else if (isModified(state) && lock !== 'owned') badges.push({ text: 'Modifié', tone: 'modified' });
-  if (state.invalid) badges.push({ text: 'Valeur illisible, ignorée par VPX', tone: 'warning' });
+  if (lock === 'owned') badges.push({ text: t('Gérée par Cyber Pinball'), tone: 'owned' });
+  if (lock === 'tableOnly') badges.push({ text: t('Par table'), tone: 'locked' });
+  if (lock === 'editor') badges.push({ text: t('Éditeur seulement'), tone: 'locked' });
+  if (state.table !== undefined) badges.push({ text: t('Surchargé pour cette table'), tone: lock === 'owned' ? 'warning' : 'table' });
+  else if (isModified(state) && lock !== 'owned') badges.push({ text: t('Modifié'), tone: 'modified' });
+  if (state.invalid) badges.push({ text: t('Valeur illisible, ignorée par VPX'), tone: 'warning' });
   return badges;
 }
 
-const WIZARD_SCREENS = 'Ouvrir l’assistant d’écrans';
-const KEEP_YOURS = 'Pour imposer une autre valeur, modifiez VPinballX.ini : au démarrage suivant, Cyber Pinball vous proposera de garder la vôtre.';
+/** Assistant proposé pour changer une clé gérée : celui des écrans, ou l'assistant complet (étape Son). */
+type WizardKind = 'screens' | 'full';
+
+function wizardLabel(kind: WizardKind): string {
+  return kind === 'screens' ? t('Ouvrir l’assistant d’écrans') : t('Ouvrir l’assistant');
+}
+
+function keepYours(): string {
+  return t('Pour imposer une autre valeur, modifiez VPinballX.ini : au démarrage suivant, Cyber Pinball vous proposera de garder la vôtre.');
+}
 
 /**
  * [Input] Mapping.<action> : touche d'une action de VPX. VPX les déclare à
@@ -784,35 +806,44 @@ function inputMapping(row: { section: string; key: string; value: string }) {
     keys: describeMapping(row.value, action),
     owned,
     why: owned
-      ? 'Touche gérée par Cyber Pinball : elle découle des boutons de la borne. Pour la changer, refaites l’étape « Boutons » de l’assistant ; une touche ajoutée dans VPX pour une manette est gardée.'
-      : 'Touche de VPX, que Cyber Pinball ne gère pas. Elle se change dans le menu de VPX (F12, puis « Input Settings »).',
+      ? t('Touche gérée par Cyber Pinball : elle découle des boutons de la borne. Pour la changer, refaites l’étape « Boutons » de l’assistant ; une touche ajoutée dans VPX pour une manette est gardée.')
+      : t('Touche de VPX, que Cyber Pinball ne gère pas. Elle se change dans le menu de VPX (F12, puis « Input Settings »).'),
   };
 }
 
+/** Phrase qui suit « : » : première lettre en minuscule, sauf nom propre en tête (« Cyber Pinball active… », « VPX… »). */
+function afterColon(text: string): string {
+  if (/^(Cyber Pinball|[A-Z0-9]{2,})\b/.test(text)) return text;
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
 /** D'où vient la valeur d'une clé gérée, et comment la changer. */
-function ownedOrigin(def: VpxSettingDef): { why: string; how: string; wizard?: string } {
+function ownedOrigin(def: VpxSettingDef): { why: string; how: string; wizard?: WizardKind } {
   if (def.section === 'Plugin.DMDUtil') {
-    return { why: 'Elle suit le DMD réel reconnu à son identifiant USB (ZeDMD, PIN2DMD, Pixelcade).', how: `Elle change quand on branche le DMD. ${KEEP_YOURS}` };
+    return {
+      why: t('Elle suit le DMD réel reconnu à son identifiant USB (ZeDMD, PIN2DMD, Pixelcade).'),
+      how: t('Elle change quand on branche le DMD. {keep}', { keep: keepYours() }),
+    };
   }
   if (def.key.startsWith('Priority.')) {
-    return { why: 'Elle choisit le plugin qui dessine sur cette fenêtre : un pack PuP d’abord, puis le .directb2s, puis ScoreView.', how: KEEP_YOURS };
+    return { why: t('Elle choisit le plugin qui dessine sur cette fenêtre : un pack PuP d’abord, puis le .directb2s, puis ScoreView.'), how: keepYours() };
   }
   if (def.section.startsWith('Plugin.') && def.key === 'Enable') {
-    return { why: 'Cyber Pinball active les plugins dont la borne a besoin et éteint ceux qui les gênent (B2SLegacy tant que B2S est actif).', how: KEEP_YOURS };
+    return { why: t('Cyber Pinball active les plugins dont la borne a besoin et éteint ceux qui les gênent (B2SLegacy tant que B2S est actif).'), how: keepYours() };
   }
   if (VPX_PLAY_SETTINGS.some((s) => s.section === def.section && s.key === def.key)) {
     return {
       why:
         def.key === 'SecurityLevel'
-          ? 'Au-dessus de 0, VPX demande la permission (Oui / Non) pour chaque objet ActiveX que crée le script de la table : une question bloquante en plein chargement.'
-          : 'Avec la VR forcée, VPX demande de reconnecter le casque (Oui / Non) ; une borne n’en a pas.',
-      how: KEEP_YOURS,
+          ? t('Au-dessus de 0, VPX demande la permission (Oui / Non) pour chaque objet ActiveX que crée le script de la table : une question bloquante en plein chargement.')
+          : t('Avec la VR forcée, VPX demande de reconnecter le casque (Oui / Non) ; une borne n’en a pas.'),
+      how: keepYours(),
     };
   }
   if (def.section === 'Player' && VPX_AUDIO_OWNED_KEYS.includes(def.key)) {
-    return { why: 'Elle découle de l’affectation des sorties audio de la borne.', how: 'Pour la changer, relancez l’assistant (étape Son).', wizard: 'Ouvrir l’assistant' };
+    return { why: t('Elle découle de l’affectation des sorties audio de la borne.'), how: t('Pour la changer, relancez l’assistant (étape Son).'), wizard: 'full' };
   }
-  return { why: 'Elle découle de l’affectation des écrans de la borne.', how: 'Pour la changer, relancez l’assistant d’écrans.', wizard: WIZARD_SCREENS };
+  return { why: t('Elle découle de l’affectation des écrans de la borne.'), how: t('Pour la changer, relancez l’assistant d’écrans.'), wizard: 'screens' };
 }
 
 function rowView(row: Row) {
@@ -827,19 +858,32 @@ function rowView(row: Row) {
       return {
         kind: 'section',
         label: row.name,
-        value: `${count + extras} réglage${count + extras > 1 ? 's' : ''}`,
-        badges: changed ? [{ text: s.tableIni ? `${changed} surchargé${changed > 1 ? 's' : ''}` : `${changed} modifié${changed > 1 ? 's' : ''}`, tone: s.tableIni ? 'table' : 'modified' }] : [],
+        value: tn(count + extras, '{n} réglage', '{n} réglages'),
+        badges: changed
+          ? [{ text: s.tableIni ? tn(changed, '{n} surchargé', '{n} surchargés') : tn(changed, '{n} modifié', '{n} modifiés'), tone: s.tableIni ? 'table' : 'modified' }]
+          : [],
       };
     }
     case 'overrides':
-      return { kind: 'section', label: 'Surcharges de cette table', value: `${overrideCount()} réglage${overrideCount() > 1 ? 's' : ''}`, badges: [{ text: 'Cette table', tone: 'table' }] };
+      return {
+        kind: 'section',
+        label: t('Surcharges de cette table'),
+        value: tn(overrideCount(), '{n} réglage', '{n} réglages'),
+        badges: [{ text: t('Cette table'), tone: 'table' }],
+      };
     case 'extra': {
       const mapping = inputMapping(row);
       if (mapping) {
-        const badge: Badge = mapping.owned ? { text: 'Gérée par Cyber Pinball', tone: 'owned' } : { text: 'Lecture seule', tone: 'locked' };
+        const badge: Badge = mapping.owned ? { text: t('Gérée par Cyber Pinball'), tone: 'owned' } : { text: t('Lecture seule'), tone: 'locked' };
         return { kind: 'setting', label: mapping.label, sub: row.key, value: mapping.keys, badges: [badge] };
       }
-      return { kind: 'setting', label: row.key, sub: 'Hors schéma (plugin ou table)', value: row.value === '' ? '(vide)' : row.value, badges: [{ text: 'Lecture seule', tone: 'locked' }] };
+      return {
+        kind: 'setting',
+        label: row.key,
+        sub: t('Hors schéma (plugin ou table)'),
+        value: row.value === '' ? t('(vide)') : row.value,
+        badges: [{ text: t('Lecture seule'), tone: 'locked' }],
+      };
     }
     case 'setting': {
       const state = stateOf(row.def);
@@ -858,34 +902,38 @@ function detailView(row: Row | undefined) {
   const s = session!;
   if (!row) return undefined;
   if (row.kind === 'section' || row.kind === 'overrides') {
-    const name = row.kind === 'section' ? row.name : 'Surcharges de cette table';
-    return { title: name, lines: [row.kind === 'overrides' ? 'Réglages que cette table remplace par sa propre valeur.' : `Réglages de la section [${name}] du fichier.`] };
+    const name = row.kind === 'section' ? row.name : t('Surcharges de cette table');
+    return {
+      title: name,
+      lines: [row.kind === 'overrides' ? t('Réglages que cette table remplace par sa propre valeur.') : t('Réglages de la section [{name}] du fichier.', { name })],
+    };
   }
   if (row.kind === 'extra') {
     const mapping = inputMapping(row);
-    if (mapping) return { title: mapping.label, lines: [`[${row.section}] ${row.key} : ${mapping.keys}`, mapping.why] };
-    return { title: row.key, lines: [`[${row.section}] ${row.key}`, 'Réglage enregistré par un plugin ou une table, absent du schéma de VPX.'] };
+    if (mapping) return { title: mapping.label, lines: [t('{name} : {value}', { name: `[${row.section}] ${row.key}`, value: mapping.keys }), mapping.why] };
+    return { title: row.key, lines: [`[${row.section}] ${row.key}`, t('Réglage enregistré par un plugin ou une table, absent du schéma de VPX.')] };
   }
   if (row.kind !== 'setting') return undefined;
   const def = row.def;
   const state = stateOf(def);
   const e = row.essential;
-  const facts: [string, string][] = [['Valeur utilisée', format(def, state.effective, e)]];
+  const facts: [string, string][] = [[t('Valeur utilisée'), format(def, state.effective, e)]];
   if (s.target.scope === 'table') {
-    facts.push(['Pour cette table', state.table !== undefined ? format(def, state.table, e) : 'non surchargé']);
-    facts.push(['Réglage général', format(def, state.global ?? (isTableOnly(def) ? undefined : def.default), e)]);
+    facts.push([t('Pour cette table'), state.table !== undefined ? format(def, state.table, e) : t('non surchargé')]);
+    facts.push([t('Réglage général'), format(def, state.global ?? (isTableOnly(def) ? undefined : def.default), e)]);
   }
-  facts.push(['Défaut de VPX', isTableOnly(def) ? 'valeur prévue par la table' : format(def, def.default, e)]);
+  facts.push([t('Défaut de VPX'), isTableOnly(def) ? t('valeur prévue par la table') : format(def, def.default, e)]);
   if (def.min !== undefined && def.max !== undefined && def.type !== 'enum' && !def.color) {
-    facts.push(['Plage', `${format(def, def.min, e)} à ${format(def, def.max, e)}`]);
+    facts.push([t('Plage'), t('{min} à {max}', { min: format(def, def.min, e), max: format(def, def.max, e) })]);
   }
-  facts.push(['Clé', `[${def.section}] ${def.key}`]);
-  if (def.plugin && def.key !== 'Enable') facts.push(['Déclaré par', `le plugin ${def.plugin}, sans effet quand il est désactivé`]);
-  if (state.invalid) facts.push(['Dans le fichier', `« ${state.invalid.raw} » (illisible, ignoré)`]);
+  facts.push([t('Clé'), `[${def.section}] ${def.key}`]);
+  if (def.plugin && def.key !== 'Enable') facts.push([t('Déclaré par'), t('le plugin {plugin}, sans effet quand il est désactivé', { plugin: def.plugin })]);
+  if (state.invalid) facts.push([t('Dans le fichier'), t('« {raw} » (illisible, ignoré)', { raw: state.invalid.raw })]);
   return {
     title: label(row),
     help: e?.help,
-    original: e ? `${def.label}${def.description ? ` : ${def.description}` : ''}` : def.description,
+    // Libellé et description de VPX, en anglais : ils restent tels quels.
+    original: e ? (def.description ? t('{name} : {value}', { name: def.label, value: def.description }) : def.label) : def.description,
     facts,
     owned: lockOf(def) === 'owned' ? `${ownedOrigin(def).why} ${ownedOrigin(def).how}` : undefined,
   };
@@ -903,7 +951,9 @@ function panelView(panel: Panel | undefined) {
       kind: 'text',
       title,
       text: panel.text,
-      hint: def.color ? 'Couleur au format RRVVBB. Entrée : enregistrer · Échap : annuler · vide : valeur par défaut.' : 'Entrée : enregistrer · Échap : annuler · vide : valeur par défaut.',
+      hint: def.color
+        ? t('Couleur au format RRVVBB. Entrée : enregistrer · Échap : annuler · vide : valeur par défaut.')
+        : t('Entrée : enregistrer · Échap : annuler · vide : valeur par défaut.'),
     };
   }
   return { kind: 'choices', title, choices: panel.choices.map((c) => ({ label: c.label, note: c.note })), index: panel.index };
@@ -912,38 +962,41 @@ function panelView(panel: Panel | undefined) {
 function view() {
   const s = session!;
   const list = rows();
-  const scope = s.target.scope === 'table' ? `Table : ${s.target.table.title}` : 'Réglages généraux, pour toutes les tables';
+  const scope = s.target.scope === 'table' ? t('Table : {title}', { title: s.target.table.title }) : t('Réglages généraux, pour toutes les tables');
   const file = s.target.scope === 'table' ? s.table!.vpxPath : activeVpxIni(loc);
   const fileNote =
     s.target.scope === 'table'
       ? s.table!.writePath !== s.table!.vpxPath
-        ? `Bac à sable : écrit dans ${s.table!.writePath}`
+        ? t('Bac à sable : écrit dans {file}', { file: s.table!.writePath })
         : s.table!.exists
           ? undefined
-          : 'Fichier créé au premier réglage.'
+          : t('Fichier créé au premier réglage.')
       : loc.sandbox
-        ? 'Bac à sable'
+        ? t('Bac à sable')
         : undefined;
   return {
-    title: 'Réglages de VPX',
+    title: t('Réglages de VPX'),
     scope,
     file,
     fileNote,
-    vpx: s.schema.count ? `VPX ${s.schema.vpx}${s.schema.variant ? ` ${s.schema.variant}` : ''} · ${s.schema.count} réglages` : '',
+    vpx: s.schema.count ? `VPX ${s.schema.vpx}${s.schema.variant ? ` ${s.schema.variant}` : ''} · ${tn(s.schema.count, '{n} réglage', '{n} réglages')}` : '',
     tabs: [
-      { id: 'essentials', label: 'Essentiels', active: s.tab === 'essentials' },
-      { id: 'advanced', label: 'Avancé', active: s.tab === 'advanced' },
+      { id: 'essentials', label: t('Essentiels'), active: s.tab === 'essentials' },
+      { id: 'advanced', label: t('Avancé'), active: s.tab === 'advanced' },
     ],
     tabsFocused: s.cursor === -1,
-    breadcrumb: s.tab === 'advanced' && s.section !== undefined ? (s.section === OVERRIDES ? 'Surcharges de cette table' : s.section) : undefined,
+    breadcrumb: s.tab === 'advanced' && s.section !== undefined ? (s.section === OVERRIDES ? t('Surcharges de cette table') : s.section) : undefined,
     rows: list.map(rowView),
     cursor: s.cursor,
     detail: detailView(list[s.cursor]),
     panel: panelView(s.panel),
     notice: s.notice,
     hints: s.panel
-      ? 'Flippers : choisir · Start : valider · Exit : annuler'
-      : `Flippers : se déplacer · Start : ${s.cursor === -1 ? 'changer d’onglet' : 'modifier'} · Exit : ${s.tab === 'advanced' && s.section !== undefined ? 'retour aux sections' : 'fermer'} · Suppr : valeur par défaut · Tab : onglet`,
+      ? t('Flippers : choisir · Start : valider · Exit : annuler')
+      : t('Flippers : se déplacer · Start : {start} · Exit : {exit} · Suppr : valeur par défaut · Tab : onglet', {
+          start: s.cursor === -1 ? t('changer d’onglet') : t('modifier'),
+          exit: s.tab === 'advanced' && s.section !== undefined ? t('retour aux sections') : t('fermer'),
+        }),
   };
 }
 

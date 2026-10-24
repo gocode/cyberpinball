@@ -68,10 +68,10 @@ class CompoundFile {
   constructor(private readonly fd: number) {
     this.fileSize = fs.fstatSync(fd).size;
     const header = this.read(0, 512);
-    if (!header.subarray(0, 8).equals(SIGNATURE)) throw new Error('ce n’est pas un fichier composé OLE');
+    if (!header.subarray(0, 8).equals(SIGNATURE)) throw new Error('ce n’est pas un fichier composé OLE'); // i18n-ignore : erreur interne, toujours rattrapée
     this.sectorSize = 1 << header.readUInt16LE(0x1e);
     this.miniSectorSize = 1 << header.readUInt16LE(0x20);
-    if (this.sectorSize !== 512 && this.sectorSize !== 4096) throw new Error('taille de secteur inattendue');
+    if (this.sectorSize !== 512 && this.sectorSize !== 4096) throw new Error('taille de secteur inattendue'); // i18n-ignore : erreur interne, toujours rattrapée
     const fatCount = header.readUInt32LE(0x2c);
     this.miniCutoff = header.readUInt32LE(0x38);
 
@@ -103,7 +103,7 @@ class CompoundFile {
         size: dir.readUInt32LE(off + 0x78),
       });
     }
-    if (this.entries[0]?.type !== 5) throw new Error('répertoire du fichier composé illisible');
+    if (this.entries[0]?.type !== 5) throw new Error('répertoire du fichier composé illisible'); // i18n-ignore : erreur interne, toujours rattrapée
     const miniFatStart = header.readUInt32LE(0x3c);
     if (miniFatStart <= MAX_SECTOR) {
       const miniFat = this.chain(miniFatStart);
@@ -119,7 +119,7 @@ class CompoundFile {
 
   private sector(n: number): Buffer {
     const offset = (n + 1) * this.sectorSize;
-    if (n > MAX_SECTOR || offset >= this.fileSize) throw new Error(`secteur ${n} hors du fichier`);
+    if (n > MAX_SECTOR || offset >= this.fileSize) throw new Error(`secteur ${n} hors du fichier`); // i18n-ignore : erreur interne, toujours rattrapée
     return this.read(offset, this.sectorSize);
   }
 
@@ -129,7 +129,7 @@ class CompoundFile {
     let total = 0;
     const seen = new Set<number>();
     for (let s = start; s <= MAX_SECTOR && total < limit; s = this.fat[s] ?? END_OF_CHAIN) {
-      if (seen.has(s)) throw new Error('chaîne de secteurs en boucle');
+      if (seen.has(s)) throw new Error('chaîne de secteurs en boucle'); // i18n-ignore : erreur interne, toujours rattrapée
       seen.add(s);
       const sector = this.sector(s);
       parts.push(sector);
@@ -148,7 +148,7 @@ class CompoundFile {
     let total = 0;
     const seen = new Set<number>();
     for (let s = entry.start; s <= MAX_SECTOR && total < size; s = this.miniFat?.[s] ?? END_OF_CHAIN) {
-      if (seen.has(s)) throw new Error('chaîne de mini-secteurs en boucle');
+      if (seen.has(s)) throw new Error('chaîne de mini-secteurs en boucle'); // i18n-ignore : erreur interne, toujours rattrapée
       seen.add(s);
       const part = this.miniStream.subarray(s * this.miniSectorSize, (s + 1) * this.miniSectorSize);
       parts.push(part);

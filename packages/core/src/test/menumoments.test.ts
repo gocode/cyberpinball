@@ -427,7 +427,7 @@ test('rendu : son du menu chargé par les fenêtres du menu', () => {
 test('partie simulée : hors écran seulement ; à l’écran, VPX ; hors écran sans elle, la partie reste refusée', () => {
   const frontend = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
   assert.match(frontend, /const simulated = OFFSCREEN \? process\.env\.CYBERPINBALL_PARTIE_SIMULEE : undefined;/);
-  assert.match(frontend, /simulated === undefined \? refuseOffscreen\('Lancer une partie de VPX'\)/);
+  assert.match(frontend, /simulated === undefined \? refuseOffscreen\(t\('Lancer une partie de VPX'\)\)/);
   // Le fond de partie n'arrive qu'avec la fenêtre de jeu : au chargement, les écrans gardent les médias du jeu.
   assert.match(frontend, /playing && state\.phase === 'playing'/);
   const renderer = fs.readFileSync(path.join(APP, 'renderer', 'frontend.js'), 'utf8');

@@ -9,6 +9,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { t } from './i18n';
 import { layoutOf } from './locations';
 import { edgeRotation, type Cabinet, type FlipperEdge, type RoleId, type Rotation } from './model';
 import { readInfo, type TableEntry, type TableInfoFile } from './tables';
@@ -35,11 +36,21 @@ export type MediaType =
 export type MediaMoment = 'browse' | 'sheet' | 'loading' | 'game' | 'attract';
 
 export const MOMENT_LABELS: Record<MediaMoment, string> = {
-  browse: 'Navigation',
-  sheet: 'Fiche, sur demande',
-  loading: 'Chargement',
-  game: 'Partie',
-  attract: 'Attente',
+  get browse() {
+    return t('Navigation');
+  },
+  get sheet() {
+    return t('Fiche, sur demande');
+  },
+  get loading() {
+    return t('Chargement');
+  },
+  get game() {
+    return t('Partie');
+  },
+  get attract() {
+    return t('Attente');
+  },
 };
 
 /** Où le média est montré : un rôle de la borne, ou la sortie audio du menu. */
@@ -111,8 +122,12 @@ export const UNREADABLE_FORMATS: readonly string[] = ['flv', 'f4v', 'avi', 'mov'
 export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
   {
     type: 'Wheel',
-    label: 'Logo',
-    description: 'Logo du jeu sur fond transparent, qui identifie la table dans la liste du menu.',
+    get label() {
+      return t('Logo');
+    },
+    get description() {
+      return t('Logo du jeu sur fond transparent, qui identifie la table dans la liste du menu.');
+    },
     target: 'playfield',
     moments: ['browse', 'attract'],
     formats: ['apng', 'png', 'webp', 'gif'],
@@ -120,13 +135,19 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     orientable: false,
     fit: 'contain',
     fallback: 'wheel-title',
-    fallbackLabel: 'Titre en texte stylisé',
+    get fallbackLabel() {
+      return t('Titre en texte stylisé');
+    },
     aliases: { popper: ['Wheel'], pinballx: ['Wheel Images'], vpinfe: ['wheel.png'] },
   },
   {
     type: 'Playfield',
-    label: 'Plateau',
-    description: 'La table qui joue, en fond du menu derrière la liste.',
+    get label() {
+      return t('Plateau');
+    },
+    get description() {
+      return t('La table qui joue, en fond du menu derrière la liste.');
+    },
     target: 'playfield',
     moments: ['browse', 'attract'],
     formats: SCREEN_FORMATS,
@@ -134,7 +155,9 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     orientable: true,
     fit: 'cover',
     fallback: 'playfield-gradient',
-    fallbackLabel: 'Verre fumé sarcelle, discret',
+    get fallbackLabel() {
+      return t('Verre fumé sarcelle, discret');
+    },
     aliases: {
       popper: ['PlayField'],
       pinballx: ['Table Videos', 'Table Images'],
@@ -143,8 +166,12 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
   },
   {
     type: 'Backglass',
-    label: 'Fronton',
-    description: "L'image ou l'animation du fronton du jeu.",
+    get label() {
+      return t('Fronton');
+    },
+    get description() {
+      return t("L'image ou l'animation du fronton du jeu.");
+    },
     target: 'backglass',
     moments: SCREEN_MOMENTS,
     formats: SCREEN_FORMATS,
@@ -152,13 +179,19 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     orientable: false,
     fit: 'contain',
     fallback: 'backglass-card',
-    fallbackLabel: 'Carte générée : titre, fabricant, année',
+    get fallbackLabel() {
+      return t('Carte générée : titre, fabricant, année');
+    },
     aliases: { popper: ['Backglass'], pinballx: ['Backglass Videos', 'Backglass Images'], vpinfe: ['bg.mp4', 'bg.png'] },
   },
   {
     type: 'DMD',
-    label: 'Afficheur',
-    description: "Animation de l'afficheur 4:1 du jeu.",
+    get label() {
+      return t('Afficheur');
+    },
+    get description() {
+      return t("Animation de l'afficheur 4:1 du jeu.");
+    },
     target: 'dmd',
     moments: SCREEN_MOMENTS,
     formats: SCREEN_FORMATS,
@@ -166,13 +199,19 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     orientable: false,
     fit: 'contain',
     fallback: 'dmd-dots',
-    fallbackLabel: 'Titre en points sur la grille 128×32',
+    get fallbackLabel() {
+      return t('Titre en points sur la grille 128×32');
+    },
     aliases: { popper: ['DMD'], pinballx: ['DMD Videos', 'DMD Images'], vpinfe: [] },
   },
   {
     type: 'FullDMD',
-    label: 'Afficheur large',
-    description: 'Animation 16:9 pour un écran DMD large.',
+    get label() {
+      return t('Afficheur large');
+    },
+    get description() {
+      return t('Animation 16:9 pour un écran DMD large.');
+    },
     target: 'dmd',
     moments: SCREEN_MOMENTS,
     formats: SCREEN_FORMATS,
@@ -180,14 +219,18 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     orientable: false,
     fit: 'contain',
     fallback: 'dmd-dots',
-    fallbackLabel: 'Titre en points sur la grille 128×32',
+    get fallbackLabel() {
+      return t('Titre en points sur la grille 128×32');
+    },
     // Le dmd.png de VPinFE et de VPinMediaDB est un FullDMD 16:9 (§ 3.1).
     aliases: { popper: ['Menu'], pinballx: ['FullDMD Videos'], vpinfe: ['dmd.mp4', 'dmd.png'] },
   },
   {
     type: 'Topper',
     label: 'Topper',
-    description: 'Animation du bandeau au-dessus du fronton.',
+    get description() {
+      return t('Animation du bandeau au-dessus du fronton.');
+    },
     target: 'topper',
     moments: SCREEN_MOMENTS,
     formats: SCREEN_FORMATS,
@@ -195,13 +238,19 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     orientable: false,
     fit: 'contain',
     fallback: 'topper-logo',
-    fallbackLabel: 'Logo animé de Cyber Pinball avec le fabricant et l’année',
+    get fallbackLabel() {
+      return t('Logo animé de Cyber Pinball avec le fabricant et l’année');
+    },
     aliases: { popper: ['Topper'], pinballx: ['Topper Videos', 'Topper Images'], vpinfe: [] },
   },
   {
     type: 'Loading',
-    label: 'Chargement',
-    description: 'Vidéo jouée pendant que VPX charge la table.',
+    get label() {
+      return t('Chargement');
+    },
+    get description() {
+      return t('Vidéo jouée pendant que VPX charge la table.');
+    },
     target: 'playfield',
     moments: ['loading'],
     formats: VIDEO_FORMATS,
@@ -209,39 +258,57 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     orientable: true,
     fit: 'cover',
     fallback: 'loading-screen',
-    fallbackLabel: 'Écran de chargement : titre et commandes',
+    get fallbackLabel() {
+      return t('Écran de chargement : titre et commandes');
+    },
     aliases: { popper: ['Loading'], pinballx: ['Loading Videos'], vpinfe: [] },
   },
   {
     type: 'Audio',
-    label: 'Musique du jeu',
-    description: 'Musique jouée tant que la table est sélectionnée.',
+    get label() {
+      return t('Musique du jeu');
+    },
+    get description() {
+      return t('Musique jouée tant que la table est sélectionnée.');
+    },
     target: 'audio',
     moments: ['browse', 'attract'],
     formats: AUDIO_FORMATS,
     pages: false,
     orientable: false,
     fallback: 'none',
-    fallbackLabel: 'Silence (ou la musique d’ambiance de la borne, si elle existe)',
+    get fallbackLabel() {
+      return t('Silence (ou la musique d’ambiance de la borne, si elle existe)');
+    },
     aliases: { popper: ['Audio'], pinballx: ['Table Audio'], vpinfe: ['audio.mp3'] },
   },
   {
     type: 'AudioLaunch',
-    label: 'Son de lancement',
-    description: 'Son court au lancement.',
+    get label() {
+      return t('Son de lancement');
+    },
+    get description() {
+      return t('Son court au lancement.');
+    },
     target: 'audio',
     moments: ['loading'],
     formats: AUDIO_FORMATS,
     pages: false,
     orientable: false,
     fallback: 'none',
-    fallbackLabel: 'Aucun',
+    get fallbackLabel() {
+      return t('Aucun');
+    },
     aliases: { popper: ['AudioLaunch'], pinballx: ['Launch Audio'], vpinfe: [] },
   },
   {
     type: 'GameInfo',
-    label: 'Prospectus',
-    description: 'Une ou plusieurs pages de présentation du jeu, sur demande.',
+    get label() {
+      return t('Prospectus');
+    },
+    get description() {
+      return t('Une ou plusieurs pages de présentation du jeu, sur demande.');
+    },
     target: 'playfield',
     moments: ['sheet'],
     formats: [...IMAGE_FORMATS, 'mp4'],
@@ -249,13 +316,19 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     orientable: false,
     fit: 'contain',
     fallback: 'info-sheet',
-    fallbackLabel: 'Fiche générée depuis le .info : titre, fabricant, année, auteurs',
+    get fallbackLabel() {
+      return t('Fiche générée depuis le .info : titre, fabricant, année, auteurs');
+    },
     aliases: { popper: ['GameInfo'], pinballx: ['Flyer Images'], vpinfe: ['flyer.png'] },
   },
   {
     type: 'GameHelp',
-    label: 'Règles',
-    description: 'Une ou plusieurs cartes de règles, sur demande.',
+    get label() {
+      return t('Règles');
+    },
+    get description() {
+      return t('Une ou plusieurs cartes de règles, sur demande.');
+    },
     target: 'playfield',
     moments: ['sheet'],
     formats: [...IMAGE_FORMATS, 'mp4'],
@@ -263,43 +336,63 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     orientable: false,
     fit: 'contain',
     fallback: 'game-controls',
-    fallbackLabel: 'Commandes de la partie',
+    get fallbackLabel() {
+      return t('Commandes de la partie');
+    },
     aliases: { popper: ['GameHelp'], pinballx: ['Instruction Cards'], vpinfe: [] },
   },
   {
     type: 'Other',
-    label: 'Autre',
-    description: 'Média sans écran chez Cyber Pinball : lu, gardé, ignoré.',
+    get label() {
+      return t('Autre');
+    },
+    get description() {
+      return t('Média sans écran chez Cyber Pinball : lu, gardé, ignoré.');
+    },
     moments: [],
     formats: SCREEN_FORMATS,
     pages: false,
     orientable: false,
     fallback: 'none',
-    fallbackLabel: 'Aucun',
+    get fallbackLabel() {
+      return t('Aucun');
+    },
     aliases: { popper: ['Other2'], pinballx: [], vpinfe: [] },
   },
   {
     type: 'RealDMD',
-    label: 'DMD physique',
-    description: 'Image pour un DMD physique, que Cyber Pinball ne gère pas : lue, gardée, ignorée.',
+    get label() {
+      return t('DMD physique');
+    },
+    get description() {
+      return t('Image pour un DMD physique, que Cyber Pinball ne gère pas : lue, gardée, ignorée.');
+    },
     moments: [],
     formats: SCREEN_FORMATS,
     pages: false,
     orientable: false,
     fallback: 'none',
-    fallbackLabel: 'Aucun',
+    get fallbackLabel() {
+      return t('Aucun');
+    },
     aliases: { popper: [], pinballx: ['Real DMD Images', 'Real DMD Videos'], vpinfe: ['realdmd.png'] },
   },
   {
     type: 'RealColorDMD',
-    label: 'DMD physique couleur',
-    description: 'Image pour un DMD physique en couleur, que Cyber Pinball ne gère pas : lue, gardée, ignorée.',
+    get label() {
+      return t('DMD physique couleur');
+    },
+    get description() {
+      return t('Image pour un DMD physique en couleur, que Cyber Pinball ne gère pas : lue, gardée, ignorée.');
+    },
     moments: [],
     formats: SCREEN_FORMATS,
     pages: false,
     orientable: false,
     fallback: 'none',
-    fallbackLabel: 'Aucun',
+    get fallbackLabel() {
+      return t('Aucun');
+    },
     aliases: {
       popper: [],
       pinballx: ['Real DMD Color Images', 'Real DMD Color Videos'],

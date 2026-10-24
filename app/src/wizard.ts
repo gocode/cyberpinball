@@ -69,6 +69,8 @@ import {
   currentFlipperEdge,
   EDGE_LABELS,
   edgeAfterRotation,
+  frontendNames,
+  type OtherFrontend,
   edgeRotation,
   edidSize,
   FLIPPER_EDGES,
@@ -93,6 +95,9 @@ import {
   sizeFromDiagonal,
   vpxFlipperEdge,
   vpxOrientationFix,
+  formatList,
+  t,
+  tn,
   type AudioRole,
   type Cabinet,
   type CabinetAudio,
@@ -117,6 +122,7 @@ import { coverDisplay } from './cover-display';
 import { LayoutReport } from './layout-check';
 import { arrangeAction, arrangeKey, arrangePanel, arrangeZones, startArrange, type ArrangeAction, type ArrangeHost, type ArrangeOutcome, type ArrangeState } from './arrange';
 import { relaunchCovered } from './screen-guard';
+import { otherFrontendsOnThisPc } from './frontend-gate';
 
 const COLORS = ['#ff3d7f', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c'];
 
@@ -185,6 +191,8 @@ interface Wizard {
   flip?: { from: Rotation; edge: FlipperEdge; turn: Rotation; deadline: number };
   /** Bord gardé malgré VPX (rotation annulée ou refusée par Windows) : Start passe à la suite. */
   keepEdge?: FlipperEdge;
+  /** Retournement demandé alors qu'un autre menu de borne est installé : avertissement affiché pour ce bord. */
+  flipWarning?: FlipperEdge;
   notice?: string;
   /** Étape « Son » ; absente tant qu'elle n'a pas commencé ou s'il n'y a aucune sortie à proposer. */
   sound?: SoundStep;
@@ -287,7 +295,11 @@ const HOLD_SHOWN_MS = 700;
 const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Assistant d'écrans : affecte chaque rôle à un écran, puis enregistre le modèle de borne. */
+/** Autres menus de borne de ce PC (PinUP Popper…), relevés au démarrage de l'assistant. */
+let otherFrontends: OtherFrontend[] = [];
+
 export function startWizard(): void {
+  otherFrontends = otherFrontendsOnThisPc();
   ipcMain.on('ready', () => broadcast());
   // Souris : étape « Boutons » (refaire un bouton, précédent, touches par défaut…).
   ipcMain.on('action', (_event, action: WizardAction) => handleWizardAction(action));
@@ -372,7 +384,7 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
     else if (code.startsWith('drag:')) {
       const [, screenNo, role, handle, dx, dy] = code.split(':');
       const selector = handle === 'move' ? `.zone[data-role="${role}"]` : `.zone[data-role="${role}"] .handle.${handle}`;
-      await windows[Number(screenNo) - 1]?.webContents.executeJavaScript(`(async () => {
+      await windows[Number(screenNo) - 1]?.webContents.executeJavaScript(/* i18n-ignore : script de page de l’autopilote */ `(async () => {
         const el = document.querySelector(${JSON.stringify(selector)});
         if (!el) return;
         const r = el.getBoundingClientRect();
@@ -669,7 +681,7 @@ function draftCabinet(): Partial<Cabinet> {
 
 function pendingChanges(): string[] {
   const lines = cabinetChanges(previous, draftCabinet());
-  if (wizard.flip) lines.push('Écran du playfield : remis dans son orientation d’origine');
+  if (wizard.flip) lines.push(t('Écran du playfield : remis dans son orientation d’origine'));
   return lines;
 }
 
@@ -680,16 +692,25 @@ function quitView() {
   const elapsed = held ? Date.now() - held.at : 0;
   const holding = held && elapsed >= HOLD_SHOWN_MS && (held.answering || !wizard.quit) ? Math.max(1, Math.ceil((held.ms - elapsed) / 1000)) : undefined;
   const quit = wizard.quit;
-  const label = (codes: string[]) => [...new Set(codes)].slice(0, 2).map(keyLabel).join(' ou ');
+  const label = (codes: string[]) => formatList([...new Set(codes)].slice(0, 2).map(keyLabel), 'or');
   return {
-    button: holding === undefined ? 'Quitter sans enregistrer' : `Maintenu : ${quit ? 'quitter' : 'quitter sans enregistrer ?'} dans ${holding} s`,
+    button:
+      holding === undefined
+        ? t('Quitter sans enregistrer')
+        : quit
+          ? t('Maintenu : quitter dans {n} s', { n: holding })
+          : t('Maintenu : quitter sans enregistrer ? dans {n} s', { n: holding }),
     holding: holding !== undefined,
     dialog: quit && {
-      title: 'Quitter sans enregistrer ?',
-      lines: quit.lines.length ? quit.lines : ['Rien n’a été changé.'],
-      lead: quit.lines.length ? 'Ce qui ne sera pas enregistré :' : '',
+      title: t('Quitter sans enregistrer ?'),
+      lines: quit.lines.length ? quit.lines : [t('Rien n’a été changé.')],
+      lead: quit.lines.length ? t('Ce qui ne sera pas enregistré :') : '',
       destination: quitDestination(previous !== undefined).text,
-      hint: `Start (${label(confirmKeys())}) : oui · Exit (${label([...exitKeys(), ...KEYS.back])}) : non · le même geste encore : oui · sans réponse dans ${Math.max(0, Math.ceil((quit.deadline - Date.now()) / 1000))} s : on continue`,
+      hint: t('Start ({confirm}) : oui · Exit ({exit}) : non · le même geste encore : oui · sans réponse dans {n} s : on continue', {
+        confirm: label(confirmKeys()),
+        exit: label([...exitKeys(), ...KEYS.back]),
+        n: Math.max(0, Math.ceil((quit.deadline - Date.now()) / 1000)),
+      }),
     },
   };
 }
@@ -711,8 +732,11 @@ function quitView() {
 const SUMMARY_ACTIONS = ['save', 'previous', 'defaults', 'restart'] as const;
 type ButtonsAction = (typeof SUMMARY_ACTIONS)[number];
 
-/** « Relevé : … » après « Touches par défaut ». */
-const DEFAULTS_LAST = 'touches par défaut des encodeurs';
+/** Marque de « Relevé : … » après « Touches par défaut » (le texte affiché est lastLabel). */
+const DEFAULTS_LAST = 'defaults';
+
+/** Dernier bouton relevé ou passé, en clair. */
+const lastLabel = (last: string) => (last === DEFAULTS_LAST ? t('touches par défaut des encodeurs') : last);
 
 
 /** Ce que la souris envoie depuis screen.js. */
@@ -776,17 +800,17 @@ function handleButtonKey(input: Input): void {
   const button = BUTTONS[capture.index]!;
   if (!button.required && code === capture.keys.exit) {
     delete capture.keys[button.id];
-    capture.last = `${button.label} : pas de bouton`;
+    capture.last = t('{button} : pas de bouton', { button: button.label });
   } else {
     const holder = BUTTONS.find((b) => b.id !== button.id && capture.keys[b.id] === code);
     capture.refused = holder
-      ? `${keyLabel(code)} est déjà la touche du bouton ${holder.label} : appuyez sur un autre bouton, ou cliquez sur ${holder.label} pour le refaire.`
+      ? t('{key} est déjà la touche du bouton {button} : appuyez sur un autre bouton, ou cliquez sur {button} pour le refaire.', { key: keyLabel(code), button: holder.label })
       : refusedKey(code);
     if (capture.refused) return;
     // Une autre touche : l'essai de ce bouton est à refaire.
     if (capture.keys[button.id] !== code) capture.tried.delete(button.id);
     capture.keys[button.id] = code;
-    capture.last = `${button.label} : ${keyLabel(code)}`;
+    capture.last = t('{button} : {key}', { button: button.label, key: keyLabel(code) });
   }
   capture.answered.add(button.id);
   nextButton(capture);
@@ -899,8 +923,8 @@ function runButtonsAction(action: ButtonsAction): void {
       if (wizard.phase !== 'buttonsSummary') return;
       const problems = buttonProblems(capture.keys);
       const untried = buttonsToTry(capture.keys, capture.reference).filter((id) => !capture.tried.has(id));
-      if (problems.length) capture.notice = `Impossible de valider : ${problems.join(' ; ')}.`;
-      else if (untried.length) capture.notice = `Essayez d’abord sur la borne : ${untried.map((id) => buttonInfo(id).label).join(', ')}.`;
+      if (problems.length) capture.notice = t('Impossible de valider : {problems}.', { problems: problems.join(' ; ') });
+      else if (untried.length) capture.notice = t('Essayez d’abord sur la borne : {buttons}.', { buttons: untried.map((id) => buttonInfo(id).label).join(', ') });
       else acceptButtons();
     }
   }
@@ -916,8 +940,8 @@ function buttonsTimeout(): void {
   }
   wizard.phase = 'assign';
   wizard.notice = wizard.buttons
-    ? 'Boutons : aucun bouton pressé, touches actuelles gardées.'
-    : 'Boutons : aucun bouton pressé, touches par défaut des encodeurs gardées.';
+    ? t('Boutons : aucun bouton pressé, touches actuelles gardées.')
+    : t('Boutons : aucun bouton pressé, touches par défaut des encodeurs gardées.');
   broadcast();
 }
 
@@ -949,11 +973,21 @@ function saveStep(): void {
     lines: summarizeChanges(plan.changes, buttonsOnly),
     findings: [
       ...(isOnly('son') ? channelNotices() : []),
-      ...plan.findings.filter((f) => f.severity !== 'info' || (buttonsOnly && f.message.startsWith('Touches de VPX'))),
+      // Boutons seuls : le constat des actions de VPX privées de leur touche, reconnu à ces actions (pas à son texte).
+      ...plan.findings.filter((f) => f.severity !== 'info' || (buttonsOnly && isSilencedFinding(f, plan.silenced))),
     ],
     iniPath: cabinet.vpx.iniPath,
     backup: report?.backup,
   };
+}
+
+/**
+ * Constat de la synchronisation qui nomme les actions de VPX privées de leur touche
+ * (« Touches de VPX reprises par les boutons de la borne : … ») : il cite chacune d'elles,
+ * sous le même libellé, dans la langue de l'interface. Rien ne dépend de son texte.
+ */
+function isSilencedFinding(f: SyncFinding, silenced: readonly { label: string }[]): boolean {
+  return silenced.length > 0 && silenced.every((s) => f.message.includes(s.label));
 }
 
 /**
@@ -980,8 +1014,8 @@ function buttonsSummary(): string {
   const main = NAVIGATION_BUTTONS.map((id) => keyLabel(keys[id])).join(', ');
   const optional = BUTTONS.filter((b) => !b.required && keys[b.id]).length;
   return wizard.buttons
-    ? `Boutons relevés : flippers, Start, Exit sur ${main} ; ${optional} bouton${optional > 1 ? 's' : ''} facultatif${optional > 1 ? 's' : ''}`
-    : `Boutons : touches par défaut des encodeurs (${main}…), [Input] de VPX inchangé`;
+    ? tn(optional, 'Boutons relevés : flippers, Start, Exit sur {main} ; {n} bouton facultatif', 'Boutons relevés : flippers, Start, Exit sur {main} ; {n} boutons facultatifs', { main })
+    : t('Boutons : touches par défaut des encodeurs ({main}…), [Input] de VPX inchangé', { main });
 }
 
 /** Lignes « bouton : touche » de l'écran final ; les boutons absents de la borne sur une seule ligne. */
@@ -989,8 +1023,8 @@ function buttonLines(keys: CabinetButtons | undefined): string[] {
   const all = buttonKeys(keys);
   const missing = BUTTONS.filter((b) => !all[b.id]).map((b) => b.label);
   return [
-    ...BUTTONS.filter((b) => all[b.id]).map((b) => `${b.label} : ${keyLabel(all[b.id])}`),
-    ...(missing.length ? [`Pas de bouton : ${missing.join(', ')}`] : []),
+    ...BUTTONS.filter((b) => all[b.id]).map((b) => t('{button} : {key}', { button: b.label, key: keyLabel(all[b.id]) })),
+    ...(missing.length ? [t('Pas de bouton : {buttons}', { buttons: missing.join(', ') })] : []),
   ];
 }
 
@@ -1001,10 +1035,10 @@ function previousPlayfieldIndex(): number {
 }
 
 const ACTION_LABELS: Record<ButtonsAction, string> = {
-  save: 'Valider',
-  previous: '◀ Précédent',
-  defaults: 'Touches par défaut',
-  restart: 'Tout relever',
+  get save() { return t('Valider'); },
+  get previous() { return t('◀ Précédent'); },
+  get defaults() { return t('Touches par défaut'); },
+  get restart() { return t('Tout relever'); },
 };
 
 /**
@@ -1022,7 +1056,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
     const answered = capture.answered.has(b.id);
     return {
       label: b.label,
-      key: code ? keyLabel(code) : answered ? 'pas de bouton' : inForce[b.id] ? keyLabel(inForce[b.id]) : b.required ? '' : 'facultatif',
+      key: code ? keyLabel(code) : answered ? t('pas de bouton') : inForce[b.id] ? keyLabel(inForce[b.id]) : b.required ? '' : t('facultatif'),
       state: !summary && i === capture.index ? 'current' : answered ? 'done' : 'todo',
       selected: summary && capture.action === SUMMARY_ACTIONS.length + i,
       tried: summary && capture.tried.has(b.id),
@@ -1030,7 +1064,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
   });
   const actions = (summary ? SUMMARY_ACTIONS : (['previous', 'defaults', 'restart'] as const)).map((id, i) => ({
     id,
-    label: id === 'save' && buttonsOnly ? 'Enregistrer' : ACTION_LABELS[id],
+    label: id === 'save' && buttonsOnly ? t('Enregistrer') : ACTION_LABELS[id],
     selected: summary && i === capture.action,
   }));
   const common = { ...base, rotation, highlight: true, name: '', details: '', buttons: list, actions };
@@ -1043,13 +1077,26 @@ function buttonsView(index: number, base: Record<string, unknown>) {
     const seconds = capture.deadline === undefined ? undefined : Math.max(0, Math.ceil((capture.deadline - Date.now()) / 1000));
     return {
       ...common,
-      prompt: toTry.length ? 'Essayez les boutons' : 'Boutons de la borne',
-      details: silenced.length ? `Perdent leur touche dans VPX : ${silenced.join(', ')}` : 'Les autres touches de VPX ne changent pas.',
-      notice: capture.notice ?? (buttonProblems(keys).join(' ; ') || (seconds === undefined ? undefined : `Sans réponse dans ${seconds} s : touches actuelles gardées.`)),
+      prompt: toTry.length ? t('Essayez les boutons') : t('Boutons de la borne'),
+      details: silenced.length ? t('Perdent leur touche dans VPX : {actions}', { actions: silenced.join(', ') }) : t('Les autres touches de VPX ne changent pas.'),
+      notice: capture.notice ?? (buttonProblems(keys).join(' ; ') || (seconds === undefined ? undefined : t('Sans réponse dans {n} s : touches actuelles gardées.', { n: seconds }))),
       step: toTry.length
-        ? `Essai des touches relevées : ${tried}`
-        : `${capture.last === DEFAULTS_LAST ? 'Touches par défaut des encodeurs' : capture.last ? `Relevé : ${capture.last}` : 'Touches actuelles'} · choisissez un bouton pour lui donner une autre touche.`,
-      hint: `Flippers (${keyLabel(keys.leftFlipper)} / ${keyLabel(keys.rightFlipper)}) : choisir · Start (${keyLabel(keys.start)}) : lancer${toTry.includes('exit') ? ` · Exit (${keyLabel(keys.exit)}) : à essayer aussi` : ''} · Clic ou Start sur un bouton : le refaire`,
+        ? t('Essai des touches relevées : {buttons}', { buttons: tried })
+        : t('{last} · choisissez un bouton pour lui donner une autre touche.', {
+            last: capture.last === DEFAULTS_LAST ? t('Touches par défaut des encodeurs') : capture.last ? t('Relevé : {last}', { last: lastLabel(capture.last) }) : t('Touches actuelles'),
+          }),
+      hint: toTry.includes('exit')
+        ? t('Flippers ({left} / {right}) : choisir · Start ({start}) : lancer · Exit ({exit}) : à essayer aussi · Clic ou Start sur un bouton : le refaire', {
+            left: keyLabel(keys.leftFlipper),
+            right: keyLabel(keys.rightFlipper),
+            start: keyLabel(keys.start),
+            exit: keyLabel(keys.exit),
+          })
+        : t('Flippers ({left} / {right}) : choisir · Start ({start}) : lancer · Clic ou Start sur un bouton : le refaire', {
+            left: keyLabel(keys.leftFlipper),
+            right: keyLabel(keys.rightFlipper),
+            start: keyLabel(keys.start),
+          }),
     };
   }
 
@@ -1059,17 +1106,26 @@ function buttonsView(index: number, base: Record<string, unknown>) {
   const seconds = capture.deadline === undefined ? undefined : Math.max(0, Math.ceil((capture.deadline - Date.now()) / 1000));
   return {
     ...common,
-    prompt: 'Appuyez sur le bouton',
+    prompt: t('Appuyez sur le bouton'),
     measure: button.label,
-    name: button.required ? `Bouton ${capture.index + 1} sur ${required}` : `Bouton facultatif ${capture.index + 1 - required} sur ${BUTTONS.length - required}`,
-    details: `Touche ${wizard.buttons ? 'actuelle' : 'par défaut'} : ${current ? keyLabel(current) : 'aucune'}`,
+    name: button.required
+      ? t('Bouton {n} sur {total}', { n: capture.index + 1, total: required })
+      : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: BUTTONS.length - required }),
+    details: wizard.buttons ? t('Touche actuelle : {key}', { key: current ? keyLabel(current) : t('aucune') }) : t('Touche par défaut : {key}', { key: current ? keyLabel(current) : t('aucune') }),
     notice:
       capture.refused ??
       (seconds === undefined
         ? undefined
-        : `Sans réponse dans ${seconds} s : ${wizard.buttons ? 'touches actuelles gardées' : 'touches par défaut des encodeurs gardées (Maj, 1, Échap…)'}.`),
-    step: capture.last ? `Relevé : ${capture.last}` : 'Chaque bouton une seule fois ; la suite de l’assistant se pilote avec eux.',
-    hint: `${button.required ? '' : `Exit (${keyLabel(capture.keys.exit)}) : la borne n’a pas ce bouton · `}Clic sur un bouton : le refaire · Retour arrière : ${redoingOne(capture) ? 'annuler' : 'bouton précédent'}`,
+        : wizard.buttons
+          ? t('Sans réponse dans {n} s : touches actuelles gardées.', { n: seconds })
+          : t('Sans réponse dans {n} s : touches par défaut des encodeurs gardées (Maj, 1, Échap…).', { n: seconds })),
+    step: capture.last ? t('Relevé : {last}', { last: lastLabel(capture.last) }) : t('Chaque bouton une seule fois ; la suite de l’assistant se pilote avec eux.'),
+    hint: button.required
+      ? t('Clic sur un bouton : le refaire · Retour arrière : {back}', { back: redoingOne(capture) ? t('annuler') : t('bouton précédent') })
+      : t('Exit ({exit}) : la borne n’a pas ce bouton · Clic sur un bouton : le refaire · Retour arrière : {back}', {
+          exit: keyLabel(capture.keys.exit),
+          back: redoingOne(capture) ? t('annuler') : t('bouton précédent'),
+        }),
   };
 }
 
@@ -1095,7 +1151,14 @@ function handleLayoutKey(is: (group: string[]) => boolean): boolean {
     if (step) {
       wizard.flipperEdge = FLIPPER_EDGES[(at + step + FLIPPER_EDGES.length) % FLIPPER_EDGES.length]!;
       wizard.notice = undefined;
+      wizard.flipWarning = undefined;
     } else if (is(KEYS.confirm)) confirmEdge();
+    // Avertissement « autre menu installé » : Exit garde l'orientation de Windows, sans rien tourner.
+    else if (back && wizard.flipWarning === wizard.flipperEdge) {
+      wizard.flipWarning = undefined;
+      wizard.keepEdge = wizard.flipperEdge;
+      wizard.notice = t('Orientation de Windows gardée : {names} n’est pas touché. Dans Cyber Pinball, les tables seront à l’envers pour vous. Start : continuer.', { names: frontendNames(otherFrontends) });
+    }
     // Orientation seule : rien avant cette question, Exit propose de quitter sans enregistrer.
     else if (back) {
       if (isOnly('playfield')) askQuit();
@@ -1125,6 +1188,13 @@ function confirmEdge(): void {
     wizard.notice = undefined;
     return;
   }
+  // L'orientation est un réglage de Windows : un autre menu de borne installé la subit aussi.
+  // Le premier Start avertit, le second retourne.
+  if (otherFrontends.length && wizard.flipWarning !== wizard.flipperEdge) {
+    wizard.flipWarning = wizard.flipperEdge;
+    return;
+  }
+  wizard.flipWarning = undefined;
   void flipPlayfield(fix);
 }
 
@@ -1137,13 +1207,13 @@ async function flipPlayfield(fix: OrientationFix): Promise<void> {
   const index = wizard.assignments.playfield!;
   const from = displays[index]!.rotation;
   const edge = wizard.flipperEdge;
-  const done = await changeOrientation(index, fix.rotation, 'Rotation de l’écran du playfield…');
+  const done = await changeOrientation(index, fix.rotation, t('Rotation de l’écran du playfield…'));
   const turn = rotationDelta(displays[index]!.rotation, from);
   wizard.flipperEdge = edgeAfterRotation(edge, turn);
   if (!done || turn === 0) {
     // Le bord suit l'image réellement affichée, même si Windows s'est arrêté en route.
     wizard.keepEdge = wizard.flipperEdge;
-    wizard.notice ??= 'Windows n’a pas tourné l’écran. Start : continuer quand même.';
+    wizard.notice ??= t('Windows n’a pas tourné l’écran. Start : continuer quand même.');
     broadcast();
     return;
   }
@@ -1173,12 +1243,14 @@ async function revertFlip(timedOut: boolean): Promise<void> {
   wizard.flip = undefined;
   wizard.phase = 'orient';
   const index = wizard.assignments.playfield!;
-  const done = await changeOrientation(index, flip.from, 'Retour à l’orientation d’origine…');
+  const done = await changeOrientation(index, flip.from, t('Retour à l’orientation d’origine…'));
   // Le bord suit l'image réellement affichée, revenue ou non.
   wizard.flipperEdge = edgeAfterRotation(flip.edge, rotationDelta(displays[index]!.rotation, flip.from));
   wizard.keepEdge = wizard.flipperEdge;
   if (done) {
-    wizard.notice = `${timedOut ? 'Pas de réponse : orientation' : 'Orientation'} d’origine rétablie. Start : continuer, tables à l’envers pour vous.`;
+    wizard.notice = timedOut
+      ? t('Pas de réponse : orientation d’origine rétablie. Start : continuer, tables à l’envers pour vous.')
+      : t('Orientation d’origine rétablie. Start : continuer, tables à l’envers pour vous.');
   }
   broadcast();
 }
@@ -1207,7 +1279,7 @@ async function changeOrientation(index: number, rotation: Rotation, working: str
     wizard.notice = undefined;
     return true;
   } catch (err) {
-    wizard.notice = `${(err as Error).message} Start : continuer quand même.`;
+    wizard.notice = t('{error} Start : continuer quand même.', { error: (err as Error).message });
     try {
       redetect();
     } catch {
@@ -1337,13 +1409,13 @@ function proposedAudioRoles(outputs: ObservedAudioOutput[], reasons: Map<string,
   const backglass = speakerOf(wizard.assignments.backglass);
   if (backglass) {
     roles.backglass = backglass.endpointId;
-    reasons.set(backglass.endpointId, 'haut-parleur de l’écran du fronton');
+    reasons.set(backglass.endpointId, t('haut-parleur de l’écran du fronton'));
   }
   const surround = outputs.filter((o) => o.channels >= 8 && o.endpointId !== roles.backglass);
   const playfield = surround.length === 1 ? surround[0] : speakerOf(wizard.assignments.playfield);
   if (playfield && playfield.endpointId !== roles.backglass) {
     roles.playfield = playfield.endpointId;
-    reasons.set(playfield.endpointId, surround.length === 1 ? 'carte 7.1' : 'haut-parleur de l’écran du playfield');
+    reasons.set(playfield.endpointId, surround.length === 1 ? t('carte 7.1') : t('haut-parleur de l’écran du playfield'));
   }
   return roles;
 }
@@ -1516,18 +1588,18 @@ function soundNotice(): string | undefined {
   if (!status) return undefined;
   if (status.ok) {
     return status.homonyms && status.homonyms > 1
-      ? `${status.homonyms} sorties portent ce nom : le son peut venir de l’autre, et VPX prendra la dernière.`
+      ? t('{n} sorties portent ce nom : le son peut venir de l’autre, et VPX prendra la dernière.', { n: status.homonyms })
       : undefined;
   }
   switch (status.reason) {
     case 'not-found':
-      return 'Electron ne trouve pas cette sortie sous ce nom : aucun son joué. Répondez quand même si vous savez où elle est branchée.';
+      return t('Electron ne trouve pas cette sortie sous ce nom : aucun son joué. Répondez quand même si vous savez où elle est branchée.');
     case 'no-labels':
-      return 'Electron ne donne pas le nom des sorties audio : aucun son joué.';
+      return t('Electron ne donne pas le nom des sorties audio : aucun son joué.');
     case 'channels':
-      return `Electron n’a ouvert que ${status.maxChannels} canaux sur cette sortie : ces haut-parleurs ne peuvent pas être testés. Exit : rien entendu.`;
+      return t('Electron n’a ouvert que {n} canaux sur cette sortie : ces haut-parleurs ne peuvent pas être testés. Exit : rien entendu.', { n: status.maxChannels ?? 0 });
     default:
-      return `Le son n’a pas pu être joué (${status.detail ?? status.reason}).`;
+      return t('Le son n’a pas pu être joué ({detail}).', { detail: status.detail ?? status.reason ?? '' });
   }
 }
 
@@ -1536,21 +1608,28 @@ function audioRoleLabel(id: string): string {
   const roles = wizard.sound?.roles ?? {};
   const backglass = roles.backglass === id;
   const playfield = roles.playfield === id;
-  return backglass && playfield ? 'fronton et plateau' : backglass ? 'fronton' : playfield ? 'plateau' : 'aucun rôle';
+  return backglass && playfield ? t('fronton et plateau') : backglass ? t('fronton') : playfield ? t('plateau') : t('aucun rôle');
 }
 
 /** Lignes du récapitulatif pour le son. */
 function audioSummary(): string[] {
   const model = buildAudio();
-  if (!model) return ['Son : aucune sortie audio proposée, étape passée'];
+  if (!model) return [t('Son : aucune sortie audio proposée, étape passée')];
   const line = (role: (typeof AUDIO_ROLES)[number]) => {
     const output = audioById(model.roles[role.id]);
-    if (!output) return `${role.label} : aucune sortie choisie, sortie par défaut de Windows`;
+    if (!output) return t('{role} : aucune sortie choisie, sortie par défaut de Windows', { role: role.label });
     const screen = audioScreen(output, displays);
-    const where = screen ? `, écran ${displays.indexOf(screen) + 1}` : '';
-    if (role.id === 'backglass') return `${role.label} : ${output.friendlyName}${where}`;
+    const where = screen ? t(', écran {n}', { n: displays.indexOf(screen) + 1 }) : '';
+    if (role.id === 'backglass') return t('{role} : {output}{where}', { role: role.label, output: output.friendlyName, where });
     const sound3D = vpxSound3D(model, output.channels);
-    return `${role.label} : ${output.friendlyName}${where}, ${channelsLabel(output.channels)}, ${PLAYFIELD_MODE_LABELS[model.playfieldMode]} (Sound3D ${sound3D})`;
+    return t('{role} : {output}{where}, {channels}, {mode} (Sound3D {sound3D})', {
+      role: role.label,
+      output: output.friendlyName,
+      where,
+      channels: channelsLabel(output.channels),
+      mode: PLAYFIELD_MODE_LABELS[model.playfieldMode],
+      sound3D,
+    });
   };
   return AUDIO_ROLES.map(line);
 }
@@ -1667,7 +1746,7 @@ interface RoleOption {
 function roleOptions(): RoleOption[] {
   const role = ROLES[wizard.roleIndex];
   const options = placedOptions();
-  if (role && role.id !== 'playfield' && options.length) options.push({ display: freeTarget(role.id as AncillaryRoleId), label: 'placer librement…', free: true });
+  if (role && role.id !== 'playfield' && options.length) options.push({ display: freeTarget(role.id as AncillaryRoleId), label: t('placer librement…'), free: true });
   return options;
 }
 
@@ -1687,8 +1766,8 @@ function placedOptions(): RoleOption[] {
   if (backglass !== undefined && !wizard.zones.backglass) {
     const size = displays[backglass]!.bounds;
     for (const [ratio, label] of [
-      [4, 'en bas, sous le Backglass (4:1)'],
-      [16 / 9, 'en bas, sous le Backglass (FullDMD 16:9)'],
+      [4, t('en bas, sous le Backglass (4:1)')],
+      [16 / 9, t('en bas, sous le Backglass (FullDMD 16:9)')],
     ] as const) {
       const split = splitBackglassDmd(size, ratio);
       options.push({ display: backglass, zone: split.dmd, host: { role: 'backglass', zone: split.backglass }, label });
@@ -1697,7 +1776,7 @@ function placedOptions(): RoleOption[] {
   const playfield = wizard.assignments.playfield;
   if (playfield !== undefined) {
     const zone = embeddedDmdZone(displays[playfield]!.bounds, wizard.flipperEdge);
-    options.push({ display: playfield, zone, label: 'incrusté dans le playfield' });
+    options.push({ display: playfield, zone, label: t('incrusté dans le playfield') });
   }
   // Disposition enregistrée, peut-être retouchée dans VPX depuis : proposée telle quelle.
   const saved = savedOption(role.id);
@@ -1711,10 +1790,10 @@ function savedOption(role: AncillaryRoleId): RoleOption | undefined {
   const fp = previous?.roles[role];
   const display = displays.findIndex((d) => fp && fingerprintOf(d).key === fp);
   if (!zone || display < 0) return undefined;
-  if (display === wizard.assignments.playfield) return { display, zone, label: 'incrusté dans le playfield, comme enregistré' };
+  if (display === wizard.assignments.playfield) return { display, zone, label: t('incrusté dans le playfield, comme enregistré') };
   if (display !== wizard.assignments.backglass || wizard.zones.backglass) return undefined;
   const host = previous?.zones?.backglass;
-  return { display, zone, ...(host && { host: { role: 'backglass' as const, zone: host } }), label: 'sur cet écran avec le Backglass, comme enregistré' };
+  return { display, zone, ...(host && { host: { role: 'backglass' as const, zone: host } }), label: t('sur cet écran avec le Backglass, comme enregistré') };
 }
 
 /** Écran (et part d'écran) du rôle dans le modèle existant, sinon le premier écran libre. */
@@ -1784,8 +1863,8 @@ function save(): void {
       {
         severity: 'info',
         message: created
-          ? `Nouvelle configuration « ${configuration.name} », avec son propre VPinballX.ini : renommez-la dans Menu et configuration > Configurations de la borne.`
-          : `Configuration « ${configuration.name} » mise à jour.`,
+          ? t('Nouvelle configuration « {name} », avec son propre VPinballX.ini : renommez-la dans Menu et configuration > Configurations de la borne.', { name: configuration.name })
+          : t('Configuration « {name} » mise à jour.', { name: configuration.name }),
       },
       ...channelNotices(),
       ...plan.findings,
@@ -1800,14 +1879,14 @@ function save(): void {
  * l'activation de chaque fenêtre et du cadrage en détail, le reste seulement compté.
  */
 function summarizeChanges(changes: VpxChange[], inputDetail = false): string[] {
-  if (changes.length === 0) return ['Aucune modification : VPinballX.ini est déjà à jour.'];
+  if (changes.length === 0) return [t('Aucune modification : VPinballX.ini est déjà à jour.')];
   const inputs = changes.filter((c) => c.section === 'Input');
   const important = changes.filter((c) => c.section !== 'Input' && /(Display|Output|BGSet|ScreenWidth|ScreenHeight|CabinetAutofitMode|SoundDevice|SoundDeviceBG|Sound3D)$/.test(c.key));
   const others = changes.length - important.length - inputs.length;
   const lines = formatChanges(important);
   if (inputDetail) lines.push(...inputLines(inputs));
-  else if (inputs.length) lines.push(`+ ${inputs.length} touche${inputs.length > 1 ? 's' : ''} des boutons ([Input] Mapping.*)`);
-  if (others > 0) lines.push(`+ ${others} réglage${others > 1 ? 's' : ''} de position, de taille, de plein écran ou de plugin`);
+  else if (inputs.length) lines.push(tn(inputs.length, '+ {n} touche des boutons ([Input] Mapping.*)', '+ {n} touches des boutons ([Input] Mapping.*)'));
+  if (others > 0) lines.push(tn(others, '+ {n} réglage de position, de taille, de plein écran ou de plugin', '+ {n} réglages de position, de taille, de plein écran ou de plugin'));
   return lines;
 }
 
@@ -1815,7 +1894,7 @@ function summarizeChanges(changes: VpxChange[], inputDetail = false): string[] {
 function inputLines(changes: VpxChange[]): string[] {
   const byValue = new Map<string, string[]>();
   for (const c of changes) byValue.set(c.value, [...(byValue.get(c.value) ?? []), c.key.replace(/^Mapping\./, '')]);
-  return [...byValue].map(([value, actions]) => `[Input] ${actions.join(', ')} → ${value || '(défaut de VPX)'}`);
+  return [...byValue].map(([value, actions]) => `[Input] ${actions.join(', ')} → ${value || t('(défaut de VPX)')}`);
 }
 
 /** Relance l'application sans --assistant : elle ouvre alors le menu des tables. */
@@ -1874,7 +1953,7 @@ function startArrangeOnly(): void {
   loadAssignments();
   wizard.flipperEdge = previousEdge() ?? 'bottom';
   wizard.phase = 'arrange';
-  wizard.arrange = startArrange(arrangeHost(), 'Enregistrer');
+  wizard.arrange = startArrange(arrangeHost(), t('Enregistrer'));
 }
 
 function afterArrange(outcome: ArrangeOutcome): void {
@@ -1910,7 +1989,7 @@ function startFreePlacement(role: AncillaryRoleId, display: number): void {
   wizard.phase = 'arrange';
   wizard.notice = undefined;
   // Ce rôle choisi, le curseur sur la ligne « Zone ».
-  wizard.arrange = startArrange(arrangeHost(), 'Revenir à l’assistant', { role, item: 'role' });
+  wizard.arrange = startArrange(arrangeHost(), t('Revenir à l’assistant'), { role, item: 'role' });
 }
 
 function afterFreePlacement(outcome: ArrangeOutcome): void {
@@ -1982,9 +2061,13 @@ function viewFor(index: number) {
     number: index + 1,
     color: COLORS[index % COLORS.length],
     name: describeDisplay(d),
-    details: `${d.gdiName} · ${vpxDisplayId(d, profile.displayIdFormat)} · empreinte ${fp.strength === 'strong' ? 'forte' : 'faible'}`,
-    assignedRole: assignedRole ? ROLES.find((r) => r.id === assignedRole)!.label : undefined,
-    assignedLabel: shown.length ? shown.map((r) => ROLES.find((x) => x.id === r)!.label).join(' et ') : undefined,
+    details:
+      fp.strength === 'strong'
+        ? t('{gdi} · {vpx} · empreinte forte', { gdi: d.gdiName, vpx: vpxDisplayId(d, profile.displayIdFormat) })
+        : t('{gdi} · {vpx} · empreinte faible', { gdi: d.gdiName, vpx: vpxDisplayId(d, profile.displayIdFormat) }),
+    // Rôle (identifiant) qui décide du panneau du récapitulatif dans screen.js.
+    assignedRole,
+    assignedLabel: shown.length ? formatList(shown.map((r) => ROLES.find((x) => x.id === r)!.label)) : undefined,
     zones: zonesView(index, option),
     phase: wizard.phase,
     notice: wizard.notice,
@@ -2000,26 +2083,46 @@ function viewFor(index: number) {
 
   if (wizard.phase === 'orient' || wizard.phase === 'flip' || wizard.phase === 'size') {
     const isPlayfield = assignedRole === 'playfield';
-    if (!isPlayfield) return { ...base, highlight: false, prompt: '', step: 'Réglage du playfield en cours' };
+    if (!isPlayfield) return { ...base, highlight: false, prompt: '', step: t('Réglage du playfield en cours') };
     if (wizard.phase === 'orient') {
       const edge = wizard.flipperEdge;
       const vpxEdge = vpxFlipperEdge(d, edge);
       // VPX ne sait pas tourner ses tables de ce côté : Start tourne l'écran dans Windows.
       const fix = wizard.keepEdge === edge ? undefined : vpxOrientationFix(d, edge);
-      const turn = fix?.delta === 180 ? 'retourne' : 'tourne';
+      if (fix && wizard.flipWarning === edge) {
+        const names = frontendNames(otherFrontends);
+        const flip = fix.delta === 180;
+        return {
+          ...base,
+          highlight: true,
+          prompt: flip ? t('Retourner l’écran dans Windows ?') : t('Tourner l’écran dans Windows ?'),
+          step: t("Flippers {edge} de l'image Windows", { edge: EDGE_LABELS[edge] }),
+          notice:
+            otherFrontends.length > 1
+              ? t('{names} sont installés sur ce PC. L’orientation de l’écran est un réglage de Windows : la changer met aussi leurs tables et leur menu à l’envers.', { names })
+              : t('{names} est installé sur ce PC. L’orientation de l’écran est un réglage de Windows : la changer met aussi ses tables et son menu à l’envers.', { names }),
+          hint: flip
+            ? t('Start : retourner l’écran quand même · Exit : garder l’orientation de Windows (tables à l’envers dans Cyber Pinball)')
+            : t('Start : tourner l’écran quand même · Exit : garder l’orientation de Windows (tables à l’envers dans Cyber Pinball)'),
+        };
+      }
       return {
         ...base,
         highlight: true,
-        prompt: 'Où sont les flippers ?',
-        step: `Flippers ${EDGE_LABELS[edge]} de l'image Windows`,
+        prompt: t('Où sont les flippers ?'),
+        step: t("Flippers {edge} de l'image Windows", { edge: EDGE_LABELS[edge] }),
         notice:
           base.notice ??
           (vpxEdge === edge
             ? undefined
             : fix
-              ? `VPX afficherait les tables flippers ${EDGE_LABELS[vpxEdge]} : Start ${turn} l’écran dans Windows pour les mettre de votre côté.`
-              : `VPX affichera les tables flippers ${EDGE_LABELS[vpxEdge]}, à l’envers pour vous.`),
-        hint: `Flippers : tourner jusqu’à lire ce texte à l’endroit, la bande de votre côté · Start : ${fix ? 'retourner l’écran pour VPX' : 'valider'} · Exit : revenir`,
+              ? fix.delta === 180
+                ? t('VPX afficherait les tables flippers {edge} : Start retourne l’écran dans Windows pour les mettre de votre côté.', { edge: EDGE_LABELS[vpxEdge] })
+                : t('VPX afficherait les tables flippers {edge} : Start tourne l’écran dans Windows pour les mettre de votre côté.', { edge: EDGE_LABELS[vpxEdge] })
+              : t('VPX affichera les tables flippers {edge}, à l’envers pour vous.', { edge: EDGE_LABELS[vpxEdge] })),
+        hint: t('Flippers : tourner jusqu’à lire ce texte à l’endroit, la bande de votre côté · Start : {confirm} · Exit : revenir', {
+          confirm: fix ? t('retourner l’écran pour VPX') : t('valider'),
+        }),
       };
     }
     if (wizard.phase === 'flip') {
@@ -2028,26 +2131,26 @@ function viewFor(index: number) {
       return {
         ...base,
         highlight: true,
-        prompt: flip.turn === 180 ? 'Écran retourné' : 'Écran tourné',
+        prompt: flip.turn === 180 ? t('Écran retourné') : t('Écran tourné'),
         measure: `${seconds} s`,
-        step: 'Les tables auront leurs flippers de votre côté. Ce texte est-il toujours à l’endroit ?',
-        notice: base.notice ?? `Sans réponse, retour à l’orientation d’origine dans ${seconds} s.`,
-        hint: 'Start : garder cette orientation · Exit : revenir à l’orientation d’origine',
+        step: t('Les tables auront leurs flippers de votre côté. Ce texte est-il toujours à l’endroit ?'),
+        notice: base.notice ?? t('Sans réponse, retour à l’orientation d’origine dans {n} s.', { n: seconds }),
+        hint: t('Start : garder cette orientation · Exit : revenir à l’orientation d’origine'),
       };
     }
     const fromEdid = edidDiagonal(d);
     return {
       ...base,
       highlight: true,
-      prompt: 'Diagonale de l’écran',
+      prompt: t('Diagonale de l’écran'),
       measure: `${wizard.diagonal}″`,
       step:
         fromEdid === undefined
-          ? 'L’écran ne donne pas sa taille : indiquez la diagonale de l’image, en pouces.'
+          ? t('L’écran ne donne pas sa taille : indiquez la diagonale de l’image, en pouces.')
           : wizard.diagonal === fromEdid
-            ? `${Math.round(wizard.diagonal * 2.54)} cm, taille annoncée par l’écran. Vérifiez-la : certains téléviseurs se trompent.`
-            : `${Math.round(wizard.diagonal * 2.54)} cm. L’écran annonce ${fromEdid}″.`,
-      hint: 'Flippers : moins / plus · Start : valider · Exit : revenir',
+            ? t('{cm} cm, taille annoncée par l’écran. Vérifiez-la : certains téléviseurs se trompent.', { cm: Math.round(wizard.diagonal * 2.54) })
+            : t('{cm} cm. L’écran annonce {inches}″.', { cm: Math.round(wizard.diagonal * 2.54), inches: fromEdid }),
+      hint: t('Flippers : moins / plus · Start : valider · Exit : revenir'),
     };
   }
 
@@ -2059,11 +2162,11 @@ function viewFor(index: number) {
       ...base,
       zones: arrangeZones(host, wizard.arrange, index),
       highlight: panelHere,
-      prompt: panelHere ? '' : (base.assignedLabel ?? 'Aucun rôle'),
-      step: panelHere ? '' : 'Disposition des écrans en cours',
+      prompt: panelHere ? '' : (base.assignedLabel ?? t('Aucun rôle')),
+      step: panelHere ? '' : t('Disposition des écrans en cours'),
       hint: '',
       notice: undefined,
-      arrange: panelHere ? { ...arrangePanel(host, wizard.arrange, (codes) => codes.map(keyLabel).slice(0, 2).join(' ou ')), findings: arrangeFindings() } : undefined,
+      arrange: panelHere ? { ...arrangePanel(host, wizard.arrange, (codes) => formatList(codes.map(keyLabel).slice(0, 2), 'or')), findings: arrangeFindings() } : undefined,
     };
   }
 
@@ -2076,11 +2179,25 @@ function viewFor(index: number) {
     return {
       ...base,
       highlight: option?.display === index,
-      prompt: option?.free ? `${role.label} : placer librement…` : option?.label ? `${role.label} ${option.label} ?` : `${role.label} ?`,
+      prompt: option?.free
+        ? t('{role} : placer librement…', { role: role.label })
+        : option?.label
+          ? t('{role} {option} ?', { role: role.label, option: option.label })
+          : t('{role} ?', { role: role.label }),
       step: option?.free
-        ? `Étape ${wizard.roleIndex + 1} sur ${ROLES.length} : l’éditeur de disposition, pour placer le ${role.label} où vous voulez, puis retour ici.`
-        : `Étape ${wizard.roleIndex + 1} sur ${ROLES.length} : quel écran affiche le ${role.label} ?`,
-      hint: `Flippers : changer d'écran${placed ? ' ou de disposition' : ''}${role.required ? '' : ', ou placer librement'} · Start : ${option?.free ? 'ouvrir l’éditeur' : 'valider'} · Exit : ${role.required ? 'quitter sans enregistrer ?' : 'aucun écran pour ce rôle'}`,
+        ? t('Étape {n} sur {total} : l’éditeur de disposition, pour placer le {role} où vous voulez, puis retour ici.', { n: wizard.roleIndex + 1, total: ROLES.length, role: role.label })
+        : t('Étape {n} sur {total} : quel écran affiche le {role} ?', { n: wizard.roleIndex + 1, total: ROLES.length, role: role.label }),
+      hint: t('{flippers} · Start : {confirm} · Exit : {exit}', {
+        flippers: placed
+          ? role.required
+            ? t("Flippers : changer d'écran ou de disposition")
+            : t("Flippers : changer d'écran ou de disposition, ou placer librement")
+          : role.required
+            ? t("Flippers : changer d'écran")
+            : t("Flippers : changer d'écran, ou placer librement"),
+        confirm: option?.free ? t('ouvrir l’éditeur') : t('valider'),
+        exit: role.required ? t('quitter sans enregistrer ?') : t('aucun écran pour ce rôle'),
+      }),
     };
   }
 
@@ -2089,14 +2206,26 @@ function viewFor(index: number) {
   const plan = wizard.phase === 'summary' ? planVpxSync(preview, displays, readTextIfExists(preview.vpx.iniPath), profile, { audio, ...(only && { overwriteManual: only.owns, only: only.owns }) }) : undefined;
   const rolesLines = ROLES.map((r) => {
     const i = wizard.assignments[r.id];
-    if (i === undefined) return `${r.label} : aucun écran`;
+    if (i === undefined) return t('{role} : aucun écran', { role: r.label });
     const zone = r.id === 'playfield' ? undefined : wizard.zones[r.id];
     const rect = zone && zoneRect(zone, displays[i]!.bounds);
-    const part = !rect ? '' : i === wizard.assignments.playfield ? `, incrusté (${rect.width} × ${rect.height} en ${rect.x}, ${rect.y})` : `, zone ${rect.width} × ${rect.height} en ${rect.x}, ${rect.y}`;
-    return `${r.label} : écran ${i + 1}, ${describeDisplay(displays[i]!)}${part}`;
+    const part = !rect
+      ? ''
+      : i === wizard.assignments.playfield
+        ? t(', incrusté ({width} × {height} en {x}, {y})', { width: rect.width, height: rect.height, x: rect.x, y: rect.y })
+        : t(', zone {width} × {height} en {x}, {y}', { width: rect.width, height: rect.height, x: rect.x, y: rect.y });
+    return t('{role} : écran {n}, {screen}{part}', { role: r.label, n: i + 1, screen: describeDisplay(displays[i]!), part });
   });
   const playfield = playfieldDisplay();
-  const playfieldLines = playfield ? [`Flippers ${EDGE_LABELS[wizard.flipperEdge]} de l'image, ${isCabinetView(playfield, wizard.flipperEdge) ? 'vue borne' : 'vue bureau'}, diagonale ${wizard.diagonal}″`] : [];
+  const playfieldLines = playfield
+    ? [
+        t("Flippers {edge} de l'image, {view}, diagonale {inches}″", {
+          edge: EDGE_LABELS[wizard.flipperEdge],
+          view: isCabinetView(playfield, wizard.flipperEdge) ? t('vue borne') : t('vue bureau'),
+          inches: wizard.diagonal,
+        }),
+      ]
+    : [];
   const summary = only ? stepSummary(rolesLines, playfieldLines) : [...rolesLines, ...playfieldLines, ...audioSummary(), buttonsSummary()];
 
   if (wizard.phase === 'summary') {
@@ -2104,13 +2233,13 @@ function viewFor(index: number) {
     return {
       ...base,
       summary,
-      ...(only && { title: only.label, columns: { left: summaryColumn(), right: 'Modifications prévues' } }),
+      ...(only && { title: only.label, columns: { left: summaryColumn(), right: t('Modifications prévues') } }),
       lines: summarizeChanges(owned),
       findings: [...channelNotices(), ...plan!.findings],
       target: preview.vpx.iniPath,
       hint: only
-        ? `Start : enregistrer (${only.label.toLowerCase()} seulement) · Exit : recommencer l’étape · Retour arrière : revenir`
-        : 'Start : enregistrer et écrire VPinballX.ini · Exit : recommencer',
+        ? t('Start : enregistrer ({step} seulement) · Exit : recommencer l’étape · Retour arrière : revenir', { step: only.label.toLowerCase() })
+        : t('Start : enregistrer et écrire VPinballX.ini · Exit : recommencer'),
     };
   }
 
@@ -2124,13 +2253,13 @@ function viewFor(index: number) {
       name: '',
       details: '',
       title: only.saved,
-      columns: { left: summaryColumn(), right: 'Modifications écrites' },
+      columns: { left: summaryColumn(), right: t('Modifications écrites') },
       summary,
       lines: wizard.result?.lines ?? [],
       findings: wizard.result?.findings ?? [],
       target: wizard.result?.iniPath,
       backup: wizard.result?.backup,
-      hint: "N'importe quel bouton : revenir au menu",
+      hint: t("N'importe quel bouton : revenir au menu"),
     };
   }
 
@@ -2141,13 +2270,13 @@ function viewFor(index: number) {
     findings: wizard.result?.findings ?? [],
     target: wizard.result?.iniPath,
     backup: wizard.result?.backup,
-    hint: "N'importe quel bouton : continuer vers les tables",
+    hint: t("N'importe quel bouton : continuer vers les tables"),
   };
 }
 
 /** Colonne de gauche du récapitulatif et du résultat d'une étape seule. */
 function summaryColumn(): string {
-  return buttonsOnly ? 'Boutons' : isOnly('son') ? 'Son' : isOnly('playfield') ? 'Playfield' : 'Rôles';
+  return buttonsOnly ? t('Boutons') : isOnly('son') ? t('Son') : isOnly('playfield') ? 'Playfield' : t('Rôles');
 }
 
 /** Ce que l'étape seule a décidé, pour le récapitulatif et le résultat. */
@@ -2158,9 +2287,9 @@ function stepSummary(rolesLines: string[], playfieldLines: string[]): string[] {
     case 'disposition':
       return rolesLines;
     case 'ecrans':
-      return [...rolesLines, ...(wizard.layoutAsked ? playfieldLines : ['Bord des flippers et diagonale : inchangés, même écran de playfield'])];
+      return [...rolesLines, ...(wizard.layoutAsked ? playfieldLines : [t('Bord des flippers et diagonale : inchangés, même écran de playfield')])];
     case 'playfield':
-      return playfieldLines.length ? playfieldLines : ['Aucun écran de playfield branché'];
+      return playfieldLines.length ? playfieldLines : [t('Aucun écran de playfield branché')];
     case 'son':
       return audioSummary();
   }
@@ -2176,10 +2305,10 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
   const speaker = audioScreen(output, displays);
   if (assignedRole !== 'playfield') {
     const isSpeaker = speaker === displays[index];
-    return { ...base, highlight: isSpeaker, prompt: isSpeaker ? 'Haut-parleur de cet écran' : '', step: 'Réglage du son en cours' };
+    return { ...base, highlight: isSpeaker, prompt: isSpeaker ? t('Haut-parleur de cet écran') : '', step: t('Réglage du son en cours') };
   }
-  const where = speaker ? ` · haut-parleur de l’écran ${displays.indexOf(speaker) + 1}` : '';
-  const details = `${output.bus || 'bus inconnu'} · ${output.channels ? channelsLabel(output.channels) : 'canaux inconnus'}${where}${output.isDefault ? ' · sortie par défaut de Windows' : ''}`;
+  const where = speaker ? t(' · haut-parleur de l’écran {n}', { n: displays.indexOf(speaker) + 1 }) : '';
+  const details = `${output.bus || t('bus inconnu')} · ${output.channels ? channelsLabel(output.channels) : t('canaux inconnus')}${where}${output.isDefault ? t(' · sortie par défaut de Windows') : ''}`;
   const notice = base.notice ?? soundNotice();
 
   if (wizard.phase === 'sound') {
@@ -2189,12 +2318,15 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
       ...base,
       highlight: true,
       measure: '♪'.repeat(Math.min(beeps, 6)) + (beeps > 6 ? ` ${beeps}` : ''),
-      prompt: `Sortie ${beeps} sur ${sound.outputs.length}`,
+      prompt: t('Sortie {n} sur {total}', { n: beeps, total: sound.outputs.length }),
       name: output.friendlyName,
       details,
       notice,
-      step: `${beeps} bip${beeps > 1 ? 's' : ''} : où l’entendez-vous ? Actuellement : ${audioRoleLabel(output.endpointId)}${reason ? ` (proposé : ${reason})` : ''}.`,
-      hint: 'Flipper gauche : fronton · Flipper droit : plateau · Start : les deux · Exit : aucun, sortie suivante',
+      step: tn(beeps, '{n} bip : où l’entendez-vous ? Actuellement : {role}{reason}.', '{n} bips : où l’entendez-vous ? Actuellement : {role}{reason}.', {
+        role: audioRoleLabel(output.endpointId),
+        reason: reason ? t(' (proposé : {reason})', { reason }) : '',
+      }),
+      hint: t('Flipper gauche : fronton · Flipper droit : plateau · Start : les deux · Exit : aucun, sortie suivante'),
     };
   }
 
@@ -2202,18 +2334,18 @@ function soundView(index: number, base: { notice?: string } & Record<string, unk
   const pair = pairs[sound.pairIndex]!;
   const answered = pairs
     .slice(0, sound.pairIndex)
-    .map((p) => `${p.label} : ${SPEAKER_PLACE_LABELS[sound.places[p.pair] ?? 'none']}`)
+    .map((p) => t('{pair} : {place}', { pair: p.label, place: SPEAKER_PLACE_LABELS[sound.places[p.pair] ?? 'none'] }))
     .join(' · ');
   return {
     ...base,
     highlight: true,
     measure: pair.label,
-    prompt: `Haut-parleurs ${sound.pairIndex + 1} sur ${pairs.length}`,
+    prompt: t('Haut-parleurs {n} sur {total}', { n: sound.pairIndex + 1, total: pairs.length }),
     name: describeAudioOutput(output),
     details,
     notice,
-    step: `Un bip à gauche, puis un plus aigu à droite : où sont ces haut-parleurs ?${answered ? ` (${answered})` : ''}`,
-    hint: 'Flipper gauche : plateau, près de vous · Flipper droit : plateau, côté fronton · Start : dans le fronton · Exit : rien entendu',
+    step: t('Un bip à gauche, puis un plus aigu à droite : où sont ces haut-parleurs ?{answered}', { answered: answered ? ` (${answered})` : '' }),
+    hint: t('Flipper gauche : plateau, près de vous · Flipper droit : plateau, côté fronton · Start : dans le fronton · Exit : rien entendu'),
   };
 }
 

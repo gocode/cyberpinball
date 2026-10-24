@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
+import { t } from '@cyberpinball/core';
 import { sha256OfFile } from './fsutil';
 import type { Component } from './manifest';
 
@@ -20,7 +21,7 @@ export async function downloadComponent(component: Component, downloadsDir: stri
 
   const part = `${file}.part`;
   const response = await fetch(component.url, { redirect: 'follow' });
-  if (!response.ok || !response.body) throw new Error(`Téléchargement impossible (HTTP ${response.status}) : ${component.url}`);
+  if (!response.ok || !response.body) throw new Error(t('Téléchargement impossible (HTTP {status}) : {url}', { status: response.status, url: component.url }));
 
   const total = Number(response.headers.get('content-length')) || component.size;
   let received = 0;
@@ -34,7 +35,7 @@ export async function downloadComponent(component: Component, downloadsDir: stri
   const actual = await sha256OfFile(part);
   if (actual !== component.sha256) {
     fs.rmSync(part);
-    throw new Error(`Empreinte SHA-256 incorrecte pour ${component.name} : attendu ${component.sha256}, obtenu ${actual}. Fichier supprimé.`);
+    throw new Error(t('Empreinte SHA-256 incorrecte pour {name} : attendu {expected}, obtenu {actual}. Fichier supprimé.', { name: component.name, expected: component.sha256, actual }));
   }
   fs.renameSync(part, file);
   return file;

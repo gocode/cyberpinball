@@ -1,3 +1,5 @@
+[English](README.en.md) · Français
+
 # Cyber Pinball — design system
 
 Langage visuel de Cyber Pinball : tokens, composants et maquettes d'écrans, dans la direction artistique du 22 octobre 2026 (noir bleu-vert, vert signal, marque très espacée), avec un fond « verre fumé », une couverture rail-bille-flippers et des écrans recomposés.

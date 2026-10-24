@@ -6,6 +6,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AncillaryRoleId, Cabinet, RoleId } from './model';
+import { t } from './i18n';
 import { roleZone, zoneRatio } from './zones';
 
 export const PUP_FILES = ['screens.pup', 'playlists.pup', 'triggers.pup'] as const;
@@ -287,42 +288,42 @@ export function parseOptionBat(root: string, bat: string): { option: boolean; va
     line = line.replace(/\s*\d?>\s*nul(\s+2>&1)?\s*$/i, '').trim();
     const command = line.split(/\s+/)[0]!.toLowerCase();
     if (IGNORED_COMMANDS.has(command) || /^echo[\s.]/i.test(line)) {
-      if (command === 'echo' && /[>|]/.test(line)) return fail(`« ${line} » écrit dans un fichier`);
+      if (command === 'echo' && /[>|]/.test(line)) return fail(t('« {line} » écrit dans un fichier', { line }));
       continue;
     }
-    if (/[|&<>]/.test(line.replace(/"[^"]*"/g, ''))) return fail(`« ${line} » enchaîne plusieurs commandes`);
+    if (/[|&<>]/.test(line.replace(/"[^"]*"/g, ''))) return fail(t('« {line} » enchaîne plusieurs commandes', { line }));
     const args = tokenize(line).slice(1);
     if (['cd', 'chdir', 'pushd'].includes(command)) {
       const target = args.filter((a) => a.toLowerCase() !== '/d');
       if (target.length === 1 && relativeArg(target[0]!) === '') continue;
-      return fail(`« ${line} » change de dossier`);
+      return fail(t('« {line} » change de dossier', { line }));
     }
     if (command === 'xcopy' || command === 'copy') {
       const flags = args.filter((a) => a.startsWith('/')).join('').toLowerCase();
       const paths = args.filter((a) => !a.startsWith('/'));
-      if (paths.length < 1 || paths.length > 2 || paths.some((p) => p.includes('+'))) return fail(`« ${line} » n’est pas une copie simple`);
+      if (paths.length < 1 || paths.length > 2 || paths.some((p) => p.includes('+'))) return fail(t('« {line} » n’est pas une copie simple', { line }));
       const src = relativeArg(paths[0]!);
       const dest = paths[1] === undefined ? '' : relativeArg(paths[1]);
-      if (src === undefined || dest === undefined) return fail(`« ${line} » sort du dossier du pack`);
+      if (src === undefined || dest === undefined) return fail(t('« {line} » sort du dossier du pack', { line }));
       const recursive = command === 'xcopy' && /\/[se]/.test(flags);
       const found = expandSource(root, src, recursive);
-      if (!found) return fail(`« ${paths[0]} » ne correspond à aucun fichier du pack`);
+      if (!found) return fail(t('« {line} » ne correspond à aucun fichier du pack', { line: paths[0]! }));
       const destDir = resolveInside(root, dest) ?? dest;
       for (const rel of found.files) copies.push({ from: path.join(found.dir, rel), to: path.join(destDir, rel) });
       continue;
     }
     if (command === 'del' || command === 'erase') {
       const targets = args.filter((a) => !a.startsWith('/'));
-      for (const t of targets) {
-        const rel = relativeArg(t);
-        if (rel === undefined || rel.includes(path.sep)) return fail(`« ${line} » supprime hors de la racine du pack`);
+      for (const target of targets) {
+        const rel = relativeArg(target);
+        if (rel === undefined || rel.includes(path.sep)) return fail(t('« {line} » supprime hors de la racine du pack', { line }));
         deletes.push(...matchNames(readDirents(root).filter((d) => d.isFile()).map((d) => d.name), rel));
       }
       continue;
     }
-    return fail(`commande « ${command} » non reconnue`);
+    return fail(t('commande « {command} » non reconnue', { command }));
   }
-  if (!copies.length) return { option: looksLikeOption, reason: option ? 'aucune copie de fichiers trouvée' : undefined };
+  if (!copies.length) return { option: looksLikeOption, reason: option ? t('aucune copie de fichiers trouvée') : undefined };
   // Le dossier commun des fichiers copiés : celui de la variante.
   const dirs = [...new Set(copies.map((c) => c.from.split(path.sep)[0]!))];
   const folder = dirs.length === 1 ? commonDir(copies.map((c) => path.dirname(c.from))) : undefined;
@@ -487,10 +488,10 @@ export function pupCabinet(cabinet: Cabinet | undefined): PupCabinet | undefined
 
 /** Description courte de la borne, pour dire pourquoi une option est retenue. */
 export function describePupCabinet(c: PupCabinet): string {
-  const parts = [c.backglass ? 'backglass' : 'sans backglass'];
+  const parts = [c.backglass ? 'backglass' : t('sans backglass')];
   if (c.dmd) parts.push(c.dmdRatio && c.dmdRatio >= 3 ? 'DMD 4:1' : 'FullDMD');
-  else parts.push('sans DMD');
-  parts.push(c.topper ? 'topper' : 'sans topper');
+  else parts.push(t('sans DMD'));
+  parts.push(c.topper ? 'topper' : t('sans topper'));
   return parts.join(', ');
 }
 

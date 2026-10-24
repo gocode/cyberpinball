@@ -64,14 +64,15 @@ function keysGrid(title, rows) {
 
 /** Pied de page : chaque commande est aussi cliquable (code de la touche équivalente). */
 /**
- * Bandeau d'aide : « Start : fiche » devient une touche cerclée « START » suivie de « fiche ».
+ * Bandeau d'aide : « Start : fiche » (« Start: game page » en anglais, sans espace avant
+ * les deux-points) devient une touche cerclée « START » suivie de « fiche ».
  * Un libellé sans « : » reste du texte.
  */
 function footer(parts) {
   const box = el('div', 'footer');
   for (const [label, code] of parts) {
     const hint = el('span', 'hint');
-    const m = /^(.+?) : (.+)$/.exec(label);
+    const m = /^(.+?) ?: (.+)$/.exec(label);
     if (m) hint.append(el('span', `cap${/^start\b/i.test(m[1]) ? ' start' : ''}`, m[1]), el('span', 'what', m[2]));
     else hint.append(el('span', 'what', label));
     if (code) hint.dataset.act = JSON.stringify({ type: 'key', code });
@@ -323,7 +324,9 @@ function menuPanel(s) {
     counter.dataset.stable = 'compteur';
     // Bureau, roues à bandeau : le fronton du jeu en fond, et les cadres chromés (frontend.css).
     const backglass = el('div', 'menu-backglass');
-    node.append(scrim, el('div', 'menu-frame plateau'), el('div', 'menu-frame fronton'), backglass, nav, el('div', 'menu-label', 'Table sélectionnée'), title, meta, counter);
+    // Classes des cadres : noms de la feuille de style (frontend.css), pas du texte affiché.
+    const frames = [el('div', 'menu-frame plateau'), el('div', 'menu-frame fronton')]; // i18n-ignore : classes CSS
+    node.append(scrim, ...frames, backglass, nav, el('div', 'menu-label', t('Table sélectionnée')), title, meta, counter);
     menuView = { node, nav, text, meta, counter, backglass };
   }
   const v = menuView;
@@ -413,12 +416,12 @@ function dropLoadingFallback() {
  * et les commandes sur fond noir.
  */
 function loadingScreen(s) {
-  const keys = keysGrid('Commandes de la partie', s.gameKeys);
+  const keys = keysGrid(t('Commandes de la partie'), s.gameKeys);
   if (s.loading?.url) {
     dropLoadingFallback();
     const o = el('section', 'overlay over-video');
     const panel = el('div', 'loading-panel');
-    panel.append(el('h1', '', s.table.title), el('div', 'lead', 'Chargement de la table…'), keys);
+    panel.append(el('h1', '', s.table.title), el('div', 'lead', t('Chargement de la table…')), keys);
     o.append(panel);
     return o;
   }
@@ -435,7 +438,7 @@ function loadingScreen(s) {
     return loadingFallback.box;
   }
   const o = el('section', 'overlay');
-  o.append(el('h1', '', s.table.title), el('div', 'lead', 'Chargement de la table…'), keys);
+  o.append(el('h1', '', s.table.title), el('div', 'lead', t('Chargement de la table…')), keys);
   return o;
 }
 
@@ -475,7 +478,7 @@ function attractScreen(s) {
     middle.append(el('div', 'attract-title', a.title));
   }
   if (a.subtitle) middle.append(el('div', 'attract-subtitle', a.subtitle));
-  box.append(brand(), middle, el('div', 'attract-hint', 'Appuyez sur un bouton pour revenir au menu'));
+  box.append(brand(), middle, el('div', 'attract-hint', t('Appuyez sur un bouton pour revenir au menu')));
   return box;
 }
 
@@ -497,7 +500,7 @@ function renderPlayfield(s) {
   // Roue dentée : menu et configuration à la souris (ou Tab), même si les boutons
   // de la borne ne répondent plus comme prévu. Toujours au-dessus des superpositions.
   const gear = el('button', 'gear', '⚙');
-  gear.title = 'Menu et configuration (Tab)';
+  gear.title = t('Menu et configuration (Tab)');
   gear.dataset.act = JSON.stringify({ type: 'config' });
   nodes.push(gear);
 
@@ -517,21 +520,21 @@ function renderPlayfield(s) {
     cover = renderLibrary(s.library);
   } else if (s.help) {
     cover = el('section', 'overlay');
-    cover.append(el('h1', '', 'Commandes'));
+    cover.append(el('h1', '', t('Commandes')));
     const keys = el('div', 'keys');
-    keys.append(keysTable('Dans le menu', s.menuKeys), keysTable('Pendant une partie', s.gameKeys));
-    cover.append(keys, footer([[s.nav.help ? `${s.nav.helpLabel} ou Exit : fermer` : 'Exit : fermer', s.nav.help ?? s.nav.exit]]));
+    keys.append(keysTable(t('Dans le menu'), s.menuKeys), keysTable(t('Pendant une partie'), s.gameKeys));
+    cover.append(keys, footer([[s.nav.help ? t('{key} ou Exit : fermer', { key: s.nav.helpLabel }) : t('Exit : fermer'), s.nav.help ?? s.nav.exit]]));
   } else if (s.phase === 'confirmQuit') {
     cover = el('section', 'overlay');
-    cover.append(el('h1', '', 'Quitter Cyber Pinball ?'), el('div', 'lead', 'Start : quitter · Exit : rester'));
+    cover.append(el('h1', '', t('Quitter Cyber Pinball ?')), el('div', 'lead', t('Start : quitter · Exit : rester')));
   } else if (s.phase === 'message' && s.message) {
     cover = el('section', 'overlay');
     cover.append(el('h1', '', s.message.title));
     const box = el('div', 'message');
     for (const line of s.message.lines) box.append(el('p', /^\d{4}-\d\d-\d\d /.test(line) ? 'log' : '', line));
     cover.append(box);
-    if (s.message.action === 'addTable') cover.append(footer([['Ajouter une table', s.nav.confirm], ['Menu', s.nav.exit]]));
-    else if (!s.message.action) cover.append(footer([['Revenir au menu', s.nav.exit]]));
+    if (s.message.action === 'addTable') cover.append(footer([[t('Ajouter une table'), s.nav.confirm], [t('Menu'), s.nav.exit]]));
+    else if (!s.message.action) cover.append(footer([[t('Revenir au menu'), s.nav.exit]]));
   }
   // Constat bref (configuration de la borne changée, mise à jour installée) : il s'efface seul.
   // Un écran plein le recouvrirait : il passe alors dans son flux, sous la marque, au-dessus du titre.

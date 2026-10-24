@@ -12,6 +12,7 @@
 
 import { VPX_AUDIO_OWNED_KEYS } from './audio';
 import { BUTTONS, buttonKeys, isInputKey, keyLabel } from './buttons';
+import { t } from './i18n';
 import { EDGE_LABELS } from './layout';
 import { ROLES, type Cabinet, type RoleId } from './model';
 import { VPX_LAYOUT_KEYS } from './vpx';
@@ -62,9 +63,9 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'boutons',
     flag: '--boutons',
-    label: 'Boutons de la borne',
-    detail: 'Appuyer sur chaque bouton : flippers, Start, Exit, crédit…',
-    saved: 'Boutons enregistrés',
+    get label() { return t('Boutons de la borne'); },
+    get detail() { return t('Appuyer sur chaque bouton : flippers, Start, Exit, crédit…'); },
+    get saved() { return t('Boutons enregistrés'); },
     phases: ['buttons', 'buttonsSummary'],
     fields: ['buttons'],
     owns: isInputKey,
@@ -72,9 +73,9 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'ecrans',
     flag: '--ecrans',
-    label: 'Écrans et rôles',
-    detail: 'Quel écran affiche le playfield, le backglass, le DMD, le topper',
-    saved: 'Écrans enregistrés',
+    get label() { return t('Écrans et rôles'); },
+    get detail() { return t('Quel écran affiche le playfield, le backglass, le DMD, le topper'); },
+    get saved() { return t('Écrans enregistrés'); },
     // Le bord des flippers et la diagonale ne sont redemandés que si le playfield change d'écran.
     phases: ['assign', 'arrange', 'orient', 'flip', 'size', 'summary'],
     fields: ['screens', 'roles', 'zones'],
@@ -83,9 +84,9 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'playfield',
     flag: '--playfield',
-    label: 'Orientation et taille du playfield',
-    detail: 'Bord des flippers, retournement de l’écran, diagonale',
-    saved: 'Playfield enregistré',
+    get label() { return t('Orientation et taille du playfield'); },
+    get detail() { return t('Bord des flippers, retournement de l’écran, diagonale'); },
+    get saved() { return t('Playfield enregistré'); },
     phases: ['orient', 'flip', 'size', 'summary'],
     fields: ['screens', 'playfield'],
     owns: isLayoutKey,
@@ -93,9 +94,9 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'disposition',
     flag: '--disposition',
-    label: 'Disposition des écrans',
-    detail: 'Place et taille du playfield, du backglass, du DMD et du topper sur chaque écran',
-    saved: 'Disposition enregistrée',
+    get label() { return t('Disposition des écrans'); },
+    get detail() { return t('Place et taille du playfield, du backglass, du DMD et du topper sur chaque écran'); },
+    get saved() { return t('Disposition enregistrée'); },
     phases: ['arrange'],
     fields: ['screens', 'roles', 'zones'],
     owns: isLayoutKey,
@@ -103,9 +104,9 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'son',
     flag: '--son',
-    label: 'Son de la borne',
-    detail: 'Sortie audio du fronton et du plateau, test des haut-parleurs',
-    saved: 'Son enregistré',
+    get label() { return t('Son de la borne'); },
+    get detail() { return t('Sortie audio du fronton et du plateau, test des haut-parleurs'); },
+    get saved() { return t('Son enregistré'); },
     phases: ['sound', 'channels', 'summary'],
     fields: ['audio'],
     owns: isAudioKey,
@@ -181,8 +182,8 @@ export function isQuitShortcut(input: { code: string; control?: boolean }): bool
 /** Où mène « Quitter sans enregistrer » : le menu, ou la fermeture quand aucune borne n'est configurée. */
 export function quitDestination(hasModel: boolean): { action: 'menu' | 'close'; text: string } {
   return hasModel
-    ? { action: 'menu', text: 'Retour au menu des tables, configuration enregistrée inchangée.' }
-    : { action: 'close', text: 'Aucune borne n’est encore configurée : Cyber Pinball se ferme, l’assistant reprendra au prochain démarrage.' };
+    ? { action: 'menu', text: t('Retour au menu des tables, configuration enregistrée inchangée.') }
+    : { action: 'close', text: t('Aucune borne n’est encore configurée : Cyber Pinball se ferme, l’assistant reprendra au prochain démarrage.') };
 }
 
 const roleLabel = (role: RoleId) => ROLES.find((r) => r.id === role)!.label;
@@ -199,21 +200,24 @@ export function cabinetChanges(before: Cabinet | undefined, after: Partial<Cabin
     const was = buttonKeys(before?.buttons);
     const now = after.buttons;
     const changed = BUTTONS.filter((b) => was[b.id] !== now[b.id]);
-    if (changed.length) lines.push(`Boutons : ${changed.map((b) => `${b.label} ${now[b.id] ? `sur ${keyLabel(now[b.id])}` : 'sans touche'}`).join(', ')}`);
+    if (changed.length) {
+      const list = changed.map((b) => (now[b.id] ? t('{button} sur {key}', { button: b.label, key: keyLabel(now[b.id]) }) : t('{button} sans touche', { button: b.label }))).join(', ');
+      lines.push(t('Boutons : {list}', { list }));
+    }
   }
   if (after.roles) {
     const screenLabel = (fp: string | undefined) =>
-      fp === undefined ? 'aucun écran' : ([...(after.screens ?? []), ...(before?.screens ?? [])].find((s) => s.fingerprint === fp)?.label ?? 'un autre écran');
+      fp === undefined ? t('aucun écran') : ([...(after.screens ?? []), ...(before?.screens ?? [])].find((s) => s.fingerprint === fp)?.label ?? t('un autre écran'));
     for (const { id } of ROLES) {
       if (before?.roles[id] === after.roles[id] && same(before?.zones?.[id], after.zones?.[id])) continue;
       const where = screenLabel(after.roles[id]);
-      lines.push(before?.roles[id] === after.roles[id] ? `${roleLabel(id)} : nouvelle place sur ${where}` : `${roleLabel(id)} : ${where}`);
+      lines.push(before?.roles[id] === after.roles[id] ? t('{role} : nouvelle place sur {screen}', { role: roleLabel(id), screen: where }) : t('{role} : {screen}', { role: roleLabel(id), screen: where }));
     }
   }
   if (after.playfield) {
-    if (before?.playfield?.flipperEdge !== after.playfield.flipperEdge) lines.push(`Flippers ${EDGE_LABELS[after.playfield.flipperEdge]} de l’image`);
-    if (!same(before?.playfield?.manualSizeCm, after.playfield.manualSizeCm)) lines.push('Diagonale du playfield');
+    if (before?.playfield?.flipperEdge !== after.playfield.flipperEdge) lines.push(t('Flippers {edge} de l’image', { edge: EDGE_LABELS[after.playfield.flipperEdge] }));
+    if (!same(before?.playfield?.manualSizeCm, after.playfield.manualSizeCm)) lines.push(t('Diagonale du playfield'));
   }
-  if (after.audio && !same(before?.audio, after.audio)) lines.push('Son : sorties du fronton et du plateau, mixage');
+  if (after.audio && !same(before?.audio, after.audio)) lines.push(t('Son : sorties du fronton et du plateau, mixage'));
   return lines;
 }
