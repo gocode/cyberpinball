@@ -26,7 +26,7 @@ On décrit la borne une fois : ses écrans, ses boutons, ses haut-parleurs. Cybe
 
 ## Captures d'écran
 
-Chaque capture est prise hors écran par [`docs/demo-captures.ps1`](docs/demo-captures.ps1), sur une borne simulée (playfield 4K couché, fronton, DMD et topper). Les jeux sont inventés et leurs visuels dessinés par le script.
+Chaque capture est prise hors écran par [`docs/demo-captures.ps1`](docs/demo-captures.ps1), sur une borne simulée (playfield 4K couché, fronton, DMD et topper). Les jeux sont inventés : leurs playfields, frontons et toppers sont des illustrations originales générées par un modèle d'images pour ces captures ([`docs/demo-captures-medias`](docs/demo-captures-medias)), le reste est dessiné par le script.
 
 <p align="center">
   <img src="docs/images/fr/game-page.webp" width="270" alt="La fiche de Neon Abyss : statistiques de parties, fichiers, et les actions Jouer, Prospectus, Règles, Modifier les informations, Médias du jeu, Réglages de cette table, Diagnostiquer et réparer, Supprimer la table.">

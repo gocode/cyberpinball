@@ -1,5 +1,8 @@
 // Tables inventées et leurs médias, dessinés ici, pour les captures de la page du projet
 // (docs\demo-captures.ps1) : aucune œuvre de tiers, ni table, ni média, ni nom de jeu réel.
+// Le plateau, le fronton et le topper des jeux principaux sont des illustrations réalistes de jeux
+// imaginaires, générées une fois pour toutes (Codex) et rangées dans docs\demo-captures-medias
+// (<jeu>-playfield, -backglass, -topper) ; à défaut, ils sont dessinés ici.
 // Pour chaque jeu : logo (Wheel), plateau vu de dessus, flippers en bas (Playfield),
 // fronton (Backglass), afficheur à points (DMD), topper, prospectus (GameInfo), règles
 // (GameHelp), et un .info (titre, fabricant, année, parties jouées).
@@ -26,9 +29,20 @@ const ROOT = path.resolve(ARGS.find((a) => !a.startsWith('-') && a !== boardArg)
 app.setPath('userData', path.join(BOARD ? path.dirname(BOARD) : path.join(ROOT, '..'), 'generateur'));
 
 /** Jeux inventés : titre, fabricant, année, teintes (principale, secondaire). */
+/** Illustrations réalistes des jeux principaux, s'il y en a : <slug>-playfield|backglass|topper.<ext>. */
+const ARTWORK = path.join(__dirname, 'demo-captures-medias');
+function artwork(game, kind) {
+  const slug = game.title.toLowerCase().replace(/\s+/g, '-');
+  for (const ext of ['webp', 'jpg', 'png']) {
+    const file = path.join(ARTWORK, `${slug}-${kind}.${ext}`);
+    if (fs.existsSync(file)) return { file, ext };
+  }
+  return undefined;
+}
+
 const GAMES = [
-  { title: 'Neon Abyss', maker: 'Orbital Works', year: 1994, hues: [188, 312], starts: 42, minutes: 318 },
-  { title: 'Star Courier', maker: 'Halcyon', year: 1987, hues: [28, 210], starts: 17, minutes: 96 },
+  { title: 'Neon Abyss', maker: 'Orbital Works', year: 1994, hues: [188, 312], focus: [0.55, 0.62], starts: 42, minutes: 318 },
+  { title: 'Star Courier', maker: 'Halcyon', year: 1987, hues: [28, 210], focus: [0.24, 0.36], starts: 17, minutes: 96 },
   { title: 'Midnight Circuit', maker: 'Voltage Games', year: 1998, hues: [276, 128], starts: 63, minutes: 541 },
   { title: 'Atlas Rising', maker: 'Meridian', year: 1979, hues: [44, 356], starts: 8, minutes: 37 },
   { title: 'Thunder Reef', maker: 'Gulfstream', year: 1991, hues: [172, 52], starts: 25, minutes: 140 },
@@ -56,7 +70,9 @@ function logo(g, w, h, s) {
   lines.forEach((line, i) => {
     const y = h / 2 + (i - (lines.length - 1) / 2) * size * 0.98;
     g.save();
-    g.shadowColor = hsl(s.hues[0], 100, 55, 0.95); g.shadowBlur = size * 0.35;
+    // noGlow : pas de halo de néon (titre du logo de la roue, posé par-dessus l'illustration).
+    if (s.noGlow) { g.shadowColor = 'rgba(0,0,0,0.6)'; g.shadowBlur = size * 0.08; g.shadowOffsetY = size * 0.04; }
+    else { g.shadowColor = hsl(s.hues[0], 100, 55, 0.95); g.shadowBlur = size * 0.35; }
     g.lineWidth = size * 0.16; g.strokeStyle = hsl(s.hues[0], 90, 12); g.lineJoin = 'round';
     g.strokeText(line, w / 2, y);
     g.restore();
@@ -99,9 +115,12 @@ function scene(g, w, h, s, withScores) {
   g.strokeStyle = hsl(s.hues[0], 100, 60, 0.75); g.lineWidth = Math.max(1, w / 500);
   for (let i = -12; i <= 12; i++) { g.beginPath(); g.moveTo(cx + i * w * 0.02, horizon); g.lineTo(cx + i * w * 0.16, h); g.stroke(); }
   for (let k = 1; k < 9; k++) { const y = horizon + (h - horizon) * Math.pow(k / 8, 1.8); g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
-  g.save(); g.translate(0, h * 0.06); logo(g, w, h * 0.34, s); g.restore();
-  g.fillStyle = 'rgba(255,255,255,0.85)'; g.font = '700 ' + Math.round(h * 0.035) + 'px ' + FONT; g.textAlign = 'center';
-  g.fillText(s.maker.toUpperCase() + '  ·  ' + s.year, w / 2, h * 0.47);
+  // bare : sans titre ni fabricant (le centre du logo de la roue, qui porte déjà le titre).
+  if (!s.bare) {
+    g.save(); g.translate(0, h * 0.06); logo(g, w, h * 0.34, s); g.restore();
+    g.fillStyle = 'rgba(255,255,255,0.85)'; g.font = '700 ' + Math.round(h * 0.035) + 'px ' + FONT; g.textAlign = 'center';
+    g.fillText(s.maker.toUpperCase() + '  ·  ' + s.year, w / 2, h * 0.47);
+  }
   if (withScores) {
     const bw = w * 0.2, bh = h * 0.07, y = h * 0.86;
     for (let i = 0; i < 4; i++) {
@@ -235,10 +254,58 @@ function rules(g, w, h, s) {
   });
 }
 
-window.paint = (kind, spec) => {
+/**
+ * Logo de la roue, à la façon des médaillons des frontends de flipper : une fine lunette chromée,
+ * l'illustration du jeu qui remplit le disque (son fronton s'il existe, sinon la scène dessinée),
+ * et le titre en lettres chromées en bas, qui déborde de la lunette.
+ */
+async function wheel(g, w, h, s) {
+  const cx = w / 2, cy = h * 0.47, R = Math.min(w, h) * 0.45, r = R * 0.84;
+  // Couronne de métal poli : reflets clairs en haut à gauche et en bas à droite, ombres entre les deux,
+  // arête sombre dehors et dedans.
+  g.save();
+  g.shadowColor = 'rgba(0,0,0,0.55)'; g.shadowBlur = R * 0.06; g.shadowOffsetY = R * 0.025;
+  const chrome = g.createLinearGradient(cx - R, cy - R, cx + R, cy + R);
+  [[0, '#ffffff'], [0.16, '#c9ced4'], [0.32, '#4d535b'], [0.46, '#f4f6f8'], [0.6, '#8a9199'], [0.78, '#2f343a'], [0.9, '#d9dde1'], [1, '#7c838b']].forEach(([o, c]) => chrome.addColorStop(o, c));
+  g.fillStyle = chrome; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill();
+  g.restore();
+  const bevel = g.createLinearGradient(0, cy - R, 0, cy + R);
+  bevel.addColorStop(0, 'rgba(255,255,255,0.55)'); bevel.addColorStop(0.5, 'rgba(255,255,255,0)'); bevel.addColorStop(1, 'rgba(0,0,0,0.35)');
+  g.fillStyle = bevel; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.arc(cx, cy, r, 0, Math.PI * 2, true); g.fill();
+  g.lineWidth = R * 0.018; g.strokeStyle = 'rgba(20,22,26,0.85)';
+  g.beginPath(); g.arc(cx, cy, R - g.lineWidth / 2, 0, Math.PI * 2); g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,0.75)'; g.lineWidth = R * 0.03;
+  g.beginPath(); g.arc(cx, cy, R * 0.92, Math.PI * 1.1, Math.PI * 1.45); g.stroke();
+  // Illustration dans le disque.
+  g.save(); g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.clip();
+  let art;
+  if (s.art) { art = new Image(); art.src = s.art; await art.decode(); }
+  else {
+    art = document.createElement('canvas'); art.width = 1000; art.height = 800;
+    scene(art.getContext('2d'), 1000, 800, { ...s, bare: true }, false);
+  }
+  // Point d'intérêt de l'illustration (fractions de l'image : un visage, la scène sous le titre du
+  // fronton), placé un peu au-dessus du centre puisque le titre couvre le bas ; le disque reste couvert.
+  const [fx, fy] = s.focus || (s.art ? [0.5, 0.6] : [0.5, 0.62]);
+  const scale = (2 * r * (s.art ? 1.25 : 1.15)) / art.height;
+  const dw = art.width * scale, dh = art.height * scale;
+  const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+  const x = clamp(cx - fx * dw, cx + r - dw, cx - r);
+  const y = clamp(cy - r * 0.15 - fy * dh, cy + r - dh, cy - r);
+  g.drawImage(art, x, y, dw, dh);
+  const glass = g.createRadialGradient(cx - r * 0.35, cy - r * 0.45, r * 0.05, cx, cy, r);
+  glass.addColorStop(0, 'rgba(255,255,255,0.28)'); glass.addColorStop(0.5, 'rgba(255,255,255,0)'); glass.addColorStop(1, 'rgba(0,0,0,0.35)');
+  g.fillStyle = glass; g.fillRect(cx - r, cy - r, 2 * r, 2 * r);
+  g.restore();
+  g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = R * 0.015; g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.stroke();
+  // Titre en bas, par-dessus la lunette.
+  g.save(); g.translate(w * 0.03, h * 0.6); logo(g, w * 0.94, h * 0.36, { ...s, noGlow: true }); g.restore();
+}
+
+window.paint = async (kind, spec) => {
   const c = document.createElement('canvas'); c.width = spec.w; c.height = spec.h;
   const g = c.getContext('2d');
-  ({ logo, scene: (g2, w, h, s) => scene(g2, w, h, s, true), playfield, dmd, topper, flyer, rules })[kind](g, spec.w, spec.h, spec);
+  await ({ logo, wheel, scene: (g2, w, h, s) => scene(g2, w, h, s, true), playfield, dmd, topper, flyer, rules })[kind](g, spec.w, spec.h, spec);
   return c.toDataURL(spec.type || 'image/png', 0.9).split(',')[1];
 };
 `;
@@ -273,7 +340,7 @@ async function board(file) {
       g.restore();
       if (l.border) { g.strokeStyle = l.border; g.lineWidth = 2; g.beginPath(); g.roundRect(l.x + 1, l.y + 1, l.w - 2, l.h - 2, l.radius || 0); g.stroke(); }
     }
-    return c.toDataURL('image/webp', spec.quality || 0.82).split(',')[1];
+    return c.toDataURL(/\.jpe?g$/i.test(spec.out) ? 'image/jpeg' : 'image/webp', spec.quality || 0.82).split(',')[1];
   })()`);
   fs.mkdirSync(path.dirname(spec.out), { recursive: true });
   fs.writeFileSync(spec.out, Buffer.from(out, 'base64'));
@@ -299,11 +366,17 @@ app.whenReady().then(async () => {
     fs.mkdirSync(medias, { recursive: true });
     fs.writeFileSync(path.join(folder, `${name}.vpx`), '');
     const file = (type, ext) => path.join(medias, `(${type}) ${name}.${ext}`);
-    fs.writeFileSync(file('Wheel', 'png'), await paint('logo', { ...game, w: 900, h: 420 }));
-    fs.writeFileSync(file('Playfield', 'png'), await paint('playfield', { ...game, w: 1080, h: 1920 }));
-    fs.writeFileSync(file('Backglass', 'png'), await paint('scene', { ...game, w: 1280, h: 1024 }));
+    // Logo rond de la roue, l'illustration du fronton au centre quand le jeu en a une.
+    const backglassArt = artwork(game, 'backglass');
+    const art = backglassArt && `data:image/${backglassArt.ext === 'jpg' ? 'jpeg' : backglassArt.ext};base64,${fs.readFileSync(backglassArt.file).toString('base64')}`;
+    fs.writeFileSync(file('Wheel', 'png'), await paint('wheel', { ...game, w: 600, h: 600, ...(art && { art }) }));
+    const drawn = { Playfield: ['playfield', 'playfield', 1080, 1920], Backglass: ['backglass', 'scene', 1280, 1024], Topper: ['topper', 'topper', 1920, 540] };
+    for (const [type, [kind, painter, w, h]] of Object.entries(drawn)) {
+      const art = artwork(game, kind);
+      if (art) fs.copyFileSync(art.file, file(type, art.ext));
+      else fs.writeFileSync(file(type, 'png'), await paint(painter, { ...game, w, h }));
+    }
     fs.writeFileSync(file('DMD', 'png'), await paint('dmd', { ...game, w: 1024, h: 256 }));
-    fs.writeFileSync(file('Topper', 'png'), await paint('topper', { ...game, w: 1920, h: 540 }));
     fs.writeFileSync(file('GameInfo', 'jpg'), await paint('flyer', { ...game, w: 800, h: 1100, type: 'image/jpeg' }));
     fs.writeFileSync(file('GameHelp', 'png'), await paint('rules', { ...game, w: 1000, h: 700 }));
     const info = {

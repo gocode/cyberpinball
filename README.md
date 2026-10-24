@@ -26,7 +26,7 @@ You describe your cabinet once: its screens, buttons and speakers. Cyber Pinball
 
 ## Screenshots
 
-Every screenshot is taken off-screen by [`docs/demo-captures.ps1`](docs/demo-captures.ps1) on a simulated cabinet (4K playfield lying flat, backglass, DMD and topper). The games are made up and their artwork is drawn by the script.
+Every screenshot is taken off-screen by [`docs/demo-captures.ps1`](docs/demo-captures.ps1) on a simulated cabinet (4K playfield lying flat, backglass, DMD and topper). The games are made up: their playfields, backglasses and toppers are original illustrations generated with an image model for these screenshots ([`docs/demo-captures-medias`](docs/demo-captures-medias)), and the rest is drawn by the script.
 
 <p align="center">
   <img src="docs/images/en/game-page.webp" width="270" alt="The game page of Neon Abyss: play statistics, files, and the actions Play, Flyer, Rules, Edit info, Game media, Settings for this table, Diagnose and fix, Remove table.">
