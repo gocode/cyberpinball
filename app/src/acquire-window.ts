@@ -6,18 +6,28 @@
 //
 // En haut, un bandeau de Cyber Pinball rappelle ce qu'il faut télécharger (jeu, version,
 // auteurs, nom de ROM) et donne Précédent, « Ouvrir dans mon navigateur » et Fermer.
+// Fermer (ou Échap, la touche qu'on presse par réflexe pour une image agrandie ou après
+// une capture d'écran) ne perd rien : l'historique de la page est gardé, et la fenêtre
+// rouverte pour la même page de départ reprend là où l'utilisateur en était.
+// La fenêtre se lit à la souris : elle s'ouvre sur l'écran que donne le menu (le fronton
+// quand le playfield est couché et tourné, où la souris irait de travers) et y amène le
+// pointeur, qui pouvait être sur un écran qui le cache. Exit de la borne la ferme, comme Échap.
 // Chaque téléchargement de la session est rangé dans <racine>\downloads\acquisition, puis
 // remis à l'application avec la chaîne de redirections : la fiche traversée dit à quel
 // élément de la liste d'attente il revient.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ipcMain, session, shell, WebContentsView, type BrowserWindow, type DownloadItem, type Session } from 'electron';
+import { ipcMain, screen, session, shell, WebContentsView, type BrowserWindow, type DownloadItem, type Rectangle, type Session } from 'electron';
 import { DIRECT_MAX_STEPS, DOWNLOAD_PROBES, probeReasonText, t, WAIT_PROBES, type ProbeResult, type SiteCookie, type SourceSite } from '@cyberpinball/core';
+import { setCursorPosition } from '@cyberpinball/win-displays';
 import { coverDisplay, fillBelow } from './cover-display';
+import { onJoystickInput } from './joystick-input';
 import { createWindow, OFFSCREEN, primaryRect } from './offscreen';
 
 export const ACQUIRE_PARTITION = 'persist:acquisition';
+/** Message du bandeau quand la fenêtre reprend où l'utilisateur en était. */
+const RESUMED = () => t('Repris là où vous en étiez. « Retour à la fiche » revient à la page de départ.');
 /** Hauteur du bandeau de Cyber Pinball, en pixels. */
 const BAR = 96;
 
@@ -59,6 +69,10 @@ export interface AcquireEvents {
   failed(filename: string, reason: 'cancelled' | 'interrupted'): void;
   /** La fenêtre s'est fermée. */
   closed(): void;
+  /** Écran à couvrir (coordonnées Electron) ; sans lui, l'écran principal de Windows. */
+  screen?(): Rectangle | undefined;
+  /** Touches qui ferment la fenêtre comme Échap : Exit de la borne (touche ou bouton de joystick). */
+  exitKeys?(): string[];
 }
 
 /** Fenêtre ouverte : la fenêtre, la page du site, ce qu’on y attend. */
@@ -99,6 +113,8 @@ const WAIT_MAX_MS = 150_000;
 export function createAcquirer(events: AcquireEvents) {
   let open: AcquireOpen | undefined;
   let prepared: Session | undefined;
+  /** Historique de la dernière fenêtre fermée, et sa page de départ : la rouvrir dessus le reprend. */
+  let kept: { url: string; entries: Electron.NavigationEntry[]; index: number } | undefined;
 
   /** Session de la fenêtre : téléchargements interceptés, agent utilisateur de Chromium sans « Electron ». */
   function acquireSession(): Session {
@@ -188,20 +204,37 @@ export function createAcquirer(events: AcquireEvents) {
     });
   }
 
-  /** Ouvre (ou réutilise) la fenêtre sur la page demandée. */
+  /**
+   * Ouvre (ou réutilise) la fenêtre sur la page demandée. Pour la même page de départ
+   * que la fenêtre ouverte, ou que la dernière fermée, elle reprend là où l'utilisateur
+   * en était, avec son historique (Précédent), sans repartir de la page de départ.
+   */
   function show(request: AcquireRequest): void {
     registerIpc();
     const s = acquireSession();
     if (open && !open.win.isDestroyed()) {
-      claimFor(open.view.webContents.id, request.claim);
+      const contents = open.view.webContents;
+      const resume = open.request.url === request.url && Boolean(contents.getURL()) && contents.getURL() !== 'about:blank';
+      claimFor(contents.id, request.claim);
       open.request = request;
-      open.status = request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.');
-      open.warn = request.status !== undefined;
-      void open.view.webContents.loadURL(request.url);
+      if (resume) {
+        open.status = RESUMED();
+        open.warn = false;
+      } else {
+        open.status = request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.');
+        open.warn = request.status !== undefined;
+        void contents.loadURL(request.url);
+      }
       sendBar();
+      // Réduite (Windows+D, Windows+M) : focus() seul ne la rouvre pas.
+      if (open.win.isMinimized()) open.win.restore();
+      open.win.show();
       open.win.focus();
+      bringPointer(open.win.getBounds());
       return;
     }
+    const restore = kept?.url === request.url && kept.entries.length ? kept : undefined;
+    kept = undefined;
     const win = createWindow({
       title: t('Récupérer : {game}', { game: request.game }),
       show: false,
@@ -218,7 +251,9 @@ export function createAcquirer(events: AcquireEvents) {
       webPreferences: { session: s, contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: OFFSCREEN },
     });
     win.contentView.addChildView(view);
-    open = { win, view, request, status: request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.'), warn: request.status !== undefined };
+    open = restore
+      ? { win, view, request, status: RESUMED() }
+      : { win, view, request, status: request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.'), warn: request.status !== undefined };
     const contents = view.webContents;
     claimFor(contents.id, request.claim);
     // Une page qui ouvre un nouvel onglet (lien de téléchargement, MEGA) : dans la même vue.
@@ -230,28 +265,61 @@ export function createAcquirer(events: AcquireEvents) {
     contents.on('did-fail-load', (_e, code, description, url, isMainFrame) => {
       if (isMainFrame && code !== -3) setStatus(t('Page inaccessible ({error}) : {url}. Lien mort ? « Retour à la fiche » ou une autre source.', { error: description, url }), true);
     });
-    // Échap ferme, comme Exit partout ailleurs.
+    // Une vidéo de la page en plein écran : Échap lui revient (elle en sort).
+    let pageFullScreen = false;
+    contents.on('enter-html-full-screen', () => (pageFullScreen = true));
+    contents.on('leave-html-full-screen', () => (pageFullScreen = false));
+    // Échap ferme, comme Exit partout ailleurs ; Exit de la borne aussi, même tapé dans un
+    // champ (un encodeur envoie une touche, sans clavier pour la corriger).
+    const closing = (input: Electron.Input) =>
+      input.type === 'keyDown' && !pageFullScreen && (input.key === 'Escape' || Boolean(events.exitKeys?.().includes(input.code)));
     const escape = (e: Electron.Event, input: Electron.Input) => {
-      if (input.type === 'keyDown' && input.key === 'Escape') {
-        e.preventDefault();
-        close();
-      }
+      if (!closing(input)) return;
+      e.preventDefault();
+      close();
     };
     contents.on('before-input-event', escape);
     win.webContents.on('before-input-event', escape);
+    onJoystickInput(win, (input) => closing(input) && close());
     const viewId = contents.id;
+    // Fermée de quelque façon que ce soit (Fermer, Échap, Alt+F4) : l'historique est gardé.
+    win.on('close', () => {
+      if (contents.isDestroyed()) return;
+      const entries = contents.navigationHistory.getAllEntries();
+      kept = entries.length ? { url: open?.request.url ?? request.url, entries, index: contents.navigationHistory.getActiveIndex() } : undefined;
+    });
     win.on('closed', () => {
       claims.delete(viewId);
       open = undefined;
       events.closed();
     });
-    // Tout l'écran principal de Windows, comme les réglages : au-dessus du menu, jamais le bureau.
-    coverDisplay(win, primaryRect());
+    // Tout un écran, au-dessus du menu, jamais le bureau : celui que donne le menu, sinon l'écran principal de Windows.
+    const bounds = events.screen?.() ?? primaryRect();
+    coverDisplay(win, bounds);
     fillBelow(win, view, BAR);
     void win.loadFile(path.join(__dirname, '..', 'renderer', 'acquire.html'));
-    void contents.loadURL(request.url);
+    if (restore) void contents.navigationHistory.restore({ entries: restore.entries, index: restore.index }).catch(() => contents.loadURL(request.url));
+    else void contents.loadURL(request.url);
     win.show();
     win.focus();
+    bringPointer(bounds);
+  }
+
+  /**
+   * Amène le pointeur au milieu de l'écran de la fenêtre, s'il n'y est pas : sur une borne,
+   * il était sur un autre écran, où le menu le cache, ou sur le playfield tourné, où il
+   * irait de travers. Hors écran, le pointeur du poste n'est pas touché.
+   */
+  function bringPointer(bounds: Rectangle): void {
+    if (OFFSCREEN) return;
+    const at = screen.getCursorScreenPoint();
+    if (at.x >= bounds.x && at.x < bounds.x + bounds.width && at.y >= bounds.y && at.y < bounds.y + bounds.height) return;
+    const middle = screen.dipToScreenPoint({ x: bounds.x + bounds.width / 2, y: bounds.y + bounds.height / 2 });
+    try {
+      setCursorPosition(middle.x, middle.y);
+    } catch (error) {
+      console.warn(`Fenêtre « Récupérer » : pointeur non déplacé (${(error as Error).message})`); // i18n-ignore : console
+    }
   }
 
   /** Vues cachées en cours de téléchargement direct : identifiant de leur page -> qui attend le fichier. */
@@ -501,6 +569,8 @@ export function createAcquirer(events: AcquireEvents) {
     readPage,
     fetchImage,
     isOpen: () => Boolean(open && !open.win.isDestroyed()),
+    /** Rouvrir la fenêtre sur cette page de départ reprendrait là où l'utilisateur en était. */
+    resumable: (url: string) => Boolean((open && !open.win.isDestroyed() && open.request.url === url) || kept?.url === url),
     /** Pour les essais : fenêtre et page affichées. */
     current: () => open,
   };

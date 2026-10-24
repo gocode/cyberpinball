@@ -8,6 +8,11 @@
 // combinaison de touches séparées par « & ». Une touche du clavier s'écrit
 // « Key;<scancode SDL> » ; une manette « SDLJoy_<GUID SDL>_<n>;<bouton> ». Une
 // valeur vide vaut la touche par défaut de VPX.
+//
+// Un bouton de la borne est une touche du clavier (encodeur en mode clavier : son
+// KeyboardEvent.code) ou un bouton de joystick (Pinscape sur KL25Z, encodeur en mode
+// manette : le jeton de VPX lui-même, « SDLJoy_<GUID>_<n>;<bouton> », lu par la
+// bibliothèque SDL de VPX, packages/win-displays/src/joystick.ts).
 
 import { formatList, t } from './i18n';
 import { IniDocument } from './ini';
@@ -265,6 +270,9 @@ const KEY_LABELS: Record<string, string> = {
  */
 export function keyLabel(code: string | undefined): string {
   if (!code) return t('aucune');
+  const joy = joystickButton(code);
+  // Numéroté à partir de 1, comme le panneau « Contrôleurs de jeu » de Windows et l'outil de configuration du Pinscape.
+  if (joy) return t('Bouton {n} du joystick', { n: joy.button + 1 });
   if (KEY_LABELS[code]) return KEY_LABELS[code]!;
   const m = /^(?:Key|Digit)(.)$/.exec(code) ?? /^(F\d+)$/.exec(code);
   if (m) return m[1]!;
@@ -288,11 +296,65 @@ export const PREVIOUS_KEY = 'Backspace';
  * Cyber Pinball (Tab pour la configuration, Retour arrière pour corriger un relevé).
  */
 export function refusedKey(code: string): string | undefined {
+  if (joystickButton(code)) return undefined;
   if (code === 'MetaLeft' || code === 'MetaRight') return t('La touche Windows ouvre le menu Démarrer : réglez ce bouton de l’encodeur sur une autre touche.');
   if (code === CONFIG_KEY) return t('Tab est réservée à l’accès à la configuration : réglez ce bouton de l’encodeur sur une autre touche.');
   if (code === PREVIOUS_KEY) return t('Retour arrière est réservée pour corriger un relevé : réglez ce bouton de l’encodeur sur une autre touche.');
   if (sdlScancode(code) === undefined) return t('Touche « {code} » inconnue de VPX : réglez ce bouton de l’encodeur sur une autre touche.', { code });
   return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Boutons de joystick
+
+/** Jeton de VPX d'un bouton de joystick : « SDLJoy_<GUID SDL en 32 chiffres hexadécimaux>_<rang>;<bouton> ». */
+const JOYSTICK_TOKEN = /^(SDLJoy_[0-9a-f]{32}_\d+);(\d+)$/i;
+
+/** Joystick et numéro SDL (à partir de 0) d'un bouton de joystick ; undefined pour une touche du clavier. */
+export function joystickButton(code: string): { device: string; button: number } | undefined {
+  const m = JOYSTICK_TOKEN.exec(code);
+  return m ? { device: m[1]!, button: Number(m[2]) } : undefined;
+}
+
+/** Code d'un bouton de joystick, tel que VPX l'écrit dans [Input]. */
+export function joystickCode(device: string, button: number): string {
+  return `${device};${button}`;
+}
+
+/**
+ * Identifiants que VPX donne aux joysticks, d'après leurs GUID SDL dans l'ordre de SDL :
+ * « SDLJoy_<GUID>_<rang> », le rang distinguant les joysticks de même GUID (deux Pinscape),
+ * comme SDLInputHandler::OnJoystickAdded.
+ */
+export function joystickDeviceIds(guids: string[]): string[] {
+  return guids.map((guid, i) => `SDLJoy_${guid}_${1 + guids.slice(0, i).filter((g) => g === guid).length}`);
+}
+
+/**
+ * Joysticks que VPX a vus à sa dernière partie (vpinball.log, « Joystick connected: <nom>
+ * (… VPX UID: <identifiant>) ») : de quoi vérifier que Cyber Pinball les nomme comme lui.
+ */
+export function joysticksInVpxLog(log: string): { name: string; id: string }[] {
+  const found = new Map<string, string>();
+  for (const m of log.matchAll(/Joystick connected: (.*?) \(SDL ID:.*?VPX UID: (SDLJoy_[0-9a-f]{32}_\d+)\)/gi)) found.set(m[2]!, m[1]!);
+  return [...found].map(([id, name]) => ({ id, name }));
+}
+
+/**
+ * Joysticks des boutons de la borne que VPX n'a pas vus à sa dernière partie alors qu'il en
+ * voyait d'autres : leurs boutons ne répondent pas en jeu (identifiant calculé autrement,
+ * ou joystick débranché). Vide : rien à signaler, ou VPX n'a vu aucun joystick.
+ */
+export function joysticksUnseenByVpx(buttons: CabinetButtons | undefined, seen: { id: string }[]): string[] {
+  if (!buttons || seen.length === 0) return [];
+  const known = new Set(seen.map((j) => j.id.toLowerCase()));
+  const wanted = new Set(Object.values(buttons).flatMap((code) => (code ? [joystickButton(code)?.device] : [])).filter((d): d is string => Boolean(d)));
+  return [...wanted].filter((d) => !known.has(d.toLowerCase()));
+}
+
+/** Élément de [Input] d'un bouton de la borne : « Key;225 », ou le jeton du joystick. */
+function mappingToken(code: string): string {
+  return joystickButton(code) ? code : `Key;${sdlScancode(code)}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -546,6 +608,22 @@ export function withKeyboardKeys(current: string, keys: number[]): string {
   return formatMapping(result.length ? result : [[`Key;${NO_KEY}`]]);
 }
 
+/**
+ * Valeur Mapping.* d'une action d'un bouton de la borne : les touches seules du clavier
+ * remplacées par `keys` (withKeyboardKeys), le bouton de joystick `joystick` en tête. Les
+ * boutons de joystick écrits la dernière fois (`before`) sont retirés, pour qu'un relevé
+ * changé ne laisse pas l'ancien ; ceux ajoutés dans VPX sont gardés.
+ */
+export function withButtonMapping(current: string, keys: number[], joystick?: string, before?: string): string {
+  const stale = new Set(parseMapping(before ?? '').filter((alt) => alt.length === 1 && joystickButton(alt[0]!)).map((alt) => alt[0]!));
+  if (joystick) stale.add(joystick);
+  const kept = parseMapping(current).filter((alt) => !(alt.length === 1 && stale.has(alt[0]!)));
+  if (!joystick) return withKeyboardKeys(formatMapping(kept), keys);
+  // Le joystick suffit : pas de « Key;0 » quand aucune touche du clavier ne reste.
+  const rest = keys.length ? parseMapping(withKeyboardKeys(formatMapping(kept), keys)) : kept.filter((alt) => singleKey(alt) === undefined);
+  return formatMapping([[joystick], ...rest]);
+}
+
 /** Touches seules du clavier d'une valeur Mapping.* (la touche par défaut de VPX si la valeur est vide). */
 export function keyboardKeys(value: string | undefined, action: string): number[] {
   const text = value?.trim() ? value : VPX_INPUT_DEFAULTS[action] !== undefined ? `Key;${VPX_INPUT_DEFAULTS[action]}` : '';
@@ -590,10 +668,11 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
   const settings: VpxSetting[] = [];
   const silenced: SilencedAction[] = [];
   const released: VpxSetting[] = [];
-  const put = (action: string, keys: number[]) => {
+  const put = (action: string, keys: number[], joystick?: string) => {
     // Une valeur vide vaut la touche par défaut de VPX : elle est remplacée, rien à garder.
-    const current = doc.get(VPX_INPUT_SECTION, mappingKey(action)) ?? '';
-    settings.push({ section: VPX_INPUT_SECTION, key: mappingKey(action), value: withKeyboardKeys(current, keys) });
+    const key = mappingKey(action);
+    const current = doc.get(VPX_INPUT_SECTION, key) ?? '';
+    settings.push({ section: VPX_INPUT_SECTION, key, value: withButtonMapping(current, keys, joystick, written[`${VPX_INPUT_SECTION}.${key}`]) });
   };
 
   // Scancode -> bouton qui le tient.
@@ -622,9 +701,11 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
   for (const b of BUTTONS) {
     const code = buttons[b.id];
     const scancode = code === undefined ? undefined : sdlScancode(code);
+    // Bouton de joystick : la touche du clavier de VPX reste aussi, sauf si un autre bouton l'a prise.
+    const joystick = code !== undefined && joystickButton(code) ? code : undefined;
     for (const action of b.vpx) {
       driven.add(action);
-      put(action, scancode !== undefined ? [scancode] : free(action, [VPX_INPUT_DEFAULTS[action]!]));
+      put(action, scancode !== undefined ? [scancode] : free(action, [VPX_INPUT_DEFAULTS[action]!]), joystick);
     }
   }
 
@@ -658,7 +739,7 @@ const IN_GAME_MENU = 'InGameUI';
  * laisse pas l'ancienne ; manettes et combinaisons ajoutées dans VPX sont gardées.
  */
 function inGameMenuMapping(buttons: CabinetButtons, current: string, before: string | undefined, keys: number[]): string {
-  const combo = inGameMenuButtons(buttons).map((id) => `Key;${sdlScancode(buttons[id]!)}`);
+  const combo = inGameMenuButtons(buttons).map((id) => mappingToken(buttons[id]!));
   const stale = new Set([formatMapping([combo]), ...parseMapping(before ?? '').filter((alt) => alt.length > 1).map((alt) => formatMapping([alt]))]);
   const others = parseMapping(current).filter((alt) => !stale.has(formatMapping([alt])));
   const base = parseMapping(withKeyboardKeys(formatMapping(others), keys)).filter((alt) => singleKey(alt) !== NO_KEY);
@@ -693,6 +774,7 @@ export function describeMapping(value: string | undefined, action: string): stri
     const key = singleKey(alt);
     if (key === NO_KEY) return t('aucune touche');
     if (key !== undefined) return keyLabel(codeOfScancode(key) ?? `scancode ${key}`);
+    if (alt.length === 1 && joystickButton(alt[0]!)) return keyLabel(alt[0]);
     if (alt.every((p) => KEY_TOKEN.test(p))) return alt.map((p) => keyLabel(codeOfScancode(Number(KEY_TOKEN.exec(p)![1])))).join(' + ');
     return alt.some((p) => p.startsWith('SDLJoy_')) ? t('bouton de manette') : alt.join(' + ');
   });

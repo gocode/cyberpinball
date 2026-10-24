@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
 import { createHash, createPublicKey, generateKeyPairSync } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as http from 'node:http';
@@ -9,19 +10,30 @@ import { test } from 'node:test';
 import {
   checkForUpdate,
   compareAppVersions,
+  downloadAppPackage,
   downloadUpdate,
+  installedSocle,
+  loadPrereleaseSetting,
   missedReleases,
+  prereleaseFeedUrl,
   openEnvelope,
   recordPendingUpdate,
   relaunchArguments,
   releaseAssetUrl,
+  savePrereleaseSetting,
   signManifest,
+  stagedAppDir,
+  swapAppDir,
   takeUpdateOutcome,
+  unpackAppPackage,
   updateFeedUrl,
   updateInstallerArguments,
   updateNotes,
+  updatePlan,
   updatePublicKey,
   UPDATE_REPOSITORY,
+  waitForExit,
+  windowsTar,
   type UpdateManifest,
 } from '../update';
 import { UPDATE_PUBLIC_KEY } from '../update-key';
@@ -210,4 +222,170 @@ test('nouveautés de chaque version manquée, la plus récente d’abord, dans l
   // Un historique mal formé n'est même pas signé.
   assert.throws(() => signManifest({ ...m, history: [{ version: 'v2', notes: [] }] }, k.priv), /historique/);
   assert.throws(() => signManifest({ ...m, history: [{ version: '0.2.0', notes: 'deux' as unknown as string[] }] }, k.priv), /historique/);
+});
+
+test('suivi : une version plus récente que celle d’avant compte comme installée (installeur d’une publication rapide)', () => {
+  const dir = temp();
+  // Version d'avant la mise à jour légère : elle notait la version du flux (0.2.3), l'installeur a posé 0.2.0.
+  recordPendingUpdate(dir, { from: '0.1.0', to: '0.2.3', started: new Date().toISOString(), installer: 'x.exe' });
+  assert.deepEqual(takeUpdateOutcome(dir, '0.2.0'), { kind: 'installed', from: '0.1.0', to: '0.2.0' });
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/** Flux d'une publication rapide : paquet léger de 0.2.3, installeurs de la 0.2.0. */
+function lightManifest(zip: Buffer, url: string, socle = 'electron-44.5.1-abc'): UpdateManifest {
+  const m = manifestFor(Buffer.from('exe'), 'https://example.org/v0.2.0/CyberPinball-Setup.exe', '0.2.3');
+  return {
+    ...m,
+    installer: { ...m.installer, version: '0.2.0' },
+    app: { name: 'CyberPinball-application.zip', url, size: zip.length, sha256: createHash('sha256').update(zip).digest('hex'), socle },
+  };
+}
+
+test('mise à jour légère ou installeur : selon le socle installé ; flux vérifié', () => {
+  const k = keys();
+  const m = lightManifest(Buffer.from('zip'), 'https://example.org/CyberPinball-application.zip');
+  assert.deepEqual(openEnvelope(JSON.stringify(signManifest(m, k.priv)), k.pub), m);
+  // Même socle : le paquet léger.
+  assert.equal(updatePlan(m, '0.2.1', 'electron-44.5.1-abc').kind, 'light');
+  // Autre socle, ou version sans socle : l'installeur de la 0.2.0, puis la mise à jour légère.
+  assert.deepEqual(updatePlan(m, '0.1.0', 'electron-40.0.0-def'), { kind: 'installer', asset: m.installer, installs: '0.2.0', thenLight: true });
+  assert.equal(updatePlan(m, '0.1.0', undefined).kind, 'installer');
+  // L'installeur publié n'apporte rien de plus récent : ni l'un ni l'autre.
+  assert.deepEqual(updatePlan(m, '0.2.1', 'electron-40.0.0-def'), { kind: 'none', installs: '0.2.0' });
+  // Flux d'avant la mise à jour légère : l'installeur de la version du flux.
+  const { app: _, ...old } = m;
+  const oldInstaller = { ...m.installer, version: undefined };
+  assert.deepEqual(updatePlan({ ...old, installer: oldInstaller }, '0.1.0', 'electron-44.5.1-abc'), { kind: 'installer', asset: oldInstaller, installs: '0.2.3', thenLight: false });
+  // Un paquet ou une version d'installeur mal formés ne sont même pas signés.
+  assert.throws(() => signManifest({ ...m, app: { ...m.app!, socle: '' } }, k.priv), /paquet de l’application/);
+  assert.throws(() => signManifest({ ...m, app: { ...m.app!, name: 'app.exe' } }, k.priv), /paquet de l’application/);
+  assert.throws(() => signManifest({ ...m, installer: { ...m.installer, version: 'v2' } }, k.priv), /version de l’installeur/);
+});
+
+test('socle installé : lu dans le package.json de l’application, absent sinon', () => {
+  const dir = temp();
+  assert.equal(installedSocle(dir), undefined);
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ version: '0.2.0' }));
+  assert.equal(installedSocle(dir), undefined);
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ version: '0.2.0', cyberpinball: { socle: 'electron-44.5.1-abc' } }));
+  assert.equal(installedSocle(dir), 'electron-44.5.1-abc');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+/** Paquet léger fabriqué comme par scripts/fabriquer.mjs (tar.exe de Windows). */
+function makeAppPackage(dir: string, version: string, socle: string): Buffer {
+  const src = path.join(dir, `src-${version}`);
+  fs.mkdirSync(path.join(src, 'dist'), { recursive: true });
+  fs.writeFileSync(path.join(src, 'package.json'), JSON.stringify({ version, cyberpinball: { socle } }));
+  fs.writeFileSync(path.join(src, 'dist', 'main.js'), `// ${version}`);
+  const zip = path.join(dir, `app-${version}.zip`);
+  const run = spawnSync(windowsTar(), ['-a', '-c', '-f', zip, '-C', src, 'package.json', 'dist']);
+  assert.equal(run.status, 0, String(run.stderr));
+  return fs.readFileSync(zip);
+}
+
+test('paquet léger : téléchargé à côté de l’installeur, déplié, refusé s’il ne contient pas la version annoncée', async () => {
+  const dir = temp();
+  const zip = makeAppPackage(dir, '0.2.3', 'electron-44.5.1-abc');
+  const other = makeAppPackage(dir, '0.2.2', 'electron-44.5.1-abc');
+  const site = await serve({ '/app.zip': zip, '/autre.zip': other });
+  const downloads = path.join(dir, 'downloads');
+  try {
+    fs.mkdirSync(downloads);
+    fs.writeFileSync(path.join(downloads, 'CyberPinball-Setup-0.2.0.exe'), 'installeur');
+    fs.writeFileSync(path.join(downloads, 'CyberPinball-application-0.2.1.zip'), 'ancien paquet');
+    const m = lightManifest(zip, `${site.url}/app.zip`);
+    const file = await downloadAppPackage(m, downloads);
+    assert.equal(path.basename(file), 'CyberPinball-application-0.2.3.zip');
+    // Seul l'ancien paquet est retiré : l'installeur est d'une autre sorte.
+    assert.deepEqual(fs.readdirSync(downloads).sort(), ['CyberPinball-Setup-0.2.0.exe', 'CyberPinball-application-0.2.3.zip']);
+    const staged = stagedAppDir(downloads, m);
+    unpackAppPackage(file, staged, m);
+    assert.equal(fs.readFileSync(path.join(staged, 'dist', 'main.js'), 'utf8'), '// 0.2.3');
+
+    // Un paquet d'une autre version (ou d'un autre socle) que le flux : effacé, jamais mis en place.
+    const wrong = lightManifest(other, `${site.url}/autre.zip`);
+    const wrongFile = await downloadAppPackage(wrong, downloads);
+    assert.throws(() => unpackAppPackage(wrongFile, staged, wrong), /inutilisable/);
+    assert.ok(!fs.existsSync(staged));
+    assert.throws(() => unpackAppPackage(file, staged, { ...m, app: { ...m.app!, socle: 'electron-40.0.0-def' } }), /inutilisable/);
+  } finally {
+    await site.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('mise en place : l’application remplacée, l’ancienne retirée ; intacte en cas d’échec', async () => {
+  const dir = temp();
+  const appDir = path.join(dir, 'app', 'resources', 'app');
+  const staged = path.join(dir, 'downloads', 'application-0.2.3');
+  for (const [d, v] of [
+    [appDir, '0.2.0'],
+    [staged, '0.2.3'],
+  ] as const) {
+    fs.mkdirSync(path.join(d, 'dist'), { recursive: true });
+    fs.writeFileSync(path.join(d, 'package.json'), JSON.stringify({ version: v }));
+  }
+  fs.writeFileSync(path.join(appDir, 'dist', 'ancien.js'), '');
+  try {
+    // Paquet absent : rien ne bouge.
+    await assert.rejects(swapAppDir(appDir, path.join(dir, 'absent')), /introuvable/);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8')).version, '0.2.0');
+
+    assert.equal(await swapAppDir(appDir, staged), true);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8')).version, '0.2.3');
+    assert.ok(!fs.existsSync(path.join(appDir, 'dist', 'ancien.js')), 'aucun fichier de l’ancienne version ne reste');
+    assert.ok(!fs.existsSync(`${appDir}.precedente`));
+    assert.ok(!fs.existsSync(staged));
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('attente d’un processus : immédiate s’il est terminé, limitée sinon', async () => {
+  const child = spawnSync(process.execPath, ['-e', '0']);
+  assert.equal(await waitForExit(child.pid ?? 999_999, 1_000), true);
+  const start = Date.now();
+  assert.equal(await waitForExit(process.pid, 300), false);
+  assert.ok(Date.now() - start >= 300);
+});
+
+test('préversions : réglage gardé ; flux de la release la plus récente, préversions comprises', async () => {
+  const dir = temp();
+  assert.equal(loadPrereleaseSetting(dir), false);
+  savePrereleaseSetting(dir, true);
+  assert.equal(loadPrereleaseSetting(dir), true);
+  fs.writeFileSync(path.join(dir, 'preversions.json'), '{');
+  assert.equal(loadPrereleaseSetting(dir), false);
+  fs.rmSync(dir, { recursive: true, force: true });
+
+  const k = keys();
+  const feed = (version: string) => JSON.stringify(signManifest(manifestFor(Buffer.from('exe'), 'https://example.org/x.exe', version), k.priv));
+  const site = await serve({ '/v0.2.0/cyberpinball-maj.json': feed('0.2.0'), '/v0.3.0-essai.2/cyberpinball-maj.json': feed('0.3.0-essai.2') });
+  const asset = (v: string) => [{ name: 'cyberpinball-maj.json', browser_download_url: `${site.url}/v${v}/cyberpinball-maj.json` }];
+  const listed: Record<string, string> = {};
+  const api = await serve(listed);
+  const releasesUrl = `${api.url}/releases`;
+  try {
+    listed['/releases'] = JSON.stringify([
+      { tag_name: 'v0.3.0-essai.1', draft: false, prerelease: true, assets: asset('0.3.0-essai.1') },
+      { tag_name: 'v0.3.0-essai.2', draft: false, prerelease: true, assets: asset('0.3.0-essai.2') },
+      { tag_name: 'v0.4.0', draft: true, prerelease: false, assets: asset('0.4.0') },
+      { tag_name: 'v0.2.0', draft: false, prerelease: false, assets: asset('0.2.0') },
+      { tag_name: 'v0.2.5', draft: false, prerelease: false, assets: [] },
+    ]);
+    assert.equal(await prereleaseFeedUrl({ releasesUrl }), `${site.url}/v0.3.0-essai.2/cyberpinball-maj.json`);
+    const check = await checkForUpdate({ current: '0.2.0', prereleases: true, releasesUrl, publicKey: k.pub });
+    assert.equal(check.status, 'available');
+    assert.equal(check.latest.version, '0.3.0-essai.2');
+    // La version finale publiée ensuite passe devant ses préversions.
+    listed['/releases'] = JSON.stringify([{ tag_name: 'v0.3.0', draft: false, assets: asset('0.3.0') }]);
+    assert.equal(await prereleaseFeedUrl({ releasesUrl }), `${site.url}/v0.3.0/cyberpinball-maj.json`);
+    listed['/releases'] = '[]';
+    await assert.rejects(prereleaseFeedUrl({ releasesUrl }), /Aucune version publiée/);
+  } finally {
+    await site.close();
+    await api.close();
+  }
 });

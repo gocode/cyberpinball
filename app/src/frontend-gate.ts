@@ -12,6 +12,7 @@ import { runningProcessNames } from '@cyberpinball/win-displays';
 import { coverDisplay } from './cover-display';
 import { LayoutReport } from './layout-check';
 import { createWindow, isShown, OFFSCREEN, primaryRect } from './offscreen';
+import { onJoystickInput } from './joystick-input';
 import { locations } from './paths';
 
 const CHECK_MS = 1000;
@@ -93,13 +94,17 @@ export function otherFrontendsGate(): Promise<Gate> {
     win.webContents.ipc.on('action', (_event, action: { type?: string; action?: string }) => {
       if (action?.type === 'buttons') done(action.action === 'continue');
     });
-    win.webContents.on('before-input-event', (event, input: Input) => {
-      if (input.type !== 'keyDown') return;
+    const answer = (input: Input): boolean => {
+      if (input.type !== 'keyDown') return false;
       if (keys.confirm.includes(input.code)) done(true);
       else if (keys.exit.includes(input.code) || (input.control && input.code === 'KeyQ')) done(false);
-      else return;
-      event.preventDefault();
+      else return false;
+      return true;
+    };
+    win.webContents.on('before-input-event', (event, input: Input) => {
+      if (answer(input)) event.preventDefault();
     });
+    onJoystickInput(win, answer);
     win.on('closed', () => done(false));
     timer = setInterval(() => {
       const still = unacceptedFrontends();

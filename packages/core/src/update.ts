@@ -14,7 +14,22 @@
 // l'ancien dossier jusqu'au bout (remis en place en cas d'échec), garde les raccourcis
 // choisis à l'installation, puis relance Cyber Pinball. Le fichier data\mise-a-jour.json
 // dit au démarrage suivant si la nouvelle version est bien là.
+//
+// Mise à jour légère : chaque release joint aussi le paquet de l'application seule
+// (CyberPinball-application.zip, le contenu de app\resources\app : quelques Mo). Une borne dont
+// le socle (Electron et l'exécutable qui l'entoure, voir scripts/fabriquer.mjs) est celui du
+// paquet le prend à la place de l'installeur : téléchargé et vérifié comme lui, déplié à côté,
+// puis mis en place par app/src/maj-legere.ts une fois Cyber Pinball fermé (l'ancien
+// resources\app gardé jusqu'au bout), et Cyber Pinball relancé. Une publication rapide
+// (scripts/publier.mjs --rapide) ne refait pas les installeurs : son flux désigne ceux de la
+// dernière publication complète (installer.version), qu'une borne d'un autre socle installe
+// d'abord avant de recevoir la mise à jour légère.
+//
+// Préversions (0.2.0-essai.1) : une borne qui les accepte (réglage gardé dans
+// <données>\preversions.json) cherche le flux de la release la plus récente, préversions
+// comprises, par l'API GitHub ; les autres ne lisent que celui de la dernière version finale.
 
+import { spawnSync } from 'node:child_process';
 import { createHash, createPublicKey, createPrivateKey, sign, verify } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -29,8 +44,20 @@ export const UPDATE_REPOSITORY = 'gocode/cyberpinball';
 export const UPDATE_FEED_NAME = 'cyberpinball-maj.json';
 /** Installeur joint à chaque release et téléchargé par la mise à jour (sans VPX : il est déjà installé). */
 export const UPDATE_INSTALLER_NAME = 'CyberPinball-Setup.exe';
+/** Paquet léger joint à chaque release : l'application seule (app\resources\app). */
+export const UPDATE_APP_NAME = 'CyberPinball-application.zip';
 /** Suivi d'une mise à jour lancée, dans le dossier de données. */
 export const UPDATE_PENDING_FILE = 'mise-a-jour.json';
+/** Réglage des préversions, dans le dossier de données. */
+export const UPDATE_PRERELEASES_FILE = 'preversions.json';
+
+/** Fichier joint à une release : adresse, taille et empreinte, vérifiées au téléchargement. */
+export interface UpdateAsset {
+  name: string;
+  url: string;
+  size: number;
+  sha256: string;
+}
 
 /** Ce que décrit le flux : la dernière version publiée. */
 export interface UpdateManifest {
@@ -41,7 +68,18 @@ export interface UpdateManifest {
   notes: string[];
   /** Nouveautés dans une autre langue (CHANGELOG.en.md), affichées par une borne réglée dans cette langue. */
   notesByLanguage?: Partial<Record<Language, string[]>>;
-  installer: { name: string; url: string; size: number; sha256: string };
+  installer: UpdateAsset & {
+    /**
+     * Version qu'il installe, quand ce n'est pas celle du flux : publication rapide, qui reprend
+     * l'installeur de la dernière publication complète. Absent : la version du flux.
+     */
+    version?: string;
+  };
+  /**
+   * Paquet léger : remplace app\resources\app d'une borne au même socle, sans installeur.
+   * Absent des flux d'avant la mise à jour légère.
+   */
+  app?: UpdateAsset & { socle: string };
   /**
    * Nouveautés des versions précédentes (CHANGELOG), la plus récente d'abord : une borne qui a
    * sauté des versions voit tout ce qui a changé depuis la sienne. Absent des flux plus anciens.
@@ -182,6 +220,23 @@ function checkManifest(m: UpdateManifest): void {
   if (typeof i.url !== 'string' || !/^https?:\/\//.test(i.url)) fail(t('adresse de l’installeur absente'));
   if (!Number.isInteger(i.size) || i.size <= 0) fail(t('taille de l’installeur absente'));
   if (typeof i.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(i.sha256)) fail(t('empreinte de l’installeur absente'));
+  if (i.version !== undefined && (typeof i.version !== 'string' || !isVersion(i.version))) fail(t('version de l’installeur illisible'));
+  const a = m.app;
+  if (
+    a !== undefined &&
+    (typeof a?.name !== 'string' ||
+      !/^[\w.-]+\.zip$/i.test(a.name) ||
+      typeof a.url !== 'string' ||
+      !/^https?:\/\//.test(a.url) ||
+      !Number.isInteger(a.size) ||
+      a.size <= 0 ||
+      typeof a.sha256 !== 'string' ||
+      !/^[0-9a-f]{64}$/.test(a.sha256) ||
+      typeof a.socle !== 'string' ||
+      !a.socle)
+  ) {
+    fail(t('paquet de l’application illisible'));
+  }
 }
 
 /** Nouveautés dans la langue de l'interface, sinon en français (flux d'avant les traductions). */
@@ -203,16 +258,69 @@ export function missedReleases(manifest: UpdateManifest, current: string, lang: 
   return [{ version: manifest.version, notes: updateNotes(manifest, lang) }, ...older.map((e) => ({ version: e.version, notes: updateNotes(e, lang) }))];
 }
 
+// ---------- Préversions ----------
+
+/** La borne accepte-t-elle les préversions ? Non tant que rien n'est réglé. */
+export function loadPrereleaseSetting(dataDir: string): boolean {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(dataDir, UPDATE_PRERELEASES_FILE), 'utf8').replace(/^﻿/, '')).preversions === true;
+  } catch {
+    return false;
+  }
+}
+
+export function savePrereleaseSetting(dataDir: string, on: boolean): void {
+  fs.mkdirSync(dataDir, { recursive: true });
+  fs.writeFileSync(path.join(dataDir, UPDATE_PRERELEASES_FILE), `${JSON.stringify({ preversions: on }, null, 2)}\n`, 'utf8');
+}
+
+/** Liste des releases du dépôt, préversions comprises (API GitHub, sans jeton : 60 requêtes par heure). */
+export function releasesApiUrl(repository = UPDATE_REPOSITORY): string {
+  return `https://api.github.com/repos/${repository}/releases?per_page=30`;
+}
+
+/**
+ * Adresse du flux le plus récent, préversions comprises : celui de la release de plus haute
+ * version qui en a un (les brouillons ne sont pas listés sans jeton). Le flux reste vérifié
+ * par sa signature : la liste ne fait que dire où le chercher.
+ */
+export async function prereleaseFeedUrl(opts: { releasesUrl?: string; fetch?: typeof fetch; signal?: AbortSignal } = {}): Promise<string> {
+  const get = opts.fetch ?? fetch;
+  const response = await get(opts.releasesUrl ?? releasesApiUrl(), {
+    signal: opts.signal ?? AbortSignal.timeout(20_000),
+    headers: { accept: 'application/vnd.github+json', 'cache-control': 'no-cache' },
+  });
+  if (!response.ok) throw new Error(t('Le site des mises à jour répond HTTP {status}.', { status: response.status }));
+  type Listed = { tag_name?: string; draft?: boolean; assets?: { name?: string; browser_download_url?: string }[] };
+  const listed = (await response.json()) as Listed[];
+  let best: { version: string; url: string } | undefined;
+  for (const r of Array.isArray(listed) ? listed : []) {
+    const version = r.tag_name?.replace(/^v/, '');
+    const feed = r.assets?.find((a) => a.name === UPDATE_FEED_NAME)?.browser_download_url;
+    if (r.draft || !version || !isVersion(version) || !feed) continue;
+    if (!best || compareAppVersions(version, best.version) > 0) best = { version, url: feed };
+  }
+  if (!best) throw new Error(t('Aucune version publiée pour l’instant sur le site des mises à jour.'));
+  return best.url;
+}
+
 /** Cherche la dernière version publiée et la compare à celle qui tourne. */
 export async function checkForUpdate(opts: {
   current: string;
   feedUrl?: string;
+  /** Préversions comprises : le flux de la release la plus récente (CYBERPINBALL_MAJ_URL les remplace aussi). */
+  prereleases?: boolean;
+  releasesUrl?: string;
   publicKey?: string;
   fetch?: typeof fetch;
   signal?: AbortSignal;
 }): Promise<UpdateCheck> {
-  const url = opts.feedUrl ?? updateFeedUrl();
+  let url = opts.feedUrl ?? updateFeedUrl();
   const get = opts.fetch ?? fetch;
+  if (opts.prereleases && !opts.feedUrl && !process.env.CYBERPINBALL_MAJ_URL) {
+    // Liste illisible (limite de l'API atteinte…) : le flux des versions finales, toujours lisible.
+    url = await prereleaseFeedUrl({ releasesUrl: opts.releasesUrl, fetch: get, signal: opts.signal }).catch(() => url);
+  }
   let response: Response;
   try {
     response = await get(url, { redirect: 'follow', signal: opts.signal ?? AbortSignal.timeout(20_000), headers: { 'cache-control': 'no-cache' } });
@@ -226,6 +334,38 @@ export async function checkForUpdate(opts: {
   return { status: compareAppVersions(latest.version, opts.current) > 0 ? 'available' : 'up-to-date', current: opts.current, latest };
 }
 
+// ---------- Mise à jour légère ou installeur ----------
+
+/**
+ * Socle d'une application installée : champ cyberpinball.socle de app\resources\app\package.json
+ * (scripts/fabriquer.mjs). Undefined pour une version d'avant la mise à jour légère, ou lancée
+ * depuis les sources.
+ */
+export function installedSocle(appDir: string): string | undefined {
+  try {
+    const socle = JSON.parse(fs.readFileSync(path.join(appDir, 'package.json'), 'utf8')).cyberpinball?.socle;
+    return typeof socle === 'string' && socle ? socle : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export type UpdatePlan =
+  /** Paquet léger : même socle, seule l'application change. */
+  | { kind: 'light'; asset: UpdateAsset }
+  /** Installeur : socle différent (ou flux sans paquet léger). thenLight : il installe une version plus ancienne que le flux, la mise à jour légère suit. */
+  | { kind: 'installer'; asset: UpdateAsset; installs: string; thenLight: boolean }
+  /** Ni l'un ni l'autre : l'installeur publié n'apporte rien de plus récent que la version installée. */
+  | { kind: 'none'; installs: string };
+
+/** Comment passer de la version installée (et de son socle) à celle du flux. */
+export function updatePlan(manifest: UpdateManifest, current: string, socle: string | undefined): UpdatePlan {
+  if (manifest.app && socle && manifest.app.socle === socle) return { kind: 'light', asset: manifest.app };
+  const installs = manifest.installer.version ?? manifest.version;
+  if (compareAppVersions(installs, current) <= 0) return { kind: 'none', installs };
+  return { kind: 'installer', asset: manifest.installer, installs, thenLight: installs !== manifest.version };
+}
+
 // ---------- Téléchargement ----------
 
 /** Dossier des installeurs téléchargés, dans downloads\ de la racine. */
@@ -233,9 +373,14 @@ export function updateDownloadsDir(downloadsDir: string): string {
   return path.join(downloadsDir, 'cyberpinball');
 }
 
-/** Nom local de l'installeur : la version y figure, pour ne jamais confondre deux téléchargements. */
+/** Nom local de l'installeur : la version qu'il installe y figure, pour ne jamais confondre deux téléchargements. */
 export function updateInstallerFile(dir: string, manifest: UpdateManifest): string {
-  return path.join(dir, `CyberPinball-Setup-${manifest.version}.exe`);
+  return path.join(dir, `CyberPinball-Setup-${manifest.installer.version ?? manifest.version}.exe`);
+}
+
+/** Nom local du paquet léger. */
+export function updateAppFile(dir: string, manifest: UpdateManifest): string {
+  return path.join(dir, `CyberPinball-application-${manifest.version}.zip`);
 }
 
 export async function sha256File(file: string): Promise<string> {
@@ -249,18 +394,34 @@ export async function sha256File(file: string): Promise<string> {
  * s'il est intact. Un fichier de la mauvaise taille ou empreinte est supprimé, jamais lancé.
  * Les anciens installeurs du dossier sont supprimés : seul le dernier sert.
  */
-export async function downloadUpdate(
-  manifest: UpdateManifest,
-  dir: string,
-  opts: { onProgress?: (received: number, total: number) => void; signal?: AbortSignal; fetch?: typeof fetch } = {},
-): Promise<string> {
+export async function downloadUpdate(manifest: UpdateManifest, dir: string, opts: DownloadOptions = {}): Promise<string> {
+  return downloadAsset(manifest.installer, updateInstallerFile(dir, manifest), opts);
+}
+
+/** Télécharge le paquet léger, comme l'installeur : vérifié, repris s'il est déjà là, les anciens supprimés. */
+export async function downloadAppPackage(manifest: UpdateManifest, dir: string, opts: DownloadOptions = {}): Promise<string> {
+  if (!manifest.app) throw new Error(t('Flux de mise à jour incomplet : {what}.', { what: t('paquet de l’application illisible') }));
+  return downloadAsset(manifest.app, updateAppFile(dir, manifest), opts);
+}
+
+export interface DownloadOptions {
+  onProgress?: (received: number, total: number) => void;
+  signal?: AbortSignal;
+  fetch?: typeof fetch;
+}
+
+/** Fichiers téléchargés par les mises à jour, et leurs restes : un seul de chaque sorte est gardé. */
+const DOWNLOADED = [/^CyberPinball-Setup-.+\.exe(\.part)?$/i, /^CyberPinball-application-.+\.zip(\.part)?$/i];
+
+async function downloadAsset(asset: UpdateAsset, file: string, opts: DownloadOptions): Promise<string> {
+  const dir = path.dirname(file);
   fs.mkdirSync(dir, { recursive: true });
-  const file = updateInstallerFile(dir, manifest);
+  const kind = DOWNLOADED.find((re) => re.test(path.basename(file)));
   for (const old of fs.readdirSync(dir)) {
-    if (/^CyberPinball-Setup-.+\.exe(\.part)?$/i.test(old) && path.join(dir, old) !== file) fs.rmSync(path.join(dir, old), { force: true });
+    if (kind?.test(old) && path.join(dir, old) !== file) fs.rmSync(path.join(dir, old), { force: true });
   }
-  if (fs.existsSync(file) && fs.statSync(file).size === manifest.installer.size && (await sha256File(file)) === manifest.installer.sha256) {
-    opts.onProgress?.(manifest.installer.size, manifest.installer.size);
+  if (fs.existsSync(file) && fs.statSync(file).size === asset.size && (await sha256File(file)) === asset.sha256) {
+    opts.onProgress?.(asset.size, asset.size);
     return file;
   }
 
@@ -268,13 +429,13 @@ export async function downloadUpdate(
   const get = opts.fetch ?? fetch;
   let response: Response;
   try {
-    response = await get(manifest.installer.url, { redirect: 'follow', signal: opts.signal });
+    response = await get(asset.url, { redirect: 'follow', signal: opts.signal });
   } catch (error) {
     if (opts.signal?.aborted) throw new Error(t('Téléchargement annulé.'));
     throw new Error(t('Téléchargement impossible : {message}', { message: (error as Error).message }));
   }
-  if (!response.ok || !response.body) throw new Error(t('Téléchargement impossible (HTTP {status}) : {url}', { status: response.status, url: manifest.installer.url }));
-  const total = manifest.installer.size;
+  if (!response.ok || !response.body) throw new Error(t('Téléchargement impossible (HTTP {status}) : {url}', { status: response.status, url: asset.url }));
+  const total = asset.size;
   let received = 0;
   const body = Readable.fromWeb(response.body as import('node:stream/web').ReadableStream);
   body.on('data', (chunk: Buffer) => {
@@ -290,16 +451,140 @@ export async function downloadUpdate(
   }
   const size = fs.statSync(part).size;
   const actual = size === total ? await sha256File(part) : undefined;
-  if (actual !== manifest.installer.sha256) {
+  if (actual !== asset.sha256) {
     fs.rmSync(part, { force: true });
     throw new Error(
       size !== total
-        ? t('Installeur incomplet ({size} octets reçus sur {total}) : fichier supprimé.', { size, total })
-        : t('Empreinte SHA-256 de l’installeur incorrecte (attendu {expected}, obtenu {actual}) : fichier supprimé.', { expected: manifest.installer.sha256, actual: String(actual) }),
+        ? t('Téléchargement incomplet ({size} octets reçus sur {total}) : fichier supprimé.', { size, total })
+        : t('Empreinte SHA-256 du fichier téléchargé incorrecte (attendu {expected}, obtenu {actual}) : fichier supprimé.', { expected: asset.sha256, actual: String(actual) }),
     );
   }
   fs.renameSync(part, file);
   return file;
+}
+
+// ---------- Mise en place du paquet léger ----------
+
+/** Dossier où le paquet léger est déplié, à côté de son téléchargement. */
+export function stagedAppDir(dir: string, manifest: UpdateManifest): string {
+  return path.join(dir, `application-${manifest.version}`);
+}
+
+/** tar.exe de Windows (bsdtar) : il lit et écrit les zip. Celui de Git (GNU tar) ne les lit pas. */
+export function windowsTar(): string {
+  return path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe');
+}
+
+/**
+ * Déplie le paquet léger dans `target` (vidé d'abord), puis vérifie qu'il contient bien la
+ * version du flux, au socle annoncé : un paquet qui ne correspond pas est effacé, jamais mis en place.
+ */
+export function unpackAppPackage(zip: string, target: string, manifest: UpdateManifest): void {
+  fs.rmSync(target, { recursive: true, force: true });
+  fs.mkdirSync(target, { recursive: true });
+  const run = spawnSync(windowsTar(), ['-x', '-f', zip, '-C', target], { encoding: 'utf8', windowsHide: true });
+  let problem: string | undefined;
+  if (run.status !== 0) problem = (run.error?.message ?? run.stderr) || `tar ${run.status}`;
+  else {
+    let pkg: { version?: string; cyberpinball?: { socle?: string } } = {};
+    try {
+      pkg = JSON.parse(fs.readFileSync(path.join(target, 'package.json'), 'utf8'));
+    } catch {
+      // Pas de package.json : signalé ci-dessous.
+    }
+    if (pkg.version !== manifest.version || pkg.cyberpinball?.socle !== manifest.app?.socle || !fs.existsSync(path.join(target, 'dist', 'main.js'))) {
+      problem = t('il contient la version {version}, pas {expected}', { version: String(pkg.version), expected: manifest.version });
+    }
+  }
+  if (problem) {
+    fs.rmSync(target, { recursive: true, force: true });
+    throw new Error(t('Paquet de l’application inutilisable ({problem}) : rien n’a été remplacé.', { problem: problem.trim() }));
+  }
+}
+
+/** Ce que fait app/src/maj-legere.ts une fois Cyber Pinball fermé (écrit en JSON à côté du paquet). */
+export interface LightUpdateJob {
+  /** Processus de Cyber Pinball à attendre. */
+  pid: number;
+  /** app\resources\app, à remplacer. */
+  appDir: string;
+  /** Paquet déplié (stagedAppDir). */
+  staged: string;
+  version: string;
+  /** Relance : CyberPinball.exe, ses arguments d'avant, son dossier de travail. */
+  exe: string;
+  args: string[];
+  cwd: string;
+  /** Écrire la version dans « Programmes et fonctionnalités » (pas dans un bac à sable). */
+  registry: boolean;
+  /** Journal de l'opération. */
+  log: string;
+}
+
+/** Attend la fin d'un processus (jusqu'à timeoutMs). Vrai s'il s'est terminé. */
+export async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
+  const end = Date.now() + timeoutMs;
+  for (;;) {
+    try {
+      process.kill(pid, 0);
+    } catch {
+      return true;
+    }
+    if (Date.now() > end) return false;
+    await new Promise((r) => setTimeout(r, 200));
+  }
+}
+
+/**
+ * Remplace `appDir` par `staged` : l'ancien devient <appDir>.precedente le temps de
+ * l'opération (essais pendant `retryMs`, tant qu'un fichier reste tenu), remis en place si la
+ * nouvelle ne peut s'y mettre, supprimé sinon. En cas d'erreur, `appDir` est intact.
+ * Faux si l'ancienne n'a pas pu être supprimée tout de suite (un fichier encore tenu par un
+ * processus de Chromium qui finit de se fermer) : la mise à jour est faite quand même, et
+ * removePreviousApp la retire au démarrage suivant.
+ */
+export async function swapAppDir(appDir: string, staged: string, opts: { retryMs?: number } = {}): Promise<boolean> {
+  if (!fs.existsSync(path.join(staged, 'package.json'))) throw new Error(t('Paquet de l’application introuvable : {dir}', { dir: staged }));
+  const previous = `${appDir}.precedente`;
+  removePreviousApp(appDir);
+  const end = Date.now() + (opts.retryMs ?? 10_000);
+  for (;;) {
+    try {
+      fs.renameSync(appDir, previous);
+      break;
+    } catch (error) {
+      if (Date.now() > end) throw new Error(t('{dir} reste utilisé : rien n’a été remplacé ({message}).', { dir: appDir, message: (error as Error).message }));
+      await new Promise((r) => setTimeout(r, 250));
+    }
+  }
+  try {
+    try {
+      fs.renameSync(staged, appDir);
+    } catch {
+      // Autre disque (EXDEV) : copie, puis effacement du paquet déplié.
+      fs.cpSync(staged, appDir, { recursive: true });
+      fs.rmSync(staged, { recursive: true, force: true });
+    }
+  } catch (error) {
+    fs.rmSync(appDir, { recursive: true, force: true });
+    fs.renameSync(previous, appDir);
+    throw error;
+  }
+  return removePreviousApp(appDir);
+}
+
+/**
+ * Retire <appDir>.precedente, reste d'une mise à jour légère (nouveaux essais pendant 5 s si
+ * un fichier est encore tenu). Vrai s'il n'en reste rien ; jamais d'erreur.
+ */
+export function removePreviousApp(appDir: string): boolean {
+  const previous = `${appDir}.precedente`;
+  try {
+    fs.rmSync(previous, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 });
+  } catch {
+    // Retiré au prochain démarrage, ou à la prochaine mise à jour.
+  }
+  return !fs.existsSync(previous);
 }
 
 // ---------- Installation ----------
@@ -320,9 +605,11 @@ export function relaunchArguments(args: string[]): string {
 
 export interface PendingUpdate {
   from: string;
+  /** Version attendue au redémarrage (celle que pose l'installeur ou le paquet léger). */
   to: string;
-  /** Date du lancement de l'installeur (ISO 8601). */
+  /** Date du lancement de l'installeur ou de la mise en place (ISO 8601). */
   started: string;
+  /** Installeur lancé, ou paquet léger mis en place. */
   installer: string;
 }
 
@@ -338,7 +625,10 @@ export type UpdateOutcome =
 
 /**
  * Au démarrage : une mise à jour avait été lancée ? Lit et efface le suivi, et dit si
- * la version attendue tourne. Un suivi illisible est effacé sans rien dire.
+ * la version attendue tourne. Une version plus récente que celle d'avant compte aussi comme
+ * installée : une version d'avant la mise à jour légère notait la version du flux, alors que
+ * l'installeur d'une publication rapide pose celle de la dernière publication complète.
+ * Un suivi illisible est effacé sans rien dire.
  */
 export function takeUpdateOutcome(dataDir: string, current: string): UpdateOutcome | undefined {
   const file = path.join(dataDir, UPDATE_PENDING_FILE);
@@ -351,7 +641,9 @@ export function takeUpdateOutcome(dataDir: string, current: string): UpdateOutco
   }
   fs.rmSync(file, { force: true });
   if (!pending || typeof pending.to !== 'string' || typeof pending.from !== 'string') return undefined;
-  return current === pending.to ? { kind: 'installed', from: pending.from, to: pending.to } : { kind: 'failed', from: pending.from, to: pending.to, current };
+  if (current === pending.to) return { kind: 'installed', from: pending.from, to: pending.to };
+  const newer = isVersion(current) && isVersion(pending.from) && compareAppVersions(current, pending.from) > 0;
+  return newer ? { kind: 'installed', from: pending.from, to: current } : { kind: 'failed', from: pending.from, to: pending.to, current };
 }
 
 /** 111 Mio, 2,4 Mio (111 MiB, 2.4 MiB). */

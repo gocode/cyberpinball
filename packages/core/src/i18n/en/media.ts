@@ -456,6 +456,7 @@ export const messages: Record<string, string> = {
   'Chercher sur le web…': 'Search the web…',
   'Téléchargement : {got}': 'Downloading: {got}',
   'Navigateur intégré : ce que vous y téléchargez revient ici': 'Built-in browser: what you download there comes back here',
+  'Reprend la page où vous en étiez ; ce que vous y téléchargez revient ici': 'Picks up the page where you left off; what you download there comes back here',
   'Pas montré sur votre borne': 'Not shown on your cabinet',
   'C’est déjà le média actuel : rien ne changerait. Choisissez une autre proposition.': 'This is already the current media: nothing would change. Choose another suggestion.',
   '{n} pour ce média': '{n} for this media',

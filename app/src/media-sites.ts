@@ -2,9 +2,10 @@
 // sources-medias.md § 6) : VPForums, puis VPUniverse en dernier recours. Cœur :
 // packages/core/src/mediasites.ts.
 //
-// - Recherche : une page de résultats par site et par titre, lue dans une vue cachée de
-//   la session « Récupérer », quand l'utilisateur ouvre les propositions. Gardée une
-//   demi-heure : revenir sur un média ne relance rien.
+// - Recherche : les pages de résultats d'un site pour un titre (trois au plus), lues
+//   dans une vue cachée de la session « Récupérer », quand l'utilisateur ouvre les
+//   propositions d'un média ; sur VPUniverse, dans les seules catégories de ce média.
+//   Gardée une demi-heure : revenir sur un média ne relance rien.
 // - Vignettes : l'image fixe que l'auteur a déposée, reçue avec les cookies de la session.
 // - File : un fichier à la fois par site, chaque site de son côté. Le minuteur de
 //   VPUniverse (environ 45 s) se déroule dans la page, les secondes restantes sont
@@ -21,14 +22,17 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  checkSiteSearch,
   formatSize,
   hitTypes,
   mediaSite,
   receivedMedias,
+  siteSearchByType,
   siteSearchUrl,
   siteState,
   siteHitKey,
   sourceSite,
+  SITE_SEARCH_PAGES,
   SITE_SEARCH_PROBES,
   t,
   type MediaSiteId,
@@ -117,19 +121,41 @@ export function createMediaSites(ctx: MediaSitesContext) {
 
   // ---------- Recherche ----------
 
-  /** Résultats d'un site pour un texte : de la demi-heure passée, sinon une page lue maintenant. */
-  async function search(site: MediaSiteId, query: string): Promise<SiteSearchResult> {
-    const key = `${site}:${query.toLowerCase()}`;
+  /** Une page de résultats, lue et vérifiée (checkSiteSearch). */
+  async function searchPage(site: MediaSiteId, query: string, type: MediaType | undefined, page: number): Promise<SiteSearchResult> {
+    let raw: unknown;
+    try {
+      raw = await ctx.acquirer.readPage(siteSearchUrl(site, query, type, page), SITE_SEARCH_PROBES[site], 20_000);
+    } catch {
+      raw = undefined;
+    }
+    const checked = checkSiteSearch(site, raw);
+    // Fiches sans titre : la page a changé de forme. L'écran ne le dit que si la plupart le sont.
+    if (checked.untitled) console.warn(`${site} : ${checked.untitled} résultat(s) sans titre pour « ${query} » (page ${page}) : script de recherche à revoir.`); // i18n-ignore : journal
+    return checked;
+  }
+
+  /**
+   * Résultats d'un site pour un texte et un média : de la demi-heure passée, sinon lus
+   * maintenant, jusqu'à SITE_SEARCH_PAGES pages. VPUniverse cherche dans les seules
+   * catégories du média ; VPForums, partout (une recherche sert à tous les médias).
+   */
+  async function search(site: MediaSiteId, query: string, type?: MediaType): Promise<SiteSearchResult> {
+    const own = siteSearchByType(site) ? type : undefined;
+    const key = `${site}:${own ?? '*'}:${query.toLowerCase()}`;
     const cached = searches.get(key);
     if (cached && Date.now() - cached.at < SEARCH_TTL_MS) return cached.result;
-    let result: SiteSearchResult;
-    try {
-      const raw = (await ctx.acquirer.readPage(siteSearchUrl(site, query), SITE_SEARCH_PROBES[site], 20_000)) as SiteSearchResult | undefined;
-      result = raw && typeof raw === 'object' && 'kind' in raw ? raw : { kind: 'show', reason: 'unreadable' };
-    } catch {
-      result = { kind: 'show', reason: 'unreadable' };
+    const first = await searchPage(site, query, own, 1);
+    let result = first;
+    if (first.kind === 'hits') {
+      const hits = [...first.hits];
+      for (let page = 2; page <= Math.min(first.pages ?? 1, SITE_SEARCH_PAGES); page++) {
+        const next = await searchPage(site, query, own, page);
+        if (next.kind !== 'hits') break;
+        hits.push(...next.hits.filter((h) => !hits.some((k) => k.id === h.id)));
+      }
+      result = { kind: 'hits', hits, pages: first.pages };
     }
-    if (result.kind === 'hits') result = { kind: 'hits', hits: result.hits.map((h) => ({ ...h, site })) };
     // Seuls des résultats se gardent : après un échec ou une connexion, la visite suivante relit la page.
     if (result.kind === 'hits') searches.set(key, { at: Date.now(), result });
     return result;
@@ -521,6 +547,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
     receipt: (key: string) => loadReceipts().get(key),
     progressText,
     openWeb,
+    /** Rouvrir la fenêtre « Récupérer » sur cette page de départ reprendrait la page où l'utilisateur en était. */
+    resumable: (url: string) => ctx.acquirer.resumable(url),
     webReceipts: () => loadWeb(),
     webProgress: () => webProgress,
     /** Appelé à chaque fichier reçu de la recherche web (sans média dedans : `files` vide). */

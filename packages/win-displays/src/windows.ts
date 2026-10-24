@@ -45,6 +45,7 @@ interface Api {
   PostMessageW: NativeFn;
   SendMessageTimeoutW: NativeFn;
   keybd_event: NativeFn;
+  SetCursorPos: NativeFn;
 }
 
 let api: Api | undefined;
@@ -76,6 +77,7 @@ function loadApi(): Api {
       'intptr_t __stdcall SendMessageTimeoutW(void *hwnd, uint32_t msg, uintptr_t wParam, void *lParam, uint32_t flags, uint32_t timeout, _Out_ uintptr_t *result)',
     ),
     keybd_event: user32.func('void __stdcall keybd_event(uint8_t vk, uint8_t scan, uint32_t flags, uintptr_t extra)'),
+    SetCursorPos: user32.func('bool __stdcall SetCursorPos(int x, int y)'),
   };
   return api;
 }
@@ -216,6 +218,15 @@ export function hideWindow(target: WindowInfo): void {
 /** Réaffiche une fenêtre masquée, sans l'activer. */
 export function showWindowInactive(target: WindowInfo): void {
   loadApi().ShowWindow(target.hwnd, SW_SHOWNA);
+}
+
+/**
+ * Place le pointeur de la souris en (x, y), pixels physiques du bureau : sur une borne, une
+ * fenêtre qui se lit à la souris l'amène sous le pointeur, qui pouvait être sur un écran
+ * qui le cache.
+ */
+export function setCursorPosition(x: number, y: number): boolean {
+  return Boolean(loadApi().SetCursorPos(Math.round(x), Math.round(y)));
 }
 
 /**

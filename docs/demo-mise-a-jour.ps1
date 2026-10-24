@@ -19,9 +19,16 @@
 #   .\docs\demo-mise-a-jour.ps1 -Deploye        # ancienne version copiée comme par npm run deployer
 #                                               (sans l'installeur, donc sans installation.ini),
 #                                               avec un raccourci de démarrage déjà là
+#   .\docs\demo-mise-a-jour.ps1 -Legere         # mise à jour légère : l'ancienne version est publiée
+#                                               (installeur, paquet léger, flux), la suivante l'est en
+#                                               publication rapide (paquet léger seul, mêmes
+#                                               installeurs) ; la borne télécharge le paquet, se
+#                                               ferme, maj-legere.js remplace resources\app et la
+#                                               relance, sans installeur
 param(
   [switch]$SansFabrication,
   [switch]$Deploye,
+  [switch]$Legere,
   [int]$Port = 8765,
   [string]$Source = 'D:\CyberPinball'
 )
@@ -33,6 +40,8 @@ Use-HorsEcran 'borne'
 
 $base = "$wt\tmp\demo-mise-a-jour"
 $home_ = "$base\home"; $racine = "$base\racine"; $site = "$base\site"; $faux = "$base\site-falsifie"; $captures = "$home_\captures"
+# Mise à jour légère : la publication de l'ancienne version, dont la rapide reprend les installeurs.
+$siteAncien = "$base\site-ancien"
 $ancien = "$base\installeurs\CyberPinball-Setup-ancien.exe"
 $exe = "$racine\app\CyberPinball.exe"
 function Stop-Borne { Get-Process CyberPinball -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$base\*" } | Stop-Process -Force }
@@ -56,9 +65,30 @@ $nouvelle = node -e "const v=process.argv[1].split('.');v[2]=String(Number(v[2])
 
 Push-Location $wt
 try {
-  if (-not $SansFabrication -or -not (Test-Path $ancien)) {
-    "`n=== Installeur $ancienne"
-    node scripts\fabriquer.mjs --installeur --leger | Select-Object -Last 1
+  Set-Content "$base\nouveautes.md" "- Version d'essai de la mise à jour`n- Deuxième point des nouveautés" -Encoding UTF8
+  if ($Legere) {
+    if (-not $SansFabrication -or -not (Test-Path $ancien) -or -not (Test-Path "$siteAncien\cyberpinball-maj.json")) {
+      "`n=== Publication locale de $ancienne (installeur, paquet léger, flux)"
+      if (Test-Path $siteAncien) { Remove-Item -Recurse -Force $siteAncien }
+      node scripts\publier.mjs --leger --local $siteAncien --url "http://127.0.0.1:$Port/site-ancien" --notes "$base\nouveautes.md" | Select-Object -Last 3
+      if ($LASTEXITCODE -ne 0) { throw 'Publication locale de l''ancienne version impossible.' }
+      Copy-Item "$siteAncien\CyberPinball-Setup.exe" $ancien
+      $copie = "$base\installeurs\app-ancienne"
+      if (Test-Path $copie) { Remove-Item -Recurse -Force $copie }
+      Copy-Item -Recurse "$wt\release\win-unpacked" $copie
+    }
+    "`n=== Publication rapide de $nouvelle (paquet léger seul)"
+    $env:CYBERPINBALL_VERSION_ESSAI = $nouvelle
+    node scripts\publier.mjs --rapide --local $site --url "http://127.0.0.1:$Port/site" --reference "$siteAncien\cyberpinball-maj.json" --notes "$base\nouveautes.md" | Select-Object -Last 4
+    if ($LASTEXITCODE -ne 0) { throw 'Publication rapide impossible.' }
+    Remove-Item Env:CYBERPINBALL_VERSION_ESSAI
+    if (Test-Path "$site\CyberPinball-Setup.exe") { throw 'La publication rapide a refait un installeur.' }
+  }
+  if (-not $Legere -and (-not $SansFabrication -or -not (Test-Path $ancien))) {
+    "`n=== Installeur $ancienne (autre socle : la mise à jour passe par l'installeur)"
+    # Comme après un changement d'Electron : le paquet léger de la suivante ne lui convient pas.
+    $env:CYBERPINBALL_SOCLE_ESSAI = 'essai-ancien-socle'
+    try { node scripts\fabriquer.mjs --installeur --leger | Select-Object -Last 1 } finally { Remove-Item Env:CYBERPINBALL_SOCLE_ESSAI }
     if ($LASTEXITCODE -ne 0) { throw 'Fabrication de l''ancienne version impossible.' }
     Copy-Item "$wt\release\CyberPinball-Setup.exe" $ancien
     # L'application elle-même, pour -Deploye : ce que copie npm run deployer.
@@ -66,14 +96,15 @@ try {
     if (Test-Path $copie) { Remove-Item -Recurse -Force $copie }
     Copy-Item -Recurse "$wt\release\win-unpacked" $copie
   }
-  "`n=== Publication locale de $nouvelle"
-  Set-Content "$base\nouveautes.md" "- Version d'essai de la mise à jour`n- Deuxième point des nouveautés" -Encoding UTF8
-  $env:CYBERPINBALL_VERSION_ESSAI = $nouvelle
-  $publier = @('scripts\publier.mjs', '--leger', '--local', $site, '--url', "http://127.0.0.1:$Port/site", '--notes', "$base\nouveautes.md")
-  if ($SansFabrication -and (Test-Path "$wt\release\cyberpinball-maj.json")) { $publier += '--sans-fabrication' }
-  node @publier | Select-Object -Last 3
-  if ($LASTEXITCODE -ne 0) { throw 'Publication locale impossible.' }
-  Remove-Item Env:CYBERPINBALL_VERSION_ESSAI
+  if (-not $Legere) {
+    "`n=== Publication locale de $nouvelle"
+    $env:CYBERPINBALL_VERSION_ESSAI = $nouvelle
+    $publier = @('scripts\publier.mjs', '--leger', '--local', $site, '--url', "http://127.0.0.1:$Port/site", '--notes', "$base\nouveautes.md")
+    if ($SansFabrication -and (Test-Path "$wt\release\cyberpinball-maj.json")) { $publier += '--sans-fabrication' }
+    node @publier | Select-Object -Last 3
+    if ($LASTEXITCODE -ne 0) { throw 'Publication locale impossible.' }
+    Remove-Item Env:CYBERPINBALL_VERSION_ESSAI
+  }
 } finally { Pop-Location }
 
 # Flux falsifié : la version annoncée est changée après signature.
@@ -125,18 +156,19 @@ try {
   Start-Borne 'site' 'Tab,action:Mise à jour de Cyber Pinball,wait:2500,action:Plus tard,wait:800' "$captures\disponible"
 
   "`n=== Mise à jour $ancienne -> $nouvelle"
-  # L'installeur relance Cyber Pinball avec le même autopilote, qui écrit dans le même dossier :
-  # celui de l'ancienne version est mis de côté dès qu'elle se ferme.
+  # L'installeur (ou maj-legere.js) relance Cyber Pinball avec le même autopilote, qui écrit dans
+  # le même dossier : celui de l'ancienne version est mis de côté dès qu'elle se ferme.
   Start-Borne 'site' 'Tab,action:Mise à jour de Cyber Pinball,wait:2500,action:Mettre à jour maintenant,wait:20000' "$captures\en-cours"
   Rename-Item "$captures\en-cours" "$captures\ancienne"
-  "Ancienne version fermée ; l'installeur prend la suite."
+  $qui = if ($Legere) { 'la mise à jour légère' } else { 'l''installeur' }
+  "Ancienne version fermée ; $qui prend la suite."
   $relance = $null
   for ($i = 0; $i -lt 240 -and -not $relance; $i++) {
     Start-Sleep -Milliseconds 500
     $relance = Get-Process CyberPinball -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $exe } | Select-Object -First 1
   }
-  if (-not $relance) { throw 'Cyber Pinball n''a pas été relancé par l''installeur.' }
-  "Relancé par l'installeur après $([math]::Round($i / 2)) s."
+  if (-not $relance) { throw "Cyber Pinball n'a pas été relancé par $qui." }
+  "Relancé par $qui après $([math]::Round($i / 2)) s."
   if (-not $relance.WaitForExit(180000)) { Stop-Borne; throw 'La nouvelle version ne s''est pas fermée.' }
   Rename-Item "$captures\en-cours" "$captures\nouvelle"
 } finally {
@@ -148,7 +180,11 @@ try {
 $problemes = @()
 $ini = Get-Content "$racine\app\installation.ini" -Encoding Unicode
 $ver = ($ini | Select-String '^version=(.*)$').Matches.Groups[1].Value
-if ($ver -ne $nouvelle) { $problemes += "installation.ini : version $ver, attendu $nouvelle" }
+# Mise à jour légère : seule l'application change ; l'installation (installation.ini) reste celle de l'installeur.
+$attendue = if ($Legere) { $ancienne } else { $nouvelle }
+if ($ver -ne $attendue) { $problemes += "installation.ini : version $ver, attendu $attendue" }
+$app = Get-Content "$racine\app\resources\app\package.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+if ($app.version -ne $nouvelle) { $problemes += "application installée : version $($app.version), attendu $nouvelle" }
 if (-not ($ini | Select-String '^demarrage=1$')) { $problemes += 'le lancement au démarrage n''a pas été gardé' }
 if ($ini | Select-String '^bureau=1$') { $problemes += 'un raccourci sur le bureau a été ajouté' }
 if (-not (Test-Path "$home_\Démarrage\Cyber Pinball.lnk")) { $problemes += 'raccourci du démarrage absent' }
@@ -157,13 +193,25 @@ if (Test-Path "$racine\app.precedente") { $problemes += 'app.precedente n''a pas
 # En bac à sable, le dossier de données est celui du bac à sable (sur une borne : <racine>\data).
 if (-not (Test-Path "$home_\cabinet.json")) { $problemes += 'dossier de données du bac à sable introuvable' }
 if (Test-Path "$home_\mise-a-jour.json") { $problemes += 'suivi mise-a-jour.json non consommé par la nouvelle version' }
-if (-not (Test-Path "$racine\downloads\cyberpinball\CyberPinball-Setup-$nouvelle.exe")) { $problemes += 'installeur téléchargé absent' }
 $requetes = Get-Content $journal
+if ($Legere) {
+  $dl = "$racine\downloads\cyberpinball"
+  if (-not (Test-Path "$dl\CyberPinball-application-$nouvelle.zip")) { $problemes += 'paquet léger téléchargé absent' }
+  if (Get-ChildItem $dl -Filter 'CyberPinball-Setup-*' -ErrorAction SilentlyContinue) { $problemes += 'un installeur a été téléchargé' }
+  if (Test-Path "$dl\application-$nouvelle") { $problemes += 'paquet déplié resté à côté du téléchargement' }
+  if (Test-Path "$racine\app\resources\app.precedente") { $problemes += 'resources\app.precedente n''a pas été supprimé' }
+  if ((Get-Content "$dl\maj-legere.txt" -Raw -Encoding UTF8) -notmatch 'remplacé') { $problemes += "mise en place non faite, voir $dl\maj-legere.txt" }
+  if (($requetes | Select-String '/site/CyberPinball-application.zip 200').Count -ne 1) { $problemes += 'paquet léger non téléchargé une fois' }
+  if ($requetes | Select-String 'CyberPinball-Setup') { $problemes += 'installeur demandé au site' }
+} else {
+  if (-not (Test-Path "$racine\downloads\cyberpinball\CyberPinball-Setup-$nouvelle.exe")) { $problemes += 'installeur téléchargé absent' }
+  if (($requetes | Select-String '/site/CyberPinball-Setup.exe 200').Count -ne 1) { $problemes += 'installeur non téléchargé une fois' }
+  if ($requetes | Select-String 'CyberPinball-application') { $problemes += 'paquet léger demandé par une version d''un autre socle' }
+}
 $requetes | ForEach-Object { "  site : $_" }
 # Au moins une fois : la recherche de démarrage, puis celle de l'entrée « Mise à jour ».
 if (($requetes | Select-String 'site-falsifie/cyberpinball-maj.json 200').Count -lt 1) { $problemes += 'flux falsifié non demandé' }
 if ($requetes | Select-String 'site-falsifie/CyberPinball-Setup') { $problemes += 'installeur téléchargé malgré le flux falsifié' }
-if (($requetes | Select-String '/site/CyberPinball-Setup.exe 200').Count -ne 1) { $problemes += 'installeur non téléchargé une fois' }
 foreach ($d in 'falsifie', 'disponible', 'ancienne', 'nouvelle') {
   try { Assert-HorsEcran "$captures\$d" } catch { $problemes += "$d : $($_.Exception.Message)" }
   $mep = "$captures\$d\mise-en-page.txt"
@@ -171,4 +219,4 @@ foreach ($d in 'falsifie', 'disponible', 'ancienne', 'nouvelle') {
 }
 "Captures : $captures (falsifie, disponible, ancienne, nouvelle)"
 if ($problemes) { $problemes | ForEach-Object { "PROBLÈME : $_" }; throw "$($problemes.Count) problème(s)." }
-"Mise à jour $ancienne -> $nouvelle : réussie, raccourcis gardés, rien d'autre touché."
+"Mise à jour $(if ($Legere) { 'légère ' })$ancienne -> $nouvelle : réussie, raccourcis gardés, rien d'autre touché."

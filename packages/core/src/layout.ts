@@ -128,3 +128,18 @@ function landscape(size: { width: number; height: number }): SizeCm {
 function round2(value: number): number {
   return Math.round(value * 100) / 100;
 }
+
+/**
+ * Écran où lire une page à la souris (fenêtre « Récupérer » d'un site) parmi ceux du menu :
+ * le playfield si son image n'est pas tournée (bureau, ou borne dont Windows suit l'écran) ;
+ * sinon le plus grand des autres, le fronton d'abord à taille égale, debout face au joueur.
+ * Sur le playfield tourné, la page serait de travers et la souris irait à angle droit de sa
+ * main. undefined : aucun écran (l'écran principal de Windows reste le repli).
+ */
+export function readingScreen<B extends { width: number; height: number }>(screens: { role: string; bounds: B }[], playfieldRotation: Rotation): B | undefined {
+  const playfield = screens.find((s) => s.role === 'playfield');
+  if (playfield && playfieldRotation === 0) return playfield.bounds;
+  const area = (b: B) => b.width * b.height;
+  const others = screens.filter((s) => s.role !== 'playfield').sort((a, b) => area(b.bounds) - area(a.bounds) || Number(b.role === 'backglass') - Number(a.role === 'backglass'));
+  return others[0]?.bounds ?? playfield?.bounds;
+}

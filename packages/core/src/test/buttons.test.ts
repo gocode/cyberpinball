@@ -8,6 +8,11 @@ import {
   buttonsToTry,
   DEFAULT_BUTTONS,
   isInputKey,
+  joystickButton,
+  joystickCode,
+  joystickDeviceIds,
+  joysticksInVpxLog,
+  joysticksUnseenByVpx,
   withDefaultButtons,
   describeMapping,
   gameKeys,
@@ -350,4 +355,84 @@ test('touches par défaut remises : [Input] réécrit et les actions de VPX retr
   assert.equal(input(plan.nextIni!, 'ExtraBall'), 'Key;5');
   assert.equal(input(plan.nextIni!, 'Debugger'), '');
   assert.equal(input(plan.nextIni!, 'LeftFlipper'), 'Key;225');
+});
+
+// ---------------------------------------------------------------------------
+// Boutons de joystick (Pinscape sur KL25Z, encodeur en mode manette)
+
+/** GUID SDL d'un Pinscape (bus USB, VID 0x1209, PID 0xEAEA), tel que SDL_GUIDToString l'écrit. */
+const PINSCAPE_GUID = '03007a4f0912000aeaea000001000000';
+const PINSCAPE = `SDLJoy_${PINSCAPE_GUID}_1`;
+const joy = (button: number) => joystickCode(PINSCAPE, button);
+
+test('joysticks : identifiants de VPX, rang par GUID identique', () => {
+  const other = '030000005e0400008e02000010010000';
+  assert.deepEqual(joystickDeviceIds([PINSCAPE_GUID, other, PINSCAPE_GUID]), [PINSCAPE, `SDLJoy_${other}_1`, `SDLJoy_${PINSCAPE_GUID}_2`]);
+  assert.deepEqual(joystickButton(joy(4)), { device: PINSCAPE, button: 4 });
+  assert.equal(joystickButton('ShiftLeft'), undefined);
+  // Un axe (seuil) ou un GUID tronqué n'est pas un bouton de la borne.
+  assert.equal(joystickButton(`${PINSCAPE};514;o;0.9`), undefined);
+  assert.equal(joystickButton('SDLJoy_0300_1;9'), undefined);
+});
+
+test('joysticks : un bouton se relève, se nomme et se refuse en double comme une touche', () => {
+  assert.equal(keyLabel(joy(0)), 'Bouton 1 du joystick');
+  assert.equal(refusedKey(joy(23)), undefined);
+  const buttons: CabinetButtons = { ...DEFAULT_BUTTONS, leftFlipper: joy(0), rightFlipper: joy(1), start: joy(2), exit: joy(3) };
+  assert.deepEqual(buttonProblems(buttons), []);
+  assert.deepEqual(buttonKeys(buttons), buttons);
+  assert.deepEqual(buttonProblems({ ...buttons, credit: joy(2) }), ['Start et Crédit : même touche (Bouton 3 du joystick)']);
+  // Les boutons pilotent l'interface ; les flèches d'un clavier aussi.
+  assert.deepEqual(navigationKeys(buttons).previous, [joy(0), 'ArrowLeft', 'ArrowUp']);
+  assert.deepEqual(navigationKeys(buttons).confirm, [joy(2), 'Enter', 'NumpadEnter']);
+});
+
+test('joysticks : [Input] reçoit le bouton, garde la touche du clavier de VPX, oublie l’ancien relevé', () => {
+  const buttons: CabinetButtons = { ...DEFAULT_BUTTONS, leftFlipper: joy(0), rightFlipper: joy(1), start: joy(2), exit: joy(3), leftMagna: joy(6), rightMagna: joy(7) };
+  const first = planVpxSync(cabinetWith(buttons), devPcDisplays(), VPX_FIRST_RUN);
+  const ini = first.nextIni!;
+  assert.equal(input(ini, 'LeftFlipper'), `${joy(0)} | Key;225`);
+  assert.equal(input(ini, 'UILeft'), `${joy(0)} | Key;225`);
+  assert.equal(input(ini, 'Start'), `${joy(2)} | Key;30`);
+  assert.equal(input(ini, 'ExitGame'), `${joy(3)} | Key;41`);
+  // Le menu de VPX en partie : les deux MagnaSave du joystick ensemble.
+  assert.equal(input(ini, 'InGameUI'), `Key;69 | ${joy(6)} & ${joy(7)}`);
+  assert.equal(describeMapping(input(ini, 'LeftFlipper'), 'LeftFlipper'), 'Bouton 1 du joystick ou Maj gauche');
+
+  // Un bouton ajouté dans VPX : pas une modification à la main, rien à réécrire.
+  const edited = ini.replace(`Mapping.LeftFlipper = ${joy(0)} | Key;225`, `Mapping.LeftFlipper = ${joy(0)} | Key;225 | ${joy(12)}`);
+  const kept = planVpxSync(cabinetWith(buttons), devPcDisplays(), edited, undefined, { memory: first.memory });
+  assert.deepEqual(kept.manualEdits, []);
+  assert.deepEqual(kept.changes, []);
+  // Relevé refait (étape « Boutons ») : flipper gauche sur un autre bouton. L'ancien part, celui ajouté dans VPX reste.
+  const next = planVpxSync(cabinetWith({ ...buttons, leftFlipper: joy(10) }), devPcDisplays(), edited, undefined, { memory: first.memory, overwriteManual: isInputKey });
+  assert.equal(input(next.nextIni!, 'LeftFlipper'), `${joy(10)} | Key;225 | ${joy(12)}`);
+  assert.equal(input(next.nextIni!, 'LeftStagedFlipper'), `${joy(10)} | Key;225`);
+
+  // Retour aux touches de l'encodeur : plus aucun bouton de joystick relevé.
+  const back = planVpxSync(cabinetWith({ ...DEFAULT_BUTTONS }), devPcDisplays(), first.nextIni!, undefined, { memory: first.memory });
+  assert.equal(input(back.nextIni!, 'LeftFlipper'), 'Key;225');
+  assert.equal(input(back.nextIni!, 'InGameUI'), 'Key;69 | Key;224 & Key;228');
+});
+
+test('joysticks : touche du clavier de VPX prise par un autre bouton, le joystick seul', () => {
+  // Lanceur du joystick, et Entrée (touche du lanceur dans VPX) donnée au Start de l'encodeur.
+  const buttons: CabinetButtons = { ...DEFAULT_BUTTONS, plunger: joy(5), start: 'Enter' };
+  const ini = planVpxSync(cabinetWith(buttons), devPcDisplays(), VPX_FIRST_RUN).nextIni!;
+  assert.equal(input(ini, 'LaunchBall'), joy(5));
+  assert.equal(input(ini, 'Start'), 'Key;40');
+});
+
+test('joysticks vus par VPX : relus dans vpinball.log, ceux des boutons qu’il n’a pas vus signalés', () => {
+  const log = [
+    `2026-10-24 21:12:03.120 INFO  [1234] [SDLInputHandler::OnJoystickAdded@287] Joystick connected: mjrnet Pinscape Controller #1 (SDL ID: 3, Axes: 6, Buttons: 32, Hats: 0, VPX UID: ${PINSCAPE})`,
+    '2026-10-24 21:12:03.121 INFO  [1234] something else',
+  ].join('\n');
+  assert.deepEqual(joysticksInVpxLog(log), [{ id: PINSCAPE, name: 'mjrnet Pinscape Controller #1' }]);
+  const buttons: CabinetButtons = { ...DEFAULT_BUTTONS, leftFlipper: joy(0) };
+  assert.deepEqual(joysticksUnseenByVpx(buttons, joysticksInVpxLog(log)), []);
+  const elsewhere = joystickCode(`SDLJoy_${'0'.repeat(32)}_1`, 0);
+  assert.deepEqual(joysticksUnseenByVpx({ ...buttons, rightFlipper: elsewhere }, joysticksInVpxLog(log)), [`SDLJoy_${'0'.repeat(32)}_1`]);
+  // VPX n'a vu aucun joystick (débranché pendant la partie) : rien à conclure.
+  assert.deepEqual(joysticksUnseenByVpx(buttons, []), []);
 });

@@ -5,7 +5,7 @@
 // En premier : refuse toute écriture hors du bac à sable pendant un essai sans opérateur.
 import './sandbox-guard';
 // Puis, avant le démarrage d'Electron : le mode hors écran des essais sans opérateur.
-import { relaunchOnHiddenDesktop } from './offscreen';
+import { OFFSCREEN, relaunchOnHiddenDesktop } from './offscreen';
 // Puis la langue de l'interface, avant les modules qui affichent quelque chose.
 import './language';
 import { app } from 'electron';
@@ -15,9 +15,13 @@ import { locations } from './paths';
 import { otherFrontendsGate } from './frontend-gate';
 import { guardScreens } from './screen-guard';
 import { startSettingsAlone } from './settings';
+import { journalUncaught } from './uncaught';
 import { startWizard } from './wizard';
 
 const loc = locations();
+// À l'écran, une erreur non rattrapée est notée dans <données>\logs\erreurs.txt et
+// l'application continue, sans boîte modale (hors écran : l'essai s'arrête, offscreen.ts).
+if (!OFFSCREEN) journalUncaught(loc.dataDir);
 const wantsSettings = process.argv.includes('--reglages');
 const wantsWizard = !wantsSettings && (process.argv.includes('--assistant') || wizardStepOf(process.argv) !== undefined || !loadCabinet(loc.dataDir));
 

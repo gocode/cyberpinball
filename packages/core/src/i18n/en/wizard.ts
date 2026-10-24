@@ -344,6 +344,13 @@ export const messages: Record<string, string> = {
   'Mode stéréo': 'Stereo mode',
   'aucune touche': 'no key',
   'bouton de manette': 'gamepad button',
+  'Bouton {n} du joystick': 'Joystick button {n}',
+  // app/src/wizard.ts : joysticks pendant le relevé des boutons
+  'Joystick lu : {names}': 'Joystick read: {names}',
+  'Aucun joystick branché': 'No joystick connected',
+  'Joysticks illisibles : {error}': 'Joysticks unreadable: {error}',
+  'Joysticks lus une fois VPX installé': 'Joysticks are read once VPX is installed',
+  'Joysticks en cours de lecture…': 'Reading joysticks…',
 
   // packages/core/src/wizardsteps.ts
   'Appuyer sur chaque bouton : flippers, Start, Exit, crédit…': 'Press each button: flippers, Start, Exit, coin…',

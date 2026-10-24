@@ -214,3 +214,4 @@ export * from './audio';
 export * from './usb';
 export * from './desktop';
 export * from './processes';
+export * from './joystick';

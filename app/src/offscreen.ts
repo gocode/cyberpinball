@@ -87,7 +87,18 @@ const shown = new WeakSet<BrowserWindow>();
 
 /** Crée une fenêtre de l'application : à l'écran, ou rendue hors écran pendant un essai. */
 export function createWindow(options: BrowserWindowConstructorOptions): BrowserWindow {
-  if (!OFFSCREEN) return new BrowserWindow(options);
+  // Jamais d'écran clair : tant qu'une fenêtre n'a pas encore affiché sa page, Windows 11 lui
+  // donne le fond système de son thème (#F3F3F3 en thème clair), malgré backgroundColor et
+  // ready-to-show. Au démarrage, les quatre écrans de la borne restaient ainsi gris d'une à trois
+  // secondes. Sans fond système, l'écran garde ce qu'il y a dessous (le voile noir) jusqu'à la
+  // première image (mesures sur les vrais écrans, 24 octobre 2026). L'autre éclair, bleu pâle,
+  // vient du plein écran : voir coverDisplay. Détection : docs\demo-ecrans-couverts.ps1.
+  // Une fenêtre montrée reste donc transparente jusqu'à sa première image : paintedOnScreen.
+  if (!OFFSCREEN) {
+    const win = new BrowserWindow({ ...options, backgroundMaterial: 'none' });
+    trackPainting(win);
+    return win;
+  }
   const win = new BrowserWindow({
     ...options,
     show: false,
@@ -100,6 +111,48 @@ export function createWindow(options: BrowserWindowConstructorOptions): BrowserW
   keepOffscreen(win);
   startWatch();
   return win;
+}
+
+/** Fenêtres à l'écran pas encore montrées avec leur page affichée. */
+const unpainted = new Set<BrowserWindow>();
+let somePainted = false;
+let paintedListeners: (() => void)[] = [];
+/** Au-delà, une fenêtre montrée compte comme peinte même si sa page n'a rien affiché (page bloquée). */
+const PAINT_WAIT_MS = 3000;
+/** Le temps que Windows affiche l'image envoyée par la page (quelques rafraîchissements d'écran). */
+const PAINT_SETTLE_MS = 150;
+
+function trackPainting(win: BrowserWindow): void {
+  unpainted.add(win);
+  const done = () => {
+    unpainted.delete(win);
+    if (unpainted.size > 0 || !somePainted) return;
+    const listeners = paintedListeners;
+    paintedListeners = [];
+    for (const listener of listeners) listener();
+  };
+  win.once('closed', done);
+  win.once('show', () => {
+    // Deux images demandées à la page : la seconde n'est préparée qu'une fois la première partie.
+    const frames = win.webContents.executeJavaScript('new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))', true).catch(() => false);
+    void Promise.race([frames, new Promise((r) => setTimeout(r, PAINT_WAIT_MS))])
+      .then(() => new Promise((r) => setTimeout(r, PAINT_SETTLE_MS)))
+      .then(() => {
+        if (!win.isDestroyed()) somePainted = true;
+        done();
+      });
+  });
+}
+
+/**
+ * Appelle `listener` (une fois) dès que toutes les fenêtres créées jusque-là ont été montrées
+ * avec leur page à l'écran, au moins une l'ayant été. Avant sa première image, une fenêtre est
+ * transparente (createWindow) : une relance (screen-guard.ts) ne laisse partir l'ancien
+ * processus qu'à ce moment, sans quoi le bureau se verrait au travers des nouvelles fenêtres.
+ */
+export function paintedOnScreen(listener: () => void): void {
+  if (OFFSCREEN || (somePainted && unpainted.size === 0)) return listener();
+  paintedListeners.push(listener);
 }
 
 /**

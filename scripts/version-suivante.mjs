@@ -4,6 +4,10 @@
 //   node scripts/version-suivante.mjs            -> 0.1.1 devient 0.1.2
 //   node scripts/version-suivante.mjs mineure    -> 0.1.1 devient 0.2.0
 //   node scripts/version-suivante.mjs majeure    -> 0.1.1 devient 1.0.0
+//   node scripts/version-suivante.mjs essai      -> préversion d'essai : 0.1.1 devient 0.1.2-essai.1,
+//                                                   0.1.2-essai.1 devient 0.1.2-essai.2 ; ses nouveautés
+//                                                   vont sous « ## 0.1.2 » (la version finale)
+//   (depuis une préversion, le correctif est sa version finale : 0.1.2-essai.2 devient 0.1.2)
 //   node scripts/version-suivante.mjs --verifier -> les nouveautés de la version actuelle sont-elles écrites ?
 // Rien n'est enregistré dans git ici : le lanceur (action « version ») le fait une fois les
 // nouveautés écrites.
@@ -25,8 +29,15 @@ function notesOf(file, version) {
   return changelogSections(fs.readFileSync(file, 'utf8')).get(version) ?? [];
 }
 
+// Une préversion (0.1.2-essai.1) écrit ses nouveautés sous sa version finale (## 0.1.2).
+const notesVersion = (version) => version.replace(/-.*$/, '');
+
 if (arg === '--verifier') {
-  const [fr, en] = changelogs.map((f) => notesOf(f, pkg.version));
+  const [fr, en] = changelogs.map((f) => notesOf(f, pkg.version).length ? notesOf(f, pkg.version) : notesOf(f, notesVersion(pkg.version)));
+  if (pkg.version.includes('-') && !fr.length && !en.length) {
+    console.log(`Préversion ${pkg.version} sans nouveautés : la release dira « Préversion d'essai de la ${notesVersion(pkg.version)} ».`);
+    process.exit(0);
+  }
   const problems = [];
   if (!fr.length) problems.push(`aucune nouveauté pour ${pkg.version} dans CHANGELOG.md`);
   if (fr.length !== en.length) problems.push(`${fr.length} point(s) en français, ${en.length} en anglais (CHANGELOG.en.md)`);
@@ -41,7 +52,19 @@ if (arg === '--verifier') {
 const parts = pkg.version.split(/[.-]/).slice(0, 3).map(Number);
 if (parts.some((n) => !Number.isInteger(n))) throw new Error(`Version illisible : ${pkg.version}`);
 const [major, minor, patch] = parts;
-const next = arg === 'majeure' ? `${major + 1}.0.0` : arg === 'mineure' ? `${major}.${minor + 1}.0` : `${major}.${minor}.${patch + 1}`;
+const essai = /-essai\.(\d+)$/.exec(pkg.version);
+const isPre = pkg.version.includes('-');
+const next =
+  arg === 'majeure'
+    ? `${major + 1}.0.0`
+    : arg === 'mineure'
+      ? `${major}.${minor + 1}.0`
+      : arg === 'essai'
+        ? essai
+          ? `${major}.${minor}.${patch}-essai.${Number(essai[1]) + 1}`
+          : `${major}.${minor}.${isPre ? patch : patch + 1}-essai.1`
+        : `${major}.${minor}.${isPre ? patch : patch + 1}`;
+const notesSection = notesVersion(next);
 
 pkg.version = next;
 fs.writeFileSync(pkgFile, `${JSON.stringify(pkg, null, 2)}\n`);
@@ -57,11 +80,11 @@ for (const file of changelogs) {
   const raw = fs.readFileSync(file, 'utf8');
   const crlf = raw.includes('\r\n');
   let text = raw.replace(/\r\n/g, '\n');
-  if (!new RegExp(`^## ${next.replace(/\./g, '\\.')}\\b`, 'm').test(text)) {
+  if (!new RegExp(`^## ${notesSection.replace(/\./g, '\\.')}\\b`, 'm').test(text)) {
     const at = text.search(/^## /m);
-    const section = `## ${next}\n\n`;
+    const section = `## ${notesSection}\n\n`;
     text = at >= 0 ? text.slice(0, at) + section + text.slice(at) : `${text.replace(/\n*$/, '\n\n')}${section}`;
   }
   fs.writeFileSync(file, crlf ? text.replace(/\n/g, '\r\n') : text);
 }
-console.log(`Version ${next} : écrivez ses nouveautés sous « ## ${next} » dans CHANGELOG.md et CHANGELOG.en.md (une ligne « - » par point).`);
+console.log(`Version ${next} : écrivez ses nouveautés sous « ## ${notesSection} » dans CHANGELOG.md et CHANGELOG.en.md (une ligne « - » par point).`);

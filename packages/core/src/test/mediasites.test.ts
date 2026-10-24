@@ -9,7 +9,9 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
 import { test } from 'node:test';
-import { hitGameName, hitTypes, MEDIA_SITES, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchUrl, SITE_SEARCH_PROBES, webHost, webMediaChoices, webSearchUrl, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
+import { parseHTML } from 'linkedom';
+import type { MediaType } from '../medias';
+import { checkSiteSearch, hitGameName, hitTypes, MEDIA_SITES, receivedMedias, siteHitSummary, siteMediaChoices, siteOffers, siteQuery, siteSearchByType, siteSearchUrl, SITE_SEARCH_PAGES, SITE_SEARCH_PROBES, webHost, webMediaChoices, webSearchUrl, type SiteHit, type SiteReceipt, type WebReceipt } from '../mediasites';
 import { WAIT_PROBES } from '../sitesessions';
 import { createVpsDb, type VpsGame } from '../vps';
 
@@ -195,4 +197,98 @@ test('fichiers reçus du web : proposés à leur table seulement, pour leur méd
   assert.deepEqual(webMediaChoices('FullDMD', receipts, path.join(dir, 'T2.vpx')), [], 'pas pour une autre table');
   assert.equal(webMediaChoices('FullDMD', receipts, table)[0]!.source, 'web');
   fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ---------------------------------------------------------------------------
+// Scripts de page, exécutés sur une vraie page de résultats (test-pages/), telle qu'un
+// visiteur la reçoit puis telle qu'un membre connecté la voit. Le 24/10/2026, connecté,
+// chaque fiche pas encore vue portait devant son titre une pastille « non lu » (un lien
+// vers la fiche, sans texte) : le script prenait ce lien pour le titre, les 25 résultats
+// de Game of Thrones sortaient sans titre et passaient pour « d'autres jeux ».
+
+const PAGES = path.join(__dirname, '..', '..', 'test-pages');
+
+/** Exécute un script de page sur `html`, avec un DOM sans navigateur (linkedom). */
+function runProbe(html: string, script: string, url: string): unknown {
+  const { document } = parseHTML(html);
+  // linkedom n'a pas de mise en page : innerText vaut textContent.
+  if (document.body && !('innerText' in document.body)) Object.defineProperty(document.body, 'innerText', { get: () => document.body.textContent });
+  const location = new URL(url);
+  // Copié comme executeJavaScript le rend à l'application (sérialisé, hors du contexte de la page).
+  return JSON.parse(JSON.stringify(vm.runInNewContext(script, { document, location, window: {}, URL })));
+}
+
+/** La même page, vue par un membre connecté : plus de lien de connexion, une pastille « non lu » devant chaque titre. */
+function asMember(html: string): string {
+  return html
+    .replace(/<a [^>]*id="elUserSignIn"[^>]*>[^<]*<\/a>/, '<a href="https://vpuniverse.com/profile/1-membre/" id="elUserLink">membre</a>')
+    .replace(
+      /<a href='(https:\/\/vpuniverse\.com\/files\/file\/[^']+)' data-linkType="link" data-searchable>/g,
+      `<a href='$1?do=getNewComment' title='Go to first unread' data-ipsTooltip><span class='ipsItemStatus ipsItemStatus_small'><i class='fa fa-circle'></i></span></a> $&`,
+    );
+}
+
+const GOT_LE: VpsGame = { id: '0jCbA0Ttem', name: 'Game of Thrones (Limited Edition)', manufacturer: 'Stern', year: 2015 };
+const GOT_ORIGINAL: VpsGame = { id: '3S00DA0h', name: 'Game of Thrones', manufacturer: 'Original', year: 2021 };
+const THE_GAMES: VpsGame = { id: 'aWiinbr2', name: 'The Games', manufacturer: 'Gottlieb', year: 1984 };
+const gotDb = createVpsDb([GOT_LE, GOT_ORIGINAL, THE_GAMES, T2]);
+
+test('page de résultats de VPUniverse : titres, catégories, nombre de pages, en visiteur comme en membre connecté', () => {
+  const page = fs.readFileSync(path.join(PAGES, 'vpuniverse-recherche.html'), 'utf8');
+  const url = siteSearchUrl('vpuniverse', 'game thrones');
+  const member = asMember(page);
+  assert.ok(member.includes('do=getNewComment'), 'la page du membre porte les pastilles');
+  for (const [who, html] of [['visiteur', page], ['membre', member]] as const) {
+    const result = checkSiteSearch('vpuniverse', runProbe(html, SITE_SEARCH_PROBES.vpuniverse, url));
+    assert.equal(result.kind, 'hits', who);
+    if (result.kind !== 'hits') continue;
+    assert.equal(result.untitled, undefined, `${who} : aucun titre vide`);
+    assert.equal(result.pages, 3, who);
+    assert.deepEqual(
+      result.hits.map((h) => [h.id, h.title, h.category?.id]),
+      [
+        ['14667', 'Game of Thrones 1.0.3 - Vídeo Topper', '160'],
+        ['29635', 'Game Of Thrones Topper Video', '160'],
+        ['32486', 'Game of Thrones Limited Edition (Stern 2015) - Diagonale Style Wheel', '127'],
+        ['25038', 'Game of Thrones Stark (Hursty Toppers)', '160'],
+        ['31825', 'Game of Thrones Instruction Card / Rules', '91'],
+      ],
+      who,
+    );
+    // Adresse de la fiche, jamais celle de la pastille.
+    assert.ok(result.hits.every((h) => h.site === 'vpuniverse' && !h.url.includes('?')), who);
+    const sum = siteHitSummary(result.hits, [GOT_LE, GOT_ORIGINAL], gotDb);
+    assert.deepEqual(sum, { byType: { Topper: 3, Wheel: 1, GameHelp: 1 }, packs: 0, elsewhere: 0 }, who);
+  }
+});
+
+test('résultats sans titre : la page a changé de forme, elle est déclarée illisible au lieu de passer pour d’autres jeux', () => {
+  const hit = (id: string, title: string) => ({ id, url: `https://vpuniverse.com/files/file/${id}-x/`, title });
+  const blank = checkSiteSearch('vpuniverse', { kind: 'hits', hits: [hit('1', ''), hit('2', ' '), hit('3', 'Game of Thrones Topper Video')] });
+  assert.deepEqual(blank, { kind: 'show', reason: 'unreadable', untitled: 2 });
+  const one = checkSiteSearch('vpuniverse', { kind: 'hits', hits: [hit('1', ''), hit('2', 'A'), hit('3', 'B')], pages: 2 });
+  assert.equal(one.kind, 'hits');
+  assert.equal(one.kind === 'hits' && one.hits.length, 2);
+  assert.equal(one.untitled, 1);
+  assert.equal(one.kind === 'hits' && one.pages, 2);
+  assert.equal(one.kind === 'hits' && one.hits.every((h) => h.site === 'vpuniverse'), true);
+  assert.deepEqual(checkSiteSearch('vpforums', undefined), { kind: 'show', reason: 'unreadable' });
+  assert.deepEqual(checkSiteSearch('vpforums', { kind: 'login' }), { kind: 'login' });
+});
+
+test('recherche par média : VPUniverse cherche dans les seules catégories du média ouvert, pages suivantes comprises', () => {
+  const nodes = (type?: MediaType) => new URL(siteSearchUrl('vpuniverse', 'game thrones', type)).searchParams.get('nodes')!.split(',');
+  assert.deepEqual(nodes('Topper'), ['160', '93']);
+  assert.deepEqual(nodes('Wheel'), ['70', '127', '149']);
+  assert.deepEqual(nodes('FullDMD'), ['143']);
+  // Sans média, ou pour un média sans catégorie à lui : toutes les catégories des médias de menu.
+  assert.equal(nodes().length, 14);
+  assert.equal(nodes('Audio').length, 14);
+  assert.equal(new URL(siteSearchUrl('vpuniverse', 'game thrones', 'Topper', 2)).searchParams.get('page'), '2');
+  assert.equal(new URL(siteSearchUrl('vpuniverse', 'game thrones', 'Topper')).searchParams.get('page'), null);
+  // VPForums ne filtre pas par catégorie : une recherche sert à tous les médias.
+  assert.equal(siteSearchUrl('vpforums', 'game thrones', 'Topper'), siteSearchUrl('vpforums', 'game thrones'));
+  assert.equal(siteSearchByType('vpuniverse'), true);
+  assert.equal(siteSearchByType('vpforums'), false);
+  assert.ok(SITE_SEARCH_PAGES >= 2);
 });

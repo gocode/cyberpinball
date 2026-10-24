@@ -5,7 +5,7 @@
 // 1. un voile noir par écran, ouvert avant toute autre fenêtre ; les fenêtres de Cyber
 //    Pinball, puis celles de VPX, s'empilent dessus. Il ne prend jamais le focus.
 // 2. Une relance de l'application (menu ↔ assistant) passe le relais sans trou : l'ancien
-//    processus garde ses fenêtres jusqu'à ce que le nouveau ait montré les siennes.
+//    processus garde ses fenêtres jusqu'à ce que le nouveau ait peint les siennes.
 // 3. Pendant une partie, les barres des tâches de Windows sont masquées : quand VPX prend le
 //    premier plan, Windows les remet un instant devant les écrans qu'il n'occupe pas. À la
 //    fin, seules celles que Cyber Pinball a masquées reviennent (coexistence.ts).
@@ -14,11 +14,12 @@
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { app, BrowserWindow, screen, type Display, type Rectangle } from 'electron';
 import { coverNotice, parseTaskbarMarker, screenCover, taskbarMarkerText, taskbarsToRestore, type HiddenTaskbar } from '@cyberpinball/core';
-import { allowAnyForeground, hideWindow, listWindows, showWindowInactive, taskbarWindows, visibleWindowsOf } from '@cyberpinball/win-displays';
-import { createWindow, desktopDisplays, OFFSCREEN } from './offscreen';
+import { allowAnyForeground, hideWindow, listWindows, showWindowInactive, taskbarWindows } from '@cyberpinball/win-displays';
+import { createWindow, desktopDisplays, OFFSCREEN, paintedOnScreen } from './offscreen';
 import { coverDisplay, coverProblem } from './cover-display';
 import { locations } from './paths';
 
@@ -31,6 +32,10 @@ const DISPLAY_SETTLE_MS = 1500;
 const REPORT_AFTER_MS = 1000;
 /** Au-delà, une relance qui n'a rien montré laisse quand même partir l'ancien processus. */
 const RELAUNCH_TIMEOUT_MS = 15_000;
+/** Fichier témoin d'une relance : le nouveau processus le crée quand ses fenêtres sont peintes. */
+const RELAY_ENV = 'CYBERPINBALL_RELEVE';
+/** Marge entre le signal du nouveau processus et la fermeture de l'ancien. */
+const RELAY_SETTLE_MS = 400;
 
 /** Voile de chaque écran, par identifiant d'écran d'Electron. */
 const veils = new Map<number, BrowserWindow>();
@@ -56,6 +61,10 @@ export function guardScreens(): void {
   if (fs.existsSync(taskbarMarker())) restoreTaskbars(parseTaskbarMarker(fs.readFileSync(taskbarMarker(), 'utf8')));
   process.on('exit', () => hiddenTaskbars.length > 0 && restoreTaskbars());
   placeVeils();
+  // Relancé par relaunchCovered : l'ancien processus attend que nos fenêtres soient peintes.
+  const relay = process.env[RELAY_ENV];
+  delete process.env[RELAY_ENV];
+  if (relay) paintedOnScreen(() => fs.writeFileSync(relay, ''));
   // Un écran rebranché (ou réveillé) n'est pas toujours prêt à l'événement : un voile mis en
   // plein écran trop tôt atterrit sur l'écran principal. Il est replacé un peu plus tard.
   const displaysChanged = () => {
@@ -74,7 +83,7 @@ export function guardScreens(): void {
   });
   app.on('before-quit', (event) => {
     // Pendant une relève, l'ancien processus garde ses fenêtres jusqu'à ce que le nouveau
-    // montre les siennes (relaunchCovered le ferme alors par app.exit).
+    // peigne les siennes (relaunchCovered le ferme alors par app.exit).
     if (relaunching) return event.preventDefault();
     desktopAllowed = 'fermeture';
   });
@@ -114,12 +123,12 @@ function openVeil(d: Display): BrowserWindow {
   veilSet.add(win);
   coverDisplay(win, d.bounds);
   // Sans page, Chromium peint la fenêtre en blanc malgré backgroundColor. Le titre reste
-  // celui du voile (relaunchCovered le reconnaît ainsi).
+  // celui du voile (constats du gardien, recherches dans la pile des fenêtres).
   win.on('page-title-updated', (e) => e.preventDefault());
   void win.loadURL(VEIL_PAGE);
-  // Montrée avant sa première image, une fenêtre reste blanche près d'une seconde : le voile
-  // n'apparaît que peint en noir (au démarrage, le bureau se voit un peu plus longtemps ; à une
-  // relance, les fenêtres de l'ancien processus couvrent les écrans jusque-là).
+  // Le voile n'apparaît que peint en noir ; avant sa première image, il serait transparent
+  // (createWindow) : au démarrage, le bureau se voit un peu plus longtemps ; à une relance, les
+  // fenêtres de l'ancien processus couvrent les écrans jusque-là.
   win.once('ready-to-show', () => win.isDestroyed() || win.showInactive());
   return win;
 }
@@ -259,16 +268,20 @@ export function relaunchCovered(args: string[]): void {
   relaunching = true;
   // Le nouveau processus doit pouvoir prendre le premier plan.
   allowAnyForeground();
-  const child = spawn(process.execPath, args, { detached: true, stdio: 'inherit', env: process.env, windowsHide: true });
+  // Ses fenêtres sont transparentes jusqu'à leur première image (createWindow) : visibles pour
+  // Windows ne suffit pas, il signale lui-même qu'elles sont peintes (paintedOnScreen).
+  const relay = path.join(os.tmpdir(), `cyberpinball-releve-${process.pid}-${Date.now()}`);
+  const child = spawn(process.execPath, args, { detached: true, stdio: 'inherit', env: { ...process.env, [RELAY_ENV]: relay }, windowsHide: true });
   child.unref();
   const started = Date.now();
   const timer = setInterval(() => {
-    const shown = child.pid !== undefined && visibleWindowsOf(child.pid).some((w) => w.title !== VEIL_TITLE);
+    const shown = fs.existsSync(relay);
     if (!shown && child.exitCode === null && Date.now() - started < RELAUNCH_TIMEOUT_MS) return;
     clearInterval(timer);
-    if (!shown) console.warn('Relance : le nouveau processus n’a montré aucune fenêtre, le bureau peut se voir.');
-    else console.log(`Relance : fenêtres du nouveau processus visibles après ${Date.now() - started} ms, l’ancien se ferme.`);
-    // Le temps que ses fenêtres se peignent.
-    setTimeout(() => app.exit(0), shown ? 400 : 0);
+    fs.rmSync(relay, { force: true });
+    if (!shown) console.warn('Relance : le nouveau processus n’a peint aucune fenêtre, le bureau peut se voir.');
+    else console.log(`Relance : fenêtres du nouveau processus peintes après ${Date.now() - started} ms, l’ancien se ferme.`);
+    // Le temps que Windows affiche les images que leurs pages ont envoyées.
+    setTimeout(() => app.exit(0), shown ? RELAY_SETTLE_MS : 0);
   }, 100);
 }

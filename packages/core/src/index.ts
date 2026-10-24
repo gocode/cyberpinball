@@ -34,6 +34,7 @@ export * from './medias';
 export * from './b2simage';
 export * from './png';
 export * from './mediaerrors';
+export * from './errorlog';
 export * from './mediaimport';
 export * from './mediaview';
 export * from './mediaedit';

@@ -10,25 +10,38 @@
 //
 // L'installeur, lancé en mode /MAJ, attend que Cyber Pinball se ferme, remplace app\
 // puis le relance : au démarrage suivant, le menu dit si la nouvelle version est là.
+// Mise à jour légère (même socle : Electron et l'exécutable inchangés) : le paquet de
+// l'application est téléchargé, vérifié et déplié à côté, puis maj-legere.ts le met en place
+// une fois Cyber Pinball fermé et le relance. Les préversions se règlent ici aussi.
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   checkForUpdate,
+  downloadAppPackage,
   downloadUpdate,
   formatDate,
   formatMebibytes,
+  installedSocle,
   layoutOf,
+  loadPrereleaseSetting,
   recordPendingUpdate,
   relaunchArguments,
+  removePreviousApp,
+  savePrereleaseSetting,
+  stagedAppDir,
   t,
   takeUpdateOutcome,
+  unpackAppPackage,
   updateDownloadsDir,
   updateInstallerArguments,
+  updatePlan,
   missedReleases,
+  type LightUpdateJob,
   type Locations,
   type UpdateManifest,
+  type UpdatePlan,
 } from '@cyberpinball/core';
 import type { Action, Built, Row, Section, SystemItem } from './library';
 
@@ -38,6 +51,8 @@ export interface UpdatesHost {
   version: string;
   /** Dossier de CyberPinball.exe. */
   exeDir: string;
+  /** Dossier de l'application (app.getAppPath()) : app\resources\app d'une installation. */
+  appDir: string;
   /** Hors écran (essais) : installeur silencieux, aucune fenêtre. */
   silent: boolean;
   library: {
@@ -57,11 +72,13 @@ type State =
   | { kind: 'up-to-date'; latest: UpdateManifest }
   | { kind: 'available'; latest: UpdateManifest }
   | { kind: 'downloading'; latest: UpdateManifest; received: number; total: number; abort: AbortController }
-  | { kind: 'installing'; latest: UpdateManifest }
+  | { kind: 'installing'; latest: UpdateManifest; light: boolean }
   | { kind: 'error'; message: string; latest?: UpdateManifest };
 
 const leadInstall = () =>
   t('Tables, médias, configuration et données ne sont pas touchés. Pendant l’installation (une minute environ), Cyber Pinball se ferme puis redémarre tout seul ; en cas d’échec, la version actuelle reste en place.');
+const leadLight = () =>
+  t('Tables, médias, configuration et données ne sont pas touchés. Cyber Pinball se ferme, remplace ses fichiers et redémarre en quelques secondes ; en cas d’échec, la version actuelle reste en place.');
 
 /** Délai entre l'écran « Installation » et la fermeture : le temps de le lire. */
 const QUIT_DELAY_MS = 2500;
@@ -91,6 +108,31 @@ export function createUpdatesMenu(host: UpdatesHost) {
     return path.dirname(host.exeDir);
   }
 
+  /** L'application installée peut être remplacée par le paquet léger : celle de app\resources\app, à côté de CyberPinball.exe. */
+  const swappable = () => path.resolve(host.appDir).toLowerCase() === path.join(host.exeDir, 'resources', 'app').toLowerCase();
+
+  /** Socle de l'application qui tourne, s'il peut recevoir la mise à jour légère. */
+  const socle = () => (swappable() ? installedSocle(host.appDir) : undefined);
+
+  const prereleases = () => loadPrereleaseSetting(host.loc.dataDir);
+  const plan = (latest: UpdateManifest): UpdatePlan => updatePlan(latest, host.version, socle());
+
+  /** Préversions reçues ou non : le choix est gardé, puis une recherche repart. */
+  function togglePrereleases(): void {
+    try {
+      savePrereleaseSetting(host.loc.dataDir, !prereleases());
+    } catch (error) {
+      state = { kind: 'error', message: (error as Error).message };
+      return show();
+    }
+    void check();
+  }
+
+  const prereleaseAction = (): Action =>
+    prereleases()
+      ? { label: t('Préversions : reçues'), detail: t('Les versions d’essai sont proposées aussi ; choisir pour ne plus les recevoir'), run: togglePrereleases }
+      : { label: t('Préversions : non reçues'), detail: t('Choisir pour recevoir aussi les versions d’essai (0.2.0-essai.1…)'), run: togglePrereleases };
+
   const systemItem: SystemItem = {
     get label() {
       return t('Mise à jour de Cyber Pinball');
@@ -100,7 +142,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
       return state.kind === 'available';
     },
     get detail() {
-      const installed = t('Version {version} installée', { version: host.version });
+      const installed = prereleases() ? t('Version {version} installée, préversions reçues', { version: host.version }) : t('Version {version} installée', { version: host.version });
       if (state.kind === 'available' || state.kind === 'downloading') return t('{installed} · {version} disponible', { installed, version: state.latest.version });
       if (state.kind === 'up-to-date') return t('{installed}, la dernière', { installed });
       return t('{installed} · chercher une version plus récente', { installed });
@@ -134,7 +176,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
   async function checkQuietly(): Promise<boolean> {
     if (!quietAllowed()) return true;
     try {
-      const result = await checkForUpdate({ current: host.version });
+      const result = await checkForUpdate({ current: host.version, prereleases: prereleases() });
       // L'utilisateur a pu lancer une opération entre-temps : son état prime.
       if (!quietAllowed()) return true;
       state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
@@ -162,7 +204,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
     state = { kind: 'checking' };
     show();
     try {
-      const result = await checkForUpdate({ current: host.version });
+      const result = await checkForUpdate({ current: host.version, prereleases: prereleases() });
       state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
       checkedAt = Date.now();
     } catch (error) {
@@ -174,25 +216,34 @@ export function createUpdatesMenu(host: UpdatesHost) {
 
   async function download(latest: UpdateManifest): Promise<void> {
     const root = installedRoot();
-    if (!root || !host.loc.root) return;
+    const how = plan(latest);
+    if (!root || !host.loc.root || how.kind === 'none') return;
     const abort = new AbortController();
-    state = { kind: 'downloading', latest, received: 0, total: latest.installer.size, abort };
+    state = { kind: 'downloading', latest, received: 0, total: how.asset.size, abort };
     show();
     let shown = 0;
+    const dir = updateDownloadsDir(layoutOf(host.loc.root).downloads);
+    const progress = {
+      signal: abort.signal,
+      onProgress: (received: number, total: number) => {
+        if (state.kind !== 'downloading') return;
+        state = { ...state, received, total };
+        // Quelques images par seconde suffisent.
+        if (Date.now() - shown > 250 || received === total) {
+          shown = Date.now();
+          host.broadcast();
+        }
+      },
+    };
     try {
-      const file = await downloadUpdate(latest, updateDownloadsDir(layoutOf(host.loc.root).downloads), {
-        signal: abort.signal,
-        onProgress: (received, total) => {
-          if (state.kind !== 'downloading') return;
-          state = { ...state, received, total };
-          // Quelques images par seconde suffisent.
-          if (Date.now() - shown > 250 || received === total) {
-            shown = Date.now();
-            host.broadcast();
-          }
-        },
-      });
-      install(latest, file, root);
+      if (how.kind === 'light') {
+        const file = await downloadAppPackage(latest, dir, progress);
+        const staged = stagedAppDir(dir, latest);
+        unpackAppPackage(file, staged, latest);
+        installLight(latest, staged, dir);
+      } else {
+        install(latest, await downloadUpdate(latest, dir, progress), root, how.installs);
+      }
     } catch (error) {
       state = abort.signal.aborted ? { kind: 'available', latest } : { kind: 'error', message: (error as Error).message, latest };
       console.log(`Mise à jour : ${describe()}`);
@@ -200,10 +251,10 @@ export function createUpdatesMenu(host: UpdatesHost) {
     }
   }
 
-  function install(latest: UpdateManifest, installer: string, root: string): void {
-    state = { kind: 'installing', latest };
+  function install(latest: UpdateManifest, installer: string, root: string, installs: string): void {
+    state = { kind: 'installing', latest, light: false };
     show();
-    recordPendingUpdate(host.loc.dataDir, { from: host.version, to: latest.version, started: new Date().toISOString(), installer });
+    recordPendingUpdate(host.loc.dataDir, { from: host.version, to: installs, started: new Date().toISOString(), installer });
     const args = updateInstallerArguments(root, { silent: host.silent });
     console.log(`Mise à jour : ${installer} ${args.join(' ')}`);
     try {
@@ -228,6 +279,57 @@ export function createUpdatesMenu(host: UpdatesHost) {
       takeUpdateOutcome(host.loc.dataDir, host.version);
       state = { kind: 'error', message: t('L’installeur n’a pas démarré : {message}', { message: (error as Error).message }), latest };
       return show();
+    }
+    setTimeout(() => {
+      if (state.kind === 'installing') host.quit();
+    }, QUIT_DELAY_MS);
+  }
+
+  /**
+   * Mise à jour légère : maj-legere.js de la nouvelle version, lancé par CyberPinball.exe en mode
+   * Node, attend la fermeture, remplace app\resources\app puis relance Cyber Pinball.
+   */
+  function installLight(latest: UpdateManifest, staged: string, dir: string): void {
+    state = { kind: 'installing', latest, light: true };
+    show();
+    const fail = (message: string) => {
+      takeUpdateOutcome(host.loc.dataDir, host.version);
+      state = { kind: 'error', message: t('La mise à jour légère n’a pas démarré : {message}', { message }), latest };
+      show();
+    };
+    try {
+      // Hors du paquet déplié : il est renommé pendant la mise en place.
+      const helper = path.join(dir, 'maj-legere.js');
+      fs.copyFileSync(path.join(staged, 'dist', 'maj-legere.js'), helper);
+      const job: LightUpdateJob = {
+        pid: process.pid,
+        appDir: host.appDir,
+        staged,
+        version: latest.version,
+        exe: process.execPath,
+        // Relance avec les mêmes arguments (données de Chromium, configuration…).
+        args: process.argv.slice(1),
+        cwd: process.cwd(),
+        // Dans un bac à sable (essais), « Programmes et fonctionnalités » n'est pas touché.
+        registry: !process.env.CYBERPINBALL_HOME,
+        log: path.join(dir, 'maj-legere.txt'),
+      };
+      const jobFile = path.join(dir, 'maj-legere.json');
+      fs.writeFileSync(jobFile, `${JSON.stringify(job, null, 2)}\n`, 'utf8');
+      recordPendingUpdate(host.loc.dataDir, { from: host.version, to: latest.version, started: new Date().toISOString(), installer: staged });
+      console.log(`Mise à jour légère : ${helper} ${jobFile}`);
+      const child = spawn(process.execPath, [helper, jobFile], {
+        detached: true,
+        stdio: 'ignore',
+        windowsHide: true,
+        // Hors de app\ : rien ne doit tenir le dossier à remplacer.
+        cwd: dir,
+        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' },
+      });
+      child.on('error', (error) => fail(error.message));
+      child.unref();
+    } catch (error) {
+      return fail((error as Error).message);
     }
     setTimeout(() => {
       if (state.kind === 'installing') host.quit();
@@ -284,32 +386,42 @@ export function createUpdatesMenu(host: UpdatesHost) {
               rows: [{ text: t('Cyber Pinball est à jour'), detail: t('Dernière version publiée : {version}, le {date}', { version: state.latest.version, date: date(state.latest.date) }), tone: 'ok' }],
             },
           ],
-          actions: [{ label: t('Rechercher à nouveau'), run: () => void check() }, retour],
+          actions: [{ label: t('Rechercher à nouveau'), run: () => void check() }, prereleaseAction(), retour],
           back,
         };
       case 'available': {
         const latest = state.latest;
+        const how = plan(latest);
         const actions: Action[] = [];
+        const checked = t('Vérifié avant l’installation : flux signé par l’éditeur, empreinte SHA-256');
         const download_: Row[] = [
-          {
-            text: t('Installeur, {size}', { size: formatMebibytes(latest.installer.size) }),
-            detail: t('Vérifié avant l’installation : flux signé par l’éditeur, empreinte SHA-256'),
-          },
+          how.kind === 'light'
+            ? { text: t('Mise à jour légère, {size}', { size: formatMebibytes(how.asset.size) }), detail: t('L’application seule, sans réinstallation. {checked}', { checked }) }
+            : how.kind === 'installer' && how.thenLight
+              ? { text: t('Installeur de la {installs}, {size}', { installs: how.installs, size: formatMebibytes(how.asset.size) }), detail: t('Puis la mise à jour légère vers {version}, proposée au redémarrage. {checked}', { version: latest.version, checked }) }
+              : how.kind === 'installer'
+                ? { text: t('Installeur, {size}', { size: formatMebibytes(how.asset.size) }), detail: checked }
+                : { text: t('Cette version demande une réinstallation, et son installeur n’est pas encore publié'), detail: t('Installeur publié : {installs}', { installs: how.installs }), tone: 'warning' },
         ];
-        if (root) {
-          actions.push({ label: t('Mettre à jour maintenant'), detail: t('Télécharge et installe {version} ; Cyber Pinball redémarre', { version: latest.version }), tone: 'ok', run: () => void download(latest) });
-        } else {
+        if (root && how.kind !== 'none') {
+          actions.push({
+            label: t('Mettre à jour maintenant'),
+            detail: how.kind === 'light' ? t('Télécharge {version} ; Cyber Pinball redémarre en quelques secondes', { version: latest.version }) : t('Télécharge et installe {version} ; Cyber Pinball redémarre', { version: how.installs }),
+            tone: 'ok',
+            run: () => void download(latest),
+          });
+        } else if (!root) {
           download_.push({
             text: t('Lancé depuis les sources : pas d’installation possible d’ici'),
             detail: t('Mettre à jour le dépôt (git pull), puis npm run build ; ou installer avec l’installeur'),
             tone: 'warning',
           });
         }
-        actions.push({ label: t('Plus tard'), run: back });
+        actions.push(prereleaseAction(), { label: t('Plus tard'), run: back });
         return {
           heading: t('Cyber Pinball {version} est disponible', { version: latest.version }),
           subheading: t('{subheading} · publiée le {date}', { subheading, date: date(latest.date) }),
-          lead: root ? leadInstall() : undefined,
+          lead: !root || how.kind === 'none' ? undefined : how.kind === 'light' ? leadLight() : leadInstall(),
           sections: [...notesSections(latest), { title: t('Téléchargement'), rows: download_ }],
           actions,
           back,
@@ -321,7 +433,10 @@ export function createUpdatesMenu(host: UpdatesHost) {
         return {
           heading: t('Téléchargement de Cyber Pinball {version}', { version: latest.version }),
           subheading,
-          lead: t('Une fois vérifié, l’installeur se lance : Cyber Pinball se ferme puis redémarre.'),
+          lead:
+            plan(latest).kind === 'light'
+              ? t('Une fois vérifiée, la mise à jour se met en place : Cyber Pinball se ferme puis redémarre.')
+              : t('Une fois vérifié, l’installeur se lance : Cyber Pinball se ferme puis redémarre.'),
           sections: [{ rows: [{ text: t('{received} sur {total}', { received: formatMebibytes(received), total: formatMebibytes(total) }), detail: t('{percent} %', { percent }), tone: 'info' }] }],
           actions: [{ label: t('Annuler'), detail: t('Le téléchargement s’arrête ; rien n’est installé'), run: () => abort.abort() }],
           back: () => abort.abort(),
@@ -331,7 +446,9 @@ export function createUpdatesMenu(host: UpdatesHost) {
         return {
           heading: t('Installation de Cyber Pinball {version}', { version: state.latest.version }),
           subheading,
-          lead: t('Cyber Pinball se ferme pour laisser l’installeur faire, puis redémarre dans une minute environ.'),
+          lead: state.light
+            ? t('Cyber Pinball se ferme, remplace ses fichiers puis redémarre dans quelques secondes.')
+            : t('Cyber Pinball se ferme pour laisser l’installeur faire, puis redémarre dans une minute environ.'),
           sections: [],
           actions: [],
           back: () => undefined,
@@ -343,6 +460,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
           sections: [{ rows: [{ text: state.message, tone: 'error' }] }],
           actions: [
             state.latest ? { label: t('Réessayer le téléchargement'), run: () => void download((state as { latest: UpdateManifest }).latest) } : { label: t('Réessayer'), run: () => void check() },
+            prereleaseAction(),
             retour,
           ],
           back,
@@ -355,6 +473,8 @@ export function createUpdatesMenu(host: UpdatesHost) {
    * là, ou ancienne version restée en place). Undefined s'il n'y en avait pas.
    */
   function startupNotice(): string | undefined {
+    // Reste d'une mise à jour légère dont l'ancienne version était encore tenue à la mise en place.
+    if (swappable() && fs.existsSync(`${host.appDir}.precedente`)) console.log(`Mise à jour légère : ancienne version ${removePreviousApp(host.appDir) ? 'retirée' : 'toujours tenue'}.`); // i18n-ignore : journal
     const outcome = takeUpdateOutcome(host.loc.dataDir, host.version);
     if (!outcome) return undefined;
     const text =

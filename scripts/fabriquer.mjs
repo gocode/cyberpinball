@@ -4,6 +4,14 @@
 //                                                 et CyberPinball-Setup-complet.exe (avec VPX) ;
 //                                                 --leger : sans la version complète
 //   node scripts/fabriquer.mjs --deployer      -> idem, puis copie dans <racine>\app\ + raccourci
+//   node scripts/fabriquer.mjs --application   -> l'application seule (build\app et son paquet),
+//                                                 sans electron-builder : publication rapide
+//
+// Chaque fabrication écrit aussi release\CyberPinball-application.zip : le contenu de
+// app\resources\app, que les bornes du même socle prennent en mise à jour légère
+// (packages/core/src/update.ts). Le socle (Electron, electron-builder, icône et métadonnées de
+// l'exécutable) est noté dans le package.json de l'application (cyberpinball.socle) : tout ce
+// qui, hors de resources\app, demanderait l'installeur pour changer.
 //
 // Signature : facultative, par variables d'environnement (voir scripts/signature.mjs).
 //
@@ -12,6 +20,7 @@
 // à part, car il contient des bibliothèques natives (.node).
 
 import { execFileSync, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
@@ -40,8 +49,9 @@ fs.rmSync(path.join(repo, 'build'), { recursive: true, force: true });
 const esbuild = require('esbuild');
 const common = { bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: ['electron', 'koffi'], logLevel: 'warning' };
 await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', 'main.js')], outfile: path.join(stage, 'dist', 'main.js') });
-// Un preload par type de fenêtre (preload.js, settings-preload.js…) : on les prend tous.
-for (const name of fs.readdirSync(path.join(repo, 'app', 'dist')).filter((f) => /preload\.js$/.test(f))) {
+// Un preload par type de fenêtre (preload.js, settings-preload.js…) : on les prend tous. Et la
+// mise en place de la mise à jour légère, lancée à part par l'exécutable en mode Node.
+for (const name of fs.readdirSync(path.join(repo, 'app', 'dist')).filter((f) => /preload\.js$/.test(f) || f === 'maj-legere.js')) {
   await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', name)], outfile: path.join(stage, 'dist', name) });
 }
 
@@ -68,6 +78,28 @@ for (const pkg of ['koffi', koffiNative]) {
   fs.cpSync(path.join(repo, 'node_modules', pkg), path.join(stage, 'node_modules', pkg), { recursive: true, filter: koffiRuntime });
 }
 const versionOf = (pkg) => require(path.join(repo, 'node_modules', pkg, 'package.json')).version;
+
+// Configuration de l'exécutable (electron-builder). Avec la version d'Electron, d'electron-builder
+// et l'icône, elle fait le socle : tout ce qui entoure resources\app dans app\.
+const icon = path.join(repo, 'app', 'ressources', 'icone.ico');
+const builderConfig = {
+  appId: 'org.cyberpinball.app',
+  productName: 'Cyber Pinball',
+  executableName: 'CyberPinball',
+  copyright: 'Cyber Pinball, logiciel libre',
+  electronVersion: rootPkg.devDependencies.electron,
+  // koffi charge des .node : hors archive asar pour qu'ils restent chargeables.
+  asar: false,
+  npmRebuild: false,
+  nodeGypRebuild: false,
+};
+const sha256 = (data) => createHash('sha256').update(data).digest('hex');
+// CYBERPINBALL_SOCLE_ESSAI : un autre socle, pour les essais de la mise à jour par installeur
+// (comme après un changement d'Electron : docs\demo-mise-a-jour.ps1).
+const socle = process.env.CYBERPINBALL_SOCLE_ESSAI || `electron-${builderConfig.electronVersion}-${sha256(
+  JSON.stringify({ builderConfig, electronBuilder: versionOf('electron-builder'), icon: sha256(fs.readFileSync(icon)), platform: `${process.platform}-${process.arch}` }),
+).slice(0, 12)}`;
+
 fs.writeFileSync(
   path.join(stage, 'package.json'),
   JSON.stringify(
@@ -79,32 +111,42 @@ fs.writeFileSync(
       main: 'dist/main.js',
       author: 'Cyber Pinball',
       dependencies: { koffi: versionOf('koffi'), [koffiNative]: versionOf(koffiNative) },
+      cyberpinball: { socle },
     },
     null,
     2,
   ),
 );
 
+/** release\CyberPinball-application.zip : build\app tel quel, écrit par le tar.exe de Windows (bsdtar, qui fait les zip). */
+function packageApplication() {
+  const { UPDATE_APP_NAME, windowsTar } = require(path.join(repo, 'packages', 'core', 'dist', 'update.js'));
+  const zip = path.join(release, UPDATE_APP_NAME);
+  fs.mkdirSync(release, { recursive: true });
+  fs.rmSync(zip, { force: true });
+  const run = spawnSync(windowsTar(), ['-a', '-c', '-f', zip, '-C', stage, ...fs.readdirSync(stage)], { encoding: 'utf8' });
+  if (run.status !== 0) throw new Error(`Paquet de l'application impossible : ${run.stderr || run.error?.message}`);
+  console.log(`\nPaquet de l'application : ${zip} (${(fs.statSync(zip).size / 1024 ** 2).toFixed(1)} Mio, socle ${socle})`);
+}
+
+if (process.argv.includes('--application')) {
+  packageApplication();
+  process.exit(0);
+}
+
 step('Assemblage de l’exécutable (electron-builder)');
 const { build, Platform } = require('electron-builder');
 await build({
   targets: Platform.WINDOWS.createTarget('dir'),
   config: {
-    appId: 'org.cyberpinball.app',
-    productName: 'Cyber Pinball',
-    executableName: 'CyberPinball',
-    copyright: 'Cyber Pinball, logiciel libre',
-    electronVersion: rootPkg.devDependencies.electron,
+    ...builderConfig,
     directories: { app: stage, output: release },
-    // koffi charge des .node : hors archive asar pour qu'ils restent chargeables.
-    asar: false,
-    npmRebuild: false,
-    nodeGypRebuild: false,
     // Icône et métadonnées (version, description) écrites dans l'exe. La signature,
     // facultative, est faite ensuite par scripts/signature.mjs, comme pour les installeurs.
-    win: { icon: path.join(repo, 'app', 'ressources', 'icone.ico'), signExecutable: false },
+    win: { icon, signExecutable: false },
   },
 });
+packageApplication();
 const exe = path.join(unpacked, 'CyberPinball.exe');
 if (signatureConfigured()) {
   step('Signature');

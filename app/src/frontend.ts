@@ -5,7 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, globalShortcut, ipcMain, session, type BrowserWindow, type Input } from 'electron';
+import { app, globalShortcut, ipcMain, session, type BrowserWindow, type Input, type Rectangle } from 'electron';
 import {
   CONFIG_KEY,
   WIZARD_STEPS,
@@ -17,10 +17,13 @@ import {
   keyLabel,
   navigationKeys,
   withoutButtonKeys,
+  joysticksInVpxLog,
+  joysticksUnseenByVpx,
   keepManualEdits,
   layoutOf,
   loadCabinet,
   readInfo,
+  readingScreen,
   readTextIfExists,
   recordPlay,
   ROLES,
@@ -70,10 +73,11 @@ import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, windowR
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
 import { createLibrary, type SystemItem, type UiAction } from './library';
+import { onJoystickInput } from './joystick-input';
 import { locations, vpxInstall, vpxProfile } from './paths';
 import { activeVpxIni, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
-import { coverDisplay } from './cover-display';
+import { coverDisplay, minimizeCovered } from './cover-display';
 import { acceptFrontends, unacceptedFrontends } from './frontend-gate';
 import { allowDesktop, hideTaskbars, nameScreen, relaunchCovered, restoreTaskbars, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
@@ -237,6 +241,7 @@ const library = createLibrary({
   quit: () => void quit(),
   keys: () => KEYS,
   windows: () => windows,
+  readingScreen: () => readingScreenRect(),
   broadcast: () => broadcast(),
 });
 // Configurations de la borne : la configuration active est nommée dans le sous-menu.
@@ -327,6 +332,7 @@ const updates = createUpdatesMenu({
   loc,
   version: app.getVersion(),
   exeDir: path.dirname(process.execPath),
+  appDir: app.getAppPath(),
   silent: OFFSCREEN,
   library,
   broadcast: () => broadcast(),
@@ -355,7 +361,7 @@ function showDesktop(): void {
   library.leave();
   onDesktop = true;
   allowDesktop('Bureau Windows'); // i18n-ignore : raison gardée par le gardien des écrans, jamais affichée
-  for (const win of windows.values()) win.minimize();
+  for (const win of windows.values()) minimizeCovered(win);
 }
 
 /** Fenêtres réduites par « Bureau Windows », en attente du retour du playfield. */
@@ -549,6 +555,16 @@ function resolveManualEdits(keep: boolean): void {
 }
 
 /**
+ * Écran où lire une page à la souris (fenêtre « Récupérer ») : le playfield si le menu n'y
+ * est pas tourné, sinon le plus grand autre écran du menu (readingScreen) ; chaque fenêtre
+ * du menu couvre tout son écran.
+ */
+function readingScreenRect(): Rectangle | undefined {
+  const screens = [...windows].filter(([, w]) => !w.isDestroyed()).map(([role, w]) => ({ role, bounds: w.getBounds() }));
+  return readingScreen(screens, rotation);
+}
+
+/**
  * Une fenêtre par écran de la borne. Les rôles qui partagent un écran (backglass
  * et DMD sur le fronton, DMD incrusté dans le playfield) sont dessinés dans la
  * même fenêtre, chacun dans sa zone, là où VPX les affichera pendant la partie.
@@ -596,6 +612,8 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     win.webContents.on('before-input-event', (event, input) => {
       if (input.type === 'keyDown' && handleKey(input)) event.preventDefault();
     });
+    // Boutons d'un joystick (Pinscape…) : comme des touches.
+    onJoystickInput(win, (input) => input.type === 'keyDown' && handleKey(input));
     // Seule la mise en page du playfield pivote : la fenêtre garde les bornes de l'écran.
     const turn = role.id === 'playfield' ? rotation : 0;
     win.loadFile(path.join(__dirname, '..', 'renderer', 'frontend.html'), { query: { role: role.id, rotation: String(turn), zones: JSON.stringify(parts), ...(playfield && { playfield: JSON.stringify(playfield) }) } });
@@ -830,7 +848,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     // Les parties du test automatique ne comptent pas dans les statistiques.
     if (!autoStopAfterMs) recordPlay(table, startedAt, result.seconds);
     tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
-    state = { ...state, phase: 'menu' };
+    const unseen = simulated === undefined ? joystickMessage(install.version) : undefined;
+    state = unseen ? { ...state, phase: 'message', message: unseen } : { ...state, phase: 'menu' };
   } else {
     state = { ...state, phase: 'message', message: explain(result) };
   }
@@ -895,6 +914,28 @@ async function showMenuAgain(): Promise<boolean> {
     if (target) bringToFront(target);
   }
   return ours();
+}
+
+/**
+ * Boutons de joystick de la borne que VPX n'a pas trouvés à cette partie (vpinball.log) alors
+ * qu'il voyait d'autres joysticks : Cyber Pinball et VPX ne nomment pas le joystick de la même
+ * façon, et ces boutons ne répondent pas en jeu. Le relevé est à refaire.
+ */
+function joystickMessage(version: string): Message | undefined {
+  const log = readTextIfExists(path.join(vpxPrefDir(version), 'vpinball.log'));
+  if (!log) return undefined;
+  const seen = joysticksInVpxLog(log);
+  const unseen = joysticksUnseenByVpx(loadCabinet(loc.dataDir)?.buttons, seen);
+  if (!unseen.length) return undefined;
+  console.warn(`Joysticks des boutons absents de vpinball.log : ${unseen.join(', ')} ; VPX a vu ${seen.map((j) => `${j.name} (${j.id})`).join(', ')}`); // i18n-ignore : console
+  return {
+    title: t('Boutons du joystick introuvables dans VPX'),
+    lines: [
+      t('VPX a vu {seen}, mais pas le joystick des boutons relevés ({unseen}) : ces boutons n’ont pas répondu pendant la partie.', { seen: formatList(seen.map((j) => j.name), 'and'), unseen: unseen.join(', ') }),
+      t('Start : refaire l’étape « Boutons » · Exit : menu'),
+    ],
+    action: 'buttons',
+  };
 }
 
 function explain(result: LaunchResult): Message {

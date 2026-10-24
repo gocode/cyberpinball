@@ -7,7 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { dialog, type BrowserWindow, type Input } from 'electron';
+import { dialog, type BrowserWindow, type Input, type Rectangle } from 'electron';
 import {
   CONFIG_KEY,
   variantTraitsLabel,
@@ -157,6 +157,8 @@ export interface LibraryHost {
   /** Touches des boutons de la borne (flippers, Start, Exit), avec celles d'un clavier. */
   keys(): NavigationKeys;
   windows(): Map<RoleId, BrowserWindow>;
+  /** Écran où lire une page à la souris (fenêtre « Récupérer »), en coordonnées Electron. */
+  readingScreen?(): Rectangle | undefined;
   broadcast(): void;
   /** Dossier Téléchargements surveillé pour la liste d'attente (essais : un dossier du bac à sable). */
   downloadsDir?(): string;

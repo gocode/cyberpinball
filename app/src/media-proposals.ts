@@ -254,11 +254,11 @@ export function createProposals(ctx: ProposalsContext) {
   }
 
   /**
-   * Recherche sur chaque site, pour les jeux retenus : une page par titre, gardée une
-   * demi-heure. VPForums réserve sa recherche aux membres ; VPUniverse montre ses
-   * résultats à tous, mais ne laisse télécharger qu'avec un compte.
+   * Recherche sur chaque site, pour les jeux retenus et le média ouvert : trois pages au
+   * plus par titre, gardées une demi-heure. VPForums réserve sa recherche aux membres ;
+   * VPUniverse montre ses résultats à tous, mais ne laisse télécharger qu'avec un compte.
    */
-  async function searchSites(st: State): Promise<void> {
+  async function searchSites(st: State, type: MediaType): Promise<void> {
     const sites = ctx.sites;
     if (!sites) return;
     const queries = siteQueries(st);
@@ -273,7 +273,7 @@ export function createProposals(ctx: ProposalsContext) {
       }
       for (const q of queries) {
         ctx.progress(t('Recherche sur {site} : « {query} »…', { site: site.name, query: q }));
-        const r = await sites.search(site.id, q);
+        const r = await sites.search(site.id, q, type);
         if (r.kind === 'hits') found.hits.push(...r.hits.filter((h) => !found.hits.some((k) => k.id === h.id)));
         else if (r.kind === 'login') found.login = true;
         else found.problem = r.reason === 'challenge' ? t('le site fait une vérification (Cloudflare)') : r.reason === 'down' ? t('le site ne répond pas pour l’instant') : t('page de résultats illisible');
@@ -283,7 +283,7 @@ export function createProposals(ctx: ProposalsContext) {
 
   /** Aperçus (image 1k, ou le son lui-même) et poids des propositions de VPinMediaDB pour ce type ; vignettes des sites. */
   async function prepareType(st: State, type: MediaType): Promise<void> {
-    await searchSites(st);
+    await searchSites(st, type);
     if (ctx.sites) {
       ctx.progress(t('Vignettes des sites…'));
       await ctx.sites.stageThumbs(choicesFor(st, type).flatMap((c) => (c.site && !c.site.received ? [c.site.hit] : [])));
@@ -523,7 +523,9 @@ export function createProposals(ctx: ProposalsContext) {
         label: t('Chercher sur le web…'),
         detail: loading
           ? t('Téléchargement : {got}', { got: loading.total ? t('{got} sur {total}', { got: formatSize(loading.received), total: formatSize(loading.total) }) : formatSize(loading.received) })
-          : t('Navigateur intégré : ce que vous y téléchargez revient ici'),
+          : ctx.sites.resumable(webUrl(st, table, type))
+            ? t('Reprend la page où vous en étiez ; ce que vous y téléchargez revient ici')
+            : t('Navigateur intégré : ce que vous y téléchargez revient ici'),
         tone: choices.length ? undefined : 'ok',
         run: () => openWeb(table, type),
       });
@@ -699,13 +701,17 @@ export function createProposals(ctx: ProposalsContext) {
   /** Média et table d'où la recherche web est partie, et le choix qu'elle représente. */
   let webWanted: { file: string; type: MediaType; pick: number } | undefined;
 
+  /** Page de départ de la recherche web pour ce média : la même d'une visite à l'autre, pour reprendre la page en cours. */
+  function webUrl(st: State, table: TableEntry, type: MediaType): string {
+    return webSearchUrl(st.query ?? includedGames(st)[0]?.lead.game.name ?? table.title, type);
+  }
+
   function openWeb(table: TableEntry, type: MediaType): void {
     const st = state!;
-    const name = st.query ?? includedGames(st)[0]?.lead.game.name ?? table.title;
     const pick = ++picks;
     lastPick.set(`${table.file}|${type}`, pick);
     webWanted = { file: table.file, type, pick };
-    ctx.sites!.openWeb({ url: webSearchUrl(name, type), table: table.file, title: table.title, type, label: mediaTypeInfo(type).label });
+    ctx.sites!.openWeb({ url: webUrl(st, table, type), table: table.file, title: table.title, type, label: mediaTypeInfo(type).label });
     st.notice = { text: t('Recherche ouverte dans la fenêtre « Récupérer » : téléchargez-y le fichier voulu, il revient ici. Fermer (Échap) pour revenir.'), tone: 'info' };
     ctx.show(() => build(type), ctx.cursor());
   }

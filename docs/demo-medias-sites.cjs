@@ -215,8 +215,10 @@ function fakeSites(acq, counters, videos) {
     // Fausse recherche sur le web : un résultat qui mène à un fichier, comme un lien direct trouvé par l'utilisateur.
     if (host === 'duckduckgo.com') {
       counters.webSearch = url.searchParams.get('q');
-      return html('<h1>Résultats</h1><a id="r" href="https://medias.exemple.org/t2-fulldmd.zip">Terminator 2 FullDMD video (zip)</a>', false);
+      return html('<h1>Résultats</h1><a id="fiche" href="https://medias.exemple.org/fiche">Terminator 2 FullDMD video</a>', false);
     }
+    // Page d'un fichier trouvée par la recherche : on la quitte (Échap), on doit y revenir.
+    if (host === 'medias.exemple.org' && url.pathname === '/fiche') return html('<h1>T2 FullDMD</h1><a id="r" href="https://medias.exemple.org/t2-fulldmd.zip">Télécharger (zip)</a>', false);
     if (host === 'medias.exemple.org') return attachment('t2-fulldmd.zip', zipStored({ 'T2 FullDMD.webm': videos.fulldmd }));
     return new Response('Page de démonstration absente', { status: 404 });
   };
@@ -407,7 +409,23 @@ async function run(report, sc) {
   await until('la fausse page de recherche', () => require('electron').webContents.getAllWebContents().some((w) => /duckduckgo\.com/.test(w.getURL()) && !w.isLoading()));
   const page = require('electron').webContents.getAllWebContents().find((w) => /duckduckgo\.com/.test(w.getURL()));
   log.push(`Recherche web : « ${counters.webSearch} »`);
-  await page.executeJavaScript("document.getElementById('r').click()");
+  // Une page ouverte depuis la recherche, puis Échap (le réflexe après une capture d'écran) :
+  // la fenêtre se ferme ; rouverte, elle reprend cette page, « Précédent » compris.
+  await page.executeJavaScript("document.getElementById('fiche').click()");
+  await until('la page du fichier', () => /\/fiche$/.test(page.getURL()) && !page.isLoading());
+  page.sendInputEvent({ type: 'keyDown', keyCode: 'Escape' });
+  await until('la fenêtre « Récupérer » fermée par Échap', () => page.isDestroyed());
+  act('Retour : Afficheur large');
+  act('Voir les propositions');
+  await idle();
+  const resumeDetail = view().actions.find((a) => a.label.startsWith('Chercher sur le web'))?.detail ?? '';
+  if (!/^Reprend la page/.test(resumeDetail)) throw new Error(`« Chercher sur le web… » ne dit pas qu’il reprend la page : « ${resumeDetail} »`);
+  act('Chercher sur le web');
+  await until('la page du fichier reprise', () => require('electron').webContents.getAllWebContents().some((w) => /\/fiche$/.test(w.getURL()) && !w.isLoading()));
+  const resumed = require('electron').webContents.getAllWebContents().find((w) => /\/fiche$/.test(w.getURL()));
+  if (!resumed.navigationHistory.canGoBack()) throw new Error('page reprise sans « Précédent » vers la recherche');
+  log.push(`Reprise après Échap : ${resumed.getURL()}, « Précédent » vers la recherche : oui ; action : « ${resumeDetail} »`);
+  await resumed.executeJavaScript("document.getElementById('r').click()");
   await until('le fichier du web dans le brouillon', () => (view().sections ?? []).some((sec) => sec.rows.some((r) => /^Reçu de medias\.exemple\.org\./.test(r.text))));
   for (const w of BrowserWindow.getAllWindows()) if (w !== win) w.close();
   await delay(1000);

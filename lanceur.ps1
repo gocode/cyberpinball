@@ -237,6 +237,20 @@ $Actions = [ordered]@{
     Label = 'Publier avec l''installeur léger seulement (deux fois plus rapide ; sans la version complète avec VPX)'
     Run   = { Confirm-Publication; Invoke-Checked { node scripts/publier.mjs --leger } 'La publication' }
   }
+  'publier-rapide' = @{
+    Label = 'Publier sans refaire les installeurs (1 à 2 min) : les bornes reçoivent la mise à jour légère'
+    Run   = { Confirm-Publication; Invoke-Checked { node scripts/publier.mjs --rapide } 'La publication' }
+  }
+  'preversion' = @{
+    Label = 'Passer à la préversion d''essai suivante (0.1.3-essai.1…), pour les bornes qui acceptent les préversions'
+    Run   = {
+      Invoke-Checked { node scripts/version-suivante.mjs essai } 'Le changement de version'
+      $version = (Get-Content (Join-Path $PSScriptRoot 'package.json') -Raw -Encoding UTF8 | ConvertFrom-Json).version
+      Invoke-Checked { git add package.json package-lock.json CHANGELOG.md CHANGELOG.en.md } 'git add'
+      Invoke-Checked { git commit -m "Version $version" } "L'enregistrement (git commit)"
+      Step "Préversion $version enregistrée. « publier-rapide » la met en ligne : seules les bornes réglées sur « Préversions : reçues » la voient."
+    }
+  }
   'publier-brouillon' = @{
     Label = 'Publier en brouillon (invisible des bornes, à rendre public ensuite sur GitHub)'
     Run   = { Confirm-Publication; Invoke-Checked { node scripts/publier.mjs --brouillon } 'La publication' }
@@ -252,6 +266,10 @@ $Actions = [ordered]@{
   'essai-maj' = @{
     Label = 'Essai complet de la mise à jour, hors écran (deux versions fabriquées ; 15 min environ)'
     Run   = { Build; & (Join-Path $PSScriptRoot 'docs\demo-mise-a-jour.ps1') }
+  }
+  'essai-maj-legere' = @{
+    Label = 'Essai complet de la mise à jour légère, hors écran (publication rapide sur un site local ; 10 min environ)'
+    Run   = { Build; & (Join-Path $PSScriptRoot 'docs\demo-mise-a-jour.ps1') -Legere }
   }
   'tests' = @{
     Section = 'Essais sans opérateur'

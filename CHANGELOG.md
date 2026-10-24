@@ -9,6 +9,14 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.3
+
+- Boutons d'un Pinscape (KL25Z) ou d'un encodeur en mode manette : relevés dans l'étape « Boutons » et suivis par tout le menu et par VPX.
+- Fenêtre « Récupérer » sur une borne : elle s'ouvre sur un écran lisible (le fronton si le playfield est tourné), le pointeur amené dessus ; Exit la ferme.
+- La fenêtre « Récupérer » rouverte reprend la page où vous en étiez ; recherche des sites plus complète.
+- Plus d'écran blanc quand une fenêtre s'ouvre ou change d'écran.
+- Mises à jour plus légères (l'application seule, en quelques secondes) et préversions d'essai, à recevoir ou non depuis le menu de la mise à jour.
+
 ## 0.1.2
 
 - Mise à jour : la recherche part dès le démarrage, puis toutes les 6 heures ; la pastille rouge s'affiche sans ouvrir le menu.

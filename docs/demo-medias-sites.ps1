@@ -2,8 +2,9 @@
 # dernier recours) dans les propositions de chaque média : d'abord les vrais sites en
 # visiteur et en lecture seule (une page de résultats chacun, une vignette), puis de
 # fausses fiches imitant les deux moteurs pour la connexion, la file, le minuteur de
-# VPUniverse déroulé dans la page, la réception et le pack complet. Profil Electron à
-# part : la session de l'utilisateur n'est jamais touchée. Captures et relevé dans
+# VPUniverse déroulé dans la page, la réception, le pack complet et la reprise de la
+# page web après Échap. Profil Electron à part : la session de l'utilisateur n'est
+# jamais touchée. Captures et relevé dans
 # tmp\demo-medias-sites\captures.
 #   .\docs\demo-medias-sites.ps1
 $ErrorActionPreference = 'Stop'

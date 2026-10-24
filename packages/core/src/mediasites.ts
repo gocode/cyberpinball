@@ -128,14 +128,38 @@ export function siteQuery(name: string): string {
   return (words.length ? words : vpsWords(main)).slice(0, 4).join(' ');
 }
 
-/** Page de résultats pour un texte, limitée aux catégories des médias de menu. */
-export function siteSearchUrl(site: MediaSiteId, query: string): string {
+/** Pages de résultats lues au plus par recherche (25 fiches par page sur VPUniverse). */
+export const SITE_SEARCH_PAGES = 3;
+
+/**
+ * Catégories où chercher un média : celles qui le rangent, et seulement elles. Toutes
+ * catégories confondues, les logos d'un jeu connu remplissent la première page (16 sur
+ * 25 pour Game of Thrones) et les toppers passent aux pages suivantes.
+ */
+export function siteSearchNodes(site: MediaSiteId, type?: MediaType): string[] {
+  const all = SITE_CATEGORIES[site];
+  const own = type ? all.filter((c) => c.types.includes(type) && !c.pack) : [];
+  return (own.length ? own : all).map((c) => c.id);
+}
+
+/**
+ * Page de résultats pour un texte, limitée aux catégories du média `type` (toutes les
+ * catégories des médias de menu sans lui), page `page`. VPForums ne filtre pas par
+ * catégorie et sa page de résultats ne dit pas son nombre de pages : `type` et `page`
+ * n'y changent rien (sa recherche rend quelques fiches par titre).
+ */
+export function siteSearchUrl(site: MediaSiteId, query: string, type?: MediaType, page = 1): string {
   const q = encodeURIComponent(query.trim());
   if (site === 'vpuniverse') {
-    const nodes = SITE_CATEGORIES.vpuniverse.map((c) => c.id).join(',');
-    return `https://vpuniverse.com/search/?q=${q}&type=downloads_file&nodes=${nodes}&search_and_or=and&sortby=relevancy`;
+    const nodes = siteSearchNodes(site, type).join(',');
+    return `https://vpuniverse.com/search/?q=${q}&type=downloads_file&nodes=${nodes}&search_and_or=and&sortby=relevancy${page > 1 ? `&page=${page}` : ''}`;
   }
   return `https://www.vpforums.org/index.php?app=core&module=search&do=search&search_term=${q}&search_app=downloads`;
+}
+
+/** La recherche d'un site dépend du média : VPUniverse filtre par catégorie, VPForums non. */
+export function siteSearchByType(site: MediaSiteId): boolean {
+  return site === 'vpuniverse';
 }
 
 /** Un résultat de recherche, tel que la page le montre. */
@@ -159,7 +183,8 @@ export interface SiteHit {
 
 /** Ce que le script de recherche a vu dans la page. */
 export type SiteSearchResult =
-  | { kind: 'hits'; hits: SiteHit[] }
+  /** `pages` : nombre de pages de résultats, si la page le dit. */
+  | { kind: 'hits'; hits: SiteHit[]; pages?: number }
   /** La recherche est réservée aux membres. */
   | { kind: 'login' }
   /** Vérification de Cloudflare, site en panne, page illisible : à montrer. */
@@ -168,12 +193,17 @@ export type SiteSearchResult =
 /**
  * Script de la page de résultats d'Invision Community (VPUniverse) : un élément
  * ipsStreamItem par fiche, avec son titre, sa catégorie, son auteur, sa vignette.
+ * Pour un membre connecté, une fiche pas encore vue porte devant son titre une pastille
+ * « non lu » : un lien vers la même fiche (?do=getNewComment), sans texte. Le titre est
+ * le lien qui a du texte, jamais le premier venu (sinon, titres vides : aucun résultat
+ * ne désigne plus le jeu, test « membre connecté » de mediasites.test.ts).
  */
 const INVISION_SEARCH = /* i18n-ignore : script de la page du site, motifs de recherche */ String.raw`(() => {${COMMON_PROBE}
   const hits = [];
   const seen = new Set();
   for (const item of document.querySelectorAll('li.ipsStreamItem, .ipsStreamItem')) {
-    const link = item.querySelector('.ipsStreamItem_title a[href*="/files/file/"], h2 a[href*="/files/file/"]');
+    const links = [...item.querySelectorAll('.ipsStreamItem_title a[href*="/files/file/"], h2 a[href*="/files/file/"]')].filter((a) => a.textContent.trim());
+    const link = links.find((a) => a.hasAttribute('data-searchable')) || links.find((a) => !/[?&]do=/.test(a.href)) || links[0];
     if (!link) continue;
     const m = /\/files\/file\/(\d+)-/.exec(link.href);
     if (!m || seen.has(m[1])) continue;
@@ -198,7 +228,9 @@ const INVISION_SEARCH = /* i18n-ignore : script de la page du site, motifs de re
     });
   }
   if (!hits.length && document.querySelector('#elUserSignIn') && /sign in|log in/i.test(document.title)) return { kind: 'login' };
-  return { kind: 'hits', hits };
+  const pagination = document.querySelector('[data-pages]');
+  const pages = pagination ? Number(pagination.getAttribute('data-pages')) || undefined : undefined;
+  return { kind: 'hits', hits, pages };
 })()`;
 
 /**
@@ -244,6 +276,25 @@ export const SITE_SEARCH_PROBES: Record<MediaSiteId, string> = {
   vpuniverse: INVISION_SEARCH,
   vpforums: IPBOARD3_SEARCH,
 };
+
+/**
+ * Ce que le script de la page a rendu, vérifié : chaque résultat garde son site et doit
+ * avoir un identifiant et un titre. Une fiche sans titre ne désigne aucun jeu et
+ * passerait, sans bruit, pour « d'un autre jeu » : la page a changé de forme (pastille
+ * « non lu » des membres, nouvelle version du forum). Si la plupart des résultats sont
+ * dans ce cas, la page est déclarée illisible, ce que l'écran dit ; `untitled` compte
+ * les fiches écartées, pour le journal.
+ */
+export function checkSiteSearch(site: MediaSiteId, raw: unknown): SiteSearchResult & { untitled?: number } {
+  if (!raw || typeof raw !== 'object' || !('kind' in raw)) return { kind: 'show', reason: 'unreadable' };
+  const r = raw as SiteSearchResult;
+  if (r.kind !== 'hits') return r;
+  const all = Array.isArray(r.hits) ? r.hits : [];
+  const hits = all.filter((h) => h && typeof h.id === 'string' && h.id && typeof h.title === 'string' && h.title.trim()).map((h) => ({ ...h, site }));
+  const untitled = all.length - hits.length;
+  if (untitled > hits.length) return { kind: 'show', reason: 'unreadable', untitled };
+  return { kind: 'hits', hits, pages: typeof r.pages === 'number' && r.pages > 0 ? r.pages : undefined, ...(untitled ? { untitled } : {}) };
+}
 
 // ---------------------------------------------------------------------------
 // Rapprochement et types

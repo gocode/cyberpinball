@@ -251,4 +251,8 @@ export const messages: Record<string, string> = {
   'Start : jouer quand même · Exit : revenir au menu': 'Start: play anyway · Exit: back to the menu',
   // app/src/frontend.ts : réglage de l’affichage en partie
   'Réglage de l’affichage': 'Display adjustment',
+  // app/src/frontend.ts : joystick des boutons que VPX n'a pas vu
+  'Boutons du joystick introuvables dans VPX': 'Joystick buttons not found by VPX',
+  'VPX a vu {seen}, mais pas le joystick des boutons relevés ({unseen}) : ces boutons n’ont pas répondu pendant la partie.':
+    'VPX saw {seen}, but not the joystick of the recorded buttons ({unseen}): those buttons did not respond during the game.',
 };

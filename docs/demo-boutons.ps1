@@ -14,6 +14,11 @@
 #      (tmp\captures\boutons\lecture) ;
 #   1c. --boutons sur une autre copie : « Touches par défaut » puis Start (1) enregistre
 #      aussitôt, sans essai (tmp\captures\boutons\defauts) ;
+#   1d. --boutons sur une autre copie, au joystick : un joystick virtuel de SDL, lu par la
+#      bibliothèque SDL de VPX comme un Pinscape sur KL25Z, donne les six boutons
+#      obligatoires (boutons 1 à 6), Exit passe les facultatifs, l'essai et Start
+#      enregistrent ; [Input] reçoit « SDLJoy_<GUID>_1;<bouton> » à côté des touches de VPX
+#      (tmp\captures\boutons\joystick ; sauté sans bibliothèque SDL de VPX, -Sdl) ;
 #   2. assistant complet sur une borne neuve : personne ne touche à rien pendant 21 s,
 #      les touches par défaut sont gardées et l'assistant passe aux écrans
 #      (tmp\captures\boutons\delai) ;
@@ -34,7 +39,9 @@ param(
   [switch]$Run,
   [string]$Cabinet = 'D:\CyberPinball\data\cabinet.json',
   [string]$Ini = 'D:\CyberPinball\config\VPinballX.ini',
-  [string]$Ecrans = 'pc-dev'
+  [string]$Ecrans = 'pc-dev',
+  # Bibliothèque SDL de VPX, pour l'étape au joystick (1d).
+  [string]$Sdl = 'D:\CyberPinball\emulators\vpx\current\SDL364.dll'
 )
 $ErrorActionPreference = 'Stop'
 $wt = Split-Path $PSScriptRoot -Parent
@@ -47,8 +54,8 @@ $captures = "$wt\tmp\captures\boutons"
 
 if (Test-Path $base) { Remove-Item -Recurse -Force $base }
 $root = "$base\root"; $borne = "$base\borne"; $neuve = "$base\neuve"; $neuve2 = "$base\neuve2"
-$lecture = "$base\lecture"; $defauts = "$base\defauts"
-New-Item -ItemType Directory -Force "$root\tables\Demo (Cyber Pinball 2026)", "$borne\sandbox", "$neuve\sandbox", "$neuve2\sandbox", "$lecture\sandbox", "$defauts\sandbox" | Out-Null
+$lecture = "$base\lecture"; $defauts = "$base\defauts"; $joystick = "$base\joystick"
+New-Item -ItemType Directory -Force "$root\tables\Demo (Cyber Pinball 2026)", "$borne\sandbox", "$neuve\sandbox", "$neuve2\sandbox", "$lecture\sandbox", "$defauts\sandbox", "$joystick\sandbox" | Out-Null
 # Le modèle copié désigne le VPinballX.ini du bac à sable, jamais le vrai.
 $model = Get-ModeleBorne $Cabinet
 $model.vpx.iniPath = "$borne\sandbox\VPinballX.ini"
@@ -111,7 +118,7 @@ try {
     ForEach-Object { $_.Line }
 
   # Copies de la borne de l'étape 1, chacune avec son propre VPinballX.ini.
-  foreach ($h in $lecture, $defauts) {
+  foreach ($h in $lecture, $defauts, $joystick) {
     $copie = Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons
     $copie.vpx.iniPath = "$h\sandbox\VPinballX.ini"
     $copie | ConvertTo-Json -Depth 20 | Set-Content -Path "$h\cabinet.json" -Encoding UTF8
@@ -126,6 +133,18 @@ try {
   '== 1c. Étape « Boutons » seule : touches par défaut, enregistrées sans essai'
   Invoke-Autopilot $defauts @('click:#actions button:nth-child(3)', 'Digit1') 'defauts' @('--assistant', '--boutons')
   (Get-ModeleBorne "$defauts\cabinet.json" -AvecBoutons).buttons | Format-List | Out-String
+
+  '== 1d. Étape « Boutons » seule, au joystick (joystick virtuel de SDL)'
+  if (Test-Path $Sdl) {
+    $env:CYBERPINBALL_SDL = $Sdl
+    # Tout relever ; boutons 1 à 6 du joystick (numéros SDL 0 à 5) pour les obligatoires ;
+    # Exit (bouton 4, Joy3) passe les neuf facultatifs ; essai des flippers et d'Exit, puis Start enregistre.
+    $joy = @('click:#actions button:nth-child(4)', 'Joy0', 'Joy1', 'Joy2', 'Joy3', 'Joy4', 'Joy5') + @('Joy3') * 9 + @('Joy0', 'Joy1', 'Joy3', 'Joy2')
+    Invoke-Autopilot $joystick $joy 'joystick' @('--assistant', '--boutons')
+    Remove-Item Env:CYBERPINBALL_SDL
+    (Get-ModeleBorne "$joystick\cabinet.json" -AvecBoutons).buttons | Format-List | Out-String
+    Select-String -Path "$joystick\sandbox\VPinballX.ini" -Pattern '^Mapping\.(LeftFlipper|RightFlipper|Start|ExitGame|Credit1|LaunchBall|LeftMagna|InGameUI) =' | ForEach-Object { $_.Line }
+  } else { "Sauté : pas de bibliothèque SDL de VPX ($Sdl)." }
 
   '== 2. Assistant complet, personne ne touche à rien'
   Invoke-Autopilot $neuve @('Attendre21', 'ShiftRight', 'Digit1') 'delai' @('--assistant')

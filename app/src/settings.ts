@@ -61,6 +61,7 @@ import { backupDir, locations, vpxInstall, vpxProfile } from './paths';
 import { activeVpxIni } from './vpx-ini';
 import { describeReset, resetButtons } from './buttons-reset';
 import { coverDisplay } from './cover-display';
+import { onJoystickInput } from './joystick-input';
 import { createWindow, primaryRect } from './offscreen';
 import { LayoutReport } from './layout-check';
 import { click } from './library';
@@ -216,6 +217,7 @@ export function openSettings(target: SettingsTarget, options: OpenSettingsOption
   win.webContents.on('before-input-event', (event, input) => {
     if (input.type === 'keyDown' && handleKey(input)) event.preventDefault();
   });
+  onJoystickInput(win, (input) => input.type === 'keyDown' && handleKey(input));
 
   let resolveClosed!: () => void;
   const s: Session = {

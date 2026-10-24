@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { toPhysicalScreen } from '../fingerprint';
-import { currentFlipperEdge, diagonalInches, edgeAfterRotation, edidSize, isCabinetView, playerView, playfieldRotation, playfieldSize, rotatedDisplay, sizeFromDiagonal } from '../layout';
+import { currentFlipperEdge, diagonalInches, edgeAfterRotation, edidSize, isCabinetView, playerView, playfieldRotation, playfieldSize, readingScreen, rotatedDisplay, sizeFromDiagonal } from '../layout';
 import { edgeRotation, type FlipperEdge } from '../model';
 import { vpxFlipperEdge, vpxOrientationFix } from '../vpx';
 import { devPcDisplays, display, emptyCabinet } from './fixtures';
@@ -160,4 +160,26 @@ test('fenêtres du playfield : la rotation suit l’orientation actuelle de l’
   // Retourné hors de l'assistant : joueur à gauche de la nouvelle image.
   assert.equal(playfieldRotation(cabinet, rotatedDisplay(iiyama(), 180)), 90);
   assert.equal(playfieldRotation(cabinet, rotatedDisplay(iiyama(), 90)), 0);
+});
+
+test('écran de lecture à la souris : le playfield droit, sinon le fronton', () => {
+  const playfield = { x: 0, y: 0, width: 1920, height: 1080 };
+  const backglass = { x: 1920, y: 0, width: 1920, height: 1080 };
+  const dmd = { x: 3840, y: 0, width: 1280, height: 390 };
+  const screens = [
+    { role: 'dmd', bounds: dmd },
+    { role: 'playfield', bounds: playfield },
+    { role: 'backglass', bounds: backglass },
+  ];
+  // Bureau, ou playfield que Windows montre dans le sens du joueur : on y reste.
+  assert.equal(readingScreen(screens, 0), playfield);
+  // Playfield couché et tourné (flippers à gauche ou à droite de l'image) : le fronton.
+  assert.equal(readingScreen(screens, 270), backglass);
+  assert.equal(readingScreen(screens, 90), backglass);
+  assert.equal(readingScreen(screens, 180), backglass);
+  // À taille égale, le fronton plutôt que le topper ; seul écran : le playfield, même tourné.
+  assert.equal(readingScreen([{ role: 'topper', bounds: dmd }, { role: 'backglass', bounds: dmd }, { role: 'playfield', bounds: playfield }], 270), dmd);
+  assert.equal(readingScreen([{ role: 'topper', bounds: { ...dmd } }, { role: 'backglass', bounds: dmd }], 270), dmd);
+  assert.equal(readingScreen([{ role: 'playfield', bounds: playfield }], 270), playfield);
+  assert.equal(readingScreen([], 270), undefined);
 });

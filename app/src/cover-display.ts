@@ -20,6 +20,13 @@ const OFFSCREEN = offscreenMode(process.env);
  * retour du bureau Windows (fenêtre réduite, puis rouverte), la fenêtre reprend tout son
  * écran si elle l'a perdu.
  *
+ * Jamais d'écran clair : une fenêtre qui apparaît déjà en plein écran (montrée, ou rouverte
+ * depuis la barre des tâches) est peinte en bleu pâle (#D3E3FD) par Windows quelques dizaines
+ * de millisecondes, à chaque fois ; montrée à la taille de son écran puis mise en plein écran,
+ * jamais (mesures sur les vrais écrans, 24 octobre 2026). Une fenêtre pas encore montrée prend
+ * donc seulement la taille de son écran, et passe en plein écran dès qu'elle s'affiche ; pour
+ * la réduire, minimizeCovered.
+ *
  * Hors écran (essai sans opérateur, app/src/offscreen.ts), ni plein écran ni reprise :
  * la fenêtre prend seulement la taille de son écran, réel ou simulé, pivotement compris.
  */
@@ -34,19 +41,45 @@ export function coverDisplay(win: BrowserWindow, bounds: Rectangle): void {
       const wanted = covered.get(win);
       if (wanted && !win.isDestroyed() && coverProblem(stateOf(win), wanted)) cover(win, wanted);
     };
-    win.on('show', recover);
-    win.on('restore', recover);
+    // Suivi par les événements : le module est chargé sans electron par les tests du cœur.
+    win.on('show', () => {
+      displayed.add(win);
+      recover();
+    });
+    // Rouverte depuis la barre des tâches, une fenêtre restée en plein écran émet
+    // « enter-full-screen », pas « restore » (Electron, Windows).
+    win.on('enter-full-screen', () => displayed.add(win));
+    win.on('hide', () => displayed.delete(win));
+    win.on('minimize', () => displayed.delete(win));
+    win.on('restore', () => {
+      displayed.add(win);
+      recover();
+    });
   }
   covered.set(win, bounds);
   cover(win, bounds);
 }
 
+/**
+ * Réduit une fenêtre couverte par coverDisplay (menu système > « Bureau Windows ») : elle
+ * quitte d'abord le plein écran, pour ne pas revenir en bleu pâle ; rouverte, elle le reprend.
+ */
+export function minimizeCovered(win: BrowserWindow): void {
+  if (win.isDestroyed()) return;
+  if (!OFFSCREEN && win.isFullScreen()) win.setFullScreen(false);
+  win.minimize();
+}
+
 /** Écran que chaque fenêtre doit couvrir (coordonnées Electron). */
 const covered = new WeakMap<BrowserWindow, Rectangle>();
+/** Fenêtres affichées (ni cachées, ni réduites, ni encore jamais montrées). */
+const displayed = new WeakSet<BrowserWindow>();
 
 function cover(win: BrowserWindow, bounds: Rectangle): void {
   if (win.isFullScreen()) win.setFullScreen(false);
   win.setBounds(bounds);
+  // Pas encore affichée : le plein écran viendra à son apparition (événement show ou restore).
+  if (!displayed.has(win)) return;
   win.setFullScreen(true);
   const problem = coverProblem(stateOf(win), bounds);
   if (problem) console.warn(`Fenêtre « ${win.getTitle()} » : ne couvre pas son écran (${problem}).`);

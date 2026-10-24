@@ -7,6 +7,14 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.3
+
+- Buttons of a Pinscape (KL25Z) or of an encoder in gamepad mode: captured in the "Buttons" step and followed by the whole menu and by VPX.
+- "Fetch" window on a cabinet: it opens on a readable screen (the backglass if the playfield is turned), with the pointer brought onto it; Exit closes it.
+- The "Fetch" window, when reopened, picks up the page where you were; more thorough site search.
+- No more white screen when a window opens or moves to another screen.
+- Lighter updates (the application alone, in a few seconds) and test pre-releases, to receive or not from the update menu.
+
 ## 0.1.2
 
 - Updates: the check runs right at start-up, then every 6 hours; the red dot appears without opening the menu.

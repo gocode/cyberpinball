@@ -116,6 +116,7 @@ import {
 import { setDisplayOrientation } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { createWindow, OFFSCREEN, windowRect } from './offscreen';
+import { joystickStatus, onJoystickInput, pressVirtualButton } from './joystick-input';
 import { locations, vpxProfile } from './paths';
 import { activeVpxIni, audioOutputs, syncVpxIni } from './vpx-ini';
 import { coverDisplay } from './cover-display';
@@ -346,6 +347,9 @@ export function startWizard(): void {
       if (process.env.CYBERPINBALL_AUTOPILOT && !isQuitShortcut(input)) event.preventDefault();
       else if (handleKey(input)) event.preventDefault();
     });
+    // Boutons d'un joystick (Pinscape…) : relevés et suivis comme des touches. Sans opérateur,
+    // un joystick virtuel de SDL appuie (autopilote « Joy<n> »).
+    onJoystickInput(win, (input) => void handleKey(input));
     // Une touche relâchée hors de la fenêtre n'arrive jamais : elle n'est plus tenue pour maintenue.
     win.on('blur', () => releaseKeys());
     win.loadFile(path.join(__dirname, '..', 'renderer', 'screen.html'));
@@ -408,6 +412,10 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
         handleKey({ type: 'keyUp', code: key, control: false } as Input);
       }
     } else if (code === 'CtrlQ') handleKey({ type: 'keyDown', code: 'KeyQ', control: true } as Input);
+    // « Joy3 » : bouton 3 (numéro SDL) d'un joystick virtuel, par le chemin d'un vrai Pinscape.
+    else if (/^Joy\d+$/.test(code)) {
+      if (!(await pressVirtualButton(Number(code.slice(3))))) console.error(`Autopilote : ${code} sans joystick lisible (${JSON.stringify(joystickStatus())})`); // i18n-ignore : console de l'autopilote
+    }
     else if (step > 0) {
       // Un appui : enfoncée puis relâchée (le relevé des boutons se fait au relâchement).
       handleKey({ type: 'keyDown', code, control: false } as Input);
@@ -1111,7 +1119,7 @@ function buttonsView(index: number, base: Record<string, unknown>) {
     name: button.required
       ? t('Bouton {n} sur {total}', { n: capture.index + 1, total: required })
       : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: BUTTONS.length - required }),
-    details: wizard.buttons ? t('Touche actuelle : {key}', { key: current ? keyLabel(current) : t('aucune') }) : t('Touche par défaut : {key}', { key: current ? keyLabel(current) : t('aucune') }),
+    details: [wizard.buttons ? t('Touche actuelle : {key}', { key: current ? keyLabel(current) : t('aucune') }) : t('Touche par défaut : {key}', { key: current ? keyLabel(current) : t('aucune') }), joystickLine()].join(' · '),
     notice:
       capture.refused ??
       (seconds === undefined
@@ -1127,6 +1135,20 @@ function buttonsView(index: number, base: Record<string, unknown>) {
           back: redoingOne(capture) ? t('annuler') : t('bouton précédent'),
         }),
   };
+}
+
+/**
+ * Joysticks pendant le relevé : une borne à Pinscape (KL25Z) ou à encodeur en mode manette
+ * envoie des boutons de joystick, lus par la bibliothèque SDL de VPX (joystick-input.ts).
+ */
+function joystickLine(): string {
+  const status = joystickStatus();
+  if (status.state === 'ready') {
+    return status.devices.length ? t('Joystick lu : {names}', { names: status.devices.map((d) => d.name || d.id).join(', ') }) : t('Aucun joystick branché');
+  }
+  if (status.state === 'error') return t('Joysticks illisibles : {error}', { error: status.error });
+  if (status.state === 'no-vpx') return t('Joysticks lus une fois VPX installé');
+  return t('Joysticks en cours de lecture…');
 }
 
 /** Après le choix du playfield : diagonale proposée depuis l'EDID, sinon la saisie précédente. */

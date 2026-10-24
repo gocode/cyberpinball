@@ -3,6 +3,9 @@
 # une capture du bureau entier sert de référence ; pendant le scénario, le bureau entier est
 # capturé en continu (CopyFromScreen, tous écrans compris) et chaque écran est comparé à la
 # référence : un point identique au bureau d'avant le lancement est un point de bureau visible.
+# Chaque écran est aussi mesuré en points blancs : un écran à plus de moitié blanc pendant que
+# Cyber Pinball tourne (fenêtre montrée avant d'être peinte, ou découverte sans image) est noté
+# BLANC, avec le processus au premier plan à cet instant.
 # Bac à sable dans tmp\demo-ecrans-couverts (copie du modèle de borne, du VPinballX.ini réel et
 # de Terminator 2 1.25 ; VPX partagé en lecture par une jonction vers les émulateurs réels).
 # Scénarios (-Scenarios) :
@@ -13,8 +16,9 @@
 #   reglages       : réglages de VPX seuls (--reglages), sur l'écran principal.
 # Captures dans tmp\captures\ecrans-couverts\<Etiquette>\<scénario> : reference.png, bureau-*.png
 # (réduites au tiers : une sur huit, et toutes celles où un écran montre le bureau),
-# couverture.txt (part de chaque écran identique au bureau, en %, et celle de sa bande du bas,
-# où est la barre des tâches) et sortie.txt (console de Cyber Pinball, constats du gardien).
+# couverture.txt (part de chaque écran identique au bureau, en %, celle de sa bande du bas, où
+# est la barre des tâches, et sa part de blanc après « b ») et sortie.txt (console de Cyber
+# Pinball, constats du gardien).
 # Aucune autre instance de Cyber Pinball ne doit tourner, et rien ne doit bouger sur le bureau
 # pendant ce temps (une fenêtre qui change n'est plus identique à la référence).
 #   .\docs\demo-ecrans-couverts.ps1 -Etiquette apres [-Scenarios partie,endurance] [-Lancements 10]
@@ -77,6 +81,28 @@ public static class Couverture {
       }
     return eligible == 0 ? 0 : 100.0 * same / eligible;
   }
+  // Part (en %) des points de la zone clairs (chaque composante à 200 ou plus : le blanc, le gris
+  // #F3F3F3 et le bleu #D3E3FD que Windows peint à l'apparition d'une fenêtre), hors
+  // points identiques à la référence (une fenêtre blanche du bureau n'est pas un écran blanc).
+  public static double Blanc(IntPtr reference, IntPtr shot, int stride, int left, int top, int width, int height, int step) {
+    int all = 0, white = 0;
+    for (int y = top; y < top + height; y += step)
+      for (int x = left; x < left + width; x += step) {
+        int a = Marshal.ReadInt32(reference, y * stride + x * 4), b = Marshal.ReadInt32(shot, y * stride + x * 4);
+        all++;
+        if ((a & 0xFFFFFF) == (b & 0xFFFFFF)) continue;
+        if (Math.Min((b >> 16) & 255, Math.Min((b >> 8) & 255, b & 255)) >= 200) white++;
+      }
+    return all == 0 ? 0 : 100.0 * white / all;
+  }
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd, out uint pid);
+  // Processus de la fenêtre au premier plan (0 : aucune).
+  public static uint PremierPlan() {
+    uint pid;
+    GetWindowThreadProcessId(GetForegroundWindow(), out pid);
+    return pid;
+  }
 }
 '@
 
@@ -129,6 +155,7 @@ function Invoke-Scenario([string]$name, [hashtable]$vars, [string[]]$arguments, 
       }
       $bits = $shot.LockBits($full, [System.Drawing.Imaging.ImageLockMode]::ReadOnly, $format)
       $flag = $false
+      $whites = @()
       $parts = foreach ($s in $screens) {
         $b = $s.Bounds
         $x = $b.Left - $all.Left; $y = $b.Top - $all.Top
@@ -136,12 +163,19 @@ function Invoke-Scenario([string]$name, [hashtable]$vars, [string[]]$arguments, 
         # Bande du bas : la barre des tâches.
         $bottom = [Couverture]::Identique($refBits.Scan0, $bits.Scan0, $bits.Stride, $x, $y + $b.Height - 60, $b.Width, 60, 4)
         if ($alive -and ($screen -gt 0.5 -or $bottom -gt 5)) { $flag = $true }
-        '{0} {1:N1}/{2:N1}' -f $s.DeviceName.Replace('\\.\', ''), $screen, $bottom
+        $white = [Couverture]::Blanc($refBits.Scan0, $bits.Scan0, $bits.Stride, $x, $y, $b.Width, $b.Height, 8)
+        if ($alive -and $white -gt 50) { $whites += $s.DeviceName.Replace('\\.\', '') }
+        '{0} {1:N1}/{2:N1} b{3:N0}' -f $s.DeviceName.Replace('\\.\', ''), $screen, $bottom, $white
       }
       $shot.UnlockBits($bits)
       $mark = if (-not $alive) { 'arrêté ' } elseif ($other) { 'autre  ' } elseif ($flag) { 'BUREAU ' } else { 'couvert' }
-      Add-Content -Path (Join-Path $dir 'couverture.txt') -Value ('{0:D4} {1:HH:mm:ss.fff} {2} : {3}' -f $i, (Get-Date), $mark, ($parts -join ' · '))
-      if ($flag -or $i % 8 -eq 0) {
+      $blanc = ''
+      if ($whites.Count) {
+        $fg = (Get-Process -Id ([Couverture]::PremierPlan()) -ErrorAction SilentlyContinue).ProcessName
+        $blanc = " · BLANC $($whites -join ', ') (premier plan : $(if ($fg) { $fg } else { 'aucun' }))"
+      }
+      Add-Content -Path (Join-Path $dir 'couverture.txt') -Value ('{0:D4} {1:HH:mm:ss.fff} {2} : {3}{4}' -f $i, (Get-Date), $mark, ($parts -join ' · '), $blanc)
+      if ($flag -or $whites.Count -or $i % 8 -eq 0) {
         $small = [System.Drawing.Bitmap]::new($shot, [int]($all.Width / 3), [int]($all.Height / 3))
         $small.Save((Join-Path $dir ('bureau-{0:D4}.png' -f $i)), [System.Drawing.Imaging.ImageFormat]::Png); $small.Dispose()
       }
@@ -155,17 +189,27 @@ function Invoke-Scenario([string]$name, [hashtable]$vars, [string[]]$arguments, 
     Start-Sleep -Milliseconds 200
   }
   Remove-Item "$dir\pret"
+  # Guet rapide des écrans clairs (une vingtaine de relevés par seconde) : les captures, deux ou
+  # trois par seconde, ratent les éclairs de quelques dizaines de millisecondes.
+  Add-Type -AssemblyName System.Windows.Forms
+  $rects = [System.Windows.Forms.Screen]::AllScreens | ForEach-Object { '{0}:{1},{2},{3},{4}' -f $_.DeviceName.Replace('\\.\', ''), $_.Bounds.X, $_.Bounds.Y, $_.Bounds.Width, $_.Bounds.Height }
+  $guet = Start-Process -FilePath node -ArgumentList (@('docs\guet-ecrans-clairs.cjs', "`"$dir`"", $seconds) + $rects) -WorkingDirectory $wt -NoNewWindow -PassThru -RedirectStandardOutput "$dir\guet.txt"
   # Sortie d'Electron redirigée par cmd vers des fichiers ; cmd attend Electron (l'opérateur & n'attend
   # pas un programme graphique). Arguments en une seule chaîne : PowerShell 7 ne les requote pas.
   $all = @('app', "--user-data-dir=`"$base\chromium-$name`"") + $arguments
   $line = "`"$electron`" $($all -join ' ') > `"$dir\sortie.txt`" 2> `"$dir\erreurs.txt`""
+  [IO.File]::WriteAllText("$dir\commande.txt", $line, $utf8)
   $shell = Start-Process -FilePath cmd.exe -ArgumentList "/d /c `"$line`"" -WorkingDirectory $wt -NoNewWindow -PassThru
   $shell.WaitForExit()
   # Une relance (assistant ↔ menu) laisse le nouveau processus seul : on attend aussi sa fin.
   for ($t = 0; $t -lt 600 -and @(Get-Process electron -ErrorAction SilentlyContinue | Where-Object { $_.Path -like "$wt\*" }).Count; $t++) { Start-Sleep -Milliseconds 500 }
+  # Le guet s'arrête aussitôt : le bureau qui revient à la fermeture n'est pas un écran clair.
+  [IO.File]::WriteAllText("$dir\fin-guet", '')
   Start-Sleep -Seconds 2
   [IO.File]::WriteAllText("$dir\fin", '')
   Wait-Job $shots -Timeout 30 | Out-Null; Receive-Job $shots; Remove-Job $shots -Force
+  if (-not $guet.WaitForExit(10000)) { $guet.Kill() }
+  Remove-Item "$dir\fin-guet" -ErrorAction SilentlyContinue
   Remove-Item "$dir\fin" -ErrorAction SilentlyContinue
 
   # Bilan : le temps de démarrage (du lancement au premier instant où tout est couvert), puis
@@ -189,6 +233,18 @@ function Invoke-Scenario([string]$name, [hashtable]$vars, [string[]]$arguments, 
   if ($null -ne $startup) { '  démarrage : bureau visible au plus {0:N1} s (avant les premières fenêtres)' -f $startup }
   if ($bad.Count) { "  BUREAU VISIBLE sur $($bad.Count) captures ensuite :"; $bad | Select-Object -First 12 | ForEach-Object { "    $_" } }
   else { '  ensuite : tous les écrans couverts à chaque capture' }
+  # Démarrage compris : un écran blanc n'est jamais acceptable, même avant les premières fenêtres.
+  $white = @($alive | Where-Object { $_ -match ' · BLANC ' })
+  if ($white.Count) { "  ÉCRAN BLANC sur $($white.Count) captures :"; $white | Select-Object -First 12 | ForEach-Object { "    $_" } }
+  else { '  blanc : aucun écran blanc' }
+  # Éclairs du guet rapide : clair, puis de nouveau sombre. Un écran clair suivi d'autre chose est
+  # le plus souvent le bureau qui revient à la fermeture : listé à part, à vérifier sur les captures.
+  $rowsClair = @(Get-Content "$dir\clair.txt" -Encoding utf8 -ErrorAction SilentlyContinue)
+  $flashes = @($rowsClair | Where-Object { $_ -match 'puis sombre' })
+  $doubtful = @($rowsClair | Where-Object { $_ -match 'puis autre chose' })
+  if ($doubtful.Count) { '  clair puis autre chose (fermeture ?) :'; $doubtful | Select-Object -First 10 | ForEach-Object { "    $_" } }
+  if ($flashes.Count) { "  ÉCRAN CLAIR (guet rapide) : $($flashes.Count) éclair$(if ($flashes.Count -gt 1) { 's' }) :"; $flashes | Select-Object -First 20 | ForEach-Object { "    $_" } }
+  else { "  clair : aucun éclair ($(Get-Content "$dir\guet.txt" -Encoding utf8 -ErrorAction SilentlyContinue))" }
   Select-String -Path "$dir\sortie.txt", "$dir\erreurs.txt" -Pattern 'Écran «|ne couvre pas|Bilan|Écrans :|^#\d+' -Encoding utf8 | ForEach-Object { "  console : $($_.Line)" }
 }
 

@@ -5,16 +5,23 @@
 //   npm run publier -- --sans-fabrication -> reprend release\ tel qu'il est
 //   npm run publier -- --notes <fichier>  -> nouveautés (sinon : section « ## <version> » de CHANGELOG.md,
 //                                            et de CHANGELOG.en.md pour la release GitHub)
-//   npm run publier -- --local <dossier> --url <adresse> -> flux et installeur dans un dossier
-//                                            servi à cette adresse, sans GitHub (essais ;
-//                                            --leger : sans fabriquer la version complète)
+//   npm run publier -- --rapide           -> sans refaire les installeurs (une à deux minutes) : le
+//                                            paquet léger seul, le flux désignant les installeurs
+//                                            de la dernière publication complète
+//   npm run publier -- --local <dossier> --url <adresse> -> flux, installeur et paquet léger dans
+//                                            un dossier servi à cette adresse, sans GitHub (essais ;
+//                                            --leger : sans fabriquer la version complète ;
+//                                            --rapide demande --reference <flux publié>)
 //
 // Étapes : contrôle de publication (scripts/audit-publication.mjs), fabrication des deux
-// installeurs, flux cyberpinball-maj.json signé par la clé de publication
-// (scripts/cle-publication.mjs), puis release GitHub avec trois fichiers : les deux
-// installeurs et le flux, posée sur l'instantané du code envoyé sur main (scripts/envoyer-github.mjs).
-// Une version avec préversion (0.2.0-beta.1) est publiée en
-// « pre-release » : GitHub ne la donne pas pour « latest », les bornes ne la voient pas.
+// installeurs et du paquet léger (CyberPinball-application.zip), flux cyberpinball-maj.json
+// signé par la clé de publication (scripts/cle-publication.mjs), puis release GitHub avec ces
+// quatre fichiers, posée sur l'instantané du code envoyé sur main (scripts/envoyer-github.mjs).
+// Une version avec préversion (0.2.0-essai.1) est publiée en « pre-release » : GitHub ne la
+// donne pas pour « latest », seules les bornes qui acceptent les préversions la voient.
+//
+// Publication rapide : refusée si le socle (Electron, exécutable : scripts/fabriquer.mjs) n'est
+// plus celui du dernier flux publié, puisque les bornes ne pourraient pas prendre le paquet léger.
 //
 // Jeton GitHub : voir scripts/jeton-github.mjs (%USERPROFILE%\.cyberpinball\jeton-github.txt, ou
 // CYBERPINBALL_GITHUB_TOKEN). Jamais dans le dépôt ni sur la ligne de commande.
@@ -42,6 +49,8 @@ const option = (name) => {
   return at >= 0 ? argv[at + 1] : undefined;
 };
 const local = option('--local');
+const rapid = argv.includes('--rapide');
+const prerelease = version.includes('-');
 
 function step(text) {
   console.log(`\n> ${text}`);
@@ -92,22 +101,56 @@ if (!local) {
 }
 
 if (!argv.includes('--sans-fabrication')) {
-  step('Fabrication des installeurs');
-  const args = [path.join(repo, 'scripts', 'fabriquer.mjs'), '--installeur', ...(argv.includes('--leger') ? ['--leger'] : [])];
+  step(rapid ? 'Fabrication de l’application seule (sans electron-builder ni installeurs)' : 'Fabrication des installeurs');
+  const args = [path.join(repo, 'scripts', 'fabriquer.mjs'), ...(rapid ? ['--application'] : ['--installeur', ...(argv.includes('--leger') ? ['--leger'] : [])])];
   const run = spawnSync(process.execPath, args, { cwd: repo, stdio: 'inherit' });
   if (run.status !== 0) fail('la fabrication a échoué.');
 }
-const built = JSON.parse(fs.readFileSync(path.join(release, 'win-unpacked', 'resources', 'app', 'package.json'), 'utf8')).version;
-if (built !== version) fail(`release\\ contient la version ${built}, pas ${version} : relancez sans --sans-fabrication.`);
+// L'application telle que fabriquée (build\app), dont le paquet léger est l'image exacte.
+const appPkg = JSON.parse(fs.readFileSync(path.join(repo, 'build', 'app', 'package.json'), 'utf8'));
+const built = rapid ? appPkg.version : JSON.parse(fs.readFileSync(path.join(release, 'win-unpacked', 'resources', 'app', 'package.json'), 'utf8')).version;
+if (built !== version || appPkg.version !== version) fail(`release\\ contient la version ${built}, pas ${version} : relancez sans --sans-fabrication.`);
+const socle = appPkg.cyberpinball?.socle;
+if (!socle) fail('build\\app\\package.json n’a pas de socle (cyberpinball.socle) : relancez sans --sans-fabrication.');
 const installer = path.join(release, update.UPDATE_INSTALLER_NAME);
 const complete = path.join(release, 'CyberPinball-Setup-complet.exe');
-if (!fs.existsSync(installer)) fail(`${installer} manque.`);
+const appPackage = path.join(release, update.UPDATE_APP_NAME);
+if (!rapid && !fs.existsSync(installer)) fail(`${installer} manque.`);
+if (!fs.existsSync(appPackage)) fail(`${appPackage} manque.`);
+
+// Publication rapide : les installeurs sont ceux du dernier flux publié (préversions comprises
+// pour une préversion), à condition que les bornes puissent prendre le paquet léger.
+let reference;
+if (rapid) {
+  step('Installeurs de la dernière publication complète');
+  const source = option('--reference') ?? (local ? undefined : prerelease ? await update.prereleaseFeedUrl() : update.updateFeedUrl({}));
+  if (!source) fail('--rapide avec --local demande --reference <fichier ou adresse du flux publié>.');
+  const text = /^https?:\/\//.test(source) ? await fetch(source, { redirect: 'follow' }).then((r) => (r.ok ? r.text() : fail(`flux publié illisible (HTTP ${r.status}) : ${source}`))) : fs.readFileSync(source, 'utf8');
+  reference = update.openEnvelope(text, update.updatePublicKey({}));
+  const installs = reference.installer.version ?? reference.version;
+  if (!reference.app) fail(`le flux publié (${reference.version}) n'a pas de paquet léger : faites d'abord une publication complète (sans --rapide).`);
+  if (reference.app.socle !== socle) {
+    fail(`le socle a changé (publié : ${reference.app.socle} ; fabriqué : ${socle}) : Electron ou l'exécutable ne sont plus les mêmes, les bornes ont besoin de l'installeur. Publication complète (sans --rapide).`);
+  }
+  if (update.compareAppVersions(reference.version, version) >= 0) fail(`la version ${reference.version} est déjà publiée : changez la version de package.json.`);
+  console.log(`Flux publié : ${reference.version}, socle identique. Installeurs repris : ceux de la ${installs}.`);
+}
 
 step('Nouveautés');
 const notesFile = option('--notes');
-const notes = notesFile ? bulletPoints(fs.readFileSync(notesFile, 'utf8')) : changelogNotes(path.join(repo, 'CHANGELOG.md'), version);
+// Une préversion (0.2.0-essai.1) sans section à elle prend celle de sa version finale (## 0.2.0).
+const base = version.replace(/-.*$/, '');
+const changelog = (file) => {
+  const own = changelogNotes(file, version);
+  return own.length || !prerelease ? own : changelogNotes(file, base);
+};
+let notes = notesFile ? bulletPoints(fs.readFileSync(notesFile, 'utf8')) : changelog(path.join(repo, 'CHANGELOG.md'));
 // Version anglaise : dans la release GitHub, et dans le flux pour les bornes réglées en anglais.
-const notesEn = notesFile ? [] : changelogNotes(path.join(repo, 'CHANGELOG.en.md'), version);
+let notesEn = notesFile ? [] : changelog(path.join(repo, 'CHANGELOG.en.md'));
+if (!notes.length && prerelease) {
+  notes = [`Préversion d'essai de la ${base}.`];
+  notesEn = [`Test pre-release of ${base}.`];
+}
 if (!notes.length && !local) fail(`aucune nouveauté pour ${version} : ajoutez une section « ## ${version} » à CHANGELOG.md (une ligne « - » par point), ou --notes <fichier>.`);
 for (const n of notes) console.log(`  - ${n}`);
 for (const n of notesEn) console.log(`  - (en) ${n}`);
@@ -132,11 +175,20 @@ const manifest = {
   notes,
   ...(notesEn.length && { notesByLanguage: { en: notesEn } }),
   ...(history.length && { history }),
-  installer: {
-    name: update.UPDATE_INSTALLER_NAME,
-    url: local ? `${urlBase.replace(/\/$/, '')}/${update.UPDATE_INSTALLER_NAME}` : update.releaseAssetUrl(version, update.UPDATE_INSTALLER_NAME),
-    size: fs.statSync(installer).size,
-    sha256: await update.sha256File(installer),
+  installer: reference
+    ? { ...reference.installer, version: reference.installer.version ?? reference.version }
+    : {
+        name: update.UPDATE_INSTALLER_NAME,
+        url: local ? `${urlBase.replace(/\/$/, '')}/${update.UPDATE_INSTALLER_NAME}` : update.releaseAssetUrl(version, update.UPDATE_INSTALLER_NAME),
+        size: fs.statSync(installer).size,
+        sha256: await update.sha256File(installer),
+      },
+  app: {
+    name: update.UPDATE_APP_NAME,
+    url: local ? `${urlBase.replace(/\/$/, '')}/${update.UPDATE_APP_NAME}` : update.releaseAssetUrl(version, update.UPDATE_APP_NAME),
+    size: fs.statSync(appPackage).size,
+    sha256: await update.sha256File(appPackage),
+    socle,
   },
 };
 const envelope = update.signManifest(manifest, privateKey);
@@ -144,11 +196,13 @@ const envelope = update.signManifest(manifest, privateKey);
 update.openEnvelope(JSON.stringify(envelope), update.updatePublicKey({}));
 const feed = path.join(release, update.UPDATE_FEED_NAME);
 fs.writeFileSync(feed, `${JSON.stringify(envelope, null, 2)}\n`, 'utf8');
-console.log(`${feed}\n  installeur ${manifest.installer.size} octets, SHA-256 ${manifest.installer.sha256}`);
+console.log(`${feed}\n  installeur ${manifest.installer.size} octets${reference ? ` (celui de la ${manifest.installer.version})` : ''}, SHA-256 ${manifest.installer.sha256}`);
+console.log(`  paquet léger ${manifest.app.size} octets, SHA-256 ${manifest.app.sha256}, socle ${socle}`);
 
 if (local) {
   fs.mkdirSync(local, { recursive: true });
-  fs.copyFileSync(installer, path.join(local, update.UPDATE_INSTALLER_NAME));
+  if (!reference) fs.copyFileSync(installer, path.join(local, update.UPDATE_INSTALLER_NAME));
+  fs.copyFileSync(appPackage, path.join(local, update.UPDATE_APP_NAME));
   fs.copyFileSync(feed, path.join(local, update.UPDATE_FEED_NAME));
   console.log(`\nPublication locale : ${local} (à servir à ${urlBase})`);
   process.exit(0);
@@ -158,15 +212,27 @@ step('Code sur GitHub (instantané, sans l’historique)');
 const commit = option('--commit') ?? snapshotAndPush({ message: `Cyber Pinball ${version}` });
 
 step(`Release v${version} sur github.com/${repository}`);
+const installs = manifest.installer.version ?? version;
+const installersText = reference
+  ? [
+      `**Installeurs** : ceux de la [${installs}](https://github.com/${repository}/releases/tag/v${installs}) ; une borne installée avec eux reçoit ensuite la mise à jour légère vers ${version}.`,
+      '',
+    ]
+  : [
+      `**${update.UPDATE_INSTALLER_NAME}** : installeur léger (Visual Pinball X téléchargé au premier lancement).`,
+      '',
+      '**CyberPinball-Setup-complet.exe** : avec l’archive officielle de Visual Pinball X, pour une borne sans Internet. Redistribution gratuite seulement : ni vendue, ni livrée avec une borne vendue ou exploitée commercialement (licence de VPX).',
+      '',
+    ];
 const body = [
   ...notes.map((n) => `- ${n}`),
   '',
   ...(notesEn.length ? ['**English**', '', ...notesEn.map((n) => `- ${n}`), ''] : []),
-  `**${update.UPDATE_INSTALLER_NAME}** : installeur léger (Visual Pinball X téléchargé au premier lancement). Les bornes déjà installées se mettent à jour depuis le menu système, « Mise à jour de Cyber Pinball ».`,
+  `Les bornes déjà installées se mettent à jour depuis le menu système, « Mise à jour de Cyber Pinball » : mise à jour légère (**${update.UPDATE_APP_NAME}**, l'application seule) si elles ont déjà le même socle (${socle}), sinon par l'installeur.`,
   '',
-  '**CyberPinball-Setup-complet.exe** : avec l’archive officielle de Visual Pinball X, pour une borne sans Internet. Redistribution gratuite seulement : ni vendue, ni livrée avec une borne vendue ou exploitée commercialement (licence de VPX).',
-  '',
+  ...installersText,
   `SHA-256 de ${update.UPDATE_INSTALLER_NAME} : \`${manifest.installer.sha256}\``,
+  `SHA-256 de ${update.UPDATE_APP_NAME} : \`${manifest.app.sha256}\``,
 ].join('\n');
 const created = await api('POST', '/releases', {
   tag_name: `v${version}`,
@@ -174,11 +240,12 @@ const created = await api('POST', '/releases', {
   name: `Cyber Pinball ${version}`,
   body,
   draft: true,
-  prerelease: version.includes('-'),
+  prerelease,
 });
 if (created.status !== 201) fail(`création de la release refusée (HTTP ${created.status}) : ${JSON.stringify(created.json)}`);
 const uploadBase = created.json.upload_url.replace(/\{.*\}$/, '');
-for (const file of [installer, ...(fs.existsSync(complete) ? [complete] : []), feed]) {
+const files = reference ? [appPackage, feed] : [installer, ...(fs.existsSync(complete) ? [complete] : []), appPackage, feed];
+for (const file of files) {
   const name = path.basename(file);
   process.stdout.write(`  ${name} (${(fs.statSync(file).size / 1024 ** 2).toFixed(1)} Mio)… `);
   const blob = await fs.openAsBlob(file);
@@ -193,9 +260,10 @@ if (argv.includes('--brouillon')) {
   if (published.status !== 200) fail(`publication refusée (HTTP ${published.status}) ; la release reste en brouillon : ${created.json.html_url}`);
   console.log(`\nPubliée : ${published.json.html_url}`);
   // Les bornes lisent ce flux : vérifié tel qu'elles le recevront.
-  const check = await update.checkForUpdate({ current: '0.0.0' }).catch((error) => error);
+  // Une préversion : lue comme une borne qui accepte les préversions.
+  const check = await update.checkForUpdate({ current: '0.0.0', prereleases: prerelease }).catch((error) => error);
   if (check instanceof Error) console.log(`Attention : le flux n'est pas encore lisible par les bornes (${check.message}).`);
-  else console.log(`Flux lu comme une borne : version ${check.latest.version}${version.includes('-') ? ' (préversion : les bornes restent sur la dernière version finale)' : ''}.`);
+  else console.log(`Flux lu comme une borne : version ${check.latest.version}${prerelease ? ' (préversion : seules les bornes qui acceptent les préversions la voient)' : ''}.`);
 }
 
 // Description et sujets du dépôt, d'après package.json. Sans la permission « Administration »,

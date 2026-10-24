@@ -232,6 +232,8 @@ export function createCatalog(ctx: CatalogContext) {
       refresh?.();
       host.broadcast();
     },
+    screen: () => host.readingScreen?.(),
+    exitKeys: () => host.keys().exit,
   });
 
   let watcher: { stop(): void } | undefined;

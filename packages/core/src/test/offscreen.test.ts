@@ -82,6 +82,22 @@ test('toute fenêtre naît par createWindow : hors écran pendant un essai', () 
   assert.deepEqual(offenders(/new BrowserWindow\(/, 'offscreen.ts'), [], 'utiliser createWindow(options) de app/src/offscreen.ts');
 });
 
+test('jamais d’écran clair : toute fenêtre à l’écran naît sans fond système de Windows', () => {
+  // Sans page affichée, Windows 11 peint la fenêtre du fond de son thème (#F3F3F3 en clair).
+  const create = fs.readFileSync(path.join(SOURCES, 'offscreen.ts'), 'utf8').match(/export function createWindow[\s\S]*?\n}/)?.[0] ?? '';
+  assert.match(create, /if \(!OFFSCREEN\) \{\s*const win = new BrowserWindow\(\{ \.\.\.options, backgroundMaterial: 'none' \}\);\s*trackPainting\(win\);/);
+  assert.deepEqual(offenders(/backgroundMaterial/, 'offscreen.ts'), [], 'le fond système des fenêtres est fixé par createWindow');
+});
+
+test('jamais d’écran clair : plein écran et réduction ne passent que par cover-display.ts', () => {
+  // Une fenêtre montrée, ou rouverte, déjà en plein écran est peinte en bleu pâle (#D3E3FD) :
+  // coverDisplay ne la met en plein écran qu'une fois affichée, minimizeCovered le quitte avant
+  // de la réduire.
+  assert.deepEqual(offenders(/\.(setFullScreen|setKiosk|minimize)\(/, 'cover-display.ts'), [], 'utiliser coverDisplay ou minimizeCovered de app/src/cover-display.ts');
+  const cover = fs.readFileSync(path.join(SOURCES, 'cover-display.ts'), 'utf8');
+  assert.match(cover, /if \(!displayed\.has\(win\)\) return;\s*win\.setFullScreen\(true\);/);
+});
+
 test('les écrans ne se lisent que par observedDisplays : les écrans simulés valent partout', () => {
   assert.deepEqual(offenders(/probeDisplays\(/, 'displays.ts'), [], 'utiliser observedDisplays() de app/src/displays.ts');
 });
@@ -118,6 +134,14 @@ test('hors écran, une exception non rattrapée arrête l’essai au lieu d’ou
   assert.match(text, /if \(OFFSCREEN\) \{\s*process\.on\('uncaughtException'[\s\S]*?app\.exit\(1\)/);
 });
 
+test('à l’écran, une exception non rattrapée est journalisée et l’application continue, sans boîte modale', () => {
+  assert.match(fs.readFileSync(path.join(SOURCES, 'main.ts'), 'utf8'), /if \(!OFFSCREEN\) journalUncaught\(loc\.dataDir\);/);
+  const text = fs.readFileSync(path.join(SOURCES, 'uncaught.ts'), 'utf8');
+  assert.match(text, /process\.on\('uncaughtException'/);
+  assert.match(text, /process\.on\('unhandledRejection'/);
+  assert.doesNotMatch(text, /app\.(exit|quit)\(|dialog\./);
+});
+
 // Nouvelle console : Windows la confie au Terminal, qui s'ouvre sur le bureau de l'utilisateur,
 // même depuis le bureau caché. Les scripts lancent les outils en ligne de commande dans leur
 // propre console, et l'application avec windowsHide.
@@ -137,8 +161,9 @@ test('application : tout outil en ligne de commande est lancé avec windowsHide'
   const found = dirs.flatMap((dir) =>
     fs
       .readdirSync(dir)
-      // Programmes à fenêtres : VPX (launcher.ts), l'installeur de la mise à jour et sa page de progression (updates-menu.ts).
-      .filter((f) => f.endsWith('.ts') && f !== 'launcher.ts' && f !== 'updates-menu.ts')
+      // Programmes à fenêtres : VPX (launcher.ts), l'installeur de la mise à jour et sa page de progression (updates-menu.ts),
+      // Cyber Pinball relancé après la mise à jour légère (maj-legere.ts).
+      .filter((f) => f.endsWith('.ts') && f !== 'launcher.ts' && f !== 'updates-menu.ts' && f !== 'maj-legere.ts')
       .flatMap((f) => {
         const lines = fs.readFileSync(path.join(dir, f), 'utf8').split('\n');
         return lines.flatMap((line, i) =>
