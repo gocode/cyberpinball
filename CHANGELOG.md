@@ -12,6 +12,7 @@ son interface).
 ## 0.1.3
 
 - Boutons d'un Pinscape (KL25Z) ou d'un encodeur en mode manette : relevés dans l'étape « Boutons » et suivis par tout le menu et par VPX.
+- Bouton Pause, facultatif, dans l'étape « Boutons » : un appui met la partie en pause, un autre la reprend (P au clavier par défaut).
 - Lanceur analogique (plunger à capteur d'un Pinscape) : détecté en le tirant, réglé et essayé dans l'étape « Lanceur », avec l'accéléromètre pour les tremblements.
 - Boutons du jeu et boutons de l'interface réglés séparément ; touches du clavier et boutons de joystick se mélangent librement.
 - « Ajouter une table » réunit au même endroit toutes les façons d'ajouter une table, avec des filtres dans le catalogue et l'installation rapide.

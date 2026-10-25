@@ -43,6 +43,8 @@ export const BUTTONS: readonly ButtonInfo[] = [
   { id: 'leftMagna', get label() { return t('MagnaSave gauche'); }, required: false, default: 'ControlLeft', vpx: ['LeftMagna', 'UIUp'] },
   { id: 'rightMagna', get label() { return t('MagnaSave droit'); }, required: false, default: 'ControlRight', vpx: ['RightMagna', 'UIDown'] },
   { id: 'extraBall', label: 'Extra Ball', required: false, default: 'KeyB', vpx: ['ExtraBall'] },
+  // Pause de VPX : la partie s'arrête, le même bouton la reprend.
+  { id: 'pause', label: 'Pause', required: false, default: 'KeyP', vpx: ['Pause'] },
   { id: 'tilt', get label() { return t('Tilt (balancier)'); }, required: false, default: 'KeyT', vpx: ['Tilt'] },
   { id: 'nudgeLeft', get label() { return t('Tremblement à gauche'); }, required: false, default: 'KeyZ', vpx: ['LeftNudge'] },
   { id: 'nudgeRight', get label() { return t('Tremblement à droite'); }, required: false, default: 'Slash', vpx: ['RightNudge'] },
@@ -598,6 +600,7 @@ export function gameKeys(buttons: CabinetButtons | undefined): [string, string][
   };
   optional('MagnaSave', ['leftMagna', 'rightMagna']);
   optional('Extra Ball', ['extraBall']);
+  optional('Pause', ['pause']);
   optional('Tilt', ['tilt']);
   optional(t('Tremblements'), ['nudgeLeft', 'nudgeRight', 'nudgeCenter']);
   optional('Volume', ['volumeDown', 'volumeUp']);
@@ -707,7 +710,6 @@ const VPX_ACTION_LABELS: Record<string, string> = {
   get Credit3() { return t('Crédit 3'); },
   get Credit4() { return t('Crédit 4'); },
   get Lockbar() { return t('Bouton de la lockbar'); },
-  Pause: 'Pause',
   get PerfOverlay() { return t('Statistiques d’affichage'); },
   get InGameUI() { return t('Menu de VPX'); },
   SlamTilt: 'Slam Tilt',

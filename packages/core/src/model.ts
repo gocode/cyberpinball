@@ -203,6 +203,7 @@ export type ButtonId =
   | 'leftMagna'
   | 'rightMagna'
   | 'extraBall'
+  | 'pause'
   | 'tilt'
   | 'nudgeLeft'
   | 'nudgeRight'

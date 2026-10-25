@@ -10,6 +10,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 ## 0.1.3
 
 - Buttons of a Pinscape (KL25Z) or of an encoder in gamepad mode: captured in the "Buttons" step and followed by the whole menu and by VPX.
+- Optional Pause button in the "Buttons" step: one press pauses the game, another resumes it (P on the keyboard by default).
 - Analog plunger (a Pinscape sensor plunger): detected by pulling it, set and tested in the "Plunger" step, along with the accelerometer for nudging.
 - Game buttons and interface buttons set separately; keyboard keys and joystick buttons mix freely.
 - "Add a table" brings every way of adding a table together in one place, with filters in the catalogue and quick install.

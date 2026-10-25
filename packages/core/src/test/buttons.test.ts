@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { toPhysicalScreen } from '../fingerprint';
 import {
   BUTTONS,
+  buttonInfo,
   buttonKeys,
   buttonProblems,
   buttonsToTry,
@@ -208,7 +209,7 @@ test('touches par défaut des encodeurs : écrites telles que VPX les écrit, ri
   assert.equal(input(plan.nextIni!, 'VolumeDown'), 'Key;45');
   // Volume − et Service 7 partagent - par défaut dans VPX : ce doublon voulu reste.
   assert.deepEqual(plan.silenced, []);
-  assert.equal(input(plan.nextIni!, 'Pause'), '');
+  assert.equal(input(plan.nextIni!, 'Pause'), 'Key;19', 'bouton Pause sur P, la touche de VPX');
   assert.equal(plan.memory['Input.Mapping.Start'], 'Key;30');
   // Menu de VPX : F12 au clavier, les deux MagnaSave sur la borne.
   assert.equal(input(plan.nextIni!, 'InGameUI'), 'Key;69 | Key;224 & Key;228');
@@ -283,6 +284,32 @@ test('un bouton facultatif passé perd sa touche par défaut si un autre bouton 
   const plan = planVpxSync(cabinetWith(buttons), devPcDisplays(), VPX_FIRST_RUN);
   assert.equal(input(plan.nextIni!, 'LaunchBall'), 'Key;5');
   assert.equal(input(plan.nextIni!, 'ExtraBall'), 'Key;0');
+});
+
+test('bouton Pause : facultatif, sur P comme dans VPX, et un relevé fait sans lui garde la pause de VPX', () => {
+  // Octobre 2026 : aucun bouton de la borne n'arrivait à l'action Pause de VPX (P au clavier, InputManager.cpp).
+  const pause = buttonInfo('pause');
+  assert.equal(pause.required, false);
+  assert.deepEqual(pause.vpx, ['Pause']);
+  assert.equal(sdlScancode(pause.default), VPX_INPUT_DEFAULTS.Pause, 'la touche des encodeurs est celle de VPX');
+  assert.equal(DEFAULT_BUTTONS.pause, 'KeyP');
+  assert.equal(input(planVpxSync(cabinetWith({ ...DEFAULT_BUTTONS }), devPcDisplays(), VPX_FIRST_RUN).nextIni!, 'Pause'), 'Key;19');
+  assert.ok(gameKeys(undefined).some(([title, keys]) => title === 'Pause' && keys === 'P'));
+
+  // Relevé d'avant ce bouton (ou Pause passé par Exit) : la touche P de VPX reste, l'aide-mémoire n'en parle pas.
+  const before: CabinetButtons = { ...DEFAULT_BUTTONS };
+  delete before.pause;
+  assert.deepEqual(buttonProblems(before), []);
+  const kept = planVpxSync(cabinetWith(before), devPcDisplays(), VPX_FIRST_RUN);
+  assert.equal(input(kept.nextIni!, 'Pause'), 'Key;19');
+  assert.deepEqual(kept.silenced, []);
+  assert.ok(!gameKeys(before).some(([title]) => title === 'Pause'));
+  // … sauf si un autre bouton a pris P : la pause se tait, comme avant.
+  const taken = planVpxSync(cabinetWith({ ...before, plunger: 'KeyP' }), devPcDisplays(), VPX_FIRST_RUN);
+  assert.equal(input(taken.nextIni!, 'Pause'), 'Key;0');
+  assert.deepEqual(taken.silenced.map((s) => [s.action, s.button]), [['Pause', 'plunger']]);
+  // Relevé avec Pause : P n'est plus libre pour un autre bouton.
+  assert.match(recordButton({ ...DEFAULT_BUTTONS }, 'plunger', 'KeyP').refused!, /P est déjà la touche du bouton Pause/);
 });
 
 test('boutons de manette affectés dans VPX : gardés à côté de la touche', () => {
@@ -465,6 +492,7 @@ test('relevé mixte : touches du clavier et boutons du joystick, librement d’u
     leftMagna: 'ControlLeft',
     rightMagna: joy(7),
     extraBall: 'Escape', // Exit : la borne n'a pas ce bouton
+    pause: joy(15),
     tilt: joy(9),
     nudgeLeft: 'KeyZ',
     nudgeRight: 'Escape',
@@ -508,6 +536,7 @@ test('relevé mixte : touches du clavier et boutons du joystick, librement d’u
   assert.equal(input(ini, 'RightMagna'), `${joy(7)} | Key;228`);
   assert.equal(input(ini, 'Tilt'), `${joy(9)} | Key;23`);
   assert.equal(input(ini, 'VolumeUp'), `${joy(14)} | Key;46`);
+  assert.equal(input(ini, 'Pause'), `${joy(15)} | Key;19`);
   // Le menu de VPX en partie : un MagnaSave au clavier, l'autre au joystick.
   assert.equal(input(ini, 'InGameUI'), `Key;69 | Key;224 & ${joy(7)}`);
 });

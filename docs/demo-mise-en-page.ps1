@@ -62,7 +62,7 @@ function Invoke-Review([string]$name, [string]$home_, [string[]]$codes, [string[
   Assert-HorsEcran "$captures\$name"
 }
 
-$encodeur = @('KeyA', 'KeyA', 'KeyS', 'MetaLeft', 'Digit2', 'KeyQ', 'Digit3', 'KeyW', 'KeyQ', 'KeyQ', 'KeyD', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ')
+$encodeur = @('KeyA', 'KeyA', 'KeyS', 'MetaLeft', 'Digit2', 'KeyQ', 'Digit3', 'KeyW', 'KeyQ', 'KeyQ', 'KeyD', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ')
 $essai = @('Digit2', 'KeyA', 'KeyS', 'KeyQ', 'Digit2')
 Push-Location $wt
 try {

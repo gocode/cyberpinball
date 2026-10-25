@@ -137,13 +137,17 @@ body {
   font-size: 6vmin;
 }
 
-/* Tous les boutons : relevés, en cours, à venir. Deux colonnes sur un écran en hauteur. */
+/*
+ * Tous les boutons : relevés, en cours, à venir. Quatre colonnes sur un écran en largeur
+ * (seize boutons du jeu : quatre rangées ; sur trois colonnes, la sixième rangée poussait
+ * les actions sous l'avertissement du pied), deux sur un écran en hauteur.
+ */
 .buttons-list {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   text-align: left;
   gap: 0.8vmin 1.2vmin;
-  width: min(94%, 150vmin);
+  width: min(94%, 160vmin);
   margin: 1vmin 0 0;
   padding: 0;
   list-style: none;
