@@ -12,7 +12,7 @@ import { applyOps, sameFile, type FileOp } from '../fileops';
 import { mediaErrorsFile, readMediaErrors, recordMediaError } from '../mediaerrors';
 import { readInfo, scanTables, type TableEntry } from '../tables';
 import { buildZip } from '../romzip';
-import { starTrekPack } from './fixtures';
+import { devPcDisplays, starTrekPack } from './fixtures';
 
 const SCRIPT = 'Const cGameName="afm_113b"\r\nLoadVPM "01560000", "WPC.VBS", 3.26\r\nController.GameName = cGameName\r\n';
 const TABLE = 'Attack from Mars (Bally 1995)';
@@ -301,6 +301,12 @@ const TRAPS: Trap[] = [
     code: 'manualView',
     arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[Player]\r\nCabinetAutofitMode = 0\r\n\r\n[TableOverride]\r\nViewCabVOfs = 12\r\n'),
   },
+  // Windows en portrait, joueur en bas : cadrage manuel imposé par la table, sa vue garde la rotation de l'auteur.
+  {
+    code: 'tableOrientation',
+    arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[Player]\r\nCabinetAutofitMode = 0\r\n'),
+    ctx: () => ({ orientation: portraitOrientation() }),
+  },
   // DMD posé dans le cadre d'un PuP-Pack, enregistré pour la table par le menu de VPX.
   {
     code: 'tableWindows',
@@ -569,6 +575,45 @@ test('cadrage manuel imposé par la table : la clé est retirée, le reste du .i
   // Cadrage automatique choisi pour cette table : rien à signaler.
   write(ini, '[Player]\r\nCabinetAutofitMode = 2\r\n');
   assert.deepEqual(diagnose(scanTables(tablesDir)[0]!, ctx()), []);
+  fs.rmSync(tablesDir, { recursive: true });
+  fs.rmSync(trashDir, { recursive: true, force: true });
+});
+
+/** Playfield en portrait dans Windows, joueur en bas, VPinballX.ini synchronisé (vue borne, cadrage automatique). */
+function portraitOrientation(globalIni = '[Player]\nBGSet = 1\nCabinetAutofitMode = 1\n'): NonNullable<DoctorContext['orientation']> {
+  const d = devPcDisplays()[3]!;
+  return { window: { ...d, bounds: { ...d.bounds, width: 1080, height: 1920 }, rotation: 90 }, edge: 'bottom', globalIni };
+}
+
+test('table qui change le sens de la partie : constat, réparation, rien quand VPinballX.ini est en cause', () => {
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-traps-'));
+  const folder = healthyTable(tablesDir);
+  const ini = path.join(folder, `${TABLE}.ini`);
+  const trashDir = `${tablesDir}-corbeille`;
+  const findings = (orientation = portraitOrientation()) => diagnose(scanTables(tablesDir)[0]!, { tablesDir, script: scriptFacts(SCRIPT), orientation });
+  // Cadrage manuel : un seul constat, celui du sens (il remplace « Cadrage manuel imposé »).
+  write(ini, '[Player]\r\nCabinetAutofitMode = 0\r\n\r\n[TableOverride]\r\nViewCabRotation = 270\r\n');
+  const manual = findings();
+  assert.deepEqual(manual.map((f) => f.code), ['tableOrientation']);
+  assert.match(manual[0]!.detail, /\[Player\] CabinetAutofitMode = 0 : VPX reprend la vue de l’auteur/);
+  applyOps(manual[0]!.fix!.ops, { trashDir });
+  assert.equal(fs.readFileSync(ini, 'utf8'), '[TableOverride]\r\nViewCabRotation = 270\r\n');
+  assert.deepEqual(findings(), [], 'cadrage automatique : ViewCabRotation est sans effet');
+  // Vue bureau imposée à une borne dont le joueur est à droite d'une image paysage : flippers en bas.
+  write(ini, '[Player]\nBGSet = 0\n');
+  const d = devPcDisplays()[3]!;
+  const side = { window: d, edge: 'right' as const, globalIni: '[Player]\nBGSet = 1\nCabinetAutofitMode = 1\n' };
+  const desktop = findings(side);
+  assert.equal(desktop[0]?.code, 'tableOrientation');
+  assert.match(desktop[0]!.detail, /flippers en bas, alors que vous êtes à droite/);
+  applyOps(desktop[0]!.fix!.ops, { trashDir });
+  assert.ok(!fs.existsSync(ini), 'seule la clé dans le fichier : il part entier à la corbeille');
+  // VPinballX.ini lui-même en cadrage manuel : la synchronisation le dit, pas le médecin de chaque table.
+  write(ini, '[Player]\nCabinetAutofitMode = 0\n');
+  assert.deepEqual(findings(portraitOrientation('[Player]\nBGSet = 1\nCabinetAutofitMode = 0\n')).map((f) => f.code), ['manualView']);
+  // Cadrage choisi pour cette table, ou rien sur la borne : pas de constat de sens.
+  write(ini, '[Player]\nCabinetAutofitMode = 2\n');
+  assert.deepEqual(findings(), []);
   fs.rmSync(tablesDir, { recursive: true });
   fs.rmSync(trashDir, { recursive: true, force: true });
 });

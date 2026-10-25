@@ -6,7 +6,7 @@ import { IniDocument } from './ini';
 import { loadOwnedMemory, readTextIfExists, saveOwnedMemory, writeWithBackup, type WriteReport } from './store';
 import { currentFlipperEdge, EDGE_LABELS, playfieldSize } from './layout';
 import { matchScreens } from './match';
-import { ROLES, type AncillaryRoleId, type AudioRole, type Cabinet, type ObservedAudioOutput, type ObservedDisplay, type ObservedUsbDevice, type RoleId, type ScreenZone } from './model';
+import { ROLES, type AncillaryRoleId, type AudioRole, type Cabinet, type FlipperEdge, type ObservedAudioOutput, type ObservedDisplay, type ObservedUsbDevice, type RoleId, type ScreenZone } from './model';
 import {
   applyVpxDefaults,
   applyVpxSettings,
@@ -14,8 +14,10 @@ import {
   disabledPlugins,
   iniBool,
   vpxDisplayName,
+  isVpxAutofit,
   vpxFlipperEdge,
   vpxLayoutSettings,
+  vpxPlayedFlipperEdge,
   VPX_PLAY_SETTINGS,
   vpxPluginDefaults,
   vpxSettingsFor,
@@ -221,23 +223,17 @@ export function planVpxSync(
     const size = screenSize && zoneSizeCm(screenSize, assignments.playfield, zones.playfield);
     const settings = vpxLayoutSettings(playfield, edge, size);
     applyOwned(settings.settings);
-    changes.push(...applyVpxDefaults(doc, settings.defaults.filter((s) => !outside(s))));
+    if (settings.autofit && !outside(settings.autofit)) findings.push(...requireAutofit(doc, settings.autofit, kept, changes));
     if (!size) {
       findings.push({
         severity: 'warning',
         message: t("Playfield : taille de l'écran inconnue. Relancez l'assistant d'écrans et indiquez sa diagonale pour que VPX cadre les tables à la bonne échelle."),
       });
     }
-    const expected = vpxFlipperEdge(playfield, edge);
-    if (edge !== expected) {
-      findings.push({
-        severity: 'warning',
-        message: t(
-          "Playfield : flippers {edge} de l'image, mais VPX les place toujours {expected}. Les tables s'afficheront à l'envers : relancez l'assistant d'écrans, il tournera l'écran du playfield dans Windows pour VPX.",
-          { edge: EDGE_LABELS[edge], expected: EDGE_LABELS[expected] },
-        ),
-      });
-    }
+    // Sens des tables d'après ce que VPX lira, valeurs changées ou gardées à la main comprises
+    // (étape seule de l'assistant : le cadrage n'est pas de son ressort).
+    const finding = !outside(settings.settings[0]!) && orientationFinding(playfield, edge, (section, key) => doc.get(section, key));
+    if (finding) findings.push(finding);
   } else {
     findings.push({
       severity: 'info',
@@ -367,6 +363,82 @@ function sameValue(a: string | undefined, b: string): boolean {
   const x = Number(a);
   const y = Number(b);
   return Number.isFinite(x) && Number.isFinite(y) && Math.abs(x - y) < 1e-3;
+}
+
+/** Ce que le médecin doit savoir de la borne pour juger le sens d'une table. */
+export interface PlayfieldOrientation {
+  /** Fenêtre du playfield que VPX ouvrira (sa zone de l'écran). */
+  window: ObservedDisplay;
+  /** Bord du joueur dans l'image actuelle. */
+  edge: FlipperEdge;
+  /** VPinballX.ini de la configuration active, sous les .ini des tables. */
+  globalIni: string;
+}
+
+/** Playfield de la borne tel que VPX le verra ; undefined sans playfield branché ni bord des flippers. */
+export function playfieldOrientation(cabinet: Cabinet, observed: ObservedDisplay[], globalIni: string): PlayfieldOrientation | undefined {
+  const fp = cabinet.roles.playfield;
+  const display = fp ? matchScreens(cabinet.screens, observed).matched.get(fp) : undefined;
+  const edge = display && currentFlipperEdge(cabinet, display);
+  if (!display || !edge) return undefined;
+  return { window: zoneDisplay(display, cabinetZones(cabinet).playfield), edge, globalIni };
+}
+
+/**
+ * Vue borne : le cadrage automatique de VPX est la seule garantie du sens des tables
+ * (vpxPlayedFlipperEdge). Le mode choisi (« Ajuster » ou « Remplir ») est gardé ; une
+ * autre valeur, « Manual » compris, est remplacée, sauf si l'utilisateur a gardé la clé
+ * (vpxManual) : orientationFinding le signale alors.
+ */
+function requireAutofit(doc: IniDocument, autofit: VpxSetting, kept: Set<string>, changes: VpxChange[]): SyncFinding[] {
+  const before = doc.get(autofit.section, autofit.key);
+  if (isVpxAutofit(before) || kept.has(ownedId(autofit.section, autofit.key))) return [];
+  changes.push(...applyVpxSettings(doc, [autofit]));
+  if (before === undefined || before.trim() === '') return [];
+  return [
+    {
+      severity: 'info',
+      message: t(
+        "Playfield : cadrage automatique de VPX rétabli ([Player] CabinetAutofitMode = {before} → {value}). En cadrage manuel, chaque table garde la rotation réglée par son auteur et peut s'afficher de travers sur cette borne.",
+        { before: before.trim(), value: autofit.value },
+      ),
+    },
+  ];
+}
+
+/**
+ * Constat quand VPX ne dessinera pas les flippers du côté du joueur, d'après les valeurs
+ * qu'il lira (`read` : VPinballX.ini, ou le .ini d'une table par-dessus). Deux causes :
+ * l'orientation de Windows (VPX ne sait pas tourner ses tables vers ce bord : l'assistant
+ * tourne l'écran) ou une valeur de VPinballX.ini changée à la main ou gardée par l'utilisateur.
+ */
+export function orientationFinding(window: ObservedDisplay, edge: FlipperEdge, read: (section: string, key: string) => string | undefined): SyncFinding | undefined {
+  const played = vpxPlayedFlipperEdge(read, window);
+  if (played.edge === edge) return undefined;
+  const expected = vpxFlipperEdge(window, edge);
+  if (expected !== edge) {
+    return {
+      severity: 'warning',
+      message: t(
+        "Playfield : flippers {edge} de l'image, mais VPX les place toujours {expected}. Les tables s'afficheront à l'envers : relancez l'assistant d'écrans, il tournera l'écran du playfield dans Windows pour VPX.",
+        { edge: EDGE_LABELS[edge], expected: EDGE_LABELS[expected] },
+      ),
+    };
+  }
+  const keys = ['BGSet', 'CabinetAutofitMode'].map((key) => t('[Player] {key} = {value}', { key, value: read('Player', key)?.trim() || t('(absent)') })).join(t(' ; '));
+  return {
+    severity: 'warning',
+    message: played.edge
+      ? t("Playfield : flippers {edge} de l'image, mais avec {keys}, VPX les dessinera {played}. Les tables s'afficheront de travers : remettez les valeurs de Cyber Pinball.", {
+          edge: EDGE_LABELS[edge],
+          keys,
+          played: EDGE_LABELS[played.edge],
+        })
+      : t("Playfield : flippers {edge} de l'image, mais avec {keys}, VPX garde pour chaque table la rotation réglée par son auteur, souvent pour un autre écran : les tables peuvent s'afficher de travers. Remettez le cadrage automatique (CabinetAutofitMode = 1).", {
+          edge: EDGE_LABELS[edge],
+          keys,
+        }),
+  };
 }
 
 export function formatManualEdit(e: ManualEdit): string {

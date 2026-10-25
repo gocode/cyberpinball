@@ -134,10 +134,21 @@ test('borne, joueur à droite d’un playfield paysage : vue borne, taille EDID,
   assert.ok(!plan.findings.some((f) => f.message.includes("à l'envers")));
 });
 
-test('le mode de cadrage choisi par l’utilisateur est conservé', () => {
+test('vue borne : le mode de cadrage choisi est gardé, le cadrage manuel est remplacé', () => {
   const cabinet = { ...cabinetForDevPc(), playfield: { flipperEdge: 'right' as const } };
-  const plan = planVpxSync(cabinet, devPcDisplays(), '[Player]\nCabinetAutofitMode = 0\n');
-  assert.equal(IniDocument.parse(plan.nextIni!).get('Player', 'CabinetAutofitMode'), '0');
+  const fill = planVpxSync(cabinet, devPcDisplays(), '[Player]\nCabinetAutofitMode = 2\n');
+  assert.equal(IniDocument.parse(fill.nextIni!).get('Player', 'CabinetAutofitMode'), '2');
+  // En manuel, VPX garde la rotation de chaque table : le sens des tables n'est plus garanti.
+  for (const manual of ['0', 'Manual']) {
+    const plan = planVpxSync(cabinet, devPcDisplays(), `[Player]\nCabinetAutofitMode = ${manual}\n`);
+    assert.equal(IniDocument.parse(plan.nextIni!).get('Player', 'CabinetAutofitMode'), '1');
+    assert.ok(plan.findings.some((f) => f.severity === 'info' && f.message.includes(`CabinetAutofitMode = ${manual} → 1`)));
+    assert.ok(!plan.findings.some((f) => f.severity === 'warning'));
+  }
+  // Clé gardée par l'utilisateur : laissée, mais signalée.
+  const kept = planVpxSync({ ...cabinet, vpxManual: ['Player.CabinetAutofitMode'] }, devPcDisplays(), '[Player]\nCabinetAutofitMode = 0\n');
+  assert.equal(IniDocument.parse(kept.nextIni!).get('Player', 'CabinetAutofitMode'), '0');
+  assert.ok(kept.findings.some((f) => f.severity === 'warning' && f.message.includes('la rotation réglée par son auteur')));
 });
 
 test('joueur à gauche : VPX tournerait la table à l’envers, on le signale', () => {

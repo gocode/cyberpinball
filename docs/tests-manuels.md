@@ -76,6 +76,16 @@ Ce que les captures ne montrent pas : le joueur réellement placé au bord de l'
 | --- | --- | --- | --- |
 | 28 | Joueur au bord gauche ou droit | Assistant d'écrans : flippers à gauche (ou à droite) de l'image, puis action `jouer`. Sans assistant : `CYBERPINBALL_FLIPPERS=left` (ou `right`) avant `npx electron app`. Parcourir le menu, H, la fiche, « Modifier les informations » (clavier à l'écran), Exit > « Ajouter une table », R pour les réglages ; cliquer des éléments à la souris, glisser un `.directb2s` depuis l'explorateur. | Vu depuis le bord des flippers, tout est droit et occupe l'écran en portrait (titre en haut, pied de page côté joueur). Flipper gauche : élément précédent, droit : suivant, comme à 0°. Le clic touche l'élément visé ; le cadre « Déposez les fichiers de la table ici » est droit lui aussi. Le backglass, le DMD et le topper ne pivotent pas. |
 
+# Tests manuels du sens des tables en partie
+
+Ce que le test du cœur (`packages/core/src/test/orientation.test.ts`) ne peut pas montrer : l'image réelle de VPX. Il fixe déjà, pour les quatre orientations de Windows et les quatre bords des flippers, que le `VPinballX.ini` écrit fait dessiner les flippers du côté du joueur.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 309 | Windows en portrait, flippers en bas | Écran du playfield passé en portrait dans Windows, assistant fait avec « flippers en bas ». Dans `VPinballX.ini`, mettre `[Player] CabinetAutofitMode = 0` (ancien réglage), redémarrer Cyber Pinball, lancer trois tables différentes. | Au démarrage, la synchronisation remet `CabinetAutofitMode = 1` et le dit (« cadrage automatique de VPX rétabli »). Chaque table s'affiche flippers en bas, comme le menu, sans refaire l'assistant. |
+| 310 | Windows en paysage, joueur sur le côté | Windows en paysage, assistant avec les flippers à gauche (Start retourne l'écran) ou à droite. Lancer trois tables. | Les tables s'affichent flippers du côté du joueur, dans le même sens que le menu. |
+| 311 | Table qui impose son cadrage | Dans le dossier d'une table, `<table>.ini` avec `[Player] CabinetAutofitMode = 0`. Fiche > médecin. | Constat « Table de travers sur cette borne » (et non « Cadrage manuel imposé ») ; la réparation retire la clé ; la table relancée s'affiche dans le sens du joueur. |
+
 # Tests manuels du jalon 4 (base VPS, essai sur 10 tables réelles)
 
 Sortie attendue du jalon : 10 tables réelles installées depuis leurs archives, sans correction manuelle. Prérequis : Cyber Pinball et VPX installés, accès à Internet au premier ajout (téléchargement de la base VPS, environ 8 Mo). Le choix « Quel jeu est-ce ? » n'est pas une correction manuelle ; renommer un fichier, déplacer un fichier ou modifier un `.info` à la main en est une.

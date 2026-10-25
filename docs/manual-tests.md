@@ -76,6 +76,16 @@ What the screenshots don't show: the player actually standing at the edge of the
 | --- | --- | --- | --- |
 | 28 | Player at the left or right edge | Screen wizard: flippers on the left (or right) of the image, then `jouer` action. Without the wizard: `CYBERPINBALL_FLIPPERS=left` (or `right`) before `npx electron app`. Browse the menu, H, the details screen, "Modifier les informations" (Edit information) (on-screen keyboard), Exit > "Ajouter une table" (Add a table), R for the settings; click items with the mouse, drag a `.directb2s` from File Explorer. | Seen from the flipper edge, everything is upright and fills the screen in portrait (title at the top, footer on the player's side). Left flipper: previous item, right: next, as at 0°. The click hits the intended item; the "Déposez les fichiers de la table ici" (Drop the table files here) frame is upright too. The backglass, the DMD and the topper don't rotate. |
 
+# Manual tests for the direction of tables in play
+
+What the core test (`packages/core/src/test/orientation.test.ts`) cannot show: VPX's real picture. It already pins down, for the four Windows orientations and the four flipper edges, that the `VPinballX.ini` written makes VPX draw the flippers on the player's side.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 309 | Windows in portrait, flippers at the bottom | Playfield screen switched to portrait in Windows, wizard done with "flippers at the bottom". In `VPinballX.ini`, set `[Player] CabinetAutofitMode = 0` (old setting), restart Cyber Pinball, launch three different tables. | At start-up, the sync puts back `CabinetAutofitMode = 1` and says so ("cadrage automatique de VPX rétabli" (VPX automatic framing restored)). Every table shows with the flippers at the bottom, like the menu, without redoing the wizard. |
+| 310 | Windows in landscape, player on a side | Windows in landscape, wizard with the flippers on the left (Start flips the screen) or on the right. Launch three tables. | Tables show with the flippers on the player's side, the same way round as the menu. |
+| 311 | Table that forces its framing | In a table's folder, `<table>.ini` with `[Player] CabinetAutofitMode = 0`. Table page > doctor. | Finding "Table de travers sur cette borne" (Table sideways on this cabinet), not "Cadrage manuel imposé" (Manual view forced); the repair removes the key; the table, launched again, shows the player's way round. |
+
 # Manual tests for milestone 4 (VPS database, trial on 10 real tables)
 
 Milestone exit criterion: 10 real tables installed from their archives, with no manual correction. Prerequisites: Cyber Pinball and VPX installed, Internet access on the first addition (download of the VPS database, about 8 MB). The "Quel jeu est-ce ?" (Which game is it?) choice is not a manual correction; renaming a file, moving a file or editing a `.info` by hand is one.

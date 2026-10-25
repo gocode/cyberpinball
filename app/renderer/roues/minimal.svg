@@ -1,9 +1,9 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="540" viewBox="0 0 1080 540">
 <!-- Roue Minimaliste : un filet lumineux sous les médaillons, la table reste dégagée. Repère 1080 × 540 du bandeau ; image fixe, rien ne s'anime ici. -->
 <defs>
-  <filter id="halo" x="-10%" y="-60%" width="120%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
-  <filter id="haloLarge" x="-10%" y="-80%" width="120%" height="260%"><feGaussianBlur stdDeviation="16"/></filter>
-  <filter id="ombre" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>
+  <filter id="halo" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="5"/></filter>
+  <filter id="haloLarge" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="16"/></filter>
+  <filter id="ombre" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="14"/></filter>
   <linearGradient id="neon" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1080" y2="0">
     <stop offset="0" stop-color="#2ad1b6" stop-opacity=".25"/><stop offset=".22" stop-color="#2ad1b6"/>
     <stop offset=".5" stop-color="#5ff2d6"/><stop offset=".78" stop-color="#2ad1b6"/><stop offset="1" stop-color="#2ad1b6" stop-opacity=".25"/>

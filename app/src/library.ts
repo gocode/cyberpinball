@@ -76,6 +76,7 @@ import {
   type KnownTable,
   type NavigationKeys,
   type PackPlan,
+  type PlayfieldOrientation,
   type PupCabinet,
   type PupVariant,
   type RoleId,
@@ -159,6 +160,8 @@ export interface LibraryHost {
   adjustDisplay?(table: TableEntry): Promise<{ ok: boolean; message?: string } | undefined>;
   /** Journal de VPX (vpinball.log), lu par le médecin pour les PuP-Packs. */
   vpxLogFile?(): string | undefined;
+  /** Playfield de la borne et VPinballX.ini actif : le médecin y juge le sens d'une table. */
+  playfieldOrientation?(): PlayfieldOrientation | undefined;
   quit(): void;
   /** Touches des boutons de la borne (flippers, Start, Exit), avec celles d'un clavier. */
   keys(): NavigationKeys;
@@ -646,6 +649,7 @@ export function createLibrary(host: LibraryHost) {
       vpxLog: readLog(host.vpxLogFile?.()),
       otherPackNames: otherPackNames(table),
       romLibrary: layout()?.roms,
+      orientation: host.playfieldOrientation?.(),
     });
     return { script, findings };
   }

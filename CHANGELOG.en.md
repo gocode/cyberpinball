@@ -16,6 +16,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - A ROM stored in a subfolder of its zip is recognised; "Diagnose and fix" gathers a ROM scattered in a table.
 - Correctable waiting list: reassign, empty, replace or remove a file received by mistake; a table's page has a "Files" section.
 - An icon for each menu.
+- Table menu on a cabinet: help bar reduced to Flippers, Start and Exit ("Cabinet controls" in the system menu), glow of the arrows and the name no longer cut off.
+- Tables show the right way up during a game on a cabinet whose flippers are at the bottom.
 - The "Récupérer" window stays in front: the backglass no longer comes over it on the first click.
 - "Fetch" window on a cabinet: it opens on a readable screen (the backglass if the playfield is turned), with the pointer brought onto it; Exit closes it.
 - The "Fetch" window, when reopened, picks up the page where you were; more thorough site search.

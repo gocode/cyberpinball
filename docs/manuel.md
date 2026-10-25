@@ -510,9 +510,28 @@ Clés écrites dans `VPinballX.ini` (`vpxLayoutSettings`, relevées dans `ViewSe
 | --- | --- | --- |
 | `[Player] BGSet` | 1 (borne) si l'image est plus haute que large pour le joueur, sinon 0 | oui |
 | `[Player] ScreenWidth`, `ScreenHeight` | taille réelle en cm, le grand côté en largeur quelle que soit l'orientation | oui |
-| `[Player] CabinetAutofitMode` | 1 (« Ajuster la table ») en vue borne, seulement si la clé est vide | non, modifiable dans les réglages |
+| `[Player] CabinetAutofitMode` | en vue borne, 1 (« Ajuster la table ») ou 2 (« Remplir l'écran ») : le mode choisi est gardé, toute autre valeur (absente, 0, `Manual`) devient 1 | en partie : le mode est libre, le manuel est refusé |
 
 Avec le cadrage automatique, VPX recalcule toute la vue borne de la table et en déduit la rotation de la forme de la fenêtre : flippers à droite d'une image paysage, en bas d'une image portrait, sans réglage possible.
+
+#### Sens des tables en partie
+
+VPX dessine dans les coordonnées de Windows : seule compte la forme de la fenêtre du playfield, jamais l'orientation de l'écran. Ce qui décide du sens (`vpxPlayedFlipperEdge`, `packages/core/src/vpx.ts`, relevé dans `ViewSetup.cpp`, `player.cpp` et `pintable.cpp` de VPX 10.8.1, commit `af26b2d93`) :
+
+| Valeurs lues par VPX (`VPinballX.ini`, sous le `.ini` de la table) | Rotation de la vue | Flippers |
+| --- | --- | --- |
+| `BGSet = 1`, `CabinetAutofitMode` 1 ou 2 | `SetWindowAutofit` remet la rotation de la table à 0 à chaque partie, `GetRotation` ajoute 270° pour une fenêtre paysage, 0° pour une fenêtre portrait ; `ViewCabRotation` n'y fait rien | à droite (paysage), en bas (portrait) |
+| `BGSet = 1`, cadrage manuel (`CabinetAutofitMode` 0, absent : défaut de VPX) | celle de la vue borne réglée dans la table, souvent 270° pour un Windows en paysage | imprévisible : de travers sur un Windows en portrait |
+| `BGSet` 0 ou 2 (vue bureau ou FSS) | celle de la vue bureau de la table | en bas |
+
+Une rotation de r degrés met les flippers au bord dont `edgeRotation` vaut r (0 en bas, 90 à gauche, 180 en haut, 270 à droite) : c'est la même convention que la rotation du menu. Sans `ScreenWidth`/`ScreenHeight`, VPX cadre quand même, avec sa taille par défaut.
+
+D'où la règle : en vue borne, le cadrage automatique est exigé, pas proposé. Jusqu'à la 0.1.3-essai.3, `CabinetAutofitMode` n'était écrit que si la clé était vide : un `CabinetAutofitMode = 0` déjà présent (ancien `VPinballX.ini`, réglage changé dans le menu de VPX ou dans « Réglages ») restait, et chaque table reprenait sa propre vue borne, tournée pour un Windows en paysage. Sur un playfield en portrait dans Windows, flippers en bas, le menu était droit et la partie de travers.
+
+- **Synchronisation** (`requireAutofit`, `orientationFinding`, `packages/core/src/sync.ts`) : une valeur hors de 1 et 2 est remplacée par 1, avec le constat « cadrage automatique de VPX rétabli » quand elle était écrite ; une borne déjà configurée est corrigée au prochain démarrage, sans refaire l'assistant. Après écriture, le sens est recalculé sur le fichier : si VPX ne dessinera pas les flippers du côté du joueur (orientation de Windows à changer, `BGSet` changé à la main, `CabinetAutofitMode` gardé par l'utilisateur dans `vpxManual`), un avertissement le dit, avec les valeurs en cause.
+- **Réglages** : le choix « Manuel », et la valeur par défaut de VPX qui en est un, ne sont plus proposés pour `CabinetAutofitMode` dans le réglage général.
+- **Médecin** : « Table de travers sur cette borne » (`tableOrientation`) quand le `.ini` d'une table, par `BGSet` ou `CabinetAutofitMode`, empêche VPX de dessiner les flippers du côté du joueur ; il remplace alors « Cadrage manuel imposé par la table ». La réparation retire ces clés seulement ; le fichier part à la corbeille s'il ne contient rien d'autre. Si `VPinballX.ini` est lui-même en cause, c'est la synchronisation qui le dit.
+- **Test** : `packages/core/src/test/orientation.test.ts` parcourt les quatre orientations de Windows, d'un écran paysage et d'un écran natif portrait, les quatre bords des flippers et sept `VPinballX.ini` de départ : la partie est dans le sens du joueur et du menu, sans avertissement, et une seconde synchronisation ne change plus rien ; écran tourné hors de l'assistant ou retournement refusé : sens juste, ou avertissement.
 
 Pour un joueur à gauche ou en haut, l'assistant tourne lui-même l'écran du playfield dans Windows. À l'étape « Où sont les flippers ? », il annonce « Start : retourner l'écran pour VPX » ; Start passe l'écran en orientation retournée (`setDisplayOrientation`, `packages/win-displays/src/orientation.ts` : `ChangeDisplaySettingsExW` essayé à blanc, appliqué, relu, et remis comme avant si Windows a fait autre chose). L'assistant refait la détection, replace ses fenêtres et recalcule le bord du joueur dans la nouvelle image (gauche ↔ droite, haut ↔ bas) : le joueur voit toujours le texte à l'endroit. Comme Windows, il demande ensuite de garder cette orientation : sans Start dans les 15 secondes, ou avec Exit, l'écran reprend son orientation d'origine, et Start continue alors sans retourner (tables à l'envers). Le choix de la rotation est dans `vpxOrientationFix` (`packages/core/src/vpx.ts`) : un retournement, qui garde la définition et la disposition des autres écrans ; un quart de tour seulement pour un Windows en portrait vu de côté. La synchronisation, elle, ne touche pas à l'orientation : elle signale le problème et renvoie vers l'assistant. Avec un autre menu de borne installé ou ouvert (PinUP Popper, PinballX, PinballY), le premier Start ne retourne rien : il avertit que l'orientation est un réglage de Windows que cet autre menu subit aussi ; Start retourne quand même, Exit garde l'orientation de Windows (voir [Cohabitation avec un autre menu de borne](#cohabitation-avec-un-autre-menu-de-borne)).
 

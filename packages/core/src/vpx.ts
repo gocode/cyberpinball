@@ -219,11 +219,32 @@ const AUTOFIT_FIT_TABLE = '1';
 /** Clés de cadrage possédées par Cyber Pinball : elles découlent du playfield. */
 export const VPX_LAYOUT_KEYS = ['BGSet', 'ScreenWidth', 'ScreenHeight'];
 
+/** Libellés des énumérations BGSet et CabinetAutofitMode (Settings_properties.inl, l. 165-167). */
+const BGSET_LABELS = ['Desktop / Full Single Screen', 'Cabinet', 'Full Single Screen'];
+const AUTOFIT_LABELS = ['Manual', 'Fit Table', 'Fit Screen'];
+
+/** Énumération lue comme EnumPropertyDef::ParseEnum : un libellé, ou un nombre dans les bornes ; sinon la valeur par défaut. */
+function vpxEnum(raw: string | undefined, labels: string[], fallback: number): number {
+  const text = raw?.trim() ?? '';
+  const index = labels.indexOf(text);
+  if (index >= 0) return index;
+  const n = /^[-+]?\d+$/.test(text) ? Number(text) : NaN;
+  return n >= 0 && n < labels.length ? n : fallback;
+}
+
+/** CabinetAutofitMode qui fait cadrer la table par VPX : « Fit Table » (1) ou « Fit Screen » (2), pas « Manual » (0, défaut de VPX). */
+export function isVpxAutofit(raw: string | undefined): boolean {
+  return vpxEnum(raw, AUTOFIT_LABELS, 0) !== 0;
+}
+
 export interface VpxLayout {
   /** Réglages possédés, réécrits à chaque synchronisation. */
   settings: VpxSetting[];
-  /** Valeurs proposées, écrites seulement quand la clé est vide : l'utilisateur peut les changer. */
-  defaults: VpxSetting[];
+  /**
+   * Vue borne : cadrage automatique exigé. Le mode choisi par l'utilisateur (1 ou 2) est
+   * gardé ; toute autre valeur, absente ou « Manual », est remplacée par celle-ci.
+   */
+  autofit?: VpxSetting;
 }
 
 /**
@@ -231,8 +252,10 @@ export interface VpxLayout {
  * - ScreenWidth / ScreenHeight : taille réelle de l'image en cm, le grand côté en
  *   largeur quelle que soit l'orientation ; VPX ne les échange jamais ;
  * - BGSet = 1 (vue borne) quand l'image est plus haute que large pour le joueur ;
- * - CabinetAutofitMode = 1 (« Fit Table ») : VPX recalcule toute la vue borne de
- *   la table, y compris sa rotation, déduite de la forme de la fenêtre.
+ * - CabinetAutofitMode 1 (« Fit Table ») ou 2 (« Fit Screen ») : VPX recalcule toute
+ *   la vue borne de la table, y compris sa rotation, déduite de la forme de la
+ *   fenêtre. C'est la seule façon de connaître le sens des tables en vue borne
+ *   (vpxPlayedFlipperEdge) : le mode est donc exigé, pas seulement proposé.
  */
 export function vpxLayoutSettings(display: ObservedDisplay, edge: FlipperEdge, size: SizeCm | undefined): VpxLayout {
   const cabinet = isCabinetView(display, edge);
@@ -241,19 +264,47 @@ export function vpxLayoutSettings(display: ObservedDisplay, edge: FlipperEdge, s
     settings.push({ section: 'Player', key: 'ScreenWidth', value: formatCm(size.width) });
     settings.push({ section: 'Player', key: 'ScreenHeight', value: formatCm(size.height) });
   }
-  const defaults = cabinet ? [{ section: 'Player', key: 'CabinetAutofitMode', value: AUTOFIT_FIT_TABLE }] : [];
-  return { settings, defaults };
+  return { settings, ...(cabinet && { autofit: { section: 'Player', key: 'CabinetAutofitMode', value: AUTOFIT_FIT_TABLE } }) };
+}
+
+export interface VpxPlayedEdge {
+  /** Bord de la fenêtre du playfield où VPX dessinera les flippers ; undefined : celui que prévoit chaque table. */
+  edge?: FlipperEdge;
+  /** desktop : vue bureau ; autofit : vue borne cadrée par VPX ; manual : vue borne réglée dans la table. */
+  view: 'desktop' | 'autofit' | 'manual';
 }
 
 /**
- * Bord où VPX affichera les flippers. En vue borne, le cadrage automatique tourne
- * la vue de 270° pour une fenêtre paysage (joueur à droite) et de 0° pour une
- * fenêtre portrait (joueur en bas), sans réglage possible (ViewSetup::GetRotation,
- * SetWindowAutofit). En vue bureau, les tables sont dessinées flippers en bas.
+ * Bord où VPX 10.8.1 dessinera les flippers dans la fenêtre du playfield, d'après les
+ * valeurs qu'il lira (`read` : le .ini de la table par-dessus VPinballX.ini). VPX dessine
+ * dans les coordonnées de Windows : seule compte la forme de la fenêtre, pas l'orientation
+ * de l'écran. Une rotation de vue de r degrés met les flippers au bord dont edgeRotation
+ * vaut r (0 en bas, 270 à droite : ViewSetup::ComputeMVP).
+ * - Vue borne (BGSet = 1) et cadrage automatique (CabinetAutofitMode 1 ou 2) : à chaque
+ *   partie, SetWindowAutofit remet la rotation de la table à 0 (après ses surcharges :
+ *   ViewCabRotation n'y fait rien), et GetRotation y ajoute 270° pour une fenêtre
+ *   paysage, 0° pour une fenêtre portrait (`viewportWidth < viewportHeight ? 0 : 3`).
+ *   ScreenWidth / ScreenHeight absents, VPX prend ses valeurs par défaut et cadre quand même.
+ * - Vue borne en cadrage manuel : la vue borne réglée dans la table, avec sa rotation
+ *   (souvent 270°, pour un Windows en paysage) : rien ne garantit le sens.
+ * - Vue bureau (BGSet 0 ou 2, PinTable::UpdateCurrentBGSet) : la vue bureau ou FSS de
+ *   la table, dessinée flippers en bas.
+ */
+export function vpxPlayedFlipperEdge(read: (section: string, key: string) => string | undefined, window: ObservedDisplay): VpxPlayedEdge {
+  if (vpxEnum(read('Player', 'BGSet'), BGSET_LABELS, 0) !== 1) return { edge: 'bottom', view: 'desktop' };
+  if (!isVpxAutofit(read('Player', 'CabinetAutofitMode'))) return { view: 'manual' };
+  return { edge: window.bounds.width < window.bounds.height ? 'bottom' : 'right', view: 'autofit' };
+}
+
+/**
+ * Bord où VPX affichera les flippers avec le cadrage écrit par Cyber Pinball
+ * (vpxLayoutSettings, cadrage automatique en vue borne) : à droite d'une fenêtre
+ * paysage, en bas d'une fenêtre portrait, sans réglage possible ; en bas en vue bureau.
  */
 export function vpxFlipperEdge(display: ObservedDisplay, edge: FlipperEdge): FlipperEdge {
-  if (!isCabinetView(display, edge)) return 'bottom';
-  return display.bounds.width > display.bounds.height ? 'right' : 'bottom';
+  const layout = vpxLayoutSettings(display, edge, undefined);
+  const values = [...layout.settings, ...(layout.autofit ? [layout.autofit] : [])];
+  return vpxPlayedFlipperEdge((section, key) => values.find((s) => s.section === section && s.key === key)?.value, display).edge!;
 }
 
 export interface OrientationFix {

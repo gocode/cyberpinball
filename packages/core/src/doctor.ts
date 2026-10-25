@@ -51,6 +51,9 @@ import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember
 import { companion, nameKey } from './tablefiles';
 import { parseTableName, type TableEntry } from './tables';
 import { findTableIni } from './vpx-settings';
+import { EDGE_LABELS } from './layout';
+import { orientationFinding, type PlayfieldOrientation } from './sync';
+import { vpxPlayedFlipperEdge } from './vpx';
 
 export type FindingSeverity = 'error' | 'warning' | 'info';
 
@@ -92,6 +95,7 @@ export const FINDING_CODES = [
   'pupCaptureRom',
   'pupLog',
   'manualView',
+  'tableOrientation',
   'tableWindows',
   'mediaUnreadable',
   'mediaMisnamed',
@@ -155,6 +159,8 @@ export interface DoctorContext {
    * sont lues dans <logsDir>\medias-erreurs.json (mediaerrors.ts).
    */
   mediaErrors?: MediaErrorEntry[];
+  /** Playfield de la borne (playfieldOrientation) : le .ini de la table peut changer le sens de la partie. */
+  orientation?: PlayfieldOrientation;
 }
 
 /** Mémoire de Cyber Pinball dans le .info : option et nom d'origine de chaque pack installé. */
@@ -447,8 +453,9 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // 7. Cadrage manuel imposé par le .ini de la table (souvent livré avec elle).
-  const manual = manualViewFinding(entry.file);
+  // 7. Sens de la partie changé par le .ini de la table, sinon cadrage manuel qu'il impose (souvent livré avec elle).
+  const orientation = ctx.orientation && tableOrientationFinding(entry.file, ctx.orientation);
+  const manual = orientation || manualViewFinding(entry.file);
   if (manual) findings.push(manual);
 
   // 7 bis. Écrans placés pour cette table seulement (menu de VPX, « Save as Table Override »).
@@ -489,6 +496,54 @@ function manualViewFinding(tableFile: string): Finding | undefined {
     ),
     fix: {
       label: t('Rendre le cadrage automatique à la table'),
+      ops: doc.entries().length ? [{ op: 'write', path: ini.path, content: doc.toString() }] : [{ op: 'trash', path: ini.path }],
+    },
+  };
+}
+
+/** Clés du .ini d'une table qui décident du sens de la partie (vpxPlayedFlipperEdge). */
+const ORIENTATION_KEYS = ['BGSet', 'CabinetAutofitMode'];
+
+/**
+ * Le .ini de la table change le sens de la partie sur cette borne : sans lui, VPX
+ * dessinerait les flippers du côté du joueur ; avec lui (vue bureau, ou cadrage manuel
+ * qui reprend la rotation réglée par l'auteur), plus. La réparation retire ces clés ;
+ * l'ancien fichier part à la corbeille. Si VPinballX.ini est lui-même en cause, c'est
+ * la synchronisation qui le dit.
+ */
+function tableOrientationFinding(tableFile: string, orientation: PlayfieldOrientation): Finding | undefined {
+  const ini = findTableIni(tableFile);
+  if (!ini.exists) return undefined;
+  const doc = IniDocument.parse(fs.readFileSync(ini.path, 'utf8'));
+  const global = IniDocument.parse(orientation.globalIni);
+  const read = (section: string, key: string) => {
+    const own = doc.get(section, key);
+    return own !== undefined && own.trim() !== '' ? own : global.get(section, key);
+  };
+  if (orientationFinding(orientation.window, orientation.edge, (s, k) => global.get(s, k))) return undefined;
+  const played = vpxPlayedFlipperEdge(read, orientation.window);
+  if (played.edge === orientation.edge) return undefined;
+  const keys = ORIENTATION_KEYS.filter((key) => (doc.get('Player', key)?.trim() ?? '') !== '');
+  const set = keys.map((key) => t('[Player] {key} = {value}', { key, value: doc.get('Player', key)!.trim() })).join(t(' ; '));
+  for (const key of keys) doc.remove('Player', key);
+  const name = path.basename(ini.path);
+  return {
+    code: 'tableOrientation',
+    severity: 'warning',
+    title: t('Table de travers sur cette borne'),
+    detail: played.edge
+      ? t('{name} règle {keys} : VPX dessinera cette table flippers {played}, alors que vous êtes {edge} de l’écran. Sans ces clés, le cadrage automatique de la borne la remet dans votre sens.', {
+          name,
+          keys: set,
+          played: EDGE_LABELS[played.edge],
+          edge: EDGE_LABELS[orientation.edge],
+        })
+      : t('{name} règle {keys} : VPX reprend la vue de l’auteur de la table, avec sa rotation, souvent pour un autre écran : la table peut s’afficher de travers. Sans ces clés, le cadrage automatique de la borne la met dans votre sens.', {
+          name,
+          keys: set,
+        }),
+    fix: {
+      label: t('Remettre la table dans le sens de la borne'),
       ops: doc.entries().length ? [{ op: 'write', path: ini.path, content: doc.toString() }] : [{ op: 'trash', path: ini.path }],
     },
   };

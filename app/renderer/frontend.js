@@ -531,7 +531,8 @@ function renderPlayfield(s) {
     cover.append(el('h1', '', t('Commandes')));
     const keys = el('div', 'keys');
     keys.append(keysTable(t('Dans le menu'), s.menuKeys), keysTable(t('Pendant une partie'), s.gameKeys));
-    cover.append(keys, footer([[s.nav.help ? t('{key} ou Exit : fermer', { key: s.nav.helpLabel }) : t('Exit : fermer'), s.nav.help ?? s.nav.exit]]));
+    // Exit seul dans le badge : le nom du bouton de l'aide (« Bouton 14 du joystick ») n'y tient pas ; il ferme aussi.
+    cover.append(keys, footer([[t('Exit : fermer'), s.nav.exit]]));
   } else if (s.phase === 'confirmQuit') {
     cover = el('section', 'overlay');
     cover.append(el('h1', '', t('Quitter Cyber Pinball ?')), el('div', 'lead', t('Start : quitter · Exit : rester')));

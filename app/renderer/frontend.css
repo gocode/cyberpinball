@@ -597,6 +597,12 @@ html.menu-desktop .menu.menu-band .menu-title {
   height: calc(var(--t-h) * var(--b));
   justify-content: center;
   text-align: center;
+  /*
+   * Lueur du nom : un filtre sur la zone, pas un text-shadow sur le texte. Le texte et sa zone
+   * coupent ce qui déborde (titre limité à une ou deux lignes) : un text-shadow y était tranché
+   * en rectangle (borne, 25 octobre 2026). Le filtre se dessine après la découpe, il déborde.
+   */
+  filter: drop-shadow(0 0 calc(5 * var(--b)) var(--t-glow)) drop-shadow(0 0 calc(13 * var(--b)) var(--t-glow));
 }
 
 .menu.menu-band .menu-title .title,
@@ -607,7 +613,6 @@ html.menu-desktop .menu.menu-band .menu-title .title {
   line-height: 1.2;
   text-transform: uppercase;
   color: var(--t-color);
-  text-shadow: 0 0 calc(10 * var(--b)) var(--t-glow), 0 0 calc(26 * var(--b)) var(--t-glow);
 }
 
 .menu.menu-band .menu-title .title[data-size='m'],
@@ -870,6 +875,8 @@ html.menu-desktop .menu-band .menu-frame.fronton {
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  /* Un badge reste sur une ligne : un nom trop long déborde (layout-check le signale), il ne s'empile pas. */
+  white-space: nowrap;
   color: var(--ink);
 }
 

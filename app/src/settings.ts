@@ -25,6 +25,7 @@ import {
   isEditorSection,
   isLiveVisual,
   isOwned,
+  isVpxAutofit,
   isTableOnly,
   loadOwnedMemory,
   numericChoices,
@@ -483,7 +484,7 @@ function choicesFor(def: VpxSettingDef, state: SettingState, essential?: Essenti
   if (def.type === 'bool') values = [false, true];
   else if (def.type === 'enum') values = def.values!.map((_, i) => def.min! + i);
   else values = numericChoices(def, typeof state.effective === 'number' ? state.effective : undefined);
-  return [
+  const choices: Choice[] = [
     first,
     ...values.map((v) => ({
       label: format(def, v, essential),
@@ -491,6 +492,10 @@ function choicesFor(def: VpxSettingDef, state: SettingState, essential?: Essenti
       note: sameValue(def, v, def.default) ? t('défaut de VPX') : undefined,
     })),
   ];
+  // Cadrage manuel pour toutes les tables : chacune garde la rotation de son auteur, de travers
+  // en vue borne ; la synchronisation remettrait aussitôt le cadrage automatique (requireAutofit).
+  if (s.target.scope !== 'global' || def.section !== 'Player' || def.key !== 'CabinetAutofitMode') return choices;
+  return choices.filter((c) => isVpxAutofit(c.value === undefined ? undefined : String(c.value)));
 }
 
 function info(title: string, lines: string[], actions: { label: string; run: () => void }[] = [], id?: string): Panel {

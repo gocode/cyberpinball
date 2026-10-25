@@ -24,6 +24,7 @@ import {
   keepManualEdits,
   layoutOf,
   loadCabinet,
+  playfieldOrientation,
   readInfo,
   readingScreen,
   readTextIfExists,
@@ -118,13 +119,16 @@ function menuKeys(): [string, string][] {
   ];
 }
 
-/** Pied du menu : chaque commande est aussi cliquable (code de la touche équivalente). */
+/**
+ * Pied du menu : chaque commande est aussi cliquable (code de la touche équivalente). Les
+ * boutons nommés par leur rôle seulement (Flippers, Start, Exit) : un nom de touche
+ * (« Bouton 14 du joystick ») ne tient pas dans un badge, et l'aide-mémoire et les réglages
+ * de VPX s'ouvrent aussi depuis le menu système (Exit).
+ */
 function menuFooter(): [string, string?][] {
   return [
     [t('Flippers : choisir')],
     [t('Start : fiche'), KEYS.confirm[0]],
-    ...(KEYS.help.length ? [[t('{key} : commandes', { key: keyLabel(KEYS.help[0]) }), KEYS.help[0]] as [string, string]] : []),
-    ...(KEYS.settings.length ? [[t('{key} : réglages', { key: keyLabel(KEYS.settings[0]) }), KEYS.settings[0]] as [string, string]] : []),
     [t('Exit : menu'), KEYS.exit[0]],
   ];
 }
@@ -244,6 +248,10 @@ const library = createLibrary({
     const install = vpxInstall(loc);
     return install ? path.join(vpxPrefDir(install.version), 'vpinball.log') : undefined;
   },
+  playfieldOrientation: () => {
+    const cabinet = loadCabinet(loc.dataDir);
+    return cabinet ? playfieldOrientation(cabinet, observedDisplays(), readTextIfExists(activeVpxIni(loc))) : undefined;
+  },
   quit: () => void quit(),
   keys: () => KEYS,
   windows: () => windows,
@@ -355,6 +363,20 @@ const updates = createUpdatesMenu({
   background: !OFFSCREEN || Boolean(process.env.CYBERPINBALL_MAJ_URL),
 });
 library.systemItems.splice(library.systemItems.length - 1, 0, updates.systemItem);
+// Aide-mémoire des boutons : aussi ici, puisque le pied du menu ne nomme que Flippers, Start et Exit.
+library.systemItems.splice(library.systemItems.length - 1, 0, {
+  icon: 'gamepad',
+  get label() {
+    return t('Commandes de la borne');
+  },
+  get detail() {
+    return t('Les boutons du menu et de la partie');
+  },
+  run: () => {
+    state = tables.length ? { ...state, phase: 'menu', help: true } : { ...state, phase: 'message', message: noTables() };
+    broadcast();
+  },
+});
 // Juste avant « Quitter Cyber Pinball ».
 library.systemItems.splice(library.systemItems.length - 1, 0, {
   icon: 'desktop',
@@ -1207,7 +1229,7 @@ function viewFor(role: RoleId) {
     loadingKeys: displayMode ? { title: t('Réglage de l’affichage'), rows: displayKeys(buttons) } : { title: t('Commandes de la partie'), rows: gameKeys(buttons) },
     menuKeys: menuKeys(),
     footer: menuFooter(),
-    nav: { confirm: KEYS.confirm[0], exit: KEYS.exit[0], help: KEYS.help[0], helpLabel: KEYS.help.length ? keyLabel(KEYS.help[0]) : undefined },
+    nav: { confirm: KEYS.confirm[0], exit: KEYS.exit[0], help: KEYS.help[0] },
   };
 }
 

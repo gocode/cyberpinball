@@ -3,9 +3,9 @@
      néon, second arc sous les médaillons, ombres des places, plaque du titre et flèches.
      Image fixe : les flous sont calculés une fois, rien ne s'anime ici. -->
 <defs>
-  <filter id="halo" x="-10%" y="-60%" width="120%" height="220%"><feGaussianBlur stdDeviation="5"/></filter>
-  <filter id="haloLarge" x="-10%" y="-80%" width="120%" height="260%"><feGaussianBlur stdDeviation="16"/></filter>
-  <filter id="ombre" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="14"/></filter>
+  <filter id="halo" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="5"/></filter>
+  <filter id="haloLarge" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="16"/></filter>
+  <filter id="ombre" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="14"/></filter>
   <linearGradient id="verre" x1="0" y1="0" x2="0" y2="1">
     <stop offset="0" stop-color="#0a2620" stop-opacity=".62"/>
     <stop offset=".18" stop-color="#041310" stop-opacity=".84"/>

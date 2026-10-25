@@ -510,9 +510,28 @@ Keys written to `VPinballX.ini` (`vpxLayoutSettings`, read from `ViewSetup.cpp` 
 | --- | --- | --- |
 | `[Player] BGSet` | 1 (cabinet) if the image is taller than it is wide for the player, otherwise 0 | yes |
 | `[Player] ScreenWidth`, `ScreenHeight` | real size in cm, the long side as the width whatever the orientation | yes |
-| `[Player] CabinetAutofitMode` | 1 ("Ajuster la table" (Fit table)) in cabinet view, only if the key is empty | no, can be changed in the settings |
+| `[Player] CabinetAutofitMode` | in cabinet view, 1 ("Fit Table") or 2 ("Fit Screen"): the chosen mode is kept, any other value (absent, 0, `Manual`) becomes 1 | in game: the mode is free, manual is refused |
 
 With automatic framing, VPX recomputes the table's whole cabinet view and derives the rotation from the shape of the window: flippers on the right of a landscape image, at the bottom of a portrait image, with no setting to change it.
+
+#### Direction of tables in play
+
+VPX draws in Windows coordinates: only the shape of the playfield window counts, never the orientation of the screen. What decides the direction (`vpxPlayedFlipperEdge`, `packages/core/src/vpx.ts`, read from `ViewSetup.cpp`, `player.cpp` and `pintable.cpp` of VPX 10.8.1, commit `af26b2d93`):
+
+| Values read by VPX (`VPinballX.ini`, under the table's `.ini`) | View rotation | Flippers |
+| --- | --- | --- |
+| `BGSet = 1`, `CabinetAutofitMode` 1 or 2 | `SetWindowAutofit` resets the table's rotation to 0 at every game, `GetRotation` adds 270° for a landscape window, 0° for a portrait window; `ViewCabRotation` has no effect | right (landscape), bottom (portrait) |
+| `BGSet = 1`, manual framing (`CabinetAutofitMode` 0, or absent: VPX default) | that of the cabinet view set in the table, often 270° for Windows in landscape | unpredictable: sideways on Windows in portrait |
+| `BGSet` 0 or 2 (desktop or FSS view) | that of the table's desktop view | bottom |
+
+A rotation of r degrees puts the flippers at the edge whose `edgeRotation` is r (0 bottom, 90 left, 180 top, 270 right): the same convention as the menu rotation. Without `ScreenWidth`/`ScreenHeight`, VPX still fits the table, with its default size.
+
+Hence the rule: in cabinet view, automatic framing is required, not suggested. Up to 0.1.3-essai.3, `CabinetAutofitMode` was only written when the key was empty: a `CabinetAutofitMode = 0` already there (old `VPinballX.ini`, setting changed in the VPX menu or in "Réglages" (Settings)) stayed, and every table went back to its own cabinet view, rotated for Windows in landscape. On a playfield in portrait in Windows, flippers at the bottom, the menu was upright and the game sideways.
+
+- **Sync** (`requireAutofit`, `orientationFinding`, `packages/core/src/sync.ts`): a value other than 1 and 2 is replaced by 1, with the finding "cadrage automatique de VPX rétabli" (VPX automatic framing restored) when it was written; a cabinet already set up is corrected at the next start, without redoing the wizard. After writing, the direction is computed again from the file: if VPX will not draw the flippers on the player's side (Windows orientation to change, `BGSet` changed by hand, `CabinetAutofitMode` kept by the user in `vpxManual`), a warning says so, with the values at fault.
+- **Settings**: the "Manuel" (Manual) choice, and the VPX default that is one, are no longer offered for `CabinetAutofitMode` in the general setting.
+- **Doctor**: "Table de travers sur cette borne" (Table sideways on this cabinet, `tableOrientation`) when a table's `.ini`, through `BGSet` or `CabinetAutofitMode`, stops VPX drawing the flippers on the player's side; it then replaces "Cadrage manuel imposé par la table" (Manual view forced by the table). The repair removes these keys only; the file goes to the recycle bin if it holds nothing else. If `VPinballX.ini` itself is at fault, the sync says so.
+- **Test**: `packages/core/src/test/orientation.test.ts` goes through the four Windows orientations, of a landscape screen and of a native portrait screen, the four flipper edges and seven starting `VPinballX.ini` files: the game goes the player's and the menu's way, without a warning, and a second sync changes nothing more; screen rotated outside the wizard or flip refused: right direction, or a warning.
 
 For a player on the left or at the top, the wizard rotates the playfield screen in Windows itself. At the "Où sont les flippers ?" (Where are the flippers?) step, it announces "Start : retourner l'écran pour VPX" (Start: flip the screen for VPX); Start switches the screen to a flipped orientation (`setDisplayOrientation`, `packages/win-displays/src/orientation.ts`: `ChangeDisplaySettingsExW` tried as a dry run, applied, read back, and put back as it was if Windows did something else). The wizard runs the detection again, repositions its windows and recomputes the player's edge in the new image (left ↔ right, top ↔ bottom): the player always sees the text upright. Like Windows, it then asks whether to keep this orientation: without Start within 15 seconds, or with Exit, the screen returns to its original orientation, and Start then carries on without flipping (tables upside down). The choice of rotation is in `vpxOrientationFix` (`packages/core/src/vpx.ts`): a flip, which keeps the resolution and the layout of the other screens; a quarter turn only for a Windows portrait screen seen from the side. The sync, on the other hand, does not touch the orientation: it reports the problem and points to the wizard. With another cabinet frontend installed or running (PinUP Popper, PinballX, PinballY), the first Start flips nothing: it warns that the orientation is a Windows setting that the other frontend is subject to as well; Start flips anyway, Exit keeps the Windows orientation (see [Coexisting with another cabinet frontend](#coexisting-with-another-cabinet-frontend)).
 
