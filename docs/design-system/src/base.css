@@ -192,3 +192,13 @@
 .cp-thumb:before{inset:10px}.cp-thumb:after{content:"";width:28px;height:20px;inset:50% auto auto 50%;transform:translate(-50%,-50%);border:1px solid var(--line-strong)}
 .cp-root :focus-visible{outline:2px solid var(--signal);outline-offset:5px}
 .cp-search .caret{background:var(--ink)}
+
+/* Icônes des menus (25 octobre 2026, registre app/renderer/icons.js) : 30 px, couleur du libellé,
+   alignées sur sa première ligne ; pastille en haut à droite de l'icône. */
+.cp-menu-item{align-items:flex-start;gap:24px}
+.cp-menu-item > .cp-i,.cp-menu-item > .cp-glyph{margin-top:4px}
+.cp-menu-item .cp-i,.cp-menu-item.is-focus .cp-i{font-size:30px;color:inherit}
+.cp-menu-item.is-danger:not(.is-focus){color:var(--danger)}
+.cp-menu-item.is-disabled,.cp-menu-item.is-disabled small{color:var(--ink-faint)}
+.cp-glyph{position:relative;display:flex;flex:none}
+.cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}

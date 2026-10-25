@@ -19,15 +19,28 @@
 #      obligatoires (boutons 1 à 6), Exit passe les facultatifs, l'essai et Start
 #      enregistrent ; [Input] reçoit « SDLJoy_<GUID>_1;<bouton> » à côté des touches de VPX
 #      (tmp\captures\boutons\joystick ; sauté sans bibliothèque SDL de VPX, -Sdl) ;
+#   1e. --boutons sur une autre copie, clavier et joystick mélangés : flipper gauche, Start et
+#      lanceur au joystick, flipper droit, Exit et crédit au clavier ; l'essai mélange les deux,
+#      Start (joystick) enregistre ; [Input] reçoit chaque bouton par son chemin
+#      (tmp\captures\boutons\mixte ; sauté sans bibliothèque SDL de VPX) ;
+#   1f. --interface sur une autre copie : les boutons de l'interface s'ouvrent sur ceux du jeu
+#      (A, S, 2, Q) ; « Tout relever », puis précédent sur J, suivant sur L, valider sur le
+#      bouton 8 du joystick virtuel (K sans bibliothèque SDL), retour sur U, aide sur I, pas de
+#      bouton des réglages ; l'essai, valider enregistre ; cabinet.json reçoit « navigation »,
+#      les boutons du jeu et VPinballX.ini ne changent pas (tmp\captures\boutons\interface) ;
 #   2. assistant complet sur une borne neuve : personne ne touche à rien pendant 21 s,
 #      les touches par défaut sont gardées et l'assistant passe aux écrans
 #      (tmp\captures\boutons\delai) ;
 #   3. assistant complet sur une borne neuve : « Touches par défaut » puis « Tout relever »
-#      à la souris, puis les touches de l'étape 1 : la suite se pilote avec elles, le 1
-#      ne valide plus rien (tmp\captures\boutons\complet) ;
+#      à la souris, puis les touches de l'étape 1 ; les boutons de l'interface proposés sur
+#      les mêmes, validés : la suite se pilote avec eux, le 1 ne valide plus rien
+#      (tmp\captures\boutons\complet) ;
 #   4. menu des tables de la borne de l'étape 1 : aide-mémoire (H) avec ses touches, puis
 #      menu système > « Touches par défaut des encodeurs » à la souris
 #      (tmp\captures\boutons\menu) ;
+#   4b. menu des tables de la borne de l'étape 1f : U (retour) ferme le message, A (flipper
+#      du jeu) ne fait rien, I ouvre l'aide-mémoire, U ouvre le menu système, L s'y déplace
+#      (tmp\captures\boutons\menu-interface) ;
 #   5. réglages de VPX de cette borne : onglet Avancé, section Input, une touche gérée
 #      (tmp\captures\boutons\reglages).
 #   .\docs\demo-boutons.ps1 -Run
@@ -54,8 +67,8 @@ $captures = "$wt\tmp\captures\boutons"
 
 if (Test-Path $base) { Remove-Item -Recurse -Force $base }
 $root = "$base\root"; $borne = "$base\borne"; $neuve = "$base\neuve"; $neuve2 = "$base\neuve2"
-$lecture = "$base\lecture"; $defauts = "$base\defauts"; $joystick = "$base\joystick"
-New-Item -ItemType Directory -Force "$root\tables\Demo (Cyber Pinball 2026)", "$borne\sandbox", "$neuve\sandbox", "$neuve2\sandbox", "$lecture\sandbox", "$defauts\sandbox", "$joystick\sandbox" | Out-Null
+$lecture = "$base\lecture"; $defauts = "$base\defauts"; $joystick = "$base\joystick"; $mixte = "$base\mixte"; $interface = "$base\interface"
+New-Item -ItemType Directory -Force "$root\tables\Demo (Cyber Pinball 2026)", "$borne\sandbox", "$neuve\sandbox", "$neuve2\sandbox", "$lecture\sandbox", "$defauts\sandbox", "$joystick\sandbox", "$mixte\sandbox", "$interface\sandbox" | Out-Null
 # Le modèle copié désigne le VPinballX.ini du bac à sable, jamais le vrai.
 $model = Get-ModeleBorne $Cabinet
 $model.vpx.iniPath = "$borne\sandbox\VPinballX.ini"
@@ -118,7 +131,7 @@ try {
     ForEach-Object { $_.Line }
 
   # Copies de la borne de l'étape 1, chacune avec son propre VPinballX.ini.
-  foreach ($h in $lecture, $defauts, $joystick) {
+  foreach ($h in $lecture, $defauts, $joystick, $mixte, $interface) {
     $copie = Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons
     $copie.vpx.iniPath = "$h\sandbox\VPinballX.ini"
     $copie | ConvertTo-Json -Depth 20 | Set-Content -Path "$h\cabinet.json" -Encoding UTF8
@@ -141,10 +154,36 @@ try {
     # Exit (bouton 4, Joy3) passe les neuf facultatifs ; essai des flippers et d'Exit, puis Start enregistre.
     $joy = @('click:#actions button:nth-child(4)', 'Joy0', 'Joy1', 'Joy2', 'Joy3', 'Joy4', 'Joy5') + @('Joy3') * 9 + @('Joy0', 'Joy1', 'Joy3', 'Joy2')
     Invoke-Autopilot $joystick $joy 'joystick' @('--assistant', '--boutons')
-    Remove-Item Env:CYBERPINBALL_SDL
     (Get-ModeleBorne "$joystick\cabinet.json" -AvecBoutons).buttons | Format-List | Out-String
     Select-String -Path "$joystick\sandbox\VPinballX.ini" -Pattern '^Mapping\.(LeftFlipper|RightFlipper|Start|ExitGame|Credit1|LaunchBall|LeftMagna|InGameUI) =' | ForEach-Object { $_.Line }
+
+    '== 1e. Étape « Boutons » seule, clavier et joystick mélangés'
+    # Tout relever ; flipper gauche Joy0, flipper droit S, Start Joy2, Exit Q, crédit 3, lanceur Joy5 ;
+    # Exit (Q) passe les neuf facultatifs ; essai Joy0, S, Q, puis Start (Joy2) enregistre.
+    $mix = @('click:#actions button:nth-child(4)', 'Joy0', 'KeyS', 'Joy2', 'KeyQ', 'Digit3', 'Joy5') + @('KeyQ') * 9 + @('Joy0', 'KeyS', 'KeyQ', 'Joy2')
+    Invoke-Autopilot $mixte $mix 'mixte' @('--assistant', '--boutons')
+    Remove-Item Env:CYBERPINBALL_SDL
+    $mixed = (Get-ModeleBorne "$mixte\cabinet.json" -AvecBoutons).buttons
+    $mixed | Format-List | Out-String
+    if ($mixed.leftFlipper -notmatch '^SDLJoy_[0-9a-f]{32}_\d+;0$' -or $mixed.rightFlipper -ne 'KeyS' -or $mixed.exit -ne 'KeyQ' -or $mixed.start -notmatch ';2$') { throw "1e : relevé mixte non enregistré : $($mixed | ConvertTo-Json -Compress)" }
+    Select-String -Path "$mixte\sandbox\VPinballX.ini" -Pattern '^Mapping\.(LeftFlipper|RightFlipper|Start|ExitGame|Credit1|LaunchBall) =' | ForEach-Object { $_.Line }
   } else { "Sauté : pas de bibliothèque SDL de VPX ($Sdl)." }
+
+  '== 1f. Boutons de l''interface seuls, clavier et joystick'
+  $valider = if (Test-Path $Sdl) { $env:CYBERPINBALL_SDL = $Sdl; 'Joy7' } else { 'KeyK' }
+  $iniAvant = (Get-FileHash "$interface\sandbox\VPinballX.ini").Hash
+  $jeuAvant = (Get-ModeleBorne "$interface\cabinet.json" -AvecBoutons).buttons | ConvertTo-Json -Compress
+  # Tout relever ; précédent J, suivant L, valider ($valider), retour U, aide I, réglages passés par U ;
+  # essai J, L, U, puis valider enregistre.
+  $nav = @('click:#actions button:nth-child(4)', 'KeyJ', 'KeyL', $valider, 'KeyU', 'KeyI', 'KeyU', 'KeyJ', 'KeyL', 'KeyU', $valider)
+  Invoke-Autopilot $interface $nav 'interface' @('--assistant', '--interface')
+  if (Test-Path Env:CYBERPINBALL_SDL) { Remove-Item Env:CYBERPINBALL_SDL }
+  $modele = Get-ModeleBorne "$interface\cabinet.json" -AvecBoutons
+  $modele.navigation | Format-List | Out-String
+  if ($modele.navigation.previous -ne 'KeyJ' -or $modele.navigation.next -ne 'KeyL' -or $modele.navigation.back -ne 'KeyU' -or $modele.navigation.help -ne 'KeyI' -or $modele.navigation.settings) { throw "1f : boutons de l'interface non enregistrés : $($modele.navigation | ConvertTo-Json -Compress)" }
+  if (($modele.buttons | ConvertTo-Json -Compress) -ne $jeuAvant) { throw '1f : les boutons du jeu ont changé' }
+  if ((Get-FileHash "$interface\sandbox\VPinballX.ini").Hash -ne $iniAvant) { throw '1f : VPinballX.ini a changé' }
+  '-- Boutons du jeu et VPinballX.ini inchangés'
 
   '== 2. Assistant complet, personne ne touche à rien'
   Invoke-Autopilot $neuve @('Attendre21', 'ShiftRight', 'Digit1') 'delai' @('--assistant')
@@ -152,7 +191,7 @@ try {
   '== 3. Assistant complet avec les touches de l''encodeur'
   # Touches par défaut à la souris, puis Tout relever, puis l'encodeur.
   $souris = @('click:#actions button:nth-child(2)', 'click:#actions button:nth-child(4)')
-  Invoke-Autopilot $neuve2 (@($souris) + @($encodeur) + @($essai) + @('Digit1', 'KeyS', 'Digit2', 'Digit2', 'Digit2')) 'complet' @('--assistant')
+  Invoke-Autopilot $neuve2 (@($souris) + @($encodeur) + @($essai) + @('Digit2', 'Digit1', 'KeyS', 'Digit2', 'Digit2', 'Digit2')) 'complet' @('--assistant')
 
   '== 4. Menu des tables de la borne de l''étape 1, puis touches par défaut à la souris'
   # « VPX n'est pas installé » : plus tard ; commandes ; menu système (Exit = Q) ; clic sur
@@ -163,6 +202,10 @@ try {
   Invoke-Autopilot $borne $menu 'menu' @()
   '-- Boutons de cabinet.json après la remise'
   (Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons).buttons | Format-List | Out-String
+  (Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons).navigation | Format-List | Out-String
+
+  '== 4b. Menu des tables de la borne de l''étape 1f, piloté par les boutons de l''interface'
+  Invoke-Autopilot $interface @('KeyU', 'KeyA', 'KeyI', 'KeyU', 'KeyU', 'KeyL', 'KeyL', 'KeyU') 'menu-interface' @()
 
   '== 5. Réglages de VPX : section Input'
   $sections = @('ArrowDown') * 8                  # Avancé : Version, Editor, Player… Input est la 8e section

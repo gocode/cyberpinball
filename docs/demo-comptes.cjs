@@ -236,6 +236,7 @@ async function run(report) {
 
   // ---------- Comptes des sites ----------
   library.openSystem();
+  act('Ajouter une table');
   act('Comptes des sites');
   await idle();
   await shot('comptes');
@@ -245,7 +246,8 @@ async function run(report) {
 
   // ---------- Ce qu'il faut pour Terminator 2 ----------
   library.openSystem();
-  act('Trouver une table');
+  act('Ajouter une table');
+  act('Trouver une table en ligne');
   act('J’ai compris');
   await idle();
   act('Chercher un titre');
@@ -293,6 +295,7 @@ async function run(report) {
 
   // Comptes : les deux sites connectés ; déconnexion de vpforums.org.
   library.openSystem();
+  act('Ajouter une table');
   act('Comptes des sites');
   await idle();
   await shot('comptes-deux-connectes');

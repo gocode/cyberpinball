@@ -8,11 +8,17 @@
 // Comme une touche du clavier, un bouton tenu se répète (isAutoRepeat) : un flipper tenu
 // fait défiler le menu. Aucune fenêtre de Cyber Pinball au premier plan (une partie de
 // VPX) : les appuis ne vont nulle part.
+//
+// Une fenêtre peut être active pour Electron sans avoir le clavier (foreground.ts) : à chaque
+// appui, le clavier doit suivre, sinon la fenêtre reprend le premier plan de Windows. Sans
+// cela, une borne qui mélange touches du clavier et boutons du joystick ne relève plus que
+// les boutons du joystick.
 
 import * as path from 'node:path';
 import { BrowserWindow, type Input } from 'electron';
 import { joystickCode } from '@cyberpinball/core';
 import { openJoysticks, sdlLibraryIn, type JoystickDevice, type JoystickReader } from '@cyberpinball/win-displays';
+import { keyboardFollows } from './foreground';
 import { isShown, OFFSCREEN } from './offscreen';
 import { locations, vpxInstall } from './paths';
 
@@ -116,6 +122,8 @@ function target(): BrowserWindow | undefined {
 function send(code: string, type: 'keyDown' | 'keyUp', isAutoRepeat = false): void {
   const win = target();
   if (!win) return;
+  // Le clavier va là où vont les boutons du joystick.
+  if (type === 'keyDown' && !isAutoRepeat) keyboardFollows(win, `le bouton ${code} du joystick allait à Cyber Pinball`); // i18n-ignore : console
   listeners.get(win)!({ type, code, key: '', isAutoRepeat, shift: false, control: false, alt: false, meta: false } as Input);
 }
 

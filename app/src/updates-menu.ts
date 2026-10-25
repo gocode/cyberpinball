@@ -130,10 +130,11 @@ export function createUpdatesMenu(host: UpdatesHost) {
 
   const prereleaseAction = (): Action =>
     prereleases()
-      ? { label: t('Préversions : reçues'), detail: t('Les versions d’essai sont proposées aussi ; choisir pour ne plus les recevoir'), run: togglePrereleases }
-      : { label: t('Préversions : non reçues'), detail: t('Choisir pour recevoir aussi les versions d’essai (0.2.0-essai.1…)'), run: togglePrereleases };
+      ? { label: t('Préversions : reçues'), detail: t('Les versions d’essai sont proposées aussi ; choisir pour ne plus les recevoir'), icon: 'flask', run: togglePrereleases }
+      : { label: t('Préversions : non reçues'), detail: t('Choisir pour recevoir aussi les versions d’essai (0.2.0-essai.1…)'), icon: 'flask', run: togglePrereleases };
 
   const systemItem: SystemItem = {
+    icon: 'upgrade',
     get label() {
       return t('Mise à jour de Cyber Pinball');
     },
@@ -359,11 +360,16 @@ export function createUpdatesMenu(host: UpdatesHost) {
     }));
   }
 
+  /** Chaque état de l'écran garde l'icône de l'entrée du menu système. */
   function build(): Built {
+    return { icon: 'upgrade', ...buildState() };
+  }
+
+  function buildState(): Built {
     const back = () => host.library.openSystem();
     const heading = t('Mise à jour de Cyber Pinball');
     const subheading = t('Version installée : {version}', { version: host.version });
-    const retour: Action = { label: t('Retour'), run: back };
+    const retour: Action = { label: t('Retour'), icon: 'back', run: back };
     const root = installedRoot();
 
     switch (state.kind) {
@@ -386,7 +392,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
               rows: [{ text: t('Cyber Pinball est à jour'), detail: t('Dernière version publiée : {version}, le {date}', { version: state.latest.version, date: date(state.latest.date) }), tone: 'ok' }],
             },
           ],
-          actions: [{ label: t('Rechercher à nouveau'), run: () => void check() }, prereleaseAction(), retour],
+          actions: [{ label: t('Rechercher à nouveau'), icon: 'refresh', run: () => void check() }, prereleaseAction(), retour],
           back,
         };
       case 'available': {
@@ -408,6 +414,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
             label: t('Mettre à jour maintenant'),
             detail: how.kind === 'light' ? t('Télécharge {version} ; Cyber Pinball redémarre en quelques secondes', { version: latest.version }) : t('Télécharge et installe {version} ; Cyber Pinball redémarre', { version: how.installs }),
             tone: 'ok',
+            icon: 'download',
             run: () => void download(latest),
           });
         } else if (!root) {
@@ -417,7 +424,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
             tone: 'warning',
           });
         }
-        actions.push(prereleaseAction(), { label: t('Plus tard'), run: back });
+        actions.push(prereleaseAction(), { label: t('Plus tard'), icon: 'back', run: back });
         return {
           heading: t('Cyber Pinball {version} est disponible', { version: latest.version }),
           subheading: t('{subheading} · publiée le {date}', { subheading, date: date(latest.date) }),
@@ -438,7 +445,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
               ? t('Une fois vérifiée, la mise à jour se met en place : Cyber Pinball se ferme puis redémarre.')
               : t('Une fois vérifié, l’installeur se lance : Cyber Pinball se ferme puis redémarre.'),
           sections: [{ rows: [{ text: t('{received} sur {total}', { received: formatMebibytes(received), total: formatMebibytes(total) }), detail: t('{percent} %', { percent }), tone: 'info' }] }],
-          actions: [{ label: t('Annuler'), detail: t('Le téléchargement s’arrête ; rien n’est installé'), run: () => abort.abort() }],
+          actions: [{ label: t('Annuler'), detail: t('Le téléchargement s’arrête ; rien n’est installé'), icon: 'close', run: () => abort.abort() }],
           back: () => abort.abort(),
         };
       }
@@ -459,7 +466,9 @@ export function createUpdatesMenu(host: UpdatesHost) {
           subheading,
           sections: [{ rows: [{ text: state.message, tone: 'error' }] }],
           actions: [
-            state.latest ? { label: t('Réessayer le téléchargement'), run: () => void download((state as { latest: UpdateManifest }).latest) } : { label: t('Réessayer'), run: () => void check() },
+            state.latest
+              ? { label: t('Réessayer le téléchargement'), icon: 'download', run: () => void download((state as { latest: UpdateManifest }).latest) }
+              : { label: t('Réessayer'), icon: 'refresh', run: () => void check() },
             prereleaseAction(),
             retour,
           ],

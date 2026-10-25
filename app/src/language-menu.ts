@@ -33,6 +33,7 @@ export function createLanguageMenu(host: LanguageMenuHost): SystemItem {
     host.library.openCustom(
       () => ({
         heading: t('Langue / Language'),
+        icon: 'language',
         lead: t('Langue de tous les écrans de Cyber Pinball : menu, fiches, assistant et réglages.'),
         sections: [],
         actions: [
@@ -50,6 +51,7 @@ export function createLanguageMenu(host: LanguageMenuHost): SystemItem {
   }
 
   return {
+    icon: 'language',
     get label() {
       return t('Langue / Language : {name}', { name: LANGUAGE_NAMES[language()] });
     },

@@ -11,6 +11,7 @@ import type { PupCabinet } from '../puppack';
 import { applyOps, sameFile, type FileOp } from '../fileops';
 import { mediaErrorsFile, readMediaErrors, recordMediaError } from '../mediaerrors';
 import { readInfo, scanTables, type TableEntry } from '../tables';
+import { buildZip } from '../romzip';
 import { starTrekPack } from './fixtures';
 
 const SCRIPT = 'Const cGameName="afm_113b"\r\nLoadVPM "01560000", "WPC.VBS", 3.26\r\nController.GameName = cGameName\r\n';
@@ -150,6 +151,25 @@ const TRAPS: Trap[] = [
       fs.rmSync(path.join(folder, 'pinmame'), { recursive: true });
     },
     ctx: (folder) => ({ romLibrary: libraryOf(folder) }),
+  },
+  // Puces de la ROM déballées à la racine de la table (ancien import d'un zip à sous-dossier).
+  {
+    code: 'romScattered',
+    arm: (folder) => {
+      fs.rmSync(path.join(folder, 'pinmame'), { recursive: true });
+      write(path.join(folder, 'afm_113b.rom'), 'puce');
+      write(path.join(folder, 'afm_u6.l1'), 'son');
+    },
+  },
+  // ROM dont les puces sont dans un sous-dossier du zip : PinMAME ne la lit pas.
+  {
+    code: 'romNested',
+    arm: (folder) => {
+      const chip = path.join(folder, 'puce.tmp');
+      write(chip, 'puce');
+      write(path.join(folder, 'pinmame', 'roms', 'afm_113b.zip'), buildZip([{ from: chip, name: 'afm_113b/afm_113b.rom' }]));
+      fs.rmSync(chip);
+    },
   },
   // Copie identique au lieu d'un lien.
   { code: 'romCopy', arm: (folder) => write(path.join(libraryOf(folder), 'afm_113b.zip'), 'rom'), ctx: (folder) => ({ romLibrary: libraryOf(folder) }) },

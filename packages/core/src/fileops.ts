@@ -6,6 +6,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { formatNumber, t } from './i18n';
+import { buildZip, writeZipData, type RomZipMember } from './romzip';
 
 export type FileOp =
   | { op: 'move'; from: string; to: string }
@@ -18,7 +19,12 @@ export type FileOp =
    * Lien physique : to devient le même fichier que from, sans place en plus (voir linkFile).
    * Copie quand les deux ne sont pas sur le même volume.
    */
-  | { op: 'link'; from: string; to: string };
+  | { op: 'link'; from: string; to: string }
+  /**
+   * ROM refaite à plat : un .zip dont les puces sont à la racine (romzip.ts), à partir
+   * de fichiers libres ou des fichiers d'un autre zip. Un fichier déjà là part à la corbeille.
+   */
+  | { op: 'zip'; to: string; files: RomZipMember[]; mtimeMs?: number };
 
 export interface OpContext {
   /** Dossier de la corbeille de cette opération (créé à la première utilisation). */
@@ -66,6 +72,13 @@ export function applyOps(ops: FileOp[], ctx: OpContext): void {
       case 'link':
         linkFile(op.from, op.to, ctx);
         break;
+      case 'zip': {
+        // Contenu lu avant de mettre l'ancien fichier à la corbeille : la ROM peut se refaire d'elle-même.
+        const data = buildZip(op.files);
+        if (fs.existsSync(op.to)) moveToTrash(op.to, ctx);
+        writeZipData(op.to, data, op.mtimeMs);
+        break;
+      }
     }
   }
 }

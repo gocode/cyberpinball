@@ -1,7 +1,7 @@
 // Écrit components/<Nom>/README.md et preview.html pour chaque composant et chaque maquette.
 import fs from 'node:fs';
 import path from 'node:path';
-import { ICONS } from './icones.mjs';
+import { FAMILIES } from './icones.mjs';
 import { fileURLToPath } from 'node:url';
 import { ecrans } from './ecrans.mjs';
 
@@ -42,31 +42,45 @@ C.Marque = {
 };
 
 C.Icones = {
-  readme: `Le jeu d'icônes de Cyber Pinball : trait 1,75 sur une grille de 24, une seule couleur.
+  readme: `Le jeu d'icônes de Cyber Pinball : un seul registre, \`app/renderer/icons.js\`, où chaque icône est dessinée une fois ; l'application et ce design system le lisent tous deux.
 
-- Fournir : \`<i class="cp-i cp-i-<nom>"></i>\` ; la taille suit \`font-size\`, la couleur suit \`color\`.
-- Toujours à côté d'un mot (entrée de menu, ligne, onglet, bouton). Seules les flèches de la roue et la croix d'effacement vont seules.
-- Au repos \`ink-muted\`, choisie \`signal\` (ou \`on-signal\` sur un aplat vert).`,
-  html: page('<!-- @dsCard group="Marque" height=650 width=1280 -->', `
-<div style="display:grid;grid-template-columns:repeat(6,1fr);gap:22px 12px">
-${Object.keys(ICONS).map((n) => `  <div style="display:grid;justify-items:center;gap:8px;color:var(--ink)"><i class="cp-i cp-i-${n}" style="font-size:40px"></i><span style="font-size:20px;color:var(--ink-muted)">${n}</span></div>`).join('\n')}
-</div>`),
+- Dessin : trait de 2 sur une grille de 24, bouts et joints arrondis, zone vive de 3 à 21 (2 à 22 pour les pointes), aucun remplissage. Une silhouette par fonction ; deux entrées d'un même menu n'ont jamais la même icône, une même fonction garde la sienne partout.
+- Tailles (petit côté de 1 080 px) : entrée de menu 30 px (\`2.78cqmin\`), à 24 px du libellé, alignée sur sa première ligne ; titre d'écran 60 px ; roue dentée 38 px (zone cliquable de 72 px) ; onglets et groupes 22 à 26 px. Jamais sous 20 px.
+- Couleur : celle du libellé. Au repos \`ink\` ; choisie \`on-signal\` sur l'aplat vert ; sans objet \`ink-faint\` ; destructrice \`danger\` au repos (icône et verbe), sombre sur l'aplat rouge une fois choisie.
+- Pastille « attend l'utilisateur » : rond rouge de 12 px en haut à droite de l'icône, cerclé de noir ; la même sur la roue dentée.
+- Pas d'icône devant une valeur, une ligne de statistiques, une table, une configuration ou un choix de liste : seulement devant ce qui ouvre ou fait quelque chose.
+- Fournir, ici : \`<i class="cp-i cp-i-<nom>"></i>\` (masque, taille \`font-size\`, couleur \`color\`) ; dans l'application : \`cyberIcon('<nom>')\`, et un champ \`icon\` sur l'entrée de menu.`,
+  html: page('<!-- @dsCard group="Marque" height=2790 width=1600 -->', `
+<div class="cp-label" style="margin:0 0 18px">États</div>
+<ul class="cp-menu" style="display:grid;grid-template-columns:repeat(5,1fr);gap:16px;margin-bottom:44px">
+  <li class="cp-menu-item">${i('trash')}<span>Repos<small>ink</small></span></li>
+  <li class="cp-menu-item is-focus">${i('trash')}<span>Choisie<small>on-signal</small></span></li>
+  <li class="cp-menu-item is-disabled">${i('trash')}<span>Sans objet<small>ink-faint</small></span></li>
+  <li class="cp-menu-item is-danger">${i('trash')}<span>Supprimer<small>danger</small></span></li>
+  <li class="cp-menu-item"><span class="cp-glyph">${i('upgrade')}<span class="cp-dot"></span></span><span>À traiter<small>pastille</small></span></li>
+</ul>
+${FAMILIES.map(([title, names]) => `<div class="cp-label" style="margin:0 0 18px">${title}</div>
+<div style="display:grid;grid-template-columns:repeat(8,1fr);gap:14px;margin-bottom:40px">
+${names.map((n) => `  <div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"><span style="display:flex;align-items:end;gap:18px"><i class="cp-i cp-i-${n}" style="font-size:30px"></i><i class="cp-i cp-i-${n}" style="font-size:60px"></i></span><span style="font-size:20px;color:var(--ink-muted)">${n}</span></div>`).join('\n')}
+</div>`).join('\n')}`),
 };
 
 C.LigneMenu = {
   readme: `Une entrée de menu, en capitales, avec son icône et, au besoin, un détail sur une ligne.
 
-- Fournir : une liste \`.cp-menu\` d'éléments \`.cp-menu-item\` (icône, libellé, \`<small>\` facultatif). \`.is-focus\` sur l'entrée choisie, \`.is-quiet\` sur « Quitter ».
-- L'entrée choisie est une barre opaque \`signal\`, texte \`on-signal\`.
+- Fournir : une liste \`.cp-menu\` d'éléments \`.cp-menu-item\` (icône, libellé, \`<small>\` facultatif). \`.is-focus\` sur l'entrée choisie, \`.is-quiet\` sur « Quitter », \`.is-danger\` sur une action destructrice.
+- L'icône (30 px, couleur du libellé) est alignée sur la première ligne du libellé ; la pastille rouge d'une entrée qui attend l'utilisateur se pose en haut à droite de l'icône (\`.cp-glyph\` > icône + \`.cp-dot\`).
+- L'entrée choisie est une barre opaque \`signal\`, texte et icône \`on-signal\`.
 - Pour : menu système, configuration de la borne, menus d'Exit. Pas pour les listes de tables (voir \`Roue\` et \`CarteTable\`).`,
-  html: page('<!-- @dsCard group="Navigation" height=780 width=920 -->', `
+  html: page('<!-- @dsCard group="Navigation" height=900 width=920 -->', `
 <ul class="cp-menu" style="width:840px">
-  <li class="cp-menu-item is-focus">${i('plus')}<span>Ajouter une table<small>Depuis le dossier d'import, une clé USB ou ce PC</small></span></li>
+  <li class="cp-menu-item is-focus">${i('table-add')}<span>Ajouter une table<small>Depuis le dossier d'import, une clé USB ou ce PC</small></span></li>
   <li class="cp-menu-item">${i('search')}<span>Trouver une table<small>Catalogue VPS : chaque jeu, ses versions, ce qu'il faut</small></span></li>
-  <li class="cp-menu-item">${i('list')}<span>Liste d'attente</span></li>
+  <li class="cp-menu-item">${i('inbox')}<span>Liste d'attente</span></li>
   <li class="cp-menu-item">${i('chip')}<span>Bibliothèque de ROM</span></li>
   <li class="cp-menu-item">${i('sliders')}<span>Réglages de VPX</span></li>
   <li class="cp-menu-item">${i('cabinet')}<span>Configuration de la borne</span></li>
+  <li class="cp-menu-item"><span class="cp-glyph">${i('upgrade')}<span class="cp-dot"></span></span><span>Mise à jour de Cyber Pinball<small>0.2.0 disponible</small></span></li>
   <li class="cp-menu-item is-quiet">${i('power')}<span>Quitter Cyber Pinball</span></li>
 </ul>`),
 };
@@ -194,7 +208,7 @@ C.Bouton = {
   <span class="cp-btn">${i('book')}Prospectus</span>
   <span class="cp-btn">${i('eye')}Régler l’affichage</span>
   <span class="cp-btn danger">${i('trash')}Supprimer la table</span>
-  <span class="cp-btn small">${i('update')}Analyser à nouveau</span>
+  <span class="cp-btn small">${i('refresh')}Analyser à nouveau</span>
 </div>`),
 };
 

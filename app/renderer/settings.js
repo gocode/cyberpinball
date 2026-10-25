@@ -33,13 +33,18 @@ function header(s) {
     back.addEventListener('click', () => act({ type: 'back' }));
     titles.append(back);
   }
-  titles.append(el('h1', '', s.title), el('div', 'scope', s.scope));
+  // Icône du titre : celle de l'entrée « Réglages de VPX » du menu système.
+  const title = el('h1', '', s.title);
+  title.prepend(cyberIcon('sliders', 'title-icon'));
+  titles.append(title, el('div', 'scope', s.scope));
   const file = el('div', 'file', s.file);
   if (s.fileNote) file.append(el('span', 'file-note', s.fileNote));
   titles.append(file);
   const tabs = el('nav', `tabs${s.tabsFocused ? ' focused' : ''}`);
+  tabs.dataset.iconMenu = '';
   for (const tab of s.tabs) {
-    const b = el('button', `tab${tab.active ? ' active' : ''}`, tab.label);
+    const b = el('button', `tab${tab.active ? ' active' : ''}`);
+    b.append(cyberIcon(tab.icon, 'tab-icon'), el('span', '', tab.label));
     b.addEventListener('click', () => act({ type: 'tab', tab: tab.id }));
     tabs.append(b);
   }
@@ -58,7 +63,9 @@ function list(s) {
   const ul = el('ul');
   s.rows.forEach((row, index) => {
     if (row.kind === 'group') {
-      ul.append(el('li', 'group', row.label));
+      const group = el('li', 'group');
+      group.append(cyberIcon(row.icon, 'group-icon'), el('span', '', row.label));
+      ul.append(group);
       return;
     }
     const li = el('li', `row ${row.kind}${index === s.cursor ? ' selected' : ''}`);

@@ -31,6 +31,7 @@ import {
   mediaDbNotice,
   mediaDbNoticeAccepted,
   mediaDbOfferLabel,
+  mediaDbOffers,
   mediaFileName,
   mediaPlacement,
   mediaTypeInfo,
@@ -825,7 +826,88 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     });
   }
 
-  return { openTable, openMissing, withNotice };
+  // ---------- Ajout d'une table (plan d'installation) ----------
+
+  /**
+   * Pour le plan d'ajout : ce que VPinMediaDB a pour ces jeux (identifiants VPS), la
+   * variante par défaut de chaque média (celle que retient « Chercher les médias » pour un
+   * média qui manque) et leur poids. Index indisponible : `problem`, et aucun jeu.
+   */
+  async function forGames(ids: string[]): Promise<{ problem?: string; games: Map<string, MediaDbGameOffer> }> {
+    const { db: found, problem } = await index();
+    if (!found) return { problem, games: new Map() };
+    const quality = qualityChoice().quality;
+    const games = new Map<string, MediaDbGameOffer>();
+    for (const id of new Set(ids)) {
+      const entry = found.entries.get(id);
+      if (entry) games.set(id, { offers: mediaDbOffers(entry, quality).map((o) => o.variants[0]!), bytes: 0, unknown: 0 });
+    }
+    if (!games.size) return { games };
+    const sizes = await ctx.search.sizes([...games.values()].flatMap((g) => g.offers.map((o) => o.file)));
+    for (const g of games.values()) {
+      for (const o of g.offers) {
+        const size = sizes.get(o.file.url);
+        if (size === undefined) g.unknown++;
+        else g.bytes += size;
+      }
+    }
+    return { games };
+  }
+
+  /**
+   * Après l'ajout, sans autre plan (celui de l'ajout les a montrés) : les médias qui
+   * manquent à ces tables, depuis VPinMediaDB. Seulement les tables reconnues par leur
+   * identifiant VPS ; un média déjà là n'est jamais remplacé. L'avertissement, montré
+   * dans le plan, vaut lecture.
+   */
+  async function fillMissing(files: string[]): Promise<{ installed: number; bytes: number; tables: number; failed: string[] }> {
+    const out = { installed: 0, bytes: 0, tables: 0, failed: [] as string[] };
+    const { db: found, problem } = await index();
+    if (!found) {
+      out.failed.push(problem ?? t('index de VPinMediaDB indisponible'));
+      return out;
+    }
+    acceptMediaDbNotice(host.dataDir);
+    const vps = await ctx.search.vps();
+    const tables = oneByFolder(files.map((f) => ctx.find(f)).filter((x): x is TableEntry => Boolean(x)));
+    const trashDir = trashDirFor(ctx.layout()!.trash, 'Remplacé par les médias de VPinMediaDB'); // i18n-ignore : nom de dossier de la corbeille
+    for (const [i, table] of tables.entries()) {
+      const match = matchMediaDb(found, table, vps);
+      if (match.how !== 'vps-id') continue;
+      const o = prepare(table, match, 0, true);
+      const choices = choicesOf(o);
+      if (!choices.length) continue;
+      const result = await installMediaDb(table, choices, {
+        infoFile: infoFileFor(table, ctx.tablesDir()),
+        trashDir,
+        stagingDir: staging(),
+        entry: entryOf(o).entry,
+        onProgress: progressReporter((step) => t('Médias de VPinMediaDB, table {i} sur {total}, {title} : {step}', { i: i + 1, total: tables.length, title: table.title, step })),
+      });
+      out.tables++;
+      out.installed += result.installed.length;
+      out.bytes += result.installed.reduce((n, x) => n + x.size, 0);
+      for (const f of result.failed) out.failed.push(t('{title}, {type} : {reason}', { title: table.title, type: mediaTypeInfo(f.type).label, reason: f.reason }));
+    }
+    cleanMediaDbStaging(staging());
+    host.reload();
+    return out;
+  }
+
+  return { openTable, openMissing, withNotice, forGames, fillMissing };
+}
+
+/** Ce que VPinMediaDB a pour un jeu, pour le plan d'ajout : un fichier par média, et le poids total. */
+export interface MediaDbGameOffer {
+  offers: MediaDbOffer[];
+  bytes: number;
+  /** Fichiers dont le poids n'a pas pu être lu. */
+  unknown: number;
+}
+
+/** « Logo (image), Plateau (vidéo)… » : les médias d'un plan, avec leur variante. */
+export function mediaOffersLabel(offers: MediaDbOffer[]): string {
+  return offers.map((o) => `${mediaTypeInfo(o.type).label} (${mediaDbOfferLabel(o)})`).join(', ');
 }
 
 function capped(title: string, rows: Row[]): Section {

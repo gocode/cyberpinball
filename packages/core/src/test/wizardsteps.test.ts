@@ -88,7 +88,7 @@ test('quitter sans enregistrer : retour au menu, ou fermeture annoncée au premi
 
 test('étapes seules : options, phases et entrées du menu', () => {
   const ids = WIZARD_STEPS.map((s) => s.id);
-  assert.deepEqual(ids, ['boutons', 'ecrans', 'playfield', 'disposition', 'son']);
+  assert.deepEqual(ids, ['boutons', 'interface', 'ecrans', 'playfield', 'disposition', 'son']);
   assert.equal(new Set(WIZARD_STEPS.map((s) => s.flag)).size, WIZARD_STEPS.length);
   for (const step of WIZARD_STEPS) {
     assert.ok(step.phases.length > 0 && step.phases.every((p) => WIZARD_PHASES.includes(p) && p !== 'done'), step.id);
@@ -232,7 +232,24 @@ test('les écrans de l’assistant affichent toujours le bouton « Quitter sans 
 test('menu système : chaque étape seule dans « Configuration de la borne »', () => {
   const frontend = read('app', 'src', 'frontend.ts');
   assert.match(frontend, /return t\('Configuration de la borne'\)/);
-  assert.match(frontend, /WIZARD_STEPS\.map\(\(step\) => \(\{ label: step\.label, detail: step\.detail, run: \(\) => relaunchWizard\(step\.flag\) \}\)\)/);
+  assert.match(frontend, /WIZARD_STEPS\.map\(\(step\) => \(\{ label: step\.label, detail: step\.detail, icon: step\.icon, run: \(\) => relaunchWizard\(step\.flag\) \}\)\)/);
   // Plus d'entrée d'étape directement dans le menu système.
   assert.doesNotMatch(frontend, /relaunchWizard\('(boutons|disposition)'\)/);
+});
+
+test('boutons de l’interface : étape seule sans clé de VPinballX.ini, changements annoncés', () => {
+  const step = WIZARD_STEPS.find((s) => s.id === 'interface')!;
+  assert.deepEqual(step.fields, ['navigation']);
+  assert.deepEqual(step.phases, ['navigation', 'navigationSummary']);
+  assert.ok(step.phases.every((p) => CAPTURE_PHASES.includes(p)));
+  assert.equal(step.owns('Input.Mapping.Start'), false);
+  const before = emptyCabinet();
+  before.buttons = { leftFlipper: 'KeyA', rightFlipper: 'KeyS', start: 'Digit2', exit: 'KeyQ', credit: 'Digit5', plunger: 'Enter' };
+  // Seule la navigation change ; les boutons du jeu sont gardés.
+  const built = { ...before, buttons: { ...before.buttons, leftFlipper: 'KeyZ' }, navigation: { previous: 'KeyJ', next: 'KeyS', confirm: 'Digit2', back: 'KeyQ' } };
+  const saved = stepCabinet(before, built, step);
+  assert.deepEqual(saved.buttons, before.buttons);
+  assert.deepEqual(saved.navigation, built.navigation);
+  // Sans navigation enregistrée, celle en vigueur est déduite du jeu : seul Précédent a changé.
+  assert.deepEqual(cabinetChanges(before, { navigation: built.navigation }), ['Interface : Précédent sur J']);
 });

@@ -12,6 +12,12 @@ son interface).
 ## 0.1.3
 
 - Boutons d'un Pinscape (KL25Z) ou d'un encodeur en mode manette : relevés dans l'étape « Boutons » et suivis par tout le menu et par VPX.
+- Boutons du jeu et boutons de l'interface réglés séparément ; touches du clavier et boutons de joystick se mélangent librement.
+- « Ajouter une table » réunit au même endroit toutes les façons d'ajouter une table, avec des filtres dans le catalogue et l'installation rapide.
+- « Ce qu'il manque pour jouer » : un parcours guidé, d'une ROM ou d'un fronton manquant jusqu'à « Jouer ».
+- Une ROM rangée dans un sous-dossier de son zip est reconnue ; « Diagnostiquer et réparer » regroupe une ROM éparpillée dans une table.
+- Liste d'attente corrigeable : réaffecter, vider, remplacer ou retirer un fichier reçu par erreur ; la fiche d'une table a une section « Fichiers ».
+- Une icône pour chaque menu.
 - Fenêtre « Récupérer » sur une borne : elle s'ouvre sur un écran lisible (le fronton si le playfield est tourné), le pointeur amené dessus ; Exit la ferme.
 - La fenêtre « Récupérer » rouverte reprend la page où vous en étiez ; recherche des sites plus complète.
 - Plus d'écran blanc quand une fenêtre s'ouvre ou change d'écran.

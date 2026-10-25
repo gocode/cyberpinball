@@ -54,6 +54,7 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
 
   /** Entrée du menu système ; son détail nomme la configuration active. */
   const systemItem: SystemItem = {
+    icon: 'layers',
     get label() {
       return t('Configurations de la borne');
     },
@@ -87,10 +88,11 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
           host.relaunch();
         },
       }));
-      actions.push({ label: t('Nouvelle configuration'), detail: t('Assistant complet pour les écrans branchés'), run: () => host.relaunch(true) });
+      actions.push({ label: t('Nouvelle configuration'), detail: t('Assistant complet pour les écrans branchés'), icon: 'plus', run: () => host.relaunch(true) });
       actions.push({ label: t('Plus tard'), detail: t('Le menu reste sur l’écran principal ; une partie redemandera la configuration'), run: () => host.library.leave() });
       return {
         heading: t('Quelle configuration est branchée ?'),
+        icon: 'layers',
         lead: reason ?? explainChoice(s, choice),
         sections: [{ title: t('Écrans branchés'), rows: [{ text: describeDisplays(host.displays()) }] }],
         actions,
@@ -116,10 +118,11 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
         };
       });
       const actions: Action[] = s.configurations.map((c) => ({ label: quoted(c.name), detail: t('Utiliser, forcer, renommer, supprimer'), run: () => openConfiguration(c.id) }));
-      actions.push({ label: t('Nouvelle configuration'), detail: t('Assistant complet pour les écrans branchés'), run: () => host.relaunch(true) });
+      actions.push({ label: t('Nouvelle configuration'), detail: t('Assistant complet pour les écrans branchés'), icon: 'plus', run: () => host.relaunch(true) });
       if (s.forced) {
         actions.push({
           label: t('Reconnaissance automatique'),
+          icon: 'auto',
           detail: t('Ne plus forcer « {name} » : la configuration suivra les écrans branchés', { name: nameOf(s, s.forced) }),
           run: () => {
             updateCabinetSet(host.loc.dataDir, (x) => forceConfiguration(x, undefined));
@@ -128,11 +131,12 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
         });
       }
       if (s.trash?.length) {
-        actions.push({ label: t('Corbeille'), detail: tn(s.trash.length, '{n} configuration supprimée', '{n} configurations supprimées'), run: () => openTrash() });
+        actions.push({ label: t('Corbeille'), detail: tn(s.trash.length, '{n} configuration supprimée', '{n} configurations supprimées'), icon: 'trash', run: () => openTrash() });
       }
-      actions.push({ label: t('Retour'), run: () => host.library.openSystem() });
+      actions.push({ label: t('Retour'), icon: 'back', run: () => host.library.openSystem() });
       return {
         heading: t('Configurations de la borne'),
+        icon: 'layers',
         subheading: current
           ? s.forced === current.id
             ? t('Active : « {name} », forcée depuis ce menu', { name: current.name })
@@ -161,6 +165,7 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
       if (!isActive) {
         actions.push({
           label: t('Utiliser avec ces écrans'),
+          icon: 'check',
           detail: t('Retenue pour les écrans branchés ; la reconnaissance reste automatique'),
           run: () => {
             updateCabinetSet(host.loc.dataDir, (x) => rememberChoice(x, host.displays(), id));
@@ -171,6 +176,7 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
       if (s.forced !== id) {
         actions.push({
           label: t('Toujours utiliser celle-ci'),
+          icon: 'pin',
           detail: t('Forcée, quels que soient les écrans branchés'),
           run: () => {
             updateCabinetSet(host.loc.dataDir, (x) => forceConfiguration(x, id));
@@ -181,6 +187,7 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
       actions.push({
         label: t('Renommer'),
         detail: c.name,
+        icon: 'edit',
         run: () =>
           host.library.openPrompt(t('Renommer la configuration'), t('Nom'), c.name, (name) => {
             if (name) updateCabinetSet(host.loc.dataDir, (x) => renameConfiguration(x, id, name));
@@ -188,11 +195,12 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
           }),
       });
       if (s.configurations.length > 1) {
-        actions.push({ label: t('Supprimer'), detail: t('Mise à la corbeille, restaurable ; son VPinballX.ini reste sur le disque'), tone: 'warning', run: () => confirmTrash(id) });
+        actions.push({ label: t('Supprimer'), detail: t('Mise à la corbeille, restaurable ; son VPinballX.ini reste sur le disque'), tone: 'warning', icon: 'trash', run: () => confirmTrash(id) });
       }
-      actions.push({ label: t('Retour'), run: () => openManager(index) });
+      actions.push({ label: t('Retour'), icon: 'back', run: () => openManager(index) });
       return {
         heading: quoted(c.name),
+        icon: 'layers',
         subheading: [isActive && t('active'), s.forced === id && t('forcée')].filter(Boolean).join(' · ') || undefined,
         lead: score ? explainScore(score) : undefined,
         sections: [{ title: t('Écrans'), rows: screenRows(c, score) }, { title: t('Fichiers'), rows: [{ text: 'VPinballX.ini', detail: configIniPath(host.loc.vpxIni, c) }] }],
@@ -213,10 +221,11 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
           : t("Elle va dans la corbeille des configurations, d'où elle se restaure telle quelle."),
         sections: [],
         actions: [
-          { label: t('Annuler'), run: () => openConfiguration(id) },
+          { label: t('Annuler'), icon: 'close', run: () => openConfiguration(id) },
           {
             label: t('Supprimer'),
             tone: 'warning',
+            icon: 'trash',
             run: () => {
               updateCabinetSet(host.loc.dataDir, (x) => trashConfiguration(x, id));
               if (isActive) host.relaunch();
@@ -244,6 +253,7 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
       actions.push({ label: t('Retour'), run: () => openManager() });
       return {
         heading: t('Corbeille des configurations'),
+        icon: 'trash',
         lead: t('Une configuration restaurée reprend ses écrans, ses réglages et son VPinballX.ini.'),
         sections: [],
         actions,

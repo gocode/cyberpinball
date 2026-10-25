@@ -16,7 +16,7 @@
 
 import { formatList, t } from './i18n';
 import { IniDocument } from './ini';
-import type { ButtonId, Cabinet, CabinetButtons } from './model';
+import type { ButtonId, Cabinet, CabinetButtons, NavigationButtons, NavigationId } from './model';
 import type { VpxSetting } from './vpx';
 
 export interface ButtonInfo {
@@ -73,34 +73,112 @@ export function buttonKeys(buttons: CabinetButtons | undefined): CabinetButtons 
  * que VPX ne sait pas lire, la même touche pour deux boutons. Vide : relevé valable.
  */
 export function buttonProblems(buttons: CabinetButtons): string[] {
+  return keyProblems(GAME_KEYS, buttons);
+}
+
+/** Ce que devient le relevé quand le bouton demandé envoie une touche (recordKey). */
+export interface ButtonRecord<K = SetKeys> {
+  keys: K;
+  /** Exit (Retour pour l'interface), déjà relevé, sur un bouton facultatif : la borne n'a pas ce bouton. */
+  skipped?: boolean;
+  /** Touche refusée et pourquoi ; le relevé est inchangé. */
+  refused?: string;
+}
+
+/** Le bouton de jeu `id` vient d'envoyer `code` (recordKey sur les boutons du jeu). */
+export function recordButton(keys: CabinetButtons, id: ButtonId, code: string): ButtonRecord<CabinetButtons> {
+  return recordKey(GAME_KEYS, keys, id, code) as ButtonRecord<CabinetButtons>;
+}
+
+/** Boutons de jeu à essayer au récapitulatif de leur relevé : flippers, Start, Exit. */
+export const MAIN_GAME_BUTTONS: readonly ButtonId[] = ['leftFlipper', 'rightFlipper', 'start', 'exit'];
+
+/**
+ * Boutons de jeu à essayer sur la borne avant de valider ces touches : ceux dont la
+ * touche n'est pas celle de référence (les touches en vigueur à l'arrivée sur l'étape, ou
+ * celles des encodeurs quand on les a choisies). L'essai ne sert qu'à surprendre un
+ * mauvais relevé : une touche qu'on n'a pas relevée n'est pas à essayer.
+ */
+export function buttonsToTry(keys: CabinetButtons, reference: CabinetButtons): ButtonId[] {
+  return keysToTry(GAME_KEYS, keys, reference) as ButtonId[];
+}
+
+// ---------------------------------------------------------------------------
+// Deux jeux de boutons, relevés de la même façon
+//
+// Les boutons du jeu (ce que VPX reçoit pendant une partie, [Input] Mapping.*) et ceux de
+// l'interface (ce qui pilote Cyber Pinball : menu, fiches, réglages, assistant) se relèvent,
+// se récapitulent et s'essaient chacun de leur côté, par les mêmes fonctions.
+
+/** Touches d'un jeu de boutons : identifiant du bouton -> touche ou bouton de joystick. */
+export type SetKeys = Partial<Record<string, string>>;
+
+export interface KeySet {
+  kind: 'game' | 'interface';
+  items: readonly { id: string; label: string; required: boolean }[];
+  /** Bouton qui, une fois relevé, passe un bouton facultatif : Exit, ou Retour. */
+  skip: string;
+  /** Au récapitulatif : choisir (précédent, suivant), lancer le choix, sortir. */
+  move: { previous: string; next: string; confirm: string; exit: string };
+  /** Boutons à essayer au récapitulatif quand leur touche a changé. */
+  tried: readonly string[];
+  /** Pourquoi ce bouton ne peut pas avoir cette touche ; undefined : accepté. */
+  refused(id: string, code: string): string | undefined;
+}
+
+export const GAME_KEYS: KeySet = {
+  kind: 'game',
+  items: BUTTONS,
+  skip: 'exit',
+  move: { previous: 'leftFlipper', next: 'rightFlipper', confirm: 'start', exit: 'exit' },
+  tried: MAIN_GAME_BUTTONS,
+  refused: (_id, code) => refusedKey(code),
+};
+
+/**
+ * Le bouton `id` vient d'envoyer `code`, touche du clavier ou bouton du joystick : les deux
+ * se relèvent de la même façon, et se mélangent librement d'un bouton à l'autre. Refusé si
+ * un autre bouton du même jeu l'a déjà, ou si `set.refused` le refuse ; le bouton qui passe
+ * (`set.skip`), une fois relevé, passe un bouton facultatif.
+ */
+export function recordKey(set: KeySet, keys: SetKeys, id: string, code: string): ButtonRecord {
+  const item = set.items.find((b) => b.id === id)!;
+  const skip = keys[set.skip];
+  if (!item.required && skip && code === skip) {
+    const next = { ...keys };
+    delete next[id];
+    return { keys: next, skipped: true };
+  }
+  const holder = set.items.find((b) => b.id !== id && keys[b.id] === code);
+  const refused = holder
+    ? t('{key} est déjà la touche du bouton {button} : appuyez sur un autre bouton, ou cliquez sur {button} pour le refaire.', { key: keyLabel(code), button: holder.label })
+    : set.refused(id, code);
+  if (refused) return { keys, refused };
+  return { keys: { ...keys, [id]: code } };
+}
+
+/** Ce qui rend un relevé de ce jeu inutilisable (buttonProblems, navigationProblems). Vide : valable. */
+export function keyProblems(set: KeySet, keys: SetKeys): string[] {
   const problems: string[] = [];
-  const holders = new Map<string, ButtonInfo>();
-  for (const b of BUTTONS) {
-    const code = buttons[b.id];
+  const holders = new Map<string, string>();
+  for (const b of set.items) {
+    const code = keys[b.id];
     if (!code) {
       if (b.required) problems.push(t('{button} : aucune touche', { button: b.label }));
       continue;
     }
-    const refused = refusedKey(code);
+    const refused = set.refused(b.id, code);
     if (refused) problems.push(t('{button} : {problem}', { button: b.label, problem: refused }));
     const other = holders.get(code);
-    if (other) problems.push(t('{first} et {second} : même touche ({key})', { first: other.label, second: b.label, key: keyLabel(code) }));
-    else holders.set(code, b);
+    if (other) problems.push(t('{first} et {second} : même touche ({key})', { first: other, second: b.label, key: keyLabel(code) }));
+    else holders.set(code, b.label);
   }
   return problems;
 }
 
-/** Boutons qui pilotent toute l'interface : flippers, Start, Exit. */
-export const NAVIGATION_BUTTONS: readonly ButtonId[] = ['leftFlipper', 'rightFlipper', 'start', 'exit'];
-
-/**
- * Boutons de navigation à essayer sur la borne avant de valider ces touches : ceux
- * dont la touche n'est pas celle de référence (les touches en vigueur à l'arrivée sur
- * l'étape, ou celles des encodeurs quand on les a choisies). L'essai ne sert qu'à
- * surprendre un mauvais relevé : une touche qu'on n'a pas relevée n'est pas à essayer.
- */
-export function buttonsToTry(keys: CabinetButtons, reference: CabinetButtons): ButtonId[] {
-  return NAVIGATION_BUTTONS.filter((id) => !keys[id] || keys[id] !== reference[id]);
+/** Boutons de ce jeu à essayer avant de valider : ceux de `set.tried` dont la touche a changé. */
+export function keysToTry(set: KeySet, keys: SetKeys, reference: SetKeys): string[] {
+  return set.tried.filter((id) => !keys[id] || keys[id] !== reference[id]);
 }
 
 /** Clé gérée de [Input] (« Input.Mapping.LeftFlipper ») : celles que l'étape « Boutons » reprend en main. */
@@ -109,13 +187,15 @@ export function isInputKey(id: string): boolean {
 }
 
 /**
- * Remise aux touches par défaut des encodeurs : le relevé devient celui des encodeurs
+ * Remise aux touches par défaut des encodeurs, des deux jeux de boutons : le relevé du jeu
+ * devient celui des encodeurs, l'interface leurs flippers, Start et Exit
  * (écrit dans [Input] à la synchronisation suivante, qui rend aussi leur touche aux
  * actions de VPX qui l'avaient perdue), et les touches gardées à la main sont reprises.
  */
 export function withDefaultButtons(cabinet: Cabinet): Cabinet {
   const vpxManual = cabinet.vpxManual?.filter((id) => !isInputKey(id));
-  const next: Cabinet = { ...cabinet, buttons: { ...DEFAULT_BUTTONS } };
+  // Les deux jeux : l'interface revient sur les flippers, Start et Exit des encodeurs.
+  const next: Cabinet = { ...cabinet, buttons: { ...DEFAULT_BUTTONS }, navigation: defaultNavigation(DEFAULT_BUTTONS) };
   if (vpxManual?.length) next.vpxManual = vpxManual;
   else delete next.vpxManual;
   return next;
@@ -360,6 +440,77 @@ function mappingToken(code: string): string {
 // ---------------------------------------------------------------------------
 // Navigation dans l'interface
 
+/** Ce que l'interface lit d'une borne : ses deux jeux de boutons (un Cabinet convient). */
+export type ButtonsSource = Pick<Cabinet, 'buttons' | 'navigation'> | undefined;
+
+export interface NavigationInfo {
+  id: NavigationId;
+  label: string;
+  /** Obligatoire : l'assistant attend ce bouton. Facultatif : Retour le passe. */
+  required: boolean;
+  /** Bouton de jeu qui tient ce rôle par défaut (borne d'avant les boutons de l'interface, touches par défaut). */
+  game?: ButtonId;
+  /** Touches de secours du clavier, toujours actives pour ce rôle et pour lui seul. */
+  fallback: readonly string[];
+}
+
+/** Boutons de l'interface, dans l'ordre de l'assistant. */
+export const NAVIGATION: readonly NavigationInfo[] = [
+  { id: 'previous', get label() { return t('Précédent'); }, required: true, game: 'leftFlipper', fallback: ['ArrowLeft', 'ArrowUp'] },
+  { id: 'next', get label() { return t('Suivant'); }, required: true, game: 'rightFlipper', fallback: ['ArrowRight', 'ArrowDown'] },
+  { id: 'confirm', get label() { return t('Valider'); }, required: true, game: 'start', fallback: ['Enter', 'NumpadEnter'] },
+  { id: 'back', get label() { return t('Retour et menu'); }, required: true, game: 'exit', fallback: ['Escape'] },
+  { id: 'help', get label() { return t('Aide-mémoire'); }, required: false, fallback: [] },
+  { id: 'settings', get label() { return t('Réglages de VPX'); }, required: false, fallback: [] },
+];
+
+/**
+ * Touches qu'un bouton de l'interface refuse : celles que refuse un bouton de jeu (touche
+ * Windows, Tab, Retour arrière…), et les touches de secours d'un autre rôle (flèches, Entrée,
+ * Échap), qui gardent toujours le leur.
+ */
+export function refusedNavigationKey(id: string, code: string): string | undefined {
+  const refused = refusedKey(code);
+  if (refused) return refused;
+  const owner = NAVIGATION.find((n) => n.id !== id && n.fallback.includes(code));
+  return owner ? t('{key} reste la touche de secours « {action} » : choisissez un autre bouton.', { key: keyLabel(code), action: owner.label }) : undefined;
+}
+
+export const INTERFACE_KEYS: KeySet = {
+  kind: 'interface',
+  items: NAVIGATION,
+  skip: 'back',
+  move: { previous: 'previous', next: 'next', confirm: 'confirm', exit: 'back' },
+  tried: ['previous', 'next', 'confirm', 'back'],
+  refused: refusedNavigationKey,
+};
+
+/**
+ * Boutons de l'interface par défaut : les mêmes boutons physiques que flippers, Start et
+ * Exit du jeu (ceux des encodeurs tant que le jeu n'a pas été relevé).
+ */
+export function defaultNavigation(buttons: CabinetButtons | undefined): NavigationButtons {
+  const keys = buttonKeys(buttons);
+  const nav: NavigationButtons = {};
+  for (const n of NAVIGATION) if (n.game && keys[n.game]) nav[n.id] = keys[n.game];
+  return nav;
+}
+
+/** Ce qui rend un relevé des boutons de l'interface inutilisable. Vide : relevé valable. */
+export function navigationProblems(navigation: NavigationButtons): string[] {
+  return keyProblems(INTERFACE_KEYS, navigation);
+}
+
+/**
+ * Boutons de l'interface en vigueur : ceux de l'étape « Boutons de l'interface » ; sans
+ * elle (borne d'avant, migration douce), ou si leur relevé est incohérent, les flippers,
+ * Start et Exit du jeu (defaultNavigation) : l'interface reste toujours pilotable.
+ */
+export function navigationButtons(source: ButtonsSource): NavigationButtons {
+  const nav = source?.navigation;
+  return nav && navigationProblems(nav).length === 0 ? { ...nav } : defaultNavigation(source?.buttons);
+}
+
 export interface NavigationKeys {
   previous: string[];
   next: string[];
@@ -368,19 +519,21 @@ export interface NavigationKeys {
 }
 
 /**
- * Touches qui pilotent l'interface : flipper gauche / droit pour se déplacer,
- * Start pour valider, Exit pour revenir ; plus les flèches, Entrée et Échap d'un
- * clavier branché, sauf quand l'une d'elles est déjà un autre bouton de navigation.
- * Sans étape « Boutons », les touches d'avant : Maj, 1, Échap. `vertical` ajoute
- * les flèches haut et bas (listes du menu).
+ * Touches qui pilotent l'interface : ses boutons Précédent / Suivant pour se déplacer,
+ * Valider, Retour pour revenir (par défaut flippers, Start, Exit) ; plus les touches de
+ * secours d'un clavier branché, flèches, Entrée et Échap, sauf quand l'une d'elles est
+ * déjà un autre bouton de l'interface (relevé d'avant les boutons de l'interface, déduit
+ * du jeu). Les boutons du jeu n'en prennent aucune. `vertical` ajoute les flèches haut et
+ * bas (listes du menu).
  */
-export function navigationKeys(buttons: CabinetButtons | undefined, vertical = true): NavigationKeys {
-  const keys = buttonKeys(buttons);
-  const groups: [keyof NavigationKeys, string | undefined, string[]][] = [
-    ['previous', keys.leftFlipper, ['ArrowLeft', ...(vertical ? ['ArrowUp'] : [])]],
-    ['next', keys.rightFlipper, ['ArrowRight', ...(vertical ? ['ArrowDown'] : [])]],
-    ['confirm', keys.start, ['Enter', 'NumpadEnter']],
-    ['exit', keys.exit, ['Escape']],
+export function navigationKeys(source: ButtonsSource, vertical = true): NavigationKeys {
+  const nav = navigationButtons(source);
+  const fallback = (id: NavigationId) => NAVIGATION.find((n) => n.id === id)!.fallback.filter((k) => vertical || (k !== 'ArrowUp' && k !== 'ArrowDown'));
+  const groups: [keyof NavigationKeys, string | undefined, readonly string[]][] = [
+    ['previous', nav.previous, fallback('previous')],
+    ['next', nav.next, fallback('next')],
+    ['confirm', nav.confirm, fallback('confirm')],
+    ['exit', nav.back, fallback('back')],
   ];
   const cabinet = new Set(groups.map(([, key]) => key).filter((k): k is string => Boolean(k)));
   const result = {} as NavigationKeys;
@@ -390,9 +543,25 @@ export function navigationKeys(buttons: CabinetButtons | undefined, vertical = t
   return result;
 }
 
-/** Retire d'une liste de raccourcis (H, R…) les touches prises par un bouton de la borne. */
-export function withoutButtonKeys(codes: string[], buttons: CabinetButtons | undefined): string[] {
-  const taken = new Set(Object.values(buttonKeys(buttons)));
+/** Touches de toute l'interface : navigation, puis aide-mémoire (H, F1) et réglages de VPX (R). */
+export interface InterfaceKeys extends NavigationKeys {
+  help: string[];
+  settings: string[];
+}
+
+/**
+ * navigationKeys, plus les boutons Aide et Réglages de l'interface s'ils ont été relevés,
+ * et les raccourcis H, F1 et R d'un clavier tant qu'aucun bouton de la borne ne les envoie.
+ */
+export function interfaceKeys(source: ButtonsSource, vertical = true): InterfaceKeys {
+  const nav = navigationButtons(source);
+  const own = (id: NavigationId, keyboard: string[]) => [...new Set([...(nav[id] ? [nav[id]!] : []), ...withoutButtonKeys(keyboard, source)])];
+  return { ...navigationKeys(source, vertical), help: own('help', ['KeyH', 'F1']), settings: own('settings', ['KeyR']) };
+}
+
+/** Retire d'une liste de raccourcis (H, R…) les touches prises par un bouton de la borne, du jeu ou de l'interface. */
+export function withoutButtonKeys(codes: string[], source: ButtonsSource): string[] {
+  const taken = new Set([...Object.values(buttonKeys(source?.buttons)), ...Object.values(navigationButtons(source))]);
   return codes.filter((c) => !taken.has(c));
 }
 

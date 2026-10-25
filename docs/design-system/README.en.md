@@ -6,7 +6,7 @@ The visual language of Cyber Pinball: tokens, components and screen mockups, fol
 
 ## Opening and regenerating
 
-Open `index.html`: the design system page (foundations, colors, typography, spacing, 13 live components with their HTML code, 5 screens). `components/<Name>/preview.html` shows a single component at its reference size. These are static previews, without handling of the cabinet buttons. The pages load Saira from Google Fonts; offline, they fall back to Segoe UI.
+Open `index.html`: the design system page (foundations, colors, typography, spacing, 13 live components with their HTML code, 7 screens, including “What’s missing to play” on the cabinet and on the desktop). `components/<Name>/preview.html` shows a single component at its reference size. These are static previews, without handling of the cabinet buttons. The pages load Saira from Google Fonts; offline, they fall back to Segoe UI.
 
 From the repository root, with Node 22 or later:
 
@@ -21,8 +21,8 @@ Sources, to edit instead of the generated files:
 - `tokens.json`: colors, families, sizes, spacing, radii and glows.
 - `src/base.css`: the `.cp-*` components; the last declarations, those of the revision, produce the final rendering.
 - `src/fonds.css`: the "smoked glass" background.
-- `src/icones.mjs`: the 36 icons (SVG masks).
-- `src/composants.mjs` and `src/ecrans.mjs`: component examples and the composition of the five screens.
+- `src/icones.mjs`: the icons, read from the application’s registry (`app/renderer/icons.js`, the only place where they are drawn), turned into SVG masks.
+- `src/composants.mjs` and `src/ecrans.mjs`: component examples and the composition of the seven screens.
 - `src/couverture.html`: the cover.
 - `src/page.mjs`: the `index.html` page.
 

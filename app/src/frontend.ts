@@ -9,14 +9,16 @@ import { app, globalShortcut, ipcMain, session, type BrowserWindow, type Input, 
 import {
   CONFIG_KEY,
   WIZARD_STEPS,
-  buttonKeys,
   buttonProblems,
   formatManualEdit,
   gameKeys,
   displayKeys,
   keyLabel,
-  navigationKeys,
-  withoutButtonKeys,
+  interfaceKeys,
+  navigationButtons,
+  navigationProblems,
+  type ButtonsSource,
+  type NavigationButtons,
   joysticksInVpxLog,
   joysticksUnseenByVpx,
   keepManualEdits,
@@ -88,24 +90,26 @@ import { createLanguageMenu } from './language-menu';
 import { createUpdatesMenu } from './updates-menu';
 
 /**
- * Touches du menu : celles des boutons de la borne (étape « Boutons » de
- * l'assistant, sinon les touches par défaut des encodeurs), les flèches, Entrée et
- * Échap d'un clavier, et H et R tant qu'aucun bouton ne les envoie.
+ * Touches du menu : celles des boutons de l'interface (étape « Boutons de l'interface »
+ * de l'assistant, sinon les flippers, Start et Exit du jeu), les flèches, Entrée et
+ * Échap d'un clavier, et H et R tant qu'aucun bouton ne les envoie (interfaceKeys).
  */
-function menuKeysFor(buttons: CabinetButtons | undefined) {
-  return { ...navigationKeys(buttons), help: withoutButtonKeys(['KeyH', 'F1'], buttons), settings: withoutButtonKeys(['KeyR'], buttons) };
+function menuKeysFor(cabinet: ButtonsSource) {
+  return interfaceKeys(cabinet);
 }
 
-/** Boutons de la borne, relus au démarrage du menu (l'étape « Boutons » relance l'application). */
+/** Boutons de la borne, du jeu et de l'interface, relus au démarrage du menu (les étapes « Boutons » relancent l'application). */
 let buttons: CabinetButtons | undefined;
+let navigation: NavigationButtons | undefined;
 let KEYS = menuKeysFor(undefined);
 
 /** Aide-mémoire « Dans le menu », avec les touches de cette borne. */
 function menuKeys(): [string, string][] {
-  const keys = buttonKeys(buttons);
+  // Boutons de l'interface : par défaut les flippers, Start et Exit du jeu.
+  const keys = navigationButtons({ buttons, navigation });
   const or = (codes: string[]) => formatList(codes.map(keyLabel), 'or');
   return [
-    [t('Choisir une table'), t('Flippers ({left} / {right}) ou flèches', { left: keyLabel(keys.leftFlipper), right: keyLabel(keys.rightFlipper) })],
+    [t('Choisir une table'), t('Précédent / Suivant ({left} / {right}) ou flèches', { left: keyLabel(keys.previous), right: keyLabel(keys.next) })],
     [t('Fiche de la table (Jouer, Modifier…)'), `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`],
     ...(KEYS.help.length ? [[t('Afficher les commandes'), or(KEYS.help)] as [string, string]] : []),
     [t('Réglages de VPX'), KEYS.settings.length ? t('{keys}, ou Exit puis « Réglages de VPX »', { keys: or(KEYS.settings) }) : t('Exit puis « Réglages de VPX »')],
@@ -138,7 +142,9 @@ interface Message {
   title: string;
   lines: string[];
   /** Ce que fait Start sur ce message. */
-  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'otherFrontend';
+  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'journey';
+  /** Table d'une partie échouée : Start ouvre « Ce qu'il manque pour jouer » (action 'journey'). */
+  table?: string;
 }
 
 interface State {
@@ -243,6 +249,11 @@ const library = createLibrary({
   windows: () => windows,
   readingScreen: () => readingScreenRect(),
   broadcast: () => broadcast(),
+  installVpx: () => {
+    library.leave();
+    startVpxInstall();
+  },
+  setup: () => void relaunchWizard(),
 });
 // Configurations de la borne : la configuration active est nommée dans le sous-menu.
 const configurations = createConfigurationsMenu({
@@ -258,6 +269,7 @@ library.systemItems.splice(
   1,
   0,
   {
+    icon: 'sliders',
     get label() {
       return t('Réglages de VPX');
     },
@@ -267,6 +279,7 @@ library.systemItems.splice(
     run: () => openVpxSettings(),
   },
   {
+    icon: 'cabinet',
     get label() {
       return t('Configuration de la borne');
     },
@@ -288,9 +301,9 @@ library.systemItems.splice(
  */
 function cabinetSetupItems(): SystemItem[] {
   return [
-    ...WIZARD_STEPS.map((step) => ({ label: step.label, detail: step.detail, run: () => relaunchWizard(step.flag) })),
-    { label: t('Assistant complet'), detail: t('Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son'), run: () => relaunchWizard() },
-    { label: t('Touches par défaut des encodeurs'), detail: t('Si les boutons ne répondent plus comme prévu (aussi à la souris)'), run: () => resetButtonsFromMenu() },
+    ...WIZARD_STEPS.map((step) => ({ label: step.label, detail: step.detail, icon: step.icon, run: () => relaunchWizard(step.flag) })),
+    { label: t('Assistant complet'), detail: t('Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son'), icon: 'wizard', run: () => relaunchWizard() },
+    { label: t('Touches par défaut des encodeurs'), detail: t('Si les boutons ne répondent plus comme prévu (aussi à la souris)'), icon: 'keyboard', run: () => resetButtonsFromMenu() },
     configurations.systemItem,
   ];
 }
@@ -298,9 +311,10 @@ function cabinetSetupItems(): SystemItem[] {
 function openCabinetSetup(): void {
   library.openCustom(() => ({
     heading: t('Configuration de la borne'),
+    icon: 'cabinet',
     lead: t('Chaque étape se refait seule, puis revient au menu des tables. « Quitter sans enregistrer » (ou Exit maintenu 2 s) en sort sans rien changer.'),
     sections: [],
-    actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, attention: i.attention, run: i.run })), { label: t('Retour'), run: () => library.openSystem() }],
+    actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, icon: i.icon, attention: i.attention, run: i.run })), { label: t('Retour'), icon: 'back', run: () => library.openSystem() }],
     back: () => library.openSystem(),
     // La sélection va d'office sur l'entrée qui attend l'utilisateur (pastille rouge).
   }), Math.max(0, cabinetSetupItems().findIndex((i) => i.attention)));
@@ -343,6 +357,7 @@ const updates = createUpdatesMenu({
 library.systemItems.splice(library.systemItems.length - 1, 0, updates.systemItem);
 // Juste avant « Quitter Cyber Pinball ».
 library.systemItems.splice(library.systemItems.length - 1, 0, {
+  icon: 'desktop',
   get label() {
     return t('Bureau Windows');
   },
@@ -381,7 +396,8 @@ function resetButtonsFromMenu(): void {
   const reset = resetButtons();
   if (!reset) return;
   buttons = reset.cabinet.buttons;
-  KEYS = menuKeysFor(buttons);
+  navigation = reset.cabinet.navigation;
+  KEYS = menuKeysFor(reset.cabinet);
   library.leave();
   state = { ...state, phase: 'message', message: { title: t('Touches par défaut des encodeurs remises'), lines: describeReset(reset) } };
   broadcast();
@@ -414,7 +430,8 @@ export function startFrontend(): void {
   // orientation changée hors de l'assistant fait aussi tourner le menu.
   rotation = menuRotation(choose ? undefined : cabinet, choose ? undefined : assignments.playfield);
   buttons = cabinet?.buttons;
-  KEYS = menuKeysFor(buttons);
+  navigation = cabinet?.navigation;
+  KEYS = menuKeysFor(cabinet);
   audioOutput = choose ? undefined : menuAudioOutput(cabinet)?.friendlyName;
   medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, onChange: () => broadcast() });
   serveMedias(() => medias!.allowedDirs(tables));
@@ -442,6 +459,17 @@ export function startFrontend(): void {
         title: t('Boutons de la borne à refaire'),
         lines: [...buttonProblems(buttons), t('Les touches par défaut des encodeurs servent en attendant.'), t('Start : refaire l’étape « Boutons » · Exit : menu')],
         action: 'buttons',
+      },
+    };
+  } else if (navigation && navigationProblems(navigation).length) {
+    // Boutons de l'interface inutilisables : le menu suit déjà les flippers, Start et Exit du jeu (navigationButtons).
+    state = {
+      ...state,
+      phase: 'message',
+      message: {
+        title: t('Boutons de l’interface à refaire'),
+        lines: [...navigationProblems(navigation), t('Les flippers, Start et Exit du jeu servent en attendant.'), t('Start : refaire l’étape « Boutons de l’interface » · Exit : menu')],
+        action: 'interface',
       },
     };
   }
@@ -687,6 +715,7 @@ function handleKey(input: Input): boolean {
       if (is(KEYS.confirm) && state.message?.action === 'wizard') return relaunchWizard();
       if (is(KEYS.confirm) && state.message?.action === 'install-vpx') return startVpxInstall();
       if (is(KEYS.confirm) && state.message?.action === 'buttons') return relaunchWizard('--boutons');
+      if (is(KEYS.confirm) && state.message?.action === 'interface') return relaunchWizard('--interface');
       if (state.message?.action === 'manualEdits') {
         resolveManualEdits(is(KEYS.confirm));
         state = { ...state, phase: tables.length ? 'menu' : 'message', message: tables.length ? undefined : noTables() };
@@ -706,6 +735,10 @@ function handleKey(input: Input): boolean {
       if (state.message?.action === 'addTable') {
         if (is(KEYS.confirm)) library.openAdd();
         else library.openSystem();
+        return true;
+      }
+      if (state.message?.action === 'journey' && state.message.table && is(KEYS.confirm)) {
+        library.openJourney(state.message.table);
         return true;
       }
       if (tables.length) state = { ...state, phase: 'menu', message: undefined };
@@ -851,7 +884,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     const unseen = simulated === undefined ? joystickMessage(install.version) : undefined;
     state = unseen ? { ...state, phase: 'message', message: unseen } : { ...state, phase: 'menu' };
   } else {
-    state = { ...state, phase: 'message', message: explain(result) };
+    state = { ...state, phase: 'message', message: explain(result, table) };
   }
   // Configuration de la borne changée juste avant la partie : VPX avait déjà les bons
   // écrans, le menu les reprend en redémarrant.
@@ -938,14 +971,18 @@ function joystickMessage(version: string): Message | undefined {
   };
 }
 
-function explain(result: LaunchResult): Message {
+/**
+ * Partie échouée : ce qu'en dit VPX, puis Start mène à « Ce qu'il manque pour jouer », qui
+ * relit la table, dit ce qui manque et où le trouver (ROM absente, dossier du DMD…).
+ */
+function explain(result: LaunchResult, table: TableEntry): Message {
   const lines = [result.message ?? t('Erreur inconnue.')];
   if (result.message && /can't start game/i.test(result.message)) {
     lines.push(t('La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.'));
   }
   lines.push(...result.notices);
   if (result.logTail.length) lines.push(t('Fin du journal de VPX :'), ...result.logTail.slice(-5));
-  return { title: t('La partie n’a pas pu se dérouler'), lines: [...lines, t('Start ou Exit : revenir au menu.')] };
+  return { title: t('La partie n’a pas pu se dérouler'), lines, action: 'journey', table: table.file };
 }
 
 /**

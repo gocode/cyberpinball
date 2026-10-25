@@ -265,4 +265,7 @@ export const messages: Record<string, string> = {
   '{frontend} : autre émulateur que Visual Pinball, non repris.': '{frontend}: emulator other than Visual Pinball, not imported.',
   'Plusieurs tables possibles ({tables}) : rien n’est copié.': 'Several possible tables ({tables}): nothing is copied.',
   'Aucune table installée ne porte ce nom : rien n’est copié.': 'No installed table has this name: nothing is copied.',
+  // Entonnoir « Ajouter une table », filtres du catalogue, installation rapide
+  'index de VPinMediaDB indisponible': 'VPinMediaDB index unavailable',
+  'Médias de VPinMediaDB, table {i} sur {total}, {title} : {step}': 'VPinMediaDB media, table {i} of {total}, {title}: {step}',
 };

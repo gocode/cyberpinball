@@ -1,8 +1,10 @@
-// Démonstration hors écran de l'acquisition des tables (docs/recherche/acquisition.md,
-// A3 à A7) : catalogue de la vraie base VPS, fiche de Terminator 2, ce qu'il faut pour
-// la borne, fenêtre « Récupérer », liste d'attente, surveillance d'un dossier
-// Téléchargements, installation par le plan d'import, mises à jour. Les pages de
-// vpuniverse.com et vpforums.org ne sont jamais chargées : la session de la fenêtre
+// Démonstration hors écran de l'entonnoir « Ajouter une table » et de l'acquisition des
+// tables (docs/recherche/acquisition.md, A3 à A7) : une seule entrée du menu système,
+// catalogue de la vraie base VPS et ses filtres aux boutons, fiche de Terminator 2,
+// installation rapide (pages ouvertes l'une après l'autre, plan, médias de VPinMediaDB
+// téléchargés depuis GitHub), puis un complément récupéré dans son navigateur (liste
+// d'attente, surveillance d'un dossier Téléchargements, « Prêt à installer »), mises à jour.
+// Les pages de vpuniverse.com et vpforums.org ne sont jamais chargées : la session de la fenêtre
 // « Récupérer » est servie par de fausses fiches qui proposent des fichiers factices.
 // Aucune fenêtre n'apparaît (rendu hors écran), lancé par docs\demo-catalogue.ps1 sur le
 // bureau caché. Captures et relevé dans tmp\demo-catalogue\captures.
@@ -45,7 +47,7 @@ function sandbox() {
   const root = path.join(BASE, 'root');
   const L = core.layoutOf(root);
   for (const d of [L.tables, L.import, L.media, L.data, L.trash, L.downloads, L.roms]) fs.mkdirSync(d, { recursive: true });
-  for (const f of fs.readdirSync(REAL_DOWNLOADS)) if (/^vpsdb/.test(f)) fs.copyFileSync(path.join(REAL_DOWNLOADS, f), path.join(L.downloads, f));
+  for (const f of fs.readdirSync(REAL_DOWNLOADS)) if (/^(vpsdb|vpinmdb)/.test(f)) fs.copyFileSync(path.join(REAL_DOWNLOADS, f), path.join(L.downloads, f));
   // Une table installée sans provenance, plus ancienne que celle de VPS : une mise à jour à trouver.
   const gotg = path.join(L.tables, GOTG);
   put(path.join(gotg, `${GOTG}.vpx`), vpxWithInfo({ TableName: 'Guardians Of The Galaxy', AuthorName: 'Pincredibles', TableVersion: '2.0' }));
@@ -60,7 +62,22 @@ function sandbox() {
     updatedAt: '',
   });
   fs.mkdirSync(path.join(BASE, 'Téléchargements'), { recursive: true });
+  // Ce qu'une borne en 0.1.3-essai.1 a pu garder : un pack de médias rangé comme table de
+  // Terminator 2 par une version qui ne vérifiait rien (contenu non noté), table bloquée.
+  const vps = core.loadVpsDb(L.downloads);
+  const t2 = vps.games.find((g) => g.id === T2);
+  const advice = core.recommendVersion(t2).file;
+  const list = { items: [] };
+  const item = core.addToWaitList(list, t2, { kind: 'table', required: true, state: 'todo', detail: '', files: [] }, advice, core.liveLinks(advice)[0].url, new Date('2026-10-24T20:00:00Z'));
+  const pack = put(path.join(L.downloads, 'acquisition', 'Terminator 2 Media Pack.zip'), mediaPack());
+  core.markReceived(item, pack, 'window', new Date('2026-10-24T20:05:00Z'));
+  core.saveWaitList(L.data, list);
   return { root, L };
+}
+
+/** Pack de médias pour PinUP Popper : images et vidéos, aucun .vpx. */
+function mediaPack() {
+  return zipStored({ 'T2/Wheel/Terminator 2.png': 'png', 'T2/Backglass/Terminator 2.mp4': 'mp4', 'T2/DMD/Terminator 2.mp4': 'mp4', 'T2/Topper/Terminator 2.mp4': 'mp4', 'T2/Audio/launch.mp3': 'mp3' });
 }
 
 /**
@@ -91,6 +108,8 @@ function fakeForum(vps) {
     const key = core.pageKey(request.url);
     const hit = key && files.get(key);
     if (!hit) return new Response('<h1>Page de démonstration absente</h1>', { status: 404, headers: { 'content-type': 'text/html; charset=utf-8' } });
+    // La fiche d'une table propose aussi son pack de médias, comme sur vpuniverse.com.
+    if (url.searchParams.get('media') === '1') return new Response(mediaPack(), { headers: { 'content-type': 'application/octet-stream', 'content-disposition': 'attachment; filename="Terminator 2 Media Pack.zip"' } });
     if (url.searchParams.get('do') === 'download' || url.searchParams.get('dl') === '1') {
       const { name, data } = content(hit.kind, hit.file);
       return new Response(data, { headers: { 'content-type': 'application/octet-stream', 'content-disposition': `attachment; filename="${name}"` } });
@@ -100,7 +119,8 @@ function fakeForum(vps) {
       <body style="font-family:Segoe UI;background:#1b1f2a;color:#e5e7eb;padding:40px">
       <p style="color:#94a3b8">Fausse fiche de démonstration (${url.hostname}) : la vraie demande de se connecter.</p>
       <h1>${title}</h1><p>Connecté en tant que <b>demo</b>.</p>
-      <a class="download" href="${url.origin}${url.pathname}${url.search ? `${url.search}&` : '?'}do=download" style="display:inline-block;padding:14px 28px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none">Download this file</a>`;
+      <a class="download" href="${url.origin}${url.pathname}${url.search ? `${url.search}&` : '?'}do=download" style="display:inline-block;padding:14px 28px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none">Download this file</a>
+      ${hit.kind === 'table' ? `<a class="media" href="${url.origin}${url.pathname}${url.search ? `${url.search}&` : '?'}media=1" style="display:inline-block;margin-left:20px;padding:14px 28px;background:#475569;color:#fff;border-radius:6px;text-decoration:none">Media pack</a>` : ''}`;
     return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
   };
 }
@@ -212,17 +232,48 @@ async function run(report) {
     await delay(300);
   }
 
-  // ---------- Menu système, avertissement, catalogue ----------
+  /** Attend que la fenêtre « Récupérer » montre la fiche de cet élément, chargée. */
+  async function pageOf(item) {
+    await until(`fiche de ${item.kind}`, () => {
+      const open = catalog().acquirer.current();
+      return open && core.pageKey(open.view.webContents.getURL()) === core.pageKey(item.page) && !open.view.webContents.isLoading();
+    });
+  }
+  const press = (group) => key(KEYS[group][0]);
+
+  // ---------- Menu système : une seule entrée, l'entonnoir ----------
   library.openSystem();
   await shot('menu-systeme');
-  act('Trouver une table');
+  act('Ajouter une table');
+  await shot('entonnoir');
+  act('Trouver une table en ligne');
   await shot('avertissement');
   act('J’ai compris');
   await idle();
   await shot('catalogue');
-  act('Jeux : tous les jeux');
+
+  // ---------- Filtres, aux boutons de la borne ----------
+  act('Filtres');
   await idle();
-  await shot('catalogue-sans-rom');
+  await shot('filtres');
+  press('confirm'); // Jeux : tous -> sans ROM à trouver
+  await shot('filtres-sans-rom');
+  press('confirm'); // -> électroniques
+  press('next');
+  for (let i = 0; i < 3; i++) press('confirm'); // Fichiers : peu importe -> fronton -> ROM -> PuP-Pack
+  await shot('filtres-fichiers-pup');
+  press('next');
+  press('confirm'); // Site : vpuniverse.com
+  await shot('filtres-site');
+  act('Voir les');
+  await idle();
+  await shot('catalogue-filtre');
+  act('Filtres');
+  await idle();
+  act('Effacer les filtres');
+  await shot('filtres-effaces');
+  act('Voir les');
+  await idle();
   act('Chercher un titre');
   for (const c of 'terminator') key(`Key${c.toUpperCase()}`, c);
   key('Enter');
@@ -231,31 +282,101 @@ async function run(report) {
   act('Terminator 2 - Judgment Day');
   await idle();
   await shot('versions-t2');
+
+  // ---------- Réparer l'existant : le pack de médias rangé comme table (0.1.3-essai.1), détecté ----------
   const advice = core.recommendVersion(vps.games.find((g) => g.id === T2));
   act(core.versionLabel(advice.file));
   await idle();
-  await shot('ce-qu-il-faut');
+  await shot('ce-qu-il-faut-a-corriger');
+  log.push(`à corriger : ${JSON.stringify(catalog().problems().map((p) => `${p.item.kind}:${p.problem}:${p.content}`))}`);
+  if (!catalog().problems().some((p) => p.item.kind === 'table' && p.content === 'media')) throw new Error('le pack de médias rangé comme table n’est pas détecté');
+  act('Table : à corriger');
+  await shot('element-a-corriger');
+  // Aux boutons : Start sur la première action proposée, « Vider l'élément ».
+  if (view().actions[view().cursor].label !== 'Vider l’élément') throw new Error(`action proposée : ${view().actions[view().cursor].label}`);
+  key(KEYS.confirm[0]);
+  await idle();
+  await shot('table-videe');
+  if (waitList().items.find((i) => i.kind === 'table').state !== 'waiting') throw new Error('la table n’est pas redevenue attendue');
+  act('Terminator 2 Media Pack.zip');
+  await shot('pack-de-cote');
+  act('Rattacher à un autre élément');
+  await idle();
+  await shot('rattacher-a');
+  act('Retour');
+  act('Le mettre à la corbeille');
+  await idle();
+  await shot('pack-a-la-corbeille');
+  // Exit : la liste revient au catalogue, d'où l'on retrouve la version.
+  key(KEYS.exit[0]);
+  await idle();
+  act('Terminator 2 - Judgment Day');
+  await idle();
+  act(core.versionLabel(advice.file));
+  await idle();
 
-  // ---------- Fenêtre « Récupérer » ----------
+  // ---------- Fenêtre « Récupérer » : le pack de médias de la fiche n'est pas rangé comme table ----------
   act('Récupérer : Table');
   await idle();
   await shotAcquire('recuperer-table');
-  await download('table');
-  await shotAcquire('recuperer-table-recue');
+  const strays = () => (waitList().strays ?? []).length;
+  const before = strays();
+  await catalog().acquirer.current().view.webContents.executeJavaScript(`document.querySelector('a.media').click()`);
+  await until('pack de médias gardé de côté', () => strays() > before);
+  await idle();
+  await shot('fichier-recu-a-verifier');
+  if (waitList().items.find((i) => i.kind === 'table').state !== 'waiting') throw new Error('le pack de médias a été rangé comme table');
+  act('Le garder de côté');
+  await idle();
   catalog().acquirer.close();
   await idle();
-  await shot('table-recue');
-  act('Récupérer : ROM');
+  act('Autres versions');
   await idle();
-  await download('ROM');
-  catalog().acquirer.close();
-  act('Récupérer : Fronton');
+
+  // ---------- Installation rapide : chaque page s'ouvre d'elle-même, puis le plan ----------
+  act('Installation rapide');
   await idle();
-  await shot('frontons-au-choix');
-  library.handleAction({ type: 'activate', index: 0 });
+  const quickKinds = [];
+  for (let n = 0; n < 4; n++) {
+    const next = waitList().items.find((i) => i.state === 'waiting' && ['table', 'b2s', 'rom'].includes(i.kind));
+    if (!next || !catalog().acquirer.isOpen()) break;
+    await pageOf(next);
+    if (n === 0) {
+      await shot('installation-rapide');
+      await shotAcquire('installation-rapide-table');
+    }
+    quickKinds.push(next.kind);
+    await download(next.kind);
+  }
+  log.push(`installation rapide : ${quickKinds.join(', ')} récupérés l’un après l’autre ; fenêtre ouverte à la fin : ${catalog().acquirer.isOpen()}`);
   await idle();
-  await download('fronton');
-  catalog().acquirer.close();
+  for (let i = 0; i < 5 && view().heading !== 'Plan d’installation'; i++) {
+    // Choix éventuels : le premier proposé.
+    library.handleAction({ type: 'activate', index: 0 });
+    await idle();
+  }
+  await shot('plan-installation-rapide');
+  act('Installer');
+  await idle();
+  await shot('apres-installation-rapide');
+  const t2Table = () => core.scanTables(L.tables).find((t) => t.info.Info?.VPSId === T2);
+  log.push(`médias rangés : ${JSON.stringify(t2Table() && fs.existsSync(path.join(t2Table().folder, 'medias')) ? fs.readdirSync(path.join(t2Table().folder, 'medias')) : [])}`);
+
+  // ---------- Chemin manuel : un complément récupéré dans son navigateur ----------
+  library.openSystem();
+  act('Ajouter une table');
+  act('Trouver une table en ligne');
+  await idle();
+  act('Filtres');
+  await idle();
+  act('Sur la borne');
+  act('Voir les');
+  await idle();
+  act('Terminator 2 - Judgment Day');
+  await idle();
+  act(core.versionLabel(core.recommendVersion(vps.games.find((g) => g.id === T2)).file));
+  await idle();
+  await shot('ce-qu-il-faut-installe');
   // PuP-Pack : la page s'ouvre, mais on le télécharge « dans son navigateur ».
   act('Récupérer : PuP-Pack');
   await idle();
@@ -264,36 +385,65 @@ async function run(report) {
   await idle();
   catalog().acquirer.close();
   await idle();
-  await shot('ce-qu-il-faut-recu');
-
-  // ---------- Liste d'attente et Téléchargements ----------
-  act('Liste d’attente');
+  library.openSystem();
+  act('Ajouter une table');
+  act('Récupérés et attendus');
   await idle();
   act('Surveiller Téléchargements');
-  await shot('liste-attente');
+  await shot('recuperes-et-attendus');
   put(path.join(userDownloads, 'Terminator 2 PuP-Pack 3.0.zip.crdownload'), 'en cours');
   await delay(500);
   fs.renameSync(path.join(userDownloads, 'Terminator 2 PuP-Pack 3.0.zip.crdownload'), path.join(userDownloads, 'Terminator 2 PuP-Pack 3.0.zip'));
   fs.writeFileSync(path.join(userDownloads, 'Terminator 2 PuP-Pack 3.0.zip'), zipStored({ 'screens.pup': 'ScreenNum,ScreenDes\r\n2,Backglass' }));
   await until('PuP-Pack reçu par la surveillance', () => waitList().items.some((i) => i.kind === 'pup' && i.state === 'received'), 20_000);
   await delay(300);
-  await shot('liste-attente-pup-recu');
-
-  // ---------- Installation ----------
+  await shot('recuperes-pup-recu');
+  // En borne (zone du playfield en hauteur) : la liste et un élément, aux boutons.
+  win.setContentSize(1080, 1920);
+  await delay(300);
+  // Aux flippers jusqu'au premier élément, Start pour l'ouvrir.
+  for (let i = 0; i < 20 && view().cursor !== 0; i++) key(KEYS.previous[0]);
+  await shot('recuperes-borne');
+  key(KEYS.confirm[0]);
+  await shot('element-borne');
+  if (!view().heading.startsWith('PuP-Pack : ')) throw new Error(`Start sur la première ligne : ${view().heading}`);
+  key(KEYS.exit[0]);
+  await idle();
+  win.setContentSize(sc.width, sc.height);
+  await delay(300);
+  // Un élément reçu, le remplacer, retirer le jeu : les écrans, sans rien changer.
+  act('PuP-Pack : ');
+  await shot('element-recu');
+  act('Remplacer par un autre fichier');
+  await idle();
+  await shot('remplacer-le-pup');
+  act('Retour');
+  act('Retirer tout le jeu de la liste');
+  await shot('retirer-le-jeu');
+  act('Annuler');
+  act('Retour à la liste');
+  await idle();
+  act('Retour');
+  await idle();
+  await shot('entonnoir-pret-a-installer');
+  library.openSystem();
+  await shot('menu-systeme-pastille');
+  act('Ajouter une table');
   act('Installer : Terminator 2');
   await idle();
-  await shot('plan-installation');
   for (let i = 0; i < 5 && !view().actions.some((a) => a.label === 'Installer'); i++) {
     // Choix éventuels (option du PuP-Pack) : le premier proposé.
     library.handleAction({ type: 'activate', index: 0 });
     await idle();
   }
+  await shot('plan-complement');
   act('Installer');
   await idle();
-  await shot('apres-installation');
+  await shot('apres-complement');
 
-  // ---------- Mises à jour ----------
+  // ---------- Mises à jour, depuis l'entonnoir ----------
   library.openSystem();
+  act('Ajouter une table');
   act('Mises à jour des tables');
   await idle();
   await shot('mises-a-jour');
@@ -314,14 +464,15 @@ async function run(report) {
 app.on('window-all-closed', () => {});
 
 app.whenReady().then(async () => {
-  // Garde-temps : une démonstration ne reste jamais bloquée ; le relevé dit où elle en était.
+  // Garde-temps : une démonstration ne reste jamais bloquée ; le relevé dit où elle en était
+  // (huit minutes : les médias de VPinMediaDB, environ 14 Mo, sont vraiment téléchargés).
   setTimeout(() => {
-    LOG.push('ÉCHEC : plus de cinq minutes, arrêt (dernière étape ci-dessus).');
+    LOG.push('ÉCHEC : plus de huit minutes, arrêt (dernière étape ci-dessus).');
     fs.mkdirSync(CAPTURES, { recursive: true });
     fs.writeFileSync(path.join(CAPTURES, 'resultat.txt'), LOG.join('\n') + '\n', 'utf8');
     console.log(LOG.join('\n'));
     app.exit(2);
-  }, 300_000).unref();
+  }, 480_000).unref();
   serveMedias(() => servedDirs());
   fs.rmSync(BASE, { recursive: true, force: true });
   const report = new LayoutReport(CAPTURES);

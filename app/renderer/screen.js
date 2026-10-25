@@ -4,7 +4,7 @@
 const $ = (id) => document.getElementById(id);
 
 // Étapes où un seul écran porte la question, les autres restent en retrait.
-const STEP_PHASES = ['buttons', 'buttonsSummary', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'gate'];
+const STEP_PHASES = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'gate'];
 
 function text(id, value) {
   $(id).textContent = value ?? '';
@@ -271,7 +271,7 @@ function render(state) {
   // Panneau (récapitulatif, résultat) : sur le playfield, sauf quand l'état en décide (étape « Boutons »).
   const report = state.report ?? (['summary', 'done'].includes(state.phase) && state.assignedRole === 'playfield');
   root.classList.toggle('report', report);
-  root.classList.toggle('buttons', ['buttons', 'buttonsSummary'].includes(state.phase));
+  root.classList.toggle('buttons', ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary'].includes(state.phase));
   renderButtons(state);
   root.classList.toggle('orient', ['orient', 'flip'].includes(state.phase) && state.highlight);
   root.classList.toggle('sound', ['sound', 'channels'].includes(state.phase) && state.highlight);

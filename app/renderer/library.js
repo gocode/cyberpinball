@@ -15,7 +15,7 @@ function actOn(node, action) {
 }
 
 function renderLibrary(v) {
-  const o = libEl('section', `lib lib-${v.screen}`);
+  const o = libEl('section', `lib lib-${v.screen}${v.variant ? ` lib-${v.variant}` : ''}`);
   const head = libEl('header', 'lib-head');
   // Retour en tête : à la souris, inutile de descendre au bas de la liste chercher « Retour ».
   if (v.back) {
@@ -24,7 +24,13 @@ function renderLibrary(v) {
     back.append(libEl('span', 'lib-back-arrow', '‹'), libEl('span', '', v.back));
     head.append(back);
   }
-  head.append(libEl('h1', '', v.heading));
+  const h1 = libEl('h1', '', v.heading);
+  // Icône du titre : celle de l'entrée qui a ouvert l'écran (registre icons.js).
+  if (v.icon) {
+    h1.classList.add('with-icon');
+    h1.prepend(cyberIcon(v.icon, 'lib-head-icon'));
+  }
+  head.append(h1);
   if (v.subheading) head.append(libEl('div', 'lib-sub', v.subheading));
   if (v.lead) head.append(libEl('p', 'lib-lead', v.lead));
   o.append(head);
@@ -35,11 +41,14 @@ function renderLibrary(v) {
       ? 'lib-body lib-pages'
       : v.media
         ? `lib-body lib-media${v.media.large ? ' large' : ''}`
-        : v.sections.length
-          ? 'lib-body'
-          : 'lib-body only-actions',
+        : v.journey
+          ? 'lib-body lib-journey'
+          : v.sections.length
+            ? 'lib-body'
+            : 'lib-body only-actions',
   );
   if (v.pages) body.append(renderPages(v.pages));
+  else if (v.journey) body.append(renderJourney(v.journey));
   else if (v.media || v.sections.length) {
     const content = libEl('div', 'lib-content');
     // Médias : le message du moment, puis les cartes, puis les sections titrées.
@@ -55,11 +64,12 @@ function renderLibrary(v) {
       for (const row of section.rows) {
         const li = libEl('li', `lib-row tone-${row.tone ?? 'none'}`);
         if (row.action !== undefined) {
-          li.classList.add('fixable');
+          li.classList.add(row.pick ? 'pick' : 'fixable');
           if (row.action === v.cursor) li.classList.add('selected');
           actOn(li, { type: 'activate', index: row.action });
         }
         const line = libEl('div', 'lib-row-line');
+        if (row.icon) line.append(cyberIcon(row.icon, 'lib-row-icon'));
         line.append(libEl('span', 'lib-row-text', row.text));
         for (const badge of row.badges ?? []) line.append(libEl('span', 'badge', badge));
         li.append(line);
@@ -75,20 +85,31 @@ function renderLibrary(v) {
 
   // Prospectus et règles : les flippers tournent les pages ; les actions restent là pour la souris.
   const actions = libEl('ol', v.pages ? 'lib-actions pages-actions' : 'lib-actions');
-  // Les actions montrées en cartes (un média, une page, un fichier) ne sont pas répétées dans la liste.
-  const carded = new Set((v.media?.cards ?? []).map((c) => c.action).filter((a) => a !== undefined));
+  // Une colonne d'icônes dès qu'une action en a une : les libellés restent alignés.
+  if (v.actions.some((a) => a.icon)) {
+    actions.classList.add('with-icons');
+    // Deux entrées d'un même menu n'ont jamais la même icône (garde-fou de mise en page).
+    actions.dataset.iconMenu = '';
+  }
+  // Les actions montrées en cartes (un média, une page, un fichier) ou en lignes à choisir
+  // (un fichier de la table, un élément de la liste d'attente) ne sont pas répétées dans la liste.
+  const carded = new Set([...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick))].map((c) => c.action).filter((a) => a !== undefined));
   v.actions.forEach((a, i) => {
     if (carded.has(i)) return;
     const li = actOn(libEl('li', `lib-action tone-${a.tone ?? 'none'}${i === v.cursor && !v.pages ? ' current' : ''}`), { type: 'activate', index: i });
     // Libellé en attribut : une démonstration clique une action par son nom, pas par son rang.
     li.dataset.label = a.label;
     const label = libEl('span', 'label', a.label);
-    // Pastille rouge : cette entrée attend l'utilisateur (une mise à jour disponible…).
-    if (a.attention) {
-      const dot = libEl('span', 'lib-attention');
-      dot.title = t('Attend votre intervention');
-      label.append(dot);
-    }
+    // Pastille rouge : cette entrée attend l'utilisateur (une mise à jour disponible…). En haut
+    // à droite de son icône, sinon après le libellé.
+    const dot = a.attention ? libEl('span', 'lib-attention') : undefined;
+    if (dot) dot.title = t('Attend votre intervention');
+    if (a.icon) {
+      const glyph = libEl('span', 'lib-action-glyph');
+      glyph.append(cyberIcon(a.icon, 'lib-action-icon'));
+      if (dot) glyph.append(dot);
+      li.append(glyph);
+    } else if (dot) label.append(dot);
     li.append(label);
     if (a.detail) li.append(libEl('span', 'detail', a.detail));
     actions.append(li);
@@ -105,6 +126,45 @@ function renderLibrary(v) {
   forgetMediaNodes();
   if (v.pages?.fallback !== 'info-sheet') forgetInfoCard();
   return o;
+}
+
+// ---------- Ce qu'il manque pour jouer (journey.ts) ----------
+
+/**
+ * Parcours d'une table : « Étape n sur N », une barre d'un segment par étape (réglée,
+ * courante, à faire, facultative), puis les étapes numérotées, chacune avec son mot et
+ * son signe d'état ; la courante est marquée d'un filet clair, jamais en vert (le vert
+ * reste au geste choisi, dans la liste des actions). Un clic sur une étape déclenche
+ * son premier geste.
+ */
+function renderJourney(j) {
+  const box = libEl('div', 'lib-content journey');
+  const progress = libEl('div', 'journey-progress');
+  const top = libEl('div', 'journey-top');
+  top.append(libEl('span', 'journey-position', j.position), libEl('span', 'journey-summary', j.summary));
+  const bar = libEl('div', 'journey-bar');
+  for (const s of j.steps) bar.append(libEl('i', s.state === 'done' ? 'done' : s.current ? 'current' : s.state === 'optional' ? 'optional' : ''));
+  progress.append(top, bar);
+  box.append(progress);
+  if (j.notice) box.append(libEl('div', `journey-notice tone-${j.notice.tone}`, j.notice.text));
+  const list = libEl('ol', 'journey-steps');
+  for (const s of j.steps) {
+    const li = libEl('li', `journey-step state-${s.state}${s.current ? ' current' : ''}`);
+    if (s.action !== undefined) {
+      li.classList.add('fixable');
+      actOn(li, { type: 'activate', index: s.action });
+    }
+    const text = libEl('div', 'journey-text');
+    text.append(libEl('div', 'journey-title', s.title));
+    if (s.detail) text.append(libEl('div', 'journey-detail', s.detail));
+    if (s.note) text.append(libEl('div', 'journey-note', s.note));
+    const state = libEl('span', `journey-state tone-${s.tone}`);
+    state.append(libEl('span', 'journey-sign', s.sign), libEl('span', '', s.word));
+    li.append(libEl('span', 'journey-num', String(s.n)), text, state);
+    list.append(li);
+  }
+  box.append(list);
+  return box;
 }
 
 // ---------- Prospectus et règles, page par page ----------

@@ -10,6 +10,12 @@ its own language before installing, and in the GitHub release. Short sentences, 
 ## 0.1.3
 
 - Buttons of a Pinscape (KL25Z) or of an encoder in gamepad mode: captured in the "Buttons" step and followed by the whole menu and by VPX.
+- Game buttons and interface buttons set separately; keyboard keys and joystick buttons mix freely.
+- "Add a table" brings every way of adding a table together in one place, with filters in the catalogue and quick install.
+- "What's missing to play": a guided path, from a missing ROM or backglass all the way to "Play".
+- A ROM stored in a subfolder of its zip is recognised; "Diagnose and fix" gathers a ROM scattered in a table.
+- Correctable waiting list: reassign, empty, replace or remove a file received by mistake; a table's page has a "Files" section.
+- An icon for each menu.
 - "Fetch" window on a cabinet: it opens on a readable screen (the backglass if the playfield is turned), with the pointer brought onto it; Exit closes it.
 - The "Fetch" window, when reopened, picks up the page where you were; more thorough site search.
 - No more white screen when a window opens or moves to another screen.

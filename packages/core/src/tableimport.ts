@@ -32,8 +32,10 @@ import {
   type VariantChoice,
 } from './puppack';
 import { listRoms, romFile, romHash, romKey, sameRomFile, tableRomsDir } from './romlibrary';
+import { buildZip, listRelative, readZipEntries, recognizeRomName, romContent, zipContentHash, type RomHints, type RomZipMember } from './romzip';
 import { classifyDir, classifyFile, nameKey, type FileKind } from './tablefiles';
 import { parseTableName, readInfo, type TableInfoFile } from './tables';
+import { HISTORIC_ROM_ALIASES } from './vpmalias';
 import { ipdbIdOf, matchVps, type VpsCandidate, type VpsDb } from './vps';
 
 export interface ImportSource {
@@ -83,6 +85,12 @@ export interface PlanOptions {
   romLibrary?: string;
   /** Version gardée par ROM (clé RomImport.key) : empreinte du contenu choisi. */
   romChoices?: Map<string, string>;
+  /**
+   * Jeu VPS de ces fichiers, quand on le sait (récupérés depuis le catalogue pour ce jeu) :
+   * ce qui n'est rattaché à aucune table revient à la table de ce jeu, nouvelle ou déjà
+   * installée (un PuP-Pack récupéré après la table, dont l'archive ne dit pas le jeu).
+   */
+  vpsGame?: string;
 }
 
 /** Une version d'une ROM : celle de la bibliothèque ou une ROM importée. */
@@ -93,9 +101,17 @@ export interface RomImportVersion {
   /** « bibliothèque », ou d'où vient le fichier importé. */
   label: string;
   inLibrary: boolean;
-  /** Fichier importé qui porte ce contenu. */
+  /** Fichier importé qui porte ce contenu (zip, ou dossier de puces). */
   from?: string;
   mode?: 'move' | 'copy';
+  /** Puces à refaire en un zip à plat : elles étaient dans un sous-dossier, ou déballées. */
+  build?: RomZipMember[];
+  /** Dossier où étaient les puces (« t2_l8 »), si la ROM est refaite à plat. */
+  folder?: string;
+  /** Nom d'origine, quand la ROM a été reconnue sous un autre nom (« Terminator 2 ROM »). */
+  renamedFrom?: string;
+  /** Vient d'une archive déballée : le dossier de travail est effacé après l'import. */
+  unpacked?: boolean;
 }
 
 /** Ce que l'import fait d'une ROM, avec la bibliothèque : rangée une fois, liée partout où elle sert. */
@@ -112,6 +128,11 @@ export interface RomImport {
   decided: boolean;
   /** Fichiers importés qui ne servent pas (doublons, version écartée) : corbeille s'ils sont déplacés. */
   unused: { from: string; source: string; mode: 'move' | 'copy' }[];
+  /**
+   * ROM importées reconnues d'après leur contenu : puces dans un sous-dossier (folder,
+   * refaite à plat), ou archive d'un autre nom (renamedFrom). hash : leur version.
+   */
+  recognized: { source: string; folder?: string; renamedFrom?: string; hash: string }[];
   /**
    * Tables qui recevront un lien. state : new (absente de la table), copy (copie identique
    * remplacée), different (autre version remplacée, corbeille), linked (déjà liée, rien à faire).
@@ -180,6 +201,8 @@ export interface ImportStep {
   replaces: boolean;
   /** PuP-Pack : nom, option, nettoyage. */
   pack?: PackPlan;
+  /** ROM refaite à plat dans pinmame\roms (sans bibliothèque) ; trashSource : l'original part à la corbeille. */
+  zip?: { files: RomZipMember[]; mtimeMs: number; trashSource: boolean };
   /**
    * Média de présentation reconnu (Popper, PinballX, VPinFE, « (Type) ») : rangé
    * sous « medias\(Type) <dossier>.ext ». trash : médias du même type déjà là,
@@ -228,6 +251,20 @@ interface Item {
   name?: string;
   /** Média de présentation reconnu d'après son nom et son dossier. */
   media?: RecognizedMedia;
+  /** ROM reconnue d'après son contenu : son nom, et les puces à refaire à plat s'il le faut. */
+  rom?: RomItem;
+  /** Vient d'une archive déballée (dossier de travail). */
+  unpacked: boolean;
+}
+
+interface RomItem {
+  /** Nom de la ROM, sans .zip (« t2_l8 »). */
+  name: string;
+  /** Puces à remettre à la racine d'un nouveau zip : sous-dossier dans le zip, ou dossier de puces. */
+  build?: RomZipMember[];
+  /** Dossier où étaient les puces. */
+  folder?: string;
+  mtimeMs: number;
 }
 
 interface Game {
@@ -257,7 +294,11 @@ export function planImport(sources: ImportSource[], opts: PlanOptions): ImportPl
     ...[...(opts.scripts?.values() ?? [])].map((f) => f.dmdFolder),
     ...(opts.existing ?? []).map((k) => k.dmdFolder),
   ].filter((d): d is string => Boolean(d));
-  sources.forEach((src, pkg) => collect(src, pkg, items, ignored, dmdFolders));
+  const hints: RomHints = {
+    wanted: uniqueNames([...[...(opts.scripts?.values() ?? [])].flatMap((f) => f.roms), ...(opts.existing ?? []).flatMap((k) => k.roms)]),
+    known: knownRoms(opts.vps),
+  };
+  sources.forEach((src, pkg) => collect(src, pkg, items, ignored, dmdFolders, hints));
 
   const packages = sources.map((src) => ({ name: src.label ?? path.basename(src.path), isPack: src.unpacked || isDir(src.path) }));
   const games = groupGames(items.filter((i) => i.kind === 'table'), items, packages, opts);
@@ -265,9 +306,10 @@ export function planImport(sources: ImportSource[], opts: PlanOptions): ImportPl
 
   // Avec la bibliothèque, une ROM n'appartient pas à une table : elle va à la bibliothèque.
   const romItems: { item: Item; owner?: Game }[] = [];
+  const ofGame = opts.vpsGame ? games.filter((g) => g.vpsId === opts.vpsGame) : [];
   for (const item of items.filter((i) => i.kind !== 'table')) {
-    const game = assign(item, games, packages, opts.vps);
-    if (opts.romLibrary && item.kind === 'rom' && !item.isDir) romItems.push({ item, owner: game });
+    const game = assign(item, games, packages, opts.vps) ?? (ofGame.length === 1 ? ofGame[0] : undefined);
+    if (opts.romLibrary && item.kind === 'rom' && (!item.isDir || item.rom)) romItems.push({ item, owner: game });
     else if (game) game.others.push(item);
     else leftovers.push({ source: item.source, reason: t('Je ne sais pas à quelle table il appartient : il reste où il est.') });
   }
@@ -289,7 +331,7 @@ function planRoms(romItems: { item: Item; owner?: Game }[], games: Game[], plann
   const stored = listRoms(library);
   const byKey = new Map<string, { item: Item; owner?: Game }[]>();
   for (const r of romItems) {
-    const key = romKey(path.basename(r.item.path));
+    const key = romKey(r.item.rom?.name ?? path.basename(r.item.path));
     byKey.set(key, [...(byKey.get(key) ?? []), r]);
   }
   // ROM déjà dans la bibliothèque que demande une table de l'import, sans l'avoir ni la recevoir.
@@ -303,15 +345,17 @@ function planRoms(romItems: { item: Item; owner?: Game }[], games: Game[], plann
   const result: RomImport[] = [];
   for (const [key, incoming] of byKey) {
     const storedFile = stored.get(key);
-    const name = storedFile ? path.basename(storedFile.path) : path.basename(incoming[0]!.item.path);
+    const first = incoming[0]?.item;
+    const name = storedFile ? path.basename(storedFile.path) : `${first?.rom?.name ?? path.basename(first!.path).replace(/\.zip$/i, '')}.zip`;
     const to = path.join(library, name);
     const versions: RomImportVersion[] = [];
     if (storedFile) versions.push({ hash: romHash(storedFile), size: storedFile.size, mtimeMs: storedFile.mtimeMs, label: t('bibliothèque'), inLibrary: true });
+    const recognized: RomImport['recognized'] = [];
     for (const { item } of incoming) {
-      const file = romFile(item.path);
-      if (!file) continue;
-      const hash = romHash(file);
-      if (!versions.some((v) => v.hash === hash)) versions.push({ hash, size: file.size, mtimeMs: file.mtimeMs, label: item.source, inLibrary: false, from: item.path, mode: item.mode });
+      const version = importedVersion(item);
+      if (!version) continue;
+      if (version.folder || version.renamedFrom) recognized.push({ source: item.source, folder: version.folder, renamedFrom: version.renamedFrom, hash: version.hash });
+      if (!versions.some((v) => v.hash === version.hash)) versions.push(version);
     }
     // La plus récente d'abord ; à date égale, celle de la bibliothèque.
     versions.sort((a, b) => b.mtimeMs - a.mtimeMs || Number(b.inLibrary) - Number(a.inLibrary));
@@ -322,7 +366,11 @@ function planRoms(romItems: { item: Item; owner?: Game }[], games: Game[], plann
 
     const ops: FileOp[] = [];
     // La version gardée entre dans la bibliothèque ; l'ancienne y part à la corbeille.
-    if (!kept.inLibrary) ops.push({ op: kept.mode!, from: kept.from!, to });
+    // Des puces dans un sous-dossier ou déballées sont refaites en un zip à plat.
+    if (!kept.inLibrary && kept.build) {
+      ops.push({ op: 'zip', to, files: kept.build, mtimeMs: kept.mtimeMs });
+      if (kept.mode === 'move' && !kept.unpacked) ops.push({ op: 'trash', path: kept.from! });
+    } else if (!kept.inLibrary) ops.push({ op: kept.mode!, from: kept.from!, to });
     const unused = incoming
       .filter(({ item }) => item.path !== kept.from)
       .map(({ item }) => ({ from: item.path, source: item.source, mode: item.mode }));
@@ -345,9 +393,79 @@ function planRoms(romItems: { item: Item; owner?: Game }[], games: Game[], plann
       links.push({ folder: g.folder, title: g.title, to: target, state, copy: !sameVolume(library, g.folder) });
       if (state !== 'linked') ops.push({ op: 'link', from: to, to: target });
     }
-    result.push({ key, name, to, versions, keep, decided: picked >= 0, unused, links, ops });
+    result.push({ key, name, to, versions, keep, decided: picked >= 0, unused, recognized, links, ops });
   }
   return result.sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+}
+
+/** Version d'une ROM importée : le zip tel quel, ou le zip à plat qu'on refera (son empreinte d'avance). */
+function importedVersion(item: Item): RomImportVersion | undefined {
+  const rom = item.rom;
+  const base = { label: item.source, inLibrary: false, from: item.path, mode: item.mode, unpacked: item.unpacked };
+  const original = path.basename(item.path).replace(/\.zip$/i, '');
+  const renamedFrom = rom && !item.isDir && original.toLowerCase() !== rom.name.toLowerCase() ? original : undefined;
+  if (rom?.build) {
+    try {
+      const data = buildZip(rom.build);
+      const hash = zipContentHash(data)!;
+      return { ...base, hash, size: data.length, mtimeMs: rom.mtimeMs, build: rom.build, folder: rom.folder, ...(renamedFrom ? { renamedFrom } : {}) };
+    } catch {
+      // Zip abîmé : rangé tel quel plutôt que perdu ; un dossier, lui, n'a rien à ranger.
+      if (item.isDir) return undefined;
+    }
+  }
+  const file = romFile(item.path);
+  if (!file) return undefined;
+  return { ...base, hash: romHash(file), size: file.size, mtimeMs: file.mtimeMs, ...(renamedFrom ? { renamedFrom } : {}) };
+}
+
+/** Noms de ROM connus : ceux de la base VPS, et les anciens noms de VPinMAME. */
+function knownRoms(vps?: VpsDb): Set<string> {
+  const names = new Set<string>();
+  for (const [alias, rom] of HISTORIC_ROM_ALIASES) {
+    names.add(alias.toLowerCase());
+    names.add(rom.toLowerCase());
+  }
+  for (const g of vps?.games ?? []) for (const r of g.romFiles ?? []) if (r.version?.trim()) names.add(r.version.trim().toLowerCase());
+  return names;
+}
+
+/**
+ * ROM d'un .zip : son nom d'après son contenu (archive « T2 ROM.zip » qui contient
+ * t2_l8.rom), et ses puces à remettre à la racine si elles sont dans un sous-dossier.
+ * Un fichier qui n'est pas un zip lisible garde son nom et reste tel quel.
+ */
+function describeRomZip(file: string, hints: RomHints): RomItem {
+  const stem = path.basename(file).replace(/\.zip$/i, '');
+  const mtimeMs = romFile(file)?.mtimeMs ?? 0;
+  const entries = readZipEntries(file);
+  const content = entries && romContent(entries.map((e) => e.name));
+  if (!content) return { name: stem, mtimeMs };
+  const folders = content.dir ? content.dir.split('/').reverse() : [];
+  const name = recognizeRomName({ names: [path.basename(file), ...folders], chips: content.chips }, hints, true) ?? stem;
+  if (!content.dir) return { name, mtimeMs };
+  return { name, mtimeMs, folder: content.dir, build: content.chips.map((c) => ({ from: file, entry: c, name: path.basename(c) })) };
+}
+
+/**
+ * Dossier qui ne contient qu'une ROM déballée (ses puces, dans un même dossier) :
+ * son nom vient du dossier, de l'archive dont il sort ou des puces ; sans nom reconnu
+ * (ROM demandée par une table, ROM connue), guess accepte un nom qui ressemble à une ROM.
+ */
+function romFolder(dir: string, names: string[], hints: RomHints, guess: boolean): RomItem | undefined {
+  const rel = listRelative(dir, 64);
+  const content = rel && romContent(rel);
+  if (!content) return undefined;
+  const folders = content.dir ? content.dir.split('/').reverse() : [];
+  const name = recognizeRomName({ names: [...names, ...folders], chips: content.chips }, hints, guess);
+  if (!name) return undefined;
+  const chips = content.chips.map((c) => path.join(dir, ...c.split('/')));
+  return {
+    name,
+    mtimeMs: Math.max(...chips.map((c) => romFile(c)?.mtimeMs ?? 0)),
+    folder: content.dir || path.basename(dir),
+    build: chips.map((c) => ({ from: c, name: path.basename(c) })),
+  };
 }
 
 /** Range une ROM du plan dans la bibliothèque et la lie dans ses tables (après applyImport des tables). */
@@ -360,12 +478,18 @@ export function applyRomImport(rom: RomImport, ctx: ImportContext): void {
   }
 }
 
-function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[], dmdFolders: string[]): void {
+function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[], dmdFolders: string[], hints: RomHints): void {
   const label = src.label ?? path.basename(src.path);
+  const unpacked = Boolean(src.unpacked);
   const push = (p: string, dir: boolean, kind: FileKind, parents: string[], source: string, media?: RecognizedMedia) => {
     if (kind === 'ignored') ignored.push(source);
-    else items.push({ path: p, isDir: dir, kind, parents, pkg, source, mode: src.mode, ...(media ? { media } : {}) });
+    else {
+      const rom = kind === 'rom' && !dir ? describeRomZip(p, hints) : undefined;
+      items.push({ path: p, isDir: dir, kind, parents, pkg, source, mode: src.mode, unpacked, ...(media ? { media } : {}), ...(rom ? { rom } : {}) });
+    }
   };
+  const pushRom = (p: string, parents: string[], source: string, rom: RomItem) =>
+    items.push({ path: p, isDir: true, kind: 'rom', parents, pkg, source, mode: src.mode, unpacked, rom });
   // Dossiers au-dessus d'une sélection (« …\POPMedia\Visual Pinball X\Wheel ») : ils disent comment lire les médias.
   const above = src.unpacked ? [] : path.resolve(src.path).split(/[\\/]+/).filter(Boolean).slice(0, -1);
   if (!isDir(src.path)) {
@@ -384,7 +508,13 @@ function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[
   }
   // Archive qui contient directement le pack (screens.pup à sa racine) : elle lui donne son nom.
   if (src.unpacked && isPackRoot(src.path) && !fs.readdirSync(src.path).some((f) => f.toLowerCase().endsWith('.vpx'))) {
-    items.push({ path: src.path, isDir: true, kind: 'pup', parents: [], pkg, source: label, mode: src.mode, name: label.replace(/\.(zip|7z|rar)$/i, '') });
+    items.push({ path: src.path, isDir: true, kind: 'pup', parents: [], pkg, source: label, mode: src.mode, unpacked, name: label.replace(/\.(zip|7z|rar)$/i, '') });
+    return;
+  }
+  // Archive (.7z, .rar) ou dossier qui ne contient qu'une ROM : ses puces feront un zip à plat.
+  const whole = romFolder(src.path, [src.unpacked ? label : path.basename(src.path)], hints, true);
+  if (whole) {
+    pushRom(src.path, [], label, whole);
     return;
   }
   // Les médias rangés à la Popper, à la PinballX ou dans medias\ sont lus fichier par fichier.
@@ -405,7 +535,10 @@ function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[
           continue;
         }
         const kind = classifyDir(dirent.name, p, parents, dmdFolders);
+        // Dossier de puces (« t2_l8 », « roms\t2_l8 ») : une ROM, jamais éparpillée dans la table.
+        const rom = kind ? undefined : romFolder(p, [dirent.name], hints, (parents.at(-1) ?? '').toLowerCase() === 'roms');
         if (kind) push(p, true, kind, parents, source);
+        else if (rom) pushRom(p, parents, source, rom);
         else walk(p, [...parents, dirent.name]);
       } else {
         const media = recognizeMedia(dirent.name, folder);
@@ -533,7 +666,7 @@ function assign(item: Item, games: Game[], packages: { name: string; isPack: boo
   if (item.media) return assignMedia(item.media, games, vps);
   // 2. Nommé comme la ROM d'une table (ROM, couleurs, sons alternatifs, vidéos PuP),
   // ou comme le pack que son script charge.
-  const name = (item.kind === 'pup' ? packOrigin(item) : path.basename(item.path).replace(/\.[^.]+$/, '')).toLowerCase();
+  const name = (item.kind === 'pup' ? packOrigin(item) : (item.rom?.name ?? path.basename(item.path).replace(/\.[^.]+$/, ''))).toLowerCase();
   const parent = (item.parents.at(-1) ?? '').toLowerCase();
   const byRom = games.find((g) => g.roms.some((r) => r.toLowerCase() === name || (parent && r.toLowerCase() === parent)));
   if (byRom) return byRom;
@@ -684,9 +817,16 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
     switch (item.kind) {
       case 'backglass':
         break;
-      case 'rom':
-        add(item, path.join('pinmame', 'roms', name));
+      case 'rom': {
+        // Sans bibliothèque, la ROM va dans la table ; refaite à plat si ses puces étaient dans un dossier.
+        const step = add(item, path.join('pinmame', 'roms', item.rom ? `${item.rom.name}.zip` : name));
+        if (step && item.rom?.build) {
+          step.zip = { files: item.rom.build, mtimeMs: item.rom.mtimeMs, trashSource: item.mode === 'move' && !item.unpacked };
+          step.isDir = false;
+          warnings.push(t('ROM « {rom} » reconnue dans le dossier « {folder} » : refaite à plat dans pinmame\\roms, comme PinMAME la lit.', { rom: item.rom.name, folder: item.rom.folder ?? '' }));
+        }
         break;
+      }
       case 'nvram':
         add(item, path.join('pinmame', 'nvram', name));
         break;
@@ -817,6 +957,11 @@ export function applyImport(plan: TablePlan, ctx: ImportContext): void {
     // Un pack se remplace en entier : jamais de mélange d'anciens et de nouveaux fichiers.
     if (s.pack?.replaces && fs.existsSync(s.pack.replaces)) ops.push({ op: 'trash', path: s.pack.replaces });
     for (const old of s.media?.trash ?? []) if (fs.existsSync(old)) ops.push({ op: 'trash', path: old });
+    if (s.zip) {
+      ops.push({ op: 'zip', to: s.to, files: s.zip.files, mtimeMs: s.zip.mtimeMs });
+      if (s.zip.trashSource) ops.push({ op: 'trash', path: s.from });
+      continue;
+    }
     ops.push({ op: s.mode, from: s.from, to: s.to });
     if (s.pack) ops.push(...packOps(s.to, s.pack));
   }

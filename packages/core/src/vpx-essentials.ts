@@ -4,6 +4,7 @@
 // l'onglet « Avancé ». Une entrée absente du schéma d'une version est ignorée.
 
 import { t } from './i18n';
+import type { IconName } from './icons';
 
 export interface EssentialSetting {
   section: string;
@@ -19,11 +20,14 @@ export interface EssentialSetting {
 
 export interface EssentialGroup {
   title: string;
+  /** Icône du groupe dans l'onglet « Essentiels » (registre app/renderer/icons.js). */
+  icon: IconName;
   settings: EssentialSetting[];
 }
 
 export const VPX_ESSENTIALS: EssentialGroup[] = [
   {
+    icon: 'eye',
     get title() {
       return t('Vue de la table et cadrage');
     },
@@ -124,6 +128,7 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
     ],
   },
   {
+    icon: 'sound',
     get title() {
       return t('Son');
     },
@@ -173,6 +178,7 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
     ],
   },
   {
+    icon: 'gauge',
     get title() {
       return t('Performances et synchronisation');
     },
@@ -304,6 +310,7 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
     ],
   },
   {
+    icon: 'dmd',
     title: 'DMD', // même nom dans toutes les langues
     settings: [
       {
@@ -364,6 +371,7 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
   },
   {
     // Réglages déclarés par les plugins B2S, PUP et DMDUtil : sans effet quand le plugin est éteint.
+    icon: 'pup',
     get title() {
       return t('Backglass, PuP et DMD réel');
     },
@@ -458,6 +466,7 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
     ],
   },
   {
+    icon: 'folder',
     get title() {
       return t('Dossiers communs à toutes les tables');
     },
@@ -505,6 +514,7 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
     ],
   },
   {
+    icon: 'bulb',
     get title() {
       return t('Jeu et éclairage');
     },

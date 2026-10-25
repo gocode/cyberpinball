@@ -11,23 +11,27 @@
 // relevé se fait au relâchement : une touche maintenue n'est jamais relevée.
 
 import { VPX_AUDIO_OWNED_KEYS } from './audio';
-import { BUTTONS, buttonKeys, isInputKey, keyLabel } from './buttons';
+import { BUTTONS, buttonKeys, isInputKey, keyLabel, NAVIGATION, navigationButtons } from './buttons';
 import { t } from './i18n';
+import type { IconName } from './icons';
 import { EDGE_LABELS } from './layout';
 import { ROLES, type Cabinet, type RoleId } from './model';
 import { VPX_LAYOUT_KEYS } from './vpx';
 
 /** Étapes de l'assistant (états de wizard.ts) ; « done » : enregistré, résultat affiché. */
-export const WIZARD_PHASES = ['buttons', 'buttonsSummary', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'summary', 'done'] as const;
+export const WIZARD_PHASES = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'summary', 'done'] as const;
 export type WizardPhase = (typeof WIZARD_PHASES)[number];
 
-/** Relevé des boutons : tant qu'il dure, les touches de la borne ne sont pas sûres. */
-export const CAPTURE_PHASES: readonly WizardPhase[] = ['buttons', 'buttonsSummary'];
+/**
+ * Relevé des boutons, du jeu (« buttons ») puis de l'interface (« navigation ») : tant
+ * qu'il dure, les touches de la borne ne sont pas sûres.
+ */
+export const CAPTURE_PHASES: readonly WizardPhase[] = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary'];
 
-export type WizardStepId = 'boutons' | 'ecrans' | 'playfield' | 'disposition' | 'son';
+export type WizardStepId = 'boutons' | 'interface' | 'ecrans' | 'playfield' | 'disposition' | 'son';
 
 /** Champs du modèle de borne qu'une étape peut décider. */
-export type CabinetField = 'buttons' | 'screens' | 'roles' | 'zones' | 'playfield' | 'audio';
+export type CabinetField = 'buttons' | 'navigation' | 'screens' | 'roles' | 'zones' | 'playfield' | 'audio';
 
 export interface WizardStep {
   id: WizardStepId;
@@ -35,6 +39,8 @@ export interface WizardStep {
   flag: string;
   /** Entrée du sous-menu « Configuration de la borne ». */
   label: string;
+  /** Son icône dans ce sous-menu, et en titre de l'étape (registre app/renderer/icons.js). */
+  icon: IconName;
   detail: string;
   /** Titre de l'écran final. */
   saved: string;
@@ -63,16 +69,30 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'boutons',
     flag: '--boutons',
-    get label() { return t('Boutons de la borne'); },
-    get detail() { return t('Appuyer sur chaque bouton : flippers, Start, Exit, crédit…'); },
-    get saved() { return t('Boutons enregistrés'); },
+    icon: 'button',
+    get label() { return t('Boutons du jeu'); },
+    get detail() { return t('Ce que VPX reçoit en partie : flippers, Start, crédit, lanceur…'); },
+    get saved() { return t('Boutons du jeu enregistrés'); },
     phases: ['buttons', 'buttonsSummary'],
     fields: ['buttons'],
     owns: isInputKey,
   },
   {
+    id: 'interface',
+    flag: '--interface',
+    icon: 'gamepad',
+    get label() { return t('Boutons de l’interface'); },
+    get detail() { return t('Ce qui pilote Cyber Pinball : précédent, suivant, valider, retour…'); },
+    get saved() { return t('Boutons de l’interface enregistrés'); },
+    phases: ['navigation', 'navigationSummary'],
+    fields: ['navigation'],
+    // VPX ne lit pas les boutons de l'interface : aucune clé de VPinballX.ini.
+    owns: () => false,
+  },
+  {
     id: 'ecrans',
     flag: '--ecrans',
+    icon: 'screens',
     get label() { return t('Écrans et rôles'); },
     get detail() { return t('Quel écran affiche le playfield, le backglass, le DMD, le topper'); },
     get saved() { return t('Écrans enregistrés'); },
@@ -84,6 +104,7 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'playfield',
     flag: '--playfield',
+    icon: 'playfield',
     get label() { return t('Orientation et taille du playfield'); },
     get detail() { return t('Bord des flippers, retournement de l’écran, diagonale'); },
     get saved() { return t('Playfield enregistré'); },
@@ -94,6 +115,7 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'disposition',
     flag: '--disposition',
+    icon: 'layout',
     get label() { return t('Disposition des écrans'); },
     get detail() { return t('Place et taille du playfield, du backglass, du DMD et du topper sur chaque écran'); },
     get saved() { return t('Disposition enregistrée'); },
@@ -104,6 +126,7 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
   {
     id: 'son',
     flag: '--son',
+    icon: 'sound',
     get label() { return t('Son de la borne'); },
     get detail() { return t('Sortie audio du fronton et du plateau, test des haut-parleurs'); },
     get saved() { return t('Son enregistré'); },
@@ -203,6 +226,16 @@ export function cabinetChanges(before: Cabinet | undefined, after: Partial<Cabin
     if (changed.length) {
       const list = changed.map((b) => (now[b.id] ? t('{button} sur {key}', { button: b.label, key: keyLabel(now[b.id]) }) : t('{button} sans touche', { button: b.label }))).join(', ');
       lines.push(t('Boutons : {list}', { list }));
+    }
+  }
+  if (after.navigation) {
+    // Sans boutons de l'interface enregistrés, ceux en vigueur sont déduits du jeu.
+    const was = navigationButtons(before);
+    const now = after.navigation;
+    const changed = NAVIGATION.filter((n) => was[n.id] !== now[n.id]);
+    if (changed.length) {
+      const list = changed.map((n) => (now[n.id] ? t('{button} sur {key}', { button: n.label, key: keyLabel(now[n.id]) }) : t('{button} sans touche', { button: n.label }))).join(', ');
+      lines.push(t('Interface : {list}', { list }));
     }
   }
   if (after.roles) {

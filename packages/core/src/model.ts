@@ -167,6 +167,13 @@ export interface Cabinet {
    * et aucune clé [Input] n'est écrite.
    */
   buttons?: CabinetButtons;
+  /**
+   * Boutons qui pilotent l'interface de Cyber Pinball (précédent, suivant, valider,
+   * retour, aide, réglages), relevés à l'étape « Boutons de l'interface », indépendants de
+   * ceux du jeu. Absent (borne d'avant cette étape) : l'interface suit les boutons du jeu,
+   * flippers, Start et Exit (defaultNavigation). VPX ne les lit pas.
+   */
+  navigation?: NavigationButtons;
   vpx: {
     iniPath: string;
   };
@@ -196,6 +203,12 @@ export type ButtonId =
  * Un bouton facultatif absent de la borne n'y figure pas.
  */
 export type CabinetButtons = Partial<Record<ButtonId, string>>;
+
+/** Boutons de l'interface (liste et ordre dans buttons.ts, NAVIGATION). */
+export type NavigationId = 'previous' | 'next' | 'confirm' | 'back' | 'help' | 'settings';
+
+/** Bouton de l'interface -> touche ou bouton de joystick, comme CabinetButtons. */
+export type NavigationButtons = Partial<Record<NavigationId, string>>;
 
 /**
  * Sortie audio telle que Windows la voit au moment de la détection (registre

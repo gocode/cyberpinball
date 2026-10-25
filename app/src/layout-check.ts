@@ -34,7 +34,8 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 50);
     const id = el.id ? '#' + el.id : '';
     const cls = typeof el.className === 'string' && el.className.trim() ? '.' + el.className.trim().split(/\s+/).join('.') : '';
-    return el.tagName.toLowerCase() + id + cls + (text ? ' « ' + text + ' »' : '');
+    const icon = el.getAttribute('data-icon') ? '[' + el.getAttribute('data-icon') + ']' : '';
+    return el.tagName.toLowerCase() + id + cls + icon + (text ? ' « ' + text + ' »' : '');
   };
   const shown = (el) => {
     for (let e = el; e; e = e.parentElement) {
@@ -80,7 +81,7 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       }
     }
   }
-  for (const el of document.querySelectorAll('button, [data-act], input, select, textarea')) {
+  for (const el of document.querySelectorAll('button, [data-act], input, select, textarea, svg.icon')) {
     if (!shown(el)) continue;
     const r = el.getBoundingClientRect();
     if (r.width > 1 && r.height > 1) boxes.push({ el, r });
@@ -195,6 +196,26 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   // Image chargée sans pixels, vidéo en erreur : l'écran montrerait un aperçu cassé.
   for (const img of document.images) if (img.complete && img.getAttribute('src') && img.naturalWidth === 0) problems.add('image non chargée : ' + img.getAttribute('src').slice(0, 120));
   for (const video of document.querySelectorAll('video')) if (video.error) problems.add('vidéo non chargée : ' + (video.getAttribute('src') || '').slice(0, 120));
+  // Icônes du registre (icons.js) : nom inconnu, plus petite que 20 px à l'échelle d'un petit
+  // côté de 1 080 px, ou la même pour deux entrées d'un menu (data-icon-menu) : elle ne
+  // distinguerait plus rien.
+  const px = 1080 / Math.min(vw, vh);
+  for (const icon of document.querySelectorAll('svg.icon')) {
+    if (!shown(icon)) continue;
+    if (icon.classList.contains('icon-unknown')) problems.add('icône inconnue : ' + icon.getAttribute('data-icon'));
+    const r = icon.getBoundingClientRect();
+    const side = Math.min(r.width, r.height) * px;
+    if (side > 0 && side < 19.5) problems.add('icône plus petite que 20 px (' + side.toFixed(1) + ' px) : ' + label(icon));
+  }
+  for (const menu of document.querySelectorAll('[data-icon-menu]')) {
+    const seenIcons = new Map();
+    for (const entry of menu.children) {
+      const name = entry.querySelector('svg.icon')?.getAttribute('data-icon');
+      if (!name) continue;
+      if (seenIcons.has(name)) problems.add('même icône pour deux entrées d’un menu (' + name + ') : ' + label(seenIcons.get(name)) + ' et ' + label(entry));
+      else seenIcons.set(name, entry);
+    }
+  }
   return [...problems];
 })()`;
 

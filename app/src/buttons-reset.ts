@@ -1,4 +1,5 @@
-// Remise aux touches par défaut des encodeurs (Maj, 1, Échap, 5, Entrée…), le recours
+// Remise aux touches par défaut des encodeurs (Maj, 1, Échap, 5, Entrée…), des boutons du
+// jeu comme de ceux de l'interface (sur les flippers, Start et Exit), le recours
 // quand un mauvais relevé de l'étape « Boutons » rend la borne impossible à piloter :
 // menu système et réglages de VPX (à la souris), commande sync --boutons-par-defaut
 // (lanceur, sans aucun bouton). cabinet.json d'abord, puis [Input] de VPinballX.ini.
@@ -32,6 +33,7 @@ export function describeReset(reset: ButtonsReset): string[] {
   const blocking = reset.sync.plan.findings.filter((f) => f.severity === 'blocking');
   return [
     t('Flippers : Maj gauche / Maj droite · Start : 1 · Exit : Échap · Crédit : 5 · Lanceur : Entrée.'),
+    t('Interface : précédent, suivant, valider, retour sur les flippers, Start et Exit.'),
     blocking.length
       ? t("VPinballX.ini n'a pas pu être mis à jour ({reasons}) ; il le sera au prochain démarrage.", { reasons: blocking.map((f) => f.message).join(' ') })
       : reset.written

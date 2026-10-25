@@ -44,9 +44,10 @@ import {
   loadCabinet,
   writeWithBackup,
   type Cabinet,
-  type CabinetButtons,
+  type ButtonsSource,
   type EssentialSetting,
   type FlipperEdge,
+  type IconName,
   type RoleId,
   type ObservedDisplay,
   type Rotation,
@@ -102,17 +103,16 @@ export function menuRotation(cabinet: Cabinet | undefined, playfield: ObservedDi
 }
 
 /**
- * Touches de l'écran : flippers, Start et Exit de la borne (étape « Boutons » de
- * l'assistant, sinon touches par défaut des encodeurs), plus celles d'un clavier,
- * tant qu'aucun bouton ne les envoie.
+ * Touches de l'écran : les boutons de l'interface (étape « Boutons de l'interface », sinon
+ * flippers, Start et Exit du jeu), plus celles d'un clavier, tant qu'aucun bouton ne les envoie.
  */
-function settingsKeys(buttons: CabinetButtons | undefined) {
+function settingsKeys(cabinet: ButtonsSource) {
   return {
-    ...navigationKeys(buttons),
-    pageUp: withoutButtonKeys(['PageUp'], buttons),
-    pageDown: withoutButtonKeys(['PageDown'], buttons),
-    tab: withoutButtonKeys(['Tab'], buttons),
-    reset: withoutButtonKeys(['Delete'], buttons),
+    ...navigationKeys(cabinet),
+    pageUp: withoutButtonKeys(['PageUp'], cabinet),
+    pageDown: withoutButtonKeys(['PageDown'], cabinet),
+    tab: withoutButtonKeys(['Tab'], cabinet),
+    reset: withoutButtonKeys(['Delete'], cabinet),
   };
 }
 let KEYS = settingsKeys(undefined);
@@ -135,7 +135,7 @@ type Panel =
   | { kind: 'info'; id?: string; title: string; lines: string[]; actions: { label: string; run: () => void }[]; index: number };
 
 type Row =
-  | { kind: 'group'; title: string }
+  | { kind: 'group'; title: string; icon: IconName }
   | { kind: 'setting'; def: VpxSettingDef; essential?: EssentialSetting }
   | { kind: 'section'; name: string }
   | { kind: 'overrides' }
@@ -203,7 +203,7 @@ export function openSettings(target: SettingsTarget, options: OpenSettingsOption
     return session.closed;
   }
   registerIpc();
-  KEYS = settingsKeys(loadCabinet(loc.dataDir)?.buttons);
+  KEYS = settingsKeys(loadCabinet(loc.dataDir));
   const schema = currentSchema();
   const win = createWindow({
     title: t('Cyber Pinball — Réglages'),
@@ -311,7 +311,7 @@ function rows(): Row[] {
         if (def && s.target.scope === 'table' && isLiveVisual(def)) return [];
         return def ? [{ kind: 'setting' as const, def, essential: e }] : [];
       });
-      return settings.length ? [{ kind: 'group' as const, title: group.title }, ...settings] : [];
+      return settings.length ? [{ kind: 'group' as const, title: group.title, icon: group.icon }, ...settings] : [];
     });
   }
   if (s.section === OVERRIDES) {
@@ -555,7 +555,7 @@ function resetButtonsHere(): void {
   const s = session!;
   const reset = resetButtons();
   if (!reset) return;
-  KEYS = settingsKeys(reset.cabinet.buttons);
+  KEYS = settingsKeys(reset.cabinet);
   s.owned = ownedKeys();
   reload();
   s.notice = { tone: 'ok', text: t('Touches par défaut des encodeurs remises. {details}', { details: describeReset(reset).join(' ') }) };
@@ -871,7 +871,7 @@ function rowView(row: Row) {
   const s = session!;
   switch (row.kind) {
     case 'group':
-      return { kind: 'group', label: row.title };
+      return { kind: 'group', label: row.title, icon: row.icon };
     case 'section': {
       const count = s.schema.settings.filter((d) => d.section === row.name).length;
       const extras = extraEntries().filter((e) => e.section === row.name).length;
@@ -1002,8 +1002,8 @@ function view() {
     fileNote,
     vpx: s.schema.count ? `VPX ${s.schema.vpx}${s.schema.variant ? ` ${s.schema.variant}` : ''} · ${tn(s.schema.count, '{n} réglage', '{n} réglages')}` : '',
     tabs: [
-      { id: 'essentials', label: t('Essentiels'), active: s.tab === 'essentials' },
-      { id: 'advanced', label: t('Avancé'), active: s.tab === 'advanced' },
+      { id: 'essentials', label: t('Essentiels'), icon: 'star', active: s.tab === 'essentials' },
+      { id: 'advanced', label: t('Avancé'), icon: 'list', active: s.tab === 'advanced' },
     ],
     tabsFocused: s.cursor === -1,
     // Bouton de retour en tête (Exit à la souris) : sortir d'une section, ou fermer les réglages.

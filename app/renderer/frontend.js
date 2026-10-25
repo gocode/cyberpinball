@@ -500,7 +500,8 @@ function renderPlayfield(s) {
   const nodes = [];
   // Roue dentée : menu et configuration à la souris (ou Tab), même si les boutons
   // de la borne ne répondent plus comme prévu. Toujours au-dessus des superpositions.
-  const gear = el('button', 'gear', '⚙');
+  const gear = el('button', 'gear');
+  gear.append(cyberIcon('gear'));
   gear.title = t('Menu et configuration (Tab)');
   gear.dataset.act = JSON.stringify({ type: 'config' });
   // Pastille rouge : une entrée du menu système attend l'utilisateur (mise à jour disponible…).
@@ -541,6 +542,8 @@ function renderPlayfield(s) {
     for (const line of s.message.lines) box.append(el('p', /^\d{4}-\d\d-\d\d /.test(line) ? 'log' : '', line));
     cover.append(box);
     if (s.message.action === 'addTable') cover.append(footer([[t('Ajouter une table'), s.nav.confirm], [t('Menu'), s.nav.exit]]));
+    // Partie échouée : Start mène au parcours « Ce qu'il manque pour jouer » (clic compris).
+    else if (s.message.action === 'journey') cover.append(footer([[t('Start : voir ce qu’il manque pour jouer'), s.nav.confirm], [t('Exit : revenir au menu'), s.nav.exit]]));
     else if (!s.message.action) cover.append(footer([[t('Revenir au menu'), s.nav.exit]]));
   }
   // Constat bref (configuration de la borne changée, mise à jour installée) : il s'efface seul.

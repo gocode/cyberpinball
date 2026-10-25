@@ -45,8 +45,9 @@ import {
   type PupScriptFacts,
   type PupVariant,
 } from './puppack';
-import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, tableAliasFile, withAlias, withoutAlias } from './romalias';
+import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
+import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
 import { companion, nameKey } from './tablefiles';
 import { parseTableName, type TableEntry } from './tables';
 import { findTableIni } from './vpx-settings';
@@ -70,6 +71,8 @@ export const FINDING_CODES = [
   'romMisplaced',
   'romUnknown',
   'romNotLinked',
+  'romScattered',
+  'romNested',
   'romCopy',
   'romAlias',
   'romAliasHistoric',
@@ -106,6 +109,12 @@ export interface Finding {
   title: string;
   detail: string;
   fix?: Fix;
+  /**
+   * Constats de ROM : la ROM qui manque ou qu'il faut lier (`rom`), et la révision voisine
+   * présente sur la borne (`neighbour`), pour le parcours « Ce qu'il manque pour jouer » (journey.ts).
+   */
+  rom?: string;
+  neighbour?: string;
 }
 
 /** Ce qu'on a appris du script de la table. */
@@ -1483,7 +1492,120 @@ function listDirs(dir: string): string[] {
  * commun (PinMAMEPath, la bibliothèque de ROM). Il lit aussi <table>\pinmame\alias.txt
  * avant tout : révision voisine, ou ancien nom de VPinMAME (romalias.ts).
  */
+/**
+ * ROM attendue par le script. D'abord ses puces éparpillées dans la table (un ancien
+ * import déballait une ROM rangée dans un sous-dossier de son zip) : si la ROM n'est
+ * nulle part ailleurs, elles sont refaites en un zip à plat, rangé dans la bibliothèque
+ * et lié ; sinon elles ne servent à rien et partent à la corbeille.
+ */
 function checkRom(folder: string, roms: string[], library?: string): Finding[] {
+  const scattered = scatteredRom(folder, roms);
+  const findings = checkRomFiles(folder, roms, library, scattered);
+  if (!scattered || findings.some((f) => f.code === 'romScattered')) return findings;
+  const list = formatList(scattered.files.map((f) => path.relative(folder, f)));
+  return [
+    ...findings,
+    {
+      code: 'romScattered',
+      severity: 'info',
+      rom: scattered.rom,
+      title: t('Fichiers de ROM éparpillés'),
+      detail: tn(
+        scattered.files.length,
+        '{list} : un fichier de la ROM {rom} resté dans le dossier de la table. La table utilise {rom}.zip ; celui-ci ne sert à rien.',
+        '{list} : des fichiers de la ROM {rom} restés dans le dossier de la table. La table utilise {rom}.zip ; ceux-ci ne servent à rien.',
+        { list, rom: scattered.rom },
+      ),
+      fix: { label: tn(scattered.files.length, 'Mettre ce fichier à la corbeille', 'Mettre ces fichiers à la corbeille'), ops: scatteredTrash(scattered) },
+    },
+  ];
+}
+
+/** Puces d'une ROM hors de son zip, dans le dossier de la table. */
+interface ScatteredRom {
+  rom: string;
+  files: string[];
+  /** Dossier nommé comme la ROM qui les contient (sinon, la racine de la table). */
+  dir?: string;
+}
+
+/**
+ * Puces de la ROM demandée laissées à la racine de la table (« t2_l8.rom »,
+ * « t2_u14.l3 » : même nom ou même famille que la ROM), ou dans un dossier nommé
+ * comme elle qui ne contient qu'elles.
+ */
+function scatteredRom(folder: string, roms: string[]): ScatteredRom | undefined {
+  let best: ScatteredRom | undefined;
+  for (const rom of roms) {
+    const lower = rom.toLowerCase();
+    const family = `${romFamilyOf(rom)}_`;
+    const files = readDirents(folder)
+      .filter((d) => d.isFile() && isChipName(d.name))
+      .map((d) => d.name)
+      .filter((n) => n.replace(/\.[^.]+$/, '').toLowerCase() === lower || n.toLowerCase().startsWith(family))
+      .map((n) => path.join(folder, n));
+    const dirName = readDirents(folder).find((d) => d.isDirectory() && d.name.toLowerCase() === lower)?.name;
+    const dir = dirName ? path.join(folder, dirName) : undefined;
+    const content = dir ? romContent(listRelative(dir, 64) ?? []) : undefined;
+    const found: ScatteredRom | undefined = content
+      ? { rom, dir, files: [...files, ...content.chips.map((c) => path.join(dir!, ...c.split('/')))] }
+      : files.length
+        ? { rom, files }
+        : undefined;
+    if (found && (!best || found.files.length > best.files.length)) best = found;
+  }
+  return best;
+}
+
+/** Les puces éparpillées à la corbeille (le dossier de la ROM d'un bloc). */
+function scatteredTrash(s: ScatteredRom): FileOp[] {
+  const loose = s.files.filter((f) => !s.dir || !isInside(f, s.dir));
+  return [...loose.map((f) => ({ op: 'trash' as const, path: f })), ...(s.dir ? [{ op: 'trash' as const, path: s.dir }] : [])];
+}
+
+/**
+ * Remet une ROM en place : son .zip à plat, rangé dans la bibliothèque et lié dans
+ * pinmame\roms (copié d'un disque à l'autre), ou dans pinmame\roms sans bibliothèque.
+ */
+function rebuildRomOps(name: string, members: RomZipMember[], folder: string, library: string | undefined, mtimeMs: number): FileOp[] {
+  const inTable = path.join(folder, 'pinmame', 'roms', name);
+  const target = library ? path.join(library, name) : inTable;
+  return [{ op: 'zip', to: target, files: members, mtimeMs }, ...(library ? [{ op: 'link' as const, from: target, to: inTable }] : [])];
+}
+
+/** Puces d'un zip rangées dans un sous-dossier : le zip à refaire à plat, sinon undefined. */
+function nestedRom(file: string): { folder: string; members: RomZipMember[] } | undefined {
+  const entries = readZipEntries(file);
+  const content = entries && romContent(entries.map((e) => e.name));
+  if (!content?.dir) return undefined;
+  return { folder: content.dir, members: content.chips.map((c) => ({ from: file, entry: c, name: path.basename(c) })) };
+}
+
+/** Une ROM de pinmame\roms dont les puces sont dans un sous-dossier : PinMAME ne la lit pas. */
+function checkRomNested(folder: string, file: string, library?: string): Finding | undefined {
+  const nested = nestedRom(file);
+  if (!nested) return undefined;
+  const name = path.basename(file);
+  const rom = name.replace(/\.zip$/i, '');
+  const stored = library ? storedRom(library, name) : undefined;
+  // La ROM de la bibliothèque est refaite à plat si c'est celle de la table, ou si la bibliothèque n'en a pas.
+  const intoLibrary = library && (!stored || sameRomFile(stored, romFile(file)!));
+  return {
+    code: 'romNested',
+    severity: 'error',
+    rom,
+    title: t('ROM « {rom} » illisible : ses fichiers sont dans un sous-dossier du zip', { rom }),
+    detail: t('{name} contient le dossier « {folder} » : PinMAME ne lit que les fichiers à la racine du zip, la table ne démarre pas.', { name, folder: nested.folder }),
+    fix: {
+      label: intoLibrary ? t('Refaire {name} à plat dans la bibliothèque', { name }) : t('Refaire {name} à plat', { name }),
+      ops: intoLibrary
+        ? rebuildRomOps(name, nested.members, folder, library, romFile(file)!.mtimeMs)
+        : [{ op: 'zip', to: file, files: nested.members, mtimeMs: romFile(file)!.mtimeMs }],
+    },
+  };
+}
+
+function checkRomFiles(folder: string, roms: string[], library: string | undefined, scattered: ScatteredRom | undefined): Finding[] {
   const romsDir = path.join(folder, 'pinmame', 'roms');
   const files = listSafe(romsDir);
   const dirExists = fs.existsSync(romsDir);
@@ -1516,8 +1638,37 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
   }
 
   const found = roms.map(here).find(Boolean);
-  if (found) return [...findings, ...(library ? checkRomCopy(path.join(romsDir, found), library) : [])];
+  if (found) {
+    const nested = checkRomNested(folder, path.join(romsDir, found), library);
+    if (nested) return [...findings, nested];
+    return [...findings, ...(library ? checkRomCopy(path.join(romsDir, found), library) : [])];
+  }
   const rom = roms[0]!;
+
+  // Puces éparpillées dans la table, et la ROM nulle part ailleurs : on refait son zip.
+  if (scattered && !roms.some((r) => aliasFor(aliases, r) || inLibrary(r))) {
+    const name = `${scattered.rom}.zip`;
+    const where = scattered.dir ? t('dans le dossier « {folder} » de la table', { folder: path.basename(scattered.dir) }) : t('à la racine du dossier de la table');
+    const members = scattered.files.map((f) => ({ from: f, name: path.basename(f) }));
+    const mtimeMs = Math.max(...scattered.files.map((f) => romFile(f)?.mtimeMs ?? 0));
+    findings.push({
+      code: 'romScattered',
+      severity: 'error',
+      rom: scattered.rom,
+      title: t('ROM « {rom} » en fichiers éparpillés dans la table', { rom: scattered.rom }),
+      detail: tn(
+        scattered.files.length,
+        'Le fichier de la ROM {rom} ({list}) est {where} : PinMAME ne lit une ROM que sous la forme {rom}.zip, ses fichiers à la racine du zip, dans pinmame\\roms. La table ne démarre pas. La correction refait le zip ; le fichier éparpillé va à la corbeille.',
+        'Les {n} fichiers de la ROM {rom} ({list}) sont {where} : PinMAME ne lit une ROM que sous la forme {rom}.zip, ses fichiers à la racine du zip, dans pinmame\\roms. La table ne démarre pas. La correction refait le zip ; les fichiers éparpillés vont à la corbeille.',
+        { rom: scattered.rom, list: formatList(members.map((m) => m.name)), where },
+      ),
+      fix: {
+        label: library ? t('Refaire {name} dans la bibliothèque et le lier', { name }) : t('Refaire {name} dans pinmame\\roms', { name }),
+        ops: [...rebuildRomOps(name, members, folder, library, mtimeMs), ...scatteredTrash(scattered)],
+      },
+    });
+    return findings;
+  }
 
   // Un alias est déjà en place : c'est sa ROM qu'il faut.
   const alias = roms.map((r) => aliasFor(aliases, r)).find(Boolean);
@@ -1529,6 +1680,8 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
         findings.push({
           code: 'romAlias',
           severity: 'info',
+          rom: alias.alias,
+          neighbour: alias.rom,
           title: t('Révision voisine : {rom} au lieu de {asked}', { rom: alias.rom, asked: alias.alias }),
           detail: t('pinmame\\alias.txt fait charger {rom}, la table demande {asked}. {warning} Quand {asked}.zip arrivera, le médecin proposera de retirer l’alias.', {
             rom: alias.rom,
@@ -1545,6 +1698,7 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
         ? {
             code: 'romNotLinked',
             severity: 'error',
+            rom: alias.rom,
             title: t('ROM « {rom} » pas liée dans la table', { rom: alias.rom }),
             detail: t('pinmame\\alias.txt fait charger {rom} pour {asked} ; elle est dans la bibliothèque, mais pas dans pinmame\\roms.', { rom: alias.rom, asked: alias.alias }),
             fix: { label: t('Lier la ROM de la bibliothèque dans pinmame\\roms'), ops },
@@ -1552,6 +1706,7 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
         : {
             code: 'romMissing',
             severity: 'error',
+            rom: alias.rom,
             title: t('ROM « {rom} » absente', { rom: alias.rom }),
             detail: t(
               'pinmame\\alias.txt fait charger {rom} quand le script demande {asked}, mais {rom}.zip n’est nulle part. Ajoutez-la (dossier d’import, puis « Ajouter une table »), ou retirez l’alias.',
@@ -1571,6 +1726,7 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
     findings.push({
       code: 'romAliasHistoric',
       severity: 'error',
+      rom: real,
       title: t('« {asked} » : ancien nom de la ROM {rom}', { asked, rom: real }),
       detail: [
         t('Le script demande {asked}, que VPinMAME traduisait de lui-même en {rom} ; le plugin PinMAME de VPX 10.8.1 ne connaît plus ces anciens noms : sans alias, la table ne démarre pas.', {
@@ -1600,6 +1756,7 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
       code: 'romNotLinked',
       // Sans pinmame\roms, PinMAME la trouve dans son dossier commun ; avec, il ne regarde que là.
       severity: dirExists ? 'error' : 'info',
+      rom: name.replace(/\.zip$/i, ''),
       title: dirExists
         ? t('ROM « {rom} » absente de pinmame\\roms', { rom: name.replace(/.zip$/i, '') })
         : t('ROM « {rom} » pas liée dans la table', { rom: name.replace(/.zip$/i, '') }),
@@ -1624,12 +1781,24 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
   // La ROM est peut-être dans le dossier, mais pas au bon endroit.
   const stray = findFile(folder, roms.map((r) => `${r.toLowerCase()}.zip`), romsDir);
   if (stray) {
+    const nested = nestedRom(stray);
     findings.push({
       code: 'romMisplaced',
       severity: 'error',
+      rom: path.basename(stray).replace(/\.zip$/i, ''),
       title: t('ROM mal rangée'),
-      detail: t('PinMAME cherche la ROM dans pinmame\\roms ; « {file} » n’y est pas.', { file: path.relative(folder, stray) }),
-      fix: { label: t('Ranger la ROM dans pinmame\\roms'), ops: [{ op: 'move', from: stray, to: path.join(romsDir, path.basename(stray)) }] },
+      detail: nested
+        ? t('PinMAME cherche la ROM dans pinmame\\roms, ses fichiers à la racine du zip ; « {file} » n’y est pas, et ses fichiers sont dans le dossier « {folder} ».', {
+            file: path.relative(folder, stray),
+            folder: nested.folder,
+          })
+        : t('PinMAME cherche la ROM dans pinmame\\roms ; « {file} » n’y est pas.', { file: path.relative(folder, stray) }),
+      fix: nested
+        ? {
+            label: library ? t('Refaire la ROM à plat dans la bibliothèque') : t('Refaire la ROM à plat dans pinmame\\roms'),
+            ops: [...rebuildRomOps(path.basename(stray), nested.members, folder, library, romFile(stray)!.mtimeMs), { op: 'trash', path: stray }],
+          }
+        : { label: t('Ranger la ROM dans pinmame\\roms'), ops: [{ op: 'move', from: stray, to: path.join(romsDir, path.basename(stray)) }] },
     });
     return findings;
   }
@@ -1641,6 +1810,8 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
     findings.push({
       code: 'romAlias',
       severity: 'error',
+      rom,
+      neighbour,
       title: t('ROM « {rom} » absente, révision voisine {neighbour} sur la borne', { rom, neighbour }),
       detail: t('La table ne démarrera pas sans {rom}.zip. {neighbour}.zip, du même jeu, est {where} : un alias peut la faire charger à sa place. {warning}', {
         rom,
@@ -1659,10 +1830,11 @@ function checkRom(folder: string, roms: string[], library?: string): Finding[] {
   findings.push({
     code: 'romMissing',
     severity: 'error',
+    rom,
     title: t('ROM « {rom} » absente', { rom }),
     detail: [
       t(
-        'La table ne démarrera pas sans {rom}.zip{others}. Mettez le fichier dans le dossier d’import (ou glissez-le sur cette fenêtre) puis « Ajouter une table » : il sera rangé dans la bibliothèque de ROM et lié dans pinmame\\roms. Pour la trouver : menu système > « Trouver une table ».',
+        'La table ne démarrera pas sans {rom}.zip{others}. Mettez le fichier dans le dossier d’import (ou glissez-le sur cette fenêtre) puis « Ajouter une table » : il sera rangé dans la bibliothèque de ROM et lié dans pinmame\\roms. Pour savoir où la trouver, étape par étape : « Ce qu’il manque pour jouer ».',
         { rom, others },
       ),
       dirExists && !files.length ? t('Le dossier pinmame\\roms de la table est vide : tant qu’il existe, PinMAME ne cherche pas ailleurs.') : '',

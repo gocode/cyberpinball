@@ -318,3 +318,28 @@ test('import : pack d’une table originale nommé d’après B2SInit, choix de 
   assert.deepEqual([picked.choice.chosen?.label, picked.decided], ['Option 3 - Desktop', true]);
   fs.rmSync(root, { recursive: true });
 });
+
+test('import : un PuP-Pack récupéré après la table, archive muette, revient à la table du jeu VPS récupéré', () => {
+  const root = tmp();
+  const tablesDir = path.join(root, 'tables');
+  const table = path.join(tablesDir, 'Terminator 2 (Williams 1991)');
+  write(path.join(table, 'Terminator 2 (Williams 1991).vpx'), 'vpx');
+  // L'archive ne dit pas le jeu : screens.pup à la racine, nom sans le titre de la table.
+  const staging = path.join(root, 'staging', 'PUP');
+  write(path.join(staging, 'screens.pup'), screens({ topper: false, dmd: 'backglass' }));
+  const sources = [{ path: staging, label: 'T2 PuP 3.0.zip', mode: 'copy' as const, unpacked: true }];
+  const existing = [
+    { folder: table, title: 'Terminator 2', roms: [], vpsId: 'BunvWvh9' },
+    { folder: path.join(tablesDir, 'Fireball (Bally 1972)'), title: 'Fireball', roms: [], vpsId: 'em1' },
+  ];
+  const lost = planImport(sources, { tablesDir, existing, cabinet: CABINET_2 });
+  assert.deepEqual(lost.tables, [], 'sans le jeu, rien ne dit à quelle table il revient');
+  assert.equal(lost.leftovers.length, 1);
+  const plan = planImport(sources, { tablesDir, existing, cabinet: CABINET_2, vpsGame: 'BunvWvh9' });
+  assert.equal(plan.tables.length, 1);
+  assert.equal(plan.tables[0]!.folder, table);
+  assert.equal(plan.tables[0]!.isNew, false);
+  assert.ok(plan.tables[0]!.steps.some((s) => s.kind === 'pup'));
+  assert.deepEqual(plan.leftovers, []);
+  fs.rmSync(root, { recursive: true });
+});

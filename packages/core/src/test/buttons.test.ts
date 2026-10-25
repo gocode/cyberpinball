@@ -19,15 +19,30 @@ import {
   displayKeys,
   keyLabel,
   navigationKeys,
+  recordButton,
+  recordKey,
   refusedKey,
+  refusedNavigationKey,
+  defaultNavigation,
+  interfaceKeys,
+  INTERFACE_KEYS,
+  keysToTry,
+  NAVIGATION,
+  navigationButtons,
+  navigationProblems,
+  type SetKeys,
   sdlScancode,
   vpxInputSettings,
   VPX_INPUT_DEFAULTS,
   withKeyboardKeys,
   withoutButtonKeys,
 } from '../buttons';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { IniDocument } from '../ini';
-import type { Cabinet, CabinetButtons } from '../model';
+import { loadCabinet, saveCabinet } from '../store';
+import type { Cabinet, CabinetButtons, NavigationButtons } from '../model';
 import { keepManualEdits, planVpxSync } from '../sync';
 import { isOwned, vpxOwnedKeys } from '../vpx-settings';
 import { devPcDisplays, emptyCabinet } from './fixtures';
@@ -93,7 +108,7 @@ test('touches refusées : inconnues de VPX, la touche Windows, Tab et Retour arr
   assert.match(refusedKey('Tab')!, /configuration/);
   assert.match(refusedKey('Backspace')!, /corriger un relevé/);
   // Un relevé enregistré avec Tab ne peut pas priver de la configuration : il est incohérent.
-  assert.deepEqual(navigationKeys({ ...DEFAULT_BUTTONS, exit: 'Tab' }), navigationKeys(undefined));
+  assert.deepEqual(navigationKeys({ buttons: { ...DEFAULT_BUTTONS, exit: 'Tab' } }), navigationKeys(undefined));
   assert.match(refusedKey('MetaLeft')!, /menu Démarrer/);
   assert.match(refusedKey('MediaPlayPause')!, /inconnue de VPX/);
 });
@@ -119,7 +134,7 @@ test('navigation sans étape « Boutons » : les touches d’avant', () => {
 });
 
 test('navigation avec les boutons relevés, sans voler la touche d’un autre bouton', () => {
-  const keys = navigationKeys({ leftFlipper: 'KeyA', rightFlipper: 'ArrowLeft', start: 'Digit2', exit: 'Enter', credit: 'Digit5', plunger: 'Space' });
+  const keys = navigationKeys({ buttons: { leftFlipper: 'KeyA', rightFlipper: 'ArrowLeft', start: 'Digit2', exit: 'Enter', credit: 'Digit5', plunger: 'Space' } });
   assert.deepEqual(keys.previous, ['KeyA', 'ArrowUp'], 'Flèche gauche est le flipper droit');
   assert.deepEqual(keys.next, ['ArrowLeft', 'ArrowRight', 'ArrowDown']);
   assert.deepEqual(keys.confirm, ['Digit2', 'NumpadEnter'], 'Entrée est Exit');
@@ -129,7 +144,7 @@ test('navigation avec les boutons relevés, sans voler la touche d’un autre bo
 });
 
 test('raccourcis du menu retirés quand un bouton les envoie', () => {
-  assert.deepEqual(withoutButtonKeys(['KeyH', 'F1'], { ...DEFAULT_BUTTONS, extraBall: 'KeyH' }), ['F1']);
+  assert.deepEqual(withoutButtonKeys(['KeyH', 'F1'], { buttons: { ...DEFAULT_BUTTONS, extraBall: 'KeyH' } }), ['F1']);
   assert.deepEqual(withoutButtonKeys(['KeyH', 'F1'], undefined), ['KeyH', 'F1']);
 });
 
@@ -331,7 +346,7 @@ test('relevé incohérent : détecté, et l’interface garde les touches par d�
   assert.match(buttonProblems({ ...DEFAULT_BUTTONS, start: 'MetaLeft' })[0]!, /^Start : La touche Windows/);
   assert.deepEqual(buttonProblems({ ...DEFAULT_BUTTONS }), []);
   // Aucun bouton de navigation ne peut manquer : les touches par défaut reprennent.
-  assert.deepEqual(navigationKeys(twice), navigationKeys(undefined));
+  assert.deepEqual(navigationKeys({ buttons: twice }), navigationKeys(undefined));
   assert.equal(buttonKeys(missingStart).start, 'Digit1');
 });
 
@@ -383,8 +398,8 @@ test('joysticks : un bouton se relève, se nomme et se refuse en double comme un
   assert.deepEqual(buttonKeys(buttons), buttons);
   assert.deepEqual(buttonProblems({ ...buttons, credit: joy(2) }), ['Start et Crédit : même touche (Bouton 3 du joystick)']);
   // Les boutons pilotent l'interface ; les flèches d'un clavier aussi.
-  assert.deepEqual(navigationKeys(buttons).previous, [joy(0), 'ArrowLeft', 'ArrowUp']);
-  assert.deepEqual(navigationKeys(buttons).confirm, [joy(2), 'Enter', 'NumpadEnter']);
+  assert.deepEqual(navigationKeys({ buttons: buttons }).previous, [joy(0), 'ArrowLeft', 'ArrowUp']);
+  assert.deepEqual(navigationKeys({ buttons: buttons }).confirm, [joy(2), 'Enter', 'NumpadEnter']);
 });
 
 test('joysticks : [Input] reçoit le bouton, garde la touche du clavier de VPX, oublie l’ancien relevé', () => {
@@ -435,4 +450,182 @@ test('joysticks vus par VPX : relus dans vpinball.log, ceux des boutons qu’il 
   assert.deepEqual(joysticksUnseenByVpx({ ...buttons, rightFlipper: elsewhere }, joysticksInVpxLog(log)), [`SDLJoy_${'0'.repeat(32)}_1`]);
   // VPX n'a vu aucun joystick (débranché pendant la partie) : rien à conclure.
   assert.deepEqual(joysticksUnseenByVpx(buttons, []), []);
+});
+
+test('relevé mixte : touches du clavier et boutons du joystick, librement d’un bouton à l’autre, enregistrés et écrits dans [Input]', () => {
+  // Octobre 2026, vraie borne à Pinscape : les boutons du joystick se relevaient, plus les
+  // touches du clavier. Les deux se relèvent par le même chemin (recordButton), dans l'ordre de l'assistant.
+  const pressed: Record<string, string> = {
+    leftFlipper: joy(0),
+    rightFlipper: 'ShiftRight',
+    start: joy(2),
+    exit: 'Escape',
+    credit: 'Digit5',
+    plunger: joy(5),
+    leftMagna: 'ControlLeft',
+    rightMagna: joy(7),
+    extraBall: 'Escape', // Exit : la borne n'a pas ce bouton
+    tilt: joy(9),
+    nudgeLeft: 'KeyZ',
+    nudgeRight: 'Escape',
+    nudgeCenter: 'Escape',
+    volumeDown: 'Minus',
+    volumeUp: joy(14),
+  };
+  let keys: CabinetButtons = {};
+  for (const b of BUTTONS) {
+    const record = recordButton(keys, b.id, pressed[b.id]!);
+    assert.equal(record.refused, undefined, `${b.id} : ${record.refused}`);
+    keys = record.keys;
+  }
+  assert.deepEqual(keys, Object.fromEntries(Object.entries(pressed).filter(([id, code]) => id === 'exit' || code !== 'Escape')));
+  assert.deepEqual(buttonProblems(keys), []);
+  assert.deepEqual(buttonKeys(keys), keys, 'un relevé mixte pilote l’interface tel quel');
+  assert.deepEqual(navigationKeys({ buttons: keys }).next, ['ShiftRight', 'ArrowRight', 'ArrowDown']);
+  assert.deepEqual(navigationKeys({ buttons: keys }).confirm, [joy(2), 'Enter', 'NumpadEnter']);
+  // Une touche déjà prise est refusée, qu'elle vienne du clavier ou du joystick.
+  assert.match(recordButton(keys, 'credit', 'ShiftRight').refused!, /Maj droite est déjà la touche du bouton Flipper droit/);
+  assert.match(recordButton(keys, 'credit', joy(0)).refused!, /Bouton 1 du joystick est déjà la touche du bouton Flipper gauche/);
+
+  // Enregistré dans cabinet.json, relu tel quel.
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-mixte-'));
+  try {
+    saveCabinet(home, cabinetWith(keys));
+    assert.deepEqual(loadCabinet(home)!.buttons, keys);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+
+  // [Input] : la touche du clavier pour les boutons du clavier, le bouton du joystick (et la touche de VPX) pour les autres.
+  const ini = planVpxSync(cabinetWith(keys), devPcDisplays(), VPX_FIRST_RUN).nextIni!;
+  assert.equal(input(ini, 'LeftFlipper'), `${joy(0)} | Key;225`);
+  assert.equal(input(ini, 'RightFlipper'), 'Key;229');
+  assert.equal(input(ini, 'Start'), `${joy(2)} | Key;30`);
+  assert.equal(input(ini, 'ExitGame'), 'Key;41');
+  assert.equal(input(ini, 'Credit1'), 'Key;34');
+  assert.equal(input(ini, 'LaunchBall'), `${joy(5)} | Key;40`);
+  assert.equal(input(ini, 'LeftMagna'), 'Key;224');
+  assert.equal(input(ini, 'RightMagna'), `${joy(7)} | Key;228`);
+  assert.equal(input(ini, 'Tilt'), `${joy(9)} | Key;23`);
+  assert.equal(input(ini, 'VolumeUp'), `${joy(14)} | Key;46`);
+  // Le menu de VPX en partie : un MagnaSave au clavier, l'autre au joystick.
+  assert.equal(input(ini, 'InGameUI'), `Key;69 | Key;224 & ${joy(7)}`);
+});
+
+test('clavier et joystick : le clavier suit les boutons du joystick, et l’assistant ne perd pas une touche en changeant d’écran', () => {
+  const read = (...parts: string[]) => fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', ...parts), 'utf8');
+  // Chaque appui d'un bouton du joystick vérifie que le premier plan de Windows (le clavier) est à Cyber Pinball.
+  const joystick = read('app', 'src', 'joystick-input.ts');
+  assert.match(joystick, /function send\([\s\S]*?keyboardFollows\(win,[\s\S]*?listeners\.get\(win\)/);
+  const foreground = read('app', 'src', 'foreground.ts');
+  assert.match(foreground, /foregroundWindow\(\)[\s\S]*?process\.pid[\s\S]*?bringToFront\(/);
+  assert.match(foreground, /if \(OFFSCREEN/, 'hors écran, jamais de premier plan');
+  const wizard = read('app', 'src', 'wizard.ts');
+  // L'assistant prend le clavier une fois ses fenêtres affichées.
+  assert.match(wizard, /ready-to-show[\s\S]{0,200}takeKeyboard\(\)/);
+  assert.match(wizard, /function takeKeyboard\(\)[\s\S]*?keyboardFollows\(/);
+  // Touches du clavier et boutons du joystick arrivent au même traitement.
+  assert.match(wizard, /before-input-event[\s\S]{0,400}handleKey\(input\)/);
+  assert.match(wizard, /onJoystickInput\(win, \(input\) => void handleKey\(input\)\)/);
+  // Le focus qui passe d'un écran de l'assistant à l'autre ne relâche pas les touches enfoncées.
+  assert.doesNotMatch(wizard, /win\.on\('blur', \(\) => releaseKeys\(\)\)/);
+  assert.match(wizard, /win\.on\('blur', [^\n]*isFocused\(\)[^\n]*releaseKeys\(\)/);
+  // Le relevé passe par recordKey, sans distinguer clavier et joystick.
+  assert.match(wizard, /function handleButtonKey[\s\S]*?recordKey\(/);
+});
+
+// ---------------------------------------------------------------------------
+// Deux jeux de boutons : le jeu (VPX, [Input]) et l'interface (Cyber Pinball)
+
+test('interface : sans boutons de l’interface, elle suit les flippers, Start et Exit du jeu (migration douce)', () => {
+  assert.deepEqual(navigationButtons(undefined), { previous: 'ShiftLeft', next: 'ShiftRight', confirm: 'Digit1', back: 'Escape' });
+  // Borne d'avant les boutons de l'interface : sa navigation reste sur ses boutons de jeu.
+  const game: CabinetButtons = { ...DEFAULT_BUTTONS, leftFlipper: joy(0), rightFlipper: joy(1), start: joy(2), exit: joy(3) };
+  assert.deepEqual(navigationButtons({ buttons: game }), { previous: joy(0), next: joy(1), confirm: joy(2), back: joy(3) });
+  assert.deepEqual(defaultNavigation(game), navigationButtons({ buttons: game }));
+  assert.deepEqual(navigationKeys({ buttons: game }).previous, [joy(0), 'ArrowLeft', 'ArrowUp']);
+});
+
+test('interface : ses boutons sont indépendants de ceux du jeu', () => {
+  const buttons: CabinetButtons = { ...DEFAULT_BUTTONS, leftFlipper: joy(0), rightFlipper: joy(1), start: joy(2), exit: joy(3) };
+  const navigation: NavigationButtons = { previous: 'KeyJ', next: 'KeyL', confirm: joy(9), back: 'KeyU', help: 'KeyI' };
+  assert.deepEqual(navigationProblems(navigation), []);
+  const keys = interfaceKeys({ buttons, navigation });
+  assert.deepEqual(keys.previous, ['KeyJ', 'ArrowLeft', 'ArrowUp']);
+  assert.deepEqual(keys.next, ['KeyL', 'ArrowRight', 'ArrowDown']);
+  assert.deepEqual(keys.confirm, [joy(9), 'Enter', 'NumpadEnter']);
+  assert.deepEqual(keys.exit, ['KeyU', 'Escape']);
+  assert.deepEqual(keys.help, ['KeyI', 'KeyH', 'F1']);
+  assert.deepEqual(keys.settings, ['KeyR']);
+  // Les boutons du jeu ne pilotent plus l'interface.
+  assert.ok(!Object.values(keys).flat().some((k) => [joy(0), joy(1), joy(2), joy(3)].includes(k)));
+  // Relever le jeu autrement ne change pas l'interface.
+  assert.deepEqual(navigationButtons({ buttons: { ...buttons, leftFlipper: 'KeyA' }, navigation }), navigation);
+  // Un raccourci du clavier pris par un bouton, du jeu ou de l'interface, n'ouvre plus rien.
+  assert.deepEqual(withoutButtonKeys(['KeyH', 'F1'], { buttons, navigation: { ...navigation, settings: 'F1' } }), ['KeyH']);
+  assert.deepEqual(withoutButtonKeys(['KeyH', 'KeyT'], { buttons, navigation }), ['KeyH'], 'T est le tilt du jeu');
+});
+
+test('interface : les touches de secours du clavier gardent toujours leur rôle', () => {
+  assert.match(refusedNavigationKey('previous', 'Enter')!, /Entrée reste la touche de secours « Valider »/);
+  assert.match(refusedNavigationKey('confirm', 'Escape')!, /Échap reste la touche de secours « Retour et menu »/);
+  assert.match(refusedNavigationKey('help', 'ArrowUp')!, /Flèche haut reste la touche de secours « Précédent »/);
+  assert.equal(refusedNavigationKey('confirm', 'Enter'), undefined);
+  assert.equal(refusedNavigationKey('back', 'Escape'), undefined);
+  assert.match(refusedNavigationKey('next', 'Tab')!, /Tab est réservée/);
+  assert.equal(refusedNavigationKey('next', joy(4)), undefined);
+  // Relevé incohérent : l'interface revient sur les boutons du jeu, jamais impilotable.
+  const twice: NavigationButtons = { previous: 'KeyJ', next: 'KeyJ', confirm: 'KeyK', back: 'KeyU' };
+  assert.deepEqual(navigationProblems(twice), ['Précédent et Suivant : même touche (J)']);
+  assert.deepEqual(navigationButtons({ navigation: twice }), navigationButtons(undefined));
+  assert.deepEqual(navigationProblems({ previous: 'KeyJ', next: 'KeyL', confirm: 'KeyK' }), ['Retour et menu : aucune touche']);
+});
+
+test('interface : relevé au clavier et au joystick mélangés, Retour passe les facultatifs', () => {
+  const pressed = ['KeyJ', joy(1), 'Enter', 'KeyU', 'KeyU', joy(5)];
+  let keys: SetKeys = {};
+  for (const [i, n] of NAVIGATION.entries()) {
+    const record = recordKey(INTERFACE_KEYS, keys, n.id, pressed[i]!);
+    assert.equal(record.refused, undefined, n.id);
+    keys = record.keys;
+  }
+  assert.deepEqual(keys, { previous: 'KeyJ', next: joy(1), confirm: 'Enter', back: 'KeyU', settings: joy(5) });
+  assert.match(recordKey(INTERFACE_KEYS, keys, 'help', 'KeyJ').refused!, /J est déjà la touche du bouton Précédent/);
+  // Le même bouton physique peut servir au jeu et à l'interface : chaque jeu ne refuse que ses propres doublons.
+  assert.equal(recordKey(INTERFACE_KEYS, keys, 'help', 'ShiftLeft').refused, undefined);
+  assert.deepEqual(keysToTry(INTERFACE_KEYS, keys, navigationButtons(undefined)), ['previous', 'next', 'confirm', 'back']);
+  assert.deepEqual(keysToTry(INTERFACE_KEYS, keys, keys), []);
+});
+
+test('interface : enregistrée dans cabinet.json, absente de [Input], remise avec les touches par défaut', () => {
+  const buttons: CabinetButtons = { ...DEFAULT_BUTTONS, leftFlipper: joy(0) };
+  const navigation: NavigationButtons = { previous: 'KeyJ', next: 'KeyL', confirm: 'KeyK', back: 'KeyU' };
+  const home = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-interface-'));
+  try {
+    saveCabinet(home, { ...cabinetWith(buttons), navigation });
+    assert.deepEqual(loadCabinet(home)!.navigation, navigation);
+    assert.deepEqual(loadCabinet(home)!.buttons, buttons);
+  } finally {
+    fs.rmSync(home, { recursive: true, force: true });
+  }
+  // VPX ne lit que les boutons du jeu.
+  const without = planVpxSync(cabinetWith(buttons), devPcDisplays(), VPX_FIRST_RUN).nextIni;
+  const withNav = planVpxSync({ ...cabinetWith(buttons), navigation }, devPcDisplays(), VPX_FIRST_RUN).nextIni;
+  assert.equal(withNav, without);
+  assert.ok(!/Key;13\b|Key;15\b/.test(withNav ?? ''), 'ni J ni L dans [Input]');
+  // Touches par défaut des encodeurs : les deux jeux.
+  const reset = withDefaultButtons({ ...cabinetWith(buttons), navigation });
+  assert.deepEqual(reset.buttons, DEFAULT_BUTTONS);
+  assert.deepEqual(reset.navigation, { previous: 'ShiftLeft', next: 'ShiftRight', confirm: 'Digit1', back: 'Escape' });
+});
+
+test('l’interface lit ses propres boutons partout, jamais ceux du jeu seuls', () => {
+  const read = (...parts: string[]) => fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', ...parts), 'utf8');
+  for (const file of ['frontend.ts', 'frontend-gate.ts', 'settings.ts', 'wizard.ts']) {
+    const src = read('app', 'src', file);
+    // navigationKeys, interfaceKeys, withoutButtonKeys reçoivent la borne (ses deux jeux), pas ses seuls boutons de jeu.
+    assert.doesNotMatch(src, /(navigationKeys|interfaceKeys|withoutButtonKeys)\([^)]*\?\.buttons\b/, file);
+    assert.doesNotMatch(src, /(navigationKeys|interfaceKeys)\(buttons\b/, file);
+  }
+  assert.match(read('app', 'src', 'frontend.ts'), /function menuKeysFor\(cabinet: ButtonsSource\)[\s\S]*?interfaceKeys\(cabinet\)/);
 });

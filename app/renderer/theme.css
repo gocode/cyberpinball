@@ -55,3 +55,18 @@ body {
   font-variant-numeric: tabular-nums;
   line-height: 1.33;
 }
+
+/*
+ * Icônes du registre (icons.js, cyberIcon) : un SVG au trait, de la couleur du texte, à la
+ * taille de la police de son conteneur (1em) sauf taille donnée par l'écran. Un seul trait
+ * pour toute la famille, à toutes les tailles (2 unités de la grille de 24) ; rien sous 20 px
+ * à l'échelle d'un petit côté de 1 080 px (docs/design-system, « Icones »).
+ */
+.icon {
+  width: 1em;
+  height: 1em;
+  flex: none;
+  overflow: visible;
+  stroke-width: 2;
+  vertical-align: -0.14em;
+}

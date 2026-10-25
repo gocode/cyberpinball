@@ -13,6 +13,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { sameVolume, type FileOp } from './fileops';
+import { zipContentHash } from './romzip';
 
 /** Un fichier de ROM sur le disque. */
 export interface RomFile {
@@ -87,12 +88,17 @@ export const sameRomFile = (a: RomFile, b: RomFile): boolean => a.dev === b.dev 
 
 const hashes = new Map<string, { size: number; mtimeMs: number; hash: string }>();
 
-/** Empreinte SHA-1 du contenu (gardée en mémoire tant que le fichier ne change pas). */
+/**
+ * Empreinte du contenu (gardée en mémoire tant que le fichier ne change pas) : celle
+ * des puces du zip (zipContentHash), pour qu'une même ROM zippée par deux outils soit
+ * une seule version ; à défaut, SHA-1 des octets.
+ */
 export function romHash(file: RomFile): string {
   const key = `${file.dev}:${file.ino}`;
   const known = hashes.get(key);
   if (known && known.size === file.size && known.mtimeMs === file.mtimeMs) return known.hash;
-  const hash = createHash('sha1').update(fs.readFileSync(file.path)).digest('hex');
+  const data = fs.readFileSync(file.path);
+  const hash = zipContentHash(data) ?? createHash('sha1').update(data).digest('hex');
   hashes.set(key, { size: file.size, mtimeMs: file.mtimeMs, hash });
   return hash;
 }

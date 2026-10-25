@@ -1,0 +1,92 @@
+// Noms des icônes de l'interface. Les dessins sont dans un seul fichier, le registre
+// app/renderer/icons.js (chargé par chaque fenêtre, et par la planche du design system) ;
+// ici, la liste de leurs noms, pour que le code ne demande que des icônes qui existent.
+// Une entrée de menu déclare la sienne par son champ `icon` (SystemItem, Action, Row,
+// Built pour le titre d'un écran) ; le rendu la dessine. src/test/icons.test.ts vérifie
+// que cette liste et le registre ont exactement les mêmes noms.
+
+export const ICON_NAMES = [
+  // Navigation et actions courantes
+  'gear',
+  'back',
+  'chevron-left',
+  'chevron-right',
+  'check',
+  'close',
+  'plus',
+  'edit',
+  'trash',
+  'restore',
+  'pin',
+  'auto',
+  'filter',
+  'sort',
+  'download',
+  'flask',
+  'alert',
+  'info',
+  'search',
+  // Menu système
+  'table-add',
+  'sliders',
+  'cabinet',
+  'inbox',
+  'refresh',
+  'account',
+  'chip',
+  'link',
+  'import',
+  'image-download',
+  'music',
+  'language',
+  'upgrade',
+  'desktop',
+  'power',
+  // Configuration de la borne
+  'button',
+  'screens',
+  'playfield',
+  'layout',
+  'sound',
+  'wizard',
+  'keyboard',
+  'layers',
+  // Fiche d'un jeu
+  'play',
+  'rules',
+  'image',
+  'pup',
+  'frame',
+  'pulse',
+  // Médias, son et attente
+  'layout-menu',
+  'volume',
+  'video',
+  'rocket',
+  'attract',
+  'shuffle',
+  'volume-low',
+  'film',
+  'quality',
+  // Réglages de VPX
+  'star',
+  'list',
+  'eye',
+  'gauge',
+  'dmd',
+  'folder',
+  'bulb',
+  // Design system : commandes de la borne, sources, objets
+  'tables',
+  'book',
+  'monitor',
+  'flipper',
+  'start',
+  'exit',
+  'coin',
+  'plunger',
+  'usb',
+  'gamepad',
+] as const;
+
+export type IconName = (typeof ICON_NAMES)[number];

@@ -78,6 +78,18 @@ export async function unpackArchive(file: string, dest: string): Promise<boolean
   return true;
 }
 
+/**
+ * Ce que contient une archive (zip, 7z, rar), sans la déballer ; undefined si le fichier
+ * n'en est pas une ou qu'elle est illisible. Sert à vérifier ce qu'on a reçu (liste d'attente).
+ */
+export async function archiveEntries(file: string): Promise<string[] | undefined> {
+  try {
+    return isArchive(file) ? await listArchive(file) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function isArchive(p: string): boolean {
   return ARCHIVE_EXT.has(path.extname(p).toLowerCase()) && fs.statSync(p).isFile();
 }

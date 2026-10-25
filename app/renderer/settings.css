@@ -147,9 +147,16 @@ header {
 }
 
 h1 {
+  display: flex;
+  align-items: center;
+  gap: 1.9vmin;
   margin: 0.6vmin 0 0;
   font-size: 5vmin;
   font-weight: 600;
+}
+
+.title-icon {
+  font-size: 4.3vmin;
 }
 
 .scope {
@@ -214,6 +221,17 @@ h1 {
   box-shadow: 0 0 1.8vmin var(--signal-haze);
 }
 
+/* Icône d'onglet (registre icons.js) : de la couleur du texte de l'onglet. */
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.2vmin;
+}
+
+.tab-icon {
+  font-size: 2.4vmin;
+}
+
 .vpx {
   font-size: 1.85vmin;
   color: var(--quiet);
@@ -268,6 +286,17 @@ h1 {
 
 .list li.group:first-child {
   margin-top: 0;
+}
+
+/* Icône d'un groupe des Essentiels : même vert que son intertitre. */
+.list li.group {
+  display: flex;
+  align-items: center;
+  gap: 1.2vmin;
+}
+
+.group-icon {
+  font-size: 2.4vmin;
 }
 
 .list li.row {

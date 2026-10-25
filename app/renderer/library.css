@@ -109,6 +109,22 @@ body.mouse .lib-back:hover {
   line-height: 1.05;
 }
 
+.lib-head h1.with-icon {
+  display: flex;
+  align-items: center;
+  gap: 2.4cqmin;
+}
+
+.lib-head-icon {
+  font-size: 5.56cqmin;
+}
+
+.lib-row-icon {
+  font-size: 2.4cqmin;
+  color: var(--ink-muted);
+  align-self: center;
+}
+
 .lib-sub {
   margin-top: 1cqmin;
   font-size: 3.2cqmin;
@@ -243,6 +259,65 @@ body.mouse .lib-back:hover {
   color: var(--ink-faint);
 }
 
+/* Faits d'un fichier ou d'un élément de la liste d'attente : libellé et valeur sur une ligne, comme la fiche. */
+.lib-facts .lib-row {
+  display: grid;
+  grid-template-columns: 26cqmin minmax(0, 1fr);
+  column-gap: 2cqmin;
+  align-items: baseline;
+  padding-top: 0.7cqmin;
+  padding-bottom: 0.7cqmin;
+  font-size: 2.2cqmin;
+}
+
+.lib-facts .lib-row-detail {
+  margin: 0;
+  font-size: 2.2cqmin;
+  color: var(--ink);
+}
+
+/*
+ * Fiche en hauteur (borne, playfield tourné) : les informations prennent leur place, bornée
+ * (statistiques sur une ligne, résumé des fichiers), et les actions passent sur deux colonnes.
+ * Sans cela, la liste des actions mangeait la hauteur et la partie informations était rognée.
+ */
+@container (orientation: portrait) {
+  .lib-sheet .lib-body {
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 3cqmin;
+  }
+
+  .lib-sheet .lib-content {
+    max-height: 62cqh;
+  }
+
+  .lib-sheet .lib-row,
+  .lib-facts .lib-row {
+    grid-template-columns: 21cqmin minmax(0, 1fr);
+  }
+
+  .lib-sheet .lib-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 0.8cqmin 1.2cqmin;
+  }
+
+  .lib-sheet .lib-action {
+    padding: 1.2cqmin 1.8cqmin;
+    font-size: 2.3cqmin;
+  }
+
+  .lib-sheet .lib-action .detail {
+    font-size: 1.9cqmin;
+  }
+}
+
+/* Fichiers d'une table : le nom en entier (il passe à la ligne), la taille en pastille. */
+.lib-files .lib-row-text {
+  font-weight: 500;
+}
+
 /* Contours tracés à l'intérieur de l'élément (outline-offset négatif) : tracés autour, une liste qui défile les rognerait à gauche, en haut ou en bas. */
 .lib-row.selected {
   background: var(--signal-wash);
@@ -297,6 +372,51 @@ body.mouse .lib-back:hover {
   box-shadow: 0 0 0 0.3cqmin var(--void);
 }
 
+/*
+ * Colonne d'icônes (registre icons.js) : l'icône de 30 px à gauche, alignée sur la première
+ * ligne du libellé, à 24 px du texte ; libellé et détail dans la seconde colonne, même pour
+ * une action sans icône. L'icône a la couleur du libellé : au repos, choisie (sombre sur
+ * l'aplat vert), destructrice (rouge au repos, sombre sur l'aplat rouge).
+ */
+.lib-actions.with-icons .lib-action {
+  display: grid;
+  grid-template-columns: 2.78cqmin minmax(0, 1fr);
+  column-gap: 2.22cqmin;
+  align-items: start;
+}
+
+.lib-actions.with-icons .lib-action > .label,
+.lib-actions.with-icons .lib-action > .detail {
+  grid-column: 2;
+}
+
+.lib-action-glyph {
+  position: relative;
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  margin-top: 0.37cqmin;
+}
+
+.lib-action-icon {
+  font-size: 2.78cqmin;
+}
+
+.lib-action.tone-error:not(.current) {
+  color: var(--danger);
+}
+
+/* Sur une entrée à icône, la pastille passe en haut à droite de l'icône. */
+.lib-action-glyph .lib-attention {
+  position: absolute;
+  top: -0.65cqmin;
+  right: -0.65cqmin;
+  width: 1.11cqmin;
+  height: 1.11cqmin;
+  margin: 0;
+  box-shadow: 0 0 0 0.19cqmin var(--void);
+}
+
 .lib-action .detail {
   display: block;
   margin-top: 0.3cqmin;
@@ -328,7 +448,8 @@ body.mouse .lib-back:hover {
 }
 
 body.mouse .lib-action:not(.current):hover,
-body.mouse .lib-row.fixable:hover {
+body.mouse .lib-row.fixable:hover,
+body.mouse .lib-row.pick:not(.selected):hover {
   background: var(--panel);
 }
 
@@ -868,4 +989,222 @@ body.mouse .media-card[data-act]:hover {
 .pages-keys .pages-note {
   align-self: center;
   margin-top: 2cqmin;
+}
+
+/* ---------- Ce qu'il manque pour jouer : progression et étapes (docs/design-system, EcranParcours) ---------- */
+
+/* Au bureau, les étapes prennent la place ; en borne (portrait), les gestes suivent la liste. */
+.lib-body.lib-journey {
+  grid-template-columns: 1.9fr 1fr;
+  gap: 4cqmin;
+}
+
+@container (orientation: portrait) {
+  .lib-body.lib-journey {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, max-content) auto;
+    align-content: start;
+  }
+}
+
+.lib-journey .lib-actions {
+  gap: 0.6cqmin;
+}
+
+.lib-journey .lib-action {
+  padding: 1.2cqmin 2.2cqmin;
+  font-size: 2.4cqmin;
+}
+
+.journey {
+  gap: 1.4cqmin;
+}
+
+.journey-progress {
+  display: grid;
+  gap: 1.4cqmin;
+}
+
+.journey-top {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1cqmin 2.4cqmin;
+}
+
+.journey-position {
+  font-size: 2.6cqmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.journey-summary {
+  font-size: 2.05cqmin;
+  color: var(--ink-muted);
+}
+
+/* Un segment par étape : réglée en vert, courante en clair, facultative en pointillé. */
+.journey-bar {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.9cqmin;
+}
+
+.journey-bar i {
+  height: 0.9cqmin;
+  border-radius: 0.45cqmin;
+  background: var(--line-strong);
+}
+
+.journey-bar i.done {
+  background: var(--signal);
+}
+
+.journey-bar i.current {
+  background: var(--ink);
+}
+
+.journey-bar i.optional {
+  background: none;
+  border: 1px dashed var(--line-strong);
+}
+
+.journey-notice {
+  padding: 1.2cqmin 1.8cqmin;
+  border-left: 0.4cqmin solid var(--line-strong);
+  border-radius: 0.3cqmin;
+  background: var(--surface-raised);
+  font-size: 2.2cqmin;
+  line-height: 1.4;
+}
+
+.journey-notice.tone-ok {
+  border-left-color: var(--signal);
+}
+
+.journey-notice.tone-warning {
+  border-left-color: var(--warning);
+}
+
+.journey-notice.tone-error {
+  border-left-color: var(--danger);
+}
+
+.journey-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.4cqmin;
+}
+
+.journey-step {
+  display: grid;
+  grid-template-columns: 4.2cqmin minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 1.6cqmin;
+  padding: 0.9cqmin 1.4cqmin;
+  border: 1px solid transparent;
+  border-bottom-color: var(--line);
+  font-size: 2.45cqmin;
+  line-height: 1.3;
+}
+
+.journey-num {
+  width: 3.8cqmin;
+  height: 3.8cqmin;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+  font-size: 2.05cqmin;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.journey-title {
+  font-weight: 500;
+  word-break: break-word;
+}
+
+.journey-detail {
+  margin-top: 0.3cqmin;
+  font-size: 2.1cqmin;
+  line-height: 1.4;
+  color: var(--ink-muted);
+  word-break: break-word;
+}
+
+.journey-note {
+  margin-top: 0.9cqmin;
+  padding: 0.6cqmin 1.5cqmin;
+  border-left: 0.3cqmin solid var(--line-strong);
+  font-size: 2.1cqmin;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+/* L'état : un mot et un signe, jamais la couleur seule. */
+.journey-state {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.7cqmin;
+  margin-top: 0.4cqmin;
+  font-size: 1.9cqmin;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-muted);
+}
+
+.journey-state.tone-ok {
+  color: var(--signal);
+}
+
+.journey-state.tone-warning {
+  color: var(--warning);
+}
+
+.journey-state.tone-error {
+  color: var(--danger);
+}
+
+.journey-sign {
+  font-size: 2.2cqmin;
+}
+
+/* Réglée : cochée, en retrait. */
+.journey-step.state-done .journey-num {
+  border-color: rgba(139, 226, 58, 0.45);
+  color: var(--signal);
+}
+
+.journey-step.state-done .journey-title {
+  color: var(--ink-muted);
+}
+
+/* Courante : un panneau et un filet clair, sans vert (le vert est au geste choisi). */
+.journey-step.current {
+  border: 1px solid var(--line-strong);
+  border-radius: 0.6cqmin;
+  background: var(--surface-raised);
+  box-shadow: inset 0.4cqmin 0 var(--ink);
+}
+
+.journey-step.current .journey-num {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.journey-step.current .journey-title {
+  font-weight: 600;
+}
+
+body.mouse .journey-step.fixable:hover {
+  background: var(--panel);
 }

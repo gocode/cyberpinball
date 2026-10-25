@@ -908,15 +908,19 @@ html.menu-desktop .footer.menu-help .cap {
   font-size: calc(18 * var(--u));
 }
 
-/* Roue dentée de la configuration : discrète, dans le coin, cliquable par-dessus tout. */
+/*
+ * Roue dentée de la configuration (icône gear du registre) : discrète, dans le coin, cliquable
+ * par-dessus tout. Icône de 38 px à l'échelle d'un petit côté de 1 080 px, zone cliquable de 72 px.
+ */
 .gear {
   position: absolute;
-  top: 1.6cqmin;
-  right: 2cqmin;
+  top: 0.4cqmin;
+  right: 1.3cqmin;
   z-index: 100;
-  padding: 0.4cqmin 0.9cqmin;
+  display: flex;
+  padding: 1.57cqmin;
   font: inherit;
-  font-size: 3.2cqmin;
+  font-size: 3.52cqmin;
   line-height: 1;
   color: var(--quiet);
   background: transparent;
@@ -940,15 +944,16 @@ body.mouse .gear {
   opacity: 1;
 }
 
+/* Pastille en haut à droite de l'icône, comme sur les entrées du menu (library.css, .lib-attention). */
 .gear-dot {
   position: absolute;
-  top: 0.6cqmin;
-  right: 0.6cqmin;
-  width: 0.85cqmin;
-  height: 0.85cqmin;
+  top: 0.92cqmin;
+  right: 0.92cqmin;
+  width: 1.11cqmin;
+  height: 1.11cqmin;
   border-radius: 50%;
   background: var(--danger);
-  box-shadow: 0 0 0 0.2cqmin var(--bg), 0 0 0.8cqmin var(--danger);
+  box-shadow: 0 0 0 0.19cqmin var(--void);
   pointer-events: none;
 }
 

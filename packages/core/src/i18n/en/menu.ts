@@ -2,7 +2,7 @@
 export const messages: Record<string, string> = {
   // app/src/frontend.ts
   'Choisir une table': 'Choose a table',
-  'Flippers ({left} / {right}) ou flèches': 'Flippers ({left} / {right}) or arrow keys',
+  'Précédent / Suivant ({left} / {right}) ou flèches': 'Previous / Next ({left} / {right}) or arrow keys',
   'Fiche de la table (Jouer, Modifier…)': 'Game page (Play, Edit…)',
   'Afficher les commandes': 'Show controls',
   'Réglages de VPX': 'VPX settings',
@@ -33,6 +33,10 @@ export const messages: Record<string, string> = {
   'Boutons de la borne à refaire': 'Cabinet buttons need redoing',
   'Les touches par défaut des encodeurs servent en attendant.': 'Encoder default keys are used in the meantime.',
   'Start : refaire l’étape « Boutons » · Exit : menu': 'Start: redo the “Buttons” step · Exit: menu',
+  'Boutons de l’interface à refaire': 'Interface buttons need redoing',
+  'Les flippers, Start et Exit du jeu servent en attendant.': 'The game flippers, Start and Exit are used in the meantime.',
+  'Start : refaire l’étape « Boutons de l’interface » · Exit : menu': 'Start: redo the “Interface buttons” step · Exit: menu',
+  'Interface : précédent, suivant, valider, retour sur les flippers, Start et Exit.': 'Interface: previous, next, confirm, back on the flippers, Start and Exit.',
   "VPX n'est pas installé": 'VPX is not installed',
   'Cyber Pinball a besoin de Visual Pinball X pour jouer. Son archive est déjà sur la borne : l’installation se passe de connexion.':
     'Cyber Pinball needs Visual Pinball X to play. Its archive is already on the cabinet: no internet needed to install.',

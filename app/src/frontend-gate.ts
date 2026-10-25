@@ -69,7 +69,7 @@ export function otherFrontendsGate(): Promise<Gate> {
   const open = unacceptedFrontends();
   if (!open.length) return Promise.resolve({ proceed: true, close: () => undefined });
 
-  const keys = navigationKeys(loadCabinet(locations().dataDir)?.buttons);
+  const keys = navigationKeys(loadCabinet(locations().dataDir));
   const win = createWindow({
     frame: false,
     show: false,

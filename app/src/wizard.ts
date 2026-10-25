@@ -16,16 +16,25 @@ import {
   AUDIO_ROLES,
   BUTTONS,
   PREVIOUS_KEY,
-  buttonInfo,
   buttonKeys,
-  buttonProblems,
-  buttonsToTry,
-  NAVIGATION_BUTTONS,
+  defaultNavigation,
+  GAME_KEYS,
+  INTERFACE_KEYS,
+  keyProblems,
+  keysToTry,
+  MAIN_GAME_BUTTONS,
+  navigationButtons,
+  recordKey,
+  withoutButtonKeys,
   IniDocument,
   keyLabel,
   loadOwnedMemory,
   navigationKeys,
-  refusedKey,
+  type ButtonsSource,
+  type KeySet,
+  type NavigationButtons,
+  type NavigationId,
+  type SetKeys,
   vpxInputSettings,
   readJsonFile,
   zoneFindings,
@@ -50,7 +59,6 @@ import {
   FULL_ZONE,
   type AncillaryRoleId,
   type ScreenZone,
-  type ButtonId,
   type CabinetButtons,
   audioScreen,
   channelsLabel,
@@ -115,7 +123,8 @@ import {
 } from '@cyberpinball/core';
 import { setDisplayOrientation } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
-import { createWindow, OFFSCREEN, windowRect } from './offscreen';
+import { createWindow, isShown, OFFSCREEN, windowRect } from './offscreen';
+import { keyboardFollows, keyboardIncident } from './foreground';
 import { joystickStatus, onJoystickInput, pressVirtualButton } from './joystick-input';
 import { locations, vpxProfile } from './paths';
 import { activeVpxIni, audioOutputs, syncVpxIni } from './vpx-ini';
@@ -128,13 +137,12 @@ import { otherFrontendsOnThisPc } from './frontend-gate';
 const COLORS = ['#ff3d7f', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c'];
 
 /**
- * Touches de l'assistant : celles des boutons de la borne (flippers, Start, Exit),
- * les touches par défaut des encodeurs tant qu'ils n'ont pas été relevés, plus les
- * flèches, Entrée, Échap et Retour arrière d'un clavier.
+ * Touches de l'assistant : celles des boutons de l'interface (par défaut flippers, Start,
+ * Exit du jeu, ceux des encodeurs tant qu'ils n'ont pas été relevés), plus les flèches,
+ * Entrée, Échap et Retour arrière d'un clavier.
  */
-function wizardKeys(buttons: CabinetButtons | undefined) {
-  const taken = new Set(Object.values(buttonKeys(buttons)));
-  return { ...navigationKeys(buttons, false), back: taken.has('Backspace') ? [] : ['Backspace'] };
+function wizardKeys(source: ButtonsSource) {
+  return { ...navigationKeys(source, false), back: withoutButtonKeys(['Backspace'], source) };
 }
 let KEYS = wizardKeys(undefined);
 
@@ -173,8 +181,10 @@ const SIMULATED_ORIENTATION = Boolean(process.env.CYBERPINBALL_AUTOPILOT) || OFF
 
 interface Wizard {
   phase: Phase;
-  /** Touches des boutons en vigueur : celles du modèle, puis celles relevées. Absentes : touches par défaut. */
+  /** Touches des boutons du jeu en vigueur : celles du modèle, puis celles relevées. Absentes : touches par défaut. */
   buttons?: CabinetButtons;
+  /** Boutons de l'interface en vigueur : ceux du modèle, puis relevés. Absents : flippers, Start et Exit du jeu. */
+  navigation?: NavigationButtons;
   /** Étape « Boutons » en cours. */
   capture?: ButtonCapture;
   roleIndex: number;
@@ -211,25 +221,27 @@ interface Wizard {
 }
 
 interface ButtonCapture {
-  /** Bouton demandé, indice dans BUTTONS. */
+  /** Jeu de boutons relevé : ceux du jeu (GAME_KEYS) ou de l'interface (INTERFACE_KEYS). */
+  set: KeySet;
+  /** Bouton demandé, indice dans set.items. */
   index: number;
-  keys: CabinetButtons;
+  keys: SetKeys;
   /** Boutons répondus : relevés, ou passés (pas de bouton sur la borne). */
-  answered: Set<ButtonId>;
+  answered: Set<string>;
   /** Fin du délai de 20 s ; plus de délai dès qu'un bouton a été pressé ou qu'on a cliqué. */
   deadline?: number;
   /** Dernier bouton relevé ou passé, rappelé sous la question suivante. */
   last?: string;
   /** Touche refusée et pourquoi. */
   refused?: string;
-  /** Touches qui n'ont pas à être essayées (buttonsToTry) : celles en vigueur à l'arrivée, ou celles des encodeurs choisies. */
-  reference: CabinetButtons;
+  /** Touches qui n'ont pas à être essayées (keysToTry) : celles en vigueur à l'arrivée, ou celles par défaut choisies. */
+  reference: SetKeys;
   /**
    * Récapitulatif : choix aux flippers (une action de SUMMARY_ACTIONS, puis un bouton
-   * de BUTTONS à refaire), boutons de navigation essayés, message.
+   * du jeu relevé à refaire), boutons essayés, message.
    */
   action: number;
-  tried: Set<ButtonId>;
+  tried: Set<string>;
   notice?: string;
 }
 
@@ -277,8 +289,10 @@ let quitCountdown: NodeJS.Timeout | undefined;
 /** Étape refaite seule (--boutons, --son…) : le modèle existe, le reste est gardé. */
 let only: WizardStep | undefined;
 const isOnly = (id: WizardStepId) => only?.id === id;
-/** Mode --boutons : le modèle existe, seule l'étape « Boutons » est refaite. */
+/** Mode --boutons : le modèle existe, seule l'étape « Boutons du jeu » est refaite. */
 let buttonsOnly = false;
+/** Mode --interface : le modèle existe, seule l'étape « Boutons de l'interface » est refaite. */
+let interfaceOnly = false;
 /** Mode --disposition : le modèle existe, seules les zones sont refaites. */
 let arrangeOnly = false;
 
@@ -321,6 +335,7 @@ export function startWizard(): void {
   // Sans modèle enregistré, il n'y a rien à garder : l'assistant complet.
   only = previous ? STEP_ARGUMENT : undefined;
   buttonsOnly = isOnly('boutons');
+  interfaceOnly = isOnly('interface');
   arrangeOnly = isOnly('disposition');
   startMode();
 
@@ -350,18 +365,35 @@ export function startWizard(): void {
     // Boutons d'un joystick (Pinscape…) : relevés et suivis comme des touches. Sans opérateur,
     // un joystick virtuel de SDL appuie (autopilote « Joy<n> »).
     onJoystickInput(win, (input) => void handleKey(input));
-    // Une touche relâchée hors de la fenêtre n'arrive jamais : elle n'est plus tenue pour maintenue.
-    win.on('blur', () => releaseKeys());
+    // Une touche relâchée hors de l'assistant n'arrive jamais : elle n'est plus tenue pour
+    // maintenue. Le focus qui passe d'un de ses écrans à l'autre garde les touches enfoncées,
+    // dont le relâchement arrive à l'autre fenêtre : sinon, la touche n'est jamais relevée.
+    win.on('blur', () => setImmediate(() => windows.some((w) => !w.isDestroyed() && w.isFocused()) || releaseKeys()));
     win.loadFile(path.join(__dirname, '..', 'renderer', 'screen.html'));
-    win.once('ready-to-show', () => win.show());
+    win.once('ready-to-show', () => {
+      win.show();
+      if (windows.every((w) => w.isDestroyed() || isShown(w))) takeKeyboard();
+    });
     return win;
   });
-  windows[displays.findIndex((d) => d.primary)]?.focus();
   // Une rotation change la géométrie des écrans : chaque fenêtre reprend le sien.
   screen.on('display-metrics-changed', () => placeWindows());
 
   const autopilot = process.env.CYBERPINBALL_AUTOPILOT;
   if (autopilot) void runAutopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE);
+}
+
+/**
+ * Toutes les fenêtres affichées : l'écran principal prend le clavier. Relancé par le menu, le
+ * processus de l'assistant peut se voir refuser le premier plan par Windows, ses fenêtres
+ * restant actives pour Electron : les boutons du joystick y arriveraient, pas les touches du
+ * clavier (foreground.ts).
+ */
+function takeKeyboard(): void {
+  const main = windows[displays.findIndex((d) => d.primary)] ?? windows[0];
+  if (!main || main.isDestroyed()) return;
+  main.focus();
+  keyboardFollows(main, 'l’assistant s’ouvrait'); // i18n-ignore : console
 }
 
 /**
@@ -540,8 +572,8 @@ function handleKeyUp(input: Input): boolean {
   if (held?.code === input.code) stopHold();
   if (!pressed.delete(input.code)) return false;
   if (busy || wizard.quit || wizard.leaving || !CAPTURE_PHASES.includes(wizard.phase)) return true;
-  if (wizard.phase === 'buttons') handleButtonKey(input);
-  else handleButtonsSummaryKey(input);
+  if (isSummaryPhase(wizard.phase)) handleButtonsSummaryKey(input);
+  else handleButtonKey(input);
   broadcast();
   return true;
 }
@@ -556,14 +588,16 @@ function handleKeyUp(input: Input): boolean {
 // encore : oui ; sans réponse, l'assistant reprend. Rien n'est écrit : ni le modèle,
 // ni VPinballX.ini ; une orientation d'écran non confirmée est remise.
 
-/** Touches Exit connues : celles de l'assistant, et celle déjà relevée pendant le relevé. */
+/** Touches Exit connues : celles de l'assistant, et Exit (ou Retour) déjà relevé pendant le relevé. */
 function exitKeys(): string[] {
-  const recorded = wizard.capture?.keys.exit;
+  const capture = wizard.capture;
+  const recorded = capture?.keys[capture.set.move.exit];
   return [...KEYS.exit, ...(recorded ? [recorded] : [])];
 }
 
 function confirmKeys(): string[] {
-  const recorded = wizard.capture?.keys.start;
+  const capture = wizard.capture;
+  const recorded = capture?.keys[capture.set.move.confirm];
   return [...KEYS.confirm, ...(recorded ? [recorded] : [])];
 }
 
@@ -662,8 +696,11 @@ function leaveWithoutSaving(): boolean {
 function draftCabinet(): Partial<Cabinet> {
   const draft: Partial<Cabinet> = { screens: displays.map(toPhysicalScreen) };
   const capture = wizard.capture;
-  const keys = capture?.answered.size ? { ...buttonKeys(wizard.buttons), ...capture.keys } : wizard.buttons;
+  const captured = (set: KeySet) => capture?.set === set && capture.answered.size > 0;
+  const keys = captured(GAME_KEYS) ? ({ ...buttonKeys(wizard.buttons), ...capture!.keys } as CabinetButtons) : wizard.buttons;
   if (keys && keys !== previous?.buttons) draft.buttons = keys;
+  const navigation = captured(INTERFACE_KEYS) ? ({ ...navigationButtons(inForce()), ...capture!.keys } as NavigationButtons) : wizard.navigation;
+  if (navigation && navigation !== previous?.navigation) draft.navigation = navigation;
   if (arrangeOnly) {
     const arranged = arrangeCabinet();
     draft.roles = arranged.roles;
@@ -724,19 +761,24 @@ function quitView() {
 }
 
 // ---------------------------------------------------------------------------
-// Étape « Boutons »
+// Étapes « Boutons du jeu » et « Boutons de l'interface »
 //
-// Dès qu'il y a des touches en vigueur (modèle enregistré, ou --boutons), l'étape
-// s'ouvre sur le récapitulatif : chaque bouton avec sa touche, et un bouton se refait
-// seul (clic sur sa ligne, ou flippers puis Start). Sur une nouvelle borne, relevé
-// bouton par bouton, la touche en vigueur rappelée en retrait. Une erreur se corrige
-// sans les boutons de la borne : clic sur une ligne, Retour arrière ou « Précédent »,
-// « Touches par défaut » et « Tout relever ». Au récapitulatif, les flippers, Start et
-// Exit dont la touche vient d'être relevée doivent avoir été essayés avant de valider
-// (buttonsToTry) : un mauvais relevé ne peut pas être enregistré sans que le joueur
-// s'en aperçoive ; les touches gardées ou celles des encodeurs n'ont pas à l'être.
+// Deux jeux de boutons, relevés chacun de son côté par le même écran (KeySet, core) : ceux
+// du jeu (GAME_KEYS, ce que VPX reçoit en partie, [Input]) puis, dans l'assistant complet,
+// ceux de l'interface (INTERFACE_KEYS, ce qui pilote Cyber Pinball), proposés sur les mêmes
+// boutons que flippers, Start et Exit. Dès qu'il y a des touches en vigueur (modèle
+// enregistré, étape seule, ou l'interface après le jeu), l'étape s'ouvre sur le
+// récapitulatif : chaque bouton avec sa touche, et un bouton se refait seul (clic sur sa
+// ligne, ou précédent / suivant puis valider). Sur une nouvelle borne, relevé bouton par
+// bouton, la touche en vigueur rappelée en retrait. Une erreur se corrige sans les boutons
+// de la borne : clic sur une ligne, Retour arrière ou « Précédent », « Touches par défaut »
+// et « Tout relever ». Au récapitulatif, les boutons à essayer du jeu relevé (flippers,
+// Start, Exit ; précédent, suivant, valider, retour) dont la touche vient d'être relevée
+// doivent avoir été pressés avant de valider (keysToTry) : un mauvais relevé ne peut pas
+// être enregistré sans que le joueur s'en aperçoive ; les touches gardées ou celles par
+// défaut n'ont pas à l'être.
 
-/** Actions du récapitulatif, choisies aux flippers ou à la souris. */
+/** Actions du récapitulatif, choisies aux boutons ou à la souris. */
 const SUMMARY_ACTIONS = ['save', 'previous', 'defaults', 'restart'] as const;
 type ButtonsAction = (typeof SUMMARY_ACTIONS)[number];
 
@@ -744,37 +786,61 @@ type ButtonsAction = (typeof SUMMARY_ACTIONS)[number];
 const DEFAULTS_LAST = 'defaults';
 
 /** Dernier bouton relevé ou passé, en clair. */
-const lastLabel = (last: string) => (last === DEFAULTS_LAST ? t('touches par défaut des encodeurs') : last);
+const lastLabel = (set: KeySet, last: string) =>
+  last !== DEFAULTS_LAST ? last : set === GAME_KEYS ? t('touches par défaut des encodeurs') : t('mêmes boutons que flippers, Start et Exit du jeu');
 
+/** Phase du relevé d'un jeu de boutons, et de son récapitulatif. */
+const capturePhase = (set: KeySet): Phase => (set === GAME_KEYS ? 'buttons' : 'navigation');
+const summaryPhase = (set: KeySet): Phase => (set === GAME_KEYS ? 'buttonsSummary' : 'navigationSummary');
+const isSummaryPhase = (phase: Phase) => phase === 'buttonsSummary' || phase === 'navigationSummary';
+
+/** Les deux jeux de boutons en vigueur : ceux du modèle, puis ceux relevés et validés. */
+const inForce = (): ButtonsSource => ({ buttons: wizard.buttons, navigation: wizard.navigation });
+
+/** Touches en vigueur d'un jeu de boutons : du jeu (celles des encodeurs sans relevé), ou de l'interface (déduites du jeu sans relevé). */
+function inForceKeys(set: KeySet): SetKeys {
+  return set === GAME_KEYS ? buttonKeys(wizard.buttons) : navigationButtons(inForce());
+}
 
 /** Ce que la souris envoie depuis screen.js. */
 type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; action: ButtonsAction } | { type: 'quit'; op: 'ask' | 'yes' | 'no' } | ArrangeAction;
 
-/**
- * Arrivée sur l'étape : le récapitulatif des touches en vigueur s'il y en a (ou en
- * --boutons, où ce sont au pire celles des encodeurs), sinon le relevé du premier
- * bouton. Délai de 20 s, sauf en --boutons où l'on est venu exprès. « Tout relever » :
- * relevé complet, rien de gardé.
- */
+/** Arrivée sur l'étape « Boutons du jeu » (startCapture). */
 function startButtons(initial = false): void {
-  const keep = initial && (wizard.buttons !== undefined || buttonsOnly);
-  const keys = keep ? buttonKeys(wizard.buttons) : {};
-  const timed = initial && !(keep && buttonsOnly);
-  wizard.phase = keep ? 'buttonsSummary' : 'buttons';
+  startCapture(GAME_KEYS, initial);
+}
+
+/**
+ * Arrivée sur le relevé d'un jeu de boutons : le récapitulatif des touches en vigueur s'il
+ * y en a (ou à l'étape seule, où ce sont au pire celles par défaut ; toujours pour
+ * l'interface, proposée sur les boutons du jeu), sinon le relevé du premier bouton. Délai
+ * de 20 s pour les boutons du jeu de l'assistant complet, pas à l'étape seule où l'on est
+ * venu exprès. « Tout relever » : relevé complet, rien de gardé.
+ */
+function startCapture(set: KeySet, initial = false): void {
+  const game = set === GAME_KEYS;
+  const stepOnly = only?.id === (game ? 'boutons' : 'interface');
+  const keep = initial && ((game ? wizard.buttons : wizard.navigation) !== undefined || stepOnly || !game);
+  const keys = keep ? inForceKeys(set) : {};
+  const timed = initial && game && !(keep && stepOnly);
+  wizard.phase = keep ? summaryPhase(set) : capturePhase(set);
   wizard.capture = {
+    set,
     index: 0,
     keys,
-    answered: new Set(keep ? BUTTONS.map((b) => b.id) : []),
+    answered: new Set(keep ? set.items.map((b) => b.id) : []),
     reference: { ...keys },
     action: 0,
     tried: new Set(),
+    // Interface jamais relevée : proposée sur les flippers, Start et Exit du jeu, et dite comme telle.
+    ...(keep && !game && !wizard.navigation && { last: DEFAULTS_LAST }),
     ...(timed && { deadline: Date.now() + BUTTONS_TIMEOUT_MS }),
   };
   stopButtonsCountdown();
   if (!timed) return;
   buttonsCountdown = setInterval(() => {
     const deadline = wizard.capture?.deadline;
-    if ((wizard.phase !== 'buttons' && wizard.phase !== 'buttonsSummary') || deadline === undefined) stopButtonsCountdown();
+    if (!CAPTURE_PHASES.includes(wizard.phase) || deadline === undefined) stopButtonsCountdown();
     else if (Date.now() >= deadline) buttonsTimeout();
     else broadcast();
   }, 1000);
@@ -794,10 +860,9 @@ function touched(capture: ButtonCapture): void {
 }
 
 /**
- * Le bouton demandé envoie cette touche. Refusée si un autre bouton l'a déjà ou si
- * VPX ne sait pas la lire ; Exit, une fois relevé, passe un bouton facultatif ;
- * Retour arrière revient au bouton précédent, ou au récapitulatif si l'on refaisait
- * un seul bouton.
+ * Le bouton demandé envoie cette touche, du clavier ou du joystick (recordKey, core).
+ * Retour arrière revient au bouton précédent, ou au récapitulatif si l'on refaisait un
+ * seul bouton.
  */
 function handleButtonKey(input: Input): void {
   const capture = wizard.capture!;
@@ -805,86 +870,82 @@ function handleButtonKey(input: Input): void {
   touched(capture);
   const code = input.code;
   if (code === PREVIOUS_KEY) return previousButton();
-  const button = BUTTONS[capture.index]!;
-  if (!button.required && code === capture.keys.exit) {
-    delete capture.keys[button.id];
-    capture.last = t('{button} : pas de bouton', { button: button.label });
-  } else {
-    const holder = BUTTONS.find((b) => b.id !== button.id && capture.keys[b.id] === code);
-    capture.refused = holder
-      ? t('{key} est déjà la touche du bouton {button} : appuyez sur un autre bouton, ou cliquez sur {button} pour le refaire.', { key: keyLabel(code), button: holder.label })
-      : refusedKey(code);
-    if (capture.refused) return;
-    // Une autre touche : l'essai de ce bouton est à refaire.
-    if (capture.keys[button.id] !== code) capture.tried.delete(button.id);
-    capture.keys[button.id] = code;
-    capture.last = t('{button} : {key}', { button: button.label, key: keyLabel(code) });
-  }
+  const button = capture.set.items[capture.index]!;
+  const record = recordKey(capture.set, capture.keys, button.id, code);
+  capture.refused = record.refused;
+  if (record.refused) return;
+  // Une autre touche : l'essai de ce bouton est à refaire.
+  if (capture.keys[button.id] !== record.keys[button.id]) capture.tried.delete(button.id);
+  capture.keys = record.keys;
+  capture.last = record.skipped ? t('{button} : pas de bouton', { button: button.label }) : t('{button} : {key}', { button: button.label, key: keyLabel(code) });
   capture.answered.add(button.id);
   nextButton(capture);
 }
 
 /** Bouton suivant sans réponse (après celui-ci, puis depuis le début) ; tous répondus : récapitulatif. */
 function nextButton(capture: ButtonCapture): void {
-  const order = [...BUTTONS.keys()].map((i) => (capture.index + 1 + i) % BUTTONS.length);
-  const next = order.find((i) => !capture.answered.has(BUTTONS[i]!.id));
+  const items = capture.set.items;
+  const order = [...items.keys()].map((i) => (capture.index + 1 + i) % items.length);
+  const next = order.find((i) => !capture.answered.has(items[i]!.id));
   if (next === undefined) enterButtonsSummary(capture);
   else capture.index = next;
 }
 
 /** Récapitulatif, curseur sur « Valider » ; les essais des touches inchangées restent acquis. */
 function enterButtonsSummary(capture: ButtonCapture): void {
-  wizard.phase = 'buttonsSummary';
+  wizard.phase = summaryPhase(capture.set);
   capture.action = 0;
 }
 
 /** Tous les boutons ont leur réponse : on refait un seul bouton, depuis le récapitulatif. */
 function redoingOne(capture: ButtonCapture): boolean {
-  return BUTTONS.every((b) => capture.answered.has(b.id));
+  return capture.set.items.every((b) => capture.answered.has(b.id));
 }
 
 /** Refaire ce bouton seul : les autres gardent leur touche, puis retour au récapitulatif. */
 function redoButton(capture: ButtonCapture, index: number): void {
-  if (!BUTTONS[index]) return;
+  if (!capture.set.items[index]) return;
   capture.index = index;
-  wizard.phase = 'buttons';
+  wizard.phase = capturePhase(capture.set);
 }
 
 /** Retour arrière ou « Précédent » : le bouton d'avant ; depuis le récapitulatif, le dernier. */
 function previousButton(): void {
   const capture = wizard.capture!;
-  if (wizard.phase === 'buttons' && redoingOne(capture)) return enterButtonsSummary(capture);
-  if (wizard.phase === 'buttonsSummary') capture.index = BUTTONS.length - 1;
+  const summary = isSummaryPhase(wizard.phase);
+  if (!summary && redoingOne(capture)) return enterButtonsSummary(capture);
+  if (summary) capture.index = capture.set.items.length - 1;
   else capture.index = Math.max(0, capture.index - 1);
-  wizard.phase = 'buttons';
+  wizard.phase = capturePhase(capture.set);
 }
 
 /**
- * Récapitulatif : chaque bouton de navigation relevé est essayé. Les flippers
- * choisissent une action ou un bouton à refaire, Start lance ce choix, Exit est
- * seulement essayé. Les flèches et Entrée d'un clavier choisissent et lancent aussi,
- * sans compter comme essai.
+ * Récapitulatif : chaque bouton à essayer du jeu relevé est essayé. Ses boutons précédent
+ * et suivant (flippers du jeu) choisissent une action ou un bouton à refaire, valider (Start)
+ * lance ce choix, retour (Exit) est seulement essayé. Les touches de l'interface en vigueur,
+ * les flèches et Entrée d'un clavier choisissent et lancent aussi, sans compter comme essai.
  */
 function handleButtonsSummaryKey(input: Input): void {
   const capture = wizard.capture!;
   if (input.isAutoRepeat) return;
   touched(capture);
   const code = input.code;
-  const keys = capture.keys;
-  const choices = SUMMARY_ACTIONS.length + BUTTONS.length;
+  const { keys, set } = capture;
+  const choices = SUMMARY_ACTIONS.length + set.items.length;
   const move = (step: number) => (capture.action = (capture.action + step + choices) % choices);
   const run = () =>
     capture.action < SUMMARY_ACTIONS.length ? runButtonsAction(SUMMARY_ACTIONS[capture.action]!) : redoButton(capture, capture.action - SUMMARY_ACTIONS.length);
-  const button = NAVIGATION_BUTTONS.find((id) => keys[id] === code);
-  if (button) capture.tried.add(button);
-  if (button === 'leftFlipper') move(-1);
-  else if (button === 'rightFlipper') move(1);
-  else if (button === 'start') run();
-  else if (button === 'exit') return;
+  const tried = set.tried.find((id) => keys[id] === code);
+  if (tried) capture.tried.add(tried);
+  const own = (role: keyof KeySet['move']) => keys[set.move[role]] === code;
+  if (own('previous')) move(-1);
+  else if (own('next')) move(1);
+  else if (own('confirm')) run();
+  else if (own('exit')) return;
   else if (code === PREVIOUS_KEY) previousButton();
-  else if (code === 'ArrowLeft' || code === 'ArrowUp') move(-1);
-  else if (code === 'ArrowRight' || code === 'ArrowDown') move(1);
-  else if (code === 'Enter' || code === 'NumpadEnter') run();
+  else if (code === 'ArrowLeft' || code === 'ArrowUp' || KEYS.previous.includes(code)) move(-1);
+  else if (code === 'ArrowRight' || code === 'ArrowDown' || KEYS.next.includes(code)) move(1);
+  else if (KEYS.confirm.includes(code)) run();
 }
 
 /** Clic dans l'étape (screen.js) : refaire un bouton, ou une action. */
@@ -906,7 +967,7 @@ function handleWizardAction(action: WizardAction): void {
     return;
   }
   const capture = wizard.capture;
-  if (!capture || (wizard.phase !== 'buttons' && wizard.phase !== 'buttonsSummary')) return;
+  if (!capture || !CAPTURE_PHASES.includes(wizard.phase)) return;
   touched(capture);
   if (action.type === 'button') redoButton(capture, action.index);
   else runButtonsAction(action.action);
@@ -915,28 +976,31 @@ function handleWizardAction(action: WizardAction): void {
 
 function runButtonsAction(action: ButtonsAction): void {
   const capture = wizard.capture!;
+  const set = capture.set;
   switch (action) {
     case 'previous':
       return previousButton();
     case 'restart':
-      return startButtons();
+      return startCapture(set);
     case 'defaults':
-      // Les touches des encodeurs : connues, elles s'enregistrent sans essai.
-      capture.keys = buttonKeys(undefined);
+      // Les touches des encodeurs, ou pour l'interface les flippers, Start et Exit du jeu : connues, elles s'enregistrent sans essai.
+      capture.keys = set === GAME_KEYS ? buttonKeys(undefined) : defaultNavigation(wizard.buttons);
       capture.reference = { ...capture.keys };
-      capture.answered = new Set(BUTTONS.map((b) => b.id));
+      capture.answered = new Set(set.items.map((b) => b.id));
       capture.last = DEFAULTS_LAST;
       return enterButtonsSummary(capture);
     case 'save': {
-      if (wizard.phase !== 'buttonsSummary') return;
-      const problems = buttonProblems(capture.keys);
-      const untried = buttonsToTry(capture.keys, capture.reference).filter((id) => !capture.tried.has(id));
+      if (!isSummaryPhase(wizard.phase)) return;
+      const problems = keyProblems(set, capture.keys);
+      const untried = keysToTry(set, capture.keys, capture.reference).filter((id) => !capture.tried.has(id));
       if (problems.length) capture.notice = t('Impossible de valider : {problems}.', { problems: problems.join(' ; ') });
-      else if (untried.length) capture.notice = t('Essayez d’abord sur la borne : {buttons}.', { buttons: untried.map((id) => buttonInfo(id).label).join(', ') });
+      else if (untried.length) capture.notice = t('Essayez d’abord sur la borne : {buttons}.', { buttons: untried.map((id) => itemLabel(set, id)).join(', ') });
       else acceptButtons();
     }
   }
 }
+
+const itemLabel = (set: KeySet, id: string) => set.items.find((b) => b.id === id)!.label;
 
 /** Personne n'a touché à rien : les touches actuelles restent (celles des encodeurs sur une nouvelle borne). */
 function buttonsTimeout(): void {
@@ -953,19 +1017,25 @@ function buttonsTimeout(): void {
   broadcast();
 }
 
-/** Valider au récapitulatif : ces touches pilotent la suite de l'assistant. */
+/**
+ * Valider au récapitulatif. Les boutons de l'interface pilotent aussitôt la suite de
+ * l'assistant ; après ceux du jeu, l'assistant complet propose ceux de l'interface.
+ */
 function acceptButtons(): void {
-  wizard.buttons = { ...wizard.capture!.keys };
-  KEYS = wizardKeys(wizard.buttons);
+  const capture = wizard.capture!;
+  if (capture.set === GAME_KEYS) wizard.buttons = { ...capture.keys } as CabinetButtons;
+  else wizard.navigation = { ...capture.keys } as NavigationButtons;
+  KEYS = wizardKeys(inForce());
   wizard.capture = undefined;
-  if (buttonsOnly) saveStep();
+  if (only) saveStep();
+  else if (capture.set === GAME_KEYS) startCapture(INTERFACE_KEYS, true);
   else wizard.phase = 'assign';
 }
 
 /**
  * Étape refaite seule : le modèle garde tout le reste (stepCabinet, core), et
  * VPinballX.ini ne reprend la main que sur les clés de l'étape ; les autres clés
- * changées à la main restent en attente.
+ * changées à la main restent en attente. Les boutons de l'interface n'ont aucune clé.
  */
 function saveStep(): void {
   const step = only!;
@@ -974,9 +1044,13 @@ function saveStep(): void {
   const cabinet = stepCabinet(previous!, stepBuilt(), step, extra);
   saveCabinet(loc.dataDir, cabinet);
   previous = cabinet;
+  wizard.phase = 'done';
+  if (interfaceOnly) {
+    wizard.result = { lines: [t('VPinballX.ini inchangé : VPX ne lit pas les boutons de l’interface.')], findings: [], iniPath: cabinet.vpx.iniPath };
+    return;
+  }
   // Seulement les clés de l'étape, reprises en main même changées à la main ; les autres restent telles quelles.
   const { plan, report } = syncVpxIni(loc.dataDir, cabinet.vpx.iniPath, cabinet, displays, profile, step.owns, cabinet.audio ? audio : undefined, step.owns);
-  wizard.phase = 'done';
   wizard.result = {
     lines: summarizeChanges(plan.changes, buttonsOnly),
     findings: [
@@ -1004,7 +1078,9 @@ function isSilencedFinding(f: SyncFinding, silenced: readonly { label: string }[
  * emplacement (celui du bac à sable avec CYBERPINBALL_HOME).
  */
 function stepBuilt(): Cabinet {
-  if (buttonsOnly) return { ...previous!, buttons: wizard.buttons, vpx: { iniPath: activeVpxIni(loc) }, updatedAt: new Date().toISOString() };
+  const stamp = { vpx: { iniPath: activeVpxIni(loc) }, updatedAt: new Date().toISOString() };
+  if (buttonsOnly) return { ...previous!, buttons: wizard.buttons, ...stamp };
+  if (interfaceOnly) return { ...previous!, navigation: wizard.navigation, ...stamp };
   if (arrangeOnly) return arrangeCabinet();
   return buildCabinet();
 }
@@ -1016,22 +1092,25 @@ function silencedPreview(keys: CabinetButtons): string[] {
   return plan.silenced.map((s) => `${s.label} (${keyLabel(keys[s.button])})`);
 }
 
-/** Ligne des boutons dans le récapitulatif de l'assistant complet. */
-function buttonsSummary(): string {
+/** Lignes des boutons dans le récapitulatif de l'assistant complet : le jeu, puis l'interface. */
+function buttonsSummary(): string[] {
   const keys = buttonKeys(wizard.buttons);
-  const main = NAVIGATION_BUTTONS.map((id) => keyLabel(keys[id])).join(', ');
+  const main = MAIN_GAME_BUTTONS.map((id) => keyLabel(keys[id])).join(', ');
   const optional = BUTTONS.filter((b) => !b.required && keys[b.id]).length;
-  return wizard.buttons
-    ? tn(optional, 'Boutons relevés : flippers, Start, Exit sur {main} ; {n} bouton facultatif', 'Boutons relevés : flippers, Start, Exit sur {main} ; {n} boutons facultatifs', { main })
-    : t('Boutons : touches par défaut des encodeurs ({main}…), [Input] de VPX inchangé', { main });
+  const nav = navigationButtons(inForce());
+  return [
+    wizard.buttons
+      ? tn(optional, 'Boutons relevés : flippers, Start, Exit sur {main} ; {n} bouton facultatif', 'Boutons relevés : flippers, Start, Exit sur {main} ; {n} boutons facultatifs', { main })
+      : t('Boutons : touches par défaut des encodeurs ({main}…), [Input] de VPX inchangé', { main }),
+    t('Interface : précédent, suivant, valider, retour sur {keys}', { keys: INTERFACE_KEYS.tried.map((id) => keyLabel(nav[id as NavigationId])).join(', ') }),
+  ];
 }
 
 /** Lignes « bouton : touche » de l'écran final ; les boutons absents de la borne sur une seule ligne. */
-function buttonLines(keys: CabinetButtons | undefined): string[] {
-  const all = buttonKeys(keys);
-  const missing = BUTTONS.filter((b) => !all[b.id]).map((b) => b.label);
+function buttonLines(set: KeySet, all: SetKeys): string[] {
+  const missing = set.items.filter((b) => !all[b.id]).map((b) => b.label);
   return [
-    ...BUTTONS.filter((b) => all[b.id]).map((b) => t('{button} : {key}', { button: b.label, key: keyLabel(all[b.id]) })),
+    ...set.items.filter((b) => all[b.id]).map((b) => t('{button} : {key}', { button: b.label, key: keyLabel(all[b.id]) })),
     ...(missing.length ? [t('Pas de bouton : {buttons}', { buttons: missing.join(', ') })] : []),
   ];
 }
@@ -1050,21 +1129,23 @@ const ACTION_LABELS: Record<ButtonsAction, string> = {
 };
 
 /**
- * Étape « Boutons » : même écran partout, on ne sait pas encore lequel le joueur
- * regarde. La liste de tous les boutons et les actions sont cliquables.
+ * Relevé d'un jeu de boutons : même écran partout, on ne sait pas encore lequel le joueur
+ * regarde. La liste de tous les boutons du jeu relevé et les actions sont cliquables.
  */
 function buttonsView(index: number, base: Record<string, unknown>) {
   const capture = wizard.capture!;
-  const summary = wizard.phase === 'buttonsSummary';
+  const set = capture.set;
+  const game = set === GAME_KEYS;
+  const summary = isSummaryPhase(wizard.phase);
   const rotation = index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0;
   // Pas encore relevé : la touche en vigueur, en retrait.
-  const inForce = buttonKeys(wizard.buttons);
-  const list = BUTTONS.map((b, i) => {
+  const inForceSet = inForceKeys(set);
+  const list = set.items.map((b, i) => {
     const code = capture.keys[b.id];
     const answered = capture.answered.has(b.id);
     return {
       label: b.label,
-      key: code ? keyLabel(code) : answered ? t('pas de bouton') : inForce[b.id] ? keyLabel(inForce[b.id]) : b.required ? '' : t('facultatif'),
+      key: code ? keyLabel(code) : answered ? t('pas de bouton') : inForceSet[b.id] ? keyLabel(inForceSet[b.id]) : b.required ? '' : t('facultatif'),
       state: !summary && i === capture.index ? 'current' : answered ? 'done' : 'todo',
       selected: summary && capture.action === SUMMARY_ACTIONS.length + i,
       tried: summary && capture.tried.has(b.id),
@@ -1072,54 +1153,64 @@ function buttonsView(index: number, base: Record<string, unknown>) {
   });
   const actions = (summary ? SUMMARY_ACTIONS : (['previous', 'defaults', 'restart'] as const)).map((id, i) => ({
     id,
-    label: id === 'save' && buttonsOnly ? t('Enregistrer') : ACTION_LABELS[id],
+    label: id === 'save' && only ? t('Enregistrer') : ACTION_LABELS[id],
     selected: summary && i === capture.action,
   }));
   const common = { ...base, rotation, highlight: true, name: '', details: '', buttons: list, actions };
+  const keyOf = (role: keyof KeySet['move']) => keyLabel(capture.keys[set.move[role]]);
 
   if (summary) {
     const keys = capture.keys;
-    const toTry = buttonsToTry(keys, capture.reference);
-    const tried = toTry.map((id) => `${buttonInfo(id).label} ${capture.tried.has(id) ? '✓' : '○'}`).join(' · ');
-    const silenced = silencedPreview(keys);
+    const toTry = keysToTry(set, keys, capture.reference);
+    const tried = toTry.map((id) => `${itemLabel(set, id)} ${capture.tried.has(id) ? '✓' : '○'}`).join(' · ');
+    const silenced = game ? silencedPreview(keys as CabinetButtons) : [];
     const seconds = capture.deadline === undefined ? undefined : Math.max(0, Math.ceil((capture.deadline - Date.now()) / 1000));
+    const choose = { left: keyOf('previous'), right: keyOf('next'), start: keyOf('confirm'), exit: keyOf('exit') };
     return {
       ...common,
-      prompt: toTry.length ? t('Essayez les boutons') : t('Boutons de la borne'),
-      details: silenced.length ? t('Perdent leur touche dans VPX : {actions}', { actions: silenced.join(', ') }) : t('Les autres touches de VPX ne changent pas.'),
-      notice: capture.notice ?? (buttonProblems(keys).join(' ; ') || (seconds === undefined ? undefined : t('Sans réponse dans {n} s : touches actuelles gardées.', { n: seconds }))),
+      prompt: toTry.length ? t('Essayez les boutons') : game ? t('Boutons du jeu') : t('Boutons de l’interface'),
+      details: !game
+        ? t('Touches de secours du clavier toujours actives : Tab, flèches, Entrée, Échap.')
+        : silenced.length
+          ? t('Perdent leur touche dans VPX : {actions}', { actions: silenced.join(', ') })
+          : t('Les autres touches de VPX ne changent pas.'),
+      notice: capture.notice ?? (keyProblems(set, keys).join(' ; ') || (seconds === undefined ? undefined : t('Sans réponse dans {n} s : touches actuelles gardées.', { n: seconds }))),
       step: toTry.length
         ? t('Essai des touches relevées : {buttons}', { buttons: tried })
         : t('{last} · choisissez un bouton pour lui donner une autre touche.', {
-            last: capture.last === DEFAULTS_LAST ? t('Touches par défaut des encodeurs') : capture.last ? t('Relevé : {last}', { last: lastLabel(capture.last) }) : t('Touches actuelles'),
+            last:
+              capture.last === DEFAULTS_LAST
+                ? game
+                  ? t('Touches par défaut des encodeurs')
+                  : t('Mêmes boutons que flippers, Start et Exit du jeu')
+                : capture.last
+                  ? t('Relevé : {last}', { last: lastLabel(set, capture.last) })
+                  : t('Touches actuelles'),
           }),
-      hint: toTry.includes('exit')
-        ? t('Flippers ({left} / {right}) : choisir · Start ({start}) : lancer · Exit ({exit}) : à essayer aussi · Clic ou Start sur un bouton : le refaire', {
-            left: keyLabel(keys.leftFlipper),
-            right: keyLabel(keys.rightFlipper),
-            start: keyLabel(keys.start),
-            exit: keyLabel(keys.exit),
-          })
-        : t('Flippers ({left} / {right}) : choisir · Start ({start}) : lancer · Clic ou Start sur un bouton : le refaire', {
-            left: keyLabel(keys.leftFlipper),
-            right: keyLabel(keys.rightFlipper),
-            start: keyLabel(keys.start),
-          }),
+      hint: game
+        ? toTry.includes('exit')
+          ? t('Flippers ({left} / {right}) : choisir · Start ({start}) : lancer · Exit ({exit}) : à essayer aussi · Clic ou Start sur un bouton : le refaire', choose)
+          : t('Flippers ({left} / {right}) : choisir · Start ({start}) : lancer · Clic ou Start sur un bouton : le refaire', choose)
+        : toTry.includes('back')
+          ? t('Précédent / Suivant ({left} / {right}) : choisir · Valider ({start}) : lancer · Retour ({exit}) : à essayer aussi · Clic ou Valider sur un bouton : le refaire', choose)
+          : t('Précédent / Suivant ({left} / {right}) : choisir · Valider ({start}) : lancer · Clic ou Valider sur un bouton : le refaire', choose),
     };
   }
 
-  const button = BUTTONS[capture.index]!;
-  const required = BUTTONS.filter((b) => b.required).length;
-  const current = buttonKeys(wizard.buttons)[button.id];
+  const button = set.items[capture.index]!;
+  const required = set.items.filter((b) => b.required).length;
+  const current = inForceSet[button.id];
+  const recorded = game ? wizard.buttons : wizard.navigation;
   const seconds = capture.deadline === undefined ? undefined : Math.max(0, Math.ceil((capture.deadline - Date.now()) / 1000));
+  const back = redoingOne(capture) ? t('annuler') : t('bouton précédent');
   return {
     ...common,
     prompt: t('Appuyez sur le bouton'),
     measure: button.label,
     name: button.required
       ? t('Bouton {n} sur {total}', { n: capture.index + 1, total: required })
-      : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: BUTTONS.length - required }),
-    details: [wizard.buttons ? t('Touche actuelle : {key}', { key: current ? keyLabel(current) : t('aucune') }) : t('Touche par défaut : {key}', { key: current ? keyLabel(current) : t('aucune') }), joystickLine()].join(' · '),
+      : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: set.items.length - required }),
+    details: [recorded ? t('Touche actuelle : {key}', { key: current ? keyLabel(current) : t('aucune') }) : t('Touche par défaut : {key}', { key: current ? keyLabel(current) : t('aucune') }), joystickLine()].join(' · '),
     notice:
       capture.refused ??
       (seconds === undefined
@@ -1127,13 +1218,16 @@ function buttonsView(index: number, base: Record<string, unknown>) {
         : wizard.buttons
           ? t('Sans réponse dans {n} s : touches actuelles gardées.', { n: seconds })
           : t('Sans réponse dans {n} s : touches par défaut des encodeurs gardées (Maj, 1, Échap…).', { n: seconds })),
-    step: capture.last ? t('Relevé : {last}', { last: lastLabel(capture.last) }) : t('Chaque bouton une seule fois ; la suite de l’assistant se pilote avec eux.'),
+    step: capture.last
+      ? t('Relevé : {last}', { last: lastLabel(set, capture.last) })
+      : game
+        ? t('Chaque bouton une seule fois : ce que VPX recevra pendant une partie.')
+        : t('Chaque bouton une seule fois : ce qui pilotera le menu et la suite de l’assistant.'),
     hint: button.required
-      ? t('Clic sur un bouton : le refaire · Retour arrière : {back}', { back: redoingOne(capture) ? t('annuler') : t('bouton précédent') })
-      : t('Exit ({exit}) : la borne n’a pas ce bouton · Clic sur un bouton : le refaire · Retour arrière : {back}', {
-          exit: keyLabel(capture.keys.exit),
-          back: redoingOne(capture) ? t('annuler') : t('bouton précédent'),
-        }),
+      ? t('Clic sur un bouton : le refaire · Retour arrière : {back}', { back })
+      : game
+        ? t('Exit ({exit}) : la borne n’a pas ce bouton · Clic sur un bouton : le refaire · Retour arrière : {back}', { exit: keyOf('exit'), back })
+        : t('Retour ({exit}) : pas de bouton pour ce rôle · Clic sur un bouton : le refaire · Retour arrière : {back}', { exit: keyOf('exit'), back }),
   };
 }
 
@@ -1144,7 +1238,10 @@ function buttonsView(index: number, base: Record<string, unknown>) {
 function joystickLine(): string {
   const status = joystickStatus();
   if (status.state === 'ready') {
-    return status.devices.length ? t('Joystick lu : {names}', { names: status.devices.map((d) => d.name || d.id).join(', ') }) : t('Aucun joystick branché');
+    const read = status.devices.length ? t('Joystick lu : {names}', { names: status.devices.map((d) => d.name || d.id).join(', ') }) : t('Aucun joystick branché');
+    // Le clavier allait ailleurs (foreground.ts) : à noter, c'est ce qui empêchait de relever ses touches.
+    const lost = keyboardIncident();
+    return lost ? `${read} · ${lost.back ? t('clavier repris à {holder}', { holder: lost.holder }) : t('clavier retenu par {holder}', { holder: lost.holder })}` : read;
   }
   if (status.state === 'error') return t('Joysticks illisibles : {error}', { error: status.error });
   if (status.state === 'no-vpx') return t('Joysticks lus une fois VPX installé');
@@ -1685,6 +1782,8 @@ function startMode(): void {
     case undefined:
     case 'boutons':
       return startButtons(true);
+    case 'interface':
+      return startCapture(INTERFACE_KEYS, true);
     case 'disposition':
       return startArrangeOnly();
     case 'ecrans':
@@ -1711,9 +1810,11 @@ function loadAssignments(): void {
 function restart(): void {
   // Les boutons relevés restent : « recommencer » ne refait que les écrans et le son.
   const buttons = wizard ? wizard.buttons : previous?.buttons;
-  KEYS = wizardKeys(buttons);
+  const navigation = wizard ? wizard.navigation : previous?.navigation;
+  KEYS = wizardKeys({ buttons, navigation });
   wizard = {
     buttons,
+    navigation,
     sound: undefined,
     phase: 'assign',
     roleIndex: 0,
@@ -1845,6 +1946,7 @@ function buildCabinet(): Cabinet {
     playfield: playfieldLayout(),
     ...(audioModel && { audio: audioModel }),
     ...(wizard.buttons && { buttons: wizard.buttons }),
+    ...(wizard.navigation && { navigation: wizard.navigation }),
     vpx: { iniPath: targetIni() },
     updatedAt: new Date().toISOString(),
   };
@@ -2101,7 +2203,7 @@ function viewFor(index: number) {
   // (une orientation remise n'a plus de compte à rebours).
   if (wizard.leaving) return { ...base, highlight: false, report: false, prompt: '', step: '', hint: '', notice: undefined };
 
-  if (wizard.phase === 'buttons' || wizard.phase === 'buttonsSummary') return buttonsView(index, base);
+  if (CAPTURE_PHASES.includes(wizard.phase)) return buttonsView(index, base);
 
   if (wizard.phase === 'orient' || wizard.phase === 'flip' || wizard.phase === 'size') {
     const isPlayfield = assignedRole === 'playfield';
@@ -2248,7 +2350,7 @@ function viewFor(index: number) {
         }),
       ]
     : [];
-  const summary = only ? stepSummary(rolesLines, playfieldLines) : [...rolesLines, ...playfieldLines, ...audioSummary(), buttonsSummary()];
+  const summary = only ? stepSummary(rolesLines, playfieldLines) : [...rolesLines, ...playfieldLines, ...audioSummary(), ...buttonsSummary()];
 
   if (wizard.phase === 'summary') {
     const owned = plan!.changes;
@@ -2267,11 +2369,11 @@ function viewFor(index: number) {
 
   if (only) {
     // Boutons seuls : l'écran que le joueur regarde n'est pas connu, le résultat s'affiche partout.
-    const previousLayout = buttonsOnly || arrangeOnly;
+    const previousLayout = buttonsOnly || interfaceOnly || arrangeOnly;
     return {
       ...base,
       ...(previousLayout && { rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0 }),
-      report: buttonsOnly || index === (wizard.assignments.playfield ?? 0),
+      report: buttonsOnly || interfaceOnly || index === (wizard.assignments.playfield ?? 0),
       name: '',
       details: '',
       title: only.saved,
@@ -2298,14 +2400,16 @@ function viewFor(index: number) {
 
 /** Colonne de gauche du récapitulatif et du résultat d'une étape seule. */
 function summaryColumn(): string {
-  return buttonsOnly ? t('Boutons') : isOnly('son') ? t('Son') : isOnly('playfield') ? 'Playfield' : t('Rôles');
+  return buttonsOnly ? t('Boutons') : interfaceOnly ? t('Interface') : isOnly('son') ? t('Son') : isOnly('playfield') ? 'Playfield' : t('Rôles');
 }
 
 /** Ce que l'étape seule a décidé, pour le récapitulatif et le résultat. */
 function stepSummary(rolesLines: string[], playfieldLines: string[]): string[] {
   switch (only!.id) {
     case 'boutons':
-      return buttonLines(wizard.buttons);
+      return buttonLines(GAME_KEYS, buttonKeys(wizard.buttons));
+    case 'interface':
+      return buttonLines(INTERFACE_KEYS, navigationButtons(inForce()));
     case 'disposition':
       return rolesLines;
     case 'ecrans':

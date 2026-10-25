@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import type { Cabinet } from './model';
 import { formatDate, formatList, t, tn } from './i18n';
 import { dmdMediaType } from './medias';
+import { romContent } from './romzip';
 import type { TableInfoFile } from './tables';
 import { matchVps, searchVps, vpsKey, type VpsDb, type VpsGame, type VpsLink, type VpsTableFile } from './vps';
 
@@ -115,6 +116,18 @@ export function playableWithoutRom(game: VpsGame): boolean {
 export type CatalogKind = 'all' | 'ss' | 'em' | 'original' | 'norom';
 export type CatalogState = 'all' | 'missing' | 'installed';
 export type CatalogSort = 'name' | 'recent';
+/**
+ * Fichiers que le jeu doit proposer (avec un lien vivant) : fronton, ROM, PuP-Pack…, une
+ * version VR, ou des médias sur VPinMediaDB (index passé à catalog()).
+ */
+export type CatalogSupport = 'any' | 'b2s' | 'rom' | 'pup' | 'altsound' | 'altcolor' | 'music' | 'topper' | 'pov' | 'vr' | 'media';
+/** Site où se télécharge la table (ou les fichiers du filtre « Fichiers ») ; « free » : sans compte. */
+export type CatalogSite = 'all' | 'vpuniverse' | 'vpforums' | 'pinballnirvana' | 'free';
+
+export const CATALOG_KINDS: readonly CatalogKind[] = ['all', 'norom', 'ss', 'em', 'original'];
+export const CATALOG_STATES: readonly CatalogState[] = ['missing', 'all', 'installed'];
+export const CATALOG_SUPPORTS: readonly CatalogSupport[] = ['any', 'b2s', 'rom', 'pup', 'altsound', 'altcolor', 'music', 'topper', 'pov', 'vr', 'media'];
+export const CATALOG_SITES: readonly CatalogSite[] = ['all', 'vpuniverse', 'vpforums', 'pinballnirvana', 'free'];
 
 export interface CatalogFilter {
   /** Titre, initiales, nom de ROM. */
@@ -123,7 +136,14 @@ export interface CatalogFilter {
   state?: CatalogState;
   vr?: boolean;
   pup?: boolean;
+  support?: CatalogSupport;
+  site?: CatalogSite;
   sort?: CatalogSort;
+}
+
+/** Ce que catalog() ne trouve pas dans la base VPS : jeux qui ont des médias sur VPinMediaDB (identifiants VPS). */
+export interface CatalogExtras {
+  media?: ReadonlySet<string>;
 }
 
 export const CATALOG_KIND_LABELS: Record<CatalogKind, string> = {
@@ -156,11 +176,107 @@ export const CATALOG_STATE_LABELS: Record<CatalogState, string> = {
   },
 };
 
+export const CATALOG_SUPPORT_LABELS: Record<CatalogSupport, string> = {
+  get any() {
+    return t('peu importe');
+  },
+  get b2s() {
+    return t('avec un fronton (.directb2s)');
+  },
+  get rom() {
+    return t('avec sa ROM');
+  },
+  get pup() {
+    return t('avec un PuP-Pack');
+  },
+  get altsound() {
+    return t('avec des sons remasterisés');
+  },
+  get altcolor() {
+    return t('avec des couleurs de DMD');
+  },
+  get music() {
+    return t('avec une musique');
+  },
+  get topper() {
+    return t('avec un topper');
+  },
+  get pov() {
+    return t('avec un point de vue (POV)');
+  },
+  get vr() {
+    return t('jouable en VR');
+  },
+  get media() {
+    return t('avec des médias sur VPinMediaDB');
+  },
+};
+
+export const CATALOG_SITE_LABELS: Record<CatalogSite, string> = {
+  get all() {
+    return t('tous les sites');
+  },
+  vpuniverse: 'vpuniverse.com',
+  vpforums: 'vpforums.org',
+  pinballnirvana: 'pinballnirvana.com',
+  get free() {
+    return t('sans compte (Google Drive, MEGA, Dropbox, GitHub…)');
+  },
+};
+
+/** Hôtes qui ne servent pas de fichier à télécharger : une vidéo, une fiche d'IPDB. */
+const NOT_A_DOWNLOAD = new Set<LinkHostId>(['youtube', 'ipdb']);
+
+/** Le lien mène-t-il au site choisi ? « free » : un site qui ne demande pas de compte. */
+export function linkOnSite(url: string, site: CatalogSite): boolean {
+  if (site === 'all') return true;
+  const host = linkHost(url);
+  if (site === 'free') return !host.account && !NOT_A_DOWNLOAD.has(host.id);
+  return host.id === site;
+}
+
+/**
+ * Fichiers d'un jeu que vise le filtre « Fichiers » : ceux du genre choisi, ou les
+ * versions VPX (tous genres, VR). Un PuP-Pack fourni avec la table compte. undefined
+ * pour les médias de VPinMediaDB, qui ne sont pas dans la base VPS.
+ */
+export function supportFiles(game: VpsGame, support: CatalogSupport): VpsTableFile[] | undefined {
+  switch (support) {
+    case 'any':
+      return vpxVersions(game);
+    case 'b2s':
+      return game.b2sFiles ?? [];
+    case 'rom':
+      return (game.romFiles ?? []).map((r) => ({ ...r, id: r.id ?? `rom:${r.version}` }) as VpsTableFile);
+    case 'pup':
+      return [...(game.pupPackFiles ?? []), ...vpxVersions(game).filter((f) => hasFeature(f, 'incl. PuP'))];
+    case 'altsound':
+      return game.altSoundFiles ?? [];
+    case 'altcolor':
+      return game.altColorFiles ?? [];
+    case 'music':
+      return game.soundFiles ?? [];
+    case 'topper':
+      return game.topperFiles ?? [];
+    case 'pov':
+      return game.povFiles ?? [];
+    case 'vr':
+      return vpxVersions(game).filter((f) => hasFeature(f, 'VR'));
+    case 'media':
+      return undefined;
+  }
+}
+
 /**
  * Jeux du catalogue : ceux qui ont au moins une version VPX, filtrés et triés. Avec un
- * texte, l'ordre est celui de la recherche (le plus ressemblant d'abord).
+ * texte, l'ordre est celui de la recherche (le plus ressemblant d'abord). Le filtre
+ * « Fichiers » demande au moins un fichier de ce genre avec un lien vivant ; le site,
+ * un tel lien sur ce site (les versions VPX quand le filtre « Fichiers » n'en vise pas).
+ * Sans index de VPinMediaDB (`extras.media`), le filtre de ses médias ne garde rien.
  */
-export function catalog(db: VpsDb, filter: CatalogFilter, installed: Set<string>): VpsGame[] {
+export function catalog(db: VpsDb, filter: CatalogFilter, installed: Set<string>, extras: CatalogExtras = {}): VpsGame[] {
+  const support = filter.support ?? 'any';
+  const site = filter.site ?? 'all';
   const keep = (g: VpsGame) => {
     if (!vpxVersions(g).length) return false;
     switch (filter.kind ?? 'all') {
@@ -181,6 +297,11 @@ export function catalog(db: VpsDb, filter: CatalogFilter, installed: Set<string>
     if (filter.state === 'missing' && installed.has(g.id)) return false;
     if (filter.vr && !vpxVersions(g).some((f) => hasFeature(f, 'VR'))) return false;
     if (filter.pup && !(g.pupPackFiles?.length || vpxVersions(g).some((f) => hasFeature(f, 'incl. PuP')))) return false;
+    if (support === 'media' && !extras.media?.has(g.id)) return false;
+    const files = supportFiles(g, support) ?? vpxVersions(g);
+    const live = files.filter((f) => liveLinks(f).length);
+    if (support !== 'any' && support !== 'media' && !live.length) return false;
+    if (site !== 'all' && !live.some((f) => liveLinks(f).some((l) => linkOnSite(l.url, site)))) return false;
     return true;
   };
   const text = filter.text?.trim();
@@ -383,6 +504,18 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
   return needs;
 }
 
+/**
+ * Installation rapide d'une version : ce qui est récupéré d'office pour jouer (l'indispensable
+ * à récupérer et le fronton conseillé, le premier fichier de chacun), et l'indispensable
+ * introuvable, qui l'empêche (une autre version, ou la fiche, ligne par ligne).
+ */
+export function quickNeeds(needs: Need[]): { get: Need[]; blocked: Need[] } {
+  return {
+    get: needs.filter((n) => n.state === 'todo' && n.files.length > 0 && (n.required || n.kind === 'b2s')),
+    blocked: needs.filter((n) => n.required && n.state === 'unavailable'),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Liste d'attente
 
@@ -410,11 +543,41 @@ export interface WaitItem {
   rom?: string;
   addedAt: string;
   state: WaitState;
-  received?: { file: string; at: string; via: 'window' | 'watch' | 'manual'; url?: string };
+  received?: ReceivedFile;
+  /** Table installée pour laquelle on le récupère (parcours « Ce qu'il manque pour jouer », journey.ts). */
+  table?: string;
+}
+
+export interface ReceivedFile {
+  file: string;
+  at: string;
+  via: 'window' | 'watch' | 'manual';
+  url?: string;
+  /** Ce que contient le fichier, reconnu à la réception (classifyContent). */
+  content?: ContentKind;
+  /** « 14 images, 9 vidéos, aucun .vpx » */
+  summary?: string;
+}
+
+/** Fichier reçu sans élément : rien n'y correspondait, il ne convenait pas, ou il a été retiré d'un élément. */
+export interface StrayFile {
+  file: string;
+  at: string;
+  via: 'window' | 'watch' | 'manual';
+  url?: string;
+  content?: ContentKind;
+  /** « 14 images, 9 vidéos, aucun .vpx » */
+  summary?: string;
+  /** Élément auquel il semblait revenir, refusé faute de convenir (confirmation demandée). */
+  expected?: string;
+  /** Élément attendu auquel il conviendrait. */
+  suggested?: string;
 }
 
 export interface WaitList {
   items: WaitItem[];
+  /** Fichiers reçus sans élément, gardés pour être rattachés plus tard. */
+  strays?: StrayFile[];
   /** Avertissement du catalogue lu et accepté (date ISO). */
   noticeAcceptedAt?: string;
   /** Surveiller le dossier Téléchargements tant que quelque chose est attendu (choix de l'utilisateur). */
@@ -441,6 +604,8 @@ export function loadWaitList(dataDir: string): WaitList {
     const items = Array.isArray(raw.items) ? raw.items.filter((i): i is WaitItem => Boolean(i) && typeof (i as WaitItem).id === 'string' && typeof (i as WaitItem).gameId === 'string') : [];
     const r = raw as WaitList;
     const list: WaitList = { items };
+    const strays = Array.isArray(r.strays) ? r.strays.filter((s): s is StrayFile => Boolean(s) && typeof s.file === 'string' && typeof s.at === 'string') : [];
+    if (strays.length) list.strays = strays;
     if (typeof r.noticeAcceptedAt === 'string') list.noticeAcceptedAt = r.noticeAcceptedAt;
     if (r.watchDownloads === true) list.watchDownloads = true;
     if (r.directDownload === true) list.directDownload = true;
@@ -458,14 +623,18 @@ export function saveWaitList(dataDir: string, list: WaitList): void {
   fs.renameSync(tmp, file);
 }
 
-/** Ajoute (ou remet en attente) le fichier d'un besoin ; renvoie l'élément. */
-export function addToWaitList(list: WaitList, game: VpsGame, need: Need, file: VpsTableFile, page: string, now = new Date()): WaitItem {
+/**
+ * Ajoute (ou remet en attente) le fichier d'un besoin ; renvoie l'élément. `table` : la
+ * table installée à qui il manque (parcours « Ce qu'il manque pour jouer »).
+ */
+export function addToWaitList(list: WaitList, game: VpsGame, need: Pick<Need, 'kind'> & Partial<Need>, file: VpsTableFile, page: string, now = new Date(), table?: string): WaitItem {
   const id = `${game.id}:${file.id}`;
   const existing = list.items.find((i) => i.id === id);
   if (existing) {
     if (existing.state === 'installed') existing.state = 'waiting';
     existing.page = page;
     existing.pageKey = pageKey(page);
+    if (table) existing.table = table;
     return existing;
   }
   const item: WaitItem = {
@@ -484,6 +653,7 @@ export function addToWaitList(list: WaitList, game: VpsGame, need: Need, file: V
     addedAt: now.toISOString(),
     state: 'waiting',
   };
+  if (table) item.table = table;
   list.items.push(item);
   return item;
 }
@@ -501,6 +671,152 @@ export interface DownloadFacts {
   urls?: string[];
   /** Nom du fichier reçu. */
   filename: string;
+  /** Ce qu'il contient (classifyContent, archive listée) ; sans lui, son extension seule. */
+  content?: ContentKind;
+}
+
+// ---------------------------------------------------------------------------
+// Ce que contient un fichier reçu
+
+/** Sorte d'un fichier reçu : celle d'un besoin, un pack de médias du frontend, ou on ne sait pas. */
+export type ContentKind = NeedKind | 'media' | 'unknown';
+
+/** « un pack de médias » : ce qu'est le fichier, en clair. */
+export const CONTENT_LABELS: Record<ContentKind, string> = {
+  get table() {
+    return t('une table');
+  },
+  get b2s() {
+    return t('un fronton (.directb2s)');
+  },
+  get rom() {
+    return t('une ROM');
+  },
+  get pup() {
+    return t('un PuP-Pack');
+  },
+  get altsound() {
+    return t('des sons remasterisés (altsound)');
+  },
+  get altcolor() {
+    return t('des couleurs de DMD (Serum, VNI)');
+  },
+  get music() {
+    return t('de la musique');
+  },
+  get topper() {
+    return t('une animation de topper');
+  },
+  get pov() {
+    return t('un point de vue (POV)');
+  },
+  get media() {
+    return t('un pack de médias');
+  },
+  get unknown() {
+    return t('un contenu non reconnu');
+  },
+};
+
+/** Ce qu'un élément attend, en clair : « un .vpx, ou une archive qui en contient un ». */
+export const EXPECTED_LABELS: Record<NeedKind, string> = {
+  get table() {
+    return t('un .vpx, ou une archive qui en contient un');
+  },
+  get b2s() {
+    return t('un .directb2s, ou une archive qui en contient un');
+  },
+  get rom() {
+    return t('une ROM : un .zip de fichiers de puces, sans dossier');
+  },
+  get pup() {
+    return t('un PuP-Pack : une archive avec des fichiers .pup');
+  },
+  get altsound() {
+    return t('une archive avec altsound.csv ou g-sound.csv');
+  },
+  get altcolor() {
+    return t('un fichier Serum (.cRZ) ou VNI (.vni, .pal, .pac)');
+  },
+  get music() {
+    return t('des fichiers audio (.mp3, .ogg, .wav)');
+  },
+  get topper() {
+    return t('une vidéo ou une image de topper');
+  },
+  get pov() {
+    return t('un fichier .pov');
+  },
+};
+
+const AUDIO = /\.(mp3|ogg|wav|flac)$/i;
+const COLORS = /\.(pac|vni|pal|crz|crom|cromc)$/i;
+const IMAGES = /\.(png|jpe?g|gif|apng|bmp|webp)$/i;
+const VIDEOS = /\.(mp4|f4v|avi|mkv|webm|mov|wmv|flv)$/i;
+const ARCHIVES = /\.(zip|7z|rar)$/i;
+
+/**
+ * Ce que contient un fichier reçu, d'après son nom et, pour une archive, la liste de ce
+ * qu'elle contient (entries ; undefined : pas une archive, ou illisible). Une table
+ * l'emporte sur ce qu'elle fournit avec elle (fronton, ROM) ; un PuP-Pack sur ses vidéos.
+ */
+export function classifyContent(name: string, entries?: string[]): ContentKind {
+  const lower = name.toLowerCase();
+  if (!ARCHIVES.test(lower) || !entries) {
+    if (lower.endsWith('.vpx')) return 'table';
+    if (lower.endsWith('.directb2s')) return 'b2s';
+    if (lower.endsWith('.pov')) return 'pov';
+    if (AUDIO.test(lower)) return 'music';
+    if (COLORS.test(lower)) return 'altcolor';
+    if (IMAGES.test(lower) || VIDEOS.test(lower)) return /topper/i.test(name) ? 'topper' : 'media';
+    return 'unknown';
+  }
+  const files = entries.map((e) => e.replace(/\\/g, '/')).filter((e) => !e.endsWith('/'));
+  const base = (e: string) => e.slice(e.lastIndexOf('/') + 1).toLowerCase();
+  const has = (test: (e: string) => boolean) => files.some((e) => test(e.toLowerCase()));
+  if (has((e) => e.endsWith('.vpx'))) return 'table';
+  if (has((e) => e.endsWith('.directb2s'))) return 'b2s';
+  if (has((e) => e.endsWith('.pup') || e.includes('pupvideos/'))) return 'pup';
+  if (files.some((e) => ['altsound.csv', 'g-sound.csv'].includes(base(e)))) return 'altsound';
+  if (has((e) => COLORS.test(e))) return 'altcolor';
+  // Une ROM : des puces, toutes dans un même dossier, quel que soit le format (romzip.ts).
+  if (romContent(entries)) return 'rom';
+  if (has((e) => e.endsWith('.pov'))) return 'pov';
+  const media = files.filter((e) => IMAGES.test(e) || VIDEOS.test(e)).length;
+  if (!media && has((e) => AUDIO.test(e))) return 'music';
+  if (media) return /topper/i.test(name) && !/media.?pack/i.test(name) ? 'topper' : 'media';
+  return 'unknown';
+}
+
+/** « 14 images, 9 vidéos, aucun .vpx » : ce que contient une archive, pour qu'on juge soi-même. */
+export function contentSummary(name: string, entries?: string[]): string | undefined {
+  if (!ARCHIVES.test(name) || !entries) return undefined;
+  const files = entries.map((e) => e.replace(/\\/g, '/')).filter((e) => !e.endsWith('/'));
+  const count = (re: RegExp) => files.filter((e) => re.test(e)).length;
+  const [vpx, b2s, pup, images, videos, sounds] = [/\.vpx$/i, /\.directb2s$/i, /\.pup$/i, IMAGES, VIDEOS, AUDIO].map(count) as [number, number, number, number, number, number];
+  const shown = [
+    vpx ? tn(vpx, '{n} .vpx', '{n} .vpx') : '',
+    b2s ? tn(b2s, '{n} .directb2s', '{n} .directb2s') : '',
+    pup ? tn(pup, '{n} fichier .pup', '{n} fichiers .pup') : '',
+    images ? tn(images, '{n} image', '{n} images') : '',
+    videos ? tn(videos, '{n} vidéo', '{n} vidéos') : '',
+    sounds ? tn(sounds, '{n} son', '{n} sons') : '',
+  ].filter(Boolean);
+  if (!shown.length) shown.push(tn(files.length, '{n} fichier', '{n} fichiers'));
+  if (!vpx) shown.push(t('aucun .vpx'));
+  return shown.join(', ');
+}
+
+/**
+ * Ce fichier convient-il à ce qu'attend l'élément ? 'unknown' quand on ne sait pas ce
+ * qu'il contient (archive illisible) : on le prend alors sans pouvoir le vérifier.
+ */
+export function contentFits(kind: NeedKind, content: ContentKind | undefined): 'yes' | 'no' | 'unknown' {
+  if (!content || content === 'unknown') return 'unknown';
+  if (content === kind) return 'yes';
+  // Un topper se distribue comme une vidéo, tout comme les médias du frontend.
+  if (kind === 'topper' && content === 'media') return 'yes';
+  return 'no';
 }
 
 /**
@@ -513,16 +829,23 @@ export function matchDownload(list: WaitList, d: DownloadFacts, vps?: VpsDb): Wa
   const waiting = list.items.filter((i) => i.state === 'waiting');
   if (!waiting.length || isPartialDownload(d.filename) || !RECEIVABLE.test(d.filename)) return undefined;
   const keys = new Set((d.urls ?? []).map(pageKey).filter((k): k is string => Boolean(k)));
+  const content = d.content ?? classifyContent(d.filename);
+  // Une fiche de forum propose parfois plusieurs fichiers (la table et son pack de médias) :
+  // la fiche traversée ne suffit pas quand le contenu dit autre chose.
   const byPage = waiting.filter((i) => i.pageKey && keys.has(i.pageKey));
-  if (byPage.length === 1) return byPage[0];
+  if (byPage.length === 1 && contentFits(byPage[0]!.kind, content) !== 'no') return byPage[0];
   const base = d.filename.replace(/\.[^.]+$/, '');
   const ext = path.extname(d.filename).toLowerCase();
-  // Zip au nom de la ROM attendue.
+  // Zip au nom de la ROM attendue (s'il contient bien une ROM, quand on l'a lu).
   const rom = waiting.find((i) => i.kind === 'rom' && i.rom && i.rom.toLowerCase() === base.toLowerCase());
-  if (rom) return rom;
-  const kinds: NeedKind[] = ext === '.vpx' ? ['table'] : ext === '.directb2s' ? ['b2s'] : ext === '.pov' ? ['pov'] : /\.(mp3|ogg|wav)$/.test(ext) ? ['music'] : /\.(pac|vni|pal|crz|cromc)$/.test(ext) ? ['altcolor'] : ['table', 'b2s', 'pup', 'altsound', 'altcolor', 'music', 'topper', 'pov'];
+  if (rom && contentFits('rom', content) !== 'no') return rom;
+  // Contenu reconnu : seuls les éléments qu'il peut remplir ; sinon d'après l'extension.
+  const kinds: NeedKind[] =
+    content !== 'unknown'
+      ? (['table', 'b2s', 'rom', 'pup', 'altsound', 'altcolor', 'music', 'topper', 'pov'] as NeedKind[]).filter((k) => contentFits(k, content) === 'yes')
+      : ext === '.vpx' ? ['table'] : ext === '.directb2s' ? ['b2s'] : ext === '.pov' ? ['pov'] : /\.(mp3|ogg|wav)$/.test(ext) ? ['music'] : /\.(pac|vni|pal|crz|cromc)$/.test(ext) ? ['altcolor'] : ['table', 'b2s', 'pup', 'altsound', 'altcolor', 'music', 'topper', 'pov'];
   const candidates = (byPage.length ? byPage : waiting).filter((i) => kinds.includes(i.kind));
-  if (candidates.length === 1 && (byPage.length || candidates[0]!.kind !== 'table' || ext === '.vpx' || ext === '.directb2s')) {
+  if (candidates.length === 1 && (byPage.length || candidates[0]!.kind !== 'table' || ext === '.vpx' || ext === '.directb2s' || content === 'table')) {
     // Un seul attendu de cette sorte : encore faut-il que le nom ne désigne pas un autre jeu.
     if (!vps) return candidates[0];
   }
@@ -535,10 +858,163 @@ export function matchDownload(list: WaitList, d: DownloadFacts, vps?: VpsDb): Wa
   return named.length === 1 ? named[0] : undefined;
 }
 
-/** Marque un élément reçu, avec le fichier et d'où il vient. */
-export function markReceived(item: WaitItem, file: string, via: 'window' | 'watch' | 'manual', now = new Date(), url?: string): void {
+/** Marque un élément reçu, avec le fichier, d'où il vient et ce qu'il contient. */
+export function markReceived(item: WaitItem, file: string, via: 'window' | 'watch' | 'manual', now = new Date(), url?: string, content?: { content?: ContentKind; summary?: string }): void {
   item.state = 'received';
   item.received = { file, at: now.toISOString(), via, url };
+  if (content?.content) item.received.content = content.content;
+  if (content?.summary) item.received.summary = content.summary;
+}
+
+export interface Placement {
+  /** Élément auquel revient le fichier : celui qu'il remplit, ou celui qu'on attendait et qu'il ne remplit pas. */
+  item?: WaitItem;
+  /**
+   * fits : il convient ; unknown : contenu illisible, pris sans vérification ; mismatch : il
+   * ne convient pas à l'élément (confirmation à demander) ; none : rien ne lui correspond.
+   */
+  verdict: 'fits' | 'unknown' | 'mismatch' | 'none';
+  /** Élément attendu du même jeu auquel il conviendrait, à proposer. */
+  better?: WaitItem;
+}
+
+/**
+ * Où ranger un fichier reçu : l'élément qu'il remplit (matchDownload), sinon celui pour
+ * lequel la fenêtre « Récupérer » était ouverte (opened, même déjà reçu : on récupère de
+ * nouveau), en vérifiant que le contenu convient. Un pack de médias reçu pour la table
+ * n'est jamais rangé d'office : verdict « mismatch », avec l'élément qui lui irait.
+ */
+export function placeDownload(list: WaitList, d: DownloadFacts, vps?: VpsDb, opened?: string): Placement {
+  const content = d.content ?? classifyContent(d.filename);
+  const matched = matchDownload(list, { ...d, content }, vps);
+  const open = opened ? list.items.find((i) => i.id === opened && i.state !== 'installed') : undefined;
+  const item = matched ?? (open && !isPartialDownload(d.filename) && RECEIVABLE.test(d.filename) ? open : undefined);
+  const fit = item ? contentFits(item.kind, content) : 'no';
+  const better = !item || fit === 'no' ? betterItem(list, content, item?.gameId) : undefined;
+  if (!item) return better ? { verdict: 'none', better } : { verdict: 'none' };
+  if (fit === 'no') return better ? { item, verdict: 'mismatch', better } : { item, verdict: 'mismatch' };
+  return { item, verdict: fit === 'yes' ? 'fits' : 'unknown' };
+}
+
+/** Seul élément attendu du jeu que ce contenu remplirait. */
+function betterItem(list: WaitList, content: ContentKind, gameId: string | undefined): WaitItem | undefined {
+  if (!gameId || content === 'unknown') return undefined;
+  const fits = list.items.filter((i) => i.gameId === gameId && i.state === 'waiting' && contentFits(i.kind, content) === 'yes');
+  return fits.length === 1 ? fits[0] : undefined;
+}
+
+/** Garde un fichier reçu de côté, sans élément (rien n'y correspondait, ou on l'a retiré d'un élément). */
+export function setAside(list: WaitList, received: Omit<StrayFile, 'at'> & { at?: string }, now = new Date()): StrayFile {
+  const strays = (list.strays ??= []);
+  const existing = strays.find((s) => samePathText(s.file, received.file));
+  const stray: StrayFile = { ...received, at: received.at ?? now.toISOString() };
+  for (const key of Object.keys(stray) as (keyof StrayFile)[]) if (stray[key] === undefined) delete stray[key];
+  if (existing) Object.assign(existing, stray);
+  else strays.push(stray);
+  return existing ?? stray;
+}
+
+/** Retire un fichier de ceux gardés de côté (rattaché, mis à la corbeille, oublié). */
+export function forgetStray(list: WaitList, file: string): void {
+  list.strays = (list.strays ?? []).filter((s) => !samePathText(s.file, file));
+  if (!list.strays.length) delete list.strays;
+}
+
+const samePathText = (a: string, b: string) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
+/**
+ * Rattache un fichier à un élément (réaffectation, remplacement, fichier gardé de côté) :
+ * l'élément devient reçu ; le fichier qu'il avait, s'il en avait un autre, est gardé de côté.
+ * Renvoie ce fichier remplacé.
+ */
+export function attachFile(list: WaitList, item: WaitItem, file: Omit<ReceivedFile, 'at'> & { at?: string }, now = new Date()): string | undefined {
+  const previous = item.received && !samePathText(item.received.file, file.file) ? item.received : undefined;
+  forgetStray(list, file.file);
+  // Le même fichier ne remplit pas deux éléments : celui qui l'avait redevient attendu.
+  for (const other of list.items) if (other !== item && other.state === 'received' && other.received && samePathText(other.received.file, file.file)) clearItem(list, other, false);
+  if (previous) setAside(list, { file: previous.file, via: previous.via, url: previous.url, content: previous.content, summary: previous.summary, at: previous.at });
+  markReceived(item, file.file, file.via, file.at ? new Date(file.at) : now, file.url, file);
+  // L'élément a son fichier : les fichiers gardés de côté ne lui sont plus une question.
+  for (const s of list.strays ?? []) {
+    if (s.expected === item.id) delete s.expected;
+    if (s.suggested === item.id) delete s.suggested;
+  }
+  return previous?.file;
+}
+
+/** Déplace le fichier reçu d'un élément vers un autre ; le premier redevient attendu. */
+export function reassignFile(list: WaitList, from: WaitItem, to: WaitItem, now = new Date()): void {
+  const received = from.received;
+  if (!received || from === to) return;
+  clearItem(list, from, false);
+  attachFile(list, to, received, now);
+}
+
+/**
+ * Vide un élément reçu : il redevient attendu. keep : le fichier est gardé de côté (à
+ * rattacher plus tard) ; sinon il est renvoyé, pour la corbeille. Renvoie le fichier.
+ */
+export function clearItem(list: WaitList, item: WaitItem, keep: boolean): string | undefined {
+  const received = item.received;
+  item.state = 'waiting';
+  delete item.received;
+  if (!received) return undefined;
+  if (keep) setAside(list, { file: received.file, via: received.via, url: received.url, content: received.content, summary: received.summary, at: received.at });
+  return received.file;
+}
+
+/** Ne plus attendre un élément ; son fichier reçu est gardé de côté (keep) ou renvoyé, pour la corbeille. */
+export function removeItem(list: WaitList, item: WaitItem, keep: boolean): string | undefined {
+  const file = item.state === 'received' ? clearItem(list, item, keep) : undefined;
+  list.items = list.items.filter((i) => i !== item);
+  for (const s of list.strays ?? []) {
+    if (s.expected === item.id) delete s.expected;
+    if (s.suggested === item.id) delete s.suggested;
+  }
+  return file;
+}
+
+/**
+ * Retire un jeu entier de la liste d'attente (les tables installées n'en dépendent pas) ;
+ * renvoie les fichiers reçus de ses éléments, que l'appelant garde ou met à la corbeille.
+ */
+export function removeGame(list: WaitList, gameId: string): string[] {
+  const files: string[] = [];
+  for (const item of list.items.filter((i) => i.gameId === gameId)) {
+    const file = removeItem(list, item, false);
+    if (file) files.push(file);
+  }
+  return files;
+}
+
+export interface WaitProblem {
+  item: WaitItem;
+  /** mismatch : le fichier reçu ne convient pas ; missing : il a disparu (déplacé ou effacé). */
+  problem: 'mismatch' | 'missing';
+  content?: ContentKind;
+  /** Élément attendu du même jeu auquel le fichier conviendrait. */
+  better?: WaitItem;
+}
+
+/**
+ * Éléments reçus à corriger : fichier disparu, ou qui ne convient pas à l'élément (un pack
+ * de médias rangé comme table, par exemple par une version qui ne vérifiait rien).
+ * contentOf : ce que contient un fichier (noté à la réception, ou lu par l'appelant).
+ */
+export function waitListProblems(list: WaitList, contentOf: (item: WaitItem) => ContentKind | undefined, exists: (file: string) => boolean = fs.existsSync): WaitProblem[] {
+  const problems: WaitProblem[] = [];
+  for (const item of list.items) {
+    if (item.state !== 'received' || !item.received) continue;
+    if (!exists(item.received.file)) {
+      problems.push({ item, problem: 'missing' });
+      continue;
+    }
+    const content = contentOf(item) ?? item.received.content;
+    if (contentFits(item.kind, content) !== 'no') continue;
+    const better = betterItem(list, content!, item.gameId);
+    problems.push(better ? { item, problem: 'mismatch', content, better } : { item, problem: 'mismatch', content });
+  }
+  return problems;
 }
 
 // ---------------------------------------------------------------------------

@@ -22,6 +22,7 @@ import {
   nextGameMediaMode,
   t,
   volumeLabel,
+  type IconName,
   type MenuLayout,
   type MenuMediaSettings,
 } from '@cyberpinball/core';
@@ -85,45 +86,54 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
       {
         label: t('Présentation du menu : {layout}', { layout: MENU_LAYOUT_LABELS[v.menuLayout] }),
         detail: t('{detail} (Start : choisir)', { detail: LAYOUT_DETAILS[v.menuLayout] }),
+        icon: 'layout-menu',
         run: () => openLayout(),
       },
       {
         label: v.music ? t('Musique des jeux : jouée') : t('Musique des jeux : coupée'),
         detail: v.music ? t('Musique du jeu choisi pendant la navigation (Start : couper)') : t('Borne silencieuse dans le menu (Start : jouer la musique de chaque jeu)'),
+        icon: 'music',
         run: () => set({ music: !v.music }),
       },
       {
         label: t('Volume de la musique : {volume}', { volume: volumeLabel(v.musicVolume) }),
         detail: v.music ? undefined : t('Musique coupée pour l’instant'),
+        icon: 'volume',
         run: () => openVolume('musicVolume', 1),
       },
       {
         label: t('Son des vidéos du menu : {volume}', { volume: volumeLabel(v.videoVolume) }),
         detail: t('Vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée'),
+        icon: 'video',
         run: () => openVolume('videoVolume', 2),
       },
       {
         label: t('Volume du lancement : {volume}', { volume: volumeLabel(v.launchVolume) }),
         detail: t('Son de lancement du jeu, sinon son de sa vidéo de chargement'),
+        icon: 'rocket',
         run: () => openVolume('launchVolume', 3),
       },
       {
         label: t('Mode attente : {delay}', { delay: attractDelayLabel(v.attractDelay) }),
         detail: t('Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu'),
+        icon: 'attract',
         run: () => openChoice('attractDelay', ATTRACT_DELAY_CHOICES, (x) => (x ? t('Après {duration} sans bouton', { duration: durationLabel(x) }) : t('Jamais')), 4),
       },
       {
         label: t('Table suivante en attente : toutes les {duration}', { duration: durationLabel(v.attractInterval) }),
+        icon: 'shuffle',
         run: () => openChoice('attractInterval', ATTRACT_INTERVAL_CHOICES, (x) => t('Toutes les {duration}', { duration: durationLabel(x) }), 5),
       },
       {
         label: v.attractSound === 'reduced' ? t('Son en attente : réduit') : t('Son en attente : coupé'),
         detail: v.attractSound === 'reduced' ? t('Musique et vidéos à 30 % de leur volume (Start : couper)') : t('Rien ne joue en attente (Start : son réduit)'),
+        icon: 'volume-low',
         run: () => set({ attractSound: v.attractSound === 'reduced' ? 'muted' : 'reduced' }),
       },
-      { label: t('Médias pendant la partie : {mode}', { mode: GAME_MEDIA_LABELS[v.game] }), detail: gameDetail(), run: () => set({ game: nextGameMediaMode(v.game) }) },
+      { label: t('Médias pendant la partie : {mode}', { mode: GAME_MEDIA_LABELS[v.game] }), detail: gameDetail(), icon: 'film', run: () => set({ game: nextGameMediaMode(v.game) }) },
       {
         label: t('Qualité téléchargée (VPinMediaDB) : {quality}', { quality: MEDIADB_QUALITY_LABELS[v.downloadQuality] }),
+        icon: 'quality',
         detail:
           v.downloadQuality === 'auto'
             ? t('4k si l’écran du plateau dépasse {pixels} points, 1k sinon ; seule l’image du plateau existe en 4k (Start : changer)', { pixels: formatNumber(MEDIADB_4K_ABOVE) })
@@ -139,11 +149,12 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
     const output = host.output();
     return {
       heading: heading(),
+      icon: 'music',
       lead: t('Sortie du son : {output}. Volume propre à un jeu : sa fiche, « Médias du jeu ».', {
         output: output ?? t('sortie par défaut de Windows (aucune sortie affectée au fronton par l’assistant)'),
       }),
       sections: [],
-      actions: [...actions(), { label: t('Retour'), run: () => host.library.openSystem() }],
+      actions: [...actions(), { label: t('Retour'), icon: 'back', run: () => host.library.openSystem() }],
       back: () => host.library.openSystem(),
     };
   }
@@ -152,14 +163,14 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
     host.library.openCustom(build, at);
   }
 
-  function volumeTitles(key: VolumeKey): { heading: string; lead: string } {
+  function volumeTitles(key: VolumeKey): { heading: string; icon: IconName; lead: string } {
     switch (key) {
       case 'musicVolume':
-        return { heading: t('Volume de la musique'), lead: t('Musique du jeu choisi pendant la navigation, avant le volume propre à chaque jeu.') };
+        return { heading: t('Volume de la musique'), icon: 'volume', lead: t('Musique du jeu choisi pendant la navigation, avant le volume propre à chaque jeu.') };
       case 'videoVolume':
-        return { heading: t('Son des vidéos du menu'), lead: t('Son de la vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée. 0 % : vidéos muettes.') };
+        return { heading: t('Son des vidéos du menu'), icon: 'video', lead: t('Son de la vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée. 0 % : vidéos muettes.') };
       case 'launchVolume':
-        return { heading: t('Volume du lancement'), lead: t('Son joué au lancement d’une table, ou son de sa vidéo de chargement. Rien pendant la partie : VPX a la parole.') };
+        return { heading: t('Volume du lancement'), icon: 'rocket', lead: t('Son joué au lancement d’une table, ou son de sa vidéo de chargement. Rien pendant la partie : VPX a la parole.') };
     }
   }
 
@@ -191,6 +202,7 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
     host.library.openCustom(
       () => ({
         heading: t('Présentation du menu'),
+        icon: 'layout-menu',
         lead: t('Comment les tables défilent dans le menu. Les roues font glisser les logos d’une place à l’autre ; la liste montre les titres.'),
         sections: [],
         actions: [
@@ -211,10 +223,10 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
     );
   }
 
-  function choiceTitles(key: ChoiceKey): { heading: string; lead: string } {
+  function choiceTitles(key: ChoiceKey): { heading: string; icon: IconName; lead: string } {
     return key === 'attractDelay'
-      ? { heading: t('Mode attente'), lead: t('Après ce temps sans bouton sur le menu des tables, la borne présente des tables au hasard. Le premier bouton revient au menu, sans rien lancer.') }
-      : { heading: t('Table suivante en attente'), lead: t('Temps passé sur chaque table tirée au hasard.') };
+      ? { heading: t('Mode attente'), icon: 'attract', lead: t('Après ce temps sans bouton sur le menu des tables, la borne présente des tables au hasard. Le premier bouton revient au menu, sans rien lancer.') }
+      : { heading: t('Table suivante en attente'), icon: 'shuffle', lead: t('Temps passé sur chaque table tirée au hasard.') };
   }
 
   function openChoice(key: ChoiceKey, choices: readonly number[], label: (value: number) => string, back: number): void {
@@ -242,6 +254,7 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
   }
 
   return {
+    icon: 'music',
     get label() {
       return heading();
     },

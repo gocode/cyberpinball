@@ -55,7 +55,7 @@ const info = comps.map((name) => {
 const NAMES = {
   Marque: 'Marque', Icones: 'Icônes', LigneMenu: 'Entrée de menu', Onglets: 'Onglets', Roue: 'Roue des tables', BandeauAide: "Bandeau d'aide",
   Panneau: 'Panneau', Ligne: 'Ligne', Etat: "Ligne d'état", Bouton: 'Bouton', CarteTable: 'Carte de table', Clavier: 'Clavier à l’écran', Question: 'Question',
-  EcranMenuCab: 'Menu des tables, borne', EcranFiche: 'Fiche d’une table, bureau', EcranMenuSysteme: 'Menu système, bureau', EcranDiagnostic: 'Diagnostic, borne', EcranAssistant: 'Assistant, relevé des boutons',
+  EcranMenuCab: 'Menu des tables, borne', EcranFiche: 'Fiche d’une table, bureau', EcranMenuSysteme: 'Menu système, bureau', EcranDiagnostic: 'Diagnostic, borne', EcranAssistant: 'Assistant, relevé des boutons', EcranParcours: 'Ce qu’il manque pour jouer, borne', EcranParcoursBureau: 'Ce qu’il manque pour jouer, bureau',
 };
 const ORDER = ['Marque', 'Navigation', 'Structure', 'Contenu', 'Actions', 'Saisie'];
 const cover = info.find((c) => c.name === 'Cover');

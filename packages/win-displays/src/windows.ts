@@ -138,6 +138,11 @@ export function visibleWindowsOf(pid: number): WindowInfo[] {
   return listWindows((info) => info.pid === pid && info.visible);
 }
 
+/** Fenêtre de premier niveau de ce HWND (valeur de BrowserWindow.getNativeWindowHandle()), si elle existe encore. */
+export function windowOfHandle(handle: bigint): WindowInfo | undefined {
+  return listWindows((w) => w.handle === handle)[0];
+}
+
 export function foregroundWindow(): WindowInfo | undefined {
   const w = loadApi();
   const hwnd = w.GetForegroundWindow();

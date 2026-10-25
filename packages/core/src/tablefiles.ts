@@ -6,6 +6,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { t } from './i18n';
 import { findPackRoot, isJunkName } from './puppack';
+import { romContent } from './romzip';
 
 export type FileKind =
   | 'table'
@@ -101,24 +102,15 @@ export const ARCHIVE_EXT = new Set(['.zip', '.7z', '.rar']);
 const IGNORED_FILES = new Set(['crash.txt', 'crash.dmp', 'thumbs.db', 'desktop.ini', '.ds_store']);
 const IGNORED_DIRS = new Set(['cache', '__macosx', '.git']);
 
-/** Extensions qui montrent qu'une archive est un paquet de table et non une ROM. */
-const PACK_EXT = new Set([
-  '.vpx', '.directb2s', '.vbs', '.ini', '.pov', '.info', '.mp4', '.avi', '.f4v', '.png', '.jpg', '.apng', '.gif',
-  '.crz', '.crom', '.cromc', '.vni', '.pal', '.pac', '.mp3', '.ogg', '.wav', '.csv', '.pup', '.pdf', '.zip', '.7z', '.rar',
-]);
-
 /**
- * Une archive .zip est-elle une ROM (à ranger telle quelle dans pinmame\roms) ou
- * un paquet à déballer ? Une ROM ne contient que des fichiers de puces, sans dossier.
+ * Une archive .zip est-elle une ROM (à ranger dans la bibliothèque) ou un paquet à
+ * déballer ? Une ROM ne contient que des puces, toutes dans un même dossier : à la
+ * racine, ou dans un sous-dossier (« t2_l8.zip › t2_l8 › t2_l8.rom »), qui sera
+ * refaite à plat à l'import (romzip.ts).
  */
 export function classifyArchive(name: string, entries: string[]): 'rom' | 'pack' {
   if (path.extname(name).toLowerCase() !== '.zip') return 'pack';
-  for (const raw of entries) {
-    const entry = raw.replace(/\\/g, '/');
-    if (entry.endsWith('/') || entry.slice(0, -1).includes('/')) return 'pack';
-    if (PACK_EXT.has(path.extname(entry).toLowerCase())) return 'pack';
-  }
-  return 'rom';
+  return romContent(entries) ? 'rom' : 'pack';
 }
 
 /** Comparaison de noms insensible à la casse, aux espaces et à la ponctuation. */
