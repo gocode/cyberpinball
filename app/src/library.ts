@@ -971,6 +971,7 @@ export function createLibrary(host: LibraryHost) {
     if (inv.tableIni) files.push({ text: t('Réglages propres'), detail: t('oui'), tone: 'ok' });
     else absent.push(t('réglages propres'));
     files.push(mediaRow(table));
+    if (inv.scriptPatched) files.push({ text: t('Script adapté'), detail: t('PuP-Pack allumé par Cyber Pinball'), tone: 'ok' });
     if (inv.scriptOverride) check.push(t('un .vbs remplace le script de la table'));
     if (inv.crashReports.length) check.push(t('un rapport de plantage laissé par VPX'));
     if (absent.length) files.push({ text: t('Absents'), detail: absent.join(', '), tone: 'quiet' });
@@ -1851,7 +1852,15 @@ export function createLibrary(host: LibraryHost) {
       .filter((t) => !samePath(t.folder, tablesDir()))
       .map((t): KnownTable => {
         const facts = cachedScript(t.file, host.dataDir);
-        return { folder: t.folder, title: t.title, roms: facts?.roms ?? [], dmdFolder: facts?.dmdFolder, pupNames: expectedPackNames(facts), vpsId: t.info.Info?.VPSId };
+        return {
+          folder: t.folder,
+          title: t.title,
+          roms: facts?.roms ?? [],
+          dmdFolder: facts?.dmdFolder,
+          pupNames: expectedPackNames(facts),
+          vpsId: t.info.Info?.VPSId,
+          pupOff: facts?.pup?.disabledBy ? [t.file] : [],
+        };
       });
     // Une table a une entrée par version : un seul dossier suffit.
     const unique = existing.filter((t, i) => existing.findIndex((o) => samePath(o.folder, t.folder)) === i);
@@ -1859,6 +1868,7 @@ export function createLibrary(host: LibraryHost) {
       const versions = existing.filter((o) => samePath(o.folder, t.folder));
       t.roms = [...new Set(versions.flatMap((o) => o.roms))];
       t.pupNames = [...new Set(versions.flatMap((o) => o.pupNames ?? []))];
+      t.pupOff = versions.flatMap((o) => o.pupOff ?? []);
     }
     return unique;
   }

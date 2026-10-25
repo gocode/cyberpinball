@@ -383,4 +383,6 @@ export const messages: Record<string, string> = {
   'dossier {folder} absent (facultatif)': 'folder {folder} missing (optional)',
   '{rom} (bibliothèque ou alias)': '{rom} (library or alias)',
   'absent : le script de la table le charge (facultatif)': 'missing: the table’s script loads it (optional)',
+  'Script adapté': 'Adapted script',
+  'PuP-Pack allumé par Cyber Pinball': 'PuP-Pack switched on by Cyber Pinball',
 };

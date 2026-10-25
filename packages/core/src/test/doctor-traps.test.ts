@@ -14,12 +14,15 @@ import { mediaErrorsFile, readMediaErrors, recordMediaError } from '../mediaerro
 import { blocksPlay, playBlockers } from '../playable';
 import { readInfo, scanTables, type TableEntry } from '../tables';
 import { buildZip } from '../romzip';
-import { devPcDisplays, starTrekPack } from './fixtures';
+import { devPcDisplays, starTrekPack, vpxWithScript } from './fixtures';
+import { buildScriptPatch } from '../scriptpatch';
 
 const SCRIPT = 'Const cGameName="afm_113b"\r\nLoadVPM "01560000", "WPC.VBS", 3.26\r\nController.GameName = cGameName\r\n';
 const TABLE = 'Attack from Mars (Bally 1995)';
 /** Même table, avec un PuP-Pack chargé par le script. */
 const PUP_SCRIPT = `${SCRIPT}Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\nPuPlayer.B2SInit "", cGameName\r\n`;
+/** Même table, dont le script coupe le pack (« usePUP = False », comme 2001 : A Space Odyssey). */
+const PUP_OFF_SCRIPT = `${SCRIPT}usePUP = False\r\nIf usePUP = True Then\r\n  Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\n  PuPlayer.B2SInit "", cGameName\r\nEnd If\r\n`;
 /** Borne à trois écrans : backglass, DMD 4:1, pas de topper ; playfield 16:9 couché, Windows en paysage. */
 const CABINET: PupCabinet = {
   backglass: true,
@@ -134,6 +137,14 @@ const TRAPS: Trap[] = [
     },
   },
   { code: 'scriptOverride', arm: (folder) => write(path.join(folder, `${TABLE}.vbs`), 'script extrait') },
+  // .vbs de Cyber Pinball (PuP-Pack allumé) tiré du script d'une version précédente de la table.
+  {
+    code: 'scriptPatchStale',
+    arm: (folder) => {
+      write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(PUP_OFF_SCRIPT.replace('3.26', '3.27')));
+      write(path.join(folder, `${TABLE}.vbs`), buildScriptPatch(PUP_OFF_SCRIPT, [scriptFacts(PUP_OFF_SCRIPT).pup!.disabledBy!])!);
+    },
+  },
   { code: 'backglassMissing', arm: (folder) => fs.rmSync(path.join(folder, `${TABLE}.directb2s`)) },
   {
     code: 'backglassMisnamed',
@@ -273,6 +284,15 @@ const TRAPS: Trap[] = [
     arm: (folder) => write(path.join(folder, 'pupvideos', 'afm_113b', 'Attract', 'intro.mp4'), 'mp4'),
     script: scriptFacts(`${PUP_SCRIPT}PuPlayer.playlistadd 2, "Attract", 1, 0\r\n`),
   },
+  // Pack bien rangé, que le script ne lance jamais (« usePUP = False »).
+  {
+    code: 'pupDisabledByScript',
+    arm: (folder) => {
+      healthyPack(folder);
+      write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(PUP_OFF_SCRIPT));
+    },
+    script: scriptFacts(PUP_OFF_SCRIPT),
+  },
   {
     code: 'pupCaptureRom',
     arm: (folder) => {
@@ -292,8 +312,9 @@ const TRAPS: Trap[] = [
     ctx: (folder) => ({
       vpxLog: [
         `2026-10-20 21:00:00.000 INFO  [Main] [PinTable::LoadGameFromFilename@1419] LoadGameFromFilename ${path.join(folder, `${TABLE}.vpx`)}`,
-        '2026-10-20 21:00:02.000 INFO  [Main] [WinEditor::DoPlay@908] Starting Play mode [table: Attack from Mars, play mode: 0]',
+        // Lignes de VPX 10.8.1 lancé par Cyber Pinball (sans l'éditeur : jamais « Starting Play mode »).
         '2026-10-20 21:00:02.500 INFO  [Main] [MsgPI::MsgPlugin::Load@520] Plugin PUP loaded (library: plugin-pup64.dll) [id=13]',
+        '2026-10-20 21:00:02.600 INFO  [Main] [Player::Player@727] Starting script',
         `2026-10-20 21:00:03.000 INFO  [Main] [PUP::PUPManager::SetGameDir@155] PUP path: ${path.join(folder, 'pupvideos', 'afm_113b')}`,
         '2026-10-20 21:00:03.100 INFO  [Main] [PUP::PUPManager::LoadConfig@213] No screens.pup file found',
       ].join('\r\n'),
@@ -355,7 +376,7 @@ test('table témoin avec PuP-Pack : pack bien nommé, option appliquée, écrans
   const folder = healthyTable(tablesDir);
   const pack = healthyPack(folder);
   const entry = scanTables(tablesDir)[0]!;
-  const log = [`LoadGameFromFilename ${entry.file}`, 'Starting Play mode [table: Attack from Mars]', 'Plugin PUP loaded (library: plugin-pup64.dll)', `PUP path: ${pack}`].join('\n');
+  const log = [`LoadGameFromFilename ${entry.file}`, 'Plugin PUP loaded (library: plugin-pup64.dll)', '[Player::Player@727] Starting script', `PUP path: ${pack}`, '[Player::Player@832] Startup done'].join('\n');
   assert.deepEqual(diagnose(entry, { tablesDir, script: scriptFacts(PUP_SCRIPT), cabinet: CABINET, vpxLog: log }), []);
   fs.rmSync(tablesDir, { recursive: true });
 });

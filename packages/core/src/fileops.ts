@@ -13,8 +13,11 @@ export type FileOp =
   | { op: 'copy'; from: string; to: string }
   | { op: 'trash'; path: string }
   | { op: 'delete'; path: string }
-  /** Écrit un petit fichier texte (.info) ; l'ancien part à la corbeille. */
-  | { op: 'write'; path: string; content: string }
+  /**
+   * Écrit un petit fichier texte (.info) ; l'ancien part à la corbeille. latin1 : un
+   * caractère par octet (script de table rendu octet pour octet).
+   */
+  | { op: 'write'; path: string; content: string; encoding?: 'utf8' | 'latin1' }
   /**
    * Lien physique : to devient le même fichier que from, sans place en plus (voir linkFile).
    * Copie quand les deux ne sont pas sur le même volume.
@@ -67,7 +70,7 @@ export function applyOps(ops: FileOp[], ctx: OpContext): void {
       case 'write':
         if (fs.existsSync(op.path)) moveToTrash(op.path, ctx);
         fs.mkdirSync(path.dirname(op.path), { recursive: true });
-        fs.writeFileSync(op.path, op.content, 'utf8');
+        fs.writeFileSync(op.path, op.content, op.encoding ?? 'utf8');
         break;
       case 'link':
         linkFile(op.from, op.to, ctx);

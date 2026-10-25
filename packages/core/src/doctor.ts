@@ -34,17 +34,21 @@ import {
   appliedVariant,
   chooseVariant,
   describePupCabinet,
+  enablePupSwitch,
   expectedPackNames,
   findPackRoot,
   isVisible,
   pupScriptFacts,
+  pupScriptSwitch,
   screenRole,
   scoreVariant,
   variantTraitsLabel,
   type PupCabinet,
   type PupScriptFacts,
+  type PupSwitch,
   type PupVariant,
 } from './puppack';
+import { buildScriptPatch, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
 import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
@@ -55,6 +59,8 @@ import { findTableIni } from './vpx-settings';
 import { EDGE_LABELS } from './layout';
 import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
+import { scriptCode } from './vbscript';
+import { readVpxScript } from './vpxinfo';
 
 export type FindingSeverity = 'error' | 'warning' | 'info';
 
@@ -68,6 +74,7 @@ export interface Fix {
 export const FINDING_CODES = [
   'outsideFolder',
   'scriptOverride',
+  'scriptPatchStale',
   'backglassMissing',
   'backglassMisnamed',
   'backglassStray',
@@ -90,6 +97,7 @@ export const FINDING_CODES = [
   'pupOrphan',
   'pupOptionNotApplied',
   'pupOptionUnsuited',
+  'pupDisabledByScript',
   'pupScreenAbsent',
   'pupPlayfieldScreen',
   'pupScriptDriven',
@@ -252,10 +260,7 @@ export function tableFolderName(title: string, manufacturer?: string, year?: num
 
 /** Nom(s) de ROM d'après le script VBScript de la table. */
 export function scriptFacts(vbs: string): ScriptFacts {
-  const code = vbs
-    .split(/\r?\n/)
-    .map(stripComment)
-    .join('\n');
+  const code = scriptCode(vbs);
   const usesPinmame = /\bLoadVPM\b|VPinMAME\.Controller/i.test(code);
   const roms: string[] = [];
   const add = (name: string) => {
@@ -306,18 +311,6 @@ function dmdProjectFolder(code: string): string | undefined {
   return undefined;
 }
 
-/** Retire le commentaire VBScript d'une ligne (apostrophe hors chaîne, ou Rem). */
-function stripComment(line: string): string {
-  if (/^\s*rem\b/i.test(line)) return '';
-  let inString = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') inString = !inString;
-    else if (c === "'" && !inString) return line.slice(0, i);
-  }
-  return line;
-}
-
 export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   const findings: Finding[] = [];
   const folder = entry.folder;
@@ -345,9 +338,22 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
     });
   }
 
-  // 2. Un .vbs nommé comme la table remplace son script.
+  // 2. Un .vbs nommé comme la table remplace son script ; celui de Cyber Pinball (PuP-Pack
+  // allumé, scriptpatch.ts) est le bienvenu tant qu'il est tiré du script actuel de la table.
   const vbs = has(`${base}.vbs`);
-  if (vbs) {
+  const override = vbs ? readOverride(entry, path.join(folder, vbs)) : undefined;
+  if (vbs && override?.state.kind === 'stale') {
+    const state = override.state;
+    findings.push({
+      code: 'scriptPatchStale',
+      severity: 'warning',
+      title: t('Script adapté pour une ancienne version de la table'),
+      detail: t('Cyber Pinball a écrit {file} (PuP-Pack allumé) d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.', { file: vbs }),
+      fix: state.content
+        ? { label: t('Refaire {file} d’après le nouveau script', { file: vbs }), ops: [{ op: 'write', path: path.join(folder, vbs), content: state.content, encoding: 'latin1' }] }
+        : { label: t('Mettre {file} à la corbeille', { file: vbs }), ops: [{ op: 'trash', path: path.join(folder, vbs) }] },
+    });
+  } else if (vbs && override?.state.kind !== 'ours') {
     findings.push({
       code: 'scriptOverride',
       severity: 'warning',
@@ -464,7 +470,7 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   if (windows) findings.push(windows);
 
   // 8. PuP-Pack (mode plugins de VPX 10.8.1).
-  if (ownFolder) findings.push(...checkPup(entry, ctx));
+  if (ownFolder) findings.push(...checkPup(entry, ctx, override));
 
   // 9. Médias de présentation (medias\ de la table).
   if (ownFolder) findings.push(...checkMedias(entry, ctx));
@@ -605,8 +611,65 @@ function tableWindowsFinding(tableFile: string): Finding | undefined {
   };
 }
 
+/** Le .vbs qui remplace le script de la table, et s'il vient de Cyber Pinball. */
+interface Override {
+  file: string;
+  /** Contenu, lu en latin1 (un caractère par octet). */
+  text: string;
+  state: ScriptPatchState;
+}
+
+function readOverride(entry: TableEntry, file: string): Override | undefined {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'latin1');
+  } catch {
+    return undefined;
+  }
+  // Le script de la table n'est lu que pour un .vbs marqué par Cyber Pinball.
+  const state: ScriptPatchState = readScriptPatch(text) ? scriptPatchState(text, readVpxScript(entry.file)) : { kind: 'foreign' };
+  return { file, text, state };
+}
+
+/**
+ * PuP-Pack coupé par le script : la correction allume l'interrupteur dans un .vbs à côté
+ * de la table (scriptpatch.ts), sans toucher à la table ; dans le .vbs déjà là s'il vient
+ * d'ailleurs. Sans le texte du script (table protégée), le constat dit quoi changer.
+ */
+function pupSwitchFinding(entry: TableEntry, pack: string, off: PupSwitch, override: Override | undefined): Finding {
+  const base = path.basename(entry.file).replace(/\.vpx$/i, '');
+  const target = override?.file ?? path.join(entry.folder, `${base}.vbs`);
+  const file = path.basename(target);
+  let content: string | undefined;
+  if (override?.state.kind === 'ours') {
+    // Un interrupteur de plus dans notre .vbs : refait d'après la table, tous allumés.
+    const embedded = readVpxScript(entry.file);
+    const sw = pupScriptSwitch(scriptCode(override.text));
+    if (embedded !== undefined && sw) content = buildScriptPatch(embedded, [...override.state.patch.switches, sw]);
+  } else if (override) {
+    const sw = pupScriptSwitch(scriptCode(override.text));
+    if (sw) content = enablePupSwitch(override.text, sw);
+  } else {
+    const embedded = readVpxScript(entry.file);
+    // Relu dans le texte de la table : c'est lui qu'on recopie, ligne pour ligne.
+    const sw = embedded !== undefined ? pupScriptSwitch(scriptCode(embedded)) : undefined;
+    if (embedded !== undefined && sw) content = buildScriptPatch(embedded, [sw]);
+  }
+  const params = { variable: off.variable, value: off.value, enable: off.enable ?? '?', pack, file };
+  const detail = [t('Le script met {variable} = {value} : il ne lance jamais le PuP-Pack, et la partie n’affiche que le fronton et le DMD habituels, même avec pupvideos\\{pack} bien rangé.', params)];
+  if (content && !override) detail.push(t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où seule cette valeur change.', params));
+  else if (!content && off.enable) detail.push(t('Mettez {variable} = {enable} dans le script de la table (éditeur de VPX).', params));
+  return {
+    code: 'pupDisabledByScript',
+    severity: 'warning',
+    title: t('PuP-Pack coupé par le script de la table'),
+    detail: detail.join(' '),
+    fix: content ? { label: t('Allumer le PuP-Pack ({variable} = {enable}, dans {file})', params), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+  };
+}
+
 /** Règles du § 4.4 de la recherche sur les PuP-Packs, sans lancer VPX. */
-function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
+function checkPup(entry: TableEntry, ctx: DoctorContext, override?: Override): Finding[] {
   const folder = entry.folder;
   const facts = ctx.script && !('error' in ctx.script) ? ctx.script : undefined;
   const pupName = listSafe(folder).find((f) => f.toLowerCase() === 'pupvideos');
@@ -683,6 +746,11 @@ function checkPup(entry: TableEntry, ctx: DoctorContext): Finding[] {
       },
     });
   }
+
+  // Script qui ne lance jamais le pack (« usePUP = False ») : bien rangé, il ne s'affichera pas.
+  // C'est le script que VPX joue qui compte : le .vbs posé à côté s'il y en a un.
+  const off = override ? pupScriptSwitch(scriptCode(override.text)) : facts?.pup?.disabledBy;
+  if (off && matching.length) findings.push(pupSwitchFinding(entry, matching[0]!, off, override));
 
   for (const pack of matching) {
     const dir = path.join(pupvideos, pack);
@@ -852,7 +920,9 @@ function checkPupLog(entry: TableEntry, log: string, expected: string[], found: 
   if (!start) return [];
   const end = loads.find((x) => x.i > start.i)?.i ?? lines.length;
   const session = lines.slice(start.i, end);
-  if (!session.some((l) => /Plugin PUP loaded/.test(l)) || !session.some((l) => /Starting Play mode/.test(l))) return [];
+  // Une vraie partie : VPX 10.8.1 écrit « Starting script » puis « Startup done » (Player::Player) ;
+  // « Starting Play mode » vient du lancement depuis l'éditeur.
+  if (!session.some((l) => /Plugin PUP loaded/.test(l)) || !session.some((l) => /Starting Play mode|Starting script|Startup done/.test(l))) return [];
   const findings: Finding[] = [];
   const pathIndex = session.findLastIndex((l) => /PUP path: /.test(l));
   const pupPath = pathIndex >= 0 ? /PUP path: (.+)$/.exec(session[pathIndex]!)![1]!.trim() : undefined;
@@ -865,7 +935,7 @@ function checkPupLog(entry: TableEntry, log: string, expected: string[], found: 
         detail: t('À la dernière partie, VPX a chargé « {path} » mais n’y a pas trouvé de screens.pup : les écrans du pack sont restés éteints.', { path: pupPath }),
       });
     }
-  } else if (!pupPath && expected.length && !found.some((f) => f.code === 'pupMissing')) {
+  } else if (!pupPath && expected.length && !found.some((f) => f.code === 'pupMissing' || f.code === 'pupDisabledByScript')) {
     findings.push({
       code: 'pupLog',
       severity: 'warning',

@@ -369,3 +369,49 @@ export function readVpxTableInfo(file: string): VpxTableInfo | undefined {
     if (fd !== undefined) fs.closeSync(fd);
   }
 }
+
+/** Protection du script (SECB, pintable.h) : script chiffré, illisible sans VPX. */
+const DISABLE_SCRIPT_EDITING = 0x00000002;
+const DISABLE_EVERYTHING = 0x80000000;
+
+/**
+ * Script écrit dans la table, octet pour octet (lu en latin1 : chaque caractère est un
+ * octet, le texte réécrit tel quel redonne le même fichier). VPX le range dans
+ * GameStg/GameData : l'enregistrement CODE (longueur 4) est suivi de la longueur du
+ * texte et du texte (BiffReader::AsScript, au commit af26b2d93). undefined si la table
+ * n'est pas lisible, n'a pas de script, ou si son script est protégé (chiffré).
+ */
+export function readVpxScript(file: string): string | undefined {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const cfb = new CompoundFile(fd);
+    const game = cfb.children(cfb.entries[0]!).find((e) => e.type === 1 && e.name === 'GameStg');
+    const gameData = game && cfb.children(game).find((e) => e.type === 2 && e.name === 'GameData');
+    if (!gameData) return undefined;
+    const data = cfb.stream(gameData);
+    let pos = 0;
+    while (pos + 8 <= data.length) {
+      const size = data.readUInt32LE(pos);
+      const tag = data.toString('latin1', pos + 4, pos + 8);
+      if (size < 4) return undefined;
+      if (tag === 'SECB' && size >= 4 + 36) {
+        const flags = data.readUInt32LE(pos + 8 + 32);
+        if ((flags & DISABLE_EVERYTHING) >>> 0 === DISABLE_EVERYTHING || (flags & DISABLE_SCRIPT_EDITING) === DISABLE_SCRIPT_EDITING) return undefined;
+      }
+      if (tag === 'CODE') {
+        if (pos + 12 > data.length) return undefined;
+        const length = data.readUInt32LE(pos + 8);
+        if (pos + 12 + length > data.length) return undefined;
+        return data.toString('latin1', pos + 12, pos + 12 + length);
+      }
+      if (tag === 'ENDB') return undefined;
+      pos += 4 + size;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}

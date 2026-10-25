@@ -567,7 +567,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       const now = Date.now();
       if (p.received && now - last < 250) return;
       last = now;
-      const amount = p.received || p.size ? formatTransfer(progress) : '';
+      const amount = p.received || p.size ? formatTransfer(progress, true) : '';
       const params = { type: mediaTypeInfo(p.type).label, index: p.index + 1, total: p.total, amount };
       ctx.progress(line(amount ? t('{type} ({index} sur {total}) : {amount}…', params) : t('{type} ({index} sur {total})…', params)));
     };

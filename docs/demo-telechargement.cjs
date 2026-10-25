@@ -32,7 +32,9 @@ const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Serveur lent : /connu/<nom>?mo=24&debit=1.6 (Content-Length donné), /inconnu/<nom>
- * (envoi par morceaux, sans taille), /fiche (page de départ). Les réponses en cours sont
+ * (envoi par morceaux, sans taille ; avec &fin=1, il s'arrête à `mo`), /fiche (page de
+ * départ), /fiche-taille (fiche à la manière de vpuniverse : la taille de chaque fichier
+ * affichée sur la page, que le serveur, lui, n'annonce pas). Les réponses en cours sont
  * suivies : une annulation côté Cyber Pinball ferme la connexion, le relevé le dit.
  */
 function slowServer() {
@@ -46,6 +48,15 @@ function slowServer() {
 main{max-width:900px;margin:60px auto;padding:24px 32px;background:#243241;border-radius:8px}a{color:#7cc4ff}</style>
 <main><h1>Fiche simulée : serveur local lent</h1><p>Les téléchargements de cette démonstration viennent d'un petit serveur sur 127.0.0.1, volontairement lent.</p>
 <ul><li><a href="/connu/Table-simulee-24Mo.zip?mo=24&debit=1.6">Table simulée (24 Mo, taille connue)</a></li><li><a href="/inconnu/Medias-sans-taille.zip">Médias (taille inconnue)</a></li></ul></main>`);
+      return;
+    }
+    if (url.pathname === '/fiche-taille') {
+      res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      res.end(`<!doctype html><meta charset="utf-8"><title>Fiche avec tailles</title>
+<style>html,body{margin:0;height:100%;background:#1b2530;color:#e8eef2;font:22px/1.5 Segoe UI,sans-serif}
+main{max-width:900px;margin:60px auto;padding:24px 32px;background:#243241;border-radius:8px}li{margin:6px 0}</style>
+<main><h1>Medieval Madness (Williams 1997)</h1><ul class="ipsDataList"><li><strong>Views</strong> <span>12 345</span></li><li><strong>Size</strong> <span>5.2 MB</span></li></ul>
+<ul><li class="ipsDataItem"><h4>Table-sans-en-tete.zip</h4><p>4 MB</p></li><li class="ipsDataItem"><h4>Medieval Madness.directb2s</h4><p>1.2 MB</p></li></ul></main>`);
       return;
     }
     const m = /^\/(connu|inconnu)\/(.+)$/.exec(url.pathname);
@@ -62,12 +73,12 @@ main{max-width:900px;margin:60px auto;padding:24px 32px;background:#243241;borde
     const chunk = Buffer.alloc(Math.round(rate / 20), 0x5a);
     let sent = 0;
     const timer = setInterval(() => {
-      if (known && sent >= size) {
+      if ((known || url.searchParams.has('fin')) && sent >= size) {
         clearInterval(timer);
         res.end();
         return;
       }
-      const piece = known ? chunk.subarray(0, Math.min(chunk.length, size - sent)) : chunk;
+      const piece = known || url.searchParams.has('fin') ? chunk.subarray(0, Math.min(chunk.length, size - sent)) : chunk;
       sent += piece.length;
       res.write(piece);
     }, 50);
@@ -224,6 +235,23 @@ async function run(report) {
   s = await shot('recu');
   if (!/^Reçu : Petit-fichier\.zip/.test(s.status)) fail(`fin non dite : ${s.status}`);
 
+  // 5 bis. Le serveur n'annonce pas la taille, la page du site l'affiche : « sur environ 4 Mo »,
+  // un pourcentage et une barre qui avance (jamais 100 % avant la fin), le bon fichier de la liste.
+  LOG.push('→ fiche qui affiche la taille de chaque fichier ; serveur sans taille, 4 Mo à 1 Mo/s');
+  await open.view.webContents.loadURL(`${origin}/fiche-taille`);
+  await delay(500);
+  startDownload('inconnu/Table-sans-en-tete.zip', '?mo=4&debit=1&fin=1');
+  await waitRows(1);
+  await delay(2000);
+  s = await shot('taille-lue-sur-la-page');
+  const approx = s.rows[0];
+  if (!/^\d+ %$/.test(approx.pct) || !/ sur environ 4 Mo · .+ [kM]o\/s/.test(approx.text) || approx.unknown || !approx.fill) fail(`taille de la page non reprise : ${JSON.stringify(approx)}`);
+  await waitRows(0, 10_000);
+  s = await shot('taille-lue-recu');
+  if (!/^Reçu : Table-sans-en-tete\.zip/.test(s.status)) fail(`fin non dite : ${s.status}`);
+  await open.view.webContents.loadURL(`${origin}/fiche`);
+  await delay(300);
+
   // 6. Quatre à la fois, dont un lancé hors de la page visible (session seule, comme une vue cachée).
   LOG.push('→ quatre téléchargements, dont un hors de la page visible');
   startDownload('connu/Table-A.zip', '?mo=40&debit=1.2');
@@ -282,7 +310,7 @@ async function run(report) {
   LOG.push(`connexions fermées par une annulation, côté serveur : ${closed.join(', ') || '(aucune)'}`);
   const left = fs.existsSync(dir) ? fs.readdirSync(dir) : [];
   LOG.push(`dossier de réception : ${left.join(', ') || '(vide)'}`);
-  if (left.some((f) => f !== 'Petit-fichier.zip')) fail('un fichier annulé est resté dans le dossier de réception');
+  if (left.some((f) => !['Petit-fichier.zip', 'Table-sans-en-tete.zip'].includes(f))) fail('un fichier annulé est resté dans le dossier de réception');
 
   acquirer.close();
   for (let i = 0; i < 50 && acquirer.isOpen(); i++) await delay(100);

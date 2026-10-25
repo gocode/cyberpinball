@@ -221,20 +221,17 @@ button.close {
   transition: width 0.25s linear;
 }
 
-/* Taille inconnue : un segment qui parcourt la barre, sans pourcentage. */
-.download.unknown .dl-fill {
-  width: 28%;
-  transition: none;
-  animation: dl-sweep 1.6s ease-in-out infinite;
+/*
+ * Taille inconnue (ni le site ni sa page ne la donnent) : pas de remplissage, une piste en
+ * pointillés. Un segment qui glissait ressemblait à une barre à moitié pleine et ne disait
+ * rien ; le texte dit « reçus, taille non annoncée », avec le volume et le débit qui avancent.
+ */
+.download.unknown .dl-track {
+  background: repeating-linear-gradient(90deg, var(--line-soft) 0 6px, transparent 6px 12px);
 }
 
-@keyframes dl-sweep {
-  from {
-    left: -28%;
-  }
-  to {
-    left: 100%;
-  }
+.download.unknown .dl-fill {
+  display: none;
 }
 
 /* En pause, interrompu : la barre s'arrête, en orange. */
@@ -278,11 +275,3 @@ button.dl-cancel {
   color: var(--muted);
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .download.unknown .dl-fill {
-    animation: none;
-    left: 0;
-    width: 100%;
-    opacity: 0.35;
-  }
-}

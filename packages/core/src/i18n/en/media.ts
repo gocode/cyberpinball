@@ -433,6 +433,9 @@ export const messages: Record<string, string> = {
   'Média : {title}': 'Media: {title}',
   'À faire vous-même : {reason}. Le fichier téléchargé revient aux propositions du média.': 'For you to do: {reason}. The downloaded file goes back to the media suggestions.',
   '{got} sur {total}': '{got} of {total}',
+  '{got} sur environ {total}': '{got} of about {total}',
+  '{got} reçus, taille non annoncée': '{got} received, size not announced',
+  '{pct} % · {received}': '{pct}% · {received}',
 
   // packages/core/src/mediasites.ts
   '808 packs de médias complets, 4 153 logos, 1 829 vidéos': '808 complete media packs, 4,153 logos, 1,829 videos',

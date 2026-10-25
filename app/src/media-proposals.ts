@@ -32,6 +32,7 @@ import {
   formatDate,
   formatSize,
   formatTransfer,
+  transferPercent,
   localMediaChoices,
   MEDIA_SITES,
   mediaSite,
@@ -399,7 +400,7 @@ export function createProposals(ctx: ProposalsContext) {
         state = { label: job.seconds !== undefined ? t('Attente du site · {n} s', { n: job.seconds }) : t('Attente du site'), tone: 'info' };
         if (job.seconds !== undefined && site.wait) progress = Math.max(0, Math.min(1, 1 - job.seconds / site.wait));
       } else if (job.state === 'downloading') {
-        const pct = job.total ? Math.round(((job.received ?? 0) / job.total) * 100) : undefined;
+        const pct = transferPercent({ received: job.received ?? 0, total: job.total, approx: job.approx });
         state = { label: pct !== undefined ? t('Téléchargement · {pct} %', { pct }) : t('Téléchargement'), tone: 'ok' };
         if (pct !== undefined) progress = pct / 100;
         facts.push(ctx.sites!.progressText(job));
@@ -524,7 +525,7 @@ export function createProposals(ctx: ProposalsContext) {
       actions.push({
         label: t('Chercher sur le web…'),
         detail: loading
-          ? t('Téléchargement : {got}', { got: formatTransfer(loading) })
+          ? t('Téléchargement : {got}', { got: formatTransfer(loading, true) })
           : ctx.sites.resumable(webUrl(st, table, type))
             ? t('Reprend la page où vous en étiez ; ce que vous y téléchargez revient ici')
             : t('Navigateur intégré : ce que vous y téléchargez revient ici'),
@@ -615,7 +616,7 @@ export function createProposals(ctx: ProposalsContext) {
             const progress = meter.update(received, total);
             if (Date.now() - last < 250) return;
             last = Date.now();
-            ctx.progress(t('{label} : {progress}…', { label: mediaTypeInfo(type).label, progress: formatTransfer(progress) }));
+            ctx.progress(t('{label} : {progress}…', { label: mediaTypeInfo(type).label, progress: formatTransfer(progress, true) }));
           });
         } catch (error) {
           return ctx.back(type, { text: t('Téléchargement impossible : {error}. Rien n’a été laissé.', { error: (error as Error).message }), tone: 'error' });

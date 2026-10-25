@@ -234,4 +234,5 @@ export const messages: Record<string, string> = {
   'lien vers la bibliothèque de ROM': 'link to the ROM library',
   'copie à part : la bibliothèque a aussi cette ROM': 'separate copy: the library also has this ROM',
   'propre à la table, pas dans la bibliothèque': 'own to the table, not in the library',
+  'script de la table adapté par Cyber Pinball : PuP-Pack allumé': 'table script adapted by Cyber Pinball: PuP-Pack switched on',
 };

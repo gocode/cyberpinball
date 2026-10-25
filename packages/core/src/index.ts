@@ -60,3 +60,5 @@ export * from './wizardsteps';
 export * from './update';
 export * from './i18n';
 export * from './icons';
+export * from './scriptpatch';
+export * from './vbscript';

@@ -11,6 +11,7 @@ import { romBlockers } from './doctor';
 import { t } from './i18n';
 import { isJunkName } from './puppack';
 import { romFile, sameRomFile, storedRom } from './romlibrary';
+import { isScriptPatchFile } from './scriptpatch';
 import { classifyDir, classifyFile, companion, type FileKind } from './tablefiles';
 
 export type TableFileState = 'ok' | 'info' | 'warning' | 'error' | 'quiet';
@@ -108,7 +109,8 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
         fileEntry(name, kind, sameBase(name) ? 'ok' : 'quiet', sameBase(name) ? t('réglages propres à cette table') : t('réglages d’une autre version'));
         break;
       case 'script':
-        if (sameBase(name)) fileEntry(name, 'scriptOverride', 'warning', t('remplace le script écrit dans la table'));
+        if (sameBase(name) && isScriptPatchFile(path.join(folder, name))) fileEntry(name, 'scriptOverride', 'ok', t('script de la table adapté par Cyber Pinball : PuP-Pack allumé'));
+        else if (sameBase(name)) fileEntry(name, 'scriptOverride', 'warning', t('remplace le script écrit dans la table'));
         else fileEntry(name, kind, 'quiet', t('script complémentaire'));
         break;
       case 'pov':

@@ -1,3 +1,4 @@
+import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Cabinet, EdidInfo, ObservedDisplay, Rect } from '../model';
@@ -149,4 +150,152 @@ export function starTrekPack(root: string): void {
   }
   // Option 1 appliquée à la racine, comme sur la borne.
   for (const f of ['screens.pup', 'triggers.pup']) fs.copyFileSync(path.join(root, 'PuP-Pack_Options', options[0]![0], f), path.join(root, f));
+}
+
+// ---------------------------------------------------------------------------
+// Fichier composé OLE minimal, comme VPX en écrit : TableInfo et ses flux UTF-16LE, et
+// GameStg (GameData, ImageN) si on lui en donne.
+
+export function cfb(streams: Record<string, string | Buffer>, game: Record<string, Buffer> = {}): Buffer {
+  const SECTOR = 512;
+  const FREE = 0xffffffff;
+  const END = 0xfffffffe;
+  const FATSECT = 0xfffffffd;
+  const infoNames = Object.keys(streams);
+  const gameNames = Object.keys(game);
+  const names = [...infoNames, ...gameNames];
+  const data = [
+    ...infoNames.map((n) => {
+      const v = streams[n]!;
+      return Buffer.isBuffer(v) ? v : Buffer.from(v, 'utf16le');
+    }),
+    ...gameNames.map((n) => game[n]!),
+  ];
+  // Entrées : racine, TableInfo et ses flux, puis GameStg et ses flux (les petits dans le mini-flux, les gros en secteurs).
+  const gameAt = 2 + infoNames.length;
+  const entries = gameAt + (gameNames.length ? 1 + gameNames.length : 0);
+  const dirSectors = Math.ceil((entries * 128) / SECTOR);
+  const mini: Buffer[] = [];
+  const miniFat: number[] = [];
+  const big: Buffer[] = [];
+  const starts: number[] = [];
+  let bigSectors = 0;
+  for (const d of data) {
+    if (d.length < 4096) {
+      const first = miniFat.length;
+      const count = Math.max(1, Math.ceil(d.length / 64));
+      for (let i = 0; i < count; i++) miniFat.push(i === count - 1 ? END : first + i + 1);
+      mini.push(Buffer.concat([d, Buffer.alloc(count * 64 - d.length)]));
+      starts.push(first);
+    } else {
+      const count = Math.ceil(d.length / SECTOR);
+      starts.push(-1 - bigSectors);
+      big.push(Buffer.concat([d, Buffer.alloc(count * SECTOR - d.length)]));
+      bigSectors += count;
+    }
+  }
+  const miniStream = Buffer.concat(mini);
+  const miniStreamSectors = Math.ceil(miniStream.length / SECTOR);
+  const miniFatSectors = Math.max(1, Math.ceil((miniFat.length * 4) / SECTOR));
+  // Secteurs : 0 FAT, puis répertoire, mini-FAT, mini-flux, gros flux.
+  const dirAt = 1;
+  const miniFatAt = dirAt + dirSectors;
+  const miniStreamAt = miniFatAt + miniFatSectors;
+  const bigAt = miniStreamAt + miniStreamSectors;
+  const total = bigAt + bigSectors;
+  const fat = new Array<number>(SECTOR / 4).fill(FREE);
+  fat[0] = FATSECT;
+  const chain = (start: number, count: number) => {
+    for (let i = 0; i < count; i++) fat[start + i] = i === count - 1 ? END : start + i + 1;
+  };
+  chain(dirAt, dirSectors);
+  chain(miniFatAt, miniFatSectors);
+  chain(miniStreamAt, miniStreamSectors);
+  let offset = bigAt;
+  for (const b of big) {
+    chain(offset, b.length / SECTOR);
+    offset += b.length / SECTOR;
+  }
+  assert.ok(total <= SECTOR / 4, 'une seule FAT suffit pour ce test');
+
+  const header = Buffer.alloc(SECTOR);
+  Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]).copy(header, 0);
+  header.writeUInt16LE(0x3e, 0x18);
+  header.writeUInt16LE(3, 0x1a);
+  header.writeUInt16LE(0xfffe, 0x1c);
+  header.writeUInt16LE(9, 0x1e);
+  header.writeUInt16LE(6, 0x20);
+  header.writeUInt32LE(1, 0x2c);
+  header.writeUInt32LE(dirAt, 0x30);
+  header.writeUInt32LE(4096, 0x38);
+  header.writeUInt32LE(miniFatAt, 0x3c);
+  header.writeUInt32LE(miniFatSectors, 0x40);
+  header.writeUInt32LE(END, 0x44);
+  for (let i = 0; i < 109; i++) header.writeUInt32LE(i === 0 ? 0 : FREE, 0x4c + i * 4);
+
+  const dir = Buffer.alloc(dirSectors * SECTOR);
+  const entry = (i: number, name: string, type: number, child: number, right: number, start: number, size: number) => {
+    const o = i * 128;
+    dir.write(`${name}\0`, o, 'utf16le');
+    dir.writeUInt16LE((name.length + 1) * 2, o + 0x40);
+    dir[o + 0x42] = type;
+    dir[o + 0x43] = 1;
+    dir.writeUInt32LE(FREE, o + 0x44);
+    dir.writeUInt32LE(right, o + 0x48);
+    dir.writeUInt32LE(child, o + 0x4c);
+    dir.writeUInt32LE(start, o + 0x74);
+    dir.writeUInt32LE(size, o + 0x78);
+  };
+  entry(0, 'Root Entry', 5, 1, FREE, miniStream.length ? miniStreamAt : END, miniStream.length);
+  entry(1, 'TableInfo', 1, infoNames.length ? 2 : FREE, gameNames.length ? gameAt : FREE, 0, 0);
+  const startOf = (i: number) => (starts[i]! < 0 ? bigAt + (-1 - starts[i]!) : starts[i]!);
+  infoNames.forEach((n, i) => entry(2 + i, n, 2, FREE, i + 1 < infoNames.length ? 3 + i : FREE, startOf(i), data[i]!.length));
+  if (gameNames.length) {
+    entry(gameAt, 'GameStg', 1, gameAt + 1, FREE, 0, 0);
+    gameNames.forEach((n, j) => {
+      const i = infoNames.length + j;
+      entry(gameAt + 1 + j, n, 2, FREE, j + 1 < gameNames.length ? gameAt + 2 + j : FREE, startOf(i), data[i]!.length);
+    });
+  }
+  for (let i = entries; i < dirSectors * 4; i++) {
+    dir.writeUInt32LE(FREE, i * 128 + 0x44);
+    dir.writeUInt32LE(FREE, i * 128 + 0x48);
+    dir.writeUInt32LE(FREE, i * 128 + 0x4c);
+  }
+  const fatBuf = Buffer.alloc(SECTOR);
+  fat.forEach((v, i) => fatBuf.writeUInt32LE(v >>> 0, i * 4));
+  const miniFatBuf = Buffer.alloc(miniFatSectors * SECTOR, 0xff);
+  miniFat.forEach((v, i) => miniFatBuf.writeUInt32LE(v >>> 0, i * 4));
+  return Buffer.concat([header, fatBuf, dir, miniFatBuf, Buffer.concat([miniStream, Buffer.alloc(miniStreamSectors * SECTOR - miniStream.length)]), ...big]);
+}
+
+// Enregistrements BIFF de VPX : [longueur][étiquette][données], chaînes [longueur][octets].
+export const biff = (tag: string, data: Buffer = Buffer.alloc(0)) => {
+  const head = Buffer.alloc(8);
+  head.writeUInt32LE(4 + data.length, 0);
+  head.write(tag, 4, 'latin1');
+  return Buffer.concat([head, data]);
+};
+export const biffStr = (s: string) => {
+  const n = Buffer.alloc(4);
+  n.writeUInt32LE(Buffer.byteLength(s), 0);
+  return Buffer.concat([n, Buffer.from(s)]);
+};
+export const u32 = (v: number) => {
+  const b = Buffer.alloc(4);
+  b.writeUInt32LE(v, 0);
+  return b;
+};
+
+/**
+ * .vpx minimal dont GameStg/GameData porte ce script, comme VPX l'écrit : l'enregistrement
+ * CODE (longueur 4), puis la longueur du texte et le texte. `protectedScript` : un
+ * enregistrement SECB qui marque le script comme protégé (chiffré).
+ */
+export function vpxWithScript(script: string, protectedScript = false): Buffer {
+  const secb = Buffer.alloc(52);
+  secb.writeUInt32LE(0x00000002, 32);
+  const text = Buffer.from(script, 'latin1');
+  const gameData = Buffer.concat([...(protectedScript ? [biff('SECB', secb)] : []), biff('NAME', biffStr('Table1')), biff('CODE'), u32(text.length), text, biff('ENDB')]);
+  return cfb({ TableName: 'Table' }, { GameData: gameData });
 }

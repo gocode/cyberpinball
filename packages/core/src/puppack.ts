@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { AncillaryRoleId, Cabinet, RoleId } from './model';
 import { formatList, t } from './i18n';
+import { commentStart, statements } from './vbscript';
 import { roleZone, zoneRatio } from './zones';
 
 export const PUP_FILES = ['screens.pup', 'playlists.pup', 'triggers.pup'] as const;
@@ -21,6 +22,23 @@ export interface PupScriptFacts {
   packNames: string[];
   /** Le script déclare lui-même ses playlists (packs anciens, sans .pup). */
   playlistAdd: boolean;
+  /**
+   * Le script ne lance jamais le pack : son lancement dépend d'une variable que le
+   * script règle autrement au départ (« usePUP = False »). Absent si rien ne l'en empêche.
+   */
+  disabledBy?: PupSwitch;
+}
+
+/** Interrupteur du script qui décide si le PuP-Pack est lancé. */
+export interface PupSwitch {
+  /** Variable (« usePUP »). */
+  variable: string;
+  /** Valeur que le script lui donne, telle qu'écrite (« False »). */
+  value: string;
+  /** Valeur qui lance le pack (« True ») ; absente si on ne sait pas la déduire. */
+  enable?: string;
+  /** Ligne de l'affectation dans le script (à partir de 0). */
+  line: number;
 }
 
 /**
@@ -41,7 +59,239 @@ export function pupScriptFacts(code: string): PupScriptFacts | undefined {
   if (!uses && !b2s.length && !init.length) return undefined;
   const packNames: string[] = [];
   for (const name of [...b2s, ...init]) if (name && !packNames.some((n) => n.toLowerCase() === name.toLowerCase())) packNames.push(name);
-  return { packNames, playlistAdd: /\.playlistadd\b/i.test(code) };
+  const facts: PupScriptFacts = { packNames, playlistAdd: /\.playlistadd\b/i.test(code) };
+  const disabledBy = pupScriptSwitch(code);
+  if (disabledBy) facts.disabledBy = disabledBy;
+  return facts;
+}
+
+// ---------- Interrupteur du script ----------
+
+const ROUTINE_START = /^\s*(?:(?:public|private)\s+)?(?:sub|function)\s+(\w+)/i;
+const ROUTINE_END = /^\s*end\s+(?:sub|function)\b/i;
+const LITERAL = /^(true|false|-?\d+|"[^"]*")$/i;
+
+type Value = boolean | number | string;
+
+function literalValue(text: string): Value {
+  const lower = text.toLowerCase();
+  if (lower === 'true') return true;
+  if (lower === 'false') return false;
+  if (text.startsWith('"')) return text.slice(1, -1);
+  return Number(text);
+}
+
+/** Valeur numérique de VBScript (True vaut -1), ou la chaîne. */
+const numeric = (v: Value) => (v === true ? -1 : v === false ? 0 : v);
+
+interface Assignment {
+  /** Nom de la variable tel qu'écrit. */
+  name: string;
+  value: string;
+  line: number;
+  /** Dans une Sub ou une Function (exécutée plus tard, ou jamais). */
+  inRoutine: boolean;
+  /** Valeur littérale (sinon calculée : option de la table, fichier, autre variable). */
+  literal: boolean;
+}
+
+/**
+ * Le lancement du pack (CreateObject("PinUpPlayer.PinDisplay"), puis B2SInit ou
+ * Init) n'est atteint que si une variable a une certaine valeur, et le script lui en
+ * donne une autre au départ : 2001 : A Space Odyssey (Original 2025) livre
+ * « usePUP = False », et le plugin PUP ne charge jamais son pack, même bien rangé.
+ * Les conditions qui entourent la ligne sont suivies dans sa Sub, puis là où cette
+ * Sub est appelée (trois niveaux). undefined si rien ne l'empêche, ou si on ne peut
+ * pas le dire : valeur calculée (option de la table, fichier lu), changée dans une
+ * Sub, Else, Select Case.
+ * `code` : le script sans commentaires, une ligne pour une ligne (scriptCode).
+ */
+export function pupScriptSwitch(code: string): PupSwitch | undefined {
+  const lines = code.split(/\r?\n/);
+  const routineOf: (string | undefined)[] = [];
+  let routine: string | undefined;
+  for (const line of lines) {
+    const start = ROUTINE_START.exec(line);
+    if (start) routine = start[1]!.toLowerCase();
+    routineOf.push(routine);
+    if (ROUTINE_END.test(line)) routine = undefined;
+  }
+  const assignments = new Map<string, Assignment[]>();
+  lines.forEach((line, i) => {
+    const inRoutine = routineOf[i] !== undefined && !ROUTINE_START.test(line);
+    for (const statement of statements(line)) {
+      // « If x Then usePUP = True » : une affectation qui peut avoir lieu, comme dans une Sub.
+      const single = /^if\s+.+?\s+then\s+(.+)$/i.exec(statement);
+      const tails = single ? single[1]!.split(/\s+else\s+/i) : [statement];
+      for (const s of tails) {
+        const m = /^(?:const\s+|set\s+)?([A-Za-z_]\w*)\s*=\s*(.+)$/i.exec(s.trim());
+        if (!m || /^(if|elseif|for|while|do|select|case)\b/i.test(s.trim())) continue;
+        const key = m[1]!.toLowerCase();
+        const value = m[2]!.trim();
+        const list = assignments.get(key) ?? [];
+        list.push({ name: m[1]!, value, line: i, inRoutine: inRoutine || Boolean(single), literal: LITERAL.test(value) });
+        assignments.set(key, list);
+      }
+    }
+  });
+
+  /** Valeur de départ d'une variable, si elle est sûre : littérale hors de toute Sub, jamais rallumée ailleurs. */
+  const startValue = (name: string, off: (v: Value) => boolean): Assignment | undefined => {
+    const list = assignments.get(name.toLowerCase()) ?? [];
+    const top = list.filter((a) => !a.inRoutine);
+    if (!top.length || top.some((a) => !a.literal)) return undefined;
+    const last = top.at(-1)!;
+    if (top.some((a) => numeric(literalValue(a.value)) !== numeric(literalValue(last.value)))) return undefined;
+    // Une Sub qui la rallume (option de la table, réglage lu) : on ne peut rien dire.
+    if (list.some((a) => a.inRoutine && (!a.literal || !off(literalValue(a.value))))) return undefined;
+    return last;
+  };
+
+  /** Condition d'un If : fausse au départ ? Alors la variable et la valeur qui la rendrait vraie. */
+  const blocking = (cond: string): PupSwitch | undefined => {
+    const c = cond.trim().replace(/^\((.*)\)$/, '$1').trim();
+    const ors = c.split(/\s+or\s+/i);
+    if (ors.length > 1) {
+      const all = ors.map(blocking);
+      return all.every(Boolean) ? all[0] : undefined;
+    }
+    for (const part of c.split(/\s+and\s+/i)) {
+      const found = blockingPart(part.trim().replace(/^\((.*)\)$/, '$1').trim());
+      if (found) return found;
+    }
+    return undefined;
+  };
+  const blockingPart = (part: string): PupSwitch | undefined => {
+    let variable: string;
+    let test: (v: Value) => boolean;
+    let enable: (assigned: string) => string | undefined;
+    const bool = (assigned: string, on: boolean) => (/^(true|false)$/i.test(assigned) ? (on ? 'True' : 'False') : on ? '1' : '0');
+    let m: RegExpExecArray | null;
+    if ((m = /^not\s+([A-Za-z_]\w*)$/i.exec(part))) {
+      variable = m[1]!;
+      test = (v) => !truthy(v);
+      enable = (a) => bool(a, false);
+    } else if ((m = /^([A-Za-z_]\w*)$/.exec(part))) {
+      variable = m[1]!;
+      test = truthy;
+      enable = (a) => bool(a, true);
+    } else if ((m = /^([A-Za-z_]\w*)\s*(=|<>|>=|<=|>|<)\s*(true|false|-?\d+|"[^"]*")$/i.exec(part))) {
+      variable = m[1]!;
+      const op = m[2]!;
+      const raw = m[3]!;
+      const want = numeric(literalValue(raw));
+      test = (v) => compare(numeric(v), op, want);
+      enable = (a) => {
+        if (op === '=') return /^(true|false)$/i.test(raw) ? (want === -1 ? 'True' : 'False') : raw;
+        if (op === '<>' && typeof want !== 'string') return bool(a, want === 0);
+        if (typeof want !== 'number') return undefined;
+        if (op === '>=') return String(want);
+        if (op === '>') return String(want + 1);
+        return undefined;
+      };
+    } else return undefined;
+    const assigned = startValue(variable, (v) => !test(v));
+    if (!assigned || test(literalValue(assigned.value))) return undefined;
+    const sw: PupSwitch = { variable: assigned.name, value: assigned.value, line: assigned.line };
+    const on = enable(assigned.value);
+    if (on !== undefined) sw.enable = on;
+    return sw;
+  };
+
+  /** Conditions des If qui entourent la ligne `i`, jusqu'au début de sa Sub ; null : branche Else, on ne sait pas. */
+  const guards = (i: number, needle: RegExp): { conds: string[]; routine?: string } | null => {
+    const conds: string[] = [];
+    const single = /^\s*if\s+(.+?)\s+then\s+(.+)$/i.exec(lines[i]!);
+    if (single && needle.test(single[2]!)) conds.push(single[1]!);
+    let depth = 0;
+    for (let j = i - 1; j >= 0; j--) {
+      const l = lines[j]!.trim();
+      const start = ROUTINE_START.exec(l);
+      if (start) return { conds, routine: start[1]!.toLowerCase() };
+      if (ROUTINE_END.test(l)) return { conds };
+      if (/^end\s+if\b/i.test(l)) depth++;
+      else if (/^if\b.+\bthen$/i.test(l)) {
+        if (depth > 0) depth--;
+        else conds.push(/^if\s+(.+)\s+then$/i.exec(l)![1]!);
+      } else if (depth === 0 && /^(else|elseif|case)\b/i.test(l)) return null;
+    }
+    return { conds };
+  };
+
+  /** La ligne est-elle bloquée ? Le blocage, null si elle est atteinte (ou si on ne sait pas). */
+  const blockedAt = (i: number, needle: RegExp, level: number): PupSwitch | null => {
+    const g = guards(i, needle);
+    if (!g) return null;
+    for (const cond of g.conds) {
+      const sw = blocking(cond);
+      if (sw) return sw;
+    }
+    if (!g.routine || level >= 3) return null;
+    const call = new RegExp(`\\b${g.routine}\\b`, 'i');
+    const sites = lines.map((l, k) => k).filter((k) => call.test(lines[k]!) && !ROUTINE_START.test(lines[k]!) && routineOf[k] !== g.routine);
+    // Sub jamais appelée par le script : un événement de VPX (Table1_Init…), atteinte.
+    if (!sites.length) return null;
+    let first: PupSwitch | null = null;
+    for (const k of sites) {
+      const sw = blockedAt(k, call, level + 1);
+      if (!sw) return null;
+      first ??= sw;
+    }
+    return first;
+  };
+
+  const create = /CreateObject\s*\(\s*"PinUpPlayer\.PinDisplay"\s*\)/i;
+  const starts = lines.map((l, i) => i).filter((i) => create.test(lines[i]!));
+  if (!starts.length) return undefined;
+  let found: PupSwitch | undefined;
+  for (const i of starts) {
+    const sw = blockedAt(i, create, 0);
+    if (!sw) return undefined;
+    found ??= sw;
+  }
+  return found;
+}
+
+function truthy(v: Value): boolean {
+  return typeof v === 'string' ? v !== '' : v !== false && v !== 0;
+}
+
+function compare(a: number | string, op: string, b: number | string): boolean {
+  if (typeof a !== typeof b) return op === '<>';
+  switch (op) {
+    case '=':
+      return a === b;
+    case '<>':
+      return a !== b;
+    case '>':
+      return a > b;
+    case '<':
+      return a < b;
+    case '>=':
+      return a >= b;
+    default:
+      return a <= b;
+  }
+}
+
+/**
+ * Le script avec l'interrupteur allumé : seule la valeur de l'affectation change, sur
+ * sa ligne ; le reste (fins de ligne, commentaires, accents) est rendu tel quel.
+ * undefined si la ligne n'est plus celle qu'on attend.
+ */
+export function enablePupSwitch(script: string, sw: PupSwitch): string | undefined {
+  if (sw.enable === undefined) return undefined;
+  const parts = script.split(/(\r?\n)/);
+  const index = sw.line * 2;
+  const line = parts[index];
+  if (line === undefined) return undefined;
+  const at = commentStart(line);
+  const code = at < 0 ? line : line.slice(0, at);
+  const value = sw.value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const re = new RegExp(`(^|:)(\\s*(?:const\\s+)?${sw.variable}\\s*=\\s*)${value}(?=\\s*(?::|$))`, 'i');
+  if (!re.test(code)) return undefined;
+  parts[index] = code.replace(re, (_, sep: string, head: string) => `${sep}${head}${sw.enable}`) + (at < 0 ? '' : line.slice(at));
+  return parts.join('');
 }
 
 /** Littéral, ou valeurs données à la variable (Const cPuPPack = "…", pGameName = "…"). */

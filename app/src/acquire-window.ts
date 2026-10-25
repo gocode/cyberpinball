@@ -31,6 +31,9 @@ import { app, BrowserWindow, ipcMain, screen, session, shell, WebContentsView, t
 import {
   createTransferMeter,
   DIRECT_MAX_STEPS,
+  expectedSizeFromPage,
+  PAGE_SIZE_PROBE,
+  type PageSizeHint,
   DOWNLOAD_PROBES,
   formatTransfer,
   probeReasonText,
@@ -200,7 +203,9 @@ export function createAcquirer(events: AcquireEvents) {
         if (claim.signal.aborted) item.cancel();
         else claim.signal.addEventListener('abort', () => item.getState() === 'progressing' && item.cancel(), { once: true });
       }
-      track(item, filename, (progress) => (claim ? claim.progress?.(progress) : events.progress(filename, progress)));
+      const tracked = track(item, filename, (progress) => (claim ? claim.progress?.(progress) : events.progress(filename, progress)));
+      // Le site n'annonce pas la taille : celle qu'affiche sa page, à défaut.
+      if (contents && !item.getTotalBytes()) void expectedFrom(contents, filename).then((bytes) => (tracked.expected = bytes));
       item.once('done', (_e, state) => {
         untrack(item);
         if (state === 'completed') {
@@ -225,19 +230,53 @@ export function createAcquirer(events: AcquireEvents) {
   }
 
   /** Téléchargements en cours de la session, par ordre d'arrivée. */
-  const downloads = new Map<number, { id: number; item: DownloadItem; filename: string; meter: TransferMeter; progress: TransferProgress; report(p: TransferProgress): void }>();
+  /** Un téléchargement suivi ; `expected` : la taille lue sur sa page, quand le site ne l'annonce pas. */
+  type Tracked = { id: number; item: DownloadItem; filename: string; meter: TransferMeter; progress: TransferProgress; report(p: TransferProgress): void; expected?: number };
+  const downloads = new Map<number, Tracked>();
+
+  /** Tailles affichées par la dernière page chargée de chaque vue (fenêtre visible, téléchargement direct). */
+  const pageHints = new Map<number, PageSizeHint[]>();
+
+  /** Relève les tailles que montre chaque page chargée : la page de téléchargement qui suit les montre rarement. */
+  function watchSizes(contents: Electron.WebContents): void {
+    const id = contents.id;
+    contents.on('did-stop-loading', () => {
+      void readSizes(contents).then((hints) => {
+        if (hints.length) pageHints.set(id, hints);
+      });
+    });
+    contents.once('destroyed', () => pageHints.delete(id));
+  }
+
+  async function readSizes(contents: Electron.WebContents): Promise<PageSizeHint[]> {
+    try {
+      if (contents.isDestroyed()) return [];
+      const hints = (await contents.executeJavaScript(PAGE_SIZE_PROBE, true)) as unknown;
+      return Array.isArray(hints) ? (hints as PageSizeHint[]).filter((h) => typeof h?.size === 'string' && typeof h?.context === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Taille d'un fichier d'après la page d'où il part (celle-ci, sinon la précédente de la même vue). */
+  async function expectedFrom(contents: Electron.WebContents, filename: string): Promise<number | undefined> {
+    const now = await readSizes(contents);
+    return expectedSizeFromPage(now, filename) ?? expectedSizeFromPage(pageHints.get(contents.id) ?? [], filename);
+  }
   let nextDownload = 1;
   let sampler: NodeJS.Timeout | undefined;
   let samples = 0;
   /** Téléchargement désigné à la borne (Start), jusqu'à quand. */
   let armed: { id: number; until: number } | undefined;
 
-  function track(item: DownloadItem, filename: string, report: (p: TransferProgress) => void): void {
+  function track(item: DownloadItem, filename: string, report: (p: TransferProgress) => void) {
     const id = nextDownload++;
     const meter = createTransferMeter();
-    downloads.set(id, { id, item, filename, meter, progress: meter.update(item.getReceivedBytes(), item.getTotalBytes()), report });
+    const entry: Tracked = { id, item, filename, meter, progress: meter.update(item.getReceivedBytes(), item.getTotalBytes()), report };
+    downloads.set(id, entry);
     sampler ??= setInterval(sample, SAMPLE_MS);
     sendBar();
+    return entry;
   }
 
   function untrack(item: DownloadItem): void {
@@ -254,14 +293,17 @@ export function createAcquirer(events: AcquireEvents) {
   function sample(): void {
     const report = ++samples % REPORT_EVERY === 0;
     for (const d of downloads.values()) {
-      const total = d.item.getTotalBytes();
+      // Taille annoncée par le site, sinon celle de sa page (approchée).
+      const announced = d.item.getTotalBytes();
+      const total = announced || d.expected;
+      const approx = !announced && Boolean(d.expected);
       if (d.item.isPaused() || d.item.getState() !== 'progressing') {
         // En pause ou interrompu : pas de débit, la mesure repart à la reprise.
         d.meter.pause();
-        d.progress = { received: d.item.getReceivedBytes(), ...(total ? { total } : {}) };
+        d.progress = { received: d.item.getReceivedBytes(), ...(total ? { total } : {}), ...(total && approx ? { approx: true } : {}) };
         continue;
       }
-      d.progress = d.meter.update(d.item.getReceivedBytes(), total);
+      d.progress = d.meter.update(d.item.getReceivedBytes(), total, Date.now(), approx);
       if (report) d.report(d.progress);
     }
     if (armed && Date.now() > armed.until) armed = undefined;
@@ -291,6 +333,7 @@ export function createAcquirer(events: AcquireEvents) {
     const rest = [...downloads.values()].filter((d) => !shown.some((l) => l.id === d.id));
     const sum: TransferProgress = { received: rest.reduce((n, d) => n + d.progress.received, 0) };
     if (rest.every((d) => d.progress.total)) sum.total = rest.reduce((n, d) => n + d.progress.total!, 0);
+    if (sum.total && rest.some((d) => d.progress.approx)) sum.approx = true;
     const rate = rest.reduce((n, d) => n + (d.progress.rate ?? 0), 0);
     if (rate > 0) sum.rate = rate;
     return { lines: shown, more: t('Et {n} autres : {progress}', { n: rest.length, progress: formatTransfer(sum) }) };
@@ -443,6 +486,7 @@ export function createAcquirer(events: AcquireEvents) {
       : { win, view, request, status: request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.'), warn: request.status !== undefined };
     const contents = view.webContents;
     claimFor(contents.id, request.claim);
+    watchSizes(contents);
     // Une page qui ouvre un nouvel onglet (lien de téléchargement, MEGA) : dans la même vue.
     contents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/i.test(url)) void contents.loadURL(url);
@@ -661,6 +705,7 @@ export function createAcquirer(events: AcquireEvents) {
   ): Promise<{ ok: true; filename: string } | { ok: false; reason: string; login?: boolean; quota?: boolean }> {
     const view = hiddenView();
     const contents = view.webContents;
+    watchSizes(contents);
     if (opts.claim) claims.set(contents.id, opts.claim);
     let started: DownloadItem | undefined;
     let wake: (() => void) | undefined;

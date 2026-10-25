@@ -289,7 +289,7 @@ function setupStep(input: JourneyInput): JourneyStep {
 }
 
 /** Constats de rangement de la table : proposés, jamais indispensables (la table se lance). */
-const TIDY_CODES: readonly Finding['code'][] = ['outsideFolder', 'scriptOverride', 'crashReport'];
+const TIDY_CODES: readonly Finding['code'][] = ['outsideFolder', 'scriptOverride', 'scriptPatchStale', 'crashReport'];
 
 /** Le fichier .vpx : là, puisque la table est installée ; ce que demande son script. */
 function tableStep(input: JourneyInput): JourneyStep {
@@ -448,7 +448,7 @@ function backglassStep(input: JourneyInput): JourneyStep | undefined {
   return extraStep(input, 'backglass', 'b2s', title, t('Facultatif : sans lui, le menu garde son image sur l’écran du fronton pendant la partie.'), (s) => t('Récupérer le fronton : {label}', { label: versionLabel(s.file) }));
 }
 
-const PUP_FIXES: readonly Finding['code'][] = ['pupMissing', 'pupNested', 'pupOptionNotApplied', 'pupOptionUnsuited'];
+const PUP_FIXES: readonly Finding['code'][] = ['pupMissing', 'pupNested', 'pupDisabledByScript', 'pupOptionNotApplied', 'pupOptionUnsuited'];
 
 function pupStep(input: JourneyInput): JourneyStep | undefined {
   const script = input.script && !('error' in input.script) ? input.script : undefined;
@@ -457,6 +457,9 @@ function pupStep(input: JourneyInput): JourneyStep | undefined {
   const title = 'PuP-Pack';
   const fixable = found.find((f) => f.fix);
   if (fixable) return { id: 'pup', title, state: 'todo', required: false, detail: `${fixable.title}. ${fixable.detail}`, choices: [repairChoice(fixable, true)] };
+  // Coupé par un script qu'on ne sait pas réécrire (table protégée) : à changer à la main.
+  const off = found.find((f) => f.code === 'pupDisabledByScript');
+  if (off) return { id: 'pup', title, state: 'todo', required: false, detail: `${off.title}. ${off.detail}`, choices: [] };
   if (found.some((f) => f.code === 'pupMissing')) {
     return extraStep(input, 'pup', 'pup', title, t('Facultatif : le script charge un PuP-Pack (vidéos sur le fronton et l’afficheur) ; la table se joue sans.'), (s) => t('Récupérer le PuP-Pack : {label}', { label: versionLabel(s.file) }));
   }

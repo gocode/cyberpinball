@@ -363,7 +363,7 @@ export function createCatalog(ctx: CatalogContext) {
     received: (file, facts) => void received(file, facts, 'window', vpsCache),
     progress: (filename, progress) => {
       notice = {
-        text: t('Téléchargement de « {file} » : {progress}…', { file: filename, progress: formatTransfer(progress) }),
+        text: t('Téléchargement de « {file} » : {progress}…', { file: filename, progress: formatTransfer(progress, true) }),
         tone: 'info',
       };
       host.broadcast();

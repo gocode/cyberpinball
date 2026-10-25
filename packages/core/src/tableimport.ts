@@ -27,6 +27,7 @@ import {
   findPackRoot,
   isPackRoot,
   type BatReport,
+  pupScriptSwitch,
   type PupCabinet,
   type PupVariant,
   type VariantChoice,
@@ -37,6 +38,9 @@ import { classifyDir, classifyFile, nameKey, type FileKind } from './tablefiles'
 import { parseTableName, readInfo, type TableInfoFile } from './tables';
 import { HISTORIC_ROM_ALIASES } from './vpmalias';
 import { ipdbIdOf, matchVps, type VpsCandidate, type VpsDb } from './vps';
+import { buildScriptPatch, readScriptPatch } from './scriptpatch';
+import { scriptCode } from './vbscript';
+import { readVpxScript } from './vpxinfo';
 
 export interface ImportSource {
   /** Fichier ou dossier sur le disque (une archive déjà déballée est un dossier). */
@@ -60,6 +64,8 @@ export interface KnownTable {
   pupNames?: string[];
   /** Jeu VPS de son .info : le dossier est retrouvé même si VPS lui donne un autre nom. */
   vpsId?: string;
+  /** Ses .vpx dont le script coupe le PuP-Pack (« usePUP = False ») : allumé si le pack arrive. */
+  pupOff?: string[];
 }
 
 export interface PlanOptions {
@@ -228,6 +234,15 @@ export interface TablePlan {
   warnings: string[];
   /** Absent sans base VPS, et pour un complément sans table. */
   vps?: TableVps;
+  /** .vbs de Cyber Pinball (PuP-Pack allumé) à écrire ou à retirer. */
+  scripts: ScriptPatchPlan[];
+}
+
+/** .vbs de Cyber Pinball, à côté d'un .vpx installé : le script de la table, PuP-Pack allumé. */
+export interface ScriptPatchPlan {
+  to: string;
+  /** Contenu, en latin1 (octet pour octet) ; absent : l'ancien .vbs de Cyber Pinball part à la corbeille. */
+  content?: string;
 }
 
 export interface ImportPlan {
@@ -282,6 +297,8 @@ interface Game {
   dmdFolders: string[];
   /** Noms de PuP-Pack attendus d'après les scripts. */
   pupNames: string[];
+  /** .vpx déjà installés dont le script coupe le PuP-Pack (KnownTable.pupOff). */
+  pupOff?: string[];
   vps?: TableVps;
   /** Jeu VPS retenu, ou celui du .info d'une table installée. */
   vpsId?: string;
@@ -574,6 +591,7 @@ function groupGames(vpx: Item[], items: Item[], packages: { name: string; isPack
       dmdFolders: known.dmdFolder ? [known.dmdFolder] : [],
       pupNames: known.pupNames ?? [],
       vpsId: known.vpsId,
+      pupOff: known.pupOff,
     });
   }
   return games;
@@ -622,6 +640,7 @@ function describeGame(vpx: Item[], items: Item[], packages: { name: string; isPa
     pupNames: uniqueNames([...pupNames, ...(known?.pupNames ?? [])]),
     vps,
     vpsId: game?.id ?? known?.vpsId,
+    pupOff: known?.pupOff,
   };
 }
 
@@ -926,6 +945,7 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
     warnings.push(t("La ROM « {rom} » n'est pas dans l'import : la table ne démarrera pas sans elle.", { rom: game.roms[0]! }));
   }
   if (!game.isNew && !game.vpx.length && !steps.length) warnings.push(t('Rien à ajouter à cette table.'));
+  const scripts = planScriptPatches(game, steps, opts, warnings);
 
   return {
     title: info.Info.Title ?? game.title,
@@ -941,7 +961,64 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
     roms: game.roms,
     warnings,
     vps: game.vps,
+    scripts,
   };
+}
+
+/**
+ * PuP-Pack coupé par le script (« usePUP = False ») : allumé dans un .vbs posé à côté
+ * de la table (scriptpatch.ts), sans toucher à la table, dès que le pack est là. À la
+ * mise à jour d'une table, le .vbs de Cyber Pinball est refait d'après le nouveau script,
+ * ou retiré s'il ne sert plus. Un .vbs venu d'ailleurs n'est jamais remplacé.
+ */
+function planScriptPatches(game: Game, steps: ImportStep[], opts: PlanOptions, warnings: string[]): ScriptPatchPlan[] {
+  const packs = [...steps.flatMap((s) => (s.pack ? [s.pack.name] : [])), ...listSafe(path.join(game.folder, 'pupvideos'))].map((n) => n.toLowerCase());
+  const incoming = steps.flatMap((s) => (s.pack ? [s.pack.name.toLowerCase()] : []));
+  const out: ScriptPatchPlan[] = [];
+  const consider = (source: string, vpx: string, names: string[], off: boolean, packsThere: string[]) => {
+    const to = vpx.replace(/.vpx$/i, '.vbs');
+    const file = path.basename(to);
+    if (steps.some((s) => samePath(s.to, to))) return;
+    const existing = readLatin1(to);
+    const ours = existing !== undefined && readScriptPatch(existing) !== undefined;
+    if (existing !== undefined && !ours) return;
+    const wanted = off && names.some((n) => packsThere.includes(n.toLowerCase()));
+    if (!wanted && !ours) return;
+    const script = readVpxScript(source);
+    const sw = script !== undefined ? pupScriptSwitch(scriptCode(script)) : undefined;
+    const content = script !== undefined && sw ? buildScriptPatch(script, [sw]) : undefined;
+    if (content !== undefined && content === existing) return;
+    const params = { table: game.title, file, variable: sw?.variable ?? '', value: sw?.value ?? '', enable: sw?.enable ?? '?' };
+    if (content) {
+      out.push({ to, content });
+      warnings.push(t('Le script de « {table} » coupe le PuP-Pack ({variable} = {value}) : Cyber Pinball l’allume dans {file}, sans modifier la table.', params));
+    } else if (ours) {
+      out.push({ to });
+      warnings.push(t('{file}, écrit par Cyber Pinball pour l’ancienne version de la table, part à la corbeille : le nouveau script ne coupe plus le PuP-Pack.', params));
+    } else if (sw) {
+      warnings.push(t('Le script de « {table} » coupe le PuP-Pack ({variable} = {value}) : mettez {variable} = {enable} dans son script.', params));
+    } else if (wanted) {
+      warnings.push(t('Le script de « {table} » coupe le PuP-Pack : il faudra l’allumer dans son script.', params));
+    }
+  };
+  for (const step of steps.filter((s) => s.kind === 'table')) {
+    const facts = opts.scripts?.get(step.from.toLowerCase());
+    consider(step.from, step.to, expectedPackNames(facts), Boolean(facts?.pup?.disabledBy), packs);
+  }
+  // Table déjà installée : seulement si le pack arrive avec cet import.
+  for (const vpx of game.pupOff ?? []) {
+    if (steps.some((s) => s.kind === 'table' && samePath(s.to, vpx))) continue;
+    consider(vpx, vpx, game.pupNames, true, incoming);
+  }
+  return out;
+}
+
+function readLatin1(file: string): string | undefined {
+  try {
+    return fs.readFileSync(file, 'latin1');
+  } catch {
+    return undefined;
+  }
 }
 
 export interface ImportContext extends OpContext {
@@ -966,6 +1043,10 @@ export function applyImport(plan: TablePlan, ctx: ImportContext): void {
     if (s.pack) ops.push(...packOps(s.to, s.pack));
   }
   applyOps(ops, ctx);
+  applyOps(
+    (plan.scripts ?? []).map((s): FileOp => (s.content !== undefined ? { op: 'write', path: s.to, content: s.content, encoding: 'latin1' } : { op: 'trash', path: s.to })),
+    ctx,
+  );
   const tmp = `${plan.infoFile}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, JSON.stringify(plan.info, null, 2) + '\n', 'utf8');
   fs.renameSync(tmp, plan.infoFile);

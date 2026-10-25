@@ -25,6 +25,7 @@ son interface).
 - Écran « Téléchargements » : les fichiers déjà reçus, à reprendre ou à supprimer ; un sélecteur de fichiers intégré remplace celui de Windows.
 - Fenêtre « Récupérer » : progression de chaque téléchargement (pourcentage, volume, débit, temps restant) et bouton « Annuler ».
 - L'écran où s'ouvre la fenêtre « Récupérer » se choisit dans la configuration de la borne.
+- PuP-Pack coupé par le script de sa table (2001, par exemple) : allumé à l'installation, et réparé par « Diagnostiquer et réparer » pour les tables déjà installées.
 - La fenêtre « Récupérer » reste au premier plan : le fronton ne passe plus devant au premier clic.
 - Fenêtre « Récupérer » sur une borne : elle s'ouvre sur un écran lisible (le fronton si le playfield est tourné), le pointeur amené dessus ; Exit la ferme.
 - La fenêtre « Récupérer » rouverte reprend la page où vous en étiez ; recherche des sites plus complète.

@@ -56,8 +56,8 @@ export interface MediaSitesContext {
 }
 
 /** Champs d'un SiteJob pour une progression (chacun écrit, même absent : pas de débit d'un relevé précédent). */
-function progressOf(p: TransferProgress): Pick<SiteJob, 'received' | 'total' | 'rate' | 'remaining'> {
-  return { received: p.received, total: p.total, rate: p.rate, remaining: p.remaining };
+function progressOf(p: TransferProgress): Pick<SiteJob, 'received' | 'total' | 'approx' | 'rate' | 'remaining'> {
+  return { received: p.received, total: p.total, approx: p.approx, rate: p.rate, remaining: p.remaining };
 }
 
 export type SiteJobState ='queued' | 'waiting' | 'downloading' | 'unpacking' | 'received' | 'failed';
@@ -74,6 +74,8 @@ export interface SiteJob {
   seconds?: number;
   received?: number;
   total?: number;
+  /** Taille lue sur la page du site (il ne l'annonce pas) : approchée. */
+  approx?: boolean;
   /** Débit lissé (octets par seconde) et secondes restantes, dès qu'ils sont mesurés (transfer.ts). */
   rate?: number;
   remaining?: number;
@@ -532,7 +534,7 @@ export function createMediaSites(ctx: MediaSitesContext) {
   /** « 18,4 Mo sur 40 Mo · 2,1 Mo/s · environ 10 s » (transfer.ts). */
   function progressText(job: SiteJob): string | undefined {
     if (job.received === undefined) return undefined;
-    return formatTransfer({ received: job.received, total: job.total, rate: job.rate, remaining: job.remaining });
+    return formatTransfer({ received: job.received, total: job.total, approx: job.approx, rate: job.rate, remaining: job.remaining });
   }
 
   return {

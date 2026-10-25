@@ -7,6 +7,7 @@ import * as path from 'node:path';
 import { t } from './i18n';
 import { findPackRoot, isJunkName } from './puppack';
 import { romContent } from './romzip';
+import { isScriptPatchFile } from './scriptpatch';
 
 export type FileKind =
   | 'table'
@@ -137,7 +138,10 @@ export interface TableInventory {
   altsound: string[];
   music: number;
   tableIni: boolean;
+  /** Un .vbs venu d'ailleurs remplace le script de la table. */
   scriptOverride: boolean;
+  /** Le .vbs est celui de Cyber Pinball : le script de la table, PuP-Pack allumé (scriptpatch.ts). */
+  scriptPatched: boolean;
   medias: number;
   crashReports: string[];
 }
@@ -160,7 +164,8 @@ export function inventory(tableFile: string, ownFolder: boolean): TableInventory
     altsound: ownFolder ? listDirs(path.join(folder, 'altsound')) : [],
     music: ownFolder ? countFiles(path.join(folder, 'music')) : 0,
     tableIni: fs.existsSync(path.join(folder, `${base}.ini`)),
-    scriptOverride: fs.existsSync(path.join(folder, `${base}.vbs`)),
+    scriptOverride: fs.existsSync(path.join(folder, `${base}.vbs`)) && !isScriptPatchFile(path.join(folder, `${base}.vbs`)),
+    scriptPatched: isScriptPatchFile(path.join(folder, `${base}.vbs`)),
     medias: ownFolder ? countFiles(path.join(folder, 'medias')) : 0,
     crashReports: ownFolder ? files.filter((f) => ['crash.txt', 'crash.dmp'].includes(lower(f))) : [],
   };

@@ -23,6 +23,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - "Downloads" screen: files already received, to reuse or delete; a built-in file picker replaces the Windows one.
 - "Fetch" window: progress of each download (percentage, size, speed, time left) and a "Cancel" button.
 - The screen where the "Fetch" window opens is chosen in the cabinet configuration.
+- PuP-Pack turned off by its table's script (2001, for instance): turned on at install, and repaired by "Diagnose and fix" for tables already installed.
 - The "Récupérer" window stays in front: the backglass no longer comes over it on the first click.
 - "Fetch" window on a cabinet: it opens on a readable screen (the backglass if the playfield is turned), with the pointer brought onto it; Exit closes it.
 - The "Fetch" window, when reopened, picks up the page where you were; more thorough site search.
