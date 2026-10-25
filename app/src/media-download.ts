@@ -16,7 +16,9 @@ import * as path from 'node:path';
 import {
   acceptMediaDbNotice,
   cleanMediaDbStaging,
+  createTransferMeter,
   formatSize,
+  formatTransfer,
   freeSpace,
   infoFileFor,
   installMediaDb,
@@ -557,11 +559,15 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   /** Message de progression, au plus quatre fois par seconde ; `line` habille l'étape (« Téléchargement : … »). */
   function progressReporter(line: (step: string) => string) {
     let last = 0;
+    // Un compteur par fichier : débit et temps restant du fichier en cours (transfer.ts).
+    let meter = { index: -1, of: createTransferMeter() };
     return (p: { index: number; total: number; type: MediaType; received: number; size?: number }) => {
+      if (meter.index !== p.index) meter = { index: p.index, of: createTransferMeter() };
+      const progress = meter.of.update(p.received, p.size);
       const now = Date.now();
       if (p.received && now - last < 250) return;
       last = now;
-      const amount = p.size ? t('{received} sur {size}', { received: formatSize(p.received), size: formatSize(p.size) }) : p.received ? formatSize(p.received) : '';
+      const amount = p.received || p.size ? formatTransfer(progress) : '';
       const params = { type: mediaTypeInfo(p.type).label, index: p.index + 1, total: p.total, amount };
       ctx.progress(line(amount ? t('{type} ({index} sur {total}) : {amount}…', params) : t('{type} ({index} sur {total})…', params)));
     };

@@ -1,4 +1,5 @@
 import { vpxAudioSettings } from './audio';
+import { managedJoysticks, noAutoLayoutSettings, vpxAnalogSettings } from './plunger';
 import { buttonInfo, buttonProblems, DEFAULT_BUTTONS, inGameMenuSetting, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, type SilencedAction } from './buttons';
 import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxFolderDefaults, type DetectedDmd, type GlobalDmdFolders } from './dmd';
 import { t } from './i18n';
@@ -300,6 +301,12 @@ export function planVpxSync(
       });
     }
   }
+
+  // Lanceur analogique et accéléromètre : seulement après l'étape « Lanceur ». Les joysticks
+  // dont Cyber Pinball écrit les boutons ou les capteurs ne reçoivent plus la disposition par
+  // défaut de VPX, qui commencerait par effacer tout ce qui vient d'eux (plunger.ts).
+  if (cabinet.analog) applyOwned(vpxAnalogSettings(cabinet.analog));
+  applyOwned(noAutoLayoutSettings(managedJoysticks(buttonIssues.length ? undefined : cabinet.buttons, cabinet.analog)));
 
   // Deux plugins qui réclament le même objet COM : le dernier chargé l'emporte.
   for (const plugin of profile.enabledPlugins) {

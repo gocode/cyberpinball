@@ -60,6 +60,8 @@ import {
   type AncillaryRoleId,
   type ScreenZone,
   type CabinetButtons,
+  type CabinetAnalog,
+  analogLines,
   audioScreen,
   channelsLabel,
   describeAudioOutput,
@@ -125,7 +127,8 @@ import { setDisplayOrientation } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { createWindow, isShown, OFFSCREEN, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
-import { joystickStatus, onJoystickInput, pressVirtualButton } from './joystick-input';
+import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton } from './joystick-input';
+import { plungerClick, plungerKey, plungerTick, plungerView, startPlungerStep, type PlungerAction, type PlungerOutcome, type PlungerStep } from './plunger-step';
 import { locations, vpxProfile } from './paths';
 import { activeVpxIni, audioOutputs, syncVpxIni } from './vpx-ini';
 import { coverDisplay } from './cover-display';
@@ -187,6 +190,10 @@ interface Wizard {
   navigation?: NavigationButtons;
   /** Étape « Boutons » en cours. */
   capture?: ButtonCapture;
+  /** Lanceur et accéléromètre en vigueur : ceux du modèle, puis ceux de l'étape « Lanceur ». Absents : rien d'écrit. */
+  analog?: CabinetAnalog;
+  /** Étape « Lanceur » en cours. */
+  plunger?: PlungerStep;
   roleIndex: number;
   /** Réponse proposée au rôle en cours : indice dans roleOptions(). */
   option: number;
@@ -285,6 +292,8 @@ let wizard: Wizard;
 let busy = false;
 let countdown: NodeJS.Timeout | undefined;
 let buttonsCountdown: NodeJS.Timeout | undefined;
+/** Lecture des axes pendant l'étape « Lanceur ». */
+let plungerTimer: NodeJS.Timeout | undefined;
 let quitCountdown: NodeJS.Timeout | undefined;
 /** Étape refaite seule (--boutons, --son…) : le modèle existe, le reste est gardé. */
 let only: WizardStep | undefined;
@@ -444,6 +453,11 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
         handleKey({ type: 'keyUp', code: key, control: false } as Input);
       }
     } else if (code === 'CtrlQ') handleKey({ type: 'keyDown', code: 'KeyQ', control: true } as Input);
+    // « Axe2:0.9 » : l'axe 2 (Z) d'un Pinscape virtuel à 0,9, par le chemin d'un vrai lanceur.
+    else if (/^Axe\d+:-?[\d.]+$/.test(code)) {
+      const [axis, value] = code.slice(3).split(':').map(Number) as [number, number];
+      if (!moveVirtualAxis(axis, value)) console.error(`Autopilote : ${code} sans joystick lisible (${JSON.stringify(joystickStatus())})`); // i18n-ignore : console de l'autopilote
+    }
     // « Joy3 » : bouton 3 (numéro SDL) d'un joystick virtuel, par le chemin d'un vrai Pinscape.
     else if (/^Joy\d+$/.test(code)) {
       if (!(await pressVirtualButton(Number(code.slice(3))))) console.error(`Autopilote : ${code} sans joystick lisible (${JSON.stringify(joystickStatus())})`); // i18n-ignore : console de l'autopilote
@@ -492,6 +506,18 @@ function handleKey(input: Input): boolean {
       touched(wizard.capture!);
       pressed.add(input.code);
     }
+    broadcast();
+    return true;
+  }
+
+  if (wizard.phase === 'plunger') {
+    if (input.isAutoRepeat && !wizard.plunger!.editing) return true;
+    const outcome = plungerKey(wizard.plunger!, { previous: is(KEYS.previous), next: is(KEYS.next), confirm: is(KEYS.confirm) });
+    if (outcome === 'unhandled') {
+      if (is(KEYS.exit)) askQuit();
+      else if (is(KEYS.back) && !only) startCapture(INTERFACE_KEYS, true);
+      else return false;
+    } else afterPlunger(outcome);
     broadcast();
     return true;
   }
@@ -701,6 +727,8 @@ function draftCabinet(): Partial<Cabinet> {
   if (keys && keys !== previous?.buttons) draft.buttons = keys;
   const navigation = captured(INTERFACE_KEYS) ? ({ ...navigationButtons(inForce()), ...capture!.keys } as NavigationButtons) : wizard.navigation;
   if (navigation && navigation !== previous?.navigation) draft.navigation = navigation;
+  const analog = wizard.plunger ? wizard.plunger.analog : wizard.analog;
+  if (analog && JSON.stringify(analog) !== JSON.stringify(previous?.analog)) draft.analog = analog;
   if (arrangeOnly) {
     const arranged = arrangeCabinet();
     draft.roles = arranged.roles;
@@ -803,7 +831,7 @@ function inForceKeys(set: KeySet): SetKeys {
 }
 
 /** Ce que la souris envoie depuis screen.js. */
-type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; action: ButtonsAction } | { type: 'quit'; op: 'ask' | 'yes' | 'no' } | ArrangeAction;
+type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; action: ButtonsAction | PlungerAction } | { type: 'quit'; op: 'ask' | 'yes' | 'no' } | ArrangeAction;
 
 /** Arrivée sur l'étape « Boutons du jeu » (startCapture). */
 function startButtons(initial = false): void {
@@ -966,11 +994,16 @@ function handleWizardAction(action: WizardAction): void {
     broadcast();
     return;
   }
+  if (wizard.phase === 'plunger' && (action.type === 'button' || action.type === 'buttons')) {
+    afterPlunger(plungerClick(wizard.plunger!, action.type === 'button' ? { row: action.index } : { action: action.action as PlungerAction }));
+    broadcast();
+    return;
+  }
   const capture = wizard.capture;
   if (!capture || !CAPTURE_PHASES.includes(wizard.phase)) return;
   touched(capture);
   if (action.type === 'button') redoButton(capture, action.index);
-  else runButtonsAction(action.action);
+  else runButtonsAction(action.action as ButtonsAction);
   broadcast();
 }
 
@@ -1029,7 +1062,60 @@ function acceptButtons(): void {
   wizard.capture = undefined;
   if (only) saveStep();
   else if (capture.set === GAME_KEYS) startCapture(INTERFACE_KEYS, true);
+  else startPlunger();
+}
+
+// ---------------------------------------------------------------------------
+// Étape « Lanceur » (plunger-step.ts)
+
+/** Écart entre deux lectures des axes : une trentaine par seconde, assez pour voir un tir. */
+const PLUNGER_TICK_MS = 30;
+
+/**
+ * Arrivée sur l'étape. Dans l'assistant complet, une borne sans aucun joystick à axes ni
+ * réglage connu n'a rien à régler : on passe aux écrans, sans rien écrire.
+ */
+function startPlunger(): void {
+  const step = startPlungerStep(wizard.analog, readTextIfExists(activeVpxIni(loc)));
+  step.readings = joystickAxes();
+  if (!only && !step.initial && step.readings.length === 0) {
+    wizard.phase = 'assign';
+    wizard.notice = t('Lanceur : aucun joystick à axes branché, rien à régler.');
+    return;
+  }
+  wizard.plunger = step;
+  wizard.phase = 'plunger';
+  stopPlungerTimer();
+  plungerTimer = setInterval(() => {
+    if (wizard.phase !== 'plunger' || !wizard.plunger) return stopPlungerTimer();
+    if (plungerTick(wizard.plunger, joystickAxes(), Date.now())) broadcast();
+  }, PLUNGER_TICK_MS);
+}
+
+function stopPlungerTimer(): void {
+  if (plungerTimer) clearInterval(plungerTimer);
+  plungerTimer = undefined;
+}
+
+/** Enregistrer (le réglage de l'étape) ou « Pas de lanceur analogique » (aucun capteur). */
+function afterPlunger(outcome: PlungerOutcome): void {
+  if (outcome !== 'save' && outcome !== 'none') return;
+  wizard.analog = outcome === 'save' ? structuredClone(wizard.plunger!.analog) : {};
+  wizard.plunger = undefined;
+  stopPlungerTimer();
+  if (only) saveStep();
   else wizard.phase = 'assign';
+}
+
+/** Étape « Lanceur » : même écran partout, comme les boutons ; droit sur l'ancien playfield. */
+function plungerViewFor(index: number, base: Record<string, unknown>) {
+  const label = (codes: string[]) => keyLabel(codes[0]);
+  return {
+    ...base,
+    rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0,
+    highlight: true,
+    ...plungerView(wizard.plunger!, only ? t('Enregistrer') : t('Continuer'), { previous: label(KEYS.previous), next: label(KEYS.next), confirm: label(KEYS.confirm), exit: label(KEYS.exit) }),
+  };
 }
 
 /**
@@ -1052,7 +1138,7 @@ function saveStep(): void {
   // Seulement les clés de l'étape, reprises en main même changées à la main ; les autres restent telles quelles.
   const { plan, report } = syncVpxIni(loc.dataDir, cabinet.vpx.iniPath, cabinet, displays, profile, step.owns, cabinet.audio ? audio : undefined, step.owns);
   wizard.result = {
-    lines: summarizeChanges(plan.changes, buttonsOnly),
+    lines: summarizeChanges(plan.changes, buttonsOnly || isOnly('lanceur')),
     findings: [
       ...(isOnly('son') ? channelNotices() : []),
       // Boutons seuls : le constat des actions de VPX privées de leur touche, reconnu à ces actions (pas à son texte).
@@ -1081,6 +1167,7 @@ function stepBuilt(): Cabinet {
   const stamp = { vpx: { iniPath: activeVpxIni(loc) }, updatedAt: new Date().toISOString() };
   if (buttonsOnly) return { ...previous!, buttons: wizard.buttons, ...stamp };
   if (interfaceOnly) return { ...previous!, navigation: wizard.navigation, ...stamp };
+  if (isOnly('lanceur')) return { ...previous!, analog: wizard.analog, ...stamp };
   if (arrangeOnly) return arrangeCabinet();
   return buildCabinet();
 }
@@ -1784,6 +1871,8 @@ function startMode(): void {
       return startButtons(true);
     case 'interface':
       return startCapture(INTERFACE_KEYS, true);
+    case 'lanceur':
+      return startPlunger();
     case 'disposition':
       return startArrangeOnly();
     case 'ecrans':
@@ -1811,10 +1900,13 @@ function restart(): void {
   // Les boutons relevés restent : « recommencer » ne refait que les écrans et le son.
   const buttons = wizard ? wizard.buttons : previous?.buttons;
   const navigation = wizard ? wizard.navigation : previous?.navigation;
+  const analog = wizard ? wizard.analog : previous?.analog;
   KEYS = wizardKeys({ buttons, navigation });
+  stopPlungerTimer();
   wizard = {
     buttons,
     navigation,
+    analog,
     sound: undefined,
     phase: 'assign',
     roleIndex: 0,
@@ -1947,6 +2039,7 @@ function buildCabinet(): Cabinet {
     ...(audioModel && { audio: audioModel }),
     ...(wizard.buttons && { buttons: wizard.buttons }),
     ...(wizard.navigation && { navigation: wizard.navigation }),
+    ...(wizard.analog && { analog: wizard.analog }),
     vpx: { iniPath: targetIni() },
     updatedAt: new Date().toISOString(),
   };
@@ -2204,6 +2297,7 @@ function viewFor(index: number) {
   if (wizard.leaving) return { ...base, highlight: false, report: false, prompt: '', step: '', hint: '', notice: undefined };
 
   if (CAPTURE_PHASES.includes(wizard.phase)) return buttonsView(index, base);
+  if (wizard.phase === 'plunger') return plungerViewFor(index, base);
 
   if (wizard.phase === 'orient' || wizard.phase === 'flip' || wizard.phase === 'size') {
     const isPlayfield = assignedRole === 'playfield';
@@ -2350,7 +2444,7 @@ function viewFor(index: number) {
         }),
       ]
     : [];
-  const summary = only ? stepSummary(rolesLines, playfieldLines) : [...rolesLines, ...playfieldLines, ...audioSummary(), ...buttonsSummary()];
+  const summary = only ? stepSummary(rolesLines, playfieldLines) : [...rolesLines, ...playfieldLines, ...audioSummary(), ...buttonsSummary(), ...(wizard.analog ? analogLines(wizard.analog) : [])];
 
   if (wizard.phase === 'summary') {
     const owned = plan!.changes;
@@ -2369,11 +2463,11 @@ function viewFor(index: number) {
 
   if (only) {
     // Boutons seuls : l'écran que le joueur regarde n'est pas connu, le résultat s'affiche partout.
-    const previousLayout = buttonsOnly || interfaceOnly || arrangeOnly;
+    const previousLayout = buttonsOnly || interfaceOnly || arrangeOnly || isOnly('lanceur');
     return {
       ...base,
       ...(previousLayout && { rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0 }),
-      report: buttonsOnly || interfaceOnly || index === (wizard.assignments.playfield ?? 0),
+      report: buttonsOnly || interfaceOnly || isOnly('lanceur') || index === (wizard.assignments.playfield ?? 0),
       name: '',
       details: '',
       title: only.saved,
@@ -2400,7 +2494,7 @@ function viewFor(index: number) {
 
 /** Colonne de gauche du récapitulatif et du résultat d'une étape seule. */
 function summaryColumn(): string {
-  return buttonsOnly ? t('Boutons') : interfaceOnly ? t('Interface') : isOnly('son') ? t('Son') : isOnly('playfield') ? 'Playfield' : t('Rôles');
+  return buttonsOnly ? t('Boutons') : interfaceOnly ? t('Interface') : isOnly('lanceur') ? t('Lanceur') : isOnly('son') ? t('Son') : isOnly('playfield') ? 'Playfield' : t('Rôles');
 }
 
 /** Ce que l'étape seule a décidé, pour le récapitulatif et le résultat. */
@@ -2410,6 +2504,8 @@ function stepSummary(rolesLines: string[], playfieldLines: string[]): string[] {
       return buttonLines(GAME_KEYS, buttonKeys(wizard.buttons));
     case 'interface':
       return buttonLines(INTERFACE_KEYS, navigationButtons(inForce()));
+    case 'lanceur':
+      return analogLines(wizard.analog ?? {});
     case 'disposition':
       return rolesLines;
     case 'ecrans':

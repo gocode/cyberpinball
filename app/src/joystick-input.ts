@@ -16,7 +16,7 @@
 
 import * as path from 'node:path';
 import { BrowserWindow, type Input } from 'electron';
-import { joystickCode } from '@cyberpinball/core';
+import { joystickCode, type AxisReading } from '@cyberpinball/core';
 import { openJoysticks, sdlLibraryIn, type JoystickDevice, type JoystickReader } from '@cyberpinball/win-displays';
 import { keyboardFollows } from './foreground';
 import { isShown, OFFSCREEN } from './offscreen';
@@ -81,6 +81,33 @@ export async function pressVirtualButton(button: number): Promise<boolean> {
   await pause();
   reader.pressVirtual(virtualId, button, false);
   await pause();
+  return true;
+}
+
+/**
+ * Position des axes de chaque joystick (lanceur analogique, accéléromètre), lue au dernier
+ * sondage ; vide sans VPX ou sans joystick à axes.
+ */
+export function joystickAxes(): AxisReading[] {
+  start();
+  if (!reader && status.state !== 'error' && Date.now() >= nextTry) open();
+  return reader ? reader.axes() : [];
+}
+
+/** Pinscape virtuel des essais sans opérateur (six axes, comme un KL25Z en « X/Y/Z + RX/RY/RZ »). */
+let virtualPinscape: number | undefined;
+
+/**
+ * Essai sans opérateur (autopilote « Axe2:0.9 ») : l'axe `axis` d'un Pinscape virtuel de SDL
+ * prend la valeur `value` (-1 à 1), lue par le même chemin qu'un vrai lanceur. Faux si SDL
+ * n'est pas lisible (VPX absent).
+ */
+export function moveVirtualAxis(axis: number, value: number): boolean {
+  start();
+  if (!reader && status.state !== 'error') open();
+  if (!reader) return false;
+  virtualPinscape ??= reader.attachVirtual('mjrnet Pinscape Controller (joystick virtuel)', 32, 6);
+  reader.moveVirtual(virtualPinscape, axis, value);
   return true;
 }
 

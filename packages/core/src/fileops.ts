@@ -240,17 +240,22 @@ export function sizeOf(target: string): number {
   }
 }
 
-/** « 1,0 Go », « 64 Mo », « 4,8 ko ». */
-export function formatSize(bytes: number): string {
+/**
+ * « 1,0 Go », « 64 Mo », « 4,8 ko ». `fine` : une décimale fixe jusqu'à 100 (« 48,2 Mo »,
+ * « 48,0 Mo »), pour un volume qui avance sous les yeux sans changer de largeur.
+ */
+export function formatSize(bytes: number, fine = false): string {
   const units: [number, string][] = [
     [1024 ** 3, t('Go')],
     [1024 ** 2, t('Mo')],
     [1024, t('ko')],
   ];
   for (const [size, unit] of units) {
-    if (bytes >= size) {
+    // Dès 1000 de l'unité d'en dessous : « 1,0 Mo » plutôt que « 1 021 ko ».
+    if (bytes >= (size * 1000) / 1024) {
       const value = bytes / size;
-      return `${formatNumber(value, { maximumFractionDigits: value < 10 ? 1 : 0 })} ${unit}`;
+      const digits = value < (fine ? 100 : 10) ? 1 : 0;
+      return `${formatNumber(value, { maximumFractionDigits: digits, minimumFractionDigits: fine ? digits : 0 })} ${unit}`;
     }
   }
   return t('{n} octets', { n: bytes });

@@ -177,7 +177,7 @@ export function createJourney(ctx: JourneyContext) {
     if (!table || !journey) return { heading: t('Ce qu’il manque pour jouer'), sections: [], actions: [{ label: t('Retour à la fiche'), run: toSheet }], back: toSheet };
     const actions: Action[] = [];
     /** Première action de chaque étape : un clic sur l'étape la déclenche. */
-    const stepAction = new Map<number, number>();
+    const stepAction = new Map<JourneyStep, number>();
     for (const { step, choice } of journeyChoices(journey)) {
       if (!stepAction.has(step)) stepAction.set(step, actions.length);
       actions.push({ label: choice.label, detail: choice.detail, tone: choice.primary ? 'ok' : undefined, run: () => run(table.file, choice.action) });
@@ -187,6 +187,10 @@ export function createJourney(ctx: JourneyContext) {
       { label: t('Diagnostic complet'), detail: t('Tous les constats du médecin, médias compris'), run: () => ((open = undefined), ctx.catalog.setRefresh(undefined), ctx.doctor(table)) },
     );
     const notice = open?.notice;
+    const view = (s: JourneyStep, n: number | undefined, current: boolean) => {
+      const label = stateLabel(s);
+      return { n, title: s.title, detail: s.detail, note: current ? s.note : undefined, state: s.state, word: label.word, sign: label.sign, tone: label.tone, current, action: stepAction.get(s) };
+    };
     return {
       heading: journey.ready ? t('Tout est prêt pour jouer') : t('Ce qu’il manque pour jouer'),
       subheading: [table.title, table.manufacturer, table.year].filter(Boolean).join(' · '),
@@ -195,21 +199,9 @@ export function createJourney(ctx: JourneyContext) {
         position: journeyPosition(journey),
         summary: journeySummary(journey),
         notice,
-        steps: journey.steps.map((s, i) => {
-          const label = stateLabel(s);
-          return {
-            n: i + 1,
-            title: s.title,
-            detail: s.detail,
-            note: i === journey.current ? s.note : undefined,
-            state: s.state,
-            word: label.word,
-            sign: label.sign,
-            tone: label.tone,
-            current: i === journey.current,
-            action: stepAction.get(i),
-          };
-        }),
+        steps: journey.steps.map((s, i) => view(s, i + 1, i === journey.current)),
+        extrasTitle: t('Pour aller plus loin'),
+        extras: journey.extras.map((s) => view(s, undefined, false)),
       },
       actions,
       back: toSheet,

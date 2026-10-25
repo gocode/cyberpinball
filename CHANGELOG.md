@@ -12,6 +12,7 @@ son interface).
 ## 0.1.3
 
 - Boutons d'un Pinscape (KL25Z) ou d'un encodeur en mode manette : relevés dans l'étape « Boutons » et suivis par tout le menu et par VPX.
+- Lanceur analogique (plunger à capteur d'un Pinscape) : détecté en le tirant, réglé et essayé dans l'étape « Lanceur », avec l'accéléromètre pour les tremblements.
 - Boutons du jeu et boutons de l'interface réglés séparément ; touches du clavier et boutons de joystick se mélangent librement.
 - « Ajouter une table » réunit au même endroit toutes les façons d'ajouter une table, avec des filtres dans le catalogue et l'installation rapide.
 - « Ce qu'il manque pour jouer » : un parcours guidé, d'une ROM ou d'un fronton manquant jusqu'à « Jouer ».
@@ -20,6 +21,10 @@ son interface).
 - Une icône pour chaque menu.
 - Menu des tables sur la borne : bandeau d'aide réduit à Flippers, Start et Exit (« Commandes de la borne » dans le menu système), halos des flèches et du nom sans coupure.
 - Les tables s'affichent dans le bon sens pendant la partie sur une borne dont les flippers sont en bas.
+- Seuls le fichier de la table et sa ROM sont obligatoires pour jouer ; contenu du DMD, fronton et PuP-Pack sont proposés pour aller plus loin.
+- Écran « Téléchargements » : les fichiers déjà reçus, à reprendre ou à supprimer ; un sélecteur de fichiers intégré remplace celui de Windows.
+- Fenêtre « Récupérer » : progression de chaque téléchargement (pourcentage, volume, débit, temps restant) et bouton « Annuler ».
+- L'écran où s'ouvre la fenêtre « Récupérer » se choisit dans la configuration de la borne.
 - La fenêtre « Récupérer » reste au premier plan : le fronton ne passe plus devant au premier clic.
 - Fenêtre « Récupérer » sur une borne : elle s'ouvre sur un écran lisible (le fronton si le playfield est tourné), le pointeur amené dessus ; Exit la ferme.
 - La fenêtre « Récupérer » rouverte reprend la page où vous en étiez ; recherche des sites plus complète.

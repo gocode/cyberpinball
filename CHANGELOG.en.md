@@ -10,6 +10,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 ## 0.1.3
 
 - Buttons of a Pinscape (KL25Z) or of an encoder in gamepad mode: captured in the "Buttons" step and followed by the whole menu and by VPX.
+- Analog plunger (a Pinscape sensor plunger): detected by pulling it, set and tested in the "Plunger" step, along with the accelerometer for nudging.
 - Game buttons and interface buttons set separately; keyboard keys and joystick buttons mix freely.
 - "Add a table" brings every way of adding a table together in one place, with filters in the catalogue and quick install.
 - "What's missing to play": a guided path, from a missing ROM or backglass all the way to "Play".
@@ -18,6 +19,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - An icon for each menu.
 - Table menu on a cabinet: help bar reduced to Flippers, Start and Exit ("Cabinet controls" in the system menu), glow of the arrows and the name no longer cut off.
 - Tables show the right way up during a game on a cabinet whose flippers are at the bottom.
+- Only the table file and its ROM are required to play; DMD content, backglass and PuP-Pack are offered as extras.
+- "Downloads" screen: files already received, to reuse or delete; a built-in file picker replaces the Windows one.
+- "Fetch" window: progress of each download (percentage, size, speed, time left) and a "Cancel" button.
+- The screen where the "Fetch" window opens is chosen in the cabinet configuration.
 - The "Récupérer" window stays in front: the backglass no longer comes over it on the first click.
 - "Fetch" window on a cabinet: it opens on a readable screen (the backglass if the playfield is turned), with the pointer brought onto it; Exit closes it.
 - The "Fetch" window, when reopened, picks up the page where you were; more thorough site search.

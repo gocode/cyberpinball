@@ -11,7 +11,6 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { dialog } from 'electron';
 import {
   applyOps,
   b2sCacheDir,
@@ -71,6 +70,7 @@ import { allowPreview } from './media-protocol';
 import { createProposals } from './media-proposals';
 import type { MediaSites } from './media-sites';
 import type { MediaSearch } from './media-search';
+import type { PickRequest } from './file-picker';
 
 export interface MediasContext {
   host: LibraryHost;
@@ -83,6 +83,8 @@ export interface MediasContext {
   sheet(table: TableEntry, flash?: string): void;
   /** Retour au menu des tables. */
   leave(): void;
+  /** Sélecteur de fichiers de Cyber Pinball (file-picker.ts) ; undefined à l'abandon. */
+  pick?(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
   /** « Chercher les médias » sur VPinMediaDB (media-download.ts) ; `back` revient ici avec un message. */
   download?(table: TableEntry, back: (message?: { text: string; tone: Tone }) => void): void;
   /** Propositions de chaque média (media-proposals.ts) : recherche, téléchargement, saisie d'un titre. */
@@ -531,7 +533,7 @@ export function createMedias(ctx: MediasContext) {
       if (proposals) actions.push(proposalsAction(s, table, type));
       actions.push(
         { label: t('Ajouter une page depuis le dossier d’import'), detail: importDetail, run: () => openPick(s, type, { kind: 'add' }) },
-        { label: t('Ajouter une page depuis ce PC…'), detail: t('Ou glissez le fichier sur cette fenêtre'), run: () => void pickOnPc(s, type, { kind: 'add' }) },
+        { label: t('Ajouter une page : choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glissez-le ici'), run: () => void pickOnPc(s, type, { kind: 'add' }) },
       );
       if (pages.length) {
         actions.push({
@@ -572,7 +574,7 @@ export function createMedias(ctx: MediasContext) {
       if (proposals) actions.push(proposalsAction(s, table, type));
       actions.push(
         { label: file ? t('Remplacer depuis le dossier d’import') : t('Prendre dans le dossier d’import'), detail: importDetail, run: () => openPick(s, type, { kind: 'set' }) },
-        { label: file ? t('Remplacer depuis ce PC…') : t('Choisir sur ce PC…'), detail: t('Ou glissez le fichier sur cette fenêtre'), run: () => void pickOnPc(s, type, { kind: 'set' }) },
+        { label: file ? t('Remplacer : choisir un fichier…') : t('Choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glissez-le ici'), run: () => void pickOnPc(s, type, { kind: 'set' }) },
       );
       if (file) actions.push({ label: t('Mettre à la corbeille'), detail: t('Ensuite : {after}', { after: afterRemoval(s, table, type) }), tone: 'error', run: () => remove(s, table, type) });
     }
@@ -674,7 +676,7 @@ export function createMedias(ctx: MediasContext) {
     if (index < pages.length - 1) actions.push({ label: t('Descendre'), detail: t('Devient la page {page}', { page: index + 2 }), run: () => move(index + 1) });
     actions.push(
       { label: t('Remplacer depuis le dossier d’import'), run: () => openPick(s, type, { kind: 'replace', index }) },
-      { label: t('Remplacer depuis ce PC…'), detail: t('Ou glissez le fichier sur cette fenêtre'), run: () => void pickOnPc(s, type, { kind: 'replace', index }) },
+      { label: t('Remplacer : choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glissez-le ici'), run: () => void pickOnPc(s, type, { kind: 'replace', index }) },
       {
         label: t('Mettre cette page à la corbeille'),
         detail: pages.length > 1 ? t('Les pages suivantes remontent') : undefined,
@@ -781,17 +783,18 @@ export function createMedias(ctx: MediasContext) {
 
   async function pickOnPc(s: Session, type: MediaType, target: Target): Promise<void> {
     const info = mediaTypeInfo(type);
-    const win = host.windows().get('playfield');
-    const options: Electron.OpenDialogOptions = {
+    const before = tableOf(s);
+    if (!ctx.pick || !before) return;
+    const paths = await ctx.pick({
       title: t('{label} : choisir un fichier', { label: info.label }),
-      properties: ['openFile'],
-      filters: [{ name: info.label, extensions: [...info.formats] }],
-    };
-    const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
-    win?.focus();
+      icon: 'image',
+      purpose: t('{label} de {table}', { label: info.label, table: before.title }),
+      mode: 'file',
+      filter: { label: info.label, extensions: [...info.formats] },
+    });
     const table = tableOf(s);
-    if (result.canceled || !result.filePaths[0] || !table) return;
-    s.next = { text: place(s, table, type, { from: result.filePaths[0], mode: 'copy' }, target), tone: 'info' };
+    if (!paths?.[0] || !table) return;
+    s.next = { text: place(s, table, type, { from: paths[0], mode: 'copy' }, target), tone: 'info' };
     returnTo(s, type, target);
   }
 

@@ -15,8 +15,7 @@ export const messages: Record<string, string> = {
   Installé: 'Installed',
   '{site} · compte nécessaire': '{site} · account required',
   'Reçu pour {game} : {kind}, {label} (« {file} », {size}).': 'Received for {game}: {kind}, {label} (“{file}”, {size}).',
-  'Téléchargement de « {file} » : {got} sur {total}…': 'Downloading “{file}”: {got} of {total}…',
-  'Téléchargement de « {file} » : {got}…': 'Downloading “{file}”: {got}…',
+  'Téléchargement de « {file} » : {progress}…': 'Downloading “{file}”: {progress}…',
   'Téléchargement annulé : « {file} ». Rien n’a été gardé.': 'Download cancelled: “{file}”. Nothing was kept.',
   'Téléchargement interrompu : « {file} ». Rien n’a été gardé.': 'Download interrupted: “{file}”. Nothing was kept.',
   'Trouver une table': 'Find a table',
@@ -191,6 +190,13 @@ export const messages: Record<string, string> = {
 
   // app/src/acquire-window.ts
   'Téléchargement de {file}…': 'Downloading {file}…',
+  'En pause · {progress}': 'Paused · {progress}',
+  'Interrompu · {progress}': 'Interrupted · {progress}',
+  'Et {n} autres : {progress}': 'And {n} more: {progress}',
+  // app/renderer/acquire.js
+  '{pct} %': '{pct}%',
+  'Start de nouveau : annuler · flippers : un autre · Exit : garder': 'Start again: cancel · flippers: another one · Exit: keep',
+  'Annuler ?': 'Cancel?',
   'Reçu : {file}, rangé dans la liste d’attente. Fermer (Échap) pour revenir, ou téléchargez autre chose.':
     'Received: {file}, added to the download queue. Close (Esc) to go back, or download something else.',
   'Téléchargement annulé : {file}': 'Download cancelled: {file}',
@@ -428,6 +434,8 @@ export const messages: Record<string, string> = {
   'la table': 'the table',
   'le fronton': 'the backglass',
   'la ROM': 'the ROM',
-  'Installation rapide : chaque page s’ouvre d’elle-même dans la fenêtre « Récupérer » ; connectez-vous, téléchargez. Le plan s’ouvre quand tout l’indispensable est là.': 'Quick install: each page opens by itself in the “Get” window; sign in, download. The plan opens once all the essentials are here.',
   'Tout l’indispensable est là ou attendu : un fichier téléchargé arrive tout seul dans « Récupérés et attendus ».': 'All the essentials are here or expected: a downloaded file lands in “Received and expected” by itself.',
+  'Installation rapide : chaque page s’ouvre d’elle-même dans la fenêtre « Récupérer », l’indispensable d’abord ; connectez-vous, téléchargez. Dès que l’indispensable est là, « Installer sans attendre » ouvre le plan.': 'Quick install: each page opens by itself in the “Get” window, the essentials first; sign in, download. As soon as the essentials are here, “Install without waiting” opens the plan.',
+  'Installer sans attendre': 'Install without waiting',
+  '{kind} : facultatif, reste dans la liste d’attente': '{kind}: optional, stays in the waiting list',
 };

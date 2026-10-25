@@ -103,8 +103,9 @@ export function coverProblem(state: { fullScreen: boolean; bounds: Rectangle }, 
  * Place une vue (WebContentsView) dans sa fenêtre, sous un bandeau de `top` pixels, sur
  * toute la place restante : la page d'un site sous le bandeau de la fenêtre
  * « Récupérer ». Suit les changements de taille de la fenêtre (plein écran, rotation).
+ * Rend de quoi changer la hauteur du bandeau (une ligne par téléchargement en cours).
  */
-export function fillBelow(win: BrowserWindow, view: { setBounds(bounds: Rectangle): void }, top: number): void {
+export function fillBelow(win: BrowserWindow, view: { setBounds(bounds: Rectangle): void }, top: number): (top: number) => void {
   const place = () => {
     if (win.isDestroyed()) return;
     const [width, height] = win.getContentSize();
@@ -112,4 +113,9 @@ export function fillBelow(win: BrowserWindow, view: { setBounds(bounds: Rectangl
   };
   win.on('resize', place);
   place();
+  return (next) => {
+    if (next === top) return;
+    top = next;
+    place();
+  };
 }

@@ -174,6 +174,18 @@ export interface Cabinet {
    * flippers, Start et Exit (defaultNavigation). VPX ne les lit pas.
    */
   navigation?: NavigationButtons;
+  /**
+   * Lanceur analogique et accéléromètre, relevés à l'étape « Lanceur » (plunger.ts). Absent
+   * tant qu'elle n'a pas été faite : aucun capteur n'est écrit dans [Input] ; vide : la borne
+   * n'en a pas, VPX n'en lit aucun.
+   */
+  analog?: CabinetAnalog;
+  /**
+   * Écran du navigateur intégré (fenêtre « Récupérer ») : celui de ce rôle, retrouvé par
+   * son empreinte quel que soit son numéro dans Windows (browser-screen.ts). Absent :
+   * automatique, le playfield s'il est droit, sinon le plus grand des autres écrans.
+   */
+  browserScreen?: RoleId;
   vpx: {
     iniPath: string;
   };
@@ -209,6 +221,37 @@ export type NavigationId = 'previous' | 'next' | 'confirm' | 'back' | 'help' | '
 
 /** Bouton de l'interface -> touche ou bouton de joystick, comme CabinetButtons. */
 export type NavigationButtons = Partial<Record<NavigationId, string>>;
+
+/** Capteurs analogiques de la borne : un lanceur, un accéléromètre (étape « Lanceur »). */
+export interface CabinetAnalog {
+  plunger?: PlungerSensor;
+  nudge?: NudgeSensor;
+}
+
+/** Lanceur analogique : un axe de joystick, tel que VPX le lit ([Input] Mapping.Plunger0.*). */
+export interface PlungerSensor {
+  /** Joystick, par son identifiant de VPX : « SDLJoy_<GUID>_<rang> ». */
+  device: string;
+  /** Nom donné par SDL (« mjrnet Pinscape Controller »), pour l'écran. */
+  name?: string;
+  /** Numéro SDL de l'axe de la position, à partir de 0 (Z d'un Pinscape : 2). */
+  axis: number;
+  /** Tirer le lanceur fait baisser la valeur de l'axe. */
+  reversed: boolean;
+  /** Part de la course ignorée autour du repos, de 0 à 0,3. */
+  deadZone: number;
+  /** Axe de la vitesse mesurée par la carte (RZ d'un Pinscape en « X/Y/Z + RX/RY/RZ » : 5). */
+  speedAxis?: number;
+}
+
+/** Accéléromètre de la borne pour les tremblements ([Input] Mapping.Nudge0.*, manette). */
+export interface NudgeSensor {
+  device: string;
+  name?: string;
+  /** Axes SDL de l'accélération latérale et longitudinale (X et Y d'un Pinscape : 0 et 1). */
+  x: number;
+  y: number;
+}
 
 /**
  * Sortie audio telle que Windows la voit au moment de la détection (registre

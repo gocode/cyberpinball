@@ -3,7 +3,10 @@
 // Fiche (« Ce qu'il manque pour jouer » en tête), médecin, échec d'une partie, puis le
 // parcours : ROM à récupérer, avertissement du catalogue, fenêtre « Récupérer » sur une
 // fausse fiche vpforums.org (aucune page des forums n'est chargée), ROM reçue, reprise
-// depuis la liste d'attente, plan d'installation, retour au parcours, « Jouer ». Chaque
+// depuis la liste d'attente, plan d'installation, retour au parcours, « Jouer ». Puis une
+// table originale qui dessine son DMD avec FlexDMD, livrée sans son dossier ni fronton :
+// rien d'obligatoire ne manque, « Jouer » est proposé tout de suite, le contenu du DMD et
+// le fronton « pour aller plus loin » (playable.ts). Chaque
 // état est capturé en paysage (bureau) et en portrait (borne). Vraie base VPS, copiée
 // depuis D:\CyberPinball\downloads. Aucune fenêtre n'apparaît : lancé par
 // docs\demo-parcours.ps1 sur le bureau caché. Captures et relevé dans tmp\demo-parcours\captures.
@@ -31,6 +34,10 @@ const REAL_DOWNLOADS = 'D:\\CyberPinball\\downloads';
 const T2 = 'BunvWvh9';
 const TABLE = 'Terminator 2 - Judgment Day (Williams 1991)';
 const SCRIPT = 'Option Explicit\r\nConst cGameName="t2_l8"\r\nLoadVPM "01560000", "WPC.VBS", 3.26\r\nController.GameName = cGameName\r\n';
+/** Table originale (sans ROM) dont le script dessine le DMD avec FlexDMD, livrée sans son dossier ni fronton. */
+const GOONIES = 'The Goonies Never Say Die Pinball (Original 2021)';
+const GOONIES_VPS = '34pZqivK';
+const GOONIES_SCRIPT = 'Option Explicit\r\nDim FlexDMD\r\nSet FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nWith FlexDMD\r\n  .GameName = "goonies"\r\n  .ProjectFolder = "./TheGooniesDMD/"\r\nEnd With\r\n';
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 function offscreen(width, height, extra = {}) {
@@ -59,6 +66,9 @@ function sandbox() {
   // Une autre révision du même jeu, déjà sur la borne : l'alias est proposé en second.
   put(path.join(L.roms, 't2_l6.zip'), zipStored({ 't2_l6.rom': 'révision voisine' }));
   put(path.join(root, 'emulators', 'vpx', 'VPinballX64.exe'), '');
+  const goonies = put(path.join(L.tables, GOONIES, `${GOONIES}.vpx`), vpxWithInfo({ TableName: 'The Goonies Never Say Die Pinball', AuthorName: 'VPW', TableVersion: '1.5' }));
+  put(path.join(L.tables, GOONIES, `${GOONIES}.info`), JSON.stringify({ Info: { Title: 'The Goonies Never Say Die Pinball', Manufacturer: 'Original', Year: 2021, VPSId: GOONIES_VPS } }, null, 2));
+  rememberScript(goonies, core.scriptFacts(GOONIES_SCRIPT), L.data);
   const screen = (fingerprint, widthPx, heightPx) => ({ fingerprint, strength: 'strong', label: fingerprint, widthPx, heightPx, widthCm: 0, heightCm: 0 });
   core.saveCabinet(L.data, {
     version: 1,
@@ -170,6 +180,7 @@ async function run(report) {
     if (phase === 'library' && v) {
       log.push(`${label} : ${v.heading} | ${v.subheading ?? ''} | ${v.actions.map((a) => `${a.label}${a.detail ? ` (${a.detail})` : ''}`).join(' | ')}`);
       if (v.journey) log.push(`   ${v.journey.position} · ${v.journey.summary} : ${v.journey.steps.map((s) => `${s.n} ${s.title} [${s.word}]${s.current ? ' ←' : ''}`).join(' · ')}`);
+      if (v.journey?.extras.length) log.push(`   ${v.journey.extrasTitle} : ${v.journey.extras.map((s) => `${s.title} [${s.word}]`).join(' · ')}`);
     } else log.push(`${label} : ${phase}${message ? ` « ${message.title} »` : ''}`);
   }
   async function shotAcquire(name) {
@@ -282,6 +293,26 @@ async function run(report) {
   library.openSheet(t2());
   await shot('fiche-apres');
   expect('la fiche ne propose plus le parcours', view().actions[0].label === 'Jouer');
+
+  // ---------- Sans contenu du DMD ni fronton : « Jouer » tout de suite ----------
+  const goonies = () => tables.find((t) => t.info.Info?.VPSId === GOONIES_VPS);
+  library.openSheet(goonies());
+  await shot('goonies-fiche', true);
+  expect('fiche : « Jouer » en tête, rien d’indispensable', view().actions[0].label === 'Jouer' && !view().actions.some((a) => a.label === 'Ce qu’il manque pour jouer'));
+  expect('fiche : le contenu du DMD proposé « pour aller plus loin »', view().actions.some((a) => a.label === 'Pour aller plus loin'));
+  act('Diagnostiquer et réparer');
+  await idle();
+  await shot('goonies-medecin');
+  expect('médecin : dossier du DMD en avertissement, pas de parcours imposé', !view().actions.some((a) => a.label === 'Ce qu’il manque pour jouer') && view().sections.some((sec) => sec.rows.some((r) => /TheGooniesDMD/.test(r.text) && r.tone === 'warning')));
+  library.openJourney(goonies().file);
+  await idle();
+  await shot('goonies-parcours', true);
+  const j = view().journey;
+  expect('parcours : « Tout est prêt pour jouer », Jouer conseillé', view().heading === 'Tout est prêt pour jouer' && view().actions[0].label === 'Jouer' && current()?.title === 'Jouer');
+  expect('parcours : étape 3 sur 3, les améliorations hors décompte', j.position === 'Étape 3 sur 3' && j.extras.some((s) => s.title === 'Contenu du DMD' && s.word === 'Facultatif') && j.extras.some((s) => s.title === 'Fronton'));
+  act('Jouer');
+  await delay(200);
+  expect('la partie est lancée sans le dossier du DMD ni le fronton', played.length === 2);
 
   ipcMain.removeListener('action', onAction);
   win.destroy();

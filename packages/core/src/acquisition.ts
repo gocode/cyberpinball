@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import type { Cabinet } from './model';
 import { formatDate, formatList, t, tn } from './i18n';
 import { dmdMediaType } from './medias';
+import { requiredForPlay } from './playable';
 import { romContent } from './romzip';
 import type { TableInfoFile } from './tables';
 import { matchVps, searchVps, vpsKey, type VpsDb, type VpsGame, type VpsLink, type VpsTableFile } from './vps';
@@ -447,7 +448,7 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
   const needs: Need[] = [];
   needs.push({
     kind: 'table',
-    required: true,
+    required: requiredForPlay('table'),
     state: ctx.installed ? 'have' : liveLinks(version).length ? 'todo' : 'unavailable',
     detail: ctx.installed
       ? t('déjà installée sur cette borne')
@@ -461,26 +462,26 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
   const b2s = withLinks(game.b2sFiles).map((f) => f as VpsTableFile);
   const fits = (f: VpsTableFile) => (ctx.screens.dmd === 'full' ? hasFeature(f, 'FullDMD') || hasFeature(f, '3Screens') : ctx.screens.dmd === 'small' ? hasFeature(f, '3Screens') : hasFeature(f, '2Screens'));
   b2s.sort((a, b) => Number(fits(b)) - Number(fits(a)) || recent(a, b));
-  if (hasFeature(version, 'incl. B2S')) needs.push({ kind: 'b2s', required: false, state: 'included', detail: t('fourni avec la table'), files: [] });
-  else if (!ctx.screens.backglass) needs.push({ kind: 'b2s', required: false, state: 'useless', detail: t('cette borne n’a pas d’écran de fronton'), files: b2s });
+  if (hasFeature(version, 'incl. B2S')) needs.push({ kind: 'b2s', required: requiredForPlay('b2s'), state: 'included', detail: t('fourni avec la table'), files: [] });
+  else if (!ctx.screens.backglass) needs.push({ kind: 'b2s', required: requiredForPlay('b2s'), state: 'useless', detail: t('cette borne n’a pas d’écran de fronton'), files: b2s });
   else if (b2s.length) {
     const detail = fits(b2s[0]!)
       ? tn(b2s.length, 'conseillé : {n} fronton, le premier va avec les écrans de la borne', 'conseillé : {n} frontons, le premier va avec les écrans de la borne')
       : tn(b2s.length, 'conseillé : {n} fronton, aucun annoncé pour les écrans de la borne', 'conseillé : {n} frontons, aucun annoncé pour les écrans de la borne');
-    needs.push({ kind: 'b2s', required: false, state: 'todo', detail, files: b2s });
-  } else needs.push({ kind: 'b2s', required: false, state: 'unavailable', detail: t('aucun fronton connu de VPS : le menu en dessinera un'), files: [] });
+    needs.push({ kind: 'b2s', required: requiredForPlay('b2s'), state: 'todo', detail, files: b2s });
+  } else needs.push({ kind: 'b2s', required: requiredForPlay('b2s'), state: 'unavailable', detail: t('aucun fronton connu de VPS : le menu en dessinera un'), files: [] });
 
   // ROM.
   if (!versionWithoutRom(game, version)) {
     const roms = [...new Set((game.romFiles ?? []).map((r) => (r.version ?? '').trim()).filter(Boolean))];
     const present = roms.filter((r) => ctx.roms.has(r.toLowerCase()));
-    if (hasFeature(version, 'incl. ROM')) needs.push({ kind: 'rom', required: true, state: 'included', detail: t('fournie avec la table'), files: [], roms });
-    else if (present.length) needs.push({ kind: 'rom', required: true, state: 'have', detail: t('{roms} : déjà sur la borne', { roms: present.join(', ') }), files: [], roms });
+    if (hasFeature(version, 'incl. ROM')) needs.push({ kind: 'rom', required: requiredForPlay('rom'), state: 'included', detail: t('fournie avec la table'), files: [], roms });
+    else if (present.length) needs.push({ kind: 'rom', required: requiredForPlay('rom'), state: 'have', detail: t('{roms} : déjà sur la borne', { roms: present.join(', ') }), files: [], roms });
     else {
       const files = withLinks(game.romFiles).map((r) => ({ ...r, id: r.id ?? `rom:${r.version}` }) as VpsTableFile).sort(recent);
       needs.push({
         kind: 'rom',
-        required: true,
+        required: requiredForPlay('rom'),
         state: files.length ? 'todo' : 'unavailable',
         detail: roms.length ? t('{roms} : à récupérer, si vous y avez droit', { roms: formatList(roms, 'or') }) : t('nom inconnu de VPS : le script de la table le dira une fois installée'),
         files,
@@ -491,9 +492,9 @@ export function requirements(game: VpsGame, version: VpsTableFile, ctx: NeedCont
 
   // Compléments facultatifs.
   const optional = (kind: NeedKind, files: VpsTableFile[] | undefined, detail: string, included?: string) => {
-    if (included && hasFeature(version, included)) return needs.push({ kind, required: false, state: 'included', detail: t('fourni avec la table'), files: [] });
+    if (included && hasFeature(version, included)) return needs.push({ kind, required: requiredForPlay(kind), state: 'included', detail: t('fourni avec la table'), files: [] });
     const usable = withLinks(files).sort(recent);
-    if (usable.length) needs.push({ kind, required: false, state: 'optional', detail, files: usable });
+    if (usable.length) needs.push({ kind, required: requiredForPlay(kind), state: 'optional', detail, files: usable });
   };
   optional('pup', game.pupPackFiles, t('facultatif : vidéos sur le fronton et l’afficheur pendant la partie'), 'incl. PuP');
   optional('altsound', game.altSoundFiles, t('facultatif : sons du jeu remasterisés'));

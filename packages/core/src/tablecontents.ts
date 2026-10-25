@@ -7,6 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { romBlockers } from './doctor';
 import { t } from './i18n';
 import { isJunkName } from './puppack';
 import { romFile, sameRomFile, storedRom } from './romlibrary';
@@ -166,11 +167,13 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
     }
     // Attendus par le script mais absents.
     if (dmd && !listDirents(folder).some((d) => d.isDirectory() && lower(d.name) === lower(dmd))) {
-      add({ kind: 'dmdFolder', rel: dmd, dir: true, size: 0, state: 'error', note: t('absent : le script de la table le charge'), missing: true });
+      // Facultatif (playable.ts) : la table se lance sans lui.
+      add({ kind: 'dmdFolder', rel: dmd, dir: true, size: 0, state: 'warning', note: t('absent : le script de la table le charge (facultatif)'), missing: true });
     }
   }
   const roms = entries.filter((e) => e.kind === 'rom' && !e.missing).map((e) => lower(e.name));
-  if (opts.ownFolder && wanted.length && !wanted.some((r) => roms.includes(`${lower(r)}.zip`))) {
+  // Absente pour de bon : ni dans la table, ni trouvée par le dossier commun de PinMAME ou un alias (playable.ts).
+  if (opts.ownFolder && wanted.length && !wanted.some((r) => roms.includes(`${lower(r)}.zip`)) && romBlockers(folder, wanted, opts.romLibrary).length) {
     add({ kind: 'rom', rel: path.join('pinmame', 'roms', `${wanted[0]}.zip`), dir: false, size: 0, state: 'error', note: t('absente : la table ne démarre pas sans elle'), missing: true });
   }
 

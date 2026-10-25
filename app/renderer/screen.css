@@ -194,6 +194,91 @@ body {
   }
 }
 
+/* Étape « Lanceur » : une seule colonne de réglages, libellé à gauche, valeur à droite. */
+#screen.plunger .buttons-list {
+  grid-template-columns: minmax(0, 1fr);
+  width: min(94%, 110vmin);
+  font-size: 2.6vmin;
+}
+
+/* Jauge du lanceur : l'avant à gauche, le repos au quart, tiré à fond à droite. */
+.gauge {
+  width: min(94%, 110vmin);
+  margin: 1vmin 0;
+}
+
+.gauge-label {
+  min-height: 1.3em;
+  font-size: 2.2vmin;
+  color: var(--ink-muted);
+  text-align: left;
+}
+
+.gauge-track {
+  position: relative;
+  height: 4.4vmin;
+  border: 0.3vmin solid var(--tile-line);
+  border-radius: 0.5vmin;
+  background: var(--tile);
+  overflow: hidden;
+}
+
+.gauge-fill {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  box-shadow: 0 0 2vmin var(--signal-haze);
+}
+
+.gauge-rest {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 25%;
+  width: 0.3vmin;
+  background: var(--ink-muted);
+}
+
+.gauge-peak {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0.5vmin;
+  margin-left: -0.25vmin;
+  background: var(--warning);
+}
+
+.gauge-scale {
+  position: relative;
+  height: 1.4em;
+  font-size: 1.9vmin;
+  color: var(--ink-faint);
+}
+
+.gauge-scale span {
+  position: absolute;
+  top: 0.3em;
+}
+
+.gauge-scale span:nth-child(1) {
+  left: 0;
+}
+
+.gauge-scale span:nth-child(2) {
+  left: 25%;
+  transform: translateX(-50%);
+}
+
+.gauge-scale span:nth-child(3) {
+  right: 0;
+}
+
+/* Joystick du lanceur débranché : la jauge éteinte. */
+.gauge.missing .gauge-track {
+  opacity: 0.35;
+}
+
 .actions {
   display: flex;
   flex-wrap: wrap;

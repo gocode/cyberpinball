@@ -49,6 +49,7 @@ import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAlias
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
 import { companion, nameKey } from './tablefiles';
+import { playBlockers, playSeverity } from './playable';
 import { parseTableName, type TableEntry } from './tables';
 import { findTableIni } from './vpx-settings';
 import { EDGE_LABELS } from './layout';
@@ -129,8 +130,8 @@ export interface ScriptFacts {
   roms: string[];
   /**
    * Dossier, à côté de la table, d'où FlexDMD ou UltraDMD charge les images,
-   * vidéos et polices du DMD (ProjectFolder). Sans lui, le script s'arrête au
-   * démarrage : la table s'affiche mais la partie ne commence pas.
+   * vidéos et polices du DMD (ProjectFolder). Facultatif pour jouer (playable.ts) :
+   * sans lui, ce DMD-là reste vide et certains scripts s'arrêtent (« Type incompatible »).
    */
   dmdFolder?: string;
   /** Absent si la table n'utilise pas PuP. */
@@ -404,7 +405,7 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
       findings.push(...checkRom(folder, ctx.script.roms, ctx.romLibrary));
     }
     if (!('error' in ctx.script) && ctx.script.dmdFolder) {
-      const finding = checkDmdFolder(folder, ctx.script.dmdFolder);
+      const finding = checkDmdFolder(folder, ctx.script.dmdFolder, ctx.script.usesPinmame);
       if (finding) findings.push(finding);
     }
   }
@@ -468,8 +469,9 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   // 9. Médias de présentation (medias\ de la table).
   if (ownFolder) findings.push(...checkMedias(entry, ctx));
 
+  // Seule la ROM bloque « Jouer » (playable.ts) : tout autre constat est au plus un avertissement.
   const order: Record<FindingSeverity, number> = { error: 0, warning: 1, info: 2 };
-  return findings.sort((a, b) => order[a.severity] - order[b.severity]);
+  return findings.map(playSeverity).sort((a, b) => order[a.severity] - order[b.severity]);
 }
 
 /**
@@ -1553,6 +1555,15 @@ function listDirs(dir: string): string[] {
  * nulle part ailleurs, elles sont refaites en un zip à plat, rangé dans la bibliothèque
  * et lié ; sinon elles ne servent à rien et partent à la corbeille.
  */
+/**
+ * Ce qui empêche la ROM demandée par le script d'être lue (playable.ts), sans relire la
+ * table : vide quand elle est là, liée, trouvée par le dossier commun de PinMAME ou
+ * fournie par un alias. Pour la fiche, qui n'appelle pas tout le médecin.
+ */
+export function romBlockers(folder: string, roms: string[], library?: string): Finding[] {
+  return roms.length ? playBlockers(checkRom(folder, roms, library)) : [];
+}
+
 function checkRom(folder: string, roms: string[], library?: string): Finding[] {
   const scattered = scatteredRom(folder, roms);
   const findings = checkRomFiles(folder, roms, library, scattered);
@@ -1931,13 +1942,21 @@ function checkRomCopy(file: string, library: string): Finding[] {
   ];
 }
 
-function checkDmdFolder(folder: string, dmdFolder: string): Finding | undefined {
+/**
+ * Dossier FlexDMD / UltraDMD que charge le script, absent. Facultatif (playable.ts) : la
+ * table se lance sans lui. Sans ses images, FlexDMD renvoie Nothing au script (NewImage,
+ * plugins/flexdmd/actors/Image.cpp) : ce DMD-là reste vide, et un script qui ne s'y attend
+ * pas s'arrête sur « Type incompatible » (Goonies de VPW).
+ */
+function checkDmdFolder(folder: string, dmdFolder: string, usesPinmame: boolean): Finding | undefined {
   const dirs = readDirents(folder).filter((d) => d.isDirectory()).map((d) => d.name);
   if (dirs.some((d) => d.toLowerCase() === dmdFolder.toLowerCase())) return undefined;
-  const intro = t(
-    'Le DMD de cette table est dessiné par son script, avec les images, vidéos et polices du dossier « {folder} ». Sans lui, le script s’arrête au démarrage (« Type incompatible ») : la table s’affiche, mais la partie ne commence pas.',
-    { folder: dmdFolder },
-  );
+  const intro = [
+    t('Facultatif : le script dessine un DMD avec les images, vidéos et polices du dossier « {folder} », mais la table se lance sans lui.', { folder: dmdFolder }),
+    usesPinmame
+      ? t('Le DMD de la ROM s’affiche à l’emplacement du DMD ; si le script s’arrête sur « Type incompatible », c’est ce dossier qui manque.')
+      : t('Sans lui, ce DMD reste vide ; si le script s’arrête sur « Type incompatible », c’est ce dossier qui manque.'),
+  ].join(' ');
   // Contenu vidé à la racine par un import qui aplatissait les sous-dossiers : on le range.
   const own = [path.basename(folder), ...readDirents(folder).filter((d) => d.isFile() && /\.vpx$/i.test(d.name)).map((d) => d.name.slice(0, -4))].map((n) =>
     n.toLowerCase(),
@@ -1949,7 +1968,7 @@ function checkDmdFolder(folder: string, dmdFolder: string): Finding | undefined 
   if (loose.length) {
     return {
       code: 'dmdFolderMissing',
-      severity: 'error',
+      severity: 'warning',
       title: t('Dossier « {folder} » absent, son contenu est en vrac', { folder: dmdFolder }),
       detail: `${intro} ${tn(loose.length, '{n} image ou police du DMD sont à la racine du dossier de la table.', '{n} images ou polices du DMD sont à la racine du dossier de la table.')}`,
       fix: {
@@ -1960,7 +1979,7 @@ function checkDmdFolder(folder: string, dmdFolder: string): Finding | undefined 
   }
   return {
     code: 'dmdFolderMissing',
-    severity: 'error',
+    severity: 'warning',
     title: t('Dossier « {folder} » absent', { folder: dmdFolder }),
     detail: `${intro} ${t('Ce dossier est fourni avec la table d’origine ; mettez-le dans le dossier d’import puis « Ajouter une table ».')}`,
   };

@@ -9,7 +9,7 @@ import * as path from 'node:path';
 import { describeDisplay, fingerprintOf, modelKeyOfScreen } from './fingerprint';
 import { formatList, t, tn } from './i18n';
 import { matchScreens } from './match';
-import type { Cabinet, ObservedDisplay, PhysicalScreen } from './model';
+import type { Cabinet, ObservedDisplay, PhysicalScreen, RoleId } from './model';
 
 export interface CabinetConfiguration extends Cabinet {
   /** Identifiant stable : il nomme le VPinballX.ini de la configuration et ne change pas au renommage. */
@@ -263,6 +263,18 @@ export function forceConfiguration(set: CabinetSet, id: string | undefined): Cab
   if (id) next.active = id;
   else delete next.forced;
   return next;
+}
+
+/** Écran du navigateur intégré d'une configuration : un rôle, ou undefined pour automatique. */
+export function setBrowserScreen(set: CabinetSet, id: string, role: RoleId | undefined): CabinetSet {
+  return {
+    ...set,
+    configurations: set.configurations.map((c) => {
+      if (c.id !== id) return c;
+      const { browserScreen: _old, ...rest } = c;
+      return role ? { ...rest, browserScreen: role } : rest;
+    }),
+  };
 }
 
 export function renameConfiguration(set: CabinetSet, id: string, name: string): CabinetSet {

@@ -9,7 +9,9 @@ import { test } from 'node:test';
 import { diagnose, FINDING_CODES, pupMemory, pupOptionOps, scriptFacts, setPupMemory, tablePupPacks, type DoctorContext, type Finding } from '../doctor';
 import type { PupCabinet } from '../puppack';
 import { applyOps, sameFile, type FileOp } from '../fileops';
+import { planJourney } from '../journey';
 import { mediaErrorsFile, readMediaErrors, recordMediaError } from '../mediaerrors';
+import { blocksPlay, playBlockers } from '../playable';
 import { readInfo, scanTables, type TableEntry } from '../tables';
 import { buildZip } from '../romzip';
 import { devPcDisplays, starTrekPack } from './fixtures';
@@ -478,6 +480,12 @@ for (const trap of TRAPS) {
       findings.some((f) => f.code === trap.code),
       `${trap.code} attendu, constats : ${findings.map((f) => f.code).join(', ') || 'aucun'}`,
     );
+    // La règle de playable.ts : seul un constat de ROM est bloquant, et « Jouer » n'attend que lui.
+    for (const f of findings) assert.ok(f.severity !== 'error' || blocksPlay(f), `${f.code} classé bloquant`);
+    const journey = planJourney({ file: entry!.file, vpxInstalled: true, cabinetConfigured: true, screens: { backglass: true, dmd: 'small', topper: false }, script: trap.script ?? scriptFacts(SCRIPT), findings });
+    assert.equal(journey.ready, playBlockers(findings).length === 0, `${trap.code} : « Jouer » ${journey.ready ? 'proposé' : 'retenu'}`);
+    assert.ok(journey.extras.every((s) => !s.required));
+    assert.ok(journey.steps.every((s) => !s.required || s.state === 'done' || s.id === 'rom' || s.id === 'play'), `${trap.code} : une étape indispensable autre que la ROM`);
     fs.rmSync(tablesDir, { recursive: true });
   });
 }

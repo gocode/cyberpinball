@@ -6,7 +6,7 @@ Langage visuel de Cyber Pinball : tokens, composants et maquettes d'écrans, dan
 
 ## Ouvrir et régénérer
 
-Ouvrir `index.html` : la page du design system (fondations, couleurs, typographie, espaces, 13 composants vivants avec leur code HTML, 7 écrans, dont « Ce qu’il manque pour jouer » en borne et au bureau). `components/<Nom>/preview.html` montre un composant seul, à sa taille de référence. Ce sont des aperçus statiques, sans gestion des boutons de la borne. Les pages chargent Saira depuis Google Fonts ; sans réseau, elles retombent sur Segoe UI.
+Ouvrir `index.html` : la page du design system (fondations, couleurs, typographie, espaces, 13 composants vivants avec leur code HTML, 10 écrans, dont « Ce qu’il manque pour jouer » en borne et au bureau, « Téléchargements » et le sélecteur de fichiers). `components/<Nom>/preview.html` montre un composant seul, à sa taille de référence. Ce sont des aperçus statiques, sans gestion des boutons de la borne. Les pages chargent Saira depuis Google Fonts ; sans réseau, elles retombent sur Segoe UI.
 
 Depuis la racine du dépôt, avec Node 22 ou plus :
 
@@ -22,7 +22,7 @@ Sources, à modifier à la place des fichiers générés :
 - `src/base.css` : composants `.cp-*` ; les dernières déclarations, celles de la révision, font le rendu final.
 - `src/fonds.css` : le fond « verre fumé ».
 - `src/icones.mjs` : les icônes, lues dans le registre de l’application (`app/renderer/icons.js`, seul endroit où elles sont dessinées), changées en masques SVG.
-- `src/composants.mjs` et `src/ecrans.mjs` : exemples des composants et composition des sept écrans.
+- `src/composants.mjs` et `src/ecrans.mjs` : exemples des composants et composition des dix écrans.
 - `src/couverture.html` : la couverture.
 - `src/page.mjs` : la page `index.html`.
 

@@ -97,7 +97,6 @@ export const messages: Record<string, string> = {
     'VPS games pointed to by the table’s name, the name its author wrote inside it, its ROM or its PuP-Pack, that have media on VPinMediaDB. The reasons are under each game.',
   'choix actuel': 'current choice',
   'identifiant VPS {id}': 'VPS ID {id}',
-  '{received} sur {size}': '{received} of {size}',
   '{type} ({index} sur {total}) : {amount}…': '{type} ({index} of {total}): {amount}…',
   '{type} ({index} sur {total})…': '{type} ({index} of {total})…',
   'Téléchargement depuis VPinMediaDB…': 'Downloading from VPinMediaDB…',

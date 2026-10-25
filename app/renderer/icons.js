@@ -66,6 +66,8 @@ const CYBER_ICONS = {
   gauge: '<path d="M4 20a10 10 0 1 1 16 0M12 3v3M3 12h3M18 12h3M12 16l5-7"/>', // Performances et synchronisation.
   dmd: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M10 14h.01M14 14h.01M18 14h.01"/>', // Afficheur à points, backglass et DMD réel.
   folder: '<path d="M3 6V4h6l3 3h9v13H3z"/>', // Dossiers communs.
+  'folder-download': '<path d="M10 20H3V4h6l3 3h9v5M17 13v8M14 18l3 3 3-3"/>', // Dossier Téléchargements de Windows : dossier ouvert d’une flèche qui descend.
+  drive: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 13h18M7 16h.01M11 16h.01"/>', // Disque ou lecteur de ce PC.
   bulb: '<path d="M8 17v-2a7 7 0 1 1 8 0v2zM9 21h6"/>', // Jeu et éclairage.
 
   // Actions et états courants

@@ -113,6 +113,10 @@ $Actions = [ordered]@{
     Label = 'Boutons de la borne seulement (liste cliquable, Ctrl+Q pour quitter)'
     Run   = { Build; Step 'Étape « Boutons »'; npx electron app --boutons }
   }
+  'plunger' = @{
+    Label = 'Lanceur analogique seulement (plunger à capteur du Pinscape, Ctrl+Q pour quitter)'
+    Run   = { Build; Step 'Étape « Lanceur »'; npx electron app --assistant --lanceur }
+  }
   'boutons-defaut' = @{
     Label = 'Remettre les touches par défaut des encodeurs (si les boutons ne pilotent plus rien)'
     Run   = { Build; Step 'Touches par défaut des encodeurs'; node app/dist/sync-cli.js --boutons-par-defaut }

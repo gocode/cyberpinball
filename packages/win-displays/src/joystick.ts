@@ -7,7 +7,8 @@
 // « Boutons » relève est donc exactement ce que VPX lira.
 //
 // Lecture par sondage (SDL_UpdateJoysticks, puis l'état de chaque bouton) : ni file
-// d'événements ni pompe de messages, qui détournerait celle d'Electron.
+// d'événements ni pompe de messages, qui détournerait celle d'Electron. Les axes (lanceur
+// analogique, accéléromètre du Pinscape) se lisent de même, numérotés comme dans VPX.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -20,6 +21,8 @@ type NativeFn = (...args: any[]) => any;
 const SDL_INIT_JOYSTICK = 0x200;
 const SDL_INIT_GAMEPAD = 0x2000;
 const SDL_JOYSTICK_TYPE_GAMEPAD = 1;
+/** Joystick quelconque : un Pinscape n'est pas une manette, ses axes n'ont ni gâchette ni repos imposé. */
+const SDL_JOYSTICK_TYPE_UNKNOWN = 0;
 /** Laisse lire les boutons quand aucune fenêtre de l'application n'a le focus (celle de VPX l'a). */
 const HINT_BACKGROUND = 'SDL_JOYSTICK_ALLOW_BACKGROUND_EVENTS';
 
@@ -37,6 +40,14 @@ export interface JoystickDevice {
   /** Nom donné par SDL (« mjrnet Pinscape Controller »). */
   name: string;
   buttons: number;
+  axes: number;
+}
+
+export interface JoystickAxes {
+  device: string;
+  name: string;
+  /** Valeur de chaque axe, de -1 à 1 : la valeur SDL divisée par 32768, comme VPX. */
+  values: number[];
 }
 
 export interface JoystickButtonEvent {
@@ -53,10 +64,14 @@ export interface JoystickReader {
   devices(): JoystickDevice[];
   /** Boutons enfoncés ou relâchés depuis l'appel précédent ; suit les branchements. */
   poll(): JoystickButtonEvent[];
+  /** Position des axes de chaque joystick, au dernier sondage (poll). */
+  axes(): JoystickAxes[];
   /** Joystick virtuel de SDL (essais sans matériel) : son identifiant SDL. */
-  attachVirtual(name: string, buttons: number): number;
+  attachVirtual(name: string, buttons: number, axes?: number): number;
   /** Appuie ou relâche un bouton d'un joystick virtuel. */
   pressVirtual(sdlId: number, button: number, down: boolean): void;
+  /** Place un axe d'un joystick virtuel, de -1 à 1. */
+  moveVirtual(sdlId: number, axis: number, value: number): void;
   close(): void;
 }
 
@@ -75,9 +90,12 @@ interface Api {
   SDL_CloseJoystick: NativeFn;
   SDL_GetNumJoystickButtons: NativeFn;
   SDL_GetJoystickButton: NativeFn;
+  SDL_GetNumJoystickAxes: NativeFn;
+  SDL_GetJoystickAxis: NativeFn;
   SDL_UpdateJoysticks: NativeFn;
   SDL_AttachVirtualJoystick: NativeFn;
   SDL_SetJoystickVirtualButton: NativeFn;
+  SDL_SetJoystickVirtualAxis: NativeFn;
 }
 
 /** Bibliothèques déjà chargées : SDL ne s'initialise qu'une fois par processus. */
@@ -135,9 +153,12 @@ function loadApi(dll: string): Api {
     SDL_CloseJoystick: lib.func('void SDL_CloseJoystick(void *joystick)'),
     SDL_GetNumJoystickButtons: lib.func('int SDL_GetNumJoystickButtons(void *joystick)'),
     SDL_GetJoystickButton: lib.func('bool SDL_GetJoystickButton(void *joystick, int button)'),
+    SDL_GetNumJoystickAxes: lib.func('int SDL_GetNumJoystickAxes(void *joystick)'),
+    SDL_GetJoystickAxis: lib.func('int16 SDL_GetJoystickAxis(void *joystick, int axis)'),
     SDL_UpdateJoysticks: lib.func('void SDL_UpdateJoysticks()'),
     SDL_AttachVirtualJoystick: lib.func('uint32 SDL_AttachVirtualJoystick(const CP_SDL_VirtualJoystickDesc *desc)'),
     SDL_SetJoystickVirtualButton: lib.func('bool SDL_SetJoystickVirtualButton(void *joystick, int button, bool down)'),
+    SDL_SetJoystickVirtualAxis: lib.func('bool SDL_SetJoystickVirtualAxis(void *joystick, int axis, int16 value)'),
   };
   loaded.set(dll, api);
   return api;
@@ -150,6 +171,7 @@ interface Opened {
   name: string;
   /** État de chaque bouton au sondage précédent. */
   state: boolean[];
+  axes: number;
 }
 
 /**
@@ -203,7 +225,8 @@ export function openJoysticks(dll: string): JoystickReader {
       const handle = sdl.SDL_OpenJoystick(j.sdlId);
       if (!handle) continue;
       const buttons = Math.max(0, sdl.SDL_GetNumJoystickButtons(handle) as number);
-      opened.set(j.sdlId, { ...j, handle, state: new Array<boolean>(buttons).fill(false) });
+      const axes = Math.max(0, sdl.SDL_GetNumJoystickAxes(handle) as number);
+      opened.set(j.sdlId, { ...j, handle, state: new Array<boolean>(buttons).fill(false), axes });
     }
   }
 
@@ -219,7 +242,7 @@ export function openJoysticks(dll: string): JoystickReader {
     devices() {
       if (closed) return [];
       follow();
-      return [...opened.values()].map((j) => ({ id: j.id, name: j.name, buttons: j.state.length }));
+      return [...opened.values()].map((j) => ({ id: j.id, name: j.name, buttons: j.state.length, axes: j.axes }));
     },
     poll() {
       if (closed) return [];
@@ -239,14 +262,20 @@ export function openJoysticks(dll: string): JoystickReader {
       }
       return events;
     },
-    attachVirtual(name, buttons) {
+    axes() {
+      if (closed) return [];
+      return [...opened.values()]
+        .filter((j) => j.axes > 0)
+        .map((j) => ({ device: j.id, name: j.name, values: Array.from({ length: j.axes }, (_, axis) => (sdl.SDL_GetJoystickAxis(j.handle, axis) as number) / 32768) }));
+    },
+    attachVirtual(name, buttons, axes = 0) {
       const desc = {
         version: koffi.sizeof(structs!.virtualDesc),
-        type: SDL_JOYSTICK_TYPE_GAMEPAD,
+        type: axes > 0 ? SDL_JOYSTICK_TYPE_UNKNOWN : SDL_JOYSTICK_TYPE_GAMEPAD,
         padding: 0,
         vendor_id: 0,
         product_id: 0,
-        naxes: 0,
+        naxes: axes,
         nbuttons: buttons,
         nballs: 0,
         nhats: 0,
@@ -277,6 +306,11 @@ export function openJoysticks(dll: string): JoystickReader {
     pressVirtual(sdlId, button, down) {
       const j = opened.get(sdlId);
       if (!j || !sdl.SDL_SetJoystickVirtualButton(j.handle, button, down)) throw new Error(`SDL : ${sdl.SDL_GetError() as string}`);
+    },
+    moveVirtual(sdlId, axis, value) {
+      const j = opened.get(sdlId);
+      const raw = Math.max(-32768, Math.min(32767, Math.round(value * 32768)));
+      if (!j || !sdl.SDL_SetJoystickVirtualAxis(j.handle, axis, raw)) throw new Error(`SDL : ${sdl.SDL_GetError() as string}`);
     },
     close() {
       if (closed) return;

@@ -23,7 +23,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   checkSiteSearch,
-  formatSize,
+  formatTransfer,
   hitTypes,
   mediaSite,
   receivedMedias,
@@ -41,6 +41,7 @@ import {
   type SiteReceipt,
   type SiteSearchResult,
   type SiteState,
+  type TransferProgress,
   type WebReceipt,
 } from '@cyberpinball/core';
 import type { Acquirer } from './acquire-window';
@@ -54,7 +55,12 @@ export interface MediaSitesContext {
   changed(): void;
 }
 
-export type SiteJobState = 'queued' | 'waiting' | 'downloading' | 'unpacking' | 'received' | 'failed';
+/** Champs d'un SiteJob pour une progression (chacun écrit, même absent : pas de débit d'un relevé précédent). */
+function progressOf(p: TransferProgress): Pick<SiteJob, 'received' | 'total' | 'rate' | 'remaining'> {
+  return { received: p.received, total: p.total, rate: p.rate, remaining: p.remaining };
+}
+
+export type SiteJobState ='queued' | 'waiting' | 'downloading' | 'unpacking' | 'received' | 'failed';
 
 /** Un téléchargement demandé depuis les propositions d'un média. */
 export interface SiteJob {
@@ -68,6 +74,9 @@ export interface SiteJob {
   seconds?: number;
   received?: number;
   total?: number;
+  /** Débit lissé (octets par seconde) et secondes restantes, dès qu'ils sont mesurés (transfer.ts). */
+  rate?: number;
+  remaining?: number;
   error?: string;
   /** Le site demande une connexion. */
   login?: boolean;
@@ -296,12 +305,11 @@ export function createMediaSites(ctx: MediaSitesContext) {
       claim: {
         dir: incoming,
         signal: stop.signal,
-        progress: (received, total) => {
+        progress: (p) => {
           Object.assign(job, {
             state: 'downloading',
             seconds: undefined,
-            received,
-            total,
+            ...progressOf(p),
           });
           ctx.changed();
         },
@@ -400,6 +408,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
       seconds: undefined,
       received: undefined,
       total: undefined,
+      rate: undefined,
+      remaining: undefined,
     });
     jobs.set(key, job);
     const folder = path.join(dir, `${hit.site}-${hit.id}`);
@@ -412,8 +422,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
       status: reason ? t('À faire vous-même : {reason}. Le fichier téléchargé revient aux propositions du média.', { reason }) : undefined,
       claim: {
         dir: path.join(folder, 'recu'),
-        progress: (received, total) => {
-          Object.assign(job, { state: 'downloading', received, total });
+        progress: (p) => {
+          Object.assign(job, { state: 'downloading', ...progressOf(p) });
           ctx.changed();
         },
         done: (r) => {
@@ -459,8 +469,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
     fs.writeFileSync(file, `${JSON.stringify(webReceipts, null, 2)}\n`, 'utf8');
   }
 
-  /** Téléchargements en cours depuis la recherche web (octets reçus, total). */
-  let webProgress: { received: number; total?: number } | undefined;
+  /** Téléchargement en cours depuis la recherche web (octets reçus, total, débit, temps restant). */
+  let webProgress: TransferProgress | undefined;
 
   /**
    * Fenêtre « Récupérer » sur une recherche web, quand les sources branchées n'ont pas
@@ -480,8 +490,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
       status: t('Cherchez, ouvrez une page, téléchargez : le fichier revient aux propositions ({label}). Fermer (Échap) pour revenir.', { label: request.label }),
       claim: {
         dir: incoming,
-        progress: (received, total) => {
-          webProgress = { received, total };
+        progress: (p) => {
+          webProgress = p;
           ctx.changed();
         },
         done: (r) => {
@@ -519,18 +529,18 @@ export function createMediaSites(ctx: MediaSitesContext) {
     ctx.changed();
   }
 
-  /** « 18,4 Mo sur 40 Mo », « 64 % ». */
+  /** « 18,4 Mo sur 40 Mo · 2,1 Mo/s · environ 10 s » (transfer.ts). */
   function progressText(job: SiteJob): string | undefined {
     if (job.received === undefined) return undefined;
-    return job.total
-      ? t('{got} sur {total}', {
-          got: formatSize(job.received),
-          total: formatSize(job.total),
-        })
-      : formatSize(job.received);
+    return formatTransfer({ received: job.received, total: job.total, rate: job.rate, remaining: job.remaining });
   }
 
   return {
+    /** Des fichiers reçus sont partis (écran « Téléchargements ») : les relevés seront relus. */
+    forget: () => {
+      receipts = undefined;
+      webReceipts = undefined;
+    },
     state,
     signIn,
     search,

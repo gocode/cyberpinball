@@ -1,4 +1,5 @@
-/* Bandeau de la fenêtre « Récupérer » : 96 px en haut, la page du site en dessous. */
+/* Bandeau de la fenêtre « Récupérer » : 96 px en haut (122 px avec la ligne sur l'écran
+   retenu, BAR_WITH_NOTE dans acquire-window.ts), la page du site en dessous. */
 :root {
   /* Noms historiques de cette feuille, rebranchés sur le thème (theme.css). */
   --bg: var(--void);
@@ -18,11 +19,20 @@
 html,
 body {
   margin: 0;
-  height: 96px;
+  height: var(--bar-height, 96px);
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
+}
+
+/* Le bandeau et, dessous, les téléchargements en cours : hauteur donnée par le processus
+   principal (--bar-height), qui pose la page du site juste en dessous. */
+.frame {
+  height: var(--bar-height, 96px);
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  box-shadow: 0 1px 0 rgba(28, 143, 128, 0.25);
 }
 
 .bar {
@@ -31,9 +41,6 @@ body {
   align-items: center;
   gap: 24px;
   padding: 0 20px;
-  border-bottom: 1px solid var(--line);
-  background: var(--panel);
-  box-shadow: 0 1px 0 rgba(28, 143, 128, 0.25);
 }
 
 .what {
@@ -88,6 +95,24 @@ body {
   color: var(--ok);
 }
 
+html.with-note .bar {
+  height: 122px;
+}
+
+/* Écran choisi pas branché, playfield tourné : dit tant que la fenêtre est ouverte. */
+.screen-note {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 14px;
+  color: var(--warn);
+}
+
+.screen-note[hidden] {
+  display: none;
+}
+
 /* Repli d'un téléchargement direct, téléchargement interrompu, page morte. */
 .status.warn {
   color: var(--warn);
@@ -122,4 +147,142 @@ button:disabled {
 button.close {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* ---------- Téléchargements en cours : une ligne de 34 px chacun (DOWNLOAD_ROW dans
+   acquire-window.ts), 8 px de marge en dessous (DOWNLOAD_PAD) ---------- */
+
+/* 8 px sous les lignes, filets compris (celui du dessus, celui du bas du bandeau). */
+.downloads {
+  padding: 0 20px 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+.downloads[hidden] {
+  display: none;
+}
+
+.download,
+.download-more {
+  height: 34px;
+}
+
+.download {
+  display: grid;
+  grid-template-columns: minmax(0, 22fr) minmax(64px, 26fr) 3.6em minmax(0, 42fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 0 0 0 10px;
+  border-left: 2px solid transparent;
+  font-size: 14px;
+}
+
+.dl-name,
+.dl-text,
+.download-more {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.dl-name {
+  color: var(--text);
+}
+
+.dl-text {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.dl-pct {
+  text-align: right;
+  font-weight: 600;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Barre fine : sarcelle au repos, vert signal pour ce qui est reçu. */
+.dl-track {
+  position: relative;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.dl-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 0;
+  border-radius: 2px;
+  background: var(--accent);
+  box-shadow: 0 0 8px var(--signal-haze);
+  transition: width 0.25s linear;
+}
+
+/* Taille inconnue : un segment qui parcourt la barre, sans pourcentage. */
+.download.unknown .dl-fill {
+  width: 28%;
+  transition: none;
+  animation: dl-sweep 1.6s ease-in-out infinite;
+}
+
+@keyframes dl-sweep {
+  from {
+    left: -28%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+/* En pause, interrompu : la barre s'arrête, en orange. */
+.download.stalled .dl-fill {
+  background: var(--warn);
+  box-shadow: none;
+  animation: none;
+}
+
+.download.stalled .dl-text {
+  color: var(--warn);
+}
+
+/* Même largeur pour « Annuler » et « Annuler ? » : la ligne désignée ne se décale pas. */
+button.dl-cancel {
+  min-width: 104px;
+  font-size: 13px;
+  padding: 4px 12px;
+}
+
+/* Désigné à la borne (Start) : Start de nouveau l'annule. */
+.download.armed {
+  border-left-color: var(--accent);
+  background: var(--signal-wash);
+}
+
+.download.armed .dl-text {
+  color: var(--text);
+}
+
+.download.armed button.dl-cancel {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-signal);
+}
+
+.download-more {
+  line-height: 34px;
+  padding-left: 12px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .download.unknown .dl-fill {
+    animation: none;
+    left: 0;
+    width: 100%;
+    opacity: 0.35;
+  }
 }

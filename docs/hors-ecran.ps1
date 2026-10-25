@@ -54,7 +54,8 @@ function Use-HorsEcran([string]$Ecrans = 'pc-dev') {
 # démonstration demanderait laquelle prendre : la configuration active désigne les écrans
 # branchés sur le poste aujourd'hui, pas ceux que la démonstration simule.
 # Sans -AvecBoutons, les boutons relevés (du jeu et de l'interface) sont retirés : les touches par défaut des encodeurs
-# (Start sur 1, Exit sur Échap…) sont celles que les démonstrations rejouent.
+# (Start sur 1, Exit sur Échap…) sont celles que les démonstrations rejouent ; le lanceur analogique aussi, pour que
+# l'étape « Lanceur » parte de VPinballX.ini comme sur une borne où elle n'a jamais été faite.
 function Get-ModeleBorne([string]$Fichier, [switch]$AvecBoutons) {
   $core = Join-Path (Split-Path $PSScriptRoot -Parent) 'packages\core\dist\index.js'
   Assert-Compile
@@ -64,7 +65,7 @@ const fs = require('fs');
 const read = (f) => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''));
 const raw = read(file);
 if (!raw.configurations) {
-  if (keep !== '1') { delete raw.buttons; delete raw.navigation; }
+  if (keep !== '1') { delete raw.buttons; delete raw.navigation; delete raw.analog; }
   console.log(JSON.stringify(raw));
   process.exit(0);
 }
@@ -80,7 +81,7 @@ if (displaysFile) {
   pick = set.configurations.find((x) => x.id === id) ?? pick;
 }
 const { id, name, iniFile, ...cabinet } = pick;
-if (keep !== '1') { delete cabinet.buttons; delete cabinet.navigation; }
+if (keep !== '1') { delete cabinet.buttons; delete cabinet.navigation; delete cabinet.analog; }
 console.log(JSON.stringify(cabinet));
 '@
   $json = node -e $script $core $Fichier "$env:CYBERPINBALL_DISPLAYS" $(if ($AvecBoutons) { '1' } else { '0' })

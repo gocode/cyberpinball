@@ -74,7 +74,9 @@ export function saveCabinet(home: string, cabinet: Cabinet | CabinetConfiguratio
   const set = loadCabinetSet(home);
   const target = set && (set.configurations.find((c) => c.id === (cabinet as Partial<CabinetConfiguration>).id) ?? activeConfiguration(set));
   if (!set || !target) return saveCabinetSet(home, addConfiguration(set, cabinet).set);
-  const saved: CabinetConfiguration = { ...cabinet, id: target.id, name: target.name, ...(target.iniFile && { iniFile: target.iniFile }), updatedAt: new Date().toISOString() };
+  // Réglages que l'assistant ne demande pas (écran du navigateur intégré) : gardés quand il refait le modèle.
+  const kept = !('browserScreen' in cabinet) && target.browserScreen ? { browserScreen: target.browserScreen } : {};
+  const saved: CabinetConfiguration = { ...kept, ...cabinet, id: target.id, name: target.name, ...(target.iniFile && { iniFile: target.iniFile }), updatedAt: new Date().toISOString() };
   return saveCabinetSet(home, { ...set, configurations: set.configurations.map((c) => (c.id === target.id ? saved : c)) });
 }
 

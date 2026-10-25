@@ -7,7 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { dialog, type BrowserWindow, type Input, type Rectangle } from 'electron';
+import { app, type BrowserWindow, type Input, type Rectangle } from 'electron';
 import {
   CONFIG_KEY,
   variantTraitsLabel,
@@ -62,11 +62,18 @@ import {
   NEED_LABELS,
   mediaDbNotice,
   ARCHIVE_EXT,
+  downloadInventory,
+  loadMediaDb,
+  MEDIADB_INDEX_FILE,
+  tableFilter,
+  type MediaDb,
   formatDate,
   formatDateTime,
   formatList,
   formatNumber,
   language,
+  playBlockers,
+  romBlockers,
   messagesOf,
   t,
   tn,
@@ -105,6 +112,8 @@ import { createMediaSites } from './media-sites';
 import { createMediaImport } from './media-import';
 import { createMedias, type MediaView } from './library-medias';
 import { createTableFiles } from './table-files';
+import { createFilePicker, type PickRequest } from './file-picker';
+import { createDownloadsScreen } from './downloads-screen';
 import { isShown, refuseOffscreen } from './offscreen';
 
 const MANUFACTURERS = [
@@ -166,11 +175,18 @@ export interface LibraryHost {
   /** Touches des boutons de la borne (flippers, Start, Exit), avec celles d'un clavier. */
   keys(): NavigationKeys;
   windows(): Map<RoleId, BrowserWindow>;
-  /** Écran où lire une page à la souris (fenêtre « Récupérer »), en coordonnées Electron. */
-  readingScreen?(): Rectangle | undefined;
+  /**
+   * Écran du navigateur intégré (fenêtre « Récupérer »), en coordonnées Electron, et ce que
+   * son bandeau en dit (écran choisi pas branché, playfield tourné).
+   */
+  browserScreen?(): { bounds: Rectangle; notice?: string } | undefined;
+  /** Choix de l'écran du navigateur intégré pour la configuration active ; Retour mène à `back`. */
+  openBrowserScreen?(back: () => void): void;
   broadcast(): void;
   /** Dossier Téléchargements surveillé pour la liste d'attente (essais : un dossier du bac à sable). */
   downloadsDir?(): string;
+  /** Bureau, raccourci du sélecteur de fichiers (essais : un dossier du bac à sable). */
+  desktopDir?(): string;
   /** Télécharge et installe VPX, progression à l'écran (parcours « Ce qu'il manque pour jouer »). */
   installVpx?(): void;
   /** Assistant de la borne : écrans, boutons, son. */
@@ -211,9 +227,15 @@ export interface Row {
   pick?: boolean;
   /** Icône devant le texte (registre app/renderer/icons.js). */
   icon?: IconName;
+  /** Repère neutre (filet clair) : l'emplacement ouvert, un fichier coché ; jamais en vert, réservé au choix courant. */
+  current?: boolean;
+  /** Seconde ligne, mot et signe : à quoi sert un fichier (« ✓ Installé avec… », « ! À installer… »). */
+  note?: { text: string; sign: string; tone: Tone };
 }
 export interface Section {
   title?: string;
+  /** Rôle de la section, pour la mise en page d'un écran (classe kind-<kind>) : « places », « entries »… */
+  kind?: string;
   rows: Row[];
   more?: number;
 }
@@ -245,30 +267,38 @@ export interface Built {
   variant?: string;
   /** Parcours « Ce qu'il manque pour jouer » (journey.ts) : progression et étapes numérotées, à la place des sections. */
   journey?: JourneyView;
+  /** Bandeau d'aide propre à l'écran (sélecteur de fichiers : Exit remonte d'un dossier). */
+  hint?: string;
 }
 
 /** Ce que le rendu montre du parcours d'une table (app/renderer/library.js, renderJourney). */
 export interface JourneyView {
-  /** « Étape 3 sur 5 » et « 2 étapes réglées · 1 indispensable à faire ». */
+  /** « Étape 3 sur 4 » et « 2 étapes réglées · 1 indispensable à faire · 1 amélioration proposée ». */
   position: string;
   summary: string;
   /** Ce qui vient de se passer : fichier reçu, réparé, installé. */
   notice?: { text: string; tone: Tone };
-  steps: {
-    n: number;
-    title: string;
-    detail: string;
-    /** À savoir avant de choisir (étape courante seulement). */
-    note?: string;
-    state: string;
-    /** Mot et signe de l'état : jamais la couleur seule. */
-    word: string;
-    sign: string;
-    tone: Tone;
-    current: boolean;
-    /** Première action de l'étape : un clic sur l'étape la déclenche. */
-    action?: number;
-  }[];
+  /** Le chemin jusqu'à « Jouer », numéroté ; puis « Pour aller plus loin », sans numéro. */
+  steps: JourneyStepView[];
+  extrasTitle: string;
+  extras: JourneyStepView[];
+}
+
+export interface JourneyStepView {
+  /** Rang dans le chemin ; absent pour une amélioration. */
+  n?: number;
+  title: string;
+  detail: string;
+  /** À savoir avant de choisir (étape courante seulement). */
+  note?: string;
+  state: string;
+  /** Mot et signe de l'état : jamais la couleur seule. */
+  word: string;
+  sign: string;
+  tone: Tone;
+  current: boolean;
+  /** Première action de l'étape : un clic sur l'étape la déclenche. */
+  action?: number;
 }
 
 type Field = 'Title' | 'Manufacturer' | 'Year';
@@ -371,6 +401,7 @@ export function createLibrary(host: LibraryHost) {
       },
       run: () => openAdd(),
     },
+    { icon: 'download', get label() { return t('Téléchargements'); }, get detail() { return t('Ce que Cyber Pinball a téléchargé : le reprendre, faire de la place'); }, run: () => openDownloads() },
     { icon: 'chip', get label() { return t('Bibliothèque de ROM'); }, get detail() { return t('Chaque ROM, ses tables, sa taille ; inutilisées et absentes'); }, run: () => openRoms() },
     { icon: 'link', get label() { return t('Ranger les ROM dans la bibliothèque'); }, get detail() { return t('Une seule copie par ROM, liée dans chaque table'); }, run: () => openRomMigration() },
     { icon: 'import', get label() { return t('Reprendre les médias de PinUP Popper / PinballX'); }, get detail() { return t('Logos, vidéos, frontons… copiés dans chaque table'); }, run: () => mediaImport.open() },
@@ -387,13 +418,7 @@ export function createLibrary(host: LibraryHost) {
     tables: () => host.tables(),
     romsOf: (t) => cachedScript(t.file, host.dataDir)?.roms ?? [],
     vps: () => vpsForImport(),
-    pickDirectory: async () => {
-      const win = host.windows().get('playfield');
-      const options: Electron.OpenDialogOptions = { title: t('Dossier de PinUP Popper ou de PinballX'), properties: ['openDirectory'] };
-      const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
-      win?.focus();
-      return result.canceled ? undefined : result.filePaths[0];
-    },
+    pickDirectory: async () => (await pickPaths({ title: t('Dossier de PinUP Popper ou de PinballX'), icon: 'import', purpose: t('Reprise des médias d’un autre frontend'), mode: 'folder', start: 'desktop' }))?.[0],
     openCustom: (build, at) => openCustom(build, at),
     openSystem: () => openSystem(),
     openNotice: (heading, lines) => openNotice(heading, lines),
@@ -529,6 +554,7 @@ export function createLibrary(host: LibraryHost) {
     install: (paths, acquisition, journey) => startImport(paths, 'copy', acquisition, journey),
     downloadsDir: host.downloadsDir,
     openJourney: (file) => journeyUi.open(file),
+    pick: (request) => pickPaths(request),
   });
   if (layout()) catalogUi.start();
 
@@ -545,7 +571,7 @@ export function createLibrary(host: LibraryHost) {
     catalog: catalogUi,
     sheet: (table, flash) => openSheet(table, flash),
     doctor: (table) => openDoctor(table.file),
-    pickFiles: (journey) => void pick('openFile', journey),
+    pickFiles: (journey) => void pick('files', journey),
     install: (paths, acquisition, journey) => startImport(paths, 'copy', acquisition, journey),
     drop: (paths, journey) => startImport(paths, 'copy', undefined, journey),
   });
@@ -579,6 +605,7 @@ export function createLibrary(host: LibraryHost) {
     cursor: () => cursor,
     sheet: (table, flash) => openSheet(table, flash),
     leave: () => leave(),
+    pick: (request) => pickPaths(request),
     download: (table, back) => mediaDownload.openTable(table, back),
     proposals: {
       search: mediaSearch,
@@ -602,6 +629,100 @@ export function createLibrary(host: LibraryHost) {
     roms: () => openRoms(),
     leave: () => leave(),
   });
+
+  // ---------- Téléchargements et sélecteur de fichiers ----------
+
+  /** Index de VPinMediaDB pour nommer les fichiers de downloadspinmediadb, relu quand il change. */
+  let mediaDbCache: { mtimeMs: number; db?: MediaDb } | undefined;
+  function mediaDbForNames(dir: string): MediaDb | undefined {
+    try {
+      if (!fs.readdirSync(path.join(dir, 'vpinmediadb')).length) return undefined;
+      const mtimeMs = fs.statSync(path.join(dir, MEDIADB_INDEX_FILE)).mtimeMs;
+      if (mediaDbCache?.mtimeMs !== mtimeMs) {
+        mediaDbCache = { mtimeMs, db: loadMediaDb(dir) };
+        // Les noms des jeux viennent de la base VPS : lue une fois, si elle est là.
+        if (!vpsLoaded) {
+          vpsDb = loadVpsDb(dir);
+          vpsLoaded = true;
+        }
+      }
+      return mediaDbCache.db;
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Inventaire des téléchargements ; `windows` : avec les fichiers du dernier mois de Téléchargements de Windows. */
+  function inventoryOf(windows = false) {
+    const l = layout();
+    if (!l) return [];
+    const winDir = host.downloadsDir?.() ?? app.getPath('downloads');
+    return downloadInventory({
+      downloadsDir: l.downloads,
+      waitList: catalogUi.waitList(),
+      mediaDb: mediaDbForNames(l.downloads),
+      gameName: (id) => vpsDb?.games.find((g) => g.id === id)?.name,
+      tableName: (file) => find(file)?.title,
+      windows: windows && winDir ? { dir: winDir, since: new Date(Date.now() - 30 * 24 * 3600_000) } : undefined,
+    });
+  }
+
+  const picker = createFilePicker({
+    layout,
+    show: (build, at) => openCustom(build, at),
+    cursor: () => cursor,
+    inventory: () => inventoryOf(false),
+    windowsDownloads: host.downloadsDir,
+    desktop: host.desktopDir,
+    broadcast: () => host.broadcast(),
+  });
+
+  /**
+   * Choisir des fichiers ou un dossier dans le sélecteur de Cyber Pinball ; undefined à
+   * l'abandon, et l'écran d'où l'on vient revient tel quel (curseur compris).
+   */
+  function pickPaths(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined> {
+    const from = screen;
+    const at = cursor;
+    const restore = () => {
+      if (from) {
+        screen = from;
+        cursor = at;
+        host.broadcast();
+      } else leave();
+    };
+    return new Promise((resolve) =>
+      picker.open({
+        ...request,
+        done: (paths) => {
+          restore();
+          resolve(paths);
+        },
+        cancel: () => {
+          restore();
+          resolve(undefined);
+        },
+      }),
+    );
+  }
+
+  const downloadsUi = createDownloadsScreen({
+    layout,
+    show: (build, at) => openCustom(build, at),
+    inventory: (windows) => inventoryOf(windows),
+    forget: (files) => {
+      mediaSites.forget();
+      return catalogUi.forgetFiles(files);
+    },
+    install: (paths) => startImport(paths, 'copy'),
+    back: () => openSystem(),
+  });
+
+  function openDownloads(): void {
+    if (!layout()) return openAdd();
+    section = 'download';
+    downloadsUi.open();
+  }
 
   function openAdd(): void {
     if (!layout()) {
@@ -808,7 +929,8 @@ export function createLibrary(host: LibraryHost) {
     const stats: Row[] = [{ text: user.StartCount ? tn(user.StartCount, 'Jouée {n} fois', 'Jouée {n} fois') : t('Jamais jouée'), detail: played || undefined }];
 
     const script = cachedScript(table.file, host.dataDir);
-    const romMissing = script?.usesPinmame && script.roms.length > 0 && !script.roms.some((r) => inv.roms.some((f) => f.toLowerCase() === `${r.toLowerCase()}.zip`));
+    // Seule la ROM peut empêcher de jouer (playable.ts) : la règle du médecin, sans relire la table.
+    const romMissing = Boolean(script?.usesPinmame && romBlockers(table.folder, script.roms, layout()?.roms).length);
     // Résumé borné : une ligne par sorte présente, une pour les absentes, une pour ce qui est à
     // vérifier ; trois noms au plus par ligne. Le détail de chaque fichier est dans « Fichiers ».
     const list = (items: string[]) => (items.length > 3 ? t('{names} et {n} autres', { names: items.slice(0, 2).join(', '), n: items.length - 2 }) : items.join(', '));
@@ -819,6 +941,7 @@ export function createLibrary(host: LibraryHost) {
     else absent.push('backglass');
     if (inv.strayBackglasses.length) check.push(tn(inv.strayBackglasses.length, '{n} backglass mal nommé', '{n} backglass mal nommés'));
     if (romMissing) files.push({ text: 'ROM', detail: t('{rom}.zip absente', { rom: script!.roms[0]! }), tone: 'error' });
+    else if (!inv.roms.length && script?.usesPinmame && script.roms.length) files.push({ text: 'ROM', detail: t('{rom} (bibliothèque ou alias)', { rom: formatList(script.roms, 'or') }), tone: 'ok' });
     else if (inv.roms.length) {
       const library = layout()?.roms;
       const names = inv.roms.map((r) => {
@@ -830,7 +953,7 @@ export function createLibrary(host: LibraryHost) {
     } else if (!script || script.usesPinmame) absent.push('ROM');
     if (script?.dmdFolder) {
       const present = dmdPresent(table.folder, script.dmdFolder);
-      files.push({ text: t('Contenu du DMD'), detail: present ? script.dmdFolder : t('dossier {folder} absent', { folder: script.dmdFolder }), tone: present ? 'ok' : 'error' });
+      files.push({ text: t('Contenu du DMD'), detail: present ? script.dmdFolder : t('dossier {folder} absent (facultatif)', { folder: script.dmdFolder }), tone: present ? 'ok' : 'warning' });
     }
     const pup = inv.pup.map((p) => {
       const option = pupMemory(table.info, p)?.option;
@@ -854,26 +977,26 @@ export function createLibrary(host: LibraryHost) {
     if (check.length) files.push({ text: t('À vérifier'), detail: check.join(', '), tone: 'warning' });
     s.contents ??= tableFiles.contentsOf(table);
     const contents = s.contents;
-    // Ce qui empêche de jouer, déjà connu sans relire la table ; ou un parcours commencé et pas fini.
+    // Ce qui empêche de jouer (la ROM), déjà connu sans relire la table ; ou un parcours commencé
+    // et pas fini. Le contenu du DMD manquant est proposé, après « Jouer », jamais en tête.
     const dmdMissing = Boolean(script?.dmdFolder && !dmdPresent(table.folder, script.dmdFolder));
     const started = journeyUi.position(table.file);
     const missing: Action[] =
-      romMissing || dmdMissing || (started && !started.ready)
+      romMissing || (started && !started.ready)
         ? [
             {
               label: t('Ce qu’il manque pour jouer'),
               detail:
                 started && !started.ready && started.position
                   ? t('Reprendre : {position}', { position: started.position })
-                  : romMissing
-                    ? t('ROM {rom} absente : où la trouver, étape par étape', { rom: script!.roms[0]! })
-                    : t('Contenu du DMD absent : étape par étape'),
+                  : t('ROM {rom} absente : où la trouver, étape par étape', { rom: script!.roms[0]! }),
               tone: 'ok',
               attention: true,
               run: () => journeyUi.open(table.file),
             },
           ]
         : [];
+    const further: Action[] = dmdMissing && !missing.length ? [{ label: t('Pour aller plus loin'), detail: t('Contenu du DMD absent (facultatif) : le récupérer'), icon: 'download', run: () => journeyUi.open(table.file) }] : [];
 
     return {
       heading: table.title,
@@ -893,6 +1016,7 @@ export function createLibrary(host: LibraryHost) {
             host.play(table);
           },
         },
+        ...further,
         ...SHEET_PAGE_TYPES.map((type) => pagesAction(table, type)),
         { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', run: () => openEdit(table) },
         { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), icon: 'image', run: () => medias.open(table) },
@@ -1190,8 +1314,8 @@ export function createLibrary(host: LibraryHost) {
     if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour'), run: next }], back: next };
     const findings = s.findings ?? [];
     const actions: Action[] = [];
-    // Un constat bloquant : le parcours mène jusqu'à « Jouer » (où trouver la ROM, la récupérer, l'installer).
-    if (findings.some((f) => f.severity === 'error')) {
+    // Un constat qui empêche de jouer (la ROM seule, playable.ts) : le parcours mène jusqu'à « Jouer ».
+    if (playBlockers(findings).length) {
       actions.push({ label: t('Ce qu’il manque pour jouer'), detail: t('Étape par étape, jusqu’à « Jouer »'), tone: 'ok', run: () => journeyUi.open(table.file) });
     }
     const rows: Row[] = findings.map((f) => {
@@ -1252,7 +1376,7 @@ export function createLibrary(host: LibraryHost) {
     const space = romSpace(scan);
     const actions: Action[] = [];
     const tidyAction = tidy.length ? actions.push({ label: t('Ranger les ROM dans la bibliothèque'), detail: tn(tidy.length, '{n} ROM copiée, hors de la bibliothèque ou pas liée', '{n} ROM copiées, hors de la bibliothèque ou pas liées'), tone: 'warning', run: () => openRomMigration() }) - 1 : undefined;
-    const addAction = missing.length ? actions.push({ label: t('Ajouter'), detail: tn(missing.length, '{n} ROM absente : dossier d’import, clé USB ou ce PC', '{n} ROM absentes : dossier d’import, clé USB ou ce PC'), run: () => openAdd() }) - 1 : undefined;
+    const addAction = missing.length ? actions.push({ label: t('Ajouter'), detail: tn(missing.length, '{n} ROM absente : téléchargements, clé USB ou ce PC', '{n} ROM absentes : téléchargements, clé USB ou ce PC'), run: () => void pick('rom') }) - 1 : undefined;
     const unusedRows: Row[] = unused.map((e) => ({
       text: e.name,
       detail: t('{size} · aucune table ne l’a ni ne l’attend', { size: formatSize(e.stored!.size) }),
@@ -1538,7 +1662,7 @@ export function createLibrary(host: LibraryHost) {
           label: t('Installer : {game}', { game: g.label }),
           detail: wrong.length ? t('à corriger d’abord : {items}', { items: g.problems.map((p) => NEED_LABELS[p.item.kind]).join(', ') }) : tn(g.items.length, '{n} fichier reçu : voir le plan', '{n} fichiers reçus : voir le plan'),
           tone: wrong.length ? 'warning' : 'ok',
-          icon: ready.length === 1 ? 'download' : undefined,
+          icon: ready.length === 1 ? 'check' : undefined,
           run: () => catalogUi.installGame(g.gameId),
         });
         return row;
@@ -1568,8 +1692,9 @@ export function createLibrary(host: LibraryHost) {
     });
     actions.push(
       { label: t('Trouver une table en ligne'), detail: t('Catalogue VPS : versions, filtres, installation rapide'), icon: 'search', run: () => catalogUi.open() },
-      { label: t('Choisir des fichiers sur ce PC…'), detail: t('Tables, frontons, ROM, zip ; ou glissez-les ici'), icon: 'import', run: () => void pick('openFile') },
-      { label: t('Choisir un dossier sur ce PC…'), icon: 'folder', run: () => void pick('openDirectory') },
+      { label: t('Reprendre un fichier téléchargé'), detail: downloadsDetail(), icon: 'download', run: () => void pick('downloads') },
+      { label: t('Choisir des fichiers…'), detail: t('Clé USB, Téléchargements, Bureau, disques ; ou glissez-les ici'), icon: 'import', run: () => void pick('files') },
+      { label: t('Choisir un dossier…'), detail: t('Tout le dossier d’une table, depuis une clé USB ou un disque'), icon: 'folder', run: () => void pick('folder') },
       { label: t('Récupérés et attendus'), detail: catalogUi.summary(), icon: 'inbox', run: () => catalogUi.openWaitList(() => openAdd()) },
       { label: t('Mises à jour des tables'), detail: t('Nouvelles versions des tables installées'), icon: 'refresh', run: () => catalogUi.openUpdates() },
       { label: t('Comptes des sites'), detail: t('vpuniverse.com, vpforums.org… : connexions gardées'), icon: 'account', run: () => catalogUi.openAccounts() },
@@ -1587,6 +1712,13 @@ export function createLibrary(host: LibraryHost) {
     };
   }
 
+  /** « 4 fichiers de table déjà reçus » : ce que l'entonnoir peut reprendre sans rien télécharger. */
+  function downloadsDetail(): string {
+    const filter = tableFilter();
+    const n = inventoryOf(false).filter((e) => filter.extensions.includes(path.extname(e.name).slice(1).toLowerCase())).length;
+    return n ? tn(n, 'Téléchargements de Cyber Pinball : {n} fichier, sans le télécharger de nouveau', 'Téléchargements de Cyber Pinball : {n} fichiers, sans les télécharger de nouveau') : t('Téléchargements de Cyber Pinball : rien pour le moment');
+  }
+
   function listImport(): string[] {
     try {
       return fs.readdirSync(layout()!.import).filter((n) => !n.startsWith('.'));
@@ -1595,26 +1727,20 @@ export function createLibrary(host: LibraryHost) {
     }
   }
 
-  /** `journey` : fichier choisi pour une table à qui il manque quelque chose ; son parcours reprend après l'installation. */
-  async function pick(kind: 'openFile' | 'openDirectory', journey?: string): Promise<void> {
-    const win = host.windows().get('playfield');
-    const options: Electron.OpenDialogOptions = {
-      title: t('Ajouter une table'),
-      properties: kind === 'openFile' ? ['openFile', 'multiSelections'] : ['openDirectory', 'multiSelections'],
-      filters:
-        kind === 'openFile'
-          ? [
-              { name: t('Fichiers de table'), extensions: ['vpx', 'directb2s', 'zip', '7z', 'rar', 'vbs', 'ini', 'pov', 'info', 'crz', 'cromc', 'vni', 'pal', 'pac', 'mp3', 'ogg', 'wav'] },
-              { name: t('Médias (logos, vidéos, images)'), extensions: ['png', 'apng', 'webp', 'jpg', 'jpeg', 'gif', 'mp4', 'webm', 'm4v', 'mp3', 'ogg', 'm4a', 'flac', 'wav'] },
-              { name: t('Tous les fichiers'), extensions: ['*'] },
-            ]
-          : undefined,
-    };
-    // Une boîte de dialogue native s'ouvrirait sur les écrans du poste.
-    if (refuseOffscreen('Choisir des fichiers dans une boîte de dialogue')) return; // i18n-ignore : message de console
-    const result = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
-    win?.focus();
-    if (!result.canceled && result.filePaths.length) startImport(result.filePaths, 'copy', undefined, journey, !journey);
+  /**
+   * Choisir des fichiers (ou un dossier) pour l'ajout, dans le sélecteur de Cyber Pinball : les
+   * téléchargements de Cyber Pinball d'abord quand ils ont ce qu'il faut. `journey` : fichier
+   * choisi pour une table à qui il manque quelque chose ; son parcours reprend après l'installation.
+   */
+  async function pick(kind: 'files' | 'folder' | 'downloads' | 'rom', journey?: string): Promise<void> {
+    const request: Omit<PickRequest, 'done' | 'cancel'> =
+      kind === 'folder'
+        ? { title: t('Choisir un dossier'), icon: 'folder', purpose: t('Ajout d’une table'), mode: 'folder' }
+        : kind === 'rom'
+          ? { title: t('Choisir des ROM'), icon: 'chip', purpose: t('Ajout d’une ROM'), mode: 'files', filter: { label: t('ROM et archives'), extensions: ['zip', '7z', 'rar'] }, start: 'cp' }
+          : { title: t('Choisir des fichiers'), icon: 'import', purpose: journey ? t('Ajout de ce qu’il manque à {table}', { table: find(journey)?.title ?? path.basename(journey) }) : t('Ajout d’une table'), mode: 'files-or-folder', filter: tableFilter(), start: kind === 'downloads' ? 'cp' : undefined };
+    const paths = await pickPaths(request);
+    if (paths?.length) startImport(paths, 'copy', undefined, journey, !journey);
   }
 
   /**
@@ -2342,7 +2468,7 @@ export function createLibrary(host: LibraryHost) {
         ? editorView.kind === 'choice'
           ? t('Flippers : choisir · Start : valider · Exit : annuler')
           : t('Flippers : choisir une touche · Start : la taper · Exit : annuler · ou tapez au clavier, Entrée pour valider')
-        : t('Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris'),
+        : (built.hint ?? t('Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris')),
     };
   }
 

@@ -11,6 +11,11 @@
 // ouvre la bonne page dans la fenêtre « Récupérer » et range le fichier que l'utilisateur y
 // télécharge, rattaché à la table.
 //
+// Seuls le fichier .vpx et, si le script en demande une, la ROM sont obligatoires
+// (playable.ts) : le chemin jusqu'à « Jouer » ne compte qu'eux, avec VPX et la borne. Le
+// reste (rangement, contenu du DMD, fronton, PuP-Pack, affichage) est proposé à part,
+// « Pour aller plus loin », sans jamais retenir « Jouer » ni compter dans « étape n sur N ».
+//
 // Les étapes déjà montrées pour une table sont retenues (<données>\parcours.json) : une
 // étape réglée reste dans la liste, cochée, et le décompte « étape n sur N » ne bouge pas
 // quand on reprend le parcours plus tard.
@@ -32,13 +37,20 @@ import {
 } from './acquisition';
 import type { Finding, ScriptFacts } from './doctor';
 import { formatDate, formatList, t, tn } from './i18n';
+import { blocksPlay } from './playable';
 import { neighbourRom, neighbourWarning, romFamilyOf } from './romalias';
 import type { VpsDb, VpsGame, VpsTableFile } from './vps';
 
-export type JourneyStepId = 'setup' | 'table' | 'rom' | 'dmd' | 'backglass' | 'pup' | 'display' | 'play';
+export type JourneyStepId = 'setup' | 'table' | 'rom' | 'tidy' | 'dmd' | 'backglass' | 'pup' | 'display' | 'play';
 
-/** Ordre des étapes : ce qui fait démarrer la table d'abord, les compléments ensuite, « Jouer » à la fin. */
-export const JOURNEY_STEPS: readonly JourneyStepId[] = ['setup', 'table', 'rom', 'dmd', 'backglass', 'pup', 'display', 'play'];
+/** Chemin jusqu'à « Jouer » : VPX et la borne, la table, sa ROM. Seules ces étapes peuvent être indispensables. */
+export const JOURNEY_PATH: readonly JourneyStepId[] = ['setup', 'table', 'rom', 'play'];
+
+/** « Pour aller plus loin » : facultatives, proposées après le chemin, jamais indispensables. */
+export const JOURNEY_EXTRAS: readonly JourneyStepId[] = ['tidy', 'dmd', 'backglass', 'pup', 'display'];
+
+/** Toutes les étapes, dans l'ordre où elles sont montrées (mémoire des parcours). */
+export const JOURNEY_STEPS: readonly JourneyStepId[] = ['setup', 'table', 'rom', 'tidy', 'dmd', 'backglass', 'pup', 'display', 'play'];
 
 /**
  * - done : réglée ;
@@ -104,15 +116,20 @@ export interface JourneyStep {
 }
 
 export interface Journey {
+  /** Le chemin jusqu'à « Jouer » (JOURNEY_PATH) : « étape n sur N » ne compte que lui. */
   steps: JourneyStep[];
-  /** Étape à faire maintenant : la première indispensable pas réglée, sinon « Jouer ». */
+  /** « Pour aller plus loin » (JOURNEY_EXTRAS) : facultatives, jamais indispensables. */
+  extras: JourneyStep[];
+  /** Étape du chemin à faire maintenant : la première indispensable pas réglée, sinon « Jouer ». */
   current: number;
   /** Tout l'indispensable est réglé. */
   ready: boolean;
-  /** Étapes réglées, hors « Jouer ». */
+  /** Étapes du chemin réglées, hors « Jouer ». */
   settled: number;
   /** Étapes indispensables qui restent, hors « Jouer ». */
   remaining: number;
+  /** Améliorations proposées et pas faites. */
+  proposed: number;
 }
 
 export interface JourneyInput {
@@ -271,31 +288,35 @@ function setupStep(input: JourneyInput): JourneyStep {
   return { id: 'setup', title: t('Borne et VPX'), state: choices.length ? 'todo' : 'done', required: true, detail, choices };
 }
 
-const TABLE_CODES: readonly Finding['code'][] = ['outsideFolder', 'scriptUnreadable', 'scriptOverride', 'crashReport'];
+/** Constats de rangement de la table : proposés, jamais indispensables (la table se lance). */
+const TIDY_CODES: readonly Finding['code'][] = ['outsideFolder', 'scriptOverride', 'crashReport'];
 
+/** Le fichier .vpx : là, puisque la table est installée ; ce que demande son script. */
 function tableStep(input: JourneyInput): JourneyStep {
-  const found = input.findings.filter((f) => TABLE_CODES.includes(f.code));
   const script = input.script && !('error' in input.script) ? input.script : undefined;
-  if (!found.length) {
-    const detail = !script
-      ? t('Dans son propre dossier.')
-      : script.usesPinmame && script.roms.length
-        ? t('Dans son propre dossier ; le script demande la ROM {rom}.', { rom: formatList(script.roms, 'or') })
-        : script.usesPinmame
-          ? t('Dans son propre dossier ; le script utilise PinMAME.')
-          : t('Dans son propre dossier ; le script ne demande pas de ROM.');
-    return { id: 'table', title: t('Fichiers de la table'), state: 'done', required: true, detail, choices: [] };
-  }
-  // Hors de son dossier, ou script illisible : la ROM ne peut pas être vérifiée.
-  const required = found.some((f) => f.code === 'outsideFolder' || f.code === 'scriptUnreadable');
-  const choices = found.filter((f) => f.fix).map((f, i) => repairChoice(f, i === 0));
+  const file = path.basename(input.file);
+  const detail = !script
+    ? t('{file} est là.', { file })
+    : script.usesPinmame && script.roms.length
+      ? t('{file} est là ; son script demande la ROM {rom}.', { file, rom: formatList(script.roms, 'or') })
+      : script.usesPinmame
+        ? t('{file} est là ; son script utilise PinMAME.', { file })
+        : t('{file} est là ; son script ne demande pas de ROM.', { file });
+  return { id: 'table', title: t('Table'), state: 'done', required: true, detail, choices: [] };
+}
+
+/** Table hors de son dossier, script remplacé, rapport de plantage : à ranger, si on veut. */
+function tidyStep(input: JourneyInput): JourneyStep | undefined {
+  const found = input.findings.filter((f) => TIDY_CODES.includes(f.code));
+  const title = t('Rangement de la table');
+  if (!found.length) return input.seen?.includes('tidy') ? { id: 'tidy', title, state: 'done', required: false, detail: t('Rien à ranger.'), choices: [] } : undefined;
   return {
-    id: 'table',
-    title: t('Fichiers de la table'),
+    id: 'tidy',
+    title,
     state: 'todo',
-    required,
+    required: false,
     detail: found.length > 1 ? `${formatList(found.map((f) => f.title))}. ${found[0]!.detail}` : `${found[0]!.title}. ${found[0]!.detail}`,
-    choices,
+    choices: found.filter((f) => f.fix).map((f, i) => repairChoice(f, i === 0)),
   };
 }
 
@@ -324,8 +345,11 @@ function romStep(input: JourneyInput): JourneyStep | undefined {
   if (main.code === 'romNotLinked' && main.severity === 'info') return step('done', t('Dans la bibliothèque de ROM ; la table la trouve par le dossier commun de PinMAME.'), { title });
   // Une correction sur place suffit : lier, ranger, écrire ou retirer un alias.
   if (main.fix && ROM_FIXED_HERE.includes(main.code)) {
-    return step('todo', `${main.title}. ${main.detail}`, { title, required: main.severity === 'error', choices: [repairChoice(main, true)] });
+    return step('todo', `${main.title}. ${main.detail}`, { title, required: blocksPlay(main), choices: [repairChoice(main, true)] });
   }
+
+  // Rien qui empêche PinMAME de la lire (un rappel, une copie à part) : la table joue.
+  if (!blocksPlay(main)) return step('done', t('Présente : la table la trouve.'), { title });
 
   // La ROM n'est pas sur la borne : la récupérer.
   const targets = [...new Set([rom, ...(main.code === 'romMissing' && !main.fix ? script.roms : [])])];
@@ -365,16 +389,20 @@ function romStep(input: JourneyInput): JourneyStep | undefined {
   return { id: 'rom', title, state: waiting?.state ?? 'todo', required: true, detail, note, choices };
 }
 
+/**
+ * Dossier FlexDMD / UltraDMD que charge le script : facultatif. Sans lui, l'emplacement du
+ * DMD garde le DMD de la ROM (ou reste vide pour une table sans ROM) ; proposé, jamais exigé.
+ */
 function dmdStep(input: JourneyInput): JourneyStep | undefined {
   const script = input.script && !('error' in input.script) ? input.script : undefined;
   const finding = input.findings.find((f) => f.code === 'dmdFolderMissing');
   const title = t('Contenu du DMD');
   if (!finding) {
     return script?.dmdFolder || input.seen?.includes('dmd')
-      ? { id: 'dmd', title, state: 'done', required: true, detail: script?.dmdFolder ? t('Dossier « {folder} » présent.', { folder: script.dmdFolder }) : t('Présent.'), choices: [] }
+      ? { id: 'dmd', title, state: 'done', required: false, detail: script?.dmdFolder ? t('Dossier « {folder} » présent.', { folder: script.dmdFolder }) : t('Présent.'), choices: [] }
       : undefined;
   }
-  if (finding.fix) return { id: 'dmd', title, state: 'todo', required: true, detail: `${finding.title}. ${finding.detail}`, choices: [repairChoice(finding, true)] };
+  if (finding.fix) return { id: 'dmd', title, state: 'todo', required: false, detail: `${finding.title}. ${finding.detail}`, choices: [repairChoice(finding, true)] };
   // Le dossier est livré avec la table d'origine : récupérer de nouveau son archive.
   const sources = gameSources(input.vps, input.vpsId, 'table', input.screens, input.sourceFileId);
   const items = activeItems(input, (i) => i.kind === 'table' && (sameFile(i.table, input.file) || (Boolean(input.vpsId) && i.gameId === input.vpsId)));
@@ -383,12 +411,17 @@ function dmdStep(input: JourneyInput): JourneyStep | undefined {
   for (const s of sources.slice(0, 1)) choices.push(fetchChoice(s, t('Récupérer la table d’origine ({version})', { version: versionLabel(s.file) })));
   choices.push({ ...addFileChoice(), label: t('J’ai l’archive de la table') });
   if (!choices.some((c) => c.primary)) choices[0]!.primary = true;
+  const folder = script?.dmdFolder ?? '';
   return {
     id: 'dmd',
     title,
-    state: waiting?.state ?? 'todo',
-    required: true,
-    detail: waiting?.detail ?? t('Le dossier « {folder} », livré avec la table d’origine, manque : sans lui, la partie ne commence pas. L’archive de la table le contient.', { folder: script?.dmdFolder ?? '' }),
+    state: waiting?.state ?? 'optional',
+    required: false,
+    detail:
+      waiting?.detail ??
+      (script?.usesPinmame
+        ? t('Le DMD de la ROM s’affiche à sa place. Le dossier « {folder} » ajoute celui que dessine le script ; l’archive de la table d’origine le contient.', { folder })
+        : t('La table se lance sans lui. Le dossier « {folder} » contient les images du DMD que dessine le script ; l’archive de la table d’origine le contient.', { folder })),
     choices,
   };
 }
@@ -443,9 +476,12 @@ function displayStep(input: JourneyInput): JourneyStep | undefined {
   };
 }
 
-/** Le parcours de cette table, de la borne à « Jouer ». */
+/** Le parcours de cette table, de la borne à « Jouer », et ce qu'on peut ajouter ensuite. */
 export function planJourney(input: JourneyInput): Journey {
-  const steps = [setupStep(input), tableStep(input), romStep(input), dmdStep(input), backglassStep(input), pupStep(input), displayStep(input)].filter((s): s is JourneyStep => Boolean(s));
+  const present = (list: (JourneyStep | undefined)[]) => list.filter((s): s is JourneyStep => Boolean(s));
+  const steps = present([setupStep(input), tableStep(input), romStep(input)]);
+  // La règle (playable.ts) : rien de « Pour aller plus loin » ne retient « Jouer ».
+  const extras = present([tidyStep(input), dmdStep(input), backglassStep(input), pupStep(input), displayStep(input)]).map((s) => ({ ...s, required: false }));
   const blockers = steps.map((s, i) => ({ s, n: i + 1 })).filter(({ s }) => s.required && s.state !== 'done');
   const ready = !blockers.length;
   steps.push({
@@ -461,36 +497,41 @@ export function planJourney(input: JourneyInput): Journey {
   const current = ready ? steps.length - 1 : steps.indexOf(blockers[0]!.s);
   return {
     steps,
+    extras,
     current,
     ready,
     settled: steps.filter((s) => s.id !== 'play' && s.state === 'done').length,
     remaining: blockers.length,
+    proposed: extras.filter((s) => s.state !== 'done' && s.choices.length > 0).length,
   };
 }
 
 /**
  * Gestes proposés à l'écran, dans l'ordre : ceux de l'étape courante (le conseillé en
- * tête), puis le premier de chaque autre étape pas réglée (un fronton facultatif à
- * récupérer, un affichage à corriger).
+ * tête), puis le premier de chaque autre étape du chemin pas réglée, puis le premier de
+ * chaque amélioration (« Pour aller plus loin » : un fronton, le contenu du DMD).
  */
-export function journeyChoices(journey: Journey): { step: number; choice: JourneyChoice }[] {
-  const out = journey.steps[journey.current]!.choices.map((choice) => ({ step: journey.current, choice }));
-  journey.steps.forEach((s, i) => {
-    if (i === journey.current || s.state === 'done' || !s.choices.length) return;
-    out.push({ step: i, choice: { ...s.choices[0]!, primary: false } });
-  });
+export function journeyChoices(journey: Journey): { step: JourneyStep; choice: JourneyChoice }[] {
+  const now = journey.steps[journey.current]!;
+  const out = now.choices.map((choice) => ({ step: now, choice }));
+  for (const s of [...journey.steps, ...journey.extras]) {
+    if (s === now || s.state === 'done' || !s.choices.length) continue;
+    out.push({ step: s, choice: { ...s.choices[0]!, primary: false } });
+  }
   return out;
 }
 
-/** « Étape 3 sur 5 » */
+/** « Étape 3 sur 4 » : le chemin jusqu'à « Jouer » seulement. */
 export function journeyPosition(journey: Journey): string {
   return t('Étape {n} sur {total}', { n: journey.current + 1, total: journey.steps.length });
 }
 
-/** « 2 étapes réglées · 1 indispensable à faire » */
+/** « 2 étapes réglées · 1 indispensable à faire », et les améliorations proposées. */
 export function journeySummary(journey: Journey): string {
   const settled = tn(journey.settled, '{n} étape réglée', '{n} étapes réglées');
-  return journey.ready ? `${settled} · ${t('prête à jouer')}` : `${settled} · ${tn(journey.remaining, '{n} indispensable à faire', '{n} indispensables à faire')}`;
+  const state = journey.ready ? t('prête à jouer') : tn(journey.remaining, '{n} indispensable à faire', '{n} indispensables à faire');
+  const more = journey.proposed ? ` · ${tn(journey.proposed, '{n} amélioration proposée', '{n} améliorations proposées')}` : '';
+  return `${settled} · ${state}${more}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -546,7 +587,7 @@ export function journeyRecord(memory: JourneyMemory, file: string): JourneyRecor
 export function rememberJourney(memory: JourneyMemory, file: string, title: string, journey: Journey, now = new Date()): JourneyRecord {
   const key = file.toLowerCase();
   const previous = memory.tables[key];
-  const steps = JOURNEY_STEPS.filter((id) => previous?.steps.includes(id) || journey.steps.some((s) => s.id === id));
+  const steps = JOURNEY_STEPS.filter((id) => previous?.steps.includes(id) || [...journey.steps, ...journey.extras].some((s) => s.id === id));
   const record: JourneyRecord = { title, steps, startedAt: previous?.startedAt ?? now.toISOString(), updatedAt: now.toISOString(), position: journeyPosition(journey), ready: journey.ready };
   memory.tables[key] = record;
   return record;

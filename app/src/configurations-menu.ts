@@ -1,10 +1,14 @@
 // Configurations de la borne dans le menu système : la configuration active, le
 // choix quand les écrans branchés n'en désignent pas une à coup sûr, et la gestion
-// (forcer, renommer, nouvelle configuration, corbeille). Tout se pilote aux boutons.
+// (forcer, renommer, nouvelle configuration, corbeille), et l'écran du navigateur intégré
+// de chaque configuration. Tout se pilote aux boutons.
 // Changer de configuration relance le menu : ses fenêtres se rouvrent sur les bons écrans.
 
 import {
+  browserRoleLabel,
+  browserScreenOptions,
   chooseConfiguration,
+  describeBrowserScreen,
   configIniPath,
   describeDisplays,
   explainChoice,
@@ -17,6 +21,7 @@ import {
   renameConfiguration,
   restoreConfiguration,
   ROLES,
+  setBrowserScreen,
   t,
   tn,
   trashConfiguration,
@@ -24,8 +29,10 @@ import {
   type CabinetConfiguration,
   type CabinetSet,
   type ConfigurationScore,
+  type IconName,
   type Locations,
   type ObservedDisplay,
+  type RoleId,
 } from '@cyberpinball/core';
 import type { Action, Built, Row, SystemItem } from './library';
 
@@ -45,6 +52,8 @@ export interface ConfigurationsHost {
 const lead = () => t('Chaque configuration a ses écrans, ses rôles, son son, ses boutons et son VPinballX.ini ; les tables, les ROM et les médias sont communs.');
 /** Nom d'une configuration entre guillemets, à la façon de la langue. */
 const quoted = (name: string) => t('« {name} »', { name });
+/** Icône de chaque choix de l'écran du navigateur intégré : deux actions d'un écran n'ont jamais la même. */
+const SCREEN_ICONS: Record<RoleId | 'auto', IconName> = { auto: 'auto', playfield: 'playfield', backglass: 'image', dmd: 'dmd', topper: 'bulb' };
 
 export function createConfigurationsMenu(host: ConfigurationsHost) {
   const set = () => loadCabinetSet(host.loc.dataDir)!;
@@ -153,8 +162,9 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
     }, at);
   }
 
-  function openConfiguration(id: string): void {
-    host.library.openCustom(() => {
+  /** Écran d'une configuration ; `focus` : l'action désignée à l'arrivée (retour d'un réglage). */
+  function openConfiguration(id: string, focus?: string): void {
+    const build = (): Built => {
       const s = set();
       const c = s.configurations.find((x) => x.id === id);
       if (!c) return { heading: t('Configuration introuvable'), sections: [], actions: [{ label: t('Retour'), run: () => openManager() }], back: () => openManager() };
@@ -185,6 +195,12 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
         });
       }
       actions.push({
+        label: t('Écran du navigateur intégré'),
+        detail: browserScreenSummary(c),
+        icon: 'monitor',
+        run: () => openBrowserScreen(id, () => openConfiguration(id, t('Écran du navigateur intégré'))),
+      });
+      actions.push({
         label: t('Renommer'),
         detail: c.name,
         icon: 'edit',
@@ -207,7 +223,8 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
         actions,
         back: () => openManager(index),
       };
-    });
+    };
+    host.library.openCustom(build, focus ? Math.max(0, build().actions.findIndex((a) => a.label === focus)) : 0);
   }
 
   function confirmTrash(id: string): void {
@@ -262,7 +279,69 @@ export function createConfigurationsMenu(host: ConfigurationsHost) {
     });
   }
 
-  return { systemItem, openChooser, openManager };
+  /** « Automatique (maintenant : Fronton) », « DMD », « DMD (pas branché : automatique) ». */
+  function browserScreenSummary(c: CabinetConfiguration): string {
+    const options = browserScreenOptions(c, host.displays());
+    const current = options.find((o) => o.current) ?? options[0]!;
+    if (!current.role) return current.roles.length ? t('Automatique (maintenant : {screen})', { screen: current.roles.map(browserRoleLabel).join(' + ') }) : t('Automatique');
+    return current.display ? current.label : t('{screen} (pas branché : automatique)', { screen: current.label });
+  }
+
+  /**
+   * Écran où s'ouvre le navigateur intégré (fenêtre « Récupérer ») pour une configuration
+   * (la configuration active sans `id`) : Automatique, ou un rôle de la borne. Chaque choix a
+   * sa ligne d'aperçu (écran, dimensions, sens), surlignée quand on le désigne ; le choix fait,
+   * on revient à `back`.
+   */
+  function openBrowserScreen(id: string | undefined, back: () => void = () => openManager()): void {
+    const configurationId = () => id ?? active(set())?.id;
+    const build = (): Built => {
+      const s = set();
+      const c = s.configurations.find((x) => x.id === configurationId());
+      if (!c) return { heading: t('Configuration introuvable'), sections: [], actions: [{ label: t('Retour'), run: back }], back };
+      const options = browserScreenOptions(c, host.displays());
+      const rows: Row[] = options.map((o, i) => ({
+        text: o.role ? o.label : t('Automatique'),
+        detail: describeBrowserScreen(c, o),
+        icon: SCREEN_ICONS[o.role ?? 'auto'],
+        tone: !o.display ? 'quiet' : o.tilted ? 'warning' : 'ok',
+        badges: [...(o.current ? [t('choisi')] : []), ...(o.display ? [] : [t('pas branché')])],
+        action: i,
+      }));
+      const actions: Action[] = options.map((o) => ({
+        label: o.role ? o.label : t('Automatique'),
+        detail: o.role
+          ? o.tilted
+            ? t('Possible, mais la souris y ira de travers')
+            : o.display
+              ? t('Toujours sur cet écran')
+              : t('Pas branché : automatique en attendant')
+          : t('Playfield s’il est droit, sinon le plus grand des autres écrans'),
+        tone: o.current ? 'ok' : o.tilted ? 'warning' : undefined,
+        icon: SCREEN_ICONS[o.role ?? 'auto'],
+        run: () => {
+          updateCabinetSet(host.loc.dataDir, (x) => setBrowserScreen(x, c.id, o.role));
+          back();
+        },
+      }));
+      actions.push({ label: t('Retour'), icon: 'back', run: back });
+      return {
+        heading: t('Écran du navigateur intégré'),
+        icon: 'monitor',
+        subheading: t('Configuration {name}', { name: quoted(c.name) }),
+        lead: t('La fenêtre « Récupérer » (catalogue, comptes des sites, médias des sites, recherche sur le web) s’ouvre sur cet écran et y amène le pointeur. L’écran est retrouvé par son rôle, même si Windows le renumérote ; pas branché, c’est l’écran automatique, et le bandeau de la fenêtre le dit.'),
+        sections: [{ title: t('Aperçu'), rows }],
+        actions,
+        back,
+      };
+    };
+    const s = set();
+    const c = s.configurations.find((x) => x.id === configurationId());
+    const at = c ? Math.max(0, browserScreenOptions(c, host.displays()).findIndex((o) => o.current)) : 0;
+    host.library.openCustom(build, at);
+  }
+
+  return { systemItem, openChooser, openManager, openBrowserScreen };
 }
 
 /** Une ligne par écran de la configuration : rôles, et s'il est branché. */

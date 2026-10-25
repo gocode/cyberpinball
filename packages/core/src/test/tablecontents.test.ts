@@ -78,16 +78,24 @@ test('fichiers de la table : chaque fichier avec sa sorte, son dossier, sa taill
   assert.ok(c.entries.every((e) => e.path === path.join(folder, e.rel)));
 });
 
-test('fichiers de la table : ROM et dossier DMD attendus par le script mais absents', () => {
+test('fichiers de la table : ROM et dossier DMD attendus par le script mais absents (le DMD, facultatif)', () => {
   const { folder, table } = fixture();
   fs.rmSync(path.join(folder, 'pinmame'), { recursive: true });
   const c = tableContents(table, { ownFolder: true, script: { usesPinmame: true, roms: ['t2_l8', 't2_l6'], dmdFolder: 'T2DMD' } });
   const missing = c.entries.filter((e) => e.missing);
   assert.deepEqual(missing.map((e) => [e.kind, e.rel, e.state]), [
     ['rom', path.join('pinmame', 'roms', 't2_l8.zip'), 'error'],
-    ['dmdFolder', 'T2DMD', 'error'],
+    ['dmdFolder', 'T2DMD', 'warning'],
   ]);
   assert.equal(c.entries.find((e) => e.kind === 'rom'), missing[0], 'la ROM absente en tête de ses semblables');
+});
+
+test('fichiers de la table : ROM trouvée par le dossier commun de PinMAME, pas « absente » (playable.ts)', () => {
+  const { folder, table } = fixture();
+  fs.rmSync(path.join(folder, 'pinmame'), { recursive: true });
+  const library = path.join(path.dirname(path.dirname(folder)), 'pinmame', 'roms');
+  const c = tableContents(table, { ownFolder: true, romLibrary: library, script: { usesPinmame: true, roms: ['t2_l8'] } });
+  assert.deepEqual(c.entries.filter((e) => e.missing), []);
 });
 
 test('fichiers de la table : dans le dossier commun, seuls ses fichiers compagnons', () => {

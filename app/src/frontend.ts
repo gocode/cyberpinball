@@ -26,7 +26,6 @@ import {
   loadCabinet,
   playfieldOrientation,
   readInfo,
-  readingScreen,
   readTextIfExists,
   recordPlay,
   ROLES,
@@ -72,10 +71,12 @@ import {
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
+import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, windowRect } from './offscreen';
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
 import { createLibrary, type SystemItem, type UiAction } from './library';
+import { cachedScript } from './vbs';
 import { onJoystickInput } from './joystick-input';
 import { locations, vpxInstall, vpxProfile } from './paths';
 import { activeVpxIni, syncConfiguration } from './vpx-ini';
@@ -166,6 +167,8 @@ let tables: TableEntry[] = [];
 let windows = new Map<RoleId, BrowserWindow>();
 /** Rotation des fenêtres du playfield, pour un joueur placé au bord des flippers. */
 let rotation: Rotation = 0;
+/** Écran de chaque rôle de la borne, au démarrage du menu (écran du navigateur intégré). */
+let menuAssignments: Partial<Record<RoleId, ObservedDisplay>> = {};
 let state: State = { phase: 'menu', index: 0, help: false };
 /** Rôles dessinés par chaque fenêtre : le sien (playfield) et ceux de ses zones. */
 let windowRoles = new Map<RoleId, RoleId[]>();
@@ -255,7 +258,8 @@ const library = createLibrary({
   quit: () => void quit(),
   keys: () => KEYS,
   windows: () => windows,
-  readingScreen: () => readingScreenRect(),
+  browserScreen: () => browserScreenRect(),
+  openBrowserScreen: (back) => configurations.openBrowserScreen(undefined, back),
   broadcast: () => broadcast(),
   installVpx: () => {
     library.leave();
@@ -462,6 +466,7 @@ export function startFrontend(): void {
     attract.dispose();
   });
 
+  menuAssignments = choose ? {} : assignments;
   openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
   for (const f of selection?.findings ?? []) console.log(`Configuration de la borne : ${f.message}`);
   if (selection?.previous && selection.configuration) showBanner(t('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }));
@@ -605,13 +610,15 @@ function resolveManualEdits(keep: boolean): void {
 }
 
 /**
- * Écran où lire une page à la souris (fenêtre « Récupérer ») : le playfield si le menu n'y
- * est pas tourné, sinon le plus grand autre écran du menu (readingScreen) ; chaque fenêtre
- * du menu couvre tout son écran.
+ * Écran du navigateur intégré (fenêtre « Récupérer ») : celui du rôle choisi dans la
+ * configuration (« Écran du navigateur intégré »), relu à chaque ouverture ; en automatique
+ * ou quand il n'est pas branché, le playfield si le menu n'y est pas tourné, sinon le plus
+ * grand autre écran du menu (browserScreenFor). Sans écran de la borne (configuration à
+ * choisir), les fenêtres du menu, chacune sur tout son écran.
  */
-function readingScreenRect(): Rectangle | undefined {
-  const screens = [...windows].filter(([, w]) => !w.isDestroyed()).map(([role, w]) => ({ role, bounds: w.getBounds() }));
-  return readingScreen(screens, rotation);
+function browserScreenRect(): { bounds: Rectangle; notice?: string } | undefined {
+  const fallback = () => [...windows].filter(([, w]) => !w.isDestroyed()).map(([role, w]) => ({ role, bounds: w.getBounds() }));
+  return browserScreenFor(menuAssignments, rotation, loadCabinet(loc.dataDir)?.browserScreen, fallback);
 }
 
 /**
@@ -995,12 +1002,19 @@ function joystickMessage(version: string): Message | undefined {
 
 /**
  * Partie échouée : ce qu'en dit VPX, puis Start mène à « Ce qu'il manque pour jouer », qui
- * relit la table, dit ce qui manque et où le trouver (ROM absente, dossier du DMD…).
+ * relit la table, dit ce qui manque et où le trouver. Seule la ROM empêche une table de
+ * démarrer (playable.ts) ; un script arrêté par un DMD sans son dossier est signalé comme
+ * tel, le dossier restant proposé (« Pour aller plus loin »), pas exigé.
  */
 function explain(result: LaunchResult, table: TableEntry): Message {
   const lines = [result.message ?? t('Erreur inconnue.')];
   if (result.message && /can't start game/i.test(result.message)) {
     lines.push(t('La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.'));
+  }
+  const dmdFolder = cachedScript(table.file, loc.dataDir)?.dmdFolder;
+  const scriptStopped = /type (mismatch|incompatible)/i.test([result.message ?? '', ...result.logTail].join('\n'));
+  if (dmdFolder && scriptStopped && !fs.existsSync(path.join(table.folder, dmdFolder))) {
+    lines.push(t('Le script s’est arrêté sur le DMD qu’il dessine : son dossier « {folder} » manque. Start : le récupérer (« Pour aller plus loin »).', { folder: dmdFolder }));
   }
   lines.push(...result.notices);
   if (result.logTail.length) lines.push(t('Fin du journal de VPX :'), ...result.logTail.slice(-5));

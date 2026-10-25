@@ -4,7 +4,7 @@
 const $ = (id) => document.getElementById(id);
 
 // Étapes où un seul écran porte la question, les autres restent en retrait.
-const STEP_PHASES = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'gate'];
+const STEP_PHASES = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'gate'];
 
 function text(id, value) {
   $(id).textContent = value ?? '';
@@ -52,6 +52,26 @@ function renderButtons(state) {
     button.dataset.act = JSON.stringify({ type: 'buttons', action: a.id });
     actions.append(button);
   }
+}
+
+// Étape « Lanceur » : la position du lanceur telle que VPX la lira, de l'avant (-1/3) à tiré
+// à fond (1), le repos au quart de la piste ; le plus grand recul depuis le dernier tir.
+const GAUGE_REST = 0.25;
+function renderGauge(state) {
+  const g = state.phase === 'plunger' ? state.gauge : undefined;
+  const box = $('gauge');
+  box.hidden = !g;
+  if (!g) return;
+  const at = (p) => GAUGE_REST + p * (1 - GAUGE_REST);
+  const fill = $('gauge-fill');
+  const from = Math.min(at(0), at(g.position));
+  fill.style.left = `${from * 100}%`;
+  fill.style.width = `${Math.abs(at(g.position) - at(0)) * 100}%`;
+  const peak = $('gauge-peak');
+  peak.hidden = !(g.peak > 0.02);
+  peak.style.left = `${at(g.peak) * 100}%`;
+  box.classList.toggle('missing', Boolean(g.missing));
+  text('gauge-label', g.label);
 }
 
 document.addEventListener('click', (event) => {
@@ -271,8 +291,10 @@ function render(state) {
   // Panneau (récapitulatif, résultat) : sur le playfield, sauf quand l'état en décide (étape « Boutons »).
   const report = state.report ?? (['summary', 'done'].includes(state.phase) && state.assignedRole === 'playfield');
   root.classList.toggle('report', report);
-  root.classList.toggle('buttons', ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary'].includes(state.phase));
+  root.classList.toggle('buttons', ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger'].includes(state.phase));
+  root.classList.toggle('plunger', state.phase === 'plunger');
   renderButtons(state);
+  renderGauge(state);
   root.classList.toggle('orient', ['orient', 'flip'].includes(state.phase) && state.highlight);
   root.classList.toggle('sound', ['sound', 'channels'].includes(state.phase) && state.highlight);
   for (const angle of [90, 180, 270]) root.classList.toggle(`rot-${angle}`, state.rotation === angle);

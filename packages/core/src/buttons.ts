@@ -181,9 +181,17 @@ export function keysToTry(set: KeySet, keys: SetKeys, reference: SetKeys): strin
   return set.tried.filter((id) => !keys[id] || keys[id] !== reference[id]);
 }
 
-/** Clé gérée de [Input] (« Input.Mapping.LeftFlipper ») : celles que l'étape « Boutons » reprend en main. */
+/**
+ * Clé gérée de [Input] (« Input.Mapping.LeftFlipper ») : celles que l'étape « Boutons » reprend
+ * en main. Les capteurs (lanceur, accéléromètre) sont à l'étape « Lanceur » (plunger.ts).
+ */
 export function isInputKey(id: string): boolean {
-  return id.toLowerCase().startsWith('input.');
+  return id.toLowerCase().startsWith('input.') && !isSensorKey(id);
+}
+
+/** Clé d'un capteur analogique de [Input] : « Input.PlungerSensorCount », « Input.Mapping.Nudge0.X »… */
+export function isSensorKey(id: string): boolean {
+  return /^input\.(plungersensorcount|nudgesensorcount|mapping\.(plunger|nudge)\d+\.)/i.test(id);
 }
 
 /**

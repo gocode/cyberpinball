@@ -1205,6 +1205,221 @@ body.mouse .media-card[data-act]:hover {
   font-weight: 600;
 }
 
+/* « Pour aller plus loin » : facultatif, après le chemin, sans numéro ni décompte. */
+.journey-extras-title {
+  margin-top: 1.6cqmin;
+  padding: 0 1.4cqmin 0.4cqmin;
+  font-size: 1.9cqmin;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.journey-num.extra {
+  border-style: dashed;
+  font-weight: 500;
+}
+
+.journey-extras .journey-step {
+  padding-block: 0.6cqmin;
+}
+
+.journey-extras .journey-detail {
+  font-size: 1.95cqmin;
+}
+
 body.mouse .journey-step.fixable:hover {
   background: var(--panel);
+}
+
+/* ---------- Lignes repérées et usage d'un fichier (sélecteur, téléchargements) ---------- */
+
+/* Repère neutre : l'emplacement ouvert, un fichier coché. Le vert reste au choix courant. */
+.lib-row.current {
+  background: var(--surface-raised);
+  box-shadow: inset 0.4cqmin 0 var(--ink);
+}
+
+.lib-row-note {
+  display: flex;
+  align-items: baseline;
+  gap: 0.9cqmin;
+  margin-top: 0.5cqmin;
+  font-size: 2cqmin;
+  font-weight: 500;
+  line-height: 1.35;
+  color: var(--quiet);
+}
+
+.lib-row-sign {
+  flex: none;
+  min-width: 1.6cqmin;
+  font-weight: 700;
+  text-align: center;
+}
+
+.lib-row-note.tone-ok {
+  color: var(--signal);
+}
+
+.lib-row-note.tone-warning {
+  color: var(--warning);
+}
+
+.lib-row-note.tone-error {
+  color: var(--danger);
+}
+
+.lib-row-note.tone-info {
+  color: var(--meta);
+}
+
+/* ---------- Sélecteur de fichiers (file-picker.ts) ---------- */
+
+/*
+ * Au bureau : emplacements, contenu du lieu ouvert et gestes, en trois colonnes ; chaque
+ * colonne défile seule. En borne (portrait) : les emplacements en bandeau de trois de front,
+ * le contenu, puis les gestes sur deux colonnes.
+ */
+.lib-picker .lib-body,
+.lib-downloads .lib-body {
+  grid-template-columns: minmax(0, 1fr) 46cqmin;
+  gap: 4cqmin;
+}
+
+.lib-picker .lib-content {
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 34cqmin minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  column-gap: 3cqmin;
+  row-gap: 1.5cqmin;
+}
+
+.lib-picker .kind-flash {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.lib-picker .kind-places {
+  grid-column: 1;
+  grid-row: 2;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.lib-picker .kind-entries {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 1cqmin;
+}
+
+.lib-picker .kind-places .lib-row {
+  border-bottom: 0;
+  border-radius: 0.5cqmin;
+  font-size: 2.3cqmin;
+}
+
+.lib-picker .kind-places .lib-row-detail {
+  font-size: 1.9cqmin;
+  padding-left: 3.4cqmin;
+}
+
+/* L'icône d'un emplacement reste devant son nom, même quand il passe à la ligne. */
+.lib-picker .kind-places .lib-row-line {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.lib-picker .kind-places .lib-row-icon {
+  margin-top: 0.3cqmin;
+  align-self: flex-start;
+}
+
+.lib-picker .kind-places .lib-row-text {
+  min-width: 0;
+}
+
+.lib-picker .lib-action.tone-quiet:not(.current),
+.lib-downloads .lib-action.tone-quiet:not(.current) {
+  color: var(--ink-faint);
+}
+
+@container (orientation: portrait) {
+  .lib-picker .lib-body,
+  .lib-downloads .lib-body {
+    grid-template-columns: 1fr;
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 2.5cqmin;
+  }
+
+  .lib-picker .lib-content {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+  }
+
+  .lib-picker .kind-places {
+    grid-column: 1;
+    grid-row: 2;
+    overflow: visible;
+  }
+
+  .lib-picker .kind-places h2 {
+    display: none;
+  }
+
+  .lib-picker .kind-places .lib-rows {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.8cqmin;
+  }
+
+  .lib-picker .kind-places .lib-row {
+    padding: 1cqmin 1.2cqmin;
+    border: 1px solid var(--line);
+    font-size: 2.1cqmin;
+  }
+
+  .lib-picker .kind-places .lib-row-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .lib-picker .kind-places .lib-row-line {
+    flex-wrap: nowrap;
+  }
+
+  .lib-picker .kind-places .lib-row-detail {
+    display: none;
+  }
+
+  .lib-picker .kind-entries {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  .lib-picker .lib-actions,
+  .lib-downloads .lib-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    /* Chaque geste garde sa hauteur : son détail reste sous son libellé. */
+    align-items: start;
+    gap: 0.8cqmin 1.2cqmin;
+  }
+
+  .lib-picker .lib-action,
+  .lib-downloads .lib-action {
+    padding: 1.2cqmin 1.8cqmin;
+    font-size: 2.3cqmin;
+  }
+
+  .lib-picker .lib-action .detail,
+  .lib-downloads .lib-action .detail {
+    font-size: 1.9cqmin;
+  }
 }

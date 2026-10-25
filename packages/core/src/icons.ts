@@ -75,6 +75,8 @@ export const ICON_NAMES = [
   'gauge',
   'dmd',
   'folder',
+  'folder-download',
+  'drive',
   'bulb',
   // Design system : commandes de la borne, sources, objets
   'tables',

@@ -226,7 +226,6 @@ export const messages: Record<string, string> = {
   'sons alternatifs hors de leur dossier : ils ne seront pas chargés': 'alternative sounds outside their folder: they will not be loaded',
   'scripts complémentaires': 'additional scripts',
   'autre dossier': 'other folder',
-  'absent : le script de la table le charge': 'missing: the table script loads it',
   'absente : la table ne démarre pas sans elle': 'missing: the table does not start without it',
   'sauvegarde de PinMAME (scores, réglages du jeu)': 'PinMAME save (scores, game settings)',
   'réglages de PinMAME': 'PinMAME settings',

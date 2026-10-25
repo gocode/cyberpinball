@@ -28,8 +28,10 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  createTransferMeter,
   formatDate,
   formatSize,
+  formatTransfer,
   localMediaChoices,
   MEDIA_SITES,
   mediaSite,
@@ -522,7 +524,7 @@ export function createProposals(ctx: ProposalsContext) {
       actions.push({
         label: t('Chercher sur le web…'),
         detail: loading
-          ? t('Téléchargement : {got}', { got: loading.total ? t('{got} sur {total}', { got: formatSize(loading.received), total: formatSize(loading.total) }) : formatSize(loading.received) })
+          ? t('Téléchargement : {got}', { got: formatTransfer(loading) })
           : ctx.sites.resumable(webUrl(st, table, type))
             ? t('Reprend la page où vous en étiez ; ce que vous y téléchargez revient ici')
             : t('Navigateur intégré : ce que vous y téléchargez revient ici'),
@@ -606,13 +608,14 @@ export function createProposals(ctx: ProposalsContext) {
     const download = () =>
       void ctx.task(t('Téléchargement depuis {source}…', { source: sourceName(choice) }), async () => {
         let last = 0;
+        const meter = createTransferMeter();
         let file: string;
         try {
           file = await ctx.search.stage(offer.file, (received, total) => {
+            const progress = meter.update(received, total);
             if (Date.now() - last < 250) return;
             last = Date.now();
-            const label = mediaTypeInfo(type).label;
-            ctx.progress(total ? t('{label} : {received} sur {total}…', { label, received: formatSize(received), total: formatSize(total) }) : t('{label} : {received}…', { label, received: formatSize(received) }));
+            ctx.progress(t('{label} : {progress}…', { label: mediaTypeInfo(type).label, progress: formatTransfer(progress) }));
           });
         } catch (error) {
           return ctx.back(type, { text: t('Téléchargement impossible : {error}. Rien n’a été laissé.', { error: (error as Error).message }), tone: 'error' });

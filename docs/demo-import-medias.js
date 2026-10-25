@@ -7,7 +7,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const { execFileSync } = require('node:child_process');
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow } = require('electron');
 
 const W = path.resolve(__dirname, '..');
 const T = path.join(W, 'tmp', 'demo-import-medias');
@@ -72,8 +72,8 @@ app.whenReady().then(async () => {
   const out = path.join(W, 'tmp', 'captures', 'import-medias');
   fs.rmSync(out, { recursive: true, force: true });
   fs.mkdirSync(out, { recursive: true });
-  // Le choix d'un dossier passe par une boîte de dialogue : remplacée, rien ne s'ouvre.
-  dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [pinup] });
+  // Le dossier se choisit dans le sélecteur de Cyber Pinball : le Bureau du bac à sable, sans lecteur.
+  process.env.CYBERPINBALL_LECTEURS = '[]';
   const win = new BrowserWindow({
     show: false,
     width: 1280,
@@ -110,6 +110,8 @@ app.whenReady().then(async () => {
     keys: () => ({}),
     windows: () => new Map([['playfield', win]]),
     broadcast: () => !win.isDestroyed() && send(),
+    desktopDir: () => path.dirname(pinup),
+    downloadsDir: () => path.join(T, 'Téléchargements'),
   });
   await win.loadFile(path.join(W, 'app', 'renderer', 'frontend.html'), { query: { role: 'playfield', rotation: '0' } });
   const delay = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -137,6 +139,11 @@ app.whenReady().then(async () => {
   await shot('2-reprise-source');
   const choose = library.view().actions.findIndex((a) => a.label.startsWith('Choisir un dossier'));
   library.handleAction({ type: 'activate', index: choose });
+  await idle();
+  const pickAction = (label) => library.handleAction({ type: 'activate', index: library.view().actions.findIndex((a) => a.label === label) });
+  pickAction(path.basename(pinup));
+  await shot('3-selecteur-dossier');
+  pickAction(core.t('Prendre ce dossier entier'));
   await idle();
   await shot('3-reprise-plan');
   library.handleAction({ type: 'activate', index: 0 });

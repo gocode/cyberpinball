@@ -86,7 +86,7 @@ function inputOf(box: Box, extra: Partial<JourneyInput> = {}, script: ScriptFact
   };
 }
 
-const step = (j: Journey, id: string) => j.steps.find((s) => s.id === id)!;
+const step = (j: Journey, id: string) => [...j.steps, ...j.extras].find((s) => s.id === id)!;
 const primary = (j: Journey) => j.steps[j.current]!.choices.find((c) => c.primary)!;
 
 test('ROM absente : le parcours mène à sa page dans la base VPS, puis reçue, installée, jusqu’à « Jouer »', () => {
@@ -94,11 +94,12 @@ test('ROM absente : le parcours mène à sa page dans la base VPS, puis reçue, 
   try {
     // 1. Rien sur la borne : l'étape ROM est la courante, son geste ouvre la fiche vpforums de t2_l8.
     let j = planJourney(inputOf(box));
-    assert.deepEqual(j.steps.map((s) => s.id), ['setup', 'table', 'rom', 'backglass', 'play']);
+    assert.deepEqual(j.steps.map((s) => s.id), ['setup', 'table', 'rom', 'play']);
+    assert.deepEqual(j.extras.map((s) => s.id), ['backglass']);
     assert.equal(j.steps[j.current]!.id, 'rom');
     assert.equal(j.ready, false);
-    assert.equal(journeyPosition(j), 'Étape 3 sur 5');
-    assert.equal(journeySummary(j), '3 étapes réglées · 1 indispensable à faire');
+    assert.equal(journeyPosition(j), 'Étape 3 sur 4');
+    assert.equal(journeySummary(j), '2 étapes réglées · 1 indispensable à faire');
     assert.equal(step(j, 'rom').state, 'todo');
     assert.equal(step(j, 'rom').title, 'ROM t2_l8');
     assert.match(step(j, 'rom').detail, /Ouvrez sa page sur vpforums\.org/);
@@ -146,8 +147,8 @@ test('ROM absente : le parcours mène à sa page dans la base VPS, puis reçue, 
     assert.equal(step(j, 'rom').state, 'done');
     assert.equal(j.steps[j.current]!.id, 'play');
     assert.equal(primary(j).action.kind, 'play');
-    assert.equal(journeyPosition(j), 'Étape 5 sur 5');
-    assert.equal(journeySummary(j), '4 étapes réglées · prête à jouer');
+    assert.equal(journeyPosition(j), 'Étape 4 sur 4');
+    assert.equal(journeySummary(j), '3 étapes réglées · prête à jouer');
   } finally {
     fs.rmSync(box.root, { recursive: true, force: true });
   }
@@ -234,19 +235,57 @@ test('VPX absent : installer VPX d’abord, la ROM attend de lire le script', ()
   }
 });
 
-test('dossier du DMD absent : récupérer la table d’origine, qui le contient', () => {
+test('dossier du DMD absent : facultatif, « Jouer » tout de suite, la table d’origine proposée pour aller plus loin', () => {
   const box = sandbox();
   try {
     write(path.join(box.folder, 'pinmame', 'roms', 't2_l8.zip'), 'rom');
     const script = { ...scriptFacts(SCRIPT), dmdFolder: 'T2DMD' };
-    const j = planJourney(inputOf(box, {}, script));
+    const input = inputOf(box, {}, script);
+    // Le médecin le signale sans le dire bloquant.
+    const finding = input.findings.find((f) => f.code === 'dmdFolderMissing')!;
+    assert.equal(finding.severity, 'warning');
+    assert.match(finding.detail, /Facultatif/);
+    const j = planJourney(input);
+    assert.equal(j.ready, true);
+    assert.equal(j.steps[j.current]!.id, 'play');
+    assert.equal(journeyChoices(j)[0]!.choice.action.kind, 'play');
+    assert.ok(!j.steps.some((s) => s.id === 'dmd'), 'pas dans le chemin');
     const dmd = step(j, 'dmd');
-    assert.equal(dmd.state, 'todo');
-    assert.equal(j.steps[j.current]!.id, 'dmd');
-    const fetch = primary(j);
+    assert.equal(dmd.required, false);
+    assert.equal(dmd.state, 'optional');
+    assert.match(dmd.detail, /Le DMD de la ROM s’affiche à sa place/);
+    const fetch = dmd.choices.find((c) => c.primary)!;
     assert.equal(fetch.label, 'Récupérer la table d’origine (G5k, VPW 1.25)');
     assert.ok(fetch.action.kind === 'fetch' && fetch.action.source.kind === 'table');
     assert.ok(dmd.choices.some((c) => c.label === 'J’ai l’archive de la table'));
+    // Proposée après « Jouer », sans être allumée ; comptée en amélioration, pas en étape.
+    const later = journeyChoices(j).find((c) => c.step.id === 'dmd')!;
+    assert.equal(later.choice.primary, false);
+    assert.equal(journeyPosition(j), 'Étape 4 sur 4');
+    assert.match(journeySummary(j), /prête à jouer · 1 amélioration proposée/);
+  } finally {
+    fs.rmSync(box.root, { recursive: true, force: true });
+  }
+});
+
+test('table sans ROM, sans contenu du DMD ni fronton : « Jouer » est proposé tout de suite', () => {
+  const box = sandbox();
+  try {
+    fs.rmSync(path.join(box.folder, `${TABLE}.directb2s`));
+    // Table originale qui dessine son DMD avec FlexDMD, livrée sans son dossier.
+    const script = scriptFacts('Set FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nFlexDMD.ProjectFolder = "./OrigDMD/"\r\n');
+    assert.equal(script.usesPinmame, false);
+    assert.equal(script.dmdFolder, 'OrigDMD');
+    const j = planJourney(inputOf(box, {}, script));
+    assert.equal(j.ready, true);
+    assert.deepEqual(j.steps.map((s) => s.id), ['setup', 'table', 'play']);
+    assert.equal(journeyPosition(j), 'Étape 3 sur 3');
+    assert.deepEqual(j.extras.map((s) => s.id), ['dmd', 'backglass']);
+    assert.ok(j.extras.every((s) => !s.required));
+    assert.match(step(j, 'dmd').detail, /La table se lance sans lui/);
+    const first = journeyChoices(j)[0]!;
+    assert.equal(first.choice.action.kind, 'play');
+    assert.equal(first.choice.primary, true);
   } finally {
     fs.rmSync(box.root, { recursive: true, force: true });
   }
@@ -265,7 +304,7 @@ test('fronton absent : facultatif, ne bloque pas « Jouer », proposé après', 
     assert.equal(choices[0]!.choice.action.kind, 'play');
     assert.equal(choices[0]!.choice.primary, true);
     // Le fronton suit, sans être allumé.
-    const next = choices.find((c) => j.steps[c.step]!.id === 'backglass')!;
+    const next = choices.find((c) => c.step.id === 'backglass')!;
     assert.equal(next.choice.label, 'Récupérer le fronton : HauntFreaks');
     assert.equal(next.choice.primary, false);
   } finally {
@@ -277,9 +316,10 @@ test('parcours repris : une étape réglée depuis reste dans la liste, cochée,
   const box = sandbox();
   const data = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-parcours-donnees-'));
   try {
-    // Script remplacé par un .vbs : étape « Fichiers » conseillée (pas indispensable), puis réglée.
+    // Script remplacé par un .vbs : « Rangement de la table » conseillé (pas indispensable), puis réglé.
     const before = planJourney(inputOf(box, { findings: [{ code: 'scriptOverride', severity: 'warning', title: 'Script de la table remplacé', detail: 'x', fix: { label: 'Corbeille', ops: [] } }, ...inputOf(box).findings] }));
-    assert.equal(step(before, 'table').state, 'todo');
+    assert.equal(step(before, 'tidy').state, 'todo');
+    assert.equal(step(before, 'table').state, 'done');
     // La ROM est réglée par un fichier glissé : l'étape « ROM » reste, réglée.
     const memory = loadJourneys(data);
     rememberJourney(memory, box.file, 'Terminator 2', before, new Date('2026-10-25T10:00:00Z'));
@@ -287,12 +327,13 @@ test('parcours repris : une étape réglée depuis reste dans la liste, cochée,
     write(path.join(box.folder, 'pinmame', 'roms', 't2_l8.zip'), 'rom');
     const reloaded = loadJourneys(data);
     const record = journeyRecord(reloaded, box.file.toUpperCase())!;
-    assert.deepEqual(record.steps, ['setup', 'table', 'rom', 'backglass', 'play']);
-    assert.equal(record.position, 'Étape 3 sur 5');
-    assert.equal(step(before, 'table').required, false);
+    assert.deepEqual(record.steps, ['setup', 'table', 'rom', 'tidy', 'backglass', 'play']);
+    assert.equal(record.position, 'Étape 3 sur 4');
+    assert.equal(step(before, 'tidy').required, false);
     const after = planJourney(inputOf(box, { seen: record.steps }));
-    assert.equal(after.steps.length, 5);
-    assert.ok(after.steps.every((s) => s.id === 'play' || s.state === 'done'));
+    assert.equal(after.steps.length, 4);
+    assert.equal(after.extras.length, 2);
+    assert.ok([...after.steps, ...after.extras].every((s) => s.id === 'play' || s.state === 'done'));
     assert.equal(after.ready, true);
     assert.equal(forgetJourney(reloaded, box.file), true);
     assert.equal(journeyRecord(reloaded, box.file), undefined);

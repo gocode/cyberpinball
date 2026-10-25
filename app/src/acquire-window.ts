@@ -9,17 +9,41 @@
 // Fermer (ou Échap, la touche qu'on presse par réflexe pour une image agrandie ou après
 // une capture d'écran) ne perd rien : l'historique de la page est gardé, et la fenêtre
 // rouverte pour la même page de départ reprend là où l'utilisateur en était.
-// La fenêtre se lit à la souris : elle s'ouvre sur l'écran que donne le menu (le fronton
-// quand le playfield est couché et tourné, où la souris irait de travers) et y amène le
-// pointeur, qui pouvait être sur un écran qui le cache. Exit de la borne la ferme, comme Échap.
+// La fenêtre se lit à la souris : elle s'ouvre sur l'écran que donne le menu, celui choisi
+// dans « Écran du navigateur intégré » (configuration de la borne), sinon automatique (le
+// fronton quand le playfield est couché et tourné, où la souris irait de travers), et y amène
+// le pointeur, qui pouvait être sur un écran qui le cache. Une ligne de plus dans le bandeau
+// dit quand l'écran choisi n'est pas branché, ou que le playfield choisi est de travers.
+// Exit de la borne la ferme, comme Échap.
 // Chaque téléchargement de la session est rangé dans <racine>\downloads\acquisition, puis
 // remis à l'application avec la chaîne de redirections : la fiche traversée dit à quel
 // élément de la liste d'attente il revient.
+// Tant qu'un téléchargement de la session est en cours (page visible, téléchargement direct
+// ou média d'un site depuis une vue cachée), le bandeau lui donne une ligne : barre de
+// progression, pourcentage, « 48,2 Mo sur 312 Mo · 3,1 Mo/s · environ 1 min » (transfer.ts)
+// et Annuler. Les téléchargements sont relevés quatre fois par seconde, pas à chaque paquet.
+// À la borne : Start désigne le dernier téléchargement, les flippers en choisissent un autre,
+// Start de nouveau l'annule ; Exit (ou Échap) renonce sans fermer la fenêtre.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow, ipcMain, screen, session, shell, WebContentsView, type DownloadItem, type Rectangle, type Session } from 'electron';
-import { DIRECT_MAX_STEPS, DOWNLOAD_PROBES, probeReasonText, t, WAIT_PROBES, type ProbeResult, type SiteCookie, type SourceSite } from '@cyberpinball/core';
+import {
+  createTransferMeter,
+  DIRECT_MAX_STEPS,
+  DOWNLOAD_PROBES,
+  formatTransfer,
+  probeReasonText,
+  t,
+  transferPercent,
+  WAIT_PROBES,
+  type NavigationKeys,
+  type ProbeResult,
+  type SiteCookie,
+  type SourceSite,
+  type TransferMeter,
+  type TransferProgress,
+} from '@cyberpinball/core';
 import { setCursorPosition } from '@cyberpinball/win-displays';
 import { coverDisplay, fillBelow } from './cover-display';
 import { onJoystickInput } from './joystick-input';
@@ -28,8 +52,21 @@ import { createWindow, OFFSCREEN, primaryRect } from './offscreen';
 export const ACQUIRE_PARTITION = 'persist:acquisition';
 /** Message du bandeau quand la fenêtre reprend où l'utilisateur en était. */
 const RESUMED = () => t('Repris là où vous en étiez. « Retour à la fiche » revient à la page de départ.');
-/** Hauteur du bandeau de Cyber Pinball, en pixels. */
+/** Hauteur du bandeau de Cyber Pinball, en pixels ; avec la ligne sur l'écran retenu (écran choisi pas branché, playfield tourné). */
 const BAR = 96;
+const BAR_WITH_NOTE = 122;
+/** Une ligne de téléchargement en cours sous le bandeau (acquire.css, .download), et la marge qui les suit. */
+const DOWNLOAD_ROW = 34;
+const DOWNLOAD_PAD = 8;
+/** Au plus, lignes de téléchargement ; au-delà, la dernière résume les autres. */
+const DOWNLOAD_ROWS = 3;
+/** Relevé des téléchargements en cours (bandeau) ; un relevé sur REPORT_EVERY va aussi au menu. */
+const SAMPLE_MS = 250;
+const REPORT_EVERY = 2;
+/** Annulation à la borne : Start désigne un téléchargement, puis l'annule s'il est pressé dans ce délai. */
+const ARM_MS = 6000;
+/** Touches qu'une page garde pour elle : jamais prises pour un bouton de la borne quand elle a le clavier. */
+const PAGE_KEYS = new Set(['Enter', 'NumpadEnter', 'Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Backspace']);
 
 export interface AcquireRequest {
   /** Page à ouvrir (lien de VPS). */
@@ -54,7 +91,8 @@ export interface DownloadClaim {
   dir: string;
   /** Arrêt demandé par l'utilisateur : le téléchargement en cours est annulé. */
   signal?: AbortSignal;
-  progress?(received: number, total: number | undefined): void;
+  /** Progression, deux fois par seconde au plus (débit lissé, temps restant : transfer.ts). */
+  progress?(progress: TransferProgress): void;
   done(result: { file: string; filename: string; urls: string[] } | { error: 'cancelled' | 'interrupted' }): void;
 }
 
@@ -63,16 +101,35 @@ export interface AcquireEvents {
   dir(): string;
   /** Fichier reçu en entier, avec les adresses traversées. */
   received(file: string, facts: { urls: string[]; filename: string }): void;
-  /** Progression d'un téléchargement (octets reçus, total s'il est connu). */
-  progress(filename: string, received: number, total: number | undefined): void;
+  /** Progression d'un téléchargement, deux fois par seconde au plus (octets reçus, total s'il est connu, débit, temps restant). */
+  progress(filename: string, progress: TransferProgress): void;
   /** Téléchargement interrompu ou annulé. */
   failed(filename: string, reason: 'cancelled' | 'interrupted'): void;
   /** La fenêtre s'est fermée. */
   closed(): void;
-  /** Écran à couvrir (coordonnées Electron) ; sans lui, l'écran principal de Windows. */
-  screen?(): Rectangle | undefined;
+  /**
+   * Écran à couvrir (coordonnées Electron) et ce que le bandeau en dit ; sans lui, l'écran
+   * principal de Windows. Relu à chaque nouvelle fenêtre : un changement de réglage vaut
+   * dès l'ouverture suivante.
+   */
+  screen?(): { bounds: Rectangle; notice?: string } | undefined;
   /** Touches qui ferment la fenêtre comme Échap : Exit de la borne (touche ou bouton de joystick). */
   exitKeys?(): string[];
+  /** Boutons de l'interface qui annulent un téléchargement à la borne : Valider (Start), Précédent et Suivant (flippers). */
+  navKeys?(): Pick<NavigationKeys, 'previous' | 'next' | 'confirm'>;
+}
+
+/** Ligne du bandeau pour un téléchargement en cours. */
+export interface DownloadLine {
+  id: number;
+  filename: string;
+  state: 'progressing' | 'paused' | 'interrupted';
+  /** Absent quand la taille est inconnue : barre indéterminée. */
+  percent?: number;
+  /** « 48,2 Mo sur 312 Mo · 3,1 Mo/s · environ 1 min », précédé de l'état s'il n'avance pas. */
+  text: string;
+  /** Désigné à la borne : Start de nouveau l'annule. */
+  armed?: boolean;
 }
 
 /** Fenêtre ouverte : la fenêtre, la page du site, ce qu’on y attend. */
@@ -83,6 +140,10 @@ export interface AcquireOpen {
   status: string;
   /** Le message est un avertissement (repli d'un téléchargement direct, téléchargement interrompu, page morte). */
   warn?: boolean;
+  /** Ligne du bandeau sur l'écran retenu, tant que la fenêtre est ouverte (écran choisi pas branché, playfield tourné). */
+  screenNote?: string;
+  /** Change la hauteur du bandeau (la page du site suit en dessous). */
+  setBar?(height: number): void;
 }
 
 /** Nom libre dans `dir` : « table.zip », sinon « table (2).zip ». */
@@ -139,12 +200,9 @@ export function createAcquirer(events: AcquireEvents) {
         if (claim.signal.aborted) item.cancel();
         else claim.signal.addEventListener('abort', () => item.getState() === 'progressing' && item.cancel(), { once: true });
       }
-      item.on('updated', (_e, state) => {
-        if (state !== 'progressing') return;
-        if (claim) claim.progress?.(item.getReceivedBytes(), item.getTotalBytes() || undefined);
-        else events.progress(filename, item.getReceivedBytes(), item.getTotalBytes() || undefined);
-      });
+      track(item, filename, (progress) => (claim ? claim.progress?.(progress) : events.progress(filename, progress)));
       item.once('done', (_e, state) => {
+        untrack(item);
         if (state === 'completed') {
           if (claim) {
             if (visible) setStatus(t('Reçu : {file}, rendu aux propositions du média. Fermer (Échap) pour revenir.', { file: filename }));
@@ -166,6 +224,125 @@ export function createAcquirer(events: AcquireEvents) {
     return s;
   }
 
+  /** Téléchargements en cours de la session, par ordre d'arrivée. */
+  const downloads = new Map<number, { id: number; item: DownloadItem; filename: string; meter: TransferMeter; progress: TransferProgress; report(p: TransferProgress): void }>();
+  let nextDownload = 1;
+  let sampler: NodeJS.Timeout | undefined;
+  let samples = 0;
+  /** Téléchargement désigné à la borne (Start), jusqu'à quand. */
+  let armed: { id: number; until: number } | undefined;
+
+  function track(item: DownloadItem, filename: string, report: (p: TransferProgress) => void): void {
+    const id = nextDownload++;
+    const meter = createTransferMeter();
+    downloads.set(id, { id, item, filename, meter, progress: meter.update(item.getReceivedBytes(), item.getTotalBytes()), report });
+    sampler ??= setInterval(sample, SAMPLE_MS);
+    sendBar();
+  }
+
+  function untrack(item: DownloadItem): void {
+    for (const [id, d] of downloads) if (d.item === item) downloads.delete(id);
+    if (armed && !downloads.has(armed.id)) armed = undefined;
+    if (!downloads.size && sampler) {
+      clearInterval(sampler);
+      sampler = undefined;
+    }
+    sendBar();
+  }
+
+  /** Relevé des téléchargements en cours : le bandeau à chaque fois, le menu un relevé sur deux. */
+  function sample(): void {
+    const report = ++samples % REPORT_EVERY === 0;
+    for (const d of downloads.values()) {
+      const total = d.item.getTotalBytes();
+      if (d.item.isPaused() || d.item.getState() !== 'progressing') {
+        // En pause ou interrompu : pas de débit, la mesure repart à la reprise.
+        d.meter.pause();
+        d.progress = { received: d.item.getReceivedBytes(), ...(total ? { total } : {}) };
+        continue;
+      }
+      d.progress = d.meter.update(d.item.getReceivedBytes(), total);
+      if (report) d.report(d.progress);
+    }
+    if (armed && Date.now() > armed.until) armed = undefined;
+    sendBar();
+  }
+
+  /** Lignes du bandeau : une par téléchargement, la dernière résume les autres au-delà de DOWNLOAD_ROWS. */
+  function downloadLines(): { lines: DownloadLine[]; more?: string } {
+    const all = [...downloads.values()].map((d): DownloadLine => {
+      const state = d.item.isPaused() ? 'paused' : d.item.getState() === 'interrupted' ? 'interrupted' : 'progressing';
+      const text = formatTransfer(d.progress);
+      const percent = transferPercent(d.progress);
+      return {
+        id: d.id,
+        filename: d.filename,
+        state,
+        ...(percent !== undefined ? { percent } : {}),
+        text: state === 'paused' ? t('En pause · {progress}', { progress: text }) : state === 'interrupted' ? t('Interrompu · {progress}', { progress: text }) : text,
+        ...(armed?.id === d.id ? { armed: true } : {}),
+      };
+    });
+    if (all.length <= DOWNLOAD_ROWS) return { lines: all };
+    // Le téléchargement désigné à la borne reste visible ; les autres se résument.
+    const shown = all.slice(0, DOWNLOAD_ROWS - 1);
+    const pick = all.find((l) => l.armed);
+    if (pick && !shown.includes(pick)) shown[shown.length - 1] = pick;
+    const rest = [...downloads.values()].filter((d) => !shown.some((l) => l.id === d.id));
+    const sum: TransferProgress = { received: rest.reduce((n, d) => n + d.progress.received, 0) };
+    if (rest.every((d) => d.progress.total)) sum.total = rest.reduce((n, d) => n + d.progress.total!, 0);
+    const rate = rest.reduce((n, d) => n + (d.progress.rate ?? 0), 0);
+    if (rate > 0) sum.rate = rate;
+    return { lines: shown, more: t('Et {n} autres : {progress}', { n: rest.length, progress: formatTransfer(sum) }) };
+  }
+
+  /** Hauteur du bandeau : la base (avec la ligne sur l'écran retenu), plus une ligne par téléchargement. */
+  function barHeight(rows: number): number {
+    return (open?.screenNote ? BAR_WITH_NOTE : BAR) + (rows ? rows * DOWNLOAD_ROW + DOWNLOAD_PAD : 0);
+  }
+
+  /** Annule un téléchargement en cours (bouton Annuler, ou Start à la borne). */
+  function cancelDownload(id: number): void {
+    const d = downloads.get(id);
+    armed = undefined;
+    if (d && d.item.getState() !== 'completed') d.item.cancel();
+  }
+
+  /**
+   * Boutons de la borne pour annuler : Start désigne le dernier téléchargement, les flippers
+   * en choisissent un autre, Start de nouveau l'annule. Vrai si la touche a servi.
+   */
+  function cabinetKey(input: Electron.Input): boolean {
+    if (input.type !== 'keyDown' || !downloads.size) return false;
+    const keys = events.navKeys?.();
+    if (!keys) return false;
+    const ids = [...downloads.keys()];
+    const now = Date.now();
+    const current = armed && now <= armed.until && downloads.has(armed.id) ? armed.id : undefined;
+    if (keys.confirm.includes(input.code)) {
+      if (input.isAutoRepeat) return true;
+      if (current !== undefined) cancelDownload(current);
+      else armed = { id: ids[ids.length - 1]!, until: now + ARM_MS };
+      sendBar();
+      return true;
+    }
+    if (current === undefined) return false;
+    const step = keys.previous.includes(input.code) ? -1 : keys.next.includes(input.code) ? 1 : 0;
+    if (!step) return false;
+    const at = ids.indexOf(current);
+    armed = { id: ids[(at + step + ids.length) % ids.length]!, until: now + ARM_MS };
+    sendBar();
+    return true;
+  }
+
+  /** Exit ou Échap pendant qu'un téléchargement est désigné : on renonce, la fenêtre reste. */
+  function disarm(): boolean {
+    if (!armed || Date.now() > armed.until) return false;
+    armed = undefined;
+    sendBar();
+    return true;
+  }
+
   function setStatus(status: string, warn = false): void {
     if (!open) return;
     open.status = status;
@@ -178,13 +355,20 @@ export function createAcquirer(events: AcquireEvents) {
     const v = open.view.webContents;
     // Le destinataire (fonctions, signal d'arrêt) ne passe pas l'IPC : le bandeau n'en a pas besoin.
     const { claim: _claim, ...request } = open.request;
+    const { lines, more } = downloadLines();
+    const height = barHeight(lines.length + (more ? 1 : 0));
     open.win.webContents.send('acquire:state', {
       ...request,
       status: open.status,
       warn: open.warn === true,
+      screenNote: open.screenNote,
       address: v.getURL(),
       canGoBack: v.navigationHistory.canGoBack(),
+      downloads: lines,
+      more,
+      barHeight: height,
     });
+    open.setBar?.(height);
   }
 
   let ipcReady = false;
@@ -201,6 +385,9 @@ export function createAcquirer(events: AcquireEvents) {
       else if (action === 'home') void v.loadURL(open.request.url);
       else if (action === 'browser') void shell.openExternal(v.getURL() || open.request.url);
       else if (action === 'close') close();
+    });
+    ipcMain.on('acquire:cancel', (e, id: unknown) => {
+      if (open && e.sender === open.win.webContents && typeof id === 'number') cancelDownload(id);
     });
   }
 
@@ -245,7 +432,7 @@ export function createAcquirer(events: AcquireEvents) {
     });
     win.setMenuBarVisibility(false);
     win.on('page-title-updated', (e) => e.preventDefault());
-    // Au-dessus des fenêtres plein écran du menu, sur l'écran principal de Windows.
+    // Au-dessus des fenêtres plein écran du menu, sur l'écran qu'elle couvre.
     win.setAlwaysOnTop(true, 'screen-saver');
     const view = new WebContentsView({
       webPreferences: { session: s, contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: OFFSCREEN },
@@ -273,14 +460,27 @@ export function createAcquirer(events: AcquireEvents) {
     // champ (un encodeur envoie une touche, sans clavier pour la corriger).
     const closing = (input: Electron.Input) =>
       input.type === 'keyDown' && !pageFullScreen && (input.key === 'Escape' || Boolean(events.exitKeys?.().includes(input.code)));
+    // Exit pendant qu'un téléchargement est désigné pour l'annulation : on renonce, sans fermer.
+    const exit = () => disarm() || close();
     const escape = (e: Electron.Event, input: Electron.Input) => {
       if (!closing(input)) return;
       e.preventDefault();
-      close();
+      exit();
     };
     contents.on('before-input-event', escape);
     win.webContents.on('before-input-event', escape);
-    onJoystickInput(win, (input) => closing(input) && close());
+    // Le bandeau n'a pas de champ : les boutons de la borne y servent toujours.
+    win.webContents.on('before-input-event', (e, input) => cabinetKey(input) && e.preventDefault());
+    // La page garde ses touches (Entrée, flèches…) et ce qu'on tape dans un champ : Start n'y
+    // désigne un téléchargement que hors d'un champ de saisie, sans retirer la touche à la page.
+    contents.on('before-input-event', (_e, input) => {
+      if (input.type !== 'keyDown' || !downloads.size || PAGE_KEYS.has(input.code)) return;
+      void contents
+        .executeJavaScript('(() => { const e = document.activeElement; return Boolean(e && (e.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName))); })()', true)
+        .then((typing) => typing || cabinetKey(input))
+        .catch(() => undefined);
+    });
+    onJoystickInput(win, (input) => (closing(input) ? exit() : cabinetKey(input)));
     const viewId = contents.id;
     // Fermée de quelque façon que ce soit (Fermer, Échap, Alt+F4) : l'historique est gardé.
     win.on('close', () => {
@@ -292,12 +492,16 @@ export function createAcquirer(events: AcquireEvents) {
     win.on('closed', () => {
       claims.delete(viewId);
       open = undefined;
+      armed = undefined;
       events.closed();
     });
-    // Tout un écran, au-dessus du menu, jamais le bureau : celui que donne le menu, sinon l'écran principal de Windows.
-    const bounds = events.screen?.() ?? primaryRect();
+    // Tout un écran, au-dessus du menu, jamais le bureau : celui que donne le menu (choisi ou
+    // automatique), sinon l'écran principal de Windows.
+    const place = events.screen?.();
+    const bounds = place?.bounds ?? primaryRect();
+    if (place?.notice) open.screenNote = place.notice;
     coverDisplay(win, bounds);
-    fillBelow(win, view, BAR);
+    open.setBar = fillBelow(win, view, barHeight(0));
     void win.loadFile(path.join(__dirname, '..', 'renderer', 'acquire.html'));
     if (restore) void contents.navigationHistory.restore({ entries: restore.entries, index: restore.index }).catch(() => contents.loadURL(request.url));
     else void contents.loadURL(request.url);

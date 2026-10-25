@@ -28,6 +28,7 @@ import {
   contentSummary,
   EXPECTED_LABELS,
   forgetStray,
+  forgetDownloads,
   CATALOG_STATES,
   CATALOG_SUPPORT_LABELS,
   CATALOG_SUPPORTS,
@@ -35,6 +36,7 @@ import {
   formatList,
   formatNumber,
   formatSize,
+  formatTransfer,
   installedGames,
   isPartialDownload,
   linkHost,
@@ -47,6 +49,7 @@ import {
   NEED_LABELS,
   placeDownload,
   quickNeeds,
+  requiredForPlay,
   readVpxTableInfo,
   reassignFile,
   recommendVersion,
@@ -97,6 +100,7 @@ import {
 import { createAcquirer } from './acquire-window';
 import { archiveEntries } from './archives';
 import { recentDownloads, watchDownloads } from './downloads-watch';
+import type { PickRequest } from './file-picker';
 import type { Action, Built, LibraryHost, Row, Section, Tone } from './library';
 import type { MediaCard, MediaThumb } from './library-medias';
 import { allowPreview } from './media-protocol';
@@ -127,6 +131,8 @@ export interface CatalogContext {
   downloadsDir?(): string;
   /** Parcours « Ce qu'il manque pour jouer » d'une table installée (liste d'attente : « Reprendre »). */
   openJourney?(file: string): void;
+  /** Sélecteur de fichiers de Cyber Pinball (file-picker.ts) ; undefined à l'abandon. */
+  pick?(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
 }
 
 /** Jeux par page du catalogue : une page tient sur l'écran, cartes et vignettes comprises. */
@@ -355,9 +361,9 @@ export function createCatalog(ctx: CatalogContext) {
   const acquirer = createAcquirer({
     dir: acquisitionDir,
     received: (file, facts) => void received(file, facts, 'window', vpsCache),
-    progress: (filename, got, total) => {
+    progress: (filename, progress) => {
       notice = {
-        text: total ? t('Téléchargement de « {file} » : {got} sur {total}…', { file: filename, got: formatSize(got), total: formatSize(total) }) : t('Téléchargement de « {file} » : {got}…', { file: filename, got: formatSize(got) }),
+        text: t('Téléchargement de « {file} » : {progress}…', { file: filename, progress: formatTransfer(progress) }),
         tone: 'info',
       };
       host.broadcast();
@@ -374,8 +380,9 @@ export function createCatalog(ctx: CatalogContext) {
       refresh?.();
       host.broadcast();
     },
-    screen: () => host.readingScreen?.(),
+    screen: () => host.browserScreen?.(),
     exitKeys: () => host.keys().exit,
+    navKeys: () => host.keys(),
   });
 
   let watcher: { stop(): void } | undefined;
@@ -812,6 +819,10 @@ export function createCatalog(ctx: CatalogContext) {
           },
         ],
       });
+      // Tout l'indispensable est reçu : ce qui reste (le fronton) est facultatif, le plan peut s'ouvrir.
+      if (next && !items.some((i) => i.state === 'waiting' && requiredForPlay(i.kind))) {
+        actions.push({ label: t('Installer sans attendre'), detail: t('{kind} : facultatif, reste dans la liste d’attente', { kind: NEED_LABELS[next.kind] }), tone: 'ok', icon: 'download', run: () => quickDone(game.id) });
+      }
       if (next && !acquirer.isOpen()) actions.push({ label: t('Continuer l’installation rapide'), detail: t('{kind} : {label}', { kind: NEED_LABELS[next.kind], label: next.label }), tone: 'ok', icon: 'download', run: () => fetchItem(next, () => openNeeds(game.id, version.id)) });
       actions.push({ label: t('Arrêter l’installation rapide'), detail: t('Ce qui est reçu reste dans la liste d’attente'), icon: 'close', run: () => stopQuick(game, version) });
     } else {
@@ -873,7 +884,7 @@ export function createCatalog(ctx: CatalogContext) {
       heading: t('Ce qu’il faut : {game}', { game: vpsLabel(game) }),
       subheading: version.updatedAt ? t('Version {version}, du {date}', { version: versionLabel(version), date: formatDay(version.updatedAt) }) : t('Version {version}', { version: versionLabel(version) }),
       lead: running
-        ? t('Installation rapide : chaque page s’ouvre d’elle-même dans la fenêtre « Récupérer » ; connectez-vous, téléchargez. Le plan s’ouvre quand tout l’indispensable est là.')
+        ? t('Installation rapide : chaque page s’ouvre d’elle-même dans la fenêtre « Récupérer », l’indispensable d’abord ; connectez-vous, téléchargez. Dès que l’indispensable est là, « Installer sans attendre » ouvre le plan.')
         : missing.length
           ? t('Pour jouer : {items}. Start sur une ligne ouvre sa page dans la fenêtre « Récupérer » : connectez-vous, téléchargez ; le fichier est rangé tout seul dans la liste d’attente.', { items: missing.map((n) => NEED_LABELS[n.kind]).join(', ') })
           : received.length
@@ -1014,7 +1025,9 @@ export function createCatalog(ctx: CatalogContext) {
         notice = { text: t('Installation rapide impossible : {items} introuvable pour cette version. Choisissez-en une autre.', { items: blocked.map((n) => NEED_LABELS[n.kind]).join(', ') }), tone: 'warning' };
         return openNeeds(game.id, version.id);
       }
-      const items = wanted.map((need) => itemFor(game, need) ?? addToWaitList(waitList(), game, need, need.files[0]!, liveLinks(need.files[0]!)[0]!.url));
+      // L'indispensable d'abord (playable.ts) : le fronton conseillé vient après, et ne retient jamais le plan.
+      const ordered = [...wanted].sort((a, b) => Number(requiredForPlay(b.kind)) - Number(requiredForPlay(a.kind)));
+      const items = ordered.map((need) => itemFor(game, need) ?? addToWaitList(waitList(), game, need, need.files[0]!, liveLinks(need.files[0]!)[0]!.url));
       save();
       quick = { gameId: game.id, versionId: version.id, items: items.map((i) => i.id) };
       quickStep();
@@ -1038,11 +1051,15 @@ export function createCatalog(ctx: CatalogContext) {
     const items = quickItems();
     const next = items.find((i) => i.state === 'waiting');
     if (next) return fetchItem(next, () => openNeeds(game.id, version.id));
-    // Tout est reçu : la fenêtre se ferme, le plan s'ouvre.
+    quickDone(game.id);
+  }
+
+  /** Fin de l'installation rapide : la fenêtre se ferme, le plan s'ouvre (un fronton encore attendu le reste). */
+  function quickDone(gameId: string): void {
     quick = undefined;
     refresh = undefined;
     if (acquirer.isOpen()) acquirer.close();
-    installGame(game.id, true);
+    installGame(gameId, true);
   }
 
   function stopQuick(game: VpsGame, version: VpsTableFile): void {
@@ -1453,6 +1470,15 @@ export function createCatalog(ctx: CatalogContext) {
         if (good.length) sections.push({ title: t('Conviennent'), rows: good.map(row) });
         if (bad.length) sections.push({ title: t('Ne conviennent pas'), rows: bad.map(row) });
         if (!candidates.length) sections.push({ rows: [{ text: t('Aucun fichier déjà téléchargé'), detail: t('Ni gardé de côté, ni dans downloads\\acquisition, ni dans Téléchargements depuis un mois.'), tone: 'quiet' }] });
+        if (ctx.pick)
+          actions.push({
+            label: t('Chercher ailleurs…'),
+            detail: t('Téléchargements de Cyber Pinball, clé USB, disques'),
+            run: async () => {
+              const paths = await ctx.pick!({ title: t('Choisir un fichier : {item}', { item: itemName(item) }), icon: 'inbox', purpose: t('Liste d’attente : {item}', { item: itemName(item) }), mode: 'file', filter: { label: EXPECTED_LABELS[item.kind], extensions: ['vpx', 'directb2s', 'zip', '7z', 'rar', 'mp3', 'ogg', 'wav', 'pov', 'pac', 'vni', 'pal', 'crz', 'cromc', 'mp4', 'png', 'jpg'] }, start: 'cp' });
+              if (paths?.[0]) assign(paths[0], id, 'manual', () => openReplace(id));
+            },
+          });
         actions.push(
           { label: item.received ? t('Rouvrir la page pour le télécharger de nouveau') : t('Rouvrir la page'), detail: hostLine(linkHost(item.page)), tone: good.length ? undefined : 'ok', run: () => reopen(item, back) },
           { label: t('Retour'), run: back },
@@ -1710,8 +1736,17 @@ export function createCatalog(ctx: CatalogContext) {
           openAccounts(ctx.cursor());
         },
       },
-      { label: t('Retour'), run: () => ctx.home() },
     );
+    // L'écran où s'ouvre « Récupérer » : réglage de la configuration de la borne, à portée d'ici.
+    if (host.openBrowserScreen) {
+      const at = actions.length;
+      actions.push({
+        label: t('Écran du navigateur intégré'),
+        detail: t('Où s’ouvre la fenêtre « Récupérer » (réglage de la configuration de la borne)'),
+        run: () => host.openBrowserScreen!(() => openAccounts(at)),
+      });
+    }
+    actions.push({ label: t('Retour'), run: () => ctx.home() });
     return {
       heading: t('Comptes des sites'),
       subheading: tn(states.filter((s) => s.state.connected).length, '{n} connecté sur {total}', '{n} connectés sur {total}', { total: states.length }),
@@ -1814,6 +1849,15 @@ export function createCatalog(ctx: CatalogContext) {
     summary,
     /** Appelé par l'installation, une fois les tables rangées. */
     installed: installedItems,
+    /**
+     * Des fichiers téléchargés sont partis à la corbeille (écran « Téléchargements ») : gardés de
+     * côté oubliés, éléments reçus redevenus attendus. Renvoie le nombre de ces éléments.
+     */
+    forgetFiles: (files: string[]) => {
+      const { waiting } = forgetDownloads(waitList(), files);
+      save();
+      return waiting.length;
+    },
     /** Reprend la surveillance au démarrage, si elle était voulue. */
     start: () => {
       updateWatch();

@@ -58,11 +58,11 @@ function renderLibrary(v) {
         content.append(renderMediaCards(v.media, v.cursor));
         continue;
       }
-      const box = libEl('section', 'lib-section');
+      const box = libEl('section', `lib-section${section.kind ? ` kind-${section.kind}` : ''}`);
       if (section.title) box.append(libEl('h2', '', section.title));
       const list = libEl('ul', 'lib-rows');
       for (const row of section.rows) {
-        const li = libEl('li', `lib-row tone-${row.tone ?? 'none'}`);
+        const li = libEl('li', `lib-row tone-${row.tone ?? 'none'}${row.current ? ' current' : ''}`);
         if (row.action !== undefined) {
           li.classList.add(row.pick ? 'pick' : 'fixable');
           if (row.action === v.cursor) li.classList.add('selected');
@@ -74,6 +74,12 @@ function renderLibrary(v) {
         for (const badge of row.badges ?? []) line.append(libEl('span', 'badge', badge));
         li.append(line);
         if (row.detail) li.append(libEl('div', 'lib-row-detail', row.detail));
+        // À quoi sert un fichier : signe et mot, jamais la couleur seule.
+        if (row.note) {
+          const note = libEl('div', `lib-row-note tone-${row.note.tone}`);
+          note.append(libEl('span', 'lib-row-sign', row.note.sign), libEl('span', '', row.note.text));
+          li.append(note);
+        }
         list.append(li);
       }
       if (section.more > 0) list.append(libEl('li', 'lib-row more', tn(section.more, '… et {n} autre', '… et {n} autres')));
@@ -147,8 +153,18 @@ function renderJourney(j) {
   progress.append(top, bar);
   box.append(progress);
   if (j.notice) box.append(libEl('div', `journey-notice tone-${j.notice.tone}`, j.notice.text));
-  const list = libEl('ol', 'journey-steps');
-  for (const s of j.steps) {
+  box.append(journeyList(j.steps, 'ol'));
+  // Facultatif, après le chemin : jamais compté dans « Étape n sur N ».
+  if (j.extras?.length) {
+    box.append(libEl('div', 'journey-extras-title', j.extrasTitle), journeyList(j.extras, 'ul', 'journey-extras'));
+  }
+  return box;
+}
+
+/** Étapes du parcours : numérotées (le chemin), ou marquées « + » (pour aller plus loin). */
+function journeyList(steps, tag, extra = '') {
+  const list = libEl(tag, `journey-steps ${extra}`.trim());
+  for (const s of steps) {
     const li = libEl('li', `journey-step state-${s.state}${s.current ? ' current' : ''}`);
     if (s.action !== undefined) {
       li.classList.add('fixable');
@@ -160,11 +176,10 @@ function renderJourney(j) {
     if (s.note) text.append(libEl('div', 'journey-note', s.note));
     const state = libEl('span', `journey-state tone-${s.tone}`);
     state.append(libEl('span', 'journey-sign', s.sign), libEl('span', '', s.word));
-    li.append(libEl('span', 'journey-num', String(s.n)), text, state);
+    li.append(libEl('span', s.n === undefined ? 'journey-num extra' : 'journey-num', s.n === undefined ? '+' : String(s.n)), text, state);
     list.append(li);
   }
-  box.append(list);
-  return box;
+  return list;
 }
 
 // ---------- Prospectus et règles, page par page ----------

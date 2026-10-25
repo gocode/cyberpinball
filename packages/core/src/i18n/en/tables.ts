@@ -202,7 +202,6 @@ export const messages: Record<string, string> = {
   'Autre version de la ROM que celle de la bibliothèque': 'ROM version differs from the library’s',
   'pinmame\\roms\\{name} ({size}, {date}) n’a pas le même contenu que celle de la bibliothèque ({librarySize}, {libraryDate}). Pour garder plutôt celle de la table, « Ranger les ROM » dans le menu laisse choisir.': 'pinmame\\roms\\{name} ({size}, {date}) differs from the library’s ({librarySize}, {libraryDate}). To keep the table’s instead, “Organize ROMs” in the menu lets you choose.',
   'Utiliser la ROM de la bibliothèque (celle de la table va à la corbeille)': 'Use the library ROM (the table’s goes to the trash)',
-  'Le DMD de cette table est dessiné par son script, avec les images, vidéos et polices du dossier « {folder} ». Sans lui, le script s’arrête au démarrage (« Type incompatible ») : la table s’affiche, mais la partie ne commence pas.': 'This table’s DMD is drawn by its script, using the images, videos and fonts in the “{folder}” folder. Without it, the script stops at startup (“Type mismatch”): the table shows, but the game doesn’t start.',
   'Dossier « {folder} » absent, son contenu est en vrac': '“{folder}” folder missing, its content is loose',
   '{n} image ou police du DMD sont à la racine du dossier de la table.': '{n} DMD image or font is at the root of the table folder.',
   '{n} images ou polices du DMD sont à la racine du dossier de la table.': '{n} DMD images or fonts are at the root of the table folder.',
@@ -299,6 +298,14 @@ export const messages: Record<string, string> = {
   'Mo': 'MB',
   'ko': 'KB',
   '{n} octets': '{n} bytes',
+  // packages/core/src/transfer.ts
+  '{size}/s': '{size}/s',
+  'quelques secondes': 'a few seconds',
+  'environ {n} s': 'about {n} s',
+  'environ {n} min': 'about {n} min',
+  'environ {h} h {m} min': 'about {h} h {m} min',
+  'environ {h} h': 'about {h} h',
+  '{got} sur {total}': '{got} of {total}',
   // packages/core/src/locations.ts
   'Le dossier doit être un chemin complet, par exemple D:\\CyberPinball.': 'The folder must be a full path, for example D:\\CyberPinball.',
   'Un dossier réseau ne convient pas : VPX doit lire ses fichiers en local.': 'A network folder won’t do: VPX must read its files locally.',
@@ -399,4 +406,7 @@ export const messages: Record<string, string> = {
   'Playfield : cadrage automatique de VPX rétabli ([Player] CabinetAutofitMode = {before} → {value}). En cadrage manuel, chaque table garde la rotation réglée par son auteur et peut s\'afficher de travers sur cette borne.': 'Playfield: VPX automatic framing restored ([Player] CabinetAutofitMode = {before} → {value}). With manual framing, each table keeps the rotation set by its author and may show sideways on this cabinet.',
   'Playfield : flippers {edge} de l\'image, mais avec {keys}, VPX les dessinera {played}. Les tables s\'afficheront de travers : remettez les valeurs de Cyber Pinball.': 'Playfield: flippers {edge} in the image, but with {keys}, VPX will draw them {played}. Tables will show sideways: restore the Cyber Pinball values.',
   'Playfield : flippers {edge} de l\'image, mais avec {keys}, VPX garde pour chaque table la rotation réglée par son auteur, souvent pour un autre écran : les tables peuvent s\'afficher de travers. Remettez le cadrage automatique (CabinetAutofitMode = 1).': 'Playfield: flippers {edge} in the image, but with {keys}, VPX keeps for each table the rotation set by its author, often for another screen: tables may show sideways. Restore automatic framing (CabinetAutofitMode = 1).',
+  'Facultatif : le script dessine un DMD avec les images, vidéos et polices du dossier « {folder} », mais la table se lance sans lui.': 'Optional: the script draws a DMD with the images, videos and fonts in the “{folder}” folder, but the table starts without it.',
+  'Le DMD de la ROM s’affiche à l’emplacement du DMD ; si le script s’arrête sur « Type incompatible », c’est ce dossier qui manque.': 'The ROM’s DMD shows in the DMD’s place; if the script stops on “Type mismatch”, this folder is what’s missing.',
+  'Sans lui, ce DMD reste vide ; si le script s’arrête sur « Type incompatible », c’est ce dossier qui manque.': 'Without it, this DMD stays empty; if the script stops on “Type mismatch”, this folder is what’s missing.',
 };
