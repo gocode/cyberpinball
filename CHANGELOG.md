@@ -18,6 +18,7 @@ son interface).
 - Une ROM rangée dans un sous-dossier de son zip est reconnue ; « Diagnostiquer et réparer » regroupe une ROM éparpillée dans une table.
 - Liste d'attente corrigeable : réaffecter, vider, remplacer ou retirer un fichier reçu par erreur ; la fiche d'une table a une section « Fichiers ».
 - Une icône pour chaque menu.
+- La fenêtre « Récupérer » reste au premier plan : le fronton ne passe plus devant au premier clic.
 - Fenêtre « Récupérer » sur une borne : elle s'ouvre sur un écran lisible (le fronton si le playfield est tourné), le pointeur amené dessus ; Exit la ferme.
 - La fenêtre « Récupérer » rouverte reprend la page où vous en étiez ; recherche des sites plus complète.
 - Plus d'écran blanc quand une fenêtre s'ouvre ou change d'écran.

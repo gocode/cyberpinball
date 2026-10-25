@@ -18,7 +18,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ipcMain, screen, session, shell, WebContentsView, type BrowserWindow, type DownloadItem, type Rectangle, type Session } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, session, shell, WebContentsView, type DownloadItem, type Rectangle, type Session } from 'electron';
 import { DIRECT_MAX_STEPS, DOWNLOAD_PROBES, probeReasonText, t, WAIT_PROBES, type ProbeResult, type SiteCookie, type SourceSite } from '@cyberpinball/core';
 import { setCursorPosition } from '@cyberpinball/win-displays';
 import { coverDisplay, fillBelow } from './cover-display';
@@ -246,7 +246,7 @@ export function createAcquirer(events: AcquireEvents) {
     win.setMenuBarVisibility(false);
     win.on('page-title-updated', (e) => e.preventDefault());
     // Au-dessus des fenêtres plein écran du menu, sur l'écran principal de Windows.
-    win.setAlwaysOnTop(true, 'floating');
+    win.setAlwaysOnTop(true, 'screen-saver');
     const view = new WebContentsView({
       webPreferences: { session: s, contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: OFFSCREEN },
     });
@@ -288,6 +288,7 @@ export function createAcquirer(events: AcquireEvents) {
       const entries = contents.navigationHistory.getAllEntries();
       kept = entries.length ? { url: open?.request.url ?? request.url, entries, index: contents.navigationHistory.getActiveIndex() } : undefined;
     });
+    keepInFront(win);
     win.on('closed', () => {
       claims.delete(viewId);
       open = undefined;
@@ -303,6 +304,32 @@ export function createAcquirer(events: AcquireEvents) {
     win.show();
     win.focus();
     bringPointer(bounds);
+  }
+
+  /**
+   * Tant que la fenêtre est ouverte, aucune autre fenêtre de Cyber Pinball ne passe devant :
+   * vraie borne à Pinscape (0.1.3-essai.2), au premier clic dans la page, le fronton (fenêtre
+   * du menu en plein écran sur le même écran) reprenait le focus et le premier plan, et la
+   * fenêtre « Récupérer » disparaissait derrière. Toute fenêtre de l'application qui prend le
+   * focus (clic, focus() d'une lecture de script, retour du bureau, bouton du joystick) le
+   * rend donc aussitôt à « Récupérer », qui réaffirme son « toujours au-dessus » ; elle le
+   * réaffirme aussi chaque fois qu'elle perd le focus au profit de l'application. Fermée,
+   * les fenêtres du menu reprennent la main normalement (events.closed).
+   */
+  function keepInFront(win: BrowserWindow): void {
+    const raise = () => {
+      if (win.isDestroyed() || OFFSCREEN) return;
+      win.setAlwaysOnTop(true, 'screen-saver');
+      win.moveTop();
+      if (!win.isFocused()) win.focus();
+    };
+    const otherFocused = (_e: Electron.Event, other: BrowserWindow) => {
+      if (other !== win) setImmediate(raise);
+    };
+    app.on('browser-window-focus', otherFocused);
+    win.on('blur', () => setImmediate(() => BrowserWindow.getFocusedWindow() && raise()));
+    win.on('always-on-top-changed', (_e, onTop) => onTop || setImmediate(raise));
+    win.once('closed', () => app.off('browser-window-focus', otherFocused));
   }
 
   /**

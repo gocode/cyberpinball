@@ -142,7 +142,33 @@ export function comparePair(pair) {
     }
     for (const version of b.keys()) if (!a.has(version)) problems.push(`${pair.en} : section « ## ${version} » absente de ${pair.fr}`);
   }
+  if (/tests-manuels/.test(pair.fr)) problems.push(...testNumberProblems(pair, read(pair.fr), read(pair.en)));
   problems.push(...brokenLinks(pair.fr, fr), ...brokenLinks(pair.en, en));
+  return problems;
+}
+
+/** Numéros des tests manuels (« | 254 | … »), dans l'ordre du document. */
+export function testNumbers(text) {
+  return [...text.matchAll(/^\| (\d+) \|/gm)].map((m) => Number(m[1]));
+}
+
+/**
+ * Tests manuels : chaque numéro une seule fois (deux sessions parallèles avaient pris 254 à
+ * 256 le 25/10/2026), et les mêmes numéros dans le même ordre en français et en anglais.
+ */
+export function testNumberProblems(pair, frText, enText) {
+  const problems = [];
+  const fr = testNumbers(frText);
+  const en = testNumbers(enText);
+  for (const [file, numbers] of [[pair.fr, fr], [pair.en, en]]) {
+    const twice = [...new Set(numbers.filter((n, i) => numbers.indexOf(n) !== i))];
+    if (twice.length) problems.push(`${file} : numéro${twice.length > 1 ? 's' : ''} de test en double : ${twice.join(', ')} (prendre le suivant libre : ${Math.max(...numbers) + 1})`);
+  }
+  const at = fr.findIndex((n, i) => n !== en[i]);
+  if (at >= 0 || fr.length !== en.length) {
+    const i = at >= 0 ? at : Math.min(fr.length, en.length);
+    problems.push(`${pair.en} : test n° ${en[i] ?? 'absent'} à la place de ${fr[i] ?? 'rien'} (même ordre que ${pair.fr})`);
+  }
   return problems;
 }
 

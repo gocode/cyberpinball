@@ -629,3 +629,19 @@ test('l’interface lit ses propres boutons partout, jamais ceux du jeu seuls', 
   }
   assert.match(read('app', 'src', 'frontend.ts'), /function menuKeysFor\(cabinet: ButtonsSource\)[\s\S]*?interfaceKeys\(cabinet\)/);
 });
+
+test('fenêtre au-dessus du menu (« Récupérer ») : aucune fenêtre de la borne ne repasse devant elle', () => {
+  // Vraie borne à Pinscape (0.1.3-essai.2) : au premier clic dans « Récupérer », le fronton
+  // reprenait le focus et passait devant. Toute fenêtre mise « toujours au-dessus » doit
+  // reprendre le focus quand une autre fenêtre de l'application le prend.
+  const dir = path.join(__dirname, '..', '..', '..', '..', 'app', 'src');
+  const onTop = fs.readdirSync(dir).filter((f) => f.endsWith('.ts') && /\.setAlwaysOnTop\(true/.test(fs.readFileSync(path.join(dir, f), 'utf8')));
+  assert.ok(onTop.includes('acquire-window.ts'));
+  for (const f of onTop) {
+    const source = fs.readFileSync(path.join(dir, f), 'utf8');
+    assert.match(source, /app\.on\('browser-window-focus'[\s\S]*?app\.off\('browser-window-focus'/, `${f} : le focus pris par une autre fenêtre doit lui revenir`);
+    assert.match(source, /\.moveTop\(\)/, `${f} : la fenêtre doit repasser devant`);
+  }
+  const acquire = fs.readFileSync(path.join(dir, 'acquire-window.ts'), 'utf8');
+  assert.match(acquire, /keepInFront\(win\);[\s\S]{0,40}win\.on\('closed'/);
+});

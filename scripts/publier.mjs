@@ -261,8 +261,16 @@ if (argv.includes('--brouillon')) {
   console.log(`\nPubliée : ${published.json.html_url}`);
   // Les bornes lisent ce flux : vérifié tel qu'elles le recevront.
   // Une préversion : lue comme une borne qui accepte les préversions.
-  const check = await update.checkForUpdate({ current: '0.0.0', prereleases: prerelease }).catch((error) => error);
+  // GitHub met sa liste des releases à jour avec quelques secondes de retard (le 25/10/2026,
+  // 0.1.3-essai.2 lue « 0.1.3-essai.1 ») : on relit jusqu'à voir la version publiée.
+  let check;
+  for (let attempt = 0; attempt < 12; attempt++) {
+    if (attempt) await new Promise((resolve) => setTimeout(resolve, 5000));
+    check = await update.checkForUpdate({ current: '0.0.0', prereleases: prerelease }).catch((error) => error);
+    if (!(check instanceof Error) && check.latest.version === version) break;
+  }
   if (check instanceof Error) console.log(`Attention : le flux n'est pas encore lisible par les bornes (${check.message}).`);
+  else if (check.latest.version !== version) console.log(`Attention : au bout d'une minute, les bornes lisent encore la version ${check.latest.version}, pas ${version} : à vérifier sur GitHub.`);
   else console.log(`Flux lu comme une borne : version ${check.latest.version}${prerelease ? ' (préversion : seules les bornes qui acceptent les préversions la voient)' : ''}.`);
 }
 
