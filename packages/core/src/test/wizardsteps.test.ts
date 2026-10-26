@@ -7,6 +7,7 @@ import { toPhysicalScreen } from '../fingerprint';
 import { IniDocument } from '../ini';
 import type { Cabinet } from '../model';
 import { planVpxSync } from '../sync';
+import { SYSTEM_ITEMS, systemPathOf } from '../systemmenu';
 import { devPcDisplays, emptyCabinet } from './fixtures';
 import {
   CAPTURE_PHASES,
@@ -237,7 +238,10 @@ test('les écrans de l’assistant affichent toujours le bouton « Quitter sans 
 
 test('menu système : chaque étape seule dans « Configuration de la borne »', () => {
   const frontend = read('app', 'src', 'frontend.ts');
-  assert.match(frontend, /return t\('Configuration de la borne'\)/);
+  // L'entrée vient de l'arbre du menu système (systemmenu.ts), rubrique Borne ; son sous-menu, de frontend.ts.
+  assert.equal(SYSTEM_ITEMS.cabinet.label, 'Configuration de la borne');
+  assert.deepEqual(systemPathOf('cabinet'), ['borne']);
+  assert.match(frontend, /library\.provideSystemItem\('cabinet'/);
   assert.match(frontend, /WIZARD_STEPS\.map\(\(step\) => \(\{ label: step\.label, detail: step\.detail, icon: step\.icon, run: \(\) => relaunchWizard\(step\.flag\) \}\)\)/);
   // Plus d'entrée d'étape directement dans le menu système.
   assert.doesNotMatch(frontend, /relaunchWizard\('(boutons|disposition)'\)/);

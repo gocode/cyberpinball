@@ -167,7 +167,10 @@ test('application : tout outil en ligne de commande est lancé avec windowsHide'
       .flatMap((f) => {
         const lines = fs.readFileSync(path.join(dir, f), 'utf8').split('\n');
         return lines.flatMap((line, i) =>
-          /\b(spawn|spawnSync|execFile|execFileSync|execSync)\(/.test(line) && !/windowsHide: true/.test(lines.slice(i, i + 4).join(' ')) ? [`${f}:${i + 1} ${line.trim()}`] : [],
+          // « // fenêtre voulue » en fin de ligne : un programme lancé pour être vu (l'Explorateur de la borne dédiée).
+          /\b(spawn|spawnSync|execFile|execFileSync|execSync)\(/.test(line) && !/windowsHide: true/.test(lines.slice(i, i + 4).join(' ')) && !/\/\/ fenêtre voulue$/.test(line.trim())
+            ? [`${f}:${i + 1} ${line.trim()}`]
+            : [],
         );
       }),
   );

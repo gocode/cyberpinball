@@ -20,6 +20,10 @@
 #                un média FullDMD avec un cadre de DMD ; avant la partie simulée, la fenêtre du
 #                DMD de VPX est posée dans ce cadre par le .ini de la table ; pendant la partie,
 #                médias « éteints », l'écran du DMD garde l'habillage ; au retour, le menu ;
+#   interface  : sons de l'interface (ui-sounds.js) : clic de solénoïde à chaque table, pièce
+#                au Start, rien pendant la partie simulée (fenêtre muette) ; un record entré au
+#                tableau pendant la partie (VPReg.stg remplacé) : knocker au retour ; écran
+#                « Médias, son et attente » : couper, rétablir (clic), volume (pièce) ;
 #   attente    : mode attente après 5 s sans bouton, une table au hasard toutes les 3 s avec
 #                ses médias et sa musique au volume réduit ; un flipper, Start puis Exit en
 #                sortent sans changer la sélection, sans ouvrir la fiche ni le menu système.
@@ -34,7 +38,7 @@
 #   .\docs\demo-moments.ps1 [-Scenarios navigation, silence, partie] [-Ecrans pc-dev]
 # VPX n'est jamais lancé ; ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont touchés.
 param(
-  [string[]]$Scenarios = @('navigation', 'silence', 'menus', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'habillage', 'attente'),
+  [string[]]$Scenarios = @('navigation', 'silence', 'menus', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'habillage', 'interface', 'attente'),
   [string]$Source = 'D:\CyberPinball',
   [string]$Ecrans = 'pc-dev'
 )
@@ -58,6 +62,8 @@ if (Test-Path $base) {
   Remove-Item -Recurse -Force $base
 }
 $root = "$base\root"
+# Table au titre très long (docs\demo-moments.cjs) : celle que joue le scénario « interface ».
+$tableLongue = "$root\tables\Le très long titre d’une table imaginaire pour vérifier les débordements du chargement et des écrans (Stern 2020)"
 Push-Location $wt
 try { & $electron docs\demo-moments.cjs $root 2>&1 | ForEach-Object { "   $_" } } finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw 'Génération des médias en échec.' }
@@ -216,6 +222,51 @@ $scenes = @{
       '07-wait_1500' = @{ phase = 'loading'; commandes = "Réglage de l’affichage" }
       '08-until_playing' = @{ phase = 'playing' }
       '09-until_library' = @{ phase = 'library' }
+    }
+  }
+  # Sons de l'interface : relevés dans son.txt (champ « interface » : sons déjà joués, muet).
+  # Records de la table jouée (la troisième, au titre très long) : VPReg.stg d'avant la partie,
+  # remplacé pendant la partie par un tableau où JUL est entré premier (highscores.ts).
+  interface = @{
+    Reglages = @{ music = $false; game = 'still' }
+    Simulee = 'backglass'
+    Avant = {
+      param($root)
+      $folder = (Get-ChildItem -LiteralPath "$root\tables" -Directory | Where-Object Name -like 'Le tr*').FullName
+      node -e "const f = require('./packages/core/dist/test/fixtures.js'); const fs = require('fs'); const [user, after] = process.argv.slice(1); fs.mkdirSync(user, { recursive: true }); fs.writeFileSync(user + '/VPReg.stg', f.cfb({ HighScore1: '5000000', HighScore1Name: 'AAA', HighScore2: '3000000', HighScore2Name: 'BBB' }, {}, { info: 'Imaginaire' })); fs.writeFileSync(after, f.cfb({ HighScore1: '7500000', HighScore1Name: 'JUL', HighScore2: '5000000', HighScore2Name: 'AAA' }, {}, { info: 'Imaginaire' }))" "$folder\user" "$root\VPReg-apres.stg"
+    }
+    Apres = {
+      param($root, $captures)
+      $folder = (Get-ChildItem -LiteralPath "$root\tables" -Directory | Where-Object Name -like 'Le tr*').FullName
+      Remove-Item -LiteralPath "$folder\user" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -LiteralPath "$root\VPReg-apres.stg" -Force -ErrorAction SilentlyContinue
+      if (-not (Select-String -Path "$captures\sortie.txt" -Pattern 'Record \(.*\) : 7500000 \(JUL\), place 1\.' -Quiet)) { 'journal : record de JUL non relevé' }
+    }
+    Etapes = @(
+      'wait:1000',                # 01 aucun son de l'interface
+      $Down, $Down,               # 03 deux tables : deux clics de solénoïde
+      $Start, $Start,             # 05 fiche, puis « Jouer » : la pièce tombe au chargement
+      'until:playing',            # 06 partie : fenêtre muette, plus rien ne part
+      "copy:$root\VPReg-apres.stg|$tableLongue\user\VPReg.stg", # 07 la table enregistre un record
+      'until:menu',               # 08 retour : le knocker, et les sons reviennent
+      $Down,                      # 09 un clic
+      $Exit, 'wait:200', 'wait:200', # 12 menu système
+      'action:son et attente',    # 13 l'écran « Médias, son et attente » et ses deux lignes
+      "action:Sons de l’interface", # 14 coupés : aucun son
+      "action:Sons de l’interface", # 15 rétablis : le clic de confirmation
+      'action:Volume des sons',   # 16 la liste des volumes, sur 50 %
+      $Up, $Start                 # 18 40 % : la pièce à ce volume, retour sur la ligne du volume
+    )
+    Attendu = @{
+      '01-wait_1000' = @{ interface = ''; phase = 'menu' }
+      '03-ArrowDown' = @{ interface = 'solenoid,solenoid'; phase = 'menu' }
+      '05-Digit1' = @{ interface = 'solenoid,solenoid,coin'; phase = 'loading' }
+      '06-until_playing' = @{ interface = 'solenoid,solenoid,coin'; muet = $true; phase = 'playing' }
+      '08-until_menu' = @{ interface = 'solenoid,solenoid,coin,knocker'; muet = $false; phase = 'menu' }
+      '09-ArrowDown' = @{ interface = 'solenoid,solenoid,coin,knocker,solenoid'; phase = 'menu' }
+      '14-action_Sons_de_l_interface' = @{ interface = 'solenoid,solenoid,coin,knocker,solenoid'; phase = 'library' }
+      '15-action_Sons_de_l_interface' = @{ interface = 'solenoid,solenoid,coin,knocker,solenoid,solenoid'; phase = 'library' }
+      '18-Digit1' = @{ interface = 'solenoid,solenoid,coin,knocker,solenoid,solenoid,coin'; dernier = 0.4; phase = 'library' }
     }
   }
   pivotee = @{
@@ -380,6 +431,14 @@ foreach ($name in $Scenarios) {
     # Phase du menu attendue (loading, playing, menu) : une étape tombée dans la phase voisine
     # se voit ici, et non par une couche ou un son qui ne correspond pas.
     if ($want.phase) { $ok = $ok -and $menu.phase -eq $want.phase; if ($menu.phase -ne $want.phase) { $state += " (phase attendue : $($want.phase))" } }
+    # Sons de l'interface joués jusque-là (ui-sounds.js), muets pendant la partie.
+    if ($want.ContainsKey('interface')) {
+      $played = @($got.interface.joues | ForEach-Object { $_.son }) -join ','
+      $ok = $ok -and $played -eq $want.interface
+      if ($want.ContainsKey('muet')) { $ok = $ok -and [bool]$got.interface.muet -eq $want.muet }
+      if ($want.dernier) { $ok = $ok -and [math]::Abs(@($got.interface.joues)[-1].volume - $want.dernier) -lt 0.001 }
+      $state += " · sons de l'interface : $(if ($played) { $played } else { 'aucun' })$(if ($got.interface.muet) { ' (muets)' })"
+    }
     if ($want.commandes) { $ok = $ok -and $menu.commandes -eq $want.commandes; $state += " · aide-mémoire : $($menu.commandes)" }
     if ($want.etat) {
       $ok = $ok -and [bool]$menu.attente -eq $want.etat.attente -and $menu.phase -eq $want.etat.phase -and $menu.position -eq $want.etat.position

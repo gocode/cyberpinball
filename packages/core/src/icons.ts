@@ -42,6 +42,7 @@ export const ICON_NAMES = [
   'upgrade',
   'desktop',
   'power',
+  'lock',
   // Configuration de la borne
   'button',
   'screens',
@@ -58,6 +59,7 @@ export const ICON_NAMES = [
   'pup',
   'frame',
   'pulse',
+  'health',
   // Médias, son et attente
   'layout-menu',
   'volume',
@@ -80,6 +82,8 @@ export const ICON_NAMES = [
   'bulb',
   // Design system : commandes de la borne, sources, objets
   'tables',
+  'pinball-app',
+  'toolbox',
   'book',
   'monitor',
   'flipper',

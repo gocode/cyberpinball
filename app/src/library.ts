@@ -10,6 +10,17 @@ import * as path from 'node:path';
 import { app, type BrowserWindow, type Input, type Rectangle } from 'electron';
 import {
   CONFIG_KEY,
+  isSystemGroup,
+  SYSTEM_GROUP_IDS,
+  SYSTEM_GROUPS,
+  SYSTEM_ITEM_IDS,
+  SYSTEM_ITEMS,
+  SYSTEM_ROOT,
+  systemEntry,
+  systemPathOf,
+  type SystemEntryId,
+  type SystemGroupId,
+  type SystemItemId,
   variantTraitsLabel,
   tablePupPacks,
   pupOptionOps,
@@ -84,6 +95,7 @@ import {
   type ImportPlan,
   type KnownTable,
   type NavigationKeys,
+  type ObservedDisplay,
   type PackPlan,
   type PlayfieldOrientation,
   type PupCabinet,
@@ -118,6 +130,7 @@ import { createMedias, playsSoundPreview, type MediaView } from './library-media
 import { createTableFiles } from './table-files';
 import { createFilePicker, type PickRequest } from './file-picker';
 import { createDownloadsScreen } from './downloads-screen';
+import { createHealth, type HealthView } from './health';
 import { isShown, refuseOffscreen } from './offscreen';
 
 const MANUFACTURERS = [
@@ -195,6 +208,12 @@ export interface LibraryHost {
   installVpx?(): void;
   /** Assistant de la borne : écrans, boutons, son. */
   setup?(): void;
+  /** Écrans branchés (displays.ts) : la santé de la borne les compare à la configuration retenue. */
+  displays?(): ObservedDisplay[];
+  /** Version de VPX installée et active ; undefined : pas installé. */
+  vpxVersion?(): string | undefined;
+  /** Espace d'un lecteur (essais : lecteurs simulés) ; sans lui, celui du vrai lecteur. */
+  diskSpace?(dir: string): { free: number; total: number } | undefined;
 }
 
 /** Entrée du menu système (Exit dans le menu). La session des réglages peut y ajouter la sienne. */
@@ -209,6 +228,12 @@ export interface SystemItem {
   shortcut?: ActionShortcut;
   run: () => void;
 }
+
+/**
+ * Entrée du menu système fournie par l'application : son nom et son icône viennent de l'arbre
+ * des rubriques (SYSTEM_ITEMS, core) ; `label` seulement pour un nom qui change (la langue).
+ */
+export type ProvidedSystemItem = Omit<SystemItem, 'label' | 'icon'> & { readonly label?: string };
 
 /**
  * Raccourci clavier d'une entrée de menu : les touches à montrer, une touche cerclée chacune
@@ -286,6 +311,8 @@ export interface Built {
   variant?: string;
   /** Parcours « Ce qu'il manque pour jouer » (journey.ts) : progression et étapes numérotées, à la place des sections. */
   journey?: JourneyView;
+  /** Santé de la borne (health.ts) : bilan et lignes, chacune rattachée à son action, à la place des sections. */
+  health?: HealthView;
   /** Bandeau d'aide propre à l'écran (sélecteur de fichiers : Exit remonte d'un dossier). */
   hint?: string;
 }
@@ -328,7 +355,8 @@ type Editor =
   | { kind: 'number'; field: Field; label: string; value: number; typed: string; cursor: number };
 
 type Screen =
-  | { kind: 'system' }
+  /** Menu système : une rubrique, ou ses rubriques (racine). */
+  | { kind: 'system'; group?: SystemGroupId }
   | { kind: 'sheet'; file: string; flash?: string; pup?: TablePupPack[]; contents?: TableContents }
   /** Options des PuP-Packs de la table (fiche > « PuP-Pack »). */
   | { kind: 'pupOptions'; file: string; flash?: string; pup?: TablePupPack[] }
@@ -336,7 +364,8 @@ type Screen =
   | { kind: 'pages'; file: string; type: SheetPageType; index: number }
   | { kind: 'edit'; file: string; fields: { Title: string; Manufacturer: string; Year?: number }; editor?: Editor }
   /** `added` : ce que l'ajout a fait en plus de ranger les fichiers (médias de VPinMediaDB), montré à la vérification. */
-  | { kind: 'doctor'; file: string; findings?: Finding[]; script?: ScriptResult; log: string[]; queue: string[]; afterImport: boolean; added?: Row[] }
+  /** `back` : l'écran qui l'a ouvert (Santé de la borne), à la place de la fiche. */
+  | { kind: 'doctor'; file: string; findings?: Finding[]; script?: ScriptResult; log: string[]; queue: string[]; afterImport: boolean; added?: Row[]; back?: () => void }
   | { kind: 'remove'; file: string }
   | { kind: 'addSource' }
   | {
@@ -417,32 +446,52 @@ export function createLibrary(host: LibraryHost) {
    * dans quelle partie du menu on est. Oubliée au retour au menu système ou aux tables.
    */
   let section: IconName | undefined;
-  const systemItems: SystemItem[] = [
-    // Une seule entrée pour toutes les façons d'ajouter une table : l'entonnoir (openAdd).
-    {
-      icon: 'table-add',
-      get label() {
-        return t('Ajouter une table');
+  /**
+   * Entrées du menu système, par identifiant : l'arbre des rubriques (systemmenu.ts, core) les
+   * range ; frontend.ts et les autres écrans y ajoutent les leurs (provideSystemItem).
+   */
+  const systemItems = new Map<SystemItemId, ProvidedSystemItem>([
+    [
+      // Une seule entrée pour toutes les façons d'ajouter une table : l'entonnoir (openAdd).
+      'add-table',
+      {
+        get detail() {
+          const ready = catalogUi.ready().length;
+          return ready
+            ? tn(ready, 'Fichier, dossier, catalogue en ligne… · {n} jeu prêt à installer', 'Fichier, dossier, catalogue en ligne… · {n} jeux prêts à installer')
+            : t('Fichier, dossier, clé USB, catalogue en ligne, récupérés, mises à jour');
+        },
+        // Des fichiers reçus attendent leur installation : pastille rouge.
+        get attention() {
+          return catalogUi.ready().length > 0;
+        },
+        run: () => openAdd(),
       },
-      get detail() {
-        const ready = catalogUi.ready().length;
-        return ready
-          ? tn(ready, 'Fichier, dossier, catalogue en ligne… · {n} jeu prêt à installer', 'Fichier, dossier, catalogue en ligne… · {n} jeux prêts à installer')
-          : t('Fichier, dossier, clé USB, catalogue en ligne, récupérés, mises à jour');
-      },
-      // Des fichiers reçus attendent leur installation : pastille rouge.
-      get attention() {
-        return catalogUi.ready().length > 0;
-      },
-      run: () => openAdd(),
-    },
-    { icon: 'download', get label() { return t('Téléchargements'); }, get detail() { return t('Ce que Cyber Pinball a téléchargé : le reprendre, faire de la place'); }, run: () => openDownloads() },
-    { icon: 'chip', get label() { return t('Bibliothèque de ROM'); }, get detail() { return t('Chaque ROM, ses tables, sa taille ; inutilisées et absentes'); }, run: () => openRoms() },
-    { icon: 'link', get label() { return t('Ranger les ROM dans la bibliothèque'); }, get detail() { return t('Une seule copie par ROM, liée dans chaque table'); }, run: () => openRomMigration() },
-    { icon: 'import', get label() { return t('Reprendre les médias de PinUP Popper / PinballX'); }, get detail() { return t('Logos, vidéos, frontons… copiés dans chaque table'); }, run: () => mediaImport.open() },
-    { icon: 'image-download', get label() { return t('Médias manquants : chercher sur VPinMediaDB'); }, get detail() { return t('Logos, plateaux, frontons… téléchargés pour les tables à qui il en manque'); }, run: () => mediaDownload.openMissing() },
-    { icon: 'power', get label() { return t('Quitter Cyber Pinball'); }, run: () => host.quit() },
-  ];
+    ],
+    ['downloads', { get detail() { return t('Ce que Cyber Pinball a téléchargé : le reprendre, faire de la place'); }, run: () => openDownloads() }],
+    ['roms', { get detail() { return t('Chaque ROM, ses tables, sa taille ; inutilisées et absentes'); }, run: () => openRoms() }],
+    ['rom-migration', { get detail() { return t('Réunir les ROM dans la bibliothèque : une copie partagée par les tables'); }, run: () => openRomMigration() }],
+    ['media-import', { get detail() { return t('Copier les logos, vidéos et frontons de PinUP Popper ou PinballX dans les dossiers des tables'); }, run: () => mediaImport.open() }],
+    ['missing-media', { get detail() { return t('Chercher sur VPinMediaDB les logos, plateaux et frontons qui manquent aux tables'); }, run: () => mediaDownload.openMissing() }],
+    ['quit', { run: () => host.quit() }],
+  ]);
+  /**
+   * Rubrique du menu système où l'on est (undefined : la racine), et la dernière entrée choisie :
+   * « Retour » des écrans qui s'en ouvrent y ramène, la sélection sur cette entrée.
+   */
+  let systemGroup: SystemGroupId | undefined;
+  let systemChosen: SystemEntryId | undefined;
+  /**
+   * Écran qui a ouvert une entrée du menu système hors du menu (la santé de la borne ouvre
+   * « Médias manquants », la configuration de la borne…) : le « Retour » de cette entrée, qui
+   * appelle openSystem, y ramène. Oublié au retour aux tables et à la roue dentée.
+   */
+  let systemReturn: (() => void) | undefined;
+
+  /** Ajoute une entrée du menu système ; l'arbre des rubriques (systemmenu.ts, core) dit où elle va. */
+  function provideSystemItem(id: SystemItemId, item: ProvidedSystemItem): void {
+    systemItems.set(id, item);
+  }
 
   const layout = () => (host.root ? layoutOf(host.root) : undefined);
   const tablesDir = () => layout()?.tables ?? '';
@@ -515,6 +564,9 @@ export function createLibrary(host: LibraryHost) {
   function leave(): void {
     screen = undefined;
     section = undefined;
+    systemGroup = undefined;
+    systemChosen = undefined;
+    systemReturn = undefined;
     host.leave();
     host.broadcast();
   }
@@ -539,10 +591,65 @@ export function createLibrary(host: LibraryHost) {
 
   // ---------- Ouvertures ----------
 
-  /** Menu système ; la sélection va d'office sur la première entrée qui attend l'utilisateur (pastille rouge). */
+  /**
+   * Menu système. Depuis les tables (Exit, roue dentée) : ses rubriques. Depuis un écran qui
+   * s'en est ouvert (son « Retour ») : la rubrique d'où l'on venait, sur l'entrée choisie.
+   */
   function openSystem(): void {
+    if (!screen) systemGroup = systemChosen = systemReturn = undefined;
+    const back = systemReturn;
+    systemReturn = undefined;
+    if (back) return back();
+    openSystemGroup(systemGroup, systemChosen);
+  }
+
+  /** Les rubriques du menu système, quel que soit l'écran ouvert (roue dentée). */
+  function openSystemRoot(): void {
+    systemReturn = undefined;
+    openSystemGroup(undefined);
+  }
+
+  /** Une entrée du menu système ouverte depuis un autre écran : son « Retour » ramène à `back`. */
+  function runSystemItem(id: SystemItemId, back: () => void): void {
+    const item = systemItems.get(id);
+    if (!item) return back();
+    section = SYSTEM_ITEMS[id].icon;
+    systemReturn = back;
+    item.run();
+  }
+
+  /** Entrées d'une rubrique (de la racine : les rubriques) que l'application fournit. */
+  function systemEntries(group: SystemGroupId | undefined): SystemEntryId[] {
+    return (group ? SYSTEM_GROUPS[group].entries : SYSTEM_ROOT).filter((id) => isSystemGroup(id) || systemItems.has(id));
+  }
+
+  /** Une entrée attend l'utilisateur (pastille rouge) ; une rubrique, dès que l'une des siennes. */
+  function systemAttention(id: SystemEntryId): boolean {
+    return isSystemGroup(id) ? systemEntries(id).some(systemAttention) : Boolean(systemItems.get(id)?.attention);
+  }
+
+  /** Ouvre une rubrique, la sélection sur `at`, sinon sur la première entrée à pastille. */
+  function openSystemGroup(group: SystemGroupId | undefined, at?: SystemEntryId): void {
     section = undefined;
-    go({ kind: 'system' }, Math.max(0, systemItems.findIndex((i) => i.attention)));
+    systemGroup = group;
+    const entries = systemEntries(group);
+    const chosen = at ? entries.indexOf(at) : -1;
+    go({ kind: 'system', group }, chosen >= 0 ? chosen : Math.max(0, entries.findIndex(systemAttention)));
+  }
+
+  /** Entrée du menu système : une rubrique s'ouvre ; une entrée fournie fait ce qu'elle fait. */
+  function runSystemEntry(id: SystemEntryId): void {
+    systemChosen = id;
+    if (isSystemGroup(id)) return openSystemGroup(id);
+    section = SYSTEM_ITEMS[id].icon;
+    systemItems.get(id)!.run();
+  }
+
+  /** Remonte d'un cran : la rubrique parente (ou la racine), la sélection sur celle qu'on quitte. */
+  function systemUp(group: SystemGroupId): void {
+    const path = systemPathOf(group) ?? [];
+    systemChosen = group;
+    openSystemGroup(path.at(-1), group);
   }
 
   /**
@@ -637,6 +744,29 @@ export function createLibrary(host: LibraryHost) {
     cursor: () => cursor,
     search: mediaSearch,
     prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
+  });
+
+  // Santé de la borne (Menu système > Borne) : relevé en tâche de fond, gardé ; une page de bilan.
+  const health = createHealth({
+    host,
+    layout,
+    doctor: () => quickDoctor(),
+    media: (pause) => mediaDownload.offlineSurvey(pause),
+    openCustom: (build, at) => openCustom(build, at),
+    openSystem: () => openSystem(),
+    runSystemItem: (id, back) => runSystemItem(id, back),
+    openDoctor: (file, back) => openDoctor(file, [], false, undefined, back),
+    showing: (build) => screen?.kind === 'custom' && screen.build === build,
+  });
+  provideSystemItem('health', {
+    get detail() {
+      return health.summary();
+    },
+    // Un point bloquant au dernier relevé : pastille rouge, jusqu'à la roue dentée.
+    get attention() {
+      return health.attention();
+    },
+    run: () => health.open(),
   });
 
   // Écran « Médias » de la fiche : logo, fronton, vidéos, règles…
@@ -785,8 +915,8 @@ export function createLibrary(host: LibraryHost) {
     go({ kind: 'addSource' });
   }
 
-  function openDoctor(file: string, queue: string[] = [], afterImport = false, added?: Row[]): void {
-    go({ kind: 'doctor', file, log: [], queue, afterImport, added });
+  function openDoctor(file: string, queue: string[] = [], afterImport = false, added?: Row[], back?: () => void): void {
+    go({ kind: 'doctor', file, log: [], queue, afterImport, added, back });
     void analyse();
   }
 
@@ -832,6 +962,31 @@ export function createLibrary(host: LibraryHost) {
       orientation: host.playfieldOrientation?.(),
     });
     return { script, findings };
+  }
+
+  /**
+   * Médecin sans lancer VPX ni convertir de vidéo, pour la santé de la borne : le script déjà
+   * lu (undefined s'il ne l'a jamais été), sans l'habillage FullDMD. Modèle de borne, journal
+   * de VPX et sens du playfield sont lus une fois pour tout le relevé.
+   */
+  function quickDoctor(): (table: TableEntry) => Finding[] | undefined {
+    const cabinet = pupCabinet(loadCabinet(host.dataDir));
+    const vpxLog = readLog(host.vpxLogFile?.());
+    const orientation = host.playfieldOrientation?.();
+    return (table) => {
+      const script = cachedScript(table.file, host.dataDir);
+      if (!script) return undefined;
+      return diagnose(table, {
+        tablesDir: tablesDir(),
+        script,
+        logsDir: path.join(host.dataDir, 'logs'),
+        cabinet,
+        vpxLog,
+        otherPackNames: otherPackNames(table),
+        romLibrary: layout()?.roms,
+        orientation,
+      });
+    };
   }
 
   /** Applique les corrections du médecin ; renvoie le fichier de la table, qui a pu changer de place. */
@@ -918,29 +1073,30 @@ export function createLibrary(host: LibraryHost) {
 
   // ---------- Écrans ----------
 
+  /** Menu système : les rubriques (racine), ou les entrées d'une rubrique. */
+  function buildSystem(group: SystemGroupId | undefined): Built {
+    const actions: Action[] = systemEntries(group).map((id) => {
+      const entry = systemEntry(id);
+      const item = isSystemGroup(id) ? undefined : systemItems.get(id);
+      return {
+        label: item?.label ?? entry.label,
+        detail: isSystemGroup(id) ? SYSTEM_GROUPS[id].detail : item?.detail,
+        icon: entry.icon,
+        attention: systemAttention(id),
+        shortcut: item?.shortcut,
+        run: () => runSystemEntry(id),
+      };
+    });
+    if (!group) return { heading: t('Menu système'), icon: 'gear', sections: [], actions: [...actions, { label: t('Retour aux tables'), icon: 'back', run: leave }], back: leave };
+    const up = () => systemUp(group);
+    const g = SYSTEM_GROUPS[group];
+    return { heading: g.label, icon: g.icon, sections: [], actions: [...actions, { label: t('Retour'), icon: 'back', run: up }], back: up };
+  }
+
   function build(): Built {
     switch (screen!.kind) {
       case 'system':
-        return {
-          heading: t('Menu et configuration'),
-          icon: 'gear',
-          sections: [],
-          actions: [
-            ...systemItems.map((i) => ({
-              label: i.label,
-              detail: i.detail,
-              icon: i.icon,
-              attention: i.attention,
-              shortcut: i.shortcut,
-              run: () => {
-                section = i.icon;
-                return i.run();
-              },
-            })),
-            { label: t('Retour aux tables'), icon: 'back' as const, run: leave },
-          ],
-          back: leave,
-        };
+        return buildSystem((screen as Extract<Screen, { kind: 'system' }>).group);
       case 'sheet':
         return buildSheet(screen as Extract<Screen, { kind: 'sheet' }>);
       case 'pupOptions':
@@ -1407,6 +1563,7 @@ export function createLibrary(host: LibraryHost) {
     const next = () => {
       const [following, ...rest] = s.queue;
       if (following) openDoctor(following, rest, s.afterImport);
+      else if (s.back) s.back();
       else if (table) openSheet(table);
       else leave();
     };
@@ -1428,7 +1585,7 @@ export function createLibrary(host: LibraryHost) {
     const fixable = findings.filter((f) => f.fix);
     if (fixable.length > 1) actions.push({ label: t('Tout réparer'), detail: tn(fixable.length, '{n} correction', '{n} corrections'), run: () => repair(s, fixable) });
     actions.push({ label: t('Analyser à nouveau'), run: () => void analyse() });
-    actions.push({ label: s.queue.length ? t('Table suivante') : t('Retour à la fiche'), run: next });
+    actions.push({ label: s.queue.length ? t('Table suivante') : s.back ? t('Retour') : t('Retour à la fiche'), run: next });
     // Hors de son dossier, la ROM n'est pas vérifiée (PinMAME la cherche alors ailleurs).
     const romChecked = !findings.some((f) => f.code === 'outsideFolder');
     if (s.findings && !findings.length) rows.push({ text: t('Aucun problème détecté'), detail: scriptNote(s.script), tone: 'ok' });
@@ -2570,6 +2727,7 @@ export function createLibrary(host: LibraryHost) {
       media: built.media,
       variant: built.variant,
       journey: built.journey,
+      health: built.health,
       cursor,
       busy,
       editor: editorView,
@@ -2667,7 +2825,10 @@ export function createLibrary(host: LibraryHost) {
         if (win === playfield || isShown(win)) await layout.check(win.webContents, win === playfield ? name : `${name} (${role})`);
       }
       if (!captureDir) continue;
-      const sound = await playfield.webContents.executeJavaScript('window.CyberMenuAudio?.status?.()').catch(() => undefined);
+      // Avec les sons de l'interface déjà joués (ui-sounds.js) : son, volume, fenêtre muette pendant la partie.
+      const sound = await playfield.webContents
+        .executeJavaScript('window.CyberMenuAudio && { ...window.CyberMenuAudio.status(), interface: window.CyberUiSounds?.status?.() }')
+        .catch(() => undefined);
       if (sound) {
         // Et ce que montre chaque écran (couches de médias : élément, fichier, lecture).
         const screens: Record<string, unknown> = {};
@@ -2706,18 +2867,38 @@ export function createLibrary(host: LibraryHost) {
     // Ou qui le contient : un libellé à virgule (« Médias, son et attente ») ne s'écrit pas en
     // entier, les étapes de CYBERPINBALL_AUTOPILOT étant séparées par des virgules.
     const index = start >= 0 ? start : actions.findIndex((a) => names.some((n) => a.label.includes(n)));
+    // Entrée du menu système rangée dans une autre rubrique : on y va, comme on l'aurait ouverte
+    // (les démonstrations nomment l'entrée, pas le chemin, qui change quand l'arbre change).
+    if (index < 0 && screen?.kind === 'system') {
+      const label = (id: SystemEntryId) => (isSystemGroup(id) ? systemEntry(id).label : (systemItems.get(id)?.label ?? systemEntry(id).label));
+      const ids = [...SYSTEM_GROUP_IDS, ...SYSTEM_ITEM_IDS].filter((id) => isSystemGroup(id) || systemItems.has(id));
+      const found = ids.find((id) => names.includes(label(id))) ?? ids.find((id) => names.some((n) => label(id).startsWith(n))) ?? ids.find((id) => names.some((n) => label(id).includes(n)));
+      const trail = found && systemPathOf(found);
+      if (found && trail) {
+        systemChosen = found;
+        openSystemGroup(trail.at(-1), found);
+        return runSystemEntry(found);
+      }
+    }
     if (index < 0) return console.log(`Autopilote : aucune action « ${wanted} » sur cet écran (${actions.map((a) => a.label).join(' · ') || 'aucune action'}).`);
     handleAction({ type: 'activate', index });
   }
 
   return {
-    systemItems,
+    provideSystemItem,
+    /** Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes, sauf pendant `quiet` (une partie). */
+    watchHealth: (quiet?: () => boolean) => health.watch(quiet),
+    /** Santé de la borne : relevé, page (essais). */
+    health,
     openSystem,
+    openSystemRoot,
     openCustom,
     openPrompt,
     openNotice,
     openSheet,
     openAdd,
+    /** Opération longue : le message à l'écran, les touches ignorées (borne dédiée : l'autorisation de Windows). */
+    task,
     /** Ferme la gestion des tables (une entrée du menu système qui affiche ensuite un message). */
     leave,
     handleKey,
@@ -2734,7 +2915,7 @@ export function createLibrary(host: LibraryHost) {
     /** Table dont parle l'écran ouvert (fiche, médias du jeu, fichiers, parcours…) : ses médias restent sur les écrans de la borne. */
     table: () => tableOf(screen),
     /** Une entrée du menu système attend l'utilisateur : pastille rouge sur la roue dentée. */
-    attention: () => systemItems.some((i) => i.attention),
+    attention: () => SYSTEM_ROOT.some(systemAttention),
   };
 }
 

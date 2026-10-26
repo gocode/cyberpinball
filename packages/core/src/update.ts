@@ -1,5 +1,5 @@
 // Mise à jour de Cyber Pinball depuis l'application : jamais d'office, toujours à la
-// demande de l'utilisateur (menu système > « Mise à jour de Cyber Pinball »).
+// demande de l'utilisateur (menu système > « Cyber Pinball » > « Mise à jour de Cyber Pinball »).
 //
 // Chaque version est publiée en release GitHub (scripts/publier.mjs) avec trois fichiers :
 // les deux installeurs et le flux cyberpinball-maj.json. Le flux décrit la version,

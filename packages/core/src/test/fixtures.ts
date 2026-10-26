@@ -219,9 +219,10 @@ export function gotgPack(root: string, applied: 0 | 2 = 2): void {
 
 // ---------------------------------------------------------------------------
 // Fichier composé OLE minimal, comme VPX en écrit : TableInfo et ses flux UTF-16LE, et
-// GameStg (GameData, ImageN) si on lui en donne.
+// GameStg (GameData, ImageN) si on lui en donne. `storages` renomme les deux stockages : VPReg.stg
+// range un stockage par table (highscores.test.ts).
 
-export function cfb(streams: Record<string, string | Buffer>, game: Record<string, Buffer> = {}): Buffer {
+export function cfb(streams: Record<string, string | Buffer>, game: Record<string, Buffer> = {}, storages: { info?: string; game?: string } = {}): Buffer {
   const SECTOR = 512;
   const FREE = 0xffffffff;
   const END = 0xfffffffe;
@@ -312,11 +313,11 @@ export function cfb(streams: Record<string, string | Buffer>, game: Record<strin
     dir.writeUInt32LE(size, o + 0x78);
   };
   entry(0, 'Root Entry', 5, 1, FREE, miniStream.length ? miniStreamAt : END, miniStream.length);
-  entry(1, 'TableInfo', 1, infoNames.length ? 2 : FREE, gameNames.length ? gameAt : FREE, 0, 0);
+  entry(1, storages.info ?? 'TableInfo', 1, infoNames.length ? 2 : FREE, gameNames.length ? gameAt : FREE, 0, 0);
   const startOf = (i: number) => (starts[i]! < 0 ? bigAt + (-1 - starts[i]!) : starts[i]!);
   infoNames.forEach((n, i) => entry(2 + i, n, 2, FREE, i + 1 < infoNames.length ? 3 + i : FREE, startOf(i), data[i]!.length));
   if (gameNames.length) {
-    entry(gameAt, 'GameStg', 1, gameAt + 1, FREE, 0, 0);
+    entry(gameAt, storages.game ?? 'GameStg', 1, gameAt + 1, FREE, 0, 0);
     gameNames.forEach((n, j) => {
       const i = infoNames.length + j;
       entry(gameAt + 1 + j, n, 2, FREE, j + 1 < gameNames.length ? gameAt + 2 + j : FREE, startOf(i), data[i]!.length);

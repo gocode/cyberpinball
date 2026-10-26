@@ -607,12 +607,12 @@ function renderPlayfield(s) {
   // de la borne ne répondent plus comme prévu. Toujours au-dessus des superpositions.
   const gear = el('button', 'gear');
   gear.append(cyberIcon('gear'));
-  gear.title = t('Menu et configuration (Tab)');
+  gear.title = t('Menu système (Tab)');
   gear.dataset.act = JSON.stringify({ type: 'config' });
   // Pastille rouge : une entrée du menu système attend l'utilisateur (mise à jour disponible…).
   if (s.attention) {
     gear.classList.add('has-attention');
-    gear.title = t('Menu et configuration (Tab) : un élément attend votre intervention');
+    gear.title = t('Menu système (Tab) : un élément attend votre intervention');
     gear.append(el('span', 'gear-dot'));
   }
   nodes.push(gear);
@@ -709,8 +709,57 @@ const zones = parts.map((p) => {
   zone.style.width = `${p.zone.width * 100}%`;
   zone.style.height = `${p.zone.height * 100}%`;
   zoneLayer.append(zone);
-  return { role: p.role, layer: CyberMedia.layer(zone, layerOptions(p.role)) };
+  return { role: p.role, node: zone, layer: CyberMedia.layer(zone, layerOptions(p.role)) };
 });
+
+/**
+ * DMD du menu vivant (app/src/live-dmd.ts) : le processus principal envoie chaque image
+ * changée de l'afficheur (128 × 32 nuances), ou « le média » quand c'est au tour du média DMD
+ * de la table. L'afficheur se pose sur la zone du DMD, à la place dite par l'état (liveDmd :
+ * dans le cadre du média FullDMD, ou la bande 4:1 sur du noir). Sans liveDmd (DMD classique,
+ * partie en cours), il disparaît et la zone montre son média comme avant.
+ */
+const dmdZone = zones.find((z) => z.role === 'dmd');
+let liveDmd;
+/** Dernière image reçue : elle peut arriver avant l'état qui crée l'afficheur. */
+let lastDmdShot;
+
+function dropLiveDmd() {
+  liveDmd?.matrix.destroy();
+  liveDmd?.holder.remove();
+  liveDmd = undefined;
+}
+
+/** La vidéo de la zone ne joue que si elle se voit : pas sous l'afficheur posé sur du noir. */
+function dmdMediaActive() {
+  return !liveDmd || liveDmd.framed || liveDmd.holder.hidden;
+}
+
+function syncLiveDmd(spec) {
+  if (!dmdZone || !spec || typeof window.CyberFallback?.dotMatrix !== 'function') return dropLiveDmd();
+  if (!liveDmd) {
+    const holder = el('div', 'live-dmd');
+    const box = el('div', 'live-dmd-dots');
+    holder.append(box);
+    dmdZone.node.append(holder);
+    liveDmd = { holder, box, matrix: CyberFallback.dotMatrix(box, {}) };
+    if (lastDmdShot) showDmdShot(lastDmdShot);
+  }
+  liveDmd.framed = spec.framed;
+  liveDmd.holder.classList.toggle('framed', spec.framed);
+  const a = spec.area;
+  Object.assign(liveDmd.box.style, { left: `${a.x * 100}%`, top: `${a.y * 100}%`, width: `${a.width * 100}%`, height: `${a.height * 100}%` });
+}
+
+function showDmdShot(shot) {
+  lastDmdShot = shot;
+  if (!liveDmd) return;
+  liveDmd.holder.hidden = Boolean(shot.media);
+  if (!shot.media && shot.dots) liveDmd.matrix.show(shot.dots);
+  dmdZone.layer.setActive(dmdMediaActive());
+}
+
+window.cyber.onDmd?.(showDmdShot);
 
 /** Média du rôle pour la table choisie ; sans table, seul le topper garde son repli. */
 function viewOf(s, part) {
@@ -722,7 +771,7 @@ function viewOf(s, part) {
 function renderZones(s) {
   for (const z of zones) {
     z.layer.show(viewOf(s, z.role));
-    z.layer.setActive(true);
+    z.layer.setActive(z !== dmdZone || dmdMediaActive());
   }
 }
 
@@ -784,6 +833,8 @@ window.cyberEtat = () => ({
     const img = n.querySelector('img.wheel-img');
     return img ? decodeURIComponent(img.getAttribute('src')).replace(/^.*[\\/]/, '') : `titre : ${n.textContent}`; // i18n-ignore : relevé des essais
   }),
+  // DMD du menu vivant : affiché ou non (page du média), dans le cadre du FullDMD ou sur du noir, points allumés.
+  dmd: liveDmd && { visible: !liveDmd.holder.hidden, cadre: Boolean(liveDmd.framed), points: lastDmdShot?.dots ? lastDmdShot.dots.filter((v) => v > 0).length : 0 },
   couches: [...(background ? [['playfield', background]] : []), ...zones.map((z) => [z.role, z.layer])].map(([part, layer]) => ({ role: part, ...layer.state() })),
 });
 
@@ -791,6 +842,8 @@ window.cyber.onState((s) => {
   lastState = s;
   document.documentElement.classList.toggle('in-game', Boolean(s.game));
   CyberMedia.preload(s.preload);
+  // Sons de l'interface : muets pendant la partie, même si un ordre de jouer arrivait.
+  window.CyberUiSounds?.setPhase(s.phase);
   // Son du menu (playfield seulement) : musique, son de lancement, son de la vidéo du plateau.
   if (role === 'playfield') {
     CyberMenuAudio.update(s.sound);
@@ -799,6 +852,7 @@ window.cyber.onState((s) => {
   // Fond de partie dès que la fenêtre de jeu de VPX s'affiche ; avant, au chargement, chaque
   // écran garde les médias du jeu (le playfield, sa vidéo de chargement et les commandes).
   // L'écran de chargement de secours reste d'un état à l'autre (renderPlayfield le quitte).
+  syncLiveDmd(s.game ? undefined : s.liveDmd);
   if (s.game) return renderGame(s);
   document.documentElement.classList.toggle('attract-mode', Boolean(s.attract));
   zoneLayer.classList.remove('off');

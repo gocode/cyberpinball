@@ -5,7 +5,7 @@
 
 import { LANGUAGE_NAMES, LANGUAGES, language, t, type Language } from '@cyberpinball/core';
 import { chooseLanguage } from './language';
-import type { Built, SystemItem } from './library';
+import type { Built, ProvidedSystemItem } from './library';
 
 export interface LanguageMenuHost {
   library: {
@@ -22,7 +22,7 @@ const SWITCH_TO: Record<Language, string> = {
   en: 'Switch the cabinet to English; the menu restarts', // i18n-ignore : said in English, whatever the current language
 };
 
-export function createLanguageMenu(host: LanguageMenuHost): SystemItem {
+export function createLanguageMenu(host: LanguageMenuHost): ProvidedSystemItem {
   function choose(lang: Language): void {
     if (lang === language()) return host.library.openSystem();
     chooseLanguage(lang);
@@ -51,7 +51,6 @@ export function createLanguageMenu(host: LanguageMenuHost): SystemItem {
   }
 
   return {
-    icon: 'language',
     get label() {
       return t('Langue / Language : {name}', { name: LANGUAGE_NAMES[language()] });
     },

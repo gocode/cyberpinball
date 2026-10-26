@@ -196,10 +196,10 @@ try {
 
   '== 4. Menu des tables de la borne de l''étape 1, puis touches par défaut à la souris'
   # « VPX n'est pas installé » : plus tard ; commandes ; menu système (Exit = Q) ; clic sur
-  # « Configuration de la borne », puis sur « Touches par défaut des encodeurs » ; retour au
+  # « Borne », puis « Configuration de la borne », puis sur « Touches par défaut des encodeurs » ; retour au
   # menu, commandes avec les touches par défaut. Les entrées sont désignées par leur libellé.
   # Roue dentée (clic) puis Tab pour se déplacer ; après la remise, Tab rouvre la configuration.
-  $menu = @('Escape', 'KeyH', 'KeyH', 'click:.gear', 'Tab', 'Tab', 'click:.lib-action[data-label="Configuration de la borne"]', 'click:.lib-action[data-label="Touches par défaut des encodeurs"]', 'Escape', 'Tab', 'Escape', 'KeyH')
+  $menu = @('Escape', 'KeyH', 'KeyH', 'click:.gear', 'Tab', 'Tab', 'click:.lib-action[data-label="Borne"]', 'click:.lib-action[data-label="Configuration de la borne"]', 'click:.lib-action[data-label="Touches par défaut des encodeurs"]', 'Escape', 'Tab', 'Escape', 'KeyH')
   Invoke-Autopilot $borne $menu 'menu' @()
   '-- Boutons de cabinet.json après la remise'
   (Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons).buttons | Format-List | Out-String

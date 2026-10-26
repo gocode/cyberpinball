@@ -279,6 +279,11 @@
 
   /** Intensité de chaque nuance : point éteint, faible, moyen, plein (4 nuances, comme les DMD d'origine). */
   const LEVELS = [0.07, 0.34, 0.67, 1];
+  /**
+   * 16 nuances (DMD du menu vivant, packages/core/src/livedmd.ts) : du point éteint, à peine
+   * visible, au plein éclat ; une courbe douce, car l'œil voit mieux les écarts dans le sombre.
+   */
+  const LEVELS_16 = Array.from({ length: 16 }, (_, v) => (v ? 0.12 + 0.88 * Math.pow(v / 15, 1.6) : 0.07));
   const FRAME = 40;
 
   function rgb(color) {
@@ -294,7 +299,8 @@
    * couverte d'un masque noir percé d'un trou rond par point, et d'un léger halo.
    */
   class Matrix {
-    constructor(root, cols, rows, color) {
+    constructor(root, cols, rows, color, levels = LEVELS) {
+      this.levels = levels;
       this.cols = cols;
       this.rows = rows;
       this.buffer = new Uint8Array(cols * rows);
@@ -312,7 +318,7 @@
 
     setColor(color) {
       const [r, g, b] = rgb(color);
-      this.lut = LEVELS.map((f) => [Math.round(r * f), Math.round(g * f), Math.round(b * f)]);
+      this.lut = this.levels.map((f) => [Math.round(r * f), Math.round(g * f), Math.round(b * f)]);
     }
 
     resize() {
@@ -901,6 +907,46 @@
     });
   }
 
+  /**
+   * Afficheur à points nu, pour des images calculées ailleurs (DMD du menu vivant : le
+   * processus principal envoie chaque image, 128 × 32 nuances de 0 à 15). Il suit la taille
+   * de son conteneur et garde sa dernière image.
+   *   const m = CyberFallback.dotMatrix(conteneur, { color });
+   *   m.show(points);   // Uint8Array de cols × rows nuances
+   *   m.destroy();
+   */
+  function dotMatrix(container, options = {}) {
+    const root = el('div', 'cp-fb cp-fb-dotmatrix');
+    root.setAttribute('aria-hidden', 'true');
+    container.append(root);
+    const matrix = new Matrix(root, options.cols ?? 128, options.rows ?? 32, options.color ?? DMD_COLOR, LEVELS_16);
+    const observer = new ResizeObserver(() => matrix.resize());
+    observer.observe(root);
+    matrix.resize();
+    let redraw;
+    return {
+      element: root,
+      show(dots) {
+        if (!dots || dots.length !== matrix.buffer.length) return;
+        matrix.buffer.set(dots);
+        matrix.draw();
+        // Une image posée avant la première peinture de la fenêtre peut ne jamais être composée
+        // (fenêtre hors écran, page fixe envoyée une seule fois) : un second tracé peu après.
+        clearTimeout(redraw);
+        redraw = setTimeout(() => matrix.draw(), 120);
+      },
+      setColor(color) {
+        matrix.setColor(color);
+        matrix.draw();
+      },
+      destroy() {
+        clearTimeout(redraw);
+        observer.disconnect();
+        root.remove();
+      },
+    };
+  }
+
   // ---------- Composants HTML ----------
 
   /** Fronton : titre en grand lisible de loin, filet sarcelle, fabricant et année, sous un cadre de verre fumé. */
@@ -1039,6 +1085,7 @@
     backglass,
     dmd,
     fullDmd,
+    dotMatrix,
     topper,
     wheel,
     playfield,

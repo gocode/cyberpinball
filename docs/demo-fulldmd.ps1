@@ -70,7 +70,7 @@ foreach ($name in $Cas) {
   $autopilot = $wait
   if ($name -eq 'ambigu') {
     $model | Add-Member -NotePropertyName zones -NotePropertyValue ([pscustomobject]@{ dmd = $band }) -Force
-    $autopilot = (@($wait, 'click:.gear', 'click:.lib-action[data-label="Configuration de la borne"]', 'click:.lib-action[data-label="Écran du DMD"]', 'wait:800') -join ',')
+    $autopilot = (@($wait, 'click:.gear', 'click:.lib-action[data-label="Borne"]', 'click:.lib-action[data-label="Configuration de la borne"]', 'click:.lib-action[data-label="Écran du DMD"]', 'wait:800') -join ',')
   } elseif ($name -eq 'fulldmd') {
     $model | Add-Member -NotePropertyName dmdKind -NotePropertyValue 'fulldmd' -Force
   } elseif ($name -eq 'bande') {

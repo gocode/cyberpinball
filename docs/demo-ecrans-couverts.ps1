@@ -11,7 +11,7 @@
 # Scénarios (-Scenarios) :
 #   partie         : Start, Start (fiche puis Jouer), partie arrêtée seule après 10 s, retour au menu ;
 #   endurance      : test d'endurance (CYBERPINBALL_STRESS = -Lancements,10) ;
-#   vers-assistant : menu système > « Configuration de la borne » > « Assistant complet » (relance de l'application) ;
+#   vers-assistant : menu système > « Borne » > « Configuration de la borne » > « Assistant complet » (relance de l'application) ;
 #   vers-menu      : étape « Boutons » seule, laissée sans bouton : l'assistant rend la main au menu ;
 #   reglages       : réglages de VPX seuls (--reglages), sur l'écran principal.
 # Captures dans tmp\captures\ecrans-couverts\<Etiquette>\<scénario> : reference.png, bureau-*.png
@@ -258,7 +258,7 @@ foreach ($scenario in $Scenarios) {
     # autopilote, « Attendre12 » n'y est qu'une touche) : la relève doit le retenir jusqu'à ce que
     # l'assistant soit à l'écran. L'assistant relancé rejoue les mêmes étapes : les clics n'y
     # trouvent rien, il attend 12 s (« Attendre12 ») puis se ferme.
-    'vers-assistant' { Invoke-Scenario 'vers-assistant' @{ CYBERPINBALL_AUTOPILOT = 'click:.gear,click:.lib-action[data-label="Configuration de la borne"],click:.lib-action[data-label="Assistant complet"],Attendre12' } @() 60 }
+    'vers-assistant' { Invoke-Scenario 'vers-assistant' @{ CYBERPINBALL_AUTOPILOT = 'click:.gear,click:.lib-action[data-label="Borne"],click:.lib-action[data-label="Configuration de la borne"],click:.lib-action[data-label="Assistant complet"],Attendre12' } @() 60 }
     # Étape « Boutons » sans bouton : l'assistant relance le menu, qui rejoue ces étapes (touches
     # sans effet), attend 6 s (wait:6000) et se ferme.
     'vers-menu' { Invoke-Scenario 'vers-menu' @{ CYBERPINBALL_AUTOPILOT = 'Attendre3,SansBoutons,Attendre20,wait:6000' } @('--assistant', '--boutons') 60 }

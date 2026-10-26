@@ -169,8 +169,8 @@ if ($Partie) {
   if ($Scenarios -contains 'reglages') { Invoke-Scenario 'reglages' (@('F24') * ($Secondes * 2)) @('--reglages') ($Secondes + 12) }
   if ($Scenarios -contains 'assistant') { Invoke-Scenario 'assistant' @("Attendre$Secondes") @('--assistant', '--boutons') ($Secondes + 12) }
   # Exit : « plus tard » au message « VPX n'est pas installé », puis le menu système ;
-  # 8e entrée : « Bureau Windows ».
-  if ($Scenarios -contains 'bureau') { Invoke-Scenario 'bureau' @($exit, $exit, 'click:.lib-action[data-label="Bureau Windows"]', 'wait:12000') @() 30 {
+  # rubrique « Borne », « Bureau Windows ».
+  if ($Scenarios -contains 'bureau') { Invoke-Scenario 'bureau' @($exit, $exit, 'click:.lib-action[data-label="Borne"]', 'click:.lib-action[data-label="Bureau Windows"]', 'wait:12000') @() 30 {
     param($proc)
     $playfield = [IntPtr]::Zero
     for ($t = 0; $t -lt 100 -and ($playfield -eq [IntPtr]::Zero -or -not [DemoFenetres]::IsIconic($playfield)); $t++) {

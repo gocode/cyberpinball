@@ -1,4 +1,4 @@
-// Menu système > « Mise à jour de Cyber Pinball » : recherche de la dernière version
+// Menu système > « Cyber Pinball » > « Mise à jour de Cyber Pinball » : recherche de la dernière version
 // publiée, ses nouveautés, puis, à la demande seulement, téléchargement vérifié et
 // installation (packages/core/src/update.ts).
 //
@@ -43,7 +43,7 @@ import {
   type UpdateManifest,
   type UpdatePlan,
 } from '@cyberpinball/core';
-import type { Action, Built, Row, Section, SystemItem } from './library';
+import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
 
 export interface UpdatesHost {
   loc: Locations;
@@ -133,11 +133,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
       ? { label: t('Préversions : reçues'), detail: t('Les versions d’essai sont proposées aussi ; choisir pour ne plus les recevoir'), icon: 'flask', run: togglePrereleases }
       : { label: t('Préversions : non reçues'), detail: t('Choisir pour recevoir aussi les versions d’essai (0.2.0-essai.1…)'), icon: 'flask', run: togglePrereleases };
 
-  const systemItem: SystemItem = {
-    icon: 'upgrade',
-    get label() {
-      return t('Mise à jour de Cyber Pinball');
-    },
+  const systemItem: ProvidedSystemItem = {
     /** Pastille rouge : une version plus récente attend l'utilisateur. */
     get attention() {
       return state.kind === 'available';

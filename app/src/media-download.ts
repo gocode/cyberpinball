@@ -22,6 +22,8 @@ import {
   freeSpace,
   infoFileFor,
   installMediaDb,
+  loadMediaDb,
+  loadVpsDb,
   loadCabinet,
   matchMediaDb,
   MEDIADB_CITATION,
@@ -52,6 +54,7 @@ import {
   type MediaDbOffer,
   type MediaDbProposal,
   type MediaDbQualityChoice,
+  type MediaFacts,
   type MediaType,
   type TableEntry,
   mediaUrl,
@@ -666,6 +669,31 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     return survey;
   }
 
+  /**
+   * Ce que VPinMediaDB ajouterait aux tables, d'après l'index et la base VPS déjà gardés : ni
+   * réseau, ni VPX, ni recherche approfondie ; seules les tables reconnues avec certitude
+   * comptent, comme dans le plan de « Médias manquants » (Santé de la borne, health.ts).
+   * `pause` laisse respirer le menu entre deux tables.
+   */
+  async function offlineSurvey(pause: () => Promise<void>): Promise<MediaFacts | undefined> {
+    const layout = ctx.layout();
+    if (!layout) return undefined;
+    const found = loadMediaDb(layout.downloads);
+    if (!found) return { tables: 0, medias: 0 };
+    const vps = loadVpsDb(layout.downloads);
+    const facts: MediaFacts = { index: (found.checkedAt ?? found.downloadedAt)?.toISOString(), tables: 0, medias: 0 };
+    for (const table of oneByFolder(host.tables())) {
+      await pause();
+      const match = matchMediaDb(found, table, vps);
+      if (!match.confident) continue;
+      const missing = choicesOf(prepare(table, match, 0, true)).length;
+      if (!missing) continue;
+      facts.tables++;
+      facts.medias += missing;
+    }
+    return facts;
+  }
+
   function surveyRow(o: Offer, action?: number): Row {
     const choices = choicesOf(o);
     const types = choices.map((c) => `${mediaTypeInfo(c.offer.type).label} (${mediaDbOfferLabel(c.offer)})`).join(', ');
@@ -902,7 +930,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     return out;
   }
 
-  return { openTable, openMissing, withNotice, forGames, fillMissing };
+  return { openTable, openMissing, withNotice, forGames, fillMissing, offlineSurvey };
 }
 
 /** Ce que VPinMediaDB a pour un jeu, pour le plan d'ajout : un fichier par média, et le poids total. */

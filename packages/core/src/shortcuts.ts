@@ -15,7 +15,7 @@ export interface Shortcut {
 }
 
 export const SHORTCUTS = {
-  /** Menu système > « Bureau Windows », et retour au menu depuis le bureau. */
+  /** Menu système > « Borne » > « Bureau Windows », et retour au menu depuis le bureau. */
   desktop: { control: true, shift: true, code: 'KeyD' },
   /** Arrêter une partie bloquée (pendant une partie seulement). */
   forceStop: { control: true, shift: true, code: 'KeyK' },

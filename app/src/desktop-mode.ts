@@ -1,4 +1,4 @@
-// Mode bureau (menu système > « Bureau Windows », ou son raccourci) : tous les écrans du PC
+// Mode bureau (menu système > « Borne » > « Bureau Windows », ou son raccourci) : tous les écrans du PC
 // redeviennent utilisables comme sans Cyber Pinball, quel que soit leur nombre.
 //
 // Signalement du 26/10/2026 : en mode bureau, souvent un seul écran revenait. Seules les

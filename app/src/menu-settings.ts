@@ -1,7 +1,7 @@
 // Réglages des médias, du son et du mode attente du menu (docs/recherche/medias.md, § 5.4),
 // dans le menu système : musique des jeux, volumes, mode attente, médias pendant la
-// partie, qualité téléchargée depuis VPinMediaDB. Tout se règle aux
-// boutons : Start change un choix ou ouvre la liste des valeurs, Exit revient.
+// partie, DMD du menu (vivant ou classique), qualité téléchargée depuis VPinMediaDB.
+// Tout se règle aux boutons : Start change un choix ou ouvre la liste des valeurs, Exit revient.
 // Les réglages s'appliquent tout de suite (on entend le nouveau volume) et sont gardés
 // dans <données>\medias.json.
 
@@ -9,6 +9,7 @@ import {
   ATTRACT_DELAY_CHOICES,
   ATTRACT_INTERVAL_CHOICES,
   GAME_MEDIA_LABELS,
+  MENU_DMD_LABELS,
   MENU_LAYOUT_LABELS,
   MENU_LAYOUTS,
   MEDIADB_4K_ABOVE,
@@ -25,8 +26,9 @@ import {
   type IconName,
   type MenuLayout,
   type MenuMediaSettings,
+  type UiSoundId,
 } from '@cyberpinball/core';
-import type { Action, Built, SystemItem } from './library';
+import type { Action, Built, ProvidedSystemItem } from './library';
 
 export interface MenuSettingsHost {
   library: {
@@ -38,6 +40,8 @@ export interface MenuSettingsHost {
   save(next: MenuMediaSettings): void;
   /** Nom Windows de la sortie audio du menu ; undefined : sortie par défaut. */
   output(): string | undefined;
+  /** Fait entendre un son de l'interface (réglage tout juste changé), s'il est permis. */
+  preview(id: UiSoundId): void;
 }
 
 const heading = () => t('Médias, son et attente');
@@ -64,10 +68,32 @@ const LAYOUT_DETAILS: Record<MenuLayout, string> = {
 /** Libellé d'une présentation en tête de ligne : « roue Médaillons » devient « Roue Médaillons ». */
 const capitalized = (text: string) => text.charAt(0).toLocaleUpperCase() + text.slice(1);
 
-type VolumeKey = 'musicVolume' | 'videoVolume' | 'launchVolume';
+type VolumeKey = 'musicVolume' | 'videoVolume' | 'launchVolume' | 'uiSoundsVolume';
 type ChoiceKey = 'attractDelay' | 'attractInterval';
 
-export function createMenuSettings(host: MenuSettingsHost): SystemItem {
+/**
+ * Lignes de l'écran, dans l'ordre : un sous-écran revient sur sa ligne par son rang, tiré
+ * d'ici (une ligne ajoutée ne décale plus les retours).
+ */
+export const MENU_SETTINGS_ROWS = [
+  'menuLayout',
+  'music',
+  'musicVolume',
+  'videoVolume',
+  'launchVolume',
+  'uiSounds',
+  'uiSoundsVolume',
+  'attractDelay',
+  'attractInterval',
+  'attractSound',
+  'game',
+  'dmd',
+  'downloadQuality',
+] as const;
+type Row = (typeof MENU_SETTINGS_ROWS)[number];
+const row = (key: Row) => MENU_SETTINGS_ROWS.indexOf(key);
+
+export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
   const s = () => host.settings();
   const set = (patch: Partial<MenuMediaSettings>) => host.save({ ...s(), ...patch });
 
@@ -82,56 +108,82 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
 
   function actions(): Action[] {
     const v = s();
-    return [
-      {
+    const rows: Record<Row, Action> = {
+      menuLayout: {
         label: t('Présentation du menu : {layout}', { layout: MENU_LAYOUT_LABELS[v.menuLayout] }),
         detail: t('{detail} (Start : choisir)', { detail: LAYOUT_DETAILS[v.menuLayout] }),
         icon: 'layout-menu',
         run: () => openLayout(),
       },
-      {
+      music: {
         label: v.music ? t('Musique des jeux : jouée') : t('Musique des jeux : coupée'),
         detail: v.music ? t('Musique du jeu choisi pendant la navigation (Start : couper)') : t('Borne silencieuse dans le menu (Start : jouer la musique de chaque jeu)'),
         icon: 'music',
         run: () => set({ music: !v.music }),
       },
-      {
+      musicVolume: {
         label: t('Volume de la musique : {volume}', { volume: volumeLabel(v.musicVolume) }),
         detail: v.music ? undefined : t('Musique coupée pour l’instant'),
         icon: 'volume',
-        run: () => openVolume('musicVolume', 1),
+        run: () => openVolume('musicVolume'),
       },
-      {
+      videoVolume: {
         label: t('Son des vidéos du menu : {volume}', { volume: volumeLabel(v.videoVolume) }),
         detail: t('Vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée'),
         icon: 'video',
-        run: () => openVolume('videoVolume', 2),
+        run: () => openVolume('videoVolume'),
       },
-      {
+      launchVolume: {
         label: t('Volume du lancement : {volume}', { volume: volumeLabel(v.launchVolume) }),
         detail: t('Son de lancement du jeu, sinon son de sa vidéo de chargement'),
         icon: 'rocket',
-        run: () => openVolume('launchVolume', 3),
+        run: () => openVolume('launchVolume'),
       },
-      {
+      uiSounds: {
+        label: v.uiSounds ? t('Sons de l’interface : joués') : t('Sons de l’interface : coupés'),
+        detail: v.uiSounds
+          ? t('Clic de solénoïde au changement de table, pièce au Start, knocker sur un record ; jamais pendant la partie (Start : couper)')
+          : t('Aucun bruit de flipper dans le menu (Start : les jouer)'),
+        icon: 'flipper',
+        run: () => {
+          set({ uiSounds: !v.uiSounds });
+          host.preview('solenoid');
+        },
+      },
+      uiSoundsVolume: {
+        label: t('Volume des sons de l’interface : {volume}', { volume: volumeLabel(v.uiSoundsVolume) }),
+        detail: v.uiSounds ? undefined : t('Sons de l’interface coupés pour l’instant'),
+        icon: 'sound',
+        run: () => openVolume('uiSoundsVolume'),
+      },
+      attractDelay: {
         label: t('Mode attente : {delay}', { delay: attractDelayLabel(v.attractDelay) }),
         detail: t('Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu'),
         icon: 'attract',
-        run: () => openChoice('attractDelay', ATTRACT_DELAY_CHOICES, (x) => (x ? t('Après {duration} sans bouton', { duration: durationLabel(x) }) : t('Jamais')), 4),
+        run: () => openChoice('attractDelay', ATTRACT_DELAY_CHOICES, (x) => (x ? t('Après {duration} sans bouton', { duration: durationLabel(x) }) : t('Jamais'))),
       },
-      {
+      attractInterval: {
         label: t('Table suivante en attente : toutes les {duration}', { duration: durationLabel(v.attractInterval) }),
         icon: 'shuffle',
-        run: () => openChoice('attractInterval', ATTRACT_INTERVAL_CHOICES, (x) => t('Toutes les {duration}', { duration: durationLabel(x) }), 5),
+        run: () => openChoice('attractInterval', ATTRACT_INTERVAL_CHOICES, (x) => t('Toutes les {duration}', { duration: durationLabel(x) })),
       },
-      {
+      attractSound: {
         label: v.attractSound === 'reduced' ? t('Son en attente : réduit') : t('Son en attente : coupé'),
         detail: v.attractSound === 'reduced' ? t('Musique et vidéos à 30 % de leur volume (Start : couper)') : t('Rien ne joue en attente (Start : son réduit)'),
         icon: 'volume-low',
         run: () => set({ attractSound: v.attractSound === 'reduced' ? 'muted' : 'reduced' }),
       },
-      { label: t('Médias pendant la partie : {mode}', { mode: GAME_MEDIA_LABELS[v.game] }), detail: gameDetail(), icon: 'film', run: () => set({ game: nextGameMediaMode(v.game) }) },
-      {
+      game: { label: t('Médias pendant la partie : {mode}', { mode: GAME_MEDIA_LABELS[v.game] }), detail: gameDetail(), icon: 'film', run: () => set({ game: nextGameMediaMode(v.game) }) },
+      dmd: {
+        label: t('DMD du menu : {mode}', { mode: MENU_DMD_LABELS[v.dmd] }),
+        detail:
+          v.dmd === 'live'
+            ? t('Cyber Pinball dessine l’afficheur : titre, records, PRESS START, horloge, crédits, puis le média DMD du jeu (Start : média seul)')
+            : t('Le média DMD du jeu, sinon son titre qui défile (Start : DMD vivant)'),
+        icon: 'dmd',
+        run: () => set({ dmd: v.dmd === 'live' ? 'classic' : 'live' }),
+      },
+      downloadQuality: {
         label: t('Qualité téléchargée (VPinMediaDB) : {quality}', { quality: MEDIADB_QUALITY_LABELS[v.downloadQuality] }),
         icon: 'quality',
         detail:
@@ -142,7 +194,8 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
               : t('Image du plateau en 1k, la plus légère (Start : changer)'),
         run: () => set({ downloadQuality: MEDIADB_QUALITY_SETTINGS[(MEDIADB_QUALITY_SETTINGS.indexOf(v.downloadQuality) + 1) % MEDIADB_QUALITY_SETTINGS.length]! }),
       },
-    ];
+    };
+    return MENU_SETTINGS_ROWS.map((key) => rows[key]);
   }
 
   function build(): Built {
@@ -171,10 +224,13 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
         return { heading: t('Son des vidéos du menu'), icon: 'video', lead: t('Son de la vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée. 0 % : vidéos muettes.') };
       case 'launchVolume':
         return { heading: t('Volume du lancement'), icon: 'rocket', lead: t('Son joué au lancement d’une table, ou son de sa vidéo de chargement. Rien pendant la partie : VPX a la parole.') };
+      case 'uiSoundsVolume':
+        return { heading: t('Volume des sons de l’interface'), icon: 'sound', lead: t('Clic de solénoïde, pièce et knocker, sur la sortie du son du menu. Rien pendant la partie : VPX a la parole.') };
     }
   }
 
-  function openVolume(key: VolumeKey, back: number): void {
+  function openVolume(key: VolumeKey): void {
+    const back = row(key);
     const now = s()[key];
     host.library.openCustom(
       () => ({
@@ -187,6 +243,7 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
             tone: value === s()[key] ? ('ok' as const) : undefined,
             run: () => {
               set({ [key]: value });
+              if (key === 'uiSoundsVolume') host.preview('coin');
               open(back);
             },
           })),
@@ -212,12 +269,12 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
             tone: layout === s().menuLayout ? ('ok' as const) : undefined,
             run: () => {
               set({ menuLayout: layout });
-              open(0);
+              open(row('menuLayout'));
             },
           })),
-          { label: t('Retour'), run: () => open(0) },
+          { label: t('Retour'), run: () => open(row('menuLayout')) },
         ],
-        back: () => open(0),
+        back: () => open(row('menuLayout')),
       }),
       Math.max(0, MENU_LAYOUTS.indexOf(s().menuLayout)),
     );
@@ -229,7 +286,8 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
       : { heading: t('Table suivante en attente'), icon: 'shuffle', lead: t('Temps passé sur chaque table tirée au hasard.') };
   }
 
-  function openChoice(key: ChoiceKey, choices: readonly number[], label: (value: number) => string, back: number): void {
+  function openChoice(key: ChoiceKey, choices: readonly number[], label: (value: number) => string): void {
+    const back = row(key);
     const now = s()[key];
     host.library.openCustom(
       () => ({
@@ -254,10 +312,6 @@ export function createMenuSettings(host: MenuSettingsHost): SystemItem {
   }
 
   return {
-    icon: 'music',
-    get label() {
-      return heading();
-    },
     get detail() {
       const v = s();
       const params = { delay: attractDelayLabel(v.attractDelay), mode: GAME_MEDIA_LABELS[v.game] };

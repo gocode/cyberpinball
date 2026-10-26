@@ -13,6 +13,10 @@ contextBridge.exposeInMainWorld('cyber', {
     ipcRenderer.on('state', (_event, state) => callback(state));
   },
   ready: () => ipcRenderer.send('ready'),
+  // DMD du menu vivant (live-dmd.ts) : chaque image changée de l'afficheur, ou le média de la table.
+  onDmd: (callback: (shot: unknown) => void) => {
+    ipcRenderer.on('dmd', (_event, shot) => callback(shot));
+  },
   // Souris : clics et fichiers glissés sur la fenêtre (gestion des tables).
   act: (action: unknown) => ipcRenderer.send('action', action),
   pathOf: (file: File) => webUtils.getPathForFile(file),
@@ -24,4 +28,8 @@ contextBridge.exposeInMainWorld('cyber', {
     ipcRenderer.on('sound', (_event, command) => callback(command));
   },
   soundStatus: (status: unknown) => ipcRenderer.send('sound-status', status),
+  // Menu : sons de l'interface (clic de solénoïde, pièce, knocker), joués par renderer/ui-sounds.js.
+  onUiSound: (callback: (cue: unknown) => void) => {
+    ipcRenderer.on('ui-sound', (_event, cue) => callback(cue));
+  },
 });

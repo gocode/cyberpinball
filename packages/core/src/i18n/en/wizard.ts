@@ -564,7 +564,7 @@ export const messages: Record<string, string> = {
   'Tilt : balancier simulé par VPX, contact à {angle}': 'Tilt: tilt bob simulated by VPX, contact at {angle}',
   'Tilt : aucun balancier, ni réel ni simulé': 'Tilt: no tilt bob, neither real nor simulated',
   'Slam tilt : {key}': 'Slam tilt: {key}',
-  'menu système > « Configuration de la borne » > « Tilt »': 'system menu > “Cabinet configuration” > “Tilt”',
+  'menu système > « Borne » > « Configuration de la borne » > « Tilt »': 'system menu > “Cabinet” > “Cabinet setup” > “Tilt”',
   'Tilt : balancier de la borne choisi, mais aucun bouton « Balancier de tilt » relevé. Relevez-le à l’étape « Boutons du jeu », ou choisissez le balancier simulé ({where}).':
     'Tilt: cabinet tilt bob chosen, but no “Tilt bob” button recorded. Record it at the “Game buttons” step, or choose the simulated tilt bob ({where}).',
   'Tilt : le balancier de la borne ({key}) et celui que VPX simule à partir des secousses sont actifs ensemble : un même coup peut compter deux fois. Choisissez l’un des deux ({where}).':

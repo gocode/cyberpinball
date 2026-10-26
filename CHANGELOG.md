@@ -9,6 +9,14 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.4
+
+- Menu système en quatre rubriques : Tables, Médias, Borne et Cyber Pinball ; ce qui ne sert qu'en venant d'un autre frontend est rangé dans « Migration ».
+- DMD du menu vivant : Cyber Pinball dessine lui-même l'afficheur, avec le titre, PRESS START, les crédits, l'horloge et les records.
+- Sons de l'interface : clic de solénoïde au changement de table, pièce au Start, knocker quand un record tombe ; désactivables dans « Médias, son et attente ».
+- Santé de la borne (rubrique Borne) : espace disque, tables qui ne démarrent pas, médias manquants, écrans et version de VPX sur un seul écran.
+- Borne dédiée (rubrique Borne), désactivée par défaut : Cyber Pinball peut remplacer l'Explorateur de Windows, avec un moyen de le rappeler.
+
 ## 0.1.3
 
 - Boutons d'un Pinscape (KL25Z) ou d'un encodeur en mode manette : relevés dans l'étape « Boutons » et suivis par tout le menu et par VPX.

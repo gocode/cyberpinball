@@ -43,12 +43,15 @@ function renderLibrary(v) {
         ? `lib-body lib-media${v.media.large ? ' large' : ''}`
         : v.journey
           ? 'lib-body lib-journey'
-          : v.sections.length
+          : v.health
+            ? 'lib-body lib-health'
+            : v.sections.length
             ? 'lib-body'
             : 'lib-body only-actions',
   );
   if (v.pages) body.append(renderPages(v.pages));
   else if (v.journey) body.append(renderJourney(v.journey));
+  else if (v.health) body.append(renderHealth(v.health, v.cursor));
   else if (v.media || v.sections.length) {
     const content = libEl('div', 'lib-content');
     // Médias : le message du moment, puis les cartes, puis les sections titrées.
@@ -102,7 +105,9 @@ function renderLibrary(v) {
   }
   // Les actions montrées en cartes (un média, une page, un fichier) ou en lignes à choisir
   // (un fichier de la table, un élément de la liste d'attente) ne sont pas répétées dans la liste.
-  const carded = new Set([...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick))].map((c) => c.action).filter((a) => a !== undefined));
+  const carded = new Set(
+    [...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick)), ...(v.health?.groups.flatMap((g) => g.lines) ?? [])].map((c) => c.action).filter((a) => a !== undefined),
+  );
   v.actions.forEach((a, i) => {
     if (carded.has(i)) return;
     const li = actOn(libEl('li', `lib-action tone-${a.tone ?? 'none'}${i === v.cursor && !v.pages ? ' current' : ''}`), { type: 'activate', index: i });
@@ -205,6 +210,50 @@ function journeyList(steps, tag, extra = '') {
     list.append(li);
   }
   return list;
+}
+
+// ---------- Santé de la borne (health.ts) ----------
+
+/**
+ * Bilan en tête (autant de Bloquant, d'À vérifier, d'OK ; quand il date), puis les contrôles
+ * par domaine : chaque ligne a son état (signe et mot, jamais la couleur seule) et ce qu'elle
+ * ouvre pour réparer. La ligne est l'action : flippers pour la choisir, Start l'ouvre.
+ */
+function renderHealth(h, cursor) {
+  const box = libEl('div', 'lib-content health');
+  const summary = libEl('div', 'health-summary');
+  const counts = libEl('div', 'health-counts');
+  for (const c of h.counts) {
+    const count = libEl('span', `health-count tone-${c.tone}${c.n ? '' : ' none'}`);
+    count.append(libEl('span', 'health-sign', c.sign), libEl('b', '', String(c.n)), libEl('span', '', c.word));
+    counts.append(count);
+  }
+  summary.append(counts, libEl('span', `health-when${h.busy ? ' busy' : ''}`, h.when));
+  box.append(summary);
+  for (const g of h.groups) {
+    const group = libEl('section', 'health-group');
+    const title = libEl('h2', 'health-group-title');
+    if (g.icon) title.append(cyberIcon(g.icon, 'health-group-icon'));
+    title.append(libEl('span', '', g.title));
+    if (g.meta) title.append(libEl('span', 'health-group-meta', g.meta));
+    const list = libEl('ul', 'health-lines');
+    for (const l of g.lines) {
+      const li = actOn(libEl('li', `health-line state-${l.state}${l.action === cursor ? ' selected' : ''}`), { type: 'activate', index: l.action });
+      const text = libEl('div', 'health-text');
+      text.append(libEl('div', 'health-title', l.title));
+      if (l.detail) text.append(libEl('div', 'health-detail', l.detail));
+      const go = libEl('div', 'health-go');
+      go.append(libEl('span', 'health-go-arrow', '›'), libEl('span', '', l.go));
+      text.append(go);
+      const state = libEl('span', `health-state tone-${l.tone}`);
+      state.append(libEl('span', 'health-sign', l.sign), libEl('span', '', l.word));
+      li.append(text, state);
+      list.append(li);
+    }
+    group.append(title, list);
+    box.append(group);
+  }
+  return box;
 }
 
 // ---------- Prospectus et règles, page par page ----------
@@ -428,7 +477,7 @@ document.addEventListener('drop', (event) => {
 
 /** Garde visible l'élément choisi quand la liste dépasse de l'écran. */
 function revealSelection() {
-  for (const node of document.querySelectorAll('.lib-row.selected, .lib-action.current, .key.current, .media-card.selected')) {
+  for (const node of document.querySelectorAll('.lib-row.selected, .health-line.selected, .lib-action.current, .key.current, .media-card.selected')) {
     node.scrollIntoView({ block: 'nearest' });
   }
   for (const list of document.querySelectorAll('.lib-actions, .lib-content')) {

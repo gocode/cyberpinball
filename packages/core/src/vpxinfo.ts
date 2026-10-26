@@ -41,7 +41,7 @@ const MAX_SECTOR = 0xfffffffa;
 /** Au-delà, un champ est tronqué : la règle du jeu peut être longue, on n'en a pas besoin entière. */
 const MAX_FIELD_BYTES = 64 * 1024;
 
-interface DirEntry {
+export interface DirEntry {
   name: string;
   type: number;
   left: number;
@@ -54,8 +54,9 @@ interface DirEntry {
 /**
  * Lecteur minimal de fichier composé : en-tête, FAT (avec la DIFAT des gros
  * fichiers), répertoire et mini-flux. Lève une erreur si le fichier n'en est pas un.
+ * Sert aussi pour VPReg.stg, où VPX range ce que les tables enregistrent (highscores.ts).
  */
-class CompoundFile {
+export class CompoundFile {
   private readonly sectorSize: number;
   private readonly miniSectorSize: number;
   private readonly miniCutoff: number;

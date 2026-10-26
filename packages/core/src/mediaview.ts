@@ -475,6 +475,24 @@ function menuLayoutOf(value: unknown, fallback: MenuLayout): MenuLayout {
   return MENU_LAYOUTS.includes(value as MenuLayout) ? (value as MenuLayout) : fallback;
 }
 
+/**
+ * DMD du menu : vivant (Cyber Pinball dessine l'afficheur à points : titre, records, PRESS
+ * START, horloge, crédits, média DMD ; livedmd.ts), ou classique (le média DMD de la table,
+ * sinon le DMD généré qui fait défiler le titre).
+ */
+export type MenuDmdMode = 'live' | 'classic';
+
+export const MENU_DMD_MODES: readonly MenuDmdMode[] = ['live', 'classic'];
+
+export const MENU_DMD_LABELS: Record<MenuDmdMode, string> = {
+  get live() {
+    return t('vivant');
+  },
+  get classic() {
+    return t('classique');
+  },
+};
+
 /** Réglages globaux des médias et du son du menu (§ 5.4), dans <données>\medias.json. */
 export interface MenuMediaSettings {
   /** Figés par défaut : une image fixe ne coûte rien au GPU pendant que VPX joue. */
@@ -487,6 +505,10 @@ export interface MenuMediaSettings {
   videoVolume: number;
   /** Son de lancement (AudioLaunch) et son de la vidéo de chargement (Loading). */
   launchVolume: number;
+  /** Sons de l'interface (clic de solénoïde, pièce, knocker : uisounds.ts) ; joués par défaut. */
+  uiSounds: boolean;
+  /** Leur volume en pour cent, sur la sortie du menu. */
+  uiSoundsVolume: number;
   /** Secondes sans bouton avant le mode attente ; 0 : jamais. */
   attractDelay: number;
   /** Secondes entre deux tables tirées au hasard en mode attente. */
@@ -496,6 +518,8 @@ export interface MenuMediaSettings {
   menuLayout: MenuLayout;
   /** Qualité téléchargée depuis VPinMediaDB : d'après l'écran du plateau (défaut), ou imposée. */
   downloadQuality: MediaDbQualitySetting;
+  /** DMD du menu : vivant par défaut, classique pour revenir au média seul. */
+  dmd: MenuDmdMode;
 }
 
 export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
@@ -504,11 +528,14 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   musicVolume: 60,
   videoVolume: 0,
   launchVolume: 80,
+  uiSounds: true,
+  uiSoundsVolume: 50,
   attractDelay: 300,
   attractInterval: 20,
   attractSound: 'muted',
   menuLayout: 'medaillons',
   downloadQuality: 'auto',
+  dmd: 'live',
 };
 
 /** <données>\medias.json */
@@ -531,11 +558,14 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     musicVolume: intIn(r.musicVolume, 0, 100, d.musicVolume),
     videoVolume: intIn(r.videoVolume, 0, 100, d.videoVolume),
     launchVolume: intIn(r.launchVolume, 0, 100, d.launchVolume),
+    uiSounds: typeof r.uiSounds === 'boolean' ? r.uiSounds : d.uiSounds,
+    uiSoundsVolume: intIn(r.uiSoundsVolume, 0, 100, d.uiSoundsVolume),
     attractDelay: intIn(r.attractDelay, 0, 24 * 3600, d.attractDelay),
     attractInterval: intIn(r.attractInterval, 3, 3600, d.attractInterval),
     attractSound: r.attractSound === 'reduced' || r.attractSound === 'muted' ? r.attractSound : d.attractSound,
     menuLayout: menuLayoutOf(r.menuLayout, d.menuLayout),
     downloadQuality: MEDIADB_QUALITY_SETTINGS.includes(r.downloadQuality as MediaDbQualitySetting) ? (r.downloadQuality as MediaDbQualitySetting) : d.downloadQuality,
+    dmd: MENU_DMD_MODES.includes(r.dmd as MenuDmdMode) ? (r.dmd as MenuDmdMode) : d.dmd,
   };
 }
 

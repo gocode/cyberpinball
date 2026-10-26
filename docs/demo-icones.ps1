@@ -2,8 +2,8 @@
 # sur un bureau Windows caché, avec des tables inventées (docs\demo-captures.cjs) et une
 # version suivante annoncée par un site local (pastille rouge sur « Mise à jour de Cyber
 # Pinball » et sur la roue dentée). Pour chaque jeu d'écrans et chaque langue :
-#   menu     : fiche d'un jeu (Jouer choisi, puis une autre action), menu système (choix sur
-#              l'entrée à pastille, puis remonté en haut), « Configuration de la borne »,
+#   menu     : fiche d'un jeu (Jouer choisi, puis une autre action), rubriques du menu système
+#              (choix sur celle à pastille, puis remonté en haut), chaque rubrique et « Migration », « Configuration de la borne »,
 #              « Configurations de la borne », « Médias, son et attente », « Langue »,
 #              « Mise à jour de Cyber Pinball » (version disponible), catalogue (titre hérité) ;
 #   reglages : l'écran des réglages de VPX (onglets et groupes des Essentiels).
@@ -109,16 +109,20 @@ try {
 
       if ($Etapes -contains 'menu') {
         # VPX n'est pas installé : Exit (plus tard). Start : la fiche du premier jeu ; trois
-        # flippers : une autre action choisie. Exit, Exit : le menu système, choix sur la pastille.
+        # flippers : une autre action choisie. Exit, Exit : les rubriques du menu système, choix
+        # sur celle à pastille (Cyber Pinball), puis remonté en haut. Chaque rubrique, et
+        # « Migration » ; Exit remonte d'un cran.
         Invoke-Capture $dossier $langue 'menu' (@(
             'Escape', 'wait:1500', 'Digit1', 'wait:1500', 'ShiftRight', 'ShiftRight', 'ShiftRight',
             'Escape', 'Escape', 'wait:2500'
           ) + $enHaut + @(
-            'action:Configuration de la borne', 'wait:600',
-            'action:Configurations de la borne', 'wait:600', 'Escape', 'Escape',
-            (& $entree 'music'), 'wait:600', 'Escape',
+            'action:Tables', 'wait:600', 'Escape',
+            'action:Médias', 'wait:600', (& $entree 'music'), 'wait:600', 'Escape', 'Escape',
+            'action:Borne', 'wait:600', 'action:Configuration de la borne', 'wait:600',
+            'action:Configurations de la borne', 'wait:600', 'Escape', 'Escape', 'Escape',
+            'action:Cyber Pinball', 'wait:600', 'action:Migration', 'wait:600', 'Escape',
             'action:Langue', 'wait:600', 'Escape',
-            'action:Mise à jour de Cyber Pinball', 'wait:2500', 'Escape',
+            'action:Mise à jour de Cyber Pinball', 'wait:2500', 'Escape', 'Escape',
             'action:Ajouter une table', 'wait:1500', 'action:Trouver une table en ligne', 'wait:1500'
           )) @()
       }

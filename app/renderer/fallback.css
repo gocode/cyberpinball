@@ -340,6 +340,7 @@ html.cp-fb-hidden .cp-fb *::after {
 /* ---------- Afficheurs à points ---------- */
 
 .cp-fb-dmd,
+.cp-fb-dotmatrix,
 .cp-fb-fulldmd {
   background: #000;
 }

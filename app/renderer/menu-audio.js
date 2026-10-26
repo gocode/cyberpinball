@@ -151,6 +151,7 @@
     sinkLabel = id ? name : 'sortie par défaut'; // i18n-ignore : état lu par les essais (status), jamais affiché
     for (const track of [music, launch, ...fading]) track?.el.setSinkId(sinkId).catch(() => {});
     window.CyberMedia?.setSink?.(sinkId);
+    window.CyberUiSounds?.setSink?.(sinkId);
   }
 
   function update(sound) {

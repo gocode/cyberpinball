@@ -15,8 +15,10 @@ import { messages as journey } from './journey';
 import { messages as waitlist } from './waitlist';
 import { messages as files } from './files';
 import { messages as webmedia } from './webmedia';
+import { messages as health } from './health';
+import { messages as dedicated } from './dedicated';
 
 /** Chaque partie du catalogue, par nom de fichier (pour le test des doublons). */
-export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia };
+export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dedicated };
 
 export const EN_MESSAGES: Catalog = Object.assign({}, ...Object.values(EN_PARTS));

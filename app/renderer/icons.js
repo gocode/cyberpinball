@@ -23,7 +23,10 @@ const CYBER_ICONS = {
   language: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>', // Langues, sans lettre ni drapeau.
   upgrade: '<path d="M12 21V6M6 12l6-6 6 6M5 2h14"/>', // Nouvelle version de Cyber Pinball.
   desktop: '<rect x="3" y="3" width="14" height="13" rx="1"/><path d="M10 7h3M21 8v13H8"/>', // Fenêtres en cascade et tiret de réduction, sans flèche.
-  power: '<path d="M12 3v9M6 6a8.5 8.5 0 1 0 12 0"/>', // Quitter l’application.
+  'pinball-app': '<circle cx="12" cy="7" r="3"/><path d="M3 15a2 2 0 0 1 3-1l4 3a1.5 1.5 0 0 1-1.5 2.5L4 18a2 2 0 0 1-1-3zM21 15a2 2 0 0 0-3-1l-4 3a1.5 1.5 0 0 0 1.5 2.5L20 18a2 2 0 0 0 1-3z"/>', // Bille et deux batteurs : l’application (rubrique Cyber Pinball du menu système).
+  toolbox: '<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M8 8V4h8v4M3 13h7M14 13h7"/><rect x="10" y="11" width="4" height="4" rx="0.5"/>', // Boîte à outils : configuration de la borne, à côté de l’assistant guidé.
+  power: '<path d="M12 3v9M6 6a8.5 8.5 0 1 0 12 0"/>', // Alimentation du PC (quitter l’application : exit).
+  lock: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>', // Borne dédiée : Cyber Pinball seul, à la place du bureau Windows.
   back: '<path d="M21 12H3M10 5l-7 7 7 7"/>', // Retour à l’écran parent.
   gear: '<path d="M9 2h6l.5 3 2 1.2 2.5-1 2 3.6-2 2v2.4l2 2-2 3.6-2.5-1-2 1.2-.5 3H9l-.5-3-2-1.2-2.5 1-2-3.6 2-2v-2.4l-2-2 2-3.6 2.5 1 2-1.2z"/><circle cx="12" cy="12" r="3"/>', // Accès souris et titre du menu système.
 
@@ -46,6 +49,7 @@ const CYBER_ICONS = {
   pup: '<path d="M6 3h15v13M3 7h14v14H3zM8 11l5 3-5 3z"/>', // Paquet de vidéos, deux plans superposés.
   frame: '<path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/>', // Cadrer l’affichage pendant la partie.
   pulse: '<path d="M2 12h5l3-8 4 16 3-8h5"/>', // Diagnostiquer et réparer.
+  health: '<path d="M12 5.5C9 1.5 3 2 3 7.5c0 4.5 4.5 9 9 13.5 4.5-4.5 9-9 9-13.5 0-5.5-6-6-9-2z"/><path d="M5.5 10.5h3L10 7.5l2 6.5 2-3.5h4.5"/>', // Santé de la borne : un cœur et son pouls (Codex).
   trash: '<path d="M3 7h18M6 7l1 14h10l1-14M8 7V3h8v4M10 11v6M14 11v6"/>', // Supprimer, envoyer à la corbeille.
 
   // Médias, son et attente
@@ -91,7 +95,7 @@ const CYBER_ICONS = {
   monitor: '<rect x="3" y="3" width="18" height="13" rx="2"/><path d="M12 16v5M7 21h10"/>', // Un écran physique.
   flipper: '<path d="m6 21 13-9a4 4 0 0 0-5-6L3 17a2.5 2.5 0 0 0 3 4z"/>', // Batteur de flipper, silhouette élargie.
   start: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/>', // Bouton Start vu du dessus.
-  exit: '<path d="M14 3h7v18h-7M16 12H3M8 7l-5 5 5 5"/>', // Bouton Exit ou sortie d’un parcours.
+  exit: '<path d="M14 3h7v18h-7M16 12H3M8 7l-5 5 5 5"/>', // Bouton Exit, sortie d’un parcours, quitter Cyber Pinball.
   coin: '<ellipse cx="10" cy="12" rx="6" ry="9"/><path d="M10 3h4a6 9 0 0 1 0 18h-4M16 12h4"/>', // Pièce vue de biais, face vierge et tranche avec un cran.
   plunger: '<path d="M7 3h10M12 3v10M8 13h8v8H8z"/>', // Lance-bille mécanique.
   tilt: '<path d="M12 2v11M10 13h4l-2 4z"/><ellipse cx="12" cy="15" rx="9" ry="3"/>', // Balancier de tilt : pendule et cône au milieu de son anneau.

@@ -175,7 +175,7 @@ export function tiltFindings(cabinet: Pick<Cabinet, 'buttons' | 'analog' | 'tilt
   const plumb = plumbFromIni(ini);
   const tilt = cabinet.tilt;
   const bob = cabinet.buttons?.tilt;
-  const where = t('menu système > « Configuration de la borne » > « Tilt »');
+  const where = t('menu système > « Borne » > « Configuration de la borne » > « Tilt »');
   if (tilt?.mode === 'bob' && !bob) {
     findings.push({ severity: 'warning', message: t('Tilt : balancier de la borne choisi, mais aucun bouton « Balancier de tilt » relevé. Relevez-le à l’étape « Boutons du jeu », ou choisissez le balancier simulé ({where}).', { where }) });
   }

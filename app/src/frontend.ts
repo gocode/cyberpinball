@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, session, type Input, type Rectangle } from 'electron';
 import {
   CONFIG_KEY,
+  SYSTEM_ITEMS,
   WIZARD_STEPS,
   buttonProblems,
   formatManualEdit,
@@ -65,6 +66,9 @@ import {
   occupiedRoles,
   saveMenuMediaSettings,
   tableMediaVolume,
+  newRecords,
+  uiSoundCue,
+  type UiSoundId,
   type MenuMediaSettings,
   type MenuMoment,
   type MenuPhase,
@@ -98,6 +102,15 @@ import {
   shortcutKeys,
   shortcutLabel,
   SHORTCUTS,
+  cachedFrame,
+  frameCacheFile,
+  liveDmdArea,
+  readTableRecords,
+  vpRegFile,
+  type DmdAnimationName,
+  type DmdAnimationOptions,
+  type FrameRecord,
+  type TableRecords,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -107,7 +120,8 @@ import { installVpx, vpxArchivePresent } from './install-vpx';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
 import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
 import { cachedScript } from './vbs';
-import { prepareDressing } from './fulldmd';
+import { mediaFrame, prepareDressing } from './fulldmd';
+import { LiveDmd, type LiveDmdAnimationHandle } from './live-dmd';
 import { createConverter } from './media-convert';
 import { onJoystickInput } from './joystick-input';
 import { locations, vpxInstall, vpxProfile } from './paths';
@@ -123,6 +137,9 @@ import { serveMedias } from './media-protocol';
 import { createMenuSettings } from './menu-settings';
 import { createLanguageMenu } from './language-menu';
 import { createUpdatesMenu } from './updates-menu';
+import { createDedicatedMenu } from './dedicated-menu';
+import { createDedicatedSystem } from './dedicated-system';
+import { handOverOnQuit, shellSession } from './dedicated-session';
 
 /**
  * Touches du menu : celles des boutons de l'interface (étape « Boutons de l'interface »
@@ -329,7 +346,12 @@ const library = createLibrary({
     startVpxInstall();
   },
   setup: () => void relaunchWizard(),
+  displays: () => observedDisplays(),
+  vpxVersion: () => vpxInstall(loc)?.version,
 });
+// Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes (pastille
+// rouge) ; jamais pendant une partie ni son chargement.
+library.watchHealth(() => state.phase === 'loading' || state.phase === 'playing');
 // Configurations de la borne : la configuration active est nommée dans le sous-menu.
 const configurations = createConfigurationsMenu({
   loc,
@@ -338,39 +360,28 @@ const configurations = createConfigurationsMenu({
   library: { ...library, openSystem: () => openCabinetSetup() },
   relaunch: (newConfiguration) => (newConfiguration ? relaunchWizard(undefined, true) : relaunchMenu()),
 });
-// Le menu système (Exit) donne aussi accès aux réglages de VPX et à la configuration de la borne.
+// Le menu système (Exit) donne aussi accès aux réglages de VPX et à la configuration de la borne ;
+// l'arbre des rubriques (systemmenu.ts, core) dit où va chaque entrée.
 // Les démonstrations désignent les entrées par leur libellé (data-label), pas par leur rang.
-library.systemItems.splice(
-  1,
-  0,
-  {
-    icon: 'sliders',
-    get label() {
-      return t('Réglages de VPX');
-    },
-    get detail() {
-      return t('Son, vue, performances, pour toutes les tables');
-    },
-    get shortcut() {
-      return interfaceShortcut(KEYS.settings);
-    },
-    run: () => openVpxSettings(),
+library.provideSystemItem('vpx-settings', {
+  get detail() {
+    return t('Son, vue, performances, pour toutes les tables');
   },
-  {
-    icon: 'cabinet',
-    get label() {
-      return t('Configuration de la borne');
-    },
-    get detail() {
-      return t('Boutons, écrans, playfield, disposition, son : chaque étape seule, ou l’assistant complet');
-    },
-    // Le sous-menu porte la pastille de ses entrées.
-    get attention() {
-      return cabinetSetupItems().some((i) => i.attention);
-    },
-    run: () => openCabinetSetup(),
+  get shortcut() {
+    return interfaceShortcut(KEYS.settings);
   },
-);
+  run: () => openVpxSettings(),
+});
+library.provideSystemItem('cabinet', {
+  get detail() {
+    return t('Boutons, écrans, playfield, disposition, son : chaque étape seule, ou l’assistant complet');
+  },
+  // Le sous-menu porte la pastille de ses entrées.
+  get attention() {
+    return cabinetSetupItems().some((i) => i.attention);
+  },
+  run: () => openCabinetSetup(),
+});
 
 /**
  * Sous-menu « Configuration de la borne » : chaque étape de l'assistant se refait
@@ -471,8 +482,8 @@ function zoneAspect(cabinet: Cabinet, screen: { widthPx: number; heightPx: numbe
 
 function openCabinetSetup(): void {
   library.openCustom(() => ({
-    heading: t('Configuration de la borne'),
-    icon: 'cabinet',
+    heading: SYSTEM_ITEMS.cabinet.label,
+    icon: SYSTEM_ITEMS.cabinet.icon,
     lead: t('Chaque étape se refait seule, puis revient au menu des tables. « Quitter sans enregistrer » (ou Exit maintenu 2 s) en sort sans rien changer.'),
     sections: [],
     actions: [...cabinetSetupItems().map((i) => ({ label: i.label, detail: i.detail, icon: i.icon, attention: i.attention, run: i.run })), { label: t('Retour'), icon: 'back', run: () => library.openSystem() }],
@@ -481,9 +492,8 @@ function openCabinetSetup(): void {
   }), Math.max(0, cabinetSetupItems().findIndex((i) => i.attention)));
 }
 // Médias, son et attente (musique, volumes, mode attente, médias pendant la partie) : un écran à part.
-library.systemItems.splice(
-  library.systemItems.length - 1,
-  0,
+library.provideSystemItem(
+  'menu-media',
   createMenuSettings({
     library,
     settings: () => mediaSettings,
@@ -498,10 +508,11 @@ library.systemItems.splice(
       broadcast();
     },
     output: () => audioOutput,
+    preview: (id) => playUiSound(id),
   }),
 );
 // Langue de l'interface : le choix relance le menu, comme un changement de configuration.
-library.systemItems.splice(library.systemItems.length - 1, 0, createLanguageMenu({ library, relaunch: () => relaunchMenu() }));
+library.provideSystemItem('language', createLanguageMenu({ library, relaunch: () => relaunchMenu() }));
 // Mise à jour de Cyber Pinball : recherche discrète en arrière-plan (pastille rouge), installation à la demande.
 const updates = createUpdatesMenu({
   loc,
@@ -511,17 +522,17 @@ const updates = createUpdatesMenu({
   silent: OFFSCREEN,
   library,
   broadcast: () => broadcast(),
-  quit: () => quit(),
+  // Borne dédiée : Shell Launcher ne relance rien, l'installeur relance lui-même Cyber Pinball.
+  quit: () => {
+    handOverOnQuit();
+    quit();
+  },
   // Essais hors écran : seulement vers leur site d'essai, jamais vers GitHub.
   background: !OFFSCREEN || Boolean(process.env.CYBERPINBALL_MAJ_URL),
 });
-library.systemItems.splice(library.systemItems.length - 1, 0, updates.systemItem);
+library.provideSystemItem('updates', updates.systemItem);
 // Aide-mémoire des boutons : aussi ici, puisque le pied du menu ne nomme que Flippers, Start et Exit.
-library.systemItems.splice(library.systemItems.length - 1, 0, {
-  icon: 'gamepad',
-  get label() {
-    return t('Commandes de la borne');
-  },
+library.provideSystemItem('controls', {
   get detail() {
     return t('Les boutons du menu et de la partie');
   },
@@ -533,12 +544,32 @@ library.systemItems.splice(library.systemItems.length - 1, 0, {
     broadcast();
   },
 });
-// Juste avant « Quitter Cyber Pinball ».
-library.systemItems.splice(library.systemItems.length - 1, 0, {
-  icon: 'desktop',
-  get label() {
-    return t('Bureau Windows');
-  },
+// Borne dédiée (Shell Launcher) : Cyber Pinball à la place du bureau Windows pour ce compte,
+// désactivée par défaut. Quand il est le shell de la session, « Ouvrir l'Explorateur Windows »
+// remplace « Bureau Windows » (il n'y a pas de bureau sans Explorateur), et « Quitter » le
+// relance : sans lui, l'écran resterait noir.
+const dedicatedSystem = createDedicatedSystem(loc.dataDir);
+const dedicated = createDedicatedMenu({
+  library,
+  system: dedicatedSystem,
+  dataDir: loc.dataDir,
+  // L'exécutable installé ; depuis les sources, seulement avec Windows simulé (démonstrations).
+  command: () => (app.isPackaged ? [process.execPath] : dedicatedSystem.simulated ? [process.execPath, app.getAppPath()] : undefined),
+  shellSession: shellSession(),
+  desktopKeys: shortcutLabel(SHORTCUTS.desktop),
+  showDesktop: () => void showDesktop(),
+});
+library.provideSystemItem('dedicated', dedicated.dedicatedItem);
+if (shellSession()) {
+  library.provideSystemItem('explorer', dedicated.explorerItem);
+  library.provideSystemItem('quit', {
+    label: t('Redémarrer Cyber Pinball'),
+    get detail() {
+      return t('Cyber Pinball est le shell de Windows : il revient aussitôt');
+    },
+    run: () => relaunchMenu(),
+  });
+} else library.provideSystemItem('desktop', {
   get detail() {
     return t('Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys: shortcutLabel(SHORTCUTS.desktop) });
   },
@@ -568,7 +599,7 @@ let desktopWatch: NodeJS.Timeout | undefined;
 const DESKTOP_WATCH_MS = 500;
 
 /**
- * Menu système > « Bureau Windows », ou son raccourci depuis le menu : tous les écrans du PC
+ * Menu système > « Borne » > « Bureau Windows », ou son raccourci depuis le menu : tous les écrans du PC
  * se libèrent, le bureau et les barres des tâches reviennent. Le même raccourci (global tant
  * que dure le mode bureau), le bouton du playfield dans la barre des tâches ou Alt+Tab
  * ramènent le menu sur tous ses écrans (restoreFromDesktop).
@@ -576,6 +607,9 @@ const DESKTOP_WATCH_MS = 500;
 function showDesktop(): boolean {
   if (desktop.active || state.phase === 'loading' || state.phase === 'playing') return true;
   library.leave();
+  // Borne dédiée : sans Explorateur, il n'y a pas de bureau ; une fenêtre de fichiers en tient
+  // lieu (sous Shell Launcher, explorer.exe n'ouvre que cela, sans barre des tâches).
+  if (shellSession() && !dedicatedSystem.explorerShown()) dedicatedSystem.openExplorer();
   setDesktopMode(true);
   const away = desktop.enter();
   console.log(`Mode bureau : ${away.length} fenêtres de Cyber Pinball rangées (${away.filter(isVeil).length} voiles), tous les écrans libres.`);
@@ -603,7 +637,7 @@ function restoreFromDesktop(): void {
   broadcast();
 }
 
-/** Menu système > « Touches par défaut des encodeurs » : le menu suit aussitôt ces touches. */
+/** Menu système > « Borne » > « Configuration de la borne » > « Touches par défaut des encodeurs » : le menu suit aussitôt ces touches. */
 function resetButtonsFromMenu(): void {
   const reset = resetButtons();
   if (!reset) return;
@@ -619,7 +653,11 @@ export function startFrontend(): void {
   // Chromium ne donne le nom des sorties audio, et n'autorise setSinkId (sortie du fronton
   // pour la musique du menu), qu'avec ces permissions ; les pages du menu sont locales.
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media' || permission === 'speaker-selection');
-  ipcMain.on('ready', () => broadcast());
+  ipcMain.on('ready', () => {
+    broadcast();
+    // Fenêtre (re)chargée : elle n'a pas encore l'image du DMD vivant.
+    liveDmd.resend();
+  });
   ipcMain.on('media-error', (_event, error: MediaErrorReport) => recordMediaError(error));
   ipcMain.on('action', (_event, action: UiAction) => {
     // Un clic en mode attente y met fin, sans autre effet.
@@ -628,7 +666,7 @@ export function startFrontend(): void {
     else if (action.type === 'config') openConfig();
     else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
       if (action.offset === 0) library.openSheet(tables[state.index]!);
-      else state = { ...state, index: (state.index + action.offset + tables.length * 10) % tables.length };
+      else moveSelection(action.offset);
       broadcast();
     } else library.handleAction(action);
   });
@@ -638,6 +676,7 @@ export function startFrontend(): void {
   tables = loc.root ? scanTables(layoutOf(loc.root).tables) : [];
   // Configuration à choisir : le menu s'ouvre droit sur l'écran principal, avec les boutons de la dernière utilisée.
   const cabinet = loadCabinet(loc.dataDir);
+  menuDmdKind = cabinet && !choose ? dmdKindOf(cabinet) : undefined;
   // Rotation d'après l'écran du playfield tel que Windows le décrit maintenant : une
   // orientation changée hors de l'assistant fait aussi tourner le menu.
   rotation = menuRotation(choose ? undefined : cabinet, choose ? undefined : assignments.playfield);
@@ -665,13 +704,14 @@ export function startFrontend(): void {
     mediaWatch?.close();
     medias?.save();
     attract.dispose();
+    liveDmd.dispose();
   });
 
   menuAssignments = choose ? {} : assignments;
   openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
   for (const f of selection?.findings ?? []) console.log(`Configuration de la borne : ${f.message}`);
   // Bande DMD seule sur un écran large, jamais tranchée : l'utilisateur dit une fois ce qu'est l'écran.
-  if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(t('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Configuration de la borne > Écran du DMD.'));
+  if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(t('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Borne > Configuration de la borne > Écran du DMD.'));
   if (selection?.previous && selection.configuration) showBanner(t('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }));
   // Après une mise à jour : la nouvelle version est-elle là ?
   const updateNotice = updates.startupNotice();
@@ -989,8 +1029,8 @@ function handleKey(input: Input): boolean {
     case 'menu':
       if (is(KEYS.help)) state = { ...state, help: !state.help };
       else if (state.help && is(KEYS.exit)) state = { ...state, help: false };
-      else if (is(KEYS.previous)) state = { ...state, index: (state.index - 1 + tables.length) % tables.length };
-      else if (is(KEYS.next)) state = { ...state, index: (state.index + 1) % tables.length };
+      else if (is(KEYS.previous)) moveSelection(-1);
+      else if (is(KEYS.next)) moveSelection(1);
       else if (is(KEYS.confirm)) library.openSheet(tables[state.index]!);
       else if (is(KEYS.settings)) openVpxSettings();
       else if (is(KEYS.exit)) library.openSystem();
@@ -1083,6 +1123,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   state = { ...state, phase: 'loading', help: false };
   launchCount++;
   broadcast();
+  // La pièce tombe au Start d'une vraie partie (pas au réglage de l'affichage), avant que VPX ne prenne les écrans.
+  if (!displayMode) playUiSound('coin');
+  // Records d'avant la partie (VPReg.stg de la table, highscores.ts), pour savoir au retour si l'un est tombé (knocker).
+  const recordsBefore = readTableRecords(table);
   const loadingMs = Number(process.env.CYBERPINBALL_LOADING_MS ?? 2500);
   await delay(Math.min(400, loadingMs));
   await capture('chargement');
@@ -1149,6 +1193,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   for (const notice of result.notices) console.log(`VPX (${table.id}) : ${notice}`);
 
   if (mode === 'display') return { result, focusReturned };
+  // Un score entré au tableau d'honneur pendant la partie : le knocker sonne au retour au menu.
+  const entered = result.ok ? newRecords(recordsBefore, readTableRecords(table)) : [];
+  for (const s of entered) console.log(`Record (${table.id}) : ${s.score}${s.initials ? ` (${s.initials})` : ''}, place ${s.rank}.`);
   if (result.ok) {
     // Les parties du test automatique ne comptent pas dans les statistiques.
     if (!autoStopAfterMs) recordPlay(table, startedAt, result.seconds);
@@ -1162,6 +1209,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // écrans, le menu les reprend en redémarrant.
   if (selection?.previous && result.ok) relaunchMenu();
   broadcast();
+  if (entered.length) playUiSound('knocker');
   return { result, focusReturned };
 }
 
@@ -1408,7 +1456,7 @@ function openVpxSettings(table?: TableEntry): void {
 function openConfig(): boolean {
   if (state.phase === 'loading' || state.phase === 'playing') return true;
   state = { ...state, help: false };
-  library.openSystem();
+  library.openSystemRoot();
   return true;
 }
 
@@ -1490,6 +1538,8 @@ function viewFor(role: RoleId) {
     // part et d'autre de la table choisie, en boucle comme la liste : la roue reste centrée.
     neighbors: tables.length >= 9 ? neighbors : tables.map((t, i) => neighbor(t, ((i - state.index + tables.length * 2 + Math.floor((tables.length - 1) / 2)) % tables.length) - Math.floor((tables.length - 1) / 2))),
     menuLayout: mediaSettings.menuLayout,
+    // DMD du menu vivant : où poser les points dans la zone du DMD de cette fenêtre (absent : DMD classique).
+    liveDmd: liveDmdView(role),
     medias: subject ? mediasOf(subject) : defaults,
     preload,
     // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
@@ -1528,6 +1578,24 @@ function viewFor(role: RoleId) {
   };
 }
 
+/** Table voisine dans le menu des tables (boutons, roue cliquée) : le solénoïde claque à chaque table. */
+function moveSelection(offset: number): void {
+  const index = (state.index + offset + tables.length * 10) % tables.length;
+  if (index === state.index) return;
+  state = { ...state, index };
+  playUiSound('solenoid');
+}
+
+/**
+ * Son de l'interface (uisounds.ts), joué par la fenêtre du playfield (renderer/ui-sounds.js)
+ * sur la sortie du son du menu : seulement s'il est activé, et jamais pendant une partie.
+ */
+function playUiSound(id: UiSoundId): void {
+  const cue = uiSoundCue(id, mediaSettings, moment());
+  const win = windows.get('playfield');
+  if (cue && win && !win.isDestroyed()) win.webContents.send('ui-sound', cue);
+}
+
 /** Moment du menu, pour le son : chargement, partie, ou navigation (fiche et messages compris). */
 function moment(): MenuMoment {
   if (attractTable()) return 'attract';
@@ -1550,7 +1618,122 @@ function soundView() {
   return { ...plan, launchId: plan.launch ? launchCount : undefined, output: audioOutput };
 }
 
+// ---------------------------------------------------------------------------
+// DMD du menu vivant (live-dmd.ts, packages/core/src/livedmd.ts) : pendant la navigation,
+// l'écran du DMD montre l'afficheur à points dessiné par Cyber Pinball (titre, PRESS START,
+// records, média DMD, horloge, crédits) ; « classique » dans Médias, son et attente revient au
+// média seul. Rien pendant la partie : VPX a l'afficheur.
+
+const liveDmd = new LiveDmd({
+  send: (shot) => {
+    const win = dmdWindow();
+    if (win && !win.isDestroyed()) win.webContents.send('dmd', shot);
+  },
+});
+/** Animation « chargement » jouée sur le DMD pendant le lancement d'une table. */
+let loadingDmd: LiveDmdAnimationHandle | undefined;
+/** Records lus de chaque table, relus quand son VPReg.stg change (après une partie). */
+const recordsCache = new Map<string, { stamp: string; records?: TableRecords }>();
+/** Cadre de chaque média FullDMD par adresse (elle change avec le fichier), une fois lu ou cherché. */
+const dmdFrames = new Map<string, FrameRecord | undefined>();
+/** Écran du DMD de la borne : FullDMD ou DMD seul (dmdKindOf), lu au démarrage du menu. */
+let menuDmdKind: DmdKind | undefined;
+
+/**
+ * Joue une animation sur le DMD du menu (« chargement »…), par-dessus l'alternance ; sans
+ * effet visible si le DMD du menu est classique ou s'il n'y a pas d'écran du DMD.
+ */
+export function playDmdAnimation(name: DmdAnimationName, options?: DmdAnimationOptions): LiveDmdAnimationHandle {
+  return liveDmd.play(name, options);
+}
+
+/** Fenêtre qui dessine le rôle dmd (sa propre fenêtre, ou celle de l'écran qu'il partage). */
+function dmdWindow(): BrowserWindow | undefined {
+  for (const [role, roles] of windowRoles) if (roles.includes('dmd')) return windows.get(role);
+  return undefined;
+}
+
+/** Le DMD vivant se montre : réglé ainsi, un écran du DMD, ni partie ni mode bureau. */
+function liveDmdOn(): boolean {
+  return mediaSettings.dmd === 'live' && Boolean(dmdWindow()) && state.phase !== 'playing' && !desktop.active;
+}
+
+function tableRecords(table: TableEntry): TableRecords | undefined {
+  const file = vpRegFile(table);
+  let stamp = 'absent';
+  try {
+    const st = fs.statSync(file);
+    stamp = `${st.size}:${st.mtimeMs}`;
+  } catch {
+    // Pas de VPReg.stg : la table n'a rien enregistré.
+  }
+  const known = recordsCache.get(table.file);
+  if (known?.stamp === stamp) return known.records;
+  const records = stamp === 'absent' ? undefined : readTableRecords(table);
+  recordsCache.set(table.file, { stamp, records });
+  return records;
+}
+
+/**
+ * Cadre du DMD dans un média FullDMD, s'il a déjà été cherché (fulldmd-cadres.json) ; sinon
+ * cherché une fois en arrière-plan, et les fenêtres sont prévenues quand il est trouvé.
+ */
+function knownDmdFrame(url: string): FrameRecord | undefined {
+  if (dmdFrames.has(url)) return dmdFrames.get(url);
+  const file = mediaPathFromUrl(url);
+  const known = file ? cachedFrame(frameCacheFile(loc.dataDir), file) : undefined;
+  dmdFrames.set(url, known);
+  if (file && !known) {
+    void mediaFrame(file, loc.dataDir, (converter ??= createConverter())).then((found) => {
+      dmdFrames.set(url, found);
+      if (found?.frame) broadcast();
+    });
+  }
+  return known;
+}
+
+/**
+ * Place des points dans la zone du DMD de cette fenêtre : dans le cadre du média FullDMD (le
+ * média se voit autour, framed), sinon la bande 4:1 centrée sur du noir. undefined : DMD
+ * classique, ou la fenêtre n'a pas le DMD.
+ */
+function liveDmdView(role: RoleId): { area: ReturnType<typeof liveDmdArea>; framed: boolean } | undefined {
+  if (!liveDmdOn() || !(windowRoles.get(role) ?? [role]).includes('dmd')) return undefined;
+  const table = screensSubject();
+  const view = table && medias ? medias.roleMedia(table, 'dmd') : undefined;
+  const fullDmd = menuDmdKind === 'fulldmd' && (view?.found ?? view?.type) === 'FullDMD';
+  const record = fullDmd && view?.url ? knownDmdFrame(view.url) : undefined;
+  const rect = roleRects.find((r) => r.role === 'dmd')?.rect;
+  const framed = Boolean(record?.frame);
+  return { area: liveDmdArea(framed ? record : undefined, rect ?? { width: 16, height: 9 }), framed };
+}
+
+/** Programme du DMD vivant d'après l'état du menu : la table montrée, le chargement, la partie. */
+function syncLiveDmd(): void {
+  if (!liveDmdOn()) {
+    loadingDmd?.stop();
+    loadingDmd = undefined;
+    return liveDmd.pause();
+  }
+  if (state.phase === 'loading') loadingDmd ??= liveDmd.play('chargement');
+  else {
+    loadingDmd?.stop();
+    loadingDmd = undefined;
+  }
+  const table = screensSubject();
+  if (!table) liveDmd.show('', undefined);
+  else {
+    const records = tableRecords(table);
+    const media = medias?.roleMedia(table, 'dmd').url;
+    // Une autre table, ou la même dont les records ou le média ont changé : l'alternance repart du titre.
+    const key = JSON.stringify([table.file, records?.scores, records?.credits, media]);
+    liveDmd.show(key, { title: table.title, manufacturer: table.manufacturer, year: table.year, records, hasMedia: Boolean(media) });
+  }
+  liveDmd.resume();
+}
+
 function broadcast(): void {
+  syncLiveDmd();
   // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).
   attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !desktop.active);
   if (!attract.active) attractIndex = undefined;

@@ -25,6 +25,7 @@ import { allowAnyForeground, hideWindow, listWindows, showWindowInactive, taskba
 import { createWindow, desktopDisplays, isShown, OFFSCREEN, paintedOnScreen } from './offscreen';
 import { coverDisplay, coverProblem } from './cover-display';
 import { locations } from './paths';
+import { relaunchThroughShellLauncher } from './dedicated-session';
 
 export const VEIL_TITLE = 'Cyber Pinball — Fond';
 const VEIL_PAGE = 'data:text/html;charset=utf-8,<!doctype html><html style="background:%23000;cursor:none"></html>';
@@ -324,6 +325,9 @@ function formatTitles(titles: string[]): string {
  */
 export function relaunchCovered(args: string[]): void {
   if (relaunching) return;
+  // Borne dédiée : le processus que surveille Shell Launcher ne passe pas le relais à un autre
+  // (hors surveillance) ; il se ferme et Shell Launcher le relance avec ces arguments.
+  if (relaunchThroughShellLauncher(args)) return;
   relaunching = true;
   // Le nouveau processus doit pouvoir prendre le premier plan.
   allowAnyForeground();

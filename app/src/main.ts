@@ -6,6 +6,9 @@
 import './sandbox-guard';
 // Puis, avant le démarrage d'Electron : le mode hors écran des essais sans opérateur.
 import { OFFSCREEN, relaunchOnHiddenDesktop } from './offscreen';
+// Puis la borne dédiée (Cyber Pinball lancé par Shell Launcher) : son option retirée des
+// arguments, ceux d'une relance repris, avant les modules qui les lisent.
+import './dedicated-session';
 // Puis la langue de l'interface, avant les modules qui affichent quelque chose.
 import './language';
 import { app } from 'electron';
