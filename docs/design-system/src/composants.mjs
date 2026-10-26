@@ -263,6 +263,31 @@ C.Question = {
   html: page('<!-- @dsCard group="Saisie" height=680 width=1300 -->', `<div style="position:relative;height:580px;border-radius:8px;overflow:hidden" class="cp-art" data-label="">${question}</div>`),
 };
 
+// Préavis d'arrêt de l'horaire et voile de nuit (app/renderer/frontend.css, « Horaire de la borne » ; maquette revue par Codex).
+const preavisCss = `.pv-scene{position:relative;width:1080px;height:760px;overflow:hidden;border-radius:8px;background:linear-gradient(160deg,#16303a,#0a1416 60%,#2a1830)}
+.pv-scene .pv-veil{position:absolute;inset:0;background:#000;opacity:.7}
+.pv-scene .pv-attract{position:absolute;left:0;right:0;top:220px;text-align:center;font:600 64px var(--font-ui);color:var(--ink);letter-spacing:.06em}
+.pv{position:absolute;left:50%;bottom:97px;transform:translateX(-50%);box-sizing:border-box;width:864px;display:grid;grid-template-columns:65px minmax(0,1fr);align-items:center;column-gap:32px;row-gap:13px;padding:32px 43px 35px;border:2px solid var(--line-strong);border-radius:9px;background:var(--surface);color:var(--ink)}
+.pv .cp-i{grid-column:1;grid-row:1/3;font-size:65px;color:var(--ink-muted)}
+.pv .lab{grid-column:2;font:600 24px/1.25 var(--font-ui);letter-spacing:.14em;text-transform:uppercase}
+.pv .num{grid-column:2;font:600 97px/1 var(--font-ui);font-variant-numeric:tabular-nums}
+.pv .num small{margin-left:6px;font-size:24px;font-weight:400;color:var(--ink-muted)}
+.pv .bar{grid-column:1/-1;height:5px;margin-top:9px;border-radius:3px;background:var(--line-strong);overflow:hidden}
+.pv .bar::after{content:'';display:block;height:100%;width:73%;background:var(--ink-muted)}
+.pv .hint{grid-column:1/-1;font:500 24px/1.4 var(--font-ui);text-align:center}`;
+C.Preavis = {
+  readme: `Préavis d'arrêt de l'horaire de la borne, posé sur le plateau au-dessus du voile de nuit : ce qui va arriver, le temps restant, comment l'éviter. Le moindre bouton le retire.
+
+- Fournir : \`.stop-notice\` (couche \`#stop\`, géométrie et rotation du plateau) avec l'icône de l'arrêt (\`moon\` pour la veille, \`power\` pour l'extinction), le libellé (« Mise en veille dans », « Extinction dans »), le compte (\`.stop-notice-count\`, secondes et « s »), la jauge (\`.stop-notice-bar\`, durée totale \`--stop-ms\`, temps écoulé négatif \`--stop-delay\`) et l'invite (« Appuyez sur un bouton pour garder la borne allumée »).
+- Mesures (petit côté 1080) : largeur extérieure 864 px au plus, à 97 px du bas ; icône 65 px ; libellé et invite 24 px ; compte 97 px, chiffres tabulaires ; jauge 5 px.
+- Sobre : fond \`surface\` opaque, filet \`line-strong\`, compte \`ink\` sans halo, pas de vert (ni choix ni réussite), pas d'ambre (un arrêt réglé n'est pas une anomalie), invite fixe, pas de pulsation ni de clignotement final. Pendant le préavis, l'invite du mode attente disparaît : une consigne à la fois.
+- Voile de nuit (\`.night-veil\`) : noir sur toute la fenêtre, 50, 70 (défaut), 85 ou 100 % ; descend en 4 s (\`ease-in-out\`), se lève d'un coup. L'invite du mode attente reste dessous ; seul le préavis passe au-dessus. Ni le DMD ni un son ne répètent le préavis.`,
+  html: page('<!-- @dsCard group="Contenu" height=840 width=1160 -->', `
+<div class="pv-scene"><div class="pv-attract">NEON GALAXY</div><div class="pv-veil"></div>
+  <div class="pv">${i('moon')}<div class="lab">Mise en veille dans</div><div class="num">22<small>s</small></div><div class="bar"></div><div class="hint">Appuyez sur un bouton pour garder la borne allumée</div></div>
+</div>`, preavisCss),
+};
+
 Object.assign(C, ecrans({screen, i, wheel}));
 // Couverture : l'image de la bannière est incorporée (data:), pour que l'aperçu tienne seul dans la page du design system.
 const banniere = `data:image/webp;base64,${fs.readFileSync(new URL('../assets/fond-banniere.webp', import.meta.url)).toString('base64')}`;

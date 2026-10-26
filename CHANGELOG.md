@@ -21,6 +21,7 @@ son interface).
 - Force des secousses de l'accéléromètre, réglable dans l'étape « Tilt » de la configuration de la borne : ×2 est proposé pour un Pinscape, que VPX ignorait presque à l'échelle d'origine.
 - Lancement en cinéma : au Start, le logo du jeu s'envole du plateau vers le fronton, le DMD charge, un coup de bobine quand VPX prend la main ; VPX n'attend jamais, et « Médias, son et attente » le coupe.
 - Listes des menus : une liste trop longue est signalée par un filet en haut ou en bas au lieu d'un fondu, l'entrée choisie reste entière et chaque liste commence juste sous son titre.
+- Horaire de la borne (« Médias, son et attente », désactivé par défaut) : comme en salle d'arcade, la borne baisse ses écrans et se tait la nuit, puis se met en veille ou s'éteint à l'heure choisie si personne ne joue, après 30 s de préavis qu'un simple bouton annule.
 
 ## 0.1.3
 

@@ -28,6 +28,8 @@ const CYBER_ICONS = {
   power: '<path d="M12 3v9M6 6a8.5 8.5 0 1 0 12 0"/>', // Alimentation du PC (quitter l’application : exit).
   lock: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>', // Borne dédiée : Cyber Pinball seul, à la place du bureau Windows.
   moon: '<path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/>', // Croissant : mettre la borne en veille.
+  clock: '<path d="M12 4a8 8 0 1 1 0 16a8 8 0 1 1 0-16Z M12 7v5l3.5 2"/>', // Cadran : horaire de la borne, heure d’arrêt.
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>', // Soleil : fin de la nuit de l’horaire.
   restart: '<path d="M20 12a8 8 0 1 1-2.3-5.7M20 3v4h-4M12 8v5"/>', // Flèche qui reboucle autour du trait d’alimentation : redémarrer.
   back: '<path d="M21 12H3M10 5l-7 7 7 7"/>', // Retour à l’écran parent.
   gear: '<path d="M9 2h6l.5 3 2 1.2 2.5-1 2 3.6-2 2v2.4l2 2-2 3.6-2.5-1-2 1.2-.5 3H9l-.5-3-2-1.2-2.5 1-2-3.6 2-2v-2.4l-2-2 2-3.6 2.5 1 2-1.2z"/><circle cx="12" cy="12" r="3"/>', // Accès souris et titre du menu système.

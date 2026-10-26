@@ -7,8 +7,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, session, type Input, type Rectangle } from 'electron';
 import {
+  ArcadeHours,
   CONFIG_KEY,
+  STOP_IDLE_FALLBACK_MS,
+  STOP_NOTICE_MS,
+  arcadeHoursClock,
+  powerSimulated,
   powerTexts,
+  powerUnavailable,
   SYSTEM_ITEMS,
   WIZARD_STEPS,
   buttonProblems,
@@ -71,6 +77,9 @@ import {
   uiSoundCue,
   LaunchCinema,
   type CinemaView,
+  type PowerAction,
+  type PowerOutcome,
+  type StopNotice,
   type UiSoundId,
   type MenuMediaSettings,
   type MenuMoment,
@@ -147,6 +156,7 @@ import { createDedicatedMenu } from './dedicated-menu';
 import { createDedicatedSystem } from './dedicated-system';
 import { handOverOnQuit, shellSession } from './dedicated-session';
 import { createPowerMenu } from './power';
+import { readWakeDevices } from './arcade-hours';
 
 /**
  * Touches du menu : celles des boutons de l'interface (étape « Boutons de l'interface »
@@ -292,7 +302,8 @@ const attract = new AttractMode({
   delayMs: () => mediaSettings.attractDelay * 1000,
   intervalMs: () => mediaSettings.attractInterval * 1000,
   onEnter: () => showAttractTable(),
-  onNext: () => showAttractTable(),
+  // Écrans noirs la nuit (horaire) : plus de table qui change sous le voile, rien ne tourne pour rien.
+  onNext: () => (hours.night() && mediaSettings.hours.nightDim >= 100 ? undefined : showAttractTable()),
 });
 /** Table montrée en attente, et les dernières montrées (évitées au tirage). */
 let attractIndex: number | undefined;
@@ -545,6 +556,7 @@ library.provideSystemItem(
     save: (next) => {
       mediaSettings = next;
       attract.reschedule();
+      hours.update();
       try {
         saveMenuMediaSettings(loc.dataDir, mediaSettings);
       } catch (error) {
@@ -554,6 +566,8 @@ library.provideSystemItem(
     },
     output: () => audioOutput,
     preview: (id) => playUiSound(id),
+    wakeDevices: () => wakeDevices(),
+    sleepAllowed: () => !powerUnavailable('sleep', power.capabilities()),
   }),
 );
 // Langue de l'interface : le choix relance le menu, comme un changement de configuration.
@@ -627,10 +641,14 @@ if (shellSession()) {
 // Mode invité : on joue, rien d'autre ; l'écran de l'entrée dit la combinaison qui déverrouille.
 library.provideSystemItem('guest-mode', createGuestMenu({ library, guest, buttons: () => buttons }));
 
+/** Horloge de l'horaire et des actions programmées : celle du PC, décalée seulement dans un essai qui le demande. */
+const hoursClock = arcadeHoursClock(process.env, powerSimulated(process.env));
+
 // Éteindre, mettre en veille, redémarrer (app/src/power.ts) : une confirmation, puis un écran
 // noir sur chaque écran le temps que Windows prenne la main ; le menu garde ses fenêtres.
 const power = createPowerMenu({
   library,
+  clock: hoursClock,
   prepare: async (_action, title, line) => {
     library.leave();
     state = { ...state, phase: 'message', help: false, message: { title, lines: [line], action: 'power' } };
@@ -640,24 +658,72 @@ const power = createPowerMenu({
     // Le temps que chaque écran peigne l'écran noir avant que Windows n'agisse.
     await delay(600);
   },
-  finish: (action, outcome) => {
-    const menu = () => (state = tables.length ? { ...state, phase: 'menu', message: undefined } : { ...state, phase: 'message', message: noTables() });
-    if (outcome.simulated) {
-      menu();
-      showBanner(powerTexts(action).simulated);
-    } else if (outcome.ok) {
-      // Réveil après la veille : le menu, tel qu'il était.
-      menu();
-      broadcast();
-    } else {
-      const titles = { shutdown: t('La borne ne s’est pas éteinte'), sleep: t('La borne ne s’est pas mise en veille'), restart: t('La borne n’a pas redémarré') };
-      state = { ...state, phase: 'message', message: { title: titles[action], lines: [outcome.problem ?? t('Windows n’a pas dit pourquoi.')] } };
-      broadcast();
-    }
-  },
+  finish: (action, outcome) => powerFinished(action, outcome),
   clearNotice: () => (state = { ...state, banner: undefined }),
   log: (line) => console.log(line),
 });
+
+/** Après une action d'alimentation, demandée au menu ou faite par l'horaire : réveil, refus de Windows, fin d'un essai. */
+function powerFinished(action: PowerAction, outcome: PowerOutcome): void {
+  const menu = () => (state = tables.length ? { ...state, phase: 'menu', message: undefined } : { ...state, phase: 'message', message: noTables() });
+  if (outcome.simulated) {
+    menu();
+    showBanner(powerTexts(action).simulated);
+  } else if (outcome.ok) {
+    // Réveil après la veille : le menu, tel qu'il était.
+    menu();
+    broadcast();
+  } else {
+    const titles = { shutdown: t('La borne ne s’est pas éteinte'), sleep: t('La borne ne s’est pas mise en veille'), restart: t('La borne n’a pas redémarré') };
+    state = { ...state, phase: 'message', message: { title: titles[action], lines: [outcome.problem ?? t('Windows n’a pas dit pourquoi.')] } };
+    broadcast();
+  }
+}
+
+/**
+ * Horaire de la borne (packages/core/src/arcadehours.ts) : la nuit, en attente, un voile noir
+ * sur chaque écran et l'attente muette ; à l'heure dite, si personne ne joue, 30 s de préavis
+ * puis la veille ou l'extinction, par le module d'alimentation (écran noir, réglages
+ * enregistrés, simulée en essai). Le moindre bouton retire le préavis.
+ */
+const hours = new ArcadeHours({
+  control: power.control,
+  settings: () => mediaSettings.hours,
+  idle: () => stopIdle(),
+  notice: (notice) => {
+    stopNotice = notice;
+    broadcast();
+  },
+  changed: () => broadcast(),
+  done: (action, outcome) => powerFinished(action, outcome),
+  log: (line) => console.log(line),
+  clock: hoursClock,
+});
+/** Préavis d'arrêt affiché, s'il y en a un. */
+let stopNotice: StopNotice | undefined;
+
+/**
+ * Borne libre pour l'arrêt de l'horaire : au menu (ni partie, ni chargement, ni bureau, ni
+ * action d'alimentation en cours), en mode attente ou assez longtemps sans bouton.
+ */
+function stopIdle(): boolean {
+  if (desktop.active || state.phase === 'loading' || state.phase === 'playing' || power.control.busy) return false;
+  if (state.phase === 'message' && state.message?.action === 'power') return false;
+  return attract.active || attract.idleFor() >= Math.max(STOP_IDLE_FALLBACK_MS, mediaSettings.attractDelay * 1000);
+}
+
+/** Boutons qui peuvent réveiller la borne, relus au plus toutes les minutes (un périphérique branché entre-temps). */
+let wakeList: { at: number; devices?: string[] | null; pending?: boolean } = { at: 0 };
+function wakeDevices(): string[] | null | undefined {
+  if (!wakeList.pending && Date.now() - wakeList.at > 60_000) {
+    wakeList = { ...wakeList, pending: true };
+    void readWakeDevices(powerSimulated(process.env)).then((devices) => {
+      wakeList = { at: Date.now(), devices };
+      broadcast();
+    });
+  }
+  return wakeList.devices;
+}
 library.provideSystemItem('sleep', power.items.sleep);
 library.provideSystemItem('restart', power.items.restart);
 library.provideSystemItem('shutdown', power.items.shutdown);
@@ -742,8 +808,9 @@ export function startFrontend(): void {
   });
   ipcMain.on('media-error', (_event, error: MediaErrorReport) => recordMediaError(error));
   ipcMain.on('action', (_event, action: UiAction) => {
-    // Un clic en mode attente y met fin, sans autre effet.
-    if (attract.activity()) return void leaveAttract();
+    // Un clic en mode attente y met fin, sans autre effet ; de même pour le préavis d'arrêt de l'horaire.
+    const noticed = hours.activity();
+    if (attract.activity() || noticed) return void leaveAttract();
     if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
     // Roue dentée (ou cadenas, en mode invité).
     else if (action.type === 'config') guest.knock('menu.system') && openConfig();
@@ -789,11 +856,14 @@ export function startFrontend(): void {
     mediaWatch?.close();
     saveSettings();
     attract.dispose();
+    hours.dispose();
     liveDmd.dispose();
   });
 
   menuAssignments = choose ? {} : assignments;
   openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
+  // Horaire de la borne : nuit et arrêt programmé, d'après les réglages de medias.json.
+  hours.start();
   for (const f of selection?.findings ?? []) console.log(`Configuration de la borne : ${f.message}`);
   // Bande DMD seule sur un écran large, jamais tranchée : l'utilisateur dit une fois ce qu'est l'écran.
   if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(t('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Borne > Configuration de la borne > Écran du DMD.'));
@@ -1089,7 +1159,9 @@ function handleKey(input: Input): boolean {
   // Raccourci du mode bureau, de n'importe quel écran du menu (sauf pendant une partie) ; une fenêtre rouverte au bureau le reçoit aussi : retour.
   if (matchesShortcut(input, SHORTCUTS.desktop)) return desktop.active ? (restoreFromDesktop(), true) : guest.knock('shortcut.desktop') ? showDesktop() : true;
   // N'importe quel bouton en mode attente y met fin, sans autre effet ; sinon il remet le compte à zéro.
-  if (attract.activity()) return leaveAttract();
+  // Le préavis d'arrêt de l'horaire aussi : la borne reste allumée tant qu'on joue.
+  const noticed = hours.activity();
+  if (attract.activity() || noticed) return leaveAttract();
 
   // Tab : menu et configuration, quels que soient les boutons relevés (dans le menu, Tab s'y déplace).
   if (input.code === CONFIG_KEY && ['menu', 'message', 'confirmQuit'].includes(state.phase)) return guest.knock('menu.system') ? openConfig() : true;
@@ -1705,6 +1777,10 @@ function viewFor(role: RoleId) {
     library: state.phase === 'library' ? library.view() : undefined,
     // Mode attente : la table montrée, son logo, et l'invite du playfield.
     attract: shown ? { ...describe(shown), wheel: medias?.wheel(shown) } : undefined,
+    // Horaire : voile noir de la nuit (0 à 1) sur chaque écran, en attente seulement.
+    night: shown && hours.night() ? mediaSettings.hours.nightDim / 100 : 0,
+    // Préavis d'arrêt (dessiné par le playfield) : son heure dans l'horloge de la fenêtre.
+    stop: stopNotice ? { action: stopNotice.action, endsAt: Date.now() + (stopNotice.endsAt - hoursClock.now()), ms: STOP_NOTICE_MS } : undefined,
     // Partie en cours (fenêtre de jeu de VPX à l'écran) : fond de partie de chaque rôle de
     // l'écran, selon « médias pendant la partie » et ce que VPX occupe. Avant, au chargement,
     // les écrans gardent les médias du jeu, animés, jusqu'à ce que VPX les recouvre.
@@ -1771,7 +1847,7 @@ function soundView() {
   const now = moment();
   const plan =
     table && medias
-      ? menuSound(now, mediaSettings, { music: medias.sound(table, 'Audio'), launch: now === 'loading' ? medias.sound(table, 'AudioLaunch') : undefined }, tableMediaVolume(table))
+      ? menuSound(now, now === 'attract' && hours.night() ? { ...mediaSettings, attractSound: 'muted' } : mediaSettings, { music: medias.sound(table, 'Audio'), launch: now === 'loading' ? medias.sound(table, 'AudioLaunch') : undefined }, tableMediaVolume(table))
       : { video: 0 };
   return { ...plan, launchId: plan.launch ? launchCount : undefined, output: audioOutput };
 }

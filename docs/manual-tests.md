@@ -834,6 +834,21 @@ On the cabinet with the sound on, then on a PC. The unattended proof: `packages/
 | 448 | On a desktop | On a PC (desktop menu), launch a table. | The logo starts from the 9:16 frame and leaves it through the top; the title and controls panel does not move. Backglass on another screen: the logo lands there; without a backglass, nothing waits for it and loading stays the same. |
 | 449 | Turned playfield | Cabinet with the playfield lying flat and turned (Windows in landscape). | The logo shoots towards the backglass as the player sees it, not towards the top of the screen as Windows sees it. |
 
+## Cabinet schedule
+
+On the cabinet, then on a PC. The unattended proof: `packages/core/src/test/arcadehours.test.ts` (night spanning midnight, stop window, warning, button, game until morning, sleep during the window, no real stop in a test) and `.\docs\demo-attente.ps1` (simulated clock; captures in `tmp\demo-attente`). What they do not show: the real sleep, the real wake-up by a button, readability from a metre away.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 450 | Settings | System menu > Media > "Médias, son et attente" > "Horaire de la borne". | The screen lists the schedule (off by default), the start and end of the night, the screens at night, the automatic stop, the stop mode, then the "Waking from sleep" block with the devices Windows allows. Turn the schedule on: the "Médias, son et attente" line says "night 23:00–8:00 · sleep at 2:00". |
+| 451 | Night | Schedule on, night start set to the hour that just passed; wait for attract mode. | The veil comes down slowly on the playfield, the backglass and the DMD; attract mode goes silent. A flipper: the veil lifts at once, the menu comes back unchanged. |
+| 452 | Black screens | "Screens during night attract mode: black screens", at night, in attract mode. | Everything goes black, without a flash; the table shown no longer changes. A button: the menu comes back, bright. |
+| 453 | Stop by sleep | Automatic stop set to the coming hour; leave the cabinet in attract mode. | On time, on the playfield: "Going to sleep in 30 s", the draining gauge; at zero, the black "Going to sleep…" screen on every screen, then sleep. |
+| 454 | Keep the cabinet on | During the warning, press a button. | The warning disappears at once, the menu comes back, nothing is launched. The cabinet does not stop while it is played; left alone (attract delay), a new 30 s warning. |
+| 455 | Game at stop time | Start a game just before the stop time, play past it. | Nothing during the game; back in the menu and left alone, the warning comes, then the stop. After the end of the night, no more stop that day. |
+| 456 | Waking up | Cabinet put to sleep by the schedule: press a cabinet button, then the PC power button. | A button listed in "Waking from sleep" wakes the cabinet (if the BIOS powers USB in sleep); the power button, always. The menu comes back as it was. Left alone before the end of the night, it goes back to sleep. |
+| 457 | Shutdown | "Stop mode: shutdown", stop at the coming hour. | Warning "Shutting down in", black "Shutting the cabinet down…" screen, then Windows shuts down; the PC power button turns it back on. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

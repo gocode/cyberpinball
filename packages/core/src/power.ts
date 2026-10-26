@@ -123,12 +123,33 @@ export const POWER_TIMER_STEP_MS = 60_000;
  * pendant l'heure d'extinction ne s'éteint pas à son réveil.
  */
 export const POWER_MISSED_AFTER_MS = 5 * 60_000;
+/** Une action qui attend la borne libre (`ready`) relit son état à ce rythme. */
+export const POWER_READY_STEP_MS = 1000;
+
+/** Préavis avant une action programmée : affiché pendant `ms`, retiré au moindre bouton. */
+export interface PowerNotice {
+  ms: number;
+  /** Préavis affiché (`endsAt` : heure de l'action, horloge du module), ou retiré (undefined). */
+  show(endsAt: number | undefined): void;
+}
 
 export interface PowerScheduleOptions {
-  /** L'heure est passée de plus de POWER_MISSED_AFTER_MS (borne en veille, PC arrêté) : rien n'est fait. */
+  /**
+   * L'heure est passée de plus de POWER_MISSED_AFTER_MS sans que l'horloge ait tourné (borne en
+   * veille, PC arrêté), ou `until` est dépassé : rien n'est fait.
+   */
   onMissed?: (action: PowerAction, at: number) => void;
   /** Après l'action (réveil après la veille, refus de Windows). */
   onDone?: (outcome: PowerOutcome) => void;
+  /**
+   * La borne est-elle libre ? Une partie en cours, un bouton récent retiennent l'action : passé
+   * l'heure, elle attend que ce soit vrai (relu toutes les POWER_READY_STEP_MS).
+   */
+  ready?: () => boolean;
+  /** Au-delà de cette heure, une action retenue n'est plus faite : manquée (fin de la nuit). */
+  until?: number;
+  /** Préavis : l'action n'est faite qu'après lui, la borne restée libre tout du long. */
+  notice?: PowerNotice;
 }
 
 export interface ScheduledPower {
@@ -149,6 +170,11 @@ export interface PowerHost {
    * tâches rendues. L'action attend sa fin.
    */
   prepare(action: PowerAction): void | Promise<void>;
+  /**
+   * Après l'exécuteur, avant de rendre la main : l'arrêt de Windows qui ferme l'application, ou
+   * qui ne vient pas. Toute action y passe, demandée au menu ou programmée.
+   */
+  settle?(action: PowerAction, outcome: PowerOutcome): Promise<PowerOutcome>;
   clock?: PowerClock;
 }
 
@@ -172,18 +198,32 @@ export function createPowerControl(host: PowerHost) {
     if (running) return running;
     running = (async () => {
       await host.prepare(action);
+      let outcome: PowerOutcome;
       try {
-        return await host.executor(powerStep(action));
+        outcome = await host.executor(powerStep(action));
       } catch (error) {
-        return { ok: false, problem: error instanceof Error ? error.message : String(error) };
+        outcome = { ok: false, problem: error instanceof Error ? error.message : String(error) };
       }
+      return host.settle ? host.settle(action, outcome) : outcome;
     })().finally(() => (running = undefined));
     return running;
   }
 
-  /** Programme l'action à l'heure `at` (ms depuis 1970) ; `cancel()` l'annule. */
+  /**
+   * Programme l'action à l'heure `at` (ms depuis 1970) ; `cancel()` l'annule. Avec `ready`, elle
+   * attend ensuite la borne libre ; avec `notice`, elle s'annonce avant d'agir.
+   */
   function schedule(action: PowerAction, at: number, options: PowerScheduleOptions = {}): ScheduledPower {
     let state: 'pending' | 'done' | 'cancelled' = 'pending';
+    /** Dernier passage de la minuterie : un écart plus grand que POWER_MISSED_AFTER_MS, c'est une veille. */
+    let lastTick: number | undefined;
+    /** Fin du préavis en cours. */
+    let noticeEnds: number | undefined;
+    const withdraw = () => {
+      if (noticeEnds === undefined) return;
+      noticeEnds = undefined;
+      options.notice?.show(undefined);
+    };
     const entry: ScheduledPower & { handle?: unknown } = {
       action,
       at,
@@ -194,6 +234,7 @@ export function createPowerControl(host: PowerHost) {
         if (state !== 'pending') return;
         state = 'cancelled';
         if (entry.handle !== undefined) clock.clearTimeout(entry.handle);
+        withdraw();
         forget();
       },
     };
@@ -201,17 +242,43 @@ export function createPowerControl(host: PowerHost) {
       const i = scheduled.indexOf(entry);
       if (i >= 0) scheduled.splice(i, 1);
     };
+    const later = (ms: number) => (entry.handle = clock.setTimeout(arm, ms));
     const arm = () => {
       entry.handle = undefined;
       if (state !== 'pending') return;
-      const late = clock.now() - at;
-      if (late < 0) {
-        entry.handle = clock.setTimeout(arm, Math.min(-late, POWER_TIMER_STEP_MS));
+      const now = clock.now();
+      if (now < at) {
+        lastTick = now;
+        later(Math.min(at - now, POWER_TIMER_STEP_MS));
+        return;
+      }
+      // Avant l'heure, l'écart se compte depuis l'heure prévue ; ensuite, depuis le dernier passage.
+      const gap = now - Math.max(lastTick ?? at, at);
+      lastTick = now;
+      if (gap > POWER_MISSED_AFTER_MS || (options.until !== undefined && now > options.until)) {
+        state = 'done';
+        withdraw();
+        forget();
+        return options.onMissed?.(action, at);
+      }
+      if (options.ready && !options.ready()) {
+        // Quelqu'un joue (ou vient d'appuyer) : le préavis s'efface, l'action attend.
+        withdraw();
+        later(POWER_READY_STEP_MS);
+        return;
+      }
+      if (options.notice && noticeEnds === undefined) {
+        noticeEnds = now + options.notice.ms;
+        options.notice.show(noticeEnds);
+      }
+      if (noticeEnds !== undefined && now < noticeEnds) {
+        later(Math.min(noticeEnds - now, POWER_READY_STEP_MS));
         return;
       }
       state = 'done';
+      // Le préavis laisse la place à l'écran noir de l'action (prepare).
+      withdraw();
       forget();
-      if (late > POWER_MISSED_AFTER_MS) return options.onMissed?.(action, at);
       void run(action).then((outcome) => options.onDone?.(outcome));
     };
     scheduled.push(entry);

@@ -297,6 +297,11 @@ export class AttractMode {
     return this.on;
   }
 
+  /** Temps sans bouton (ni clic), ou depuis que l'attente est redevenue permise. */
+  idleFor(): number {
+    return this.timers.now() - this.idleSince;
+  }
+
   /** Bouton, clic, souris : remet le compte à zéro ; vrai si cela met fin à l'attente. */
   activity(): boolean {
     const ended = this.on;

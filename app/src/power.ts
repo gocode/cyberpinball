@@ -21,6 +21,7 @@ import {
   type IconName,
   type PowerAction,
   type PowerCapabilities,
+  type PowerClock,
   type PowerExecutor,
   type PowerOutcome,
 } from '@cyberpinball/core';
@@ -49,6 +50,8 @@ export interface PowerMenuHost {
   /** Efface le constat en cours (celui d'un essai précédent) : il ne doit pas parler d'une autre action. */
   clearNotice(): void;
   log(line: string): void;
+  /** Horloge des actions programmées : celle de l'horaire (décalée dans un essai qui le demande). */
+  clock?: PowerClock;
 }
 
 /** Exécuteur réel : shutdown.exe, ou la mise en veille par powrprof. Jamais construit en essai. */
@@ -72,30 +75,31 @@ export function createPowerMenu(host: PowerMenuHost) {
   const control = createPowerControl({
     executor: powerExecutor(process.env, realExecutor, (line) => host.log(line)),
     capabilities,
+    clock: host.clock,
     prepare: (action) => {
       const texts = powerTexts(action);
       return host.prepare(action, texts.progress, texts.progressLine);
     },
+    // Pour un arrêt, attendre que Windows ferme l'application : demandé au menu ou programmé (horaire).
+    settle: async (action, outcome) => {
+      // Un essai garde aussi l'écran noir de la veille le temps de sa capture.
+      if (!outcome.ok || (action === 'sleep' && !outcome.simulated)) return outcome;
+      await new Promise((resolve) => setTimeout(resolve, outcome.simulated ? SIMULATED_WAIT_MS : SHUTDOWN_WAIT_MS));
+      if (outcome.simulated) return outcome;
+      return {
+        ok: false,
+        problem:
+          action === 'restart'
+            ? t('Windows n’a pas redémarré au bout d’une minute : une application l’en empêche peut-être (document non enregistré).')
+            : t('Windows ne s’est pas éteint au bout d’une minute : une application l’en empêche peut-être (document non enregistré).'),
+      };
+    },
   });
 
   /** Fait l'action ; pour un arrêt, attend que Windows ferme l'application. */
-  async function act(action: PowerAction): Promise<PowerOutcome> {
+  function act(action: PowerAction): Promise<PowerOutcome> {
     host.log(`Alimentation : ${action} demandé depuis le menu.`); // i18n-ignore : journal
-    const outcome = await control.run(action);
-    // Un essai garde aussi l'écran noir de la veille le temps de sa capture.
-    if (outcome.ok && (action !== 'sleep' || outcome.simulated)) {
-      await new Promise((resolve) => setTimeout(resolve, outcome.simulated ? SIMULATED_WAIT_MS : SHUTDOWN_WAIT_MS));
-      if (!outcome.simulated) {
-        return {
-          ok: false,
-          problem:
-            action === 'restart'
-              ? t('Windows n’a pas redémarré au bout d’une minute : une application l’en empêche peut-être (document non enregistré).')
-              : t('Windows ne s’est pas éteint au bout d’une minute : une application l’en empêche peut-être (document non enregistré).'),
-        };
-      }
-    }
-    return outcome;
+    return control.run(action);
   }
 
   function confirm(action: PowerAction): void {
@@ -136,8 +140,10 @@ export function createPowerMenu(host: PowerMenuHost) {
   });
 
   return {
-    /** Actions programmées (mode attente et horaire : extinction à heure fixe) ; `cancel()` les annule. */
+    /** Actions programmées (horaire de la borne, app/src/arcade-hours.ts) ; `cancel()` les annule. */
     control,
+    /** Ce que sait faire ce PC (veille possible ou non). */
+    capabilities,
     /** L'action tout de suite, sans confirmation, avec l'attente de Windows après un arrêt. */
     run: act,
     /** Entrées du menu système, rangées par l'arbre (packages/core/src/systemmenu.ts, rubrique Borne). */

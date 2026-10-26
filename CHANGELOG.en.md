@@ -19,6 +19,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Accelerometer nudge strength, adjustable in the "Tilt" step of the cabinet setup: ×2 is proposed for a Pinscape, which VPX almost ignored at the original scale.
 - Cinematic launch: on Start, the game logo flies from the playfield to the backglass, the DMD shows loading, a coil thumps when VPX takes over; VPX never waits, and "Media, sound and attract mode" turns it off.
 - Menu lists: a list too long for the screen is marked by a rule at the top or bottom instead of a fade, the selected entry stays whole and every list starts just below its title.
+- Cabinet schedule ("Media, sound and attract mode", off by default): like in an arcade, the cabinet dims its screens and goes quiet at night, then sleeps or shuts down at the chosen time if nobody is playing, after a 30-second warning that any button cancels.
 
 ## 0.1.3
 

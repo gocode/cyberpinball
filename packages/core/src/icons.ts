@@ -47,6 +47,8 @@ export const ICON_NAMES = [
   'guest',
   'moon',
   'restart',
+  'clock',
+  'sun',
   // Configuration de la borne
   'button',
   'screens',

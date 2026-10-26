@@ -9,6 +9,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { b2sCacheDir, b2sImages } from './b2simage';
+import { DEFAULT_ARCADE_HOURS, normalizeArcadeHours, type ArcadeHoursSettings } from './arcadehours';
 import { t } from './i18n';
 import { layoutOf } from './locations';
 import { MEDIADB_QUALITY_SETTINGS, type MediaDbQualitySetting } from './mediadb';
@@ -525,6 +526,8 @@ export interface MenuMediaSettings {
   downloadQuality: MediaDbQualitySetting;
   /** DMD du menu : vivant par défaut, classique pour revenir au média seul. */
   dmd: MenuDmdMode;
+  /** Horaire de la borne (arcadehours.ts) : nuit voilée, arrêt à heure fixe ; non suivi par défaut. */
+  hours: ArcadeHoursSettings;
 }
 
 export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
@@ -542,6 +545,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   menuLayout: 'medaillons',
   downloadQuality: 'auto',
   dmd: 'live',
+  hours: DEFAULT_ARCADE_HOURS,
 };
 
 /** <données>\medias.json */
@@ -573,6 +577,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     menuLayout: menuLayoutOf(r.menuLayout, d.menuLayout),
     downloadQuality: MEDIADB_QUALITY_SETTINGS.includes(r.downloadQuality as MediaDbQualitySetting) ? (r.downloadQuality as MediaDbQualitySetting) : d.downloadQuality,
     dmd: MENU_DMD_MODES.includes(r.dmd as MenuDmdMode) ? (r.dmd as MenuDmdMode) : d.dmd,
+    hours: normalizeArcadeHours(r.hours),
   };
 }
 

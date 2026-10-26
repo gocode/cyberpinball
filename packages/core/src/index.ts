@@ -81,4 +81,5 @@ export * from './fulldmdtable';
 export * from './dedicated';
 export * from './uisounds';
 export * from './power';
+export * from './arcadehours';
 export * from './cinema';

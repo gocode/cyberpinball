@@ -1,6 +1,7 @@
 // Réglages des médias, du son et du mode attente du menu (docs/recherche/medias.md, § 5.4),
-// dans le menu système : musique des jeux, volumes, lancement en cinéma, mode attente, médias
-// pendant la partie, DMD du menu (vivant ou classique), qualité téléchargée depuis VPinMediaDB.
+// dans le menu système : musique des jeux, volumes, lancement en cinéma, mode attente et
+// horaire de la borne (nuit voilée, arrêt à heure fixe : packages/core/src/arcadehours.ts),
+// médias pendant la partie, DMD du menu (vivant ou classique), qualité téléchargée depuis VPinMediaDB.
 // Tout se règle aux boutons : Start change un choix ou ouvre la liste des valeurs, Exit revient.
 // Les réglages s'appliquent tout de suite (on entend le nouveau volume) et sont gardés
 // dans <données>\medias.json.
@@ -8,6 +9,8 @@
 import {
   ATTRACT_DELAY_CHOICES,
   ATTRACT_INTERVAL_CHOICES,
+  HOUR_CHOICES,
+  NIGHT_DIM_CHOICES,
   GAME_MEDIA_LABELS,
   MENU_DMD_LABELS,
   MENU_LAYOUT_LABELS,
@@ -16,19 +19,25 @@ import {
   MEDIADB_QUALITY_LABELS,
   MEDIADB_QUALITY_SETTINGS,
   VOLUME_CHOICES,
+  arcadeHoursSummary,
   attractDelayLabel,
   durationLabel,
+  hourLabel,
   formatNumber,
   nearestChoice,
   nextGameMediaMode,
+  nightDimLabel,
+  stopActionLabel,
+  stopInNight,
   t,
   volumeLabel,
+  type ArcadeHoursSettings,
   type IconName,
   type MenuLayout,
   type MenuMediaSettings,
   type UiSoundId,
 } from '@cyberpinball/core';
-import type { Action, Built, ProvidedSystemItem } from './library';
+import type { Action, Built, ProvidedSystemItem, Row as SectionRow } from './library';
 
 export interface MenuSettingsHost {
   library: {
@@ -42,6 +51,14 @@ export interface MenuSettingsHost {
   output(): string | undefined;
   /** Fait entendre un son de l'interface (réglage tout juste changé), s'il est permis. */
   preview(id: UiSoundId): void;
+  /**
+   * Périphériques que Windows autorise à réveiller le PC (boutons, clavier, souris), lus sans
+   * rien écrire ; undefined tant que la lecture n'a pas répondu (l'écran se redessine alors),
+   * null si Windows n'a pas répondu.
+   */
+  wakeDevices(): readonly string[] | null | undefined;
+  /** La veille est-elle possible sur ce PC (pas de veille moderne seule) ? */
+  sleepAllowed(): boolean;
 }
 
 const heading = () => t('Médias, son et attente');
@@ -87,6 +104,7 @@ export const MENU_SETTINGS_ROWS = [
   'attractDelay',
   'attractInterval',
   'attractSound',
+  'hours',
   'game',
   'dmd',
   'downloadQuality',
@@ -185,6 +203,15 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         detail: v.attractSound === 'reduced' ? t('Musique et vidéos à 30 % de leur volume (Start : couper)') : t('Rien ne joue en attente (Start : son réduit)'),
         icon: 'volume-low',
         run: () => set({ attractSound: v.attractSound === 'reduced' ? 'muted' : 'reduced' }),
+      },
+      hours: {
+        label: t('Horaire de la borne : {summary}', { summary: arcadeHoursSummary(v.hours) }),
+        detail:
+          v.hours.on && v.attractDelay === 0
+            ? t('Mode attente réglé sur « jamais » : pas de voile la nuit ; l’arrêt attend {minutes} min sans bouton (Start : régler)', { minutes: 5 })
+            : t('Attente muette et écrans assombris la nuit, arrêt automatique (Start : régler)'),
+        icon: 'clock',
+        run: () => openHours(),
       },
       game: { label: t('Médias pendant la partie : {mode}', { mode: GAME_MEDIA_LABELS[v.game] }), detail: gameDetail(), icon: 'film', run: () => set({ game: nextGameMediaMode(v.game) }) },
       dmd: {
@@ -321,6 +348,180 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         back: () => open(back),
       }),
       Math.max(0, choices.indexOf(nearestChoice(choices, now))),
+    );
+  }
+
+  // ---------- Horaire de la borne ----------
+
+  const HOURS_ROWS = ['on', 'nightFrom', 'nightTo', 'nightDim', 'stopAt', 'stopBy'] as const;
+  type HoursRow = (typeof HOURS_ROWS)[number];
+  type HourKey = 'nightFrom' | 'nightTo' | 'stopAt';
+  const h = () => s().hours;
+  const setHours = (patch: Partial<ArcadeHoursSettings>) => set({ hours: { ...h(), ...patch } });
+
+  /** Ce que dit le bloc « Réveil depuis la veille » : lu dans Windows, rien n'y est écrit. */
+  function wakeRows(): SectionRow[] {
+    const v = h();
+    const devices = host.wakeDevices();
+    const allowed =
+      devices === undefined
+        ? t('Recherche des périphériques autorisés…')
+        : devices === null
+          ? t('Liste des périphériques indisponible')
+          : devices.length
+            ? t('Périphériques autorisés par Windows : {devices}', { devices: devices.join(', ') })
+            : t('Aucun périphérique autorisé détecté');
+    return [
+      ...(v.stopBy === 'shutdown' ? [{ text: t('Après extinction, rallumez la borne avec le bouton d’alimentation du PC. Les autorisations ci-dessous concernent uniquement la veille.') }] : []),
+      { text: t('Bouton d’alimentation du PC') },
+      { text: allowed, tone: devices === null ? ('warning' as const) : undefined },
+      { text: t('Informations lues dans Windows ; aucun réglage modifié ici.'), tone: 'quiet' as const },
+    ];
+  }
+
+  function hoursActions(): Action[] {
+    const v = h();
+    const outside = !stopInNight(v);
+    const rows: Record<HoursRow, Action> = {
+      on: {
+        label: v.on ? t('Horaire de la borne : activé') : t('Horaire de la borne : désactivé'),
+        detail: v.on ? t('Règle l’attente la nuit et l’arrêt automatique (Start : désactiver)') : t('Réglages conservés ; aucun effet tant que l’horaire est désactivé (Start : activer)'),
+        icon: 'auto',
+        run: () => setHours({ on: !v.on }),
+      },
+      nightFrom: { label: t('Début de la nuit : {hour}', { hour: hourLabel(v.nightFrom) }), icon: 'attract', run: () => openHour('nightFrom') },
+      nightTo: { label: t('Fin de la nuit : {hour}', { hour: hourLabel(v.nightTo) }), icon: 'sun', run: () => openHour('nightTo') },
+      nightDim: {
+        label: t('Écrans pendant l’attente nocturne : {dim}', { dim: nightDimLabel(v.nightDim) }),
+        detail: t('L’attente est muette la nuit, quel que soit ce choix'),
+        icon: 'bulb',
+        run: () => openNightDim(),
+      },
+      stopAt: {
+        label: v.stopAt === null ? t('Arrêt automatique : jamais') : t('Arrêt automatique : {hour}', { hour: hourLabel(v.stopAt) }),
+        detail:
+          v.stopAt === null
+            ? undefined
+            : outside
+              ? t('Hors de la nuit ({from}–{to}) : arrêt à cette heure si la borne est libre, sinon dans l’heure qui suit', { from: hourLabel(v.nightFrom), to: hourLabel(v.nightTo) })
+              : t('30 s de préavis ; si une partie est en cours, arrêt reporté jusqu’à ce que la borne soit libre, avant {hour}', { hour: hourLabel(v.nightTo) }),
+        tone: outside ? 'warning' : undefined,
+        icon: 'clock',
+        run: () => openHour('stopAt'),
+      },
+      stopBy: {
+        label: t('Mode d’arrêt : {action}', { action: stopActionLabel(v.stopBy) }),
+        detail:
+          v.stopBy === 'sleep' && !host.sleepAllowed()
+            ? t('Ce PC n’a que la veille moderne : la borne ne pourra pas se mettre en veille (Start : extinction)')
+            : v.stopAt === null
+              ? t('Utilisé si une heure d’arrêt est choisie (Start : changer)')
+              : v.stopBy === 'sleep'
+                ? t('Le menu revient au réveil (Start : extinction)')
+                : t('Cyber Pinball se ferme, puis Windows éteint le PC (Start : mise en veille)'),
+        tone: v.stopBy === 'sleep' && !host.sleepAllowed() ? 'warning' : undefined,
+        icon: v.stopBy === 'sleep' ? 'moon' : 'power',
+        run: () => setHours({ stopBy: v.stopBy === 'sleep' ? 'shutdown' : 'sleep' }),
+      },
+    };
+    return HOURS_ROWS.map((key) => rows[key]);
+  }
+
+  function openHours(at = 0): void {
+    host.library.openCustom(
+      () => ({
+        heading: t('Horaire de la borne'),
+        icon: 'clock',
+        lead: t('La nuit, l’attente devient muette et les écrans peuvent s’assombrir. Un arrêt automatique laisse 30 s pour garder la borne allumée.'),
+        sections: [{ title: t('Réveil depuis la veille'), rows: wakeRows() }],
+        actions: [...hoursActions(), { label: t('Retour'), icon: 'back', run: () => open(row('hours')) }],
+        back: () => open(row('hours')),
+      }),
+      at,
+    );
+  }
+
+  function hourTitles(key: HourKey): { heading: string; icon: IconName; lead: string } {
+    switch (key) {
+      case 'nightFrom':
+        return { heading: t('Début de la nuit'), icon: 'attract', lead: t('À partir de cette heure, la borne en attente baisse ses écrans et se tait.') };
+      case 'nightTo':
+        return { heading: t('Fin de la nuit'), icon: 'sun', lead: t('À cette heure, les écrans retrouvent leur lumière ; un arrêt retenu par une partie n’est plus fait.') };
+      case 'stopAt':
+        return {
+          heading: t('Arrêt automatique'),
+          icon: 'clock',
+          lead: t('Heure à laquelle la borne s’arrête, si personne ne joue. Une partie en cours la retient : elle s’arrête dès que la borne est libre, jusqu’à la fin de la nuit.'),
+        };
+    }
+  }
+
+  function openHour(key: HourKey): void {
+    const back = HOURS_ROWS.indexOf(key);
+    const values: (number | null)[] = key === 'stopAt' ? [null, ...HOUR_CHOICES] : [...HOUR_CHOICES];
+    const now = h()[key];
+    const at = now === null ? 0 : values.indexOf(nearestChoice(HOUR_CHOICES, now));
+    host.library.openCustom(
+      () => ({
+        ...hourTitles(key),
+        sections: [],
+        actions: [
+          ...values.map((value) => {
+            const v = h();
+            const current = value === v[key];
+            // Début et fin de la nuit égaux : pas de nuit du tout. Refusé, plutôt qu'une nuit de 24 h inventée.
+            const clash = (key === 'nightFrom' && value === v.nightTo) || (key === 'nightTo' && value === v.nightFrom);
+            const outside = key === 'stopAt' && value !== null && !stopInNight({ ...v, stopAt: value });
+            return {
+              label: value === null ? t('Jamais') : hourLabel(value),
+              detail: current
+                ? t('choix actuel')
+                : clash
+                  ? key === 'nightFrom'
+                    ? t('Heure de la fin de la nuit : choisissez deux heures différentes')
+                    : t('Heure du début de la nuit : choisissez deux heures différentes')
+                  : outside
+                    ? t('hors de la nuit')
+                    : undefined,
+              tone: current ? ('ok' as const) : clash ? ('quiet' as const) : undefined,
+              run: () => {
+                if (clash) return;
+                setHours({ [key]: value });
+                openHours(back);
+              },
+            };
+          }),
+          { label: t('Retour'), run: () => openHours(back) },
+        ],
+        back: () => openHours(back),
+      }),
+      Math.max(0, at),
+    );
+  }
+
+  function openNightDim(): void {
+    const back = HOURS_ROWS.indexOf('nightDim');
+    host.library.openCustom(
+      () => ({
+        heading: t('Écrans pendant l’attente nocturne'),
+        icon: 'bulb',
+        lead: t('Voile noir posé sur chaque écran la nuit, quand la borne est en attente. Il descend lentement et se lève au premier bouton. Écrans noirs : les vidéos s’arrêtent dessous.'),
+        sections: [],
+        actions: [
+          ...NIGHT_DIM_CHOICES.map((value) => ({
+            label: capitalized(nightDimLabel(value)),
+            detail: value === h().nightDim ? t('choix actuel') : undefined,
+            tone: value === h().nightDim ? ('ok' as const) : undefined,
+            run: () => {
+              setHours({ nightDim: value });
+              openHours(back);
+            },
+          })),
+          { label: t('Retour'), run: () => openHours(back) },
+        ],
+        back: () => openHours(back),
+      }),
+      Math.max(0, NIGHT_DIM_CHOICES.indexOf(nearestChoice(NIGHT_DIM_CHOICES, h().nightDim))),
     );
   }
 

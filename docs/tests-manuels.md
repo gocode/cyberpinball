@@ -834,6 +834,21 @@ Sur la borne, son allumé, puis sur un PC. La preuve sans opérateur : `packages
 | 448 | Au bureau | Sur un PC (menu au bureau), lancer une table. | Le logo part du cadre 9:16 et en sort par le haut ; l'encart du titre et des commandes ne bouge pas. Fronton sur un autre écran : le logo s'y pose ; sans fronton, rien ne l'attend et le chargement reste le même. |
 | 449 | Plateau tourné | Borne au playfield couché et tourné (Windows en paysage). | Le logo file vers le fronton vu du joueur, pas vers le haut de l'écran pour Windows. |
 
+## Horaire de la borne
+
+Sur la borne, puis sur un PC. La preuve sans opérateur : `packages/core/src/test/arcadehours.test.ts` (nuit à cheval sur minuit, fenêtre d'arrêt, préavis, bouton, partie jusqu'au matin, veille pendant la fenêtre, aucun arrêt réel en essai) et `.\docs\demo-attente.ps1` (horloge simulée ; captures dans `tmp\demo-attente`). Ce qu'ils ne montrent pas : la vraie veille, le vrai réveil par un bouton, la lisibilité à un mètre.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 450 | Réglages | Menu système > Médias > « Médias, son et attente » > « Horaire de la borne ». | L'écran liste l'horaire (désactivé par défaut), le début et la fin de la nuit, les écrans la nuit, l'arrêt automatique, le mode d'arrêt, puis le bloc « Réveil depuis la veille » avec les périphériques que Windows autorise. Activer l'horaire : la ligne de « Médias, son et attente » dit « nuit 23 h–8 h · veille à 2 h ». |
+| 451 | Nuit | Horaire activé, début de la nuit réglé sur l'heure qui vient de passer ; attendre le mode attente. | Le voile descend lentement sur le plateau, le fronton et le DMD ; l'attente se tait. Un flipper : le voile se lève d'un coup, le menu revient sans rien changer. |
+| 452 | Écrans noirs | « Écrans pendant l'attente nocturne : écrans noirs », la nuit, en attente. | Tout devient noir, sans éclair ; la table montrée ne change plus. Un bouton : le menu revient, lumineux. |
+| 453 | Arrêt en veille | Arrêt automatique réglé sur l'heure qui vient ; laisser la borne en attente. | À l'heure, sur le plateau : « Mise en veille dans 30 s », la jauge qui se vide ; à zéro, l'écran noir « Mise en veille… » sur chaque écran, puis la veille. |
+| 454 | Garder la borne allumée | Pendant le préavis, appuyer sur un bouton. | Le préavis disparaît aussitôt, le menu revient, rien ne se lance. La borne ne s'arrête pas tant qu'on joue ; laissée seule (délai du mode attente), nouveau préavis de 30 s. |
+| 455 | Partie à l'heure d'arrêt | Lancer une partie juste avant l'heure d'arrêt, jouer au-delà. | Rien pendant la partie ; de retour au menu et laissée seule, le préavis vient, puis l'arrêt. Après la fin de la nuit, plus d'arrêt ce jour-là. |
+| 456 | Réveil | Borne en veille par l'horaire : appuyer sur un bouton de la borne, puis sur le bouton d'alimentation du PC. | Un bouton listé dans « Réveil depuis la veille » réveille la borne (si le BIOS alimente l'USB en veille) ; le bouton d'alimentation, toujours. Le menu revient tel qu'il était. Laissée seule avant la fin de la nuit, elle se rendort. |
+| 457 | Extinction | « Mode d'arrêt : extinction », arrêt à l'heure qui vient. | Préavis « Extinction dans », écran noir « Extinction de la borne… », puis Windows s'éteint ; le bouton d'alimentation du PC la rallume. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

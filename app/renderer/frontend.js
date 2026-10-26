@@ -562,7 +562,8 @@ function dropAttractLogo() {
  */
 function attractScreen(s) {
   const a = s.attract;
-  const box = el('section', 'attract');
+  // Préavis d'arrêt (couche #stop, en bas du plateau) : l'écran d'attente lui laisse sa place.
+  const box = el('section', s.stop ? 'attract has-stop' : 'attract');
   const middle = el('div', 'attract-middle');
   const logo = CyberMedia.logo(a.wheel, 'attract-image');
   const kit = window.CyberFallback;
@@ -583,7 +584,9 @@ function attractScreen(s) {
     middle.append(el('div', 'attract-title', a.title));
   }
   if (a.subtitle) middle.append(el('div', 'attract-subtitle', a.subtitle));
-  box.append(brand(), middle, el('div', 'attract-hint', t('Appuyez sur un bouton pour revenir au menu')));
+  box.append(brand(), middle);
+  // Pendant le préavis d'arrêt de l'horaire, sa propre invite seule : pas deux consignes à la fois.
+  if (!s.stop) box.append(el('div', 'attract-hint', t('Appuyez sur un bouton pour revenir au menu')));
   return box;
 }
 
@@ -924,6 +927,84 @@ function backgroundVisible(s) {
   return s.phase === 'menu' && !s.help;
 }
 
+// ---------- Horaire de la borne (arcadehours.ts, frontend.css) ----------
+
+const nightVeil = document.getElementById('night-veil');
+const stopLayer = document.getElementById('stop');
+/** Durée de la descente du voile (frontend.css, .night-veil.on). */
+const VEIL_MS = 4000;
+/** Écrans noirs : passé la descente du voile, les médias s'arrêtent (rien ne tourne pour rien). */
+let veilOpaque = false;
+let veilTimer;
+
+/**
+ * Voile de nuit (s.night, 0 à 1) : sur toute la fenêtre, en attente. Il descend lentement, se
+ * lève d'un coup. À 1 (écrans noirs), une fois opaque, les médias de la fenêtre s'arrêtent.
+ */
+function syncNight(s) {
+  const level = s.game ? 0 : s.night ?? 0;
+  nightVeil.style.setProperty('--night', String(level));
+  nightVeil.classList.toggle('lowered', level > 0);
+  if (level < 1) {
+    clearTimeout(veilTimer);
+    veilTimer = undefined;
+    veilOpaque = false;
+  } else if (!veilOpaque && !veilTimer) {
+    veilTimer = setTimeout(() => {
+      veilTimer = undefined;
+      veilOpaque = true;
+      pauseUnderVeil();
+    }, VEIL_MS);
+  }
+}
+
+/** Écrans noirs : vidéos et sons des médias arrêtés sous le voile opaque. */
+function pauseUnderVeil() {
+  if (!veilOpaque) return;
+  background?.setActive(false);
+  for (const z of zones) z.layer.setActive(false);
+}
+
+/** Préavis en cours : clé (heure de l'arrêt), élément du nombre, minuterie du compte. */
+let stopShown;
+
+function dropStop() {
+  if (!stopShown) return;
+  clearInterval(stopShown.timer);
+  stopShown = undefined;
+  stopLayer.replaceChildren();
+}
+
+/**
+ * Préavis d'arrêt (s.stop), dessiné par le playfield au-dessus du voile : ce qui va arriver, le
+ * temps restant, comment l'éviter. Nombre et jauge suivent la même échéance (s.stop.endsAt) ;
+ * rien ici ne commande l'arrêt, décidé par le processus principal.
+ */
+function syncStop(s) {
+  const stop = role === 'playfield' && !s.game && s.stop;
+  if (!stop) return dropStop();
+  const key = `${stop.action}:${stop.endsAt}`;
+  if (stopShown?.key === key) return;
+  dropStop();
+  const box = el('div', 'stop-notice');
+  box.append(
+    cyberIcon(stop.action === 'sleep' ? 'moon' : 'power', 'stop-notice-icon'),
+    el('div', 'stop-notice-label', stop.action === 'sleep' ? t('Mise en veille dans') : t('Extinction dans')),
+  );
+  const count = el('div', 'stop-notice-count');
+  const bar = el('div', 'stop-notice-bar');
+  bar.style.setProperty('--stop-ms', `${stop.ms}ms`);
+  bar.style.setProperty('--stop-delay', `${-Math.max(0, stop.ms - (stop.endsAt - Date.now()))}ms`);
+  box.append(count, bar, el('div', 'stop-notice-hint', t('Appuyez sur un bouton pour garder la borne allumée')));
+  const tick = () => {
+    const seconds = Math.max(0, Math.ceil((stop.endsAt - Date.now()) / 1000));
+    count.replaceChildren(String(seconds), el('small', '', t('s')));
+  };
+  tick();
+  stopLayer.replaceChildren(box);
+  stopShown = { key, timer: setInterval(tick, 250) };
+}
+
 /** Dernier état reçu, pour le relevé des essais sans opérateur (cyberEtat). */
 let lastState;
 
@@ -932,6 +1013,9 @@ window.cyberEtat = () => ({
   phase: lastState?.phase,
   position: lastState?.position,
   attente: lastState?.attract?.title,
+  // Horaire : voile de nuit (opacité) et préavis d'arrêt affiché (action, secondes restantes).
+  nuit: lastState?.night ?? 0,
+  preavis: stopShown ? { action: lastState?.stop?.action, secondes: Number(stopLayer.querySelector('.stop-notice-count')?.firstChild?.textContent) } : undefined,
   // Titre de l'aide-mémoire du chargement : commandes de la partie, ou réglage de l'affichage.
   commandes: lastState?.phase === 'loading' ? lastState.loadingKeys?.title : undefined,
   // Gestion des tables (fiche, prospectus et règles, médias du jeu) : l'écran et la page montrés.
@@ -971,6 +1055,10 @@ window.cyber.onState((s) => {
   syncLiveDmd(s.game ? undefined : s.liveDmd);
   // Lancement en cinéma : posé au Start, effacé quand VPX paraît (avant le fond de partie).
   syncCinema(s);
+  // Horaire : voile de nuit et préavis d'arrêt, levés pendant la partie et pour l'écran noir de l'arrêt.
+  const powering = s.phase === 'message' && s.message?.action === 'power';
+  syncNight(powering ? { ...s, night: 0 } : s);
+  syncStop(powering ? { ...s, stop: undefined } : s);
   if (s.game) return renderGame(s);
   // Extinction, veille ou redémarrage : du noir sur chaque écran, sans média ni décor ; le
   // playfield seul dit ce qui se passe (frontend.css, html.power-phase).
@@ -998,5 +1086,6 @@ window.cyber.onState((s) => {
     background.setActive(Boolean(loadingVideo) || backgroundVisible(s));
   } else root.replaceChildren();
   renderZones(s);
+  pauseUnderVeil();
 });
 window.cyber.ready();
