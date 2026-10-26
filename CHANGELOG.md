@@ -35,6 +35,15 @@ son interface).
 - Écran du DMD : dites s'il s'agit d'un FullDMD (tout l'écran, DMD du jeu incrusté) ou d'un DMD seul ; le menu, VPX et les PuP-Packs le respectent.
 - PuP-Pack sur le fronton : l'option du pack est choisie d'après les écrans de la borne, le DMD du jeu reste devant le pack, et le pack est vérifié avant chaque partie.
 - Tilt : nouvelle étape « Tilt » (balancier de la borne, ou balancier simulé par VPX d'après l'accéléromètre), balancier et slam tilt relevés dans l'étape « Boutons ».
+- Un média ajouté, remplacé ou retiré (logo de la roue, fronton, vidéo, musique…) et une table ajoutée ou renommée se voient aussitôt sur tous les écrans, sans redémarrer.
+- Menu système, réglages, aide et messages : fronton, afficheur et topper passent à l'affichage de Cyber Pinball, sans la vidéo ni la musique de la dernière table ; la fiche d'une table garde ses médias.
+- « Sons de la table » (Médias du jeu > Musique ou Son de lancement) : écouter les musiques du PuP-Pack et le son de ses vidéos, et en faire la musique de présentation ou le son de lancement du jeu.
+- Médias : « Chercher moi-même sur le web… » sur chaque média ouvre le navigateur intégré sur une recherche que vous changez à votre guise ; le fichier téléchargé est vérifié, converti si besoin (une musique se découpe) et affecté aussitôt.
+- « Bureau Windows » libère enfin tous les écrans du PC, et non plus souvent un seul ; Ctrl+Maj+D y va directement depuis le menu et en revient, raccourci affiché à côté de l'entrée.
+- Afficheur large (FullDMD) en partie : l'habillage du menu reste à l'écran et le DMD du jeu se place dans son cadre ; sa place s'ajuste en partie, table par table, dans le menu de VPX.
+- Médias : sur une page YouTube, Vimeo ou Dailymotion, « Récupérer le son » ou « Récupérer la vidéo » par l'outil yt-dlp, téléchargé depuis GitHub et vérifié à la première utilisation.
+- PuP-Pack : l'option appliquée s'affiche enfin telle qu'elle est (l'option 2 de Guardians of the Galaxy ne passe plus pour l'option 0), chaque option une seule fois, la mieux adaptée à la borne conseillée ; « appliquée » n'est annoncé qu'une fois l'option vérifiée en place, sinon le message dit pourquoi.
+- Écran de chargement : sur la borne, la vidéo de chargement du jeu seule, plein écran, sans texte ; au bureau, la vidéo dans le cadre du plateau et le titre avec les commandes de la partie dans un encart à côté, sans plus rien recouvrir.
 
 ## 0.1.2
 

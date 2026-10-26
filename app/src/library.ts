@@ -13,6 +13,8 @@ import {
   variantTraitsLabel,
   tablePupPacks,
   pupOptionOps,
+  checkAppliedOption,
+  missingSources,
   type TableContents,
   type TablePupPack,
   findTableIni,
@@ -108,9 +110,11 @@ import { createCatalog } from './catalog';
 import { createJourney } from './journey';
 import { createMediaDownload, mediaOffersLabel, type MediaDbGameOffer } from './media-download';
 import { createMediaSearch } from './media-search';
+import { createConverter } from './media-convert';
+import { analyseDressing } from './fulldmd';
 import { createMediaSites } from './media-sites';
 import { createMediaImport } from './media-import';
-import { createMedias, type MediaView } from './library-medias';
+import { createMedias, playsSoundPreview, type MediaView } from './library-medias';
 import { createTableFiles } from './table-files';
 import { createFilePicker, type PickRequest } from './file-picker';
 import { createDownloadsScreen } from './downloads-screen';
@@ -201,7 +205,19 @@ export interface SystemItem {
   icon: IconName;
   /** Quelque chose attend l'utilisateur ici (une mise à jour disponible…) : pastille rouge, jusque sur la roue dentée. */
   attention?: boolean;
+  /** Raccourci clavier qui fait la même chose sans passer par le menu (ActionShortcut). */
+  shortcut?: ActionShortcut;
   run: () => void;
+}
+
+/**
+ * Raccourci clavier d'une entrée de menu : les touches à montrer, une touche cerclée chacune
+ * (« Ctrl », « Maj », « D »), et ce qui le reconnaît. Les deux viennent de la définition du
+ * raccourci (SHORTCUTS, touches de l'interface) : ce qui est affiché est ce qui marche.
+ */
+export interface ActionShortcut {
+  keys: string[];
+  matches(input: Input): boolean;
 }
 
 export type UiAction =
@@ -248,6 +264,8 @@ export interface Action {
   icon?: IconName;
   /** Pastille rouge à côté du libellé : cette action attend l'utilisateur. */
   attention?: boolean;
+  /** Raccourci clavier de l'action, montré à droite du libellé ; il la déclenche aussi depuis son menu. */
+  shortcut?: ActionShortcut;
   run: () => void | Promise<void>;
 }
 /** Écran décrit : titre, sections, actions (flippers pour choisir, Start pour valider) et retour (Exit). */
@@ -357,16 +375,30 @@ type Screen =
   | { kind: 'roms'; scan?: RomLibraryScan }
   /** Rangement des ROM existantes dans la bibliothèque : plan à valider. */
   | { kind: 'romMigrate'; scan?: RomLibraryScan; choices: Map<string, string> }
-  | { kind: 'notice'; heading: string; lines: string[]; then: () => void }
+  /** `table` : la table dont parle l'écran (tableOf), pour les écrans de la borne. */
+  | { kind: 'notice'; heading: string; lines: string[]; then: () => void; table?: string }
   /** Écran décrit hors de la gestion des tables (configurations de la borne), recalculé à chaque affichage. */
-  | { kind: 'custom'; build: () => Built }
+  | { kind: 'custom'; build: () => Built; table?: string }
   /** Saisie d'un texte au clavier à l'écran ; `done` reçoit undefined à l'annulation. */
-  | { kind: 'prompt'; heading: string; lead?: string; editor: Editor; done: (value: string | undefined) => void };
+  | { kind: 'prompt'; heading: string; lead?: string; editor: Editor; done: (value: string | undefined) => void; table?: string };
 
 type EditorScreen = Extract<Screen, { kind: 'edit' | 'prompt' }>;
 
 /** Écrans d'une table : son titre est le nom du jeu, sans l'icône de la partie du menu d'où l'on vient. */
 const TABLE_SCREENS: readonly Screen['kind'][] = ['sheet', 'pupOptions', 'pages', 'edit', 'doctor', 'remove'];
+
+/**
+ * Table dont parle un écran : les écrans de la borne gardent ses médias (screensTable de
+ * packages/core). Les écrans d'une table la portent ; un écran décrit (médias du jeu, fichiers,
+ * parcours…) la déclare à son ouverture (openCustom) ; une saisie ou un message garde celle de
+ * l'écran d'où il s'ouvre. Tout autre écran n'en a pas : l'affichage par défaut de Cyber Pinball.
+ */
+function tableOf(s: Screen | undefined): string | undefined {
+  if (!s) return undefined;
+  if (TABLE_SCREENS.includes(s.kind)) return (s as Extract<Screen, { file: string }>).file;
+  if (s.kind === 'custom' || s.kind === 'notice' || s.kind === 'prompt') return s.table;
+  return undefined;
+}
 
 type AddPlan = Extract<Screen, { kind: 'addPlan' }>;
 type PagesScreen = Extract<Screen, { kind: 'pages' }>;
@@ -374,6 +406,8 @@ type PagesScreen = Extract<Screen, { kind: 'pages' }>;
 export function createLibrary(host: LibraryHost) {
   let screen: Screen | undefined;
   let cursor = 0;
+  /** L'écran affiché fait écouter des sons (propositions, sons de la table) : relevé à chaque vue. */
+  let soundPreview = false;
   // Opérations longues en cours (l'installation enchaîne sur l'analyse) et leur message.
   let busyCount = 0;
   let busy: string | undefined;
@@ -511,18 +545,21 @@ export function createLibrary(host: LibraryHost) {
     go({ kind: 'system' }, Math.max(0, systemItems.findIndex((i) => i.attention)));
   }
 
-  /** Écran fourni par l'appelant (configurations de la borne) ; ses actions ouvrent les écrans suivants. */
-  function openCustom(build: () => Built, at = 0): void {
-    go({ kind: 'custom', build }, at);
+  /**
+   * Écran fourni par l'appelant (configurations de la borne) ; ses actions ouvrent les écrans
+   * suivants. `table` : la table dont il parle (ses médias, ses fichiers…), sinon aucune.
+   */
+  function openCustom(build: () => Built, at = 0, table?: string): void {
+    go({ kind: 'custom', build, table }, at);
   }
 
   /** Saisie d'un nom avec le clavier à l'écran (ou un vrai clavier). */
   function openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void {
-    go({ kind: 'prompt', heading, lead, editor: { kind: 'text', label, value, cursor: 0, shift: false, typed: false }, done });
+    go({ kind: 'prompt', heading, lead, editor: { kind: 'text', label, value, cursor: 0, shift: false, typed: false }, done, table: tableOf(screen) });
   }
 
   function openNotice(heading: string, lines: string[], then: () => void = leave): void {
-    go({ kind: 'notice', heading, lines, then });
+    go({ kind: 'notice', heading, lines, then, table: tableOf(screen) });
   }
 
   function openSheet(table: TableEntry, flash?: string): void {
@@ -563,7 +600,7 @@ export function createLibrary(host: LibraryHost) {
   const journeyUi = createJourney({
     host,
     find,
-    show: (build, at) => openCustom(build, at),
+    show: (build, at, table) => openCustom(build, at, table),
     cursor: () => cursor,
     task: (message, work) => task(message, work),
     vps: () => vpsForImport(),
@@ -578,7 +615,13 @@ export function createLibrary(host: LibraryHost) {
   });
 
   // Médias des sites communautaires (VPForums, VPUniverse), dans la session de « Récupérer ».
-  const mediaSites = createMediaSites({ acquirer: catalogUi.acquirer, downloadsDir: () => layout()?.downloads, changed: () => host.broadcast() });
+  const mediaSites = createMediaSites({
+    acquirer: catalogUi.acquirer,
+    downloadsDir: () => layout()?.downloads,
+    changed: () => host.broadcast(),
+    // Recherche libre : ce qui arrive dans Téléchargements de Windows pendant ce temps (navigateur de l'utilisateur).
+    windowsDownloads: () => host.downloadsDir?.() ?? app.getPath('downloads'),
+  });
 
   // Téléchargement depuis VPinMediaDB, depuis l'écran « Médias » ou le menu système.
   const mediaDownload = createMediaDownload({
@@ -586,7 +629,7 @@ export function createLibrary(host: LibraryHost) {
     layout,
     tablesDir,
     find,
-    openCustom: (build, at) => openCustom(build, at),
+    openCustom: (build, at, table) => openCustom(build, at, table),
     openSystem: () => openSystem(),
     openNotice: (heading, lines, then) => openNotice(heading, lines, then),
     task: (message, work) => task(message, work),
@@ -602,7 +645,7 @@ export function createLibrary(host: LibraryHost) {
     layout,
     tablesDir,
     find,
-    show: (build, at) => openCustom(build, at),
+    show: (build, at, table) => openCustom(build, at, table),
     cursor: () => cursor,
     sheet: (table, flash) => openSheet(table, flash),
     leave: () => leave(),
@@ -615,7 +658,9 @@ export function createLibrary(host: LibraryHost) {
       prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
       withNotice: (then, back) => mediaDownload.withNotice(then, back),
       sites: mediaSites,
+      convert: createConverter(),
     },
+
   });
 
   // Section « Fichiers » de la fiche : tout le dossier de la table, fichier par fichier.
@@ -624,7 +669,7 @@ export function createLibrary(host: LibraryHost) {
     tablesDir,
     find,
     script: (table) => cachedScript(table.file, host.dataDir),
-    show: (build, at) => openCustom(build, at),
+    show: (build, at, table) => openCustom(build, at, table),
     sheet: (table) => openSheet(table),
     doctor: (table) => openDoctor(table.file),
     roms: () => openRoms(),
@@ -668,9 +713,11 @@ export function createLibrary(host: LibraryHost) {
     });
   }
 
+  /** Table de l'écran d'où s'ouvre le sélecteur de fichiers (un média de cette table à choisir) : il la garde. */
+  let pickerTable: string | undefined;
   const picker = createFilePicker({
     layout,
-    show: (build, at) => openCustom(build, at),
+    show: (build, at) => openCustom(build, at, pickerTable),
     cursor: () => cursor,
     inventory: () => inventoryOf(false),
     windowsDownloads: host.downloadsDir,
@@ -685,7 +732,9 @@ export function createLibrary(host: LibraryHost) {
   function pickPaths(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined> {
     const from = screen;
     const at = cursor;
+    pickerTable = tableOf(from);
     const restore = () => {
+      pickerTable = undefined;
       if (from) {
         screen = from;
         cursor = at;
@@ -754,6 +803,9 @@ export function createLibrary(host: LibraryHost) {
     });
   }
 
+  /** Convertisseur hors écran du diagnostic : images des vidéos FullDMD (habillage). */
+  let dressConverter: ReturnType<typeof createConverter> | undefined;
+
   /**
    * Script de la table (lu par VPX, sinon la dernière lecture gardée) et constats du médecin.
    * Sert au diagnostic et au parcours « Ce qu'il manque pour jouer ».
@@ -763,11 +815,17 @@ export function createLibrary(host: LibraryHost) {
     const script = exe ? await readScript(exe, table.file, host.dataDir) : cachedScript(table.file, host.dataDir);
     // Lire le script a pu faire passer une fenêtre de VPX devant le menu.
     if (exe) host.windows().get('playfield')?.focus();
+    const cabinet = loadCabinet(host.dataDir);
+    // Habillage FullDMD : cadre du média FullDMD (cherché une fois), place du DMD dans le .ini de la table.
+    const dressing = host.root
+      ? await analyseDressing(table, { root: host.root, dataDir: host.dataDir, cabinet, facts: script && !('error' in script) ? script : undefined, converter: (dressConverter ??= createConverter()) })
+      : undefined;
     const findings = diagnose(table, {
       tablesDir: tablesDir(),
       script,
       logsDir: path.join(host.dataDir, 'logs'),
-      cabinet: pupCabinet(loadCabinet(host.dataDir)),
+      cabinet: pupCabinet(cabinet),
+      dressing,
       vpxLog: readLog(host.vpxLogFile?.()),
       otherPackNames: otherPackNames(table),
       romLibrary: layout()?.roms,
@@ -873,6 +931,7 @@ export function createLibrary(host: LibraryHost) {
               detail: i.detail,
               icon: i.icon,
               attention: i.attention,
+              shortcut: i.shortcut,
               run: () => {
                 section = i.icon;
                 return i.run();
@@ -1163,21 +1222,41 @@ export function createLibrary(host: LibraryHost) {
     const sections: Section[] = packs.map((p) => ({
       title: packs.length > 1 ? p.pack : t('Options du pack {pack}', { pack: p.pack }),
       rows: [
-        { text: t('Appliquée'), detail: p.applied ? p.applied.label : t('aucune : les .pup de la racine ne sont ceux d’aucune option') },
+        {
+          text: t('Appliquée'),
+          detail: !p.applied
+            ? t('aucune : les fichiers de la racine ne sont ceux d’aucune option')
+            : p.incomplete
+              ? t('{option}, en partie seulement ({differences})', { option: p.applied.label, differences: p.incomplete.join(', ') })
+              : p.applied.label,
+          tone: !p.applied || p.incomplete ? ('warning' as const) : undefined,
+        },
+        // Options aux fichiers identiques : rien sur le disque ne dit laquelle est en place.
+        ...(p.twins.length
+          ? [{ text: t('Mêmes fichiers'), detail: t('{list} : rien ne la distingue de l’appliquée', { list: p.twins.map((v) => `« ${v.label} »`).join(', ') }), tone: 'info' as const }]
+          : []),
         {
           text: t('Pour cette borne'),
-          detail: !cabinet ? t('borne pas encore configurée') : p.recommended ? t('{option} ({cabinet})', { option: p.recommended.label, cabinet: describePupCabinet(cabinet) }) : t('pas de choix net : à essayer'),
-          tone: p.recommended && p.recommended !== p.applied ? 'warning' : 'ok',
+          detail: !cabinet
+            ? t('borne pas encore configurée')
+            : p.recommended
+              ? t('{option} ({cabinet})', { option: p.recommended.label, cabinet: describePupCabinet(cabinet) })
+              : p.candidates
+                ? t('pas de choix net entre « {first} » et « {second} » ({cabinet}) : à essayer', { first: p.candidates[0].label, second: p.candidates[1].label, cabinet: describePupCabinet(cabinet) })
+                : t('pas de choix net : à essayer'),
+          // Vert seulement si l'option conseillée est en place ; sans choix net, une information.
+          tone: !cabinet ? undefined : !p.recommended ? 'info' : p.recommended !== p.applied ? 'warning' : 'ok',
         },
       ],
     }));
     const actions: Action[] = packs.flatMap((p) =>
       p.variants.map((v) => {
-        const state = v === p.applied ? t('appliquée') : v === p.recommended ? t('conseillée pour la borne') : undefined;
+        const state = v === p.applied ? (p.incomplete ? t('appliquée en partie') : t('appliquée')) : p.twins.includes(v) ? t('mêmes fichiers que l’appliquée') : undefined;
+        const advice = v === p.recommended ? t('conseillée pour la borne') : undefined;
         return {
           label: packs.length > 1 ? `${p.pack} : ${v.label}` : v.label,
-          detail: [traitsLabel(v), state].filter(Boolean).join(' · '),
-          tone: v === p.applied ? ('ok' as const) : undefined,
+          detail: [traitsLabel(v), state, advice].filter(Boolean).join(' · '),
+          tone: v === p.applied && !p.incomplete ? ('ok' as const) : undefined,
           run: () => applyPupOption(s, table, p, v),
         };
       }),
@@ -1204,18 +1283,34 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /**
-   * Applique une option : ses fichiers recopiés (les anciens .pup à la corbeille), le choix
-   * retenu dans le .info, marqué comme choisi ici (le médecin ne le remet plus en cause).
+   * Applique une option : ses fichiers recopiés (les remplacés et ceux que son .bat supprime
+   * partent à la corbeille, d'où l'on revient à l'état d'avant), le choix retenu dans le .info,
+   * marqué comme choisi ici (le médecin ne le remet plus en cause). La réussite n'est
+   * annoncée qu'après relecture du pack : l'option doit être reconnue en place (appliedOption),
+   * sinon le message dit ce qui manque.
    */
   function applyPupOption(s: Extract<Screen, { kind: 'pupOptions' }>, table: TableEntry, pack: TablePupPack, variant: PupVariant): void {
-    if (variant === pack.applied && pack.memory?.chosen === 'user') {
+    if (variant === pack.applied && !pack.incomplete && pack.memory?.chosen === 'user') {
       s.flash = t('« {option} » est déjà appliquée.', { option: variant.label });
       return host.broadcast();
     }
+    // Un fichier de l'option manque : rien n'est touché, plutôt qu'un pack à moitié changé.
+    const missing = missingSources(pack.root, variant);
+    if (missing.length) {
+      s.flash = t('« {option} » non appliquée, rien n’a changé : {files} introuvable dans le pack.', { option: variant.label, files: formatList(missing.slice(0, 3), 'and') });
+      s.pup = undefined;
+      return host.broadcast();
+    }
+    const trashDir = trashDirFor(layout()!.trash, `PuP-Pack ${path.basename(table.folder)}`); // i18n-ignore : nom de dossier
     try {
-      const trashDir = trashDirFor(layout()!.trash, `PuP-Pack ${path.basename(table.folder)}`); // i18n-ignore : nom de dossier
       applyOps(pupOptionOps(table, pack.root, pack.pack, variant, { ...(pack.memory ?? {}), chosen: 'user' }), { trashDir });
-      s.flash = t('« {option} » appliquée : elle sert dès la prochaine partie. « Jouer » pour la voir.', { option: variant.label });
+      const check = checkAppliedOption(pack.root, variant.label);
+      const done = t('« {option} » appliquée : elle sert dès la prochaine partie. « Jouer » pour la voir.', { option: variant.label });
+      s.flash = !check.ok
+        ? t('« {option} » n’est pas en place après la copie : {reason}.', { option: variant.label, reason: check.reasons.join(', ') })
+        : fs.existsSync(trashDir)
+          ? t('{message} L’état d’avant est dans la corbeille de Cyber Pinball ({folder}).', { message: done, folder: path.basename(trashDir) })
+          : done;
     } catch (error) {
       s.flash = t('Option non appliquée : {message}', { message: (error as Error).message });
     }
@@ -2335,7 +2430,12 @@ export function createLibrary(host: LibraryHost) {
     else if (is(KEYS.next)) cursor = (cursor + 1) % n;
     else if (is(KEYS.confirm)) void built.actions[cursor]?.run();
     else if (is(KEYS.exit)) built.back();
-    else return false;
+    else {
+      // Raccourci d'une entrée (affiché à droite de son libellé) : elle, sans s'y déplacer.
+      const hit = built.actions.find((a) => a.shortcut?.matches(input));
+      if (!hit) return false;
+      void hit.run();
+    }
     host.broadcast();
     return true;
   }
@@ -2456,6 +2556,7 @@ export function createLibrary(host: LibraryHost) {
     if (!screen) return undefined;
     const built = build();
     cursor = Math.min(cursor, Math.max(0, built.actions.length - 1));
+    soundPreview = playsSoundPreview(built.media);
     const editorView = (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor ? viewEditor(screen.editor) : undefined;
     return {
       screen: screen.kind,
@@ -2465,7 +2566,7 @@ export function createLibrary(host: LibraryHost) {
       lead: built.lead,
       sections: built.sections,
       back: backLabel(built),
-      actions: built.actions.map(({ label, detail, tone, icon, attention }) => ({ label, detail, tone, icon, attention: attention || undefined })),
+      actions: built.actions.map(({ label, detail, tone, icon, attention, shortcut }) => ({ label, detail, tone, icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined })),
       media: built.media,
       variant: built.variant,
       journey: built.journey,
@@ -2518,7 +2619,9 @@ export function createLibrary(host: LibraryHost) {
    * ne dépend pas du rang des actions, qui change quand on en ajoute une), et
    * « until:phase » (attendre que le menu passe à cette phase, playing ou menu par
    * exemple, deux minutes au plus : une démonstration ne parie pas sur la durée des
-   * étapes, qui varie avec le nombre d'écrans et leur définition).
+   * étapes, qui varie avec le nombre d'écrans et leur définition), « copy:source|destination »
+   * et « remove:chemin » (fichier posé ou retiré pendant que le menu tourne, comme à la main :
+   * le guet des dossiers, mediawatch.ts, doit le faire voir sans redémarrer).
    * Le garde-fou de mise en page inspecte chaque écran, pas seulement le playfield.
    */
   async function autopilot(steps: string[], captureDir: string | undefined, pressKey: (input: Input) => void, phase: () => string): Promise<void> {
@@ -2544,8 +2647,17 @@ export function createLibrary(host: LibraryHost) {
           if (phase() !== wanted) console.log(`Autopilote : phase « ${wanted} » jamais atteinte (encore « ${phase()} » après deux minutes).`);
         }
         else if (step.startsWith('click:')) await click(playfield, step.slice(6));
+        else if (step.startsWith('copy:')) {
+          const [from, to] = step.slice(5).split('|') as [string, string];
+          fs.mkdirSync(path.dirname(to), { recursive: true });
+          fs.copyFileSync(from, to);
+        } else if (step.startsWith('remove:')) fs.rmSync(step.slice(7), { force: true });
         else if (step.startsWith('action:')) activateByLabel(step.slice(7));
-        else key(step);
+        else if (/^((Control|Shift|Alt)\+)+\w+$/.test(step)) {
+          // Combinaison (« Control+Shift+KeyD ») : le raccourci tel que le clavier l'envoie.
+          const parts = step.split('+');
+          pressKey({ type: 'keyDown', code: parts.at(-1)!, key: '', control: parts.includes('Control'), shift: parts.includes('Shift'), alt: parts.includes('Alt'), meta: false } as Input);
+        } else key(step);
       }
       await delay(150);
       for (let waited = 0; busy && waited < 120_000; waited += 100) await delay(100);
@@ -2617,6 +2729,10 @@ export function createLibrary(host: LibraryHost) {
     /** Ce qu'il manque pour jouer : parcours d'une table (fiche, partie échouée, médecin). */
     openJourney: (file: string) => journeyUi.open(file),
     isActive: () => screen !== undefined,
+    /** L'écran fait écouter des sons : la musique du menu se tait (un seul son à la fois). */
+    previewsSound: () => screen !== undefined && soundPreview,
+    /** Table dont parle l'écran ouvert (fiche, médias du jeu, fichiers, parcours…) : ses médias restent sur les écrans de la borne. */
+    table: () => tableOf(screen),
     /** Une entrée du menu système attend l'utilisateur : pastille rouge sur la roue dentée. */
     attention: () => systemItems.some((i) => i.attention),
   };

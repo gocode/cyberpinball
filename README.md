@@ -77,6 +77,7 @@ The buttons are those learned by the wizard. Until then, the usual defaults of c
 | Start | 1 | Play |
 | Exit | Escape | System menu (settings, cabinet setup, updates, quit) |
 | Keyboard | Tab, or ⚙ with the mouse | System menu, from anywhere |
+| Keyboard | Ctrl+Shift+D | Windows desktop: frees every screen of the PC; again: back to the menu |
 | Keyboard | Ctrl+Shift+K | Stop a game that hangs |
 
 During a game, the keys are those in VPX's `[Input]` section, shown on the loading screen.

@@ -203,6 +203,14 @@
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item > span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -296,5 +304,6 @@
 .cp-i-exit { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-coin { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-plunger { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-tilt { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-usb { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-gamepad { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E") }

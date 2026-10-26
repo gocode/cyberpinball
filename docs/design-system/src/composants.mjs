@@ -71,16 +71,18 @@ C.LigneMenu = {
 - Fournir : une liste \`.cp-menu\` d'éléments \`.cp-menu-item\` (icône, libellé, \`<small>\` facultatif). \`.is-focus\` sur l'entrée choisie, \`.is-quiet\` sur « Quitter », \`.is-danger\` sur une action destructrice.
 - L'icône (30 px, couleur du libellé) est alignée sur la première ligne du libellé ; la pastille rouge d'une entrée qui attend l'utilisateur se pose en haut à droite de l'icône (\`.cp-glyph\` > icône + \`.cp-dot\`).
 - L'entrée choisie est une barre opaque \`signal\`, texte et icône \`on-signal\`.
+- Raccourci clavier qui fait la même chose sans passer par le menu : \`.cp-shortcut\` en dernier dans l'entrée, une \`.cp-cap\` par touche (« Ctrl », « Maj », « D ») séparées par « + », à droite de la première ligne. Les touches viennent de la définition du raccourci dans le code, jamais écrites à la main ; un bouton de joystick ne s'y montre pas.
 - Pour : menu système, configuration de la borne, menus d'Exit. Pas pour les listes de tables (voir \`Roue\` et \`CarteTable\`).`,
-  html: page('<!-- @dsCard group="Navigation" height=900 width=920 -->', `
+  html: page('<!-- @dsCard group="Navigation" height=1060 width=920 -->', `
 <ul class="cp-menu" style="width:840px">
   <li class="cp-menu-item is-focus">${i('table-add')}<span>Ajouter une table<small>Depuis le dossier d'import, une clé USB ou ce PC</small></span></li>
   <li class="cp-menu-item">${i('search')}<span>Trouver une table<small>Catalogue VPS : chaque jeu, ses versions, ce qu'il faut</small></span></li>
   <li class="cp-menu-item">${i('inbox')}<span>Liste d'attente</span></li>
   <li class="cp-menu-item">${i('chip')}<span>Bibliothèque de ROM</span></li>
-  <li class="cp-menu-item">${i('sliders')}<span>Réglages de VPX</span></li>
+  <li class="cp-menu-item">${i('sliders')}<span>Réglages de VPX</span><span class="cp-shortcut"><span class="cp-cap">R</span></span></li>
   <li class="cp-menu-item">${i('cabinet')}<span>Configuration de la borne</span></li>
   <li class="cp-menu-item"><span class="cp-glyph">${i('upgrade')}<span class="cp-dot"></span></span><span>Mise à jour de Cyber Pinball<small>0.2.0 disponible</small></span></li>
+  <li class="cp-menu-item">${i('desktop')}<span>Bureau Windows<small>Libère tous les écrans du PC</small></span><span class="cp-shortcut"><span class="cp-cap">Ctrl</span>+<span class="cp-cap">Maj</span>+<span class="cp-cap">D</span></span></li>
   <li class="cp-menu-item is-quiet">${i('power')}<span>Quitter Cyber Pinball</span></li>
 </ul>`),
 };

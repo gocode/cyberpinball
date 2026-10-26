@@ -399,7 +399,8 @@
         const node = slot?.media;
         const tag = node?.tagName;
         return {
-          element: tag === 'VIDEO' ? 'vidéo' : tag === 'IMG' ? 'image' : tag === 'CANVAS' ? 'image figée' : slot?.view ? 'repli' : 'vide', // i18n-ignore : état lu par les essais
+          // « marque » : l'affichage par défaut de Cyber Pinball (aucune table), « repli » : celui d'une table sans ce média.
+          element: tag === 'VIDEO' ? 'vidéo' : tag === 'IMG' ? 'image' : tag === 'CANVAS' ? 'image figée' : slot?.view ? (slot.view.brand ? 'marque' : 'repli') : 'vide', // i18n-ignore : état lu par les essais
           fichier: slot?.url ? decodeURIComponent(slot.url).replace(/^.*[\\/]/, '').replace(/\?v=.*$/, '') : undefined,
           lecture: tag === 'VIDEO' ? (node.paused ? 'en pause' : 'en lecture') : undefined,
         };

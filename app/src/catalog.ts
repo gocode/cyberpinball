@@ -98,6 +98,7 @@ import {
   type WaitProblem,
 } from '@cyberpinball/core';
 import { createAcquirer } from './acquire-window';
+import { createYtDlp } from './ytdlp-tool';
 import { archiveEntries } from './archives';
 import { recentDownloads, watchDownloads } from './downloads-watch';
 import type { PickRequest } from './file-picker';
@@ -358,6 +359,9 @@ export function createCatalog(ctx: CatalogContext) {
   }
 
   let vpsCache: VpsDb | undefined;
+  // yt-dlp, téléchargé à la première demande (<racine>\tools\yt-dlp) ; Cyber Pinball lui sert de moteur JavaScript.
+  // CYBERPINBALL_YTDLP : un outil tout prêt, sans installation (essais).
+  const ytdlp = createYtDlp({ root: () => ctx.layout()?.root, node: process.execPath, override: () => process.env.CYBERPINBALL_YTDLP || undefined });
   const acquirer = createAcquirer({
     dir: acquisitionDir,
     received: (file, facts) => void received(file, facts, 'window', vpsCache),
@@ -383,6 +387,7 @@ export function createCatalog(ctx: CatalogContext) {
     screen: () => host.browserScreen?.(),
     exitKeys: () => host.keys().exit,
     navKeys: () => host.keys(),
+    grabVideo: ytdlp,
   });
 
   let watcher: { stop(): void } | undefined;

@@ -3,6 +3,9 @@
 #   navigation : musique de chaque jeu, volume relatif d'un jeu, son de la vidéo du plateau
 #                quand le jeu n'a pas de musique, écran « Médias, son et attente » et ses listes ;
 #   silence    : réglages par défaut (musique coupée, vidéos muettes) : rien ne joue ;
+#   menus      : hors du menu des tables (aide, menu système, ses réglages), chaque écran montre
+#                l'affichage par défaut de Cyber Pinball (couches « marque »), en silence ; au
+#                retour à la roue, les médias et la musique de la table reviennent ; sa fiche les garde ;
 #   reglage    : fiche > « Régler l'affichage en partie » : chargement avec les boutons du menu
 #                de VPX, partie simulée, retour sur la fiche ;
 #   partie     : partie simulée (CYBERPINBALL_PARTIE_SIMULEE, VPX jamais lancé) de trois tables :
@@ -13,6 +16,10 @@
 #   pivotee    : la même partie, playfield tourné (flippers à gauche) et DMD en bande sous le
 #                fronton (zones) : chargement et fond de partie dans la bonne orientation, puis
 #                le mode attente tourné ;
+#   habillage  : FullDMD habillé (signalement du 26/10/2026, The Walking Dead) : Neon Galaxy reçoit
+#                un média FullDMD avec un cadre de DMD ; avant la partie simulée, la fenêtre du
+#                DMD de VPX est posée dans ce cadre par le .ini de la table ; pendant la partie,
+#                médias « éteints », l'écran du DMD garde l'habillage ; au retour, le menu ;
 #   attente    : mode attente après 5 s sans bouton, une table au hasard toutes les 3 s avec
 #                ses médias et sa musique au volume réduit ; un flipper, Start puis Exit en
 #                sortent sans changer la sélection, sans ouvrir la fiche ni le menu système.
@@ -27,7 +34,7 @@
 #   .\docs\demo-moments.ps1 [-Scenarios navigation, silence, partie] [-Ecrans pc-dev]
 # VPX n'est jamais lancé ; ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont touchés.
 param(
-  [string[]]$Scenarios = @('navigation', 'silence', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'attente'),
+  [string[]]$Scenarios = @('navigation', 'silence', 'menus', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'habillage', 'attente'),
   [string]$Source = 'D:\CyberPinball',
   [string]$Ecrans = 'pc-dev'
 )
@@ -62,7 +69,10 @@ $probe = node "$wt\packages\win-displays\dist\cli.js" --json | ConvertFrom-Json
 $output = @($probe.audio)[0]
 
 # Touches : celles des encodeurs par défaut (flèches, Start = 1, Exit = Échap).
-$Start = 'Digit1'; $Exit = 'Escape'; $Down = 'ArrowDown'; $Up = 'ArrowUp'
+$Start = 'Digit1'; $Exit = 'Escape'; $Down = 'ArrowDown'; $Up = 'ArrowUp'; $Help = 'KeyH'
+# Écrans de la borne hors du menu des tables : affichage par défaut (scénario « menus »).
+$marque = @{ 'playfield/playfield' = 'marque'; 'backglass/backglass' = 'marque'; 'dmd/dmd' = 'marque'; 'topper/topper' = 'marque' }
+$neon = @{ 'playfield/playfield' = 'vidéo en lecture'; 'backglass/backglass' = 'vidéo en lecture'; 'topper/topper' = 'vidéo en lecture' }
 $scenes = @{
   navigation = @{
     Reglages = @{ music = $true; musicVolume = 60; videoVolume = 40; launchVolume = 80 }
@@ -76,9 +86,9 @@ $scenes = @{
       # Les attentes gardent à chaque étape son numéro (captures attendues ci-dessous).
       $Exit, 'wait:200', 'wait:200', 'wait:200', 'wait:200', # 14 menu système
       'action:son et attente',    # 15 l'écran « Médias, son et attente »
-      'action:Musique des jeux', 'wait:1000',     # 17 musique coupée (le fond du menu, caché par l'écran, est en pause)
+      'action:Musique des jeux', 'wait:1000',     # 17 musique coupée ; menu système : rien d'une table ne s'entend
       'wait:200', 'wait:200', 'action:Son des vidéos du menu', # 20 liste « Son des vidéos du menu », sur 40 %
-      $Down, $Start, 'wait:1000', # 23 50 %
+      $Down, $Start, 'wait:1000', # 23 50 %, toujours en silence
       $Exit, $Exit, 'wait:1500',  # 26 retour aux tables : la vidéo de Rocket Rally s'entend à 50 %
       $Exit, 'wait:200', 'wait:200', 'wait:200', 'wait:200', 'action:son et attente', # 32 de nouveau l'écran des réglages
       'action:Présentation du menu', # 33 la liste des roues et de la liste, sur Médaillons
@@ -90,8 +100,8 @@ $scenes = @{
       '05-wait_1500' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0 }
       '07-wait_1500' = @{ musique = "(Audio) Pharaoh's Gold (Gottlieb 1979).wav"; volume = 0.3; video = 0 }
       '09-wait_1500' = @{ musique = $null; video = 0.4 }
-      '17-wait_1000' = @{ musique = $null; video = 0.4; pause = $true }
-      '23-wait_1000' = @{ musique = $null; video = 0.5; pause = $true }
+      '17-wait_1000' = @{ musique = $null; video = 0; couches = $marque }
+      '23-wait_1000' = @{ musique = $null; video = 0; couches = $marque }
       '26-wait_1500' = @{ musique = $null; video = 0.5 }
     }
   }
@@ -101,6 +111,33 @@ $scenes = @{
     Attendu = @{
       '05-wait_1500' = @{ musique = $null; video = 0 }
       '08-wait_1500' = @{ musique = $null; video = 0 }
+    }
+  }
+  # Hors du menu des tables (signalement du 26/10/2026) : aide, menu système et ses réglages
+  # montrent l'affichage par défaut sur tous les écrans, sans musique ni vidéo de la table ;
+  # le retour à la roue rend ses médias à la table choisie, et sa fiche les garde.
+  menus = @{
+    Reglages = @{ music = $true; musicVolume = 60; videoVolume = 40 }
+    Etapes = @(
+      $Down, $Down, $Down, 'wait:1500', # 04 Neon Galaxy : ses vidéos, sa musique
+      $Help, 'wait:1000',         # 06 aide des commandes : affichage par défaut
+      $Help, 'wait:1500',         # 08 aide fermée : Neon Galaxy revient
+      $Exit, 'wait:1000',         # 10 menu système : affichage par défaut, silence
+      'action:son et attente', 'wait:1000', # 12 ses réglages : toujours l'affichage par défaut
+      $Exit, $Exit, 'wait:1500',  # 15 retour à la roue : Neon Galaxy revient
+      $Start, 'wait:1000',        # 17 sa fiche : elle parle de Neon Galaxy, qui reste
+      $Exit, 'wait:1000'          # 19 retour à la roue
+    )
+    Attendu = @{
+      '04-wait_1500' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu'; couches = $neon }
+      '06-wait_1000' = @{ musique = $null; video = 0; phase = 'menu'; couches = $marque }
+      '08-wait_1500' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu'; couches = $neon }
+      '10-wait_1000' = @{ musique = $null; video = 0; phase = 'library'; couches = $marque }
+      '12-wait_1000' = @{ musique = $null; video = 0; phase = 'library'; couches = $marque }
+      '15-wait_1500' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu'; couches = $neon }
+      # Fiche : le fond du playfield, caché par l'écran, est en pause.
+      '17-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; pause = $true; phase = 'library'; couches = @{ 'backglass/backglass' = 'vidéo en lecture'; 'topper/topper' = 'vidéo en lecture' } }
+      '19-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu'; couches = $neon }
     }
   }
   # Présentation en liste (réglage « Présentation du menu : liste ») : sept lignes fixes, la
@@ -207,6 +244,45 @@ $scenes = @{
       '16-ArrowUp' = @{ etat = @{ attente = $false; phase = 'menu'; position = 3 } }
     }
   }
+  habillage = @{
+    Reglages = @{ music = $false; game = 'off' }
+    Simulee = 'backglass'
+    # Média FullDMD habillé (illustration, cadre, DMD figé : framedFullDmd des essais) pour Neon Galaxy.
+    Avant = {
+      param($root)
+      $folder = "$root\tables\Neon Galaxy (Williams 1992)"
+      $info = "$folder\Neon Galaxy (Williams 1992).info"
+      if (Test-Path -LiteralPath $info) { Copy-Item -LiteralPath $info "$folder\info.avant" -Force }
+      node -e "const f = require('./packages/core/dist/test/fixtures.js'); const p = require('./packages/core/dist/png.js'); require('fs').writeFileSync(process.argv[1], p.encodePng(f.framedFullDmd({ width: 1920, height: 1080 }).image))" "$folder\medias\(FullDMD) Neon Galaxy (Williams 1992).png"
+    }
+    # La fenêtre du DMD posée dans le cadre pour cette table seule ; puis la table rendue telle quelle aux autres scénarios.
+    Apres = {
+      param($root, $captures)
+      $folder = "$root\tables\Neon Galaxy (Williams 1992)"
+      $ini = "$folder\Neon Galaxy (Williams 1992).ini"
+      $problems = @()
+      $text = if (Test-Path $ini) { Get-Content $ini -Raw } else { '' }
+      if ($text -notmatch 'ScoreViewFullScreen = 0' -or $text -notmatch 'ScoreViewWndX = \d+' -or $text -notmatch 'ScoreViewHeight = \d+') { $problems += "fenêtre du DMD absente du .ini de la table : $text" }
+      else { Write-Host "  .ini de la table : $(($text -split "`r?`n" | Where-Object { $_ -match '^ScoreView' }) -join ' · ')" }
+      if (-not (Select-String -Path "$captures\sortie.txt" -Pattern 'Habillage FullDMD .* DMD posé dans le cadre' -Quiet)) { $problems += 'journal : DMD non posé dans le cadre' }
+      Remove-Item $ini, "$folder\medias\(FullDMD) Neon Galaxy (Williams 1992).png" -ErrorAction SilentlyContinue
+      # Le .info retient la place écrite (CyberPinball.fullDmd) : rendu tel qu'il était.
+      $info = "$folder\Neon Galaxy (Williams 1992).info"
+      if (Test-Path -LiteralPath "$folder\info.avant") { Move-Item -LiteralPath "$folder\info.avant" $info -Force } else { Remove-Item -LiteralPath $info -ErrorAction SilentlyContinue }
+      $problems
+    }
+    Etapes = @(
+      $Down, $Down, $Down, 'wait:1000', # 04 Neon Galaxy : son média FullDMD habillé sur l'écran du DMD
+      $Start, $Start, 'wait:1500', # 07 chargement
+      'until:playing',            # 08 partie, médias éteints : l'habillage reste sur l'écran du DMD
+      'until:menu'                # 09 retour au menu
+    )
+    Attendu = @{
+      '04-wait_1000' = @{ phase = 'menu'; couches = @{ 'dmd/dmd' = 'image' } }
+      '08-until_playing' = @{ phase = 'playing'; couches = @{ 'dmd/dmd' = 'image figée' } }
+      '09-until_menu' = @{ phase = 'menu'; couches = @{ 'dmd/dmd' = 'image' } }
+    }
+  }
   attente = @{
     Reglages = @{ music = $true; musicVolume = 60; videoVolume = 50; launchVolume = 80; attractDelay = 5; attractInterval = 3; attractSound = 'reduced' }
     Etapes = @(
@@ -264,6 +340,7 @@ foreach ($name in $Scenarios) {
   }
   $model | ConvertTo-Json -Depth 20 | Set-Content -Path "$home_\cabinet.json" -Encoding UTF8
   if ($scene.Reglages) { $scene.Reglages | ConvertTo-Json | Set-Content -Path "$home_\medias.json" -Encoding UTF8 }
+  if ($scene.Avant) { Push-Location $wt; try { & $scene.Avant $root } finally { Pop-Location } }
 
   $env:CYBERPINBALL_ROOT = $root
   $env:CYBERPINBALL_HOME = $home_
@@ -279,6 +356,7 @@ foreach ($name in $Scenarios) {
   $line = "`"$electron`" app --user-data-dir=`"$dir\chromium`" > `"$captures\sortie.txt`" 2> `"$captures\erreurs.txt`""
   Start-Process -FilePath cmd.exe -ArgumentList '/d', '/c', "`"$line`"" -WorkingDirectory $wt -NoNewWindow -Wait
   Assert-HorsEcran $captures
+  if ($scene.Apres) { foreach ($p in @(& $scene.Apres $root $captures)) { if ($p) { $failures += "$name : $p" } } }
 
   $layout = Get-Content "$captures\mise-en-page.txt" -Raw -Encoding UTF8
   if ($layout -notmatch '^Aucun problème') { $failures += "$name : mise en page`n$layout" }

@@ -11,15 +11,18 @@
 //    fin, seules celles que Cyber Pinball a masquées reviennent (coexistence.ts).
 // 4. Deux fois par seconde, la pile des fenêtres de Windows est relue (screenCover) : un
 //    écran qui reste découvert, ou sous la barre des tâches, est signalé dans la console.
+// 5. En mode bureau (desktop-mode.ts), l'inverse : les voiles sont cachés, ceux d'un écran
+//    branché entre-temps naissent cachés, et un écran qu'une fenêtre de Cyber Pinball
+//    recouvre encore est signalé (desktopBlockers). Au retour, chaque écran retrouve son voile.
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { app, BrowserWindow, screen, type Display, type Rectangle } from 'electron';
-import { coverNotice, parseTaskbarMarker, screenCover, taskbarMarkerText, taskbarsToRestore, type HiddenTaskbar } from '@cyberpinball/core';
+import { coverNotice, desktopBlockers, parseTaskbarMarker, screenCover, taskbarMarkerText, taskbarsToRestore, type HiddenTaskbar } from '@cyberpinball/core';
 import { allowAnyForeground, hideWindow, listWindows, showWindowInactive, taskbarWindows } from '@cyberpinball/win-displays';
-import { createWindow, desktopDisplays, OFFSCREEN, paintedOnScreen } from './offscreen';
+import { createWindow, desktopDisplays, isShown, OFFSCREEN, paintedOnScreen } from './offscreen';
 import { coverDisplay, coverProblem } from './cover-display';
 import { locations } from './paths';
 
@@ -42,8 +45,12 @@ const veils = new Map<number, BrowserWindow>();
 const veilSet = new WeakSet<BrowserWindow>();
 /** Nom des écrans dans les constats (rôle dans la borne), par identifiant d'écran. */
 const names = new Map<number, string>();
-/** Raison pour laquelle le bureau peut se voir (« Bureau Windows », fermeture) ; undefined : il ne doit pas. */
+/** Raison pour laquelle le bureau peut se voir (mode bureau, fermeture) ; undefined : il ne doit pas. */
 let desktopAllowed: string | undefined;
+/** Mode bureau : les voiles restent cachés, aucune fenêtre de Cyber Pinball ne doit couvrir un écran. */
+let desktopMode = false;
+/** Mode bureau : constat déjà fait, par écran (fenêtres qui le recouvraient). */
+const desktopReported = new Map<number, string>();
 let relaunching = false;
 const uncoveredSince = new Map<number, number>();
 const reported = new Map<number, string>();
@@ -129,8 +136,14 @@ function openVeil(d: Display): BrowserWindow {
   // Le voile n'apparaît que peint en noir ; avant sa première image, il serait transparent
   // (createWindow) : au démarrage, le bureau se voit un peu plus longtemps ; à une relance, les
   // fenêtres de l'ancien processus couvrent les écrans jusque-là.
-  win.once('ready-to-show', () => win.isDestroyed() || win.showInactive());
+  // En mode bureau (écran branché entre-temps), il attend caché le retour au menu.
+  win.once('ready-to-show', () => win.isDestroyed() || desktopMode || win.showInactive());
   return win;
+}
+
+/** Voile noir du gardien des écrans (le mode bureau le cache au lieu de le réduire). */
+export function isVeil(win: BrowserWindow): boolean {
+  return veilSet.has(win);
 }
 
 function sameRect(a: Rectangle, b: Rectangle): boolean {
@@ -221,12 +234,24 @@ export function nameScreen(bounds: Rectangle, name: string): void {
 }
 
 /**
- * Le bureau peut se voir (menu système > « Bureau Windows ») : plus de constat jusqu'à
- * l'appel avec undefined.
+ * Mode bureau (desktop-mode.ts) : le bureau doit se voir sur chaque écran. Les barres des
+ * tâches qu'une partie aurait laissées masquées reviennent ; les voiles déjà cachés par
+ * le mode bureau le restent, ceux d'un écran branché entre-temps naissent cachés. Au
+ * retour (false), chaque écran, même branché pendant le mode bureau, retrouve son voile.
  */
-export function allowDesktop(reason: string | undefined): void {
-  desktopAllowed = reason;
-  if (!reason) uncoveredSince.clear();
+export function setDesktopMode(on: boolean): void {
+  if (on === desktopMode) return;
+  desktopMode = on;
+  desktopAllowed = on ? 'mode bureau' : undefined; // i18n-ignore : raison gardée par le gardien des écrans, jamais affichée
+  uncoveredSince.clear();
+  desktopReported.clear();
+  if (OFFSCREEN) return;
+  if (on) {
+    if (hiddenTaskbars.length) restoreTaskbars();
+    return;
+  }
+  placeVeils(true);
+  for (const veil of veils.values()) if (!veil.isDestroyed() && !isShown(veil)) veil.showInactive();
 }
 
 /** Constats depuis le dernier appel (écrans restés découverts), pour le bilan d'endurance. */
@@ -237,6 +262,7 @@ export function takeCoverIncidents(): string[] {
 }
 
 function checkScreens(): void {
+  if (desktopMode) return checkDesktop();
   if (desktopAllowed || relaunching) return;
   const stack = listWindows((w) => w.visible);
   const now = Date.now();
@@ -256,6 +282,39 @@ function checkScreens(): void {
     incidents.push(line);
     console.warn(line);
   }
+}
+
+/**
+ * Mode bureau : un écran qu'une fenêtre de Cyber Pinball recouvre encore, même en partie,
+ * au-delà du temps d'une réduction, est signalé une fois (le mode bureau la range de nouveau).
+ */
+function checkDesktop(): void {
+  const stack = listWindows((w) => w.visible);
+  const now = Date.now();
+  for (const d of desktopDisplays()) {
+    const blockers = desktopBlockers(screen.dipToScreenRect(null, d.bounds), stack, [process.pid]);
+    if (!blockers.length) {
+      uncoveredSince.delete(d.id);
+      if (desktopReported.delete(d.id)) console.log(`Mode bureau : écran ${screenName(d)} de nouveau libre.`);
+      continue;
+    }
+    const since = uncoveredSince.get(d.id) ?? now;
+    uncoveredSince.set(d.id, since);
+    const titles = formatTitles(blockers.map((w) => w.title));
+    if (now - since < REPORT_AFTER_MS || desktopReported.get(d.id) === titles) continue;
+    desktopReported.set(d.id, titles);
+    const line = `Mode bureau : écran ${screenName(d)} encore couvert par ${titles}.`; // i18n-ignore : constat pour la console et le bilan d’endurance
+    incidents.push(line);
+    console.warn(line);
+  }
+}
+
+function screenName(d: Display): string {
+  return `« ${names.get(d.id) ?? `${d.bounds.width} × ${d.bounds.height} en ${d.bounds.x}, ${d.bounds.y}`} »`;
+}
+
+function formatTitles(titles: string[]): string {
+  return [...new Set(titles)].map((title) => `« ${title || 'fenêtre sans titre'} »`).join(', '); // i18n-ignore : constat pour la console
 }
 
 /**

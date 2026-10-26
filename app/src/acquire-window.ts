@@ -15,6 +15,11 @@
 // le pointeur, qui pouvait être sur un écran qui le cache. Une ligne de plus dans le bandeau
 // dit quand l'écran choisi n'est pas branché, ou que le playfield choisi est de travers.
 // Exit de la borne la ferme, comme Échap.
+// Recherche libre (« Chercher moi-même sur le web… », docs/recherche/sources-medias.md § 7) :
+// le bandeau gagne un champ de recherche prérempli et ses moteurs (web, images, vidéos,
+// YouTube) ; sur une page vidéo, une ligne la décrit (sonde VIDEO_PAGE_PROBE) et, quand la
+// page lit un fichier vidéo ordinaire, « Télécharger cette vidéo » le rend au média.
+
 // Chaque téléchargement de la session est rangé dans <racine>\downloads\acquisition, puis
 // remis à l'application avec la chaîne de redirections : la fiche traversée dit à quel
 // élément de la liste d'attente il revient.
@@ -35,11 +40,22 @@ import {
   PAGE_SIZE_PROBE,
   type PageSizeHint,
   DOWNLOAD_PROBES,
+  checkVideoPage,
+  formatClock,
   formatTransfer,
   probeReasonText,
   t,
   transferPercent,
+  VIDEO_PAGE_PROBE,
+  videoSiteName,
   WAIT_PROBES,
+  webEngineLabel,
+  webEngineUrl,
+  webSearchOf,
+  WEB_ENGINES,
+  type GrabKind,
+  type VideoPage,
+  type WebEngine,
   type NavigationKeys,
   type ProbeResult,
   type SiteCookie,
@@ -51,13 +67,20 @@ import { setCursorPosition } from '@cyberpinball/win-displays';
 import { coverDisplay, fillBelow } from './cover-display';
 import { onJoystickInput } from './joystick-input';
 import { createWindow, OFFSCREEN, primaryRect } from './offscreen';
+import type { GrabProgress, GrabResult } from './ytdlp-tool';
 
 export const ACQUIRE_PARTITION = 'persist:acquisition';
 /** Message du bandeau quand la fenêtre reprend où l'utilisateur en était. */
-const RESUMED = () => t('Repris là où vous en étiez. « Retour à la fiche » revient à la page de départ.');
+const RESUMED = (request: AcquireRequest) =>
+  request.search ? t('Repris là où vous en étiez. « Retour à la recherche » revient à la première page de résultats.') : t('Repris là où vous en étiez. « Retour à la fiche » revient à la page de départ.');
 /** Hauteur du bandeau de Cyber Pinball, en pixels ; avec la ligne sur l'écran retenu (écran choisi pas branché, playfield tourné). */
 const BAR = 96;
 const BAR_WITH_NOTE = 122;
+/** Recherche libre : la ligne du champ de recherche ; sur une page vidéo, la ligne qui la décrit (acquire.css). */
+const SEARCH_ROW = 52;
+const VIDEO_ROW = 40;
+/** Une page vidéo se lit après son chargement, puis de nouveau un peu plus tard (YouTube écrit son titre après coup). */
+const VIDEO_PROBE_DELAYS = [700, 3000];
 /** Une ligne de téléchargement en cours sous le bandeau (acquire.css, .download), et la marge qui les suit. */
 const DOWNLOAD_ROW = 34;
 const DOWNLOAD_PAD = 8;
@@ -84,6 +107,11 @@ export interface AcquireRequest {
   host: string;
   /** Ce que la page téléchargera revient à ce destinataire (un média), pas à la liste d'attente. */
   claim?: DownloadClaim;
+  /**
+   * Recherche libre : un champ de recherche dans le bandeau, prérempli, avec ses moteurs ;
+   * « Retour à la recherche » au lieu de « Retour à la fiche » ; les pages vidéo y sont décrites.
+   */
+  search?: { query: string; engine: WebEngine; want?: GrabKind };
 }
 
 /**
@@ -120,6 +148,14 @@ export interface AcquireEvents {
   exitKeys?(): string[];
   /** Boutons de l'interface qui annulent un téléchargement à la borne : Valider (Start), Précédent et Suivant (flippers). */
   navKeys?(): Pick<NavigationKeys, 'previous' | 'next' | 'confirm'>;
+  /**
+   * Recherche libre : la vidéo ou le son d'une page vidéo qui ne lit pas de fichier ordinaire
+   * (YouTube, Vimeo…), par yt-dlp (ytdlp-tool.ts) ; absent : pas proposé.
+   */
+  grabVideo?: {
+    installed(): boolean;
+    grab(request: { url: string; want: GrabKind; out: string; signal: AbortSignal; progress(p: GrabProgress): void }): Promise<GrabResult>;
+  };
 }
 
 /** Ligne du bandeau pour un téléchargement en cours. */
@@ -147,6 +183,10 @@ export interface AcquireOpen {
   screenNote?: string;
   /** Change la hauteur du bandeau (la page du site suit en dessous). */
   setBar?(height: number): void;
+  /** Recherche libre : la page affichée est une page vidéo (sonde VIDEO_PAGE_PROBE). */
+  video?: VideoPage;
+  /** Recherche libre : la dernière page de résultats vue, dont le champ garde le texte sur les pages suivantes. */
+  lastSearch?: { query: string; engine: WebEngine };
 }
 
 /** Nom libre dans `dir` : « table.zip », sinon « table (2).zip ». */
@@ -312,25 +352,35 @@ export function createAcquirer(events: AcquireEvents) {
 
   /** Lignes du bandeau : une par téléchargement, la dernière résume les autres au-delà de DOWNLOAD_ROWS. */
   function downloadLines(): { lines: DownloadLine[]; more?: string } {
-    const all = [...downloads.values()].map((d): DownloadLine => {
+    const entries: { id: number; progress: TransferProgress; line: DownloadLine }[] = [...downloads.values()].map((d) => {
       const state = d.item.isPaused() ? 'paused' : d.item.getState() === 'interrupted' ? 'interrupted' : 'progressing';
       const text = formatTransfer(d.progress);
       const percent = transferPercent(d.progress);
       return {
         id: d.id,
-        filename: d.filename,
-        state,
-        ...(percent !== undefined ? { percent } : {}),
-        text: state === 'paused' ? t('En pause · {progress}', { progress: text }) : state === 'interrupted' ? t('Interrompu · {progress}', { progress: text }) : text,
-        ...(armed?.id === d.id ? { armed: true } : {}),
+        progress: d.progress,
+        line: {
+          id: d.id,
+          filename: d.filename,
+          state,
+          ...(percent !== undefined ? { percent } : {}),
+          text: state === 'paused' ? t('En pause · {progress}', { progress: text }) : state === 'interrupted' ? t('Interrompu · {progress}', { progress: text }) : text,
+          ...(armed?.id === d.id ? { armed: true } : {}),
+        },
       };
     });
+    for (const g of grabs.values()) {
+      const percent = transferPercent(g.progress);
+      const text = g.phase === 'install' ? t('Installation de yt-dlp · {progress}', { progress: formatTransfer(g.progress) }) : g.progress.received ? formatTransfer(g.progress) : t('yt-dlp prépare la page…');
+      entries.push({ id: g.id, progress: g.progress, line: { id: g.id, filename: g.label, state: 'progressing', ...(percent !== undefined ? { percent } : {}), text, ...(armed?.id === g.id ? { armed: true } : {}) } });
+    }
+    const all = entries.map((e) => e.line);
     if (all.length <= DOWNLOAD_ROWS) return { lines: all };
     // Le téléchargement désigné à la borne reste visible ; les autres se résument.
     const shown = all.slice(0, DOWNLOAD_ROWS - 1);
     const pick = all.find((l) => l.armed);
     if (pick && !shown.includes(pick)) shown[shown.length - 1] = pick;
-    const rest = [...downloads.values()].filter((d) => !shown.some((l) => l.id === d.id));
+    const rest = entries.filter((d) => !shown.some((l) => l.id === d.id));
     const sum: TransferProgress = { received: rest.reduce((n, d) => n + d.progress.received, 0) };
     if (rest.every((d) => d.progress.total)) sum.total = rest.reduce((n, d) => n + d.progress.total!, 0);
     if (sum.total && rest.some((d) => d.progress.approx)) sum.approx = true;
@@ -339,9 +389,55 @@ export function createAcquirer(events: AcquireEvents) {
     return { lines: shown, more: t('Et {n} autres : {progress}', { n: rest.length, progress: formatTransfer(sum) }) };
   }
 
-  /** Hauteur du bandeau : la base (avec la ligne sur l'écran retenu), plus une ligne par téléchargement. */
+  /** Hauteur du bandeau : la base (avec la ligne sur l'écran retenu), le champ de recherche, la page vidéo, une ligne par téléchargement. */
   function barHeight(rows: number): number {
-    return (open?.screenNote ? BAR_WITH_NOTE : BAR) + (rows ? rows * DOWNLOAD_ROW + DOWNLOAD_PAD : 0);
+    const base = open?.screenNote ? BAR_WITH_NOTE : BAR;
+    return base + (open?.request.search ? SEARCH_ROW : 0) + (open?.request.search && open.video ? VIDEO_ROW : 0) + (rows ? rows * DOWNLOAD_ROW + DOWNLOAD_PAD : 0);
+  }
+
+  /** Ligne d'une page vidéo : ce qu'elle est, et ce que Cyber Pinball peut en faire. */
+  function videoLine(video: VideoPage): { text: string; hint: string; direct: boolean; grab?: { preferred: GrabKind } } {
+    const duration = video.duration ? ` · ${formatClock(video.duration)}` : '';
+    const text = video.site === 'other' ? t('Vidéo de la page : « {title} »{duration}', { title: video.title, duration }) : t('Vidéo {site} : « {title} »{duration}', { site: videoSiteName(video.site), title: video.title, duration });
+    if (video.direct) return { text, hint: t('La page lit un fichier vidéo : « Télécharger cette vidéo » le rend au média, son son compris.'), direct: true };
+    // yt-dlp : seulement pour une recherche partie d'un média (le fichier lui revient).
+    if (events.grabVideo && open && claims.has(open.view.webContents.id)) {
+      return {
+        text,
+        hint: events.grabVideo.installed()
+          ? t('yt-dlp récupère le son seul (M4A) ou la vidéo seule (MP4), vérifiés puis proposés pour le média.')
+          : t('La première fois, Cyber Pinball télécharge l’outil yt-dlp depuis GitHub (18 Mo, vérifié) ; ensuite le son seul (M4A) ou la vidéo seule (MP4).'),
+        direct: false,
+        grab: { preferred: open.request.search?.want ?? 'video' },
+      };
+    }
+    return {
+      text,
+      hint: t('Récupérer la vidéo ou son son demanderait un outil externe (yt-dlp) que Cyber Pinball n’a pas : prenez un fichier que la page propose au téléchargement.'),
+      direct: false,
+    };
+  }
+
+  /** Recherche libre : lit la page affichée, et dit dans le bandeau si c'est une page vidéo. */
+  function probeVideo(contents: Electron.WebContents): void {
+    if (!open?.request.search) return;
+    for (const wait of VIDEO_PROBE_DELAYS) {
+      setTimeout(() => {
+        if (!open || contents.isDestroyed() || contents !== open.view.webContents) return;
+        const url = contents.getURL();
+        contents
+          .executeJavaScript(VIDEO_PAGE_PROBE, true)
+          .then((raw: unknown) => {
+            // La page a changé entre-temps : sa propre lecture suivra.
+            if (!open || contents.isDestroyed() || contents.getURL() !== url) return;
+            const video = checkVideoPage(raw);
+            if (JSON.stringify(video) === JSON.stringify(open.video)) return;
+            open.video = video;
+            sendBar();
+          })
+          .catch(() => undefined);
+      }, wait);
+    }
   }
 
   /** Annule un téléchargement en cours (bouton Annuler, ou Start à la borne). */
@@ -349,6 +445,70 @@ export function createAcquirer(events: AcquireEvents) {
     const d = downloads.get(id);
     armed = undefined;
     if (d && d.item.getState() !== 'completed') d.item.cancel();
+    grabs.get(id)?.stop.abort();
+  }
+
+  /** Récupérations en cours par yt-dlp : une ligne chacune dans le bandeau, comme un téléchargement. */
+  type Grab = { id: number; url: string; want: GrabKind; label: string; phase: GrabProgress['phase']; meter: TransferMeter; progress: TransferProgress; stop: AbortController };
+  const grabs = new Map<number, Grab>();
+  let grabRedraw: NodeJS.Timeout | undefined;
+
+  /** La vidéo ou le son de la page affichée, par yt-dlp ; le fichier revient au média comme un téléchargement. */
+  function grabVideo(want: GrabKind): void {
+    if (!open || !events.grabVideo) return;
+    const contents = open.view.webContents;
+    const video = open.video;
+    const claim = claims.get(contents.id);
+    if (!video || video.direct || !claim) return;
+    if ([...grabs.values()].some((g) => g.url === video.url && g.want === want)) return;
+    const first = !events.grabVideo.installed();
+    const what = want === 'audio' ? t('le son') : t('la vidéo');
+    const meter = createTransferMeter();
+    const grab: Grab = {
+      id: nextDownload++,
+      url: video.url,
+      want,
+      label: want === 'audio' ? t('Son de « {title} »', { title: video.title }) : t('Vidéo de « {title} »', { title: video.title }),
+      phase: first ? 'install' : 'download',
+      meter,
+      progress: { received: 0 },
+      stop: new AbortController(),
+    };
+    grabs.set(grab.id, grab);
+    setStatus(first ? t('Première fois : yt-dlp se télécharge depuis GitHub (18 Mo, vérifié), puis récupère {what}…', { what }) : t('yt-dlp récupère {what} de la page…', { what }));
+    const out = path.join(claim.dir, `yt-dlp-${Date.now().toString(36)}`);
+    void events.grabVideo
+      .grab({
+        url: video.url,
+        want,
+        out,
+        signal: grab.stop.signal,
+        progress: (p) => {
+          if (p.phase !== grab.phase) grab.meter = createTransferMeter();
+          grab.phase = p.phase;
+          grab.progress = grab.meter.update(p.received, p.total, Date.now(), p.approx);
+          if (p.phase === 'download') claim.progress?.(grab.progress);
+          // Redessiné quatre fois par seconde au plus, comme les téléchargements.
+          grabRedraw ??= setTimeout(() => {
+            grabRedraw = undefined;
+            sendBar();
+          }, SAMPLE_MS);
+        },
+      })
+      .then((result) => {
+        grabs.delete(grab.id);
+        if (armed?.id === grab.id) armed = undefined;
+        if (result.ok) {
+          const filename = path.basename(result.file);
+          if (open && contents === open.view.webContents) setStatus(t('Reçu : {file}, vérifié puis proposé pour le média. Fermer (Échap) pour le voir.', { file: filename }));
+          claim.done({ file: result.file, filename, urls: [video.url] });
+        } else {
+          if (open && contents === open.view.webContents) setStatus(result.cancelled ? t('Récupération arrêtée : rien n’a été gardé.') : t('yt-dlp n’a pas pu récupérer {what} : {reason}', { what, reason: result.reason }), !result.cancelled);
+          claim.done({ error: result.cancelled ? 'cancelled' : 'interrupted' });
+        }
+        sendBar();
+      });
+    sendBar();
   }
 
   /**
@@ -356,12 +516,12 @@ export function createAcquirer(events: AcquireEvents) {
    * en choisissent un autre, Start de nouveau l'annule. Vrai si la touche a servi.
    */
   function cabinetKey(input: Electron.Input): boolean {
-    if (input.type !== 'keyDown' || !downloads.size) return false;
+    if (input.type !== 'keyDown' || (!downloads.size && !grabs.size)) return false;
     const keys = events.navKeys?.();
     if (!keys) return false;
-    const ids = [...downloads.keys()];
+    const ids = [...downloads.keys(), ...grabs.keys()];
     const now = Date.now();
-    const current = armed && now <= armed.until && downloads.has(armed.id) ? armed.id : undefined;
+    const current = armed && now <= armed.until && ids.includes(armed.id) ? armed.id : undefined;
     if (keys.confirm.includes(input.code)) {
       if (input.isAutoRepeat) return true;
       if (current !== undefined) cancelDownload(current);
@@ -400,8 +560,11 @@ export function createAcquirer(events: AcquireEvents) {
     const { claim: _claim, ...request } = open.request;
     const { lines, more } = downloadLines();
     const height = barHeight(lines.length + (more ? 1 : 0));
+    const search = open.request.search ? (webSearchOf(v.getURL()) ?? open.lastSearch ?? open.request.search) : undefined;
     open.win.webContents.send('acquire:state', {
       ...request,
+      search: search ? { ...search, engines: WEB_ENGINES.map((id) => ({ id, label: webEngineLabel(id) })) } : undefined,
+      video: open.request.search && open.video ? videoLine(open.video) : undefined,
       status: open.status,
       warn: open.warn === true,
       screenNote: open.screenNote,
@@ -415,6 +578,8 @@ export function createAcquirer(events: AcquireEvents) {
   }
 
   let ipcReady = false;
+  /** Le champ de recherche du bandeau a le clavier. */
+  let barTyping = false;
   function registerIpc(): void {
     if (ipcReady) return;
     ipcReady = true;
@@ -432,6 +597,26 @@ export function createAcquirer(events: AcquireEvents) {
     ipcMain.on('acquire:cancel', (e, id: unknown) => {
       if (open && e.sender === open.win.webContents && typeof id === 'number') cancelDownload(id);
     });
+    // Recherche libre : le texte et le moteur choisis dans le bandeau.
+    ipcMain.on('acquire:search', (e, query: unknown, engine: unknown) => {
+      if (!open?.request.search || e.sender !== open.win.webContents || typeof query !== 'string' || !query.trim()) return;
+      const chosen = WEB_ENGINES.includes(engine as WebEngine) ? (engine as WebEngine) : 'web';
+      void open.view.webContents.loadURL(webEngineUrl(query, chosen));
+    });
+    // « Télécharger cette vidéo » : le fichier que la page lit, téléchargé comme un lien (il revient au média).
+    // « Récupérer le son » / « Récupérer la vidéo » : yt-dlp, sur la page vidéo affichée.
+    ipcMain.on('acquire:grab', (e, want: unknown) => {
+      if (!open || e.sender !== open.win.webContents || (want !== 'audio' && want !== 'video')) return;
+      grabVideo(want);
+    });
+    ipcMain.on('acquire:video', (e) => {
+      if (!open?.video?.direct || e.sender !== open.win.webContents) return;
+      open.view.webContents.downloadURL(open.video.direct);
+    });
+    // Champ de recherche du bandeau : tant qu'on y tape, les touches ne sont pas des boutons de la borne.
+    ipcMain.on('acquire:typing', (e, typing: unknown) => {
+      if (open && e.sender === open.win.webContents) barTyping = typing === true;
+    });
   }
 
   /**
@@ -447,12 +632,14 @@ export function createAcquirer(events: AcquireEvents) {
       const resume = open.request.url === request.url && Boolean(contents.getURL()) && contents.getURL() !== 'about:blank';
       claimFor(contents.id, request.claim);
       open.request = request;
+      if (!resume) open.video = undefined;
       if (resume) {
-        open.status = RESUMED();
+        open.status = RESUMED(request);
         open.warn = false;
       } else {
         open.status = request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.');
-        open.warn = request.status !== undefined;
+        // Le message d'une recherche libre est un mode d'emploi, pas un avertissement.
+        open.warn = request.status !== undefined && !request.search;
         void contents.loadURL(request.url);
       }
       sendBar();
@@ -482,8 +669,10 @@ export function createAcquirer(events: AcquireEvents) {
     });
     win.contentView.addChildView(view);
     open = restore
-      ? { win, view, request, status: RESUMED() }
-      : { win, view, request, status: request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.'), warn: request.status !== undefined };
+      ? { win, view, request, status: RESUMED(request) }
+      : { win, view, request, status: request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.'), warn: request.status !== undefined && !request.search };
+    // Reprise : le texte de la dernière page de résultats de l'historique gardé.
+    if (restore) open.lastSearch = restore.entries.slice(0, restore.index + 1).reverse().map((e) => webSearchOf(e.url)).find(Boolean);
     const contents = view.webContents;
     claimFor(contents.id, request.claim);
     watchSizes(contents);
@@ -493,8 +682,26 @@ export function createAcquirer(events: AcquireEvents) {
       return { action: 'deny' };
     });
     for (const event of ['did-navigate', 'did-navigate-in-page', 'did-stop-loading'] as const) contents.on(event as 'did-stop-loading', () => sendBar());
+    // Recherche libre : chaque page chargée, ou changée sans rechargement (YouTube), est relue.
+    contents.on('did-navigate', (_e, url) => {
+      const found = webSearchOf(url);
+      if (open && found) open.lastSearch = found;
+      if (open?.video) {
+
+        open.video = undefined;
+        sendBar();
+      }
+    });
+    contents.on('did-stop-loading', () => probeVideo(contents));
+    contents.on('did-navigate-in-page', (_e, _url, isMainFrame) => isMainFrame && probeVideo(contents));
     contents.on('did-fail-load', (_e, code, description, url, isMainFrame) => {
-      if (isMainFrame && code !== -3) setStatus(t('Page inaccessible ({error}) : {url}. Lien mort ? « Retour à la fiche » ou une autre source.', { error: description, url }), true);
+      if (isMainFrame && code !== -3)
+        setStatus(
+          open?.request.search
+            ? t('Page inaccessible ({error}) : {url}. Lien mort ? « Précédent », ou une autre recherche.', { error: description, url })
+            : t('Page inaccessible ({error}) : {url}. Lien mort ? « Retour à la fiche » ou une autre source.', { error: description, url }),
+          true,
+        );
     });
     // Une vidéo de la page en plein écran : Échap lui revient (elle en sort).
     let pageFullScreen = false;
@@ -513,12 +720,12 @@ export function createAcquirer(events: AcquireEvents) {
     };
     contents.on('before-input-event', escape);
     win.webContents.on('before-input-event', escape);
-    // Le bandeau n'a pas de champ : les boutons de la borne y servent toujours.
-    win.webContents.on('before-input-event', (e, input) => cabinetKey(input) && e.preventDefault());
+    // Les boutons de la borne servent dans le bandeau, sauf pendant qu'on tape dans son champ de recherche.
+    win.webContents.on('before-input-event', (e, input) => !barTyping && cabinetKey(input) && e.preventDefault());
     // La page garde ses touches (Entrée, flèches…) et ce qu'on tape dans un champ : Start n'y
     // désigne un téléchargement que hors d'un champ de saisie, sans retirer la touche à la page.
     contents.on('before-input-event', (_e, input) => {
-      if (input.type !== 'keyDown' || !downloads.size || PAGE_KEYS.has(input.code)) return;
+      if (input.type !== 'keyDown' || (!downloads.size && !grabs.size) || PAGE_KEYS.has(input.code)) return;
       void contents
         .executeJavaScript('(() => { const e = document.activeElement; return Boolean(e && (e.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName))); })()', true)
         .then((typing) => typing || cabinetKey(input))
@@ -536,6 +743,8 @@ export function createAcquirer(events: AcquireEvents) {
     win.on('closed', () => {
       claims.delete(viewId);
       open = undefined;
+      barTyping = false;
+
       armed = undefined;
       events.closed();
     });

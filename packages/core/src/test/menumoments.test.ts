@@ -424,6 +424,22 @@ test('rendu : son du menu chargé par les fenêtres du menu', () => {
   assert.match(audio, /setSinkId/);
 });
 
+test('un seul son : la musique du menu se tait pendant l’écoute d’une carte (propositions, sons de la table)', () => {
+  const frontend = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  // Le plan sonore ne prend la table de l'écran que si celui-ci ne fait rien écouter.
+  assert.match(frontend, /const table = state\.phase === 'library' && library\.previewsSound\(\) \? undefined : screensSubject\(\);/);
+  const library = fs.readFileSync(path.join(APP, 'src', 'library.ts'), 'utf8');
+  // Relevé à chaque vue, avant que soundView() ne le lise (viewFor : library puis sound).
+  assert.match(library, /soundPreview = playsSoundPreview\(built\.media\);/);
+  const medias = fs.readFileSync(path.join(APP, 'src', 'library-medias.ts'), 'utf8');
+  assert.match(medias, /c\.action !== undefined && c\.thumb\.kind === 'audio' && !!c\.thumb\.url/);
+  // Le rendu joue le son de la carte choisie, celle qui a une action (library.js).
+  const renderer = fs.readFileSync(path.join(APP, 'renderer', 'library.js'), 'utf8');
+  assert.match(renderer, /renderThumb\(c\.thumb, c\.action === cursor\)/);
+  const order = frontend.indexOf("library: state.phase === 'library' ? library.view() : undefined");
+  assert.ok(order > 0 && order < frontend.indexOf("sound: role === 'playfield' ? soundView() : undefined"), 'vue de la bibliothèque construite avant le son');
+});
+
 test('partie simulée : hors écran seulement ; à l’écran, VPX ; hors écran sans elle, la partie reste refusée', () => {
   const frontend = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
   assert.match(frontend, /const simulated = OFFSCREEN \? process\.env\.CYBERPINBALL_PARTIE_SIMULEE : undefined;/);

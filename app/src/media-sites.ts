@@ -13,10 +13,12 @@
 // - Reçus : rangés dans <téléchargements>\sites\<site>-<fiche>\, archive déballée, et
 //   notés dans sites\recus.json : un fichier reçu reste proposé aux visites suivantes,
 //   pour ce média comme pour les autres écrans d'un pack.
-// - Web : « Chercher sur le web… » ouvre la fenêtre « Récupérer » sur une recherche ;
-//   ce que l'utilisateur y télécharge est rangé dans <téléchargements>\sites\web\, noté
-//   dans sites\web.json avec la table et le média d'où il l'a cherché, et revient à ses
-//   propositions.
+// - Web : « Chercher moi-même sur le web… » (écran du média) ou « Chercher sur le web… »
+//   (propositions) ouvre la fenêtre « Récupérer » sur une recherche libre ; ce que
+//   l'utilisateur y télécharge, ou ce qui arrive dans Téléchargements de Windows pendant
+//   ce temps (son propre navigateur), est rangé dans <téléchargements>\sites\web\, déballé,
+//   jugé pour le média (accepté, à convertir, refusé : webmedia.ts), noté dans
+//   sites\web.json avec la table et le média d'où il l'a cherché, et revient à ce média.
 
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
@@ -25,6 +27,10 @@ import {
   checkSiteSearch,
   formatTransfer,
   hitTypes,
+  mediaKind,
+  isMediaDownload,
+  judgeWebFiles,
+  mediaTypeInfo,
   mediaSite,
   receivedMedias,
   siteSearchByType,
@@ -42,10 +48,13 @@ import {
   type SiteSearchResult,
   type SiteState,
   type TransferProgress,
+  type MediaKind,
+  type WebEngine,
   type WebReceipt,
 } from '@cyberpinball/core';
 import type { Acquirer } from './acquire-window';
 import { unpackArchive } from './archives';
+import { watchDownloads } from './downloads-watch';
 
 export interface MediaSitesContext {
   acquirer: Acquirer;
@@ -53,7 +62,24 @@ export interface MediaSitesContext {
   downloadsDir(): string | undefined;
   /** Quelque chose a changé (attente, progression, reçu) : redessiner l'écran. */
   changed(): void;
+  /** Téléchargements de Windows, surveillé pendant une recherche libre ; absent : pas de surveillance. */
+  windowsDownloads?(): string | undefined;
 }
+
+/** Recherche libre en cours : d'où elle part et pour quel média. */
+export interface WebRequest {
+  url: string;
+  table: string;
+  title: string;
+  type: MediaType;
+  label: string;
+  /** Texte cherché et moteur, repris dans le champ de recherche du bandeau. */
+  query: string;
+  engine: WebEngine;
+}
+
+/** Au plus, surveillance de Téléchargements de Windows après l'ouverture d'une recherche libre. */
+const WINDOWS_WATCH_MS = 2 * 3600_000;
 
 /** Champs d'un SiteJob pour une progression (chacun écrit, même absent : pas de débit d'un relevé précédent). */
 function progressOf(p: TransferProgress): Pick<SiteJob, 'received' | 'total' | 'approx' | 'rate' | 'remaining'> {
@@ -474,22 +500,63 @@ export function createMediaSites(ctx: MediaSitesContext) {
   /** Téléchargement en cours depuis la recherche web (octets reçus, total, débit, temps restant). */
   let webProgress: TransferProgress | undefined;
 
+  /** Surveillance de Téléchargements de Windows pendant une recherche libre. */
+  let windowsWatch: { stop(): void; timer: NodeJS.Timeout } | undefined;
+
+  function stopWeb(): void {
+    if (!windowsWatch) return;
+    windowsWatch.stop();
+    clearTimeout(windowsWatch.timer);
+    windowsWatch = undefined;
+  }
+
   /**
-   * Fenêtre « Récupérer » sur une recherche web, quand les sources branchées n'ont pas
-   * ce qu'il faut : l'utilisateur cherche, se connecte si le site le demande et
-   * télécharge lui-même. Chaque fichier reçu est déballé et revient à ce média.
+   * Ce qui arrive dans Téléchargements de Windows pendant la recherche (l'utilisateur est
+   * passé par « Ouvrir dans mon navigateur ») : copié, l'original reste où il est, puis
+   * traité comme un fichier de la fenêtre. Seuls les médias et les archives comptent.
    */
-  function openWeb(request: { url: string; table: string; title: string; type: MediaType; label: string }): void {
+  function watchWindows(request: WebRequest, web: string): void {
+    stopWeb();
+    const dir = ctx.windowsDownloads?.();
+    if (!dir || !fs.existsSync(dir)) return;
+    const watch = watchDownloads({
+      dir,
+      arrived: (file) => {
+        if (!isMediaDownload(path.basename(file))) return;
+        const incoming = path.join(web, 'recu');
+        fs.mkdirSync(incoming, { recursive: true });
+        const copy = path.join(incoming, `${Date.now().toString(36)}-${path.basename(file)}`);
+        try {
+          fs.copyFileSync(file, copy);
+        } catch {
+          return; // fichier repris ou effacé entre-temps
+        }
+        void completeWeb(copy, path.basename(file), [], request, web, true);
+      },
+    });
+    windowsWatch = { stop: watch.stop, timer: setTimeout(stopWeb, WINDOWS_WATCH_MS) };
+  }
+
+  /**
+   * Fenêtre « Récupérer » sur une recherche libre : l'utilisateur cherche (le champ du
+   * bandeau garde son texte), se connecte si le site le demande et télécharge lui-même.
+   * Chaque fichier reçu est déballé, jugé pour ce média et lui revient.
+   */
+  function openWeb(request: WebRequest): void {
     const dir = root();
     if (!dir) return;
     const web = path.join(dir, 'web');
     const incoming = path.join(web, 'recu');
+    const info = mediaTypeInfo(request.type);
+    watchWindows(request, web);
     ctx.acquirer.show({
       url: request.url,
       game: request.title,
-      expected: t('Média : {label}', { label: request.label }),
-      host: t('Recherche sur le web · fichiers que vous choisissez'),
-      status: t('Cherchez, ouvrez une page, téléchargez : le fichier revient aux propositions ({label}). Fermer (Échap) pour revenir.', { label: request.label }),
+      expected: t('Média : {label} ({formats})', { label: request.label, formats: info.formats.join(', ') }),
+      host: t('Recherche libre · fichiers que vous choisissez'),
+      status: t('Cherchez, ouvrez une page, téléchargez : le fichier est vérifié puis proposé pour « {label} ». Fermer (Échap) garde la page.', { label: request.label }),
+      // Sur une page vidéo, yt-dlp propose d'abord le son pour une musique, la vidéo pour un écran.
+      search: { query: request.query, engine: request.engine, want: info.formats.some((f) => mediaKind(`x.${f}`) === 'video') ? 'video' : 'audio' },
       claim: {
         dir: incoming,
         progress: (p) => {
@@ -505,31 +572,70 @@ export function createMediaSites(ctx: MediaSitesContext) {
     });
   }
 
-  async function completeWeb(file: string, filename: string, urls: string[], request: { table: string; type: MediaType }, web: string): Promise<void> {
+  let webCount = 0;
+
+  /**
+   * Fichier reçu d'une recherche libre : déballé, chaque fichier jugé pour le média (un
+   * nom qui ment sur le contenu est corrigé), puis noté. Ce qui ne sert à rien n'est pas
+   * gardé, mais l'écran dit pourquoi.
+   */
+  async function completeWeb(file: string, filename: string, urls: string[], request: { table: string; type: MediaType }, web: string, windows = false): Promise<void> {
     const stamp = new Date();
-    const key = `web:${stamp.getTime().toString(36)}`;
+    const key = `web:${stamp.getTime().toString(36)}${(webCount++).toString(36)}`;
     const files = path.join(web, key.slice(4), 'fichiers');
+    const base: Omit<WebReceipt, 'files'> = { key, table: request.table, type: request.type, url: urls[0] ?? '', filename, date: stamp.toISOString(), ...(windows ? { windows: true } : {}) };
     fs.rmSync(files, { recursive: true, force: true });
     try {
       if (await unpackArchive(file, files)) fs.rmSync(file, { force: true });
       else {
         fs.mkdirSync(files, { recursive: true });
-        fs.renameSync(file, path.join(files, path.basename(file)));
+        // Le nom d'origine, sans le préfixe de la copie faite depuis Téléchargements de Windows.
+        fs.renameSync(file, path.join(files, windows ? filename : path.basename(file)));
       }
-    } catch {
-      // Archive illisible : rien à proposer ; l'utilisateur voit que rien n'est arrivé.
+    } catch (error) {
       fs.rmSync(file, { force: true });
+      fs.rmSync(path.dirname(files), { recursive: true, force: true });
+      const receipt: WebReceipt = { ...base, files: [], refused: [{ name: filename, reason: t('archive illisible ({error})', { error: (error as Error).message.split('\n')[0]! }) }] };
+      for (const listener of webListeners) listener(receipt);
       return ctx.changed();
     }
+    let judged = judgeWebFiles(files, request.type);
+    // Un nom qui ment sur le contenu (vidéo WebM nommée .mp4) : le fichier prend la bonne extension.
+    for (const j of judged) {
+      if (j.verdict.status !== 'accepted' || !j.verdict.ext) continue;
+      const fixed = path.join(path.dirname(j.file), `${path.basename(j.file, path.extname(j.file))}.${j.verdict.ext}`);
+      if (fs.existsSync(fixed)) continue;
+      fs.renameSync(j.file, fixed);
+    }
+    judged = judgeWebFiles(files, request.type);
     const medias = receivedMedias(files, { types: [request.type] });
-    const receipt: WebReceipt = { key, table: request.table, type: request.type, url: urls[0] ?? '', filename, date: stamp.toISOString(), files: medias };
-    if (medias.length) {
+    // Un fichier d'un pack, rangé pour un autre écran (logo dans un pack de topper), lui revient : ni refusé, ni converti ici.
+    const elsewhere = new Set(medias.filter((m) => m.type && m.type !== request.type).map((m) => same(m.file)));
+    const refused = judged.filter((j) => j.verdict.status === 'refused' && !elsewhere.has(same(j.file)));
+    // Ni refusé, ni à convertir : seuls restent les fichiers que le menu lit tels quels.
+    const refusedSet = new Set(judged.filter((j) => j.verdict.status !== 'accepted' && !elsewhere.has(same(j.file))).map((j) => same(j.file)));
+    const receipt: WebReceipt = {
+      ...base,
+      files: medias.filter((m) => !refusedSet.has(same(m.file))),
+      convert: judged.flatMap((j) => (j.verdict.status === 'convert' && !elsewhere.has(same(j.file)) ? [{ file: j.file, kind: j.verdict.kind, to: j.verdict.to, from: j.verdict.from }] : [])),
+      refused: refused.map((j) => ({ name: path.relative(files, j.file), reason: j.verdict.status === 'refused' ? j.verdict.reason : '' })),
+    };
+    if (receipt.files.length || receipt.convert!.length) {
       loadWeb().push(receipt);
       saveWeb();
     } else fs.rmSync(path.dirname(files), { recursive: true, force: true });
     for (const listener of webListeners) listener(receipt);
     ctx.changed();
   }
+
+  /** Fichier produit pour un reçu (conversion, extrait découpé) : proposé désormais pour ce média. */
+  function addWebFile(key: string, file: string, kind: MediaKind): void {
+    const receipt = loadWeb().find((r) => r.key === key);
+    if (!receipt || receipt.files.some((f) => same(f.file) === same(file))) return;
+    receipt.files.push({ file, type: receipt.type, kind });
+    saveWeb();
+  }
+  const same = (a: string) => path.resolve(a).toLowerCase();
 
   /** « 18,4 Mo sur 40 Mo · 2,1 Mo/s · environ 10 s » (transfer.ts). */
   function progressText(job: SiteJob): string | undefined {
@@ -559,9 +665,14 @@ export function createMediaSites(ctx: MediaSitesContext) {
     receipt: (key: string) => loadReceipts().get(key),
     progressText,
     openWeb,
+    /** Fin de la recherche libre (gestionnaire des médias fermé) : Téléchargements de Windows n'est plus surveillé. */
+    stopWeb,
+    addWebFile,
     /** Rouvrir la fenêtre « Récupérer » sur cette page de départ reprendrait la page où l'utilisateur en était. */
     resumable: (url: string) => ctx.acquirer.resumable(url),
     webReceipts: () => loadWeb(),
+    webReceipt: (key: string) => loadWeb().find((r) => r.key === key),
+
     webProgress: () => webProgress,
     /** Appelé à chaque fichier reçu de la recherche web (sans média dedans : `files` vide). */
     onWebReceived: (listener: (receipt: WebReceipt) => void) => void webListeners.push(listener),

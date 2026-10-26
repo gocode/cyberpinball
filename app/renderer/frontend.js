@@ -175,33 +175,51 @@ function wheelItem(n) {
   const tilt = el('div', 'wheel-tilt');
   hit.append(tilt);
   face.append(hit);
-  const item = { node, face, hit, ratio: 1, offset: n.offset };
+  node.append(face);
+  const item = { node, face, hit, tilt, ratio: 1, offset: n.offset };
+  fillWheelItem(item, n);
+  return item;
+}
+
+/**
+ * Contenu d'une place de la roue : le logo de la table, sinon son titre. Rappelé quand le
+ * logo ou le titre change pour une table déjà dans la roue (média ajouté, remplacé ou
+ * supprimé, table renommée : l'adresse du logo change avec le fichier, mediaUrl) ; la place
+ * ne bouge pas, et l'ancien contenu reste jusqu'à ce que le nouveau logo soit prêt.
+ */
+function fillWheelItem(item, n) {
+  item.wheel = n.wheel;
+  item.title = n.title;
+  const { node, tilt } = item;
+  const current = () => item.wheel === n.wheel && item.title === n.title;
+  const place = () => {
+    if (wheelView) placeWheelItem(item, wheelView.style);
+  };
   const named = () => {
+    if (!current()) return;
     tilt.replaceChildren(el('div', 'wheel-name', n.title));
     node.classList.add('disc');
     item.ratio = 1;
-    if (wheelView) placeWheelItem(item, wheelView.style);
+    place();
   };
   const logo = CyberMedia.logo(n.wheel)?.cloneNode();
-  if (logo) {
-    logo.className = 'wheel-img';
-    tilt.append(logo);
-    const measured = () => {
-      if (!logo.naturalWidth) return;
-      item.ratio = logo.naturalWidth / logo.naturalHeight;
-      // Logo qui n'est pas un médaillon carré (large, détouré) : posé sur un disque.
-      node.classList.toggle('disc', item.ratio > 1.25 || item.ratio < 0.8);
-      if (wheelView) placeWheelItem(item, wheelView.style);
-    };
-    if (logo.complete) measured();
-    else logo.addEventListener('load', measured, { once: true });
+  if (!logo) return named();
+  logo.className = 'wheel-img';
+  const shown = () => {
+    if (!current() || !logo.naturalWidth) return;
+    if (tilt.firstChild !== logo || tilt.childNodes.length > 1) tilt.replaceChildren(logo);
+    item.ratio = logo.naturalWidth / logo.naturalHeight;
+    // Logo qui n'est pas un médaillon carré (large, détouré) : posé sur un disque.
+    node.classList.toggle('disc', item.ratio > 1.25 || item.ratio < 0.8);
+    place();
+  };
+  // Place neuve : le logo y est posé tout de suite, mesuré une fois chargé.
+  if (!tilt.firstChild) tilt.append(logo);
+  if (logo.complete && logo.naturalWidth) shown();
+  else {
+    logo.addEventListener('load', shown, { once: true });
     logo.addEventListener('error', named, { once: true });
-  } else {
-    tilt.append(el('div', 'wheel-name', n.title));
-    node.classList.add('disc');
   }
-  node.append(face);
-  return item;
 }
 
 function placeWheelItem(item, style, hidden = item.leaving) {
@@ -259,6 +277,8 @@ function wheelStage(s, style) {
         void item.node.offsetWidth;
       }
     }
+    // Table restée dans la roue dont le logo ou le titre a changé : contenu refait sur place.
+    if (item.wheel !== n.wheel || item.title !== n.title) fillWheelItem(item, n);
     placeWheelItem(item, style);
   }
   for (const [key, item] of v.items) {
@@ -294,10 +314,13 @@ function tableList(s) {
  */
 function syncMenuShape() {
   const desktop = root.offsetWidth > root.offsetHeight;
+  const changed = document.documentElement.classList.contains('menu-desktop') !== desktop;
   document.documentElement.classList.toggle('menu-desktop', desktop);
   document.documentElement.classList.toggle('menu-cab', !desktop);
+  return changed;
 }
-new ResizeObserver(syncMenuShape).observe(root);
+// L'écran de chargement n'a pas la même composition en borne et au bureau : il est refait.
+new ResizeObserver(() => syncMenuShape() && lastState?.phase === 'loading' && !lastState.game && role === 'playfield' && renderPlayfield(lastState)).observe(root);
 syncMenuShape();
 
 /**
@@ -412,38 +435,116 @@ function dropLoadingFallback() {
 }
 
 /**
- * Chargement d'une table, sur le playfield : les commandes de la partie, toujours lisibles.
- * Avec la vidéo de chargement du jeu (Loading), elle passe en fond, les commandes dans un
- * bandeau par-dessus ; sans elle, l'écran de chargement de secours (fallback.js : titre,
- * fabricant, année, barre d'attente) avec les commandes dessous ; sans fallback.js, le titre
- * et les commandes sur fond noir.
+ * Média de chargement absent : l'écran de chargement de secours (fallback.js : marque, titre,
+ * fabricant, année, barre d'attente), à la place du média, sans libellé ni commandes ; `slot`
+ * reçoit l'aide-mémoire du réglage de l'affichage en borne. Sans fallback.js, rien : le fond
+ * du playfield reste sombre.
+ */
+function loadingStandIn(s, className, slot) {
+  const kit = window.CyberFallback;
+  if (typeof kit?.loading !== 'function') {
+    dropLoadingFallback();
+    return undefined;
+  }
+  const key = JSON.stringify([className, s.table.title, s.table.manufacturer, s.table.year, slot ? s.loadingKeys : null]);
+  if (loadingFallback?.key !== key) {
+    dropLoadingFallback();
+    const box = el('section', `loading-fallback ${className}`);
+    const handle = kit.loading(box, { title: s.table.title, manufacturer: s.table.manufacturer, year: s.table.year }, { label: false });
+    if (slot) handle.slot?.append(slot);
+    loadingFallback = { key, box, handle };
+  }
+  return loadingFallback.box;
+}
+
+/**
+ * Encart du chargement au bureau, à droite du cadre du média : titre, fabricant · année,
+ * l'état avec sa barre d'attente, puis les commandes de la partie (ou les boutons du menu de
+ * VPX pour le réglage de l'affichage). Mêmes marges que le cadre, même hauteur ; les
+ * commandes passent sur une colonne quand l'encart est étroit, et rapetissent s'il le faut
+ * pour tenir sans être rognées (fitLoadingCard).
+ */
+function loadingCard(s) {
+  const card = el('section', 'loading-card');
+  const title = el('h1', 'loading-title', s.table.title);
+  title.dataset.size = titleSize(s.table.title);
+  const head = el('div', 'loading-head');
+  head.append(title);
+  if (s.table.subtitle) head.append(el('div', 'loading-meta', s.table.subtitle));
+  const state = el('div', 'loading-state');
+  const bar = el('div', 'loading-bar');
+  bar.append(el('div', 'loading-run'));
+  state.append(el('span', '', t('Chargement de la table…')), bar);
+  card.append(head, state, keysGrid(s.loadingKeys.title, s.loadingKeys.rows));
+  return card;
+}
+
+/**
+ * Commandes de l'encart, sans rien rogner, au plus lisible qui tienne : deux colonnes sans
+ * couper une touche sur deux lignes, sinon une colonne, sinon deux colonnes aux touches
+ * coupées, le corps de 24 à 20 (plancher du design system) ; puis l'encart compact (marges et
+ * titre réduits). En dernier recours seulement, sous le plancher (jusqu'à 15) : une commande
+ * plus petite vaut mieux qu'une commande cachée.
+ */
+function fitLoadingCard(card) {
+  const list = card?.isConnected && card.querySelector('.game-keys-list');
+  if (!list) return;
+  const rows = [...list.children];
+  const fits = () => card.scrollHeight <= card.clientHeight + 1;
+  // Un libellé ou une touche sur plus d'une ligne : plus haut qu'une fois et demie son interligne.
+  const wraps = () => rows.some((row) => [...row.children].some((cell) => cell.offsetHeight > parseFloat(getComputedStyle(cell).lineHeight) * 1.5));
+  const legible = [1, 0.917, 0.833];
+  const tries = [
+    ...legible.map((k) => [false, 2, k, false]),
+    ...legible.map((k) => [false, 1, k, true]),
+    ...legible.map((k) => [false, 2, k, true]),
+    ...legible.map((k) => [true, 1, k, true]),
+    [true, 2, 0.833, true],
+    ...[0.75, 0.7, 0.65].map((k) => [true, 1, k, true]),
+    [true, 2, 0.65, true],
+  ];
+  for (const [compact, columns, scale, wrapped] of tries) {
+    card.classList.toggle('compact', compact);
+    list.dataset.columns = String(columns);
+    card.style.setProperty('--keys-scale', String(scale));
+    // Deux colonnes trop étroites (encart étroit) : la grille n'en garde qu'une.
+    if (columns === 2 && (getComputedStyle(list).gridTemplateColumns ?? '').split(' ').length < 2) continue;
+    if (fits() && (wrapped || !wraps())) return;
+  }
+}
+
+const refitLoadingCard = () => fitLoadingCard(root.querySelector('.loading-card'));
+new ResizeObserver(refitLoadingCard).observe(root);
+document.fonts?.addEventListener('loadingdone', refitLoadingCard);
+
+/**
+ * Chargement d'une table, sur le playfield. En borne, le média de chargement du jeu (Loading)
+ * prend tout l'écran, seul : ni titre, ni état, ni commandes (le réglage de l'affichage garde
+ * son aide-mémoire, les boutons du menu de VPX) ; sans média, l'écran de chargement de
+ * secours. Au bureau, le média (ou son repli) dans le cadre 9:16 du menu, l'encart du titre
+ * et des commandes à sa droite (loadingCard), la marque à sa place.
  */
 function loadingScreen(s) {
-  // Partie normale : ses commandes ; réglage de l'affichage : les boutons du menu de VPX.
-  const keys = keysGrid(s.loadingKeys.title, s.loadingKeys.rows);
-  if (s.loading?.url) {
-    dropLoadingFallback();
-    const o = el('section', 'overlay over-video');
-    const panel = el('div', 'loading-panel');
-    panel.append(el('h1', '', s.table.title), el('div', 'lead', t('Chargement de la table…')), keys);
-    o.append(panel);
-    return o;
+  const desktop = document.documentElement.classList.contains('menu-desktop');
+  if (desktop) {
+    const nodes = [brand(), loadingCard(s)];
+    if (!s.loading?.url) {
+      const standIn = loadingStandIn(s, 'in-frame');
+      if (standIn) nodes.unshift(standIn);
+    } else dropLoadingFallback();
+    return nodes;
   }
-  const kit = window.CyberFallback;
-  if (typeof kit?.loading === 'function') {
-    const key = JSON.stringify([s.table.title, s.table.manufacturer, s.table.year, s.loadingKeys]);
-    if (loadingFallback?.key !== key) {
-      dropLoadingFallback();
-      const box = el('section', 'overlay loading-fallback');
-      const handle = kit.loading(box, { title: s.table.title, manufacturer: s.table.manufacturer, year: s.table.year });
-      handle.slot?.append(keys);
-      loadingFallback = { key, box, handle };
-    }
-    return loadingFallback.box;
-  }
-  const o = el('section', 'overlay');
-  o.append(el('h1', '', s.table.title), el('div', 'lead', t('Chargement de la table…')), keys);
-  return o;
+  // Réglage de l'affichage : les boutons du menu de VPX restent lisibles, sur le média.
+  const reminder = s.loadingKeys.display ? keysGrid(s.loadingKeys.title, s.loadingKeys.rows) : undefined;
+  reminder?.classList.add('display-reminder');
+  const standIn = s.loading?.url ? dropLoadingFallback() : loadingStandIn(s, 'full', reminder);
+  if (standIn) return [standIn];
+  if (!reminder) return [];
+  const o = el('section', 'loading-reminder');
+  const panel = el('div', 'loading-panel');
+  panel.append(reminder);
+  o.append(panel);
+  return [o];
 }
 
 /** Logo de secours du mode attente (fallback.js), gardé tant que la table montrée ne change pas. */
@@ -494,9 +595,10 @@ function renderPlayfield(s) {
     return;
   }
   dropAttractLogo();
-  // Chargement : rien du menu dessous (la vidéo de chargement se voit à travers le bandeau).
+  // Chargement : rien du menu dessous.
   if (s.phase === 'loading' && s.table) {
-    root.replaceChildren(loadingScreen(s));
+    root.replaceChildren(...loadingScreen(s));
+    fitLoadingCard(root.querySelector('.loading-card'));
     return;
   }
   dropLoadingFallback();
@@ -635,6 +737,7 @@ function renderGame(s) {
   const game = s.game;
   dropLoadingFallback();
   document.documentElement.classList.remove('loading-video');
+  document.documentElement.classList.remove('loading-phase');
   const show = (layer, part) => {
     const view = game.medias?.[part] ?? viewOf(s, part);
     const play = game.play?.[part] ?? (game.mode === 'off' ? 'off' : 'still');
@@ -645,9 +748,12 @@ function renderGame(s) {
   };
   if (background) show(background, 'playfield');
   for (const z of zones) show(z.layer, z.role);
-  // Éteints : du noir et le titre en discret, sans les zones par-dessus.
-  zoneLayer.classList.toggle('off', game.mode === 'off');
-  root.replaceChildren(...(game.mode === 'off' ? [gameCard(game.table)] : []));
+  // Éteints : du noir et le titre en discret, sans les zones par-dessus. Un FullDMD habillé
+  // (le DMD de VPX dans le cadre de son média) garde son habillage : il fait partie de l'afficheur.
+  const parts = [...(background ? ['playfield'] : []), ...zones.map((z) => z.role)];
+  const off = parts.every((part) => (game.play?.[part] ?? (game.mode === 'off' ? 'off' : 'still')) === 'off');
+  zoneLayer.classList.toggle('off', off);
+  root.replaceChildren(...(off ? [gameCard(game.table)] : []));
 }
 
 /** Le fond du playfield ne joue que s'il se voit : les superpositions et la fiche sont opaques. */
@@ -672,6 +778,12 @@ window.cyberEtat = () => ({
     sousTitre: lastState.library.subheading,
     page: lastState.library.pages && { numero: lastState.library.pages.index + 1, sur: lastState.library.pages.count, element: lastState.library.pages.page?.kind ?? 'repli', repli: lastState.library.pages.fallback },
   },
+  tables: lastState?.count,
+  // Roue du menu : chaque place, le logo affiché (fichier et version de son adresse) ou le titre.
+  roue: [...document.querySelectorAll('.wheel-item')].map((n) => {
+    const img = n.querySelector('img.wheel-img');
+    return img ? decodeURIComponent(img.getAttribute('src')).replace(/^.*[\\/]/, '') : `titre : ${n.textContent}`; // i18n-ignore : relevé des essais
+  }),
   couches: [...(background ? [['playfield', background]] : []), ...zones.map((z) => [z.role, z.layer])].map(([part, layer]) => ({ role: part, ...layer.state() })),
 });
 
@@ -686,17 +798,19 @@ window.cyber.onState((s) => {
   }
   // Fond de partie dès que la fenêtre de jeu de VPX s'affiche ; avant, au chargement, chaque
   // écran garde les médias du jeu (le playfield, sa vidéo de chargement et les commandes).
+  // L'écran de chargement de secours reste d'un état à l'autre (renderPlayfield le quitte).
   if (s.game) return renderGame(s);
-  dropLoadingFallback();
   document.documentElement.classList.toggle('attract-mode', Boolean(s.attract));
   zoneLayer.classList.remove('off');
   if (role === 'playfield') {
     const loadingVideo = s.phase === 'loading' && s.loading?.url ? s.loading : undefined;
     const backdrop = loadingVideo ?? viewOf(s, 'playfield');
     // Média en fond : la liste prend un fond translucide pour rester lisible ; la vidéo de
-    // chargement reste pleine, sous le bandeau des commandes.
+    // chargement reste pleine, sans voile (plein écran en borne, dans le cadre au bureau).
     document.documentElement.classList.toggle('has-backdrop', Boolean(backdrop?.url));
     document.documentElement.classList.toggle('loading-video', Boolean(loadingVideo));
+    // Écran de chargement (garde-fou de mise en page, layout-check.ts).
+    document.documentElement.classList.toggle('loading-phase', s.phase === 'loading' && Boolean(s.table) && !s.attract);
     renderPlayfield(s);
     background.show(backdrop);
     background.setActive(Boolean(loadingVideo) || backgroundVisible(s));

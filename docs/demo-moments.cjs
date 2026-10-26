@@ -192,6 +192,11 @@ const LAYOUT_CASES = [
   ['deux textes l’un sur l’autre', '<div style="position:absolute;top:10px;left:10px;font-size:30px">Premier texte</div><div style="position:absolute;top:15px;left:20px;font-size:30px">Second texte</div>', 'chevauchement'],
   ['texte coupé sans « … »', '<div style="width:120px;overflow:hidden;white-space:nowrap"><span>Un texte coupé sans prévenir personne</span></div>', 'coupé'],
   ['texte hors de la fenêtre', '<div style="position:absolute;left:350px;top:10px;white-space:nowrap;font-size:30px">Ce texte sort de la fenêtre</div>', 'hors de la fenêtre'],
+  // Écran de chargement (html.loading-phase) : en borne, aucun texte sur le média ; au bureau, l'encart à côté du cadre.
+  ['chargement en borne, un titre sur le média', '<script>document.documentElement.className = "loading-phase menu-cab"</script><main id="root" style="position:fixed;inset:0"><h1>Neon Galaxy</h1></main>', 'texte sur le chargement en borne'],
+  ['chargement en borne, le repli seul', '<script>document.documentElement.className = "loading-phase menu-cab"</script><main id="root" style="position:fixed;inset:0"><div class="cp-fb-loading"><div>Neon Galaxy</div></div></main>', undefined],
+  ['chargement au bureau, encart sur le cadre', '<script>document.documentElement.className = "loading-phase menu-desktop"</script><div id="media-bg" style="position:fixed;left:20px;top:20px;width:100px;height:180px"></div><main id="root" style="position:fixed;inset:0"><section class="loading-card" style="position:absolute;left:110px;top:20px;width:200px;height:180px"></section></main>', 'encart du chargement sur le cadre'],
+  ['chargement au bureau, encart à côté du cadre', '<script>document.documentElement.className = "loading-phase menu-desktop"</script><div id="media-bg" style="position:fixed;left:20px;top:20px;width:100px;height:180px"></div><main id="root" style="position:fixed;inset:0"><section class="loading-card" style="position:absolute;left:150px;top:20px;width:200px;height:180px"></section></main>', undefined],
 ];
 
 async function checkGuard() {

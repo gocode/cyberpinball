@@ -275,3 +275,142 @@ button.dl-cancel {
   color: var(--muted);
 }
 
+
+/* ---------- Recherche libre : ligne de recherche de 52 px (SEARCH_ROW dans acquire-window.ts),
+   puis, sur une page vidéo, une ligne de 40 px qui la décrit (VIDEO_ROW) ---------- */
+
+.search {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 0 20px 10px;
+}
+
+.search[hidden],
+.video[hidden] {
+  display: none;
+}
+
+/* Moteurs : des pastilles, celle retenue allumée en vert signal. */
+.engines {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+  background: var(--surface-sunken);
+}
+
+button.engine {
+  font-size: 14px;
+  padding: 6px 14px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+}
+
+button.engine:hover:not(.on) {
+  border-color: var(--line);
+  color: var(--text);
+}
+
+button.engine.on {
+  border-color: var(--accent);
+  background: var(--signal-wash);
+  color: var(--accent);
+}
+
+#query {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text);
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  outline: none;
+}
+
+#query:focus {
+  border-color: var(--accent);
+  box-shadow: var(--glow-signal);
+}
+
+button.go {
+  flex: none;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-signal);
+  font-weight: 600;
+}
+
+button.go:hover {
+  filter: brightness(1.08);
+}
+
+.video {
+  height: 40px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 20px 8px;
+  padding: 0 4px 0 12px;
+  border-left: 2px solid var(--accent);
+  background: var(--signal-wash);
+  font-size: 14px;
+}
+
+.video-mark {
+  flex: none;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.video-text,
+.video-hint {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.video-text {
+  flex: 0 1 auto;
+  max-width: 50%;
+  font-weight: 600;
+}
+
+.video-hint {
+  flex: 1 1 0;
+  color: var(--muted);
+}
+
+#video-get,
+button.grab {
+  flex: none;
+  font-size: 14px;
+  padding: 5px 14px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Le geste attendu pour ce média (le son pour une musique), allumé ; l'autre reste en contour. */
+button.grab {
+  font-size: 14px;
+  padding: 5px 14px;
+  border-color: var(--line);
+  color: var(--text);
+}
+
+button.grab.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-signal);
+  font-weight: 600;
+}

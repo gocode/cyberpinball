@@ -1167,13 +1167,204 @@ html.annex #media-bg {
 
 /* ---------- Chargement d'une table ---------- */
 
-/* Vidéo de chargement du jeu : pleine, sans le voile du menu ; les commandes dans un bandeau en bas. */
+/*
+ * Média de chargement du jeu (Loading) : plein, sans le voile du menu. En borne, il occupe
+ * tout l'écran, seul ; au bureau, le cadre 9:16 du menu (#media-bg), l'encart à sa droite.
+ */
 html.loading-video #media-bg::after {
   display: none;
 }
 
-.overlay.over-video {
+/* Repli du média (fallback.js) : tout l'écran en borne ; au bureau, à la place du média, dans le cadre (cotes de #media-bg). */
+.loading-fallback {
+  position: absolute;
+  inset: 0;
+}
+
+.loading-fallback.in-frame {
+  inset: auto;
+  left: calc(80 * var(--u));
+  top: calc(92 * var(--u));
+  width: calc(531 * var(--u));
+  height: calc(944 * var(--u));
+  overflow: hidden;
+  border-radius: calc(5 * var(--u));
+}
+
+/* Aide-mémoire du réglage de l'affichage sous la barre d'attente du repli, sur toute sa largeur. */
+.loading-fallback .cp-ld-slot {
+  width: 100%;
+}
+
+/*
+ * Encart du bureau, à droite du cadre : mêmes cotes que lui (haut 92, hauteur 944, bord de
+ * l'écran à 80, pour un petit côté de 1080), le même chant (ombres de #media-bg) ; entre les
+ * deux, l'écart qui sépare le cadre du bord de l'écran (60 de chant à chant). Dans le flux,
+ * au rythme fixé par Codex (octobre 2026) : titre, méta, état et sa barre, puis les
+ * commandes ; le vide qui reste passe sous elles. Commandes à 24 (--keys-scale les mène à 20
+ * au plus bas, fitLoadingCard) ; variante compacte (.compact) quand rien d'autre ne tient.
+ */
+.loading-card {
+  --k: var(--keys-scale, 1);
+  --pad: 48;
+  --after-meta: 32;
+  --after-bar: 48;
+  --after-rule: 24;
+  position: absolute;
+  left: calc(711 * var(--u));
+  right: calc(80 * var(--u));
+  top: calc(92 * var(--u));
+  height: calc(944 * var(--u));
+  display: flex;
+  flex-direction: column;
+  padding: calc(var(--pad) * var(--u));
+  overflow: hidden;
+  border-radius: calc(5 * var(--u));
+  background: linear-gradient(160deg, var(--surface-raised), var(--surface) 55%, var(--surface-sunken));
+  outline: 1px solid rgba(178, 219, 205, 0.18);
+  outline-offset: -1px;
+  box-shadow:
+    0 0 0 calc(4 * var(--u)) var(--void),
+    0 0 0 calc(15 * var(--u)) #102a24,
+    0 0 0 calc(16 * var(--u)) var(--line-strong),
+    0 0 0 calc(20 * var(--u)) rgba(0, 0, 0, 0.6),
+    var(--halo-panel);
+}
+
+.loading-card.compact {
+  --pad: 32;
+  --after-meta: 24;
+  --after-bar: 32;
+  --after-rule: 16;
+}
+
+.loading-card > * {
+  flex: none;
+}
+
+/* Titre : deux lignes au plus, puis « … » ; un titre long, ou l'encart compact, à 48. Interligne 1,2 (voir .menu-title). */
+.loading-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+  margin: 0;
+  font-size: calc(64 * var(--u));
+  font-weight: 600;
+  letter-spacing: calc(-0.8 * var(--u));
+  line-height: 1.2;
+}
+
+.loading-title[data-size='m'],
+.loading-title[data-size='s'],
+.loading-card.compact .loading-title {
+  font-size: calc(48 * var(--u));
+  letter-spacing: 0;
+}
+
+.loading-meta {
+  margin-top: calc(12 * var(--u));
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: calc(28 * var(--u));
+  line-height: calc(36 * var(--u));
+  letter-spacing: calc(0.5 * var(--u));
+  color: var(--meta);
+}
+
+/* État : « Chargement de la table… », et dessous sa barre d'attente en vert signal. */
+.loading-state {
+  display: flex;
+  flex-direction: column;
+  gap: calc(12 * var(--u));
+  margin-top: calc(var(--after-meta) * var(--u));
+  font-size: calc(24 * var(--u));
+  line-height: calc(32 * var(--u));
+  color: var(--ink-muted);
+}
+
+.loading-bar {
+  position: relative;
+  width: min(100%, calc(520 * var(--u)));
+  height: calc(4 * var(--u));
+  border-radius: calc(2 * var(--u));
+  overflow: hidden;
+  background: var(--line-soft);
+}
+
+.loading-run {
+  position: absolute;
+  inset: 0;
+  width: 35%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, var(--signal), transparent);
+  animation: loading-run 1.8s ease-in-out infinite;
+}
+
+@keyframes loading-run {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(290%);
+  }
+}
+
+/* Commandes sous l'état, après un filet ; sur deux colonnes quand elles tiennent, sinon une. */
+.loading-card .game-keys {
+  margin-top: calc(var(--after-bar) * var(--u));
+  padding-top: calc(var(--after-rule) * var(--u));
+  border-top: 1px solid var(--line-soft);
+  font-size: calc(24 * var(--u) * var(--k));
+  line-height: 1.333;
+}
+
+.loading-card .game-keys h2 {
+  margin: 0 0 calc(8 * var(--u));
+  font-size: calc(22 * var(--u));
+  text-align: left;
+}
+
+/* Une colonne, ou deux (data-columns, fitLoadingCard) quand chacune garde au moins 440 de large. */
+.loading-card .game-keys-list {
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: calc(48 * var(--u));
+}
+
+.loading-card .game-keys-list[data-columns='2'] {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, max(calc(440 * var(--u)), (100% - 48 * var(--u)) / 2)), 1fr));
+}
+
+/* Le libellé à gauche, la touche à droite dans sa colonne : un nom long y passe à la ligne, sous lui-même. */
+.loading-card .game-key {
+  display: grid;
+  grid-template-columns: fit-content(55%) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: calc(16 * var(--u));
+  padding: calc(10 * var(--u) * var(--k)) 0;
+}
+
+.loading-card.compact .game-key {
+  padding: calc(6 * var(--u)) 0;
+}
+
+.loading-card .game-key-name {
+  margin-left: 0;
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+/* Borne, réglage de l'affichage : les boutons du menu de VPX dans un bandeau, en bas du média. */
+.loading-reminder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: flex-end;
+  padding: 6cqmin;
   background: linear-gradient(to bottom, transparent 45%, var(--scrim));
 }
 
@@ -1190,11 +1381,7 @@ html.loading-video #media-bg::after {
   box-shadow: var(--halo-panel);
 }
 
-.loading-panel .lead {
-  font-size: 2.4vmin;
-}
-
-/* Commandes de la partie au chargement : grille compacte, trois colonnes sur un écran large. */
+/* Commandes au chargement : grille compacte, sur plusieurs colonnes quand la place le permet. */
 .game-keys {
   width: 100%;
   font-size: 2vmin;
@@ -1230,28 +1417,6 @@ html.loading-video #media-bg::after {
   margin-left: auto;
   font-weight: 700;
   text-align: right;
-}
-
-/* Un titre très long tient sur deux lignes, puis « … ». */
-.loading-panel h1 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  overflow-wrap: anywhere;
-  text-align: center;
-  line-height: 1.2;
-}
-
-/* Écran de chargement de secours (fallback.js) : il remplit le playfield, les commandes dessous. */
-.overlay.loading-fallback {
-  display: block;
-  padding: 0;
-}
-
-/* Les commandes prennent toute la largeur de l'écran de secours, sous la barre d'attente. */
-.loading-fallback .cp-ld-slot {
-  width: 100%;
 }
 
 /* ---------- Mode attente ---------- */

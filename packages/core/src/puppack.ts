@@ -482,11 +482,20 @@ export function findPackRoot(dir: string, depth = 3): string | undefined {
   return next ? findPackRoot(path.join(dir, next.name), depth - 1) : undefined;
 }
 
+/**
+ * Copie de sauvegarde d'un dossier (« PuP-Pack_Options - Copy », « _backup », « Topper.orig ») :
+ * ni une option, ni l'état en place. Gardians of the Galaxy (gotg_2020) livre un
+ * « PuP-Pack_Options - Copy » à côté du vrai dossier d'options.
+ */
+export function isBackupName(name: string): boolean {
+  return /(^|[^a-z])(copy|copie|backup|sauvegarde|old)([^a-z]|$)|\.(orig|bak|old)$/i.test(name);
+}
+
 /** Sous-dossiers d'options (« PuP-Pack_Options\Option 1 - … ») qui contiennent des .pup. */
 function optionFolders(root: string): string[] {
   const found: string[] = [];
   for (const d of readDirents(root)) {
-    if (!d.isDirectory() || !OPTIONS_DIR.test(d.name)) continue;
+    if (!d.isDirectory() || !OPTIONS_DIR.test(d.name) || isBackupName(d.name)) continue;
     for (const sub of readDirents(path.join(root, d.name))) {
       if (sub.isDirectory() && hasPupFile(path.join(root, d.name, sub.name))) found.push(path.join(d.name, sub.name));
     }
@@ -618,9 +627,14 @@ export function analysePack(root: string): PupPackInfo {
     bats.push({ bat, ok: Boolean(result.variant), reason: result.reason });
     if (result.variant) variants.push({ ...result.variant, traits: traitsOf(root, result.variant) });
   }
-  // Variantes rangées dans un dossier d'options : celles qu'aucun .bat lisible ne couvre.
+  // Variantes rangées dans un dossier d'options : celles qu'aucun .bat lisible ne couvre (un
+  // .bat qui en recopie un fichier le couvre), jamais deux fois le même nom. GOTG (gotg_2020) :
+  // chaque option apparaissait deux fois, par son .bat et par son dossier, et l'égalité de
+  // score entre les deux jumelles cachait la recommandation (« pas de choix net »).
+  const inside = (file: string, folder: string) => file.toLowerCase().startsWith(folder.toLowerCase() + path.sep);
   for (const folder of optionFolders(root)) {
-    if (variants.some((v) => v.folder && v.folder.toLowerCase() === folder.toLowerCase())) continue;
+    if (variants.some((v) => (v.folder && v.folder.toLowerCase() === folder.toLowerCase()) || v.copies.some((c) => inside(c.from, folder)))) continue;
+    if (variants.some((v) => v.label.toLowerCase() === path.basename(folder).toLowerCase())) continue;
     const copies = listFiles(path.join(root, folder)).map((rel) => ({ from: path.join(folder, rel), to: rel }));
     const variant = { label: path.basename(folder), folder, copies, deletes: [] };
     variants.push({ ...variant, traits: traitsOf(root, variant) });
@@ -652,7 +666,9 @@ export function parseOptionBat(root: string, bat: string): { option: boolean; va
   const mentionsCopy = /^\s*@?\s*(x?copy)\b/im.test(text);
   const option = looksLikeOption || mentionsCopy;
   const copies: { from: string; to: string }[] = [];
-  const deletes: string[] = [];
+  // Chaque del avec le nombre de copies faites avant lui : un fichier supprimé puis recopié
+  // (« del Option*.jpg », puis « xcopy Option 2.JPG ») reste en place.
+  const deleted: { name: string; at: number }[] = [];
   const fail = (reason: string) => ({ option, reason });
   for (const raw of text.split(/\r?\n/)) {
     let line = raw.trim().replace(/^@/, '').trim();
@@ -689,17 +705,22 @@ export function parseOptionBat(root: string, bat: string): { option: boolean; va
       for (const target of targets) {
         const rel = relativeArg(target);
         if (rel === undefined || rel.includes(path.sep)) return fail(t('« {line} » supprime hors de la racine du pack', { line }));
-        deletes.push(...matchNames(readDirents(root).filter((d) => d.isFile()).map((d) => d.name), rel));
+        for (const name of matchNames(readDirents(root).filter((d) => d.isFile()).map((d) => d.name), rel)) deleted.push({ name, at: copies.length });
       }
       continue;
     }
     return fail(t('commande « {command} » non reconnue', { command }));
   }
   if (!copies.length) return { option: looksLikeOption, reason: option ? t('aucune copie de fichiers trouvée') : undefined };
-  // Le dossier commun des fichiers copiés : celui de la variante.
-  const dirs = [...new Set(copies.map((c) => c.from.split(path.sep)[0]!))];
-  const folder = dirs.length === 1 ? commonDir(copies.map((c) => path.dirname(c.from))) : undefined;
-  return { option: true, variant: { label, bat, folder: folder || undefined, copies, deletes } };
+  const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
+  const deletes = [...new Set(deleted.filter((d) => !copies.slice(d.at).some((c) => same(c.to, d.name))).map((d) => d.name))];
+  // Dossier de la variante : celui d'où viennent ses .pup (l'aperçu « Option 2.JPG » est
+  // souvent pris un cran plus haut), sinon le dossier commun des fichiers copiés.
+  const pups = copies.filter((c) => c.from.toLowerCase().endsWith('.pup'));
+  const sources = (pups.length ? pups : copies).map((c) => path.dirname(c.from));
+  const dirs = [...new Set(sources.map((d) => d.split(path.sep)[0]!))];
+  const folder = dirs.length === 1 ? commonDir(sources) : undefined;
+  return { option: true, variant: { label, bat, folder: folder && folder !== '.' ? folder : undefined, copies, deletes } };
 }
 
 /** Découpe une ligne de commande en arguments, guillemets compris. */
@@ -786,7 +807,7 @@ export function traitsOf(root: string, variant: Omit<PupVariant, 'traits'>): Var
   };
   if (/(no|without|sans) topper/.test(name)) traits.topper = false;
   else if (/topper/.test(name)) traits.topper = true;
-  if (/(no|without|sans) (real |full ?)?dmd/.test(name)) traits.dmd = 'none';
+  if (/\b(no|without|sans) ?(real |full ?)?dmd/.test(name)) traits.dmd = 'none';
   else if (/dmd.*\b(on|in|sur|dans)\b.*(backglass|bg)\b/.test(name) || /\b2 ?(screen|ecran)/.test(name)) traits.dmd = 'backglass';
   else if (/dmd|3 ?(screen|ecran)|three screen/.test(name)) traits.dmd = 'separate';
   if (/full ?dmd/.test(name)) traits.fullDmd = true;
@@ -944,6 +965,8 @@ export interface VariantChoice {
   chosen?: PupVariant;
   /** Choix évident : retenu sans demander. */
   confident: boolean;
+  /** Choix d'après la borne pas net : l'option qui talonne la retenue. */
+  runnerUp?: PupVariant;
   /** remembered : option de l'installation précédente ; cabinet : d'après la borne. */
   reason: 'remembered' | 'only' | 'cabinet' | 'default' | 'none';
 }
@@ -960,26 +983,111 @@ export function chooseVariant(variants: PupVariant[], cabinet: PupCabinet | unde
   }
   const ranked = variants.map((v) => ({ v, score: scoreVariant(v.traits, cabinet) })).sort((a, b) => b.score - a.score);
   const [best, second] = ranked;
-  return { chosen: best!.v, confident: !second || best!.score - second.score >= 4, reason: 'cabinet' };
+  const confident = !second || best!.score - second.score >= 4;
+  return { chosen: best!.v, confident, reason: 'cabinet', ...(!confident && { runnerUp: second!.v }) };
 }
 
-/** Variante dont les .pup sont ceux de la racine, ou undefined. */
-export function appliedVariant(info: PupPackInfo): PupVariant | undefined {
-  return info.variants.find((v) => isApplied(info.root, v));
+/** Option en place à la racine du pack, telle que appliedOption la reconnaît. */
+export interface AppliedOption {
+  variant: PupVariant;
+  /** Tout ce que l'option recopie et supprime est en place ; sinon, seuls ses .pup le sont. */
+  complete: boolean;
+  /** Ce qui manque à une option incomplète (differences). */
+  differences: string[];
+  /** Autres options que les fichiers en place ne distinguent pas de celle-ci. */
+  twins: PupVariant[];
 }
 
+/**
+ * Option dont les fichiers sont à la racine. Toute l'option compte, pas ses seuls .pup :
+ * GOTG (gotg_2020) a les mêmes screens.pup, playlists.pup et triggers.pup dans l'option 0
+ * (bureau, PuPDesktopPunch.exe recopié) et l'option 2 (FullDMD, PuPDesktopPunch.exe
+ * supprimé, « Option Selected.txt » à 2) ; la première qui ressemblait l'emportait, et
+ * l'option 2 appliquée s'affichait toujours « Option 0 » (26 octobre 2026). Une option
+ * complète l'emporte sur une option dont seuls les .pup sont là ; entre jumelles, celle
+ * retenue dans le .info (remembered), puis celle qui recopie le plus de fichiers.
+ */
+export function appliedOption(info: PupPackInfo, remembered?: string): AppliedOption | undefined {
+  const withPups = info.variants.filter((v) => v.copies.some((c) => c.to.toLowerCase().endsWith('.pup')));
+  const diffs = new Map(withPups.map((v) => [v, variantDifferences(info.root, v)]));
+  const complete = withPups.filter((v) => !diffs.get(v)!.length);
+  const pupsOnly = withPups.filter((v) => !diffs.get(v)!.some((d) => d.pup));
+  const pool = complete.length ? complete : pupsOnly;
+  if (!pool.length) return undefined;
+  const isRemembered = (v: PupVariant) => Boolean(remembered) && v.label.toLowerCase() === remembered!.toLowerCase();
+  const variant = pool.find(isRemembered) ?? [...pool].sort((a, b) => b.copies.length - a.copies.length)[0]!;
+  return { variant, complete: complete.length > 0, differences: diffs.get(variant)!.map((d) => d.text), twins: pool.filter((v) => v !== variant) };
+}
+
+/**
+ * Après « Appliquer » : le pack relu, l'option est-elle en place ? Sinon, pourquoi (ce qui
+ * manque, ou l'option dont les fichiers sont là). La réussite ne s'annonce jamais sans ça.
+ */
+export function checkAppliedOption(root: string, label: string): { ok: true } | { ok: false; reasons: string[] } {
+  const info = analysePack(root);
+  const now = appliedOption(info, label);
+  if (now?.variant.label === label && now.complete) return { ok: true };
+  const variant = info.variants.find((v) => v.label === label);
+  const reasons = variant ? variantDifferences(root, variant).map((d) => d.text) : [t('l’option n’est plus dans le pack')];
+  if (!reasons.length && now) reasons.push(t('les fichiers en place sont ceux de « {current} »', { current: now.variant.label }));
+  return { ok: false, reasons };
+}
+
+/** Fichiers de l'option introuvables dans le pack : l'appliquer s'arrêterait en chemin. */
+export function missingSources(root: string, variant: Pick<PupVariant, 'copies'>): string[] {
+  return variant.copies.filter((c) => !fs.existsSync(path.join(root, c.from))).map((c) => c.from);
+}
+
+/** Variante en place à la racine (appliedOption), ou undefined. */
+export function appliedVariant(info: PupPackInfo, remembered?: string): PupVariant | undefined {
+  return appliedOption(info, remembered)?.variant;
+}
+
+/** Tous les fichiers de l'option sont en place, et ceux qu'elle supprime absents. */
 export function isApplied(root: string, variant: PupVariant): boolean {
-  const pups = variant.copies.filter((c) => c.to.toLowerCase().endsWith('.pup'));
-  if (!pups.length) return false;
-  return pups.every((c) => {
+  return variant.copies.some((c) => c.to.toLowerCase().endsWith('.pup')) && !variantDifferences(root, variant).length;
+}
+
+/** Image d'aperçu posée à la racine (« Option 2.JPG ») : PinUP Popper la montre, le plugin PUP l'ignore. */
+function isPreviewImage(rel: string): boolean {
+  return !rel.includes(path.sep) && /\.(jpe?g|png|gif|bmp)$/i.test(rel);
+}
+
+/** Au-delà, deux fichiers de même taille sont tenus pour identiques (vidéos d'une option). */
+const COMPARE_LIMIT = 8 * 1024 * 1024;
+
+/**
+ * Écarts entre la racine et une option : fichier recopié absent ou différent, fichier
+ * supprimé par son .bat encore là. Les aperçus de la racine ne comptent pas. `pup` : l'écart
+ * porte sur un .pup (l'option n'est pas du tout en place).
+ */
+export function variantDifferences(root: string, variant: Pick<PupVariant, 'copies' | 'deletes'>, limit = 4): { text: string; pup: boolean }[] {
+  const found: { text: string; pup: boolean }[] = [];
+  const copies = [...variant.copies].sort((a, b) => Number(b.to.toLowerCase().endsWith('.pup')) - Number(a.to.toLowerCase().endsWith('.pup')));
+  for (const c of copies) {
+    if (isPreviewImage(c.to)) continue;
+    const pup = c.to.toLowerCase().endsWith('.pup');
     const dest = resolveInside(root, c.to);
-    if (dest === undefined) return false;
-    try {
-      return fs.readFileSync(path.join(root, c.from)).equals(fs.readFileSync(path.join(root, dest)));
-    } catch {
-      return false;
-    }
-  });
+    const same = dest !== undefined && sameFile(path.join(root, c.from), path.join(root, dest));
+    if (!same) found.push({ text: dest === undefined ? t('{file} absent', { file: c.to }) : t('{file} différent de celui de l’option', { file: c.to }), pup });
+    if (found.length >= limit) return found;
+  }
+  for (const d of variant.deletes) {
+    if (isPreviewImage(d) || resolveInside(root, d) === undefined) continue;
+    found.push({ text: t('{file} encore là (l’option le supprime)', { file: d }), pup: false });
+    if (found.length >= limit) return found;
+  }
+  return found;
+}
+
+function sameFile(a: string, b: string): boolean {
+  try {
+    const size = fs.statSync(a).size;
+    if (size !== fs.statSync(b).size) return false;
+    return size > COMPARE_LIMIT || fs.readFileSync(a).equals(fs.readFileSync(b));
+  } catch {
+    return false;
+  }
 }
 
 // ---------- Utilitaires ----------

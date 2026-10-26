@@ -28,10 +28,12 @@ import {
   type MediaKind,
   type MediaType,
 } from './medias';
-import type { RoleId } from './model';
+import type { Rect, RoleId } from './model';
+import { dressRecord, isDressWindow, tableDmdWindow } from './fulldmdframe';
+import { dressHiddenFinding, type TableDressing } from './fulldmdtable';
 import {
   analysePack,
-  appliedVariant,
+  appliedOption,
   cabinetFullDmd,
   chooseVariant,
   describePupCabinet,
@@ -46,6 +48,7 @@ import {
   screenRole,
   scoreVariant,
   variantTraitsLabel,
+  type AppliedOption,
   type PupCabinet,
   type PupScriptFacts,
   type PupSwitch,
@@ -58,7 +61,7 @@ import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './rom
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
 import { companion, nameKey } from './tablefiles';
 import { playBlockers, playSeverity } from './playable';
-import { parseTableName, type TableEntry } from './tables';
+import { parseTableName, readInfo, type TableEntry } from './tables';
 import { findTableIni } from './vpx-settings';
 import { EDGE_LABELS } from './layout';
 import { orientationFinding, type PlayfieldOrientation } from './sync';
@@ -102,6 +105,7 @@ export const FINDING_CODES = [
   'pupOrphan',
   'pupOptionNotApplied',
   'pupOptionUnsuited',
+  'pupOptionMismatch',
   'pupDisabledByScript',
   'pupHidesDmd',
   'pupPlaylistOrder',
@@ -113,6 +117,7 @@ export const FINDING_CODES = [
   'manualView',
   'tableOrientation',
   'tableWindows',
+  'fullDmdHidden',
   'mediaUnreadable',
   'mediaMisnamed',
   'mediaStray',
@@ -182,6 +187,11 @@ export interface DoctorContext {
   mediaErrors?: MediaErrorEntry[];
   /** Playfield de la borne (playfieldOrientation) : le .ini de la table peut changer le sens de la partie. */
   orientation?: PlayfieldOrientation;
+  /**
+   * Habillage FullDMD de la table (tableDressing, fulldmdtable.ts) : cadre trouvé dans son média
+   * FullDMD et place du DMD dans son .ini ; absent, l'habillage n'est pas vérifié.
+   */
+  dressing?: TableDressing;
 }
 
 /** Mémoire de Cyber Pinball dans le .info : option et nom d'origine de chaque pack installé. */
@@ -230,10 +240,16 @@ export interface TablePupPack {
   /** Racine du pack (screens.pup). */
   root: string;
   variants: PupVariant[];
-  /** Option dont les .pup sont à la racine. */
+  /** Option dont les fichiers sont à la racine (appliedOption). */
   applied?: PupVariant;
+  /** Seuls les .pup de l'option appliquée sont en place : ce qui manque. */
+  incomplete?: string[];
+  /** Options que les fichiers en place ne distinguent pas de l'appliquée. */
+  twins: PupVariant[];
   /** Option la plus proche de la borne, si le choix est net. */
   recommended?: PupVariant;
+  /** Choix pas net : les deux options en tête pour la borne. */
+  candidates?: [PupVariant, PupVariant];
   memory?: PupMemory;
 }
 
@@ -252,14 +268,19 @@ export function tablePupPacks(entry: TableEntry, borne?: PupCabinet): TablePupPa
     const info = analysePack(findPackRoot(dir) ?? dir);
     if (!info.variants.length) return [];
     const best = cabinet ? chooseVariant(info.variants, cabinet) : undefined;
+    const memory = pupMemory(entry.info, pack);
+    const applied = appliedOption(info, memory?.option);
     return [
       {
         pack,
         root: info.root,
         variants: info.variants,
-        applied: appliedVariant(info),
+        applied: applied?.variant,
+        incomplete: applied && !applied.complete ? applied.differences : undefined,
+        twins: applied?.twins ?? [],
         recommended: best?.confident ? best.chosen : undefined,
-        memory: pupMemory(entry.info, pack),
+        candidates: best && !best.confident && best.chosen && best.runnerUp ? [best.chosen, best.runnerUp] : undefined,
+        memory,
       },
     ];
   });
@@ -480,9 +501,12 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   const manual = orientation || manualViewFinding(entry.file);
   if (manual) findings.push(manual);
 
-  // 7 bis. Écrans placés pour cette table seulement (menu de VPX, « Save as Table Override »).
-  const windows = tableWindowsFinding(entry.file);
+  // 7 bis. Écrans placés pour cette table seulement (menu de VPX, « Save as Table Override »),
+  // dont le DMD qui recouvrirait l'habillage FullDMD : ce constat-là garde la fenêtre du DMD.
+  const hidden = ctx.dressing && dressHiddenFinding(entry, ctx.dressing);
+  const windows = tableWindowsFinding(entry.file, dressRecord(entry.info), Boolean(hidden));
   if (windows) findings.push(windows);
+  if (hidden) findings.push(hidden);
 
   // 8. PuP-Pack (mode plugins de VPX 10.8.1).
   if (ownFolder) findings.push(...checkPup(entry, ctx, override));
@@ -587,12 +611,16 @@ const WINDOW_KEY = /^(Output|Display|FullScreen|WndX|WndY|Width|Height)$/i;
  * cadre que dessine un PuP-Pack) ; le constat le montre et permet d'y revenir, par
  * exemple après un changement d'écran. La réparation retire ces clés et rien d'autre.
  */
-function tableWindowsFinding(tableFile: string): Finding | undefined {
+function tableWindowsFinding(tableFile: string, dress: Rect | undefined, dmdElsewhere = false): Finding | undefined {
   const ini = findTableIni(tableFile);
   if (!ini.exists) return undefined;
   const doc = IniDocument.parse(fs.readFileSync(ini.path, 'utf8'));
+  // Le DMD posé par Cyber Pinball dans le cadre de l'habillage FullDMD (fulldmdtable.ts) est géré, pas un réglage
+  // à défaire ; une place réglée qui recouvre l'habillage relève de « Le DMD cacherait l'habillage FullDMD » (dmdElsewhere).
+  const dressed = dmdElsewhere || isDressWindow(tableDmdWindow(doc), dress);
   const placed: string[] = [];
   for (const w of TABLE_WINDOWS) {
+    if (dressed && w.section === 'ScoreView') continue;
     const keys = doc
       .entries()
       .filter((e) => e.section.toLowerCase() === w.section.toLowerCase() && e.key.toLowerCase().startsWith(w.prefix.toLowerCase()) && WINDOW_KEY.test(e.key.slice(w.prefix.length)) && e.value.trim() !== '');
@@ -701,7 +729,7 @@ function staleFinding(override: Override): Finding {
  * gardée. Sans elles, un pack installé reste éteint tant qu'on n'ouvre pas le médecin
  * (2001 - A Space Odyssey, 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupHidesDmd', 'pupPlaylistOrder'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupPlaylistOrder'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -735,6 +763,9 @@ export function repairPupForPlay(entry: TableEntry, ctx: DoctorContext, ops: OpC
     if (!next) break;
     applyOps(next.fix!.ops, ops);
     done.push(next);
+    // Une réparation réécrit le .info (option retenue) : la suivante part de celui-là, sinon
+    // l'option qu'elle vient de retenir passerait pour différente de celle en place.
+    if (fs.existsSync(entry.infoFile)) entry = { ...entry, info: readInfo(entry.infoFile) };
   }
   return done;
 }
@@ -764,6 +795,36 @@ function readOverride(entry: TableEntry, file: string): Override | undefined {
  * de la table (scriptpatch.ts), sans toucher à la table ; dans le .vbs déjà là s'il vient
  * d'ailleurs. Sans le texte du script (table protégée), le constat dit quoi changer.
  */
+/**
+ * L'option retenue dans le .info n'est pas celle dont les fichiers sont en place (un .bat
+ * lancé à la main, une copie interrompue, l'ancienne reconnaissance par les seuls .pup), ou
+ * n'y est qu'en partie. Choisie dans la fiche ou en partie en place : elle est réappliquée.
+ * Retenue d'office à l'installation : c'est la mémoire qui suit les fichiers.
+ */
+function pupMismatchFinding(entry: TableEntry, root: string, pack: string, kept: PupVariant, current: AppliedOption, memory: PupMemory): Finding {
+  const partial = current.variant === kept;
+  const reapply = partial || memory.chosen === 'user';
+  const detail = partial
+    ? t('pupvideos\\{pack} : « {option} » n’est qu’en partie en place ({differences}).', { pack, option: kept.label, differences: current.differences.join(', ') })
+    : t('pupvideos\\{pack} : « {kept} » est l’option retenue ({why}), mais les fichiers en place sont ceux de « {current} ».', {
+        pack,
+        kept: kept.label,
+        current: current.variant.label,
+        why: memory.chosen === 'user' ? t('choisie dans la fiche') : t('choisie à l’installation'),
+      });
+  return {
+    code: 'pupOptionMismatch',
+    severity: reapply ? 'warning' : 'info',
+    title: partial ? t('Option du PuP-Pack incomplète') : t('Option du PuP-Pack différente de celle retenue'),
+    detail,
+    fix: reapply
+      ? { label: t('Réappliquer « {option} »', { option: kept.label }), ops: pupOptionOps(entry, root, pack, kept, memory) }
+      : fs.existsSync(entry.infoFile)
+        ? { label: t('Retenir « {option} », l’option en place', { option: current.variant.label }), ops: [{ op: 'write', path: entry.infoFile, content: withPupMemory(entry.info, pack, { ...memory, option: current.variant.label }) }] }
+        : undefined,
+  };
+}
+
 function pupSwitchFinding(entry: TableEntry, pack: string, off: PupSwitch, override: Override | undefined): Finding {
   const base = path.basename(entry.file).replace(/\.vpx$/i, '');
   const target = override?.file ?? path.join(entry.folder, `${base}.vbs`);
@@ -900,7 +961,8 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
 
     // Option non appliquée : des variantes, et une racine sans .pup ou avec des .pup d'aucune variante.
     // Un pack imbriqué est d'abord remonté : la correction viserait sinon l'ancien emplacement.
-    if (!nested.has(pack) && info.variants.length && (!info.pupFiles.length || !appliedVariant(info))) {
+    const current = appliedOption(info, memory?.option);
+    if (!nested.has(pack) && info.variants.length && (!info.pupFiles.length || !current)) {
       const choice = chooseVariant(info.variants, ctx.cabinet, memory?.option);
       const v = choice.chosen!;
       const failed = info.bats.filter((b) => !b.ok);
@@ -939,10 +1001,16 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       });
     }
 
+    // Option retenue dans le .info qui n'est pas celle en place, ou en place à moitié.
+    const kept = memory?.option ? info.variants.find((v) => v.label.toLowerCase() === memory.option!.toLowerCase()) : undefined;
+    if (!nested.has(pack) && kept && current && (current.variant !== kept || !current.complete)) {
+      findings.push(pupMismatchFinding(entry, info.root, pack, kept, current, memory!));
+    }
+
     // Option appliquée moins adaptée à la borne qu'une autre (borne changée depuis
     // l'installation, ou choix d'office d'une autre époque) : sauf si elle a été choisie
     // dans la fiche, la meilleure est proposée, nettement meilleure seulement.
-    const applied = appliedVariant(info);
+    const applied = current?.variant;
     if (ctx.cabinet && applied && memory?.chosen !== 'user' && info.variants.length > 1) {
       const best = chooseVariant(info.variants, ctx.cabinet);
       if (best.confident && best.chosen && best.chosen !== applied && scoreVariant(best.chosen.traits, ctx.cabinet) - scoreVariant(applied.traits, ctx.cabinet) >= 4) {

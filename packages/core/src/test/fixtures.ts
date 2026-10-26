@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { Cabinet, EdidInfo, ObservedDisplay, Rect } from '../model';
+import type { RgbaImage } from '../png';
 
 /** Construit un EDID de base valide (128 octets) avec les champs utiles aux tests. */
 export function makeEdid(opts: {
@@ -152,6 +153,70 @@ export function starTrekPack(root: string): void {
   for (const f of ['screens.pup', 'triggers.pup']) fs.copyFileSync(path.join(root, 'PuP-Pack_Options', options[0]![0], f), path.join(root, f));
 }
 
+/**
+ * Pack de Guardians of the Galaxy (Stern 2017, gotg_2020), tel qu'installé sur la borne :
+ * quatre .bat (« del Option*.jpg », xcopy du dossier de l'option et de son aperçu, puis del
+ * des outils du bureau), une option 4 sans .bat, un « PuP-Pack_Options - Copy » de
+ * sauvegarde. Les options 0 (bureau : PuPDesktopPunch.exe, PuPInit.bat) et 2 (FullDMD) ont
+ * les mêmes .pup octet pour octet ; seuls « Option Selected.txt » et les outils du bureau
+ * les distinguent. La racine est dans l'état laissé par l'option `applied`.
+ */
+export function gotgPack(root: string, applied: 0 | 2 = 2): void {
+  const head = 'ScreenNum,ScreenDes,PlayList,PlayFile,Loopit,Active,Priority,CustomPos';
+  const screens = (backglass: string, dmd: string) =>
+    [
+      head,
+      '0,Topper,,,0,off,,',
+      '1,DMD,,,0,off,,',
+      `2,Backglass,${backglass},0,ForceBack,,`,
+      '3,PlayField,,,0,off,,',
+      '4,Music,,,0,MusicOnly,,',
+      `5,FullDMD,,,0,ForceBack,,${dmd ? `"${dmd}"` : ''}`,
+      '6,Callouts,,,0,off,,',
+      `11,pDMDText,,,0,show,,"${dmd || '5,0,0,100,100'},4"`,
+      `12,pBonusScreen,,,0,ForcePopBack,,"${dmd || '5,0,0,100,100'}"`,
+      `13,pOverVid,,,0,ForcePop,,"${dmd || '5,0,0,100,100'}"`,
+      '14,Audio,,,0,MusicOnly,,',
+      `15,pUnderVid,,,0,show,,"${dmd || '5,0,0,100,100'}"`,
+      '',
+    ].join('\r\n');
+  const three = screens('PuPFrames,GuardiansBackglass2.png', '');
+  const write = (rel: string, content: string) => {
+    fs.mkdirSync(path.dirname(path.join(root, rel)), { recursive: true });
+    fs.writeFileSync(path.join(root, rel), content);
+  };
+  const options: [string, string, boolean][] = [
+    ['Option 0 - 3 Screen Desktop', three, true],
+    ['Option 1 - 2 Screen NoDMD', screens('PuPImages,GOTGpindmdframefinished.png', '2,21.5,41,57,56.2'), true],
+    ['Option 2 - 3 Screen FullDMD', three, true],
+    ['Option 3 - 2 Screen 5x4', screens('PuPImages,GOTG-5x4.png', '2,16.4,51.5,67.2,46.3'), true],
+    ['Option 4 - Backbox AIO - 4x3 and 5x4 - Speaker Panel, Full DMD, Backglass', screens('PuPFrames,GuardiansBackglass2.png', '6,23,60.7,54,38.2'), false],
+  ];
+  options.forEach(([name, s, bat], n) => {
+    const dir = `PuP-Pack_Options\\${name}`;
+    write(path.join('PuP-Pack_Options', name, 'screens.pup'), s);
+    write(path.join('PuP-Pack_Options', name, 'playlists.pup'), 'playlists');
+    write(path.join('PuP-Pack_Options', name, 'triggers.pup'), 'triggers');
+    write(path.join('PuP-Pack_Options', name, 'Option Selected.txt'), String(n));
+    write(path.join('PuP-Pack_Options', `Option ${n}.JPG`), `aperçu ${n}`);
+    if (!bat) return;
+    const tools = n === 0 ? '' : 'del PuPInit.bat\r\ndel PuPDesktopPunch.exe\r\ndel PinUpPlayer.ini\r\n';
+    write(`${name}.bat`, `rem echo off\r\ndel Option*.jpg\r\nxcopy /y "${dir}\\*.*"\r\nxcopy /y "PuP-Pack_Options\\Option ${n}.JPG"\r\n${tools}`);
+  });
+  write(path.join('PuP-Pack_Options', 'Option 0 - 3 Screen Desktop', 'PuPDesktopPunch.exe'), 'punch');
+  write(path.join('PuP-Pack_Options', 'Option 0 - 3 Screen Desktop', 'PuPInit.bat'), '@echo off\r\nstart PuPDesktopPunch.exe "Visual Pinball Player" 5');
+  // Sauvegardes laissées par l'auteur : ni des options, ni l'état en place.
+  write(path.join('PuP-Pack_Options - Copy', 'screens.pup'), three);
+  write(path.join('PuP-Pack_Options - Copy', 'PinUPKeepBack.exe'), 'keep');
+  write(path.join('Topper.orig', 'Song-1.mp3'), 'song');
+  write(path.join('PuPFrames', 'GuardiansBackglass2.png'), 'png');
+  write('getCodec.bat', '@echo Off\r\n@for %%A IN (*.mp4) DO ffprobe -i "%%A"\r\n');
+  // La racine telle que le .bat de l'option l'a laissée.
+  const chosen = options[applied]![0];
+  for (const f of fs.readdirSync(path.join(root, 'PuP-Pack_Options', chosen))) fs.copyFileSync(path.join(root, 'PuP-Pack_Options', chosen, f), path.join(root, f));
+  fs.copyFileSync(path.join(root, 'PuP-Pack_Options', `Option ${applied}.JPG`), path.join(root, `Option ${applied}.JPG`));
+}
+
 // ---------------------------------------------------------------------------
 // Fichier composé OLE minimal, comme VPX en écrit : TableInfo et ses flux UTF-16LE, et
 // GameStg (GameData, ImageN) si on lui en donne.
@@ -298,4 +363,65 @@ export function vpxWithScript(script: string, protectedScript = false): Buffer {
   const text = Buffer.from(script, 'latin1');
   const gameData = Buffer.concat([...(protectedScript ? [biff('SECB', secb)] : []), biff('NAME', biffStr('Table1')), biff('CODE'), u32(text.length), text, biff('ENDB')]);
   return cfb({ TableName: 'Table' }, { GameData: gameData });
+}
+
+/** Générateur pseudo-aléatoire stable : les images de test ne changent pas d'un essai à l'autre. */
+export function seeded(seed: number): () => number {
+  let s = seed >>> 0;
+  return () => {
+    s = (s * 1664525 + 1013904223) >>> 0;
+    return s / 2 ** 32;
+  };
+}
+
+/**
+ * Média FullDMD synthétique, comme ceux de VPinMediaDB : une illustration chargée en haut (blocs
+ * de couleur au hasard), un cadre de DMD en bas (trait plein, ou pointillés comme 2001), un DMD
+ * figé dedans (fond rouge sombre, « texte » orange vif), du noir autour. Renvoie aussi l'intérieur
+ * du cadre, en pixels.
+ */
+export function framedFullDmd(opts: { width?: number; height?: number; dotted?: boolean; seed?: number } = {}): { image: RgbaImage; inner: { x: number; y: number; width: number; height: number } } {
+  const width = opts.width ?? 960;
+  const height = opts.height ?? 540;
+  const rnd = seeded(opts.seed ?? 7);
+  const data = Buffer.alloc(width * height * 4);
+  const fill = (x0: number, y0: number, w: number, h: number, rgb: [number, number, number]) => {
+    for (let y = Math.max(0, y0); y < Math.min(height, y0 + h); y++) {
+      for (let x = Math.max(0, x0); x < Math.min(width, x0 + w); x++) {
+        const o = (y * width + x) * 4;
+        data[o] = rgb[0];
+        data[o + 1] = rgb[1];
+        data[o + 2] = rgb[2];
+        data[o + 3] = 255;
+      }
+    }
+  };
+  fill(0, 0, width, height, [0, 0, 0]);
+  // Illustration : 600 blocs de couleur sur la moitié haute.
+  for (let i = 0; i < 600; i++) {
+    const w = Math.round(4 + rnd() * width * 0.08);
+    const h = Math.round(4 + rnd() * height * 0.12);
+    fill(Math.round(rnd() * width), Math.round(rnd() * height * 0.5), w, h, [Math.round(rnd() * 255), Math.round(rnd() * 255), Math.round(rnd() * 255)]);
+  }
+  const outer = { x: Math.round(width * 0.05), y: Math.round(height * 0.56), width: Math.round(width * 0.9), height: Math.round(height * 0.4) };
+  const border = Math.max(3, Math.round(width / 160));
+  if (opts.dotted) {
+    for (let y = outer.y; y < outer.y + outer.height; y += border * 2)
+      for (let x = outer.x; x < outer.x + outer.width; x += border * 2) {
+        const edge = x < outer.x + border * 2 || x >= outer.x + outer.width - border * 2 || y < outer.y + border * 2 || y >= outer.y + outer.height - border * 2;
+        if (edge) fill(x, y, border, border, [255, 255, 255]);
+      }
+  } else {
+    fill(outer.x, outer.y, outer.width, outer.height, [120, 200, 50]);
+  }
+  const inner = { x: outer.x + border * 2, y: outer.y + border * 2, width: outer.width - border * 4, height: outer.height - border * 4 };
+  fill(inner.x, inner.y, inner.width, inner.height, [58, 13, 5]);
+  // DMD figé : trois lignes de « lettres » orange.
+  for (let line = 0; line < 3; line++) {
+    for (let c = 0; c < 14; c++) {
+      if (rnd() < 0.25) continue;
+      fill(Math.round(inner.x + inner.width * (0.18 + c * 0.047)), Math.round(inner.y + inner.height * (0.12 + line * 0.3)), Math.round(inner.width * 0.035), Math.round(inner.height * 0.2), [255, 90, 20]);
+    }
+  }
+  return { image: { width, height, data }, inner };
 }

@@ -84,6 +84,8 @@ function quoteArgument(arg: string): string {
 
 /** Fenêtres que l'application tient pour affichées (hors écran, aucune ne l'est vraiment). */
 const shown = new WeakSet<BrowserWindow>();
+/** Hors écran, fenêtres que l'application a réduites (mode bureau). */
+const minimized = new WeakSet<BrowserWindow>();
 
 /** Crée une fenêtre de l'application : à l'écran, ou rendue hors écran pendant un essai. */
 export function createWindow(options: BrowserWindowConstructorOptions): BrowserWindow {
@@ -175,9 +177,15 @@ function keepOffscreen(win: BrowserWindow): void {
     setFullScreen: none,
     setKiosk: none,
     maximize: none,
-    // Réduire ou rouvrir une fenêtre cachée la montrerait (Windows).
-    minimize: none,
-    restore: none,
+    // Réduire ou rouvrir une fenêtre cachée la montrerait (Windows) : la réduction n'est que
+    // tenue pour faite (mode bureau), la fenêtre ne compte plus comme affichée jusqu'à sa réouverture.
+    minimize: () => {
+      if (shown.delete(win)) minimized.add(win);
+    },
+    restore: () => {
+      if (minimized.delete(win)) shown.add(win);
+    },
+    isMinimized: () => minimized.has(win),
     flashFrame: none,
   });
 }

@@ -55,6 +55,14 @@ export function screenCover(display: CoverRect, stack: StackedWindow[], coverPid
   return { state: 'uncovered' };
 }
 
+/**
+ * Mode bureau (menu système > « Bureau Windows ») : l'inverse. Aucune fenêtre des processus
+ * `pids` ne doit plus rien recouvrir de l'écran `display` ; rend celles qui le font encore.
+ */
+export function desktopBlockers(display: CoverRect, stack: StackedWindow[], pids: number[]): StackedWindow[] {
+  return stack.filter((w) => !w.minimized && pids.includes(w.pid) && intersects(w.rect, display));
+}
+
 /** Constat en clair pour la console ; undefined si l'écran est couvert. */
 export function coverNotice(cover: ScreenCover): string | undefined {
   if (cover.state === 'taskbar') return 'la barre des tâches de Windows passe devant'; // i18n-ignore : constat pour la console

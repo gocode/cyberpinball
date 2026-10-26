@@ -120,6 +120,16 @@ function renderLibrary(v) {
       li.append(glyph);
     } else if (dot) label.append(dot);
     li.append(label);
+    // Raccourci clavier de l'entrée, à droite : une touche cerclée par touche, comme le bandeau d'aide.
+    if (a.keys?.length) {
+      const keys = libEl('span', 'lib-action-keys');
+      keys.title = a.keys.join('+');
+      a.keys.forEach((k, n) => {
+        if (n) keys.append(libEl('span', 'plus', '+'));
+        keys.append(libEl('span', 'lib-keycap', k));
+      });
+      li.append(keys);
+    }
     if (a.detail) li.append(libEl('span', 'detail', a.detail));
     actions.append(li);
   });
@@ -302,6 +312,8 @@ function forgetMediaNodes() {
 function renderThumb(t, selected = false) {
   const box = libEl('div', `media-thumb kind-${t.kind} rot-${t.rotation}`);
   if ((t.kind === 'image' || t.kind === 'video') && t.url) box.append(mediaNode(t.kind, t.url));
+  // Un son peut montrer une image pendant qu'il s'écoute : sa forme d'onde (recherche libre, découpe).
+  else if (t.kind === 'audio' && t.poster) box.append(mediaNode('image', t.poster));
   else box.append(libEl('span', 'media-placeholder', t.text ?? ''));
   // Un son proposé s'écoute quand sa carte est choisie : on ne choisit pas une musique sans l'entendre.
   if (t.kind === 'audio' && t.url) {
@@ -419,4 +431,21 @@ function revealSelection() {
   for (const node of document.querySelectorAll('.lib-row.selected, .lib-action.current, .key.current, .media-card.selected')) {
     node.scrollIntoView({ block: 'nearest' });
   }
+  for (const list of document.querySelectorAll('.lib-actions, .lib-content')) {
+    markOverflow(list);
+    if (list.dataset.overflowWatch) continue;
+    list.dataset.overflowWatch = '';
+    list.addEventListener('scroll', () => markOverflow(list), { passive: true });
+  }
+}
+
+/**
+ * Liste qui défile : le bord derrière lequel il reste des entrées s'efface en fondu
+ * (library.css, .more-above / .more-below). Sans cela, la dernière entrée visible était
+ * coupée net au milieu d'une ligne (écran PuP-Pack de GOTG, 26 octobre 2026).
+ */
+function markOverflow(list) {
+  const slack = 2;
+  list.classList.toggle('more-above', list.scrollTop > slack);
+  list.classList.toggle('more-below', list.scrollTop + list.clientHeight < list.scrollHeight - slack);
 }

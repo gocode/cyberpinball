@@ -330,9 +330,9 @@ function pupFolderTypes(folder: string): { type: MediaType; rank: number }[] {
   return out;
 }
 
-const MUSIC_FOLDER = /music|song|audio|bgm|soundtrack|topper|attract/i;
+export const MUSIC_FOLDER = /music|song|audio|bgm|soundtrack|topper|attract/i;
 /** Copies de sauvegarde, options et polices d'un pack : rien à montrer. */
-const SPARE_FOLDER = /backup|\.orig$|options|_delta|^fonts?$/i;
+export const SPARE_FOLDER = /backup|\.orig$|options|_delta|^fonts?$/i;
 
 interface PupTrigger {
   trigger: string;

@@ -5,8 +5,12 @@
 // sur la fenêtre ; remplacer ; mettre à la corbeille ; demi-tour du plateau ;
 // volume relatif ; ordre des pages ; « Chercher les médias » sur VPinMediaDB
 // (media-download.ts, son propre plan) ; « Voir les propositions » de chaque média,
-// toutes sources réunies (media-proposals.ts). Tout va dans un brouillon : rien n'est
-// écrit avant « Enregistrer », qui montre d'abord le plan, comme l'ajout d'une table.
+// toutes sources réunies (media-proposals.ts) ; « Chercher moi-même sur le web… » de chaque
+// média, recherche libre dans le navigateur intégré (media-web.ts). Tout va dans un
+// brouillon : rien n'est écrit avant « Enregistrer », qui montre d'abord le plan, comme
+// l'ajout d'une table. Seule exception : un fichier reçu de la recherche libre, affecté
+// depuis son écran « Reçu » qui montre ce qui sera écrit, est enregistré aussitôt (ce seul
+// média ; le reste du brouillon attend « Enregistrer »).
 // La logique (plan, renommage, .info) est dans packages/core/src/mediaedit.ts.
 
 import * as fs from 'node:fs';
@@ -46,6 +50,7 @@ import {
   nextMemory,
   ownMediaPages,
   planMediaChanges,
+  planSingleMedia,
   playfieldMediaRotation,
   resolveMedia,
   samePath,
@@ -67,8 +72,11 @@ import {
 } from '@cyberpinball/core';
 import type { Action, Built, LibraryHost, Row, Section, Tone } from './library';
 import { allowPreview } from './media-protocol';
+import type { Converter } from './media-convert';
 import { createProposals } from './media-proposals';
+import { createTableSounds } from './media-sounds';
 import type { MediaSites } from './media-sites';
+import { createWebSearch } from './media-web';
 import type { MediaSearch } from './media-search';
 import type { PickRequest } from './file-picker';
 
@@ -77,8 +85,8 @@ export interface MediasContext {
   layout(): Layout | undefined;
   tablesDir(): string;
   find(file: string): TableEntry | undefined;
-  /** Affiche un écran décrit (openCustom de library.ts), le curseur sur l'action `at`. */
-  show(build: () => Built, at?: number): void;
+  /** Affiche un écran décrit (openCustom de library.ts), le curseur sur l'action `at` ; `table` : la table dont il parle. */
+  show(build: () => Built, at?: number, table?: string): void;
   cursor(): number;
   sheet(table: TableEntry, flash?: string): void;
   /** Retour au menu des tables. */
@@ -96,6 +104,8 @@ export interface MediasContext {
     withNotice(then: () => void, back: () => void): void;
     /** Sites communautaires, avec le compte de l'utilisateur. */
     sites?: MediaSites;
+    /** Conversions des fichiers reçus de la recherche libre ; absent : pas de recherche libre (essais). */
+    convert?: Converter;
   };
 }
 
@@ -106,6 +116,8 @@ export interface MediaThumb {
   /** Rotation horaire vue du joueur (plateau et chargement), demi-tour compris. */
   rotation: Rotation;
   text?: string;
+  /** Son : image montrée pendant qu'il s'écoute (sa forme d'onde), à la place du texte. */
+  poster?: string;
 }
 
 /** Carte d'un média ou d'une page, rattachée à une action (Start ou clic l'ouvre). */
@@ -132,6 +144,14 @@ export interface MediaView {
   cards: MediaCard[];
   /** Grand aperçu (un seul média ou une seule page). */
   large?: boolean;
+}
+
+/**
+ * L'écran fait écouter des sons : une carte à choisir porte un son, joué quand elle est
+ * choisie (library.js). La musique du menu se tait pendant ce temps : un seul son à la fois.
+ */
+export function playsSoundPreview(media: MediaView | undefined): boolean {
+  return (media?.cards ?? []).some((c) => c.action !== undefined && c.thumb.kind === 'audio' && !!c.thumb.url);
 }
 
 type Target = { kind: 'set' } | { kind: 'add' } | { kind: 'replace'; index: number };
@@ -282,8 +302,36 @@ export function createMedias(ctx: MediasContext) {
   function open(table: TableEntry): void {
     session = { file: table.file, draft: emptyMediaDraft() };
     proposals?.reset();
-    ctx.show(() => buildOverview(session!));
+    web?.stop();
+    ctx.show(() => buildOverview(session!), undefined, table.file);
   }
+
+  // Recherche libre de chaque média (navigateur intégré), sur la session en cours.
+  const web =
+    ctx.proposals?.sites && ctx.proposals.convert
+      ? createWebSearch({
+          sites: ctx.proposals.sites,
+          convert: ctx.proposals.convert,
+          downloadsDir: () => ctx.layout()?.downloads,
+          task: ctx.proposals.task,
+          progress: ctx.proposals.progress,
+          show: (build, at) => (session ? nav(session, build, at) : ctx.show(build, at)),
+          cursor: () => ctx.cursor(),
+          broadcast: () => host.broadcast(),
+          find: (file) => ctx.find(file),
+          active: (table) => session?.file === table.file,
+          thumb: (table, type, file) => thumbOf(session!, table, type, file),
+          facts: (file) => factsOf(session!, file),
+          current: (table, type) => current(session!, table, type),
+          commit: (table, type, entry) => commit(session!, table, type, entry),
+          place: (table, type, entry) => place(session!, table, type, entry, mediaTypeInfo(type).pages ? { kind: 'add' } : { kind: 'set' }),
+          back: (type, message) => {
+            if (!session) return;
+            session.next = message;
+            openType(session, type);
+          },
+        })
+      : undefined;
 
   // Propositions de chaque média : branchées sur le brouillon de la session en cours.
   const proposals = ctx.proposals
@@ -301,6 +349,7 @@ export function createMedias(ctx: MediasContext) {
         b2s: (table) => b2sSources(session!, table),
         active: (table) => session?.file === table.file,
         placement: (type) => mediaPlacement(type, cabinet()),
+        web: web && { open: (table, type, title) => web.open(table, type, title), detail: (table, type, title) => web.detail(table, type, title) },
         back: (type, message) => {
           if (!session) return;
           session.next = message;
@@ -309,11 +358,24 @@ export function createMedias(ctx: MediasContext) {
       })
     : undefined;
 
+  // Sons de la table (PuP-Pack, médias, vidéos sonores) : musique et son de lancement.
+  const sounds = createTableSounds({
+    dataDir: host.dataDir,
+    tablesDir: () => ctx.tablesDir(),
+    show: (build, at) => (session ? nav(session, build, at) : ctx.show(build, at)),
+    place: (table, type, file) => place(session!, table, type, { from: file, mode: 'copy' }, { kind: 'set' }),
+    back: (type, at, message) => {
+      if (!session) return;
+      session.next = message;
+      openType(session, type, at);
+    },
+  });
+
   /** Ouvre un écran des médias : le message prévu pour lui remplace celui de l'écran précédent. */
   function nav(s: Session, build: () => Built, at?: number): void {
     s.notice = s.next;
     s.next = undefined;
-    ctx.show(build, at);
+    ctx.show(build, at, s.file);
   }
 
   /** Vue d'ensemble, le curseur sur ce type (ou cette action), sinon là où il était. */
@@ -442,6 +504,7 @@ export function createMedias(ctx: MediasContext) {
 
   function close(table: TableEntry): void {
     session = undefined;
+    web?.stop();
     ctx.sheet(table);
   }
 
@@ -531,6 +594,7 @@ export function createMedias(ctx: MediasContext) {
         cards.push({ action: i, title: t('Page {page}', { page: i + 1 }), facts: `${entryName(entry)} · ${factsOf(s, file)}`, pending: pagePending(table, type, entry, i), thumb: thumbOf(s, table, type, file) });
       });
       if (proposals) actions.push(proposalsAction(s, table, type));
+      if (web) actions.push(webAction(s, table, type));
       actions.push(
         { label: t('Ajouter une page depuis le dossier d’import'), detail: importDetail, run: () => openPick(s, type, { kind: 'add' }) },
         { label: t('Ajouter une page : choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glissez-le ici'), run: () => void pickOnPc(s, type, { kind: 'add' }) },
@@ -572,6 +636,11 @@ export function createMedias(ctx: MediasContext) {
         ],
       });
       if (proposals) actions.push(proposalsAction(s, table, type));
+      if (web) actions.push(webAction(s, table, type));
+      if (info.target === 'audio') {
+        const at = actions.length;
+        actions.push({ label: t('Sons de la table'), detail: t('PuP-Pack, médias, vidéos avec du son : écouter, puis choisir'), tone: 'ok', run: () => sounds.open(table, type, at) });
+      }
       actions.push(
         { label: file ? t('Remplacer depuis le dossier d’import') : t('Prendre dans le dossier d’import'), detail: importDetail, run: () => openPick(s, type, { kind: 'set' }) },
         { label: file ? t('Remplacer : choisir un fichier…') : t('Choisir un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, ce PC ; ou glissez-le ici'), run: () => void pickOnPc(s, type, { kind: 'set' }) },
@@ -622,6 +691,21 @@ export function createMedias(ctx: MediasContext) {
       detail: n === undefined ? t('Toutes les versions trouvées : VPinMediaDB (jeu reconnu et proches), PuP-Pack, DMD, .directb2s') : tn(n, '{n} proposition avec aperçu', '{n} propositions avec aperçu'),
       tone: 'ok',
       run: () => proposals!.open(table, type),
+    };
+  }
+
+  /**
+   * « Chercher moi-même sur le web… » : le navigateur intégré sur une recherche libre ; ce
+   * qui y est téléchargé est vérifié puis proposé pour ce média (media-web.ts).
+   */
+  function webAction(s: Session, table: TableEntry, type: MediaType): Action {
+    return {
+      label: t('Chercher moi-même sur le web…'),
+      detail: web!.detail(table, type),
+      run: () => {
+        s.notice = { text: web!.open(table, type), tone: 'info' };
+        host.broadcast();
+      },
     };
   }
 
@@ -869,7 +953,40 @@ export function createMedias(ctx: MediasContext) {
     );
   }
 
+  // ---------- Affectation immédiate (recherche libre) ----------
+
+  /**
+   * Écrit un seul média aussitôt, après l'écran « Reçu » qui a montré ce qui serait écrit :
+   * le fichier rangé sous son nom, l'ancien à la corbeille. Les autres changements du
+   * brouillon restent à enregistrer ; celui de ce média, remplacé, est oublié.
+   */
+  function commit(s: Session, table: TableEntry, type: MediaType, entry: MediaPageEntry): { text: string; tone: Tone } {
+    const info = mediaTypeInfo(type);
+    const now = current(s, table, type);
+    const source = entrySource(entry);
+    if (!info.pages && now[0] && sameFileContent(source, now[0])) return { text: t('« {file} » est identique au média {label} actuel : rien n’a été écrit.', { file: path.basename(source), label: info.label }), tone: 'info' };
+    const plan = planSingleMedia(table, type, entry, now, { infoFile: infoFileFor(table, ctx.tablesDir()) });
+    if (plan.problems.length) return { text: t('Rien n’a été écrit : {problems}', { problems: plan.problems.join(' ') }), tone: 'error' };
+    const trashDir = trashDirFor(ctx.layout()!.trash, `Médias ${path.basename(table.folder)}`); // i18n-ignore : nom de dossier de la corbeille
+    try {
+      applyOps(plan.ops, { trashDir });
+    } catch (error) {
+      host.reload(table.file);
+      return { text: t('Écriture interrompue : {error}. Ce qui a déjà été fait est resté ; les fichiers retirés sont dans {dir}.', { error: (error as Error).message, dir: path.relative(root(), trashDir) }), tone: 'error' };
+    }
+    delete s.draft.pages[type];
+    host.reload(table.file);
+    const name = mediaFileName(table, type, path.extname(source).slice(1), info.pages ? now.length + 1 : 1);
+    return {
+      text: [t('Enregistré : « {name} » est maintenant le média {label}, le menu le montre.', { name, label: info.label }), plan.steps.some((st) => st.kind === 'trash') ? t('Ancien fichier dans la corbeille : {dir}.', { dir: path.relative(root(), trashDir) }) : '']
+        .filter(Boolean)
+        .join(' '),
+      tone: 'ok',
+    };
+  }
+
   // ---------- Plan et enregistrement ----------
+
 
   function planFor(s: Session, table: TableEntry) {
     const currentPages: Partial<Record<MediaType, string[]>> = {};

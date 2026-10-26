@@ -14,7 +14,11 @@ import { mediaErrorsFile, readMediaErrors, recordMediaError } from '../mediaerro
 import { blocksPlay, playBlockers } from '../playable';
 import { readInfo, scanTables, type TableEntry } from '../tables';
 import { buildZip } from '../romzip';
-import { devPcDisplays, starTrekPack, vpxWithScript } from './fixtures';
+import { devPcDisplays, framedFullDmd, starTrekPack, vpxWithScript } from './fixtures';
+import { pngFrame } from '../fulldmdframe';
+import { dressScreen, tableDressing } from '../fulldmdtable';
+import type { Cabinet, PhysicalScreen } from '../model';
+import { encodePng } from '../png';
 import { buildScriptPatch } from '../scriptpatch';
 
 const SCRIPT = 'Const cGameName="afm_113b"\r\nLoadVPM "01560000", "WPC.VBS", 3.26\r\nController.GameName = cGameName\r\n';
@@ -261,6 +265,17 @@ const TRAPS: Trap[] = [
     script: scriptFacts(PUP_SCRIPT),
   },
   {
+    // Option choisie dans la fiche (3), fichiers d'une autre (1) en place : un .bat lancé à la main.
+    code: 'pupOptionMismatch',
+    arm: (folder) => {
+      const pack = path.join(folder, 'pupvideos', 'afm_113b');
+      fs.mkdirSync(pack, { recursive: true });
+      starTrekPack(pack);
+      write(path.join(folder, `${TABLE}.info`), JSON.stringify({ CyberPinball: { pup: { afm_113b: { option: 'Option 3 - BG and Topper Seperate', chosen: 'user' } } } }));
+    },
+    script: scriptFacts(PUP_SCRIPT),
+  },
+  {
     code: 'pupScreenAbsent',
     arm: (folder) => {
       const pack = healthyPack(folder);
@@ -355,6 +370,20 @@ const TRAPS: Trap[] = [
   {
     code: 'tableWindows',
     arm: (folder) => write(path.join(folder, `${TABLE}.ini`), '[ScoreView]\r\nScoreViewWndX = 760\r\nScoreViewWndY = 860\r\nScoreViewWidth = 400\r\nScoreViewHeight = 100\r\n\r\n[Player]\r\nCabinetAutofitPos = 0.1\r\n'),
+  },
+  // Habillage FullDMD (fulldmdtable.ts) : le .ini de la table met le DMD sur tout l'écran, par-dessus l'habillage.
+  {
+    code: 'fullDmdHidden',
+    arm: (folder) => {
+      write(media(folder, `(FullDMD) ${TABLE}.png`), encodePng(framedFullDmd({ width: 1920, height: 1080 }).image));
+      write(path.join(folder, `${TABLE}.ini`), '[ScoreView]\r\nScoreViewFullScreen = 1\r\n');
+    },
+    ctx: (folder) => {
+      const screen = (fingerprint: string): PhysicalScreen => ({ fingerprint, strength: 'strong', label: fingerprint, widthPx: 1920, heightPx: 1080, widthCm: 48, heightCm: 27 });
+      const cabinet: Cabinet = { version: 1, screens: [screen('PF'), screen('DMD')], roles: { playfield: 'PF', dmd: 'DMD' }, dmdKind: 'fulldmd', vpx: { iniPath: 'VPinballX.ini' }, updatedAt: '' };
+      const entry = scanTables(path.dirname(folder))[0]!;
+      return { dressing: tableDressing(entry, { screen: dressScreen(cabinet), root: path.dirname(folder), cabinet, facts: scriptFacts(SCRIPT), b2sFullDmd: false, frameOf: pngFrame }) };
+    },
   },
   // Médias (docs/recherche/medias.md, § 5.5, tâche T11).
   { code: 'mediaUnreadable', arm: (folder) => write(media(folder, `(Backglass) ${TABLE}.flv`), 'flv') },

@@ -66,7 +66,8 @@ export interface MediaDownloadContext {
   layout(): Layout | undefined;
   tablesDir(): string;
   find(file: string): TableEntry | undefined;
-  openCustom(build: () => Built, at?: number): void;
+  /** `table` : la table dont parle l'écran (ses médias restent sur les écrans de la borne). */
+  openCustom(build: () => Built, at?: number, table?: string): void;
   openSystem(): void;
   openNotice(heading: string, lines: string[], then?: () => void): void;
   /** Opération longue : message à l'écran, touches ignorées. */
@@ -334,7 +335,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
         { label: t('Retour aux médias'), run: leave },
       ],
       back: leave,
-    }));
+    }), undefined, table.file);
   }
 
   interface PlanMode {
@@ -412,7 +413,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   }
 
   function showTablePlan(o: Offer, mode: PlanMode, at = 0): void {
-    ctx.openCustom(() => buildTablePlan(o, mode), at);
+    ctx.openCustom(() => buildTablePlan(o, mode), at, o.file);
   }
 
   function buildTablePlan(o: Offer, mode: PlanMode): Built {
@@ -553,6 +554,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
         back,
       }),
       o.pick,
+      o.file,
     );
   }
 

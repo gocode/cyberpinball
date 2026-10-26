@@ -33,6 +33,15 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - DMD screen: say whether it is a FullDMD (the whole screen, game DMD inset) or a DMD only; the menu, VPX and PuP-Packs follow it.
 - PuP-Pack on the backglass: the pack option is chosen from the cabinet's screens, the game DMD stays in front of the pack, and the pack is checked before each game.
 - Tilt: new "Tilt" step (the cabinet's plumb bob, or a plumb bob simulated by VPX from the accelerometer), plumb bob and slam tilt captured in the "Buttons" step.
+- A media file added, replaced or removed (wheel logo, backglass, video, music…) and a table added or renamed show up immediately on every screen, without restarting.
+- System menu, settings, help and messages: backglass, display and topper switch to the Cyber Pinball display, without the last table's video or music; a table's details screen keeps its media.
+- "Table sounds" (Game media > Music or Launch sound): listen to the PuP-Pack's music and its videos' sound, and make one the game's presentation music or launch sound.
+- Media: "Search the web myself…" on each media item opens the built-in browser on a search you change as you like; the downloaded file is checked, converted if needed (music can be trimmed) and assigned at once.
+- "Bureau Windows" (Windows desktop) now frees every screen of the PC, rather than often just one; Ctrl+Shift+D goes there straight from the menu and back, the shortcut shown next to the entry.
+- Wide display (FullDMD) in game: the menu's artwork stays on screen and the game's DMD sits in its frame; its placement is fine-tuned in game, table by table, from the VPX menu.
+- Media: on a YouTube, Vimeo or Dailymotion page, "Get the sound" or "Get the video" through the yt-dlp tool, downloaded from GitHub and checked on first use.
+- PuP-Pack: the applied option is finally shown as it is (option 2 of Guardians of the Galaxy no longer passes for option 0), each option only once, the one best suited to the cabinet recommended; "applied" is only announced once the option is checked in place, otherwise the message says why.
+- Loading screen: on the cabinet, the game's loading video alone, full screen, with no text; on a desktop, the video in the playfield frame and the title with the game's controls in a panel beside it, no longer covering anything.
 
 ## 0.1.2
 

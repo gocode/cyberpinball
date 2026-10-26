@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<!-- Page d'une vidéo de youtube.com, telle qu'un visiteur la voit (26/10/2026), réduite à ce que lit la sonde des pages vidéo (VIDEO_PAGE_PROBE, webmedia.ts) : l'en-tête est celui reçu par un visiteur (balises meta, titre, adresse canonique) ; le corps reprend la structure que le script de YouTube construit (bandeau avec « Sign in », lecteur, titre de la vidéo), le lecteur lisant un flux découpé (blob:). Sert aux tests de webmedia.test.ts. -->
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<title>Me at the zoo - YouTube</title>
+<link rel="canonical" href="https://www.youtube.com/watch?v=jNQXAC9IVRw">
+<meta property="og:site_name" content="YouTube">
+<meta property="og:url" content="https://www.youtube.com/watch?v=jNQXAC9IVRw">
+<meta property="og:title" content="Me at the zoo">
+<meta property="og:type" content="video.other">
+<meta property="og:video:url" content="https://www.youtube.com/embed/jNQXAC9IVRw">
+<meta property="og:video:type" content="text/html">
+<meta itemprop="name" content="Me at the zoo">
+<meta itemprop="identifier" content="jNQXAC9IVRw">
+<meta itemprop="duration" content="PT0M19S">
+</head>
+<body dir="ltr">
+<ytd-app>
+  <div id="masthead-container" class="style-scope ytd-app">
+    <ytd-masthead id="masthead" class="style-scope ytd-app">
+      <div id="end" class="style-scope ytd-masthead">
+        <div id="buttons" class="style-scope ytd-masthead">
+          <ytd-button-renderer class="style-scope ytd-masthead"><a class="yt-spec-button-shape-next" href="https://accounts.google.com/ServiceLogin?service=youtube&amp;uilel=3&amp;passive=true&amp;continue=https%3A%2F%2Fwww.youtube.com%2Fwatch%3Fv%3DjNQXAC9IVRw" aria-label="Sign in">Sign in</a></ytd-button-renderer>
+        </div>
+      </div>
+    </ytd-masthead>
+  </div>
+  <ytd-page-manager id="page-manager" class="style-scope ytd-app">
+    <ytd-watch-flexy class="style-scope ytd-page-manager" video-id="jNQXAC9IVRw" role="main">
+      <div id="player" class="style-scope ytd-watch-flexy">
+        <div id="movie_player" class="html5-video-player">
+          <div class="html5-video-container"><video tabindex="-1" class="video-stream html5-main-video" src="blob:https://www.youtube.com/5f0e4c3a-7d1e-4f0b-9a52-0c8d7e2b1a46"></video></div>
+        </div>
+      </div>
+      <div id="below" class="style-scope ytd-watch-flexy">
+        <ytd-watch-metadata class="watch-active-metadata style-scope ytd-watch-flexy">
+          <div id="title" class="style-scope ytd-watch-metadata"><h1 class="style-scope ytd-watch-metadata"><yt-formatted-string force-default-style="" class="style-scope ytd-watch-metadata">Me at the zoo</yt-formatted-string></h1></div>
+          <div id="owner" class="style-scope ytd-watch-metadata"><a class="yt-simple-endpoint style-scope yt-formatted-string" href="/@jawed">jawed</a></div>
+        </ytd-watch-metadata>
+      </div>
+    </ytd-watch-flexy>
+  </ytd-page-manager>
+</ytd-app>
+</body>
+</html>

@@ -5,7 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, globalShortcut, ipcMain, session, type BrowserWindow, type Input, type Rectangle } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, session, type Input, type Rectangle } from 'electron';
 import {
   CONFIG_KEY,
   WIZARD_STEPS,
@@ -48,6 +48,9 @@ import {
   mediaErrorsFile,
   recordMediaError as logMediaError,
   MenuMedias,
+  defaultMediaView,
+  watchMediaChanges,
+  type MediaWatch,
   isServedMedia,
   loadMenuMediaSettings,
   mediaPathFromUrl,
@@ -57,11 +60,14 @@ import {
   attractMemory,
   momentScreen,
   pickAttractTable,
+  samePath,
+  screensTable,
   occupiedRoles,
   saveMenuMediaSettings,
   tableMediaVolume,
   type MenuMediaSettings,
   type MenuMoment,
+  type MenuPhase,
   type RoleRect,
   type AncillaryRoleId,
   type CabinetButtons,
@@ -73,6 +79,9 @@ import {
   type Rotation,
   type ScreenSurface,
   type ScreenZone,
+  liveDressCoverage,
+  DRESS_COVERED,
+  type TableDressing,
   type TableEntry,
   type MediaTarget,
   type MediaType,
@@ -83,6 +92,12 @@ import {
   pupCabinet,
   repairPupForPlay,
   trashDirFor,
+  accelerator,
+  shownKeys,
+  matchesShortcut,
+  shortcutKeys,
+  shortcutLabel,
+  SHORTCUTS,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -90,15 +105,18 @@ import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, windowRect } from './offscreen';
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
-import { createLibrary, type SystemItem, type UiAction } from './library';
+import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
 import { cachedScript } from './vbs';
+import { prepareDressing } from './fulldmd';
+import { createConverter } from './media-convert';
 import { onJoystickInput } from './joystick-input';
 import { locations, vpxInstall, vpxProfile } from './paths';
 import { activeVpxIni, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
-import { coverDisplay, minimizeCovered } from './cover-display';
+import { coverDisplay, hideCovered, minimizeCovered } from './cover-display';
+import { DesktopMode } from './desktop-mode';
 import { acceptFrontends, unacceptedFrontends } from './frontend-gate';
-import { allowDesktop, hideTaskbars, nameScreen, relaunchCovered, restoreTaskbars, takeCoverIncidents } from './screen-guard';
+import { hideTaskbars, isVeil, nameScreen, relaunchCovered, restoreTaskbars, setDesktopMode, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
 import { menuRotation, openSettings } from './settings';
 import { serveMedias } from './media-protocol';
@@ -113,6 +131,12 @@ import { createUpdatesMenu } from './updates-menu';
  */
 function menuKeysFor(cabinet: ButtonsSource) {
   return interfaceKeys(cabinet);
+}
+
+/** Raccourci d'une entrée du menu système d'après des touches de l'interface (R, H) : celles en vigueur sur cette borne. */
+function interfaceShortcut(codes: string[]): ActionShortcut | undefined {
+  if (!codes.length) return undefined;
+  return { keys: shownKeys(codes), matches: (input) => !input.control && !input.alt && !input.meta && codes.includes(input.code) };
 }
 
 /** Boutons de la borne, du jeu et de l'interface, relus au démarrage du menu (les étapes « Boutons » relancent l'application). */
@@ -133,7 +157,8 @@ function menuKeys(): [string, string][] {
     ...(KEYS.help.length ? [[t('Afficher les commandes'), or(KEYS.help)] as [string, string]] : []),
     [t('Réglages de VPX'), KEYS.settings.length ? t('{keys}, ou Exit puis « Réglages de VPX »', { keys: or(KEYS.settings) }) : t('Exit puis « Réglages de VPX »')],
     [t('Menu et configuration (tables, réglages, boutons, écrans, Bureau Windows, quitter)'), t('Exit ({keys}), Tab, ou clic sur ⚙ en haut à droite', { keys: or(KEYS.exit) })],
-    [t('Arrêter une partie bloquée'), t('Ctrl+Maj+K')],
+    [t('Bureau Windows (tous les écrans du PC), puis retour au menu'), shortcutLabel(SHORTCUTS.desktop)],
+    [t('Arrêter une partie bloquée'), shortcutLabel(SHORTCUTS.forceStop)],
   ];
 }
 
@@ -151,14 +176,13 @@ function menuFooter(): [string, string?][] {
   ];
 }
 
-const FORCE_STOP_SHORTCUT = 'Control+Shift+K';
 /**
  * Titre de la fenêtre du playfield, tel qu'openWindows l'a donné (rôles qu'elle dessine,
  * dans la langue de l'interface) : showMenuAgain la retrouve par lui.
  */
 let playfieldTitle = 'Cyber Pinball';
 
-type Phase = 'menu' | 'loading' | 'playing' | 'message' | 'confirmQuit' | 'library';
+type Phase = MenuPhase;
 
 interface Message {
   title: string;
@@ -200,6 +224,8 @@ const OCCUPIED_CHECK_MS = 2000;
 // Médias des jeux (docs/recherche/medias.md, § 5) : résolus au démarrage du menu, quand
 // le modèle de la borne et la rotation du playfield sont connus.
 let medias: MenuMedias | undefined;
+/** Guet des dossiers des tables et des médias : tout changement se voit aussitôt sur chaque écran. */
+let mediaWatch: MediaWatch | undefined;
 let mediaSettings: MenuMediaSettings = loadMenuMediaSettings(loc.dataDir);
 const mediaErrorLog = mediaErrorsFile(path.join(loc.dataDir, 'logs'));
 /** Tables voisines dont les médias sont préchargés par chaque fenêtre. */
@@ -242,6 +268,26 @@ function leaveAttract(): boolean {
 /** Table montrée en mode attente, s'il est en cours. */
 function attractTable(): TableEntry | undefined {
   return attract.active && attractIndex !== undefined ? tables[attractIndex] : undefined;
+}
+
+/** Réglages de VPX ouverts par-dessus le menu ; `about` : la table réglée (réglages d'une table, depuis sa fiche). */
+let vpxSettingsOpen: { about?: TableEntry } | undefined;
+
+/**
+ * Table dont les écrans de la borne montrent les médias, et dont on entend la musique
+ * (screensTable) ; undefined : l'affichage par défaut de Cyber Pinball, en silence. Hors du
+ * menu des tables, seul un écran qui parle d'une table la garde (fiche, médias du jeu…).
+ */
+function screensSubject(): TableEntry | undefined {
+  const find = (file: string | undefined) => (file ? tables.find((t) => samePath(t.file, file)) : undefined);
+  return screensTable({
+    phase: state.phase,
+    help: state.help,
+    selected: attractTable() ?? tables[state.index],
+    playing,
+    about: state.phase === 'library' ? find(library.table()) : state.phase === 'message' ? find(state.message?.table) : undefined,
+    overlay: vpxSettingsOpen,
+  });
 }
 
 // Fiche, ajout, médecin et suppression des tables (library.ts).
@@ -304,6 +350,9 @@ library.systemItems.splice(
     },
     get detail() {
       return t('Son, vue, performances, pour toutes les tables');
+    },
+    get shortcut() {
+      return interfaceShortcut(KEYS.settings);
     },
     run: () => openVpxSettings(),
   },
@@ -476,6 +525,9 @@ library.systemItems.splice(library.systemItems.length - 1, 0, {
   get detail() {
     return t('Les boutons du menu et de la partie');
   },
+  get shortcut() {
+    return interfaceShortcut(KEYS.help);
+  },
   run: () => {
     state = tables.length ? { ...state, phase: 'menu', help: true } : { ...state, phase: 'message', message: noTables() };
     broadcast();
@@ -488,33 +540,67 @@ library.systemItems.splice(library.systemItems.length - 1, 0, {
     return t('Bureau Windows');
   },
   get detail() {
-    return t('Réduit Cyber Pinball ; son bouton dans la barre des tâches le rouvre');
+    return t('Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys: shortcutLabel(SHORTCUTS.desktop) });
+  },
+  // Touches lues dans la définition du raccourci (SHORTCUTS) : celles que reconnaissent handleKey et le raccourci global.
+  get shortcut() {
+    return { keys: shortcutKeys(SHORTCUTS.desktop), matches: (input: Input) => matchesShortcut(input, SHORTCUTS.desktop) };
   },
   run: () => showDesktop(),
 });
 
 /**
- * Menu système > « Bureau Windows » : toutes les fenêtres se réduisent, le bureau et la
- * barre des tâches reviennent. Le bouton du playfield dans la barre des tâches (ou Alt+Tab)
- * rouvre le menu sur tous les écrans (restoreFromDesktop).
+ * Mode bureau : chaque fenêtre de Cyber Pinball (menu, voiles du gardien des écrans, et toute
+ * autre ouverte) quitte son écran, quel que soit leur nombre (desktop-mode.ts).
  */
-function showDesktop(): void {
+const desktop = new DesktopMode<BrowserWindow>({
+  windows: () => BrowserWindow.getAllWindows(),
+  isShown,
+  isVeil,
+  hideVeil: hideCovered,
+  showVeil: (win) => win.showInactive(),
+  minimizeWindow: minimizeCovered,
+  restoreWindow: (win) => win.restore(),
+  raiseWindow: (win) => win.moveTop(),
+});
+/** Au bureau : range ce qui reviendrait sur un écran, et suit le retour d'une fenêtre rouverte. */
+let desktopWatch: NodeJS.Timeout | undefined;
+const DESKTOP_WATCH_MS = 500;
+
+/**
+ * Menu système > « Bureau Windows », ou son raccourci depuis le menu : tous les écrans du PC
+ * se libèrent, le bureau et les barres des tâches reviennent. Le même raccourci (global tant
+ * que dure le mode bureau), le bouton du playfield dans la barre des tâches ou Alt+Tab
+ * ramènent le menu sur tous ses écrans (restoreFromDesktop).
+ */
+function showDesktop(): boolean {
+  if (desktop.active || state.phase === 'loading' || state.phase === 'playing') return true;
   library.leave();
-  onDesktop = true;
-  allowDesktop('Bureau Windows'); // i18n-ignore : raison gardée par le gardien des écrans, jamais affichée
-  for (const win of windows.values()) minimizeCovered(win);
+  setDesktopMode(true);
+  const away = desktop.enter();
+  console.log(`Mode bureau : ${away.length} fenêtres de Cyber Pinball rangées (${away.filter(isVeil).length} voiles), tous les écrans libres.`);
+  if (!OFFSCREEN && !globalShortcut.register(accelerator(SHORTCUTS.desktop), () => restoreFromDesktop())) {
+    console.warn(`Mode bureau : ${shortcutLabel(SHORTCUTS.desktop)} est déjà pris par un autre programme ; la barre des tâches ramène le menu.`);
+  }
+  desktopWatch = setInterval(() => {
+    if (desktop.reopened()) return restoreFromDesktop();
+    for (const win of desktop.clear()) console.warn(`Mode bureau : « ${win.getTitle()} » était revenue sur son écran, de nouveau rangée.`);
+  }, DESKTOP_WATCH_MS);
+  broadcast();
+  return true;
 }
 
-/** Fenêtres réduites par « Bureau Windows », en attente du retour du playfield. */
-let onDesktop = false;
-
-/** Le playfield revient du bureau : les autres écrans le suivent, le menu reprend la main. */
+/** Retour du bureau : chaque écran retrouve son voile puis sa fenêtre, le menu reprend la main. */
 function restoreFromDesktop(): void {
-  if (!onDesktop) return;
-  onDesktop = false;
-  allowDesktop(undefined);
-  for (const win of windows.values()) if (win.isMinimized()) win.restore();
-  windows.get('playfield')?.focus();
+  if (!desktop.active) return;
+  clearInterval(desktopWatch);
+  if (!OFFSCREEN) globalShortcut.unregister(accelerator(SHORTCUTS.desktop));
+  desktop.leave();
+  setDesktopMode(false);
+  console.log('Mode bureau : retour au menu.');
+  // Rappelé par le raccourci global, depuis une autre application : Windows ne laisse pas toujours le focus.
+  void takeForeground();
+  broadcast();
 }
 
 /** Menu système > « Touches par défaut des encodeurs » : le menu suit aussitôt ces touches. */
@@ -562,7 +648,21 @@ export function startFrontend(): void {
   audioOutput = choose ? undefined : menuAudioOutput(cabinet)?.friendlyName;
   medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, onChange: () => broadcast() });
   serveMedias(() => medias!.allowedDirs(tables));
+  // Média ajouté, remplacé ou supprimé, table ajoutée, renommée ou supprimée, par
+  // n'importe quel chemin (Cyber Pinball ou à la main) : relu et renvoyé aux fenêtres.
+  if (loc.root) {
+    const layout = layoutOf(loc.root);
+    mediaWatch = watchMediaChanges({
+      dirs: [layout.tables, layout.media],
+      onChange: (changes) => {
+        if (changes.has('tables')) reloadTables();
+        else medias?.invalidate();
+        broadcast();
+      },
+    });
+  }
   app.on('before-quit', () => {
+    mediaWatch?.close();
     medias?.save();
     attract.dispose();
   });
@@ -645,6 +745,8 @@ function reloadTables(selectFile?: string): void {
   tables = loc.root ? scanTables(layoutOf(loc.root).tables) : [];
   // Médias ajoutés, remplacés ou supprimés avec les tables : tout est recherché à nouveau.
   medias?.invalidate();
+  // Dossier des tables ou des médias créé depuis le démarrage (première table) : guetté aussi.
+  mediaWatch?.rearm();
   const wanted = selectFile ?? current;
   const index = tables.findIndex((t) => t.file.toLowerCase() === wanted?.toLowerCase());
   state = { ...state, index: index >= 0 ? index : Math.min(state.index, Math.max(0, tables.length - 1)) };
@@ -784,11 +886,10 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
       if (role.id === 'playfield') win.focus();
     });
     // Une fenêtre en plein écran qui revient de la barre des tâches émet « enter-full-screen »,
-    // pas « restore » (Electron, Windows).
-    if (role.id === 'playfield') {
-      win.on('restore', () => restoreFromDesktop());
-      win.on('enter-full-screen', () => restoreFromDesktop());
-    }
+    // pas « restore » (Electron, Windows). Seul le playfield a un bouton dans la barre des
+    // tâches ; Alt+Tab rouvre aussi les autres.
+    win.on('restore', () => restoreFromDesktop());
+    win.on('enter-full-screen', () => restoreFromDesktop());
     windows.set(role.id, win);
     windowRoles.set(role.id, [...(role.id === 'playfield' ? (['playfield'] as RoleId[]) : []), ...parts.map((p) => p.role)]);
   }
@@ -832,6 +933,8 @@ function recordMediaError(error: MediaErrorReport): void {
 function handleKey(input: Input): boolean {
   const is = (group: string[]) => group.includes(input.code);
   if (input.control && input.code === 'KeyQ') return quit();
+  // Raccourci du mode bureau, de n'importe quel écran du menu (sauf pendant une partie) ; une fenêtre rouverte au bureau le reçoit aussi : retour.
+  if (matchesShortcut(input, SHORTCUTS.desktop)) return desktop.active ? (restoreFromDesktop(), true) : showDesktop();
   // N'importe quel bouton en mode attente y met fin, sans autre effet ; sinon il remet le compte à zéro.
   if (attract.activity()) return leaveAttract();
 
@@ -1000,6 +1103,17 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 
   // PuP-Pack : ce qui l'empêcherait de s'afficher est réglé avant la partie, sans rien demander.
   preparePupPack(table);
+  // Habillage FullDMD : le DMD de VPX posé dans le cadre du média FullDMD, que le fond de partie montre autour.
+  dressing = loc.root
+    ? await prepareDressing(table, {
+        root: loc.root,
+        dataDir: loc.dataDir,
+        cabinet: loadCabinet(loc.dataDir),
+        facts: cachedScript(table.file, loc.dataDir),
+        converter: (converter ??= createConverter()),
+        trashDir: trashDirFor(layoutOf(loc.root).trash, `Avant la partie ${path.basename(table.folder)}`), // i18n-ignore : nom de dossier
+      })
+    : undefined;
 
   // Les fenêtres du menu restent derrière VPX, sans jamais lui prendre le focus : l'écran de
   // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque
@@ -1018,11 +1132,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
       ? simulateVpx({ onPlaying })
       : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: table.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying });
   // Une partie simulée ne prend aucun raccourci global au poste.
-  if (simulated === undefined) globalShortcut.register(FORCE_STOP_SHORTCUT, () => game.stop());
+  if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => game.stop());
   const result = await game.done;
-  if (simulated === undefined) globalShortcut.unregister(FORCE_STOP_SHORTCUT);
+  if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
   stopWatchOccupied();
   playing = undefined;
+  dressing = undefined;
   displayMode = false;
 
   // Les barres des tâches reviennent avant que le menu reprenne le premier plan : redevenu
@@ -1052,6 +1167,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 
 /** Table en cours de partie : chaque fenêtre affiche son fond de partie. */
 let playing: TableEntry | undefined;
+/** Habillage FullDMD de la partie en cours (fulldmd.ts) : l'écran du DMD le garde autour du DMD de VPX. */
+let dressing: TableDressing | undefined;
+/** Le DMD de VPX a déjà été vu sur l'habillage pendant cette partie (signalé une fois). */
+let dressCoveredSeen = false;
+/** Convertisseur hors écran : images des vidéos FullDMD, pour y chercher le cadre du DMD. */
+let converter: ReturnType<typeof createConverter> | undefined;
 /** Partie lancée pour régler l'affichage : le chargement rappelle les boutons du menu de VPX. */
 let displayMode = false;
 
@@ -1073,15 +1194,32 @@ function watchOccupied(simulated: RoleId[] | undefined): void {
     broadcast();
   };
   if (simulated) return update(simulated);
+  dressCoveredSeen = false;
   const check = () => {
     try {
-      update(occupiedRoles(roleRects, listWindows((w) => w.visible), process.pid));
+      const stack = listWindows((w) => w.visible);
+      update(occupiedRoles(roleRects, stack, process.pid));
+      watchDressing(stack);
     } catch {
       // Pile des fenêtres illisible un instant : le dernier constat reste.
     }
   };
   check();
   occupiedWatch = setInterval(check, OCCUPIED_CHECK_MS);
+}
+
+/**
+ * Habillage FullDMD : une fenêtre de VPX (ou de PinMAME, d'un PuP-Pack) qui le recouvre en
+ * partie est signalée dans le journal, une fois par partie : la place du DMD que VPX a prise
+ * n'est pas celle du .ini de la table (fulldmdtable.ts, liveDressCoverage).
+ */
+function watchDressing(stack: ReturnType<typeof listWindows>): void {
+  const dmd = roleRects.find((r) => r.role === 'dmd');
+  if (!dressing?.plan.dressed || !dmd || dressCoveredSeen) return;
+  const share = liveDressCoverage(stack, process.pid, dmd.rect, dressing);
+  if (share < DRESS_COVERED) return;
+  dressCoveredSeen = true;
+  console.log(`Partie : le DMD de VPX recouvre ${Math.round(share * 100)} % de l’habillage FullDMD (${playing?.id ?? '?'}) ; fiche de la table > Diagnostic pour le remettre dans le cadre.`);
 }
 
 function stopWatchOccupied(): void {
@@ -1093,6 +1231,11 @@ function stopWatchOccupied(): void {
 /** Le menu, resté derrière VPX, reprend le premier plan ; renvoie true s'il est bien revenu. */
 async function showMenuAgain(): Promise<boolean> {
   for (const win of windows.values()) if (!isShown(win)) win.show();
+  return takeForeground();
+}
+
+/** Le playfield prend le premier plan (après une partie, ou au retour du bureau depuis une autre application). */
+async function takeForeground(): Promise<boolean> {
   const playfield = windows.get('playfield');
   playfield?.focus();
   // Hors écran, aucune fenêtre n'a de premier plan à reprendre.
@@ -1248,8 +1391,14 @@ function startVpxInstall(): boolean {
 function openVpxSettings(table?: TableEntry): void {
   const playfield = windows.get('playfield');
   const target = table ? ({ scope: 'table', table } as const) : ({ scope: 'global' } as const);
+  // Réglages généraux : rien d'une table sur les écrans de la borne ; réglages d'une table : ses médias.
+  vpxSettingsOpen = { about: table };
+  broadcast();
   // À la fermeture de l'application, le playfield peut être détruit avant les réglages.
-  void openSettings(target, { bounds: playfield?.getBounds(), rotation, onClose: () => playfield && !playfield.isDestroyed() && playfield.focus() });
+  void openSettings(target, { bounds: playfield?.getBounds(), rotation, onClose: () => playfield && !playfield.isDestroyed() && playfield.focus() }).then(() => {
+    vpxSettingsOpen = undefined;
+    broadcast();
+  });
 }
 
 /**
@@ -1320,8 +1469,11 @@ function viewFor(role: RoleId) {
   // Média de chaque rôle de cette fenêtre (le sien et ceux de ses zones), et ceux des voisines à précharger.
   const roles = windowRoles.get(role) ?? [role];
   const mediasOf = (t: TableEntry) => (medias ? Object.fromEntries(roles.map((r) => [r, medias!.roleMedia(t, r)])) : {});
+  // Écran qui ne parle d'aucune table (menu système, réglages, aide, messages) : l'affichage par défaut de Cyber Pinball.
+  const subject = screensSubject();
+  const defaults = Object.fromEntries(roles.map((r) => [r, medias ? medias.defaultMedia(r) : defaultMediaView(r)]));
   const preload =
-    !shown && table && medias && tables.length > 1
+    !shown && table && subject === table && medias && tables.length > 1
       ? [...new Set(PRELOAD_OFFSETS.map((o) => tables[(state.index + o + tables.length * 10) % tables.length]!))]
           .filter((t) => t !== table)
           .flatMap((t) => roles.map((r) => medias!.roleMedia(t, r)))
@@ -1338,9 +1490,9 @@ function viewFor(role: RoleId) {
     // part et d'autre de la table choisie, en boucle comme la liste : la roue reste centrée.
     neighbors: tables.length >= 9 ? neighbors : tables.map((t, i) => neighbor(t, ((i - state.index + tables.length * 2 + Math.floor((tables.length - 1) / 2)) % tables.length) - Math.floor((tables.length - 1) / 2))),
     menuLayout: mediaSettings.menuLayout,
-    medias: table ? mediasOf(table) : {},
+    medias: subject ? mediasOf(subject) : defaults,
     preload,
-    // Chargement : la vidéo Loading du jeu sous les commandes de la partie, sur le playfield.
+    // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
     loading: state.phase === 'loading' && role === 'playfield' && medias && table ? medias.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
     // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
     backglass: role === 'playfield' && medias && table && !shown ? medias.typeMedia(table, 'backglass', 'Backglass') : undefined,
@@ -1362,13 +1514,14 @@ function viewFor(role: RoleId) {
             file: playing.file,
             mode: mediaSettings.game,
             medias: mediasOf(playing),
-            play: Object.fromEntries(roles.map((r) => [r, momentScreen('game', r, { game: mediaSettings.game, occupied: occupied.has(r) }).play])),
+            play: Object.fromEntries(roles.map((r) => [r, momentScreen('game', r, { game: mediaSettings.game, occupied: occupied.has(r), dressed: r === 'dmd' && dressing?.plan.dressed }).play])),
           }
         : undefined,
     // Le son du menu ne sort que d'une fenêtre : celle du playfield.
     sound: role === 'playfield' ? soundView() : undefined,
     gameKeys: gameKeys(buttons, tilt),
-    loadingKeys: displayMode ? { title: t('Réglage de l’affichage'), rows: displayKeys(buttons) } : { title: t('Commandes de la partie'), rows: gameKeys(buttons, tilt) },
+    // Aide-mémoire du chargement : au bureau toujours ; en borne, celui du réglage de l'affichage seulement (display).
+    loadingKeys: displayMode ? { title: t('Réglage de l’affichage'), rows: displayKeys(buttons), display: true } : { title: t('Commandes de la partie'), rows: gameKeys(buttons, tilt), display: false },
     menuKeys: menuKeys(),
     footer: menuFooter(),
     nav: { confirm: KEYS.confirm[0], exit: KEYS.exit[0], help: KEYS.help[0] },
@@ -1386,7 +1539,9 @@ function moment(): MenuMoment {
  * son de lancement, volume du son de sa vidéo, sur la sortie du fronton.
  */
 function soundView() {
-  const table = playing ?? attractTable() ?? tables[state.index];
+  // Hors du menu des tables, seule la table dont parle l'écran ouvert se fait entendre (screensSubject),
+  // et rien quand cet écran fait écouter des sons (propositions, sons de la table) : un seul son à la fois.
+  const table = state.phase === 'library' && library.previewsSound() ? undefined : screensSubject();
   const now = moment();
   const plan =
     table && medias
@@ -1397,7 +1552,7 @@ function soundView() {
 
 function broadcast(): void {
   // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).
-  attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !onDesktop);
+  attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !desktop.active);
   if (!attract.active) attractIndex = undefined;
   for (const [role, win] of windows) {
     if (!win.isDestroyed()) win.webContents.send('state', viewFor(role));

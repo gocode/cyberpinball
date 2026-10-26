@@ -22,6 +22,8 @@
 // demi-pixel près. Changer de table ne change que leur contenu.
 // Sur un écran sans playfield (fronton, DMD, topper), le fond du playfield ne doit pas se voir :
 // seulement les zones des rôles, sur du noir.
+// Au chargement d'une table : en borne, aucun texte de l'interface sur le média ; au bureau,
+// l'encart du titre et des commandes ne recouvre pas le cadre du média.
 // Les problèmes vont dans la console et dans <captures>\mise-en-page.txt.
 
 import * as fs from 'node:fs';
@@ -201,6 +203,40 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   if (document.documentElement.classList.contains('annex')) {
     const bg = document.getElementById('media-bg');
     if (bg && shown(bg) && bg.getBoundingClientRect().width > T) problems.add('fond du playfield sur un écran sans playfield : ' + label(bg));
+  }
+  // Écran de chargement d'une table (html.loading-phase, octobre 2026). En
+  // borne, le média de chargement seul : aucun texte de l'interface sur le playfield, sauf le
+  // repli du média (.cp-fb-loading : marque, titre, sans son libellé) et l'aide-mémoire du
+  // réglage de l'affichage (.display-reminder). Au bureau, l'encart du titre et des commandes
+  // ne recouvre pas le cadre du média, chants compris (20 sur un petit côté de 1080), et tient
+  // dans la zone du playfield ; le repli du média est posé exactement dans le cadre.
+  const page = document.documentElement;
+  const zone = document.getElementById('root');
+  if (page.classList.contains('loading-phase') && zone) {
+    if (page.classList.contains('menu-cab')) {
+      for (const { el, text } of boxes) {
+        if (!text || !zone.contains(el) || el.closest('.display-reminder')) continue;
+        if (el.closest('.cp-fb-loading') && !el.closest('.cp-ld-label')) continue;
+        problems.add('texte sur le chargement en borne : ' + label(el));
+      }
+    } else {
+      const card = zone.querySelector('.loading-card');
+      const frame = document.getElementById('media-bg');
+      const z = zone.getBoundingClientRect();
+      const edge = (20 * Math.min(z.width, z.height)) / 1080;
+      const grow = (r, d) => ({ left: r.left - d, right: r.right + d, top: r.top - d, bottom: r.bottom + d });
+      if (!card || !shown(card)) problems.add('chargement au bureau sans l’encart du titre et des commandes');
+      else if (frame) {
+        const a = grow(card.getBoundingClientRect(), edge), b = grow(frame.getBoundingClientRect(), edge);
+        if (Math.min(a.right, b.right) - Math.max(a.left, b.left) > T && Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) > T) problems.add('encart du chargement sur le cadre du média : ' + label(card).slice(0, 60));
+        if (a.left < z.left - T || a.top < z.top - T || a.right > z.right + T || a.bottom > z.bottom + T) problems.add('encart du chargement hors de la zone du playfield : ' + label(card).slice(0, 60));
+        const standIn = zone.querySelector('.loading-fallback.in-frame');
+        if (standIn && shown(standIn)) {
+          const s = standIn.getBoundingClientRect(), f = frame.getBoundingClientRect();
+          if (['left', 'top', 'right', 'bottom'].some((k) => Math.abs(s[k] - f[k]) > 1)) problems.add('repli du média de chargement hors du cadre : ' + label(standIn).slice(0, 60));
+        }
+      }
+    }
   }
   // Image chargée sans pixels, vidéo en erreur : l'écran montrerait un aperçu cassé.
   for (const img of document.images) if (img.complete && img.getAttribute('src') && img.naturalWidth === 0) problems.add('image non chargée : ' + img.getAttribute('src').slice(0, 120));

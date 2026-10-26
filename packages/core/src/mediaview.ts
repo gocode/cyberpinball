@@ -19,6 +19,7 @@ import {
   mediaMemory,
   resolveMedia,
   resolveRoleMedia,
+  roleMediaType,
   tableMediaDir,
   type B2sImageKind,
   type MediaFallback,
@@ -162,6 +163,8 @@ export interface MediaView {
   orient?: { edge: FlipperEdge; halfTurn: boolean };
   fallback?: MediaFallback;
   card: MediaCard;
+  /** Affichage par défaut de Cyber Pinball (defaultMediaView) : l'écran ne parle d'aucune table. */
+  brand?: boolean;
 }
 
 /** Bord des flippers dans l'image Windows du playfield, d'après la rotation du menu. */
@@ -201,6 +204,28 @@ export function toMediaView(table: TableEntry, role: RoleId, resolved: ResolvedM
   return view;
 }
 
+/**
+ * Affichage par défaut de Cyber Pinball sur l'écran d'un rôle, quand l'écran ouvert ne parle
+ * d'aucune table (menu système, réglages, aide, messages : screensTable de menumoments.ts).
+ * C'est le repli intégré du rôle sans titre de jeu, qui dessine la marque (app/renderer/fallback.js) :
+ * fronton « CYBER PINBALL » sous son verre fumé, afficheur avec le logo et la marque en points
+ * (DMD ou FullDMD selon son écran), topper avec le logo et la marque, plateau en verre fumé.
+ * Jamais un fichier : ni image, ni vidéo, ni son d'une table ne reste à l'écran.
+ */
+export function defaultMediaView(role: RoleId, cabinet?: Cabinet): MediaView {
+  const type = roleMediaType(role, cabinet);
+  return {
+    role,
+    type,
+    source: 'fallback',
+    fallback: MEDIA_TYPES.find((t) => t.type === type)?.fallback ?? 'none',
+    fit: role === 'playfield' ? 'cover' : 'contain',
+    rotation: 0,
+    card: { title: '' },
+    brand: true,
+  };
+}
+
 export interface MenuMediaOptions {
   root: string | undefined;
   dataDir: string;
@@ -212,12 +237,17 @@ export interface MenuMediaOptions {
   b2s?: boolean;
   /** Une image du .directb2s vient d'être extraite : l'état est à renvoyer aux fenêtres. */
   onChange?: () => void;
-  /** Durée de vie des résultats, pour voir un média ajouté à la main sans redémarrer (défaut : 10 s). */
+  /** Durée de vie des résultats : filet quand le guet des dossiers (mediawatch.ts) est impossible (défaut : 10 s). */
   ttlMs?: number;
   now?: () => number;
 }
 
-type B2sEntry = { state: 'pending' } | { state: 'done'; backglass?: string; dmd?: string };
+/**
+ * Image du .directb2s d'une table. `stale` : médias changés depuis (invalidate), le
+ * .directb2s est relu en tâche de fond ; en attendant, l'image d'avant reste montrée
+ * (jamais de repli intercalé, qui ferait clignoter le fronton).
+ */
+type B2sEntry = { state: 'pending' | 'done'; backglass?: string; dmd?: string; stale?: boolean };
 
 function isRole(what: RoleId | MediaType): what is RoleId {
   return ROLES.some((r) => r.id === what);
@@ -248,6 +278,11 @@ export class MenuMedias {
     return toMediaView(table, role, this.resolve(table, role), this.edge);
   }
 
+  /** Affichage par défaut de Cyber Pinball sur l'écran d'un rôle (defaultMediaView), DMD ou FullDMD selon la borne. */
+  defaultMedia(role: RoleId): MediaView {
+    return defaultMediaView(role, this.opts.cabinet);
+  }
+
   /** Média d'un type donné sur l'écran d'un rôle : la vidéo de chargement (Loading) du playfield. */
   typeMedia(table: TableEntry, role: RoleId, type: MediaType): MediaView {
     return toMediaView(table, role, this.resolve(table, type), this.edge);
@@ -270,9 +305,13 @@ export class MenuMedias {
     return allowedMediaDirs({ root: this.opts.root, dataDir: this.opts.dataDir, tables });
   }
 
-  /** Oublie les résultats (tables relues, médias ajoutés ou supprimés). */
+  /**
+   * Oublie les résultats (tables relues, médias ajoutés, remplacés ou supprimés, guet des
+   * dossiers : mediawatch.ts) ; les .directb2s déjà lus seront relus, un ajouté trouvé.
+   */
   invalidate(): void {
     this.memo.clear();
+    for (const entry of this.b2s.values()) if (entry.state === 'done') entry.stale = true;
   }
 
   /** Écrit le cache des dimensions. */
@@ -307,18 +346,18 @@ export class MenuMedias {
   private b2sImage(table: TableEntry, kind: B2sImageKind): string | undefined {
     const key = table.file.toLowerCase();
     const entry = this.b2s.get(key);
-    if (entry?.state === 'done') return entry[kind];
-    if (entry) return undefined;
+    if (entry && !entry.stale) return entry[kind];
     const base = path.basename(table.file).replace(/\.vpx$/i, '');
     const file = companion(table.folder, base, table.id.includes('/'), '.directb2s');
     if (!file) {
       this.b2s.set(key, { state: 'done' });
       return undefined;
     }
-    this.b2s.set(key, { state: 'pending' });
+    // Relecture : l'image d'avant reste montrée jusqu'à la fin (le cache des images la rend vite).
+    this.b2s.set(key, { state: 'pending', backglass: entry?.backglass, dmd: entry?.dmd });
     this.queue.push({ key, file });
     void this.extractNext();
-    return undefined;
+    return entry?.[kind];
   }
 
   /** Une extraction à la fois : un .directb2s fait souvent des dizaines de Mo. */
@@ -329,11 +368,18 @@ export class MenuMedias {
     this.extracting = true;
     try {
       const images = await b2sImages(job.file, b2sCacheDir(this.opts.dataDir));
-      this.b2s.set(job.key, { state: 'done', backglass: images.backglass?.file, dmd: images.dmd?.file });
-      for (const k of [...this.memo.keys()]) if (k.startsWith(`${job.key}|`)) this.memo.delete(k);
-      if (images.backglass || images.dmd) this.opts.onChange?.();
+      const before = this.b2s.get(job.key);
+      const after = { state: 'done' as const, backglass: images.backglass?.file, dmd: images.dmd?.file };
+      this.b2s.set(job.key, after);
+      // Rendu redemandé seulement si l'image a changé (relecture après invalidate : souvent la même).
+      if (before?.backglass !== after.backglass || before?.dmd !== after.dmd) {
+        for (const k of [...this.memo.keys()]) if (k.startsWith(`${job.key}|`)) this.memo.delete(k);
+        this.opts.onChange?.();
+      }
     } catch {
-      this.b2s.set(job.key, { state: 'done' });
+      // Illisible (copie en cours) : l'image d'avant reste ; le prochain changement relira.
+      const before = this.b2s.get(job.key);
+      this.b2s.set(job.key, { state: 'done', backglass: before?.backglass, dmd: before?.dmd });
     } finally {
       this.extracting = false;
       void this.extractNext();

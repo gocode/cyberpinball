@@ -271,6 +271,14 @@
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item > span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -364,6 +372,7 @@
 .cp-i-exit { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-coin { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-plunger { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-tilt { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-usb { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-gamepad { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E") }
 
@@ -719,6 +728,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -812,6 +829,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css2?family=Saira:wdth,wght@50..125,100..900&amp;display=swap&quot;&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;&lt;style&gt;
@@ -1159,6 +1177,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -1252,6 +1278,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -1362,6 +1389,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-exit&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-exit&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;exit&lt;/span&gt;&lt;/div&gt;
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-coin&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-coin&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;coin&lt;/span&gt;&lt;/div&gt;
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-plunger&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-plunger&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;plunger&lt;/span&gt;&lt;/div&gt;
+  &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-tilt&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-tilt&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;tilt&lt;/span&gt;&lt;/div&gt;
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-usb&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-usb&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;usb&lt;/span&gt;&lt;/div&gt;
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-gamepad&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-gamepad&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;gamepad&lt;/span&gt;&lt;/div&gt;
 &lt;/div&gt;
@@ -1470,6 +1498,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-exit" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-exit" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;exit&lt;/span&gt;&lt;/div&gt;
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-coin" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-coin" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;coin&lt;/span&gt;&lt;/div&gt;
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-plunger" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-plunger" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;plunger&lt;/span&gt;&lt;/div&gt;
+  &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-tilt" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-tilt" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;tilt&lt;/span&gt;&lt;/div&gt;
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-usb" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-usb" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;usb&lt;/span&gt;&lt;/div&gt;
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-gamepad" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-gamepad" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;gamepad&lt;/span&gt;&lt;/div&gt;
 &lt;/div&gt;</code></pre></details>
@@ -1749,6 +1778,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -1842,6 +1879,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -2143,6 +2181,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -2236,6 +2282,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -2264,8 +2311,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
 <section class="ds-comp" id="LigneMenu">
   <header><span class="ds-group">Navigation</span><h3>Entrée de menu</h3><code class="ds-cls">LigneMenu</code></header>
   <div class="ds-doc"><p>Une entrée de menu, en capitales, avec son icône et, au besoin, un détail sur une ligne.</p>
-<ul><li>Fournir : une liste <code>.cp-menu</code> d'éléments <code>.cp-menu-item</code> (icône, libellé, <code>&lt;small&gt;</code> facultatif). <code>.is-focus</code> sur l'entrée choisie, <code>.is-quiet</code> sur « Quitter », <code>.is-danger</code> sur une action destructrice.</li><li>L'icône (30 px, couleur du libellé) est alignée sur la première ligne du libellé ; la pastille rouge d'une entrée qui attend l'utilisateur se pose en haut à droite de l'icône (<code>.cp-glyph</code> &gt; icône + <code>.cp-dot</code>).</li><li>L'entrée choisie est une barre opaque <code>signal</code>, texte et icône <code>on-signal</code>.</li><li>Pour : menu système, configuration de la borne, menus d'Exit. Pas pour les listes de tables (voir <code>Roue</code> et <code>CarteTable</code>).</li></ul></div>
-  <div class="ds-frame " data-w="920" data-h="900"><iframe title="Entrée de menu" loading="lazy" width="920" height="900" srcdoc="&lt;!doctype html&gt;
+<ul><li>Fournir : une liste <code>.cp-menu</code> d'éléments <code>.cp-menu-item</code> (icône, libellé, <code>&lt;small&gt;</code> facultatif). <code>.is-focus</code> sur l'entrée choisie, <code>.is-quiet</code> sur « Quitter », <code>.is-danger</code> sur une action destructrice.</li><li>L'icône (30 px, couleur du libellé) est alignée sur la première ligne du libellé ; la pastille rouge d'une entrée qui attend l'utilisateur se pose en haut à droite de l'icône (<code>.cp-glyph</code> &gt; icône + <code>.cp-dot</code>).</li><li>L'entrée choisie est une barre opaque <code>signal</code>, texte et icône <code>on-signal</code>.</li><li>Raccourci clavier qui fait la même chose sans passer par le menu : <code>.cp-shortcut</code> en dernier dans l'entrée, une <code>.cp-cap</code> par touche (« Ctrl », « Maj », « D ») séparées par « + », à droite de la première ligne. Les touches viennent de la définition du raccourci dans le code, jamais écrites à la main ; un bouton de joystick ne s'y montre pas.</li><li>Pour : menu système, configuration de la borne, menus d'Exit. Pas pour les listes de tables (voir <code>Roue</code> et <code>CarteTable</code>).</li></ul></div>
+  <div class="ds-frame " data-w="920" data-h="1060"><iframe title="Entrée de menu" loading="lazy" width="920" height="1060" srcdoc="&lt;!doctype html&gt;
 &lt;html lang=&quot;fr&quot; data-theme=&quot;borne&quot;&gt;
 &lt;head&gt;&lt;style&gt;/* Cyber Pinball — generated from tokens.json */
 :root, [data-theme=&quot;borne&quot;] {
@@ -2536,6 +2583,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -2629,6 +2684,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -2642,9 +2698,10 @@ details pre code { color: var(--ink-muted); white-space: pre }
   &lt;li class=&quot;cp-menu-item&quot;&gt;&lt;i class=&quot;cp-i cp-i-search&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Trouver une table&lt;small&gt;Catalogue VPS : chaque jeu, ses versions, ce qu'il faut&lt;/small&gt;&lt;/span&gt;&lt;/li&gt;
   &lt;li class=&quot;cp-menu-item&quot;&gt;&lt;i class=&quot;cp-i cp-i-inbox&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Liste d'attente&lt;/span&gt;&lt;/li&gt;
   &lt;li class=&quot;cp-menu-item&quot;&gt;&lt;i class=&quot;cp-i cp-i-chip&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Bibliothèque de ROM&lt;/span&gt;&lt;/li&gt;
-  &lt;li class=&quot;cp-menu-item&quot;&gt;&lt;i class=&quot;cp-i cp-i-sliders&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Réglages de VPX&lt;/span&gt;&lt;/li&gt;
+  &lt;li class=&quot;cp-menu-item&quot;&gt;&lt;i class=&quot;cp-i cp-i-sliders&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Réglages de VPX&lt;/span&gt;&lt;span class=&quot;cp-shortcut&quot;&gt;&lt;span class=&quot;cp-cap&quot;&gt;R&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
   &lt;li class=&quot;cp-menu-item&quot;&gt;&lt;i class=&quot;cp-i cp-i-cabinet&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Configuration de la borne&lt;/span&gt;&lt;/li&gt;
   &lt;li class=&quot;cp-menu-item&quot;&gt;&lt;span class=&quot;cp-glyph&quot;&gt;&lt;i class=&quot;cp-i cp-i-upgrade&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span class=&quot;cp-dot&quot;&gt;&lt;/span&gt;&lt;/span&gt;&lt;span&gt;Mise à jour de Cyber Pinball&lt;small&gt;0.2.0 disponible&lt;/small&gt;&lt;/span&gt;&lt;/li&gt;
+  &lt;li class=&quot;cp-menu-item&quot;&gt;&lt;i class=&quot;cp-i cp-i-desktop&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Bureau Windows&lt;small&gt;Libère tous les écrans du PC&lt;/small&gt;&lt;/span&gt;&lt;span class=&quot;cp-shortcut&quot;&gt;&lt;span class=&quot;cp-cap&quot;&gt;Ctrl&lt;/span&gt;+&lt;span class=&quot;cp-cap&quot;&gt;Maj&lt;/span&gt;+&lt;span class=&quot;cp-cap&quot;&gt;D&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
   &lt;li class=&quot;cp-menu-item is-quiet&quot;&gt;&lt;i class=&quot;cp-i cp-i-power&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span&gt;Quitter Cyber Pinball&lt;/span&gt;&lt;/li&gt;
 &lt;/ul&gt;
 &lt;/body&gt;
@@ -2655,9 +2712,10 @@ details pre code { color: var(--ink-muted); white-space: pre }
   &lt;li class="cp-menu-item"&gt;&lt;i class="cp-i cp-i-search" aria-hidden="true"&gt;&lt;/i&gt;&lt;span&gt;Trouver une table&lt;small&gt;Catalogue VPS : chaque jeu, ses versions, ce qu'il faut&lt;/small&gt;&lt;/span&gt;&lt;/li&gt;
   &lt;li class="cp-menu-item"&gt;&lt;i class="cp-i cp-i-inbox" aria-hidden="true"&gt;&lt;/i&gt;&lt;span&gt;Liste d'attente&lt;/span&gt;&lt;/li&gt;
   &lt;li class="cp-menu-item"&gt;&lt;i class="cp-i cp-i-chip" aria-hidden="true"&gt;&lt;/i&gt;&lt;span&gt;Bibliothèque de ROM&lt;/span&gt;&lt;/li&gt;
-  &lt;li class="cp-menu-item"&gt;&lt;i class="cp-i cp-i-sliders" aria-hidden="true"&gt;&lt;/i&gt;&lt;span&gt;Réglages de VPX&lt;/span&gt;&lt;/li&gt;
+  &lt;li class="cp-menu-item"&gt;&lt;i class="cp-i cp-i-sliders" aria-hidden="true"&gt;&lt;/i&gt;&lt;span&gt;Réglages de VPX&lt;/span&gt;&lt;span class="cp-shortcut"&gt;&lt;span class="cp-cap"&gt;R&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
   &lt;li class="cp-menu-item"&gt;&lt;i class="cp-i cp-i-cabinet" aria-hidden="true"&gt;&lt;/i&gt;&lt;span&gt;Configuration de la borne&lt;/span&gt;&lt;/li&gt;
   &lt;li class="cp-menu-item"&gt;&lt;span class="cp-glyph"&gt;&lt;i class="cp-i cp-i-upgrade" aria-hidden="true"&gt;&lt;/i&gt;&lt;span class="cp-dot"&gt;&lt;/span&gt;&lt;/span&gt;&lt;span&gt;Mise à jour de Cyber Pinball&lt;small&gt;0.2.0 disponible&lt;/small&gt;&lt;/span&gt;&lt;/li&gt;
+  &lt;li class="cp-menu-item"&gt;&lt;i class="cp-i cp-i-desktop" aria-hidden="true"&gt;&lt;/i&gt;&lt;span&gt;Bureau Windows&lt;small&gt;Libère tous les écrans du PC&lt;/small&gt;&lt;/span&gt;&lt;span class="cp-shortcut"&gt;&lt;span class="cp-cap"&gt;Ctrl&lt;/span&gt;+&lt;span class="cp-cap"&gt;Maj&lt;/span&gt;+&lt;span class="cp-cap"&gt;D&lt;/span&gt;&lt;/span&gt;&lt;/li&gt;
   &lt;li class="cp-menu-item is-quiet"&gt;&lt;i class="cp-i cp-i-power" aria-hidden="true"&gt;&lt;/i&gt;&lt;span&gt;Quitter Cyber Pinball&lt;/span&gt;&lt;/li&gt;
 &lt;/ul&gt;</code></pre></details>
 </section>
@@ -2936,6 +2994,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -3029,6 +3095,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -3328,6 +3395,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -3421,6 +3496,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -3732,6 +3808,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -3825,6 +3909,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -4136,6 +4221,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -4229,6 +4322,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -4526,6 +4620,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -4619,6 +4721,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -4920,6 +5023,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -5013,6 +5124,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -5318,6 +5430,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -5411,6 +5531,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -5714,6 +5835,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -5807,6 +5936,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -6166,6 +6296,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -6259,6 +6397,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -6562,6 +6701,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -6655,6 +6802,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -6943,6 +7091,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -7036,6 +7192,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -7326,6 +7483,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -7419,6 +7584,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -7712,6 +7878,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -7805,6 +7979,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -8102,6 +8277,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -8195,6 +8378,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -8481,6 +8665,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -8574,6 +8766,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -8874,6 +9067,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -8967,6 +9168,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -9266,6 +9468,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -9359,6 +9569,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -9660,6 +9871,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -9753,6 +9972,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
@@ -10055,6 +10275,14 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
 
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item &gt; span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -10148,6 +10376,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-exit { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%203h7v18h-7M16%2012H3M8%207l-5%205%205%205%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-coin { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cellipse%20cx%3D%2210%22%20cy%3D%2212%22%20rx%3D%226%22%20ry%3D%229%22%2F%3E%3Cpath%20d%3D%22M10%203h4a6%209%200%200%201%200%2018h-4M16%2012h4%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-plunger { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%203h10M12%203v10M8%2013h8v8H8z%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-tilt { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-usb { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gamepad { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;

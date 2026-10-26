@@ -59,7 +59,12 @@ function offending(pattern: RegExp, allowed: string[] = []): string[] {
 }
 
 test('aucune fenêtre n’est masquée : un écran sans fenêtre montrerait le bureau', () => {
-  assert.deepEqual(offending(/\.hide\(\)/), [], 'garder la fenêtre (derrière VPX), ou la fermer si le gardien couvre son écran');
+  assert.deepEqual(offending(/\.hide\(\)/, ['cover-display.ts']), [], 'garder la fenêtre (derrière VPX), ou la fermer si le gardien couvre son écran');
+  // Seule exception : hideCovered, pour le mode bureau (desktop-mode.ts), où le bureau doit justement se voir.
+  const cover = fs.readFileSync(path.join(SOURCES, 'cover-display.ts'), 'utf8');
+  assert.equal(cover.match(/\.hide\(\)/g)?.length, 1);
+  assert.match(cover, /export function hideCovered\(win: BrowserWindow\): void \{[^}]*win\.hide\(\);\s*\}/);
+  assert.deepEqual(offending(/hideCovered\b/, ['cover-display.ts']).filter((l) => !/^frontend\.ts:\d+ (import .*|hideVeil: hideCovered,)$|^desktop-mode\.ts:\d+ \/\*\*/.test(l)), [], 'hideCovered ne sert qu’au mode bureau');
 });
 
 test('l’application ne se relance que par relaunchCovered : le bureau se verrait entre les deux processus', () => {

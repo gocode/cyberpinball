@@ -41,7 +41,8 @@ import type { ScriptResult } from './vbs';
 export interface JourneyContext {
   host: LibraryHost;
   find(file: string): TableEntry | undefined;
-  show(build: () => Built, at?: number): void;
+  /** Affiche un écran décrit ; `table` : la table dont il parle. */
+  show(build: () => Built, at?: number, table?: string): void;
   cursor(): number;
   task(message: string, work: () => Promise<void> | void): Promise<void>;
   /** Base VPS en cache (téléchargée la première fois) ; undefined sans réseau ni cache. */
@@ -111,7 +112,7 @@ export function createJourney(ctx: JourneyContext) {
       saveJourneys(host.dataDir, mem);
       if (!open || !samePath(open.file, table.file)) return;
       open.journey = journey;
-      ctx.show(() => build(table.file), at ?? 0);
+      ctx.show(() => build(table.file), at ?? 0, table.file);
     });
   }
 

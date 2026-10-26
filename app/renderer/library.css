@@ -348,6 +348,37 @@ body.mouse .lib-back:hover {
   padding: 0.6cqmin;
 }
 
+/*
+ * Liste qui défile (library.js, markOverflow) : le bord derrière lequel il reste des entrées
+ * s'efface en fondu, au lieu de couper net la dernière ligne visible. La marge de défilement
+ * garde l'entrée choisie hors du fondu (scrollIntoView en tient compte).
+ */
+.lib-actions,
+.lib-content {
+  --fade: 7cqmin;
+  /* Le dernier quart du fondu est vide : rien d'une ligne coupée au bord ne se devine. */
+  --fade-end: calc(var(--fade) / 4);
+  scroll-padding-block: var(--fade);
+}
+
+.lib-actions.more-below,
+.lib-content.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent calc(100% - var(--fade-end)));
+  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent calc(100% - var(--fade-end)));
+}
+
+.lib-actions.more-above,
+.lib-content.more-above {
+  -webkit-mask-image: linear-gradient(to bottom, transparent var(--fade-end), #000 var(--fade));
+  mask-image: linear-gradient(to bottom, transparent var(--fade-end), #000 var(--fade));
+}
+
+.lib-actions.more-above.more-below,
+.lib-content.more-above.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, transparent var(--fade-end), #000 var(--fade), #000 calc(100% - var(--fade)), transparent calc(100% - var(--fade-end)));
+  mask-image: linear-gradient(to bottom, transparent var(--fade-end), #000 var(--fade), #000 calc(100% - var(--fade)), transparent calc(100% - var(--fade-end)));
+}
+
 /* Entrée de menu : capitales espacées ; la choisie est un aplat vert signal, texte sombre. */
 .lib-action {
   padding: 1.6cqmin 2.4cqmin;
@@ -415,6 +446,60 @@ body.mouse .lib-back:hover {
   height: 1.11cqmin;
   margin: 0;
   box-shadow: 0 0 0 0.19cqmin var(--void);
+}
+
+/*
+ * Raccourci clavier d'une entrée (« Bureau Windows » : Ctrl + Maj + D) : touches cerclées du
+ * bandeau d'aide, alignées à droite sur la première ligne du libellé ; le détail passe dessous,
+ * sur toute la largeur. Sur l'entrée choisie, les touches prennent la couleur du texte.
+ */
+.lib-actions.with-icons .lib-action:has(> .lib-action-keys) {
+  grid-template-columns: 2.78cqmin minmax(0, 1fr) auto;
+}
+
+.lib-actions.with-icons .lib-action:has(> .lib-action-keys) > .detail {
+  grid-column: 2 / 4;
+}
+
+.lib-action-keys {
+  grid-column: 3;
+  grid-row: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6cqmin;
+  margin-left: 1.6cqmin;
+  font-size: 1.85cqmin;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--quiet);
+}
+
+.lib-action:not(.with-icons .lib-action) > .lib-action-keys {
+  float: right;
+}
+
+.lib-action-keys .lib-keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.7cqmin;
+  height: 3.15cqmin;
+  padding: 0 0.9cqmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.3cqmin;
+  background: var(--surface-raised);
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.lib-action.current .lib-action-keys,
+.lib-action.current .lib-action-keys .lib-keycap {
+  color: var(--on-signal);
+}
+
+.lib-action.current .lib-action-keys .lib-keycap {
+  border-color: var(--on-signal);
+  background: transparent;
 }
 
 .lib-action .detail {

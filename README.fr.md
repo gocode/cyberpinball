@@ -77,6 +77,7 @@ Les boutons sont ceux que l'assistant a relevés. En attendant, ce sont les touc
 | Start | 1 | Jouer |
 | Exit | Échap | Menu système (réglages, configuration de la borne, mise à jour, quitter) |
 | Clavier | Tab, ou ⚙ à la souris | Menu système, de n'importe où |
+| Clavier | Ctrl+Maj+D | Bureau Windows : libère tous les écrans du PC ; de nouveau : retour au menu |
 | Clavier | Ctrl+Maj+K | Arrêter une partie bloquée |
 
 Pendant une partie, les touches sont celles de la section `[Input]` de VPX, rappelées sur l'écran de chargement.

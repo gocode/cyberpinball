@@ -148,7 +148,7 @@ export const WINDOWS_CHANGES: WindowsChange[] = [
   { call: 'hideWindow', files: ['app/src/screen-guard.ts', 'app/src/launcher.ts'] },
   // Réaffiche les barres des tâches que Cyber Pinball a masquées (taskbarsToRestore).
   { call: 'showWindowInactive', files: ['app/src/screen-guard.ts'] },
-  // Ctrl+Maj+K pendant une partie seulement, rendu à la fin.
+  // Raccourcis globaux (SHORTCUTS) : Ctrl+Maj+K pendant une partie, Ctrl+Maj+D en mode bureau ; chacun rendu à la fin.
   { call: 'globalShortcut.register', files: ['app/src/frontend.ts'] },
   // Entrée de « Programmes et fonctionnalités » (HKCU), retirée à la désinstallation.
   { call: 'WriteRegStr', files: ['scripts/installeur/cyberpinball.nsi'] },

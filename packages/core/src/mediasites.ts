@@ -526,9 +526,13 @@ const WEB_SEARCH_WORDS: Partial<Record<MediaType, string>> = {
  * Edition) »), puis l'écran, puis « vpinball » pour rester chez les flippers virtuels.
  */
 export function webSearchUrl(game: string, type: MediaType): string {
+  return `https://duckduckgo.com/?q=${encodeURIComponent(webSearchQuery(game, type))}`;
+}
+
+/** Texte de cette recherche, repris dans le champ de recherche du bandeau de « Récupérer ». */
+export function webSearchQuery(game: string, type: MediaType): string {
   const title = game.replace(/\s*\([^)]*\)\s*/g, ' ').split(/\s+-\s+|:\s*/)[0]!.replace(/\s+/g, ' ').trim();
-  const q = [title, WEB_SEARCH_WORDS[type] ?? type, 'vpinball'].filter(Boolean).join(' ');
-  return `https://duckduckgo.com/?q=${encodeURIComponent(q)}`;
+  return [title, WEB_SEARCH_WORDS[type] ?? type, 'vpinball'].filter(Boolean).join(' ');
 }
 
 /**
@@ -549,6 +553,12 @@ export interface WebReceipt {
   /** Date de réception (ISO). */
   date: string;
   files: ReceivedMedia[];
+  /** Fichiers à convertir pour ce média avant de s'en servir (image en PNG, son ou son d'une vidéo en WAV). */
+  convert?: { file: string; kind: MediaKind; to: 'png' | 'wav'; from: 'image' | 'audio' | 'video' }[];
+  /** Fichiers refusés pour ce média, et pourquoi (ils ne sont pas gardés). */
+  refused?: { name: string; reason: string }[];
+  /** Arrivé dans Téléchargements de Windows (navigateur de l'utilisateur), pas dans la fenêtre « Récupérer ». */
+  windows?: boolean;
 }
 
 /** Hôte d'une adresse, sans « www. » : « vpuniverse.com ». */

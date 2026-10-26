@@ -467,7 +467,7 @@ function pupStep(input: JourneyInput): JourneyStep | undefined {
 }
 
 function displayStep(input: JourneyInput): JourneyStep | undefined {
-  const found = input.findings.filter((f) => (f.code === 'tableOrientation' || f.code === 'manualView' || f.code === 'tableWindows') && f.fix);
+  const found = input.findings.filter((f) => (f.code === 'tableOrientation' || f.code === 'manualView' || f.code === 'tableWindows' || f.code === 'fullDmdHidden') && f.fix);
   if (!found.length) return input.seen?.includes('display') ? { id: 'display', title: t('Affichage'), state: 'done', required: false, detail: t('Cadrage et écrans de la configuration de la borne.'), choices: [] } : undefined;
   return {
     id: 'display',

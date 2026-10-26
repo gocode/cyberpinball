@@ -260,6 +260,17 @@ export interface MediaPlanContext {
   now?: Date;
 }
 
+/**
+ * Plan d'un seul média, écrit aussitôt après confirmation (recherche libre : écran « Reçu ») :
+ * le fichier rangé sous son nom, ou ajouté après les pages d'aujourd'hui, et ce qu'il
+ * remplace à la corbeille. `current` : pages de ce média aujourd'hui. Les autres médias
+ * et les réglages (demi-tour, volume) ne changent pas.
+ */
+export function planSingleMedia(table: TableEntry, type: MediaType, entry: MediaPageEntry, current: string[], context: Omit<MediaPlanContext, 'current'>): MediaPlan {
+  const pages: MediaPageEntry[] = mediaTypeInfo(type).pages ? [...current.map((file) => ({ file })), entry] : [entry];
+  return planMediaChanges(table, { ...emptyMediaDraft(), pages: { [type]: pages } }, { ...context, current: { [type]: current } });
+}
+
 const extOf = (file: string) => path.extname(file).slice(1).toLowerCase();
 
 /** Nom provisoire dans medias\, le temps de renuméroter les pages sans en écraser une. */

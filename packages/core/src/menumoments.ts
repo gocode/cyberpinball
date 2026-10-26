@@ -33,14 +33,70 @@ export interface MomentScreen {
  *   médias du jeu, animés, sur les autres écrans jusqu'à ce que VPX les prenne ;
  * - partie : le playfield est sous VPX, figé ; un écran que VPX occupe aussi (fronton du
  *   .directb2s, DMD de PinMAME…), figé : il ne se voit pas, il ne doit rien coûter ; les
- *   écrans libres suivent le réglage « médias pendant la partie » (figés par défaut).
+ *   écrans libres suivent le réglage « médias pendant la partie » (figés par défaut) ; le
+ *   FullDMD habillé (le DMD de VPX dans le cadre du média) montre toujours son habillage,
+ *   figé, ou animé si les médias le sont.
  */
-export function momentScreen(moment: MenuMoment, role: RoleId, opts: { game: GameMediaMode; occupied?: boolean }): MomentScreen {
+export function momentScreen(moment: MenuMoment, role: RoleId, opts: { game: GameMediaMode; occupied?: boolean; dressed?: boolean }): MomentScreen {
   if (moment === 'loading') return { media: role === 'playfield' ? 'Loading' : 'role', play: 'animated' };
   if (moment !== 'game') return { media: 'role', play: 'animated' };
+  // Habillage FullDMD (fulldmdframe.ts) : le DMD de VPX est posé dans le cadre du média, qui reste
+  // visible autour ; jamais éteint, puisqu'il fait partie de l'afficheur.
+  if (role === 'dmd' && opts.dressed) return { media: 'role', play: opts.game === 'animated' ? 'animated' : 'still' };
   if (opts.game === 'off') return { media: 'role', play: 'off' };
   if (role === 'playfield' || opts.occupied) return { media: 'role', play: 'still' };
   return { media: 'role', play: opts.game };
+}
+
+/** Phase du menu (app/src/frontend.ts) : tables, chargement, partie, message, confirmation de sortie, menu système. */
+export type MenuPhase = 'menu' | 'loading' | 'playing' | 'message' | 'confirmQuit' | 'library';
+
+export const MENU_PHASES: readonly MenuPhase[] = ['menu', 'loading', 'playing', 'message', 'confirmQuit', 'library'];
+
+/** Ce qui est ouvert, pour savoir de quelle table parlent les écrans de la borne. */
+export interface ScreensContext {
+  phase: MenuPhase;
+  /** Aide des commandes ouverte par-dessus le menu des tables. */
+  help: boolean;
+  /** Table choisie dans la roue, ou montrée par le mode attente. */
+  selected?: TableEntry;
+  /** Table de la partie lancée (chargement, partie). */
+  playing?: TableEntry;
+  /**
+   * Table dont parle l'écran ouvert, s'il en parle : sa fiche, ses médias, ses fichiers, son
+   * parcours (menu système, view().table de library.ts), une partie échouée (message).
+   */
+  about?: TableEntry;
+  /** Fenêtre ouverte par-dessus le menu (réglages de VPX) ; `about` : la table qu'elle règle. */
+  overlay?: { about?: TableEntry };
+}
+
+/**
+ * Table dont chaque phase montre les médias sur les écrans de la borne. Le menu des tables
+ * montre la table choisie, le chargement et la partie celle qu'on joue ; tout autre écran ne
+ * garde une table que s'il parle d'elle. Une phase qui ne déclare rien prend l'affichage par
+ * défaut : l'enregistrement est exhaustif, une nouvelle phase doit dire de quelle table elle parle.
+ */
+const PHASE_TABLE: Record<MenuPhase, (s: ScreensContext) => TableEntry | undefined> = {
+  menu: (s) => (s.help ? undefined : s.selected),
+  loading: (s) => s.playing ?? s.selected,
+  playing: (s) => s.playing ?? s.selected,
+  message: (s) => s.about,
+  confirmQuit: () => undefined,
+  library: (s) => s.about,
+};
+
+/**
+ * Table dont les écrans de la borne (fronton, DMD ou FullDMD, topper, et le fond du playfield)
+ * montrent les médias, et dont on entend la musique ; undefined : l'affichage par défaut de
+ * Cyber Pinball (defaultMediaView) et le silence. Hors du menu des tables, rien de la dernière
+ * table de la roue ne reste à l'écran : menu système, réglages, aide, messages, confirmation de
+ * sortie montrent l'affichage par défaut ; la fiche d'une table, ses médias, ses fichiers, son
+ * parcours et ses réglages gardent les médias de cette table, celle dont on parle.
+ */
+export function screensTable(s: ScreensContext): TableEntry | undefined {
+  if (s.overlay && s.phase !== 'loading' && s.phase !== 'playing') return s.overlay.about;
+  return PHASE_TABLE[s.phase](s);
 }
 
 /** Zone d'un rôle à l'écran, en pixels physiques (l'écran entier, ou sa part d'un écran partagé). */

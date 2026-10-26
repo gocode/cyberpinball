@@ -61,13 +61,23 @@ export function coverDisplay(win: BrowserWindow, bounds: Rectangle): void {
 }
 
 /**
- * Réduit une fenêtre couverte par coverDisplay (menu système > « Bureau Windows ») : elle
+ * Réduit une fenêtre couverte par coverDisplay (mode bureau, desktop-mode.ts) : elle
  * quitte d'abord le plein écran, pour ne pas revenir en bleu pâle ; rouverte, elle le reprend.
  */
 export function minimizeCovered(win: BrowserWindow): void {
   if (win.isDestroyed()) return;
   if (!OFFSCREEN && win.isFullScreen()) win.setFullScreen(false);
   win.minimize();
+}
+
+/**
+ * Cache une fenêtre couverte par coverDisplay (voile du gardien des écrans, en mode bureau) :
+ * même précaution que minimizeCovered ; remontrée, elle reprend le plein écran (événement show).
+ */
+export function hideCovered(win: BrowserWindow): void {
+  if (win.isDestroyed()) return;
+  if (!OFFSCREEN && win.isFullScreen()) win.setFullScreen(false);
+  win.hide();
 }
 
 /** Écran que chaque fenêtre doit couvrir (coordonnées Electron). */

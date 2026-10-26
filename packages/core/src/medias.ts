@@ -259,7 +259,7 @@ export const MEDIA_TYPES: readonly MediaTypeInfo[] = [
     fit: 'cover',
     fallback: 'loading-screen',
     get fallbackLabel() {
-      return t('Écran de chargement : titre et commandes');
+      return t('Écran de chargement : titre et barre d’attente');
     },
     aliases: { popper: ['Loading'], pinballx: ['Loading Videos'], vpinfe: [] },
   },
@@ -751,9 +751,12 @@ function finish(
  * le type de son écran, FullDMD ou DMD seul (dmdMediaType).
  */
 export function resolveRoleMedia(table: TableEntry, root: string, role: RoleId, options: ResolveOptions = {}): ResolvedMedia {
-  const type: MediaType =
-    role === 'playfield' ? 'Playfield' : role === 'backglass' ? 'Backglass' : role === 'topper' ? 'Topper' : (options.cabinet && dmdMediaType(options.cabinet)) ?? 'DMD';
-  return resolveMedia(table, root, type, options);
+  return resolveMedia(table, root, roleMediaType(role, options.cabinet), options);
+}
+
+/** Type de média de l'écran d'un rôle : Playfield, Backglass, Topper, et DMD ou FullDMD selon l'écran du DMD. */
+export function roleMediaType(role: RoleId, cabinet?: Cabinet): MediaType {
+  return role === 'playfield' ? 'Playfield' : role === 'backglass' ? 'Backglass' : role === 'topper' ? 'Topper' : (cabinet && dmdMediaType(cabinet)) ?? 'DMD';
 }
 
 // ---------------------------------------------------------------------------

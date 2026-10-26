@@ -971,8 +971,9 @@
   }
 
   /**
-   * Écran de chargement de secours : marque, titre, fabricant et année, barre d'attente.
-   * handle.slot reçoit ce que l'appelant veut montrer dessous (les commandes de la partie).
+   * Écran de chargement de secours : marque, titre, fabricant et année, barre d'attente,
+   * « Chargement de la table… » (sans lui avec l'option label: false). handle.slot reçoit ce
+   * que l'appelant veut montrer dessous (un aide-mémoire).
    */
   function loading(container, game, options) {
     let slot;
@@ -988,7 +989,9 @@
         body.append(ctx.fit(wordmarkBox('cp-ld-brand')), title);
         const meta = metaOf(g);
         if (meta) body.append(ctx.fit(fitBox('cp-ld-meta cp-meta-text', meta), { max: () => 0.36 * sizeOf(title) }));
-        body.append(bar, ctx.fit(fitBox('cp-ld-label cp-one-line', t('Chargement de la table…'))), slot);
+        body.append(bar);
+        if (ctx.options.label !== false) body.append(ctx.fit(fitBox('cp-ld-label cp-one-line', t('Chargement de la table…'))));
+        body.append(slot);
         ctx.root.append(body);
       };
     });

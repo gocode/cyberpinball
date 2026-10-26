@@ -28,8 +28,8 @@ export interface TableFilesContext {
   find(file: string): TableEntry | undefined;
   /** Script de la table, s'il a déjà été lu (ROM demandées, dossier DMD). */
   script(table: TableEntry): ScriptResult | undefined;
-  /** Affiche un écran décrit, le curseur sur l'action `at`. */
-  show(build: () => Built, at?: number): void;
+  /** Affiche un écran décrit, le curseur sur l'action `at` ; `table` : la table dont il parle. */
+  show(build: () => Built, at?: number, table?: string): void;
   sheet(table: TableEntry): void;
   doctor(table: TableEntry): void;
   roms(): void;
@@ -56,7 +56,7 @@ export function createTableFiles(ctx: TableFilesContext) {
 
   /** Liste des fichiers ; `at` : l'action sur laquelle revenir (le fichier dont on sort). */
   function open(table: TableEntry, at = 0, contents = contentsOf(table)): void {
-    ctx.show(() => build(table.file, contents), at);
+    ctx.show(() => build(table.file, contents), at, table.file);
   }
 
   function build(file: string, contents: TableContents): Built {
@@ -119,7 +119,7 @@ export function createTableFiles(ctx: TableFilesContext) {
       if (entry.state === 'warning' || entry.state === 'error') actions.push({ label: t('Diagnostiquer et réparer'), tone: 'warning', run: () => ctx.doctor(table) });
       actions.push({ label: t('Retour aux fichiers'), run: back });
       return { heading: entry.name, subheading: `${KIND_LABELS[entry.kind]} · ${table.title}`, sections: [{ rows }], actions, back, variant: 'facts' };
-    });
+    }, undefined, table.file);
   }
 
   return { open, contentsOf, summary };

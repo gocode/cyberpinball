@@ -11,8 +11,8 @@
 //   Une fiche choisie part dans la file de son site ; reçue, elle se choisit comme un
 //   fichier de la borne, et la carte qui l'a demandée la met d'elle-même dans le brouillon ;
 // - le web, quand rien de tout cela ne convient : « Chercher sur le web… » ouvre la
-//   fenêtre « Récupérer » sur une recherche, et ce que l'utilisateur y télécharge revient
-//   ici (media-sites.ts), en tête des propositions.
+//   recherche libre du média (media-web.ts) ; ce que l'utilisateur y télécharge est vérifié
+//   et montré sur son écran « Reçu », puis reste ici, en tête des propositions.
 //
 // Chaque site dit combien de ses résultats servent à ce média, et à quels autres écrans
 // vont les autres. Un afficheur que la borne ne montre pas (Afficheur 4:1 sur un écran
@@ -41,9 +41,7 @@ import {
   siteQuery,
   webHost,
   webMediaChoices,
-  webSearchUrl,
   type MediaPlacement,
-  type WebReceipt,
   type MediaSiteId,
   type SiteHit,
   type SiteState,
@@ -116,6 +114,8 @@ export interface ProposalsContext {
   active(table: TableEntry): boolean;
   /** Où ce média s'affiche sur la borne, et s'il s'y voit (l'autre afficheur passe avant lui). */
   placement(type: MediaType): MediaPlacement;
+  /** Recherche libre du média (media-web.ts) ; `title` : le titre cherché ici, s'il y en a un. */
+  web?: { open(table: TableEntry, type: MediaType, title?: string): string; detail(table: TableEntry, type: MediaType, title?: string): string };
 }
 
 /** Ce qu'un site a donné pour les jeux retenus. */
@@ -520,15 +520,10 @@ export function createProposals(ctx: ProposalsContext) {
         },
       });
     }
-    if (ctx.sites) {
-      const loading = ctx.sites.webProgress();
+    if (ctx.web) {
       actions.push({
         label: t('Chercher sur le web…'),
-        detail: loading
-          ? t('Téléchargement : {got}', { got: formatTransfer(loading, true) })
-          : ctx.sites.resumable(webUrl(st, table, type))
-            ? t('Reprend la page où vous en étiez ; ce que vous y téléchargez revient ici')
-            : t('Navigateur intégré : ce que vous y téléchargez revient ici'),
+        detail: ctx.web.detail(table, type, st.query),
         tone: choices.length ? undefined : 'ok',
         run: () => openWeb(table, type),
       });
@@ -702,49 +697,18 @@ export function createProposals(ctx: ProposalsContext) {
 
   // ---------- Recherche sur le web ----------
 
-  /** Média et table d'où la recherche web est partie, et le choix qu'elle représente. */
-  let webWanted: { file: string; type: MediaType; pick: number } | undefined;
-
-  /** Page de départ de la recherche web pour ce média : la même d'une visite à l'autre, pour reprendre la page en cours. */
-  function webUrl(st: State, table: TableEntry, type: MediaType): string {
-    return webSearchUrl(st.query ?? includedGames(st)[0]?.lead.game.name ?? table.title, type);
-  }
-
+  /**
+   * Recherche libre du média, sur le titre saisi ici s'il y en a un : ce que l'utilisateur
+   * télécharge s'ouvre sur l'écran « Reçu » (media-web.ts). Un choix fait ici avant n'est
+   * plus attendu : un fichier d'un site qui arriverait ensuite ne le remplace pas.
+   */
   function openWeb(table: TableEntry, type: MediaType): void {
     const st = state!;
-    const pick = ++picks;
-    lastPick.set(`${table.file}|${type}`, pick);
-    webWanted = { file: table.file, type, pick };
-    ctx.sites!.openWeb({ url: webUrl(st, table, type), table: table.file, title: table.title, type, label: mediaTypeInfo(type).label });
-    st.notice = { text: t('Recherche ouverte dans la fenêtre « Récupérer » : téléchargez-y le fichier voulu, il revient ici. Fermer (Échap) pour revenir.'), tone: 'info' };
+    lastPick.set(`${table.file}|${type}`, ++picks);
+    st.notice = { text: ctx.web!.open(table, type, st.query), tone: 'info' };
     ctx.show(() => build(type), ctx.cursor());
   }
 
-  // Un fichier reçu de la recherche web : seul pour ce média, il va dans le brouillon,
-  // comme une proposition choisie ; sinon il attend parmi les propositions.
-  ctx.sites?.onWebReceived((receipt: WebReceipt) => {
-    if (!state || state.file !== receipt.table) return;
-    const table = ctx.find(receipt.table);
-    if (!table || !ctx.active(table)) return;
-    const host = webHost(receipt.url);
-    if (!receipt.files.length) {
-      state.notice = { text: t('Reçu de {host} : « {file} », mais rien dedans que le menu sache montrer.', { host, file: receipt.filename }), tone: 'warning' };
-      return;
-    }
-    const files = webMediaChoices(receipt.type, [receipt], receipt.table);
-    const wanted = webWanted && webWanted.file === receipt.table && webWanted.type === receipt.type && lastPick.get(`${receipt.table}|${receipt.type}`) === webWanted.pick;
-    if (files.length !== 1 || !wanted) {
-      state.notice = {
-        text: files.length
-          ? tn(files.length, 'Reçu de {host} : {n} fichier pour ce média, à choisir.', 'Reçu de {host} : {n} fichiers pour ce média, à choisir.', { host })
-          : t('Reçu de {host} : « {file} », rien pour ce média ; les autres écrans le proposent.', { host, file: receipt.filename }),
-        tone: 'info',
-      };
-      return;
-    }
-    const text = ctx.place(table, receipt.type, { from: files[0]!.file!, mode: 'copy', origin: { origin: host, url: receipt.url } });
-    state.notice = { text: `${t('Reçu de {host}.', { host })} ${text}`, tone: 'ok' };
-  });
 
   function signIn(table: TableEntry, type: MediaType, site: MediaSiteId): void {
     ctx.sites!.signIn(site);

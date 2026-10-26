@@ -377,6 +377,18 @@ export const messages: Record<string, string> = {
   '{name} règle [Player] CabinetAutofitMode = 0 : VPX ne cadre pas cette table et reprend une vue réglée à la main, peut-être pour un autre écran (table tronquée ou qui déborde). Ensuite, « Régler l’affichage en partie » dans la fiche la cadre sur la table lancée.': '{name} sets [Player] CabinetAutofitMode = 0: VPX does not frame this table and uses a hand-set view, perhaps made for another screen (table cut off or overflowing). Then “Adjust display in game” on the table page frames it on the running table.',
   // packages/core/src/doctor.ts : option du PuP-Pack inadaptée
   'Option du PuP-Pack inadaptée à la borne': 'PuP-Pack option unsuited to the cabinet',
+  'pupvideos\\{pack} : « {option} » n’est qu’en partie en place ({differences}).': 'pupvideos\\{pack}: “{option}” is only partly in place ({differences}).',
+  'choisie dans la fiche': 'chosen on the table sheet',
+  'choisie à l’installation': 'chosen at installation',
+  'pupvideos\\{pack} : « {kept} » est l’option retenue ({why}), mais les fichiers en place sont ceux de « {current} ».': 'pupvideos\\{pack}: “{kept}” is the kept option ({why}), but the files in place are those of “{current}”.',
+  'Option du PuP-Pack incomplète': 'Incomplete PuP-Pack option',
+  'Option du PuP-Pack différente de celle retenue': 'PuP-Pack option differs from the kept one',
+  'Réappliquer « {option} »': 'Apply “{option}” again',
+  'Retenir « {option} », l’option en place': 'Keep “{option}”, the option in place',
+  '{file} absent': '{file} missing',
+  'l’option n’est plus dans le pack': 'the option is no longer in the pack',
+  '{file} différent de celui de l’option': '{file} differs from the option’s',
+  '{file} encore là (l’option le supprime)': '{file} still there (the option deletes it)',
   'pupvideos\\{pack} applique « {applied} » ({appliedTraits}) ; pour cette borne ({cabinet}), « {best} » ({bestTraits}) convient mieux. Fiche > « PuP-Pack » pour voir et choisir les options.': 'pupvideos\\{pack} applies “{applied}” ({appliedTraits}); for this cabinet ({cabinet}), “{best}” ({bestTraits}) suits better. Table page > “PuP-Pack” to see and choose the options.',
   'Appliquer « {option} »': 'Apply “{option}”',
   // packages/core/src/doctor.ts : ROM éparpillée ou à sous-dossier (romzip.ts)
@@ -434,4 +446,24 @@ export const messages: Record<string, string> = {
   '{n} autres playlists sont dans ce cas.': '{n} other playlists are in the same case.',
   'Renommer « {right} » en « {to} »': 'Rename “{right}” to “{to}”',
   'Renommer {n} fichiers pour rétablir l’ordre': 'Rename {n} files to restore the order',
+  // packages/core/src/fulldmdframe.ts, fulldmdtable.ts, app/src/fulldmd-cli.ts (habillage FullDMD)
+  'l’écran du DMD n’est pas un FullDMD': 'the DMD screen is not a FullDMD',
+  'DMD incrusté dans le playfield': 'DMD embedded in the playfield',
+  'pas de média FullDMD pour cette table': 'no FullDMD media for this table',
+  'média FullDMD pas encore analysé': 'FullDMD media not analysed yet',
+  'aucun cadre de DMD dans le média FullDMD': 'no DMD frame in the FullDMD media',
+  'la table ne dessine pas de DMD': 'the table draws no DMD',
+  'le .directb2s montre déjà son FullDMD': 'the .directb2s already shows its own FullDMD',
+  'le PuP-Pack occupe la fenêtre du DMD': 'the PuP-Pack holds the DMD window',
+  'Le DMD cacherait l’habillage FullDMD': 'The DMD would hide the FullDMD artwork',
+  'tout l’écran': 'the whole screen',
+  '{media} habille l’écran du FullDMD autour d’un cadre de DMD, mais {file} place le DMD de cette table sur {where} : en partie, il recouvrirait l’habillage. Cyber Pinball pose le DMD dans le cadre ({w} × {h} en {x}, {y}) ; la place s’ajuste ensuite en partie, dans le menu de VPX.':
+    '{media} dresses the FullDMD screen around a DMD frame, but {file} puts this table’s DMD on {where}: in game, it would cover the artwork. Cyber Pinball puts the DMD in the frame ({w} × {h} at {x}, {y}); the placement is then fine-tuned in game, from the VPX menu.',
+  'Poser le DMD dans le cadre de l’habillage': 'Put the DMD in the artwork’s frame',
+  'pas d’habillage : {reason}': 'no artwork: {reason}',
+  'habillé (cadre {w} × {h} en {x}, {y}), DMD posé dans le cadre': 'dressed (frame {w} × {h} at {x}, {y}), DMD placed in the frame',
+  'habillé (cadre {w} × {h} en {x}, {y}), DMD posé dans le cadre à la prochaine partie': 'dressed (frame {w} × {h} at {x}, {y}), DMD placed in the frame at the next game',
+  'DMD sur l’habillage ({share} % recouvert) : place réglée dans {file} ; fiche > Diagnostic pour le poser dans le cadre ({w} × {h} en {x}, {y})':
+    'DMD over the artwork ({share} % covered): placement set in {file}; table sheet > Diagnosis to put it in the frame ({w} × {h} at {x}, {y})',
+  'habillé (cadre {w} × {h} en {x}, {y}), place du DMD réglée en partie et gardée': 'dressed (frame {w} × {h} at {x}, {y}), DMD placement set in game and kept',
 };

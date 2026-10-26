@@ -202,3 +202,11 @@
 .cp-menu-item.is-disabled,.cp-menu-item.is-disabled small{color:var(--ink-faint)}
 .cp-glyph{position:relative;display:flex;flex:none}
 .cp-dot{position:absolute;top:-7px;right:-7px;width:12px;height:12px;border-radius:50%;background:var(--danger);box-shadow:0 0 0 2px var(--void)}
+
+/* Raccourci clavier d'une entrée (26 octobre 2026) : les touches cerclées du bandeau d'aide, à droite de la
+   première ligne du libellé ; sur l'entrée choisie, elles prennent la couleur du texte. */
+.cp-menu-item > span:not(.cp-glyph):not(.cp-shortcut){flex:1;min-width:0}
+.cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
+.cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
+.cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
