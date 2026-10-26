@@ -1096,6 +1096,8 @@ export function createLibrary(host: LibraryHost) {
     if (!table) return undefined;
     const pages = pagesOf(table, s.type);
     const authors = table.info.Info?.Authors?.filter((a) => typeof a === 'string' && a.trim());
+    // Commandes de la partie : celles de la borne (boutons, tilt) ; une borne sans modèle a les touches par défaut.
+    const cabinet = s.type === 'GameHelp' ? loadCabinet(host.dataDir) : undefined;
     return {
       type: s.type,
       index: s.index,
@@ -1110,7 +1112,7 @@ export function createLibrary(host: LibraryHost) {
         description: typeof table.info.Info?.Description === 'string' ? table.info.Info.Description : undefined,
         version: table.version,
       },
-      keys: s.type === 'GameHelp' ? gameKeys(loadCabinet(host.dataDir)?.buttons) : undefined,
+      keys: s.type === 'GameHelp' ? gameKeys(cabinet?.buttons, cabinet?.tilt) : undefined,
     };
   }
 

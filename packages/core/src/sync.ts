@@ -1,5 +1,6 @@
 import { vpxAudioSettings } from './audio';
 import { managedJoysticks, noAutoLayoutSettings, vpxAnalogSettings } from './plunger';
+import { tiltFindings, vpxTiltSettings } from './tilt';
 import { buttonInfo, buttonProblems, DEFAULT_BUTTONS, inGameMenuSetting, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, type SilencedAction } from './buttons';
 import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxFolderDefaults, type DetectedDmd, type GlobalDmdFolders } from './dmd';
 import { t } from './i18n';
@@ -309,6 +310,11 @@ export function planVpxSync(
   // défaut de VPX, qui commencerait par effacer tout ce qui vient d'eux (plunger.ts).
   if (cabinet.analog) applyOwned(vpxAnalogSettings(cabinet.analog));
   applyOwned(noAutoLayoutSettings(managedJoysticks(buttonIssues.length ? undefined : cabinet.buttons, cabinet.analog)));
+
+  // Tilt : le balancier simulé de VPX allumé ou éteint, seulement après l'étape « Tilt » ; ce qui
+  // ferait mal tilter la borne est signalé d'après ce que VPX lira (tilt.ts).
+  if (cabinet.tilt) applyOwned(vpxTiltSettings(cabinet.tilt));
+  findings.push(...tiltFindings(cabinet, doc.toString()));
 
   // Deux plugins qui réclament le même objet COM : le dernier chargé l'emporte.
   for (const plugin of profile.enabledPlugins) {

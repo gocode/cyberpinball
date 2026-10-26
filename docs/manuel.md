@@ -33,7 +33,7 @@ npm install
 npm test          # compile et lance les tests du cœur
 npm run probe     # liste les écrans et les sorties audio détectés, leur empreinte et le nom attendu par VPX
 npm start         # menu des tables (assistant d'écrans au premier démarrage)
-npm run assistant # assistant complet (-- --boutons, --lanceur, --ecrans, --playfield, --disposition, --son : une seule étape)
+npm run assistant # assistant complet (-- --boutons, --lanceur, --tilt, --ecrans, --playfield, --disposition, --son : une seule étape)
 npm run fabriquer # exécutable dans release\win-unpacked\ (npm run deployer : et copie dans <racine>\app\)
 npm run installeur # idem, puis release\CyberPinball-Setup.exe et -complet.exe (-- --leger : sans la complète)
 npm run sync      # ce que fera l'application à chaque démarrage : corrige VPinballX.ini si les écrans ont bougé
@@ -387,7 +387,7 @@ Menu des tables, touche R (ou Exit puis « Réglages de VPX ») ; seul : `npx el
 
 ## Assistant et menu de configuration
 
-L'assistant (`app/src/wizard.ts`, écrans `app/renderer/screen.*`) enchaîne au premier démarrage, ou par « Assistant complet » : **boutons** (relevé de chaque bouton), **écrans et rôles** (playfield, backglass, DMD, topper), **orientation et taille du playfield** (bord des flippers, retournement de l'écran dans Windows si VPX en a besoin, diagonale), **disposition des écrans** (zones), **son** (sorties audio, test des haut-parleurs), puis le récapitulatif et l'écriture de `cabinet.json` et de `VPinballX.ini`. La liste des étapes, ce que chacune décide et ses clés sont dans [packages/core/src/wizardsteps.ts](../packages/core/src/wizardsteps.ts) (`WIZARD_PHASES`, `WIZARD_STEPS`), testés dans [wizardsteps.test.ts](../packages/core/src/test/wizardsteps.test.ts).
+L'assistant (`app/src/wizard.ts`, écrans `app/renderer/screen.*`) enchaîne au premier démarrage, ou par « Assistant complet » : **boutons** (relevé de chaque bouton), **lanceur analogique** (plunger à capteur, accéléromètre), **tilt** (balancier de la borne ou balancier simulé par VPX), **écrans et rôles** (playfield, backglass, DMD, topper), **orientation et taille du playfield** (bord des flippers, retournement de l'écran dans Windows si VPX en a besoin, diagonale), **disposition des écrans** (zones), **son** (sorties audio, test des haut-parleurs), puis le récapitulatif et l'écriture de `cabinet.json` et de `VPinballX.ini`. La liste des étapes, ce que chacune décide et ses clés sont dans [packages/core/src/wizardsteps.ts](../packages/core/src/wizardsteps.ts) (`WIZARD_PHASES`, `WIZARD_STEPS`), testés dans [wizardsteps.test.ts](../packages/core/src/test/wizardsteps.test.ts).
 
 **Menu système (Exit, Tab ou ⚙) > « Configuration de la borne »** regroupe tout ce qui règle la borne. Chaque étape s'y refait seule et revient au menu des tables, enregistrée ou non :
 
@@ -396,6 +396,7 @@ L'assistant (`app/src/wizard.ts`, écrans `app/renderer/screen.*`) enchaîne au 
 | Boutons du jeu | `--boutons` | relevé des boutons du jeu et essai | `[Input]` |
 | Boutons de l'interface | `--interface` | relevé des boutons qui pilotent Cyber Pinball et essai | aucune |
 | Lanceur analogique | `--lanceur` | détection du lanceur à capteur, sens, zone morte, vitesse, accéléromètre, essai | `[Input]` des capteurs |
+| Tilt | `--tilt` | balancier de la borne ou balancier simulé par VPX, angle du contact, essai aux secousses | `[Player] SimulatedPlumb`, `PlumbThresholdAngle` |
 | Écrans et rôles | `--ecrans` | l'écran de chaque rôle ; bord des flippers et diagonale seulement si le playfield change d'écran | fenêtres de VPX et cadrage |
 | Orientation et taille du playfield | `--playfield` | bord des flippers, retournement de l'écran, diagonale | fenêtres de VPX et cadrage |
 | Disposition des écrans | `--disposition` | zone de chaque rôle sur son écran | fenêtres de VPX et cadrage |
@@ -463,7 +464,7 @@ Chaque entrée de menu porte une icône qui la distingue, et chaque écran ouver
 - **Toute l'interface lit ses propres boutons** : menu (`interfaceKeys`), réglages de VPX, avertissement « autre menu ouvert », assistant (`navigationKeys`), toujours avec la borne entière (`ButtonsSource`), jamais les seuls boutons du jeu (test d'invariant dans `buttons.test.ts`). L'aide-mémoire « Pendant une partie » et le réglage de l'affichage en partie restent ceux du jeu (`gameKeys`, `displayKeys`).
 - **Relevé incohérent** des boutons de l'interface (`navigationProblems`) : l'interface revient sur les flippers, Start et Exit du jeu, et le menu propose au démarrage de refaire l'étape (« Boutons de l'interface à refaire », Start : `--interface`).
 
-Première étape de l'assistant, puisque tout le reste se pilote aux boutons : l'écran demande « Appuyez sur le bouton » flipper gauche, flipper droit, Start, Exit, crédit, lanceur, puis les boutons facultatifs (MagnaSave gauche et droit, Extra Ball, Pause, Tilt, tremblements à gauche, à droite et vers l'avant, volume − et +), qu'Exit passe. La même question s'affiche sur tous les écrans (droite pour le joueur sur l'ancien playfield), au-dessus de la liste de tous les boutons : ceux déjà relevés avec leur touche, celui en cours, ceux à venir, pour choisir à l'avance quel bouton de la borne tiendra quel rôle. Une touche déjà relevée pour un autre bouton est refusée, comme la touche Windows et les touches que VPX ne sait pas lire ; un bouton compte quand on le relâche, une seule fois, et une touche maintenue 3 s ouvre « Quitter sans enregistrer ? » au lieu d'être relevée.
+Première étape de l'assistant, puisque tout le reste se pilote aux boutons : l'écran demande « Appuyez sur le bouton » flipper gauche, flipper droit, Start, Exit, crédit, lanceur, puis les boutons facultatifs (MagnaSave gauche et droit, Extra Ball, Pause, balancier de tilt, slam tilt, tremblements à gauche, à droite et vers l'avant, volume − et +), qu'Exit passe. La même question s'affiche sur tous les écrans (droite pour le joueur sur l'ancien playfield), au-dessus de la liste de tous les boutons : ceux déjà relevés avec leur touche, celui en cours, ceux à venir, pour choisir à l'avance quel bouton de la borne tiendra quel rôle. Une touche déjà relevée pour un autre bouton est refusée, comme la touche Windows et les touches que VPX ne sait pas lire ; un bouton compte quand on le relâche, une seule fois, et une touche maintenue 3 s ouvre « Quitter sans enregistrer ? » au lieu d'être relevée.
 
 **Assistant complet** : les boutons du jeu d'abord, puis ceux de l'interface, proposés sur les mêmes boutons que flippers, Start et Exit qu'on vient de relever : Valider (Start) les garde sans essai ; un bouton se refait seul, ou « Tout relever » les demande un par un (Précédent, Suivant, Valider, Retour et menu, puis Aide-mémoire et Réglages de VPX, que Retour passe). Au récapitulatif de l'interface, Précédent, Suivant, Valider et Retour dont la touche a changé doivent avoir été pressés avant Valider ; au récapitulatif du jeu, les flippers, Start et Exit. Les touches de l'interface en vigueur, les flèches et Entrée choisissent et lancent aussi aux deux récapitulatifs, sans compter comme essai. Sans réponse à la première étape (20 s), les deux jeux gardent leurs touches et l'assistant passe aux écrans.
 
@@ -491,7 +492,8 @@ Les touches sont rangées dans `cabinet.json` (`buttons` pour le jeu, `navigatio
 | Start, Exit | `Mapping.Start` (`Key;30`), `Mapping.ExitGame` (`Key;41`) |
 | Crédit, lanceur | `Mapping.Credit1` (`Key;34`), `Mapping.LaunchBall` (`Key;40`) |
 | MagnaSave gauche / droit | `Mapping.LeftMagna`, `UIUp` (`Key;224`) / `RightMagna`, `UIDown` (`Key;228`) |
-| Extra Ball, Pause, Tilt | `Mapping.ExtraBall` (`Key;5`), `Mapping.Pause` (`Key;19`), `Mapping.Tilt` (`Key;23`) |
+| Extra Ball, Pause, balancier de tilt | `Mapping.ExtraBall` (`Key;5`), `Mapping.Pause` (`Key;19`), `Mapping.Tilt` (`Key;23`) |
+| Slam tilt (porte du monnayeur) | `Mapping.SlamTilt` (`Key;74`) |
 | Tremblements | `Mapping.LeftNudge` (`Key;29`), `RightNudge` (`Key;56`), `CenterNudge` (`Key;44`) |
 | Volume − / + | `Mapping.VolumeDown` (`Key;45`), `Mapping.VolumeUp` (`Key;46`) |
 
@@ -535,6 +537,40 @@ Clés écrites (`vpxAnalogSettings`, format relevé dans `PlungerHandler.cpp`, `
 - **Disposition par défaut de VPX coupée** : VPX reconnaît un Pinscape à six axes et propose en partie d'appliquer sa disposition (lanceur sur Z, accéléromètre sur X et Y). Accepter efface d'abord tout ce qui vient de ce joystick (`ApplyDefaultDeviceMapping`, `ClearDeviceMappings`), y compris les boutons relevés par Cyber Pinball. `NoAutoLayout` coupe cette proposition pour les joysticks de la borne ; un Pinscape réglé en « X/Y/Z » seulement (trois axes) n'était de toute façon pas reconnu par VPX, et son lanceur ne marchait qu'une fois affecté à la main.
 - Ces clés appartiennent à l'étape « Lanceur » (`isAnalogKey`) et plus à l'étape « Boutons » ; `NoAutoLayout` est aux deux. Comme les autres clés gérées, un réglage changé ensuite dans le menu de VPX (zone morte, par exemple) est signalé, gardé ou remis au choix.
 - Le bouton « Lanceur » (`Mapping.LaunchBall`) reste : il sert aux tables à lanceur automatique, et le Pinscape peut l'envoyer quand on pousse le lanceur vers l'avant (« ZB Launch Ball », réglé sur la carte).
+
+## Tilt
+
+Ce qui fait tilter la borne se décide à l'étape « Tilt » de l'assistant ([app/src/tilt-step.ts](../app/src/tilt-step.ts), [packages/core/src/tilt.ts](../packages/core/src/tilt.ts)). Elle suit l'étape « Lanceur » dans l'assistant complet, qui la passe sans rien écrire sur une borne sans accéléromètre, sans balancier relevé ni tilt enregistré (VPX garde alors son balancier simulé) ; seule : menu système > « Configuration de la borne » > « Tilt » (`npm run assistant -- --tilt`, action `tilt` du lanceur). Démonstration sans opérateur, avec un Pinscape virtuel de SDL : `docs\demo-tilt.ps1 -Run`.
+
+**Ce que VPX en fait** (VPX 10.8.1, commit `af26b2d93`) :
+
+- l'action **Tilt** (`[Input] Mapping.Tilt`, T par défaut) arrive au script de la table comme la touche `MechanicalTilt`, que les scripts de PinMAME appellent `keyBangBack` (`scripts/VPMKeys.vbs`) : `vpmKeyDown` appelle `vpmNudge.DoMechTilt` (`WPC.vbs`, `s11.vbs`, `sega.vbs`…), qui donne une impulsion sur l'interrupteur du balancier de la machine (`vpmNudge.TiltSwitch`, `core.vbs`). La ROM compte ses avertissements puis tilte, comme la vraie machine ;
+- le **balancier simulé** (`physics/cabinet/PlumbHandler.cpp`) est un pendule de 10 cm mû par l'accélération de la caisse : celle que VPX déduit des secousses de l'accéléromètre (`GamepadNudge.cpp` : intention de secousse, puis caisse de 113 kg sur ses pieds) et des boutons de tremblement. Quand il touche son anneau, il appuie lui-même sur l'action Tilt. Réglages `[Player]` (`Settings_properties.inl`) : `SimulatedPlumb` (1 par défaut), `PlumbThresholdAngle` (angle du contact en degrés, de 0,15 à 4, 1 par défaut ; plus petit, tilt plus facile), `PlumbDamping` (amortissement, 0 à 2, 1). Le `.ini` d'une table peut les remplacer pour elle (`PhysicsEngine.cpp` lit les réglages de la table) ;
+- l'action **SlamTilt** (`Mapping.SlamTilt`, Origine par défaut) arrive au script comme `keySlamDoorHit` : l'interrupteur slam tilt de la machine (`swSlamTilt`, 21 sur une WPC) reste fermé tant que le bouton est appuyé, et la ROM arrête la partie de tous les joueurs.
+
+Le guide du Pinscape (mjrnet, « Nudge & Tilt ») câble un vrai balancier comme un bouton, sur une entrée du KL25Z réglée en bouton de joystick (ou en touche T) ; avec lui, le balancier simulé est en trop : deux balanciers, un même coup compterait deux fois.
+
+**Les quatre cas, et ce que Cyber Pinball écrit** :
+
+| Borne | Étape « Boutons » | Étape « Tilt » | `VPinballX.ini` |
+| --- | --- | --- | --- |
+| Balancier câblé (Pinscape ou encodeur) | « Balancier de tilt » relevé (bouton de joystick ou T) | « Balancier de la borne » | `[Input] Mapping.Tilt = SDLJoy_…;9 \| Key;23`, `[Player] SimulatedPlumb = 0` |
+| Accéléromètre seul | « Balancier de tilt » passé (Exit) | « Balancier simulé par VPX », angle du contact | `[Player] SimulatedPlumb = 1`, `PlumbThresholdAngle = 0.5` (par exemple) |
+| Slam tilt de la porte | « Slam tilt » relevé | sans effet | `[Input] Mapping.SlamTilt = SDLJoy_…;11 \| Key;74` |
+| Ni balancier ni simulation | « Balancier de tilt » passé | « Pas de tilt » | `[Player] SimulatedPlumb = 0` ; la touche T d'un clavier reste le tilt |
+
+**Relevé du balancier** (étape « Boutons ») : le bouton facultatif « Balancier de tilt » demande « Faites toucher l'anneau au balancier » et rappelle ce qu'il est (le pendule contre son anneau, câblé sur une entrée du Pinscape ou de l'encodeur). Il se relève comme les autres, au joystick comme au clavier (`recordButton`). Un contact rebondit, et un balancier qui oscille retouche son anneau : la touche tout juste relevée ne compte plus pendant 1 s pour le bouton suivant (`BOUNCE_MS`, `wizard.ts`), sauf après Exit qui passe un bouton (on le presse plusieurs fois de suite). Le « Slam tilt » suit, facultatif lui aussi.
+
+**L'étape « Tilt »** :
+
+- **Proposition** : un balancier relevé l'emporte (« Balancier de la borne », balancier simulé éteint) ; sans lui, ce que VPX fait aujourd'hui (« Réglage actuel de VPX : balancier simulé par VPX, contact à 1,00° »). Une borne dont l'étape est faite s'ouvre sur son réglage. Ligne « Tilt » : Start (ou clic) passe d'un mode à l'autre : « Balancier de la borne » et « Balancier simulé par VPX » avec un balancier relevé, sinon « Balancier simulé par VPX » et « Pas de tilt ».
+- **Angle du contact** (balancier simulé) : Start puis flippers, par pas de 0,05°, de 0,15° à 4° ; Start pour finir.
+- **Essai** : l'anneau du contact vu de dessus. En balancier simulé, le point suit le balancier calculé comme VPX le calculera, pas à pas d'une milliseconde, d'après les axes de l'accéléromètre lus par la bibliothèque SDL de VPX (même mise en forme des axes, même `Mapping.Nudge0.Strength`, même amortissement) : chaque contact allume l'anneau, « TILT » dessous, et compte comme un appui sur Tilt (le balancier rebondit sur l'anneau : une secousse franche en fait souvent plusieurs, comme dans VPX) ; le pied d'écran dit la part du contact atteinte et la secousse en g. Avec le balancier de la borne, l'anneau s'allume à chaque contact réel (« Contacts du balancier : n »). Sans accéléromètre réglé (étape « Lanceur »), l'étape le dit : seuls les boutons de tremblement feront bouger le balancier simulé.
+- **Clés** : `[Player] SimulatedPlumb` et `PlumbThresholdAngle` (`vpxTiltSettings`, `isTiltKey`), seulement après l'étape (migration douce : sans elle, `[Player]` reste tel quel). L'amortissement reste à VPX (F12 > « Nudge Settings »). Comme les autres clés gérées, un angle changé ensuite en partie est signalé, gardé ou remis au choix.
+
+**Réglages incohérents signalés** (`tiltFindings`, à chaque synchronisation : résultat de l'assistant et de ses étapes, action `sync`) : balancier relevé, étape « Tilt » jamais faite et balancier simulé allumé (deux balanciers) ; « Balancier de la borne » choisi sans bouton relevé ; balancier simulé sans accéléromètre ni bouton de tremblement ; balancier simulé choisi mais éteint à la main dans `VPinballX.ini`.
+
+**Aide-mémoire « Pendant une partie »** : une seule ligne « Tilt » (l'aide-mémoire remplit déjà l'écran) : la touche ou le bouton du balancier, « secousse trop forte » quand le balancier simulé est choisi, et « slam tilt » avec sa touche s'il en a une (`gameKeys`).
 
 ## Configurations de la borne
 

@@ -111,6 +111,20 @@ export function moveVirtualAxis(axis: number, value: number): boolean {
   return true;
 }
 
+/**
+ * Essai sans opérateur (autopilote « Pinscape9 ») : le bouton `button` du Pinscape virtuel des
+ * axes, appuyé puis relâché, comme un balancier câblé sur la carte qui porte l'accéléromètre.
+ */
+export async function pressVirtualPinscapeButton(button: number): Promise<boolean> {
+  if (!moveVirtualAxis(0, 0)) return false;
+  const pause = () => new Promise((resolve) => setTimeout(resolve, POLL_MS * 5));
+  reader!.pressVirtual(virtualPinscape!, button, true);
+  await pause();
+  reader!.pressVirtual(virtualPinscape!, button, false);
+  await pause();
+  return true;
+}
+
 function start(): void {
   if (timer) return;
   timer = setInterval(tick, POLL_MS);

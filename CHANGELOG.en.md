@@ -32,6 +32,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Lighter updates (the application alone, in a few seconds) and test pre-releases, to receive or not from the update menu.
 - DMD screen: say whether it is a FullDMD (the whole screen, game DMD inset) or a DMD only; the menu, VPX and PuP-Packs follow it.
 - PuP-Pack on the backglass: the pack option is chosen from the cabinet's screens, the game DMD stays in front of the pack, and the pack is checked before each game.
+- Tilt: new "Tilt" step (the cabinet's plumb bob, or a plumb bob simulated by VPX from the accelerometer), plumb bob and slam tilt captured in the "Buttons" step.
 
 ## 0.1.2
 

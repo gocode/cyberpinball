@@ -195,6 +195,12 @@ export interface Cabinet {
    */
   analog?: CabinetAnalog;
   /**
+   * Tilt de la borne, décidé à l'étape « Tilt » (tilt.ts) : balancier de la borne (le bouton
+   * « Balancier de tilt » de l'étape « Boutons »), balancier simulé par VPX, ou aucun. Absent
+   * tant qu'elle n'a pas été faite : [Player] SimulatedPlumb et PlumbThresholdAngle restent tels quels.
+   */
+  tilt?: CabinetTilt;
+  /**
    * Écran du navigateur intégré (fenêtre « Récupérer ») : celui de ce rôle, retrouvé par
    * son empreinte quel que soit son numéro dans Windows (browser-screen.ts). Absent :
    * automatique, le playfield s'il est droit, sinon le plus grand des autres écrans.
@@ -219,6 +225,7 @@ export type ButtonId =
   | 'extraBall'
   | 'pause'
   | 'tilt'
+  | 'slamTilt'
   | 'nudgeLeft'
   | 'nudgeRight'
   | 'nudgeCenter'
@@ -257,6 +264,18 @@ export interface PlungerSensor {
   deadZone: number;
   /** Axe de la vitesse mesurée par la carte (RZ d'un Pinscape en « X/Y/Z + RX/RY/RZ » : 5). */
   speedAxis?: number;
+}
+
+/**
+ * Ce qui fait tilter la borne : son balancier mécanique (un bouton relevé, VPX n'en simule pas),
+ * le balancier que VPX simule à partir des secousses, ou rien.
+ */
+export type TiltMode = 'bob' | 'simulated' | 'none';
+
+export interface CabinetTilt {
+  mode: TiltMode;
+  /** Angle du balancier simulé qui touche l'anneau, en degrés ([Player] PlumbThresholdAngle, 0,15 à 4). Gardé quand le mode change. */
+  threshold: number;
 }
 
 /** Accéléromètre de la borne pour les tremblements ([Input] Mapping.Nudge0.*, manette). */

@@ -65,6 +65,7 @@ import {
   type RoleRect,
   type AncillaryRoleId,
   type CabinetButtons,
+  type CabinetTilt,
   type ConfigurationSelection,
   type ManualEdit,
   type ObservedDisplay,
@@ -116,6 +117,8 @@ function menuKeysFor(cabinet: ButtonsSource) {
 
 /** Boutons de la borne, du jeu et de l'interface, relus au démarrage du menu (les étapes « Boutons » relancent l'application). */
 let buttons: CabinetButtons | undefined;
+/** Tilt de l'étape « Tilt » : l'aide-mémoire de la partie dit le balancier simulé. */
+let tilt: CabinetTilt | undefined;
 let navigation: NavigationButtons | undefined;
 let KEYS = menuKeysFor(undefined);
 
@@ -553,6 +556,7 @@ export function startFrontend(): void {
   // orientation changée hors de l'assistant fait aussi tourner le menu.
   rotation = menuRotation(choose ? undefined : cabinet, choose ? undefined : assignments.playfield);
   buttons = cabinet?.buttons;
+  tilt = cabinet?.tilt;
   navigation = cabinet?.navigation;
   KEYS = menuKeysFor(cabinet);
   audioOutput = choose ? undefined : menuAudioOutput(cabinet)?.friendlyName;
@@ -1363,8 +1367,8 @@ function viewFor(role: RoleId) {
         : undefined,
     // Le son du menu ne sort que d'une fenêtre : celle du playfield.
     sound: role === 'playfield' ? soundView() : undefined,
-    gameKeys: gameKeys(buttons),
-    loadingKeys: displayMode ? { title: t('Réglage de l’affichage'), rows: displayKeys(buttons) } : { title: t('Commandes de la partie'), rows: gameKeys(buttons) },
+    gameKeys: gameKeys(buttons, tilt),
+    loadingKeys: displayMode ? { title: t('Réglage de l’affichage'), rows: displayKeys(buttons) } : { title: t('Commandes de la partie'), rows: gameKeys(buttons, tilt) },
     menuKeys: menuKeys(),
     footer: menuFooter(),
     nav: { confirm: KEYS.confirm[0], exit: KEYS.exit[0], help: KEYS.help[0] },

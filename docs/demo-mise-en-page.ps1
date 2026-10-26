@@ -62,7 +62,7 @@ function Invoke-Review([string]$name, [string]$home_, [string[]]$codes, [string[
   Assert-HorsEcran "$captures\$name"
 }
 
-$encodeur = @('KeyA', 'KeyA', 'KeyS', 'MetaLeft', 'Digit2', 'KeyQ', 'Digit3', 'KeyW', 'KeyQ', 'KeyQ', 'KeyD', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ')
+$encodeur = @('KeyA', 'KeyA', 'KeyS', 'MetaLeft', 'Digit2', 'KeyQ', 'Digit3', 'KeyW', 'KeyQ', 'KeyQ', 'KeyD', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ')
 $essai = @('Digit2', 'KeyA', 'KeyS', 'KeyQ', 'Digit2')
 Push-Location $wt
 try {
@@ -72,6 +72,11 @@ try {
   # Étape seule sur une borne au playfield pivoté (joueur à gauche, puis à droite), jusqu'à « Boutons enregistrés ».
   foreach ($edge in 'left', 'right') {
     Invoke-Review "boutons-seuls-$edge" (New-Home "borne-$edge" $edge) (@('KeyA', 'KeyA') + @($encodeur | Select-Object -Skip 2) + @('click:#actions button:nth-child(3)') + @('ShiftLeft', 'ShiftRight', 'Escape', 'Digit1')) @('--assistant', '--boutons') "$base\sans-son.json"
+  }
+  # Étape « Tilt » seule sur le playfield pivoté, sans accéléromètre (avertissement) : contact du
+  # balancier simulé réglé, « Pas de tilt », retour au balancier simulé, Enregistrer et résultat.
+  foreach ($edge in 'left', 'right') {
+    Invoke-Review "tilt-seul-$edge" (New-Home "tilt-$edge" $edge) @('click:#buttons li:nth-child(2)', 'ShiftLeft', 'Digit1', 'click:#buttons li:nth-child(1)', 'click:#buttons li:nth-child(1)', 'click:#actions button:nth-child(1)') @('--assistant', '--tilt') "$base\sans-son.json"
   }
   # Écrans, orientation, retournement proposé puis annulé, diagonale, son (sorties fictives), récapitulatif, enregistrement.
   $etapesEcrans = @(

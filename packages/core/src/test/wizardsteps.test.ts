@@ -88,7 +88,7 @@ test('quitter sans enregistrer : retour au menu, ou fermeture annoncée au premi
 
 test('étapes seules : options, phases et entrées du menu', () => {
   const ids = WIZARD_STEPS.map((s) => s.id);
-  assert.deepEqual(ids, ['boutons', 'interface', 'lanceur', 'ecrans', 'playfield', 'disposition', 'son']);
+  assert.deepEqual(ids, ['boutons', 'interface', 'lanceur', 'tilt', 'ecrans', 'playfield', 'disposition', 'son']);
   assert.equal(new Set(WIZARD_STEPS.map((s) => s.flag)).size, WIZARD_STEPS.length);
   for (const step of WIZARD_STEPS) {
     assert.ok(step.phases.length > 0 && step.phases.every((p) => WIZARD_PHASES.includes(p) && p !== 'done'), step.id);
@@ -110,6 +110,9 @@ test('chaque étape seule ne reprend que ses clés de VPinballX.ini', () => {
   for (const k of ['Player.PlayfieldDisplay', 'Player.BGSet', 'Player.ScreenWidth', 'Backglass.BackglassOutput', 'ScoreView.ScoreViewX', 'Topper.TopperDisplay']) {
     assert.deepEqual(owners(k), ['ecrans', 'playfield', 'disposition'], k);
   }
+  // Balancier simulé de VPX : l'étape « Tilt » seule ; son amortissement reste à VPX.
+  for (const k of ['Player.SimulatedPlumb', 'Player.PlumbThresholdAngle']) assert.deepEqual(owners(k), ['tilt'], k);
+  assert.deepEqual(owners('Player.PlumbDamping'), []);
   // Ni les réglages de jeu ni les plugins : aucune étape seule ne les reprend.
   assert.deepEqual(owners('Player.FXAA'), []);
   assert.deepEqual(owners('Plugin.B2S.Enable'), []);

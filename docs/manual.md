@@ -33,7 +33,7 @@ npm install
 npm test          # builds and runs the core tests
 npm run probe     # lists the detected screens and audio outputs, their fingerprint and the name VPX expects
 npm start         # table menu (screen wizard on first startup)
-npm run assistant # full wizard (-- --boutons, --lanceur, --ecrans, --playfield, --disposition, --son: a single step)
+npm run assistant # full wizard (-- --boutons, --lanceur, --tilt, --ecrans, --playfield, --disposition, --son: a single step)
 npm run fabriquer # executable in release\win-unpacked\ (npm run deployer: also copies it to <racine>\app\)
 npm run installeur # same, then release\CyberPinball-Setup.exe and -complet.exe (-- --leger: without the full one)
 npm run sync      # what the application does at every startup: fixes VPinballX.ini if the screens have moved
@@ -387,7 +387,7 @@ From the table menu, R key (or Exit then "Réglages de VPX" (VPX settings)); sta
 
 ## Setup wizard and configuration menu
 
-The setup wizard (`app/src/wizard.ts`, screens `app/renderer/screen.*`) runs at first start, or through "Assistant complet" (Full setup wizard), and goes through: **buttons** (capturing each button), **screens and roles** (playfield, backglass, DMD, topper), **playfield orientation and size** (flipper edge, flipping the screen in Windows if VPX needs it, diagonal), **screen layout** (zones), **sound** (audio outputs, speaker test), then the summary and the writing of `cabinet.json` and `VPinballX.ini`. The list of steps, what each one decides and its keys are in [packages/core/src/wizardsteps.ts](../packages/core/src/wizardsteps.ts) (`WIZARD_PHASES`, `WIZARD_STEPS`), tested in [wizardsteps.test.ts](../packages/core/src/test/wizardsteps.test.ts).
+The setup wizard (`app/src/wizard.ts`, screens `app/renderer/screen.*`) runs at first start, or through "Assistant complet" (Full setup wizard), and goes through: **buttons** (capturing each button), **analog plunger** (sensor plunger, accelerometer), **tilt** (cabinet tilt bob or tilt bob simulated by VPX), **screens and roles** (playfield, backglass, DMD, topper), **playfield orientation and size** (flipper edge, flipping the screen in Windows if VPX needs it, diagonal), **screen layout** (zones), **sound** (audio outputs, speaker test), then the summary and the writing of `cabinet.json` and `VPinballX.ini`. The list of steps, what each one decides and its keys are in [packages/core/src/wizardsteps.ts](../packages/core/src/wizardsteps.ts) (`WIZARD_PHASES`, `WIZARD_STEPS`), tested in [wizardsteps.test.ts](../packages/core/src/test/wizardsteps.test.ts).
 
 **System menu (Exit, Tab or ⚙) > "Configuration de la borne" (Cabinet configuration)** gathers everything that sets up the cabinet. Each step can be redone there on its own and returns to the table menu, saved or not:
 
@@ -396,6 +396,7 @@ The setup wizard (`app/src/wizard.ts`, screens `app/renderer/screen.*`) runs at 
 | "Boutons du jeu" (Game buttons) | `--boutons` | game button capture and test | `[Input]` |
 | "Boutons de l'interface" (Interface buttons) | `--interface` | capture and test of the buttons that drive Cyber Pinball | none |
 | "Lanceur analogique" (Analog plunger) | `--lanceur` | sensor plunger detection, direction, dead zone, speed, accelerometer, test | sensor `[Input]` keys |
+| "Tilt" | `--tilt` | cabinet tilt bob or tilt bob simulated by VPX, contact angle, nudge test | `[Player] SimulatedPlumb`, `PlumbThresholdAngle` |
 | "Écrans et rôles" (Screens and roles) | `--ecrans` | the screen of each role; flipper edge and diagonal only if the playfield moves to another screen | VPX windows and framing |
 | "Orientation et taille du playfield" (Playfield orientation and size) | `--playfield` | flipper edge, screen flip, diagonal | VPX windows and framing |
 | "Disposition des écrans" (Screen layout) | `--disposition` | zone of each role on its screen | VPX windows and framing |
@@ -463,7 +464,7 @@ Every menu entry carries an icon of its own, and every screen opened from the sy
 - **The whole interface reads its own buttons**: menu (`interfaceKeys`), VPX settings, "other frontend open" warning, wizard (`navigationKeys`), always given the whole cabinet (`ButtonsSource`), never the game buttons alone (invariant test in `buttons.test.ts`). The "During a game" cheat sheet and the in-game display adjustment stay the game's (`gameKeys`, `displayKeys`).
 - **Inconsistent capture** of the interface buttons (`navigationProblems`): the interface falls back to the game flippers, Start and Exit, and the menu offers at startup to redo the step ("Boutons de l'interface à refaire", Interface buttons need redoing; Start: `--interface`).
 
-This is the first step of the wizard, since everything else is driven with the buttons: the screen asks "Appuyez sur le bouton" (Press the button) for left flipper, right flipper, Start, Exit, coin, plunger, then the optional buttons (left and right MagnaSave, Extra Ball, Pause, Tilt, nudges to the left, to the right and forward, volume − and +), which Exit skips. The same question is shown on every screen (upright for the player on the previous playfield), above the list of all buttons: those already captured with their key, the current one, those still to come, so you can decide in advance which cabinet button will play which role. A key already captured for another button is refused, as are the Windows key and keys VPX cannot read; a button counts when it is released, only once, and a key held for 3 s opens "Quitter sans enregistrer ?" (Leave without saving?) instead of being captured.
+This is the first step of the wizard, since everything else is driven with the buttons: the screen asks "Appuyez sur le bouton" (Press the button) for left flipper, right flipper, Start, Exit, coin, plunger, then the optional buttons (left and right MagnaSave, Extra Ball, Pause, tilt bob, slam tilt, nudges to the left, to the right and forward, volume − and +), which Exit skips. The same question is shown on every screen (upright for the player on the previous playfield), above the list of all buttons: those already captured with their key, the current one, those still to come, so you can decide in advance which cabinet button will play which role. A key already captured for another button is refused, as are the Windows key and keys VPX cannot read; a button counts when it is released, only once, and a key held for 3 s opens "Quitter sans enregistrer ?" (Leave without saving?) instead of being captured.
 
 **Full wizard**: the game buttons first, then the interface buttons, offered on the same buttons as the flippers, Start and Exit just captured: "Valider" (Confirm, Start) keeps them without a test; one button can be redone on its own, or "Tout relever" (Capture all) asks for them one by one (Previous, Next, Confirm, Back and menu, then Cheat sheet and VPX settings, which Back skips). On the interface summary, Previous, Next, Confirm and Back whose key changed must have been pressed before Confirm; on the game summary, the flippers, Start and Exit. The interface keys in effect, the arrows and Enter also choose and run on both summaries, without counting as a test. With no answer on the first step (20 s), both sets keep their keys and the wizard moves on to the screens.
 
@@ -491,7 +492,8 @@ The keys are stored in `cabinet.json` (`buttons` for the game, `navigation` for 
 | Start, Exit | `Mapping.Start` (`Key;30`), `Mapping.ExitGame` (`Key;41`) |
 | Coin, plunger | `Mapping.Credit1` (`Key;34`), `Mapping.LaunchBall` (`Key;40`) |
 | Left / right MagnaSave | `Mapping.LeftMagna`, `UIUp` (`Key;224`) / `RightMagna`, `UIDown` (`Key;228`) |
-| Extra Ball, Pause, Tilt | `Mapping.ExtraBall` (`Key;5`), `Mapping.Pause` (`Key;19`), `Mapping.Tilt` (`Key;23`) |
+| Extra Ball, Pause, tilt bob | `Mapping.ExtraBall` (`Key;5`), `Mapping.Pause` (`Key;19`), `Mapping.Tilt` (`Key;23`) |
+| Slam tilt (coin door) | `Mapping.SlamTilt` (`Key;74`) |
 | Nudges | `Mapping.LeftNudge` (`Key;29`), `RightNudge` (`Key;56`), `CenterNudge` (`Key;44`) |
 | Volume − / + | `Mapping.VolumeDown` (`Key;45`), `Mapping.VolumeUp` (`Key;46`) |
 
@@ -535,6 +537,40 @@ Keys written (`vpxAnalogSettings`, format read in `PlungerHandler.cpp`, `Physics
 - **VPX's default layout turned off**: VPX recognises a six-axis Pinscape and offers, during a game, to apply its layout (plunger on Z, accelerometer on X and Y). Accepting first erases everything coming from that joystick (`ApplyDefaultDeviceMapping`, `ClearDeviceMappings`), including the buttons mapped by Cyber Pinball. `NoAutoLayout` turns that offer off for the cabinet's joysticks; a Pinscape set to "X/Y/Z" only (three axes) was not recognised by VPX anyway, and its plunger only worked once assigned by hand.
 - These keys belong to the "Lanceur" step (`isAnalogKey`) and no longer to the "Boutons" (Buttons) step; `NoAutoLayout` belongs to both. Like the other managed keys, a setting later changed in VPX's menu (the dead zone, for example) is reported, then kept or reset as you choose.
 - The "Lanceur" (Launch) button (`Mapping.LaunchBall`) stays: it serves tables with an automatic plunger, and the Pinscape can send it when the plunger is pushed forward ("ZB Launch Ball", set on the board).
+
+## Tilt
+
+What makes the cabinet tilt is decided at the wizard's "Tilt" step ([app/src/tilt-step.ts](../app/src/tilt-step.ts), [packages/core/src/tilt.ts](../packages/core/src/tilt.ts)). It follows the "Lanceur" (Plunger) step in the full wizard, which skips it without writing anything on a cabinet with no accelerometer, no captured tilt bob and no saved tilt (VPX then keeps its simulated tilt bob); on its own: system menu > "Configuration de la borne" (Cabinet configuration) > "Tilt" (`npm run assistant -- --tilt`, `tilt` action of the launcher). Unattended demo, with a virtual SDL Pinscape: `docs\demo-tilt.ps1 -Run`.
+
+**What VPX does with it** (VPX 10.8.1, commit `af26b2d93`):
+
+- the **Tilt** action (`[Input] Mapping.Tilt`, T by default) reaches the table script as the `MechanicalTilt` key, which PinMAME scripts call `keyBangBack` (`scripts/VPMKeys.vbs`): `vpmKeyDown` calls `vpmNudge.DoMechTilt` (`WPC.vbs`, `s11.vbs`, `sega.vbs`…), which pulses the machine's tilt bob switch (`vpmNudge.TiltSwitch`, `core.vbs`). The ROM counts its warnings, then tilts, like the real machine;
+- the **simulated tilt bob** (`physics/cabinet/PlumbHandler.cpp`) is a 10 cm pendulum driven by the cabinet's acceleration: the one VPX derives from the accelerometer's nudges (`GamepadNudge.cpp`: nudge intent, then a 113 kg cabinet on its legs) and from the nudge buttons. When it touches its ring, it presses the Tilt action itself. `[Player]` settings (`Settings_properties.inl`): `SimulatedPlumb` (1 by default), `PlumbThresholdAngle` (contact angle in degrees, 0.15 to 4, 1 by default; smaller, easier tilt), `PlumbDamping` (0 to 2, 1). A table's `.ini` can override them for that table (`PhysicsEngine.cpp` reads the table's settings);
+- the **SlamTilt** action (`Mapping.SlamTilt`, Home by default) reaches the script as `keySlamDoorHit`: the machine's slam tilt switch (`swSlamTilt`, 21 on a WPC) stays closed while the button is held, and the ROM ends the game for every player.
+
+The Pinscape guide (mjrnet, "Nudge & Tilt") wires a real tilt bob like a button, on a KL25Z input set as a joystick button (or the T key); with it, the simulated tilt bob is redundant: two tilt bobs, a single bump would count twice.
+
+**The four cases, and what Cyber Pinball writes**:
+
+| Cabinet | "Boutons" (Buttons) step | "Tilt" step | `VPinballX.ini` |
+| --- | --- | --- | --- |
+| Wired tilt bob (Pinscape or encoder) | "Balancier de tilt" (Tilt bob) captured (joystick button or T) | "Balancier de la borne" (Cabinet tilt bob) | `[Input] Mapping.Tilt = SDLJoy_…;9 \| Key;23`, `[Player] SimulatedPlumb = 0` |
+| Accelerometer only | "Balancier de tilt" skipped (Exit) | "Balancier simulé par VPX" (Tilt bob simulated by VPX), contact angle | `[Player] SimulatedPlumb = 1`, `PlumbThresholdAngle = 0.5` (for example) |
+| Coin door slam tilt | "Slam tilt" captured | no effect | `[Input] Mapping.SlamTilt = SDLJoy_…;11 \| Key;74` |
+| Neither a tilt bob nor simulation | "Balancier de tilt" skipped | "Pas de tilt" (No tilt) | `[Player] SimulatedPlumb = 0`; a keyboard's T key stays the tilt |
+
+**Capturing the tilt bob** ("Boutons" step): the optional "Balancier de tilt" (Tilt bob) button asks "Faites toucher l'anneau au balancier" (Make the tilt bob touch its ring) and recalls what it is (the pendulum against its ring, wired to a Pinscape or encoder input). It is captured like the others, from the joystick as from the keyboard (`recordButton`). A contact bounces, and a swinging tilt bob touches its ring again: the key just captured no longer counts for the next button for 1 s (`BOUNCE_MS`, `wizard.ts`), except after Exit skips a button (it is pressed several times in a row). "Slam tilt" comes next, optional too.
+
+**The "Tilt" step**:
+
+- **Proposal**: a captured tilt bob wins ("Balancier de la borne", simulated tilt bob off); without one, what VPX does today ("Réglage actuel de VPX : balancier simulé par VPX, contact à 1,00°", Current VPX setting: tilt bob simulated by VPX, contact at 1.00°). A cabinet whose step is done opens on its setting. "Tilt" line: Start (or a click) switches modes: "Balancier de la borne" and "Balancier simulé par VPX" with a captured tilt bob, otherwise "Balancier simulé par VPX" and "Pas de tilt".
+- **Contact angle** (simulated tilt bob): Start, then the flippers, in 0.05° steps, from 0.15° to 4°; Start to finish.
+- **Test**: the contact ring seen from above. With the simulated tilt bob, the dot follows the tilt bob computed as VPX will compute it, one millisecond at a time, from the accelerometer axes read by VPX's SDL library (same axis shaping, same `Mapping.Nudge0.Strength`, same damping): each contact lights the ring, "TILT" under it, and counts as a Tilt press (the tilt bob bounces on the ring: a hard nudge often makes several, as in VPX); the footer gives the share of the contact reached and the nudge in g. With the cabinet tilt bob, the ring lights at each real contact ("Contacts du balancier : n", Tilt bob contacts: n). Without an accelerometer set ("Lanceur" step), the step says so: only the nudge buttons will move the simulated tilt bob.
+- **Keys**: `[Player] SimulatedPlumb` and `PlumbThresholdAngle` (`vpxTiltSettings`, `isTiltKey`), only after the step (smooth migration: without it, `[Player]` stays as it is). Damping is left to VPX (F12 > "Nudge Settings"). Like the other managed keys, an angle changed later in a game is reported, kept or reset as you choose.
+
+**Inconsistent settings reported** (`tiltFindings`, at each synchronization: result of the wizard and its steps, `sync` action): tilt bob captured, "Tilt" step never done and simulated tilt bob on (two tilt bobs); "Balancier de la borne" chosen without a captured button; simulated tilt bob without an accelerometer or nudge button; simulated tilt bob chosen but turned off by hand in `VPinballX.ini`.
+
+**"Pendant une partie" (During a game) reminder**: a single "Tilt" line (the reminder already fills the screen): the tilt bob's key or button, "secousse trop forte" (nudging too hard) when the simulated tilt bob is chosen, and "slam tilt" with its key if it has one (`gameKeys`).
 
 ## Cabinet configurations
 

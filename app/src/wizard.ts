@@ -67,7 +67,10 @@ import {
   type ScreenZone,
   type CabinetButtons,
   type CabinetAnalog,
+  type CabinetTilt,
   analogLines,
+  hasBob,
+  tiltLines,
   audioScreen,
   channelsLabel,
   describeAudioOutput,
@@ -133,8 +136,9 @@ import { setDisplayOrientation } from '@cyberpinball/win-displays';
 import { observedDisplays, simulatedDisplays } from './displays';
 import { createWindow, isShown, OFFSCREEN, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
-import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton } from './joystick-input';
+import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualPinscapeButton } from './joystick-input';
 import { plungerClick, plungerKey, plungerTick, plungerView, startPlungerStep, type PlungerAction, type PlungerOutcome, type PlungerStep } from './plunger-step';
+import { startTiltStep, tiltClick, tiltKey, tiltTick, tiltView, type TiltAction, type TiltOutcome, type TiltStep } from './tilt-step';
 import { locations, vpxProfile } from './paths';
 import { activeVpxIni, audioOutputs, syncVpxIni } from './vpx-ini';
 import { coverDisplay } from './cover-display';
@@ -200,6 +204,10 @@ interface Wizard {
   analog?: CabinetAnalog;
   /** Étape « Lanceur » en cours. */
   plunger?: PlungerStep;
+  /** Tilt en vigueur : celui du modèle, puis celui de l'étape « Tilt ». Absent : rien d'écrit. */
+  tilt?: CabinetTilt;
+  /** Étape « Tilt » en cours. */
+  tiltStep?: TiltStep;
   roleIndex: number;
   /** Réponse proposée au rôle en cours : indice dans roleOptions(). */
   option: number;
@@ -252,6 +260,8 @@ interface ButtonCapture {
   last?: string;
   /** Touche refusée et pourquoi. */
   refused?: string;
+  /** Dernière touche relevée et quand : un contact qui rebondit (balancier, interrupteur) ne compte qu'une fois (BOUNCE_MS). */
+  bounce?: { code: string; at: number };
   /** Touches qui n'ont pas à être essayées (keysToTry) : celles en vigueur à l'arrivée, ou celles par défaut choisies. */
   reference: SetKeys;
   /**
@@ -305,6 +315,8 @@ let countdown: NodeJS.Timeout | undefined;
 let buttonsCountdown: NodeJS.Timeout | undefined;
 /** Lecture des axes pendant l'étape « Lanceur ». */
 let plungerTimer: NodeJS.Timeout | undefined;
+/** Lecture de l'accéléromètre pendant l'étape « Tilt ». */
+let tiltTimer: NodeJS.Timeout | undefined;
 let quitCountdown: NodeJS.Timeout | undefined;
 /** Étape refaite seule (--boutons, --son…) : le modèle existe, le reste est gardé. */
 let only: WizardStep | undefined;
@@ -469,6 +481,10 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
       const [axis, value] = code.slice(3).split(':').map(Number) as [number, number];
       if (!moveVirtualAxis(axis, value)) console.error(`Autopilote : ${code} sans joystick lisible (${JSON.stringify(joystickStatus())})`); // i18n-ignore : console de l'autopilote
     }
+    // « Pinscape9 » : bouton 9 du Pinscape virtuel des axes (un balancier câblé sur la carte de l'accéléromètre).
+    else if (/^Pinscape\d+$/.test(code)) {
+      if (!(await pressVirtualPinscapeButton(Number(code.slice(8))))) console.error(`Autopilote : ${code} sans joystick lisible (${JSON.stringify(joystickStatus())})`); // i18n-ignore : console de l'autopilote
+    }
     // « Joy3 » : bouton 3 (numéro SDL) d'un joystick virtuel, par le chemin d'un vrai Pinscape.
     else if (/^Joy\d+$/.test(code)) {
       if (!(await pressVirtualButton(Number(code.slice(3))))) console.error(`Autopilote : ${code} sans joystick lisible (${JSON.stringify(joystickStatus())})`); // i18n-ignore : console de l'autopilote
@@ -529,6 +545,19 @@ function handleKey(input: Input): boolean {
       else if (is(KEYS.back) && !only) startCapture(INTERFACE_KEYS, true);
       else return false;
     } else afterPlunger(outcome);
+    broadcast();
+    return true;
+  }
+
+  if (wizard.phase === 'tilt') {
+    const step = wizard.tiltStep!;
+    if (input.isAutoRepeat && !step.editing) return true;
+    const outcome = tiltKey(step, { previous: is(KEYS.previous), next: is(KEYS.next), confirm: is(KEYS.confirm) }, input.code, Date.now());
+    if (outcome === 'unhandled') {
+      if (is(KEYS.exit)) askQuit();
+      else if (is(KEYS.back) && !only) startPlunger();
+      else return false;
+    } else afterTilt(outcome);
     broadcast();
     return true;
   }
@@ -741,6 +770,8 @@ function draftCabinet(): Partial<Cabinet> {
   if (navigation && navigation !== previous?.navigation) draft.navigation = navigation;
   const analog = wizard.plunger ? wizard.plunger.analog : wizard.analog;
   if (analog && JSON.stringify(analog) !== JSON.stringify(previous?.analog)) draft.analog = analog;
+  const tilt = wizard.tiltStep ? wizard.tiltStep.tilt : wizard.tilt;
+  if (tilt && JSON.stringify(tilt) !== JSON.stringify(previous?.tilt)) draft.tilt = tilt;
   if (arrangeOnly) {
     const arranged = arrangeCabinet();
     draft.roles = arranged.roles;
@@ -846,7 +877,7 @@ function inForceKeys(set: KeySet): SetKeys {
 }
 
 /** Ce que la souris envoie depuis screen.js. */
-type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; action: ButtonsAction | PlungerAction } | { type: 'quit'; op: 'ask' | 'yes' | 'no' } | ArrangeAction;
+type WizardAction = { type: 'button'; index: number } | { type: 'buttons'; action: ButtonsAction | PlungerAction | TiltAction } | { type: 'quit'; op: 'ask' | 'yes' | 'no' } | ArrangeAction;
 
 /** Arrivée sur l'étape « Boutons du jeu » (startCapture). */
 function startButtons(initial = false): void {
@@ -913,6 +944,8 @@ function handleButtonKey(input: Input): void {
   touched(capture);
   const code = input.code;
   if (code === PREVIOUS_KEY) return previousButton();
+  // Rebond : le contact d'un balancier ou d'un interrupteur se ferme plusieurs fois en un geste.
+  if (capture.bounce?.code === code && Date.now() - capture.bounce.at < BOUNCE_MS) return;
   const button = capture.set.items[capture.index]!;
   const record = recordKey(capture.set, capture.keys, button.id, code);
   capture.refused = record.refused;
@@ -922,8 +955,17 @@ function handleButtonKey(input: Input): void {
   capture.keys = record.keys;
   capture.last = record.skipped ? t('{button} : pas de bouton', { button: button.label }) : t('{button} : {key}', { button: button.label, key: keyLabel(code) });
   capture.answered.add(button.id);
+  // Pas après Exit qui passe un bouton : on le presse plusieurs fois de suite, vite.
+  capture.bounce = record.skipped ? undefined : { code, at: Date.now() };
   nextButton(capture);
 }
+
+/**
+ * Durée pendant laquelle la touche tout juste relevée ne compte plus pour le bouton suivant :
+ * les rebonds d'un même contact, et un balancier qui retouche son anneau en oscillant.
+ * Elle serait de toute façon refusée (déjà prise) : ignorée sans message.
+ */
+const BOUNCE_MS = 1000;
 
 /** Bouton suivant sans réponse (après celui-ci, puis depuis le début) ; tous répondus : récapitulatif. */
 function nextButton(capture: ButtonCapture): void {
@@ -1014,6 +1056,11 @@ function handleWizardAction(action: WizardAction): void {
     broadcast();
     return;
   }
+  if (wizard.phase === 'tilt' && (action.type === 'button' || action.type === 'buttons')) {
+    afterTilt(tiltClick(wizard.tiltStep!, action.type === 'button' ? { row: action.index } : { action: action.action as TiltAction }));
+    broadcast();
+    return;
+  }
   const capture = wizard.capture;
   if (!capture || !CAPTURE_PHASES.includes(wizard.phase)) return;
   touched(capture);
@@ -1094,7 +1141,7 @@ function startPlunger(): void {
   const step = startPlungerStep(wizard.analog, readTextIfExists(activeVpxIni(loc)));
   step.readings = joystickAxes();
   if (!only && !step.initial && step.readings.length === 0) {
-    wizard.phase = 'assign';
+    startTilt();
     wizard.notice = t('Lanceur : aucun joystick à axes branché, rien à régler.');
     return;
   }
@@ -1119,7 +1166,7 @@ function afterPlunger(outcome: PlungerOutcome): void {
   wizard.plunger = undefined;
   stopPlungerTimer();
   if (only) saveStep();
-  else wizard.phase = 'assign';
+  else startTilt();
 }
 
 /** Étape « Lanceur » : même écran partout, comme les boutons ; droit sur l'ancien playfield. */
@@ -1130,6 +1177,69 @@ function plungerViewFor(index: number, base: Record<string, unknown>) {
     rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0,
     highlight: true,
     ...plungerView(wizard.plunger!, only ? t('Enregistrer') : t('Continuer'), { previous: label(KEYS.previous), next: label(KEYS.next), confirm: label(KEYS.confirm), exit: label(KEYS.exit) }),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Étape « Tilt » (tilt-step.ts)
+
+/** Écart entre deux lectures de l'accéléromètre : celui du sondage des joysticks. */
+const TILT_TICK_MS = 10;
+/** Au plus une mise à jour des écrans par ce délai : le balancier bouge à chaque lecture. */
+const TILT_BROADCAST_MS = 33;
+
+/**
+ * Arrivée sur l'étape. Dans l'assistant complet, une borne sans accéléromètre, sans balancier
+ * relevé ni tilt enregistré n'a rien à régler : on passe aux écrans, VPX garde son balancier simulé.
+ */
+function startTilt(): void {
+  if (!only && !wizard.tilt && !wizard.analog?.nudge && !hasBob(wizard.buttons)) {
+    wizard.phase = 'assign';
+    return;
+  }
+  wizard.notice = undefined;
+  const step = startTiltStep(wizard.tilt, readTextIfExists(activeVpxIni(loc)), wizard.buttons, wizard.analog);
+  step.readings = joystickAxes();
+  wizard.tiltStep = step;
+  wizard.phase = 'tilt';
+  stopTiltTimer();
+  let sent = 0;
+  let pending = false;
+  tiltTimer = setInterval(() => {
+    if (wizard.phase !== 'tilt' || !wizard.tiltStep) return stopTiltTimer();
+    const now = Date.now();
+    pending = tiltTick(wizard.tiltStep, joystickAxes(), now) || pending;
+    if (pending && now - sent >= TILT_BROADCAST_MS) {
+      pending = false;
+      sent = now;
+      broadcast();
+    }
+  }, TILT_TICK_MS);
+}
+
+function stopTiltTimer(): void {
+  if (tiltTimer) clearInterval(tiltTimer);
+  tiltTimer = undefined;
+}
+
+/** Enregistrer (ou Continuer) : le tilt de l'étape. */
+function afterTilt(outcome: TiltOutcome): void {
+  if (outcome !== 'save') return;
+  wizard.tilt = structuredClone(wizard.tiltStep!.tilt);
+  wizard.tiltStep = undefined;
+  stopTiltTimer();
+  if (only) saveStep();
+  else wizard.phase = 'assign';
+}
+
+/** Étape « Tilt » : même écran partout, comme le lanceur ; droit sur l'ancien playfield. */
+function tiltViewFor(index: number, base: Record<string, unknown>) {
+  const label = (codes: string[]) => keyLabel(codes[0]);
+  return {
+    ...base,
+    rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0,
+    highlight: true,
+    ...tiltView(wizard.tiltStep!, only ? t('Enregistrer') : t('Continuer'), { previous: label(KEYS.previous), next: label(KEYS.next), confirm: label(KEYS.confirm) }),
   };
 }
 
@@ -1183,6 +1293,7 @@ function stepBuilt(): Cabinet {
   if (buttonsOnly) return { ...previous!, buttons: wizard.buttons, ...stamp };
   if (interfaceOnly) return { ...previous!, navigation: wizard.navigation, ...stamp };
   if (isOnly('lanceur')) return { ...previous!, analog: wizard.analog, ...stamp };
+  if (isOnly('tilt')) return { ...previous!, tilt: wizard.tilt, ...stamp };
   if (arrangeOnly) return arrangeCabinet();
   return buildCabinet();
 }
@@ -1307,12 +1418,16 @@ function buttonsView(index: number, base: Record<string, unknown>) {
   const back = redoingOne(capture) ? t('annuler') : t('bouton précédent');
   return {
     ...common,
-    prompt: t('Appuyez sur le bouton'),
+    prompt: ('prompt' in button && button.prompt) || t('Appuyez sur le bouton'),
     measure: button.label,
     name: button.required
       ? t('Bouton {n} sur {total}', { n: capture.index + 1, total: required })
       : t('Bouton facultatif {n} sur {total}', { n: capture.index + 1 - required, total: set.items.length - required }),
-    details: [recorded ? t('Touche actuelle : {key}', { key: current ? keyLabel(current) : t('aucune') }) : t('Touche par défaut : {key}', { key: current ? keyLabel(current) : t('aucune') }), joystickLine()].join(' · '),
+    details: [
+      ...('how' in button && button.how ? [button.how] : []),
+      recorded ? t('Touche actuelle : {key}', { key: current ? keyLabel(current) : t('aucune') }) : t('Touche par défaut : {key}', { key: current ? keyLabel(current) : t('aucune') }),
+      joystickLine(),
+    ].join(' · '),
     notice:
       capture.refused ??
       (seconds === undefined
@@ -1890,6 +2005,8 @@ function startMode(): void {
       return startCapture(INTERFACE_KEYS, true);
     case 'lanceur':
       return startPlunger();
+    case 'tilt':
+      return startTilt();
     case 'disposition':
       return startArrangeOnly();
     case 'ecrans':
@@ -1919,12 +2036,15 @@ function restart(): void {
   const buttons = wizard ? wizard.buttons : previous?.buttons;
   const navigation = wizard ? wizard.navigation : previous?.navigation;
   const analog = wizard ? wizard.analog : previous?.analog;
+  const tilt = wizard ? wizard.tilt : previous?.tilt;
   KEYS = wizardKeys({ buttons, navigation });
   stopPlungerTimer();
+  stopTiltTimer();
   wizard = {
     buttons,
     navigation,
     analog,
+    tilt,
     sound: undefined,
     phase: 'assign',
     roleIndex: 0,
@@ -2097,6 +2217,7 @@ function buildCabinet(): Cabinet {
     ...(wizard.buttons && { buttons: wizard.buttons }),
     ...(wizard.navigation && { navigation: wizard.navigation }),
     ...(wizard.analog && { analog: wizard.analog }),
+    ...(wizard.tilt && { tilt: wizard.tilt }),
     vpx: { iniPath: targetIni() },
     updatedAt: new Date().toISOString(),
   };
@@ -2155,7 +2276,7 @@ function save(): void {
 function summarizeChanges(changes: VpxChange[], inputDetail = false): string[] {
   if (changes.length === 0) return [t('Aucune modification : VPinballX.ini est déjà à jour.')];
   const inputs = changes.filter((c) => c.section === 'Input');
-  const important = changes.filter((c) => c.section !== 'Input' && /(Display|Output|BGSet|ScreenWidth|ScreenHeight|CabinetAutofitMode|SoundDevice|SoundDeviceBG|Sound3D)$/.test(c.key));
+  const important = changes.filter((c) => c.section !== 'Input' && /(Display|Output|BGSet|ScreenWidth|ScreenHeight|CabinetAutofitMode|SoundDevice|SoundDeviceBG|Sound3D|SimulatedPlumb|PlumbThresholdAngle)$/.test(c.key));
   const others = changes.length - important.length - inputs.length;
   const lines = formatChanges(important);
   if (inputDetail) lines.push(...inputLines(inputs));
@@ -2363,6 +2484,7 @@ function viewFor(index: number) {
 
   if (CAPTURE_PHASES.includes(wizard.phase)) return buttonsView(index, base);
   if (wizard.phase === 'plunger') return plungerViewFor(index, base);
+  if (wizard.phase === 'tilt') return tiltViewFor(index, base);
 
   if (wizard.phase === 'orient' || wizard.phase === 'flip' || wizard.phase === 'size') {
     const isPlayfield = assignedRole === 'playfield';
@@ -2518,7 +2640,7 @@ function viewFor(index: number) {
         }),
       ]
     : [];
-  const summary = only ? stepSummary(rolesLines, playfieldLines) : [...rolesLines, ...playfieldLines, ...audioSummary(), ...buttonsSummary(), ...(wizard.analog ? analogLines(wizard.analog) : [])];
+  const summary = only ? stepSummary(rolesLines, playfieldLines) : [...rolesLines, ...playfieldLines, ...audioSummary(), ...buttonsSummary(), ...(wizard.analog ? analogLines(wizard.analog) : []), ...(wizard.tilt ? tiltLines(wizard.tilt, wizard.buttons) : [])];
 
   if (wizard.phase === 'summary') {
     const owned = plan!.changes;
@@ -2537,11 +2659,11 @@ function viewFor(index: number) {
 
   if (only) {
     // Boutons seuls : l'écran que le joueur regarde n'est pas connu, le résultat s'affiche partout.
-    const previousLayout = buttonsOnly || interfaceOnly || arrangeOnly || isOnly('lanceur');
+    const previousLayout = buttonsOnly || interfaceOnly || arrangeOnly || isOnly('lanceur') || isOnly('tilt');
     return {
       ...base,
       ...(previousLayout && { rotation: index === previousPlayfieldIndex() ? edgeRotation(previousEdge() ?? 'bottom') : 0 }),
-      report: buttonsOnly || interfaceOnly || isOnly('lanceur') || index === (wizard.assignments.playfield ?? 0),
+      report: buttonsOnly || interfaceOnly || isOnly('lanceur') || isOnly('tilt') || index === (wizard.assignments.playfield ?? 0),
       name: '',
       details: '',
       title: only.saved,
@@ -2568,7 +2690,7 @@ function viewFor(index: number) {
 
 /** Colonne de gauche du récapitulatif et du résultat d'une étape seule. */
 function summaryColumn(): string {
-  return buttonsOnly ? t('Boutons') : interfaceOnly ? t('Interface') : isOnly('lanceur') ? t('Lanceur') : isOnly('son') ? t('Son') : isOnly('playfield') ? 'Playfield' : t('Rôles');
+  return buttonsOnly ? t('Boutons') : interfaceOnly ? t('Interface') : isOnly('lanceur') ? t('Lanceur') : isOnly('tilt') ? 'Tilt' : isOnly('son') ? t('Son') : isOnly('playfield') ? 'Playfield' : t('Rôles');
 }
 
 /** Ce que l'étape seule a décidé, pour le récapitulatif et le résultat. */
@@ -2580,6 +2702,8 @@ function stepSummary(rolesLines: string[], playfieldLines: string[]): string[] {
       return buttonLines(INTERFACE_KEYS, navigationButtons(inForce()));
     case 'lanceur':
       return analogLines(wizard.analog ?? {});
+    case 'tilt':
+      return wizard.tilt ? tiltLines(wizard.tilt, wizard.buttons) : [];
     case 'disposition':
       return rolesLines;
     case 'ecrans':

@@ -104,7 +104,7 @@ $encodeur = @(
   'KeyQ', 'KeyQ',          # pas de MagnaSave
   'KeyD',                  # Extra Ball sur D : le débogueur de VPX perd sa touche
   'KeyQ',                  # pas de Pause
-  'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ' # ni tilt, ni tremblements, ni volume
+  'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ' # ni balancier, ni slam tilt, ni tremblements, ni volume
 )
 # Récapitulatif : flippers, Exit puis Start essayés, Start valide.
 $essai = @('KeyA', 'KeyS', 'KeyQ', 'Digit2')
@@ -115,7 +115,7 @@ $corrections = @(
   'click:#actions button:nth-child(4)', # Valider, Précédent, Touches par défaut, Tout relever
   'KeyA', 'KeyS', 'Digit2', 'KeyE', # Exit sur E par erreur
   'Backspace', 'KeyQ',              # Retour arrière : Exit refait sur Q
-  'Digit3', 'KeyW', 'KeyQ', 'KeyQ', 'KeyD', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ',
+  'Digit3', 'KeyW', 'KeyQ', 'KeyQ', 'KeyD', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ', 'KeyQ',
   'Digit2',                         # Start au récapitulatif sans essai : refusé
   'click:#buttons li:nth-child(5)', 'Digit5' # clic sur « Crédit », refait sur 5
 )
@@ -152,16 +152,16 @@ try {
   if (Test-Path $Sdl) {
     $env:CYBERPINBALL_SDL = $Sdl
     # Tout relever ; boutons 1 à 6 du joystick (numéros SDL 0 à 5) pour les obligatoires ;
-    # Exit (bouton 4, Joy3) passe les dix facultatifs ; essai des flippers et d'Exit, puis Start enregistre.
-    $joy = @('click:#actions button:nth-child(4)', 'Joy0', 'Joy1', 'Joy2', 'Joy3', 'Joy4', 'Joy5') + @('Joy3') * 10 + @('Joy0', 'Joy1', 'Joy3', 'Joy2')
+    # Exit (bouton 4, Joy3) passe les onze facultatifs ; essai des flippers et d'Exit, puis Start enregistre.
+    $joy = @('click:#actions button:nth-child(4)', 'Joy0', 'Joy1', 'Joy2', 'Joy3', 'Joy4', 'Joy5') + @('Joy3') * 11 + @('Joy0', 'Joy1', 'Joy3', 'Joy2')
     Invoke-Autopilot $joystick $joy 'joystick' @('--assistant', '--boutons')
     (Get-ModeleBorne "$joystick\cabinet.json" -AvecBoutons).buttons | Format-List | Out-String
     Select-String -Path "$joystick\sandbox\VPinballX.ini" -Pattern '^Mapping\.(LeftFlipper|RightFlipper|Start|ExitGame|Credit1|LaunchBall|LeftMagna|InGameUI) =' | ForEach-Object { $_.Line }
 
     '== 1e. Étape « Boutons » seule, clavier et joystick mélangés'
     # Tout relever ; flipper gauche Joy0, flipper droit S, Start Joy2, Exit Q, crédit 3, lanceur Joy5 ;
-    # Exit (Q) passe les dix facultatifs ; essai Joy0, S, Q, puis Start (Joy2) enregistre.
-    $mix = @('click:#actions button:nth-child(4)', 'Joy0', 'KeyS', 'Joy2', 'KeyQ', 'Digit3', 'Joy5') + @('KeyQ') * 10 + @('Joy0', 'KeyS', 'KeyQ', 'Joy2')
+    # Exit (Q) passe les onze facultatifs ; essai Joy0, S, Q, puis Start (Joy2) enregistre.
+    $mix = @('click:#actions button:nth-child(4)', 'Joy0', 'KeyS', 'Joy2', 'KeyQ', 'Digit3', 'Joy5') + @('KeyQ') * 11 + @('Joy0', 'KeyS', 'KeyQ', 'Joy2')
     Invoke-Autopilot $mixte $mix 'mixte' @('--assistant', '--boutons')
     Remove-Item Env:CYBERPINBALL_SDL
     $mixed = (Get-ModeleBorne "$mixte\cabinet.json" -AvecBoutons).buttons

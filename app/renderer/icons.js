@@ -94,6 +94,7 @@ const CYBER_ICONS = {
   exit: '<path d="M14 3h7v18h-7M16 12H3M8 7l-5 5 5 5"/>', // Bouton Exit ou sortie d’un parcours.
   coin: '<ellipse cx="10" cy="12" rx="6" ry="9"/><path d="M10 3h4a6 9 0 0 1 0 18h-4M16 12h4"/>', // Pièce vue de biais, face vierge et tranche avec un cran.
   plunger: '<path d="M7 3h10M12 3v10M8 13h8v8H8z"/>', // Lance-bille mécanique.
+  tilt: '<path d="M12 2v11M10 13h4l-2 4z"/><ellipse cx="12" cy="15" rx="9" ry="3"/>', // Balancier de tilt : pendule et cône au milieu de son anneau.
   usb: '<path d="M12 17V3M9 6l3-3 3 3M6 9v3l6 3 6-3V7M6 6h.01M16 3h4v4h-4z"/><circle cx="12" cy="20" r="2"/>', // Support USB.
   gamepad: '<path d="M7 7h10c4 0 5 5 5 10 0 3-3 4-5 1l-2-3H9l-2 3c-2 3-5 2-5-1 0-5 1-10 5-10zM7 9v4M5 11h4M15 10h.01M19 12h.01"/>', // Contrôleur générique, hors touches de l’encodeur.
 };

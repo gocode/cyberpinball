@@ -18,10 +18,11 @@ import { EDGE_LABELS } from './layout';
 import { dmdKindLabel } from './dmdscreen';
 import { ROLES, type Cabinet, type RoleId } from './model';
 import { analogLines, isAnalogKey } from './plunger';
+import { isTiltKey, tiltLines } from './tilt';
 import { VPX_LAYOUT_KEYS } from './vpx';
 
 /** Étapes de l'assistant (états de wizard.ts) ; « done » : enregistré, résultat affiché. */
-export const WIZARD_PHASES = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'summary', 'done'] as const;
+export const WIZARD_PHASES = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'summary', 'done'] as const;
 export type WizardPhase = (typeof WIZARD_PHASES)[number];
 
 /**
@@ -30,10 +31,10 @@ export type WizardPhase = (typeof WIZARD_PHASES)[number];
  */
 export const CAPTURE_PHASES: readonly WizardPhase[] = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary'];
 
-export type WizardStepId = 'boutons' | 'interface' | 'lanceur' | 'ecrans' | 'playfield' | 'disposition' | 'son';
+export type WizardStepId = 'boutons' | 'interface' | 'lanceur' | 'tilt' | 'ecrans' | 'playfield' | 'disposition' | 'son';
 
 /** Champs du modèle de borne qu'une étape peut décider. */
-export type CabinetField = 'buttons' | 'navigation' | 'analog' | 'screens' | 'roles' | 'zones' | 'dmdKind' | 'playfield' | 'audio';
+export type CabinetField = 'buttons' | 'navigation' | 'analog' | 'tilt' | 'screens' | 'roles' | 'zones' | 'dmdKind' | 'playfield' | 'audio';
 
 export interface WizardStep {
   id: WizardStepId;
@@ -101,6 +102,17 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
     phases: ['plunger'],
     fields: ['analog'],
     owns: isAnalogKey,
+  },
+  {
+    id: 'tilt',
+    flag: '--tilt',
+    icon: 'tilt',
+    get label() { return 'Tilt'; },
+    get detail() { return t('Balancier de la borne, ou balancier simulé par VPX à partir des secousses : seuil et essai'); },
+    get saved() { return t('Tilt enregistré'); },
+    phases: ['tilt'],
+    fields: ['tilt'],
+    owns: isTiltKey,
   },
   {
     id: 'ecrans',
@@ -269,5 +281,6 @@ export function cabinetChanges(before: Cabinet | undefined, after: Partial<Cabin
   }
   if (after.audio && !same(before?.audio, after.audio)) lines.push(t('Son : sorties du fronton et du plateau, mixage'));
   if (after.analog && !same(before?.analog, after.analog)) lines.push(...analogLines(after.analog));
+  if (after.tilt && !same(before?.tilt, after.tilt)) lines.push(...tiltLines(after.tilt, after.buttons ?? before?.buttons));
   return lines;
 }

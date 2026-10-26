@@ -87,6 +87,7 @@ export const ICON_NAMES = [
   'exit',
   'coin',
   'plunger',
+  'tilt',
   'usb',
   'gamepad',
 ] as const;

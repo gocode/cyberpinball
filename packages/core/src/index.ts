@@ -25,6 +25,7 @@ export * from './vps';
 export * from './audio';
 export * from './buttons';
 export * from './plunger';
+export * from './tilt';
 export * from './dmd';
 export * from './vpx-plugin-settings';
 export * from './puppack';

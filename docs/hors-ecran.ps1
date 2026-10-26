@@ -65,7 +65,7 @@ const fs = require('fs');
 const read = (f) => JSON.parse(fs.readFileSync(f, 'utf8').replace(/^\uFEFF/, ''));
 const raw = read(file);
 if (!raw.configurations) {
-  if (keep !== '1') { delete raw.buttons; delete raw.navigation; delete raw.analog; }
+  if (keep !== '1') { delete raw.buttons; delete raw.navigation; delete raw.analog; delete raw.tilt; }
   console.log(JSON.stringify(raw));
   process.exit(0);
 }
@@ -81,7 +81,7 @@ if (displaysFile) {
   pick = set.configurations.find((x) => x.id === id) ?? pick;
 }
 const { id, name, iniFile, ...cabinet } = pick;
-if (keep !== '1') { delete cabinet.buttons; delete cabinet.navigation; delete cabinet.analog; }
+if (keep !== '1') { delete cabinet.buttons; delete cabinet.navigation; delete cabinet.analog; delete cabinet.tilt; }
 console.log(JSON.stringify(cabinet));
 '@
   $json = node -e $script $core $Fichier "$env:CYBERPINBALL_DISPLAYS" $(if ($AvecBoutons) { '1' } else { '0' })

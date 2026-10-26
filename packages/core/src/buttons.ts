@@ -16,7 +16,7 @@
 
 import { formatList, t } from './i18n';
 import { IniDocument } from './ini';
-import type { ButtonId, Cabinet, CabinetButtons, NavigationButtons, NavigationId } from './model';
+import type { ButtonId, Cabinet, CabinetButtons, CabinetTilt, NavigationButtons, NavigationId } from './model';
 import type { VpxSetting } from './vpx';
 
 export interface ButtonInfo {
@@ -28,6 +28,10 @@ export interface ButtonInfo {
   default: string;
   /** Actions de VPX que ce bouton déclenche (« Mapping.<action> »). */
   vpx: string[];
+  /** Question du relevé quand ce n'est pas un bouton qu'on appuie (le balancier). */
+  prompt?: string;
+  /** Ce qu'est ce bouton sur une borne, rappelé pendant son relevé. */
+  how?: string;
 }
 
 /** Ordre de l'assistant : les boutons qui pilotent l'interface d'abord, Exit avant les facultatifs. */
@@ -45,7 +49,25 @@ export const BUTTONS: readonly ButtonInfo[] = [
   { id: 'extraBall', label: 'Extra Ball', required: false, default: 'KeyB', vpx: ['ExtraBall'] },
   // Pause de VPX : la partie s'arrête, le même bouton la reprend.
   { id: 'pause', label: 'Pause', required: false, default: 'KeyP', vpx: ['Pause'] },
-  { id: 'tilt', get label() { return t('Tilt (balancier)'); }, required: false, default: 'KeyT', vpx: ['Tilt'] },
+  // Balancier mécanique (tilt bob) câblé comme un bouton : le contact du pendule avec son anneau.
+  {
+    id: 'tilt',
+    get label() { return t('Balancier de tilt'); },
+    get prompt() { return t('Faites toucher l’anneau au balancier'); },
+    get how() { return t('Le pendule contre son anneau, câblé sur une entrée du Pinscape (bouton de joystick) ou de l’encodeur (touche T)'); },
+    required: false,
+    default: 'KeyT',
+    vpx: ['Tilt'],
+  },
+  // Slam tilt de la porte du monnayeur : la ROM arrête la partie de tous les joueurs.
+  {
+    id: 'slamTilt',
+    label: 'Slam tilt',
+    get how() { return t('L’interrupteur à lame lestée de la porte du monnayeur : la ROM arrête la partie de tous les joueurs'); },
+    required: false,
+    default: 'Home',
+    vpx: ['SlamTilt'],
+  },
   { id: 'nudgeLeft', get label() { return t('Tremblement à gauche'); }, required: false, default: 'KeyZ', vpx: ['LeftNudge'] },
   { id: 'nudgeRight', get label() { return t('Tremblement à droite'); }, required: false, default: 'Slash', vpx: ['RightNudge'] },
   { id: 'nudgeCenter', get label() { return t('Tremblement vers l’avant'); }, required: false, default: 'Space', vpx: ['CenterNudge'] },
@@ -575,8 +597,11 @@ export function withoutButtonKeys(codes: string[], source: ButtonsSource): strin
   return codes.filter((c) => !taken.has(c));
 }
 
-/** Aide-mémoire « Pendant une partie » : chaque bouton affecté et sa touche. */
-export function gameKeys(buttons: CabinetButtons | undefined): [string, string][] {
+/**
+ * Aide-mémoire « Pendant une partie » : chaque bouton affecté et sa touche. Le tilt dit aussi
+ * le balancier simulé par VPX quand l'étape « Tilt » l'a choisi (`tilt`, tilt.ts).
+ */
+export function gameKeys(buttons: CabinetButtons | undefined, tilt?: CabinetTilt): [string, string][] {
   const keys = buttonKeys(buttons);
   const label = (id: ButtonId) => keyLabel(keys[id]);
   // « Z / / / Espace » ne se lit pas : avec la touche « / », les touches sont séparées par « · ».
@@ -601,7 +626,14 @@ export function gameKeys(buttons: CabinetButtons | undefined): [string, string][
   optional('MagnaSave', ['leftMagna', 'rightMagna']);
   optional('Extra Ball', ['extraBall']);
   optional('Pause', ['pause']);
-  optional('Tilt', ['tilt']);
+  // Une seule ligne (l'aide-mémoire remplit l'écran) : le balancier (ou la touche T), la
+  // secousse trop forte s'il est simulé, le slam tilt.
+  const tiltWays = [
+    ...(keys.tilt ? [label('tilt')] : []),
+    ...(tilt?.mode === 'simulated' ? [t('secousse trop forte')] : []),
+    ...(keys.slamTilt ? [t('slam tilt {key}', { key: label('slamTilt') })] : []),
+  ];
+  if (tiltWays.length) rows.push(['Tilt', tiltWays.join(' · ')]);
   optional(t('Tremblements'), ['nudgeLeft', 'nudgeRight', 'nudgeCenter']);
   optional('Volume', ['volumeDown', 'volumeUp']);
   return rows;

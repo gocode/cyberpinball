@@ -117,6 +117,10 @@ $Actions = [ordered]@{
     Label = 'Lanceur analogique seulement (plunger à capteur du Pinscape, Ctrl+Q pour quitter)'
     Run   = { Build; Step 'Étape « Lanceur »'; npx electron app --assistant --lanceur }
   }
+  'tilt' = @{
+    Label = 'Tilt seulement (balancier de la borne ou balancier simulé par VPX, Ctrl+Q pour quitter)'
+    Run   = { Build; Step 'Étape « Tilt »'; npx electron app --assistant --tilt }
+  }
   'boutons-defaut' = @{
     Label = 'Remettre les touches par défaut des encodeurs (si les boutons ne pilotent plus rien)'
     Run   = { Build; Step 'Touches par défaut des encodeurs'; node app/dist/sync-cli.js --boutons-par-defaut }

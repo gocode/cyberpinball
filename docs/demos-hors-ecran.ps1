@@ -6,7 +6,7 @@
 # Restent réservées aux écrans du poste ($env:CYBERPINBALL_A_L_ECRAN = '1') : demo-barre-taches,
 # demo-fenetres (parties de VPX, captures du bureau entier), l'endurance.
 param(
-  [string[]]$Demos = @('boutons', 'medias', 'mise-en-page', 'plugins', 'pup', 'roms', 'tables', 'vps', 'zones'),
+  [string[]]$Demos = @('boutons', 'medias', 'mise-en-page', 'plugins', 'pup', 'roms', 'tables', 'tilt', 'vps', 'zones'),
   [string]$Ecrans = 'pc-dev'
 )
 $ErrorActionPreference = 'Stop'

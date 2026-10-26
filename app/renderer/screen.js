@@ -4,7 +4,7 @@
 const $ = (id) => document.getElementById(id);
 
 // Étapes où un seul écran porte la question, les autres restent en retrait.
-const STEP_PHASES = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'gate'];
+const STEP_PHASES = ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt', 'assign', 'orient', 'flip', 'size', 'arrange', 'sound', 'channels', 'gate'];
 
 function text(id, value) {
   $(id).textContent = value ?? '';
@@ -72,6 +72,35 @@ function renderGauge(state) {
   peak.style.left = `${at(g.peak) * 100}%`;
   box.classList.toggle('missing', Boolean(g.missing));
   text('gauge-label', g.label);
+}
+
+// Étape « Tilt » : le balancier vu de dessus, dans l'anneau du contact (rayon 1), comme
+// l'affiche VPX en partie (PlumbOverlay) ; l'anneau s'allume à chaque contact, « TILT » dessous.
+// Le balancier de la borne n'a pas de position à montrer : l'anneau s'allume seulement.
+function renderPlumb(state) {
+  const p = state.phase === 'tilt' ? state.plumb : undefined;
+  const box = $('plumb');
+  box.hidden = !p;
+  if (!p) return;
+  const ring = $('plumb-ring');
+  ring.classList.toggle('contact', Boolean(p.contact));
+  ring.classList.toggle('missing', Boolean(p.missing));
+  const bob = $('plumb-bob');
+  const rod = $('plumb-rod');
+  bob.hidden = !p.simulated;
+  rod.hidden = !p.simulated;
+  if (p.simulated) {
+    // Centre à 50 %, l'anneau au bord : x et y vont de -1 à 1.
+    bob.style.left = `${50 + p.x * 50}%`;
+    bob.style.top = `${50 + p.y * 50}%`;
+    rod.style.width = `${Math.hypot(p.x, p.y) * 50}%`;
+    rod.style.transform = `rotate(${Math.atan2(p.y, p.x)}rad)`;
+  }
+  // Au contact, « TILT » sous l'anneau, à la place de sa légende : rien ne recouvre le point.
+  text('plumb-label', p.label);
+  const caption = $('plumb-caption');
+  caption.classList.toggle('contact', Boolean(p.contact));
+  text('plumb-caption', p.contact ? 'TILT' : p.caption);
 }
 
 document.addEventListener('click', (event) => {
@@ -291,10 +320,12 @@ function render(state) {
   // Panneau (récapitulatif, résultat) : sur le playfield, sauf quand l'état en décide (étape « Boutons »).
   const report = state.report ?? (['summary', 'done'].includes(state.phase) && state.assignedRole === 'playfield');
   root.classList.toggle('report', report);
-  root.classList.toggle('buttons', ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger'].includes(state.phase));
-  root.classList.toggle('plunger', state.phase === 'plunger');
+  root.classList.toggle('buttons', ['buttons', 'buttonsSummary', 'navigation', 'navigationSummary', 'plunger', 'tilt'].includes(state.phase));
+  // Lanceur et tilt : une colonne de réglages sous la jauge ou le balancier.
+  root.classList.toggle('plunger', state.phase === 'plunger' || state.phase === 'tilt');
   renderButtons(state);
   renderGauge(state);
+  renderPlumb(state);
   root.classList.toggle('orient', ['orient', 'flip'].includes(state.phase) && state.highlight);
   root.classList.toggle('sound', ['sound', 'channels'].includes(state.phase) && state.highlight);
   for (const angle of [90, 180, 270]) root.classList.toggle(`rot-${angle}`, state.rotation === angle);

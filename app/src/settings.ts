@@ -184,7 +184,7 @@ function ownedKeys(): Set<string> {
     .filter((id) => id.startsWith(input))
     .map((id) => id.slice(input.length));
   const roles = cabinet ? (Object.keys(cabinet.roles) as RoleId[]) : undefined;
-  return vpxOwnedKeys(vpxProfile(loc).profile, cabinet?.vpxManual, Boolean(cabinet?.audio), { roles, dmdKeys, inputKeys });
+  return vpxOwnedKeys(vpxProfile(loc).profile, cabinet?.vpxManual, Boolean(cabinet?.audio), { roles, dmdKeys, inputKeys, tilt: Boolean(cabinet?.tilt) });
 }
 let ipcReady = false;
 /** États calculés depuis la dernière lecture des fichiers (un affichage en demande des milliers). */

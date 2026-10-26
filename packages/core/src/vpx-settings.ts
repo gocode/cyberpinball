@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { IniDocument } from './ini';
 import { VPX_AUDIO_OWNED_KEYS } from './audio';
+import { VPX_TILT_OWNED_KEYS } from './tilt';
 import type { RoleId } from './model';
 import { disabledPlugins, rendererPriorities, VPX_LAYOUT_KEYS, VPX_PLAY_SETTINGS, VPX_WINDOWS, type VpxProfile } from './vpx';
 import type { VpxSettingDef } from './vpx-settings-parser';
@@ -42,6 +43,8 @@ export interface OwnedKeysOptions {
   dmdKeys?: string[];
   /** Clés de [Input] écrites lors de la dernière synchronisation (étape « Boutons » faite). */
   inputKeys?: string[];
+  /** Étape « Tilt » faite : le balancier simulé de VPX ([Player] SimulatedPlumb, PlumbThresholdAngle). */
+  tilt?: boolean;
 }
 
 /**
@@ -66,6 +69,7 @@ export function vpxOwnedKeys(profile: VpxProfile, manual: string[] = [], audio =
   if (audio) for (const key of VPX_AUDIO_OWNED_KEYS) keys.push(['Player', key]);
   for (const key of options.dmdKeys ?? []) keys.push(['Plugin.DMDUtil', key]);
   for (const key of options.inputKeys ?? []) keys.push(['Input', key]);
+  if (options.tilt) for (const key of VPX_TILT_OWNED_KEYS) keys.push(['Player', key]);
   // Clés changées à la main que l'utilisateur a choisi de garder (Cabinet.vpxManual, « Section.Clé ») :
   // section et clé peuvent contenir un point (Plugin.B2S, Priority.PUP), on compare donc le texte entier.
   const kept = new Set(manual.map((id) => id.toLowerCase()));

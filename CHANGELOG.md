@@ -34,6 +34,7 @@ son interface).
 - Mises à jour plus légères (l'application seule, en quelques secondes) et préversions d'essai, à recevoir ou non depuis le menu de la mise à jour.
 - Écran du DMD : dites s'il s'agit d'un FullDMD (tout l'écran, DMD du jeu incrusté) ou d'un DMD seul ; le menu, VPX et les PuP-Packs le respectent.
 - PuP-Pack sur le fronton : l'option du pack est choisie d'après les écrans de la borne, le DMD du jeu reste devant le pack, et le pack est vérifié avant chaque partie.
+- Tilt : nouvelle étape « Tilt » (balancier de la borne, ou balancier simulé par VPX d'après l'accéléromètre), balancier et slam tilt relevés dans l'étape « Boutons ».
 
 ## 0.1.2
 

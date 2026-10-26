@@ -125,7 +125,7 @@ body {
 
 /* Étape « Boutons » : le nom du bouton demandé, assez petit pour tenir sur un écran en portrait. */
 #screen.buttons .measure {
-  font-size: 9vmin;
+  font-size: 8vmin;
   text-align: center;
 }
 
@@ -139,8 +139,9 @@ body {
 
 /*
  * Tous les boutons : relevés, en cours, à venir. Quatre colonnes sur un écran en largeur
- * (seize boutons du jeu : quatre rangées ; sur trois colonnes, la sixième rangée poussait
- * les actions sous l'avertissement du pied), deux sur un écran en hauteur.
+ * (dix-sept boutons du jeu : cinq rangées, assez serrées pour laisser sa place à
+ * l'avertissement du pied ; sur trois colonnes, la sixième rangée poussait les actions
+ * dessous), deux sur un écran en hauteur.
  */
 .buttons-list {
   display: grid;
@@ -160,7 +161,7 @@ body {
   flex-wrap: wrap;
   justify-content: space-between;
   column-gap: 1vmin;
-  padding: 0.9vmin 1.4vmin;
+  padding: 0.7vmin 1.4vmin;
   border: 0.3vmin solid transparent;
   border-radius: 0.5vmin;
   background: var(--tile);
@@ -198,7 +199,7 @@ body {
   }
 }
 
-/* Étape « Lanceur » : une seule colonne de réglages, libellé à gauche, valeur à droite. */
+/* Étapes « Lanceur » et « Tilt » : une seule colonne de réglages, libellé à gauche, valeur à droite. */
 #screen.plunger .buttons-list {
   grid-template-columns: minmax(0, 1fr);
   width: min(94%, 110vmin);
@@ -281,6 +282,107 @@ body {
 /* Joystick du lanceur débranché : la jauge éteinte. */
 .gauge.missing .gauge-track {
   opacity: 0.35;
+}
+
+/*
+ * Étape « Tilt » : le balancier vu de dessus dans l'anneau du contact. Le point suit le
+ * balancier simulé ; l'anneau s'allume à chaque contact, simulé ou réel, « TILT » dessous.
+ */
+.plumb {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.8vmin;
+  margin: 1vmin 0;
+}
+
+.plumb-ring {
+  position: relative;
+  width: 20vmin;
+  height: 20vmin;
+  border: 0.4vmin solid var(--accent);
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--tile) 0 60%, var(--signal-wash) 100%);
+  box-shadow: 0 0 2vmin var(--signal-haze);
+}
+
+.plumb-ring::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1vmin;
+  height: 1vmin;
+  margin: -0.5vmin 0 0 -0.5vmin;
+  border-radius: 50%;
+  background: var(--ink-faint);
+}
+
+.plumb-rod {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  height: 0.4vmin;
+  margin-top: -0.2vmin;
+  background: var(--ink-muted);
+  transform-origin: 0 50%;
+}
+
+.plumb-bob {
+  position: absolute;
+  width: 3vmin;
+  height: 3vmin;
+  margin: -1.5vmin 0 0 -1.5vmin;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 1.6vmin var(--signal-haze);
+}
+
+.plumb-label {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 3vmin;
+  font-size: 2.4vmin;
+  font-weight: 500;
+  color: var(--ink-muted);
+  text-align: center;
+  pointer-events: none;
+}
+
+.plumb-ring.contact {
+  border-color: var(--warning);
+  box-shadow: 0 0 3vmin var(--warning);
+}
+
+.plumb-ring.contact .plumb-bob {
+  background: var(--warning);
+}
+
+/* Accéléromètre absent, ou pas de tilt : l'anneau éteint. */
+.plumb-ring.missing {
+  opacity: 0.4;
+}
+
+.plumb-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 4.6vmin;
+  font-size: 2vmin;
+  color: var(--ink-muted);
+}
+
+/* Légende remplacée par « TILT » au contact : même hauteur, rien ne bouge. */
+.plumb-caption.contact {
+  font-size: 4.4vmin;
+  font-weight: 700;
+  font-stretch: 112%;
+  letter-spacing: 0.12em;
+  color: var(--warning);
+  text-shadow: 0 0 2vmin var(--warning);
 }
 
 .actions {

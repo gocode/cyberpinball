@@ -494,6 +494,7 @@ test('relevé mixte : touches du clavier et boutons du joystick, librement d’u
     extraBall: 'Escape', // Exit : la borne n'a pas ce bouton
     pause: joy(15),
     tilt: joy(9),
+    slamTilt: joy(10),
     nudgeLeft: 'KeyZ',
     nudgeRight: 'Escape',
     nudgeCenter: 'Escape',
@@ -535,6 +536,7 @@ test('relevé mixte : touches du clavier et boutons du joystick, librement d’u
   assert.equal(input(ini, 'LeftMagna'), 'Key;224');
   assert.equal(input(ini, 'RightMagna'), `${joy(7)} | Key;228`);
   assert.equal(input(ini, 'Tilt'), `${joy(9)} | Key;23`);
+  assert.equal(input(ini, 'SlamTilt'), `${joy(10)} | Key;74`);
   assert.equal(input(ini, 'VolumeUp'), `${joy(14)} | Key;46`);
   assert.equal(input(ini, 'Pause'), `${joy(15)} | Key;19`);
   // Le menu de VPX en partie : un MagnaSave au clavier, l'autre au joystick.
