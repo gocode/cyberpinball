@@ -24,6 +24,8 @@
 // seulement les zones des rôles, sur du noir.
 // Au chargement d'une table : en borne, aucun texte de l'interface sur le média ; au bureau,
 // l'encart du titre et des commandes ne recouvre pas le cadre du média.
+// Une liste qui défile n'a jamais de fondu (mask-image), et son choix courant s'y voit en entier.
+// Le lancement en cinéma traverse les écrans : le logo qui en sort n'est pas « coupé ».
 // Les problèmes vont dans la console et dans <captures>\mise-en-page.txt.
 
 import * as fs from 'node:fs';
@@ -144,6 +146,9 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     }
   }
   boxes.forEach(({ el, r }, i) => {
+    // Lancement en cinéma : le logo (ou le titre de son médaillon) sort de son écran par le haut
+    // et entre dans le fronton par le bas ; rogné par l'écran qu'il traverse, c'est voulu.
+    if (el.closest('.cinema')) return;
     let scrolled = false;
     // Coupure voulue : « … » ou lignes limitées, par le texte lui-même ou par le premier
     // conteneur qui le coupe. Elle n'excuse que ce conteneur : ce qui en reste visible (les
@@ -237,6 +242,31 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
         }
       }
     }
+  }
+  // Liste qui défile : jamais de fondu (mask-image) sur elle, il fait passer la ligne du bord
+  // pour désactivée (menu système, octobre 2026 : « Écrans et rôles ») ; et le choix courant
+  // s'y voit en entier : ni rogné par la liste, ni caché par ce qui y reste accroché (bilan de
+  // la santé). Un calque posé par-dessus la liste (attente, dialogue) n'est pas compté.
+  const scrollsY = (e) => /^(auto|scroll)$/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + T;
+  for (const el of document.querySelectorAll('*')) {
+    if (!scrollsY(el) || !shown(el)) continue;
+    const s = getComputedStyle(el);
+    if ([s.maskImage, s.webkitMaskImage].some((m) => m && m !== 'none')) problems.add('fondu sur une liste qui défile : ' + label(el).slice(0, 60));
+  }
+  for (const el of document.querySelectorAll('.lib-action.current, .lib-row.selected, .health-line.selected, .media-card.selected')) {
+    if (!shown(el)) continue;
+    let list = el.parentElement;
+    while (list && list !== document.body && !scrollsY(list)) list = list.parentElement;
+    if (!list || list === document.body) continue;
+    const r = el.getBoundingClientRect(), c = list.getBoundingClientRect();
+    let whole = r.left >= c.left - T && r.right <= c.right + T && r.top >= c.top - T && r.bottom <= c.bottom + T;
+    const d = Math.min(4, r.width / 4, r.height / 4);
+    const points = [[(r.left + r.right) / 2, r.top + d], [(r.left + r.right) / 2, r.bottom - d], [r.left + d, (r.top + r.bottom) / 2], [r.right - d, (r.top + r.bottom) / 2]];
+    for (const [x, y] of whole ? points : []) {
+      const hit = document.elementFromPoint(x, y);
+      if (hit && list.contains(hit) && !el.contains(hit) && !hit.contains(el)) whole = false;
+    }
+    if (!whole) problems.add('choix pas entier dans sa liste : ' + label(el).slice(0, 60));
   }
   // Image chargée sans pixels, vidéo en erreur : l'écran montrerait un aperçu cassé.
   for (const img of document.images) if (img.complete && img.getAttribute('src') && img.naturalWidth === 0) problems.add('image non chargée : ' + img.getAttribute('src').slice(0, 120));

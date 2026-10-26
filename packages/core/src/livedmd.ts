@@ -16,6 +16,7 @@ import { DMD_FONT_HUGE, DMD_FONT_LARGE, DMD_FONT_SMALL, dmdText, textWidth, type
 import { centeredDmdBand } from './dmdscreen';
 import { frameWindow, type FrameRecord, type FrameRect } from './fulldmdframe';
 import { dmdScore, type TableRecords } from './highscores';
+import { CINEMA_TIMELINE } from './cinema';
 
 export const DMD_WIDTH = 128;
 export const DMD_HEIGHT = 32;
@@ -370,33 +371,117 @@ export interface DmdAnimationOptions {
   label?: string;
 }
 
-/** Chargement : le mot en grand, et une bille qui roule d'un bout à l'autre d'un rail en pointillés. */
-function loadingAnimation(options: DmdAnimationOptions = {}): DmdAnimation {
-  const label = dmdText(options.label ?? 'LOADING');
+/** Rail du chargement : ligne, bouts, et largeur de la bille (4 × 2 points, posée dessus). */
+const RAIL = 26;
+const RAIL_FROM = 8;
+const RAIL_TO = 119;
+/** Un passage de la bille d'un bout à l'autre du rail, en ms. */
+const RAIL_PASS = 1400;
+
+/** Le mot en grand (petit s'il ne tient pas) et le rail en pointillés, sans la bille. */
+function loadingBase(label: string): DmdDots {
   const large = textWidth(DMD_FONT_LARGE, label) <= DMD_USABLE;
   const base = blankDots();
   drawCentered(base, large ? DMD_FONT_LARGE : DMD_FONT_SMALL, large ? label : label.slice(0, 20), large ? 3 : 7);
-  // Rail de x = 8 à 119 sur la ligne 26, nettement plus sombre que la bille (4 × 2 points, posée dessus).
-  const RAIL = 26;
-  const FROM = 8;
-  const TO = 119;
-  for (let x = FROM; x <= TO; x += 2) base[RAIL * DMD_WIDTH + x] = DMD_LEVEL.rail;
-  /** Un passage d'un bout à l'autre, en ms. */
-  const PASS = 1400;
+  // Rail de x = 8 à 119 sur la ligne 26, nettement plus sombre que la bille.
+  for (let x = RAIL_FROM; x <= RAIL_TO; x += 2) base[RAIL * DMD_WIDTH + x] = DMD_LEVEL.rail;
+  return base;
+}
+
+/** La bille posée sur le rail en x0, et sa traînée de 4 points au plus, qui s'éteint derrière elle (dir : sens de la course). */
+function drawBall(dots: DmdDots, x0: number, dir: -1 | 0 | 1): void {
+  if (dir) {
+    for (let trail = 1; trail <= 4; trail++) {
+      const x = dir < 0 ? x0 + 3 + trail : x0 - trail;
+      if (x >= 0 && x < DMD_WIDTH) dots[(RAIL - 1) * DMD_WIDTH + x] = Math.max(dots[(RAIL - 1) * DMD_WIDTH + x]!, DMD_LEVEL.secondary - 2 * trail);
+    }
+  }
+  for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 4; dx++) if (x0 + dx >= 0) dots[(RAIL - 2 + dy) * DMD_WIDTH + x0 + dx] = DMD_LEVEL.accent;
+}
+
+/** La bille en aller-retour adouci sur le rail : elle ralentit aux bouts, comme sur un rail en pente ; à 0 ms, au bout gauche. */
+function rollingBall(dots: DmdDots, elapsed: number): void {
+  const phase = (elapsed % (2 * RAIL_PASS)) / (2 * RAIL_PASS);
+  const k = 0.5 - 0.5 * Math.cos(phase * 2 * Math.PI);
+  drawBall(dots, Math.round(RAIL_FROM + k * (RAIL_TO - RAIL_FROM - 3)), phase < 0.5 ? 1 : -1);
+}
+
+/** Chargement : le mot en grand, et une bille qui roule d'un bout à l'autre d'un rail en pointillés. */
+function loadingAnimation(options: DmdAnimationOptions = {}): DmdAnimation {
+  const base = loadingBase(dmdText(options.label ?? 'LOADING'));
   return {
     dots(elapsed) {
       const dots = base.slice();
-      // Aller-retour adouci : la bille ralentit aux bouts, comme sur un rail en pente.
-      const phase = (elapsed % (2 * PASS)) / (2 * PASS);
-      const k = 0.5 - 0.5 * Math.cos(phase * 2 * Math.PI);
-      const x0 = Math.round(FROM + k * (TO - FROM - 3));
-      const dir = phase < 0.5 ? -1 : 1;
-      // Traînée de 4 points au plus, qui s'éteint derrière la bille.
-      for (let trail = 1; trail <= 4; trail++) {
-        const x = dir < 0 ? x0 - trail : x0 + 3 + trail;
-        if (x >= 0 && x < DMD_WIDTH) dots[(RAIL - 1) * DMD_WIDTH + x] = Math.max(dots[(RAIL - 1) * DMD_WIDTH + x]!, DMD_LEVEL.secondary - 2 * trail);
+      rollingBall(dots, elapsed);
+      return dots;
+    },
+  };
+}
+
+/** Rayon du disque lumineux du passage, en points (9 de diamètre, revue de Codex du 26/10/2026). */
+const PASS_RADIUS = 4.5;
+/** Traînée sous le disque, point par point en s'éloignant de lui : 7, 4, 2, puis rien. */
+const PASS_TRAIL = [7, 7, 6, 5, 4, 4, 3, 2, 2, 1];
+
+/**
+ * Disque lumineux qui traverse l'afficheur de bas en haut (`k` de 0 à 1 : centre de y = 36 à
+ * y = −5, en x = 64), sa traînée dessous : le logo du jeu passe du plateau au fronton, à travers
+ * le DMD. Cœur 14, couronne 9 puis 4 ; posé par-dessus le titre (le plus clair l'emporte).
+ */
+function drawPass(dots: DmdDots, k: number): void {
+  const cx = DMD_WIDTH / 2;
+  const cy = 36 - k * 41;
+  for (let y = 0; y < DMD_HEIGHT; y++) {
+    for (let x = 0; x < DMD_WIDTH; x++) {
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cy;
+      const d = Math.hypot(dx, dy) / PASS_RADIUS;
+      let level = d <= 0.45 ? 14 : d <= 0.75 ? 9 : d <= 1 ? 4 : 0;
+      // Traînée : dans l'axe, sur la largeur du cœur, qui s'éteint en dix points sous le disque.
+      const behind = Math.floor(dy - PASS_RADIUS);
+      if (behind >= 0 && behind < PASS_TRAIL.length && Math.abs(dx) <= 1.5) level = Math.max(level, PASS_TRAIL[behind]!);
+      if (level > 0) dots[y * DMD_WIDTH + x] = Math.max(dots[y * DMD_WIDTH + x]!, level);
+    }
+  }
+}
+
+/** Éclat local à la sortie du disque, en haut de l'afficheur : quelques points, cœur 15 puis 8. */
+function drawFlash(dots: DmdDots): void {
+  for (let y = 0; y < 3; y++) {
+    for (let x = 61; x < 67; x++) {
+      const d = Math.hypot(x + 0.5 - DMD_WIDTH / 2, y + 0.5);
+      const level = d <= 1.5 ? DMD_LEVEL.accent : d <= 2.6 ? 8 : 0;
+      if (level) dots[y * DMD_WIDTH + x] = Math.max(dots[y * DMD_WIDTH + x]!, level);
+    }
+  }
+}
+
+/** Tremblement de la bille au lanceur, un pas toutes les 100 ms, avec des retours au centre. */
+const PLUNGER_SHAKE = [0, -1, 0, 1];
+
+/**
+ * Lancement en cinéma (cinema.ts, CINEMA_TIMELINE) : le titre et la bille au bout du rail ; à
+ * l'armement du logo, elle tremble d'un point, comme sur le lanceur ; quand le logo a quitté le
+ * plateau, un disque lumineux traverse l'afficheur de bas en haut, un éclat local à sa sortie ;
+ * puis la bille roule depuis le même bout (le chargement). Tourne jusqu'à ce qu'on l'arrête :
+ * VPX prend l'afficheur, la séquence s'arrête où elle en est.
+ */
+function launchAnimation(options: DmdAnimationOptions = {}): DmdAnimation {
+  const base = loadingBase(dmdText(options.label ?? 'LOADING'));
+  const { arm, dmdPass, dmdPassLength, dmdFlash } = CINEMA_TIMELINE;
+  const flash = dmdPass + dmdPassLength;
+  const rolling = flash + dmdFlash;
+  return {
+    dots(elapsed) {
+      const dots = base.slice();
+      if (elapsed >= rolling) {
+        rollingBall(dots, elapsed - rolling);
+        return dots;
       }
-      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 4; dx++) dots[(RAIL - 2 + dy) * DMD_WIDTH + x0 + dx] = DMD_LEVEL.accent;
+      const shake = elapsed >= arm && elapsed < flash ? PLUNGER_SHAKE[Math.floor((elapsed - arm) / 100) % PLUNGER_SHAKE.length]! : 0;
+      drawBall(dots, RAIL_FROM + shake, 0);
+      if (elapsed >= dmdPass && elapsed < flash) drawPass(dots, (elapsed - dmdPass) / dmdPassLength);
+      else if (elapsed >= flash) drawFlash(dots);
       return dots;
     },
   };
@@ -405,6 +490,7 @@ function loadingAnimation(options: DmdAnimationOptions = {}): DmdAnimation {
 /** Animations qu'on peut jouer sur le DMD du menu, par leur nom. */
 export const DMD_ANIMATIONS = {
   chargement: loadingAnimation,
+  lancement: launchAnimation,
 } satisfies Record<string, (options?: DmdAnimationOptions) => DmdAnimation>;
 
 export type DmdAnimationName = keyof typeof DMD_ANIMATIONS;

@@ -793,6 +793,88 @@ function showDmdShot(shot) {
 
 window.cyber.onDmd?.(showDmdShot);
 
+// ---------- Lancement en cinéma (cinema.ts, frontend.css) ----------
+
+/**
+ * Au Start d'une partie, l'état apporte la part de cette fenêtre (s.cinema) : le plateau, d'où
+ * le logo s'allume et s'envole (#cinema, tourné comme la racine), et le fronton, où il se pose
+ * (sa zone). La couche est posée une fois par lancement, à l'heure du Start (--cine-elapsed) :
+ * la feuille de style fait le reste, sans rien demander au processus principal. Quand la
+ * fenêtre de jeu de VPX paraît (s.game), elle s'efface en CINEMA_FADE_MS ; tout autre état
+ * (échec, retour au menu) la retire aussitôt. Un lancement fini ne se rejoue jamais.
+ */
+const CINEMA_FADE_MS = 240;
+const cinemaLayer = document.getElementById('cinema');
+const backglassZone = zones.find((z) => z.role === 'backglass');
+/** Couches posées pour le lancement en cours : { id, stages }. */
+let cinemaShown;
+/** Dernier lancement passé à VPX : ses états tardifs ne reposent pas la couche. */
+let cinemaEnded;
+
+/** Logo du jeu ; sans logo lisible, le médaillon de la roue avec le titre. */
+function cinemaFace(view) {
+  const disc = () => {
+    const d = el('div', 'cine-disc');
+    d.append(el('div', 'cine-disc-title', view.title));
+    return d;
+  };
+  const logo = CyberMedia.logo(view.logo)?.cloneNode();
+  if (!logo) return disc();
+  logo.className = 'cine-img';
+  logo.addEventListener('error', () => logo.replaceWith(disc()), { once: true });
+  return logo;
+}
+
+/** Une scène de la chorégraphie : « depart » (plateau) ou « arrivee » (fronton), posée à l'heure du Start. */
+function cinemaStage(view, part) {
+  const stage = el('div', `cinema cinema-${part}`);
+  stage.dataset.cinema = part;
+  stage.style.setProperty('--cine-elapsed', String(Math.max(0, Date.now() - view.startedAt)));
+  if (part === 'arrivee') stage.append(el('div', 'cine-scrim'));
+  const flight = el('div', 'cine-flight');
+  const logo = el('div', 'cine-logo');
+  logo.append(cinemaFace(view));
+  const ring = el('div', 'cine-ring');
+  if (part === 'depart') {
+    // Le recul de l'armement est porté à part : l'allumage et l'envol ne se recouvrent pas.
+    const arm = el('div', 'cine-arm');
+    arm.append(logo);
+    flight.append(el('div', 'cine-trail'), arm, ring);
+  } else flight.append(el('div', 'cine-trail'), logo, ring);
+  stage.append(flight);
+  return stage;
+}
+
+function dropCinema() {
+  for (const stage of cinemaShown?.stages ?? []) {
+    clearTimeout(stage.fade);
+    stage.node.remove();
+  }
+  cinemaShown = undefined;
+}
+
+function syncCinema(s) {
+  const view = s.cinema;
+  if (view && view.id !== cinemaEnded) {
+    if (cinemaShown?.id === view.id) return;
+    dropCinema();
+    const stages = [];
+    if (view.depart && cinemaLayer) stages.push({ node: cinemaLayer.appendChild(cinemaStage(view, 'depart')) });
+    if (view.arrivee && backglassZone) stages.push({ node: backglassZone.node.appendChild(cinemaStage(view, 'arrivee')) });
+    cinemaShown = { id: view.id, stages };
+    return;
+  }
+  if (!cinemaShown) return;
+  if (!s.game) return dropCinema();
+  // VPX a la main : fondu, puis la couche part ; ce lancement ne se rejoue plus.
+  cinemaEnded = cinemaShown.id;
+  for (const stage of cinemaShown.stages) {
+    if (stage.fade) continue;
+    stage.node.classList.add('cine-fin');
+    stage.fade = setTimeout(() => stage.node.remove(), CINEMA_FADE_MS);
+  }
+}
+
 /** Média du rôle pour la table choisie ; sans table, seul le topper garde son repli. */
 function viewOf(s, part) {
   const view = s.medias?.[part];
@@ -867,6 +949,8 @@ window.cyberEtat = () => ({
   }),
   // DMD du menu vivant : affiché ou non (page du média), dans le cadre du FullDMD ou sur du noir, points allumés.
   dmd: liveDmd && { visible: !liveDmd.holder.hidden, cadre: Boolean(liveDmd.framed), points: lastDmdShot?.dots ? lastDmdShot.dots.filter((v) => v > 0).length : 0 },
+  // Lancement en cinéma : les scènes posées (départ, arrivée), le logo ou le médaillon, et si elles s'effacent.
+  cinema: [...document.querySelectorAll('.cinema')].map((n) => ({ scene: n.dataset.cinema, visage: n.querySelector('.cine-disc') ? 'médaillon' : 'logo', fin: n.classList.contains('cine-fin') })), // i18n-ignore : relevé des essais
   couches: [...(background ? [['playfield', background]] : []), ...zones.map((z) => [z.role, z.layer])].map(([part, layer]) => ({ role: part, ...layer.state() })),
 });
 
@@ -885,6 +969,8 @@ window.cyber.onState((s) => {
   // écran garde les médias du jeu (le playfield, sa vidéo de chargement et les commandes).
   // L'écran de chargement de secours reste d'un état à l'autre (renderPlayfield le quitte).
   syncLiveDmd(s.game ? undefined : s.liveDmd);
+  // Lancement en cinéma : posé au Start, effacé quand VPX paraît (avant le fond de partie).
+  syncCinema(s);
   if (s.game) return renderGame(s);
   // Extinction, veille ou redémarrage : du noir sur chaque écran, sans média ni décor ; le
   // playfield seul dit ce qui se passe (frontend.css, html.power-phase).

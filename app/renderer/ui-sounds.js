@@ -1,5 +1,5 @@
 // Sons de l'interface (registre et règle : packages/core/src/uisounds.ts) : clic de
-// solénoïde, pièce, knocker. Seule la fenêtre du playfield les joue, sur la sortie du son
+// solénoïde, pièce, knocker, coup de bobine. Seule la fenêtre du playfield les joue, sur la sortie du son
 // du menu (menu-audio.js lui passe la même sortie, setSink), par-dessus la musique sans
 // jamais la toucher. Chaque son est synthétisé ici par WebAudio, à la volée : aucun
 // enregistrement, aucun fichier, aucun droit d'un tiers.
@@ -7,8 +7,10 @@
 // Le processus principal décide s'il joue (uiSoundCue : réglage, volume, jamais pendant
 // une partie) et l'envoie par le canal « ui-sound ». Repli de ce côté : rien ne sort quand
 // l'état dit que la partie est en cours, et tout ce qui sonne encore se tait à ce moment.
+// Seule exception, le son du passage de relais (cue.handover : le coup de bobine, quand VPX
+// prend la main) : il part au tout début de la partie et y finit de sonner.
 //
-//   CyberUiSounds.play(id, volume)  // volume de 0 à 1 ; rend true si le son part
+//   CyberUiSounds.play(id, volume, handover)  // volume de 0 à 1 ; rend true si le son part
 //   CyberUiSounds.setPhase(phase)   // phase de l'état (frontend.js)
 //   CyberUiSounds.setSink(sinkId)   // sortie Chromium du son du menu ; '' : par défaut
 //   CyberUiSounds.status()          // ce qui a joué, pour les essais sans opérateur
@@ -16,6 +18,8 @@
 (() => {
   'use strict';
 
+  /** Sons du passage de relais (UI_SOUNDS[id].handover, uisounds.ts) : les seuls permis au début de la partie. */
+  const HANDOVER = new Set(['coil']);
   /** Écart minimal entre deux fois le même son, en ms : la roue qui défile vite ne mitraille pas. */
   const MIN_GAP_MS = 45;
   /** Contexte audio fermé après ce temps sans son : aucun flux ouvert sur la sortie pendant le reste du menu. */
@@ -136,6 +140,18 @@
       hiss(ac, out, t + 0.004, { freq: 650, q: 4, peak: 0.3, decay: 0.12 });
       return 0.4;
     },
+    // Coup de bobine (lancement en cinéma, quand VPX prend la main) : un « tchoum » sec et mat,
+    // le noyau d'une grosse bobine qui frappe sa butée (prescription de Codex, 26/10/2026). Un
+    // seul contact de bruit filtré, un corps sourd qui descend de 145 à 95 Hz (et son octave,
+    // pour les petits haut-parleurs), une pointe de métal vers 650 Hz bien en dessous ; 125 ms,
+    // sans réverbération. Plus sourd que le clic, sans le tintement de la pièce, moins dur que le knocker.
+    coil(ac, out, t) {
+      hiss(ac, out, t, { freq: 1700, q: 0.5, peak: 0.55, attack: 0.002, decay: 0.01 });
+      tone(ac, out, t + 0.002, { from: 145, to: 95, glide: 0.045, peak: 0.8, attack: 0.002, decay: 0.09 });
+      tone(ac, out, t + 0.002, { type: 'triangle', from: 290, to: 190, glide: 0.045, peak: 0.16, attack: 0.002, decay: 0.07 });
+      hiss(ac, out, t + 0.008, { freq: 650, q: 2, peak: 0.14, attack: 0.002, decay: 0.06 });
+      return 0.125;
+    },
   };
 
   function forget(entry) {
@@ -148,13 +164,16 @@
     live.delete(entry);
     if (live.size === 0) {
       clearTimeout(idleTimer);
-      idleTimer = setTimeout(closeContext, IDLE_CLOSE_MS);
+      // Pendant la partie (coup de bobine fini) : aucun flux ne reste ouvert sur la sortie.
+      if (silent) closeContext();
+      else idleTimer = setTimeout(closeContext, IDLE_CLOSE_MS);
     }
   }
 
-  function play(id, volume) {
+  function play(id, volume, relay = false) {
     const recipe = RECIPES[id];
-    if (silent || !recipe || !(volume > 0)) return false;
+    const handover = relay && HANDOVER.has(id);
+    if ((silent && !handover) || !recipe || !(volume > 0)) return false;
     const now = Date.now();
     if (now - (lastAt[id] ?? -Infinity) < MIN_GAP_MS) return false;
     lastAt[id] = now;
@@ -163,7 +182,7 @@
     out.gain.value = Math.min(1, volume);
     out.connect(ac.destination);
     const length = recipe(ac, out, ac.currentTime + 0.01);
-    const entry = { out };
+    const entry = { out, handover };
     entry.timer = setTimeout(() => forget(entry), (length + 0.2) * 1000);
     live.add(entry);
     history.push({ son: id, volume: Math.round(volume * 1000) / 1000 });
@@ -171,12 +190,13 @@
     return true;
   }
 
-  /** Partie en cours : rien ne sort, et ce qui sonne encore se tait. */
+  /** Partie en cours : rien ne sort, et ce qui sonne encore se tait, sauf le son du passage de relais. */
   function setPhase(phase) {
     silent = phase === 'playing';
     if (!silent) return;
-    for (const entry of [...live]) forget(entry);
-    closeContext();
+    for (const entry of [...live]) if (!entry.handover) forget(entry);
+    // Le contexte se ferme avec le dernier son (forget) ; tout de suite s'il ne reste rien.
+    if (live.size === 0) closeContext();
   }
 
   function setSink(id) {
@@ -192,5 +212,5 @@
     status: () => ({ joues: history.slice(), muet: silent, enCours: live.size }),
   };
 
-  window.cyber?.onUiSound?.((cue) => play(cue?.id, cue?.volume));
+  window.cyber?.onUiSound?.((cue) => play(cue?.id, cue?.volume, cue?.handover === true));
 })();

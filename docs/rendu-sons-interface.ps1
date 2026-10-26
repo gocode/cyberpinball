@@ -1,5 +1,5 @@
 ﻿# Sons de l'interface (app/renderer/ui-sounds.js) rendus en WAV, pour les écouter sans lancer
-# le menu : tmp\sons-interface\solenoid.wav, coin.wav, knocker.wav (mono, 48 kHz, à pleine
+# le menu : tmp\sons-interface\solenoid.wav, coin.wav, knocker.wav, coil.wav (mono, 48 kHz, à pleine
 # échelle du réglage : volume 100 %). Relève la crête, le niveau efficace et la durée audible
 # de chacun ; échoue si un son écrête. Hors écran, sur un bureau Windows caché : rien ne
 # s'affiche ni ne s'entend (OfflineAudioContext, docs\rendu-sons-interface.cjs).

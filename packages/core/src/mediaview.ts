@@ -505,6 +505,11 @@ export interface MenuMediaSettings {
   videoVolume: number;
   /** Son de lancement (AudioLaunch) et son de la vidéo de chargement (Loading). */
   launchVolume: number;
+  /**
+   * Lancement en cinéma (cinema.ts) : au Start, le logo du jeu s'envole du plateau vers le
+   * fronton, le DMD charge, un coup de bobine quand VPX prend la main. Joué par défaut.
+   */
+  cinema: boolean;
   /** Sons de l'interface (clic de solénoïde, pièce, knocker : uisounds.ts) ; joués par défaut. */
   uiSounds: boolean;
   /** Leur volume en pour cent, sur la sortie du menu. */
@@ -528,6 +533,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   musicVolume: 60,
   videoVolume: 0,
   launchVolume: 80,
+  cinema: true,
   uiSounds: true,
   uiSoundsVolume: 50,
   attractDelay: 300,
@@ -558,6 +564,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     musicVolume: intIn(r.musicVolume, 0, 100, d.musicVolume),
     videoVolume: intIn(r.videoVolume, 0, 100, d.videoVolume),
     launchVolume: intIn(r.launchVolume, 0, 100, d.launchVolume),
+    cinema: typeof r.cinema === 'boolean' ? r.cinema : d.cinema,
     uiSounds: typeof r.uiSounds === 'boolean' ? r.uiSounds : d.uiSounds,
     uiSoundsVolume: intIn(r.uiSoundsVolume, 0, 100, d.uiSoundsVolume),
     attractDelay: intIn(r.attractDelay, 0, 24 * 3600, d.attractDelay),

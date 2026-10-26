@@ -56,6 +56,8 @@ Les valeurs sont définies pour un petit côté de 1080 px. Dans Electron, conve
 
 Marges extérieures 48 à 64 px, panneaux 32 à 40 px ; lignes de réglage de 68 à 76 px selon la densité. La fiche utilise deux rangées de trois onglets au lieu de réduire leurs libellés.
 
+Une liste seule (menu système, rubriques) part juste sous l’en-tête, avec le même écart sur chaque écran ; elle est centrée en largeur, jamais en hauteur. Une liste plus haute que sa zone défile : un filet `--line-strong` de 3 px à la référence marque le bord derrière lequel il reste des entrées, en haut comme en bas. Jamais de fondu sur une liste : la ligne du bord passerait pour désactivée. L’entrée choisie est toujours entière dans la vue.
+
 ## États et interaction à intégrer dans le prototype
 
 `.is-focus` représente le contrôle sur lequel agit l’appui ; `.is-active` / `.is-current` représentent une vue ouverte. Le produit doit les mettre à jour selon la navigation réelle. Dans une intégration interactive, employer des boutons, des liens et des onglets sémantiques, exposer l’état courant aux technologies d’assistance et synchroniser le focus DOM. Les spans des aperçus ne sont pas des composants interactifs prêts à livrer.

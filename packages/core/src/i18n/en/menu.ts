@@ -131,22 +131,29 @@ export const messages: Record<string, string> = {
   'Vidéo du plateau, quand le jeu n’a pas de musique ou qu’elle est coupée': 'Playfield video, when the game has no music or it’s off',
   'Volume du lancement : {volume}': 'Launch volume: {volume}',
   'Son de lancement du jeu, sinon son de sa vidéo de chargement': 'Game’s launch sound, or else its loading video’s sound',
+  'Lancement en cinéma : joué': 'Cinematic launch: on',
+  'Lancement en cinéma : coupé': 'Cinematic launch: off',
+  'Au Start, le logo du jeu s’envole du plateau vers le fronton, le DMD charge, un coup de bobine quand VPX prend la main ; VPX n’attend jamais (Start : couper)':
+    'On Start, the game logo flies from the playfield up to the backglass, the DMD shows loading, a coil thump when VPX takes over; VPX never waits (Start: turn off)',
+  'Le chargement seul, sans logo ni coup de bobine (Start : jouer le lancement en cinéma)': 'Loading screen only, no logo or coil thump (Start: play the cinematic launch)',
   'Sons de l’interface : joués': 'Interface sounds: on',
   'Sons de l’interface : coupés': 'Interface sounds: off',
-  'Clic de solénoïde au changement de table, pièce au Start, knocker sur un record ; jamais pendant la partie (Start : couper)':
-    'Solenoid click when changing tables, coin on Start, knocker on a new high score; never during play (Start: mute)',
+  'Clic de solénoïde au changement de table, pièce au Start, knocker sur un record, coup de bobine au lancement en cinéma ; rien pendant la partie (Start : couper)':
+    'Solenoid click when changing tables, coin on Start, knocker on a new high score, coil thump on the cinematic launch; nothing during play (Start: mute)',
   'Aucun bruit de flipper dans le menu (Start : les jouer)': 'No pinball noises in the menu (Start: play them)',
   'Volume des sons de l’interface : {volume}': 'Interface sound volume: {volume}',
   'Sons de l’interface coupés pour l’instant': 'Interface sounds off for now',
   'Volume des sons de l’interface': 'Interface sound volume',
-  'Clic de solénoïde, pièce et knocker, sur la sortie du son du menu. Rien pendant la partie : VPX a la parole.':
-    'Solenoid click, coin and knocker, on the menu’s sound output. Nothing during play: VPX takes over.',
+  'Clic de solénoïde, pièce, knocker et coup de bobine, sur la sortie du son du menu. Rien pendant la partie : VPX a la parole.':
+    'Solenoid click, coin, knocker and coil thump, on the menu’s sound output. Nothing during play: VPX takes over.',
   'Clic de solénoïde': 'Solenoid click',
   'Changement de table dans le menu': 'Changing tables in the menu',
   'Pièce qui tombe': 'Coin drop',
   'Start : lancement d’une partie': 'Start: launching a game',
   Knocker: 'Knocker',
   'Record battu, au retour de la partie': 'High score beaten, back from the game',
+  'Coup de bobine': 'Coil thump',
+  'Lancement en cinéma : VPX prend la main': 'Cinematic launch: VPX takes over',
   'Mode attente : {delay}': 'Attract mode: {delay}',
   'Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu': 'Random tables with their media; any button returns to the menu',
   'Après {duration} sans bouton': 'After {duration} idle',

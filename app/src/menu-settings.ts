@@ -1,6 +1,6 @@
 // Réglages des médias, du son et du mode attente du menu (docs/recherche/medias.md, § 5.4),
-// dans le menu système : musique des jeux, volumes, mode attente, médias pendant la
-// partie, DMD du menu (vivant ou classique), qualité téléchargée depuis VPinMediaDB.
+// dans le menu système : musique des jeux, volumes, lancement en cinéma, mode attente, médias
+// pendant la partie, DMD du menu (vivant ou classique), qualité téléchargée depuis VPinMediaDB.
 // Tout se règle aux boutons : Start change un choix ou ouvre la liste des valeurs, Exit revient.
 // Les réglages s'appliquent tout de suite (on entend le nouveau volume) et sont gardés
 // dans <données>\medias.json.
@@ -81,6 +81,7 @@ export const MENU_SETTINGS_ROWS = [
   'musicVolume',
   'videoVolume',
   'launchVolume',
+  'cinema',
   'uiSounds',
   'uiSoundsVolume',
   'attractDelay',
@@ -139,10 +140,22 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         icon: 'rocket',
         run: () => openVolume('launchVolume'),
       },
+      cinema: {
+        label: v.cinema ? t('Lancement en cinéma : joué') : t('Lancement en cinéma : coupé'),
+        detail: v.cinema
+          ? t('Au Start, le logo du jeu s’envole du plateau vers le fronton, le DMD charge, un coup de bobine quand VPX prend la main ; VPX n’attend jamais (Start : couper)')
+          : t('Le chargement seul, sans logo ni coup de bobine (Start : jouer le lancement en cinéma)'),
+        icon: 'plunger',
+        run: () => {
+          set({ cinema: !v.cinema });
+          // Rétabli : le coup de bobine se fait entendre (s'il est permis : sons de l'interface joués).
+          if (!v.cinema) host.preview('coil');
+        },
+      },
       uiSounds: {
         label: v.uiSounds ? t('Sons de l’interface : joués') : t('Sons de l’interface : coupés'),
         detail: v.uiSounds
-          ? t('Clic de solénoïde au changement de table, pièce au Start, knocker sur un record ; jamais pendant la partie (Start : couper)')
+          ? t('Clic de solénoïde au changement de table, pièce au Start, knocker sur un record, coup de bobine au lancement en cinéma ; rien pendant la partie (Start : couper)')
           : t('Aucun bruit de flipper dans le menu (Start : les jouer)'),
         icon: 'flipper',
         run: () => {
@@ -225,7 +238,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
       case 'launchVolume':
         return { heading: t('Volume du lancement'), icon: 'rocket', lead: t('Son joué au lancement d’une table, ou son de sa vidéo de chargement. Rien pendant la partie : VPX a la parole.') };
       case 'uiSoundsVolume':
-        return { heading: t('Volume des sons de l’interface'), icon: 'sound', lead: t('Clic de solénoïde, pièce et knocker, sur la sortie du son du menu. Rien pendant la partie : VPX a la parole.') };
+        return { heading: t('Volume des sons de l’interface'), icon: 'sound', lead: t('Clic de solénoïde, pièce, knocker et coup de bobine, sur la sortie du son du menu. Rien pendant la partie : VPX a la parole.') };
     }
   }
 

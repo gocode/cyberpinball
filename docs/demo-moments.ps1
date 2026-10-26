@@ -24,6 +24,11 @@
 #                au Start, rien pendant la partie simulée (fenêtre muette) ; un record entré au
 #                tableau pendant la partie (VPReg.stg remplacé) : knocker au retour ; écran
 #                « Médias, son et attente » : couper, rétablir (clic), volume (pièce) ;
+#   cinema     : lancement en cinéma (cinema.ts) d'une partie simulée de Neon Galaxy : au
+#                chargement, le plateau montre le départ du logo et le fronton son arrivée ; le
+#                coup de bobine sonne au passage de relais ; le journal dit quand VPX est parti ;
+#   sans-cinema: la même partie, le réglage coupé : aucune scène, pas de coup de bobine, et VPX
+#                part au même moment qu'avec le cinéma (docs\demo-cinema.ps1 lance les deux) ;
 #   attente    : mode attente après 5 s sans bouton, une table au hasard toutes les 3 s avec
 #                ses médias et sa musique au volume réduit ; un flipper, Start puis Exit en
 #                sortent sans changer la sélection, sans ouvrir la fiche ni le menu système.
@@ -38,7 +43,7 @@
 #   .\docs\demo-moments.ps1 [-Scenarios navigation, silence, partie] [-Ecrans pc-dev]
 # VPX n'est jamais lancé ; ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont touchés.
 param(
-  [string[]]$Scenarios = @('navigation', 'silence', 'menus', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'habillage', 'interface', 'attente'),
+  [string[]]$Scenarios = @('navigation', 'silence', 'menus', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'habillage', 'interface', 'cinema', 'sans-cinema', 'attente'),
   [string]$Source = 'D:\CyberPinball',
   [string]$Ecrans = 'pc-dev'
 )
@@ -246,7 +251,7 @@ $scenes = @{
       'wait:1000',                # 01 aucun son de l'interface
       $Down, $Down,               # 03 deux tables : deux clics de solénoïde
       $Start, $Start,             # 05 fiche, puis « Jouer » : la pièce tombe au chargement
-      'until:playing',            # 06 partie : fenêtre muette, plus rien ne part
+      'until:playing',            # 06 partie : fenêtre muette, plus rien ne part que le coup de bobine du relais
       "copy:$root\VPReg-apres.stg|$tableLongue\user\VPReg.stg", # 07 la table enregistre un record
       'until:menu',               # 08 retour : le knocker, et les sons reviennent
       $Down,                      # 09 un clic
@@ -261,12 +266,42 @@ $scenes = @{
       '01-wait_1000' = @{ interface = ''; phase = 'menu' }
       '03-ArrowDown' = @{ interface = 'solenoid,solenoid'; phase = 'menu' }
       '05-Digit1' = @{ interface = 'solenoid,solenoid,coin'; phase = 'loading' }
-      '06-until_playing' = @{ interface = 'solenoid,solenoid,coin'; muet = $true; phase = 'playing' }
-      '08-until_menu' = @{ interface = 'solenoid,solenoid,coin,knocker'; muet = $false; phase = 'menu' }
-      '09-ArrowDown' = @{ interface = 'solenoid,solenoid,coin,knocker,solenoid'; phase = 'menu' }
-      '14-action_Sons_de_l_interface' = @{ interface = 'solenoid,solenoid,coin,knocker,solenoid'; phase = 'library' }
-      '15-action_Sons_de_l_interface' = @{ interface = 'solenoid,solenoid,coin,knocker,solenoid,solenoid'; phase = 'library' }
-      '18-Digit1' = @{ interface = 'solenoid,solenoid,coin,knocker,solenoid,solenoid,coin'; dernier = 0.4; phase = 'library' }
+      '06-until_playing' = @{ interface = 'solenoid,solenoid,coin,coil'; muet = $true; phase = 'playing' }
+      '08-until_menu' = @{ interface = 'solenoid,solenoid,coin,coil,knocker'; muet = $false; phase = 'menu' }
+      '09-ArrowDown' = @{ interface = 'solenoid,solenoid,coin,coil,knocker,solenoid'; phase = 'menu' }
+      '14-action_Sons_de_l_interface' = @{ interface = 'solenoid,solenoid,coin,coil,knocker,solenoid'; phase = 'library' }
+      '15-action_Sons_de_l_interface' = @{ interface = 'solenoid,solenoid,coin,coil,knocker,solenoid,solenoid'; phase = 'library' }
+      '18-Digit1' = @{ interface = 'solenoid,solenoid,coin,coil,knocker,solenoid,solenoid,coin'; dernier = 0.4; phase = 'library' }
+    }
+  }
+  # Lancement en cinéma : la part de chaque fenêtre (cyberEtat : scènes posées, sans celles qui
+  # s'effacent), le coup de bobine au relais, et le moment où VPX part, comparé sans le cinéma.
+  cinema = @{
+    Reglages = @{ music = $false; game = 'still'; cinema = $true }
+    Simulee = 'backglass'
+    Etapes = @(
+      $Down, $Down, $Down, 'wait:1000', # 04 Neon Galaxy : trois clics
+      $Start, $Start,             # 06 fiche, puis « Jouer » : la pièce, la chorégraphie part
+      'wait:1500',                # 07 chargement : le logo est passé du plateau au fronton
+      'until:playing',            # 08 VPX prend la main : coup de bobine, plus aucune scène
+      'until:menu'                # 09 retour au menu
+    )
+    Apres = { param($root, $captures) Test-Lancement $captures 'joué' }
+    Attendu = @{
+      '07-wait_1500' = @{ phase = 'loading'; interface = 'solenoid,solenoid,solenoid,coin'; cinema = @{ playfield = 'depart'; backglass = 'arrivee'; dmd = ''; topper = '' } }
+      '08-until_playing' = @{ phase = 'playing'; interface = 'solenoid,solenoid,solenoid,coin,coil'; muet = $true; cinema = @{ playfield = ''; backglass = ''; dmd = ''; topper = '' } }
+      '09-until_menu' = @{ phase = 'menu'; interface = 'solenoid,solenoid,solenoid,coin,coil'; cinema = @{ playfield = ''; backglass = '' } }
+    }
+  }
+  'sans-cinema' = @{
+    Reglages = @{ music = $false; game = 'still'; cinema = $false }
+    Simulee = 'backglass'
+    Etapes = @($Down, $Down, $Down, 'wait:1000', $Start, $Start, 'wait:1500', 'until:playing', 'until:menu')
+    Apres = { param($root, $captures) Test-Lancement $captures 'coupé' }
+    Attendu = @{
+      '07-wait_1500' = @{ phase = 'loading'; interface = 'solenoid,solenoid,solenoid,coin'; cinema = @{ playfield = ''; backglass = ''; dmd = ''; topper = '' } }
+      '08-until_playing' = @{ phase = 'playing'; interface = 'solenoid,solenoid,solenoid,coin'; muet = $true }
+      '09-until_menu' = @{ phase = 'menu'; interface = 'solenoid,solenoid,solenoid,coin' }
     }
   }
   pivotee = @{
@@ -361,6 +396,25 @@ $scenes = @{
   }
 }
 
+# Lancement en cinéma : le menu dit quand VPX est parti (frontend.ts, play). Avec et sans le
+# cinéma, ce doit être le même moment : après l'écran de chargement (CYBERPINBALL_LOADING_MS), jamais
+# plus tard. Le premier relevé est gardé pour le comparer au second.
+$script:lancements = @{}
+function Test-Lancement([string]$Captures, [string]$Mode) {
+  $line = Select-String -Path "$Captures\sortie.txt" -Pattern 'Lancement : VPX lancé (\d+) ms après le Start \(écran de chargement (\d+) ms(?:, captures des essais (\d+) ms)?, préparation (\d+) ms ; lancement en cinéma (\S+)\)' | Select-Object -First 1
+  if (-not $line) { return 'journal : moment du lancement de VPX non relevé' }
+  $g = $line.Matches[0].Groups
+  $total = [int]$g[1].Value; $loading = [int]$g[2].Value; $shots = [int]('0' + $g[3].Value); $prep = [int]$g[4].Value; $seen = $g[5].Value
+  # Ce qui n'est ni l'écran de chargement, ni les captures des essais, ni la préparation (écrans,
+  # PuP-Pack, habillage) : rien ne doit attendre, à la gigue des minuteurs près.
+  $other = $total - $loading - $shots - $prep
+  "  VPX lancé $total ms après le Start : écran de chargement $loading ms, captures $shots ms, préparation $prep ms, reste $other ms (lancement en cinéma $seen)" | Write-Host
+  $script:lancements[$Mode] = $other
+  if ($seen -ne $Mode) { "journal : lancement en cinéma $seen au lieu de $Mode" }
+  if ($loading -ne [int]$env:CYBERPINBALL_LOADING_MS) { "écran de chargement de $loading ms au lieu de $($env:CYBERPINBALL_LOADING_MS)" }
+  if ($other -gt 150) { "VPX lancé $other ms après l'écran de chargement et la préparation : quelque chose l'a fait attendre" }
+}
+
 $failures = @()
 foreach ($name in $Scenarios) {
   $scene = $scenes[$name]
@@ -440,6 +494,16 @@ foreach ($name in $Scenarios) {
       $state += " · sons de l'interface : $(if ($played) { $played } else { 'aucun' })$(if ($got.interface.muet) { ' (muets)' })"
     }
     if ($want.commandes) { $ok = $ok -and $menu.commandes -eq $want.commandes; $state += " · aide-mémoire : $($menu.commandes)" }
+    # Lancement en cinéma : scènes posées dans chaque fenêtre (sans celles qui s'effacent au relais).
+    if ($want.cinema) {
+      $cinemaParts = @()
+      foreach ($win in ($want.cinema.Keys | Sort-Object)) {
+        $shown = @($got.ecrans.$win.cinema | Where-Object { $_ -and -not $_.fin } | ForEach-Object { $_.scene }) -join ','
+        $cinemaParts += "$win $(if ($shown) { $shown } else { 'aucune' })"
+        if ($shown -ne $want.cinema[$win]) { $ok = $false; $cinemaParts[-1] += " (attendu : $(if ($want.cinema[$win]) { $want.cinema[$win] } else { 'aucune' }))" }
+      }
+      $state += " · cinéma : $($cinemaParts -join ', ')"
+    }
     if ($want.etat) {
       $ok = $ok -and [bool]$menu.attente -eq $want.etat.attente -and $menu.phase -eq $want.etat.phase -and $menu.position -eq $want.etat.position
     }

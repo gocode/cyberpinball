@@ -14,6 +14,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Interface sounds: a solenoid click when changing table, a coin on Start, the knocker when a high score falls; can be turned off in "Media, sound and attract mode".
 - Cabinet health (Cabinet section): disk space, tables that don't start, missing media, screens and VPX version on a single screen.
 - Dedicated cabinet (Cabinet section), off by default: Cyber Pinball can replace the Windows Explorer, with a way to bring it back.
+- Shut down, restart and sleep from the Cabinet section: one confirmation, then settings are saved and every screen turns black, never showing the desktop; on wake, the menu comes back as it was.
+- Guest mode (Cabinet section): for a party or the kids, guests can only choose a table, play and read its game page; holding both flippers and both MagnaSaves for 3 seconds unlocks it.
+- Accelerometer nudge strength, adjustable in the "Tilt" step of the cabinet setup: ×2 is proposed for a Pinscape, which VPX almost ignored at the original scale.
+- Cinematic launch: on Start, the game logo flies from the playfield to the backglass, the DMD shows loading, a coil thumps when VPX takes over; VPX never waits, and "Media, sound and attract mode" turns it off.
+- Menu lists: a list too long for the screen is marked by a rule at the top or bottom instead of a fade, the selected entry stays whole and every list starts just below its title.
 
 ## 0.1.3
 

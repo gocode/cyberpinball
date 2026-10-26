@@ -28,7 +28,8 @@ body {
  * posées par frontend.js ; tout l'écran par défaut). Les tailles de la page sont en
  * cqmin : relatives à cette zone, pas à la fenêtre.
  */
-#root {
+#root,
+#cinema {
   position: fixed;
   left: calc(var(--pf-x, 0) * 100vw);
   top: calc(var(--pf-y, 0) * 100vh);
@@ -64,7 +65,10 @@ html[data-rotation='270'] {
 
 html[data-rotation='90'] #root,
 html[data-rotation='180'] #root,
-html[data-rotation='270'] #root {
+html[data-rotation='270'] #root,
+html[data-rotation='90'] #cinema,
+html[data-rotation='180'] #cinema,
+html[data-rotation='270'] #cinema {
   position: fixed;
   top: calc((var(--pf-y, 0) + var(--pf-h, 1) / 2) * 100vh);
   left: calc((var(--pf-x, 0) + var(--pf-w, 1) / 2) * 100vw);
@@ -1546,6 +1550,343 @@ html.loading-video #media-bg::after {
   margin-left: auto;
   font-weight: 700;
   text-align: right;
+}
+
+/* ---------- Lancement en cinéma (cinema.ts, frontend.js : syncCinema) ---------- */
+
+/*
+ * Au Start, le logo du jeu s'allume sur le plateau et s'envole vers le fronton ; il y entre par
+ * le bas et s'y pose ; quand VPX prend la main, tout s'efface. Rythme revu par Codex
+ * (26/10/2026), CINEMA_TIMELINE dans cinema.ts (cinema.test.ts vérifie que les deux s'accordent),
+ * en millisecondes depuis le Start :
+ *   0–240      allumage   le logo paraît au centre, une onde brève part de lui
+ *   240–340    armement   il recule d'un cran, comme une bille tirée par le lanceur
+ *   340–740    envol      il file vers le haut et sort de l'écran (son bord bas vers 660 ms)
+ *   660–900    passage    (DMD vivant, livedmd.ts) une tache de lumière traverse l'afficheur
+ *   800–1080   voile      le fronton s'assombrit
+ *   840–1200   arrivée    il entre par le bas du fronton, dépasse à peine, se pose
+ *   1200–1600  impact     une onde autour du logo posé
+ *   1600–…     tenue      un halo respire derrière lui, jusqu'au passage de relais
+ * Chaque départ se compte depuis le Start (--ce : millisecondes écoulées quand la couche est
+ * posée, sans unité) : une fenêtre qui la pose en retard reprend au bon moment, les écrans
+ * restent d'accord. Rien ici ne commande VPX, qui part et prend la main sans attendre.
+ */
+
+/* Couche du plateau : la zone du playfield, tournée comme la racine (le haut est le fronton). */
+#cinema {
+  pointer-events: none;
+}
+
+.cinema {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  container-type: size;
+  --ce: var(--cine-elapsed, 0);
+}
+
+/* Au bureau, le logo part du cadre 9:16 du média (#media-bg) et en sort par le haut : l'encart ne bouge pas. */
+html.menu-desktop #cinema .cinema-depart {
+  --px: calc(100cqmin / 1080);
+  inset: auto;
+  left: calc(80 * var(--px));
+  top: calc(92 * var(--px));
+  width: calc(531 * var(--px));
+  height: calc(944 * var(--px));
+  border-radius: calc(5 * var(--px));
+}
+
+/* Sur le fronton, par-dessus son média. */
+.zone > .cinema {
+  z-index: 3;
+}
+
+.cine-flight {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+}
+
+.cine-arm,
+.cine-logo {
+  position: absolute;
+  left: calc(var(--cine-w) / -2);
+  top: calc(var(--cine-h) / -2);
+  width: var(--cine-w);
+  height: var(--cine-h);
+}
+
+.cine-arm .cine-logo {
+  left: 0;
+  top: 0;
+}
+
+.cine-logo {
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.cine-logo img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 0.6cqmin 1.2cqmin rgba(0, 0, 0, 0.85));
+}
+
+/* Sans logo : le médaillon de la roue (chrome fin, fond opaque), le titre dedans. */
+.cine-disc {
+  width: min(var(--cine-w), var(--cine-h));
+  aspect-ratio: 1;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: calc(min(var(--cine-w), var(--cine-h)) * 0.025) solid #8fa39d;
+  background: radial-gradient(circle at 50% 35%, #12342c, #030807 75%) #030807;
+  box-shadow: inset 0 0 0 calc(min(var(--cine-w), var(--cine-h)) * 0.009) #e6f0ec, 0 0.6cqmin 1.2cqmin rgba(0, 0, 0, 0.8);
+  display: grid;
+  place-items: center;
+  padding: calc(min(var(--cine-w), var(--cine-h)) * 0.12);
+}
+
+.cine-disc-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+  min-width: 0;
+  width: 100%;
+  text-align: center;
+  /* Plancher de 20 px pour un petit côté de 1080. */
+  font-size: max(1.852cqmin, calc(min(var(--cine-w), var(--cine-h)) * 0.12));
+  font-weight: 600;
+  font-stretch: 112%;
+  line-height: 1.2;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+/*
+ * Deux impulsions brèves, au départ et à la pose ; aucun anneau pendant la tenue. Une animation
+ * qui ne fait que passer (onde, traînée d'arrivée) ne garde que sa fin (forwards) : remplie vers
+ * l'arrière (both), sa première image se verrait pendant tout son délai (l'onde de la pose, à
+ * demi visible dès l'arrivée du logo ; cinema.test.ts).
+ */
+.cine-ring {
+  position: absolute;
+  --ring: calc(min(var(--cine-w), var(--cine-h)) * 1.15);
+  left: calc(var(--ring) / -2);
+  top: calc(var(--ring) / -2);
+  width: var(--ring);
+  height: var(--ring);
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 0.32cqmin solid var(--signal);
+  box-shadow: 0 0 0.9cqmin rgba(139, 226, 58, 0.38);
+  opacity: 0;
+}
+
+/* Traînée : une tête pâle courte sous le logo qui file. */
+.cine-trail {
+  position: absolute;
+  left: calc(var(--cine-w) * -0.06);
+  top: calc(var(--cine-h) * 0.15);
+  width: calc(var(--cine-w) * 0.12);
+  height: 32cqh;
+  transform-origin: top;
+  border-radius: 50% 50% 0 0;
+  background: linear-gradient(to bottom, rgba(225, 255, 190, 0.65), rgba(139, 226, 58, 0.32) 25%, rgba(139, 226, 58, 0));
+  filter: blur(0.5cqmin);
+  opacity: 0;
+}
+
+/* Départ : le plateau. */
+.cinema-depart {
+  --cine-w: 58cqw;
+  --cine-h: 24cqh;
+}
+
+.cinema-depart .cine-logo {
+  animation: cine-allumage 240ms cubic-bezier(0.2, 0.7, 0.3, 1) both;
+  animation-delay: calc((0 - var(--ce)) * 1ms);
+}
+
+.cinema-depart .cine-ring {
+  animation: cine-onde 380ms ease-out forwards;
+  animation-delay: calc((40 - var(--ce)) * 1ms);
+}
+
+.cinema-depart .cine-arm {
+  animation: cine-armement 100ms ease-in-out both;
+  animation-delay: calc((240 - var(--ce)) * 1ms);
+}
+
+.cinema-depart .cine-flight {
+  animation: cine-envol 400ms cubic-bezier(0.4, 0, 0.75, 0.45) both;
+  animation-delay: calc((340 - var(--ce)) * 1ms);
+}
+
+.cinema-depart .cine-trail {
+  animation: cine-trainee 400ms linear both;
+  animation-delay: calc((340 - var(--ce)) * 1ms);
+}
+
+@keyframes cine-allumage {
+  from {
+    opacity: 0;
+    transform: scale(0.88);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes cine-onde {
+  from {
+    opacity: 0.5;
+    transform: scale(0.72);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+@keyframes cine-armement {
+  to {
+    transform: translateY(1.8cqh) scale(0.96);
+  }
+}
+
+@keyframes cine-envol {
+  to {
+    transform: translateY(-100cqh) scale(0.9);
+  }
+}
+
+@keyframes cine-trainee {
+  from {
+    opacity: 0;
+    transform: scaleY(0.15);
+  }
+  25% {
+    opacity: 0.55;
+  }
+  65% {
+    opacity: 0.65;
+  }
+  to {
+    opacity: 0;
+    transform: scaleY(1);
+  }
+}
+
+/* Arrivée : le fronton (sa fenêtre, ou sa zone sur un écran partagé). */
+.cinema-arrivee {
+  --cine-w: 56cqw;
+  --cine-h: 44cqh;
+}
+
+.cinema-arrivee .cine-flight {
+  top: 47%;
+  animation: cine-arrivee 360ms cubic-bezier(0.16, 0.72, 0.3, 1) both;
+  animation-delay: calc((840 - var(--ce)) * 1ms);
+}
+
+.cinema-arrivee .cine-trail {
+  animation: cine-trainee-arrivee 260ms ease-out forwards;
+  animation-delay: calc((840 - var(--ce)) * 1ms);
+}
+
+.cinema-arrivee .cine-ring {
+  animation: cine-onde 400ms ease-out forwards;
+  animation-delay: calc((1200 - var(--ce)) * 1ms);
+}
+
+/* Tenue : un halo fixe derrière le logo, dont seule l'opacité respire. */
+.cinema-arrivee .cine-logo::before {
+  content: '';
+  position: absolute;
+  inset: -8%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, rgba(139, 226, 58, 0.24), rgba(139, 226, 58, 0) 70%);
+  opacity: 0.35;
+  animation: cine-souffle 3200ms ease-in-out infinite;
+  animation-delay: calc((1600 - var(--ce)) * 1ms);
+}
+
+/* Le fronton s'assombrit sous le logo, sans s'éteindre. */
+.cine-scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--void);
+  opacity: 0;
+  animation: cine-voile 280ms ease-out both;
+  animation-delay: calc((800 - var(--ce)) * 1ms);
+}
+
+@keyframes cine-arrivee {
+  0% {
+    transform: translateY(75cqh) scale(0.9);
+  }
+  80% {
+    transform: translateY(-1.2cqh) scale(1.012);
+    animation-timing-function: cubic-bezier(0.35, 0, 0.65, 1);
+  }
+  100% {
+    transform: none;
+  }
+}
+
+@keyframes cine-trainee-arrivee {
+  from {
+    opacity: 0.55;
+    transform: scaleY(0.8);
+  }
+  to {
+    opacity: 0;
+    transform: scaleY(0.15);
+  }
+}
+
+@keyframes cine-voile {
+  to {
+    opacity: 0.64;
+  }
+}
+
+@keyframes cine-souffle {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
+/* Passage de relais : ce qui n'était pas encore parti ne part plus, et tout s'efface. */
+.cinema.cine-fin *,
+.cinema.cine-fin .cine-logo::before {
+  animation-play-state: paused;
+}
+
+.cinema.cine-fin {
+  animation: cine-fin 240ms linear forwards;
+}
+
+@keyframes cine-fin {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
 }
 
 /* ---------- Mode attente ---------- */

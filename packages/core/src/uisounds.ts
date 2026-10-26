@@ -4,8 +4,7 @@
 // règle qui décide s'il joue ; le rendu tient la recette de chaque son, synthétisée par
 // WebAudio : aucun extrait de vrai flipper, aucun fichier.
 //
-// Ajouter un son (le « coup de bobine » du lancement en cinéma, par exemple) : son
-// identifiant dans UI_SOUND_IDS, sa fiche dans UI_SOUNDS, sa recette dans le registre
+// Ajouter un son : son identifiant dans UI_SOUND_IDS, sa fiche dans UI_SOUNDS, sa recette dans le registre
 // RECIPES d'app/renderer/ui-sounds.js, puis l'appel playUiSound(id) dans app/src/frontend.ts.
 // uisounds.test.ts vérifie que chaque son du registre a sa recette, sa fiche et sa ligne
 // dans le manuel.
@@ -15,7 +14,7 @@ import type { MenuMediaSettings } from './mediaview';
 import type { MenuMoment } from './menumoments';
 import { playVolume } from './menumoments';
 
-export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker'] as const;
+export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil'] as const;
 export type UiSoundId = (typeof UI_SOUND_IDS)[number];
 
 export interface UiSoundSpec {
@@ -27,6 +26,11 @@ export interface UiSoundSpec {
   readonly source: string;
   /** Licence du son ; une recette du dépôt suit la licence du code de Cyber Pinball. */
   readonly license: string;
+  /**
+   * Son du passage de relais : joué à l'instant où VPX prend la main, il a le droit de partir
+   * quand la partie vient de commencer, et d'y finir de sonner. Aucun autre son n'y a droit.
+   */
+  readonly handover?: boolean;
 }
 
 const SYNTH_SOURCE = 'synthèse WebAudio, app/renderer/ui-sounds.js'; // i18n-ignore : provenance, citée telle quelle
@@ -63,22 +67,38 @@ export const UI_SOUNDS: Readonly<Record<UiSoundId, UiSoundSpec>> = {
     source: SYNTH_SOURCE,
     license: OWN_LICENSE,
   },
+  coil: {
+    get label() {
+      return t('Coup de bobine');
+    },
+    get when() {
+      return t('Lancement en cinéma : VPX prend la main');
+    },
+    source: SYNTH_SOURCE,
+    license: OWN_LICENSE,
+    handover: true,
+  },
 };
 
 /** Son à jouer : identifiant et volume de lecture (0 à 1). */
 export interface UiSoundCue {
   id: UiSoundId;
   volume: number;
+  /** Son du passage de relais : la fenêtre le laisse partir et sonner au début de la partie. */
+  handover?: true;
 }
 
 /**
  * Le son `id` joue-t-il maintenant, et à quel volume ? Jamais pendant une partie (VPX a la
- * parole : rien ne doit s'ajouter à sa musique), jamais en mode attente, jamais quand les
- * sons de l'interface sont coupés ou à 0 %. Le chargement est permis : la pièce tombe au
- * Start, avant que VPX ne prenne les écrans.
+ * parole : rien ne doit s'ajouter à sa musique), sauf le son du passage de relais (le coup de
+ * bobine, à l'instant où VPX prend la main) ; jamais en mode attente, jamais quand les sons de
+ * l'interface sont coupés ou à 0 %. Le chargement est permis : la pièce tombe au Start, avant
+ * que VPX ne prenne les écrans.
  */
 export function uiSoundCue(id: UiSoundId, settings: Pick<MenuMediaSettings, 'uiSounds' | 'uiSoundsVolume'>, moment: MenuMoment): UiSoundCue | undefined {
-  if (!settings.uiSounds || moment === 'game' || moment === 'attract') return undefined;
+  const handover = UI_SOUNDS[id].handover === true;
+  if (!settings.uiSounds || (moment === 'game' && !handover) || moment === 'attract') return undefined;
   const volume = playVolume(settings.uiSoundsVolume);
-  return volume > 0 ? { id, volume } : undefined;
+  if (!(volume > 0)) return undefined;
+  return handover ? { id, volume, handover } : { id, volume };
 }

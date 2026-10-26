@@ -39,12 +39,38 @@ test('rien ne joue quand les sons sont coupés, à 0 %, en mode attente ou penda
       assert.equal(uiSoundCue(id, off, moment), undefined, `${id} coupé, ${moment}`);
       assert.equal(uiSoundCue(id, silent, moment), undefined, `${id} à 0 %, ${moment}`);
     }
-    assert.equal(uiSoundCue(id, S, 'game'), undefined, `${id} pendant la partie`);
+    const relay = UI_SOUNDS[id].handover ? { handover: true } : {};
+    // Pendant la partie : seul le son du passage de relais (le coup de bobine, quand VPX prend la main).
+    assert.deepEqual(uiSoundCue(id, S, 'game'), UI_SOUNDS[id].handover ? { id, volume: playVolume(50), handover: true } : undefined, `${id} pendant la partie`);
     assert.equal(uiSoundCue(id, S, 'attract'), undefined, `${id} en mode attente`);
-    assert.deepEqual(uiSoundCue(id, S, 'browse'), { id, volume: playVolume(50) });
+    assert.deepEqual(uiSoundCue(id, S, 'browse'), { id, volume: playVolume(50), ...relay });
     // La pièce tombe au Start : le chargement précède l'arrivée de VPX.
-    assert.deepEqual(uiSoundCue(id, { ...S, uiSoundsVolume: 80 }, 'loading'), { id, volume: 0.8 });
+    assert.deepEqual(uiSoundCue(id, { ...S, uiSoundsVolume: 80 }, 'loading'), { id, volume: 0.8, ...relay });
   }
+  assert.deepEqual(UI_SOUND_IDS.filter((id) => UI_SOUNDS[id].handover), ['coil'], 'un seul son de relais');
+});
+
+test('fenêtre : le coup de bobine du relais part au début de la partie et y finit de sonner, seul', () => {
+  const w = uiSoundsWindow();
+  w.api.setPhase('menu');
+  w.cue({ id: 'coin', volume: 0.5 });
+  w.api.setPhase('playing');
+  assert.equal(w.api.status().enCours, 0);
+  // Le relais arrive après l'état de la partie (frontend.ts : onPlaying, puis onForeground).
+  w.cue({ id: 'coil', volume: 0.5, handover: true });
+  assert.equal(w.api.status().enCours, 1, 'le coup de bobine sonne');
+  w.api.setPhase('playing');
+  assert.equal(w.api.status().enCours, 1, 'un état de la partie renvoyé ne le coupe pas');
+  // Un autre son se réclamant du relais ne passe pas.
+  w.clock.now += 100;
+  w.cue({ id: 'knocker', volume: 0.5, handover: true });
+  w.cue({ id: 'coil', volume: 0.5 });
+  assert.deepEqual(Array.from(w.api.status().joues, (h) => h.son), ['coin', 'coil']);
+  // Le son fini, plus aucun flux ouvert pendant la partie.
+  const closed = w.log.closed;
+  w.flush();
+  assert.equal(w.api.status().enCours, 0);
+  assert.ok(w.log.closed > closed, 'contexte audio fermé');
 });
 
 // ---------------------------------------------------------------------------
@@ -276,7 +302,12 @@ test('réglages du menu : chaque sous-écran revient sur sa propre ligne ; aper�
     assert.equal(opened.at(-1)!.at, i, `${MENU_SETTINGS_ROWS[i]} : un choix revient sur sa ligne`);
     settings = snapshot;
   }
-  // Basculer les sons fait entendre le clic ; choisir leur volume, la pièce.
+  // Basculer les sons fait entendre le clic ; choisir leur volume, la pièce ; rétablir le lancement en cinéma, le coup de bobine.
   assert.ok(previews.includes('solenoid'));
   assert.ok(previews.includes('coin'));
+  settings = { ...S, cinema: false };
+  main().actions[MENU_SETTINGS_ROWS.indexOf('cinema')]!.run();
+  assert.equal(settings.cinema, true);
+  assert.equal(previews.at(-1), 'coil');
+  assert.match(main().actions[MENU_SETTINGS_ROWS.indexOf('cinema')]!.label, /Lancement en cinéma : joué/);
 });

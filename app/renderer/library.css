@@ -147,10 +147,22 @@ body.mouse .lib-back:hover {
   gap: 5cqmin;
 }
 
+/*
+ * Liste seule : centrée en largeur, mais partie juste sous l'en-tête (l'écart de .lib), à la
+ * même hauteur d'un écran à l'autre. Centrée en hauteur, une liste courte commençait au milieu
+ * de l'écran, une longue en haut (revue de Codex, octobre 2026). La rangée prend toute la
+ * hauteur ; la liste s'y pose en haut, et ne défile qu'au-delà.
+ */
 .lib-body.only-actions {
   grid-template-columns: minmax(0, 70cqmin);
+  grid-template-rows: minmax(0, 1fr);
   justify-content: center;
-  align-content: center;
+}
+
+.lib-body.only-actions > .lib-actions {
+  align-self: start;
+  max-height: 100%;
+  box-sizing: border-box;
 }
 
 @container (orientation: portrait) {
@@ -349,34 +361,28 @@ body.mouse .lib-back:hover {
 }
 
 /*
- * Liste qui défile (library.js, markOverflow) : le bord derrière lequel il reste des entrées
- * s'efface en fondu, au lieu de couper net la dernière ligne visible. La marge de défilement
- * garde l'entrée choisie hors du fondu (scrollIntoView en tient compte).
+ * Liste qui défile (library.js, markOverflow) : un filet sur le bord derrière lequel il reste
+ * des entrées. Le filet est le bord du conteneur, hors du contenu : la ligne qui le touche reste
+ * entière et pleinement lisible. Jamais de fondu (mask-image) : il faisait passer la dernière
+ * ligne visible pour désactivée (revue de Codex, octobre 2026 ; contours.test.ts et le garde-fou
+ * de mise en page le refusent). Les bords sont toujours là, transparents tant qu'il n'y a rien
+ * derrière : rien ne bouge quand ils s'allument. La marge de défilement garde l'entrée choisie
+ * entière, à distance du filet (scrollIntoView en tient compte).
  */
 .lib-actions,
 .lib-content {
-  --fade: 7cqmin;
-  /* Le dernier quart du fondu est vide : rien d'une ligne coupée au bord ne se devine. */
-  --fade-end: calc(var(--fade) / 4);
-  scroll-padding-block: var(--fade);
-}
-
-.lib-actions.more-below,
-.lib-content.more-below {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent calc(100% - var(--fade-end)));
-  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent calc(100% - var(--fade-end)));
+  border-block: 0.3cqmin solid transparent;
+  scroll-padding-block: 1.2cqmin;
 }
 
 .lib-actions.more-above,
 .lib-content.more-above {
-  -webkit-mask-image: linear-gradient(to bottom, transparent var(--fade-end), #000 var(--fade));
-  mask-image: linear-gradient(to bottom, transparent var(--fade-end), #000 var(--fade));
+  border-top-color: var(--line-strong);
 }
 
-.lib-actions.more-above.more-below,
-.lib-content.more-above.more-below {
-  -webkit-mask-image: linear-gradient(to bottom, transparent var(--fade-end), #000 var(--fade), #000 calc(100% - var(--fade)), transparent calc(100% - var(--fade-end)));
-  mask-image: linear-gradient(to bottom, transparent var(--fade-end), #000 var(--fade), #000 calc(100% - var(--fade)), transparent calc(100% - var(--fade-end)));
+.lib-actions.more-below,
+.lib-content.more-below {
+  border-bottom-color: var(--line-strong);
 }
 
 /* Entrée de menu : capitales espacées ; la choisie est un aplat vert signal, texte sombre. */
@@ -1323,7 +1329,7 @@ body.mouse .journey-step.fixable:hover {
 /*
  * Maquette revue par Codex (octobre 2026) : en paysage, la liste prend la place et les deux
  * actions générales une colonne étroite ; le bilan reste accroché en haut de la liste qui
- * défile (aucun fondu au-dessus de lui) ; constat 28 px, détail 24 px, état et destination
+ * défile (aucun filet au-dessus de lui) ; constat 28 px, détail 24 px, état et destination
  * 22 px à la référence 1 080 ; la destination en casse naturelle, secondaire, verte seulement
  * sur la ligne choisie. Un seul choix à la fois : chaque ligne a sa propre action.
  */
@@ -1337,9 +1343,7 @@ body.mouse .journey-step.fixable:hover {
 }
 
 .lib-body.lib-health > .health {
-  --fade: 3.2cqmin;
-  --fade-end: 0.6cqmin;
-  /* Bilan sur deux rangées et son fondu ; marge réservée au scrollIntoView existant.
+  /* Bilan sur deux rangées ; marge réservée au scrollIntoView existant.
    * À recalculer si son contenu dépasse deux rangées (autre langue, etc.). */
   --health-summary-clearance: 13.5cqmin;
   display: flex;
@@ -1347,28 +1351,18 @@ body.mouse .journey-step.fixable:hover {
   gap: 2cqmin;
   min-width: 0;
   min-height: 0;
-  padding: 0 0.8cqmin var(--fade) 0;
+  padding: 0 0.8cqmin 1.2cqmin 0;
   overflow: auto;
   scrollbar-gutter: stable;
   scroll-padding-block-start: var(--health-summary-clearance);
-  scroll-padding-block-end: calc(var(--fade) + 0.6cqmin);
+  scroll-padding-block-end: 1.8cqmin;
   scroll-behavior: auto;
 }
 
-/* Un masque supérieur effacerait aussi le bilan sticky : on le neutralise.
- * Le masque inférieur conserve le signal de continuation de la liste.
- * Les classes more-* restent pilotées par markOverflow(), déjà présent.
- */
-.lib-body.lib-health > .health,
+/* Le bilan, accroché en haut, dit déjà ce qui précède : pas de filet au-dessus de lui.
+ * Le filet du bas (.lib-content.more-below) garde le signal de continuation de la liste. */
 .lib-body.lib-health > .health.more-above {
-  -webkit-mask-image: none;
-  mask-image: none;
-}
-
-.lib-body.lib-health > .health.more-below,
-.lib-body.lib-health > .health.more-above.more-below {
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent calc(100% - var(--fade-end)));
-  mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent calc(100% - var(--fade-end)));
+  border-top-color: transparent;
 }
 
 .lib-health .health-summary {
@@ -1385,23 +1379,10 @@ body.mouse .journey-step.fixable:hover {
   border: 0.093cqmin solid var(--line-strong);
   border-radius: 0.55cqmin;
   background: var(--surface-raised);
-  /* Surface opaque : les lignes qui passent dessous ne brouillent pas le bilan. */
+  /* Surface opaque, et une bande pleine dessous : les lignes qui passent dessous ne brouillent
+   * pas le bilan. Pas de dégradé : une ligne à demi effacée passerait pour désactivée (la
+   * réserve de défilement garde la ligne choisie au-delà). */
   box-shadow: 0 0.6cqmin 0 var(--surface);
-}
-
-/*
- * Sous le bilan accroché, un court fondu : une ligne qui passe dessous en défilant s'efface au
- * lieu d'être coupée net à son bord (la réserve de défilement garde la ligne choisie au-delà).
- */
-.lib-health .health-summary::after {
-  content: '';
-  position: absolute;
-  left: -0.093cqmin;
-  right: -0.093cqmin;
-  top: calc(100% + 0.6cqmin);
-  height: 3.2cqmin;
-  background: linear-gradient(to bottom, var(--surface) 45%, transparent);
-  pointer-events: none;
 }
 
 .lib-health .health-counts {

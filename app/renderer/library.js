@@ -489,12 +489,14 @@ function revealSelection() {
 }
 
 /**
- * Liste qui défile : le bord derrière lequel il reste des entrées s'efface en fondu
- * (library.css, .more-above / .more-below). Sans cela, la dernière entrée visible était
- * coupée net au milieu d'une ligne (écran PuP-Pack de GOTG, 26 octobre 2026).
+ * Liste qui défile : un filet sur le bord derrière lequel il reste des entrées (library.css,
+ * .more-above / .more-below). Sans indication, la dernière entrée visible était coupée net
+ * au milieu d'une ligne (écran PuP-Pack de GOTG, 26 octobre 2026). Seule une liste qui défile
+ * vraiment est marquée : une liste qui déborde sans défiler (boutons des pages) n'a rien à cacher.
  */
 function markOverflow(list) {
   const slack = 2;
-  list.classList.toggle('more-above', list.scrollTop > slack);
-  list.classList.toggle('more-below', list.scrollTop + list.clientHeight < list.scrollHeight - slack);
+  const scrolls = /^(auto|scroll)$/.test(getComputedStyle(list).overflowY);
+  list.classList.toggle('more-above', scrolls && list.scrollTop > slack);
+  list.classList.toggle('more-below', scrolls && list.scrollTop + list.clientHeight < list.scrollHeight - slack);
 }

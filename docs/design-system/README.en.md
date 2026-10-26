@@ -56,6 +56,8 @@ Values are defined for a short side of 1080 px. In Electron, convert n px to `n 
 
 Outer margins 48 to 64 px, panels 32 to 40 px; setting rows 68 to 76 px depending on density. The details screen uses two rows of three tabs rather than shortening their labels.
 
+A list on its own (system menu, sections) starts just below the header, with the same gap on every screen; it is centred horizontally, never vertically. A list taller than its area scrolls: a 3 px (at reference) `--line-strong` rule marks the edge behind which entries remain, at the top as at the bottom. Never a fade on a list: the line at the edge would look disabled. The selected entry is always whole in view.
+
 ## States and interaction to build into the prototype
 
 `.is-focus` marks the control that a button press acts on; `.is-active` / `.is-current` mark an open view. The product must update them according to the actual navigation. In an interactive integration, use semantic buttons, links and tabs, expose the current state to assistive technologies and keep the DOM focus in sync. The spans in the previews are not interactive components ready to ship.

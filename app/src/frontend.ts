@@ -69,6 +69,8 @@ import {
   tableMediaVolume,
   newRecords,
   uiSoundCue,
+  LaunchCinema,
+  type CinemaView,
   type UiSoundId,
   type MenuMediaSettings,
   type MenuMoment,
@@ -275,6 +277,11 @@ const PRELOAD_OFFSETS = [1, -1, 2, -2];
 let audioOutput: string | undefined;
 /** Numéro du lancement en cours : le son de lancement est joué une fois par lancement. */
 let launchCount = 0;
+/**
+ * Lancement en cinéma (cinema.ts) : l'état de la chorégraphie, que chaque fenêtre joue d'elle-même
+ * (viewFor, cinemaFor). Rien ici ne l'attend : VPX part quand il partait, le relais vient du lanceur.
+ */
+const cinema = new LaunchCinema();
 
 /**
  * Mode attente (§ 5.2) : après le délai réglé sans bouton, une table tirée au hasard toutes
@@ -1236,6 +1243,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   guest.releaseAll();
   state = { ...state, phase: 'loading', help: false };
   launchCount++;
+  const pressedAt = Date.now();
+  // Lancement en cinéma, pour une vraie partie : la chorégraphie part au Start, dans les fenêtres
+  // du menu ; elle ne retarde rien de ce qui suit (cinema.test.ts).
+  if (mediaSettings.cinema && !displayMode) cinema.start(launchCount, { title: table.title, manufacturer: table.manufacturer, year: table.year, logo: medias?.wheel(table) });
   broadcast();
   // La pièce tombe au Start d'une vraie partie (pas au réglage de l'affichage), avant que VPX ne prenne les écrans.
   if (!displayMode) playUiSound('coin');
@@ -1243,12 +1254,19 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const recordsBefore = readTableRecords(table);
   const loadingMs = Number(process.env.CYBERPINBALL_LOADING_MS ?? 2500);
   await delay(Math.min(400, loadingMs));
+  const captured = Date.now();
   await capture('chargement');
+  // Captures des essais sans opérateur (CYBERPINBALL_CAPTURE) : comptées à part dans le journal du lancement.
+  const captureMs = Date.now() - captured;
   await delay(Math.max(0, loadingMs - 400));
 
   // Les écrans ont pu bouger depuis le démarrage du menu, la configuration de la borne aussi.
+  const preparing = Date.now();
   const { problem, choose, selection } = syncScreens();
-  if (choose || problem) displayMode = false;
+  if (choose || problem) {
+    displayMode = false;
+    cinema.stop();
+  }
   if (choose) {
     configurations.openChooser(t('Avant de jouer, choisissez la configuration branchée : elle décide des écrans de VPX.'));
     return undefined;
@@ -1285,14 +1303,21 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     broadcast();
     if (autoStopAfterMs) setTimeout(() => game.stop(), autoStopAfterMs);
   };
+  // VPX prend la main (sa fenêtre de jeu au premier plan, dit le lanceur) : le coup de bobine, une fois.
+  const onForeground = () => {
+    if (cinema.handover()) playUiSound('coil');
+  };
+  // Ce qui a pris le temps du Start au lancement : rien d'autre que l'écran de chargement et la préparation (docs\demo-cinema.ps1).
+  console.log(`Lancement : VPX lancé ${Date.now() - pressedAt} ms après le Start (écran de chargement ${loadingMs} ms${captureMs ? `, captures des essais ${captureMs} ms` : ''}, préparation ${Date.now() - preparing} ms ; lancement en cinéma ${cinema.running ? 'joué' : 'coupé'}).`);
   const game =
     simulated !== undefined
-      ? simulateVpx({ onPlaying })
-      : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: table.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying });
+      ? simulateVpx({ onPlaying, onForeground })
+      : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: table.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying, onForeground });
   // Une partie simulée ne prend aucun raccourci global au poste.
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   const result = await game.done;
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
+  cinema.stop();
   stopWatchOccupied();
   playing = undefined;
   dressing = undefined;
@@ -1664,6 +1689,8 @@ function viewFor(role: RoleId) {
     liveDmd: liveDmdView(role),
     medias: subject ? mediasOf(subject) : defaults,
     preload,
+    // Lancement en cinéma : la part de cette fenêtre (le plateau d'où part le logo, le fronton où il se pose).
+    cinema: state.phase === 'loading' ? cinemaFor(role) : undefined,
     // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
     loading: state.phase === 'loading' && role === 'playfield' && medias && table ? medias.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
     // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
@@ -1701,6 +1728,12 @@ function viewFor(role: RoleId) {
     footer: menuFooter(),
     nav: { confirm: KEYS.confirm[0], exit: KEYS.exit[0], help: KEYS.help[0] },
   };
+}
+
+/** Part d'une fenêtre dans le lancement en cinéma : le logo part du plateau, se pose sur le fronton (sa fenêtre ou sa zone). */
+function cinemaFor(role: RoleId): CinemaView | undefined {
+  const roles = windowRoles.get(role) ?? [role];
+  return cinema.view({ depart: role === 'playfield', arrivee: roles.includes('backglass') });
 }
 
 /** Table voisine dans le menu des tables (boutons, roue cliquée) : le solénoïde claque à chaque table. */
@@ -1755,7 +1788,7 @@ const liveDmd = new LiveDmd({
     if (win && !win.isDestroyed()) win.webContents.send('dmd', shot);
   },
 });
-/** Animation « chargement » jouée sur le DMD pendant le lancement d'une table. */
+/** Animation jouée sur le DMD pendant le lancement d'une table : « lancement » (cinéma) ou « chargement ». */
 let loadingDmd: LiveDmdAnimationHandle | undefined;
 /** Records lus de chaque table, relus quand son VPReg.stg change (après une partie). */
 const recordsCache = new Map<string, { stamp: string; records?: TableRecords }>();
@@ -1840,7 +1873,9 @@ function syncLiveDmd(): void {
     loadingDmd = undefined;
     return liveDmd.pause();
   }
-  if (state.phase === 'loading') loadingDmd ??= liveDmd.play('chargement');
+  // Chargement : l'animation du lancement en cinéma (le logo traverse l'afficheur, puis le titre et la bille), sinon celle du chargement.
+  const launch = cinema.subject;
+  if (state.phase === 'loading') loadingDmd ??= launch ? liveDmd.play('lancement', { label: launch.title }) : liveDmd.play('chargement');
   else {
     loadingDmd?.stop();
     loadingDmd = undefined;

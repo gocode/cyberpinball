@@ -16,6 +16,11 @@ son interface).
 - Sons de l'interface : clic de solénoïde au changement de table, pièce au Start, knocker quand un record tombe ; désactivables dans « Médias, son et attente ».
 - Santé de la borne (rubrique Borne) : espace disque, tables qui ne démarrent pas, médias manquants, écrans et version de VPX sur un seul écran.
 - Borne dédiée (rubrique Borne), désactivée par défaut : Cyber Pinball peut remplacer l'Explorateur de Windows, avec un moyen de le rappeler.
+- Éteindre, redémarrer et mettre en veille depuis la rubrique Borne : une confirmation, puis les réglages sont enregistrés et tous les écrans passent au noir, sans jamais montrer le bureau ; au réveil, le menu revient tel quel.
+- Mode invité (rubrique Borne) : pour une soirée ou les enfants, on peut seulement choisir une table, jouer et lire sa fiche ; les deux flippers et les deux MagnaSave tenus 3 secondes déverrouillent.
+- Force des secousses de l'accéléromètre, réglable dans l'étape « Tilt » de la configuration de la borne : ×2 est proposé pour un Pinscape, que VPX ignorait presque à l'échelle d'origine.
+- Lancement en cinéma : au Start, le logo du jeu s'envole du plateau vers le fronton, le DMD charge, un coup de bobine quand VPX prend la main ; VPX n'attend jamais, et « Médias, son et attente » le coupe.
+- Listes des menus : une liste trop longue est signalée par un filet en haut ou en bas au lieu d'un fondu, l'entrée choisie reste entière et chaque liste commence juste sous son titre.
 
 ## 0.1.3
 

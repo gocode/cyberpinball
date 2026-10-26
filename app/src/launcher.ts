@@ -57,6 +57,12 @@ export interface LaunchOptions {
   timeoutMs?: number;
   /** Appelé quand la fenêtre de jeu est à l'écran. */
   onPlaying?: () => void;
+  /**
+   * Appelé une fois, quand la fenêtre de jeu tient le premier plan (Windows le dit :
+   * foregroundWindow appartient à VPX) : VPX a pris la main. Jamais d'après un délai : si
+   * Windows ne lui donne jamais le premier plan, il n'est pas appelé.
+   */
+  onForeground?: () => void;
 }
 
 export interface RunningGame {
@@ -79,6 +85,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
 
   let player: WindowInfo | undefined;
   let playingSince: number | undefined;
+  let foreground = false;
   let failure: LaunchFailure | undefined;
   let message: string | undefined;
   let killTimer: NodeJS.Timeout | undefined;
@@ -135,6 +142,12 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
           child.kill();
         }
       }
+
+      // VPX prend la main : sa fenêtre de jeu tient le premier plan (relu à chaque tour, dès qu'elle est là).
+      if (player && !foreground && !failure && foregroundWindow()?.pid === child.pid) {
+        foreground = true;
+        opts.onForeground?.();
+      }
     }, POLL_MS);
 
     const finish = (exitCode: number | null) => {
@@ -176,7 +189,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
  * jusqu'à stop(). Le menu passe ainsi par le chargement, la partie et le retour, comme
  * avec VPX, sans rien ouvrir sur les écrans du poste.
  */
-export function simulateVpx(opts: { onPlaying?: () => void; loadMs?: number }): RunningGame {
+export function simulateVpx(opts: { onPlaying?: () => void; onForeground?: () => void; loadMs?: number }): RunningGame {
   const t0 = Date.now();
   let playingSince: number | undefined;
   let finish: (result: LaunchResult) => void = () => undefined;
@@ -184,6 +197,8 @@ export function simulateVpx(opts: { onPlaying?: () => void; loadMs?: number }): 
   const timer = setTimeout(() => {
     playingSince = Date.now();
     opts.onPlaying?.();
+    // Sans fenêtre de VPX, la « fenêtre de jeu » simulée a le premier plan dès qu'elle paraît.
+    opts.onForeground?.();
   }, opts.loadMs ?? 1500);
   let stopped = false;
   const stop = () => {
