@@ -183,7 +183,8 @@ test('détection : l’axe tiré puis relâché, son sens, et ce que l’étape 
   // Bruit de 2 % au repos : 3 % de zone morte ; Pinscape à six axes, lanceur sur Z : vitesse sur RZ.
   assert.deepEqual(proposed, {
     plunger: { device: PINSCAPE, name: PINSCAPE_NAME, axis: 2, reversed: false, deadZone: 0.03, speedAxis: 5 },
-    nudge: { device: PINSCAPE, name: PINSCAPE_NAME, x: 0, y: 1 },
+    // Force des secousses d'un Pinscape en « 1G » : 1 g mesuré vaut 1 g dans VPX (NUDGE_GAIN).
+    nudge: { device: PINSCAPE, name: PINSCAPE_NAME, x: 0, y: 1, gain: 2 },
   });
 });
 

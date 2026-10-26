@@ -17,7 +17,7 @@ import type { IconName } from './icons';
 import { EDGE_LABELS } from './layout';
 import { dmdKindLabel } from './dmdscreen';
 import { ROLES, type Cabinet, type RoleId } from './model';
-import { analogLines, isAnalogKey } from './plunger';
+import { analogLines, isAnalogKey, isNudgeAxisKey } from './plunger';
 import { isTiltKey, tiltLines } from './tilt';
 import { VPX_LAYOUT_KEYS } from './vpx';
 
@@ -108,11 +108,12 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
     flag: '--tilt',
     icon: 'tilt',
     get label() { return 'Tilt'; },
-    get detail() { return t('Balancier de la borne, ou balancier simulé par VPX à partir des secousses : seuil et essai'); },
+    get detail() { return t('Balancier de la borne ou simulé par VPX, force des secousses de l’accéléromètre : réglage à l’essai'); },
     get saved() { return t('Tilt enregistré'); },
     phases: ['tilt'],
-    fields: ['tilt'],
-    owns: isTiltKey,
+    // La force des secousses est l'échelle des axes de l'accéléromètre, réglée ici à l'essai.
+    fields: ['tilt', 'analog'],
+    owns: (id) => isTiltKey(id) || isNudgeAxisKey(id),
   },
   {
     id: 'ecrans',

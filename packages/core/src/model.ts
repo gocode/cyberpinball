@@ -285,6 +285,14 @@ export interface NudgeSensor {
   /** Axes SDL de l'accélération latérale et longitudinale (X et Y d'un Pinscape : 0 et 1). */
   x: number;
   y: number;
+  /**
+   * Force des secousses : échelle de VPX des deux axes (plunger.ts, NUDGE_GAIN). Absente : 1,
+   * la valeur lue telle quelle, comme la disposition par défaut de VPX pour un Pinscape.
+   */
+  gain?: number;
+  /** Axe inversé dans le menu de VPX (échelle négative), gardé tel quel. */
+  invertX?: boolean;
+  invertY?: boolean;
 }
 
 /**

@@ -107,21 +107,36 @@ html[data-rotation='270'] #root {
   margin: 0;
 }
 
-/* Constat bref sous le titre, entre lui et le menu ; s'efface seul. */
+/*
+ * Constat bref sous la marque, au menu des tables ; s'efface seul. Aux unités de la zone
+ * (cqmin, comme la marque et la roue dentée) : sur la borne pivotée aussi, il reste sous la
+ * marque et s'arrête avant la roue dentée. Sur son fond, il se lit par-dessus le média.
+ */
 .banner {
   position: absolute;
-  top: 6.4vmin;
-  left: 4vmin;
-  right: 4vmin;
+  top: 6.6cqmin;
+  left: 4cqmin;
+  right: 9cqmin;
+  z-index: 2;
+  width: fit-content;
+  margin-inline: auto;
+  padding: 0.6cqmin 1.4cqmin;
   text-align: center;
-  font-size: 2vmin;
-  color: var(--meta);
+  font-size: 2.1cqmin;
+  color: var(--ink);
+  background: var(--scrim);
+  border-radius: 0.6cqmin;
 }
 
 /* Le même constat dans le flux d'un écran opaque (message, menu système), au-dessus de son
    titre : centré dans un message, aligné à gauche dans l'en-tête du menu système. */
 .banner.banner-inline {
   position: static;
+  width: auto;
+  margin-inline: 0;
+  padding: 0;
+  color: var(--meta);
+  background: none;
   font-size: 2.4cqmin;
   text-align: inherit;
 }
@@ -964,7 +979,97 @@ body.mouse .gear {
   pointer-events: none;
 }
 
+/*
+ * Mode invité : cadenas et mot « Invité » à la place de la roue dentée, dans le coin appris du
+ * menu système. Repère commun de 64 px (petit côté de 1 080 px) : cadenas de 32 px au centre,
+ * anneau de rayon 26 px et de 4 px de trait autour, qui se remplit de midi, dans le sens horaire,
+ * pendant que la combinaison est tenue. Une porte fermée remplace le mot par une pastille opaque,
+ * lisible sur n'importe quel média.
+ */
+@property --unlock {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+.guest-lock {
+  position: absolute;
+  top: 0.74cqmin;
+  right: 1.67cqmin;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 1.11cqmin;
+  line-height: 1.2;
+}
+
+body.mouse .guest-lock {
+  cursor: pointer;
+}
+
+.guest-lock-label {
+  font-size: 2.2cqmin;
+  letter-spacing: 0.04em;
+  color: var(--meta);
+}
+
+.guest-lock-pill {
+  font-size: 2.2cqmin;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 0.1cqmin solid var(--line-strong);
+  border-radius: 999px;
+  padding: 0.7cqmin 1.8cqmin;
+  white-space: nowrap;
+}
+
+.guest-lock-glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 5.93cqmin;
+  height: 5.93cqmin;
+  color: var(--ink-muted);
+}
+
+.guest-lock-icon {
+  width: 2.96cqmin;
+  height: 2.96cqmin;
+}
+
+.guest-lock.knocked .guest-lock-glyph,
+.guest-lock.unlocking .guest-lock-glyph,
+.guest-lock.unlocked .guest-lock-glyph {
+  color: var(--ink);
+}
+
+/* Anneau : piste et progression dans le même repère que le cadenas ; repris au temps déjà tenu à chaque rendu. */
+.guest-lock.unlocking .guest-lock-glyph::before {
+  content: '';
+  position: absolute;
+  inset: 0.37cqmin;
+  border-radius: 50%;
+  background: conic-gradient(var(--signal) var(--unlock), var(--line-strong) 0);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 0.37cqmin), #000 calc(100% - 0.33cqmin));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 0.37cqmin), #000 calc(100% - 0.33cqmin));
+  animation: guest-unlock var(--unlock-ms, 3000ms) linear var(--unlock-delay, 0ms) forwards;
+}
+
+@keyframes guest-unlock {
+  to {
+    --unlock: 100%;
+  }
+}
+
 /* ---------- Superpositions ---------- */
+
+/* Extinction, veille, redémarrage : du noir uni sur chaque écran, sans décor ni marque. */
+html.power-phase,
+html.power-phase body,
+.overlay.power {
+  background: #000;
+}
 
 .overlay {
   --pad-top: 6cqmin;

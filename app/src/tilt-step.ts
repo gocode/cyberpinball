@@ -7,6 +7,10 @@
 //   les boutons de tremblement ; l'angle du contact se règle aux flippers ;
 // - pas de tilt (aucun balancier relevé).
 //
+// Avec un accéléromètre, la force des secousses (échelle de ses axes, NUDGE_GAIN) se règle aussi
+// ici : VPX ignore une secousse trop faible, et un Pinscape à l'échelle 1 n'en donne presque
+// jamais assez (plunger.ts). L'essai dit la secousse lue et le seuil sous lequel VPX l'ignore.
+//
 // Essai sur le même écran : le balancier simulé vu de dessus, calculé comme VPX le calculera
 // d'après les axes de l'accéléromètre lus par la bibliothèque SDL de VPX, avec chaque contact
 // avec l'anneau (un tilt) ; le balancier de la borne s'allume à chaque contact réel. Tout se
@@ -14,13 +18,19 @@
 
 import {
   axisLabel,
+  clampNudgeGain,
   clampThreshold,
   formatNumber,
+  gainLabel,
   hasBob,
   keyLabel,
+  NUDGE_GAIN,
+  nudgeFloor,
+  nudgeScale,
   plumbOptionsFromIni,
   plumbView,
   proposedTilt,
+  setPlumbShape,
   setPlumbThreshold,
   startPlumb,
   stepPlumb,
@@ -39,11 +49,13 @@ import {
 } from '@cyberpinball/core';
 
 /** Lignes du réglage. */
-export type TiltRow = 'mode' | 'threshold';
+export type TiltRow = 'mode' | 'threshold' | 'gain';
 export type TiltAction = 'save';
 
 /** Durée pendant laquelle un contact (simulé ou réel) reste allumé à l'écran. */
 const FLASH_MS = 800;
+/** Plus forte secousse lue : celle des dernières secondes. */
+const RAW_PEAK_MS = 3000;
 
 export interface TiltStep {
   /** Réglage proposé, enregistré par « Enregistrer » (« Continuer » dans l'assistant complet). */
@@ -55,9 +67,15 @@ export interface TiltStep {
   bob?: string;
   /** Accéléromètre de l'étape « Lanceur ». */
   nudge?: CabinetAnalog['nudge'];
+  /** Force des secousses proposée (accéléromètre seulement), enregistrée avec le tilt. */
+  gain?: number;
+  /** [Input] Mapping.Nudge0.Strength : le seuil de VPX en dépend aussi. */
+  strength: number;
   selected: TiltRow | TiltAction;
-  /** Angle en cours de réglage aux flippers. */
-  editing: boolean;
+  /** Ligne en cours de réglage aux flippers : l'angle ou la force. */
+  editing?: 'threshold' | 'gain';
+  /** Secousses lues récemment : [instant, plus grande valeur des deux axes, de 0 à 1]. */
+  raw: [number, number][];
   sim: PlumbSimulation;
   readings: AxisReading[];
   last?: number;
@@ -76,23 +94,44 @@ export function startTiltStep(saved: CabinetTilt | undefined, ini: string, butto
   // Un mode qui n'est plus possible (balancier retiré à l'étape « Boutons », ou ajouté depuis « Pas de tilt »).
   if (!modes.includes(tilt.mode)) tilt.mode = tilt.mode === 'bob' ? 'simulated' : 'bob';
   tilt.threshold = clampThreshold(tilt.threshold);
-  return {
+  const options = plumbOptionsFromIni(ini, tilt.threshold);
+  const nudge = analog?.nudge;
+  const step: TiltStep = {
     tilt,
     modes,
     ...(!saved && { vpx: tiltFromIni(ini, buttons) }),
     ...(hasBob(buttons) && { bob: buttons!.tilt }),
-    ...(analog?.nudge && { nudge: analog.nudge }),
+    ...(nudge && { nudge: structuredClone(nudge) }),
+    // Force jamais réglée (échelle 1, celle de VPX) : celle d'un Pinscape en « 1G » est proposée.
+    ...(nudge && { gain: clampNudgeGain(nudge.gain ?? NUDGE_GAIN.pinscape) }),
+    strength: options.strength ?? 1,
     selected: 'save',
-    editing: false,
-    sim: startPlumb(plumbOptionsFromIni(ini, tilt.threshold)),
+    raw: [],
+    sim: startPlumb(options),
     readings: [],
     seenTilts: 0,
     bobContacts: 0,
   };
+  applyGain(step);
+  return step;
+}
+
+/** Le réglage de l'accéléromètre avec la force choisie ; inchangé sans accéléromètre. */
+export function analogWithGain(step: TiltStep, analog: CabinetAnalog | undefined): CabinetAnalog | undefined {
+  if (!analog?.nudge || step.gain === undefined) return analog;
+  return { ...analog, nudge: { ...analog.nudge, gain: step.gain } };
+}
+
+/** La simulation lit les axes à la force choisie, comme VPX les lira. */
+function applyGain(step: TiltStep): void {
+  const n = step.nudge;
+  if (!n || step.gain === undefined) return;
+  const shape = (axis: 'x' | 'y') => ({ deadZone: 0, limit: 1, scale: nudgeScale({ ...n, gain: step.gain }, axis) });
+  setPlumbShape(step.sim, shape('x'), shape('y'));
 }
 
 export function rows(step: TiltStep): TiltRow[] {
-  return step.tilt.mode === 'simulated' ? ['mode', 'threshold'] : ['mode'];
+  return [...(['mode'] as const), ...(step.tilt.mode === 'simulated' ? (['threshold'] as const) : []), ...(step.gain !== undefined ? (['gain'] as const) : [])];
 }
 
 function choices(step: TiltStep): (TiltRow | TiltAction)[] {
@@ -118,10 +157,10 @@ export function tiltKey(step: TiltStep, keys: TiltKeys, code: string, now: numbe
     step.bobAt = now;
   }
   if (step.editing) {
-    const steps = Math.round(step.tilt.threshold / THRESHOLD_STEP);
-    if (keys.previous) setThreshold(step, (steps - 1) * THRESHOLD_STEP);
-    else if (keys.next) setThreshold(step, (steps + 1) * THRESHOLD_STEP);
-    else if (keys.confirm) step.editing = false;
+    const delta = keys.previous ? -1 : keys.next ? 1 : 0;
+    if (delta && step.editing === 'threshold') setThreshold(step, (Math.round(step.tilt.threshold / THRESHOLD_STEP) + delta) * THRESHOLD_STEP);
+    else if (delta) setGain(step, step.gain! + delta * NUDGE_GAIN.step);
+    else if (keys.confirm) step.editing = undefined;
     else return bob ? 'stay' : 'unhandled';
     return 'stay';
   }
@@ -136,7 +175,7 @@ export function tiltKey(step: TiltStep, keys: TiltKeys, code: string, now: numbe
 
 /** Clic sur une ligne (indice dans rows) ou une action. */
 export function tiltClick(step: TiltStep, what: { row: number } | { action: TiltAction }): TiltOutcome {
-  step.editing = false;
+  step.editing = undefined;
   const choice = 'row' in what ? rows(step)[what.row] : what.action;
   if (!choice) return 'stay';
   step.selected = choice;
@@ -153,9 +192,15 @@ function choose(step: TiltStep, choice: TiltRow | TiltAction): TiltOutcome {
       return 'stay';
     }
     case 'threshold':
-      step.editing = true;
+    case 'gain':
+      step.editing = choice;
       return 'stay';
   }
+}
+
+function setGain(step: TiltStep, value: number): void {
+  step.gain = clampNudgeGain(value);
+  applyGain(step);
 }
 
 function setThreshold(step: TiltStep, value: number): void {
@@ -174,7 +219,9 @@ function nudgeAxes(step: TiltStep): { x: number; y: number } | undefined {
 
 /** Lecture des axes : la simulation avance du temps écoulé. Vrai si l'écran change. */
 export function tiltTick(step: TiltStep, readings: AxisReading[], now: number): boolean {
-  const before = JSON.stringify(plumb(step, now));
+  // L'écran change avec le balancier, ou avec la plus forte secousse lue (au pour cent près).
+  const shown = () => JSON.stringify([plumb(step, now), Math.round(rawPeak(step) * 100)]);
+  const before = shown();
   step.readings = readings;
   // Accéléromètre repris de VPX : il n'a que l'identifiant du joystick ; son nom vient de SDL.
   const sensor = step.nudge;
@@ -182,13 +229,15 @@ export function tiltTick(step: TiltStep, readings: AxisReading[], now: number): 
     const name = readings.find((r) => r.device === sensor.device)?.name;
     if (name) sensor.name = name;
   }
-  stepPlumb(step.sim, nudgeAxes(step), step.last === undefined ? 0 : now - step.last);
+  const axes = nudgeAxes(step);
+  stepPlumb(step.sim, axes, step.last === undefined ? 0 : now - step.last);
   step.last = now;
+  step.raw = [...step.raw.filter(([at]) => now - at < RAW_PEAK_MS), ...(axes ? [[now, Math.max(Math.abs(axes.x), Math.abs(axes.y))] as [number, number]] : [])];
   if (step.sim.tilts !== step.seenTilts) {
     step.seenTilts = step.sim.tilts;
     step.tiltAt = now;
   }
-  return JSON.stringify(plumb(step, now)) !== before;
+  return shown() !== before;
 }
 
 /** Ce que dessine screen.js : l'anneau du contact et le balancier vu de dessus. */
@@ -219,6 +268,7 @@ function plumb(step: TiltStep, now: number): PlumbDrawing {
 const ROW_LABELS: Record<TiltRow, () => string> = {
   mode: () => 'Tilt',
   threshold: () => t('Contact du balancier simulé'),
+  gain: () => t('Force des secousses'),
 };
 
 function rowValue(step: TiltStep, row: TiltRow): string {
@@ -227,9 +277,18 @@ function rowValue(step: TiltStep, row: TiltRow): string {
       return step.tilt.mode === 'bob' ? t('{mode} · {key}', { mode: tiltModeLabel('bob'), key: keyLabel(step.bob) }) : tiltModeLabel(step.tilt.mode);
     case 'threshold': {
       const angle = thresholdLabel(step.tilt.threshold);
-      return step.editing ? `◀ ${angle} ▶` : angle;
+      return step.editing === 'threshold' ? `◀ ${angle} ▶` : angle;
+    }
+    case 'gain': {
+      const gain = gainLabel(step.gain!);
+      return step.editing === 'gain' ? `◀ ${gain} ▶` : gain;
     }
   }
+}
+
+/** Plus forte secousse lue ces dernières secondes, de 0 à 1 (pleine échelle de l'axe). */
+function rawPeak(step: TiltStep): number {
+  return Math.max(0, ...step.raw.map(([, v]) => v));
 }
 
 function rowHelp(step: TiltStep, choice: TiltRow | TiltAction | undefined): string {
@@ -239,9 +298,11 @@ function rowHelp(step: TiltStep, choice: TiltRow | TiltAction | undefined): stri
       if (step.tilt.mode === 'simulated') return step.bob ? t('VPX simule un balancier d’après les secousses ; le balancier de la borne compte aussi : un même coup peut compter deux fois.') : t('VPX simule un balancier d’après les secousses de l’accéléromètre et les boutons de tremblement.');
       return t('Ni balancier ni balancier simulé : la borne ne tilte pas (la touche T reste celle du tilt).');
     case 'threshold':
-      return step.editing
+      return step.editing === 'threshold'
         ? t('Plus petit : tilt plus facile. VPX va de {min} à {max}, {def} par défaut.', { min: thresholdLabel(0.15), max: thresholdLabel(4), def: thresholdLabel(1) })
         : t('Angle auquel le balancier simulé touche son anneau : plus petit, tilt plus facile.');
+    case 'gain':
+      return t('Plus grand : la bille et le balancier réagissent à des secousses plus douces. À {pinscape}, 1 g mesuré par un Pinscape (réglé en « 1G ») vaut 1 g dans VPX.', { pinscape: gainLabel(NUDGE_GAIN.pinscape) });
     default:
       return '';
   }
@@ -265,7 +326,17 @@ export function tiltView(step: TiltStep, saveLabel: string, keys: TiltViewKeys, 
   const simulated = step.tilt.mode === 'simulated';
   const v = plumbView(step.sim);
   const n = step.nudge;
-  const accelerometer = n ? t('Accéléromètre : axes {x} et {y} de {device}', { x: axisLabel(n.x), y: axisLabel(n.y), device: n.name || n.device }) : undefined;
+  // Ce que lit l'accéléromètre, et sous quoi VPX l'ignore : de quoi régler la force à l'essai.
+  const accelerometer =
+    n && step.gain !== undefined
+      ? t('Axes {x} et {y} de {device} : secousse lue {pct} %, VPX l’ignore sous {floor} %', {
+          x: axisLabel(n.x),
+          y: axisLabel(n.y),
+          device: n.name || n.device,
+          pct: Math.round(rawPeak(step) * 100),
+          floor: Math.round(nudgeFloor(step.gain, step.strength) * 100),
+        })
+      : undefined;
   let line: string;
   if (simulated) {
     line = v.tilts
@@ -280,7 +351,7 @@ export function tiltView(step: TiltStep, saveLabel: string, keys: TiltViewKeys, 
     name: step.vpx ? t('Réglage actuel de VPX : {what}', { what: vpxLine(step.vpx) }) : t('Essayez : le balancier suit ce que VPX calculera'),
     details: rowHelp(step, selected),
     notice: simulated && !step.nudge ? t('Pas d’accéléromètre réglé (étape « Lanceur ») : seuls les boutons de tremblement feront bouger le balancier simulé, et cet essai ne le montre pas.') : simulated && drawing.missing ? t('Accéléromètre introuvable : est-il branché ?') : undefined,
-    plumb: { ...drawing, caption: simulated ? (accelerometer ?? '') : '' },
+    plumb: { ...drawing, caption: accelerometer ?? '' },
     step: line,
     buttons: rows(step).map((row) => ({ label: ROW_LABELS[row](), key: rowValue(step, row), state: 'done', selected: selected === row })),
     actions: [{ id: 'save', label: saveLabel, selected: selected === 'save' }],

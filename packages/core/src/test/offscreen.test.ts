@@ -202,8 +202,10 @@ test('scripts : un fichier lu pour y chercher un texte accentué l’est en UTF-
 });
 
 // PowerShell ignore la casse : une variable locale $ecrans écrasait le paramètre [string]$Ecrans
-// (et devenait une seule chaîne au lieu d'une liste de touches).
-test('scripts : aucun paramètre réaffecté dans le corps du script', () => {
+// (et devenait une seule chaîne au lieu d'une liste de touches). Une boucle foreach ($ecrans
+// in $Ecrans) aussi : la variable de boucle est le paramètre, qui ne vaut plus ensuite que son
+// dernier élément (vu dans demo-alimentation.ps1 : le second scénario ne tournait que sur un jeu d'écrans).
+test('scripts : aucun paramètre réaffecté dans le corps du script, ni pris comme variable de boucle', () => {
   const scripts = [path.join(REPO, 'lanceur.ps1'), ...fs.readdirSync(path.join(REPO, 'docs')).filter((f) => f.endsWith('.ps1')).map((f) => path.join(REPO, 'docs', f))];
   const found = scripts.flatMap((file) => {
     const text = fs.readFileSync(file, 'utf8');
@@ -212,8 +214,8 @@ test('scripts : aucun paramètre réaffecté dans le corps du script', () => {
     const names = [...block[1]!.matchAll(/\$(\w+)/g)].map((m) => m[1]!.toLowerCase());
     const body = text.slice(block.index + block[0].length).split('\n');
     return body.flatMap((line, i) => {
-      const m = /^\s*\$(\w+)\s*=[^=]/.exec(line);
-      return m && names.includes(m[1]!.toLowerCase()) ? [`${path.basename(file)} : $${m[1]} réaffecté (« ${line.trim()} »)`] : [];
+      const m = /^\s*\$(\w+)\s*=[^=]/.exec(line) ?? /\bforeach\s*\(\s*\$(\w+)\s+in\b/i.exec(line);
+      return m && names.includes(m[1]!.toLowerCase()) ? [`${path.basename(file)} : $${m[1]} réaffecté ou pris comme variable de boucle (« ${line.trim()} »)`] : [];
     });
   });
   assert.deepEqual(found, []);

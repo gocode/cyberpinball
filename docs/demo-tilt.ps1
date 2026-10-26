@@ -10,9 +10,12 @@
 #      Mapping.SlamTilt (tmp\captures\tilt\boutons) ;
 #   3. --tilt : « Balancier de la borne » proposé, un contact du balancier allume l'anneau, Start
 #      enregistre : [Player] SimulatedPlumb = 0 (tmp\captures\tilt\balancier) ;
+#      Avant, la force des secousses est remise à ×1 (borne réglée avant elle, comme la vraie en
+#      octobre 2026) : l'étape propose ×2 et l'écrit (Mapping.Nudge0.X et .Y à l'échelle 2) ;
 #   4. --tilt : « Balancier simulé par VPX » à la souris, contact à 0,50° aux flippers, une
-#      secousse franche sur X (TILT), une douce vers l'avant, Enregistrer : SimulatedPlumb = 1,
-#      PlumbThresholdAngle = 0.5 (tmp\captures\tilt\simule).
+#      secousse franche sur X (TILT), une douce vers l'avant ; force des secousses de ×2 à ×2,50,
+#      une petite secousse (15 % de l'échelle, lue sous l'anneau) ; Enregistrer : SimulatedPlumb = 1,
+#      PlumbThresholdAngle = 0.5, axes à l'échelle 2.5 (tmp\captures\tilt\simule).
 #   .\docs\demo-tilt.ps1 -Run
 # Hors écran par défaut, sur les écrans simulés de docs\ecrans\<Ecrans>.json (-Ecrans) ;
 # $env:CYBERPINBALL_A_L_ECRAN = '1' pour les vrais écrans du poste (docs\hors-ecran.ps1).
@@ -82,7 +85,8 @@ try {
   '== 1. Étape « Lanceur » : lanceur et accéléromètre du Pinscape virtuel'
   Invoke-Autopilot @('Axe2:0', 'Axe2:0', 'Axe2:0', 'Axe2:0.5', 'Axe2:0.95', 'Axe2:0', 'Digit1') 'lanceur' @('--assistant', '--lanceur')
   $analog = (Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons).analog
-  if ($analog.nudge.x -ne 0 -or $analog.nudge.y -ne 1) { throw "1 : accéléromètre non enregistré : $($analog | ConvertTo-Json -Compress -Depth 5)" }
+  # Force des secousses d'un Pinscape en « 1G » : ×2 (1 g mesuré = 1 g dans VPX).
+  if ($analog.nudge.x -ne 0 -or $analog.nudge.y -ne 1 -or $analog.nudge.gain -ne 2) { throw "1 : accéléromètre non enregistré : $($analog | ConvertTo-Json -Compress -Depth 5)" }
   $pinscape = $analog.nudge.device
 
   '== 2. Étape « Boutons » : balancier sur le bouton 9 du Pinscape, slam tilt sur Origine'
@@ -97,23 +101,32 @@ try {
   if ((Get-Cle 'Input' 'Mapping.Tilt') -ne "$pinscape;9 | Key;23") { throw '2 : [Input] Mapping.Tilt inattendu' }
   if ((Get-Cle 'Input' 'Mapping.SlamTilt') -ne 'Key;74') { throw '2 : [Input] Mapping.SlamTilt inattendu' }
 
-  '== 3. Étape « Tilt » : balancier de la borne, essayé, enregistré'
+  '== 3. Étape « Tilt » : balancier de la borne, essayé, enregistré ; force des secousses ×1 remise à ×2'
+  # Borne réglée avant la force des secousses : ni force dans le modèle, échelle 1 dans VPX.
+  $set = Get-Content "$borne\cabinet.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+  foreach ($c in @($set.configurations) + @($set)) { if ($c.analog.nudge.gain) { $c.analog.nudge.PSObject.Properties.Remove('gain') } }
+  $set | ConvertTo-Json -Depth 30 | Set-Content -Path "$borne\cabinet.json" -Encoding UTF8
+  (Get-Content $iniFile -Raw -Encoding UTF8) -replace '(?m)^(Mapping\.Nudge0\.[XY] = .*;A;0\.000000;)2\.000000(;1\.000000)', '${1}1.000000$2' | Set-Content -Path $iniFile -Encoding UTF8 -NoNewline
+  if ((Get-Cle 'Input' 'Mapping.Nudge0.X') -notmatch ';1\.000000;1\.000000$') { throw '3 : échelle 1 non remise' }
   Invoke-Autopilot @('Pinscape9', 'Digit1') 'balancier' @('--assistant', '--tilt')
   (Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons).tilt | ConvertTo-Json -Compress
   Show-Tilt
   if ((Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons).tilt.mode -ne 'bob') { throw '3 : balancier de la borne non enregistré' }
   if ((Get-Cle 'Player' 'SimulatedPlumb') -ne '0') { throw '3 : le balancier simulé de VPX devait être éteint' }
+  if ((Get-Cle 'Input' 'Mapping.Nudge0.X') -notmatch ';512;A;0\.000000;2\.000000;1\.000000$') { throw '3 : force des secousses ×2 non écrite' }
 
   '== 4. Étape « Tilt » : balancier simulé, contact à 0,50°, secousses, enregistré'
   # Clic sur « Tilt » (balancier simulé), clic sur le contact, dix crans de moins, Start pour finir ;
-  # secousse franche sur X, repos ; secousse douce vers l'avant (Y négatif), repos ; Enregistrer.
-  $simule = @('click:#buttons li:nth-child(1)', 'click:#buttons li:nth-child(2)') + @('ShiftLeft') * 10 + @('Digit1', 'Axe0:1', 'Axe0:0', 'Axe1:-0.35', 'Axe1:0', 'click:#actions button:nth-child(1)')
+  # secousse franche sur X, repos ; secousse douce vers l'avant (Y négatif), repos ; clic sur la
+  # force des secousses, deux crans de plus, Start ; petite secousse sur X, repos ; Enregistrer.
+  $simule = @('click:#buttons li:nth-child(1)', 'click:#buttons li:nth-child(2)') + @('ShiftLeft') * 10 + @('Digit1', 'Axe0:1', 'Axe0:0', 'Axe1:-0.35', 'Axe1:0', 'click:#buttons li:nth-child(3)', 'ShiftRight', 'ShiftRight', 'Digit1', 'Axe0:0.15', 'Axe0:0', 'click:#actions button:nth-child(1)')
   Invoke-Autopilot $simule 'simule' @('--assistant', '--tilt')
   $tilt = (Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons).tilt
   $tilt | ConvertTo-Json -Compress
   Show-Tilt
   if ($tilt.mode -ne 'simulated' -or [math]::Abs($tilt.threshold - 0.5) -gt 0.001) { throw "4 : balancier simulé non enregistré : $($tilt | ConvertTo-Json -Compress)" }
   if ((Get-Cle 'Player' 'SimulatedPlumb') -ne '1' -or (Get-Cle 'Player' 'PlumbThresholdAngle') -ne '0.5') { throw '4 : [Player] inattendu' }
+  if ((Get-Cle 'Input' 'Mapping.Nudge0.X') -notmatch ';512;A;0\.000000;2\.500000;1\.000000$' -or (Get-Cle 'Input' 'Mapping.Nudge0.Y') -notmatch ';513;A;0\.000000;2\.500000;1\.000000$') { throw '4 : force des secousses ×2,50 non écrite' }
 } finally {
   Pop-Location
   Remove-Item Env:CYBERPINBALL_SDL -ErrorAction SilentlyContinue

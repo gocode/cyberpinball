@@ -43,6 +43,10 @@ export const ICON_NAMES = [
   'desktop',
   'power',
   'lock',
+  'unlock',
+  'guest',
+  'moon',
+  'restart',
   // Configuration de la borne
   'button',
   'screens',

@@ -546,7 +546,6 @@ export const messages: Record<string, string> = {
   'Vitesse du lanceur : calculée par VPX': 'Plunger speed: computed by VPX',
   'Vitesse du lanceur : mesurée par la carte (axe {axis})': 'Plunger speed: measured by the board (axis {axis})',
   'Pas de lanceur analogique : le bouton Lanceur seul': 'No analog plunger: the Launch button only',
-  'Accéléromètre : axes {x} et {y} de {device}': 'Accelerometer: axes {x} and {y} of {device}',
   'Pas d’accéléromètre : tremblements aux boutons': 'No accelerometer: nudging by buttons',
   'Plunger à capteur (Pinscape…) : axe, sens, zone morte, accéléromètre': 'Sensor plunger (Pinscape…): axis, direction, dead zone, accelerometer',
   'Lanceur enregistré': 'Plunger saved',
@@ -573,7 +572,6 @@ export const messages: Record<string, string> = {
     'Tilt: simulated tilt bob, but neither an accelerometer nor a nudge button to move it: it will never tilt.',
   'Tilt : balancier simulé choisi, mais éteint dans VPinballX.ini ([Player] SimulatedPlumb = 0) : la borne ne tiltera pas aux secousses.':
     'Tilt: simulated tilt bob chosen, but turned off in VPinballX.ini ([Player] SimulatedPlumb = 0): the cabinet will not tilt when nudged.',
-  'Balancier de la borne, ou balancier simulé par VPX à partir des secousses : seuil et essai': 'Cabinet tilt bob, or tilt bob simulated by VPX from nudges: threshold and test',
   'Tilt enregistré': 'Tilt saved',
   'Contact du balancier simulé': 'Simulated tilt bob contact',
   '{mode} · {key}': '{mode} · {key}',
@@ -597,4 +595,13 @@ export const messages: Record<string, string> = {
   'Pas d’accéléromètre réglé (étape « Lanceur ») : seuls les boutons de tremblement feront bouger le balancier simulé, et cet essai ne le montre pas.':
     'No accelerometer set (“Plunger” step): only the nudge buttons will move the simulated tilt bob, and this test does not show it.',
   'Accéléromètre introuvable : est-il branché ?': 'Accelerometer not found: is it plugged in?',
+  // Force des secousses (plunger.ts NUDGE_GAIN, tilt-step.ts)
+  'Force des secousses': 'Nudge strength',
+  'Plus grand : la bille et le balancier réagissent à des secousses plus douces. À {pinscape}, 1 g mesuré par un Pinscape (réglé en « 1G ») vaut 1 g dans VPX.':
+    'Larger: the ball and the tilt bob react to gentler nudges. At {pinscape}, 1 g measured by a Pinscape (set to “1G”) is 1 g in VPX.',
+  'Axes {x} et {y} de {device} : secousse lue {pct} %, VPX l’ignore sous {floor} %': 'Axes {x} and {y} of {device}: {pct}% nudge read, VPX ignores it under {floor}%',
+  'Accéléromètre : axes {x} et {y} de {device}, force des secousses {gain}': 'Accelerometer: axes {x} and {y} of {device}, nudge strength {gain}',
+  'Secousses : accéléromètre lu à la force {gain} ; un Pinscape réglé en « 1G » n’y donne presque aucune secousse (VPX ignore tout ce qui reste sous {floor} % de l’échelle). Réglez la force des secousses à l’essai ({where}).':
+    'Nudging: accelerometer read at strength {gain}; a Pinscape set to “1G” gives almost no nudge there (VPX ignores anything under {floor}% of the scale). Set the nudge strength by testing ({where}).',
+  'Balancier de la borne ou simulé par VPX, force des secousses de l’accéléromètre : réglage à l’essai': 'Cabinet tilt bob or simulated by VPX, accelerometer nudge strength: set by testing',
 };

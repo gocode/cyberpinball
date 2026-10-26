@@ -587,6 +587,46 @@ function attractScreen(s) {
   return box;
 }
 
+/**
+ * Mode invité : le cadenas et le mot « Invité » dans le coin, à la place de la roue dentée. Une
+ * porte fermée (Exit, Tab, clic sur le cadenas, fichiers glissés…) remplace le mot par la pastille
+ * « Verrouillé · mode invité » quelques secondes ; la combinaison tenue remplit l'anneau du
+ * cadenas. Rien n'y dit la combinaison : seul l'écran de l'entrée « Mode invité » la montre.
+ * Juste après le déverrouillage, un cadenas ouvert et « Mode invité désactivé », puis la roue.
+ */
+function guestLock(g) {
+  const box = el('div', `guest-lock${g.hint ? ' knocked' : ''}${g.unlocking ? ' unlocking' : ''}${g.active ? '' : ' unlocked'}`);
+  // Un clic frappe à la porte du menu système : le processus principal répond par l'indice.
+  if (g.active) box.dataset.act = JSON.stringify({ type: 'config' });
+  const label = g.hint ?? (g.unlocking ? t('Déverrouillage…') : g.active ? t('Invité') : t('Mode invité désactivé'));
+  box.append(el('span', g.hint || !g.active ? 'guest-lock-pill' : 'guest-lock-label', label));
+  const glyph = el('span', 'guest-lock-glyph');
+  glyph.append(cyberIcon(g.active ? 'lock' : 'unlock', 'guest-lock-icon'));
+  if (g.unlocking) {
+    // L'anneau reprend où il en est à chaque rendu : délai négatif du temps déjà tenu.
+    glyph.style.setProperty('--unlock-ms', `${g.unlocking.ms}ms`);
+    glyph.style.setProperty('--unlock-delay', `${-Math.max(0, Date.now() - g.unlocking.since)}ms`);
+  }
+  box.append(glyph);
+  return box;
+}
+
+/** Roue dentée : menu et configuration à la souris (ou Tab), même si les boutons de la borne ne répondent plus comme prévu. */
+function gearButton(s) {
+  // Toujours au-dessus des superpositions.
+  const gear = el('button', 'gear');
+  gear.append(cyberIcon('gear'));
+  gear.title = t('Menu système (Tab)');
+  gear.dataset.act = JSON.stringify({ type: 'config' });
+  // Pastille rouge : une entrée du menu système attend l'utilisateur (mise à jour disponible…).
+  if (s.attention) {
+    gear.classList.add('has-attention');
+    gear.title = t('Menu système (Tab) : un élément attend votre intervention');
+    gear.append(el('span', 'gear-dot'));
+  }
+  return gear;
+}
+
 function renderPlayfield(s) {
   // Mode attente : la table tirée au hasard, sans la liste du menu.
   if (s.attract) {
@@ -603,19 +643,9 @@ function renderPlayfield(s) {
   }
   dropLoadingFallback();
   const nodes = [];
-  // Roue dentée : menu et configuration à la souris (ou Tab), même si les boutons
-  // de la borne ne répondent plus comme prévu. Toujours au-dessus des superpositions.
-  const gear = el('button', 'gear');
-  gear.append(cyberIcon('gear'));
-  gear.title = t('Menu système (Tab)');
-  gear.dataset.act = JSON.stringify({ type: 'config' });
-  // Pastille rouge : une entrée du menu système attend l'utilisateur (mise à jour disponible…).
-  if (s.attention) {
-    gear.classList.add('has-attention');
-    gear.title = t('Menu système (Tab) : un élément attend votre intervention');
-    gear.append(el('span', 'gear-dot'));
-  }
-  nodes.push(gear);
+  // Extinction, veille ou redémarrage en cours : plus rien à choisir, ni roue dentée ni cadenas.
+  // Mode invité : le cadenas prend la place de la roue dentée, le menu système est fermé.
+  if (!(s.phase === 'message' && s.message?.action === 'power')) nodes.push(s.guest ? guestLock(s.guest) : gearButton(s));
 
   if (s.table) {
     CyberMedia.beginRender();
@@ -642,7 +672,7 @@ function renderPlayfield(s) {
     cover = el('section', 'overlay');
     cover.append(el('h1', '', t('Quitter Cyber Pinball ?')), el('div', 'lead', t('Start : quitter · Exit : rester')));
   } else if (s.phase === 'message' && s.message) {
-    cover = el('section', 'overlay');
+    cover = el('section', s.message.action === 'power' ? 'overlay power' : 'overlay');
     cover.append(el('h1', '', s.message.title));
     const box = el('div', 'message');
     for (const line of s.message.lines) box.append(el('p', /^\d{4}-\d\d-\d\d /.test(line) ? 'log' : '', line));
@@ -655,9 +685,11 @@ function renderPlayfield(s) {
   // Constat bref (configuration de la borne changée, mise à jour installée) : il s'efface seul.
   // Un écran plein le recouvrirait : il passe alors dans son flux, sous la marque, au-dessus du titre.
   if (s.banner && cover) (cover.querySelector('.lib-head') ?? cover).prepend(el('div', 'banner banner-inline', s.banner));
-  else if (s.banner) nodes.splice(1, 0, el('div', 'banner', s.banner));
+  // Au menu des tables, en dernier : ni le menu ni son voile ne le recouvrent (frontend.css, .banner).
+  else if (s.banner) nodes.push(el('div', 'banner', s.banner));
   if (cover) {
-    cover.prepend(brand());
+    // L'écran noir de l'extinction ne porte que son message.
+    if (!cover.classList.contains('power')) cover.prepend(brand());
     nodes.push(cover);
   } else nodes.unshift(brand());
   placeChildren(nodes);
@@ -854,6 +886,16 @@ window.cyber.onState((s) => {
   // L'écran de chargement de secours reste d'un état à l'autre (renderPlayfield le quitte).
   syncLiveDmd(s.game ? undefined : s.liveDmd);
   if (s.game) return renderGame(s);
+  // Extinction, veille ou redémarrage : du noir sur chaque écran, sans média ni décor ; le
+  // playfield seul dit ce qui se passe (frontend.css, html.power-phase).
+  const power = s.phase === 'message' && s.message?.action === 'power';
+  document.documentElement.classList.toggle('power-phase', power);
+  if (power) {
+    zoneLayer.classList.add('off');
+    if (role !== 'playfield') return root.replaceChildren();
+    background.show(undefined);
+    return renderPlayfield(s);
+  }
   document.documentElement.classList.toggle('attract-mode', Boolean(s.attract));
   zoneLayer.classList.remove('off');
   if (role === 'playfield') {

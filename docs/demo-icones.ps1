@@ -90,16 +90,16 @@ $entree = { param($icon) "click:.lib-action:has(svg[data-icon=`"$icon`"])" }
 $enHaut = @(1..18 | ForEach-Object { 'ArrowUp' })
 
 try {
-  foreach ($ecrans in $Ecrans) {
-    Use-HorsEcran $ecrans
+  foreach ($jeu in $Ecrans) {
+    Use-HorsEcran $jeu
     foreach ($langue in $Langues) {
-      "== $ecrans, $langue"
-      $dossier = "$base\$ecrans\$langue"
+      "== $jeu, $langue"
+      $dossier = "$base\$jeu\$langue"
       $home_ = "$dossier\home"
       if (Test-Path $home_) { Remove-Item -Recurse -Force $home_ }
       New-Item -ItemType Directory -Force "$home_\sandbox" | Out-Null
       Set-Content "$home_\sandbox\VPinballX.ini" '' -Encoding UTF8
-      node "$PSScriptRoot\demo-medias.cjs" modele "$PSScriptRoot\ecrans\$ecrans.json" "$home_\cabinet.json" "$home_\sandbox\VPinballX.ini" | Out-Null
+      node "$PSScriptRoot\demo-medias.cjs" modele "$PSScriptRoot\ecrans\$jeu.json" "$home_\cabinet.json" "$home_\sandbox\VPinballX.ini" | Out-Null
       if ($LASTEXITCODE -ne 0) { throw 'Modèle de borne des écrans simulés impossible.' }
       $env:CYBERPINBALL_HOME = $home_
       $env:CYBERPINBALL_ROOT = $root

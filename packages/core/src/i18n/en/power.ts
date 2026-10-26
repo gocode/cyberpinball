@@ -1,0 +1,50 @@
+// Catalogue anglais : alimentation de la borne (éteindre, mettre en veille, redémarrer).
+// Clé : le texte français tel qu'il est passé à t() ou tn().
+export const messages: Record<string, string> = {
+  // packages/core/src/power.ts
+  'Ce PC utilise la veille moderne, que Cyber Pinball ne peut pas demander à Windows. Pour le mettre en veille : le menu Démarrer de Windows, ou le bouton d’alimentation du PC.': 'This PC uses Modern Standby, which Cyber Pinball cannot request from Windows. To put it to sleep: the Windows Start menu, or the PC power button.',
+  'Éteindre la borne': 'Shut down the cabinet',
+  'Ferme Cyber Pinball, puis éteint le PC': 'Closes Cyber Pinball, then shuts the PC down',
+  'Éteindre la borne ?': 'Shut down the cabinet?',
+  'Cyber Pinball enregistre ses réglages et se ferme.': 'Cyber Pinball saves its settings and closes.',
+  'Windows éteint le PC.': 'Windows shuts the PC down.',
+  'Pour rallumer la borne, appuyez sur le bouton d’alimentation du PC.': 'To turn the cabinet back on, press the PC power button.',
+  'Start : éteindre · Exit : annuler': 'Start: shut down · Exit: cancel',
+  'Extinction de la borne…': 'Shutting the cabinet down…',
+  'Réglages enregistrés. Arrêt de Windows en cours.': 'Settings saved. Windows is shutting down.',
+  'Mettre en veille': 'Sleep',
+  'Écrans et PC en veille ; le menu revient au réveil': 'Screens and PC go to sleep; the menu comes back on wake',
+  'Mettre la borne en veille ?': 'Put the cabinet to sleep?',
+  'Cyber Pinball enregistre ses réglages et reste ouvert.': 'Cyber Pinball saves its settings and stays open.',
+  'Le PC et les écrans passent en veille.': 'The PC and the screens go to sleep.',
+  'Pour reprendre, appuyez sur le bouton d’alimentation du PC. Le menu revient au réveil.': 'To resume, press the PC power button. The menu comes back on wake.',
+  'Start : mettre en veille · Exit : annuler': 'Start: sleep · Exit: cancel',
+  'Mise en veille…': 'Going to sleep…',
+  'Réglages enregistrés ; le menu revient au réveil.': 'Settings saved; the menu comes back on wake.',
+  'Redémarrer la borne': 'Restart the cabinet',
+  'Ferme Cyber Pinball, puis redémarre le PC': 'Closes Cyber Pinball, then restarts the PC',
+  'Redémarrer la borne ?': 'Restart the cabinet?',
+  'Windows redémarre le PC.': 'Windows restarts the PC.',
+  'Cyber Pinball revient seul s’il démarre avec Windows (option de l’installation).': 'Cyber Pinball opens again by itself if it starts with Windows (installation option).',
+  'Start : redémarrer · Exit : annuler': 'Start: restart · Exit: cancel',
+  'Redémarrage de la borne…': 'Restarting the cabinet…',
+  'Réglages enregistrés. Redémarrage de Windows en cours.': 'Settings saved. Windows is restarting.',
+  'Mode essai : extinction simulée, le PC reste allumé.': 'Test mode: shutdown simulated, the PC stays on.',
+  'Mode essai : mise en veille simulée, le PC reste allumé.': 'Test mode: sleep simulated, the PC stays on.',
+  'Mode essai : redémarrage simulé, le PC reste allumé.': 'Test mode: restart simulated, the PC stays on.',
+  // app/src/power.ts
+  'Windows a refusé la mise en veille.': 'Windows refused to sleep.',
+  '{command} a répondu {code}.': '{command} returned {code}.',
+  'Windows n’a pas redémarré au bout d’une minute : une application l’en empêche peut-être (document non enregistré).':
+    'Windows had not restarted after a minute: an application may be holding it (unsaved document).',
+  'Windows ne s’est pas éteint au bout d’une minute : une application l’en empêche peut-être (document non enregistré).':
+    'Windows had not shut down after a minute: an application may be holding it (unsaved document).',
+  'Veille indisponible depuis Cyber Pinball': 'Sleep not available from Cyber Pinball',
+  'Ce qui va se passer': 'What will happen',
+  'Indisponible : ce PC n’a que la veille moderne': 'Not available: this PC only has Modern Standby',
+  // app/src/frontend.ts
+  'La borne ne s’est pas éteinte': 'The cabinet did not shut down',
+  'La borne ne s’est pas mise en veille': 'The cabinet did not go to sleep',
+  'La borne n’a pas redémarré': 'The cabinet did not restart',
+  'Windows n’a pas dit pourquoi.': 'Windows did not say why.',
+};

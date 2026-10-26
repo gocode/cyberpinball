@@ -25,6 +25,10 @@ export const SYSTEM_ITEM_IDS = [
   'desktop',
   'explorer',
   'dedicated',
+  'guest-mode',
+  'sleep',
+  'restart',
+  'shutdown',
   'language',
   'updates',
   'media-import',
@@ -75,8 +79,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'borne',
     icon: 'cabinet',
     get label() { return t('Borne'); },
-    get detail() { return t('Boutons, écrans, son, réglages de VPX, bureau Windows'); },
-    entries: ['health', 'cabinet', 'vpx-settings', 'controls', 'desktop', 'explorer', 'dedicated'],
+    get detail() { return t('Boutons, écrans, son, réglages de VPX, bureau Windows, veille et extinction'); },
+    entries: ['health', 'cabinet', 'vpx-settings', 'controls', 'desktop', 'explorer', 'dedicated', 'guest-mode', 'sleep', 'restart', 'shutdown'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -108,6 +112,11 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // Seulement quand Cyber Pinball est le shell de Windows (borne dédiée) : à la place de « Bureau Windows ».
   explorer: { icon: 'folder', get label() { return t('Ouvrir l’Explorateur Windows'); } },
   dedicated: { icon: 'lock', get label() { return t('Borne dédiée'); } },
+  'guest-mode': { icon: 'guest', get label() { return t('Mode invité'); } },
+  // Alimentation du PC (app/src/power.ts) : chacune passe par un écran de confirmation.
+  sleep: { icon: 'moon', get label() { return t('Mettre en veille'); } },
+  restart: { icon: 'restart', get label() { return t('Redémarrer la borne'); } },
+  shutdown: { icon: 'power', get label() { return t('Éteindre la borne'); } },
   // Nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée.
   language: { icon: 'language', label: 'Langue / Language' }, // i18n-ignore
   updates: { icon: 'upgrade', get label() { return t('Mise à jour de Cyber Pinball'); } },

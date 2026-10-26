@@ -24,7 +24,7 @@
 // Cyber Pinball a écrits. Une borne réglée par Cyber Pinball coupe donc cette proposition
 // ([Input] Device.<joystick>.NoAutoLayout = 1) pour chaque joystick qu'elle utilise.
 
-import { t } from './i18n';
+import { formatNumber, t } from './i18n';
 import { IniDocument } from './ini';
 import type { CabinetAnalog, CabinetButtons, PlungerSensor, NudgeSensor } from './model';
 import type { VpxSetting } from './vpx';
@@ -41,12 +41,57 @@ export const PINSCAPE_PLUNGER_SPEED_SCALE = 12.5;
 /** Zone morte la plus large que propose le menu de VPX (SensorSetupPage.cpp : 0 à 30 %). */
 export const MAX_DEAD_ZONE = 0.3;
 
+/**
+ * Force des secousses : échelle des axes de l'accéléromètre ([Input] Mapping.Nudge0.X et .Y).
+ *
+ * VPX lit un accéléromètre de manette (Mapping.Nudge0.Type = 0, sa disposition par défaut pour un
+ * Pinscape, InputManager / SDLInputHandler.h) comme un stick : une valeur de 1 vaut g/2 m/s²
+ * (GamepadNudge::StepOneMillisecond), et une secousse sous 1 m/s² ne compte pas
+ * (NudgeIntentHandler::EvaluateImpulse). Or un Pinscape réglé en « 1G » (son réglage par défaut,
+ * config.h) envoie l'accélération en g, pleine échelle à 1 g (rawToReport, main.cpp) : à
+ * l'échelle 1, VPX ne voit que la moitié de chaque secousse et ignore tout ce qui reste sous
+ * 0,2 g, c'est-à-dire presque toutes les secousses d'un joueur (octobre 2026, vraie borne : la
+ * bille bougeait à peine et le balancier simulé ne tiltait jamais). À l'échelle 2, 1 g mesuré
+ * vaut 1 g dans VPX. Réglé à l'étape « Tilt », essai à l'appui.
+ */
+export const NUDGE_GAIN = { min: 0.5, max: 6, step: 0.25, default: 1, pinscape: 2 } as const;
+
+/** Force bornée à ce que l'étape propose, arrondie au pas. */
+export function clampNudgeGain(value: number): number {
+  const v = Number.isFinite(value) ? value : NUDGE_GAIN.default;
+  return Math.round(Math.min(NUDGE_GAIN.max, Math.max(NUDGE_GAIN.min, v)) / NUDGE_GAIN.step) * NUDGE_GAIN.step;
+}
+
+/** Échelle écrite pour un axe de l'accéléromètre : la force, négative si l'axe est inversé. */
+export function nudgeScale(nudge: Pick<NudgeSensor, 'gain' | 'invertX' | 'invertY'>, axis: 'x' | 'y'): number {
+  const gain = nudge.gain ?? NUDGE_GAIN.default;
+  return (axis === 'x' ? nudge.invertX : nudge.invertY) ? -gain : gain;
+}
+
+/**
+ * Plus petite valeur d'axe (de 0 à 1) dont VPX fait une secousse : 1 m/s² d'intention, divisé
+ * par g/2, par la force et par [Input] Mapping.Nudge0.Strength (1 par défaut).
+ */
+export function nudgeFloor(gain: number, strength = 1): number {
+  return 1 / ((9.80665 / 2) * gain * strength);
+}
+
 /** Axes d'un Pinscape (« X/Y/Z + RX/RY/RZ ») : accéléromètre sur X et Y, lanceur sur Z, sa vitesse sur RZ. */
 export const PINSCAPE_AXES = { nudgeX: 0, nudgeY: 1, plunger: 2, plungerSpeed: 5 } as const;
 
 /** Nom que SDL donne à un Pinscape (KL25Z ou Pico), celui que VPX reconnaît. */
 export function isPinscape(name: string | undefined): boolean {
   return Boolean(name?.startsWith('mjrnet Pinscape Controller'));
+}
+
+/** Force des secousses pour l'écran : « ×2,00 ». */
+export function gainLabel(gain: number): string {
+  return `×${formatNumber(gain, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/** Clé des axes de l'accéléromètre : « Input.Mapping.Nudge0.X », « .Y ». L'étape « Tilt » y règle la force. */
+export function isNudgeAxisKey(id: string): boolean {
+  return /^input\.mapping\.nudge0\.[xy]$/i.test(id);
 }
 
 /** Nom d'un axe pour l'écran, comme le panneau « Contrôleurs de jeu » de Windows : X, Y, Z, RX, RY, RZ, puis « axe 7 ». */
@@ -106,8 +151,8 @@ export function vpxAnalogSettings(analog: CabinetAnalog): VpxSetting[] {
   put('NudgeSensorCount', nudge ? '1' : '0');
   if (nudge) {
     put('Mapping.Nudge0.Type', '0');
-    put('Mapping.Nudge0.X', sensorMapping(nudge.device, nudge.x, 'A'));
-    put('Mapping.Nudge0.Y', sensorMapping(nudge.device, nudge.y, 'A'));
+    put('Mapping.Nudge0.X', sensorMapping(nudge.device, nudge.x, 'A', 0, nudgeScale(nudge, 'x')));
+    put('Mapping.Nudge0.Y', sensorMapping(nudge.device, nudge.y, 'A', 0, nudgeScale(nudge, 'y')));
   }
   return settings;
 }
@@ -167,7 +212,11 @@ export function analogFromIni(ini: string): CabinetAnalog {
   if (count('NudgeSensorCount') > 0 && Number(doc.get(INPUT, 'Mapping.Nudge0.Type') || '0') === 0) {
     const x = parseSensorMapping(doc.get(INPUT, 'Mapping.Nudge0.X'));
     const y = parseSensorMapping(doc.get(INPUT, 'Mapping.Nudge0.Y'));
-    if (x && y && x.device === y.device) analog.nudge = { device: x.device, x: x.axis, y: y.axis };
+    if (x && y && x.device === y.device) {
+      // Force et sens réglés dans VPX : repris tels quels (la force, celle de l'axe X).
+      const gain = Math.abs(x.scale);
+      analog.nudge = { device: x.device, x: x.axis, y: y.axis, ...(gain !== 1 && gain > 0 && { gain }), ...(x.scale < 0 && { invertX: true }), ...(y.scale < 0 && { invertY: true }) };
+    }
   }
   return analog;
 }
@@ -343,7 +392,10 @@ export function proposedAnalog(axis: DetectedAxis): CabinetAnalog {
   const deadZone = axis.noise > 0.01 ? Math.min(0.1, Math.ceil((axis.noise + 0.01) * 100) / 100) : 0;
   const pinscape = isPinscape(axis.name) && axis.axes >= 6 && axis.axis === PINSCAPE_AXES.plunger;
   const plunger: PlungerSensor = { device: axis.device, name: axis.name, axis: axis.axis, reversed: axis.reversed, deadZone, ...(pinscape && { speedAxis: PINSCAPE_AXES.plungerSpeed }) };
-  const nudge: NudgeSensor | undefined = isPinscape(axis.name) && axis.axis !== PINSCAPE_AXES.nudgeX && axis.axis !== PINSCAPE_AXES.nudgeY ? { device: axis.device, name: axis.name, x: PINSCAPE_AXES.nudgeX, y: PINSCAPE_AXES.nudgeY } : undefined;
+  const nudge: NudgeSensor | undefined =
+    isPinscape(axis.name) && axis.axis !== PINSCAPE_AXES.nudgeX && axis.axis !== PINSCAPE_AXES.nudgeY
+      ? { device: axis.device, name: axis.name, x: PINSCAPE_AXES.nudgeX, y: PINSCAPE_AXES.nudgeY, gain: NUDGE_GAIN.pinscape }
+      : undefined;
   return { plunger, ...(nudge && { nudge }) };
 }
 
@@ -375,6 +427,10 @@ export function analogLines(analog: CabinetAnalog): string[] {
     lines.push(p.speedAxis === undefined ? t('Vitesse du lanceur : calculée par VPX') : t('Vitesse du lanceur : mesurée par la carte (axe {axis})', { axis: axisLabel(p.speedAxis) }));
   } else lines.push(t('Pas de lanceur analogique : le bouton Lanceur seul'));
   const n = analog.nudge;
-  lines.push(n ? t('Accéléromètre : axes {x} et {y} de {device}', { x: axisLabel(n.x), y: axisLabel(n.y), device: n.name || n.device }) : t('Pas d’accéléromètre : tremblements aux boutons'));
+  lines.push(
+    n
+      ? t('Accéléromètre : axes {x} et {y} de {device}, force des secousses {gain}', { x: axisLabel(n.x), y: axisLabel(n.y), device: n.name || n.device, gain: gainLabel(n.gain ?? NUDGE_GAIN.default) })
+      : t('Pas d’accéléromètre : tremblements aux boutons'),
+  );
   return lines;
 }

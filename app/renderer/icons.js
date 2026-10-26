@@ -27,8 +27,12 @@ const CYBER_ICONS = {
   toolbox: '<rect x="3" y="8" width="18" height="13" rx="2"/><path d="M8 8V4h8v4M3 13h7M14 13h7"/><rect x="10" y="11" width="4" height="4" rx="0.5"/>', // Boîte à outils : configuration de la borne, à côté de l’assistant guidé.
   power: '<path d="M12 3v9M6 6a8.5 8.5 0 1 0 12 0"/>', // Alimentation du PC (quitter l’application : exit).
   lock: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M12 14v3"/>', // Borne dédiée : Cyber Pinball seul, à la place du bureau Windows.
+  moon: '<path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/>', // Croissant : mettre la borne en veille.
+  restart: '<path d="M20 12a8 8 0 1 1-2.3-5.7M20 3v4h-4M12 8v5"/>', // Flèche qui reboucle autour du trait d’alimentation : redémarrer.
   back: '<path d="M21 12H3M10 5l-7 7 7 7"/>', // Retour à l’écran parent.
   gear: '<path d="M9 2h6l.5 3 2 1.2 2.5-1 2 3.6-2 2v2.4l2 2-2 3.6-2.5-1-2 1.2-.5 3H9l-.5-3-2-1.2-2.5 1-2-3.6 2-2v-2.4l-2-2 2-3.6 2.5 1 2-1.2z"/><circle cx="12" cy="12" r="3"/>', // Accès souris et titre du menu système.
+  guest: '<circle cx="9" cy="7" r="3.5"/><path d="M2 21c0-4 3-7 7-7 1.4 0 2.7.3 3.7.9M14 15h7v6h-7zM15.5 15v-2a2 2 0 0 1 4 0v2"/>', // Mode invité : un invité et son cadenas.
+  unlock: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 7.5-2M12 14v3"/>', // Mode invité arrêté : cadenas ouvert.
 
   // Configuration de la borne
   button: '<path d="M6 13v-2a6 6 0 0 1 12 0v2c0 4-12 4-12 0zM6 13a9 4 0 1 0 12 0"/>', // Dôme de bouton d’arcade sur une collerette débordante.

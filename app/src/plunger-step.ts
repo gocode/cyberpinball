@@ -20,6 +20,7 @@ import {
   feedDetection,
   liveAxis,
   MAX_DEAD_ZONE,
+  NUDGE_GAIN,
   PINSCAPE_AXES,
   plungerPosition,
   proposedAnalog,
@@ -184,9 +185,16 @@ function choose(step: PlungerStep, choice: PlungerRow | PlungerAction): PlungerO
       return 'stay';
     case 'nudge':
       if (step.analog.nudge) delete step.analog.nudge;
-      else if (p) step.analog.nudge = { device: p.device, ...(p.name && { name: p.name }), x: PINSCAPE_AXES.nudgeX, y: PINSCAPE_AXES.nudgeY };
+      // Force déjà réglée (étape « Tilt ») sur ce joystick : gardée ; sinon celle d'un Pinscape en « 1G ».
+      else if (p) step.analog.nudge = { device: p.device, ...(p.name && { name: p.name }), x: PINSCAPE_AXES.nudgeX, y: PINSCAPE_AXES.nudgeY, gain: keptGain(step, p.device) };
       return 'stay';
   }
+}
+
+/** Force des secousses de l'accéléromètre d'arrivée s'il est sur ce joystick ; sinon celle d'un Pinscape. */
+function keptGain(step: PlungerStep, device: string): number {
+  const before = step.initial?.nudge;
+  return before?.device === device && before.gain !== undefined ? before.gain : NUDGE_GAIN.pinscape;
 }
 
 /** Nouvelle détection ; « Garder le réglage actuel » ramène celui d'arrivée. */
@@ -216,8 +224,10 @@ export function plungerTick(step: PlungerStep, readings: AxisReading[], now: num
     step.detection = feedDetection(step.detection, readings);
     const axis = detectedAxis(step.detection);
     if (axis?.released) {
-      // La détection décide du capteur et de son sens ; le reste vient de proposedAnalog.
+      // La détection décide du capteur et de son sens ; le reste vient de proposedAnalog, sauf la
+      // force des secousses déjà réglée sur ce joystick (étape « Tilt »).
       step.analog = proposedAnalog(axis);
+      if (step.analog.nudge) step.analog.nudge.gain = keptGain(step, step.analog.nudge.device);
       step.rest = axis.rest;
       step.mode = 'settings';
       step.shot = { recent: [] };

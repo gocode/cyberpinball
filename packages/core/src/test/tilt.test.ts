@@ -9,6 +9,7 @@ import {
   clampThreshold,
   isTiltKey,
   plumbFromIni,
+  setPlumbShape,
   plumbOptionsFromIni,
   plumbView,
   proposedTilt,
@@ -21,13 +22,14 @@ import {
   tiltModes,
   vpxTiltSettings,
 } from '../tilt';
+import { analogFromIni, clampNudgeGain, nudgeFloor, vpxAnalogSettings } from '../plunger';
 import { cabinetChanges, stepCabinet, wizardStepInfo } from '../wizardsteps';
 import { vpxOwnedKeys, isOwned } from '../vpx-settings';
 import { devPcDisplays, emptyCabinet } from './fixtures';
 
 const PINSCAPE = 'SDLJoy_03000000fa190000ed00000000000000_1';
 const BOB = joystickCode(PINSCAPE, 9);
-const NUDGE: CabinetAnalog = { nudge: { device: PINSCAPE, x: 0, y: 1 } };
+const NUDGE: CabinetAnalog = { nudge: { device: PINSCAPE, x: 0, y: 1, gain: 2 } };
 
 function cabinetWith(fields: Partial<Pick<Cabinet, 'buttons' | 'analog' | 'tilt'>> = {}): Cabinet {
   const cabinet = emptyCabinet();
@@ -130,6 +132,54 @@ test('réglages incohérents signalés : deux balanciers, balancier absent, rien
   // Et par la synchronisation, comme les autres constats.
   const plan = planVpxSync(cabinetWith({ buttons: { ...DEFAULT_BUTTONS, tilt: BOB }, analog: NUDGE }), devPcDisplays(), VPX_FIRST_RUN);
   assert.ok(plan.findings.some((f) => f.severity === 'warning' && f.message.startsWith('Tilt : le balancier de la borne')));
+});
+
+test('force des secousses : échelle des axes de l’accéléromètre, reprise de VPX, accéléromètre trop faible signalé', () => {
+  // Écrite dans Mapping.Nudge0.X et .Y ; l'axe inversé dans VPX le reste.
+  const settings = (analog: CabinetAnalog) => Object.fromEntries(vpxAnalogSettings(analog).map((s) => [s.key, s.value]));
+  assert.equal(settings(NUDGE)['Mapping.Nudge0.X'], `${PINSCAPE};512;A;0.000000;2.000000;1.000000`);
+  assert.equal(settings({ nudge: { device: PINSCAPE, x: 0, y: 1, gain: 3, invertY: true } })['Mapping.Nudge0.Y'], `${PINSCAPE};513;A;0.000000;-3.000000;1.000000`);
+  // Sans force (étape « Lanceur » d'avant) : l'échelle 1 de VPX.
+  assert.equal(settings({ nudge: { device: PINSCAPE, x: 0, y: 1 } })['Mapping.Nudge0.X'], `${PINSCAPE};512;A;0.000000;1.000000;1.000000`);
+  const fromVpx = (x: string, y: string) => analogFromIni(['[Input]', 'NudgeSensorCount = 1', 'Mapping.Nudge0.Type = 0', `Mapping.Nudge0.X = ${PINSCAPE};512;A;0.000000;${x};1.000000`, `Mapping.Nudge0.Y = ${PINSCAPE};513;A;0.000000;${y};1.000000`, ''].join('\r\n')).nudge;
+  assert.deepEqual(fromVpx('1.000000', '1.000000'), { device: PINSCAPE, x: 0, y: 1 });
+  assert.deepEqual(fromVpx('2.500000', '-2.500000'), { device: PINSCAPE, x: 0, y: 1, gain: 2.5, invertY: true });
+  // Bornes et pas du réglage ; seuil de VPX : 1 m/s² d'intention, une valeur de 1 vaut g/2.
+  assert.equal(clampNudgeGain(9), 6);
+  assert.equal(clampNudgeGain(1.1), 1);
+  assert.equal(Math.round(nudgeFloor(1) * 100), 20);
+  assert.equal(Math.round(nudgeFloor(2) * 100), 10);
+  assert.equal(Math.round(nudgeFloor(2, 2) * 100), 5);
+  // Accéléromètre à la force de VPX : la vraie borne d'octobre 2026, signalée ; à ×2, plus rien.
+  const weak = tiltFindings(cabinetWith({ analog: { nudge: { device: PINSCAPE, x: 0, y: 1 } } }), VPX_FIRST_RUN);
+  assert.match(weak.map((f) => `${f.severity}: ${f.message}`).join('\n'), /^warning: Secousses : accéléromètre lu à la force ×1,00 ; .* sous 20 % de l’échelle/m);
+  assert.deepEqual(tiltFindings(cabinetWith({ analog: NUDGE }), VPX_FIRST_RUN), []);
+  // Étape « Tilt » : elle reprend en main l'échelle des axes, pas leur choix ni le lanceur.
+  const tilt = wizardStepInfo('tilt');
+  for (const id of ['Input.Mapping.Nudge0.X', 'Input.Mapping.Nudge0.Y', 'Player.PlumbThresholdAngle']) assert.ok(tilt.owns(id), id);
+  for (const id of ['Input.Mapping.Nudge0.Type', 'Input.NudgeSensorCount', 'Input.Mapping.Plunger0.Position', 'Input.Mapping.Tilt']) assert.ok(!tilt.owns(id), id);
+  assert.ok(wizardStepInfo('lanceur').owns('Input.Mapping.Nudge0.X'));
+});
+
+test('force des secousses : la même secousse, ignorée à ×1, fait tilter à ×2 (simulation de VPX)', () => {
+  // 0,15 g sur X pendant 40 ms : sous le seuil de VPX à ×1 (20 %), au-dessus à ×2 (10 %).
+  const run = (gain: number) => {
+    const sim = startPlumb({ threshold: 0.3, x: { deadZone: 0, scale: gain, limit: 1 }, y: { deadZone: 0, scale: gain, limit: 1 } });
+    let peak = 0;
+    for (const [x, ms] of [[0.15, 40], [0, 1500]] as const) {
+      for (let t = 0; t < ms; t += 8) {
+        stepPlumb(sim, { x, y: 0 }, 8);
+        peak = Math.max(peak, sim.peak);
+      }
+    }
+    return { peak, tilts: sim.tilts };
+  };
+  assert.deepEqual(run(1), { peak: 0, tilts: 0 });
+  assert.ok(run(2).peak > 0 || run(2).tilts > 0, JSON.stringify(run(2)));
+  // Réglée pendant l'essai : la simulation suit, comme VPX lira les axes.
+  const sim = startPlumb({ threshold: 1 });
+  setPlumbShape(sim, { deadZone: 0, scale: 3, limit: 1 }, { deadZone: 0, scale: -3, limit: 1 });
+  assert.equal(sim.options.y!.scale, -3);
 });
 
 test('étape « Tilt » refaite seule : son champ et ses clés seulement', () => {

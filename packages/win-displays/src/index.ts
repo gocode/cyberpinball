@@ -215,3 +215,4 @@ export * from './usb';
 export * from './desktop';
 export * from './processes';
 export * from './joystick';
+export * from './power';

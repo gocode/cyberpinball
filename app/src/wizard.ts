@@ -138,7 +138,7 @@ import { createWindow, isShown, OFFSCREEN, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
 import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualPinscapeButton } from './joystick-input';
 import { plungerClick, plungerKey, plungerTick, plungerView, startPlungerStep, type PlungerAction, type PlungerOutcome, type PlungerStep } from './plunger-step';
-import { startTiltStep, tiltClick, tiltKey, tiltTick, tiltView, type TiltAction, type TiltOutcome, type TiltStep } from './tilt-step';
+import { analogWithGain, startTiltStep, tiltClick, tiltKey, tiltTick, tiltView, type TiltAction, type TiltOutcome, type TiltStep } from './tilt-step';
 import { locations, vpxProfile } from './paths';
 import { activeVpxIni, audioOutputs, syncVpxIni } from './vpx-ini';
 import { coverDisplay } from './cover-display';
@@ -768,7 +768,7 @@ function draftCabinet(): Partial<Cabinet> {
   if (keys && keys !== previous?.buttons) draft.buttons = keys;
   const navigation = captured(INTERFACE_KEYS) ? ({ ...navigationButtons(inForce()), ...capture!.keys } as NavigationButtons) : wizard.navigation;
   if (navigation && navigation !== previous?.navigation) draft.navigation = navigation;
-  const analog = wizard.plunger ? wizard.plunger.analog : wizard.analog;
+  const analog = wizard.plunger ? wizard.plunger.analog : wizard.tiltStep ? analogWithGain(wizard.tiltStep, wizard.analog) : wizard.analog;
   if (analog && JSON.stringify(analog) !== JSON.stringify(previous?.analog)) draft.analog = analog;
   const tilt = wizard.tiltStep ? wizard.tiltStep.tilt : wizard.tilt;
   if (tilt && JSON.stringify(tilt) !== JSON.stringify(previous?.tilt)) draft.tilt = tilt;
@@ -1226,6 +1226,8 @@ function stopTiltTimer(): void {
 function afterTilt(outcome: TiltOutcome): void {
   if (outcome !== 'save') return;
   wizard.tilt = structuredClone(wizard.tiltStep!.tilt);
+  // La force des secousses va avec l'accéléromètre (Mapping.Nudge0.X et .Y).
+  wizard.analog = analogWithGain(wizard.tiltStep!, wizard.analog);
   wizard.tiltStep = undefined;
   stopTiltTimer();
   if (only) saveStep();
@@ -1293,7 +1295,7 @@ function stepBuilt(): Cabinet {
   if (buttonsOnly) return { ...previous!, buttons: wizard.buttons, ...stamp };
   if (interfaceOnly) return { ...previous!, navigation: wizard.navigation, ...stamp };
   if (isOnly('lanceur')) return { ...previous!, analog: wizard.analog, ...stamp };
-  if (isOnly('tilt')) return { ...previous!, tilt: wizard.tilt, ...stamp };
+  if (isOnly('tilt')) return { ...previous!, tilt: wizard.tilt, analog: wizard.analog, ...stamp };
   if (arrangeOnly) return arrangeCabinet();
   return buildCabinet();
 }

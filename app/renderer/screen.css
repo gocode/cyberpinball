@@ -298,8 +298,8 @@ body {
 
 .plumb-ring {
   position: relative;
-  width: 20vmin;
-  height: 20vmin;
+  width: 16vmin;
+  height: 16vmin;
   border: 0.4vmin solid var(--accent);
   border-radius: 50%;
   background: radial-gradient(circle, var(--tile) 0 60%, var(--signal-wash) 100%);
@@ -330,9 +330,9 @@ body {
 
 .plumb-bob {
   position: absolute;
-  width: 3vmin;
-  height: 3vmin;
-  margin: -1.5vmin 0 0 -1.5vmin;
+  width: 2.6vmin;
+  height: 2.6vmin;
+  margin: -1.3vmin 0 0 -1.3vmin;
   border-radius: 50%;
   background: var(--accent);
   box-shadow: 0 0 1.6vmin var(--signal-haze);

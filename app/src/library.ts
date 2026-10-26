@@ -114,6 +114,8 @@ import {
   type VpsDb,
   type VpsRefresh,
   type VpsTableFile,
+  type GuestDoor,
+  type GuestMode,
 } from '@cyberpinball/core';
 import { prepareImport, type PreparedImport } from './archives';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
@@ -214,6 +216,8 @@ export interface LibraryHost {
   vpxVersion?(): string | undefined;
   /** Espace d'un lecteur (essais : lecteurs simulés) ; sans lui, celui du vrai lecteur. */
   diskSpace?(dir: string): { free: number; total: number } | undefined;
+  /** Mode invité : seules la fiche, ses pages et les actions à porte ouverte passent (guestmode.ts). */
+  guest: Pick<GuestMode, 'active' | 'allows' | 'knock'>;
 }
 
 /** Entrée du menu système (Exit dans le menu). La session des réglages peut y ajouter la sienne. */
@@ -291,8 +295,13 @@ export interface Action {
   attention?: boolean;
   /** Raccourci clavier de l'action, montré à droite du libellé ; il la déclenche aussi depuis son menu. */
   shortcut?: ActionShortcut;
+  /** Porte de l'action en mode invité (GUEST_DOORS) : sans porte, ou porte fermée, l'invité ne la voit pas. */
+  door?: GuestDoor;
   run: () => void | Promise<void>;
 }
+
+/** Action de la fiche : chacune déclare sa porte, ouverte ou fermée à l'invité (le compilateur l'exige). */
+type SheetAction = Action & { door: GuestDoor };
 /** Écran décrit : titre, sections, actions (flippers pour choisir, Start pour valider) et retour (Exit). */
 export interface Built {
   heading: string;
@@ -429,6 +438,9 @@ function tableOf(s: Screen | undefined): string | undefined {
   return undefined;
 }
 
+/** Écrans ouverts à l'invité, par leur porte : la fiche, le prospectus et les règles. Tout autre écran est fermé. */
+const GUEST_SCREENS: Partial<Record<Screen['kind'], GuestDoor>> = { sheet: 'menu.sheet', pages: 'sheet.read' };
+
 type AddPlan = Extract<Screen, { kind: 'addPlan' }>;
 type PagesScreen = Extract<Screen, { kind: 'pages' }>;
 
@@ -555,6 +567,8 @@ export function createLibrary(host: LibraryHost) {
   }
 
   function go(next: Screen, at = 0): void {
+    // Mode invité : un écran fermé ne s'ouvre pas, le cadenas le dit.
+    if (!host.guest.knock(GUEST_SCREENS[next.kind])) return;
     screen = next;
     cursor = at;
     host.enter();
@@ -639,6 +653,8 @@ export function createLibrary(host: LibraryHost) {
 
   /** Entrée du menu système : une rubrique s'ouvre ; une entrée fournie fait ce qu'elle fait. */
   function runSystemEntry(id: SystemEntryId): void {
+    // Mode invité : aucune entrée du menu système, par quelque chemin qu'on y arrive (clic, autopilote).
+    if (!host.guest.knock('menu.system')) return;
     systemChosen = id;
     if (isSystemGroup(id)) return openSystemGroup(id);
     section = SYSTEM_ITEMS[id].icon;
@@ -1093,7 +1109,13 @@ export function createLibrary(host: LibraryHost) {
     return { heading: g.label, icon: g.icon, sections: [], actions: [...actions, { label: t('Retour'), icon: 'back', run: up }], back: up };
   }
 
+  /** L'écran affiché ; en mode invité, sans les actions dont la porte est fermée (ou qui n'en ont pas). */
   function build(): Built {
+    const built = buildScreen();
+    return host.guest.active ? { ...built, actions: built.actions.filter((a) => host.guest.allows(a.door)) } : built;
+  }
+
+  function buildScreen(): Built {
     switch (screen!.kind) {
       case 'system':
         return buildSystem((screen as Extract<Screen, { kind: 'system' }>).group);
@@ -1136,7 +1158,7 @@ export function createLibrary(host: LibraryHost) {
 
   function buildSheet(s: Extract<Screen, { kind: 'sheet' }>): Built {
     const table = find(s.file);
-    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), run: leave }], back: leave };
+    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), door: 'sheet.back', run: leave }], back: leave };
     const own = !samePath(table.folder, tablesDir());
     const inv = inventory(table.file, own);
     const user = table.info.User ?? {};
@@ -1198,7 +1220,7 @@ export function createLibrary(host: LibraryHost) {
     // et pas fini. Le contenu du DMD manquant est proposé, après « Jouer », jamais en tête.
     const dmdMissing = Boolean(script?.dmdFolder && !dmdPresent(table.folder, script.dmdFolder));
     const started = journeyUi.position(table.file);
-    const missing: Action[] =
+    const missing: SheetAction[] =
       romMissing || (started && !started.ready)
         ? [
             {
@@ -1209,46 +1231,49 @@ export function createLibrary(host: LibraryHost) {
                   : t('ROM {rom} absente : où la trouver, étape par étape', { rom: script!.roms[0]! }),
               tone: 'ok',
               attention: true,
+              door: 'sheet.missing',
               run: () => journeyUi.open(table.file),
             },
           ]
         : [];
-    const further: Action[] = dmdMissing && !missing.length ? [{ label: t('Pour aller plus loin'), detail: t('Contenu du DMD absent (facultatif) : le récupérer'), icon: 'download', run: () => journeyUi.open(table.file) }] : [];
+    const further: SheetAction[] =
+      dmdMissing && !missing.length ? [{ label: t('Pour aller plus loin'), detail: t('Contenu du DMD absent (facultatif) : le récupérer'), icon: 'download', door: 'sheet.further', run: () => journeyUi.open(table.file) }] : [];
+    // Mode invité : la fiche sert à jouer ; les fichiers de la table (noms, ROM, replis) n'y sont pas montrés.
+    const guest = host.guest.active;
+    const actions: SheetAction[] = [
+      ...missing,
+      {
+        label: t('Jouer'),
+        icon: 'play',
+        door: 'sheet.play',
+        run: () => {
+          screen = undefined;
+          host.play(table);
+        },
+      },
+      ...further,
+      ...SHEET_PAGE_TYPES.map((type) => pagesAction(table, type)),
+      { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },
+      { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), icon: 'image', door: 'sheet.medias', run: () => medias.open(table) },
+      { label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) },
+      ...pupAction(table, s),
+      ...(host.adjustDisplay && host.vpxExe()
+        ? [{ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }]
+        : []),
+      ...(host.tableSettings
+        ? [{ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, door: 'sheet.table-settings' as const, run: () => host.tableSettings!(table) }]
+        : []),
+      { label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) },
+      { label: t('Supprimer la table'), detail: t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
+      { label: t('Retour au menu'), icon: 'back', door: 'sheet.back', run: leave },
+    ];
 
     return {
       heading: table.title,
       subheading: [table.manufacturer, table.year].filter(Boolean).join(' · ') || undefined,
       lead: s.flash ?? table.version,
-      sections: [
-        { title: t('Statistiques'), rows: stats },
-        { title: t('Fichiers'), rows: files },
-      ],
-      actions: [
-        ...missing,
-        {
-          label: t('Jouer'),
-          icon: 'play',
-          run: () => {
-            screen = undefined;
-            host.play(table);
-          },
-        },
-        ...further,
-        ...SHEET_PAGE_TYPES.map((type) => pagesAction(table, type)),
-        { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', run: () => openEdit(table) },
-        { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), icon: 'image', run: () => medias.open(table) },
-        { label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', run: () => tableFiles.open(table, 0, contents) },
-        ...pupAction(table, s),
-        ...(host.adjustDisplay && host.vpxExe()
-          ? [{ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, run: () => adjustDisplay(table) }]
-          : []),
-        ...(host.tableSettings
-          ? [{ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, run: () => host.tableSettings!(table) }]
-          : []),
-        { label: t('Diagnostiquer et réparer'), icon: 'pulse', run: () => openDoctor(table.file) },
-        { label: t('Supprimer la table'), detail: t('Mise à la corbeille'), tone: 'error', icon: 'trash', run: () => go({ kind: 'remove', file: table.file }) },
-        { label: t('Retour au menu'), icon: 'back', run: leave },
-      ],
+      sections: [{ title: t('Statistiques'), rows: stats }, ...(guest ? [] : [{ title: t('Fichiers'), rows: files }])],
+      actions,
       back: leave,
     };
   }
@@ -1258,10 +1283,11 @@ export function createLibrary(host: LibraryHost) {
   const pagesOf = (table: TableEntry, type: SheetPageType) => sheetPages(table, host.root, host.dataDir, type);
 
   /** « Prospectus : 2 pages » ; sans fichier, ce que montre le repli. */
-  function pagesAction(table: TableEntry, type: SheetPageType): Action {
+  function pagesAction(table: TableEntry, type: SheetPageType): SheetAction {
     const n = pagesOf(table, type).length;
     return {
       label: mediaTypeInfo(type).label,
+      door: 'sheet.read',
       icon: type === 'GameInfo' ? 'info' : 'rules',
       detail: n ? tn(n, '{n} page', '{n} pages') : type === 'GameInfo' ? t('Fiche générée : titre, fabricant, année') : t('Commandes de la partie'),
       run: () => go({ kind: 'pages', file: table.file, type, index: 0 }),
@@ -1271,7 +1297,7 @@ export function createLibrary(host: LibraryHost) {
   function buildPages(s: PagesScreen): Built {
     const table = find(s.file);
     const back = () => (table ? openSheet(table) : leave());
-    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), run: leave }], back };
+    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), door: 'sheet.back', run: leave }], back };
     const count = Math.max(1, pagesOf(table, s.type).length);
     s.index = Math.min(s.index, count - 1);
     const turn = (step: number) => {
@@ -1283,9 +1309,10 @@ export function createLibrary(host: LibraryHost) {
       heading: table.title,
       subheading: count > 1 ? t('{label} · page {page} sur {count}', { label, page: s.index + 1, count }) : label,
       sections: [],
+      // Lire, page par page : ouvert à l'invité comme la fiche.
       actions: [
-        ...(count > 1 ? [{ label: t('‹ Page précédente'), run: () => turn(-1) }, { label: t('Page suivante ›'), run: () => turn(1) }] : []),
-        { label: t('Retour à la fiche'), run: back },
+        ...(count > 1 ? [{ label: t('‹ Page précédente'), door: 'sheet.read' as const, run: () => turn(-1) }, { label: t('Page suivante ›'), door: 'sheet.read' as const, run: () => turn(1) }] : []),
+        { label: t('Retour à la fiche'), door: 'sheet.read', run: back },
       ],
       back,
     };
@@ -1353,7 +1380,7 @@ export function createLibrary(host: LibraryHost) {
     return s.pup;
   }
 
-  function pupAction(table: TableEntry, s: { pup?: TablePupPack[] }): Action[] {
+  function pupAction(table: TableEntry, s: { pup?: TablePupPack[] }): SheetAction[] {
     const packs = pupPacksOf(table, s);
     if (!packs.length) return [];
     const unsuited = packs.some((p) => p.recommended && p.applied !== p.recommended && p.memory?.chosen !== 'user');
@@ -1364,6 +1391,7 @@ export function createLibrary(host: LibraryHost) {
         icon: 'pup',
         detail: unsuited ? t('{applied} · une autre option convient mieux à la borne', { applied }) : applied,
         tone: unsuited ? 'warning' : undefined,
+        door: 'sheet.pup',
         run: () => go({ kind: 'pupOptions', file: table.file }),
       },
     ];
@@ -2683,7 +2711,7 @@ export function createLibrary(host: LibraryHost) {
   function handleAction(action: UiAction): void {
     if (busy) return;
     if (action.type === 'drop') {
-      if (!action.paths.length) return;
+      if (!action.paths.length || !host.guest.knock('files.drop')) return;
       // Sur l'écran des médias d'un jeu, un fichier déposé est un média de ce jeu.
       const onScreen = screen ? build().drop : undefined;
       if (onScreen) onScreen(action.paths);
@@ -2779,7 +2807,9 @@ export function createLibrary(host: LibraryHost) {
    * exemple, deux minutes au plus : une démonstration ne parie pas sur la durée des
    * étapes, qui varie avec le nombre d'écrans et leur définition), « copy:source|destination »
    * et « remove:chemin » (fichier posé ou retiré pendant que le menu tourne, comme à la main :
-   * le guet des dossiers, mediawatch.ts, doit le faire voir sans redémarrer).
+   * le guet des dossiers, mediawatch.ts, doit le faire voir sans redémarrer), « hold:code » et
+   * « release:code » (bouton tenu puis relâché : combinaison de déverrouillage du mode invité ;
+   * une touche simple est appuyée puis relâchée).
    * Le garde-fou de mise en page inspecte chaque écran, pas seulement le playfield.
    */
   async function autopilot(steps: string[], captureDir: string | undefined, pressKey: (input: Input) => void, phase: () => string): Promise<void> {
@@ -2792,7 +2822,11 @@ export function createLibrary(host: LibraryHost) {
     const layout = new LayoutReport(captureDir);
     // Ce que joue le son du menu après chaque étape (fenêtres muettes hors écran : rien ne s'entend).
     const sounds: string[] = [];
-    const key = (code: string, k = '') => pressKey({ type: 'keyDown', code, key: k, shift: false, control: false, alt: false, meta: false } as Input);
+    const send = (type: 'keyDown' | 'keyUp', code: string, k = '') => pressKey({ type, code, key: k, shift: false, control: false, alt: false, meta: false } as Input);
+    const key = (code: string, k = '') => {
+      send('keyDown', code, k);
+      send('keyUp', code, k);
+    };
     for (const [i, step] of ['depart', ...steps].entries()) {
       if (i > 0) {
         if (step.startsWith('type:')) for (const ch of step.slice(5)) key(ch === ' ' ? 'Space' : `Key${ch.toUpperCase()}`, ch);
@@ -2811,6 +2845,8 @@ export function createLibrary(host: LibraryHost) {
           fs.copyFileSync(from, to);
         } else if (step.startsWith('remove:')) fs.rmSync(step.slice(7), { force: true });
         else if (step.startsWith('action:')) activateByLabel(step.slice(7));
+        else if (step.startsWith('hold:')) send('keyDown', step.slice(5));
+        else if (step.startsWith('release:')) send('keyUp', step.slice(8));
         else if (/^((Control|Shift|Alt)\+)+\w+$/.test(step)) {
           // Combinaison (« Control+Shift+KeyD ») : le raccourci tel que le clavier l'envoie.
           const parts = step.split('+');

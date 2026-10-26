@@ -49,16 +49,16 @@ $touches = @(
 )
 
 try {
-  foreach ($ecrans in $Ecrans) {
-    Use-HorsEcran $ecrans
+  foreach ($jeu in $Ecrans) {
+    Use-HorsEcran $jeu
     foreach ($langue in $Langues) {
-      "== $ecrans, $langue"
-      $dossier = "$base\$ecrans\$langue"
+      "== $jeu, $langue"
+      $dossier = "$base\$jeu\$langue"
       $home_ = "$dossier\home"
       if (Test-Path $home_) { Remove-Item -Recurse -Force $home_ }
       New-Item -ItemType Directory -Force "$home_\sandbox" | Out-Null
       Set-Content "$home_\sandbox\VPinballX.ini" '' -Encoding UTF8
-      node "$PSScriptRoot\demo-medias.cjs" modele "$PSScriptRoot\ecrans\$ecrans.json" "$home_\cabinet.json" "$home_\sandbox\VPinballX.ini" | Out-Null
+      node "$PSScriptRoot\demo-medias.cjs" modele "$PSScriptRoot\ecrans\$jeu.json" "$home_\cabinet.json" "$home_\sandbox\VPinballX.ini" | Out-Null
       if ($LASTEXITCODE -ne 0) { throw 'Modèle de borne des écrans simulés impossible.' }
       $env:CYBERPINBALL_HOME = $home_
       $env:CYBERPINBALL_ROOT = $root
@@ -69,7 +69,7 @@ try {
       Push-Location $wt
       try { $log = & $electron app 2>&1 | ForEach-Object { "$_" } } finally { Pop-Location }
       $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Mode bureau)' } | ForEach-Object { Write-Host "   $_" }
-      $id = "$ecrans/$langue"
+      $id = "$jeu/$langue"
       if ($log -match 'Autopilote : aucun') { $failures += "$id : une action rejouée n'a pas trouvé son écran" }
       if ($log -match 'Traduction manquante') { $failures += "$id : texte sans traduction" }
       $libres = @($log | Where-Object { $_ -match '^Mode bureau : .*tous les écrans libres' }).Count

@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, session, type Input, type Rectangle } from 'electron';
 import {
   CONFIG_KEY,
+  powerTexts,
   SYSTEM_ITEMS,
   WIZARD_STEPS,
   buttonProblems,
@@ -102,6 +103,8 @@ import {
   shortcutKeys,
   shortcutLabel,
   SHORTCUTS,
+  GuestMode,
+  type GuestDoor,
   cachedFrame,
   frameCacheFile,
   liveDmdArea,
@@ -137,9 +140,11 @@ import { serveMedias } from './media-protocol';
 import { createMenuSettings } from './menu-settings';
 import { createLanguageMenu } from './language-menu';
 import { createUpdatesMenu } from './updates-menu';
+import { createGuestMenu } from './guest-menu';
 import { createDedicatedMenu } from './dedicated-menu';
 import { createDedicatedSystem } from './dedicated-system';
 import { handOverOnQuit, shellSession } from './dedicated-session';
+import { createPowerMenu } from './power';
 
 /**
  * Touches du menu : celles des boutons de l'interface (étape « Boutons de l'interface »
@@ -168,15 +173,17 @@ function menuKeys(): [string, string][] {
   // Boutons de l'interface : par défaut les flippers, Start et Exit du jeu.
   const keys = navigationButtons({ buttons, navigation });
   const or = (codes: string[]) => formatList(codes.map(keyLabel), 'or');
-  return [
-    [t('Choisir une table'), t('Précédent / Suivant ({left} / {right}) ou flèches', { left: keyLabel(keys.previous), right: keyLabel(keys.next) })],
-    [t('Fiche de la table (Jouer, Modifier…)'), `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`],
-    ...(KEYS.help.length ? [[t('Afficher les commandes'), or(KEYS.help)] as [string, string]] : []),
-    [t('Réglages de VPX'), KEYS.settings.length ? t('{keys}, ou Exit puis « Réglages de VPX »', { keys: or(KEYS.settings) }) : t('Exit puis « Réglages de VPX »')],
-    [t('Menu et configuration (tables, réglages, boutons, écrans, Bureau Windows, quitter)'), t('Exit ({keys}), Tab, ou clic sur ⚙ en haut à droite', { keys: or(KEYS.exit) })],
-    [t('Bureau Windows (tous les écrans du PC), puis retour au menu'), shortcutLabel(SHORTCUTS.desktop)],
-    [t('Arrêter une partie bloquée'), shortcutLabel(SHORTCUTS.forceStop)],
+  // En mode invité, seulement ce qui marche : chaque ligne passe par sa porte.
+  const rows: [GuestDoor, string, string][] = [
+    ['menu.choose', t('Choisir une table'), t('Précédent / Suivant ({left} / {right}) ou flèches', { left: keyLabel(keys.previous), right: keyLabel(keys.next) })],
+    ['menu.sheet', guest.active ? t('Fiche de la table (Jouer, Prospectus, Règles)') : t('Fiche de la table (Jouer, Modifier…)'), `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`],
+    ...(KEYS.help.length ? [['menu.commands', t('Afficher les commandes'), or(KEYS.help)] as [GuestDoor, string, string]] : []),
+    ['menu.vpx-settings', t('Réglages de VPX'), KEYS.settings.length ? t('{keys}, ou Exit puis « Réglages de VPX »', { keys: or(KEYS.settings) }) : t('Exit puis « Réglages de VPX »')],
+    ['menu.system', t('Menu et configuration (tables, réglages, boutons, écrans, Bureau Windows, quitter)'), t('Exit ({keys}), Tab, ou clic sur ⚙ en haut à droite', { keys: or(KEYS.exit) })],
+    ['shortcut.desktop', t('Bureau Windows (tous les écrans du PC), puis retour au menu'), shortcutLabel(SHORTCUTS.desktop)],
+    ['game.force-stop', t('Arrêter une partie bloquée'), shortcutLabel(SHORTCUTS.forceStop)],
   ];
+  return rows.filter(([door]) => guest.allows(door)).map(([, what, how]) => [what, how]);
 }
 
 /**
@@ -189,7 +196,8 @@ function menuFooter(): [string, string?][] {
   return [
     [t('Flippers : choisir')],
     [t('Start : fiche'), KEYS.confirm[0]],
-    [t('Exit : menu'), KEYS.exit[0]],
+    // Mode invité : Exit n'ouvre pas le menu système.
+    ...(guest.allows('menu.system') ? [[t('Exit : menu'), KEYS.exit[0]] as [string, string]] : []),
   ];
 }
 
@@ -205,10 +213,26 @@ interface Message {
   title: string;
   lines: string[];
   /** Ce que fait Start sur ce message. */
-  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'journey';
+  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'journey' | 'power';
   /** Table d'une partie échouée : Start ouvre « Ce qu'il manque pour jouer » (action 'journey'). */
   table?: string;
 }
+
+/**
+ * Porte de Start sur chaque message (mode invité, GUEST_DOORS) : fermée, Start ne fait rien et
+ * Exit ferme le message sans rien faire d'autre. Un message nouveau doit dire la sienne.
+ */
+const MESSAGE_DOORS: Record<NonNullable<Message['action']>, GuestDoor> = {
+  wizard: 'message.wizard',
+  'install-vpx': 'message.install-vpx',
+  addTable: 'message.add-table',
+  manualEdits: 'message.manual-edits',
+  buttons: 'message.buttons',
+  interface: 'message.interface',
+  otherFrontend: 'message.other-frontend',
+  journey: 'message.journey',
+  power: 'message.power',
+};
 
 interface State {
   phase: Phase;
@@ -307,6 +331,19 @@ function screensSubject(): TableEntry | undefined {
   });
 }
 
+/**
+ * Mode invité (guestmode.ts) : gardé d'un démarrage à l'autre. Chaque porte d'entrée du menu
+ * passe par lui ; la combinaison de déverrouillage suit les boutons de la borne.
+ */
+const guest = new GuestMode({
+  dataDir: loc.dataDir,
+  buttons: () => buttons,
+  onChange: () => broadcast(),
+  onUnlock: () => console.log('Mode invité : déverrouillé par la combinaison des boutons.'),
+});
+/** Cyber Pinball se ferme lui-même (quitter, relance, arrêt de Windows) : le mode invité laisse fermer ses fenêtres. */
+let closing = false;
+
 // Fiche, ajout, médecin et suppression des tables (library.ts).
 const library = createLibrary({
   root: loc.root,
@@ -346,6 +383,7 @@ const library = createLibrary({
     startVpxInstall();
   },
   setup: () => void relaunchWizard(),
+  guest,
   displays: () => observedDisplays(),
   vpxVersion: () => vpxInstall(loc)?.version,
 });
@@ -579,6 +617,43 @@ if (shellSession()) {
   },
   run: () => showDesktop(),
 });
+// Mode invité : on joue, rien d'autre ; l'écran de l'entrée dit la combinaison qui déverrouille.
+library.provideSystemItem('guest-mode', createGuestMenu({ library, guest, buttons: () => buttons }));
+
+// Éteindre, mettre en veille, redémarrer (app/src/power.ts) : une confirmation, puis un écran
+// noir sur chaque écran le temps que Windows prenne la main ; le menu garde ses fenêtres.
+const power = createPowerMenu({
+  library,
+  prepare: async (_action, title, line) => {
+    library.leave();
+    state = { ...state, phase: 'message', help: false, message: { title, lines: [line], action: 'power' } };
+    broadcast();
+    saveSettings();
+    restoreTaskbars();
+    // Le temps que chaque écran peigne l'écran noir avant que Windows n'agisse.
+    await delay(600);
+  },
+  finish: (action, outcome) => {
+    const menu = () => (state = tables.length ? { ...state, phase: 'menu', message: undefined } : { ...state, phase: 'message', message: noTables() });
+    if (outcome.simulated) {
+      menu();
+      showBanner(powerTexts(action).simulated);
+    } else if (outcome.ok) {
+      // Réveil après la veille : le menu, tel qu'il était.
+      menu();
+      broadcast();
+    } else {
+      const titles = { shutdown: t('La borne ne s’est pas éteinte'), sleep: t('La borne ne s’est pas mise en veille'), restart: t('La borne n’a pas redémarré') };
+      state = { ...state, phase: 'message', message: { title: titles[action], lines: [outcome.problem ?? t('Windows n’a pas dit pourquoi.')] } };
+      broadcast();
+    }
+  },
+  clearNotice: () => (state = { ...state, banner: undefined }),
+  log: (line) => console.log(line),
+});
+library.provideSystemItem('sleep', power.items.sleep);
+library.provideSystemItem('restart', power.items.restart);
+library.provideSystemItem('shutdown', power.items.shutdown);
 
 /**
  * Mode bureau : chaque fenêtre de Cyber Pinball (menu, voiles du gardien des écrans, et toute
@@ -663,10 +738,11 @@ export function startFrontend(): void {
     // Un clic en mode attente y met fin, sans autre effet.
     if (attract.activity()) return void leaveAttract();
     if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
-    else if (action.type === 'config') openConfig();
+    // Roue dentée (ou cadenas, en mode invité).
+    else if (action.type === 'config') guest.knock('menu.system') && openConfig();
     else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
-      if (action.offset === 0) library.openSheet(tables[state.index]!);
-      else moveSelection(action.offset);
+      if (action.offset === 0) guest.knock('menu.sheet') && library.openSheet(tables[state.index]!);
+      else if (guest.knock('menu.choose')) moveSelection(action.offset);
       broadcast();
     } else library.handleAction(action);
   });
@@ -701,8 +777,10 @@ export function startFrontend(): void {
     });
   }
   app.on('before-quit', () => {
+    closing = true;
+    guest.dispose();
     mediaWatch?.close();
-    medias?.save();
+    saveSettings();
     attract.dispose();
     liveDmd.dispose();
   });
@@ -717,6 +795,7 @@ export function startFrontend(): void {
   const updateNotice = updates.startupNotice();
   updates.startBackgroundChecks();
   if (updateNotice) showBanner(updateNotice);
+  if (guest.active) console.log('Mode invité : actif (réglage gardé) ; le menu système et les réglages sont fermés.');
   if (choose) configurations.openChooser();
   else if (problem) state = { ...state, phase: 'message', message: problem };
   else if (manual) state = { ...state, phase: 'message', message: manual };
@@ -772,7 +851,7 @@ export function startFrontend(): void {
   }
   if (stress && install) void runStress(stress, process.env.CYBERPINBALL_TABLE);
   const autopilot = process.env.CYBERPINBALL_AUTOPILOT;
-  if (autopilot && !stress) void library.autopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE, (input) => handleKey(input), () => state.phase);
+  if (autopilot && !stress) void library.autopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE, (input) => (input.type === 'keyUp' ? handleKeyUp(input) : handleKey(input)), () => state.phase);
 }
 
 function noTables(): Message {
@@ -915,9 +994,15 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     win.on('page-title-updated', (e) => e.preventDefault());
     win.webContents.on('before-input-event', (event, input) => {
       if (input.type === 'keyDown' && handleKey(input)) event.preventDefault();
+      else if (input.type === 'keyUp') handleKeyUp(input);
     });
     // Boutons d'un joystick (Pinscape…) : comme des touches.
-    onJoystickInput(win, (input) => input.type === 'keyDown' && handleKey(input));
+    onJoystickInput(win, (input) => (input.type === 'keyDown' ? handleKey(input) : handleKeyUp(input)));
+    // Mode invité : Alt+F4 ne ferme pas le menu. Cyber Pinball seul se ferme (quitter, relance), et Windows à son arrêt.
+    win.on('close', (event) => {
+      if (!closing && !guest.knock('window.close')) event.preventDefault();
+    });
+    win.on('query-session-end', () => (closing = true));
     // Seule la mise en page du playfield pivote : la fenêtre garde les bornes de l'écran.
     const turn = role.id === 'playfield' ? rotation : 0;
     win.loadFile(path.join(__dirname, '..', 'renderer', 'frontend.html'), { query: { role: role.id, rotation: String(turn), zones: JSON.stringify(parts), ...(playfield && { playfield: JSON.stringify(playfield) }) } });
@@ -970,16 +1055,37 @@ function recordMediaError(error: MediaErrorReport): void {
   }
 }
 
+/**
+ * Combinaison de déverrouillage du mode invité : écoutée dans le menu, ses fiches et ses
+ * messages ; jamais pendant une partie ni son chargement, ni au bureau.
+ */
+function unlockListening(): boolean {
+  return state.phase !== 'loading' && state.phase !== 'playing' && !desktop.active;
+}
+
+/** Touche ou bouton relâché : seule la combinaison de déverrouillage s'en sert. */
+function handleKeyUp(input: Input): void {
+  guest.input(input.code, false, unlockListening());
+}
+
+/**
+ * Touches et boutons du menu. En mode invité, chaque porte (GUEST_DOORS) laisse passer ou non :
+ * fermée, rien ne se passe que l'indice « Verrouillé » près du cadenas.
+ */
 function handleKey(input: Input): boolean {
   const is = (group: string[]) => group.includes(input.code);
-  if (input.control && input.code === 'KeyQ') return quit();
+  // Un bouton de la combinaison appuyé pendant qu'un autre est tenu ne fait rien d'autre.
+  if (guest.input(input.code, true, unlockListening())) return true;
+  if (input.control && input.code === 'KeyQ') return guest.knock('shortcut.quit') ? quit() : true;
+  // Extinction, veille ou redémarrage en cours : plus rien ne se choisit.
+  if (state.phase === 'message' && state.message?.action === 'power') return true;
   // Raccourci du mode bureau, de n'importe quel écran du menu (sauf pendant une partie) ; une fenêtre rouverte au bureau le reçoit aussi : retour.
-  if (matchesShortcut(input, SHORTCUTS.desktop)) return desktop.active ? (restoreFromDesktop(), true) : showDesktop();
+  if (matchesShortcut(input, SHORTCUTS.desktop)) return desktop.active ? (restoreFromDesktop(), true) : guest.knock('shortcut.desktop') ? showDesktop() : true;
   // N'importe quel bouton en mode attente y met fin, sans autre effet ; sinon il remet le compte à zéro.
   if (attract.activity()) return leaveAttract();
 
   // Tab : menu et configuration, quels que soient les boutons relevés (dans le menu, Tab s'y déplace).
-  if (input.code === CONFIG_KEY && ['menu', 'message', 'confirmQuit'].includes(state.phase)) return openConfig();
+  if (input.code === CONFIG_KEY && ['menu', 'message', 'confirmQuit'].includes(state.phase)) return guest.knock('menu.system') ? openConfig() : true;
 
   switch (state.phase) {
     case 'loading':
@@ -989,6 +1095,13 @@ function handleKey(input: Input): boolean {
       return library.handleKey(input);
     case 'message':
       if (!is(KEYS.confirm) && !is(KEYS.exit)) return false;
+      // Mode invité, action du message fermée : Start ne la fait pas ; Exit ferme le message sans rien changer.
+      if (state.message?.action && !guest.allows(MESSAGE_DOORS[state.message.action])) {
+        if (is(KEYS.confirm)) guest.knock(MESSAGE_DOORS[state.message.action]);
+        else if (tables.length) state = { ...state, phase: 'menu', message: undefined };
+        else guest.knock('menu.system');
+        break;
+      }
       if (is(KEYS.confirm) && state.message?.action === 'wizard') return relaunchWizard();
       if (is(KEYS.confirm) && state.message?.action === 'install-vpx') return startVpxInstall();
       if (is(KEYS.confirm) && state.message?.action === 'buttons') return relaunchWizard('--boutons');
@@ -1023,17 +1136,17 @@ function handleKey(input: Input): boolean {
       else if (state.message?.action === 'install-vpx') state = { ...state, message: noTables() };
       break;
     case 'confirmQuit':
-      if (is(KEYS.confirm)) return quit();
+      if (is(KEYS.confirm)) return guest.knock('shortcut.quit') ? quit() : true;
       state = { ...state, phase: 'menu' };
       break;
     case 'menu':
-      if (is(KEYS.help)) state = { ...state, help: !state.help };
+      if (is(KEYS.help)) guest.knock('menu.commands') && (state = { ...state, help: !state.help });
       else if (state.help && is(KEYS.exit)) state = { ...state, help: false };
-      else if (is(KEYS.previous)) moveSelection(-1);
-      else if (is(KEYS.next)) moveSelection(1);
-      else if (is(KEYS.confirm)) library.openSheet(tables[state.index]!);
-      else if (is(KEYS.settings)) openVpxSettings();
-      else if (is(KEYS.exit)) library.openSystem();
+      else if (is(KEYS.previous)) guest.knock('menu.choose') && moveSelection(-1);
+      else if (is(KEYS.next)) guest.knock('menu.choose') && moveSelection(1);
+      else if (is(KEYS.confirm)) guest.knock('menu.sheet') && library.openSheet(tables[state.index]!);
+      else if (is(KEYS.settings)) guest.knock('menu.vpx-settings') && openVpxSettings();
+      else if (is(KEYS.exit)) guest.knock('menu.system') && library.openSystem();
       else return false;
       break;
   }
@@ -1120,6 +1233,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 
   // Dès le chargement : son écran rappelle les boutons du menu de VPX, pas ceux du jeu.
   displayMode = mode === 'display';
+  guest.releaseAll();
   state = { ...state, phase: 'loading', help: false };
   launchCount++;
   broadcast();
@@ -1176,7 +1290,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
       ? simulateVpx({ onPlaying })
       : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: table.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying });
   // Une partie simulée ne prend aucun raccourci global au poste.
-  if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => game.stop());
+  if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   const result = await game.done;
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
   stopWatchOccupied();
@@ -1455,6 +1569,8 @@ function openVpxSettings(table?: TableEntry): void {
  */
 function openConfig(): boolean {
   if (state.phase === 'loading' || state.phase === 'playing') return true;
+  // Extinction, veille ou redémarrage en cours : la roue dentée n'ouvre plus rien.
+  if (state.phase === 'message' && state.message?.action === 'power') return true;
   state = { ...state, help: false };
   library.openSystemRoot();
   return true;
@@ -1483,8 +1599,14 @@ function showBanner(text: string): void {
 }
 
 function quit(): boolean {
+  closing = true;
   app.quit();
   return true;
+}
+
+/** Ce que le menu garde d'un démarrage à l'autre : avant de quitter, d'éteindre ou de mettre en veille. */
+function saveSettings(): void {
+  medias?.save();
 }
 
 function delay(ms: number): Promise<void> {
@@ -1546,8 +1668,11 @@ function viewFor(role: RoleId) {
     loading: state.phase === 'loading' && role === 'playfield' && medias && table ? medias.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
     // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
     backglass: role === 'playfield' && medias && table && !shown ? medias.typeMedia(table, 'backglass', 'Backglass') : undefined,
-    message: state.message,
+    // Mode invité : un message dont l'action est fermée n'en propose pas (son pied dit « Revenir au menu »).
+    message: state.message?.action && !guest.allows(MESSAGE_DOORS[state.message.action]) ? { ...state.message, action: undefined } : state.message,
     banner: state.banner,
+    // Mode invité : cadenas, indice « Verrouillé », anneau du déverrouillage (dessinés par le playfield).
+    guest: guest.view(),
     /** Pastille rouge sur la roue dentée : une entrée du menu système attend l'utilisateur. */
     attention: library.attention(),
     library: state.phase === 'library' ? library.view() : undefined,

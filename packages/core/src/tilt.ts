@@ -29,7 +29,7 @@ import { buttonKeys, keyLabel } from './buttons';
 import { formatNumber, t } from './i18n';
 import { IniDocument } from './ini';
 import type { Cabinet, CabinetButtons, CabinetTilt, TiltMode } from './model';
-import { MAX_DEAD_ZONE, parseSensorMapping, type ParsedSensor } from './plunger';
+import { gainLabel, MAX_DEAD_ZONE, NUDGE_GAIN, nudgeFloor, parseSensorMapping, type ParsedSensor } from './plunger';
 import { iniBool, type VpxSetting } from './vpx';
 
 const PLAYER = 'Player';
@@ -168,7 +168,9 @@ export interface TiltFinding {
  * - balancier de la borne relevé, étape « Tilt » jamais faite, et balancier simulé de VPX
  *   allumé : deux balanciers, un même coup compte deux fois ;
  * - balancier simulé, mais rien pour le faire bouger (ni accéléromètre ni bouton de tremblement) ;
- * - balancier simulé choisi, éteint dans VPinballX.ini (gardé à la main).
+ * - balancier simulé choisi, éteint dans VPinballX.ini (gardé à la main) ;
+ * - accéléromètre lu à l'échelle 1 ou moins (celle de VPX) : VPX ignore presque toutes les
+ *   secousses d'un Pinscape (plunger.ts, NUDGE_GAIN).
  */
 export function tiltFindings(cabinet: Pick<Cabinet, 'buttons' | 'analog' | 'tilt'>, ini: string): TiltFinding[] {
   const findings: TiltFinding[] = [];
@@ -192,6 +194,17 @@ export function tiltFindings(cabinet: Pick<Cabinet, 'buttons' | 'analog' | 'tilt
       findings.push({ severity: 'info', message: t('Tilt : balancier simulé, mais ni accéléromètre ni bouton de tremblement pour le faire bouger : il ne tiltera jamais.') });
     }
     if (!plumb.simulated) findings.push({ severity: 'warning', message: t('Tilt : balancier simulé choisi, mais éteint dans VPinballX.ini ([Player] SimulatedPlumb = 0) : la borne ne tiltera pas aux secousses.') });
+  }
+  const nudge = cabinet.analog?.nudge;
+  if (nudge && (nudge.gain ?? NUDGE_GAIN.default) < NUDGE_GAIN.pinscape) {
+    findings.push({
+      severity: 'warning',
+      message: t('Secousses : accéléromètre lu à la force {gain} ; un Pinscape réglé en « 1G » n’y donne presque aucune secousse (VPX ignore tout ce qui reste sous {floor} % de l’échelle). Réglez la force des secousses à l’essai ({where}).', {
+        gain: gainLabel(nudge.gain ?? NUDGE_GAIN.default),
+        floor: Math.round(nudgeFloor(nudge.gain ?? NUDGE_GAIN.default) * 100),
+        where,
+      }),
+    });
   }
   return findings;
 }
@@ -306,6 +319,12 @@ export function startPlumb(options: PlumbOptions): PlumbSimulation {
 export function setPlumbThreshold(sim: PlumbSimulation, threshold: number): void {
   sim.options.threshold = threshold;
   sim.peak = 0;
+}
+
+/** Nouvelle mise en forme des axes (force des secousses changée) : la simulation continue. */
+export function setPlumbShape(sim: PlumbSimulation, x: PlumbOptions['x'], y: PlumbOptions['y']): void {
+  sim.options.x = x;
+  sim.options.y = y;
 }
 
 /** Valeur d'un axe comme VPX la calcule (SensorMapping::UpdateValue) : zone morte, limite, échelle. */
