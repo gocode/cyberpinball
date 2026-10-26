@@ -230,7 +230,8 @@ export interface Row {
   /** Repère neutre (filet clair) : l'emplacement ouvert, un fichier coché ; jamais en vert, réservé au choix courant. */
   current?: boolean;
   /** Seconde ligne, mot et signe : à quoi sert un fichier (« ✓ Installé avec… », « ! À installer… »). */
-  note?: { text: string; sign: string; tone: Tone };
+  note?: { text: string; sign: string; tone: Tone };  /** Schéma de l'écran du DMD à droite de la ligne (« Écran du DMD ») : FullDMD ou DMD seul en bande. */
+  figure?: 'fulldmd' | 'dmd';
 }
 export interface Section {
   title?: string;

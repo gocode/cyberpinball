@@ -34,6 +34,7 @@ export * from './romalias';
 export * from './vpmalias';
 export * from './sandbox';
 export * from './zones';
+export * from './dmdscreen';
 export * from './screencover';
 export * from './coexistence';
 export * from './medias';

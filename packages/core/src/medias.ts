@@ -13,7 +13,7 @@ import { t } from './i18n';
 import { layoutOf } from './locations';
 import { edgeRotation, type Cabinet, type FlipperEdge, type RoleId, type Rotation } from './model';
 import { readInfo, type TableEntry, type TableInfoFile } from './tables';
-import { roleZone, zoneRatio } from './zones';
+import { dmdKindForRatio, dmdKindOf } from './dmdscreen';
 
 /** Types de VPX, tels qu'ils apparaissent entre parenthèses dans les noms de fichiers. */
 export type MediaType =
@@ -748,7 +748,7 @@ function finish(
 
 /**
  * Média de chaque rôle de la borne : Playfield, Backglass, Topper, et pour le DMD
- * le type qui colle aux proportions réelles de son écran (dmdMediaType).
+ * le type de son écran, FullDMD ou DMD seul (dmdMediaType).
  */
 export function resolveRoleMedia(table: TableEntry, root: string, role: RoleId, options: ResolveOptions = {}): ResolvedMedia {
   const type: MediaType =
@@ -759,28 +759,19 @@ export function resolveRoleMedia(table: TableEntry, root: string, role: RoleId, 
 // ---------------------------------------------------------------------------
 // DMD ou FullDMD
 
-/**
- * Frontière entre 4:1 et 16:9 : moyenne géométrique des deux proportions
- * (√(4 × 16/9) = 8/3), pour que l'écart se mesure en rapport et non en différence.
- */
-export const DMD_RATIO_THRESHOLD = 8 / 3;
-
-/** Type d'afficheur pour des proportions (grand côté sur petit côté). */
+/** Type d'afficheur pour des proportions (grand côté sur petit côté) : DMD à partir de 8:3. */
 export function dmdTypeForRatio(ratio: number): 'DMD' | 'FullDMD' {
-  return ratio >= DMD_RATIO_THRESHOLD ? 'DMD' : 'FullDMD';
+  return dmdKindForRatio(ratio) === 'dmd' ? 'DMD' : 'FullDMD';
 }
 
 /**
- * DMD ou FullDMD selon les proportions réelles de la zone du rôle dmd (écran
- * entier, bande sous le fronton, ou incrustation dans le playfield). undefined
- * sans rôle dmd, ou si son écran n'est pas dans le modèle.
+ * DMD ou FullDMD selon l'écran du rôle dmd : le type dit par l'utilisateur (« Écran du DMD »,
+ * assistant), sinon les proportions réelles de sa zone (écran entier, bande sous le fronton,
+ * incrustation dans le playfield). undefined sans rôle dmd, ou si son écran n'est pas dans le modèle.
  */
 export function dmdMediaType(cabinet: Cabinet): 'DMD' | 'FullDMD' | undefined {
-  const fingerprint = cabinet.roles.dmd;
-  const screen = fingerprint ? cabinet.screens.find((s) => s.fingerprint === fingerprint) : undefined;
-  if (!screen) return undefined;
-  const ratio = zoneRatio(roleZone(cabinet, 'dmd'), { width: screen.widthPx, height: screen.heightPx });
-  return ratio === undefined ? undefined : dmdTypeForRatio(ratio);
+  const kind = dmdKindOf(cabinet);
+  return kind === undefined ? undefined : kind === 'dmd' ? 'DMD' : 'FullDMD';
 }
 
 // ---------------------------------------------------------------------------

@@ -34,10 +34,11 @@ const T2_SCRIPT = [
 ].join('\r\n');
 
 test('nom de ROM lu dans le script, commentaires ignorés', () => {
-  assert.deepEqual(scriptFacts(T2_SCRIPT), { usesPinmame: true, roms: ['t2_l8'] });
+  assert.deepEqual(scriptFacts(T2_SCRIPT), { usesPinmame: true, roms: ['t2_l8'], drawsDmd: true });
   assert.deepEqual(scriptFacts('Set Controller = CreateObject("VPinMAME.Controller")\nController.GameName = "afm_113b"'), {
     usesPinmame: true,
     roms: ['afm_113b'],
+    drawsDmd: true,
   });
   // Choix entre deux ROM selon une option du script.
   const choice = 'LoadVPM "1", "S11.VBS", 1\nIf UseFree Then cRom = "fp_a" Else cRom = "fp_b"\n.GameName = cRom';

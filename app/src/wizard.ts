@@ -52,6 +52,12 @@ import {
   type WizardStep,
   type WizardStepId,
   ANCILLARY_ROLES,
+  centeredDmdBand,
+  DMD_RATIO_THRESHOLD,
+  dmdKindAfterArrange,
+  dmdKindLabel,
+  dmdKindOf,
+  type DmdKind,
   embeddedDmdZone,
   sameZone,
   splitBackglassDmd,
@@ -218,8 +224,13 @@ interface Wizard {
   layoutAsked?: boolean;
   /** Rôles auxquels on a répondu « aucun écran » dans cette session. */
   unassigned: Set<RoleId>;
+  /**
+   * FullDMD ou DMD seul, répondu à l'étape des rôles, avec la zone du DMD à ce moment : une
+   * zone changée ensuite dans l'éditeur décide à sa place, par sa forme (dmdKindAfterArrange).
+   */
+  dmdKind?: { kind: DmdKind; zone?: ScreenZone };
   /** « Placer librement… » : l'éditeur de disposition ouvert sur ce rôle, et l'état d'avant pour revenir. */
-  free?: { role: AncillaryRoleId; option: number; assignments: Partial<Record<RoleId, number>>; zones: Partial<Record<RoleId, ScreenZone>> };
+  free?: { role: AncillaryRoleId; option: number; assignments: Partial<Record<RoleId, number>>; zones: Partial<Record<RoleId, ScreenZone>>; dmdKind?: Wizard['dmdKind'] };
   /** « Quitter sans enregistrer ? » ouvert : ce qui serait perdu, et la fin du délai de réponse. */
   quit?: { lines: string[]; deadline: number };
   /** Sortie sans enregistrer en cours : où l'on va. */
@@ -576,6 +587,7 @@ function handleKey(input: Input): boolean {
       wizard.unassigned.delete(role.id);
       if (option.zone && role.id !== 'playfield') wizard.zones[role.id] = option.zone;
       if (option.host) wizard.zones[option.host.role] = option.host.zone;
+      if (role.id === 'dmd') wizard.dmdKind = option.dmdKind && { kind: option.dmdKind, ...(option.zone && { zone: option.zone }) };
       // Écrans et rôles seuls : bord des flippers et diagonale redemandés seulement pour un autre écran.
       if (role.id === 'playfield' && !(isOnly('ecrans') && fingerprintOf(displays[option.display]!).key === previous?.roles.playfield)) startLayout();
       else nextRole();
@@ -733,6 +745,7 @@ function draftCabinet(): Partial<Cabinet> {
     const arranged = arrangeCabinet();
     draft.roles = arranged.roles;
     draft.zones = arranged.zones;
+    draft.dmdKind = arranged.dmdKind;
   } else {
     const roles = { ...previous?.roles };
     const zones = { ...previous?.zones };
@@ -746,6 +759,8 @@ function draftCabinet(): Partial<Cabinet> {
     }
     draft.roles = roles;
     draft.zones = zones;
+    // Réponse FullDMD ou DMD seul déjà donnée à l'étape des rôles.
+    if (wizard.assignments.dmd !== undefined && wizard.dmdKind) draft.dmdKind = wizardDmdKind(roles, zones);
   }
   if (wizard.layoutAsked && playfieldDisplay()) draft.playfield = playfieldLayout();
   if (wizard.sound) draft.audio = buildAudio();
@@ -1853,9 +1868,11 @@ function goBack(): void {
   const zone = role.id === 'playfield' ? undefined : wizard.zones[role.id];
   delete wizard.assignments[role.id];
   if (role.id !== 'playfield') delete wizard.zones[role.id];
+  const kind = role.id === 'dmd' ? wizard.dmdKind?.kind : undefined;
+  if (role.id === 'dmd') wizard.dmdKind = undefined;
   // Le rôle qui lui avait cédé une part de son écran le retrouve entier.
   for (const r of ANCILLARY_ROLES) if (r !== role.id && wizard.assignments[r] === current) delete wizard.zones[r];
-  const at = roleOptions().findIndex((o) => !o.free && o.display === current && (zone ? Boolean(o.zone && sameZone(o.zone, zone)) : !o.zone));
+  const at = roleOptions().findIndex((o) => !o.free && o.display === current && (zone ? Boolean(o.zone && sameZone(o.zone, zone)) : !o.zone) && (!kind || !o.dmdKind || o.dmdKind === kind));
   wizard.option = at >= 0 ? at : defaultOption();
 }
 
@@ -1894,6 +1911,7 @@ function loadAssignments(): void {
     if (index >= 0) wizard.assignments[id] = index;
   }
   wizard.zones = structuredClone(previous!.zones ?? {});
+  wizard.dmdKind = previous!.dmdKind && { kind: previous!.dmdKind, ...(previous!.zones?.dmd && { zone: previous!.zones.dmd }) };
 }
 
 function restart(): void {
@@ -1951,6 +1969,8 @@ interface RoleOption {
   label?: string;
   /** « Placer librement… » : l'éditeur de disposition sur ce rôle, posé d'abord sur cet écran. */
   free?: boolean;
+  /** Rôle dmd : FullDMD ou DMD seul, ce que dit cette réponse. */
+  dmdKind?: DmdKind;
 }
 
 /**
@@ -1975,23 +1995,32 @@ function freeTarget(role: AncillaryRoleId): number {
 /** Écrans entiers libres et, pour le DMD, les parts d'écran toutes faites. */
 function placedOptions(): RoleOption[] {
   const role = ROLES[wizard.roleIndex];
-  const options: RoleOption[] = freeDisplays().map((display) => ({ display }));
-  if (role?.id !== 'dmd') return options;
+  if (role?.id !== 'dmd') return freeDisplays().map((display) => ({ display }));
+  // Un écran large libre : FullDMD sur tout l'écran, ou DMD seul en bande (découpe du panneau
+  // des haut-parleurs). Un écran déjà 4:1 : DMD seul.
+  const options: RoleOption[] = freeDisplays().flatMap((display): RoleOption[] => {
+    const size = displays[display]!.bounds;
+    if (Math.max(size.width, size.height) / Math.min(size.width, size.height) >= DMD_RATIO_THRESHOLD) return [{ display, dmdKind: 'dmd' }];
+    return [
+      { display, dmdKind: 'fulldmd' },
+      { display, zone: centeredDmdBand(size), dmdKind: 'dmd', label: t('en bande 4:1 au centre') },
+    ];
+  });
   const backglass = wizard.assignments.backglass;
   if (backglass !== undefined && !wizard.zones.backglass) {
     const size = displays[backglass]!.bounds;
-    for (const [ratio, label] of [
-      [4, t('en bas, sous le Backglass (4:1)')],
-      [16 / 9, t('en bas, sous le Backglass (FullDMD 16:9)')],
+    for (const [ratio, kind, label] of [
+      [4, 'dmd', t('en bas, sous le Backglass (4:1)')],
+      [16 / 9, 'fulldmd', t('en bas, sous le Backglass (16:9)')],
     ] as const) {
       const split = splitBackglassDmd(size, ratio);
-      options.push({ display: backglass, zone: split.dmd, host: { role: 'backglass', zone: split.backglass }, label });
+      options.push({ display: backglass, zone: split.dmd, host: { role: 'backglass', zone: split.backglass }, label, dmdKind: kind });
     }
   }
   const playfield = wizard.assignments.playfield;
   if (playfield !== undefined) {
     const zone = embeddedDmdZone(displays[playfield]!.bounds, wizard.flipperEdge);
-    options.push({ display: playfield, zone, label: t('incrusté dans le playfield') });
+    options.push({ display: playfield, zone, label: t('incrusté dans le playfield'), dmdKind: 'dmd' });
   }
   // Disposition enregistrée, peut-être retouchée dans VPX depuis : proposée telle quelle.
   const saved = savedOption(role.id);
@@ -2005,10 +2034,15 @@ function savedOption(role: AncillaryRoleId): RoleOption | undefined {
   const fp = previous?.roles[role];
   const display = displays.findIndex((d) => fp && fingerprintOf(d).key === fp);
   if (!zone || display < 0) return undefined;
-  if (display === wizard.assignments.playfield) return { display, zone, label: t('incrusté dans le playfield, comme enregistré') };
-  if (display !== wizard.assignments.backglass || wizard.zones.backglass) return undefined;
+  const dmdKind = role === 'dmd' && previous ? dmdKindOf(previous) : undefined;
+  if (display === wizard.assignments.playfield) return { display, zone, label: t('incrusté dans le playfield, comme enregistré'), ...(dmdKind && { dmdKind }) };
+  if (display !== wizard.assignments.backglass || wizard.zones.backglass) {
+    // DMD seul sur son écran, dans une zone placée à la main : proposée telle quelle.
+    if (role !== 'dmd' || !freeDisplays().includes(display)) return undefined;
+    return { display, zone, label: t('comme enregistré'), ...(dmdKind && { dmdKind }) };
+  }
   const host = previous?.zones?.backglass;
-  return { display, zone, ...(host && { host: { role: 'backglass' as const, zone: host } }), label: t('sur cet écran avec le Backglass, comme enregistré') };
+  return { display, zone, ...(host && { host: { role: 'backglass' as const, zone: host } }), label: t('sur cet écran avec le Backglass, comme enregistré'), ...(dmdKind && { dmdKind }) };
 }
 
 /** Écran (et part d'écran) du rôle dans le modèle existant, sinon le premier écran libre. */
@@ -2018,10 +2052,30 @@ function defaultOption(): number {
   const fp = role && previous?.roles[role.id];
   const known = displays.findIndex((d) => fp && fingerprintOf(d).key === fp);
   const zone = role && role.id !== 'playfield' ? previous?.zones?.[role.id] : undefined;
-  const exact = options.findIndex((o) => !o.free && o.display === known && (zone ? Boolean(o.zone && sameZone(o.zone, zone)) : !o.zone));
+  const kind = role?.id === 'dmd' && previous ? dmdKindOf(previous) : undefined;
+  const exact = options.findIndex((o) => !o.free && o.display === known && (zone ? Boolean(o.zone && sameZone(o.zone, zone)) : !o.zone) && (!kind || !o.dmdKind || o.dmdKind === kind));
   // Sinon le même écran : la zone du backglass, par exemple, dépend du choix fait ensuite pour le DMD.
   const sameScreen = options.findIndex((o) => !o.free && o.display === known);
   return Math.max(0, exact >= 0 ? exact : sameScreen);
+}
+
+/**
+ * FullDMD ou DMD seul : la réponse de l'étape des rôles tant que la zone du DMD est celle de
+ * cette réponse ; placée ou changée dans l'éditeur, d'après la forme de sa zone.
+ */
+function wizardDmdKind(roles: Cabinet['roles'], zones: Cabinet['zones']): DmdKind | undefined {
+  if (!roles.dmd) return undefined;
+  const chosen = wizard.dmdKind;
+  if (chosen && sameZone(chosen.zone ?? FULL_ZONE, zones?.dmd ?? FULL_ZONE)) return chosen.kind;
+  return dmdKindOf({ version: 1, screens: displays.map(toPhysicalScreen), roles, ...(zones && { zones }), vpx: { iniPath: '' }, updatedAt: '' });
+}
+
+/** Nom d'un rôle dans l'assistant : « FullDMD » pour le DMD quand c'en est un (réponse ou forme de sa zone). */
+function wizardRoleLabel(role: RoleId): string {
+  const label = ROLES.find((r) => r.id === role)!.label;
+  if (role !== 'dmd' || wizard.assignments.dmd === undefined) return label;
+  const roles = { dmd: fingerprintOf(displays[wizard.assignments.dmd]!).key };
+  return dmdKindLabel(wizardDmdKind(roles, wizard.zones.dmd ? { dmd: wizard.zones.dmd } : undefined));
 }
 
 function buildCabinet(): Cabinet {
@@ -2030,11 +2084,14 @@ function buildCabinet(): Cabinet {
     roles[role] = fingerprintOf(displays[index]!).key;
   }
   const audioModel = buildAudio();
+  const zones = Object.keys(wizard.zones).length ? { ...wizard.zones } : undefined;
+  const dmdKind = wizardDmdKind(roles, zones);
   return {
     version: 1,
     screens: displays.map(toPhysicalScreen),
     roles,
-    ...(Object.keys(wizard.zones).length && { zones: { ...wizard.zones } }),
+    ...(zones && { zones }),
+    ...(dmdKind && { dmdKind }),
     playfield: playfieldLayout(),
     ...(audioModel && { audio: audioModel }),
     ...(wizard.buttons && { buttons: wizard.buttons }),
@@ -2155,7 +2212,7 @@ function restoreOrientation(): void {
 // Étape « Disposition » (arrange.ts) : la zone de chaque rôle sur son écran.
 
 function arrangeHost(): ArrangeHost {
-  return { displays, assignments: wizard.assignments, zones: wizard.zones, keys: KEYS };
+  return { displays, assignments: wizard.assignments, zones: wizard.zones, keys: KEYS, roleLabel: wizardRoleLabel };
 }
 
 /** Après les rôles, ou en revenant du son : l'éditeur, sur « Terminer » pour passer d'un Start. */
@@ -2196,7 +2253,9 @@ function afterArrange(outcome: ArrangeOutcome): void {
  * au rôle suivant, Exit revient à la question telle qu'elle était.
  */
 function startFreePlacement(role: AncillaryRoleId, display: number): void {
-  wizard.free = { role, option: wizard.option, assignments: { ...wizard.assignments }, zones: structuredClone(wizard.zones) };
+  wizard.free = { role, option: wizard.option, assignments: { ...wizard.assignments }, zones: structuredClone(wizard.zones), dmdKind: wizard.dmdKind };
+  // Placé à la main : FullDMD ou DMD seul d'après la forme donnée à sa zone.
+  if (role === 'dmd') wizard.dmdKind = undefined;
   wizard.assignments[role] = display;
   wizard.unassigned.delete(role);
   // Sa place enregistrée sur ce même écran, sinon l'écran entier.
@@ -2218,6 +2277,7 @@ function afterFreePlacement(outcome: ArrangeOutcome): void {
   if (outcome === 'back') {
     wizard.assignments = free.assignments;
     wizard.zones = free.zones;
+    wizard.dmdKind = free.dmdKind;
     wizard.option = free.option;
     return;
   }
@@ -2249,7 +2309,12 @@ function arrangeCabinet(): Cabinet {
   const screens = [...saved.screens, ...displays.map(toPhysicalScreen).filter((sc) => !known.has(sc.fingerprint))];
   const zones = Object.keys(wizard.zones).length ? { ...wizard.zones } : undefined;
   // Le fichier de la configuration active, comme pour les boutons seuls.
-  return { ...saved, screens, roles, zones, vpx: { iniPath: activeVpxIni(loc) }, updatedAt: new Date().toISOString() };
+  const next: Cabinet = { ...saved, screens, roles, zones, vpx: { iniPath: activeVpxIni(loc) }, updatedAt: new Date().toISOString() };
+  // Zone du DMD inchangée : son type aussi (une configuration ambiguë reste à trancher) ; changée : sa forme.
+  const dmdKind = dmdKindAfterArrange(saved, next);
+  if (dmdKind) next.dmdKind = dmdKind;
+  else delete next.dmdKind;
+  return next;
 }
 
 function zonesView(index: number, option: RoleOption | undefined) {
@@ -2260,9 +2325,9 @@ function zonesView(index: number, option: RoleOption | undefined) {
   for (const r of ANCILLARY_ROLES) {
     if (wizard.assignments[r] !== index) continue;
     const zone = (proposed?.host?.role === r ? proposed.host.zone : wizard.zones[r]) ?? (proposed ? FULL_ZONE : undefined);
-    if (zone) parts.push({ label: ROLES.find((x) => x.id === r)!.label, zone, candidate: false });
+    if (zone) parts.push({ label: wizardRoleLabel(r), zone, candidate: false });
   }
-  if (proposed && role) parts.push({ label: role.label, zone: proposed.zone!, candidate: true });
+  if (proposed && role) parts.push({ label: proposed.dmdKind ? dmdKindLabel(proposed.dmdKind) : role.label, zone: proposed.zone!, candidate: true });
   return parts;
 }
 
@@ -2284,7 +2349,7 @@ function viewFor(index: number) {
         : t('{gdi} · {vpx} · empreinte faible', { gdi: d.gdiName, vpx: vpxDisplayId(d, profile.displayIdFormat) }),
     // Rôle (identifiant) qui décide du panneau du récapitulatif dans screen.js.
     assignedRole,
-    assignedLabel: shown.length ? formatList(shown.map((r) => ROLES.find((x) => x.id === r)!.label)) : undefined,
+    assignedLabel: shown.length ? formatList(shown.map(wizardRoleLabel)) : undefined,
     zones: zonesView(index, option),
     phase: wizard.phase,
     notice: wizard.notice,
@@ -2394,17 +2459,25 @@ function viewFor(index: number) {
 
   if (wizard.phase === 'assign' && role) {
     const placed = roleOptions().some((o) => o.zone);
+    // Rôle dmd : la réponse dit FullDMD ou DMD seul.
+    const named = option?.dmdKind ? dmdKindLabel(option.dmdKind) : role.label;
     return {
       ...base,
       highlight: option?.display === index,
       prompt: option?.free
         ? t('{role} : placer librement…', { role: role.label })
         : option?.label
-          ? t('{role} {option} ?', { role: role.label, option: option.label })
-          : t('{role} ?', { role: role.label }),
+          ? t('{role} {option} ?', { role: named, option: option.label })
+          : t('{role} ?', { role: named }),
       step: option?.free
         ? t('Étape {n} sur {total} : l’éditeur de disposition, pour placer le {role} où vous voulez, puis retour ici.', { n: wizard.roleIndex + 1, total: ROLES.length, role: role.label })
-        : t('Étape {n} sur {total} : quel écran affiche le {role} ?', { n: wizard.roleIndex + 1, total: ROLES.length, role: role.label }),
+        : option?.dmdKind === 'fulldmd'
+          ? t('Étape {n} sur {total} : un FullDMD montre l’image du jeu sur tout l’écran, son DMD incrusté.', { n: wizard.roleIndex + 1, total: ROLES.length })
+          : option?.dmdKind === 'dmd'
+            ? t('Étape {n} sur {total} : un DMD seul montre le DMD du jeu, du noir autour.', { n: wizard.roleIndex + 1, total: ROLES.length })
+            : role.id === 'dmd'
+              ? t('Étape {n} sur {total} : quel écran affiche le DMD ou le FullDMD ?', { n: wizard.roleIndex + 1, total: ROLES.length })
+              : t('Étape {n} sur {total} : quel écran affiche le {role} ?', { n: wizard.roleIndex + 1, total: ROLES.length, role: role.label }),
       hint: t('{flippers} · Start : {confirm} · Exit : {exit}', {
         flippers: placed
           ? role.required
@@ -2425,6 +2498,7 @@ function viewFor(index: number) {
   const rolesLines = ROLES.map((r) => {
     const i = wizard.assignments[r.id];
     if (i === undefined) return t('{role} : aucun écran', { role: r.label });
+    const name = wizardRoleLabel(r.id);
     const zone = r.id === 'playfield' ? undefined : wizard.zones[r.id];
     const rect = zone && zoneRect(zone, displays[i]!.bounds);
     const part = !rect
@@ -2432,7 +2506,7 @@ function viewFor(index: number) {
       : i === wizard.assignments.playfield
         ? t(', incrusté ({width} × {height} en {x}, {y})', { width: rect.width, height: rect.height, x: rect.x, y: rect.y })
         : t(', zone {width} × {height} en {x}, {y}', { width: rect.width, height: rect.height, x: rect.x, y: rect.y });
-    return t('{role} : écran {n}, {screen}{part}', { role: r.label, n: i + 1, screen: describeDisplay(displays[i]!), part });
+    return t('{role} : écran {n}, {screen}{part}', { role: name, n: i + 1, screen: describeDisplay(displays[i]!), part });
   });
   const playfield = playfieldDisplay();
   const playfieldLines = playfield

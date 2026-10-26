@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import type { AncillaryRoleId, Cabinet, RoleId } from './model';
 import { formatList, t } from './i18n';
 import { commentStart, statements } from './vbscript';
+import { dmdKindForRatio, dmdKindOf } from './dmdscreen';
 import { roleZone, zoneRatio } from './zones';
 
 export const PUP_FILES = ['screens.pup', 'playlists.pup', 'triggers.pup'] as const;
@@ -22,6 +23,11 @@ export interface PupScriptFacts {
   packNames: string[];
   /** Le script déclare lui-même ses playlists (packs anciens, sans .pup). */
   playlistAdd: boolean;
+  /**
+   * Le script écrit lui-même le score sur un écran du pack (PuP-DMD : LabelNew, LabelInit) :
+   * le pack dessine alors le DMD de la table, il peut occuper la fenêtre du DMD.
+   */
+  labels?: boolean;
   /**
    * Le script ne lance jamais le pack : son lancement dépend d'une variable que le
    * script règle autrement au départ (« usePUP = False »). Absent si rien ne l'en empêche.
@@ -60,6 +66,7 @@ export function pupScriptFacts(code: string): PupScriptFacts | undefined {
   const packNames: string[] = [];
   for (const name of [...b2s, ...init]) if (name && !packNames.some((n) => n.toLowerCase() === name.toLowerCase())) packNames.push(name);
   const facts: PupScriptFacts = { packNames, playlistAdd: /\.playlistadd\b/i.test(code) };
+  if (/\.(LabelNew|LabelInit)\b/i.test(code)) facts.labels = true;
   const disabledBy = pupScriptSwitch(code);
   if (disabledBy) facts.disabledBy = disabledBy;
   return facts;
@@ -375,6 +382,64 @@ export function isVisible(screen: PupScreen): boolean {
   return !/^(off|musiconly)$/i.test(screen.mode);
 }
 
+/** Fenêtres de VPX où le plugin PUP dessine quelque chose avec ce screens.pup. */
+export interface PupWindows {
+  topper: boolean;
+  backglass: boolean;
+  dmd: boolean;
+}
+
+/**
+ * Ce que le plugin PUP dessine dans chaque fenêtre, comme PUPManager::Render (commit
+ * af26b2d93) : une fenêtre a une racine (Topper : écran 0 ; Backglass : 2, sinon 6 ;
+ * ScoreView : 5, sinon 1), utilisable si elle n'est pas un écran posé dans un autre sans
+ * enfant, et si un écran visible descend d'elle. Les écrans s'ajoutent dans l'ordre du
+ * fichier ; un parent de CustomPos absent est créé d'office (ForceBack), un écran repris
+ * plus bas remplace le premier et garde ses enfants (PUPManager::AddScreen).
+ * Exemple : 2001 - A Space Odyssey, option « B2S Users … Pup on Fulldmd » : l'écran 2 est
+ * posé dans le 5 (« 5,12.7,13.5,74.8,74.6 ») : rien sur le fronton, tout sur le FullDMD.
+ */
+export function pupWindows(screens: PupScreen[]): PupWindows {
+  const usable = pupRoots(screens);
+  return { topper: usable(0), backglass: usable(2) || usable(6), dmd: usable(5) || usable(1) };
+}
+
+/**
+ * Écran PuP que le plugin prend comme racine de la fenêtre du DMD : 5 (FullDMD, 16:9) ou, à
+ * défaut, 1 (DMD) ; undefined quand le pack n'y dessine rien (PUPManager::Render).
+ */
+export function pupDmdRoot(screens: PupScreen[]): 1 | 5 | undefined {
+  const usable = pupRoots(screens);
+  return usable(5) ? 5 : usable(1) ? 1 : undefined;
+}
+
+/** Racines utilisables d'après screens.pup, comme PUPManager::Render (voir pupWindows). */
+function pupRoots(screens: PupScreen[]): (root: number) => boolean {
+  const byNum = new Map<number, PupScreen>();
+  const parentOf = new Map<number, number>();
+  for (const s of screens) {
+    byNum.set(s.num, s);
+    parentOf.delete(s.num);
+    if (s.parent !== undefined && s.parent !== s.num) {
+      if (!byNum.has(s.parent)) byNum.set(s.parent, { num: s.parent, description: '', mode: s.parent === 3 ? 'Off' : s.parent === 4 ? 'MusicOnly' : 'ForceBack' });
+      parentOf.set(s.num, s.parent);
+    }
+  }
+  const hasChildren = (num: number) => [...parentOf.values()].includes(num);
+  const descends = (num: number, root: number) => {
+    const seen = new Set<number>();
+    for (let n: number | undefined = num; n !== undefined && !seen.has(n); n = parentOf.get(n)) {
+      if (n === root) return true;
+      seen.add(n);
+    }
+    return false;
+  };
+  return (root: number) => {
+    if (!byNum.has(root) || (parentOf.has(root) && !hasChildren(root))) return false;
+    return [...byNum.values()].some((s) => isVisible(s) && descends(s.num, root));
+  };
+}
+
 /** Rôle de la borne où le plugin dessine un écran PuP ; null : jamais affiché (Playfield). */
 export function screenRole(num: number): RoleId | null | undefined {
   if (num === 0) return 'topper';
@@ -433,6 +498,61 @@ function hasPupFile(dir: string): boolean {
   return readDirents(dir).some((d) => d.isFile() && d.name.toLowerCase().endsWith('.pup'));
 }
 
+// ---------- Ordre des playlists ----------
+
+/** Fichier d'une playlist à renommer, chemins relatifs à la racine du pack. */
+export interface PlaylistRename {
+  playlist: string;
+  /** Premier fichier pour le plugin PUP, aujourd'hui. */
+  wrong: string;
+  from: string;
+  to: string;
+}
+
+/** Ordre de Windows et de PinUP Player : sans tenir compte de la casse (noms en majuscules, comme NTFS). */
+function folderOrder(a: string, b: string): number {
+  const x = a.toUpperCase();
+  const y = b.toUpperCase();
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
+/** Ordre du plugin PUP : std::ranges::sort sur les chemins, caractère par caractère, casse comprise. */
+function pluginOrder(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+/**
+ * Fichiers à renommer pour que le plugin PUP commence chaque playlist par le même fichier
+ * que PinUP Player. Le plugin trie les fichiers d'une playlist en tenant compte de la casse
+ * (PUPPlaylist.cpp, commit af26b2d93), PinUP Player non ; un écran dont screens.pup donne
+ * la playlist sans fichier joue le premier. *2001 - A Space Odyssey* : l'écran 14
+ * « Callouts » joue PupAlphas, dont l'auteur a nommé « aaclear.png » (transparent) pour
+ * qu'il passe devant les cadres « Overlay1… » ; le plugin prenait « Overlay1 by Dr Nobody
+ * TY.png », un cadre entier écrasé au milieu du fronton (26 octobre 2026). Le fichier voulu
+ * prend son nom en majuscules (extension gardée) : il passe alors premier dans les deux
+ * ordres. Le plugin retrouve un fichier nommé par un déclencheur sans tenir compte de la
+ * casse : rien d'autre ne change.
+ */
+export function playlistRenames(root: string): PlaylistRename[] {
+  const renames: PlaylistRename[] = [];
+  for (const dir of readDirents(root)) {
+    if (!dir.isDirectory() || isJunkName(dir.name) || OPTIONS_DIR.test(dir.name)) continue;
+    const files = readDirents(path.join(root, dir.name))
+      .filter((d) => d.isFile() && !isJunkName(d.name))
+      .map((d) => d.name);
+    if (files.length < 2) continue;
+    const wrong = [...files].sort(pluginOrder)[0]!;
+    const wanted = [...files].sort(folderOrder)[0]!;
+    if (wrong === wanted) continue;
+    const ext = path.extname(wanted);
+    const renamed = wanted.slice(0, wanted.length - ext.length).toUpperCase() + ext;
+    const after = files.map((f) => (f === wanted ? renamed : f)).sort(pluginOrder)[0];
+    if (after !== renamed || renamed === wanted) continue;
+    renames.push({ playlist: dir.name, wrong, from: path.join(dir.name, wanted), to: path.join(dir.name, renamed) });
+  }
+  return renames;
+}
+
 // ---------- Options ----------
 
 export interface VariantTraits {
@@ -447,6 +567,8 @@ export interface VariantTraits {
   fullDmd?: boolean;
   /** Proportions du backglass visées (16/9, 4/3…). */
   ratios: number[];
+  /** Fenêtres que le plugin PUP remplit avec le screens.pup de la variante (pupWindows). */
+  windows?: PupWindows;
 }
 
 export interface PupVariant {
@@ -700,6 +822,16 @@ export function traitsOf(root: string, variant: Omit<PupVariant, 'traits'>): Var
       }
     }
     if (!traits.desktop && shown(3) && !shown(2) && !shown(6)) traits.desktop = true;
+    if (screens.length) {
+      traits.windows = pupWindows(screens);
+      // Sans indice dans le nom : l'écran que le plugin met dans la fenêtre du DMD, le 5 (FullDMD
+      // 16:9) ou le 1 (DMD) ; un FullDMD dans une bande 4:1 y serait réduit.
+      const root = pupDmdRoot(screens);
+      if (traits.fullDmd === undefined && root) traits.fullDmd = root === 5;
+      // La fenêtre du topper, remplie ou non, l'emporte sur le nom : « Default Locale Topper
+      // Off » (2001) range le topper dans l'écran principal, la fenêtre du topper reste vide.
+      if (screens.some((s) => s.num === 0 || s.parent === 0)) traits.topper = traits.windows.topper;
+    }
   }
   return traits;
 }
@@ -713,6 +845,16 @@ export interface PupCabinet {
   topper: boolean;
   /** Grand côté sur petit côté : 4 pour un DMD réel, 1,78 pour un écran 16:9. */
   dmdRatio?: number;
+  /**
+   * L'écran du DMD est un FullDMD (dmdKindOf : choix de l'utilisateur, sinon forme de sa zone).
+   * Absent : d'après dmdRatio.
+   */
+  fullDmd?: boolean;
+  /**
+   * La table a son fronton (.directb2s) : une option qui laisse la fenêtre du backglass au
+   * B2S (« B2S Users ») a alors quelque chose à y montrer. Absent : on ne sait pas.
+   */
+  tableBackglass?: boolean;
   backglassRatio?: number;
   /**
    * Largeur sur hauteur de chaque rôle, en pixels de Windows (zone comprise) : le
@@ -742,6 +884,7 @@ export function pupCabinet(cabinet: Cabinet | undefined): PupCabinet | undefined
     dmd: Boolean(cabinet.roles.dmd),
     topper: Boolean(cabinet.roles.topper),
     dmdRatio: ratio('dmd'),
+    ...(cabinet.roles.dmd && dmdKindOf(cabinet) && { fullDmd: dmdKindOf(cabinet) === 'fulldmd' }),
     backglassRatio: ratio('backglass'),
     aspects,
   };
@@ -756,6 +899,7 @@ export function variantTraitsLabel(v: PupVariant): string {
   if (traits.topper !== undefined) parts.push(traits.topper ? 'topper' : t('sans topper'));
   if (traits.dmd) parts.push({ separate: t('DMD sur son écran'), backglass: t('DMD dans le backglass'), none: t('sans DMD') }[traits.dmd]);
   if (traits.fullDmd !== undefined) parts.push(traits.fullDmd ? 'FullDMD' : t('DMD réel'));
+  if (traits.windows && !traits.windows.backglass) parts.push(t('fronton laissé au .directb2s'));
   const ratios: Record<string, string> = { '1.78': '16:9', '2.33': '21:9', '1.33': '4:3', '1.25': '5:4', '1.00': '1:1' };
   if (traits.ratios.length) parts.push(formatList(traits.ratios.map((r) => ratios[r.toFixed(2)] ?? r.toFixed(2)), 'or'));
   return parts.join(' · ') || t('disposition non décrite');
@@ -764,10 +908,18 @@ export function variantTraitsLabel(v: PupVariant): string {
 /** Description courte de la borne, pour dire pourquoi une option est retenue. */
 export function describePupCabinet(c: PupCabinet): string {
   const parts = [c.backglass ? 'backglass' : t('sans backglass')];
-  if (c.dmd) parts.push(c.dmdRatio && c.dmdRatio >= 3 ? 'DMD 4:1' : 'FullDMD');
+  if (c.dmd) parts.push(cabinetFullDmd(c) === false ? 'DMD 4:1' : 'FullDMD');
   else parts.push(t('sans DMD'));
   parts.push(c.topper ? 'topper' : t('sans topper'));
+  if (c.backglass && c.tableBackglass === false) parts.push(t('table sans .directb2s'));
   return parts.join(', ');
+}
+
+/** FullDMD ou DMD seul : le type de l'écran, sinon les proportions de la fenêtre du DMD. */
+export function cabinetFullDmd(c: PupCabinet): boolean | undefined {
+  if (!c.dmd) return undefined;
+  if (c.fullDmd !== undefined) return c.fullDmd;
+  return c.dmdRatio ? dmdKindForRatio(c.dmdRatio) === 'fulldmd' : undefined;
 }
 
 export function scoreVariant(t: VariantTraits, c: PupCabinet): number {
@@ -779,8 +931,12 @@ export function scoreVariant(t: VariantTraits, c: PupCabinet): number {
   if (t.dmd === 'separate') s += c.dmd ? 10 : -25;
   else if (t.dmd === 'backglass') s += c.dmd ? -8 : 10;
   else if (t.dmd === 'none') s += c.dmd ? -10 : 4;
-  if (t.fullDmd !== undefined && c.dmd && c.dmdRatio) s += t.fullDmd === c.dmdRatio < 3 ? 4 : -6;
+  const full = cabinetFullDmd(c);
+  if (t.fullDmd !== undefined && c.dmd && full !== undefined) s += t.fullDmd === full ? 4 : -6;
   if (t.ratios.length && c.backglassRatio) s += t.ratios.some((r) => Math.abs(r - c.backglassRatio!) / r < 0.08) ? 5 : -5;
+  // Fronton laissé vide par le pack : il faut que le .directb2s de la table y soit, sinon
+  // l'écran reste sur une image fixe (2001 - A Space Odyssey, octobre 2026).
+  if (c.backglass && t.windows && !t.windows.backglass) s += c.tableBackglass === false ? -30 : c.tableBackglass ? -2 : -6;
   return s;
 }
 

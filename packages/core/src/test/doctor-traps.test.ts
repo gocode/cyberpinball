@@ -112,6 +112,8 @@ function healthyPack(folder: string): string {
   }
   write(path.join(pack, 'Option 1 - Backglass DMD Separate.bat'), 'xcopy /y "PuP-Pack_Options\\Option 1 - Backglass DMD Separate\\*"\r\n');
   write(path.join(pack, 'Backglass', 'attract.mp4'), 'mp4');
+  // Le pack occupe la fenêtre du DMD (écran 5) d'une table à ROM : le DMD de la ROM reste devant.
+  write(path.join(folder, `${TABLE}.ini`), '[ScoreView]\r\nPriority.PUP = 0\r\n');
   return pack;
 }
 
@@ -285,6 +287,25 @@ const TRAPS: Trap[] = [
     script: scriptFacts(`${PUP_SCRIPT}PuPlayer.playlistadd 2, "Attract", 1, 0\r\n`),
   },
   // Pack bien rangé, que le script ne lance jamais (« usePUP = False »).
+  // Playlist dont l'image transparente « aaclear.png » passe après « Overlay1.png » pour le plugin PUP.
+  {
+    code: 'pupPlaylistOrder',
+    arm: (folder) => {
+      const pack = healthyPack(folder);
+      write(path.join(pack, 'PupAlphas', 'aaclear.png'), 'png');
+      write(path.join(pack, 'PupAlphas', 'Overlay1.png'), 'png');
+    },
+    script: scriptFacts(PUP_SCRIPT),
+  },
+  // Pack dans la fenêtre du DMD d'une table à ROM, sans réglage pour elle : le score serait caché.
+  {
+    code: 'pupHidesDmd',
+    arm: (folder) => {
+      healthyPack(folder);
+      fs.rmSync(path.join(folder, `${TABLE}.ini`));
+    },
+    script: scriptFacts(PUP_SCRIPT),
+  },
   {
     code: 'pupDisabledByScript',
     arm: (folder) => {
@@ -523,7 +544,8 @@ test('corrections des PuP-Packs : appliquées, le constat disparaît', () => {
     const trashDir = `${tablesDir}-corbeille`;
     applyOps(finding.fix.ops, { trashDir });
     const after = diagnose(scanTables(tablesDir)[0]!, ctx()).map((f) => f.code);
-    assert.ok(!after.some((c) => c.startsWith('pup')), `${code} : reste ${after.join(', ')}`);
+    // Ces packs occupent la fenêtre du DMD d'une table à ROM : pupHidesDmd peut suivre, à part.
+    assert.ok(!after.some((c) => c.startsWith('pup') && c !== 'pupHidesDmd'), `${code} : reste ${after.join(', ')}`);
     fs.rmSync(tablesDir, { recursive: true });
     fs.rmSync(trashDir, { recursive: true, force: true });
   }
@@ -803,6 +825,12 @@ test('médecin des médias : proportions, orientation du plateau et DMD selon la
   assert.match(ratio(CABINET)!.detail, /faute de média « Afficheur » \(DMD\)/);
   // Le même FullDMD sur un écran DMD 16:9 : il est chez lui.
   assert.equal(ratio({ ...CABINET, dmdRatio: 16 / 9, aspects: { ...CABINET.aspects, dmd: 16 / 9 } }), undefined);
+  // Écran dit FullDMD (Configuration de la borne > Écran du DMD), encore dans sa bande 4,78:1 : le
+  // FullDMD est le média attendu, seules ses proportions sont signalées ; dit DMD seul : faute de DMD.
+  const band = { ...CABINET, dmdRatio: 4.78, aspects: { ...CABINET.aspects, dmd: 4.78 } };
+  assert.doesNotMatch(ratio({ ...band, fullDmd: true })!.detail, /faute de média/);
+  assert.match(ratio({ ...band, fullDmd: true })!.detail, /Afficheur large|FullDMD/);
+  assert.match(ratio({ ...band, fullDmd: false })!.detail, /faute de média « Afficheur » \(DMD\)/);
   // Borne non configurée : pas de comparaison.
   assert.equal(ratio({ backglass: true, dmd: true, topper: false }), undefined);
   fs.rmSync(tablesDir, { recursive: true });

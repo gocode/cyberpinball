@@ -32,6 +32,15 @@ export type Rotation = 0 | 90 | 180 | 270;
 export type AncillaryRoleId = Exclude<RoleId, 'playfield'>;
 
 /**
+ * Ce que montre l'écran du rôle dmd (fenêtre ScoreView de VPX) :
+ * - `fulldmd` : un écran large (16:9) qui montre les médias FullDMD et l'écran 5 des
+ *   PuP-Packs, avec le DMD de la ROM ou de FlexDMD incrusté par-dessus ;
+ * - `dmd` : le DMD seul, en bande 4:1 (vrai écran DMD, bande sous le fronton ou derrière
+ *   la découpe du panneau des haut-parleurs, incrustation dans le playfield).
+ */
+export type DmdKind = 'fulldmd' | 'dmd';
+
+/**
  * Partie de l'image d'un écran, en fractions de sa largeur et de sa hauteur
  * (0 à 1, origine en haut à gauche de l'image Windows). Une fraction survit à un
  * changement de définition de l'écran, pas des pixels.
@@ -152,6 +161,11 @@ export interface Cabinet {
    * n'occuper qu'une partie de son écran (poste de bureau).
    */
   zones?: Partial<Record<RoleId, ScreenZone>>;
+  /**
+   * FullDMD ou DMD seul, dit par l'utilisateur (assistant, « Écran du DMD »). Absent dans les
+   * modèles d'avant ce choix : déduit des proportions de la zone du DMD (dmdscreen.ts).
+   */
+  dmdKind?: DmdKind;
   /** Absent dans les modèles enregistrés avant l'assistant d'orientation : flippers en bas. */
   playfield?: PlayfieldLayout;
   /**

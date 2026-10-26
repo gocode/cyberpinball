@@ -1233,6 +1233,75 @@ body.mouse .journey-step.fixable:hover {
   background: var(--panel);
 }
 
+/* ---------- Écran du DMD : schéma de chaque réponse ---------- */
+
+/*
+ * Texte à gauche, schéma de 256 × 144 (référence 1 080) à droite, centré sur la ligne
+ * (maquettes revues par Codex, octobre 2026). Aucun orange : c'est une interface, pas un DMD.
+ */
+.lib-row:has(.dmd-figure) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 3cqmin;
+  min-height: 17.3cqmin;
+}
+
+.dmd-figure {
+  position: relative;
+  width: 23.7cqmin;
+  height: 13.3cqmin;
+  border: 0.19cqmin solid var(--line-strong);
+  border-radius: 0.46cqmin;
+  background: #000;
+  overflow: hidden;
+}
+
+.dmd-figure.kind-fulldmd {
+  background:
+    radial-gradient(ellipse at 80% 10%, rgba(42, 209, 182, 0.35), transparent 60%),
+    linear-gradient(160deg, var(--surface-raised), var(--void) 70%);
+}
+
+.dmd-figure-media {
+  position: absolute;
+  top: 1cqmin;
+  left: 1.4cqmin;
+  font-size: 1.85cqmin;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+/* Le DMD : en bas du média pour un FullDMD, bande pleine largeur au milieu pour un DMD seul. */
+.dmd-figure-dmd {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border: 0.19cqmin solid var(--line-strong);
+  font-size: 1.85cqmin;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  color: var(--ink);
+}
+
+.kind-fulldmd .dmd-figure-dmd {
+  left: 12%;
+  right: 12%;
+  bottom: 12%;
+  height: 30%;
+}
+
+.kind-dmd .dmd-figure-dmd {
+  left: -0.2cqmin;
+  right: -0.2cqmin;
+  top: 33%;
+  height: 34%;
+}
+
 /* ---------- Lignes repérées et usage d'un fichier (sélecteur, téléchargements) ---------- */
 
 /* Repère neutre : l'emplacement ouvert, un fichier coché. Le vert reste au choix courant. */

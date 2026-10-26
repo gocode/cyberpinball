@@ -1084,6 +1084,21 @@ body.mouse .gear {
   background: var(--bg);
 }
 
+/*
+ * Fronton, DMD, topper : hors des zones, du noir pur (le panneau autour d'une bande DMD), et le
+ * noir des médias montrés en « contain » ; le fond d'ambiance n'est que sur le playfield.
+ */
+html.annex,
+html.annex body,
+html.annex .zone {
+  background: #000;
+}
+
+/* Le fond du playfield (et son cadre 9:16 au bureau) n'existe que sur l'écran du playfield (layout-check.ts). */
+html.annex #media-bg {
+  display: none;
+}
+
 .secondary {
   position: relative;
   height: 100%;

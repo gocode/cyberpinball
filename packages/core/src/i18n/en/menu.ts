@@ -17,6 +17,28 @@ export const messages: Record<string, string> = {
   'Exit : menu': 'Exit: menu',
   'Son, vue, performances, pour toutes les tables': 'Sound, view, performance, for every table',
   'Configuration de la borne': 'Cabinet setup',
+  // app/src/frontend.ts : « Écran du DMD »
+  'Écran du DMD': 'DMD screen',
+  'FullDMD 16:9 ou DMD seul : ce que montre l’écran du DMD': '16:9 FullDMD or DMD only: what the DMD screen shows',
+  'Le DMD occupe une bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Est-ce un FullDMD ?':
+    'The DMD fills a {zone} strip in the middle of the “{screen}” screen ({ratio}), which shows nothing else. Is it a FullDMD?',
+  'L’écran « {screen} » est un FullDMD.': 'The “{screen}” screen is a FullDMD.',
+  'L’écran du DMD est un FullDMD.': 'The DMD screen is a FullDMD.',
+  'L’écran « {screen} » montre le DMD seul.': 'The “{screen}” screen shows the DMD only.',
+  'L’écran du DMD montre le DMD seul.': 'The DMD screen shows the DMD only.',
+  'Zone du DMD : {ratio}.': 'DMD area: {ratio}.',
+  'C’est un FullDMD': 'It’s a FullDMD',
+  'Tout l’écran 16:9 : média FullDMD, écran 5 des PuP-Packs, DMD du jeu incrusté': 'The whole 16:9 screen: FullDMD media, PuP-Pack screen 5, game DMD inset',
+  'C’est un DMD seul': 'It’s a DMD only',
+  'Garder la bande : le DMD du jeu seul, du noir autour': 'Keep the strip: the game DMD alone, black around it',
+  'Une bande 4:1 : le DMD du jeu seul, du noir autour': 'A 4:1 strip: the game DMD alone, black around it',
+  'Un FullDMD montre le média FullDMD du jeu et l’écran 5 des PuP-Packs, avec le DMD du jeu incrusté. Un DMD seul ne montre que le DMD, en bande 4:1.':
+    'A FullDMD shows the game’s FullDMD media and PuP-Pack screen 5, with the game DMD inset. A DMD-only screen shows just the DMD, as a 4:1 strip.',
+  'Ce que montre cet écran': 'What this screen shows',
+  'Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Configuration de la borne > Écran du DMD.':
+    'DMD screen to check: FullDMD or DMD only? System menu > Cabinet setup > DMD screen.',
+  // app/renderer/library.js : schéma de l'écran du DMD
+  'Média 16:9': '16:9 media',
   'Boutons, écrans, playfield, disposition, son : chaque étape seule, ou l’assistant complet': 'Buttons, screens, playfield, layout, sound: one step at a time, or the full wizard',
   'Assistant complet': 'Full wizard',
   'Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son': 'Every step in a row: buttons, screens, playfield, layout, sound',

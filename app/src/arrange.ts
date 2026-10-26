@@ -58,6 +58,8 @@ export interface ArrangeHost {
   assignments: Partial<Record<RoleId, number>>;
   zones: Partial<Record<RoleId, ScreenZone>>;
   keys: ArrangeKeys;
+  /** Nom montré d'un rôle, s'il dépend de la borne (FullDMD ou DMD) ; sinon celui de ROLES. */
+  roleLabel?: (role: RoleId) => string;
 }
 
 type ItemId = 'role' | 'screen' | 'format' | 'full' | 'moveX' | 'moveY' | 'width' | 'height' | 'exact' | 'exactPos' | 'place' | 'align' | 'snap' | 'reset' | 'done';
@@ -175,7 +177,8 @@ export function startArrange(host: ArrangeHost, doneLabel?: string, start: { rol
   };
 }
 
-const labelOf = (role: RoleId) => ROLES.find((r) => r.id === role)!.label;
+/** Nom du rôle sur cette borne : « FullDMD » pour le DMD d'un écran FullDMD (ArrangeHost.roleLabel). */
+const labelOf = (host: ArrangeHost, role: RoleId) => host.roleLabel?.(role) ?? ROLES.find((r) => r.id === role)!.label;
 const screenLabel = (d: ObservedDisplay, i: number) => `${i + 1} · ${d.friendlyName || d.monitorDescription || d.gdiName} (${d.bounds.width} × ${d.bounds.height})`;
 const assignedRoles = (host: ArrangeHost) => ROLES.map((r) => r.id).filter((r) => host.assignments[r] !== undefined);
 const displayOf = (host: ArrangeHost, role: RoleId) => {
@@ -213,7 +216,7 @@ function choicesFor(host: ArrangeHost, s: ArrangeState, item: ItemId): Choice[] 
   const base = () => s.undo?.zone ?? zoneOf(host, s.role);
   switch (item) {
     case 'role':
-      return ROLES.map((r) => ({ label: labelOf(r.id), apply: (_h, st) => void (st.role = r.id) }));
+      return ROLES.map((r) => ({ label: labelOf(host, r.id), apply: (_h, st) => void (st.role = r.id) }));
     case 'screen': {
       // Un rôle annexe peut n'avoir aucun écran (borne sans topper, par exemple).
       const none: Choice = {
@@ -245,11 +248,11 @@ function choicesFor(host: ArrangeHost, s: ArrangeState, item: ItemId): Choice[] 
     case 'place':
       return neighbours(host, s.role).flatMap((other) =>
         SIDES.map((side) => ({
-          label: side.label(labelOf(other)),
+          label: side.label(labelOf(host, other)),
           apply: (h: ArrangeHost, st: ArrangeState) => {
             const placed = placeBeside(base(), zoneOf(h, other), sizeOf(h, st.role), side.id);
             setZone(h, st.role, placed ?? base());
-            return placed ? undefined : side.noRoom(labelOf(other));
+            return placed ? undefined : side.noRoom(labelOf(host, other));
           },
         })),
       );
@@ -261,12 +264,12 @@ function choicesFor(host: ArrangeHost, s: ArrangeState, item: ItemId): Choice[] 
 /** Valeur affichée en face de chaque ligne. */
 function valueOf(host: ArrangeHost, s: ArrangeState, item: ItemId): string {
   const display = displayOf(host, s.role);
-  if (!display) return item === 'role' ? labelOf(s.role) : item === 'screen' ? t('aucun écran') : '';
+  if (!display) return item === 'role' ? labelOf(host, s.role) : item === 'screen' ? t('aucun écran') : '';
   const zone = zoneOf(host, s.role);
   const r = zoneRect(zone, display.bounds);
   switch (item) {
     case 'role':
-      return labelOf(s.role);
+      return labelOf(host, s.role);
     case 'screen':
       return screenLabel(display, host.assignments[s.role]!);
     case 'format':
@@ -293,8 +296,8 @@ function valueOf(host: ArrangeHost, s: ArrangeState, item: ItemId): string {
 function itemDisabled(host: ArrangeHost, s: ArrangeState, item: ItemId): string | undefined {
   if (item === 'snap') return undefined;
   if (item === 'screen' && s.role === 'playfield') return t("Le playfield change d'écran à l'étape des rôles.");
-  if (!displayOf(host, s.role) && !['role', 'screen', 'reset', 'done'].includes(item)) return t("Le {role} n'a pas d'écran : choisissez-en un à la ligne « Écran ».", { role: labelOf(s.role) });
-  if (item === 'place' && neighbours(host, s.role).length === 0) return t("Aucun autre rôle sur l'écran du {role}.", { role: labelOf(s.role) });
+  if (!displayOf(host, s.role) && !['role', 'screen', 'reset', 'done'].includes(item)) return t("Le {role} n'a pas d'écran : choisissez-en un à la ligne « Écran ».", { role: labelOf(host, s.role) });
+  if (item === 'place' && neighbours(host, s.role).length === 0) return t("Aucun autre rôle sur l'écran du {role}.", { role: labelOf(host, s.role) });
   return undefined;
 }
 
@@ -539,7 +542,7 @@ function drag(host: ArrangeHost, s: ArrangeState, action: Extract<ArrangeAction,
   });
   host.assignments[action.role] = plan.display;
   setZone(host, action.role, plan.zone);
-  s.notice = plan.display !== origin ? t("{role} sur l'écran {n} : relâchez pour l'y laisser.", { role: labelOf(action.role), n: plan.display + 1 }) : undefined;
+  s.notice = plan.display !== origin ? t("{role} sur l'écran {n} : relâchez pour l'y laisser.", { role: labelOf(host, action.role), n: plan.display + 1 }) : undefined;
   return 'handled';
 }
 
@@ -561,7 +564,7 @@ export function arrangeZones(host: ArrangeHost, s: ArrangeState, index: number) 
       const rect = zoneRect(zone, display.bounds);
       const placement = zonePlacement(r, assignments, host.zones);
       const how = placement === 'embedded' ? t('incrusté') : placement === 'window' ? t('fenêtre') : t('plein écran');
-      return { role: r, label: `${labelOf(r)} · ${rect.width} × ${rect.height} · ${how}`, zone, selected: r === s.role, editable: true };
+      return { role: r, label: `${labelOf(host, r)} · ${rect.width} × ${rect.height} · ${how}`, zone, selected: r === s.role, editable: true };
     });
 }
 
@@ -614,7 +617,7 @@ export function arrangePanel(host: ArrangeHost, s: ArrangeState, keyLabel: (code
   const dock = here ? (zone.y + zone.height / 2 < 0.5 ? 'bottom' : 'top') : undefined;
   return {
     dock,
-    title: t('Disposition · {role}', { role: labelOf(s.role) }),
+    title: t('Disposition · {role}', { role: labelOf(host, s.role) }),
     detail: rect
       ? t('{width} × {height} px en {x}, {y} · {where} · format {format}', { width: rect.width, height: rect.height, x: rect.x, y: rect.y, where, format: formatLabel(zone.aspect) })
       : t('Aucun écran'),
@@ -626,7 +629,7 @@ export function arrangePanel(host: ArrangeHost, s: ArrangeState, keyLabel: (code
       ? t('Souris : tirez une zone pour la déplacer, jusque sur un autre écran ; tirez un coin pour la redimensionner ; Alt maintenu : sans aimantation. Flèches du clavier : la déplacer au pixel.')
       : t('Souris : tirez une zone pour la déplacer, jusque sur un autre écran ; tirez un coin pour la redimensionner. Flèches du clavier : la déplacer au pixel.'),
     order: t("Les zones peuvent se chevaucher. Superposition : {order} pour les incrustations ; Windows décide pour deux fenêtres. Pas de rotation par zone : VPX n'en a pas de réglage.", {
-      order: EMBEDDED_ORDER.map(labelOf).join(t(' sous ')),
+      order: EMBEDDED_ORDER.map((r) => labelOf(host, r)).join(t(' sous ')),
     }),
   };
 }

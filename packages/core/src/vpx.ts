@@ -6,7 +6,7 @@
 import { t } from './i18n';
 import { IniDocument } from './ini';
 import { edgeAfterRotation, isCabinetView, rotatedDisplay, type SizeCm } from './layout';
-import type { FlipperEdge, ObservedDisplay, RoleId, Rotation, ScreenZone } from './model';
+import type { DmdKind, FlipperEdge, ObservedDisplay, RoleId, Rotation, ScreenZone } from './model';
 import { vpxRect, zonePlacement } from './zones';
 
 interface VpxWindow {
@@ -77,12 +77,17 @@ export type VpxAncillarySection = 'Backglass' | 'ScoreView' | 'Topper';
  * - B2S ensuite : backglass et FullDMD du .directb2s ;
  * - ScoreView en dernier : affichage générique du DMD et des scores.
  * Le moteur porte le nom de son plugin (PUPManager.cpp, B2SServer.cpp, ScoreViewPlugin.cpp).
+ * Écran DMD seul (bande 4:1) : B2S y passe à 0 (DMD_ONLY_PRIORITIES), son image FullDMD
+ * n'a rien à faire dans la bande ; le DMD de la ROM y est dessiné par ScoreView.
  */
 export const VPX_RENDERER_PRIORITIES: Record<VpxAncillarySection, Record<string, number>> = {
   Backglass: { PUP: 100, B2S: 50 },
   ScoreView: { PUP: 100, B2S: 50, ScoreView: 10 },
   Topper: { PUP: 100 },
 };
+
+/** Priorités de la fenêtre du DMD quand l'écran est un DMD seul : le FullDMD du .directb2s après le DMD. */
+export const DMD_ONLY_PRIORITIES: Record<string, number> = { ...VPX_RENDERER_PRIORITIES.ScoreView, B2S: 0 };
 
 /**
  * Identifiant d'écran attendu par VPX. VPX compare cette chaîne au caractère
@@ -113,6 +118,7 @@ export function vpxSettingsFor(
   assignments: Partial<Record<RoleId, ObservedDisplay>>,
   profile: VpxProfile = DEFAULT_VPX_PROFILE,
   zones: Partial<Record<RoleId, ScreenZone>> = {},
+  dmdKind?: DmdKind,
 ): VpxSetting[] {
   const settings: VpxSetting[] = [];
   for (const plugin of profile.enabledPlugins) {
@@ -144,7 +150,7 @@ export function vpxSettingsFor(
     put('WndY', rect.y);
     put('Width', rect.width);
     put('Height', rect.height);
-    for (const [renderer, priority] of rendererPriorities(win.section, profile)) {
+    for (const [renderer, priority] of rendererPriorities(win.section, profile, role === 'dmd' ? dmdKind : undefined)) {
       settings.push({ section: win.section, key: `Priority.${renderer}`, value: String(priority) });
     }
   }
@@ -179,8 +185,8 @@ export function disabledPlugins(profile: VpxProfile): string[] {
 }
 
 /** Priorités écrites pour une fenêtre : seulement celles des plugins activés. */
-export function rendererPriorities(section: string, profile: VpxProfile): [string, number][] {
-  const table = VPX_RENDERER_PRIORITIES[section as VpxAncillarySection] ?? {};
+export function rendererPriorities(section: string, profile: VpxProfile, dmdKind?: DmdKind): [string, number][] {
+  const table = section === 'ScoreView' && dmdKind === 'dmd' ? DMD_ONLY_PRIORITIES : (VPX_RENDERER_PRIORITIES[section as VpxAncillarySection] ?? {});
   return Object.entries(table).filter(([renderer]) => profile.enabledPlugins.includes(renderer));
 }
 
@@ -191,10 +197,11 @@ export function rendererPriorities(section: string, profile: VpxProfile): [strin
  * sans incrustation (ScoreViewDMDOverlay = 0 par défaut), le DMD de la ROM n'y
  * apparaît pas : on ne verrait que le cadre. ScoreViewDMDAutoPos cherche dans
  * l'image le plus grand rectangle sombre aux proportions du DMD (B2SDMDOverlay.cpp).
+ * Rien pour un écran DMD seul : B2S n'y dessine pas (DMD_ONLY_PRIORITIES).
  */
-export function vpxPluginDefaults(assignments: Partial<Record<RoleId, ObservedDisplay>>, profile: VpxProfile): VpxSetting[] {
+export function vpxPluginDefaults(assignments: Partial<Record<RoleId, ObservedDisplay>>, profile: VpxProfile, dmdKind?: DmdKind): VpxSetting[] {
   const defaults: VpxSetting[] = [];
-  if (assignments.dmd && profile.enabledPlugins.includes('B2S')) {
+  if (assignments.dmd && dmdKind !== 'dmd' && profile.enabledPlugins.includes('B2S')) {
     defaults.push({ section: 'Plugin.B2S', key: 'ScoreViewDMDOverlay', value: '1' });
     defaults.push({ section: 'Plugin.B2S', key: 'ScoreViewDMDAutoPos', value: '1' });
   }

@@ -72,8 +72,11 @@ function renderLibrary(v) {
         if (row.icon) line.append(cyberIcon(row.icon, 'lib-row-icon'));
         line.append(libEl('span', 'lib-row-text', row.text));
         for (const badge of row.badges ?? []) line.append(libEl('span', 'badge', badge));
-        li.append(line);
-        if (row.detail) li.append(libEl('div', 'lib-row-detail', row.detail));
+        // Schéma à droite (« Écran du DMD ») : le texte passe dans une colonne à part.
+        const main = row.figure ? libEl('div', 'lib-row-main') : li;
+        main.append(line);
+        if (row.detail) main.append(libEl('div', 'lib-row-detail', row.detail));
+        if (row.figure) li.append(main, dmdFigure(row.figure));
         // À quoi sert un fichier : signe et mot, jamais la couleur seule.
         if (row.note) {
           const note = libEl('div', `lib-row-note tone-${row.note.tone}`);
@@ -143,6 +146,18 @@ function renderLibrary(v) {
  * reste au geste choisi, dans la liste des actions). Un clic sur une étape déclenche
  * son premier geste.
  */
+/**
+ * Schéma de l'écran du DMD (« Écran du DMD ») : FullDMD, un média 16:9 avec le DMD du jeu
+ * incrusté dans un cadre ; DMD seul, une bande au milieu du noir.
+ */
+function dmdFigure(kind) {
+  const figure = libEl('div', `dmd-figure kind-${kind}`);
+  figure.setAttribute('aria-hidden', 'true');
+  if (kind === 'fulldmd') figure.append(libEl('span', 'dmd-figure-media', t('Média 16:9')));
+  figure.append(libEl('span', 'dmd-figure-dmd', 'DMD'));
+  return figure;
+}
+
 function renderJourney(j) {
   const box = libEl('div', 'lib-content journey');
   const progress = libEl('div', 'journey-progress');

@@ -109,7 +109,8 @@ export const messages: Record<string, string> = {
   'Afficheurs rangés sous le mauvais type': 'DMD media filed under the wrong type',
   '« {name} » est en {ratio} : c’est un média « {actual} » ({type}), pas « {wrong} ».': '“{name}” is {ratio}: it’s “{actual}” media ({type}), not “{wrong}”.',
   'Un fichier ({type}) de ce nom existe déjà : gardez l’un des deux.': 'A ({type}) file with that name already exists: keep one of them.',
-  'Le menu montre le DMD 4:1 sur un écran proche du 4:1, et le FullDMD 16:9 sur un écran large.': 'The menu shows the 4:1 DMD on a screen close to 4:1, and the 16:9 FullDMD on a wide screen.',
+  'Le menu montre le média DMD sur un écran DMD seul, et le média FullDMD sur un écran FullDMD (Configuration de la borne > Écran du DMD).':
+    'The menu shows the DMD media on a DMD-only screen, and the FullDMD media on a FullDMD screen (Cabinet setup > DMD screen).',
   'Renommer les {n} fichiers selon leurs proportions': 'Rename the {n} files to match their proportions',
   'Média mal nommé': 'Misnamed media file',
   'Médias mal nommés': 'Misnamed media files',
@@ -424,4 +425,13 @@ export const messages: Record<string, string> = {
   '{file}, écrit par Cyber Pinball pour l’ancienne version de la table, part à la corbeille : le nouveau script ne coupe plus le PuP-Pack.': '{file}, written by Cyber Pinball for the old version of the table, goes to the trash: the new script no longer switches the PuP-Pack off.',
   'Le script de « {table} » coupe le PuP-Pack ({variable} = {value}) : mettez {variable} = {enable} dans son script.': 'The script of “{table}” switches the PuP-Pack off ({variable} = {value}): set {variable} = {enable} in its script.',
   'Le script de « {table} » coupe le PuP-Pack : il faudra l’allumer dans son script.': 'The script of “{table}” switches the PuP-Pack off: it will have to be switched on in its script.',
+  'Le PuP-Pack cacherait le DMD de la table': 'The PuP-Pack would hide the table’s DMD',
+  'pupvideos\\{pack} occupe la fenêtre du DMD, où le plugin PUP ne dessine jamais le DMD de la table : son score n’apparaîtrait pas. Pour cette table, le DMD passera devant le pack ({file}) ; le pack garde le fronton et le topper.': 'pupvideos\\{pack} takes the DMD window, where the PUP plugin never draws the table’s DMD: its score would not show. For this table, the DMD will go in front of the pack ({file}); the pack keeps the backglass and the topper.',
+  'Garder le DMD de la table devant le PuP-Pack': 'Keep the table’s DMD in front of the PuP-Pack',
+  'Playlist du PuP-Pack lue dans le mauvais ordre': 'PuP-Pack playlist read in the wrong order',
+  'Le plugin PUP trie les fichiers en tenant compte des majuscules, PinUP Player non : dans pupvideos\\{pack}\\{playlist}, il commencerait par « {wrong} » au lieu de « {right} », que l’auteur a nommé pour passer en premier (souvent une image transparente). Un écran du pack montrerait ce fichier à la place.': 'The PUP plugin sorts files with upper case first, PinUP Player does not: in pupvideos\\{pack}\\{playlist}, it would start with “{wrong}” instead of “{right}”, which the author named to come first (often a transparent image). A screen of the pack would show that file instead.',
+  'Une autre playlist est dans ce cas.': 'Another playlist is in the same case.',
+  '{n} autres playlists sont dans ce cas.': '{n} other playlists are in the same case.',
+  'Renommer « {right} » en « {to} »': 'Rename “{right}” to “{to}”',
+  'Renommer {n} fichiers pour rétablir l’ordre': 'Rename {n} files to restore the order',
 };

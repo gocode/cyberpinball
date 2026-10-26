@@ -168,6 +168,17 @@ export function screenSurfaces(assignments: Partial<Record<RoleId, ObservedDispl
   return surfaces;
 }
 
+/** Proportions lisibles : « 16:9 », « 9:16 », « 4:1 », sinon « 2,35:1 ». */
+export function ratioLabel(widthOverHeight: number): string {
+  const portrait = widthOverHeight < 1;
+  const r = portrait ? 1 / widthOverHeight : widthOverHeight;
+  const known: [number, number][] = [[1, 1], [5, 4], [4, 3], [3, 2], [16, 10], [16, 9], [2, 1], [21, 9], [3, 1], [4, 1]];
+  const near = known.find(([w, h]) => Math.abs(Math.log(r / (w / h))) < 0.02);
+  if (near) return portrait ? `${near[1]}:${near[0]}` : `${near[0]}:${near[1]}`;
+  const value = formatNumber(r, { maximumFractionDigits: 2 });
+  return portrait ? `1:${value}` : `${value}:1`;
+}
+
 /** Grand côté sur petit côté de la zone, en pixels de son écran. */
 export function zoneRatio(zone: ScreenZone, size: Size): number | undefined {
   const w = zone.width * size.width;

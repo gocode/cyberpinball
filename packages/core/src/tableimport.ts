@@ -28,6 +28,7 @@ import {
   isPackRoot,
   type BatReport,
   pupScriptSwitch,
+  playlistRenames,
   type PupCabinet,
   type PupVariant,
   type VariantChoice,
@@ -174,6 +175,8 @@ export interface PackPlan {
   junk: string[];
   /** Le pack n'a pas de .pup et aucune option : seul le script peut le piloter. */
   noPupFiles: boolean;
+  /** Fichiers renommés pour que le plugin PUP commence ses playlists comme PinUP Player (playlistRenames). */
+  renames: { from: string; to: string }[];
 }
 
 /** Ce que la base VPS dit d'une nouvelle table. */
@@ -1067,6 +1070,7 @@ function packOps(dir: string, pack: PackPlan): FileOp[] {
     ...pack.junk.map((j) => ({ op: 'delete' as const, path: path.join(dir, j) })),
     ...(v?.copies ?? []).map((c) => ({ op: 'copy' as const, from: path.join(dir, c.from), to: path.join(dir, c.to) })),
     ...(v?.deletes ?? []).map((d) => ({ op: 'trash' as const, path: path.join(dir, d) })),
+    ...pack.renames.map((r) => ({ op: 'move' as const, from: path.join(dir, r.from), to: path.join(dir, r.to) })),
   ];
 }
 
@@ -1097,7 +1101,10 @@ function planPack(item: Item, game: Game, opts: PlanOptions, info: TableInfoFile
   const key = step.to.toLowerCase();
   const picked = opts.pupChoices?.get(key);
   const remembered = existing ? pupMemory(info, name)?.option : undefined;
-  let choice = chooseVariant(analysis.variants, opts.cabinet, remembered);
+  // Une option qui laisse le fronton au .directb2s (« B2S Users ») ne vaut que si la table en a un.
+  const tableBackglass = game.others.some((i) => i.kind === 'backglass') || listSafe(game.folder).some((f) => f.toLowerCase().endsWith('.directb2s'));
+  const cabinet = opts.cabinet && { ...opts.cabinet, tableBackglass };
+  let choice = chooseVariant(analysis.variants, cabinet, remembered);
   const chosen = picked ? analysis.variants.find((v) => v.label === picked) : undefined;
   if (chosen) choice = { chosen, confident: true, reason: choice.reason };
   step.renamed = path.basename(step.to) !== origin;
@@ -1116,6 +1123,7 @@ function planPack(item: Item, game: Game, opts: PlanOptions, info: TableInfoFile
     decided: Boolean(chosen),
     junk: analysis.junk,
     noPupFiles: !analysis.pupFiles.length && !analysis.variants.length,
+    renames: playlistRenames(root).map((r) => ({ from: r.from, to: r.to })),
   };
 }
 

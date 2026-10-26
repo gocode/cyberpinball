@@ -15,6 +15,7 @@ import { BUTTONS, buttonKeys, isInputKey, keyLabel, NAVIGATION, navigationButton
 import { t } from './i18n';
 import type { IconName } from './icons';
 import { EDGE_LABELS } from './layout';
+import { dmdKindLabel } from './dmdscreen';
 import { ROLES, type Cabinet, type RoleId } from './model';
 import { analogLines, isAnalogKey } from './plunger';
 import { VPX_LAYOUT_KEYS } from './vpx';
@@ -32,7 +33,7 @@ export const CAPTURE_PHASES: readonly WizardPhase[] = ['buttons', 'buttonsSummar
 export type WizardStepId = 'boutons' | 'interface' | 'lanceur' | 'ecrans' | 'playfield' | 'disposition' | 'son';
 
 /** Champs du modèle de borne qu'une étape peut décider. */
-export type CabinetField = 'buttons' | 'navigation' | 'analog' | 'screens' | 'roles' | 'zones' | 'playfield' | 'audio';
+export type CabinetField = 'buttons' | 'navigation' | 'analog' | 'screens' | 'roles' | 'zones' | 'dmdKind' | 'playfield' | 'audio';
 
 export interface WizardStep {
   id: WizardStepId;
@@ -110,7 +111,7 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
     get saved() { return t('Écrans enregistrés'); },
     // Le bord des flippers et la diagonale ne sont redemandés que si le playfield change d'écran.
     phases: ['assign', 'arrange', 'orient', 'flip', 'size', 'summary'],
-    fields: ['screens', 'roles', 'zones'],
+    fields: ['screens', 'roles', 'zones', 'dmdKind'],
     owns: isLayoutKey,
   },
   {
@@ -132,7 +133,7 @@ export const WIZARD_STEPS: readonly WizardStep[] = [
     get detail() { return t('Place et taille du playfield, du backglass, du DMD et du topper sur chaque écran'); },
     get saved() { return t('Disposition enregistrée'); },
     phases: ['arrange'],
-    fields: ['screens', 'roles', 'zones'],
+    fields: ['screens', 'roles', 'zones', 'dmdKind'],
     owns: isLayoutKey,
   },
   {
@@ -258,6 +259,9 @@ export function cabinetChanges(before: Cabinet | undefined, after: Partial<Cabin
       const where = screenLabel(after.roles[id]);
       lines.push(before?.roles[id] === after.roles[id] ? t('{role} : nouvelle place sur {screen}', { role: roleLabel(id), screen: where }) : t('{role} : {screen}', { role: roleLabel(id), screen: where }));
     }
+  }
+  if ('dmdKind' in after && after.roles?.dmd && before?.dmdKind !== after.dmdKind && after.dmdKind) {
+    lines.push(t('Écran du DMD : {kind}', { kind: dmdKindLabel(after.dmdKind) }));
   }
   if (after.playfield) {
     if (before?.playfield?.flipperEdge !== after.playfield.flipperEdge) lines.push(t('Flippers {edge} de l’image', { edge: EDGE_LABELS[after.playfield.flipperEdge] }));

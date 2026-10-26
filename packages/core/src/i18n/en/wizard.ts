@@ -105,7 +105,20 @@ export const messages: Record<string, string> = {
   '{role} : {output}{where}, {channels}, {mode} (Sound3D {sound3D})': '{role}: {output}{where}, {channels}, {mode} (Sound3D {sound3D})',
   'placer librement…': 'place freely…',
   'en bas, sous le Backglass (4:1)': 'at the bottom, under the Backglass (4:1)',
-  'en bas, sous le Backglass (FullDMD 16:9)': 'at the bottom, under the Backglass (FullDMD 16:9)',
+  'en bas, sous le Backglass (16:9)': 'at the bottom, under the Backglass (16:9)',
+  'en bande 4:1 au centre': 'as a 4:1 strip in the middle',
+  'Étape {n} sur {total} : un FullDMD montre l’image du jeu sur tout l’écran, son DMD incrusté.': 'Step {n} of {total}: a FullDMD shows the game image on the whole screen, its DMD inset.',
+  'Étape {n} sur {total} : un DMD seul montre le DMD du jeu, du noir autour.': 'Step {n} of {total}: a DMD-only screen shows the game DMD, black around it.',
+  'comme enregistré': 'as saved',
+  'Étape {n} sur {total} : quel écran affiche le DMD ou le FullDMD ?': 'Step {n} of {total}: which screen shows the DMD or the FullDMD?',
+  'Écran du DMD : {kind}': 'DMD screen: {kind}',
+  // packages/core/src/dmdscreen.ts
+  'DMD : bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Si c’est un FullDMD, dites-le dans Configuration de la borne > Écran du DMD : le menu, VPX et les PuP-Packs le traiteront comme tel.':
+    'DMD: {zone} strip in the middle of the “{screen}” screen ({ratio}), which shows nothing else. If it’s a FullDMD, say so in Cabinet setup > DMD screen: the menu, VPX and PuP-Packs will treat it as one.',
+  'FullDMD dans une zone {ratio} : les médias 16:9 y seront réduits. Écran du DMD (Configuration de la borne) lui rend tout son écran.':
+    'FullDMD in a {ratio} area: 16:9 media will be shrunk into it. DMD screen (Cabinet setup) gives it back its whole screen.',
+  'DMD seul dans une zone {ratio} : le DMD y aura des bandes noires. Écran du DMD (Configuration de la borne) le remet en bande 4:1.':
+    'DMD only in a {ratio} area: the DMD will have black bars. DMD screen (Cabinet setup) puts it back into a 4:1 strip.',
   'incrusté dans le playfield': 'embedded in the playfield',
   'incrusté dans le playfield, comme enregistré': 'embedded in the playfield, as saved',
   'sur cet écran avec le Backglass, comme enregistré': 'on this screen with the Backglass, as saved',

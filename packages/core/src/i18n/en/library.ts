@@ -385,4 +385,6 @@ export const messages: Record<string, string> = {
   'absent : le script de la table le charge (facultatif)': 'missing: the table’s script loads it (optional)',
   'Script adapté': 'Adapted script',
   'PuP-Pack allumé par Cyber Pinball': 'PuP-Pack switched on by Cyber Pinball',
+  'fronton laissé au .directb2s': 'backglass left to the .directb2s',
+  'table sans .directb2s': 'table without a .directb2s',
 };

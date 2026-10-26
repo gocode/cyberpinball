@@ -17,6 +17,9 @@ if (playfieldZone) {
 }
 // Rotation de la mise en page pour un joueur au bord des flippers (frontend.css).
 document.documentElement.dataset.rotation = params.get('rotation') ?? '0';
+// Écran sans playfield (fronton, DMD, topper) : du noir hors des zones, comme le panneau d'une
+// borne autour de la découpe du DMD, jamais le fond d'ambiance du menu (frontend.css).
+document.documentElement.classList.toggle('annex', role !== 'playfield');
 
 function el(tag, className, text) {
   const node = document.createElement(tag);

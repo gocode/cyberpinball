@@ -5,8 +5,8 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { formatSize, isInside, safeName, sameVolume, sizeOf, type FileOp } from './fileops';
-import { formatDate, formatDateTime, formatList, formatNumber, t, tn } from './i18n';
+import { applyOps, formatSize, isInside, safeName, sameVolume, sizeOf, type FileOp, type OpContext } from './fileops';
+import { formatDate, formatDateTime, formatList, t, tn } from './i18n';
 import { IniDocument } from './ini';
 import { isCurrentMediaError, mediaErrorsFile, readMediaErrors, type MediaErrorEntry, type MediaErrorKind } from './mediaerrors';
 import {
@@ -32,6 +32,7 @@ import type { RoleId } from './model';
 import {
   analysePack,
   appliedVariant,
+  cabinetFullDmd,
   chooseVariant,
   describePupCabinet,
   enablePupSwitch,
@@ -40,6 +41,8 @@ import {
   isVisible,
   pupScriptFacts,
   pupScriptSwitch,
+  pupWindows,
+  playlistRenames,
   screenRole,
   scoreVariant,
   variantTraitsLabel,
@@ -47,6 +50,7 @@ import {
   type PupScriptFacts,
   type PupSwitch,
   type PupVariant,
+  type PlaylistRename,
 } from './puppack';
 import { buildScriptPatch, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
 import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
@@ -61,6 +65,7 @@ import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
 import { scriptCode } from './vbscript';
 import { readVpxScript } from './vpxinfo';
+import { ratioLabel } from './zones';
 
 export type FindingSeverity = 'error' | 'warning' | 'info';
 
@@ -98,6 +103,8 @@ export const FINDING_CODES = [
   'pupOptionNotApplied',
   'pupOptionUnsuited',
   'pupDisabledByScript',
+  'pupHidesDmd',
+  'pupPlaylistOrder',
   'pupScreenAbsent',
   'pupPlayfieldScreen',
   'pupScriptDriven',
@@ -142,6 +149,11 @@ export interface ScriptFacts {
    * sans lui, ce DMD-là reste vide et certains scripts s'arrêtent (« Type incompatible »).
    */
   dmdFolder?: string;
+  /**
+   * La table dessine son propre DMD (ROM de PinMAME, FlexDMD, UltraDMD) : un PuP-Pack qui
+   * occupe la fenêtre du DMD le cache, le plugin PUP ne dessinant jamais le DMD de la table.
+   */
+  drawsDmd?: boolean;
   /** Absent si la table n'utilise pas PuP. */
   pup?: PupScriptFacts;
 }
@@ -230,7 +242,8 @@ export interface TablePupPack {
  * dossiers d'options), avec celle appliquée et celle qui convient à la borne : la fiche
  * les propose (« PuP-Pack »), le médecin compare les deux.
  */
-export function tablePupPacks(entry: TableEntry, cabinet?: PupCabinet): TablePupPack[] {
+export function tablePupPacks(entry: TableEntry, borne?: PupCabinet): TablePupPack[] {
+  const cabinet = withTableBackglass(entry, borne);
   const pupName = listSafe(entry.folder).find((f) => f.toLowerCase() === 'pupvideos');
   if (!pupName) return [];
   const pupvideos = path.join(entry.folder, pupName);
@@ -250,6 +263,16 @@ export function tablePupPacks(entry: TableEntry, cabinet?: PupCabinet): TablePup
       },
     ];
   });
+}
+
+/**
+ * La borne, et si cette table a son fronton (.directb2s) : une option de PuP-Pack qui
+ * laisse le fronton au B2S n'y montre sinon qu'une image fixe (pupWindows).
+ */
+function withTableBackglass(entry: TableEntry, cabinet: PupCabinet | undefined): PupCabinet | undefined {
+  if (!cabinet) return undefined;
+  const base = path.basename(entry.file).replace(/.vpx$/i, '');
+  return { ...cabinet, tableBackglass: Boolean(companion(entry.folder, base, true, '.directb2s')) };
 }
 
 /** Nom du dossier d'une table : « Terminator 2 (Williams 1991) ». */
@@ -276,6 +299,7 @@ export function scriptFacts(vbs: string): ScriptFacts {
   const facts: ScriptFacts = { usesPinmame, roms: usesPinmame ? roms : [] };
   const dmdFolder = dmdProjectFolder(code);
   if (dmdFolder) facts.dmdFolder = dmdFolder;
+  if (usesPinmame || dmdFolder || /CreateObject\s*\(\s*"(FlexDMD\.FlexDMD|UltraDMD\.DMDObject)"/i.test(code)) facts.drawsDmd = true;
   const pup = pupScriptFacts(code);
   if (pup) facts.pup = pup;
   return facts;
@@ -342,17 +366,8 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   // allumé, scriptpatch.ts) est le bienvenu tant qu'il est tiré du script actuel de la table.
   const vbs = has(`${base}.vbs`);
   const override = vbs ? readOverride(entry, path.join(folder, vbs)) : undefined;
-  if (vbs && override?.state.kind === 'stale') {
-    const state = override.state;
-    findings.push({
-      code: 'scriptPatchStale',
-      severity: 'warning',
-      title: t('Script adapté pour une ancienne version de la table'),
-      detail: t('Cyber Pinball a écrit {file} (PuP-Pack allumé) d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.', { file: vbs }),
-      fix: state.content
-        ? { label: t('Refaire {file} d’après le nouveau script', { file: vbs }), ops: [{ op: 'write', path: path.join(folder, vbs), content: state.content, encoding: 'latin1' }] }
-        : { label: t('Mettre {file} à la corbeille', { file: vbs }), ops: [{ op: 'trash', path: path.join(folder, vbs) }] },
-    });
+  if (override?.state.kind === 'stale') {
+    findings.push(staleFinding(override));
   } else if (vbs && override?.state.kind !== 'ours') {
     findings.push({
       code: 'scriptOverride',
@@ -611,6 +626,119 @@ function tableWindowsFinding(tableFile: string): Finding | undefined {
   };
 }
 
+/**
+ * Le plugin PUP ne dessine jamais le DMD de la table : il n'en lit les images que pour
+ * reconnaître des scènes (PuPCapture, PUPManager::ProcessDmdFrame). Dans la fenêtre du DMD,
+ * VPX garde le premier moteur qui dessine, par priorité (player.cpp, OnAuxRendererChanged) :
+ * avec Priority.PUP = 100, un pack qui a un écran 5 ou 1 cache le score de la ROM, de FlexDMD
+ * ou d'UltraDMD (2001 - A Space Odyssey, option « DMD on Fulldmd »). La priorité se lit dans
+ * les réglages de la table : « [ScoreView] Priority.PUP = 0 » dans son .ini rend la fenêtre
+ * au DMD pour elle seule ; le pack garde le fronton et le topper. Une valeur déjà écrite
+ * pour la table (menu de VPX en partie) est respectée.
+ */
+function pupHidesDmdFinding(tableFile: string, pack: string): Finding | undefined {
+  const ini = findTableIni(tableFile);
+  const doc = IniDocument.parse(ini.exists ? fs.readFileSync(ini.path, 'utf8') : '');
+  if (doc.get('ScoreView', 'Priority.PUP') !== undefined) return undefined;
+  doc.set('ScoreView', 'Priority.PUP', '0');
+  const params = { pack, file: path.basename(ini.path) };
+  return {
+    code: 'pupHidesDmd',
+    severity: 'warning',
+    title: t('Le PuP-Pack cacherait le DMD de la table'),
+    detail: t('pupvideos\\{pack} occupe la fenêtre du DMD, où le plugin PUP ne dessine jamais le DMD de la table : son score n’apparaîtrait pas. Pour cette table, le DMD passera devant le pack ({file}) ; le pack garde le fronton et le topper.', params),
+    fix: { label: t('Garder le DMD de la table devant le PuP-Pack'), ops: [{ op: 'write', path: ini.path, content: doc.toString() }] },
+  };
+}
+
+/** Fichiers d'un pack renommés pour que le plugin PUP commence ses playlists comme PinUP Player (playlistRenames). */
+function playlistOrderFinding(pack: string, root: string, renames: PlaylistRename[]): Finding {
+  const first = renames[0]!;
+  const params = {
+    pack,
+    playlist: first.playlist,
+    wrong: first.wrong,
+    right: path.basename(first.from),
+    to: path.basename(first.to),
+    n: renames.length,
+  };
+  return {
+    code: 'pupPlaylistOrder',
+    severity: 'warning',
+    title: t('Playlist du PuP-Pack lue dans le mauvais ordre'),
+    detail: [
+      t('Le plugin PUP trie les fichiers en tenant compte des majuscules, PinUP Player non : dans pupvideos\\{pack}\\{playlist}, il commencerait par « {wrong} » au lieu de « {right} », que l’auteur a nommé pour passer en premier (souvent une image transparente). Un écran du pack montrerait ce fichier à la place.', params),
+      renames.length > 1 ? tn(renames.length - 1, 'Une autre playlist est dans ce cas.', '{n} autres playlists sont dans ce cas.', { n: renames.length - 1 }) : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+    fix: {
+      label: tn(renames.length, 'Renommer « {right} » en « {to} »', 'Renommer {n} fichiers pour rétablir l’ordre', params),
+      ops: renames.map((r) => ({ op: 'move' as const, from: path.join(root, r.from), to: path.join(root, r.to) })),
+    },
+  };
+}
+
+/** Le .vbs de Cyber Pinball tiré du script d'une version précédente de la table. */
+function staleFinding(override: Override): Finding {
+  const file = path.basename(override.file);
+  const content = override.state.kind === 'stale' ? override.state.content : undefined;
+  return {
+    code: 'scriptPatchStale',
+    severity: 'warning',
+    title: t('Script adapté pour une ancienne version de la table'),
+    detail: t('Cyber Pinball a écrit {file} (PuP-Pack allumé) d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.', { file }),
+    fix: content
+      ? { label: t('Refaire {file} d’après le nouveau script', { file }), ops: [{ op: 'write', path: override.file, content, encoding: 'latin1' }] }
+      : { label: t('Mettre {file} à la corbeille', { file }), ops: [{ op: 'trash', path: override.file }] },
+  };
+}
+
+/**
+ * Réparations des PuP-Packs que le menu fait seul avant chaque partie : elles ne touchent
+ * qu'au pack (renommé, remonté, option recopiée, les anciens fichiers à la corbeille) et
+ * au .vbs de Cyber Pinball, jamais à la table ; une option choisie dans la fiche est
+ * gardée. Sans elles, un pack installé reste éteint tant qu'on n'ouvre pas le médecin
+ * (2001 - A Space Odyssey, 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack).
+ */
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupHidesDmd', 'pupPlaylistOrder'];
+
+/**
+ * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
+ * périmé), le script est lu dans le .vpx (readVpxScript), sans lancer VPX.
+ */
+export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[] {
+  if (path.resolve(entry.folder).toLowerCase() === path.resolve(ctx.tablesDir).toLowerCase()) return [];
+  const base = path.basename(entry.file).replace(/.vpx$/i, '');
+  let script = ctx.script;
+  if (!script || 'error' in script) {
+    const text = readVpxScript(entry.file);
+    if (text !== undefined) script = scriptFacts(text);
+  }
+  const vbs = listSafe(entry.folder).find((f) => f.toLowerCase() === `${base.toLowerCase()}.vbs`);
+  const override = vbs ? readOverride(entry, path.join(entry.folder, vbs)) : undefined;
+  const found: Finding[] = [];
+  if (override?.state.kind === 'stale') found.push(staleFinding(override));
+  found.push(...checkPup(entry, { ...ctx, script, vpxLog: undefined }, override));
+  return found.filter((f) => f.fix && PUP_PLAY_REPAIRS.includes(f.code));
+}
+
+/**
+ * Applique les réparations de pupPlayRepairs une à une (l'une peut en appeler une autre :
+ * pack remonté, puis son option), six au plus ; les fichiers remplacés vont à la corbeille.
+ * Renvoie les constats réglés, pour le journal.
+ */
+export function repairPupForPlay(entry: TableEntry, ctx: DoctorContext, ops: OpContext): Finding[] {
+  const done: Finding[] = [];
+  for (let round = 0; round < 6; round++) {
+    const next = pupPlayRepairs(entry, ctx).find((f) => !done.some((d) => d.code === f.code && d.fix!.label === f.fix!.label));
+    if (!next) break;
+    applyOps(next.fix!.ops, ops);
+    done.push(next);
+  }
+  return done;
+}
+
 /** Le .vbs qui remplace le script de la table, et s'il vient de Cyber Pinball. */
 interface Override {
   file: string;
@@ -669,7 +797,8 @@ function pupSwitchFinding(entry: TableEntry, pack: string, off: PupSwitch, overr
 }
 
 /** Règles du § 4.4 de la recherche sur les PuP-Packs, sans lancer VPX. */
-function checkPup(entry: TableEntry, ctx: DoctorContext, override?: Override): Finding[] {
+function checkPup(entry: TableEntry, context: DoctorContext, override?: Override): Finding[] {
+  const ctx = { ...context, cabinet: withTableBackglass(entry, context.cabinet) };
   const folder = entry.folder;
   const facts = ctx.script && !('error' in ctx.script) ? ctx.script : undefined;
   const pupName = listSafe(folder).find((f) => f.toLowerCase() === 'pupvideos');
@@ -756,6 +885,18 @@ function checkPup(entry: TableEntry, ctx: DoctorContext, override?: Override): F
     const dir = path.join(pupvideos, pack);
     const info = analysePack(findPackRoot(dir) ?? dir);
     const memory = pupMemory(entry.info, pack);
+
+    // Playlist que le plugin commence par un autre fichier que PinUP Player (tri sensible à la casse).
+    if (!nested.has(pack)) {
+      const renames = playlistRenames(info.root);
+      if (renames.length) findings.push(playlistOrderFinding(pack, info.root, renames));
+    }
+
+    // Pack dans la fenêtre du DMD d'une table qui dessine son propre DMD : le score disparaîtrait.
+    if (!nested.has(pack) && !off && facts?.drawsDmd && !facts.pup?.labels && ctx.cabinet?.dmd && info.screens.length && pupWindows(info.screens).dmd) {
+      const finding = pupHidesDmdFinding(entry.file, pack);
+      if (finding) findings.push(finding);
+    }
 
     // Option non appliquée : des variantes, et une racine sans .pup ou avec des .pup d'aucune variante.
     // Un pack imbriqué est d'abord remonté : la correction viserait sinon l'ancien emplacement.
@@ -1052,17 +1193,6 @@ function quote(name: string): string {
   return t('« {name} »', { name });
 }
 
-/** Proportions lisibles : « 16:9 », « 9:16 », « 4:1 », sinon « 2,35:1 ». */
-export function ratioLabel(widthOverHeight: number): string {
-  const portrait = widthOverHeight < 1;
-  const r = portrait ? 1 / widthOverHeight : widthOverHeight;
-  const known: [number, number][] = [[1, 1], [5, 4], [4, 3], [3, 2], [16, 10], [16, 9], [2, 1], [21, 9], [3, 1], [4, 1]];
-  const near = known.find(([w, h]) => Math.abs(Math.log(r / (w / h))) < 0.02);
-  if (near) return portrait ? `${near[1]}:${near[0]}` : `${near[0]}:${near[1]}`;
-  const value = formatNumber(r, { maximumFractionDigits: 2 });
-  return portrait ? `1:${value}` : `${value}:1`;
-}
-
 const ROLE_LABELS: Record<RoleId, string> = {
   get playfield() {
     return t('le plateau');
@@ -1250,7 +1380,7 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
           }),
           ...(s.to ? [] : [t('Un fichier ({type}) de ce nom existe déjà : gardez l’un des deux.', { type: s.actual })]),
         ]),
-        t('Le menu montre le DMD 4:1 sur un écran proche du 4:1, et le FullDMD 16:9 sur un écran large.'),
+        t('Le menu montre le média DMD sur un écran DMD seul, et le média FullDMD sur un écran FullDMD (Configuration de la borne > Écran du DMD).'),
       ].join(' '),
       fix: fixable.length
         ? {
@@ -1483,7 +1613,9 @@ function checkMedias(entry: TableEntry, ctx: DoctorContext): Finding[] {
     check('Backglass', 'backglass');
     check('Topper', 'topper');
     if (aspects.dmd) {
-      const wanted = dmdTypeForRatio(ctx.cabinet?.dmdRatio ?? Math.max(aspects.dmd, 1 / aspects.dmd));
+      // Le type de l'écran du DMD (FullDMD ou DMD seul), sinon les proportions de sa fenêtre.
+      const full = ctx.cabinet && cabinetFullDmd(ctx.cabinet);
+      const wanted: MediaType = full === undefined ? dmdTypeForRatio(Math.max(aspects.dmd, 1 / aspects.dmd)) : full ? 'FullDMD' : 'DMD';
       const partner: MediaType = wanted === 'DMD' ? 'FullDMD' : 'DMD';
       if (!check(wanted, 'dmd')) check(partner, 'dmd', t(', faute de média « {type} » ({code})', { type: label(wanted), code: wanted }));
     }

@@ -31,7 +31,18 @@ import {
   ROLES,
   saveCabinet,
   scanTables,
+  cabinetRoleLabel,
   cabinetZones,
+  dmdKindChoices,
+  dmdKindOf,
+  dmdKindQuestion,
+  dmdScreen,
+  ratioLabel,
+  roleZone,
+  withDmdKind,
+  type Cabinet,
+  type DmdKind,
+  type RoleInfo,
   screenSurfaces,
   zoneRect,
   mediaErrorsFile,
@@ -68,6 +79,9 @@ import {
   frontendNames,
   t,
   type OtherFrontend,
+  pupCabinet,
+  repairPupForPlay,
+  trashDirFor,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -312,12 +326,95 @@ library.systemItems.splice(
  * complet, les touches par défaut et les configurations de la borne.
  */
 function cabinetSetupItems(): SystemItem[] {
+  const steps: SystemItem[] = WIZARD_STEPS.map((step) => ({ label: step.label, detail: step.detail, icon: step.icon, run: () => relaunchWizard(step.flag) }));
+  // « Écran du DMD » après la disposition des écrans, quand la borne a un DMD.
+  const dmd = dmdScreenItem();
+  if (dmd) steps.splice(WIZARD_STEPS.findIndex((s) => s.id === 'disposition') + 1, 0, dmd);
   return [
-    ...WIZARD_STEPS.map((step) => ({ label: step.label, detail: step.detail, icon: step.icon, run: () => relaunchWizard(step.flag) })),
+    ...steps,
     { label: t('Assistant complet'), detail: t('Toutes les étapes à la suite : boutons, écrans, playfield, disposition, son'), icon: 'wizard', run: () => relaunchWizard() },
     { label: t('Touches par défaut des encodeurs'), detail: t('Si les boutons ne répondent plus comme prévu (aussi à la souris)'), icon: 'keyboard', run: () => resetButtonsFromMenu() },
     configurations.systemItem,
   ];
+}
+
+/**
+ * « Écran du DMD » : FullDMD ou DMD seul, dit une fois pour toutes. Pastille rouge tant
+ * qu'une bande DMD seule sur un écran large reste sans réponse (dmdKindQuestion).
+ */
+function dmdScreenItem(): SystemItem | undefined {
+  const cabinet = loadCabinet(loc.dataDir);
+  if (!cabinet?.roles.dmd) return undefined;
+  return {
+    icon: 'dmd',
+    label: t('Écran du DMD'),
+    detail: t('FullDMD 16:9 ou DMD seul : ce que montre l’écran du DMD'),
+    attention: Boolean(dmdKindQuestion(cabinet)),
+    run: () => openDmdScreen(),
+  };
+}
+
+/**
+ * Écran « Écran du DMD » : l'état actuel (ambigu : « À vérifier »), puis les deux réponses avec
+ * leur schéma. Start enregistre le choix (zone ajustée seulement si elle n'a pas la bonne forme,
+ * withDmdKind) et relance le menu : ses fenêtres, VPinballX.ini et les PuP-Packs suivent.
+ */
+function openDmdScreen(): void {
+  library.openCustom(() => {
+    const cabinet = loadCabinet(loc.dataDir);
+    const back = () => openCabinetSetup();
+    if (!cabinet?.roles.dmd) return { heading: t('Écran du DMD'), icon: 'dmd', sections: [], actions: [{ label: t('Retour'), icon: 'back', run: back }], back };
+    const question = dmdKindQuestion(cabinet);
+    const current = dmdKindOf(cabinet);
+    const screen = dmdScreen(cabinet);
+    const choices = dmdKindChoices(cabinet);
+    const state = question
+      ? { text: t('Le DMD occupe une bande {zone} au milieu de l’écran « {screen} » ({ratio}), qui ne montre rien d’autre. Est-ce un FullDMD ?', { zone: ratioLabel(question.zoneRatio), screen: question.screen, ratio: ratioLabel(question.screenRatio) }), tone: 'warning' as const }
+      : {
+          text:
+            current === 'fulldmd'
+              ? screen
+                ? t('L’écran « {screen} » est un FullDMD.', { screen: screen.label })
+                : t('L’écran du DMD est un FullDMD.')
+              : screen
+                ? t('L’écran « {screen} » montre le DMD seul.', { screen: screen.label })
+                : t('L’écran du DMD montre le DMD seul.'),
+          detail: screen ? t('Zone du DMD : {ratio}.', { ratio: ratioLabel(zoneAspect(cabinet, screen)) }) : undefined,
+          tone: 'info' as const,
+        };
+    const choose = (kind: DmdKind) => () => {
+      saveCabinet(loc.dataDir, withDmdKind(cabinet, kind));
+      relaunchMenu();
+    };
+    const all: { kind: DmdKind; label: string; detail: string; icon: 'image' | 'dmd' }[] = [
+      { kind: 'fulldmd', label: t('C’est un FullDMD'), detail: t('Tout l’écran 16:9 : média FullDMD, écran 5 des PuP-Packs, DMD du jeu incrusté'), icon: 'image' },
+      { kind: 'dmd', label: t('C’est un DMD seul'), detail: question ? t('Garder la bande : le DMD du jeu seul, du noir autour') : t('Une bande 4:1 : le DMD du jeu seul, du noir autour'), icon: 'dmd' },
+    ];
+    const offered = all.filter((c) => choices.includes(c.kind));
+    // Une réponse déjà enregistrée est « Actuel » ; une forme seulement déduite ne l'est pas encore.
+    const answered = cabinet.dmdKind ?? (question ? undefined : current);
+    return {
+      heading: t('Écran du DMD'),
+      icon: 'dmd',
+      lead: t('Un FullDMD montre le média FullDMD du jeu et l’écran 5 des PuP-Packs, avec le DMD du jeu incrusté. Un DMD seul ne montre que le DMD, en bande 4:1.'),
+      sections: [
+        { rows: [{ text: state.text, ...(state.detail && { detail: state.detail }), tone: state.tone }] },
+        {
+          title: t('Ce que montre cet écran'),
+          kind: 'dmd-kinds',
+          rows: offered.map((c, i) => ({ text: c.label, detail: c.detail, icon: c.icon, action: i, pick: true, figure: c.kind, ...(answered === c.kind && { badges: [t('Actuel')] }) })),
+        },
+      ],
+      actions: [...offered.map((c) => ({ label: c.label, detail: c.detail, icon: c.icon, run: choose(c.kind) })), { label: t('Retour'), icon: 'back' as const, run: back }],
+      back,
+    };
+  });
+}
+
+/** Proportions de la zone du DMD, largeur sur hauteur. */
+function zoneAspect(cabinet: Cabinet, screen: { widthPx: number; heightPx: number }): number {
+  const zone = roleZone(cabinet, 'dmd');
+  return (zone.width * screen.widthPx) / (zone.height * screen.heightPx);
 }
 
 function openCabinetSetup(): void {
@@ -469,6 +566,8 @@ export function startFrontend(): void {
   menuAssignments = choose ? {} : assignments;
   openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
   for (const f of selection?.findings ?? []) console.log(`Configuration de la borne : ${f.message}`);
+  // Bande DMD seule sur un écran large, jamais tranchée : l'utilisateur dit une fois ce qu'est l'écran.
+  if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(t('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Configuration de la borne > Écran du DMD.'));
   if (selection?.previous && selection.configuration) showBanner(t('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }));
   // Après une mise à jour : la nouvelle version est-elle là ?
   const updateNotice = updates.startupNotice();
@@ -630,6 +729,8 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
   windows = new Map();
   windowRoles = new Map();
   const surfaces = screenSurfaces(assignments, zones);
+  const cabinet = loadCabinet(loc.dataDir);
+  const labelOf = (role: RoleInfo) => ({ ...role, label: cabinetRoleLabel(cabinet, role.id, role.label) });
   roleRects = surfaces.flatMap((s) => {
     const d = s.display.bounds;
     const own = s.role === 'playfield' ? [{ role: s.role, rect: { ...d } }] : [];
@@ -645,8 +746,8 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     ...surfaces.map((s) => ({ role: s.role, bounds: windowRect(s.display.bounds), parts: s.parts, playfield: s.playfield })),
   ];
   for (const { role: id, bounds, parts, playfield } of pages) {
-    const role = ROLES.find((r) => r.id === id)!;
-    const title = `Cyber Pinball — ${formatList([role, ...parts.filter((p) => p.role !== id).map((p) => ROLES.find((r) => r.id === p.role)!)].map((r) => r.label))}`;
+    const role = labelOf(ROLES.find((r) => r.id === id)!);
+    const title = `Cyber Pinball — ${formatList([role, ...parts.filter((p) => p.role !== id).map((p) => labelOf(ROLES.find((r) => r.id === p.role)!))].map((r) => r.label))}`;
     if (role.id === 'playfield') playfieldTitle = title;
     const win = createWindow({
       title,
@@ -793,6 +894,26 @@ function handleKey(input: Input): boolean {
   return true;
 }
 
+/**
+ * Réparations des PuP-Packs avant une partie (doctor.ts, PUP_PLAY_REPAIRS) : pack mal rangé,
+ * option qui laisse le fronton vide ou faite pour une autre borne, script qui coupe le pack.
+ * Seuls le pack et le .vbs de Cyber Pinball changent ; l'ancien va à la corbeille.
+ */
+function preparePupPack(table: TableEntry): void {
+  if (!loc.root) return;
+  const layout = layoutOf(loc.root);
+  try {
+    const done = repairPupForPlay(
+      table,
+      { tablesDir: layout.tables, script: cachedScript(table.file, loc.dataDir), cabinet: pupCabinet(loadCabinet(loc.dataDir)) },
+      { trashDir: trashDirFor(layout.trash, `Avant la partie ${path.basename(table.folder)}`) }, // i18n-ignore : nom de dossier
+    );
+    for (const f of done) console.log(`PuP-Pack (${table.id}) : ${f.title} → ${f.fix!.label}`);
+  } catch (error) {
+    console.log(`PuP-Pack (${table.id}) : réparation avant la partie impossible (${(error as Error).message}).`);
+  }
+}
+
 export interface PlayReport {
   result: LaunchResult;
   focusReturned: boolean;
@@ -872,6 +993,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     broadcast();
     return undefined;
   }
+
+  // PuP-Pack : ce qui l'empêcherait de s'afficher est réglé avant la partie, sans rien demander.
+  preparePupPack(table);
 
   // Les fenêtres du menu restent derrière VPX, sans jamais lui prendre le focus : l'écran de
   // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque

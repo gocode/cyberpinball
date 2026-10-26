@@ -20,6 +20,8 @@
 // Enfin, les zones marquées data-stable (menu des tables) ne doivent pas bouger d'une
 // touche à l'autre : même fenêtre, même taille, même présentation, même position au
 // demi-pixel près. Changer de table ne change que leur contenu.
+// Sur un écran sans playfield (fronton, DMD, topper), le fond du playfield ne doit pas se voir :
+// seulement les zones des rôles, sur du noir.
 // Les problèmes vont dans la console et dans <captures>\mise-en-page.txt.
 
 import * as fs from 'node:fs';
@@ -192,6 +194,13 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       if (veil >= 0 && text >= 0 && veil < text) problems.add('sous un voile : ' + label(el));
     });
     veils.forEach((v, i) => (v.style.pointerEvents = saved[i]));
+  }
+  // Écran sans playfield (fronton, DMD, topper : html.annex) : rien du fond du playfield, seulement
+  // les zones sur du noir (Poste à 3 écrans, octobre 2026 : le cadre 9:16 du plateau, celui du menu
+  // au bureau, dessiné autour d'une bande DMD).
+  if (document.documentElement.classList.contains('annex')) {
+    const bg = document.getElementById('media-bg');
+    if (bg && shown(bg) && bg.getBoundingClientRect().width > T) problems.add('fond du playfield sur un écran sans playfield : ' + label(bg));
   }
   // Image chargée sans pixels, vidéo en erreur : l'écran montrerait un aperçu cassé.
   for (const img of document.images) if (img.complete && img.getAttribute('src') && img.naturalWidth === 0) problems.add('image non chargée : ' + img.getAttribute('src').slice(0, 120));
