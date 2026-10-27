@@ -25,6 +25,9 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   checkSiteSearch,
+  partSearchUrl,
+  siteQuery,
+  type NeedKind,
   formatTransfer,
   hitTypes,
   mediaKind,
@@ -119,6 +122,8 @@ interface Cached {
 }
 
 const SEARCH_TTL_MS = 30 * 60 * 1000;
+/** Attente imposée par un site qu'on accepte avant de recommencer une recherche, en secondes. */
+const MAX_FLOOD_WAIT_S = 150;
 
 export const jobKey = siteHitKey;
 
@@ -159,10 +164,10 @@ export function createMediaSites(ctx: MediaSitesContext) {
   // ---------- Recherche ----------
 
   /** Une page de résultats, lue et vérifiée (checkSiteSearch). */
-  async function searchPage(site: MediaSiteId, query: string, type: MediaType | undefined, page: number): Promise<SiteSearchResult> {
+  async function searchPage(site: MediaSiteId, query: string, type: MediaType | undefined, page: number, url = siteSearchUrl(site, query, type, page)): Promise<SiteSearchResult> {
     let raw: unknown;
     try {
-      raw = await ctx.acquirer.readPage(siteSearchUrl(site, query, type, page), SITE_SEARCH_PROBES[site], 20_000);
+      raw = await ctx.acquirer.readPage(url, SITE_SEARCH_PROBES[site], 20_000);
     } catch {
       raw = undefined;
     }
@@ -179,15 +184,50 @@ export function createMediaSites(ctx: MediaSitesContext) {
    */
   async function search(site: MediaSiteId, query: string, type?: MediaType): Promise<SiteSearchResult> {
     const own = siteSearchByType(site) ? type : undefined;
-    const key = `${site}:${own ?? '*'}:${query.toLowerCase()}`;
+    return searchPages(site, query, `${site}:${own ?? '*'}:${query.toLowerCase()}`, (page) => siteSearchUrl(site, query, own, page));
+  }
+
+  /**
+   * Résultats d'un site pour une partie d'un jeu (PuP-Pack, fronton, couleurs…) : VPUniverse
+   * dans les seules catégories de la partie (gameparts.ts), VPForums partout.
+   */
+  async function searchPart(site: MediaSiteId, title: string, part: NeedKind, onWait?: (seconds: number) => void): Promise<SiteSearchResult> {
+    const by = site === 'vpuniverse' ? part : '*';
+    return searchPages(site, siteQuery(title), `${site}:part-${by}:${siteQuery(title).toLowerCase()}`, (page) => partSearchUrl(site, title, part, page), onWait);
+  }
+
+  /** Recherches de chaque site, l'une après l'autre : deux recherches en même temps déclencheraient l'attente imposée. */
+  const searching = new Map<MediaSiteId, Promise<unknown>>();
+
+  /**
+   * Jusqu'à SITE_SEARCH_PAGES pages de résultats, de la demi-heure passée si on les a. Une
+   * recherche à la fois par site ; quand le site impose d'attendre (VPUniverse, pour un
+   * visiteur : environ 90 s), on attend, `onWait` le dit à l'écran, puis on recommence une fois.
+   */
+  function searchPages(site: MediaSiteId, query: string, key: string, urlOf: (page: number) => string, onWait?: (seconds: number) => void): Promise<SiteSearchResult> {
+    const run = (searching.get(site) ?? Promise.resolve()).then(() => searchPagesNow(site, query, key, urlOf, onWait));
+    searching.set(site, run.catch(() => undefined));
+    return run;
+  }
+
+  async function searchPagesNow(site: MediaSiteId, query: string, key: string, urlOf: (page: number) => string, onWait?: (seconds: number) => void): Promise<SiteSearchResult> {
     const cached = searches.get(key);
     if (cached && Date.now() - cached.at < SEARCH_TTL_MS) return cached.result;
-    const first = await searchPage(site, query, own, 1);
+    const flood = await searchPage(site, query, undefined, 1, urlOf(1));
+    if (flood.kind === 'show' && flood.reason === 'flood' && flood.wait <= MAX_FLOOD_WAIT_S) {
+      onWait?.(flood.wait);
+      await new Promise((r) => setTimeout(r, (flood.wait + 2) * 1000));
+    } else if (flood.kind !== 'hits' || !flood.hits.length) {
+      // Aucun résultat, vraiment (l'attente imposée est reconnue à part) : gardé comme les autres.
+      if (flood.kind === 'hits') searches.set(key, { at: Date.now(), result: flood });
+      return flood;
+    }
+    const first = flood.kind === 'hits' && flood.hits.length ? flood : await searchPage(site, query, undefined, 1, urlOf(1));
     let result = first;
     if (first.kind === 'hits') {
       const hits = [...first.hits];
       for (let page = 2; page <= Math.min(first.pages ?? 1, SITE_SEARCH_PAGES); page++) {
-        const next = await searchPage(site, query, own, page);
+        const next = await searchPage(site, query, undefined, page, urlOf(page));
         if (next.kind !== 'hits') break;
         hits.push(...next.hits.filter((h) => !hits.some((k) => k.id === h.id)));
       }
@@ -652,6 +692,7 @@ export function createMediaSites(ctx: MediaSitesContext) {
     state,
     signIn,
     search,
+    searchPart,
     stageThumbs,
     thumb: (url: string | undefined) => (url ? thumbs.get(url) : undefined),
     enqueue,

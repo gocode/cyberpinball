@@ -1,7 +1,8 @@
 // Santé de la borne (Menu système > Borne) : un bilan qui réunit ce que d'autres écrans
 // savent déjà, sans le recalculer autrement. L'espace disque des lecteurs qui comptent
 // (tables, téléchargements, données) ; les tables qui ne démarrent pas, d'après le médecin
-// (doctor.ts, playable.ts) ; les médias que VPinMediaDB peut fournir, d'après l'index déjà
+// (doctor.ts, playable.ts) ; les PuP-Packs que le médecin voit éteints en partie (cause et
+// réparation) ; les médias que VPinMediaDB peut fournir, d'après l'index déjà
 // téléchargé (mediadb.ts, aucun réseau) ; la configuration de la borne retenue contre les
 // écrans branchés (configurations.ts), et le sens des tables en partie (gameorientation.ts) ; la version de VPX installée contre celle que Cyber
 // Pinball connaît (manifeste de l'installeur, aucun réseau).
@@ -18,16 +19,18 @@ import { activeConfiguration, chooseConfiguration, chosenId, scoreConfiguration,
 import type { Finding } from './doctor';
 import { formatSize } from './fileops';
 import { orientationFacts, orientationVerdict, type OrientationFacts } from './gameorientation';
-import { formatDate, t, tn } from './i18n';
+import { formatDate, formatList, t, tn } from './i18n';
 import type { IconName } from './icons';
-import type { ObservedDisplay } from './model';
+import { matchScreens } from './match';
+import { ROLES, type ObservedDisplay, type RoleId } from './model';
 import { playBlockers } from './playable';
 import { systemPathOf, type SystemItemId } from './systemmenu';
+import { vpxDisplayName, type VpxDisplayIdFormat } from './vpx';
 
 export type HealthState = 'ok' | 'check' | 'blocking';
 
 /** Les contrôles, dans l'ordre de la page. */
-export const HEALTH_CHECKS = ['disk', 'tables', 'media', 'screens', 'vpx'] as const;
+export const HEALTH_CHECKS = ['disk', 'tables', 'pup', 'media', 'screens', 'vpx'] as const;
 export type HealthCheckId = (typeof HEALTH_CHECKS)[number];
 
 /** Où mène une ligne. */
@@ -105,6 +108,27 @@ export interface ScreensFacts {
   plugged: number;
   /** Sens des tables en partie sur le playfield branché ; absent sans playfield reconnu ni bord du joueur. */
   orientation?: OrientationFacts;
+  /**
+   * Rôles dont les écrans portent le même nom pour une version de VPX qui ne repère les écrans
+   * que par leur nom (10.8.1) : elle ouvre leurs fenêtres sur le premier de ces écrans.
+   */
+  homonyms?: { name: string; roles: RoleId[] }[];
+}
+
+/** Une table dont le PuP-Pack ne se verra pas en partie, d'après son médecin. */
+export interface PupHealth {
+  file: string;
+  title: string;
+  /** Le constat, tel que le médecin le dit (« PuP-Pack coupé par le script de la table »). */
+  reason: string;
+  /** Réparé de lui-même avant la prochaine partie (PUP_PLAY_REPAIRS), sinon à faire dans le médecin. */
+  auto: boolean;
+}
+
+export interface PupFacts {
+  /** Tables qui ont un dossier pupvideos. */
+  packs: number;
+  flagged: PupHealth[];
 }
 
 export interface VpxFacts {
@@ -119,6 +143,8 @@ export interface HealthFacts {
   at: string;
   disks: DiskFact[];
   tables?: TablesFacts;
+  /** PuP-Packs des tables ; absent d'un relevé plus ancien. */
+  pup?: PupFacts;
   media?: MediaFacts;
   screens?: ScreensFacts;
   vpx: VpxFacts;
@@ -194,14 +220,82 @@ export function tablesFacts(tables: { file: string; title: string; findings?: re
   return { count: tables.length, flagged, unanalysed };
 }
 
+/**
+ * Constats du médecin qui empêchent un PuP-Pack de se voir en partie : pack introuvable ou mal
+ * rangé, script qui le coupe, option absente ou faite pour une autre borne, pack qui cache le DMD,
+ * journal de VPX qui ne l'a pas vu chargé. Ceux de simple information ne comptent pas.
+ */
+export const PUP_HEALTH_FINDINGS = [
+  'pupMissing',
+  'pupNested',
+  'pupDisabledByScript',
+  'scriptPatchStale',
+  'pupOptionNotApplied',
+  'pupOptionMismatch',
+  'pupOptionUnsuited',
+  'pupHidesDmd',
+  'pupLog',
+] as const satisfies readonly Finding['code'][];
+
+/**
+ * PuP-Packs à revoir : pour chaque table qui en a un (`hasPack`), le premier constat de
+ * PUP_HEALTH_FINDINGS ; `autoRepairs` : ceux que le menu répare seul avant chaque partie.
+ */
+export function pupFacts(
+  tables: { file: string; title: string; hasPack: boolean; findings?: readonly Pick<Finding, 'code' | 'severity' | 'title'>[] }[],
+  autoRepairs: readonly string[] = [],
+): PupFacts {
+  const flagged: PupHealth[] = [];
+  let packs = 0;
+  for (const table of tables) {
+    if (!table.hasPack) continue;
+    packs++;
+    const found = table.findings?.find((f) => f.severity !== 'info' && (PUP_HEALTH_FINDINGS as readonly string[]).includes(f.code));
+    if (found) flagged.push({ file: table.file, title: table.title, reason: found.title, auto: autoRepairs.includes(found.code) });
+  }
+  flagged.sort((a, b) => a.title.localeCompare(b.title));
+  return { packs, flagged };
+}
+
+/**
+ * Écrans affectés à des rôles différents qui portent le même nom pour VPX (vpxDisplayName) :
+ * une version qui ne les repère que par leur nom (`format` « name », VPX 10.8.1,
+ * Window::GetDisplayConfig) prend le premier, et y ouvre les fenêtres des deux rôles. Le fronton
+ * et le DMD se superposent alors sur un écran, l'autre reste au menu : les vidéos d'un PuP-Pack
+ * faites pour le DMD se perdent derrière le fronton (poste à deux PL2294H, 27 octobre 2026).
+ */
+export function homonymousRoles(
+  roles: Partial<Record<RoleId, string>>,
+  saved: Parameters<typeof matchScreens>[0],
+  observed: ObservedDisplay[],
+  format: VpxDisplayIdFormat | undefined,
+): { name: string; roles: RoleId[] }[] {
+  if (format !== 'name') return [];
+  const match = matchScreens(saved, observed);
+  const byName = new Map<string, { displays: ObservedDisplay[]; roles: RoleId[] }>();
+  for (const role of ROLES) {
+    const fp = roles[role.id];
+    const display = fp ? match.matched.get(fp) : undefined;
+    if (!display) continue;
+    const name = vpxDisplayName(display);
+    const entry = byName.get(name) ?? { displays: [], roles: [] };
+    if (!entry.displays.includes(display)) entry.displays.push(display);
+    entry.roles.push(role.id);
+    byName.set(name, entry);
+  }
+  // Deux rôles sur un même écran (zones) sont voulus : seuls comptent des écrans distincts.
+  return [...byName].filter(([, e]) => e.displays.length > 1).map(([name, e]) => ({ name, roles: e.roles }));
+}
+
 /** Configuration retenue (active) contre les écrans branchés, et celle que la reconnaissance choisirait aujourd'hui. */
-export function screensFacts(set: CabinetSet | undefined, observed: ObservedDisplay[]): ScreensFacts {
+export function screensFacts(set: CabinetSet | undefined, observed: ObservedDisplay[], format?: VpxDisplayIdFormat): ScreensFacts {
   const configurations = set?.configurations.length ?? 0;
   const active = set && activeConfiguration(set);
   if (!set || !active) return { configurations, plugged: observed.length };
   const score = scoreConfiguration(active, observed);
   const chosen = chosenId(chooseConfiguration(set, observed));
   const orientation = orientationFacts(active, observed);
+  const homonyms = homonymousRoles(active.roles, active.screens, observed, format);
   return {
     configurations,
     plugged: observed.length,
@@ -215,6 +309,7 @@ export function screensFacts(set: CabinetSet | undefined, observed: ObservedDisp
     },
     better: chosen && chosen !== active.id ? set.configurations.find((c) => c.id === chosen)?.name : undefined,
     ...(orientation && { orientation }),
+    ...(homonyms.length && { homonyms }),
   };
 }
 
@@ -310,6 +405,34 @@ export function tableLines(facts: TablesFacts): HealthLine[] {
   return lines;
 }
 
+/**
+ * PuP-Packs : une ligne par table dont le pack ne se verra pas, vers son médecin (la cause et la
+ * réparation en un geste) ; une ligne OK quand tous sont prêts ; rien sans aucun pack.
+ */
+export function pupLines(facts: PupFacts): HealthLine[] {
+  if (!facts.packs) return [];
+  const go = t('Ouvrir le médecin de la table');
+  const lines: HealthLine[] = facts.flagged.map((f) => ({
+    check: 'pup',
+    state: 'check',
+    title: f.title,
+    detail: f.auto ? t('{reason} — réparé de lui-même avant la prochaine partie', { reason: f.reason }) : f.reason,
+    go,
+    target: { kind: 'doctor', file: f.file },
+  }));
+  if (!lines.length) {
+    lines.push({
+      check: 'pup',
+      state: 'ok',
+      title: tn(facts.packs, '{n} PuP-Pack prêt', '{n} PuP-Packs prêts'),
+      detail: t('Rangés sous le nom que cherche la table, option faite pour la borne, allumés par le script'),
+      go: t('Ajouter une table'),
+      target: SYSTEM('add-table'),
+    });
+  }
+  return lines;
+}
+
 export function mediaLines(facts: MediaFacts): HealthLine[] {
   const go = t('Voir les médias manquants');
   const target = SYSTEM('missing-media');
@@ -344,10 +467,30 @@ export function screensLines(facts: ScreensFacts): HealthLine[] {
   const parts = [found, missing, a.extra ? tn(a.extra, '{n} écran branché en plus', '{n} écrans branchés en plus') : '', a.found ? '' : better].filter(Boolean).join(t(' ; '));
   if (!a.found) return line('blocking', t('{name} : aucun de ses écrans n’est branché', { name }), parts);
   if (!a.playfieldFound) return line('blocking', t('{name} : l’écran du playfield est introuvable', { name }), parts);
-  const sense = facts.orientation ? orientationLines(facts.orientation) : [];
+  const sense = [...(facts.orientation ? orientationLines(facts.orientation) : []), ...homonymLines(facts.homonyms ?? [])];
   if (facts.better) return [...line('check', t('{name} retenue, « {better} » correspondrait mieux', { name, better: facts.better }), parts), ...sense];
   if (a.missing.length) return [...line('check', t('{name} retrouvée en partie', { name }), parts), ...sense];
   return [...line('ok', t('{name} reconnue', { name }), parts), ...sense];
+}
+
+/**
+ * Écrans que VPX confond (homonymousRoles) : ses fenêtres de ces rôles s'ouvrent toutes sur le
+ * premier. Rien à régler dans Cyber Pinball : la cause et ce qu'elle cache sont dits.
+ */
+function homonymLines(homonyms: { name: string; roles: RoleId[] }[]): HealthLine[] {
+  return homonyms.map((h) => {
+    const roles = h.roles.map((id) => ROLES.find((r) => r.id === id)?.label ?? id);
+    return {
+      check: 'screens',
+      state: 'check',
+      title: t('VPX confond deux écrans « {name} »', { name: h.name }),
+      detail: t('Il repère les écrans par leur seul nom et ouvre {roles} sur le premier : ils s’y superposent, et les vidéos d’un PuP-Pack faites pour l’un se cachent derrière l’autre', {
+        roles: formatList(roles, 'and'),
+      }),
+      go: t('Ouvrir la configuration de la borne'),
+      target: SYSTEM('cabinet'),
+    };
+  });
 }
 
 /** Sens des tables en partie : « Orientation et taille du playfield » le règle de nouveau. */
@@ -382,6 +525,7 @@ export function healthLines(facts: HealthFacts): HealthLine[] {
   return [
     ...diskLines(facts.disks),
     ...(facts.tables ? tableLines(facts.tables) : []),
+    ...(facts.pup ? pupLines(facts.pup) : []),
     ...(facts.media ? mediaLines(facts.media) : []),
     ...(facts.screens ? screensLines(facts.screens) : []),
     ...vpxLines(facts.vpx),
@@ -400,6 +544,8 @@ export function healthCheckInfo(check: HealthCheckId): { title: string; icon: Ic
       return { title: t('Espace disque'), icon: 'drive' };
     case 'tables':
       return { title: t('Tables'), icon: 'tables' };
+    case 'pup':
+      return { title: t('PuP-Packs'), icon: 'video' };
     case 'media':
       return { title: t('Médias'), icon: 'image' };
     case 'screens':

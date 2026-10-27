@@ -8,6 +8,7 @@
 // téléchargement : scripts déjà lus, index de VPinMediaDB déjà gardé, manifeste de
 // l'installeur. Il cède la main entre deux tables pour que le menu reste fluide.
 
+import * as fs from 'node:fs';
 import {
   diskFacts,
   diskSpace,
@@ -19,6 +20,8 @@ import {
   healthStateLabel,
   loadCabinetSet,
   loadHealthFacts,
+  PUP_PLAY_REPAIRS,
+  pupFacts,
   saveHealthFacts,
   screensFacts,
   SYSTEM_ITEMS,
@@ -37,6 +40,7 @@ import {
 } from '@cyberpinball/core';
 import { findComponent } from '@cyberpinball/installer';
 import type { Action, Built, LibraryHost } from './library';
+import { locations, vpxProfile } from './paths';
 
 export interface HealthContext {
   host: LibraryHost;
@@ -76,6 +80,15 @@ interface HealthLineView {
   tone: string;
 }
 
+/** Un dossier pupvideos à côté de la table (dossier illisible : non). */
+function hasPupFolder(folder: string): boolean {
+  try {
+    return fs.readdirSync(folder, { withFileTypes: true }).some((d) => d.isDirectory() && d.name.toLowerCase() === 'pupvideos');
+  } catch {
+    return false;
+  }
+}
+
 /** Premier relevé après le démarrage : le menu d'abord. */
 const FIRST_DELAY_MS = 15_000;
 /** Puis un relevé toutes les 30 minutes, et à chaque ouverture de la page. */
@@ -104,10 +117,11 @@ export function createHealth(ctx: HealthContext) {
     const layout = ctx.layout();
     const disks = diskFacts({ tables: layout?.tables, downloads: layout?.downloads, data: host.dataDir }, host.diskSpace ?? diskSpace);
     const vpx = { installed: host.vpxVersion?.(), known: knownVpx() };
-    const screens = host.displays ? screensFacts(loadCabinetSet(host.dataDir), host.displays()) : undefined;
+    const screens = host.displays ? screensFacts(loadCabinetSet(host.dataDir), host.displays(), vpxProfile(locations()).profile.displayIdFormat) : undefined;
     let tables: HealthFacts['tables'];
+    let pup: HealthFacts['pup'];
     if (layout) {
-      const seen: { file: string; title: string; findings?: Finding[] }[] = [];
+      const seen: { file: string; title: string; hasPack: boolean; findings?: Finding[] }[] = [];
       const doctor = ctx.doctor();
       for (const table of host.tables()) {
         await pause();
@@ -118,12 +132,15 @@ export function createHealth(ctx: HealthContext) {
           // Une table illisible n'arrête pas le relevé : elle est à revoir, chez son médecin.
           findings = [{ code: 'scriptUnreadable', severity: 'warning', title: (error as Error).message, detail: '' }];
         }
-        seen.push({ file: table.file, title: table.title, findings });
+        // Un dossier pupvideos à côté de la table : son PuP-Pack est relevé à part.
+        const hasPack = hasPupFolder(table.folder);
+        seen.push({ file: table.file, title: table.title, hasPack, findings });
       }
       tables = tablesFacts(seen);
+      pup = pupFacts(seen, PUP_PLAY_REPAIRS);
     }
     const media = layout ? await ctx.media(pause) : undefined;
-    return { at: new Date().toISOString(), disks, tables, media, screens, vpx };
+    return { at: new Date().toISOString(), disks, tables, pup, media, screens, vpx };
   }
 
   /** Relève tout en arrière-plan ; un relevé en cours n'est pas doublé. */
@@ -221,7 +238,7 @@ export function createHealth(ctx: HealthContext) {
     return {
       heading: SYSTEM_ITEMS.health.label,
       icon: SYSTEM_ITEMS.health.icon,
-      lead: facts ? undefined : t('Premier relevé en cours : espace disque, tables, médias, écrans et VPX.'),
+      lead: facts ? undefined : t('Premier relevé en cours : espace disque, tables, PuP-Packs, médias, écrans et VPX.'),
       sections: [],
       actions,
       back,

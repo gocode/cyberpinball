@@ -115,6 +115,8 @@ async function scenario(sc, box, report) {
   let phase = 'library';
   let vpxInstalls = 0;
   const library = createLibrary({
+    // Mode invité inactif : tout passe (host.guest est obligatoire, library.ts).
+    guest: { active: false, allows: () => true, knock: () => true },
     root,
     dataDir: L.data,
     vpxExe: () => undefined,

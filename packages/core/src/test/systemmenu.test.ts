@@ -8,11 +8,13 @@ import {
   SYSTEM_GROUP_IDS,
   SYSTEM_GROUPS,
   SYSTEM_ITEM_IDS,
+  SYSTEM_ITEMS,
   SYSTEM_ROOT,
   systemEntry,
   systemPathOf,
   type SystemEntryId,
   type SystemGroupId,
+  type SystemItemId,
 } from '../systemmenu';
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
@@ -149,4 +151,85 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Tables, Médias, Borne, Cyber Pinball)');
   assert.equal(checkPath(['Cyber Pinball', 'Language / Langue']), undefined);
   assert.equal(checkPath(['Cabinet', 'Cabinet setup', 'Tilt']), undefined);
+});
+
+// ---------- Entrées nommées avec leur rubrique, hors chemin « > » ----------
+// « Dans la rubrique Borne : « Mettre en veille »… » ou « Menu système > Borne : « … » » : le
+// relevé des chemins s'arrête à la rubrique, et la phrase restait juste quand les entrées
+// changeaient de rubrique (veille et extinction passées de Borne à Cyber Pinball, 27/10/2026).
+
+/** Rubrique où l'on arrive au bout d'un chemin qui s'arrête sur une rubrique ; undefined sinon. */
+function groupAtEnd(parts: string[]): SystemGroupId | undefined {
+  let at: readonly SystemEntryId[] = SYSTEM_ROOT;
+  let group: SystemGroupId | undefined;
+  for (const part of parts) {
+    const found = at.find((id) => namesOf(id).includes(norm(part)));
+    if (!found || !isSystemGroup(found)) return undefined;
+    group = found;
+    at = SYSTEM_GROUPS[found].entries;
+  }
+  return group;
+}
+
+const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** Rubriques qu'une phrase désigne comme lieu : « rubrique Borne », « Borne (Cabinet) section », « Menu système > Borne : ». */
+function placesIn(sentence: string): SystemGroupId[] {
+  const text = norm(sentence);
+  const places = new Set<SystemGroupId>();
+  for (const group of SYSTEM_GROUP_IDS) {
+    for (const name of new Set(namesOf(group))) {
+      const n = escape(name);
+      const named = new RegExp(`rubriques?\\s+(?:«\\s*)?${n}(?![\\p{L}])|(?<![\\p{L}])"?${n}"?(?:\\s*\\([^)]*\\))?\\s+section|section\\s+"?${n}(?![\\p{L}])`, 'u');
+      if (named.test(text)) places.add(group);
+    }
+  }
+  for (const m of sentence.matchAll(/(?:menu système|system menu)\s*(?:\*{0,2}\s*\([^)]*\))?\s*\*{0,2}\s*>\s*(.*)/gi)) {
+    const group = groupAtEnd(segments(m[1]!));
+    if (group) places.add(group);
+  }
+  return [...places];
+}
+
+/** Entrées du menu (pas les rubriques) nommées entre guillemets dans une phrase. */
+function itemsIn(sentence: string): SystemItemId[] {
+  const quoted = [...sentence.matchAll(/«\s*([^»]+?)\s*»|“([^”]+)”|"([^"]+)"/g)].map((m) => norm((m[1] ?? m[2] ?? m[3])!));
+  return SYSTEM_ITEM_IDS.filter((id) => namesOf(id).some((name) => quoted.includes(name)));
+}
+
+/** Erreur d'une phrase qui range une entrée dans une rubrique qui ne la contient pas ; undefined sinon. */
+function checkPlace(sentence: string): string | undefined {
+  const places = placesIn(sentence);
+  if (!places.length) return undefined;
+  for (const id of itemsIn(sentence)) {
+    const trail = systemPathOf(id) ?? [];
+    if (!places.some((group) => trail.includes(group))) {
+      return `« ${SYSTEM_ITEMS[id].label} » est dans ${trail.map((g) => SYSTEM_GROUPS[g].label).join(' > ')}, pas dans ${places.map((g) => SYSTEM_GROUPS[g].label).join(' ni ')}`;
+    }
+  }
+  return undefined;
+}
+
+test('les entrées nommées « dans la rubrique … » du manuel et de l’interface y sont', () => {
+  const problems: string[] = [];
+  for (const file of textFiles()) {
+    const lines = fs.readFileSync(file, 'utf8').split('\n');
+    lines.forEach((line, i) => {
+      // Une phrase, ou une cellule de tableau.
+      for (const sentence of line.split(/(?<=[.!?])\s+(?=[A-ZÀ-Ý«"“])|\s\|\s/)) {
+        const problem = checkPlace(sentence);
+        if (problem) problems.push(`${path.relative(REPO, file)}:${i + 1} : ${problem}`);
+      }
+    });
+  }
+  assert.deepEqual(problems, []);
+});
+
+test('lecture des rubriques nommées : rubrique, section, chemin qui s’arrête sur une rubrique', () => {
+  assert.match(checkPlace('Dans la rubrique Borne du menu système : « Mettre en veille », « Redémarrer la borne ».')!, /Mettre en veille.+Cyber Pinball, pas dans Borne/);
+  assert.match(checkPlace('In the system menu\'s Borne (Cabinet) section: "Mettre en veille" (Sleep).')!, /pas dans Borne/);
+  assert.match(checkPlace('Menu système > Borne : « Éteindre la borne », « Annuler ».')!, /Éteindre la borne/);
+  assert.equal(checkPlace('Dans la rubrique Cyber Pinball, après « Quitter Cyber Pinball » : « Mettre en veille ».'), undefined);
+  assert.equal(checkPlace('« Borne dédiée : activée » dans la rubrique Borne.'), undefined);
+  assert.equal(checkPlace('« Mettre en veille », sans rubrique nommée.'), undefined);
 });

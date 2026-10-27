@@ -24,6 +24,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   liveLinks,
+  NEED_LABELS,
   linkHost,
   recommendVersion,
   requirements,
@@ -84,6 +85,8 @@ export type JourneyAction =
   | { kind: 'repair'; finding: Finding }
   /** Page du fichier dans la fenêtre « Récupérer » (ou téléchargement direct, connecté). */
   | { kind: 'fetch'; source: FileSource }
+  /** Plusieurs fichiers d'une même partie : la galerie des fichiers (aperçu, popularité), Start récupère celui choisi. */
+  | { kind: 'choose'; sources: FileSource[] }
   | { kind: 'reopen'; item: WaitItem }
   /** Fichiers reçus : plan d'import, puis retour au parcours. */
   | { kind: 'install'; items: WaitItem[] }
@@ -238,6 +241,17 @@ function fetchChoice(source: FileSource, label: string): JourneyChoice {
   };
 }
 
+/**
+ * Tous les fichiers d'une partie, quand la base VPS en connaît plusieurs : le premier est
+ * proposé d'office, les autres se choisissent en galerie (aperçu, popularité, auteur, date).
+ * Un seul jeu à la fois : la galerie récupère pour le jeu de la table.
+ */
+function chooseChoice(sources: FileSource[]): JourneyChoice[] {
+  const same = sources.filter((s) => s.game.id === sources[0]?.game.id);
+  if (same.length < 2) return [];
+  return [{ action: { kind: 'choose', sources: same }, label: t('{kind} : voir les {n} au choix', { kind: NEED_LABELS[same[0]!.kind], n: same.length }), detail: t('Aperçu, téléchargements, note, auteur et date de chacun') }];
+}
+
 const addFileChoice = (): JourneyChoice => ({ action: { kind: 'addFile' }, label: t('J’ai déjà le fichier'), detail: t('Le glisser sur cet écran, ou le choisir sur ce PC') });
 
 /**
@@ -379,6 +393,7 @@ function romStep(input: JourneyInput): JourneyStep | undefined {
       : t('La table ne démarre pas sans {rom}.zip. La base VPS n’est pas sur cette borne (jamais téléchargée, pas de réseau) : ajoutez le fichier si vous l’avez.', { rom });
   }
   for (const s of exact.slice(0, 2)) choices.push(fetchChoice(s, exact.length > 1 ? t('Récupérer la ROM {rom} ({site})', { rom: s.rom!, site: s.host.label }) : t('Récupérer la ROM {rom}', { rom: s.rom! })));
+  if (!waiting && exact.length > 2) choices.push(...chooseChoice(exact));
   if (aliasHere) choices.push({ ...repairChoice(aliasHere), label: t('Jouer avec {neighbour}, révision voisine', { neighbour: aliasHere.neighbour ?? '' }), detail: t('Déjà sur la borne ; réglages et records non repris') });
   else if (near.length) choices.push(fetchChoice(near[0]!, t('Récupérer {rom}, révision voisine', { rom: near[0]!.rom! })));
   // Alias vers une ROM absente : on peut aussi revenir à la ROM demandée.
@@ -433,6 +448,7 @@ function extraStep(input: JourneyInput, id: 'backglass' | 'pup', kind: 'b2s' | '
   const waiting = waitState(items);
   const choices: JourneyChoice[] = [...(waiting?.choices ?? [])];
   for (const s of sources.slice(0, 1)) choices.push(fetchChoice(s, fetchLabel(s)));
+  if (!waiting) choices.push(...chooseChoice(sources));
   choices.push(addFileChoice());
   if (!choices.some((c) => c.primary)) choices[0]!.primary = true;
   return { id, title, state: waiting?.state ?? 'optional', required: false, detail: waiting?.detail ?? missingDetail, choices };
@@ -520,6 +536,9 @@ export function journeyChoices(journey: Journey): { step: JourneyStep; choice: J
   for (const s of [...journey.steps, ...journey.extras]) {
     if (s === now || s.state === 'done' || !s.choices.length) continue;
     out.push({ step: s, choice: { ...s.choices[0]!, primary: false } });
+    // Plusieurs fichiers au choix : la galerie reste à portée, même hors de l'étape en cours (fronton, PuP-Pack).
+    const choose = s.choices.find((c) => c.action.kind === 'choose');
+    if (choose && choose !== s.choices[0]) out.push({ step: s, choice: { ...choose, primary: false } });
   }
   return out;
 }

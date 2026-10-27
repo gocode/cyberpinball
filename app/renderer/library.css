@@ -1021,6 +1021,52 @@ body.mouse .media-card[data-act]:hover {
   min-width: 0;
 }
 
+/* Ce que le fichier sait faire (« 2Screens », « VR ») : neutre, en retrait de l'état. */
+.badge.media-tag {
+  color: var(--ink-muted);
+  border-color: var(--line);
+}
+
+/* Date et site d'un fichier, sous sa popularité. */
+.media-tile .media-meta {
+  color: var(--quiet);
+}
+
+/*
+ * Fichiers à choisir (frontons, tables, ROM…) : trois tuiles par rangée, la popularité et la
+ * date en entier (elles passent à la ligne plutôt que d'être coupées) ; l'aperçu plafonné
+ * plus bas au bureau, pour qu'une table en hauteur tienne entière au-dessus du détail.
+ */
+.media-cards.gallery.files {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.media-cards.gallery.files .media-facts {
+  white-space: normal;
+}
+
+.media-cards.gallery.files .media-tile .media-thumb {
+  max-height: 16vmin;
+}
+
+@container (orientation: portrait) {
+  .media-cards.gallery.files .media-tile .media-thumb {
+    max-height: 30vmin;
+  }
+}
+
+/* Détail d'un fichier : une ligne par fait, jamais un pavé qui repousse la galerie. */
+.lib-gallery.files,
+.lib-gallery.files .media-detail {
+  min-width: 0;
+}
+
+.lib-gallery.files .media-detail .media-extra {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .media-tile .media-facts {
   font-size: 1.9vmin;
   white-space: nowrap;

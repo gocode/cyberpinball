@@ -16,7 +16,7 @@ son interface).
 - Sons de l'interface : clic de solénoïde au changement de table, pièce au Start, knocker quand un record tombe ; désactivables dans « Médias, son et attente ».
 - Santé de la borne (rubrique Borne) : espace disque, tables qui ne démarrent pas, médias manquants, écrans et version de VPX sur un seul écran.
 - Borne dédiée (rubrique Borne), désactivée par défaut : Cyber Pinball peut remplacer l'Explorateur de Windows, avec un moyen de le rappeler.
-- Éteindre, redémarrer et mettre en veille depuis la rubrique Borne : une confirmation, puis les réglages sont enregistrés et tous les écrans passent au noir, sans jamais montrer le bureau ; au réveil, le menu revient tel quel.
+- Éteindre, redémarrer et mettre en veille depuis la rubrique Cyber Pinball, juste après « Quitter Cyber Pinball » : une confirmation, puis les réglages sont enregistrés et tous les écrans passent au noir, sans jamais montrer le bureau ; au réveil, le menu revient tel quel.
 - Mode invité (rubrique Borne) : pour une soirée ou les enfants, on peut seulement choisir une table, jouer et lire sa fiche ; les deux flippers et les deux MagnaSave tenus 3 secondes déverrouillent.
 - Force des secousses de l'accéléromètre, réglable dans l'étape « Tilt » de la configuration de la borne : ×2 est proposé pour un Pinscape, que VPX ignorait presque à l'échelle d'origine.
 - Lancement en cinéma : au Start, le logo du jeu s'envole du plateau vers le fronton, le DMD charge, un coup de bobine quand VPX prend la main ; VPX n'attend jamais, et « Médias, son et attente » le coupe.
@@ -26,10 +26,13 @@ son interface).
 - Sens des tables gardé d'un démarrage à l'autre : après un redémarrage ou une reconnexion, les tables ne s'affichent plus à l'envers en partie. « Santé de la borne » dit si elles sont dans votre sens, et répare celles qu'on avait retournées dans le menu de VPX.
 - Parties du jeu : chaque fichier reçu va dans la partie que dit son contenu (table, PuP-Pack, fronton, ROM, couleurs, sons, musique…), même si l'on attendait autre chose ; un fichier à corriger ne bloque plus l'installation du reste. La fiche d'une table a une section « Parties du jeu » pour ajouter, remplacer, réaffecter ou retirer chaque partie.
 - Téléchargements : un fichier peut être ajouté à une table, à un autre jeu, ou installé comme nouvelle table.
-- Propositions de médias en galerie, avec la popularité de VPUniverse et un tri par popularité ; le média enregistré est toujours celui qu'on a choisi.
+- Tout fichier à choisir (médias, fronton, table, PuP-Pack…) s'affiche en galerie : aperçu, nombre de téléchargements et note lus sur le site, auteur, version et date, avec un tri par popularité ; le média enregistré est toujours celui qu'on a choisi.
 - Les listes ne bougent plus pendant un téléchargement : seul un geste de l'utilisateur les fait défiler.
 - Fronton et DMD aux couleurs de la marque, avec une police à points dessinée pour Cyber Pinball ; la couleur du DMD se règle (vert signal par défaut, préréglages ou couleur libre).
 - Boutons du jeu : les touches du clavier se relèvent de nouveau.
+- « Chercher sur le web… » sur chaque écran d'ajout ou de choix : le navigateur intégré s'ouvre sur une recherche déjà remplie. Une partie absente d'un jeu lance d'office la recherche sur VPS, Téléchargements, VPForums et VPUniverse.
+- Recherche sur VPUniverse plus fiable : les mots courts du titre (« say », « die ») ne vident plus la recherche, et l'attente imposée par le site n'est plus prise pour « aucun résultat ».
+- PuP-Packs visibles en partie : quand le script d'une table garde son PuP-Pack ou son PuP-DMD éteint, Cyber Pinball l'allume à l'installation et avant chaque partie.
 
 ## 0.1.3
 

@@ -3,14 +3,15 @@
 // (PinTable::LoadScriptOverride, pintable.cpp l. 2199-2209 au commit af26b2d93 ; le
 // journal le dit : « Loading script: <fichier> »). Quand le script coupe un PuP-Pack
 // pourtant bien installé (« usePUP = False »), Cyber Pinball écrit ce .vbs : le script
-// d'origine octet pour octet, sauf la valeur de l'interrupteur, plus une dernière ligne
+// d'origine octet pour octet, sauf la valeur de chaque interrupteur (le pack, et la PuP-DMD
+// quand l'option du pack occupe la fenêtre du DMD), plus une dernière ligne
 // de commentaire qui dit d'où il vient (en fin de fichier : les numéros de ligne des
 // erreurs de script ne bougent pas). Le médecin le reconnaît, le refait quand la table
 // est mise à jour, et un .vbs venu d'ailleurs reste signalé comme avant.
 
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
-import { enablePupSwitch, pupScriptSwitch, type PupSwitch } from './puppack';
+import { enablePupSwitch, pupSwitchesToEnable, type PupSwitch } from './puppack';
 import { scriptCode } from './vbscript';
 
 /** Début de la dernière ligne d'un script adapté par Cyber Pinball. */
@@ -76,8 +77,9 @@ export function scriptPatchState(vbs: string, embedded: string | undefined): Scr
   if (!patch) return { kind: 'foreign' };
   if (embedded === undefined) return { kind: 'ours', patch };
   if (scriptHash(embedded) !== patch.from) {
-    const sw = pupScriptSwitch(scriptCode(embedded));
-    const content = sw ? buildScriptPatch(embedded, [sw]) : undefined;
+    // Refait avec les mêmes sortes d'interrupteurs : la PuP-DMD seulement si l'ancien l'allumait.
+    const switches = pupSwitchesToEnable(scriptCode(embedded), patch.switches.some((s) => s.kind === 'dmd'));
+    const content = switches.length ? buildScriptPatch(embedded, switches) : undefined;
     return content ? { kind: 'stale', patch, content } : { kind: 'stale', patch };
   }
   return buildScriptPatch(embedded, patch.switches) === vbs ? { kind: 'ours', patch } : { kind: 'foreign' };

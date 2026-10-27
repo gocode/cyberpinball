@@ -27,7 +27,9 @@ import {
   findPackRoot,
   isPackRoot,
   type BatReport,
-  pupScriptSwitch,
+  describeSwitches,
+  packDrawsDmd,
+  pupSwitchesToEnable,
   playlistRenames,
   type PupCabinet,
   type PupVariant,
@@ -995,6 +997,18 @@ function planScriptPatches(game: Game, steps: ImportStep[], opts: PlanOptions, w
   const packs = [...steps.flatMap((s) => (s.pack ? [s.pack.name] : [])), ...listSafe(path.join(game.folder, 'pupvideos'))].map((n) => n.toLowerCase());
   const incoming = steps.flatMap((s) => (s.pack ? [s.pack.name.toLowerCase()] : []));
   const out: ScriptPatchPlan[] = [];
+  /**
+   * Le pack que la table chargera occupe-t-il la fenêtre du DMD ? D'après l'option retenue pour
+   * un pack qui arrive, sinon d'après le pack déjà rangé ; alors la PuP-DMD s'allume avec lui.
+   */
+  const drawsDmd = (names: string[]): boolean => {
+    if (opts.cabinet && !opts.cabinet.dmd) return false;
+    const same = (n: string) => names.some((m) => m.toLowerCase() === n.toLowerCase());
+    const step = steps.find((s) => s.pack && same(s.pack.name));
+    if (step?.pack) return step.pack.choice.chosen?.traits.windows?.dmd ?? packDrawsDmd(step.from);
+    const there = listSafe(path.join(game.folder, 'pupvideos')).find(same);
+    return there !== undefined && packDrawsDmd(path.join(game.folder, 'pupvideos', there));
+  };
   const consider = (source: string, vpx: string, names: string[], off: boolean, packsThere: string[]) => {
     const to = vpx.replace(/.vpx$/i, '.vbs');
     const file = path.basename(to);
@@ -1002,21 +1016,25 @@ function planScriptPatches(game: Game, steps: ImportStep[], opts: PlanOptions, w
     const existing = readLatin1(to);
     const ours = existing !== undefined && readScriptPatch(existing) !== undefined;
     if (existing !== undefined && !ours) return;
-    const wanted = off && names.some((n) => packsThere.includes(n.toLowerCase()));
-    if (!wanted && !ours) return;
+    // Le script est relu quand le pack est là, même si une lecture gardée ne voyait rien de coupé.
+    const packThere = names.some((n) => packsThere.includes(n.toLowerCase()));
+    if (!packThere && !ours) return;
     const script = readVpxScript(source);
-    const sw = script !== undefined ? pupScriptSwitch(scriptCode(script)) : undefined;
-    const content = script !== undefined && sw ? buildScriptPatch(script, [sw]) : undefined;
+    const switches = script !== undefined ? pupSwitchesToEnable(scriptCode(script), drawsDmd(names)) : [];
+    const wanted = packThere && (off || switches.length > 0);
+    if (!wanted && !ours) return;
+    const sw = switches[0];
+    const content = script !== undefined && switches.length ? buildScriptPatch(script, switches) : undefined;
     if (content !== undefined && content === existing) return;
-    const params = { table: game.title, file, variable: sw?.variable ?? '', value: sw?.value ?? '', enable: sw?.enable ?? '?' };
+    const params = { table: game.title, file, values: describeSwitches(switches, 'value'), enables: describeSwitches(switches, 'enable') };
     if (content) {
       out.push({ to, content });
-      warnings.push(t('Le script de « {table} » coupe le PuP-Pack ({variable} = {value}) : Cyber Pinball l’allume dans {file}, sans modifier la table.', params));
+      warnings.push(t('Le script de « {table} » coupe le PuP-Pack ({values}) : Cyber Pinball l’allume dans {file}, sans modifier la table.', params));
     } else if (ours) {
       out.push({ to });
       warnings.push(t('{file}, écrit par Cyber Pinball pour l’ancienne version de la table, part à la corbeille : le nouveau script ne coupe plus le PuP-Pack.', params));
     } else if (sw) {
-      warnings.push(t('Le script de « {table} » coupe le PuP-Pack ({variable} = {value}) : mettez {variable} = {enable} dans son script.', params));
+      warnings.push(t('Le script de « {table} » coupe le PuP-Pack ({values}) : mettez {enables} dans son script.', params));
     } else if (wanted) {
       warnings.push(t('Le script de « {table} » coupe le PuP-Pack : il faudra l’allumer dans son script.', params));
     }

@@ -28,11 +28,13 @@ import {
   tn,
   trashDownloads,
   type DownloadEntry,
+  type AddScreenId,
   type ContentKind,
   type DownloadSort,
   type Layout,
   type NeedKind,
   type TableEntry,
+  knownVpsId,
 } from '@cyberpinball/core';
 import type { Action, Built, Row, Section, Tone } from './library';
 import { useNote } from './file-picker';
@@ -58,6 +60,8 @@ export interface DownloadsScreenContext {
   addToTable(paths: string[], table: TableEntry): void;
   /** Rattache le fichier à une partie d'un jeu de la liste d'attente. */
   attachToGame(file: string, gameId: string, kind: NeedKind, back: () => void): void;
+  /** « Chercher sur le web… » de cet écran ; un fichier reçu sans jeu ouvre le plan d'ajout. */
+  web(screen: AddScreenId, back: () => void): Action;
   /** Tâche avec message d'attente (lecture d'une archive). */
   task(message: string, work: () => Promise<void> | void): Promise<void>;
   back(): void;
@@ -112,6 +116,7 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
       },
     );
     if (mine.length) actions.push({ label: t('Tout vider'), detail: t('{summary} : corbeille de Cyber Pinball', { summary: downloadsSummary(mine) }), icon: 'trash', tone: 'error', run: () => confirmEmpty() });
+    actions.push(ctx.web('downloads', () => open()));
     actions.push({ label: t('Retour'), icon: 'back', run: () => ctx.back() });
     const { count, bytes } = downloadTotals(mine);
     return {
@@ -202,7 +207,7 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
     ctx.show(() => {
       const sug = ctx.suggest(e.file);
       const tables = ctx.tables().sort((a, b) => Number(b === sug.table) - Number(a === sug.table) || a.title.localeCompare(b.title, 'fr'));
-      const games = ctx.games().filter((g) => !tables.some((x) => x.info.Info?.VPSId === g.gameId));
+      const games = ctx.games().filter((g) => !tables.some((x) => knownVpsId(x.info) === g.gameId));
       const actions: Action[] = [];
       const tableRows: Row[] = tables.map((x) => {
         const action = actions.length;
@@ -215,6 +220,7 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
         actions.push({ label: g.label, run: () => (part ? ctx.attachToGame(e.file, g.gameId, part, () => openGames(e)) : openPart(e, g)) });
         return { text: g.label, detail: part ? t('liste d’attente · {part}', { part: NEED_LABELS[part] }) : t('liste d’attente · partie à choisir'), action, pick: true };
       });
+      actions.push(ctx.web('downloads.games', () => openGames(e)));
       actions.push({ label: t('Retour'), icon: 'back', run: back });
       const sections: Section[] = [];
       if (tableRows.length) sections.push({ title: t('Tables installées'), rows: tableRows });

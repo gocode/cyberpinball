@@ -1,5 +1,5 @@
 // Alimentation de la borne : l'éteindre, la mettre en veille, la redémarrer. Aujourd'hui
-// depuis le menu système (rubrique Borne, app/src/power.ts) ; demain à heure fixe (mode
+// depuis le menu système (rubrique Cyber Pinball, app/src/power.ts) ; demain à heure fixe (mode
 // attente et horaire : extinction à 2 h), d'où une action programmée et annulable.
 //
 // Ce module décide de la méthode et du moment ; il n'agit que par un exécuteur qu'on lui

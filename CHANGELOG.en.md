@@ -14,7 +14,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Interface sounds: a solenoid click when changing table, a coin on Start, the knocker when a high score falls; can be turned off in "Media, sound and attract mode".
 - Cabinet health (Cabinet section): disk space, tables that don't start, missing media, screens and VPX version on a single screen.
 - Dedicated cabinet (Cabinet section), off by default: Cyber Pinball can replace the Windows Explorer, with a way to bring it back.
-- Shut down, restart and sleep from the Cabinet section: one confirmation, then settings are saved and every screen turns black, never showing the desktop; on wake, the menu comes back as it was.
+- Shut down, restart and sleep from the Cyber Pinball section, right after "Quit Cyber Pinball": one confirmation, then settings are saved and every screen turns black, never showing the desktop; on wake, the menu comes back as it was.
 - Guest mode (Cabinet section): for a party or the kids, guests can only choose a table, play and read its game page; holding both flippers and both MagnaSaves for 3 seconds unlocks it.
 - Accelerometer nudge strength, adjustable in the "Tilt" step of the cabinet setup: ×2 is proposed for a Pinscape, which VPX almost ignored at the original scale.
 - Cinematic launch: on Start, the game logo flies from the playfield to the backglass, the DMD shows loading, a coil thumps when VPX takes over; VPX never waits, and "Media, sound and attract mode" turns it off.
@@ -24,10 +24,13 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Table orientation kept from one start to the next: after a restart or a reconnection, tables no longer show upside down in game. "Cabinet health" says whether they face you, and repairs those that were turned in the VPX menu.
 - Game parts: every file received goes to the part its content calls for (table, PuP-Pack, backglass, ROM, colours, sounds, music…), even when something else was expected; a file to fix no longer blocks installing the rest. A table's sheet has a "Game parts" section to add, replace, reassign or remove each part.
 - Downloads: a file can be added to a table, to another game, or installed as a new table.
-- Media proposals shown as a gallery, with VPUniverse popularity and a sort by popularity; the media saved is always the one you picked.
+- Every file to choose (media, backglass, table, PuP-Pack…) is shown as a gallery: preview, download count and rating read from the site, author, version and date, with a sort by popularity; the media saved is always the one you picked.
 - Lists no longer move during a download: only a user gesture scrolls them.
 - Backglass and DMD in the brand's colours, with a dot font drawn for Cyber Pinball; the DMD colour is adjustable (signal green by default, presets or a free colour).
 - Game buttons: keyboard keys can be captured again.
+- "Search the web…" on every add or choice screen: the built-in browser opens on a search already filled in. A part missing from a game starts a search on VPS, Downloads, VPForums and VPUniverse right away.
+- More reliable VPUniverse search: short words in the title ("say", "die") no longer empty the search, and the wait imposed by the site is no longer taken for "no results".
+- PuP-Packs visible in game: when a table's script keeps its PuP-Pack or PuP-DMD switched off, Cyber Pinball switches it on at install and before each game.
 
 ## 0.1.3
 

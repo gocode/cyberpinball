@@ -101,6 +101,8 @@ async function scenario(sc, box, report) {
   const windows = new Map([['playfield', win]]);
   let phase = 'library';
   const library = createLibrary({
+    // Mode invité inactif : tout passe (host.guest est obligatoire, library.ts).
+    guest: { active: false, allows: () => true, knock: () => true },
     root,
     dataDir: L.data,
     vpxExe: () => 'C:\\Visual Pinball\\VPinballX64.exe',

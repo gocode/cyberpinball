@@ -1292,6 +1292,21 @@ function preparePupPack(table: TableEntry): void {
   }
 }
 
+/**
+ * Aucune fenêtre de Cyber Pinball ne reste « toujours au premier plan » pendant une partie :
+ * elle passerait devant les fenêtres de VPX où le plugin PUP dessine (fronton, DMD, topper), et
+ * l'on entendrait le PuP-Pack sans le voir. « Récupérer » est la seule à l'être
+ * (acquire-window.ts) : fermée au lancement, son historique est gardé pour la rouvrir.
+ * pupvisible.test.ts vérifie qu'aucune autre fenêtre de l'application ne se met au premier plan.
+ */
+function closeTopmostWindows(): void {
+  for (const win of BrowserWindow.getAllWindows()) {
+    if (win.isDestroyed() || !win.isAlwaysOnTop()) continue;
+    console.log(`Partie : « ${win.getTitle()} » fermée, elle restait au premier plan devant VPX.`);
+    win.close();
+  }
+}
+
 export interface PlayReport {
   result: LaunchResult;
   focusReturned: boolean;
@@ -1390,6 +1405,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 
   // PuP-Pack : ce qui l'empêcherait de s'afficher est réglé avant la partie, sans rien demander.
   preparePupPack(table);
+  closeTopmostWindows();
   // Habillage FullDMD : le DMD de VPX posé dans le cadre du média FullDMD, que le fond de partie montre autour.
   dressing = loc.root
     ? await prepareDressing(table, {

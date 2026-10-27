@@ -93,6 +93,8 @@ export interface MediasContext {
   leave(): void;
   /** Sélecteur de fichiers de Cyber Pinball (file-picker.ts) ; undefined à l'abandon. */
   pick?(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
+  /** « Chercher sur le web… » pour les médias de cette table (catalog.ts) ; `back` redessine l'écran. */
+  webGame?(table: TableEntry, back: () => void): Action;
   /** « Chercher les médias » sur VPinMediaDB (media-download.ts) ; `back` revient ici avec un message. */
   download?(table: TableEntry, back: (message?: { text: string; tone: Tone }) => void): void;
   /** Propositions de chaque média (media-proposals.ts) : recherche, téléchargement, saisie d'un titre. */
@@ -142,6 +144,10 @@ export interface MediaCard {
   flag?: { label: string; tone: Tone };
   /** Popularité sur le site de la fiche (« 510 téléchargements »). */
   popularity?: string;
+  /** Galerie : seconde ligne sous la popularité (date et site d'un fichier à choisir). */
+  meta?: string;
+  /** Galerie : étiquettes neutres, ce que le fichier sait faire (« 2Screens », « VR »). */
+  tags?: string[];
 }
 
 export interface MediaView {
@@ -152,6 +158,8 @@ export interface MediaView {
   gallery?: boolean;
   /** Format des aperçus de la galerie (« 16 / 9 »), celui de l'écran qui montre le média. */
   aspect?: string;
+  /** Galerie de fichiers à choisir (file-gallery.ts) : trois par rangée, faits en entier. */
+  files?: boolean;
 }
 
 /**
@@ -479,6 +487,7 @@ export function createMedias(ctx: MediasContext) {
       );
     }
     const leave = () => (n ? openLeave(s) : close(table));
+    if (ctx.webGame) actions.push(ctx.webGame(table, () => open(table)));
     actions.push({ label: t('Retour à la fiche'), run: leave });
     const sections: Section[] = [];
     if (s.notice) sections.push({ rows: [{ text: s.notice.text, tone: s.notice.tone }] });
@@ -711,6 +720,7 @@ export function createMedias(ctx: MediasContext) {
     return {
       label: t('Chercher moi-même sur le web…'),
       detail: web!.detail(table, type),
+      web: 'medias.type',
       run: () => {
         s.notice = { text: web!.open(table, type), tone: 'info' };
         host.broadcast();

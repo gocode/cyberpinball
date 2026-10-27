@@ -26,14 +26,14 @@ export const SYSTEM_ITEM_IDS = [
   'explorer',
   'dedicated',
   'guest-mode',
-  'sleep',
-  'restart',
-  'shutdown',
   'language',
   'updates',
   'media-import',
   'rom-migration',
   'quit',
+  'sleep',
+  'restart',
+  'shutdown',
 ] as const;
 export type SystemItemId = (typeof SYSTEM_ITEM_IDS)[number];
 
@@ -79,15 +79,16 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'borne',
     icon: 'cabinet',
     get label() { return t('Borne'); },
-    get detail() { return t('Boutons, écrans, son, réglages de VPX, bureau Windows, veille et extinction'); },
-    entries: ['health', 'cabinet', 'vpx-settings', 'controls', 'desktop', 'explorer', 'dedicated', 'guest-mode', 'sleep', 'restart', 'shutdown'],
+    get detail() { return t('Boutons, écrans, son, réglages de VPX, bureau Windows, mode invité'); },
+    entries: ['health', 'cabinet', 'vpx-settings', 'controls', 'desktop', 'explorer', 'dedicated', 'guest-mode'],
   },
   cyberpinball: {
     id: 'cyberpinball',
     icon: 'pinball-app',
     label: 'Cyber Pinball', // i18n-ignore : le nom de l'application
-    get detail() { return t('Langue, mise à jour, migration, quitter'); },
-    entries: ['language', 'updates', 'migration', 'quit'],
+    get detail() { return t('Langue, mise à jour, migration, quitter, veille et extinction'); },
+    // Les sorties à la fin, de la plus légère à la plus lourde : quitter, veille, redémarrage, arrêt.
+    entries: ['language', 'updates', 'migration', 'quit', 'sleep', 'restart', 'shutdown'],
   },
   migration: {
     id: 'migration',
@@ -113,10 +114,6 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   explorer: { icon: 'folder', get label() { return t('Ouvrir l’Explorateur Windows'); } },
   dedicated: { icon: 'lock', get label() { return t('Borne dédiée'); } },
   'guest-mode': { icon: 'guest', get label() { return t('Mode invité'); } },
-  // Alimentation du PC (app/src/power.ts) : chacune passe par un écran de confirmation.
-  sleep: { icon: 'moon', get label() { return t('Mettre en veille'); } },
-  restart: { icon: 'restart', get label() { return t('Redémarrer la borne'); } },
-  shutdown: { icon: 'power', get label() { return t('Éteindre la borne'); } },
   // Nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée.
   language: { icon: 'language', label: 'Langue / Language' }, // i18n-ignore
   updates: { icon: 'upgrade', get label() { return t('Mise à jour de Cyber Pinball'); } },
@@ -124,6 +121,10 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'rom-migration': { icon: 'link', get label() { return t('Regrouper les ROM'); } },
   // Le symbole d'alimentation est gardé pour l'arrêt du PC.
   quit: { icon: 'exit', get label() { return t('Quitter Cyber Pinball'); } },
+  // Alimentation du PC (app/src/power.ts) : chacune passe par un écran de confirmation.
+  sleep: { icon: 'moon', get label() { return t('Mettre en veille'); } },
+  restart: { icon: 'restart', get label() { return t('Redémarrer la borne'); } },
+  shutdown: { icon: 'power', get label() { return t('Éteindre la borne'); } },
 };
 
 export function isSystemGroup(id: SystemEntryId): id is SystemGroupId {

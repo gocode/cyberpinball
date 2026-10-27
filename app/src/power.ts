@@ -1,4 +1,4 @@
-// Éteindre, mettre en veille, redémarrer la borne depuis le menu système (rubrique Borne).
+// Éteindre, mettre en veille, redémarrer la borne depuis le menu système (rubrique Cyber Pinball).
 // Chaque entrée ouvre un écran de confirmation qui dit ce qui va se passer : Start confirme,
 // Exit annule. La méthode, la simulation des essais et l'action programmée (extinction à
 // heure fixe) sont dans packages/core/src/power.ts ; ici, l'exécuteur réel et l'enchaînement
@@ -146,7 +146,7 @@ export function createPowerMenu(host: PowerMenuHost) {
     capabilities,
     /** L'action tout de suite, sans confirmation, avec l'attente de Windows après un arrêt. */
     run: act,
-    /** Entrées du menu système, rangées par l'arbre (packages/core/src/systemmenu.ts, rubrique Borne). */
+    /** Entrées du menu système, rangées par l'arbre (packages/core/src/systemmenu.ts, rubrique Cyber Pinball). */
     items: { shutdown: item('shutdown'), sleep: item('sleep'), restart: item('restart') } satisfies Record<PowerAction, ProvidedSystemItem>,
   };
 }

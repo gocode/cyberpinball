@@ -128,6 +128,18 @@ export function siteQuery(name: string): string {
   return (words.length ? words : vpsWords(main)).slice(0, 4).join(' ');
 }
 
+/**
+ * Texte réellement envoyé au site : VPUniverse ignore les mots de trois lettres ou moins, et
+ * sa recherche « et » ne rend alors rien du tout (« goonies never say die », le 27/10/2026) ;
+ * ils sont retirés, sauf s'il ne restait rien.
+ */
+export function siteSearchText(site: MediaSiteId, query: string): string {
+  const words = query.trim().split(/\s+/).filter(Boolean);
+  if (site !== 'vpuniverse') return words.join(' ');
+  const long = words.filter((w) => w.length > 3);
+  return (long.length ? long : words).join(' ');
+}
+
 /** Pages de résultats lues au plus par recherche (25 fiches par page sur VPUniverse). */
 export const SITE_SEARCH_PAGES = 3;
 
@@ -149,7 +161,7 @@ export function siteSearchNodes(site: MediaSiteId, type?: MediaType): string[] {
  * n'y changent rien (sa recherche rend quelques fiches par titre).
  */
 export function siteSearchUrl(site: MediaSiteId, query: string, type?: MediaType, page = 1): string {
-  const q = encodeURIComponent(query.trim());
+  const q = encodeURIComponent(siteSearchText(site, query));
   if (site === 'vpuniverse') {
     const nodes = siteSearchNodes(site, type).join(',');
     return `https://vpuniverse.com/search/?q=${q}&type=downloads_file&nodes=${nodes}&search_and_or=and&sortby=relevancy${page > 1 ? `&page=${page}` : ''}`;
@@ -188,7 +200,9 @@ export type SiteSearchResult =
   /** La recherche est réservée aux membres. */
   | { kind: 'login' }
   /** Vérification de Cloudflare, site en panne, page illisible : à montrer. */
-  | { kind: 'show'; reason: 'challenge' | 'down' | 'captcha' | 'unreadable' };
+  | { kind: 'show'; reason: 'challenge' | 'down' | 'captcha' | 'unreadable' }
+  /** Le site impose d'attendre entre deux recherches (visiteur de VPUniverse : environ 90 s). */
+  | { kind: 'show'; reason: 'flood'; wait: number };
 
 /**
  * Script de la page de résultats d'Invision Community (VPUniverse) : un élément
@@ -201,6 +215,9 @@ export type SiteSearchResult =
 const INVISION_SEARCH = /* i18n-ignore : script de la page du site, motifs de recherche */ String.raw`(() => {${COMMON_PROBE}
   const hits = [];
   const seen = new Set();
+  // Visiteur : une recherche toutes les 90 secondes environ ; la page d'erreur dit combien attendre.
+  const flood = /Please wait (\d+) seconds? before attempting another search/i.exec(text);
+  if (flood) return { kind: 'show', reason: 'flood', wait: Number(flood[1]) };
   for (const item of document.querySelectorAll('li.ipsStreamItem, .ipsStreamItem')) {
     const links = [...item.querySelectorAll('.ipsStreamItem_title a[href*="/files/file/"], h2 a[href*="/files/file/"]')].filter((a) => a.textContent.trim());
     const link = links.find((a) => a.hasAttribute('data-searchable')) || links.find((a) => !/[?&]do=/.test(a.href)) || links[0];

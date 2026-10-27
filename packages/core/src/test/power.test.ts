@@ -250,9 +250,11 @@ test('textes : chaque action dit ce qui va se passer, et ce que font Start et Ex
   assert.match(powerTexts('sleep').steps.join(' '), /reste ouvert/);
 });
 
-test('menu système : veille, redémarrage et extinction dans la rubrique Borne, nommés comme leur confirmation', () => {
-  const borne = SYSTEM_GROUPS.borne.entries;
-  assert.deepEqual(borne.slice(-3), ['sleep', 'restart', 'shutdown']);
+test('menu système : veille, redémarrage et extinction dans la rubrique Cyber Pinball, après « Quitter Cyber Pinball », nommés comme leur confirmation', () => {
+  // Les sorties ensemble (27/10/2026), de la plus légère à la plus lourde.
+  const cyberpinball = SYSTEM_GROUPS.cyberpinball.entries;
+  assert.deepEqual(cyberpinball.slice(-4), ['quit', 'sleep', 'restart', 'shutdown']);
+  for (const action of POWER_ACTIONS) assert.ok(!SYSTEM_GROUPS.borne.entries.includes(action), `« ${action} » est encore dans la rubrique Borne`);
   for (const action of POWER_ACTIONS) assert.equal(SYSTEM_ITEMS[action].label, powerTexts(action).label);
   assert.deepEqual(POWER_ACTIONS.map((a) => SYSTEM_ITEMS[a].icon), ['power', 'moon', 'restart']);
 });

@@ -18,6 +18,7 @@ import {
   journeySummary,
   loadCabinet,
   loadJourneys,
+  NEED_LABELS,
   planJourney,
   rememberJourney,
   samePath,
@@ -33,6 +34,8 @@ import {
   type TableEntry,
   type VpsDb,
   type WaitItem,
+  knownVpsId,
+  partWebQuery,
 } from '@cyberpinball/core';
 import type { Catalog } from './catalog';
 import type { Action, Built, LibraryHost, Tone } from './library';
@@ -97,7 +100,7 @@ export function createJourney(ctx: JourneyContext) {
       const mem = memory();
       const journey = planJourney({
         file: table.file,
-        vpsId: tableSourceOf(table.info)?.vpsGameId ?? table.info.Info?.VPSId,
+        vpsId: knownVpsId(table.info),
         sourceFileId: tableSourceOf(table.info)?.vpsFileId,
         vpxInstalled: Boolean(host.vpxExe()),
         cabinetConfigured: Boolean(loadCabinet(host.dataDir)),
@@ -136,6 +139,21 @@ export function createJourney(ctx: JourneyContext) {
       }
       case 'fetch':
         return ctx.catalog.fetchFor(action.source, { table: table.file, back });
+      case 'choose': {
+        const first = action.sources[0]!;
+        return ctx.catalog.chooseFor(
+          {
+            game: first.game,
+            kind: first.kind,
+            files: action.sources.map((s) => s.file),
+            heading: t('{kind} : au choix', { kind: NEED_LABELS[first.kind] }),
+            subheading: table.title,
+            lead: t('Le plus adapté à la borne d’abord. Start ouvre sa page dans la fenêtre « Récupérer » : le fichier téléchargé est rangé pour cette table, puis le parcours reprend.'),
+            advised: t('adapté à la borne'),
+          },
+          { table: table.file, back, web: ctx.catalog.webAction('journey.files', { query: partWebQuery(table.title, first.kind), target: { gameId: first.game.id, gameLabel: table.title, kind: first.kind, table: table.file } }, back) },
+        );
+      }
       case 'reopen':
         return ctx.catalog.reopen(action.item, back);
       case 'install': {
@@ -184,6 +202,8 @@ export function createJourney(ctx: JourneyContext) {
       actions.push({ label: choice.label, detail: choice.detail, tone: choice.primary ? 'ok' : undefined, run: () => run(table.file, choice.action) });
     }
     actions.push(
+      // Toujours une issue vers le web : ce qui y est téléchargé revient à cette table, dans sa partie.
+      ctx.catalog.webAction('journey', { query: partWebQuery(table.title), target: { gameId: knownVpsId(table.info), gameLabel: table.title, table: table.file } }, () => show(table.file, ctx.catalog.takeNotice())),
       { label: t('Revérifier'), detail: t('Relit la table et ce qui est arrivé'), run: () => show(table.file) },
       { label: t('Diagnostic complet'), detail: t('Tous les constats du médecin, médias compris'), run: () => ((open = undefined), ctx.catalog.setRefresh(undefined), ctx.doctor(table)) },
     );

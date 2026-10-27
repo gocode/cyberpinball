@@ -78,6 +78,23 @@ function offenders(pattern: RegExp, allowed: string): string[] {
     .flatMap((s) => s.text.split('\n').flatMap((line, i) => (pattern.test(line) && !/^\s*(\/\/|\*)/.test(line) ? [`${s.file}:${i + 1} ${line.trim()}`] : [])));
 }
 
+/**
+ * Les démonstrations hors écran (docs\demo-*.cjs) créent la bibliothèque avec un hôte factice :
+ * sans mode invité (host.guest, obligatoire depuis guestmode.ts), elles s'arrêtaient au premier
+ * écran (« Cannot read properties of undefined (reading 'knock') », 27/10/2026, treize d'entre elles).
+ */
+test('toute démonstration qui crée la bibliothèque lui donne un mode invité', () => {
+  const docs = path.join(REPO, 'docs');
+  const missing = fs
+    .readdirSync(docs)
+    .filter((f) => /^demo-.*\.cjs$/.test(f))
+    .flatMap((f) => {
+      const text = fs.readFileSync(path.join(docs, f), 'utf8');
+      return [...text.matchAll(/createLibrary\(\{([\s\S]*?)\n\s*\}\);/g)].filter((m) => !/\bguest:/.test(m[1]!)).map(() => f);
+    });
+  assert.deepEqual(missing, [], 'ajouter guest: { active: false, allows: () => true, knock: () => true } à createLibrary');
+});
+
 test('toute fenêtre naît par createWindow : hors écran pendant un essai', () => {
   assert.deepEqual(offenders(/new BrowserWindow\(/, 'offscreen.ts'), [], 'utiliser createWindow(options) de app/src/offscreen.ts');
 });

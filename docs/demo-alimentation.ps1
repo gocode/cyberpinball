@@ -1,9 +1,9 @@
-﻿# Démonstration sans opérateur de l'alimentation de la borne (menu système > Borne : « Mettre
+﻿# Démonstration sans opérateur de l'alimentation de la borne (menu système > Cyber Pinball : « Mettre
 # en veille », « Redémarrer la borne », « Éteindre la borne »), hors écran sur un bureau Windows
 # caché, avec des tables inventées (docs\demo-captures.cjs). Rien n'est jamais éteint : le
 # pilote automatique rend l'alimentation simulée (packages\core\src\power.ts, powerSimulated),
 # chaque action est seulement journalisée (« Alimentation simulée : … »).
-#   confirmations : pour chaque action, l'entrée choisie dans la rubrique Borne, son écran de
+#   confirmations : pour chaque action, l'entrée choisie dans la rubrique Cyber Pinball, son écran de
 #                   confirmation, Exit (annuler : retour à la rubrique), puis de nouveau la
 #                   confirmation et Start : l'écran noir de l'action, puis le menu avec le
 #                   constat de l'essai ;
@@ -41,7 +41,7 @@ if (-not (Test-Path "$root\tables")) {
 }
 
 $Start = 'Digit1'; $Exit = 'Escape'
-# Une action : depuis la racine du menu système, l'autopilote ouvre la rubrique Borne et l'entrée
+# Une action : depuis la racine du menu système, l'autopilote ouvre la rubrique Cyber Pinball et l'entrée
 # (son écran de confirmation) ; Exit annule (retour à la rubrique, la sélection sur l'entrée) ;
 # l'entrée de nouveau, Start : l'écran noir, puis le menu et le constat de l'essai.
 function Get-Etapes([string]$libelle) {

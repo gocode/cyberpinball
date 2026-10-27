@@ -40,10 +40,25 @@ const MATRIX = {
     { id: 'r5a2h31Gz8', tableFormat: 'VPX', authors: ['Enthusiast', 'VP_Cooks', 'JPSalas', 'MerlinRTP'], version: '1.0.14', updatedAt: 1709998917834, urls: [{ url: page(18478, PAGE) }] },
   ],
   pupPackFiles: [{ id: 'pupMatrix', authors: ['Enthusiast'], version: '1.0.14', urls: [{ url: page(18478, PAGE) }] }],
+  // Les sept frontons de la base VPS (27/10/2026), leurs vignettes et leurs fiches de VPUniverse : la galerie
+  // des fichiers lit ces fiches en visiteur (popularité), comme sur la borne.
   b2sFiles: [
-    { id: 'b2sA', authors: ['Fabouh'], features: ['FullDMD'], updatedAt: 1700000000000, urls: [{ url: page(22480, 'the-matrix-full-dmd') }] },
-    { id: 'b2sB', authors: ['HauntFreaks'], features: ['2Screens'], updatedAt: 1690000000000, urls: [{ url: page(14000, 'the-matrix-b2s') }] },
+    { id: 'j6Aw6m0rTw', authors: ['BurtMacklin'], version: '1.0.0', features: ['2Screens'], updatedAt: 1683463147240, imgUrl: 'https://virtualpinballspreadsheet.github.io/vps-db/img/OUvOEgWRhf_b2s_1689696097190.webp', urls: [{ url: 'https://vpuniverse.com/files/file/13671-matrix-2screen-b2s/' }] },
+    { id: '_raIxhdzqz', authors: ['Entropie008'], version: '1.0', updatedAt: 1708632619468, imgUrl: 'https://virtualpinballspreadsheet.github.io/vps-db/img/undefined_b2s_1679420170691.webp', urls: [{ url: 'https://vpuniverse.com/files/file/13659-the-matrix-backglass/' }] },
+    { id: '946Yee9pA0', authors: ['Stevenoj27'], version: '1.0', updatedAt: 1679419970394, imgUrl: 'https://virtualpinballspreadsheet.github.io/vps-db/img/undefined_b2s_1679419983602.webp', urls: [{ url: 'https://vpuniverse.com/files/file/13664-matrix-the-original-2023-b2s/' }] },
+    { id: 'dc5zJM-kCh', authors: ['JPO'], version: '1.0', updatedAt: 1679419906914, imgUrl: 'https://virtualpinballspreadsheet.github.io/vps-db/img/undefined_b2s_1679419901180.webp', urls: [{ url: 'https://vpuniverse.com/files/file/13665-the-matrix-animated-backglass/' }] },
+    { id: 'TG52-zqg27', authors: ['lanch723'], version: '1.0', features: ['2Screens'], updatedAt: 1679419799075, imgUrl: 'https://virtualpinballspreadsheet.github.io/vps-db/img/undefined_b2s_1679419795979.webp', urls: [{ url: 'https://vpuniverse.com/files/file/13669-the-matrix-animated-backglass/' }] },
+    { id: 'SmbaA7liF6', authors: ['BurtMacklin'], version: '1.0', features: ['FullDMD'], updatedAt: 1679419713346, imgUrl: 'https://virtualpinballspreadsheet.github.io/vps-db/img/undefined_b2s_1679419700162.webp', urls: [{ url: 'https://vpuniverse.com/files/file/13667-the-matrix2-options-backglass-with-fulldmd/' }], comment: 'Two versions available' },
+    { id: '2S33ff5T6a', authors: ['HauntFreaks'], version: '1.0', features: ['FullDMD'], updatedAt: 1679419629211, imgUrl: 'https://virtualpinballspreadsheet.github.io/vps-db/img/undefined_b2s_1679419624697.webp', urls: [{ url: 'https://vpuniverse.com/files/file/13668-the-matrix-original-2023-b2s-one-hour-wonder/' }] },
   ],
+};
+const GOONIES = {
+  id: '34pZqivK',
+  name: 'The Goonies Never Say Die Pinball',
+  manufacturer: 'Original',
+  year: 2021,
+  type: 'SS',
+  tableFiles: [{ id: 'gVPW', tableFormat: 'VPX', authors: ['VPW'], version: '1.5', urls: [{ url: page(7818, 'the-goonies-never-say-die-pinball-vpw') }] }],
 };
 const SCREENS = [
   { name: 'paysage', width: 1920, height: 1080, rotation: 0, lang: 'fr' },
@@ -74,7 +89,11 @@ function sandbox(name) {
   put(path.join(folder, `${FOLDER}.info`), JSON.stringify({ Info: { Title: 'The Matrix', Manufacturer: 'Original', Year: 2023, VPSId: MATRIX.id }, CyberPinball: { source } }, null, 2));
   // Une autre table, pour réaffecter.
   put(path.join(L.tables, 'Star Trek (Stern 2013)', 'Star Trek LE.vpx'), 'x');
-  put(path.join(L.downloads, 'vpsdb.json'), JSON.stringify([MATRIX]));
+  put(path.join(L.downloads, 'vpsdb.json'), JSON.stringify([MATRIX, GOONIES]));
+  // The Goonies comme sur la borne : fabricant « VPW », aucun identifiant VPS dans le .info.
+  const goonies = path.join(L.tables, 'The Goonies Never Say Die Pinball (VPW 2021)');
+  put(path.join(goonies, 'The Goonies Never Say Die Pinball (VPW 2021) 1.5.vpx'), 'x');
+  put(path.join(goonies, 'The Goonies Never Say Die Pinball (VPW 2021).info'), JSON.stringify({ Info: { Title: 'The Goonies Never Say Die Pinball', Manufacturer: 'VPW', Year: 2021 } }, null, 2));
   put(path.join(L.downloads, 'vpsdb.meta.json'), JSON.stringify({ checkedAt: new Date().toISOString(), downloadedAt: new Date().toISOString() }));
   const acq = path.join(L.downloads, 'acquisition');
   const zip = put(
@@ -165,6 +184,11 @@ async function scenario(sc, box, report, log) {
   const expect = (cond, what) => {
     if (!cond) throw new Error(`${name} : ${what}`);
   };
+  /** Attend la fin de la pré-recherche d'une partie (sites compris, attente imposée par VPUniverse comprise : 150 s au plus). */
+  const presearched = async () => {
+    for (let i = 0; i < 300 && (view()?.sections ?? []).flatMap((x) => x.rows).some((r) => /recherche…|searching…|impose/.test(r.detail ?? '')); i++) await delay(500);
+    await settle();
+  };
   const rowsText = () => (view()?.sections ?? []).flatMap((s) => s.rows.map((r) => `${r.text} ${r.detail ?? ''} ${(r.badges ?? []).join(' ')}`)).join('\n');
 
   // 1. La liste d'attente s'est rangée seule au démarrage : rien à corriger, rien de côté.
@@ -209,8 +233,8 @@ async function scenario(sc, box, report, log) {
   await shot('parties-du-jeu');
   await act('PuP-Pack');
   await shot('partie-pup-pack');
-  await act(T('{verb} depuis Téléchargements', { verb: T('Remplacer') }));
-  await shot('remplacer-depuis-telechargements');
+  await act(T('Tous les fichiers téléchargés…'));
+  await shot('tous-les-fichiers-telecharges');
   library.handleKey({ type: 'keyDown', code: KEYS.exit[0], key: '', shift: false, control: false, alt: false, meta: false });
   await settle();
   await act(T('Retirer de la table'));
@@ -221,9 +245,43 @@ async function scenario(sc, box, report, log) {
   expect(!fs.existsSync(path.join(box.folder, 'pupvideos', 'TheMatrix')), 'le PuP-Pack devrait être à la corbeille');
   // Le fronton : absent, deux fichiers sur VPS.
   await act(T('Fronton (.directb2s)'));
+  await presearched();
   await shot('partie-fronton-absent');
-  await act(T('Récupérer sur le web'));
+  expect(view().actions.some((a) => a.label === T('Fichiers de VPS : voir les {n} au choix', { n: MATRIX.b2sFiles.length })), 'les frontons de VPS devraient être proposés');
+  expect(view().actions.some((a) => a.label === T('Chercher sur le web…')), '« Chercher sur le web… » devrait être là');
+  await act(T('Fichiers de VPS : voir les {n} au choix', { n: MATRIX.b2sFiles.length }));
   await shot('fronton-au-choix');
+  // La galerie des fichiers : un aperçu par fronton (vignette VPS), la popularité lue fiche par fiche.
+  const cards = () => view().media?.cards ?? [];
+  expect(view().media?.gallery && view().media?.files, 'les frontons au choix devraient être une galerie de fichiers');
+  expect(cards().length === MATRIX.b2sFiles.length, `${MATRIX.b2sFiles.length} tuiles attendues, ${cards().length} vues`);
+  for (let i = 0; i < 100 && cards().filter((c) => c.popularity).length < 5; i++) await delay(250);
+  const popular = cards().filter((c) => c.popularity).length;
+  log.push(`${name} : popularité lue pour ${popular} frontons sur ${cards().length} ; aperçus : ${cards().filter((c) => c.thumb.kind === 'image').length}`);
+  expect(cards().every((c) => c.thumb.kind === 'image' || c.thumb.text), 'chaque tuile devrait avoir un aperçu ou dire pourquoi');
+  await shot('fronton-au-choix-popularite');
+  await act(T('Trier : {order}', { order: T('date') }));
+  await shot('fronton-tri-popularite');
+  expect(view().actions[view().cursor]?.id === 'key:sort', 'le curseur devrait rester sur « Trier »');
+  await act(T('Trier : {order}', { order: T('popularité') }));
+
+  // 5. The Goonies : jeu reconnu sans identifiant dans le .info, PuP-Pack cherché d'office partout.
+  tables = core.scanTables(L.tables);
+  library.openSheet(tables.find((x) => x.title === 'The Goonies Never Say Die Pinball'));
+  await act(T('Parties du jeu'));
+  await shot('goonies-parties');
+  expect(view().actions.some((a) => a.label === T('Jeu VPS : {game}', { game: 'The Goonies Never Say Die Pinball (Original 2021)' })), 'The Goonies devrait être reconnu');
+  await act('PuP-Pack');
+  await shot('goonies-pup-recherche');
+  await presearched();
+  await shot('goonies-pup-propositions');
+  expect(view().actions.some((a) => a.label === T('Chercher sur le web…')), '« Chercher sur le web… » devrait être là');
+  for (const site of ['VPForums', 'VPUniverse']) expect(view().sections.flatMap((x) => x.rows).some((r) => r.text === site), `${site} devrait être cherché`);
+
+  // 6. Les autres écrans d'ajout : « Chercher sur le web… » partout.
+  library.openAdd();
+  await shot('entonnoir');
+  expect(view().actions.some((a) => a.label === T('Chercher sur le web…')), 'l’entonnoir devrait proposer le web');
 
   ipcMain.removeListener('action', onAction);
   win.destroy();

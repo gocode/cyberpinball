@@ -80,9 +80,42 @@ function mediaPack() {
   return zipStored({ 'T2/Wheel/Terminator 2.png': 'png', 'T2/Backglass/Terminator 2.mp4': 'mp4', 'T2/DMD/Terminator 2.mp4': 'mp4', 'T2/Topper/Terminator 2.mp4': 'mp4', 'T2/Audio/launch.mp3': 'mp3' });
 }
 
+/** Popularité d'une fausse fiche : chiffres tirés de son adresse, toujours les mêmes d'une démonstration à l'autre. */
+function fakeStats(key) {
+  let h = 0;
+  for (const c of key) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return { downloads: 40 + (h % 4800), views: 300 + (h % 21000), rating: 3.5 + ((h >> 4) % 4) / 2, reviews: 1 + ((h >> 8) % 30) };
+}
+
+/**
+ * Description schema.org d'une fausse fiche de VPUniverse, sur le modèle de la vraie
+ * (packages/core/test-pages/vpuniverse-fiche.html) : téléchargements, vues, note, capture.
+ */
+function fakeFileLd(url, key, hit, title) {
+  const s = fakeStats(key);
+  return `<script type='application/ld+json'>${JSON.stringify({
+    '@context': 'http://schema.org',
+    '@type': 'WebApplication',
+    url,
+    name: title,
+    applicationCategory: hit.kind === 'b2s' ? 'B2S Backglass Downloads' : hit.kind === 'rom' ? 'ROMs' : hit.kind === 'pup' ? 'PuP-Packs' : 'VPX - Pinball Tables',
+    dateCreated: new Date(hit.file.updatedAt ?? Date.UTC(2023, 0, 1)).toISOString(),
+    fileSize: `${(s.downloads % 90) + 3}.4 MB`,
+    softwareVersion: hit.file.version ?? '1.0',
+    author: { '@type': 'Person', name: (hit.file.authors ?? ['demo'])[0] },
+    interactionStatistic: [
+      { '@type': 'InteractionCounter', interactionType: 'http://schema.org/ViewAction', userInteractionCount: s.views },
+      { '@type': 'InteractionCounter', interactionType: 'http://schema.org/DownloadAction', userInteractionCount: s.downloads },
+    ],
+    aggregateRating: { '@type': 'AggregateRating', ratingValue: s.rating, reviewCount: s.reviews, bestRating: '5' },
+    screenshot: [{ '@type': 'ImageObject', url: `https://vpuniverse.com/screenshots/demo/${encodeURIComponent(key)}.jpg`, thumbnail: { '@type': 'ImageObject', url: `https://vpuniverse.com/screenshots/demo/${encodeURIComponent(key)}.thumb.jpg` } }],
+  })}</script>`;
+}
+
 /**
  * Fausses fiches de forum pour les fichiers de Terminator 2 : une page avec un lien
- * « Télécharger », qui renvoie un fichier factice du bon genre (table, fronton, ROM).
+ * « Télécharger », qui renvoie un fichier factice du bon genre (table, fronton, ROM), et
+ * sa popularité comme la vraie la donne (galerie des fichiers à choisir).
  */
 function fakeForum(vps) {
   const game = vps.games.find((g) => g.id === T2);
@@ -105,6 +138,8 @@ function fakeForum(vps) {
   };
   return async (request) => {
     const url = new URL(request.url);
+    // Capture déposée par l'auteur (galerie des fichiers à choisir) : une image du dépôt.
+    if (url.pathname.startsWith('/screenshots/demo/')) return new Response(fs.readFileSync(path.join(WT, 'docs', 'demo-captures-medias', 'neon-abyss-backglass.jpg')), { headers: { 'content-type': 'image/jpeg' } });
     const key = core.pageKey(request.url);
     const hit = key && files.get(key);
     if (!hit) return new Response('<h1>Page de démonstration absente</h1>', { status: 404, headers: { 'content-type': 'text/html; charset=utf-8' } });
@@ -118,7 +153,7 @@ function fakeForum(vps) {
     const html = `<!doctype html><meta charset="utf-8"><title>${title}</title>
       <body style="font-family:Segoe UI;background:#1b1f2a;color:#e5e7eb;padding:40px">
       <p style="color:#94a3b8">Fausse fiche de démonstration (${url.hostname}) : la vraie demande de se connecter.</p>
-      <h1>${title}</h1><p>Connecté en tant que <b>demo</b>.</p>
+      <h1>${title}</h1><p>Connecté en tant que <b>demo</b>.</p>${url.hostname.endsWith('vpuniverse.com') ? fakeFileLd(request.url, key, hit, title) : ''}
       <a class="download" href="${url.origin}${url.pathname}${url.search ? `${url.search}&` : '?'}do=download" style="display:inline-block;padding:14px 28px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none">Download this file</a>
       ${hit.kind === 'table' ? `<a class="media" href="${url.origin}${url.pathname}${url.search ? `${url.search}&` : '?'}media=1" style="display:inline-block;margin-left:20px;padding:14px 28px;background:#475569;color:#fff;border-radius:6px;text-decoration:none">Media pack</a>` : ''}`;
     return new Response(html, { headers: { 'content-type': 'text/html; charset=utf-8' } });
@@ -150,6 +185,7 @@ async function run(report) {
     windows: () => windows,
     broadcast: () => send(),
     downloadsDir: () => userDownloads,
+    guest: { active: false, allows: () => true, knock: () => true },
   });
   function send() {
     if (win.isDestroyed()) return;
@@ -244,6 +280,8 @@ async function run(report) {
   // ---------- Menu système : une seule entrée, l'entonnoir ----------
   library.openSystem();
   await shot('menu-systeme');
+  // « Ajouter une table » est rangé sous « Tables » dans le menu système.
+  act('Tables');
   act('Ajouter une table');
   await shot('entonnoir');
   act('Trouver une table en ligne');
@@ -282,6 +320,17 @@ async function run(report) {
   act('Terminator 2 - Judgment Day');
   await idle();
   await shot('versions-t2');
+  // Galerie des fichiers à choisir : la popularité arrive fiche par fiche (fausses fiches), puis le tri.
+  await until('popularité des versions de Terminator 2', () => view().media?.cards.some((c) => c.popularity));
+  await delay(1500);
+  await shot('versions-t2-popularite');
+  act('Trier');
+  await idle();
+  await shot('versions-t2-tri-popularite');
+  // Retour à l'ordre conseillé (popularité, date, conseillé) : la suite garde son ordre habituel.
+  act('Trier');
+  act('Trier');
+  await idle();
 
   // ---------- Réparer l'existant : le pack de médias rangé comme table (0.1.3-essai.1), détecté ----------
   const advice = core.recommendVersion(vps.games.find((g) => g.id === T2));
@@ -364,6 +413,8 @@ async function run(report) {
 
   // ---------- Chemin manuel : un complément récupéré dans son navigateur ----------
   library.openSystem();
+  // « Ajouter une table » est rangé sous « Tables » dans le menu système.
+  act('Tables');
   act('Ajouter une table');
   act('Trouver une table en ligne');
   await idle();
@@ -380,12 +431,16 @@ async function run(report) {
   // PuP-Pack : la page s'ouvre, mais on le télécharge « dans son navigateur ».
   act('Récupérer : PuP-Pack');
   await idle();
+  await until('popularité des PuP-Packs', () => view().media?.cards.some((c) => c.popularity));
+  await delay(1500);
   await shot('pup-au-choix');
   act('LTek');
   await idle();
   catalog().acquirer.close();
   await idle();
   library.openSystem();
+  // « Ajouter une table » est rangé sous « Tables » dans le menu système.
+  act('Tables');
   act('Ajouter une table');
   act('Récupérés et attendus');
   await idle();
@@ -428,6 +483,8 @@ async function run(report) {
   await shot('entonnoir-pret-a-installer');
   library.openSystem();
   await shot('menu-systeme-pastille');
+  // « Ajouter une table » est rangé sous « Tables » dans le menu système.
+  act('Tables');
   act('Ajouter une table');
   act('Installer : Terminator 2');
   await idle();
@@ -443,6 +500,8 @@ async function run(report) {
 
   // ---------- Mises à jour, depuis l'entonnoir ----------
   library.openSystem();
+  // « Ajouter une table » est rangé sous « Tables » dans le menu système.
+  act('Tables');
   act('Ajouter une table');
   act('Mises à jour des tables');
   await idle();

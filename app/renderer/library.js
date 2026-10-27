@@ -101,7 +101,7 @@ function renderLibrary(v) {
     // Galerie : le détail de la tuile choisie sous la liste qui défile, jamais par-dessus.
     const detail = v.media?.gallery ? galleryDetail(v.media, v.cursor) : undefined;
     if (detail) {
-      const column = libEl('div', 'lib-gallery');
+      const column = libEl('div', `lib-gallery${v.media.files ? ' files' : ''}`);
       column.append(content, detail);
       body.append(column);
     } else body.append(content);
@@ -444,7 +444,7 @@ function renderMediaCards(m, cursor) {
 // montrera ; nom, provenance, état et popularité sur la tuile. Le détail de la tuile choisie
 // (d'où elle vient, ce qui arrivera au téléchargement) reste sous la galerie, toujours visible.
 function renderGallery(m, cursor) {
-  const list = libEl('ol', 'media-cards gallery');
+  const list = libEl('ol', `media-cards gallery${m.files ? ' files' : ''}`);
   if (m.aspect) list.style.setProperty('--thumb-aspect', m.aspect);
   for (const c of m.cards) {
     const selected = c.action === cursor;
@@ -454,11 +454,12 @@ function renderGallery(m, cursor) {
     const top = libEl('div', 'media-top');
     top.append(libEl('span', 'media-title', c.title));
     li.append(top);
-    // Étiquettes courtes seulement (état, autre jeu) ; la provenance ouvre la ligne de faits.
-    if (c.state || c.flag) {
+    // Étiquettes courtes seulement (état, autre jeu, ce que le fichier sait faire) ; la provenance ouvre la ligne de faits.
+    if (c.state || c.flag || c.tags?.length) {
       const badges = libEl('div', 'media-badges');
       if (c.state) badges.append(libEl('span', `badge media-state tone-${c.state.tone}`, c.state.label));
       if (c.flag) badges.append(libEl('span', `badge media-flag tone-${c.flag.tone}`, c.flag.label));
+      for (const tag of c.tags ?? []) badges.append(libEl('span', 'badge media-tag', tag));
       li.append(badges);
     }
     // Une ligne : d'où vient la proposition, puis sa popularité si le site la donne, sinon ce
@@ -468,6 +469,8 @@ function renderGallery(m, cursor) {
     const what = c.popularity ?? c.facts;
     if (what) line.append(libEl('span', c.popularity ? 'media-pop' : '', `${c.code ? ' · ' : ''}${what}`));
     li.append(line);
+    // Fichier à choisir : date et site sous la popularité.
+    if (c.meta) li.append(libEl('div', 'media-facts media-meta', c.meta));
     if (typeof c.progress === 'number') li.append(progressBar(c.progress));
     list.append(li);
   }
@@ -481,7 +484,8 @@ function galleryDetail(m, cursor) {
   const detail = libEl('div', 'media-detail');
   const top = libEl('div', 'media-top');
   top.append(libEl('span', 'media-title', chosen.title));
-  const facts = [chosen.code, chosen.popularity, chosen.facts].filter(Boolean).join(' · ');
+  // Un fichier à choisir a déjà sa popularité et sa date sur la tuile : le détail ne les redit pas.
+  const facts = m.files ? '' : [chosen.code, chosen.popularity, chosen.facts].filter(Boolean).join(' · ');
   if (facts) top.append(libEl('span', 'media-facts', facts));
   detail.append(top);
   if (chosen.pending) detail.append(libEl('div', 'media-pending', chosen.pending));

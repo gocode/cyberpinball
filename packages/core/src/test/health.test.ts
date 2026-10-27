@@ -185,12 +185,14 @@ function everyCase(): HealthFacts[] {
   const many = tablesFacts(Array.from({ length: 7 }, (_, i) => ({ file: `${i}.vpx`, title: `Table ${i}`, findings: [i % 2 ? crash : romMissing] })).concat([{ file: 'u.vpx', title: 'U', findings: undefined as never }]));
   const active = { name: 'Borne', total: 3, found: 3, missing: [], extra: 0, playfieldFound: true };
   return [
-    { at, disks, tables: many, media: { tables: 0, medias: 0 }, screens: { configurations: 0, plugged: 3 }, vpx: { known: '10.8.1' } },
-    { at, disks: [], tables: tablesFacts([]), media: { index: at, tables: 0, medias: 0 }, screens: { configurations: 1, plugged: 3, active }, vpx: { installed: '10.8.0', known: '10.8.1' } },
+    { at, disks, tables: many, pup: { packs: 2, flagged: [{ file: 'g.vpx', title: 'The Goonies', reason: 'PuP-Pack coupé par le script de la table', auto: true }] }, media: { tables: 0, medias: 0 }, screens: { configurations: 0, plugged: 3 }, vpx: { known: '10.8.1' } },
+    { at, disks: [], tables: tablesFacts([]), pup: { packs: 2, flagged: [] }, media: { index: at, tables: 0, medias: 0 }, screens: { configurations: 1, plugged: 3, active }, vpx: { installed: '10.8.0', known: '10.8.1' } },
     { at, disks: [], tables: tablesFacts([{ file: 'a.vpx', title: 'A', findings: [] }]), media: { index: at, tables: 4, medias: 9 }, screens: { configurations: 2, plugged: 2, active: { ...active, found: 2, missing: ['DMD'] } }, vpx: { installed: '10.8.1', known: '10.8.1' } },
     { at, disks: [], screens: { configurations: 2, plugged: 2, active: { ...active, found: 2, missing: ['Playfield'], playfieldFound: false } }, vpx: { installed: '10.8.1' } },
     { at, disks: [], screens: { configurations: 2, plugged: 3, active: { ...active, found: 0, missing: ['A', 'B', 'C'] }, better: 'Bureau' }, vpx: {} },
     { at, disks: [], screens: { configurations: 2, plugged: 3, active, better: 'Bureau' }, vpx: {} },
+    // VPX 10.8.1 confond le fronton et le DMD, deux écrans du même nom.
+    { at, disks: [], screens: { configurations: 1, plugged: 3, active, homonyms: [{ name: 'PL2294H', roles: ['backglass', 'dmd'] }] }, vpx: {} },
   ];
 }
 
@@ -205,7 +207,7 @@ test('chaque contrôle passe par ses états, et chaque ligne mène à un écran 
     assert.ok((HEALTH_TARGET_KINDS as readonly string[]).includes(l.target.kind), `${l.check} « ${l.title} » : cible inconnue`);
     assert.ok(targetReachable(l.target), `${l.check} « ${l.title} » : l'entrée ${JSON.stringify(l.target)} n'est dans aucune rubrique du menu système`);
   }
-  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], vpx: ['ok', 'check', 'blocking'] };
+  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], vpx: ['ok', 'check', 'blocking'] };
   for (const check of HEALTH_CHECKS) assert.deepEqual([...(seen.get(check) ?? [])].sort(), [...expected[check]!].sort(), `états du contrôle ${check}`);
   // Chaque sorte de cible sert.
   assert.deepEqual([...new Set(lines.map((l) => l.target.kind))].sort(), [...HEALTH_TARGET_KINDS].sort());

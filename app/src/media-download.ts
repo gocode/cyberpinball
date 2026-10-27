@@ -83,6 +83,8 @@ export interface MediaDownloadContext {
   search: MediaSearch;
   /** Saisie d'un texte au clavier de l'écran (ou au vrai clavier) ; undefined : annulé. */
   prompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
+  /** « Chercher sur le web… » pour les médias de cette table (catalog.ts) ; `back` redessine l'écran. */
+  webGame?(table: TableEntry, back: () => void): Action;
 }
 
 /** Ce que VPinMediaDB propose à une table, et ce que l'utilisateur en retient. */
@@ -336,6 +338,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       ],
       actions: [
         { label: t('Chercher un autre titre…'), detail: t('Titre en anglais, initiales ou nom de ROM'), tone: 'ok', run: () => askTitle(table, back, () => showNothing(table, reason, deep, back)) },
+        ...(ctx.webGame ? [ctx.webGame(table, () => showNothing(table, reason, deep, back))] : []),
         { label: t('Retour aux médias'), run: leave },
       ],
       back: leave,
@@ -462,6 +465,8 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
         run: () => openCandidates(o, mode),
       });
     }
+    const own = ctx.find(o.file);
+    if (own && ctx.webGame) actions.push(ctx.webGame(own, () => showTablePlan(o, mode, ctx.cursor())));
     actions.push({ label: mode.single ? t('Annuler') : t('Retour au plan général'), detail: mode.single ? t('Rien n’est téléchargé') : undefined, run: cancel });
 
     // Une seule ligne avant les cartes : le jeu reconnu et la qualité. L'avertissement est dans l'en-tête,

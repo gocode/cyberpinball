@@ -68,6 +68,8 @@ import {
   sheetPages,
   SHEET_PAGE_TYPES,
   samePath,
+  tableGame,
+  partWebQuery,
   tableSourceOf,
   scanRomLibrary,
   sizeOf,
@@ -94,6 +96,7 @@ import {
   t,
   tn,
   type Finding,
+  type AddScreenId,
   type IconName,
   type ImportPlan,
   type KnownTable,
@@ -123,6 +126,7 @@ import {
   followCursor,
   resolveActivation,
   type FocusAnchor,
+  knownVpsId,
 } from '@cyberpinball/core';
 import { prepareImport, type PreparedImport } from './archives';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
@@ -312,6 +316,8 @@ export interface Action {
    * sert d'identité s'il est unique dans l'écran.
    */
   key?: string;
+  /** Issue vers le web de cet écran d'ajout ou de choix (« Chercher sur le web… », ADD_SCREENS). */
+  web?: AddScreenId;
   run: () => void | Promise<void>;
 }
 
@@ -736,10 +742,18 @@ export function createLibrary(host: LibraryHost) {
     // Récupérés pour une table installée : tout lui revient (un PuP-Pack, un fronton…).
     install: (paths, acquisition, journey) => startImport(paths, 'copy', acquisition, journey, false, journey && find(journey) ? path.dirname(journey) : undefined),
     downloadsDir: host.downloadsDir,
+    addFiles: (paths) => startImport(paths, 'copy', undefined, undefined, true),
     openJourney: (file) => journeyUi.open(file),
     pick: (request) => pickPaths(request),
   });
   if (layout()) catalogUi.start();
+
+  /**
+   * « Chercher sur le web… » des écrans de médias d'une table : ce qui est téléchargé revient
+   * à ce jeu, dans la partie que dit son contenu (médias du menu, PuP-Pack, fronton…).
+   */
+  const webForTable = (screen: AddScreenId) => (table: TableEntry, back: () => void) =>
+    catalogUi.webAction(screen, { query: partWebQuery(table.title, 'media'), target: { gameId: knownVpsId(table.info), gameLabel: table.title, kind: 'media', table: table.file } }, back);
 
   // Ce qu'il manque pour jouer : parcours guidé d'une table jusqu'à « Jouer ».
   const journeyUi = createJourney({
@@ -782,6 +796,7 @@ export function createLibrary(host: LibraryHost) {
     cursor: () => cursor,
     search: mediaSearch,
     prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
+    webGame: webForTable('mediadb'),
   });
 
   // Santé de la borne (Menu système > Borne) : relevé en tâche de fond, gardé ; une page de bilan.
@@ -819,6 +834,7 @@ export function createLibrary(host: LibraryHost) {
     leave: () => leave(),
     pick: (request) => pickPaths(request),
     download: (table, back) => mediaDownload.openTable(table, back),
+    webGame: webForTable('medias'),
     proposals: {
       search: mediaSearch,
       task: (message, work) => task(message, work),
@@ -852,11 +868,26 @@ export function createLibrary(host: LibraryHost) {
     tables: () => host.tables(),
     script: (table) => cachedScript(table.file, host.dataDir),
     show: (build, at, table) => openCustom(build, at, table),
+    isShowing: (build) => screen?.kind === 'custom' && screen.build === build,
+    cursor: () => cursor,
     sheet: (table) => openSheet(table),
     leave: () => leave(),
     task: (message, work) => task(message, work),
     vps: () => vpsForImport(),
+    // Le jeu que la table désigne, même sans identifiant dans son .info (script non relu ici).
+    identify: async (table) => {
+      const vps = await vpsForImport();
+      return vps ? tableGame(vps, table, await mediaSearch.evidence(table, false)) : { leads: [] };
+    },
+    setGame: (table, gameId) => {
+      const infoFile = infoFileFor(table, tablesDir());
+      const info = readInfo(infoFile);
+      applyOps([{ op: 'write', path: infoFile, content: JSON.stringify({ ...info, Info: { ...info.Info, VPSId: gameId } }, null, 2) + '\n' }], { trashDir: trashDirFor(layout()!.trash, 'Remplacé à l’import') }); // i18n-ignore : nom de dossier
+      host.reload(table.file);
+    },
+    prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
     catalog: catalogUi,
+    sites: mediaSites,
     install: (paths, table, back) => installTo(paths, table, back),
     pick: (request) => pickPaths(request),
     pupOptions: (table) => go({ kind: 'pupOptions', file: table.file }),
@@ -959,6 +990,7 @@ export function createLibrary(host: LibraryHost) {
     games: () => catalogUi.games(),
     addToTable: (paths, table) => installTo(paths, table, () => downloadsUi.open()),
     attachToGame: (file, gameId, kind, back) => catalogUi.attachToGame(file, gameId, kind, back),
+    web: (screen, back) => catalogUi.webAction(screen, { query: partWebQuery('table'), received: (file) => startImport([file], 'copy') }, back),
     task: (message, work) => task(message, work),
     back: () => openSystem(),
   });
@@ -992,7 +1024,7 @@ export function createLibrary(host: LibraryHost) {
     const item = l.items.find((i) => i.received && samePath(i.received.file, file)) ?? (key ? l.items.find((i) => i.pageKey === key) : undefined) ?? l.items.find((i) => i.id === stray?.expected || i.id === stray?.suggested);
     const tables = ownTables();
     if (item) {
-      const table = (item.table ? tables.find((x) => samePath(x.file, item.table!)) : undefined) ?? tables.find((x) => (tableSourceOf(x.info)?.vpsGameId ?? x.info.Info?.VPSId) === item.gameId);
+      const table = (item.table ? tables.find((x) => samePath(x.file, item.table!)) : undefined) ?? tables.find((x) => knownVpsId(x.info) === item.gameId);
       return table ? { table } : { game: { gameId: item.gameId, label: item.gameLabel } };
     }
     const name = nameKey(path.basename(file).replace(/\.[^.]+$/, ''));
@@ -1758,6 +1790,7 @@ export function createLibrary(host: LibraryHost) {
       const total = unused.reduce((sum, e) => sum + e.stored!.size, 0);
       actions.push({ label: t('Mettre toutes les ROM inutilisées à la corbeille'), detail: t('{n} ROM · {size}', { n: formatNumber(unused.length), size: formatSize(total) }), run: () => trashRoms(unused) });
     }
+    actions.push(catalogUi.webAction('roms', { query: partWebQuery('pinmame', 'rom'), received: (file) => startImport([file], 'copy') }, () => openRoms()));
     actions.push({ label: t('Actualiser'), run: () => openRoms() }, { label: t('Retour au menu'), run: back });
 
     const sections: Section[] = [];
@@ -2071,6 +2104,7 @@ export function createLibrary(host: LibraryHost) {
       { label: t('Récupérés et attendus'), detail: catalogUi.summary(), icon: 'inbox', run: () => catalogUi.openWaitList(() => openAdd()) },
       { label: t('Mises à jour des tables'), detail: t('Nouvelles versions des tables installées'), icon: 'refresh', run: () => catalogUi.openUpdates() },
       { label: t('Comptes des sites'), detail: t('vpuniverse.com, vpforums.org… : connexions gardées'), icon: 'account', run: () => catalogUi.openAccounts() },
+      catalogUi.webAction('add.funnel', { query: partWebQuery('table', 'table'), received: (file) => startImport([file], 'copy', undefined, undefined, true) }, () => openAdd()),
       { label: t('Retour'), icon: 'back', run: () => openSystem() },
     );
     return {
@@ -2230,7 +2264,7 @@ export function createLibrary(host: LibraryHost) {
           roms: facts?.roms ?? [],
           dmdFolder: facts?.dmdFolder,
           pupNames: expectedPackNames(facts),
-          vpsId: t.info.Info?.VPSId,
+          vpsId: knownVpsId(t.info),
           pupOff: facts?.pup?.disabledBy ? [t.file] : [],
         };
       });
@@ -2841,6 +2875,8 @@ export function createLibrary(host: LibraryHost) {
     warnUnkeyed(built, ids);
     soundPreview = playsSoundPreview(built.media);
     const editorView = (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor ? viewEditor(screen.editor) : undefined;
+    // « Chercher sur le web… » n'a son icône que dans un menu à icônes : seule, elle décalerait tous les libellés.
+    const iconMenu = built.actions.some((a) => a.icon && !a.web);
     return {
       screen: screen.kind,
       heading: built.heading,
@@ -2849,7 +2885,7 @@ export function createLibrary(host: LibraryHost) {
       lead: built.lead,
       sections: built.sections,
       back: backLabel(built),
-      actions: built.actions.map(({ label, detail, tone, icon, attention, shortcut }, i) => ({ label, detail, tone, icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
+      actions: built.actions.map(({ label, detail, tone, icon, web, attention, shortcut }, i) => ({ label, detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
       media: built.media,
       variant: built.variant,
       journey: built.journey,

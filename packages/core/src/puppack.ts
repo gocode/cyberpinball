@@ -33,6 +33,12 @@ export interface PupScriptFacts {
    * script règle autrement au départ (« usePUP = False »). Absent si rien ne l'en empêche.
    */
   disabledBy?: PupSwitch;
+  /**
+   * La PuP-DMD (le score que le script écrit sur l'écran DMD du pack, LabelInit) dépend d'une
+   * autre variable éteinte au départ (« enablePupDMD = False ») : un pack dont l'option occupe
+   * la fenêtre du DMD n'y montrerait que son cadre vide, par-dessus le DMD de la table.
+   */
+  dmdDisabledBy?: PupSwitch;
 }
 
 /** Interrupteur du script qui décide si le PuP-Pack est lancé. */
@@ -45,6 +51,8 @@ export interface PupSwitch {
   enable?: string;
   /** Ligne de l'affectation dans le script (à partir de 0). */
   line: number;
+  /** Ce qu'il allume : le pack (absent), ou la PuP-DMD. */
+  kind?: 'dmd';
 }
 
 /**
@@ -69,7 +77,29 @@ export function pupScriptFacts(code: string): PupScriptFacts | undefined {
   if (/\.(LabelNew|LabelInit)\b/i.test(code)) facts.labels = true;
   const disabledBy = pupScriptSwitch(code);
   if (disabledBy) facts.disabledBy = disabledBy;
+  const dmdDisabledBy = pupDmdSwitch(code);
+  if (dmdDisabledBy) facts.dmdDisabledBy = dmdDisabledBy;
   return facts;
+}
+
+/**
+ * Interrupteurs à allumer pour que le pack se voie : celui de son lancement, et celui de la
+ * PuP-DMD quand l'option en place dessine dans la fenêtre du DMD (`packDrawsDmd`, pupWindows) :
+ * sans elle, le pack y pose son cadre vide (« PuPFrames\default.png ») par-dessus le DMD de la
+ * table. The Goonies (VPW 2021) livre les deux éteints (octobre 2026). `code` : scriptCode.
+ */
+export function pupSwitchesToEnable(code: string, packDrawsDmd: boolean): PupSwitch[] {
+  const found: PupSwitch[] = [];
+  const main = pupScriptSwitch(code);
+  if (main) found.push(main);
+  const dmd = packDrawsDmd ? pupDmdSwitch(code) : undefined;
+  if (dmd && dmd.enable !== undefined) found.push(dmd);
+  return found;
+}
+
+/** Les interrupteurs d'une liste, pour un message : « enablePupPack = True, enablePupDMD = True ». */
+export function describeSwitches(switches: PupSwitch[], state: 'value' | 'enable'): string {
+  return switches.map((s) => `${s.variable} = ${state === 'value' ? s.value : (s.enable ?? '?')}`).join(', ');
 }
 
 // ---------- Interrupteur du script ----------
@@ -108,12 +138,35 @@ interface Assignment {
  * donne une autre au départ : 2001 : A Space Odyssey (Original 2025) livre
  * « usePUP = False », et le plugin PUP ne charge jamais son pack, même bien rangé.
  * Les conditions qui entourent la ligne sont suivies dans sa Sub, puis là où cette
- * Sub est appelée (trois niveaux). undefined si rien ne l'empêche, ou si on ne peut
- * pas le dire : valeur calculée (option de la table, fichier lu), changée dans une
- * Sub, Else, Select Case.
+ * Sub est appelée (trois niveaux). Une variable qui ne fait que recopier une autre
+ * (« HasPup = enablePupPack », The Goonies) renvoie à celle-ci : c'est elle qu'il faut
+ * allumer. undefined si rien ne l'empêche, ou si on ne peut pas le dire : valeur calculée
+ * (option de la table, fichier lu), changée dans une Sub, Else, Select Case.
  * `code` : le script sans commentaires, une ligne pour une ligne (scriptCode).
  */
 export function pupScriptSwitch(code: string): PupSwitch | undefined {
+  return switchFinder(code)(PUP_CREATE);
+}
+
+const PUP_CREATE = /CreateObject\s*\(\s*"PinUpPlayer\.PinDisplay"\s*\)/i;
+
+/**
+ * Interrupteur de la PuP-DMD : la variable qui empêche d'atteindre LabelInit (mise en place
+ * des textes de la PuP-DMD), si ce n'est pas déjà celle qui coupe le pack. The Goonies :
+ * « Const enablePupDMD = False », et PuPInit fait alors cacher l'écran DMD du pack par
+ * PinUP Player (SendMSG FN 12), que le plugin PUP ne gère pas.
+ */
+export function pupDmdSwitch(code: string): PupSwitch | undefined {
+  const find = switchFinder(code);
+  const dmd = find(/\.LabelInit\b/i);
+  if (!dmd) return undefined;
+  const main = find(PUP_CREATE);
+  if (main && main.variable.toLowerCase() === dmd.variable.toLowerCase()) return undefined;
+  return { ...dmd, kind: 'dmd' };
+}
+
+/** Pour une ligne du script (needle), la variable éteinte au départ qui l'empêche d'être atteinte. */
+function switchFinder(code: string): (needle: RegExp) => PupSwitch | undefined {
   const lines = code.split(/\r?\n/);
   const routineOf: (string | undefined)[] = [];
   let routine: string | undefined;
@@ -142,10 +195,26 @@ export function pupScriptSwitch(code: string): PupSwitch | undefined {
     }
   });
 
-  /** Valeur de départ d'une variable, si elle est sûre : littérale hors de toute Sub, jamais rallumée ailleurs. */
-  const startValue = (name: string, off: (v: Value) => boolean): Assignment | undefined => {
+  /**
+   * Valeur de départ d'une variable, si elle est sûre : littérale hors de toute Sub, jamais
+   * rallumée ailleurs. Recopiée d'une autre variable (« HasPup = enablePupPack »), et jamais
+   * changée dans une Sub : la valeur de départ de cette autre variable, deux relais au plus.
+   */
+  const startValue = (name: string, off: (v: Value) => boolean, depth = 0): Assignment | undefined => {
     const list = assignments.get(name.toLowerCase()) ?? [];
     const top = list.filter((a) => !a.inRoutine);
+    const alias = top[0]?.value;
+    if (
+      depth < 2 &&
+      alias !== undefined &&
+      /^[A-Za-z_]\w*$/.test(alias) &&
+      !LITERAL.test(alias) &&
+      alias.toLowerCase() !== name.toLowerCase() &&
+      top.every((a) => a.value.toLowerCase() === alias.toLowerCase()) &&
+      !list.some((a) => a.inRoutine)
+    ) {
+      return startValue(alias, off, depth + 1);
+    }
     if (!top.length || top.some((a) => !a.literal)) return undefined;
     const last = top.at(-1)!;
     if (top.some((a) => numeric(literalValue(a.value)) !== numeric(literalValue(last.value)))) return undefined;
@@ -247,16 +316,17 @@ export function pupScriptSwitch(code: string): PupSwitch | undefined {
     return first;
   };
 
-  const create = /CreateObject\s*\(\s*"PinUpPlayer\.PinDisplay"\s*\)/i;
-  const starts = lines.map((l, i) => i).filter((i) => create.test(lines[i]!));
-  if (!starts.length) return undefined;
-  let found: PupSwitch | undefined;
-  for (const i of starts) {
-    const sw = blockedAt(i, create, 0);
-    if (!sw) return undefined;
-    found ??= sw;
-  }
-  return found;
+  return (needle) => {
+    const starts = lines.map((l, i) => i).filter((i) => needle.test(lines[i]!));
+    if (!starts.length) return undefined;
+    let found: PupSwitch | undefined;
+    for (const i of starts) {
+      const sw = blockedAt(i, needle, 0);
+      if (!sw) return undefined;
+      found ??= sw;
+    }
+    return found;
+  };
 }
 
 function truthy(v: Value): boolean {
@@ -438,6 +508,12 @@ function pupRoots(screens: PupScreen[]): (root: number) => boolean {
     if (!byNum.has(root) || (parentOf.has(root) && !hasChildren(root))) return false;
     return [...byNum.values()].some((s) => isVisible(s) && descends(s.num, root));
   };
+}
+
+/** Le pack rangé dans `dir` (racine retrouvée sous les imbrications) occupe la fenêtre du DMD avec l'option en place. */
+export function packDrawsDmd(dir: string): boolean {
+  const screens = analysePack(findPackRoot(dir) ?? dir).screens;
+  return screens.length > 0 && pupWindows(screens).dmd;
 }
 
 /** Rôle de la borne où le plugin dessine un écran PuP ; null : jamais affiché (Playfield). */

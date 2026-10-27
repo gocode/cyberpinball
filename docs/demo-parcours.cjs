@@ -114,6 +114,8 @@ async function run(report) {
   let message;
   const played = [];
   const library = createLibrary({
+    // Mode invité inactif : tout passe (host.guest est obligatoire, library.ts).
+    guest: { active: false, allows: () => true, knock: () => true },
     root,
     dataDir: L.data,
     vpxExe: () => path.join(root, 'emulators', 'vpx', 'VPinballX64.exe'),

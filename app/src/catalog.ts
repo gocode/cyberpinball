@@ -52,6 +52,9 @@ import {
   loadCabinet,
   loadWaitList,
   mediaUrl,
+  partWebQuery,
+  pageKey,
+  webEngineUrl,
   moveToTrash,
   NEED_LABELS,
   partFits,
@@ -110,6 +113,8 @@ import {
   type WaitList,
   type WaitProblem,
   type WaitRepair,
+  type AddScreenId,
+  knownVpsId,
 } from '@cyberpinball/core';
 import { createAcquirer } from './acquire-window';
 import { createYtDlp } from './ytdlp-tool';
@@ -118,8 +123,29 @@ import { recentDownloads, watchDownloads } from './downloads-watch';
 import type { PickRequest } from './file-picker';
 import type { Action, Built, LibraryHost, Row, Section, Tone } from './library';
 import type { MediaCard, MediaThumb } from './library-medias';
+import { createFileGallery, type FileChoice } from './file-gallery';
 import { allowPreview } from './media-protocol';
 import type { MediaSearch } from './media-search';
+import { createSiteFiles } from './site-files';
+
+/** Jeu (et partie) auquel revient ce qu'une recherche libre fait télécharger. */
+export interface WebTarget {
+  /** Jeu de la base VPS ; absent : celui de la table installée (son dossier). */
+  gameId?: string;
+  gameLabel: string;
+  /** Partie cherchée ; le contenu du fichier reçu l'emporte. */
+  kind?: NeedKind;
+  /** Table installée à qui il revient. */
+  table?: string;
+}
+
+/** « Chercher sur le web… » : le texte prérempli, et à qui revient le fichier. */
+export interface WebSearch {
+  query: string;
+  target?: WebTarget;
+  /** Sans jeu : ce qu'on fait du fichier reçu (plan d'ajout d'une nouvelle table). */
+  received?: (file: string) => void;
+}
 
 export interface CatalogContext {
   host: LibraryHost;
@@ -146,6 +172,8 @@ export interface CatalogContext {
   downloadsDir?(): string;
   /** Parcours « Ce qu'il manque pour jouer » d'une table installée (liste d'attente : « Reprendre »). */
   openJourney?(file: string): void;
+  /** Plan d'ajout d'une nouvelle table avec ces fichiers (un fichier reçu d'une recherche libre sans jeu). */
+  addFiles?(paths: string[]): void;
   /** Sélecteur de fichiers de Cyber Pinball (file-picker.ts) ; undefined à l'abandon. */
   pick?(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
 }
@@ -332,7 +360,7 @@ export function createCatalog(ctx: CatalogContext) {
 
   /** Table installée d'un jeu VPS, et les parties qu'elle a déjà (repairWaitList). */
   function tableOfGame(gameId: string): { file: string; has: (kind: NeedKind) => boolean } | undefined {
-    const entry = host.tables().find((x) => (tableSourceOf(x.info)?.vpsGameId ?? x.info.Info?.VPSId) === gameId);
+    const entry = host.tables().find((x) => knownVpsId(x.info) === gameId);
     if (!entry) return undefined;
     let parts: ReturnType<typeof installedParts> | undefined;
     return { file: entry.file, has: (kind) => (parts ??= installedParts(tableContents(entry.file, { ownFolder: !samePath(entry.folder, ctx.tablesDir()) }))).has(kind) };
@@ -460,6 +488,9 @@ export function createCatalog(ctx: CatalogContext) {
     navKeys: () => host.keys(),
     grabVideo: ytdlp,
   });
+  // Fiches des fichiers sur leur site (popularité, captures) et galerie des fichiers à choisir.
+  const siteFiles = createSiteFiles({ acquirer, downloadsDir: () => ctx.layout()?.downloads, changed: () => host.broadcast() });
+  const fileGallery = createFileGallery({ siteFiles, vpsThumb: (url) => thumbs.get(url), redraw: () => host.broadcast() });
 
   let watcher: { stop(): void } | undefined;
   /** La surveillance tourne si l'utilisateur l'a voulue et que quelque chose est attendu. */
@@ -653,6 +684,7 @@ export function createCatalog(ctx: CatalogContext) {
       },
     );
     const waiting = waitList().items.filter((i) => i.state !== 'installed').length;
+    actions.push(webAction('catalog', { query: partWebQuery(filter.text ?? 'table', 'table'), received: newTable }, () => openCatalog(ctx.cursor())));
     actions.push({ label: t('Récupérés et attendus'), detail: waiting ? summary() : t('vide'), icon: 'inbox', run: () => openWaitList(undefined, () => openCatalog()) }, { label: t('Retour'), icon: 'back', run: () => ctx.home() });
     const sections: Section[] = noticeSection();
     if (!found.length) {
@@ -794,39 +826,11 @@ export function createCatalog(ctx: CatalogContext) {
       .sort((x, y) => Number(y.id === advice?.file.id) - Number(x.id === advice?.file.id))
       .slice(0, 20);
     const mine = installedVersion(game);
-    // Installation rapide en tête : la version conseillée, d'un coup.
-    // Déjà installée (provenance notée) : plus rien d'indispensable à récupérer d'un coup.
-    const actions: Action[] = advice && mine.source !== advice.file.id ? [quickAction(game, advice.file, fast)] : [];
-    const first = actions.length;
-    actions.push(...versions.map((v) => ({ label: versionLabel(v), run: () => openNeeds(game.id, v.id) })));
-    const cards: MediaCard[] = versions.map((v, i) => {
-      const features = (v.features ?? []).filter((f) => !/^incl\./i.test(f)).slice(0, 6);
-      const included = (v.features ?? []).filter((f) => /^incl\./i.test(f)).map((f) => f.replace(/^incl\.\s*/i, ''));
-      const links = liveLinks(v);
-      let state: MediaCard['state'];
-      if (mine.source === v.id) state = { label: t('Installée'), tone: 'ok' };
-      else if (advice?.file.id === v.id) state = { label: t('Conseillée'), tone: 'ok' };
-      else if (!links.length) state = { label: t('Aucun lien'), tone: 'error' };
-      return {
-        action: first + i,
-        title: versionLabel(v),
-        code: features.length ? features.join(' · ') : undefined,
-        state,
-        facts: [
-          v.updatedAt ? t('mise à jour le {date}', { date: formatDay(v.updatedAt) }) : undefined,
-          included.length ? t('fournit {items}', { items: included.join(', ') }) : undefined,
-          links.length ? t('sur {sites}', { sites: [...new Set(links.map((l) => linkHost(l.url).label))].join(', ') }) : undefined,
-        ]
-          .filter(Boolean)
-          .join(' · '),
-        extra: [v.comment, advice?.file.id === v.id ? t('Conseillée : {reasons}.', { reasons: advice.reasons.join(', ') }) : undefined].filter((x): x is string => Boolean(x)),
-        thumb: thumbOf(imageOf(v), versionLabel(v)),
-      };
-    });
-    actions.push({ label: t('Retour au catalogue'), run: () => openCatalog() });
     const count = vpxVersions(game).length;
     const more = count - versions.length;
-    return {
+    return fileGallery.build({
+      kind: 'table',
+      files: versions,
       heading: vpsLabel(game),
       subheading: [
         gameKind(game),
@@ -838,15 +842,25 @@ export function createCatalog(ctx: CatalogContext) {
         .join(' · '),
       lead: [
         more > 0
-          ? t('{n} versions pour VPX : la conseillée, puis la plus récente d’abord (les {shown} plus récentes montrées).', { n: count, shown: versions.length })
-          : tn(count, '{n} version pour VPX : la conseillée, puis la plus récente d’abord.', '{n} versions pour VPX : la conseillée, puis la plus récente d’abord.'),
-        t('MOD : reprise d’une autre version ; VR : jouable en réalité virtuelle ; nFozzy, Fleep : physique et sons refaits. Choisissez une version pour voir ce qu’il faut.'),
+          ? t('{n} versions pour VPX : la conseillée, puis la plus récente (les {shown} plus récentes montrées).', { n: count, shown: versions.length })
+          : tn(count, '{n} version pour VPX : la conseillée, puis la plus récente.', '{n} versions pour VPX : la conseillée, puis la plus récente.'),
+        t('Choisissez-en une pour voir ce qu’il faut. MOD : reprise d’une autre version ; VR : jouable en réalité virtuelle ; nFozzy, Fleep : physique et sons refaits.'),
       ].join(' '),
+      advised: t('conseillée d’abord'),
+      // Installation rapide en tête : la version conseillée, d'un coup. Déjà installée (provenance
+      // notée) : plus rien d'indispensable à récupérer d'un coup.
+      before: advice && mine.source !== advice.file.id ? [quickAction(game, advice.file, fast)] : [],
+      after: [webAction('catalog.game', { query: partWebQuery(game.name, 'table'), target: { gameId: game.id, gameLabel: vpsLabel(game), kind: 'table' } }, () => openGame(game.id, ctx.cursor())), { label: t('Retour au catalogue'), run: () => openCatalog() }],
       sections: noticeSection(),
-      actions,
+      state: (v) =>
+        mine.source === v.id ? { label: t('Installée'), tone: 'ok' } : advice?.file.id === v.id ? { label: t('Conseillée'), tone: 'ok' } : !liveLinks(v).length ? { label: t('Aucun lien'), tone: 'error' } : undefined,
+      extra: (v) => {
+        const included = (v.features ?? []).filter((f) => /^incl\./i.test(f)).map((f) => f.replace(/^incl\.\s*/i, ''));
+        return [advice?.file.id === v.id ? t('Conseillée : {reasons}.', { reasons: advice.reasons.join(', ') }) : undefined, included.length ? t('fournit {items}', { items: included.join(', ') }) : undefined].filter((x): x is string => Boolean(x));
+      },
+      pick: (v) => openNeeds(game.id, v.id),
       back: () => openCatalog(),
-      media: { cards },
-    };
+    });
   }
 
   // ---------- Ce qu'il faut pour une version ----------
@@ -984,6 +998,7 @@ export function createCatalog(ctx: CatalogContext) {
         run: () => installGame(game.id),
       });
     }
+    actions.push(webAction('catalog.needs', { query: partWebQuery(game.name), target: { gameId: game.id, gameLabel: vpsLabel(game) } }, () => openNeeds(game.id, version.id, ctx.cursor())));
     actions.push({ label: t('Autres versions'), run: () => openGame(game.id) }, { label: t('Récupérés et attendus'), detail: summary(), run: () => openWaitList(undefined, () => openNeeds(game.id, version.id)) });
     const missing = needs.filter((n) => n.required && n.state === 'todo' && !itemFor(game, n));
     return {
@@ -1004,33 +1019,31 @@ export function createCatalog(ctx: CatalogContext) {
   }
 
   function openFiles(game: VpsGame, version: VpsTableFile, need: Need): void {
+    const back = () => openNeeds(game.id, version.id);
+    chooseFiles({
+      kind: need.kind,
+      files: need.files,
+      heading: t('{kind} : au choix', { kind: NEED_LABELS[need.kind] }),
+      subheading: vpsLabel(game),
+      lead: need.kind === 'b2s' ? t('Les frontons qui vont avec les écrans de la borne d’abord (2 ou 3 écrans, afficheur large), puis les plus récents. Start ouvre sa page dans la fenêtre « Récupérer ».') : t('Les plus récents d’abord. Start ouvre sa page dans la fenêtre « Récupérer ».'),
+      advised: need.kind === 'b2s' ? t('écrans de la borne') : undefined,
+      state: (f) => (itemFor(game, need)?.fileId === f.id ? WAIT_LABELS[itemFor(game, need)!.state] : undefined),
+      pick: (f) => get(game, need, f, back),
+      back,
+      web: webAction('catalog.files', { query: partWebQuery(game.name, need.kind), target: { gameId: game.id, gameLabel: vpsLabel(game), kind: need.kind } }, back),
+    });
+  }
+
+  /**
+   * Écran de choix d'un fichier (galerie des fichiers) : les vignettes de la base VPS reçues
+   * d'abord, la popularité arrive ensuite, fiche par fiche.
+   */
+  function chooseFiles(choice: Omit<FileChoice, 'after'> & { web?: Action }): void {
+    refresh = undefined;
     void ctx.task(t('Fichiers au choix…'), async () => {
-      await fetchThumbs(need.files.slice(0, 12).map(imageOf));
-      const back = () => openNeeds(game.id, version.id);
-      ctx.show(() => {
-        const files = need.files.slice(0, 12);
-        return {
-          heading: t('{kind} : au choix', { kind: NEED_LABELS[need.kind] }),
-          subheading: vpsLabel(game),
-          lead: need.kind === 'b2s' ? t('Les frontons qui vont avec les écrans de la borne d’abord (2 ou 3 écrans, afficheur large), puis les plus récents.') : t('Les plus récents d’abord.'),
-          sections: [],
-          actions: [...files.map((f) => ({ label: versionLabel(f), run: () => get(game, need, f, () => openNeeds(game.id, version.id)) })), { label: t('Retour'), run: back }],
-          back,
-          media: {
-            cards: files.map((f, i) => {
-              const links = liveLinks(f);
-              return {
-                action: i,
-                title: need.kind === 'rom' ? (f.version ?? 'ROM') : versionLabel(f),
-                code: (f.features ?? []).slice(0, 4).join(' · ') || undefined,
-                facts: [f.updatedAt ? t('le {date}', { date: formatDay(f.updatedAt) }) : undefined, links[0] ? linkHost(links[0].url).label : undefined].filter(Boolean).join(' · '),
-                extra: f.comment ? [f.comment] : undefined,
-                thumb: thumbOf(imageOf(f), NEED_LABELS[need.kind]),
-              };
-            }),
-          },
-        };
-      });
+      const files = choice.files.slice(0, 12);
+      await fetchThumbs(files.map(imageOf));
+      ctx.show(() => fileGallery.build({ ...choice, files, sections: noticeSection(), after: [...(choice.web ? [choice.web] : []), { label: t('Retour'), run: choice.back }] }));
     });
   }
 
@@ -1088,6 +1101,107 @@ export function createCatalog(ctx: CatalogContext) {
     acquirer.show({ url: i.page, game: i.gameLabel, expected: t('{kind} : {label}', { kind: NEED_LABELS[i.kind], label: i.label }), host: hostLine(h) });
     updateWatch();
     after?.();
+  }
+
+  // ---------- Chercher sur le web, récupérer une page pour une partie ----------
+
+  /** Jeu de la liste d'attente d'une table installée que la base VPS ne connaît pas : son dossier. */
+  const localGameId = (table: string) => `table:${path.basename(path.dirname(table)).toLowerCase()}`;
+
+  /**
+   * « Chercher sur le web… », de n'importe quel écran d'ajout ou de choix : la fenêtre
+   * « Récupérer » sur une recherche libre préremplie (moteurs au choix dans le bandeau).
+   * Ce que l'utilisateur y télécharge revient au jeu de l'écran, dans la partie que dit
+   * son contenu, ajoutée s'il le faut ; sans jeu, il est gardé de côté et `received` le
+   * reprend (le plan d'ajout d'une nouvelle table, depuis l'entonnoir).
+   */
+  function searchWeb(req: WebSearch, after?: () => void): void {
+    windowItem = undefined;
+    fs.mkdirSync(acquisitionDir(), { recursive: true });
+    const target = req.target;
+    acquirer.show({
+      url: webEngineUrl(req.query, 'web'),
+      game: target?.gameLabel ?? t('Recherche libre'),
+      expected: target?.kind ? t('{kind} : le fichier que vous choisirez', { kind: NEED_LABELS[target.kind] }) : t('Ce que vous choisirez : table, fronton, PuP-Pack, ROM, médias…'),
+      host: t('Recherche libre · fichiers que vous choisissez'),
+      status: target
+        ? t('Cherchez, ouvrez une page, téléchargez : le fichier est reconnu, puis rangé dans la partie de {game} que dit son contenu.', { game: target.gameLabel })
+        : t('Cherchez, ouvrez une page, téléchargez : le fichier est reconnu, puis proposé à l’ajout.'),
+      search: { query: req.query, engine: 'web' },
+      claim: {
+        dir: acquisitionDir(),
+        done: (r) => {
+          if (!('error' in r)) void receivedWeb(r.file, r.filename, r.urls, req);
+        },
+      },
+    });
+    after?.();
+  }
+
+  /** Fichier reçu d'une recherche libre : rangé dans une partie du jeu de l'écran, ou gardé de côté. */
+  async function receivedWeb(file: string, filename: string, urls: string[], req: WebSearch): Promise<void> {
+    const seen = await inspect(file);
+    const l = waitList();
+    const target = req.target;
+    const kind = seen.content !== 'unknown' ? (seen.content as NeedKind) : target?.kind;
+    if (target && kind && (target.gameId || target.table)) {
+      const gameId = target.gameId ?? localGameId(target.table!);
+      const waiting = l.items.find((i) => i.gameId === gameId && i.kind === kind && i.state === 'waiting');
+      const page = (urls.find((u) => /^https?:/i.test(u)) ?? '').replace(/[?#].*$/, '');
+      const item = waiting ?? addPart(l, { gameId, gameLabel: target.gameLabel, kind, label: filename.replace(/\.[^.]+$/, ''), page, ...(target.table ? { table: target.table } : {}) });
+      const replaced = attachFile(l, item, { file, via: 'window', url: urls.at(-1), ...seen });
+      save();
+      notice = {
+        text: [
+          t('« {file} » : {kind} de {game}, à installer.', { file: filename, kind: NEED_LABELS[kind], game: target.gameLabel }),
+          target.kind && target.kind !== kind ? t('C’est {content}, pas {expected} : rangé dans sa propre partie.', { content: CONTENT_LABELS[kind], expected: CONTENT_LABELS[target.kind] }) : '',
+          replaced ? t('L’ancien, « {file} », est gardé de côté.', { file: path.basename(replaced) }) : '',
+        ]
+          .filter(Boolean)
+          .join(' '),
+        tone: 'ok',
+      };
+    } else {
+      setAside(l, { file, via: 'window', url: urls.at(-1), ...seen });
+      save();
+      notice = { text: t('Reçu « {file} » ({content}) : gardé de côté, dans « Récupérés et attendus » et Téléchargements.', { file: filename, content: CONTENT_LABELS[seen.content] }), tone: 'ok' };
+      if (req.received) return req.received(file);
+    }
+    refresh?.();
+    host.broadcast();
+  }
+
+  /** Destinataire d'une recherche libre faite pour un élément de la liste d'attente : son jeu, sa partie, sa table. */
+  const itemTarget = (item: WaitItem): WebTarget => ({ gameId: item.gameId, gameLabel: item.gameLabel, kind: item.kind, ...(item.table ? { table: item.table } : {}) });
+
+  /** Fichier reçu d'une recherche libre sans jeu : le plan d'ajout d'une nouvelle table. */
+  const newTable = (file: string) => (ctx.addFiles ? ctx.addFiles([file]) : undefined);
+
+  /** Action « Chercher sur le web… » d'un écran d'ajout ou de choix (ADD_SCREENS) ; `after` : redessine l'écran. */
+  function webAction(screen: AddScreenId, req: WebSearch, after?: () => void): Action {
+    return {
+      label: t('Chercher sur le web…'),
+      detail: t('Navigateur intégré, recherche libre : « {query} »', { query: req.query }),
+      icon: 'link',
+      web: screen,
+      run: () => searchWeb(req, after),
+    };
+  }
+
+  /**
+   * Récupère pour une partie d'un jeu une page trouvée ailleurs que dans VPS (un résultat de
+   * VPUniverse ou de VPForums) : elle entre dans la liste d'attente, pour la table s'il y en
+   * a une, et s'ouvre dans « Récupérer » (ou se télécharge directement).
+   */
+  function fetchPart(target: WebTarget & { kind: NeedKind }, page: { url: string; label: string }, after: () => void): void {
+    const l = waitList();
+    const gameId = target.gameId ?? localGameId(target.table!);
+    const item = addPart(l, { gameId, gameLabel: target.gameLabel, kind: target.kind, label: page.label, page: page.url, ...(target.table ? { table: target.table } : {}) });
+    item.page = page.url;
+    item.pageKey = pageKey(page.url);
+    item.label = page.label;
+    save();
+    fetchItem(item, after);
   }
 
   // ---------- Installation rapide ----------
@@ -1314,6 +1428,7 @@ export function createCatalog(ctx: CatalogContext) {
       { label: t('Chercher dans Téléchargements'), detail: t('Ce qui y est arrivé depuis l’ajout à la liste'), run: () => scanDownloads() },
     );
     if (l.items.some((i) => i.state === 'installed')) actions.push({ label: t('Oublier les éléments installés'), run: () => ((l.items = l.items.filter((i) => i.state !== 'installed')), save(), ctx.show(() => buildWaitList())) });
+    actions.push(webAction('waitlist', { query: partWebQuery('table'), received: newTable }, () => openWaitList(ctx.cursor())));
     actions.push({ label: t('Retour'), run: () => waitBack() });
     const waitingCount = active.filter((i) => i.state === 'waiting').length;
     const receivedCount = active.filter((i) => i.state === 'received').length;
@@ -1370,6 +1485,7 @@ export function createCatalog(ctx: CatalogContext) {
     }
     const count = waitList().items.filter((i) => i.gameId === item.gameId && i.state !== 'installed').length;
     actions.push({ label: t('Retirer tout le jeu de la liste'), detail: tn(count, '{n} élément', '{n} éléments'), run: () => openRemoveGame(item.gameId, () => openItem(id)) });
+    actions.push(webAction('waitlist.item', { query: partWebQuery(item.gameLabel, item.kind), target: itemTarget(item) }, () => openItem(id, ctx.cursor())));
     actions.push({ label: t('Retour à la liste'), run: back });
     const lead = issue
       ? issue.problem === 'missing'
@@ -1597,6 +1713,7 @@ export function createCatalog(ctx: CatalogContext) {
           });
         actions.push(
           { label: item.received ? t('Rouvrir la page pour le télécharger de nouveau') : t('Rouvrir la page'), detail: hostLine(linkHost(item.page)), tone: good.length ? undefined : 'ok', run: () => reopen(item, back) },
+          webAction('waitlist.replace', { query: partWebQuery(item.gameLabel, item.kind), target: itemTarget(item) }, back),
           { label: t('Retour'), run: back },
         );
         return {
@@ -1992,7 +2109,29 @@ export function createCatalog(ctx: CatalogContext) {
     /** Parcours « Ce qu'il manque pour jouer » (journey.ts) : récupérer un fichier pour une table installée. */
     fetchFor: (source: { game: VpsGame; kind: NeedKind; file: VpsTableFile }, opts: { table: string; back: () => void }) =>
       withNotice(() => get(source.game, { kind: source.kind }, source.file, opts.back, opts.table), opts.back),
+    /**
+     * Fichiers d'une partie d'un jeu au choix, pour une table installée (parties du jeu,
+     * « Ce qu'il manque pour jouer ») : la galerie des fichiers ; Start récupère le fichier
+     * choisi pour cette table.
+     */
+    chooseFor: (source: { game: VpsGame; kind: NeedKind; files: VpsTableFile[]; heading: string; subheading: string; lead: string; advised?: string }, opts: { table: string; back: () => void; web?: Action }) =>
+      withNotice(
+        () =>
+          chooseFiles({
+            ...source,
+            pick: (f) => get(source.game, { kind: source.kind }, f, opts.back, opts.table),
+            back: opts.back,
+            web: opts.web,
+          }),
+        opts.back,
+      ),
     reopen,
+    /** « Chercher sur le web… » depuis un écran d'ajout ou de choix, et son action. */
+    searchWeb,
+    webAction,
+    /** Une page d'un site pour une partie d'un jeu : liste d'attente, puis « Récupérer ». */
+    fetchPart,
+    localGameId,
     /** Liste d'attente tenue par le catalogue (celle qui est enregistrée). */
     waitList,
     /** Rapproche Téléchargements de la liste d'attente ; nombre de fichiers retrouvés. */

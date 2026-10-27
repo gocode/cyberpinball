@@ -110,4 +110,10 @@ export const messages: Record<string, string> = {
   'Pour aller plus loin': 'Going further',
   'Contenu du DMD absent (facultatif) : le récupérer': 'DMD content missing (optional): get it',
   'Le script s’est arrêté sur le DMD qu’il dessine : son dossier « {folder} » manque. Start : le récupérer (« Pour aller plus loin »).': 'The script stopped on the DMD it draws: its “{folder}” folder is missing. Start: get it (“Going further”).',
+  // Plusieurs fichiers d'une partie : la galerie des fichiers.
+  '{kind} : voir les {n} au choix': '{kind}: see the {n} to choose from',
+  'Aperçu, téléchargements, note, auteur et date de chacun': 'Preview, downloads, rating, author and date of each',
+  'Le plus adapté à la borne d’abord. Start ouvre sa page dans la fenêtre « Récupérer » : le fichier téléchargé est rangé pour cette table, puis le parcours reprend.':
+    'The best fit for the cabinet first. Start opens its page in the “Get” window: the downloaded file is stored for this table, then the checklist resumes.',
+  'adapté à la borne': 'cabinet fit',
 };

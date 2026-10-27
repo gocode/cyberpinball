@@ -900,6 +900,20 @@ export function createAcquirer(events: AcquireEvents) {
   }
 
   /**
+   * Texte d'une page du site (fiche d'un fichier), avec les cookies de la session, sans
+   * l'afficher ni exécuter ses scripts ; `status` dit une fiche disparue (404). undefined
+   * sans réseau ou si la page n'arrive pas à temps.
+   */
+  async function fetchText(url: string, timeoutMs = 20_000): Promise<{ status: number; text: string } | undefined> {
+    try {
+      const response = await acquireSession().fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+      return { status: response.status, text: response.ok ? await response.text() : '' };
+    } catch {
+      return undefined;
+    }
+  }
+
+  /**
    * Téléchargement direct, sur demande de l'utilisateur déjà connecté : la fiche est
    * chargée dans une vue cachée de sa session, la sonde du site (sitesessions.ts) dit
    * quel lien suivre, au plus quatre pages. Résout dès que le téléchargement commence
@@ -1053,6 +1067,7 @@ export function createAcquirer(events: AcquireEvents) {
     direct,
     readPage,
     fetchImage,
+    fetchText,
     isOpen: () => Boolean(open && !open.win.isDestroyed()),
     /** Rouvrir la fenêtre sur cette page de départ reprendrait là où l'utilisateur en était. */
     resumable: (url: string) => Boolean((open && !open.win.isDestroyed() && open.request.url === url) || kept?.url === url),

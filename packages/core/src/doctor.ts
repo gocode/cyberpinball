@@ -37,12 +37,14 @@ import {
   cabinetFullDmd,
   chooseVariant,
   describePupCabinet,
+  describeSwitches,
   enablePupSwitch,
   expectedPackNames,
   findPackRoot,
   isVisible,
+  packDrawsDmd,
   pupScriptFacts,
-  pupScriptSwitch,
+  pupSwitchesToEnable,
   pupWindows,
   playlistRenames,
   screenRole,
@@ -825,35 +827,55 @@ function pupMismatchFinding(entry: TableEntry, root: string, pack: string, kept:
   };
 }
 
-function pupSwitchFinding(entry: TableEntry, pack: string, off: PupSwitch, override: Override | undefined): Finding {
+/**
+ * Interrupteurs éteints dans le script que VPX jouera (`offs`, pupSwitchesToEnable) : le
+ * lancement du pack, et la PuP-DMD quand l'option du pack occupe la fenêtre du DMD.
+ */
+function pupSwitchFinding(entry: TableEntry, pack: string, offs: PupSwitch[], override: Override | undefined, drawsDmd: boolean): Finding {
   const base = path.basename(entry.file).replace(/\.vpx$/i, '');
   const target = override?.file ?? path.join(entry.folder, `${base}.vbs`);
   const file = path.basename(target);
   let content: string | undefined;
-  if (override?.state.kind === 'ours') {
-    // Un interrupteur de plus dans notre .vbs : refait d'après la table, tous allumés.
-    const embedded = readVpxScript(entry.file);
-    const sw = pupScriptSwitch(scriptCode(override.text));
-    if (embedded !== undefined && sw) content = buildScriptPatch(embedded, [...override.state.patch.switches, sw]);
-  } else if (override) {
-    const sw = pupScriptSwitch(scriptCode(override.text));
-    if (sw) content = enablePupSwitch(override.text, sw);
+  if (override && override.state.kind !== 'ours') {
+    // .vbs venu d'ailleurs : allumé dans ce fichier même, chaque valeur sur sa ligne.
+    let text: string | undefined = override.text;
+    for (const sw of offs) text = text === undefined ? undefined : enablePupSwitch(text, sw);
+    content = text;
   } else {
+    // Notre .vbs, ou pas de .vbs : refait d'après le texte de la table, recopié ligne pour ligne.
     const embedded = readVpxScript(entry.file);
-    // Relu dans le texte de la table : c'est lui qu'on recopie, ligne pour ligne.
-    const sw = embedded !== undefined ? pupScriptSwitch(scriptCode(embedded)) : undefined;
-    if (embedded !== undefined && sw) content = buildScriptPatch(embedded, [sw]);
+    const switches = embedded !== undefined ? pupSwitchesToEnable(scriptCode(embedded), drawsDmd) : [];
+    if (embedded !== undefined && switches.length) content = buildScriptPatch(embedded, switches);
   }
-  const params = { variable: off.variable, value: off.value, enable: off.enable ?? '?', pack, file };
-  const detail = [t('Le script met {variable} = {value} : il ne lance jamais le PuP-Pack, et la partie n’affiche que le fronton et le DMD habituels, même avec pupvideos\\{pack} bien rangé.', params)];
-  if (content && !override) detail.push(t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où seule cette valeur change.', params));
-  else if (!content && off.enable) detail.push(t('Mettez {variable} = {enable} dans le script de la table (éditeur de VPX).', params));
+  const main = offs.find((s) => s.kind !== 'dmd');
+  const dmd = offs.find((s) => s.kind === 'dmd');
+  const params = { pack, file, values: describeSwitches(offs, 'value'), enables: describeSwitches(offs, 'enable') };
+  const detail: string[] = [];
+  if (main) {
+    detail.push(
+      t('Le script met {variable} = {value} : il ne lance jamais le PuP-Pack, et la partie n’affiche que le fronton et le DMD habituels, même avec pupvideos\\{pack} bien rangé.', {
+        ...params,
+        variable: main.variable,
+        value: main.value,
+      }),
+    );
+  }
+  if (dmd) {
+    detail.push(
+      t('Le script met {variable} = {value} : la PuP-DMD (le score que le pack écrit sur son écran DMD) reste éteinte, et le DMD ne montrerait que le cadre vide du pack.', {
+        variable: dmd.variable,
+        value: dmd.value,
+      }),
+    );
+  }
+  if (content && !override) detail.push(t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où seules ces valeurs changent.', params));
+  else if (!content && offs.every((s) => s.enable)) detail.push(t('Mettez {enables} dans le script de la table (éditeur de VPX).', params));
   return {
     code: 'pupDisabledByScript',
     severity: 'warning',
-    title: t('PuP-Pack coupé par le script de la table'),
+    title: main ? t('PuP-Pack coupé par le script de la table') : t('PuP-DMD coupée par le script de la table'),
     detail: detail.join(' '),
-    fix: content ? { label: t('Allumer le PuP-Pack ({variable} = {enable}, dans {file})', params), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+    fix: content ? { label: t('Allumer le PuP-Pack ({enables}, dans {file})', params), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
   };
 }
 
@@ -938,9 +960,15 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
   }
 
   // Script qui ne lance jamais le pack (« usePUP = False ») : bien rangé, il ne s'affichera pas.
-  // C'est le script que VPX joue qui compte : le .vbs posé à côté s'il y en a un.
-  const off = override ? pupScriptSwitch(scriptCode(override.text)) : facts?.pup?.disabledBy;
-  if (off && matching.length) findings.push(pupSwitchFinding(entry, matching[0]!, off, override));
+  // C'est le script que VPX joue qui compte : le .vbs posé à côté s'il y en a un, sinon celui de
+  // la table, relu dans le .vpx (une lecture gardée en cache peut dater d'avant qu'on sache voir
+  // un interrupteur, comme « HasPup = enablePupPack » des Goonies). La PuP-DMD compte aussi
+  // quand l'option en place occupe la fenêtre du DMD d'une borne qui en a une.
+  const drawsDmd = matching.length > 0 && ctx.cabinet?.dmd !== false && packDrawsDmd(path.join(pupvideos, matching[0]!));
+  const played = override ? override.text : matching.length && facts?.pup ? readVpxScript(entry.file) : undefined;
+  const offs = played !== undefined ? pupSwitchesToEnable(scriptCode(played), drawsDmd) : facts?.pup?.disabledBy ? [facts.pup.disabledBy] : [];
+  const off = offs.find((s) => s.kind !== 'dmd');
+  if (offs.length && matching.length) findings.push(pupSwitchFinding(entry, matching[0]!, offs, override, drawsDmd));
 
   for (const pack of matching) {
     const dir = path.join(pupvideos, pack);

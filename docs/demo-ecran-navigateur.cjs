@@ -90,6 +90,8 @@ async function run(report) {
   let phase = 'library';
   let configurations;
   const library = createLibrary({
+    // Mode invité inactif : tout passe (host.guest est obligatoire, library.ts).
+    guest: { active: false, allows: () => true, knock: () => true },
     root,
     dataDir: L.data,
     vpxExe: () => undefined,

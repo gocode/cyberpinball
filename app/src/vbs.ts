@@ -11,7 +11,7 @@
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { scriptFacts, t, type ScriptFacts } from '@cyberpinball/core';
+import { readVpxScript, scriptFacts, t, type ScriptFacts } from '@cyberpinball/core';
 
 export type ScriptResult = ScriptFacts | { error: string };
 
@@ -19,11 +19,11 @@ interface CacheEntry {
   size: number;
   mtimeMs: number;
   facts: ScriptFacts;
-  /** Version de la lecture : une entrée plus ancienne est relue (2 : dossier DMD, 3 : appels PuP, 4 : interrupteur du PuP, 5 : DMD dessiné par la table). */
+  /** Version de la lecture : une entrée plus ancienne est relue (2 : dossier DMD, 3 : appels PuP, 4 : interrupteur du PuP, 5 : DMD dessiné par la table, 6 : interrupteur relayé par une autre variable et PuP-DMD). */
   v?: number;
 }
 
-const FACTS_VERSION = 5;
+const FACTS_VERSION = 6;
 
 function fresh(entry: CacheEntry | undefined, stat: fs.Stats): entry is CacheEntry {
   return Boolean(entry && entry.v === FACTS_VERSION && entry.size === stat.size && entry.mtimeMs === stat.mtimeMs);
@@ -112,10 +112,26 @@ export function rememberScript(table: string, facts: ScriptFacts, dataDir: strin
  * Une lecture d'une version précédente sert encore : la ROM y est, seuls les appels PuP manquent.
  */
 export function cachedScript(table: string, dataDir: string): ScriptFacts | undefined {
-  const entry = loadCache(path.join(dataDir, 'cache', 'scripts.json'))[table.toLowerCase()];
+  const cacheFile = path.join(dataDir, 'cache', 'scripts.json');
+  const cache = loadCache(cacheFile);
+  const entry: CacheEntry | undefined = cache[table.toLowerCase()];
   try {
     const stat = fs.statSync(table);
-    return fresh(entry, stat) ? entry.facts : undefined;
+    const old = entry !== undefined && entry.size === stat.size && entry.mtimeMs === stat.mtimeMs ? entry : undefined;
+    if (fresh(entry, stat)) return entry.facts;
+    // Lecture d'une version précédente pour la même table : relue dans le .vpx, sans lancer
+    // VPX (même texte que -ExtractVBS). Sans elle, la santé de la borne et la préparation des
+    // parties ne verraient pas ce qu'on sait lire depuis (interrupteur relayé des Goonies).
+    if (old) {
+      const text = readVpxScript(table);
+      // Script protégé : l'ancienne lecture sert encore (la ROM y est).
+      if (text === undefined) return old.facts;
+      const facts = scriptFacts(text);
+      cache[table.toLowerCase()] = { size: stat.size, mtimeMs: stat.mtimeMs, facts, v: FACTS_VERSION };
+      saveCache(cacheFile, cache);
+      return facts;
+    }
+    return undefined;
   } catch {
     return undefined;
   }

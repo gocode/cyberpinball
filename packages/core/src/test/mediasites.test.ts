@@ -50,7 +50,8 @@ test('texte cherché : le titre sans sous-titre ni petits mots, quatre mots au p
 test('adresses de recherche : catégories des médias de menu sur VPUniverse, application des téléchargements sur VPForums', () => {
   const u = new URL(siteSearchUrl('vpuniverse', 'terminator 2'));
   assert.equal(u.hostname, 'vpuniverse.com');
-  assert.equal(u.searchParams.get('q'), 'terminator 2');
+  // VPUniverse ignore les mots de trois lettres ou moins, et sa recherche « et » ne rend alors rien : ils sont retirés.
+  assert.equal(u.searchParams.get('q'), 'terminator');
   assert.equal(u.searchParams.get('type'), 'downloads_file');
   assert.ok(u.searchParams.get('nodes')!.split(',').includes('160'), 'vidéos du topper');
   const f = new URL(siteSearchUrl('vpforums', 'medieval madness'));

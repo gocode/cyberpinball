@@ -324,7 +324,15 @@ export function createProposals(ctx: ProposalsContext) {
         const r = await sites.search(site.id, q, type);
         if (r.kind === 'hits') found.hits.push(...r.hits.filter((h) => !found.hits.some((k) => k.id === h.id)));
         else if (r.kind === 'login') found.login = true;
-        else found.problem = r.reason === 'challenge' ? t('le site fait une vérification (Cloudflare)') : r.reason === 'down' ? t('le site ne répond pas pour l’instant') : t('page de résultats illisible');
+        else
+          found.problem =
+            r.reason === 'challenge'
+              ? t('le site fait une vérification (Cloudflare)')
+              : r.reason === 'down'
+                ? t('le site ne répond pas pour l’instant')
+                : r.reason === 'flood'
+                  ? t('le site impose d’attendre entre deux recherches : réessayez dans {n} s', { n: r.wait })
+                  : t('page de résultats illisible');
       }
     }
   }
@@ -623,6 +631,7 @@ export function createProposals(ctx: ProposalsContext) {
       actions.push({
         label: t('Chercher sur le web…'),
         detail: ctx.web.detail(table, type, st.query),
+        web: 'medias.proposals',
         tone: choices.length ? undefined : 'ok',
         run: () => openWeb(table, type),
       });
