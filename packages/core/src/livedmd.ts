@@ -12,7 +12,7 @@
 // Les mots de l'afficheur restent ceux des flippers (PRESS START, CREDITS, HIGH SCORE) : ils
 // font partie du décor, comme sur les machines vendues en France.
 
-import { DMD_FONT_HUGE, DMD_FONT_LARGE, DMD_FONT_SMALL, dmdText, textWidth, type DmdFont } from './dmdfont';
+import { DMD_FONT_BRAND, DMD_FONT_HUGE, DMD_FONT_LARGE, DMD_FONT_SMALL, dmdText, textWidth, type DmdFont } from './dmdfont';
 import { centeredDmdBand } from './dmdscreen';
 import { frameWindow, type FrameRecord, type FrameRect } from './fulldmdframe';
 import { dmdScore, type TableRecords } from './highscores';
@@ -33,10 +33,17 @@ export const DMD_LEVEL = {
   main: 14,
   /** Horloge et crédits : présents sans prendre le pas sur la table. */
   quiet: 11,
-  /** Fabricant et année, libellé des records. */
-  secondary: 9,
+  /** Fabricant et année, libellé des records : environ 66 % de la couleur, lisibles sans prendre le pas (seconde revue du 27/10/2026). */
+  secondary: 11,
   /** Rail du chargement (5 : visible sans concurrencer la bille, seconde revue). */
   rail: 5,
+  /**
+   * Marque : PINBALL au plein éclat, CYBER un ton dessous mais au-dessus du secondaire, son trait
+   * d'un point étant léger ; sur un afficheur d'une couleur, la lumière porte la hiérarchie que
+   * l'interface donne par la couleur (CYBER clair, PINBALL vert signal ; revue du 27/10/2026).
+   */
+  brandCyber: 11,
+  brandPinball: 15,
 };
 
 /** Une image de l'afficheur : DMD_WIDTH × DMD_HEIGHT nuances, ligne par ligne. */
@@ -231,11 +238,11 @@ export function creditsPage(credits = 0): DmdPage {
   return still('credits', LIVE_DMD_TIMING.credits, (dots) => drawCentered(dots, DMD_FONT_LARGE, `CREDITS ${credits}`, 9, DMD_LEVEL.quiet));
 }
 
-/** Sans table : la marque sur deux lignes. */
+/** Sans table : la marque empilée dans sa police (dmdfont.ts), 3 lignes libres en haut et en bas, 4 entre les mots. */
 export function brandPage(): DmdPage {
   return still('brand', LIVE_DMD_TIMING.brand, (dots) => {
-    drawCentered(dots, DMD_FONT_LARGE, 'CYBER', 1);
-    drawCentered(dots, DMD_FONT_LARGE, 'PINBALL', 17);
+    drawCentered(dots, DMD_FONT_BRAND, 'CYBER', 3, DMD_LEVEL.brandCyber);
+    drawCentered(dots, DMD_FONT_BRAND, 'PINBALL', 18, DMD_LEVEL.brandPinball);
   });
 }
 

@@ -98,6 +98,12 @@ export interface PlanOptions {
    * installée (un PuP-Pack récupéré après la table, dont l'archive ne dit pas le jeu).
    */
   vpsGame?: string;
+  /**
+   * Dossier d'une table installée choisie par l'utilisateur (ajout depuis la fiche du jeu, ou
+   * depuis Téléchargements à une table) : tout ce que contient l'import lui revient, la table
+   * comprise, sauf ce qui va ailleurs par nature (une ROM entre dans la bibliothèque).
+   */
+  target?: string;
 }
 
 /** Une version d'une ROM : celle de la bibliothèque ou une ROM importée. */
@@ -321,14 +327,25 @@ export function planImport(sources: ImportSource[], opts: PlanOptions): ImportPl
   sources.forEach((src, pkg) => collect(src, pkg, items, ignored, dmdFolders, hints));
 
   const packages = sources.map((src) => ({ name: src.label ?? path.basename(src.path), isPack: src.unpacked || isDir(src.path) }));
-  const games = groupGames(items.filter((i) => i.kind === 'table'), items, packages, opts);
+  let games = groupGames(items.filter((i) => i.kind === 'table'), items, packages, opts);
   const leftovers: ImportPlan['leftovers'] = [];
+  // Table choisie : les .vpx de l'import en deviennent des versions, rien ne part dans une nouvelle table.
+  const target = opts.target ? games.find((g) => samePath(g.folder, opts.target!)) : undefined;
+  if (target) {
+    for (const g of games.filter((g) => g !== target && g.isNew)) {
+      target.vpx.push(...g.vpx);
+      target.roms = [...new Set([...target.roms, ...g.roms])];
+      target.dmdFolders = [...new Set([...target.dmdFolders, ...g.dmdFolders])];
+      target.pupNames = uniqueNames([...target.pupNames, ...g.pupNames]);
+    }
+    games = games.filter((g) => g === target || !g.isNew);
+  }
 
   // Avec la bibliothèque, une ROM n'appartient pas à une table : elle va à la bibliothèque.
   const romItems: { item: Item; owner?: Game }[] = [];
   const ofGame = opts.vpsGame ? games.filter((g) => g.vpsId === opts.vpsGame) : [];
   for (const item of items.filter((i) => i.kind !== 'table')) {
-    const game = assign(item, games, packages, opts.vps) ?? (ofGame.length === 1 ? ofGame[0] : undefined);
+    const game = target ?? assign(item, games, packages, opts.vps) ?? (ofGame.length === 1 ? ofGame[0] : undefined);
     if (opts.romLibrary && item.kind === 'rom' && (!item.isDir || item.rom)) romItems.push({ item, owner: game });
     else if (game) game.others.push(item);
     else leftovers.push({ source: item.source, reason: t('Je ne sais pas à quelle table il appartient : il reste où il est.') });

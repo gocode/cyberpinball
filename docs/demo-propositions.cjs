@@ -13,7 +13,8 @@
 // cadre dans PupImages ; le .vpx range aussi son plateau, sa carte de règles, le
 // fronton et le logo de sa pièce VR (GameStg). Parcours : plan automatique (« Quel jeu
 // est-ce ? » et ses raisons), propositions du fronton, choix d'une autre version,
-// jeux retenus, recherche d'un titre au clavier, musique, plateau, règles, logo,
+// média suivant et précédent sans quitter les propositions (galerie), jeux retenus,
+// recherche d'un titre au clavier, musique, plateau, règles, logo,
 // afficheur large, fronton tout allumé du .directb2s (sa copie au nom du site écartée,
 // un autre .directb2s proposé), plan d'enregistrement, provenance dans le .info.
 
@@ -175,6 +176,8 @@ async function scenario(sc, box, report) {
     keys: () => KEYS,
     windows: () => windows,
     broadcast: () => send(),
+    // Mode invité arrêté : tout est ouvert.
+    guest: { active: false, allows: () => true, knock: () => true },
   });
   function send() {
     if (win.isDestroyed()) return;
@@ -246,10 +249,15 @@ async function scenario(sc, box, report) {
   key(KEYS.next[0]);
   await shot('fronton-troisieme');
   // Une autre version que celle du plan automatique : la deuxième proposition.
+  // Le choix reste sur les propositions (galerie) : la tuile le dit, « Enregistrer » est là.
   library.handleAction({ type: 'activate', index: 1 });
   await idle();
   await shot('fronton-choisi');
-  act('Voir les propositions');
+  // Un média après l'autre, sans revenir à la vue d'ensemble ; le choix du fronton reste au brouillon.
+  act('Média suivant');
+  await idle();
+  await shot('media-suivant');
+  act('Média précédent');
   await idle();
   await shot('fronton-propositions-choisi');
 
@@ -280,6 +288,7 @@ async function scenario(sc, box, report) {
   await shot('musique-propositions');
   library.handleAction({ type: 'activate', index: 0 });
   await idle();
+  act('Retour : Musique');
   act('Retour aux médias');
   act('Plateau');
   act('Voir les propositions');

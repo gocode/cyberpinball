@@ -85,13 +85,14 @@ test('mode invité : chaque message du menu dit la porte de son action', () => {
  */
 const INPUT_SOURCES: Record<string, { count: number; why: string }> = {
   'frontend.ts': { count: 7, why: 'le menu : handleKey, handleKeyUp, le canal « action » et les raccourcis globaux passent par GuestMode (knock)' },
+  'key-input.ts': { count: 2, why: 'touches des fenêtres inscrites par onKeyInput (menu, assistant), remises à leur traitement ; la page demande seulement si un appui a été traité' },
   'frontend-gate.ts': { count: 2, why: 'au démarrage, un autre menu de borne ouvert : attendre ou continuer, rien n’est modifié' },
   'language.ts': { count: 1, why: 'lecture du catalogue des traductions' },
   'settings.ts': { count: 4, why: 'réglages de VPX : derrière menu.vpx-settings et sheet.table-settings, fermées' },
-  'wizard.ts': { count: 5, why: 'assistant de la borne, lancé à part : derrière message.wizard, message.buttons, message.interface et le menu système, fermés' },
+  'wizard.ts': { count: 7, why: 'assistant de la borne, lancé à part : derrière message.wizard, message.buttons, message.interface et le menu système, fermés ; l’autopilote guette ses propres touches rejouées (Clavier:…)' },
   'acquire-window.ts': { count: 12, why: 'fenêtre « Récupérer » : derrière sheet.missing, sheet.further et le menu système, fermés' },
 };
-const INPUT_PATTERN = /ipcMain\.(?:on|once|handle|handleOnce)\(|globalShortcut\.register\(|'before-input-event'|(?<!function )onJoystickInput\(/g;
+const INPUT_PATTERN = /ipcMain\.(?:on|once|handle|handleOnce)\(|globalShortcut\.register\(|'before-input-event'|(?<!function )onJoystickInput\(|(?<!function )onKeyInput\(/g;
 
 test('mode invité : toute source d’entrées de app/src est revue (une nouvelle doit dire sa porte)', () => {
   const found: Record<string, number> = {};

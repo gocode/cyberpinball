@@ -75,6 +75,7 @@ const CYBER_ICONS = {
   eye: '<path d="M2 12C7 3 17 3 22 12c-5 9-15 9-20 0z"/><circle cx="12" cy="12" r="3"/>', // Vue de la table et cadrage.
   gauge: '<path d="M4 20a10 10 0 1 1 16 0M12 3v3M3 12h3M18 12h3M12 16l5-7"/>', // Performances et synchronisation.
   dmd: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M6 14h.01M10 14h.01M14 14h.01M18 14h.01"/>', // Afficheur à points, backglass et DMD réel.
+  palette: '<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2s-1-1.5-1-2.5 1-1.5 2-1.5h2a4 4 0 0 0 4-4c0-4.5-4-8-9-8z"/><path d="M7.5 11h.01M10 7h.01M15 7.5h.01"/>', // Palette du peintre : couleur des points du DMD.
   folder: '<path d="M3 6V4h6l3 3h9v13H3z"/>', // Dossiers communs.
   'folder-download': '<path d="M10 20H3V4h6l3 3h9v5M17 13v8M14 18l3 3 3-3"/>', // Dossier Téléchargements de Windows : dossier ouvert d’une flèche qui descend.
   drive: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 13h18M7 16h.01M11 16h.01"/>', // Disque ou lecteur de ce PC.

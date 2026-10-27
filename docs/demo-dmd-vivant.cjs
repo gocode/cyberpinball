@@ -130,11 +130,15 @@ app.whenReady().then(async () => {
       ? { role: 'dmd', type: fullDmd ? 'FullDMD' : 'DMD', source: 'table', url: core.mediaUrl(file), kind: 'image', fit: 'contain', rotation: 0, card: { title: table?.title } }
       : table
         ? { role: 'dmd', type: fullDmd ? 'FullDMD' : 'DMD', source: 'fallback', fallback: 'dmd-dots', fit: 'contain', rotation: 0, card: { title: table.title, manufacturer: table.manufacturer, year: table.year } }
-        : undefined;
-    // Place des points, comme liveDmdView (frontend.ts) : dans le cadre du média FullDMD s'il en a un.
+        : fullDmd
+          ? { role: 'dmd', type: 'FullDMD', source: 'fallback', fallback: 'dmd-dots', fit: 'contain', rotation: 0, card: { title: '' }, brand: true }
+          : undefined;
+    // Place des points, comme liveDmdView (frontend.ts) : dans le cadre du média FullDMD s'il en a un ;
+    // FullDMD sans table, pas de bande : le repli dessine la marque sur toute sa grille.
     const record = fullDmd && file ? core.pngFrame(file) : undefined;
     const zonePx = { width: zone.width * width, height: zone.height * height };
-    const liveDmd = { area: core.liveDmdArea(record?.frame ? record : undefined, zonePx), framed: Boolean(record?.frame) };
+    const brandOnly = fullDmd && !table;
+    const liveDmd = brandOnly ? undefined : { area: core.liveDmdArea(record?.frame ? record : undefined, zonePx), framed: Boolean(record?.frame) };
     win.webContents.send('state', { role: 'dmd', phase: 'menu', help: false, medias: { dmd: view }, preload: [], liveDmd });
     // Le vrai programme, à une horloge arrêtée au milieu de la page voulue.
     let now = 0;
@@ -167,7 +171,10 @@ app.whenReady().then(async () => {
     for (const p of found) problems.push(`${name} : ${p}`);
     // Ce que chaque cas doit montrer : des points (ou le média sur sa page), dans le cadre pour un FullDMD habillé.
     const wantMedia = page === 'media';
-    if (!shown.dmd) problems.push(`${name} : pas d'afficheur à points`);
+    if (brandOnly) {
+      if (shown.dmd) problems.push(`${name} : bande du DMD vivant sur un FullDMD sans table`);
+      if (shown.couches?.[0]?.element !== 'marque') problems.push(`${name} : pas de repli FullDMD (la marque) sous le DMD`);
+    } else if (!shown.dmd) problems.push(`${name} : pas d'afficheur à points`);
     else {
       if (shown.dmd.visible === wantMedia) problems.push(`${name} : afficheur ${shown.dmd.visible ? 'visible' : 'caché'} sur la page ${page}`);
       if (!wantMedia && !shown.dmd.points) problems.push(`${name} : aucun point allumé`);

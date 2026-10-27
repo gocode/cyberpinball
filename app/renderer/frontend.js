@@ -630,7 +630,18 @@ function gearButton(s) {
   return gear;
 }
 
+/**
+ * Chaque état redessine l'écran ; les listes qui défilent restent où elles étaient
+ * (library.js, revealSelection). L'écran est nommé par ce qu'il montre : un autre repart du haut.
+ */
 function renderPlayfield(s) {
+  menuScroll.capture(root);
+  drawPlayfield(s);
+  const l = s.phase === 'library' ? s.library : undefined;
+  revealSelection(root, l ? ['library', l.screen, l.variant ?? '', l.heading].join('|') : s.attract ? 'attract' : s.phase);
+}
+
+function drawPlayfield(s) {
   // Mode attente : la table tirée au hasard, sans la liste du menu.
   if (s.attract) {
     dropLoadingFallback();
@@ -696,7 +707,6 @@ function renderPlayfield(s) {
     nodes.push(cover);
   } else nodes.unshift(brand());
   placeChildren(nodes);
-  revealSelection();
 }
 
 /** Repli minimal d'un écran annexe (sans fallback.js) : le titre de la table sur fond noir. */
@@ -1052,6 +1062,10 @@ window.cyber.onState((s) => {
   // Fond de partie dès que la fenêtre de jeu de VPX s'affiche ; avant, au chargement, chaque
   // écran garde les médias du jeu (le playfield, sa vidéo de chargement et les commandes).
   // L'écran de chargement de secours reste d'un état à l'autre (renderPlayfield le quitte).
+  // Couleur réglée des points (DMD du menu et replis) : avant l'afficheur, qui naît à la bonne couleur ;
+  // le jeton --dmd sert au repli minimal, sans fallback.js.
+  window.CyberFallback?.setDmdColor?.(s.dmdColor);
+  if (s.dmdColor) document.documentElement.style.setProperty('--dmd', s.dmdColor);
   syncLiveDmd(s.game ? undefined : s.liveDmd);
   // Lancement en cinéma : posé au Start, effacé quand VPX paraît (avant le fond de partie).
   syncCinema(s);

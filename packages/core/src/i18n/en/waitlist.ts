@@ -45,7 +45,6 @@ export const messages: Record<string, string> = {
   'reçu : {file} — {problem}': 'received: {file} — {problem}',
   '{label} : à corriger': '{label}: to fix',
   '{kind} : {problem}': '{kind}: {problem}',
-  'à corriger d’abord : {items}': 'fix first: {items}',
   // Liste d'attente
   'fichier disparu (déplacé ou effacé)': 'file gone (moved or deleted)',
   '{content}, pas {expected}': '{content}, not {expected}',
@@ -66,8 +65,6 @@ export const messages: Record<string, string> = {
   'De côté': 'Kept aside',
   '{n} à corriger': '{n} to fix',
   '{n} sans élément': '{n} not assigned',
-  'Ce que vous récupérez, jeu par jeu. Start sur un élément : le rouvrir, le réaffecter, le vider ou le remplacer. Un fichier qui ne convient pas à ce qu’on attendait n’est jamais rangé sans votre accord ; rien n’est installé avant le plan.':
-    'What you are getting, game by game. Start on an item: reopen, reassign, clear or replace it. A file that does not fit what was expected is never filed without your consent; nothing is installed before the plan.',
   // Un élément
   'Élément retiré': 'Item removed',
   'Retour à la liste': 'Back to the list',
@@ -163,7 +160,6 @@ export const messages: Record<string, string> = {
   'Recherche dans Téléchargements…': 'Searching Downloads…',
   // Installation
   'Vérification des fichiers reçus…': 'Checking the received files…',
-  'À corriger avant d’installer : {item}, {problem}.': 'To fix before installing: {item}, {problem}.',
 
   // app/src/library.ts : fiche d'une table, résumé des fichiers
   'dernière partie le {date}': 'last game on {date}',

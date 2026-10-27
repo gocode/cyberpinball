@@ -1,13 +1,15 @@
 // Écran « Téléchargements » (menu système) : tout ce que Cyber Pinball a téléchargé,
 // gardé sous <racine>\downloads pour le reprendre sans le télécharger de nouveau — d'où
-// il vient, quand, sa taille, à quoi il sert. Un fichier s'ouvre (le reprendre pour une
-// table, le mettre à la corbeille) ; « Tout vider » met toute la zone à la corbeille de
+// il vient, quand, sa taille, à quoi il sert, ce qu'il contient. Un fichier s'ouvre : l'ajouter
+// à n'importe quel jeu (une table installée, ou un jeu de la liste d'attente), dans la partie
+// que dit son contenu ; l'installer comme nouvelle table ; le mettre à la corbeille ; « Tout vider » met toute la zone à la corbeille de
 // Cyber Pinball, après confirmation. En option, les fichiers récents du dossier
 // Téléchargements de Windows, montrés ici sans ouvrir l'explorateur.
 // Cœur : packages/core/src/downloads.ts.
 
 import * as path from 'node:path';
 import {
+  CONTENT_LABELS,
   DOWNLOAD_KIND_LABELS,
   DOWNLOAD_ORIGIN_LABELS,
   DOWNLOAD_SORT_LABELS,
@@ -17,14 +19,20 @@ import {
   downloadTotals,
   emptiableDownloads,
   formatDateTime,
+  formatList,
   formatSize,
+  NEED_LABELS,
+  PART_KINDS,
   sortDownloads,
   t,
   tn,
   trashDownloads,
   type DownloadEntry,
+  type ContentKind,
   type DownloadSort,
   type Layout,
+  type NeedKind,
+  type TableEntry,
 } from '@cyberpinball/core';
 import type { Action, Built, Row, Section, Tone } from './library';
 import { useNote } from './file-picker';
@@ -36,10 +44,26 @@ export interface DownloadsScreenContext {
   inventory(windows: boolean): DownloadEntry[];
   /** Les fichiers sont partis : la liste d'attente et les relevés des sites oublient. Renvoie les éléments redevenus attendus. */
   forget(files: string[]): number;
-  /** Reprendre un fichier pour l'ajouter (plan d'ajout d'une table). */
+  /** Reprendre un fichier comme nouvelle table (plan d'ajout). */
   install(paths: string[]): void;
+  /** Ce que contient un fichier : sa partie principale et toutes celles qu'il apporte (archive listée). */
+  inspect(file: string): Promise<{ content: ContentKind; summary?: string; parts?: NeedKind[] }>;
+  /** Le jeu auquel il revient sans doute : sa table installée, ou un jeu de la liste d'attente. */
+  suggest(file: string): { table?: TableEntry; game?: { gameId: string; label: string } };
+  /** Tables installées, une par dossier. */
+  tables(): TableEntry[];
+  /** Jeux de la liste d'attente. */
+  games(): { gameId: string; label: string }[];
+  /** Plan d'ajout de ce fichier à une table installée, tout destiné à elle. */
+  addToTable(paths: string[], table: TableEntry): void;
+  /** Rattache le fichier à une partie d'un jeu de la liste d'attente. */
+  attachToGame(file: string, gameId: string, kind: NeedKind, back: () => void): void;
+  /** Tâche avec message d'attente (lecture d'une archive). */
+  task(message: string, work: () => Promise<void> | void): Promise<void>;
   back(): void;
 }
+
+type Seen = Awaited<ReturnType<DownloadsScreenContext['inspect']>>;
 
 /** Ce qu'on peut reprendre par l'ajout d'une table : table, fronton, ROM, archive, média. */
 const INSTALLABLE = new Set(['table', 'b2s', 'rom', 'archive', 'image', 'video', 'audio']);
@@ -48,6 +72,8 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
   let sort: DownloadSort = 'date';
   let windows = false;
   let flash: { text: string; tone: Tone } | undefined;
+  /** Contenu de chaque fichier ouvert, lu une fois. */
+  const seenOf = new Map<string, Seen>();
 
   const flashSection = (): Section[] => (flash ? [{ rows: [{ text: flash.text, tone: flash.tone }] }] : []);
 
@@ -112,8 +138,17 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
 
   function openFile(file: string): void {
     flash = undefined;
-    ctx.show(() => buildFile(file));
+    const key = file.toLowerCase();
+    if (seenOf.has(key)) return ctx.show(() => buildFile(file));
+    void ctx.task(t('Lecture du fichier…'), async () => {
+      seenOf.set(key, await ctx.inspect(file));
+      ctx.show(() => buildFile(file));
+    });
   }
+
+  /** Parties qu'apporte un fichier : « PuP-Pack », « Table, Fronton ». */
+  const partsOf = (seen: Seen | undefined): NeedKind[] => (seen ? (seen.parts ?? (seen.content === 'unknown' ? [] : [seen.content])) : []);
+  const partsText = (parts: NeedKind[]) => formatList(parts.map((k) => NEED_LABELS[k]));
 
   function buildFile(file: string): Built {
     const e = find(file);
@@ -128,10 +163,27 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
       { text: t('Provenance'), detail: [e.source, DOWNLOAD_ORIGIN_LABELS[e.origin]].filter(Boolean).join(' · ') },
     ];
     if (e.url) rows.push({ text: t('Adresse'), detail: e.url });
+    const seen = seenOf.get(file.toLowerCase());
+    const parts = partsOf(seen);
+    if (seen) rows.push({ text: t('Contient'), detail: [CONTENT_LABELS[seen.content], seen.summary].filter(Boolean).join(' : ') });
+    const sug = ctx.suggest(e.file);
+    if (sug.table ?? sug.game) rows.push({ text: t('Jeu'), detail: sug.table?.title ?? sug.game!.label });
     rows.push({ text: t('Usage'), detail: `${note.sign} ${note.text}`, tone: note.tone === 'quiet' ? undefined : note.tone });
     rows.push({ text: t('Emplacement'), detail: path.dirname(e.file) });
     const actions: Action[] = [];
-    if (INSTALLABLE.has(e.kind)) actions.push({ label: t('Reprendre pour ajouter une table'), detail: t('Plan d’ajout à valider ; le fichier reste ici'), icon: 'table-add', run: () => ctx.install([e.file]) });
+    if (INSTALLABLE.has(e.kind)) {
+      // Le jeu probable d'abord, dans la partie que dit son contenu ; puis n'importe quel autre jeu.
+      if (sug.table) {
+        const table = sug.table;
+        actions.push({ label: t('Ajouter à {title}', { title: table.title }), detail: parts.length ? t('{parts} · plan à valider ; le fichier reste ici', { parts: partsText(parts) }) : t('Plan à valider ; le fichier reste ici'), icon: 'table-add', tone: 'ok', run: () => ctx.addToTable([e.file], table) });
+      } else if (sug.game && parts[0]) {
+        const game = sug.game;
+        const part = parts[0];
+        actions.push({ label: t('Rattacher à {game}', { game: game.label }), detail: t('{part} · liste d’attente', { part: NEED_LABELS[part] }), icon: 'inbox', tone: 'ok', run: () => ctx.attachToGame(e.file, game.gameId, part, () => openFile(file)) });
+      }
+      actions.push({ label: t('Ajouter à un autre jeu…'), detail: t('Une table installée, ou un jeu attendu'), icon: 'tables', run: () => openGames(e) });
+      if (!seen || seen.content === 'unknown' || parts.includes('table')) actions.push({ label: t('Installer comme nouvelle table'), detail: t('Plan d’ajout à valider ; le fichier reste ici'), icon: 'table-add', run: () => ctx.install([e.file]) });
+    }
     actions.push({
       label: t('Mettre à la corbeille'),
       detail: e.outside ? t('Retiré de Téléchargements de Windows, gardé dans la corbeille de Cyber Pinball') : t('Corbeille de Cyber Pinball'),
@@ -141,6 +193,60 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
     });
     actions.push({ label: t('Retour'), icon: 'back', run: back });
     return { heading: e.label ?? e.name, icon: 'download', subheading: downloadLine(e), sections: [...flashSection(), { rows }], actions, back, variant: 'facts' };
+  }
+
+  /** Ajouter à un jeu : le probable d'abord, puis les tables installées, puis les jeux de la liste d'attente. */
+  function openGames(e: DownloadEntry): void {
+    const back = () => openFile(e.file);
+    const parts = partsOf(seenOf.get(e.file.toLowerCase()));
+    ctx.show(() => {
+      const sug = ctx.suggest(e.file);
+      const tables = ctx.tables().sort((a, b) => Number(b === sug.table) - Number(a === sug.table) || a.title.localeCompare(b.title, 'fr'));
+      const games = ctx.games().filter((g) => !tables.some((x) => x.info.Info?.VPSId === g.gameId));
+      const actions: Action[] = [];
+      const tableRows: Row[] = tables.map((x) => {
+        const action = actions.length;
+        actions.push({ label: x.title, run: () => ctx.addToTable([e.file], x) });
+        return { text: x.title, detail: x === sug.table ? t('probable · table installée') : t('table installée'), tone: x === sug.table ? 'ok' : undefined, action, pick: true };
+      });
+      const gameRows: Row[] = games.map((g) => {
+        const action = actions.length;
+        const part = parts[0];
+        actions.push({ label: g.label, run: () => (part ? ctx.attachToGame(e.file, g.gameId, part, () => openGames(e)) : openPart(e, g)) });
+        return { text: g.label, detail: part ? t('liste d’attente · {part}', { part: NEED_LABELS[part] }) : t('liste d’attente · partie à choisir'), action, pick: true };
+      });
+      actions.push({ label: t('Retour'), icon: 'back', run: back });
+      const sections: Section[] = [];
+      if (tableRows.length) sections.push({ title: t('Tables installées'), rows: tableRows });
+      if (gameRows.length) sections.push({ title: t('Jeux attendus'), rows: gameRows });
+      if (!sections.length) sections.push({ rows: [{ text: t('Aucune table installée, aucun jeu attendu'), tone: 'quiet' }] });
+      return {
+        heading: t('Ajouter à un jeu'),
+        icon: 'download',
+        subheading: parts.length ? `${e.name} · ${partsText(parts)}` : e.name,
+        lead: t('Le jeu d’abord ; la partie est celle que dit le contenu. Une table installée reçoit le fichier par le plan d’ajout, à valider ; un jeu attendu le reçoit dans sa liste d’attente.'),
+        sections,
+        actions,
+        back,
+      };
+    }, 0);
+  }
+
+  /** Contenu illisible : la partie du jeu attendu à laquelle le rattacher. */
+  function openPart(e: DownloadEntry, game: { gameId: string; label: string }): void {
+    const back = () => openGames(e);
+    ctx.show(
+      () => ({
+        heading: t('Quelle partie ?'),
+        icon: 'download',
+        subheading: `${e.name} · ${game.label}`,
+        lead: t('Le contenu de ce fichier n’a pas pu être lu : dites ce qu’il est. Le plan vérifiera avant d’installer.'),
+        sections: [],
+        actions: [...PART_KINDS.map((k): Action => ({ label: NEED_LABELS[k], run: () => ctx.attachToGame(e.file, game.gameId, k, back) })), { label: t('Retour'), icon: 'back', run: back }],
+        back,
+      }),
+      0,
+    );
   }
 
   /** Confirmation de « Tout vider » : ce qui part, ce que la liste d'attente perd ; le curseur sur Annuler. */

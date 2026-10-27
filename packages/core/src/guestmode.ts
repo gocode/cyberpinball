@@ -52,6 +52,7 @@ export const GUEST_DOORS = {
   'sheet.further': false, // Pour aller plus loin (téléchargements)
   'sheet.edit': false, // Modifier les informations
   'sheet.medias': false, // Médias du jeu
+  'sheet.parts': false, // Parties du jeu (ajouter, remplacer, retirer)
   'sheet.files': false, // Fichiers de la table
   'sheet.pup': false, // Options du PuP-Pack
   'sheet.display': false, // Régler l’affichage en partie

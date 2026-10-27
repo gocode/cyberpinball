@@ -373,7 +373,13 @@ export function versionLabel(file: { authors?: string[]; version?: string }): st
 // ---------------------------------------------------------------------------
 // Ce qu'il faut pour une version
 
-export type NeedKind = 'table' | 'b2s' | 'rom' | 'pup' | 'altsound' | 'altcolor' | 'music' | 'topper' | 'pov';
+export type NeedKind = 'table' | 'b2s' | 'rom' | 'pup' | 'altsound' | 'altcolor' | 'music' | 'topper' | 'pov' | 'media';
+
+/**
+ * Parties d'un jeu, dans l'ordre où on les montre : tout ce qu'un fichier reçu peut
+ * apporter. « media » : les médias du menu (pack d'images et de vidéos), que VPS ne liste pas.
+ */
+export const PART_KINDS: readonly NeedKind[] = ['table', 'b2s', 'rom', 'pup', 'altcolor', 'altsound', 'music', 'pov', 'topper', 'media'];
 
 export const NEED_LABELS: Record<NeedKind, string> = {
   get table() {
@@ -396,6 +402,9 @@ export const NEED_LABELS: Record<NeedKind, string> = {
   topper: 'Topper',
   get pov() {
     return t('Point de vue (POV)');
+  },
+  get media() {
+    return t('Médias du menu');
   },
 };
 
@@ -558,6 +567,10 @@ export interface ReceivedFile {
   content?: ContentKind;
   /** « 14 images, 9 vidéos, aucun .vpx » */
   summary?: string;
+  /** Toutes les parties qu'il apporte (contentParts) : une archive complète fournit la table, le fronton, la ROM… */
+  parts?: NeedKind[];
+  /** Rattaché à la demande expresse de l'utilisateur alors qu'il ne convient pas : jamais réorienté d'office. */
+  forced?: boolean;
 }
 
 /** Fichier reçu sans élément : rien n'y correspondait, il ne convenait pas, ou il a été retiré d'un élément. */
@@ -573,6 +586,9 @@ export interface StrayFile {
   expected?: string;
   /** Élément attendu auquel il conviendrait. */
   suggested?: string;
+  parts?: NeedKind[];
+  /** Gardé de côté à la demande de l'utilisateur : jamais rattaché d'office à une partie (repairWaitList). */
+  kept?: boolean;
 }
 
 export interface WaitList {
@@ -664,8 +680,13 @@ export function isPartialDownload(name: string): boolean {
   return /\.(crdownload|part|partial|tmp|download|opdownload)$/i.test(name) || /^~\$|^\.~/.test(name);
 }
 
-/** Extensions de ce qu'on récupère pour une table. */
-const RECEIVABLE = /\.(vpx|directb2s|zip|7z|rar|mp3|ogg|wav|pov|pac|vni|pal|crz|cromc)$/i;
+/** Extensions de ce qu'on récupère pour une table : ses fichiers, ses archives, ses vidéos et images (topper, médias du menu). */
+const RECEIVABLE = /\.(vpx|directb2s|zip|7z|rar|mp3|ogg|wav|flac|pov|pac|vni|pal|crz|cromc|mp4|f4v|avi|mkv|webm|mov|png|jpe?g|gif|apng|webp)$/i;
+
+/** Ce fichier peut-il être une partie d'un jeu (table, fronton, archive, son, vidéo…) ? */
+export function isReceivable(name: string): boolean {
+  return RECEIVABLE.test(name) && !isPartialDownload(name);
+}
 
 export interface DownloadFacts {
   /** Adresses de la chaîne de redirections, de la page au fichier (fenêtre « Récupérer »). */
@@ -748,6 +769,9 @@ export const EXPECTED_LABELS: Record<NeedKind, string> = {
   get pov() {
     return t('un fichier .pov');
   },
+  get media() {
+    return t('des images ou des vidéos pour le menu');
+  },
 };
 
 const AUDIO = /\.(mp3|ogg|wav|flac)$/i;
@@ -809,6 +833,32 @@ export function contentSummary(name: string, entries?: string[]): string | undef
 }
 
 /**
+ * Toutes les parties d'un jeu qu'apporte un fichier reçu, la principale (classifyContent)
+ * d'abord : une archive complète fournit la table, son fronton, sa ROM (dans un dossier
+ * roms), son PuP-Pack… Vide quand on ne sait pas ce qu'il contient.
+ */
+export function contentParts(name: string, entries?: string[]): NeedKind[] {
+  const main = classifyContent(name, entries);
+  const parts: NeedKind[] = main === 'unknown' ? [] : [main];
+  if (!ARCHIVES.test(name) || !entries) return parts;
+  const files = entries.map((e) => e.replace(/\\/g, '/').toLowerCase()).filter((e) => !e.endsWith('/'));
+  const has = (test: (e: string) => boolean) => files.some(test);
+  const base = (e: string) => e.slice(e.lastIndexOf('/') + 1);
+  const found: [NeedKind, boolean][] = [
+    ['table', has((e) => e.endsWith('.vpx'))],
+    ['b2s', has((e) => e.endsWith('.directb2s'))],
+    ['rom', has((e) => e.endsWith('.zip') && /(^|\/)roms\//.test(e))],
+    ['pup', has((e) => e.endsWith('.pup') || e.includes('pupvideos/'))],
+    ['altcolor', has((e) => COLORS.test(e))],
+    ['altsound', files.some((e) => ['altsound.csv', 'g-sound.csv'].includes(base(e)))],
+    ['music', has((e) => /(^|\/)music\//.test(e) && AUDIO.test(e))],
+    ['pov', has((e) => e.endsWith('.pov'))],
+  ];
+  for (const [kind, present] of found) if (present && !parts.includes(kind)) parts.push(kind);
+  return parts;
+}
+
+/**
  * Ce fichier convient-il à ce qu'attend l'élément ? 'unknown' quand on ne sait pas ce
  * qu'il contient (archive illisible) : on le prend alors sans pouvoir le vérifier.
  */
@@ -818,6 +868,12 @@ export function contentFits(kind: NeedKind, content: ContentKind | undefined): '
   // Un topper se distribue comme une vidéo, tout comme les médias du frontend.
   if (kind === 'topper' && content === 'media') return 'yes';
   return 'no';
+}
+
+/** Comme contentFits, mais une archive qui apporte cette partie avec d'autres convient aussi (table et PuP-Pack ensemble). */
+export function partFits(kind: NeedKind, seen: { content?: ContentKind; parts?: NeedKind[] } | undefined): 'yes' | 'no' | 'unknown' {
+  const fit = contentFits(kind, seen?.content);
+  return fit === 'no' && seen?.parts?.includes(kind) ? 'yes' : fit;
 }
 
 /**
@@ -843,8 +899,8 @@ export function matchDownload(list: WaitList, d: DownloadFacts, vps?: VpsDb): Wa
   // Contenu reconnu : seuls les éléments qu'il peut remplir ; sinon d'après l'extension.
   const kinds: NeedKind[] =
     content !== 'unknown'
-      ? (['table', 'b2s', 'rom', 'pup', 'altsound', 'altcolor', 'music', 'topper', 'pov'] as NeedKind[]).filter((k) => contentFits(k, content) === 'yes')
-      : ext === '.vpx' ? ['table'] : ext === '.directb2s' ? ['b2s'] : ext === '.pov' ? ['pov'] : /\.(mp3|ogg|wav)$/.test(ext) ? ['music'] : /\.(pac|vni|pal|crz|cromc)$/.test(ext) ? ['altcolor'] : ['table', 'b2s', 'pup', 'altsound', 'altcolor', 'music', 'topper', 'pov'];
+      ? PART_KINDS.filter((k) => contentFits(k, content) === 'yes')
+      : ext === '.vpx' ? ['table'] : ext === '.directb2s' ? ['b2s'] : ext === '.pov' ? ['pov'] : /\.(mp3|ogg|wav)$/.test(ext) ? ['music'] : /\.(pac|vni|pal|crz|cromc)$/.test(ext) ? ['altcolor'] : PART_KINDS.filter((k) => k !== 'rom' && k !== 'media');
   const candidates = (byPage.length ? byPage : waiting).filter((i) => kinds.includes(i.kind));
   if (candidates.length === 1 && (byPage.length || candidates[0]!.kind !== 'table' || ext === '.vpx' || ext === '.directb2s' || content === 'table')) {
     // Un seul attendu de cette sorte : encore faut-il que le nom ne désigne pas un autre jeu.
@@ -860,11 +916,13 @@ export function matchDownload(list: WaitList, d: DownloadFacts, vps?: VpsDb): Wa
 }
 
 /** Marque un élément reçu, avec le fichier, d'où il vient et ce qu'il contient. */
-export function markReceived(item: WaitItem, file: string, via: 'window' | 'watch' | 'manual', now = new Date(), url?: string, content?: { content?: ContentKind; summary?: string }): void {
+export function markReceived(item: WaitItem, file: string, via: 'window' | 'watch' | 'manual', now = new Date(), url?: string, content?: { content?: ContentKind; summary?: string; parts?: NeedKind[]; forced?: boolean }): void {
   item.state = 'received';
   item.received = { file, at: now.toISOString(), via, url };
   if (content?.content) item.received.content = content.content;
   if (content?.summary) item.received.summary = content.summary;
+  if (content?.parts?.length) item.received.parts = content.parts;
+  if (content?.forced) item.received.forced = true;
 }
 
 export interface Placement {
@@ -877,24 +935,148 @@ export interface Placement {
   verdict: 'fits' | 'unknown' | 'mismatch' | 'none';
   /** Élément attendu du même jeu auquel il conviendrait, à proposer. */
   better?: WaitItem;
+  /**
+   * Partie à ajouter au jeu, d'après le contenu : aucun élément de cette sorte n'était attendu
+   * (un PuP-Pack proposé sur la même page que la table). Verdict « fits ».
+   */
+  create?: NewPart;
+  /** Élément qu'on attendait et que le fichier ne remplit pas : le fichier va dans sa propre partie. */
+  instead?: WaitItem;
+}
+
+/** Partie d'un jeu à ajouter à la liste d'attente, d'après le contenu d'un fichier reçu. */
+export interface NewPart {
+  gameId: string;
+  gameLabel: string;
+  kind: NeedKind;
+  /** « VPW 1.25 », ou le nom du fichier reçu faute de fichier VPS reconnu. */
+  label: string;
+  /** Page d'où il vient (sans paramètres de téléchargement). */
+  page: string;
+  /** Fichier VPS de cette partie dont un lien mène à la même page. */
+  file?: VpsTableFile;
+  /** Table installée à qui il revient. */
+  table?: string;
+}
+
+const keysOf = (urls: (string | undefined)[] | undefined) => new Set((urls ?? []).map((u) => (u ? pageKey(u) : undefined)).filter((k): k is string => Boolean(k)));
+
+/** Jeu dont un élément a été récupéré sur l'une de ces pages ; undefined s'il n'y en a pas, ou plusieurs. */
+function gameOfPages(list: WaitList, keys: Set<string>): string | undefined {
+  const games = new Set(list.items.filter((i) => i.pageKey && keys.has(i.pageKey)).map((i) => i.gameId));
+  return games.size === 1 ? [...games][0] : undefined;
+}
+
+/**
+ * Fichiers VPS d'une partie d'un jeu, de cette sorte seulement : une version de la table
+ * qui fournit son PuP-Pack (« incl. PuP ») reste une table, jamais le PuP-Pack.
+ */
+export function partFiles(game: VpsGame, kind: NeedKind): VpsTableFile[] {
+  switch (kind) {
+    case 'table':
+      return vpxVersions(game);
+    case 'rom':
+      return supportFiles(game, 'rom') ?? [];
+    case 'b2s':
+      return game.b2sFiles ?? [];
+    case 'pup':
+      return game.pupPackFiles ?? [];
+    case 'altsound':
+      return game.altSoundFiles ?? [];
+    case 'altcolor':
+      return game.altColorFiles ?? [];
+    case 'music':
+      return game.soundFiles ?? [];
+    case 'topper':
+      return game.topperFiles ?? [];
+    case 'pov':
+      return game.povFiles ?? [];
+    case 'media':
+      return [];
+  }
+}
+
+/** Élément attendu de cette partie du jeu, celui de la même page d'abord. */
+function waitingPart(list: WaitList, gameId: string, kind: NeedKind, keys: Set<string>): WaitItem | undefined {
+  const waiting = list.items.filter((i) => i.gameId === gameId && i.state === 'waiting' && i.kind === kind);
+  return waiting.find((i) => i.pageKey && keys.has(i.pageKey)) ?? waiting[0];
+}
+
+/** Ce qu'il faut pour ajouter au jeu la partie que ce fichier apporte. */
+function newPart(list: WaitList, gameId: string, kind: NeedKind, filename: string, urls: (string | undefined)[] | undefined, vps: VpsDb | undefined, from?: WaitItem): NewPart {
+  const keys = keysOf(urls);
+  const ref = from ?? list.items.find((i) => i.gameId === gameId);
+  const game = vps?.games.find((g) => g.id === gameId);
+  const file = game ? partFiles(game, kind).find((f) => liveLinks(f).some((l) => keys.has(pageKey(l.url) ?? ''))) : undefined;
+  const link = file ? liveLinks(file).find((l) => keys.has(pageKey(l.url) ?? '')) : undefined;
+  const sameRef = ref?.pageKey && keys.has(ref.pageKey) ? ref.page : undefined;
+  const first = (urls ?? []).find((u): u is string => Boolean(u && pageKey(u)));
+  const page = link?.url ?? sameRef ?? (first ? first.replace(/[?#].*$/, '') : (ref?.page ?? ''));
+  const gameLabel = ref?.gameLabel ?? (game ? (game.manufacturer && game.year ? `${game.name} (${game.manufacturer} ${game.year})` : game.name) : gameId);
+  const label = file ? (kind === 'rom' ? (file.version ?? 'ROM') : versionLabel(file)) : path.basename(filename).replace(/\.[^.]+$/, '');
+  const part: NewPart = { gameId, gameLabel, kind, label, page };
+  if (file) part.file = file;
+  if (ref?.table) part.table = ref.table;
+  return part;
+}
+
+/** Ajoute à la liste la partie d'un jeu (reprise si elle y est déjà) ; elle est attendue jusqu'à ce qu'on lui donne son fichier. */
+export function addPart(list: WaitList, part: NewPart, now = new Date()): WaitItem {
+  const fileId = part.file?.id ?? `recu-${part.kind}`;
+  // Un élément d'une autre sorte sous le même identifiant n'est jamais repris : une partie n'en remplit pas une autre.
+  const taken = list.items.some((i) => i.id === `${part.gameId}:${fileId}` && i.kind !== part.kind);
+  const id = taken ? `${part.gameId}:${fileId}:${part.kind}` : `${part.gameId}:${fileId}`;
+  const existing = list.items.find((i) => i.id === id);
+  if (existing) {
+    if (existing.state === 'installed') existing.state = 'waiting';
+    if (part.table) existing.table = part.table;
+    if (!part.file) existing.label = part.label;
+    return existing;
+  }
+  const item: WaitItem = { id, gameId: part.gameId, gameLabel: part.gameLabel, kind: part.kind, fileId, label: part.label, page: part.page, pageKey: pageKey(part.page), addedAt: now.toISOString(), state: 'waiting' };
+  if (part.file) {
+    item.version = part.file.version;
+    item.authors = part.file.authors;
+    item.updatedAt = part.file.updatedAt;
+    if (part.kind === 'rom') item.rom = part.file.version;
+  }
+  if (part.table) item.table = part.table;
+  list.items.push(item);
+  return item;
 }
 
 /**
  * Où ranger un fichier reçu : l'élément qu'il remplit (matchDownload), sinon celui pour
  * lequel la fenêtre « Récupérer » était ouverte (opened, même déjà reçu : on récupère de
- * nouveau), en vérifiant que le contenu convient. Un pack de médias reçu pour la table
- * n'est jamais rangé d'office : verdict « mismatch », avec l'élément qui lui irait.
+ * nouveau), en vérifiant que le contenu convient. Un fichier qui ne convient pas à ce qu'on
+ * attendait va dans la partie du jeu qui correspond à son contenu, attendue ou ajoutée
+ * (create), quand le jeu est sûr : fenêtre ouverte pour ce jeu, ou page d'un de ses éléments.
+ * Sinon (jeu deviné d'après le nom, contenu illisible) : verdict « mismatch », on demande.
  */
 export function placeDownload(list: WaitList, d: DownloadFacts, vps?: VpsDb, opened?: string): Placement {
   const content = d.content ?? classifyContent(d.filename);
   const matched = matchDownload(list, { ...d, content }, vps);
   const open = opened ? list.items.find((i) => i.id === opened && i.state !== 'installed') : undefined;
-  const item = matched ?? (open && !isPartialDownload(d.filename) && RECEIVABLE.test(d.filename) ? open : undefined);
+  const receivable = !isPartialDownload(d.filename) && RECEIVABLE.test(d.filename);
+  const item = matched ?? (open && receivable ? open : undefined);
   const fit = item ? contentFits(item.kind, content) : 'no';
-  const better = !item || fit === 'no' ? betterItem(list, content, item?.gameId) : undefined;
+  if (item && fit !== 'no') return { item, verdict: fit === 'yes' ? 'fits' : 'unknown' };
+  const keys = keysOf(d.urls);
+  const gameId = item?.gameId ?? (receivable ? gameOfPages(list, keys) : undefined);
+  if (gameId && content !== 'unknown') {
+    // Le jeu est sûr : la fenêtre était ouverte pour lui, ou le fichier vient de la page d'un de ses éléments.
+    const sure = !item || item === open || [...list.items].some((i) => i.gameId === gameId && i.pageKey && keys.has(i.pageKey));
+    if (sure) {
+      const kind = content as NeedKind;
+      const target = waitingPart(list, gameId, kind, keys);
+      const placed: Placement = target ? { item: target, verdict: 'fits' } : { verdict: 'fits', create: newPart(list, gameId, kind, d.filename, d.urls, vps, item) };
+      if (item) placed.instead = item;
+      return placed;
+    }
+  }
+  const better = betterItem(list, content, gameId);
   if (!item) return better ? { verdict: 'none', better } : { verdict: 'none' };
-  if (fit === 'no') return better ? { item, verdict: 'mismatch', better } : { item, verdict: 'mismatch' };
-  return { item, verdict: fit === 'yes' ? 'fits' : 'unknown' };
+  return better ? { item, verdict: 'mismatch', better } : { item, verdict: 'mismatch' };
 }
 
 /** Seul élément attendu du jeu que ce contenu remplirait. */
@@ -902,6 +1084,48 @@ function betterItem(list: WaitList, content: ContentKind, gameId: string | undef
   if (!gameId || content === 'unknown') return undefined;
   const fits = list.items.filter((i) => i.gameId === gameId && i.state === 'waiting' && contentFits(i.kind, content) === 'yes');
   return fits.length === 1 ? fits[0] : undefined;
+}
+
+export interface Routed {
+  item: WaitItem;
+  /** La partie a été ajoutée au jeu pour ce fichier. */
+  created: boolean;
+  /** Élément qu'on attendait, que le fichier ne remplissait pas (il reste attendu). */
+  instead?: WaitItem;
+  /** Éléments attendus du même jeu que le fichier apporte aussi : plus attendus à part. */
+  covered: WaitItem[];
+  /** Ancien fichier de l'élément, gardé de côté. */
+  replaced?: string;
+}
+
+/**
+ * Range un fichier reçu selon le placement : dans l'élément, ou dans la partie ajoutée au
+ * jeu. Les autres parties qu'il apporte (archive complète : fronton, ROM, PuP-Pack) ne
+ * sont plus attendues à part. undefined si le placement ne range rien (on demande).
+ */
+export function routeReceived(list: WaitList, place: Placement, file: Omit<ReceivedFile, 'at'> & { at?: string }, now = new Date()): Routed | undefined {
+  if (place.verdict === 'mismatch' || place.verdict === 'none') return undefined;
+  const count = list.items.length;
+  const item = place.create ? addPart(list, place.create, now) : place.item;
+  if (!item) return undefined;
+  const replaced = attachFile(list, item, file, now);
+  const routed: Routed = { item, created: list.items.length > count, covered: coverParts(list, item) };
+  if (place.instead && place.instead !== item) routed.instead = place.instead;
+  if (replaced) routed.replaced = replaced;
+  return routed;
+}
+
+/** Retire les éléments attendus du jeu que le fichier reçu de cet élément apporte aussi ; les renvoie. */
+function coverParts(list: WaitList, item: WaitItem): WaitItem[] {
+  const parts = item.received?.parts ?? [];
+  const covered = list.items.filter((i) => i !== item && i.gameId === item.gameId && i.state === 'waiting' && i.kind !== item.kind && parts.includes(i.kind));
+  for (const c of covered) removeItem(list, c, false);
+  return covered;
+}
+
+/** Élément reçu du jeu dont le fichier apporte cette partie (archive complète), s'il y en a un. */
+export function coveredBy(list: WaitList, gameId: string, kind: NeedKind): WaitItem | undefined {
+  return list.items.find((i) => i.gameId === gameId && i.state === 'received' && i.kind !== kind && Boolean(i.received?.parts?.includes(kind)));
 }
 
 /** Garde un fichier reçu de côté, sans élément (rien n'y correspondait, ou on l'a retiré d'un élément). */
@@ -933,7 +1157,7 @@ export function attachFile(list: WaitList, item: WaitItem, file: Omit<ReceivedFi
   forgetStray(list, file.file);
   // Le même fichier ne remplit pas deux éléments : celui qui l'avait redevient attendu.
   for (const other of list.items) if (other !== item && other.state === 'received' && other.received && samePathText(other.received.file, file.file)) clearItem(list, other, false);
-  if (previous) setAside(list, { file: previous.file, via: previous.via, url: previous.url, content: previous.content, summary: previous.summary, at: previous.at });
+  if (previous) setAside(list, { file: previous.file, via: previous.via, url: previous.url, content: previous.content, summary: previous.summary, parts: previous.parts, at: previous.at });
   markReceived(item, file.file, file.via, file.at ? new Date(file.at) : now, file.url, file);
   // L'élément a son fichier : les fichiers gardés de côté ne lui sont plus une question.
   for (const s of list.strays ?? []) {
@@ -960,7 +1184,7 @@ export function clearItem(list: WaitList, item: WaitItem, keep: boolean): string
   item.state = 'waiting';
   delete item.received;
   if (!received) return undefined;
-  if (keep) setAside(list, { file: received.file, via: received.via, url: received.url, content: received.content, summary: received.summary, at: received.at });
+  if (keep) setAside(list, { file: received.file, via: received.via, url: received.url, content: received.content, summary: received.summary, parts: received.parts, at: received.at });
   return received.file;
 }
 
@@ -1011,11 +1235,96 @@ export function waitListProblems(list: WaitList, contentOf: (item: WaitItem) => 
       continue;
     }
     const content = contentOf(item) ?? item.received.content;
-    if (contentFits(item.kind, content) !== 'no') continue;
+    // Rattaché à la demande expresse de l'utilisateur : son choix, pas un problème.
+    if (item.received.forced || partFits(item.kind, { content, parts: item.received.parts }) !== 'no') continue;
     const better = betterItem(list, content!, item.gameId);
     problems.push(better ? { item, problem: 'mismatch', content, better } : { item, problem: 'mismatch', content });
   }
   return problems;
+}
+
+/** Ce que repairWaitList a remis en place. */
+export type WaitRepair =
+  /** Un fichier rangé dans une partie qui n'est pas la sienne est passé dans la sienne. */
+  | { repair: 'moved'; file: string; from: WaitItem; to: WaitItem; created: boolean }
+  /** Le fichier vient de la page d'un autre élément de la même partie : il lui revient (deux versions d'une table). */
+  | { repair: 'swapped'; file: string; from: WaitItem; to: WaitItem }
+  /** Un fichier gardé de côté, d'un jeu connu, a trouvé sa partie ; installed : déjà installée dans la table. */
+  | { repair: 'claimed'; file: string; to: WaitItem; created: boolean; installed: boolean };
+
+export interface RepairContext {
+  /** Le fichier existe-t-il encore ? */
+  exists?: (file: string) => boolean;
+  /**
+   * Table installée de ce jeu, et si elle a déjà cette partie (un PuP-Pack dans pupvideos…) :
+   * une partie déjà installée n'est plus à installer.
+   */
+  tableOf?: (gameId: string) => { file: string; has: (kind: NeedKind) => boolean } | undefined;
+  /** Base VPS : le fichier VPS de la partie, d'après la page. */
+  vps?: VpsDb;
+}
+
+/**
+ * Remet chaque fichier de la liste d'attente dans la partie qui lui revient, sans rien
+ * demander quand le jeu est sûr : un fichier rangé dans une partie qui n'est pas la sienne
+ * (un PuP-Pack dans « Table ») passe dans la sienne, et l'élément redevient attendu ; un
+ * fichier venu de la page d'un autre élément de la même partie lui revient ; un fichier
+ * gardé de côté dont le jeu est sûr (il vient de la page d'un de ses éléments) devient une
+ * partie de ce jeu, installée si la table l'a déjà. Ce qui a été choisi à la
+ * main (rattaché quand même, gardé de côté exprès) n'est pas touché. Renvoie ce qui a changé.
+ */
+export function repairWaitList(list: WaitList, ctx: RepairContext = {}, now = new Date()): WaitRepair[] {
+  const exists = ctx.exists ?? fs.existsSync;
+  const repairs: WaitRepair[] = [];
+  // 1. Fichier dans une partie qui n'est pas la sienne.
+  for (const item of [...list.items]) {
+    const r = item.received;
+    if (item.state !== 'received' || !r || r.forced || !r.content || r.content === 'unknown' || !exists(r.file)) continue;
+    if (partFits(item.kind, r) !== 'no') continue;
+    const kind = r.content as NeedKind;
+    const keys = keysOf([r.url]);
+    const count = list.items.length;
+    const to = waitingPart(list, item.gameId, kind, keys) ?? addPart(list, newPart(list, item.gameId, kind, r.file, [r.url], ctx.vps, item), now);
+    clearItem(list, item, false);
+    attachFile(list, to, r, now);
+    repairs.push({ repair: 'moved', file: r.file, from: item, to, created: list.items.length > count });
+  }
+  // 2. Fichier venu de la page d'un autre élément de la même partie, qui l'attend encore.
+  for (const item of list.items) {
+    const r = item.received;
+    const key = r?.url ? pageKey(r.url) : undefined;
+    if (!r || r.forced || !key || key === item.pageKey || (item.state !== 'received' && item.state !== 'installed')) continue;
+    const owner = list.items.find((o) => o !== item && o.gameId === item.gameId && o.kind === item.kind && o.state === 'waiting' && o.pageKey === key);
+    if (!owner) continue;
+    owner.state = item.state;
+    owner.received = r;
+    if (item.table) owner.table = item.table;
+    item.state = 'waiting';
+    delete item.received;
+    repairs.push({ repair: 'swapped', file: r.file, from: item, to: owner });
+  }
+  // 3. Fichier gardé de côté dont le jeu est connu.
+  for (const stray of [...(list.strays ?? [])]) {
+    if (stray.kept || !stray.content || stray.content === 'unknown' || !exists(stray.file)) continue;
+    // Le jeu d'après la page d'où vient le fichier, seulement : un jeu deviné reste une question (expected, suggested).
+    const keys = keysOf([stray.url]);
+    const gameId = gameOfPages(list, keys);
+    if (!gameId) continue;
+    const kind = stray.content as NeedKind;
+    const table = ctx.tableOf?.(gameId);
+    const count = list.items.length;
+    const waiting = waitingPart(list, gameId, kind, keys);
+    const part = waiting ? undefined : newPart(list, gameId, kind, stray.file, [stray.url], ctx.vps);
+    if (part && table) part.table = table.file;
+    const to = waiting ?? addPart(list, part!, now);
+    const received = { file: stray.file, via: stray.via, url: stray.url, content: stray.content, summary: stray.summary, parts: stray.parts, at: stray.at };
+    attachFile(list, to, received, now);
+    // La table de ce jeu a déjà cette partie (installée à la main) : il n'y a plus rien à installer.
+    const installed = Boolean(!waiting && table?.has(kind));
+    if (installed) to.state = 'installed';
+    repairs.push({ repair: 'claimed', file: stray.file, to, created: list.items.length > count, installed });
+  }
+  return repairs;
 }
 
 // ---------------------------------------------------------------------------

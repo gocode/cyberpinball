@@ -208,6 +208,15 @@ function sameEntries(a: MediaPageEntry[], b: MediaPageEntry[]): boolean {
   return a.length === b.length && a.every((e, i) => 'file' in e && 'file' in b[i]! && samePath(e.file, (b[i] as { file: string }).file));
 }
 
+/**
+ * Empreinte des pages voulues pour un type : deux empreintes différentes, le choix a changé.
+ * Un fichier attendu d'un site n'entre dans le brouillon que si l'empreinte n'a pas bougé
+ * depuis qu'on l'a demandé (un autre choix fait entre-temps l'emporte).
+ */
+export function pagesSignature(pages: readonly MediaPageEntry[]): string {
+  return JSON.stringify(pages.map((e) => ('file' in e ? ['file', e.file.toLowerCase()] : ['from', e.from.toLowerCase(), e.origin?.url ?? ''])));
+}
+
 /** Le brouillon change-t-il ce type par rapport à aujourd'hui ? */
 export function isTypeChanged(draft: MediaDraft, type: MediaType, current: string[]): boolean {
   const wanted = draft.pages[type];

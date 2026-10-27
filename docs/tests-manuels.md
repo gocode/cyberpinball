@@ -872,6 +872,62 @@ Sur la borne au playfield couché, après la section précédente. La preuve san
 | 465 | Santé de la borne | Menu système > Borne > « Santé de la borne », après un redémarrage du PC. | Sous « Écrans », après la configuration reconnue : « Tables dans votre sens, flippers … », avec l'orientation de Windows. |
 | 466 | Table corrigée dans VPX | Une table qu'on avait remise dans son sens par le menu de VPX (cadrage manuel), du temps où elle s'affichait à l'envers après chaque redémarrage. | Si elle est maintenant à l'envers, son médecin dit « Table de travers sur cette borne » et où VPX la dessine ; sa réparation la remet dans le sens de la borne. Une table corrigée qui est dans le bon sens n'est pas signalée comme de travers. |
 
+## Touches du clavier au relevé
+
+Sur un PC sans boutons de borne (clavier seul), puis sur la borne à Pinscape. La preuve sans opérateur : `packages/core/src/test/clavier-reel.test.ts` (vraies touches rejouées hors écran, joystick virtuel de SDL). Ce qu'elle ne montre pas : un vrai clavier, et un encodeur en mode clavier à côté des boutons du Pinscape.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 467 | Une touche changée au clavier | Menu système > « Borne » > « Configuration de la borne » > « Boutons du jeu ». Flippers (ou flèches) jusqu'à « Crédit », Start (ou clic), puis une touche libre du clavier, par exemple 5 ; « Enregistrer ». | Crédit prend la touche dès qu'on la relâche, « Relevé : Crédit : 5 » ; aucun « Quitter sans enregistrer ? » ne s'ouvre. Rouvert, « Boutons du jeu » montre 5. |
+| 468 | Cas limites au clavier | Pendant un relevé : une touche déjà prise par un autre bouton ; Retour arrière en refaisant un bouton seul ; Échap à la question « Quitter sans enregistrer ? » ; une touche tenue 3 s. | Touche prise refusée avec le nom du bouton qui l'a ; Retour arrière revient au récapitulatif sans rien changer ; Échap ferme la question ; la touche tenue ouvre la question sans être relevée. |
+| 469 | Clavier et Pinscape mélangés | Sur la borne : « Tout relever », flippers et Start aux boutons du Pinscape, crédit et Exit sur une touche du clavier ; essai, « Enregistrer », puis une partie. | Chaque bouton est relevé par son chemin ; dans la partie, flippers, Start, crédit et Exit marchent. Dans le menu en mode invité, les flippers tenus puis relâchés au clavier ne bloquent plus la sélection. |
+
+## Choix des médias en galerie
+
+Sur la borne, une table dont VPinMediaDB et VPUniverse ont plusieurs versions d'un même média (The Matrix, afficheur large). La preuve sans opérateur : `packages/core/src/test/choix-media.test.ts`, `.\docs\demo-propositions.ps1` (captures dans `tmp\demo-propositions\captures`) et la maquette `.\docs\recherche\maquettes\propositions-galerie.ps1`. Ce qu'ils ne montrent pas : une vraie file de VPUniverse qui reçoit un fichier pendant qu'on choisit, l'écran lu à un mètre.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 470 | Le média rangé est celui choisi | Fiche > « Médias du jeu » > Afficheur large > « Voir les propositions ». Mettre une fiche de VPUniverse dans la file, puis, pendant l'attente, choisir la 2ᵉ tuile (l'image de VPinMediaDB) aux flippers et Start. Attendre la réception de la fiche, puis « Enregistrer ». | La tuile choisie passe à « Choisi, à enregistrer » et le reste quand le fichier du site arrive (message « Reçu de VPUniverse : …, à choisir si vous le préférez »). Après l'enregistrement, l'afficheur large du menu montre l'image choisie, pas la vidéo d'avant ni le fichier du site. |
+| 471 | Liste qui bouge sous le curseur | Sur les mêmes propositions, poser le curseur sur une tuile placée après une fiche en file ; attendre la réception de celle-ci, puis Start, sans bouger. | Le contour vert reste sur la même tuile quand la fiche reçue devient ses fichiers ; Start valide la tuile qu'on regardait. |
+| 472 | Un média après l'autre | Choisir une proposition, puis « Média suivant : … » jusqu'au chargement, en en choisissant une sur chaque écran ; puis « Enregistrer » depuis les propositions. | Chaque choix reste sur sa tuile et dans le brouillon ; le média précédent dit « Un choix en attente d'enregistrement ». Le plan liste tous les médias choisis, et le menu les montre après l'enregistrement. |
+| 473 | Popularité et autre jeu | Sur les propositions de The Matrix : « Trier : pertinence ». | Les tuiles de VPUniverse disent leur nombre de téléchargements ; le tri passe à « Trier : popularité », les plus téléchargées d'abord, et reste pour le média suivant. Les tuiles « The Matrix (Original 2026) » de VPinMediaDB portent « Autre jeu » et leur détail nomme votre table de 2023. |
+
+## Parties du jeu
+
+Sur la borne, connecté à VPUniverse. La preuve sans opérateur : `packages/core/src/test/parties.test.ts` et `.\docs\demo-parties-du-jeu.ps1`.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 474 | La borne du 27 octobre | Première ouverture de Cyber Pinball après la mise à jour, puis Menu système > « Tables » > « Ajouter une table » > « Récupérés et attendus ». | Plus rien « À corriger » ni « Reçus sans élément » pour The Matrix : le zip du PuP-Pack est rangé comme PuP-Pack, installé avec la table ; la version 1.0.14 est celle qui est installée. Un message dit ce qui a été rangé. |
+| 475 | Table et PuP-Pack sur la même fiche | Catalogue > un jeu dont la fiche VPUniverse propose la table et le PuP-Pack en deux fichiers (The Matrix 1.0.14) > « Récupérer : Table » ; télécharger les deux fichiers. | Le `.vpx` va dans « Table », le zip dans « PuP-Pack » (partie ajoutée au jeu), avec le message « … est un PuP-Pack, pas une table : rangé comme PuP-Pack… ». « Installer : The Matrix » dit « table et pup-pack · voir le plan » ; le plan installe les deux d'un coup. |
+| 476 | Archive complète | Récupérer une table dont le zip contient aussi le `.directb2s` (et la ROM), alors que le fronton était aussi attendu. | L'élément « Table » dit « apporte aussi : fronton (.directb2s) » ; le fronton n'est plus attendu à part ; « Ce qu'il faut » le dit « Fourni », dans ce zip. |
+| 477 | Rien ne bloque | Rattacher à la main un pack de médias à « Table » (« Le rattacher quand même »), puis « Installer » le jeu. | Le plan s'ouvre avec les autres fichiers ; rien ne demande de corriger d'abord. |
+| 478 | Parties du jeu | Fiche d'une table installée > « Parties du jeu ». | Une ligne par partie : table, fronton, ROM (« Inutile » pour une table sans ROM), PuP-Pack, couleurs, sons, musique, point de vue, réglages propres, médias ; présentes avec leurs fichiers, absentes avec « n sur VPS ». Rien ne déborde, en borne comme au bureau. |
+| 479 | Ajouter un PuP-Pack à une table installée | « Parties du jeu » > « PuP-Pack » > « Ajouter depuis Téléchargements » > le zip ; puis « Installer ». | Le plan dit « Complément pour : <la table> », le pack dans `pupvideos` ; « Annuler » revient à l'écran du PuP-Pack. Après « Installer », la partie est « Présent ». |
+| 480 | Récupérer une partie sur le web | « Parties du jeu » > « Fronton » > « Récupérer sur le web » > un fronton ; le télécharger dans « Récupérer ». | L'écran des parties le montre « Reçu, à installer » ; « Installer ce qui est reçu » ouvre le plan ciblé sur cette table. |
+| 481 | Réaffecter, retirer | « Parties du jeu » > « PuP-Pack » > « Réaffecter à une autre table » > une table ; puis, sur celle-ci, « Retirer de la table ». | Le pack quitte la première table pour l'autre (ce qu'elle avait part à la corbeille) ; « Retirer » demande confirmation, le curseur sur « Annuler », puis met le pack dans la corbeille de Cyber Pinball. |
+| 482 | Téléchargements : n'importe quel jeu | Menu système > « Tables » > « Téléchargements » > un zip de PuP-Pack. | Lignes « Contient : un PuP-Pack… » et « Jeu » ; « Ajouter à <la table> » en tête ; « Ajouter à un autre jeu… » liste les tables installées puis les jeux attendus ; « Installer comme nouvelle table » n'est proposé que pour un fichier qui contient un `.vpx` (ou illisible). |
+
+## Listes pendant un téléchargement
+
+Sur la borne, aux boutons, puis à la souris. La preuve sans opérateur : `packages/core/src/test/defilement.test.ts` et `.\docs\demo-defilement-progression.ps1` (captures dans `tmp\demo-defilement-progression`). Ce qu'ils ne montrent pas : un vrai téléchargement d'un site, la molette d'une vraie souris.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 483 | Propositions pendant un téléchargement | Fiche d'une table > « Médias du jeu » > un média > propositions ; Start sur une proposition VPUniverse (« Attente du site »), puis remonter la liste à la molette pendant le décompte. | La liste reste où la molette l'a mise jusqu'à la fin du téléchargement ; elle ne revient jamais seule sur la carte qui télécharge. Un flipper ramène la carte choisie dans la vue. |
+| 484 | Autres listes qui se mettent à jour | Pendant un téléchargement, Menu système > « Tables » > « Téléchargements », puis « Tables » > « Ajouter une table » > « Récupérés et attendus » : faire défiler chaque liste à la molette. | Aucune liste ne saute pendant que les fichiers arrivent ; le choix ne bouge qu'aux flippers, à Tab ou au clic. |
+
+## Fronton et DMD de la marque
+
+Sur la borne (fronton et DMD), la marque et les afficheurs à points dans la DA (manuel, « Fronton et DMD de la marque »). La preuve sans opérateur : `packages/core/src/test/marque-dmd.test.ts`, `.\docs\demo-replis.ps1` et `.\docs\demo-dmd-vivant.ps1`.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 485 | Fronton de la marque | Ouvrir le menu système (Exit), puis un réglage et l'aide. | Le fronton montre la couverture : « CYBER » au-dessus de « PINBALL » en vert, lettres fines, larges et très espacées, à gauche ; la bille et les batteurs sarcelle à droite, fondus vers le noir. Plus de grosses capitales blanches. Retour au menu des tables : le fronton reprend le média de la table, sans éclair clair. |
+| 486 | DMD de la marque | Dans le menu système, regarder le DMD ; puis revenir au menu des tables. | Le DMD montre « CYBER » au-dessus de « PINBALL » en vert signal, au trait fin et très espacé, PINBALL plus lumineux que CYBER ; puis PRESS START et l'horloge dans la police carrée de la marque. Au menu des tables : le titre, ses records et l'heure dans la même police, lisibles à un mètre et demi. Les points éteints restent gris, sans voile vert. |
+| 487 | Couleur du DMD | Menu système > « Médias » > « Médias, son et attente » > « Couleur du DMD » : choisir « Orange plasma », puis « Couleur libre… » et écrire `#3060FF`, puis `#202020`, puis revenir à « Vert signal ». Quitter et relancer Cyber Pinball entre deux essais. | Chaque choix revient sur la ligne, qui le nomme ; le DMD change de couleur aussitôt, page de la marque comprise. `#202020` est refusé (« trop sombre ») sans rien changer. La couleur choisie est la même après une relance. En partie, le DMD de VPX garde la couleur de la table. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

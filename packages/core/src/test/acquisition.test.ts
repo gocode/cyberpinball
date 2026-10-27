@@ -273,19 +273,22 @@ test('contenu d’un fichier reçu : table, fronton, ROM, PuP-Pack, pack de méd
   assert.equal(contentFits('table', undefined), 'unknown');
 });
 
-test('rattachement vérifié : un pack de médias reçu pour la table demande confirmation et propose l’élément qui lui va', () => {
+test('rattachement vérifié : un fichier reçu pour la table va dans la partie que dit son contenu, jamais dans la table', () => {
   const l = list();
   const [table, b2s, rom] = l.items;
-  // Fenêtre ouverte pour la table, fiche qui propose aussi le pack de médias : refusé d'office.
+  // Fenêtre ouverte pour la table, fiche qui propose aussi le pack de médias : il devient les médias du jeu.
   const media = { filename: 'Terminator 2 Media Pack.zip', urls: [vpu(200, 't2-vpw').url], content: classifyContent('T2.zip', MEDIA_PACK) };
   assert.equal(matchDownload(l, media), undefined, 'la fiche traversée ne suffit pas quand le contenu dit autre chose');
   const p = placeDownload(l, media, undefined, table!.id);
-  assert.equal(p.verdict, 'mismatch');
-  assert.equal(p.item, table);
-  assert.equal(p.better, undefined, 'aucun élément n’attend de médias');
-  // Un fronton reçu par la fenêtre de la table : confirmation, le fronton attendu proposé.
+  assert.equal(p.verdict, 'fits');
+  assert.equal(p.item, undefined);
+  assert.equal(p.instead, table, 'la table reste attendue');
+  assert.deepEqual([p.create?.kind, p.create?.gameId, p.create?.label], ['media', T2.id, 'Terminator 2 Media Pack']);
+  // Un fronton reçu par la fenêtre de la table : rangé comme le fronton attendu.
   const front = placeDownload(l, { filename: 'T2.zip', content: classifyContent('T2.zip', ['T2.directb2s']), urls: [vpu(200).url] }, undefined, table!.id);
-  assert.deepEqual([front.verdict, front.item?.kind, front.better?.kind], ['mismatch', 'table', 'b2s']);
+  assert.deepEqual([front.verdict, front.item?.kind, front.instead?.kind], ['fits', 'b2s', 'table']);
+  // Nommé comme la ROM attendue (dossier Téléchargements), mais c'est autre chose : rien n'est rangé d'après le nom seul.
+  assert.equal(placeDownload(l, { filename: 't2_l8.zip', content: 'media' }).verdict, 'none');
   // Sans fenêtre (dossier Téléchargements surveillé) : le seul fronton attendu, sans question.
   assert.deepEqual(placeDownload(l, { filename: 'T2.zip', content: 'b2s' }), { item: b2s, verdict: 'fits' });
   // La vraie table : rangée sans question.

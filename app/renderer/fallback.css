@@ -33,12 +33,6 @@
 }
 
 @font-face {
-  font-family: 'CP Press Start';
-  src: url('polices/press-start-2p/PressStart2P-Regular.ttf') format('truetype');
-  font-display: block;
-}
-
-@font-face {
   font-family: 'CP Audiowide';
   src: url('polices/audiowide/Audiowide-Regular.ttf') format('truetype');
   font-display: block;
@@ -334,6 +328,89 @@ html.cp-fb-hidden .cp-fb *::after {
     letter-spacing: 0.14em;
     margin-right: -0.14em;
     font-stretch: 100%;
+  }
+}
+
+/*
+ * Fronton sans jeu : la couverture de la marque (docs/design-system/src/couverture.html,
+ * maquettes revues par le directeur artistique le 27/10/2026). L'illustration de la DA
+ * (fronton-marque.webp) calée à droite, fondue vers le noir sous la marque empilée à gauche ;
+ * en 4:3 et plus étroit, la marque monte et l'illustration occupe le bas. Lumière fixe.
+ */
+.cp-bg-art {
+  position: absolute;
+  inset: 0;
+  background: var(--cp-void) url('fronton-marque.webp') right center / auto 100cqh no-repeat;
+}
+
+.cp-bg-art::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--cp-void) 0%, rgb(3 8 7 / 0.97) 26%, rgb(3 8 7 / 0.82) 40%, rgb(3 8 7 / 0.22) 63%, transparent 80%);
+}
+
+.cp-wordmark-stack > span {
+  display: block;
+  width: max-content;
+  white-space: nowrap;
+  line-height: 1.35;
+  letter-spacing: 0.28em;
+  margin-right: -0.28em;
+}
+
+.cp-bg-mark {
+  position: absolute;
+  left: 7cqw;
+  top: 50cqh;
+  transform: translateY(-50%);
+  /* PINBALL fait environ 7,4 em de large : la marque ne passe jamais la moitié de l'écran. */
+  font-size: min(10.5cqh, 6.4cqw);
+}
+
+@container (max-aspect-ratio: 3 / 2) {
+  .cp-bg-art {
+    /* Largeur de l'illustration ; sa hauteur en fait 43 %. */
+    --art: 110cqw;
+    background-size: var(--art) auto;
+    background-position: right bottom;
+  }
+
+  /* Le haut de l'illustration est toujours fondu : pas d'arête en portrait. */
+  .cp-bg-art::after {
+    background:
+      linear-gradient(180deg, var(--cp-void) calc(100cqh - 0.43 * var(--art)), transparent calc(100cqh - 0.3 * var(--art))),
+      linear-gradient(180deg, var(--cp-void) 0%, rgb(3 8 7 / 0.94) 23%, rgb(3 8 7 / 0.72) 42%, transparent 69%),
+      linear-gradient(90deg, rgb(3 8 7 / 0.55), transparent 80%);
+  }
+
+  .cp-bg-mark {
+    left: 8cqw;
+    top: 30cqh;
+    font-size: min(10cqh, 10.5cqw);
+  }
+}
+
+@container (min-aspect-ratio: 2 / 1) {
+  .cp-bg-mark {
+    left: 8cqw;
+    font-size: 12cqh;
+  }
+}
+
+/* En hauteur (9:16) : l'illustration agrandie et centrée remplit le bas, la marque ne bouge pas. */
+@container (max-aspect-ratio: 4 / 5) {
+  .cp-bg-art {
+    --art: 140cqw;
+    background-position: center bottom;
+  }
+}
+
+/* Bande (3:1, 4:1) : la marque prend la moitié de la hauteur, l'illustration garde sa droite. */
+@container (min-aspect-ratio: 5 / 2) {
+  .cp-bg-mark {
+    left: 6cqw;
+    font-size: 19cqh;
   }
 }
 

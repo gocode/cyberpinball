@@ -1,6 +1,6 @@
 // Page de démonstration des replis intégrés (fallback-demo.html).
 
-/** Jeux d'exemple : titres très courts et très longs, accents, champs absents. */
+/** Jeux d'exemple : titres très courts et très longs, accents, champs absents ; le dernier, aucun jeu (la marque). */
 const SAMPLES = [
   { title: 'Ali', manufacturer: 'Stern', year: 1980 },
   { title: 'Terminator 2: Judgment Day', manufacturer: 'Williams', year: 1991 },
@@ -8,6 +8,7 @@ const SAMPLES = [
   { title: 'Le Bœuf à la mode : élégie pour un été très chaud', manufacturer: 'Société Française d’Électromécanique Ludique', year: 1978 },
   { title: 'Supercalifragilisticexpialidocious' },
   { title: 'Œil de Lynx', manufacturer: 'Gottlieb' },
+  {},
 ];
 
 const COMPONENTS = {
@@ -74,6 +75,8 @@ function single(kind) {
   document.documentElement.dataset.rotation = params.get('rotation') ?? '0';
   document.body.classList.add('demo-single');
   const game = SAMPLES[Number(params.get('jeu') ?? 1)] ?? SAMPLES[1];
+  // Couleur réglée des afficheurs à points (« Couleur du DMD »), en hexadécimal sans « # ».
+  if (params.get('couleur')) CyberFallback.setDmdColor(`#${params.get('couleur')}`);
   mount(kind, stage, game, { animate: params.get('anime') !== '0', style: params.get('style') ?? undefined, page: Number(params.get('page') ?? 0) });
 }
 
@@ -97,7 +100,7 @@ function gallery() {
     const head = el('header', 'demo-head');
     head.append(
       el('h1', '', 'Replis intégrés'),
-      el('p', '', `Exemple ${index + 1} / ${SAMPLES.length} : ${game.title}${game.manufacturer ? `, ${game.manufacturer}` : ''}${game.year ? `, ${game.year}` : ''}`),
+      el('p', '', `Exemple ${index + 1} / ${SAMPLES.length} : ${game.title ?? 'aucun jeu (la marque)'}${game.manufacturer ? `, ${game.manufacturer}` : ''}${game.year ? `, ${game.year}` : ''}`),
       el('p', 'demo-hint', `← → : autre exemple · A : ${animate ? 'figer' : 'animer'}`),
     );
     const grid = el('div', 'demo-grid');

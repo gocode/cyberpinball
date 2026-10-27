@@ -1,4 +1,4 @@
-// Le vrai rendu du menu (media.js, library.js, frontend.js) dans un document linkedom, pour
+// Le vrai rendu du menu (media.js, scroll-keeper.js, library.js, frontend.js) dans un document linkedom, pour
 // les essais : images « chargées » dès qu'elles ont une adresse, états envoyés comme par
 // frontend.ts. Sans mise en page : les tailles valent 0, la fenêtre a la forme « borne »
 // tant que l'essai ne pose pas html.menu-desktop lui-même.
@@ -44,7 +44,7 @@ export function menuRenderer(extra: Record<string, unknown> = {}) {
   };
   ctx.window = ctx;
   vm.createContext(ctx);
-  for (const name of ['i18n.js', 'icons.js', 'media.js', 'library.js', 'frontend.js']) {
+  for (const name of ['i18n.js', 'icons.js', 'media.js', 'scroll-keeper.js', 'library.js', 'frontend.js']) {
     vm.runInContext(fs.readFileSync(path.join(APP, 'renderer', name), 'utf8'), ctx, { filename: name });
   }
   const send = (s: unknown) => onState!(s);

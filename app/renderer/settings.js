@@ -85,6 +85,8 @@ function list(s) {
 function detail(d) {
   const box = el('aside', 'detail');
   if (!d) return box;
+  // Le détail d'un autre réglage repart du haut ; celui du même réglage reste où il était.
+  box.dataset.scrollKey = d.title;
   box.append(el('h2', '', d.title));
   if (d.help) box.append(el('p', 'help', d.help));
   for (const line of d.lines ?? []) box.append(el('p', 'help', line));
@@ -157,8 +159,14 @@ function panel(p) {
   return overlay;
 }
 
+/** Défilement (scroll-keeper.js) : chaque liste reste où elle était d'un état à l'autre. */
+const scroll = CyberScroll.keeper([
+  ['.list ul .selected', 'nearest'],
+  ['.wheel .selected', 'center'],
+]);
+
 function render(s) {
-  const previousScroll = root.querySelector('.list ul')?.scrollTop ?? 0;
+  scroll.capture(root);
   const frag = document.createDocumentFragment();
   frag.append(header(s));
   const body = el('div', 'body');
@@ -170,12 +178,8 @@ function render(s) {
   if (s.panel) frag.append(panel(s.panel));
   root.replaceChildren(frag);
 
-  const ul = root.querySelector('.list ul');
-  if (ul) {
-    ul.scrollTop = previousScroll;
-    ul.querySelector('.selected')?.scrollIntoView({ block: 'nearest' });
-  }
-  root.querySelector('.wheel .selected')?.scrollIntoView({ block: 'center' });
+  // La ligne choisie est ramenée dans la vue quand le choix change, jamais à une simple mise à jour.
+  scroll.settle(root, [s.title, s.breadcrumb ?? '', s.tabs.find((tab) => tab.active)?.id ?? '', s.panel?.title ?? ''].join('|'));
   const input = root.querySelector('input.text');
   if (input) {
     input.focus();

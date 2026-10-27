@@ -1,7 +1,7 @@
 // Réglages des médias, du son et du mode attente du menu (docs/recherche/medias.md, § 5.4),
 // dans le menu système : musique des jeux, volumes, lancement en cinéma, mode attente et
 // horaire de la borne (nuit voilée, arrêt à heure fixe : packages/core/src/arcadehours.ts),
-// médias pendant la partie, DMD du menu (vivant ou classique), qualité téléchargée depuis VPinMediaDB.
+// médias pendant la partie, DMD du menu (vivant ou classique) et sa couleur, qualité téléchargée depuis VPinMediaDB.
 // Tout se règle aux boutons : Start change un choix ou ouvre la liste des valeurs, Exit revient.
 // Les réglages s'appliquent tout de suite (on entend le nouveau volume) et sont gardés
 // dans <données>\medias.json.
@@ -9,6 +9,7 @@
 import {
   ATTRACT_DELAY_CHOICES,
   ATTRACT_INTERVAL_CHOICES,
+  DMD_COLOR_PRESETS,
   HOUR_CHOICES,
   NIGHT_DIM_CHOICES,
   GAME_MEDIA_LABELS,
@@ -21,12 +22,16 @@ import {
   VOLUME_CHOICES,
   arcadeHoursSummary,
   attractDelayLabel,
+  dmdColorLabel,
+  dmdColorPreset,
+  dmdColorReadable,
   durationLabel,
   hourLabel,
   formatNumber,
   nearestChoice,
   nextGameMediaMode,
   nightDimLabel,
+  parseDmdColor,
   stopActionLabel,
   stopInNight,
   t,
@@ -43,6 +48,8 @@ export interface MenuSettingsHost {
   library: {
     openCustom(build: () => Built, at?: number): void;
     openSystem(): void;
+    /** Saisie au clavier à l'écran (couleur libre du DMD) ; undefined : abandonnée. */
+    openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
   };
   settings(): MenuMediaSettings;
   /** Enregistre et applique (état renvoyé aux fenêtres). */
@@ -107,6 +114,7 @@ export const MENU_SETTINGS_ROWS = [
   'hours',
   'game',
   'dmd',
+  'dmdColor',
   'downloadQuality',
 ] as const;
 type Row = (typeof MENU_SETTINGS_ROWS)[number];
@@ -222,6 +230,12 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
             : t('Le média DMD du jeu, sinon son titre qui défile (Start : DMD vivant)'),
         icon: 'dmd',
         run: () => set({ dmd: v.dmd === 'live' ? 'classic' : 'live' }),
+      },
+      dmdColor: {
+        label: t('Couleur du DMD : {color}', { color: dmdColorLabel(v.dmdColor) }),
+        detail: t('Les points de l’afficheur que Cyber Pinball dessine : DMD du menu, DMD d’un jeu sans média ; pas celui de VPX en partie (Start : choisir)'),
+        icon: 'palette',
+        run: () => openDmdColor(),
       },
       downloadQuality: {
         label: t('Qualité téléchargée (VPinMediaDB) : {quality}', { quality: MEDIADB_QUALITY_LABELS[v.downloadQuality] }),
@@ -348,6 +362,66 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         back: () => open(back),
       }),
       Math.max(0, choices.indexOf(nearestChoice(choices, now))),
+    );
+  }
+
+  // ---------- Couleur du DMD ----------
+
+  /**
+   * Préréglages, puis la couleur libre. Le DMD du menu montre la marque dans le menu système
+   * (aucune table) : la couleur choisie s'y voit dès le retour sur la ligne.
+   */
+  function openDmdColor(at?: number): void {
+    const back = row('dmdColor');
+    const current = () => s().dmdColor;
+    const free = () => !dmdColorPreset(current());
+    host.library.openCustom(
+      () => ({
+        heading: t('Couleur du DMD'),
+        icon: 'palette',
+        lead: t('Couleur des points du DMD du menu et des DMD que Cyber Pinball dessine pour un jeu sans média. Le DMD de VPX, en partie, garde la couleur de la table.'),
+        sections: [],
+        actions: [
+          ...DMD_COLOR_PRESETS.map((preset) => ({
+            label: preset.label,
+            detail: preset.hex === current() ? t('{detail} · choix actuel', { detail: preset.detail }) : preset.detail,
+            tone: preset.hex === current() ? ('ok' as const) : undefined,
+            run: () => {
+              set({ dmdColor: preset.hex });
+              open(back);
+            },
+          })),
+          {
+            label: free() ? t('Couleur libre : {hex}', { hex: current().toUpperCase() }) : t('Couleur libre…'),
+            detail: free() ? t('Choix actuel · Start : en écrire une autre') : t('Une couleur écrite en hexadécimal, comme #8BE23A'),
+            tone: free() ? ('ok' as const) : undefined,
+            icon: 'edit',
+            run: () => openFreeDmdColor(),
+          },
+          { label: t('Retour'), icon: 'back', run: () => open(back) },
+        ],
+        back: () => open(back),
+      }),
+      at ?? (free() ? DMD_COLOR_PRESETS.length : Math.max(0, DMD_COLOR_PRESETS.findIndex((p) => p.hex === current()))),
+    );
+  }
+
+  /** Couleur libre, au clavier à l'écran ; une couleur trop sombre pour l'afficheur est refusée. */
+  function openFreeDmdColor(error?: string): void {
+    const at = DMD_COLOR_PRESETS.length;
+    host.library.openPrompt(
+      t('Couleur libre du DMD'),
+      t('Couleur (hexadécimal)'),
+      s().dmdColor.toUpperCase(),
+      (value) => {
+        if (value === undefined) return openDmdColor(at);
+        const color = parseDmdColor(value);
+        if (!color) return openFreeDmdColor(t('« {value} » n’est pas une couleur : six chiffres hexadécimaux (0 à 9, A à F), comme #8BE23A.', { value }));
+        if (!dmdColorReadable(color)) return openFreeDmdColor(t('{hex} est trop sombre : les points ne se verraient pas sur le noir de l’afficheur.', { hex: color.toUpperCase() }));
+        set({ dmdColor: color });
+        open(row('dmdColor'));
+      },
+      error ?? t('Six chiffres hexadécimaux, rouge puis vert puis bleu : #8BE23A est le vert signal, #FF8A1F l’orange plasma.'),
     );
   }
 

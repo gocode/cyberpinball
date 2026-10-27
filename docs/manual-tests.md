@@ -872,6 +872,62 @@ On the cabinet with the lying-flat playfield, after the previous section. The un
 | 465 | Cabinet health | System menu > Cabinet > "Cabinet health", after restarting the PC. | Under "Screens", after the recognised configuration: "Tables the right way for you, flippers …", with the Windows orientation. |
 | 466 | Table fixed in VPX | A table that had been turned the right way through VPX's menu (manual framing), back when it showed upside down after every restart. | If it is now upside down, its doctor says "Table de travers sur cette borne" (Table sideways on this cabinet) and where VPX draws it; its repair puts it back the cabinet's way. A fixed table that is the right way is not reported as sideways. |
 
+## Keyboard keys during capture
+
+On a PC without cabinet buttons (keyboard only), then on the Pinscape cabinet. The unattended proof: `packages/core/src/test/clavier-reel.test.ts` (real keys replayed off screen, SDL virtual joystick). What it does not show: a real keyboard, and an encoder in keyboard mode alongside the Pinscape buttons.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 467 | One key changed with the keyboard | System menu > "Borne" (Cabinet) > "Configuration de la borne" > "Boutons du jeu" (Game buttons). Flippers (or arrows) to "Crédit" (Credit), Start (or click), then a free keyboard key, for instance 5; "Enregistrer" (Save). | Credit takes the key as soon as it is released, "Relevé : Crédit : 5" (Captured: Credit: 5); no "Quitter sans enregistrer ?" (Quit without saving?) opens. Reopened, "Boutons du jeu" shows 5. |
+| 468 | Edge cases with the keyboard | During a capture: a key already taken by another button; Backspace while redoing a single button; Escape at the "Quitter sans enregistrer ?" question; a key held for 3 s. | Taken key refused, naming the button that has it; Backspace returns to the summary without changing anything; Escape closes the question; the held key opens the question without being captured. |
+| 469 | Keyboard and Pinscape mixed | On the cabinet: "Tout relever" (Capture all), flippers and Start on Pinscape buttons, credit and Exit on keyboard keys; try them, "Enregistrer", then a game. | Each button is captured along its own path; in the game, flippers, Start, credit and Exit work. In the menu in guest mode, flippers held then released on the keyboard no longer block the selection. |
+
+## Media choice in a gallery
+
+On the cabinet, a table for which VPinMediaDB and VPUniverse have several versions of the same media item (The Matrix, wide display). The unattended proof: `packages/core/src/test/choix-media.test.ts`, `.\docs\demo-propositions.ps1` (captures in `tmp\demo-propositions\captures`) and the mock-up `.\docs\recherche\maquettes\propositions-galerie.ps1`. What they do not show: a real VPUniverse queue receiving a file while you choose, the screen read from a metre away.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 470 | The stored media is the one chosen | Table sheet > "Médias du jeu" (Game media) > Afficheur large (Wide display) > "Voir les propositions" (See suggestions). Queue a VPUniverse file page, then, while it waits, choose the 2nd tile (VPinMediaDB's image) with the flippers and Start. Wait for the file page to arrive, then "Enregistrer" (Save). | The chosen tile turns "Choisi, à enregistrer" (Chosen, to be saved) and stays so when the site's file arrives (message "Reçu de VPUniverse : …, à choisir si vous le préférez", Received from VPUniverse: …, to choose if you prefer it). After saving, the menu's wide display shows the chosen image, neither the previous video nor the site's file. |
+| 471 | List moving under the cursor | On the same suggestions, put the cursor on a tile placed after a queued file page; wait for that page to arrive, then Start, without moving. | The green outline stays on the same tile when the received page turns into its files; Start validates the tile you were looking at. |
+| 472 | One media item after another | Choose a suggestion, then "Média suivant : …" (Next media: …) up to loading, choosing one on each screen; then "Enregistrer" (Save) from the suggestions. | Each choice stays on its tile and in the draft; the previous media item says "Un choix en attente d'enregistrement" (A choice waiting to be saved). The plan lists every chosen media item, and the menu shows them after saving. |
+| 473 | Popularity and other game | On The Matrix's suggestions: "Trier : pertinence" (Sort: relevance). | VPUniverse tiles give their download count; sorting turns into "Trier : popularité" (Sort: popularity), most downloaded first, and stays for the next media item. VPinMediaDB's "The Matrix (Original 2026)" tiles carry "Autre jeu" (Other game) and their detail names your 2023 table. |
+
+## Game parts
+
+On the cabinet, signed in to VPUniverse. Proof without an operator: `packages/core/src/test/parties.test.ts` and `.\docs\demo-parties-du-jeu.ps1`.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 474 | The 27 October cabinet | First Cyber Pinball start after the update, then System menu > "Tables" > "Ajouter une table" (Add a table) > "Récupérés et attendus" (Received and expected). | Nothing left "À corriger" (To fix) nor "Reçus sans élément" (Received without an item) for The Matrix: the PuP-Pack zip is filed as the PuP-Pack, installed with the table; version 1.0.14 is the installed one. A message says what was filed. |
+| 475 | Table and PuP-Pack on the same page | Catalog > a game whose VPUniverse page offers the table and the PuP-Pack as two files (The Matrix 1.0.14) > "Récupérer : Table" (Get: Table); download both files. | The `.vpx` goes to "Table", the zip to "PuP-Pack" (part added to the game), with the message "… is a PuP-Pack, not a table: filed as PuP-Pack…". "Installer : The Matrix" (Install: The Matrix) says "table and pup-pack · see the plan"; the plan installs both at once. |
+| 476 | Complete archive | Get a table whose zip also contains the `.directb2s` (and the ROM), while the backglass was expected too. | The "Table" item says "also brings: backglass (.directb2s)"; the backglass is no longer expected separately; "Ce qu'il faut" (What it takes) says it is "Fourni" (Included), in that zip. |
+| 477 | Nothing blocks | Attach a media pack to "Table" by hand ("Le rattacher quand même", Attach it anyway), then "Installer" (Install) the game. | The plan opens with the other files; nothing asks to fix first. |
+| 478 | Game parts | Page of an installed table > "Parties du jeu" (Game parts). | One line per part: table, backglass, ROM ("Inutile", Not needed, for a table without a ROM), PuP-Pack, colours, sounds, music, point of view, own settings, media; present ones with their files, missing ones with "n on VPS". Nothing overflows, on the cabinet as on a desktop. |
+| 479 | Add a PuP-Pack to an installed table | "Parties du jeu" > "PuP-Pack" > "Ajouter depuis Téléchargements" (Add from Downloads) > the zip; then "Installer" (Install). | The plan says "Complément pour : <the table>" (Complement for), the pack in `pupvideos`; "Annuler" (Cancel) goes back to the PuP-Pack screen. After "Installer", the part is "Présent" (Present). |
+| 480 | Get a part from the web | "Parties du jeu" > "Fronton" (Backglass) > "Récupérer sur le web" (Get from the web) > a backglass; download it in "Récupérer". | The parts screen shows it "Reçu, à installer" (Received, to install); "Installer ce qui est reçu" (Install what was received) opens the plan targeting this table. |
+| 481 | Reassign, remove | "Parties du jeu" > "PuP-Pack" > "Réaffecter à une autre table" (Reassign to another table) > a table; then, on that one, "Retirer de la table" (Remove from the table). | The pack leaves the first table for the other (what it had goes to the trash); "Retirer" asks for confirmation, cursor on "Annuler" (Cancel), then puts the pack in the Cyber Pinball trash. |
+| 482 | Downloads: any game | System menu > "Tables" > "Téléchargements" (Downloads) > a PuP-Pack zip. | "Contient" (Contains: a PuP-Pack…) and "Jeu" (Game) lines; "Ajouter à <the table>" (Add to) first; "Ajouter à un autre jeu…" (Add to another game…) lists the installed tables then the expected games; "Installer comme nouvelle table" (Install as a new table) is only offered for a file that contains a `.vpx` (or is unreadable). |
+
+## Lists during a download
+
+On the cabinet, with the buttons, then with the mouse. The unattended proof: `packages/core/src/test/defilement.test.ts` and `.\docs\demo-defilement-progression.ps1` (captures in `tmp\demo-defilement-progression`). What they do not show: a real download from a site, the wheel of a real mouse.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 483 | Proposals during a download | Table details screen > "Médias du jeu" (Game media) > a media > proposals; Start on a VPUniverse proposal ("Attente du site" (Waiting for the site)), then scroll the list up with the wheel during the countdown. | The list stays where the wheel put it until the download ends; it never goes back on its own to the downloading card. A flipper brings the selected card back into view. |
+| 484 | Other lists that update | During a download, System menu > "Tables" > "Téléchargements" (Downloads), then "Tables" > "Ajouter une table" (Add a table) > "Récupérés et attendus" (Retrieved and expected): scroll each list with the wheel. | No list jumps while files arrive; the selection only moves with the flippers, Tab or a click. |
+
+## Brand backglass and DMD
+
+On the cabinet (backglass and DMD), the brand and the dot displays in the art direction (manual, "Brand backglass and DMD"). The unattended proof: `packages/core/src/test/marque-dmd.test.ts`, `.\docs\demo-replis.ps1` and `.\docs\demo-dmd-vivant.ps1`.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 485 | Brand backglass | Open the system menu (Exit), then a setting and the help. | The backglass shows the cover: "CYBER" above "PINBALL" in green, thin, wide and widely spaced letters, on the left; the teal ball and flippers on the right, faded to black. No more big white capitals. Back to the table menu: the backglass takes the table's media again, with no bright flash. |
+| 486 | Brand DMD | In the system menu, look at the DMD; then go back to the table menu. | The DMD shows "CYBER" above "PINBALL" in signal green, with thin strokes, widely spaced, PINBALL brighter than CYBER; then PRESS START and the clock in the brand's square font. In the table menu: the title, its high scores and the time in the same font, readable at a metre and a half. Unlit dots stay grey, with no green veil. |
+| 487 | DMD colour | System menu > "Médias" (Media) > "Médias, son et attente" (Media, sound and attract mode) > "Couleur du DMD" (DMD colour): choose "Orange plasma" (Plasma orange), then "Couleur libre…" (Custom colour…) and type `#3060FF`, then `#202020`, then go back to "Vert signal" (Signal green). Quit and restart Cyber Pinball between two tries. | Each choice returns to the row, which names it; the DMD changes colour at once, brand page included. `#202020` is refused ("trop sombre", too dark) without changing anything. The chosen colour is the same after a restart. During play, VPX's DMD keeps the table's colour. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

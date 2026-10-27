@@ -31,7 +31,8 @@
   --on-warning: #1a1203;
   --danger: #ff6b6b;
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  /* Points des afficheurs dessinés, par défaut (DEFAULT_DMD_COLOR) ; la couleur réglée le remplace (frontend.js). */
+  --dmd: #8be23a;
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.88);
   --halo-panel: 0 0 0 1px rgba(28, 143, 128, 0.1), 0 0 32px rgba(28, 143, 128, 0.16);

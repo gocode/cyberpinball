@@ -12,7 +12,9 @@ import * as path from 'node:path';
 import { app } from 'electron';
 import {
   acquisitionNotice,
+  addPart,
   addToWaitList,
+  applyOps,
   attachFile,
   cabinetScreens,
   catalog,
@@ -23,6 +25,8 @@ import {
   CATALOG_STATE_LABELS,
   classifyContent,
   clearItem,
+  contentParts,
+  coveredBy,
   CONTENT_LABELS,
   contentFits,
   contentSummary,
@@ -37,8 +41,11 @@ import {
   formatNumber,
   formatSize,
   formatTransfer,
+  infoFileFor,
   installedGames,
+  installedParts,
   isPartialDownload,
+  isReceivable,
   linkHost,
   liveLinks,
   listRoms,
@@ -47,9 +54,13 @@ import {
   mediaUrl,
   moveToTrash,
   NEED_LABELS,
+  partFits,
   placeDownload,
   quickNeeds,
+  repairWaitList,
+  routeReceived,
   requiredForPlay,
+  readInfo,
   readVpxTableInfo,
   reassignFile,
   recommendVersion,
@@ -58,12 +69,14 @@ import {
   requirements,
   samePath,
   setAside,
+  setTableSource,
   siteOfUrl,
   siteState,
   SOURCE_SITES,
   saveWaitList,
   t,
   tn,
+  tableContents,
   tableRomsDir,
   tableSourceOf,
   tableUpdate,
@@ -96,6 +109,7 @@ import {
   type WaitItem,
   type WaitList,
   type WaitProblem,
+  type WaitRepair,
 } from '@cyberpinball/core';
 import { createAcquirer } from './acquire-window';
 import { createYtDlp } from './ytdlp-tool';
@@ -260,7 +274,7 @@ export function createCatalog(ctx: CatalogContext) {
 
   // ---------- Contenu des fichiers reçus ----------
 
-  type Seen = { content: ContentKind; summary?: string };
+  type Seen = { content: ContentKind; summary?: string; parts?: NeedKind[] };
   /** Contenu reconnu de chaque fichier déjà lu (une archive est listée une fois), selon sa taille et sa date. */
   const inspected = new Map<string, { size: number; mtimeMs: number; seen: Seen }>();
 
@@ -280,6 +294,9 @@ export function createCatalog(ctx: CatalogContext) {
     const seen: Seen = { content: classifyContent(name, entries) };
     const summary = contentSummary(name, entries);
     if (summary) seen.summary = summary;
+    // Une archive complète apporte plusieurs parties : la table, son fronton, sa ROM…
+    const parts = contentParts(name, entries);
+    if (parts.length > 1) seen.parts = parts;
     if (st) inspected.set(key, { size: st.size, mtimeMs: st.mtimeMs, seen });
     return seen;
   }
@@ -302,7 +319,56 @@ export function createCatalog(ctx: CatalogContext) {
       Object.assign(s, await inspect(s.file));
       changed = true;
     }
+    // Chaque fichier dans la partie qui lui revient : ce qu'une version précédente (ou une
+    // retouche à la main) a laissé dans la mauvaise partie, ou de côté, se range de lui-même.
+    const repairs = repairWaitList(waitList(), { tableOf: tableOfGame, vps: vpsCache });
+    if (repairs.length) {
+      changed = true;
+      fixSources(repairs);
+      notice = { text: repairs.map(repairText).join(' '), tone: 'info' };
+    }
     if (changed) save();
+  }
+
+  /** Table installée d'un jeu VPS, et les parties qu'elle a déjà (repairWaitList). */
+  function tableOfGame(gameId: string): { file: string; has: (kind: NeedKind) => boolean } | undefined {
+    const entry = host.tables().find((x) => (tableSourceOf(x.info)?.vpsGameId ?? x.info.Info?.VPSId) === gameId);
+    if (!entry) return undefined;
+    let parts: ReturnType<typeof installedParts> | undefined;
+    return { file: entry.file, has: (kind) => (parts ??= installedParts(tableContents(entry.file, { ownFolder: !samePath(entry.folder, ctx.tablesDir()) }))).has(kind) };
+  }
+
+  /** « « TheMatrixPupPackv1.0.14.zip » : PuP-Pack de The Matrix, déjà installé dans la table. » */
+  function repairText(r: WaitRepair): string {
+    const file = path.basename(r.file);
+    switch (r.repair) {
+      case 'moved':
+        return t('« {file} » est {content} : rangé comme {kind} de {game} ; {from} est de nouveau attendu.', { file, content: CONTENT_LABELS[r.to.kind], kind: NEED_LABELS[r.to.kind], game: r.to.gameLabel, from: itemName(r.from) });
+      case 'swapped':
+        return t('« {file} » vient de la page de {to} : il lui revient ; {from} est de nouveau attendu.', { file, to: itemName(r.to), from: itemName(r.from) });
+      case 'claimed':
+        return r.installed
+          ? t('« {file} » : {kind} de {game}, déjà installé dans la table.', { file, kind: NEED_LABELS[r.to.kind], game: r.to.gameLabel })
+          : t('« {file} », gardé de côté : rangé comme {kind} de {game}.', { file, kind: NEED_LABELS[r.to.kind], game: r.to.gameLabel });
+    }
+  }
+
+  /**
+   * Un fichier rendu à l'élément de sa page (deux versions d'une table) : la provenance notée
+   * dans le .info de la table installée avec lui devient celle de cet élément (mises à jour justes).
+   */
+  function fixSources(repairs: WaitRepair[]): void {
+    for (const r of repairs) {
+      if (r.repair !== 'swapped' || r.to.state !== 'installed' || r.to.kind !== 'table') continue;
+      for (const entry of host.tables()) {
+        const source = tableSourceOf(entry.info);
+        if (source?.vpsGameId !== r.from.gameId || source.vpsFileId !== r.from.fileId || path.basename(entry.file).toLowerCase() !== path.basename(r.file).toLowerCase()) continue;
+        const infoFile = infoFileFor(entry, ctx.tablesDir());
+        const next = setTableSource(readInfo(infoFile), { ...source, vpsFileId: r.to.fileId, version: r.to.version, authors: r.to.authors, updatedAt: r.to.updatedAt, page: r.to.page });
+        applyOps([{ op: 'write', path: infoFile, content: JSON.stringify(next, null, 2) + '\n' }], { trashDir: trashDirFor(ctx.layout()!.trash, 'Remplacé à l’import') }); // i18n-ignore : nom de dossier
+        host.reload(entry.file);
+      }
+    }
   }
 
   /**
@@ -316,23 +382,28 @@ export function createCatalog(ctx: CatalogContext) {
     const l = waitList();
     const url = facts.urls?.at(-1);
     const place = placeDownload(l, { ...facts, content: seen.content }, vps, via === 'window' ? windowItem : undefined);
-    const attached = place.item && place.verdict !== 'mismatch' ? place.item : undefined;
-    if (attached) {
-      const item = attached;
-      const replaced = attachFile(l, item, { file, via, url, ...seen });
+    // Rangé dans la partie que dit son contenu, quel que soit l'élément qu'on attendait.
+    const routed = routeReceived(l, place, { file, via, url, ...seen });
+    if (routed) {
+      const item = routed.item;
       save();
+      const size = formatSize(fileSize(file));
       notice = {
         text: [
-          t('Reçu pour {game} : {kind}, {label} (« {file} », {size}).', { game: item.gameLabel, kind: NEED_LABELS[item.kind], label: item.label, file: facts.filename, size: formatSize(fileSize(file)) }),
+          routed.instead
+            ? t('« {file} » est {content}, pas {expected} : rangé comme {kind} de {game} ({size}).', { file: facts.filename, content: CONTENT_LABELS[seen.content], expected: CONTENT_LABELS[routed.instead.kind], kind: NEED_LABELS[item.kind], game: item.gameLabel, size })
+            : t('Reçu pour {game} : {kind}, {label} (« {file} », {size}).', { game: item.gameLabel, kind: NEED_LABELS[item.kind], label: item.label, file: facts.filename, size }),
+          routed.instead && routed.instead.state === 'waiting' ? t('{item} reste attendu.', { item: itemName(routed.instead) }) : '',
+          routed.covered.length ? t('Il apporte aussi {parts} : plus attendus à part.', { parts: formatList(routed.covered.map((c) => NEED_LABELS[c.kind])) }) : '',
           place.verdict === 'unknown' ? t('Contenu non vérifié (archive illisible) : regardez le plan avant d’installer.') : '',
-          replaced ? t('L’ancien, « {file} », est gardé de côté.', { file: path.basename(replaced) }) : '',
+          routed.replaced ? t('L’ancien, « {file} », est gardé de côté.', { file: path.basename(routed.replaced) }) : '',
         ]
           .filter(Boolean)
           .join(' '),
         tone: place.verdict === 'unknown' ? 'warning' : 'ok',
       };
     } else if (place.item) {
-      // Ne convient pas à ce qu'on attendait : rien n'est rangé d'office, on demande.
+      // Jeu deviné d'après le nom, contenu d'une autre partie : rien n'est rangé d'office, on demande.
       setAside(l, { file, via, url, ...seen, expected: place.item.id, suggested: place.better?.id });
       save();
       notice = { text: t('« {file} » est {content}, pas {expected} : où le ranger ?', { file: facts.filename, content: CONTENT_LABELS[seen.content], expected: CONTENT_LABELS[place.item.kind] }), tone: 'warning' };
@@ -353,7 +424,7 @@ export function createCatalog(ctx: CatalogContext) {
     updateWatch();
     // Installation rapide : la page suivante, ou le plan quand tout est là (un fichier qui ne
     // convient pas l'arrête sur la question « où le ranger ? »).
-    if (attached && quick?.items.includes(attached.id)) return quickStep();
+    if (routed && quick?.items.includes(routed.item.id)) return quickStep();
     refresh?.();
     host.broadcast();
   }
@@ -797,8 +868,13 @@ export function createCatalog(ctx: CatalogContext) {
     return requirements(game, version, { screens: cabinetScreens(loadCabinet(dataDir())), roms: romsHere(), installed: installedVersion(game).source === version.id });
   }
 
+  /**
+   * Élément de la liste pour ce besoin : celui d'un de ses fichiers VPS ; sinon, hors table (une
+   * par version), la partie ajoutée au jeu d'après le contenu d'un fichier reçu.
+   */
   function itemFor(game: VpsGame, need: Need): WaitItem | undefined {
-    return waitList().items.find((i) => i.gameId === game.id && i.kind === need.kind && i.state !== 'installed' && need.files.some((f) => f.id === i.fileId));
+    const items = waitList().items.filter((i) => i.gameId === game.id && i.kind === need.kind && i.state !== 'installed');
+    return items.find((i) => need.files.some((f) => f.id === i.fileId)) ?? (need.kind === 'table' ? undefined : items[0]);
   }
 
   function buildNeeds(game: VpsGame, version: VpsTableFile): Built {
@@ -838,7 +914,9 @@ export function createCatalog(ctx: CatalogContext) {
     for (const need of needs) {
       const item = itemFor(game, need);
       const issue = item && problemOf(item);
-      const st = issue ? { label: t('À corriger'), tone: 'error' as const } : item ? WAIT_LABELS[item.state] : STATE_LABELS[need.state];
+      // Apporté par le fichier reçu d'une autre partie (archive complète) : rien à récupérer à part.
+      const cover = item ? undefined : coveredBy(waitList(), game.id, need.kind);
+      const st = issue ? { label: t('À corriger'), tone: 'error' as const } : item ? WAIT_LABELS[item.state] : cover ? STATE_LABELS.included : STATE_LABELS[need.state];
       const canGet = need.files.length > 0 && (need.state === 'todo' || need.state === 'optional' || need.state === 'useless');
       const label = `${NEED_LABELS[need.kind]}${need.kind === 'rom' && need.roms?.length ? ` ${formatList(need.roms, 'or')}` : ''}`;
       const host1 = need.files[0] && liveLinks(need.files[0])[0] ? linkHost(liveLinks(need.files[0])[0]!.url) : undefined;
@@ -846,7 +924,13 @@ export function createCatalog(ctx: CatalogContext) {
         title: label,
         code: need.required ? t('indispensable') : undefined,
         state: { label: st.label, tone: st.tone },
-        facts: item?.received ? (issue ? t('reçu : {file} — {problem}', { file: path.basename(item.received.file), problem: problemText(issue) }) : t('reçu : {file}', { file: path.basename(item.received.file) })) : need.detail,
+        facts: item?.received
+          ? issue
+            ? t('reçu : {file} — {problem}', { file: path.basename(item.received.file), problem: problemText(issue) })
+            : t('reçu : {file}', { file: path.basename(item.received.file) })
+          : cover?.received
+            ? t('dans « {file} », reçu avec {kind}', { file: path.basename(cover.received.file), kind: NEED_LABELS[cover.kind] })
+            : need.detail,
         extra: [
           ...(canGet && host1 ? [whereToGet(need.files.length, host1)] : []),
           ...(need.kind === 'rom' && need.state === 'todo' ? [t('Protégée par le droit d’auteur : Cyber Pinball n’en fournit aucune ; ne la récupérez que si vous y avez droit.')] : []),
@@ -868,18 +952,35 @@ export function createCatalog(ctx: CatalogContext) {
       }
       cards.push(card);
     }
+    // Parties ajoutées au jeu d'après le contenu d'un fichier reçu, que VPS ne liste pas pour cette version.
+    for (const extra of waitList().items.filter((i) => i.gameId === game.id && i.state !== 'installed' && i.kind !== 'table' && !needs.some((n) => n.kind === i.kind))) {
+      const issue = problemOf(extra);
+      cards.push({
+        title: NEED_LABELS[extra.kind],
+        state: issue ? { label: t('À corriger'), tone: 'error' } : WAIT_LABELS[extra.state],
+        facts: extra.received ? t('reçu : {file}', { file: path.basename(extra.received.file) }) : extra.label,
+        extra: [t('Partie ajoutée d’après le contenu d’un fichier reçu.')],
+        thumb: { kind: 'fallback', rotation: 0, text: NEED_LABELS[extra.kind] },
+        action: actions.length,
+      });
+      actions.push({ label: itemName(extra), detail: t('Récupérés et attendus'), run: () => openItem(extra.id) });
+    }
     const received = waitList().items.filter((i) => i.gameId === game.id && i.state === 'received');
     const tableReady = received.some((i) => i.kind === 'table' && !problemOf(i));
-    const blocking = problems(game.id).filter((p) => p.problem === 'mismatch');
+    const apart = problems(game.id).filter((p) => p.problem === 'mismatch');
     if (received.length) {
+      // Un fichier à corriger ne retient jamais le reste : il est laissé de côté par le plan.
       actions.push({
         label: t('Préparer l’installation'),
-        detail: blocking.length
-          ? t('à corriger d’abord : {items}', { items: blocking.map((p) => NEED_LABELS[p.item.kind]).join(', ') })
-          : tableReady
-            ? tn(received.length, '{n} fichier reçu : voir le plan', '{n} fichiers reçus : voir le plan')
-            : tn(received.length, '{n} fichier reçu (pas encore la table) : voir le plan', '{n} fichiers reçus (pas encore la table) : voir le plan'),
-        tone: blocking.length ? 'warning' : 'ok',
+        detail: [
+          tableReady
+            ? tn(received.length - apart.length, '{n} fichier reçu : voir le plan', '{n} fichiers reçus : voir le plan')
+            : tn(received.length - apart.length, '{n} fichier reçu (pas encore la table) : voir le plan', '{n} fichiers reçus (pas encore la table) : voir le plan'),
+          apart.length ? t('{items} à corriger à part', { items: apart.map((p) => NEED_LABELS[p.item.kind]).join(', ') }) : '',
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        tone: 'ok',
         run: () => installGame(game.id),
       });
     }
@@ -1145,9 +1246,11 @@ export function createCatalog(ctx: CatalogContext) {
               ? t('reçu le {date} : {file} (Téléchargements)', { date: formatDay(Date.parse(i.received.at)), file: path.basename(i.received.file) })
               : t('reçu le {date} : {file}', { date: formatDay(Date.parse(i.received.at)), file: path.basename(i.received.file) })
             : t('attendu depuis le {date} · {site}', { date: formatDay(Date.parse(i.addedAt)), site: linkHost(i.page).label });
+          const along = (i.received?.parts ?? []).filter((k) => k !== i.kind);
+          const detail = along.length ? t('{when} · apporte aussi : {parts}', { when, parts: formatList(along.map((k) => NEED_LABELS[k].toLowerCase())) }) : when;
           return {
             text: itemName(i),
-            detail: issue ? `${when} — ${problemText(issue)}` : when,
+            detail: issue ? `${when} — ${problemText(issue)}` : detail,
             badges: [issue ? t('À corriger') : WAIT_LABELS[i.state].label],
             tone: issue ? 'error' : WAIT_LABELS[i.state].tone,
             action,
@@ -1178,11 +1281,14 @@ export function createCatalog(ctx: CatalogContext) {
     for (const [gameId, label] of games) {
       const got = active.filter((i) => i.gameId === gameId && i.state === 'received');
       if (!got.length) continue;
-      const blocking = issues.filter((p) => p.item.gameId === gameId);
+      // Ce qui est à corriger reste à part : le reste s'installe.
+      const apart = issues.filter((p) => p.item.gameId === gameId && p.problem === 'mismatch');
+      const ready = got.filter((i) => !apart.some((p) => p.item === i));
+      if (!ready.length) continue;
       actions.push({
         label: t('Installer : {game}', { game: label }),
-        detail: blocking.length ? t('à corriger d’abord : {items}', { items: blocking.map((p) => NEED_LABELS[p.item.kind]).join(', ') }) : tn(got.length, '{n} fichier reçu : voir le plan', '{n} fichiers reçus : voir le plan'),
-        tone: blocking.length ? 'warning' : 'ok',
+        detail: [t('{parts} · voir le plan', { parts: formatList(ready.map((i) => NEED_LABELS[i.kind].toLowerCase())) }), apart.length ? t('{items} à corriger à part', { items: apart.map((p) => NEED_LABELS[p.item.kind]).join(', ') }) : ''].filter(Boolean).join(' · '),
+        tone: 'ok',
         run: () => installGame(gameId),
       });
     }
@@ -1214,7 +1320,7 @@ export function createCatalog(ctx: CatalogContext) {
     return {
       heading: t('Récupérés et attendus'),
       subheading: [tn(waitingCount, '{n} attendu', '{n} attendus'), tn(receivedCount, '{n} reçu', '{n} reçus'), issues.length ? tn(issues.length, '{n} à corriger', '{n} à corriger') : undefined, strays.length ? tn(strays.length, '{n} sans élément', '{n} sans élément') : undefined].filter(Boolean).join(' · '),
-      lead: t('Ce que vous récupérez, jeu par jeu. Start sur un élément : le rouvrir, le réaffecter, le vider ou le remplacer. Un fichier qui ne convient pas à ce qu’on attendait n’est jamais rangé sans votre accord ; rien n’est installé avant le plan.'),
+      lead: t('Ce que vous récupérez, jeu par jeu. Chaque fichier va dans la partie que dit son contenu, quel que soit l’élément qu’on attendait ; s’il y a un doute, on vous le demande. Start sur un élément : le rouvrir, le réaffecter, le vider ou le remplacer. Rien n’est installé avant le plan.'),
       sections,
       actions,
       back: () => waitBack(),
@@ -1301,6 +1407,8 @@ export function createCatalog(ctx: CatalogContext) {
     const exists = fs.existsSync(item.received.file);
     const file = clearItem(l, item, keep && exists);
     if (!keep && file) trash([file]);
+    const aside = keep && file ? l.strays?.find((s) => samePath(s.file, file)) : undefined;
+    if (aside) aside.kept = true;
     save();
     updateWatch();
     notice = {
@@ -1335,14 +1443,16 @@ export function createCatalog(ctx: CatalogContext) {
       if (!item || !fs.existsSync(file)) return back();
       const seen = await inspect(file);
       const stray = waitList().strays?.find((s) => samePath(s.file, file));
+      // Rattaché quand même : son choix, jamais réorienté d'office (repairWaitList).
+      const forced = partFits(item.kind, seen) === 'no';
       const go = () => {
-        const replaced = attachFile(waitList(), item, { file, via: stray?.via ?? via, url: stray?.url, at: stray?.at, ...seen });
+        const replaced = attachFile(waitList(), item, { file, via: stray?.via ?? via, url: stray?.url, at: stray?.at, ...seen, ...(forced ? { forced } : {}) });
         save();
         updateWatch();
         notice = { text: [t('« {file} » rattaché à {item}.', { file: path.basename(file), item: itemName(item) }), replaced ? t('L’ancien, « {file} », est gardé de côté.', { file: path.basename(replaced) }) : ''].filter(Boolean).join(' '), tone: 'ok' };
         openWaitList(itemAction(id));
       };
-      if (contentFits(item.kind, seen.content) === 'no') confirmMismatch(file, seen, item, go, back);
+      if (forced) confirmMismatch(file, seen, item, go, back);
       else go();
     });
   }
@@ -1354,15 +1464,17 @@ export function createCatalog(ctx: CatalogContext) {
     const target = l.items.find((i) => i.id === to);
     if (!target) return openWaitList();
     if (!from) return assign(src.file, to, 'manual', back);
-    const seen = { content: from.received?.content, summary: from.received?.summary };
+    const seen = { content: from.received?.content, summary: from.received?.summary, parts: from.received?.parts };
+    const forced = partFits(target.kind, seen) === 'no';
     const go = () => {
       reassignFile(l, from, target);
+      if (forced && target.received) target.received.forced = true;
       save();
       updateWatch();
       notice = { text: t('« {file} » rattaché à {item} ; {from} est de nouveau attendu.', { file: path.basename(src.file), item: itemName(target), from: itemName(from) }), tone: 'ok' };
       openWaitList(itemAction(to));
     };
-    if (contentFits(target.kind, seen.content) === 'no') confirmMismatch(src.file, seen, target, go, back ?? (() => openItem(from.id)));
+    if (forced) confirmMismatch(src.file, seen, target, go, back ?? (() => openItem(from.id)));
     else go();
   }
 
@@ -1389,19 +1501,19 @@ export function createCatalog(ctx: CatalogContext) {
   function openTargets(src: { file: string; from?: string }): void {
     void ctx.task(t('Vérification du fichier…'), async () => {
       const from = src.from ? waitList().items.find((i) => i.id === src.from) : undefined;
-      const seen = from?.received?.content ? { content: from.received.content, summary: from.received.summary } : await inspect(src.file);
+      const seen = from?.received?.content ? { content: from.received.content, summary: from.received.summary, parts: from.received.parts } : await inspect(src.file);
       const back = () => (from ? openItem(from.id) : openStray(src.file));
       refresh = undefined;
       ctx.show(() => {
         const targets = activeItems().filter((i) => i.id !== src.from);
-        const fits = targets.filter((i) => contentFits(i.kind, seen.content) !== 'no');
-        const others = targets.filter((i) => contentFits(i.kind, seen.content) === 'no');
+        const fits = targets.filter((i) => partFits(i.kind, seen) !== 'no');
+        const others = targets.filter((i) => partFits(i.kind, seen) === 'no');
         const actions: Action[] = [];
         const row = (i: WaitItem, good: boolean): Row => {
           const action = actions.length;
           actions.push({ label: itemName(i), detail: i.gameLabel, run: () => moveFile(src, i.id, () => openTargets(src)) });
           const state = i.received ? t('reçu : {file}', { file: path.basename(i.received.file) }) : t('attendu');
-          return { text: itemName(i), detail: good ? `${i.gameLabel} · ${state}` : t('{game} · {state} — attend {expected}', { game: i.gameLabel, state, expected: CONTENT_LABELS[i.kind] }), badges: good ? [contentFits(i.kind, seen.content) === 'yes' ? t('Convient') : t('Non vérifié')] : undefined, tone: good ? 'ok' : 'quiet', action, pick: true };
+          return { text: itemName(i), detail: good ? `${i.gameLabel} · ${state}` : t('{game} · {state} — attend {expected}', { game: i.gameLabel, state, expected: CONTENT_LABELS[i.kind] }), badges: good ? [partFits(i.kind, seen) === 'yes' ? t('Convient') : t('Non vérifié')] : undefined, tone: good ? 'ok' : 'quiet', action, pick: true };
         };
         const sections: Section[] = [];
         if (fits.length) sections.push({ title: t('Conviennent'), rows: fits.map((i) => row(i, true)) });
@@ -1423,7 +1535,7 @@ export function createCatalog(ctx: CatalogContext) {
 
   /** Fichiers qu'on peut rattacher à la main : gardés de côté, reçus par « Récupérer », arrivés dans Téléchargements. */
   type Candidate = { file: string; origin: string; seen: Seen; mtimeMs: number };
-  async function candidatesFor(item: WaitItem): Promise<Candidate[]> {
+  async function candidatesFor(item: Pick<WaitItem, 'kind'>): Promise<Candidate[]> {
     const l = waitList();
     const taken = new Set(l.items.filter((i) => i.received).map((i) => path.resolve(i.received!.file).toLowerCase()));
     const found = new Map<string, { file: string; origin: string }>();
@@ -1432,17 +1544,16 @@ export function createCatalog(ctx: CatalogContext) {
       if (!taken.has(key) && !found.has(key) && fs.existsSync(file)) found.set(key, { file, origin });
     };
     for (const s of l.strays ?? []) add(s.file, t('gardé de côté'));
-    const receivable = (name: string) => /\.(vpx|directb2s|zip|7z|rar|mp3|ogg|wav|pov|pac|vni|pal|crz|cromc)$/i.test(name) && !isPartialDownload(name);
     try {
-      for (const name of fs.readdirSync(acquisitionDir())) if (receivable(name)) add(path.join(acquisitionDir(), name), t('reçu par « Récupérer »'));
+      for (const name of fs.readdirSync(acquisitionDir())) if (isReceivable(name)) add(path.join(acquisitionDir(), name), t('reçu par « Récupérer »'));
     } catch {
       // Dossier pas encore créé.
     }
     const month = new Date(Date.now() - 31 * 24 * 3600 * 1000);
-    for (const file of recentDownloads(userDownloads(), month)) if (receivable(path.basename(file))) add(file, t('Téléchargements'));
+    for (const file of recentDownloads(userDownloads(), month)) if (isReceivable(path.basename(file))) add(file, t('Téléchargements'));
     const out: Candidate[] = [];
     for (const c of [...found.values()].slice(0, 40)) out.push({ ...c, seen: await inspect(c.file), mtimeMs: fs.statSync(c.file).mtimeMs });
-    const rank = (c: Candidate) => ({ yes: 0, unknown: 1, no: 2 })[contentFits(item.kind, c.seen.content)];
+    const rank = (c: Candidate) => ({ yes: 0, unknown: 1, no: 2 })[partFits(item.kind, c.seen)];
     return out.sort((a, b) => rank(a) - rank(b) || b.mtimeMs - a.mtimeMs);
   }
 
@@ -1459,7 +1570,7 @@ export function createCatalog(ctx: CatalogContext) {
         const row = (c: Candidate): Row => {
           const action = actions.length;
           actions.push({ label: path.basename(c.file), detail: c.origin, run: () => assign(c.file, id, 'manual', () => openReplace(id)) });
-          const fit = contentFits(item.kind, c.seen.content);
+          const fit = partFits(item.kind, c.seen);
           return {
             text: path.basename(c.file),
             detail: [c.origin, contentLine(c.seen), formatSize(fileSize(c.file)), t('le {date}', { date: formatDay(c.mtimeMs) })].join(' · '),
@@ -1469,8 +1580,8 @@ export function createCatalog(ctx: CatalogContext) {
             pick: true,
           };
         };
-        const good = candidates.filter((c) => contentFits(item.kind, c.seen.content) !== 'no');
-        const bad = candidates.filter((c) => contentFits(item.kind, c.seen.content) === 'no');
+        const good = candidates.filter((c) => partFits(item.kind, c.seen) !== 'no');
+        const bad = candidates.filter((c) => partFits(item.kind, c.seen) === 'no');
         const sections: Section[] = [];
         if (good.length) sections.push({ title: t('Conviennent'), rows: good.map(row) });
         if (bad.length) sections.push({ title: t('Ne conviennent pas'), rows: bad.map(row) });
@@ -1522,7 +1633,16 @@ export function createCatalog(ctx: CatalogContext) {
     const suggested = stray.suggested ? l.items.find((i) => i.id === stray.suggested && i.state !== 'installed') : undefined;
     const rows: Row[] = [{ text: t('Reçu'), detail: receivedLine(stray) }, { text: t('Contenu'), detail: contentLine(stray), tone: expected ? 'warning' : undefined }];
     if (expected) rows.push({ text: t('Attendu'), detail: `${itemName(expected)} — ${EXPECTED_LABELS[expected.kind]}` });
-    const keep = { label: t('Le garder de côté'), detail: expected ? t('Rien n’est rattaché ; {item} reste attendu', { item: itemName(expected) }) : t('Pour le rattacher plus tard'), run: back };
+    const keep = {
+      label: t('Le garder de côté'),
+      detail: expected ? t('Rien n’est rattaché ; {item} reste attendu', { item: itemName(expected) }) : t('Pour le rattacher plus tard'),
+      run: () => {
+        // Gardé exprès : il n'est plus rangé d'office dans une partie (repairWaitList).
+        stray.kept = true;
+        save();
+        back();
+      },
+    };
     const actions: Action[] = [];
     if (suggested) actions.push({ label: t('Rattacher à : {item}', { item: itemName(suggested) }), detail: t('Le fichier lui convient'), tone: 'ok', run: () => assign(stray.file, suggested.id, stray.via, () => openStray(file, back)) });
     actions.push(suggested ? keep : { ...keep, tone: 'ok' });
@@ -1559,7 +1679,7 @@ export function createCatalog(ctx: CatalogContext) {
     const item = l.items.find((i) => i.id === id);
     const stray = l.strays?.find((s) => samePath(s.file, file));
     if (!item || !stray) return openWaitList();
-    attachFile(l, item, { file: stray.file, via: stray.via, url: stray.url, at: stray.at, content: stray.content, summary: stray.summary });
+    attachFile(l, item, { file: stray.file, via: stray.via, url: stray.url, at: stray.at, content: stray.content, summary: stray.summary, parts: stray.parts, forced: true });
     save();
     updateWatch();
     notice = { text: t('« {file} » rattaché à {item}, à votre demande.', { file: path.basename(file), item: itemName(item) }), tone: 'warning' };
@@ -1610,9 +1730,8 @@ export function createCatalog(ctx: CatalogContext) {
       const seen = await inspect(file);
       // Vérifié comme à la réception : seul ce qui convient est rangé d'office.
       const place = placeDownload(l, { filename: path.basename(file), content: seen.content }, vpsCache);
-      if (!place.item || place.verdict === 'mismatch' || place.item.state !== 'waiting') continue;
-      attachFile(l, place.item, { file, via: 'watch', ...seen });
-      found++;
+      if (place.item && place.item.state !== 'waiting') continue;
+      if (routeReceived(l, place, { file, via: 'watch', ...seen })) found++;
     }
     if (found) save();
     return found;
@@ -1635,20 +1754,20 @@ export function createCatalog(ctx: CatalogContext) {
   function installGame(gameId: string, quick = false): void {
     void ctx.task(t('Vérification des fichiers reçus…'), async () => {
       await noteContents(waitList().items.filter((i) => i.gameId === gameId));
-      // Un fichier qui ne convient pas ne part jamais à l'installation : on le corrige d'abord.
-      const wrong = problems(gameId).find((p) => p.problem === 'mismatch');
-      if (wrong) {
-        notice = { text: t('À corriger avant d’installer : {item}, {problem}.', { item: itemName(wrong.item), problem: problemText(wrong) }), tone: 'warning' };
-        return openItem(wrong.item.id);
-      }
-      const items = waitList().items.filter((i) => i.gameId === gameId && i.state === 'received' && i.received && fs.existsSync(i.received.file));
+      // Un fichier qui ne convient pas ne part jamais à l'installation, mais ne retient pas le reste.
+      const apart = problems(gameId).filter((p) => p.problem === 'mismatch');
       const lost = waitList().items.filter((i) => i.gameId === gameId && i.state === 'received' && (!i.received || !fs.existsSync(i.received.file)));
       for (const i of lost) {
         i.state = 'waiting';
         i.received = undefined;
       }
       if (lost.length) save();
+      const items = waitList().items.filter((i) => i.gameId === gameId && i.state === 'received' && i.received && fs.existsSync(i.received.file) && !apart.some((p) => p.item === i));
       if (!items.length) {
+        if (apart[0]) {
+          notice = { text: t('À corriger : {item}, {problem}.', { item: itemName(apart[0].item), problem: problemText(apart[0]) }), tone: 'warning' };
+          return openItem(apart[0].item.id);
+        }
         notice = { text: t('Les fichiers reçus ont disparu (déplacés ou effacés) : ils sont de nouveau attendus.'), tone: 'warning' };
         return openWaitList();
       }
@@ -1899,6 +2018,24 @@ export function createCatalog(ctx: CatalogContext) {
     receive: (file: string, via: 'window' | 'watch') => received(file, { filename: path.basename(file) }, via, vpsCache),
     /** Pour les essais : ce que la liste juge à corriger. */
     problems: () => problems(),
+    /** Ce que contient un fichier (archive listée une fois) : sa partie principale et toutes celles qu'il apporte. */
+    inspect,
+    /** Fichiers déjà téléchargés pour une partie (gardés de côté, « Récupérer », Téléchargements), ceux qui conviennent d'abord. */
+    candidates: (kind: NeedKind) => candidatesFor({ kind }),
+    /** Jeux de la liste d'attente (encore attendus ou reçus), pour y rattacher un fichier. */
+    games: () => [...new Map(activeItems().map((i) => [i.gameId, i.gameLabel])).entries()].map(([gameId, label]) => ({ gameId, label })),
+    /**
+     * Rattache un fichier à une partie d'un jeu de la liste d'attente (Téléchargements, « Ajouter à
+     * un autre jeu ») : l'élément attendu de cette partie, ou la partie ajoutée au jeu.
+     */
+    attachToGame: (file: string, gameId: string, kind: NeedKind, back: () => void) => {
+      const l = waitList();
+      const ref = l.items.find((i) => i.gameId === gameId);
+      if (!ref) return back();
+      const item = l.items.find((i) => i.gameId === gameId && i.kind === kind && i.state === 'waiting') ?? addPart(l, { gameId, gameLabel: ref.gameLabel, kind, label: path.basename(file).replace(/\.[^.]+$/, ''), page: ref.page, ...(ref.table ? { table: ref.table } : {}) });
+      save();
+      assign(file, item.id, 'manual', back);
+    },
     fileSize,
   };
 }

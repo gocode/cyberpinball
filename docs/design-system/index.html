@@ -29,7 +29,7 @@
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -49,8 +49,8 @@
   --font-ui: Saira, "Segoe UI", system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: "Bebas Neue", Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: "Press Start 2P", monospace;
+  --font-brand: Saira, "Segoe UI", sans-serif;
+  --font-dot: "Saira Points", monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -61,9 +61,9 @@
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -357,6 +357,7 @@
 .cp-i-eye { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-gauge { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-dmd { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-palette { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-folder { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-folder-download { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-drive { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E") }
@@ -497,7 +498,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -517,8 +518,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -529,9 +530,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -825,6 +826,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -908,12 +910,12 @@ details pre code { color: var(--ink-muted); white-space: pre }
 <div class="ds-swatch"><span class="chip" style="background:rgba(3, 8, 7, 0.72)"></span><div><b>scrim</b><code>rgba(3, 8, 7, 0.72)</code><p>Bandeau d'aide posé sur un média.</p></div></div>
 <div class="ds-swatch"><span class="chip" style="background:rgba(3, 8, 7, 0.86)"></span><div><b>scrim-strong</b><code>rgba(3, 8, 7, 0.86)</code><p>Voile sous une question qui bloque l'écran.</p></div></div>
 <div class="ds-swatch"><span class="chip" style="background:#1c8f80"></span><div><b>halo</b><code>#1c8f80</code><p>Lueur sarcelle des panneaux (dans halo-panel) ; jamais pour du texte.</p></div></div>
-<div class="ds-swatch"><span class="chip" style="background:#ff8a1f"></span><div><b>dmd</b><code>#ff8a1f</code><p>Orange des afficheurs DMD, réservé aux replis dessinés pour l'afficheur ; pas une couleur d'interface.</p></div></div></div>
+<div class="ds-swatch"><span class="chip" style="background:#8be23a"></span><div><b>dmd</b><code>#8be23a</code><p>Couleur par défaut des points des afficheurs que Cyber Pinball dessine (DMD du menu, replis) : le vert signal de la marque, réglable dans le menu (« Couleur du DMD », packages/core/src/dmdcolor.ts : préréglages, dont l'orange plasma #ff8a1f, et couleur libre). Pas une couleur d'interface.</p></div></div></div>
 
     <h2 class="ds-h2" id="typographie" style="margin-top:56px">Typographie</h2>
     <p>Saira pour toute l'interface, avec son axe de largeur : 125 % pour la marque, 112 % pour titres, menus, boutons et intertitres, 100 % pour le texte courant. Les replis dessinés gardent leurs polices propres.</p>
     <h3>Interface</h3><div class="ds-type"><div class="spec"><b>wordmark</b><code>64px / 1.15 · 300 · 0.5em</code><p>Marque, en capitales, largeur 125 %, « PINBALL » en signal. Écran de départ et en-tête (22 px, 0,42 em).</p></div><div class="sample wordmark" style="font-stretch:125%;text-transform:uppercase;font-size:min(48px,5.4vw);overflow-wrap:normal">CYBER PINBALL</div></div><div class="ds-type"><div class="spec"><b>display</b><code>60px / 1.02 · 600</code><p>Titre de la table choisie dans le menu et sur sa fiche.</p></div><div class="sample display" style="">Medieval Madness</div></div><div class="ds-type"><div class="spec"><b>title</b><code>34px / 1.15 · 400 · 0.12em</code><p>Titre d'un écran ou d'un panneau, en capitales, largeur 112 %.</p></div><div class="sample title" style="text-transform:uppercase;font-stretch:112%;">COMMANDES</div></div><div class="ds-type"><div class="spec"><b>menu</b><code>28px / 1.3 · 500 · 0.1em</code><p>Entrée de menu, en capitales, largeur 112 %.</p></div><div class="sample menu" style="text-transform:uppercase;font-stretch:112%;">AJOUTER UNE TABLE</div></div><div class="ds-type"><div class="spec"><b>body</b><code>24px / 1.5 · 400</code><p>Texte courant, libellés de ligne, descriptions. Le plus petit texte qu'on lit en jouant.</p></div><div class="sample body" style="">Une ROM sert souvent à plusieurs tables.</div></div><div class="ds-type"><div class="spec"><b>meta</b><code>24px / 1.4 · 400 · 0.02em</code><p>Fabricant et année, en meta, le point en ink-faint.</p></div><div class="sample meta" style="">Williams · 1997</div></div><div class="ds-type"><div class="spec"><b>detail</b><code>20px / 1.35 · 400</code><p>Détail sous un libellé, bandeau d'aide. Plancher absolu de l'interface.</p></div><div class="sample detail" style="">Depuis le dossier d'import, une clé USB ou ce PC</div></div><div class="ds-type"><div class="spec"><b>label</b><code>20px / 1.3 · 600 · 0.24em</code><p>Intertitre de groupe, en capitales, en signal (comme dans la DA).</p></div><div class="sample label" style="text-transform:uppercase;font-stretch:112%;color:var(--signal);">ÉTAT DES ÉCRANS</div></div><div class="ds-type"><div class="spec"><b>kicker</b><code>20px / 1.3 · 500 · 0.38em</code><p>Surtitre au-dessus du titre d'un panneau ; pas de texte qu'il faut lire en jouant.</p></div><div class="sample kicker" style="text-transform:uppercase;font-stretch:112%;">CYBER PINBALL</div></div>
-<h3>Replis dessinés</h3><div class="ds-type"><div class="spec"><b>replis-titre</b><code>72px / 1 · 400</code><p>Titre d'un fronton ou d'un écran de chargement dessiné quand le média manque.</p></div><div class="sample replis-titre" style="">THE ADDAMS FAMILY</div></div><div class="ds-type"><div class="spec"><b>replis-logo</b><code>40px / 1.05 · 400</code><p>Logo rond dessiné (style néon) et plaque fabricant · année.</p></div><div class="sample replis-logo" style="">Black Knight</div></div><div class="ds-type"><div class="spec"><b>replis-marque</b><code>36px / 1.1 · 700 · 0.2em</code><p>Marque sur le topper et l'écran « en partie » dessinés ; style « arcade » du logo.</p></div><div class="sample replis-marque" style="">CYBER PINBALL</div></div><div class="ds-type"><div class="spec"><b>replis-dmd</b><code>24px / 1.2 · 400</code><p>Petits textes de l'afficheur DMD dessiné, en dmd.</p></div><div class="sample replis-dmd" style="">STERN 2020</div></div>
+<h3>Replis dessinés</h3><div class="ds-type"><div class="spec"><b>replis-titre</b><code>72px / 1 · 600</code><p>Titre d'un fronton ou d'un écran de chargement dessiné quand le média manque : Saira condensée (84 %), en capitales.</p></div><div class="sample replis-titre" style="">THE ADDAMS FAMILY</div></div><div class="ds-type"><div class="spec"><b>replis-logo</b><code>40px / 1.05 · 400</code><p>Logo rond dessiné (style néon) et plaque fabricant · année.</p></div><div class="sample replis-logo" style="">Black Knight</div></div><div class="ds-type"><div class="spec"><b>replis-marque</b><code>36px / 1.35 · 300 · 0.28em</code><p>Marque des écrans dessinés, Saira légère élargie (125 %), « PINBALL » en signal : empilée sur le fronton sans jeu (couverture, 0,28 em), sur une ligne sur le topper, le chargement et l'écran « en partie » (0,5 em).</p></div><div class="sample replis-marque" style="">CYBER PINBALL</div></div><div class="ds-type"><div class="spec"><b>replis-dmd</b><code>24px / 1.2 · 400</code><p>Afficheurs à points : « Saira Points », police à points dessinée d'après Saira (petit 5 × 7, grand 9 × 14, marque 11 × 11 ; packages/core/src/dmdfont.ts), en dmd. Les aperçus HTML la remplacent par une police à chasse fixe.</p></div><div class="sample replis-dmd" style="">STERN 2020</div></div>
 
     <h2 class="ds-h2" id="espaces" style="margin-top:56px">Espaces et rayons</h2>
     <div class="ds-steps"><div class="ds-step"><span class="bar" style="width:4px"></span><b>space-1</b><code>4px</code><p>Entre deux entrées d'un menu.</p></div><div class="ds-step"><span class="bar" style="width:8px"></span><b>space-2</b><code>8px</code><p>Entre deux lignes, deux onglets.</p></div><div class="ds-step"><span class="bar" style="width:12px"></span><b>space-3</b><code>12px</code><p>Marge intérieure d'une carte, entre deux logos de la roue.</p></div><div class="ds-step"><span class="bar" style="width:16px"></span><b>space-4</b><code>16px</code><p>Entre icône et libellé.</p></div><div class="ds-step"><span class="bar" style="width:24px"></span><b>space-5</b><code>24px</code><p>Marge intérieure d'une entrée de menu ; sous l'en-tête d'un panneau.</p></div><div class="ds-step"><span class="bar" style="width:32px"></span><b>space-6</b><code>32px</code><p>Marge intérieure d'un panneau.</p></div><div class="ds-step"><span class="bar" style="width:48px"></span><b>space-7</b><code>48px</code><p>Entre deux blocs d'un écran ; marge intérieure d'une question.</p></div><div class="ds-step"><span class="bar" style="width:64px"></span><b>space-8</b><code>64px</code><p>Marge de l'écran.</p></div></div>
@@ -956,7 +958,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -976,8 +978,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -988,9 +990,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -1284,6 +1286,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -1399,6 +1402,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-eye&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-eye&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;eye&lt;/span&gt;&lt;/div&gt;
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-gauge&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-gauge&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;gauge&lt;/span&gt;&lt;/div&gt;
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-dmd&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-dmd&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;dmd&lt;/span&gt;&lt;/div&gt;
+  &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-palette&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-palette&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;palette&lt;/span&gt;&lt;/div&gt;
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-folder&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-folder&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;folder&lt;/span&gt;&lt;/div&gt;
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-folder-download&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-folder-download&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;folder-download&lt;/span&gt;&lt;/div&gt;
   &lt;div style=&quot;display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)&quot;&gt;&lt;span style=&quot;display:flex;align-items:end;gap:18px&quot;&gt;&lt;i class=&quot;cp-i cp-i-drive&quot; style=&quot;font-size:30px&quot;&gt;&lt;/i&gt;&lt;i class=&quot;cp-i cp-i-drive&quot; style=&quot;font-size:60px&quot;&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style=&quot;font-size:20px;color:var(--ink-muted)&quot;&gt;drive&lt;/span&gt;&lt;/div&gt;
@@ -1518,6 +1522,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-eye" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-eye" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;eye&lt;/span&gt;&lt;/div&gt;
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-gauge" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-gauge" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;gauge&lt;/span&gt;&lt;/div&gt;
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-dmd" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-dmd" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;dmd&lt;/span&gt;&lt;/div&gt;
+  &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-palette" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-palette" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;palette&lt;/span&gt;&lt;/div&gt;
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-folder" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-folder" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;folder&lt;/span&gt;&lt;/div&gt;
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-folder-download" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-folder-download" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;folder-download&lt;/span&gt;&lt;/div&gt;
   &lt;div style="display:grid;justify-items:center;gap:10px;padding:18px 6px 14px;border:1px solid var(--line);border-radius:6px;color:var(--ink)"&gt;&lt;span style="display:flex;align-items:end;gap:18px"&gt;&lt;i class="cp-i cp-i-drive" style="font-size:30px"&gt;&lt;/i&gt;&lt;i class="cp-i cp-i-drive" style="font-size:60px"&gt;&lt;/i&gt;&lt;/span&gt;&lt;span style="font-size:20px;color:var(--ink-muted)"&gt;drive&lt;/span&gt;&lt;/div&gt;
@@ -1587,7 +1592,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -1607,8 +1612,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -1619,9 +1624,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -1915,6 +1920,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -2000,7 +2006,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -2020,8 +2026,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -2032,9 +2038,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -2328,6 +2334,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -2412,7 +2419,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -2432,8 +2439,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -2444,9 +2451,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -2740,6 +2747,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -2833,7 +2841,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -2853,8 +2861,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -2865,9 +2873,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -3161,6 +3169,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -3244,7 +3253,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -3264,8 +3273,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -3276,9 +3285,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -3572,6 +3581,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -3667,7 +3677,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -3687,8 +3697,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -3699,9 +3709,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -3995,6 +4005,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -4090,7 +4101,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -4110,8 +4121,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -4122,9 +4133,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -4418,6 +4429,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -4499,7 +4511,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -4519,8 +4531,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -4531,9 +4543,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -4827,6 +4839,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -4912,7 +4925,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -4932,8 +4945,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -4944,9 +4957,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -5240,6 +5253,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -5329,7 +5343,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -5349,8 +5363,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -5361,9 +5375,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -5657,6 +5671,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -5744,7 +5759,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -5764,8 +5779,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -5776,9 +5791,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -6072,6 +6087,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -6159,7 +6175,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -6179,8 +6195,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -6191,9 +6207,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -6487,6 +6503,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -6630,7 +6647,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -6650,8 +6667,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -6662,9 +6679,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -6958,6 +6975,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -7045,7 +7063,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -7065,8 +7083,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -7077,9 +7095,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -7373,6 +7391,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -7445,7 +7464,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -7465,8 +7484,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -7477,9 +7496,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -7773,6 +7792,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -7847,7 +7867,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -7867,8 +7887,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -7879,9 +7899,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -8175,6 +8195,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -8206,7 +8227,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 &lt;/style&gt;&lt;meta charset=&quot;utf-8&quot;&gt;&lt;title&gt;Cyber Pinball&lt;/title&gt;
 &lt;meta name=&quot;viewport&quot; content=&quot;width=device-width,initial-scale=1&quot;&gt;
 &lt;link rel=&quot;stylesheet&quot; href=&quot;https://fonts.googleapis.com/css2?family=Saira:wdth,wght@50..125,100..900&amp;family=Audiowide&amp;family=Bebas+Neue&amp;family=Orbitron:wght@400..900&amp;family=Press+Start+2P&amp;display=swap&quot;&gt;
-&lt;style&gt;html,body{margin:0;background:var(--void)} body{padding:32px} body{padding:0} .scr{position:relative;overflow:hidden;background:var(--void)} .scr{background-color:var(--void)}.scr&gt;.cp-hints{position:absolute;bottom:0;left:0;right:0}.topline{display:flex;justify-content:space-between;align-items:center}.muted{color:var(--ink-muted)}.media{border-radius:6px}.section-heading{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line-strong);padding-bottom:16px;margin:0 0 8px}.section-heading .cp-label{color:var(--ink)}.screen-content{position:absolute;inset:48px 64px 116px}.fiche-layout{position:absolute;inset:48px 64px 116px;display:grid;grid-template-columns:740px minmax(0,1fr);gap:32px}.fiche-media{display:grid;grid-template-rows:1fr 164px;gap:24px;min-height:0}.fiche-panel{display:flex;flex-direction:column;gap:18px;padding:32px}.fiche-panel .cp-display{font-size:52px;margin:10px 0 12px}.fiche-panel .cp-iconbar{flex:none}.is-current{box-shadow:inset 0 -3px var(--ink-muted);color:var(--ink)!important}.fiche-description{font-size:24px;line-height:1.5;margin:0}.fiche-panel .cp-status{grid-template-columns:28px minmax(0,1fr) 154px 88px;min-height:94px;padding:14px 0;gap:12px;font-size:24px}.fiche-panel .cp-status:last-child{border:0}.fiche-actions{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:auto}.dmd{border:1px solid var(--line-strong);border-radius:6px;display:grid;place-items:center;background:radial-gradient(circle,#ff8a1f12 1px,transparent 1.4px) 0 0/8px 8px,#090806;color:var(--dmd);font-family:monospace;font-size:38px;font-weight:bold;letter-spacing:.04em}&lt;/style&gt;&lt;/head&gt;
+&lt;style&gt;html,body{margin:0;background:var(--void)} body{padding:32px} body{padding:0} .scr{position:relative;overflow:hidden;background:var(--void)} .scr{background-color:var(--void)}.scr&gt;.cp-hints{position:absolute;bottom:0;left:0;right:0}.topline{display:flex;justify-content:space-between;align-items:center}.muted{color:var(--ink-muted)}.media{border-radius:6px}.section-heading{display:flex;justify-content:space-between;align-items:baseline;border-bottom:1px solid var(--line-strong);padding-bottom:16px;margin:0 0 8px}.section-heading .cp-label{color:var(--ink)}.screen-content{position:absolute;inset:48px 64px 116px}.fiche-layout{position:absolute;inset:48px 64px 116px;display:grid;grid-template-columns:740px minmax(0,1fr);gap:32px}.fiche-media{display:grid;grid-template-rows:1fr 164px;gap:24px;min-height:0}.fiche-panel{display:flex;flex-direction:column;gap:18px;padding:32px}.fiche-panel .cp-display{font-size:52px;margin:10px 0 12px}.fiche-panel .cp-iconbar{flex:none}.is-current{box-shadow:inset 0 -3px var(--ink-muted);color:var(--ink)!important}.fiche-description{font-size:24px;line-height:1.5;margin:0}.fiche-panel .cp-status{grid-template-columns:28px minmax(0,1fr) 154px 88px;min-height:94px;padding:14px 0;gap:12px;font-size:24px}.fiche-panel .cp-status:last-child{border:0}.fiche-actions{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:auto}.dmd{border:1px solid var(--line-strong);border-radius:6px;display:grid;place-items:center;background:radial-gradient(circle,#8be23a12 1px,transparent 1.4px) 0 0/8px 8px,#090806;color:var(--dmd);font-family:monospace;font-size:38px;font-weight:bold;letter-spacing:.04em}&lt;/style&gt;&lt;/head&gt;
 &lt;body class=&quot;cp-root&quot;&gt;
 &lt;div class=&quot;scr&quot; style=&quot;width:1920px;height:1080px&quot;&gt;
     &lt;div class=&quot;fond-ambiance&quot; style=&quot;position:absolute;inset:0&quot;&gt;&lt;/div&gt;&lt;main class=&quot;fiche-layout&quot;&gt;
@@ -8252,7 +8273,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -8272,8 +8293,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -8284,9 +8305,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -8580,6 +8601,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -8661,7 +8683,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -8681,8 +8703,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -8693,9 +8715,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -8989,6 +9011,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -9059,7 +9082,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -9079,8 +9102,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -9091,9 +9114,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -9387,6 +9410,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -9471,7 +9495,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -9491,8 +9515,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -9503,9 +9527,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -9799,6 +9823,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -9882,7 +9907,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -9902,8 +9927,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -9914,9 +9939,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -10210,6 +10235,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -10295,7 +10321,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -10315,8 +10341,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -10327,9 +10353,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -10623,6 +10649,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
@@ -10709,7 +10736,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -10729,8 +10756,8 @@ details pre code { color: var(--ink-muted); white-space: pre }
   --font-ui: Saira, &quot;Segoe UI&quot;, system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: &quot;Bebas Neue&quot;, Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: &quot;Press Start 2P&quot;, monospace;
+  --font-brand: Saira, &quot;Segoe UI&quot;, sans-serif;
+  --font-dot: &quot;Saira Points&quot;, monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -10741,9 +10768,9 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }
 
 /* Cyber Pinball — composants. Dimensions en px pour un écran dont le petit côté fait
@@ -11037,6 +11064,7 @@ details pre code { color: var(--ink-muted); white-space: pre }
 .cp-i-eye { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M2%2012C7%203%2017%203%2022%2012c-5%209-15%209-20%200z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%223%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-gauge { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%2020a10%2010%200%201%201%2016%200M12%203v3M3%2012h3M18%2012h3M12%2016l5-7%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-dmd { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%222%22%20y%3D%226%22%20width%3D%2220%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M6%2010h.01M10%2010h.01M14%2010h.01M18%2010h.01M6%2014h.01M10%2014h.01M14%2014h.01M18%2014h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
+.cp-i-palette { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%203a9%209%200%201%200%200%2018c1.5%200%202-1%202-2s-1-1.5-1-2.5%201-1.5%202-1.5h2a4%204%200%200%200%204-4c0-4.5-4-8-9-8z%22%2F%3E%3Cpath%20d%3D%22M7.5%2011h.01M10%207h.01M15%207.5h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%206V4h6l3%203h9v13H3z%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-folder-download { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M10%2020H3V4h6l3%203h9v5M17%2013v8M14%2018l3%203%203-3%22%2F%3E%3C%2Fsvg%3E&quot;) }
 .cp-i-drive { --i: url(&quot;data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Crect%20x%3D%223%22%20y%3D%226%22%20width%3D%2218%22%20height%3D%2212%22%20rx%3D%222%22%2F%3E%3Cpath%20d%3D%22M3%2013h18M7%2016h.01M11%2016h.01%22%2F%3E%3C%2Fsvg%3E&quot;) }

@@ -32,7 +32,8 @@ const SIZES = {
   'petit-16x9': [480, 270],
 };
 const ALL = Object.keys(SIZES);
-const GAMES = [0, 1, 2, 3, 4, 5];
+// Le dernier jeu d'exemple est « aucun jeu » : la marque (affichage par défaut, defaultMediaView).
+const GAMES = [0, 1, 2, 3, 4, 5, 6];
 
 /** Une capture : composant, jeu, taille, variante (paramètres en plus), délai avant la capture. */
 const shots = [];
@@ -46,6 +47,8 @@ add('dmd', GAMES, ALL);
 add('dmd', GAMES, ['4x1', 'petit-4x1', '16x9'], { page: '1' }, 1200, '-page2');
 add('dmd', [1, 3], ['4x1', 'petit-4x1'], { page: '2' }, 1200, '-page3');
 add('dmd', [2, 3, 4], ['4x1'], { anime: '0' }, 600, '-fige');
+// Couleur réglée (« Couleur du DMD ») : la marque et un titre dans chaque préréglage (dmdcolor.ts).
+for (const couleur of ['8be23a', '36c9b4', 'e6f0ec', '5fb4cf', 'f2b33d', 'ff8a1f']) add('dmd', [1, 6], ['4x1'], { couleur }, 1200, `-couleur-${couleur}`);
 add('fulldmd', GAMES, ALL);
 add('topper', GAMES, ALL);
 for (const style of ['chrome', 'neon', 'arcade']) add('wheel', GAMES, ALL, { style }, 900, `-${style}`);

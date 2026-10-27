@@ -34,7 +34,7 @@ Le vert `signal #8be23a` désigne le choix courant ou l’action principale. PIN
 
 Les états gardent un mot et un signe : coche + OK, triangle + À vérifier, croix + Bloquant. La gravité ne dépend jamais de la couleur seule : OK en `signal`, À vérifier en `warning` (ambre `#f2b33d`), Bloquant en `danger` (rouge `#ff6b6b`), chacun avec son signe et son mot. Une suppression conserve son verbe explicite, son icône et, dans le produit, sa confirmation. `meta #5fb4cf` reste réservé aux métadonnées.
 
-L’orange `dmd` appartient uniquement à l’afficheur de repli. Ce n’est pas un second accent d’interface.
+`dmd` est la couleur par défaut des points des afficheurs que Cyber Pinball dessine (DMD du menu, replis) : le vert signal de la marque, réglable dans le menu (« Couleur du DMD » : vert signal, sarcelle, encre claire, bleu glacier, ambre doux, orange plasma `#ff8a1f`, ou une couleur libre). Ce n’est pas un second accent d’interface. Ces afficheurs écrivent avec « Saira Points », police à points dessinée d’après Saira (`packages/core/src/dmdfont.ts`) : la marque y est empilée, CYBER un ton dessous et PINBALL au plein éclat, puisqu’un afficheur n’a qu’une couleur.
 
 ## Typographie et lisibilité
 

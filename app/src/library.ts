@@ -57,6 +57,8 @@ import {
   planRomMigration,
   pruneEmptyDirs,
   pupCabinet,
+  nameKey,
+  pageKey,
   pupMemory,
   refreshVpsDb,
   removalTargets,
@@ -66,6 +68,7 @@ import {
   sheetPages,
   SHEET_PAGE_TYPES,
   samePath,
+  tableSourceOf,
   scanRomLibrary,
   sizeOf,
   trashDirFor,
@@ -116,11 +119,16 @@ import {
   type VpsTableFile,
   type GuestDoor,
   type GuestMode,
+  actionIds,
+  followCursor,
+  resolveActivation,
+  type FocusAnchor,
 } from '@cyberpinball/core';
 import { prepareImport, type PreparedImport } from './archives';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
 import { LayoutReport } from './layout-check';
 import { createCatalog } from './catalog';
+import { createGameParts } from './game-parts';
 import { createJourney } from './journey';
 import { createMediaDownload, mediaOffersLabel, type MediaDbGameOffer } from './media-download';
 import { createMediaSearch } from './media-search';
@@ -250,7 +258,8 @@ export interface ActionShortcut {
 }
 
 export type UiAction =
-  | { type: 'activate'; index: number }
+  /** `id` : identité de l'action cliquée (focus.ts), pour valider cet élément même si la liste a bougé. */
+  | { type: 'activate'; index: number; id?: string }
   | { type: 'editor'; index: number }
   | { type: 'drop'; paths: string[] }
   | { type: 'key'; code: string }
@@ -297,6 +306,12 @@ export interface Action {
   shortcut?: ActionShortcut;
   /** Porte de l'action en mode invité (GUEST_DOORS) : sans porte, ou porte fermée, l'invité ne la voit pas. */
   door?: GuestDoor;
+  /**
+   * Identité stable de l'élément (une proposition, un fichier) : le curseur le suit quand
+   * la liste change, et un clic le valide où qu'il soit (focus.ts). Sans clé, le libellé
+   * sert d'identité s'il est unique dans l'écran.
+   */
+  key?: string;
   run: () => void | Promise<void>;
 }
 
@@ -400,6 +415,10 @@ type Screen =
       journey?: string;
       /** Ouvert depuis l'entonnoir (fichiers choisis sur ce PC) : « Annuler » y revient. */
       fromHub?: boolean;
+      /** Dossier de la table installée à qui tout revient (parties du jeu, Téléchargements : « Ajouter à »). */
+      target?: string;
+      /** « Annuler » revient là (l'écran des parties du jeu, le fichier de Téléchargements). */
+      back?: () => void;
       /**
        * Médias de VPinMediaDB pour les nouvelles tables du plan, téléchargés juste après
        * l'installation (seulement ceux qui manquent). `games` : par identifiant VPS ;
@@ -447,6 +466,8 @@ type PagesScreen = Extract<Screen, { kind: 'pages' }>;
 export function createLibrary(host: LibraryHost) {
   let screen: Screen | undefined;
   let cursor = 0;
+  /** Ce que la dernière vue montrait sous le curseur : il le suit si la liste change (focus.ts). */
+  let anchor: FocusAnchor | undefined;
   /** L'écran affiché fait écouter des sons (propositions, sons de la table) : relevé à chaque vue. */
   let soundPreview = false;
   // Opérations longues en cours (l'installation enchaîne sur l'analyse) et leur message.
@@ -712,7 +733,8 @@ export function createLibrary(host: LibraryHost) {
     openNotice: (heading, lines, then) => openNotice(heading, lines, then),
     vps: () => vpsForImport(),
     search: mediaSearch,
-    install: (paths, acquisition, journey) => startImport(paths, 'copy', acquisition, journey),
+    // Récupérés pour une table installée : tout lui revient (un PuP-Pack, un fronton…).
+    install: (paths, acquisition, journey) => startImport(paths, 'copy', acquisition, journey, false, journey && find(journey) ? path.dirname(journey) : undefined),
     downloadsDir: host.downloadsDir,
     openJourney: (file) => journeyUi.open(file),
     pick: (request) => pickPaths(request),
@@ -733,7 +755,7 @@ export function createLibrary(host: LibraryHost) {
     sheet: (table, flash) => openSheet(table, flash),
     doctor: (table) => openDoctor(table.file),
     pickFiles: (journey) => void pick('files', journey),
-    install: (paths, acquisition, journey) => startImport(paths, 'copy', acquisition, journey),
+    install: (paths, acquisition, journey) => startImport(paths, 'copy', acquisition, journey, false, journey && find(journey) ? path.dirname(journey) : undefined),
     drop: (paths, journey) => startImport(paths, 'copy', undefined, journey),
   });
 
@@ -820,6 +842,26 @@ export function createLibrary(host: LibraryHost) {
     doctor: (table) => openDoctor(table.file),
     roms: () => openRoms(),
     leave: () => leave(),
+  });
+
+  // « Parties du jeu » de la fiche : chaque partie ajoutée, remplacée, réaffectée ou retirée.
+  const gameParts = createGameParts({
+    layout,
+    tablesDir,
+    find,
+    tables: () => host.tables(),
+    script: (table) => cachedScript(table.file, host.dataDir),
+    show: (build, at, table) => openCustom(build, at, table),
+    sheet: (table) => openSheet(table),
+    leave: () => leave(),
+    task: (message, work) => task(message, work),
+    vps: () => vpsForImport(),
+    catalog: catalogUi,
+    install: (paths, table, back) => installTo(paths, table, back),
+    pick: (request) => pickPaths(request),
+    pupOptions: (table) => go({ kind: 'pupOptions', file: table.file }),
+    medias: (table) => medias.open(table),
+    reload: (file) => host.reload(file),
   });
 
   // ---------- Téléchargements et sélecteur de fichiers ----------
@@ -911,8 +953,52 @@ export function createLibrary(host: LibraryHost) {
       return catalogUi.forgetFiles(files);
     },
     install: (paths) => startImport(paths, 'copy'),
+    inspect: (file) => catalogUi.inspect(file),
+    suggest: (file) => suggestGame(file),
+    tables: () => ownTables(),
+    games: () => catalogUi.games(),
+    addToTable: (paths, table) => installTo(paths, table, () => downloadsUi.open()),
+    attachToGame: (file, gameId, kind, back) => catalogUi.attachToGame(file, gameId, kind, back),
+    task: (message, work) => task(message, work),
     back: () => openSystem(),
   });
+
+  /**
+   * Plan d'ajout de ces fichiers à une table installée choisie (parties du jeu, Téléchargements).
+   * Un fichier reçu dans la liste d'attente y est marqué installé ensuite, comme par « Installer ».
+   */
+  function installTo(paths: string[], table: TableEntry, back?: () => void): void {
+    const got = catalogUi.waitList().items.filter((i) => i.state === 'received' && i.received && paths.some((p) => samePath(p, i.received!.file)));
+    const gameId = got[0]?.gameId;
+    const acquisition = gameId ? { gameId, items: got.filter((i) => i.gameId === gameId) } : undefined;
+    startImport(paths, 'copy', acquisition, undefined, false, table.folder, back);
+  }
+
+  /** Tables installées dans leur propre dossier, une par dossier (celles qui peuvent recevoir une partie). */
+  function ownTables(): TableEntry[] {
+    const own = host.tables().filter((x) => !samePath(x.folder, tablesDir()));
+    return own.filter((x, i) => own.findIndex((o) => samePath(o.folder, x.folder)) === i);
+  }
+
+  /**
+   * Jeu auquel revient sans doute un fichier téléchargé : celui de la liste d'attente qui l'a
+   * reçu, ou dont un élément vient de la même page ; sinon la table installée dont le titre est
+   * dans son nom (« TheMatrixPupPack.zip »). Sa table installée, s'il en a une.
+   */
+  function suggestGame(file: string): { table?: TableEntry; game?: { gameId: string; label: string } } {
+    const l = catalogUi.waitList();
+    const stray = l.strays?.find((s) => samePath(s.file, file));
+    const key = stray?.url ? pageKey(stray.url) : undefined;
+    const item = l.items.find((i) => i.received && samePath(i.received.file, file)) ?? (key ? l.items.find((i) => i.pageKey === key) : undefined) ?? l.items.find((i) => i.id === stray?.expected || i.id === stray?.suggested);
+    const tables = ownTables();
+    if (item) {
+      const table = (item.table ? tables.find((x) => samePath(x.file, item.table!)) : undefined) ?? tables.find((x) => (tableSourceOf(x.info)?.vpsGameId ?? x.info.Info?.VPSId) === item.gameId);
+      return table ? { table } : { game: { gameId: item.gameId, label: item.gameLabel } };
+    }
+    const name = nameKey(path.basename(file).replace(/\.[^.]+$/, ''));
+    const named = tables.filter((x) => nameKey(x.title).length >= 4 && name.includes(nameKey(x.title))).sort((a, b) => nameKey(b.title).length - nameKey(a.title).length);
+    return named[0] ? { table: named[0] } : {};
+  }
 
   function openDownloads(): void {
     if (!layout()) return openAdd();
@@ -1255,6 +1341,7 @@ export function createLibrary(host: LibraryHost) {
       ...SHEET_PAGE_TYPES.map((type) => pagesAction(table, type)),
       { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },
       { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), icon: 'image', door: 'sheet.medias', run: () => medias.open(table) },
+      { label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) },
       { label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) },
       ...pupAction(table, s),
       ...(host.adjustDisplay && host.vpxExe()
@@ -1939,13 +2026,15 @@ export function createLibrary(host: LibraryHost) {
       const rows = ready.slice(0, 3).map((g): Row => {
         // Un fichier reçu qui ne convient pas (un pack de médias pour la table) : à corriger avant ;
         // « Installer » ouvre alors l'élément à corriger (liste d'attente, catalog.ts).
+        // Un fichier à corriger reste à part : il ne retient pas l'installation du reste.
         const wrong = g.problems.map((p) => t('{kind} : {problem}', { kind: NEED_LABELS[p.item.kind], problem: p.text }));
-        const row: Row = { text: g.label, detail: wrong.length ? wrong.join(' · ') : g.items.map((i) => t('{kind} : {label}', { kind: NEED_LABELS[i.kind], label: i.label })).join(' · '), badges: [wrong.length ? t('À corriger') : t('Reçu')], tone: wrong.length ? 'error' : 'ok', action: actions.length };
+        const ready = g.items.filter((i) => !g.problems.some((p) => p.item === i));
+        const row: Row = { text: g.label, detail: [...ready.map((i) => t('{kind} : {label}', { kind: NEED_LABELS[i.kind], label: i.label })), ...wrong].join(' · '), badges: [wrong.length ? t('À corriger à part') : t('Reçu')], tone: wrong.length ? 'warning' : 'ok', action: actions.length };
         // Une icône par entrée d'un menu : seulement quand un seul jeu est prêt.
         actions.push({
           label: t('Installer : {game}', { game: g.label }),
-          detail: wrong.length ? t('à corriger d’abord : {items}', { items: g.problems.map((p) => NEED_LABELS[p.item.kind]).join(', ') }) : tn(g.items.length, '{n} fichier reçu : voir le plan', '{n} fichiers reçus : voir le plan'),
-          tone: wrong.length ? 'warning' : 'ok',
+          detail: tn(ready.length, '{n} fichier reçu : voir le plan', '{n} fichiers reçus : voir le plan'),
+          tone: 'ok',
           icon: ready.length === 1 ? 'check' : undefined,
           run: () => catalogUi.installGame(g.gameId),
         });
@@ -2032,9 +2121,9 @@ export function createLibrary(host: LibraryHost) {
    * fichiers reçus du catalogue. `journey` : ajout fait depuis le parcours d'une table, on y
    * revient après l'installation ; `fromHub` : « Annuler » revient à l'entonnoir.
    */
-  function startImport(paths: string[], mode: 'move' | 'copy', acquisition?: AddPlan['acquisition'], journey?: string, fromHub = false): void {
+  function startImport(paths: string[], mode: 'move' | 'copy', acquisition?: AddPlan['acquisition'], journey?: string, fromHub = false, target?: string, back?: () => void): void {
     if (!layout()) return openAdd();
-    const s: AddPlan = { kind: 'addPlan', mode, scripts: new Map(), existing: [], vpsChoices: new Map(), pupChoices: new Map(), romChoices: new Map(), cabinet: pupCabinet(loadCabinet(host.dataDir)), acquisition, journey, fromHub };
+    const s: AddPlan = { kind: 'addPlan', mode, scripts: new Map(), existing: [], vpsChoices: new Map(), pupChoices: new Map(), romChoices: new Map(), cabinet: pupCabinet(loadCabinet(host.dataDir)), acquisition, journey, fromHub, target, back };
     go(s);
     void task(t('Analyse des fichiers…'), async () => {
       s.prepared = await prepareImport(paths, mode, path.join(host.dataDir, 'staging'));
@@ -2168,6 +2257,7 @@ export function createLibrary(host: LibraryHost) {
       romLibrary: layout()!.roms,
       romChoices: s.romChoices,
       vpsGame: s.acquisition?.gameId,
+      target: s.target,
     });
   }
 
@@ -2332,7 +2422,8 @@ export function createLibrary(host: LibraryHost) {
   function buildAddPlan(s: AddPlan): Built {
     const cancel = () => {
       if (s.prepared) fs.rmSync(s.prepared.staging, { recursive: true, force: true });
-      if (s.journey && find(s.journey)) journeyUi.open(s.journey);
+      if (s.back) s.back();
+      else if (s.journey && find(s.journey)) journeyUi.open(s.journey);
       else if (s.mode === 'move' || s.fromHub || s.acquisition) go({ kind: 'addSource' });
       else leave();
     };
@@ -2609,6 +2700,8 @@ export function createLibrary(host: LibraryHost) {
     if (screen.kind === 'pages') return pagesKey(screen, input);
     const built = build();
     const n = built.actions.length;
+    // Start valide l'élément que la dernière vue montrait sous le curseur, même si la liste a bougé.
+    cursor = followCursor(actionIds(built.actions), cursor, screen, anchor);
     // Tab / Maj+Tab : se déplacer au clavier quels que soient les boutons relevés.
     if (input.code === CONFIG_KEY) cursor = (cursor + (input.shift ? -1 : 1) + n) % n;
     else if (is(KEYS.previous)) cursor = (cursor - 1 + n) % n;
@@ -2728,10 +2821,12 @@ export function createLibrary(host: LibraryHost) {
       host.broadcast();
     } else if (action.type === 'activate') {
       const built = build();
-      if (!built.actions[action.index]) return;
-      cursor = action.index;
+      // L'élément cliqué, où qu'il soit maintenant ; disparu entre-temps : rien, l'écran se redessine.
+      const index = resolveActivation(actionIds(built.actions), action.index, action.id);
+      if (index === undefined) return host.broadcast();
+      cursor = index;
       host.broadcast();
-      void built.actions[action.index]!.run();
+      void built.actions[index]!.run();
     }
   }
 
@@ -2740,7 +2835,10 @@ export function createLibrary(host: LibraryHost) {
   function view() {
     if (!screen) return undefined;
     const built = build();
-    cursor = Math.min(cursor, Math.max(0, built.actions.length - 1));
+    const ids = actionIds(built.actions);
+    cursor = followCursor(ids, cursor, screen, anchor);
+    anchor = { screen, cursor, id: ids[cursor] };
+    warnUnkeyed(built, ids);
     soundPreview = playsSoundPreview(built.media);
     const editorView = (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor ? viewEditor(screen.editor) : undefined;
     return {
@@ -2751,7 +2849,7 @@ export function createLibrary(host: LibraryHost) {
       lead: built.lead,
       sections: built.sections,
       back: backLabel(built),
-      actions: built.actions.map(({ label, detail, tone, icon, attention, shortcut }) => ({ label, detail, tone, icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined })),
+      actions: built.actions.map(({ label, detail, tone, icon, attention, shortcut }, i) => ({ label, detail, tone, icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
       media: built.media,
       variant: built.variant,
       journey: built.journey,
@@ -2770,6 +2868,19 @@ export function createLibrary(host: LibraryHost) {
           : t('Flippers : choisir une touche · Start : la taper · Exit : annuler · ou tapez au clavier, Entrée pour valider')
         : (built.hint ?? t('Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris')),
     };
+  }
+
+  /**
+   * Cartes sans identité (deux propositions au même libellé, sans clé) : le curseur ne
+   * peut les suivre que par leur rang, et une liste qui bouge ferait valider une autre
+   * carte (focus.ts). Signalé une fois par écran dans le journal, pour le corriger.
+   */
+  const unkeyedWarned = new Set<string>();
+  function warnUnkeyed(built: Built, ids: (string | undefined)[]): void {
+    const loose = (built.media?.cards ?? []).filter((c) => c.action !== undefined && ids[c.action] === undefined);
+    if (!loose.length || unkeyedWarned.has(built.heading)) return;
+    unkeyedWarned.add(built.heading);
+    console.warn(`Écran « ${built.heading} » : ${loose.length} carte(s) sans identité (clé ou libellé unique) ; le curseur les suit par leur rang.`);
   }
 
   /**
@@ -2959,8 +3070,9 @@ export function createLibrary(host: LibraryHost) {
 /** Vrai clic de souris au centre de l'élément (autopilote du menu et des réglages de VPX). */
 export async function click(win: BrowserWindow, selector: string): Promise<void> {
   const center = (await win.webContents.executeJavaScript(
-    // Une ligne hors de la vue (liste qui défile) y est d'abord ramenée, comme à la molette.
-    `(() => { const el = document.querySelector(${JSON.stringify(selector)}); el?.scrollIntoView({ block: 'nearest' }); const r = el?.getBoundingClientRect(); return r ? [r.x + r.width / 2, r.y + r.height / 2] : null; })()`,
+    // Une ligne hors de la vue (liste qui défile) y est d'abord ramenée, comme à la molette :
+    // un geste, pas un défilement inattendu pour le garde-fou (scroll-keeper.js).
+    `(() => { if (typeof CyberScroll === 'object') CyberScroll.gesture(); const el = document.querySelector(${JSON.stringify(selector)}); el?.scrollIntoView({ block: 'nearest' }); const r = el?.getBoundingClientRect(); return r ? [r.x + r.width / 2, r.y + r.height / 2] : null; })()`,
   )) as [number, number] | null;
   if (!center) {
     console.log(`Autopilote : aucun élément ne correspond à « ${selector} ».`);

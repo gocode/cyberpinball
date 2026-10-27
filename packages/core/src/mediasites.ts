@@ -605,6 +605,17 @@ export function webMediaChoices(type: MediaType, receipts: WebReceipt[], table: 
 /** Clé d'une fiche : « vpuniverse:27996 ». */
 export const siteHitKey = (hit: Pick<SiteHit, 'site' | 'id'>) => `${hit.site}:${hit.id}`;
 
+/**
+ * Identité d'une proposition à l'écran (focus.ts) : la fiche d'un site, puis chacun de ses
+ * fichiers une fois reçus (« site:<fiche>/<fichier> »), pour que le curseur posé sur la
+ * fiche reste sur ce qu'elle a donné ; les autres, leur identifiant.
+ */
+export function mediaChoiceKey(choice: Pick<MediaChoice, 'id' | 'site'>): string {
+  if (!choice.site) return choice.id;
+  const hit = `site:${siteHitKey(choice.site.hit)}`;
+  return choice.site.received ? `${hit}/${choice.id}` : hit;
+}
+
 /** Nature par défaut d'un média, pour une fiche dont la catégorie ne la dit pas (pack). */
 function defaultKind(type: MediaType): MediaKind {
   if (type === 'Audio' || type === 'AudioLaunch') return 'audio';

@@ -82,6 +82,7 @@ export const ICON_NAMES = [
   'eye',
   'gauge',
   'dmd',
+  'palette',
   'folder',
   'folder-download',
   'drive',

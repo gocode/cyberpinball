@@ -9,12 +9,18 @@ function libEl(tag, className, text) {
   return node;
 }
 
+// Vue en cours de dessin : un clic part avec l'identité de l'action qu'il vise (focus.ts),
+// pour valider cet élément même si la liste a bougé entre-temps.
+let drawn;
+
 function actOn(node, action) {
-  node.dataset.act = JSON.stringify(action);
+  const id = action.type === 'activate' ? drawn?.actions[action.index]?.id : undefined;
+  node.dataset.act = JSON.stringify(id === undefined ? action : { ...action, id });
   return node;
 }
 
 function renderLibrary(v) {
+  drawn = v;
   const o = libEl('section', `lib lib-${v.screen}${v.variant ? ` lib-${v.variant}` : ''}`);
   const head = libEl('header', 'lib-head');
   // Retour en tête : à la souris, inutile de descendre au bas de la liste chercher « Retour ».
@@ -40,7 +46,7 @@ function renderLibrary(v) {
     v.pages
       ? 'lib-body lib-pages'
       : v.media
-        ? `lib-body lib-media${v.media.large ? ' large' : ''}`
+        ? `lib-body lib-media${v.media.large ? ' large' : ''}${v.media.gallery ? ' with-gallery' : ''}`
         : v.journey
           ? 'lib-body lib-journey'
           : v.health
@@ -92,7 +98,13 @@ function renderLibrary(v) {
       box.append(list);
       content.append(box);
     }
-    body.append(content);
+    // Galerie : le détail de la tuile choisie sous la liste qui défile, jamais par-dessus.
+    const detail = v.media?.gallery ? galleryDetail(v.media, v.cursor) : undefined;
+    if (detail) {
+      const column = libEl('div', 'lib-gallery');
+      column.append(content, detail);
+      body.append(column);
+    } else body.append(content);
   }
 
   // Prospectus et règles : les flippers tournent les pages ; les actions restent là pour la souris.
@@ -391,6 +403,7 @@ function syncAudio() {
 // Une carte par média (ou par page, ou par fichier à prendre) : aperçu, nom, où il s'affiche,
 // à quoi il sert, ce qui est montré aujourd'hui.
 function renderMediaCards(m, cursor) {
+  if (m.gallery) return renderGallery(m, cursor);
   const list = libEl('ol', `media-cards${m.large ? ' large' : ''}`);
   for (const c of m.cards) {
     const li = libEl('li', `media-card${c.action === cursor ? ' selected' : ''}${c.note ? ' unused' : ''}`);
@@ -425,6 +438,63 @@ function renderMediaCards(m, cursor) {
     list.append(li);
   }
   return list;
+}
+
+// Propositions d'un média en galerie : chaque aperçu en grand, au format de l'écran qui le
+// montrera ; nom, provenance, état et popularité sur la tuile. Le détail de la tuile choisie
+// (d'où elle vient, ce qui arrivera au téléchargement) reste sous la galerie, toujours visible.
+function renderGallery(m, cursor) {
+  const list = libEl('ol', 'media-cards gallery');
+  if (m.aspect) list.style.setProperty('--thumb-aspect', m.aspect);
+  for (const c of m.cards) {
+    const selected = c.action === cursor;
+    const li = libEl('li', `media-card media-tile${selected ? ' selected' : ''}`);
+    if (c.action !== undefined) actOn(li, { type: 'activate', index: c.action });
+    li.append(renderThumb(c.thumb, selected));
+    const top = libEl('div', 'media-top');
+    top.append(libEl('span', 'media-title', c.title));
+    li.append(top);
+    // Étiquettes courtes seulement (état, autre jeu) ; la provenance ouvre la ligne de faits.
+    if (c.state || c.flag) {
+      const badges = libEl('div', 'media-badges');
+      if (c.state) badges.append(libEl('span', `badge media-state tone-${c.state.tone}`, c.state.label));
+      if (c.flag) badges.append(libEl('span', `badge media-flag tone-${c.flag.tone}`, c.flag.label));
+      li.append(badges);
+    }
+    // Une ligne : d'où vient la proposition, puis sa popularité si le site la donne, sinon ce
+    // qu'est le fichier ; le reste au détail, sous la galerie.
+    const line = libEl('div', 'media-facts');
+    if (c.code) line.append(libEl('span', 'media-source', c.code));
+    const what = c.popularity ?? c.facts;
+    if (what) line.append(libEl('span', c.popularity ? 'media-pop' : '', `${c.code ? ' · ' : ''}${what}`));
+    li.append(line);
+    if (typeof c.progress === 'number') li.append(progressBar(c.progress));
+    list.append(li);
+  }
+  return list;
+}
+
+/** Détail de la tuile choisie : d'où elle vient, ce qui arrivera au téléchargement ; rien hors des tuiles. */
+function galleryDetail(m, cursor) {
+  const chosen = m.cards.find((c) => c.action === cursor);
+  if (!chosen) return undefined;
+  const detail = libEl('div', 'media-detail');
+  const top = libEl('div', 'media-top');
+  top.append(libEl('span', 'media-title', chosen.title));
+  const facts = [chosen.code, chosen.popularity, chosen.facts].filter(Boolean).join(' · ');
+  if (facts) top.append(libEl('span', 'media-facts', facts));
+  detail.append(top);
+  if (chosen.pending) detail.append(libEl('div', 'media-pending', chosen.pending));
+  for (const extra of chosen.extra ?? []) detail.append(libEl('div', 'media-extra', extra));
+  return detail;
+}
+
+function progressBar(value) {
+  const bar = libEl('div', 'media-progress');
+  const fill = libEl('span', '');
+  fill.style.width = `${Math.round(Math.max(0, Math.min(1, value)) * 100)}%`;
+  bar.append(fill);
+  return bar;
 }
 
 function renderEditor(e) {
@@ -475,11 +545,16 @@ document.addEventListener('drop', (event) => {
   if (paths.length) window.cyber.act({ type: 'drop', paths });
 });
 
-/** Garde visible l'élément choisi quand la liste dépasse de l'écran. */
-function revealSelection() {
-  for (const node of document.querySelectorAll('.lib-row.selected, .health-line.selected, .lib-action.current, .key.current, .media-card.selected')) {
-    node.scrollIntoView({ block: 'nearest' });
-  }
+/** Défilement du menu (scroll-keeper.js) : capture avant chaque rendu, revealSelection après. */
+const menuScroll = CyberScroll.keeper([['.lib-row.selected, .health-line.selected, .lib-action.current, .key.current, .media-card.selected', 'nearest']]);
+
+/**
+ * Remet chaque liste où elle était, et garde visible l'élément choisi quand la liste dépasse
+ * de l'écran : seulement quand le choix change (geste) ou qu'un autre écran s'ouvre, jamais
+ * à un tic de progression. `screen` nomme l'écran affiché.
+ */
+function revealSelection(root, screen) {
+  menuScroll.settle(root, screen);
   for (const list of document.querySelectorAll('.lib-actions, .lib-content')) {
     markOverflow(list);
     if (list.dataset.overflowWatch) continue;

@@ -138,6 +138,7 @@ import { cachedScript } from './vbs';
 import { mediaFrame, prepareDressing } from './fulldmd';
 import { LiveDmd, type LiveDmdAnimationHandle } from './live-dmd';
 import { createConverter } from './media-convert';
+import { onKeyInput } from './key-input';
 import { onJoystickInput } from './joystick-input';
 import { locations, vpxInstall, vpxProfile } from './paths';
 import { activeVpxIni, syncConfiguration } from './vpx-ini';
@@ -1101,10 +1102,8 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     coverDisplay(win, bounds);
     nameScreen(bounds, role.label);
     win.on('page-title-updated', (e) => e.preventDefault());
-    win.webContents.on('before-input-event', (event, input) => {
-      if (input.type === 'keyDown' && handleKey(input)) event.preventDefault();
-      else if (input.type === 'keyUp') handleKeyUp(input);
-    });
+    // Relâchements compris (combinaison du mode invité) : onKeyInput les fait arriver (key-input.ts).
+    onKeyInput(win, handleKey, handleKeyUp);
     // Boutons d'un joystick (Pinscape…) : comme des touches.
     onJoystickInput(win, (input) => (input.type === 'keyDown' ? handleKey(input) : handleKeyUp(input)));
     // Mode invité : Alt+F4 ne ferme pas le menu. Cyber Pinball seul se ferme (quitter, relance), et Windows à son arrêt.
@@ -1797,6 +1796,8 @@ function viewFor(role: RoleId) {
     // part et d'autre de la table choisie, en boucle comme la liste : la roue reste centrée.
     neighbors: tables.length >= 9 ? neighbors : tables.map((t, i) => neighbor(t, ((i - state.index + tables.length * 2 + Math.floor((tables.length - 1) / 2)) % tables.length) - Math.floor((tables.length - 1) / 2))),
     menuLayout: mediaSettings.menuLayout,
+    // Couleur des points des afficheurs dessinés par Cyber Pinball (DMD du menu, replis dmd et fullDmd).
+    dmdColor: mediaSettings.dmdColor,
     // DMD du menu vivant : où poser les points dans la zone du DMD de cette fenêtre (absent : DMD classique).
     liveDmd: liveDmdView(role),
     medias: subject ? mediasOf(subject) : defaults,
@@ -1974,6 +1975,9 @@ function knownDmdFrame(url: string): FrameRecord | undefined {
 function liveDmdView(role: RoleId): { area: ReturnType<typeof liveDmdArea>; framed: boolean } | undefined {
   if (!liveDmdOn() || !(windowRoles.get(role) ?? [role]).includes('dmd')) return undefined;
   const table = screensSubject();
+  // FullDMD sans table : la marque sur toute la grille de 160 × 90 du repli (fallback.js, fullDmd),
+  // pas une bande 4:1 entre deux aplats noirs (revue du directeur artistique, 27/10/2026).
+  if (!table && menuDmdKind === 'fulldmd' && state.phase !== 'loading') return undefined;
   const view = table && medias ? medias.roleMedia(table, 'dmd') : undefined;
   const fullDmd = menuDmdKind === 'fulldmd' && (view?.found ?? view?.type) === 'FullDMD';
   const record = fullDmd && view?.url ? knownDmdFrame(view.url) : undefined;

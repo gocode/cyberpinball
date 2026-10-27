@@ -34,7 +34,7 @@ Green `signal #8be23a` marks the current choice or the primary action. PINBALL i
 
 States always keep a word and a sign: check mark + "OK", triangle + "À vérifier" (To check), cross + "Bloquant" (Blocking). Severity never depends on color alone: "OK" in `signal`, "À vérifier" in `warning` (amber `#f2b33d`), "Bloquant" in `danger` (red `#ff6b6b`), each with its sign and its word. A deletion keeps its explicit verb, its icon and, in the product, its confirmation. `meta #5fb4cf` is reserved for metadata.
 
-The `dmd` orange belongs only to the fallback display. It is not a second interface accent.
+`dmd` is the default colour of the dots of the displays Cyber Pinball draws (menu DMD, fallbacks): the brand’s signal green, adjustable in the menu (“Couleur du DMD” (DMD colour): signal green, teal, light ink, glacier blue, soft amber, plasma orange `#ff8a1f`, or a custom colour). It is not a second interface accent. These displays write with “Saira Points”, a dot font drawn after Saira (`packages/core/src/dmdfont.ts`): the brand is stacked there, CYBER one shade lower and PINBALL at full brightness, since a display has only one colour.
 
 ## Typography and legibility
 

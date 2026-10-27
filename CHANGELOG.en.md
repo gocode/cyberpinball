@@ -22,6 +22,12 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Cabinet schedule ("Media, sound and attract mode", off by default): like in an arcade, the cabinet dims its screens and goes quiet at night, then sleeps or shuts down at the chosen time if nobody is playing, after a 30-second warning that any button cancels.
 - Windows desktop given back the right way up: Cyber Pinball no longer rotates the playfield screen in the Windows setting, only while it is open; every exit, even after a crash, gives the desktop its previous orientation back. A cabinet already left rotated offers it on first start.
 - Table orientation kept from one start to the next: after a restart or a reconnection, tables no longer show upside down in game. "Cabinet health" says whether they face you, and repairs those that were turned in the VPX menu.
+- Game parts: every file received goes to the part its content calls for (table, PuP-Pack, backglass, ROM, colours, sounds, music…), even when something else was expected; a file to fix no longer blocks installing the rest. A table's sheet has a "Game parts" section to add, replace, reassign or remove each part.
+- Downloads: a file can be added to a table, to another game, or installed as a new table.
+- Media proposals shown as a gallery, with VPUniverse popularity and a sort by popularity; the media saved is always the one you picked.
+- Lists no longer move during a download: only a user gesture scrolls them.
+- Backglass and DMD in the brand's colours, with a dot font drawn for Cyber Pinball; the DMD colour is adjustable (signal green by default, presets or a free colour).
+- Game buttons: keyboard keys can be captured again.
 
 ## 0.1.3
 

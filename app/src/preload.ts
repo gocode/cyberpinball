@@ -5,6 +5,17 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 // Sans réponse, sendSync rend {} : renderer/i18n.js prend alors le français.
 contextBridge.exposeInMainWorld('cyberI18n', ipcRenderer.sendSync('i18n') ?? {});
 
+// Touche traitée par le processus principal (key-input.ts) : la page ne s'en sert pas
+// (défilement, focus, bouton activé). Elle n'est pas annulée là-bas, pour que son
+// relâchement y arrive : Chromium l'aurait sinon jeté.
+window.addEventListener(
+  'keydown',
+  (event) => {
+    if (ipcRenderer.sendSync('key-handled', event.code)) event.preventDefault();
+  },
+  true,
+);
+
 // Chaque fenêtre d'écran reçoit son propre état ; les touches sont captées côté
 // processus principal (before-input-event). Le rendu n'envoie que les clics de
 // souris et les fichiers glissés sur la fenêtre.

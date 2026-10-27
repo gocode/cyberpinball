@@ -138,12 +138,20 @@ export interface MediaCard {
   thumb: MediaThumb;
   /** Avancement d'une attente ou d'un téléchargement, de 0 à 1 (barre sous les faits). */
   progress?: number;
+  /** Signe à part de l'état (« Autre jeu » : une proposition d'un autre jeu que la table). */
+  flag?: { label: string; tone: Tone };
+  /** Popularité sur le site de la fiche (« 510 téléchargements »). */
+  popularity?: string;
 }
 
 export interface MediaView {
   cards: MediaCard[];
   /** Grand aperçu (un seul média ou une seule page). */
   large?: boolean;
+  /** Galerie : les propositions en tuiles, le détail de la tuile choisie dessous. */
+  gallery?: boolean;
+  /** Format des aperçus de la galerie (« 16 / 9 »), celui de l'écran qui montre le média. */
+  aspect?: string;
 }
 
 /**
@@ -350,6 +358,7 @@ export function createMedias(ctx: MediasContext) {
         active: (table) => session?.file === table.file,
         placement: (type) => mediaPlacement(type, cabinet()),
         web: web && { open: (table, type, title) => web.open(table, type, title), detail: (table, type, title) => web.detail(table, type, title) },
+        save: { changes: (table) => changes(session!, table), open: () => session && openPlan(session) },
         back: (type, message) => {
           if (!session) return;
           session.next = message;

@@ -1264,7 +1264,7 @@ html.annex #media-bg {
   color: var(--dmd);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  text-shadow: 0 0 2cqmin rgba(255, 138, 31, 0.6);
+  text-shadow: 0 0 2cqmin color-mix(in srgb, var(--dmd) 60%, transparent);
 }
 
 .dmd .subtitle {

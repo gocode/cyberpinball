@@ -57,6 +57,7 @@ import {
   type MediaFacts,
   type MediaType,
   type TableEntry,
+  type VpsGame,
   mediaUrl,
 } from '@cyberpinball/core';
 import type { Action, Built, LibraryHost, Row, Section } from './library';
@@ -422,6 +423,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   function buildTablePlan(o: Offer, mode: PlanMode): Built {
     const table = ctx.find(o.file);
     const actions: Action[] = o.proposals.map((p) => ({
+      key: `type:${p.type}`,
       label: t('{type} : {choice}', { type: mediaTypeInfo(p.type).label, choice: choiceLabel(p, o.chosen.get(p.type)) }),
       detail: t('Start : {choice}', { choice: choiceLabel(p, nextChoice(p, o.chosen.get(p.type))) }),
       run: () => {
@@ -478,6 +480,7 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
             ].join(' '),
             tone: o.match.confident ? 'info' : 'warning',
           },
+          ...otherGameRows(table, c.game),
         ],
       },
     ];
@@ -931,6 +934,16 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
   }
 
   return { openTable, openMissing, withNotice, forGames, fillMissing, offlineSurvey };
+}
+
+/**
+ * Jeu de VPinMediaDB qui n'est pas celui de la table (même titre, autre table de la base
+ * VPS : autres auteurs, autre année) : dit en clair, ses médias peuvent ne pas lui ressembler.
+ */
+export function otherGameRows(table: TableEntry | undefined, game: VpsGame | undefined): Row[] {
+  const own = table?.info.Info?.VPSId;
+  if (!game || !own || game.id === own) return [];
+  return [{ text: t('Autre jeu que votre table : {game}', { game: vpsLabel(game) }), detail: t('Même titre, autre table de la base VPS (autres auteurs, autre année) : ses médias peuvent ne pas ressembler à votre table.'), tone: 'warning' }];
 }
 
 /** Ce que VPinMediaDB a pour un jeu, pour le plan d'ajout : un fichier par média, et le poids total. */

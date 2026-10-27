@@ -25,7 +25,7 @@
   --scrim: rgba(3, 8, 7, 0.72);
   --scrim-strong: rgba(3, 8, 7, 0.86);
   --halo: #1c8f80;
-  --dmd: #ff8a1f;
+  --dmd: #8be23a;
   --halo-panel: 0 0 24px rgba(28,143,128,0.10);
   --glow-signal: 0 0 0 1px #8be23a, 0 0 18px rgba(139,226,58,0.16);
 }
@@ -45,8 +45,8 @@
   --font-ui: Saira, "Segoe UI", system-ui, sans-serif;
   --font-logo: Audiowide, Saira, sans-serif;
   --font-marquee: "Bebas Neue", Saira, sans-serif;
-  --font-brand: Orbitron, Saira, sans-serif;
-  --font-dot: "Press Start 2P", monospace;
+  --font-brand: Saira, "Segoe UI", sans-serif;
+  --font-dot: "Saira Points", monospace;
 }
 .wordmark { font-family: var(--font-ui); font-size: 64px; line-height: 1.15; font-weight: 300; letter-spacing: 0.5em; }
 .display { font-family: var(--font-ui); font-size: 60px; line-height: 1.02; font-weight: 600; }
@@ -57,7 +57,7 @@
 .detail { font-family: var(--font-ui); font-size: 20px; line-height: 1.35; font-weight: 400; }
 .label { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 600; letter-spacing: 0.24em; }
 .kicker { font-family: var(--font-ui); font-size: 20px; line-height: 1.3; font-weight: 500; letter-spacing: 0.38em; }
-.replis-titre { font-family: var(--font-marquee); font-size: 72px; line-height: 1; font-weight: 400; }
+.replis-titre { font-family: var(--font-ui); font-size: 72px; line-height: 1; font-weight: 600; }
 .replis-logo { font-family: var(--font-logo); font-size: 40px; line-height: 1.05; font-weight: 400; }
-.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.1; font-weight: 700; letter-spacing: 0.2em; }
+.replis-marque { font-family: var(--font-brand); font-size: 36px; line-height: 1.35; font-weight: 300; letter-spacing: 0.28em; }
 .replis-dmd { font-family: var(--font-dot); font-size: 24px; line-height: 1.2; font-weight: 400; }

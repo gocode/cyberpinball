@@ -101,8 +101,10 @@ test('affichage par défaut : le rendu a un composant pour chaque écran (media.
       assert.match(exported, new RegExp(`\\b${kind},`), `${role} : composant « ${kind} » absent de fallback.js`);
     }
   }
-  // Sans titre, chaque composant dessine la marque, jamais un écran vide ou clair.
-  for (const brand of ["g.title || BRAND", 'brandPage(matrix', 'wordmarkBox(']) assert.ok(fallback.includes(brand), brand);
+  // Sans titre, chaque composant dessine la marque (fronton empilé, afficheurs, topper…), jamais un
+  // écran vide ou clair, ni la marque écrite comme un titre de jeu (marque-dmd.test.ts).
+  for (const brand of ["stackedWordmark('cp-bg-mark')", 'brandPage(matrix', 'blitBrand(matrix', 'wordmarkBox(']) assert.ok(fallback.includes(brand), brand);
+  assert.ok(!fallback.includes('g.title || BRAND'), 'la marque en titre de secours');
 });
 
 test('menu : les médias et le son de chaque fenêtre passent par screensTable', () => {

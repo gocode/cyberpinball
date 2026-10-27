@@ -26,6 +26,8 @@
 // l'encart du titre et des commandes ne recouvre pas le cadre du média.
 // Une liste qui défile n'a jamais de fondu (mask-image), et son choix courant s'y voit en entier.
 // Le lancement en cinéma traverse les écrans : le logo qui en sort n'est pas « coupé ».
+// Une liste ne défile jamais sans geste de l'utilisateur (app/renderer/scroll-keeper.js) : un
+// rendu qui la ramène ailleurs, un tic de progression par exemple, est signalé.
 // Les problèmes vont dans la console et dans <captures>\mise-en-page.txt.
 
 import * as fs from 'node:fs';
@@ -246,7 +248,8 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   // Liste qui défile : jamais de fondu (mask-image) sur elle, il fait passer la ligne du bord
   // pour désactivée (menu système, octobre 2026 : « Écrans et rôles ») ; et le choix courant
   // s'y voit en entier : ni rogné par la liste, ni caché par ce qui y reste accroché (bilan de
-  // la santé). Un calque posé par-dessus la liste (attente, dialogue) n'est pas compté.
+  // la santé). Un calque posé par-dessus la liste (attente, dialogue) n'est pas compté, ni une
+// liste que l'utilisateur a lui-même éloignée du choix à la molette (data-user-scroll).
   const scrollsY = (e) => /^(auto|scroll)$/.test(getComputedStyle(e).overflowY) && e.scrollHeight > e.clientHeight + T;
   for (const el of document.querySelectorAll('*')) {
     if (!scrollsY(el) || !shown(el)) continue;
@@ -257,7 +260,8 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     if (!shown(el)) continue;
     let list = el.parentElement;
     while (list && list !== document.body && !scrollsY(list)) list = list.parentElement;
-    if (!list || list === document.body) continue;
+    // Liste éloignée du choix par l'utilisateur lui-même, à la molette (scroll-keeper.js) : voulu.
+    if (!list || list === document.body || list.hasAttribute('data-user-scroll')) continue;
     const r = el.getBoundingClientRect(), c = list.getBoundingClientRect();
     let whole = r.left >= c.left - T && r.right <= c.right + T && r.top >= c.top - T && r.bottom <= c.bottom + T;
     const d = Math.min(4, r.width / 4, r.height / 4);
@@ -306,6 +310,9 @@ const STABLE = String.raw`(() => {
 })()`;
 
 type Stable = { shape: string; zones: Record<string, number[]> };
+
+/** Défilements sans geste relevés par la page depuis la dernière inspection (scroll-keeper.js). */
+const DRIFTS = `(typeof CyberScroll === 'object' ? CyberScroll.takeDrifts() : [])`;
 
 /** Zones data-stable qui ont bougé depuis le relevé précédent de la même page. */
 function moved(before: Stable | undefined, now: Stable): string[] {
@@ -364,7 +371,13 @@ export class LayoutReport {
     }
     const shifts = now ? moved(this.stable.get(contents.id), now) : [];
     if (now) this.stable.set(contents.id, now);
-    for (const problem of [...errors.splice(0), ...(await checkLayout(contents)), ...shifts]) {
+    let drifts: string[] = [];
+    try {
+      drifts = ((await contents.executeJavaScript(DRIFTS)) as string[]).map((d) => `défilement sans geste de l'utilisateur : ${d}`); // i18n-ignore : rapport de mise en page, pour le développeur
+    } catch {
+      drifts = [];
+    }
+    for (const problem of [...errors.splice(0), ...(await checkLayout(contents)), ...shifts, ...drifts]) {
       const line = `${where} : ${problem}`;
       console.log(`Mise en page : ${line}`);
       this.lines.push(line);

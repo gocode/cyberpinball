@@ -4,7 +4,7 @@
 #   DMD seul    : écran 4:1 (titre, titre long qui défile, PRESS START, record, horloge, crédits,
 #                 page du média DMD, animation « chargement »), bande 4:1 sur un écran 16:9 ;
 #   FullDMD     : média au cadre dessiné (les points dans le cadre, puis la page du média seul),
-#                 sans média (la bande 4:1 sur du noir), sans table (la marque).
+#                 sans média (la bande 4:1 sur du noir), sans table (la marque sur toute la grille du repli, sans bande).
 # Le garde-fou de mise en page (layout-check.ts) doit rester muet, et chaque cas montrer ce qu'il
 # doit (points allumés, média sur sa page, cadre pris ou non). Captures dans tmp\captures\dmd-vivant.
 #   .\docs\demo-dmd-vivant.ps1

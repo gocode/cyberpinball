@@ -136,6 +136,7 @@ import { orientation } from './display-orientation';
 import { observedDisplays, orientationSimulated } from './displays';
 import { createWindow, isShown, OFFSCREEN, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
+import { onKeyInput, sendableKey } from './key-input';
 import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualPinscapeButton } from './joystick-input';
 import { plungerClick, plungerKey, plungerTick, plungerView, startPlungerStep, type PlungerAction, type PlungerOutcome, type PlungerStep } from './plunger-step';
 import { analogWithGain, startTiltStep, tiltClick, tiltKey, tiltTick, tiltView, type TiltAction, type TiltOutcome, type TiltStep } from './tilt-step';
@@ -383,13 +384,12 @@ export function startWizard(): void {
     });
     // Positions en pixels physiques -> coordonnées Electron (DIP), écran par écran.
     coverDisplay(win, windowRect(d.bounds));
-    win.webContents.on('before-input-event', (event, input) => {
-      if (input.type !== 'keyDown' && input.type !== 'keyUp') return;
-      // Sans opérateur, seules les touches rejouées comptent : une touche tapée sur le PC
-      // pendant les captures serait relevée comme un bouton. Ctrl+Q reste permis.
-      if (process.env.CYBERPINBALL_AUTOPILOT && !isQuitShortcut(input)) event.preventDefault();
-      else if (handleKey(input)) event.preventDefault();
-    });
+    // Le relevé compte une touche à son relâchement : onKeyInput le fait arriver (key-input.ts).
+    onKeyInput(
+      win,
+      (input) => ignoredKey(input) || handleKey(input),
+      (input) => void (ignoredKey(input) || handleKey(input)),
+    );
     // Boutons d'un joystick (Pinscape…) : relevés et suivis comme des touches. Sans opérateur,
     // un joystick virtuel de SDL appuie (autopilote « Joy<n> »).
     onJoystickInput(win, (input) => void handleKey(input));
@@ -409,6 +409,42 @@ export function startWizard(): void {
 
   const autopilot = process.env.CYBERPINBALL_AUTOPILOT;
   if (autopilot) void runAutopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE);
+}
+
+/** Touche que l'autopilote rejoue en ce moment par le chemin d'une vraie touche (« Clavier:KeyA »). */
+let replaying: string | undefined;
+
+/**
+ * Sans opérateur, seules les touches rejouées comptent : une touche tapée sur le PC pendant
+ * les captures serait relevée comme un bouton. Ctrl+Q reste permis.
+ */
+function ignoredKey(input: Input): boolean {
+  return Boolean(process.env.CYBERPINBALL_AUTOPILOT) && !isQuitShortcut(input) && input.code !== replaying;
+}
+
+/**
+ * Autopilote « Clavier:KeyA » : la touche appuyée puis relâchée par webContents.sendInputEvent,
+ * comme une vraie touche (before-input-event, Chromium, preload.ts), sur l'écran principal.
+ * Faux si elle n'y est pas arrivée, appui et relâchement compris.
+ */
+async function pressRealKey(code: string): Promise<boolean> {
+  const keyCode = sendableKey(code);
+  const win = windows[displays.findIndex((d) => d.primary)] ?? windows[0];
+  if (!keyCode || !win || win.isDestroyed()) return false;
+  const seen = new Set<string>();
+  const watch = (_event: Electron.Event, input: Input) => input.code === code && seen.add(input.type);
+  win.webContents.on('before-input-event', watch);
+  replaying = code;
+  try {
+    win.webContents.sendInputEvent({ type: 'keyDown', keyCode });
+    await delay(50);
+    win.webContents.sendInputEvent({ type: 'keyUp', keyCode });
+    await delay(50);
+  } finally {
+    replaying = undefined;
+    win.webContents.off('before-input-event', watch);
+  }
+  return seen.has('keyDown') && seen.has('keyUp');
 }
 
 /**
@@ -472,6 +508,10 @@ async function runAutopilot(codes: string[], captureDir: string | undefined): Pr
         handleKey({ type: 'keyUp', code: key, control: false } as Input);
       }
     } else if (code === 'CtrlQ') handleKey({ type: 'keyDown', code: 'KeyQ', control: true } as Input);
+    // « Clavier:KeyA » : la touche par le chemin d'une vraie touche du clavier (pressRealKey).
+    else if (code.startsWith('Clavier:')) {
+      if (!(await pressRealKey(code.slice(8)))) console.error(`Autopilote : ${code} n’est pas arrivée jusqu’à l’assistant, appui et relâchement`); // i18n-ignore : console de l'autopilote
+    }
     // « Axe2:0.9 » : l'axe 2 (Z) d'un Pinscape virtuel à 0,9, par le chemin d'un vrai lanceur.
     else if (/^Axe\d+:-?[\d.]+$/.test(code)) {
       const [axis, value] = code.slice(3).split(':').map(Number) as [number, number];
@@ -945,6 +985,8 @@ function handleButtonKey(input: Input): void {
   const button = capture.set.items[capture.index]!;
   const record = recordKey(capture.set, capture.keys, button.id, code);
   capture.refused = record.refused;
+  // Sans opérateur, la trace de chaque relevé (essais de bout en bout, clavier-reel.test.ts).
+  if (process.env.CYBERPINBALL_AUTOPILOT) console.log(`Assistant : relevé ${capture.set.kind}, ${button.id} sur ${code} : ${record.refused ? `refusé (${record.refused})` : record.skipped ? 'passé' : 'gardé'}`); // i18n-ignore : console de l'autopilote
   if (record.refused) return;
   // Une autre touche : l'essai de ce bouton est à refaire.
   if (capture.keys[button.id] !== record.keys[button.id]) capture.tried.delete(button.id);

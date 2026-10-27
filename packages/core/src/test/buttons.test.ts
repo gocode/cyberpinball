@@ -27,6 +27,7 @@ import {
   defaultNavigation,
   interfaceKeys,
   INTERFACE_KEYS,
+  GAME_KEYS,
   keysToTry,
   NAVIGATION,
   navigationButtons,
@@ -555,14 +556,65 @@ test('clavier et joystick : le clavier suit les boutons du joystick, et l’assi
   // L'assistant prend le clavier une fois ses fenêtres affichées.
   assert.match(wizard, /ready-to-show[\s\S]{0,200}takeKeyboard\(\)/);
   assert.match(wizard, /function takeKeyboard\(\)[\s\S]*?keyboardFollows\(/);
-  // Touches du clavier et boutons du joystick arrivent au même traitement.
-  assert.match(wizard, /before-input-event[\s\S]{0,400}handleKey\(input\)/);
+  // Touches du clavier (relâchement compris, key-input.ts) et boutons du joystick arrivent au même traitement.
+  assert.match(wizard, /onKeyInput\(\s*win,[\s\S]{0,200}handleKey\(input\)[\s\S]{0,100}handleKey\(input\)/);
   assert.match(wizard, /onJoystickInput\(win, \(input\) => void handleKey\(input\)\)/);
   // Le focus qui passe d'un écran de l'assistant à l'autre ne relâche pas les touches enfoncées.
   assert.doesNotMatch(wizard, /win\.on\('blur', \(\) => releaseKeys\(\)\)/);
   assert.match(wizard, /win\.on\('blur', [^\n]*isFocused\(\)[^\n]*releaseKeys\(\)/);
   // Le relevé passe par recordKey, sans distinguer clavier et joystick.
   assert.match(wizard, /function handleButtonKey[\s\S]*?recordKey\(/);
+});
+
+test('chaque bouton, du jeu et de l’interface, se relève sur une touche du clavier comme sur un bouton du joystick', () => {
+  // Octobre 2026 : sur un PC sans boutons de borne, plus aucune touche du clavier ne se relevait.
+  for (const set of [GAME_KEYS, INTERFACE_KEYS]) {
+    for (const [i, item] of set.items.entries()) {
+      // Une touche libre, que VPX connaît et qu'aucun autre bouton ne tient : F1, F2…
+      const key = `F${i + 1}`;
+      assert.equal(sdlScancode(key) !== undefined, true, key);
+      const byKey = recordKey(set, {}, item.id, key);
+      assert.equal(byKey.refused, undefined, `${set.kind} ${item.id} : ${byKey.refused}`);
+      assert.equal(byKey.keys[item.id], key);
+      const byJoystick = recordKey(set, {}, item.id, joy(i));
+      assert.equal(byJoystick.refused, undefined, `${set.kind} ${item.id} : ${byJoystick.refused}`);
+      assert.equal(byJoystick.keys[item.id], joy(i));
+      // Déjà prise par un autre bouton du même jeu : refusée, sans rien changer.
+      const other = set.items.find((b) => b.id !== item.id)!;
+      const taken = recordKey(set, { [other.id]: key }, item.id, key);
+      assert.match(taken.refused!, new RegExp(`déjà la touche du bouton ${other.label}`));
+      assert.deepEqual(taken.keys, { [other.id]: key });
+    }
+  }
+  // Le bouton qui passe (Exit, Retour), une fois relevé, passe un bouton facultatif ; un obligatoire le garde.
+  const exit = 'Escape';
+  assert.equal(recordKey(GAME_KEYS, { exit }, 'extraBall', exit).skipped, true);
+  assert.match(recordKey(GAME_KEYS, { exit }, 'credit', exit).refused!, /déjà la touche du bouton Exit/);
+});
+
+test('touches du clavier : le relâchement d’un appui traité arrive toujours (key-input.ts)', () => {
+  // Annuler un appui dans before-input-event jette son relâchement (Chromium) : le relevé des
+  // boutons, qui compte une touche à son relâchement, ne voyait plus le clavier, et le mode
+  // invité gardait pour tenue une touche relâchée. Toute fenêtre qui lit les relâchements
+  // passe donc par onKeyInput, dont la page annule elle-même les appuis traités.
+  const dir = path.join(__dirname, '..', '..', '..', '..', 'app', 'src');
+  const read = (file: string) => fs.readFileSync(path.join(dir, file), 'utf8');
+  const keyInput = read('key-input.ts');
+  assert.match(keyInput, /before-input-event[\s\S]*?handled\.set\(input\.code, down\(input\)\)[\s\S]*?keyUp[\s\S]*?up\(input\)/);
+  assert.doesNotMatch(keyInput, /\.preventDefault\(\)/, 'onKeyInput n’annule jamais un appui');
+  const preload = read('preload.ts');
+  assert.match(preload, /addEventListener\(\s*'keydown',[\s\S]*?sendSync\('key-handled', event\.code\)\)\s*event\.preventDefault\(\)[\s\S]*?true,?\s*\)/, 'la page annule les appuis traités, en phase de capture');
+  assert.match(keyInput, /KEY_HANDLED_CHANNEL = 'key-handled'/);
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.ts') && f !== 'key-input.ts')) {
+    const text = read(file);
+    // Aucun before-input-event ne lit les relâchements lui-même.
+    for (const handler of text.matchAll(/on\('before-input-event', \([^)]*\) => \{[\s\S]*?\n\s*\}\);/g))
+      assert.doesNotMatch(handler[0], /keyUp/, `${file} : relâchement lu dans before-input-event, passer par onKeyInput`);
+    // onKeyInput : seulement pour une page qui charge preload.js, qui annule les appuis traités.
+    if (/onKeyInput\(/.test(text)) assert.match(text, /'preload\.js'/, `${file} : onKeyInput sans preload.js`);
+  }
+  assert.match(read('wizard.ts'), /onKeyInput\(/);
+  assert.match(read('frontend.ts'), /onKeyInput\(win, handleKey, handleKeyUp\)/);
 });
 
 // ---------------------------------------------------------------------------

@@ -24,6 +24,12 @@ son interface).
 - Horaire de la borne (« Médias, son et attente », désactivé par défaut) : comme en salle d'arcade, la borne baisse ses écrans et se tait la nuit, puis se met en veille ou s'éteint à l'heure choisie si personne ne joue, après 30 s de préavis qu'un simple bouton annule.
 - Bureau Windows rendu dans son sens : Cyber Pinball ne tourne plus l'écran du plateau dans le réglage de Windows, seulement le temps d'être ouvert ; chaque sortie, même après un plantage, rend au bureau l'orientation d'avant. Une borne déjà laissée tournée le propose au premier démarrage.
 - Sens des tables gardé d'un démarrage à l'autre : après un redémarrage ou une reconnexion, les tables ne s'affichent plus à l'envers en partie. « Santé de la borne » dit si elles sont dans votre sens, et répare celles qu'on avait retournées dans le menu de VPX.
+- Parties du jeu : chaque fichier reçu va dans la partie que dit son contenu (table, PuP-Pack, fronton, ROM, couleurs, sons, musique…), même si l'on attendait autre chose ; un fichier à corriger ne bloque plus l'installation du reste. La fiche d'une table a une section « Parties du jeu » pour ajouter, remplacer, réaffecter ou retirer chaque partie.
+- Téléchargements : un fichier peut être ajouté à une table, à un autre jeu, ou installé comme nouvelle table.
+- Propositions de médias en galerie, avec la popularité de VPUniverse et un tri par popularité ; le média enregistré est toujours celui qu'on a choisi.
+- Les listes ne bougent plus pendant un téléchargement : seul un geste de l'utilisateur les fait défiler.
+- Fronton et DMD aux couleurs de la marque, avec une police à points dessinée pour Cyber Pinball ; la couleur du DMD se règle (vert signal par défaut, préréglages ou couleur libre).
+- Boutons du jeu : les touches du clavier se relèvent de nouveau.
 
 ## 0.1.3
 

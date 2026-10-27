@@ -1,7 +1,8 @@
 // Replis intégrés : l'habillage des écrans quand un jeu n'a pas ses médias
 // (docs/recherche/medias.md, § 5.1, colonne « Repli »). Chaque composant se dessine
-// dans un conteneur à partir du seul { title, manufacturer, year }, sans aucune
-// image : CSS, SVG et canvas, avec les polices OFL de polices/. Couleurs et matière
+// dans un conteneur à partir du seul { title, manufacturer, year } : CSS, SVG et canvas,
+// avec les polices OFL de polices/ ; les afficheurs à points écrivent avec la police à
+// points de la marque (police-points.js, chargé avant ce script). Couleurs et matière
 // sont celles du design system (docs/design-system) : voir fallback.css.
 //
 //   const h = CyberFallback.backglass(conteneur, jeu, { animate: true });
@@ -24,7 +25,6 @@
   // Langue de l'interface (i18n.js, chargé avant ce script dans frontend.html). La page de
   // démonstration fallback-demo.html le charge sans i18n.js : les textes y restent en français.
   const t = typeof window.t === 'function' ? window.t : (source, params) => source.replace(/\{(\w+)\}/g, (whole, name) => (params && Object.hasOwn(params, name) ? String(params[name]) : whole));
-  const uiLocale = typeof window.uiLocale === 'function' ? window.uiLocale : () => 'fr-FR';
 
   /**
    * Couleurs de la direction artistique (docs/design-system) : sarcelle lumineuse des
@@ -32,9 +32,14 @@
    * et ne prétend pas montrer les couleurs d'une table qu'on n'a pas.
    */
   const BORNE = { primary: '#36c9b4', secondary: '#5fb4cf' };
-  /** Orangé des afficheurs à plasma d'origine (jeton dmd, réservé aux afficheurs). */
-  const DMD_COLOR = '#ff8a1f';
-  const BRAND = 'CYBER PINBALL';
+  /**
+   * Couleur des points par défaut, celle de la DA (DEFAULT_DMD_COLOR, packages/core/src/dmdcolor.ts) ;
+   * la couleur réglée dans le menu la remplace (setDmdColor).
+   */
+  const DMD_COLOR = '#8be23a';
+  let dmdColor = DMD_COLOR;
+  /** Afficheurs qui suivent la couleur réglée (ceux sans options.color). */
+  const tinted = new Set();
 
   // ---------- Outils ----------
 
@@ -67,11 +72,11 @@
 
   /** « Williams · 1991 », « Williams », « 1991 » ou rien ; le point reste avec le fabricant. */
   const metaOf = (g) => [g.manufacturer, g.year].filter(Boolean).join('\u00a0· ');
-  const upper = (text) => text.toLocaleUpperCase(uiLocale());
 
-  // Chargement des polices dès le départ : les afficheurs dessinent sur canvas, où
-  // une police pas encore chargée serait remplacée sans prévenir.
-  const FONTS = ['"CP Saira"', '"CP Bebas Neue"', '"CP Press Start"', '"CP Orbitron"', '"CP Audiowide"'];
+  // Chargement des polices dès le départ : un texte ajusté à sa boîte se mesure de nouveau
+  // quand sa police arrive (relayoutAll). Les afficheurs à points n'en ont pas besoin : leur
+  // police est dessinée point par point (police-points.js).
+  const FONTS = ['"CP Saira"', '"CP Bebas Neue"', '"CP Orbitron"', '"CP Audiowide"'];
   const fontsReady = Promise.all(FONTS.map((f) => document.fonts.load(`16px ${f}`, 'AÉé'))).catch(() => {}); // i18n-ignore : glyphes d'essai des polices
 
   // ---------- Minuteries, arrêtées quand la fenêtre est cachée ----------
@@ -215,6 +220,7 @@
     let resizers = [];
     let stops = [];
     let failures = [];
+    const disposers = [];
     const observer = new ResizeObserver(() => layout());
     const ctx = {
       root,
@@ -231,6 +237,9 @@
       },
       onResize(fn) {
         resizers.push(fn);
+      },
+      onDestroy(fn) {
+        disposers.push(fn);
       },
     };
     function layout() {
@@ -266,6 +275,7 @@
       problems: () => [...failures, ...(ctx.problems?.() ?? [])],
       destroy() {
         clear();
+        for (const fn of disposers) fn();
         observer.disconnect();
         mounted.delete(layout);
         root.remove();
@@ -277,30 +287,31 @@
 
   // ---------- Afficheur à points (DMD) ----------
 
-  /** Intensité de chaque nuance : point éteint, faible, moyen, plein (4 nuances, comme les DMD d'origine). */
-  const LEVELS = [0.07, 0.34, 0.67, 1];
   /**
-   * 16 nuances (DMD du menu vivant, packages/core/src/livedmd.ts) : du point éteint, à peine
-   * visible, au plein éclat ; une courbe douce, car l'œil voit mieux les écarts dans le sombre.
+   * 16 nuances, comme le DMD vivant du menu (packages/core/src/livedmd.ts) : une courbe douce, car
+   * l'œil voit mieux les écarts dans le sombre. Le point éteint n'est pas une nuance de la couleur
+   * (un voile vert ou orange sur toute la grille) : il garde un gris neutre, à peine visible (OFF_DOT).
    */
-  const LEVELS_16 = Array.from({ length: 16 }, (_, v) => (v ? 0.12 + 0.88 * Math.pow(v / 15, 1.6) : 0.07));
+  const LEVELS_16 = Array.from({ length: 16 }, (_, v) => (v ? 0.12 + 0.88 * Math.pow(v / 15, 1.6) : 0));
+  const OFF_DOT = [14, 18, 17];
+  /** Nuances des pages dessinées ici : celles de DMD_LEVEL (livedmd.ts). */
+  const LEVEL = { main: 14, quiet: 11, secondary: 11, lamp: 5, flash: 15, brandCyber: 11, brandPinball: 15 };
   const FRAME = 40;
 
   function rgb(color) {
     const probe = document.createElement('canvas').getContext('2d');
-    probe.fillStyle = validColor(color) ?? DMD_COLOR;
+    probe.fillStyle = validColor(color) ?? dmdColor;
     probe.fillRect(0, 0, 1, 1);
     return [...probe.getImageData(0, 0, 1, 1).data.slice(0, 3)];
   }
 
   /**
-   * Grille de cols × rows points, chaque point valant 0 à 3. Dessin : la grille est
-   * écrite dans un petit canvas d'un pixel par point, agrandie sans lissage, puis
-   * couverte d'un masque noir percé d'un trou rond par point, et d'un léger halo.
+   * Grille de cols × rows points, chaque point valant 0 à 15. Dessin : la grille est écrite dans
+   * un petit canvas d'un pixel par point, agrandie sans lissage, puis couverte d'un masque noir
+   * percé d'un trou rond par point, et d'un léger halo.
    */
   class Matrix {
-    constructor(root, cols, rows, color, levels = LEVELS) {
-      this.levels = levels;
+    constructor(root, cols, rows, color) {
       this.cols = cols;
       this.rows = rows;
       this.buffer = new Uint8Array(cols * rows);
@@ -318,7 +329,7 @@
 
     setColor(color) {
       const [r, g, b] = rgb(color);
-      this.lut = this.levels.map((f) => [Math.round(r * f), Math.round(g * f), Math.round(b * f)]);
+      this.lut = LEVELS_16.map((f, v) => (v ? [Math.round(r * f), Math.round(g * f), Math.round(b * f)] : OFF_DOT));
     }
 
     resize() {
@@ -400,75 +411,98 @@
     }
   }
 
-  // Textes en points : dessinés avec une police dans un canvas de travail, puis
-  // ramenés aux 4 nuances (Bebas Neue lissée) ou à 2 (Press Start 2P, police pixel
-  // dessinée à sa taille native de 8 px, un point par pixel).
-  const inkCanvas = document.createElement('canvas');
-  const inkCtx = inkCanvas.getContext('2d', { willReadFrequently: true });
-  /** Sous SHARP points de haut, les lettres sont espacées de 2 points et posées en 2 nuances (voir rasterize). */
-  const SHARP = 24;
-  const BEBAS = (size) => ({ family: '"CP Bebas Neue", "Segoe UI", sans-serif', size, spacing: size < SHARP ? 2 : 1 }); // i18n-ignore : noms de polices
-  const PIXEL = { family: '"CP Press Start", Consolas, monospace', size: 8, spacing: 0, crisp: true };
-
-  function setFont(ctx, f) {
-    ctx.font = `${f.size}px ${f.family}`;
-    ctx.letterSpacing = `${f.spacing}px`;
-  }
-
-  function measure(text, f) {
-    setFont(inkCtx, f);
-    const m = inkCtx.measureText(text);
-    return { w: Math.ceil(m.actualBoundingBoxLeft + m.actualBoundingBoxRight), h: Math.ceil(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) };
-  }
-
   /**
-   * Image de points d'une ligne de texte, rognée à l'encre : { w, h, px }. La police
-   * pixel est dessinée 8 fois plus grande et lue au centre de chaque pixel de police :
-   * à sa taille native, un décalage d'un demi-pixel doublerait chaque trait au seuillage.
+   * Afficheur à la couleur donnée (options.color), sinon à la couleur réglée dans le menu, qu'il
+   * suit ensuite (setDmdColor) jusqu'à sa destruction.
    */
-  function rasterize(text, f) {
-    const scale = f.crisp ? 8 : 1;
-    const big = { ...f, size: f.size * scale, spacing: f.spacing * scale };
-    setFont(inkCtx, big);
-    const m = inkCtx.measureText(text);
-    const pad = 2;
-    const w = Math.max(1, Math.ceil((m.actualBoundingBoxLeft + m.actualBoundingBoxRight) / scale) + pad * 2);
-    const h = Math.max(1, Math.ceil((m.actualBoundingBoxAscent + m.actualBoundingBoxDescent) / scale) + pad * 2);
-    inkCanvas.width = w * scale;
-    inkCanvas.height = h * scale;
-    setFont(inkCtx, big);
-    inkCtx.fillStyle = '#fff';
-    inkCtx.fillText(text, (pad + Math.round(m.actualBoundingBoxLeft / scale)) * scale, (pad + Math.round(m.actualBoundingBoxAscent / scale)) * scale);
-    const data = inkCtx.getImageData(0, 0, w * scale, h * scale).data;
-    const px = new Uint8Array(w * h);
-    let x0 = w;
-    let x1 = -1;
-    let y0 = h;
-    let y1 = -1;
-    const half = scale >> 1;
-    for (let i = 0; i < px.length; i++) {
-      const sx = (i % w) * scale + half;
-      const sy = Math.floor(i / w) * scale + half;
-      const a = data[(sy * w * scale + sx) * 4 + 3];
-      // Petites tailles : point allumé ou éteint, sans nuance intermédiaire, qui boucherait
-      // l'intérieur des lettres à diagonales (W, M, N) et collerait les lettres entre elles.
-      const v = f.crisp || f.size < SHARP ? (a >= 128 ? 3 : 0) : a >= 170 ? 3 : a >= 100 ? 2 : a >= 45 ? 1 : 0;
-      px[i] = v;
-      if (v) {
-        const x = i % w;
-        const y = (i - x) / w;
-        x0 = Math.min(x0, x);
-        x1 = Math.max(x1, x);
-        y0 = Math.min(y0, y);
-        y1 = Math.max(y1, y);
-      }
+  function tintedMatrix(root, cols, rows, color, onDestroy) {
+    const matrix = new Matrix(root, cols, rows, color ?? dmdColor);
+    if (color === undefined) {
+      tinted.add(matrix);
+      onDestroy(() => tinted.delete(matrix));
     }
-    if (x1 < 0) return { w: 0, h: 0, px: new Uint8Array(0) };
-    const tw = x1 - x0 + 1;
-    const th = y1 - y0 + 1;
-    const out = new Uint8Array(tw * th);
-    for (let y = 0; y < th; y++) out.set(px.subarray((y + y0) * w + x0, (y + y0) * w + x0 + tw), y * tw);
-    return { w: tw, h: th, px: out };
+    return matrix;
+  }
+
+  /** Couleur réglée (« Couleur du DMD », medias.json) : tous les afficheurs qui la suivent sont redessinés. */
+  function setDmdColor(color) {
+    const c = validColor(color);
+    if (!c || c === dmdColor) return;
+    dmdColor = c;
+    for (const matrix of tinted) {
+      matrix.setColor(c);
+      matrix.draw();
+    }
+  }
+
+  // Textes en points : la police du DMD vivant, « Saira Points » (police-points.js, copie de
+  // packages/core/src/dmdfont.ts) : petit (5 × 7), grand (9 × 14), marque (11 × 11), agrandis au
+  // besoin d'un facteur entier au plus proche voisin, comme l'horloge du DMD vivant.
+
+  /** Polices : { height, spacing, scale, glyphs: Map(signe → image de points 0/1) }. */
+  const POINTS = (() => {
+    const source = typeof CYBER_POINTS === 'object' ? CYBER_POINTS : {}; // police-points.js, chargé avant
+    const fonts = {};
+    for (const [name, f] of Object.entries(source)) {
+      const glyphs = new Map();
+      for (const [c, rows] of Object.entries(f.glyphs)) {
+        const w = rows[0].length;
+        const px = new Uint8Array(w * rows.length);
+        rows.forEach((row, y) => [...row].forEach((ch, x) => (px[y * w + x] = ch === '#' ? 1 : 0)));
+        glyphs.set(c, { w, h: rows.length, px });
+      }
+      fonts[name] = { height: f.height, spacing: f.spacing, glyphs };
+    }
+    return fonts;
+  })();
+
+  /** Une taille de la police, agrandie ×scale (points carrés de scale × scale). */
+  const pointsFont = (name, scale = 1) => ({ ...POINTS[name], height: POINTS[name].height * scale, spacing: POINTS[name].spacing * scale, scale });
+
+  /** Texte tel qu'un DMD l'écrit (dmdText de dmdfont.ts) : capitales sans accent, signes inconnus en « ? ». */
+  function dmdText(raw) {
+    const plain = String(raw)
+      .normalize('NFD')
+      .replace(/\p{M}/gu, '')
+      .replace(/[’‘]/g, "'")
+      .replace(/[“”]/g, '"')
+      .replace(/[–—]/g, '-')
+      .replace(/ß/g, 'SS')
+      .replace(/[Ææ]/g, 'AE')
+      .replace(/[Œœ]/g, 'OE')
+      .replace(/[Øø]/g, 'O')
+      .toUpperCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+    const known = POINTS.petit?.glyphs;
+    return [...plain].map((c) => (!known || known.has(c) ? c : '?')).join('');
+  }
+
+  const glyphOf = (f, c) => f.glyphs.get(c) ?? f.glyphs.get('?') ?? f.glyphs.values().next().value;
+
+  /** Largeur en points d'un texte (textWidth de dmdfont.ts). */
+  function measure(text, f) {
+    let w = 0;
+    for (const c of text) w += glyphOf(f, c).w * f.scale + f.spacing;
+    return Math.max(0, w - f.spacing);
+  }
+
+  /** Image de points d'une ligne de texte : { w, h, px }, chaque point allumé à la nuance level. */
+  function rasterize(text, f, level = LEVEL.main) {
+    const w = Math.max(1, measure(text, f));
+    const h = f.height;
+    const px = new Uint8Array(w * h);
+    let x0 = 0;
+    for (const c of text) {
+      const g = glyphOf(f, c);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < g.w * f.scale; x++) {
+          if (g.px[Math.floor(y / f.scale) * g.w + Math.floor(x / f.scale)] && x0 + x < w) px[y * w + x0 + x] = level;
+        }
+      }
+      x0 += g.w * f.scale + f.spacing;
+    }
+    return { w, h, px };
   }
 
   /** Découpe des mots en n lignes, la plus large étant la plus étroite possible. */
@@ -492,26 +526,27 @@
     return best;
   }
 
+  /** Écart entre deux lignes : deux points, agrandis avec la police. */
+  const lineGap = (f) => 2 * f.scale;
+
   /**
-   * Mise en page d'un texte dans une zone de points, en Bebas Neue, de la plus grande
-   * taille à la plus petite, en 1 à maxLines lignes. null si rien ne tient.
+   * Mise en page d'un texte dans une zone de points : la première taille de la liste (la plus
+   * grande d'abord) qui le fait tenir, chacune en 1 à maxLines lignes. null si rien ne tient.
+   * sizes : [{ font, maxLines }].
    */
-  function layoutText(text, area, { maxSize, minSize, maxLines }) {
+  function layoutText(text, area, sizes, level) {
     const words = text.split(' ').filter(Boolean);
     if (!words.length) return null;
-    for (let size = maxSize; size >= minSize; size--) {
-      const f = BEBAS(size);
+    for (const { font: f, maxLines } of sizes) {
       const widths = new Map();
       const width = (s) => {
-        if (!widths.has(s)) widths.set(s, measure(s, f).w);
+        if (!widths.has(s)) widths.set(s, measure(s, f));
         return widths.get(s);
       };
       for (let n = 1; n <= Math.min(maxLines, words.length); n++) {
         const lines = splitLines(words, n, width);
-        const sizes = lines.map((l) => measure(l, f));
-        const gap = Math.max(1, Math.round(size * 0.14));
-        const h = sizes.reduce((sum, m) => sum + m.h, 0) + gap * (n - 1);
-        if (Math.max(...sizes.map((m) => m.w)) <= area.w && h <= area.h) return { font: f, lines, gap };
+        const h = n * f.height + lineGap(f) * (n - 1);
+        if (Math.max(...lines.map(width)) <= area.w && h <= area.h) return { font: f, lines, level };
       }
     }
     return null;
@@ -519,61 +554,60 @@
 
   /**
    * Comme layoutText, en coupant au besoin les mots démesurés en 2 puis 3 morceaux
-   * (« SUPERCALIFRAGILISTICEXPIALIDOCIOUS » sur 160 points de large).
+   * (« SUPERCALIFRAGILISTICEXPIALIDOCIOUS » sur 122 points de large) : chaque taille essaie ses
+   * coupes avant de céder la place à la suivante, plus petite.
    */
-  function layoutCut(text, area, limits) {
-    const direct = layoutText(text, area, limits);
-    if (direct) return direct;
-    for (const parts of [2, 3]) {
-      const cut = text
-        .split(' ')
-        .map((w) => {
-          if (w.length < 12) return w;
-          const step = Math.ceil(w.length / parts);
-          return Array.from({ length: parts }, (_, i) => w.slice(i * step, (i + 1) * step)).join(' ');
-        })
-        .join(' ');
-      if (cut === text) break;
-      const lay = layoutText(cut, area, { ...limits, maxLines: Math.max(limits.maxLines, parts) });
-      if (lay) return lay;
+  function layoutCut(text, area, sizes, level) {
+    for (const size of sizes) {
+      for (const parts of [1, 2, 3]) {
+        const cut =
+          parts === 1
+            ? text
+            : text
+                .split(' ')
+                .map((w) => {
+                  if (w.length < 12) return w;
+                  const step = Math.ceil(w.length / parts);
+                  return Array.from({ length: parts }, (_, i) => w.slice(i * step, (i + 1) * step)).join(' ');
+                })
+                .join(' ');
+        if (parts > 1 && cut === text) break;
+        const lay = layoutText(cut, area, [{ ...size, maxLines: Math.max(size.maxLines, parts) }], level);
+        if (lay) return lay;
+      }
     }
     return null;
   }
 
-  /** Repli en police pixel (8 points par signe), coupé au besoin, tronqué en dernier recours. */
-  function layoutPixel(text, area) {
-    const perLine = Math.max(1, Math.floor(area.w / 8));
-    const maxLines = Math.max(1, Math.floor((area.h + 2) / 10));
+  /** Dernier recours, figé : le petit, coupé où il faut, tronqué de « ... » s'il reste du texte. */
+  function layoutTruncated(text, area, level) {
+    const f = pointsFont('petit');
+    const maxLines = Math.max(1, Math.floor((area.h + lineGap(f)) / (f.height + lineGap(f))));
     const lines = [];
     let line = '';
-    for (let word of text.split(' ').filter(Boolean)) {
-      while (word.length > perLine) {
-        if (line) lines.push(line);
-        lines.push(word.slice(0, perLine));
-        word = word.slice(perLine);
-        line = '';
-      }
-      if (!line) line = word;
-      else if (line.length + 1 + word.length <= perLine) line += ` ${word}`;
-      else {
-        lines.push(line);
-        line = word;
-      }
+    for (const c of text) {
+      if (measure(line + c, f) > area.w) {
+        lines.push(line.trimEnd());
+        line = c.trimStart();
+      } else line += c;
     }
     if (line) lines.push(line);
     const truncated = lines.length > maxLines;
     if (truncated) {
       lines.length = maxLines;
-      lines[maxLines - 1] = `${lines[maxLines - 1].slice(0, perLine - 1)}…`;
+      let last = lines[maxLines - 1];
+      while (last && measure(`${last}...`, f) > area.w) last = last.slice(0, -1);
+      lines[maxLines - 1] = `${last.trimEnd()}...`;
     }
-    return { font: PIXEL, lines, gap: 2, truncated };
+    return { font: f, lines, level, truncated };
   }
 
   /** Images de points d'une mise en page, et sa hauteur totale. */
   function rasterLayout(lay) {
-    const bmps = lay.lines.map((l) => rasterize(l, lay.font));
-    const h = bmps.reduce((sum, b) => sum + b.h, 0) + lay.gap * (bmps.length - 1);
-    return { bmps, h, gap: lay.gap };
+    const bmps = lay.lines.map((l) => rasterize(l, lay.font, lay.level));
+    const gap = lineGap(lay.font);
+    const h = bmps.reduce((sum, b) => sum + b.h, 0) + gap * (bmps.length - 1);
+    return { bmps, h, gap };
   }
 
   /** Pose une mise en page centrée dans la zone, à partir de y si donné. */
@@ -598,26 +632,28 @@
     };
   }
 
+  /** Marges du DMD vivant : 3 points de chaque côté, 1 en haut et en bas. */
+  const textArea = (matrix) => ({ x: 3, y: 1, w: matrix.cols - 6, h: matrix.rows - 2 });
+
   /**
-   * Page de texte pour l'afficheur 128 × 32 : texte fixe s'il tient lisiblement,
-   * sinon défilant (animé) ou en police pixel (figé).
+   * Page de texte pour l'afficheur 128 × 32 : en grand sur une ou deux lignes s'il y tient, sinon
+   * en petit sur trois, sinon défilant en grand (animé) ou coupé en petit (figé).
    */
   function textPage(matrix, text, hold, animate, problems) {
-    const area = { x: 2, y: 1, w: matrix.cols - 4, h: matrix.rows - 2 };
-    const lay = layoutText(text, area, { maxSize: 34, minSize: 13, maxLines: 2 });
+    const area = textArea(matrix);
+    const sizes = [
+      { font: pointsFont('grand'), maxLines: 2 },
+      { font: pointsFont('petit'), maxLines: 3 },
+    ];
+    const lay = layoutText(text, area, sizes, LEVEL.main);
     if (lay) {
       const ras = rasterLayout(lay);
       return still(matrix, hold, () => blitLayout(matrix, ras, area));
     }
-    if (animate) {
-      let size = 30;
-      while (size > 12 && measure(text, BEBAS(size)).h > matrix.rows - 6) size--;
-      return scrollPage(matrix, rasterize(text, BEBAS(size)), 40);
-    }
-    // Figé : plus petit et sur trois lignes, puis en police pixel, tronqué en dernier recours.
-    let lay2 = layoutCut(text, area, { maxSize: 12, minSize: 9, maxLines: 3 });
+    if (animate) return scrollPage(matrix, rasterize(text, pointsFont('grand'), LEVEL.main), 40);
+    let lay2 = layoutCut(text, area, sizes, LEVEL.main);
     if (!lay2) {
-      lay2 = layoutPixel(text, area);
+      lay2 = layoutTruncated(text, area, LEVEL.main);
       if (lay2.truncated) problems.push(`texte tronqué sur l'afficheur figé : « ${text} »`); // i18n-ignore : diagnostic des essais de mise en page
     }
     const ras = rasterLayout(lay2);
@@ -637,15 +673,15 @@
     };
   }
 
-  /** Fabricant et année sur une même page s'ils y tiennent, sinon une page chacun. */
+  /** Fabricant et année sur une même page s'ils y tiennent (le fabricant un ton dessous), sinon une page chacun. */
   function metaPages(matrix, g, animate, problems) {
-    const maker = upper(g.manufacturer);
-    const year = g.year;
+    const maker = dmdText(g.manufacturer);
+    const year = dmdText(g.year);
     if (maker && year) {
-      const top = { x: 2, y: 1, w: matrix.cols - 4, h: 13 };
-      const bottom = { x: 2, y: 16, w: matrix.cols - 4, h: 15 };
-      const makerLay = layoutText(maker, top, { maxSize: 18, minSize: 12, maxLines: 1 });
-      const yearLay = layoutText(year, bottom, { maxSize: 24, minSize: 12, maxLines: 1 });
+      const top = { x: 3, y: 1, w: matrix.cols - 6, h: 14 };
+      const bottom = { x: 3, y: 17, w: matrix.cols - 6, h: 14 };
+      const makerLay = layoutText(maker, top, [{ font: pointsFont('grand'), maxLines: 1 }, { font: pointsFont('petit'), maxLines: 1 }], LEVEL.secondary);
+      const yearLay = layoutText(year, bottom, [{ font: pointsFont('grand'), maxLines: 1 }], LEVEL.main);
       if (makerLay && yearLay) {
         const a = rasterLayout(makerLay);
         const b = rasterLayout(yearLay);
@@ -661,63 +697,22 @@
   }
 
   /**
-   * Logo de Cyber Pinball en points, comme l'icône (icone.svg) : plaque au filet faible,
-   * bille cerclée avec son reflet en bas à gauche, traînée qui passe par-dessus le filet
-   * jusqu'au coin haut droit. Image de points { w, h, px } carrée de h lignes.
+   * La marque empilée dans sa police, comme la page de la marque du DMD vivant (brandPage de
+   * livedmd.ts) : CYBER un ton dessous, PINBALL au plein éclat, centrés dans la zone.
    */
-  function logoBitmap(h) {
-    const w = h;
-    const px = new Uint8Array(w * h);
-    const set = (x, y, v) => {
-      if (x >= 0 && y >= 0 && x < w && y < h) px[y * w + x] = Math.max(px[y * w + x], v);
-    };
-    // Plaque : un point sur deux le long du bord, coins arrondis, au plus faible.
-    const inset = 2;
-    for (let i = inset + 2; i <= w - 1 - inset - 2; i += 2) {
-      set(i, inset, 1);
-      set(i, h - 1 - inset, 1);
-      set(inset, i, 1);
-      set(w - 1 - inset, i, 1);
-    }
-    const r = h * 0.27;
-    const cx = w * 0.4;
-    const cy = h * 0.6;
-    // Traînée : un fuseau de la bille au coin haut droit, plus lumineux près de la bille.
-    const tx = w - 1;
-    const ty = 0;
-    const len = Math.hypot(tx - cx, ty - cy);
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const t = ((x - cx) * (tx - cx) + (y - cy) * (ty - cy)) / (len * len);
-        if (t <= 0 || t > 1) continue;
-        const dist = Math.abs((x - cx) * (ty - cy) - (y - cy) * (tx - cx)) / len;
-        if (dist <= r * 0.75 * (1 - t) + 0.3) set(x, y, t < 0.55 ? 2 : 1);
-      }
-    }
-    // Bille : cercle plein au-dessus de la traînée, filet clair, reflet en haut à gauche.
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const d = Math.hypot(x - cx, y - cy);
-        if (d > r) continue;
-        px[y * w + x] = d > r - 1 ? 3 : 0;
-        if (Math.hypot(x - (cx - r * 0.4), y - (cy - r * 0.4)) < r * 0.24) px[y * w + x] = 3;
-      }
-    }
-    return { w, h, px };
+  function blitBrand(matrix, area) {
+    const f = pointsFont('marque');
+    const cyber = rasterize('CYBER', f, LEVEL.brandCyber);
+    const pinball = rasterize('PINBALL', f, LEVEL.brandPinball);
+    const gap = 4;
+    const top = area.y + Math.floor((area.h - (cyber.h + gap + pinball.h)) / 2);
+    matrix.blit(cyber, area.x + Math.floor((area.w - cyber.w) / 2), top);
+    matrix.blit(pinball, area.x + Math.floor((area.w - pinball.w) / 2), top + cyber.h + gap);
   }
 
-  /** Page de la marque : le logo en points et « CYBER PINBALL » à côté (sinon le texte seul). */
-  function brandPage(matrix, hold, animate, problems) {
-    const logo = logoBitmap(matrix.rows - 4);
-    const x0 = 3;
-    const area = { x: x0 + logo.w + 5, y: 1, w: matrix.cols - (x0 + logo.w + 5) - 3, h: matrix.rows - 2 };
-    const lay = layoutText(BRAND, area, { maxSize: 22, minSize: 11, maxLines: 2 });
-    if (!lay) return textPage(matrix, BRAND, hold, animate, problems);
-    const ras = rasterLayout(lay);
-    return still(matrix, hold, () => {
-      matrix.blit(logo, x0, Math.floor((matrix.rows - logo.h) / 2));
-      blitLayout(matrix, ras, area);
-    });
+  /** Page de la marque sur l'afficheur 128 × 32 : 3 lignes libres en haut et en bas, 4 entre les mots. */
+  function brandPage(matrix, hold) {
+    return still(matrix, hold, () => blitBrand(matrix, { x: 0, y: 0, w: matrix.cols, h: matrix.rows }));
   }
 
   /** Transition d'une image à l'autre : balayage avec un trait lumineux, ou poussée vers le haut. */
@@ -729,7 +724,7 @@
       for (let y = 0; y < rows; y++) {
         for (let x = 0; x < cols; x++) {
           const i = y * cols + x;
-          out[i] = x < edge ? to[i] : x === edge ? 3 : from[i];
+          out[i] = x < edge ? to[i] : x === edge ? LEVEL.flash : from[i];
         }
       }
     } else {
@@ -796,31 +791,26 @@
   }
 
   /**
-   * Afficheur 4:1 : titre, puis fabricant et année, puis la marque, en boucle.
-   * options.color : couleur des points ; options.page : page de départ (0 = titre).
+   * Afficheur 4:1 : titre, puis fabricant et année, puis la marque, en boucle ; sans titre, la marque.
+   * options.color : couleur des points (sinon la couleur réglée) ; options.page : page de départ (0 = titre).
    */
   function dmd(container, game, options) {
     return component(container, 'dmd', game, options, (ctx) => {
-      const matrix = new Matrix(ctx.root, 128, 32, ctx.options.color ?? DMD_COLOR);
+      const matrix = tintedMatrix(ctx.root, 128, 32, ctx.options.color, ctx.onDestroy);
       let problems = [];
       ctx.problems = () => problems;
       ctx.root.setAttribute('aria-hidden', 'true');
-      let generation = 0;
       return (g) => {
-        const current = ++generation;
         problems = [];
         ctx.onResize(() => matrix.resize());
-        // Les pages se calculent une fois les polices prêtes (sinon, police de secours).
-        fontsReady.then(() => {
-          if (current !== generation || !ctx.root.isConnected) return;
-          const pages = [g.title ? textPage(matrix, upper(g.title), 5000, ctx.animate, problems) : brandPage(matrix, 5000, ctx.animate, problems)];
-          if (ctx.animate) {
-            pages.push(...metaPages(matrix, g, true, problems));
-            if (g.title) pages.push(brandPage(matrix, 2500, true, problems));
-          }
-          matrix.resize();
-          sequence(ctx, matrix, pages, ctx.options.page);
-        });
+        const title = dmdText(g.title);
+        const pages = [title ? textPage(matrix, title, 5000, ctx.animate, problems) : brandPage(matrix, 5000)];
+        if (ctx.animate) {
+          pages.push(...metaPages(matrix, g, true, problems));
+          if (title) pages.push(brandPage(matrix, 2500));
+        }
+        matrix.resize();
+        sequence(ctx, matrix, pages, ctx.options.page);
       };
     });
   }
@@ -828,80 +818,94 @@
   /** Afficheur large 16:9 : même grille de points, plus fine ; titre, fabricant et année, cadre de lampes. */
   function fullDmd(container, game, options) {
     return component(container, 'fulldmd', game, options, (ctx) => {
-      const matrix = new Matrix(ctx.root, 160, 90, ctx.options.color ?? DMD_COLOR);
+      const matrix = tintedMatrix(ctx.root, 160, 90, ctx.options.color, ctx.onDestroy);
       let problems = [];
       ctx.problems = () => problems;
       ctx.root.setAttribute('aria-hidden', 'true');
-      let generation = 0;
       return (g) => {
-        const current = ++generation;
         problems = [];
         ctx.onResize(() => matrix.resize());
-        fontsReady.then(() => {
-          if (current !== generation || !ctx.root.isConnected) return;
-          const inner = { x: 6, y: 6, w: matrix.cols - 12, h: matrix.rows - 12 };
-          const metaText = upper(metaOf(g));
+        const inner = { x: 6, y: 6, w: matrix.cols - 12, h: matrix.rows - 12 };
+        const title = dmdText(g.title);
+        matrix.clear();
+        if (!title) blitBrand(matrix, inner);
+        else {
+          const metaText = dmdText(metaOf(g));
+          const metaArea = { w: inner.w, h: 30 };
+          // Le grand agrandi ×3 ou ×2 pour un titre court, à sa taille pour un long, le petit en dernier.
+          const sizes = [3, 2, 1].map((scale) => ({ font: pointsFont('grand', scale), maxLines: scale === 1 ? 4 : 3 })).concat({ font: pointsFont('petit'), maxLines: 6 });
+          // Le fabricant en petit doublé s'il laisse le titre plus grand que lui, sinon en petit.
           let meta = null;
-          if (metaText) {
-            const lay = layoutCut(metaText, { w: inner.w, h: 36 }, { maxSize: 18, minSize: 10, maxLines: 3 }) ?? layoutPixel(metaText, { w: inner.w, h: 38 });
-            if (lay.truncated) problems.push(`fabricant tronqué : « ${metaText} »`); // i18n-ignore : diagnostic des essais de mise en page
-            meta = rasterLayout(lay);
+          let lay = null;
+          let titleArea = inner;
+          let reserved = 0;
+          for (const metaFont of metaText ? [pointsFont('petit', 2), pointsFont('petit')] : [null]) {
+            const metaLay = metaFont && layoutCut(metaText, metaArea, [{ font: metaFont, maxLines: 3 }], LEVEL.secondary);
+            if (metaFont && !metaLay) continue;
+            meta = metaLay ? rasterLayout(metaLay) : null;
+            reserved = meta ? meta.h + 7 : 0;
+            titleArea = { x: inner.x, y: inner.y, w: inner.w, h: inner.h - reserved };
+            lay = layoutCut(title, titleArea, sizes, LEVEL.main);
+            if (lay && (!metaLay || lay.font.height > metaLay.font.height)) break;
           }
-          const reserved = meta ? meta.h + 7 : 0;
-          const titleArea = { x: inner.x, y: inner.y, w: inner.w, h: inner.h - reserved };
-          const title = upper(g.title || BRAND);
-          let lay = layoutCut(title, titleArea, { maxSize: 64, minSize: 12, maxLines: 3 });
+          if (metaText && !meta) {
+            const metaLay = layoutTruncated(metaText, metaArea, LEVEL.secondary);
+            if (metaLay.truncated) problems.push(`fabricant tronqué : « ${metaText} »`); // i18n-ignore : diagnostic des essais de mise en page
+            meta = rasterLayout(metaLay);
+            reserved = meta.h + 7;
+            titleArea = { x: inner.x, y: inner.y, w: inner.w, h: inner.h - reserved };
+            lay = layoutCut(title, titleArea, sizes, LEVEL.main);
+          }
           if (!lay) {
-            lay = layoutPixel(title, titleArea);
+            lay = layoutTruncated(title, titleArea, LEVEL.main);
             if (lay.truncated) problems.push(`titre tronqué : « ${title} »`); // i18n-ignore : diagnostic des essais de mise en page
           }
           const ras = rasterLayout(lay);
           // Titre, filet et fabricant forment un bloc centré verticalement.
           const total = ras.h + reserved;
           const top = inner.y + Math.floor((inner.h - total) / 2);
-          matrix.clear();
           blitLayout(matrix, ras, titleArea, top);
           if (meta) {
             const ruleY = top + ras.h + 3;
             const ruleW = Math.min(inner.w, 60);
-            for (let x = 0; x < ruleW; x += 2) matrix.buffer[ruleY * matrix.cols + inner.x + Math.floor((inner.w - ruleW) / 2) + x] = 1;
+            for (let x = 0; x < ruleW; x += 2) matrix.buffer[ruleY * matrix.cols + inner.x + Math.floor((inner.w - ruleW) / 2) + x] = LEVEL.lamp;
             blitLayout(matrix, meta, inner, ruleY + 4);
           }
-          const base = matrix.buffer.slice();
-          // Cadre de lampes fixe et faible : un point sur deux le long du bord.
-          const { cols } = matrix;
-          for (let x = 1; x < cols - 1; x += 2) matrix.buffer[1 * cols + x] = 1;
-          for (let y = 3; y < matrix.rows - 1; y += 2) matrix.buffer[y * cols + cols - 2] = 1;
-          for (let x = cols - 4; x >= 1; x -= 2) matrix.buffer[(matrix.rows - 2) * cols + x] = 1;
-          for (let y = matrix.rows - 4; y >= 3; y -= 2) matrix.buffer[y * cols + 1] = 1;
-          const lit = matrix.buffer.slice();
-          // Seul mouvement, comme le reflet du fronton : un éclat qui traverse le titre toutes les 12 s.
-          let shine = -1;
-          const paint = () => {
-            matrix.buffer.set(lit);
-            if (shine >= 0) {
-              for (let y = inner.y; y < inner.y + inner.h; y++) {
-                for (let x = inner.x; x < inner.x + inner.w; x++) {
-                  const i = y * cols + x;
-                  if (base[i] && Math.abs(x + y * 0.5 - shine) < 3) matrix.buffer[i] = 3;
-                }
+        }
+        const base = matrix.buffer.slice();
+        // Cadre de lampes fixe et faible : un point sur deux le long du bord.
+        const { cols } = matrix;
+        for (let x = 1; x < cols - 1; x += 2) matrix.buffer[1 * cols + x] = LEVEL.lamp;
+        for (let y = 3; y < matrix.rows - 1; y += 2) matrix.buffer[y * cols + cols - 2] = LEVEL.lamp;
+        for (let x = cols - 4; x >= 1; x -= 2) matrix.buffer[(matrix.rows - 2) * cols + x] = LEVEL.lamp;
+        for (let y = matrix.rows - 4; y >= 3; y -= 2) matrix.buffer[y * cols + 1] = LEVEL.lamp;
+        const lit = matrix.buffer.slice();
+        // Seul mouvement, comme le reflet du fronton : un éclat qui traverse le texte toutes les 12 s.
+        let shine = -1;
+        const paint = () => {
+          matrix.buffer.set(lit);
+          if (shine >= 0) {
+            for (let y = inner.y; y < inner.y + inner.h; y++) {
+              for (let x = inner.x; x < inner.x + inner.w; x++) {
+                const i = y * cols + x;
+                if (base[i] && Math.abs(x + y * 0.5 - shine) < 3) matrix.buffer[i] = LEVEL.flash;
               }
             }
-            matrix.draw();
-          };
-          matrix.resize();
+          }
+          matrix.draw();
+        };
+        matrix.resize();
+        paint();
+        let first = true;
+        ctx.run(() => {
+          if (first) {
+            first = false;
+            return 4000;
+          }
+          shine = shine < 0 ? inner.x : shine + 4;
+          if (shine > inner.x + inner.w + inner.h) shine = -1;
           paint();
-          let first = true;
-          ctx.run(() => {
-            if (first) {
-              first = false;
-              return 4000;
-            }
-            shine = shine < 0 ? inner.x : shine + 4;
-            if (shine > inner.x + inner.w + inner.h) shine = -1;
-            paint();
-            return shine >= 0 ? FRAME : 12000;
-          });
+          return shine >= 0 ? FRAME : 12000;
         });
       };
     });
@@ -910,7 +914,7 @@
   /**
    * Afficheur à points nu, pour des images calculées ailleurs (DMD du menu vivant : le
    * processus principal envoie chaque image, 128 × 32 nuances de 0 à 15). Il suit la taille
-   * de son conteneur et garde sa dernière image.
+   * de son conteneur, garde sa dernière image, et la couleur réglée sauf options.color.
    *   const m = CyberFallback.dotMatrix(conteneur, { color });
    *   m.show(points);   // Uint8Array de cols × rows nuances
    *   m.destroy();
@@ -919,7 +923,8 @@
     const root = el('div', 'cp-fb cp-fb-dotmatrix');
     root.setAttribute('aria-hidden', 'true');
     container.append(root);
-    const matrix = new Matrix(root, options.cols ?? 128, options.rows ?? 32, options.color ?? DMD_COLOR, LEVELS_16);
+    let dispose = () => {};
+    const matrix = tintedMatrix(root, options.cols ?? 128, options.rows ?? 32, options.color, (fn) => (dispose = fn));
     const observer = new ResizeObserver(() => matrix.resize());
     observer.observe(root);
     matrix.resize();
@@ -941,6 +946,7 @@
       },
       destroy() {
         clearTimeout(redraw);
+        dispose();
         observer.disconnect();
         root.remove();
       },
@@ -949,12 +955,33 @@
 
   // ---------- Composants HTML ----------
 
-  /** Fronton : titre en grand lisible de loin, filet sarcelle, fabricant et année, sous un cadre de verre fumé. */
+  /**
+   * Marque empilée, comme la couverture du design system (docs/design-system/src/couverture.html) :
+   * « CYBER » au-dessus de « PINBALL » en vert signal, Saira légère élargie, très espacée.
+   */
+  function stackedWordmark(className) {
+    const mark = el('div', `cp-wordmark cp-wordmark-stack ${className}`);
+    mark.append(el('span', 'cp-ink', 'CYBER'), el('span', 'cp-ink cp-pin', 'PINBALL'));
+    return mark;
+  }
+
+  /**
+   * Fronton : sans jeu (menu système, réglages, aide : defaultMediaView), la couverture de la
+   * marque ; avec un jeu, son titre en grand lisible de loin, filet sarcelle, fabricant et année,
+   * sous un cadre de verre fumé.
+   */
   function backglass(container, game, options) {
     return component(container, 'backglass', game, options, (ctx) => (g) => {
+      ctx.root.classList.toggle('cp-bg-brand', !g.title);
+      if (!g.title) {
+        // L'illustration de la DA (bille et batteurs sarcelle, fronton-marque.webp), fondue vers le
+        // noir sous la marque ; composition revue par le directeur artistique (27/10/2026).
+        ctx.root.replaceChildren(el('div', 'cp-bg-art'), stackedWordmark('cp-bg-mark'));
+        return;
+      }
       const body = el('div', 'cp-bg-body');
       // Titre court : pas plus haut que la moitié du petit côté, pour rester une carte et non un mot géant.
-      const title = ctx.fit(fitBox('cp-bg-title cp-game-title', g.title || BRAND), { breakable: true, max: () => 0.5 * Math.min(ctx.root.clientWidth, ctx.root.clientHeight) });
+      const title = ctx.fit(fitBox('cp-bg-title cp-game-title', g.title), { breakable: true, max: () => 0.5 * Math.min(ctx.root.clientWidth, ctx.root.clientHeight) });
       body.append(title);
       const meta = metaOf(g);
       // Le fabricant reste en retrait du titre : au plus un gros tiers de sa taille.
@@ -999,7 +1026,8 @@
   function wheel(container, game, options) {
     return component(container, 'wheel', game, options, (ctx) => (g) => {
       const style = WHEEL_STYLES.includes(ctx.options.style) ? ctx.options.style : WHEEL_STYLES[hash(`${g.title}|style`) % WHEEL_STYLES.length];
-      ctx.root.replaceChildren(ctx.fit(fitBox(`cp-wh-title cp-wh-${style}`, g.title || BRAND), { breakable: true }));
+      // Sans titre, la marque telle quelle (wordmarkBox), jamais écrite dans le style d'un jeu.
+      ctx.root.replaceChildren(g.title ? ctx.fit(fitBox(`cp-wh-title cp-wh-${style}`, g.title), { breakable: true }) : ctx.fit(wordmarkBox('cp-wh-title')));
     });
   }
 
@@ -1086,6 +1114,7 @@
     dmd,
     fullDmd,
     dotMatrix,
+    setDmdColor,
     topper,
     wheel,
     playfield,

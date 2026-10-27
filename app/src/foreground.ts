@@ -8,6 +8,8 @@
 // vraie borne à Pinscape (0.1.3-essai.1) : boutons du joystick relevés à l'étape « Boutons »,
 // touche du clavier jamais reçue. Chaque appui d'un bouton du joystick vérifie donc que le
 // clavier suit (keyboardFollows), et l'assistant reprend le premier plan en s'ouvrant.
+// Le même symptôme avait une autre cause, trouvée le 27 octobre 2026 : le relâchement des
+// touches, jeté par Chromium (key-input.ts).
 
 import type { BrowserWindow } from 'electron';
 import { bringToFront, foregroundWindow, windowOfHandle } from '@cyberpinball/win-displays';

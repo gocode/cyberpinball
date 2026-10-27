@@ -114,7 +114,6 @@ export const messages: Record<string, string> = {
   Adresse: 'Address',
   Usage: 'Use',
   Emplacement: 'Location',
-  'Reprendre pour ajouter une table': 'Reuse to add a table',
   'Plan d’ajout à valider ; le fichier reste ici': 'Add plan to confirm; the file stays here',
   'Retiré de Téléchargements de Windows, gardé dans la corbeille de Cyber Pinball': 'Removed from Windows Downloads, kept in the Cyber Pinball trash',
   'À la corbeille': 'To the trash',

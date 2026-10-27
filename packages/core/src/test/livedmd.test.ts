@@ -4,7 +4,7 @@
 import assert from 'node:assert/strict';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { DMD_FONT_HUGE, DMD_FONT_LARGE, DMD_FONT_SMALL, dmdText, scale2x, textWidth } from '../dmdfont';
+import { DMD_FONT_BRAND, DMD_FONT_HUGE, DMD_FONT_LARGE, DMD_FONT_SMALL, DMD_FONT_ROWS, dmdText, doubled, textWidth } from '../dmdfont';
 import type { TableRecords } from '../highscores';
 import {
   DMD_HEIGHT,
@@ -41,17 +41,50 @@ function litColumns(dots: DmdDots): number[] {
   return [...cols].sort((a, b) => a - b);
 }
 
-test('police : chaque signe a 7 lignes de même largeur, les agrandissements doublent', () => {
-  for (const [c, g] of DMD_FONT_SMALL.glyphs) {
-    assert.equal(g.h, 7, `hauteur de « ${c} »`);
-    assert.equal(g.px.length, g.w * g.h, `largeur de « ${c} »`);
+test('police à points : chaque signe a la hauteur de sa taille, des lignes de même largeur, rien que des points', () => {
+  for (const [name, f] of Object.entries(DMD_FONT_ROWS)) {
+    for (const [c, rows] of Object.entries(f.glyphs)) {
+      assert.equal(rows.length, f.height, `${name} : hauteur de « ${c} »`);
+      assert.ok(rows.every((r) => r.length === rows[0]!.length && /^[#.]+$/.test(r)), `${name} : lignes de « ${c} »`);
+    }
   }
+  assert.equal(DMD_FONT_SMALL.height, 7);
   assert.equal(DMD_FONT_LARGE.height, 14);
   assert.equal(DMD_FONT_HUGE.height, 28);
-  assert.equal(DMD_FONT_LARGE.glyphs.get('A')!.w, 10);
-  // Scale2x garde une diagonale en diagonale : pas d'escalier de 2 × 2.
-  const diag = scale2x({ w: 2, h: 2, px: Uint8Array.from([1, 0, 0, 1]) });
-  assert.deepEqual([...diag.px], [1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1]);
+  assert.equal(DMD_FONT_BRAND.height, 11);
+});
+
+test('police à points : le grand est dessiné, pas agrandi, et sait écrire tout ce que le petit écrit', () => {
+  // Les mêmes signes aux deux tailles : dmdText ne laisse passer que ceux du petit.
+  assert.deepEqual(Object.keys(DMD_FONT_ROWS.grand.glyphs).sort(), Object.keys(DMD_FONT_ROWS.petit.glyphs).sort());
+  // Lettres et chiffres de 9 points, traits de deux : un titre de 12 lettres tient dans 122 points.
+  for (const c of 'ABCDEFGHJKLMNOPQRSTUVWXYZ0123456789') assert.equal(DMD_FONT_LARGE.glyphs.get(c)!.w, 9, `largeur de « ${c} »`);
+  assert.ok(textWidth(DMD_FONT_LARGE, 'MMMMMMMMMMMM') <= DMD_WIDTH - 2 * DMD_MARGIN);
+  // Le grand n'est pas le petit doublé (l'ancien Scale2x), mais un dessin propre.
+  const small2 = doubled(DMD_FONT_SMALL.glyphs.get('B')!);
+  assert.notDeepEqual([...DMD_FONT_LARGE.glyphs.get('B')!.px], [...small2.px]);
+  // L'horloge : le grand doublé au plus proche voisin, chiffres de largeur égale (rien ne bouge d'une minute à l'autre).
+  const widths = new Set([...'0123456789'].map((c) => DMD_FONT_HUGE.glyphs.get(c)!.w));
+  assert.deepEqual([...widths], [18]);
+  assert.deepEqual([...doubled({ w: 2, h: 1, px: Uint8Array.from([1, 0]) }).px], [1, 1, 0, 0, 1, 1, 0, 0]);
+});
+
+test('police à points : la marque, empilée, tient dans l’afficheur ; le I sans empattements, comme Saira', () => {
+  assert.equal(DMD_FONT_BRAND.glyphs.get('I')!.w, 1);
+  assert.ok(textWidth(DMD_FONT_BRAND, 'PINBALL') <= DMD_WIDTH - 2 * DMD_MARGIN);
+  assert.deepEqual(Object.keys(DMD_FONT_ROWS.marque.glyphs).sort(), [...new Set('CYBERPINBALL')].sort());
+});
+
+test('marque : CYBER un ton dessous, PINBALL au plein éclat, dans la police de la marque', () => {
+  const brand = liveDmdPages(undefined)[0]!;
+  assert.equal(brand.id, 'brand');
+  const dots = brand.dots(0);
+  const levelsOfRows = (from: number, to: number) => new Set([...dots.subarray(from * DMD_WIDTH, to * DMD_WIDTH)].filter((v) => v > 0));
+  assert.deepEqual([...levelsOfRows(0, 16)], [DMD_LEVEL.brandCyber]);
+  assert.deepEqual([...levelsOfRows(16, DMD_HEIGHT)], [DMD_LEVEL.brandPinball]);
+  assert.ok(DMD_LEVEL.brandCyber < DMD_LEVEL.brandPinball && DMD_LEVEL.brandCyber >= DMD_LEVEL.secondary);
+  // 3 lignes libres en haut et en bas.
+  assert.equal(levelsOfRows(0, 3).size + levelsOfRows(DMD_HEIGHT - 3, DMD_HEIGHT).size, 0);
 });
 
 test('texte du DMD : capitales sans accent, signes inconnus en « ? »', () => {
