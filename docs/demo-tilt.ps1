@@ -12,6 +12,7 @@
 #      enregistre : [Player] SimulatedPlumb = 0 (tmp\captures\tilt\balancier) ;
 #      Avant, la force des secousses est remise à ×1 (borne réglée avant elle, comme la vraie en
 #      octobre 2026) : l'étape propose ×2 et l'écrit (Mapping.Nudge0.X et .Y à l'échelle 2) ;
+#      la table tremblait à l'écran (NudgeStrength = 1, valeur de VPX) : l'étape écrit 0 ;
 #   4. --tilt : « Balancier simulé par VPX » à la souris, contact à 0,50° aux flippers, une
 #      secousse franche sur X (TILT), une douce vers l'avant ; force des secousses de ×2 à ×2,50,
 #      une petite secousse (15 % de l'échelle, lue sous l'anneau) ; Enregistrer : SimulatedPlumb = 1,
@@ -71,7 +72,7 @@ function Get-Cle([string]$section, [string]$key) {
   }
 }
 function Show-Tilt {
-  foreach ($k in 'SimulatedPlumb', 'PlumbThresholdAngle', 'PlumbDamping') { "[Player] $k = $(Get-Cle 'Player' $k)" }
+  foreach ($k in 'SimulatedPlumb', 'PlumbThresholdAngle', 'PlumbDamping', 'NudgeStrength') { "[Player] $k = $(Get-Cle 'Player' $k)" }
   foreach ($k in 'Mapping.Tilt', 'Mapping.SlamTilt', 'NudgeSensorCount', 'Mapping.Nudge0.X', 'Mapping.Nudge0.Y') { "[Input] $k = $(Get-Cle 'Input' $k)" }
 }
 $layoutFailures = @()
@@ -108,11 +109,14 @@ try {
   $set | ConvertTo-Json -Depth 30 | Set-Content -Path "$borne\cabinet.json" -Encoding UTF8
   (Get-Content $iniFile -Raw -Encoding UTF8) -replace '(?m)^(Mapping\.Nudge0\.[XY] = .*;A;0\.000000;)2\.000000(;1\.000000)', '${1}1.000000$2' | Set-Content -Path $iniFile -Encoding UTF8 -NoNewline
   if ((Get-Cle 'Input' 'Mapping.Nudge0.X') -notmatch ';1\.000000;1\.000000$') { throw '3 : échelle 1 non remise' }
+  # Table qui tremble à l'écran sous les secousses, comme VPX le fait de lui-même.
+  (Get-Content $iniFile -Raw -Encoding UTF8) -replace '(?m)^NudgeStrength = .*$', 'NudgeStrength = 1' | Set-Content -Path $iniFile -Encoding UTF8 -NoNewline
   Invoke-Autopilot @('Pinscape9', 'Digit1') 'balancier' @('--assistant', '--tilt')
   (Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons).tilt | ConvertTo-Json -Compress
   Show-Tilt
   if ((Get-ModeleBorne "$borne\cabinet.json" -AvecBoutons).tilt.mode -ne 'bob') { throw '3 : balancier de la borne non enregistré' }
   if ((Get-Cle 'Player' 'SimulatedPlumb') -ne '0') { throw '3 : le balancier simulé de VPX devait être éteint' }
+  if ((Get-Cle 'Player' 'NudgeStrength') -ne '0') { throw '3 : la table devait rester immobile à l''écran (NudgeStrength = 0)' }
   if ((Get-Cle 'Input' 'Mapping.Nudge0.X') -notmatch ';512;A;0\.000000;2\.000000;1\.000000$') { throw '3 : force des secousses ×2 non écrite' }
 
   '== 4. Étape « Tilt » : balancier simulé, contact à 0,50°, secousses, enregistré'
@@ -126,6 +130,7 @@ try {
   Show-Tilt
   if ($tilt.mode -ne 'simulated' -or [math]::Abs($tilt.threshold - 0.5) -gt 0.001) { throw "4 : balancier simulé non enregistré : $($tilt | ConvertTo-Json -Compress)" }
   if ((Get-Cle 'Player' 'SimulatedPlumb') -ne '1' -or (Get-Cle 'Player' 'PlumbThresholdAngle') -ne '0.5') { throw '4 : [Player] inattendu' }
+  if ((Get-Cle 'Player' 'NudgeStrength') -ne '0') { throw '4 : la table devait rester immobile à l''écran (NudgeStrength = 0)' }
   if ((Get-Cle 'Input' 'Mapping.Nudge0.X') -notmatch ';512;A;0\.000000;2\.500000;1\.000000$' -or (Get-Cle 'Input' 'Mapping.Nudge0.Y') -notmatch ';513;A;0\.000000;2\.500000;1\.000000$') { throw '4 : force des secousses ×2,50 non écrite' }
 } finally {
   Pop-Location

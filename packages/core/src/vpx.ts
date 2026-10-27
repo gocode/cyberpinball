@@ -293,14 +293,40 @@ export interface VpxPlayedEdge {
  *   paysage, 0° pour une fenêtre portrait (`viewportWidth < viewportHeight ? 0 : 3`).
  *   ScreenWidth / ScreenHeight absents, VPX prend ses valeurs par défaut et cadre quand même.
  * - Vue borne en cadrage manuel : la vue borne réglée dans la table, avec sa rotation
- *   (souvent 270°, pour un Windows en paysage) : rien ne garantit le sens.
+ *   (souvent 270°, pour un Windows en paysage) : rien ne garantit le sens, sauf si le .ini
+ *   donne la vue et sa rotation (manualCabRotation : correction faite dans le menu de VPX).
  * - Vue bureau (BGSet 0 ou 2, PinTable::UpdateCurrentBGSet) : la vue bureau ou FSS de
  *   la table, dessinée flippers en bas.
  */
 export function vpxPlayedFlipperEdge(read: (section: string, key: string) => string | undefined, window: ObservedDisplay): VpxPlayedEdge {
   if (vpxEnum(read('Player', 'BGSet'), BGSET_LABELS, 0) !== 1) return { edge: 'bottom', view: 'desktop' };
-  if (!isVpxAutofit(read('Player', 'CabinetAutofitMode'))) return { view: 'manual' };
+  if (!isVpxAutofit(read('Player', 'CabinetAutofitMode'))) {
+    const rotation = manualCabRotation(read, window);
+    return rotation === undefined ? { view: 'manual' } : { edge: ROTATION_EDGES[rotation], view: 'manual' };
+  }
   return { edge: window.bounds.width < window.bounds.height ? 'bottom' : 'right', view: 'autofit' };
+}
+
+const VIEW_MODE_LABELS = ['Legacy', 'Camera', 'Window'];
+const VLM_WINDOW = 2;
+const ROTATION_EDGES: Record<Rotation, FlipperEdge> = { 0: 'bottom', 90: 'left', 180: 'top', 270: 'right' };
+
+/**
+ * Vue borne en cadrage manuel : rotation de la vue quand le .ini la donne en entier, par
+ * exemple après « Save as Table Override » dans le menu de VPX (ViewSetup::GetRotation) :
+ * en mode « Window », ViewCabRotation s'ajoute à 270° pour une fenêtre paysage, 0° pour
+ * une fenêtre portrait ; en « Legacy » ou « Camera », elle vaut seule. Sans ViewCabMode
+ * ni ViewCabRotation, ce sont les valeurs du .vpx : undefined. Hors quart de tour aussi.
+ */
+function manualCabRotation(read: (section: string, key: string) => string | undefined, window: ObservedDisplay): Rotation | undefined {
+  const rawMode = read('TableOverride', 'ViewCabMode')?.trim();
+  const rawRotation = read('TableOverride', 'ViewCabRotation')?.trim();
+  if (!rawMode || !rawRotation) return undefined;
+  const mode = vpxEnum(rawMode, VIEW_MODE_LABELS, -1);
+  const value = Number(rawRotation);
+  if (mode < 0 || !Number.isFinite(value) || Math.abs(value % 90) > 1e-3) return undefined;
+  const base = mode === VLM_WINDOW && window.bounds.width >= window.bounds.height ? 270 : 0;
+  return ((((base + Math.round(value)) % 360) + 360) % 360) as Rotation;
 }
 
 /**

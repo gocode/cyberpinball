@@ -359,6 +359,14 @@ export const messages: Record<string, string> = {
   'orientation d\'origine ({before}°) rétablie': 'original orientation ({before}°) restored',
   'orientation d\'origine non rétablie ({reason})': 'original orientation not restored ({reason})',
   'Windows n\'a pas tourné l\'écran {name} ({reason}) ; {state}.': 'Windows didn’t rotate screen {name} ({reason}); {state}.',
+  // packages/core/src/sessionorientation.ts : orientation des écrans pendant la session
+  'écran du playfield ({name})': 'playfield screen ({name})',
+  'Écran introuvable : son orientation n’a pas été rendue à Windows.': 'Screen not found: its orientation was not given back to Windows.',
+  'Windows n’a pas repris l’orientation {origin}° pour {label} : {reason}': 'Windows did not take back the {origin}° orientation for {label}: {reason}',
+  '{label} est débranché : il reprendra son orientation d’origine ({origin}°) au prochain démarrage de Cyber Pinball.': '{label} is unplugged: it will get its original orientation ({origin}°) back the next time Cyber Pinball starts.',
+  '{label} n’a pas repris son orientation d’origine ({origin}°) : {reason} Paramètres > Affichage > Orientation de l’écran la rétablit.': '{label} did not get its original orientation ({origin}°) back: {reason} Settings > Display > Display orientation restores it.',
+  'Windows n’a pas tourné {label} à {rotation}° : {reason}': 'Windows did not rotate {label} to {rotation}°: {reason}',
+  'À la dernière fermeture de Cyber Pinball : {problem}': 'When Cyber Pinball last closed: {problem}',
   // packages/win-displays/src/usb.ts
   'La liste des périphériques USB change sans cesse : réessayez.': 'The USB device list keeps changing: try again.',
   'La détection des périphériques USB ne fonctionne que sous Windows pour le moment.': 'USB device detection only works on Windows for now.',

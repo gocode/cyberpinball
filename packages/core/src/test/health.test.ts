@@ -138,11 +138,12 @@ test('écrans : la configuration retenue contre les écrans branchés', () => {
   set = addConfiguration(set, cabinetFor(borne), 'Borne du salon').set;
   // La borne retenue, tous ses écrans branchés.
   const ok = screensFacts(set, borne);
-  assert.deepEqual(states(screensLines(ok)), ['ok']);
+  // Puis le sens des tables en partie (gameorientation.test.ts).
+  assert.deepEqual(states(screensLines(ok)), ['ok', 'ok']);
   assert.match(screensLines(ok)[0]!.title, /« Borne du salon » reconnue/);
   // Un écran éteint (pas le playfield) : retrouvée en partie.
   const partial = screensFacts(set, borne.slice(1));
-  assert.deepEqual(states(screensLines(partial)), ['check']);
+  assert.deepEqual(states(screensLines(partial)), ['check', 'ok']);
   assert.match(screensLines(partial)[0]!.detail!, /introuvable/);
   // Le playfield débranché : bloquant.
   assert.deepEqual(states(screensLines(screensFacts(set, borne.slice(0, -1)))), ['blocking']);

@@ -20,6 +20,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Cinematic launch: on Start, the game logo flies from the playfield to the backglass, the DMD shows loading, a coil thumps when VPX takes over; VPX never waits, and "Media, sound and attract mode" turns it off.
 - Menu lists: a list too long for the screen is marked by a rule at the top or bottom instead of a fade, the selected entry stays whole and every list starts just below its title.
 - Cabinet schedule ("Media, sound and attract mode", off by default): like in an arcade, the cabinet dims its screens and goes quiet at night, then sleeps or shuts down at the chosen time if nobody is playing, after a 30-second warning that any button cancels.
+- Windows desktop given back the right way up: Cyber Pinball no longer rotates the playfield screen in the Windows setting, only while it is open; every exit, even after a crash, gives the desktop its previous orientation back. A cabinet already left rotated offers it on first start.
+- Table orientation kept from one start to the next: after a restart or a reconnection, tables no longer show upside down in game. "Cabinet health" says whether they face you, and repairs those that were turned in the VPX menu.
 
 ## 0.1.3
 

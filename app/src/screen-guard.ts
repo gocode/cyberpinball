@@ -26,6 +26,7 @@ import { createWindow, desktopDisplays, isShown, OFFSCREEN, paintedOnScreen } fr
 import { coverDisplay, coverProblem } from './cover-display';
 import { locations } from './paths';
 import { relaunchThroughShellLauncher } from './dedicated-session';
+import { handOverOrientation } from './display-orientation';
 
 export const VEIL_TITLE = 'Cyber Pinball — Fond';
 const VEIL_PAGE = 'data:text/html;charset=utf-8,<!doctype html><html style="background:%23000;cursor:none"></html>';
@@ -329,6 +330,8 @@ export function relaunchCovered(args: string[]): void {
   // (hors surveillance) ; il se ferme et Shell Launcher le relance avec ces arguments.
   if (relaunchThroughShellLauncher(args)) return;
   relaunching = true;
+  // Le nouveau processus reprend l'orientation des écrans telle quelle.
+  handOverOrientation();
   // Le nouveau processus doit pouvoir prendre le premier plan.
   allowAnyForeground();
   // Ses fenêtres sont transparentes jusqu'à leur première image (createWindow) : visibles pour

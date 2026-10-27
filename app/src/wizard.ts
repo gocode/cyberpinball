@@ -132,8 +132,8 @@ import {
   type SyncFinding,
   type VpxChange,
 } from '@cyberpinball/core';
-import { setDisplayOrientation } from '@cyberpinball/win-displays';
-import { observedDisplays, simulatedDisplays } from './displays';
+import { orientation } from './display-orientation';
+import { observedDisplays, orientationSimulated } from './displays';
 import { createWindow, isShown, OFFSCREEN, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
 import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualPinscapeButton } from './joystick-input';
@@ -187,10 +187,6 @@ let created: string | undefined;
 
 /** Délai pour garder la nouvelle orientation, comme dans Windows ; sans réponse, retour à l'ancienne. */
 const FLIP_TIMEOUT_MS = 15_000;
-
-// Sans opérateur, hors écran ou sur des écrans simulés, l'orientation est simulée : on ne
-// tourne jamais un vrai écran.
-const SIMULATED_ORIENTATION = Boolean(process.env.CYBERPINBALL_AUTOPILOT) || OFFSCREEN || simulatedDisplays();
 
 interface Wizard {
   phase: Phase;
@@ -1605,15 +1601,14 @@ async function changeOrientation(index: number, rotation: Rotation, working: str
   const focused = BrowserWindow.getFocusedWindow();
   await delay(150); // le temps d'afficher le message avant que l'écran ne clignote
   try {
+    // Pour la session seulement (display-orientation.ts) : l'origine est notée avant, et rendue à
+    // Windows à la sortie. Sans opérateur, hors écran ou sur des écrans simulés, simulée.
     const display = displays[index]!;
-    if (SIMULATED_ORIENTATION) {
-      displays[index] = rotatedDisplay(display, rotationDelta(rotation, display.rotation));
-    } else {
-      const changed = displayChange(2000);
-      setDisplayOrientation(display.gdiName, rotation);
-      await changed;
-      redetect();
-    }
+    const changed = orientationSimulated() ? Promise.resolve() : displayChange(2000);
+    const report = orientation.want(fingerprintOf(display).key, rotation);
+    if (report.problems.length) throw new Error(report.problems.join(' '));
+    await changed;
+    redetect();
     wizard.notice = undefined;
     return true;
   } catch (err) {
@@ -2225,12 +2220,18 @@ function buildCabinet(): Cabinet {
   };
 }
 
-/** Bord des flippers et taille : la taille saisie n'est gardée que si elle diffère de celle de l'EDID. */
+/**
+ * Bord des flippers et taille : la taille saisie n'est gardée que si elle diffère de celle de l'EDID.
+ * Écran tourné pour VPX : l'orientation de jeu, que le menu redonnera à chaque démarrage, Windows
+ * gardant la sienne.
+ */
 function playfieldLayout(): NonNullable<Cabinet['playfield']> {
   const playfield = playfieldDisplay();
   const fromEdid = edidDiagonal(playfield);
   const manualSizeCm = playfield && wizard.diagonal !== fromEdid ? sizeFromDiagonal(wizard.diagonal, playfield) : undefined;
-  return { flipperEdge: wizard.flipperEdge, ...(manualSizeCm && { manualSizeCm }) };
+  const origin = playfield && orientation.origin(fingerprintOf(playfield).key);
+  const windowsRotation = playfield && origin !== undefined && playfield.rotation !== origin ? playfield.rotation : undefined;
+  return { flipperEdge: wizard.flipperEdge, ...(manualSizeCm && { manualSizeCm }), ...(windowsRotation !== undefined && { windowsRotation }) };
 }
 
 /**
@@ -2316,13 +2317,8 @@ function restoreOrientation(): void {
   const flip = wizard.flip;
   const index = wizard.assignments.playfield;
   wizard.flip = undefined;
-  if (flip && index !== undefined && !SIMULATED_ORIENTATION) {
-    try {
-      setDisplayOrientation(displays[index]!.gdiName, flip.from);
-    } catch {
-      // On quitte quand même : l'assistant pourra être relancé.
-    }
-  }
+  // En cas d'échec, la sortie (display-orientation.ts) rend de toute façon l'orientation d'origine.
+  if (flip && index !== undefined) orientation.want(fingerprintOf(displays[index]!).key, flip.from);
 }
 
 /** Ce que doit afficher l'écran n° index, selon l'étape de l'assistant. */

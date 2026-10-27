@@ -32,6 +32,15 @@ export const messages: Record<string, string> = {
   'Copier les logos, vidéos et frontons de PinUP Popper ou PinballX dans les dossiers des tables': 'Copy logos, videos and backglasses from PinUP Popper or PinballX into the table folders',
   'Regrouper les ROM': 'Gather ROMs',
   'Réunir les ROM dans la bibliothèque : une copie partagée par les tables': 'Gather ROMs in the library: one copy shared by the tables',
+  // app/src/frontend.ts : bureau laissé tourné par une version d'avant le 27/10/2026
+  'Bureau Windows tourné par Cyber Pinball': 'Windows desktop rotated by Cyber Pinball',
+  'Une version précédente de l’assistant a tourné l’écran du playfield dans Windows ({playing}°) et l’y a laissé : hors de Cyber Pinball, le bureau et le menu Démarrer de cet écran sont tournés aussi.':
+    'An earlier version of the wizard rotated the playfield screen in Windows ({playing}°) and left it that way: outside Cyber Pinball, the desktop and Start menu on that screen are rotated too.',
+  'Désormais, Cyber Pinball ne le tourne que pendant qu’il est ouvert, et rend son orientation à Windows en sortant. Les tables restent dans le même sens.':
+    'From now on, Cyber Pinball only rotates it while it is open, and gives Windows its orientation back on exit. Tables keep the same direction.',
+  'Start : rendre à Windows l’orientation {origin}° (l’écran clignote deux fois) · Exit : garder {playing}° pour le bureau':
+    'Start: give Windows its {origin}° orientation back (the screen flickers twice) · Exit: keep {playing}° for the desktop',
+  'Orientation rendue à Windows : le bureau sera droit après Cyber Pinball.': 'Orientation given back to Windows: the desktop will be upright after Cyber Pinball.',
   // app/src/frontend.ts : « Écran du DMD »
   'Écran du DMD': 'DMD screen',
   'FullDMD 16:9 ou DMD seul : ce que montre l’écran du DMD': '16:9 FullDMD or DMD only: what the DMD screen shows',

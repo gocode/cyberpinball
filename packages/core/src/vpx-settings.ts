@@ -7,7 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { IniDocument } from './ini';
 import { VPX_AUDIO_OWNED_KEYS } from './audio';
-import { VPX_TILT_OWNED_KEYS } from './tilt';
+import { VPX_STILL_TABLE, VPX_TILT_OWNED_KEYS } from './tilt';
 import type { RoleId } from './model';
 import { disabledPlugins, rendererPriorities, VPX_LAYOUT_KEYS, VPX_PLAY_SETTINGS, VPX_WINDOWS, type VpxProfile } from './vpx';
 import type { VpxSettingDef } from './vpx-settings-parser';
@@ -51,7 +51,8 @@ export interface OwnedKeysOptions {
  * Clés que Cyber Pinball écrit lui-même (vpx.ts, audio.ts, dmd.ts) : position et taille des
  * fenêtres de VPX, plugins activés ou éteints, priorités des plugins sur les fenêtres
  * affectées, vue et taille réelle du playfield, réglages qui évitent les boîtes de
- * dialogue en partie (VPX_PLAY_SETTINGS), DMD réel détecté, touches des boutons
+ * dialogue en partie (VPX_PLAY_SETTINGS), table immobile sous les secousses
+ * (VPX_STILL_TABLE), DMD réel détecté, touches des boutons
  * de la borne ([Input], une fois l'étape « Boutons » faite) et, une fois l'étape
  * « Son » faite (`audio`), sorties audio et mixage du plateau. L'écran de réglages les
  * affiche sans permettre de les modifier : c'est l'assistant qui en décide.
@@ -65,7 +66,7 @@ export function vpxOwnedKeys(profile: VpxProfile, manual: string[] = [], audio =
   }
   for (const plugin of [...profile.enabledPlugins, ...disabledPlugins(profile)]) keys.push([`Plugin.${plugin}`, 'Enable']);
   for (const key of VPX_LAYOUT_KEYS) keys.push(['Player', key]);
-  for (const s of VPX_PLAY_SETTINGS) keys.push([s.section, s.key]);
+  for (const s of [...VPX_PLAY_SETTINGS, ...VPX_STILL_TABLE]) keys.push([s.section, s.key]);
   if (audio) for (const key of VPX_AUDIO_OWNED_KEYS) keys.push(['Player', key]);
   for (const key of options.dmdKeys ?? []) keys.push(['Plugin.DMDUtil', key]);
   for (const key of options.inputKeys ?? []) keys.push(['Input', key]);

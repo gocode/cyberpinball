@@ -215,7 +215,7 @@ test('bascule aller-retour entre deux postes : aucun réglage fait à la main n�
   assert.equal(onDesk.selection.configuration?.id, 'second-poste');
   assert.equal(onDesk.iniPath, configIniPath(baseIni, desk));
   assert.equal(IniDocument.parse(fs.readFileSync(onDesk.iniPath, 'utf8')).get('Player', 'PlayfieldDisplay'), 'BenQ GW2480 [3840, 0]');
-  handEdit(onDesk.iniPath, 'Player', 'NudgeStrength', '0.03');
+  handEdit(onDesk.iniPath, 'Player', 'KeyboardNudgeStrength', '0.5');
   // Le fichier du PC de développement n'a pas été touché.
   assert.equal(fs.readFileSync(baseIni, 'utf8'), devIni);
 
@@ -233,7 +233,7 @@ test('bascule aller-retour entre deux postes : aucun réglage fait à la main n�
 
   // Et de nouveau le second poste : son propre réglage est toujours là, sans fausse modification à la main.
   const again = sync(secondDeskDisplays());
-  assert.equal(IniDocument.parse(fs.readFileSync(again.iniPath, 'utf8')).get('Player', 'NudgeStrength'), '0.03');
+  assert.equal(IniDocument.parse(fs.readFileSync(again.iniPath, 'utf8')).get('Player', 'KeyboardNudgeStrength'), '0.5');
   assert.deepEqual(again.plan.manualEdits, []);
   assert.equal(again.report, undefined);
   // Chaque fichier a sa mémoire des clés écrites.

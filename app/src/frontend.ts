@@ -125,6 +125,7 @@ import {
   type DmdAnimationOptions,
   type FrameRecord,
   type TableRecords,
+  type LegacyOrientation,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -143,6 +144,7 @@ import { activeVpxIni, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
 import { coverDisplay, hideCovered, minimizeCovered } from './cover-display';
 import { DesktopMode } from './desktop-mode';
+import { answerLegacy, legacyDesktopTurned, orientationForDesktop, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
 import { acceptFrontends, unacceptedFrontends } from './frontend-gate';
 import { hideTaskbars, isVeil, nameScreen, relaunchCovered, restoreTaskbars, setDesktopMode, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
@@ -225,7 +227,7 @@ interface Message {
   title: string;
   lines: string[];
   /** Ce que fait Start sur ce message. */
-  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'journey' | 'power';
+  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'journey' | 'power' | 'orientation';
   /** Table d'une partie échouée : Start ouvre « Ce qu'il manque pour jouer » (action 'journey'). */
   table?: string;
 }
@@ -244,6 +246,7 @@ const MESSAGE_DOORS: Record<NonNullable<Message['action']>, GuestDoor> = {
   otherFrontend: 'message.other-frontend',
   journey: 'message.journey',
   power: 'message.power',
+  orientation: 'message.orientation',
 };
 
 interface State {
@@ -744,6 +747,8 @@ const desktop = new DesktopMode<BrowserWindow>({
 });
 /** Au bureau : range ce qui reviendrait sur un écran, et suit le retour d'une fenêtre rouverte. */
 let desktopWatch: NodeJS.Timeout | undefined;
+/** Proposition de rendre à Windows l'orientation du bureau, en attente de réponse. */
+let legacyOrientation: LegacyOrientation | undefined;
 const DESKTOP_WATCH_MS = 500;
 
 /**
@@ -760,6 +765,8 @@ function showDesktop(): boolean {
   if (shellSession() && !dedicatedSystem.explorerShown()) dedicatedSystem.openExplorer();
   setDesktopMode(true);
   const away = desktop.enter();
+  // Le bureau dans l'orientation de Windows, le temps d'y travailler.
+  orientationForDesktop();
   console.log(`Mode bureau : ${away.length} fenêtres de Cyber Pinball rangées (${away.filter(isVeil).length} voiles), tous les écrans libres.`);
   if (!OFFSCREEN && !globalShortcut.register(accelerator(SHORTCUTS.desktop), () => restoreFromDesktop())) {
     console.warn(`Mode bureau : ${shortcutLabel(SHORTCUTS.desktop)} est déjà pris par un autre programme ; la barre des tâches ramène le menu.`);
@@ -777,9 +784,12 @@ function restoreFromDesktop(): void {
   if (!desktop.active) return;
   clearInterval(desktopWatch);
   if (!OFFSCREEN) globalShortcut.unregister(accelerator(SHORTCUTS.desktop));
+  // L'orientation de jeu revient ; un quart de tour change la taille des écrans, le menu rouvre ses fenêtres.
+  const moved = orientationFromDesktop();
   desktop.leave();
   setDesktopMode(false);
   console.log('Mode bureau : retour au menu.');
+  if (moved) return relaunchMenu();
   // Rappelé par le raccourci global, depuis une autre application : Windows ne laisse pas toujours le focus.
   void takeForeground();
   broadcast();
@@ -866,6 +876,10 @@ export function startFrontend(): void {
   hours.start();
   for (const f of selection?.findings ?? []) console.log(`Configuration de la borne : ${f.message}`);
   // Bande DMD seule sur un écran large, jamais tranchée : l'utilisateur dit une fois ce qu'est l'écran.
+  // Orientation des écrans : ce que le démarrage (ou la dernière fermeture) n'a pas pu rendre.
+  const orientationProblems = takeOrientationProblems();
+  if (orientationProblems.length) showBanner(orientationProblems.join(' '));
+  const legacy = choose ? undefined : legacyDesktopTurned();
   if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(t('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Borne > Configuration de la borne > Écran du DMD.'));
   if (selection?.previous && selection.configuration) showBanner(t('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }));
   // Après une mise à jour : la nouvelle version est-elle là ?
@@ -899,7 +913,23 @@ export function startFrontend(): void {
       },
     };
   }
-  else if (!install) {
+  else if (legacy) {
+    // Borne configurée avant le 27/10/2026 : Windows garde l'orientation de jeu, bureau compris.
+    legacyOrientation = legacy;
+    state = {
+      ...state,
+      phase: 'message',
+      message: {
+        title: t('Bureau Windows tourné par Cyber Pinball'),
+        lines: [
+          t('Une version précédente de l’assistant a tourné l’écran du playfield dans Windows ({playing}°) et l’y a laissé : hors de Cyber Pinball, le bureau et le menu Démarrer de cet écran sont tournés aussi.', { playing: legacy.playing }),
+          t('Désormais, Cyber Pinball ne le tourne que pendant qu’il est ouvert, et rend son orientation à Windows en sortant. Les tables restent dans le même sens.'),
+          t('Start : rendre à Windows l’orientation {origin}° (l’écran clignote deux fois) · Exit : garder {playing}° pour le bureau', { origin: legacy.origin, playing: legacy.playing }),
+        ],
+        action: 'orientation',
+      },
+    };
+  } else if (!install) {
     state = {
       ...state,
       phase: 'message',
@@ -964,6 +994,8 @@ function syncScreens(overwriteManual = false): {
   const { selection, sync } = syncConfiguration(observedDisplays(), profile, overwriteManual);
   if (!sync) return { assignments: {}, choose: true, selection };
   const { plan } = sync;
+  // Journal : sens de la partie, écrans à revoir (le menu n'en montre que les points bloquants).
+  for (const f of plan.findings.filter((f) => f.severity === 'warning')) console.log(`Synchronisation : ${f.message}`);
   const blocking = plan.findings.filter((f) => f.severity === 'blocking');
   if (blocking.length) {
     return {
@@ -1199,6 +1231,14 @@ function handleKey(input: Input): boolean {
           void run.play();
           return true;
         }
+        break;
+      }
+      if (state.message?.action === 'orientation' && legacyOrientation) {
+        const report = answerLegacy(legacyOrientation, is(KEYS.confirm));
+        legacyOrientation = undefined;
+        state = { ...state, phase: tables.length ? 'menu' : 'message', message: tables.length ? undefined : noTables() };
+        if (report.problems.length) showBanner(report.problems.join(' '));
+        else if (is(KEYS.confirm)) showBanner(t('Orientation rendue à Windows : le bureau sera droit après Cyber Pinball.'));
         break;
       }
       if (state.message?.action === 'addTable') {

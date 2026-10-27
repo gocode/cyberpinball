@@ -69,9 +69,19 @@ export function vpxTiltSettings(tilt: CabinetTilt): VpxSetting[] {
   return settings;
 }
 
-/** Clé de l'étape « Tilt » : « Player.SimulatedPlumb », « Player.PlumbThresholdAngle ». */
+/**
+ * Table immobile à l'écran : [Player] NudgeStrength (« Visual Nudge Strength », 0 à 2, 1 par
+ * défaut) décale seulement l'image du plateau d'autant que la caisse simulée bouge
+ * (Renderer.cpp : décalage de l'écran ou translation de la table, m_visualNudgeStrength ×
+ * GetCabinetOffset). La bille, le balancier simulé et le script n'en dépendent pas. Sur une
+ * borne, c'est la vraie caisse qui bouge : à 0, seule la bille réagit aux secousses (essai sur
+ * la vraie borne, octobre 2026). Écrit à chaque synchronisation, tilt réglé ou non.
+ */
+export const VPX_STILL_TABLE: readonly VpxSetting[] = [{ section: PLAYER, key: 'NudgeStrength', value: '0' }];
+
+/** Clé de l'étape « Tilt » : « Player.SimulatedPlumb », « Player.PlumbThresholdAngle », « Player.NudgeStrength ». */
 export function isTiltKey(id: string): boolean {
-  return /^player\.(simulatedplumb|plumbthresholdangle)$/i.test(id);
+  return /^player\.(simulatedplumb|plumbthresholdangle|nudgestrength)$/i.test(id);
 }
 
 /** Clés [Player] que l'étape « Tilt » peut écrire. */

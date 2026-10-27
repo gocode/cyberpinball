@@ -140,8 +140,8 @@ export interface WindowsChange {
  * dans ses fichiers, ou un nouvel appel qui modifie Windows, le fait échouer.
  */
 export const WINDOWS_CHANGES: WindowsChange[] = [
-  // Orientation de l’écran du playfield, gardée au redémarrage : seulement dans l’assistant, sur Start, confirmée en 15 s, et après un avertissement si un autre menu est installé.
-  { call: 'setDisplayOrientation', files: ['app/src/wizard.ts'] },
+  // Orientation de l’écran du playfield pour la session seulement (rien dans le réglage de Windows) : décidée dans l’assistant, sur Start, confirmée en 15 s, après un avertissement si un autre menu est installé ; redonnée au démarrage, rendue à chaque sortie et au mode bureau (sessionorientation.ts). Le réglage de Windows n’est écrit que pour lui rendre l’orientation qu’une version d’avant le 27/10/2026 y avait laissée, sur Start.
+  { call: 'setDisplayOrientation', files: ['app/src/display-orientation.ts'] },
   // Appel Windows de setDisplayOrientation.
   { call: 'ChangeDisplaySettingsExW', files: ['packages/win-displays/src/orientation.ts'] },
   // Barres des tâches masquées pendant une partie, puis seulement celles-là réaffichées ; fenêtres de l’éditeur de VPX masquées.

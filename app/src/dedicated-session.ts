@@ -14,6 +14,7 @@
 import { spawn } from 'node:child_process';
 import { app } from 'electron';
 import { DEDICATED_SESSION_ENV, HANDOVER_EXIT_CODE, takeDedicatedFlag, takeShellRelaunch, writeShellRelaunch } from '@cyberpinball/core';
+import { handOverOrientation } from './display-orientation';
 import { OFFSCREEN } from './offscreen';
 import { locations } from './paths';
 
@@ -61,6 +62,8 @@ export function relaunchThroughShellLauncher(args: string[]): boolean {
   if (!monitored) return false;
   const own = shellBase.length && shellBase.every((a, i) => args[i] === a) ? args.slice(shellBase.length) : args;
   writeShellRelaunch(locations().dataDir, own);
+  // Le processus relancé reprend l'orientation des écrans telle quelle.
+  handOverOrientation();
   console.log(`Borne dédiée : relance par Shell Launcher (${own.join(' ') || 'sans argument'}).`);
   app.exit(0);
   return true;

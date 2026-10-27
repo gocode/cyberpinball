@@ -1,6 +1,8 @@
 // Orientation d'un écran sous Windows (paysage, portrait, retournés), comme dans
-// Paramètres > Affichage, par ChangeDisplaySettingsExW. Windows garde le réglage
-// au redémarrage (CDS_UPDATEREGISTRY).
+// Paramètres > Affichage, par ChangeDisplaySettingsExW. Par défaut, pour la session seulement :
+// le réglage de Windows (celui du bureau, repris au redémarrage) ne change pas. CDS_UPDATEREGISTRY
+// (`persist`) ne sert qu'à rendre à Windows une orientation qu'une version précédente avait
+// enregistrée (app/src/display-orientation.ts).
 //
 // DEVMODEW est lu et écrit octet par octet, comme les structures de index.ts.
 
@@ -8,6 +10,8 @@ import * as koffi from 'koffi';
 import { t, type Rotation } from '@cyberpinball/core';
 
 const ENUM_CURRENT_SETTINGS = 0xffffffff;
+/** Changement dynamique : pour la session, sans toucher au réglage de Windows. */
+const CDS_DYNAMIC = 0;
 const CDS_UPDATEREGISTRY = 0x1;
 const CDS_TEST = 0x2;
 const DM_DISPLAYORIENTATION = 0x00000080;
@@ -116,14 +120,21 @@ export function displayOrientation(gdiName: string): Rotation {
   return orientationOf(currentMode(loadApi(), gdiName));
 }
 
+export interface OrientationOptions {
+  /** Aussi dans le réglage de Windows (CDS_UPDATEREGISTRY), repris au redémarrage. Faux par défaut. */
+  persist?: boolean;
+}
+
 /**
  * Change l'orientation d'un écran et renvoie celle qu'il avait. Windows essaie
  * d'abord le mode à blanc (CDS_TEST) ; après l'application, l'orientation est
  * relue, et si elle n'est pas celle demandée, l'écran revient à son orientation
- * d'origine et une erreur explique pourquoi.
+ * d'origine et une erreur explique pourquoi. Sans `persist`, rien n'est écrit :
+ * un redémarrage du PC rend l'orientation de Windows.
  */
-export function setDisplayOrientation(gdiName: string, rotation: Rotation): Rotation {
+export function setDisplayOrientation(gdiName: string, rotation: Rotation, options: OrientationOptions = {}): Rotation {
   if (process.platform !== 'win32') throw new Error(t("L'orientation des écrans ne se règle que sous Windows."));
+  const flags = options.persist ? CDS_UPDATEREGISTRY : CDS_DYNAMIC;
   const w = loadApi();
   const original = currentMode(w, gdiName);
   const before = orientationOf(original);
@@ -133,12 +144,12 @@ export function setDisplayOrientation(gdiName: string, rotation: Rotation): Rota
   const tested = change(w, gdiName, wanted, CDS_TEST);
   if (tested !== 0) throw new Error(t("Windows refuse de tourner l'écran {name} ({reason}).", { name: gdiName, reason: describe(tested) }));
 
-  const applied = change(w, gdiName, wanted, CDS_UPDATEREGISTRY);
+  const applied = change(w, gdiName, wanted, flags);
   const after = orientationOf(currentMode(w, gdiName));
   if (applied === 0 && after === rotation) return before;
 
   // Windows a refusé ou fait autre chose : on remet l'écran comme il était.
-  const restored = after === before ? 0 : change(w, gdiName, modeFor(currentMode(w, gdiName), before), CDS_UPDATEREGISTRY);
+  const restored = after === before ? 0 : change(w, gdiName, modeFor(currentMode(w, gdiName), before), flags);
   const reason = applied !== 0 ? describe(applied) : t('orientation relue : {after}° au lieu de {wanted}°', { after, wanted: rotation });
   const state = restored === 0 ? t("orientation d'origine ({before}°) rétablie", { before }) : t("orientation d'origine non rétablie ({reason})", { reason: describe(restored) });
   throw new Error(t("Windows n'a pas tourné l'écran {name} ({reason}) ; {state}.", { name: gdiName, reason, state }));

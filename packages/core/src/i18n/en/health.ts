@@ -84,4 +84,11 @@ export const messages: Record<string, string> = {
   '{n} point à vérifier': '{n} item to check',
   '{n} points à vérifier': '{n} items to check',
   'Tout est en ordre': 'All in order',
+  // packages/core/src/gameorientation.ts : sens des tables en partie
+  'Windows en {rotation}°': 'Windows at {rotation}°',
+  'orientation de jeu : {playing}°, que Windows n’a pas reprise': 'game orientation: {playing}°, which Windows did not take back',
+  'relancez « Orientation et taille du playfield »': 'run “Playfield orientation and size” again',
+  'Tables à l’envers : VPX les dessinera flippers {played}, vous êtes {player}': 'Tables upside down: VPX will draw them with the flippers {played}, you stand {player}',
+  '{windows} ; {why}': '{windows}; {why}',
+  'Tables dans votre sens, flippers {player}': 'Tables the right way for you, flippers {player}',
 };

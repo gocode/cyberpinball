@@ -20,6 +20,7 @@ import {
   tiltFromIni,
   tiltLines,
   tiltModes,
+  VPX_STILL_TABLE,
   vpxTiltSettings,
 } from '../tilt';
 import { analogFromIni, clampNudgeGain, nudgeFloor, vpxAnalogSettings } from '../plunger';
@@ -55,6 +56,24 @@ test('clés [Player] de chaque cas : balancier de la borne, balancier simulé, p
   for (const id of ['Player.SimulatedPlumb', 'Player.PlumbThresholdAngle']) assert.ok(isTiltKey(id), id);
   assert.ok(!isTiltKey('Player.PlumbDamping'));
   assert.ok(wizardStepInfo('tilt').owns('Player.SimulatedPlumb'));
+});
+
+test('table immobile à l’écran : NudgeStrength à 0 à chaque synchronisation, tilt réglé ou non', () => {
+  assert.deepEqual(VPX_STILL_TABLE.map((s) => `${s.section}.${s.key}=${s.value}`), ['Player.NudgeStrength=0']);
+  // Borne neuve (étape « Tilt » jamais faite) et borne réglée : VPX à 1 par défaut, 0 écrit, en mémoire.
+  for (const cabinet of [cabinetWith(), cabinetWith({ analog: NUDGE, tilt: { mode: 'simulated', threshold: 1 } })]) {
+    const plan = planVpxSync(cabinet, devPcDisplays(), '[Player]\r\nNudgeStrength = 1\r\n');
+    assert.equal(player(plan.nextIni!, 'NudgeStrength'), '0');
+    assert.equal(plan.memory['Player.NudgeStrength'], '0');
+  }
+  // Clé gérée, montrée sans modification possible, même sans étape « Tilt ».
+  assert.ok(isOwned(vpxOwnedKeys({ displayIdFormat: 'name', enabledPlugins: [] }), 'Player', 'NudgeStrength'));
+  assert.ok(wizardStepInfo('tilt').owns('Player.NudgeStrength'));
+  // Remise à la main dans VPX après coup : signalée, pas écrasée.
+  const handSet = '[Player]\r\nNudgeStrength = 0.5\r\n';
+  const again = planVpxSync(cabinetWith(), devPcDisplays(), handSet, undefined, { memory: { 'Player.NudgeStrength': '0' } });
+  assert.equal(player(again.nextIni ?? handSet, 'NudgeStrength'), '0.5');
+  assert.deepEqual(again.manualEdits.map((e) => `${e.section}.${e.key}`), ['Player.NudgeStrength']);
 });
 
 test('ce que VPX fait aujourd’hui : valeurs de VPinballX.ini, sinon celles de VPX (balancier simulé allumé, 1°)', () => {

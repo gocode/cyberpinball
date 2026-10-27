@@ -144,6 +144,13 @@ export interface PlayfieldLayout {
    * est absent ou incohérent (téléviseurs, projecteurs). Prime sur l'EDID.
    */
   manualSizeCm?: { width: number; height: number };
+  /**
+   * Orientation de Windows dans laquelle le playfield a été configuré, quand l'assistant a dû
+   * tourner l'écran pour VPX (vpxOrientationFix). Cyber Pinball la donne à l'écran pour la
+   * session seulement et rend la sienne à Windows en sortant (sessionorientation.ts). Absent :
+   * l'écran garde l'orientation de Windows.
+   */
+  windowsRotation?: Rotation;
 }
 
 export interface Cabinet {

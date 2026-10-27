@@ -6,6 +6,9 @@
 import './sandbox-guard';
 // Puis, avant le démarrage d'Electron : le mode hors écran des essais sans opérateur.
 import { OFFSCREEN, relaunchOnHiddenDesktop } from './offscreen';
+// Puis l'orientation des écrans pendant la session : sa sortie (will-quit) passe avant celle de la
+// borne dédiée, qui sort avec son propre code.
+import { startOrientation } from './display-orientation';
 // Puis la borne dédiée (Cyber Pinball lancé par Shell Launcher) : son option retirée des
 // arguments, ceux d'une relance repris, avant les modules qui les lisent.
 import './dedicated-session';
@@ -37,6 +40,9 @@ if (!relaunchOnHiddenDesktop()) {
     if (!gate.proceed) return app.quit();
     // Avant toute autre fenêtre : chaque écran de la borne est couvert dès maintenant.
     guardScreens();
+    // Puis l'écran du playfield dans son orientation de jeu, pour la session seulement, avant que
+    // le menu ou l'assistant ne lisent les écrans.
+    await startOrientation();
     if (wantsSettings) void startSettingsAlone(loc.root ? scanTables(layoutOf(loc.root).tables) : []);
     else if (wantsWizard) startWizard();
     else startFrontend();

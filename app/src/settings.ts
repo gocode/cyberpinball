@@ -41,6 +41,8 @@ import {
   VPX_AUDIO_OWNED_KEYS,
   VPX_ESSENTIALS,
   VPX_PLAY_SETTINGS,
+  VPX_STILL_TABLE,
+  VPX_TILT_OWNED_KEYS,
   vpxOwnedKeys,
   loadCabinet,
   writeWithBackup,
@@ -865,6 +867,12 @@ function ownedOrigin(def: VpxSettingDef): { why: string; how: string; wizard?: W
           : t('Avec la VR forcée, VPX demande de reconnecter le casque (Oui / Non) ; une borne n’en a pas.'),
       how: keepYours(),
     };
+  }
+  if (VPX_STILL_TABLE.some((s) => s.section === def.section && s.key === def.key)) {
+    return { why: t('Sur une borne, c’est la vraie caisse qui bouge : la table reste immobile à l’écran, seule la bille réagit aux secousses.'), how: keepYours() };
+  }
+  if (def.section === 'Player' && (VPX_TILT_OWNED_KEYS as readonly string[]).includes(def.key)) {
+    return { why: t('Elle découle du tilt choisi pour la borne (balancier de la borne ou simulé par VPX).'), how: t('Pour la changer : menu système > Borne > Configuration de la borne > Tilt.') };
   }
   if (def.section === 'Player' && VPX_AUDIO_OWNED_KEYS.includes(def.key)) {
     return { why: t('Elle découle de l’affectation des sorties audio de la borne.'), how: t('Pour la changer, relancez l’assistant (étape Son).'), wizard: 'full' };

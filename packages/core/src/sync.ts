@@ -1,6 +1,6 @@
 import { vpxAudioSettings } from './audio';
 import { managedJoysticks, noAutoLayoutSettings, vpxAnalogSettings } from './plunger';
-import { tiltFindings, vpxTiltSettings } from './tilt';
+import { tiltFindings, VPX_STILL_TABLE, vpxTiltSettings } from './tilt';
 import { buttonInfo, buttonProblems, DEFAULT_BUTTONS, inGameMenuSetting, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, type SilencedAction } from './buttons';
 import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxFolderDefaults, type DetectedDmd, type GlobalDmdFolders } from './dmd';
 import { t } from './i18n';
@@ -313,7 +313,9 @@ export function planVpxSync(
 
   // Tilt : le balancier simulé de VPX allumé ou éteint, seulement après l'étape « Tilt » ; ce qui
   // ferait mal tilter la borne est signalé d'après ce que VPX lira (tilt.ts).
+  // La table ne bouge jamais à l'écran sous les secousses : seule la bille réagit.
   if (cabinet.tilt) applyOwned(vpxTiltSettings(cabinet.tilt));
+  applyOwned([...VPX_STILL_TABLE]);
   findings.push(...tiltFindings(cabinet, doc.toString()));
 
   // Deux plugins qui réclament le même objet COM : le dernier chargé l'emporte.

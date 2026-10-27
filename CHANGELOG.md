@@ -22,6 +22,8 @@ son interface).
 - Lancement en cinéma : au Start, le logo du jeu s'envole du plateau vers le fronton, le DMD charge, un coup de bobine quand VPX prend la main ; VPX n'attend jamais, et « Médias, son et attente » le coupe.
 - Listes des menus : une liste trop longue est signalée par un filet en haut ou en bas au lieu d'un fondu, l'entrée choisie reste entière et chaque liste commence juste sous son titre.
 - Horaire de la borne (« Médias, son et attente », désactivé par défaut) : comme en salle d'arcade, la borne baisse ses écrans et se tait la nuit, puis se met en veille ou s'éteint à l'heure choisie si personne ne joue, après 30 s de préavis qu'un simple bouton annule.
+- Bureau Windows rendu dans son sens : Cyber Pinball ne tourne plus l'écran du plateau dans le réglage de Windows, seulement le temps d'être ouvert ; chaque sortie, même après un plantage, rend au bureau l'orientation d'avant. Une borne déjà laissée tournée le propose au premier démarrage.
+- Sens des tables gardé d'un démarrage à l'autre : après un redémarrage ou une reconnexion, les tables ne s'affichent plus à l'envers en partie. « Santé de la borne » dit si elles sont dans votre sens, et répare celles qu'on avait retournées dans le menu de VPX.
 
 ## 0.1.3
 

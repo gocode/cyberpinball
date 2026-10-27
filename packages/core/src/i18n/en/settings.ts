@@ -63,6 +63,10 @@ export const messages: Record<string, string> = {
     'Above 0, VPX asks for permission (Yes / No) for each ActiveX object the table script creates: a blocking prompt mid-load.',
   'Avec la VR forcée, VPX demande de reconnecter le casque (Oui / Non) ; une borne n’en a pas.': 'With VR forced, VPX asks to reconnect the headset (Yes / No). A cabinet has none.',
   'Elle découle de l’affectation des sorties audio de la borne.': 'It follows the cabinet’s audio output assignment.',
+  'Sur une borne, c’est la vraie caisse qui bouge : la table reste immobile à l’écran, seule la bille réagit aux secousses.':
+    'On a cabinet, the real cabinet is what moves: the table stays still on screen, only the ball reacts to nudges.',
+  'Elle découle du tilt choisi pour la borne (balancier de la borne ou simulé par VPX).': 'It follows the tilt chosen for the cabinet (cabinet tilt bob or simulated by VPX).',
+  'Pour la changer : menu système > Borne > Configuration de la borne > Tilt.': 'To change it: system menu > Borne (Cabinet) > Configuration de la borne (Cabinet setup) > Tilt.',
   'Pour la changer, relancez l’assistant (étape Son).': 'To change it, run the wizard again (Sound step).',
   'Elle découle de l’affectation des écrans de la borne.': 'It follows the cabinet’s screen assignment.',
   'Pour la changer, relancez l’assistant d’écrans.': 'To change it, run the screen wizard again.',

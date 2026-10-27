@@ -3,7 +3,7 @@
 // (tables, téléchargements, données) ; les tables qui ne démarrent pas, d'après le médecin
 // (doctor.ts, playable.ts) ; les médias que VPinMediaDB peut fournir, d'après l'index déjà
 // téléchargé (mediadb.ts, aucun réseau) ; la configuration de la borne retenue contre les
-// écrans branchés (configurations.ts) ; la version de VPX installée contre celle que Cyber
+// écrans branchés (configurations.ts), et le sens des tables en partie (gameorientation.ts) ; la version de VPX installée contre celle que Cyber
 // Pinball connaît (manifeste de l'installeur, aucun réseau).
 //
 // L'application relève les faits en tâche de fond et les garde (app/src/health.ts) ; ce
@@ -17,6 +17,7 @@ import { compareVersions } from './acquisition';
 import { activeConfiguration, chooseConfiguration, chosenId, scoreConfiguration, type CabinetSet } from './configurations';
 import type { Finding } from './doctor';
 import { formatSize } from './fileops';
+import { orientationFacts, orientationVerdict, type OrientationFacts } from './gameorientation';
 import { formatDate, t, tn } from './i18n';
 import type { IconName } from './icons';
 import type { ObservedDisplay } from './model';
@@ -102,6 +103,8 @@ export interface ScreensFacts {
   better?: string;
   /** Écrans branchés. */
   plugged: number;
+  /** Sens des tables en partie sur le playfield branché ; absent sans playfield reconnu ni bord du joueur. */
+  orientation?: OrientationFacts;
 }
 
 export interface VpxFacts {
@@ -198,6 +201,7 @@ export function screensFacts(set: CabinetSet | undefined, observed: ObservedDisp
   if (!set || !active) return { configurations, plugged: observed.length };
   const score = scoreConfiguration(active, observed);
   const chosen = chosenId(chooseConfiguration(set, observed));
+  const orientation = orientationFacts(active, observed);
   return {
     configurations,
     plugged: observed.length,
@@ -210,6 +214,7 @@ export function screensFacts(set: CabinetSet | undefined, observed: ObservedDisp
       playfieldFound: score.playfieldFound,
     },
     better: chosen && chosen !== active.id ? set.configurations.find((c) => c.id === chosen)?.name : undefined,
+    ...(orientation && { orientation }),
   };
 }
 
@@ -339,9 +344,16 @@ export function screensLines(facts: ScreensFacts): HealthLine[] {
   const parts = [found, missing, a.extra ? tn(a.extra, '{n} écran branché en plus', '{n} écrans branchés en plus') : '', a.found ? '' : better].filter(Boolean).join(t(' ; '));
   if (!a.found) return line('blocking', t('{name} : aucun de ses écrans n’est branché', { name }), parts);
   if (!a.playfieldFound) return line('blocking', t('{name} : l’écran du playfield est introuvable', { name }), parts);
-  if (facts.better) return line('check', t('{name} retenue, « {better} » correspondrait mieux', { name, better: facts.better }), parts);
-  if (a.missing.length) return line('check', t('{name} retrouvée en partie', { name }), parts);
-  return line('ok', t('{name} reconnue', { name }), parts);
+  const sense = facts.orientation ? orientationLines(facts.orientation) : [];
+  if (facts.better) return [...line('check', t('{name} retenue, « {better} » correspondrait mieux', { name, better: facts.better }), parts), ...sense];
+  if (a.missing.length) return [...line('check', t('{name} retrouvée en partie', { name }), parts), ...sense];
+  return [...line('ok', t('{name} reconnue', { name }), parts), ...sense];
+}
+
+/** Sens des tables en partie : « Orientation et taille du playfield » le règle de nouveau. */
+function orientationLines(facts: OrientationFacts): HealthLine[] {
+  const verdict = orientationVerdict(facts);
+  return [{ check: 'screens', state: verdict.state, title: verdict.title, detail: verdict.detail, go: t('Ouvrir la configuration de la borne'), target: SYSTEM('cabinet') }];
 }
 
 export function vpxLines(facts: VpxFacts): HealthLine[] {

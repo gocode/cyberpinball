@@ -43,6 +43,7 @@ export const GUEST_DOORS = {
   'message.buttons': false, // Refaire l’étape « Boutons »
   'message.interface': false, // Refaire l’étape « Boutons de l’interface »
   'message.journey': false, // Ce qu’il manque pour jouer, après une partie échouée
+  'message.orientation': false, // Rendre à Windows l’orientation du bureau qu’une version précédente avait changée
   // Fiche d'une table (app/src/library.ts, buildSheet)
   'sheet.play': true, // Jouer
   'sheet.read': true, // Prospectus et règles, page par page
