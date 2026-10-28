@@ -32,8 +32,9 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, BrowserWindow, ipcMain, screen, session, shell, WebContentsView, type DownloadItem, type Rectangle, type Session } from 'electron';
+import { app, BrowserWindow, ipcMain, screen, session, shell, WebContentsView, webFrameMain, type DownloadItem, type Rectangle, type Session } from 'electron';
 import {
+  audioSinkScript,
   createTransferMeter,
   DIRECT_MAX_STEPS,
   expectedSizeFromPage,
@@ -146,6 +147,8 @@ export interface AcquireEvents {
   screen?(): { bounds: Rectangle; notice?: string } | undefined;
   /** Touches qui ferment la fenêtre comme Échap : Exit de la borne (touche ou bouton de joystick). */
   exitKeys?(): string[];
+  /** Nom Windows de la sortie audio de la borne (celle du menu) ; absent : sortie par défaut. */
+  audioOutput?(): string | undefined;
   /** Boutons de l'interface qui annulent un téléchargement à la borne : Valider (Start), Précédent et Suivant (flippers). */
   navKeys?(): Pick<NavigationKeys, 'previous' | 'next' | 'confirm'>;
   /**
@@ -691,6 +694,12 @@ export function createAcquirer(events: AcquireEvents) {
         open.video = undefined;
         sendBar();
       }
+    });
+    // Son des pages (vidéos YouTube, extraits) sur la sortie de la borne, comme le menu.
+    contents.on('did-frame-finish-load', (_e, _isMainFrame, processId, routingId) => {
+      const output = events.audioOutput?.();
+      const frame = output ? webFrameMain.fromId(processId, routingId) : undefined;
+      if (frame) void frame.executeJavaScript(audioSinkScript(output!)).catch(() => undefined);
     });
     contents.on('did-stop-loading', () => probeVideo(contents));
     contents.on('did-navigate-in-page', (_e, _url, isMainFrame) => isMainFrame && probeVideo(contents));

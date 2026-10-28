@@ -486,6 +486,7 @@ export function createCatalog(ctx: CatalogContext) {
     screen: () => host.browserScreen?.(),
     exitKeys: () => host.keys().exit,
     navKeys: () => host.keys(),
+    audioOutput: () => host.audioOutput?.(),
     grabVideo: ytdlp,
   });
   // Fiches des fichiers sur leur site (popularité, captures) et galerie des fichiers à choisir.

@@ -1000,6 +1000,14 @@ Deux bornes (ou la borne et le poste de développement), installées par l'insta
 | 515 | Acceptée borne éteinte | Envoyer une demande, éteindre la borne qui demande, accepter sur l'autre, rallumer. | Amis des deux côtés dès la reconnexion. |
 | 516 | Réseau local | Les deux bornes sur la même box, Internet débranché. | Chacune voit l'autre « À proximité (réseau local) » ; demande et acceptation passent. |
 
+## Son des écrans de la bibliothèque
+
+Sur la borne dont la sortie par défaut de Windows n'est pas celle du fronton (Paramètres > Son), la sortie du fronton choisie à l'étape « Son » de l'assistant. La preuve sans opérateur : `packages/core/src/test/sortie-audio.test.ts`.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 525 | Sons proposés et pages web | Fiche d'un jeu > « Médias du jeu » > « Musique du jeu » : choisir une proposition ou un son de la table. Puis « Récupérer » une vidéo sur YouTube et la lancer. | Le son proposé et celui de la vidéo YouTube sortent par les haut-parleurs du fronton, comme la musique de la roue ; rien sur la sortie par défaut de Windows. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

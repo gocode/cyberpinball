@@ -37,6 +37,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - PuP-Pack videos triggered by DMD frames on FlexDMD tables without ROM (Game of Thrones LE): Cyber Pinball recognises these frames during the game and starts the videos, like PinUP Player.
 - PuP-Packs: the backglass no longer flickers when the same background video is requested several times in a row (Game of Thrones LE, house selection screen).
 - PuP-Packs: images shipped under a video name (Game of Thrones LE) finally show as images, with no flicker, and files with accented names are found; Cyber Pinball fixes this for every pack, on install and before each game.
+- All sound goes through the cabinet speakers: the music and sounds offered in "Game media", and videos watched in "Get" (YouTube…), no longer go to the Windows default output, often silent on a PinCab.
 
 ## 0.1.3
 

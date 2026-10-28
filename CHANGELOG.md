@@ -39,6 +39,7 @@ son interface).
 - Vidéos des PuP-Packs déclenchées par les images du DMD sur les tables FlexDMD sans ROM (Game of Thrones LE) : Cyber Pinball reconnaît ces images pendant la partie et lance les vidéos, comme PinUP Player.
 - PuP-Packs : le fronton ne clignote plus quand une même vidéo de fond est demandée plusieurs fois de suite (Game of Thrones LE, écran du choix de la maison).
 - PuP-Packs : les images livrées sous un nom de vidéo (Game of Thrones LE) s’affichent enfin comme des images, sans clignoter, et les fichiers aux noms accentués sont retrouvés ; Cyber Pinball le corrige pour tout pack, dès l’installation et avant chaque partie.
+- Tout le son passe par les haut-parleurs de la borne : les musiques et sons proposés dans « Médias du jeu », et les vidéos regardées dans « Récupérer » (YouTube…), ne partent plus sur la sortie par défaut de Windows, souvent muette sur un PinCab.
 
 ## 0.1.3
 

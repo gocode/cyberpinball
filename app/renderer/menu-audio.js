@@ -8,6 +8,7 @@
 //   - lancement : la musique s'éteint, le son de lancement part ; la partie coupe tout.
 //
 //   CyberMenuAudio.update(son)   // son : { music?, launch?, launchId?, video, output? }
+//   CyberMenuAudio.route(élément)  // un <audio> ou <video> de la page sur la même sortie (library.js)
 //   CyberMenuAudio.attachVideo(couche)  // couche du fond (media.js), dont le son est relevé
 //   CyberMenuAudio.status()      // ce qui joue, pour les essais sans opérateur
 
@@ -62,7 +63,7 @@
     el.loop = loop;
     el.volume = 0;
     el.src = url;
-    if (sinkId) el.setSinkId(sinkId).catch(() => {});
+    route(el);
     el.addEventListener('error', () => {
       try {
         const e = el.error;
@@ -149,10 +150,24 @@
     if (wantedOutput !== name) return;
     sinkId = id;
     sinkLabel = id ? name : 'sortie par défaut'; // i18n-ignore : état lu par les essais (status), jamais affiché
-    for (const track of [music, launch, ...fading]) track?.el.setSinkId(sinkId).catch(() => {});
+    for (const track of [music, launch, ...fading]) route(track?.el);
+    for (const el of document.querySelectorAll('audio, video')) route(el);
     window.CyberMedia?.setSink?.(sinkId);
     window.CyberUiSounds?.setSink?.(sinkId);
   }
+
+  /**
+   * Envoie un élément audio ou vidéo sur la sortie du menu. Tout le son de la fenêtre y va
+   * (aperçus de la bibliothèque compris) : la sortie par défaut de Windows n'est pas
+   * forcément branchée à la borne.
+   */
+  function route(el) {
+    if (typeof el?.setSinkId !== 'function' || el.sinkId === sinkId) return;
+    el.setSinkId(sinkId).catch(() => {});
+  }
+
+  // Filet : un élément du document qui se met à jouer sans être passé par route.
+  document.addEventListener('play', (e) => route(e.target), true);
 
   function update(sound) {
     const s = sound ?? { video: 0 };
@@ -179,6 +194,7 @@
 
   window.CyberMenuAudio = {
     update,
+    route,
     attachVideo: (layer) => (videoLayer = layer),
     status: () => ({ sortie: sinkLabel, probleme: sinkProblem, musique: describe(music), lancement: describe(launch), enFondu: fading.size, video: videoLayer?.sound() }),
   };

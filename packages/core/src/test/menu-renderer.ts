@@ -10,8 +10,12 @@ import { parseHTML } from 'linkedom';
 
 export const APP = path.join(__dirname, '..', '..', '..', '..', 'app');
 
-/** `extra` : globales de plus pour la page (window.CyberFallback simulé, par exemple). */
-export function menuRenderer(extra: Record<string, unknown> = {}) {
+/**
+ * `extra` : globales de plus pour la page (window.CyberFallback simulé, par exemple).
+ * `menuAudio` : le vrai menu-audio.js (navigator.mediaDevices et Audio à fournir dans `extra`)
+ * au lieu d'un CyberMenuAudio muet.
+ */
+export function menuRenderer(extra: Record<string, unknown> = {}, opts: { menuAudio?: boolean } = {}) {
   const html = fs.readFileSync(path.join(APP, 'renderer', 'frontend.html'), 'utf8').replace(/<script[^>]*><\/script>/g, '');
   const { window, document } = parseHTML(html);
   const Img = Object.getPrototypeOf(document.createElement('img'));
@@ -39,16 +43,16 @@ export function menuRenderer(extra: Record<string, unknown> = {}) {
     },
     HTMLElement: window.HTMLElement,
     cyber: { onState: (f: (s: unknown) => void) => (onState = f), ready() {}, act() {}, mediaError() {} },
-    CyberMenuAudio: { attachVideo() {}, update() {} },
+    ...(opts.menuAudio ? {} : { CyberMenuAudio: { attachVideo() {}, update() {} } }),
     ...extra,
   };
   ctx.window = ctx;
   vm.createContext(ctx);
-  for (const name of ['i18n.js', 'icons.js', 'media.js', 'scroll-keeper.js', 'library.js', 'frontend.js']) {
+  for (const name of ['i18n.js', 'icons.js', 'media.js', ...(opts.menuAudio ? ['menu-audio.js'] : []), 'scroll-keeper.js', 'library.js', 'frontend.js']) {
     vm.runInContext(fs.readFileSync(path.join(APP, 'renderer', name), 'utf8'), ctx, { filename: name });
   }
   const send = (s: unknown) => onState!(s);
-  return { document, send };
+  return { document, send, window: ctx };
 }
 
 /** État du menu comme viewFor (frontend.ts) l'envoie, pour une roue de trois tables. */

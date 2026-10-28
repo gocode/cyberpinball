@@ -353,6 +353,8 @@ function mediaNode(kind, url) {
       node.volume = 0.6;
     } else node.alt = '';
     node.src = url;
+    // Sur la sortie de la borne, comme la musique du menu, pas sur celle de Windows.
+    if (kind !== 'image') window.CyberMenuAudio?.route?.(node);
     mediaNodes.set(key, node);
   }
   return node;
@@ -395,6 +397,8 @@ function syncAudio() {
   for (const [key, node] of mediaNodes) {
     if (!key.startsWith('audio ')) continue;
     if (node === playingAudio) {
+      // Joué avant d'entrer dans le document : le filet de menu-audio.js ne le verrait pas.
+      window.CyberMenuAudio?.route?.(node);
       if (node.paused) node.play().catch(() => undefined);
     } else if (!node.paused) node.pause();
   }

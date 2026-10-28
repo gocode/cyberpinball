@@ -53,6 +53,7 @@ export * from './mediaedit';
 export * from './focus';
 export * from './offscreen';
 export * from './menumoments';
+export * from './audiosink';
 export * from './mediadb';
 export * from './vpxinfo';
 export * from './highscores';

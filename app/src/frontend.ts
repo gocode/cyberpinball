@@ -415,6 +415,7 @@ const library = createLibrary({
   keys: () => KEYS,
   windows: () => windows,
   browserScreen: () => browserScreenRect(),
+  audioOutput: () => audioOutput,
   openBrowserScreen: (back) => configurations.openBrowserScreen(undefined, back),
   broadcast: () => broadcast(),
   installVpx: () => {

@@ -212,6 +212,8 @@ export interface LibraryHost {
    * son bandeau en dit (écran choisi pas branché, playfield tourné).
    */
   browserScreen?(): { bounds: Rectangle; notice?: string } | undefined;
+  /** Nom Windows de la sortie audio du menu (menuAudioOutput), pour le son des pages de « Récupérer ». */
+  audioOutput?(): string | undefined;
   /** Choix de l'écran du navigateur intégré pour la configuration active ; Retour mène à `back`. */
   openBrowserScreen?(back: () => void): void;
   broadcast(): void;

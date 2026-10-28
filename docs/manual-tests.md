@@ -1000,6 +1000,14 @@ Two cabinets (or the cabinet and the development machine), installed with the in
 | 515 | Accepted while off | Send a request, turn off the requesting cabinet, accept on the other, turn it back on. | Friends on both sides as soon as it reconnects. |
 | 516 | Local network | Both cabinets on the same router, Internet unplugged. | Each sees the other "À proximité (réseau local)" (Nearby); request and acceptance get through. |
 
+## Sound of the library screens
+
+On the cabinet whose Windows default output is not the backglass one (Settings > Sound), with the backglass output chosen at the setup wizard's "Son" (Sound) step. The unattended proof: `packages/core/src/test/sortie-audio.test.ts`.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 525 | Offered sounds and web pages | A game's sheet > "Médias du jeu" (Game media) > "Musique du jeu" (Game music): pick an offer or a table sound. Then "Récupérer" (Get) a video on YouTube and play it. | The offered sound and the YouTube video's sound come out of the backglass speakers, like the wheel music; nothing on the Windows default output. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).
