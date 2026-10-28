@@ -997,7 +997,7 @@ Les médias d'un jeu se rangent dans le dossier de sa table, sous-dossier `media
 | `(FullDMD)` | Afficheur large | Animation 16:9 pour un afficheur large. | Afficheur large (16:9), aux mêmes moments | comme le fronton | l'Afficheur centré, sinon le titre en points |
 | `(Topper)` | Topper | Le bandeau animé au-dessus du fronton. | Topper, aux mêmes moments | comme le fronton | logo animé et marque de Cyber Pinball, fabricant et année |
 | `(Loading)` | Chargement | Vidéo jouée pendant que VPX charge la table. | Playfield, du Start à l'apparition de la partie : plein écran en borne, dans le cadre 9:16 au bureau | mp4, webm, m4v | écran de chargement de secours : marque, titre, fabricant, année, barre d'attente |
-| `(Audio)` | Musique du jeu | La musique de la table choisie. | Haut-parleurs du fronton, tant que la table est choisie (« Musique des jeux », coupée par défaut) ; en attente si son son est réduit | mp3, ogg, m4a, flac, wav | la musique de la borne, sinon le silence |
+| `(Audio)` | Musique du jeu | La musique de la table choisie. | Haut-parleurs du fronton, tant que la table est choisie (« Musique des jeux », jouée par défaut) ; en attente si son son est réduit | mp3, ogg, m4a, flac, wav | la musique de la borne, sinon le silence |
 | `(AudioLaunch)` | Son de lancement | Un son court au lancement. | Haut-parleurs du fronton, une fois, au Start | comme la musique | rien (ou le son de la vidéo de chargement) |
 | `(GameInfo)` | Prospectus | Une ou plusieurs pages de présentation du jeu. | Playfield, sur demande : fiche > « Prospectus », page par page | png, apng, webp, jpg, jpeg, gif, mp4 | une fiche générée depuis le `.info` : titre, fabricant, année, auteurs |
 | `(GameHelp)` | Règles | Une ou plusieurs cartes de règles. | Playfield, sur demande : fiche > « Règles », page par page | comme le prospectus | les commandes de la partie |
@@ -1068,8 +1068,8 @@ Le son du menu sort d'une seule fenêtre, celle du playfield (`app/renderer/menu
 
 | Moment | On entend | Réglage (défaut) |
 | --- | --- | --- |
-| Navigation, fiche de la table, partie échouée | la musique du jeu choisi, `(Audio)` (sinon celle de la borne, `<racine>\media\(Audio).*`), en boucle | « Musique des jeux » : **coupée** par défaut, pour une borne silencieuse dans une pièce de vie ; « Volume de la musique » (60 %) |
-| Navigation, jeu sans musique ou musique coupée | le son de la vidéo du fond du playfield | « Son des vidéos du menu » (0 % : muettes) |
+| Navigation, fiche de la table, partie échouée | la musique du jeu choisi, `(Audio)` (sinon celle de la borne, `<racine>\media\(Audio).*`), en boucle | « Musique des jeux » : **jouée** par défaut, pour que la roue ne soit jamais muette à l'installation (à couper pour une borne silencieuse dans une pièce de vie) ; « Volume de la musique » (60 %) |
+| Navigation, jeu sans musique ou musique coupée | le son de la vidéo du fond du playfield | « Son des vidéos du menu » (40 % ; 0 % : muettes) |
 | Chargement | le son de lancement, `(AudioLaunch)`, une fois ; sans lui, le son de la vidéo de chargement | « Volume du lancement » (80 %) |
 | Partie | rien : tout se tait en fondu dès que la fenêtre de jeu de VPX apparaît | — |
 | Attente | comme en navigation, pour la table montrée | « Son en attente » : **coupé** par défaut, ou réduit (30 % du volume) |

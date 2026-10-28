@@ -59,15 +59,15 @@ function sandbox(): { root: string; dataDir: string; tables: TableEntry[] } {
 // ---------------------------------------------------------------------------
 // Réglages
 
-test('réglages : musique coupée par défaut, médias figés en partie, attente après 5 min, sans son', () => {
-  assert.equal(S.music, false);
+test('réglages : musique jouée par défaut, médias figés en partie, attente après 5 min, sans son', () => {
+  assert.equal(S.music, true, 'la roue a du son dès l’installation');
   assert.equal(S.game, 'still');
-  assert.equal(S.videoVolume, 0, 'vidéos du menu muettes par défaut');
+  assert.equal(S.videoVolume, 40, 'vidéo du plateau entendue pour un jeu sans musique');
   assert.equal(S.attractDelay, 300);
   assert.equal(S.attractSound, 'muted');
   const { dataDir } = sandbox();
   assert.deepEqual(loadMenuMediaSettings(dataDir), S);
-  const mine: MenuMediaSettings = { ...S, music: true, musicVolume: 40, attractDelay: 0, attractSound: 'reduced' };
+  const mine: MenuMediaSettings = { ...S, music: false, musicVolume: 40, attractDelay: 0, attractSound: 'reduced' };
   saveMenuMediaSettings(dataDir, mine);
   assert.deepEqual(loadMenuMediaSettings(dataDir), mine);
 });
@@ -190,9 +190,14 @@ test('volume relatif : lu dans CyberPinball.medias.volume du .info, 100 % sans r
   assert.equal(tableMediaVolume(undefined), 100);
 });
 
-test('son en navigation : borne silencieuse par défaut, la musique du jeu seulement si elle est activée', () => {
+test('son en navigation : la roue n’est jamais muette par défaut, ni pour un jeu sans musique', () => {
   const sources = { music: 'cyber-media://fichier/a.mp3', launch: 'cyber-media://fichier/b.ogg' };
-  assert.deepEqual(menuSound('browse', S, sources), { video: 0 });
+  // Installation neuve (aucun medias.json) : la musique du jeu, sinon le son de sa vidéo.
+  const fresh = loadMenuMediaSettings(sandbox().dataDir);
+  assert.deepEqual(menuSound('browse', fresh, sources), { music: { url: sources.music, volume: 0.6 }, video: 0 });
+  assert.ok(menuSound('browse', fresh, {}).video > 0, 'jeu sans musique : la vidéo du plateau s’entend');
+  // Coupée par le joueur : silence, et ce choix est gardé.
+  assert.deepEqual(menuSound('browse', { ...S, music: false, videoVolume: 0 }, sources), { video: 0 });
   const on = { ...S, music: true, musicVolume: 50, videoVolume: 40 };
   assert.deepEqual(menuSound('browse', on, sources, 80), { music: { url: sources.music, volume: 0.4 }, video: 0 }, 'musique au volume du jeu, vidéo muette');
   // Jeu sans musique : le son de la vidéo du plateau, à son réglage.

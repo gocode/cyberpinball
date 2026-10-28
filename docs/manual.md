@@ -997,7 +997,7 @@ A game's media go in its table's folder, in a `medias\` subfolder, and are named
 | `(FullDMD)` | "Afficheur large" (Wide display) | 16:9 animation for a wide display. | Wide display (16:9), at the same moments | same as the backglass | the "Afficheur" media centered, otherwise the title in dots |
 | `(Topper)` | "Topper" | The animated banner above the backglass. | Topper, at the same moments | same as the backglass | animated logo and Cyber Pinball brand, manufacturer and year |
 | `(Loading)` | "Chargement" (Loading) | Video played while VPX loads the table. | Playfield, from the Start press until the game appears: full screen on a cabinet, in the 9:16 frame on a desktop | mp4, webm, m4v | backup loading screen: brand, title, manufacturer, year, progress bar |
-| `(Audio)` | "Musique du jeu" (Game music) | The music of the selected table. | Backglass speakers, as long as the table is selected ("Musique des jeux" (Game music), off by default); in attract mode if attract-mode sound is set to reduced | mp3, ogg, m4a, flac, wav | the cabinet music, otherwise silence |
+| `(Audio)` | "Musique du jeu" (Game music) | The music of the selected table. | Backglass speakers, as long as the table is selected ("Musique des jeux" (Game music), on by default); in attract mode if attract-mode sound is set to reduced | mp3, ogg, m4a, flac, wav | the cabinet music, otherwise silence |
 | `(AudioLaunch)` | "Son de lancement" (Launch sound) | A short sound at launch. | Backglass speakers, once, on Start | same as the music | nothing (or the loading video's sound) |
 | `(GameInfo)` | "Prospectus" (Flyer) | One or more pages presenting the game. | Playfield, on request: details screen > "Prospectus", page by page | png, apng, webp, jpg, jpeg, gif, mp4 | a card generated from the `.info`: title, manufacturer, year, authors |
 | `(GameHelp)` | "Règles" (Rules) | One or more rule cards. | Playfield, on request: details screen > "Règles", page by page | same as the flyer | the game controls |
@@ -1068,8 +1068,8 @@ The menu sound comes from a single window, the playfield one (`app/renderer/menu
 
 | Moment | You hear | Setting (default) |
 | --- | --- | --- |
-| Navigation, the table's details screen, failed game | the selected game's music, `(Audio)` (otherwise the cabinet's, `<racine>\media\(Audio).*`), looping | "Musique des jeux" (Game music): **off** by default, for a silent cabinet in a living room; "Volume de la musique" (Music volume) (60%) |
-| Navigation, game with no music or music off | the sound of the playfield background video | "Son des vidéos du menu" (Menu video sound) (0%: muted) |
+| Navigation, the table's details screen, failed game | the selected game's music, `(Audio)` (otherwise the cabinet's, `<racine>\media\(Audio).*`), looping | "Musique des jeux" (Game music): **on** by default, so the wheel is never silent after installation (turn it off for a silent cabinet in a living room); "Volume de la musique" (Music volume) (60%) |
+| Navigation, game with no music or music off | the sound of the playfield background video | "Son des vidéos du menu" (Menu video sound) (40%; 0%: muted) |
 | Loading | the launch sound, `(AudioLaunch)`, once; without it, the sound of the loading video | "Volume du lancement" (Launch volume) (80%) |
 | Play | nothing: everything fades out as soon as VPX's game window appears | — |
 | Attract mode | as during navigation, for the table being shown | "Son en attente" (Attract mode sound): **off** by default, or reduced (30% of the volume) |

@@ -499,11 +499,11 @@ export const MENU_DMD_LABELS: Record<MenuDmdMode, string> = {
 export interface MenuMediaSettings {
   /** Figés par défaut : une image fixe ne coûte rien au GPU pendant que VPX joue. */
   game: GameMediaMode;
-  /** Musique du jeu (Audio) pendant la navigation : coupée par défaut, pour une borne silencieuse. */
+  /** Musique du jeu (Audio) pendant la navigation : jouée par défaut, la roue n'est jamais muette à l'installation. */
   music: boolean;
   /** Volumes en pour cent, avant le volume relatif du jeu (CyberPinball.medias.volume du .info). */
   musicVolume: number;
-  /** Son de la vidéo du plateau dans le menu ; 0 : muette (défaut). */
+  /** Son de la vidéo du plateau dans le menu, pour un jeu sans musique (40 % par défaut) ; 0 : muette. */
   videoVolume: number;
   /** Son de lancement (AudioLaunch) et son de la vidéo de chargement (Loading). */
   launchVolume: number;
@@ -535,9 +535,9 @@ export interface MenuMediaSettings {
 
 export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   game: 'still',
-  music: false,
+  music: true,
   musicVolume: 60,
-  videoVolume: 0,
+  videoVolume: 40,
   launchVolume: 80,
   cinema: true,
   uiSounds: true,

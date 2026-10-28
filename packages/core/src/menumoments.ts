@@ -177,8 +177,8 @@ export interface MenuSoundPlan {
 
 /**
  * Son du menu à un moment (§ 5.2, § 5.4) :
- * - navigation : la musique du jeu si elle est activée (coupée par défaut), sinon le son de
- *   la vidéo du plateau à son volume (muette par défaut) ; jamais les deux à la fois ;
+ * - navigation : la musique du jeu si elle est activée (jouée par défaut), sinon le son de
+ *   la vidéo du plateau à son volume (40 % par défaut) ; jamais les deux à la fois ;
  * - chargement : le son de lancement, sinon le son de la vidéo de chargement ;
  * - partie : rien, VPX a la parole ;
  * - attente : comme la navigation, au volume réduit, ou rien (défaut).
