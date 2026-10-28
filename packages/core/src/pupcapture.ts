@@ -16,6 +16,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { DMD_HEIGHT, DMD_WIDTH } from './livedmd';
+import { parseCsvLine } from './puppack';
 import { commentStart } from './vbscript';
 
 const PIXELS = DMD_WIDTH * DMD_HEIGHT;
@@ -231,8 +232,44 @@ export interface PupCapture extends CaptureWatch {
   /** Dossier du pack dans pupvideos. */
   pack: string;
   depth: DmdDepth;
-  /** Empreinte des fichiers de PupCapture (captureSignature) : le bloc est refait quand elle change. */
+  /** Empreinte des fichiers de PupCapture et de triggers.pup (captureSignature) : le bloc est refait quand elle change. */
   sig: string;
+}
+
+/**
+ * Déclencheurs « D<n> » qui ne font que changer la vidéo de fond d'un écran (toutes leurs lignes
+ * actives de triggers.pup en « SetBG », avec un fichier nommé) : pour chacun, les fonds posés,
+ * « écran|playlist|fichier ». Le plugin PUP relance la vidéo de fond à chaque SetBG, même quand
+ * c'est celle qui tourne déjà (PUPMediaManager::Play, au commit af26b2d93) ; PinUP Player la
+ * laissait tourner. Game of Thrones LE, 28 octobre 2026 : l'écran « choisis ta maison » du DMD
+ * alterne avec une image de remplissage, D11 (Stark, SetBG) repartait à chaque retour, et le
+ * fronton ne montrait presque que le début noir de la vidéo, avec des éclairs de Stark.
+ */
+export function backgroundTriggers(root: string): Map<number, string[]> {
+  const file = readDirents(root).find((d) => d.isFile() && d.name.toLowerCase() === 'triggers.pup');
+  const rows = new Map<number, { setBg: boolean; key: string }[]>();
+  if (!file) return new Map();
+  let text = '';
+  try {
+    text = fs.readFileSync(path.join(root, file.name), 'latin1');
+  } catch {
+    return new Map();
+  }
+  for (const line of text.split(/\r?\n/).slice(1)) {
+    const cols = parseCsvLine(line);
+    if (cols.length < 7 || cols[1]!.trim() !== '1') continue;
+    const d = /^D(\d+)$/i.exec(cols[3]!.trim());
+    if (!d) continue;
+    const id = Number(d[1]);
+    const playFile = cols[6]!.trim();
+    const setBg = /^setbg$/i.test((cols[12] ?? '').trim()) && playFile !== '';
+    const list = rows.get(id) ?? [];
+    list.push({ setBg, key: `${cols[4]!.trim()}|${cols[5]!.trim()}|${playFile}`.toLowerCase() });
+    rows.set(id, list);
+  }
+  const found = new Map<number, string[]>();
+  for (const [id, list] of rows) if (list.every((r) => r.setBg)) found.set(id, list.map((r) => r.key));
+  return found;
 }
 
 const WATCH_SUB = 'CyberPinball_PuPCapture';
@@ -252,7 +289,7 @@ export const WATCH_RECHECK_MS = 250;
  * numéro croissant) dont la zone est identique déclenche « D<n> », sauf si c'est déjà la dernière
  * reconnue (DMD::MatchIndexed).
  */
-export function captureWatchLines(captures: CaptureImage[], watch: PupCapture): string[] {
+export function captureWatchLines(captures: CaptureImage[], watch: PupCapture, backgrounds: Map<number, string[]> = new Map()): string[] {
   const full = captures.filter((c) => c.region.w === DMD_WIDTH && c.region.h === DMD_HEIGHT);
   const masked = captures.filter((c) => !full.includes(c));
   const probes = fullProbes(full);
@@ -267,18 +304,34 @@ export function captureWatchLines(captures: CaptureImage[], watch: PupCapture): 
     const r = c.region;
     data.push(`${P}Masked(${i}) = Array(${c.id}, ${r.x}, ${r.y}, ${r.w}, ${r.h}, ${regionHash(c.pixels, r)}, Array(${pr.join(', ')}), Array(${pr.map((p) => c.pixels[p]!).join(', ')}))`);
   });
+  // Fonds posés par un déclencheur reconnu : il n'est renvoyé que s'il change au moins un fond.
+  const bgData = [...backgrounds]
+    .filter(([id]) => captures.some((c) => c.id === id))
+    .map(([id, keys]) => `${P}Bg.Item(${id}) = Array(${keys.map((k) => `"${k.replace(/"/g, '""')}"`).join(', ')})`);
   const { flex, pup } = watch;
   const settings: PupCapture = { pack: watch.pack, flex, pup, timer: watch.timer, depth: watch.depth, sig: watch.sig };
   return [
     CAPTURE_HEAD + JSON.stringify(settings),
-    `Dim ${P}Full, ${P}Masked, ${P}Probes, ${P}Last, ${P}Next, ${P}Sig, ${P}SigUntil`,
+    `Dim ${P}Full, ${P}Masked, ${P}Probes, ${P}Last, ${P}Next, ${P}Sig, ${P}SigUntil, ${P}Bg, ${P}BgOf`,
     `Sub ${P}Init`,
     `  Set ${P}Full = CreateObject("Scripting.Dictionary")`,
+    `  Set ${P}Bg = CreateObject("Scripting.Dictionary")`,
+    `  Set ${P}BgOf = CreateObject("Scripting.Dictionary")`,
     `  ReDim ${P}Masked(${masked.length - 1})`,
     `  ${P}Probes = Array(${probes.join(', ')})`,
     `  ${P}Last = 0 : ${P}Next = 0 : ${P}Sig = ""`,
     ...data.map((l) => `  ${l}`),
+    ...bgData.map((l) => `  ${l}`),
     `End Sub`,
+    // Faux quand chaque fond que pose ce déclencheur est déjà celui de son écran.
+    `Function ${P}Changes(id)`,
+    `  Dim e, s, k : ${P}Changes = Not ${P}Bg.Exists(id)`,
+    `  If ${P}Changes Then Exit Function`,
+    `  For Each e In ${P}Bg.Item(id)`,
+    `    k = InStr(e, "|") : s = Left(e, k - 1)`,
+    `    If ${P}BgOf.Item(s) <> e Then ${P}Changes = True : ${P}BgOf.Item(s) = e`,
+    `  Next`,
+    `End Function`,
     `Function ${P}Join(a, b)`,
     `  Dim r : If IsArray(a) Then r = a : ReDim Preserve r(UBound(r) + 1) : r(UBound(r)) = b : ${P}Join = r Else ${P}Join = Array(b)`,
     `End Function`,
@@ -324,7 +377,7 @@ export function captureWatchLines(captures: CaptureImage[], watch: PupCapture): 
     `  For i = 0 To n - 1`,
     `    c = cands(i)`,
     `    If ${P}Hash(px, c(1), c(2), c(3), c(4)) = c(5) Then`,
-    `      If c(0) <> ${P}Last Then ${P}Last = c(0) : ${pup}.B2SData "D" & c(0), 1 : ${pup}.B2SData "D" & c(0), 0`,
+    `      If c(0) <> ${P}Last Then ${P}Last = c(0) : If ${P}Changes(c(0)) Then ${pup}.B2SData "D" & c(0), 1 : ${pup}.B2SData "D" & c(0), 0`,
     `      Exit Sub`,
     `    End If`,
     `  Next`,
@@ -395,7 +448,8 @@ export function sameCapture(a: PupCapture, b: PupCapture): boolean {
 }
 
 /**
- * Empreinte des captures du pack : noms et contenus des fichiers que lit libpupdmd, triés.
+ * Empreinte des captures du pack : noms et contenus des fichiers que lit libpupdmd, triés, puis
+ * triggers.pup (les fonds des déclencheurs sont écrits dans le bloc).
  * Lue avant chaque partie : quelques Mo à lire, rien à décoder.
  */
 export function captureSignature(root: string): string {
@@ -413,6 +467,15 @@ export function captureSignature(root: string): string {
       } catch {
         hash.update('?');
       }
+    }
+  }
+  // Les déclencheurs comptent aussi : leurs fonds (backgroundTriggers) sont écrits dans le bloc.
+  const triggers = readDirents(root).find((e) => e.isFile() && e.name.toLowerCase() === 'triggers.pup');
+  if (triggers) {
+    try {
+      hash.update(fs.readFileSync(path.join(root, triggers.name)));
+    } catch {
+      hash.update('?');
     }
   }
   return hash.digest('hex').slice(0, 16);

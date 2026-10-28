@@ -62,7 +62,7 @@ import {
   type PupVariant,
   type PlaylistRename,
 } from './puppack';
-import { addCaptureWatch, captureBlock, captureSettings, captureWatchLines, readCaptures, sameCapture, type CaptureBlocker } from './pupcapture';
+import { addCaptureWatch, backgroundTriggers, captureBlock, captureSettings, captureWatchLines, readCaptures, sameCapture, type CaptureBlocker } from './pupcapture';
 import { buildScriptPatch, ownCapture, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
 import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
@@ -1013,7 +1013,7 @@ function pupCaptureFinding(entry: TableEntry, pack: string, root: string, overri
   if (upToDate) return undefined;
   const captures = readCaptures(root, settings.depth);
   if (!captures.length) return unseen('size');
-  const block = { settings, lines: captureWatchLines(captures, settings) };
+  const block = { settings, lines: captureWatchLines(captures, settings, backgroundTriggers(root)) };
   let content: string | undefined;
   if (foreign) content = addCaptureWatch(foreign.text, settings.timer, block.lines);
   else {

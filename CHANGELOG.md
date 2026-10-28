@@ -37,6 +37,7 @@ son interface).
 - Amis (Menu système > Amis), entre bornes et sans serveur central : vos amis en ligne avec la table qu'ils jouent et leurs derniers records, recherche d'un joueur par son nom ou sur le réseau local, demandes d'amis, premiers badges. Le partage est activé par défaut et se coupe dans « Partage et réseau », qui dit aussi ce que voient les autres bornes ; Windows demande une fois d'autoriser Cyber Pinball dans son pare-feu.
 - PuP-Packs que la table ne lance pas elle-même (Game of Thrones LE) : Cyber Pinball les range sous le bon nom et les lance avant chaque partie ; le médecin dit quelles vidéos du pack ne peuvent pas se déclencher avec le DMD de la table.
 - Vidéos des PuP-Packs déclenchées par les images du DMD sur les tables FlexDMD sans ROM (Game of Thrones LE) : Cyber Pinball reconnaît ces images pendant la partie et lance les vidéos, comme PinUP Player.
+- PuP-Packs : le fronton ne clignote plus quand une même vidéo de fond est demandée plusieurs fois de suite (Game of Thrones LE, écran du choix de la maison).
 
 ## 0.1.3
 

@@ -15,6 +15,8 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import {
   addCaptureWatch,
+  backgroundTriggers,
+  captureSignature,
   captureWatchLines,
   findFlexDmdObject,
   findFrameTimer,
@@ -117,9 +119,9 @@ test('Référence : la première capture par numéro, jamais deux fois de suite,
 });
 
 /** Trace du VBScript généré, exécuté par cscript sur une suite d'images de FlexDMD. */
-function runVbs(captures: CaptureImage[], frames: Uint8Array[], step = 300): string[] {
+function runVbs(captures: CaptureImage[], frames: Uint8Array[], step = 300, backgrounds?: Map<number, string[]>): string[] {
   const table = ['Sub FrameTimer_Timer() \' frame timer', 'End Sub', ''].join('\r\n');
-  const watched = addCaptureWatch(table, 'FrameTimer', captureWatchLines(captures, WATCH))!;
+  const watched = addCaptureWatch(table, 'FrameTimer', captureWatchLines(captures, WATCH, backgrounds))!;
   const harness = [
     'Dim GameTime : GameTime = 0',
     'Class FakeFlex : Public DmdPixels : End Class',
@@ -207,4 +209,50 @@ test('Empreinte : identique sur la zone seulement, et dans les bornes du calcul 
   // Le code généré garde ses données sur une ligne par capture.
   const lines = captureWatchLines(readCaptures(pack(), 4), WATCH);
   assert.equal(lines.filter((l) => /^ {2}CyberPinball_PuPCap(Full\.Item\("[0-9A-F]+"\)|Masked\(\d+\)) =/.test(l)).length, 4);
+});
+
+// Le plugin PUP relance la vidéo de fond à chaque SetBG, même quand c'est celle qui tourne
+// (PUPMediaManager::Play) ; PinUP Player la laissait tourner. Game of Thrones LE, 28 octobre 2026 :
+// l'écran « choisis ta maison » alternait avec une image de remplissage, D11 (Stark, SetBG)
+// repartait à chaque retour, et le fronton restait presque noir, avec des éclairs de Stark.
+const TRIGGERS = [
+  'ID,Active,Descript,Trigger,ScreenNum,PlayList,PlayFile,Volume,Priority,Length,Counter,RestSeconds,Loop,Defaults',
+  '1,1,Stark,D3,2,"Choose your House",Stark.mp4,,7,,,,SetBG,0',
+  '2,1,Zone,D7,2,"Choose your House",Lannister.mp4,,7,,,,SetBG,0',
+  '3,1,Drain,D12,2,Balldrain,,,10,,,,,0',
+  '4,1,Fond sans fichier,D20,2,Fonds,,,7,,,,SetBG,0',
+  '5,1,Deux effets,D21,2,Fonds,a.mp4,,7,,,,SetBG,0',
+  '6,1,Deux effets,D21,5,Varios,b.mp4,,7,,,,,0',
+  '7,0,Inactif,D22,2,Fonds,c.mp4,,7,,,,SetBG,0',
+  '',
+].join('\r\n');
+
+test('Fonds : seuls les déclencheurs qui ne font que poser un fichier en fond (SetBG) sont retenus', () => {
+  const root = pack();
+  const before = captureSignature(root);
+  fs.writeFileSync(path.join(root, 'triggers.pup'), TRIGGERS);
+  assert.deepEqual(
+    [...backgroundTriggers(root)],
+    [
+      [3, ['2|choose your house|stark.mp4']],
+      [7, ['2|choose your house|lannister.mp4']],
+    ],
+  );
+  // triggers.pup entre dans l'empreinte : les .vbs déjà écrits sont refaits avant la partie suivante.
+  assert.notEqual(captureSignature(root), before);
+  assert.equal(backgroundTriggers(path.join(root, 'absent')).size, 0);
+});
+
+test('VBScript généré : un fond déjà en place n’est pas renvoyé, un autre fond l’est', { skip: process.platform !== 'win32' }, () => {
+  const root = pack();
+  fs.writeFileSync(path.join(root, 'triggers.pup'), TRIGGERS);
+  const captures = readCaptures(root, 4);
+  const zoneOnC = dmd(C);
+  for (let y = ZONE.y; y < ZONE.y + ZONE.h; y++) for (let x = ZONE.x; x < ZONE.x + ZONE.w; x++) zoneOnC[y * W + x] = B[y * W + x]! * 17;
+  // Stark (D3, fond), drain (D12, vidéo), Stark de nouveau : déjà en fond, pas renvoyé ; drain de
+  // nouveau : renvoyé ; Lannister (D7, autre fond) puis Stark : chaque changement de fond part.
+  const frames = [dmd(A), dmd(C), dmd(A), dmd(C), zoneOnC, dmd(A)];
+  assert.deepEqual(runVbs(captures, frames, 300, backgroundTriggers(root)), ['D3=1 D3=0', 'D12=1 D12=0', '', 'D12=1 D12=0', 'D7=1 D7=0', 'D3=1 D3=0']);
+  // Sans les fonds du pack, la référence de libpupdmd : D3 repart à chaque retour.
+  assert.deepEqual(runVbs(captures, frames, 300), ['D3=1 D3=0', 'D12=1 D12=0', 'D3=1 D3=0', 'D12=1 D12=0', 'D7=1 D7=0', 'D3=1 D3=0']);
 });
