@@ -371,6 +371,48 @@ export function readVpxTableInfo(file: string): VpxTableInfo | undefined {
   }
 }
 
+/**
+ * Nom de l'objet table (« Table1 ») : ses événements s'appellent <nom>_Init, <nom>_KeyDown…
+ * Enregistrement NAME de GameStg/GameData (longueur en octets, puis le texte, en UTF-16 dans
+ * les tables enregistrées par VPX). undefined si la table n'est pas lisible.
+ */
+export function readVpxTableName(file: string): string | undefined {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const cfb = new CompoundFile(fd);
+    const game = cfb.children(cfb.entries[0]!).find((e) => e.type === 1 && e.name === 'GameStg');
+    const gameData = game && cfb.children(game).find((e) => e.type === 2 && e.name === 'GameData');
+    if (!gameData) return undefined;
+    const data = cfb.stream(gameData);
+    let pos = 0;
+    while (pos + 8 <= data.length) {
+      const size = data.readUInt32LE(pos);
+      const tag = data.toString('latin1', pos + 4, pos + 8);
+      if (size < 4) return undefined;
+      if (tag === 'NAME' && pos + 12 <= data.length) {
+        const bytes = data.subarray(pos + 12, Math.min(data.length, pos + 12 + data.readUInt32LE(pos + 8)));
+        const wide = bytes.length >= 2 && bytes.length % 2 === 0 && bytes.every((b, i) => i % 2 === 0 || b === 0);
+        const name = (wide ? bytes.toString('utf16le') : bytes.toString('latin1')).trim();
+        return /^\w+$/.test(name) ? name : undefined;
+      }
+      // Le texte du script suit l'enregistrement CODE, hors de sa longueur.
+      if (tag === 'CODE') {
+        if (pos + 12 > data.length) return undefined;
+        pos += 12 + data.readUInt32LE(pos + 8);
+        continue;
+      }
+      if (tag === 'ENDB') return undefined;
+      pos += 4 + size;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
 /** Protection du script (SECB, pintable.h) : script chiffré, illisible sans VPX. */
 const DISABLE_SCRIPT_EDITING = 0x00000002;
 const DISABLE_EVERYTHING = 0x80000000;

@@ -39,6 +39,11 @@ export interface PupScriptFacts {
    * la fenêtre du DMD n'y montrerait que son cadre vide, par-dessus le DMD de la table.
    */
   dmdDisabledBy?: PupSwitch;
+  /**
+   * Le script envoie lui-même des déclencheurs « D » au pack (PuPlayer.B2SData "D…") : ceux que
+   * le pack attend d'une image du DMD (PuPCapture) peuvent venir de là.
+   */
+  dmdTriggers?: boolean;
 }
 
 /** Interrupteur du script qui décide si le PuP-Pack est lancé. */
@@ -75,6 +80,7 @@ export function pupScriptFacts(code: string): PupScriptFacts | undefined {
   for (const name of [...b2s, ...init]) if (name && !packNames.some((n) => n.toLowerCase() === name.toLowerCase())) packNames.push(name);
   const facts: PupScriptFacts = { packNames, playlistAdd: /\.playlistadd\b/i.test(code) };
   if (/\.(LabelNew|LabelInit)\b/i.test(code)) facts.labels = true;
+  if (/\.B2SData\s*\(?\s*"D/i.test(code)) facts.dmdTriggers = true;
   const disabledBy = pupScriptSwitch(code);
   if (disabledBy) facts.disabledBy = disabledBy;
   const dmdDisabledBy = pupDmdSwitch(code);
@@ -377,14 +383,116 @@ function resolveValue(code: string, token: string): string[] {
   return [...code.matchAll(new RegExp(`\\b${token}\\s*=\\s*"([^"\\r\\n]*)"`, 'gi'))].map((v) => v[1]!.trim());
 }
 
+/** Le script pilote un jeu par PinMAME (`code` : scriptCode). */
+export function usesPinmameCode(code: string): boolean {
+  return /\bLoadVPM\b|VPinMAME\.Controller/i.test(code);
+}
+
+/** Ce qu'il faut savoir du script pour dire comment le plugin trouve le pack. */
+export interface PupLoadFacts {
+  usesPinmame: boolean;
+  roms: string[];
+  pup?: PupScriptFacts;
+  /** Nom du jeu donné à B2S Server (cGameName), pour une table sans ROM. */
+  b2sName?: string;
+}
+
+/**
+ * Personne ne chargera le pack : le script ne lance jamais PuP, et la table ne joue pas de ROM.
+ * Le plugin PUP de VPX 10.8.1 ne charge un pack de lui-même que pour un jeu PinMAME
+ * (PUPPlugin.cpp, OnControllersChanged, au commit af26b2d93 : un jeu publié par B2S, « b2s::… »,
+ * est ignoré). Ces packs sont faits pour PinUP Player branché sur B2S Server, qui les cherchait
+ * sous le nom du jeu donné à B2S. *Game of Thrones LE (VPW, Stern 2015)*, 28 octobre 2026 :
+ * script en FlexDMD, « Dim PuPlayer ' Not currently used », pack de mikeleonheart à côté ;
+ * vpinball.log disait « Plugin PUP loaded », jamais « PUP path ».
+ */
+export function pupLoaderNeeded(facts: PupLoadFacts): boolean {
+  return !facts.usesPinmame && !facts.pup;
+}
+
 /** Noms de dossier possibles du pack, dans l'ordre où le plugin les essaie. */
-export function expectedPackNames(facts: { usesPinmame: boolean; roms: string[]; pup?: PupScriptFacts } | undefined): string[] {
+export function expectedPackNames(facts: PupLoadFacts | undefined): string[] {
   if (!facts) return [];
   const names: string[] = [];
-  for (const name of [...(facts.pup?.packNames ?? []), ...(facts.usesPinmame ? facts.roms : [])]) {
+  // Sans chargement par le script ni par la ROM, le nom que lui donnait PinUP Player : celui du jeu pour B2S.
+  const own = pupLoaderNeeded(facts) && facts.b2sName ? [facts.b2sName] : [];
+  for (const name of [...(facts.pup?.packNames ?? []), ...(facts.usesPinmame ? facts.roms : []), ...own]) {
     if (name && !names.some((n) => n.toLowerCase() === name.toLowerCase())) names.push(name);
   }
   return names;
+}
+
+// ---------- Lancement du pack par Cyber Pinball ----------
+
+/** Lancement du pack ajouté au script par Cyber Pinball, quand le script ne le fait pas. */
+export interface PupLoader {
+  /** Dossier du pack dans pupvideos. */
+  pack: string;
+  /** Objet table (« Table1 ») : le pack est lancé au début de sa Sub <table>_Init ; absent, à la fin du script. */
+  table?: string;
+}
+
+const LOADER_SUB = 'CyberPinball_PuPStart';
+
+/**
+ * Le script qui lance le pack comme le ferait la table : un objet PinUpPlayer.PinDisplay, puis
+ * B2SInit avec le nom du dossier (PUPPinDisplay::B2SInit charge le pack et démarre ses écrans).
+ * Le plugin demande de le faire pendant l'initialisation de la table : l'appel est ajouté au
+ * début de <table>_Init, sur la ligne de la Sub (« Sub Table1_Init : CyberPinball_PuPStart ») ;
+ * la Sub elle-même, après la dernière ligne. Les numéros de ligne du script ne bougent pas.
+ * Sans plugin PUP, l'erreur est ignorée (On Error Resume Next, dans la Sub seulement) puis
+ * effacée : un « If Err Then MsgBox » plus loin dans <table>_Init ne la verrait pas.
+ */
+export function addPupLoader(script: string, loader: PupLoader): string {
+  const eol = /\r\n/.test(script) ? '\r\n' : '\n';
+  const parts = script.split(/(\r?\n)/);
+  let called = false;
+  if (loader.table) {
+    const name = loader.table.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const head = new RegExp(`^(\\s*(?:(?:public|private)\\s+)?sub\\s+${name}_init\\b(?:\\s*\\(\\s*\\))?)`, 'i');
+    for (let i = 0; i < parts.length && !called; i += 2) {
+      const line = parts[i]!;
+      const at = commentStart(line);
+      const code = at < 0 ? line : line.slice(0, at);
+      if (!head.test(code)) continue;
+      parts[i] = line.replace(head, `$1 : ${LOADER_SUB}`);
+      called = true;
+    }
+  }
+  let text = parts.join('');
+  if (text && !/\r?\n$/.test(text)) text += eol;
+  const pack = loader.pack.replace(/"/g, '""');
+  const lines = [
+    `Dim CyberPinball_PuP`,
+    `Sub ${LOADER_SUB} : On Error Resume Next : Set CyberPinball_PuP = CreateObject("PinUpPlayer.PinDisplay") : CyberPinball_PuP.B2SInit "", "${pack}" : Err.Clear : End Sub`,
+    ...(called ? [] : [LOADER_SUB]),
+  ];
+  return text + lines.join(eol) + eol;
+}
+
+// ---------- Déclencheurs par images du DMD ----------
+
+/**
+ * Déclencheurs actifs du pack (triggers.pup à sa racine) : ceux qui attendent une image du DMD
+ * (« D<n> » avec PupCapture\<n>.bmp), et tous.
+ */
+export function captureTriggers(root: string): { capture: number; total: number } {
+  const file = readDirents(root).find((d) => d.isFile() && d.name.toLowerCase() === 'triggers.pup');
+  if (!file) return { capture: 0, total: 0 };
+  const captureDir = readDirents(root).find((d) => d.isDirectory() && d.name.toLowerCase() === 'pupcapture');
+  const images = new Set(captureDir ? readDirents(path.join(root, captureDir.name)).filter((d) => d.isFile()).map((d) => d.name.toLowerCase()) : []);
+  let capture = 0;
+  let total = 0;
+  for (const line of readText(path.join(root, file.name)).split(/\r?\n/).slice(1)) {
+    const cols = parseCsvLine(line);
+    if (cols.length < 4 || cols[1]!.trim() !== '1') continue;
+    const trigger = cols[3]!.trim();
+    if (!/^[A-Z]\d/i.test(trigger)) continue;
+    total++;
+    const d = /^D(\d+)$/i.exec(trigger);
+    if (d && Number(d[1]) > 0 && images.has(`${Number(d[1])}.bmp`)) capture++;
+  }
+  return { capture, total };
 }
 
 // ---------- screens.pup ----------

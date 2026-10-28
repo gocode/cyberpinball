@@ -968,6 +968,17 @@ Sur la borne (ou le poste de développement), avec The Goonies Never Say Die Pin
 | 505 | Fronton et DMD recalés en partie | Poste à 3 écrans (fronton et DMD sur deux PL2294H). Lancer The Matrix, jouer une bille, quitter. | Dans les 2 s qui suivent l'ouverture de la partie, le DMD (« Visual Pinball Score View ») passe sur son écran, à la même taille ; le fronton reste sur le sien ; ni l'un ni l'autre ne prend le focus (les flippers répondent). Les vidéos du pack faites pour le DMD s'y voient. Le journal du menu dit « Partie : « Visual Pinball Score View » ramenée sur l'écran du rôle dmd (… → …) », une seule fois. |
 | 506 | Rien ne bouge sans homonymes | Borne dont les écrans ont des noms différents, ou VPX qui repère aussi la position. Lancer une partie. | Aucune ligne « ramenée sur l'écran » dans le journal du menu ; les fenêtres de VPX restent où il les ouvre. |
 
+## PuP-Pack que personne ne lance
+
+Sur la borne, avec Game of Thrones LE (Stern 2015), VPW 1.2.1, et le pack « GOT PupPack v1.0 » de mikeleonheart rangé tel quel dans `pupvideos`. La preuve sans opérateur : `packages/core/src/test/puplancement.test.ts`.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 517 | Médecin de Game of Thrones | Fiche de Game of Thrones > « Diagnostiquer et réparer ». | Constat « PuP-Pack « gameofthrones » introuvable », correction « Renommer « GOT PupPack v1.0 » en « gameofthrones » » ; après elle, « PuP-Pack jamais lancé », correction « Lancer le PuP-Pack (gameofthrones, dans … VPW 1.2.1.vbs) ». Après les deux : plus que « Vidéos du PuP-Pack déclenchées par le DMD : sans effet » (183 déclencheurs sur 185) ; la fiche dit « Script adapté ». |
+| 518 | Partie de Game of Thrones | Sans passer par le médecin (pack sous son nom d'archive, sans `.vbs`), lancer Game of Thrones, attendre l'intro, jouer une bille, quitter. | Avant la partie, le pack est renommé et le `.vbs` écrit (journal du menu : « PuP-Pack (…) : … »). En partie : la vidéo de fond du pack sur le fronton, le DMD de FlexDMD inchangé. `vpinball.log` dit « PUP path: …\pupvideos\gameofthrones ». Aucun message d'erreur de script. |
+| 519 | Santé de la borne | Menu système > « Borne » > « Santé de la borne ». | Sous « PuP-Packs », Game of Thrones est cité pour « Vidéos du PuP-Pack déclenchées par le DMD : sans effet », plus pour un pack non lancé. |
+| 520 | Mise à jour de la table | Remplacer le `.vpx` de Game of Thrones par une autre version (Parties du jeu > Table > Remplacer), puis lancer une partie. | Le `.vbs` est refait d'après le nouveau script avant la partie ; les vidéos de fond du pack sont toujours là. |
+
 ## Amis : le réseau des bornes
 
 Deux bornes (ou la borne et le poste de développement), installées par l'installeur, chacune sur sa box ; puis les deux sur le même réseau local. La preuve sans opérateur : `social.test.ts`, `social-net.test.ts`, `firewall.test.ts` et `.\docs\demo-amis.ps1`.

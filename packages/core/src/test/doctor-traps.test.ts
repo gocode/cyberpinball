@@ -27,6 +27,8 @@ const TABLE = 'Attack from Mars (Bally 1995)';
 const PUP_SCRIPT = `${SCRIPT}Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\nPuPlayer.B2SInit "", cGameName\r\n`;
 /** Même table, dont le script coupe le pack (« usePUP = False », comme 2001 : A Space Odyssey). */
 const PUP_OFF_SCRIPT = `${SCRIPT}usePUP = False\r\nIf usePUP = True Then\r\n  Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\n  PuPlayer.B2SInit "", cGameName\r\nEnd If\r\n`;
+/** Même table refaite sans ROM, en FlexDMD, dont le script ne lance jamais PuP (Game of Thrones LE, VPW). */
+const NO_PUP_SCRIPT = 'Const cGameName="afm_113b"\r\nSub Table1_Init\r\n  LoadEM\r\n  Set FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nEnd Sub\r\n';
 /** Borne à trois écrans : backglass, DMD 4:1, pas de topper ; playfield 16:9 couché, Windows en paysage. */
 const CABINET: PupCabinet = {
   backglass: true,
@@ -328,6 +330,24 @@ const TRAPS: Trap[] = [
       write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(PUP_OFF_SCRIPT));
     },
     script: scriptFacts(PUP_OFF_SCRIPT),
+  },
+  // Table originale en FlexDMD dont le script ne lance jamais PuP (Game of Thrones LE, VPW).
+  {
+    code: 'pupNotLoaded',
+    arm: (folder) => {
+      healthyPack(folder);
+      write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(NO_PUP_SCRIPT));
+    },
+    script: scriptFacts(NO_PUP_SCRIPT),
+  },
+  {
+    code: 'pupCaptureUnseen',
+    arm: (folder) => {
+      const pack = healthyPack(folder);
+      write(path.join(pack, 'triggers.pup'), 'ID,Active,Descript,Trigger,ScreenNum,PlayList\r\n2,1,Drain,D2,2,Drain\r\n');
+      write(path.join(pack, 'PupCapture', '2.bmp'), 'bmp');
+    },
+    script: scriptFacts(NO_PUP_SCRIPT),
   },
   {
     code: 'pupCaptureRom',

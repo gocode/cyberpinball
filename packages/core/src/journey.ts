@@ -464,7 +464,7 @@ function backglassStep(input: JourneyInput): JourneyStep | undefined {
   return extraStep(input, 'backglass', 'b2s', title, t('Facultatif : sans lui, le menu garde son image sur l’écran du fronton pendant la partie.'), (s) => t('Récupérer le fronton : {label}', { label: versionLabel(s.file) }));
 }
 
-const PUP_FIXES: readonly Finding['code'][] = ['pupMissing', 'pupNested', 'pupDisabledByScript', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupHidesDmd', 'pupPlaylistOrder'];
+const PUP_FIXES: readonly Finding['code'][] = ['pupMissing', 'pupNotLoaded', 'pupNested', 'pupDisabledByScript', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupHidesDmd', 'pupPlaylistOrder'];
 
 function pupStep(input: JourneyInput): JourneyStep | undefined {
   const script = input.script && !('error' in input.script) ? input.script : undefined;

@@ -227,6 +227,7 @@ export function tablesFacts(tables: { file: string; title: string; findings?: re
  */
 export const PUP_HEALTH_FINDINGS = [
   'pupMissing',
+  'pupNotLoaded',
   'pupNested',
   'pupDisabledByScript',
   'scriptPatchStale',
@@ -234,6 +235,7 @@ export const PUP_HEALTH_FINDINGS = [
   'pupOptionMismatch',
   'pupOptionUnsuited',
   'pupHidesDmd',
+  'pupCaptureUnseen',
   'pupLog',
 ] as const satisfies readonly Finding['code'][];
 

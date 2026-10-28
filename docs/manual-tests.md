@@ -968,6 +968,17 @@ On the cabinet (or the development PC), with The Goonies Never Say Die Pinball (
 | 505 | Backglass and DMD realigned in game | "Poste à 3 écrans" PC (backglass and DMD on two PL2294H). Start The Matrix, play one ball, quit. | Within 2 s of the game opening, the DMD ("Visual Pinball Score View") moves to its screen, at the same size; the backglass stays on its own; neither takes the focus (the flippers respond). The pack's videos meant for the DMD show there. The menu log says "Partie : « Visual Pinball Score View » ramenée sur l'écran du rôle dmd (… → …)", once. |
 | 506 | Nothing moves without same-name screens | Cabinet whose screens have different names, or a VPX that also finds the position. Start a game. | No "ramenée sur l'écran" line in the menu log; the VPX windows stay where it opens them. |
 
+## PuP-Pack nobody starts
+
+On the cabinet, with Game of Thrones LE (Stern 2015), VPW 1.2.1, and mikeleonheart's "GOT PupPack v1.0" pack placed as is in `pupvideos`. The unattended proof: `packages/core/src/test/puplancement.test.ts`.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 517 | Game of Thrones doctor | Game of Thrones details screen > "Diagnostiquer et réparer" (Diagnose and repair). | Finding "PuP-Pack « gameofthrones » introuvable" (PuP-Pack "gameofthrones" not found), fix "Renommer « GOT PupPack v1.0 » en « gameofthrones »" (Rename); after it, "PuP-Pack jamais lancé" (PuP-Pack never started), fix "Lancer le PuP-Pack (gameofthrones, dans … VPW 1.2.1.vbs)" (Start the PuP-Pack). After both: only "Vidéos du PuP-Pack déclenchées par le DMD : sans effet" (PuP-Pack videos triggered by the DMD: no effect) remains (183 triggers out of 185); the details screen says "Script adapté" (Adapted script). |
+| 518 | Game of Thrones game | Without going through the doctor (pack under its archive name, no `.vbs`), start Game of Thrones, wait for the intro, play one ball, quit. | Before the game, the pack is renamed and the `.vbs` written (menu log: "PuP-Pack (…) : …"). In game: the pack's background video on the backglass, the FlexDMD DMD unchanged. `vpinball.log` says "PUP path: …\pupvideos\gameofthrones". No script error message. |
+| 519 | Cabinet health | System menu > "Borne" (Cabinet) > "Santé de la borne" (Cabinet health). | Under "PuP-Packs", Game of Thrones is listed for "Vidéos du PuP-Pack déclenchées par le DMD : sans effet" (PuP-Pack videos triggered by the DMD: no effect), no longer for a pack never started. |
+| 520 | Table update | Replace the Game of Thrones `.vpx` with another version (Parties du jeu (Game parts) > Table > Replace), then start a game. | The `.vbs` is rebuilt from the new script before the game; the pack's background videos are still there. |
+
 ## Friends: the cabinet network
 
 Two cabinets (or the cabinet and the development machine), installed with the installer, each on its own router; then both on the same local network. The unattended proof: `social.test.ts`, `social-net.test.ts`, `firewall.test.ts` and `.\docs\demo-amis.ps1`.

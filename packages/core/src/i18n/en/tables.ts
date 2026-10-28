@@ -44,6 +44,23 @@ export const messages: Record<string, string> = {
   'Ajoutez le pack avec « Ajouter une table » : il sera rangé et nommé comme il faut.': 'Add the pack with “Add a table”: it will be filed and named correctly.',
   'La table se joue sans ses vidéos.': 'The table plays without its videos.',
   'Renommer « {from} » en « {to} »': 'Rename “{from}” to “{to}”',
+  'Le script ne lance pas ce pack : il est fait pour PinUP Player, qui le cherchait sous le nom du jeu pour B2S Server, pupvideos\\{name}. Cyber Pinball le lance sous ce nom.':
+    'The script doesn’t start this pack: it was made for PinUP Player, which looked for it under the game name given to B2S Server, pupvideos\\{name}. Cyber Pinball starts it under that name.',
+  'PuP-Pack jamais chargé': 'PuP-Pack never loaded',
+  'Ni le script ni une ROM ne lancent de PuP-Pack, et rien ne dit lequel de ces dossiers lancer : {list}. La table se joue sans ses vidéos ; gardez un seul pack dans pupvideos.':
+    'Neither the script nor a ROM starts a PuP-Pack, and nothing says which of these folders to start: {list}. The table plays without its videos; keep a single pack in pupvideos.',
+  'PuP-Pack jamais lancé': 'PuP-Pack never started',
+  'Le script de la table ne lance jamais de PuP-Pack, et la table ne joue pas de ROM : le plugin PUP de VPX 10.8.1 ne charge alors rien de lui-même, même avec pupvideos\\{pack} bien rangé. Ce pack est fait pour PinUP Player, que B2S Server lançait sans rien demander au script.':
+    'The table’s script never starts a PuP-Pack, and the table plays no ROM: the VPX 10.8.1 PUP plugin then loads nothing by itself, even with pupvideos\\{pack} in place. This pack was made for PinUP Player, which B2S Server started without the script asking.',
+  'La table n’est pas modifiée : VPX joue {file}, une copie de son script qui lance le pack au début de {init}.': 'The table isn’t modified: VPX plays {file}, a copy of its script that starts the pack at the beginning of {init}.',
+  'La table n’est pas modifiée : VPX joue {file}, une copie de son script qui lance le pack à son chargement.': 'The table isn’t modified: VPX plays {file}, a copy of its script that starts the pack when it loads.',
+  'Le script de la table est protégé : Cyber Pinball ne peut pas y ajouter le lancement du pack.': 'The table’s script is protected: Cyber Pinball can’t add the pack’s start to it.',
+  'Lancer le PuP-Pack ({pack}, dans {file})': 'Start the PuP-Pack ({pack}, in {file})',
+  'Vidéos du PuP-Pack déclenchées par le DMD : sans effet': 'PuP-Pack videos triggered by the DMD: no effect',
+  '{n} déclencheur sur {total} attend une image du DMD (PuPCapture).': '{n} trigger out of {total} waits for a DMD image (PuPCapture).',
+  '{n} déclencheurs sur {total} attendent une image du DMD (PuPCapture).': '{n} triggers out of {total} wait for a DMD image (PuPCapture).',
+  'Le plugin PUP de VPX 10.8.1 ne reçoit ces images que des ROM de PinMAME ; le DMD de cette table (FlexDMD, UltraDMD) ne les lui donne pas : ces vidéos ne se lanceront pas. Restent les vidéos de fond de chaque écran et les déclencheurs envoyés par la table.':
+    'The VPX 10.8.1 PUP plugin only gets these images from PinMAME ROMs; this table’s DMD (FlexDMD, UltraDMD) doesn’t provide them: these videos won’t start. What remains: each screen’s background videos and the triggers the table sends.',
   'PuP-Pack inutilisé': 'Unused PuP-Pack',
   'PuP-Packs inutilisés': 'Unused PuP-Packs',
   'Le plugin charge pupvideos\\{pack} ; {list} ne sert à aucune table du dossier ({size}).': 'The plugin loads pupvideos\\{pack}; {list} isn’t used by any table in the folder ({size}).',

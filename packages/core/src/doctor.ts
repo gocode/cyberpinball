@@ -37,15 +37,20 @@ import {
   cabinetFullDmd,
   chooseVariant,
   describePupCabinet,
+  addPupLoader,
   describeSwitches,
   enablePupSwitch,
   expectedPackNames,
   findPackRoot,
   isVisible,
   packDrawsDmd,
+  captureTriggers,
+  pupLoaderNeeded,
   pupScriptFacts,
   pupSwitchesToEnable,
   pupWindows,
+  usesPinmameCode,
+  type PupLoader,
   playlistRenames,
   screenRole,
   scoreVariant,
@@ -69,7 +74,7 @@ import { EDGE_LABELS } from './layout';
 import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
 import { scriptCode } from './vbscript';
-import { readVpxScript } from './vpxinfo';
+import { readVpxScript, readVpxTableName } from './vpxinfo';
 import { ratioLabel } from './zones';
 
 export type FindingSeverity = 'error' | 'warning' | 'info';
@@ -103,6 +108,7 @@ export const FINDING_CODES = [
   'crashReport',
   'infoMissing',
   'pupMissing',
+  'pupNotLoaded',
   'pupNested',
   'pupOrphan',
   'pupOptionNotApplied',
@@ -115,6 +121,7 @@ export const FINDING_CODES = [
   'pupPlayfieldScreen',
   'pupScriptDriven',
   'pupCaptureRom',
+  'pupCaptureUnseen',
   'pupLog',
   'manualView',
   'tableOrientation',
@@ -163,6 +170,11 @@ export interface ScriptFacts {
   drawsDmd?: boolean;
   /** Absent si la table n'utilise pas PuP. */
   pup?: PupScriptFacts;
+  /**
+   * Nom du jeu donné à B2S Server (cGameName), pour une table sans ROM : celui sous lequel
+   * PinUP Player cherchait le pack quand le script ne le lance pas (pupLoaderNeeded).
+   */
+  b2sName?: string;
 }
 
 export interface DoctorContext {
@@ -216,6 +228,15 @@ export function setPupMemory<T extends { [key: string]: unknown }>(info: T, pack
   const pup = Object.fromEntries(Object.entries(own.pup ?? {}).filter(([name]) => name.toLowerCase() !== pack.toLowerCase()));
   pup[pack] = memory;
   return { ...info, CyberPinball: { ...own, pup } };
+}
+
+/** Le .info où ce qu'on retient du pack `from` passe sous son nouveau nom `to`. */
+export function renamePupMemory<T extends { [key: string]: unknown }>(info: T, from: string, to: string): T {
+  const memory = pupMemory(info, from);
+  if (!memory) return info;
+  const own = { ...(info.CyberPinball as { pup?: Record<string, PupMemory> } | undefined) };
+  const pup = Object.fromEntries(Object.entries(own.pup ?? {}).filter(([name]) => name.toLowerCase() !== from.toLowerCase()));
+  return setPupMemory({ ...info, CyberPinball: { ...own, pup } }, to, memory);
 }
 
 function withPupMemory(info: { [key: string]: unknown }, pack: string, memory: PupMemory): string {
@@ -307,7 +328,7 @@ export function tableFolderName(title: string, manufacturer?: string, year?: num
 /** Nom(s) de ROM d'après le script VBScript de la table. */
 export function scriptFacts(vbs: string): ScriptFacts {
   const code = scriptCode(vbs);
-  const usesPinmame = /\bLoadVPM\b|VPinMAME\.Controller/i.test(code);
+  const usesPinmame = usesPinmameCode(code);
   const roms: string[] = [];
   const add = (name: string) => {
     if (name && !roms.some((r) => r.toLowerCase() === name.toLowerCase())) roms.push(name);
@@ -325,6 +346,10 @@ export function scriptFacts(vbs: string): ScriptFacts {
   if (usesPinmame || dmdFolder || /CreateObject\s*\(\s*"(FlexDMD\.FlexDMD|UltraDMD\.DMDObject)"/i.test(code)) facts.drawsDmd = true;
   const pup = pupScriptFacts(code);
   if (pup) facts.pup = pup;
+  if (!usesPinmame) {
+    const b2s = /\.B2SName\s*=\s*"([^"\r\n]+)"/i.exec(code)?.[1] ?? /\bcGameName\s*=\s*"([^"\r\n]+)"/i.exec(code)?.[1];
+    if (b2s?.trim()) facts.b2sName = b2s.trim();
+  }
   return facts;
 }
 
@@ -731,7 +756,7 @@ function staleFinding(override: Override): Finding {
  * gardée. Sans elles, un pack installé reste éteint tant qu'on n'ouvre pas le médecin
  * (2001 - A Space Odyssey, 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupPlaylistOrder'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupPlaylistOrder'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -879,6 +904,44 @@ function pupSwitchFinding(entry: TableEntry, pack: string, offs: PupSwitch[], ov
   };
 }
 
+/**
+ * Le pack que ni le script ni la ROM ne lancent, lancé par le .vbs de Cyber Pinball : le script
+ * de la table recopié, plus le lancement au début de <table>_Init (addPupLoader). Un .vbs venu
+ * d'ailleurs reçoit le lancement dans ce fichier même.
+ */
+function pupLoaderFinding(entry: TableEntry, pack: string, override: Override | undefined): Finding {
+  const base = path.basename(entry.file).replace(/\.vpx$/i, '');
+  const target = override?.file ?? path.join(entry.folder, `${base}.vbs`);
+  const file = path.basename(target);
+  const table = readVpxTableName(entry.file);
+  const loader: PupLoader = table ? { pack, table } : { pack };
+  let content: string | undefined;
+  if (override) content = addPupLoader(override.text, loader);
+  else {
+    const embedded = readVpxScript(entry.file);
+    if (embedded !== undefined) content = buildScriptPatch(embedded, [], loader);
+  }
+  const params = { pack, file, init: table ? `${table}_Init` : '' };
+  return {
+    code: 'pupNotLoaded',
+    severity: 'warning',
+    title: t('PuP-Pack jamais lancé'),
+    detail: [
+      t('Le script de la table ne lance jamais de PuP-Pack, et la table ne joue pas de ROM : le plugin PUP de VPX 10.8.1 ne charge alors rien de lui-même, même avec pupvideos\\{pack} bien rangé. Ce pack est fait pour PinUP Player, que B2S Server lançait sans rien demander au script.', params),
+      content && !override
+        ? table
+          ? t('La table n’est pas modifiée : VPX joue {file}, une copie de son script qui lance le pack au début de {init}.', params)
+          : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script qui lance le pack à son chargement.', params)
+        : !content
+          ? t('Le script de la table est protégé : Cyber Pinball ne peut pas y ajouter le lancement du pack.')
+          : '',
+    ]
+      .filter(Boolean)
+      .join(' '),
+    fix: content ? { label: t('Lancer le PuP-Pack ({pack}, dans {file})', params), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+  };
+}
+
 /** Règles du § 4.4 de la recherche sur les PuP-Packs, sans lancer VPX. */
 function checkPup(entry: TableEntry, context: DoctorContext, override?: Override): Finding[] {
   const ctx = { ...context, cabinet: withTableBackglass(entry, context.cabinet) };
@@ -889,12 +952,16 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
   const packs = pupDir ? listDirs(pupDir) : [];
   if (!facts?.pup && !packs.length) return [];
   const findings: Finding[] = [];
+  const othersKnown = ctx.otherPackNames !== undefined || listSafe(folder).filter((f) => f.toLowerCase().endsWith('.vpx')).length <= 1;
+  // Ni le script ni la ROM ne lancent le pack : Cyber Pinball le lancera (pupNotLoaded), sous le
+  // nom du jeu pour B2S, ou à défaut sous celui du seul dossier du pack.
+  const loader = facts ? pupLoaderNeeded(facts) : false;
   const expected = expectedPackNames(facts);
+  if (loader && !expected.length && othersKnown && packs.length === 1) expected.push(packs[0]!);
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
   const matching = packs.filter((p) => expected.some((e) => same(e, p)));
   // Un pack attendu par une autre version du dossier n'est ni orphelin ni à renommer.
   const others = packs.filter((p) => !matching.includes(p) && !(ctx.otherPackNames ?? []).some((n) => same(n, p)));
-  const othersKnown = ctx.otherPackNames !== undefined || listSafe(folder).filter((f) => f.toLowerCase().endsWith('.vpx')).length <= 1;
   const pupvideos = pupDir ?? path.join(folder, 'pupvideos');
 
   // Dossier en double : pupvideos\X\X\screens.pup, ou dossier d'archive en trop.
@@ -925,12 +992,17 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
   if (facts && expected.length && !matching.length) {
     const wanted = expected[0]!;
     const candidate = othersKnown && others.length === 1 ? others[0] : undefined;
+    // L'option retenue pour le pack le suit sous son nouveau nom.
+    const memory = candidate ? pupMemory(entry.info, candidate) : undefined;
+    const keep: FileOp[] = candidate && memory && fs.existsSync(entry.infoFile) ? [{ op: 'write', path: entry.infoFile, content: JSON.stringify(renamePupMemory(entry.info, candidate, wanted), null, 2) + '\n' }] : [];
     findings.push({
       code: 'pupMissing',
       severity: 'warning',
       title: t('PuP-Pack « {name} » introuvable', { name: wanted }),
       detail: [
-        t('Le plugin PUP cherche {paths} à côté de la table.', { paths: formatList(expected.map((e) => `pupvideos\\${e}`), 'or') }),
+        loader
+          ? t('Le script ne lance pas ce pack : il est fait pour PinUP Player, qui le cherchait sous le nom du jeu pour B2S Server, pupvideos\\{name}. Cyber Pinball le lance sous ce nom.', { name: wanted })
+          : t('Le plugin PUP cherche {paths} à côté de la table.', { paths: formatList(expected.map((e) => `pupvideos\\${e}`), 'or') }),
         candidate
           ? t('« {name} » ne sera pas chargé sous ce nom.', { name: candidate })
           : packs.length
@@ -938,7 +1010,16 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
             : t('Ajoutez le pack avec « Ajouter une table » : il sera rangé et nommé comme il faut.'),
         t('La table se joue sans ses vidéos.'),
       ].join(' '),
-      fix: candidate ? { label: t('Renommer « {from} » en « {to} »', { from: candidate, to: wanted }), ops: [{ op: 'move', from: path.join(pupvideos, candidate), to: path.join(pupvideos, wanted) }] } : undefined,
+      fix: candidate ? { label: t('Renommer « {from} » en « {to} »', { from: candidate, to: wanted }), ops: [{ op: 'move', from: path.join(pupvideos, candidate), to: path.join(pupvideos, wanted) }, ...keep] } : undefined,
+    });
+  } else if (loader && !expected.length && othersKnown && others.length) {
+    // Garde-fou : un pack présent que personne ne nommera jamais au plugin ne passe pas en silence
+    // (Game of Thrones LE, 28 octobre 2026 : aucun constat, aucune vidéo).
+    findings.push({
+      code: 'pupMissing',
+      severity: 'warning',
+      title: t('PuP-Pack jamais chargé'),
+      detail: t('Ni le script ni une ROM ne lancent de PuP-Pack, et rien ne dit lequel de ces dossiers lancer : {list}. La table se joue sans ses vidéos ; gardez un seul pack dans pupvideos.', { list: others.map(quote).join(', ') }),
     });
   } else if (matching.length && othersKnown && others.length) {
     const size = others.reduce((sum, p) => sum + sizeOf(path.join(pupvideos, p)), 0);
@@ -969,6 +1050,12 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
   const offs = played !== undefined ? pupSwitchesToEnable(scriptCode(played), drawsDmd) : facts?.pup?.disabledBy ? [facts.pup.disabledBy] : [];
   const off = offs.find((s) => s.kind !== 'dmd');
   if (offs.length && matching.length) findings.push(pupSwitchFinding(entry, matching[0]!, offs, override, drawsDmd));
+
+  // Script qui ne lance jamais de pack, table sans ROM : le plugin ne le charge pas de lui-même.
+  // Le .vbs de Cyber Pinball qui le lance déjà compte ; un .vbs à refaire est déjà signalé.
+  if (loader && matching.length && override?.state.kind !== 'stale' && !(override && pupScriptFacts(scriptCode(override.text)))) {
+    findings.push(pupLoaderFinding(entry, matching[0]!, override));
+  }
 
   for (const pack of matching) {
     const dir = path.join(pupvideos, pack);
@@ -1103,6 +1190,24 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
       });
     }
 
+    // PuPCapture sans PinMAME : le plugin ne reçoit les images du DMD que des ROM de PinMAME
+    // (B2SPluginEventStream, GetIdentifyFrame) ; FlexDMD ne les lui donne pas (FlexDMDPlugin.cpp,
+    // « TODO … pup events », au commit af26b2d93). Seul le script pourrait les envoyer (B2SData "D…").
+    if (info.hasPupCapture && facts && !facts.usesPinmame && !facts.pup?.dmdTriggers) {
+      const { capture, total } = captureTriggers(info.root);
+      if (capture > 0) {
+        findings.push({
+          code: 'pupCaptureUnseen',
+          severity: 'warning',
+          title: t('Vidéos du PuP-Pack déclenchées par le DMD : sans effet'),
+          detail: [
+            tn(capture, '{n} déclencheur sur {total} attend une image du DMD (PuPCapture).', '{n} déclencheurs sur {total} attendent une image du DMD (PuPCapture).', { n: capture, total }),
+            t('Le plugin PUP de VPX 10.8.1 ne reçoit ces images que des ROM de PinMAME ; le DMD de cette table (FlexDMD, UltraDMD) ne les lui donne pas : ces vidéos ne se lanceront pas. Restent les vidéos de fond de chaque écran et les déclencheurs envoyés par la table.'),
+          ].join(' '),
+        });
+      }
+    }
+
     // PuPCapture : les images reconnues dépendent de la ROM exacte.
     const rom = facts?.usesPinmame ? facts.roms[0] : undefined;
     if (info.hasPupCapture && rom) {
@@ -1172,7 +1277,7 @@ function checkPupLog(entry: TableEntry, log: string, expected: string[], found: 
         detail: t('À la dernière partie, VPX a chargé « {path} » mais n’y a pas trouvé de screens.pup : les écrans du pack sont restés éteints.', { path: pupPath }),
       });
     }
-  } else if (!pupPath && expected.length && !found.some((f) => f.code === 'pupMissing' || f.code === 'pupDisabledByScript')) {
+  } else if (!pupPath && expected.length && !found.some((f) => f.code === 'pupMissing' || f.code === 'pupDisabledByScript' || f.code === 'pupNotLoaded')) {
     findings.push({
       code: 'pupLog',
       severity: 'warning',
