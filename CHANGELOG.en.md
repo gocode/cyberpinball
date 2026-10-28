@@ -31,6 +31,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - "Search the web…" on every add or choice screen: the built-in browser opens on a search already filled in. A part missing from a game starts a search on VPS, Downloads, VPForums and VPUniverse right away.
 - More reliable VPUniverse search: short words in the title ("say", "die") no longer empty the search, and the wait imposed by the site is no longer taken for "no results".
 - PuP-Packs visible in game: when a table's script keeps its PuP-Pack or PuP-DMD switched off, Cyber Pinball switches it on at install and before each game.
+- VPX windows in their place in game: when two screens share the same name, the backglass, the DMD and the score view no longer pile up; Cyber Pinball moves each one back to the screen of its role.
 
 ## 0.1.3
 

@@ -9,7 +9,8 @@
 // filet pour une autre version de VPX qui en ouvrirait une malgré tout.
 
 import { t, tn } from './i18n';
-import { VPX_PLAY_SETTINGS } from './vpx';
+import { ROLES, type ObservedDisplay, type Rect, type RoleId } from './model';
+import { VPX_PLAY_SETTINGS, vpxDisplayName, type VpxDisplayIdFormat } from './vpx';
 
 /** Fenêtres de jeu de VPX (Window.cpp). */
 export const VPX_GAME_TITLES = [
@@ -125,4 +126,92 @@ export function classifyVpxWindow(w: ObservedVpxWindow): VpxWindowVerdict {
     };
   }
   return { kind: 'dialog', message: text };
+}
+
+// ---------------------------------------------------------------------------
+// Recalage des fenêtres annexes
+//
+// VPX 10.8.1 ne reconnaît un écran que par son nom SDL (Window::GetDisplayConfig) et prend le
+// premier qui le porte : deux rôles sur deux écrans du même modèle ont leurs fenêtres sur le
+// même écran (poste à deux PL2294H : Backglass et Score View superposés, « Window #1 » et
+// « Window #2 » du journal « on display PL2294H »). En fenêtré, WndX et WndY sont relatifs à cet
+// écran et doivent y tenir : aucun réglage de VPinballX.ini ne l'en sort. Pendant la partie,
+// Cyber Pinball ramène donc ces fenêtres sur l'écran de leur rôle (frontend.ts, watchOccupied).
+
+/** Fenêtres annexes de VPX (Window.cpp), et le rôle dont chacune occupe l'écran. Le playfield n'en est pas : sa fenêtre, celle du rendu, n'est jamais déplacée. */
+export const VPX_ANCILLARY_WINDOWS = {
+  'Visual Pinball Backglass': 'backglass',
+  'Visual Pinball Score View': 'dmd',
+  'Visual Pinball Topper': 'topper',
+} as const satisfies Record<string, RoleId>;
+
+/**
+ * Rôles que VPX peut ouvrir sur un autre écran que le leur : avec une version qui repère les
+ * écrans par leur seul nom (`format` « name »), ceux dont un autre écran branché porte le même
+ * nom (vpxDisplayName). L'autre écran est celui d'un autre rôle (homonymousRoles, santé de la
+ * borne) ou un écran inutilisé du même modèle : VPX peut prendre l'un comme l'autre.
+ */
+export function confusableRoles(assignments: Partial<Record<RoleId, ObservedDisplay>>, observed: readonly ObservedDisplay[], format: VpxDisplayIdFormat | undefined): RoleId[] {
+  if (format !== 'name') return [];
+  const roles: RoleId[] = [];
+  for (const { id: role } of ROLES) {
+    const display = assignments[role];
+    if (!display) continue;
+    const name = vpxDisplayName(display);
+    if (observed.some((d) => d.gdiName !== display.gdiName && vpxDisplayName(d) === name)) roles.push(role);
+  }
+  return roles;
+}
+
+/** Fenêtre de VPX lue dans la pile de Windows (GetWindowRect : pixels physiques du bureau). */
+export interface PlacedVpxWindow {
+  title: string;
+  rect: Rect;
+  minimized?: boolean;
+}
+
+export interface VpxWindowMove<W extends PlacedVpxWindow> {
+  window: W;
+  role: RoleId;
+  /** Nouvelle place, à la même taille. */
+  to: Rect;
+}
+
+const centerOf = (r: Rect) => ({ x: r.x + r.width / 2, y: r.y + r.height / 2 });
+const holds = (r: Rect, p: { x: number; y: number }) => p.x >= r.x && p.x < r.x + r.width && p.y >= r.y && p.y < r.y + r.height;
+const clamp = (v: number, min: number, max: number) => Math.max(min, Math.min(max, v));
+
+/**
+ * Fenêtres annexes de VPX à ramener sur l'écran de leur rôle : celles d'un rôle confondu
+ * (confusableRoles) dont le centre n'est pas sur son écran (`screens`, bornes de l'écran de
+ * chaque rôle). Chacune garde sa taille et sa place dans l'écran où VPX l'a ouverte (WndX, WndY
+ * de VPinballX.ini sont relatifs à l'écran), sans en déborder. Une fenêtre déjà sur son écran
+ * n'est jamais touchée : ce que le joueur y règle dans le menu de VPX reste. `displays` : les
+ * écrans branchés, pour retrouver celui où VPX l'a ouverte.
+ */
+export function vpxWindowMoves<W extends PlacedVpxWindow>(
+  windows: readonly W[],
+  screens: Partial<Record<RoleId, Rect>>,
+  confused: readonly RoleId[],
+  displays: readonly Rect[],
+): VpxWindowMove<W>[] {
+  const moves: VpxWindowMove<W>[] = [];
+  for (const window of windows) {
+    const role = Object.hasOwn(VPX_ANCILLARY_WINDOWS, window.title) ? VPX_ANCILLARY_WINDOWS[window.title as keyof typeof VPX_ANCILLARY_WINDOWS] : undefined;
+    const target = role && confused.includes(role) ? screens[role] : undefined;
+    if (!role || !target || window.minimized || window.rect.width <= 0 || window.rect.height <= 0) continue;
+    const center = centerOf(window.rect);
+    if (holds(target, center)) continue;
+    const from = displays.find((d) => holds(d, center));
+    const offset = from ? { x: window.rect.x - from.x, y: window.rect.y - from.y } : { x: 0, y: 0 };
+    const { width, height } = window.rect;
+    const to = {
+      x: target.x + clamp(offset.x, 0, Math.max(0, target.width - width)),
+      y: target.y + clamp(offset.y, 0, Math.max(0, target.height - height)),
+      width,
+      height,
+    };
+    moves.push({ window, role, to });
+  }
+  return moves;
 }

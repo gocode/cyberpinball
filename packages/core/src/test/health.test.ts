@@ -193,6 +193,8 @@ function everyCase(): HealthFacts[] {
     { at, disks: [], screens: { configurations: 2, plugged: 3, active, better: 'Bureau' }, vpx: {} },
     // VPX 10.8.1 confond le fronton et le DMD, deux écrans du même nom.
     { at, disks: [], screens: { configurations: 1, plugged: 3, active, homonyms: [{ name: 'PL2294H', roles: ['backglass', 'dmd'] }] }, vpx: {} },
+    // Le playfield et le fronton : la fenêtre du playfield n'est pas déplacée.
+    { at, disks: [], screens: { configurations: 1, plugged: 3, active, homonyms: [{ name: 'PL2294H', roles: ['playfield', 'backglass'] }] }, vpx: {} },
   ];
 }
 

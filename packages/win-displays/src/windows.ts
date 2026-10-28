@@ -23,6 +23,11 @@ const SMTO_ABORTIFHUNG = 0x0002;
 /** Assez pour un rapport d'audit de VPX ; au-delà, le texte est tronqué. */
 const MAX_CONTROL_TEXT = 65_536;
 const VK_MENU = 0x12;
+const SWP_NOSIZE = 0x0001;
+const SWP_NOZORDER = 0x0004;
+const SWP_NOACTIVATE = 0x0010;
+const SWP_NOOWNERZORDER = 0x0200;
+const SWP_ASYNCWINDOWPOS = 0x4000;
 const KEYEVENTF_KEYUP = 0x0002;
 
 interface Api {
@@ -46,6 +51,7 @@ interface Api {
   SendMessageTimeoutW: NativeFn;
   keybd_event: NativeFn;
   SetCursorPos: NativeFn;
+  SetWindowPos: NativeFn;
 }
 
 let api: Api | undefined;
@@ -78,6 +84,7 @@ function loadApi(): Api {
     ),
     keybd_event: user32.func('void __stdcall keybd_event(uint8_t vk, uint8_t scan, uint32_t flags, uintptr_t extra)'),
     SetCursorPos: user32.func('bool __stdcall SetCursorPos(int x, int y)'),
+    SetWindowPos: user32.func('bool __stdcall SetWindowPos(void *hwnd, void *after, int x, int y, int cx, int cy, uint32_t flags)'),
   };
   return api;
 }
@@ -223,6 +230,16 @@ export function hideWindow(target: WindowInfo): void {
 /** Réaffiche une fenêtre masquée, sans l'activer. */
 export function showWindowInactive(target: WindowInfo): void {
   loadApi().ShowWindow(target.hwnd, SW_SHOWNA);
+}
+
+/**
+ * Déplace la fenêtre d'un autre processus en (x, y), pixels physiques du bureau, à la même
+ * taille : sans l'activer ni changer sa place dans la pile, et sans attendre son processus
+ * (SWP_ASYNCWINDOWPOS : la demande est postée à son fil, un VPX occupé ne bloque pas le menu).
+ */
+export function moveWindow(target: WindowInfo, x: number, y: number): boolean {
+  const flags = SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSIZE | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS;
+  return Boolean(loadApi().SetWindowPos(target.hwnd, null, Math.round(x), Math.round(y), 0, 0, flags));
 }
 
 /**

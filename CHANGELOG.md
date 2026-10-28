@@ -33,6 +33,7 @@ son interface).
 - « Chercher sur le web… » sur chaque écran d'ajout ou de choix : le navigateur intégré s'ouvre sur une recherche déjà remplie. Une partie absente d'un jeu lance d'office la recherche sur VPS, Téléchargements, VPForums et VPUniverse.
 - Recherche sur VPUniverse plus fiable : les mots courts du titre (« say », « die ») ne vident plus la recherche, et l'attente imposée par le site n'est plus prise pour « aucun résultat ».
 - PuP-Packs visibles en partie : quand le script d'une table garde son PuP-Pack ou son PuP-DMD éteint, Cyber Pinball l'allume à l'installation et avant chaque partie.
+- Fenêtres de VPX à leur place en partie : quand deux écrans portent le même nom, le fronton, le DMD et l'afficheur des scores ne se superposent plus ; Cyber Pinball ramène chacun sur l'écran de son rôle.
 
 ## 0.1.3
 

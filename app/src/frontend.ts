@@ -71,6 +71,8 @@ import {
   samePath,
   screensTable,
   occupiedRoles,
+  confusableRoles,
+  vpxWindowMoves,
   saveMenuMediaSettings,
   tableMediaVolume,
   newRecords,
@@ -85,6 +87,7 @@ import {
   type MenuMoment,
   type MenuPhase,
   type RoleRect,
+  type Rect,
   type AncillaryRoleId,
   type CabinetButtons,
   type CabinetTilt,
@@ -127,7 +130,7 @@ import {
   type TableRecords,
   type LegacyOrientation,
 } from '@cyberpinball/core';
-import { bringToFront, foregroundWindow, listWindows, visibleWindowsOf } from '@cyberpinball/win-displays';
+import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, windowRect } from './offscreen';
@@ -277,6 +280,13 @@ let occupied = new Set<RoleId>();
 let occupiedWatch: NodeJS.Timeout | undefined;
 /** Relecture des fenêtres pendant la partie : B2S, DMD et PuP s'ouvrent après la fenêtre de jeu. */
 const OCCUPIED_CHECK_MS = 2000;
+/**
+ * Recalage des fenêtres annexes de VPX pendant la partie (vpxWindowMoves) : rôles qu'il peut
+ * confondre, écran de chaque rôle et écrans branchés, déplacements déjà faits par fenêtre.
+ */
+let realign: { confused: RoleId[]; screens: Partial<Record<RoleId, Rect>>; displays: Rect[]; moves: Map<bigint, number> } | undefined;
+/** Une fenêtre que VPX remet sans cesse sur le mauvais écran n'est plus déplacée après ce nombre d'essais. */
+const REALIGN_TRIES = 3;
 
 // Médias des jeux (docs/recherche/medias.md, § 5) : résolus au démarrage du menu, quand
 // le modèle de la borne et la rotation du playfield sont connus.
@@ -1388,7 +1398,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 
   // Les écrans ont pu bouger depuis le démarrage du menu, la configuration de la borne aussi.
   const preparing = Date.now();
-  const { problem, choose, selection } = syncScreens();
+  const { problem, choose, selection, assignments } = syncScreens();
   if (choose || problem) {
     displayMode = false;
     cinema.stop();
@@ -1422,6 +1432,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque
   // écran (viewFor). Celui que VPX n'occupe pas (topper, backglass sans .directb2s) reste couvert.
   playing = table;
+  realign = simulated === undefined ? realignPlan(assignments) : undefined;
   hideTaskbars();
   const startedAt = new Date();
   const onPlaying = () => {
@@ -1511,7 +1522,8 @@ function watchOccupied(simulated: RoleId[] | undefined): void {
   dressCoveredSeen = false;
   const check = () => {
     try {
-      const stack = listWindows((w) => w.visible);
+      let stack = listWindows((w) => w.visible);
+      if (realignVpxWindows(stack)) stack = listWindows((w) => w.visible);
       update(occupiedRoles(roleRects, stack, process.pid));
       watchDressing(stack);
     } catch {
@@ -1540,6 +1552,41 @@ function stopWatchOccupied(): void {
   if (occupiedWatch) clearInterval(occupiedWatch);
   occupiedWatch = undefined;
   occupied = new Set();
+  realign = undefined;
+}
+
+/**
+ * Rôles que VPX peut ouvrir sur l'écran d'un autre (confusableRoles : VPX 10.8.1 et deux écrans
+ * du même nom) ; undefined quand il n'y en a pas, et rien n'est jamais déplacé.
+ */
+function realignPlan(assignments: Partial<Record<RoleId, ObservedDisplay>>): typeof realign {
+  const observed = observedDisplays();
+  const confused = confusableRoles(assignments, observed, profile.displayIdFormat);
+  if (!confused.length) return undefined;
+  console.log(`Partie : VPX repère les écrans par leur seul nom et peut confondre ceux de ${confused.join(', ')} ; ses fenêtres seront ramenées sur leur écran.`);
+  const screens: Partial<Record<RoleId, Rect>> = {};
+  for (const role of confused) if (assignments[role]) screens[role] = assignments[role]!.bounds;
+  return { confused, screens, displays: observed.map((d) => d.bounds), moves: new Map() };
+}
+
+/**
+ * Ramène sur l'écran de leur rôle les fenêtres annexes de VPX qu'il a ouvertes sur un autre
+ * (vpxWindowMoves), à la même taille, sans les activer. Renvoie true si une fenêtre a bougé.
+ */
+function realignVpxWindows(stack: ReturnType<typeof listWindows>): boolean {
+  if (!realign) return false;
+  let moved = false;
+  for (const { window, role, to } of vpxWindowMoves(stack.filter((w) => w.pid !== process.pid), realign.screens, realign.confused, realign.displays)) {
+    const tries = (realign.moves.get(window.handle) ?? 0) + 1;
+    realign.moves.set(window.handle, tries);
+    if (tries > REALIGN_TRIES) {
+      if (tries === REALIGN_TRIES + 1) console.log(`Partie : VPX remet sans cesse « ${window.title} » hors de l'écran du rôle ${role} ; elle est laissée où il la met.`);
+      continue;
+    }
+    moved = moveWindow(window, to.x, to.y) || moved;
+    console.log(`Partie : « ${window.title} » ramenée sur l'écran du rôle ${role} (${window.rect.x}, ${window.rect.y} → ${to.x}, ${to.y}).`);
+  }
+  return moved;
 }
 
 /** Le menu, resté derrière VPX, reprend le premier plan ; renvoie true s'il est bien revenu. */

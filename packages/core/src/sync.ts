@@ -161,12 +161,19 @@ export function planVpxSync(
       const name = vpxDisplayName(display);
       const sameName = observed.filter((d) => vpxDisplayName(d) === name);
       if (sameName.length > 1) {
+        // Ses fenêtres annexes sont ramenées sur leur écran pendant la partie (vpxWindowMoves), pas celle du playfield.
         findings.push({
           severity: 'warning',
-          message: t(
-            "{role} : {n} écrans s'appellent « {name} ». Cette version de VPX repère les écrans par leur seul nom et prendra le premier ; le {role} peut s'ouvrir sur le mauvais écran.",
-            { role: role.label, n: sameName.length, name },
-          ),
+          message:
+            role.id === 'playfield'
+              ? t(
+                  "{role} : {n} écrans s'appellent « {name} ». Cette version de VPX repère les écrans par leur seul nom et prendra le premier ; le {role} peut s'ouvrir sur le mauvais écran.",
+                  { role: role.label, n: sameName.length, name },
+                )
+              : t(
+                  "{role} : {n} écrans s'appellent « {name} ». Cette version de VPX repère les écrans par leur seul nom et prendra le premier ; Cyber Pinball ramène la fenêtre du {role} sur son écran pendant la partie.",
+                  { role: role.label, n: sameName.length, name },
+                ),
         });
       }
     }

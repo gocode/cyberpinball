@@ -97,5 +97,8 @@ export const messages: Record<string, string> = {
   '{n} PuP-Packs prêts': '{n} PuP-Packs ready',
   'Rangés sous le nom que cherche la table, option faite pour la borne, allumés par le script': 'Stored under the name the table looks for, option made for the cabinet, switched on by the script',
   'VPX confond deux écrans « {name} »': 'VPX mixes up two “{name}” screens',
-  'Il repère les écrans par leur seul nom et ouvre {roles} sur le premier : ils s’y superposent, et les vidéos d’un PuP-Pack faites pour l’un se cachent derrière l’autre': 'It finds screens by name only and opens {roles} on the first one: they overlap there, and a PuP-Pack’s videos meant for one hide behind the other',
+  'Il repère les écrans par leur seul nom et ouvre {roles} sur le premier : recalé à chaque partie, chaque fenêtre est ramenée sur l’écran de son rôle':
+    'It finds screens by name only and opens {roles} on the first one: realigned at every game, each window is moved back to its role’s screen',
+  'Il repère les écrans par leur seul nom et ouvre {roles} sur le premier : le fronton, le DMD et le topper sont recalés à chaque partie, pas le playfield, qui peut s’ouvrir sur l’écran d’un autre rôle':
+    'It finds screens by name only and opens {roles} on the first one: the backglass, DMD and topper are realigned at every game, but not the playfield, which may open on another role’s screen',
 };

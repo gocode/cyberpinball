@@ -475,18 +475,19 @@ export function screensLines(facts: ScreensFacts): HealthLine[] {
 
 /**
  * Écrans que VPX confond (homonymousRoles) : ses fenêtres de ces rôles s'ouvrent toutes sur le
- * premier. Rien à régler dans Cyber Pinball : la cause et ce qu'elle cache sont dits.
+ * premier. Le menu les ramène sur l'écran de leur rôle à chaque partie (vpxWindowMoves), sauf
+ * celle du playfield, la fenêtre du rendu, jamais déplacée : la ligne dit lequel reste en jeu.
  */
 function homonymLines(homonyms: { name: string; roles: RoleId[] }[]): HealthLine[] {
   return homonyms.map((h) => {
-    const roles = h.roles.map((id) => ROLES.find((r) => r.id === id)?.label ?? id);
+    const roles = formatList(h.roles.map((id) => ROLES.find((r) => r.id === id)?.label ?? id), 'and');
     return {
       check: 'screens',
       state: 'check',
       title: t('VPX confond deux écrans « {name} »', { name: h.name }),
-      detail: t('Il repère les écrans par leur seul nom et ouvre {roles} sur le premier : ils s’y superposent, et les vidéos d’un PuP-Pack faites pour l’un se cachent derrière l’autre', {
-        roles: formatList(roles, 'and'),
-      }),
+      detail: h.roles.includes('playfield')
+        ? t('Il repère les écrans par leur seul nom et ouvre {roles} sur le premier : le fronton, le DMD et le topper sont recalés à chaque partie, pas le playfield, qui peut s’ouvrir sur l’écran d’un autre rôle', { roles })
+        : t('Il repère les écrans par leur seul nom et ouvre {roles} sur le premier : recalé à chaque partie, chaque fenêtre est ramenée sur l’écran de son rôle', { roles }),
       go: t('Ouvrir la configuration de la borne'),
       target: SYSTEM('cabinet'),
     };
