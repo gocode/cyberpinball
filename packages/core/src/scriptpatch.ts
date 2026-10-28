@@ -7,12 +7,15 @@
 // quand l'option du pack occupe la fenêtre du DMD), plus une dernière ligne
 // de commentaire qui dit d'où il vient (en fin de fichier : les numéros de ligne des
 // erreurs de script ne bougent pas). Quand le script ne lance jamais le pack, et que la
-// table ne joue pas de ROM (pupLoaderNeeded), le .vbs le lance lui-même (addPupLoader).
+// table ne joue pas de ROM (pupLoaderNeeded), le .vbs le lance lui-même (addPupLoader). Quand le
+// pack attend des images d'un DMD que dessine FlexDMD (PupCapture), le .vbs les reconnaît et lui
+// envoie ses déclencheurs (pupcapture.ts, addCaptureWatch).
 // Le médecin le reconnaît, le refait quand la table est mise à jour, et un .vbs venu
 // d'ailleurs reste signalé comme avant.
 
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
+import { addCaptureWatch, captureBlock, type PupCapture } from './pupcapture';
 import { addPupLoader, enablePupSwitch, pupLoaderNeeded, pupScriptFacts, pupSwitchesToEnable, usesPinmameCode, type PupLoader, type PupSwitch } from './puppack';
 import { scriptCode } from './vbscript';
 
@@ -26,6 +29,14 @@ export interface ScriptPatch {
   switches: PupSwitch[];
   /** Lancement du pack ajouté, quand le script ne le fait pas. */
   loader?: PupLoader;
+  /** Reconnaissance des images du DMD ajoutée (déclencheurs PupCapture d'une table FlexDMD). */
+  capture?: PupCapture;
+}
+
+/** Reconnaissance à poser : ses réglages et ses lignes (captureWatchLines, ou celles d'un .vbs déjà écrit). */
+export interface CaptureBlock {
+  settings: PupCapture;
+  lines: string[];
 }
 
 /** Empreinte d'un script lu en latin1 (un caractère par octet). */
@@ -35,18 +46,21 @@ export function scriptHash(script: string): string {
 
 /**
  * Le .vbs qui lance le PuP-Pack : le script d'origine, interrupteurs allumés, lancement du
- * pack ajouté s'il le faut, et la ligne de Cyber Pinball. undefined si un interrupteur n'est
- * plus à sa place.
+ * pack ajouté s'il le faut, reconnaissance des images du DMD s'il le faut, et la ligne de Cyber
+ * Pinball. undefined si un interrupteur n'est plus à sa place, ou si le minuteur où brancher
+ * la reconnaissance n'est plus dans le script.
  */
-export function buildScriptPatch(original: string, switches: PupSwitch[], loader?: PupLoader): string | undefined {
+export function buildScriptPatch(original: string, switches: PupSwitch[], loader?: PupLoader, capture?: CaptureBlock): string | undefined {
   let text: string | undefined = original;
   for (const sw of switches) {
     text = text === undefined ? undefined : enablePupSwitch(text, sw);
   }
   if (text === undefined) return undefined;
   if (loader) text = addPupLoader(text, loader);
+  if (capture) text = addCaptureWatch(text, capture.settings.timer, capture.lines);
+  if (text === undefined) return undefined;
   const eol = /\r\n/.test(original) ? '\r\n' : '\n';
-  const patch: ScriptPatch = { from: scriptHash(original), switches, ...(loader ? { loader } : {}) };
+  const patch: ScriptPatch = { from: scriptHash(original), switches, ...(loader ? { loader } : {}), ...(capture ? { capture: capture.settings } : {}) };
   return `${text}${/\r?\n$/.test(text) ? '' : eol}${SCRIPT_PATCH_MARK}${JSON.stringify(patch)}${eol}`;
 }
 
@@ -88,10 +102,21 @@ export function scriptPatchState(vbs: string, embedded: string | undefined): Scr
     const code = scriptCode(embedded);
     const switches = pupSwitchesToEnable(code, patch.switches.some((s) => s.kind === 'dmd'));
     const loader = patch.loader && pupLoaderNeeded({ usesPinmame: usesPinmameCode(code), roms: [], pup: pupScriptFacts(code) }) ? patch.loader : undefined;
-    const content = switches.length || loader ? buildScriptPatch(embedded, switches, loader) : undefined;
+    // La reconnaissance est gardée si le nouveau script a encore son minuteur ; sinon le médecin
+    // la refera, ou dira pourquoi il ne le peut plus (pupCaptureUnseen).
+    const capture = ownCapture(vbs, patch);
+    const kept = capture ? buildScriptPatch(embedded, switches, loader, capture) : undefined;
+    const content = kept ?? (switches.length || loader ? buildScriptPatch(embedded, switches, loader) : undefined);
     return content ? { kind: 'stale', patch, content } : { kind: 'stale', patch };
   }
-  return buildScriptPatch(embedded, patch.switches, patch.loader) === vbs ? { kind: 'ours', patch } : { kind: 'foreign' };
+  return buildScriptPatch(embedded, patch.switches, patch.loader, ownCapture(vbs, patch)) === vbs ? { kind: 'ours', patch } : { kind: 'foreign' };
+}
+
+/** Le bloc de reconnaissance d'un .vbs de Cyber Pinball, tel quel, quand sa dernière ligne en annonce un. */
+export function ownCapture(vbs: string, patch: ScriptPatch): CaptureBlock | undefined {
+  if (!patch.capture) return undefined;
+  const block = captureBlock(vbs);
+  return block ? { settings: patch.capture, lines: block.lines } : undefined;
 }
 
 /** Le fichier est un .vbs écrit par Cyber Pinball (dernière ligne marquée). */

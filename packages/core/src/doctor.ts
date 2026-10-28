@@ -62,7 +62,8 @@ import {
   type PupVariant,
   type PlaylistRename,
 } from './puppack';
-import { buildScriptPatch, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
+import { addCaptureWatch, captureBlock, captureSettings, captureWatchLines, readCaptures, sameCapture, type CaptureBlocker } from './pupcapture';
+import { buildScriptPatch, ownCapture, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
 import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
@@ -756,7 +757,7 @@ function staleFinding(override: Override): Finding {
  * gardée. Sans elles, un pack installé reste éteint tant qu'on n'ouvre pas le médecin
  * (2001 - A Space Odyssey, 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupPlaylistOrder'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupPlaylistOrder'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -867,10 +868,12 @@ function pupSwitchFinding(entry: TableEntry, pack: string, offs: PupSwitch[], ov
     for (const sw of offs) text = text === undefined ? undefined : enablePupSwitch(text, sw);
     content = text;
   } else {
-    // Notre .vbs, ou pas de .vbs : refait d'après le texte de la table, recopié ligne pour ligne.
+    // Notre .vbs, ou pas de .vbs : refait d'après le texte de la table, recopié ligne pour ligne,
+    // avec le lancement du pack et la reconnaissance des images qu'il avait déjà.
     const embedded = readVpxScript(entry.file);
     const switches = embedded !== undefined ? pupSwitchesToEnable(scriptCode(embedded), drawsDmd) : [];
-    if (embedded !== undefined && switches.length) content = buildScriptPatch(embedded, switches);
+    const own = ownParts(override);
+    if (embedded !== undefined && switches.length) content = buildScriptPatch(embedded, switches, own.loader, own.capture) ?? buildScriptPatch(embedded, switches);
   }
   const main = offs.find((s) => s.kind !== 'dmd');
   const dmd = offs.find((s) => s.kind === 'dmd');
@@ -916,10 +919,12 @@ function pupLoaderFinding(entry: TableEntry, pack: string, override: Override | 
   const table = readVpxTableName(entry.file);
   const loader: PupLoader = table ? { pack, table } : { pack };
   let content: string | undefined;
-  if (override) content = addPupLoader(override.text, loader);
+  if (override && override.state.kind !== 'ours') content = addPupLoader(override.text, loader);
   else {
+    // Notre .vbs est refait (la ligne qui le marque resterait sinon avant le lancement ajouté).
     const embedded = readVpxScript(entry.file);
-    if (embedded !== undefined) content = buildScriptPatch(embedded, [], loader);
+    const own = ownParts(override);
+    if (embedded !== undefined) content = buildScriptPatch(embedded, own.switches, loader, own.capture) ?? buildScriptPatch(embedded, own.switches, loader);
   }
   const params = { pack, file, init: table ? `${table}_Init` : '' };
   return {
@@ -939,6 +944,98 @@ function pupLoaderFinding(entry: TableEntry, pack: string, override: Override | 
       .filter(Boolean)
       .join(' '),
     fix: content ? { label: t('Lancer le PuP-Pack ({pack}, dans {file})', params), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+  };
+}
+
+/** Ce qu'un .vbs de Cyber Pinball garde quand il est refait : interrupteurs, lancement du pack, reconnaissance. */
+function ownParts(override: Override | undefined): { switches: PupSwitch[]; loader?: PupLoader; capture?: ReturnType<typeof ownCapture> } {
+  if (override?.state.kind !== 'ours') return { switches: [] };
+  const { patch } = override.state;
+  return { switches: patch.switches, loader: patch.loader, capture: ownCapture(override.text, patch) };
+}
+
+/** Pourquoi Cyber Pinball ne peut pas reconnaître les images du DMD de cette table. */
+function captureBlockerText(blocker: CaptureBlocker | 'protected' | 'size'): string {
+  switch (blocker) {
+    case 'protected':
+      return t('Le script de la table est protégé : Cyber Pinball ne peut pas y ajouter la reconnaissance des images.');
+    case 'flex':
+      return t('Cyber Pinball ne sait reconnaître que les images de FlexDMD, et ce script ne crée pas d’objet FlexDMD.FlexDMD.');
+    case 'depth':
+      return t('Le DMD de FlexDMD n’y est pas en niveaux de gris (RenderMode) : ni le plugin ni Cyber Pinball ne reconnaissent ses images.');
+    case 'timer':
+      return t('Le script n’a pas de minuteur appelé à chaque image (Interval = -1) où brancher la reconnaissance.');
+    case 'pup':
+      return t('Le script ne garde pas l’objet du pack dans une variable (Set … = CreateObject("PinUpPlayer.PinDisplay")) : Cyber Pinball ne saurait pas à qui envoyer les déclencheurs.');
+    case 'size':
+      return t('Les captures du pack ne sont pas des images de 128 × 32 en 24 bits : Cyber Pinball ne sait pas les reconnaître.');
+  }
+}
+
+/**
+ * Déclencheurs « D » d'un pack à PupCapture sur une table sans ROM : le plugin PUP ne reçoit pas
+ * les images de FlexDMD (FlexDMDPlugin.cpp l. 556, au commit af26b2d93). Le .vbs de Cyber Pinball
+ * les reconnaît lui-même sur FlexDMD.DmdPixels et envoie les déclencheurs au pack (pupcapture.ts) :
+ * dans notre .vbs, refait avec ce qu'il avait déjà, ou dans un .vbs venu d'ailleurs. undefined
+ * quand le .vbs joué a déjà la reconnaissance à jour (mêmes captures, mêmes réglages).
+ * `loaderNeeded` : le pack est lancé par le .vbs de Cyber Pinball (pupLoaderNeeded).
+ */
+function pupCaptureFinding(entry: TableEntry, pack: string, root: string, override: Override | undefined, loaderNeeded: boolean): Finding | undefined {
+  const { capture, total } = captureTriggers(root);
+  if (!capture) return undefined;
+  const base = path.basename(entry.file).replace(/\.vpx$/i, '');
+  const target = override?.file ?? path.join(entry.folder, `${base}.vbs`);
+  const file = path.basename(target);
+  const params = { pack, file };
+  const count = tn(capture, '{n} déclencheur sur {total} attend une image du DMD (PuPCapture).', '{n} déclencheurs sur {total} attendent une image du DMD (PuPCapture).', { n: capture, total });
+  const unseen = (blocker: Parameters<typeof captureBlockerText>[0]): Finding => ({
+    code: 'pupCaptureUnseen',
+    severity: 'warning',
+    title: t('Vidéos du PuP-Pack déclenchées par le DMD : sans effet'),
+    detail: [
+      count,
+      t('Le plugin PUP de VPX 10.8.1 ne reçoit ces images que des ROM de PinMAME ; le DMD de cette table (FlexDMD, UltraDMD) ne les lui donne pas : ces vidéos ne se lanceront pas. Restent les vidéos de fond de chaque écran et les déclencheurs envoyés par la table.'),
+      captureBlockerText(blocker),
+    ].join(' '),
+  });
+  const foreign = override?.state.kind === 'foreign' ? override : undefined;
+  const own = ownParts(override);
+  const source = foreign ? foreign.text : readVpxScript(entry.file);
+  if (source === undefined) return unseen('protected');
+  const code = scriptCode(source);
+  // Les déclencheurs vont à l'objet qui a lancé le pack : celui du .vbs de Cyber Pinball (déjà là,
+  // ou posé avec la reconnaissance), sinon celui que crée le script.
+  const ours = loaderNeeded || own.loader !== undefined || /\bsub\s+CyberPinball_PuPStart\b/i.test(code);
+  const settings = captureSettings(code, pack, root, ours ? 'CyberPinball_PuP' : undefined);
+  if ('blocker' in settings) return unseen(settings.blocker);
+  const current = override ? captureBlock(override.text) : undefined;
+  const upToDate = current && sameCapture(current.settings, settings) && (foreign || (own.capture && sameCapture(own.capture.settings, settings)));
+  if (upToDate) return undefined;
+  const captures = readCaptures(root, settings.depth);
+  if (!captures.length) return unseen('size');
+  const block = { settings, lines: captureWatchLines(captures, settings) };
+  let content: string | undefined;
+  if (foreign) content = addCaptureWatch(foreign.text, settings.timer, block.lines);
+  else {
+    const table = readVpxTableName(entry.file);
+    const loader = own.loader ?? (loaderNeeded ? (table ? { pack, table } : { pack }) : undefined);
+    content = buildScriptPatch(source, own.switches, loader, block);
+  }
+  if (!content) return unseen('timer');
+  return {
+    code: 'pupCaptureUnseen',
+    severity: 'warning',
+    title: current ? t('Reconnaissance des images du DMD à refaire') : t('Vidéos du PuP-Pack déclenchées par le DMD : sans effet'),
+    detail: [
+      count,
+      current
+        ? t('Les captures de pupvideos\\{pack} ou le script ont changé depuis que Cyber Pinball a écrit la reconnaissance des images dans {file}.', params)
+        : t('Le plugin PUP de VPX 10.8.1 ne reçoit ces images que des ROM de PinMAME ; FlexDMD ne les lui donne pas.'),
+      foreign
+        ? t('Cyber Pinball ajoute à {file} la lecture de l’image de FlexDMD, qui envoie ces déclencheurs au pack.', params)
+        : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script qui lit l’image de FlexDMD et envoie ces déclencheurs au pack.', params),
+    ].join(' '),
+    fix: { label: t('Reconnaître les images du DMD ({pack}, dans {file})', params), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] },
   };
 }
 
@@ -1192,20 +1289,12 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
 
     // PuPCapture sans PinMAME : le plugin ne reçoit les images du DMD que des ROM de PinMAME
     // (B2SPluginEventStream, GetIdentifyFrame) ; FlexDMD ne les lui donne pas (FlexDMDPlugin.cpp,
-    // « TODO … pup events », au commit af26b2d93). Seul le script pourrait les envoyer (B2SData "D…").
-    if (info.hasPupCapture && facts && !facts.usesPinmame && !facts.pup?.dmdTriggers) {
-      const { capture, total } = captureTriggers(info.root);
-      if (capture > 0) {
-        findings.push({
-          code: 'pupCaptureUnseen',
-          severity: 'warning',
-          title: t('Vidéos du PuP-Pack déclenchées par le DMD : sans effet'),
-          detail: [
-            tn(capture, '{n} déclencheur sur {total} attend une image du DMD (PuPCapture).', '{n} déclencheurs sur {total} attendent une image du DMD (PuPCapture).', { n: capture, total }),
-            t('Le plugin PUP de VPX 10.8.1 ne reçoit ces images que des ROM de PinMAME ; le DMD de cette table (FlexDMD, UltraDMD) ne les lui donne pas : ces vidéos ne se lanceront pas. Restent les vidéos de fond de chaque écran et les déclencheurs envoyés par la table.'),
-          ].join(' '),
-        });
-      }
+    // « TODO … pup events », au commit af26b2d93). Le .vbs de Cyber Pinball les reconnaît sur
+    // FlexDMD.DmdPixels et envoie les déclencheurs (pupCaptureFinding), sauf si le script les
+    // envoie lui-même (B2SData "D…"). Un .vbs à refaire est déjà signalé (scriptPatchStale).
+    if (!nested.has(pack) && info.hasPupCapture && facts && !facts.usesPinmame && !facts.pup?.dmdTriggers && override?.state.kind !== 'stale') {
+      const finding = pupCaptureFinding(entry, pack, info.root, override, loader);
+      if (finding) findings.push(finding);
     }
 
     // PuPCapture : les images reconnues dépendent de la ROM exacte.

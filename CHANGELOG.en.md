@@ -34,6 +34,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - VPX windows in their place in game: when two screens share the same name, the backglass, the DMD and the score view no longer pile up; Cyber Pinball moves each one back to the screen of its role.
 - Friends (System menu > Friends), between cabinets and with no central server: your friends online with the table they are playing and their latest high scores, finding a player by name or on the local network, friend requests, first badges. Sharing is on by default and is turned off in "Sharing and network", which also says what other cabinets see; Windows asks once to allow Cyber Pinball through its firewall.
 - PuP-Packs the table does not start itself (Game of Thrones LE): Cyber Pinball stores them under the right name and starts them before each game; the doctor says which of the pack's videos cannot trigger with the table's DMD.
+- PuP-Pack videos triggered by DMD frames on FlexDMD tables without ROM (Game of Thrones LE): Cyber Pinball recognises these frames during the game and starts the videos, like PinUP Player.
 
 ## 0.1.3
 

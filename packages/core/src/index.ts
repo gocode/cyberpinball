@@ -30,6 +30,7 @@ export * from './tilt';
 export * from './dmd';
 export * from './vpx-plugin-settings';
 export * from './puppack';
+export * from './pupcapture';
 export * from './romlibrary';
 export * from './romzip';
 export * from './romalias';
