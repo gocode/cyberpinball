@@ -57,6 +57,7 @@ import {
   planRomMigration,
   pruneEmptyDirs,
   pupCabinet,
+  repairPupForPlay,
   nameKey,
   pageKey,
   pupMemory,
@@ -2671,6 +2672,18 @@ export function createLibrary(host: LibraryHost) {
       for (const archive of prepared.archives) if (archive.mode === 'move' && fs.existsSync(archive.path)) moveToTrash(archive.path, { trashDir });
       fs.rmSync(prepared.staging, { recursive: true, force: true });
       host.reload(checked[0]);
+      // Les réparations des PuP-Packs que le menu fait avant chaque partie (PUP_PLAY_REPAIRS), faites
+      // dès l'installation : pack renommé et lancé, option, images nommées comme des vidéos…
+      const borne = pupCabinet(loadCabinet(host.dataDir));
+      for (const file of checked) {
+        const table = find(file);
+        if (!table) continue;
+        try {
+          repairPupForPlay(table, { tablesDir: layout()!.tables, script: cachedScript(file, host.dataDir), cabinet: borne }, { trashDir });
+        } catch (error) {
+          console.log(`PuP-Pack (${table.id}) : réparation à l'installation impossible (${(error as Error).message}).`); // i18n-ignore : journal
+        }
+      }
       if (s.acquisition) noteSource(s.acquisition, checked);
       // Puis les médias de VPinMediaDB retenus dans le plan : ceux qui manquent aux nouvelles tables.
       const added: Row[] = [];

@@ -76,6 +76,7 @@ import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
 import { scriptCode } from './vbscript';
 import { readVpxScript, readVpxTableName } from './vpxinfo';
+import { describeRenames, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
 import { ratioLabel } from './zones';
 
 export type FindingSeverity = 'error' | 'warning' | 'info';
@@ -118,6 +119,8 @@ export const FINDING_CODES = [
   'pupDisabledByScript',
   'pupHidesDmd',
   'pupPlaylistOrder',
+  'pupFileNames',
+  'pupFilesMissing',
   'pupScreenAbsent',
   'pupPlayfieldScreen',
   'pupScriptDriven',
@@ -735,6 +738,26 @@ function playlistOrderFinding(pack: string, root: string, renames: PlaylistRenam
   };
 }
 
+/**
+ * Fichiers du pack que le plugin PUP lit autrement que PinUP Player (pupfiles.ts) : renommés, et
+ * chaque .pup qui les nomme réécrit (options comprises), les anciens .pup à la corbeille.
+ */
+function packFileNamesFinding(pack: string, root: string, media: PackFileFixes): Finding {
+  return {
+    code: 'pupFileNames',
+    severity: 'warning',
+    title: t('Fichiers du PuP-Pack que le plugin PUP lirait mal'),
+    detail: describeRenames(media.renames),
+    fix: {
+      label: tn(media.renames.length, 'Renommer le fichier dans pupvideos\\{pack}', 'Renommer {n} fichiers dans pupvideos\\{pack}', { pack, n: media.renames.length }),
+      ops: [
+        ...media.renames.map((r) => ({ op: 'move' as const, from: path.join(root, r.from), to: path.join(root, r.to) })),
+        ...media.writes.map((w) => ({ op: 'write' as const, path: path.join(root, w.file), content: w.content, encoding: 'latin1' as const })),
+      ],
+    },
+  };
+}
+
 /** Le .vbs de Cyber Pinball tiré du script d'une version précédente de la table. */
 function staleFinding(override: Override): Finding {
   const file = path.basename(override.file);
@@ -757,7 +780,7 @@ function staleFinding(override: Override): Finding {
  * gardée. Sans elles, un pack installé reste éteint tant qu'on n'ouvre pas le médecin
  * (2001 - A Space Odyssey, 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupPlaylistOrder'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupPlaylistOrder', 'pupFileNames'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -786,7 +809,7 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
  */
 export function repairPupForPlay(entry: TableEntry, ctx: DoctorContext, ops: OpContext): Finding[] {
   const done: Finding[] = [];
-  for (let round = 0; round < 6; round++) {
+  for (let round = 0; round < 10; round++) {
     const next = pupPlayRepairs(entry, ctx).find((f) => !done.some((d) => d.code === f.code && d.fix!.label === f.fix!.label));
     if (!next) break;
     applyOps(next.fix!.ops, ops);
@@ -1163,6 +1186,28 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
     if (!nested.has(pack)) {
       const renames = playlistRenames(info.root);
       if (renames.length) findings.push(playlistOrderFinding(pack, info.root, renames));
+    }
+
+    // Fichiers que le plugin lit autrement que PinUP Player (image nommée comme une vidéo, nom
+    // accentué), puis fichiers nommés par le pack et absents : sans eux, des écrans restent noirs.
+    if (!nested.has(pack)) {
+      const media = packFileFixes(info.root, facts?.pup ? played : undefined);
+      if (media.renames.length) findings.push(packFileNamesFinding(pack, info.root, media));
+      else {
+        const missing = missingPackFiles(info.root);
+        if (missing.length) {
+          findings.push({
+            code: 'pupFilesMissing',
+            severity: 'info',
+            title: tn(missing.length, 'Fichier du PuP-Pack absent', 'Fichiers du PuP-Pack absents'),
+            detail: tn(missing.length, 'pupvideos\\{pack} nomme {list}, absent du pack : ce qu’il devait montrer ne se verra pas.', 'pupvideos\\{pack} nomme {n} fichiers absents du pack ({list}) : ce qu’ils devaient montrer ne se verra pas.', {
+              pack,
+              n: missing.length,
+              list: missing.slice(0, 3).map(quote).join(', ') + (missing.length > 3 ? '…' : ''),
+            }),
+          });
+        }
+      }
     }
 
     // Pack dans la fenêtre du DMD d'une table qui dessine son propre DMD : le score disparaîtrait.

@@ -69,6 +69,19 @@ export const messages: Record<string, string> = {
   'Reconnaître les images du DMD ({pack}, dans {file})': 'Match the DMD frames ({pack}, in {file})',
   'Lancer le PuP-Pack ({pack}, dans {file})': 'Start the PuP-Pack ({pack}, in {file})',
   'Vidéos du PuP-Pack déclenchées par le DMD : sans effet': 'PuP-Pack videos triggered by the DMD: no effect',
+  'Fichiers du PuP-Pack que le plugin PUP lirait mal': 'PuP-Pack files the PUP plugin would misread',
+  'Renommer le fichier dans pupvideos\\{pack}': 'Rename the file in pupvideos\\{pack}',
+  'Renommer {n} fichiers dans pupvideos\\{pack}': 'Rename {n} files in pupvideos\\{pack}',
+  'Une image nommée comme une vidéo ({list}) : le plugin PUP la jouerait comme une vidéo d’une seule image, en boucle, et l’écran clignoterait.':
+    'An image named like a video ({list}): the PUP plugin would play it as a one-frame video, in a loop, and the screen would flicker.',
+  '{n} images nommées comme des vidéos ({list}) : le plugin PUP les jouerait comme des vidéos d’une seule image, en boucle, et l’écran clignoterait.':
+    '{n} images named like videos ({list}): the PUP plugin would play them as one-frame videos, in a loop, and the screen would flicker.',
+  'Un nom accentué ({list}) : le plugin PUP ne le retrouverait pas, et ce qui le nomme ne jouerait jamais.': 'A name with accents ({list}): the PUP plugin would not find it, and whatever names it would never play.',
+  '{n} noms accentués ({list}) : le plugin PUP ne les retrouverait pas, et ce qui les nomme ne jouerait jamais.': '{n} names with accents ({list}): the PUP plugin would not find them, and whatever names them would never play.',
+  'Fichier du PuP-Pack absent': 'PuP-Pack file missing',
+  'Fichiers du PuP-Pack absents': 'PuP-Pack files missing',
+  'pupvideos\\{pack} nomme {list}, absent du pack : ce qu’il devait montrer ne se verra pas.': 'pupvideos\\{pack} names {list}, missing from the pack: what it should show won’t be seen.',
+  'pupvideos\\{pack} nomme {n} fichiers absents du pack ({list}) : ce qu’ils devaient montrer ne se verra pas.': 'pupvideos\\{pack} names {n} files missing from the pack ({list}): what they should show won’t be seen.',
   '{n} déclencheur sur {total} attend une image du DMD (PuPCapture).': '{n} trigger out of {total} waits for a DMD image (PuPCapture).',
   '{n} déclencheurs sur {total} attendent une image du DMD (PuPCapture).': '{n} triggers out of {total} wait for a DMD image (PuPCapture).',
   'Le plugin PUP de VPX 10.8.1 ne reçoit ces images que des ROM de PinMAME ; le DMD de cette table (FlexDMD, UltraDMD) ne les lui donne pas : ces vidéos ne se lanceront pas. Restent les vidéos de fond de chaque écran et les déclencheurs envoyés par la table.':

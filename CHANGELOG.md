@@ -38,6 +38,7 @@ son interface).
 - PuP-Packs que la table ne lance pas elle-même (Game of Thrones LE) : Cyber Pinball les range sous le bon nom et les lance avant chaque partie ; le médecin dit quelles vidéos du pack ne peuvent pas se déclencher avec le DMD de la table.
 - Vidéos des PuP-Packs déclenchées par les images du DMD sur les tables FlexDMD sans ROM (Game of Thrones LE) : Cyber Pinball reconnaît ces images pendant la partie et lance les vidéos, comme PinUP Player.
 - PuP-Packs : le fronton ne clignote plus quand une même vidéo de fond est demandée plusieurs fois de suite (Game of Thrones LE, écran du choix de la maison).
+- PuP-Packs : les images livrées sous un nom de vidéo (Game of Thrones LE) s’affichent enfin comme des images, sans clignoter, et les fichiers aux noms accentués sont retrouvés ; Cyber Pinball le corrige pour tout pack, dès l’installation et avant chaque partie.
 
 ## 0.1.3
 

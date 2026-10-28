@@ -314,6 +314,25 @@ const TRAPS: Trap[] = [
     },
     script: scriptFacts(PUP_SCRIPT),
   },
+  // Image PNG nommée comme une vidéo (Game of Thrones LE : « Stark.mp4 ») : jouée en boucle d'une image.
+  {
+    code: 'pupFileNames',
+    arm: (folder) => {
+      const pack = healthyPack(folder);
+      write(path.join(pack, 'Attract', 'logo.mp4'), Buffer.from('89504e470d0a1a0a0000000d49484452', 'hex'));
+    },
+    script: scriptFacts(PUP_SCRIPT),
+  },
+  // Déclencheur actif dont le fichier n'est pas dans le pack.
+  {
+    code: 'pupFilesMissing',
+    arm: (folder) => {
+      const pack = healthyPack(folder);
+      write(path.join(pack, 'Attract', 'intro.mp4'), Buffer.from('000000146674797069736f6d', 'hex'));
+      write(path.join(pack, 'triggers.pup'), 'ID,Active,Descript,Trigger,ScreenNum,PlayList,PlayFile\r\n1,1,Intro,D1,2,Attract,absent.mp4\r\n');
+    },
+    script: scriptFacts(PUP_SCRIPT),
+  },
   // Pack dans la fenêtre du DMD d'une table à ROM, sans réglage pour elle : le score serait caché.
   {
     code: 'pupHidesDmd',
