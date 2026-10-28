@@ -897,7 +897,7 @@ export function createLibrary(host: LibraryHost) {
 
   // ---------- Téléchargements et sélecteur de fichiers ----------
 
-  /** Index de VPinMediaDB pour nommer les fichiers de downloadspinmediadb, relu quand il change. */
+  /** Index de VPinMediaDB pour nommer les fichiers de downloads\vpinmediadb, relu quand il change. */
   let mediaDbCache: { mtimeMs: number; db?: MediaDb } | undefined;
   function mediaDbForNames(dir: string): MediaDb | undefined {
     try {

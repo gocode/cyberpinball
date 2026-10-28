@@ -22,6 +22,7 @@ You describe your cabinet once: its screens, buttons and speakers. Cyber Pinball
 - **Alongside PinUP Popper, PinballX or PinballY.** Cyber Pinball keeps everything in its own folder, with its own copy of VPX and its own `VPinballX.ini`, and registers nothing in Windows. If another frontend is running, it waits for it to close instead of fighting over the screens; it warns before flipping a screen in Windows, and only restores the taskbars it hid itself.
 - **VPX settings without the `.ini`.** All VPX settings, read from VPX's own source code, are editable globally or per table. Visual settings (each table's framing, the position of the backglass, DMD and topper) are made on the running table: "Adjust display in game" opens VPX's menu mid-game.
 - **In-app updates.** System menu > "Cyber Pinball" > "Cyber Pinball update" checks GitHub on demand, shows what's new, then downloads and installs the new version. Every release is signed: the cabinet refuses anything that was not signed with the publisher's key. Your tables, media and settings are kept.
+- **Friends, with no server.** System menu > "Amis" (Friends): find a player by name in a directory that cabinets pass to each other, send a friend request they accept on their side, then see who is online, which table they are playing right now, and their latest event (new high score, badge earned). Cabinets on the same local network find each other even without the Internet. Built on [Holepunch](https://holepunch.to)'s Hyperswarm: cabinets talk directly, nothing goes through a server, and never a file, table or ROM. Sharing is on by default and can be turned off.
 - **English or French.** Every screen follows the language you choose in the system menu ("Language / Langue"), with dates and numbers to match. By default, Cyber Pinball speaks French if Windows does, and English otherwise.
 
 ## Screenshots
@@ -54,8 +55,8 @@ Download an installer from the [Releases](https://github.com/gocode/cyberpinball
 | `CyberPinball-Setup-complet.exe` | about 280 MiB | official archive included, for a cabinet without Internet access |
 
 - Everything lives in **one root folder** that you choose (for example `D:\CyberPinball`): the application in `app\`, and next to it the tables, media, configuration, data and emulators.
-- No administrator rights are needed: it installs for the current user.
-- Options: a desktop shortcut, and start with Windows (for a dedicated cabinet). Silent install: `/S`, `/DEMARRAGE` (start with Windows), `/SANSBUREAU` (no desktop shortcut), `/D=D:\Cabinet` (root folder, last and without quotes).
+- No administrator rights are needed: it installs for the current user. For Friends, Windows asks once for permission to let Cyber Pinball through its firewall; declining only makes the local network less reliable.
+- Options: a desktop shortcut, and start with Windows (for a dedicated cabinet). Silent install: `/S`, `/DEMARRAGE` (start with Windows), `/SANSBUREAU` (no desktop shortcut), `/PAREFEU` (ask for the firewall rule even when silent), `/D=D:\Cabinet` (root folder, last and without quotes).
 - **Uninstalling removes the application only.** Tables, media, configuration and data stay in the root folder; reinstalling into the same folder finds them as they were.
 - The installers are not code-signed yet, so Windows SmartScreen will warn when you run them.
 
@@ -117,6 +118,7 @@ Every step below is an action of `lanceur.cmd` (section "Fabrication et publicat
 
 - **Visual Pinball X** is not part of this repository. It is downloaded from its [official releases](https://github.com/vpinball/vpinball/releases) and checked against a pinned SHA-256. Its licence (GPLv3+, plus a MAME-derived licence for some files) allows redistribution only free of charge and outside any commercial product or activity. The complete installer therefore **must not be sold, nor shipped with a cabinet that is sold or operated commercially**.
 - The **VPS database** and **VPinMediaDB** declare no licence. Cyber Pinball does not ship them: they are downloaded from their official addresses when first used. Media from VPinMediaDB belong to their authors and the game artwork to its manufacturers, for **personal use on your own cabinet** only. Files from VPForums and VPUniverse are downloaded with your own account, one at a time, at your request, and stay on your cabinet: their sites forbid re-hosting or redistributing them.
+- The cabinet network uses Holepunch's Hyperswarm, HyperDHT, Protomux and secret-stream, with sodium-native and udx-native (MIT and Apache-2.0 licences).
 - Fonts (Audiowide, Bebas Neue, Orbitron, Saira) are under the SIL Open Font License; their licence files sit next to them in `app/renderer/polices`.
 - Cyber Pinball does not download tables or ROMs for you. Tables come from their authors' sites, and pinball manufacturers do not allow their ROMs to be shared.
 

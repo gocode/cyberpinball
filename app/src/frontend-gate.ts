@@ -147,7 +147,7 @@ function gateView(open: OtherFrontend[]) {
 
 /**
  * Essais sans opérateur (CYBERPINBALL_CAPTURE = dossier) : capture et garde-fou de mise en
- * page dans <dossier>utre-menu, à part de ceux du menu ou de l'assistant qui suit.
+ * page dans <dossier>\autre-menu, à part de ceux du menu ou de l'assistant qui suit.
  */
 async function capture(win: BrowserWindow): Promise<void> {
   const base = process.env.CYBERPINBALL_CAPTURE;

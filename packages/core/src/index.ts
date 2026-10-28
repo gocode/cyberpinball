@@ -90,3 +90,8 @@ export * from './power';
 export * from './arcadehours';
 export * from './cinema';
 export * from './sessionorientation';
+export * from './sharing';
+export * from './mediapack';
+export * from './social';
+export * from './badges';
+export * from './firewall';

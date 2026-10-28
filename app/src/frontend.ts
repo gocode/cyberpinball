@@ -124,6 +124,9 @@ import {
   liveDmdArea,
   readTableRecords,
   vpRegFile,
+  playStats,
+  presenceTable,
+  socialNetMode,
   type DmdAnimationName,
   type DmdAnimationOptions,
   type FrameRecord,
@@ -158,6 +161,10 @@ import { createMenuSettings } from './menu-settings';
 import { createLanguageMenu } from './language-menu';
 import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
+import { createFriendsMenu } from './friends-menu';
+import { createFirewallRule } from './firewall-rule';
+import { createSocialNet } from './social-net';
+import { seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
 import { createDedicatedSystem } from './dedicated-system';
 import { handOverOnQuit, shellSession } from './dedicated-session';
@@ -655,6 +662,34 @@ if (shellSession()) {
 // Mode invité : on joue, rien d'autre ; l'écran de l'entrée dit la combinaison qui déverrouille.
 library.provideSystemItem('guest-mode', createGuestMenu({ library, guest, buttons: () => buttons }));
 
+// Réseau des bornes (Menu système > Amis) : partage activé par défaut, démarré avec le menu ;
+// jamais le vrai réseau pendant un essai sans opérateur (socialNetMode), ni le vrai pare-feu.
+const socialMode = socialNetMode(process.env);
+// Démonstration (docs\demo-amis.ps1) : un ami hors ligne écrit avant le démarrage, des bornes fictives après.
+const socialDemo = socialMode === 'simulated' && simulatedPlayersWanted(process.env);
+if (socialDemo) seedSimulatedFriends(loc.dataDir);
+let stopSimulatedPlayers: (() => Promise<void>) | undefined;
+let socialRedraw: NodeJS.Timeout | undefined;
+const socialNet = createSocialNet({
+  dataDir: loc.dataDir,
+  mode: socialMode,
+  log: (line) => console.log(line),
+  // Un ami qui arrive, une demande reçue : l'écran se redessine, au plus quatre fois par seconde.
+  onChange: () => {
+    socialRedraw ??= setTimeout(() => {
+      socialRedraw = undefined;
+      if (!closing) broadcast();
+    }, 250);
+  },
+});
+const socialFirewall = createFirewallRule({ exe: process.execPath, simulated: socialMode !== 'public', log: (line) => console.log(line) });
+const friendsMenu = createFriendsMenu({ library, net: socialNet, firewall: socialFirewall });
+library.provideSystemItem('friends', friendsMenu.items.friends);
+library.provideSystemItem('find-player', friendsMenu.items['find-player']);
+library.provideSystemItem('friend-requests', friendsMenu.items['friend-requests']);
+library.provideSystemItem('badges', friendsMenu.items.badges);
+library.provideSystemItem('sharing', friendsMenu.items.sharing);
+
 /** Horloge de l'horaire et des actions programmées : celle du PC, décalée seulement dans un essai qui le demande. */
 const hoursClock = arcadeHoursClock(process.env, powerSimulated(process.env));
 
@@ -879,12 +914,21 @@ export function startFrontend(): void {
     attract.dispose();
     hours.dispose();
     liveDmd.dispose();
+    void stopSimulatedPlayers?.();
+    void socialNet.stop();
   });
 
   menuAssignments = choose ? {} : assignments;
   openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
   // Horaire de la borne : nuit et arrêt programmé, d'après les réglages de medias.json.
   hours.start();
+  // Réseau des bornes : présence aux amis, annuaire ; un échec s'affiche dans « Partage et réseau ».
+  void socialNet.start().then(async () => {
+    socialNet.checkBadges(playStats(tables));
+    // La règle du pare-feu, lue sans élévation : « Partage et réseau » dit si elle manque.
+    if (socialMode !== 'off') void socialFirewall.check().catch(() => undefined);
+    if (socialDemo) stopSimulatedPlayers = await startSimulatedPlayers(socialNet, loc.dataDir, (line) => console.log(line));
+  });
   for (const f of selection?.findings ?? []) console.log(`Configuration de la borne : ${f.message}`);
   // Bande DMD seule sur un écran large, jamais tranchée : l'utilisateur dit une fois ce qu'est l'écran.
   // Orientation des écrans : ce que le démarrage (ou la dernière fermeture) n'a pas pu rendre.
@@ -1437,6 +1481,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const startedAt = new Date();
   const onPlaying = () => {
     state = { ...state, phase: 'playing' };
+    // Les amis voient la table en cours, en temps réel (pas pendant un réglage de l'affichage).
+    if (!displayMode) socialNet.setPresence({ status: 'playing', table: presenceTable(table), since: new Date().toISOString() });
     watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)));
     broadcast();
     if (autoStopAfterMs) setTimeout(() => game.stop(), autoStopAfterMs);
@@ -1457,6 +1503,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
   cinema.stop();
   stopWatchOccupied();
+  socialNet.setPresence({ status: 'menu', since: new Date().toISOString() });
   playing = undefined;
   dressing = undefined;
   displayMode = false;
@@ -1477,6 +1524,13 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     // Les parties du test automatique ne comptent pas dans les statistiques.
     if (!autoStopAfterMs) recordPlay(table, startedAt, result.seconds);
     tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
+    // Pour les amis : les records entrés au tableau, la partie, puis les badges qu'ils valent.
+    if (!autoStopAfterMs) {
+      const seen = presenceTable(table);
+      for (const s of [...entered].sort((a, b) => a.rank - b.rank)) socialNet.publish({ kind: 'record', table: seen, score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) });
+      if (result.seconds >= 60) socialNet.publish({ kind: 'played', table: seen, seconds: Math.round(result.seconds) });
+      socialNet.checkBadges(playStats(tables));
+    }
     const unseen = simulated === undefined ? joystickMessage(install.version) : undefined;
     state = unseen ? { ...state, phase: 'message', message: unseen } : { ...state, phase: 'menu' };
   } else {

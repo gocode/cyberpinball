@@ -16,8 +16,9 @@
 // Signature : facultative, par variables d'environnement (voir scripts/signature.mjs).
 //
 // L'application est d'abord regroupée par esbuild en deux fichiers (processus
-// principal, preload) : les paquets du monorepo y sont inclus. Seul koffi reste
-// à part, car il contient des bibliothèques natives (.node).
+// principal, preload) : les paquets du monorepo y sont inclus. Seuls koffi, sodium-native et
+// udx-native (réseau des bornes, Hyperswarm) restent à part, car ils contiennent des
+// bibliothèques natives (.node) chargées depuis leur propre dossier.
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -47,7 +48,9 @@ execFileSync(process.execPath, [path.join(repo, 'node_modules', 'typescript', 'b
 step('Regroupement (esbuild)');
 fs.rmSync(path.join(repo, 'build'), { recursive: true, force: true });
 const esbuild = require('esbuild');
-const common = { bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: ['electron', 'koffi'], logLevel: 'warning' };
+// Modules natifs du réseau des bornes : chargés par require-addon depuis le dossier de leur paquet.
+const NATIVE_NET = ['sodium-native', 'udx-native'];
+const common = { bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: ['electron', 'koffi', ...NATIVE_NET], logLevel: 'warning' };
 await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', 'main.js')], outfile: path.join(stage, 'dist', 'main.js') });
 // Un preload par type de fenêtre (preload.js, settings-preload.js…) : on les prend tous. Et la
 // mise en place de la mise à jour légère, lancée à part par l'exécutable en mode Node.
@@ -78,6 +81,31 @@ for (const pkg of ['koffi', koffiNative]) {
   fs.cpSync(path.join(repo, 'node_modules', pkg), path.join(stage, 'node_modules', pkg), { recursive: true, filter: koffiRuntime });
 }
 const versionOf = (pkg) => require(path.join(repo, 'node_modules', pkg, 'package.json')).version;
+
+// sodium-native et udx-native, avec les paquets qu'ils chargent eux-mêmes (require-addon…) :
+// le JavaScript, la licence et le seul binaire de cette plateforme (prebuilds\win32-x64).
+const nativeNet = new Set();
+const closure = (pkg) => {
+  if (nativeNet.has(pkg)) return;
+  nativeNet.add(pkg);
+  const meta = require(path.join(repo, 'node_modules', pkg, 'package.json'));
+  for (const dep of Object.keys({ ...meta.dependencies, ...meta.optionalDependencies })) closure(dep);
+};
+for (const pkg of NATIVE_NET) closure(pkg);
+for (const pkg of nativeNet) {
+  const from = path.join(repo, 'node_modules', pkg);
+  fs.cpSync(from, path.join(stage, 'node_modules', pkg), {
+    recursive: true,
+    filter: (src) => {
+      const rel = path.relative(from, src).split(path.sep);
+      if (rel[0] === 'prebuilds' && rel[1] && rel[1] !== `${process.platform}-${process.arch}`) return false;
+      if (['test', 'examples', 'deps', 'vendor', 'include', 'src', 'docs'].includes(rel[0])) return false;
+      if (fs.statSync(src).isDirectory()) return true;
+      const name = path.basename(src);
+      return /^LICENSE/i.test(name) || /\.(c?js|mjs|json|node)$/.test(name);
+    },
+  });
+}
 
 // Configuration de l'exécutable (electron-builder). Avec la version d'Electron, d'electron-builder
 // et l'icône, elle fait le socle : tout ce qui entoure resources\app dans app\.
@@ -110,7 +138,7 @@ fs.writeFileSync(
       description: 'Frontend de borne de flipper virtuel',
       main: 'dist/main.js',
       author: 'Cyber Pinball',
-      dependencies: { koffi: versionOf('koffi'), [koffiNative]: versionOf(koffiNative) },
+      dependencies: { koffi: versionOf('koffi'), [koffiNative]: versionOf(koffiNative), ...Object.fromEntries(NATIVE_NET.map((pkg) => [pkg, versionOf(pkg)])) },
       cyberpinball: { socle },
     },
     null,

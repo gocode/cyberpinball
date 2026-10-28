@@ -33,7 +33,7 @@ test('menu système : chaque entrée est rangée une fois, sous une seule rubriq
     if (SYSTEM_ROOT.includes(group)) assert.ok(!seen.has(group), `la rubrique « ${group} » est aussi rangée dans « ${seen.get(group)} »`);
     else assert.ok(systemPathOf(group), `« ${group} » n'est accessible depuis aucune rubrique`);
   }
-  assert.equal(SYSTEM_ROOT.length, 4, 'quatre rubriques');
+  assert.equal(SYSTEM_ROOT.length, 5, 'cinq rubriques');
 });
 
 test('menu système : dans une rubrique, chaque entrée a son icône, et la rubrique la sienne', () => {
@@ -148,7 +148,7 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.deepEqual(segments('« Borne » > « Configuration de la borne » > « Tilt » : Start…'), ['Borne', 'Configuration de la borne', 'Tilt']);
   assert.deepEqual(segments('"Borne" (Cabinet) > "Configuration de la borne" (Cabinet setup) > "Tilt" (`npm run`)'), ['Borne', 'Configuration de la borne', 'Tilt']);
   assert.deepEqual(segments('Borne > Configuration de la borne > Écran du DMD.'), ['Borne', 'Configuration de la borne', 'Écran du DMD']);
-  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Tables, Médias, Borne, Cyber Pinball)');
+  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Tables, Médias, Amis, Borne, Cyber Pinball)');
   assert.equal(checkPath(['Cyber Pinball', 'Language / Langue']), undefined);
   assert.equal(checkPath(['Cabinet', 'Cabinet setup', 'Tilt']), undefined);
 });

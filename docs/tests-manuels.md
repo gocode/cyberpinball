@@ -737,7 +737,7 @@ Du Start à l'apparition de la partie. La preuve sans opérateur : `packages/cor
 | 397 | Bureau, petite fenêtre | Même chose sur un écran de 1366 × 768 ou 1280 × 1024, avec une table au titre long. | Le titre passe sur deux lignes ; les commandes passent sur une colonne si l'encart est étroit, toutes lisibles, aucune rognée. |
 | 398 | Réglage de l'affichage | Fiche d'une table > « Régler l'affichage en partie », sur la borne puis au bureau. | Sur la borne, seul l'aide-mémoire des boutons du menu de VPX est affiché, en bas du média ; au bureau, il remplace les commandes de la partie dans l'encart. |
 | 399 | Menu système en rubriques | Menu des tables, Exit : le menu système. Aux flippers, parcourir les rubriques, Start sur chacune, Exit pour remonter ; dans « Cyber Pinball », ouvrir « Migration ». Puis la même chose à la souris (clic, bouton « ‹ Retour »). | Quatre rubriques (Tables, Médias, Borne, Cyber Pinball) et « Retour aux tables », chacune avec son icône et ce qu'elle contient. Chaque rubrique montre ses entrées et « Retour » ; Exit remonte d'un cran, la sélection sur la rubrique quittée. « Migration » contient la reprise des médias de PinUP Popper / PinballX et le rangement des ROM. Au bureau comme en borne, chaque liste part juste sous le titre, à la même hauteur d'une rubrique à l'autre. Dans « Configuration de la borne », descendre jusqu'en bas puis remonter : un filet marque le bord derrière lequel il reste des entrées, aucune ligne n'est assombrie, l'entrée choisie est toujours entière. |
-| 400 | Retour à la rubrique d'origine | Borne > « Configuration de la borne » > « Configurations de la borne », Exit, Exit ; puis Médias > « Médias, son et attente », Exit ; Tables > « Bibliothèque de ROM », Exit. Enfin, depuis un de ces écrans, clic sur la roue dentée. | Chaque « Retour » ramène à la rubrique d'où l'on venait, la sélection sur l'entrée ouverte. La roue dentée rouvre toujours les quatre rubriques. Exit depuis les rubriques revient au menu des tables. |
+| 400 | Retour à la rubrique d'origine | Borne > « Configuration de la borne » > « Configurations de la borne », Exit, Exit ; puis Médias > « Médias, son et attente », Exit ; Tables > « Bibliothèque de ROM », Exit. Enfin, depuis un de ces écrans, clic sur la roue dentée. | Chaque « Retour » ramène à la rubrique d'où l'on venait, la sélection sur l'entrée ouverte. La roue dentée rouvre toujours les cinq rubriques. Exit depuis les rubriques revient au menu des tables. |
 | 401 | Pastilles des rubriques | Avec une mise à jour disponible (ou un fichier reçu à installer), ouvrir le menu système. | La pastille rouge est sur l'entrée, sur sa rubrique (Cyber Pinball, ou Tables) et sur la roue dentée ; à l'ouverture, la sélection va sur la rubrique à pastille, puis dans la rubrique sur l'entrée à pastille. |
 
 ## DMD du menu
@@ -967,6 +967,23 @@ Sur la borne (ou le poste de développement), avec The Goonies Never Say Die Pin
 | 504 | Écrans confondus recalés (santé) | Comme 502. | La ligne « VPX confond deux écrans « PL2294H » » ajoute « recalé à chaque partie, chaque fenêtre est ramenée sur l'écran de son rôle ». |
 | 505 | Fronton et DMD recalés en partie | Poste à 3 écrans (fronton et DMD sur deux PL2294H). Lancer The Matrix, jouer une bille, quitter. | Dans les 2 s qui suivent l'ouverture de la partie, le DMD (« Visual Pinball Score View ») passe sur son écran, à la même taille ; le fronton reste sur le sien ; ni l'un ni l'autre ne prend le focus (les flippers répondent). Les vidéos du pack faites pour le DMD s'y voient. Le journal du menu dit « Partie : « Visual Pinball Score View » ramenée sur l'écran du rôle dmd (… → …) », une seule fois. |
 | 506 | Rien ne bouge sans homonymes | Borne dont les écrans ont des noms différents, ou VPX qui repère aussi la position. Lancer une partie. | Aucune ligne « ramenée sur l'écran » dans le journal du menu ; les fenêtres de VPX restent où il les ouvre. |
+
+## Amis : le réseau des bornes
+
+Deux bornes (ou la borne et le poste de développement), installées par l'installeur, chacune sur sa box ; puis les deux sur le même réseau local. La preuve sans opérateur : `social.test.ts`, `social-net.test.ts`, `firewall.test.ts` et `.\docs\demo-amis.ps1`.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 507 | Pare-feu à l'installation | Installer avec la section « Partage entre bornes » cochée, accepter l'autorisation de Windows. | Le journal de l'installation dit « Cyber Pinball autorisé » ; au premier démarrage, aucune invite du pare-feu. Menu système > « Amis » > « Partage et réseau » : « Pare-feu de Windows : Cyber Pinball autorisé ». |
+| 508 | Pare-feu refusé | Refuser l'autorisation pendant l'installation, puis lancer Cyber Pinball. | « Pare-feu de Windows : pas encore autorisé » (À vérifier) et l'action « Autoriser dans le pare-feu de Windows » ; elle demande l'autorisation une fois, puis la ligne passe à OK. |
+| 509 | Partage activé par défaut | Première installation, Menu système > « Amis » > « Partage et réseau ». | « Partage activé », « Relié à N bornes », un nom « Joueur XXXX » ; la sélection sur « Retour ». |
+| 510 | Changer de nom | « Changer de nom… », taper un nom avec le clavier à l'écran. | Le nom s'affiche avec son étiquette ; l'autre borne le voit dans l'annuaire après sa prochaine connexion. Un nom d'une lettre est refusé. |
+| 511 | Trouver un joueur | Sur la seconde borne, « Trouver un joueur » > « Chercher un nom… » > le nom de la première. | Le joueur paraît (étiquette comprise) ; Start, « Envoyer une demande d'ami » : « Demande envoyée à … ». |
+| 512 | Accepter | Sur la première borne : pastille rouge sur la roue dentée, « Amis », « Demandes d'amis » > la demande > « Accepter ». | Les deux bornes montrent l'autre dans « Mes amis », en ligne. |
+| 513 | Table en cours | Sur une borne, lancer une table. | L'autre voit « En partie : <table> · depuis … » en quelques secondes, puis « Dans le menu des tables » au retour. |
+| 514 | Record | Battre un record d'une table qui en garde (VPReg.stg). | L'ami voit « Nouveau meilleur score sur <table> : … » (ou « Entré au tableau d'honneur ») comme dernier évènement. |
+| 515 | Acceptée borne éteinte | Envoyer une demande, éteindre la borne qui demande, accepter sur l'autre, rallumer. | Amis des deux côtés dès la reconnexion. |
+| 516 | Réseau local | Les deux bornes sur la même box, Internet débranché. | Chacune voit l'autre « À proximité (réseau local) » ; demande et acceptation passent. |
 
 ## Ce qui ne peut pas encore être testé
 

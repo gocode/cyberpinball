@@ -22,6 +22,7 @@ On décrit la borne une fois : ses écrans, ses boutons, ses haut-parleurs. Cybe
 - **À côté de PinUP Popper, PinballX ou PinballY.** Cyber Pinball garde tout dans son propre dossier, avec sa copie de VPX et son `VPinballX.ini`, et n'enregistre rien dans Windows. Si un autre menu est ouvert, il attend qu'il soit fermé au lieu de lui disputer les écrans ; il prévient avant de retourner un écran dans Windows, et ne réaffiche que les barres des tâches qu'il a lui-même masquées.
 - **Les réglages de VPX sans le `.ini`.** Tous les réglages de VPX, lus dans son propre code source, se changent pour toutes les tables ou pour une seule. Les réglages visuels (cadrage de chaque table, place du fronton, du DMD et du topper) se font sur la table lancée : « Régler l'affichage en partie » ouvre le menu de VPX en pleine partie.
 - **La mise à jour depuis la borne.** Menu système > « Cyber Pinball » > « Mise à jour de Cyber Pinball » cherche la dernière version sur GitHub quand on le demande, montre ses nouveautés, puis la télécharge et l'installe. Chaque version est signée : la borne refuse tout ce qui n'a pas été signé avec la clé de l'éditeur. Tables, médias et réglages restent en place.
+- **Des amis, sans serveur.** Menu système > « Amis » : trouver un joueur par son nom dans un annuaire que les bornes se transmettent, lui envoyer une demande d'ami qu'il accepte de son côté, puis voir qui est en ligne, sur quelle table il joue en ce moment et son dernier évènement (nouveau meilleur score, badge reçu). Les bornes d'un même réseau local se trouvent même sans Internet. Sur Hyperswarm, de [Holepunch](https://holepunch.to) : les bornes se parlent directement, rien ne passe par un serveur, et jamais un fichier, une table ni une ROM. Le partage est activé par défaut et se coupe.
 - **En français ou en anglais.** Chaque écran suit la langue choisie dans le menu système (« Langue / Language »), dates et nombres compris. Par défaut, Cyber Pinball parle français si Windows le parle, anglais sinon.
 
 ## Captures d'écran
@@ -54,8 +55,8 @@ Téléchargez un installeur sur la page des [versions publiées](https://github.
 | `CyberPinball-Setup-complet.exe` | 280 Mio environ | archive officielle incluse, pour une borne sans Internet |
 
 - Tout vit dans **un dossier racine** que vous choisissez (par exemple `D:\CyberPinball`) : l'application dans `app\`, et à côté les tables, médias, configuration, données et émulateurs.
-- Pas besoin de droits d'administrateur : l'installation se fait pour l'utilisateur courant.
-- Options : un raccourci sur le bureau, et le lancement au démarrage de Windows (borne dédiée). Installation silencieuse : `/S`, `/DEMARRAGE` (lancement au démarrage), `/SANSBUREAU` (pas de raccourci sur le bureau), `/D=D:\Borne` (dossier racine, en dernier et sans guillemets).
+- Pas besoin de droits d'administrateur : l'installation se fait pour l'utilisateur courant. Pour les amis, Windows demande une fois l'autorisation de laisser passer Cyber Pinball par son pare-feu ; la refuser rend seulement le réseau local moins sûr.
+- Options : un raccourci sur le bureau, et le lancement au démarrage de Windows (borne dédiée). Installation silencieuse : `/S`, `/DEMARRAGE` (lancement au démarrage), `/SANSBUREAU` (pas de raccourci sur le bureau), `/PAREFEU` (demander la règle du pare-feu même en silence), `/D=D:\Borne` (dossier racine, en dernier et sans guillemets).
 - **La désinstallation ne retire que l'application.** Tables, médias, configuration et données restent dans le dossier racine ; une réinstallation au même endroit les retrouve telles quelles.
 - Les installeurs ne sont pas encore signés : Windows SmartScreen avertit à leur lancement.
 
@@ -117,6 +118,7 @@ Chaque étape ci-dessous est une action de `lanceur.cmd` (rubrique « Fabricatio
 
 - **Visual Pinball X** ne fait pas partie de ce dépôt. Il est téléchargé depuis ses [versions officielles](https://github.com/vpinball/vpinball/releases) et vérifié contre une empreinte SHA-256 fixée. Sa licence (GPLv3+, et pour certains fichiers une licence dérivée de celle de MAME) n'autorise sa redistribution que gratuitement, hors de tout produit ou activité commerciale. L'installeur complet **ne doit donc être ni vendu, ni livré avec une borne vendue ou exploitée commercialement**.
 - La **base VPS** et **VPinMediaDB** ne déclarent aucune licence. Cyber Pinball ne les livre pas : elles sont téléchargées depuis leurs adresses officielles au premier usage. Les médias de VPinMediaDB appartiennent à leurs auteurs et les visuels des jeux à leurs fabricants : **usage personnel, sur sa propre borne** seulement. Les fichiers de VPForums et de VPUniverse se téléchargent avec votre propre compte, un à la fois, à votre demande, et restent sur votre borne : leurs sites interdisent de les remettre en ligne ou de les redistribuer.
+- Le réseau des bornes s'appuie sur Hyperswarm, HyperDHT, Protomux et secret-stream de Holepunch, avec sodium-native et udx-native (licences MIT et Apache-2.0).
 - Les polices (Audiowide, Bebas Neue, Orbitron, Saira) sont sous licence SIL Open Font License ; leurs licences sont rangées à côté d'elles, dans `app/renderer/polices`.
 - Cyber Pinball ne télécharge ni tables ni ROM à votre place. Les tables viennent des sites de leurs auteurs, et les fabricants de flippers n'autorisent pas la diffusion de leurs ROM.
 

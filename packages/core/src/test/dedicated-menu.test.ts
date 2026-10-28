@@ -285,8 +285,9 @@ function filesMatching(pattern: RegExp): string[] {
 test('les écritures de la borne dédiée ne partent que de « Activer » et « Désactiver »', () => {
   // Shell Launcher, fonctions facultatives, Winlogon : seulement dans le script du cœur.
   assert.deepEqual(filesMatching(/SetCustomShell|SetEnabled\(|Enable-WindowsOptionalFeature|Disable-WindowsOptionalFeature|WESL_UserSetting|Winlogon'/), ['packages/core/src/dedicated.ts']);
-  // L'élévation de Windows : seulement l'exécuteur.
-  assert.deepEqual(filesMatching(/-Verb RunAs|runas/i), ['app/src/dedicated-system.ts']);
+  // L'élévation de Windows : seulement l'exécuteur, et la règle du pare-feu du réseau des bornes
+  // (firewall-rule.ts), posée seulement par une action de l'écran « Partage et réseau » (firewall.test.ts).
+  assert.deepEqual(filesMatching(/-Verb RunAs|\brunas\b/i), ['app/src/dedicated-system.ts', 'app/src/firewall-rule.ts']);
   // L'exécuteur n'est appelé que par l'écran, et l'écran ne l'appelle que dans activate() et deactivate().
   assert.deepEqual(filesMatching(/runElevated\(/), ['app/src/dedicated-menu.ts', 'app/src/dedicated-system.ts']);
   const menu = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'dedicated-menu.ts'), 'utf8');

@@ -32,6 +32,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - More reliable VPUniverse search: short words in the title ("say", "die") no longer empty the search, and the wait imposed by the site is no longer taken for "no results".
 - PuP-Packs visible in game: when a table's script keeps its PuP-Pack or PuP-DMD switched off, Cyber Pinball switches it on at install and before each game.
 - VPX windows in their place in game: when two screens share the same name, the backglass, the DMD and the score view no longer pile up; Cyber Pinball moves each one back to the screen of its role.
+- Friends (System menu > Friends), between cabinets and with no central server: your friends online with the table they are playing and their latest high scores, finding a player by name or on the local network, friend requests, first badges. Sharing is on by default and is turned off in "Sharing and network", which also says what other cabinets see; Windows asks once to allow Cyber Pinball through its firewall.
 
 ## 0.1.3
 

@@ -108,6 +108,13 @@ const CYBER_ICONS = {
   tilt: '<path d="M12 2v11M10 13h4l-2 4z"/><ellipse cx="12" cy="15" rx="9" ry="3"/>', // Balancier de tilt : pendule et cône au milieu de son anneau.
   usb: '<path d="M12 17V3M9 6l3-3 3 3M6 9v3l6 3 6-3V7M6 6h.01M16 3h4v4h-4z"/><circle cx="12" cy="20" r="2"/>', // Support USB.
   gamepad: '<path d="M7 7h10c4 0 5 5 5 10 0 3-3 4-5 1l-2-3H9l-2 3c-2 3-5 2-5-1 0-5 1-10 5-10zM7 9v4M5 11h4M15 10h.01M19 12h.01"/>', // Contrôleur générique, hors touches de l’encodeur.
+  // Amis : réseau des bornes
+  friends: '<circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6M15.5 4.5a3.5 3.5 0 0 1 0 7M17 14c2.5.5 4 2.5 4 6"/>', // Deux joueurs : la rubrique Amis.
+  'friend-list': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 9 0v1M16 7h4M16 12h4M16 17h4"/>', // Un joueur et sa liste : mes amis.
+  'friend-add': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 7.5-3.35M17 13v7M13.5 16.5h7"/>', // Un joueur et un plus : trouver un joueur, demander.
+  'friend-request': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 7.5-3.35M20 16.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0zM16.5 14.5v2l1.5 1"/>', // Un joueur et une horloge : demandes en attente.
+  medal: '<circle cx="12" cy="15" r="6"/><path d="M8.5 10.2 5 3h4l3 6 3-6h4l-3.5 7.2M12 13v4"/>', // Médaille à ruban : badges.
+  network: '<path d="M14 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM20 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM11.1 7.8 6.9 16.2M12.9 7.8l4.2 8.4M8 18h8"/>', // Trois bornes reliées sans centre : partage et réseau.
 };
 
 /**

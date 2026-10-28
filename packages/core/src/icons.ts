@@ -101,6 +101,12 @@ export const ICON_NAMES = [
   'tilt',
   'usb',
   'gamepad',
+  'friends',
+  'friend-list',
+  'friend-add',
+  'friend-request',
+  'medal',
+  'network',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];

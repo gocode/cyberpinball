@@ -1,5 +1,5 @@
-// Menu système (Exit, Tab ou roue dentée) : quatre rubriques au lieu d'une longue liste.
-// Tables, Médias, Borne, Cyber Pinball ; ce qui ne sert qu'une fois, en venant d'un autre
+// Menu système (Exit, Tab ou roue dentée) : cinq rubriques au lieu d'une longue liste.
+// Tables, Médias, Amis, Borne, Cyber Pinball ; ce qui ne sert qu'une fois, en venant d'un autre
 // frontend (médias de PinUP Popper, ROM copiées dans chaque table), est rangé à part dans
 // « Migration », au fond de la rubrique Cyber Pinball.
 //
@@ -18,6 +18,11 @@ export const SYSTEM_ITEM_IDS = [
   'roms',
   'missing-media',
   'menu-media',
+  'friends',
+  'find-player',
+  'friend-requests',
+  'badges',
+  'sharing',
   'health',
   'cabinet',
   'vpx-settings',
@@ -38,7 +43,7 @@ export const SYSTEM_ITEM_IDS = [
 export type SystemItemId = (typeof SYSTEM_ITEM_IDS)[number];
 
 /** Rubriques (et sous-rubrique) : l'arbre les ouvre lui-même. */
-export const SYSTEM_GROUP_IDS = ['tables', 'medias', 'borne', 'cyberpinball', 'migration'] as const;
+export const SYSTEM_GROUP_IDS = ['tables', 'medias', 'amis', 'borne', 'cyberpinball', 'migration'] as const;
 export type SystemGroupId = (typeof SYSTEM_GROUP_IDS)[number];
 
 export type SystemEntryId = SystemItemId | SystemGroupId;
@@ -58,7 +63,7 @@ export interface SystemGroup extends SystemEntry {
 }
 
 /** Rubriques du menu système, dans l'ordre. */
-export const SYSTEM_ROOT: readonly SystemGroupId[] = ['tables', 'medias', 'borne', 'cyberpinball'];
+export const SYSTEM_ROOT: readonly SystemGroupId[] = ['tables', 'medias', 'amis', 'borne', 'cyberpinball'];
 
 export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   tables: {
@@ -74,6 +79,14 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     get label() { return t('Médias'); },
     get detail() { return t('Images et vidéos des tables, musique et mode attente du menu'); },
     entries: ['missing-media', 'menu-media'],
+  },
+  // Réseau des bornes (social.ts) : les amis, l'annuaire des joueurs, les badges, le partage.
+  amis: {
+    id: 'amis',
+    icon: 'friends',
+    get label() { return t('Amis'); },
+    get detail() { return t('Mes amis, trouver un joueur, demandes, badges, partage'); },
+    entries: ['friends', 'find-player', 'friend-requests', 'badges', 'sharing'],
   },
   borne: {
     id: 'borne',
@@ -105,6 +118,11 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   roms: { icon: 'chip', get label() { return t('Bibliothèque de ROM'); } },
   'missing-media': { icon: 'image-download', get label() { return t('Trouver les médias manquants'); } },
   'menu-media': { icon: 'music', get label() { return t('Médias, son et attente'); } },
+  friends: { icon: 'friend-list', get label() { return t('Mes amis'); } },
+  'find-player': { icon: 'friend-add', get label() { return t('Trouver un joueur'); } },
+  'friend-requests': { icon: 'friend-request', get label() { return t('Demandes d’amis'); } },
+  badges: { icon: 'medal', get label() { return t('Mes badges'); } },
+  sharing: { icon: 'network', get label() { return t('Partage et réseau'); } },
   health: { icon: 'health', get label() { return t('Santé de la borne'); } },
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
   'vpx-settings': { icon: 'sliders', get label() { return t('Réglages de VPX'); } },

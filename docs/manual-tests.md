@@ -737,7 +737,7 @@ From Start until the game appears. The proof without an operator: `packages/core
 | 397 | Desktop, small window | The same on a 1366 × 768 or 1280 × 1024 screen, with a table that has a long title. | The title wraps onto two lines; the controls switch to one column if the panel is narrow, all readable, none cut off. |
 | 398 | Display adjustment | A table's details screen > "Régler l'affichage en partie" (Adjust the display during a game), on the cabinet then on a desktop. | On the cabinet, only the reminder of VPX's menu buttons is shown, at the bottom of the media; on a desktop, it replaces the game's controls in the panel. |
 | 399 | System menu in sections | Table menu, Exit: the system menu. With the flippers, go through the sections, Start on each, Exit to go back up; in "Cyber Pinball", open "Migration". Then the same with the mouse (click, "‹ Retour" button). | Four sections (Tables, Médias, Borne, Cyber Pinball) and "Retour aux tables" (Back to tables), each with its icon and what it contains. Each section shows its entries and "Retour" (Back); Exit goes up one level, the selection on the section just left. "Migration" holds the PinUP Popper / PinballX media import and the ROM tidy-up. On the desktop as on the cabinet, each list starts just below the title, at the same height from one section to the next. In "Configuration de la borne" (Cabinet configuration), go down to the bottom then back up: a rule marks the edge behind which entries remain, no line is dimmed, the selected entry is always whole. |
-| 400 | Back to the original section | Borne > "Configuration de la borne" > "Configurations de la borne", Exit, Exit; then Médias > "Médias, son et attente", Exit; Tables > "Bibliothèque de ROM", Exit. Finally, from one of these screens, click the gear. | Each "Retour" returns to the section it came from, the selection on the entry that was opened. The gear always reopens the four sections. Exit from the sections returns to the table menu. |
+| 400 | Back to the original section | Borne > "Configuration de la borne" > "Configurations de la borne", Exit, Exit; then Médias > "Médias, son et attente", Exit; Tables > "Bibliothèque de ROM", Exit. Finally, from one of these screens, click the gear. | Each "Retour" returns to the section it came from, the selection on the entry that was opened. The gear always reopens the five sections. Exit from the sections returns to the table menu. |
 | 401 | Section red dots | With an update available (or a received file to install), open the system menu. | The red dot is on the entry, on its section (Cyber Pinball, or Tables) and on the gear; on opening, the selection goes to the section with the dot, then within the section to the entry with the dot. |
 
 ## Menu DMD
@@ -967,6 +967,23 @@ On the cabinet (or the development PC), with The Goonies Never Say Die Pinball (
 | 504 | Mixed-up screens realigned (health) | As in 502. | The line "VPX confond deux écrans « PL2294H »" (VPX mixes up two screens) adds "recalé à chaque partie, chaque fenêtre est ramenée sur l'écran de son rôle" (realigned at every game, each window is moved back to its role's screen). |
 | 505 | Backglass and DMD realigned in game | "Poste à 3 écrans" PC (backglass and DMD on two PL2294H). Start The Matrix, play one ball, quit. | Within 2 s of the game opening, the DMD ("Visual Pinball Score View") moves to its screen, at the same size; the backglass stays on its own; neither takes the focus (the flippers respond). The pack's videos meant for the DMD show there. The menu log says "Partie : « Visual Pinball Score View » ramenée sur l'écran du rôle dmd (… → …)", once. |
 | 506 | Nothing moves without same-name screens | Cabinet whose screens have different names, or a VPX that also finds the position. Start a game. | No "ramenée sur l'écran" line in the menu log; the VPX windows stay where it opens them. |
+
+## Friends: the cabinet network
+
+Two cabinets (or the cabinet and the development machine), installed with the installer, each on its own router; then both on the same local network. The unattended proof: `social.test.ts`, `social-net.test.ts`, `firewall.test.ts` and `.\docs\demo-amis.ps1`.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 507 | Firewall at install | Install with the "Partage entre bornes" section checked, accept Windows' permission prompt. | The install log says "Cyber Pinball autorisé"; on first start, no firewall prompt. System menu > "Amis" > "Partage et réseau": "Pare-feu de Windows : Cyber Pinball autorisé" (Windows Firewall: Cyber Pinball allowed). |
+| 508 | Firewall declined | Decline permission during installation, then start Cyber Pinball. | "Pare-feu de Windows : pas encore autorisé" (not allowed yet, To check) and the "Autoriser dans le pare-feu de Windows" action; it asks for permission once, then the line turns OK. |
+| 509 | Sharing on by default | First installation, System menu > "Amis" > "Partage et réseau". | "Partage activé" (Sharing on), "Relié à N bornes" (Connected to N cabinets), a "Joueur XXXX" name; the selection on "Retour". |
+| 510 | Change name | "Changer de nom…", type a name with the on-screen keyboard. | The name shows with its tag; the other cabinet sees it in the directory after its next connection. A one-letter name is refused. |
+| 511 | Find a player | On the second cabinet, "Trouver un joueur" > "Chercher un nom…" > the first one's name. | The player appears (tag included); Start, "Envoyer une demande d'ami": "Demande envoyée à …" (Request sent to). |
+| 512 | Accept | On the first cabinet: red dot on the gear, "Amis", "Demandes d'amis" > the request > "Accepter". | Both cabinets show the other in "Mes amis", online. |
+| 513 | Table being played | On one cabinet, start a table. | The other sees "En partie : <table> · depuis …" (Playing) within seconds, then "Dans le menu des tables" (In the table menu) on return. |
+| 514 | High score | Beat a high score on a table that keeps them (VPReg.stg). | The friend sees "Nouveau meilleur score sur <table> : …" (New high score on, or "Entré au tableau d'honneur") as the latest event. |
+| 515 | Accepted while off | Send a request, turn off the requesting cabinet, accept on the other, turn it back on. | Friends on both sides as soon as it reconnects. |
+| 516 | Local network | Both cabinets on the same router, Internet unplugged. | Each sees the other "À proximité (réseau local)" (Nearby); request and acceptance get through. |
 
 ## What cannot be tested yet
 

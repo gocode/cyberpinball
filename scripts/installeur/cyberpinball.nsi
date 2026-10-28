@@ -66,6 +66,8 @@ Var DemarrageDir
 Var AnciennesDonnees
 ; « 1 » : mise à jour depuis l'application (/MAJ).
 Var Maj
+; /PAREFEU : la règle du pare-feu est demandée même en installation silencieuse (/S).
+Var ParefeuSilencieux
 
 ; ---------------------------------------------------------------------------
 ; Interface
@@ -242,6 +244,22 @@ Section "Uninstall"
   ${If} $1 == "1"
   ${AndIf} $2 == $Racine
     DeleteRegKey HKCU "${CLE_DESINSTALLATION}"
+  ${EndIf}
+
+  ; Règle du pare-feu de cette application (section SEC_PAREFEU) : retirée avec l'autorisation de
+  ; Windows, seulement si elle vise bien cette racine et que quelqu'un est devant l'écran.
+  ${If} $BacASable == ""
+  ${AndIfNot} ${Silent}
+    nsExec::ExecToStack '"$SYSDIR\netsh.exe" advfirewall firewall show rule name="Cyber Pinball" verbose'
+    Pop $1
+    Pop $2
+    ClearErrors
+    ${WordFind} "$2" "$INSTDIR\${EXE}" "E#" $3
+    ${If} $1 == "0"
+    ${AndIfNot} ${Errors}
+      DetailPrint "Pare-feu de Windows : règle de Cyber Pinball retirée (autorisation demandée)."
+      ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c netsh advfirewall firewall delete rule name="Cyber Pinball"' SW_HIDE
+    ${EndIf}
   ${EndIf}
 
   DetailPrint "Application : $INSTDIR"
@@ -550,6 +568,58 @@ Section /o "Lancer au démarrage de Windows (borne dédiée)" SEC_DEMARRAGE
   WriteINIStr "$Racine\app\installation.ini" "installation" "demarrage" "1"
 SectionEnd
 
+; Réseau des bornes (Menu système > Amis) : la règle du pare-feu de Windows pour CyberPinball.exe,
+; pour que Windows n'affiche pas son invite « Autoriser l'accès » sur une borne sans souris (décidé
+; le 28/10/2026). Même nom et mêmes arguments que packages/core/src/firewall.ts (relu par
+; firewall.test.ts). L'autorisation de Windows (UAC) n'est demandée que si la règle manque ou vise
+; un autre dossier, et seulement pendant une installation où quelqu'un est devant l'écran : jamais
+; en mise à jour (/MAJ), en silence (/S, sauf /PAREFEU) ni dans un bac à sable d'essai.
+Section "Partage entre bornes : autoriser dans le pare-feu de Windows" SEC_PAREFEU
+  ${If} $BacASable != ""
+    DetailPrint "Pare-feu de Windows : bac à sable d'essai, rien n'est demandé."
+    Return
+  ${EndIf}
+  Call RegleParefeuPresente
+  ${If} $0 == "1"
+    DetailPrint "Pare-feu de Windows : Cyber Pinball est déjà autorisé."
+    WriteINIStr "$Racine\app\installation.ini" "installation" "pare_feu" "1"
+    Return
+  ${EndIf}
+  ${If} $Maj == "1"
+    DetailPrint "Pare-feu de Windows : à autoriser depuis Menu système > Amis > Partage et réseau."
+    Return
+  ${EndIf}
+  ${If} ${Silent}
+  ${AndIf} $ParefeuSilencieux != "1"
+    DetailPrint "Pare-feu de Windows : à autoriser depuis Menu système > Amis > Partage et réseau."
+    Return
+  ${EndIf}
+  DetailPrint "Pare-feu de Windows : autorisation demandée à Windows."
+  ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c netsh advfirewall firewall delete rule name="Cyber Pinball" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball" dir=in action=allow program="$Racine\app\${EXE}" enable=yes profile=any' SW_HIDE
+  Call RegleParefeuPresente
+  WriteINIStr "$Racine\app\installation.ini" "installation" "pare_feu" "$0"
+  ${If} $0 == "1"
+    DetailPrint "Pare-feu de Windows : Cyber Pinball autorisé."
+  ${Else}
+    DetailPrint "Pare-feu de Windows : pas autorisé (refusé ?) ; Menu système > Amis > Partage et réseau le propose."
+  ${EndIf}
+SectionEnd
+
+; $0 = "1" si la règle « Cyber Pinball » existe et vise $Racine\app\CyberPinball.exe (lecture sans élévation).
+Function RegleParefeuPresente
+  nsExec::ExecToStack '"$SYSDIR\netsh.exe" advfirewall firewall show rule name="Cyber Pinball" verbose'
+  Pop $1
+  Pop $2
+  StrCpy $0 "0"
+  ${If} $1 == "0"
+    ClearErrors
+    ${WordFind} "$2" "$Racine\app\${EXE}" "E#" $3
+    ${IfNot} ${Errors}
+      StrCpy $0 "1"
+    ${EndIf}
+  ${EndIf}
+FunctionEnd
+
 !insertmacro MUI_FUNCTION_DESCRIPTION_BEGIN
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_APP} "L'application, dans le sous-dossier app de la racine, avec un raccourci dans le menu Démarrer."
   !ifdef COMPLET
@@ -557,6 +627,7 @@ SectionEnd
   !endif
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_BUREAU} "Un raccourci Cyber Pinball sur le bureau."
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DEMARRAGE} "Pour une borne dédiée : Cyber Pinball s'ouvre dès l'ouverture de la session Windows."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_PAREFEU} "Amis et partage entre bornes : Windows demande une fois son autorisation, pour que son pare-feu ne bloque pas Cyber Pinball et n'affiche pas son invite sur la borne."
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Function PasserEnMiseAJour
