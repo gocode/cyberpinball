@@ -140,6 +140,27 @@ test('acceptée pendant que la borne qui demandait était éteinte : amis à la 
   }
 });
 
+test('renommée juste avant de demander : la demande arrive sous le nouveau nom', async () => {
+  const testnet = await createTestnet(3, { host: '127.0.0.1' });
+  const a = cabinet('Alice', { bootstrap: testnet.bootstrap, lan: false });
+  const b = cabinet('Bruno', { bootstrap: testnet.bootstrap, lan: false });
+  try {
+    await Promise.all([a.net.start(), b.net.start()]);
+    // Déjà reliées : Bruno a reçu « Alice » au premier contact.
+    await until('Alice dans l’annuaire de Bruno', () => b.net.state().directory.some((d) => d.profile.name === 'Alice'));
+    assert.equal(a.net.rename('Alicia'), true);
+    a.net.request(profileOf(b.net));
+    await until('demande reçue par Bruno', () => b.net.state().incoming.length === 1);
+    assert.equal(b.net.state().incoming[0]!.name, 'Alicia');
+    b.net.accept(profileOf(a.net).key);
+    await until('amis', () => a.net.state().friends.length === 1);
+    assert.equal(b.net.state().friends[0]!.name, 'Alicia');
+  } finally {
+    await Promise.all([a.net.stop(), b.net.stop()]);
+    await testnet.destroy();
+  }
+});
+
 test('réseau local sans Internet : la borne voisine apparaît, demande et acceptation passent', async () => {
   const bus = new Set<unknown>();
   // Pas de nœud d'amorçage commun : seule la balise locale les relie.

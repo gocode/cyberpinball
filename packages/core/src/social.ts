@@ -85,6 +85,8 @@ export interface SocialEvent {
 export interface Friend {
   key: string;
   name: string;
+  /** Date du profil qui a donné ce nom : seul un profil plus récent le change (renamePeer). */
+  nameAt?: string;
   /** Amis depuis (ISO). */
   since: string;
   /** Dernière connexion vue (ISO). */
@@ -96,6 +98,8 @@ export interface Friend {
 export interface FriendRequest {
   key: string;
   name: string;
+  /** Date du profil qui a donné ce nom. */
+  nameAt?: string;
   at: string;
   /** Vue sur le réseau local. */
   lan?: boolean;
@@ -123,6 +127,11 @@ export interface SocialState {
   enabled: boolean;
   /** Recherche des bornes du réseau local. */
   lan: boolean;
+  /**
+   * Bibliothèque partagée avec mes amis : la liste de mes tables et leurs médias (friendlibrary.ts).
+   * Désactivée par défaut : activée par le joueur, après l'avertissement sur les droits.
+   */
+  shareLibrary: boolean;
   name: string;
   /** Date du nom actuel : le profil signé la porte. */
   nameAt: string;
@@ -215,12 +224,17 @@ function defaultName(key: string): string {
 
 export function newSocialState(now = new Date()): SocialState {
   const key = createPlayerKey();
-  return { version: 1, enabled: true, lan: true, name: defaultName(key.publicKey), nameAt: now.toISOString(), key, friends: [], incoming: [], outgoing: [], blocked: [], declined: [], directory: [], events: [], badges: [], badgesChecked: false };
+  return { version: 1, enabled: true, lan: true, shareLibrary: false, name: defaultName(key.publicKey), nameAt: now.toISOString(), key, friends: [], incoming: [], outgoing: [], blocked: [], declined: [], directory: [], events: [], badges: [], badgesChecked: false };
 }
 
 const array = <T>(v: unknown, keep: (x: unknown) => x is T): T[] => (Array.isArray(v) ? v.filter(keep) : []);
 const isRequest = (v: unknown): v is FriendRequest => !!v && typeof v === 'object' && isPlayerPublicKey((v as FriendRequest).key) && !!normalizeName((v as FriendRequest).name) && isIso((v as FriendRequest).at);
 const isFriend = (v: unknown): v is Friend => !!v && typeof v === 'object' && isPlayerPublicKey((v as Friend).key) && !!normalizeName((v as Friend).name) && isIso((v as Friend).since);
+/** Date du nom relue : gardée si elle est lisible, retirée sinon (le prochain profil la remet). */
+const withNameAt = <T extends { nameAt?: string }>(x: T): T => {
+  const { nameAt, ...rest } = x;
+  return (isIso(nameAt) ? { ...rest, nameAt } : rest) as T;
+};
 
 /** État relu d'un fichier, réparé champ par champ ; undefined si la clé du joueur manque (fichier inutilisable). */
 export function parseSocialState(raw: unknown): SocialState | undefined {
@@ -237,12 +251,13 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     version: 1,
     enabled: s.enabled !== false,
     lan: s.lan !== false,
+    shareLibrary: s.shareLibrary === true,
     name: normalizeName(s.name) ?? defaultName(key.publicKey),
     nameAt: isIso(s.nameAt) ? s.nameAt : new Date(0).toISOString(),
     key: { publicKey: key.publicKey, privateKey: key.privateKey },
-    friends: array(s.friends, isFriend).map((f) => ({ ...f, events: array(f.events, (e): e is SocialEvent => !!parseEvent(e)) })),
-    incoming: array(s.incoming, isRequest),
-    outgoing: array(s.outgoing, isRequest),
+    friends: array(s.friends, isFriend).map((f) => withNameAt({ ...f, events: array(f.events, (e): e is SocialEvent => !!parseEvent(e)) })),
+    incoming: array(s.incoming, isRequest).map(withNameAt),
+    outgoing: array(s.outgoing, isRequest).map(withNameAt),
     blocked: array(s.blocked, (k): k is string => typeof k === 'string' && isPlayerPublicKey(k)),
     declined: array(s.declined, (d): d is { key: string; at: string } => !!d && typeof d === 'object' && isPlayerPublicKey((d as { key: string }).key) && isIso((d as { at: string }).at)),
     directory: array(s.directory, (d): d is DirectoryEntry => !!d && typeof d === 'object' && !!verifyProfile((d as DirectoryEntry).profile, new Date(8.64e15)) && isIso((d as DirectoryEntry).seen)),
@@ -405,6 +420,28 @@ export function mergeDirectory(directory: readonly DirectoryEntry[], profiles: r
     .slice(0, DIRECTORY_MAX);
 }
 
+/**
+ * Profils reçus (bonjour d'un pair, annuaire relayé, balise du réseau local) : dans l'annuaire,
+ * et le nom des amis et des demandes suit le plus récent. Toute source de profils passe par
+ * ici : un nom vu ailleurs que dans l'annuaire ne resterait pas à l'ancien.
+ */
+export function learnProfiles(state: SocialState, profiles: readonly Profile[], opts: { now: Date; lan?: boolean }): SocialState {
+  let next: SocialState = { ...state, directory: mergeDirectory(state.directory, profiles, { self: state.key.publicKey, now: opts.now, ...(opts.lan ? { lan: true } : {}) }) };
+  for (const profile of profiles) next = renamePeer(next, profile);
+  return next;
+}
+
+/** Joueur tel qu'un écran ou un message le donne : sa clé, son nom, et la date du profil qui porte ce nom. */
+export type PeerName = Pick<Profile, 'key' | 'name'> & { at?: string };
+
+/** Profil le plus récent qu'on connaît d'un joueur : l'annuaire, sinon le nom gardé dans les amis et les demandes. */
+export function peerProfile(state: SocialState, key: string): PeerName | undefined {
+  const dir = state.directory.find((d) => d.profile.key === key)?.profile;
+  const kept = state.friends.find((f) => f.key === key) ?? state.incoming.find((r) => r.key === key) ?? state.outgoing.find((r) => r.key === key);
+  if (dir && (!kept?.nameAt || Date.parse(dir.at) >= Date.parse(kept.nameAt))) return { key, name: dir.name, at: dir.at };
+  return kept ? { key, name: kept.name, ...(kept.nameAt ? { at: kept.nameAt } : {}) } : undefined;
+}
+
 /** Profils à envoyer à un pair : les plus récemment vus, le mien en tête. */
 export function directorySample(state: SocialState): Profile[] {
   return [signProfile(state), ...state.directory.filter((d) => !state.blocked.includes(d.profile.key)).map((d) => d.profile)].slice(0, DIRECTORY_BATCH);
@@ -456,8 +493,9 @@ export function relationOf(state: SocialState, key: string): Relation {
 
 const without = <T extends { key: string }>(list: readonly T[], key: string) => list.filter((x) => x.key !== key);
 
-function befriend(state: SocialState, key: string, name: string, now: Date): SocialState {
-  const friend: Friend = { key, name, since: now.toISOString(), lastSeen: now.toISOString(), events: [] };
+function befriend(state: SocialState, peer: PeerName, now: Date): SocialState {
+  const key = peer.key;
+  const friend: Friend = { key, name: peer.name, ...(peer.at ? { nameAt: peer.at } : {}), since: now.toISOString(), lastSeen: now.toISOString(), events: [] };
   return { ...state, friends: [...without(state.friends, key), friend], incoming: without(state.incoming, key), outgoing: without(state.outgoing, key) };
 }
 
@@ -472,19 +510,19 @@ export function knownName(state: SocialState, key: string): string | undefined {
 }
 
 /** Demande d'ami envoyée depuis l'écran ; s'il m'avait déjà demandé, nous voilà amis. */
-export function requestFriend(state: SocialState, profile: Pick<Profile, 'key' | 'name'>, now = new Date()): Step {
+export function requestFriend(state: SocialState, profile: PeerName, now = new Date()): Step {
   switch (relationOf(state, profile.key)) {
     case 'self':
     case 'friend':
     case 'blocked':
       return { state };
     case 'incoming':
-      return { state: befriend(state, profile.key, profile.name, now), send: 'accept' };
+      return { state: befriend(state, peerProfile(state, profile.key) ?? profile, now), send: 'accept' };
     case 'outgoing':
       return { state, send: 'request' };
     default: {
       const lan = nearbyPlayers(state, now).some((d) => d.profile.key === profile.key);
-      return { state: { ...state, outgoing: [...state.outgoing, { key: profile.key, name: profile.name, at: now.toISOString(), ...(lan ? { lan } : {}) }] }, send: 'request' };
+      return { state: { ...state, outgoing: [...state.outgoing, { key: profile.key, name: profile.name, ...(profile.at ? { nameAt: profile.at } : {}), at: now.toISOString(), ...(lan ? { lan } : {}) }] }, send: 'request' };
     }
   }
 }
@@ -495,7 +533,7 @@ export function cancelRequest(state: SocialState, key: string): Step {
 
 export function acceptRequest(state: SocialState, key: string, now = new Date()): Step {
   const request = state.incoming.find((r) => r.key === key);
-  return request ? { state: befriend(state, key, request.name, now), send: 'accept' } : { state };
+  return request ? { state: befriend(state, peerProfile(state, key) ?? request, now), send: 'accept' } : { state };
 }
 
 /** Un refus vaut ce délai : passé, une nouvelle demande du même joueur se montre de nouveau. */
@@ -540,21 +578,21 @@ export function unblockPlayer(state: SocialState, key: string): SocialState {
  * Message d'amitié reçu d'un pair (clé authentifiée par la connexion). `name` : son nom, tel
  * que son profil le donne. Ce que l'autre borne a fait : demande, acceptation, refus, retrait.
  */
-export function receiveReply(state: SocialState, from: { key: string; name: string; lan?: boolean }, reply: Reply, now = new Date()): Step {
+export function receiveReply(state: SocialState, from: PeerName & { lan?: boolean }, reply: Reply, now = new Date()): Step {
   const relation = relationOf(state, from.key);
   if (relation === 'blocked' || relation === 'self') return { state };
   switch (reply) {
     case 'request':
       if (relation === 'friend') return { state, send: 'accept' };
       // Demandé des deux côtés : amis tout de suite.
-      if (relation === 'outgoing') return { state: befriend(state, from.key, from.name, now), send: 'accept' };
+      if (relation === 'outgoing') return { state: befriend(state, from, now), send: 'accept' };
       if (relation === 'incoming') return { state };
       if (recentlyDeclined(state, from.key, now)) return { state, send: 'decline' };
       return {
-        state: { ...state, incoming: [{ key: from.key, name: from.name, at: now.toISOString(), ...(from.lan ? { lan: true } : {}) }, ...state.incoming].slice(0, INCOMING_MAX) },
+        state: { ...state, incoming: [{ key: from.key, name: from.name, ...(from.at ? { nameAt: from.at } : {}), at: now.toISOString(), ...(from.lan ? { lan: true } : {}) }, ...state.incoming].slice(0, INCOMING_MAX) },
       };
     case 'accept':
-      if (relation === 'outgoing') return { state: befriend(state, from.key, from.name, now) };
+      if (relation === 'outgoing') return { state: befriend(state, from, now) };
       // Il nous croit amis, nous ne le sommes plus (retiré pendant qu'il était hors ligne) : le lui dire.
       if (relation === 'none') return { state, send: 'unfriend' };
       return { state };
@@ -579,9 +617,20 @@ export function syncReply(state: SocialState, key: string): Reply | undefined {
 }
 
 /** Nom d'un pair revu (profil plus récent) : tenu à jour dans les amis et les demandes. */
-export function renamePeer(state: SocialState, key: string, name: string): SocialState {
-  const rename = <T extends { key: string; name: string }>(list: T[]) => list.map((x) => (x.key === key && x.name !== name ? { ...x, name } : x));
-  return { ...state, friends: rename(state.friends), incoming: rename(state.incoming), outgoing: rename(state.outgoing) };
+export function renamePeer(state: SocialState, profile: Pick<Profile, 'key' | 'name' | 'at'>): SocialState {
+  const at = Date.parse(profile.at);
+  // Un profil relayé plus ancien que celui de l'annuaire ne ramène jamais l'ancien nom.
+  const dir = state.directory.find((d) => d.profile.key === profile.key);
+  if (dir && Date.parse(dir.profile.at) > at) return state;
+  let changed = false;
+  const rename = <T extends { key: string; name: string; nameAt?: string }>(list: T[]) =>
+    list.map((x) => {
+      if (x.key !== profile.key || (x.nameAt && Date.parse(x.nameAt) > at) || (x.name === profile.name && x.nameAt === profile.at)) return x;
+      changed = true;
+      return { ...x, name: profile.name, nameAt: profile.at };
+    });
+  const next = { ...state, friends: rename(state.friends), incoming: rename(state.incoming), outgoing: rename(state.outgoing) };
+  return changed ? next : state;
 }
 
 export function friendSeen(state: SocialState, key: string, now = new Date()): SocialState {

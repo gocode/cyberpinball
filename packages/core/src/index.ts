@@ -97,3 +97,5 @@ export * from './mediapack';
 export * from './social';
 export * from './badges';
 export * from './firewall';
+export * from './friendlibrary';
+export * from './livegame';

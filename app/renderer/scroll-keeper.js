@@ -17,6 +17,11 @@
 // hors de la galerie, octobre 2026) ; s'il y était entier et qu'il grandit (pastille « Choisi,
 // à enregistrer »), la liste avance juste assez pour qu'il le reste.
 //
+// Un écran ouvert directement sur un élément plus bas (médias reçus d'un ami, octobre 2026) : la
+// liste y est amenée, puis les images des cartes se chargent, grandissent et le repoussent hors de
+// la vue. Tant que l'utilisateur n'a fait aucun geste, le choix fait à l'ouverture (ou au dernier
+// changement) reste donc entier dans la vue, à chaque rendu comme à chaque image chargée.
+//
 // Une liste que l'utilisateur a éloignée du choix (molette, barre de défilement) porte
 // data-user-scroll jusqu'au prochain changement de choix : le garde-fou de mise en page ne lui
 // reproche pas un choix hors de la vue.
@@ -118,13 +123,21 @@ const CyberScroll = (() => {
     return undefined;
   }
 
-  /** Écart entre le haut de `node` et celui de sa liste, à l'écran. */
-  const offsetIn = (node, list) => node.getBoundingClientRect().top - list.getBoundingClientRect().top;
+  // Positions dans la mise en page de la liste, jamais à l'écran : le plateau d'une borne est
+  // tourné (transform), et getBoundingClientRect y mesure l'axe d'écran, pas celui où la liste
+  // défile ; un choix qui débordait passait pour entier (médias reçus d'un ami, octobre 2026).
+  /** Haut de `node` dans la page, d'après la mise en page (offsetTop), sans défilement ni rotation. */
+  const layoutTop = (node) => {
+    let y = 0;
+    for (let n = node; n; n = n.offsetParent) y += (n.offsetTop || 0) + (n !== node ? n.clientTop || 0 : 0);
+    return y;
+  };
+  /** Écart entre le haut de `node` et celui de la vue de sa liste. */
+  const offsetIn = (node, list) => layoutTop(node) - layoutTop(list) - (list.clientTop || 0) - list.scrollTop;
   /** `node` entier dans la vue de sa liste. */
   const wholeIn = (node, list) => {
-    const r = node.getBoundingClientRect();
-    const c = list.getBoundingClientRect();
-    return r.top >= c.top - 1 && r.bottom <= c.bottom + 1;
+    const offset = offsetIn(node, list);
+    return offset >= -1 && offset + node.offsetHeight <= list.clientHeight + 1;
   };
 
   /**
@@ -136,7 +149,31 @@ const CyberScroll = (() => {
     let last;
     let captured = [];
     let anchors = [];
+    /** Choix amené dans la vue sans geste de l'utilisateur depuis : il y reste entier (images chargées ensuite). */
+    let revealed;
     const chosenIn = (root) => reveal.flatMap(([selector, block]) => [...root.querySelectorAll(selector)].map((node) => [node, block]));
+    /** Le choix tout juste amené est-il encore à garder entier (aucun geste depuis) ? */
+    const stillRevealed = () => revealed !== undefined && lastGesture < revealed.at;
+    /** Ramène dans la vue le choix qui en déborde, sauf dans une liste que l'utilisateur a déplacée. */
+    function keepWhole(root) {
+      for (const [node] of chosenIn(root)) {
+        const list = listOf(node);
+        if (!list || byUser(list) || wholeIn(node, list)) continue;
+        node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        expected.set(list, positionOf(list));
+      }
+    }
+    // Une image ou une vidéo chargée change la hauteur des cartes : le choix tout juste amené reste entier.
+    for (const type of ['load', 'loadedmetadata']) {
+      document.addEventListener(
+        type,
+        (event) => {
+          if (!stillRevealed() || !revealed.root.isConnected || !revealed.root.contains(event.target)) return;
+          keepWhole(revealed.root);
+        },
+        { capture: true, passive: true },
+      );
+    }
     return {
       capture(root) {
         captured = scrolled(root).map(([node, at]) => [keyOf(node, root), at, byUser(node)]);
@@ -146,7 +183,7 @@ const CyberScroll = (() => {
           const list = listOf(node);
           if (!list || !root.contains(list)) return;
           const offset = offsetIn(node, list);
-          if (offset + node.getBoundingClientRect().height > 0 && offset < list.clientHeight) anchors.push([rank, offset, wholeIn(node, list)]);
+          if (offset + node.offsetHeight > 0 && offset < list.clientHeight) anchors.push([rank, offset, wholeIn(node, list)]);
         });
       },
       settle(root, screen) {
@@ -172,10 +209,13 @@ const CyberScroll = (() => {
             const list = node && listOf(node);
             if (!list) continue;
             list.scrollTop += offsetIn(node, list) - offset;
-            if (whole && !wholeIn(node, list)) node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            if ((whole || stillRevealed()) && !byUser(list) && !wholeIn(node, list)) node.scrollIntoView({ block: 'nearest', inline: 'nearest' });
             moved.add(list);
           }
+          // Poussé tout entier hors de la vue (rien d'ancré) : ramené tant qu'aucun geste n'a suivi.
+          if (stillRevealed()) keepWhole(root);
         } else {
+          revealed = { root, at: Date.now() };
           for (const [node, block] of chosen) {
             node.scrollIntoView?.({ block, inline: 'nearest' });
             for (let n = node.parentElement; n; n = n.parentElement) {

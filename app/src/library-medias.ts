@@ -64,6 +64,7 @@ import {
   type Layout,
   type MediaDimensions,
   type MediaDraft,
+  type MediaOriginDraft,
   type MediaPageEntry,
   type MediaType,
   type ResolvedMedia,
@@ -315,11 +316,30 @@ export function createMedias(ctx: MediasContext) {
 
   // ---------- Ouverture ----------
 
-  function open(table: TableEntry): void {
+  function open(table: TableEntry, at?: number): void {
     session = { file: table.file, draft: emptyMediaDraft() };
     proposals?.reset();
     web?.stop();
-    ctx.show(() => buildOverview(session!), undefined, table.file);
+    ctx.show(() => buildOverview(session!), at, table.file);
+  }
+
+  /**
+   * Médias reçus d'ailleurs (la bibliothèque d'un ami) : les médias de la table s'ouvrent, ces
+   * fichiers dans le brouillon, chacun avec sa provenance ; rien n'est rangé avant « Enregistrer ».
+   * Les pages d'un même type remplacent celles d'aujourd'hui, dans leur ordre.
+   */
+  function openWith(table: TableEntry, files: readonly { type: MediaType; file: string; page?: number }[], origin: MediaOriginDraft, notice: string): void {
+    // Le curseur sur le premier média reçu : c'est lui qu'on vient vérifier.
+    const first = MANAGED_MEDIA_TYPES.findIndex((type) => files.some((f) => f.type === type));
+    open(table, first >= 0 ? first : undefined);
+    const s = session!;
+    const types = [...new Set(files.map((f) => f.type))];
+    for (const type of types) {
+      const pages = files.filter((f) => f.type === type).sort((a, b) => (a.page ?? 1) - (b.page ?? 1));
+      pages.forEach((f, i) => place(s, table, type, { from: f.file, mode: 'move', origin }, i === 0 ? { kind: 'set' } : { kind: 'add' }));
+    }
+    s.notice = { text: notice, tone: 'info' };
+    host.broadcast();
   }
 
   // Recherche libre de chaque média (navigateur intégré), sur la session en cours.
@@ -1111,7 +1131,7 @@ export function createMedias(ctx: MediasContext) {
     toOverview(s, MANAGED_MEDIA_TYPES[0]);
   }
 
-  return { open, isOpen: () => session !== undefined };
+  return { open: (table: TableEntry) => open(table), openWith, isOpen: () => session !== undefined };
 }
 
 /** Nom montré d'une page : le fichier, ou d'où vient un fichier téléchargé (reçu sous son empreinte MD5). */

@@ -3107,6 +3107,8 @@ export function createLibrary(host: LibraryHost) {
     catalog: catalogUi,
     /** Ce qu'il manque pour jouer : parcours d'une table (fiche, partie échouée, médecin). */
     openJourney: (file: string) => journeyUi.open(file),
+    /** Médias reçus d'un ami : ceux de la table s'ouvrent, ces fichiers dans le brouillon (library-medias.ts). */
+    openMediasWith: medias.openWith,
     isActive: () => screen !== undefined,
     /** L'écran fait écouter des sons : la musique du menu se tait (un seul son à la fois). */
     previewsSound: () => screen !== undefined && soundPreview,

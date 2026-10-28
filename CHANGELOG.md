@@ -40,6 +40,9 @@ son interface).
 - PuP-Packs : le fronton ne clignote plus quand une même vidéo de fond est demandée plusieurs fois de suite (Game of Thrones LE, écran du choix de la maison).
 - PuP-Packs : les images livrées sous un nom de vidéo (Game of Thrones LE) s’affichent enfin comme des images, sans clignoter, et les fichiers aux noms accentués sont retrouvés ; Cyber Pinball le corrige pour tout pack, dès l’installation et avant chaque partie.
 - Tout le son passe par les haut-parleurs de la borne : les musiques et sons proposés dans « Médias du jeu », et les vidéos regardées dans « Récupérer » (YouTube…), ne partent plus sur la sortie par défaut de Windows, souvent muette sur un PinCab.
+- Bibliothèque des amis (désactivée par défaut, à activer dans « Partage et réseau ») : « Voir sa bibliothèque » sur la fiche d'un ami montre ses tables et les médias qui vous manquent ; chaque média reçu est vérifié puis proposé dans « Médias du jeu » avant d'être enregistré. Tables, ROM et PuP-Packs ne passent jamais par le réseau.
+- Partie en direct entre amis, jusqu'à 4 bornes : l'invitation s'ouvre chez l'ami sur la même table (version vérifiée), un compte à rebours de 5 secondes lance la partie partout, puis chacun voit les résultats.
+- Le nom d'un ami suit toujours son dernier renommage, et une demande d'ami en attente repart quand les bornes se retrouvent.
 
 ## 0.1.3
 

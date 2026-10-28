@@ -38,6 +38,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - PuP-Packs: the backglass no longer flickers when the same background video is requested several times in a row (Game of Thrones LE, house selection screen).
 - PuP-Packs: images shipped under a video name (Game of Thrones LE) finally show as images, with no flicker, and files with accented names are found; Cyber Pinball fixes this for every pack, on install and before each game.
 - All sound goes through the cabinet speakers: the music and sounds offered in "Game media", and videos watched in "Get" (YouTube…), no longer go to the Windows default output, often silent on a PinCab.
+- Friends' library (off by default, turned on in "Sharing and network"): "See their library" on a friend's page shows their tables and the media you are missing; every media file received is checked, then offered in "Game media" before it is saved. Tables, ROMs and PuP-Packs never go over the network.
+- Live game between friends, up to 4 cabinets: the invitation opens on the friend's cabinet on the same table (version checked), a 5-second countdown starts the game everywhere, then everyone sees the results.
+- A friend's name always follows their latest rename, and a pending friend request is sent again when the cabinets meet.
 
 ## 0.1.3
 

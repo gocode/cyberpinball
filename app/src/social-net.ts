@@ -21,17 +21,20 @@ import {
   declineRequest,
   directorySample,
   DIRECTORY_TOPIC,
+  FILE_CHUNK,
   friendSeen,
   grantBadges,
+  learnProfiles,
   loadSocial,
-  mergeDirectory,
+  parseLibraryMessage,
+  parseLiveMessage,
   parseSocialMessage,
+  peerProfile,
   playerSeed,
   receiveEvents,
   receiveReply,
   relationOf,
   removeFriend,
-  renamePeer,
   requestFriend,
   saveSocial,
   setName,
@@ -40,6 +43,8 @@ import {
   syncReply,
   unblockPlayer,
   verifyProfile,
+  type LibraryMessage,
+  type LiveMessage,
   type PlayStats,
   type Presence,
   type Profile,
@@ -120,10 +125,17 @@ export interface SocialNetOptions {
   log?: (line: string) => void;
 }
 
+/** Messages des services posés sur le réseau des amis : bibliothèque partagée, partie en direct. */
+export type FriendMessage = LibraryMessage | LiveMessage;
+
 interface Link {
   stream: Duplex;
-  send(message: SocialMessage): void;
+  send(message: SocialMessage | FriendMessage): void;
+  /** Morceau de fichier (friendlibrary.ts, chunkFrame) ; false : le flux est plein, attendre « drain ». */
+  sendChunk(frame: Buffer): boolean;
   via: 'internet' | 'lan';
+  /** Bonjour reçu sur cette connexion : la resynchronisation (syncReply) se fait à chacune. */
+  greeted?: boolean;
 }
 
 interface Peer {
@@ -159,6 +171,18 @@ export interface SocialNet {
   remove(key: string): void;
   block(key: string): void;
   unblock(key: string): void;
+  /** Bibliothèque partagée avec mes amis (désactivée par défaut). */
+  setShareLibrary(on: boolean): void;
+  /**
+   * Message d'un service (bibliothèque, partie en direct) à un ami relié ; false : pas relié,
+   * ou pas un ami. Rien de ces services ne part vers un joueur qui n'est pas un ami.
+   */
+  send(key: string, message: FriendMessage): boolean;
+  /** Morceau de fichier à un ami, en respectant le débit du flux ; false : plus relié. */
+  sendChunk(key: string, frame: Buffer): Promise<boolean>;
+  /** Messages des services reçus d'un ami ; rend de quoi se désabonner. */
+  onMessage(listener: (key: string, message: FriendMessage) => void): () => void;
+  onChunk(listener: (key: string, frame: Buffer) => void): () => void;
 }
 
 const topicOf = (name: string) => createHash('sha256').update(name).digest();
@@ -240,10 +264,21 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
           return;
         }
         const parsed = parseSocialMessage(raw, now());
-        if (parsed) receive(key, parsed);
+        if (parsed) return receive(key, parsed, link);
+        // Bibliothèque partagée et partie en direct : entre amis seulement.
+        if (!raw || typeof raw !== 'object' || relationOf(state, key) !== 'friend') return;
+        const extra = parseLibraryMessage(raw as Record<string, unknown>) ?? parseLiveMessage(raw as Record<string, unknown>);
+        if (extra) for (const listener of messageListeners) listener(key, extra);
       },
     });
-    const link: Link = { stream, via, send: (m) => message.send(JSON.stringify(m)) };
+    const chunk = channel.addMessage({
+      encoding: c.buffer,
+      onmessage: (frame: Buffer) => {
+        if (relationOf(state, key) !== 'friend' || frame.length > FILE_CHUNK + 4) return;
+        for (const listener of chunkListeners) listener(key, frame);
+      },
+    });
+    const link: Link = { stream, via, send: (m) => message.send(JSON.stringify(m)), sendChunk: (frame) => chunk.send(frame) !== false };
     const peer = peers.get(key) ?? { key, links: new Set<Link>() };
     peers.set(key, peer);
     peer.links.add(link);
@@ -265,20 +300,19 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     changed();
   }
 
-  function receive(key: string, message: SocialMessage): void {
+  function receive(key: string, message: SocialMessage, link: Link): void {
     const peer = peers.get(key);
     if (!peer || state.blocked.includes(key)) return;
     switch (message.t) {
       case 'hello': {
         // Le profil doit être celui de la clé de la connexion.
         if (message.profile.key !== key) return;
-        const first = !peer.profile;
-        peer.profile = message.profile;
+        const first = !link.greeted;
+        link.greeted = true;
         const lan = [...peer.links].some((l) => l.via === 'lan');
-        let s: SocialState = { ...state, directory: mergeDirectory(state.directory, [message.profile, ...message.dir], { self: state.key.publicKey, now: now(), ...(lan ? { lan: true } : {}) }) };
-        s = renamePeer(s, key, message.profile.name);
-        if (relationOf(s, key) === 'friend') s = friendSeen(s, key, now());
-        commit(s);
+        learn([message.profile], lan);
+        learn(message.dir, false); // relayés : vus par lui, pas forcément à proximité
+        if (relationOf(state, key) === 'friend') commit(friendSeen(state, key, now()));
         if (first) {
           const sync = syncReply(state, key);
           if (sync) sendTo(key, { t: sync });
@@ -287,7 +321,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         return;
       }
       case 'dir':
-        commit({ ...state, directory: mergeDirectory(state.directory, message.dir, { self: state.key.publicKey, now: now() }) });
+        learn(message.dir, false);
         return;
       case 'request':
       case 'accept':
@@ -295,7 +329,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       case 'unfriend': {
         if (!peer.profile) return; // pas de demande sans profil
         const lan = [...peer.links].some((l) => l.via === 'lan');
-        apply(key, receiveReply(state, { key, name: peer.profile.name, ...(lan ? { lan: true } : {}) }, message.t as Reply, now()));
+        apply(key, receiveReply(state, { ...(peerProfile(state, key) ?? peer.profile), ...(lan ? { lan: true } : {}) }, message.t as Reply, now()));
         return;
       }
       case 'presence':
@@ -306,6 +340,19 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       case 'events':
         commit(receiveEvents(state, key, message.events));
         return;
+    }
+  }
+
+  /**
+   * Profils reçus, d'où qu'ils viennent : l'annuaire, le nom des amis et des demandes, et le
+   * profil gardé pour chaque pair relié suivent le plus récent (un renommage envoyé par « dir »
+   * vaut pour la demande qui le suit).
+   */
+  function learn(profiles: readonly Profile[], lan: boolean): void {
+    commit(learnProfiles(state, profiles, { now: now(), lan }));
+    for (const profile of profiles) {
+      const peer = peers.get(profile.key);
+      if (peer && (!peer.profile || Date.parse(profile.at) >= Date.parse(peer.profile.at))) peer.profile = profile;
     }
   }
 
@@ -356,7 +403,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     const peer = peers.get(profile.key) ?? { key: profile.key, links: new Set<Link>() };
     peers.set(profile.key, peer);
     peer.lan = { host, port: beacon.port };
-    commit({ ...renamePeer(state, profile.key, profile.name), directory: mergeDirectory(state.directory, [profile], { self: state.key.publicKey, now: now(), lan: true }) });
+    learn([profile], true);
     // Une seule des deux bornes appelle : celle qui suit l'autre, sinon la plus petite clé.
     const relation = relationOf(state, profile.key);
     const follows = relation === 'friend' || relation === 'outgoing' || relation === 'incoming';
@@ -460,6 +507,10 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     changed();
   }
 
+  const messageListeners = new Set<(key: string, message: FriendMessage) => void>();
+  const chunkListeners = new Set<(key: string, frame: Buffer) => void>();
+  const friendLink = (key: string) => (relationOf(state, key) === 'friend' ? [...(peers.get(key)?.links ?? [])][0] : undefined);
+
   function broadcastFriends(message: SocialMessage): void {
     for (const f of state.friends) sendTo(f.key, message);
   }
@@ -517,6 +568,38 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       for (const link of peers.get(key)?.links ?? []) link.stream.destroy();
     },
     unblock: (key) => commit(unblockPlayer(state, key)),
+    setShareLibrary: (on) => commit({ ...state, shareLibrary: on }),
+    send(key, message) {
+      const link = friendLink(key);
+      if (!link) return false;
+      link.send(message);
+      return true;
+    },
+    async sendChunk(key, frame) {
+      const link = friendLink(key);
+      if (!link) return false;
+      if (!link.sendChunk(frame)) {
+        // Flux plein : attendre qu'il se vide, ou qu'il se ferme.
+        await new Promise<void>((resolve) => {
+          const done = () => {
+            link.stream.removeListener('drain', done);
+            link.stream.removeListener('close', done);
+            resolve();
+          };
+          link.stream.on('drain', done);
+          link.stream.on('close', done);
+        });
+      }
+      return !!friendLink(key);
+    },
+    onMessage(listener) {
+      messageListeners.add(listener);
+      return () => messageListeners.delete(listener);
+    },
+    onChunk(listener) {
+      chunkListeners.add(listener);
+      return () => chunkListeners.delete(listener);
+    },
   };
 }
 

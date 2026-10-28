@@ -14,12 +14,15 @@ import {
   declineRequest,
   displayName,
   eventText,
+  learnProfiles,
   loadSocial,
   mergeDirectory,
   nearbyPlayers,
   newSocialState,
   normalizeName,
   parseSocialMessage,
+  parseSocialState,
+  peerProfile,
   playerSeed,
   receiveReply,
   relationOf,
@@ -135,6 +138,32 @@ test('amitié : demande, acceptation, refus retenu, demandes croisées, blocage'
   const f = blockPlayer(player('Fred'), pc.key).state;
   assert.equal(receiveReply(f, pc, 'request').state.incoming.length, 0);
   assert.equal(relationOf(f, pc.key), 'blocked');
+});
+
+test('nom d’un pair : suit le profil le plus récent, d’où qu’il vienne, jamais vers un plus ancien', () => {
+  const t0 = new Date('2026-10-28T10:00:00Z'), t1 = new Date('2026-10-28T11:00:00Z');
+  const alice = player('Alice');
+  const old = signProfile(setName(alice, 'Joueur A1', t0)!);
+  const renamed = signProfile(setName(alice, 'Alicia', t1)!);
+  let b = player('Bruno');
+  // Le premier contact donne l'ancien nom ; puis le renommage arrive par l'annuaire (« dir »).
+  b = learnProfiles(b, [old], { now: t0 });
+  b = learnProfiles(b, [renamed], { now: t1 });
+  // La demande qui suit prend le nom le plus récent connu, pas celui du premier contact.
+  b = receiveReply(b, peerProfile(b, old.key)!, 'request', t1).state;
+  assert.equal(b.incoming[0]!.name, 'Alicia');
+  // Un profil relayé plus ancien ne ramène pas l'ancien nom, ni dans l'annuaire ni dans la demande.
+  b = learnProfiles(b, [old], { now: t1 });
+  assert.equal(b.incoming[0]!.name, 'Alicia');
+  assert.equal(b.directory[0]!.profile.name, 'Alicia');
+  // Devenus amis : le nom et sa date suivent ; relu du fichier, la date reste.
+  b = acceptRequest(b, old.key, t1).state;
+  assert.equal(b.friends[0]!.name, 'Alicia');
+  const reread = parseSocialState(JSON.parse(JSON.stringify(b)))!;
+  assert.equal(reread.friends[0]!.nameAt, renamed.at);
+  // Annuaire oublié (60 jours) : la date gardée chez l'ami protège encore du vieux profil.
+  const forgot = learnProfiles({ ...reread, directory: [] }, [old], { now: t1 });
+  assert.equal(forgot.friends[0]!.name, 'Alicia');
 });
 
 test('évènements : phrases du record, du badge, de la partie', () => {

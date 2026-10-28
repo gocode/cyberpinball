@@ -130,6 +130,7 @@ import {
   type DmdAnimationName,
   type DmdAnimationOptions,
   type FrameRecord,
+  type HighScore,
   type TableRecords,
   type LegacyOrientation,
 } from '@cyberpinball/core';
@@ -163,6 +164,8 @@ import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
 import { createFriendsMenu } from './friends-menu';
 import { createFirewallRule } from './firewall-rule';
+import { createFriendContent } from './friend-content';
+import { createLiveGames } from './live-game';
 import { createSocialNet } from './social-net';
 import { seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
@@ -671,20 +674,61 @@ const socialDemo = socialMode === 'simulated' && simulatedPlayersWanted(process.
 if (socialDemo) seedSimulatedFriends(loc.dataDir);
 let stopSimulatedPlayers: (() => Promise<void>) | undefined;
 let socialRedraw: NodeJS.Timeout | undefined;
-const socialNet = createSocialNet({
-  dataDir: loc.dataDir,
-  mode: socialMode,
-  log: (line) => console.log(line),
-  // Un ami qui arrive, une demande reçue : l'écran se redessine, au plus quatre fois par seconde.
-  onChange: () => {
-    socialRedraw ??= setTimeout(() => {
-      socialRedraw = undefined;
-      if (!closing) broadcast();
-    }, 250);
-  },
-});
+/** Un ami qui arrive, une demande reçue, un transfert qui avance : l'écran se redessine, au plus quatre fois par seconde. */
+function socialChanged(): void {
+  socialRedraw ??= setTimeout(() => {
+    socialRedraw = undefined;
+    if (!closing) broadcast();
+  }, 250);
+}
+const socialNet = createSocialNet({ dataDir: loc.dataDir, mode: socialMode, log: (line) => console.log(line), onChange: socialChanged });
 const socialFirewall = createFirewallRule({ exe: process.execPath, simulated: socialMode !== 'public', log: (line) => console.log(line) });
-const friendsMenu = createFriendsMenu({ library, net: socialNet, firewall: socialFirewall });
+const romsOf = (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.roms ?? [];
+// Bibliothèque partagée entre amis : la mienne servie si je la partage, la leur et leurs médias.
+const friendContent = createFriendContent({ net: socialNet, dataDir: loc.dataDir, tables: () => tables, root: () => loc.root, romsOf, onChange: socialChanged, log: (line) => console.log(line) });
+/** Le menu des tables est à l'écran : une invitation peut s'y afficher sans rien interrompre. */
+const liveCanShow = () => !closing && state.phase === 'menu';
+// Partie en direct : invitation, départ commun, puis la table lancée ici comme par Start.
+const liveGames = createLiveGames({
+  net: socialNet,
+  dataDir: loc.dataDir,
+  tables: () => tables,
+  romsOf,
+  busy: () => playing !== undefined || state.phase === 'loading' || state.phase === 'playing',
+  onInvite: (invite) => {
+    playUiSound('coin');
+    if (liveCanShow()) friendsMenu.live.openInvite(invite.id, () => library.leave());
+  },
+  play: async (table, onPlaying) => {
+    // Le départ commun ferme l'écran ouvert (le compte à rebours), comme Start sur une table.
+    if (library.isActive()) library.leave();
+    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
+    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying });
+    // De retour au menu : les résultats, qui se complètent à mesure que les autres reviennent.
+    if (report && state.phase === 'menu') setImmediate(() => friendsMenu.live.open(() => library.leave()));
+    return report ? { ok: report.result.ok, seconds: report.result.seconds, records: report.entered.map((s) => ({ score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) })) } : undefined;
+  },
+  onChange: () => {
+    socialChanged();
+    // Le compte à rebours et l'annulation s'affichent d'eux-mêmes ; dans la gestion des tables aussi, une fois la partie acceptée.
+    friendsMenu.live.follow(() => !closing && (state.phase === 'menu' || state.phase === 'library'), () => library.leave());
+  },
+  log: (line) => console.log(line),
+});
+const friendsMenu = createFriendsMenu({
+  library: {
+    ...library,
+    catalogFor: (identity) => (identity.vpsId ? library.catalog.openGame(identity.vpsId) : library.catalog.openSearch(identity.title)),
+  },
+  net: socialNet,
+  firewall: socialFirewall,
+  content: friendContent,
+  games: liveGames,
+  tables: () => tables,
+  romsOf,
+  root: () => loc.root,
+  redraw: socialChanged,
+});
 library.provideSystemItem('friends', friendsMenu.items.friends);
 library.provideSystemItem('find-player', friendsMenu.items['find-player']);
 library.provideSystemItem('friend-requests', friendsMenu.items['friend-requests']);
@@ -916,6 +960,8 @@ export function startFrontend(): void {
     hours.dispose();
     liveDmd.dispose();
     void stopSimulatedPlayers?.();
+    friendContent.stop();
+    liveGames.stop();
     void socialNet.stop();
   });
 
@@ -928,7 +974,7 @@ export function startFrontend(): void {
     socialNet.checkBadges(playStats(tables));
     // La règle du pare-feu, lue sans élévation : « Partage et réseau » dit si elle manque.
     if (socialMode !== 'off') void socialFirewall.check().catch(() => undefined);
-    if (socialDemo) stopSimulatedPlayers = await startSimulatedPlayers(socialNet, loc.dataDir, (line) => console.log(line));
+    if (socialDemo) stopSimulatedPlayers = await startSimulatedPlayers(socialNet, loc.dataDir, () => tables, (line) => console.log(line));
   });
   for (const f of selection?.findings ?? []) console.log(`Configuration de la borne : ${f.message}`);
   // Bande DMD seule sur un écran large, jamais tranchée : l'utilisateur dit une fois ce qu'est l'écran.
@@ -1365,6 +1411,8 @@ function closeTopmostWindows(): void {
 export interface PlayReport {
   result: LaunchResult;
   focusReturned: boolean;
+  /** Scores entrés au tableau d'honneur de la table pendant la partie. */
+  entered: HighScore[];
 }
 
 /**
@@ -1372,7 +1420,7 @@ export interface PlayReport {
  * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
  * l'a demandée (la fiche) reprend la main.
  */
-async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display'): Promise<PlayReport | undefined> {
+async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void } = {}): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
   if (!install) return undefined;
   // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
@@ -1389,7 +1437,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const others = unacceptedFrontends();
   if (others.length) {
     const names = frontendNames(others);
-    pendingPlay = { frontends: others, play: () => play(table, autoStopAfterMs, mode) };
+    pendingPlay = { frontends: others, play: () => play(table, autoStopAfterMs, mode, hooks) };
     state = {
       ...state,
       phase: 'message',
@@ -1484,6 +1532,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     state = { ...state, phase: 'playing' };
     // Les amis voient la table en cours, en temps réel (pas pendant un réglage de l'affichage).
     if (!displayMode) socialNet.setPresence({ status: 'playing', table: presenceTable(table), since: new Date().toISOString() });
+    hooks.onPlaying?.();
     watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)));
     broadcast();
     if (autoStopAfterMs) setTimeout(() => game.stop(), autoStopAfterMs);
@@ -1517,7 +1566,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // pour le joueur, mais le signe qu'un réglage ou une version de VPX a changé.
   for (const notice of result.notices) console.log(`VPX (${table.id}) : ${notice}`);
 
-  if (mode === 'display') return { result, focusReturned };
+  if (mode === 'display') return { result, focusReturned, entered: [] };
   // Un score entré au tableau d'honneur pendant la partie : le knocker sonne au retour au menu.
   const entered = result.ok ? newRecords(recordsBefore, readTableRecords(table)) : [];
   for (const s of entered) console.log(`Record (${table.id}) : ${s.score}${s.initials ? ` (${s.initials})` : ''}, place ${s.rank}.`);
@@ -1542,7 +1591,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (selection?.previous && result.ok) relaunchMenu();
   broadcast();
   if (entered.length) playUiSound('knocker');
-  return { result, focusReturned };
+  return { result, focusReturned, entered };
 }
 
 /** Table en cours de partie : chaque fenêtre affiche son fond de partie. */

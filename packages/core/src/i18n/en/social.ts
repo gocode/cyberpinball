@@ -170,7 +170,6 @@ export const messages: Record<string, string> = {
   'Amis : présence, table en cours, records, badges et parties': 'Friends: presence, table being played, high scores, badges and games',
   'Bornes reliées : son adresse IP': 'Connected cabinets: its IP address',
   'Comme dans tout échange de pair à pair': 'As in any peer-to-peer exchange',
-  'Aucun fichier, table ni ROM partagé': 'No file, table or ROM shared',
   'Joueurs connus et à proximité': 'Known and nearby players',
   '{n} en attente': '{n} pending',
 };

@@ -2044,3 +2044,32 @@ body.mouse .lib-health .health-line:not(.selected):hover {
     font-size: 1.9cqmin;
   }
 }
+
+/*
+ * Partie en direct : le compte à rebours du départ commun (app/src/live-game-menu.ts). Un grand
+ * chiffre neutre, chiffres tabulaires, sans halo ni clignotement, au centre de la zone libre ; les
+ * joueurs en dessous (revue du directeur artistique du 28/10/2026 : 220 px à l'échelle 1080).
+ */
+.lib-countdown .kind-countdown .lib-row {
+  border: 0;
+  background: none;
+  padding: 1cqmin 0;
+  text-align: center;
+}
+
+.lib-countdown .kind-countdown .lib-row-line {
+  justify-content: center;
+}
+
+.lib-countdown .kind-countdown .lib-row-text {
+  font-size: 20cqmin;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.lib-countdown .kind-countdown .lib-row-detail {
+  font-size: 3.2cqmin;
+  color: var(--ink-muted);
+}
