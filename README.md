@@ -192,4 +192,8 @@ Every step below is an action of `lanceur.cmd` (section "Fabrication et publicat
 
 ## Licence
 
-The licence of Cyber Pinball itself has not been chosen yet. Until a `LICENSE` file is added, the code is published for reading and testing, and all rights remain with its author.
+Cyber Pinball is free software, released under the GNU General Public License, version 3 or (at your option) any later version (GPL-3.0-or-later). You may use, study, modify and redistribute it, free of charge or not, provided that any redistributed version, modified or not, stays under this licence and comes with its source code. It comes with no warranty. The full text is in the [LICENSE](LICENSE) file.
+
+The third-party components listed above keep their own licences. In particular, the full installer, which bundles Visual Pinball X, remains subject to the VPX licence: it must not be sold, nor supplied with a cabinet that is sold or run commercially.
+
+© 2026 Go Code.

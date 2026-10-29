@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Application Electron de Cyber Pinball : assistant d'écrans (prototype du jalon 1).",
+  "license": "GPL-3.0-or-later",
   "main": "dist/main.js",
   "dependencies": {
     "@cyberpinball/core": "0.1.0",

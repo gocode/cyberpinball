@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "description": "Installation des composants tiers (VPX…) d'après un manifeste versionné : téléchargement vérifié par SHA-256, extraction, jonction vers la version active.",
+  "license": "GPL-3.0-or-later",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "dependencies": {
