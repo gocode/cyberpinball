@@ -90,6 +90,7 @@ const INPUT_SOURCES: Record<string, { count: number; why: string }> = {
   'language.ts': { count: 1, why: 'lecture du catalogue des traductions' },
   'settings.ts': { count: 4, why: 'réglages de VPX : derrière menu.vpx-settings et sheet.table-settings, fermées' },
   'wizard.ts': { count: 7, why: 'assistant de la borne, lancé à part : derrière message.wizard, message.buttons, message.interface et le menu système, fermés ; l’autopilote guette ses propres touches rejouées (Clavier:…)' },
+  'game-recording.ts': { count: 3, why: 'enregistreur d’une partie : prêt, morceaux de vidéo et événements de sa propre fenêtre cachée (event.sender vérifié) ; armé par « Jouer et enregistrer », derrière sheet.record, fermée' },
   'acquire-window.ts': { count: 12, why: 'fenêtre « Récupérer » : derrière sheet.missing, sheet.further et le menu système, fermés' },
 };
 const INPUT_PATTERN = /ipcMain\.(?:on|once|handle|handleOnce)\(|globalShortcut\.register\(|'before-input-event'|(?<!function )onJoystickInput\(|(?<!function )onKeyInput\(/g;

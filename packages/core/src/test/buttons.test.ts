@@ -720,7 +720,17 @@ test('fenêtre au-dessus du menu (« Récupérer ») : aucune fenêtre de la bor
   const dir = path.join(__dirname, '..', '..', '..', '..', 'app', 'src');
   const onTop = fs.readdirSync(dir).filter((f) => f.endsWith('.ts') && /\.setAlwaysOnTop\(true/.test(fs.readFileSync(path.join(dir, f), 'utf8')));
   assert.ok(onTop.includes('acquire-window.ts'));
-  for (const f of onTop) {
+  // Témoin de l'enregistrement d'une partie : au-dessus de VPX pendant la partie, jamais focalisé ni
+  // cliquable ; reprendre le focus le volerait à VPX. Il le dit par ses options, vérifiées ici.
+  const neverFocused = ['game-recording.ts'];
+  for (const f of neverFocused) {
+    const source = fs.readFileSync(path.join(dir, f), 'utf8');
+    assert.match(source, /focusable: false,[\s\S]*?alwaysOnTop: true/, `${f} : fenêtre au-dessus non focalisable`);
+    assert.match(source, /setIgnoreMouseEvents\(true\)/, `${f} : les clics la traversent`);
+    assert.match(source, /showInactive\(\)/, `${f} : montrée sans prendre le focus`);
+    assert.doesNotMatch(source, /\.focus\(\)|\.show\(\)/, `${f} : jamais de focus`);
+  }
+  for (const f of onTop.filter((f) => !neverFocused.includes(f))) {
     const source = fs.readFileSync(path.join(dir, f), 'utf8');
     assert.match(source, /app\.on\('browser-window-focus'[\s\S]*?app\.off\('browser-window-focus'/, `${f} : le focus pris par une autre fenêtre doit lui revenir`);
     assert.match(source, /\.moveTop\(\)/, `${f} : la fenêtre doit repasser devant`);

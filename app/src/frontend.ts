@@ -12,6 +12,8 @@ import {
   STOP_IDLE_FALLBACK_MS,
   STOP_NOTICE_MS,
   arcadeHoursClock,
+  badgeLabel,
+  downloadReasonText,
   powerSimulated,
   powerTexts,
   powerUnavailable,
@@ -86,6 +88,7 @@ import {
   type StopNotice,
   type UiSoundId,
   type MenuMediaSettings,
+  type NoticeView,
   type MenuMoment,
   type MenuPhase,
   type RoleRect,
@@ -135,12 +138,18 @@ import {
   type HighScore,
   type TableRecords,
   type LegacyOrientation,
+  edgeOfRotation,
+  orientationFacts,
+  recordedMediaType,
+  type RecordedRole,
+  type RecordingSettings,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, windowRect } from './offscreen';
 import { installVpx, vpxArchivePresent } from './install-vpx';
+import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
 import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
 import { cachedScript } from './vbs';
@@ -158,7 +167,7 @@ import { answerLegacy, legacyDesktopTurned, orientationForDesktop, orientationFr
 import { acceptFrontends, unacceptedFrontends } from './frontend-gate';
 import { hideTaskbars, isVeil, nameScreen, relaunchCovered, restoreTaskbars, setDesktopMode, settleScreens, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
-import { menuRotation, openSettings } from './settings';
+import { forcedRotation, menuRotation, openSettings } from './settings';
 import { serveMedias } from './media-protocol';
 import { createMenuSettings } from './menu-settings';
 import { createLanguageMenu } from './language-menu';
@@ -170,6 +179,7 @@ import { createFriendContent } from './friend-content';
 import { friendTransport } from './download-sources';
 import { createLiveGames } from './live-game';
 import { createSocialNet } from './social-net';
+import { createMenuNotices } from './menu-notices';
 import { seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
 import { createDedicatedSystem } from './dedicated-system';
@@ -406,6 +416,15 @@ const library = createLibrary({
     // Sans opérateur, la partie s'arrête seule après 10 s (et ne compte pas dans les statistiques).
     void play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined);
   },
+  // Jouer et enregistrer : la même partie, l'enregistrement armé ; son écran s'ouvre au retour.
+  playAndRecord: (table, settings) => {
+    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
+    // Sans opérateur, la partie dure le délai et la durée de l'enregistrement, plus 3 s (fin à la
+    // durée) ; CYBERPINBALL_PARTIE_MS la raccourcit, pour une fin par la sortie de la table.
+    const unattended = process.env.CYBERPINBALL_AUTOPILOT ? Number(process.env.CYBERPINBALL_PARTIE_MS) || (settings.delay + settings.duration + 3) * 1000 : undefined;
+    void play(table, unattended, undefined, { record: settings });
+  },
+  recordableRoles: () => (['backglass', 'dmd'] as RecordedRole[]).filter((role) => menuAssignments[role]),
   tableSettings: (table) => openVpxSettings(table),
   adjustDisplay: async (table) => {
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
@@ -436,7 +455,13 @@ const library = createLibrary({
   guest,
   displays: () => observedDisplays(),
   vpxVersion: () => vpxInstall(loc)?.version,
-  notify: (text) => showBanner(text),
+  // Un téléchargement fini : au menu des tables, la notification du menu (selon son réglage) ; sur
+  // un écran plein, le bandeau, et la notification ne le redira pas au retour (un seul mécanisme).
+  notify: (text, job) => {
+    if (job && state.phase === 'menu') return;
+    if (job) menuNotices.said('download-done', job.id);
+    showBanner(text);
+  },
   downloadsChanged: () => downloadsChanged(),
 });
 // Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes (pastille
@@ -689,7 +714,9 @@ let socialRedraw: NodeJS.Timeout | undefined;
 function socialChanged(): void {
   socialRedraw ??= setTimeout(() => {
     socialRedraw = undefined;
-    if (!closing) broadcast();
+    if (closing) return;
+    menuNotices.observe();
+    broadcast();
   }, 250);
 }
 const socialNet = createSocialNet({ dataDir: loc.dataDir, mode: socialMode, log: (line) => console.log(line), onChange: socialChanged });
@@ -703,6 +730,7 @@ function downloadsChanged(): void {
   downloadsRedraw ??= setTimeout(() => {
     downloadsRedraw = undefined;
     if (closing) return;
+    menuNotices.observe();
     const pill = JSON.stringify(library.downloads.pill() ?? null);
     if (state.phase === 'library' || pill !== downloadsShown) {
       downloadsShown = pill;
@@ -737,6 +765,21 @@ library.downloads.setTransport('friend', friendTransport(friendContent, socialNe
 library.downloads.friends({
   has: (key) => socialNet.state().friends.some((f) => f.key === key),
   name: (key) => socialNet.state().friends.find((f) => f.key === key)?.name,
+});
+// Menu des tables : pastille des amis en ligne et notifications discrètes (menu-notices.ts), une
+// à la fois, seulement quand le menu des tables est là, nu : ni partie, ni attente, ni invité, ni
+// écran plein, ni aide, ni constat bref ou préavis d'arrêt déjà affichés.
+const menuNotices = createMenuNotices({
+  social: socialNet,
+  jobs: () => library.downloads.manager.jobs(),
+  reason: (j) => downloadReasonText(j),
+  badgeLabel,
+  mode: () => mediaSettings.notices,
+  canShow: () => !closing && state.phase === 'menu' && !state.help && !state.banner && !attract.active && !guest.active && !stopNotice && !desktop.active && tables.length > 0,
+  redraw: () => {
+    if (!closing) broadcast();
+  },
+  log: (line) => console.log(line),
 });
 /** Le menu des tables est à l'écran : une invitation peut s'y afficher sans rien interrompre. */
 const liveCanShow = () => !closing && state.phase === 'menu';
@@ -982,6 +1025,10 @@ export function startFrontend(): void {
     // Pastille des téléchargements du menu des tables.
     else if (action.type === 'downloads') {
       if (state.phase === 'menu' && guest.knock('menu.system')) library.downloads.open();
+    }
+    // Pastille des amis en ligne, notification d'un ami ou d'une demande : l'écran qu'elle annonce.
+    else if (action.type === 'friends' || action.type === 'friend-requests') {
+      if (state.phase === 'menu' && guest.knock('menu.system')) friendsMenu.items[action.type].run();
     }
     else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
       if (action.offset === 0) guest.knock('menu.sheet') && library.openSheet(tables[state.index]!);
@@ -1494,7 +1541,7 @@ export interface PlayReport {
  * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
  * l'a demandée (la fiche) reprend la main.
  */
-async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void } = {}): Promise<PlayReport | undefined> {
+async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings } = {}): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
   if (!install) return undefined;
   // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
@@ -1602,6 +1649,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   realign = simulated === undefined ? realignPlan(assignments) : undefined;
   hideTaskbars();
   settleScreens('game');
+  // Jouer et enregistrer : armé avant le lancement ; le délai part quand la table est à l'écran.
+  const recording = hooks.record && !displayMode ? armGameRecording(table, hooks.record, simulated !== undefined) : undefined;
   const startedAt = new Date();
   const onPlaying = () => {
     state = { ...state, phase: 'playing' };
@@ -1617,6 +1666,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // VPX prend la main (sa fenêtre de jeu au premier plan, dit le lanceur) : le coup de bobine, une fois.
   const onForeground = () => {
     if (cinema.handover()) playUiSound('coil');
+    recording?.shown();
   };
   // Ce qui a pris le temps du Start au lancement : rien d'autre que l'écran de chargement et la préparation (docs\demo-cinema.ps1).
   console.log(`Lancement : VPX lancé ${Date.now() - pressedAt} ms après le Start (écran de chargement ${loadingMs} ms${captureMs ? `, captures des essais ${captureMs} ms` : ''}, préparation ${Date.now() - preparing} ms ; lancement en cinéma ${cinema.running ? 'joué' : 'coupé'}).`);
@@ -1627,6 +1677,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Une partie simulée ne prend aucun raccourci global au poste.
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   const result = await game.done;
+  recording?.gameEnded();
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
   cinema.stop();
   stopWatchOccupied();
@@ -1642,6 +1693,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   restoreTaskbars();
   const focusReturned = await showMenuAgain();
   settleScreens('return');
+  // Les fichiers de l'enregistrement : rendus quelques instants après la fermeture de VPX.
+  const recorded = recording ? await recording.finished : undefined;
   // Fenêtres de l'éditeur de VPX masquées ou fermées pendant la partie : rien à faire
   // pour le joueur, mais le signe qu'un réglage ou une version de VPX a changé.
   for (const notice of result.notices) console.log(`VPX (${table.id}) : ${notice}`);
@@ -1663,6 +1716,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     }
     const unseen = simulated === undefined ? joystickMessage(install.version) : undefined;
     state = unseen ? { ...state, phase: 'message', message: unseen } : { ...state, phase: 'menu' };
+    // Partie enregistrée : son écran (aperçu, utiliser pour la roue, garder, jeter) avant la roue.
+    if (recorded && !unseen) showRecording({ ...recorded, table: tables.find((t) => t.id === table.id) ?? recorded.table });
   } else {
     state = { ...state, phase: 'message', message: explain(result, table) };
   }
@@ -1672,6 +1727,44 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   broadcast();
   if (entered.length) playUiSound('knocker');
   return { result, focusReturned, entered };
+}
+
+/**
+ * Enregistrement d'une partie (« Jouer et enregistrer ») : les écrans filmés, chacun dans la zone
+ * où VPX le dessine ; le plateau, avec le bord où VPX met les flippers (le sens de la partie).
+ */
+function armGameRecording(table: TableEntry, settings: RecordingSettings, simulated: boolean): RecordingRun | undefined {
+  const cabinet = loadCabinet(loc.dataDir);
+  const zones = cabinet ? cabinetZones(cabinet) : undefined;
+  // Le sens où VPX dessinera la table ; un bord forcé (CYBERPINBALL_FLIPPERS, essais) est celui du menu.
+  const edge = (forcedRotation() === undefined && cabinet && orientationFacts(cabinet, observedDisplays())?.played) || edgeOfRotation(rotation);
+  const screens: RecordingScreen[] = [];
+  for (const role of settings.roles) {
+    const display = menuAssignments[role];
+    if (!display) continue;
+    const zone = zones?.[role];
+    const r = zone ? zoneRect(zone, display.bounds) : { x: 0, y: 0, width: display.bounds.width, height: display.bounds.height };
+    screens.push({
+      role,
+      type: recordedMediaType(role, cabinet),
+      display: display.bounds,
+      zone: { x: display.bounds.x + r.x, y: display.bounds.y + r.y, width: r.width, height: r.height },
+      ...(role === 'playfield' && { edge }),
+    });
+  }
+  if (!screens.some((s) => s.role === 'playfield')) {
+    console.log(`Enregistrement (${table.id}) : pas d'écran du plateau retrouvé, rien n'est filmé.`);
+    return undefined;
+  }
+  const run = armRecording({ table, settings, screens, rotation, synthetic: simulated, dataDir: loc.dataDir, captureDir: process.env.CYBERPINBALL_CAPTURE });
+  run.events.on('recording-start', () => console.log(`Enregistrement (${table.id}) : événement de début.`));
+  run.events.on('recording-end', (e: { reason: string }) => console.log(`Enregistrement (${table.id}) : événement de fin (${e.reason}).`));
+  return run;
+}
+
+/** Écran du retour d'une partie enregistrée, dans la gestion des tables. */
+function showRecording(outcome: RecordingOutcome): void {
+  library.recordingResult(outcome);
 }
 
 /** Table en cours de partie : chaque fenêtre affiche son fond de partie. */
@@ -2065,6 +2158,9 @@ function viewFor(role: RoleId) {
     attention: library.attention(),
     /** Pastille des téléchargements, à gauche de la roue dentée (menu des tables). */
     downloads: role === 'playfield' && state.phase === 'menu' ? library.downloads.pill() : undefined,
+    // Amis en ligne et notification du moment, à gauche de la pastille des téléchargements
+    // (jamais en mode invité ; la file décide seule du reste : menu-notices.ts).
+    ...(role === 'playfield' ? menuCorner() : {}),
     library: state.phase === 'library' ? library.view() : undefined,
     // Mode attente : la table montrée, son logo, et l'invite du playfield.
     attract: shown ? { ...describe(shown), wheel: medias?.wheel(shown) } : undefined,
@@ -2095,6 +2191,14 @@ function viewFor(role: RoleId) {
     footer: menuFooter(),
     nav: { confirm: KEYS.confirm[0], exit: KEYS.exit[0], help: KEYS.help[0] },
   };
+}
+
+/** Coin du menu des tables (fenêtre du plateau) : amis en ligne et notification, au menu des tables seulement. */
+function menuCorner(): { friendsOnline?: { count: number; title: string }; notice?: NoticeView } {
+  // La file avance à chaque rendu, même hors du menu : une notification ouverte part quand un écran la recouvre.
+  const corner = menuNotices.view();
+  if (state.phase !== 'menu' || guest.active) return {};
+  return corner;
 }
 
 /** Part d'une fenêtre dans le lancement en cinéma : le logo part du plateau, se pose sur le fronton (sa fenêtre ou sa zone). */

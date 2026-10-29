@@ -100,7 +100,8 @@ function segments(rest: string): string[] {
       segment = (quoted[1] ?? quoted[2] ?? quoted[3])!;
       text = text.slice(quoted[0].length);
     } else {
-      const plain = /^([^.;:,()«»"“”*>`]+?)(?=\s*(?:>|[.;:,()`]|$))/.exec(text);
+      // L'apostrophe droite ferme une chaîne de code (t('Menu système > Amis')) ; celle des noms est typographique.
+      const plain = /^([^.;:,()«»"“”*>`']+?)(?=\s*(?:>|[.;:,()`']|$))/.exec(text);
       if (!plain) break;
       segment = plain[1]!;
       text = text.slice(plain[0].length);
@@ -158,6 +159,7 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.deepEqual(segments('« Borne » > « Configuration de la borne » > « Tilt » : Start…'), ['Borne', 'Configuration de la borne', 'Tilt']);
   assert.deepEqual(segments('"Borne" (Cabinet) > "Configuration de la borne" (Cabinet setup) > "Tilt" (`npm run`)'), ['Borne', 'Configuration de la borne', 'Tilt']);
   assert.deepEqual(segments('Borne > Configuration de la borne > Écran du DMD.'), ['Borne', 'Configuration de la borne', 'Écran du DMD']);
+  assert.deepEqual(segments("Amis > Demandes d’amis'),"), ['Amis', 'Demandes d’amis'], 'chemin dans une chaîne de code');
   assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Amis, Tables, Médias, Téléchargements, Borne, Cyber Pinball)');
   assert.equal(checkPath(['Téléchargements']), undefined, 'Téléchargements, à la racine');
   assert.equal(checkPath(['Tables', 'Téléchargements']), undefined, 'et toujours dans Tables');

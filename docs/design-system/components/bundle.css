@@ -232,6 +232,20 @@
 .cp-zone-list li.is-focus{background:var(--signal-wash);outline:3px solid var(--signal);outline-offset:-3px}
 .cp-zone.is-idle .cp-zone-list,.cp-menu.is-dimmed{opacity:.8}
 
+/* Notifications du menu des tables (29 octobre 2026, app/renderer/frontend.css .status-corner,
+   .friends-pill, .notice-toast ; notices.ts ; revue de Codex) : pastilles de 64 px à gauche de la roue
+   dentée, une notification à la fois, opaque, filet de 4 px dans la couleur de son ton. */
+.cp-corner{display:flex;flex-direction:row-reverse;flex-wrap:wrap;align-items:flex-start;gap:12px;width:620px}
+.cp-pill{box-sizing:border-box;display:inline-flex;align-items:center;gap:10px;height:64px;padding:0 16px;border:1px solid var(--line-strong);border-radius:32px;background:var(--surface-raised);font-size:24px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.cp-pill .cp-i{font-size:24px;color:var(--meta)}
+.cp-pill-glyph{position:relative;display:inline-flex}
+.cp-pill-dot{position:absolute;right:-3px;bottom:-1px;width:10px;height:10px;border-radius:50%;background:var(--signal);box-shadow:0 0 0 2px var(--surface-raised)}
+.cp-notice{box-sizing:border-box;display:flex;align-items:center;gap:12px;max-width:620px;height:64px;padding:0 16px;border:1px solid var(--line-strong);border-left:4px solid var(--tone,var(--meta));border-radius:8px;background:var(--surface-raised);box-shadow:0 4px 12px rgba(0,0,0,.25);color:var(--ink)}
+.cp-notice .cp-i{font-size:24px;color:var(--tone,var(--meta))}
+.cp-notice b{display:block;font-size:24px;line-height:28px;font-weight:400;white-space:nowrap}
+.cp-notice small{display:block;font-size:20px;line-height:24px;color:var(--ink-muted);white-space:nowrap}
+.cp-notice.is-ok{--tone:var(--signal)}.cp-notice.is-warning{--tone:var(--warning)}.cp-notice.is-error{--tone:var(--danger)}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -343,6 +357,7 @@
 .cp-i-friend-list { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M11.5%208a3%203%200%201%201-6%200%203%203%200%200%201%206%200zM4%2020v-1a4.5%204.5%200%200%201%209%200v1M16%207h4M16%2012h4M16%2017h4%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-friend-add { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M11.5%208a3%203%200%201%201-6%200%203%203%200%200%201%206%200zM4%2020v-1a4.5%204.5%200%200%201%207.5-3.35M17%2013v7M13.5%2016.5h7%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-friend-request { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M11.5%208a3%203%200%201%201-6%200%203%203%200%200%201%206%200zM4%2020v-1a4.5%204.5%200%200%201%207.5-3.35M20%2016.5a3.5%203.5%200%201%201-7%200%203.5%203.5%200%200%201%207%200zM16.5%2014.5v2l1.5%201%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-bell { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M6%2016v-5a6%206%200%200%201%2012%200v5l2%202H4zM10%2021h4%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-medal { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2215%22%20r%3D%226%22%2F%3E%3Cpath%20d%3D%22M8.5%2010.2%205%203h4l3%206%203-6h4l-3.5%207.2M12%2013v4%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-network { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%206a2%202%200%201%201-4%200%202%202%200%200%201%204%200zM8%2018a2%202%200%201%201-4%200%202%202%200%200%201%204%200zM20%2018a2%202%200%201%201-4%200%202%202%200%200%201%204%200zM11.1%207.8%206.9%2016.2M12.9%207.8l4.2%208.4M8%2018h8%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-pause { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M8%205v14M16%205v14%22%2F%3E%3C%2Fsvg%3E") }

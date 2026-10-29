@@ -615,7 +615,6 @@ Ce que la démonstration hors écran (`.\docs\demo-comptes.ps1`, sur de fausses 
 | 204 | Plusieurs fichiers, vérification | Un fichier de vpuniverse.com qui en propose plusieurs ; puis, si le site fait une vérification Cloudflare, le constater. | La page s'ouvre, raison en orange dans le bandeau (« 2 fichiers au choix », « vérification ») ; on choisit soi-même, le fichier est rangé. |
 | 205 | Se déconnecter | « Se déconnecter : vpforums.org », puis « Récupérer : ROM ». | « Pas connecté » ; la page de vpforums.org s'ouvre avec « vous n'êtes pas connecté ». |
 
-
 ## Mise à jour depuis la borne
 
 Sur une vraie borne installée par l'installeur, avec une version plus récente publiée sur GitHub (`npm run publier`). L'essai sans opérateur (`docs\demo-mise-a-jour.ps1`) couvre le reste, en silencieux et hors écran.
@@ -1068,6 +1067,34 @@ Sur la borne, puis au poste. Des tables sans logo (renommer le fichier `(Wheel)`
 | --- | --- | --- | --- |
 | 557 | Roue sans logo | Menu « Présentation du menu » sur chaque roue (Médaillons, Bandeau, Minimaliste, Arche) ; se placer sur une table sans logo, puis faire tourner la roue aux flippers, lentement puis vite. | Au centre, le nom du jeu en capitales dans le médaillon ; dans chaque petit médaillon, l'initiale du jeu en grand, lisible depuis la position du joueur. Pendant que la roue tourne, le nom s'éteint dès que son médaillon quitte le centre, l'initiale s'allume ensuite : jamais un petit nom illisible, jamais le nom et l'initiale l'un sur l'autre. |
 | 558 | Liste au bureau, écran étroit | Au poste, fenêtre du menu sur un écran 5:4 ou 4:3 (1280 × 1024, 1024 × 768), présentation en liste. | Les commandes « Flippers choisir · Start fiche · Exit menu » tiennent sur deux lignes sous le filet, entières ; le compteur « 01 / n » est au-dessus du filet, à droite ; les cases des initiales restent alignées, même devant un titre très long. |
+
+## Notifications du menu des tables
+
+Deux bornes amies (A et B) sur le même réseau, une troisième borne C qui n'est pas encore amie, au menu des tables de A ; au poste, puis sur la borne (écran pivoté). La preuve sans opérateur : `packages/core/src/test/notices.test.ts` et la démonstration `docs\demo-notifications-roue.ps1`.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 559 | Pastille des amis | Allumer B, attendre qu'il soit relié ; puis l'éteindre. | À gauche de la pastille des téléchargements (ou de la roue dentée), l'icône des amis, un point vert et « 1 » ; un clic ouvre « Mes amis ». B éteint : la pastille disparaît en quelques secondes, rien ne bouge ailleurs. |
+| 560 | Ami qui se connecte | Plus de dix secondes après le démarrage de A, rallumer B. | « B vient de se connecter », filet et icône bleus, environ 6 secondes, puis la notification s'estompe entièrement. Au bureau, sur la ligne de la marque, sans toucher les cadres ; en borne, sous les pastilles, alignée à droite. Ni le média ni la roue ne sont couverts. |
+| 561 | Demande d'ami | Depuis C : Menu système > « Amis » > « Trouver un joueur » > A > « Envoyer une demande d’ami ». | Sur A : « Demande d'ami : C », ambre, avec « Menu système > Amis > Demandes d'amis » ; un clic ouvre les demandes. La roue dentée garde sa pastille rouge. |
+| 562 | Téléchargement fini | Récupérer une table de B, « Continuer en arrière-plan », revenir au menu des tables et attendre la fin. | « Téléchargement fini », la table et « de B », vert ; pas de bandeau en plus. Un clic ouvre Téléchargements. Si l'on est dans le menu système à la fin : le bandeau, et rien de plus au retour. |
+| 563 | Plusieurs à la fois | Rallumer B et une autre borne amie en même temps. | Une seule notification : « 2 amis viennent de se connecter », les deux noms en précision. |
+| 564 | Rien pendant une partie, un résumé au retour | Lancer une table sur A ; pendant la partie, rallumer B, envoyer une demande depuis C et laisser finir un téléchargement ; quitter la partie. | Rien pendant le chargement ni la partie. Au retour au menu des tables, un seul résumé (« 3 nouveautés », le détail du plus urgent au moins urgent), puis plus rien. Un ami reparti avant la fin de la partie n'est pas annoncé. |
+| 565 | Attente et mode invité | Laisser A passer en mode attente pendant que B se connecte ; puis activer le mode invité et rallumer B. | En attente : rien ; au retour au menu, la notification si elle date de moins de 10 minutes. En mode invité : ni pastille des amis ni notification. |
+| 566 | Réglage | Menu système > « Médias » > « Médias, son et attente » > « Notifications du menu » : Start deux fois, puis une troisième. | « compteur seul » : la pastille, plus de message ; « coupées » : ni pastille ni message, la pastille des téléchargements reste ; « affichées » : tout revient. Le choix survit au redémarrage. |
+
+## Enregistrer une partie pour la roue
+
+Sur la borne, avec VPX et une table qui a déjà une vidéo du plateau. La preuve sans opérateur : `packages/core/src/test/enregistrement-partie.test.ts` et la démonstration `docs\demo-enregistrement-partie.ps1` (partie simulée : la vraie capture d'écran ne s'y essaie pas).
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 567 | Préparer et lancer | Fiche d'une table > « Jouer et enregistrer » ; regarder les réglages, changer la durée à 15 s, puis « Lancer et enregistrer ». | L'écran dit ce qui sera filmé (plateau, fronton si la borne en a un), le début et la durée ; la durée choisie est gardée à la fois suivante. La partie se lance comme avec « Jouer ». |
+| 568 | Témoin pendant la partie | Jouer normalement, en regardant le coin du plateau en haut à droite (vu du joueur). | Pendant le délai, une pastille « Enregistrement dans … s » à anneau vert ; puis un point rouge qui bat, « REC » et le temps ; à la fin de la durée, « ✓ Enregistré · 0:15 » trois secondes, puis plus rien. La pastille ne gêne pas le jeu, ne prend jamais le focus : flippers, Start et MagnaSave répondent comme d'habitude. |
+| 569 | La vidéo, au retour | Quitter la table après la fin de l'enregistrement. | L'écran « Enregistrement de la partie » montre la vidéo du plateau en aperçu, droite (flippers en bas), sans la pastille du témoin, avec le son de la partie ; elle commence et finit par un court fondu au noir. Le fronton, s'il était filmé, a sa propre carte. |
+| 570 | Utiliser pour la roue | « Utiliser pour la roue », lire le plan, « Confirmer ». | Le plan dit ce qui arrive dans `medias\` et ce qui part à la corbeille ; rien ne change avant « Confirmer ». Au retour aux tables, la roue montre la nouvelle vidéo du plateau, dans le bon sens ; l'ancienne est dans la corbeille de Cyber Pinball. |
+| 571 | Quitter avant la fin | « Jouer et enregistrer » avec 30 s ; quitter la table au bout d'une quinzaine de secondes ; puis une autre fois au bout de 3 s. | Première fois : « … secondes enregistrées : la table a été quittée avant la fin … », la vidéo s'arrête avant la fermeture de VPX (ni son menu ni le bureau à la fin). Seconde fois : « trop court pour la roue », rien n'est gardé. |
+| 572 | Garder de côté, puis choisir plus tard | Au retour d'un enregistrement, « Garder de côté » ; puis fiche > « Médias du jeu » > « Plateau » > « Voir les propositions ». | La roue n'a pas changé. Dans les propositions, l'enregistrement est en tête (« Enregistré en partie : … ») ; le choisir puis « Enregistrer » le met sur la roue, l'original restant de côté. |
 
 ## Ce qui ne peut pas encore être testé
 

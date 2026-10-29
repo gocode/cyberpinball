@@ -12,6 +12,7 @@ import {
   DMD_COLOR_PRESETS,
   HOUR_CHOICES,
   NIGHT_DIM_CHOICES,
+  NOTICES_MODES,
   GAME_MEDIA_LABELS,
   MENU_DMD_LABELS,
   MENU_LAYOUT_LABELS,
@@ -108,6 +109,7 @@ export const MENU_SETTINGS_ROWS = [
   'cinema',
   'uiSounds',
   'uiSoundsVolume',
+  'notices',
   'attractDelay',
   'attractInterval',
   'attractSound',
@@ -194,6 +196,17 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         detail: v.uiSounds ? undefined : t('Sons de l’interface coupés pour l’instant'),
         icon: 'sound',
         run: () => openVolume('uiSoundsVolume'),
+      },
+      notices: {
+        label: v.notices === 'all' ? t('Notifications du menu : affichées') : v.notices === 'count' ? t('Notifications du menu : compteur seul') : t('Notifications du menu : coupées'),
+        detail:
+          v.notices === 'all'
+            ? t('Nombre d’amis en ligne, et un message discret quand un ami se connecte, une demande arrive, un téléchargement finit ; jamais pendant une partie (Start : compteur seul)')
+            : v.notices === 'count'
+              ? t('Le nombre d’amis en ligne, sans message (Start : rien)')
+              : t('Ni compteur ni message ; la pastille des téléchargements reste (Start : tout afficher)'),
+        icon: 'bell',
+        run: () => set({ notices: NOTICES_MODES[(NOTICES_MODES.indexOf(v.notices) + 1) % NOTICES_MODES.length]! }),
       },
       attractDelay: {
         label: t('Mode attente : {delay}', { delay: attractDelayLabel(v.attractDelay) }),

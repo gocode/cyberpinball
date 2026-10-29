@@ -19,15 +19,22 @@ const REPO = path.join(__dirname, '..', '..', '..', '..');
  */
 const FOLLOW_UP = /(?:\b(?:Pendant|Après|Comme|pendant|après|comme|l'attente de|During|After|As|Like|during|after|waiting in)\s+)(\d{2,4})(?=\s*[,;:)])/g;
 
-function problems(file: string): string[] {
+type Section = { rows: { n: string; line: number; text: string }[] };
+
+/** Sections des tests manuels : chaque titre ouvre la sienne ; ses tests sont ses lignes « | N | ». */
+function sectionsOf(file: string): Section[] {
   const lines = fs.readFileSync(path.join(REPO, 'docs', file), 'utf8').split('\n');
-  // Sections : chaque titre ouvre la sienne ; les tests d'une section sont ses lignes « | N | ».
-  const sections: { rows: { n: string; line: number; text: string }[] }[] = [{ rows: [] }];
+  const sections: Section[] = [{ rows: [] }];
   lines.forEach((text, i) => {
     if (/^#{1,6}\s/.test(text)) sections.push({ rows: [] });
     const row = /^\|\s*(\d+[a-z]?)\s*\|/.exec(text);
     if (row) sections.at(-1)!.rows.push({ n: row[1]!, line: i + 1, text });
   });
+  return sections;
+}
+
+function problems(file: string): string[] {
+  const sections = sectionsOf(file);
   const found: string[] = [];
   for (const { rows } of sections) {
     const own = new Set(rows.map((r) => r.n));
@@ -42,4 +49,24 @@ function problems(file: string): string[] {
 
 test('tests manuels : « Pendant N », « Après N », « Comme N » renvoient à un test de la même section', () => {
   assert.deepEqual([...problems('tests-manuels.md'), ...problems('manual-tests.md')], []);
+});
+
+// Le manuel citait encore « Tests manuels 557 à 562 » pour l'enregistrement d'une partie, renuméroté
+// 567-572 à la fusion (29/10/2026) : 557-562 existaient, mais à cheval sur deux autres sections.
+test('manuel : une plage « tests manuels N à M » tient dans une seule section des tests manuels', () => {
+  const found: string[] = [];
+  for (const [manual, tests, range] of [
+    ['manuel.md', 'tests-manuels.md', /tests manuels (\d+) (?:à|-|–) (\d+)/gi],
+    ['manual.md', 'manual-tests.md', /manual tests (\d+) (?:to|-|–) (\d+)/gi],
+  ] as const) {
+    const sections = sectionsOf(tests).map((s) => new Set(s.rows.map((r) => r.n)));
+    fs.readFileSync(path.join(REPO, 'docs', manual), 'utf8').split('\n').forEach((line, i) => {
+      for (const m of line.matchAll(range)) {
+        const [from, to] = [Number(m[1]), Number(m[2])];
+        const wanted = Array.from({ length: to - from + 1 }, (_, k) => String(from + k));
+        if (!sections.some((own) => wanted.every((n) => own.has(n)))) found.push(`${manual}:${i + 1} : « ${m[0]} » ne tient dans aucune section de ${tests}`);
+      }
+    });
+  }
+  assert.deepEqual(found, []);
 });

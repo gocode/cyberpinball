@@ -113,12 +113,14 @@ const CYBER_ICONS = {
   'friend-list': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 9 0v1M16 7h4M16 12h4M16 17h4"/>', // Un joueur et sa liste : mes amis.
   'friend-add': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 7.5-3.35M17 13v7M13.5 16.5h7"/>', // Un joueur et un plus : trouver un joueur, demander.
   'friend-request': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 7.5-3.35M20 16.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0zM16.5 14.5v2l1.5 1"/>', // Un joueur et une horloge : demandes en attente.
+  bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/>', // Cloche : notifications du menu des tables.
   medal: '<circle cx="12" cy="15" r="6"/><path d="M8.5 10.2 5 3h4l3 6 3-6h4l-3.5 7.2M12 13v4"/>', // Médaille à ruban : badges.
   network: '<path d="M14 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM20 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM11.1 7.8 6.9 16.2M12.9 7.8l4.2 8.4M8 18h8"/>', // Trois bornes reliées sans centre : partage et réseau.
   // Gestionnaire de téléchargements
   pause: '<path d="M8 5v14M16 5v14"/>', // Deux barres : mettre un téléchargement en pause.
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3c-3 3.5-3 14.5 0 18M12 3c3 3.5 3 14.5 0 18"/>', // Globe à méridiens : un téléchargement venu d’un site web.
   broom: '<path d="M19 3 11 11M8 10l6 6-2 5c-3 0-7-2-9-5l5-6zM6 15l2 2"/>', // Balai : retirer les finis de la liste, sans toucher aux fichiers.
+  record: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/><circle cx="9" cy="12" r="2.5"/>', // Caméra et point d’enregistrement : jouer et enregistrer la partie pour la roue.
 };
 
 /**

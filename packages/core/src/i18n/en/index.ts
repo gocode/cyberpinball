@@ -24,8 +24,10 @@ import { messages as sharing } from './sharing';
 import { messages as social } from './social';
 import { messages as friends } from './friends';
 import { messages as downloadmanager } from './downloadmanager';
+import { messages as notices } from './notices';
+import { messages as recording } from './recording';
 
 /** Chaque partie du catalogue, par nom de fichier (pour le test des doublons). */
-export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dedicated, power, hours, parts, sharing, social, friends, downloadmanager };
+export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording };
 
 export const EN_MESSAGES: Catalog = Object.assign({}, ...Object.values(EN_PARTS));

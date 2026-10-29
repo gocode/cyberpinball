@@ -408,12 +408,17 @@ function showBackglass(holder, url) {
  * retiré du document, même un instant, perd ses transitions (la roue cesserait de glisser).
  */
 function placeChildren(nodes) {
+  placeInto(root, nodes);
+}
+
+/** Les enfants de parent deviennent nodes, dans l'ordre ; ceux qui restent ne sont jamais retirés (leurs animations continuent). */
+function placeInto(parent, nodes) {
   const keep = new Set(nodes);
-  for (const child of [...root.children]) if (!keep.has(child)) child.remove();
-  let next = root.firstChild;
+  for (const child of [...parent.children]) if (!keep.has(child)) child.remove();
+  let next = parent.firstChild;
   for (const node of nodes) {
     if (node === next) next = next.nextSibling;
-    else root.insertBefore(node, next);
+    else parent.insertBefore(node, next);
   }
 }
 
@@ -662,6 +667,110 @@ function downloadsPill(d) {
 }
 
 /**
+ * Amis en ligne, à gauche de la pastille des téléchargements : l'icône des amis, son point vert
+ * et le nombre. Un clic ouvre « Mes amis ». Rien quand aucun ami n'est en ligne : un zéro ne dit
+ * rien à qui passe devant la borne.
+ */
+function friendsPill(f) {
+  const pill = el('button', 'friends-pill');
+  pill.type = 'button';
+  pill.title = f.title;
+  pill.dataset.act = JSON.stringify({ type: 'friends' });
+  const glyph = el('span', 'friends-pill-glyph');
+  glyph.append(cyberIcon('friends', 'friends-pill-icon'), el('span', 'friends-pill-dot'));
+  pill.append(glyph, el('span', 'friends-pill-count', String(f.count)));
+  return pill;
+}
+
+/**
+ * Notification du menu des tables (packages/core/src/notices.ts) : une seule à la fois, gardée
+ * d'un rendu à l'autre tant que c'est la même (son entrée ne rejoue pas à chaque état) ; elle
+ * s'estompe quand le processus principal la dit sur le départ (leaving).
+ */
+let noticeShown;
+
+function noticeToast(n) {
+  if (noticeShown?.id !== n.id) {
+    const box = el('div', `notice-toast notice-${n.tone ?? 'info'}`);
+    box.setAttribute('role', 'status');
+    // Un clic mène à ce qu'elle annonce (Mes amis, les demandes, le gestionnaire de téléchargements).
+    if (n.act) box.dataset.act = JSON.stringify(n.act);
+    const text = el('span', 'notice-text');
+    const title = el('span', 'notice-title', n.title);
+    title.dataset.full = n.title;
+    text.append(title);
+    if (n.detail) {
+      const detail = el('span', 'notice-detail', n.detail);
+      detail.dataset.full = n.detail;
+      text.append(detail);
+    }
+    box.append(cyberIcon(n.icon ?? 'info', 'notice-icon'), text);
+    noticeShown = { id: n.id, box };
+  }
+  noticeShown.box.classList.toggle('leaving', Boolean(n.leaving));
+  return noticeShown.box;
+}
+
+/**
+ * La notification tient sur sa ligne : quand la largeur qui reste (entre la marque et les
+ * pastilles au bureau, sous elles en borne) ne suffit pas, la précision perd ses derniers mots,
+ * puis le titre, avec « … » ; le début, qui porte le sens (« Plus de place… », le nom), reste.
+ * Repart du texte entier à chaque rendu : une pastille plus étroite rend la place.
+ */
+function fitNotice() {
+  const box = noticeShown?.box;
+  if (!box?.isConnected) return;
+  const text = box.querySelector('.notice-text');
+  const parts = [box.querySelector('.notice-detail'), box.querySelector('.notice-title')].filter(Boolean);
+  for (const part of parts) part.textContent = part.dataset.full;
+  const over = () => text.scrollWidth > text.clientWidth + 0.5;
+  for (const part of parts) {
+    // D'abord les segments entiers (« · de Bruno »), puis les mots du dernier qui reste.
+    let segments = part.dataset.full.split(' · ');
+    while (over() && segments.length > 1) {
+      segments = segments.slice(0, -1);
+      part.textContent = `${segments.join(' · ')} · …`;
+    }
+    let words = segments.join(' · ').split(' ');
+    while (over() && words.length > 1) {
+      words = words.slice(0, -1);
+      part.textContent = `${words.join(' ').replace(/[\s·:,;]+$/, '')}…`;
+    }
+  }
+}
+
+/**
+ * Coin d'état du menu des tables, à gauche de la roue dentée : la pastille des téléchargements,
+ * celle des amis en ligne, puis la notification du moment. Au bureau, tout tient sur la ligne de
+ * la marque ; en borne, la notification passe sous les pastilles, alignée à droite (frontend.css).
+ * Le coin est gardé d'un rendu à l'autre, ses enfants placés sans être retirés : la notification
+ * ne repart pas de zéro quand une pastille change.
+ */
+let statusCorner;
+
+function cornerNodes(s) {
+  const nodes = [];
+  if (s.downloads) nodes.push(downloadsPill(s.downloads));
+  if (s.friendsOnline) nodes.push(friendsPill(s.friendsOnline));
+  if (s.notice) {
+    const line = statusCorner?.line ?? el('div', 'notice-line');
+    const toast = noticeToast(s.notice);
+    if (line.firstChild !== toast) line.replaceChildren(toast);
+    nodes.push(line);
+  } else noticeShown = undefined;
+  return nodes;
+}
+
+function cornerBox(s) {
+  const nodes = cornerNodes(s);
+  if (!nodes.length) return undefined;
+  statusCorner ??= { box: el('div', 'status-corner') };
+  statusCorner.line = nodes.find((n) => n.classList.contains('notice-line')) ?? statusCorner.line;
+  placeInto(statusCorner.box, nodes);
+  return statusCorner.box;
+}
+
+/**
  * Chaque état redessine l'écran ; les listes qui défilent restent où elles étaient
  * (library.js, revealSelection). L'écran est nommé par ce qu'il montre : un autre repart du haut.
  */
@@ -691,8 +800,11 @@ function drawPlayfield(s) {
   // Extinction, veille ou redémarrage en cours : plus rien à choisir, ni roue dentée ni cadenas.
   // Mode invité : le cadenas prend la place de la roue dentée, le menu système est fermé.
   if (!(s.phase === 'message' && s.message?.action === 'power')) nodes.push(s.guest ? guestLock(s.guest) : gearButton(s));
-  // Au menu des tables seulement : un écran plein a son propre accès (première entrée du menu système).
-  if (s.downloads && s.phase === 'menu' && !s.guest) nodes.push(downloadsPill(s.downloads));
+  // Au menu des tables seulement : un écran plein a son propre accès (première entrée du menu
+  // système). Pastilles et notification, jamais en mode invité.
+  const corner = s.phase === 'menu' && !s.guest ? cornerBox(s) : undefined;
+  if (corner) nodes.push(corner);
+  else noticeShown = undefined;
 
   if (s.table) {
     CyberMedia.beginRender();
@@ -740,6 +852,7 @@ function drawPlayfield(s) {
     nodes.push(cover);
   } else nodes.unshift(brand());
   placeChildren(nodes);
+  fitNotice();
 }
 
 /** Repli minimal d'un écran annexe (sans fallback.js) : le titre de la table sur fond noir. */
@@ -1069,6 +1182,12 @@ window.cyberEtat = () => ({
     page: lastState.library.pages && { numero: lastState.library.pages.index + 1, sur: lastState.library.pages.count, element: lastState.library.pages.page?.kind ?? 'repli', repli: lastState.library.pages.fallback },
   },
   tables: lastState?.count,
+  // Coin du menu des tables : notification dessinée (titre, précision, sur le départ) et amis en ligne.
+  notification: (() => {
+    const box = document.querySelector('#root .notice-toast');
+    return box ? { titre: box.querySelector('.notice-title')?.textContent, precision: box.querySelector('.notice-detail')?.textContent, depart: box.classList.contains('leaving') } : undefined;
+  })(),
+  amisEnLigne: Number(document.querySelector('#root .friends-pill-count')?.textContent) || undefined,
   // Roue du menu : chaque place, le logo affiché (fichier et version de son adresse) ou le titre.
   roue: [...document.querySelectorAll('.wheel-item')].map((n) => {
     const img = n.querySelector('img.wheel-img');

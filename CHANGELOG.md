@@ -48,6 +48,8 @@ son interface).
 - Longues listes : dans une liste de contenu (jeux, médias, fichiers…), marquée par son cadre et le repère « Exit · Sortir de la liste », Exit ramène aux actions de l'écran au lieu de le quitter ; MagnaSave (F6 au clavier) passe de l'une à l'autre en retrouvant sa place, et un flipper tenu fait défiler de lettre en lettre.
 - Téléchargements, dans le menu système et en pastille sur le menu des tables : suit tout ce qui arrive des sites et de vos amis, reprend seul là où il s'était arrêté si la connexion tombe, même le lendemain, et vous ramène d'un geste à l'écran d'où vous l'aviez demandé.
 - Les noms sous les petits médaillons de la roue sont plus grands et se lisent de loin, comme tout texte du menu.
+- Amis en ligne d'un coup d'œil sur le menu des tables, et de petites notifications discrètes, une à la fois : un ami qui se connecte, une demande d'ami, un téléchargement terminé. Rien ne s'affiche pendant une partie : un résumé vous attend au retour. Se coupe dans « Médias, son et attente ».
+- « Jouer et enregistrer », sur la fiche d'une table : Cyber Pinball filme la partie, du moment choisi jusqu'à la durée choisie ou la sortie de la table, avec un petit témoin dans le coin du plateau. Au retour, la vidéo peut devenir la présentation de la table sur la roue, après confirmation, ou être gardée de côté.
 
 ## 0.1.3
 

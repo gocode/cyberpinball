@@ -1,0 +1,167 @@
+/* Témoin de l'enregistrement d'une partie (game-recording.ts) : une pastille dans le coin du
+   plateau, en haut à droite pour le joueur, par-dessus VPX. Fenêtre transparente, exclue de la
+   capture : la vidéo ne la contient jamais. Discrète : fond de verre fumé, un seul signe coloré
+   (point rouge qui bat pendant l'enregistrement, anneau du compte à rebours, coche verte). La
+   taille suit la fenêtre (--u : un 72e de sa hauteur vue du joueur), qui suit l'écran.
+   Seul le signe porte la couleur d’état ; texte et avancement restent neutres (revu par Codex,
+   29/10/2026 : un seul accent rouge, battement de faible amplitude, immobile si le mouvement est réduit). */
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.witness {
+  --u: calc(var(--h, 72px) / 72);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  box-sizing: border-box;
+  width: var(--w, 420px);
+  height: var(--h, 72px);
+  transform: translate(-50%, -50%) rotate(var(--turn, 0deg));
+  display: grid;
+  grid-template-columns: calc(20 * var(--u)) minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: calc(12 * var(--u));
+  padding: 0 calc(26 * var(--u)) 0 calc(22 * var(--u));
+  border: calc(1 * var(--u)) solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--scrim-strong);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+}
+
+.witness[hidden] {
+  display: none;
+}
+
+.witness-sign {
+  width: calc(20 * var(--u));
+  height: calc(20 * var(--u));
+  border-radius: 50%;
+  box-sizing: border-box;
+  justify-self: center;
+}
+
+.witness-label {
+  min-width: 0;
+  font-size: calc(24 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.witness-time {
+  justify-self: end;
+  font-size: calc(22 * var(--u));
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.witness-time:empty {
+  display: none;
+}
+
+/* Hors REC, le message dispose de toute la largeur restante. */
+.witness:not(.state-recording) .witness-label {
+  grid-column: 2 / -1;
+}
+.witness:not(.state-recording) .witness-time {
+  display: none;
+}
+
+/* Avancement : un filet au bas de la pastille, sans chiffre de plus. */
+.witness-track {
+  position: absolute;
+  left: calc(22 * var(--u));
+  right: calc(22 * var(--u));
+  bottom: calc(8 * var(--u));
+  height: calc(1 * var(--u));
+  background: var(--line-soft);
+  color: var(--ink-muted);
+}
+
+.witness-fill {
+  display: block;
+  height: 100%;
+  width: clamp(0%, var(--progress, 0%), 100%);
+  background: currentColor;
+}
+
+/* Compte à rebours : anneau du signal, le texte en clair. */
+.state-waiting .witness-sign {
+  width: calc(16 * var(--u));
+  height: calc(16 * var(--u));
+  border: calc(2 * var(--u)) solid var(--signal);
+  border-right-color: var(--line-strong);
+}
+.state-waiting .witness-label {
+  letter-spacing: 0;
+  font-weight: 500;
+}
+/* Un seul accent rouge. Battement 1 Hz de faible amplitude, sans disparition ni zoom. */
+.state-recording .witness-sign {
+  width: calc(14 * var(--u));
+  height: calc(14 * var(--u));
+  background: var(--danger);
+  animation: witness-beat 1s ease-in-out infinite;
+}
+@keyframes witness-beat {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
+}
+
+/* Bilan : coche verte, prise trop courte en ambre, interruption en rouge. */
+.state-done .witness-sign,
+.state-short .witness-sign,
+.state-failed .witness-sign {
+  display: grid;
+  place-items: center;
+  font-size: calc(22 * var(--u));
+  font-weight: 700;
+  line-height: 1;
+}
+.state-done .witness-sign {
+  color: var(--signal);
+}
+.state-short .witness-sign {
+  color: var(--warning);
+}
+.state-failed .witness-sign {
+  color: var(--danger);
+}
+.state-done .witness-label,
+.state-short .witness-label,
+.state-failed .witness-label {
+  letter-spacing: 0;
+  font-weight: 500;
+}
+.state-done .witness-track,
+.state-short .witness-track,
+.state-failed .witness-track {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .state-recording .witness-sign {
+    animation: none;
+    opacity: 1;
+  }
+}

@@ -72,7 +72,8 @@ test('VPX n’attend jamais l’animation : play() lance VPX comme sans elle', (
   for (const m of main.matchAll(/await ([^;\n]+)/g)) assert.doesNotMatch(m[1]!, /cinema|Cinema|loadingDmd|liveDmd|playDmdAnimation|\.done\b(?<!game\.done)/, m[0]);
   assert.equal([...main.matchAll(/\.done\b/g)].length, 1, 'seul game.done est attendu');
   // Le relais : le lanceur le donne (partie réelle comme simulée), il fait sonner la bobine.
-  assert.match(play, /const onForeground = \(\) => \{\n\s+if \(cinema\.handover\(\)\) playUiSound\('coil'\);\n\s+\};/);
+  // Il fait aussi partir le délai de l'enregistrement d'une partie (« Jouer et enregistrer »), sans rien attendre.
+  assert.match(play, /const onForeground = \(\) => \{\n\s+if \(cinema\.handover\(\)\) playUiSound\('coil'\);\n(?:\s+recording\?\.shown\(\);\n)?\s+\};/);
   assert.match(play, /simulateVpx\(\{ onPlaying, onForeground \}\)/);
   assert.match(play, /launchVpx\(\{[^}]*onPlaying, onForeground \}\)/);
   // La chorégraphie s'arrête avec le lancement : écrans à revoir, ou partie finie.

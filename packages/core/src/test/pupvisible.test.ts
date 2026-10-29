@@ -324,7 +324,16 @@ test('pendant la partie, aucune fenêtre de Cyber Pinball ne reste au-dessus des
     .readdirSync(SOURCES)
     .filter((f) => f.endsWith('.ts'))
     .filter((f) => /setAlwaysOnTop\(\s*true|alwaysOnTop:\s*true/.test(fs.readFileSync(path.join(SOURCES, f), 'utf8')));
-  assert.deepEqual(topmost, ['acquire-window.ts'], 'toute fenêtre au premier plan doit être fermée par closeTopmostWindows avant la partie');
+  assert.deepEqual(topmost, ['acquire-window.ts', 'game-recording.ts'], 'toute fenêtre au premier plan doit être fermée par closeTopmostWindows avant la partie');
+  // Seule exception : le témoin de l'enregistrement d'une partie, voulu au-dessus de VPX. Il ne couvre
+  // qu'un coin du plateau (420 × 72 pour 1080 px), naît après closeTopmostWindows, ignore la souris,
+  // n'apparaît pas dans la capture, et disparaît à la fin de l'enregistrement.
+  const recording = fs.readFileSync(path.join(SOURCES, 'game-recording.ts'), 'utf8');
+  assert.match(recording, /const WITNESS = \{ width: 420, height: 72, margin: 28 \};/);
+  assert.match(recording, /setContentProtection\(true\)/);
+  assert.match(recording, /setTimeout\(\(\) => witness\.close\(\), VERDICT_MS\)/);
+  const front = fs.readFileSync(path.join(SOURCES, 'frontend.ts'), 'utf8');
+  assert.ok(front.indexOf('  closeTopmostWindows();') < front.indexOf('armGameRecording(table, hooks.record'), 'le témoin naît après closeTopmostWindows');
   const frontend = fs.readFileSync(path.join(SOURCES, 'frontend.ts'), 'utf8');
   const close = frontend.indexOf('  closeTopmostWindows();');
   const launch = frontend.indexOf('launchVpx({');

@@ -14,6 +14,7 @@ import { DEFAULT_DMD_COLOR, normalizeDmdColor } from './dmdcolor';
 import { t } from './i18n';
 import { layoutOf } from './locations';
 import { MEDIADB_QUALITY_SETTINGS, type MediaDbQualitySetting } from './mediadb';
+import { NOTICES_MODES, type NoticesMode } from './notices';
 import {
   MEDIA_TYPES,
   MediaDimensionCache,
@@ -531,6 +532,11 @@ export interface MenuMediaSettings {
   dmdColor: string;
   /** Horaire de la borne (arcadehours.ts) : nuit voilée, arrêt à heure fixe ; non suivi par défaut. */
   hours: ArcadeHoursSettings;
+  /**
+   * Menu des tables (notices.ts) : la pastille des amis en ligne et les notifications (tout, par
+   * défaut), la pastille seule, ou rien. La pastille des téléchargements reste dans tous les cas.
+   */
+  notices: NoticesMode;
 }
 
 export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
@@ -550,6 +556,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   dmd: 'live',
   dmdColor: DEFAULT_DMD_COLOR,
   hours: DEFAULT_ARCADE_HOURS,
+  notices: 'all',
 };
 
 /** <données>\medias.json */
@@ -583,6 +590,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     dmd: MENU_DMD_MODES.includes(r.dmd as MenuDmdMode) ? (r.dmd as MenuDmdMode) : d.dmd,
     dmdColor: normalizeDmdColor(r.dmdColor),
     hours: normalizeArcadeHours(r.hours),
+    notices: NOTICES_MODES.includes(r.notices as NoticesMode) ? (r.notices as NoticesMode) : d.notices,
   };
 }
 

@@ -53,7 +53,7 @@ const info = comps.map((name) => {
   return { name, html, group: get('group') ?? '', w: Number(get('width') ?? (name === 'Cover' ? 960 : 1100)), h: Number(get('height') ?? 300), readme };
 });
 const NAMES = {
-  Marque: 'Marque', Icones: 'Icônes', LigneMenu: 'Entrée de menu', ListeContenu: 'Liste de contenu', Onglets: 'Onglets', Roue: 'Roue des tables', BandeauAide: "Bandeau d'aide",
+  Marque: 'Marque', Icones: 'Icônes', LigneMenu: 'Entrée de menu', ListeContenu: 'Liste de contenu', Notification: 'Notifications du menu', Onglets: 'Onglets', Roue: 'Roue des tables', BandeauAide: "Bandeau d'aide",
   Panneau: 'Panneau', Ligne: 'Ligne', Etat: "Ligne d'état", Bouton: 'Bouton', CarteTable: 'Carte de table', Clavier: 'Clavier à l’écran', Question: 'Question',
   EcranMenuCab: 'Menu des tables, borne', EcranFiche: 'Fiche d’une table, bureau', EcranMenuSysteme: 'Menu système, bureau', EcranDiagnostic: 'Diagnostic, borne', EcranAssistant: 'Assistant, relevé des boutons', EcranParcours: 'Ce qu’il manque pour jouer, borne', EcranParcoursBureau: 'Ce qu’il manque pour jouer, bureau', EcranTelechargements: 'Téléchargements, borne', EcranSelecteurBureau: 'Sélecteur de fichiers, bureau', EcranSelecteurBorne: 'Sélecteur de fichiers, borne',
 };

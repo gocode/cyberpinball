@@ -14,6 +14,13 @@
 // la table que la borne n'a pas pèse 24 Mo, Bruno l'envoie à débit bridé et se déconnecte en
 // plein envoi ; =retour : au démarrage suivant de Cyber Pinball, Bruno (même borne, même clé)
 // revient après quelques secondes, et l'envoi reprend là où il s'était arrêté.
+// CYBERPINBALL_RESEAU_DEMO=notifications (menu des tables, docs\demo-notifications-roue.ps1) :
+// David, Fanny et Émile sont des amis déjà connus, hors ligne au départ (écrits avant le
+// démarrage, leurs bornes aussi), Chloé envoie une demande qui attend ; puis, à heures fixes
+// (NOTIFICATIONS_SCRIPT), David et Fanny se connectent ensemble, Bruno lance une partie, bat son record ; sa grosse table part à débit bridé quand on
+// la demande, et dès son premier morceau, pendant que le menu système est ouvert (l'écran de
+// réception), Émile (l'ami hors ligne) se connecte, Bruno gagne un badge et lance une autre
+// partie : trois nouveautés, un seul résumé au retour ; la table finit ensuite au menu des tables.
 // Leurs dossiers sont dans <données>\reseau-simule\ (le bac à sable de l'essai).
 
 import * as fs from 'node:fs';
@@ -24,17 +31,33 @@ import { createLiveGames, type LiveGames } from './live-game';
 import { createSocialNet, type SocialNet } from './social-net';
 
 export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
-  return ['1', 'partie', 'coupure', 'retour'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
+  return ['1', 'partie', 'coupure', 'retour', 'notifications'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
 }
 
 /** Table que la borne n'a pas, dans la démonstration de la coupure : assez lourde pour voir l'envoi avancer, s'arrêter, reprendre. */
 const CUT_TABLE_BYTES = 24 * 1024 * 1024;
 /** Débit de Bruno dans la démonstration de la coupure : un morceau de 64 Kio toutes les 25 ms (environ 2,5 Mo/s). */
 const CUT_CHUNK_MS = 25;
+/** Démonstration des notifications : plus lent (environ 0,9 Mo/s), la table finit une fois revenu au menu des tables. */
+const NOTICES_CHUNK_MS = 70;
 /** Bruno se déconnecte après avoir envoyé tant d'octets. */
 const CUT_AFTER_BYTES = 9 * 1024 * 1024;
 /** Au démarrage suivant, Bruno revient après ce délai. */
 const RETURN_AFTER_MS = 7000;
+
+/**
+ * Démonstration des notifications du menu des tables : ce que font les bornes fictives, en
+ * millisecondes après leur démarrage (l'autopilote de docs\demo-notifications-roue.ps1 regarde le
+ * menu des tables pendant ce temps ; les connexions des dix premières secondes ne sont pas
+ * annoncées), puis après le premier morceau de la table de Bruno (l'écran de réception est
+ * ouvert : rien ne doit s'y montrer).
+ */
+export const NOTIFICATIONS_SCRIPT = {
+  pairOnline: 15_000,
+  brunoPlays: 26_000,
+  brunoRecord: 34_000,
+  afterFirstChunk: { emileOnline: 300, brunoBadge: 600, brunoPlaysAgain: 900 },
+};
 
 /** Contenu reconnaissable de la grosse table : chaque octet dépend de sa position (un décalage se verrait à l'empreinte). */
 function bigTable(bytes: number): Buffer {
@@ -44,7 +67,7 @@ function bigTable(bytes: number): Buffer {
 }
 
 /** Avant le démarrage : un ami hors ligne et son dernier évènement, dans l'état de la borne. */
-export function seedSimulatedFriends(dataDir: string, now = new Date()): void {
+export function seedSimulatedFriends(dataDir: string, now = new Date(), env: NodeJS.ProcessEnv = process.env): void {
   if (fs.existsSync(socialFile(dataDir))) return;
   const me = setName(newSocialState(now), 'Alexis')!;
   let emile = setName(newSocialState(now), 'Émile')!; // i18n-ignore : nom d'un joueur fictif
@@ -56,7 +79,18 @@ export function seedSimulatedFriends(dataDir: string, now = new Date()): void {
     badges: [{ id: 'first-game', at: new Date(now.getTime() - 30 * 86_400_000).toISOString() }, { id: 'first-record', at: new Date(now.getTime() - 9 * 86_400_000).toISOString() }],
     badgesChecked: true,
   };
-  saveSocial(dataDir, state);
+  // Notifications : David et Fanny, amis eux aussi ; leurs bornes et celle d'Émile existent (même clé,
+  // la borne pour amie) et se connecteront plus tard (startSimulatedPlayers).
+  const others = env.CYBERPINBALL_RESEAU_DEMO === 'notifications' ? ['David', 'Fanny'].map((name) => setName(newSocialState(now), name)!) : [];
+  const since = state.friends[0]!.since;
+  saveSocial(dataDir, { ...state, friends: [...state.friends, ...others.map((o) => ({ key: o.key.publicKey, name: o.name, since, lastSeen: threeHours.toISOString(), events: [] }))] });
+  if (env.CYBERPINBALL_RESEAU_DEMO === 'notifications') {
+    for (const friend of [emile, ...others]) {
+      const dir = path.join(dataDir, 'reseau-simule', friend.name);
+      fs.mkdirSync(dir, { recursive: true });
+      saveSocial(dir, { ...friend, friends: [{ key: me.key.publicKey, name: me.name, since, events: [] }] });
+    }
+  }
 }
 
 async function bot(dataDir: string, name: string, lan: boolean, bootstrap: { host: string; port: number }[], extra: Partial<SocialState> = {}): Promise<SocialNet> {
@@ -112,7 +146,9 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   if (!bootstrap) return async () => undefined;
   const me = { key: main.state().key.publicKey, name: main.state().name };
   const mode = env.CYBERPINBALL_RESEAU_DEMO;
-  const cut = mode === 'coupure' || mode === 'retour';
+  const notices = mode === 'notifications';
+  // La grosse table, envoyée à débit bridé : pour la coupure, et pour voir un téléchargement finir en arrière-plan.
+  const cut = mode === 'coupure' || mode === 'retour' || notices;
   // Retour de Bruno : sa borne n'est pas encore là au démarrage, elle arrive quelques secondes après.
   if (mode === 'retour') await new Promise((r) => setTimeout(r, RETURN_AFTER_MS));
   if (mode === 'retour') log('Réseau simulé : Bruno revient.'); // i18n-ignore : journal
@@ -126,6 +162,8 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   // Coupure : Bruno envoie à débit bridé, et se déconnecte en plein envoi (la première fois seulement).
   let sent = 0;
   let gone = false;
+  /** Notifications : ce qui se passe pendant que la borne reçoit la table (une fois). */
+  let firstChunk: (() => void) | undefined;
   const throttled: Pick<SocialNet, 'state' | 'online' | 'send' | 'sendChunk' | 'onMessage' | 'onChunk'> = {
     state: () => bruno.state(),
     online: (key) => bruno.online(key),
@@ -134,7 +172,9 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     onChunk: (listener) => bruno.onChunk(listener),
     sendChunk: async (key, frame) => {
       if (gone) return false;
-      await new Promise((r) => setTimeout(r, CUT_CHUNK_MS));
+      firstChunk?.();
+      firstChunk = undefined;
+      await new Promise((r) => setTimeout(r, notices ? NOTICES_CHUNK_MS : CUT_CHUNK_MS));
       sent += frame.length - 4;
       if (mode === 'coupure' && sent >= CUT_AFTER_BYTES && !gone) {
         gone = true;
@@ -154,6 +194,31 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     contents: (table) => (root ? tableContents(table.file, { ownFolder: true, romLibrary: layoutOf(root).roms }) : undefined),
   });
   const timers: NodeJS.Timeout[] = [];
+  // Notifications : David et Fanny se connectent ensemble, Émile plus tard (amis déjà connus, seedSimulatedFriends).
+  const pair: SocialNet[] = [];
+  let emile: SocialNet | undefined;
+  if (notices) {
+    const at = (ms: number, run: () => unknown) => timers.push(setTimeout(() => void run(), ms));
+    at(NOTIFICATIONS_SCRIPT.pairOnline, async () => {
+      log('Réseau simulé : David et Fanny se connectent.'); // i18n-ignore : journal
+      pair.push(...(await Promise.all(['David', 'Fanny'].map((name) => bot(dataDir, name, false, bootstrap)))));
+    });
+    const afm = { title: 'Attack from Mars', manufacturer: 'Bally', year: 1995 };
+    at(NOTIFICATIONS_SCRIPT.brunoPlays, () => bruno.setPresence({ status: 'playing', table: afm, since: new Date().toISOString() }));
+    at(NOTIFICATIONS_SCRIPT.brunoRecord, () => {
+      bruno.setPresence({ status: 'menu', since: new Date().toISOString() });
+      bruno.publish({ kind: 'record', table: afm, score: 3_215_480_250, rank: 1, initials: 'BRU' });
+    });
+    firstChunk = () => {
+      const later = NOTIFICATIONS_SCRIPT.afterFirstChunk;
+      at(later.emileOnline, async () => {
+        log('Réseau simulé : Émile se connecte.'); // i18n-ignore : journal
+        emile = await bot(dataDir, 'Émile', false, bootstrap); // i18n-ignore : nom d'un joueur fictif
+      });
+      at(later.brunoBadge, () => bruno.publish({ kind: 'badge', badge: 'ten-tables' }));
+      at(later.brunoPlaysAgain, () => bruno.setPresence({ status: 'playing', table: { title: 'Medieval Madness', manufacturer: 'Williams', year: 1997 }, since: new Date().toISOString() }));
+    };
+  }
   let games: LiveGames | undefined;
   let starting = false;
   if (env.CYBERPINBALL_RESEAU_DEMO === 'partie') {
@@ -189,9 +254,12 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       root ??= brunoRoot(brunoDir, mine(), cut);
       main.accept(bruno.state().key.publicKey);
       clearInterval(accept);
-      const table = { title: 'Attack from Mars', manufacturer: 'Bally', year: 1995 };
-      bruno.setPresence({ status: 'playing', table, since: new Date(Date.now() - 12 * 60_000).toISOString() });
-      bruno.publish({ kind: 'record', table, score: 3_215_480_250, rank: 1, initials: 'BRU' });
+      // Notifications : Bruno suit l'horaire de la démonstration (NOTIFICATIONS_SCRIPT).
+      if (!notices) {
+        const table = { title: 'Attack from Mars', manufacturer: 'Bally', year: 1995 };
+        bruno.setPresence({ status: 'playing', table, since: new Date(Date.now() - 12 * 60_000).toISOString() });
+        bruno.publish({ kind: 'record', table, score: 3_215_480_250, rank: 1, initials: 'BRU' });
+      }
       // Partie en direct : l'invitation, une fois la borne reliée et le menu affiché.
       if (games) {
         timers.push(
@@ -212,6 +280,6 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     for (const timer of timers) clearTimeout(timer);
     content.stop();
     games?.stop();
-    await Promise.all([bruno.stop(), chloe.stop(), dora.stop()]);
+    await Promise.all([bruno.stop(), chloe.stop(), dora.stop(), ...pair.map((n) => n.stop()), ...(emile ? [emile.stop()] : [])]);
   };
 }

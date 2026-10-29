@@ -33,6 +33,7 @@ import {
   formatSize,
   formatTransfer,
   transferPercent,
+  listRecordings,
   localMediaChoices,
   MEDIA_SITES,
   mediaSite,
@@ -236,7 +237,13 @@ export function createProposals(ctx: ProposalsContext) {
     const previous = state?.file === table.file ? state : undefined;
     const evidence = await ctx.search.evidence(table);
     ctx.progress(t('Médias déjà sur la borne : .directb2s (fronton allumé, ampoules), PuP-Pack, DMD, images du .vpx…'));
-    const local = localMediaChoices(table, { b2s: await ctx.b2s(table), dmdFolder: evidence.script?.dmdFolder, screenshot: ctx.search.screenshot(table), vpxImages: ctx.search.vpxImages(table) });
+    const local = localMediaChoices(table, {
+      b2s: await ctx.b2s(table),
+      dmdFolder: evidence.script?.dmdFolder,
+      screenshot: ctx.search.screenshot(table),
+      vpxImages: ctx.search.vpxImages(table),
+      recordings: listRecordings(ctx.host.dataDir, table),
+    });
     const next: State = {
       file: table.file,
       games: [],
@@ -713,7 +720,7 @@ export function createProposals(ctx: ProposalsContext) {
       return stayAfterPick(type, text);
     }
     if (!choice.offer) {
-      const text = ctx.place(table, type, { from: choice.file!, mode: 'copy' });
+      const text = ctx.place(table, type, { from: choice.file!, mode: 'copy', ...(choice.source === 'recording' && { recorded: true }) });
       return stayAfterPick(type, text);
     }
     const offer = choice.offer;

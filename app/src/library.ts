@@ -154,12 +154,16 @@ import {
   type Zones,
   type FocusAnchor,
   knownVpsId,
+  type RecordedRole,
+  type RecordingSettings,
 } from '@cyberpinball/core';
 import { prepareImport, type PreparedImport } from './archives';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
 import { LayoutReport } from './layout-check';
 import { createCatalog } from './catalog';
 import { createGameParts } from './game-parts';
+import type { RecordingOutcome } from './game-recording';
+import { createRecordingMenu } from './recording-menu';
 import { createJourney } from './journey';
 import { createMediaDownload, mediaOffersLabel, type MediaDbGameOffer } from './media-download';
 import { createMediaSearch } from './media-search';
@@ -227,6 +231,13 @@ export interface LibraryHost {
    * raison que le menu affiche (écrans à revoir).
    */
   adjustDisplay?(table: TableEntry): Promise<{ ok: boolean; message?: string } | undefined>;
+  /**
+   * « Jouer et enregistrer » : la partie, l'enregistrement armé (game-recording.ts). Au retour,
+   * le menu ouvre l'écran de l'enregistrement (recording.result).
+   */
+  playAndRecord?(table: TableEntry, settings: RecordingSettings): void;
+  /** Écrans que la borne peut filmer en plus du plateau : fronton, DMD (ceux qu'elle a). */
+  recordableRoles?(): RecordedRole[];
   /** Journal de VPX (vpinball.log), lu par le médecin pour les PuP-Packs. */
   vpxLogFile?(): string | undefined;
   /** Playfield de la borne et VPinballX.ini actif : le médecin y juge le sens d'une table. */
@@ -263,8 +274,11 @@ export interface LibraryHost {
   diskSpace?(dir: string): { free: number; total: number } | undefined;
   /** Mode invité : seules la fiche, ses pages et les actions à porte ouverte passent (guestmode.ts). */
   guest: Pick<GuestMode, 'active' | 'allows' | 'knock'>;
-  /** Bandeau bref, au menu des tables comme sur un écran plein (un téléchargement fini). */
-  notify?(text: string): void;
+  /**
+   * Un téléchargement fini que son écran n'a pas repris : au menu des tables, la notification du
+   * menu le dit (menu-notices.ts) ; sur un écran plein, un bandeau bref (`text`).
+   */
+  notify?(text: string, job?: DownloadJob): void;
   /** La file des téléchargements a changé (progression, état) : la pastille ou l'écran se redessinent. */
   downloadsChanged?(): void;
 }
@@ -310,6 +324,9 @@ export type UiAction =
   | { type: 'config' }
   /** Pastille des téléchargements du menu des tables : le gestionnaire de téléchargements. */
   | { type: 'downloads' }
+  /** Pastille des amis en ligne, notification d'un ami (Mes amis) ou d'une demande (Demandes d'amis). */
+  | { type: 'friends' }
+  | { type: 'friend-requests' }
   /** Repère de la liste de contenu (« Sortir de la liste », « Revenir à la liste ») : comme MagnaSave. */
   | { type: 'zone' }
   | { type: 'wheel'; offset: number };
@@ -823,9 +840,9 @@ export function createLibrary(host: LibraryHost) {
     dataDir: host.dataDir,
     transports: { http: httpTransport() },
     finished: (job) => {
-      // Rendu de lui-même (son écran est ouvert) ; sinon un bandeau le dit, la pastille le garde « prêt ».
+      // Rendu de lui-même (son écran est ouvert) ; sinon une notification ou un bandeau le dit, la pastille le garde « prêt ».
       if (downloadFinishers.get(job.kind)?.(job)) return;
-      host.notify?.(t('Téléchargement terminé : {title}. Téléchargements, dans le menu système, pour y revenir.', { title: job.title }));
+      host.notify?.(t('Téléchargement terminé : {title}. Téléchargements, dans le menu système, pour y revenir.', { title: job.title }), job);
     },
     onChange: () => host.downloadsChanged?.(),
     log: (line) => console.log(line),
@@ -1020,6 +1037,26 @@ export function createLibrary(host: LibraryHost) {
     doctor: (table) => openDoctor(table.file),
     roms: () => openRoms(),
     leave: () => leave(),
+  });
+
+  // « Jouer et enregistrer » de la fiche, et l'écran du retour de la partie enregistrée.
+  const recording = createRecordingMenu({
+    dataDir: host.dataDir,
+    root: host.root,
+    layout,
+    tablesDir,
+    find,
+    cabinet: () => loadCabinet(host.dataDir),
+    roles: () => host.recordableRoles?.() ?? [],
+    show: (build, at, table) => openCustom(build, at, table),
+    cursor: () => cursor,
+    sheet: (table, flash) => openSheet(table, flash),
+    leave: () => leave(),
+    play: (table, settings) => {
+      screen = undefined;
+      host.playAndRecord?.(table, settings);
+    },
+    reload: (file) => host.reload(file),
   });
 
   // « Parties du jeu » de la fiche : chaque partie ajoutée, remplacée, réaffectée ou retirée.
@@ -1538,6 +1575,9 @@ export function createLibrary(host: LibraryHost) {
       { label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) },
       { label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) },
       ...pupAction(table, s),
+      ...(host.playAndRecord && host.vpxExe()
+        ? [{ label: t('Jouer et enregistrer'), detail: t('Filmer la partie pour la présentation de la table sur la roue'), icon: 'record' as const, door: 'sheet.record' as const, run: () => recording.setup(table) }]
+        : []),
       ...(host.adjustDisplay && host.vpxExe()
         ? [{ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }]
         : []),
@@ -3239,6 +3279,8 @@ export function createLibrary(host: LibraryHost) {
       if (i > 0) {
         if (step.startsWith('type:')) for (const ch of step.slice(5)) key(ch === ' ' ? 'Space' : `Key${ch.toUpperCase()}`, ch);
         else if (step === 'drag') await dragEvent(playfield, 'dragover');
+        // Retour au menu des tables d'un coup, d'où qu'on soit dans la gestion des tables (une liste à deux zones demande deux Exit).
+        else if (step === 'leave') leave();
         else if (step.startsWith('drop:')) await dragEvent(playfield, 'dragleave').then(() => handleAction({ type: 'drop', paths: step.slice(5).split('|') }));
         else if (step.startsWith('wait:')) await delay(Number(step.slice(5)));
         else if (step.startsWith('until:')) {
@@ -3352,6 +3394,8 @@ export function createLibrary(host: LibraryHost) {
     autopilot,
     /** Catalogue et fenêtre « Récupérer » (démonstrations). */
     catalog: catalogUi,
+    /** Enregistrement d'une partie : l'écran du retour (aperçu, utiliser pour la roue, garder, jeter). */
+    recordingResult: (outcome: RecordingOutcome) => recording.result(outcome),
     /** Ce qu'il manque pour jouer : parcours d'une table (fiche, partie échouée, médecin). */
     openJourney: (file: string) => journeyUi.open(file),
     /** Médias reçus d'un ami : ceux de la table s'ouvrent, ces fichiers dans le brouillon (library-medias.ts). */

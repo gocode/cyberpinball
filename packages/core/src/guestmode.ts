@@ -56,6 +56,7 @@ export const GUEST_DOORS = {
   'sheet.files': false, // Fichiers de la table
   'sheet.pup': false, // Options du PuP-Pack
   'sheet.display': false, // Régler l’affichage en partie
+  'sheet.record': false, // Jouer et enregistrer (vidéo de présentation de la table sur la roue)
   'sheet.table-settings': false, // Réglages de cette table
   'sheet.doctor': false, // Diagnostiquer et réparer
   'sheet.remove': false, // Supprimer la table

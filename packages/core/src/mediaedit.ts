@@ -175,8 +175,10 @@ export type MediaPageEntry =
    * move : pris dans le dossier d'import ou téléchargé (il le quitte) ; copy : choisi
    * sur ce PC, glissé, ou pris dans le PuP-Pack de la table (l'original reste).
    * `origin` : provenance d'un fichier téléchargé, notée dans le .info à l'enregistrement.
+   * `recorded` : enregistrement d'une partie (gamerecording.ts), filmé au standard (plateau en
+   * portrait, flippers en bas) : le demi-tour de l'ancien média ne vaut plus.
    */
-  | { from: string; mode: 'move' | 'copy'; origin?: MediaOriginDraft };
+  | { from: string; mode: 'move' | 'copy'; origin?: MediaOriginDraft; recorded?: boolean };
 
 /** Provenance d'un fichier choisi en ligne ; la date et le nom rangé sont ajoutés à l'enregistrement. */
 export type MediaOriginDraft = Omit<MediaOrigin, 'date' | 'file'>;
@@ -355,7 +357,15 @@ export function planMediaChanges(table: TableEntry, draft: MediaDraft, context: 
       }
       if (!fs.existsSync(entry.from)) problems.push(t('{name} a disparu ({dir}).', { name: path.basename(entry.from), dir: path.dirname(entry.from) }));
       incoming.push({ op: entry.mode, from: entry.from, to: target });
-      const how = entry.origin ? t('téléchargé depuis {origin}', { origin: entry.origin.origin }) : entry.mode === 'move' ? t('déplacé depuis le dossier d’import') : t('copié, l’original reste en place');
+      const how = entry.origin
+        ? t('téléchargé depuis {origin}', { origin: entry.origin.origin })
+        : entry.recorded
+          ? entry.mode === 'move'
+            ? t('enregistré en partie')
+            : t('enregistré en partie, l’original reste de côté')
+          : entry.mode === 'move'
+            ? t('déplacé depuis le dossier d’import')
+            : t('copié, l’original reste en place');
       steps.push({
         kind: 'add',
         type,
@@ -384,6 +394,8 @@ export function planMediaChanges(table: TableEntry, draft: MediaDraft, context: 
       if (mediaTypeInfo(type).orientable && draft.halfTurn[type] === undefined) delete turns[type];
       continue;
     }
+    // Enregistrement d'une partie : au standard lui aussi, le demi-tour de l'ancien ne vaut plus.
+    if (pages.length === 1 && first && 'from' in first.entry && first.entry.recorded && mediaTypeInfo(type).orientable && draft.halfTurn[type] === undefined) delete turns[type];
     const kept = old?.file ? pages.find((p) => 'file' in p.entry && path.basename(p.entry.file).toLowerCase() === old.file!.toLowerCase()) : undefined;
     if (kept) sources[type] = { ...old!, file: path.basename(kept.target) };
     else delete sources[type];

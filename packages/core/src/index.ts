@@ -104,3 +104,5 @@ export * from './badges';
 export * from './firewall';
 export * from './friendlibrary';
 export * from './livegame';
+export * from './notices';
+export * from './gamerecording';

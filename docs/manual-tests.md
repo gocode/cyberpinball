@@ -615,7 +615,6 @@ What the off-screen demonstration (`.\docs\demo-comptes.ps1`, on fake entries) d
 | 204 | Several files, verification | A vpuniverse.com file that offers several; then, if the site runs a Cloudflare check, note it. | The page opens, with the reason in orange in the banner ("2 fichiers au choix" (2 files to choose from), "vérification" (verification)); you choose yourself, and the file is filed. |
 | 205 | Logging out | "Se déconnecter : vpforums.org" (Log out: vpforums.org), then "Récupérer : ROM". | "Pas connecté"; the vpforums.org page opens with "vous n'êtes pas connecté" (you are not logged in). |
 
-
 ## Updating from the cabinet
 
 On a real cabinet installed with the installer, with a newer version published on GitHub (`npm run publier`). The unattended test (`docs\demo-mise-a-jour.ps1`) covers the rest, silently and off-screen.
@@ -1068,6 +1067,34 @@ On the cabinet, then on the desktop computer. Tables without a logo (rename the 
 | --- | --- | --- | --- |
 | 557 | Wheel without logos | "Présentation du menu" (Menu layout) on each wheel (Médaillons, Bandeau, Minimaliste, Arche); go to a table without a logo, then turn the wheel with the flippers, slowly then fast. | In the centre, the game's name in capitals inside the medallion; in each small medallion, the game's initial, large, readable from the player's position. While the wheel turns, the name goes out as soon as its medallion leaves the centre, then the initial lights up: never a small unreadable name, never the name and the initial on top of each other. |
 | 558 | List on a narrow desktop screen | On the desktop computer, menu window on a 5:4 or 4:3 screen (1280 × 1024, 1024 × 768), list layout. | The controls "Flippers choisir · Start fiche · Exit menu" (Flippers choose · Start game page · Exit menu) fit on two lines under the rule, in full; the "01 / n" counter is above the rule, on the right; the initials' boxes stay aligned, even in front of a very long title. |
+
+## Tables menu notifications
+
+Two friend cabinets (A and B) on the same network, a third cabinet C that is not a friend yet, on A's tables menu; at the desk, then on the cabinet (rotated screen). The unattended proof: `packages/core/src/test/notices.test.ts` and the demonstration `docs\demo-notifications-roue.ps1`.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 559 | Friends pill | Switch B on, wait until it is linked; then switch it off. | Left of the downloads pill (or of the gear), the friends icon, a green dot and "1"; a click opens "Mes amis" (My friends). B off: the pill disappears within a few seconds, nothing else moves. |
+| 560 | Friend coming online | More than ten seconds after A started, switch B on again. | "B vient de se connecter" (B just came online), blue edge and icon, about 6 seconds, then the notification fades out completely. On the desktop, on the brand's line, without touching the frames; on the cabinet, below the pills, aligned right. Neither the media nor the wheel is covered. |
+| 561 | Friend request | From C: Menu système (System menu) > "Amis" (Friends) > "Trouver un joueur" (Find a player) > A > "Envoyer une demande d’ami" (Send a friend request). | On A: "Demande d'ami : C" (Friend request: C), amber, with "Menu système > Amis > Demandes d'amis" (System menu > Friends > Friend requests); a click opens the requests. The gear keeps its red dot. |
+| 562 | Download finished | Get a table from B, "Continuer en arrière-plan" (Carry on in the background), go back to the tables menu and wait for the end. | "Téléchargement fini" (Download finished), the table and "de B" (from B), green; no extra banner. A click opens Downloads. If you are in the system menu at the end: the banner, and nothing more on return. |
+| 563 | Several at once | Switch B and another friend cabinet on at the same time. | A single notification: "2 amis viennent de se connecter" (2 friends just came online), both names as detail. |
+| 564 | Nothing during a game, a summary afterwards | Start a table on A; during the game, switch B on, send a request from C and let a download finish; quit the game. | Nothing during loading or the game. Back on the tables menu, a single summary ("3 nouveautés" (3 new notifications), the detail most urgent first), then nothing more. A friend who left before the end of the game is not announced. |
+| 565 | Attract and guest mode | Let A go into attract mode while B comes online; then turn guest mode on and switch B on again. | In attract mode: nothing; back on the menu, the notification if it is less than 10 minutes old. In guest mode: neither friends pill nor notification. |
+| 566 | Setting | Menu système (System menu) > "Médias" (Media) > "Médias, son et attente" (Media, sound and attract) > "Notifications du menu" (Menu notifications): Start twice, then a third time. | "compteur seul" (counter only): the pill, no more messages; "coupées" (off): neither pill nor message, the downloads pill stays; "affichées" (shown): everything comes back. The choice survives a restart. |
+
+## Recording a game for the wheel
+
+On the cabinet, with VPX and a table that already has a playfield video. The unattended proof: `packages/core/src/test/enregistrement-partie.test.ts` and the demo `docs\demo-enregistrement-partie.ps1` (simulated game: the real screen capture is not tried there).
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 567 | Prepare and launch | A table's sheet > "Jouer et enregistrer" (Play and record); look at the settings, change the length to 15 s, then "Lancer et enregistrer" (Launch and record). | The screen says what will be filmed (playfield, backglass if the cabinet has one), the start and the length; the chosen length is kept for next time. The game launches as with "Jouer" (Play). |
+| 568 | Witness during the game | Play normally, watching the top right corner of the playfield (from the player's view). | During the delay, a pill "Enregistrement dans … s" (Recording in … s) with a green ring; then a beating red dot, "REC" and the time; at the end of the length, "✓ Enregistré · 0:15" (Recorded) for three seconds, then nothing. The pill does not get in the way, never takes the focus: flippers, Start and MagnaSaves respond as usual. |
+| 569 | The video, back from the game | Leave the table after the recording has ended. | The "Enregistrement de la partie" (Game recording) screen previews the playfield video, upright (flippers at the bottom), without the witness pill, with the game sound; it starts and ends with a short fade to black. The backglass, if filmed, has its own card. |
+| 570 | Use for the wheel | "Utiliser pour la roue" (Use for the wheel), read the plan, "Confirmer" (Confirm). | The plan says what arrives in `medias\` and what goes to the recycle bin; nothing changes before "Confirmer". Back to the tables, the wheel shows the new playfield video, the right way up; the old one is in Cyber Pinball's recycle bin. |
+| 571 | Leaving before the end | "Jouer et enregistrer" with 30 s; leave the table after about fifteen seconds; then another time after 3 s. | First time: "… secondes enregistrées : la table a été quittée avant la fin …" (… seconds recorded: the table was left before the end), the video stops before VPX closes (neither its menu nor the desktop at the end). Second time: "trop court pour la roue" (too short for the wheel), nothing is kept. |
+| 572 | Keep aside, choose later | Back from a recording, "Garder de côté" (Keep aside); then sheet > "Médias du jeu" > "Plateau" > "Voir les propositions" (See the proposals). | The wheel has not changed. In the proposals, the recording comes first ("Enregistré en partie : …", Recorded in game); choosing it then "Enregistrer" (Save) puts it on the wheel, the original staying aside. |
 
 ## What cannot be tested yet
 

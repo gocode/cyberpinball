@@ -1041,11 +1041,53 @@ body.mouse .gear {
  * (revue de Codex, 29/10/2026). Bleu méta en cours, ambre en attente de la source, rouge
  * bloqué, vert quand un téléchargement fini attend qu'on y revienne ; le mot le dit toujours.
  */
-.downloads-pill {
+/*
+ * Coin d'état du menu des tables (frontend.js, cornerBox) : pastilles et notification, de droite
+ * à gauche depuis la roue dentée, en haut à 8 px. Le coin lui-même ne capte pas la souris ; ses
+ * pastilles, si. Au bureau, la ligne de la marque est assez large : la notification s'y pose, à
+ * gauche des pastilles, et s'arrête avant la marque (36 cqmin). En borne, la zone est étroite :
+ * la notification passe sur sa propre ligne, sous les pastilles, alignée sur elles à droite,
+ * loin de la roue (en bas de la zone) et du titre de la table.
+ */
+.status-corner {
   position: absolute;
   top: 0.74cqmin;
   right: 9.3cqmin;
+  left: 4cqmin;
   z-index: 100;
+  display: flex;
+  flex-direction: row-reverse;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  /* 12 px entre deux pastilles, entre les pastilles et la notification (revue de Codex, 29/10/2026). */
+  gap: 1.11cqmin;
+  pointer-events: none;
+}
+
+.status-corner > * {
+  flex: none;
+  pointer-events: auto;
+}
+
+html.menu-desktop .status-corner {
+  left: 36cqmin;
+  flex-wrap: nowrap;
+}
+
+/* La ligne de la notification : toute la largeur en borne (elle passe à la ligne), sa place au bureau. */
+.notice-line {
+  display: flex;
+  flex: 1 0 100%;
+  justify-content: flex-end;
+  min-width: 0;
+  pointer-events: none;
+}
+
+html.menu-desktop .notice-line {
+  flex: 1 1 auto;
+}
+
+.downloads-pill {
   box-sizing: border-box;
   display: grid;
   grid-template-columns: auto auto;
@@ -1056,6 +1098,7 @@ body.mouse .gear {
   padding: 0 1.48cqmin;
   font: inherit;
   font-size: 2.22cqmin;
+  font-variant-numeric: tabular-nums;
   line-height: 1.15;
   letter-spacing: 0.03em;
   color: var(--ink);
@@ -1111,6 +1154,163 @@ body.mouse .downloads-pill:hover {
 
 .downloads-pill.pill-warning .downloads-pill-bar > span {
   background: var(--warning);
+}
+
+/*
+ * Amis en ligne : même repère de 64 px que la pastille des téléchargements, plus étroite (l'icône
+ * des amis de 24 px, son point vert de 10 px, le nombre). Le vert dit « en ligne », sans plus.
+ */
+.friends-pill {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 0.9cqmin;
+  min-height: 5.93cqmin;
+  padding: 0 1.48cqmin;
+  font: inherit;
+  font-size: 2.22cqmin;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 0.1cqmin solid var(--line-strong);
+  border-radius: 2.96cqmin;
+}
+
+body.mouse .friends-pill {
+  cursor: pointer;
+}
+
+body.mouse .friends-pill:hover {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 0.18cqmin var(--signal);
+}
+
+.friends-pill-glyph {
+  position: relative;
+  display: flex;
+}
+
+.friends-pill-icon {
+  font-size: 2.22cqmin;
+  color: var(--meta);
+}
+
+.friends-pill-dot {
+  position: absolute;
+  right: -0.28cqmin;
+  bottom: -0.1cqmin;
+  width: 0.93cqmin;
+  height: 0.93cqmin;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 0 0.19cqmin var(--surface-raised);
+}
+
+/*
+ * Notification (revue de Codex, 29/10/2026) : une seule à la fois, opaque (surface pleine, lisible
+ * sur n'importe quel média), 620 px de large au plus, filet de 4 px, rayon de 8 px, 16 px de
+ * chaque côté, 12 px entre l'icône et le texte ; 64 px de haut au
+ * plus, comme les pastilles : au bureau, la ligne de la marque s'arrête là où commencent les cadres
+ * du plateau et du fronton. Titre de 24 px et précision de 20 px (plancher du design system),
+ * chacun sur une ligne : les noms et les titres de table sont raccourcis à la source
+ * (notices.ts, NOTICE_TITLE_MAX et NOTICE_DETAIL_MAX), puis à la largeur qui reste vraiment
+ * (frontend.js, fitNotice : la fin de la précision d'abord). Interlignes de 28 et 24 px. Icône
+ * de 24 px et filet dans la couleur de son ton : bleu méta pour une information (un ami qui se
+ * connecte, qui lance une partie), vert pour une réussite (fini, record, nouvel ami), ambre
+ * pour une demande, rouge pour un blocage. Elle glisse de 12 px en 260 ms en apparaissant ;
+ * en partant, tout s'estompe jusqu'à 0 en 320 ms (son entrée ne la retient pas : animations
+ * distinctes). Jamais d'animation sans fin.
+ */
+.notice-toast {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 1.11cqmin;
+  min-width: 0;
+  max-width: 57.41cqmin;
+  height: 5.93cqmin;
+  padding: 0 1.48cqmin;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 0.1cqmin solid var(--line-strong);
+  border-left: 0.37cqmin solid var(--tone, var(--meta));
+  border-radius: 0.74cqmin;
+  box-shadow: 0 0.37cqmin 1.11cqmin rgba(0, 0, 0, 0.25);
+  pointer-events: auto;
+  animation: notice-in 260ms ease-out both;
+}
+
+body.mouse .notice-toast[data-act] {
+  cursor: pointer;
+}
+
+body.mouse .notice-toast[data-act]:hover {
+  border-color: var(--signal);
+}
+
+.notice-toast.leaving {
+  animation: notice-out 320ms ease-in both;
+}
+
+@keyframes notice-in {
+  from {
+    opacity: 0;
+    transform: translateY(-1.11cqmin);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes notice-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-0.74cqmin);
+  }
+}
+
+.notice-toast.notice-ok {
+  --tone: var(--signal);
+}
+
+.notice-toast.notice-warning {
+  --tone: var(--warning);
+}
+
+.notice-toast.notice-error {
+  --tone: var(--danger);
+}
+
+.notice-icon {
+  flex: none;
+  font-size: 2.22cqmin;
+  color: var(--tone, var(--meta));
+}
+
+.notice-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.notice-title {
+  font-size: 2.22cqmin;
+  line-height: 2.59cqmin;
+  white-space: nowrap;
+}
+
+.notice-detail {
+  font-size: 1.852cqmin;
+  line-height: 2.22cqmin;
+  color: var(--ink-muted);
+  white-space: nowrap;
 }
 
 /*

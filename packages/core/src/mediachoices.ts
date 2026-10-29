@@ -27,12 +27,16 @@ import { mediaDbOfferLabel, mediaDbOffers, type MediaDbCandidate, type MediaDbOf
 import { isAcceptedFormat, mediaKind, MEDIA_TYPES, type MediaKind, type MediaType } from './medias';
 import { isJunkName, parseCsvLine, parseScreens, screenRole } from './puppack';
 import type { SiteHit } from './mediasites';
+import { recordingLabel, type SavedRecording } from './gamerecording';
 import type { TableEntry } from './tables';
 import { vpsLabel, type VpsGame } from './vps';
 
-export type MediaChoiceSource = 'mediadb' | 'vps' | 'vps-music' | 'pup' | 'dmd-folder' | 'b2s' | 'vpx' | 'vpforums' | 'vpuniverse' | 'web';
+export type MediaChoiceSource = 'recording' | 'mediadb' | 'vps' | 'vps-music' | 'pup' | 'dmd-folder' | 'b2s' | 'vpx' | 'vpforums' | 'vpuniverse' | 'web';
 
 export const MEDIA_CHOICE_SOURCE_LABELS: Record<MediaChoiceSource, string> = {
+  get recording() {
+    return t('Enregistré en partie sur cette borne');
+  },
   mediadb: 'VPinMediaDB',
   get vps() {
     return t('Vignette VPS');
@@ -262,6 +266,8 @@ export interface LocalChoiceOptions {
   screenshot?: string;
   /** Images rangées dans le .vpx (readVpxImages), déjà écrites dans le cache : plateau, règles, fronton et logo VR. */
   vpxImages?: { type: MediaType; file: string; label: string }[];
+  /** Parties enregistrées et gardées de côté (listRecordings) : en tête, ce sont celles de la borne. */
+  recordings?: SavedRecording[];
 }
 
 /** Un .directb2s de la table et ses images, déjà extraites dans le cache (b2sImages, b2sLitImages). */
@@ -419,6 +425,12 @@ export function localMediaChoices(table: TableEntry, opts: LocalChoiceOptions = 
     if (!kind) return undefined;
     return { id: file, type, kind, source, label, detail: kind === 'video' ? t('vidéo') : kind === 'audio' ? t('son') : t('image'), file, bytes };
   };
+
+  // Parties enregistrées sur cette borne (gamerecording.ts), les plus récentes d'abord.
+  for (const rec of opts.recordings ?? []) {
+    const choice = local(rec.type, rec.file, rec.bytes, 'recording', recordingLabel(rec.date));
+    if (choice) push(choice);
+  }
 
   // .directb2s : le fronton allumé et l'afficheur, déjà extraits pour le repli, puis les mêmes
   // avec toutes leurs ampoules allumées ; un second fichier du dossier est un autre fronton.

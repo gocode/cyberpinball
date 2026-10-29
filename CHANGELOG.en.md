@@ -46,6 +46,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Long lists: in a content list (games, media, files…), marked by its frame and the "Exit · Leave the list" cue, Exit takes you back to the screen's actions instead of leaving it; MagnaSave (F6 on the keyboard) switches between the two and keeps your place, and holding a flipper scrolls letter by letter.
 - Downloads, in the system menu and as a pill on the tables menu: follows everything coming from sites and your friends, resumes by itself where it stopped if the connection drops, even the next day, and takes you back in one move to the screen you asked from.
 - The names under the small medallions of the wheel are larger and can be read from a distance, like every text of the menu.
+- Friends online at a glance on the tables menu, and small, discreet notifications, one at a time: a friend coming online, a friend request, a finished download. Nothing shows during a game: a summary waits for you when you come back. Can be turned off in "Médias, son et attente" (Media, sound and attract mode).
+- "Jouer et enregistrer" (Play and record), on a table's page: Cyber Pinball films the game, from the moment you chose until the length you chose or until you leave the table, with a small witness in the corner of the playfield. Back in the menu, the video can become the table's presentation on the wheel, after confirmation, or be kept aside.
 
 ## 0.1.3
 

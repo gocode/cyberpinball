@@ -27,7 +27,13 @@ test('chaque module qui crée une fenêtre la fait couvrir son écran par coverD
   // Les fenêtres naissent toutes par createWindow (offscreen.ts) : voir offscreen.test.ts.
   const creators = appSources().filter((s) => s.file !== 'offscreen.ts' && /createWindow\(/.test(s.text));
   assert.ok(creators.length >= 3, 'menu, réglages et assistant créent leurs fenêtres');
-  for (const s of creators) assert.match(s.text, /coverDisplay\(/, `${s.file} crée une fenêtre sans coverDisplay`);
+  // Fenêtres qui ne sont pas un écran : l'enregistreur d'une partie, jamais montré, et son témoin,
+  // pastille transparente posée au coin du plateau (indicatorBounds), à sa taille.
+  const notScreens: Record<string, RegExp[]> = { 'game-recording.ts': [/show: false,\s+width: 320,/, /transparent: true,[\s\S]*?\.\.\.windowRect\(bounds\)/] };
+  for (const s of creators) {
+    if (notScreens[s.file]) for (const re of notScreens[s.file]!) assert.match(s.text, re, `${s.file} : fenêtre qui n'est pas un écran`);
+    else assert.match(s.text, /coverDisplay\(/, `${s.file} crée une fenêtre sans coverDisplay`);
+  }
 });
 
 test('coverProblem : plein écran et écran couvert, ou l’écart en clair', () => {
