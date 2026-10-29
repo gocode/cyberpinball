@@ -33,10 +33,10 @@ import { spawnSync } from 'node:child_process';
 import { createHash, createPublicKey, createPrivateKey, sign, verify } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { formatNumber, language, t, type Language } from './i18n';
 import { UPDATE_PUBLIC_KEY } from './update-key';
+import { fetchResumable, ResumableError } from './resumable';
 
 /** Dépôt GitHub des releases ; le même que « repository » du package.json racine (vérifié par les tests). */
 export const UPDATE_REPOSITORY = 'gocode/cyberpinball';
@@ -425,32 +425,36 @@ async function downloadAsset(asset: UpdateAsset, file: string, opts: DownloadOpt
     return file;
   }
 
+  // Reçu sous « .part », repris là où il s'était arrêté après une coupure (resumable.ts).
   const part = `${file}.part`;
-  const get = opts.fetch ?? fetch;
-  let response: Response;
-  try {
-    response = await get(asset.url, { redirect: 'follow', signal: opts.signal });
-  } catch (error) {
-    if (opts.signal?.aborted) throw new Error(t('Téléchargement annulé.'));
-    throw new Error(t('Téléchargement impossible : {message}', { message: (error as Error).message }));
-  }
-  if (!response.ok || !response.body) throw new Error(t('Téléchargement impossible (HTTP {status}) : {url}', { status: response.status, url: asset.url }));
   const total = asset.size;
-  let received = 0;
-  const body = Readable.fromWeb(response.body as import('node:stream/web').ReadableStream);
-  body.on('data', (chunk: Buffer) => {
-    received += chunk.length;
-    opts.onProgress?.(received, total);
-  });
+  let got: Awaited<ReturnType<typeof fetchResumable>>;
   try {
-    await pipeline(body, fs.createWriteStream(part), { signal: opts.signal });
+    got = await fetchResumable({
+      url: asset.url,
+      part,
+      ...(opts.fetch ? { fetch: opts.fetch } : {}),
+      ...(opts.signal ? { signal: opts.signal } : {}),
+      size: total,
+      hashes: ['sha256'],
+      onData: (received) => opts.onProgress?.(received, total),
+    });
   } catch (error) {
-    fs.rmSync(part, { force: true });
-    if (opts.signal?.aborted) throw new Error(t('Téléchargement annulé.'));
+    const e = error instanceof ResumableError ? error : undefined;
+    if (opts.signal?.aborted || e?.reason === 'aborted') {
+      fs.rmSync(part, { force: true });
+      throw new Error(t('Téléchargement annulé.'));
+    }
+    if (e?.reason === 'http') {
+      fs.rmSync(part, { force: true });
+      throw new Error(t('Téléchargement impossible (HTTP {status}) : {url}', { status: e.status ?? 0, url: asset.url }));
+    }
+    // Coupure : le partiel reste, le prochain essai reprendra là.
+    if (e && !e.kept) fs.rmSync(part, { force: true });
     throw new Error(t('Téléchargement interrompu : {message}', { message: (error as Error).message }));
   }
-  const size = fs.statSync(part).size;
-  const actual = size === total ? await sha256File(part) : undefined;
+  const size = got.received;
+  const actual = size === total ? got.sha256 : undefined;
   if (actual !== asset.sha256) {
     fs.rmSync(part, { force: true });
     throw new Error(

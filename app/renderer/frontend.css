@@ -894,7 +894,7 @@ html.menu-desktop .menu-band .menu-frame.fronton {
   border: 1px solid var(--line-strong);
   border-radius: 0.3cqmin;
   background: var(--surface-raised);
-  font-size: 1.85cqmin;
+  font-size: 1.86cqmin;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -985,6 +985,85 @@ body.mouse .gear {
   background: var(--danger);
   box-shadow: 0 0 0 0.19cqmin var(--void);
   pointer-events: none;
+}
+
+/*
+ * Téléchargements en cours (menu des tables) : pastille opaque à gauche de la roue dentée,
+ * lisible sur n'importe quel média. Toujours 64 px de haut (petit côté de 1 080 px), haut à
+ * 8 px, texte et icône de 24 px, barre de 4 px sous le texte quand la part reçue est connue
+ * (revue de Codex, 29/10/2026). Bleu méta en cours, ambre en attente de la source, rouge
+ * bloqué, vert quand un téléchargement fini attend qu'on y revienne ; le mot le dit toujours.
+ */
+.downloads-pill {
+  position: absolute;
+  top: 0.74cqmin;
+  right: 9.3cqmin;
+  z-index: 100;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: auto auto;
+  align-content: center;
+  align-items: center;
+  column-gap: 0.9cqmin;
+  min-height: 5.93cqmin;
+  padding: 0 1.48cqmin;
+  font: inherit;
+  font-size: 2.22cqmin;
+  line-height: 1.15;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  background: var(--surface-raised);
+  border: 0.1cqmin solid var(--line-strong);
+  border-radius: 2.96cqmin;
+}
+
+body.mouse .downloads-pill {
+  cursor: pointer;
+}
+
+body.mouse .downloads-pill:hover {
+  border-color: var(--signal);
+  box-shadow: 0 0 0 0.18cqmin var(--signal);
+}
+
+.downloads-pill-icon {
+  font-size: 2.22cqmin;
+  color: var(--meta);
+}
+
+.downloads-pill.pill-warning .downloads-pill-icon {
+  color: var(--warning);
+}
+
+.downloads-pill.pill-error .downloads-pill-icon {
+  color: var(--danger);
+}
+
+.downloads-pill.pill-ok {
+  border-color: var(--signal);
+}
+
+.downloads-pill.pill-ok .downloads-pill-icon {
+  color: var(--signal);
+}
+
+.downloads-pill-bar {
+  grid-column: 1 / -1;
+  height: 0.37cqmin;
+  margin-top: 0.55cqmin;
+  border-radius: 0.2cqmin;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.downloads-pill-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--meta);
+}
+
+.downloads-pill.pill-warning .downloads-pill-bar > span {
+  background: var(--warning);
 }
 
 /*
@@ -1172,7 +1251,7 @@ html.power-phase body,
 
 .message p.log {
   font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 1.8cqmin;
+  font-size: 1.86cqmin;
   color: var(--quiet);
 }
 

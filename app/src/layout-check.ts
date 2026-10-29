@@ -272,6 +272,14 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     }
     if (!whole) problems.add('choix pas entier dans sa liste : ' + label(el).slice(0, 60));
   }
+  // Liste de contenu (cartes, lignes à choisir, lignes de la Santé) sur un écran qui a d'autres
+  // actions : dans son cadre, avec son repère (listzones.ts, library.js zoneFrame). Sans lui, Exit
+  // sort de la liste sans qu'on puisse le savoir.
+  for (const body of document.querySelectorAll('.lib-body')) {
+    if (!shown(body) || !body.querySelector('.lib-actions > .lib-action')) continue;
+    const loose = [...body.querySelectorAll('.lib-row.pick[data-act], .media-card[data-act], .health-line[data-act]')].find((el) => !el.closest('.lib-section.options') && !el.closest('.lib-zone')?.querySelector(':scope > .lib-zone-bar .lib-zone-tag'));
+    if (loose) problems.add('liste de contenu sans cadre ni repère : ' + label(loose).slice(0, 60));
+  }
   // Image chargée sans pixels, vidéo en erreur : l'écran montrerait un aperçu cassé.
   for (const img of document.images) if (img.complete && img.getAttribute('src') && img.naturalWidth === 0) problems.add('image non chargée : ' + img.getAttribute('src').slice(0, 120));
   for (const video of document.querySelectorAll('video')) if (video.error) problems.add('vidéo non chargée : ' + (video.getAttribute('src') || '').slice(0, 120));

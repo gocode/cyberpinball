@@ -378,7 +378,6 @@ export const messages: Record<string, string> = {
   'Aucune version publiée pour l’instant sur le site des mises à jour.': 'No version published on the update site yet.',
   'Le site des mises à jour répond HTTP {status}.': 'The update site answers HTTP {status}.',
   'Téléchargement annulé.': 'Download cancelled.',
-  'Téléchargement impossible : {message}': 'Download failed: {message}',
   'Téléchargement impossible (HTTP {status}) : {url}': 'Download failed (HTTP {status}): {url}',
   'Téléchargement interrompu : {message}': 'Download interrupted: {message}',
   'Téléchargement incomplet ({size} octets reçus sur {total}) : fichier supprimé.': 'Incomplete download ({size} of {total} bytes received): file deleted.',

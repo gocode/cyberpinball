@@ -1,4 +1,4 @@
-// Démonstration hors écran de l'écran « Téléchargements » et du sélecteur de fichiers de
+// Démonstration hors écran de l'écran « Fichiers téléchargés » (Téléchargements > Fichiers téléchargés) et du sélecteur de fichiers de
 // Cyber Pinball, sur un bac à sable : téléchargements de toutes provenances (« Récupérer »,
 // médias des sites, recherche web, VPinMediaDB, mise à jour, archive de VPX), liste
 // d'attente (un fichier à installer, une table installée, un fichier gardé de côté),
@@ -190,9 +190,11 @@ async function scenario(sc, box, report) {
     if (!cond) throw new Error(`${name} : ${what}`);
   };
 
-  // 1. Écran « Téléchargements » depuis le menu système.
+  // 1. Menu système > Téléchargements (le gestionnaire), puis « Fichiers téléchargés ».
   library.openSystem();
   await act(T('Téléchargements'));
+  await shot('gestionnaire');
+  await act(T('Fichiers téléchargés'));
   await shot('telechargements');
   expect(view().sections.flatMap((s) => s.rows).some((r) => r.text === 'mm_109c.zip' && r.note?.tone === 'warning' && r.note.sign === '!'), 'la ROM reçue n’est pas « À installer »');
   await key(KEYS.next[0], 2);
@@ -249,6 +251,7 @@ async function scenario(sc, box, report) {
   // 4. « Tout vider » : confirmation, curseur sur Annuler ; corbeille ; la liste d'attente suit.
   library.openSystem();
   await act(T('Téléchargements'));
+  await act(T('Fichiers téléchargés'));
   await act(T('Tout vider'));
   await shot('confirmation-vider');
   expect(view().actions[view().cursor].label === T('Annuler'), 'le curseur doit être sur Annuler');

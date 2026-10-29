@@ -10,6 +10,7 @@ import {
   SYSTEM_ITEM_IDS,
   SYSTEM_ITEMS,
   SYSTEM_ROOT,
+  SYSTEM_ROOT_ENTRIES,
   systemEntry,
   systemPathOf,
   type SystemEntryId,
@@ -107,10 +108,11 @@ function segments(rest: string): string[] {
 
 /** Erreur du chemin, ou undefined : chaque cran nomme une entrée de la rubrique où l'on est, jusqu'à une entrée qui ouvre son propre écran (ou une rubrique). */
 function checkPath(parts: string[]): string | undefined {
-  let at: readonly SystemEntryId[] = SYSTEM_ROOT;
+  // La racine telle qu'elle s'affiche : Téléchargements (raccourci), puis les rubriques.
+  let at: readonly SystemEntryId[] = SYSTEM_ROOT_ENTRIES;
   for (const part of parts) {
     const found = at.find((id) => namesOf(id).includes(norm(part)));
-    if (!found) return `« ${part} » n'est pas dans ${at === SYSTEM_ROOT ? 'les rubriques' : 'cette rubrique'} (${at.map((id) => systemEntry(id).label).join(', ')})`;
+    if (!found) return `« ${part} » n'est pas dans ${at === SYSTEM_ROOT_ENTRIES ? 'les rubriques' : 'cette rubrique'} (${at.map((id) => systemEntry(id).label).join(', ')})`;
     if (!isSystemGroup(found)) return undefined;
     at = SYSTEM_GROUPS[found].entries;
   }
@@ -148,7 +150,9 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.deepEqual(segments('« Borne » > « Configuration de la borne » > « Tilt » : Start…'), ['Borne', 'Configuration de la borne', 'Tilt']);
   assert.deepEqual(segments('"Borne" (Cabinet) > "Configuration de la borne" (Cabinet setup) > "Tilt" (`npm run`)'), ['Borne', 'Configuration de la borne', 'Tilt']);
   assert.deepEqual(segments('Borne > Configuration de la borne > Écran du DMD.'), ['Borne', 'Configuration de la borne', 'Écran du DMD']);
-  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Tables, Médias, Amis, Borne, Cyber Pinball)');
+  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Téléchargements, Tables, Médias, Amis, Borne, Cyber Pinball)');
+  assert.equal(checkPath(['Téléchargements']), undefined, 'Téléchargements, en tête de la racine');
+  assert.equal(checkPath(['Tables', 'Téléchargements']), undefined, 'et toujours dans Tables');
   assert.equal(checkPath(['Cyber Pinball', 'Language / Langue']), undefined);
   assert.equal(checkPath(['Cabinet', 'Cabinet setup', 'Tilt']), undefined);
 });

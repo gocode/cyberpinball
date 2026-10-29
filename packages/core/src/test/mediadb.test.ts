@@ -346,7 +346,7 @@ test('téléchargement : redirection suivie, MD5 vérifié, fichier renommé seu
   assert.deepEqual(fs.readdirSync(dir), ['wheel.png']);
 });
 
-test('téléchargement : MD5 faux, réponse 404, coupure au milieu ou silence : il ne reste rien', async () => {
+test('téléchargement : MD5 faux, réponse 404, silence ou abandon : il ne reste rien ; une coupure garde de quoi reprendre', async () => {
   const dir = tmp('echecs');
   const file = (p: string, sum?: string) => ({ url: `${base}${p}`, md5: sum ?? md5(FILES.get(p)!) });
   await assert.rejects(downloadMediaDbFile(file('/BunvWvh9/wheel.png', md5('autre chose')), path.join(dir, 'a.png')), (e: Error & { reason?: string }) => e.reason === 'md5');
@@ -354,7 +354,7 @@ test('téléchargement : MD5 faux, réponse 404, coupure au milieu ou silence : 
   behaviour.set('/BunvWvh9/flyer.png', 'cut');
   behaviour.set('/BunvWvh9/1k/bg.png', 'stall');
   try {
-    await assert.rejects(downloadMediaDbFile(file('/BunvWvh9/flyer.png'), path.join(dir, 'c.png')));
+    await assert.rejects(downloadMediaDbFile(file('/BunvWvh9/flyer.png'), path.join(dir, 'c.png')), (e: Error & { reason?: string }) => e.reason === 'network');
     await assert.rejects(downloadMediaDbFile(file('/BunvWvh9/1k/bg.png'), path.join(dir, 'd.png'), { stallMs: 150 }), (e: Error & { reason?: string }) => e.reason === 'network');
     const abort = new AbortController();
     const pending = downloadMediaDbFile(file('/BunvWvh9/1k/bg.png'), path.join(dir, 'e.png'), { signal: abort.signal });
@@ -363,7 +363,14 @@ test('téléchargement : MD5 faux, réponse 404, coupure au milieu ou silence : 
   } finally {
     behaviour.clear();
   }
-  assert.deepEqual(fs.readdirSync(dir), [], 'ni fichier partiel ni fichier invalide');
+  // La coupure et le silence (4 octets puis plus rien) ont laissé leur partiel ; l'abandon, le MD5 faux et la 404, rien.
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['c.png.part', 'd.png.part'], 'ni fichier invalide, ni partiel d’un abandon');
+  assert.ok(fs.statSync(path.join(dir, 'c.png.part')).size > 0);
+  // L'essai suivant le termine, vérifié en entier (ce serveur ne sait pas reprendre : il renvoie tout, sans doublon).
+  const got = await downloadMediaDbFile(file('/BunvWvh9/flyer.png'), path.join(dir, 'c.png'));
+  assert.equal(got.md5, md5(FILES.get('/BunvWvh9/flyer.png')!));
+  assert.deepEqual(fs.readFileSync(path.join(dir, 'c.png')), FILES.get('/BunvWvh9/flyer.png'));
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['c.png', 'd.png.part']);
 });
 
 test('poids : requêtes HEAD, gardés par MD5 dans downloads pour la fois suivante ; inconnus sans réseau', async () => {
@@ -484,17 +491,21 @@ test('rangement : un fichier qui échoue n’empêche pas les autres et ne laiss
   assert.deepEqual(Object.keys(sources).sort(), ['Audio', 'Wheel']);
 });
 
-test('réception : fichiers partiels d’un arrêt brutal et vieux aperçus effacés', () => {
+test('réception : vieux aperçus et vieux partiels effacés ; un partiel récent attend sa reprise', () => {
   const dir = tmp('reception');
   const now = new Date();
   fs.writeFileSync(path.join(dir, 'a.png.part'), 'x');
   fs.writeFileSync(path.join(dir, 'recent.png'), 'x');
   const old = path.join(dir, 'vieux.png');
   fs.writeFileSync(old, 'x');
+  const oldPart = path.join(dir, 'vieux.png.part');
+  fs.writeFileSync(oldPart, 'x');
   const yesterday = new Date(now.getTime() - 2 * 24 * 3600_000);
   fs.utimesSync(old, yesterday, yesterday);
+  fs.utimesSync(oldPart, yesterday, yesterday);
   cleanMediaDbStaging(dir, { now });
-  assert.deepEqual(fs.readdirSync(dir), ['recent.png']);
+  assert.deepEqual(fs.readdirSync(dir).sort(), ['a.png.part', 'recent.png']);
+  fs.rmSync(path.join(dir, 'a.png.part'));
   cleanMediaDbStaging(dir, { now, remove: [path.join(dir, 'recent.png')] });
   assert.deepEqual(fs.readdirSync(dir), []);
 });

@@ -43,6 +43,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Live game between friends, up to 4 cabinets: the invitation opens on the friend's cabinet on the same table (version checked), a 5-second countdown starts the game everywhere, then everyone sees the results.
 - A friend's name always follows their latest rename, and a pending friend request is sent again when the cabinets meet.
 - The Windows taskbar no longer shows over the DMD, backglass or playfield when you come back from a game: Cyber Pinball puts it straight back behind, and "Cabinet health" tells you if it had to.
+- Long lists: in a content list (games, media, files…), marked by its frame and the "Exit · Leave the list" cue, Exit takes you back to the screen's actions instead of leaving it; MagnaSave (F6 on the keyboard) switches between the two and keeps your place, and holding a flipper scrolls letter by letter.
+- Downloads, at the top of the system menu and as a pill on the tables menu: follows everything coming from sites and your friends, resumes by itself where it stopped if the connection drops, even the next day, and takes you back in one move to the screen you asked from.
 
 ## 0.1.3
 

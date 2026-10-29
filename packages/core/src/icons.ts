@@ -107,6 +107,10 @@ export const ICON_NAMES = [
   'friend-request',
   'medal',
   'network',
+  // Gestionnaire de téléchargements
+  'pause',
+  'globe',
+  'broom',
 ] as const;
 
 export type IconName = (typeof ICON_NAMES)[number];

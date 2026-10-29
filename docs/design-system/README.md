@@ -6,7 +6,7 @@ Langage visuel de Cyber Pinball : tokens, composants et maquettes d'écrans, dan
 
 ## Ouvrir et régénérer
 
-Ouvrir `index.html` : la page du design system (fondations, couleurs, typographie, espaces, 13 composants vivants avec leur code HTML, 10 écrans, dont « Ce qu’il manque pour jouer » en borne et au bureau, « Téléchargements » et le sélecteur de fichiers). `components/<Nom>/preview.html` montre un composant seul, à sa taille de référence. Ce sont des aperçus statiques, sans gestion des boutons de la borne. Les pages chargent Saira depuis Google Fonts ; sans réseau, elles retombent sur Segoe UI.
+Ouvrir `index.html` : la page du design system (fondations, couleurs, typographie, espaces, 15 composants vivants avec leur code HTML, 10 écrans, dont « Ce qu’il manque pour jouer » en borne et au bureau, « Téléchargements » et le sélecteur de fichiers). `components/<Nom>/preview.html` montre un composant seul, à sa taille de référence. Ce sont des aperçus statiques, sans gestion des boutons de la borne. Les pages chargent Saira depuis Google Fonts ; sans réseau, elles retombent sur Segoe UI.
 
 Depuis la racine du dépôt, avec Node 22 ou plus :
 
@@ -57,6 +57,8 @@ Les valeurs sont définies pour un petit côté de 1080 px. Dans Electron, conve
 Marges extérieures 48 à 64 px, panneaux 32 à 40 px ; lignes de réglage de 68 à 76 px selon la densité. La fiche utilise deux rangées de trois onglets au lieu de réduire leurs libellés.
 
 Une liste seule (menu système, rubriques) part juste sous l’en-tête, avec le même écart sur chaque écran ; elle est centrée en largeur, jamais en hauteur. Une liste plus haute que sa zone défile : un filet `--line-strong` de 3 px à la référence marque le bord derrière lequel il reste des entrées, en haut comme en bas. Jamais de fondu sur une liste : la ligne du bord passerait pour désactivée. L’entrée choisie est toujours entière dans la vue.
+
+Une liste de contenu (jeux, médias, fichiers) à côté des actions de l’écran est une zone à part (`ListeContenu`) : un cadre, un bandeau qui ne défile pas avec la position du choix et le repère « Exit · Sortir de la liste » (« MagnaSave · Revenir à la liste » hors d’elle). Le cadre de la zone du choix s’éclaire en sarcelle, l’autre zone passe à 0,8 d’opacité ; le vert reste à l’élément choisi. Exit dans la liste ramène aux actions, MagnaSave bascule.
 
 ## États et interaction à intégrer dans le prototype
 

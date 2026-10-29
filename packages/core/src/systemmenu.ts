@@ -65,6 +65,16 @@ export interface SystemGroup extends SystemEntry {
 /** Rubriques du menu système, dans l'ordre. */
 export const SYSTEM_ROOT: readonly SystemGroupId[] = ['tables', 'medias', 'amis', 'borne', 'cyberpinball'];
 
+/**
+ * Entrées montrées aussi à la racine, avant les rubriques : Téléchargements, à un geste du menu
+ * des tables (Exit puis Start), comme le gestionnaire de téléchargements d'une console. Elles
+ * gardent leur place dans leur rubrique (Tables > Téléchargements).
+ */
+export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['downloads'];
+
+/** La racine du menu système telle qu'elle s'affiche : ses raccourcis, puis les rubriques. */
+export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = [...SYSTEM_ROOT_SHORTCUTS, ...SYSTEM_ROOT];
+
 export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   tables: {
     id: 'tables',

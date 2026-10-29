@@ -29,6 +29,13 @@
 // et Annuler. Les téléchargements sont relevés quatre fois par seconde, pas à chaque paquet.
 // À la borne : Start désigne le dernier téléchargement, les flippers en choisissent un autre,
 // Start de nouveau l'annule ; Exit (ou Échap) renonce sans fermer la fenêtre.
+//
+// Gestionnaire de téléchargements (packages/core/src/downloadmanager.ts) : chaque téléchargement
+// de la session y est suivi (events.track) avec ce qu'il faut pour le reprendre (adresses
+// traversées, ETag, date, taille). Une coupure brève, Chromium la reprend seul (requête Range) ;
+// une coupure longue (site arrêté, réseau perdu) laisse le partiel au chemin d'enregistrement, et
+// le gestionnaire le reprend plus tard par siteTransport : le même téléchargement s'il vit encore
+// (resume), sinon, après un redémarrage, recréé depuis son état (createInterruptedDownload).
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -63,6 +70,10 @@ import {
   type SourceSite,
   type TransferMeter,
   type TransferProgress,
+  type DownloadReturn,
+  type DownloadTransport,
+  type TrackedDownload,
+  type TransportResult,
 } from '@cyberpinball/core';
 import { setCursorPosition } from '@cyberpinball/win-displays';
 import { coverDisplay, fillBelow } from './cover-display';
@@ -121,6 +132,10 @@ export interface AcquireRequest {
  */
 export interface DownloadClaim {
   dir: string;
+  /** Écran d'où le média a été demandé : le gestionnaire de téléchargements y ramène. */
+  back?: DownloadReturn;
+  /** Nom du téléchargement dans le gestionnaire (« Vidéo du plateau : Medieval Madness »). */
+  title?: string;
   /** Arrêt demandé par l'utilisateur : le téléchargement en cours est annulé. */
   signal?: AbortSignal;
   /** Progression, deux fois par seconde au plus (débit lissé, temps restant : transfer.ts). */
@@ -147,6 +162,13 @@ export interface AcquireEvents {
   screen?(): { bounds: Rectangle; notice?: string } | undefined;
   /** Touches qui ferment la fenêtre comme Échap : Exit de la borne (touche ou bouton de joystick). */
   exitKeys?(): string[];
+  /**
+   * Un téléchargement commence : il entre dans le gestionnaire de téléchargements, qui le
+   * reprendra après une coupure (siteTransport). Sans lui, rien n'est suivi ni repris.
+   */
+  track?(download: { filename: string; target: string; url: string; host: string; total?: number; claim?: DownloadClaim }): TrackedDownload;
+  /** Une récupération par yt-dlp commence : suivie dans le gestionnaire (yt-dlp la fait, elle ne se reprend pas d'ailleurs). */
+  trackGrab?(grab: { label: string; url: string; host: string; out: string; claim: DownloadClaim }): TrackedDownload;
   /** Nom Windows de la sortie audio de la borne (celle du menu) ; absent : sortie par défaut. */
   audioOutput?(): string | undefined;
   /** Boutons de l'interface qui annulent un téléchargement à la borne : Valider (Start), Précédent et Suivant (flippers). */
@@ -192,6 +214,15 @@ export interface AcquireOpen {
   lastSearch?: { query: string; engine: WebEngine };
 }
 
+/** Hôte d'une adresse, sans « www. » : la source d'un téléchargement dans le gestionnaire. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./i, '');
+  } catch {
+    return url;
+  }
+}
+
 /** Nom libre dans `dir` : « table.zip », sinon « table (2).zip ». */
 function freeName(dir: string, name: string): string {
   const safe = name.replace(/[<>:"/\\|?*\x00-\x1f]/g, '_').slice(0, 180) || 'fichier';
@@ -230,6 +261,12 @@ export function createAcquirer(events: AcquireEvents) {
     // Un navigateur ordinaire : sans les mentions de l'application et d'Electron, que des sites refusent.
     s.setUserAgent(s.getUserAgent().replace(/\s(cyberpinball|Electron)\/\S+/gi, ''));
     s.on('will-download', (_event, item, contents) => {
+      // Reprise d'un téléchargement recréé depuis son état (redémarrage) : son chemin est déjà posé.
+      const resumed = resumeWaiters.get(item.getSavePath().toLowerCase());
+      if (resumed) {
+        resumeWaiters.delete(item.getSavePath().toLowerCase());
+        return resumed(item);
+      }
       const id = contents?.id ?? -1;
       // Téléchargement direct : la vue cachée qui l'a déclenché l'attend.
       directWaiters.get(id)?.(item);
@@ -249,17 +286,21 @@ export function createAcquirer(events: AcquireEvents) {
       const tracked = track(item, filename, (progress) => (claim ? claim.progress?.(progress) : events.progress(filename, progress)));
       // Le site n'annonce pas la taille : celle qu'affiche sa page, à défaut.
       if (contents && !item.getTotalBytes()) void expectedFrom(contents, filename).then((bytes) => (tracked.expected = bytes));
+      // Le gestionnaire de téléchargements le suit ; il le reprendra après une coupure longue.
+      const job = events.track?.({ filename, target, url: item.getURL(), host: hostOf(item.getURL()), ...(item.getTotalBytes() ? { total: item.getTotalBytes() } : {}), ...(claim ? { claim } : {}) });
+      tracked.job = job;
+      if (job) {
+        siteJobs.set(job.id, { item, target, filename, claim, visible });
+        follow(item, job);
+      }
       item.once('done', (_e, state) => {
         untrack(item);
         if (state === 'completed') {
-          if (claim) {
-            if (visible) setStatus(t('Reçu : {file}, rendu aux propositions du média. Fermer (Échap) pour revenir.', { file: filename }));
-            claim.done({ file: target, filename, urls: item.getURLChain() });
-            return;
-          }
-          setStatus(t('Reçu : {file}, rangé dans la liste d’attente. Fermer (Échap) pour revenir, ou téléchargez autre chose.', { file: filename }));
-          events.received(target, { urls: item.getURLChain(), filename });
+          job?.done([{ index: 0, file: target }]);
+          deliver(target, filename, item.getURLChain(), claim, visible);
         } else {
+          if (state === 'cancelled') job?.cancel();
+          else job?.fail('login', t('le site a refusé la reprise'));
           if (!claim || visible) setStatus(state === 'cancelled' ? t('Téléchargement annulé : {file}', { file: filename }) : t('Téléchargement interrompu : {file}', { file: filename }), true);
           fs.rmSync(target, { force: true });
           const error = state === 'cancelled' ? 'cancelled' : 'interrupted';
@@ -272,9 +313,122 @@ export function createAcquirer(events: AcquireEvents) {
     return s;
   }
 
+  /** Fichier reçu en entier : rendu au média qui l'attendait, sinon à la liste d'attente. */
+  function deliver(target: string, filename: string, urls: string[], claim: DownloadClaim | undefined, visible: boolean): void {
+    if (claim) {
+      if (visible) setStatus(t('Reçu : {file}, rendu aux propositions du média. Fermer (Échap) pour revenir.', { file: filename }));
+      claim.done({ file: target, filename, urls });
+      return;
+    }
+    if (open) setStatus(t('Reçu : {file}, rangé dans la liste d’attente. Fermer (Échap) pour revenir, ou téléchargez autre chose.', { file: filename }));
+    events.received(target, { urls, filename });
+  }
+
+  /** Téléchargements de pages suivis par le gestionnaire, par identifiant : de quoi le reprendre dans cette session. */
+  const siteJobs = new Map<string, { item?: DownloadItem; target: string; filename: string; claim?: DownloadClaim; visible: boolean }>();
+  /** Téléchargements recréés après un redémarrage, attendus par leur chemin dans will-download. */
+  const resumeWaiters = new Map<string, (item: DownloadItem) => void>();
+
+  /** État d'un téléchargement de Chromium, de quoi le recréer après un redémarrage (createInterruptedDownload). */
+  function resumeState(item: DownloadItem): Record<string, unknown> {
+    return { electron: { urlChain: item.getURLChain(), mimeType: item.getMimeType(), length: item.getTotalBytes(), lastModified: item.getLastModifiedTime(), eTag: item.getETag(), startTime: item.getStartTime() } };
+  }
+
+  /**
+   * Coupure longue (site arrêté, réseau perdu) : le partiel reste, l'état est gardé, le gestionnaire
+   * attend et reprendra. Pause ou annulation demandées dans le gestionnaire : le téléchargement suit.
+   */
+  function follow(item: DownloadItem, job: TrackedDownload): void {
+    job.remember(resumeState(item));
+    item.on('updated', (_e, state) => {
+      if (state !== 'interrupted' || !item.canResume()) return;
+      job.remember(resumeState(item));
+      job.fail('network', t('la connexion au site a été perdue'));
+    });
+    job.signal.addEventListener(
+      'abort',
+      () => {
+        if (item.getState() !== 'progressing') return;
+        // Annulé dans le gestionnaire : le téléchargement s'arrête net (Chromium efface son partiel) ; en pause, il garde ses octets.
+        if (job.signal.reason === 'cancel') item.cancel();
+        else item.pause();
+      },
+      { once: true },
+    );
+  }
+
+  /**
+   * Reprise d'une page de site par le gestionnaire : le même téléchargement s'il vit encore dans
+   * cette session, sinon recréé depuis son état gardé, au chemin de son partiel. Rendu comme un
+   * téléchargement ordinaire à la fin (média, liste d'attente).
+   */
+  const siteTransport: DownloadTransport = {
+    available: () => true,
+    fetch: ({ job, file, from, signal, progress, remember }) =>
+      new Promise<TransportResult>((resolve) => {
+        const known = siteJobs.get(job.id);
+        const run = (item: DownloadItem) => {
+          const entry = siteJobs.get(job.id) ?? { target: file.part, filename: path.basename(file.part), visible: false };
+          siteJobs.set(job.id, { ...entry, item });
+          const tick = setInterval(() => progress(item.getReceivedBytes(), item.getTotalBytes() || undefined), SAMPLE_MS);
+          let settled = false;
+          const end = (result: TransportResult) => {
+            if (settled) return;
+            settled = true;
+            clearInterval(tick);
+            item.off('updated', onUpdated);
+            resolve(result);
+          };
+          const onUpdated = (_e: Electron.Event, state: string) => {
+            if (state === 'interrupted') {
+              remember(resumeState(item));
+              end(item.canResume() ? { ok: false, reason: 'network', detail: t('la connexion au site a été perdue') } : { ok: false, reason: 'login' });
+            }
+          };
+          item.on('updated', onUpdated);
+          item.once('done', (_e, state) => {
+            if (state === 'completed') {
+              deliver(item.getSavePath(), entry.filename, item.getURLChain(), entry.claim, false);
+              end({ ok: true, file: item.getSavePath(), bytes: item.getReceivedBytes() });
+            } else end({ ok: false, reason: state === 'cancelled' ? 'network' : 'login', detail: t('le site a refusé la reprise') });
+          });
+          signal.addEventListener(
+            'abort',
+            () => {
+              if (item.getState() === 'progressing') {
+                if (signal.reason === 'cancel') item.cancel();
+                else item.pause();
+              }
+              end({ ok: false, reason: 'network' });
+            },
+            { once: true },
+          );
+          item.resume();
+        };
+        if (known?.item && (known.item.isPaused() || known.item.getState() === 'interrupted') && known.item.canResume()) return run(known.item);
+        const state = file.meta?.electron as { urlChain?: string[]; mimeType?: string; length?: number; lastModified?: string; eTag?: string; startTime?: number } | undefined;
+        if (!state?.urlChain?.length || !from) return resolve({ ok: false, reason: 'login', detail: t('il faut rouvrir la page du site') });
+        resumeWaiters.set(file.part.toLowerCase(), run);
+        acquireSession().createInterruptedDownload({
+          path: file.part,
+          urlChain: state.urlChain,
+          mimeType: state.mimeType ?? '',
+          offset: from,
+          length: state.length ?? 0,
+          lastModified: state.lastModified ?? '',
+          eTag: state.eTag ?? '',
+          startTime: state.startTime ?? 0,
+        });
+        // Rien en retour (session fermée, état refusé) : on n'attend pas indéfiniment.
+        setTimeout(() => {
+          if (resumeWaiters.delete(file.part.toLowerCase())) resolve({ ok: false, reason: 'network' });
+        }, 15_000).unref?.();
+      }),
+  };
+
   /** Téléchargements en cours de la session, par ordre d'arrivée. */
   /** Un téléchargement suivi ; `expected` : la taille lue sur sa page, quand le site ne l'annonce pas. */
-  type Tracked = { id: number; item: DownloadItem; filename: string; meter: TransferMeter; progress: TransferProgress; report(p: TransferProgress): void; expected?: number };
+  type Tracked = { id: number; item: DownloadItem; filename: string; meter: TransferMeter; progress: TransferProgress; report(p: TransferProgress): void; expected?: number; job?: TrackedDownload };
   const downloads = new Map<number, Tracked>();
 
   /** Tailles affichées par la dernière page chargée de chaque vue (fenêtre visible, téléchargement direct). */
@@ -347,7 +501,10 @@ export function createAcquirer(events: AcquireEvents) {
         continue;
       }
       d.progress = d.meter.update(d.item.getReceivedBytes(), total, Date.now(), approx);
-      if (report) d.report(d.progress);
+      if (report) {
+        d.report(d.progress);
+        d.job?.progress(d.progress.received, announced || undefined);
+      }
     }
     if (armed && Date.now() > armed.until) armed = undefined;
     sendBar();
@@ -480,6 +637,8 @@ export function createAcquirer(events: AcquireEvents) {
     grabs.set(grab.id, grab);
     setStatus(first ? t('Première fois : yt-dlp se télécharge depuis GitHub (18 Mo, vérifié), puis récupère {what}…', { what }) : t('yt-dlp récupère {what} de la page…', { what }));
     const out = path.join(claim.dir, `yt-dlp-${Date.now().toString(36)}`);
+    const job = events.trackGrab?.({ label: grab.label, url: video.url, host: hostOf(video.url), out, claim });
+    job?.signal.addEventListener('abort', () => grab.stop.abort(), { once: true });
     void events.grabVideo
       .grab({
         url: video.url,
@@ -490,7 +649,10 @@ export function createAcquirer(events: AcquireEvents) {
           if (p.phase !== grab.phase) grab.meter = createTransferMeter();
           grab.phase = p.phase;
           grab.progress = grab.meter.update(p.received, p.total, Date.now(), p.approx);
-          if (p.phase === 'download') claim.progress?.(grab.progress);
+          if (p.phase === 'download') {
+            claim.progress?.(grab.progress);
+            job?.progress(p.received, p.total);
+          }
           // Redessiné quatre fois par seconde au plus, comme les téléchargements.
           grabRedraw ??= setTimeout(() => {
             grabRedraw = undefined;
@@ -501,6 +663,9 @@ export function createAcquirer(events: AcquireEvents) {
       .then((result) => {
         grabs.delete(grab.id);
         if (armed?.id === grab.id) armed = undefined;
+        if (result.ok) job?.done([{ index: 0, file: result.file }]);
+        else if (result.cancelled) job?.cancel();
+        else job?.fail('http', result.reason);
         if (result.ok) {
           const filename = path.basename(result.file);
           if (open && contents === open.view.webContents) setStatus(t('Reçu : {file}, vérifié puis proposé pour le média. Fermer (Échap) pour le voir.', { file: filename }));
@@ -1080,6 +1245,8 @@ export function createAcquirer(events: AcquireEvents) {
     isOpen: () => Boolean(open && !open.win.isDestroyed()),
     /** Rouvrir la fenêtre sur cette page de départ reprendrait là où l'utilisateur en était. */
     resumable: (url: string) => Boolean((open && !open.win.isDestroyed() && open.request.url === url) || kept?.url === url),
+    /** Transport des pages de site pour le gestionnaire de téléchargements : reprise d'un téléchargement coupé. */
+    siteTransport,
     /** Pour les essais : fenêtre et page affichées. */
     current: () => open,
   };

@@ -185,3 +185,5 @@ if ($Partie) {
     "  $(Get-Date -Format HH:mm:ss) playfield rouvert"
   } }
 }
+# Jonction vers les vrais émulateurs retirée (docs\hors-ecran.ps1).
+Remove-JonctionsSortantes

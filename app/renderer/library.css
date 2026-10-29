@@ -344,7 +344,7 @@ body.mouse .lib-back:hover {
   border: 1px solid var(--line-strong);
   border-radius: 0.3cqmin;
   background: var(--surface-raised);
-  font-size: 1.85cqmin;
+  font-size: 1.86cqmin;
   font-weight: 600;
   color: var(--quiet);
   white-space: nowrap;
@@ -385,6 +385,130 @@ body.mouse .lib-back:hover {
 .lib-actions.more-below,
 .lib-content.more-below {
   border-bottom-color: var(--line-strong);
+}
+
+/*
+ * Liste de contenu d'un écran à deux zones (library.js, zoneFrame ; listzones.ts) : jeux, médias,
+ * fichiers, téléchargements, bibliothèque d'un ami. Un cadre à elle, un bandeau hors de ce qui
+ * défile : la position du choix à gauche, le repère à droite (« Exit · Sortir de la liste » tant
+ * qu'on y est, « MagnaSave · Revenir à la liste » sinon). La zone du choix a son cadre éclairé en
+ * sarcelle ; l'autre s'éteint un peu, sans jamais passer sous le contraste d'un texte secondaire.
+ * Un seul focus : le vert reste à l'élément choisi.
+ */
+.lib-zone {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 0.2cqmin solid var(--line-soft);
+  border-radius: 0.8cqmin;
+  background: rgba(7, 17, 15, 0.55);
+}
+
+.lib-zone.active {
+  border-color: var(--halo);
+  box-shadow: var(--halo-panel);
+}
+
+.lib-zone > .lib-content {
+  flex: 1 1 auto;
+  padding: 0.6cqmin 1cqmin 1cqmin 1.2cqmin;
+}
+
+.lib-zone-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 1.6cqmin;
+  min-height: 5.2cqmin;
+  padding: 0.6cqmin 1.2cqmin 0.6cqmin 1.8cqmin;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 2cqmin;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.lib-zone-count b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.lib-zone-count .of {
+  margin-left: 0.4em;
+}
+
+/* Initiale du saut par lettre (flipper tenu sur une liste triée par nom). */
+.lib-zone-letter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.2cqmin;
+  height: 4.2cqmin;
+  border: 0.2cqmin solid var(--halo);
+  border-radius: 0.5cqmin;
+  font-size: 2.8cqmin;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.lib-zone-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 1cqmin;
+  margin-left: auto;
+  min-width: 0;
+  font-size: 2cqmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--ink-muted);
+}
+
+.lib-zone-tag-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.lib-zone.active .lib-zone-tag {
+  color: var(--ink);
+}
+
+.lib-zone-tag .lib-keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.7cqmin;
+  height: 3.4cqmin;
+  padding: 0 0.9cqmin;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.3cqmin;
+  background: var(--surface-raised);
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--ink);
+}
+
+.lib-zone.active .lib-zone-tag .lib-keycap {
+  border-color: var(--halo);
+}
+
+body.mouse .lib-zone-tag:hover {
+  color: var(--ink);
+}
+
+/* La zone qui n'a pas le choix s'éteint un peu : assez pour se distinguer, jamais au point de paraître indisponible (revue de Codex, 29/10/2026). */
+.lib-zone.idle > .lib-content,
+.lib-body.zone-list .lib-actions {
+  opacity: 0.8;
+}
+
+/* Le bandeau garde ses repères entiers, même quand le texte du repère doit se couper. */
+.lib-zone-count,
+.lib-zone-letter,
+.lib-zone-tag .lib-keycap {
+  flex-shrink: 0;
 }
 
 /* Entrée de menu : capitales espacées ; la choisie est un aplat vert signal, texte sombre. */
@@ -476,7 +600,7 @@ body.mouse .lib-back:hover {
   align-items: center;
   gap: 0.6cqmin;
   margin-left: 1.6cqmin;
-  font-size: 1.85cqmin;
+  font-size: 1.86cqmin;
   font-weight: 600;
   letter-spacing: 0.04em;
   color: var(--quiet);
@@ -793,7 +917,7 @@ body.mouse .media-card[data-act]:hover {
   justify-content: center;
   padding: 1vmin;
   text-align: center;
-  font-size: 1.85vmin;
+  font-size: 1.86vmin;
   line-height: 1.3;
   color: var(--quiet);
   word-break: break-word;
@@ -865,6 +989,48 @@ body.mouse .media-card[data-act]:hover {
 
 .badge.media-state.tone-quiet {
   color: var(--ink-muted);
+}
+
+/*
+ * Téléchargements : la barre d'un téléchargement, sous sa ligne de faits. 8 px de haut à l'échelle
+ * d'un petit côté de 1 080 px, pour se lire de loin sur la borne. En cours : bleu méta ; fini :
+ * vert ; en attente de la source ou en pause : ambre ; échec : rouge. Taille inconnue : hachures
+ * fixes (rien ne bouge sans geste, sauf ce qui est reçu).
+ */
+.lib-row-progress {
+  height: 0.74cqmin;
+  margin: 0.8cqmin 0 0.2cqmin;
+  border-radius: 0.37cqmin;
+  background: var(--line-soft);
+  overflow: hidden;
+}
+
+.lib-row-progress > span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--meta);
+}
+
+.lib-row-progress.tone-ok > span {
+  background: var(--ok);
+}
+
+.lib-row-progress.tone-warning > span {
+  background: var(--warning);
+}
+
+.lib-row-progress.tone-error > span {
+  background: var(--error);
+}
+
+.lib-row-progress.tone-quiet > span {
+  background: var(--ink-faint);
+}
+
+.lib-row-progress.unknown > span {
+  width: 100%;
+  background: repeating-linear-gradient(135deg, var(--line-strong) 0 1.1cqmin, transparent 1.1cqmin 2.2cqmin);
 }
 
 /* Attente d'un site ou téléchargement en cours : barre sous les faits. */
@@ -969,7 +1135,8 @@ body.mouse .media-card[data-act]:hover {
   gap: 1.2vmin;
 }
 
-.lib-gallery > .lib-content {
+.lib-gallery > .lib-content,
+.lib-gallery > .lib-zone {
   flex: 1 1 auto;
 }
 
@@ -1504,7 +1671,8 @@ body.mouse .journey-step.fixable:hover {
   min-height: 0;
 }
 
-.lib-body.lib-health > .health {
+.lib-body.lib-health > .health,
+.lib-body.lib-health > .lib-zone > .health {
   /* Bilan sur deux rangées ; marge réservée au scrollIntoView existant.
    * À recalculer si son contenu dépasse deux rangées (autre langue, etc.). */
   --health-summary-clearance: 13.5cqmin;
@@ -1523,7 +1691,8 @@ body.mouse .journey-step.fixable:hover {
 
 /* Le bilan, accroché en haut, dit déjà ce qui précède : pas de filet au-dessus de lui.
  * Le filet du bas (.lib-content.more-below) garde le signal de continuation de la liste. */
-.lib-body.lib-health > .health.more-above {
+.lib-body.lib-health > .health.more-above,
+.lib-body.lib-health > .lib-zone > .health.more-above {
   border-top-color: transparent;
 }
 
@@ -1819,7 +1988,7 @@ body.mouse .lib-health .health-line:not(.selected):hover {
   position: absolute;
   top: 1cqmin;
   left: 1.4cqmin;
-  font-size: 1.85cqmin;
+  font-size: 1.86cqmin;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1834,7 +2003,7 @@ body.mouse .lib-health .health-line:not(.selected):hover {
   justify-content: center;
   background: #000;
   border: 0.19cqmin solid var(--line-strong);
-  font-size: 1.85cqmin;
+  font-size: 1.86cqmin;
   font-weight: 700;
   letter-spacing: 0.16em;
   color: var(--ink);

@@ -50,6 +50,9 @@ import {
   type Layout,
   type MediaDb,
   type MediaDbChoice,
+  type MediaDbInstallResult,
+  type DownloadManager,
+  mediaDbStagedFile,
   type MediaDbMatch,
   type MediaDbOffer,
   type MediaDbProposal,
@@ -85,6 +88,8 @@ export interface MediaDownloadContext {
   prompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
   /** « Chercher sur le web… » pour les médias de cette table (catalog.ts) ; `back` redessine l'écran. */
   webGame?(table: TableEntry, back: () => void): Action;
+  /** Gestionnaire de téléchargements : chaque plan appliqué y est suivi, une coupure s'y reprend. */
+  downloads?: DownloadManager;
 }
 
 /** Ce que VPinMediaDB propose à une table, et ce que l'utilisateur en retient. */
@@ -586,18 +591,46 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
     };
   }
 
+  /**
+   * Le plan d'une table dans la file des téléchargements : suivi pendant que cet écran télécharge.
+   * Une coupure garde ses partiels ; « Revenir à Médias du jeu » puis le même plan les reprend.
+   */
+  function trackInstall(table: TableEntry, choices: MediaDbChoice[]) {
+    const files = choices.map((c) => ({ ref: c.offer.file.url, name: mediaTypeInfo(c.offer.type).label, dest: mediaDbStagedFile(staging(), c.offer.file), part: `${mediaDbStagedFile(staging(), c.offer.file)}.part` }));
+    const job = ctx.downloads?.track({ id: `mediadb-${table.file.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(-60)}`, kind: 'mediadb', title: t('Médias de VPinMediaDB : {table}', { table: table.title }), source: { kind: 'http', label: MEDIADB_NAME }, files, back: { screen: 'table-medias', table: table.file }, resumable: true });
+    const got = new Map<number, number>();
+    const sizes = new Map<number, number>();
+    return {
+      progress(p: { index: number; received: number; size?: number }) {
+        got.set(p.index, p.received);
+        if (p.size) sizes.set(p.index, p.size);
+        const sum = (m: Map<number, number>) => [...m.values()].reduce((n, x) => n + x, 0);
+        job?.progress(sum(got), sizes.size === choices.length ? sum(sizes) : undefined);
+      },
+      finish(result: MediaDbInstallResult) {
+        if (result.failed.some((f) => f.cut)) job?.fail('network', result.failed.map((f) => f.reason).join(' ; '));
+        else if (result.failed.length && !result.installed.length) job?.fail('http', result.failed.map((f) => f.reason).join(' ; '));
+        else job?.done();
+      },
+    };
+  }
+
   function applyTable(o: Offer, mode: PlanMode): void {
     void ctx.task(t('Téléchargement depuis VPinMediaDB…'), async () => {
       const table = ctx.find(o.file);
       if (!table) return mode.back({ text: t('Cette table n’existe plus.'), tone: 'error' });
       const trashDir = trashDirFor(ctx.layout()!.trash, `Médias ${path.basename(table.folder)} (VPinMediaDB)`); // i18n-ignore : nom de dossier de la corbeille
-      const result = await installMediaDb(table, choicesOf(o), {
+      const choices = choicesOf(o);
+      const job = trackInstall(table, choices);
+      const report = progressReporter((step) => t('Téléchargement : {step}', { step }));
+      const result = await installMediaDb(table, choices, {
         infoFile: infoFileFor(table, ctx.tablesDir()),
         trashDir,
         stagingDir: staging(),
         entry: entryOf(o).entry,
-        onProgress: progressReporter((step) => t('Téléchargement : {step}', { step })),
+        onProgress: (p) => (report(p), job.progress(p)),
       });
+      job.finish(result);
       forget([o]);
       host.reload(table.file);
       const ok = result.installed.length;
@@ -826,13 +859,17 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       for (const [i, o] of active.entries()) {
         const table = ctx.find(o.file);
         if (!table) continue;
-        const result = await installMediaDb(table, choicesOf(o), {
+        const choices = choicesOf(o);
+        const job = trackInstall(table, choices);
+        const report = progressReporter((step) => t('Table {i} sur {total}, {title} : {step}', { i: i + 1, total: active.length, title: o.title, step }));
+        const result = await installMediaDb(table, choices, {
           infoFile: infoFileFor(table, ctx.tablesDir()),
           trashDir,
           stagingDir: staging(),
           entry: entryOf(o).entry,
-          onProgress: progressReporter((step) => t('Table {i} sur {total}, {title} : {step}', { i: i + 1, total: active.length, title: o.title, step })),
+          onProgress: (p) => (report(p), job.progress(p)),
         });
+        job.finish(result);
         installed += result.installed.length;
         trashed += result.installed.reduce((n, x) => n + x.trashed.length, 0);
         bytes += result.installed.reduce((n, x) => n + x.size, 0);
@@ -921,13 +958,16 @@ export function createMediaDownload(ctx: MediaDownloadContext) {
       const o = prepare(table, match, 0, true);
       const choices = choicesOf(o);
       if (!choices.length) continue;
+      const job = trackInstall(table, choices);
+      const report = progressReporter((step) => t('Médias de VPinMediaDB, table {i} sur {total}, {title} : {step}', { i: i + 1, total: tables.length, title: table.title, step }));
       const result = await installMediaDb(table, choices, {
         infoFile: infoFileFor(table, ctx.tablesDir()),
         trashDir,
         stagingDir: staging(),
         entry: entryOf(o).entry,
-        onProgress: progressReporter((step) => t('Médias de VPinMediaDB, table {i} sur {total}, {title} : {step}', { i: i + 1, total: tables.length, title: table.title, step })),
+        onProgress: (p) => (report(p), job.progress(p)),
       });
+      job.finish(result);
       out.tables++;
       out.installed += result.installed.length;
       out.bytes += result.installed.reduce((n, x) => n + x.size, 0);

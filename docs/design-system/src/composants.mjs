@@ -87,6 +87,31 @@ C.LigneMenu = {
 </ul>`),
 };
 
+const zoneRows = (names, focus) => names.map((n) => `<li${n === focus ? ' class="is-focus"' : ''}>${n}<small>table installée</small></li>`).join('');
+const zoneDemo = (active) => `
+<div style="display:grid;grid-template-columns:580px 440px;gap:40px;align-items:start">
+  <section class="cp-zone ${active ? 'is-active' : 'is-idle'}">
+    <header class="cp-zone-bar">${active ? '<span><b>17</b> / 37</span><span class="cp-zone-letter">L</span>' : '<span>37 éléments</span>'}<span class="cp-zone-tag"><span class="cp-cap">${active ? 'Exit' : 'MagnaSave'}</span>${active ? 'Sortir de la liste' : 'Revenir à la liste'}</span></header>
+    <ul class="cp-zone-list">${zoneRows(['Iron Lagoon', 'Jade Express', 'Kestrel Peak', 'Lantern Bay'], active ? 'Lantern Bay' : '')}</ul>
+  </section>
+  <ul class="cp-menu${active ? ' is-dimmed' : ''}">
+    <li class="cp-menu-item">${i('link')}<span>Chercher sur le web…</span></li>
+    <li class="cp-menu-item${active ? '' : ' is-focus'}">${i('back')}<span>Retour</span></li>
+  </ul>
+</div>`;
+
+C.ListeContenu = {
+  readme: `La liste de contenu d'un écran (jeux, médias, fichiers, téléchargements, bibliothèque d'un ami) : une zone à part des actions de l'écran, dans son cadre, avec son repère.
+
+- Fournir : \`.cp-zone\` (\`.is-active\` quand le choix y est, \`.is-idle\` sinon) avec \`.cp-zone-bar\` puis la liste qui défile (\`.cp-zone-list\`, un \`.is-focus\` au plus). Le bandeau ne défile pas.
+- Bandeau : à gauche la position du choix (« **17** / 37 ») ou, hors de la liste, le nombre d'éléments ; l'initiale \`.cp-zone-letter\` pendant un saut par lettre (flipper tenu sur une liste triée par nom) ; à droite le repère \`.cp-zone-tag\` : touche cerclée et effet, « Exit · Sortir de la liste » dans la liste, « MagnaSave · Revenir à la liste » sinon. Aucun intitulé de plus.
+- Zone du choix : cadre \`halo\` et \`halo-panel\`. L'autre zone à 0,8 d'opacité (\`.is-idle\`, \`.cp-menu.is-dimmed\`) : distincte, jamais au point de paraître indisponible. Un seul focus : le vert reste à l'élément choisi ; le repère n'est jamais vert.
+- Comportement (\`packages/core/src/listzones.ts\`) : Exit dans la liste ramène aux actions (l'entrée d'où l'on venait, sinon « Retour »), un second Exit quitte l'écran ; MagnaSave ou F6 bascule et retrouve la position quittée. La liste se décide par nature, jamais par longueur ; une liste d'options courte n'en est pas une.
+- Pour : toute liste de contenu à côté d'actions. Pas pour un menu seul (\`LigneMenu\`).`,
+  html: page('<!-- @dsCard group="Navigation" height=1040 width=1100 -->', `
+<div style="display:grid;gap:48px">${zoneDemo(true)}${zoneDemo(false)}</div>`),
+};
+
 C.Onglets = {
   readme: `Deux formes d'onglets : segmentés (texte) pour les filtres et les vues, à icônes pour les sections d'une fiche.
 

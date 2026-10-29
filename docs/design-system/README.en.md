@@ -6,7 +6,7 @@ The visual language of Cyber Pinball: tokens, components and screen mockups, fol
 
 ## Opening and regenerating
 
-Open `index.html`: the design system page (foundations, colors, typography, spacing, 13 live components with their HTML code, 10 screens, including “What’s missing to play” on the cabinet and on the desktop, “Téléchargements” (Downloads) and the file picker). `components/<Name>/preview.html` shows a single component at its reference size. These are static previews, without handling of the cabinet buttons. The pages load Saira from Google Fonts; offline, they fall back to Segoe UI.
+Open `index.html`: the design system page (foundations, colors, typography, spacing, 15 live components with their HTML code, 10 screens, including “What’s missing to play” on the cabinet and on the desktop, “Téléchargements” (Downloads) and the file picker). `components/<Name>/preview.html` shows a single component at its reference size. These are static previews, without handling of the cabinet buttons. The pages load Saira from Google Fonts; offline, they fall back to Segoe UI.
 
 From the repository root, with Node 22 or later:
 
@@ -57,6 +57,8 @@ Values are defined for a short side of 1080 px. In Electron, convert n px to `n 
 Outer margins 48 to 64 px, panels 32 to 40 px; setting rows 68 to 76 px depending on density. The details screen uses two rows of three tabs rather than shortening their labels.
 
 A list on its own (system menu, sections) starts just below the header, with the same gap on every screen; it is centred horizontally, never vertically. A list taller than its area scrolls: a 3 px (at reference) `--line-strong` rule marks the edge behind which entries remain, at the top as at the bottom. Never a fade on a list: the line at the edge would look disabled. The selected entry is always whole in view.
+
+A content list (games, media, files) next to the screen actions is a zone of its own (`ListeContenu`): a frame, a header bar that does not scroll with the position of the choice and the marker "Exit · Sortir de la liste" (Leave the list) ("MagnaSave · Revenir à la liste" (Back to the list) outside it). The frame of the zone holding the choice lights up in teal, the other zone goes to 0.8 opacity; green stays on the chosen item. Exit in the list brings back to the actions, MagnaSave switches.
 
 ## States and interaction to build into the prototype
 

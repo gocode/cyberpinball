@@ -211,6 +211,24 @@
 .cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
 .cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
 
+/* Liste de contenu (29 octobre 2026, app/renderer/library.css .lib-zone ; listzones.ts) : la liste d'un
+   écran à deux zones (jeux, médias, fichiers) dans son cadre, avec un bandeau hors de ce qui défile :
+   position du choix à gauche, repère à droite. Cadre éclairé en sarcelle quand le choix y est ; l'autre
+   zone à 0,8 d'opacité. Le vert reste à l'élément choisi. */
+.cp-zone{display:flex;flex-direction:column;min-width:0;border:2px solid var(--line);border-radius:var(--radius-md);background:rgba(7,17,15,.55)}
+.cp-zone.is-active{border-color:var(--halo);box-shadow:var(--halo-panel)}
+.cp-zone-bar{display:flex;align-items:center;gap:16px;min-height:56px;padding:6px 12px 6px 20px;border-bottom:1px solid var(--line);font-size:21px;font-weight:600;color:var(--ink-muted)}
+.cp-zone-bar b{color:var(--ink);font-weight:600}
+.cp-zone-letter{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:46px;height:46px;border:2px solid var(--halo);border-radius:var(--radius-sm);font-size:30px;font-weight:700;color:var(--ink)}
+.cp-zone-tag{display:inline-flex;align-items:center;gap:10px;margin-left:auto;font-size:21px;font-weight:600;font-stretch:112%;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.cp-zone-tag .cp-cap{flex:none;height:36px;text-transform:none;letter-spacing:.04em}
+.cp-zone.is-active .cp-zone-tag{color:var(--ink)}.cp-zone.is-active .cp-zone-tag .cp-cap{border-color:var(--halo)}
+.cp-zone-list{list-style:none;margin:0;padding:6px 12px 12px}
+.cp-zone-list li{padding:10px 16px 10px 22px;border-bottom:1px solid var(--line);font-size:26px;font-weight:600}
+.cp-zone-list li small{display:block;font-size:22px;font-weight:400;color:var(--ink-muted)}
+.cp-zone-list li.is-focus{background:var(--signal-wash);outline:3px solid var(--signal);outline-offset:-3px}
+.cp-zone.is-idle .cp-zone-list,.cp-menu.is-dimmed{opacity:.8}
+
 /* 01 — Verre fumé. Aucun vert signal dans le décor. */
 .fond-ambiance {
   background-color:var(--void);
@@ -318,3 +336,9 @@
 .cp-i-tilt { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%202v11M10%2013h4l-2%204z%22%2F%3E%3Cellipse%20cx%3D%2212%22%20cy%3D%2215%22%20rx%3D%229%22%20ry%3D%223%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-usb { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%2017V3M9%206l3-3%203%203M6%209v3l6%203%206-3V7M6%206h.01M16%203h4v4h-4z%22%2F%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2220%22%20r%3D%222%22%2F%3E%3C%2Fsvg%3E") }
 .cp-i-gamepad { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M7%207h10c4%200%205%205%205%2010%200%203-3%204-5%201l-2-3H9l-2%203c-2%203-5%202-5-1%200-5%201-10%205-10zM7%209v4M5%2011h4M15%2010h.01M19%2012h.01%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-friends { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%229%22%20cy%3D%228%22%20r%3D%223.5%22%2F%3E%3Cpath%20d%3D%22M3%2020c0-4%202.5-6%206-6s6%202%206%206M15.5%204.5a3.5%203.5%200%200%201%200%207M17%2014c2.5.5%204%202.5%204%206%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-friend-list { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M11.5%208a3%203%200%201%201-6%200%203%203%200%200%201%206%200zM4%2020v-1a4.5%204.5%200%200%201%209%200v1M16%207h4M16%2012h4M16%2017h4%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-friend-add { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M11.5%208a3%203%200%201%201-6%200%203%203%200%200%201%206%200zM4%2020v-1a4.5%204.5%200%200%201%207.5-3.35M17%2013v7M13.5%2016.5h7%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-friend-request { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M11.5%208a3%203%200%201%201-6%200%203%203%200%200%201%206%200zM4%2020v-1a4.5%204.5%200%200%201%207.5-3.35M20%2016.5a3.5%203.5%200%201%201-7%200%203.5%203.5%200%200%201%207%200zM16.5%2014.5v2l1.5%201%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-medal { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2215%22%20r%3D%226%22%2F%3E%3Cpath%20d%3D%22M8.5%2010.2%205%203h4l3%206%203-6h4l-3.5%207.2M12%2013v4%22%2F%3E%3C%2Fsvg%3E") }
+.cp-i-network { --i: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%222%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M14%206a2%202%200%201%201-4%200%202%202%200%200%201%204%200zM8%2018a2%202%200%201%201-4%200%202%202%200%200%201%204%200zM20%2018a2%202%200%201%201-4%200%202%202%200%200%201%204%200zM11.1%207.8%206.9%2016.2M12.9%207.8l4.2%208.4M8%2018h8%22%2F%3E%3C%2Fsvg%3E") }

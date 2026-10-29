@@ -631,6 +631,27 @@ function gearButton(s) {
 }
 
 /**
+ * Téléchargements en cours, à gauche de la roue dentée : icône, « 2 · 45 % » ou « Prêt », et une
+ * barre fine. Un clic ouvre le gestionnaire (Exit puis Start aux boutons : première entrée du menu
+ * système). Le mot dit l'état ; la couleur le redouble seulement.
+ */
+function downloadsPill(d) {
+  const pill = el('button', `downloads-pill pill-${d.tone ?? 'info'}`);
+  pill.type = 'button';
+  pill.title = d.title;
+  pill.dataset.act = JSON.stringify({ type: 'downloads' });
+  pill.append(cyberIcon(d.icon ?? 'download', 'downloads-pill-icon'), el('span', 'downloads-pill-label', d.label));
+  if (typeof d.value === 'number') {
+    const bar = el('span', 'downloads-pill-bar');
+    const fill = el('span', '');
+    fill.style.width = `${Math.round(Math.max(0, Math.min(1, d.value)) * 100)}%`;
+    bar.append(fill);
+    pill.append(bar);
+  }
+  return pill;
+}
+
+/**
  * Chaque état redessine l'écran ; les listes qui défilent restent où elles étaient
  * (library.js, revealSelection). L'écran est nommé par ce qu'il montre : un autre repart du haut.
  */
@@ -660,6 +681,8 @@ function drawPlayfield(s) {
   // Extinction, veille ou redémarrage en cours : plus rien à choisir, ni roue dentée ni cadenas.
   // Mode invité : le cadenas prend la place de la roue dentée, le menu système est fermé.
   if (!(s.phase === 'message' && s.message?.action === 'power')) nodes.push(s.guest ? guestLock(s.guest) : gearButton(s));
+  // Au menu des tables seulement : un écran plein a son propre accès (première entrée du menu système).
+  if (s.downloads && s.phase === 'menu' && !s.guest) nodes.push(downloadsPill(s.downloads));
 
   if (s.table) {
     CyberMedia.beginRender();

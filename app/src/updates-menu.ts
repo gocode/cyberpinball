@@ -18,6 +18,7 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  type DownloadManager,
   checkForUpdate,
   downloadAppPackage,
   downloadUpdate,
@@ -64,6 +65,8 @@ export interface UpdatesHost {
   quit(): void;
   /** Recherche en arrière-plan : faux pendant les essais hors écran sans site d'essai. */
   background: boolean;
+  /** Gestionnaire de téléchargements : le téléchargement de la mise à jour y est suivi. */
+  downloads?: DownloadManager;
 }
 
 type State =
@@ -220,9 +223,20 @@ export function createUpdatesMenu(host: UpdatesHost) {
     show();
     let shown = 0;
     const dir = updateDownloadsDir(layoutOf(host.loc.root).downloads);
+    // Suivi dans le gestionnaire de téléchargements ; « Revenir à » ramène à cet écran.
+    const job = host.downloads?.track({
+      id: `maj-${latest.version}`,
+      kind: 'update',
+      title: t('Cyber Pinball {version}', { version: latest.version }),
+      source: { kind: 'http', label: 'github.com' },
+      files: [{ ref: how.asset.url, name: path.basename(new URL(how.asset.url).pathname), bytes: how.asset.size, part: path.join(dir, `${path.basename(new URL(how.asset.url).pathname)}.part`) }],
+      back: { screen: 'updates' },
+      resumable: true,
+    });
     const progress = {
       signal: abort.signal,
       onProgress: (received: number, total: number) => {
+        job?.progress(received, total);
         if (state.kind !== 'downloading') return;
         state = { ...state, received, total };
         // Quelques images par seconde suffisent.
@@ -235,13 +249,19 @@ export function createUpdatesMenu(host: UpdatesHost) {
     try {
       if (how.kind === 'light') {
         const file = await downloadAppPackage(latest, dir, progress);
+        job?.done();
         const staged = stagedAppDir(dir, latest);
         unpackAppPackage(file, staged, latest);
         installLight(latest, staged, dir);
       } else {
-        install(latest, await downloadUpdate(latest, dir, progress), root, how.installs);
+        const installer = await downloadUpdate(latest, dir, progress);
+        job?.done();
+        install(latest, installer, root, how.installs);
       }
     } catch (error) {
+      if (abort.signal.aborted) job?.cancel();
+      // Un partiel gardé : une coupure, que « Réessayer le téléchargement » reprendra là où elle s'est arrêtée.
+      else job?.fail(fs.existsSync(dir) && fs.readdirSync(dir).some((f) => f.endsWith('.part')) ? 'network' : 'http', (error as Error).message);
       state = abort.signal.aborted ? { kind: 'available', latest } : { kind: 'error', message: (error as Error).message, latest };
       console.log(`Mise à jour : ${describe()}`);
       show();

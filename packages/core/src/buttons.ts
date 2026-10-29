@@ -591,6 +591,21 @@ export function interfaceKeys(source: ButtonsSource, vertical = true): Interface
   return { ...navigationKeys(source, vertical), help: own('help', ['KeyH', 'F1']), settings: own('settings', ['KeyR']) };
 }
 
+/** Touche du clavier qui bascule entre la liste et les actions d'un écran, comme MagnaSave (convention de Windows : F6 passe d'un volet à l'autre). */
+export const ZONE_KEY = 'F6';
+
+/**
+ * Touches qui basculent entre la liste de contenu d'un écran et ses actions (listzones.ts) : les
+ * deux MagnaSave de la borne (relevés par l'étape « Boutons », sinon leurs touches par défaut) et
+ * F6 d'un clavier, sauf celles qui sont déjà un bouton de l'interface (un flipper, Start…).
+ */
+export function zoneSwitchKeys(source: ButtonsSource): string[] {
+  const keys = buttonKeys(source?.buttons);
+  const ui = interfaceKeys(source);
+  const taken = new Set([...ui.previous, ...ui.next, ...ui.confirm, ...ui.exit, ...ui.help, ...ui.settings]);
+  return [...new Set([keys.leftMagna, keys.rightMagna, ZONE_KEY])].filter((k): k is string => Boolean(k) && !taken.has(k!));
+}
+
 /** Retire d'une liste de raccourcis (H, R…) les touches prises par un bouton de la borne, du jeu ou de l'interface. */
 export function withoutButtonKeys(codes: string[], source: ButtonsSource): string[] {
   const taken = new Set([...Object.values(buttonKeys(source?.buttons)), ...Object.values(navigationButtons(source))]);

@@ -265,11 +265,16 @@ export type LibraryMessage =
   /** Les fichiers d'une table, par paquets de TABLE_FILES_CHUNK. */
   | { t: 'table-files-get'; req: number; table: string }
   | { t: 'table-files'; req: number; chunk: number; chunks: number; files: TableFile[] }
-  /** Un fichier : un média, ou un fichier d'une table. */
-  | { t: 'file-get'; req: number; table: string; file: string }
-  | { t: 'file-head'; req: number; bytes: number }
+  /**
+   * Un fichier : un média, ou un fichier d'une table. `from` : octets déjà reçus d'un envoi
+   * coupé, la borne qui partage envoie la suite (une borne d'avant la reprise l'ignore et
+   * renvoie tout : son en-tête n'a pas de `from`, le receveur repart de zéro).
+   */
+  | { t: 'file-get'; req: number; table: string; file: string; from?: number }
+  /** `from` : premier octet envoyé (la reprise acceptée). */
+  | { t: 'file-head'; req: number; bytes: number; from?: number }
   | { t: 'file-refused'; req: number; reason: FileRefusal }
-  /** Fin du fichier : son empreinte, calculée pendant l'envoi. */
+  /** Fin du fichier : l'empreinte du fichier entier (le début déjà reçu compris), calculée pendant l'envoi. */
   | { t: 'file-end'; req: number; sha256: string }
   | { t: 'file-cancel'; req: number };
 
@@ -297,9 +302,11 @@ export function parseLibraryMessage(m: Record<string, unknown>): LibraryMessage 
       return { t: 'table-files', req: m.req, chunk: m.chunk, chunks: m.chunks, files: m.files.slice(0, TABLE_FILES_CHUNK).map(parseTableFile).filter((f): f is TableFile => !!f) };
     }
     case 'file-get':
-      return isReq(m.req) && isOpaque(m.table) && isOpaque(m.file) ? { t: 'file-get', req: m.req, table: m.table, file: m.file } : undefined;
+      if (!isReq(m.req) || !isOpaque(m.table) || !isOpaque(m.file) || (m.from !== undefined && !isCount(m.from, TABLE_FILE_MAX))) return undefined;
+      return { t: 'file-get', req: m.req, table: m.table, file: m.file, ...(m.from ? { from: m.from as number } : {}) };
     case 'file-head':
-      return isReq(m.req) && isCount(m.bytes, TABLE_FILE_MAX) ? { t: 'file-head', req: m.req, bytes: m.bytes } : undefined;
+      if (!isReq(m.req) || !isCount(m.bytes, TABLE_FILE_MAX) || (m.from !== undefined && !isCount(m.from, m.bytes))) return undefined;
+      return { t: 'file-head', req: m.req, bytes: m.bytes, ...(m.from ? { from: m.from as number } : {}) };
     case 'file-refused':
       return isReq(m.req) && ['not-shared', 'not-found', 'refused', 'busy'].includes(m.reason as string) ? { t: 'file-refused', req: m.req, reason: m.reason as FileRefusal } : undefined;
     case 'file-end':

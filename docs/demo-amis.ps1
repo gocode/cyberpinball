@@ -118,14 +118,15 @@ try {
         if (Test-Path $env:CYBERPINBALL_CAPTURE) { Remove-Item -Recurse -Force $env:CYBERPINBALL_CAPTURE }
         Push-Location $wt
         try { $log = & $electron app 2>&1 | ForEach-Object { "$_" } } finally { Pop-Location }
-        $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Réseau|Partie en direct|Bibliothèque partagée)' } | ForEach-Object { Write-Host "   $_" }
+        $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Réseau|Partie en direct|Bibliothèque partagée|Téléchargements)' } | ForEach-Object { Write-Host "   $_" }
         $id = "$nom/$jeu/$langue"
         if ($log -match 'Autopilote : (aucun|phase)') { $failures += "$id : une étape rejouée n'a pas trouvé son écran ou sa phase" }
         if ($log -match 'Traduction manquante') { $failures += "$id : texte sans traduction" }
         if (-not ($log -match 'Réseau des bornes : démarré \(simulated')) { $failures += "$id : le réseau simulé n'a pas démarré" }
         if ($log -match 'Réseau des bornes : démarré \(public') { $failures += "$id : le vrai réseau a démarré pendant l'essai" }
-        if ($nom -eq 'amis' -and -not ($log -match 'Bibliothèque partagée : [1-9]')) { $failures += "$id : les médias de Bruno ne sont pas arrivés" }
-        if ($nom -eq 'amis' -and -not ($log -match 'Bibliothèque partagée : table .*, [1-9]\d* fichier\(s\) reçu\(s\), 0 ')) { $failures += "$id : la table de Bruno n'est pas arrivée entière" }
+        # Deux réceptions (ses médias, puis toute sa table), chacune une ligne « fini » du gestionnaire (titre dans la langue de l'essai).
+        if ($nom -eq 'amis' -and @($log | Select-String -Pattern 'Téléchargements : « .+ » fini \([1-9]\d* fichier\(s\)\)').Count -lt 2) { $failures += "$id : les médias ou la table de Bruno ne sont pas arrivés" }
+        if ($nom -eq 'amis' -and ($log -match 'Téléchargements : .* en échec')) { $failures += "$id : une réception de Bruno a échoué" }
         Assert-HorsEcran $env:CYBERPINBALL_CAPTURE
         $report = "$env:CYBERPINBALL_CAPTURE\mise-en-page.txt"
         if (-not (Test-Path $report)) { $failures += "$id : relevé de mise en page absent" }

@@ -82,6 +82,22 @@ import {
   mediaDbNotice,
   ARCHIVE_EXT,
   downloadInventory,
+  createDownloadManager,
+  downloadsPill,
+  downloadsSummary,
+  emptiableDownloads,
+  resolveReturn,
+  returnLabel,
+  summarize,
+  summaryText,
+  SYSTEM_ROOT_ENTRIES,
+  type DownloadJob,
+  type DownloadJobKind,
+  type DownloadReturn,
+  type DownloadScreen,
+  type DownloadSourceKind,
+  type DownloadTransport,
+  type ReturnWorld,
   loadMediaDb,
   MEDIADB_INDEX_FILE,
   tableFilter,
@@ -126,6 +142,16 @@ import {
   actionIds,
   followCursor,
   resolveActivation,
+  enterList,
+  holdMove,
+  leaveList,
+  rememberZones,
+  screenZones,
+  switchZone,
+  zoneOf,
+  zoneStep,
+  type ZoneMemory,
+  type Zones,
   type FocusAnchor,
   knownVpsId,
 } from '@cyberpinball/core';
@@ -145,6 +171,8 @@ import { createMedias, playsSoundPreview, type MediaView } from './library-media
 import { createTableFiles } from './table-files';
 import { createFilePicker, type PickRequest } from './file-picker';
 import { createDownloadsScreen } from './downloads-screen';
+import { createDownloadCenter } from './download-center';
+import { httpTransport } from './download-sources';
 import { createHealth, type HealthView } from './health';
 import { isShown, refuseOffscreen } from './offscreen';
 
@@ -206,6 +234,8 @@ export interface LibraryHost {
   quit(): void;
   /** Touches des boutons de la borne (flippers, Start, Exit), avec celles d'un clavier. */
   keys(): NavigationKeys;
+  /** Touches qui basculent entre la liste de contenu d'un écran et ses actions : les MagnaSave, F6 (zoneSwitchKeys). */
+  zoneKeys?(): string[];
   windows(): Map<RoleId, BrowserWindow>;
   /**
    * Écran du navigateur intégré (fenêtre « Récupérer »), en coordonnées Electron, et ce que
@@ -233,6 +263,10 @@ export interface LibraryHost {
   diskSpace?(dir: string): { free: number; total: number } | undefined;
   /** Mode invité : seules la fiche, ses pages et les actions à porte ouverte passent (guestmode.ts). */
   guest: Pick<GuestMode, 'active' | 'allows' | 'knock'>;
+  /** Bandeau bref, au menu des tables comme sur un écran plein (un téléchargement fini). */
+  notify?(text: string): void;
+  /** La file des téléchargements a changé (progression, état) : la pastille ou l'écran se redessinent. */
+  downloadsChanged?(): void;
 }
 
 /** Entrée du menu système (Exit dans le menu). La session des réglages peut y ajouter la sienne. */
@@ -274,6 +308,10 @@ export type UiAction =
   | { type: 'back' }
   /** Roue dentée du menu : menu et configuration, quels que soient les boutons. */
   | { type: 'config' }
+  /** Pastille des téléchargements du menu des tables : le gestionnaire de téléchargements. */
+  | { type: 'downloads' }
+  /** Repère de la liste de contenu (« Sortir de la liste », « Revenir à la liste ») : comme MagnaSave. */
+  | { type: 'zone' }
   | { type: 'wheel'; offset: number };
 
 export type Tone = 'error' | 'warning' | 'info' | 'ok' | 'quiet';
@@ -291,11 +329,19 @@ export interface Row {
   /** Repère neutre (filet clair) : l'emplacement ouvert, un fichier coché ; jamais en vert, réservé au choix courant. */
   current?: boolean;
   /** Seconde ligne, mot et signe : à quoi sert un fichier (« ✓ Installé avec… », « ! À installer… »). */
-  note?: { text: string; sign: string; tone: Tone };  /** Schéma de l'écran du DMD à droite de la ligne (« Écran du DMD ») : FullDMD ou DMD seul en bande. */
+  note?: { text: string; sign: string; tone: Tone };
+  /** Barre d'un téléchargement sous la ligne (Téléchargements) : `value` de 0 à 1, absente si la taille est inconnue. */
+  progress?: { value?: number; tone?: Tone };
+  /** Schéma de l'écran du DMD à droite de la ligne (« Écran du DMD ») : FullDMD ou DMD seul en bande. */
   figure?: 'fulldmd' | 'dmd';
 }
 export interface Section {
   title?: string;
+  /**
+   * Liste d'options (deux ou trois réglages au choix, « Ce que montre cet écran ») : ses lignes à
+   * choisir ne forment pas une liste de contenu (listzones.ts), Exit y revient en arrière.
+   */
+  options?: boolean;
   /** Rôle de la section, pour la mise en page d'un écran (classe kind-<kind>) : « places », « entries »… */
   kind?: string;
   rows: Row[];
@@ -477,6 +523,16 @@ export function createLibrary(host: LibraryHost) {
   let cursor = 0;
   /** Ce que la dernière vue montrait sous le curseur : il le suit si la liste change (focus.ts). */
   let anchor: FocusAnchor | undefined;
+  /**
+   * Zones de l'écran (listzones.ts) : d'où l'on est entré dans la liste de contenu, où on l'a
+   * quittée ; oublié à l'ouverture d'un autre écran. `letter` : initiale du dernier saut par lettre
+   * (flipper tenu), montrée tant que le flipper reste tenu.
+   */
+  let zoneMemory: { screen: unknown; memory: ZoneMemory; letter?: string } = { screen: undefined, memory: {} };
+  /** Flipper tenu : depuis quand, et le dernier saut par lettre. */
+  let hold: { code: string; since: number; jumped: number } | undefined;
+  /** MagnaSave (ou F6) appuyé seul : la bascule se fait au relâchement, jamais sur le Ctrl d'un raccourci (Ctrl+Maj+D). */
+  let zonePress: string | undefined;
   /** L'écran affiché fait écouter des sons (propositions, sons de la table) : relevé à chaque vue. */
   let soundPreview = false;
   // Opérations longues en cours (l'installation enchaîne sur l'analyse) et leur message.
@@ -510,7 +566,25 @@ export function createLibrary(host: LibraryHost) {
         run: () => openAdd(),
       },
     ],
-    ['downloads', { get detail() { return t('Ce que Cyber Pinball a téléchargé : le reprendre, faire de la place'); }, run: () => openDownloads() }],
+    [
+      'downloads',
+      {
+        // Ce qui arrive, et le premier téléchargement prêt avec l'écran où il ramène.
+        get detail() {
+          const jobs = downloads.jobs();
+          const s = summarize(jobs);
+          const ready = jobs.find((j) => j.state === 'done' && !j.delivered);
+          if (ready) return t('{summary} · prêt : {screen}', { summary: summaryText(s), screen: returnLabel(resolveReturn(ready, downloadWorld).to, downloadWorld) });
+          return jobs.length ? summaryText(s) : t('Ce qui arrive des sites et des amis, et ce qui est gardé');
+        },
+        // Un téléchargement fini attend qu'on y revienne, ou un bloqué qu'on s'en occupe : pastille rouge.
+        get attention() {
+          const s = summarize(downloads.jobs());
+          return s.ready > 0 || s.failed > 0;
+        },
+        run: () => openDownloads(),
+      },
+    ],
     ['roms', { get detail() { return t('Chaque ROM, ses tables, sa taille ; inutilisées et absentes'); }, run: () => openRoms() }],
     ['rom-migration', { get detail() { return t('Réunir les ROM dans la bibliothèque : une copie partagée par les tables'); }, run: () => openRomMigration() }],
     ['media-import', { get detail() { return t('Copier les logos, vidéos et frontons de PinUP Popper ou PinballX dans les dossiers des tables'); }, run: () => mediaImport.open() }],
@@ -662,9 +736,9 @@ export function createLibrary(host: LibraryHost) {
     item.run();
   }
 
-  /** Entrées d'une rubrique (de la racine : les rubriques) que l'application fournit. */
+  /** Entrées d'une rubrique (de la racine : ses raccourcis, Téléchargements, puis les rubriques) que l'application fournit. */
   function systemEntries(group: SystemGroupId | undefined): SystemEntryId[] {
-    return (group ? SYSTEM_GROUPS[group].entries : SYSTEM_ROOT).filter((id) => isSystemGroup(id) || systemItems.has(id));
+    return (group ? SYSTEM_GROUPS[group].entries : SYSTEM_ROOT_ENTRIES).filter((id) => isSystemGroup(id) || systemItems.has(id));
   }
 
   /** Une entrée attend l'utilisateur (pastille rouge) ; une rubrique, dès que l'une des siennes. */
@@ -726,7 +800,88 @@ export function createLibrary(host: LibraryHost) {
 
   // Index de VPinMediaDB, recherche approfondie du jeu et aperçus, partagés par le plan
   // automatique et les propositions de chaque média.
-  const mediaSearch = createMediaSearch({ host, layout, tablesDir, progress, vps: () => vpsForImport() });
+  const mediaSearch = createMediaSearch({ host, layout, tablesDir, progress, vps: () => vpsForImport(), downloads: () => downloads });
+
+  // ---------- Gestionnaire de téléchargements ----------
+  // Tout ce qui arrive, d'un site ou d'un ami (packages/core/src/downloadmanager.ts) : la file
+  // survit au redémarrage, chaque téléchargement repart seul quand sa source revient, et ramène à
+  // l'écran d'où il a été demandé. Les fonctions des amis (finisseurs, retour à leur bibliothèque)
+  // et leur transport sont posés par friends-menu.ts et frontend.ts.
+  /** Ce qu'on fait d'un téléchargement fini, par sorte : vrai s'il a été rendu à son écran (ouvert). */
+  const downloadFinishers = new Map<DownloadJobKind, (job: DownloadJob) => boolean>();
+  /** « Revenir à… » d'un téléchargement fini, par sorte : vrai s'il l'a rendu (sinon l'écran d'origine s'ouvre). */
+  const downloadDeliverers = new Map<DownloadJobKind, (job: DownloadJob) => boolean>();
+  const returnOpeners = new Map<DownloadScreen, (back: DownloadReturn) => void>();
+  let downloadFriends: { has(key: string): boolean; name(key: string): string | undefined } | undefined;
+  const downloadWorld: ReturnWorld = {
+    hasTable: (file) => Boolean(find(file)),
+    hasFriend: (key) => downloadFriends?.has(key) ?? false,
+    tableTitle: (file) => find(file)?.title,
+    friendName: (key) => downloadFriends?.name(key),
+  };
+  const downloads = createDownloadManager({
+    dataDir: host.dataDir,
+    transports: { http: httpTransport() },
+    finished: (job) => {
+      // Rendu de lui-même (son écran est ouvert) ; sinon un bandeau le dit, la pastille le garde « prêt ».
+      if (downloadFinishers.get(job.kind)?.(job)) return;
+      host.notify?.(t('Téléchargement terminé : {title}. Téléchargements, en tête du menu système, pour y revenir.', { title: job.title }));
+    },
+    onChange: () => host.downloadsChanged?.(),
+    log: (line) => console.log(line),
+  });
+
+  /** L'écran où ramène un téléchargement, rouvert ; un écran qui n'existe plus mène au gestionnaire. */
+  function openReturn(back: DownloadReturn): void {
+    const table = 'table' in back && back.screen !== 'friend-library' ? find(back.table) : undefined;
+    switch (back.screen) {
+      case 'table-medias':
+        return table ? medias.open(table) : downloadCenter.open();
+      case 'game-parts':
+        return table ? gameParts.open(table) : downloadCenter.open();
+      case 'table-sheet':
+        return table ? openSheet(table) : downloadCenter.open();
+      case 'wait-list':
+        return catalogUi.openWaitList(() => downloadCenter.open());
+      case 'updates':
+        return systemItems.has('updates') ? runSystemItem('updates', () => downloadCenter.open()) : downloadCenter.open();
+      case 'friend-library': {
+        const opener = returnOpeners.get('friend-library');
+        return opener ? opener(back) : downloadCenter.open();
+      }
+      case 'downloads':
+        return downloadCenter.open();
+    }
+  }
+
+  /**
+   * « Revenir à… » : l'écran d'origine, avec ce qui a été reçu (médias dans le brouillon, table
+   * au plan d'ajout) ; s'il n'existe plus, un message le dit, puis son repli.
+   */
+  function deliverDownload(job: DownloadJob): void {
+    const r = resolveReturn(job, downloadWorld);
+    if (job.state === 'done') downloads.delivered(job.id);
+    if (r.lost) return openNotice(t('Écran d’origine introuvable'), [r.lost, t('Retour vers : {screen}', { screen: returnLabel(r.to, downloadWorld) })], () => openReturn(r.to));
+    if (job.state === 'done' && downloadDeliverers.get(job.kind)?.(job)) return;
+    openReturn(r.to);
+  }
+
+  /** « 23 fichiers, 4,1 Go conservés » : relu au plus toutes les cinq secondes (l'inventaire parcourt le disque). */
+  let filesDetail: { at: number; text: string } | undefined;
+  const downloadCenter = createDownloadCenter({
+    manager: downloads,
+    show: (build, at) => openCustom(build, at),
+    world: downloadWorld,
+    deliver: (job) => deliverDownload(job),
+    files: {
+      detail: () => {
+        if (!filesDetail || Date.now() - filesDetail.at > 5000) filesDetail = { at: Date.now(), text: t('{summary} conservés', { summary: downloadsSummary(emptiableDownloads(inventoryOf(false))) }) };
+        return filesDetail.text;
+      },
+      open: (back) => downloadsUi.open(back),
+    },
+    back: () => openSystem(),
+  });
 
   // Trouver une table : catalogue VPS, fenêtre « Récupérer », liste d'attente, mises à jour.
   const catalogUi = createCatalog({
@@ -748,8 +903,11 @@ export function createLibrary(host: LibraryHost) {
     addFiles: (paths) => startImport(paths, 'copy', undefined, undefined, true),
     openJourney: (file) => journeyUi.open(file),
     pick: (request) => pickPaths(request),
+    downloads,
   });
   if (layout()) catalogUi.start();
+  // Les pages des sites reprennent par le navigateur intégré, dans la même session de cookies.
+  downloads.setTransport('site', catalogUi.acquirer.siteTransport);
 
   /**
    * « Chercher sur le web… » des écrans de médias d'une table : ce qui est téléchargé revient
@@ -800,6 +958,7 @@ export function createLibrary(host: LibraryHost) {
     search: mediaSearch,
     prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
     webGame: webForTable('mediadb'),
+    downloads,
   });
 
   // Santé de la borne (Menu système > Borne) : relevé en tâche de fond, gardé ; une page de bilan.
@@ -995,7 +1154,7 @@ export function createLibrary(host: LibraryHost) {
     attachToGame: (file, gameId, kind, back) => catalogUi.attachToGame(file, gameId, kind, back),
     web: (screen, back) => catalogUi.webAction(screen, { query: partWebQuery('table'), received: (file) => startImport([file], 'copy') }, back),
     task: (message, work) => task(message, work),
-    back: () => openSystem(),
+    back: () => downloadCenter.open('files'),
   });
 
   /**
@@ -1035,10 +1194,10 @@ export function createLibrary(host: LibraryHost) {
     return named[0] ? { table: named[0] } : {};
   }
 
-  function openDownloads(): void {
-    if (!layout()) return openAdd();
+  /** Le gestionnaire de téléchargements (Menu système > Téléchargements, et sa première entrée). */
+  function openDownloads(focus?: string): void {
     section = 'download';
-    downloadsUi.open();
+    downloadCenter.open(focus);
   }
 
   function openAdd(): void {
@@ -2749,15 +2908,39 @@ export function createLibrary(host: LibraryHost) {
     if (screen.kind === 'pages') return pagesKey(screen, input);
     const built = build();
     const n = built.actions.length;
+    const ids = actionIds(built.actions);
     // Start valide l'élément que la dernière vue montrait sous le curseur, même si la liste a bougé.
-    cursor = followCursor(actionIds(built.actions), cursor, screen, anchor);
+    cursor = followCursor(ids, cursor, screen, anchor);
+    const zones = screenZones(built, n);
+    // MagnaSave (F6) : la bascule attend le relâchement ; une autre touche entre-temps l'annule.
+    if (zones && (host.zoneKeys?.() ?? []).includes(input.code)) {
+      if (!input.isAutoRepeat) zonePress = input.code;
+      return true;
+    }
+    zonePress = undefined;
+    const moving = is(KEYS.previous) || is(KEYS.next);
+    if (!moving || !input.isAutoRepeat || hold?.code !== input.code) hold = moving && !input.isAutoRepeat ? { code: input.code, since: Date.now(), jumped: 0 } : undefined;
+    zoneMemory.letter = undefined;
     // Tab / Maj+Tab : se déplacer au clavier quels que soient les boutons relevés.
-    if (input.code === CONFIG_KEY) cursor = (cursor + (input.shift ? -1 : 1) + n) % n;
-    else if (is(KEYS.previous)) cursor = (cursor - 1 + n) % n;
-    else if (is(KEYS.next)) cursor = (cursor + 1) % n;
-    else if (is(KEYS.confirm)) void built.actions[cursor]?.run();
-    else if (is(KEYS.exit)) built.back();
-    else {
+    if (input.code === CONFIG_KEY) cursor = zoneStep(zones, n, cursor, input.shift ? -1 : 1);
+    else if (moving) {
+      const dir = is(KEYS.previous) ? -1 : 1;
+      // Flipper tenu sur un écran à zones : il reste dans la sienne, s'arrête à son bout, puis accélère (par lettre sur une liste triée par nom).
+      if (zones && hold && input.isAutoRepeat) {
+        const now = Date.now();
+        const moved = holdMove(zones, built.actions.map((a) => a.label), cursor, dir, now - hold.since, now - hold.jumped);
+        if (moved.letter !== undefined) {
+          if (moved.cursor !== cursor) hold.jumped = now;
+          zoneMemory.letter = moved.letter;
+        }
+        cursor = moved.cursor;
+      } else cursor = zoneStep(zones, n, cursor, dir);
+    } else if (is(KEYS.confirm)) void built.actions[cursor]?.run();
+    // Exit dans la liste de contenu : retour aux actions de l'écran ; Exit dans les actions : l'écran se ferme.
+    else if (is(KEYS.exit)) {
+      if (zones && zoneOf(zones, cursor) === 'list') cursor = leaveList(zones, ids, zonesMemory(), backIndex(built));
+      else built.back();
+    } else {
       // Raccourci d'une entrée (affiché à droite de son libellé) : elle, sans s'y déplacer.
       const hit = built.actions.find((a) => a.shortcut?.matches(input));
       if (!hit) return false;
@@ -2765,6 +2948,51 @@ export function createLibrary(host: LibraryHost) {
     }
     host.broadcast();
     return true;
+  }
+
+  /** Touche relâchée : la bascule de MagnaSave (F6), et la fin d'un flipper tenu (l'initiale montrée s'efface). */
+  function handleKeyUp(input: Input): void {
+    if (!screen || busy) return;
+    if (hold?.code === input.code) {
+      hold = undefined;
+      if (zoneMemory.letter !== undefined) {
+        zoneMemory.letter = undefined;
+        host.broadcast();
+      }
+    }
+    if (zonePress !== input.code) return;
+    zonePress = undefined;
+    handleAction({ type: 'zone' });
+  }
+
+  /** Mémoire des zones de l'écran affiché : oubliée quand un autre écran s'ouvre. */
+  function zonesMemory(): ZoneMemory {
+    if (zoneMemory.screen !== screen) zoneMemory = { screen, memory: {} };
+    return zoneMemory.memory;
+  }
+
+  /** Rang de l'action qui fait la même chose qu'Exit (« Retour », « Annuler »…), s'il y en a une. */
+  function backIndex(built: Built): number | undefined {
+    const at = built.actions.findIndex((a) => a.run === built.back);
+    return at >= 0 ? at : undefined;
+  }
+
+  /**
+   * Repère de la liste de contenu pour le rendu : où est le choix, et ce que font Exit et MagnaSave.
+   * `listCursor` : l'élément de la liste où l'on est, ou celui où MagnaSave ramènera (le détail
+   * d'une galerie reste le sien sur les actions de l'écran).
+   */
+  function zoneView(zones: Zones | undefined, ids: (string | undefined)[]) {
+    if (!zones) return undefined;
+    const active = zoneOf(zones, cursor);
+    return {
+      active,
+      listCursor: active === 'list' ? cursor : enterList(zones, ids, zonesMemory()),
+      position: active === 'list' ? zones.list.indexOf(cursor) + 1 : undefined,
+      total: zones.list.length,
+      letter: active === 'list' ? zoneMemory.letter : undefined,
+      tag: active === 'list' ? { key: 'Exit', text: t('Sortir de la liste') } : { key: 'MagnaSave', text: t('Revenir à la liste') },
+    };
   }
 
   function editorKey(s: EditorScreen, input: Input): void {
@@ -2868,6 +3096,14 @@ export function createLibrary(host: LibraryHost) {
       if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) closeEditor(screen, false);
       else build().back();
       host.broadcast();
+    } else if (action.type === 'zone') {
+      if (screen.kind === 'pages' || ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor)) return;
+      const built = build();
+      const zones = screenZones(built, built.actions.length);
+      if (!zones) return;
+      const ids = actionIds(built.actions);
+      cursor = switchZone(zones, ids, followCursor(ids, cursor, screen, anchor), zonesMemory(), backIndex(built));
+      host.broadcast();
     } else if (action.type === 'activate') {
       const built = build();
       // L'élément cliqué, où qu'il soit maintenant ; disparu entre-temps : rien, l'écran se redessine.
@@ -2886,8 +3122,15 @@ export function createLibrary(host: LibraryHost) {
     const built = build();
     const ids = actionIds(built.actions);
     cursor = followCursor(ids, cursor, screen, anchor);
+    const zones = screenZones(built, built.actions.length);
+    // Passage d'une zone à l'autre, par n'importe quel geste (flipper, MagnaSave, Exit, clic) : retenu pour y revenir.
+    if (zones && anchor?.screen === screen && anchor.cursor < built.actions.length) {
+      const memory = zonesMemory();
+      zoneMemory.memory = rememberZones(zones, memory, { index: anchor.cursor, id: anchor.id }, cursor);
+    }
     anchor = { screen, cursor, id: ids[cursor] };
     warnUnkeyed(built, ids);
+    const zone = zoneView(zones, ids);
     soundPreview = playsSoundPreview(built.media);
     const editorView = (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor ? viewEditor(screen.editor) : undefined;
     // « Chercher sur le web… » n'a son icône que dans un menu à icônes : seule, elle décalerait tous les libellés.
@@ -2905,6 +3148,7 @@ export function createLibrary(host: LibraryHost) {
       variant: built.variant,
       journey: built.journey,
       health: built.health,
+      zone,
       cursor,
       busy,
       editor: editorView,
@@ -2917,7 +3161,9 @@ export function createLibrary(host: LibraryHost) {
         ? editorView.kind === 'choice'
           ? t('Flippers : choisir · Start : valider · Exit : annuler')
           : t('Flippers : choisir une touche · Start : la taper · Exit : annuler · ou tapez au clavier, Entrée pour valider')
-        : (built.hint ?? t('Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris')),
+        : zone?.active === 'list'
+          ? t('Flippers : parcourir, tenus pour aller vite · Start ou Entrée : valider · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran')
+          : `${built.hint ?? t('Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris')}${zone ? ` · ${t('MagnaSave ou F6 : la liste')}` : ''}`,
     };
   }
 
@@ -3100,6 +3346,7 @@ export function createLibrary(host: LibraryHost) {
     /** Ferme la gestion des tables (une entrée du menu système qui affiche ensuite un message). */
     leave,
     handleKey,
+    handleKeyUp,
     handleAction,
     view,
     autopilot,
@@ -3120,7 +3367,32 @@ export function createLibrary(host: LibraryHost) {
     /** Table dont parle l'écran ouvert (fiche, médias du jeu, fichiers, parcours…) : ses médias restent sur les écrans de la borne. */
     table: () => tableOf(screen),
     /** Une entrée du menu système attend l'utilisateur : pastille rouge sur la roue dentée. */
-    attention: () => SYSTEM_ROOT.some(systemAttention),
+    attention: () => SYSTEM_ROOT_ENTRIES.some(systemAttention),
+    /** L'écran décrit affiché est celui-ci (un transfert qui finit sous les yeux de l'utilisateur). */
+    isShowing: (build: () => Built) => screen?.kind === 'custom' && screen.build === build,
+    /** Gestionnaire de téléchargements : la file, son écran, et ce que les autres écrans y posent. */
+    downloads: {
+      manager: downloads,
+      /** Le gestionnaire, depuis le menu des tables (pastille) : « Retour » y ramène. */
+      open: (focus?: string) => {
+        if (!host.guest.knock('menu.system')) return;
+        const from = screen;
+        systemChosen = 'downloads';
+        systemReturn = from ? undefined : () => leave();
+        openDownloads(focus);
+      },
+      /** La pastille du menu des tables ; undefined quand il n'y a rien à suivre. */
+      pill: () => downloadsPill(summarize(downloads.jobs())),
+      finisher: (kind: DownloadJobKind, fn: (job: DownloadJob) => boolean) => void downloadFinishers.set(kind, fn),
+      deliverer: (kind: DownloadJobKind, fn: (job: DownloadJob) => boolean) => void downloadDeliverers.set(kind, fn),
+      opener: (screenName: DownloadScreen, fn: (back: DownloadReturn) => void) => void returnOpeners.set(screenName, fn),
+      friends: (f: { has(key: string): boolean; name(key: string): string | undefined }) => void (downloadFriends = f),
+      setTransport: (kind: DownloadSourceKind, transport: DownloadTransport) => downloads.setTransport(kind, transport),
+      /** « Revenir à… » d'un téléchargement (écran de transfert des amis). */
+      deliver: (job: DownloadJob) => deliverDownload(job),
+      /** L'écran où ramène un téléchargement (« Annuler » du plan d'ajout d'une table reçue). */
+      openReturn: (back: DownloadReturn) => openReturn(back),
+    },
   };
 }
 

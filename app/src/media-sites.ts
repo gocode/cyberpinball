@@ -372,6 +372,7 @@ export function createMediaSites(ctx: MediaSitesContext) {
       },
       claim: {
         dir: incoming,
+        title: t('{type} : {title}', { type: mediaTypeInfo(job.type).label, title: job.hit.title }),
         signal: stop.signal,
         progress: (p) => {
           Object.assign(job, {
@@ -490,6 +491,7 @@ export function createMediaSites(ctx: MediaSitesContext) {
       status: reason ? t('À faire vous-même : {reason}. Le fichier téléchargé revient aux propositions du média.', { reason }) : undefined,
       claim: {
         dir: path.join(folder, 'recu'),
+        title: t('{type} : {title}', { type: mediaTypeInfo(type).label, title: hit.title }),
         progress: (p) => {
           Object.assign(job, { state: 'downloading', ...progressOf(p) });
           ctx.changed();
@@ -599,6 +601,8 @@ export function createMediaSites(ctx: MediaSitesContext) {
       search: { query: request.query, engine: request.engine, want: info.formats.some((f) => mediaKind(`x.${f}`) === 'video') ? 'video' : 'audio' },
       claim: {
         dir: incoming,
+        title: t('{type} : {title}', { type: request.label, title: request.title }),
+        back: { screen: 'table-medias', table: request.table },
         progress: (p) => {
           webProgress = p;
           ctx.changed();

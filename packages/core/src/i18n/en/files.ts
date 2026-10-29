@@ -133,7 +133,6 @@ export const messages: Record<string, string> = {
   '{n} éléments de la liste d’attente redeviennent attendus.': '{n} waiting list items are awaited again.',
 
   // app/src/library.ts, library-medias.ts, catalog.ts : entrées qui ouvrent ces écrans
-  'Ce que Cyber Pinball a téléchargé : le reprendre, faire de la place': 'What Cyber Pinball has downloaded: reuse it, free up space',
   'Reprise des médias d’un autre frontend': 'Media taken over from another frontend',
   '{n} ROM absente : téléchargements, clé USB ou ce PC': '{n} missing ROM: downloads, USB drive or this PC',
   '{n} ROM absentes : téléchargements, clé USB ou ce PC': '{n} missing ROMs: downloads, USB drive or this PC',

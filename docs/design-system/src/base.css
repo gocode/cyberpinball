@@ -210,3 +210,21 @@
 .cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
 .cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
 .cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
+
+/* Liste de contenu (29 octobre 2026, app/renderer/library.css .lib-zone ; listzones.ts) : la liste d'un
+   écran à deux zones (jeux, médias, fichiers) dans son cadre, avec un bandeau hors de ce qui défile :
+   position du choix à gauche, repère à droite. Cadre éclairé en sarcelle quand le choix y est ; l'autre
+   zone à 0,8 d'opacité. Le vert reste à l'élément choisi. */
+.cp-zone{display:flex;flex-direction:column;min-width:0;border:2px solid var(--line);border-radius:var(--radius-md);background:rgba(7,17,15,.55)}
+.cp-zone.is-active{border-color:var(--halo);box-shadow:var(--halo-panel)}
+.cp-zone-bar{display:flex;align-items:center;gap:16px;min-height:56px;padding:6px 12px 6px 20px;border-bottom:1px solid var(--line);font-size:21px;font-weight:600;color:var(--ink-muted)}
+.cp-zone-bar b{color:var(--ink);font-weight:600}
+.cp-zone-letter{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:46px;height:46px;border:2px solid var(--halo);border-radius:var(--radius-sm);font-size:30px;font-weight:700;color:var(--ink)}
+.cp-zone-tag{display:inline-flex;align-items:center;gap:10px;margin-left:auto;font-size:21px;font-weight:600;font-stretch:112%;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.cp-zone-tag .cp-cap{flex:none;height:36px;text-transform:none;letter-spacing:.04em}
+.cp-zone.is-active .cp-zone-tag{color:var(--ink)}.cp-zone.is-active .cp-zone-tag .cp-cap{border-color:var(--halo)}
+.cp-zone-list{list-style:none;margin:0;padding:6px 12px 12px}
+.cp-zone-list li{padding:10px 16px 10px 22px;border-bottom:1px solid var(--line);font-size:26px;font-weight:600}
+.cp-zone-list li small{display:block;font-size:22px;font-weight:400;color:var(--ink-muted)}
+.cp-zone-list li.is-focus{background:var(--signal-wash);outline:3px solid var(--signal);outline-offset:-3px}
+.cp-zone.is-idle .cp-zone-list,.cp-menu.is-dimmed{opacity:.8}

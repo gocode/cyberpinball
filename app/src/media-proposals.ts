@@ -726,14 +726,18 @@ export function createProposals(ctx: ProposalsContext) {
         const meter = createTransferMeter();
         let file: string;
         try {
-          file = await ctx.search.stage(offer.file, (received, total) => {
-            const progress = meter.update(received, total);
-            if (Date.now() - last < 250) return;
-            last = Date.now();
-            ctx.progress(t('{label} : {progress}…', { label: mediaTypeInfo(type).label, progress: formatTransfer(progress, true) }));
-          });
+          file = await ctx.search.stage(
+            offer.file,
+            (received, total) => {
+              const progress = meter.update(received, total);
+              if (Date.now() - last < 250) return;
+              last = Date.now();
+              ctx.progress(t('{label} : {progress}…', { label: mediaTypeInfo(type).label, progress: formatTransfer(progress, true) }));
+            },
+            { title: t('{type} de {table}', { type: mediaTypeInfo(type).label, table: table.title }), back: { screen: 'table-medias', table: table.file } },
+          );
         } catch (error) {
-          return stayAfterPick(type, t('Téléchargement impossible : {error}. Rien n’a été laissé.', { error: (error as Error).message }), 'error');
+          return stayAfterPick(type, t('Téléchargement impossible : {error}.', { error: (error as Error).message }), 'error');
         }
         if (offer.kind === 'audio' && !isAudioFile(file)) {
           fs.rmSync(file, { force: true });

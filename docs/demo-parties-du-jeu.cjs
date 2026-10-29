@@ -208,6 +208,7 @@ async function scenario(sc, box, report, log) {
   library.openSystem();
   await act(T('Tables'));
   await act(T('Téléchargements'));
+  await act(T('Fichiers téléchargés'));
   await shot('telechargements');
   await act('TheMatrixPupPackv1.0.14.zip');
   await shot('telechargement-fichier');

@@ -27,6 +27,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { applyOps, samePath, type FileOp } from './fileops';
 import { formatDate, formatNumber, t } from './i18n';
+import { fetchResumable, partSize, ResumableError } from './resumable';
 import type { Cabinet } from './model';
 import { mediaCompetitors, ownMediaPages } from './mediaedit';
 import {
@@ -642,73 +643,42 @@ function md5OfFile(file: string): string {
 }
 
 /**
- * Télécharge un fichier vers `dest` : reçu sous « dest.part », taille et MD5 vérifiés,
- * puis renommé. En cas d'échec (réseau, réponse HTTP, taille, MD5, abandon), le
- * fichier partiel est effacé : il ne reste rien, et une MediaDbDownloadError est levée.
+ * Télécharge un fichier vers `dest` : reçu sous « dest.part », taille et MD5 vérifiés (sur le
+ * fichier entier), puis renommé. Une coupure ou un silence du site laissent le partiel : l'essai
+ * suivant reprend là où il s'était arrêté (resumable.ts, en-tête Range ; GitHub sait reprendre).
+ * Un MD5 faux, une réponse HTTP en erreur, une taille fausse ou un abandon n'en laissent rien.
+ * Échec : une MediaDbDownloadError.
  */
 export async function downloadMediaDbFile(file: MediaDbFile, dest: string, opts: MediaDbDownloadOptions = {}): Promise<{ size: number; md5: string }> {
-  const doFetch = opts.fetch ?? fetch;
   const part = `${dest}.part`;
   fs.mkdirSync(path.dirname(dest), { recursive: true });
-  const stall = new AbortController();
-  const signal = opts.signal ? AbortSignal.any([opts.signal, stall.signal]) : stall.signal;
-  let timer: NodeJS.Timeout | undefined;
-  const arm = () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => stall.abort(new MediaDbDownloadError(t('plus rien ne vient de GitHub'), 'network')), opts.stallMs ?? STALL_MS);
-  };
-  let handle: fs.promises.FileHandle | undefined;
   try {
-    arm();
-    let response: Response;
-    try {
-      response = await doFetch(file.url, { redirect: 'follow', signal });
-    } catch (error) {
-      throw toDownloadError(error, signal);
+    const got = await fetchResumable({
+      url: file.url,
+      part,
+      ...(opts.fetch ? { fetch: opts.fetch } : {}),
+      ...(opts.signal ? { signal: opts.signal } : {}),
+      stallMs: opts.stallMs ?? STALL_MS,
+      hashes: ['md5'],
+      ...(opts.onData ? { onData: opts.onData } : {}),
+    });
+    if (file.md5 && got.md5 !== file.md5) {
+      fs.rmSync(part, { force: true });
+      throw new MediaDbDownloadError(t('somme MD5 différente de celle de l’index : fichier abîmé ou modifié sur le dépôt'), 'md5');
     }
-    if (!response.ok || !response.body) throw new MediaDbDownloadError(`HTTP ${response.status}`, 'http');
-    const header = Number(response.headers.get('content-length'));
-    const total = Number.isFinite(header) && header > 0 ? header : undefined;
-    const hash = crypto.createHash('md5');
-    handle = await fs.promises.open(part, 'w');
-    let received = 0;
-    const reader = response.body.getReader();
-    try {
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        arm();
-        hash.update(value);
-        await handle.write(value);
-        received += value.byteLength;
-        opts.onData?.(received, total);
-      }
-    } catch (error) {
-      throw toDownloadError(error, signal);
-    }
-    await handle.close();
-    handle = undefined;
-    if (total !== undefined && received !== total) throw new MediaDbDownloadError(t('reçu {received} octets sur {total}', { received: formatNumber(received), total: formatNumber(total) }), 'size');
-    const md5 = hash.digest('hex');
-    if (file.md5 && md5 !== file.md5) throw new MediaDbDownloadError(t('somme MD5 différente de celle de l’index : fichier abîmé ou modifié sur le dépôt'), 'md5');
     fs.rmSync(dest, { force: true });
     fs.renameSync(part, dest);
-    return { size: received, md5 };
+    return { size: got.received, md5: got.md5! };
   } catch (error) {
-    await handle?.close().catch(() => undefined);
-    fs.rmSync(part, { force: true });
-    throw error instanceof MediaDbDownloadError ? error : toDownloadError(error, signal);
-  } finally {
-    clearTimeout(timer);
+    if (error instanceof MediaDbDownloadError) throw error;
+    const e = error instanceof ResumableError ? error : undefined;
+    const reason: MediaDbDownloadError['reason'] = e?.reason === 'http' ? 'http' : e?.reason === 'size' ? 'size' : e?.reason === 'aborted' ? 'aborted' : 'network';
+    // Seule une coupure garde son partiel (et seulement s'il a des octets) : le reste repartirait faux.
+    if (reason !== 'network' || partSize(part) === 0) fs.rmSync(part, { force: true });
+    throw new MediaDbDownloadError(reason === 'network' && e?.message === t('plus rien ne vient du site') ? t('plus rien ne vient de GitHub') : (e?.message ?? (error as Error)?.message ?? String(error)), reason);
   }
 }
 
-function toDownloadError(error: unknown, signal: AbortSignal): MediaDbDownloadError {
-  if (error instanceof MediaDbDownloadError) return error;
-  if (signal.aborted && signal.reason instanceof MediaDbDownloadError) return signal.reason;
-  if (signal.aborted) return new MediaDbDownloadError(t('téléchargement annulé'), 'aborted');
-  return new MediaDbDownloadError((error as Error)?.message ?? String(error), 'network');
-}
 
 /** Dossier de réception : <downloads>\vpinmediadb. */
 export function mediaDbStagingDir(downloadsDir: string): string {
@@ -737,8 +707,8 @@ export async function stageMediaDbFile(stagingDir: string, file: MediaDbFile, op
 }
 
 /**
- * Vide le dossier de réception : fichiers partiels d'un téléchargement interrompu
- * (arrêt de la borne), et aperçus de plus d'un jour ou de ceux donnés.
+ * Vide le dossier de réception : aperçus et fichiers partiels de plus d'un jour, et ceux donnés.
+ * Un partiel récent (coupure, arrêt de la borne) est gardé : l'essai suivant le reprend.
  */
 export function cleanMediaDbStaging(stagingDir: string, opts: { keep?: string[]; now?: Date; remove?: string[] } = {}): void {
   const now = (opts.now ?? new Date()).getTime();
@@ -757,7 +727,8 @@ export function cleanMediaDbStaging(stagingDir: string, opts: { keep?: string[];
     } catch {
       continue;
     }
-    if (name.endsWith('.part') || old || opts.remove?.some((r) => samePath(r, file))) fs.rmSync(file, { force: true, recursive: true });
+    // Un partiel récent attend sa reprise (coupure, arrêt de la borne) : il part avec les vieux aperçus, après un jour.
+    if (old || opts.remove?.some((r) => samePath(r, file))) fs.rmSync(file, { force: true, recursive: true });
   }
 }
 
@@ -794,7 +765,8 @@ export interface MediaDbInstalled {
 
 export interface MediaDbInstallResult {
   installed: MediaDbInstalled[];
-  failed: { type: MediaType; reason: string }[];
+  /** `cut` : coupure du réseau, le partiel est gardé (l'essai suivant le reprend). */
+  failed: { type: MediaType; reason: string; cut?: boolean }[];
   /** .info réécrit (sources, demi-tour retiré). */
   infoFile?: string;
 }
@@ -802,15 +774,15 @@ export interface MediaDbInstallResult {
 /**
  * Télécharge les médias choisis, un par un pour un débit modéré, et range chacun
  * dès qu'il est vérifié : les anciens fichiers de ce type à la corbeille, le nouveau
- * sous « (Type) <nom du dossier>.ext ». Un échec n'empêche pas les suivants et ne
- * laisse rien. Puis le .info note la source de chaque fichier rangé (origine,
+ * sous « (Type) <nom du dossier>.ext ». Un échec n'empêche pas les suivants ; seule une
+ * coupure laisse son partiel, que l'essai suivant reprend. Puis le .info note la source de chaque fichier rangé (origine,
  * adresse, date, MD5) et retire le demi-tour forcé d'un plateau remplacé : le
  * nouveau fichier suit le standard (paysage, flippers à droite), que le menu tourne
  * de lui-même.
  */
 export async function installMediaDb(table: TableEntry, choices: MediaDbChoice[], ctx: MediaDbInstallContext): Promise<MediaDbInstallResult> {
   const installed: MediaDbInstalled[] = [];
-  const failed: { type: MediaType; reason: string }[] = [];
+  const failed: MediaDbInstallResult['failed'] = [];
   const total = choices.length;
   for (const [index, choice] of choices.entries()) {
     const { offer } = choice;
@@ -823,7 +795,7 @@ export async function installMediaDb(table: TableEntry, choices: MediaDbChoice[]
         onData: (received, size) => ctx.onProgress?.({ index, total, type: offer.type, received, size }),
       });
     } catch (error) {
-      failed.push({ type: offer.type, reason: (error as Error).message });
+      failed.push({ type: offer.type, reason: (error as Error).message, ...(error instanceof MediaDbDownloadError && error.reason === 'network' ? { cut: true } : {}) });
       if (ctx.signal?.aborted) break;
       continue;
     }

@@ -186,7 +186,6 @@ export const messages: Record<string, string> = {
   'Cette proposition est déjà dans le brouillon.': 'This suggestion is already in the draft.',
   'Téléchargement depuis {source}…': 'Downloading from {source}…',
   '{label} : {progress}…': '{label}: {progress}…',
-  'Téléchargement impossible : {error}. Rien n’a été laissé.': 'Download failed: {error}. Nothing was left behind.',
   'Lien mort : le site a renvoyé une page au lieu du fichier. Rien n’a été gardé.': 'Dead link: the site returned a page instead of the file. Nothing was kept.',
   'Téléchargé et vérifié.': 'Downloaded and verified.',
   'Téléchargé.': 'Downloaded.',

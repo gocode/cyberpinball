@@ -266,3 +266,5 @@ foreach ($scenario in $Scenarios) {
     'reglages' { Invoke-Scenario 'reglages' @{ CYBERPINBALL_AUTOPILOT = ((@('F24') * 12) -join ',') } @('--reglages') 40 }
   }
 }
+# Jonction vers les vrais émulateurs retirée (docs\hors-ecran.ps1).
+Remove-JonctionsSortantes

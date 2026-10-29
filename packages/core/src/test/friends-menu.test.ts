@@ -9,6 +9,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { createDownloadManager } from '../downloadmanager';
 import { newSocialState } from '../social';
 import type { LiveGame, LiveInvite } from '../livegame';
 
@@ -78,9 +79,19 @@ function setup(content?: object) {
       openMediasWith: () => undefined,
       catalogFor: () => undefined,
       installReceived: () => undefined,
+      isShowing: () => false,
     },
     net,
     firewall,
+    // Gestionnaire de téléchargements sans source : les réceptions y entrent, rien ne part.
+    downloads: {
+      manager: createDownloadManager({ dataDir: dir, transports: {} }),
+      finisher: () => undefined,
+      deliverer: () => undefined,
+      opener: () => undefined,
+      deliver: () => undefined,
+      openReturn: () => undefined,
+    },
     content: content ?? createFriendContent({ net, dataDir: dir, tables: () => [], root: () => undefined, contents: () => undefined }),
     games,
     tables: () => [],

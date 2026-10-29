@@ -13,6 +13,12 @@
 // L'empreinte est calculée pendant l'envoi et donnée à la fin (file-end) : un fichier de plusieurs
 // gigaoctets n'est lu qu'une fois.
 //
+// Reprise (gestionnaire de téléchargements, fetchFile) : le receveur garde le fichier partiel
+// quand l'ami se déconnecte, et redemande le fichier à partir de ce qu'il a (file-get `from`) ;
+// l'ami relit et hache le début, puis envoie la suite : l'empreinte de la fin porte toujours sur le
+// fichier entier, et le receveur, qui a haché son début, vérifie le fichier repris en entier. Une
+// borne d'avant la reprise renvoie tout (en-tête sans `from`) : le partiel repart de zéro.
+//
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
 import { createHash } from 'node:crypto';
@@ -53,6 +59,8 @@ export interface FriendContentOptions {
   contents(table: TableEntry): TableContents | undefined;
   /** Une bibliothèque est arrivée, un transfert avance : redessiner. */
   onChange?(): void;
+  /** Ce fichier ou dossier appartient à un téléchargement de la file : le ménage du démarrage l'épargne. */
+  keep?(file: string): boolean;
   log?(line: string): void;
 }
 
@@ -72,6 +80,16 @@ export interface FetchProgress {
 }
 
 export type FetchFailure = FileRefusal | 'offline' | 'check' | 'size' | 'sha' | 'timeout' | 'cancelled';
+
+/** Ce qu'un fichier demandé devient à l'arrivée : un média vérifié, ou un fichier de table à sa place. */
+export type FetchTarget = { kind: 'media'; media: LibraryMedia } | { kind: 'file'; dest: string };
+
+/** Un fichier reçu et vérifié (taille et empreinte du fichier entier). */
+export interface FetchedFile {
+  file: string;
+  bytes: number;
+  sha256: string;
+}
 
 export interface FetchResult {
   /** Fichiers vérifiés, dans le dossier d'attente, nommés <sha256>.<format>. */
@@ -97,6 +115,14 @@ export interface FriendContent {
   tableFiles(key: string, tableId: string): Promise<TableFile[] | FetchFailure>;
   /** Prend ces fichiers d'une de ses tables, dans un dossier neuf nommé `folder`, sous leur chemin relatif. */
   fetchTable(key: string, tableId: string, folder: string, files: readonly TableFile[], progress?: (p: FetchProgress) => void, signal?: AbortSignal): Promise<TableFetchResult>;
+  /**
+   * Un fichier (média ou fichier de table), reçu dans `part`, gardé si l'ami se déconnecte : un
+   * nouvel appel avec le même partiel reprend là où il s'était arrêté (gestionnaire de
+   * téléchargements). `onBytes` : octets du fichier reçus, partiel compris.
+   */
+  fetchFile(key: string, tableId: string, id: string, target: FetchTarget, part: string, onBytes?: (bytes: number) => void, signal?: AbortSignal, expect?: number): Promise<FetchedFile | { reason: FetchFailure }>;
+  /** Dossier neuf où ranger une table reçue (gestionnaire de téléchargements). */
+  tableDir(folder: string): string;
   /** Dossier d'attente des fichiers reçus. */
   receivedDir(): string;
   stop(): void;
@@ -111,8 +137,7 @@ const FILE_TIMEOUT_MS = 30_000;
 /** Fichiers reçus mais jamais enregistrés ni installés : effacés après ce délai. */
 const RECEIVED_KEEP_MS = 7 * 24 * 3600_000;
 
-/** Ce qu'un fichier demandé devient à l'arrivée : un média vérifié, ou un fichier de table à sa place. */
-type Target = { kind: 'media'; media: LibraryMedia } | { kind: 'file'; dest: string };
+type Target = FetchTarget;
 
 interface Incoming {
   key: string;
@@ -120,11 +145,17 @@ interface Incoming {
   bytesHead?: number;
   fd?: number;
   part: string;
+  /** Octets déjà dans le partiel, demandés en reprise (file-get `from`). */
+  from: number;
+  /** Partiel gardé par le gestionnaire : une déconnexion ne l'efface pas. */
+  keep: boolean;
+  /** Taille annoncée par la bibliothèque de l'ami quand le téléchargement a été demandé. */
+  expect?: number;
   bytes: number;
   first: Buffer;
   hash: ReturnType<typeof createHash>;
   timer?: NodeJS.Timeout;
-  done(result: { file: string } | { reason: FetchFailure }): void;
+  done(result: FetchedFile | { reason: FetchFailure }): void;
 }
 
 /** Fichier de ma bibliothèque que désigne un identifiant : un média, ou un fichier d'une table. */
@@ -146,8 +177,8 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
   let nextReq = 1;
   const changed = () => opts.onChange?.();
 
-  clean(dir);
-  clean(tablesDir);
+  clean(dir, opts.keep);
+  clean(tablesDir, opts.keep);
 
   // ---------- Ma bibliothèque, servie à mes amis ----------
 
@@ -179,7 +210,7 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     return ownTableFiles.get(tableId)?.get(id);
   }
 
-  async function serveFile(key: string, req: number, tableId: string, id: string): Promise<void> {
+  async function serveFile(key: string, req: number, tableId: string, id: string, asked = 0): Promise<void> {
     const refuse = (reason: FileRefusal) => net.send(key, { t: 'file-refused', req, reason });
     if (!net.state().shareLibrary) return void refuse('not-shared');
     // Un fichier à la fois par ami : les autres attendent leur tour chez lui.
@@ -208,10 +239,19 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
         const n = fs.readSync(fd, head, 0, 512, 0);
         if (!checkShareable(what.type, what.file, head.subarray(0, n), bytes).ok) return void refuse('refused');
       }
-      if (!net.send(key, { t: 'file-head', req, bytes })) return;
+      // Reprise : le début que l'ami a déjà est relu pour l'empreinte du fichier entier, pas renvoyé.
+      const from = asked > 0 && asked <= bytes ? asked : 0;
+      if (!net.send(key, { t: 'file-head', req, bytes, ...(from ? { from } : {}) })) return;
+      if (from) log(`Bibliothèque partagée : envoi repris à partir de ${from} octets sur ${bytes}.`); // i18n-ignore : journal
       const hash = createHash('sha256');
       const buf = Buffer.alloc(FILE_CHUNK);
-      let sent = 0;
+      for (let at = 0; at < from && !upload.cancelled; ) {
+        const n = fs.readSync(fd, buf, 0, Math.min(FILE_CHUNK, from - at), at);
+        if (n <= 0) break;
+        hash.update(buf.subarray(0, n));
+        at += n;
+      }
+      let sent = from;
       while (sent < bytes && !upload.cancelled) {
         const n = fs.readSync(fd, buf, 0, Math.min(FILE_CHUNK, bytes - sent), sent);
         if (n <= 0) break;
@@ -258,13 +298,15 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     listing.done([...listing.chunks.entries()].sort((a, b) => a[0] - b[0]).flatMap(([, files]) => files));
   }
 
-  function finish(req: number, result: { file: string } | { reason: FetchFailure }): void {
+  function finish(req: number, result: FetchedFile | { reason: FetchFailure }): void {
     const job = incoming.get(req);
     if (!job) return;
     incoming.delete(req);
     if (job.timer) clearTimeout(job.timer);
     if (job.fd !== undefined) fs.closeSync(job.fd);
-    if ('reason' in result) fs.rmSync(job.part, { force: true });
+    // Un partiel du gestionnaire survit à une coupure (l'ami parti, muet, occupé) ; un fichier faux ou annulé part.
+    const resumable = 'reason' in result && job.keep && (result.reason === 'offline' || result.reason === 'timeout' || result.reason === 'busy');
+    if ('reason' in result && !resumable) fs.rmSync(job.part, { force: true });
     job.done(result);
   }
 
@@ -285,9 +327,34 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
       net.send(key, { t: 'file-cancel', req: head.req });
       return finish(head.req, { reason: 'size' });
     }
+    // Reprise d'un fichier qui a changé de taille chez l'ami depuis la demande : le début gardé ne
+    // vaut plus rien ; tout part (« size »), le gestionnaire repart de zéro une fois.
+    if (job.from > 0 && job.expect !== undefined && head.bytes !== job.expect) {
+      net.send(key, { t: 'file-cancel', req: head.req });
+      job.keep = false;
+      return finish(head.req, { reason: 'size' });
+    }
     job.bytesHead = head.bytes;
     fs.mkdirSync(path.dirname(job.part), { recursive: true });
-    job.fd = fs.openSync(job.part, 'w');
+    if (job.from > 0 && head.from === job.from && job.from <= head.bytes) {
+      // Reprise acceptée : le début gardé est haché (le fichier repris est vérifié en entier), la suite s'y ajoute.
+      job.fd = fs.openSync(job.part, 'r+');
+      const buf = Buffer.alloc(FILE_CHUNK);
+      for (let at = 0; at < job.from; ) {
+        const n = fs.readSync(job.fd, buf, 0, Math.min(FILE_CHUNK, job.from - at), at);
+        if (n <= 0) break;
+        job.hash.update(buf.subarray(0, n));
+        if (job.first.length < 512) job.first = Buffer.concat([job.first, buf.subarray(0, Math.min(n, 512 - job.first.length))]);
+        at += n;
+      }
+      fs.ftruncateSync(job.fd, job.from);
+      job.bytes = job.from;
+    } else {
+      // Pas de reprise (premier essai, ou borne d'avant la reprise qui renvoie tout) : de zéro.
+      job.fd = fs.openSync(job.part, 'w');
+      job.from = 0;
+      job.bytes = 0;
+    }
     arm(job, head.req);
   }
 
@@ -300,7 +367,7 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
       net.send(key, { t: 'file-cancel', req: chunk.req });
       return finish(chunk.req, { reason: 'size' });
     }
-    fs.writeSync(job.fd, chunk.data);
+    fs.writeSync(job.fd, chunk.data, 0, chunk.data.length, job.bytes);
     job.hash.update(chunk.data);
     if (job.first.length < 512) job.first = Buffer.concat([job.first, chunk.data.subarray(0, 512 - job.first.length)]);
     job.bytes += chunk.data.length;
@@ -323,8 +390,9 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     fs.closeSync(job.fd!);
     job.fd = undefined;
     fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.rmSync(file, { force: true });
     fs.renameSync(job.part, file);
-    finish(req, { file });
+    finish(req, { file, bytes: job.bytes, sha256: sha });
   }
 
   const unsubscribe = [
@@ -350,7 +418,7 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
         case 'table-files':
           return onTableFiles(key, message);
         case 'file-get':
-          void serveFile(key, message.req, message.table, message.file).catch((error: Error) => log(`Bibliothèque partagée : envoi impossible (${error.message}).`)); // i18n-ignore : journal
+          void serveFile(key, message.req, message.table, message.file, message.from).catch((error: Error) => log(`Bibliothèque partagée : envoi impossible (${error.message}).`)); // i18n-ignore : journal
           return;
         case 'file-cancel': {
           const upload = uploads.get(key);
@@ -378,14 +446,20 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     net.onChunk(onChunk),
   ];
 
-  function fetchOne(key: string, tableId: string, id: string, target: Target, onBytes: (bytes: number) => void, signal?: AbortSignal): Promise<{ file: string } | { reason: FetchFailure }> {
+  /** `kept` : partiel du gestionnaire, repris s'il a déjà des octets et gardé en cas de coupure. */
+  function fetchOne(key: string, tableId: string, id: string, target: Target, onBytes: (bytes: number) => void, signal?: AbortSignal, kept?: string, expect?: number): Promise<FetchedFile | { reason: FetchFailure }> {
     return new Promise((resolve) => {
       const req = nextReq++;
+      const part = kept ?? (target.kind === 'file' ? `${target.dest}.${req}.part` : path.join(dir, `${req}-${process.pid}.part`));
+      const from = kept ? (fileSize(part) ?? 0) : 0;
       const job: Incoming = {
         key,
         target,
-        part: target.kind === 'file' ? `${target.dest}.${req}.part` : path.join(dir, `${req}-${process.pid}.part`),
-        bytes: 0,
+        part,
+        from,
+        keep: Boolean(kept),
+        ...(expect !== undefined ? { expect } : {}),
+        bytes: from,
         first: Buffer.alloc(0),
         hash: createHash('sha256'),
         done: resolve,
@@ -409,7 +483,7 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
         done(result);
       };
       arm(job, req);
-      if (!net.send(key, { t: 'file-get', req, table: tableId, file: id })) finish(req, { reason: 'offline' });
+      if (!net.send(key, { t: 'file-get', req, table: tableId, file: id, ...(from ? { from } : {}) })) finish(req, { reason: 'offline' });
     });
   }
 
@@ -478,6 +552,14 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
       log(`Bibliothèque partagée : table « ${name} », ${ok.length} fichier(s) reçu(s), ${failed.length} refusé(s) ou échoué(s).`); // i18n-ignore : journal
       return { dir: root, received: ok.map((r) => r.item), failed: failed.map((f) => ({ file: f.item, reason: f.reason })) };
     },
+    fetchFile(key, tableId, id, target, part, onBytes, signal, expect) {
+      // Un fichier de table ne sort jamais du dossier des tables reçues.
+      if (target.kind === 'file' && path.relative(tablesDir, target.dest).split(path.sep).some((p) => p === '..' || !p)) return Promise.resolve({ reason: 'refused' as const });
+      return fetchOne(key, tableId, id, target, (bytes) => onBytes?.(bytes), signal, part, expect);
+    },
+    tableDir(folder) {
+      return path.join(tablesDir, `${new Date().toISOString().replace(/[:.]/g, '-')}-${nextReq++}`, safeFolderName(folder));
+    },
     receivedDir: () => dir,
     stop() {
       for (const off of unsubscribe) off();
@@ -498,8 +580,11 @@ function safeFolderName(name: string): string {
   return clean && !/^(con|prn|aux|nul|com\d|lpt\d)$/i.test(clean) && clean !== '.' && clean !== '..' ? clean : 'Table';
 }
 
-/** Ce qui traîne d'un ancien transfert (morceaux, fichiers jamais repris) : effacé après une semaine. */
-function clean(dir: string): void {
+/**
+ * Ce qui traîne d'un ancien transfert (morceaux, fichiers jamais repris) : effacé après une semaine,
+ * sauf ce qu'un téléchargement de la file garde pour reprendre (`keep`).
+ */
+function clean(dir: string, keep?: (file: string) => boolean): void {
   let names: fs.Dirent[] = [];
   try {
     names = fs.readdirSync(dir, { withFileTypes: true });
@@ -508,6 +593,7 @@ function clean(dir: string): void {
   }
   for (const d of names) {
     const file = path.join(dir, d.name);
+    if (keep?.(file)) continue;
     try {
       if (d.name.endsWith('.part') || Date.now() - fs.statSync(file).mtimeMs > RECEIVED_KEEP_MS) fs.rmSync(file, { recursive: true, force: true });
     } catch {

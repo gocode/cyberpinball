@@ -286,6 +286,11 @@ export const messages: Record<string, string> = {
   'Flippers : choisir · Start : valider · Exit : annuler': 'Flippers: choose · Start: confirm · Exit: cancel',
   'Flippers : choisir une touche · Start : la taper · Exit : annuler · ou tapez au clavier, Entrée pour valider': 'Flippers: choose a key · Start: type it · Exit: cancel · or type on a keyboard, Enter to confirm',
   'Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris': 'Flippers or Tab: choose · Start or Enter: confirm · Exit or Esc: back · mouse',
+  // Listes de contenu à deux zones (listzones.ts) : repère du cadre et bandeau d'aide.
+  'Sortir de la liste': 'Leave the list',
+  'Revenir à la liste': 'Back to the list',
+  'Flippers : parcourir, tenus pour aller vite · Start ou Entrée : valider · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran': 'Flippers: browse, hold to go faster · Start or Enter: confirm · Exit or Esc: leave the list · MagnaSave or F6: screen actions',
+  'MagnaSave ou F6 : la liste': 'MagnaSave or F6: the list',
   'bureau, un seul écran': 'desktop, single screen',
   'non géré par le plugin PUP': 'not supported by the PUP plugin',
   'sans topper': 'no topper',

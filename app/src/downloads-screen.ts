@@ -1,4 +1,4 @@
-// Écran « Téléchargements » (menu système) : tout ce que Cyber Pinball a téléchargé,
+// Écran « Fichiers téléchargés » (Téléchargements > Fichiers téléchargés) : tout ce que Cyber Pinball a téléchargé,
 // gardé sous <racine>\downloads pour le reprendre sans le télécharger de nouveau — d'où
 // il vient, quand, sa taille, à quoi il sert, ce qu'il contient. Un fichier s'ouvre : l'ajouter
 // à n'importe quel jeu (une table installée, ou un jeu de la liste d'attente), dans la partie
@@ -76,6 +76,8 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
   let sort: DownloadSort = 'date';
   let windows = false;
   let flash: { text: string; tone: Tone } | undefined;
+  /** « Retour » de la liste : l'écran qui l'a ouverte (le gestionnaire de téléchargements). */
+  let leave = () => ctx.back();
   /** Contenu de chaque fichier ouvert, lu une fois. */
   const seenOf = new Map<string, Seen>();
 
@@ -117,16 +119,16 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
     );
     if (mine.length) actions.push({ label: t('Tout vider'), detail: t('{summary} : corbeille de Cyber Pinball', { summary: downloadsSummary(mine) }), icon: 'trash', tone: 'error', run: () => confirmEmpty() });
     actions.push(ctx.web('downloads', () => open()));
-    actions.push({ label: t('Retour'), icon: 'back', run: () => ctx.back() });
+    actions.push({ label: t('Retour'), icon: 'back', run: () => leave() });
     const { count, bytes } = downloadTotals(mine);
     return {
-      heading: t('Téléchargements'),
-      icon: 'download',
+      heading: t('Fichiers téléchargés'),
+      icon: 'folder-download',
       subheading: [tn(count, '{n} fichier', '{n} fichiers'), formatSize(bytes)].join(' · '),
       lead: t('Tout ce que Cyber Pinball a téléchargé, gardé pour le reprendre sans le télécharger de nouveau. Ce que vous retirez part dans la corbeille de Cyber Pinball.'),
       sections,
       actions,
-      back: () => ctx.back(),
+      back: () => leave(),
       variant: 'downloads',
     };
   }
@@ -301,5 +303,12 @@ export function createDownloadsScreen(ctx: DownloadsScreenContext) {
     open();
   }
 
-  return { open: () => ((flash = undefined), open()) };
+  return {
+    /** `back` : où ramène « Retour » (le gestionnaire de téléchargements) ; sans lui, le menu système. */
+    open: (back?: () => void) => {
+      leave = back ?? (() => ctx.back());
+      flash = undefined;
+      open();
+    },
+  };
 }

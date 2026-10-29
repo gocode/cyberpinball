@@ -23,6 +23,7 @@ import {
   displayKeys,
   keyLabel,
   interfaceKeys,
+  zoneSwitchKeys,
   navigationButtons,
   navigationProblems,
   type ButtonsSource,
@@ -166,6 +167,7 @@ import { createGuestMenu } from './guest-menu';
 import { createFriendsMenu } from './friends-menu';
 import { createFirewallRule } from './firewall-rule';
 import { createFriendContent } from './friend-content';
+import { friendTransport } from './download-sources';
 import { createLiveGames } from './live-game';
 import { createSocialNet } from './social-net';
 import { seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
@@ -388,6 +390,9 @@ const guest = new GuestMode({
 let closing = false;
 
 // Fiche, ajout, médecin et suppression des tables (library.ts).
+// Redessin de la file des téléchargements (downloadsChanged) : déclarés avant la gestion des tables, qui la crée.
+let downloadsRedraw: NodeJS.Timeout | undefined;
+let downloadsShown: string | undefined;
 const library = createLibrary({
   root: loc.root,
   dataDir: loc.dataDir,
@@ -417,6 +422,7 @@ const library = createLibrary({
   },
   quit: () => void quit(),
   keys: () => KEYS,
+  zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   windows: () => windows,
   browserScreen: () => browserScreenRect(),
   audioOutput: () => audioOutput,
@@ -430,6 +436,8 @@ const library = createLibrary({
   guest,
   displays: () => observedDisplays(),
   vpxVersion: () => vpxInstall(loc)?.version,
+  notify: (text) => showBanner(text),
+  downloadsChanged: () => downloadsChanged(),
 });
 // Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes (pastille
 // rouge) ; jamais pendant une partie ni son chargement.
@@ -547,6 +555,7 @@ function openDmdScreen(): void {
         {
           title: t('Ce que montre cet écran'),
           kind: 'dmd-kinds',
+          options: true,
           rows: offered.map((c, i) => ({ text: c.label, detail: c.detail, icon: c.icon, action: i, pick: true, figure: c.kind, ...(answered === c.kind && { badges: [t('Actuel')] }) })),
         },
       ],
@@ -607,6 +616,7 @@ const updates = createUpdatesMenu({
   silent: OFFSCREEN,
   library,
   broadcast: () => broadcast(),
+  downloads: library.downloads.manager,
   // Borne dédiée : Shell Launcher ne relance rien, l'installeur relance lui-même Cyber Pinball.
   quit: () => {
     handOverOnQuit();
@@ -683,6 +693,23 @@ function socialChanged(): void {
   }, 250);
 }
 const socialNet = createSocialNet({ dataDir: loc.dataDir, mode: socialMode, log: (line) => console.log(line), onChange: socialChanged });
+
+/**
+ * La file des téléchargements a changé. Un écran de la gestion des tables (le gestionnaire, une
+ * réception) se redessine au plus quatre fois par seconde ; le menu des tables seulement quand ce
+ * que dit sa pastille change (le pourcentage entier), pour ne pas déranger ses vidéos.
+ */
+function downloadsChanged(): void {
+  downloadsRedraw ??= setTimeout(() => {
+    downloadsRedraw = undefined;
+    if (closing) return;
+    const pill = JSON.stringify(library.downloads.pill() ?? null);
+    if (state.phase === 'library' || pill !== downloadsShown) {
+      downloadsShown = pill;
+      broadcast();
+    }
+  }, 250);
+}
 const socialFirewall = createFirewallRule({ exe: process.execPath, simulated: socialMode !== 'public', log: (line) => console.log(line) });
 const romsOf = (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.roms ?? [];
 // Bibliothèque partagée entre amis : la mienne servie si je la partage, la leur et leurs médias.
@@ -701,7 +728,15 @@ const friendContent = createFriendContent({
   romsOf,
   contents: tableInventory,
   onChange: socialChanged,
+  // Un partiel ou une table reçue que la file des téléchargements reprendra : le ménage l'épargne.
+  keep: (file) => library.downloads.manager.owns(file),
   log: (line) => console.log(line),
+});
+// Gestionnaire de téléchargements : un ami est une source ; il reprend dès que l'ami est relié.
+library.downloads.setTransport('friend', friendTransport(friendContent, socialNet));
+library.downloads.friends({
+  has: (key) => socialNet.state().friends.some((f) => f.key === key),
+  name: (key) => socialNet.state().friends.find((f) => f.key === key)?.name,
 });
 /** Le menu des tables est à l'écran : une invitation peut s'y afficher sans rien interrompre. */
 const liveCanShow = () => !closing && state.phase === 'menu';
@@ -740,6 +775,7 @@ const friendsMenu = createFriendsMenu({
   net: socialNet,
   firewall: socialFirewall,
   content: friendContent,
+  downloads: library.downloads,
   games: liveGames,
   tables: () => tables,
   romsOf,
@@ -943,6 +979,10 @@ export function startFrontend(): void {
     if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
     // Roue dentée (ou cadenas, en mode invité).
     else if (action.type === 'config') guest.knock('menu.system') && openConfig();
+    // Pastille des téléchargements du menu des tables.
+    else if (action.type === 'downloads') {
+      if (state.phase === 'menu' && guest.knock('menu.system')) library.downloads.open();
+    }
     else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
       if (action.offset === 0) guest.knock('menu.sheet') && library.openSheet(tables[state.index]!);
       else if (guest.knock('menu.choose')) moveSelection(action.offset);
@@ -988,6 +1028,8 @@ export function startFrontend(): void {
     hours.dispose();
     liveDmd.dispose();
     void stopSimulatedPlayers?.();
+    // La file est écrite ; ce qui tournait reprendra au prochain démarrage, là où il en était.
+    library.downloads.manager.stop();
     friendContent.stop();
     liveGames.stop();
     void socialNet.stop();
@@ -1302,9 +1344,11 @@ function unlockListening(): boolean {
   return state.phase !== 'loading' && state.phase !== 'playing' && !desktop.active;
 }
 
-/** Touche ou bouton relâché : seule la combinaison de déverrouillage s'en sert. */
+/** Touche ou bouton relâché : la combinaison de déverrouillage, et la bascule des zones (MagnaSave, F6). */
 function handleKeyUp(input: Input): void {
   guest.input(input.code, false, unlockListening());
+  // Gestion des tables : MagnaSave (F6) relâché bascule entre la liste et les actions de l'écran.
+  if (state.phase === 'library') library.handleKeyUp(input);
 }
 
 /**
@@ -1870,6 +1914,7 @@ function startVpxInstall(): boolean {
   show([t('Préparation…')]);
   installVpx(root, (p) =>
     show([t('Téléchargement : {percent} % ({received} / {total} Mo)', { percent: p.percent, received: p.receivedMb, total: p.totalMb }), t('Ne débranchez pas la borne.')]),
+    library.downloads.manager,
   )
     .then((version) => {
       reloadTables();
@@ -2018,6 +2063,8 @@ function viewFor(role: RoleId) {
     guest: guest.view(),
     /** Pastille rouge sur la roue dentée : une entrée du menu système attend l'utilisateur. */
     attention: library.attention(),
+    /** Pastille des téléchargements, à gauche de la roue dentée (menu des tables). */
+    downloads: role === 'playfield' && state.phase === 'menu' ? library.downloads.pill() : undefined,
     library: state.phase === 'library' ? library.view() : undefined,
     // Mode attente : la table montrée, son logo, et l'invite du playfield.
     attract: shown ? { ...describe(shown), wheel: medias?.wheel(shown) } : undefined,

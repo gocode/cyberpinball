@@ -45,6 +45,8 @@ son interface).
 - Partie en direct entre amis, jusqu'à 4 bornes : l'invitation s'ouvre chez l'ami sur la même table (version vérifiée), un compte à rebours de 5 secondes lance la partie partout, puis chacun voit les résultats.
 - Le nom d'un ami suit toujours son dernier renommage, et une demande d'ami en attente repart quand les bornes se retrouvent.
 - La barre des tâches de Windows ne passe plus devant le DMD, le fronton ou le playfield au retour d'une partie : Cyber Pinball la remet aussitôt derrière, et « Santé de la borne » dit s'il a dû le faire.
+- Longues listes : dans une liste de contenu (jeux, médias, fichiers…), marquée par son cadre et le repère « Exit · Sortir de la liste », Exit ramène aux actions de l'écran au lieu de le quitter ; MagnaSave (F6 au clavier) passe de l'une à l'autre en retrouvant sa place, et un flipper tenu fait défiler de lettre en lettre.
+- Téléchargements, en tête du menu système et en pastille sur le menu des tables : suit tout ce qui arrive des sites et de vos amis, reprend seul là où il s'était arrêté si la connexion tombe, même le lendemain, et vous ramène d'un geste à l'écran d'où vous l'aviez demandé.
 
 ## 0.1.3
 

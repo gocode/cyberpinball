@@ -76,3 +76,5 @@ Set-Key 'PlayerVR' 'AskToTurnOn' '0'
 Invoke-Game '3. AskToTurnOn = 0 mis à la main'
 Get-ChildItem "$home_\logs" -Filter 'stress-*.json' | ForEach-Object { "`n$($_.Name)"; Get-Content $_.FullName -Raw }
 if ((Get-FileHash $realIni).Hash -eq $realHash) { "`nLe vrai VPinballX.ini n'a pas changé." } else { "`nATTENTION : le vrai VPinballX.ini a changé pendant la démonstration." }
+# Jonction vers les vrais émulateurs retirée (docs\hors-ecran.ps1).
+Remove-JonctionsSortantes

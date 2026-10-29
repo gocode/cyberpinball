@@ -38,7 +38,7 @@ import {
 } from '@cyberpinball/core';
 import type { FirewallRule } from './firewall-rule';
 import type { FriendContent } from './friend-content';
-import { createFriendLibraryMenu } from './friend-library-menu';
+import { createFriendLibraryMenu, type FriendDownloads } from './friend-library-menu';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
 import type { LiveGames } from './live-game';
 import { createLiveMenu, type LiveMenu } from './live-game-menu';
@@ -47,6 +47,8 @@ import type { SocialNet } from './social-net';
 export interface FriendsMenuHost {
   library: {
     openCustom(build: () => Built, at?: number): void;
+    /** Cet écran décrit est affiché (une réception qui finit sous les yeux de l'utilisateur). */
+    isShowing(build: () => Built): boolean;
     openSystem(): void;
     openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
     task(message: string, work: () => Promise<void> | void): Promise<void>;
@@ -63,6 +65,8 @@ export interface FriendsMenuHost {
   net: SocialNet;
   firewall: FirewallRule;
   content: FriendContent;
+  /** Gestionnaire de téléchargements : chaque réception d'un ami y passe (friend-library-menu.ts). */
+  downloads: FriendDownloads;
   games: LiveGames;
   tables(): readonly TableEntry[];
   romsOf?(table: TableEntry): readonly string[];
@@ -117,6 +121,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     library: host.library,
     net,
     content: host.content,
+    downloads: host.downloads,
     live,
     tables: host.tables,
     ...(host.romsOf ? { romsOf: host.romsOf } : {}),

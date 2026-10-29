@@ -238,8 +238,24 @@ function Enter-BureauCache([string]$Script, [System.Collections.IDictionary]$Par
   $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($command))
   $shell = (Get-Process -Id $PID).Path
   Write-Host "Sur un bureau Windows caché : $(Split-Path $Script -Leaf) (rien n'apparaît sur les écrans du poste)." -ForegroundColor DarkGray
-  $global:LASTEXITCODE = Invoke-BureauCache "`"$shell`" -NoProfile -ExecutionPolicy Bypass -OutputFormat Text -EncodedCommand $encoded" (Get-Location).Path
+  $code = Invoke-BureauCache "`"$shell`" -NoProfile -ExecutionPolicy Bypass -OutputFormat Text -EncodedCommand $encoded" (Get-Location).Path
+  Remove-JonctionsSortantes
+  $global:LASTEXITCODE = $code
   return $true
+}
+
+# Jonctions laissées dans tmp\ par les démonstrations (tmp\demo-*\root\emulators vers les vrais
+# émulateurs) : retirées à la fin, les captures restent. Le 29/10/2026, un rangement du disque
+# (Robocopy /MOVE, qui suit les jonctions) a vidé D:\CyberPinball\emulators par elles.
+# rmdir sur la jonction elle-même, sans /s : la cible n'est jamais parcourue.
+function Remove-JonctionsSortantes {
+  $repo = (Resolve-Path (Split-Path $PSScriptRoot -Parent)).Path
+  $tmp = Join-Path $repo 'tmp'
+  if (-not (Test-Path $tmp)) { return }
+  Get-ChildItem $tmp -Directory -Recurse -Depth 4 -Force -Attributes ReparsePoint -ErrorAction SilentlyContinue | ForEach-Object {
+    $target = "$($_.Target)"
+    if ($target -and -not $target.StartsWith($repo, [StringComparison]::OrdinalIgnoreCase)) { cmd /c rmdir "$($_.FullName)" }
+  }
 }
 
 # Bilan du guet de app\src\offscreen.ts (hors-ecran.txt dans le dossier des captures).

@@ -42,8 +42,9 @@ test('chaque écran d’ajout ou de choix a son issue vers le web, une seule', (
 
 test('aucun nouvel écran d’ajout ou de choix sans issue vers le web', () => {
   // Les titres qui disent qu'on ajoute, qu'on récupère ou qu'on choisit : la fonction qui
-  // construit l'écran doit contenir son issue vers le web.
-  const ADDING = /heading: t\('(Ajouter une table|Ajouter à un jeu|Trouver une table|Ce qu’il faut : |\{kind\} : au choix|\{part\} : au choix|Récupérés et attendus|Parties du jeu|Téléchargements|Bibliothèque de ROM|Médias du jeu|\{label\} : propositions|Rien sur VPinMediaDB|Remplacer : |Choisir un fichier : )/;
+  // construit l'écran doit contenir son issue vers le web. « Téléchargements » est le
+  // gestionnaire (ce qui arrive) ; l'écran où l'on reprend un fichier est « Fichiers téléchargés ».
+  const ADDING = /heading: t\('(Ajouter une table|Ajouter à un jeu|Trouver une table|Ce qu’il faut : |\{kind\} : au choix|\{part\} : au choix|Récupérés et attendus|Parties du jeu|Fichiers téléchargés|Bibliothèque de ROM|Médias du jeu|\{label\} : propositions|Rien sur VPinMediaDB|Remplacer : |Choisir un fichier : )/;
   for (const { file, text } of sources) {
     const lines = text.split('\n');
     lines.forEach((line, i) => {

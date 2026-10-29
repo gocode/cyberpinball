@@ -9,6 +9,11 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  mediaDbStagedFile,
+  MediaDbDownloadError,
+  MEDIADB_NAME,
+  type DownloadManager,
+  type DownloadReturn,
   deepSearchGames,
   inventory,
   loadCabinet,
@@ -51,6 +56,8 @@ export interface MediaSearchContext {
   progress(message: string): void;
   /** Base VPS (cache, sinon premier téléchargement). */
   vps(): Promise<VpsDb | undefined>;
+  /** Gestionnaire de téléchargements : un média demandé (stage avec `job`) y est suivi. */
+  downloads?(): DownloadManager | undefined;
 }
 
 /** Résultat d'une recherche approfondie pour une table. */
@@ -243,9 +250,24 @@ export function createMediaSearch(ctx: MediaSearchContext) {
     return mediaDbSizes(files, { downloadsDir: downloads(), onProgress: (done, total) => ctx.progress(t('Poids des fichiers : {done} sur {total}…', { done, total })) });
   }
 
-  /** Télécharge un fichier dans le dossier de réception, vérifié par MD5 ; renvoie son chemin. */
-  async function stage(file: MediaDbFile, onData?: (received: number, total: number | undefined) => void): Promise<string> {
-    return (await stageMediaDbFile(staging(), file, { onData })).path;
+  /**
+   * Télécharge un fichier dans le dossier de réception, vérifié par MD5 ; renvoie son chemin.
+   * `job` : un média demandé par l'utilisateur, suivi dans le gestionnaire de téléchargements
+   * (son nom, l'écran où il ramène) ; une coupure garde son partiel, le même choix le reprend.
+   */
+  async function stage(file: MediaDbFile, onData?: (received: number, total: number | undefined) => void, job?: { title: string; back: DownloadReturn }): Promise<string> {
+    const dest = mediaDbStagedFile(staging(), file);
+    const tracked = job
+      ? ctx.downloads?.()?.track({ id: `mediadb-${path.basename(dest).replace(/\.[^.]+$/, '')}`, kind: 'mediadb', title: job.title, source: { kind: 'http', label: MEDIADB_NAME }, files: [{ ref: file.url, name: path.basename(dest), dest, part: `${dest}.part` }], back: job.back, resumable: true })
+      : undefined;
+    try {
+      const got = await stageMediaDbFile(staging(), file, { onData: (received, total) => (tracked?.progress(received, total), onData?.(received, total)) });
+      tracked?.done([{ index: 0, file: got.path }]);
+      return got.path;
+    } catch (error) {
+      tracked?.fail(error instanceof MediaDbDownloadError && error.reason === 'network' ? 'network' : 'http', (error as Error).message);
+      throw error;
+    }
   }
 
   return { index, vps: () => ctx.vps(), evidence, deep, screenshot, vpxImages, quality, stagePreviews, sizes, stage, staging, downloads };

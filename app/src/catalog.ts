@@ -110,6 +110,7 @@ import {
   type VpsGame,
   type VpsTableFile,
   type WaitItem,
+  type DownloadManager,
   type WaitList,
   type WaitProblem,
   type WaitRepair,
@@ -176,6 +177,8 @@ export interface CatalogContext {
   addFiles?(paths: string[]): void;
   /** Sélecteur de fichiers de Cyber Pinball (file-picker.ts) ; undefined à l'abandon. */
   pick?(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
+  /** Gestionnaire de téléchargements : chaque fichier d'une page de site y est suivi, et repris après une coupure. */
+  downloads?: DownloadManager;
 }
 
 /** Jeux par page du catalogue : une page tient sur l'écran, cartes et vignettes comprises. */
@@ -488,6 +491,32 @@ export function createCatalog(ctx: CatalogContext) {
     navKeys: () => host.keys(),
     audioOutput: () => host.audioOutput?.(),
     grabVideo: ytdlp,
+    // Gestionnaire de téléchargements : le fichier d'une page y entre, avec l'écran où il ramène.
+    track: ctx.downloads
+      ? (d) => {
+          const item = windowItem ? waitList().items.find((i) => i.id === windowItem) : undefined;
+          return ctx.downloads!.track({
+            kind: 'site',
+            attached: false,
+            title: d.claim?.title ?? (item ? t('{kind} : {game}', { kind: NEED_LABELS[item.kind], game: item.gameLabel }) : d.filename),
+            source: { kind: 'site', label: d.host },
+            files: [{ ref: d.url, name: d.filename, part: d.target, dest: d.target, ...(d.total ? { bytes: d.total } : {}) }],
+            back: d.claim?.back ?? (item?.table ? { screen: 'game-parts', table: item.table } : { screen: 'wait-list' }),
+            resumable: true,
+          });
+        }
+      : undefined,
+    trackGrab: ctx.downloads
+      ? (g) =>
+          ctx.downloads!.track({
+            kind: 'tool',
+            title: g.claim.title ? `${g.claim.title} · ${g.label}` : g.label,
+            source: { kind: 'http', label: g.host },
+            files: [{ ref: g.url, name: g.label, part: g.out }],
+            back: g.claim.back ?? { screen: 'downloads' },
+            resumable: false,
+          })
+      : undefined,
   });
   // Fiches des fichiers sur leur site (popularité, captures) et galerie des fichiers à choisir.
   const siteFiles = createSiteFiles({ acquirer, downloadsDir: () => ctx.layout()?.downloads, changed: () => host.broadcast() });
@@ -1131,6 +1160,8 @@ export function createCatalog(ctx: CatalogContext) {
       search: { query: req.query, engine: 'web' },
       claim: {
         dir: acquisitionDir(),
+        ...(target ? { title: target.kind ? t('{kind} : {game}', { kind: NEED_LABELS[target.kind], game: target.gameLabel }) : target.gameLabel } : {}),
+        back: target?.table ? { screen: 'game-parts', table: target.table } : { screen: 'wait-list' },
         done: (r) => {
           if (!('error' in r)) void receivedWeb(r.file, r.filename, r.urls, req);
         },

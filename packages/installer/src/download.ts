@@ -1,8 +1,6 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
-import { t } from '@cyberpinball/core';
+import { fetchResumable, ResumableError, t } from '@cyberpinball/core';
 import { sha256OfFile } from './fsutil';
 import type { Component } from './manifest';
 
@@ -19,18 +17,17 @@ export async function downloadComponent(component: Component, downloadsDir: stri
 
   if (fs.existsSync(file) && (await sha256OfFile(file)) === component.sha256) return file;
 
+  // Reçu sous « .part », repris là où il s'était arrêté après une coupure (resumable.ts de @cyberpinball/core).
   const part = `${file}.part`;
-  const response = await fetch(component.url, { redirect: 'follow' });
-  if (!response.ok || !response.body) throw new Error(t('Téléchargement impossible (HTTP {status}) : {url}', { status: response.status, url: component.url }));
-
-  const total = Number(response.headers.get('content-length')) || component.size;
-  let received = 0;
-  const body = Readable.fromWeb(response.body as import('node:stream/web').ReadableStream);
-  body.on('data', (chunk: Buffer) => {
-    received += chunk.length;
-    onProgress?.(received, total);
-  });
-  await pipeline(body, fs.createWriteStream(part));
+  try {
+    await fetchResumable({ url: component.url, part, ...(component.size ? { size: component.size } : {}), onData: (received, total) => onProgress?.(received, total ?? component.size) });
+  } catch (error) {
+    if (error instanceof ResumableError && error.reason === 'http') {
+      fs.rmSync(part, { force: true });
+      throw new Error(t('Téléchargement impossible (HTTP {status}) : {url}', { status: error.status ?? 0, url: component.url }));
+    }
+    throw error;
+  }
 
   const actual = await sha256OfFile(part);
   if (actual !== component.sha256) {

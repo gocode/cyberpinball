@@ -9,7 +9,20 @@
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec des services d'essai.
 
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
+  currentFile,
+  downloadReasonText,
+  downloadStateLabel,
+  isSafeTableRel,
+  jobBytes,
+  type DownloadFile,
+  type DownloadJob,
+  type DownloadJobKind,
+  type DownloadManager,
+  type DownloadReturn,
+  type DownloadScreen,
   defaultPartChoice,
   displayName,
   fileRefusalLabel,
@@ -40,14 +53,30 @@ import {
   type TableFile,
   type TableIdentity,
 } from '@cyberpinball/core';
-import type { FetchProgress, FriendContent } from './friend-content';
+import type { FriendContent } from './friend-content';
 import type { Action, Built, Row, Section } from './library';
 import type { LiveMenu } from './live-game-menu';
 import type { SocialNet } from './social-net';
 
+/** Ce que la gestion des tables offre aux amis pour leurs téléchargements (library.ts, downloads). */
+export interface FriendDownloads {
+  manager: DownloadManager;
+  /** Téléchargement fini : vrai s'il a été rendu à son écran de lui-même. */
+  finisher(kind: DownloadJobKind, fn: (job: DownloadJob) => boolean): void;
+  /** « Revenir à… » d'un téléchargement fini : vrai s'il l'a rendu. */
+  deliverer(kind: DownloadJobKind, fn: (job: DownloadJob) => boolean): void;
+  /** Ouvreur d'un écran de retour (la bibliothèque d'un ami). */
+  opener(screen: DownloadScreen, fn: (back: DownloadReturn) => void): void;
+  deliver(job: DownloadJob): void;
+  openReturn(back: DownloadReturn): void;
+}
+
 export interface FriendLibraryMenuHost {
   library: {
     openCustom(build: () => Built, at?: number): void;
+    /** Cet écran décrit est affiché (une réception qui finit sous les yeux de l'utilisateur). */
+    isShowing(build: () => Built): boolean;
+    openSystem(): void;
     openMediasWith(table: TableEntry, files: readonly { type: MediaType; file: string; page?: number }[], origin: MediaOriginDraft, notice: string): void;
     catalogFor(identity: TableIdentity): void;
     /** Dossier d'une table reçue : le plan d'ajout, vers `table` quand on l'a déjà. */
@@ -59,6 +88,8 @@ export interface FriendLibraryMenuHost {
   freeSpace?(): number | undefined;
   net: Pick<SocialNet, 'state' | 'online'>;
   content: FriendContent;
+  /** Gestionnaire de téléchargements : chaque réception y passe, et reprend seule après une coupure. */
+  downloads: FriendDownloads;
   live: Pick<LiveMenu, 'inviteOn'>;
   tables(): readonly TableEntry[];
   romsOf?(table: TableEntry): readonly string[];
@@ -87,7 +118,9 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     flash = undefined;
     return row ? [{ rows: [row] }] : [];
   };
-  let transfer: { key: string; table: TableEntry | string; whole?: boolean; progress?: FetchProgress; abort: AbortController } | undefined;
+  /** Réception ouverte à l'écran : le téléchargement de la file qu'elle montre. */
+  let transfer: { id: string; build: () => Built } | undefined;
+  const downloads = host.downloads;
   /** Parties de la table d'un ami, demandées à l'ouverture de l'écran des parties, et ce qu'on en prend. */
   let parts: { key: string; tableId: string; files?: TableFile[]; error?: string; take: Map<GamePart, boolean> } | undefined;
 
@@ -358,105 +391,143 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     };
   }
 
+  /** Ce que deviennent les fichiers reçus d'une table : sous un dossier neuf, chacun à son chemin relatif vérifié. */
+  function tableJobFiles(dir: string, files: readonly TableFile[]): DownloadFile[] {
+    return files
+      .filter((f) => isSafeTableRel(f.rel))
+      .map((f) => {
+        const dest = path.join(dir, ...f.rel.split('/'));
+        return { ref: f.id, name: f.rel, bytes: f.bytes, dest, part: `${dest}.part`, meta: { part: f.part } };
+      });
+  }
+
+  /**
+   * Toute la table d'un ami, ou des parties : un téléchargement de la file (il reprend seul si
+   * l'ami se déconnecte), suivi ici tant que l'écran est ouvert ; Exit le laisse continuer.
+   */
   function startTableFetch(key: string, tableId: string, owned: TableEntry | undefined, identity: TableIdentity | undefined, files: readonly TableFile[], back: () => void): void {
     const folder = identity ? (identity.manufacturer && identity.year ? `${identity.title} (${identity.manufacturer} ${identity.year})` : identity.title) : 'Table';
-    const job = { key, table: owned ?? folder, whole: true, abort: new AbortController() } as NonNullable<typeof transfer>;
-    transfer = job;
-    host.library.openCustom(() => buildTransfer(back));
-    void content
-      .fetchTable(
-        key,
-        tableId,
-        // Une table qu'on a déjà : le dossier reçu porte le nom du nôtre, le plan l'y range.
-        owned ? owned.folder.split(/[\\/]/).pop()! : folder,
-        files,
-        (p) => {
-          job.progress = p;
-          host.redraw();
-        },
-        job.abort.signal,
-      )
-      .then((result) => {
-        if (transfer === job) transfer = undefined;
-        const failures = result.failed.filter((f) => f.reason !== 'cancelled');
-        if (job.abort.signal.aborted) {
-          flash = { text: t('Réception annulée'), tone: 'info' };
-          return back();
-        }
-        if (!result.received.length || failures.length) {
-          const why = [...new Set(failures.map((f) => fileRefusalLabel(f.reason)))].join(' ; ');
-          flash = { text: tn(failures.length, '{n} fichier pas reçu : rien n’est installé', '{n} fichiers pas reçus : rien n’est installé'), detail: why || undefined, tone: 'warning' };
-          return back();
-        }
-        if (owned) ownedTypes.delete(owned.file);
-        host.library.installReceived(result.dir, owned, back);
-      });
+    // Une table qu'on a déjà : le dossier reçu porte le nom du nôtre, le plan l'y range.
+    const dir = content.tableDir(owned ? owned.folder.split(/[\\/]/).pop()! : folder);
+    const job = downloads.manager.add({
+      kind: 'friend-table',
+      title: owned ? t('Parties de {table}', { table: owned.title }) : t('Toute la table : {table}', { table: identity?.title ?? folder }),
+      source: { kind: 'friend', label: friendName(key), key },
+      files: tableJobFiles(dir, files),
+      back: owned ? { screen: 'game-parts', table: owned.file } : { screen: 'friend-library', friend: key, table: tableId },
+      data: { table: tableId, dir, ...(owned ? { owned: owned.file } : {}) },
+      resumable: true,
+    });
+    showTransfer(job.id, back);
   }
 
-  // ---------- Réception ----------
-
+  /** Médias d'une table d'un ami : un téléchargement de la file, rendu au brouillon de « Médias du jeu ». */
   function startFetch(key: string, table: TableEntry, tableId: string, medias: readonly LibraryMedia[], back: () => void): void {
-    const job = { key, table, abort: new AbortController() } as NonNullable<typeof transfer>;
-    transfer = job;
-    host.library.openCustom(() => buildTransfer(back));
-    void content
-      .fetch(
-        key,
-        tableId,
-        medias,
-        (p) => {
-          job.progress = p;
-          host.redraw();
-        },
-        job.abort.signal,
-      )
-      .then((result) => {
-        if (transfer === job) transfer = undefined;
-        const plain = friendName(key);
-        const failures = result.failed.filter((f) => f.reason !== 'cancelled');
-        const why = [...new Set(failures.map((f) => fileRefusalLabel(f.reason)))].join(' ; ');
-        if (result.received.length) {
-          const origin: MediaOriginDraft = { origin: t('la borne de {name}', { name: displayName(plain, key) }), url: `cyberpinball:ami/${key}` };
-          const received =
-            result.received.length === 1
-              ? t('{label} reçu de {name} : vérifiez-le, puis enregistrez.', { label: mediaTypeInfo(result.received[0]!.media.type).label, name: plain })
-              : t('{n} médias reçus de {name} : vérifiez-les, puis enregistrez.', { n: result.received.length, name: plain });
-          const notice = failures.length ? `${received} ${tn(failures.length, '{n} refusé : {why}.', '{n} refusés : {why}.', { why })}` : received;
-          ownedTypes.delete(table.file);
-          host.library.openMediasWith(table, result.received.map((r) => ({ type: r.media.type, file: r.file, ...(r.media.page ? { page: r.media.page } : {}) })), origin, notice);
-          return;
-        }
-        flash = job.abort.signal.aborted ? { text: t('Réception annulée'), tone: 'info' } : { text: t('Aucun média reçu'), detail: why || undefined, tone: 'warning' };
-        back();
-      });
+    const id = `amis-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e6).toString(36)}`;
+    const label = (m: LibraryMedia) => (m.page ? t('{label}, page {page}', { label: mediaTypeInfo(m.type).label, page: m.page }) : mediaTypeInfo(m.type).label);
+    const job = downloads.manager.add({
+      id,
+      kind: 'friend-media',
+      title: medias.length === 1 ? t('{label} de {table}', { label: label(medias[0]!), table: table.title }) : t('{n} médias de {table}', { n: medias.length, table: table.title }),
+      source: { kind: 'friend', label: friendName(key), key },
+      files: medias.map((m, i) => ({ ref: m.id, name: label(m), bytes: m.bytes, part: path.join(content.receivedDir(), `${id}-${i}.part`), meta: { media: m } })),
+      back: { screen: 'table-medias', table: table.file },
+      data: { table: tableId, tableFile: table.file },
+      resumable: true,
+    });
+    showTransfer(job.id, back);
   }
 
-  function buildTransfer(back: () => void): Built {
-    const job = transfer;
-    const p = job?.progress;
-    const plain = job ? friendName(job.key) : '';
-    const tableTitle = job ? (typeof job.table === 'string' ? job.table : job.table.title) : '';
+  function showTransfer(id: string, back: () => void): void {
+    const build = () => buildTransfer(id, back);
+    transfer = { id, build };
+    host.library.openCustom(build);
+  }
+
+  /** Médias reçus et vérifiés : la table s'ouvre sur « Médias du jeu », ces fichiers dans le brouillon. */
+  function deliverMedia(job: DownloadJob): boolean {
+    const table = host.tables().find((x) => x.file === job.data?.tableFile);
+    const got = job.files.filter((f) => f.done && f.file && fs.existsSync(f.file));
+    if (!table || !got.length) return false;
+    const key = job.source.key ?? '';
+    const plain = job.source.label;
+    const origin: MediaOriginDraft = { origin: t('la borne de {name}', { name: displayName(plain, key) }), url: `cyberpinball:ami/${key}` };
+    const media = (f: DownloadFile) => f.meta?.media as LibraryMedia;
+    const notice = got.length === 1 ? t('{label} reçu de {name} : vérifiez-le, puis enregistrez.', { label: mediaTypeInfo(media(got[0]!).type).label, name: plain }) : t('{n} médias reçus de {name} : vérifiez-les, puis enregistrez.', { n: got.length, name: plain });
+    ownedTypes.delete(table.file);
+    host.library.openMediasWith(table, got.map((f) => ({ type: media(f).type, file: f.file!, ...(media(f).page ? { page: media(f).page } : {}) })), origin, notice);
+    return true;
+  }
+
+  /** Table reçue, chaque fichier vérifié : le plan d'ajout, vers la nôtre quand on l'a déjà ; « Annuler » ramène à l'écran d'origine. */
+  function deliverTable(job: DownloadJob): boolean {
+    const dir = typeof job.data?.dir === 'string' ? job.data.dir : undefined;
+    if (!dir || !fs.existsSync(dir)) return false;
+    const owned = host.tables().find((x) => x.file === job.data?.owned);
+    if (owned) ownedTypes.delete(owned.file);
+    host.library.installReceived(dir, owned, () => downloads.openReturn(job.back));
+    return true;
+  }
+
+  // Le téléchargement finit sous les yeux de l'utilisateur (son écran de réception ouvert) : rendu tout de suite.
+  const finishedHere = (deliver: (job: DownloadJob) => boolean) => (job: DownloadJob) => {
+    if (!transfer || transfer.id !== job.id || !host.library.isShowing(transfer.build)) return false;
+    transfer = undefined;
+    if (!deliver(job)) return false;
+    downloads.manager.delivered(job.id);
+    return true;
+  };
+  downloads.finisher('friend-media', finishedHere(deliverMedia));
+  downloads.finisher('friend-table', finishedHere(deliverTable));
+  downloads.deliverer('friend-media', deliverMedia);
+  downloads.deliverer('friend-table', deliverTable);
+  // « Revenir à : Bibliothèque de Bruno » : sa bibliothèque, sur la table d'où venait le téléchargement.
+  downloads.opener('friend-library', (to) => {
+    if (to.screen !== 'friend-library') return;
+    const home = () => open(to.friend, () => host.library.openSystem());
+    if (to.table && ready(to.friend)?.tables.some((x) => x.id === to.table)) openTable(to.friend, to.table, home);
+    else home();
+  });
+
+  /** Écran de la réception : ce téléchargement de la file, en direct ; Exit le laisse continuer en arrière-plan. */
+  function buildTransfer(id: string, back: () => void): Built {
+    const job = downloads.manager.get(id);
+    const whole = job?.kind === 'friend-table';
+    const plain = job?.source.label ?? '';
+    const leave = () => {
+      if (job && (job.state === 'running' || job.state === 'queued' || job.state === 'waiting')) flash = { text: t('La réception continue'), detail: t('Téléchargements, en tête du menu système, pour la suivre'), tone: 'info' };
+      transfer = undefined;
+      back();
+    };
+    const rows: Row[] = [];
+    if (!job) rows.push({ text: t('Réception retirée de la liste'), tone: 'quiet' });
+    else {
+      const { index, count } = currentFile(job);
+      const { received, total } = jobBytes(job);
+      const amount = t('{done} sur {total} · {percent} %', { done: formatSize(received, true), total: formatSize(total ?? received), percent: total ? Math.floor((100 * received) / total) : 0 });
+      if (job.state === 'waiting') rows.push({ text: downloadStateLabel(job), detail: [amount, downloadReasonText(job), t('reprise automatique à son retour')].filter(Boolean).join(' · '), icon: 'refresh', tone: 'warning' });
+      else if (job.state === 'failed') rows.push({ text: t('Réception arrêtée'), detail: downloadReasonText(job), icon: 'alert', tone: 'error' });
+      else if (job.state === 'cancelled') rows.push({ text: t('Réception annulée'), tone: 'info' });
+      else if (job.state === 'done') rows.push({ text: t('Reçu et vérifié'), detail: amount, icon: 'check', tone: 'ok' });
+      else if (received || job.state === 'running') rows.push({ text: t('Fichier {i} sur {n}', { i: index, n: count }), detail: amount, icon: 'download', tone: 'info' });
+      else rows.push({ text: t('Demande à sa borne…'), icon: 'clock', tone: 'quiet' });
+    }
+    const actions: Action[] = [];
+    if (job && (job.state === 'running' || job.state === 'queued' || job.state === 'waiting')) {
+      actions.push({ label: t('Continuer en arrière-plan'), detail: t('Suivi dans Téléchargements ; il ramène ici une fois fini'), icon: 'back', run: leave });
+      actions.push({ label: t('Annuler la réception'), detail: t('Ce qui est reçu est effacé'), icon: 'close', tone: 'error', run: () => { downloads.manager.cancel(id); flash = { text: t('Réception annulée'), tone: 'info' }; transfer = undefined; back(); } });
+    } else if (job?.state === 'done') actions.push({ label: t('Ouvrir ce qui est reçu'), icon: 'check', tone: 'ok', run: () => downloads.deliver(job) });
+    else actions.push({ label: t('Retour'), icon: 'back', run: leave });
     return {
-      heading: job?.whole ? t('Réception de la table') : t('Réception des médias'),
-      icon: job?.whole ? 'table-add' : 'image-download',
-      subheading: job ? t('de {name} · {table}', { name: plain, table: tableTitle }) : undefined,
-      lead: job?.whole
-        ? t('Chaque fichier est vérifié à l’arrivée (taille, empreinte), puis le plan d’ajout montre tout avant d’installer.')
-        : t('Chaque fichier est vérifié à l’arrivée (taille, empreinte, contenu) avant d’entrer dans le brouillon des médias de votre table.'),
-      sections: [
-        {
-          rows: [
-            p
-              ? { text: t('Fichier {i} sur {n}', { i: p.index, n: p.total }), detail: t('{done} sur {total} · {percent} %', { done: formatSize(p.bytes, true), total: formatSize(p.totalBytes), percent: p.totalBytes ? Math.floor((100 * p.bytes) / p.totalBytes) : 0 }), icon: 'download', tone: 'info' }
-              : { text: t('Demande à sa borne…'), icon: 'clock', tone: 'quiet' },
-          ],
-        },
-      ],
-      actions: [{ label: t('Annuler'), icon: 'close', run: () => job?.abort.abort() }],
-      back: () => {
-        job?.abort.abort();
-        if (!job) back();
-      },
+      heading: whole ? t('Réception de la table') : t('Réception des médias'),
+      icon: whole ? 'table-add' : 'image-download',
+      subheading: job ? t('de {name} · {table}', { name: plain, table: job.title }) : undefined,
+      lead: whole
+        ? t('Chaque fichier est vérifié à l’arrivée (taille, empreinte), puis le plan d’ajout montre tout avant d’installer. Si {name} se déconnecte, la réception reprend seule à son retour.', { name: plain })
+        : t('Chaque fichier est vérifié à l’arrivée (taille, empreinte, contenu) avant d’entrer dans le brouillon des médias de votre table. Si {name} se déconnecte, la réception reprend seule à son retour.', { name: plain }),
+      sections: [{ rows }],
+      actions,
+      back: leave,
     };
   }
 

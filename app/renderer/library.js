@@ -55,9 +55,11 @@ function renderLibrary(v) {
             ? 'lib-body'
             : 'lib-body only-actions',
   );
+  // Écran à deux zones (listzones.ts) : celle du choix est soulignée, l'autre s'éteint un peu.
+  if (v.zone) body.classList.add(v.zone.active === 'list' ? 'zone-list' : 'zone-actions');
   if (v.pages) body.append(renderPages(v.pages));
   else if (v.journey) body.append(renderJourney(v.journey));
-  else if (v.health) body.append(renderHealth(v.health, v.cursor));
+  else if (v.health) body.append(zoneFrame(renderHealth(v.health, v.cursor), v.zone));
   else if (v.media || v.sections.length) {
     const content = libEl('div', 'lib-content');
     // Médias : le message du moment, puis les cartes, puis les sections titrées.
@@ -67,7 +69,8 @@ function renderLibrary(v) {
         content.append(renderMediaCards(v.media, v.cursor));
         continue;
       }
-      const box = libEl('section', `lib-section${section.kind ? ` kind-${section.kind}` : ''}`);
+      // Liste d'options (Section.options) : pas une liste de contenu, le garde-fou ne lui demande pas de cadre.
+      const box = libEl('section', `lib-section${section.kind ? ` kind-${section.kind}` : ''}${section.options ? ' options' : ''}`);
       if (section.title) box.append(libEl('h2', '', section.title));
       const list = libEl('ul', 'lib-rows');
       for (const row of section.rows) {
@@ -86,6 +89,8 @@ function renderLibrary(v) {
         main.append(line);
         if (row.detail) main.append(libEl('div', 'lib-row-detail', row.detail));
         if (row.figure) li.append(main, dmdFigure(row.figure));
+        // Téléchargement : sa barre sous le détail ; sans valeur (taille inconnue), une barre sans fin.
+        if (row.progress) li.append(rowProgress(row.progress));
         // À quoi sert un fichier : signe et mot, jamais la couleur seule.
         if (row.note) {
           const note = libEl('div', `lib-row-note tone-${row.note.tone}`);
@@ -98,13 +103,14 @@ function renderLibrary(v) {
       box.append(list);
       content.append(box);
     }
-    // Galerie : le détail de la tuile choisie sous la liste qui défile, jamais par-dessus.
-    const detail = v.media?.gallery ? galleryDetail(v.media, v.cursor) : undefined;
+    // Galerie : le détail de la tuile choisie sous la liste qui défile, jamais par-dessus. Sur les
+    // actions de l'écran, celui de la tuile où l'on reviendra : la galerie ne change pas de taille.
+    const detail = v.media?.gallery ? galleryDetail(v.media, v.zone?.listCursor ?? v.cursor) : undefined;
     if (detail) {
       const column = libEl('div', `lib-gallery${v.media.files ? ' files' : ''}`);
-      column.append(content, detail);
+      column.append(zoneFrame(content, v.zone), detail);
       body.append(column);
-    } else body.append(content);
+    } else body.append(zoneFrame(content, v.zone));
   }
 
   // Prospectus et règles : les flippers tournent les pages ; les actions restent là pour la souris.
@@ -162,6 +168,31 @@ function renderLibrary(v) {
   forgetMediaNodes();
   if (v.pages?.fallback !== 'info-sheet') forgetInfoCard();
   return o;
+}
+
+// ---------- Liste de contenu : son cadre et son repère (listzones.ts) ----------
+
+/**
+ * Liste de contenu d'un écran à deux zones (jeux, médias, fichiers…) : dans un cadre à elle, avec
+ * un bandeau hors de ce qui défile. À gauche, la position du choix (« 12 / 42 ») ou le nombre
+ * d'éléments ; l'initiale du saut par lettre pendant qu'un flipper est tenu ; à droite, le repère :
+ * « Exit · Sortir de la liste » tant qu'on y est, « MagnaSave · Revenir à la liste » sinon (un clic
+ * fait la même chose). Un seul focus : le cadre actif s'éclaire en sarcelle, jamais en vert.
+ */
+function zoneFrame(content, z) {
+  if (!z) return content;
+  const frame = libEl('div', `lib-zone ${z.active === 'list' ? 'active' : 'idle'}`);
+  const bar = libEl('div', 'lib-zone-bar');
+  const count = libEl('span', 'lib-zone-count');
+  if (z.position) count.append(libEl('b', '', String(z.position)), libEl('span', 'of', `/ ${z.total}`));
+  else count.textContent = tn(z.total, '{n} élément', '{n} éléments');
+  bar.append(count);
+  if (z.letter) bar.append(libEl('span', 'lib-zone-letter', z.letter));
+  const tag = actOn(libEl('span', 'lib-zone-tag'), { type: 'zone' });
+  tag.append(libEl('span', 'lib-keycap', z.tag.key), libEl('span', 'lib-zone-tag-text', z.tag.text));
+  bar.append(tag);
+  frame.append(bar, content);
+  return frame;
 }
 
 // ---------- Ce qu'il manque pour jouer (journey.ts) ----------
@@ -495,6 +526,19 @@ function galleryDetail(m, cursor) {
   if (chosen.pending) detail.append(libEl('div', 'media-pending', chosen.pending));
   for (const extra of chosen.extra ?? []) detail.append(libEl('div', 'media-extra', extra));
   return detail;
+}
+
+/**
+ * Barre d'un téléchargement dans une ligne (Téléchargements) : remplie à `value` (0 à 1), sans
+ * valeur une bande qui n'avance pas, hachurée ; `tone` : la couleur de l'état (en cours, en
+ * attente, en pause, fini). Le mot de l'état est dans la ligne : la couleur ne le dit jamais seule.
+ */
+function rowProgress(p) {
+  const bar = libEl('div', `lib-row-progress tone-${p.tone ?? 'info'}${typeof p.value === 'number' ? '' : ' unknown'}`);
+  const fill = libEl('span', '');
+  if (typeof p.value === 'number') fill.style.width = `${Math.round(Math.max(0, Math.min(1, p.value)) * 1000) / 10}%`;
+  bar.append(fill);
+  return bar;
 }
 
 function progressBar(value) {

@@ -11,9 +11,9 @@ import { spawn, execFile } from 'node:child_process';
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import {
+  fetchResumable,
+  ResumableError,
   parseYtDlpLine,
   parseYtDlpRelease,
   sumsFor,
@@ -102,20 +102,15 @@ export function createYtDlp(opts: YtDlpOptions) {
     fs.mkdirSync(folder, { recursive: true });
     const sumsResponse = await get(release.sumsUrl, { redirect: 'follow', signal });
     const sums = sumsResponse.ok ? sumsFor(await sumsResponse.text(), YTDLP_ASSET) : undefined;
+    // Reçu sous « .part », repris là où il s'était arrêté après une coupure (resumable.ts).
     const part = path.join(folder, `${YTDLP_ASSET}.part`);
-    const response = await get(release.url, { redirect: 'follow', signal });
-    if (!response.ok || !response.body) throw new Error(t('téléchargement de yt-dlp impossible (HTTP {status})', { status: response.status }));
-    const total = Number(response.headers.get('content-length')) || release.size;
-    let received = 0;
-    const body = Readable.fromWeb(response.body as import('node:stream/web').ReadableStream);
-    body.on('data', (chunk: Buffer) => {
-      received += chunk.length;
-      progress?.({ phase: 'install', received, total });
-    });
     try {
-      await pipeline(body, fs.createWriteStream(part));
+      await fetchResumable({ url: release.url, part, fetch: get, ...(signal ? { signal } : {}), ...(release.size ? { size: release.size } : {}), onData: (received, total) => progress?.({ phase: 'install', received, total: total ?? release.size }) });
     } catch (error) {
-      fs.rmSync(part, { force: true });
+      if (error instanceof ResumableError && error.reason === 'http') {
+        fs.rmSync(part, { force: true });
+        throw new Error(t('téléchargement de yt-dlp impossible (HTTP {status})', { status: error.status ?? 0 }));
+      }
       throw error;
     }
     const actual = await sha256(part);
