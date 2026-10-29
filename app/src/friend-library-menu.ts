@@ -2,7 +2,8 @@
 // tables, celles qu'on a aussi et les autres ; pour une table, ses médias et ceux qui nous
 // manquent, et ses parties (table, fronton, ROM, PuP-Pack, sons…). On récupère toute une table
 // qu'on n'a pas ; d'une table qu'on a déjà, on choisit partie par partie ce qu'on prend de l'ami
-// et ce qu'on garde. La ROM est décochée d'office (décision du 29/10/2026). Puis la
+// et ce qu'on garde. La ROM et le PuP-Pack sont décochés d'office et ne se cochent qu'après
+// l'attestation des droits, une mention légale que le joueur coche (décisions du 29/10/2026). Puis la
 // réception, avec sa progression et « Annuler » : les médias seuls entrent dans le brouillon de
 // « Médias du jeu » ; une table, ou des parties, passent par le plan d'ajout (rien n'est rangé
 // avant « Installer »).
@@ -31,6 +32,8 @@ import {
   installedParts,
   partLabel,
   partRightsNote,
+  rightsAttestation,
+  attestedTableFiles,
   librarySize,
   MANAGED_MEDIA_TYPES,
   matchLibrary,
@@ -123,7 +126,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
   let transfer: { id: string; build: () => Built } | undefined;
   const downloads = host.downloads;
   /** Parties de la table d'un ami, demandées à l'ouverture de l'écran des parties, et ce qu'on en prend. */
-  let parts: { key: string; tableId: string; files?: TableFile[]; error?: string; take: Map<GamePart, boolean> } | undefined;
+  let parts: { key: string; tableId: string; files?: TableFile[]; error?: string; take: Map<GamePart, boolean>; attested: Set<GamePart> } | undefined;
 
   const friendName = (key: string) => host.net.state().friends.find((f) => f.key === key)?.name ?? '?';
   const mine = () => host.tables().map((table) => ({ table, identity: tableIdentity(table, host.romsOf?.(table) ?? []) }));
@@ -292,7 +295,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
   }
 
   function openParts(key: string, tableId: string, back: () => void): void {
-    const job: NonNullable<typeof parts> = { key, tableId, take: new Map() };
+    const job: NonNullable<typeof parts> = { key, tableId, take: new Map(), attested: new Set() };
     parts = job;
     awaiting = `parts:${key}/${tableId}`;
     const show = () => host.library.openCustom(() => buildParts(key, tableId, back));
@@ -344,7 +347,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       tone: chosen.length && room ? 'ok' : undefined,
       run: () => {
         if (!chosen.length || !room) return host.redraw();
-        startTableFetch(key, tableId, owned, match?.entry.table, chosen.flatMap((p) => p.files), back);
+        startTableFetch(key, tableId, owned, match?.entry.table, chosen.flatMap((p) => p.files), job.attested, back);
       },
     });
     const rows: Row[] = [];
@@ -358,6 +361,8 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
           key: `part:${p.part}`,
           icon: taken ? 'check' : 'close',
           run: () => {
+            // Une partie sous droits ne se coche qu'une fois sa mention légale acceptée.
+            if (!taken && rightsAttestation(p.part, plain) && !job.attested.has(p.part)) return openAttestation(key, tableId, p.part, back);
             job.take.set(p.part, !taken);
             host.redraw();
           },
@@ -390,11 +395,64 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       heading,
       icon: owned ? 'layers' : 'table-add',
       subheading: [title, t('de {name}', { name: plain })].join(' · '),
-      lead: owned ? t('Pour chaque partie : la sienne remplace la vôtre, ou vous gardez la vôtre. Le plan d’ajout montre tout avant d’installer.') : t('Toutes ses parties d’office, sauf la ROM et le PuP-Pack. Le plan d’ajout montre tout avant d’installer.'),
+      lead: owned ? t('Pour chaque partie : la sienne remplace la vôtre, ou vous gardez la vôtre. Le plan d’ajout montre tout avant d’installer.') : t('Toutes ses parties d’office, sauf la ROM et le PuP-Pack : chacun se coche après l’attestation de vos droits. Le plan d’ajout montre tout avant d’installer.'),
       sections,
       actions,
       back,
     };
+  }
+
+  /**
+   * La mention légale d'une partie sous droits : le joueur coche l'engagement, puis la prend ;
+   * l'attestation vaut pour cette table, le temps de l'écran des parties, et suit le téléchargement.
+   */
+  function openAttestation(key: string, tableId: string, part: GamePart, back: () => void): void {
+    let agreed = false;
+    const toParts = () => host.library.openCustom(() => buildParts(key, tableId, back));
+    const build = (): Built => {
+      const text = rightsAttestation(part, displayName(friendName(key), key))!;
+      const actions: Action[] = [
+        {
+          label: t('J’atteste et je m’engage'),
+          key: 'attest',
+          icon: agreed ? 'check' : 'close',
+          run: () => {
+            agreed = !agreed;
+            host.redraw();
+          },
+        },
+        {
+          label: text.take,
+          detail: agreed ? t('Elle rejoint les parties choisies') : t('Cochez d’abord l’attestation'),
+          icon: 'download',
+          tone: agreed ? 'ok' : undefined,
+          run: () => {
+            const job = parts?.key === key && parts.tableId === tableId ? parts : undefined;
+            if (!agreed || !job) return host.redraw();
+            job.attested.add(part);
+            job.take.set(part, true);
+            toParts();
+          },
+        },
+        { label: t('Retour'), icon: 'back', run: toParts },
+      ];
+      return {
+        heading: text.heading,
+        icon: 'alert',
+        subheading: partLabel(part),
+        lead: text.what,
+        sections: [
+          { rows: [{ text: text.source, tone: 'warning', icon: 'alert' }] },
+          {
+            title: t('Attestation'),
+            rows: [{ text: text.pledge, badges: [agreed ? t('Cochée') : t('À cocher')], tone: agreed ? 'ok' : 'warning', icon: agreed ? 'check' : 'close', action: 0, pick: true }],
+          },
+        ],
+        actions,
+        back: toParts,
+      };
+    };
+    host.library.openCustom(build);
   }
 
   /** Ce que deviennent les fichiers reçus d'une table : sous un dossier neuf, chacun à son chemin relatif vérifié. */
@@ -411,7 +469,8 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
    * Toute la table d'un ami, ou des parties : un téléchargement de la file (il reprend seul si
    * l'ami se déconnecte), suivi ici tant que l'écran est ouvert ; Exit le laisse continuer.
    */
-  function startTableFetch(key: string, tableId: string, owned: TableEntry | undefined, identity: TableIdentity | undefined, files: readonly TableFile[], back: () => void): void {
+  function startTableFetch(key: string, tableId: string, owned: TableEntry | undefined, identity: TableIdentity | undefined, chosen: readonly TableFile[], attested: ReadonlySet<GamePart>, back: () => void): void {
+    const files = attestedTableFiles(chosen, attested);
     const folder = identity ? (identity.manufacturer && identity.year ? `${identity.title} (${identity.manufacturer} ${identity.year})` : identity.title) : 'Table';
     // Une table qu'on a déjà : le dossier reçu porte le nom du nôtre, le plan l'y range.
     const dir = content.tableDir(owned ? owned.folder.split(/[\\/]/).pop()! : folder);
@@ -421,7 +480,8 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       source: { kind: 'friend', label: friendName(key), key },
       files: tableJobFiles(dir, files),
       back: owned ? { screen: 'game-parts', table: owned.file } : { screen: 'friend-library', friend: key, table: tableId },
-      data: { table: tableId, dir, ...(owned ? { owned: owned.file } : identity ? { identity } : {}) },
+      // L'attestation des droits suit le téléchargement : ce que le joueur a accepté, et quand.
+      data: { table: tableId, dir, ...(owned ? { owned: owned.file } : identity ? { identity } : {}), ...(attested.size ? { attested: [...attested], attestedAt: new Date().toISOString() } : {}) },
       resumable: true,
     });
     showTransfer(job.id, back);

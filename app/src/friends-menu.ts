@@ -495,7 +495,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
             { text: t('Amis : présence, table en cours, records, badges et parties') },
             ...(s.shareLibrary
               ? [
-                  { text: t('Amis : vos tables, leurs parties (fronton, PuP-Pack, sons…) et leurs médias'), detail: t('Une ROM ou un PuP-Pack seulement si votre ami les coche : ils sont décochés d’office') },
+                  { text: t('Amis : vos tables, leurs parties (fronton, PuP-Pack, sons…) et leurs médias'), detail: t('Une ROM ou un PuP-Pack seulement si votre ami les coche en attestant en avoir le droit : ils sont décochés d’office') },
                   { text: t('Ne partagez que ce que vous avez le droit de partager'), detail: t('Les captures d’œuvres (photos du fronton, prospectus, musique du jeu), les ROM et les PuP-Packs restent la propriété de leurs ayants droit'), tone: 'warning' as const, icon: 'alert' as const },
                 ]
               : [{ text: t('Aucun fichier partagé') }]),

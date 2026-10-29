@@ -25,7 +25,7 @@ interface Action {
 }
 interface Built {
   heading: string;
-  sections: { title?: string; rows: { text: string }[] }[];
+  sections: { title?: string; rows: { text: string; detail?: string }[] }[];
   actions: Action[];
 }
 type Build = () => Built;
@@ -77,6 +77,7 @@ function setup(content?: object, presence?: 'menu' | 'playing') {
   const net = presence ? { ...off, online: () => true, presenceOf: () => ({ status: presence, since: new Date().toISOString(), ...(presence === 'playing' ? { table: { title: 'Glass Lagoon' } } : {}) }) } : off;
   const firewall = createFirewallRule({ exe: 'C:\\x\\CyberPinball.exe', simulated: true });
   const games = fakeGames();
+  const manager = createDownloadManager({ dataDir: dir, transports: {} });
   const menu = createFriendsMenu({
     library: {
       openCustom: (build: Build, at?: number) => opened.push({ build, at }),
@@ -92,7 +93,7 @@ function setup(content?: object, presence?: 'menu' | 'playing') {
     firewall,
     // Gestionnaire de téléchargements sans source : les réceptions y entrent, rien ne part.
     downloads: {
-      manager: createDownloadManager({ dataDir: dir, transports: {} }),
+      manager,
       finisher: () => undefined,
       deliverer: () => undefined,
       opener: () => undefined,
@@ -105,7 +106,7 @@ function setup(content?: object, presence?: 'menu' | 'playing') {
     root: () => undefined,
     redraw: () => undefined,
   });
-  return { menu, opened, firewall, net, games, last: () => opened.at(-1)! };
+  return { menu, opened, firewall, net, games, manager, last: () => opened.at(-1)! };
 }
 
 function uniqueIcons(built: Built, what: string): void {
@@ -245,11 +246,21 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
       assert.equal(last().at, Number.MAX_SAFE_INTEGER);
       assert.equal(built.sections[0]!.rows[0]!.text, '3');
     }
-    // Le record entré passe devant la partie sans record, qui n'a pas de rang (score inconnu).
+    // Le record entré passe devant la partie sans record, qui n'a pas de rang (score inconnu) ;
+    // une autre version (d'autres règles de score) : son score s'affiche, hors classement.
     if (game.phase === 'finished') {
       const texts = built.sections.flatMap((s) => s.rows.map((r) => r.text));
-      assert.match(texts.join('|'), /\|1\. Bruno #[0-9A-F]{4} — 2\s?000\s?000\|Alice #[0-9A-F]{4} \(vous\) — Score non disponible$/u);
-      assert.equal(texts[0], 'Versions différentes : scores peu comparables');
+      assert.match(texts.join('|'), /\|Bruno #[0-9A-F]{4} — 2\s?000\s?000\|Alice #[0-9A-F]{4} \(vous\) — Score non disponible$/u);
+      assert.equal(texts[0], 'Autre version : score hors classement');
+      assert.match(built.sections.flatMap((s) => s.rows).find((r) => r.text.startsWith('Bruno'))!.detail as string, /Hors classement : autre version/);
+      // Une version proche (mêmes règles de score) : classée, avec sa mention.
+      games.game = { ...game, players: game.players.map((p) => (p.match === 'other-version' ? { ...p, match: 'same-rules' as const } : p)) };
+      menu.live.open(() => undefined);
+      const near = last().build();
+      const rows = near.sections.flatMap((s) => s.rows);
+      assert.equal(rows[0]!.text, 'Versions proches : mêmes règles de score, la physique peut différer');
+      assert.match(rows.map((r) => r.text).join('|'), /\|1\. Bruno #[0-9A-F]{4} — 2\s?000\s?000\|/u);
+      assert.match(rows.find((r) => r.text.startsWith('1. Bruno'))!.detail as string, /Version proche/);
     }
   }
   // Salon d'un invité : le curseur sur « Retour », pas sur « Quitter la partie ».
@@ -270,7 +281,7 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
   uniqueIcons(invite, 'invitation');
 });
 
-test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le PuP-Pack décochés, la réception d’abord', async () => {
+test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le PuP-Pack décochés jusqu’à l’attestation des droits, la réception d’abord', async () => {
   const id = (n: number) => n.toString(16).padStart(16, '0');
   const files = [
     { id: id(1), rel: 'Bride of Pin-bot (Williams 1991).vpx', bytes: 200_000, part: 'table' },
@@ -286,9 +297,10 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
     tableFiles: async () => files,
     fetchTable: async () => ({ dir: '', received: [], failed: [] }),
     receivedDir: () => '',
+    tableDir: (folder: string) => path.join(os.tmpdir(), 'cp-friends-menu-table', folder),
     stop: () => undefined,
   };
-  const { menu, last } = setup(content);
+  const { menu, last, manager } = setup(content);
   menu.items.friends!.run();
   await last().build().actions.find((a) => a.label.startsWith('Bruno'))!.run();
   await last().build().actions.find((a) => a.label === 'Voir sa bibliothèque')!.run();
@@ -309,7 +321,45 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
   for (const row of rows) assert.equal(built.actions[row.action!]!.label, row.text, `la ligne « ${row.text} » mène à sa propre action`);
   assert.deepEqual(rows.find((r) => r.text === 'ROM')!.badges, ['Pas prise']);
   assert.deepEqual(rows.find((r) => r.text === 'PuP-Pack')!.badges, ['Pas prise']);
-  // Start sur la ROM la prend.
+  // Start sur la ROM ouvre sa mention légale : rien n'est coché tant que l'attestation ne l'est pas.
   await built.actions[rows.find((r) => r.text === 'ROM')!.action!]!.run();
+  type Shown = { heading: string; lead?: string; actions: Action[]; sections: { rows: { text: string; action?: number; badges?: string[]; pick?: boolean }[] }[] };
+  const attest = () => last().build() as unknown as Shown;
+  assert.equal(attest().heading, 'La ROM : vos droits');
+  assert.ok(!last().at, 'le curseur sur l’attestation');
+  const pledge = attest().sections.flatMap((x) => x.rows).find((r) => r.pick)!;
+  assert.match(pledge.text, /^J’atteste avoir le droit de détenir ce contenu/);
+  assert.equal(pledge.action, 0, 'la ligne de l’engagement mène à la case');
+  assert.deepEqual(pledge.badges, ['À cocher']);
+  assert.match(attest().sections.flatMap((x) => x.rows.map((r) => r.text)).join('|'), /la borne de Bruno #[0-9A-F]{4}/);
+  const screens = () => last();
+  const before = screens();
+  await attest().actions.find((a) => a.label === 'Prendre la ROM')!.run();
+  assert.equal(screens(), before, 'sans l’attestation cochée, « Prendre la ROM » ne fait rien');
+  // Retour sans cocher : la ROM reste « Pas prise ».
+  await attest().actions.find((a) => a.label === 'Retour')!.run();
+  assert.equal(last().build().actions[0]!.label, 'Récupérer les 2 parties choisies');
+  // Cochée puis prise : la ROM rejoint les parties choisies.
+  const romRow = () => (last().build() as unknown as Shown).sections.flatMap((x) => x.rows).find((r) => r.text === 'ROM')!;
+  await last().build().actions[romRow().action!]!.run();
+  await attest().actions[0]!.run();
+  assert.deepEqual(attest().sections.flatMap((x) => x.rows).find((r) => r.pick)!.badges, ['Cochée']);
+  await attest().actions.find((a) => a.label === 'Prendre la ROM')!.run();
   assert.equal(last().build().actions[0]!.label, 'Récupérer les 3 parties choisies');
+  assert.deepEqual(romRow().badges, ['La sienne']);
+  // Décochée puis recochée : l'attestation vaut pour l'écran, la mention ne revient pas.
+  await last().build().actions[romRow().action!]!.run();
+  await last().build().actions[romRow().action!]!.run();
+  assert.equal(last().build().heading, 'Récupérer toute la table');
+  // Le PuP-Pack demande sa propre attestation.
+  const pupRow = (last().build() as unknown as Shown).sections.flatMap((x) => x.rows).find((r) => r.text === 'PuP-Pack')!;
+  await last().build().actions[pupRow.action!]!.run();
+  assert.equal(attest().heading, 'Le PuP-Pack : vos droits');
+  await attest().actions.find((a) => a.label === 'Retour')!.run();
+  // La réception : la ROM attestée part, avec la trace de l'attestation ; le PuP-Pack non attesté, jamais.
+  await last().build().actions[0]!.run();
+  const job = manager.jobs().at(-1)!;
+  assert.deepEqual(job.files.map((f) => f.name).sort(), ['Bride of Pin-bot (Williams 1991).directb2s', 'Bride of Pin-bot (Williams 1991).vpx', 'pinmame/roms/bop_l7.zip']);
+  assert.deepEqual(job.data?.attested, ['rom']);
+  assert.ok(typeof job.data?.attestedAt === 'string');
 });

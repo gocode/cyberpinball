@@ -253,6 +253,54 @@ export function partRightsNote(part: GamePart): string | undefined {
   return undefined;
 }
 
+/** Ce qu'on atteste avant de prendre une partie sous droits (décision du 29/10/2026). */
+export interface RightsAttestation {
+  heading: string;
+  /** Ce qu'est la partie, et à qui elle appartient. */
+  what: string;
+  /** D'où elle vient et qui en répond. */
+  source: string;
+  /** L'engagement que le joueur coche. */
+  pledge: string;
+  /** L'action qui la prend, une fois l'engagement coché. */
+  take: string;
+}
+
+/**
+ * La mention légale d'une partie sous droits, que le joueur coche avant de la prendre : sans elle,
+ * la ROM et le PuP-Pack d'un ami ne se cochent pas. undefined : partie libre.
+ */
+export function rightsAttestation(part: GamePart, friend: string): RightsAttestation | undefined {
+  const source = t('Ce contenu vient directement de la borne de {name} : Cyber Pinball ne le fournit pas et ne vérifie pas vos droits. Vous en êtes seul responsable.', { name: friend });
+  const pledge = t('J’atteste avoir le droit de détenir ce contenu (par exemple la machine d’origine ou une licence) et je m’engage à respecter le droit d’auteur et les conditions d’utilisation de ses ayants droit.');
+  if (part === 'rom')
+    return {
+      heading: t('La ROM : vos droits'),
+      what: t('Une ROM est le programme d’origine de la machine : elle reste protégée par le droit d’auteur de son fabricant ou de ses ayants droit.'),
+      source,
+      pledge,
+      take: t('Prendre la ROM'),
+    };
+  if (part === 'pup')
+    return {
+      heading: t('Le PuP-Pack : vos droits'),
+      what: t('Un PuP-Pack rassemble des vidéos, des images et des musiques souvent tirées du jeu, de films ou de séries, et le travail de ses auteurs : chacun garde ses droits et ses conditions d’utilisation.'),
+      source,
+      pledge,
+      take: t('Prendre le PuP-Pack'),
+    };
+  return undefined;
+}
+
+/**
+ * Les fichiers qu'une réception peut demander : ceux d'une partie sous droits seulement si le
+ * joueur l'a attestée. Dernier rempart, sous l'écran : un fichier de ROM ou de PuP-Pack sans
+ * attestation ne part jamais en téléchargement.
+ */
+export function attestedTableFiles(files: readonly TableFile[], attested: ReadonlySet<GamePart>): TableFile[] {
+  return files.filter((f) => !RIGHTS_PARTS.includes(f.part) || attested.has(f.part));
+}
+
 // ---------------------------------------------------------------------------
 // Messages
 

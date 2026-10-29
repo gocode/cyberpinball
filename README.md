@@ -29,7 +29,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 
 - **Live online games.** Invite up to three friends on the same table: the invitation opens on their cabinet, the table version is checked, a shared countdown starts the game on every cabinet at once, then everyone sees the results side by side.
 - **Who's playing, right now.** Your friends online, the table they are on, their latest high scores and badges, with small notifications on the wheel, never during a game.
-- **Shared tables and media.** Browse a friend's library: the tables you don't have, the media you are missing. Fetch a whole table, or part by part (table, backglass, sounds, media), their version and yours side by side. Everything is checked on arrival and shown in the add plan before anything is installed; ROM and PuP-Pack are unticked by default.
+- **Shared tables and media.** Browse a friend's library: the tables you don't have, the media you are missing. Fetch a whole table, or part by part (table, backglass, sounds, media), their version and yours side by side. Everything is checked on arrival and shown in the add plan before anything is installed; ROM and PuP-Pack are unticked by default, and only ticked once you attest that you hold the rights.
 - **Find players.** Search for a player by name in a directory the cabinets pass to each other, or find the cabinets around you on the local network, even without the Internet. Send a friend request; they accept on their side.
 - **Your cabinet, your rules.** Saves, high-score files and programs never leave your cabinet. Sharing is on by default and turned off in one place, "Sharing and network", which also shows what other cabinets can see. Built on [Holepunch](https://holepunch.to)'s Hyperswarm.
 

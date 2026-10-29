@@ -6,7 +6,9 @@
 // La même version de la table se reconnaît à l'empreinte SHA-256 du .vpx, calculée sans bloquer
 // le menu et gardée dans <données>\amis\empreintes.json (par chemin, taille et date). Elle vaut
 // même quand les deux bornes nomment la table autrement : l'invité calcule celle des tables du
-// même jeu et de celles qui ont la taille du .vpx annoncé.
+// même jeu et de celles qui ont la taille du .vpx annoncé. L'identifiant de table et les règles
+// de score (packages/core/src/vpxid.ts) donnent les deux autres niveaux, « version proche » et
+// « autre version » ; ils sont gardés dans <données>\amis\identifiants.json.
 //
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
@@ -27,7 +29,9 @@ import {
   LIVE_COUNTDOWN_S,
   matchLiveTable,
   newLiveGame,
+  readVpxKeys,
   roomMessage,
+  rulesKey,
   startGame,
   tableIdentity,
   type LiveGame,
@@ -38,6 +42,7 @@ import {
   type LiveTable,
   type LiveTableMatch,
   type TableEntry,
+  type VpxKeys,
 } from '@cyberpinball/core';
 import type { FriendMessage, SocialNet } from './social-net';
 
@@ -102,6 +107,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   let invites: LiveInvite[] = [];
   let launch: NodeJS.Timeout | undefined;
   const prints = createPrints(path.join(opts.dataDir, 'amis', 'empreintes.json'));
+  const tableKeys = createKeys(path.join(opts.dataDir, 'amis', 'identifiants.json'));
   const changed = () => opts.onChange?.();
 
   const isHost = () => !!game && game.host === me().key;
@@ -151,25 +157,34 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     report(result?.ok ? 'done' : 'failed', result);
   }
 
+  /** Empreinte du fichier, identifiant de table et règles de score d'une de mes tables. */
+  async function versionOf(table: TableEntry): Promise<{ print?: string; id?: string; rules?: string }> {
+    const [print, keys] = await Promise.all([prints.of(table.file), tableKeys.of(table.file)]);
+    const rules = rulesKey(opts.romsOf?.(table) ?? [], keys?.script);
+    return { ...(print ? { print } : {}), ...(keys?.id ? { id: keys.id } : {}), ...(rules ? { rules } : {}) };
+  }
+
   async function liveTable(table: TableEntry): Promise<LiveTable> {
-    const print = await prints.of(table.file);
+    const version = await versionOf(table);
     const bytes = fileSize(table.file);
-    return { table: tableIdentity(table, opts.romsOf?.(table) ?? []), ...(table.version ? { version: table.version.slice(0, 60) } : {}), ...(print ? { print } : {}), ...(bytes ? { bytes } : {}) };
+    return { table: tableIdentity(table, opts.romsOf?.(table) ?? []), ...(table.version ? { version: table.version.slice(0, 60) } : {}), ...version, ...(bytes ? { bytes } : {}) };
   }
 
   async function matchFor(invite: LiveInvite): Promise<{ match: LiveTableMatch; table?: TableEntry }> {
-    const candidates = opts.tables().map((table) => ({ entry: table, identity: tableIdentity(table, opts.romsOf?.(table) ?? []), print: undefined as string | undefined }));
-    // L'empreinte seulement pour les tables du même jeu, ou de la taille du .vpx annoncé (le même
+    const candidates = opts.tables().map((table) => ({ entry: table, identity: tableIdentity(table, opts.romsOf?.(table) ?? []) }));
+    // Les versions seulement des tables du même jeu, ou de la taille du .vpx annoncé (le même
     // fichier sous un autre nom) : un .vpx se lit en entier.
     const theirs = invite.table;
     const sameGame = (c: (typeof candidates)[number]) => matchLiveTable(theirs, [c]).match !== 'missing';
     const sameSize = (c: (typeof candidates)[number]) => !!theirs.print && !!theirs.bytes && fileSize(c.entry.file) === theirs.bytes;
-    const withPrints = await Promise.all(candidates.filter((c) => sameGame(c) || sameSize(c)).map(async (c) => ({ ...c, print: await prints.of(c.entry.file) })));
-    const found = matchLiveTable(theirs, withPrints);
+    const versions = await Promise.all(candidates.filter((c) => sameGame(c) || sameSize(c)).map(async (c) => ({ ...c, ...(await versionOf(c.entry)) })));
+    const found = matchLiveTable(theirs, versions);
     const named = [theirs.table.title, theirs.table.manufacturer, theirs.table.year, theirs.table.vpsId && `VPS ${theirs.table.vpsId}`].filter(Boolean).join(', ');
+    const level = { same: 'la même table', 'same-rules': 'une version proche, mêmes règles de score', 'other-version': 'une autre version, hors classement', missing: '' }[found.match]; // i18n-ignore : journal
     if (found.match === 'missing') log(`Invitation de ${invite.host.name} : « ${named} » introuvable ici (aucun jeu du même nom, aucun .vpx identique).`); // i18n-ignore : journal
-    else if (found.entry && !sameGame({ entry: found.entry, identity: tableIdentity(found.entry, opts.romsOf?.(found.entry) ?? []), print: undefined })) {
-      log(`Invitation de ${invite.host.name} : « ${named} » reconnue par l'empreinte de son .vpx, ici « ${found.entry.title} ».`); // i18n-ignore : journal
+    else if (found.entry) {
+      const how = sameGame({ entry: found.entry, identity: tableIdentity(found.entry, opts.romsOf?.(found.entry) ?? []) }) ? '' : ", reconnue par l'empreinte de son .vpx"; // i18n-ignore : journal
+      log(`Invitation de ${invite.host.name} : « ${named} » : ${level}${how}, ici « ${found.entry.title} ».`); // i18n-ignore : journal
     }
     return { match: found.match, ...(found.entry ? { table: found.entry } : {}) };
   }
@@ -331,12 +346,29 @@ function displayTitle(table: TableEntry): string {
 
 /** Empreintes SHA-256 des .vpx, gardées par chemin, taille et date de modification. */
 function createPrints(file: string): { of(vpx: string): Promise<string | undefined> } {
-  let cache: Record<string, string> | undefined;
-  const running = new Map<string, Promise<string | undefined>>();
+  return createFileCache(file, async (vpx) => {
+    const hash = createHash('sha256');
+    for await (const chunk of fs.createReadStream(vpx, { highWaterMark: 1 << 20 }) as AsyncIterable<Buffer>) hash.update(chunk);
+    return hash.digest('hex');
+  });
+}
+
+/** Identifiant de table et empreinte du script (vpxid.ts), gardés de même. */
+function createKeys(file: string): { of(vpx: string): Promise<VpxKeys | undefined> } {
+  return createFileCache(file, async (vpx) => {
+    const keys = await readVpxKeys(vpx);
+    return keys.id ? keys : undefined;
+  });
+}
+
+/** Ce qu'on calcule d'un .vpx, une fois par fichier (chemin, taille et date de modification). */
+function createFileCache<T>(file: string, compute: (vpx: string) => Promise<T | undefined>): { of(vpx: string): Promise<T | undefined> } {
+  let cache: Record<string, T> | undefined;
+  const running = new Map<string, Promise<T | undefined>>();
   const load = () => {
     if (cache) return cache;
     try {
-      cache = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, string>;
+      cache = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, T>;
     } catch {
       cache = {};
     }
@@ -357,16 +389,15 @@ function createPrints(file: string): { of(vpx: string): Promise<string | undefin
       if (already) return already;
       const work = (async () => {
         try {
-          const hash = createHash('sha256');
-          for await (const chunk of fs.createReadStream(vpx, { highWaterMark: 1 << 20 }) as AsyncIterable<Buffer>) hash.update(chunk);
-          const print = hash.digest('hex');
+          const value = await compute(vpx);
+          if (value === undefined) return undefined;
           const all = load();
-          // Une seule empreinte par fichier : l'ancienne (autre taille ou date) s'en va.
+          // Une seule valeur par fichier : l'ancienne (autre taille ou date) s'en va.
           for (const k of Object.keys(all)) if (k.startsWith(`${vpx.toLowerCase()}|`)) delete all[k];
-          all[key] = print;
+          all[key] = value;
           fs.mkdirSync(path.dirname(file), { recursive: true });
           fs.writeFileSync(file, JSON.stringify(all, null, 1) + '\n', 'utf8');
-          return print;
+          return value;
         } catch {
           return undefined;
         } finally {

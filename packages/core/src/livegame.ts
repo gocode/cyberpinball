@@ -5,10 +5,16 @@
 // Celui qui invite tient la partie : il reçoit les réponses et l'état de chacun, et renvoie à tous
 // la salle à jour (game-room). Les invités n'ont pas besoin d'être amis entre eux.
 //
-// Avant le départ, chaque invité dit s'il a la même table : le même jeu (sameTable : identifiant
-// VPS, ROM, titre et année), et la même version (empreinte SHA-256 du .vpx). Une autre version
-// se joue quand même, le salon le dit ; sans la table, l'invité ne peut que refuser (il la
-// récupère par le catalogue, jamais par le réseau).
+// Avant le départ, chaque invité dit ce qu'il a de la table de celui qui invite (décision du
+// 29/10/2026 : personne n'est refusé, seul le classement change) :
+// - « same » : la même table, le même .vpx (empreinte SHA-256) ou le même identifiant de table
+//   (vpxid.ts : objets et physique, sans images, sons ni script) ; classé.
+// - « same-rules » : une version proche, mêmes règles de score (même ROM, ou même script hors
+//   options) ; classé, la physique peut différer.
+// - « other-version » : le même jeu (sameTable : identifiant VPS, ROM, titre et année), d'autres
+//   règles ; il joue avec les autres, son score reste hors classement.
+// - « missing » : il ne l'a pas, il ne peut que refuser (il la récupère chez l'ami ou par le
+//   catalogue).
 //
 // Pendant la partie, le score n'est pas lisible (VPX n'écrit ses records qu'à la fin) : chacun
 // envoie sa durée de jeu et les records entrés au tableau d'honneur de la table. Voir le score,
@@ -42,10 +48,19 @@ export interface LiveTable {
    * d'après VPS à l'installation).
    */
   bytes?: number;
+  /** Identifiant de table (vpxid.ts) : la même table, même renommée ou réenregistrée. */
+  id?: string;
+  /** Règles de score (rulesKey) : « rom:… » ou « vbs:<empreinte du script hors options> ». */
+  rules?: string;
 }
 
 /** Ce que l'invité a de cette table. */
-export type LiveTableMatch = 'same' | 'other-version' | 'missing';
+export type LiveTableMatch = 'same' | 'same-rules' | 'other-version' | 'missing';
+
+/** Un score qui compte au classement : la même table, ou les mêmes règles de score. */
+export function liveRanked(p: Pick<LivePlayer, 'host' | 'match'>): boolean {
+  return p.host === true || p.match === undefined || p.match === 'same' || p.match === 'same-rules';
+}
 
 export type LivePlayerState =
   /** Invitation envoyée, pas encore de réponse. */
@@ -129,7 +144,8 @@ const isId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{16
 const isPrint = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
 const STATES: readonly LivePlayerState[] = ['invited', 'accepted', 'declined', 'busy', 'expired', 'left', 'loading', 'playing', 'done', 'failed'];
 const PHASES: readonly LivePhase[] = ['gathering', 'countdown', 'playing', 'finished', 'cancelled'];
-const MATCHES: readonly LiveTableMatch[] = ['same', 'other-version', 'missing'];
+const MATCHES: readonly LiveTableMatch[] = ['same', 'same-rules', 'other-version', 'missing'];
+const isRules = (v: unknown): v is string => typeof v === 'string' && /^(rom:[a-z0-9_,-]{1,196}|vbs:[0-9a-f]{64})$/.test(v);
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 
 function parseLiveTable(raw: unknown): LiveTable | undefined {
@@ -139,7 +155,14 @@ function parseLiveTable(raw: unknown): LiveTable | undefined {
   if (!table?.title) return undefined;
   const version = typeof r.version === 'string' && r.version.length <= 60 && !/[\x00-\x1f\x7f]/.test(r.version) ? r.version : undefined;
   const bytes = typeof r.bytes === 'number' && Number.isSafeInteger(r.bytes) && r.bytes > 0 ? r.bytes : undefined;
-  return { table, ...(version ? { version } : {}), ...(isPrint(r.print) ? { print: r.print } : {}), ...(bytes ? { bytes } : {}) };
+  return {
+    table,
+    ...(version ? { version } : {}),
+    ...(isPrint(r.print) ? { print: r.print } : {}),
+    ...(bytes ? { bytes } : {}),
+    ...(isPrint(r.id) ? { id: r.id } : {}),
+    ...(isRules(r.rules) ? { rules: r.rules } : {}),
+  };
 }
 
 function parsePeer(raw: unknown): { key: string; name: string } | undefined {
@@ -236,11 +259,15 @@ export function inviteExpired(invite: Pick<LiveInvite, 'receivedAt'>, now = new 
  * prend à l'installation le nom du jeu chez VPS (« Game of Thrones (Limited Edition) » chez l'un,
  * « Game of Thrones LE » chez l'autre).
  */
-export function matchLiveTable<T>(theirs: LiveTable, mine: readonly { entry: T; identity: TableIdentity; print?: string }[]): { match: LiveTableMatch; entry?: T } {
-  const exact = theirs.print ? mine.find((m) => m.print === theirs.print) : undefined;
+export function matchLiveTable<T>(theirs: LiveTable, mine: readonly { entry: T; identity: TableIdentity; print?: string; id?: string; rules?: string }[]): { match: LiveTableMatch; entry?: T } {
+  const exact = mine.find((m) => (theirs.print && m.print === theirs.print) || (theirs.id && m.id === theirs.id));
   if (exact) return { match: 'same', entry: exact.entry };
+  const rules = theirs.rules ? mine.find((m) => m.rules === theirs.rules) : undefined;
+  if (rules) return { match: 'same-rules', entry: rules.entry };
   const same = mine.filter((m) => sameTable(theirs.table, m.identity));
-  if (same[0]) return { match: theirs.print && same[0].print ? 'other-version' : 'same', entry: same[0].entry };
+  // Sans rien pour comparer les versions (une borne d'avant l'empreinte), le même jeu passe pour la même table.
+  const known = (x: { print?: string; id?: string; rules?: string }) => !!(x.print || x.id || x.rules);
+  if (same[0]) return { match: known(theirs) && known(same[0]) ? 'other-version' : 'same', entry: same[0].entry };
   return { match: 'missing' };
 }
 
@@ -377,7 +404,7 @@ export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match'>): st
     case 'invited':
       return t('Invité, en attente de sa réponse');
     case 'accepted':
-      return p.match === 'other-version' ? t('Prêt, avec une autre version de la table') : t('Prêt');
+      return p.match === 'other-version' ? t('Prêt, autre version : score hors classement') : p.match === 'same-rules' ? t('Prêt, version proche : mêmes règles de score') : t('Prêt');
     case 'declined':
       return p.match === 'missing' ? t('N’a pas cette table') : t('A refusé');
     case 'busy':
@@ -401,20 +428,23 @@ export function liveMatchLabel(match: LiveTableMatch): string {
   switch (match) {
     case 'same':
       return t('Vous avez cette table');
+    case 'same-rules':
+      return t('Vous avez une version proche : mêmes règles de score, votre score compte au classement');
     case 'other-version':
-      return t('Vous avez cette table dans une autre version : la partie reste possible, les scores se comparent moins bien');
+      return t('Vous avez cette table dans une autre version : vous jouez ensemble, votre score reste hors classement');
     case 'missing':
       return t('Vous n’avez pas cette table : récupérez-la par le catalogue, puis demandez une nouvelle invitation');
   }
 }
 
 /**
- * Classement de fin : d'abord ceux qui ont un record entré (le meilleur score d'abord), puis
- * ceux qui ont joué, puis les autres. Le score de la partie n'est connu que s'il est entré au
- * tableau d'honneur de la table.
+ * Classement de fin : d'abord ceux qui ont un record entré et comptent au classement (liveRanked :
+ * la même table ou les mêmes règles, le meilleur score d'abord), puis ceux qui ont joué (une autre
+ * version : hors classement, même avec un record), puis les autres. Le score de la partie n'est
+ * connu que s'il est entré au tableau d'honneur de la table.
  */
 export function liveStandings(game: Pick<LiveGame, 'players'>): LivePlayer[] {
   const best = (p: LivePlayer) => Math.max(-1, ...(p.records ?? []).map((r) => r.score));
-  const order = (p: LivePlayer) => (p.records?.length ? 0 : p.state === 'done' ? 1 : 2);
+  const order = (p: LivePlayer) => (p.records?.length && liveRanked(p) ? 0 : p.state === 'done' ? 1 : 2);
   return livePlayers(game).sort((a, b) => order(a) - order(b) || best(b) - best(a) || (b.seconds ?? 0) - (a.seconds ?? 0));
 }

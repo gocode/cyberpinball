@@ -8,7 +8,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { BADGES, grantBadges, playStats } from '../badges';
-import { defaultPartChoice, isSafeTableRel } from '../friendlibrary';
+import { attestedTableFiles, defaultPartChoice, isSafeTableRel, rightsAttestation, RIGHTS_PARTS } from '../friendlibrary';
 import {
   acceptRequest,
   blockPlayer,
@@ -184,6 +184,13 @@ test('fichiers d’une table reçus d’un ami : chemin sous le dossier de la ta
   assert.equal(defaultPartChoice('pup', false), false);
   assert.equal(defaultPartChoice('b2s', false), true);
   assert.equal(defaultPartChoice('b2s', true), false);
+  // Chaque partie sous droits a sa mention légale ; une partie libre n'en a pas.
+  for (const part of RIGHTS_PARTS) assert.match(rightsAttestation(part, 'Bruno')!.pledge, /^J’atteste avoir le droit/, part);
+  assert.equal(rightsAttestation('b2s', 'Bruno'), undefined);
+  // Dernier rempart : un fichier d'une partie sous droits ne part qu'attesté.
+  const files = (['table', 'rom', 'pup'] as const).map((part, i) => ({ id: String(i), rel: `${part}.x`, bytes: 1, part }));
+  assert.deepEqual(attestedTableFiles(files, new Set()).map((f) => f.part), ['table']);
+  assert.deepEqual(attestedTableFiles(files, new Set(['pup'])).map((f) => f.part), ['table', 'pup']);
 });
 
 test('évènements : phrases du record, du badge, de la partie', () => {

@@ -104,6 +104,8 @@ function Get-Etapes([string]$Nom, $l) {
   }
   # Au départ, le message « VPX n'est pas installé » (le bac à sable n'a pas VPX) : Exit le ferme,
   # Exit de nouveau ouvre le menu système ; les bornes fictives ont alors le temps de se relier.
+  # L'apostrophe typographique par son code : Windows PowerShell la lit comme un guillemet.
+  $ap = [char]0x2019
   return @(
     'wait:1500', $Exit, 'wait:800', $Exit, 'wait:4000',
     "action:$($l.Amis)", "action:$($l.MesAmis)", 'wait:1200',
@@ -117,7 +119,10 @@ function Get-Etapes([string]$Nom, $l) {
     # Bibliothèque de Bruno : d'abord la table qu'on n'a pas, prise tout entière jusqu'au plan d'ajout
     # (jamais installée ici) ; puis celle qu'on a aussi (curseur dessus) : ses parties au choix, et ses médias.
     "action:$($l.MesAmis)", 'wait:400', 'action:Bruno', 'wait:400', "action:$($l.Biblio)", 'wait:2000',
-    'action:Glass Lagoon', 'wait:600', "action:$($l.Toute)", 'wait:2500', "action:$($l.Prendre)", 'wait:6000',
+    # La ROM ne se prend qu'après sa mention légale : « Prendre la ROM » sans l'attestation ne fait rien.
+    'action:Glass Lagoon', 'wait:600', "action:$($l.Toute)", 'wait:2500',
+    'action:ROM', 'wait:800', 'action:Prendre la ROM', 'wait:400', "action:J$($ap)atteste et je m$($ap)engage", 'wait:800', 'action:Prendre la ROM', 'wait:800',
+    "action:$($l.Prendre)", 'wait:6000',
     $Exit, 'wait:800', $Exit, 'wait:800',
     'Enter', 'wait:600', "action:$($l.Parties)", 'wait:2500', $Exit, 'wait:600',
     "action:$($l.Prendre)", 'wait:4000'
@@ -160,6 +165,12 @@ try {
         # Deux réceptions (ses médias, puis toute sa table), chacune une ligne « fini » du gestionnaire (titre dans la langue de l'essai).
         if ($nom -eq 'amis' -and @($log | Select-String -Pattern 'Téléchargements : « .+ » fini \([1-9]\d* fichier\(s\)\)').Count -lt 2) { $failures += "$id : les médias ou la table de Bruno ne sont pas arrivés" }
         if ($nom -eq 'amis' -and ($log -match 'Téléchargements : .* en échec')) { $failures += "$id : une réception de Bruno a échoué" }
+        # La ROM attestée est arrivée avec la table ; le PuP-Pack, laissé sans attestation, jamais.
+        if ($nom -eq 'amis') {
+          $recus = @(Get-ChildItem -Recurse -File "$home_" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\amis\\tables\\' })
+          if (-not ($recus | Where-Object Name -eq 'glag_l1.zip')) { $failures += "$id : la ROM attestée de Bruno n'est pas arrivée" }
+          if ($recus | Where-Object Name -eq 'screens.pup') { $failures += "$id : le PuP-Pack non attesté de Bruno est arrivé" }
+        }
         if ($nom -eq 'en-jeu') {
           foreach ($etat in 'full', 'compact') {
             if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\invitation-en-partie-$etat.png")) { $failures += "$id : pas de capture de l'invitation pendant la partie ($etat)" }

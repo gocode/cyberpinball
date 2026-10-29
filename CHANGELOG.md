@@ -15,6 +15,7 @@ son interface).
 - « Jouer avec un ami » sur la fiche d'une table, juste sous « Jouer » : choisissez l'ami à inviter à une partie en direct. Une invitation impossible n'est plus cachée : elle reste visible, grisée avec sa raison (« Hors ligne », « Aucun ami en ligne pour l'instant »).
 - Une invitation arrive même pendant une partie : un carillon et une carte discrète dans le coin du plateau (qui l'envoie, la table, le temps restant), sans gêner le jeu. Quittez votre partie pour rejoindre l'ami, l'invitation s'ouvre au retour au menu ; ou continuez, elle s'efface seule.
 - Une table récupérée chez un ami est reconnue à ses invitations, même quand votre borne l'a nommée autrement (« Game of Thrones (Limited Edition) » ici, « Game of Thrones LE » chez lui) : le même fichier `.vpx` est la même table. Elle garde désormais à l'installation le nom qu'elle a chez l'ami.
+- Partie en direct : chaque table a un identifiant, tiré de ses objets et de sa physique (pas des images, des sons ni des options du script). Personne n'est refusé pour une question de version : la même table, ou une version proche aux mêmes règles de score (même ROM), compte au classement ; une autre version joue avec les autres, hors classement.
 
 ## 0.1.4
 

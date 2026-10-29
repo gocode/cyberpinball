@@ -135,8 +135,9 @@ function picture(width: number, height: number, hue: [number, number, number]): 
 
 /**
  * Racine de Bruno : la première table de la borne (même dossier, autre .vpx : une autre version ;
- * `sameVersion` : le même .vpx, pour la partie en direct), et une table que la borne n'a pas ;
- * chacune avec quelques médias.
+ * `sameVersion` : le même .vpx, pour la partie en direct), et une table que la borne n'a pas, avec
+ * une ROM et un PuP-Pack (des parties sous droits, à attester avant de les prendre) ; chacune avec
+ * quelques médias.
  */
 function brunoRoot(dir: string, mine: readonly TableEntry[], cut = false, sameVersion = false): string {
   const root = path.join(dir, 'borne');
@@ -155,6 +156,13 @@ function brunoRoot(dir: string, mine: readonly TableEntry[], cut = false, sameVe
     fs.writeFileSync(path.join(at, 'medias', `(Topper) ${folder}.png`), picture(768, 256, hue));
     fs.writeFileSync(path.join(at, 'medias', `(FullDMD) ${folder}.png`), picture(640, 360, hue));
     fs.writeFileSync(path.join(at, 'medias', `(Loading) ${folder}.png`), picture(640, 360, hue));
+    if (i) {
+      // Une archive zip vide (sa seule fin de répertoire) et un écran de PuP-Pack.
+      fs.mkdirSync(path.join(at, 'pinmame', 'roms'), { recursive: true });
+      fs.writeFileSync(path.join(at, 'pinmame', 'roms', 'glag_l1.zip'), Buffer.from([0x50, 0x4b, 0x05, 0x06, ...new Array(18).fill(0)]));
+      fs.mkdirSync(path.join(at, 'pupvideos', 'glag_l1'), { recursive: true });
+      fs.writeFileSync(path.join(at, 'pupvideos', 'glag_l1', 'screens.pup'), 'ScreenNum,ScreenDes\r\n2,Backglass\r\n');
+    }
   }
   return root;
 }

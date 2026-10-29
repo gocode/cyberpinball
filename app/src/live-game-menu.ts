@@ -14,6 +14,7 @@ import {
   LIVE_MAX_PLAYERS,
   liveMatchLabel,
   livePlayerStateLabel,
+  liveRanked,
   liveStandings,
   playDuration,
   t,
@@ -102,7 +103,13 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     return { text: game.title, detail: game.table.version ? t('Version : {version}', { version: game.table.version }) : undefined, icon: 'play' };
   }
 
-  const otherVersionRow = (): Row => ({ text: t('Version différente'), detail: t('Vous pouvez jouer ensemble, mais les scores sont moins comparables.'), tone: 'warning', icon: 'alert' });
+  /** Ma version, comparée à celle de celui qui invite : rien quand c'est la même table. */
+  const versionRow = (match: LiveTableMatch | undefined): Row[] =>
+    match === 'same-rules'
+      ? [{ text: t('Version proche'), detail: t('Mêmes règles de score, la physique peut différer : votre score compte au classement.'), tone: 'info', icon: 'info' }]
+      : match === 'other-version'
+        ? [{ text: t('Autre version'), detail: t('Vous jouez ensemble ; d’autres règles de score : votre score reste hors classement.'), tone: 'warning', icon: 'alert' }]
+        : [];
 
   // ---------- Depuis une fiche : l'entrée, toujours là ----------
 
@@ -238,7 +245,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     }
     actions.push({ label: t('Retour'), detail: hosting ? t('Le salon reste ouvert : « Mes amis » y ramène') : t('Vous restez dans la partie'), icon: 'back', run: back });
     const hostPlayer = game.players.find((p) => p.host);
-    const other = game.players.find((p) => p.key === myKey())?.match === 'other-version';
+    const myMatch = game.players.find((p) => p.key === myKey())?.match;
     return {
       heading: t('Partie en direct'),
       icon: 'gamepad',
@@ -246,7 +253,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       lead: hosting ? t('Lancez quand vos amis sont prêts : un compte à rebours commun, puis la table se lance sur chaque borne.') : t('En attente du départ donné par {name}.', { name: hostPlayer?.name ?? '?' }),
       sections: [
         ...takeFlash(),
-        { rows: [tableRow(game), ...(other ? [otherVersionRow()] : [])] },
+        { rows: [tableRow(game), ...versionRow(myMatch)] },
         { title: t('Joueurs ({n} sur {max})', { n: seats, max: LIVE_MAX_PLAYERS }), rows: playerRows(game) },
       ],
       actions,
@@ -301,12 +308,13 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const record = p.records?.[0];
     const who = p.key === myKey() ? t('{name} (vous)', { name: label(p.key, p.name) }) : label(p.key, p.name);
     const played = p.seconds !== undefined ? playDuration(p.seconds) : undefined;
+    const version = p.match === 'other-version' ? t('Hors classement : autre version') : p.match === 'same-rules' ? t('Version proche') : undefined;
     const detail =
       p.state === 'done'
-        ? [record ? t('Record enregistré, place {rank} du tableau', { rank: record.rank }) : t('Partie terminée'), played].filter(Boolean).join(' · ')
+        ? [record ? t('Record enregistré, place {rank} du tableau', { rank: record.rank }) : t('Partie terminée'), version, played].filter(Boolean).join(' · ')
         : livePlayerStateLabel(p);
     return {
-      text: record ? `${place}. ${who} — ${formatNumber(record.score)}` : p.state === 'done' ? `${who} — ${t('Score non disponible')}` : who,
+      text: record && place ? `${place}. ${who} — ${formatNumber(record.score)}` : record ? `${who} — ${formatNumber(record.score)}` : p.state === 'done' ? `${who} — ${t('Score non disponible')}` : who,
       detail,
       icon: record ? 'star' : 'friend-list',
       tone: p.state === 'done' ? 'ok' : p.state === 'playing' || p.state === 'loading' ? 'info' : 'quiet',
@@ -324,8 +332,9 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       if (again.length) actions.push({ label: t('Rejouer avec les mêmes joueurs'), detail: again.map((p) => p.name).join(', '), icon: 'restart', tone: 'ok', run: () => replay(again) });
     }
     actions.push({ label: finished ? t('Fermer') : t('Retour'), detail: finished ? undefined : t('Les résultats arrivent dans « Mes amis »'), icon: finished ? 'check' : 'back', run: () => { if (finished) games.close(); back(); } });
-    const ranked = standings.filter((p) => p.records?.length);
-    const versions = game.players.some((p) => p.match === 'other-version');
+    const ranked = standings.filter((p) => p.records?.length && liveRanked(p));
+    const near = game.players.some((p) => p.match === 'same-rules');
+    const apart = game.players.some((p) => p.match === 'other-version');
     return {
       heading: finished ? t('Résultats') : t('Partie en direct en cours'),
       icon: 'gamepad',
@@ -333,8 +342,17 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       lead: t('Seuls les scores inscrits au tableau d’honneur sont disponibles.'),
       sections: [
         ...takeFlash(),
-        ...(versions ? [{ rows: [{ text: t('Versions différentes : scores peu comparables'), tone: 'warning' as const, icon: 'alert' as const }] }] : []),
-        { rows: standings.map((p) => resultRow(p, p.records?.length ? ranked.indexOf(p) + 1 : undefined, standings.length > 1)) },
+        ...(near || apart
+          ? [
+              {
+                rows: [
+                  ...(near ? [{ text: t('Versions proches : mêmes règles de score, la physique peut différer'), tone: 'info' as const, icon: 'info' as const }] : []),
+                  ...(apart ? [{ text: t('Autre version : score hors classement'), detail: t('D’autres règles de score que la table de celui qui invite'), tone: 'warning' as const, icon: 'alert' as const }] : []),
+                ],
+              },
+            ]
+          : []),
+        { rows: standings.map((p) => resultRow(p, ranked.includes(p) ? ranked.indexOf(p) + 1 : undefined, standings.length > 1)) },
       ],
       actions,
       back,
@@ -389,11 +407,11 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const match = matches.get(id);
     const rows: Row[] = [
       tableRow(invite),
-      !match
-        ? { text: t('Vérification de la table sur votre borne…'), tone: 'quiet' }
-        : match === 'other-version'
-          ? otherVersionRow()
-          : { text: liveMatchLabel(match), tone: match === 'same' ? 'ok' : 'error' },
+      ...(!match
+        ? [{ text: t('Vérification de la table sur votre borne…'), tone: 'quiet' } as Row]
+        : match === 'same-rules' || match === 'other-version'
+          ? versionRow(match)
+          : [{ text: liveMatchLabel(match), tone: match === 'same' ? 'ok' : 'error' } as Row]),
     ];
     if (invite.players.length) rows.push({ text: t('Avec {names}', { names: invite.players.map((p) => p.name).join(', ') }), icon: 'friends' });
     const actions: Action[] = [];
