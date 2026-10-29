@@ -275,7 +275,8 @@ function New-FauxVpx([string]$Racine) {
     New-Item -ItemType Directory -Force $d | Out-Null
     Set-Content (Join-Path $d 'VPinballX64.exe') '' -NoNewline
   }
-  @{ version = $vpx.version } | ConvertTo-Json | Set-Content (Join-Path $current '.cyberpinball-component.json') -Encoding UTF8
+  # Sans BOM, quel que soit le PowerShell (5.1 en met un avec -Encoding UTF8) : le marqueur est du JSON.
+  [IO.File]::WriteAllText((Join-Path $current '.cyberpinball-component.json'), (@{ version = $vpx.version } | ConvertTo-Json))
 }
 
 # Bilan du guet de app\src\offscreen.ts (hors-ecran.txt dans le dossier des captures).

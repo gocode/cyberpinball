@@ -10,7 +10,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { applyOps } from '../fileops';
-import { actionIds, followCursor, indexOfId, resolveActivation, type FocusAnchor } from '../focus';
+import { actionIds, anchorOf, followCursor, indexOfId, resolveActivation, type FocusAnchor } from '../focus';
 import type { MediaChoice } from '../mediachoices';
 import { emptyMediaDraft, pagesSignature, planMediaChanges, type MediaPageEntry } from '../mediaedit';
 import { resolveMedia } from '../medias';
@@ -69,6 +69,17 @@ test('une carte insérée au-dessus : Start valide celle que le curseur montrait
   // Un autre écran, ou un curseur déplacé exprès : obéi.
   assert.equal(followCursor(ids, 1, {}, anchor), 1);
   assert.equal(followCursor(ids, 3, screen, anchor), 3);
+});
+
+test('un écran qui se charge : le curseur ne suit pas la seule action montrée le temps du chargement (Bibliothèque de ROM, 29/10/2026)', () => {
+  const screen = {};
+  // Inventaire en cours : l'écran n'a que son retour.
+  const loading = actionIds([{ label: 'Retour au menu' }]);
+  const anchor = anchorOf(screen, 0, loading, true);
+  const loaded = actionIds([{ label: 'Ranger les ROM dans la bibliothèque' }, { label: 'Ajouter' }, { label: 'Actualiser' }, { label: 'Retour au menu' }]);
+  assert.equal(followCursor(loaded, 0, screen, anchor), 0, 'la première action, pas le retour');
+  // Hors chargement, l'élément montré est suivi comme avant.
+  assert.equal(followCursor(loaded, 0, screen, anchorOf(screen, 0, loading, false)), 3);
 });
 
 test('une fiche reçue devient ses fichiers : le curseur reste sur ce qu’elle a donné', () => {

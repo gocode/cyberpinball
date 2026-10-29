@@ -14,6 +14,7 @@ son interface).
 - Lancement en cinéma : le logo du jeu se pose entier et centré sur le fronton, et part entier du plateau ; une grande roue (médaillon) sortait par le bas, coupée. Un logo plus haut que large reste aussi dans sa place sur la roue du menu.
 - « Jouer avec un ami » sur la fiche d'une table, juste sous « Jouer » : choisissez l'ami à inviter à une partie en direct. Une invitation impossible n'est plus cachée : elle reste visible, grisée avec sa raison (« Hors ligne », « Aucun ami en ligne pour l'instant »).
 - Une invitation arrive même pendant une partie : un carillon et une carte discrète dans le coin du plateau (qui l'envoie, la table, le temps restant), sans gêner le jeu. Quittez votre partie pour rejoindre l'ami, l'invitation s'ouvre au retour au menu ; ou continuez, elle s'efface seule.
+- Une table récupérée chez un ami est reconnue à ses invitations, même quand votre borne l'a nommée autrement (« Game of Thrones (Limited Edition) » ici, « Game of Thrones LE » chez lui) : le même fichier `.vpx` est la même table. Elle garde désormais à l'installation le nom qu'elle a chez l'ami.
 
 ## 0.1.4
 

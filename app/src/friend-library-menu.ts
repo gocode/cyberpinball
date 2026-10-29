@@ -37,6 +37,7 @@ import {
   mediaTypeInfo,
   missingMedias,
   ownMediaPages,
+  parseTableIdentity,
   sameTable,
   t,
   tableIdentity,
@@ -420,7 +421,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       source: { kind: 'friend', label: friendName(key), key },
       files: tableJobFiles(dir, files),
       back: owned ? { screen: 'game-parts', table: owned.file } : { screen: 'friend-library', friend: key, table: tableId },
-      data: { table: tableId, dir, ...(owned ? { owned: owned.file } : {}) },
+      data: { table: tableId, dir, ...(owned ? { owned: owned.file } : identity ? { identity } : {}) },
       resumable: true,
     });
     showTransfer(job.id, back);
@@ -470,8 +471,27 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     if (!dir || !fs.existsSync(dir)) return false;
     const owned = host.tables().find((x) => x.file === job.data?.owned);
     if (owned) ownedTypes.delete(owned.file);
+    else seedIdentity(dir, parseTableIdentity(job.data?.identity));
     host.library.installReceived(dir, owned, () => downloads.openReturn(job.back));
     return true;
+  }
+
+  /**
+   * Toute une table reçue garde le nom qu'elle a chez l'ami : un .info à ses titre, fabricant,
+   * année et jeu VPS, que le plan d'ajout prend avant le nom du jeu chez VPS. Sans lui, les deux
+   * bornes nommeraient la même table autrement (« Game of Thrones LE » chez l'ami, « Game of
+   * Thrones (Limited Edition) » ici) et ne se reconnaîtraient plus : « vous ne l'avez pas » dans
+   * sa bibliothèque, à ses invitations.
+   */
+  function seedIdentity(dir: string, identity: TableIdentity | undefined): void {
+    if (!identity?.title) return;
+    try {
+      if (fs.readdirSync(dir).some((f) => f.toLowerCase().endsWith('.info'))) return;
+      const info = { Title: identity.title, ...(identity.manufacturer ? { Manufacturer: identity.manufacturer } : {}), ...(identity.year ? { Year: identity.year } : {}), ...(identity.vpsId ? { VPSId: identity.vpsId } : {}) };
+      fs.writeFileSync(path.join(dir, `${path.basename(dir)}.info`), JSON.stringify({ Info: info }, null, 2) + '\n', 'utf8');
+    } catch {
+      // Sans .info, la table prend le nom de son jeu chez VPS ; l'invitation la reconnaît encore à son .vpx.
+    }
   }
 
   // Le téléchargement finit sous les yeux de l'utilisateur (son écran de réception ouvert) : rendu tout de suite.

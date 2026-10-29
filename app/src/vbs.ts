@@ -52,15 +52,25 @@ export async function readScript(exe: string, table: string, dataDir: string): P
     }
     await run(exe, ['-Ini', path.join(work, 'VPinballX.ini'), '-ExtractVBS', copy]);
     const vbs = path.join(work, 'table.vbs');
-    if (!fs.existsSync(vbs)) return { error: t('VPX n’a pas extrait le script de la table.') };
-    const facts = scriptFacts(fs.readFileSync(vbs, 'latin1'));
+    if (!fs.existsSync(vbs)) return fromTable(t('VPX n’a pas extrait le script de la table.'));
+    return remember(scriptFacts(fs.readFileSync(vbs, 'latin1')));
+  } catch (error) {
+    return fromTable((error as Error).message);
+  } finally {
+    fs.rmSync(work, { recursive: true, force: true });
+  }
+
+  function remember(facts: ScriptFacts): ScriptFacts {
     cache[key] = { size: stat.size, mtimeMs: stat.mtimeMs, facts, v: FACTS_VERSION };
     saveCache(cacheFile, cache);
     return facts;
-  } catch (error) {
-    return { error: (error as Error).message };
-  } finally {
-    fs.rmSync(work, { recursive: true, force: true });
+  }
+
+  // VPX n'a pas rendu le script (lancement impossible, plantage, rien d'extrait) : celui écrit
+  // dans le .vpx, relu sans VPX (même texte que -ExtractVBS). Un script protégé reste illisible.
+  function fromTable(error: string): ScriptResult {
+    const text = readVpxScript(table);
+    return text === undefined ? { error } : remember(scriptFacts(text));
   }
 }
 

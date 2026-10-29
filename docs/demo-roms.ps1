@@ -65,7 +65,7 @@ function New-Table($name, [string[]]$roms, [string]$vpxName = $name) {
     size = (Get-Item $vpx).Length
     mtimeMs = [DateTimeOffset]::new($date).ToUnixTimeMilliseconds()
     facts = [ordered]@{ usesPinmame = $true; roms = $roms }
-    v = 3
+    v = 7
   }
   return "$root\tables\$name"
 }
@@ -159,8 +159,15 @@ foreach ($t in 'Terminator 2 (Williams 1991)', 'Terminator 2 Judgment Day (Willi
 }
 $f = New-Table 'Terminator 2 VPW (Williams 1991)' @('t2_l8')
 New-Item -ItemType Directory -Force "$f\pinmame\roms" | Out-Null
-$bytes = [IO.File]::ReadAllBytes($Rom); $bytes[100] = $bytes[100] -bxor 0xFF
-[IO.File]::WriteAllBytes("$f\pinmame\roms\t2_l8.zip", $bytes)
+# Une autre version, c'est d'autres puces : l'empreinte d'une ROM est celle de ses puces
+# (CRC du zip), pas des octets de l'archive. Un octet changé dans la première puce, rezippée.
+$autre = "$base\t2-autre-version"
+Expand-Archive -Path $Rom -DestinationPath $autre -Force
+$puce = Get-ChildItem -File -Recurse $autre | Sort-Object FullName | Select-Object -First 1
+$bytes = [IO.File]::ReadAllBytes($puce.FullName); $bytes[100] = $bytes[100] -bxor 0xFF
+[IO.File]::WriteAllBytes($puce.FullName, $bytes)
+Compress-Archive -Path "$autre\*" -DestinationPath "$f\pinmame\roms\t2_l8.zip" -Force
+Remove-Item -Recurse -Force $autre
 (Get-Item "$f\pinmame\roms\t2_l8.zip").LastWriteTimeUtc = $old
 New-Table 'Terminator 2 VR (Williams 1991)' @('t2_l8') | Out-Null
 
@@ -201,12 +208,15 @@ $env:CYBERPINBALL_CAPTURE = "$wt\tmp\captures\roms"
 $env:CYBERPINBALL_AUTOPILOT = @(
   # Les entrées du menu système sont désignées par leur libellé : leur rang change quand le menu grandit.
   'Escape', 'action:Bibliothèque de ROM',           # menu système, Bibliothèque de ROM : la vue avant rangement
-  'Digit1',                                         # Ranger les ROM : le plan
-  'ShiftRight', 'ShiftRight', 'Digit1',             # Terminator 2 : garder l'ancienne version…
-  'Digit1',                                         # … puis revenir à la plus récente
-  'ShiftLeft', 'ShiftLeft', 'Digit1',               # Ranger : bilan mesuré, sur la vue après rangement
+  'action:Ranger les ROM',                          # le plan
+  'action:Garder plutôt',                           # Terminator 2 : garder l'ancienne version…
+  'action:Garder plutôt',                           # … puis revenir à la plus récente
+  'action:Ranger',                                  # bilan mesuré
+  'action:Continuer',                               # la vue après rangement
   'action:Mettre « fh_l9 »', 'action:Continuer',   # fh_l9 inutilisée à la corbeille, retour à la vue
-  'action:Ajouter', 'action:Importer le contenu du dossier', # Ajouter : dossier d'import, plan (tz_92 → bibliothèque, liée)
+  'action:Ajouter',                                 # Ajouter : le sélecteur de ROM, sur les téléchargements de Cyber Pinball
+  "action:Dossier d’import", 'action:tz_92.zip',   # tz_92.zip cochée dans le dossier d'import (guillemets doubles : ’ ferme une chaîne entre apostrophes)
+  'action:Prendre le fichier choisi',               # plan (tz_92 → bibliothèque, liée)
   'action:Installer',                               # Installer : vérification de Twilight Zone
   'Escape', 'Escape',                               # fiche, menu
   'Escape', 'action:Bibliothèque de ROM',           # la vue finale

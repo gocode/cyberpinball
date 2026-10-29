@@ -2,7 +2,7 @@
 # vrai menu, hors écran, sur un bac à sable de tables aux médias générés (docs\demo-moments.cjs).
 #   navigation : musique de chaque jeu, volume relatif d'un jeu, son de la vidéo du plateau
 #                quand le jeu n'a pas de musique, écran « Médias, son et attente » et ses listes ;
-#   silence    : réglages par défaut (musique coupée, vidéos muettes) : rien ne joue ;
+#   silence    : musique des jeux coupée, vidéos muettes (le son est actif par défaut) : rien ne joue ;
 #   menus      : hors du menu des tables (aide, menu système, ses réglages), chaque écran montre
 #                l'affichage par défaut de Cyber Pinball (couches « marque »), en silence ; au
 #                retour à la roue, les médias et la musique de la table reviennent ; sa fiche les garde ;
@@ -85,6 +85,8 @@ $Start = 'Digit1'; $Exit = 'Escape'; $Down = 'ArrowDown'; $Up = 'ArrowUp'; $Help
 # Écrans de la borne hors du menu des tables : affichage par défaut (scénario « menus »).
 $marque = @{ 'playfield/playfield' = 'marque'; 'backglass/backglass' = 'marque'; 'dmd/dmd' = 'marque'; 'topper/topper' = 'marque' }
 $neon = @{ 'playfield/playfield' = 'vidéo en lecture'; 'backglass/backglass' = 'vidéo en lecture'; 'topper/topper' = 'vidéo en lecture' }
+# Son par défaut (depuis le 28/10/2026) : la musique de Neon Galaxy à 60 %, la vidéo du plateau muette quand le jeu a sa musique.
+$neonParDefaut = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0 }
 $scenes = @{
   navigation = @{
     Reglages = @{ music = $true; musicVolume = 60; videoVolume = 40; launchVolume = 80 }
@@ -101,11 +103,12 @@ $scenes = @{
       'action:Musique des jeux', 'wait:1000',     # 17 musique coupée ; menu système : rien d'une table ne s'entend
       'wait:200', 'wait:200', 'action:Son des vidéos du menu', # 20 liste « Son des vidéos du menu », sur 40 %
       $Down, $Start, 'wait:1000', # 23 50 %, toujours en silence
-      $Exit, $Exit, 'wait:1500',  # 26 retour aux tables : la vidéo de Rocket Rally s'entend à 50 %
-      $Exit, 'wait:200', 'wait:200', 'wait:200', 'wait:200', 'action:son et attente', # 32 de nouveau l'écran des réglages
-      'action:Présentation du menu', # 33 la liste des roues et de la liste, sur Médaillons
-      'action:Roue Arche', 'wait:800', # 35 Arche choisie, retour aux réglages
-      $Exit, $Exit, 'wait:1500'   # 38 les tables, sur la roue Arche
+      # Trois Exit des réglages à la roue : la rubrique Médias, puis le menu système.
+      $Exit, $Exit, $Exit, 'wait:1500', # 27 retour aux tables : la vidéo de Rocket Rally s'entend à 50 %
+      $Exit, 'wait:200', 'wait:200', 'wait:200', 'wait:200', 'action:son et attente', # 33 de nouveau l'écran des réglages
+      'action:Présentation du menu', # 34 la liste des roues et de la liste, sur Médaillons
+      'action:Roue Arche', 'wait:800', # 36 Arche choisie, retour aux réglages
+      $Exit, $Exit, $Exit, 'wait:1500' # 40 les tables, sur la roue Arche
     )
     Attendu = @{
       '01-wait_1500' = @{ musique = $null; video = 0.4 }
@@ -114,11 +117,12 @@ $scenes = @{
       '09-wait_1500' = @{ musique = $null; video = 0.4 }
       '17-wait_1000' = @{ musique = $null; video = 0; couches = $marque }
       '23-wait_1000' = @{ musique = $null; video = 0; couches = $marque }
-      '26-wait_1500' = @{ musique = $null; video = 0.5 }
+      '27-wait_1500' = @{ musique = $null; video = 0.5 }
     }
   }
+  # Son coupé (musique des jeux coupée, vidéos muettes) ; il était par défaut jusqu'au 28/10/2026.
   silence = @{
-    Reglages = $null
+    Reglages = @{ music = $false; videoVolume = 0 }
     Etapes = @('wait:1500', $Down, $Down, $Down, 'wait:1500', $Down, $Down, 'wait:1500') # 05 Neon Galaxy, 08 Rocket Rally
     Attendu = @{
       '05-wait_1500' = @{ musique = $null; video = 0 }
@@ -136,9 +140,9 @@ $scenes = @{
       $Help, 'wait:1500',         # 08 aide fermée : Neon Galaxy revient
       $Exit, 'wait:1000',         # 10 menu système : affichage par défaut, silence
       'action:son et attente', 'wait:1000', # 12 ses réglages : toujours l'affichage par défaut
-      $Exit, $Exit, 'wait:1500',  # 15 retour à la roue : Neon Galaxy revient
-      $Start, 'wait:1000',        # 17 sa fiche : elle parle de Neon Galaxy, qui reste
-      $Exit, 'wait:1000'          # 19 retour à la roue
+      $Exit, $Exit, $Exit, 'wait:1500', # 16 retour à la roue (rubrique Médias, menu système) : Neon Galaxy revient
+      $Start, 'wait:1000',        # 18 sa fiche : elle parle de Neon Galaxy, qui reste
+      $Exit, 'wait:1000'          # 20 retour à la roue
     )
     Attendu = @{
       '04-wait_1500' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu'; couches = $neon }
@@ -146,10 +150,10 @@ $scenes = @{
       '08-wait_1500' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu'; couches = $neon }
       '10-wait_1000' = @{ musique = $null; video = 0; phase = 'library'; couches = $marque }
       '12-wait_1000' = @{ musique = $null; video = 0; phase = 'library'; couches = $marque }
-      '15-wait_1500' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu'; couches = $neon }
+      '16-wait_1500' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu'; couches = $neon }
       # Fiche : le fond du playfield, caché par l'écran, est en pause.
-      '17-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; pause = $true; phase = 'library'; couches = @{ 'backglass/backglass' = 'vidéo en lecture'; 'topper/topper' = 'vidéo en lecture' } }
-      '19-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu'; couches = $neon }
+      '18-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; pause = $true; phase = 'library'; couches = @{ 'backglass/backglass' = 'vidéo en lecture'; 'topper/topper' = 'vidéo en lecture' } }
+      '20-wait_1000' = @{ musique = '(Audio) Neon Galaxy (Williams 1992).wav'; volume = 0.6; video = 0; phase = 'menu'; couches = $neon }
     }
   }
   # Présentation en liste (réglage « Présentation du menu : liste ») : sept lignes fixes, la
@@ -158,7 +162,7 @@ $scenes = @{
     Reglages = @{ menuLayout = 'list' }
     Etapes = @('wait:1500', $Down, $Down, $Down, 'wait:1500', $Up, 'wait:1500') # 05 Neon Galaxy, 07 retour
     Attendu = @{
-      '05-wait_1500' = @{ musique = $null; video = 0 }
+      '05-wait_1500' = $neonParDefaut
     }
   }
   # Les autres roues (Médaillons, par défaut, est celle des autres scénarios) : mêmes
@@ -166,17 +170,17 @@ $scenes = @{
   bandeau = @{
     Reglages = @{ menuLayout = 'bandeau' }
     Etapes = @('wait:1500', $Down, $Down, $Down, 'wait:1500', $Up, 'wait:1500')
-    Attendu = @{ '05-wait_1500' = @{ musique = $null; video = 0 } }
+    Attendu = @{ '05-wait_1500' = $neonParDefaut }
   }
   minimal = @{
     Reglages = @{ menuLayout = 'minimal' }
     Etapes = @('wait:1500', $Down, $Down, $Down, 'wait:1500', $Up, 'wait:1500')
-    Attendu = @{ '05-wait_1500' = @{ musique = $null; video = 0 } }
+    Attendu = @{ '05-wait_1500' = $neonParDefaut }
   }
   arche = @{
     Reglages = @{ menuLayout = 'arche' }
     Etapes = @('wait:1500', $Down, $Down, $Down, 'wait:1500', $Up, 'wait:1500')
-    Attendu = @{ '05-wait_1500' = @{ musique = $null; video = 0 } }
+    Attendu = @{ '05-wait_1500' = $neonParDefaut }
   }
   partie = @{
     Reglages = @{ music = $true; musicVolume = 60; videoVolume = 0; launchVolume = 80; game = 'animated' }

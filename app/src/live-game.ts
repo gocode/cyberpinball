@@ -4,7 +4,9 @@
 // salle à tous ; un invité ne parle qu'à lui.
 //
 // La même version de la table se reconnaît à l'empreinte SHA-256 du .vpx, calculée sans bloquer
-// le menu et gardée dans <données>\amis\empreintes.json (par chemin, taille et date).
+// le menu et gardée dans <données>\amis\empreintes.json (par chemin, taille et date). Elle vaut
+// même quand les deux bornes nomment la table autrement : l'invité calcule celle des tables du
+// même jeu et de celles qui ont la taille du .vpx annoncé.
 //
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
@@ -151,20 +153,24 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
 
   async function liveTable(table: TableEntry): Promise<LiveTable> {
     const print = await prints.of(table.file);
-    return { table: tableIdentity(table, opts.romsOf?.(table) ?? []), ...(table.version ? { version: table.version.slice(0, 60) } : {}), ...(print ? { print } : {}) };
+    const bytes = fileSize(table.file);
+    return { table: tableIdentity(table, opts.romsOf?.(table) ?? []), ...(table.version ? { version: table.version.slice(0, 60) } : {}), ...(print ? { print } : {}), ...(bytes ? { bytes } : {}) };
   }
 
   async function matchFor(invite: LiveInvite): Promise<{ match: LiveTableMatch; table?: TableEntry }> {
-    const candidates = await Promise.all(
-      opts.tables().map(async (table) => ({ entry: table, identity: tableIdentity(table, opts.romsOf?.(table) ?? []), print: undefined as string | undefined })),
-    );
-    // L'empreinte seulement pour les tables du même jeu : un .vpx se lit en entier.
-    const same = matchLiveTable(invite.table, candidates);
-    if (same.match === 'missing') return { match: 'missing' };
-    const withPrints = await Promise.all(
-      candidates.filter((c) => matchLiveTable(invite.table, [c]).match !== 'missing').map(async (c) => ({ ...c, print: await prints.of(c.entry.file) })),
-    );
-    const found = matchLiveTable(invite.table, withPrints);
+    const candidates = opts.tables().map((table) => ({ entry: table, identity: tableIdentity(table, opts.romsOf?.(table) ?? []), print: undefined as string | undefined }));
+    // L'empreinte seulement pour les tables du même jeu, ou de la taille du .vpx annoncé (le même
+    // fichier sous un autre nom) : un .vpx se lit en entier.
+    const theirs = invite.table;
+    const sameGame = (c: (typeof candidates)[number]) => matchLiveTable(theirs, [c]).match !== 'missing';
+    const sameSize = (c: (typeof candidates)[number]) => !!theirs.print && !!theirs.bytes && fileSize(c.entry.file) === theirs.bytes;
+    const withPrints = await Promise.all(candidates.filter((c) => sameGame(c) || sameSize(c)).map(async (c) => ({ ...c, print: await prints.of(c.entry.file) })));
+    const found = matchLiveTable(theirs, withPrints);
+    const named = [theirs.table.title, theirs.table.manufacturer, theirs.table.year, theirs.table.vpsId && `VPS ${theirs.table.vpsId}`].filter(Boolean).join(', ');
+    if (found.match === 'missing') log(`Invitation de ${invite.host.name} : « ${named} » introuvable ici (aucun jeu du même nom, aucun .vpx identique).`); // i18n-ignore : journal
+    else if (found.entry && !sameGame({ entry: found.entry, identity: tableIdentity(found.entry, opts.romsOf?.(found.entry) ?? []), print: undefined })) {
+      log(`Invitation de ${invite.host.name} : « ${named} » reconnue par l'empreinte de son .vpx, ici « ${found.entry.title} ».`); // i18n-ignore : journal
+    }
     return { match: found.match, ...(found.entry ? { table: found.entry } : {}) };
   }
 
@@ -308,6 +314,14 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       if (launch) clearTimeout(launch);
     },
   };
+}
+
+function fileSize(file: string): number | undefined {
+  try {
+    return fs.statSync(file).size;
+  } catch {
+    return undefined;
+  }
 }
 
 function displayTitle(table: TableEntry): string {

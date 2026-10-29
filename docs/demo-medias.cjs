@@ -313,18 +313,42 @@ function captureList(dir) {
 
 const ROLE_LABELS = { playfield: 'Playfield', backglass: 'Fronton (backglass)', dmd: 'DMD', topper: 'Topper' };
 
+/**
+ * Points allumés du DMD vivant à chaque étape, d'après son.txt (cyberEtat de la fenêtre du DMD,
+ * relevé juste avant les captures) ; undefined quand le DMD vivant n'est pas montré.
+ */
+function liveDmdDots(dir) {
+  const dots = new Map();
+  const file = path.join(dir, 'son.txt');
+  if (!fs.existsSync(file)) return dots;
+  for (const line of fs.readFileSync(file, 'utf8').split('\n')) {
+    const m = /^(\d\d-\S*) : (.*)$/.exec(line);
+    if (!m) continue;
+    try {
+      dots.set(m[1], JSON.parse(m[2]).ecrans?.dmd?.dmd?.points);
+    } catch {}
+  }
+  return dots;
+}
+
 async function verify(dir, rotation) {
   const steps = captureList(dir);
+  const dmdDots = liveDmdDots(dir);
   const empty = [];
+  const blinks = [];
   for (const [step, shots] of steps) {
     for (const s of shots) {
       const st = imageStats(s.file);
       s.size = `${st.width} × ${st.height}`;
       // Une image presque uniforme : rien n'est affiché (fond noir, page blanche).
-      if (st.deviation < 2.5 && st.colors <= 3) empty.push(`${step} (${s.role}) : écran vide (${st.colors} couleur${st.colors > 1 ? 's' : ''}, écart ${st.deviation.toFixed(1)})`);
+      if (!(st.deviation < 2.5 && st.colors <= 3)) continue;
+      // DMD vivant entre deux clignotements de PRESS START (400 ms éteint) : ses points étaient
+      // allumés au relevé de l'étape, la capture, prise après les autres écrans, tombe dans le noir.
+      if (s.role === 'dmd' && dmdDots.get(step) > 0) blinks.push(`${step} (dmd) : DMD vivant éteint le temps d'un clignotement (${dmdDots.get(step)} points allumés au relevé)`);
+      else empty.push(`${step} (${s.role}) : écran vide (${st.colors} couleur${st.colors > 1 ? 's' : ''}, écart ${st.deviation.toFixed(1)})`);
     }
   }
-  fs.writeFileSync(path.join(dir, 'vides.txt'), `${empty.length ? empty.join('\n') : 'Aucun écran vide.'}\n`, 'utf8');
+  fs.writeFileSync(path.join(dir, 'vides.txt'), `${empty.length ? empty.join('\n') : 'Aucun écran vide.'}\n${blinks.map((b) => `${b}\n`).join('')}`, 'utf8');
   // Planches : chaque étape, tous les écrans à la même échelle relative, rangés comme sur la borne.
   const out = path.join(dir, 'planches');
   fs.rmSync(out, { recursive: true, force: true });

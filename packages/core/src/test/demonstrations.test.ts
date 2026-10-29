@@ -303,3 +303,24 @@ test('une démonstration qui note son échec (process.exitCode) le rend au scrip
   });
   assert.deepEqual(lost, [], 'finir par app.exit(process.exitCode ?? 0)');
 });
+
+// Incident du 29/10/2026 : demo-pup, demo-roms et demo-propositions pré-enregistraient le script de
+// leurs tables factices (data\cache\scripts.json) en version 3 de la lecture, l'application en était
+// à la 7 : une entrée plus ancienne est relue, le médecin relançait VPX (« spawn EFTYPE » sur la
+// fausse installation de New-FauxVpx) et ne savait plus quel PuP-Pack la table charge.
+test('le script pré-enregistré par les démonstrations est dans la version de lecture de l’application', () => {
+  const vbs = fs.readFileSync(path.join(REPO, 'app', 'src', 'vbs.ts'), 'utf8');
+  const current = Number(/const FACTS_VERSION = (\d+);/.exec(vbs)?.[1]);
+  assert.ok(current > 0, 'FACTS_VERSION introuvable dans app\src\vbs.ts');
+  const seeds = fs
+    .readdirSync(DOCS)
+    .filter((f) => /\.(ps1|cjs|js|mjs)$/.test(f))
+    .flatMap((script) => {
+      const text = fs.readFileSync(path.join(DOCS, script), 'utf8');
+      if (!text.includes('scripts.json')) return [];
+      // `v: 7, facts` (JavaScript) ou `v = 7` seul sur sa ligne (table PowerShell).
+      return [...text.matchAll(/\bv: (\d+), facts\b|^\s*v = (\d+)\s*$/gm)].map((m) => ({ script, v: Number(m[1] ?? m[2]) }));
+    });
+  assert.ok(seeds.length >= 3, `graines trouvées : ${seeds.length}`);
+  assert.deepEqual(seeds.filter((s) => s.v !== current), []);
+});

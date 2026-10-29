@@ -105,7 +105,7 @@ const cache = {};
 for (let i = 0; i < pairs.length; i += 2) {
   const stat = fs.statSync(pairs[i]);
   const rom = pairs[i + 1];
-  cache[pairs[i].toLowerCase()] = { size: stat.size, mtimeMs: stat.mtimeMs, v: 3, facts: { usesPinmame: true, roms: [rom], pup: { packNames: [rom], playlistAdd: false } } };
+  cache[pairs[i].toLowerCase()] = { size: stat.size, mtimeMs: stat.mtimeMs, v: 7, facts: { usesPinmame: true, roms: [rom], pup: { packNames: [rom], playlistAdd: false } } };
 }
 fs.mkdirSync(path.join(home, 'cache'), { recursive: true });
 fs.writeFileSync(path.join(home, 'cache', 'scripts.json'), JSON.stringify(cache, null, 2) + '\n');
@@ -143,22 +143,22 @@ function Invoke-Autopilot($r, $h, $captures, $steps) {
 }
 
 Invoke-Autopilot $root $home_ "$wt\tmp\captures\pup" @(
-  'Escape', 'Digit1',                          # menu système, Ajouter une table
+  'Escape', 'action:Ajouter une table',        # menu système, Ajouter une table
   'click:.lib-action:first-child',             # importer le dossier d'import : un .bat illisible, l'option est demandée
   'Digit1',                                    # option proposée d'après la borne
   'Digit1',                                    # plan : Installer
   'Escape',                                    # vérification après l'ajout, puis la fiche
   'Escape', 'ShiftLeft', 'Digit1',             # menu, Attack from Mars, fiche
   'action:Diagnostiquer',                      # Diagnostiquer et réparer (par son libellé : la fiche gagne des actions)
-  'ShiftLeft', 'ShiftLeft', 'ShiftLeft', 'Digit1', # Tout réparer : pack remonté, ancien pack à la corbeille
-  'ShiftLeft', 'ShiftLeft', 'ShiftLeft', 'Digit1', # l'analyse suivante propose l'option : l'appliquer
+  'action:Tout réparer',                       # pack remonté, ancien pack à la corbeille
+  'action:Appliquer',                          # l'analyse suivante propose l'option : l'appliquer
   'Escape',                                    # retour à la fiche : « PuP-Pack » montre l'option appliquée
   'action:PuP-Pack',                           # les options du pack, l'appliquée et la conseillée
   'action:Option 2 - FullDMD on Backglass',    # une autre option, choisie ici : appliquée et retenue
   'Escape', 'Escape'
 )
 Invoke-Autopilot $root2 $home2 "$wt\tmp\captures\pup-deux-ecrans" @(
-  'Escape', 'Digit1', 'click:.lib-action:first-child', # plan : option retenue d'office, sans question
+  'Escape', 'action:Ajouter une table', 'click:.lib-action:first-child', # plan : option retenue d'office, sans question
   'Escape'                                             # Annuler
 )
 foreach ($t in $mb, $afm) {

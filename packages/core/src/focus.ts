@@ -11,6 +11,10 @@
 // - entre deux vues d'un même écran, le curseur suit l'identité de l'élément qu'il
 //   montrait ; un élément remplacé par ses fichiers (fiche d'un site, reçue) garde le
 //   curseur sur son premier fichier (clé « <clé de la fiche>/… ») ;
+// - pendant une opération longue (inventaire, analyse), l'écran attend : ce qu'il montre sous
+//   le curseur n'a pas été choisi, il n'est pas suivi. Le 29/10/2026, la Bibliothèque de ROM
+//   s'ouvrait sur « Retour au menu », seule action de l'écran le temps de l'inventaire, que le
+//   curseur suivait une fois la liste arrivée, au lieu de sa première action ;
 // - un clic arrive avec l'identité de ce qui a été cliqué : il vaut pour cet élément où
 //   qu'il soit maintenant, et pour rien s'il a disparu.
 
@@ -40,6 +44,11 @@ export interface FocusAnchor {
   screen: unknown;
   cursor: number;
   id: string | undefined;
+}
+
+/** Ce que retient la vue : rien à suivre pendant une opération longue (`busy`), où rien ne se choisit. */
+export function anchorOf(screen: unknown, cursor: number, ids: readonly (string | undefined)[], busy: boolean): FocusAnchor {
+  return { screen, cursor, id: busy ? undefined : ids[cursor] };
 }
 
 /**

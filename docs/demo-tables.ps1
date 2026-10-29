@@ -84,8 +84,8 @@ Invoke-Autopilot 'medecin' @(
   'Escape', 'click:.lib-action:last-child',                                   # menu système, retour à la souris
   'Digit1', 'click:.lib-action[data-label="Diagnostiquer et réparer"]',     # fiche, Diagnostiquer à la souris
   'click:.lib-row.fixable',                                                   # répare la ROM en cliquant le constat
-  'ShiftRight', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'Digit1',           # Tout réparer
-  'ShiftRight', 'Digit1',                                                     # retour à la fiche
+  'action:Tout réparer',                                                      # Tout réparer
+  'action:Retour à la fiche',                                                 # retour à la fiche
   'action:Modifier les informations', 'Digit1', 'type:: Judgment Day', 'Enter', # titre au clavier
   'ShiftRight', 'Digit1', 'Escape',                                           # liste des fabricants
   'ShiftRight', 'Digit1', 'click:.key:nth-child(13)', 'Enter',                # année : + à la souris

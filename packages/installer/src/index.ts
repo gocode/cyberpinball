@@ -88,7 +88,8 @@ export function activeComponent(root: string, id: string): { version: string; en
   const current = componentPaths(root, sample.installDir, sample.version).current;
   const marker = path.join(current, MARKER);
   if (!fs.existsSync(marker)) return undefined;
-  const version = (JSON.parse(fs.readFileSync(marker, 'utf8')) as { version: string }).version;
+  // Un marqueur réécrit par un autre outil (Windows PowerShell 5.1 met un BOM en UTF-8) reste lisible.
+  const version = (JSON.parse(fs.readFileSync(marker, 'utf8').replace(/^﻿/, '')) as { version: string }).version;
   return { version, entry: loadManifest().find((c) => c.id === id && c.version === version) };
 }
 

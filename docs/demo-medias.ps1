@@ -63,12 +63,13 @@ $etapes = @(
   $Exit, 'action:Règles',       # 11 carte des règles
   $Exit, 'action:Médias du jeu', # 13 gestionnaire : chaque type, son état, son aperçu
   'action:Prospectus',          # 14 gestionnaire : les pages du prospectus
-  $Exit, $Exit, $Exit,          # 17 retour au menu
+  # Retours par leur libellé : Exit passe d'abord de la liste aux actions d'un écran à deux zones.
+  'action:Retour aux médias', 'action:Retour à la fiche', 'action:Retour au menu', # 17 retour au menu
   $Up, $Start,                  # 19 fiche de la table sans média
   'action:Prospectus',          # 20 prospectus généré depuis le .info
   $Exit, 'action:Règles',       # 22 commandes de la partie, faute de règles
   $Exit, 'action:Médias du jeu', # 24 gestionnaire : tout en repli
-  $Exit, $Exit,                 # 26 menu
+  'action:Retour à la fiche', 'action:Retour au menu', # 26 menu
   # Chargement de 17,5 s (CYBERPINBALL_LOADING_MS, puis 1,5 s de la fausse partie), partie de 10 s.
   # La partie et le retour au menu s'attendent par leur phase (until:) : la durée des étapes varie
   # avec les écrans (jusqu'à 10 s sur la borne aux quatre écrans, captures 4K comprises), seul le

@@ -140,6 +140,7 @@ import {
   type GuestDoor,
   type GuestMode,
   actionIds,
+  anchorOf,
   followCursor,
   resolveActivation,
   enterList,
@@ -3174,7 +3175,7 @@ export function createLibrary(host: LibraryHost) {
       const memory = zonesMemory();
       zoneMemory.memory = rememberZones(zones, memory, { index: anchor.cursor, id: anchor.id }, cursor);
     }
-    anchor = { screen, cursor, id: ids[cursor] };
+    anchor = anchorOf(screen, cursor, ids, Boolean(busy));
     warnUnkeyed(built, ids);
     const zone = zoneView(zones, ids);
     soundPreview = playsSoundPreview(built.media);

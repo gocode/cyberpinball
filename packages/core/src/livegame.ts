@@ -36,6 +36,12 @@ export interface LiveTable {
   version?: string;
   /** Empreinte SHA-256 du .vpx : deux bornes ont la même version quand elle est la même. */
   print?: string;
+  /**
+   * Taille du .vpx, en octets : l'invité ne calcule l'empreinte que des tables de cette taille,
+   * pour reconnaître le même fichier sous un autre nom (une table reçue d'un ami, renommée
+   * d'après VPS à l'installation).
+   */
+  bytes?: number;
 }
 
 /** Ce que l'invité a de cette table. */
@@ -132,7 +138,8 @@ function parseLiveTable(raw: unknown): LiveTable | undefined {
   const table = parseTableIdentity(r.table);
   if (!table?.title) return undefined;
   const version = typeof r.version === 'string' && r.version.length <= 60 && !/[\x00-\x1f\x7f]/.test(r.version) ? r.version : undefined;
-  return { table, ...(version ? { version } : {}), ...(isPrint(r.print) ? { print: r.print } : {}) };
+  const bytes = typeof r.bytes === 'number' && Number.isSafeInteger(r.bytes) && r.bytes > 0 ? r.bytes : undefined;
+  return { table, ...(version ? { version } : {}), ...(isPrint(r.print) ? { print: r.print } : {}), ...(bytes ? { bytes } : {}) };
 }
 
 function parsePeer(raw: unknown): { key: string; name: string } | undefined {
@@ -224,12 +231,15 @@ export function inviteExpired(invite: Pick<LiveInvite, 'receivedAt'>, now = new 
 
 /**
  * Ma table qui correspond à celle de l'invitation : la même version d'abord (même empreinte),
- * sinon le même jeu dans une autre version ; « missing » si je n'ai pas ce jeu.
+ * sinon le même jeu dans une autre version ; « missing » si je n'ai pas ce jeu. Le même fichier
+ * est la même table, quel que soit le nom que chaque borne lui donne : une table reçue d'un ami
+ * prend à l'installation le nom du jeu chez VPS (« Game of Thrones (Limited Edition) » chez l'un,
+ * « Game of Thrones LE » chez l'autre).
  */
 export function matchLiveTable<T>(theirs: LiveTable, mine: readonly { entry: T; identity: TableIdentity; print?: string }[]): { match: LiveTableMatch; entry?: T } {
-  const same = mine.filter((m) => sameTable(theirs.table, m.identity));
-  const exact = theirs.print ? same.find((m) => m.print === theirs.print) : undefined;
+  const exact = theirs.print ? mine.find((m) => m.print === theirs.print) : undefined;
   if (exact) return { match: 'same', entry: exact.entry };
+  const same = mine.filter((m) => sameTable(theirs.table, m.identity));
   if (same[0]) return { match: theirs.print && same[0].print ? 'other-version' : 'same', entry: same[0].entry };
   return { match: 'missing' };
 }
