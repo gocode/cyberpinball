@@ -1,6 +1,14 @@
-/* Bandeau de la fenêtre « Récupérer » : 96 px en haut (122 px avec la ligne sur l'écran
-   retenu, BAR_WITH_NOTE dans acquire-window.ts), la page du site en dessous. */
+/*
+ * Bandeau de la fenêtre « Récupérer », la page du site en dessous. Tout y est écrit en pixels
+ * de référence (--u : un petit côté d'écran de 1 080 px), comme le menu : la fenêtre couvre
+ * tout un écran, et le bandeau suit sa taille, en 4K comme en 1366 × 768. Aucun texte sous
+ * 20 px. Hauteurs : 132 (164 avec la ligne sur l'écran retenu) ; sur un écran étroit
+ * (portrait, 4:3 : html.narrow), les boutons passent sous le reste : 196 (228). Mêmes nombres
+ * que BAR, BAR_WITH_NOTE, BAR_NARROW et BAR_NARROW_WITH_NOTE dans acquire-window.ts, qui pose
+ * la page du site juste en dessous.
+ */
 :root {
+  --u: calc(100vmin / 1080);
   /* Noms historiques de cette feuille, rebranchés sur le thème (theme.css). */
   --bg: var(--void);
   --panel: var(--surface);
@@ -19,28 +27,46 @@
 html,
 body {
   margin: 0;
-  height: var(--bar-height, 96px);
+  height: var(--bar-height, calc(132 * var(--u)));
   overflow: hidden;
   background: var(--bg);
   color: var(--text);
   font-family: var(--font-ui);
+  line-height: 1.25;
 }
 
 /* Le bandeau et, dessous, les téléchargements en cours : hauteur donnée par le processus
    principal (--bar-height), qui pose la page du site juste en dessous. */
 .frame {
-  height: var(--bar-height, 96px);
+  height: var(--bar-height, calc(132 * var(--u)));
   border-bottom: 1px solid var(--line);
   background: var(--panel);
   box-shadow: 0 1px 0 rgba(28, 143, 128, 0.25);
 }
 
 .bar {
-  height: 96px;
+  height: calc(132 * var(--u));
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 0 20px;
+  gap: calc(32 * var(--u));
+  padding: 0 calc(32 * var(--u));
+}
+
+html.with-note .bar {
+  height: calc(164 * var(--u));
+}
+
+/* Écran étroit : ce qu'il faut télécharger sur toute la largeur, les boutons en dessous. */
+html.narrow .bar {
+  height: calc(196 * var(--u));
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: calc(12 * var(--u));
+}
+
+html.narrow.with-note .bar {
+  height: calc(228 * var(--u));
 }
 
 .what {
@@ -48,18 +74,23 @@ body {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: calc(6 * var(--u));
+}
+
+html.narrow .what {
+  flex: none;
 }
 
 .line {
   display: flex;
   align-items: baseline;
-  gap: 14px;
+  gap: calc(18 * var(--u));
   min-width: 0;
 }
 
 .brand {
   flex: none;
+  font-size: calc(22 * var(--u));
   font-weight: 600;
   font-stretch: 112%;
   letter-spacing: 0.2em;
@@ -76,27 +107,23 @@ body {
 }
 
 .game {
-  font-size: 20px;
+  font-size: calc(30 * var(--u));
   font-weight: 600;
 }
 
 .expected {
-  font-size: 16px;
+  font-size: calc(22 * var(--u));
 }
 
 .host {
   flex: none;
-  font-size: 14px;
+  font-size: calc(20 * var(--u));
   color: var(--muted);
 }
 
 .status {
-  font-size: 14px;
+  font-size: calc(20 * var(--u));
   color: var(--ok);
-}
-
-html.with-note .bar {
-  height: 122px;
 }
 
 /* Écran choisi pas branché, playfield tourné : dit tant que la fenêtre est ouverte. */
@@ -105,7 +132,7 @@ html.with-note .bar {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 14px;
+  font-size: calc(20 * var(--u));
   color: var(--warn);
 }
 
@@ -121,15 +148,22 @@ html.with-note .bar {
 .buttons {
   flex: none;
   display: flex;
-  gap: 10px;
+  gap: calc(12 * var(--u));
+}
+
+/* Écran étroit : les quatre boutons se partagent la largeur, chacun à la mesure de son libellé. */
+html.narrow .buttons button {
+  flex: 1 1 auto;
+  padding-inline: calc(12 * var(--u));
 }
 
 button {
   font: inherit;
-  font-size: 15px;
-  padding: 10px 16px;
+  font-size: calc(20 * var(--u));
+  white-space: nowrap;
+  padding: calc(12 * var(--u)) calc(20 * var(--u));
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: calc(5 * var(--u));
   background: var(--surface-raised);
   color: var(--text);
   cursor: pointer;
@@ -149,12 +183,12 @@ button.close {
   color: var(--accent);
 }
 
-/* ---------- Téléchargements en cours : une ligne de 34 px chacun (DOWNLOAD_ROW dans
-   acquire-window.ts), 8 px de marge en dessous (DOWNLOAD_PAD) ---------- */
+/* ---------- Téléchargements en cours : une ligne de 48 chacun (DOWNLOAD_ROW dans
+   acquire-window.ts), 12 de marge en dessous (DOWNLOAD_PAD) ---------- */
 
-/* 8 px sous les lignes, filets compris (celui du dessus, celui du bas du bandeau). */
+/* 8 de marge sous les lignes, le reste pour les filets (celui du dessus, celui du bas du bandeau). */
 .downloads {
-  padding: 0 20px 6px;
+  padding: 0 calc(32 * var(--u)) calc(8 * var(--u));
   border-top: 1px solid var(--line-soft);
 }
 
@@ -164,17 +198,23 @@ button.close {
 
 .download,
 .download-more {
-  height: 34px;
+  height: calc(48 * var(--u));
 }
 
 .download {
   display: grid;
-  grid-template-columns: minmax(0, 22fr) minmax(64px, 26fr) 3.6em minmax(0, 42fr) auto;
+  grid-template-columns: minmax(0, 22fr) minmax(calc(64 * var(--u)), 26fr) 3.6em minmax(0, 42fr) auto;
   align-items: center;
-  gap: 14px;
-  padding: 0 0 0 10px;
-  border-left: 2px solid transparent;
-  font-size: 14px;
+  gap: calc(16 * var(--u));
+  padding: 0 0 0 calc(12 * var(--u));
+  border-left: calc(3 * var(--u)) solid transparent;
+  font-size: calc(20 * var(--u));
+}
+
+/* Écran étroit : le texte (volume, débit, temps restant) d'abord, la barre se contente de moins (revue de Codex). */
+html.narrow .download {
+  grid-template-columns: minmax(0, 26fr) minmax(calc(48 * var(--u)), 10fr) 3.2em minmax(0, 54fr) auto;
+  gap: calc(12 * var(--u));
 }
 
 .dl-name,
@@ -205,8 +245,8 @@ button.close {
 /* Barre fine : sarcelle au repos, vert signal pour ce qui est reçu. */
 .dl-track {
   position: relative;
-  height: 4px;
-  border-radius: 2px;
+  height: calc(5 * var(--u));
+  border-radius: calc(3 * var(--u));
   background: var(--line-soft);
   overflow: hidden;
 }
@@ -215,9 +255,9 @@ button.close {
   position: absolute;
   inset: 0 auto 0 0;
   width: 0;
-  border-radius: 2px;
+  border-radius: calc(3 * var(--u));
   background: var(--accent);
-  box-shadow: 0 0 8px var(--signal-haze);
+  box-shadow: 0 0 calc(8 * var(--u)) var(--signal-haze);
   transition: width 0.25s linear;
 }
 
@@ -227,7 +267,7 @@ button.close {
  * rien ; le texte dit « reçus, taille non annoncée », avec le volume et le débit qui avancent.
  */
 .download.unknown .dl-track {
-  background: repeating-linear-gradient(90deg, var(--line-soft) 0 6px, transparent 6px 12px);
+  background: repeating-linear-gradient(90deg, var(--line-soft) 0 calc(8 * var(--u)), transparent calc(8 * var(--u)) calc(16 * var(--u)));
 }
 
 .download.unknown .dl-fill {
@@ -247,9 +287,8 @@ button.close {
 
 /* Même largeur pour « Annuler » et « Annuler ? » : la ligne désignée ne se décale pas. */
 button.dl-cancel {
-  min-width: 104px;
-  font-size: 13px;
-  padding: 4px 12px;
+  min-width: calc(120 * var(--u));
+  padding: calc(5 * var(--u)) calc(14 * var(--u));
 }
 
 /* Désigné à la borne (Start) : Start de nouveau l'annule. */
@@ -269,22 +308,22 @@ button.dl-cancel {
 }
 
 .download-more {
-  line-height: 34px;
-  padding-left: 12px;
-  font-size: 14px;
+  line-height: calc(48 * var(--u));
+  padding-left: calc(15 * var(--u));
+  font-size: calc(20 * var(--u));
   color: var(--muted);
 }
 
 
-/* ---------- Recherche libre : ligne de recherche de 52 px (SEARCH_ROW dans acquire-window.ts),
-   puis, sur une page vidéo, une ligne de 40 px qui la décrit (VIDEO_ROW) ---------- */
+/* ---------- Recherche libre : ligne de recherche de 76 (SEARCH_ROW dans acquire-window.ts),
+   puis, sur une page vidéo, une ligne de 62 qui la décrit (VIDEO_ROW) ---------- */
 
 .search {
-  height: 52px;
+  height: calc(76 * var(--u));
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 0 20px 10px;
+  gap: calc(14 * var(--u));
+  padding: 0 calc(32 * var(--u)) calc(16 * var(--u));
 }
 
 .search[hidden],
@@ -296,16 +335,15 @@ button.dl-cancel {
 .engines {
   flex: none;
   display: flex;
-  gap: 4px;
-  padding: 3px;
+  gap: calc(4 * var(--u));
+  padding: calc(3 * var(--u));
   border: 1px solid var(--line-soft);
   border-radius: 999px;
   background: var(--surface-sunken);
 }
 
 button.engine {
-  font-size: 14px;
-  padding: 6px 14px;
+  padding: calc(7 * var(--u)) calc(18 * var(--u));
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
@@ -326,14 +364,14 @@ button.engine.on {
 #query {
   flex: 1;
   min-width: 0;
-  height: 38px;
-  padding: 0 14px;
+  height: calc(54 * var(--u));
+  padding: 0 calc(18 * var(--u));
   font: inherit;
-  font-size: 16px;
+  font-size: calc(22 * var(--u));
   color: var(--text);
   background: var(--surface-sunken);
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: calc(5 * var(--u));
   outline: none;
 }
 
@@ -355,21 +393,20 @@ button.go:hover {
 }
 
 .video {
-  height: 40px;
+  height: calc(52 * var(--u));
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin: 0 20px 8px;
-  padding: 0 4px 0 12px;
-  border-left: 2px solid var(--accent);
+  gap: calc(14 * var(--u));
+  margin: 0 calc(32 * var(--u)) calc(10 * var(--u));
+  padding: 0 calc(6 * var(--u)) 0 calc(14 * var(--u));
+  border-left: calc(3 * var(--u)) solid var(--accent);
   background: var(--signal-wash);
-  font-size: 14px;
+  font-size: calc(20 * var(--u));
 }
 
 .video-mark {
   flex: none;
   color: var(--accent);
-  font-size: 12px;
 }
 
 .video-text,
@@ -394,16 +431,13 @@ button.go:hover {
 #video-get,
 button.grab {
   flex: none;
-  font-size: 14px;
-  padding: 5px 14px;
+  padding: calc(6 * var(--u)) calc(16 * var(--u));
   border-color: var(--accent);
   color: var(--accent);
 }
 
 /* Le geste attendu pour ce média (le son pour une musique), allumé ; l'autre reste en contour. */
 button.grab {
-  font-size: 14px;
-  padding: 5px 14px;
   border-color: var(--line);
   color: var(--text);
 }

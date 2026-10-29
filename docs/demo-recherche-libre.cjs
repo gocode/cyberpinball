@@ -317,6 +317,8 @@ async function run(report, sc, media) {
     const open = acquirer().current();
     if (!open) throw new Error('fenêtre « Récupérer » fermée');
     for (let i = 0; i < 50 && open.view.webContents.isLoading(); i++) await delay(100);
+    // Le bandeau a reçu son premier état (fenêtre qui vient de s'ouvrir) : sinon la capture le montre vide.
+    for (let i = 0; i < 50 && !(await open.win.webContents.executeJavaScript(`document.getElementById('game').textContent`)); i++) await delay(100);
     await delay(400);
     const l = label(`recuperer-${name}`);
     await report.check(open.win.webContents, `${sc.name}/${l} (bandeau)`);

@@ -85,17 +85,28 @@ export const ACQUIRE_PARTITION = 'persist:acquisition';
 /** Message du bandeau quand la fenêtre reprend où l'utilisateur en était. */
 const RESUMED = (request: AcquireRequest) =>
   request.search ? t('Repris là où vous en étiez. « Retour à la recherche » revient à la première page de résultats.') : t('Repris là où vous en étiez. « Retour à la fiche » revient à la page de départ.');
-/** Hauteur du bandeau de Cyber Pinball, en pixels ; avec la ligne sur l'écran retenu (écran choisi pas branché, playfield tourné). */
-const BAR = 96;
-const BAR_WITH_NOTE = 122;
+/**
+ * Hauteurs du bandeau de Cyber Pinball, en pixels de référence : ceux d'un écran dont le petit
+ * côté fait 1 080 px (acquire.css, --u), multipliés par la taille de l'écran couvert. En px
+ * fixes, le bandeau gardait 96 px et des textes de 12 à 16 px en 4K comme en 1366 × 768 (garde-fou
+ * de mise en page, 29/10/2026). Avec la ligne sur l'écran retenu (écran choisi pas branché,
+ * playfield tourné) ; sur un écran étroit, les boutons passent sous le reste (BAR_NARROW).
+ */
+const BAR_REFERENCE = 1080;
+const BAR = 132;
+const BAR_WITH_NOTE = 164;
+const BAR_NARROW = 196;
+const BAR_NARROW_WITH_NOTE = 228;
+/** Plus étroit que ce rapport largeur / hauteur (portrait, 4:3, 5:4) : les quatre boutons ne tiennent plus à côté du reste. */
+const WIDE_RATIO = 1500 / 1080;
 /** Recherche libre : la ligne du champ de recherche ; sur une page vidéo, la ligne qui la décrit (acquire.css). */
-const SEARCH_ROW = 52;
-const VIDEO_ROW = 40;
+const SEARCH_ROW = 76;
+const VIDEO_ROW = 62;
 /** Une page vidéo se lit après son chargement, puis de nouveau un peu plus tard (YouTube écrit son titre après coup). */
 const VIDEO_PROBE_DELAYS = [700, 3000];
 /** Une ligne de téléchargement en cours sous le bandeau (acquire.css, .download), et la marge qui les suit. */
-const DOWNLOAD_ROW = 34;
-const DOWNLOAD_PAD = 8;
+const DOWNLOAD_ROW = 48;
+const DOWNLOAD_PAD = 12;
 /** Au plus, lignes de téléchargement ; au-delà, la dernière résume les autres. */
 const DOWNLOAD_ROWS = 3;
 /** Relevé des téléchargements en cours (bandeau) ; un relevé sur REPORT_EVERY va aussi au menu. */
@@ -206,6 +217,8 @@ export interface AcquireOpen {
   warn?: boolean;
   /** Ligne du bandeau sur l'écran retenu, tant que la fenêtre est ouverte (écran choisi pas branché, playfield tourné). */
   screenNote?: string;
+  /** Échelle du bandeau (petit côté de l'écran couvert / 1 080) ; écran étroit : boutons sous le reste. */
+  scale?: { unit: number; narrow: boolean };
   /** Change la hauteur du bandeau (la page du site suit en dessous). */
   setBar?(height: number): void;
   /** Recherche libre : la page affichée est une page vidéo (sonde VIDEO_PAGE_PROBE). */
@@ -302,7 +315,10 @@ export function createAcquirer(events: AcquireEvents) {
           if (state === 'cancelled') job?.cancel();
           else job?.fail('login', t('le site a refusé la reprise'));
           if (!claim || visible) setStatus(state === 'cancelled' ? t('Téléchargement annulé : {file}', { file: filename }) : t('Téléchargement interrompu : {file}', { file: filename }), true);
-          fs.rmSync(target, { force: true });
+          // Juste annulé, le fichier peut encore être tenu par Chromium (ou l'antivirus) : EPERM.
+          // Levée dans l'événement, l'exception arrêtait le processus principal (démonstration du
+          // téléchargement, 29/10/2026) ; supprimé avec reprises, sans jamais lever.
+          void fs.promises.rm(target, { force: true, maxRetries: 10, retryDelay: 200 }).catch((error: Error) => console.warn(`Fichier annulé non supprimé : ${target} (${error.message})`)); // i18n-ignore : console
           const error = state === 'cancelled' ? 'cancelled' : 'interrupted';
           if (claim) claim.done({ error });
           else events.failed(filename, error);
@@ -549,10 +565,12 @@ export function createAcquirer(events: AcquireEvents) {
     return { lines: shown, more: t('Et {n} autres : {progress}', { n: rest.length, progress: formatTransfer(sum) }) };
   }
 
-  /** Hauteur du bandeau : la base (avec la ligne sur l'écran retenu), le champ de recherche, la page vidéo, une ligne par téléchargement. */
+  /** Hauteur du bandeau, en pixels de l'écran : la base (avec la ligne sur l'écran retenu), le champ de recherche, la page vidéo, une ligne par téléchargement. */
   function barHeight(rows: number): number {
-    const base = open?.screenNote ? BAR_WITH_NOTE : BAR;
-    return base + (open?.request.search ? SEARCH_ROW : 0) + (open?.request.search && open.video ? VIDEO_ROW : 0) + (rows ? rows * DOWNLOAD_ROW + DOWNLOAD_PAD : 0);
+    const narrow = open?.scale?.narrow === true;
+    const base = open?.screenNote ? (narrow ? BAR_NARROW_WITH_NOTE : BAR_WITH_NOTE) : narrow ? BAR_NARROW : BAR;
+    const reference = base + (open?.request.search ? SEARCH_ROW : 0) + (open?.request.search && open.video ? VIDEO_ROW : 0) + (rows ? rows * DOWNLOAD_ROW + DOWNLOAD_PAD : 0);
+    return Math.ceil(reference * (open?.scale?.unit ?? 1));
   }
 
   /** Ligne d'une page vidéo : ce qu'elle est, et ce que Cyber Pinball peut en faire. */
@@ -741,6 +759,7 @@ export function createAcquirer(events: AcquireEvents) {
       downloads: lines,
       more,
       barHeight: height,
+      narrow: open.scale?.narrow === true,
     });
     open.setBar?.(height);
   }
@@ -927,6 +946,7 @@ export function createAcquirer(events: AcquireEvents) {
     const place = events.screen?.();
     const bounds = place?.bounds ?? primaryRect();
     if (place?.notice) open.screenNote = place.notice;
+    open.scale = { unit: Math.min(bounds.width, bounds.height) / BAR_REFERENCE, narrow: bounds.width / bounds.height < WIDE_RATIO };
     coverDisplay(win, bounds);
     open.setBar = fillBelow(win, view, barHeight(0));
     void win.loadFile(path.join(__dirname, '..', 'renderer', 'acquire.html'));

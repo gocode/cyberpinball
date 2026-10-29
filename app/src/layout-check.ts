@@ -24,6 +24,8 @@
 // demi-pixel près. Changer de table ne change que leur contenu.
 // Sur un écran sans playfield (fronton, DMD, topper), le fond du playfield ne doit pas se voir :
 // seulement les zones des rôles, sur du noir.
+// Les zones du menu (data-frame : cadre du plateau d'un côté, roue, fronton et informations de
+// l'autre) ne se recouvrent pas et restent dans la zone du playfield.
 // Au chargement d'une table : en borne, aucun texte de l'interface sur le média ; au bureau,
 // l'encart du titre et des commandes ne recouvre pas le cadre du média.
 // Une liste qui défile n'a jamais de fondu (mask-image), et son choix courant s'y voit en entier.
@@ -263,6 +265,27 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
         }
       }
     }
+  }
+  // Zones du menu (data-frame : le nom de la zone de chaque cadre, « plateau » ou « menu ») : deux
+  // zones différentes ne se recouvrent jamais, et aucun cadre ne sort de la zone du playfield. Au
+  // bureau en 4:3 (octobre 2026), le fronton et le bandeau de la roue couvraient presque tout le
+  // cadre 9:16 du plateau sans que rien ne le dise : aucun texte ne s'y chevauchait. Les cadres
+  // d'une même zone peuvent se recouvrir (la roue mord sur le bas du fronton) ; un cadre qui
+  // couvre toute la zone du playfield est un fond (le média du plateau en borne), pas un cadre.
+  if (zone) {
+    const z = zone.getBoundingClientRect();
+    const frames = [...document.querySelectorAll('[data-frame]')].filter((el) => shown(el)).map((el) => ({ el, r: el.getBoundingClientRect() })).filter(({ r }) => r.width > T && r.height > T && !(r.width >= z.width - T && r.height >= z.height - T));
+    const at = (r) => '[' + [r.left, r.top, r.right, r.bottom].map(Math.round).join(', ') + ']';
+    const name = (el) => el.dataset.frame + ' ' + label(el).split(' « ')[0];
+    frames.forEach((a, i) => {
+      if (a.r.left < z.left - T || a.r.top < z.top - T || a.r.right > z.right + T || a.r.bottom > z.bottom + T) problems.add('cadre hors de la zone du playfield : ' + name(a.el) + ' ' + at(a.r));
+      for (const b of frames.slice(i + 1)) {
+        if (a.el.dataset.frame === b.el.dataset.frame) continue;
+        const w = Math.min(a.r.right, b.r.right) - Math.max(a.r.left, b.r.left);
+        const h = Math.min(a.r.bottom, b.r.bottom) - Math.max(a.r.top, b.r.top);
+        if (w > T && h > T) problems.add('cadres qui se recouvrent : ' + [name(a.el) + ' ' + at(a.r), name(b.el) + ' ' + at(b.r)].sort().join(' et '));
+      }
+    });
   }
   // Liste qui défile : jamais de fondu (mask-image) sur elle, il fait passer la ligne du bord
   // pour désactivée (menu système, octobre 2026 : « Écrans et rôles ») ; et le choix courant

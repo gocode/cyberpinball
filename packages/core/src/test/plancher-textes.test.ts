@@ -60,9 +60,18 @@ test('roue sans logo : à chaque place, le nom (au centre) ou l’initiale (aill
   assert.ok(literal, 'WHEELS introuvable dans frontend.js');
   const wheels = vm.runInNewContext(`(${literal[1]})`) as Record<string, { face: number[]; box: number[][]; opacity: number[] }>;
   const sheet = css('frontend.css');
-  // Corps dans le repère du bandeau (--w) ; en borne il vaut --u (--k = 1), au bureau plus (--k > 1) : la borne est le pire cas.
-  const name = number(rule(sheet, '.menu-band .wheel-name'), /font-size:\s*calc\(([\d.]+) \* var\(--w\)\)/, 'corps du nom');
-  const initial = number(rule(sheet, '.wheel-initial'), /font-size:\s*calc\(([\d.]+) \* var\(--w\)\)/, 'corps de l’initiale');
+  // Corps dans le repère du bandeau (--w), avec un plancher en multiples de 20 px (--floor-text) :
+  // max(calc(N * var(--w)), calc(var(--floor-text) * F)). En borne --w vaut --u ; au bureau, plus
+  // étroit que 16:9, le bandeau rétrécit (--w jusqu'à 0,57 --u en 5:4) et seul le plancher tient.
+  // Le pire cas est donc le plus petit des deux corps : N en borne, 20 × F au bureau étroit.
+  const size = (selector: string, what: string) => {
+    const body = rule(sheet, selector);
+    const n = number(body, /font-size:\s*max\(calc\(([\d.]+) \* var\(--w\)\)/, what);
+    const floor = number(body, /font-size:\s*max\(calc\([\d.]+ \* var\(--w\)\), calc\(var\(--floor-text\) \* ([\d.]+)\)\)/, `plancher du ${what}`);
+    return Math.min(n, 20 * floor);
+  };
+  const name = size('.menu-band .wheel-name', 'corps du nom');
+  const initial = size('.wheel-initial', 'corps de l’initiale');
   // Fondu : le nom s'éteint en `out` ms ; ce qui s'allume attend `delay` ms, puis prend `fadeIn` ms.
   const out = number(rule(sheet, '.wheel-name,\n.wheel-initial'), /transition:\s*opacity (\d+)ms linear;/, 'extinction du nom');
   const shown = rule(sheet, '.wheel-item.center .wheel-name,\n.wheel-item:not(.center) .wheel-initial');
@@ -107,6 +116,24 @@ test('roue sans logo : le médaillon porte le nom et l’initiale, la place du c
   // Un flipper : la table suivante passe au centre, la marque la suit.
   send({ ...state, position: 3, table: { title: '1941', subtitle: '' }, neighbors: state.neighbors.map((n) => ({ ...n, offset: n.offset - 1 })) });
   assert.deepEqual(items.map((n) => n.classList.contains('center')), [false, false, true]);
+});
+
+/** Planche du développeur (fallback-demo.html), jamais montrée sur un écran de la borne. */
+const DEVELOPER_SHEETS = new Set(['fallback-demo.css']);
+
+// Un corps en px fixes ne suit pas l'écran : 16 px restent 16 px en 4K (8 px de référence). Le
+// bandeau de « Récupérer » (acquire.css), plus ancien que le design system, gardait ainsi des
+// textes de 12 à 16 px dans un bandeau de 96 px, à toutes les tailles d'écran (29/10/2026).
+test('feuilles : aucun corps de texte en px fixes (ils ne suivent pas la taille de l’écran)', () => {
+  const offenders: string[] = [];
+  for (const file of fs.readdirSync(RENDERER).filter((f) => f.endsWith('.css') && !DEVELOPER_SHEETS.has(f))) {
+    for (const [, selector, body] of css(file).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      for (const [, value] of body!.matchAll(/(?:^|;)\s*font(?:-size)?:\s*([^;]+?)\s*(?:;|$)/gm)) {
+        if (/(?:^|[\s(])[0-9.]+px\b/.test(value!)) offenders.push(`${file} ${selector!.trim().replace(/\s+/g, ' ')} : ${value}`);
+      }
+    }
+  }
+  assert.deepEqual(offenders, []);
 });
 
 test('feuilles : aucun corps de texte écrit sous 20 px (cqmin, vmin, et les unités du menu --u, --w, --b)', () => {

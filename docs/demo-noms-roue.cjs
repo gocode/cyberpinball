@@ -3,13 +3,14 @@
 // (frontend.ts) l'enverrait, dix tables SANS logo : le médaillon du centre montre le nom du jeu,
 // les autres son initiale. Pour chaque roue (Médaillons, Bandeau, Minimaliste, Arche) et pour la
 // liste des titres, sur la borne (playfield couché, mise en page pivotée ; écran debout) et au
-// bureau (1080p, 1366 × 768, 1280 × 1024, 1024 × 768, 4K) :
+// bureau (1080p, 1366 × 768, 16:10, 3:2, 1280 × 1024, 1024 × 768, 4K) :
 //   - le corps rendu de ce qui se voit (corps de la police × échelle des transform, ramené à un
 //     petit côté de 1 080 px), qui ne doit jamais passer sous 20 px ; nom au centre, initiale
 //     ailleurs, jamais les deux ensemble ;
 //   - le garde-fou de mise en page (layout-check.ts) au repos, puis EN PLEIN GLISSEMENT (un
 //     flipper vient d'être pressé : les médaillons changent de place et de taille) ; il doit voir
-//     tout texte sous 20 px que voit la mesure.
+//     tout texte sous 20 px que voit la mesure, et deux zones du menu qui se recouvrent (le
+//     fronton et la roue sur le cadre du plateau, en 4:3 avant la disposition compacte).
 // Captures et relevé (mise-en-page.txt, corps.txt) dans le dossier « out » de la spécification.
 //   electron docs/demo-noms-roue.cjs <spec.json>   { "out": dossier des captures, "only": cas à rejouer (facultatif) }
 // Fenêtres jamais montrées (show: false, rendu hors écran, son coupé).
@@ -54,6 +55,9 @@ const SCREENS = [
   // Bureau : la zone du playfield en largeur, bandeau à droite du cadre du plateau.
   ['bureau-1080p', 1920, 1080, 0],
   ['bureau-1366x768', 1366, 768, 0],
+  // Plus étroits que 16:9 : groupe réduit (16:10), puis disposition compacte (3:2, 5:4, 4:3).
+  ['bureau-1280x800', 1280, 800, 0],
+  ['bureau-1500x1000', 1500, 1000, 0],
   ['bureau-1280x1024', 1280, 1024, 0],
   ['bureau-1024x768', 1024, 768, 0],
   ['bureau-4k', 3840, 2160, 0],

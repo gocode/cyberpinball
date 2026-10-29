@@ -41,6 +41,19 @@ function proposals(cursor, progress, heading = 'Chargement : propositions', noti
     ...(grown && i === cursor ? { extra: ['Choisi, à enregistrer', 'Une ligne de plus', 'Et encore une', 'Et une dernière'] } : {}),
     ...(i === 11 ? { state: { label: `Attente du site · ${Math.round(30 - progress * 30)} s`, tone: 'info' }, progress, pending: 'Le site décompte lui-même.' } : {}),
   }));
+  const sections = notice ? [{ rows: [{ text: 'Non connecté · 1 résultat visible ; le téléchargement demande votre compte (gratuit)', tone: 'warning' }] }] : [];
+  const actions = [...cards.map((c) => ({ label: c.title })), { label: 'Arrêter la file' }, { label: 'Retour' }];
+  // Les cartes sont la liste de contenu de l'écran : dans son cadre, avec son repère, comme
+  // library.ts (zoneView) le décrit au rendu. Zones calculées par le cœur, jamais recopiées.
+  const zones = core.screenZones({ sections, media: { cards } }, actions.length);
+  const inList = zones.list.includes(cursor);
+  const zone = {
+    active: inList ? 'list' : 'actions',
+    listCursor: inList ? cursor : zones.list[0],
+    position: inList ? zones.list.indexOf(cursor) + 1 : undefined,
+    total: zones.list.length,
+    tag: inList ? { key: 'Exit', text: 'Sortir de la liste' } : { key: 'MagnaSave', text: 'Revenir à la liste' },
+  };
   return {
     role: 'playfield',
     phase: 'library',
@@ -60,10 +73,11 @@ function proposals(cursor, progress, heading = 'Chargement : propositions', noti
       back: 'Retour',
       hint: '',
       // Bandeau d'un site arrivé en cours de route, en tête de la liste (GOTG, octobre 2026).
-      sections: notice ? [{ rows: [{ text: 'Non connecté · 1 résultat visible ; le téléchargement demande votre compte (gratuit)', tone: 'warning' }] }] : [],
+      sections,
       cursor,
+      zone,
       media: { cards },
-      actions: [...cards.map((c) => ({ label: c.title })), { label: 'Arrêter la file' }, { label: 'Retour' }],
+      actions,
     },
   };
 }

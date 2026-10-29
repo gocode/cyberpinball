@@ -48,6 +48,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - The names under the small medallions of the wheel are larger and can be read from a distance, like every text of the menu.
 - Friends online at a glance on the tables menu, and small, discreet notifications, one at a time: a friend coming online, a friend request, a finished download. Nothing shows during a game: a summary waits for you when you come back. Can be turned off in "Médias, son et attente" (Media, sound and attract mode).
 - "Jouer et enregistrer" (Play and record), on a table's page: Cyber Pinball films the game, from the moment you chose until the length you chose or until you leave the table, with a small witness in the corner of the playfield. Back in the menu, the video can become the table's presentation on the wheel, after confirmation, or be kept aside.
+- Tables menu on a desktop, on a screen narrower than 16:9 (5:4, 4:3): the playfield and the rest of the menu no longer overlap.
+- "Récupérer" (Fetch) window: its banner follows the size of the screen, and its texts read as well in 4K as on a small screen; in portrait, its buttons move below.
 
 ## 0.1.3
 

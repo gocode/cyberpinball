@@ -125,6 +125,8 @@ window.cyberAcquire.onState((s) => {
   $('screen-note').textContent = s.screenNote ?? '';
   $('screen-note').hidden = !s.screenNote;
   document.documentElement.classList.toggle('with-note', Boolean(s.screenNote));
+  // Écran étroit (portrait, 4:3) : les boutons sous le reste, comme le compte le processus principal.
+  document.documentElement.classList.toggle('narrow', Boolean(s.narrow));
   showSearch(s.search);
   $('home').textContent = s.search ? t('Retour à la recherche') : t('Retour à la fiche');
   $('home').title = s.search ? t('Retour à la recherche (première page de résultats)') : t('Retour à la fiche (page du fichier sur le site)');

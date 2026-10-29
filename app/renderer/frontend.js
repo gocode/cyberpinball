@@ -355,7 +355,11 @@ function menuPanel(s) {
     const backglass = el('div', 'menu-backglass');
     // Classes des cadres : noms de la feuille de style (frontend.css), pas du texte affiché.
     const frames = [el('div', 'menu-frame plateau'), el('div', 'menu-frame fronton')]; // i18n-ignore : classes CSS
-    node.append(scrim, ...frames, backglass, nav, el('div', 'menu-label', t('Table sélectionnée')), title, meta, counter);
+    // Zones du menu : le cadre du plateau d'un côté, tout le reste de l'autre ; layout-check.ts vérifie qu'elles ne se recouvrent jamais.
+    const label = el('div', 'menu-label', t('Table sélectionnée'));
+    frames[0].dataset.frame = 'plateau';
+    for (const zone of [frames[1], backglass, nav, label, title, meta, counter]) zone.dataset.frame = 'menu';
+    node.append(scrim, ...frames, backglass, nav, label, title, meta, counter);
     menuView = { node, nav, text, meta, counter, backglass };
   }
   const v = menuView;
@@ -812,7 +816,10 @@ function drawPlayfield(s) {
   }
   // Bandeau d'aide : au bureau sous les informations de la table ; en borne, absent du menu des tables.
   const help = footer(s.footer);
-  if (s.table) help.classList.add('menu-help');
+  if (s.table) {
+    help.classList.add('menu-help');
+    help.dataset.frame = 'menu';
+  }
   nodes.push(help);
 
   // Écran plein par-dessus le menu (fiche, aide, confirmation, message) : il porte la marque

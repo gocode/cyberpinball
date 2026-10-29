@@ -2,7 +2,8 @@
 # « Récupérer » : un petit serveur local lent envoie des fichiers de taille connue puis
 # inconnue ; le bandeau montre barre, pourcentage, volume, débit et temps restant ; Start de
 # la borne et la souris annulent ; un petit fichier va au bout ; quatre à la fois se
-# résument ; puis un écran de 1366 × 768. Aucun site n'est chargé.
+# résument ; puis un écran de 1366 × 768, un en portrait et un en 4:3 (boutons sous le reste).
+# Le bandeau suit l'écran : la page commence juste dessous, rien ne dépasse. Aucun site n'est chargé.
 # Captures et relevé dans tmp\demo-telechargement\captures.
 #   .\docs\demo-telechargement.ps1
 $ErrorActionPreference = 'Stop'

@@ -449,8 +449,9 @@ html.menu-desktop .menu-count {
   transition: opacity 160ms linear 60ms;
 }
 
+/* Bandeau réduit : l'initiale garde 20 px aux plus petites places (échelle 0,44). */
 .wheel-initial {
-  font-size: calc(96 * var(--w));
+  font-size: max(calc(96 * var(--w)), calc(var(--floor-text) * 2.4));
   font-weight: 600;
   font-stretch: 112%;
   line-height: 1;
@@ -466,7 +467,18 @@ html.menu-desktop .menu-count {
  * bas-gauche, aux cotes propres à chaque roue (--t-* titre, --m-* fabricant · année,
  * --c-* compteur, en pixels de référence depuis le bas du bandeau). --b : un pixel du
  * bandeau, agrandi au bureau (--k) : il dépasse un peu du cadre du fronton, bords fondus.
+ *
+ * Au bureau, sur un écran plus étroit que 16:9, le bandeau rétrécit (--b < --u) : ses textes
+ * gardent alors 20 px au moins (max(), plus gros que dessiné) et s'empilent sans se toucher
+ * (--m-bot, --t-bot : fabricant · année au-dessus du compteur centré, le titre au-dessus).
+ * Ces planchers ne changent rien tant que le bandeau garde sa taille dessinée.
  */
+@property --floor-text {
+  syntax: '<length>';
+  inherits: true;
+  initial-value: 0px;
+}
+
 html[data-menu-band] #root {
   --k: 1;
   --b: calc(var(--k) * var(--u));
@@ -485,13 +497,109 @@ html[data-menu-band] #root {
   --c-w: 130;
   --c-b: 112;
   --c-align: flex-end;
+  /* Compteur sous fabricant · année (1) ou à côté (0, Médaillons). */
+  --c-under: 0;
+  /* Corps planchers (en --u) du titre, des titres longs, de fabricant · année et du compteur, de l'aide ; hauteur de ligne des petits textes. */
+  --floor-title: 20;
+  --floor-long: 20;
+  --floor-small: 20;
+  --floor-help: 20;
+  --line-small: 24;
 }
 
+/*
+ * 20 px de référence, calculés ici, dans le repère de la zone du playfield : sous la roue (un
+ * conteneur en largeur), --u ne vaudrait plus un pixel de la zone mais un pixel de la roue.
+ */
+html[data-menu-band] .menu {
+  --floor-text: calc(20 * var(--u));
+}
+
+/*
+ * Bureau : le bandeau dépasse de 30 de chaque côté du cadre du fronton (1176), bords fondus ;
+ * fronton et bandeau à 34 du bord droit, le haut du fronton aligné sur celui du plateau, la
+ * barre d'aide sur son bas. En 16:9 et plus, le bandeau fait 1236 (--b = 1236 / 1080 --u). Plus
+ * étroit, jusqu'en 16:10, tout le groupe se réduit à la place laissée à droite du plateau (bord
+ * gauche du bandeau à 650, 23 après le cadre du plateau) : le fronton raccourcit, la roue mord
+ * moins sur lui. Image du fronton : 16:9, 1144 de large pour un bandeau de 1236, son bord droit
+ * à 46 de celui du bandeau ; son cadre l'entoure de 16.
+ */
 html.menu-desktop[data-menu-band] #root {
-  /* Le bandeau dépasse de 30 de chaque côté du cadre du fronton (1176), bords fondus ; la barre d'aide finit au bas du cadre du plateau. */
-  --k: calc(1236 / 1080);
-  --band-left: calc(100% - 1270 * var(--u));
+  --band-w: min(calc(1236 * var(--u)), calc(100cqw - 684 * var(--u)));
+  --b: calc(var(--band-w) / 1080);
+  --band-left: calc(100cqw - 34 * var(--u) - var(--band-w));
   --band-bottom: calc(28 * var(--u));
+  --bg-w: calc(var(--band-w) * 1144 / 1236);
+  --bg-right: calc(34 * var(--u) + var(--band-w) * 46 / 1236);
+}
+
+/*
+ * Bureau plus étroit que 16:10 (3:2, 4:3, 5:4) : disposition compacte, deux zones (revue de
+ * Codex, 29/10/2026). À droite du plateau, une colonne de 675 à 64 du bord : le fronton 16:9 en
+ * haut, aligné sur le haut du plateau, le bandeau entier en bas, sa barre d'aide alignée sur le
+ * bas du plateau, tous deux de la largeur de la colonne ; entre eux, le vide reste sombre (de
+ * 26 en 3:2 à 313 en 5:4). Le bandeau y descend à --b = 0,57 --u : textes à 20 px au moins,
+ * titre sur une ligne, médaillon du centre sur deux. Posé sur le menu et le bandeau d'aide (une
+ * requête de conteneur ne vaut que pour les enfants de #root) : --b et les cotes qui en
+ * dépendent sont recalculés ici, sans quoi ils garderaient la valeur héritée de #root.
+ */
+@container (aspect-ratio < 1.6) {
+  html.menu-desktop .menu.menu-band,
+  html.menu-desktop[data-menu-band] #root > .footer.menu-help {
+    --band-w: calc(100cqw - 739 * var(--u));
+    --b: calc(var(--band-w) / 1080);
+    --band-left: calc(675 * var(--u));
+    --bg-w: calc(var(--band-w) - 32 * var(--u));
+    --bg-right: calc(80 * var(--u));
+    /* Au plancher, des corps un peu plus forts : 20 --u ne font que 14 px sur un écran de 768 de haut. */
+    --floor-title: 26;
+    --floor-long: 23;
+    --floor-small: 23;
+    --floor-help: 22;
+    --line-small: 28;
+  }
+
+  /*
+   * Bandeau, Minimaliste : titre et fabricant · année sur la largeur de la colonne (moins 24 de
+   * chaque côté). L'Arche garde sa place dessinée : élargi, le titre croisait en 5:4 les
+   * médaillons qui glissent le long de ses pieds ; les Médaillons, leur plaque.
+   */
+  html.menu-desktop:is([data-menu-band='bandeau'], [data-menu-band='minimal']) .menu.menu-band :is(.menu-title, .menu-meta) {
+    left: calc(var(--band-left) + 24 * var(--u));
+    width: calc(var(--band-w) - 48 * var(--u));
+  }
+
+  /*
+   * Médaillons : titre et fabricant · année tiennent sur la plaque (352 → 460 du bandeau, 61 de
+   * haut en 5:4) ; titre à 23, lignes de 26, fabricant posé plus bas sur la plaque.
+   */
+  html.menu-desktop[data-menu-band='medaillons'] .menu.menu-band {
+    --floor-title: 23;
+    --line-small: 26;
+    --m-b: 84;
+  }
+
+  /* Médaillons : le compteur part de la flèche de la plaque et peut déborder de 24 à droite du bandeau (« 0001 / 1234 »). */
+  html.menu-desktop[data-menu-band='medaillons'] .menu.menu-band .menu-count {
+    justify-content: flex-start;
+    width: calc(170 * var(--b) + 24 * var(--u));
+  }
+
+  /* L'aide prend toute la largeur du bandeau. */
+  html.menu-desktop[data-menu-band] #root > .footer.menu-help {
+    left: var(--band-left);
+    width: calc(1080 * var(--b));
+  }
+
+  html.menu-desktop .menu.menu-band .menu-title .title[data-size='m'],
+  html.menu-desktop .menu.menu-band .menu-title .title[data-size='s'] {
+    -webkit-line-clamp: 1;
+  }
+
+  html.menu-desktop .menu-band .wheel-name {
+    -webkit-line-clamp: 2;
+    max-width: calc(180 * var(--w));
+  }
 }
 
 /*
@@ -515,6 +623,7 @@ html[data-menu-band='arche'] #root {
   --c-l: 390;
   --c-w: 300;
   --c-align: center;
+  --c-under: 1;
 }
 
 html[data-menu-band='arche'] #root {
@@ -628,9 +737,14 @@ html.menu-desktop .menu.menu-band .menu-nav {
   height: 70%;
 }
 
+/*
+ * Bandeau réduit (bureau plus étroit que 16:9) : le nom garde 20 px au centre (échelle 0,91 au
+ * moins), en y arrivant comme en le quittant (0,72 quand il finit de s’éteindre) ;
+ * plancher-textes.test.ts refait le calcul.
+ */
 .menu-band .wheel-name {
   max-width: calc(160 * var(--w));
-  font-size: calc(28 * var(--w));
+  font-size: max(calc(28 * var(--w)), calc(var(--floor-text) * 1.4));
 }
 
 html .menu.menu-band .menu-label {
@@ -643,7 +757,7 @@ html.menu-desktop .menu.menu-band .menu-title {
   top: auto;
   right: auto;
   left: calc(var(--band-left) + var(--t-l) * var(--b));
-  bottom: calc(var(--band-bottom) + var(--t-b) * var(--b));
+  bottom: calc(var(--band-bottom) + max(calc(var(--t-b) * var(--b)), calc(var(--m-b) * var(--b) + (var(--line-small) + 2) * var(--u)), calc(var(--c-under) * (var(--c-b) * var(--b) + (var(--line-small) + 2) * var(--u)) + (var(--line-small) + 2) * var(--u))));
   width: calc(var(--t-w) * var(--b));
   height: calc(var(--t-h) * var(--b));
   justify-content: center;
@@ -658,7 +772,7 @@ html.menu-desktop .menu.menu-band .menu-title {
 
 .menu.menu-band .menu-title .title,
 html.menu-desktop .menu.menu-band .menu-title .title {
-  font-size: calc(var(--t-fs) * var(--b));
+  font-size: max(calc(var(--t-fs) * var(--b)), calc(var(--floor-title) * var(--u)));
   font-weight: 700;
   letter-spacing: 0.06em;
   line-height: 1.2;
@@ -668,12 +782,12 @@ html.menu-desktop .menu.menu-band .menu-title .title {
 
 .menu.menu-band .menu-title .title[data-size='m'],
 html.menu-desktop .menu.menu-band .menu-title .title[data-size='m'] {
-  font-size: calc(24 * var(--b));
+  font-size: max(calc(24 * var(--b)), calc(var(--floor-long) * var(--u)));
 }
 
 .menu.menu-band .menu-title .title[data-size='s'],
 html.menu-desktop .menu.menu-band .menu-title .title[data-size='s'] {
-  font-size: calc(22 * var(--b));
+  font-size: max(calc(22 * var(--b)), calc(var(--floor-long) * var(--u)));
 }
 
 .menu.menu-band .menu-meta,
@@ -681,12 +795,12 @@ html.menu-desktop .menu.menu-band .menu-meta {
   top: auto;
   right: auto;
   left: calc(var(--band-left) + var(--t-l) * var(--b));
-  bottom: calc(var(--band-bottom) + var(--m-b) * var(--b));
+  bottom: calc(var(--band-bottom) + max(calc(var(--m-b) * var(--b)), calc(var(--c-under) * (var(--c-b) * var(--b) + (var(--line-small) + 2) * var(--u)))));
   width: calc(var(--t-w) * var(--b));
-  height: calc(32 * var(--b));
+  height: max(calc(32 * var(--b)), calc(var(--line-small) * var(--u)));
   text-align: center;
-  font-size: calc(22 * var(--b));
-  line-height: calc(32 * var(--b));
+  font-size: max(calc(22 * var(--b)), calc(var(--floor-small) * var(--u)));
+  line-height: max(calc(32 * var(--b)), calc(var(--line-small) * var(--u)));
   letter-spacing: 0.16em;
   text-transform: uppercase;
   color: var(--m-color);
@@ -704,10 +818,11 @@ html.menu-desktop .menu.menu-band .menu-count {
   left: calc(var(--band-left) + var(--c-l) * var(--b));
   bottom: calc(var(--band-bottom) + var(--c-b) * var(--b));
   width: calc(var(--c-w) * var(--b));
-  height: calc(32 * var(--b));
-  font-size: calc(22 * var(--b));
+  height: max(calc(32 * var(--b)), calc(var(--line-small) * var(--u)));
+  font-size: max(calc(22 * var(--b)), calc(var(--floor-small) * var(--u)));
   font-weight: 500;
   letter-spacing: 0.06em;
+  white-space: nowrap;
   color: var(--ink-muted);
   text-shadow: 0 0 calc(8 * var(--b)) rgba(0, 0, 0, 0.9);
 }
@@ -728,7 +843,7 @@ html[data-menu-band] #root > .footer.menu-help {
   padding: 0;
   border: 0;
   background: none;
-  font-size: calc(20 * var(--b));
+  font-size: max(calc(20 * var(--b)), calc(var(--floor-help) * var(--u)));
   font-weight: 500;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -736,14 +851,14 @@ html[data-menu-band] #root > .footer.menu-help {
 }
 
 html[data-menu-band] #root > .footer.menu-help .cap {
-  min-width: calc(34 * var(--b));
-  height: calc(34 * var(--b));
-  padding: 0 calc(8 * var(--b));
-  border: calc(2 * var(--b)) solid var(--signal);
-  border-radius: calc(17 * var(--b));
+  min-width: max(calc(34 * var(--b)), calc((var(--floor-help) + 10) * var(--u)));
+  height: max(calc(34 * var(--b)), calc((var(--floor-help) + 10) * var(--u)));
+  padding: 0 max(calc(8 * var(--b)), calc(6 * var(--u)));
+  border: max(calc(2 * var(--b)), calc(1.5 * var(--u))) solid var(--signal);
+  border-radius: max(calc(17 * var(--b)), calc(15 * var(--u)));
   background: rgba(139, 226, 58, 0.08);
   box-shadow: 0 0 calc(10 * var(--b)) rgba(139, 226, 58, 0.45);
-  font-size: calc(20 * var(--b));
+  font-size: max(calc(20 * var(--b)), calc(var(--floor-help) * var(--u)));
   color: var(--signal);
 }
 
@@ -761,10 +876,10 @@ html.menu-desktop .menu-band .menu-backglass {
   display: block;
   position: absolute;
   z-index: -1;
-  right: calc(80 * var(--u));
+  right: var(--bg-right);
   top: calc(92 * var(--u));
-  width: calc(1144 * var(--u));
-  height: calc(643.5 * var(--u));
+  width: var(--bg-w);
+  height: calc(var(--bg-w) * 9 / 16);
   overflow: hidden;
   background: var(--surface-sunken);
 }
@@ -818,10 +933,10 @@ html.menu-desktop .menu-band .menu-frame.plateau {
 }
 
 html.menu-desktop .menu-band .menu-frame.fronton {
-  right: calc(64 * var(--u));
+  right: calc(var(--bg-right) - 16 * var(--u));
   top: calc(76 * var(--u));
-  width: calc(1176 * var(--u));
-  height: calc(675.5 * var(--u));
+  width: calc(var(--bg-w) + 32 * var(--u));
+  height: calc(var(--bg-w) * 9 / 16 + 32 * var(--u));
 }
 
 /* Passage d'un bord à l'autre (peu de tables) : repositionné d'un coup, hors champ (wheelStage). */

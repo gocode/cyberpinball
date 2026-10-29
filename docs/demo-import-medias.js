@@ -98,6 +98,7 @@ app.whenReady().then(async () => {
       library: library.view(),
     });
   library = createLibrary({
+    guest: { active: false, allows: () => true, knock: () => true },
     root,
     dataDir: path.join(root, 'data'),
     vpxExe: () => undefined,

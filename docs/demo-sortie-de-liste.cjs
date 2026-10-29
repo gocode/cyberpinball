@@ -292,9 +292,22 @@ async function scenario(sc, box, report, log) {
     ...['Comet Lounge', 'Maple Rocket', 'Sonar Ballroom', 'Tundra Express'].map((title, i) => ({ id: `x${i}`, table: { title, manufacturer: 'Halcyon', year: 1990 + i }, medias: [] })),
   ];
   const friends = createFriendLibraryMenu({
-    library: { openCustom: (b, at) => library.openCustom(b, at), openMediasWith: () => {}, catalogFor: () => {}, installReceived: () => {} },
+    // La vraie gestion des tables et son gestionnaire de téléchargements, comme friends-menu.ts les branche.
+    library,
     net: { state: () => ({ friends: [{ key: 'bruno', name: 'Bruno' }] }), online: () => true },
-    content: { library: () => ({ state: 'ready', library: { at: new Date().toISOString(), tables: friendTables } }), refresh() {}, receivedDir: () => L.data },
+    // Rien ne se télécharge dans cette démonstration : les réceptions échouent comme hors ligne.
+    content: {
+      library: () => ({ state: 'ready', library: { at: new Date().toISOString(), tables: friendTables } }),
+      refresh() {},
+      fetch: async (_key, _id, medias) => ({ received: [], failed: medias.map((media) => ({ media, reason: 'offline' })) }),
+      tableFiles: async () => 'offline',
+      fetchTable: async (_key, _id, folder, files) => ({ dir: path.join(L.data, 'reçu', folder), received: [], failed: files.map((file) => ({ file, reason: 'offline' })) }),
+      fetchFile: async () => ({ reason: 'offline' }),
+      tableDir: (folder) => path.join(L.data, 'reçu', folder),
+      receivedDir: () => L.data,
+      stop() {},
+    },
+    downloads: library.downloads,
     live: { inviteOn() {} },
     tables: () => tables,
     root: () => root,

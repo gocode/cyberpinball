@@ -110,7 +110,7 @@ async function run(report) {
     downloadsDir: () => path.join(BASE, 'Téléchargements'),
   });
   configurations = createConfigurationsMenu({
-    loc: { dataDir: L.data, vpxIni: path.join(BASE, 'VPinballX.ini') },
+    loc: { pointerFile: path.join(BASE, 'root.json'), root: undefined, dataDir: L.data, vpxIni: path.join(BASE, 'VPinballX.ini'), legacyDataDir: L.data, sandbox: true },
     displays: () => plugged,
     library,
     relaunch: () => {},
@@ -175,8 +175,8 @@ async function run(report) {
         return `<div class="screen${on ? '' : ' off'}" style="${box(d.bounds)}"><span>${nameOf(d)} · ${d.bounds.width} × ${d.bounds.height}${on ? '' : ' · débranché'}</span></div>`;
       })
       .join('');
-    // La fenêtre se capture en entier : on n'en garde que le bandeau (96 px, 122 avec la ligne
-    // sur l'écran), puis la page du site en dessous, à la hauteur qui reste.
+    // La fenêtre se capture en entier : on n'en garde que le bandeau (sa hauteur suit l'écran,
+    // ligne sur l'écran comprise), puis la page du site en dessous, à la hauteur qui reste.
     const barH = barHeight;
     const top = bar.crop({ x: 0, y: 0, width: at.width, height: barH });
     const rest = page.crop({ x: 0, y: 0, width: at.width, height: Math.min(page.getSize().height, at.height - barH) });
@@ -212,7 +212,10 @@ async function run(report) {
     const note = open.screenNote ?? '';
     LOG.push(`${label} : fenêtre ${JSON.stringify(bounds)} ; écran attendu (${expected}) ${JSON.stringify(wanted)} : ${same ? 'OK' : 'ÉCART'} ; ligne d'écran : ${note || '(aucune)'}`);
     if (!same) throw new Error(`« Récupérer » pas sur l'écran ${expected}`);
-    await overview(label, bar, page, bounds, note ? 122 : 96);
+    // Hauteur donnée par le processus principal (acquire-window.ts), qui pose la page juste en dessous.
+    const barHeight = await open.win.webContents.executeJavaScript(`parseInt(getComputedStyle(document.documentElement).getPropertyValue('--bar-height'))`);
+    if (!(barHeight > 0)) throw new Error('hauteur du bandeau inconnue (--bar-height)');
+    await overview(label, bar, page, bounds, barHeight);
     acquirer().close();
     for (let i = 0; i < 50 && acquirer().isOpen(); i++) await delay(100);
     await idle();

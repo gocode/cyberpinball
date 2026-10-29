@@ -3,11 +3,13 @@
 # docs\demo-noms-roue.cjs envoie à la vraie page du playfield un menu de dix tables sans logo
 # (noms courts, longs, d'un seul mot, accentués) pour chacune des quatre roues et pour la liste :
 #   borne  : playfield 4K couché, la mise en page pivotée ; écran debout ;
-#   bureau : 1080p, 1366 × 768, 1280 × 1024, 1024 × 768, 4K.
+#   bureau : 1080p, 1366 × 768, 16:10 (1280 × 800), 3:2 (1500 × 1000), 1280 × 1024, 1024 × 768, 4K ;
+#   plus étroit que 16:10, la disposition compacte : fronton en haut, bandeau en bas, à droite du plateau.
 # Au repos, en plein glissement (un flipper vient d'être pressé) et à l'arrivée, le corps rendu de
 # ce que montre chaque médaillon (police × échelle de la roue : le nom au centre, l'initiale
 # ailleurs) est relevé dans corps.txt ; rien ne doit passer sous 20 px, et le garde-fou de mise en
-# page (layout-check.ts) doit rester muet. Captures et relevés dans tmp\captures\noms-roue.
+# page (layout-check.ts), qui voit aussi deux zones du menu qui se recouvrent, doit rester muet.
+# Captures et relevés dans tmp\captures\noms-roue.
 #   .\docs\demo-noms-roue.ps1 [-Seulement <expression des cas, bureau-1080p par exemple>]
 # VPX n'est jamais lancé ; ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont lus.
 param([string]$Seulement = '')

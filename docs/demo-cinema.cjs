@@ -125,8 +125,8 @@ function stateFor(role, roles, medias, table, cinema) {
     liveDmd: roles.includes('dmd') ? { area: core.liveDmdArea(undefined, { width: 1920, height: 480 }), framed: false } : undefined,
     footer: [],
     menuKeys: [],
-    gameKeys: core.gameKeys(),
-    loadingKeys: { title: 'Commandes de la partie', rows: core.gameKeys(), display: false },
+    gameKeys: core.gameKeys(undefined),
+    loadingKeys: { title: 'Commandes de la partie', rows: core.gameKeys(undefined), display: false },
     nav: {},
   };
 }

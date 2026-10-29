@@ -7,7 +7,11 @@
 //  5. un petit fichier va au bout : « Reçu : … », la ligne disparaît ;
 //  6. quatre à la fois, dont un lancé hors de la page visible (comme un téléchargement direct
 //     ou un média d'un site) : deux lignes et un résumé des autres ;
-//  7. sur un écran de 1366 × 768 : la ligne tient, rien ne déborde.
+//  7. sur un écran de 1366 × 768 : la ligne tient, rien ne déborde ;
+//  8. sur un écran en portrait (avec la ligne sur l'écran retenu) et en 4:3 : les boutons passent
+//     sous ce qu'il faut télécharger.
+// À chaque capture, le bandeau suit l'écran : la page du site commence juste sous lui, et rien
+// de ce qu'il montre ne descend plus bas.
 // La notice du menu (events.progress) est relevée : même texte, deux fois par seconde au plus.
 // Aucune fenêtre n'apparaît (rendu hors écran), lancé par docs\demo-telechargement.ps1 sur le
 // bureau caché. Captures et relevé dans tmp\demo-telechargement\captures.
@@ -99,6 +103,8 @@ async function run(report) {
   /** Notices du menu (catalog.ts les écrit avec le même formatTransfer) : texte et instant. */
   const notices = [];
   let screenBounds = { x: 0, y: 0, width: 1920, height: 1080 };
+  /** Ligne du bandeau sur l'écran retenu (écran choisi pas branché) : absente, sauf pour le portrait. */
+  let screenNotice;
   const KEYS = core.navigationKeys(core.DEFAULT_BUTTONS);
   const acquirer = createAcquirer({
     dir: () => dir,
@@ -106,7 +112,7 @@ async function run(report) {
     progress: (filename, p) => notices.push({ at: Date.now(), text: core.t('Téléchargement de « {file} » : {progress}…', { file: filename, progress: core.formatTransfer(p) }) }),
     failed: (filename, reason) => failed.push(`${filename} (${reason})`),
     closed: () => {},
-    screen: () => ({ bounds: screenBounds }),
+    screen: () => ({ bounds: screenBounds, notice: screenNotice }),
     exitKeys: () => KEYS.exit,
     navKeys: () => KEYS,
   });
@@ -155,12 +161,29 @@ async function run(report) {
     const page = await open.view.webContents.capturePage();
     const whole = new BrowserWindow({ show: false, width: width / 2, height: open.win.getContentBounds().height / 2, useContentSize: true, enableLargerThanScreen: true, webPreferences: { offscreen: true } });
     await whole.loadURL(
-      `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><style>body{margin:0;background:#000}img{display:block;width:100%}</style><img src="${bar.toDataURL()}"><img src="${page.toDataURL()}">`)}`,
+      `data:text/html;charset=utf-8,${encodeURIComponent(`<!doctype html><style>body{margin:0;background:#000;overflow:hidden}img{display:block;width:100%}</style><img src="${bar.toDataURL()}"><img src="${page.toDataURL()}">`)}`,
     );
     await delay(250);
     fs.writeFileSync(path.join(CAPTURES, `${label}-fenetre.png`), (await whole.capturePage()).toPNG());
     whole.destroy();
-    LOG.push(`${label} : bandeau ${s.height} · statut « ${s.status} »`);
+    // Le bandeau suit l'écran (petit côté de 1 080 = 1 px de référence) : la page du site
+    // commence juste sous lui, et rien de ce qu'il montre ne dépasse sa hauteur.
+    const geometry = await open.win.webContents.executeJavaScript(`(() => {
+      const kids = [...document.querySelector('.frame').children].filter((e) => e.getClientRects().length);
+      return { bottom: Math.max(...kids.map((e) => e.getBoundingClientRect().bottom + parseFloat(getComputedStyle(e).marginBottom))), narrow: document.documentElement.classList.contains('narrow'), size: [innerWidth, innerHeight] };
+    })()`);
+    // Un téléchargement qui finit pendant le relevé change la hauteur : relue jusqu'à ce que le
+    // bandeau et la page du site disent la même chose.
+    let pageTop, barTop;
+    for (let i = 0; i < 20; i++) {
+      pageTop = open.view.getBounds().y;
+      barTop = parseInt(await open.win.webContents.executeJavaScript(`getComputedStyle(document.documentElement).getPropertyValue('--bar-height')`), 10);
+      if (pageTop === barTop) break;
+      await delay(100);
+    }
+    if (pageTop !== barTop) fail(`${label} : la page du site commence à ${pageTop} px, sous un bandeau de ${barTop} px`);
+    if (geometry.bottom > height + 0.5) fail(`${label} : le contenu du bandeau descend à ${geometry.bottom.toFixed(1)} px, plus bas que ses ${height} px`);
+    LOG.push(`${label} : écran ${geometry.size.join(' × ')}${geometry.narrow ? ' (étroit : boutons dessous)' : ''} · bandeau ${s.height} (contenu jusqu'à ${geometry.bottom.toFixed(1)}) · statut « ${s.status} »`);
     for (const r of s.rows) LOG.push(`    ${r.armed ? '▶ ' : ''}${r.name} | ${r.pct || (r.unknown ? '(indéterminé)' : '')} | ${r.text} | [${r.button}]${r.fill ? ` barre ${r.fill}` : ''}`);
     if (s.more) LOG.push(`    ${s.more}`);
     return s;
@@ -289,6 +312,23 @@ async function run(report) {
   await delay(600);
   s = await shot('ecran-1366');
   if (s.rows.length !== 2 || !s.more) fail('rouverte, la fenêtre doit montrer les téléchargements en cours');
+  // 8. Écran étroit : un écran en portrait (1080 × 1920), avec la ligne sur l'écran retenu, puis
+  // un 4:3 (1024 × 768) : les boutons passent sous ce qu'il faut télécharger.
+  for (const [name, bounds, notice] of [
+    ['ecran-portrait', { x: 0, y: 0, width: 1080, height: 1920 }, 'DMD n’est pas branché, ouvert sur Fronton (automatique)'],
+    ['ecran-4-3', { x: 0, y: 0, width: 1024, height: 768 }, undefined],
+  ]) {
+    acquirer.close();
+    for (let i = 0; i < 50 && acquirer.isOpen(); i++) await delay(100);
+    LOG.push(`→ fenêtre rouverte sur un écran de ${bounds.width} × ${bounds.height}${notice ? ', avec la ligne sur l’écran retenu' : ''}`);
+    screenBounds = bounds;
+    screenNotice = notice;
+    await openWindow();
+    await delay(600);
+    s = await shot(name);
+    if (s.rows.length !== 2 || !s.more) fail(`${name} : la fenêtre doit montrer les téléchargements en cours`);
+  }
+  screenNotice = undefined;
   // Tout annuler, à la souris.
   for (let i = 0; i < 4; i++) {
     await open.win.webContents.executeJavaScript(`document.querySelector('.dl-cancel')?.click()`);

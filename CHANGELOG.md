@@ -50,6 +50,8 @@ son interface).
 - Les noms sous les petits médaillons de la roue sont plus grands et se lisent de loin, comme tout texte du menu.
 - Amis en ligne d'un coup d'œil sur le menu des tables, et de petites notifications discrètes, une à la fois : un ami qui se connecte, une demande d'ami, un téléchargement terminé. Rien ne s'affiche pendant une partie : un résumé vous attend au retour. Se coupe dans « Médias, son et attente ».
 - « Jouer et enregistrer », sur la fiche d'une table : Cyber Pinball filme la partie, du moment choisi jusqu'à la durée choisie ou la sortie de la table, avec un petit témoin dans le coin du plateau. Au retour, la vidéo peut devenir la présentation de la table sur la roue, après confirmation, ou être gardée de côté.
+- Menu des tables au bureau, sur un écran plus étroit que 16:9 (5:4, 4:3) : le plateau et le reste du menu ne se recouvrent plus.
+- Fenêtre « Récupérer » : son bandeau suit la taille de l'écran, et ses textes se lisent aussi bien en 4K que sur un petit écran ; en portrait, ses boutons passent dessous.
 
 ## 0.1.3
 
