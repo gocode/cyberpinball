@@ -1,11 +1,17 @@
 // Bibliothèque partagée entre amis (packages/core/src/friendlibrary.ts) sur le réseau des
-// bornes (social-net.ts) : ce service sert ma bibliothèque à mes amis quand je la partage, et
-// va chercher la leur et leurs médias.
+// bornes (social-net.ts) : ce service sert ma bibliothèque à mes amis quand je la partage
+// (activée par défaut), et va chercher la leur : leurs médias, et leurs tables entières, partie
+// par partie (table, fronton, ROM si le joueur la coche, PuP-Pack, sons…).
 //
-// Un fichier reçu va d'abord dans <données>\amis\recus\, jamais dans medias\ : il n'en sort que
-// s'il a la taille et l'empreinte SHA-256 annoncées, et des premiers octets qui disent un média de
-// son type (checkShareable). Puis il entre dans le brouillon des médias de la table, que
-// l'utilisateur voit et enregistre (rien n'est rangé sans lui).
+// Rien de reçu n'entre directement dans la borne :
+// - un média va dans <données>\amis\recus\, n'en sort que s'il a la taille et l'empreinte
+//   SHA-256 annoncées et des premiers octets qui disent un média de son type (checkShareable),
+//   puis entre dans le brouillon des médias de la table (rien n'est rangé sans l'utilisateur) ;
+// - les fichiers d'une table vont dans <données>\amis\tables\<date>\<dossier de la table>\, sous
+//   leur chemin relatif vérifié (jamais « .. », jamais un programme), chacun avec sa taille et
+//   son empreinte ; le dossier passe ensuite par le plan d'ajout, comme une table téléchargée.
+// L'empreinte est calculée pendant l'envoi et donnée à la fin (file-end) : un fichier de plusieurs
+// gigaoctets n'est lu qu'une fois.
 //
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
@@ -17,14 +23,22 @@ import {
   checkShareable,
   chunkFrame,
   FILE_CHUNK,
+  fileId,
+  isSafeTableRel,
   libraryMessages,
   readChunkFrame,
+  shareableTableFiles,
+  SHARE_MAX_BYTES,
+  tableFilesMessages,
   type FileRefusal,
   type FriendLibrary,
+  type GamePart,
   type LibraryMedia,
   type LibraryMessage,
   type SharedFile,
+  type TableContents,
   type TableEntry,
+  type TableFile,
 } from '@cyberpinball/core';
 import type { FriendMessage, SocialNet } from './social-net';
 
@@ -35,6 +49,8 @@ export interface FriendContentOptions {
   /** Racine de la borne (médias par défaut exclus de la bibliothèque) ; undefined : rien à partager. */
   root(): string | undefined;
   romsOf?(table: TableEntry): readonly string[];
+  /** Inventaire du dossier d'une table (tablecontents.ts) : ses parties à transmettre (sans lui, aucune table ne part). */
+  contents(table: TableEntry): TableContents | undefined;
   /** Une bibliothèque est arrivée, un transfert avance : redessiner. */
   onChange?(): void;
   log?(line: string): void;
@@ -63,6 +79,13 @@ export interface FetchResult {
   failed: { media: LibraryMedia; reason: FetchFailure }[];
 }
 
+export interface TableFetchResult {
+  /** Dossier de la table reçue (son nom est celui du dossier chez l'ami). */
+  dir: string;
+  received: TableFile[];
+  failed: { file: TableFile; reason: FetchFailure }[];
+}
+
 export interface FriendContent {
   /** Bibliothèque d'un ami : demandée à sa borne au premier appel (ou si elle date), gardée ensuite. */
   library(key: string): FriendLibraryState;
@@ -70,6 +93,10 @@ export interface FriendContent {
   refresh(key: string): void;
   /** Prend ces médias d'une de ses tables, l'un après l'autre ; `signal` : « Annuler » à l'écran. */
   fetch(key: string, tableId: string, medias: readonly LibraryMedia[], progress?: (p: FetchProgress) => void, signal?: AbortSignal): Promise<FetchResult>;
+  /** Les fichiers d'une de ses tables, partie par partie. */
+  tableFiles(key: string, tableId: string): Promise<TableFile[] | FetchFailure>;
+  /** Prend ces fichiers d'une de ses tables, dans un dossier neuf nommé `folder`, sous leur chemin relatif. */
+  fetchTable(key: string, tableId: string, folder: string, files: readonly TableFile[], progress?: (p: FetchProgress) => void, signal?: AbortSignal): Promise<TableFetchResult>;
   /** Dossier d'attente des fichiers reçus. */
   receivedDir(): string;
   stop(): void;
@@ -81,13 +108,16 @@ const LIBRARY_STALE_MS = 2 * 60_000;
 const OWN_LIBRARY_MS = 30_000;
 /** Sans en-tête ou sans morceau pendant ce délai, la demande échoue. */
 const FILE_TIMEOUT_MS = 30_000;
-/** Fichiers reçus mais jamais enregistrés : effacés du dossier d'attente après ce délai. */
+/** Fichiers reçus mais jamais enregistrés ni installés : effacés après ce délai. */
 const RECEIVED_KEEP_MS = 7 * 24 * 3600_000;
+
+/** Ce qu'un fichier demandé devient à l'arrivée : un média vérifié, ou un fichier de table à sa place. */
+type Target = { kind: 'media'; media: LibraryMedia } | { kind: 'file'; dest: string };
 
 interface Incoming {
   key: string;
-  media: LibraryMedia;
-  head?: Extract<LibraryMessage, { t: 'file-head' }>;
+  target: Target;
+  bytesHead?: number;
   fd?: number;
   part: string;
   bytes: number;
@@ -97,67 +127,110 @@ interface Incoming {
   done(result: { file: string } | { reason: FetchFailure }): void;
 }
 
+/** Fichier de ma bibliothèque que désigne un identifiant : un média, ou un fichier d'une table. */
+type Served = SharedFile | { file: string; part: GamePart };
+
 export function createFriendContent(opts: FriendContentOptions): FriendContent {
   const net = opts.net;
   const log = (line: string) => opts.log?.(line);
   const dir = path.join(opts.dataDir, 'amis', 'recus');
-  const libraries = new Map<string, { state: FriendLibraryState; asked: number; parts?: Map<number, Extract<LibraryMessage, { t: 'library' }>> }>();
-  let own: { at: number; files: Map<string, SharedFile>; library: FriendLibrary } | undefined;
+  const tablesDir = path.join(opts.dataDir, 'amis', 'tables');
+  /** `last` : la dernière bibliothèque reçue, montrée pendant qu'on redemande la suivante. */
+  const libraries = new Map<string, { state: FriendLibraryState; asked: number; last?: FriendLibrary; parts?: Map<number, Extract<LibraryMessage, { t: 'library' }>> }>();
+  let own: { at: number; files: Map<string, SharedFile>; library: FriendLibrary; byId: Map<string, TableEntry> } | undefined;
+  /** Fichiers de mes tables déjà décrits à un ami, par table : leurs identifiants le désignent. */
+  const ownTableFiles = new Map<string, Map<string, { file: string; part: GamePart }>>();
   const uploads = new Map<string, { req: number; cancelled: boolean }>();
   const incoming = new Map<number, Incoming>();
+  const listings = new Map<number, { key: string; chunks: Map<number, TableFile[]>; done(r: TableFile[] | FetchFailure): void; timer: NodeJS.Timeout }>();
   let nextReq = 1;
   const changed = () => opts.onChange?.();
 
-  cleanReceived();
+  clean(dir);
+  clean(tablesDir);
 
   // ---------- Ma bibliothèque, servie à mes amis ----------
 
   function ownLibrary(): NonNullable<typeof own> {
     if (own && Date.now() - own.at < OWN_LIBRARY_MS) return own;
     const root = opts.root();
+    const tables = opts.tables();
     const built = root
-      ? buildLibrary(opts.tables(), { root, ...(opts.romsOf ? { romsOf: opts.romsOf } : {}), size: (file) => fileSize(file) })
+      ? buildLibrary(tables, { root, ...(opts.romsOf ? { romsOf: opts.romsOf } : {}), size: (file) => fileSize(file) })
       : { library: { at: new Date().toISOString(), tables: [] }, files: new Map<string, SharedFile>() };
-    own = { at: Date.now(), ...built };
+    own = { at: Date.now(), ...built, byId: new Map(tables.map((t, i) => [built.library.tables[i]?.id ?? '', t])) };
     return own;
   }
 
-  async function serveFile(key: string, req: number, tableId: string, mediaId: string): Promise<void> {
+  /** Fichiers d'une de mes tables à transmettre, avec leurs identifiants. */
+  function describeTable(tableId: string): TableFile[] | undefined {
+    const table = ownLibrary().byId.get(tableId);
+    const contents = table && opts.contents(table);
+    if (!table || !contents) return undefined;
+    const files = shareableTableFiles(contents, table.folder);
+    ownTableFiles.set(tableId, new Map(files.map((f) => [fileId(f.file), { file: f.file, part: f.part }])));
+    return files.map((f) => ({ id: fileId(f.file), rel: f.rel, bytes: f.bytes, part: f.part }));
+  }
+
+  function served(tableId: string, id: string): Served | undefined {
+    const media = ownLibrary().files.get(`${tableId}/${id}`);
+    if (media) return media;
+    if (!ownTableFiles.has(tableId)) describeTable(tableId);
+    return ownTableFiles.get(tableId)?.get(id);
+  }
+
+  async function serveFile(key: string, req: number, tableId: string, id: string): Promise<void> {
     const refuse = (reason: FileRefusal) => net.send(key, { t: 'file-refused', req, reason });
     if (!net.state().shareLibrary) return void refuse('not-shared');
     // Un fichier à la fois par ami : les autres attendent leur tour chez lui.
     if (uploads.has(key)) return void refuse('busy');
-    let shared = ownLibrary().files.get(`${tableId}/${mediaId}`);
-    if (!shared) {
+    let what = served(tableId, id);
+    if (!what) {
       own = undefined;
-      shared = ownLibrary().files.get(`${tableId}/${mediaId}`);
+      ownTableFiles.delete(tableId);
+      what = served(tableId, id);
     }
-    if (!shared) return void refuse('not-found');
+    if (!what) return void refuse('not-found');
     const upload = { req, cancelled: false };
     uploads.set(key, upload);
+    let fd: number | undefined;
     try {
-      const read = await hashFile(shared.file);
-      if (!read) return void refuse('not-found');
-      const check = checkShareable(shared.type, shared.file, read.head, read.bytes);
-      if (!check.ok) return void refuse('refused');
-      if (!net.send(key, { t: 'file-head', req, type: shared.type, format: check.format, bytes: read.bytes, sha256: read.sha256 })) return;
-      const fd = fs.openSync(shared.file, 'r');
+      let bytes: number;
       try {
-        const buf = Buffer.alloc(FILE_CHUNK);
-        let sent = 0;
-        while (sent < read.bytes && !upload.cancelled) {
-          const n = fs.readSync(fd, buf, 0, Math.min(FILE_CHUNK, read.bytes - sent), sent);
-          if (n <= 0) break;
-          if (!(await net.sendChunk(key, chunkFrame(req, buf.subarray(0, n))))) return;
-          sent += n;
-        }
-      } finally {
-        fs.closeSync(fd);
+        fd = fs.openSync(what.file, 'r');
+        bytes = fs.fstatSync(fd).size;
+      } catch {
+        return void refuse('not-found');
       }
-      if (!upload.cancelled) net.send(key, { t: 'file-end', req });
+      // Un média passe d'abord les contrôles de l'import, comme chez celui qui le reçoit.
+      if ('type' in what) {
+        const head = Buffer.alloc(512);
+        const n = fs.readSync(fd, head, 0, 512, 0);
+        if (!checkShareable(what.type, what.file, head.subarray(0, n), bytes).ok) return void refuse('refused');
+      }
+      if (!net.send(key, { t: 'file-head', req, bytes })) return;
+      const hash = createHash('sha256');
+      const buf = Buffer.alloc(FILE_CHUNK);
+      let sent = 0;
+      while (sent < bytes && !upload.cancelled) {
+        const n = fs.readSync(fd, buf, 0, Math.min(FILE_CHUNK, bytes - sent), sent);
+        if (n <= 0) break;
+        hash.update(buf.subarray(0, n));
+        if (!(await net.sendChunk(key, chunkFrame(req, buf.subarray(0, n))))) return;
+        sent += n;
+      }
+      if (!upload.cancelled) net.send(key, { t: 'file-end', req, sha256: hash.digest('hex') });
     } finally {
+      if (fd !== undefined) fs.closeSync(fd);
       uploads.delete(key);
     }
+  }
+
+  function serveTableFiles(key: string, req: number, tableId: string): void {
+    if (!net.state().shareLibrary) return void net.send(key, { t: 'file-refused', req, reason: 'not-shared' });
+    const files = describeTable(tableId);
+    if (!files) return void net.send(key, { t: 'file-refused', req, reason: 'not-found' });
+    for (const message of tableFilesMessages(req, files)) net.send(key, message);
   }
 
   // ---------- Bibliothèques et fichiers de mes amis ----------
@@ -169,9 +242,20 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     entry.parts.set(part.part, part);
     if (entry.parts.size < part.parts) return;
     const parts = [...entry.parts.values()].sort((a, b) => a.part - b.part);
-    entry.state = { state: 'ready', library: { at: part.at, tables: parts.flatMap((p) => p.tables) } };
+    entry.last = { at: part.at, tables: parts.flatMap((p) => p.tables) };
+    entry.state = { state: 'ready', library: entry.last };
     entry.parts = undefined;
     changed();
+  }
+
+  function onTableFiles(key: string, message: Extract<LibraryMessage, { t: 'table-files' }>): void {
+    const listing = listings.get(message.req);
+    if (!listing || listing.key !== key) return;
+    listing.chunks.set(message.chunk, message.files);
+    if (listing.chunks.size < message.chunks) return;
+    listings.delete(message.req);
+    clearTimeout(listing.timer);
+    listing.done([...listing.chunks.entries()].sort((a, b) => a[0] - b[0]).flatMap(([, files]) => files));
   }
 
   function finish(req: number, result: { file: string } | { reason: FetchFailure }): void {
@@ -195,14 +279,14 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
 
   function onHead(key: string, head: Extract<LibraryMessage, { t: 'file-head' }>): void {
     const job = incoming.get(head.req);
-    if (!job || job.key !== key || job.head) return;
-    // Ce que dit l'en-tête doit être ce que la bibliothèque annonçait : le même type de média.
-    if (head.type !== job.media.type) {
+    if (!job || job.key !== key || job.bytesHead !== undefined) return;
+    // Un média plus gros que ce qu'accepte son type : refusé avant le premier octet.
+    if (job.target.kind === 'media' && head.bytes > SHARE_MAX_BYTES[job.target.media.kind]) {
       net.send(key, { t: 'file-cancel', req: head.req });
-      return finish(head.req, { reason: 'check' });
+      return finish(head.req, { reason: 'size' });
     }
-    job.head = head;
-    fs.mkdirSync(dir, { recursive: true });
+    job.bytesHead = head.bytes;
+    fs.mkdirSync(path.dirname(job.part), { recursive: true });
     job.fd = fs.openSync(job.part, 'w');
     arm(job, head.req);
   }
@@ -210,9 +294,9 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
   function onChunk(key: string, frame: Buffer): void {
     const chunk = readChunkFrame(frame);
     const job = chunk && incoming.get(chunk.req);
-    if (!chunk || !job || job.key !== key || !job.head || job.fd === undefined) return;
+    if (!chunk || !job || job.key !== key || job.bytesHead === undefined || job.fd === undefined) return;
     // Plus que la taille annoncée : arrêté au premier octet de trop.
-    if (job.bytes + chunk.data.length > job.head.bytes) {
+    if (job.bytes + chunk.data.length > job.bytesHead) {
       net.send(key, { t: 'file-cancel', req: chunk.req });
       return finish(chunk.req, { reason: 'size' });
     }
@@ -223,17 +307,22 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     arm(job, chunk.req);
   }
 
-  function onEnd(key: string, req: number): void {
+  function onEnd(key: string, end: Extract<LibraryMessage, { t: 'file-end' }>): void {
+    const req = end.req;
     const job = incoming.get(req);
-    if (!job || job.key !== key || !job.head) return;
-    const head = job.head;
-    if (job.bytes !== head.bytes) return finish(req, { reason: 'size' });
-    if (job.hash.digest('hex') !== head.sha256) return finish(req, { reason: 'sha' });
-    const check = checkShareable(head.type, `x.${head.format}`, job.first, job.bytes);
-    if (!check.ok) return finish(req, { reason: 'check' });
-    const file = path.join(dir, `${head.sha256}.${check.format}`);
+    if (!job || job.key !== key || job.bytesHead === undefined) return;
+    if (job.bytes !== job.bytesHead) return finish(req, { reason: 'size' });
+    const sha = job.hash.digest('hex');
+    if (sha !== end.sha256) return finish(req, { reason: 'sha' });
+    let file: string;
+    if (job.target.kind === 'media') {
+      const check = checkShareable(job.target.media.type, `x.${job.target.media.format}`, job.first, job.bytes);
+      if (!check.ok) return finish(req, { reason: 'check' });
+      file = path.join(dir, `${sha}.${check.format}`);
+    } else file = job.target.dest;
     fs.closeSync(job.fd!);
     job.fd = undefined;
+    fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.renameSync(job.part, file);
     finish(req, { file });
   }
@@ -247,14 +336,21 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
           return;
         case 'library-off': {
           const entry = libraries.get(key);
-          if (entry) entry.state = { state: 'off' };
+          if (entry) {
+            entry.state = { state: 'off' };
+            entry.last = undefined;
+          }
           changed();
           return;
         }
         case 'library':
           return onLibraryPart(key, message);
+        case 'table-files-get':
+          return serveTableFiles(key, message.req, message.table);
+        case 'table-files':
+          return onTableFiles(key, message);
         case 'file-get':
-          void serveFile(key, message.req, message.table, message.media).catch((error: Error) => log(`Bibliothèque partagée : envoi impossible (${error.message}).`)); // i18n-ignore : journal
+          void serveFile(key, message.req, message.table, message.file).catch((error: Error) => log(`Bibliothèque partagée : envoi impossible (${error.message}).`)); // i18n-ignore : journal
           return;
         case 'file-cancel': {
           const upload = uploads.get(key);
@@ -263,11 +359,18 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
         }
         case 'file-head':
           return onHead(key, message);
-        case 'file-refused':
+        case 'file-refused': {
           if (incoming.get(message.req)?.key === key) finish(message.req, { reason: message.reason });
+          const listing = listings.get(message.req);
+          if (listing?.key === key) {
+            listings.delete(message.req);
+            clearTimeout(listing.timer);
+            listing.done(message.reason);
+          }
           return;
+        }
         case 'file-end':
-          return onEnd(key, message.req);
+          return onEnd(key, message);
         default:
           return;
       }
@@ -275,13 +378,13 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     net.onChunk(onChunk),
   ];
 
-  function fetchOne(key: string, tableId: string, media: LibraryMedia, onBytes: (bytes: number) => void, signal?: AbortSignal): Promise<{ file: string } | { reason: FetchFailure }> {
+  function fetchOne(key: string, tableId: string, id: string, target: Target, onBytes: (bytes: number) => void, signal?: AbortSignal): Promise<{ file: string } | { reason: FetchFailure }> {
     return new Promise((resolve) => {
       const req = nextReq++;
       const job: Incoming = {
         key,
-        media,
-        part: path.join(dir, `${req}-${process.pid}.part`),
+        target,
+        part: target.kind === 'file' ? `${target.dest}.${req}.part` : path.join(dir, `${req}-${process.pid}.part`),
         bytes: 0,
         first: Buffer.alloc(0),
         hash: createHash('sha256'),
@@ -306,69 +409,109 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
         done(result);
       };
       arm(job, req);
-      if (!net.send(key, { t: 'file-get', req, table: tableId, media: media.id })) finish(req, { reason: 'offline' });
+      if (!net.send(key, { t: 'file-get', req, table: tableId, file: id })) finish(req, { reason: 'offline' });
     });
+  }
+
+  /** Une suite de fichiers, l'un après l'autre ; arrêtée au premier « plus relié » ou « annulé ». */
+  async function fetchAll<T extends { id: string; bytes: number }>(key: string, tableId: string, items: readonly T[], targetOf: (item: T) => Target, progress?: (p: FetchProgress) => void, signal?: AbortSignal) {
+    const ok: { item: T; file: string }[] = [];
+    const failed: { item: T; reason: FetchFailure }[] = [];
+    const totalBytes = items.reduce((n, m) => n + m.bytes, 0);
+    let before = 0;
+    for (const [i, item] of items.entries()) {
+      const report = (bytes: number) => progress?.({ index: i + 1, total: items.length, bytes: before + bytes, totalBytes });
+      report(0);
+      const r = signal?.aborted ? { reason: 'cancelled' as const } : await fetchOne(key, tableId, item.id, targetOf(item), report, signal);
+      if ('file' in r) ok.push({ item, file: r.file });
+      else failed.push({ item, reason: r.reason });
+      before += item.bytes;
+      if ('reason' in r && (r.reason === 'offline' || r.reason === 'cancelled')) {
+        for (const rest of items.slice(i + 1)) failed.push({ item: rest, reason: r.reason });
+        break;
+      }
+    }
+    return { ok, failed };
   }
 
   return {
     library(key) {
-      if (!net.online(key)) {
-        const known = libraries.get(key)?.state;
-        return known?.state === 'ready' ? known : { state: 'offline' };
-      }
       const entry = libraries.get(key);
-      if (!entry || (entry.state.state !== 'loading' && Date.now() - entry.asked > LIBRARY_STALE_MS)) {
-        this.refresh(key);
-        return entry?.state.state === 'ready' ? entry.state : { state: 'loading' };
-      }
-      return entry.state;
+      if (!net.online(key)) return entry?.last ? { state: 'ready', library: entry.last } : { state: 'offline' };
+      if (!entry || (entry.state.state !== 'loading' && Date.now() - entry.asked > LIBRARY_STALE_MS)) this.refresh(key);
+      const now = libraries.get(key)!;
+      // Redemandée : l'ancienne reste montrée jusqu'à l'arrivée de la nouvelle (un écran ouvert ne se vide pas).
+      return now.state.state === 'loading' && now.last ? { state: 'ready', library: now.last } : now.state;
     },
     refresh(key) {
-      libraries.set(key, { state: { state: 'loading' }, asked: Date.now() });
-      if (!net.send(key, { t: 'library-get' })) libraries.set(key, { state: { state: 'offline' }, asked: Date.now() });
+      const last = libraries.get(key)?.last;
+      libraries.set(key, { state: { state: 'loading' }, asked: Date.now(), ...(last ? { last } : {}) });
+      if (!net.send(key, { t: 'library-get' })) libraries.set(key, { state: { state: 'offline' }, asked: Date.now(), ...(last ? { last } : {}) });
     },
     async fetch(key, tableId, medias, progress, signal) {
-      const result: FetchResult = { received: [], failed: [] };
-      const totalBytes = medias.reduce((n, m) => n + m.bytes, 0);
-      let before = 0;
-      for (const [i, media] of medias.entries()) {
-        const report = (bytes: number) => progress?.({ index: i + 1, total: medias.length, bytes: before + bytes, totalBytes });
-        report(0);
-        const r = signal?.aborted ? { reason: 'cancelled' as const } : await fetchOne(key, tableId, media, report, signal);
-        if ('file' in r) result.received.push({ media, file: r.file });
-        else result.failed.push({ media, reason: r.reason });
-        before += media.bytes;
-        // Plus relié, ou annulé : les suivants échoueraient de même.
-        if ('reason' in r && (r.reason === 'offline' || r.reason === 'cancelled')) {
-          for (const rest of medias.slice(i + 1)) result.failed.push({ media: rest, reason: r.reason });
-          break;
+      const { ok, failed } = await fetchAll(key, tableId, medias, (media) => ({ kind: 'media', media }), progress, signal);
+      log(`Bibliothèque partagée : ${ok.length} média(s) reçu(s), ${failed.length} refusé(s) ou échoué(s).`); // i18n-ignore : journal
+      return { received: ok.map((r) => ({ media: r.item, file: r.file })), failed: failed.map((f) => ({ media: f.item, reason: f.reason })) };
+    },
+    tableFiles(key, tableId) {
+      return new Promise((resolve) => {
+        const req = nextReq++;
+        const timer = setTimeout(() => {
+          listings.delete(req);
+          resolve(net.online(key) ? 'timeout' : 'offline');
+        }, FILE_TIMEOUT_MS);
+        timer.unref?.();
+        listings.set(req, { key, chunks: new Map(), done: resolve, timer });
+        if (!net.send(key, { t: 'table-files-get', req, table: tableId })) {
+          listings.delete(req);
+          clearTimeout(timer);
+          resolve('offline');
         }
-      }
-      log(`Bibliothèque partagée : ${result.received.length} média(s) reçu(s), ${result.failed.length} refusé(s) ou échoué(s).`); // i18n-ignore : journal
-      return result;
+      });
+    },
+    async fetchTable(key, tableId, folder, files, progress, signal) {
+      const name = safeFolderName(folder);
+      const root = path.join(tablesDir, `${new Date().toISOString().replace(/[:.]/g, '-')}-${nextReq}`, name);
+      // Chaque chemin est revérifié ici : il ne sort jamais du dossier de la table reçue.
+      const safe = files.filter((f) => isSafeTableRel(f.rel));
+      const { ok, failed } = await fetchAll(key, tableId, safe, (f) => ({ kind: 'file', dest: path.join(root, ...f.rel.split('/')) }), progress, signal);
+      log(`Bibliothèque partagée : table « ${name} », ${ok.length} fichier(s) reçu(s), ${failed.length} refusé(s) ou échoué(s).`); // i18n-ignore : journal
+      return { dir: root, received: ok.map((r) => r.item), failed: failed.map((f) => ({ file: f.item, reason: f.reason })) };
     },
     receivedDir: () => dir,
     stop() {
       for (const off of unsubscribe) off();
       for (const req of [...incoming.keys()]) finish(req, { reason: 'offline' });
       for (const upload of uploads.values()) upload.cancelled = true;
+      for (const [req, listing] of listings) {
+        clearTimeout(listing.timer);
+        listings.delete(req);
+        listing.done('offline');
+      }
     },
   };
+}
 
-  function cleanReceived(): void {
-    let names: string[] = [];
+/** Nom de dossier sûr pour la table reçue (celui du dossier chez l'ami, nettoyé). */
+function safeFolderName(name: string): string {
+  const clean = name.replace(/[\x00-\x1f\x7f\\/:*?"<>|]/g, ' ').replace(/[. ]+$/, '').trim().slice(0, 120);
+  return clean && !/^(con|prn|aux|nul|com\d|lpt\d)$/i.test(clean) && clean !== '.' && clean !== '..' ? clean : 'Table';
+}
+
+/** Ce qui traîne d'un ancien transfert (morceaux, fichiers jamais repris) : effacé après une semaine. */
+function clean(dir: string): void {
+  let names: fs.Dirent[] = [];
+  try {
+    names = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const d of names) {
+    const file = path.join(dir, d.name);
     try {
-      names = fs.readdirSync(dir);
+      if (d.name.endsWith('.part') || Date.now() - fs.statSync(file).mtimeMs > RECEIVED_KEEP_MS) fs.rmSync(file, { recursive: true, force: true });
     } catch {
-      return;
-    }
-    for (const name of names) {
-      const file = path.join(dir, name);
-      try {
-        if (name.endsWith('.part') || Date.now() - fs.statSync(file).mtimeMs > RECEIVED_KEEP_MS) fs.rmSync(file, { force: true });
-      } catch {
-        // déjà parti
-      }
+      // déjà parti
     }
   }
 }
@@ -376,23 +519,6 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
 function fileSize(file: string): number | undefined {
   try {
     return fs.statSync(file).size;
-  } catch {
-    return undefined;
-  }
-}
-
-/** Empreinte et premiers octets d'un fichier, lus par morceaux sans bloquer le menu. */
-async function hashFile(file: string): Promise<{ sha256: string; bytes: number; head: Buffer } | undefined> {
-  try {
-    const hash = createHash('sha256');
-    let head = Buffer.alloc(0);
-    let bytes = 0;
-    for await (const chunk of fs.createReadStream(file, { highWaterMark: 1 << 20 }) as AsyncIterable<Buffer>) {
-      if (head.length < 512) head = Buffer.concat([head, chunk.subarray(0, 512 - head.length)]);
-      hash.update(chunk);
-      bytes += chunk.length;
-    }
-    return { sha256: hash.digest('hex'), bytes, head };
   } catch {
     return undefined;
   }

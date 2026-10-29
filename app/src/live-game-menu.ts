@@ -38,6 +38,8 @@ export interface LiveMenuHost {
   tables(): readonly TableEntry[];
   /** La bibliothèque de cet ami (si elle est connue) a cette table : elle passe en tête du choix. */
   friendHas?(key: string, table: TableEntry): boolean;
+  /** Cette table chez cet ami, dans sa bibliothèque partagée (« Récupérer toute la table »). */
+  openFriendTable?(key: string, identity: TableIdentity, back: () => void): void;
   redraw(): void;
   now?(): Date;
 }
@@ -357,6 +359,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
         },
       });
     }
+    if (match === 'missing' && host.openFriendTable) actions.push({ label: t('La récupérer chez {name}', { name: invite.host.name }), detail: t('Sa bibliothèque partagée : toute la table, puis le plan d’ajout'), icon: 'table-add', tone: 'ok', run: () => host.openFriendTable!(invite.host.key, invite.table.table, () => openInvite(id, back)) });
     if (match === 'missing') actions.push({ label: t('Trouver cette table dans le catalogue'), icon: 'search', run: () => host.library.catalogFor(invite.table.table) });
     actions.push({ label: t('Refuser'), icon: 'close', run: () => { games.decline(id); flash = { text: t('Invitation de {name} refusée', { name: invite.host.name }), tone: 'ok' }; back(); } });
     const left = Math.max(0, Math.ceil((LIVE_INVITE_MS - (now().getTime() - Date.parse(invite.receivedAt))) / 1000));

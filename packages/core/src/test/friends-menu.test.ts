@@ -61,7 +61,7 @@ function fakeGames() {
   return games;
 }
 
-function setup() {
+function setup(content?: object) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-friends-menu-'));
   // Un ami déjà là (hors ligne : réseau coupé).
   fs.writeFileSync(path.join(dir, 'social.json'), JSON.stringify({ ...newSocialState(), friends: [{ key: FRIEND, name: 'Bruno', since: new Date().toISOString(), events: [] }] }));
@@ -77,10 +77,11 @@ function setup() {
       task: async (_message: string, work: () => Promise<void> | void) => work(),
       openMediasWith: () => undefined,
       catalogFor: () => undefined,
+      installReceived: () => undefined,
     },
     net,
     firewall,
-    content: createFriendContent({ net, dataDir: dir, tables: () => [], root: () => undefined }),
+    content: content ?? createFriendContent({ net, dataDir: dir, tables: () => [], root: () => undefined, contents: () => undefined }),
     games,
     tables: () => [],
     root: () => undefined,
@@ -120,17 +121,17 @@ test('« Partage et réseau » : sélection sur Retour ; pare-feu à autoriser s
   assert.ok(last().build().sections.some((s) => s.rows.some((r) => r.text === 'Partage activé')));
 });
 
-test('bibliothèque partagée : seulement après l’avertissement, sélection sur « Annuler »', async () => {
+test('bibliothèque partagée : active par défaut entre amis, coupée et remise d’un geste', async () => {
   const { menu, last, net } = setup();
   menu.items.sharing!.run();
-  assert.equal(net.state().shareLibrary, false);
-  await last().build().actions.find((a) => a.label === 'Partager ma bibliothèque avec mes amis')!.run();
-  assert.equal(last().at, Number.MAX_SAFE_INTEGER);
-  assert.equal(last().build().actions.at(-1)!.label, 'Annuler');
-  assert.equal(net.state().shareLibrary, false);
-  await last().build().actions.find((a) => a.label === 'Partager')!.run();
   assert.equal(net.state().shareLibrary, true);
-  assert.ok(last().build().actions.some((a) => a.label === 'Ne plus partager ma bibliothèque'));
+  const rows = () => last().build().sections.flatMap((s) => s.rows.map((r) => r.text));
+  assert.ok(rows().includes('Bibliothèque partagée avec vos amis'));
+  await last().build().actions.find((a) => a.label === 'Ne plus partager ma bibliothèque')!.run();
+  assert.equal(net.state().shareLibrary, false);
+  assert.equal(last().at, Number.MAX_SAFE_INTEGER);
+  await last().build().actions.find((a) => a.label === 'Partager ma bibliothèque avec mes amis')!.run();
+  assert.equal(net.state().shareLibrary, true);
   uniqueIcons(last().build(), 'Partage et réseau');
 });
 
@@ -204,4 +205,48 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
   assert.equal(last().at, Number.MAX_SAFE_INTEGER, 'ouverte d’elle-même : le curseur sur « Répondre plus tard »');
   assert.equal(invite.actions.at(-1)!.label, 'Répondre plus tard');
   uniqueIcons(invite, 'invitation');
+});
+
+test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le PuP-Pack décochés, la réception d’abord', async () => {
+  const id = (n: number) => n.toString(16).padStart(16, '0');
+  const files = [
+    { id: id(1), rel: 'Bride of Pin-bot (Williams 1991).vpx', bytes: 200_000, part: 'table' },
+    { id: id(2), rel: 'Bride of Pin-bot (Williams 1991).directb2s', bytes: 50_000, part: 'b2s' },
+    { id: id(3), rel: 'pinmame/roms/bop_l7.zip', bytes: 300_000, part: 'rom' },
+    { id: id(4), rel: 'pupvideos/bop_l7/screens.pup', bytes: 2_000, part: 'pup' },
+  ];
+  const library = { at: new Date().toISOString(), tables: [{ id: id(9), table: { title: 'Bride of Pin-bot', manufacturer: 'Williams', year: 1991 }, medias: [] }] };
+  const content = {
+    library: () => ({ state: 'ready', library }),
+    refresh: () => undefined,
+    fetch: async () => ({ received: [], failed: [] }),
+    tableFiles: async () => files,
+    fetchTable: async () => ({ dir: '', received: [], failed: [] }),
+    receivedDir: () => '',
+    stop: () => undefined,
+  };
+  const { menu, last } = setup(content);
+  menu.items.friends!.run();
+  await last().build().actions.find((a) => a.label.startsWith('Bruno'))!.run();
+  await last().build().actions.find((a) => a.label === 'Voir sa bibliothèque')!.run();
+  await last().build().actions.find((a) => a.label.startsWith('Bride of Pin-bot'))!.run();
+  await last().build().actions.find((a) => a.label === 'Récupérer toute la table')!.run();
+  await new Promise((r) => setImmediate(r));
+  // Les parties arrivées pendant que l'écran est montré : il se rouvre, le curseur sur la réception.
+  const opened = last();
+  opened.build();
+  await new Promise((r) => setImmediate(r));
+  assert.notEqual(last(), opened, 'l’écran se rouvre une fois les parties arrivées');
+  assert.ok(!last().at, 'le curseur sur la première action, pas sur « Retour »');
+  const built = last().build() as unknown as { heading: string; actions: Action[]; sections: { rows: { text: string; action?: number; badges?: string[] }[] }[] };
+  assert.equal(built.heading, 'Récupérer toute la table');
+  assert.equal(built.actions[0]!.label, 'Récupérer les 2 parties choisies', 'la réception d’abord, la ROM et le PuP-Pack laissés de côté');
+  const rows = built.sections.flatMap((x) => x.rows).filter((r) => r.action !== undefined);
+  assert.equal(rows.length, 4);
+  for (const row of rows) assert.equal(built.actions[row.action!]!.label, row.text, `la ligne « ${row.text} » mène à sa propre action`);
+  assert.deepEqual(rows.find((r) => r.text === 'ROM')!.badges, ['Pas prise']);
+  assert.deepEqual(rows.find((r) => r.text === 'PuP-Pack')!.badges, ['Pas prise']);
+  // Start sur la ROM la prend.
+  await built.actions[rows.find((r) => r.text === 'ROM')!.action!]!.run();
+  assert.equal(last().build().actions[0]!.label, 'Récupérer les 3 parties choisies');
 });

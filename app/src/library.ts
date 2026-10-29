@@ -3109,6 +3109,11 @@ export function createLibrary(host: LibraryHost) {
     openJourney: (file: string) => journeyUi.open(file),
     /** Médias reçus d'un ami : ceux de la table s'ouvrent, ces fichiers dans le brouillon (library-medias.ts). */
     openMediasWith: medias.openWith,
+    /**
+     * Table reçue d'un ami (friend-content.ts) : son dossier passe par le plan d'ajout, comme une
+     * table téléchargée ; vers `table` quand on l'a déjà (les parties prises remplacent les nôtres).
+     */
+    installReceived: (dir: string, table?: TableEntry, back?: () => void) => startImport([dir], 'move', undefined, undefined, false, table?.folder, back),
     isActive: () => screen !== undefined,
     /** L'écran fait écouter des sons : la musique du menu se tait (un seul son à la fois). */
     previewsSound: () => screen !== undefined && soundPreview,

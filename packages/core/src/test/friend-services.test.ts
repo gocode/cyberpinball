@@ -1,7 +1,8 @@
 // Services posés sur le réseau des amis (app/src/friend-content.ts, app/src/live-game.ts,
 // compilés), entre deux bornes du même processus sur un réseau d'essai HyperDHT en 127.0.0.1 :
-// la bibliothèque partagée (seulement si elle est activée, seulement entre amis), le transfert
-// d'un média vérifié à l'arrivée, et une partie en direct de l'invitation aux résultats.
+// la bibliothèque partagée (activée par défaut, seulement entre amis), le transfert d'un média
+// vérifié à l'arrivée, celui d'une table entière partie par partie (jamais les sauvegardes ni un
+// programme, la ROM seulement si on la prend), et une partie en direct de l'invitation aux résultats.
 
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -13,7 +14,8 @@ import { REPO_ROOT } from './i18n-scan';
 import { encodePng } from '../png';
 import { scanTables, type TableEntry } from '../tables';
 import { layoutOf } from '../locations';
-import type { FriendLibrary, LibraryMedia } from '../friendlibrary';
+import { tableContents } from '../tablecontents';
+import { friendParts, type FriendLibrary, type LibraryMedia, type TableFile } from '../friendlibrary';
 import type { LiveGame, LiveInvite, LiveRecord, LiveTableMatch } from '../livegame';
 import type { SocialState } from '../social';
 
@@ -34,6 +36,8 @@ interface Content {
   library(key: string): LibraryState;
   refresh(key: string): void;
   fetch(key: string, tableId: string, medias: readonly LibraryMedia[]): Promise<{ received: { media: LibraryMedia; file: string }[]; failed: { reason: string }[] }>;
+  tableFiles(key: string, tableId: string): Promise<TableFile[] | string>;
+  fetchTable(key: string, tableId: string, folder: string, files: readonly TableFile[]): Promise<{ dir: string; received: TableFile[]; failed: { reason: string }[] }>;
   stop(): void;
 }
 interface Games {
@@ -73,12 +77,30 @@ function cabinet(name: string, bootstrap: { host: string; port: number }[], medi
     // Une vidéo de plusieurs morceaux (plus de 64 Kio) : l'en-tête MP4 suffit au contrôle des premiers octets.
     const mp4 = Buffer.concat([Buffer.from([0, 0, 0, 0x18]), Buffer.from('ftypisom'), Buffer.alloc(12), Buffer.alloc(400_000, 3)]);
     fs.writeFileSync(path.join(folder, 'medias', '(Backglass) Terminator 2 (Williams 1991).mp4'), mp4);
+    // Les autres parties de la table, et ce qui ne doit jamais partir : sauvegardes, records, programme.
+    fs.writeFileSync(path.join(folder, 'Terminator 2 (Williams 1991).directb2s'), '<B2SBackglassData />');
+    fs.mkdirSync(path.join(folder, 'pinmame', 'roms'), { recursive: true });
+    fs.writeFileSync(path.join(folder, 'pinmame', 'roms', 't2_l8.zip'), Buffer.alloc(2000, 1));
+    fs.mkdirSync(path.join(folder, 'pinmame', 'nvram'), { recursive: true });
+    fs.writeFileSync(path.join(folder, 'pinmame', 'nvram', 't2_l8.nv'), 'records');
+    fs.mkdirSync(path.join(folder, 'pupvideos', 't2_l8', 'Backglass'), { recursive: true });
+    fs.writeFileSync(path.join(folder, 'pupvideos', 't2_l8', 'screens.pup'), 'ScreenNum,ScreenDes');
+    fs.writeFileSync(path.join(folder, 'pupvideos', 't2_l8', 'Backglass', 'intro.mp4'), mp4);
+    fs.mkdirSync(path.join(folder, 'user'), { recursive: true });
+    fs.writeFileSync(path.join(folder, 'user', 'VPReg.stg'), 'scores');
+    fs.writeFileSync(path.join(folder, 'outil.exe'), 'MZ');
   }
   const dataDir = path.join(base, 'donnees');
   const net = netModule.createSocialNet({ dataDir, mode: 'simulated', host: '127.0.0.1', bootstrap });
   assert.equal(net.rename(name), true);
   const tables = () => scanTables(layoutOf(root).tables);
-  const content = contentModule.createFriendContent({ net, dataDir, tables, root: () => root });
+  const content = contentModule.createFriendContent({
+    net,
+    dataDir,
+    tables,
+    root: () => root,
+    contents: (table: TableEntry) => tableContents(table.file, { ownFolder: true, romLibrary: layoutOf(root).roms, script: { usesPinmame: true, roms: ['t2_l8'] } }),
+  });
   const plays: string[] = [];
   const games = gamesModule.createLiveGames({
     net,
@@ -92,7 +114,7 @@ function cabinet(name: string, bootstrap: { host: string; port: number }[], medi
       return { ok: true, seconds: name === 'Alice' ? 312 : 205, records: name === 'Alice' ? [{ score: 41_250_000, rank: 2, initials: 'ALI' }] : [] };
     },
   });
-  return { net, content, games, tables, plays, dataDir };
+  return { net, content, games, tables, plays, dataDir, folder };
 }
 
 const keyOf = (n: Net) => n.state().key.publicKey;
@@ -112,12 +134,13 @@ test('bibliothèque partagée et partie en direct entre deux amis', async () => 
     b.net.accept(keyOf(a.net));
     await until('amis', () => a.net.state().friends.length === 1 && a.net.online(keyOf(b.net)));
 
-    // Bibliothèque pas partagée (par défaut) : « off ».
-    assert.equal(b.net.state().shareLibrary, false);
+    // Partagée par défaut entre amis ; coupée par Bruno : « off ».
+    assert.equal(b.net.state().shareLibrary, true);
+    b.net.setShareLibrary(false);
     assert.equal(a.content.library(keyOf(b.net)).state, 'loading');
     await until('bibliothèque refusée', () => a.content.library(keyOf(b.net)).state === 'off');
 
-    // Partagée : la liste des tables et leurs médias, sans aucun chemin.
+    // Partagée de nouveau : la liste des tables et leurs médias, sans aucun chemin.
     b.net.setShareLibrary(true);
     a.content.refresh(keyOf(b.net));
     await until('bibliothèque reçue', () => a.content.library(keyOf(b.net)).state === 'ready');
@@ -139,6 +162,28 @@ test('bibliothèque partagée et partie en direct entre deux amis', async () => 
     // Un identifiant inconnu : refusé, rien n'est écrit.
     const forged = await a.content.fetch(keyOf(b.net), lib.tables[0]!.id, [{ ...lib.tables[0]!.medias[0]!, id: '0123456789abcdef' }]);
     assert.deepEqual(forged.failed.map((f) => f.reason), ['not-found']);
+
+    // Toute la table, partie par partie : ni sauvegardes, ni records, ni programme.
+    const files = await a.content.tableFiles(keyOf(b.net), lib.tables[0]!.id);
+    assert.ok(Array.isArray(files), `fichiers de la table : ${String(files)}`);
+    const list = files as TableFile[];
+    assert.deepEqual(friendParts(list).map((p) => p.part), ['table', 'b2s', 'rom', 'pup', 'media']);
+    assert.ok(!list.some((f) => /nvram|VPReg|\.exe$/i.test(f.rel)), 'jamais les sauvegardes, les records ni un programme');
+    // La ROM laissée de côté (décochée d'office), le reste pris.
+    const taken = list.filter((f) => f.part !== 'rom');
+    const table = await a.content.fetchTable(keyOf(b.net), lib.tables[0]!.id, 'Terminator 2 (Williams 1991)', taken);
+    assert.deepEqual(table.failed, []);
+    assert.equal(table.received.length, taken.length);
+    assert.equal(path.basename(table.dir), 'Terminator 2 (Williams 1991)');
+    assert.ok(table.dir.startsWith(path.join(a.dataDir, 'amis', 'tables')));
+    const sha = (f: string) => createHash('sha256').update(fs.readFileSync(f)).digest('hex');
+    assert.equal(sha(path.join(table.dir, 'Terminator 2 (Williams 1991).vpx')), sha(path.join(b.folder, 'Terminator 2 (Williams 1991).vpx')));
+    assert.equal(sha(path.join(table.dir, 'pupvideos', 't2_l8', 'Backglass', 'intro.mp4')), sha(path.join(b.folder, 'pupvideos', 't2_l8', 'Backglass', 'intro.mp4')));
+    assert.ok(!fs.existsSync(path.join(table.dir, 'pinmame', 'roms', 't2_l8.zip')), 'la ROM pas prise n’est pas venue');
+    // Un chemin piégé, même annoncé par un ami, n'écrit rien hors du dossier de la table.
+    const trap = await a.content.fetchTable(keyOf(b.net), lib.tables[0]!.id, 'Piège', [{ ...taken[0]!, rel: '../../evil.vpx' }]);
+    assert.deepEqual(trap.received, []);
+    assert.ok(!fs.existsSync(path.join(path.dirname(path.dirname(trap.dir)), 'evil.vpx')));
 
     // Partie en direct : Alice invite Bruno sur la table qu'ils ont tous les deux.
     await a.games.create(a.tables()[0]!);

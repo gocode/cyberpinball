@@ -8,7 +8,8 @@
 #   Parcours « amis » : la rubrique Amis, « Mes amis », la fiche de Bruno, « Trouver un joueur »
 #   (à proximité, vus récemment), une recherche « chlo », « Demandes d'amis » et la demande de
 #   Chloé, « Mes badges », « Partage et réseau », puis la bibliothèque de Bruno, sa table que la
-#   borne a aussi, et ses médias qui manquent, pris jusqu'au brouillon des médias.
+#   borne n'a pas, prise tout entière jusqu'au plan d'ajout (jamais installée), puis celle que la
+#   borne a aussi : ses parties au choix, et ses médias qui manquent, pris jusqu'au brouillon.
 #   Parcours « partie » : Bruno invite la borne à une partie en direct ; l'invitation s'ouvre
 #   d'elle-même sur le menu des tables ; accepter, le salon, le compte à rebours, la partie
 #   (simulée : VPX n'est jamais lancé, CYBERPINBALL_PARTIE_SIMULEE), puis les résultats. Les
@@ -55,8 +56,8 @@ function New-Racine([string]$Nom, [switch]$Emulateurs) {
 $Exit = 'Escape'
 # Libellés : ceux de la langue de l'essai (l'autopilote choisit une action par son libellé).
 $libelles = @{
-  'fr' = @{ Amis = 'Amis'; MesAmis = 'Mes amis'; Trouver = 'Trouver un joueur'; Chercher = 'Chercher un nom'; Demandes = 'Demandes d'; Badges = 'Mes badges'; Partage = 'Partage et réseau'; Biblio = 'Voir sa bibliothèque'; Prendre = 'Récupérer le'; Accepter = 'Accepter'; Fermer = 'Fermer' }
-  'en' = @{ Amis = 'Friends'; MesAmis = 'My friends'; Trouver = 'Find a player'; Chercher = 'Search for a name'; Demandes = 'Friend requests'; Badges = 'My badges'; Partage = 'Sharing and network'; Biblio = 'See their library'; Prendre = 'Get the'; Accepter = 'Accept'; Fermer = 'Close' }
+  'fr' = @{ Amis = 'Amis'; MesAmis = 'Mes amis'; Trouver = 'Trouver un joueur'; Chercher = 'Chercher un nom'; Demandes = 'Demandes d'; Badges = 'Mes badges'; Partage = 'Partage et réseau'; Biblio = 'Voir sa bibliothèque'; Prendre = 'Récupérer le'; Toute = 'Récupérer toute la table'; Parties = 'Choisir les parties'; Accepter = 'Accepter'; Fermer = 'Fermer' }
+  'en' = @{ Amis = 'Friends'; MesAmis = 'My friends'; Trouver = 'Find a player'; Chercher = 'Search for a name'; Demandes = 'Friend requests'; Badges = 'My badges'; Partage = 'Sharing and network'; Biblio = 'See their library'; Prendre = 'Get the'; Toute = 'Get the whole table'; Parties = 'Choose parts'; Accepter = 'Accept'; Fermer = 'Close' }
 }
 
 function Get-Etapes([string]$Nom, $l) {
@@ -81,9 +82,13 @@ function Get-Etapes([string]$Nom, $l) {
     "action:$($l.Demandes)", 'action:Chlo', 'wait:300', $Exit, 'wait:300', $Exit,
     "action:$($l.Badges)", $Exit,
     "action:$($l.Partage)", 'wait:800', $Exit,
-    # Bibliothèque de Bruno : la table qu'on a aussi vient en tête (curseur dessus), puis ses médias.
+    # Bibliothèque de Bruno : d'abord la table qu'on n'a pas, prise tout entière jusqu'au plan d'ajout
+    # (jamais installée ici) ; puis celle qu'on a aussi (curseur dessus) : ses parties au choix, et ses médias.
     "action:$($l.MesAmis)", 'wait:400', 'action:Bruno', 'wait:400', "action:$($l.Biblio)", 'wait:2000',
-    'Enter', 'wait:600', "action:$($l.Prendre)", 'wait:4000'
+    'action:Bride', 'wait:600', "action:$($l.Toute)", 'wait:2500', "action:$($l.Prendre)", 'wait:6000',
+    $Exit, 'wait:800', $Exit, 'wait:800',
+    'Enter', 'wait:600', "action:$($l.Parties)", 'wait:2500', $Exit, 'wait:600',
+    "action:$($l.Prendre)", 'wait:4000'
   )
 }
 
@@ -120,6 +125,7 @@ try {
         if (-not ($log -match 'Réseau des bornes : démarré \(simulated')) { $failures += "$id : le réseau simulé n'a pas démarré" }
         if ($log -match 'Réseau des bornes : démarré \(public') { $failures += "$id : le vrai réseau a démarré pendant l'essai" }
         if ($nom -eq 'amis' -and -not ($log -match 'Bibliothèque partagée : [1-9]')) { $failures += "$id : les médias de Bruno ne sont pas arrivés" }
+        if ($nom -eq 'amis' -and -not ($log -match 'Bibliothèque partagée : table .*, [1-9]\d* fichier\(s\) reçu\(s\), 0 ')) { $failures += "$id : la table de Bruno n'est pas arrivée entière" }
         Assert-HorsEcran $env:CYBERPINBALL_CAPTURE
         $report = "$env:CYBERPINBALL_CAPTURE\mise-en-page.txt"
         if (-not (Test-Path $report)) { $failures += "$id : relevé de mise en page absent" }

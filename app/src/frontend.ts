@@ -70,6 +70,7 @@ import {
   pickAttractTable,
   samePath,
   screensTable,
+  tableContents,
   occupiedRoles,
   confusableRoles,
   vpxWindowMoves,
@@ -685,7 +686,23 @@ const socialNet = createSocialNet({ dataDir: loc.dataDir, mode: socialMode, log:
 const socialFirewall = createFirewallRule({ exe: process.execPath, simulated: socialMode !== 'public', log: (line) => console.log(line) });
 const romsOf = (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.roms ?? [];
 // Bibliothèque partagée entre amis : la mienne servie si je la partage, la leur et leurs médias.
-const friendContent = createFriendContent({ net: socialNet, dataDir: loc.dataDir, tables: () => tables, root: () => loc.root, romsOf, onChange: socialChanged, log: (line) => console.log(line) });
+/** L'inventaire du dossier d'une table, celui de « Fichiers de la table » : ses parties, à transmettre ou déjà là. */
+function tableInventory(table: TableEntry) {
+  if (!loc.root) return undefined;
+  const script = cachedScript(table.file, loc.dataDir);
+  const facts = script && !('error' in script) ? { usesPinmame: script.usesPinmame, roms: script.roms, dmdFolder: script.dmdFolder } : undefined;
+  return tableContents(table.file, { ownFolder: !samePath(table.folder, layoutOf(loc.root).tables), romLibrary: layoutOf(loc.root).roms, script: facts });
+}
+const friendContent = createFriendContent({
+  net: socialNet,
+  dataDir: loc.dataDir,
+  tables: () => tables,
+  root: () => loc.root,
+  romsOf,
+  contents: tableInventory,
+  onChange: socialChanged,
+  log: (line) => console.log(line),
+});
 /** Le menu des tables est à l'écran : une invitation peut s'y afficher sans rien interrompre. */
 const liveCanShow = () => !closing && state.phase === 'menu';
 // Partie en direct : invitation, départ commun, puis la table lancée ici comme par Start.
@@ -728,6 +745,16 @@ const friendsMenu = createFriendsMenu({
   romsOf,
   root: () => loc.root,
   redraw: socialChanged,
+  contents: tableInventory,
+  // Une table reçue arrive dans les données avant d'être rangée : la place se compte là.
+  freeSpace: () => {
+    try {
+      const st = fs.statfsSync(loc.dataDir);
+      return st.bavail * st.bsize;
+    } catch {
+      return undefined;
+    }
+  },
 });
 library.provideSystemItem('friends', friendsMenu.items.friends);
 library.provideSystemItem('find-player', friendsMenu.items['find-player']);

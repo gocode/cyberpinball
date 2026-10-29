@@ -128,10 +128,12 @@ export interface SocialState {
   /** Recherche des bornes du réseau local. */
   lan: boolean;
   /**
-   * Bibliothèque partagée avec mes amis : la liste de mes tables et leurs médias (friendlibrary.ts).
-   * Désactivée par défaut : activée par le joueur, après l'avertissement sur les droits.
+   * Bibliothèque partagée avec mes amis : la liste de mes tables, leurs médias et leurs parties
+   * (friendlibrary.ts). Activée par défaut entre amis (décidé le 29/10/2026).
    */
   shareLibrary: boolean;
+  /** Le joueur a lui-même choisi de partager ou non : seul ce choix l'emporte sur le partage par défaut. */
+  shareLibraryChosen?: boolean;
   name: string;
   /** Date du nom actuel : le profil signé la porte. */
   nameAt: string;
@@ -224,7 +226,7 @@ function defaultName(key: string): string {
 
 export function newSocialState(now = new Date()): SocialState {
   const key = createPlayerKey();
-  return { version: 1, enabled: true, lan: true, shareLibrary: false, name: defaultName(key.publicKey), nameAt: now.toISOString(), key, friends: [], incoming: [], outgoing: [], blocked: [], declined: [], directory: [], events: [], badges: [], badgesChecked: false };
+  return { version: 1, enabled: true, lan: true, shareLibrary: true, name: defaultName(key.publicKey), nameAt: now.toISOString(), key, friends: [], incoming: [], outgoing: [], blocked: [], declined: [], directory: [], events: [], badges: [], badgesChecked: false };
 }
 
 const array = <T>(v: unknown, keep: (x: unknown) => x is T): T[] => (Array.isArray(v) ? v.filter(keep) : []);
@@ -251,7 +253,9 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     version: 1,
     enabled: s.enabled !== false,
     lan: s.lan !== false,
-    shareLibrary: s.shareLibrary === true,
+    // Un fichier écrit avant le partage par défaut porte « false » sans que le joueur l'ait choisi.
+    shareLibrary: s.shareLibraryChosen === true ? s.shareLibrary === true : true,
+    ...(s.shareLibraryChosen === true ? { shareLibraryChosen: true } : {}),
     name: normalizeName(s.name) ?? defaultName(key.publicKey),
     nameAt: isIso(s.nameAt) ? s.nameAt : new Date(0).toISOString(),
     key: { publicKey: key.publicKey, privateKey: key.privateKey },

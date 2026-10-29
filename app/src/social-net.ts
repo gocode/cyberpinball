@@ -568,7 +568,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       for (const link of peers.get(key)?.links ?? []) link.stream.destroy();
     },
     unblock: (key) => commit(unblockPlayer(state, key)),
-    setShareLibrary: (on) => commit({ ...state, shareLibrary: on }),
+    setShareLibrary: (on) => commit({ ...state, shareLibrary: on, shareLibraryChosen: true }),
     send(key, message) {
       const link = friendLink(key);
       if (!link) return false;

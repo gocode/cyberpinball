@@ -8,6 +8,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { BADGES, grantBadges, playStats } from '../badges';
+import { defaultPartChoice, isSafeTableRel } from '../friendlibrary';
 import {
   acceptRequest,
   blockPlayer,
@@ -164,6 +165,25 @@ test('nom d’un pair : suit le profil le plus récent, d’où qu’il vienne, 
   // Annuaire oublié (60 jours) : la date gardée chez l'ami protège encore du vieux profil.
   const forgot = learnProfiles({ ...reread, directory: [] }, [old], { now: t1 });
   assert.equal(forgot.friends[0]!.name, 'Alicia');
+});
+
+test('bibliothèque partagée : activée par défaut, même relue d’un fichier d’avant ; un refus du joueur reste', () => {
+  const fresh = newSocialState();
+  assert.equal(fresh.shareLibrary, true);
+  // Écrit avant le partage par défaut : « false » sans que le joueur l'ait choisi.
+  assert.equal(parseSocialState({ ...fresh, shareLibrary: false })!.shareLibrary, true);
+  // Le joueur l'a coupée lui-même : ça reste coupé.
+  assert.equal(parseSocialState({ ...fresh, shareLibrary: false, shareLibraryChosen: true })!.shareLibrary, false);
+});
+
+test('fichiers d’une table reçus d’un ami : chemin sous le dossier de la table, jamais un programme', () => {
+  for (const ok of ['Terminator 2.vpx', 'pupvideos/t2_l8/screens.pup', 'pinmame/roms/t2_l8.zip', 'medias/(Wheel) T2.png']) assert.equal(isSafeTableRel(ok), true, ok);
+  for (const bad of ['../evil.vpx', 'a/../../b', 'C:/Windows/x', '/abs', 'a\\b', 'tool.exe', 'pupvideos/run.bat', 'x.ps1', 'con.txt', 'a//b', 'fin. ', '']) assert.equal(isSafeTableRel(bad), false, bad);
+  // La ROM et le PuP-Pack jamais pris d'office (sous droits), ni une partie qu'on a déjà.
+  assert.equal(defaultPartChoice('rom', false), false);
+  assert.equal(defaultPartChoice('pup', false), false);
+  assert.equal(defaultPartChoice('b2s', false), true);
+  assert.equal(defaultPartChoice('b2s', true), false);
 });
 
 test('évènements : phrases du record, du badge, de la partie', () => {

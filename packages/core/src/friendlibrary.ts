@@ -1,22 +1,30 @@
-// Bibliothèque partagée entre amis (docs/recherche/partage-medias.md, § 14) : un ami qui l'a
-// activée laisse voir la liste de ses tables et les médias que le menu montre pour chacune ;
-// ses amis y prennent les médias qui leur manquent. Jamais une table, une ROM ni un PuP-Pack :
-// une table qu'on n'a pas se récupère par le catalogue, comme toute table (règle du projet).
+// Bibliothèque partagée entre amis (docs/recherche/partage-medias.md, § 14 et § 15), activée
+// par défaut : la liste de mes tables, les médias que le menu montre pour chacune, et chaque
+// table entière, partie par partie (table, fronton, ROM, PuP-Pack, sons…). Mes amis y prennent
+// les médias qui leur manquent, une table qu'ils n'ont pas, ou les parties qu'ils veulent d'une
+// table qu'ils ont ; la ROM seulement s'ils la cochent (décision du 29/10/2026).
+// Jamais les sauvegardes, les records ni les statistiques ; jamais un programme.
 //
-// Ce qui circule ne contient aucun chemin : chaque table et chaque média y a un identifiant
-// opaque (empreinte de son chemin sur la borne), que seule la borne qui partage sait relier à
-// un fichier. Un fichier reçu est refusé s'il ne passe pas les contrôles de l'import (§ 5.1 :
-// type, format, premiers octets, taille, SHA-256 annoncé).
+// Ce qui circule ne contient aucun chemin de la borne : chaque table, chaque média et chaque
+// fichier y a un identifiant opaque (empreinte de son chemin), que seule la borne qui partage
+// sait relier à un fichier ; un fichier de table porte son chemin relatif au dossier de la table,
+// vérifié des deux côtés (isSafeTableRel). Un média reçu est refusé s'il ne passe pas les
+// contrôles de l'import (§ 5.1 : type, format, premiers octets, taille, SHA-256).
 //
 // Ici, seulement ce qui se décide sur des données ; le transport est dans app/src/social-net.ts
 // et le service dans app/src/friend-content.ts.
 
 import { createHash } from 'node:crypto';
+import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { partOfFileKind, type GamePart } from './gameparts';
 import { t } from './i18n';
 import { MANAGED_MEDIA_TYPES, ownMediaPages } from './mediaedit';
 import { mediaKind, mediaTypeInfo, type MediaKind, type MediaType } from './medias';
+import { isJunkName } from './puppack';
 import { isShareableType, parseTableIdentity, sameTable, shareableType, SHARE_MAX_BYTES, tableIdentity, type SameTableHow, type TableIdentity } from './sharing';
+import type { TableContents } from './tablecontents';
+import type { FileKind } from './tablefiles';
 import type { TableEntry } from './tables';
 
 /** Tables envoyées par message : une grande bibliothèque part en plusieurs. */
@@ -163,19 +171,110 @@ export function librarySize(medias: readonly LibraryMedia[]): number {
 /** Pourquoi un fichier n'est pas envoyé. */
 export type FileRefusal = 'not-shared' | 'not-found' | 'refused' | 'busy';
 
+// ---------------------------------------------------------------------------
+// Une table entière : ses parties, fichier par fichier
+
+/** Plus gros fichier d'une table accepté (une vidéo de PuP-Pack, un .vpx). */
+export const TABLE_FILE_MAX = 8 * 2 ** 30;
+/** Fichiers d'une table, au plus (un PuP-Pack en compte des milliers). */
+export const TABLE_FILES_MAX = 20_000;
+/** Fichiers décrits par message. */
+export const TABLE_FILES_CHUNK = 400;
+
+/** Parties d'une table qui se transmettent (gameparts.ts) : jamais les sauvegardes, les records ni les statistiques. */
+export const SHARED_PARTS: readonly GamePart[] = ['table', 'b2s', 'rom', 'pup', 'altcolor', 'altsound', 'music', 'pov', 'ini', 'media'];
+
+/** Un fichier d'une table, tel que l'ami le décrit : chemin relatif au dossier de la table, jamais absolu. */
+export interface TableFile {
+  id: string;
+  rel: string;
+  bytes: number;
+  part: GamePart;
+}
+
+/** Programmes et raccourcis : jamais reçus, même dans une table (un script de table, lui, est exécuté par VPX). */
+const DENIED = /\.(exe|dll|com|bat|cmd|msi|msp|ps1|psm1|scr|pif|lnk|url|reg|hta|cpl|jar|sys|drv|ocx|vbe|jse|wsf|wsh|msc|appx|msix)$/i;
+const RESERVED_NAME = /^(con|prn|aux|nul|com\d|lpt\d)(\..*)?$/i;
+
+/**
+ * Chemin relatif reçu pour un fichier de table : sous le dossier de la table, sans « .. », sans
+ * lecteur ni chemin absolu, sans caractère de contrôle ni nom réservé de Windows, et pas un
+ * programme. Séparateur « / ».
+ */
+export function isSafeTableRel(rel: unknown): rel is string {
+  if (typeof rel !== 'string' || !rel || rel.length > 400 || /[\x00-\x1f\x7f\\:*?"<>|]/.test(rel) || DENIED.test(rel)) return false;
+  const parts = rel.split('/');
+  return parts.length <= 12 && parts.every((p) => p && p !== '.' && p !== '..' && !/^[ ]|[. ]$/.test(p) && !RESERVED_NAME.test(p) && p.length <= 200);
+}
+
+function parseTableFile(raw: unknown): TableFile | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const r = raw as Record<string, unknown>;
+  const bytes = r.bytes;
+  if (!isOpaque(r.id) || !isSafeTableRel(r.rel) || !SHARED_PARTS.includes(r.part as GamePart)) return undefined;
+  if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes < 0 || bytes > TABLE_FILE_MAX) return undefined;
+  return { id: r.id, rel: r.rel, bytes, part: r.part as GamePart };
+}
+
+/** Une partie de la table d'un ami : ses fichiers et leur poids. */
+export interface FriendPart {
+  part: GamePart;
+  files: TableFile[];
+  bytes: number;
+}
+
+/** Fichiers de la table d'un ami rangés par partie, dans l'ordre des parties du jeu. */
+export function friendParts(files: readonly TableFile[]): FriendPart[] {
+  return SHARED_PARTS.map((part) => {
+    const of = files.filter((f) => f.part === part);
+    return { part, files: of, bytes: of.reduce((n, f) => n + f.bytes, 0) };
+  }).filter((p) => p.files.length);
+}
+
+/**
+ * Parties sous droits, jamais prises d'office : la ROM (l'œuvre du fabricant) et le PuP-Pack
+ * (vidéos et musiques souvent tirées du jeu, assemblées par leurs auteurs) ; décisions du 29/10/2026.
+ */
+export const RIGHTS_PARTS: readonly GamePart[] = ['rom', 'pup'];
+
+/**
+ * Ce qu'on prend d'office de la table d'un ami : chaque partie qu'on n'a pas, sauf celles sous
+ * droits (RIGHTS_PARTS), décochées tant que le joueur ne les coche pas, avec la mention des
+ * droits. Une partie qu'on a déjà reste la nôtre.
+ */
+export function defaultPartChoice(part: GamePart, mineHas: boolean): boolean {
+  return !RIGHTS_PARTS.includes(part) && !mineHas;
+}
+
+/** La mention des droits d'une partie sous droits, montrée à côté de sa case. */
+export function partRightsNote(part: GamePart): string | undefined {
+  if (part === 'rom') return t('l’œuvre du fabricant : à ne prendre que si vous en avez le droit');
+  if (part === 'pup') return t('vidéos et musiques souvent tirées du jeu : à ne prendre que si vous en avez le droit');
+  return undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Messages
+
 export type LibraryMessage =
   | { t: 'library-get' }
   /** Une part de la bibliothèque (`part` de 0 à `parts` - 1). */
   | { t: 'library'; at: string; part: number; parts: number; tables: LibraryTable[] }
   /** Bibliothèque pas partagée (ou demandeur qui n'est pas un ami). */
   | { t: 'library-off' }
-  | { t: 'file-get'; req: number; table: string; media: string }
-  | { t: 'file-head'; req: number; type: MediaType; format: string; bytes: number; sha256: string }
+  /** Les fichiers d'une table, par paquets de TABLE_FILES_CHUNK. */
+  | { t: 'table-files-get'; req: number; table: string }
+  | { t: 'table-files'; req: number; chunk: number; chunks: number; files: TableFile[] }
+  /** Un fichier : un média, ou un fichier d'une table. */
+  | { t: 'file-get'; req: number; table: string; file: string }
+  | { t: 'file-head'; req: number; bytes: number }
   | { t: 'file-refused'; req: number; reason: FileRefusal }
-  | { t: 'file-end'; req: number }
+  /** Fin du fichier : son empreinte, calculée pendant l'envoi. */
+  | { t: 'file-end'; req: number; sha256: string }
   | { t: 'file-cancel'; req: number };
 
 const isReq = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v > 0 && v < 2 ** 31;
+const isCount = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max;
 
 /** Message de bibliothèque ou de fichier, vérifié champ par champ ; undefined : ignoré. */
 export function parseLibraryMessage(m: Record<string, unknown>): LibraryMessage | undefined {
@@ -190,26 +289,37 @@ export function parseLibraryMessage(m: Record<string, unknown>): LibraryMessage 
       if (typeof m.at !== 'string' || m.at.length > 40 || Number.isNaN(Date.parse(m.at)) || !Array.isArray(m.tables)) return undefined;
       return { t: 'library', at: m.at, part, parts, tables: m.tables.slice(0, LIBRARY_PART_TABLES).map(parseLibraryTable).filter((x): x is LibraryTable => !!x) };
     }
-    case 'file-get':
-      return isReq(m.req) && isOpaque(m.table) && isOpaque(m.media) ? { t: 'file-get', req: m.req, table: m.table, media: m.media } : undefined;
-    case 'file-head': {
-      const type = shareableType(m.type);
-      const format = typeof m.format === 'string' ? m.format.toLowerCase() : '';
-      const kind = mediaKind(`x.${format}`);
-      const bytes = m.bytes;
-      if (!isReq(m.req) || !type || !kind || !mediaTypeInfo(type).formats.includes(format)) return undefined;
-      if (typeof bytes !== 'number' || !Number.isSafeInteger(bytes) || bytes <= 0 || bytes > SHARE_MAX_BYTES[kind]) return undefined;
-      if (typeof m.sha256 !== 'string' || !/^[0-9a-f]{64}$/.test(m.sha256)) return undefined;
-      return { t: 'file-head', req: m.req, type, format, bytes, sha256: m.sha256 };
+    case 'table-files-get':
+      return isReq(m.req) && isOpaque(m.table) ? { t: 'table-files-get', req: m.req, table: m.table } : undefined;
+    case 'table-files': {
+      const most = Math.ceil(TABLE_FILES_MAX / TABLE_FILES_CHUNK);
+      if (!isReq(m.req) || !isCount(m.chunks, most) || !m.chunks || !isCount(m.chunk, (m.chunks as number) - 1) || !Array.isArray(m.files)) return undefined;
+      return { t: 'table-files', req: m.req, chunk: m.chunk, chunks: m.chunks, files: m.files.slice(0, TABLE_FILES_CHUNK).map(parseTableFile).filter((f): f is TableFile => !!f) };
     }
+    case 'file-get':
+      return isReq(m.req) && isOpaque(m.table) && isOpaque(m.file) ? { t: 'file-get', req: m.req, table: m.table, file: m.file } : undefined;
+    case 'file-head':
+      return isReq(m.req) && isCount(m.bytes, TABLE_FILE_MAX) ? { t: 'file-head', req: m.req, bytes: m.bytes } : undefined;
     case 'file-refused':
       return isReq(m.req) && ['not-shared', 'not-found', 'refused', 'busy'].includes(m.reason as string) ? { t: 'file-refused', req: m.req, reason: m.reason as FileRefusal } : undefined;
     case 'file-end':
+      return isReq(m.req) && typeof m.sha256 === 'string' && /^[0-9a-f]{64}$/.test(m.sha256) ? { t: 'file-end', req: m.req, sha256: m.sha256 } : undefined;
     case 'file-cancel':
-      return isReq(m.req) ? { t: m.t, req: m.req } : undefined;
+      return isReq(m.req) ? { t: 'file-cancel', req: m.req } : undefined;
     default:
       return undefined;
   }
+}
+
+/** Fichiers d'une table en messages, TABLE_FILES_CHUNK chacun. */
+export function tableFilesMessages(req: number, files: readonly TableFile[]): Extract<LibraryMessage, { t: 'table-files' }>[] {
+  const chunks = Math.max(1, Math.ceil(files.length / TABLE_FILES_CHUNK));
+  return Array.from({ length: chunks }, (_, chunk) => ({ t: 'table-files' as const, req, chunk, chunks, files: files.slice(chunk * TABLE_FILES_CHUNK, (chunk + 1) * TABLE_FILES_CHUNK) }));
+}
+
+/** Identifiant opaque d'un fichier (empreinte de son chemin sur la borne). */
+export function fileId(file: string): string {
+  return opaque(file);
 }
 
 /** Ma bibliothèque en messages, `LIBRARY_PART_TABLES` tables chacun (une bibliothèque vide : un message vide). */
@@ -253,4 +363,70 @@ export function fileRefusalLabel(reason: FileRefusal | 'offline' | 'check' | 'si
     case 'cancelled':
       return t('annulé');
   }
+}
+
+// ---------------------------------------------------------------------------
+// Fichiers de ma table, à partager
+
+/** Sortes de fichiers rangées avec la table elle-même : ce qu'il faut pour qu'elle joue comme chez l'ami. */
+const WITH_TABLE: readonly FileKind[] = ['dmdFolder', 'script', 'doc'];
+
+/** Un fichier de ma table que je peux transmettre. */
+export interface ShareableTableFile {
+  file: string;
+  /** Relatif au dossier de la table, séparateur « / ». */
+  rel: string;
+  part: GamePart;
+  bytes: number;
+}
+
+/**
+ * Fichiers d'une table à transmettre, d'après son inventaire (tablecontents.ts) : ceux de chaque
+ * partie du jeu (table, fronton, ROM, PuP-Pack, couleurs, sons, musique, point de vue, réglages,
+ * médias) et ce qui joue avec la table (contenu du DMD, scripts complémentaires). Jamais les
+ * sauvegardes, records, réglages de PinMAME ni statistiques ; jamais un programme. Les dossiers
+ * rangés d'un bloc sont dépliés fichier par fichier. Une ROM rangée dans la bibliothèque commune
+ * (pas dans le dossier) part de là, sous son chemin dans le dossier de la table.
+ */
+export function shareableTableFiles(contents: TableContents, folder: string): ShareableTableFile[] {
+  const out: ShareableTableFile[] = [];
+  const add = (file: string, rel: string, part: GamePart) => {
+    const posix = rel.split(path.sep).join('/');
+    if (out.length >= TABLE_FILES_MAX || !isSafeTableRel(posix)) return;
+    let bytes: number;
+    try {
+      const st = fs.statSync(file);
+      if (!st.isFile()) return;
+      bytes = st.size;
+    } catch {
+      return;
+    }
+    if (bytes > TABLE_FILE_MAX) return;
+    out.push({ file, rel: posix, part, bytes });
+  };
+  const walk = (dir: string, rel: string, part: GamePart) => {
+    let names: fs.Dirent[];
+    try {
+      names = fs.readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const d of names) {
+      if (isJunkName(d.name)) continue;
+      const full = path.join(dir, d.name);
+      if (d.isDirectory()) walk(full, path.join(rel, d.name), part);
+      else if (d.isFile()) add(full, path.join(rel, d.name), part);
+    }
+  };
+  for (const entry of contents.entries) {
+    const part = partOfFileKind(entry.kind) ?? (WITH_TABLE.includes(entry.kind) ? 'table' : undefined);
+    if (!part || !SHARED_PARTS.includes(part)) continue;
+    if (entry.dir) {
+      if (!entry.missing) walk(entry.path, entry.rel, part);
+      continue;
+    }
+    const file = !entry.missing && fs.existsSync(entry.path) ? entry.path : entry.kind === 'rom' && entry.library && fs.existsSync(entry.library) ? entry.library : undefined;
+    if (file) add(file, entry.rel || path.relative(folder, file), part);
+  }
+  return out;
 }

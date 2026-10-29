@@ -29,6 +29,7 @@ import {
   type FriendRequest,
   type MediaOriginDraft,
   type MediaType,
+  type TableContents,
   type TableEntry,
   type TableIdentity,
   type Presence,
@@ -52,7 +53,13 @@ export interface FriendsMenuHost {
     openMediasWith(table: TableEntry, files: readonly { type: MediaType; file: string; page?: number }[], origin: MediaOriginDraft, notice: string): void;
     /** Le jeu dans le catalogue (par son identifiant VPS, sinon une recherche de son titre). */
     catalogFor(identity: TableIdentity): void;
+    /** Dossier d'une table reçue d'un ami : le plan d'ajout, vers `table` quand on l'a déjà. */
+    installReceived(dir: string, table?: TableEntry, back?: () => void): void;
   };
+  /** Inventaire du dossier d'une de mes tables (ses parties). */
+  contents?(table: TableEntry): TableContents | undefined;
+  /** Place libre du lecteur des données, en octets. */
+  freeSpace?(): number | undefined;
   net: SocialNet;
   firewall: FirewallRule;
   content: FriendContent;
@@ -102,6 +109,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     games: host.games,
     tables: host.tables,
     friendHas: (key, table) => libraryMenu.has(key, table),
+    openFriendTable: (key, identity, back) => libraryMenu.openMatching(key, identity, back),
     redraw: host.redraw,
     ...(host.now ? { now: host.now } : {}),
   });
@@ -114,6 +122,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     ...(host.romsOf ? { romsOf: host.romsOf } : {}),
     root: host.root,
     redraw: host.redraw,
+    ...(host.contents ? { contents: host.contents } : {}),
+    ...(host.freeSpace ? { freeSpace: host.freeSpace } : {}),
   });
 
   /** Rien ne passe : partage désactivé, ou réseau coupé pour les essais. */
@@ -446,7 +456,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       { text: t('Votre nom : {name}', { name: name(s.key.publicKey, s.name) }), detail: t('Visible dans l’annuaire ; l’étiquette #{tag} vient de la clé de cette borne', { tag: name(s.key.publicKey, '').split('#')[1]! }), icon: 'friend-list' },
       { text: s.lan ? t('Réseau local : activé') : t('Réseau local : désactivé'), detail: s.lan ? tn(near, '{n} borne à proximité', '{n} bornes à proximité') : t('Les bornes de votre réseau ne vous trouvent pas sans Internet'), tone: s.lan ? 'ok' : 'quiet', icon: 'monitor' },
       s.shareLibrary
-        ? { text: t('Bibliothèque partagée avec vos amis'), detail: t('Ils voient vos tables et prennent leurs médias'), tone: 'ok', badges: [t('Partagée')], icon: 'tables' }
+        ? { text: t('Bibliothèque partagée avec vos amis'), detail: t('Ils voient vos tables et peuvent les récupérer, avec leurs médias'), tone: 'ok', badges: [t('Partagée')], icon: 'tables' }
         : { text: t('Bibliothèque pas partagée'), detail: t('Vos amis ne voient pas vos tables'), tone: 'quiet', icon: 'tables' },
       firewallRow(),
     ];
@@ -457,7 +467,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     actions.push(
       s.shareLibrary
         ? { label: t('Ne plus partager ma bibliothèque'), detail: t('Vos amis ne voient plus vos tables ni vos médias'), icon: 'tables', run: () => { net.setShareLibrary(false); flash = { text: t('Bibliothèque plus partagée'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
-        : { label: t('Partager ma bibliothèque avec mes amis'), detail: t('La liste de vos tables et leurs médias ; jamais une table ni une ROM'), icon: 'tables', run: () => openShareLibrary() },
+        : { label: t('Partager ma bibliothèque avec mes amis'), detail: t('Vos tables, leurs parties et leurs médias, entre amis seulement'), icon: 'tables', run: () => { net.setShareLibrary(true); flash = { text: t('Bibliothèque partagée avec vos amis'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
     );
     actions.push({ label: s.lan ? t('Désactiver le réseau local') : t('Activer le réseau local'), icon: 'monitor', run: async () => { await net.setLan(!s.lan); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } });
     // La coupure en dernier, juste avant « Retour » (sélection d'office).
@@ -479,42 +489,19 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
           rows: [
             { text: t('Réseau : votre nom et son étiquette') },
             { text: t('Amis : présence, table en cours, records, badges et parties') },
-            ...(s.shareLibrary ? [{ text: t('Amis : la liste de vos tables et leurs médias (logo, fronton, vidéos, règles)') }] : []),
+            ...(s.shareLibrary
+              ? [
+                  { text: t('Amis : vos tables, leurs parties (fronton, PuP-Pack, sons…) et leurs médias'), detail: t('Une ROM ou un PuP-Pack seulement si votre ami les coche : ils sont décochés d’office') },
+                  { text: t('Ne partagez que ce que vous avez le droit de partager'), detail: t('Les captures d’œuvres (photos du fronton, prospectus, musique du jeu), les ROM et les PuP-Packs restent la propriété de leurs ayants droit'), tone: 'warning' as const, icon: 'alert' as const },
+                ]
+              : [{ text: t('Aucun fichier partagé') }]),
             { text: t('Bornes reliées : son adresse IP'), detail: t('Comme dans tout échange de pair à pair') },
-            { text: s.shareLibrary ? t('Jamais une table, une ROM ni un PuP-Pack') : t('Aucun fichier partagé') },
           ],
         },
       ],
       actions,
       back,
     };
-  }
-
-  /** Avertissement sur les droits, accepté avant le premier partage (docs/recherche/partage-medias.md, § 6). */
-  function openShareLibrary(): void {
-    const cancel = () => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER);
-    host.library.openCustom(
-      () => ({
-        heading: t('Partager ma bibliothèque avec mes amis'),
-        icon: 'tables',
-        lead: t('Vos amis verront la liste de vos tables et pourront prendre leurs médias : logo, fronton, vidéos, règles, musique.'),
-        sections: [
-          {
-            rows: [
-              { text: t('Ne partagez que ce que vous avez le droit de partager'), detail: t('Les captures d’œuvres (photos du fronton, prospectus, cartes d’instructions, musique du jeu) restent la propriété de leurs ayants droit'), tone: 'warning', icon: 'alert' },
-              { text: t('Entre amis seulement'), detail: t('Personne d’autre ne voit votre bibliothèque'), icon: 'friend-list' },
-              { text: t('Jamais une table, une ROM ni un PuP-Pack'), detail: t('Une table qui manque à un ami se récupère par le catalogue, sur son site'), icon: 'lock' },
-            ],
-          },
-        ],
-        actions: [
-          { label: t('Partager'), icon: 'check', tone: 'ok', run: () => { net.setShareLibrary(true); flash = { text: t('Bibliothèque partagée avec vos amis'), tone: 'ok' }; cancel(); } },
-          { label: t('Annuler'), icon: 'back', run: cancel },
-        ],
-        back: cancel,
-      }),
-      Number.MAX_SAFE_INTEGER,
-    );
   }
 
   function askName(): void {

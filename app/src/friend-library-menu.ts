@@ -1,30 +1,43 @@
 // Bibliothèque d'un ami à l'écran (friend-content.ts, packages/core/src/friendlibrary.ts) : ses
 // tables, celles qu'on a aussi et les autres ; pour une table, ses médias et ceux qui nous
-// manquent ; puis la réception, avec sa progression et « Annuler ». Les médias reçus entrent
-// dans le brouillon des médias de notre table (Médias du jeu), à voir puis enregistrer. Une table
-// qu'on n'a pas se cherche dans le catalogue : jamais de .vpx ni de ROM par le réseau.
+// manquent, et ses parties (table, fronton, ROM, PuP-Pack, sons…). On récupère toute une table
+// qu'on n'a pas ; d'une table qu'on a déjà, on choisit partie par partie ce qu'on prend de l'ami
+// et ce qu'on garde. La ROM est décochée d'office (décision du 29/10/2026). Puis la
+// réception, avec sa progression et « Annuler » : les médias seuls entrent dans le brouillon de
+// « Médias du jeu » ; une table, ou des parties, passent par le plan d'ajout (rien n'est rangé
+// avant « Installer »).
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec des services d'essai.
 
 import {
+  defaultPartChoice,
   displayName,
   fileRefusalLabel,
   formatSize,
+  friendParts,
+  installedParts,
+  partLabel,
+  partRightsNote,
   librarySize,
   MANAGED_MEDIA_TYPES,
   matchLibrary,
   mediaTypeInfo,
   missingMedias,
   ownMediaPages,
+  sameTable,
   t,
   tableIdentity,
   tn,
   type FriendLibrary,
+  type GamePart,
+  type InstalledPart,
   type LibraryMatch,
   type LibraryMedia,
   type MediaOriginDraft,
   type MediaType,
+  type TableContents,
   type TableEntry,
+  type TableFile,
   type TableIdentity,
 } from '@cyberpinball/core';
 import type { FetchProgress, FriendContent } from './friend-content';
@@ -37,7 +50,13 @@ export interface FriendLibraryMenuHost {
     openCustom(build: () => Built, at?: number): void;
     openMediasWith(table: TableEntry, files: readonly { type: MediaType; file: string; page?: number }[], origin: MediaOriginDraft, notice: string): void;
     catalogFor(identity: TableIdentity): void;
+    /** Dossier d'une table reçue : le plan d'ajout, vers `table` quand on l'a déjà. */
+    installReceived(dir: string, table?: TableEntry, back?: () => void): void;
   };
+  /** Inventaire du dossier d'une de mes tables : les parties que j'ai déjà. */
+  contents?(table: TableEntry): TableContents | undefined;
+  /** Place libre du lecteur des données, en octets ; undefined : inconnue. */
+  freeSpace?(): number | undefined;
   net: Pick<SocialNet, 'state' | 'online'>;
   content: FriendContent;
   live: Pick<LiveMenu, 'inviteOn'>;
@@ -53,6 +72,8 @@ export interface FriendLibraryMenu {
   detail(key: string): string;
   /** Sa bibliothèque connue a cette table (pour mettre en tête le choix d'une partie en direct). */
   has(key: string, table: TableEntry): boolean;
+  /** Le même jeu dans sa bibliothèque (une invitation sur une table qu'on n'a pas) ; sinon sa bibliothèque. */
+  openMatching(key: string, identity: TableIdentity, back: () => void): void;
 }
 
 /** Tables montrées par section avant « … et n autres ». */
@@ -66,7 +87,9 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     flash = undefined;
     return row ? [{ rows: [row] }] : [];
   };
-  let transfer: { key: string; table: TableEntry; progress?: FetchProgress; abort: AbortController } | undefined;
+  let transfer: { key: string; table: TableEntry | string; whole?: boolean; progress?: FetchProgress; abort: AbortController } | undefined;
+  /** Parties de la table d'un ami, demandées à l'ouverture de l'écran des parties, et ce qu'on en prend. */
+  let parts: { key: string; tableId: string; files?: TableFile[]; error?: string; take: Map<GamePart, boolean> } | undefined;
 
   const friendName = (key: string) => host.net.state().friends.find((f) => f.key === key)?.name ?? '?';
   const mine = () => host.tables().map((table) => ({ table, identity: tableIdentity(table, host.romsOf?.(table) ?? []) }));
@@ -106,22 +129,28 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
 
   // ---------- Ses tables ----------
 
-  /** Écran ouvert avant l'arrivée de la bibliothèque : le curseur ira sur la première table quand elle arrive. */
+  /**
+   * Écran ouvert avant l'arrivée de ce qu'il montre (bibliothèque, parties d'une table) : quand
+   * c'est arrivé et qu'il est encore à l'écran (son build est appelé), il se rouvre le curseur sur
+   * sa première action. Sinon le curseur restait sur « Actualiser » ou « Retour », seules
+   * actions de l'attente, et Start ne lançait pas ce qu'on était venu faire.
+   */
   let awaiting: string | undefined;
+  function reopenWhenReady(id: string, ready: boolean, reopen: () => void): void {
+    if (awaiting !== id || !ready) return;
+    awaiting = undefined;
+    setImmediate(reopen);
+  }
 
   function open(key: string, back: () => void): void {
-    awaiting = content.library(key).state === 'loading' ? key : undefined;
+    awaiting = content.library(key).state === 'loading' ? `library:${key}` : undefined;
     host.library.openCustom(() => buildLibrary(key, back));
   }
 
   function buildLibrary(key: string, back: () => void): Built {
     const plain = friendName(key);
     const s = content.library(key);
-    // Arrivée pendant que l'écran est montré : sans cela, le curseur resterait sur « Actualiser ».
-    if (awaiting === key && s.state !== 'loading') {
-      awaiting = undefined;
-      setImmediate(() => open(key, back));
-    }
+    reopenWhenReady(`library:${key}`, s.state !== 'loading', () => open(key, back));
     const actions: Action[] = [];
     const sections: Section[] = [...takeFlash()];
     if (s.state !== 'ready') {
@@ -187,17 +216,23 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       ...(has ? (has(m.type) ? { badges: [t('Déjà équipé')] } : { badges: [t('Manquant')], tone: 'ok' as const }) : {}),
     }));
     const actions: Action[] = [];
+    // La table elle-même, partie par partie : toute la table si on ne l'a pas, sinon au choix.
+    actions.push(
+      owned
+        ? { label: t('Choisir les parties de sa table'), detail: t('Fronton, PuP-Pack, sons… : les siennes ou les vôtres'), icon: 'layers', run: () => openParts(key, tableId, () => openTable(key, tableId, back)) }
+        : { label: t('Récupérer toute la table'), detail: t('Table, fronton, sons et médias ; la ROM et le PuP-Pack au choix'), icon: 'table-add', tone: 'ok', run: () => openParts(key, tableId, () => openTable(key, tableId, back)) },
+    );
     if (owned) {
       const missing = missingMedias(entry, has!);
       if (missing.length) actions.push({ label: tn(missing.length, 'Récupérer le média manquant', 'Récupérer les {n} médias manquants'), detail: formatSize(librarySize(missing)), icon: 'image-download', tone: 'ok', run: () => startFetch(key, owned, entry.id, missing, back) });
       if (entry.medias.length && missing.length < entry.medias.length) actions.push({ label: tn(entry.medias.length, 'Récupérer son média', 'Récupérer les {n} médias'), detail: t('{size} · remplaceront les vôtres après vérification et enregistrement', { size: formatSize(librarySize(entry.medias)) }), icon: 'download', run: () => startFetch(key, owned, entry.id, entry.medias, back) });
       if (host.net.online(key)) actions.push({ label: t('Inviter {name} à jouer', { name: plain }), detail: t('Partie en direct sur cette table'), icon: 'gamepad', run: () => host.live.inviteOn(owned, key, () => openTable(key, tableId, back)) });
     } else {
-      actions.push({ label: t('Trouver cette table dans le catalogue'), detail: t('Récupérée comme toute table, sur son site : jamais par le réseau'), icon: 'search', tone: 'ok', run: () => host.library.catalogFor(entry.table) });
+      actions.push({ label: t('Trouver cette table dans le catalogue'), detail: t('Sur son site, comme toute table'), icon: 'search', run: () => host.library.catalogFor(entry.table) });
     }
     actions.push({ label: t('Retour'), icon: 'back', run: back });
     const sections: Section[] = [...takeFlash()];
-    if (!owned) sections.push({ rows: [{ text: t('Vous n’avez pas cette table'), detail: t('Ses médias se prennent une fois la table installée sur votre borne'), tone: 'info' }] });
+    if (!owned) sections.push({ rows: [{ text: t('Vous n’avez pas cette table'), detail: t('« Récupérer toute la table » l’installe, avec ses médias'), tone: 'info' }] });
     sections.push({ title: t('Ses médias'), rows: rows.length ? rows : [{ text: t('Aucun média pour cette table'), tone: 'quiet' }] });
     return {
       heading: entry.table.title,
@@ -207,6 +242,155 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       actions,
       back,
     };
+  }
+
+  // ---------- Les parties de sa table ----------
+
+  /** Parties de ma table, d'après son inventaire. */
+  function mineParts(table: TableEntry | undefined): Map<GamePart, InstalledPart> {
+    const contents = table ? host.contents?.(table) : undefined;
+    return contents ? installedParts(contents) : new Map();
+  }
+
+  function openParts(key: string, tableId: string, back: () => void): void {
+    const job: NonNullable<typeof parts> = { key, tableId, take: new Map() };
+    parts = job;
+    awaiting = `parts:${key}/${tableId}`;
+    const show = () => host.library.openCustom(() => buildParts(key, tableId, back));
+    show();
+    void content.tableFiles(key, tableId).then((files) => {
+      if (parts !== job) return;
+      if (typeof files === 'string') job.error = fileRefusalLabel(files);
+      else {
+        job.files = files;
+        const owned = matchOf(key, tableId)?.mine;
+        const have = mineParts(owned);
+        for (const p of friendParts(files)) job.take.set(p.part, defaultPartChoice(p.part, have.has(p.part)));
+      }
+      host.redraw();
+    });
+  }
+
+  function matchOf(key: string, tableId: string): LibraryMatch | undefined {
+    const library = ready(key);
+    return library ? matchLibrary({ ...library, tables: library.tables.filter((x) => x.id === tableId) }, mine())[0] : undefined;
+  }
+
+  function buildParts(key: string, tableId: string, back: () => void): Built {
+    const plain = friendName(key);
+    const match = matchOf(key, tableId);
+    const job = parts?.key === key && parts.tableId === tableId ? parts : undefined;
+    reopenWhenReady(`parts:${key}/${tableId}`, !!job && (!!job.files || !!job.error), () => host.library.openCustom(() => buildParts(key, tableId, back)));
+    const owned = match?.mine;
+    const title = match?.entry.table.title ?? '?';
+    const heading = owned ? t('Parties de sa table') : t('Récupérer toute la table');
+    const actions: Action[] = [];
+    const sections: Section[] = [...takeFlash()];
+    if (!job?.files) {
+      sections.push({ rows: [job?.error ? { text: t('Parties indisponibles : {why}', { why: job.error }), tone: 'warning' } : { text: t('Demande à sa borne…'), icon: 'clock', tone: 'quiet' }] });
+      actions.push({ label: t('Retour'), icon: 'back', run: back });
+      return { heading, icon: owned ? 'layers' : 'table-add', subheading: title, sections, actions, back };
+    }
+    const have = mineParts(owned);
+    const all = friendParts(job.files);
+    const chosen = all.filter((p) => job.take.get(p.part));
+    const bytes = chosen.reduce((n, p) => n + p.bytes, 0);
+    const free = host.freeSpace?.();
+    const room = free === undefined || free > bytes + 2 ** 30;
+    // L'action qui lance la réception d'abord (curseur dessus) ; chaque partie se prend ou se laisse dessous.
+    actions.push({
+      label: chosen.length ? tn(chosen.length, 'Récupérer la partie choisie', 'Récupérer les {n} parties choisies') : t('Aucune partie choisie'),
+      detail: chosen.length ? t('{size} · puis le plan d’ajout, avant toute installation', { size: formatSize(bytes) }) : t('Start sur une partie la prend ou la laisse'),
+      icon: 'download',
+      tone: chosen.length && room ? 'ok' : undefined,
+      run: () => {
+        if (!chosen.length || !room) return host.redraw();
+        startTableFetch(key, tableId, owned, match?.entry.table, chosen.flatMap((p) => p.files), back);
+      },
+    });
+    const rows: Row[] = [];
+    for (const p of all) {
+      const taken = job.take.get(p.part) ?? false;
+      const mineHas = have.get(p.part);
+      const his = `${tn(p.files.length, '{n} fichier', '{n} fichiers')} · ${formatSize(p.bytes)}`;
+      const index =
+        actions.push({
+          label: partLabel(p.part),
+          key: `part:${p.part}`,
+          icon: taken ? 'check' : 'close',
+          run: () => {
+            job.take.set(p.part, !taken);
+            host.redraw();
+          },
+        }) - 1;
+      rows.push({
+        text: partLabel(p.part),
+        detail: [
+          t('La sienne : {what}', { what: his }),
+          owned ? (mineHas ? t('la vôtre : {size}', { size: formatSize(mineHas.size) }) : t('vous ne l’avez pas')) : undefined,
+          partRightsNote(p.part),
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        badges: [taken ? t('La sienne') : owned && mineHas ? t('La vôtre') : t('Pas prise')],
+        tone: taken ? 'ok' : partRightsNote(p.part) ? 'warning' : 'quiet',
+        icon: taken ? 'check' : 'close',
+        action: index,
+        pick: true,
+      });
+    }
+    sections.push({ title: t('Ses parties'), rows });
+    sections.push({
+      rows: [
+        { text: t('Une table contient un script que VPX exécute'), detail: t('Ne prenez que les tables d’amis en qui vous avez confiance'), tone: 'warning', icon: 'alert' },
+        ...(room ? [] : [{ text: t('Pas assez de place : {size} libres pour {need}', { size: formatSize(free!), need: formatSize(bytes) }), tone: 'error' as const, icon: 'drive' as const }]),
+      ],
+    });
+    actions.push({ label: t('Retour'), icon: 'back', run: back });
+    return {
+      heading,
+      icon: owned ? 'layers' : 'table-add',
+      subheading: [title, t('de {name}', { name: plain })].join(' · '),
+      lead: owned ? t('Pour chaque partie : la sienne remplace la vôtre, ou vous gardez la vôtre. Le plan d’ajout montre tout avant d’installer.') : t('Toutes ses parties d’office, sauf la ROM et le PuP-Pack. Le plan d’ajout montre tout avant d’installer.'),
+      sections,
+      actions,
+      back,
+    };
+  }
+
+  function startTableFetch(key: string, tableId: string, owned: TableEntry | undefined, identity: TableIdentity | undefined, files: readonly TableFile[], back: () => void): void {
+    const folder = identity ? (identity.manufacturer && identity.year ? `${identity.title} (${identity.manufacturer} ${identity.year})` : identity.title) : 'Table';
+    const job = { key, table: owned ?? folder, whole: true, abort: new AbortController() } as NonNullable<typeof transfer>;
+    transfer = job;
+    host.library.openCustom(() => buildTransfer(back));
+    void content
+      .fetchTable(
+        key,
+        tableId,
+        // Une table qu'on a déjà : le dossier reçu porte le nom du nôtre, le plan l'y range.
+        owned ? owned.folder.split(/[\\/]/).pop()! : folder,
+        files,
+        (p) => {
+          job.progress = p;
+          host.redraw();
+        },
+        job.abort.signal,
+      )
+      .then((result) => {
+        if (transfer === job) transfer = undefined;
+        const failures = result.failed.filter((f) => f.reason !== 'cancelled');
+        if (job.abort.signal.aborted) {
+          flash = { text: t('Réception annulée'), tone: 'info' };
+          return back();
+        }
+        if (!result.received.length || failures.length) {
+          const why = [...new Set(failures.map((f) => fileRefusalLabel(f.reason)))].join(' ; ');
+          flash = { text: tn(failures.length, '{n} fichier pas reçu : rien n’est installé', '{n} fichiers pas reçus : rien n’est installé'), detail: why || undefined, tone: 'warning' };
+          return back();
+        }
+        if (owned) ownedTypes.delete(owned.file);
+        host.library.installReceived(result.dir, owned, back);
+      });
   }
 
   // ---------- Réception ----------
@@ -251,11 +435,14 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     const job = transfer;
     const p = job?.progress;
     const plain = job ? friendName(job.key) : '';
+    const tableTitle = job ? (typeof job.table === 'string' ? job.table : job.table.title) : '';
     return {
-      heading: t('Réception des médias'),
-      icon: 'image-download',
-      subheading: job ? t('de {name} · {table}', { name: plain, table: job.table.title }) : undefined,
-      lead: t('Chaque fichier est vérifié à l’arrivée (taille, empreinte, contenu) avant d’entrer dans le brouillon des médias de votre table.'),
+      heading: job?.whole ? t('Réception de la table') : t('Réception des médias'),
+      icon: job?.whole ? 'table-add' : 'image-download',
+      subheading: job ? t('de {name} · {table}', { name: plain, table: tableTitle }) : undefined,
+      lead: job?.whole
+        ? t('Chaque fichier est vérifié à l’arrivée (taille, empreinte), puis le plan d’ajout montre tout avant d’installer.')
+        : t('Chaque fichier est vérifié à l’arrivée (taille, empreinte, contenu) avant d’entrer dans le brouillon des médias de votre table.'),
       sections: [
         {
           rows: [
@@ -276,6 +463,11 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
   return {
     open,
     detail,
+    openMatching(key, identity, back) {
+      const entry = ready(key)?.tables.find((x) => sameTable(x.table, identity));
+      if (entry) openTable(key, entry.id, back);
+      else open(key, back);
+    },
     has(key, table) {
       const library = ready(key);
       if (!library) return false;
