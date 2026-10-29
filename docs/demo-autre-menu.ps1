@@ -30,18 +30,19 @@ $electron = node -p "require('electron')"
 Push-Location $wt
 try { npm run build | Out-Null } finally { Pop-Location }
 
-# Nettoyage : d'abord la jonction des émulateurs (sans /s, pour ne jamais y descendre).
+# Nettoyage : d'abord les jonctions d'une racine d'avant le 29/10/2026 (sans /s, pour ne jamais y descendre).
 if (Test-Path $base) {
   Get-ChildItem -Directory -Recurse -Depth 2 $base -Attributes ReparsePoint | ForEach-Object { cmd /c rmdir "$($_.FullName)" }
   Remove-Item -Recurse -Force $base
 }
 if (Test-Path "$wt\tmp\captures\autre-menu") { Remove-Item -Recurse -Force "$wt\tmp\captures\autre-menu" }
-# Des tables aux médias générés (comme demo-moments.ps1), et VPX en lecture pour que le menu propose de jouer.
+# Des tables aux médias générés (comme demo-moments.ps1), et une fausse installation de VPX
+# (New-FauxVpx) pour que le menu propose de jouer : la partie est simulée.
 $root = "$base\root"
 Push-Location $wt
 try { & $electron docs\demo-moments.cjs $root 2>&1 | Out-Null } finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw 'Génération des tables en échec.' }
-New-Item -ItemType Junction -Path "$root\emulators" -Target "$Source\emulators" | Out-Null
+New-FauxVpx $root
 Set-Content -Path "$base\sans-son.json" -Value '[]' -Encoding ASCII
 
 $Start = 'Digit1'; $Exit = 'Escape'

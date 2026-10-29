@@ -11,7 +11,6 @@
 # VPX n'est jamais lancé sur ces fichiers.
 param(
   [switch]$Run,
-  [string]$Emulators = 'D:\CyberPinball\emulators',
   [string]$Cabinet = 'D:\CyberPinball\data\cabinet.json',
   [string]$Ecrans = 'pc-dev'
 )
@@ -29,7 +28,8 @@ if (Test-Path $base) {
 }
 $root = "$base\root"; $home_ = "$base\home"
 New-Item -ItemType Directory -Force "$root\tables", "$root\import", $home_ | Out-Null
-New-Item -ItemType Junction -Path "$root\emulators" -Target $Emulators | Out-Null
+# VPX « installé » : une fausse installation (New-FauxVpx), jamais les vrais émulateurs.
+New-FauxVpx $root
 if (Test-Path $Cabinet) { Copy-ModeleBorne $Cabinet $home_ | Out-Null }
 
 function New-File($path, $text = 'factice') {
@@ -116,7 +116,7 @@ node $seed $home_ "$mb\Monster Bash (Williams 1998) VPW 1.1.vpx" 'mb_106b' "$afm
 # à deux écrans (ni DMD ni topper) : l'option « FullDMD on Backglass » est retenue d'office.
 $root2 = "$base\deux-ecrans\root"; $home2 = "$base\deux-ecrans\home"
 New-Item -ItemType Directory -Force "$root2\tables", "$root2\import", $home2 | Out-Null
-New-Item -ItemType Junction -Path "$root2\emulators" -Target $Emulators | Out-Null
+New-FauxVpx $root2
 if (Test-Path $Cabinet) {
   $cab = Get-ModeleBorne $Cabinet
   $cab.roles.PSObject.Properties.Remove('dmd'); $cab.roles.PSObject.Properties.Remove('topper')

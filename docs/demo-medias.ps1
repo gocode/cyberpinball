@@ -38,7 +38,7 @@ $electron = node -p "require('electron')"
 Push-Location $wt
 try { npm run build | Out-Null } finally { Pop-Location }
 
-# Nettoyage : d'abord la jonction des émulateurs (sans /s, pour ne jamais y descendre).
+# Nettoyage : d'abord les jonctions d'une racine d'avant le 29/10/2026 (sans /s, pour ne jamais y descendre).
 if (Test-Path $base) {
   Get-ChildItem -Directory -Recurse -Depth 2 $base -Attributes ReparsePoint | ForEach-Object { cmd /c rmdir "$($_.FullName)" }
   Remove-Item -Recurse -Force $base
@@ -47,8 +47,8 @@ $root = "$base\root"
 Push-Location $wt
 try { & $electron docs\demo-medias.cjs generer $root 2>&1 | ForEach-Object { "   $_" } } finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw 'Génération des médias en échec.' }
-# VPX est « installé » (le menu propose Jouer), mais la partie est simulée.
-New-Item -ItemType Junction -Path "$root\emulators" -Target "$Source\emulators" | Out-Null
+# VPX est « installé » (fausse installation, New-FauxVpx : le menu propose Jouer), mais la partie est simulée.
+New-FauxVpx $root
 
 # Touches : celles des encodeurs par défaut (flèches, Start = 1, Exit = Échap) ; les actions
 # de la fiche et du gestionnaire par leur libellé (étape action: de l'autopilote).

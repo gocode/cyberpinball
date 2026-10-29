@@ -61,7 +61,7 @@ $electron = node -p "require('electron')"
 Push-Location $wt
 try { npm run build | Out-Null } finally { Pop-Location }
 
-# Nettoyage : d'abord la jonction des émulateurs (sans /s, pour ne jamais y descendre).
+# Nettoyage : d'abord les jonctions d'une racine d'avant le 29/10/2026 (sans /s, pour ne jamais y descendre).
 if (Test-Path $base) {
   Get-ChildItem -Directory -Recurse -Depth 2 $base -Attributes ReparsePoint | ForEach-Object { cmd /c rmdir "$($_.FullName)" }
   Remove-Item -Recurse -Force $base
@@ -72,7 +72,8 @@ $tableLongue = "$root\tables\Le très long titre d’une table imaginaire pour v
 Push-Location $wt
 try { & $electron docs\demo-moments.cjs $root 2>&1 | ForEach-Object { "   $_" } } finally { Pop-Location }
 if ($LASTEXITCODE -ne 0) { throw 'Génération des médias en échec.' }
-New-Item -ItemType Junction -Path "$root\emulators" -Target "$Source\emulators" | Out-Null
+# VPX « installé » (fausse installation, New-FauxVpx) : les parties sont simulées ou refusées hors écran.
+New-FauxVpx $root
 
 # Sortie audio du fronton : la première sortie active du poste (lecture seule du registre),
 # pour que la musique soit envoyée sur une vraie sortie (setSinkId), muette hors écran.

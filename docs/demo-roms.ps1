@@ -18,7 +18,6 @@ param(
   [switch]$Run,
   [switch]$Terminator2,
   [string]$Rom = 'D:\CyberPinball\tables\Terminator 2\pinmame\roms\t2_l8.zip',
-  [string]$Emulators = 'D:\CyberPinball\emulators',
   [string]$Cabinet = 'D:\CyberPinball\data\cabinet.json',
   [string]$Ecrans = 'pc-dev'
 )
@@ -36,7 +35,8 @@ if (Test-Path $base) {
 }
 $root = "$base\root"; $home_ = "$base\home"
 New-Item -ItemType Directory -Force "$root\tables", "$root\import", $home_ | Out-Null
-New-Item -ItemType Junction -Path "$root\emulators" -Target $Emulators | Out-Null
+# VPX « installé » : une fausse installation (New-FauxVpx), jamais les vrais émulateurs.
+New-FauxVpx $root
 if (Test-Path $Cabinet) { Copy-ModeleBorne $Cabinet $home_ | Out-Null }
 
 $old = [datetime]::new(2024, 3, 1, 12, 0, 0, [DateTimeKind]::Utc)
@@ -82,7 +82,7 @@ if ($Terminator2) {
   foreach ($ordre in 'medecin', 'import') {
     $root = "$base\$ordre\root"; $home_ = "$base\$ordre\home"; $scripts = @{}
     New-Item -ItemType Directory -Force "$root\tables", "$root\import", "$root\pinmame\roms", $home_ | Out-Null
-    New-Item -ItemType Junction -Path "$root\emulators" -Target $Emulators | Out-Null
+    New-FauxVpx $root
     if (Test-Path $Cabinet) { Copy-ModeleBorne $Cabinet $home_ | Out-Null }
     # Terminator 2 telle qu'un ancien import l'a laissée : les puces de la ROM à la racine de la
     # table, à côté de ce qui doit y rester (réglages, journal de sons, enregistrement, cache).

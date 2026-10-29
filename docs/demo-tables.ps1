@@ -7,7 +7,9 @@
 # Hors écran par défaut, sur les écrans simulés de docs\ecrans\<Ecrans>.json (-Ecrans) ;
 # $env:CYBERPINBALL_A_L_ECRAN = '1' pour les vrais écrans du poste (docs\hors-ecran.ps1).
 # Hors écran, « Jouer » montre le refus (une partie de VPX nécessite les écrans du poste) ;
-# à l'écran, la partie se déroule et le menu revient.
+# à l'écran, la partie se déroule et le menu revient. Les racines ont une fausse installation
+# de VPX (New-FauxVpx) ; à l'écran seulement, le temps de la partie, celle de l'ajout voit les
+# vrais émulateurs par une jonction, retirée aussitôt (Remove-JonctionsSortantes).
 param(
   [switch]$Run,
   # Table de test : deux .vpx de Terminator 2, deux .directb2s, pinmame\roms\t2_l8.zip, crash.txt.
@@ -25,7 +27,8 @@ Use-HorsEcran $Ecrans
 $src = $Table
 $base = "$wt\tmp\demo-tables"
 
-# Nettoyage : d'abord les jonctions (sans /s, pour ne jamais descendre dans les émulateurs).
+# Nettoyage : d'abord les jonctions d'une racine d'avant le 29/10/2026 ou d'une partie
+# interrompue (sans /s, pour ne jamais descendre dans les émulateurs).
 if (Test-Path $base) {
   Get-ChildItem -Directory -Recurse -Depth 2 $base -Attributes ReparsePoint | ForEach-Object { cmd /c rmdir "$($_.FullName)" }
   Remove-Item -Recurse -Force $base
@@ -34,7 +37,7 @@ if (Test-Path $base) {
 function New-Root($name) {
   $root = "$base\$name\root"; $data = "$base\$name\home"
   New-Item -ItemType Directory -Force "$root\tables", "$root\import", $data | Out-Null
-  New-Item -ItemType Junction -Path "$root\emulators" -Target $Emulators | Out-Null
+  New-FauxVpx $root
   Copy-ModeleBorne $Cabinet $data | Out-Null
   return $root
 }
@@ -92,9 +95,20 @@ Invoke-Autopilot 'medecin' @(
   'Digit1', 'Escape', 'Escape'                                                # rangée dans son dossier, ROM absente
 )
 # Jouer depuis la fiche : la partie puis le retour au menu, ou, hors écran, le refus (Start : menu).
-$jouer = if ($env:CYBERPINBALL_A_L_ECRAN -eq '1') { @('Digit1', 'Digit1', 'wait:30000') } else { @('Digit1', 'Digit1', 'Digit1') }
-Invoke-Autopilot 'ajout' (@(
-  'Digit1', 'click:.lib-action:first-child', 'Digit1',                        # aucune table, import, plan, installer
-  'ShiftRight', 'Digit1', 'Escape',                                           # fiche, menu
-  "drop:$pack\1492939964_Terminator2(Williams1991)g5kv1.0.directb2s", 'Escape'  # glisser-déposer : remplacement proposé, annulé
-) + $jouer)
+$aLEcran = $env:CYBERPINBALL_A_L_ECRAN -eq '1'
+$jouer = if ($aLEcran) { @('Digit1', 'Digit1', 'wait:30000') } else { @('Digit1', 'Digit1', 'Digit1') }
+if ($aLEcran) {
+  # La vraie partie a besoin du vrai VPX : la fausse installation cède la place à une jonction.
+  Remove-Item -Recurse -Force "$a\emulators"
+  New-Item -ItemType Junction -Path "$a\emulators" -Target $Emulators | Out-Null
+}
+try {
+  Invoke-Autopilot 'ajout' (@(
+    'Digit1', 'click:.lib-action:first-child', 'Digit1',                        # aucune table, import, plan, installer
+    'ShiftRight', 'Digit1', 'Escape',                                           # fiche, menu
+    "drop:$pack\1492939964_Terminator2(Williams1991)g5kv1.0.directb2s", 'Escape'  # glisser-déposer : remplacement proposé, annulé
+  ) + $jouer)
+} finally {
+  # À l'écran, Enter-BureauCache ne passe pas : la jonction est retirée ici.
+  Remove-JonctionsSortantes
+}

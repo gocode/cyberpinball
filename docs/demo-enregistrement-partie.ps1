@@ -71,7 +71,7 @@ $scenes = [ordered]@{
   }
 }
 
-# Nettoyage : d'abord la jonction des émulateurs (sans /s, pour ne jamais y descendre).
+# Nettoyage : d'abord les jonctions d'une racine d'avant le 29/10/2026 (sans /s, pour ne jamais y descendre).
 if (Test-Path $base) {
   Get-ChildItem -Directory -Recurse -Depth 3 $base -Attributes ReparsePoint | ForEach-Object { cmd /c rmdir "$($_.FullName)" }
   # Par Node : la table au titre très long dépasse les 260 caractères que Remove-Item sait atteindre.
@@ -92,7 +92,8 @@ foreach ($name in $Scenarios) {
   Push-Location $wt
   try { & $electron docs\demo-moments.cjs $root 2>&1 | Out-Null } finally { Pop-Location }
   if ($LASTEXITCODE -ne 0) { throw 'Génération des médias en échec.' }
-  New-Item -ItemType Junction -Path "$root\emulators" -Target "$Source\emulators" | Out-Null
+  # VPX « installé » (fausse installation, New-FauxVpx) : la partie est simulée.
+  New-FauxVpx $root
   Copy-Item "$Source\config\VPinballX.ini" "$home_\sandbox\VPinballX.ini"
   $model = Get-ModeleBorne "$Source\data\cabinet.json"
   $model.vpx.iniPath = "$home_\sandbox\VPinballX.ini"

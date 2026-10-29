@@ -1,116 +1,116 @@
 # Cyber Pinball
 
-**Un frontend libre pour borne de flipper virtuel. Décrivez votre borne une fois : Cyber Pinball règle tout le reste, tout se pilote aux boutons des flippers, et l'on joue en ligne avec les bornes de ses amis.**
+**Un frontend libre pour borne de flipper virtuel. Vous décrivez votre borne une fois, Cyber Pinball règle tout le reste. Tout se commande avec les boutons des flippers, et vous jouez en ligne avec les bornes de vos amis.**
 
 [English](README.md) · [Télécharger](https://github.com/gocode/cyberpinball/releases) · [Manuel technique](docs/manuel.md) · [Nouveautés](CHANGELOG.md)
 
-<p align="center"><img src="docs/images/fr/cabinet.webp?v=9f776b3256" width="900" alt="Le menu des tables sur une borne à quatre écrans : l'écran du playfield, remis debout, avec le plateau de la table choisie, la roue des médaillons ronds des tables et les commandes ; à côté, le topper, le fronton et l'afficheur DMD du même jeu, Neon Abyss."></p>
+<p align="center"><img src="docs/images/fr/cabinet.webp?v=9f776b3256" width="900" alt="Le menu des tables sur une borne à quatre écrans. Sur le playfield, montré à la verticale : le plateau de la table sélectionnée, la roue de médaillons ronds et les commandes. À côté, le topper, le fronton et le DMD du même jeu, Neon Abyss."></p>
 
 <p align="center"><sub>Les tables présentées sont fictives.</sub></p>
 
-Cyber Pinball fait d'un PC rempli de tables Visual Pinball X une vraie borne d'arcade : une roue des tables digne de la machine, chaque écran de la borne utilisé, et ni clavier, ni souris, ni fichier `.ini` en vue. Il écrit et tient à jour la configuration de tous les composants à votre place (VPX, fronton, PuP-Packs et DMD, position des écrans, sorties audio, touches), trouve ce qu'il manque à une table avant qu'on puisse y jouer, rassemble ses médias depuis les sites de la communauté, et relie votre borne à celles de vos amis pour partager des tables et jouer ensemble en direct, sans aucun serveur entre elles.
+Cyber Pinball transforme un PC rempli de tables Visual Pinball X en véritable borne d'arcade. La roue de sélection a l'allure d'une vraie machine, tous les écrans de la borne servent, et vous n'avez plus jamais besoin d'un clavier, d'une souris ou d'un fichier `.ini`. Cyber Pinball configure lui-même chaque composant et garde ces réglages à jour : VPX, fronton, PuP-Packs et DMD, emplacement des écrans, sorties audio, touches. Il repère ce qui manque à une table avant que vous puissiez y jouer et va chercher ses médias sur les sites de la communauté. Il relie aussi votre borne à celles de vos amis : vous échangez des tables et jouez ensemble en direct, sans le moindre serveur entre vous.
 
-> **État : premier prototype (0.1.x).** Windows seulement, pensé pour Visual Pinball X 10.8.1 en mode plugins. Tout n'est pas encore poli : sauvegardez vos tables avant d'essayer.
+> **Statut : premier prototype (0.1.x).** Windows uniquement, conçu pour Visual Pinball X 10.8.1 en mode plugins. Il reste des angles à arrondir : sauvegardez vos tables avant de l'essayer.
 
 ## Points forts
 
-- **[Jouer entre amis, de borne à borne](#jouer-entre-amis-de-borne-à-borne)** : des parties en ligne jusqu'à quatre bornes, tables et médias partagés, qui joue et sur quelle table. Sans serveur, sans compte.
-- **[Réglée depuis la borne elle-même](#réglée-depuis-la-borne-elle-même)** : un assistant mené aux boutons des flippers, des écrans reconnus à leur empreinte matérielle, et rien ne casse quand Windows les renumérote.
-- **[Un menu digne d'une vraie borne](#un-menu-digne-dune-vraie-borne)** : roue de médaillons, DMD vivant, lancement cinématique, sons de la machine, et jamais un coin de bureau Windows.
-- **[De l'envie d'une table à la partie](#de-lenvie-dune-table-à-la-partie)** : le catalogue VPS, un chemin guidé « Ce qu'il manque pour jouer », un médecin des tables, chaque fichier téléchargé rangé à sa place.
-- **[Des médias de partout, choisis par vous](#des-médias-de-partout-choisis-par-vous)** : des galeries de ce que propose chaque site, un navigateur intégré, et vos propres parties filmées pour la roue.
-- **[Une borne qui veille sur elle-même](#une-borne-qui-veille-sur-elle-même)** : un bilan de santé, des mises à jour signées, des horaires de nuit, un mode invité pour les soirées.
+- **[Jouer entre amis, de borne à borne](#jouer-entre-amis-de-borne-à-borne)** : des parties en ligne jusqu'à quatre bornes, des tables et des médias qui s'échangent, et vous voyez qui joue à quoi. Sans serveur ni compte.
+- **[Tout se règle depuis la borne](#tout-se-règle-depuis-la-borne)** : un assistant qui se suit aux boutons des flippers. Les écrans sont reconnus à leur empreinte matérielle, si bien que rien ne casse quand Windows les renumérote.
+- **[Un menu digne d'une vraie borne](#un-menu-digne-dune-vraie-borne)** : une roue de médaillons, un DMD animé, un lancement façon cinéma, les bruits de la machine, et jamais le moindre bout de bureau Windows.
+- **[De la table repérée à la première partie](#de-la-table-repérée-à-la-première-partie)** : le catalogue VPS, un parcours guidé « Ce qu'il manque pour jouer », un médecin des tables, et chaque fichier téléchargé rangé au bon endroit.
+- **[Les médias de votre choix, d'où qu'ils viennent](#les-médias-de-votre-choix-doù-quils-viennent)** : pour chaque média, tout ce que proposent les sites, un navigateur intégré, et vos propres parties filmées pour présenter les tables sur la roue.
+- **[Une borne qui s'entretient toute seule](#une-borne-qui-sentretient-toute-seule)** : un bilan de santé, des mises à jour signées, des horaires pour la nuit, un mode invité pour les soirées.
 
 ## Jouer entre amis, de borne à borne
 
-<p align="center"><img src="docs/images/fr/live-game.webp?v=57b0ba496a" width="760" alt="Une partie en direct entre bornes : à gauche, l'invitation de Bruno s'ouvre d'elle-même sur cette borne, sur Atlas Rising ; à droite, le départ commun, un compte à rebours avec les deux joueurs prêts, avant que la table démarre sur toutes les bornes à la fois."></p>
+<p align="center"><img src="docs/images/fr/live-game.webp?v=57b0ba496a" width="760" alt="Une partie en direct entre bornes. À gauche, l'invitation de Bruno pour Atlas Rising s'affiche toute seule sur cette borne. À droite, le départ commun : un compte à rebours, les deux joueurs prêts, juste avant que la table démarre sur toutes les bornes en même temps."></p>
 
-Votre borne n'est plus une île. Cyber Pinball relie les bornes directement entre elles, par Internet ou par le réseau local, sans compte à créer et sans aucun serveur entre elles.
+Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bornes, par Internet ou sur le réseau local : pas de compte à créer, pas de serveur au milieu.
 
-- **Des parties en ligne, en direct.** Invitez jusqu'à trois amis sur la même table : l'invitation s'ouvre sur leur borne, la version de la table est vérifiée, un compte à rebours commun lance la partie sur toutes les bornes à la fois, puis chacun voit les résultats côte à côte.
-- **Qui joue, en ce moment.** Vos amis en ligne, la table sur laquelle ils sont, leurs derniers records et leurs badges, avec de petites notifications sur la roue, jamais pendant une partie.
-- **Des tables et des médias partagés.** Parcourez la bibliothèque d'un ami : les tables que vous n'avez pas, les médias qui vous manquent. Récupérez une table entière, ou partie par partie (table, fronton, sons, médias), sa version et la vôtre côte à côte. Tout est vérifié à l'arrivée et montré dans le plan d'ajout avant la moindre installation ; ROM et PuP-Pack sont décochés par défaut.
-- **Trouver des joueurs.** Cherchez un joueur par son nom dans un annuaire que les bornes se transmettent, ou trouvez les bornes autour de vous sur le réseau local, même sans Internet. Envoyez une demande d'ami ; il accepte de son côté.
-- **Votre borne, vos règles.** Sauvegardes, fichiers de records et programmes ne quittent jamais votre borne. Le partage est activé par défaut et se coupe à un seul endroit, « Partage et réseau », qui montre aussi ce que voient les autres bornes. Construit sur Hyperswarm de [Holepunch](https://holepunch.to).
+- **Des parties en direct, en ligne.** Invitez jusqu'à trois amis sur une table. L'invitation s'affiche sur leur borne, Cyber Pinball vérifie que tout le monde a la même version de la table, puis un compte à rebours commun lance la partie partout en même temps. À la fin, les scores de chacun s'affichent côte à côte.
+- **Savoir qui joue.** Vous voyez quels amis sont en ligne, sur quelle table ils jouent, leurs derniers records et leurs badges. De petites notifications apparaissent sur la roue, jamais pendant une partie.
+- **Compléter sa collection chez un ami.** Parcourez la bibliothèque d'un ami pour y repérer les tables que vous n'avez pas et les médias qui vous manquent. Récupérez une table complète ou seulement certaines de ses parties (table, fronton, sons, médias), en comparant sa version et la vôtre. Tout est vérifié à la réception, et vous voyez exactement ce qui va être ajouté avant la moindre installation ; la ROM et le PuP-Pack sont décochés par défaut.
+- **Trouver des partenaires de jeu.** Cherchez un joueur par son nom dans un annuaire que les bornes se transmettent entre elles, ou repérez les bornes voisines sur le réseau local, même sans Internet. Envoyez-lui une demande d'ami : il n'a plus qu'à l'accepter.
+- **Chez vous, c'est vous qui décidez.** Vos sauvegardes, vos fichiers de records et vos programmes ne quittent jamais votre borne. Le partage est activé par défaut et se coupe à un seul endroit, « Partage et réseau », qui montre aussi ce que les autres bornes peuvent voir. Le tout repose sur Hyperswarm, de [Holepunch](https://holepunch.to).
 
-<p align="center"><img src="docs/images/fr/friends.webp?v=8a30474698" width="760" alt="Mes amis : Bruno est en ligne et joue à Star Courier, avec son nouveau record à l'instant, et Émile est hors ligne ; à côté, la page de Bruno, ses derniers événements et Voir sa bibliothèque."></p>
+<p align="center"><img src="docs/images/fr/friends.webp?v=8a30474698" width="760" alt="Mes amis : Bruno est en ligne sur Star Courier et vient de battre son record, Émile est hors ligne. À côté, la page de Bruno, avec ses derniers événements et le bouton Voir sa bibliothèque."></p>
 
-<p align="center"><img src="docs/images/fr/friends-library.webp?v=2a1884157c" width="760" alt="La bibliothèque de Bruno : les tables communes aux deux bornes et celle que cette borne n'a pas, Glass Lagoon, avec ses médias et Récupérer toute la table."></p>
+<p align="center"><img src="docs/images/fr/friends-library.webp?v=2a1884157c" width="760" alt="La bibliothèque de Bruno : les tables que les deux bornes ont en commun, et Glass Lagoon, que cette borne n'a pas encore, avec ses médias et le bouton Récupérer toute la table."></p>
 
-## Réglée depuis la borne elle-même
+## Tout se règle depuis la borne
 
-<p align="center"><img src="docs/images/fr/wizard.webp?v=03329ccd70" width="900" alt="L'assistant de configuration, étape des écrans et de leurs rôles : chacun des quatre écrans affiche son numéro, et l'écran du playfield demande « Playfield ? » avec les indications des flippers et de Start."></p>
+<p align="center"><img src="docs/images/fr/wizard.webp?v=03329ccd70" width="900" alt="L'assistant de configuration, à l'étape des écrans et de leurs rôles : chacun des quatre écrans affiche son numéro, et celui du playfield demande « Playfield ? », avec les consignes pour les flippers et Start."></p>
 
-- **Un assistant qu'on suit debout aux flippers.** Boutons (encodeur clavier, manette ou Pinscape KL25Z), lanceur analogique, accéléromètre et plomb de tilt, écrans, sens et diagonale du playfield, sorties audio : chaque étape se répond avec les boutons de la borne.
-- **Des écrans reconnus, pas numérotés.** Chaque écran est identifié par son empreinte EDID, et `VPinballX.ini` est réécrit à chaque démarrage. Changez un écran, réveillez-les dans un autre ordre, laissez Windows tout renuméroter : le playfield reste le playfield.
-- **Le son là où il doit être.** Une étape joue un son sur chaque sortie, fait choisir celles du fronton et du playfield, et teste chaque haut-parleur d'une carte 5.1 ou 7.1. Le menu, sa musique et chaque vidéo passent par les haut-parleurs de la borne.
-- **Plusieurs configurations, une seule installation.** La même installation sert une borne et un PC de bureau : la configuration branchée est reconnue toute seule, chacune avec ses écrans, son son, ses boutons et son `VPinballX.ini`.
-- **Les réglages de VPX sans le `.ini`.** Tous les réglages de VPX, lus dans son propre code source, se modifient pour toutes les tables ou table par table. Le cadrage et la position du fronton, du DMD et du topper se règlent sur la table lancée, depuis le menu de VPX.
+- **Un assistant qui se suit debout, aux flippers.** Boutons (encodeur clavier, manette ou Pinscape KL25Z), lanceur analogique, accéléromètre et plomb de tilt, écrans, orientation et diagonale du playfield, sorties audio : à chaque étape, on répond avec les boutons de la borne.
+- **Des écrans reconnus, pas simplement numérotés.** Chaque écran est identifié par son empreinte EDID, et `VPinballX.ini` est réécrit à chaque démarrage. Vous pouvez remplacer un écran, les allumer dans un autre ordre ou laisser Windows tout renuméroter : le playfield reste le playfield.
+- **Chaque son au bon endroit.** Une étape joue un son sur chaque sortie pour vous faire choisir celle du fronton et celle du playfield, puis teste un à un les haut-parleurs d'une carte 5.1 ou 7.1. Le menu, sa musique et toutes les vidéos sortent sur les haut-parleurs de la borne.
+- **Une seule installation, plusieurs configurations.** La même installation peut servir à la borne et à un PC de bureau. Cyber Pinball reconnaît tout seul la configuration branchée, chacune avec ses écrans, son son, ses boutons et son `VPinballX.ini`.
+- **Les réglages de VPX sans toucher au `.ini`.** Tous les réglages de VPX, repris de son code source, se modifient pour l'ensemble des tables ou table par table. Le cadrage et l'emplacement du fronton, du DMD et du topper se règlent pendant la partie, depuis le menu de VPX.
 
-<p align="center"><img src="docs/images/fr/vpx-settings.webp?v=72eca11b71" width="760" alt="L'écran des réglages de VPX : l'onglet Essentiels avec la vue de la table et le son, les valeurs gérées par Cyber Pinball, et la description du réglage choisi."></p>
+<p align="center"><img src="docs/images/fr/vpx-settings.webp?v=72eca11b71" width="760" alt="L'écran des réglages de VPX : l'onglet Essentiels, avec la vue de la table et le son, les valeurs gérées par Cyber Pinball et l'explication du réglage sélectionné."></p>
 
 ## Un menu digne d'une vraie borne
 
-<p align="center"><img src="docs/images/fr/launch.webp?v=eddb60de91" width="900" alt="Animation du lancement sur une borne à quatre écrans : au Start, le logo de Neon Abyss s'allume sur le plateau, file vers le haut à travers le DMD et se pose sur le fronton, puis les écrans s'effacent quand Visual Pinball X prend la main."></p>
+<p align="center"><img src="docs/images/fr/launch.webp?v=eddb60de91" width="900" alt="Le lancement animé d'une table sur une borne à quatre écrans : au Start, le logo de Neon Abyss s'allume sur le plateau, monte en traversant le DMD et vient se poser sur le fronton, puis les écrans s'effacent quand Visual Pinball X prend le relais."></p>
 
-- **Une roue de médaillons** sur la vidéo du plateau de la table, une fenêtre par écran de la borne : le topper, le fronton et le DMD suivent le jeu choisi.
-- **Un DMD vivant.** Cyber Pinball dessine l'afficheur lui-même, avec sa propre police à points : le titre, PRESS START, les crédits, l'horloge et les records, dans la couleur de votre choix.
-- **Un lancement cinématique.** Au Start, le logo du jeu vole du playfield vers le fronton, le DMD montre le chargement, et un coup de bobine sonne quand VPX prend la main. VPX n'attend jamais le spectacle.
-- **Les sons de la machine.** Un clic de solénoïde au changement de table, une pièce au Start, le knocker quand un record tombe ; et la musique de chaque jeu sur la roue.
-- **Jamais d'écran blanc, jamais le bureau.** Du démarrage à la fin d'une partie et retour, chaque écran reste couvert ; Ctrl+Maj+D les libère tous quand vous voulez retrouver Windows.
-- **Sur un PC de bureau aussi.** Le playfield dans un cadre 9:16, la roue et le jeu à côté, le fronton sur un second écran si vous en avez un.
+- **Une roue de médaillons** posée sur la vidéo du plateau, et une fenêtre pour chaque écran de la borne : le topper, le fronton et le DMD suivent le jeu sélectionné.
+- **Un DMD bien vivant.** Cyber Pinball dessine lui-même l'afficheur, avec sa propre police à points : le titre, PRESS START, les crédits, l'heure et les records défilent dans la couleur de votre choix.
+- **Un lancement de cinéma.** Au Start, le logo du jeu s'envole du playfield jusqu'au fronton, le DMD affiche le chargement, et un coup de bobine retentit quand VPX prend le relais. Le spectacle ne retarde jamais VPX.
+- **Les bruits de la machine.** Un clac de solénoïde quand vous changez de table, une pièce au Start, le knocker quand un record tombe, et la musique de chaque jeu sur la roue.
+- **Ni écran blanc, ni bureau.** Du démarrage à la fin d'une partie, retour au menu compris, tous les écrans restent couverts. Ctrl+Maj+D les libère quand vous voulez retrouver Windows.
+- **Aussi sur un PC de bureau.** Le playfield s'affiche dans un cadre 9:16 avec la roue et le jeu à côté, et le fronton passe sur un second écran si vous en avez un.
 
-<p align="center"><img src="docs/images/fr/live-dmd.webp?v=7a6e43e169" width="760" alt="Le DMD vivant du menu, dessiné par Cyber Pinball : tour à tour le titre du jeu, PRESS START, le meilleur score et l'horloge."></p>
+<p align="center"><img src="docs/images/fr/live-dmd.webp?v=7a6e43e169" width="760" alt="Le DMD du menu, dessiné par Cyber Pinball, qui fait défiler le titre du jeu, PRESS START, le meilleur score et l'heure."></p>
 
-<p align="center"><img src="docs/images/fr/desktop.webp?v=eccb3b9ce0" width="900" alt="Le menu des tables sur un PC de bureau : le plateau de Neon Abyss dans un cadre 9:16 debout à gauche ; à droite son fronton, la roue des médaillons (Copper Comet, Lunar Diner, Midnight Circuit, Neon Abyss, Star Courier, Thunder Reef, Atlas Rising) et le bandeau du titre."></p>
+<p align="center"><img src="docs/images/fr/desktop.webp?v=eccb3b9ce0" width="900" alt="Le menu des tables sur un PC de bureau : à gauche, le plateau de Neon Abyss dans un cadre 9:16 vertical ; à droite, son fronton, la roue de médaillons (Copper Comet, Lunar Diner, Midnight Circuit, Neon Abyss, Star Courier, Thunder Reef, Atlas Rising) et le bandeau du titre."></p>
 
-## De l'envie d'une table à la partie
+## De la table repérée à la première partie
 
-<p align="center"><img src="docs/images/fr/missing-to-play.webp?v=265baffecb" width="760" alt="Ce qu'il manque pour jouer, pour Neon Abyss : à gauche, étape 3 sur 4, la ROM reste à faire et le geste conseillé est de la récupérer sur vpforums.org, ou de jouer avec une révision voisine déjà sur la borne ; à droite, une fois la ROM installée, Tout est prêt pour jouer, avec Jouer en première action."></p>
+<p align="center"><img src="docs/images/fr/missing-to-play.webp?v=265baffecb" width="760" alt="Ce qu'il manque pour jouer à Neon Abyss. À gauche, l'étape 3 sur 4 : il reste la ROM, et Cyber Pinball conseille de la récupérer sur vpforums.org, ou de jouer avec une révision proche déjà présente sur la borne. À droite, une fois la ROM installée : Tout est prêt pour jouer, avec Jouer comme première action."></p>
 
-- **« Ajouter une table » réunit toutes les entrées.** Un dossier d'import, une clé USB, le PC, votre dossier Téléchargements ou le catalogue du [Virtual Pinball Spreadsheet](https://github.com/VirtualPinballSpreadsheet/vps-db) : chaque jeu, ses versions et ce qu'il manque encore à cette borne pour y jouer. Chaque table est nommée d'après cette base.
-- **« Ce qu'il manque pour jouer ».** Un chemin pas à pas, d'une ROM ou d'un fronton manquant jusqu'à la bonne page de téléchargement, puis l'installation de ce que vous avez récupéré, jusqu'à « Jouer ». Seuls la table et sa ROM sont indispensables ; le reste est proposé en plus.
-- **Chaque fichier va à sa place.** Un fichier téléchargé est reconnu à son contenu (table, fronton, ROM, PuP-Pack, couleurs du DMD, sons, musique…) et rangé dans cette partie du jeu, même quand on attendait autre chose. Les « Parties du jeu » d'une table permettent d'ajouter, remplacer, réaffecter ou retirer chaque partie.
-- **Un médecin des tables.** « Diagnostiquer et réparer » explique en mots simples pourquoi une table ne marche pas, et répare ce qu'il peut : une ROM dans le mauvais dossier, un PuP-Pack que son script laisse éteint, un fronton sur le mauvais écran.
-- **Une bibliothèque de ROM partagée.** Chaque ROM rangée une seule fois, liée physiquement dans chaque table qui l'utilise.
-- **Des PuP-Packs qui marchent.** L'option du pack est choisie d'après vos écrans, le pack est vérifié avant chaque partie, et les problèmes connus des packs (images sous un nom de vidéo, noms de fichiers accentués, vidéos déclenchées par le DMD) sont corrigés pour tous les packs.
-- **Des téléchargements qui reprennent** le lendemain si la connexion tombe, et vous ramènent d'un geste à l'écran d'où vous êtes parti. Cyber Pinball ne télécharge jamais de tables ni de ROM à votre place : vous choisissez, sur les sites de leurs auteurs.
+- **« Ajouter une table » regroupe toutes les sources.** Un dossier d'import, une clé USB, le PC, votre dossier Téléchargements ou le catalogue du [Virtual Pinball Spreadsheet](https://github.com/VirtualPinballSpreadsheet/vps-db) : pour chaque jeu, vous voyez ses versions et ce qui manque encore à votre borne pour y jouer. Les tables portent le nom que leur donne cette base.
+- **« Ce qu'il manque pour jouer ».** Un parcours pas à pas : d'une ROM ou d'un fronton manquant jusqu'à la bonne page de téléchargement, puis l'installation de ce que vous avez récupéré, et enfin « Jouer ». Seules la table et sa ROM sont indispensables ; le reste est proposé en bonus.
+- **Chaque fichier trouve sa place.** Cyber Pinball reconnaît un fichier téléchargé à son contenu (table, fronton, ROM, PuP-Pack, couleurs du DMD, sons, musique…) et le range dans la bonne partie du jeu, même si vous attendiez autre chose. Depuis les « Parties du jeu » d'une table, vous pouvez ajouter, remplacer, réaffecter ou retirer chacune d'elles.
+- **Un médecin des tables.** « Diagnostiquer et réparer » explique simplement pourquoi une table ne fonctionne pas et répare ce qui peut l'être : une ROM dans le mauvais dossier, un PuP-Pack que le script de la table laisse éteint, un fronton sur le mauvais écran.
+- **Une seule bibliothèque de ROM.** Chaque ROM n'est stockée qu'une fois, puis liée physiquement dans chaque table qui en a besoin.
+- **Des PuP-Packs qui fonctionnent.** L'option du pack est choisie en fonction de vos écrans, le pack est vérifié avant chaque partie, et ses défauts connus (images enregistrées sous un nom de vidéo, noms de fichiers accentués, vidéos déclenchées par le DMD) sont corrigés, quel que soit le pack.
+- **Des téléchargements qui reprennent** le lendemain si la connexion coupe, et qui vous ramènent d'un geste à l'écran d'où vous étiez parti. Cyber Pinball ne télécharge jamais de tables ni de ROM de lui-même : c'est vous qui choisissez, sur les sites de leurs auteurs.
 
-## Des médias de partout, choisis par vous
+## Les médias de votre choix, d'où qu'ils viennent
 
 <p align="center">
   <img src="docs/images/fr/game-page.webp?v=c9bc2367a6" width="360" alt="La fiche du jeu Neon Abyss : statistiques de jeu, fichiers, et les actions Jouer, Prospectus, Règles, Modifier les informations, Médias du jeu, Réglages de cette table, Diagnostiquer et réparer, Retirer la table.">
-  <img src="docs/images/fr/game-media.webp?v=0804b74ab4" width="360" alt="L'écran Médias du jeu de Neon Abyss : chaque média avec son aperçu, l'endroit où le menu le montre et son rôle (logo de la roue, plateau, fronton, DMD…), et les actions Chercher les médias et Chercher sur le web.">
+  <img src="docs/images/fr/game-media.webp?v=0804b74ab4" width="360" alt="L'écran Médias du jeu de Neon Abyss : chaque média avec son aperçu, l'endroit où le menu l'affiche et son rôle (logo de la roue, plateau, fronton, DMD…), et les actions Chercher les médias et Chercher sur le web.">
 </p>
 
-- **Chaque média, côte à côte.** Logo de la roue, vidéo du plateau, fronton, DMD, topper, vidéo de chargement, musique, prospectus et règles : « Médias du jeu » montre ce qu'est chacun, où le menu l'utilise, et permet de le remplacer.
-- **Des galeries, pas des devinettes.** Chaque média liste ce que proposent [VPinMediaDB](https://github.com/superhac/vpinmediadb), VPForums et VPUniverse, avec aperçus, nombre de téléchargements, notes, auteurs et dates ; vous choisissez, et c'est le fichier choisi qui est enregistré. Les sites à compte s'utilisent avec votre propre compte gratuit ; leurs attentes sont mises en file pour vous.
-- **Un navigateur intégré** sur chaque écran d'ajout ou de choix, la recherche déjà remplie. Une page YouTube ou Vimeo ? « Récupérer le son » ou « Récupérer la vidéo », coupé et attribué d'un seul geste.
-- **Jouer et enregistrer.** Depuis la fiche d'une table, Cyber Pinball filme votre partie ; de retour au menu, la vidéo peut devenir la présentation de la table sur la roue.
-- **Jamais de roue vide.** Quand un média manque, un remplaçant est dessiné aux couleurs de la table. Vous avez déjà des médias d'un autre frontend ? Importez-les.
+- **Tous les médias d'un jeu, d'un coup d'œil.** Logo de la roue, vidéo du plateau, fronton, DMD, topper, vidéo de chargement, musique, prospectus et règles : « Médias du jeu » montre chacun d'eux, indique où le menu s'en sert et permet de le remplacer.
+- **Choisir sur pièces.** Pour chaque média, vous voyez tout ce que proposent [VPinMediaDB](https://github.com/superhac/vpinmediadb), VPForums et VPUniverse, avec aperçus, nombre de téléchargements, notes, auteurs et dates. Vous choisissez, et c'est bien ce fichier-là qui est enregistré. Les sites qui demandent un compte s'utilisent avec le vôtre, gratuit ; quand ils imposent un délai entre deux téléchargements, Cyber Pinball met les vôtres en file d'attente.
+- **Un navigateur intégré** sur chaque écran d'ajout ou de choix, avec la recherche déjà saisie. Vous tombez sur une page YouTube ou Vimeo ? « Récupérer le son » ou « Récupérer la vidéo » : l'extrait est découpé et attribué à la table en un seul geste.
+- **Jouer et enregistrer.** Depuis la fiche d'une table, Cyber Pinball filme votre partie ; de retour au menu, cette vidéo peut devenir la présentation de la table sur la roue.
+- **Jamais de roue vide.** Quand un média manque, Cyber Pinball dessine un remplaçant aux couleurs de la table. Vous avez déjà des médias venant d'un autre frontend ? Importez-les.
 
-## Une borne qui veille sur elle-même
+## Une borne qui s'entretient toute seule
 
 <p align="center">
-  <img src="docs/images/fr/health.webp?v=65df0dccb2" width="360" alt="Santé de la borne : 1 point bloquant, 2 à vérifier, 3 OK. Espace disque correct, Midnight Circuit ne démarre pas faute de sa ROM (ligne choisie, avec Ouvrir le médecin de la table), VPinMediaDB a des médias pour 2 tables, la borne du salon est reconnue avec ses 4 écrans, et une version plus récente de VPX peut être installée.">
-  <img src="docs/images/fr/update.webp?v=1d61b1b143" width="360" alt="Une mise à jour est disponible : Cyber Pinball 0.2.0, sa date de sortie, ses nouveautés, la taille de l'installeur signé, et les boutons Mettre à jour maintenant et Plus tard.">
+  <img src="docs/images/fr/health.webp?v=65df0dccb2" width="360" alt="Santé de la borne : 1 point bloquant, 2 à vérifier, 3 OK. L'espace disque suffit ; Midnight Circuit ne démarre pas faute de ROM (ligne sélectionnée, avec Ouvrir le médecin de la table) ; VPinMediaDB a des médias pour 2 tables ; la borne du salon est reconnue avec ses 4 écrans ; une version plus récente de VPX peut être installée.">
+  <img src="docs/images/fr/update.webp?v=1d61b1b143" width="360" alt="Une mise à jour est disponible : Cyber Pinball 0.2.0, avec sa date de sortie, ses nouveautés, la taille de l'installeur signé, et les boutons Mettre à jour maintenant et Plus tard.">
 </p>
 
-- **Santé de la borne.** Espace disque, tables qui ne démarrent pas, médias manquants, écrans et version de VPX sur un seul écran, chacun avec sa réparation.
-- **Des mises à jour signées, depuis la borne.** Une pastille rouge sur la roue dentée quand une version sort ; les nouveautés dans votre langue ; un bouton l'installe. Chaque version est signée, et la borne refuse tout ce qui ne porte pas la signature de l'éditeur. Tables, médias et réglages sont conservés.
-- **Des horaires d'arcade.** La nuit, la borne baisse ses écrans et se tait, puis se met en veille ou s'éteint à l'heure choisie si personne ne joue, après un avertissement que n'importe quel bouton annule.
-- **Un mode invité** pour une soirée ou les enfants : les invités choisissent une table, jouent et lisent sa fiche, rien d'autre ; les deux flippers et les deux MagnaSave tenus le déverrouillent.
-- **Une borne dédiée.** Si vous le souhaitez, Cyber Pinball remplace l'interface de Windows, avec un moyen de la retrouver ; éteindre, redémarrer et mettre en veille depuis le menu, chaque écran noir jusqu'au bout.
-- **Le bureau rendu tel qu'il était.** L'écran du playfield n'est tourné que pendant que Cyber Pinball tourne ; chaque sortie, même après un plantage, lui rend son orientation.
+- **La santé de la borne d'un seul coup d'œil.** Espace disque, tables qui ne démarrent pas, médias manquants, écrans, version de VPX : tout est réuni sur un seul écran, et chaque problème vient avec sa solution.
+- **Des mises à jour signées, installées depuis la borne.** Une pastille rouge apparaît sur la roue dentée dès qu'une version sort. Vous lisez les nouveautés dans votre langue, et un bouton suffit pour l'installer. Chaque version est signée, et la borne refuse tout ce qui ne porte pas la signature de l'éditeur. Vos tables, médias et réglages sont conservés.
+- **Des horaires d'arcade.** La nuit, la borne baisse ses écrans et coupe le son, puis se met en veille ou s'éteint à l'heure choisie si personne ne joue. Un avertissement prévient avant, et n'importe quel bouton l'annule.
+- **Un mode invité** pour les soirées ou pour les enfants : on peut choisir une table, jouer et lire sa fiche, rien de plus. Pour en sortir, on maintient les deux flippers et les deux boutons MagnaSave.
+- **Une borne dédiée.** Si vous le souhaitez, Cyber Pinball remplace l'interface de Windows, en gardant un moyen de la retrouver. Vous éteignez, redémarrez ou mettez en veille depuis le menu, avec des écrans noirs jusqu'au bout.
+- **Le bureau rendu tel que vous l'avez laissé.** L'écran du playfield n'est pivoté que le temps où Cyber Pinball fonctionne. À chaque fermeture, même après un plantage, il retrouve son orientation.
 - **En français ou en anglais**, au choix dans le menu système (« Language / Langue »), dates et nombres compris.
 
-<p align="center"><img src="docs/images/fr/system-menu.webp?v=4399a62b92" width="360" alt="Le menu système : les rubriques Amis, Tables, Médias, Téléchargements, Borne et Cyber Pinball, chacune avec ce qu'elle contient."></p>
+<p align="center"><img src="docs/images/fr/system-menu.webp?v=4399a62b92" width="360" alt="Le menu système : les rubriques Amis, Tables, Médias, Téléchargements, Borne et Cyber Pinball, chacune avec un résumé de son contenu."></p>
 
 ## Prérequis
 
 - Windows 10 ou 11, 64 bits.
-- Un disque local avec quelques Go libres. Program Files, les dossiers de Windows et les lecteurs réseau sont refusés : VPX et les tables ont besoin d'écrire à côté d'eux.
-- Visual Pinball X 10.8.1 : installé pour vous au premier lancement.
+- Un disque local avec quelques Go libres. Program Files, les dossiers de Windows et les lecteurs réseau sont exclus, car VPX et les tables doivent pouvoir écrire dans leur propre dossier.
+- Visual Pinball X 10.8.1, installé pour vous au premier lancement.
 
 ## Installation
 
@@ -118,41 +118,41 @@ Téléchargez un installeur sur la page des [versions publiées](https://github.
 
 | Fichier | Taille | Visual Pinball X |
 | --- | --- | --- |
-| `CyberPinball-Setup.exe` | 110 Mio environ | téléchargé au premier lancement depuis sa page officielle, vérifié par SHA-256 |
-| `CyberPinball-Setup-complet.exe` | 280 Mio environ | archive officielle incluse, pour une borne sans Internet |
+| `CyberPinball-Setup.exe` | 110 Mio environ | téléchargé au premier lancement depuis sa page officielle, puis vérifié par SHA-256 |
+| `CyberPinball-Setup-complet.exe` | 280 Mio environ | archive officielle incluse, pour une borne sans accès à Internet |
 
-- Tout vit dans **un dossier racine** que vous choisissez (par exemple `D:\CyberPinball`) : l'application dans `app\`, et à côté les tables, médias, configuration, données et émulateurs. Cyber Pinball garde sa propre copie de VPX et son propre `VPinballX.ini`, et n'inscrit rien dans Windows.
-- Pas besoin de droits d'administrateur : l'installation se fait pour l'utilisateur courant. Pour les amis, Windows demande une fois l'autorisation de laisser passer Cyber Pinball par son pare-feu ; la refuser rend seulement le réseau local moins sûr.
-- Options : un raccourci sur le bureau, et le lancement au démarrage de Windows (borne dédiée). Installation silencieuse : `/S`, `/DEMARRAGE` (lancement au démarrage), `/SANSBUREAU` (pas de raccourci sur le bureau), `/PAREFEU` (demander la règle du pare-feu même en silence), `/D=D:\Borne` (dossier racine, en dernier et sans guillemets).
-- **La désinstallation ne retire que l'application.** Tables, médias, configuration et données restent dans le dossier racine ; une réinstallation au même endroit les retrouve telles quelles.
-- Les installeurs ne sont pas encore signés : Windows SmartScreen avertit à leur lancement.
+- Tout est regroupé dans **un dossier racine** de votre choix (par exemple `D:\CyberPinball`) : l'application dans `app\`, et à côté les tables, les médias, la configuration, les données et les émulateurs. Cyber Pinball utilise sa propre copie de VPX et son propre `VPinballX.ini`, et n'inscrit rien dans Windows.
+- Aucun droit d'administrateur n'est nécessaire : l'installation se fait pour l'utilisateur courant. Pour les Amis, Windows vous demande une seule fois d'autoriser Cyber Pinball à franchir son pare-feu ; si vous refusez, les liaisons sur le réseau local seront simplement moins fiables.
+- En option : un raccourci sur le bureau et le lancement au démarrage de Windows (pour une borne dédiée). Installation silencieuse : `/S`, `/DEMARRAGE` (lancement au démarrage), `/SANSBUREAU` (pas de raccourci sur le bureau), `/PAREFEU` (demander la règle du pare-feu même en mode silencieux), `/D=D:\Borne` (dossier racine, en dernier et sans guillemets).
+- **La désinstallation ne retire que l'application.** Vos tables, médias, configuration et données restent dans le dossier racine ; si vous réinstallez au même endroit, vous les retrouvez tels quels.
+- Les installeurs ne sont pas encore signés : Windows SmartScreen affiche un avertissement au lancement.
 
-Au premier lancement, Cyber Pinball propose d'installer VPX, puis guide le réglage des boutons, du lanceur analogique, des écrans, du playfield, de la disposition et du son, le tout aux boutons de la borne.
+Au premier lancement, Cyber Pinball propose d'installer VPX, puis vous guide pour régler les boutons, le lanceur analogique, les écrans, le playfield, la disposition et le son, le tout avec les boutons de la borne.
 
 ## Mise à jour
 
-Depuis la borne : **menu système > « Cyber Pinball » > « Mise à jour de Cyber Pinball »**. Rien ne s'installe d'office : Cyber Pinball cherche discrètement une nouvelle version après le démarrage puis toutes les 6 heures, et quand il y en a une, une pastille rouge apparaît sur la roue dentée du menu et sur cette entrée. L'entrée montre alors les nouveautés de chaque version manquée, et l'installe d'un seul bouton si l'on choisit « Mettre à jour maintenant ». Il se ferme pendant l'installation (une minute environ), redémarre tout seul et dit quelle version est installée. Si l'installation échoue, l'installeur remet la version précédente en place.
+Depuis la borne : **menu système > « Cyber Pinball » > « Mise à jour de Cyber Pinball »**. Rien ne s'installe sans votre accord. Cyber Pinball vérifie discrètement s'il existe une nouvelle version peu après le démarrage, puis toutes les 6 heures. S'il en trouve une, une pastille rouge apparaît sur la roue dentée du menu et sur cette entrée. Vous y lisez les nouveautés de chaque version manquée, et « Mettre à jour maintenant » l'installe en un seul geste. Cyber Pinball se ferme le temps de l'installation (environ une minute), redémarre tout seul et indique la version installée. Si l'installation échoue, l'installeur rétablit la version précédente.
 
-Chaque version publiée porte un flux signé (`cyberpinball-maj.json`, Ed25519). L'installeur n'est téléchargé que si la signature correspond à la clé livrée dans l'application, et il n'est lancé que si sa taille et son SHA-256 sont les bons. Une préversion (`0.2.0-beta.1`) n'est jamais proposée aux bornes.
+Chaque version publiée s'accompagne d'un flux signé (`cyberpinball-maj.json`, Ed25519). L'installeur n'est téléchargé que si la signature correspond à la clé fournie avec l'application, et il n'est exécuté que si sa taille et son SHA-256 sont les bons. Les préversions (`0.2.0-beta.1`) ne sont jamais proposées aux bornes.
 
 ## Commandes
 
-Les boutons sont ceux que l'assistant a relevés. En attendant, ce sont les touches qu'envoient d'ordinaire les encodeurs de borne :
+Les boutons sont ceux que l'assistant a relevés. D'ici là, ce sont les touches qu'envoient habituellement les encodeurs de borne :
 
 | Bouton | Touche par défaut | Menu des tables |
 | --- | --- | --- |
 | Flipper gauche / droit | Maj gauche / droite | Choisir une table |
 | Start | 1 | Jouer |
 | Exit | Échap | Menu système (réglages, configuration de la borne, mise à jour, quitter) |
-| Clavier | Tab, ou ⚙ à la souris | Menu système, de n'importe où |
-| Clavier | Ctrl+Maj+D | Bureau Windows : libère tous les écrans du PC ; de nouveau : retour au menu |
+| Clavier | Tab, ou ⚙ à la souris | Menu système, depuis n'importe quel écran |
+| Clavier | Ctrl+Maj+D | Bureau Windows : libère tous les écrans du PC ; une seconde fois : retour au menu |
 | Clavier | Ctrl+Maj+K | Arrêter une partie bloquée |
 
-Pendant une partie, les touches sont celles de la section `[Input]` de VPX, rappelées sur l'écran de chargement.
+En cours de partie, les touches sont celles de la section `[Input]` de VPX ; l'écran de chargement les rappelle.
 
 ## Compiler depuis les sources
 
-Il faut Windows 10 ou 11 et Node.js 22 ou plus.
+Il vous faut Windows 10 ou 11 et Node.js 22 ou plus récent.
 
 ```bash
 npm install
@@ -163,32 +163,32 @@ npm run probe       # liste les écrans et les sorties audio détectés
 npm run installeur  # fabrique release\CyberPinball-Setup.exe et CyberPinball-Setup-complet.exe
 ```
 
-`lanceur.cmd` ouvre un menu avec les mêmes actions. Les tests de bout en bout se font sans opérateur et entièrement hors écran : Electron rend en mémoire sur un bureau Windows caché, avec des écrans simulés, et ne prend jamais les écrans du développeur.
+`lanceur.cmd` ouvre un menu qui propose les mêmes actions. Les tests de bout en bout tournent sans intervention et entièrement hors écran : Electron fait son rendu en mémoire sur un bureau Windows caché, avec des écrans simulés, sans jamais occuper les écrans du développeur.
 
 | Dossier | Rôle |
 | --- | --- |
-| `packages/core` | Modèle de borne, empreintes EDID, correspondance des écrans, générateurs INI et VPX, mise à jour. Sans Electron ni Windows. |
-| `packages/win-displays` | Fonctions de Windows par FFI (koffi) : écrans, sorties audio, périphériques USB, fenêtres, orientation. |
+| `packages/core` | Modèle de la borne, empreintes EDID, correspondance des écrans, générateurs INI et VPX, mise à jour. Sans Electron ni Windows. |
+| `packages/win-displays` | Appels à Windows par FFI (koffi) : écrans, sorties audio, périphériques USB, fenêtres, orientation. |
 | `packages/installer` | Manifeste des composants tiers, dossier racine, téléchargements vérifiés, jonctions de version. |
 | `app` | L'application Electron : assistant, menu des tables, réglages de VPX, gestion des tables, lancement des parties. |
 | `docs` | Manuel technique, scénarios de tests manuels, notes de recherche, design system. |
 
-Le [manuel technique](docs/manuel.md) décrit chaque partie en détail : les fichiers écrits, les commandes, les essais hors écran et les limites connues. Les [scénarios de tests manuels](docs/tests-manuels.md) couvrent ce qui demande une vraie borne. Les deux existent aussi en anglais.
+Le [manuel technique](docs/manuel.md) détaille chaque partie : fichiers écrits, commandes, essais hors écran et limites connues. Les [scénarios de tests manuels](docs/tests-manuels.md) couvrent ce qui demande une vraie borne. Les deux documents existent aussi en anglais.
 
 ### Publier une version (mainteneurs)
 
-Chaque étape ci-dessous est une action de `lanceur.cmd` (rubrique « Fabrication et publication sur GitHub ») : voir l'[aide-mémoire](docs/manuel.md#aide-mémoire--publier-une-version) du manuel technique.
+Chacune des étapes ci-dessous est une action de `lanceur.cmd` (rubrique « Fabrication et publication sur GitHub ») : voir l'[aide-mémoire](docs/manuel.md#aide-mémoire--publier-une-version) du manuel technique.
 
-`npm run publier` vérifie que rien de personnel ni de secret ne va partir, fabrique les deux installeurs, signe le flux de mise à jour et envoie un instantané du code sur `main`. Il crée ensuite la release GitHub `v<version>` avec les installeurs et le flux. Les nouveautés viennent de [CHANGELOG.md](CHANGELOG.md) (affichées sur la borne) et de sa traduction [CHANGELOG.en.md](CHANGELOG.en.md) (ajoutée à la release GitHub). Il faut un jeton GitHub à grain fin, rangé une fois pour toutes dans `%USERPROFILE%\.cyberpinball\jeton-github.txt` (ou la variable `CYBERPINBALL_GITHUB_TOKEN`), et la clé de publication : aucun des deux n'est jamais dans le dépôt, et le `.gitignore` comme le contrôle de publication en écartent les fichiers de secrets. La description et les sujets du dépôt viennent du `package.json` et sont appliqués à chaque release, ou par `npm run decrire` (le jeton a alors besoin de la permission « Administration »). Voir [Mise à jour depuis la borne](docs/manuel.md#mise-à-jour-depuis-la-borne) dans le manuel technique.
+`npm run publier` vérifie que rien de personnel ni de secret ne risque de partir, fabrique les deux installeurs, signe le flux de mise à jour et envoie un instantané du code sur `main`. Il crée ensuite la release GitHub `v<version>` avec les installeurs et le flux. Les nouveautés proviennent de [CHANGELOG.md](CHANGELOG.md), affiché sur la borne, et de sa traduction [CHANGELOG.en.md](CHANGELOG.en.md), jointe à la release GitHub. Il faut un jeton GitHub à accès restreint (fine-grained), enregistré une fois pour toutes dans `%USERPROFILE%\.cyberpinball\jeton-github.txt` (ou dans la variable `CYBERPINBALL_GITHUB_TOKEN`), ainsi que la clé de publication. Ni l'un ni l'autre ne se trouve jamais dans le dépôt : le `.gitignore` et le contrôle de publication écartent tous deux les fichiers de secrets. La description et les sujets du dépôt sont tirés du `package.json` et appliqués à chaque release, ou par `npm run decrire` (le jeton doit alors avoir la permission « Administration »). Voir [Mise à jour depuis la borne](docs/manuel.md#mise-à-jour-depuis-la-borne) dans le manuel technique.
 
 ## Composants tiers et licences
 
-- **Visual Pinball X** ne fait pas partie de ce dépôt. Il est téléchargé depuis ses [versions officielles](https://github.com/vpinball/vpinball/releases) et vérifié contre une empreinte SHA-256 fixée. Sa licence (GPLv3+, et pour certains fichiers une licence dérivée de celle de MAME) n'autorise sa redistribution que gratuitement, hors de tout produit ou activité commerciale. L'installeur complet **ne doit donc être ni vendu, ni livré avec une borne vendue ou exploitée commercialement**.
-- La **base VPS** et **VPinMediaDB** ne déclarent aucune licence. Cyber Pinball ne les livre pas : elles sont téléchargées depuis leurs adresses officielles au premier usage. Les médias de VPinMediaDB appartiennent à leurs auteurs et les visuels des jeux à leurs fabricants : **usage personnel, sur sa propre borne** seulement. Les fichiers de VPForums et de VPUniverse se téléchargent avec votre propre compte, un à la fois, à votre demande, et restent sur votre borne : leurs sites interdisent de les remettre en ligne ou de les redistribuer.
-- Le réseau des bornes s'appuie sur Hyperswarm, HyperDHT, Protomux et secret-stream de Holepunch, avec sodium-native et udx-native (licences MIT et Apache-2.0).
-- Les polices (Audiowide, Bebas Neue, Orbitron, Saira) sont sous licence SIL Open Font License ; leurs licences sont rangées à côté d'elles, dans `app/renderer/polices`.
-- Cyber Pinball ne télécharge ni tables ni ROM à votre place. Les tables viennent des sites de leurs auteurs, et les fabricants de flippers n'autorisent pas la diffusion de leurs ROM.
+- **Visual Pinball X** ne fait pas partie de ce dépôt. Il est téléchargé depuis ses [versions officielles](https://github.com/vpinball/vpinball/releases) et contrôlé avec une empreinte SHA-256 fixe. Sa licence (GPLv3+, et pour certains fichiers une licence dérivée de celle de MAME) n'en autorise la redistribution que gratuite, en dehors de tout produit ou activité commerciale. L'installeur complet **ne doit donc être ni vendu, ni fourni avec une borne vendue ou exploitée commercialement**.
+- La **base VPS** et **VPinMediaDB** n'indiquent aucune licence. Cyber Pinball ne les inclut pas : elles sont téléchargées depuis leurs adresses officielles à la première utilisation. Les médias de VPinMediaDB appartiennent à leurs auteurs, et les visuels des jeux à leurs fabricants : ils sont réservés à un **usage personnel, sur votre propre borne**. Les fichiers de VPForums et de VPUniverse se téléchargent avec votre propre compte, un par un, à votre demande, et restent sur votre borne : ces sites interdisent de les remettre en ligne ou de les redistribuer.
+- Le réseau des bornes repose sur Hyperswarm, HyperDHT, Protomux et secret-stream, de Holepunch, ainsi que sur sodium-native et udx-native (licences MIT et Apache-2.0).
+- Les polices (Audiowide, Bebas Neue, Orbitron, Saira) sont sous licence SIL Open Font License ; leurs licences se trouvent à côté d'elles, dans `app/renderer/polices`.
+- Cyber Pinball ne télécharge ni tables ni ROM à votre place. Les tables proviennent des sites de leurs auteurs, et les fabricants de flippers n'autorisent pas la diffusion de leurs ROM.
 
 ## Licence
 
-La licence de Cyber Pinball lui-même n'est pas encore choisie. Tant qu'un fichier `LICENSE` n'a pas été ajouté, le code est publié pour être lu et essayé, et tous les droits restent à son auteur.
+La licence de Cyber Pinball n'est pas encore choisie. Tant qu'aucun fichier `LICENSE` n'a été ajouté, le code est publié pour être lu et essayé, et tous les droits restent réservés à son auteur.

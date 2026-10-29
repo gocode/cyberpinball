@@ -76,6 +76,43 @@ test('les démonstrations qui posent une jonction la retirent en fin de partie (
   assert.deepEqual(unguarded, [], 'une démonstration qui pose une jonction passe par Enter-BureauCache, qui la retire à la fin, ou appelle Remove-JonctionsSortantes en dernier');
 });
 
+/**
+ * Scripts de docs\ qui posent encore une jonction vers les vrais émulateurs (D:\CyberPinball\emulators),
+ * avec leur nombre de jonctions : ceux qui lancent réellement VPX, sur les écrans du poste. Tous
+ * les autres ont une fausse installation de VPX (New-FauxVpx, docs\hors-ecran.ps1).
+ */
+const JONCTIONS_PERMISES: Record<string, { jonctions: number; raison: string }> = {
+  'demo-fenetres.ps1': { jonctions: 1, raison: 'trois vraies parties de VPX à l’écran (fenêtres d’éditeur et d’audit de VPX)' },
+  'demo-barre-taches.ps1': { jonctions: 1, raison: 'avec -Partie seulement : une vraie partie de VPX à l’écran' },
+  'demo-ecrans-couverts.ps1': { jonctions: 1, raison: 'scénarios partie et endurance : de vraies parties de VPX à l’écran' },
+  'demo-tables.ps1': { jonctions: 1, raison: 'à l’écran seulement (CYBERPINBALL_A_L_ECRAN), le temps de la vraie partie de l’ajout' },
+};
+
+test('aucun script de docs\\ ne pose de jonction vers D:\\CyberPinball hors des exceptions justifiées (New-FauxVpx à la place)', () => {
+  const docs = path.join(REPO, 'docs');
+  const junction = /-ItemType\s+['"]?(?:Junction|SymbolicLink)\b|\bmklink\s+\/[JD]\b|CreateSymbolicLink/gi;
+  const found = new Map<string, number>();
+  for (const name of fs.readdirSync(docs).filter((n) => /\.ps1$/i.test(n))) {
+    const count = (fs.readFileSync(path.join(docs, name), 'utf8').match(junction) ?? []).length;
+    if (count) found.set(name, count);
+  }
+  const refused = [...found]
+    .filter(([name, count]) => count > (JONCTIONS_PERMISES[name]?.jonctions ?? 0))
+    .map(([name, count]) => `${name} : ${count} jonction(s), ${JONCTIONS_PERMISES[name]?.jonctions ?? 0} permise(s)`);
+  assert.deepEqual(
+    refused,
+    [],
+    'Une démonstration qui ne lance pas réellement VPX prend une fausse installation (New-FauxVpx <racine>, docs\\hors-ecran.ps1) ; '
+      + 'une jonction vers les vrais émulateurs, qu’un rangement du disque suivrait jusqu’à les vider, ne s’ajoute à JONCTIONS_PERMISES qu’avec sa raison.',
+  );
+  // Liste tenue à jour : une exception sans jonction s'en va ; chacune retire la sienne en fin de partie.
+  for (const [name, { jonctions }] of Object.entries(JONCTIONS_PERMISES)) {
+    assert.equal(found.get(name) ?? 0, jonctions, `${name} : ${jonctions} jonction(s) attendue(s) ; retirez ou ajustez son exception`);
+    const text = fs.readFileSync(path.join(docs, name), 'utf8');
+    assert.match(text, /^\s*Remove-JonctionsSortantes\s*$/m, `${name} : la jonction doit être retirée à la fin (Remove-JonctionsSortantes), à l'écran aussi`);
+  }
+});
+
 test('inside : un dossier voisin au nom proche n\'est pas dedans', () => {
   assert.equal(inside('D:\\a\\b\\c', 'D:\\a\\b'), true);
   assert.equal(inside('D:\\a\\b', 'D:\\a\\b'), true);
