@@ -7,6 +7,7 @@
 //   lui-même compris ;
 // - une image ou une vidéo qui ne se charge pas (protocole des médias non branché,
 //   fichier absent, format illisible) : l'aperçu montrerait une icône cassée ;
+// - une image plus grande que sa boîte, qui en sort (logo du lancement en cinéma compris) ;
 // - un texte ou une icône plus petits que 20 px (plancher du design system) tels qu'on les
 //   voit, réduits par un transform compris (médaillons de la roue).
 // Une superposition voulue (aide, menu par-dessus le menu des tables) n'est pas un
@@ -325,7 +326,18 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   // Image chargée sans pixels, vidéo en erreur : l'écran montrerait un aperçu cassé.
   for (const img of document.images) if (img.complete && img.getAttribute('src') && img.naturalWidth === 0) problems.add('image non chargée : ' + img.getAttribute('src').slice(0, 120));
   for (const video of document.querySelectorAll('video')) if (video.error) problems.add('vidéo non chargée : ' + (video.getAttribute('src') || '').slice(0, 120));
-  const px = 1080 / Math.min(vw, vh);
+  // Image sortie de sa boîte : une grille dont la rangée suit la hauteur native de l'image ne la
+  // borne plus (max-height: 100 %, height: 100 %) ; le logo du lancement en cinéma, une roue de
+  // 1000 px, sortait par le bas du fronton, rogné et jamais centré (29/10/2026). Le cinéma n'est
+  // pas mis à part ici : le logo s'envole avec sa boîte.
+  for (const img of document.images) {
+    const box = img.parentElement;
+    if (!box || !img.naturalWidth || !shown(img)) continue;
+    const r = img.getBoundingClientRect(), c = box.getBoundingClientRect();
+    if (r.width <= T || r.height <= T) continue;
+    if (r.left < c.left - T || r.top < c.top - T || r.right > c.right + T || r.bottom > c.bottom + T) problems.add('image hors de sa boîte : ' + label(img) + ' ' + Math.round(r.width) + '×' + Math.round(r.height) + ' dans ' + label(box).slice(0, 60) + ' ' + Math.round(c.width) + '×' + Math.round(c.height));
+  }
+  const px =1080 / Math.min(vw, vh);
   // Plancher du design system : aucun texte sous 20 px à l'échelle d'un petit côté de 1 080 px.
   // Le corps qui compte est celui qu'on voit : la police multipliée par l'échelle de chaque
   // transform au-dessus du texte. Les noms des petits médaillons de la roue, réduits par

@@ -36,6 +36,12 @@ app.commandLine.appendSwitch('force-device-scale-factor', '1');
 app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required');
 
 const NEON = 'Neon Galaxy (Williams 1992)';
+/**
+ * Logo plus haut que sa boîte (300 × 520, demo-moments.cjs) : il doit s'y réduire et s'y centrer.
+ * Le 29/10/2026, une roue de 1000 px sortait par le bas du fronton ; le logo large et bas de
+ * Neon Galaxy ne pouvait pas le montrer.
+ */
+const ATLANTIS = 'Atlantis Deep (Bally 1975)';
 /** Jeu inventé de la page du projet (docs\demo-captures.cjs), aux illustrations réalistes. */
 const ABYSS = 'Neon Abyss (Orbital Works 1994)';
 const LONG = 'Le très long titre d’une table imaginaire pour vérifier les débordements du chargement et des écrans (Stern 2020)';
@@ -87,6 +93,15 @@ const SETUPS = [
       { role: 'playfield', width: 1080, height: 1920 },
     ],
     times: [520, 3000],
+  },
+  {
+    name: 'borne-logo-haut',
+    table: ATLANTIS,
+    windows: [
+      { role: 'backglass', width: 1920, height: 1080, zones: [{ role: 'backglass', zone: FULL }] },
+      { role: 'playfield', width: 1080, height: 1920 },
+    ],
+    times: [120, 3000],
   },
   {
     name: 'borne-pivotee',

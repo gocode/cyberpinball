@@ -5,7 +5,7 @@
 #                 Start (120, 300, 520, 700, 1000, 1300, 3000 ms) et au passage de relais (fondu à
 #                 +120 ms) ; le DMD reçoit l'image du vrai moteur. Borne (plateau debout, fronton et
 #                 DMD), plateau couché et tourné, bureau (fronton sur un second écran), repli sans
-#                 logo (médaillon), repli sans fronton. Planches assemblées : planche-<montage>-<instant>.png ;
+#                 logo (médaillon), repli sans fronton, logo plus haut que sa boîte (Atlantis Deep). Planches assemblées : planche-<montage>-<instant>.png ;
 #   lancement   : le vrai menu (docs\demo-moments.ps1 -Scenarios cinema, sans-cinema) lance une
 #                 partie simulée de Neon Galaxy, avec et sans le réglage : chaque fenêtre montre sa
 #                 scène, le coup de bobine sonne au passage de relais (pas sans le réglage), et VPX

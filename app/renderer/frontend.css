@@ -400,6 +400,8 @@ html.menu-desktop .menu-count {
   top: calc(50% - 50% / var(--hit, 1));
   display: grid;
   place-items: center;
+  /* Pistes de la taille de la boîte : voir .cine-logo, un logo plus haut que large en sortait par le bas. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   width: calc(100% / var(--hit, 1));
   height: calc(100% / var(--hit, 1));
   /* Contexte d'empilement : le disque d'un logo sans médaillon (::before) reste derrière lui. */
@@ -2069,9 +2071,16 @@ html.menu-desktop #cinema .cinema-depart {
   top: 0;
 }
 
+/*
+ * Pistes de la grille bornées à la boîte : sans elles, la rangée prend la hauteur native de
+ * l'image (une roue de 1000 px), que max-height: 100% ne borne plus ; le logo sortait de sa
+ * boîte par le bas, rogné par le bas du fronton et jamais centré (29/10/2026). Le garde-fou de
+ * mise en page signale toute image qui sort de sa boîte (layout-check.ts).
+ */
 .cine-logo {
   display: grid;
   place-items: center;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   isolation: isolate;
 }
 

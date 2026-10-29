@@ -7,6 +7,10 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.5
+
+- Cinema launch: the game logo now lands whole and centered on the backglass, and leaves the playfield whole; a large wheel (medallion) used to spill out the bottom, cut off. A logo taller than it is wide also stays in its slot on the menu wheel.
+
 ## 0.1.4
 
 - Friends (System menu > Friends), between cabinets and with no central server: your friends online with the table they are playing and their latest high scores, finding a player by name or on the local network, friend requests, first badges. Sharing is on by default and is turned off in "Sharing and network", which also says what other cabinets see; Windows asks once to allow Cyber Pinball through its firewall.

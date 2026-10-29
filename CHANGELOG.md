@@ -9,6 +9,10 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.5
+
+- Lancement en cinéma : le logo du jeu se pose entier et centré sur le fronton, et part entier du plateau ; une grande roue (médaillon) sortait par le bas, coupée. Un logo plus haut que large reste aussi dans sa place sur la roue du menu.
+
 ## 0.1.4
 
 - Amis (Menu système > Amis), entre bornes et sans serveur central : vos amis en ligne avec la table qu'ils jouent et leurs derniers records, recherche d'un joueur par son nom ou sur le réseau local, demandes d'amis, premiers badges. Le partage est activé par défaut et se coupe dans « Partage et réseau », qui dit aussi ce que voient les autres bornes ; Windows demande une fois d'autoriser Cyber Pinball dans son pare-feu.
