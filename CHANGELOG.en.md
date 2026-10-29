@@ -42,6 +42,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Friends' library, shared by default between friends (turned off in "Sharing and network"): "See their library" on a friend's page shows their tables and the media you are missing. You can fetch a whole table you don't have, or pick part by part those of a table you already have, their version and yours side by side; ROM and PuP-Pack are unticked by default, with a note on rights. Everything goes through the add plan before it is installed; saves, high scores and programs are never sent.
 - Live game between friends, up to 4 cabinets: the invitation opens on the friend's cabinet on the same table (version checked), a 5-second countdown starts the game everywhere, then everyone sees the results.
 - A friend's name always follows their latest rename, and a pending friend request is sent again when the cabinets meet.
+- The Windows taskbar no longer shows over the DMD, backglass or playfield when you come back from a game: Cyber Pinball puts it straight back behind, and "Cabinet health" tells you if it had to.
 
 ## 0.1.3
 

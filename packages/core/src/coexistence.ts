@@ -148,6 +148,8 @@ export const WINDOWS_CHANGES: WindowsChange[] = [
   { call: 'hideWindow', files: ['app/src/screen-guard.ts', 'app/src/launcher.ts'] },
   // Réaffiche les barres des tâches que Cyber Pinball a masquées (taskbarsToRestore).
   { call: 'showWindowInactive', files: ['app/src/screen-guard.ts'] },
+  // Barre des tâches passée devant une fenêtre du menu : rangée juste sous elle, comme l’Explorateur le fait devant une fenêtre plein écran active (taskbarguard.ts). Seulement l’ordre des fenêtres, jamais quand un autre programme a le premier plan ; l’Explorateur la remet devant à la bascule suivante, rien n’est enregistré.
+  { call: 'placeWindowBelow', files: ['app/src/screen-guard.ts'] },
   // Raccourcis globaux (SHORTCUTS) : Ctrl+Maj+K pendant une partie, Ctrl+Maj+D en mode bureau ; chacun rendu à la fin.
   { call: 'globalShortcut.register', files: ['app/src/frontend.ts'] },
   // Entrée de « Programmes et fonctionnalités » (HKCU), retirée à la désinstallation.

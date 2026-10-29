@@ -101,4 +101,22 @@ export const messages: Record<string, string> = {
     'It finds screens by name only and opens {roles} on the first one: realigned at every game, each window is moved back to its role’s screen',
   'Il repère les écrans par leur seul nom et ouvre {roles} sur le premier : le fronton, le DMD et le topper sont recalés à chaque partie, pas le playfield, qui peut s’ouvrir sur l’écran d’un autre rôle':
     'It finds screens by name only and opens {roles} on the first one: the backglass, DMD and topper are realigned at every game, but not the playfield, which may open on another role’s screen',
+  // Barres des tâches devant les écrans (packages/core/src/taskbarguard.ts)
+  'le journal logs\\ecrans.txt dit, à chaque bascule, quelle fenêtre était devant chaque écran': 'the logs\\ecrans.txt log tells, at every switch, which window was in front of each screen',
+  'Windows remettait la barre des tâches devant {screens}': 'Windows kept putting the taskbar back in front of {screens}',
+  'Remise derrière plusieurs fois en quelques secondes, elle est masquée jusqu’au bureau Windows ou à la fermeture de Cyber Pinball ; {journal}':
+    'Put back behind several times within a few seconds, it is hidden until the Windows desktop or until Cyber Pinball closes; {journal}',
+  'la dernière sur « {screen} » ({moment})': 'the last one on “{screen}” ({moment})',
+  'Barre des tâches remise derrière le menu une fois': 'Taskbar put back behind the menu once',
+  'Barre des tâches remise derrière le menu {n} fois': 'Taskbar put back behind the menu {n} times',
+  'Windows l’avait fait passer devant un écran, le gardien des écrans l’a remise derrière': 'Windows had brought it in front of a screen; the screen guard put it back behind',
+  'démarrage du menu': 'menu startup',
+  'début d’une partie': 'start of a game',
+  'partie en cours': 'game in progress',
+  'retour d’une partie': 'back from a game',
+  'passage au bureau Windows': 'switch to the Windows desktop',
+  'retour du bureau Windows': 'back from the Windows desktop',
+  'changement d’écrans ou de zone de travail': 'screen or work area change',
+  'premier plan rendu au menu': 'foreground given back to the menu',
+  'relecture du gardien des écrans': 'screen guard check',
 };

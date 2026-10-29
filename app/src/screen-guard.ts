@@ -11,6 +11,11 @@
 //    fin, seules celles que Cyber Pinball a masquées reviennent (coexistence.ts).
 // 4. Deux fois par seconde, la pile des fenêtres de Windows est relue (screenCover) : un
 //    écran qui reste découvert, ou sous la barre des tâches, est signalé dans la console.
+//    Une barre des tâches passée devant une fenêtre du menu est aussitôt remise derrière
+//    (gardien des barres, packages/core/src/taskbarguard.ts), à cette relecture comme à chaque
+//    bascule (retour de partie, retour du bureau, changement d'écrans ou de zone de travail,
+//    premier plan rendu au menu) ; chaque bascule est notée dans <données>\logs\ecrans.txt :
+//    premier plan, ce qui est au-dessus de chaque écran, rectangle de chaque barre.
 // 5. En mode bureau (desktop-mode.ts), l'inverse : les voiles sont cachés, ceux d'un écran
 //    branché entre-temps naissent cachés, et un écran qu'une fenêtre de Cyber Pinball
 //    recouvre encore est signalé (desktopBlockers). Au retour, chaque écran retrouve son voile.
@@ -20,8 +25,26 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { app, BrowserWindow, screen, type Display, type Rectangle } from 'electron';
-import { coverNotice, desktopBlockers, parseTaskbarMarker, screenCover, taskbarMarkerText, taskbarsToRestore, type HiddenTaskbar } from '@cyberpinball/core';
-import { allowAnyForeground, hideWindow, listWindows, showWindowInactive, taskbarWindows } from '@cyberpinball/win-displays';
+import {
+  appendErrorLog,
+  coverNotice,
+  coveringWindow,
+  desktopBlockers,
+  displayOf,
+  parseTaskbarMarker,
+  repairNotice,
+  screenCover,
+  SCREENS_LOG_FILE,
+  stackingReport,
+  TaskbarGuard,
+  taskbarMarkerText,
+  taskbarsToRestore,
+  type GuardScreen,
+  type HiddenTaskbar,
+  type TaskbarFacts,
+  type TaskbarMoment,
+} from '@cyberpinball/core';
+import { allowAnyForeground, foregroundWindow, hideWindow, listWindows, placeWindowBelow, showWindowInactive, taskbarWindows, type WindowInfo } from '@cyberpinball/win-displays';
 import { createWindow, desktopDisplays, isShown, OFFSCREEN, paintedOnScreen } from './offscreen';
 import { coverDisplay, coverProblem } from './cover-display';
 import { locations } from './paths';
@@ -76,13 +99,22 @@ export function guardScreens(): void {
   if (relay) paintedOnScreen(() => fs.writeFileSync(relay, ''));
   // Un écran rebranché (ou réveillé) n'est pas toujours prêt à l'événement : un voile mis en
   // plein écran trop tôt atterrit sur l'écran principal. Il est replacé un peu plus tard.
+  // L'Explorateur replace aussi ses barres des tâches, devant tout, à un changement d'écrans ou
+  // de zone de travail (display-metrics-changed, « workArea ») : elles reviennent derrière.
   const displaysChanged = () => {
     placeVeils();
-    setTimeout(() => placeVeils(true), DISPLAY_SETTLE_MS);
+    settleTaskbars('displays');
+    setTimeout(() => {
+      placeVeils(true);
+      settleScreens('displays');
+    }, DISPLAY_SETTLE_MS);
   };
   screen.on('display-added', displaysChanged);
   screen.on('display-removed', displaysChanged);
   screen.on('display-metrics-changed', displaysChanged);
+  // Une fenêtre du menu reprend le premier plan (retour de partie, du bureau, d'Alt+Tab) :
+  // l'Explorateur ne range derrière elle que la barre de son écran.
+  app.on('browser-window-focus', () => settleTaskbars('focus'));
   // Les voiles ne retiennent pas l'application : elle se ferme avec sa dernière vraie fenêtre.
   app.on('browser-window-created', (_event, win) => {
     if (creatingVeil) return;
@@ -185,14 +217,19 @@ export function hideTaskbars(): void {
   if (OFFSCREEN) return;
   const all = taskbarWindows();
   const shown = all.filter((w) => w.visible);
-  if (!shown.length) return;
-  notOurs = new Set(all.filter((w) => !w.visible).map((w) => w.handle));
-  hiddenTaskbars = shown.map((w) => ({ handle: w.handle, className: w.className }));
-  // Sans témoin, une partie interrompue laisserait les barres masquées : on ne les masque pas.
-  if (!writeTaskbarMarker()) {
-    hiddenTaskbars = [];
-    return;
+  // Une barre déjà masquée par le gardien des barres (Windows la remettait devant) reste des nôtres.
+  const ours = (w: WindowInfo) => hiddenTaskbars.some((h) => h.handle === w.handle);
+  notOurs = new Set(all.filter((w) => !w.visible && !ours(w)).map((w) => w.handle));
+  if (shown.length) {
+    const before = hiddenTaskbars;
+    hiddenTaskbars = [...before, ...shown.map((w) => ({ handle: w.handle, className: w.className }))];
+    // Sans témoin, une partie interrompue laisserait les barres masquées : on ne les masque pas.
+    if (!writeTaskbarMarker()) {
+      hiddenTaskbars = before;
+      return;
+    }
   }
+  if (!hiddenTaskbars.length) return;
   for (const w of shown) hideWindow(w);
   // Windows réaffiche parfois lui-même une barre masquée quand VPX prend le premier plan
   // (une fois sur onze parties, sur l'écran du DMD) : elle est aussitôt masquée de nouveau.
@@ -218,9 +255,20 @@ export function restoreTaskbars(hidden: HiddenTaskbar[] = hiddenTaskbars): void 
   if (OFFSCREEN) return;
   if (taskbarWatch) clearInterval(taskbarWatch);
   taskbarWatch = undefined;
+  // Réaffichée telle quelle, une barre revient devant tout : l'Explorateur l'a remise au premier
+  // plan permanent pendant la partie, et seul le playfield reprend ensuite le premier plan (le
+  // DMD et le fronton jamais). Elle est donc d'abord rangée sous la fenêtre du menu de son
+  // écran, puis réaffichée (taskbarguard.ts). Pas au bureau ni à la fermeture : elle s'y voit.
+  const behind = !desktopMode && !desktopAllowed;
+  const stack = behind ? listWindows((w) => w.visible) : [];
+  const rects = behind ? guardedScreens().map((s) => s.rect) : [];
   for (const t of taskbarsToRestore(hidden, taskbarWindows())) {
     const w = taskbarWindows().find((x) => x.handle === t.handle);
-    if (w) showWindowInactive(w);
+    if (!w) continue;
+    const own = displayOf(w.rect, rects);
+    const under = own && coveringWindow(own, stack, guardPids);
+    if (under) placeWindowBelow(w, under);
+    showWindowInactive(w);
   }
   hiddenTaskbars = [];
   notOurs = new Set();
@@ -229,6 +277,91 @@ export function restoreTaskbars(hidden: HiddenTaskbar[] = hiddenTaskbars): void 
 
 const TASKBAR_WATCH_MS = 50;
 let taskbarWatch: NodeJS.Timeout | undefined;
+
+/** Processus dont les fenêtres couvrent les écrans : Cyber Pinball. */
+const guardPids = [process.pid];
+
+/**
+ * Gardien des barres (packages/core/src/taskbarguard.ts) : une barre des tâches trouvée devant une
+ * fenêtre du menu est rangée sous elle, sans rien activer ; jamais quand un autre programme a le
+ * premier plan (VPX en partie). Celle que Windows remet devant sans cesse est masquée comme
+ * pendant une partie, avec le même témoin, jusqu'au mode bureau ou à la fermeture.
+ */
+const taskbarGuard = new TaskbarGuard<WindowInfo>(
+  {
+    stack: () => listWindows((w) => w.visible),
+    foreground: () => foregroundWindow(),
+    placeBelow: (taskbar, under) => void placeWindowBelow(taskbar, under),
+    hide: (taskbar) => hideTaskbar(taskbar),
+    now: () => Date.now(),
+  },
+  guardPids,
+);
+
+function hideTaskbar(w: WindowInfo): boolean {
+  if (!hiddenTaskbars.some((h) => h.handle === w.handle)) {
+    hiddenTaskbars.push({ handle: w.handle, className: w.className });
+    // Sans témoin, un arrêt brutal la laisserait masquée : elle reste visible.
+    if (!writeTaskbarMarker()) {
+      hiddenTaskbars.pop();
+      return false;
+    }
+  }
+  hideWindow(w);
+  return true;
+}
+
+/** Écrans de la borne pour le gardien des barres : leur rôle et leur rectangle en pixels physiques. */
+function guardedScreens(): GuardScreen[] {
+  return desktopDisplays().map((d) => ({ name: displayName(d), rect: screen.dipToScreenRect(null, d.bounds) }));
+}
+
+/**
+ * Remet derrière le menu toute barre des tâches passée devant l'un de ses écrans ; rend le
+ * nombre de barres remises. Sans effet hors écran, au bureau, à la fermeture et pendant une relève.
+ */
+export function settleTaskbars(moment: TaskbarMoment): number {
+  if (OFFSCREEN || desktopMode || desktopAllowed || relaunching) return 0;
+  let repairs;
+  try {
+    repairs = taskbarGuard.check(guardedScreens(), moment);
+  } catch (error) {
+    // API de Windows indisponible : le constat du gardien des écrans reste.
+    console.warn(`Gardien des barres : ${(error as Error).message}`); // i18n-ignore : console
+    return 0;
+  }
+  for (const r of repairs) console.log(repairNotice(r));
+  if (repairs.length) journalScreens(moment);
+  return repairs.length;
+}
+
+/**
+ * Bascule (début et fin de partie, VPX au premier plan, retour du bureau, démarrage) : la pile
+ * des fenêtres est notée dans le journal des écrans, puis le gardien des barres passe.
+ */
+export function settleScreens(moment: TaskbarMoment): void {
+  if (OFFSCREEN) return;
+  journalScreens(moment);
+  settleTaskbars(moment);
+}
+
+/** Ce que le gardien des barres a fait depuis le démarrage (« Santé de la borne »). */
+export function taskbarFacts(): TaskbarFacts {
+  return taskbarGuard.facts();
+}
+
+/**
+ * Journal des écrans, <données>\logs\ecrans.txt : à chaque bascule, le premier plan de Windows,
+ * ce qui est au-dessus de chaque écran de la borne, et le rectangle de chaque barre des tâches.
+ */
+function journalScreens(moment: TaskbarMoment): void {
+  try {
+    const entry = stackingReport(moment, guardedScreens(), listWindows((w) => w.visible), foregroundWindow(), taskbarWindows(), guardPids);
+    appendErrorLog(path.join(locations().dataDir, 'logs', SCREENS_LOG_FILE), entry);
+  } catch {
+    // Dossier des données en lecture seule, ou API de Windows indisponible : rien n'est noté.
+  }
+}
 
 /** Nom d'un écran dans les constats : son rôle dans la borne (`bounds` en coordonnées Electron). */
 export function nameScreen(bounds: Rectangle, name: string): void {
@@ -249,6 +382,8 @@ export function setDesktopMode(on: boolean): void {
   desktopReported.clear();
   if (OFFSCREEN) return;
   if (on) {
+    journalScreens('desktop');
+    taskbarGuard.forget();
     if (hiddenTaskbars.length) restoreTaskbars();
     return;
   }
@@ -266,11 +401,14 @@ export function takeCoverIncidents(): string[] {
 function checkScreens(): void {
   if (desktopMode) return checkDesktop();
   if (desktopAllowed || relaunching) return;
+  // Une barre des tâches que Windows a fait passer devant un écran hors de toute bascule (rien
+  // ne le signale à l'application) est remise derrière ici, à la relecture qui la voit.
+  settleTaskbars('watch');
   const stack = listWindows((w) => w.visible);
   const now = Date.now();
   for (const d of desktopDisplays()) {
     const notice = coverNotice(screenCover(screen.dipToScreenRect(null, d.bounds), stack, [process.pid]));
-    const name = names.get(d.id) ?? `${d.bounds.width} × ${d.bounds.height} en ${d.bounds.x}, ${d.bounds.y}`;
+    const name = displayName(d);
     if (!notice) {
       uncoveredSince.delete(d.id);
       if (reported.delete(d.id)) console.log(`Écran « ${name} » : de nouveau couvert.`);
@@ -312,7 +450,12 @@ function checkDesktop(): void {
 }
 
 function screenName(d: Display): string {
-  return `« ${names.get(d.id) ?? `${d.bounds.width} × ${d.bounds.height} en ${d.bounds.x}, ${d.bounds.y}`} »`;
+  return `« ${displayName(d)} »`;
+}
+
+/** Rôle de l'écran dans la borne, ou sa taille et sa place s'il n'en a pas. */
+function displayName(d: Display): string {
+  return names.get(d.id) ?? `${d.bounds.width} × ${d.bounds.height} en ${d.bounds.x}, ${d.bounds.y}`;
 }
 
 function formatTitles(titles: string[]): string {

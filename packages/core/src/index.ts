@@ -39,6 +39,7 @@ export * from './sandbox';
 export * from './zones';
 export * from './dmdscreen';
 export * from './screencover';
+export * from './taskbarguard';
 export * from './shortcuts';
 export * from './coexistence';
 export * from './medias';

@@ -1021,6 +1021,17 @@ Sur la borne dont la sortie par défaut de Windows n'est pas celle du fronton (P
 | --- | --- | --- | --- |
 | 525 | Sons proposés et pages web | Fiche d'un jeu > « Médias du jeu » > « Musique du jeu » : choisir une proposition ou un son de la table. Puis « Récupérer » une vidéo sur YouTube et la lancer. | Le son proposé et celui de la vidéo YouTube sortent par les haut-parleurs du fronton, comme la musique de la roue ; rien sur la sortie par défaut de Windows. |
 
+## Barre des tâches derrière le menu
+
+Sur la borne (playfield, fronton, DMD), barre des tâches de Windows affichée sur tous les écrans (Paramètres > Personnalisation > Barre des tâches > « Afficher ma barre des tâches sur tous les écrans »), sans masquage automatique. Le journal des écrans est `<données>\logs\ecrans.txt`. La preuve sans opérateur : `packages/core/src/test/taskbarguard.test.ts` et `.\docs\demo-barre-dessus.ps1`.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 539 | Dix retours de partie | Lancer dix tables d'affilée, quitter chaque partie par Exit (ou Ctrl+Maj+K) ; regarder le DMD, le fronton et le bas du playfield à chaque retour. | Aucune barre des tâches sur aucun écran au retour, pas même un instant. Dans `ecrans.txt`, chaque « retour d’une partie » dit « couvert » pour chaque écran ; une ligne « BARRE DES TÂCHES DEVANT » est suivie, dans la même seconde, d'une entrée où l'écran est de nouveau « couvert ». |
+| 540 | Zone de travail changée | Menu des tables affiché : brancher puis débrancher un écran qui n'est pas de la borne, ou changer la taille de la barre des tâches depuis une session d'administration à distance. | La barre revient derrière le menu en moins d'une seconde et demie ; `ecrans.txt` a une entrée « changement d’écrans ou de zone de travail ». |
+| 541 | Rien pendant la partie ni au menu Démarrer | Pendant une partie, puis au menu, appuyer sur la touche Windows. | En partie, VPX reste devant et rien ne lui prend le premier plan. Au menu, le menu Démarrer et sa barre des tâches s'affichent par-dessus Cyber Pinball ; Échap les referme et le menu recouvre de nouveau tout l'écran. |
+| 542 | Santé de la borne | Après les essais 539 et 540 : Menu système > « Borne » > « Santé de la borne », groupe « Écrans ». | Si le gardien a dû agir : « Barre des tâches remise derrière le menu N fois », avec l'écran et le moment de la dernière. Aucune ligne si rien n'est jamais passé devant. « Windows remettait la barre des tâches devant… » (à vérifier) seulement si une barre a dû être masquée : noter alors l'écran et joindre `ecrans.txt`. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

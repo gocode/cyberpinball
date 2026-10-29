@@ -41,6 +41,7 @@ import {
 import { findComponent } from '@cyberpinball/installer';
 import type { Action, Built, LibraryHost } from './library';
 import { locations, vpxProfile } from './paths';
+import { taskbarFacts } from './screen-guard';
 
 export interface HealthContext {
   host: LibraryHost;
@@ -117,7 +118,8 @@ export function createHealth(ctx: HealthContext) {
     const layout = ctx.layout();
     const disks = diskFacts({ tables: layout?.tables, downloads: layout?.downloads, data: host.dataDir }, host.diskSpace ?? diskSpace);
     const vpx = { installed: host.vpxVersion?.(), known: knownVpx() };
-    const screens = host.displays ? screensFacts(loadCabinetSet(host.dataDir), host.displays(), vpxProfile(locations()).profile.displayIdFormat) : undefined;
+    // Barres des tâches que le gardien des écrans a remises derrière le menu depuis le démarrage.
+    const screens = host.displays ? { ...screensFacts(loadCabinetSet(host.dataDir), host.displays(), vpxProfile(locations()).profile.displayIdFormat), taskbars: taskbarFacts() } : undefined;
     let tables: HealthFacts['tables'];
     let pup: HealthFacts['pup'];
     if (layout) {

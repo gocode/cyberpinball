@@ -18,6 +18,10 @@ export interface StackedWindow {
   /** Rectangle en pixels physiques. */
   rect: CoverRect;
   minimized: boolean;
+  /** HWND, pour la journaliser et la désigner à Windows (barre des tâches remise derrière). */
+  handle?: bigint;
+  /** Au premier plan permanent (WS_EX_TOPMOST) : au-dessus de toute fenêtre qui ne l'est pas. */
+  topmost?: boolean;
 }
 
 /** Barre des tâches de Windows : celle de l'écran principal, puis celle de chaque autre écran. */
@@ -26,8 +30,11 @@ export const TASKBAR_CLASSES = ['Shell_TrayWnd', 'Shell_SecondaryTrayWnd'] as co
 export type ScreenCover =
   /** Une fenêtre de Cyber Pinball (ou d'un processus qui couvre pour lui) recouvre tout l'écran. */
   | { state: 'covered'; by: StackedWindow }
-  /** La barre des tâches passe devant la fenêtre qui couvre l'écran. */
-  | { state: 'taskbar' }
+  /**
+   * La barre des tâches `taskbar` passe devant la fenêtre qui couvre l'écran ; `under` : la
+   * fenêtre de Cyber Pinball qui le couvre sous elle (absente : le bureau se voit aussi).
+   */
+  | { state: 'taskbar'; taskbar: StackedWindow; under?: StackedWindow }
   /** Aucune fenêtre ne couvre l'écran : le bureau se voit. */
   | { state: 'uncovered' };
 
@@ -49,10 +56,34 @@ function intersects(a: CoverRect, b: CoverRect): boolean {
 export function screenCover(display: CoverRect, stack: StackedWindow[], coverPids: number[]): ScreenCover {
   for (const w of stack) {
     if (w.minimized) continue;
-    if ((TASKBAR_CLASSES as readonly string[]).includes(w.className) && intersects(w.rect, display)) return { state: 'taskbar' };
+    if (isTaskbar(w) && intersects(w.rect, display)) {
+      const under = coveringWindow(display, stack, coverPids);
+      return under ? { state: 'taskbar', taskbar: w, under } : { state: 'taskbar', taskbar: w };
+    }
     if (coverPids.includes(w.pid) && contains(w.rect, display)) return { state: 'covered', by: w };
   }
   return { state: 'uncovered' };
+}
+
+export function isTaskbar(w: Pick<StackedWindow, 'className'>): boolean {
+  return (TASKBAR_CLASSES as readonly string[]).includes(w.className);
+}
+
+/** La plus haute fenêtre des processus `pids` qui couvre tout l'écran `display`, quoi qu'il y ait au-dessus. */
+export function coveringWindow<W extends StackedWindow>(display: CoverRect, stack: W[], pids: number[]): W | undefined {
+  return stack.find((w) => !w.minimized && pids.includes(w.pid) && contains(w.rect, display));
+}
+
+/** Écran sur lequel est posée une fenêtre (la barre des tâches de chaque écran) : celui qu'elle recouvre le plus. */
+export function displayOf<D extends CoverRect>(rect: CoverRect, displays: D[]): D | undefined {
+  let best: D | undefined;
+  let bestArea = 0;
+  for (const d of displays) {
+    const w = Math.min(rect.x + rect.width, d.x + d.width) - Math.max(rect.x, d.x);
+    const h = Math.min(rect.y + rect.height, d.y + d.height) - Math.max(rect.y, d.y);
+    if (w > 0 && h > 0 && w * h > bestArea) [best, bestArea] = [d, w * h];
+  }
+  return best;
 }
 
 /**

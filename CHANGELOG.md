@@ -44,6 +44,7 @@ son interface).
 - Bibliothèque des amis, partagée par défaut entre amis (se coupe dans « Partage et réseau ») : « Voir sa bibliothèque » sur la fiche d'un ami montre ses tables et les médias qui vous manquent. On peut récupérer toute une table absente de sa borne, ou choisir partie par partie celles d'une table qu'on a déjà, sa version et la vôtre côte à côte ; ROM et PuP-Pack sont décochés d'office, avec une mention des droits. Tout passe par le plan d'ajout avant d'être installé ; ni sauvegardes, ni records, ni programmes ne sont envoyés.
 - Partie en direct entre amis, jusqu'à 4 bornes : l'invitation s'ouvre chez l'ami sur la même table (version vérifiée), un compte à rebours de 5 secondes lance la partie partout, puis chacun voit les résultats.
 - Le nom d'un ami suit toujours son dernier renommage, et une demande d'ami en attente repart quand les bornes se retrouvent.
+- La barre des tâches de Windows ne passe plus devant le DMD, le fronton ou le playfield au retour d'une partie : Cyber Pinball la remet aussitôt derrière, et « Santé de la borne » dit s'il a dû le faire.
 
 ## 0.1.3
 

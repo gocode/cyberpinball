@@ -23,12 +23,12 @@ test("écran couvert par une fenêtre de Cyber Pinball, même sous la fenêtre d
 test('la barre des tâches au-dessus de la fenêtre qui couvre l’écran se voit', () => {
   const taskbar = win(4, 'Shell_SecondaryTrayWnd', { x: 1920, y: 1032, width: 1920, height: 48 });
   const stack = [taskbar, win(ME, 'Chrome_WidgetWin_1', TOPPER), win(ME, 'Chrome_WidgetWin_1', PLAYFIELD)];
-  assert.deepEqual(screenCover(TOPPER, stack, [ME]), { state: 'taskbar' });
+  assert.deepEqual(screenCover(TOPPER, stack, [ME]), { state: 'taskbar', taskbar, under: stack[1] });
   // Elle n'est que sur son écran : le playfield reste couvert.
   assert.equal(screenCover(PLAYFIELD, stack, [ME]).state, 'covered');
   // Passée derrière la fenêtre plein écran, elle ne se voit plus.
   assert.equal(screenCover(TOPPER, [stack[1]!, taskbar], [ME]).state, 'covered');
-  assert.match(coverNotice({ state: 'taskbar' }) ?? '', /barre des tâches/);
+  assert.match(coverNotice({ state: 'taskbar', taskbar }) ?? '', /barre des tâches/);
 });
 
 test('sans fenêtre de Cyber Pinball sur un écran, le bureau se voit', () => {

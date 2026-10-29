@@ -24,11 +24,14 @@ const SMTO_ABORTIFHUNG = 0x0002;
 const MAX_CONTROL_TEXT = 65_536;
 const VK_MENU = 0x12;
 const SWP_NOSIZE = 0x0001;
+const SWP_NOMOVE = 0x0002;
 const SWP_NOZORDER = 0x0004;
 const SWP_NOACTIVATE = 0x0010;
 const SWP_NOOWNERZORDER = 0x0200;
 const SWP_ASYNCWINDOWPOS = 0x4000;
 const KEYEVENTF_KEYUP = 0x0002;
+const GWL_EXSTYLE = -20;
+const WS_EX_TOPMOST = 0x0008;
 
 interface Api {
   EnumWindows: NativeFn;
@@ -52,6 +55,7 @@ interface Api {
   keybd_event: NativeFn;
   SetCursorPos: NativeFn;
   SetWindowPos: NativeFn;
+  GetWindowLongPtrW: NativeFn;
 }
 
 let api: Api | undefined;
@@ -85,6 +89,7 @@ function loadApi(): Api {
     keybd_event: user32.func('void __stdcall keybd_event(uint8_t vk, uint8_t scan, uint32_t flags, uintptr_t extra)'),
     SetCursorPos: user32.func('bool __stdcall SetCursorPos(int x, int y)'),
     SetWindowPos: user32.func('bool __stdcall SetWindowPos(void *hwnd, void *after, int x, int y, int cx, int cy, uint32_t flags)'),
+    GetWindowLongPtrW: user32.func('intptr_t __stdcall GetWindowLongPtrW(void *hwnd, int index)'),
   };
   return api;
 }
@@ -101,7 +106,9 @@ export interface WindowInfo {
   visible: boolean;
   /** Réduite dans la barre des tâches. */
   minimized: boolean;
-  rect: { x: number; y: number; width: number; height: number };
+  /** Au premier plan permanent (WS_EX_TOPMOST), comme la barre des tâches devant une fenêtre ordinaire. */
+  topmost: boolean;
+  rect:{ x: number; y: number; width: number; height: number };
 }
 
 function describe(w: Api, hwnd: unknown): WindowInfo {
@@ -124,6 +131,7 @@ function describe(w: Api, hwnd: unknown): WindowInfo {
     className: cls.toString('utf16le', 0, clsLen * 2),
     visible: Boolean(w.IsWindowVisible(hwnd)),
     minimized: Boolean(w.IsIconic(hwnd)),
+    topmost: (Number(w.GetWindowLongPtrW(hwnd, GWL_EXSTYLE)) & WS_EX_TOPMOST) !== 0,
     rect: { x: left, y: top, width: rect.readInt32LE(8) - left, height: rect.readInt32LE(12) - top },
   };
 }
@@ -240,6 +248,18 @@ export function showWindowInactive(target: WindowInfo): void {
 export function moveWindow(target: WindowInfo, x: number, y: number): boolean {
   const flags = SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSIZE | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS;
   return Boolean(loadApi().SetWindowPos(target.hwnd, null, Math.round(x), Math.round(y), 0, 0, flags));
+}
+
+/**
+ * Range `target` juste sous `after` dans la pile des fenêtres, sans l'activer, la déplacer ni la
+ * redimensionner : une barre des tâches passée devant une fenêtre du menu retourne derrière elle
+ * (screen-guard.ts). Sous une fenêtre ordinaire, elle perd son premier plan permanent, comme
+ * l'Explorateur le fait lui-même devant une fenêtre plein écran active ; il le lui rend à la
+ * bascule suivante. Rien n'est enregistré dans Windows.
+ */
+export function placeWindowBelow(target: WindowInfo, after: WindowInfo): boolean {
+  const flags = SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS;
+  return Boolean(loadApi().SetWindowPos(target.hwnd, after.hwnd, 0, 0, 0, 0, flags));
 }
 
 /**

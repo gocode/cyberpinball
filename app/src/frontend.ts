@@ -155,7 +155,7 @@ import { coverDisplay, hideCovered, minimizeCovered } from './cover-display';
 import { DesktopMode } from './desktop-mode';
 import { answerLegacy, legacyDesktopTurned, orientationForDesktop, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
 import { acceptFrontends, unacceptedFrontends } from './frontend-gate';
-import { hideTaskbars, isVeil, nameScreen, relaunchCovered, restoreTaskbars, setDesktopMode, takeCoverIncidents } from './screen-guard';
+import { hideTaskbars, isVeil, nameScreen, relaunchCovered, restoreTaskbars, setDesktopMode, settleScreens, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
 import { menuRotation, openSettings } from './settings';
 import { serveMedias } from './media-protocol';
@@ -909,7 +909,8 @@ function restoreFromDesktop(): void {
   console.log('Mode bureau : retour au menu.');
   if (moved) return relaunchMenu();
   // Rappelé par le raccourci global, depuis une autre application : Windows ne laisse pas toujours le focus.
-  void takeForeground();
+  // Les barres des tâches, visibles au bureau, repassent derrière le menu.
+  void takeForeground().then(() => settleScreens('desktop-back'));
   broadcast();
 }
 
@@ -1244,7 +1245,9 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     win.loadFile(path.join(__dirname, '..', 'renderer', 'frontend.html'), { query: { role: role.id, rotation: String(turn), zones: JSON.stringify(parts), ...(playfield && { playfield: JSON.stringify(playfield) }) } });
     win.once('ready-to-show', () => {
       win.show();
-      if (role.id === 'playfield') win.focus();
+      if (role.id !== 'playfield') return;
+      win.focus();
+      settleScreens('start');
     });
     // Une fenêtre en plein écran qui revient de la barre des tâches émet « enter-full-screen »,
     // pas « restore » (Electron, Windows). Seul le playfield a un bouton dans la barre des
@@ -1554,9 +1557,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   playing = table;
   realign = simulated === undefined ? realignPlan(assignments) : undefined;
   hideTaskbars();
+  settleScreens('game');
   const startedAt = new Date();
   const onPlaying = () => {
     state = { ...state, phase: 'playing' };
+    // Journal des écrans : la pile des fenêtres, la fenêtre de jeu de VPX affichée (le gardien des barres n'y touche pas).
+    settleScreens('vpx');
     // Les amis voient la table en cours, en temps réel (pas pendant un réglage de l'affichage).
     if (!displayMode) socialNet.setPresence({ status: 'playing', table: presenceTable(table), since: new Date().toISOString() });
     hooks.onPlaying?.();
@@ -1585,10 +1591,13 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   dressing = undefined;
   displayMode = false;
 
-  // Les barres des tâches reviennent avant que le menu reprenne le premier plan : redevenu
-  // fenêtre plein écran active, il les fait repasser derrière lui.
+  // Les barres des tâches reviennent, chacune rangée sous la fenêtre du menu de son écran, puis le
+  // playfield reprend le premier plan. L'Explorateur ne range derrière une fenêtre plein écran que
+  // la barre de l'écran qui a le premier plan : celles du DMD et du fronton, jamais au premier
+  // plan, restaient devant. Le gardien des barres repasse une fois le menu revenu (taskbarguard.ts).
   restoreTaskbars();
   const focusReturned = await showMenuAgain();
+  settleScreens('return');
   // Fenêtres de l'éditeur de VPX masquées ou fermées pendant la partie : rien à faire
   // pour le joueur, mais le signe qu'un réglage ou une version de VPX a changé.
   for (const notice of result.notices) console.log(`VPX (${table.id}) : ${notice}`);

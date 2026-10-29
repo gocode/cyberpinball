@@ -25,6 +25,7 @@ import { matchScreens } from './match';
 import { ROLES, type ObservedDisplay, type RoleId } from './model';
 import { playBlockers } from './playable';
 import { systemPathOf, type SystemItemId } from './systemmenu';
+import { taskbarMomentLabel, type TaskbarFacts } from './taskbarguard';
 import { vpxDisplayName, type VpxDisplayIdFormat } from './vpx';
 
 export type HealthState = 'ok' | 'check' | 'blocking';
@@ -113,6 +114,8 @@ export interface ScreensFacts {
    * que par leur nom (10.8.1) : elle ouvre leurs fenêtres sur le premier de ces écrans.
    */
   homonyms?: { name: string; roles: RoleId[] }[];
+  /** Barres des tâches de Windows passées devant les écrans pendant la session (taskbarguard.ts). */
+  taskbars?: TaskbarFacts;
 }
 
 /** Une table dont le PuP-Pack ne se verra pas en partie, d'après son médecin. */
@@ -457,6 +460,45 @@ export function mediaLines(facts: MediaFacts): HealthLine[] {
 }
 
 export function screensLines(facts: ScreensFacts): HealthLine[] {
+  return [...configurationLines(facts), ...(facts.taskbars ? taskbarLines(facts.taskbars) : [])];
+}
+
+/**
+ * Barres des tâches que le gardien a dû remettre derrière le menu (taskbarguard.ts) : rien sans
+ * incident ; à vérifier si Windows en remettait une devant sans cesse (masquée pour la session).
+ */
+function taskbarLines(facts: TaskbarFacts): HealthLine[] {
+  if (!facts.repaired) return [];
+  const go = t('Ouvrir la configuration de la borne');
+  const target = SYSTEM('cabinet');
+  const journal = t('le journal logs\\ecrans.txt dit, à chaque bascule, quelle fenêtre était devant chaque écran');
+  if (facts.hidden.length) {
+    const screens = formatList(facts.hidden.map((name) => t('« {name} »', { name })), 'and');
+    return [
+      {
+        check: 'screens',
+        state: 'check',
+        title: t('Windows remettait la barre des tâches devant {screens}', { screens }),
+        detail: t('Remise derrière plusieurs fois en quelques secondes, elle est masquée jusqu’au bureau Windows ou à la fermeture de Cyber Pinball ; {journal}', { journal }),
+        go,
+        target,
+      },
+    ];
+  }
+  const last = facts.last ? t('la dernière sur « {screen} » ({moment})', { screen: facts.last.screen, moment: taskbarMomentLabel(facts.last.moment) }) : '';
+  return [
+    {
+      check: 'screens',
+      state: 'ok',
+      title: tn(facts.repaired, 'Barre des tâches remise derrière le menu une fois', 'Barre des tâches remise derrière le menu {n} fois'),
+      detail: [t('Windows l’avait fait passer devant un écran, le gardien des écrans l’a remise derrière'), last, journal].filter(Boolean).join(t(' ; ')),
+      go,
+      target,
+    },
+  ];
+}
+
+function configurationLines(facts: ScreensFacts): HealthLine[] {
   const go = t('Ouvrir la configuration de la borne');
   const target = SYSTEM('cabinet');
   const line = (state: HealthState, title: string, detail: string): HealthLine[] => [{ check: 'screens', state, title, detail, go, target }];

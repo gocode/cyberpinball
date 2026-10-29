@@ -1021,6 +1021,17 @@ On the cabinet whose Windows default output is not the backglass one (Settings >
 | --- | --- | --- | --- |
 | 525 | Offered sounds and web pages | A game's sheet > "Médias du jeu" (Game media) > "Musique du jeu" (Game music): pick an offer or a table sound. Then "Récupérer" (Get) a video on YouTube and play it. | The offered sound and the YouTube video's sound come out of the backglass speakers, like the wheel music; nothing on the Windows default output. |
 
+## Taskbar behind the menu
+
+On the cabinet (playfield, backglass, DMD), with the Windows taskbar shown on every screen (Settings > Personalization > Taskbar > "Show my taskbar on all displays"), not auto-hidden. The screens log is `<data>\logs\ecrans.txt`. The unattended proof: `packages/core/src/test/taskbarguard.test.ts` and `.\docs\demo-barre-dessus.ps1`.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 539 | Ten returns from a game | Start ten tables in a row, leave each game with Exit (or Ctrl+Shift+K); look at the DMD, the backglass and the bottom of the playfield at each return. | No taskbar on any screen when coming back, not even for an instant. In `ecrans.txt`, each "retour d’une partie" (back from a game) entry says "couvert" (covered) for every screen; a "BARRE DES TÂCHES DEVANT" (taskbar in front) line is followed, within the same second, by an entry where the screen is "couvert" again. |
+| 540 | Work area changed | With the table menu shown: plug then unplug a screen that is not part of the cabinet, or change the taskbar size from a remote administration session. | The taskbar goes back behind the menu within a second and a half; `ecrans.txt` has a "changement d’écrans ou de zone de travail" (screen or work area change) entry. |
+| 541 | Nothing during a game or at the Start menu | During a game, then in the menu, press the Windows key. | In game, VPX stays in front and nothing takes the foreground from it. In the menu, the Start menu and its taskbar show over Cyber Pinball; Esc closes them and the menu covers the whole screen again. |
+| 542 | Cabinet health | After tests 539 and 540: System menu > "Borne" > "Santé de la borne" (Cabinet health), "Écrans" (Screens) group. | If the guard had to act: "Barre des tâches remise derrière le menu N fois" (Taskbar put back behind the menu N times), with the screen and moment of the last one. No line if nothing ever came in front. "Windows remettait la barre des tâches devant…" (Windows kept putting the taskbar back in front of…, to check) only if a taskbar had to be hidden: then note the screen and attach `ecrans.txt`. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).
