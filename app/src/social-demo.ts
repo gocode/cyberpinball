@@ -8,8 +8,8 @@
 //   Dora   : borne voisine (réseau local simulé), sans lien ;
 //   Émile  : ami hors ligne depuis trois heures (écrit dans social.json avant le démarrage).
 // CYBERPINBALL_RESEAU_DEMO=partie : de plus, Bruno invite la borne à une partie en direct sur la
-// table qu'ils ont tous deux, lance le départ dès qu'elle accepte, joue quatre secondes et bat
-// son record.
+// table qu'ils ont tous deux, ici dans la même version (la partie se montre sans avertissement),
+// lance le départ dès qu'elle accepte, joue quatre secondes et bat son record.
 // CYBERPINBALL_RESEAU_DEMO=coupure (gestionnaire de téléchargements, docs\demo-gestionnaire-telechargements.ps1) :
 // la table que la borne n'a pas pèse 24 Mo, Bruno l'envoie à débit bridé et se déconnecte en
 // plein envoi ; =retour : au démarrage suivant de Cyber Pinball, Bruno (même borne, même clé)
@@ -132,10 +132,11 @@ function picture(width: number, height: number, hue: [number, number, number]): 
 }
 
 /**
- * Racine de Bruno : la première table de la borne (même dossier, autre .vpx : une autre version),
- * et une table que la borne n'a pas ; chacune avec quelques médias.
+ * Racine de Bruno : la première table de la borne (même dossier, autre .vpx : une autre version ;
+ * `sameVersion` : le même .vpx, pour la partie en direct), et une table que la borne n'a pas ;
+ * chacune avec quelques médias.
  */
-function brunoRoot(dir: string, mine: readonly TableEntry[], cut = false): string {
+function brunoRoot(dir: string, mine: readonly TableEntry[], cut = false, sameVersion = false): string {
   const root = path.join(dir, 'borne');
   const tables = layoutOf(root).tables;
   const folders = [...(mine[0] ? [path.basename(mine[0].folder)] : []), DEMO_TABLES.notOnCabinet];
@@ -143,7 +144,8 @@ function brunoRoot(dir: string, mine: readonly TableEntry[], cut = false): strin
     const at = path.join(tables, folder);
     fs.mkdirSync(path.join(at, 'medias'), { recursive: true });
     const vpx = path.join(at, `${folder}.vpx`);
-    if (!fs.existsSync(vpx)) fs.writeFileSync(vpx, i && cut ? bigTable(CUT_TABLE_BYTES) : Buffer.alloc(200_000 + i, 9));
+    if (!i && sameVersion && mine[0]) fs.copyFileSync(mine[0].file, vpx);
+    else if (!fs.existsSync(vpx)) fs.writeFileSync(vpx, i && cut ? bigTable(CUT_TABLE_BYTES) : Buffer.alloc(200_000 + i, 9));
     const hue: [number, number, number] = i ? [200, 90, 220] : [40, 200, 170];
     fs.writeFileSync(path.join(at, 'medias', `(Wheel) ${folder}.png`), picture(256, 256, hue));
     fs.writeFileSync(path.join(at, 'medias', `(Backglass) ${folder}.png`), picture(640, 480, hue));
@@ -260,12 +262,12 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   // Bruno devient ami (la démonstration accepte à la place du joueur), puis joue. Déjà ami (retour) : sa bibliothèque tout de suite.
   const accept = setInterval(() => {
     if (main.state().friends.some((f) => f.key === bruno.state().key.publicKey)) {
-      root ??= brunoRoot(brunoDir, mine(), cut);
+      root ??= brunoRoot(brunoDir, mine(), cut, mode === 'partie');
       clearInterval(accept);
       return;
     }
     if (main.state().incoming.some((r) => r.key === bruno.state().key.publicKey)) {
-      root ??= brunoRoot(brunoDir, mine(), cut);
+      root ??= brunoRoot(brunoDir, mine(), cut, mode === 'partie');
       main.accept(bruno.state().key.publicKey);
       clearInterval(accept);
       // Notifications : Bruno suit l'horaire de la démonstration (NOTIFICATIONS_SCRIPT).

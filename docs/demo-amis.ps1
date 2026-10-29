@@ -12,22 +12,22 @@
 #   borne a aussi : ses parties au choix, et ses médias qui manquent, pris jusqu'au brouillon.
 #   Parcours « partie » : Bruno invite la borne à une partie en direct ; l'invitation s'ouvre
 #   d'elle-même sur le menu des tables ; accepter, le salon, le compte à rebours, la partie
-#   (simulée : VPX n'est jamais lancé, CYBERPINBALL_PARTIE_SIMULEE), puis les résultats. Les
-#   émulateurs de la borne réelle (-Source) sont vus par une jonction, en lecture seule.
+#   (simulée : VPX n'est jamais lancé, CYBERPINBALL_PARTIE_SIMULEE), puis les résultats. La racine
+#   a une fausse installation de VPX (New-FauxVpx, docs\hors-ecran.ps1), jamais les vrais émulateurs.
 # Le garde-fou de mise en page (chevauchement, rognure, texte trop petit) et le guet hors écran
 # doivent rester muets.
 #   .\docs\demo-amis.ps1 [-Parcours amis, partie] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans]
 # Captures dans tmp\demo-amis\<parcours>\<écrans>\<langue>\captures.
 #   .\docs\demo-amis.ps1 -Accueil [-Langues en, fr]
-# Images de la rubrique Amis de la page d'accueil (README) : parcours « amis » seul, sur l'écran
+# Images de la rubrique Amis de la page d'accueil (README) : les deux parcours, sur l'écran
 # « borne », tables et illustrations régénérées (docs\demo-captures.cjs, docs\demo-captures-medias),
-# puis docs\images\<langue>\friends.webp (« Mes amis » et la fiche de Bruno) et friends-library.webp
-# (la bibliothèque de Bruno et sa table que la borne n'a pas), playfield remis debout.
+# puis docs\images\<langue>\friends.webp (« Mes amis » et la fiche de Bruno), friends-library.webp
+# (la bibliothèque de Bruno et sa table que la borne n'a pas) et live-game.webp (la partie en
+# direct : l'invitation de Bruno, puis les résultats), playfield remis debout.
 param(
   [string[]]$Parcours = @('amis', 'partie'),
   [string[]]$Langues = @('fr', 'en'),
   [string[]]$Ecrans = @('borne', 'poste-deux-ecrans'),
-  [string]$Source = 'D:\CyberPinball',
   [switch]$Accueil
 )
 $ErrorActionPreference = 'Stop'
@@ -35,14 +35,12 @@ $wt = Split-Path $PSScriptRoot -Parent
 . "$PSScriptRoot\hors-ecran.ps1"
 # Tout le reste tourne sur un bureau Windows caché : rien ne peut apparaître sur les écrans du poste.
 if (Enter-BureauCache $PSCommandPath $PSBoundParameters) { exit $LASTEXITCODE }
-# Parcours et écrans rejoués : -Accueil n'en garde qu'un de chaque (le parcours « partie », avec sa
-# jonction vers les émulateurs, n'a rien à faire ici).
+# Parcours et écrans rejoués : -Accueil joue les deux parcours, sur l'écran « borne » seulement.
 $parcoursJoues = $Parcours
 $ecransJoues = $Ecrans
 if ($Accueil) {
-  if ($PSBoundParameters.ContainsKey('Parcours') -and ($Parcours -ne 'amis')) { throw '-Accueil : parcours « amis » seulement.' }
   if ($PSBoundParameters.ContainsKey('Ecrans') -and ($Ecrans -ne 'borne')) { throw '-Accueil : écrans « borne » seulement.' }
-  $parcoursJoues = @('amis')
+  $parcoursJoues = @('amis', 'partie')
   $ecransJoues = @('borne')
 }
 $base = "$wt\tmp\demo-amis"
@@ -52,11 +50,14 @@ $failures = @()
 Push-Location $wt
 try { npm run build | Out-Null } finally { Pop-Location }
 
-# Une racine par parcours : celle de la partie voit les émulateurs de la borne réelle (jonction).
+# Une racine par parcours ; celle de la partie a une fausse installation de VPX (New-FauxVpx).
 # -Neuve : régénérée même si elle existe (illustrations de docs\demo-captures-medias ajoutées depuis).
-function New-Racine([string]$Nom, [switch]$Emulateurs, [switch]$Neuve) {
+function New-Racine([string]$Nom, [switch]$Vpx, [switch]$Neuve) {
   $root = "$base\racine-$Nom"
-  if ($Neuve -and (Test-Path "$root\emulators")) { throw "Racine $root : elle voit les émulateurs par une jonction, jamais régénérée." }
+  # Une racine d'avant le 29/10/2026 voyait les vrais émulateurs par une jonction : retirée sans la
+  # suivre, avant que la régénération (suppression récursive de la racine) ne passe.
+  $emulators = "$root\emulators"
+  if ((Test-Path $emulators) -and ((Get-Item $emulators -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) { cmd /c rmdir "$emulators" }
   if ($Neuve -or -not (Test-Path "$root\tables")) {
     # Write-Host : la fonction ne rend que la racine.
     Write-Host "== tables inventées et leurs médias ($Nom)"
@@ -64,10 +65,7 @@ function New-Racine([string]$Nom, [switch]$Emulateurs, [switch]$Neuve) {
     try { & $electron docs\demo-captures.cjs $root 2>&1 | ForEach-Object { Write-Host "   $_" } } finally { Pop-Location }
     if ($LASTEXITCODE -ne 0) { throw 'Génération des médias en échec.' }
   }
-  if ($Emulateurs -and -not (Test-Path "$root\emulators")) {
-    if (-not (Test-Path "$Source\emulators")) { throw "Émulateurs introuvables : $Source\emulators (-Source)." }
-    New-Item -ItemType Junction -Path "$root\emulators" -Target "$Source\emulators" | Out-Null
-  }
+  if ($Vpx) { New-FauxVpx $root }
   return $root
 }
 
@@ -113,7 +111,7 @@ function Get-Etapes([string]$Nom, $l) {
 
 try {
   foreach ($nom in $parcoursJoues) {
-    $root = if ($nom -eq 'partie') { New-Racine $nom -Emulateurs } else { New-Racine $nom -Neuve:$Accueil }
+    $root = New-Racine $nom -Vpx:($nom -eq 'partie') -Neuve:$Accueil
     foreach ($jeu in $ecransJoues) {
       Use-HorsEcran $jeu
       foreach ($langue in $Langues) {
@@ -191,6 +189,10 @@ if ($Accueil) {
     Write-Paire "$out\friends.webp" (Find-Capture $c $etapes "action:$($l.MesAmis)" 1) (Find-Capture $c $etapes 'action:Bruno' 1)
     # La bibliothèque de Bruno, et sa table que la borne n'a pas : « Récupérer toute la table ».
     Write-Paire "$out\friends-library.webp" (Find-Capture $c $etapes "action:$($l.Biblio)" 1) (Find-Capture $c $etapes 'action:Glass Lagoon' 1)
+    # Partie en direct : l'invitation de Bruno, ouverte d'elle-même, puis le départ commun (compte à rebours, joueurs prêts).
+    $etapes = Get-Etapes 'partie' $l
+    $c = "$base\partie\borne\$langue\captures"
+    Write-Paire "$out\live-game.webp" (Find-Capture $c $etapes 'wait:9000' 1) (Find-Capture $c $etapes "action:$($l.Accepter)" 1)
   }
 }
 "Captures dans $base\<parcours>\<écrans>\<langue>\captures."

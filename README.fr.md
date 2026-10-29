@@ -23,9 +23,7 @@ Cyber Pinball fait d'un PC rempli de tables Visual Pinball X une vraie borne d'a
 
 ## Jouer entre amis, de borne à borne
 
-<p align="center"><img src="docs/images/fr/friends.webp?v=218e5380dc" width="760" alt="Mes amis : Bruno est en ligne et joue à Star Courier, avec son nouveau record à l'instant, et Émile est hors ligne ; à côté, la page de Bruno, ses derniers événements et Voir sa bibliothèque."></p>
-
-<p align="center"><img src="docs/images/fr/friends-library.webp?v=a13c6b478c" width="760" alt="La bibliothèque de Bruno : les tables communes aux deux bornes et celle que cette borne n'a pas, Glass Lagoon, avec ses médias et Récupérer toute la table."></p>
+<p align="center"><img src="docs/images/fr/live-game.webp?v=57b0ba496a" width="760" alt="Une partie en direct entre bornes : à gauche, l'invitation de Bruno s'ouvre d'elle-même sur cette borne, sur Atlas Rising ; à droite, le départ commun, un compte à rebours avec les deux joueurs prêts, avant que la table démarre sur toutes les bornes à la fois."></p>
 
 Votre borne n'est plus une île. Cyber Pinball relie les bornes directement entre elles, par Internet ou par le réseau local, sans compte à créer et sans aucun serveur entre elles.
 
@@ -34,6 +32,10 @@ Votre borne n'est plus une île. Cyber Pinball relie les bornes directement entr
 - **Des tables et des médias partagés.** Parcourez la bibliothèque d'un ami : les tables que vous n'avez pas, les médias qui vous manquent. Récupérez une table entière, ou partie par partie (table, fronton, sons, médias), sa version et la vôtre côte à côte. Tout est vérifié à l'arrivée et montré dans le plan d'ajout avant la moindre installation ; ROM et PuP-Pack sont décochés par défaut.
 - **Trouver des joueurs.** Cherchez un joueur par son nom dans un annuaire que les bornes se transmettent, ou trouvez les bornes autour de vous sur le réseau local, même sans Internet. Envoyez une demande d'ami ; il accepte de son côté.
 - **Votre borne, vos règles.** Sauvegardes, fichiers de records et programmes ne quittent jamais votre borne. Le partage est activé par défaut et se coupe à un seul endroit, « Partage et réseau », qui montre aussi ce que voient les autres bornes. Construit sur Hyperswarm de [Holepunch](https://holepunch.to).
+
+<p align="center"><img src="docs/images/fr/friends.webp?v=8a30474698" width="760" alt="Mes amis : Bruno est en ligne et joue à Star Courier, avec son nouveau record à l'instant, et Émile est hors ligne ; à côté, la page de Bruno, ses derniers événements et Voir sa bibliothèque."></p>
+
+<p align="center"><img src="docs/images/fr/friends-library.webp?v=2a1884157c" width="760" alt="La bibliothèque de Bruno : les tables communes aux deux bornes et celle que cette borne n'a pas, Glass Lagoon, avec ses médias et Récupérer toute la table."></p>
 
 ## Réglée depuis la borne elle-même
 
@@ -49,7 +51,7 @@ Votre borne n'est plus une île. Cyber Pinball relie les bornes directement entr
 
 ## Un menu digne d'une vraie borne
 
-<p align="center"><img src="docs/images/fr/launch.webp?v=a90b793d83" width="900" alt="Animation du lancement sur une borne à quatre écrans : au Start, le logo de Neon Abyss s'allume sur le plateau, file vers le haut à travers le DMD et se pose sur le fronton, puis les écrans s'effacent quand Visual Pinball X prend la main."></p>
+<p align="center"><img src="docs/images/fr/launch.webp?v=eddb60de91" width="900" alt="Animation du lancement sur une borne à quatre écrans : au Start, le logo de Neon Abyss s'allume sur le plateau, file vers le haut à travers le DMD et se pose sur le fronton, puis les écrans s'effacent quand Visual Pinball X prend la main."></p>
 
 - **Une roue de médaillons** sur la vidéo du plateau de la table, une fenêtre par écran de la borne : le topper, le fronton et le DMD suivent le jeu choisi.
 - **Un DMD vivant.** Cyber Pinball dessine l'afficheur lui-même, avec sa propre police à points : le titre, PRESS START, les crédits, l'horloge et les records, dans la couleur de votre choix.

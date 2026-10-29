@@ -258,6 +258,26 @@ function Remove-JonctionsSortantes {
   }
 }
 
+# Fausse installation de VPX dans la racine d'une démonstration : la version du manifeste
+# (packages\installer\components.json), un exécutable vide, et « current » en vrai dossier avec
+# son marqueur. Le menu y voit VPX installé, et une partie simulée (CYBERPINBALL_PARTIE_SIMULEE)
+# se lance sans jamais l'exécuter. À préférer à une jonction vers les vrais émulateurs, qu'un
+# rangement du disque suivrait jusqu'à les vider (incident du 29/10/2026).
+function New-FauxVpx([string]$Racine) {
+  $manifest = Get-Content (Join-Path (Split-Path $PSScriptRoot -Parent) 'packages\installer\components.json') -Raw | ConvertFrom-Json
+  $vpx = @($manifest.components | Where-Object { $_.id -eq 'vpx' })[0]
+  $dir = Join-Path $Racine ($vpx.installDir -replace '/', '\')
+  $current = Join-Path $dir 'current'
+  # Une ancienne racine a pu garder sa jonction vers les vrais émulateurs : retirée sans la suivre.
+  $emulators = Join-Path $Racine 'emulators'
+  if ((Test-Path $emulators) -and (Get-Item $emulators -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) { cmd /c rmdir "$emulators" }
+  foreach ($d in (Join-Path $dir $vpx.version), $current) {
+    New-Item -ItemType Directory -Force $d | Out-Null
+    Set-Content (Join-Path $d 'VPinballX64.exe') '' -NoNewline
+  }
+  @{ version = $vpx.version } | ConvertTo-Json | Set-Content (Join-Path $current '.cyberpinball-component.json') -Encoding UTF8
+}
+
 # Bilan du guet de app\src\offscreen.ts (hors-ecran.txt dans le dossier des captures).
 function Assert-HorsEcran([string]$Captures) {
   if ($env:CYBERPINBALL_A_L_ECRAN -eq '1') { return }

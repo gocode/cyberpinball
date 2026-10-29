@@ -23,9 +23,7 @@ Cyber Pinball turns a PC full of Visual Pinball X tables into a real arcade cabi
 
 ## Play with friends, cabinet to cabinet
 
-<p align="center"><img src="docs/images/en/friends.webp?v=6a33108121" width="760" alt="My friends: Bruno is online and playing Star Courier, with his new high score just now, and Émile is offline; next to it, Bruno's page with his latest events and See their library."></p>
-
-<p align="center"><img src="docs/images/en/friends-library.webp?v=e86981f398" width="760" alt="Bruno's library: the tables on both cabinets and the one this cabinet does not have, Glass Lagoon, with its media and Get the whole table."></p>
+<p align="center"><img src="docs/images/en/live-game.webp?v=1db3208de7" width="760" alt="A live game between cabinets: on the left, Bruno's invitation opens by itself on this cabinet, on Atlas Rising; on the right, the shared start, a countdown with both players ready, before the table starts on every cabinet at the same time."></p>
 
 Your cabinet is no longer an island. Cyber Pinball links cabinets directly to each other, over the Internet or the local network, with no account to create and no server in between.
 
@@ -34,6 +32,10 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 - **Shared tables and media.** Browse a friend's library: the tables you don't have, the media you are missing. Fetch a whole table, or part by part (table, backglass, sounds, media), their version and yours side by side. Everything is checked on arrival and shown in the add plan before anything is installed; ROM and PuP-Pack are unticked by default.
 - **Find players.** Search for a player by name in a directory the cabinets pass to each other, or find the cabinets around you on the local network, even without the Internet. Send a friend request; they accept on their side.
 - **Your cabinet, your rules.** Saves, high-score files and programs never leave your cabinet. Sharing is on by default and turned off in one place, "Sharing and network", which also shows what other cabinets can see. Built on [Holepunch](https://holepunch.to)'s Hyperswarm.
+
+<p align="center"><img src="docs/images/en/friends.webp?v=f215598b45" width="760" alt="My friends: Bruno is online and playing Star Courier, with his new high score just now, and Émile is offline; next to it, Bruno's page with his latest events and See their library."></p>
+
+<p align="center"><img src="docs/images/en/friends-library.webp?v=9d2ac18401" width="760" alt="Bruno's library: the tables on both cabinets and the one this cabinet does not have, Glass Lagoon, with its media and Get the whole table."></p>
 
 ## Set up from the cabinet itself
 
@@ -49,7 +51,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 
 ## A menu with real cabinet presence
 
-<p align="center"><img src="docs/images/en/launch.webp?v=a90b793d83" width="900" alt="Animation of the launch on a four-screen cabinet: after Start, the Neon Abyss logo lights up on the playfield, flies up through the DMD and lands on the backglass, then the screens fade out as Visual Pinball X takes over."></p>
+<p align="center"><img src="docs/images/en/launch.webp?v=eddb60de91" width="900" alt="Animation of the launch on a four-screen cabinet: after Start, the Neon Abyss logo lights up on the playfield, flies up through the DMD and lands on the backglass, then the screens fade out as Visual Pinball X takes over."></p>
 
 - **A wheel of medallions** over the table's own playfield video, one window per cabinet screen: the topper, backglass and DMD follow the selected game.
 - **A living DMD.** Cyber Pinball draws the display itself, with its own dot font: the title, PRESS START, credits, the clock and high scores, in the colour you choose.
