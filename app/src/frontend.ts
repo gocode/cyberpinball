@@ -179,6 +179,7 @@ import { createFriendContent } from './friend-content';
 import { friendTransport } from './download-sources';
 import { createGameNotices } from './game-notice';
 import { createBallCounts } from './ball-count';
+import { createTableDoubles } from './table-double';
 import { createLiveGames } from './live-game';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
@@ -789,6 +790,11 @@ const liveCanShow = () => !closing && state.phase === 'menu';
 // Partie en direct : invitation, départ commun, puis la table lancée ici comme par Start.
 // Billes par partie (ROM, script, menu de service) : une partie en direct ne classe pas 5 billes contre 3.
 const ballCounts = createBallCounts({ dataDir: loc.dataDir, romsOf, pinmameDirs: () => (loc.root ? [path.join(loc.root, 'pinmame')] : []) });
+// Une partie entre amis se joue sur un double de la table : sa mémoire de ROM, ses records et ses
+// réglages habituels ne sont jamais ouverts en écriture (table-double.ts). Ceux d'une partie
+// interrompue par un plantage partent au démarrage.
+const tableDoubles = createTableDoubles({ root: () => loc.root, tablesDir: () => (loc.root ? layoutOf(loc.root).tables : undefined), romsOf, log: (line) => console.log(line) });
+tableDoubles.sweep();
 const liveGames = createLiveGames({
   net: socialNet,
   dataDir: loc.dataDir,
@@ -806,7 +812,7 @@ const liveGames = createLiveGames({
     // Le départ commun ferme l'écran ouvert (le compte à rebours), comme Start sur une table.
     if (library.isActive()) library.leave();
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
-    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying });
+    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying, double: `${Date.now().toString(36)}` });
     // De retour au menu : les résultats, qui se complètent à mesure que les autres reviennent.
     if (report && state.phase === 'menu') setImmediate(() => friendsMenu.live.open(() => library.leave()));
     return report ? { ok: report.result.ok, seconds: report.result.seconds, records: report.entered.map((s) => ({ score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) })) } : undefined;
@@ -1556,7 +1562,7 @@ export interface PlayReport {
  * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
  * l'a demandée (la fiche) reprend la main.
  */
-async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings } = {}): Promise<PlayReport | undefined> {
+async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string } = {}): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
   if (!install) return undefined;
   // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
@@ -1657,6 +1663,21 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
       })
     : undefined;
 
+  // Partie entre amis : VPX joue un double de la table, fait après les préparations ci-dessus ; le
+  // dossier habituel n'est jamais ouvert en écriture. Sans double possible, pas de partie : jamais
+  // de repli sur le dossier habituel.
+  const doubled = hooks.double && !displayMode ? tableDoubles.start(table, hooks.double) : undefined;
+  if (doubled && !doubled.ok) {
+    console.log(`Partie entre amis (${table.id}) : pas de double, partie non lancée (${doubled.reason}).`);
+    dressing = undefined;
+    cinema.stop();
+    state = { ...state, phase: 'message', message: { title: t('Partie entre amis impossible sur cette table : {reason}', { reason: doubled.reason }), lines: [t('Votre table habituelle reste intacte : rien n’a été lancé.')] } };
+    broadcast();
+    return undefined;
+  }
+  const double = doubled?.ok ? doubled.double : undefined;
+  const played = double?.table ?? table;
+
   // Les fenêtres du menu restent derrière VPX, sans jamais lui prendre le focus : l'écran de
   // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque
   // écran (viewFor). Celui que VPX n'occupe pas (topper, backglass sans .directb2s) reste couvert.
@@ -1688,11 +1709,14 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground })
-      : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: table.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying, onForeground });
+      : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying, onForeground });
   // Une partie simulée ne prend aucun raccourci global au poste.
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   const result = await game.done;
   gameNotices.close();
+  // Les records de la partie, lus où VPX les a écrits (le double, pour une partie entre amis) ; puis le double s'en va.
+  const recordsAfter = readTableRecords(played);
+  double?.finish();
   recording?.gameEnded();
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
   cinema.stop();
@@ -1717,7 +1741,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 
   if (mode === 'display') return { result, focusReturned, entered: [] };
   // Un score entré au tableau d'honneur pendant la partie : le knocker sonne au retour au menu.
-  const entered = result.ok ? newRecords(recordsBefore, readTableRecords(table)) : [];
+  const entered = result.ok ? newRecords(recordsBefore, recordsAfter) : [];
   for (const s of entered) console.log(`Record (${table.id}) : ${s.score}${s.initials ? ` (${s.initials})` : ''}, place ${s.rank}.`);
   if (result.ok) {
     // Les parties du test automatique ne comptent pas dans les statistiques.

@@ -241,4 +241,17 @@ export const messages: Record<string, string> = {
   '{name} vous invite à jouer': '{name} invites you to play',
   'Quittez la partie pour le rejoindre, ou continuez : elle s’efface seule': 'Leave the game to join them, or keep playing: it fades away by itself',
   'Cyber Pinball — Invitation': 'Cyber Pinball — Invitation',
+  // packages/core/src/tabledouble.ts : le double d'une table pour une partie entre amis
+  'la table partage son dossier avec d’autres tables': 'the table shares its folder with other tables',
+  'dossier illisible : {error}': 'unreadable folder: {error}',
+  'lien vers un autre dossier : {path}': 'link to another folder: {path}',
+  'ROM introuvable : PinMAME écrirait dans son dossier commun': 'ROM not found: PinMAME would write into its shared folder',
+  'la table n’est pas dans son dossier': 'the table is not in its folder',
+  'double hors du dossier des parties': 'copy outside the games folder',
+  'chemin hors du double': 'path outside the copy',
+  'les tables et le dossier des parties ne sont pas sur le même disque': 'the tables and the games folder are not on the same drive',
+  'lien impossible ({code}) : {file}': 'cannot link ({code}): {file}',
+  'pas de dossier Cyber Pinball': 'no Cyber Pinball folder',
+  'Partie entre amis impossible sur cette table : {reason}': 'Game with friends not possible on this table: {reason}',
+  'Votre table habituelle reste intacte : rien n’a été lancé.': 'Your usual table stays untouched: nothing was started.',
 };

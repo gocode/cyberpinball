@@ -17,6 +17,7 @@ son interface).
 - Une table récupérée chez un ami est reconnue à ses invitations, même quand votre borne l'a nommée autrement (« Game of Thrones (Limited Edition) » ici, « Game of Thrones LE » chez lui) : le même fichier `.vpx` est la même table. Elle garde désormais à l'installation le nom qu'elle a chez l'ami.
 - Partie en direct : chaque table a un identifiant, tiré de ses objets et de sa physique (pas des images, des sons ni des options du script). Personne n'est refusé pour une question de version : la même table, ou une version proche aux mêmes règles de score (même ROM), compte au classement ; une autre version joue avec les autres, hors classement.
 - Partie en direct : le nombre de billes par partie compte. Réglées autrement que chez celui qui invite (5 contre 3), vous jouez quand même, mais votre score reste hors classement ; l'invitation le dit avant d'accepter. Il se lit dans la ROM (tables à ROM décrites par le projet Pinball Memory Maps), le script ou le menu de service de la table.
+- Partie en direct : votre table habituelle n'est jamais modifiée. La partie se joue sur un double de la table, fait juste avant le lancement et supprimé au retour : la mémoire de la ROM, vos records et vos réglages restent tels quels.
 
 ## 0.1.4
 

@@ -1109,6 +1109,7 @@ Deux bornes amies, A et B, sur le vrai réseau, chacune avec la même table. La 
 | 577 | Quitter pour rejoindre | Inviter de nouveau B en partie ; sur B, quitter la table avant la fin des deux minutes. | Au retour au menu, « Invitation de A » s'ouvre d'elle-même ; « Accepter » mène au salon de A. |
 | 578 | Sons coupés, enregistrement | Sur B, couper « Sons de l'interface » ; puis « Jouer et enregistrer » et inviter B pendant la prise. | Sons coupés : la carte arrive sans carillon. La vidéo enregistrée ne contient pas la carte ; elle tient le coin gauche, le témoin le coin droit, sans se chevaucher. |
 | 579 | Nombre de billes | Sur B, régler une table sur 5 billes (menu de service de la ROM, ou « BALL PER GAME » de Game of Thrones) ; A l'a à 3 ; A invite B, ils jouent. | Chez B, l'invitation dit « 5 billes au lieu de 3 » et « réglez votre table sur 3 billes pour être classé » ; aux résultats, « Autre nombre de billes : score hors classement » et le score de B sans rang, « Hors classement : 5 billes au lieu de 3 ». Remis à 3 : classé. Le journal de B le note. |
+| 580 | Le dossier de la table ne bouge pas | Sur B, noter la date de `pinmame\nvram\<rom>.nv` (ou de `user\VPReg.stg`) d'une table ; jouer cette table en partie en direct, entrer un record ; revenir. | Le fichier habituel a la même date et le même contenu ; le record de la partie apparaît aux résultats. Le journal dit « double prêt », puis « dossier de la table intact (N fichiers comparés) ». Aucun dossier `parties` ne reste dans la racine. |
 
 ## Ce qui ne peut pas encore être testé
 

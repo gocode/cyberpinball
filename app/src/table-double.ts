@@ -1,0 +1,111 @@
+// Partie entre amis jouée sur un double de la table (packages/core/src/tabledouble.ts), rangé dans
+// <racine>\parties\<partie>\ : VPX ouvre le double, le dossier habituel de la table n'est jamais
+// ouvert en écriture. Le journal compare l'empreinte de ce dossier avant et après la partie (taille
+// et date de chaque fichier) : « intact », ou ce qui a bougé. Les doubles laissés par un plantage
+// partent au démarrage suivant ; supprimer un lien physique ne touche jamais l'original.
+//
+// Sans electron à l'exécution : les tests du cœur peuvent le charger.
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import {
+  folderChanges,
+  folderPrint,
+  makeTableDouble,
+  planTableDouble,
+  readVpxScript,
+  removeTableDouble,
+  t,
+  usesPinmameCode,
+  type TableEntry,
+} from '@cyberpinball/core';
+
+export interface TableDoublesOptions {
+  /** Racine de Cyber Pinball : le dossier des parties est <racine>\parties, sur le disque des tables. */
+  root(): string | undefined;
+  /** Dossier des tables (une table qui y est directement partage son dossier). */
+  tablesDir(): string | undefined;
+  romsOf?(table: TableEntry): readonly string[];
+  log?(line: string): void;
+}
+
+export interface TableDouble {
+  /** La table à lancer : le double. */
+  table: TableEntry;
+  /** Après la partie : compare le dossier habituel à son empreinte d'avant, puis supprime le double. */
+  finish(): void;
+}
+
+export function createTableDoubles(opts: TableDoublesOptions) {
+  const log = (line: string) => opts.log?.(line);
+  const partiesDir = () => {
+    const root = opts.root();
+    return root ? path.join(root, 'parties') : undefined;
+  };
+  return {
+    /** Le double de la table pour la partie `id`, ou la raison de son absence. */
+    start(table: TableEntry, id: string): { ok: true; double: TableDouble } | { ok: false; reason: string } {
+      const parties = partiesDir();
+      const tablesDir = opts.tablesDir();
+      if (!parties || !tablesDir) return { ok: false, reason: t('pas de dossier Cyber Pinball') };
+      const roms = opts.romsOf?.(table) ?? [];
+      const planned = planTableDouble(
+        {
+          file: table.file,
+          folder: table.folder,
+          ownFolder: path.resolve(table.folder).toLowerCase() !== path.resolve(tablesDir).toLowerCase(),
+          roms,
+          usesPinmame: roms.length > 0 || usesPinmameCode(readVpxScript(table.file) ?? ''),
+          pinmameDir: path.join(opts.root()!, 'pinmame'),
+        },
+        path.join(parties, id),
+      );
+      if (!planned.ok) return planned;
+      const before = folderPrint(table.folder, { contents: false });
+      const made = makeTableDouble(planned.plan, parties);
+      if (!made.ok) return made;
+      const plan = planned.plan;
+      log(`Partie entre amis (${table.id}) : double prêt, ${plan.links.length} fichiers liés, ${plan.copies.length} copiés, dans ${plan.dir}.`); // i18n-ignore : journal
+      let finished = false;
+      return {
+        ok: true,
+        double: {
+          table: { ...table, file: plan.file, folder: plan.dir },
+          finish() {
+            if (finished) return;
+            finished = true;
+            const changes = folderChanges(before, folderPrint(table.folder, { contents: false }));
+            if (changes.length) log(`Partie entre amis (${table.id}) : ATTENTION, le dossier de la table a changé pendant la partie : ${changes.slice(0, 20).join(' ; ')}.`); // i18n-ignore : journal
+            else log(`Partie entre amis (${table.id}) : dossier de la table intact (${before.size} fichiers comparés).`); // i18n-ignore : journal
+            try {
+              removeTableDouble(path.join(parties, id), parties);
+              dropIfEmpty(parties);
+            } catch (error) {
+              log(`Partie entre amis (${table.id}) : double non supprimé (${(error as Error).message}) ; il partira au prochain démarrage.`); // i18n-ignore : journal
+            }
+          },
+        },
+      };
+    },
+    /** Au démarrage : les doubles d'une partie interrompue (plantage) s'en vont. */
+    sweep(): void {
+      const parties = partiesDir();
+      if (!parties) return;
+      try {
+        removeTableDouble(parties, parties);
+        dropIfEmpty(parties);
+      } catch (error) {
+        log(`Parties entre amis : ménage des doubles impossible (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+    },
+  };
+}
+
+/** Le dossier des parties, vide, s'en va : la racine reste comme avant. */
+function dropIfEmpty(dir: string): void {
+  try {
+    fs.rmdirSync(dir);
+  } catch {
+    // Absent, ou une autre partie l'occupe.
+  }
+}

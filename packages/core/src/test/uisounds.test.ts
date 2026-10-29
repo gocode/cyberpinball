@@ -268,7 +268,10 @@ test('knocker : records lus avant la partie et au retour, sonné seulement si un
   // Jusqu'à l'accolade qui ferme la fonction, en début de ligne.
   const play = main.slice(start, start + main.slice(start).search(/\r?\n\}\r?\n/));
   assert.match(play, /const recordsBefore = readTableRecords\(table\);/);
-  assert.match(play, /const entered = result\.ok \? newRecords\(recordsBefore, readTableRecords\(table\)\) : \[\];/);
+  // Au retour, lus là où VPX les a écrits : le double d'une partie entre amis (table-double.ts), sinon la table.
+  assert.match(play, /const played = double\?\.table \?\? table;/);
+  assert.match(play, /const recordsAfter = readTableRecords\(played\);\s+double\?\.finish\(\);/);
+  assert.match(play, /const entered = result\.ok \? newRecords\(recordsBefore, recordsAfter\) : \[\];/);
   assert.match(play, /if \(entered\.length\) playUiSound\('knocker'\);/);
   // Lecture d'avant au lancement, avant la partie ; le knocker après le retour au menu (broadcast).
   assert.ok(play.indexOf('recordsBefore = readTableRecords') < play.indexOf('launchVpx('));
