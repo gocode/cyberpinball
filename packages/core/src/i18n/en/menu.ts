@@ -163,6 +163,8 @@ export const messages: Record<string, string> = {
   'Record battu, au retour de la partie': 'High score beaten, back from the game',
   'Coup de bobine': 'Coil thump',
   'Lancement en cinéma : VPX prend la main': 'Cinematic launch: VPX takes over',
+  'Carillon d’invitation': 'Invitation chime',
+  'Invitation d’un ami à une partie en direct, même pendant une partie': 'A friend’s invitation to a live game, even during a game',
   'Mode attente : {delay}': 'Attract mode: {delay}',
   'Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu': 'Random tables with their media; any button returns to the menu',
   'Après {duration} sans bouton': 'After {duration} idle',

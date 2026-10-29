@@ -1,5 +1,5 @@
 // Sons de l'interface (registre et règle : packages/core/src/uisounds.ts) : clic de
-// solénoïde, pièce, knocker, coup de bobine. Seule la fenêtre du playfield les joue, sur la sortie du son
+// solénoïde, pièce, knocker, coup de bobine, carillon d'invitation. Seule la fenêtre du playfield les joue, sur la sortie du son
 // du menu (menu-audio.js lui passe la même sortie, setSink), par-dessus la musique sans
 // jamais la toucher. Chaque son est synthétisé ici par WebAudio, à la volée : aucun
 // enregistrement, aucun fichier, aucun droit d'un tiers.
@@ -8,9 +8,10 @@
 // une partie) et l'envoie par le canal « ui-sound ». Repli de ce côté : rien ne sort quand
 // l'état dit que la partie est en cours, et tout ce qui sonne encore se tait à ce moment.
 // Seule exception, le son du passage de relais (cue.handover : le coup de bobine, quand VPX
-// prend la main) : il part au tout début de la partie et y finit de sonner.
+// prend la main) : il part au tout début de la partie et y finit de sonner. Et le son d'un
+// appel (cue.call : le carillon d'une invitation d'un ami) : il sonne aussi pendant la partie.
 //
-//   CyberUiSounds.play(id, volume, handover)  // volume de 0 à 1 ; rend true si le son part
+//   CyberUiSounds.play(id, volume, handover, call)  // volume de 0 à 1 ; rend true si le son part
 //   CyberUiSounds.setPhase(phase)   // phase de l'état (frontend.js)
 //   CyberUiSounds.setSink(sinkId)   // sortie Chromium du son du menu ; '' : par défaut
 //   CyberUiSounds.status()          // ce qui a joué, pour les essais sans opérateur
@@ -20,6 +21,8 @@
 
   /** Sons du passage de relais (UI_SOUNDS[id].handover, uisounds.ts) : les seuls permis au début de la partie. */
   const HANDOVER = new Set(['coil']);
+  /** Sons d'un appel (UI_SOUNDS[id].call, uisounds.ts) : permis pendant la partie. */
+  const CALL = new Set(['invite']);
   /** Écart minimal entre deux fois le même son, en ms : la roue qui défile vite ne mitraille pas. */
   const MIN_GAP_MS = 45;
   /** Contexte audio fermé après ce temps sans son : aucun flux ouvert sur la sortie pendant le reste du menu. */
@@ -152,6 +155,29 @@
       hiss(ac, out, t + 0.008, { freq: 650, q: 2, peak: 0.14, attack: 0.002, decay: 0.06 });
       return 0.125;
     },
+    // Carillon d'invitation (un ami invite à une partie en direct, même pendant une partie) :
+    // trois notes de cloche qui montent, la, do dièse, mi (accord majeur), à 110 ms d'écart. Le
+    // seul son musical du registre, loin des chocs mécaniques des tables : il se reconnaît
+    // par-dessus la musique de VPX. Chaque note a ses partiels de cloche (octave, 2,76, 5,4) ;
+    // la dernière tient un peu plus. 0,6 s, sans réverbération.
+    invite(ac, out, t) {
+      const notes = [
+        [0, 880, 0.3],
+        [0.11, 1108.7, 0.3],
+        [0.22, 1318.5, 0.36],
+      ];
+      const partials = [
+        [1, 0.32],
+        [2, 0.12],
+        [2.76, 0.07],
+        [5.4, 0.03],
+      ];
+      for (const [at, freq, decay] of notes) {
+        for (const [ratio, peak] of partials) tone(ac, out, t + at, { from: freq * ratio, peak, attack: 0.003, decay: decay / Math.sqrt(ratio) });
+        hiss(ac, out, t + at, { filter: 'highpass', freq: 6000, peak: 0.05, decay: 0.008 });
+      }
+      return 0.6;
+    },
   };
 
   function forget(entry) {
@@ -170,10 +196,11 @@
     }
   }
 
-  function play(id, volume, relay = false) {
+  function play(id, volume, relay = false, ring = false) {
     const recipe = RECIPES[id];
     const handover = relay && HANDOVER.has(id);
-    if ((silent && !handover) || !recipe || !(volume > 0)) return false;
+    const call = ring && CALL.has(id);
+    if ((silent && !handover && !call) || !recipe || !(volume > 0)) return false;
     const now = Date.now();
     if (now - (lastAt[id] ?? -Infinity) < MIN_GAP_MS) return false;
     lastAt[id] = now;
@@ -182,7 +209,8 @@
     out.gain.value = Math.min(1, volume);
     out.connect(ac.destination);
     const length = recipe(ac, out, ac.currentTime + 0.01);
-    const entry = { out, handover };
+    // Un son permis pendant la partie (relais, appel) n'est pas coupé par son début.
+    const entry = { out, handover: handover || call };
     entry.timer = setTimeout(() => forget(entry), (length + 0.2) * 1000);
     live.add(entry);
     history.push({ son: id, volume: Math.round(volume * 1000) / 1000 });
@@ -190,7 +218,7 @@
     return true;
   }
 
-  /** Partie en cours : rien ne sort, et ce qui sonne encore se tait, sauf le son du passage de relais. */
+  /** Partie en cours : rien ne sort, et ce qui sonne encore se tait, sauf le son du passage de relais ou d'un appel. */
   function setPhase(phase) {
     silent = phase === 'playing';
     if (!silent) return;
@@ -212,5 +240,5 @@
     status: () => ({ joues: history.slice(), muet: silent, enCours: live.size }),
   };
 
-  window.cyber?.onUiSound?.((cue) => play(cue?.id, cue?.volume, cue?.handover === true));
+  window.cyber?.onUiSound?.((cue) => play(cue?.id, cue?.volume, cue?.handover === true, cue?.call === true));
 })();

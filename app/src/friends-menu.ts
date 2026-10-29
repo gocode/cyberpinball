@@ -220,9 +220,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         { title: t('Derniers évènements'), rows: events.length ? events : [{ text: t('Rien encore : ses records, badges et parties s’afficheront ici'), tone: 'quiet' }] },
       ],
       actions: [
-        ...(online && p?.status !== 'playing'
-          ? [{ label: t('Inviter à une partie en direct'), detail: t('Chacun sur sa borne, au même moment'), icon: 'gamepad' as const, tone: 'ok' as const, run: () => live.inviteFriend(key, () => openFriend(key)) }]
-          : []),
+        // Toujours là : grisée hors ligne ; en partie, l'ami la reçoit en notification sur sa table.
+        live.friendAction(key, () => openFriend(key)),
         { label: t('Voir sa bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', run: () => libraryMenu.open(key, () => openFriend(key)) },
         { label: t('Retirer de mes amis'), detail: t('Il ne verra plus votre présence, vous ne verrez plus la sienne'), icon: 'close', run: () => confirm(t('Retirer {name} de vos amis ?', { name: f.name }), t('Retirer'), () => { net.remove(key); flash = { text: t('{name} retiré de vos amis', { name: f.name }), tone: 'ok' }; openFriends(); }, () => openFriend(key)) },
         { label: t('Bloquer'), detail: t('Plus de demande, plus de connexion avec sa borne'), icon: 'lock', run: () => confirmBlock(key, f.name, () => openFriend(key), () => openFriends()) },

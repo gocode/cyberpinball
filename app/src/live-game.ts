@@ -51,9 +51,10 @@ export interface LiveGamesOptions {
   dataDir: string;
   tables(): readonly TableEntry[];
   romsOf?(table: TableEntry): readonly string[];
-  /** En partie, ou un écran qui ne doit pas être interrompu : une invitation reçue répond « occupé ». */
-  busy(): boolean;
-  /** Une invitation est arrivée. */
+  /**
+   * Une invitation est arrivée, au menu comme pendant une partie (seule une partie en direct en
+   * cours répond « occupé ») : au joueur de choisir, quitter sa partie ou l'ignorer.
+   */
   onInvite?(invite: LiveInvite): void;
   /** C'est parti : lancer la table ; `playing` quand VPX l'affiche. */
   play(table: TableEntry, playing: () => void): Promise<LivePlayResult | undefined>;
@@ -172,7 +173,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     switch (m.t) {
       case 'game-invite': {
         const host = { key, name: net.state().friends.find((f) => f.key === key)?.name ?? m.game.players.find((p) => p.key === key)?.name ?? '?' };
-        if (opts.busy() || ongoing()) {
+        if (ongoing()) {
           net.send(key, { t: 'game-answer', game: m.game.id, answer: 'busy' });
           return;
         }

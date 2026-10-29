@@ -9,7 +9,9 @@
 //   Émile  : ami hors ligne depuis trois heures (écrit dans social.json avant le démarrage).
 // CYBERPINBALL_RESEAU_DEMO=partie : de plus, Bruno invite la borne à une partie en direct sur la
 // table qu'ils ont tous deux, ici dans la même version (la partie se montre sans avertissement),
-// lance le départ dès qu'elle accepte, joue quatre secondes et bat son record.
+// lance le départ dès qu'elle accepte, joue quatre secondes et bat son record. =en-jeu : Bruno
+// attend que la borne soit en partie, puis l'invite (la notification pendant la partie,
+// game-notice.ts) ; l'invitation s'ouvre au retour au menu.
 // CYBERPINBALL_RESEAU_DEMO=coupure (gestionnaire de téléchargements, docs\demo-gestionnaire-telechargements.ps1) :
 // la table que la borne n'a pas pèse 24 Mo, Bruno l'envoie à débit bridé et se déconnecte en
 // plein envoi ; =retour : au démarrage suivant de Cyber Pinball, Bruno (même borne, même clé)
@@ -34,7 +36,7 @@ import { createLiveGames, type LiveGames } from './live-game';
 import { createSocialNet, type SocialNet } from './social-net';
 
 export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
-  return ['1', 'partie', 'coupure', 'retour', 'notifications'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
+  return ['1', 'partie', 'en-jeu', 'coupure', 'retour', 'notifications'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
 }
 
 /**
@@ -237,12 +239,11 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   }
   let games: LiveGames | undefined;
   let starting = false;
-  if (env.CYBERPINBALL_RESEAU_DEMO === 'partie') {
+  if (mode === 'partie' || mode === 'en-jeu') {
     games = createLiveGames({
       net: bruno,
       dataDir: brunoDir,
       tables: brunoTables,
-      busy: () => false,
       play: async (_table, playing) => {
         playing();
         await new Promise((r) => setTimeout(r, 4000));
@@ -262,12 +263,12 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   // Bruno devient ami (la démonstration accepte à la place du joueur), puis joue. Déjà ami (retour) : sa bibliothèque tout de suite.
   const accept = setInterval(() => {
     if (main.state().friends.some((f) => f.key === bruno.state().key.publicKey)) {
-      root ??= brunoRoot(brunoDir, mine(), cut, mode === 'partie');
+      root ??= brunoRoot(brunoDir, mine(), cut, mode === 'partie' || mode === 'en-jeu');
       clearInterval(accept);
       return;
     }
     if (main.state().incoming.some((r) => r.key === bruno.state().key.publicKey)) {
-      root ??= brunoRoot(brunoDir, mine(), cut, mode === 'partie');
+      root ??= brunoRoot(brunoDir, mine(), cut, mode === 'partie' || mode === 'en-jeu');
       main.accept(bruno.state().key.publicKey);
       clearInterval(accept);
       // Notifications : Bruno suit l'horaire de la démonstration (NOTIFICATIONS_SCRIPT).
@@ -276,17 +277,25 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
         bruno.setPresence({ status: 'playing', table, since: new Date(Date.now() - 12 * 60_000).toISOString() });
         bruno.publish({ kind: 'record', table, score: 3_215_480_250, rank: 1, initials: 'BRU' });
       }
-      // Partie en direct : l'invitation, une fois la borne reliée et le menu affiché.
+      // Partie en direct : l'invitation, une fois la borne reliée et le menu affiché ; en-jeu, une
+      // fois la borne en partie (sa présence le dit).
       if (games) {
-        timers.push(
-          setTimeout(async () => {
-            bruno.setPresence({ status: 'menu', since: new Date().toISOString() });
-            const shared = brunoTables()[0];
-            if (!shared) return;
-            await games!.create(shared);
-            games!.invite(me.key, me.name);
-          }, 6000),
-        );
+        const invite = async () => {
+          bruno.setPresence({ status: 'menu', since: new Date().toISOString() });
+          const shared = brunoTables()[0];
+          if (!shared) return;
+          await games!.create(shared);
+          games!.invite(me.key, me.name);
+        };
+        if (mode !== 'en-jeu') timers.push(setTimeout(invite, 6000));
+        else {
+          const watch = setInterval(() => {
+            if (bruno.presenceOf(me.key)?.status !== 'playing') return;
+            clearInterval(watch);
+            timers.push(setTimeout(invite, 1500));
+          }, 300);
+          timers.push(watch);
+        }
       }
     }
   }, 100);

@@ -177,6 +177,7 @@ import { createFriendsMenu } from './friends-menu';
 import { createFirewallRule } from './firewall-rule';
 import { createFriendContent } from './friend-content';
 import { friendTransport } from './download-sources';
+import { createGameNotices } from './game-notice';
 import { createLiveGames } from './live-game';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
@@ -413,8 +414,8 @@ const library = createLibrary({
   leave: () => (state = tables.length ? { ...state, phase: 'menu' } : { ...state, phase: 'message', message: noTables() }),
   play: (table) => {
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
-    // Sans opérateur, la partie s'arrête seule après 10 s (et ne compte pas dans les statistiques).
-    void play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined);
+    // Sans opérateur, la partie s'arrête seule après 10 s, ou CYBERPINBALL_PARTIE_MS (et ne compte pas dans les statistiques).
+    void play(table, process.env.CYBERPINBALL_AUTOPILOT ? Number(process.env.CYBERPINBALL_PARTIE_MS) || 10_000 : undefined);
   },
   // Jouer et enregistrer : la même partie, l'enregistrement armé ; son écran s'ouvre au retour.
   playAndRecord: (table, settings) => {
@@ -426,6 +427,7 @@ const library = createLibrary({
   },
   recordableRoles: () => (['backglass', 'dmd'] as RecordedRole[]).filter((role) => menuAssignments[role]),
   tableSettings: (table) => openVpxSettings(table),
+  playWithFriend: (table, back) => friendsMenu.live.sheetAction(table, back),
   adjustDisplay: async (table) => {
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
     const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, 'display');
@@ -789,10 +791,12 @@ const liveGames = createLiveGames({
   dataDir: loc.dataDir,
   tables: () => tables,
   romsOf,
-  busy: () => playing !== undefined || state.phase === 'loading' || state.phase === 'playing',
+  // Le carillon d'invitation sonne au menu comme pendant une partie ; en partie, la notification
+  // se pose sur le plateau, par-dessus VPX : quitter sa partie ramène au menu, où l'invitation s'ouvre.
   onInvite: (invite) => {
-    playUiSound('coin');
-    if (liveCanShow()) friendsMenu.live.openInvite(invite.id, () => library.leave());
+    playUiSound('invite');
+    if (playing) gameNotices.show(invite);
+    else if (liveCanShow()) friendsMenu.live.openInvite(invite.id, () => library.leave());
   },
   play: async (table, onPlaying) => {
     // Le départ commun ferme l'écran ouvert (le compte à rebours), comme Start sur une table.
@@ -808,6 +812,13 @@ const liveGames = createLiveGames({
     // Le compte à rebours et l'annulation s'affichent d'eux-mêmes ; dans la gestion des tables aussi, une fois la partie acceptée.
     friendsMenu.live.follow(() => !closing && (state.phase === 'menu' || state.phase === 'library'), () => library.leave());
   },
+  log: (line) => console.log(line),
+});
+// Invitation reçue pendant la partie : carte discrète dans le coin du plateau (game-notice.ts).
+const gameNotices = createGameNotices({
+  place: playfieldPlace,
+  invites: () => liveGames.invites(),
+  captureDir: process.env.CYBERPINBALL_CAPTURE,
   log: (line) => console.log(line),
 });
 const friendsMenu = createFriendsMenu({
@@ -1677,6 +1688,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Une partie simulée ne prend aucun raccourci global au poste.
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   const result = await game.done;
+  gameNotices.close();
   recording?.gameEnded();
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
   cinema.stop();
@@ -1726,7 +1738,20 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (selection?.previous && result.ok) relaunchMenu();
   broadcast();
   if (entered.length) playUiSound('knocker');
+  // Une invitation reçue pendant la partie, encore valable : elle s'ouvre au retour au menu.
+  const invite = state.phase === 'menu' && !liveGames.current() ? liveGames.invites()[0] : undefined;
+  if (invite) friendsMenu.live.openInvite(invite.id, () => library.leave());
   return { result, focusReturned, entered };
+}
+
+/** Zone du plateau à l'écran, en pixels physiques, et le sens de sa mise en page : où se pose une notification pendant la partie. */
+function playfieldPlace(): { zone: Rect; rotation: Rotation } | undefined {
+  const display = menuAssignments.playfield;
+  if (!display) return undefined;
+  const cabinet = loadCabinet(loc.dataDir);
+  const zone = cabinet ? cabinetZones(cabinet)?.playfield : undefined;
+  const r = zone ? zoneRect(zone, display.bounds) : { x: 0, y: 0, width: display.bounds.width, height: display.bounds.height };
+  return { zone: { x: display.bounds.x + r.x, y: display.bounds.y + r.y, width: r.width, height: r.height }, rotation };
 }
 
 /**

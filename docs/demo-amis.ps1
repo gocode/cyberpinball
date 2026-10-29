@@ -14,9 +14,13 @@
 #   d'elle-même sur le menu des tables ; accepter, le salon, le compte à rebours, la partie
 #   (simulée : VPX n'est jamais lancé, CYBERPINBALL_PARTIE_SIMULEE), puis les résultats. La racine
 #   a une fausse installation de VPX (New-FauxVpx, docs\hors-ecran.ps1), jamais les vrais émulateurs.
+#   Parcours « en-jeu » : Start lance une partie (simulée) ; Bruno invite la borne pendant qu'elle
+#   joue : carillon, carte dans le coin du plateau (captures invitation-en-partie-full puis
+#   -compact), puis, au retour au menu, l'invitation ouverte d'elle-même. Fausse installation de
+#   VPX comme « partie ».
 # Le garde-fou de mise en page (chevauchement, rognure, texte trop petit) et le guet hors écran
 # doivent rester muets.
-#   .\docs\demo-amis.ps1 [-Parcours amis, partie] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans]
+#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans]
 # Captures dans tmp\demo-amis\<parcours>\<écrans>\<langue>\captures.
 #   .\docs\demo-amis.ps1 -Accueil [-Langues en, fr]
 # Images de la rubrique Amis de la page d'accueil (README) : les deux parcours, sur l'écran
@@ -25,7 +29,7 @@
 # (la bibliothèque de Bruno et sa table que la borne n'a pas) et live-game.webp (la partie en
 # direct : l'invitation de Bruno, puis les résultats), playfield remis debout.
 param(
-  [string[]]$Parcours = @('amis', 'partie'),
+  [string[]]$Parcours = @('amis', 'partie', 'en-jeu'),
   [string[]]$Langues = @('fr', 'en'),
   [string[]]$Ecrans = @('borne', 'poste-deux-ecrans'),
   [switch]$Accueil
@@ -72,11 +76,22 @@ function New-Racine([string]$Nom, [switch]$Vpx, [switch]$Neuve) {
 $Exit = 'Escape'
 # Libellés : ceux de la langue de l'essai (l'autopilote choisit une action par son libellé).
 $libelles = @{
-  'fr' = @{ Amis = 'Amis'; MesAmis = 'Mes amis'; Trouver = 'Trouver un joueur'; Chercher = 'Chercher un nom'; Demandes = 'Demandes d'; Badges = 'Mes badges'; Partage = 'Partage et réseau'; Biblio = 'Voir sa bibliothèque'; Prendre = 'Récupérer le'; Toute = 'Récupérer toute la table'; Parties = 'Choisir les parties'; Accepter = 'Accepter'; Fermer = 'Fermer' }
-  'en' = @{ Amis = 'Friends'; MesAmis = 'My friends'; Trouver = 'Find a player'; Chercher = 'Search for a name'; Demandes = 'Friend requests'; Badges = 'My badges'; Partage = 'Sharing and network'; Biblio = 'See their library'; Prendre = 'Get the'; Toute = 'Get the whole table'; Parties = 'Choose parts'; Accepter = 'Accept'; Fermer = 'Close' }
+  'fr' = @{ Plus = 'Répondre plus tard'; Amis = 'Amis'; MesAmis = 'Mes amis'; Trouver = 'Trouver un joueur'; Chercher = 'Chercher un nom'; Demandes = 'Demandes d'; Badges = 'Mes badges'; Partage = 'Partage et réseau'; Biblio = 'Voir sa bibliothèque'; Prendre = 'Récupérer le'; Toute = 'Récupérer toute la table'; Parties = 'Choisir les parties'; Accepter = 'Accepter'; Fermer = 'Fermer' }
+  'en' = @{ Plus = 'Answer later'; Amis = 'Friends'; MesAmis = 'My friends'; Trouver = 'Find a player'; Chercher = 'Search for a name'; Demandes = 'Friend requests'; Badges = 'My badges'; Partage = 'Sharing and network'; Biblio = 'See their library'; Prendre = 'Get the'; Toute = 'Get the whole table'; Parties = 'Choose parts'; Accepter = 'Accept'; Fermer = 'Close' }
 }
 
 function Get-Etapes([string]$Nom, $l) {
+  if ($Nom -eq 'en-jeu') {
+    # Le menu des tables, Start (la fiche, avec « Jouer avec un ami »), « Jouer » : la partie simulée
+    # dure 24 s (CYBERPINBALL_PARTIE_MS). Bruno invite 1,5 s après l'avoir vue en partie : la carte,
+    # puis la pastille après 12 s. Au retour au menu, l'invitation s'ouvre d'elle-même ; « Répondre
+    # plus tard » la laisse.
+    return @(
+      'wait:1500', 'wait:7000', 'Enter', 'wait:800', 'action:Jouer',
+      'until:playing', 'until:library', 'wait:2500',
+      "action:$($l.Plus)", 'wait:800'
+    )
+  }
   if ($Nom -eq 'partie') {
     # Le menu des tables, puis l'invitation de Bruno (six secondes après l'amitié), ouverte d'elle-même ;
     # Bruno donne le départ peu après l'acceptation ; la partie simulée dure dix secondes.
@@ -111,7 +126,7 @@ function Get-Etapes([string]$Nom, $l) {
 
 try {
   foreach ($nom in $parcoursJoues) {
-    $root = New-Racine $nom -Vpx:($nom -eq 'partie') -Neuve:$Accueil
+    $root = New-Racine $nom -Vpx:($nom -in 'partie', 'en-jeu') -Neuve:$Accueil
     foreach ($jeu in $ecransJoues) {
       Use-HorsEcran $jeu
       foreach ($langue in $Langues) {
@@ -128,14 +143,15 @@ try {
         $env:CYBERPINBALL_ROOT = $root
         $env:CYBERPINBALL_LANGUE = $langue
         $env:CYBERPINBALL_RESEAU = 'simule'
-        $env:CYBERPINBALL_RESEAU_DEMO = if ($nom -eq 'partie') { 'partie' } else { '1' }
-        if ($nom -eq 'partie') { $env:CYBERPINBALL_PARTIE_SIMULEE = 'backglass' } else { Remove-Item Env:CYBERPINBALL_PARTIE_SIMULEE -ErrorAction SilentlyContinue }
+        $env:CYBERPINBALL_RESEAU_DEMO = if ($nom -in 'partie', 'en-jeu') { $nom } else { '1' }
+        if ($nom -in 'partie', 'en-jeu') { $env:CYBERPINBALL_PARTIE_SIMULEE = 'backglass' } else { Remove-Item Env:CYBERPINBALL_PARTIE_SIMULEE -ErrorAction SilentlyContinue }
+        if ($nom -eq 'en-jeu') { $env:CYBERPINBALL_PARTIE_MS = '24000' } else { Remove-Item Env:CYBERPINBALL_PARTIE_MS -ErrorAction SilentlyContinue }
         $env:CYBERPINBALL_AUTOPILOT = (Get-Etapes $nom $l) -join ','
         $env:CYBERPINBALL_CAPTURE = "$dossier\captures"
         if (Test-Path $env:CYBERPINBALL_CAPTURE) { Remove-Item -Recurse -Force $env:CYBERPINBALL_CAPTURE }
         Push-Location $wt
         try { $log = & $electron app 2>&1 | ForEach-Object { "$_" } } finally { Pop-Location }
-        $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Réseau|Partie en direct|Bibliothèque partagée|Téléchargements)' } | ForEach-Object { Write-Host "   $_" }
+        $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Réseau|Partie en direct|Invitation pendant la partie|Bibliothèque partagée|Téléchargements)' } | ForEach-Object { Write-Host "   $_" }
         $id = "$nom/$jeu/$langue"
         if ($log -match 'Autopilote : (aucun|phase)') { $failures += "$id : une étape rejouée n'a pas trouvé son écran ou sa phase" }
         if ($log -match 'Traduction manquante') { $failures += "$id : texte sans traduction" }
@@ -144,6 +160,12 @@ try {
         # Deux réceptions (ses médias, puis toute sa table), chacune une ligne « fini » du gestionnaire (titre dans la langue de l'essai).
         if ($nom -eq 'amis' -and @($log | Select-String -Pattern 'Téléchargements : « .+ » fini \([1-9]\d* fichier\(s\)\)').Count -lt 2) { $failures += "$id : les médias ou la table de Bruno ne sont pas arrivés" }
         if ($nom -eq 'amis' -and ($log -match 'Téléchargements : .* en échec')) { $failures += "$id : une réception de Bruno a échoué" }
+        if ($nom -eq 'en-jeu') {
+          foreach ($etat in 'full', 'compact') {
+            if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\invitation-en-partie-$etat.png")) { $failures += "$id : pas de capture de l'invitation pendant la partie ($etat)" }
+          }
+          if ($log -match 'Invitation pendant la partie \([a-z]+\) : (?!mise en page conforme)') { $failures += "$id : mise en page de l'invitation pendant la partie" }
+        }
         Assert-HorsEcran $env:CYBERPINBALL_CAPTURE
         $report = "$env:CYBERPINBALL_CAPTURE\mise-en-page.txt"
         if (-not (Test-Path $report)) { $failures += "$id : relevé de mise en page absent" }
@@ -152,7 +174,7 @@ try {
     }
   }
 } finally {
-  Remove-Item Env:CYBERPINBALL_LANGUE, Env:CYBERPINBALL_AUTOPILOT, Env:CYBERPINBALL_CAPTURE, Env:CYBERPINBALL_HOME, Env:CYBERPINBALL_ROOT, Env:CYBERPINBALL_RESEAU, Env:CYBERPINBALL_RESEAU_DEMO, Env:CYBERPINBALL_PARTIE_SIMULEE -ErrorAction SilentlyContinue
+  Remove-Item Env:CYBERPINBALL_LANGUE, Env:CYBERPINBALL_AUTOPILOT, Env:CYBERPINBALL_CAPTURE, Env:CYBERPINBALL_HOME, Env:CYBERPINBALL_ROOT, Env:CYBERPINBALL_RESEAU, Env:CYBERPINBALL_RESEAU_DEMO, Env:CYBERPINBALL_PARTIE_SIMULEE, Env:CYBERPINBALL_PARTIE_MS -ErrorAction SilentlyContinue
 }
 
 if ($failures.Count) { throw "Démonstration du réseau des bornes en échec :`n  $($failures -join "`n  ")" }

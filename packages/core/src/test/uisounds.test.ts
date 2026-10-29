@@ -39,15 +39,36 @@ test('rien ne joue quand les sons sont coupés, à 0 %, en mode attente ou penda
       assert.equal(uiSoundCue(id, off, moment), undefined, `${id} coupé, ${moment}`);
       assert.equal(uiSoundCue(id, silent, moment), undefined, `${id} à 0 %, ${moment}`);
     }
-    const relay = UI_SOUNDS[id].handover ? { handover: true } : {};
-    // Pendant la partie : seul le son du passage de relais (le coup de bobine, quand VPX prend la main).
-    assert.deepEqual(uiSoundCue(id, S, 'game'), UI_SOUNDS[id].handover ? { id, volume: playVolume(50), handover: true } : undefined, `${id} pendant la partie`);
+    const relay = { ...(UI_SOUNDS[id].handover ? { handover: true } : {}), ...(UI_SOUNDS[id].call ? { call: true } : {}) };
+    // Pendant la partie : seuls le son du passage de relais (le coup de bobine, quand VPX prend la
+    // main) et celui d'un appel (le carillon d'une invitation, qui attend une réponse).
+    const allowed = UI_SOUNDS[id].handover || UI_SOUNDS[id].call;
+    assert.deepEqual(uiSoundCue(id, S, 'game'), allowed ? { id, volume: playVolume(50), ...relay } : undefined, `${id} pendant la partie`);
     assert.equal(uiSoundCue(id, S, 'attract'), undefined, `${id} en mode attente`);
     assert.deepEqual(uiSoundCue(id, S, 'browse'), { id, volume: playVolume(50), ...relay });
     // La pièce tombe au Start : le chargement précède l'arrivée de VPX.
     assert.deepEqual(uiSoundCue(id, { ...S, uiSoundsVolume: 80 }, 'loading'), { id, volume: 0.8, ...relay });
   }
   assert.deepEqual(UI_SOUND_IDS.filter((id) => UI_SOUNDS[id].handover), ['coil'], 'un seul son de relais');
+  assert.deepEqual(UI_SOUND_IDS.filter((id) => UI_SOUNDS[id].call), ['invite'], 'un seul son d’appel');
+});
+
+test('fenêtre : le carillon d’une invitation sonne pendant la partie, et seulement lui', () => {
+  const w = uiSoundsWindow();
+  w.api.setPhase('playing');
+  w.cue({ id: 'invite', volume: 0.5, call: true });
+  assert.equal(w.api.status().enCours, 1, 'le carillon sonne');
+  w.api.setPhase('playing');
+  assert.equal(w.api.status().enCours, 1, 'un état de la partie renvoyé ne le coupe pas');
+  // Un autre son se réclamant d'un appel ne passe pas ; le carillon sans le drapeau non plus.
+  w.clock.now += 100;
+  w.cue({ id: 'knocker', volume: 0.5, call: true });
+  w.cue({ id: 'invite', volume: 0.5 });
+  assert.deepEqual(Array.from(w.api.status().joues, (h) => h.son), ['invite']);
+  const closed = w.log.closed;
+  w.flush();
+  assert.equal(w.api.status().enCours, 0);
+  assert.ok(w.log.closed > closed, 'contexte audio fermé après le carillon');
 });
 
 test('fenêtre : le coup de bobine du relais part au début de la partie et y finit de sonner, seul', () => {

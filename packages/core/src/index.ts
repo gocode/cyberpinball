@@ -106,3 +106,4 @@ export * from './friendlibrary';
 export * from './livegame';
 export * from './notices';
 export * from './gamerecording';
+export * from './gamenotice';

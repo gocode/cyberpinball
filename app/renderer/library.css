@@ -569,6 +569,12 @@ body.mouse .lib-zone-tag:hover {
   color: var(--danger);
 }
 
+/* Action indisponible (« Jouer avec un ami » sans ami en ligne, un ami hors ligne) : grisée, sa
+   raison dans le détail ; choisie, elle garde l'aplat pour qu'on lise cette raison. */
+.lib-action.tone-quiet:not(.current) {
+  color: var(--ink-faint);
+}
+
 /* Sur une entrée à icône, la pastille passe en haut à droite de l'icône. */
 .lib-action-glyph .lib-attention {
   position: absolute;
@@ -2131,11 +2137,6 @@ body.mouse .lib-health .health-line:not(.selected):hover {
 
 .lib-picker .kind-places .lib-row-text {
   min-width: 0;
-}
-
-.lib-picker .lib-action.tone-quiet:not(.current),
-.lib-downloads .lib-action.tone-quiet:not(.current) {
-  color: var(--ink-faint);
 }
 
 @container (orientation: portrait) {

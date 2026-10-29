@@ -1096,6 +1096,19 @@ On the cabinet, with VPX and a table that already has a playfield video. The una
 | 571 | Leaving before the end | "Jouer et enregistrer" with 30 s; leave the table after about fifteen seconds; then another time after 3 s. | First time: "… secondes enregistrées : la table a été quittée avant la fin …" (… seconds recorded: the table was left before the end), the video stops before VPX closes (neither its menu nor the desktop at the end). Second time: "trop court pour la roue" (too short for the wheel), nothing is kept. |
 | 572 | Keep aside, choose later | Back from a recording, "Garder de côté" (Keep aside); then sheet > "Médias du jeu" > "Plateau" > "Voir les propositions" (See the proposals). | The wheel has not changed. In the proposals, the recording comes first ("Enregistré en partie : …", Recorded in game); choosing it then "Enregistrer" (Save) puts it on the wheel, the original staying aside. |
 
+## Invitation during a game and "Play with a friend"
+
+Two friend cabinets, A and B, on the real network, each with the same table. The unattended proof: `packages/core/src/test/invitation-en-partie.test.ts`, `friends-menu.test.ts` and the demo `.\docs\demo-amis.ps1 -Parcours en-jeu` (simulated game, simulated network).
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 573 | Invitation greyed out | On A, B turned off: System menu > "Amis" (Friends) > "Mes amis" (My friends) > B. | "Inviter à une partie en direct" (Invite to a live game) is there, greyed out, "Hors ligne : invitez-le quand il sera connecté" (Offline: invite them once they are connected); Start does nothing. Turn B on: it becomes active again. |
+| 574 | Play with a friend, from a table's page | On A, a table's page > "Jouer avec un ami" (Play with a friend, under "Jouer"); first with B off, then on. | B off: greyed out, "Aucun ami en ligne pour l'instant" (No friend online right now). B on: "1 ami en ligne…" (1 friend online…); the screen lists B online ("l'a aussi", has it too, if they have the table); Start on B opens the room, the invitation leaves. |
+| 575 | Chime and card during the game | Start a table on B; from A, invite B. | On B, during the game: the chime (three rising notes) and a card in the playfield's top left as the player sees it: "A vous invite à jouer" (A invites you to play), the table, the time left, "Quittez la partie pour le rejoindre…" (Leave the game to join them…). Flippers, Start and MagnaSave respond as usual: the card never takes the focus. On A, the room says "Invité, en partie : notifié sur sa table…" (Invited, in a game: notified on their table…). |
+| 576 | Pill, then ignore | Keep playing on B without doing anything. | After a dozen seconds, the card shrinks to a pill "Invitation de A" (Invitation from A) with the time left; after the two minutes, it disappears; on A, "Pas de réponse" (No answer). |
+| 577 | Leave to join | Invite B again while in a game; on B, leave the table before the two minutes are up. | Back in the menu, "Invitation de A" opens by itself; "Accepter" (Accept) leads to A's room. |
+| 578 | Sounds off, recording | On B, turn off "Sons de l'interface" (Interface sounds); then "Jouer et enregistrer" (Play and record) and invite B during the take. | Sounds off: the card arrives without the chime. The recorded video does not contain the card; it holds the left corner, the indicator the right corner, without overlapping. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

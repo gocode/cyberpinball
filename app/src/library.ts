@@ -226,6 +226,11 @@ export interface LibraryHost {
   /** Réglages de VPX propres à cette table (écran des réglages, settings.ts). */
   tableSettings?(table: TableEntry): void;
   /**
+   * « Jouer avec un ami » (live-game-menu.ts) : l'entrée de la fiche, active quand un ami est en
+   * ligne, grisée avec sa raison sinon ; `back` rouvre la fiche.
+   */
+  playWithFriend?(table: TableEntry, back: () => void): Action;
+  /**
    * Partie de réglage de l'affichage (« Régler l'affichage en partie ») : VPX démarre la table
    * menu ouvert sur le cadrage, sans statistiques ; undefined si elle n'a pas démarré pour une
    * raison que le menu affiche (écrans à revoir).
@@ -1568,6 +1573,7 @@ export function createLibrary(host: LibraryHost) {
           host.play(table);
         },
       },
+      ...(host.playWithFriend ? [{ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }] : []),
       ...further,
       ...SHEET_PAGE_TYPES.map((type) => pagesAction(table, type)),
       { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },

@@ -720,9 +720,10 @@ test('fenêtre au-dessus du menu (« Récupérer ») : aucune fenêtre de la bor
   const dir = path.join(__dirname, '..', '..', '..', '..', 'app', 'src');
   const onTop = fs.readdirSync(dir).filter((f) => f.endsWith('.ts') && /\.setAlwaysOnTop\(true/.test(fs.readFileSync(path.join(dir, f), 'utf8')));
   assert.ok(onTop.includes('acquire-window.ts'));
-  // Témoin de l'enregistrement d'une partie : au-dessus de VPX pendant la partie, jamais focalisé ni
-  // cliquable ; reprendre le focus le volerait à VPX. Il le dit par ses options, vérifiées ici.
-  const neverFocused = ['game-recording.ts'];
+  // Témoin de l'enregistrement d'une partie et invitation d'un ami pendant la partie : au-dessus de
+  // VPX, jamais focalisés ni cliquables ; reprendre le focus le volerait à VPX. Ils le disent par
+  // leurs options, vérifiées ici.
+  const neverFocused = ['game-recording.ts', 'game-notice.ts'];
   for (const f of neverFocused) {
     const source = fs.readFileSync(path.join(dir, f), 'utf8');
     assert.match(source, /focusable: false,[\s\S]*?alwaysOnTop: true/, `${f} : fenêtre au-dessus non focalisable`);

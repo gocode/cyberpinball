@@ -106,7 +106,6 @@ function cabinet(name: string, bootstrap: { host: string; port: number }[], medi
     net,
     dataDir,
     tables,
-    busy: () => false,
     play: async (table: TableEntry, playing: () => void): Promise<{ ok: boolean; seconds: number; records: LiveRecord[] }> => {
       plays.push(table.title);
       playing();

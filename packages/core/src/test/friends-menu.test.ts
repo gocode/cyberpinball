@@ -1,7 +1,8 @@
 // Écrans « Amis » (app/src/friends-menu.ts, compilé) sur un réseau coupé : ce que chaque entrée
 // ouvre, la sélection de « Partage et réseau » sur « Retour » (un Start par mégarde ne coupe pas
 // le partage), le pare-feu à autoriser seulement quand la règle manque, les actions uniques ; la
-// bibliothèque partagée seulement après l'avertissement ; chaque écran d'une partie en direct.
+// bibliothèque partagée seulement après l'avertissement ; chaque écran d'une partie en direct ;
+// l'invitation toujours là, grisée avec sa raison, et « Jouer avec un ami » sur la fiche d'une table.
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -17,6 +18,8 @@ const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
 
 interface Action {
   label: string;
+  detail?: string;
+  tone?: string;
   icon?: string;
   run: () => void | Promise<void>;
 }
@@ -33,7 +36,9 @@ interface Item {
 }
 
 /* eslint-disable @typescript-eslint/no-require-imports */
-const { createFriendsMenu } = require(path.join(APP_DIST, 'friends-menu.js')) as { createFriendsMenu(host: object): { items: Record<string, Item>; live: { open(back: () => void): void } } };
+const { createFriendsMenu } = require(path.join(APP_DIST, 'friends-menu.js')) as {
+  createFriendsMenu(host: object): { items: Record<string, Item>; live: { open(back: () => void): void; sheetAction(table: object, back: () => void): Action } };
+};
 const { createSocialNet } = require(path.join(APP_DIST, 'social-net.js')) as { createSocialNet(o: object): { state(): { shareLibrary: boolean; key: { publicKey: string } } } };
 const { createFirewallRule } = require(path.join(APP_DIST, 'firewall-rule.js')) as { createFirewallRule(o: object): { check(): Promise<string> } };
 const { createFriendContent } = require(path.join(APP_DIST, 'friend-content.js')) as { createFriendContent(o: object): object };
@@ -62,12 +67,14 @@ function fakeGames() {
   return games;
 }
 
-function setup(content?: object) {
+/** `presence` : Bruno vu en ligne, dans le menu ou en partie (le réseau reste coupé). */
+function setup(content?: object, presence?: 'menu' | 'playing') {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-friends-menu-'));
   // Un ami déjà là (hors ligne : réseau coupé).
   fs.writeFileSync(path.join(dir, 'social.json'), JSON.stringify({ ...newSocialState(), friends: [{ key: FRIEND, name: 'Bruno', since: new Date().toISOString(), events: [] }] }));
   const opened: { build: Build; at?: number }[] = [];
-  const net = createSocialNet({ dataDir: dir, mode: 'off' });
+  const off = createSocialNet({ dataDir: dir, mode: 'off' });
+  const net = presence ? { ...off, online: () => true, presenceOf: () => ({ status: presence, since: new Date().toISOString(), ...(presence === 'playing' ? { table: { title: 'Glass Lagoon' } } : {}) }) } : off;
   const firewall = createFirewallRule({ exe: 'C:\\x\\CyberPinball.exe', simulated: true });
   const games = fakeGames();
   const menu = createFriendsMenu({
@@ -144,6 +151,51 @@ test('bibliothèque partagée : active par défaut entre amis, coupée et remise
   await last().build().actions.find((a) => a.label === 'Partager ma bibliothèque avec mes amis')!.run();
   assert.equal(net.state().shareLibrary, true);
   uniqueIcons(last().build(), 'Partage et réseau');
+});
+
+/** La fiche de Bruno. */
+async function friendPage(menu: ReturnType<typeof setup>['menu'], last: ReturnType<typeof setup>['last']): Promise<Built> {
+  menu.items.friends!.run();
+  await last().build().actions.find((a) => a.label.startsWith('Bruno'))!.run();
+  return last().build();
+}
+
+test('fiche d’un ami : l’invitation toujours là, grisée hors ligne, active en partie avec la notification annoncée', async () => {
+  const offline = setup();
+  const invite = (b: Built) => b.actions.find((a) => a.label === 'Inviter à une partie en direct');
+  const grey = invite(await friendPage(offline.menu, offline.last));
+  assert.equal(grey?.tone, 'quiet');
+  assert.equal(grey?.detail, 'Hors ligne : invitez-le quand il sera connecté');
+  const before = offline.opened.length;
+  await grey!.run();
+  assert.equal(offline.opened.length, before, 'grisée : Start n’ouvre rien');
+  const menu = setup(undefined, 'menu');
+  assert.equal(invite(await friendPage(menu.menu, menu.last))?.detail, 'Chacun sur sa borne, au même moment');
+  const playing = setup(undefined, 'playing');
+  const active = invite(await friendPage(playing.menu, playing.last));
+  assert.equal(active?.tone, 'ok');
+  assert.equal(active?.detail, 'En partie : il recevra une notification discrète sur sa table');
+  await active!.run();
+  assert.equal(playing.last().build().heading, 'Partie en direct avec Bruno');
+});
+
+test('« Jouer avec un ami » : grisée sans ami en ligne ; sinon le choix de l’ami, en partie compris', async () => {
+  const table = { file: 'C:\\t\\Glass Lagoon.vpx', title: 'Glass Lagoon', info: {} };
+  const back = () => undefined;
+  const offline = setup();
+  const grey = offline.menu.live.sheetAction(table, back);
+  assert.deepEqual([grey.label, grey.tone, grey.detail], ['Jouer avec un ami', 'quiet', 'Aucun ami en ligne pour l’instant']);
+  const playing = setup(undefined, 'playing');
+  const active = playing.menu.live.sheetAction(table, back);
+  assert.deepEqual([active.tone, active.detail], ['ok', '1 ami en ligne : chacun sur sa borne, au même moment']);
+  await active.run();
+  const choose = playing.last().build();
+  assert.equal(choose.heading, 'Jouer avec un ami');
+  const row = choose.sections[0]!.rows[0] as { text: string; detail?: string };
+  assert.ok(row.text.startsWith('Bruno'));
+  assert.equal(row.detail, 'En partie : notifié sur sa table');
+  assert.deepEqual(choose.actions.map((a) => a.label), ['Bruno', 'Retour']);
+  uniqueIcons(choose, 'Jouer avec un ami');
 });
 
 test('fiche d’un ami et sa bibliothèque : actions uniques, Retour en dernier', async () => {

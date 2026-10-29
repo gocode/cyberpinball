@@ -259,7 +259,12 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       const missing = missingMedias(entry, has!);
       if (missing.length) actions.push({ label: tn(missing.length, 'Récupérer le média manquant', 'Récupérer les {n} médias manquants'), detail: formatSize(librarySize(missing)), icon: 'image-download', tone: 'ok', run: () => startFetch(key, owned, entry.id, missing, back) });
       if (entry.medias.length && missing.length < entry.medias.length) actions.push({ label: tn(entry.medias.length, 'Récupérer son média', 'Récupérer les {n} médias'), detail: t('{size} · remplaceront les vôtres après vérification et enregistrement', { size: formatSize(librarySize(entry.medias)) }), icon: 'download', run: () => startFetch(key, owned, entry.id, entry.medias, back) });
-      if (host.net.online(key)) actions.push({ label: t('Inviter {name} à jouer', { name: plain }), detail: t('Partie en direct sur cette table'), icon: 'gamepad', run: () => host.live.inviteOn(owned, key, () => openTable(key, tableId, back)) });
+      // Toujours là : grisée hors ligne ; en partie, l'ami la reçoit en notification sur sa table.
+      actions.push(
+        host.net.online(key)
+          ? { label: t('Inviter {name} à jouer', { name: plain }), detail: t('Partie en direct sur cette table'), icon: 'gamepad', run: () => host.live.inviteOn(owned, key, () => openTable(key, tableId, back)) }
+          : { label: t('Inviter {name} à jouer', { name: plain }), detail: t('Hors ligne : invitez-le quand il sera connecté'), icon: 'gamepad', tone: 'quiet', run: () => undefined },
+      );
     } else {
       actions.push({ label: t('Trouver cette table dans le catalogue'), detail: t('Sur son site, comme toute table'), icon: 'search', run: () => host.library.catalogFor(entry.table) });
     }

@@ -1096,6 +1096,19 @@ Sur la borne, avec VPX et une table qui a déjà une vidéo du plateau. La preuv
 | 571 | Quitter avant la fin | « Jouer et enregistrer » avec 30 s ; quitter la table au bout d'une quinzaine de secondes ; puis une autre fois au bout de 3 s. | Première fois : « … secondes enregistrées : la table a été quittée avant la fin … », la vidéo s'arrête avant la fermeture de VPX (ni son menu ni le bureau à la fin). Seconde fois : « trop court pour la roue », rien n'est gardé. |
 | 572 | Garder de côté, puis choisir plus tard | Au retour d'un enregistrement, « Garder de côté » ; puis fiche > « Médias du jeu » > « Plateau » > « Voir les propositions ». | La roue n'a pas changé. Dans les propositions, l'enregistrement est en tête (« Enregistré en partie : … ») ; le choisir puis « Enregistrer » le met sur la roue, l'original restant de côté. |
 
+## Invitation pendant une partie et « Jouer avec un ami »
+
+Deux bornes amies, A et B, sur le vrai réseau, chacune avec la même table. La preuve sans opérateur : `packages/core/src/test/invitation-en-partie.test.ts`, `friends-menu.test.ts` et la démonstration `.\docs\demo-amis.ps1 -Parcours en-jeu` (partie simulée, réseau simulé).
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 573 | Invitation grisée | Sur A, B éteinte : Menu système > « Amis » > « Mes amis » > B. | « Inviter à une partie en direct » est là, grisée, « Hors ligne : invitez-le quand il sera connecté » ; Start n'y fait rien. Allumer B : elle redevient active. |
+| 574 | Jouer avec un ami, depuis la fiche d'une table | Sur A, fiche d'une table > « Jouer avec un ami » (sous « Jouer ») ; d'abord B éteinte, puis allumée. | B éteinte : grisée, « Aucun ami en ligne pour l'instant ». B allumée : « 1 ami en ligne… » ; l'écran liste B en ligne (« l'a aussi » s'il a la table) ; Start sur B ouvre le salon, l'invitation part. |
+| 575 | Carillon et carte pendant la partie | Lancer une table sur B ; depuis A, inviter B. | Sur B, pendant la partie : le carillon (trois notes qui montent) et une carte en haut à gauche du plateau, vue du joueur : « A vous invite à jouer », la table, le temps restant, « Quittez la partie pour le rejoindre… ». Flippers, Start et MagnaSave répondent comme d'habitude : la carte ne prend jamais le focus. Chez A, le salon dit « Invité, en partie : notifié sur sa table… ». |
+| 576 | Pastille, puis ignorer | Continuer à jouer sur B sans rien faire. | Après une douzaine de secondes, la carte se réduit à une pastille « Invitation de A » avec le temps restant ; au bout des deux minutes, elle disparaît ; chez A, « Pas de réponse ». |
+| 577 | Quitter pour rejoindre | Inviter de nouveau B en partie ; sur B, quitter la table avant la fin des deux minutes. | Au retour au menu, « Invitation de A » s'ouvre d'elle-même ; « Accepter » mène au salon de A. |
+| 578 | Sons coupés, enregistrement | Sur B, couper « Sons de l'interface » ; puis « Jouer et enregistrer » et inviter B pendant la prise. | Sons coupés : la carte arrive sans carillon. La vidéo enregistrée ne contient pas la carte ; elle tient le coin gauche, le témoin le coin droit, sans se chevaucher. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

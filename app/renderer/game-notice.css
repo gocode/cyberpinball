@@ -1,0 +1,162 @@
+/* Notification pendant la partie (game-notice.ts) : l'invitation d'un ami, dans le coin du plateau
+   en haut à gauche pour le joueur, par-dessus VPX. Fenêtre transparente, exclue de la capture.
+   Discrète, de la famille du témoin d'enregistrement (recording.css) : verre fumé, filet, un seul
+   accent vert signal (l'icône et le filet du temps restant). Carte entière quelques secondes, puis
+   pastille : « Invitation de Bruno · 1:24 ». La taille suit la fenêtre (--u : un 172e de la
+   hauteur de la carte vue du joueur), qui suit l'écran ; aucun texte sous 20 px à 1080 px. */
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+/* Cadre vu du joueur, tourné comme le plateau : la carte se pose dans son coin haut-gauche. */
+.frame {
+  --u: calc(var(--h, 172px) / 172);
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: var(--w, 560px);
+  height: var(--h, 172px);
+  transform: translate(-50%, -50%) rotate(var(--turn, 0deg));
+  pointer-events: none;
+  user-select: none;
+}
+
+.notice {
+  position: absolute;
+  left: 0;
+  top: 0;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: calc(44 * var(--u)) minmax(0, 1fr) auto;
+  grid-template-areas:
+    'icon title title'
+    'icon table left'
+    'icon hint hint';
+  align-items: center;
+  column-gap: calc(18 * var(--u));
+  row-gap: calc(4 * var(--u));
+  width: 100%;
+  height: 100%;
+  padding: calc(20 * var(--u)) calc(26 * var(--u)) calc(24 * var(--u)) calc(22 * var(--u));
+  border: calc(1 * var(--u)) solid var(--line-strong);
+  border-radius: calc(18 * var(--u));
+  background: var(--scrim-strong);
+  box-shadow: var(--halo-panel);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+.notice[hidden] {
+  display: none;
+}
+
+.notice-icon {
+  grid-area: icon;
+  align-self: start;
+  display: flex;
+  color: var(--signal);
+  font-size: calc(40 * var(--u));
+  margin-top: calc(2 * var(--u));
+}
+
+.notice-title {
+  grid-area: title;
+  min-width: 0;
+  font-size: calc(30 * var(--u));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notice-table {
+  grid-area: table;
+  min-width: 0;
+  font-size: calc(24 * var(--u));
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.notice-left {
+  grid-area: left;
+  justify-self: end;
+  font-size: calc(24 * var(--u));
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.notice-hint {
+  grid-area: hint;
+  min-width: 0;
+  font-size: calc(20 * var(--u));
+  color: var(--ink-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* Temps restant de l'invitation : un filet vert au bas de la carte, sans chiffre de plus. */
+.notice-track {
+  position: absolute;
+  left: calc(22 * var(--u));
+  right: calc(22 * var(--u));
+  bottom: calc(10 * var(--u));
+  height: calc(2 * var(--u));
+  background: var(--line-soft);
+}
+
+.notice-fill {
+  display: block;
+  height: 100%;
+  width: clamp(0%, var(--progress, 0%), 100%);
+  background: var(--signal);
+}
+
+/* Pastille : icône, « Invitation de Bruno », temps restant ; ni table ni conseil. */
+.notice.mode-compact {
+  width: calc(460 / 560 * 100%);
+  height: calc(64 / 172 * 100%);
+  grid-template-columns: calc(26 * var(--u)) minmax(0, 1fr) auto;
+  column-gap: calc(14 * var(--u));
+  grid-template-areas: 'icon title left';
+  padding: 0 calc(22 * var(--u)) 0 calc(20 * var(--u));
+  border-radius: 999px;
+}
+
+.mode-compact .notice-icon {
+  align-self: center;
+  margin-top: 0;
+  font-size: calc(26 * var(--u));
+}
+
+.mode-compact .notice-title {
+  font-size: calc(22 * var(--u));
+  font-weight: 500;
+}
+
+.mode-compact .notice-left {
+  font-size: calc(22 * var(--u));
+}
+
+.mode-compact .notice-table,
+.mode-compact .notice-hint {
+  display: none;
+}
+
+.mode-compact .notice-track {
+  left: calc(20 * var(--u));
+  right: calc(20 * var(--u));
+  bottom: calc(6 * var(--u));
+}

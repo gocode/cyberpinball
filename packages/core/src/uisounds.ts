@@ -14,7 +14,7 @@ import type { MenuMediaSettings } from './mediaview';
 import type { MenuMoment } from './menumoments';
 import { playVolume } from './menumoments';
 
-export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil'] as const;
+export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil', 'invite'] as const;
 export type UiSoundId = (typeof UI_SOUND_IDS)[number];
 
 export interface UiSoundSpec {
@@ -31,6 +31,11 @@ export interface UiSoundSpec {
    * quand la partie vient de commencer, et d'y finir de sonner. Aucun autre son n'y a droit.
    */
   readonly handover?: boolean;
+  /**
+   * Son d'un appel : une invitation d'un ami, qui attend une réponse. Il sonne aussi pendant la
+   * partie, une fois, pour que le joueur choisisse de quitter la sienne ou de l'ignorer.
+   */
+  readonly call?: boolean;
 }
 
 const SYNTH_SOURCE = 'synthèse WebAudio, app/renderer/ui-sounds.js'; // i18n-ignore : provenance, citée telle quelle
@@ -78,6 +83,17 @@ export const UI_SOUNDS: Readonly<Record<UiSoundId, UiSoundSpec>> = {
     license: OWN_LICENSE,
     handover: true,
   },
+  invite: {
+    get label() {
+      return t('Carillon d’invitation');
+    },
+    get when() {
+      return t('Invitation d’un ami à une partie en direct, même pendant une partie');
+    },
+    source: SYNTH_SOURCE,
+    license: OWN_LICENSE,
+    call: true,
+  },
 };
 
 /** Son à jouer : identifiant et volume de lecture (0 à 1). */
@@ -86,19 +102,22 @@ export interface UiSoundCue {
   volume: number;
   /** Son du passage de relais : la fenêtre le laisse partir et sonner au début de la partie. */
   handover?: true;
+  /** Son d'un appel : la fenêtre le laisse sonner pendant la partie. */
+  call?: true;
 }
 
 /**
  * Le son `id` joue-t-il maintenant, et à quel volume ? Jamais pendant une partie (VPX a la
  * parole : rien ne doit s'ajouter à sa musique), sauf le son du passage de relais (le coup de
- * bobine, à l'instant où VPX prend la main) ; jamais en mode attente, jamais quand les sons de
- * l'interface sont coupés ou à 0 %. Le chargement est permis : la pièce tombe au Start, avant
- * que VPX ne prenne les écrans.
+ * bobine, à l'instant où VPX prend la main) et le son d'un appel (une invitation d'un ami, qui
+ * attend une réponse) ; jamais en mode attente, jamais quand les sons de l'interface sont coupés
+ * ou à 0 %. Le chargement est permis : la pièce tombe au Start, avant que VPX ne prenne les écrans.
  */
 export function uiSoundCue(id: UiSoundId, settings: Pick<MenuMediaSettings, 'uiSounds' | 'uiSoundsVolume'>, moment: MenuMoment): UiSoundCue | undefined {
   const handover = UI_SOUNDS[id].handover === true;
-  if (!settings.uiSounds || (moment === 'game' && !handover) || moment === 'attract') return undefined;
+  const call = UI_SOUNDS[id].call === true;
+  if (!settings.uiSounds || (moment === 'game' && !handover && !call) || moment === 'attract') return undefined;
   const volume = playVolume(settings.uiSoundsVolume);
   if (!(volume > 0)) return undefined;
-  return handover ? { id, volume, handover } : { id, volume };
+  return { id, volume, ...(handover ? { handover } : {}), ...(call ? { call } : {}) };
 }

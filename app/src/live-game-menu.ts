@@ -1,6 +1,7 @@
 // Partie en direct à l'écran (live-game.ts, packages/core/src/livegame.ts) : choisir la table et
-// inviter un ami, le salon (qui est prêt, qui a refusé, qui a une autre version), l'invitation
-// reçue, le compte à rebours du départ commun, puis les résultats de chacun.
+// inviter un ami (depuis sa fiche, ou « Jouer avec un ami » sur la fiche d'une table), le salon
+// (qui est prêt, qui a refusé, qui a une autre version), l'invitation reçue, le compte à rebours
+// du départ commun, puis les résultats de chacun.
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec des services d'essai.
 
@@ -33,7 +34,7 @@ export interface LiveMenuHost {
     task(message: string, work: () => Promise<void> | void): Promise<void>;
     catalogFor(identity: TableIdentity): void;
   };
-  net: Pick<SocialNet, 'state' | 'online'>;
+  net: Pick<SocialNet, 'state' | 'online' | 'presenceOf'>;
   games: LiveGames;
   tables(): readonly TableEntry[];
   /** La bibliothèque de cet ami (si elle est connue) a cette table : elle passe en tête du choix. */
@@ -49,6 +50,10 @@ export interface LiveMenu {
   inviteFriend(key: string, back: () => void): void;
   /** Inviter cet ami sur cette table. */
   inviteOn(table: TableEntry, key: string, back: () => void): void;
+  /** Entrée « Jouer avec un ami » de la fiche d'une table : active quand un ami est en ligne, grisée avec sa raison sinon. */
+  sheetAction(table: TableEntry, back: () => void): Action;
+  /** Entrée « Inviter à une partie en direct » de la fiche d'un ami : grisée s'il est hors ligne. */
+  friendAction(key: string, back: () => void): Action;
   /** Une invitation reçue. */
   openInvite(id: string, back: () => void): void;
   /** La partie en cours (salon, départ, résultats), sinon la première invitation. */
@@ -80,10 +85,13 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   const stateTone = (p: LivePlayer): Tone | undefined =>
     p.state === 'accepted' || p.state === 'playing' || p.state === 'done' ? 'ok' : p.state === 'declined' || p.state === 'failed' || p.state === 'left' ? 'quiet' : p.state === 'busy' || p.state === 'expired' ? 'warning' : undefined;
 
+  /** En partie sur sa borne : une invitation lui arrive en notification discrète sur sa table. */
+  const playingNow = (key: string) => host.net.online(key) && host.net.presenceOf(key)?.status === 'playing';
+
   function playerRows(game: LiveGame): Row[] {
     return game.players.map((p) => ({
       text: p.key === myKey() ? t('{name} (vous)', { name: label(p.key, p.name) }) : label(p.key, p.name),
-      detail: livePlayerStateLabel(p),
+      detail: p.state === 'invited' && playingNow(p.key) ? t('Invité, en partie : notifié sur sa table, il peut quitter la sienne pour vous rejoindre') : livePlayerStateLabel(p),
       icon: p.host ? 'gamepad' : 'friend-list',
       tone: stateTone(p),
       ...(p.host ? { badges: [t('Hôte')] } : {}),
@@ -95,6 +103,53 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   }
 
   const otherVersionRow = (): Row => ({ text: t('Version différente'), detail: t('Vous pouvez jouer ensemble, mais les scores sont moins comparables.'), tone: 'warning', icon: 'alert' });
+
+  // ---------- Depuis une fiche : l'entrée, toujours là ----------
+
+  function friendAction(key: string, back: () => void): Action {
+    const base = { label: t('Inviter à une partie en direct'), icon: 'gamepad' as const };
+    if (!host.net.online(key)) return { ...base, detail: t('Hors ligne : invitez-le quand il sera connecté'), tone: 'quiet', run: () => undefined };
+    const detail = playingNow(key) ? t('En partie : il recevra une notification discrète sur sa table') : t('Chacun sur sa borne, au même moment');
+    return { ...base, detail, tone: 'ok', run: () => inviteFriend(key, back) };
+  }
+
+  function sheetAction(table: TableEntry, back: () => void): Action {
+    const friends = host.net.state().friends;
+    const online = friends.filter((f) => host.net.online(f.key)).length;
+    const base = { label: t('Jouer avec un ami'), icon: 'gamepad' as const };
+    if (!friends.length) return { ...base, detail: t('Pas encore d’ami : Menu système > Amis > Trouver un joueur'), tone: 'quiet', run: () => undefined };
+    if (!online) return { ...base, detail: t('Aucun ami en ligne pour l’instant'), tone: 'quiet', run: () => undefined };
+    return { ...base, detail: tn(online, '{n} ami en ligne : chacun sur sa borne, au même moment', '{n} amis en ligne : chacun sur sa borne, au même moment'), tone: 'ok', run: () => host.library.openCustom(() => buildChooseFriend(table, back)) };
+  }
+
+  /** Les amis à inviter sur cette table : ceux en ligne en tête (qui l'a aussi d'abord), les autres grisés. */
+  function buildChooseFriend(table: TableEntry, back: () => void): Built {
+    const has = (key: string) => host.friendHas?.(key, table) ?? false;
+    const friends = [...host.net.state().friends].sort((a, b) => Number(has(b.key)) - Number(has(a.key)) || a.name.localeCompare(b.name));
+    const online = friends.filter((f) => host.net.online(f.key));
+    const offline = friends.filter((f) => !host.net.online(f.key));
+    const reopen = () => host.library.openCustom(() => buildChooseFriend(table, back));
+    const actions: Action[] = [];
+    const rows: Row[] = online.map((f) => {
+      const index = actions.push({ label: f.name, key: `friend:${f.key}`, icon: 'friend-list', run: () => inviteOn(table, f.key, reopen) }) - 1;
+      const doing = playingNow(f.key) ? t('En partie : notifié sur sa table') : t('Dans le menu des tables');
+      return { text: label(f.key, f.name), detail: [doing, has(f.key) ? t('{name} l’a aussi', { name: f.name }) : undefined].filter(Boolean).join(' · '), icon: 'friend-list', tone: 'ok', action: index, pick: true };
+    });
+    actions.push({ label: t('Retour'), icon: 'back', run: back });
+    const sections: Section[] = [];
+    if (rows.length) sections.push({ title: t('En ligne ({n})', { n: online.length }), rows });
+    else sections.push({ rows: [{ text: t('Aucun ami en ligne pour l’instant'), detail: t('Ils apparaissent ici dès qu’ils allument leur borne'), tone: 'info' }] });
+    if (offline.length) sections.push({ title: t('Hors ligne ({n})', { n: offline.length }), rows: offline.map((f) => ({ text: label(f.key, f.name), detail: t('Hors ligne'), icon: 'friend-list', tone: 'quiet' })) });
+    return {
+      heading: t('Jouer avec un ami'),
+      icon: 'gamepad',
+      subheading: table.title,
+      lead: t('Choisissez qui inviter : il doit avoir la table aussi. Chacun joue sa partie sur sa borne, au même moment, puis les résultats arrivent.'),
+      sections,
+      actions,
+      back,
+    };
+  }
 
   // ---------- Choisir la table ----------
 
@@ -378,6 +433,8 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   return {
     inviteFriend,
     inviteOn,
+    sheetAction,
+    friendAction,
     openInvite,
     open(back) {
       const game = games.current();

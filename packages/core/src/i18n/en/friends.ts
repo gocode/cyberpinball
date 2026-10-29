@@ -193,4 +193,20 @@ export const messages: Record<string, string> = {
   'Les captures d’œuvres (photos du fronton, prospectus, musique du jeu), les ROM et les PuP-Packs restent la propriété de leurs ayants droit': 'Captures of works (backglass photos, flyers, game music), ROMs and PuP-Packs remain the property of their rights holders',
   'La récupérer chez {name}': 'Get it from {name}',
   'Sa bibliothèque partagée : toute la table, puis le plan d’ajout': 'Their shared library: the whole table, then the add plan',
+  // Jouer avec un ami (live-game-menu.ts) et invitation pendant la partie (gamenotice.ts, game-notice.html)
+  'Hors ligne : invitez-le quand il sera connecté': 'Offline: invite them once they are connected',
+  'En partie : il recevra une notification discrète sur sa table': 'In a game: they will get a discreet notification on their table',
+  'Jouer avec un ami': 'Play with a friend',
+  'Pas encore d’ami : Menu système > Amis > Trouver un joueur': 'No friend yet: System menu > Friends > Find a player',
+  'Aucun ami en ligne pour l’instant': 'No friend online right now',
+  '{n} ami en ligne : chacun sur sa borne, au même moment': '{n} friend online: each on their own cabinet, at the same time',
+  '{n} amis en ligne : chacun sur sa borne, au même moment': '{n} friends online: each on their own cabinet, at the same time',
+  'En partie : notifié sur sa table': 'In a game: notified on their table',
+  'Ils apparaissent ici dès qu’ils allument leur borne': 'They appear here as soon as they turn on their cabinet',
+  'Choisissez qui inviter : il doit avoir la table aussi. Chacun joue sa partie sur sa borne, au même moment, puis les résultats arrivent.':
+    'Choose who to invite: they must have the table too. Each plays their own game on their cabinet, at the same time, then the results come in.',
+  'Invité, en partie : notifié sur sa table, il peut quitter la sienne pour vous rejoindre': 'Invited, in a game: notified on their table, they can leave theirs to join you',
+  '{name} vous invite à jouer': '{name} invites you to play',
+  'Quittez la partie pour le rejoindre, ou continuez : elle s’efface seule': 'Leave the game to join them, or keep playing: it fades away by itself',
+  'Cyber Pinball — Invitation': 'Cyber Pinball — Invitation',
 };

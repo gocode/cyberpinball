@@ -324,7 +324,7 @@ test('pendant la partie, aucune fenêtre de Cyber Pinball ne reste au-dessus des
     .readdirSync(SOURCES)
     .filter((f) => f.endsWith('.ts'))
     .filter((f) => /setAlwaysOnTop\(\s*true|alwaysOnTop:\s*true/.test(fs.readFileSync(path.join(SOURCES, f), 'utf8')));
-  assert.deepEqual(topmost, ['acquire-window.ts', 'game-recording.ts'], 'toute fenêtre au premier plan doit être fermée par closeTopmostWindows avant la partie');
+  assert.deepEqual(topmost, ['acquire-window.ts', 'game-notice.ts', 'game-recording.ts'], 'toute fenêtre au premier plan doit être fermée par closeTopmostWindows avant la partie');
   // Seule exception : le témoin de l'enregistrement d'une partie, voulu au-dessus de VPX. Il ne couvre
   // qu'un coin du plateau (420 × 72 pour 1080 px), naît après closeTopmostWindows, ignore la souris,
   // n'apparaît pas dans la capture, et disparaît à la fin de l'enregistrement.
@@ -334,6 +334,16 @@ test('pendant la partie, aucune fenêtre de Cyber Pinball ne reste au-dessus des
   assert.match(recording, /setTimeout\(\(\) => witness\.close\(\), VERDICT_MS\)/);
   const front = fs.readFileSync(path.join(SOURCES, 'frontend.ts'), 'utf8');
   assert.ok(front.indexOf('  closeTopmostWindows();') < front.indexOf('armGameRecording(table, hooks.record'), 'le témoin naît après closeTopmostWindows');
+  // Seconde exception : l'invitation d'un ami pendant la partie (game-notice.ts), même règle. Elle ne
+  // couvre qu'un coin du plateau (560 × 172 pour 1080 px, l'autre coin que le témoin), ne naît que
+  // la partie lancée (playing, posé après closeTopmostWindows), ignore la souris, n'apparaît pas dans
+  // la capture, et disparaît à la fin de la partie.
+  const notice = fs.readFileSync(path.join(SOURCES, 'game-notice.ts'), 'utf8');
+  assert.match(notice, /setContentProtection\(true\)/);
+  assert.match(notice, /setIgnoreMouseEvents\(true\)/);
+  assert.match(front, /if \(playing\) gameNotices\.show\(invite\);/);
+  assert.ok(front.indexOf('  closeTopmostWindows();') < front.indexOf('  playing = table;'), 'l’invitation ne naît qu’après closeTopmostWindows');
+  assert.match(front, /const result = await game\.done;\r?\n\s+gameNotices\.close\(\);/);
   const frontend = fs.readFileSync(path.join(SOURCES, 'frontend.ts'), 'utf8');
   const close = frontend.indexOf('  closeTopmostWindows();');
   const launch = frontend.indexOf('launchVpx({');

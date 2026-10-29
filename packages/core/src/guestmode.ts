@@ -46,6 +46,7 @@ export const GUEST_DOORS = {
   'message.orientation': false, // Rendre à Windows l’orientation du bureau qu’une version précédente avait changée
   // Fiche d'une table (app/src/library.ts, buildSheet)
   'sheet.play': true, // Jouer
+  'sheet.friends': false, // Jouer avec un ami (les amis du propriétaire de la borne)
   'sheet.read': true, // Prospectus et règles, page par page
   'sheet.back': true, // Retour au menu
   'sheet.missing': false, // Ce qu’il manque pour jouer (téléchargements)
