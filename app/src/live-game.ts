@@ -58,6 +58,8 @@ export interface LiveGamesOptions {
   dataDir: string;
   tables(): readonly TableEntry[];
   romsOf?(table: TableEntry): readonly string[];
+  /** Billes par partie d'une de mes tables (ball-count.ts) ; undefined si inconnu. */
+  ballsOf?(table: TableEntry): Promise<number | undefined>;
   /**
    * Une invitation est arrivée, au menu comme pendant une partie (seule une partie en direct en
    * cours répond « occupé ») : au joueur de choisir, quitter sa partie ou l'ignorer.
@@ -82,8 +84,8 @@ export interface LiveGames {
   /** Invite un ami dans mon salon ; false : salon plein, ami pas relié, ou partie déjà partie. */
   invite(key: string, name: string): boolean;
   /** Ce que j'ai de la table d'une invitation. */
-  matchFor(invite: LiveInvite): Promise<{ match: LiveTableMatch; table?: TableEntry }>;
-  accept(id: string): Promise<{ match: LiveTableMatch; table?: TableEntry }>;
+  matchFor(invite: LiveInvite): Promise<LiveTableFound>;
+  accept(id: string): Promise<LiveTableFound>;
   decline(id: string): void;
   /** Départ commun (celui qui invite). */
   start(): boolean;
@@ -92,6 +94,13 @@ export interface LiveGames {
   /** Partie finie ou annulée : on n'en parle plus. */
   close(): void;
   stop(): void;
+}
+
+/** Ce que j'ai de la table d'une invitation : le niveau, ma table, et son nombre de billes s'il est connu. */
+export interface LiveTableFound {
+  match: LiveTableMatch;
+  table?: TableEntry;
+  balls?: number;
 }
 
 /** Vérification des invitations expirées et des retardataires. */
@@ -167,10 +176,11 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   async function liveTable(table: TableEntry): Promise<LiveTable> {
     const version = await versionOf(table);
     const bytes = fileSize(table.file);
-    return { table: tableIdentity(table, opts.romsOf?.(table) ?? []), ...(table.version ? { version: table.version.slice(0, 60) } : {}), ...version, ...(bytes ? { bytes } : {}) };
+    const balls = await opts.ballsOf?.(table);
+    return { table: tableIdentity(table, opts.romsOf?.(table) ?? []), ...(table.version ? { version: table.version.slice(0, 60) } : {}), ...version, ...(bytes ? { bytes } : {}), ...(balls ? { balls } : {}) };
   }
 
-  async function matchFor(invite: LiveInvite): Promise<{ match: LiveTableMatch; table?: TableEntry }> {
+  async function matchFor(invite: LiveInvite): Promise<LiveTableFound> {
     const candidates = opts.tables().map((table) => ({ entry: table, identity: tableIdentity(table, opts.romsOf?.(table) ?? []) }));
     // Les versions seulement des tables du même jeu, ou de la taille du .vpx annoncé (le même
     // fichier sous un autre nom) : un .vpx se lit en entier.
@@ -186,7 +196,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const how = sameGame({ entry: found.entry, identity: tableIdentity(found.entry, opts.romsOf?.(found.entry) ?? []) }) ? '' : ", reconnue par l'empreinte de son .vpx"; // i18n-ignore : journal
       log(`Invitation de ${invite.host.name} : « ${named} » : ${level}${how}, ici « ${found.entry.title} ».`); // i18n-ignore : journal
     }
-    return { match: found.match, ...(found.entry ? { table: found.entry } : {}) };
+    const balls = found.entry ? await opts.ballsOf?.(found.entry) : undefined;
+    if (balls && theirs.balls && balls !== theirs.balls) log(`Invitation de ${invite.host.name} : ${balls} billes par partie ici, ${theirs.balls} chez lui : score hors classement.`); // i18n-ignore : journal
+    return { match: found.match, ...(found.entry ? { table: found.entry } : {}), ...(balls ? { balls } : {}) };
   }
 
   const unsubscribe = net.onMessage((key: string, message: FriendMessage) => {
@@ -205,7 +217,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         return;
       }
       case 'game-answer':
-        if (game && isHost() && m.game === game.id) setGame(answerGame(game, key, m.answer, m.match));
+        if (game && isHost() && m.game === game.id) setGame(answerGame(game, key, m.answer, m.match, m.balls));
         return;
       case 'game-room':
         if (game && !isHost() && key === game.host) {
@@ -281,9 +293,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         changed();
         return found;
       }
-      net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'accept', match: found.match });
+      net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'accept', match: found.match, ...(found.balls ? { balls: found.balls } : {}) });
       mine = found.table;
-      game = guestGame(invite, me(), found.match);
+      game = guestGame(invite, me(), found.match, found.balls);
       changed();
       return found;
     },

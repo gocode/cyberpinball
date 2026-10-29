@@ -15,7 +15,7 @@
 // - Règles de score : pour une table à ROM PinMAME, la ROM (elle compte les points, quelle que
 //   soit la table autour) ; sinon le script écrit dans la table, sans ses commentaires ni les
 //   valeurs données hors des procédures (Const VRRoom = 1 : les options). Le nombre de billes
-//   par partie, quand c'est une telle option, n'y est donc pas : étape suivante.
+//   par partie, quand c'est une telle option, n'y est donc pas : il se compare à part (ballcount.ts).
 
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';

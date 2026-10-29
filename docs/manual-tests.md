@@ -1108,6 +1108,7 @@ Two friend cabinets, A and B, on the real network, each with the same table. The
 | 576 | Pill, then ignore | Keep playing on B without doing anything. | After a dozen seconds, the card shrinks to a pill "Invitation de A" (Invitation from A) with the time left; after the two minutes, it disappears; on A, "Pas de réponse" (No answer). |
 | 577 | Leave to join | Invite B again while in a game; on B, leave the table before the two minutes are up. | Back in the menu, "Invitation de A" opens by itself; "Accepter" (Accept) leads to A's room. |
 | 578 | Sounds off, recording | On B, turn off "Sons de l'interface" (Interface sounds); then "Jouer et enregistrer" (Play and record) and invite B during the take. | Sounds off: the card arrives without the chime. The recorded video does not contain the card; it holds the left corner, the indicator the right corner, without overlapping. |
+| 579 | Number of balls | On B, set a table to 5 balls (the ROM's service menu, or Game of Thrones' "BALL PER GAME"); A has it at 3; A invites B, they play. | On B, the invitation says "5 billes au lieu de 3" (5 balls instead of 3) and "réglez votre table sur 3 billes pour être classé" (set your table to 3 balls to be ranked); in the results, "Autre nombre de billes : score hors classement" (Another number of balls: score not ranked) and B's score without a rank, "Hors classement : 5 billes au lieu de 3". Set back to 3: ranked. B's log notes it. |
 
 ## What cannot be tested yet
 

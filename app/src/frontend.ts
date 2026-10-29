@@ -178,6 +178,7 @@ import { createFirewallRule } from './firewall-rule';
 import { createFriendContent } from './friend-content';
 import { friendTransport } from './download-sources';
 import { createGameNotices } from './game-notice';
+import { createBallCounts } from './ball-count';
 import { createLiveGames } from './live-game';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
@@ -786,11 +787,14 @@ const menuNotices = createMenuNotices({
 /** Le menu des tables est à l'écran : une invitation peut s'y afficher sans rien interrompre. */
 const liveCanShow = () => !closing && state.phase === 'menu';
 // Partie en direct : invitation, départ commun, puis la table lancée ici comme par Start.
+// Billes par partie (ROM, script, menu de service) : une partie en direct ne classe pas 5 billes contre 3.
+const ballCounts = createBallCounts({ dataDir: loc.dataDir, romsOf, pinmameDirs: () => (loc.root ? [path.join(loc.root, 'pinmame')] : []) });
 const liveGames = createLiveGames({
   net: socialNet,
   dataDir: loc.dataDir,
   tables: () => tables,
   romsOf,
+  ballsOf: async (table) => (await ballCounts.of(table))?.balls,
   // Le carillon d'invitation sonne au menu comme pendant une partie ; en partie, la notification
   // se pose sur le plateau, par-dessus VPX : quitter sa partie ramène au menu, où l'invitation s'ouvre.
   onInvite: (invite) => {

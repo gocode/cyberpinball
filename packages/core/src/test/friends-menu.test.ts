@@ -261,6 +261,13 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
       assert.equal(rows[0]!.text, 'Versions proches : mêmes règles de score, la physique peut différer');
       assert.match(rows.map((r) => r.text).join('|'), /\|1\. Bruno #[0-9A-F]{4} — 2\s?000\s?000\|/u);
       assert.match(rows.find((r) => r.text.startsWith('1. Bruno'))!.detail as string, /Version proche/);
+      // La même table, mais 5 billes par partie contre 3 : hors classement, avec la raison.
+      games.game = { ...game, table: { ...game.table, balls: 3 }, players: game.players.map((p) => (p.match === 'other-version' ? { ...p, match: 'same' as const, balls: 5 } : { ...p, balls: 3 })) };
+      menu.live.open(() => undefined);
+      const balls = last().build().sections.flatMap((s) => s.rows);
+      assert.equal(balls[0]!.text, 'Autre nombre de billes : score hors classement');
+      assert.match(balls.map((r) => r.text).join('|'), /\|Bruno #[0-9A-F]{4} — 2\s?000\s?000\|/u);
+      assert.match(balls.find((r) => r.text.startsWith('Bruno'))!.detail as string, /Hors classement : 5 billes au lieu de 3/);
     }
   }
   // Salon d'un invité : le curseur sur « Retour », pas sur « Quitter la partie ».

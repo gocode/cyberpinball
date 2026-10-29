@@ -59,6 +59,7 @@ export * from './audiosink';
 export * from './mediadb';
 export * from './vpxinfo';
 export * from './vpxid';
+export * from './ballcount';
 export * from './highscores';
 export * from './dmdfont';
 export * from './dmdcolor';

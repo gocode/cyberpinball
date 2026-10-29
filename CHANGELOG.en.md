@@ -14,6 +14,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - An invitation now arrives even during a game: a chime and a discreet card in the playfield corner (who sends it, the table, the time left), without getting in the way. Leave your game to join your friend, the invitation opens back in the menu; or keep playing, it fades away by itself.
 - A table fetched from a friend is recognised in their invitations, even when your cabinet named it differently ("Game of Thrones (Limited Edition)" here, "Game of Thrones LE" on theirs): the same `.vpx` file is the same table. It now keeps, when installed, the name it has on the friend's cabinet.
 - Live game: every table has an id, drawn from its objects and physics (not from images, sounds or script options). Nobody is refused over a version: the same table, or a close version with the same scoring rules (same ROM), counts in the ranking; another version plays with the others, out of the ranking.
+- Live game: the number of balls per game counts. Set differently from the host (5 against 3), you still play, but your score stays out of the ranking; the invitation says so before you accept. It is read from the ROM (ROM tables described by the Pinball Memory Maps project), the script or the table's service menu.
 
 ## 0.1.4
 

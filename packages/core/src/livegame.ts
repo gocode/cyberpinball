@@ -15,6 +15,8 @@
 //   règles ; il joue avec les autres, son score reste hors classement.
 // - « missing » : il ne l'a pas, il ne peut que refuser (il la récupère chez l'ami ou par le
 //   catalogue).
+// Le nombre de billes par partie compte aussi (ballcount.ts) : connu des deux côtés et différent
+// (5 contre 3), le score passe hors classement, quel que soit le niveau ; inconnu, il ne juge rien.
 //
 // Pendant la partie, le score n'est pas lisible (VPX n'écrit ses records qu'à la fin) : chacun
 // envoie sa durée de jeu et les records entrés au tableau d'honneur de la table. Voir le score,
@@ -23,7 +25,8 @@
 // Ici, seulement ce qui se décide sur des données ; le service est dans app/src/live-game.ts.
 
 import { randomBytes } from 'node:crypto';
-import { t } from './i18n';
+import { isBallCount } from './ballcount';
+import { t, tn } from './i18n';
 import { normalizeName } from './social';
 import { isPlayerPublicKey, parseTableIdentity, sameTable, type TableIdentity } from './sharing';
 
@@ -52,14 +55,25 @@ export interface LiveTable {
   id?: string;
   /** Règles de score (rulesKey) : « rom:… » ou « vbs:<empreinte du script hors options> ». */
   rules?: string;
+  /** Billes par partie de celui qui invite (ballcount.ts), s'il le sait. */
+  balls?: number;
 }
 
 /** Ce que l'invité a de cette table. */
 export type LiveTableMatch = 'same' | 'same-rules' | 'other-version' | 'missing';
 
-/** Un score qui compte au classement : la même table, ou les mêmes règles de score. */
-export function liveRanked(p: Pick<LivePlayer, 'host' | 'match'>): boolean {
-  return p.host === true || p.match === undefined || p.match === 'same' || p.match === 'same-rules';
+/** Billes par partie connues des deux côtés et différentes : les scores ne se comparent pas. */
+export function liveOtherBalls(p: Pick<LivePlayer, 'balls'>, hostBalls: number | undefined): boolean {
+  return !!p.balls && !!hostBalls && p.balls !== hostBalls;
+}
+
+/**
+ * Un score qui compte au classement : la même table, ou les mêmes règles de score, et pas un autre
+ * nombre de billes par partie que celui qui invite (`hostBalls`).
+ */
+export function liveRanked(p: Pick<LivePlayer, 'host' | 'match' | 'balls'>, hostBalls?: number): boolean {
+  if (p.host === true) return true;
+  return (p.match === undefined || p.match === 'same' || p.match === 'same-rules') && !liveOtherBalls(p, hostBalls);
 }
 
 export type LivePlayerState =
@@ -91,6 +105,8 @@ export interface LivePlayer {
   state: LivePlayerState;
   host?: boolean;
   match?: LiveTableMatch;
+  /** Billes par partie de sa table, s'il le sait. */
+  balls?: number;
   /** Invité le (ISO), pour l'expiration. */
   invitedAt?: string;
   /** Fin de partie : durée jouée et records entrés. */
@@ -130,7 +146,7 @@ export type LiveStatus = 'loading' | 'playing' | 'done' | 'failed' | 'left';
 
 export type LiveMessage =
   | { t: 'game-invite'; game: { id: string; table: LiveTable; title: string; players: { key: string; name: string }[] } }
-  | { t: 'game-answer'; game: string; answer: LiveAnswer; match?: LiveTableMatch }
+  | { t: 'game-answer'; game: string; answer: LiveAnswer; match?: LiveTableMatch; balls?: number }
   | { t: 'game-room'; game: string; phase: LivePhase; players: LivePlayer[] }
   /** Départ dans `in` millisecondes, à compter de la réception. */
   | { t: 'game-start'; game: string; in: number }
@@ -162,6 +178,7 @@ function parseLiveTable(raw: unknown): LiveTable | undefined {
     ...(bytes ? { bytes } : {}),
     ...(isPrint(r.id) ? { id: r.id } : {}),
     ...(isRules(r.rules) ? { rules: r.rules } : {}),
+    ...(isBallCount(r.balls) ? { balls: r.balls } : {}),
   };
 }
 
@@ -201,6 +218,7 @@ function parsePlayer(raw: unknown): LivePlayer | undefined {
     state: r.state as LivePlayerState,
     ...(r.host === true ? { host: true } : {}),
     ...(MATCHES.includes(r.match as LiveTableMatch) ? { match: r.match as LiveTableMatch } : {}),
+    ...(isBallCount(r.balls) ? { balls: r.balls } : {}),
     ...(s !== undefined ? { seconds: s } : {}),
     ...(records?.length ? { records } : {}),
   };
@@ -219,7 +237,13 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
     }
     case 'game-answer':
       if (!isId(m.game) || (m.answer !== 'accept' && m.answer !== 'decline' && m.answer !== 'busy')) return undefined;
-      return { t: 'game-answer', game: m.game, answer: m.answer, ...(MATCHES.includes(m.match as LiveTableMatch) ? { match: m.match as LiveTableMatch } : {}) };
+      return {
+        t: 'game-answer',
+        game: m.game,
+        answer: m.answer,
+        ...(MATCHES.includes(m.match as LiveTableMatch) ? { match: m.match as LiveTableMatch } : {}),
+        ...(isBallCount(m.balls) ? { balls: m.balls } : {}),
+      };
     case 'game-room': {
       if (!isId(m.game) || !PHASES.includes(m.phase as LivePhase) || !Array.isArray(m.players)) return undefined;
       const players = m.players.slice(0, LIVE_MAX_PLAYERS).map(parsePlayer).filter((p): p is LivePlayer => !!p);
@@ -280,7 +304,7 @@ export function newLiveGame(host: { key: string; name: string }, table: LiveTabl
     host: host.key,
     table,
     title,
-    players: [{ key: host.key, name: host.name, state: 'accepted', host: true, match: 'same' }],
+    players: [{ key: host.key, name: host.name, state: 'accepted', host: true, match: 'same', ...(table.balls ? { balls: table.balls } : {}) }],
     phase: 'gathering',
     createdAt: now.toISOString(),
   };
@@ -301,12 +325,12 @@ export function inviteToGame(game: LiveGame, peer: { key: string; name: string }
 }
 
 /** Réponse d'un invité ; ignorée s'il n'est pas invité ou si la partie est partie. */
-export function answerGame(game: LiveGame, key: string, answer: LiveAnswer, match?: LiveTableMatch): LiveGame {
+export function answerGame(game: LiveGame, key: string, answer: LiveAnswer, match?: LiveTableMatch, balls?: number): LiveGame {
   const p = game.players.find((x) => x.key === key);
   if (!p || p.host || game.phase !== 'gathering' || p.state !== 'invited') return game;
   // Sans la table, accepter ne mène à rien : compté comme un refus.
   const state: LivePlayerState = answer === 'accept' && match !== 'missing' ? 'accepted' : answer === 'busy' ? 'busy' : 'declined';
-  return setPlayer(game, key, (x) => ({ ...x, state, ...(match ? { match } : {}) }));
+  return setPlayer(game, key, (x) => ({ ...x, state, ...(match ? { match } : {}), ...(isBallCount(balls) ? { balls } : {}) }));
 }
 
 /** Invitations restées sans réponse trop longtemps : expirées. */
@@ -374,13 +398,16 @@ export function applyRoom(game: LiveGame, room: Extract<LiveMessage, { t: 'game-
 }
 
 /** Côté invité : la partie telle qu'il la suit après avoir accepté. */
-export function guestGame(invite: LiveInvite, me: { key: string; name: string }, match: LiveTableMatch): LiveGame {
+export function guestGame(invite: LiveInvite, me: { key: string; name: string }, match: LiveTableMatch, balls?: number): LiveGame {
   return {
     id: invite.id,
     host: invite.host.key,
     table: invite.table,
     title: invite.title,
-    players: [{ ...invite.host, state: 'accepted', host: true, match: 'same' }, { ...me, state: 'accepted', match }],
+    players: [
+      { ...invite.host, state: 'accepted', host: true, match: 'same', ...(invite.table.balls ? { balls: invite.table.balls } : {}) },
+      { ...me, state: 'accepted', match, ...(isBallCount(balls) ? { balls } : {}) },
+    ],
     phase: 'gathering',
     createdAt: invite.receivedAt,
   };
@@ -399,11 +426,12 @@ export function countdownLeft(game: Pick<LiveGame, 'startAt'>, now = new Date())
 // ---------------------------------------------------------------------------
 // Textes
 
-export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match'>): string {
+export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'balls'>, hostBalls?: number): string {
   switch (p.state) {
     case 'invited':
       return t('Invité, en attente de sa réponse');
     case 'accepted':
+      if (liveOtherBalls(p, hostBalls)) return t('Prêt, {balls} : score hors classement', { balls: liveBallsAgainst(p.balls!, hostBalls!) });
       return p.match === 'other-version' ? t('Prêt, autre version : score hors classement') : p.match === 'same-rules' ? t('Prêt, version proche : mêmes règles de score') : t('Prêt');
     case 'declined':
       return p.match === 'missing' ? t('N’a pas cette table') : t('A refusé');
@@ -422,6 +450,11 @@ export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match'>): st
     case 'failed':
       return t('La partie n’a pas démarré de son côté');
   }
+}
+
+/** « 5 billes au lieu de 3 ». */
+export function liveBallsAgainst(mine: number, host: number): string {
+  return t('{mine} au lieu de {host}', { mine: tn(mine, '{n} bille', '{n} billes'), host: host });
 }
 
 export function liveMatchLabel(match: LiveTableMatch): string {
@@ -443,8 +476,8 @@ export function liveMatchLabel(match: LiveTableMatch): string {
  * version : hors classement, même avec un record), puis les autres. Le score de la partie n'est
  * connu que s'il est entré au tableau d'honneur de la table.
  */
-export function liveStandings(game: Pick<LiveGame, 'players'>): LivePlayer[] {
+export function liveStandings(game: Pick<LiveGame, 'players'> & { table?: Pick<LiveTable, 'balls'> }): LivePlayer[] {
   const best = (p: LivePlayer) => Math.max(-1, ...(p.records ?? []).map((r) => r.score));
-  const order = (p: LivePlayer) => (p.records?.length && liveRanked(p) ? 0 : p.state === 'done' ? 1 : 2);
+  const order = (p: LivePlayer) => (p.records?.length && liveRanked(p, game.table?.balls) ? 0 : p.state === 'done' ? 1 : 2);
   return livePlayers(game).sort((a, b) => order(a) - order(b) || best(b) - best(a) || (b.seconds ?? 0) - (a.seconds ?? 0));
 }
