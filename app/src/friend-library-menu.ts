@@ -495,7 +495,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     const whole = job?.kind === 'friend-table';
     const plain = job?.source.label ?? '';
     const leave = () => {
-      if (job && (job.state === 'running' || job.state === 'queued' || job.state === 'waiting')) flash = { text: t('La réception continue'), detail: t('Téléchargements, en tête du menu système, pour la suivre'), tone: 'info' };
+      if (job && (job.state === 'running' || job.state === 'queued' || job.state === 'waiting')) flash = { text: t('La réception continue'), detail: t('Téléchargements, dans le menu système, pour la suivre'), tone: 'info' };
       transfer = undefined;
       back();
     };

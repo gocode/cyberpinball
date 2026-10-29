@@ -9,7 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.4
 
-- System menu in four sections: Tables, Media, Cabinet and Cyber Pinball; what is only used when coming from another frontend sits in "Migration".
+- System menu in five sections, in this order: Friends, Tables, Media, then Downloads, Cabinet and Cyber Pinball; what is only used when coming from another frontend sits in "Migration".
 - Live menu DMD: Cyber Pinball draws the display itself, with the title, PRESS START, credits, the clock and high scores.
 - Interface sounds: a solenoid click when changing table, a coin on Start, the knocker when a high score falls; can be turned off in "Media, sound and attract mode".
 - Cabinet health (Cabinet section): disk space, tables that don't start, missing media, screens and VPX version on a single screen.
@@ -44,7 +44,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - A friend's name always follows their latest rename, and a pending friend request is sent again when the cabinets meet.
 - The Windows taskbar no longer shows over the DMD, backglass or playfield when you come back from a game: Cyber Pinball puts it straight back behind, and "Cabinet health" tells you if it had to.
 - Long lists: in a content list (games, media, files…), marked by its frame and the "Exit · Leave the list" cue, Exit takes you back to the screen's actions instead of leaving it; MagnaSave (F6 on the keyboard) switches between the two and keeps your place, and holding a flipper scrolls letter by letter.
-- Downloads, at the top of the system menu and as a pill on the tables menu: follows everything coming from sites and your friends, resumes by itself where it stopped if the connection drops, even the next day, and takes you back in one move to the screen you asked from.
+- Downloads, in the system menu and as a pill on the tables menu: follows everything coming from sites and your friends, resumes by itself where it stopped if the connection drops, even the next day, and takes you back in one move to the screen you asked from.
+- The names under the small medallions of the wheel are larger and can be read from a distance, like every text of the menu.
 
 ## 0.1.3
 

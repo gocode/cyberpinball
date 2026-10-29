@@ -131,11 +131,11 @@ const wheel = (focus = 'Medieval Madness') => `
 <div class="cp-wheel">
   <span class="cp-arrow">${i('chevron-left')}</span>
   <div class="cp-wheel-track">
-    <span class="cp-logo">TZ</span>
-    <span class="cp-logo near">AFM</span>
+    <span class="cp-logo cp-initial">T</span>
+    <span class="cp-logo near cp-initial">A</span>
     <span class="cp-logo is-focus">${focus}</span>
-    <span class="cp-logo near">T2</span>
-    <span class="cp-logo">BK</span>
+    <span class="cp-logo near cp-initial">T</span>
+    <span class="cp-logo cp-initial">B</span>
   </div>
   <span class="cp-arrow">${i('chevron-right')}</span>
 </div>`;
@@ -145,7 +145,9 @@ C.Roue = {
 
 - Fournir : le logo de chaque table (\`.cp-logo\`, image ronde ou repli dessiné), cinq visibles au plus ; \`.near\` sur les voisins, \`.is-focus\` au centre ; un compteur \`.cp-count\` dessous.
 - Les flippers tournent la roue, Start ouvre la fiche. Les flèches sont cliquables à la souris.
-- Le titre, le fabricant et l'année de la table choisie s'écrivent au-dessus de la roue en \`display\` et \`meta\`, jamais dans la roue.`,
+- Le titre, le fabricant et l'année de la table choisie s'écrivent au-dessus de la roue en \`display\` et \`meta\`, jamais dans la roue.
+- Logo absent (repli dessiné) : le médaillon du centre écrit le titre (28 px, trois lignes au plus) ; les autres portent son initiale en grand (96 px dans le repère du bandeau, Saira 600, \`ink\`). Réduit à la place d'un voisin, un nom passerait sous 20 px. Nom et initiale ne se voient jamais ensemble : pendant le glissement, l'un s'éteint en 60 ms, l'autre s'allume ensuite en 160 ms.
+- Les 20 px valent pour le texte tel qu'on le voit, après la mise à l'échelle de sa place.`,
   html: page('<!-- @dsCard group="Navigation" height=400 width=1080 -->', `${wheel()}
 <p class="cp-count" style="margin-top:20px"><b>4</b> / 38</p>`),
 };

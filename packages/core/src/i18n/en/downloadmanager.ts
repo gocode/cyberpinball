@@ -106,7 +106,7 @@ export const messages: Record<string, string> = {
   'Toute la table : {table}': 'Whole table: {table}',
   '{n} médias de {table}': '{n} media of {table}',
   'La réception continue': 'Receiving carries on',
-  'Téléchargements, en tête du menu système, pour la suivre': 'Downloads, at the top of the system menu, to follow it',
+  'Téléchargements, dans le menu système, pour la suivre': 'Downloads, in the system menu, to follow it',
   'Réception retirée de la liste': 'Transfer removed from the list',
   'reprise automatique à son retour': 'resumes automatically when they are back',
   'Réception arrêtée': 'Transfer stopped',
@@ -130,7 +130,7 @@ export const messages: Record<string, string> = {
   // app/src/library.ts
   '{summary} · prêt : {screen}': '{summary} · ready: {screen}',
   'Ce qui arrive des sites et des amis, et ce qui est gardé': 'What is coming from sites and friends, and what is kept',
-  'Téléchargement terminé : {title}. Téléchargements, en tête du menu système, pour y revenir.': 'Download finished: {title}. Downloads, at the top of the system menu, to go back to it.',
+  'Téléchargement terminé : {title}. Téléchargements, dans le menu système, pour y revenir.': 'Download finished: {title}. Downloads, in the system menu, to go back to it.',
   'Écran d’origine introuvable': 'Original screen not found',
   '{summary} conservés': '{summary} kept',
 

@@ -195,9 +195,10 @@ function fillWheelItem(item, n) {
   const place = () => {
     if (wheelView) placeWheelItem(item, wheelView.style);
   };
+  // Le nom au centre ; les petits médaillons, où il passerait sous 20 px, portent l'initiale (frontend.css).
   const named = () => {
     if (!current()) return;
-    tilt.replaceChildren(el('div', 'wheel-name', n.title));
+    tilt.replaceChildren(el('div', 'wheel-name', n.title), el('div', 'wheel-initial', initialOf(n.title)));
     node.classList.add('disc');
     item.ratio = 1;
     place();
@@ -229,6 +230,8 @@ function placeWheelItem(item, style, hidden = item.leaving) {
   st.setProperty('--y', String(p.y));
   st.setProperty('--s', p.s.toFixed(4));
   st.setProperty('--o', String(hidden ? 0 : p.o));
+  // Place du centre : le nom d'un médaillon sans logo s'y lit, ailleurs son initiale.
+  item.node.classList.toggle('center', item.offset === 0 && !hidden);
   // La table choisie passe devant ses voisines (et l'anneau des Médaillons, z-index 19, entre eux).
   st.zIndex = String(20 - 2 * Math.min(4, Math.abs(item.offset)));
   if (p.o > 0 && !hidden) item.hit.dataset.act = JSON.stringify({ type: 'wheel', offset: item.offset });
@@ -422,8 +425,13 @@ function logoSlot(n) {
   const slot = el('span', 'logo-slot');
   const logo = CyberMedia.logo(n.wheel, 'list-logo');
   if (logo) slot.append(logo);
-  else slot.append(el('span', 'initial', (n.title.match(/[\p{L}\p{N}]/u) ?? ['·'])[0].toUpperCase()));
+  else slot.append(el('span', 'initial', initialOf(n.title)));
   return slot;
+}
+
+/** Initiale d'un titre (première lettre ou premier chiffre), pour la liste et les petits médaillons de la roue. */
+function initialOf(title) {
+  return (title.match(/[\p{L}\p{N}]/u) ?? ['·'])[0].toUpperCase();
 }
 
 /** Écran de chargement de secours (fallback.js) gardé d'un état à l'autre : ses animations ne repartent pas de zéro. */
@@ -507,6 +515,8 @@ function fitLoadingCard(card) {
     card.classList.toggle('compact', compact);
     list.dataset.columns = String(columns);
     card.style.setProperty('--keys-scale', String(scale));
+    // Corps de 24 × scale : sous 20, le dernier recours voulu, déclaré au garde-fou (layout-check.ts).
+    list.toggleAttribute('data-below-floor', 24 * scale < 19.5);
     // Deux colonnes trop étroites (encart étroit) : la grille n'en garde qu'une.
     if (columns === 2 && (getComputedStyle(list).gridTemplateColumns ?? '').split(' ').length < 2) continue;
     if (fits() && (wrapped || !wraps())) return;
@@ -632,8 +642,8 @@ function gearButton(s) {
 
 /**
  * Téléchargements en cours, à gauche de la roue dentée : icône, « 2 · 45 % » ou « Prêt », et une
- * barre fine. Un clic ouvre le gestionnaire (Exit puis Start aux boutons : première entrée du menu
- * système). Le mot dit l'état ; la couleur le redouble seulement.
+ * barre fine. Un clic ouvre le gestionnaire (aux boutons : Exit, puis Téléchargements, quatrième entrée
+ * du menu système). Le mot dit l'état ; la couleur le redouble seulement.
  */
 function downloadsPill(d) {
   const pill = el('button', `downloads-pill pill-${d.tone ?? 'info'}`);
@@ -1062,7 +1072,7 @@ window.cyberEtat = () => ({
   // Roue du menu : chaque place, le logo affiché (fichier et version de son adresse) ou le titre.
   roue: [...document.querySelectorAll('.wheel-item')].map((n) => {
     const img = n.querySelector('img.wheel-img');
-    return img ? decodeURIComponent(img.getAttribute('src')).replace(/^.*[\\/]/, '') : `titre : ${n.textContent}`; // i18n-ignore : relevé des essais
+    return img ? decodeURIComponent(img.getAttribute('src')).replace(/^.*[\\/]/, '') : `titre : ${n.querySelector('.wheel-name')?.textContent ?? n.textContent}`; // i18n-ignore : relevé des essais
   }),
   // DMD du menu vivant : affiché ou non (page du média), dans le cadre du FullDMD ou sur du noir, points allumés.
   dmd: liveDmd && { visible: !liveDmd.holder.hidden, cadre: Boolean(liveDmd.framed), points: lastDmdShot?.dots ? lastDmdShot.dots.filter((v) => v > 0).length : 0 },

@@ -11,6 +11,7 @@ import {
   SYSTEM_ITEMS,
   SYSTEM_ROOT,
   SYSTEM_ROOT_ENTRIES,
+  SYSTEM_ROOT_SHORTCUTS,
   systemEntry,
   systemPathOf,
   type SystemEntryId,
@@ -35,6 +36,13 @@ test('menu système : chaque entrée est rangée une fois, sous une seule rubriq
     else assert.ok(systemPathOf(group), `« ${group} » n'est accessible depuis aucune rubrique`);
   }
   assert.equal(SYSTEM_ROOT.length, 5, 'cinq rubriques');
+});
+
+test('menu système : la racine reprend les rubriques dans leur ordre, et chaque raccourci une fois', () => {
+  assert.deepEqual(SYSTEM_ROOT_ENTRIES.filter((id) => isSystemGroup(id)), [...SYSTEM_ROOT]);
+  assert.deepEqual(SYSTEM_ROOT_ENTRIES.filter((id) => !isSystemGroup(id)), [...SYSTEM_ROOT_SHORTCUTS]);
+  // Ordre choisi le 29/10/2026 : Amis en premier, Téléchargements après Médias.
+  assert.deepEqual(SYSTEM_ROOT_ENTRIES, ['amis', 'tables', 'medias', 'downloads', 'borne', 'cyberpinball']);
 });
 
 test('menu système : dans une rubrique, chaque entrée a son icône, et la rubrique la sienne', () => {
@@ -108,7 +116,7 @@ function segments(rest: string): string[] {
 
 /** Erreur du chemin, ou undefined : chaque cran nomme une entrée de la rubrique où l'on est, jusqu'à une entrée qui ouvre son propre écran (ou une rubrique). */
 function checkPath(parts: string[]): string | undefined {
-  // La racine telle qu'elle s'affiche : Téléchargements (raccourci), puis les rubriques.
+  // La racine telle qu'elle s'affiche : les rubriques et Téléchargements (raccourci).
   let at: readonly SystemEntryId[] = SYSTEM_ROOT_ENTRIES;
   for (const part of parts) {
     const found = at.find((id) => namesOf(id).includes(norm(part)));
@@ -150,8 +158,8 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.deepEqual(segments('« Borne » > « Configuration de la borne » > « Tilt » : Start…'), ['Borne', 'Configuration de la borne', 'Tilt']);
   assert.deepEqual(segments('"Borne" (Cabinet) > "Configuration de la borne" (Cabinet setup) > "Tilt" (`npm run`)'), ['Borne', 'Configuration de la borne', 'Tilt']);
   assert.deepEqual(segments('Borne > Configuration de la borne > Écran du DMD.'), ['Borne', 'Configuration de la borne', 'Écran du DMD']);
-  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Téléchargements, Tables, Médias, Amis, Borne, Cyber Pinball)');
-  assert.equal(checkPath(['Téléchargements']), undefined, 'Téléchargements, en tête de la racine');
+  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Amis, Tables, Médias, Téléchargements, Borne, Cyber Pinball)');
+  assert.equal(checkPath(['Téléchargements']), undefined, 'Téléchargements, à la racine');
   assert.equal(checkPath(['Tables', 'Téléchargements']), undefined, 'et toujours dans Tables');
   assert.equal(checkPath(['Cyber Pinball', 'Language / Langue']), undefined);
   assert.equal(checkPath(['Cabinet', 'Cabinet setup', 'Tilt']), undefined);

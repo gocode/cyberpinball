@@ -146,8 +146,10 @@ before(async () => {
       return;
     }
     if (how === 'cut') {
-      res.write(body.subarray(0, Math.floor(body.length / 2)));
-      setTimeout(() => res.destroy(), 20);
+      // La moitié part, le client a le temps de la lire, puis la connexion tombe (même règle que
+      // downloads-resume.test.ts) : couper 20 ms après l'écriture, sans attendre qu'elle soit partie,
+      // jetait parfois tout sous la charge de npm test, et aucun partiel ne restait à reprendre.
+      res.write(body.subarray(0, Math.floor(body.length / 2)), () => setTimeout(() => res.destroy(), 200));
       return;
     }
     if (how === 'stall') {

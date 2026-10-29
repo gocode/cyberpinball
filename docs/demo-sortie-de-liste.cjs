@@ -230,10 +230,12 @@ async function scenario(sc, box, report, log) {
     expect(view().heading !== heading, `${tag} : un second Exit devrait quitter l’écran`);
   }
 
-  // 1. Liste de jeux : Téléchargements > le fichier > « Ajouter à un autre jeu… » : 37 tables triées par nom.
+  // 1. Liste de jeux : Téléchargements > Fichiers téléchargés > le fichier > « Ajouter à un autre jeu… » : 37 tables triées par nom.
   library.openSystem();
   await act(T('Tables'));
   await act(T('Téléchargements'));
+  // Le gestionnaire de téléchargements (download-center.ts) mène à l'inventaire, « Fichiers téléchargés ».
+  await act(T('Fichiers téléchargés'));
   await act('pack-sons-flipper.zip');
   await act(T('Ajouter à un autre jeu…'));
   await zones('jeux', 5);

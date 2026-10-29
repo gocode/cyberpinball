@@ -11,7 +11,7 @@ son interface).
 
 ## 0.1.4
 
-- Menu système en quatre rubriques : Tables, Médias, Borne et Cyber Pinball ; ce qui ne sert qu'en venant d'un autre frontend est rangé dans « Migration ».
+- Menu système en cinq rubriques, dans cet ordre : Amis, Tables, Médias, puis Téléchargements, Borne et Cyber Pinball ; ce qui ne sert qu'en venant d'un autre frontend est rangé dans « Migration ».
 - DMD du menu vivant : Cyber Pinball dessine lui-même l'afficheur, avec le titre, PRESS START, les crédits, l'horloge et les records.
 - Sons de l'interface : clic de solénoïde au changement de table, pièce au Start, knocker quand un record tombe ; désactivables dans « Médias, son et attente ».
 - Santé de la borne (rubrique Borne) : espace disque, tables qui ne démarrent pas, médias manquants, écrans et version de VPX sur un seul écran.
@@ -46,7 +46,8 @@ son interface).
 - Le nom d'un ami suit toujours son dernier renommage, et une demande d'ami en attente repart quand les bornes se retrouvent.
 - La barre des tâches de Windows ne passe plus devant le DMD, le fronton ou le playfield au retour d'une partie : Cyber Pinball la remet aussitôt derrière, et « Santé de la borne » dit s'il a dû le faire.
 - Longues listes : dans une liste de contenu (jeux, médias, fichiers…), marquée par son cadre et le repère « Exit · Sortir de la liste », Exit ramène aux actions de l'écran au lieu de le quitter ; MagnaSave (F6 au clavier) passe de l'une à l'autre en retrouvant sa place, et un flipper tenu fait défiler de lettre en lettre.
-- Téléchargements, en tête du menu système et en pastille sur le menu des tables : suit tout ce qui arrive des sites et de vos amis, reprend seul là où il s'était arrêté si la connexion tombe, même le lendemain, et vous ramène d'un geste à l'écran d'où vous l'aviez demandé.
+- Téléchargements, dans le menu système et en pastille sur le menu des tables : suit tout ce qui arrive des sites et de vos amis, reprend seul là où il s'était arrêté si la connexion tombe, même le lendemain, et vous ramène d'un geste à l'écran d'où vous l'aviez demandé.
+- Les noms sous les petits médaillons de la roue sont plus grands et se lisent de loin, comme tout texte du menu.
 
 ## 0.1.3
 

@@ -38,7 +38,7 @@ Les états gardent un mot et un signe : coche + OK, triangle + À vérifier, cro
 
 ## Typographie et lisibilité
 
-Famille : Saira. Le mot-symbole reste en capitales espacées, léger ; les titres d’écran sont en capitales, les titres de jeux conservent leur casse naturelle. Texte courant à 24 px ; titres des constats du diagnostic à 28 px ; **aucun texte sous 20 px** à l’échelle de référence.
+Famille : Saira. Le mot-symbole reste en capitales espacées, léger ; les titres d’écran sont en capitales, les titres de jeux conservent leur casse naturelle. Texte courant à 24 px ; titres des constats du diagnostic à 28 px ; **aucun texte sous 20 px** à l’échelle de référence, tel qu’on le voit : un texte réduit par une transformation (médaillon d’une roue, pulsation) compte à sa taille rendue, et le garde-fou de mise en page le mesure ainsi.
 
 **Polices :** les aperçus chargent Saira depuis Google Fonts. Pour l'application, qui doit marcher hors ligne, Saira (SIL Open Font License) sera embarquée comme les polices des replis, depuis le dépôt google/fonts (`ofl/saira`, police variable en graisse et en largeur), dans `app/renderer/polices/`. `src/base.css` déclare déjà `local("Saira")`, puis Segoe UI.
 

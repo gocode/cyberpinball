@@ -126,7 +126,7 @@ header {
   background: var(--surface-raised);
   color: var(--ink);
   font-family: inherit;
-  font-size: 1.85vmin;
+  font-size: 1.852vmin;
   font-weight: 600;
   font-stretch: 112%;
   letter-spacing: 0.1em;
@@ -167,7 +167,7 @@ h1 {
 .file {
   margin-top: 0.6vmin;
   font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 1.85vmin;
+  font-size: 1.852vmin;
   color: var(--quiet);
   word-break: break-all;
 }
@@ -233,7 +233,7 @@ h1 {
 }
 
 .vpx {
-  font-size: 1.85vmin;
+  font-size: 1.852vmin;
   color: var(--quiet);
 }
 
@@ -335,7 +335,7 @@ h1 {
 
 .sub {
   font-family: 'Cascadia Mono', Consolas, monospace;
-  font-size: 1.85vmin;
+  font-size: 1.852vmin;
   color: var(--quiet);
 }
 
@@ -364,7 +364,7 @@ h1 {
   padding: 0.2vmin 1vmin;
   border: 1px solid var(--line-strong);
   border-radius: 0.3vmin;
-  font-size: 1.85vmin;
+  font-size: 1.852vmin;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -452,13 +452,13 @@ dd {
   margin-top: 1.6vmin;
   padding-top: 1.4vmin;
   border-top: 1px solid var(--line);
-  font-size: 1.85vmin;
+  font-size: 1.852vmin;
   color: var(--quiet);
 }
 
 .original-title {
   margin-bottom: 0.6vmin;
-  font-size: 1.85vmin;
+  font-size: 1.852vmin;
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -561,7 +561,7 @@ footer {
 
 .choices .note {
   color: var(--quiet);
-  font-size: 1.85vmin;
+  font-size: 1.852vmin;
   font-weight: 400;
   align-self: center;
 }

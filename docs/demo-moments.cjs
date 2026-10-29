@@ -192,6 +192,9 @@ const LAYOUT_CASES = [
   ['deux textes l’un sur l’autre', '<div style="position:absolute;top:10px;left:10px;font-size:30px">Premier texte</div><div style="position:absolute;top:15px;left:20px;font-size:30px">Second texte</div>', 'chevauchement'],
   ['texte coupé sans « … »', '<div style="width:120px;overflow:hidden;white-space:nowrap"><span>Un texte coupé sans prévenir personne</span></div>', 'coupé'],
   ['texte hors de la fenêtre', '<div style="position:absolute;left:350px;top:10px;white-space:nowrap;font-size:30px">Ce texte sort de la fenêtre</div>', 'hors de la fenêtre'],
+  // Plancher de 20 px, tel qu'on le voit (fenêtre de 300 de haut : 20 px de référence y font 5,6 px) : un médaillon réduit de la roue.
+  ['texte réduit par un transform sous 20 px', '<div style="transform:scale(0.2);transform-origin:0 0"><p style="margin:0;font-size:20px">Médaillon réduit</p></div>', 'texte plus petit que 20 px'],
+  ['texte réduit par un transform, lisible', '<div style="transform:scale(0.5);transform-origin:0 0"><p style="margin:0;font-size:20px">Médaillon lisible</p></div>', undefined],
   // Écran de chargement (html.loading-phase) : en borne, aucun texte sur le média ; au bureau, l'encart à côté du cadre.
   ['chargement en borne, un titre sur le média', '<script>document.documentElement.className = "loading-phase menu-cab"</script><main id="root" style="position:fixed;inset:0"><h1>Neon Galaxy</h1></main>', 'texte sur le chargement en borne'],
   ['chargement en borne, le repli seul', '<script>document.documentElement.className = "loading-phase menu-cab"</script><main id="root" style="position:fixed;inset:0"><div class="cp-fb-loading"><div>Neon Galaxy</div></div></main>', undefined],

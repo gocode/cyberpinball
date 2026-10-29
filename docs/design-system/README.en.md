@@ -38,7 +38,7 @@ States always keep a word and a sign: check mark + "OK", triangle + "À vérifie
 
 ## Typography and legibility
 
-Family: Saira. The wordmark stays in light, widely spaced capitals; screen titles are in capitals, game titles keep their natural case. Body text at 24 px; titles of diagnostic findings at 28 px; **no text below 20 px** at the reference scale.
+Family: Saira. The wordmark stays in light, widely spaced capitals; screen titles are in capitals, game titles keep their natural case. Body text at 24 px; titles of diagnostic findings at 28 px; **no text below 20 px** at the reference scale, as it is seen: a text shrunk by a transform (a wheel medallion, a pulse) counts at its rendered size, and the layout guard measures it that way.
 
 **Fonts:** the previews load Saira from Google Fonts. For the application, which must work offline, Saira (SIL Open Font License) will be bundled like the fallback fonts, from the google/fonts repository (`ofl/saira`, variable font in weight and width), in `app/renderer/polices/`. `src/base.css` already declares `local("Saira")`, then Segoe UI.
 

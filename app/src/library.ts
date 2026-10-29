@@ -825,7 +825,7 @@ export function createLibrary(host: LibraryHost) {
     finished: (job) => {
       // Rendu de lui-même (son écran est ouvert) ; sinon un bandeau le dit, la pastille le garde « prêt ».
       if (downloadFinishers.get(job.kind)?.(job)) return;
-      host.notify?.(t('Téléchargement terminé : {title}. Téléchargements, en tête du menu système, pour y revenir.', { title: job.title }));
+      host.notify?.(t('Téléchargement terminé : {title}. Téléchargements, dans le menu système, pour y revenir.', { title: job.title }));
     },
     onChange: () => host.downloadsChanged?.(),
     log: (line) => console.log(line),

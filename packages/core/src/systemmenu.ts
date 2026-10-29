@@ -1,7 +1,7 @@
 // Menu système (Exit, Tab ou roue dentée) : cinq rubriques au lieu d'une longue liste.
-// Tables, Médias, Amis, Borne, Cyber Pinball ; ce qui ne sert qu'une fois, en venant d'un autre
-// frontend (médias de PinUP Popper, ROM copiées dans chaque table), est rangé à part dans
-// « Migration », au fond de la rubrique Cyber Pinball.
+// Amis, Tables, Médias, Borne, Cyber Pinball (Téléchargements entre Médias et Borne) ; ce qui ne
+// sert qu'une fois, en venant d'un autre frontend (médias de PinUP Popper, ROM copiées dans
+// chaque table), est rangé à part dans « Migration », au fond de la rubrique Cyber Pinball.
 //
 // Ce module ne décrit que l'arbre : rubriques, ordre, libellé et icône de chaque entrée.
 // L'application fournit ce que fait chaque entrée (app/src/library.ts, frontend.ts) ; le
@@ -63,17 +63,21 @@ export interface SystemGroup extends SystemEntry {
 }
 
 /** Rubriques du menu système, dans l'ordre. */
-export const SYSTEM_ROOT: readonly SystemGroupId[] = ['tables', 'medias', 'amis', 'borne', 'cyberpinball'];
+export const SYSTEM_ROOT: readonly SystemGroupId[] = ['amis', 'tables', 'medias', 'borne', 'cyberpinball'];
 
 /**
- * Entrées montrées aussi à la racine, avant les rubriques : Téléchargements, à un geste du menu
- * des tables (Exit puis Start), comme le gestionnaire de téléchargements d'une console. Elles
- * gardent leur place dans leur rubrique (Tables > Téléchargements).
+ * Entrées montrées aussi à la racine, parmi les rubriques : Téléchargements, comme le gestionnaire
+ * de téléchargements d'une console. Elles gardent leur place dans leur rubrique
+ * (Tables > Téléchargements).
  */
 export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['downloads'];
 
-/** La racine du menu système telle qu'elle s'affiche : ses raccourcis, puis les rubriques. */
-export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = [...SYSTEM_ROOT_SHORTCUTS, ...SYSTEM_ROOT];
+/**
+ * La racine du menu système telle qu'elle s'affiche : Amis, Tables, Médias, Téléchargements, Borne,
+ * Cyber Pinball (ordre choisi le 29/10/2026). systemmenu.test.ts vérifie qu'elle reprend
+ * SYSTEM_ROOT dans son ordre et chaque raccourci une fois.
+ */
+export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['amis', 'tables', 'medias', 'downloads', 'borne', 'cyberpinball'];
 
 export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   tables: {

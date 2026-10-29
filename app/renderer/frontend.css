@@ -429,6 +429,34 @@ html.menu-desktop .menu-count {
   overflow-wrap: anywhere;
 }
 
+/*
+ * Le nom ne se lit qu'au centre : réduit à la place d'un voisin (scale(--s), jusqu'à 0,44), il
+ * passerait sous le plancher de 20 px. Les petits médaillons portent l'initiale du jeu en grand,
+ * comme la case de logo de la liste. Nom et initiale se partagent la place et ne sont jamais
+ * visibles ensemble : l'un s'éteint en 60 ms, au début du glissement, avant d'être réduit sous
+ * 20 px ; l'autre s'allume ensuite (layout-check.ts relève les textes en plein glissement).
+ */
+.wheel-name,
+.wheel-initial {
+  grid-area: 1 / 1;
+  opacity: 0;
+  transition: opacity 60ms linear;
+}
+
+.wheel-item.center .wheel-name,
+.wheel-item:not(.center) .wheel-initial {
+  opacity: 1;
+  transition: opacity 160ms linear 60ms;
+}
+
+.wheel-initial {
+  font-size: calc(96 * var(--w));
+  font-weight: 600;
+  font-stretch: 112%;
+  line-height: 1;
+  color: var(--ink);
+}
+
 /* ---------- Roues à bandeau : Médaillons, Bandeau, Minimaliste, Arche (roues/<nom>.svg) ---------- */
 
 /*
@@ -935,7 +963,26 @@ html.menu-desktop .footer.menu-help .cap {
   min-width: calc(40 * var(--u));
   height: calc(32 * var(--u));
   padding: 0 calc(8 * var(--u));
-  font-size: calc(18 * var(--u));
+  font-size: calc(20 * var(--u));
+}
+
+/*
+ * Liste au bureau, écran étroit (5:4, 4:3, 3:2) : les commandes ne tiennent pas sur une ligne à
+ * côté du compteur (1280 × 1024 : « Exit » sortait de l'écran, sur le compteur). Elles passent
+ * sur deux lignes, sur toute la largeur, et le compteur monte au-dessus du filet, à droite.
+ */
+@container (aspect-ratio < 1.6) {
+  html.menu-desktop:not([data-menu-band]) .footer.menu-help {
+    flex-wrap: wrap;
+    align-content: center;
+    row-gap: calc(10 * var(--u));
+    padding-right: 0;
+  }
+
+  html.menu-desktop:not([data-menu-band]) .menu-count {
+    top: calc(872 * var(--u));
+    height: calc(48 * var(--u));
+  }
 }
 
 /*
@@ -2370,6 +2417,8 @@ html.has-backdrop .wheel li:not(.current) {
 
 /* Case du logo dans la liste : toujours la même taille, les titres restent alignés. */
 .logo-slot {
+  /* Taille fixe dans la ligne flexible de la liste : un titre long ne la tasse pas, les titres restent alignés. */
+  flex: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;

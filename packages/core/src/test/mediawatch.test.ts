@@ -173,7 +173,7 @@ test('.directb2s ajouté après le démarrage : trouvé après invalidate ; relu
 test('roue : le logo ajouté à une table déjà dans la roue s’affiche aussitôt, à la même place', async () => {
   const { document, send } = menuRenderer();
   const item = (title: string) =>
-    [...document.querySelectorAll('.wheel-item')].find((n) => n.textContent === title || n.querySelector('img')?.getAttribute('src')?.includes(encodeURIComponent(title)));
+    [...document.querySelectorAll('.wheel-item')].find((n) => n.querySelector('.wheel-name')?.textContent === title || n.querySelector('img')?.getAttribute('src')?.includes(encodeURIComponent(title)));
   const url = (name: string, v: string) => `cyber-media://fichier/${encodeURIComponent(`D:\\T\\${name}\\medias\\(Wheel) ${name}.png`)}?v=${v}`;
 
   send(menuState({ 'A.vpx': undefined, 'Nouveau.vpx': undefined, 'C.vpx': url('C', '1') }));

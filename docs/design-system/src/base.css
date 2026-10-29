@@ -118,6 +118,9 @@
   background: radial-gradient(circle at 50% 35%, var(--surface-raised), var(--void) 75%); border: 2px solid var(--line-strong);
   font-family: var(--font-logo); color: var(--ink); text-align: center; font-size: 26px; line-height: 1; padding: 14px; overflow: hidden; opacity: .78 }
 .cp-logo.near { width: 140px; opacity: .92; font-size: 30px }
+/* Repli d’un logo absent hors du centre : l’initiale du jeu, en grand (le nom passerait sous 20 px). */
+.cp-logo.cp-initial { font-size: 56px; font-weight: 600; font-stretch: 112% }
+.cp-logo.near.cp-initial { font-size: 64px }
 .cp-logo.is-focus { width: 220px; opacity: 1; border: 4px solid var(--signal); font-size: 28px;
   box-shadow: 0 0 0 6px var(--void), 0 0 0 8px var(--signal-line), 0 0 44px var(--signal-haze) }
 .cp-arrow { width: 64px; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; background: var(--surface-raised);

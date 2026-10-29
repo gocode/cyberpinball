@@ -6,7 +6,9 @@
 // - un texte coupé par un conteneur qui masque ce qui dépasse (overflow: hidden),
 //   lui-même compris ;
 // - une image ou une vidéo qui ne se charge pas (protocole des médias non branché,
-//   fichier absent, format illisible) : l'aperçu montrerait une icône cassée.
+//   fichier absent, format illisible) : l'aperçu montrerait une icône cassée ;
+// - un texte ou une icône plus petits que 20 px (plancher du design system) tels qu'on les
+//   voit, réduits par un transform compris (médaillons de la roue).
 // Une superposition voulue (aide, menu par-dessus le menu des tables) n'est pas un
 // chevauchement : le calque du dessus a un fond opaque qui cache celui du dessous.
 // Une coupure voulue non plus : « … » posé par le texte ou par le conteneur qui le coupe
@@ -53,7 +55,7 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     return true;
   };
   // Somme des rotations des ancêtres : un quart de tour couche le texte.
-  const quarterTurned = (el) => {
+  const turn = (el) => {
     let angle = 0;
     for (let e = el; e; e = e.parentElement) {
       const m = getComputedStyle(e).transform.match(/^matrix\(([^)]+)\)/);
@@ -62,7 +64,25 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
         angle += Math.atan2(b, a);
       }
     }
-    return Math.abs(Math.sin(angle)) > 0.7;
+    return angle;
+  };
+  const quarterTurned = (el) => Math.abs(Math.sin(turn(el))) > 0.7;
+  // Ce qu'un conteneur laisse voir de ce qui dépasse : sa boîte s'il masque (overflow), ou celle de son
+  // clip-path: inset() (la roue fait entrer et sortir ses logos par ses bords, pas par ceux de l'écran).
+  // Les marges de inset() suivent la boîte de l'élément : dans une vue pivotée d'un quart de tour, son
+  // haut est à droite (ou à gauche) de l'écran.
+  const clipOf = (e) => {
+    const s = getComputedStyle(e);
+    const c = e.getBoundingClientRect();
+    if (![s.overflowX, s.overflowY].every((o) => o === 'visible')) return { left: c.left, right: c.right, top: c.top, bottom: c.bottom };
+    const m = /^inset\(([^)]*)\)/.exec(s.clipPath || '');
+    if (!m) return undefined;
+    const [t, r = t, b = t, l = r] = m[1].split(/\s+round\s+/)[0].trim().split(/\s+/);
+    const len = (x, size) => (x.endsWith('%') ? (parseFloat(x) * size) / 100 : parseFloat(x));
+    const local = [len(t, e.offsetHeight), len(r, e.offsetWidth), len(b, e.offsetHeight), len(l, e.offsetWidth)];
+    const q = (((Math.round(turn(e) / (Math.PI / 2)) % 4) + 4) % 4);
+    const side = [0, 1, 2, 3].map((i) => local[(i - q + 4) % 4]);
+    return { left: c.left + side[3], right: c.right - side[1], top: c.top + side[0], bottom: c.bottom - side[2] };
   };
   const boxes = [];
   const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -118,9 +138,8 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   const seen = boxes.map(({ el, r, text }) => {
     let v = { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
     for (let e = text ? el : el.parentElement; e && e !== document.body; e = e.parentElement) {
-      const s = getComputedStyle(e);
-      if ([s.overflowX, s.overflowY].every((o) => o === 'visible')) continue;
-      const c = e.getBoundingClientRect();
+      const c = clipOf(e);
+      if (!c) continue;
       v = { left: Math.max(v.left, c.left), right: Math.min(v.right, c.right), top: Math.max(v.top, c.top), bottom: Math.min(v.bottom, c.bottom) };
     }
     return v;
@@ -283,10 +302,60 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   // Image chargée sans pixels, vidéo en erreur : l'écran montrerait un aperçu cassé.
   for (const img of document.images) if (img.complete && img.getAttribute('src') && img.naturalWidth === 0) problems.add('image non chargée : ' + img.getAttribute('src').slice(0, 120));
   for (const video of document.querySelectorAll('video')) if (video.error) problems.add('vidéo non chargée : ' + (video.getAttribute('src') || '').slice(0, 120));
+  const px = 1080 / Math.min(vw, vh);
+  // Plancher du design system : aucun texte sous 20 px à l'échelle d'un petit côté de 1 080 px.
+  // Le corps qui compte est celui qu'on voit : la police multipliée par l'échelle de chaque
+  // transform au-dessus du texte. Les noms des petits médaillons de la roue, réduits par
+  // scale(--s), passaient à 14 px sans que rien ne le dise : ce garde-fou ne mesurait que les
+  // icônes, et le test des feuilles ne lit que les corps en cqmin (revue de Codex, 29/10/2026).
+  // Une animation qui tourne en boucle (pulsation) compte à son pas le plus petit : relevée à un
+  // autre instant, elle passerait. Un glissement ou une animation qui s'arrête comptent tels
+  // qu'à l'instant du relevé (les démonstrations en relèvent aussi en plein mouvement). Sont mis
+  // à part : le lancement en cinéma, qui emporte le médaillon hors de l'écran ; les replis
+  // (.cp-fb, fallback.js), médias dessinés à la place d'une image ou d'une vidéo du jeu, dont les
+  // textes suivent la taille de leur zone comme ceux d'un média (le repli du chargement dans le
+  // cadre 9:16 du bureau) ; un dernier recours voulu, déclaré par data-below-floor (encart du
+  // chargement, frontend.js).
+  const scaleOf = (transform) => {
+    if (!transform || transform === 'none') return 1;
+    let m;
+    try {
+      m = new DOMMatrix(transform);
+    } catch {
+      // Unités que DOMMatrix ne lit pas (cqh, %) : elles ne servent qu'aux translations.
+      try {
+        m = new DOMMatrix(transform.replace(/translate[XYZ3d]*\([^)]*\)/g, '').trim() || 'none');
+      } catch {
+        return 1;
+      }
+    }
+    return Math.hypot(m.c, m.d);
+  };
+  const glyphScale = (el) => {
+    let m = new DOMMatrix();
+    let loop = 1;
+    for (let e = el; e; e = e.parentElement) {
+      const t = getComputedStyle(e).transform;
+      if (t && t !== 'none') m = new DOMMatrix(t).multiply(m);
+      for (const a of e.getAnimations()) {
+        const timing = a.effect && a.effect.getComputedTiming();
+        if (a.playState !== 'running' || !timing || timing.iterations !== Infinity || !a.effect.getKeyframes) continue;
+        const now = scaleOf(t);
+        for (const k of a.effect.getKeyframes()) if (k.transform && now > 0) loop = Math.min(loop, scaleOf(k.transform) / now);
+      }
+    }
+    return Math.hypot(m.c, m.d) * loop;
+  };
+  const measured = new Set();
+  for (const { el, text } of boxes) {
+    if (!text || measured.has(el) || el.closest('.cinema, .cp-fb, [data-below-floor]')) continue;
+    measured.add(el);
+    const size = parseFloat(getComputedStyle(el).fontSize) * glyphScale(el) * px;
+    if (size > 0 && size < 19.5) problems.add('texte plus petit que 20 px (' + size.toFixed(1) + ' px) : ' + label(el));
+  }
   // Icônes du registre (icons.js) : nom inconnu, plus petite que 20 px à l'échelle d'un petit
   // côté de 1 080 px, ou la même pour deux entrées d'un menu (data-icon-menu) : elle ne
   // distinguerait plus rien.
-  const px = 1080 / Math.min(vw, vh);
   for (const icon of document.querySelectorAll('svg.icon')) {
     if (!shown(icon)) continue;
     if (icon.classList.contains('icon-unknown')) problems.add('icône inconnue : ' + icon.getAttribute('data-icon'));
