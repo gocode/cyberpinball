@@ -5,7 +5,9 @@
 // sur chaque page. Cas : DMD seul sur un écran 4:1, DMD seul en bande sur un écran 16:9,
 // FullDMD habillé (média au cadre dessiné, les points dans le cadre), FullDMD sans média (la
 // bande sur du noir), page du média, animation « chargement », menu sans table.
-//   electron docs/demo-dmd-vivant.cjs <spec.json>   { "out": dossier des captures }
+//   electron docs/demo-dmd-vivant.cjs <spec.json>   { "out": dossier des captures, "accueil": true (facultatif) }
+// accueil : seulement les pages de la page du projet (titre, PRESS START, record, horloge d'un jeu
+// inventé), que docs\demo-dmd-vivant.ps1 -Accueil assemble en docs\images\<langue>\live-dmd.webp.
 // Médias inventés ici (PNG dessinés point par point) ; records inventés, marqués comme tels.
 // Fenêtres jamais montrées (show: false, rendu hors écran).
 
@@ -93,6 +95,16 @@ const CASES = [
   ['fulldmd-sans-table', 1920, 1080, FULL, undefined, undefined, 'brand', true],
 ];
 
+// Page du projet (spec.accueil, docs\demo-dmd-vivant.ps1 -Accueil) : un jeu inventé de
+// docs\demo-captures.cjs, aucun nom de jeu réel ; records et initiales inventés.
+const ABYSS = { title: 'Neon Abyss', manufacturer: 'Orbital Works', year: 1994, records: { file: 'démonstration', storage: 'demo', credits: 2, scores: [{ rank: 1, score: 82450000, initials: 'ACE' }, { rank: 2, score: 61300000, initials: 'NEO' }] } };
+const ACCUEIL = [
+  ['accueil-titre', 1920, 480, FULL, ABYSS, undefined, 'title'],
+  ['accueil-press-start', 1920, 480, FULL, ABYSS, undefined, 'press-start'],
+  ['accueil-record', 1920, 480, FULL, ABYSS, undefined, 'records'],
+  ['accueil-horloge', 1920, 480, FULL, ABYSS, undefined, 'clock'],
+];
+
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 app.on('window-all-closed', () => {});
@@ -109,7 +121,7 @@ app.whenReady().then(async () => {
   serveMedias(() => [mediaDir]);
   const problems = [];
   const report = [];
-  for (const [name, width, height, zone, table, media, page, fullDmd, at = 0] of CASES) {
+  for (const [name, width, height, zone, table, media, page, fullDmd, at = 0] of spec.accueil ? ACCUEIL : CASES) {
     const win = new BrowserWindow({
       show: false,
       frame: false,

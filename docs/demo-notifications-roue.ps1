@@ -62,7 +62,7 @@ function Get-Etapes($l) {
   ) + (& $regarder 17) + @(
     # La table de Bruno, en arrière-plan, puis retour au menu des tables (elle y finit une trentaine de secondes plus tard).
     $Exit, 'wait:800', "action:$($l.Amis)", "action:$($l.MesAmis)", 'wait:1200', 'action:Bruno', 'wait:400', "action:$($l.Biblio)", 'wait:2500',
-    'action:Bride', 'wait:600', "action:$($l.Toute)", 'wait:2500', "action:$($l.Prendre)", 'wait:2000', "action:$($l.Fond)", 'wait:400',
+    'action:Glass Lagoon', 'wait:600', "action:$($l.Toute)", 'wait:2500', "action:$($l.Prendre)", 'wait:2000', "action:$($l.Fond)", 'wait:400',
     'leave', 'until:menu'
   ) + (& $regarder 18)
 }

@@ -18,17 +18,33 @@
 # doivent rester muets.
 #   .\docs\demo-amis.ps1 [-Parcours amis, partie] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans]
 # Captures dans tmp\demo-amis\<parcours>\<écrans>\<langue>\captures.
+#   .\docs\demo-amis.ps1 -Accueil [-Langues en, fr]
+# Images de la rubrique Amis de la page d'accueil (README) : parcours « amis » seul, sur l'écran
+# « borne », tables et illustrations régénérées (docs\demo-captures.cjs, docs\demo-captures-medias),
+# puis docs\images\<langue>\friends.webp (« Mes amis » et la fiche de Bruno) et friends-library.webp
+# (la bibliothèque de Bruno et sa table que la borne n'a pas), playfield remis debout.
 param(
   [string[]]$Parcours = @('amis', 'partie'),
   [string[]]$Langues = @('fr', 'en'),
   [string[]]$Ecrans = @('borne', 'poste-deux-ecrans'),
-  [string]$Source = 'D:\CyberPinball'
+  [string]$Source = 'D:\CyberPinball',
+  [switch]$Accueil
 )
 $ErrorActionPreference = 'Stop'
 $wt = Split-Path $PSScriptRoot -Parent
 . "$PSScriptRoot\hors-ecran.ps1"
 # Tout le reste tourne sur un bureau Windows caché : rien ne peut apparaître sur les écrans du poste.
 if (Enter-BureauCache $PSCommandPath $PSBoundParameters) { exit $LASTEXITCODE }
+# Parcours et écrans rejoués : -Accueil n'en garde qu'un de chaque (le parcours « partie », avec sa
+# jonction vers les émulateurs, n'a rien à faire ici).
+$parcoursJoues = $Parcours
+$ecransJoues = $Ecrans
+if ($Accueil) {
+  if ($PSBoundParameters.ContainsKey('Parcours') -and ($Parcours -ne 'amis')) { throw '-Accueil : parcours « amis » seulement.' }
+  if ($PSBoundParameters.ContainsKey('Ecrans') -and ($Ecrans -ne 'borne')) { throw '-Accueil : écrans « borne » seulement.' }
+  $parcoursJoues = @('amis')
+  $ecransJoues = @('borne')
+}
 $base = "$wt\tmp\demo-amis"
 $electron = node -p "require('electron')"
 $failures = @()
@@ -37,9 +53,11 @@ Push-Location $wt
 try { npm run build | Out-Null } finally { Pop-Location }
 
 # Une racine par parcours : celle de la partie voit les émulateurs de la borne réelle (jonction).
-function New-Racine([string]$Nom, [switch]$Emulateurs) {
+# -Neuve : régénérée même si elle existe (illustrations de docs\demo-captures-medias ajoutées depuis).
+function New-Racine([string]$Nom, [switch]$Emulateurs, [switch]$Neuve) {
   $root = "$base\racine-$Nom"
-  if (-not (Test-Path "$root\tables")) {
+  if ($Neuve -and (Test-Path "$root\emulators")) { throw "Racine $root : elle voit les émulateurs par une jonction, jamais régénérée." }
+  if ($Neuve -or -not (Test-Path "$root\tables")) {
     # Write-Host : la fonction ne rend que la racine.
     Write-Host "== tables inventées et leurs médias ($Nom)"
     Push-Location $wt
@@ -78,14 +96,15 @@ function Get-Etapes([string]$Nom, $l) {
     "action:$($l.Amis)", "action:$($l.MesAmis)", 'wait:1200',
     'action:Bruno', 'wait:400', $Exit, 'wait:300', $Exit,
     "action:$($l.Trouver)", 'wait:600',
-    "action:$($l.Chercher)", 'type:chlo', 'Enter', 'wait:400', $Exit, 'wait:300', $Exit,
-    "action:$($l.Demandes)", 'action:Chlo', 'wait:300', $Exit, 'wait:300', $Exit,
+    # Les résultats s'ouvrent dans la liste : Exit en sort, puis revient à « Trouver un joueur », puis à la rubrique.
+    "action:$($l.Chercher)", 'type:chlo', 'Enter', 'wait:400', $Exit, 'wait:300', $Exit, 'wait:300', $Exit,
+    "action:$($l.Demandes)", 'action:Chlo', 'wait:300', $Exit, 'wait:300', $Exit, 'wait:300', $Exit,
     "action:$($l.Badges)", $Exit,
     "action:$($l.Partage)", 'wait:800', $Exit,
     # Bibliothèque de Bruno : d'abord la table qu'on n'a pas, prise tout entière jusqu'au plan d'ajout
     # (jamais installée ici) ; puis celle qu'on a aussi (curseur dessus) : ses parties au choix, et ses médias.
     "action:$($l.MesAmis)", 'wait:400', 'action:Bruno', 'wait:400', "action:$($l.Biblio)", 'wait:2000',
-    'action:Bride', 'wait:600', "action:$($l.Toute)", 'wait:2500', "action:$($l.Prendre)", 'wait:6000',
+    'action:Glass Lagoon', 'wait:600', "action:$($l.Toute)", 'wait:2500', "action:$($l.Prendre)", 'wait:6000',
     $Exit, 'wait:800', $Exit, 'wait:800',
     'Enter', 'wait:600', "action:$($l.Parties)", 'wait:2500', $Exit, 'wait:600',
     "action:$($l.Prendre)", 'wait:4000'
@@ -93,9 +112,9 @@ function Get-Etapes([string]$Nom, $l) {
 }
 
 try {
-  foreach ($nom in $Parcours) {
-    $root = if ($nom -eq 'partie') { New-Racine $nom -Emulateurs } else { New-Racine $nom }
-    foreach ($jeu in $Ecrans) {
+  foreach ($nom in $parcoursJoues) {
+    $root = if ($nom -eq 'partie') { New-Racine $nom -Emulateurs } else { New-Racine $nom -Neuve:$Accueil }
+    foreach ($jeu in $ecransJoues) {
       Use-HorsEcran $jeu
       foreach ($langue in $Langues) {
         "== $nom, $jeu, $langue"
@@ -139,4 +158,39 @@ try {
 }
 
 if ($failures.Count) { throw "Démonstration du réseau des bornes en échec :`n  $($failures -join "`n  ")" }
+
+# Images de la page d'accueil : deux écrans du playfield (couché, joueur au bord gauche de la
+# capture) remis debout d'un quart de tour, côte à côte. Chaque capture est trouvée par l'étape
+# du parcours qui la précède (NN-… : NN = rang de l'étape + 1, 00 étant le départ).
+if ($Accueil) {
+  '== images de docs\images (rubrique Amis)'
+  function Find-Capture([string]$Captures, [string[]]$Etapes, [string]$Etape, [int]$Apres = 0) {
+    $i = [array]::IndexOf($Etapes, $Etape)
+    if ($i -lt 0) { throw "Étape absente du parcours : $Etape" }
+    $file = Get-ChildItem $Captures -File -Filter ('{0:D2}-*.png' -f ($i + 1 + $Apres)) | Select-Object -First 1
+    if (-not $file) { throw "Capture absente après l'étape $Etape ($Captures)." }
+    return $file.FullName
+  }
+  function Write-Paire([string]$Out, [string]$Gauche, [string]$Droite) {
+    $m = 28; $g = 24; $w = 720; $h = 1280
+    $layer = { param($src, $x) @{ src = $src; x = $x; y = $m; w = $w; h = $h; turn = -1; radius = 10; border = '#24504a' } }
+    $spec = "$base\planche.json"
+    @{ out = $Out; width = 2 * $m + 2 * $w + $g; height = 2 * $m + $h; background = '#030807'; quality = 0.84; layers = @((& $layer $Gauche $m), (& $layer $Droite ($m + $w + $g))) } |
+      ConvertTo-Json -Depth 6 | Set-Content $spec -Encoding UTF8
+    Push-Location $wt
+    try { & $electron docs\demo-captures.cjs --planche $spec 2>&1 | ForEach-Object { "   $_" } } finally { Pop-Location }
+    if ($LASTEXITCODE -ne 0) { throw "Image impossible : $Out" }
+  }
+  foreach ($langue in $Langues) {
+    $l = $libelles[$langue]
+    $etapes = Get-Etapes 'amis' $l
+    $c = "$base\amis\borne\$langue\captures"
+    $out = "$wt\docs\images\$langue"
+    New-Item -ItemType Directory -Force $out | Out-Null
+    # « Mes amis » (Bruno en partie, son record ; Émile hors ligne) et la fiche de Bruno.
+    Write-Paire "$out\friends.webp" (Find-Capture $c $etapes "action:$($l.MesAmis)" 1) (Find-Capture $c $etapes 'action:Bruno' 1)
+    # La bibliothèque de Bruno, et sa table que la borne n'a pas : « Récupérer toute la table ».
+    Write-Paire "$out\friends-library.webp" (Find-Capture $c $etapes "action:$($l.Biblio)" 1) (Find-Capture $c $etapes 'action:Glass Lagoon' 1)
+  }
+}
 "Captures dans $base\<parcours>\<écrans>\<langue>\captures."

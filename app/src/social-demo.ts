@@ -22,6 +22,9 @@
 // réception), Émile (l'ami hors ligne) se connecte, Bruno gagne un badge et lance une autre
 // partie : trois nouveautés, un seul résumé au retour ; la table finit ensuite au menu des tables.
 // Leurs dossiers sont dans <données>\reseau-simule\ (le bac à sable de l'essai).
+// Leurs tables sont inventées, comme celles de docs\demo-captures.cjs (DEMO_TABLES) : les captures
+// de ces démonstrations vont sur la page publique du projet, aucun vrai jeu ne doit y paraître
+// (packages\core\src\test\demo-tables-inventees.test.ts).
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -33,6 +36,18 @@ import { createSocialNet, type SocialNet } from './social-net';
 export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
   return ['1', 'partie', 'coupure', 'retour', 'notifications'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
 }
+
+/**
+ * Tables des bornes fictives, toutes inventées : Bruno joue à une table que la borne a aussi
+ * (celles de docs\demo-captures.cjs), Émile a battu son record sur une autre ; Bruno partage une
+ * table que la borne n'a pas (`notOnCabinet`, dossier de sa bibliothèque).
+ */
+export const DEMO_TABLES = {
+  brunoPlays: { title: 'Star Courier', manufacturer: 'Halcyon', year: 1987 },
+  brunoPlaysAgain: { title: 'Midnight Circuit', manufacturer: 'Voltage Games', year: 1998 },
+  emileRecord: { title: 'Thunder Reef', manufacturer: 'Gulfstream', year: 1991 },
+  notOnCabinet: 'Glass Lagoon (Gulfstream 1993)',
+};
 
 /** Table que la borne n'a pas, dans la démonstration de la coupure : assez lourde pour voir l'envoi avancer, s'arrêter, reprendre. */
 const CUT_TABLE_BYTES = 24 * 1024 * 1024;
@@ -72,7 +87,7 @@ export function seedSimulatedFriends(dataDir: string, now = new Date(), env: Nod
   const me = setName(newSocialState(now), 'Alexis')!;
   let emile = setName(newSocialState(now), 'Émile')!; // i18n-ignore : nom d'un joueur fictif
   const threeHours = new Date(now.getTime() - 3 * 3600_000);
-  emile = addEvent(emile, { kind: 'record', table: { title: 'Medieval Madness', manufacturer: 'Williams', year: 1997 }, score: 48_250_110, rank: 2, initials: 'EMI' }, threeHours).state;
+  emile = addEvent(emile, { kind: 'record', table: DEMO_TABLES.emileRecord, score: 48_250_110, rank: 2, initials: 'EMI' }, threeHours).state;
   const state: SocialState = {
     ...me,
     friends: [{ key: emile.key.publicKey, name: emile.name, since: new Date(now.getTime() - 20 * 86_400_000).toISOString(), lastSeen: threeHours.toISOString(), events: emile.events }],
@@ -123,7 +138,7 @@ function picture(width: number, height: number, hue: [number, number, number]): 
 function brunoRoot(dir: string, mine: readonly TableEntry[], cut = false): string {
   const root = path.join(dir, 'borne');
   const tables = layoutOf(root).tables;
-  const folders = [...(mine[0] ? [path.basename(mine[0].folder)] : []), 'Bride of Pin-bot (Williams 1991)'];
+  const folders = [...(mine[0] ? [path.basename(mine[0].folder)] : []), DEMO_TABLES.notOnCabinet];
   for (const [i, folder] of folders.entries()) {
     const at = path.join(tables, folder);
     fs.mkdirSync(path.join(at, 'medias'), { recursive: true });
@@ -203,11 +218,10 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       log('Réseau simulé : David et Fanny se connectent.'); // i18n-ignore : journal
       pair.push(...(await Promise.all(['David', 'Fanny'].map((name) => bot(dataDir, name, false, bootstrap)))));
     });
-    const afm = { title: 'Attack from Mars', manufacturer: 'Bally', year: 1995 };
-    at(NOTIFICATIONS_SCRIPT.brunoPlays, () => bruno.setPresence({ status: 'playing', table: afm, since: new Date().toISOString() }));
+    at(NOTIFICATIONS_SCRIPT.brunoPlays, () => bruno.setPresence({ status: 'playing', table: DEMO_TABLES.brunoPlays, since: new Date().toISOString() }));
     at(NOTIFICATIONS_SCRIPT.brunoRecord, () => {
       bruno.setPresence({ status: 'menu', since: new Date().toISOString() });
-      bruno.publish({ kind: 'record', table: afm, score: 3_215_480_250, rank: 1, initials: 'BRU' });
+      bruno.publish({ kind: 'record', table: DEMO_TABLES.brunoPlays, score: 3_215_480_250, rank: 1, initials: 'BRU' });
     });
     firstChunk = () => {
       const later = NOTIFICATIONS_SCRIPT.afterFirstChunk;
@@ -216,7 +230,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
         emile = await bot(dataDir, 'Émile', false, bootstrap); // i18n-ignore : nom d'un joueur fictif
       });
       at(later.brunoBadge, () => bruno.publish({ kind: 'badge', badge: 'ten-tables' }));
-      at(later.brunoPlaysAgain, () => bruno.setPresence({ status: 'playing', table: { title: 'Medieval Madness', manufacturer: 'Williams', year: 1997 }, since: new Date().toISOString() }));
+      at(later.brunoPlaysAgain, () => bruno.setPresence({ status: 'playing', table: DEMO_TABLES.brunoPlaysAgain, since: new Date().toISOString() }));
     };
   }
   let games: LiveGames | undefined;
@@ -256,7 +270,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       clearInterval(accept);
       // Notifications : Bruno suit l'horaire de la démonstration (NOTIFICATIONS_SCRIPT).
       if (!notices) {
-        const table = { title: 'Attack from Mars', manufacturer: 'Bally', year: 1995 };
+        const table = DEMO_TABLES.brunoPlays;
         bruno.setPresence({ status: 'playing', table, since: new Date(Date.now() - 12 * 60_000).toISOString() });
         bruno.publish({ kind: 'record', table, score: 3_215_480_250, rank: 1, initials: 'BRU' });
       }

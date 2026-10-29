@@ -305,5 +305,6 @@ app.whenReady().then(async () => {
   report.save();
   fs.writeFileSync(path.join(CAPTURES, 'resultat.txt'), LOG.join('\n') + '\n', 'utf8');
   console.log(LOG.join('\n'));
-  app.quit();
+  // app.quit() rendrait 0 même en échec : le script PowerShell n'y verrait rien.
+  app.exit(process.exitCode ?? 0);
 });

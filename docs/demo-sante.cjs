@@ -9,15 +9,20 @@
 // le médecin d'une table et retour, « Médias manquants » et retour, la configuration de la
 // borne et retour, « Vérifier maintenant » pendant le relevé. Captures, relevé (resultat.txt)
 // et contrôle de la mise en page dans tmp\demo-sante\captures.
+// --accueil : les images de la page du projet (README) ; les jeux inventés de docs\demo-jeux.cjs
+// (ceux de docs\demo-captures.cjs), ROM inventée, sur les écrans de la borne seulement, en
+// français et en anglais. Captures dans tmp\demo-sante-accueil\captures.
 //   npm run build
-//   .\docs\demo-sante.ps1
+//   .\docs\demo-sante.ps1 [-Accueil]
 
 const fs = require('node:fs');
 const path = require('node:path');
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, ipcMain } = require('electron');
 
 const WT = path.resolve(__dirname, '..');
-const BASE = path.join(WT, 'tmp', 'demo-sante');
+/** Images de la page du projet : jeux inventés de la page, écrans de la borne seulement. */
+const ACCUEIL = process.argv.includes('--accueil');
+const BASE = path.join(WT, 'tmp', ACCUEIL ? 'demo-sante-accueil' : 'demo-sante');
 const CAPTURES = path.join(BASE, 'captures');
 const core = require(path.join(WT, 'packages', 'core', 'dist', 'index.js'));
 const { createLibrary } = require(path.join(WT, 'app', 'dist', 'library.js'));
@@ -25,6 +30,10 @@ const { LayoutReport } = require(path.join(WT, 'app', 'dist', 'layout-check.js')
 const { serveMedias } = require(path.join(WT, 'app', 'dist', 'media-protocol.js'));
 const { rememberScript } = require(path.join(WT, 'app', 'dist', 'vbs.js'));
 const { findComponent } = require(path.join(WT, 'packages', 'installer', 'dist', 'index.js'));
+// Le guet hors écran (app\src\offscreen.ts) écrit son bilan dans le dossier des captures : demo-sante.ps1 le lit.
+process.env.CYBERPINBALL_CAPTURE ??= CAPTURES;
+const { createWindow } = require(path.join(WT, 'app', 'dist', 'offscreen.js'));
+const { GAMES, tableName, game } = require('./demo-jeux.cjs');
 let servedDirs = () => [];
 
 const GB = 1024 ** 3;
@@ -35,10 +44,9 @@ const SCREENS = [
   { name: 'borne', displays: 'borne', width: 3840, height: 2160, rotation: 90, free: 412 * GB },
   { name: 'bureau', displays: 'pc-dev', width: 1920, height: 1080, rotation: 0, free: 6.2 * GB },
 ];
-const SCENARIOS = [
-  ...SCREENS.flatMap((s) => [{ ...s, lang: 'fr' }, { ...s, lang: 'en' }]),
-  { ...SCREENS[1], name: 'bureau-1366x768', width: 1366, height: 768, lang: 'fr' },
-];
+const SCENARIOS = ACCUEIL
+  ? [{ ...SCREENS[0], lang: 'fr' }, { ...SCREENS[0], lang: 'en' }]
+  : [...SCREENS.flatMap((s) => [{ ...s, lang: 'fr' }, { ...s, lang: 'en' }]), { ...SCREENS[1], name: 'bureau-1366x768', width: 1366, height: 768, lang: 'fr' }];
 
 const MM = 'Medieval Madness (Williams 1997)';
 const AFM = 'Attack from Mars (Bally 1995)';
@@ -49,7 +57,8 @@ const MEDIADB = 'https://raw.githubusercontent.com/superhac/vpinmediadb/main';
 
 const delay = (ms) => new Promise((r) => setTimeout(r, ms));
 function offscreen(width, height, extra = {}) {
-  const win = new BrowserWindow({ show: false, width, height, useContentSize: true, enableLargerThanScreen: true, webPreferences: { offscreen: true, ...extra } });
+  // Par createWindow : rendue hors écran (Use-HorsEcran), et surveillée par le guet.
+  const win = createWindow({ show: false, width, height, useContentSize: true, enableLargerThanScreen: true, webPreferences: { offscreen: true, ...extra } });
   win.setContentSize(width, height);
   return win;
 }
@@ -72,27 +81,39 @@ function cabinetFor(displays) {
   };
 }
 
-function sandbox(name) {
+function sandbox(name, lang) {
   const box = path.join(BASE, name);
   const root = path.join(box, 'root');
   const L = core.layoutOf(root);
   for (const d of [L.tables, L.import, L.media, L.data, L.trash, L.downloads, L.roms]) fs.mkdirSync(d, { recursive: true });
   const table = (title, vpsId) => {
     const file = put(path.join(L.tables, title, `${title}.vpx`), 'x'.repeat(4096));
-    const [, game, maker, year] = /^(.*) \((\S+) (\d{4})\)$/.exec(title);
+    const [, game, maker, year] = /^(.*) \(([^()]+) (\d{4})\)$/.exec(title);
     put(path.join(L.tables, title, `${title}.info`), JSON.stringify({ Info: { Title: game, Manufacturer: maker, Year: Number(year), ...(vpsId && { VPSId: vpsId }) } }));
     return file;
   };
-  const files = { mm: table(MM, 'mmVps1997'), afm: table(AFM, 'afmVps1995'), t2: table(T2), long: table(LONG), xenon: table(XENON) };
-  // Une vraie collection : 200 tables électromécaniques saines, qui ne demandent aucune ROM.
-  files.healthy = Array.from({ length: 200 }, (_, i) => table(`Table saine ${String(i + 1).padStart(3, '0')} (Gottlieb ${1950 + (i % 30)})`));
-  put(path.join(L.tables, T2, 'crash.txt'), 'Reason: EXCEPTION_ACCESS_VIOLATION\r\n');
-  // Index de VPinMediaDB déjà téléchargé : des médias pour Medieval Madness et Attack from Mars.
   const entry = (id) => ({ wheel: `${MEDIADB}/${id}/wheel.png`, bg: `${MEDIADB}/${id}/bg.png`, '1k': { table: `${MEDIADB}/${id}/1k/table.png` } });
-  put(path.join(L.downloads, core.MEDIADB_INDEX_FILE), JSON.stringify({ mmVps1997: entry('mmVps1997'), afmVps1995: entry('afmVps1995') }));
-  // Deux configurations de la borne ; la borne du salon est celle retenue.
-  let set = core.addConfiguration(undefined, cabinetFor(displaysOf('borne')), 'Borne du salon').set;
-  set = core.addConfiguration(set, cabinetFor(displaysOf('pc-dev')), 'Bureau').set;
+  let files;
+  if (ACCUEIL) {
+    // Les sept jeux inventés de la page : Midnight Circuit sans sa ROM (inventée), Lunar Diner et
+    // Copper Comet sans médias, que VPinMediaDB peut fournir. Pas de rapport de plantage : la page
+    // tient alors sur l'écran, de l'espace disque à VPX.
+    const of = (title, vpsId) => table(tableName(game(title)), vpsId);
+    files = { mm: of('Midnight Circuit', 'mdcVps1998'), afm: of('Lunar Diner', 'ldnVps1964'), comet: of('Copper Comet', 'ccmVps1983'), t2: of('Atlas Rising') };
+    files.healthy = GAMES.filter((g) => !['Midnight Circuit', 'Lunar Diner', 'Copper Comet', 'Atlas Rising'].includes(g.title)).map((g) => of(g.title));
+    put(path.join(L.downloads, core.MEDIADB_INDEX_FILE), JSON.stringify({ ldnVps1964: entry('ldnVps1964'), ccmVps1983: entry('ccmVps1983') }));
+  } else {
+    files = { mm: table(MM, 'mmVps1997'), afm: table(AFM, 'afmVps1995'), t2: table(T2), long: table(LONG), xenon: table(XENON) };
+    // Une vraie collection : 200 tables électromécaniques saines, qui ne demandent aucune ROM.
+    files.healthy = Array.from({ length: 200 }, (_, i) => table(`Table saine ${String(i + 1).padStart(3, '0')} (Gottlieb ${1950 + (i % 30)})`));
+    put(path.join(L.tables, T2, 'crash.txt'), 'Reason: EXCEPTION_ACCESS_VIOLATION\r\n');
+    // Index de VPinMediaDB déjà téléchargé : des médias pour Medieval Madness et Attack from Mars.
+    put(path.join(L.downloads, core.MEDIADB_INDEX_FILE), JSON.stringify({ mmVps1997: entry('mmVps1997'), afmVps1995: entry('afmVps1995') }));
+  }
+  // Deux configurations de la borne ; la borne du salon est celle retenue (noms donnés par l'utilisateur : dans sa langue).
+  const english = ACCUEIL && lang === 'en';
+  let set = core.addConfiguration(undefined, cabinetFor(displaysOf('borne')), english ? 'Living-room cabinet' : 'Borne du salon').set;
+  set = core.addConfiguration(set, cabinetFor(displaysOf('pc-dev')), english ? 'Desk' : 'Bureau').set;
   core.saveCabinetSet(L.data, { ...set, active: set.configurations[0].id });
   return { root, L, files };
 }
@@ -103,8 +124,10 @@ async function scenario(sc, box, report) {
   let tables = core.scanTables(L.tables);
   servedDirs = () => core.allowedMediaDirs({ root, dataDir: L.data, tables });
   // Scripts déjà lus (le relevé ne lance jamais VPX) ; celui de Xenon ne l'a jamais été.
-  rememberScript(files.mm, { usesPinmame: true, roms: ['mm_109c'] }, L.data);
-  rememberScript(files.long, { usesPinmame: true, roms: ['t2_l8'] }, L.data);
+  // Page du projet : une ROM inventée (mcirc_l3), aucune table jamais analysée.
+  rememberScript(files.mm, { usesPinmame: true, roms: [ACCUEIL ? 'mcirc_l3' : 'mm_109c'] }, L.data);
+  if (files.long) rememberScript(files.long, { usesPinmame: true, roms: ['t2_l8'] }, L.data);
+  if (files.comet) rememberScript(files.comet, { usesPinmame: false, roms: [] }, L.data);
   rememberScript(files.afm, { usesPinmame: false, roms: [] }, L.data);
   rememberScript(files.t2, { usesPinmame: false, roms: [] }, L.data);
   for (const file of files.healthy) rememberScript(file, { usesPinmame: false, roms: [] }, L.data);
@@ -180,12 +203,14 @@ async function scenario(sc, box, report) {
       let box = el.parentElement;
       while (box && !['auto', 'scroll'].includes(getComputedStyle(box).overflowY)) box = box.parentElement;
       const [boxTop, boxBottom] = box ? span(box.getBoundingClientRect()) : [0, Infinity];
-      // Le bilan reste accroché en haut de la liste, avec un fondu dessous : la ligne choisie ne doit passer ni sous l'un ni sous l'autre.
+      // Le bilan reste accroché en haut de la liste, avec une bande pleine dessous (son ombre portée,
+      // sans flou : library.css) : la ligne choisie ne doit passer ni sous l'un ni sous l'autre.
+      // (Le fondu ::after d'avant n'existe plus : sa hauteur « auto » rendait toute ligne « ROGNÉE ».)
       const summary = box && box.querySelector('.health-summary');
       let free = boxTop;
       if (summary) {
-        const after = getComputedStyle(summary, '::after');
-        free = Math.max(boxTop, span(summary.getBoundingClientRect())[0] + parseFloat(after.top) + parseFloat(after.height));
+        const band = parseFloat((getComputedStyle(summary).boxShadow.match(/-?[0-9.]+px/g) || [])[1]) || 0;
+        free = Math.max(boxTop, span(summary.getBoundingClientRect())[1] + band);
       }
       return top >= free - 1 && bottom <= boxBottom + 1 ? 'visible' : 'ROGNÉ';
     })()`);
@@ -206,6 +231,12 @@ async function scenario(sc, box, report) {
   const expect = (cond, what) => {
     if (!cond) throw new Error(`${name} : ${what}`);
   };
+  /** Exit jusqu'à quitter l'écran : le premier sort de la liste (« Sortir de la liste »), le suivant revient. */
+  const leave = async () => {
+    const heading = view().heading;
+    for (let i = 0; i < 3 && view().heading === heading; i++) await key(KEYS.exit[0]);
+    expect(view().heading !== heading, `Exit ne quitte pas « ${heading} »`);
+  };
   const HEALTH = core.SYSTEM_ITEMS.health.label;
   const onHealth = (what) => expect(view().heading === HEALTH, `${what} : on devrait revenir à « ${HEALTH} » (${view().heading})`);
 
@@ -221,10 +252,10 @@ async function scenario(sc, box, report) {
   expect(h, 'aucun bilan après le relevé');
   const count = (state) => h.counts.find((c) => c.state === state).n;
   log.push(`${name} : ${count('blocking')} bloquant(s), ${count('check')} à vérifier, ${count('ok')} OK`);
-  expect(count('blocking') >= 2, 'deux tables sans ROM devraient être bloquantes');
+  expect(count('blocking') >= (ACCUEIL ? 1 : 2), ACCUEIL ? 'une table sans ROM devrait être bloquante' : 'deux tables sans ROM devraient être bloquantes');
   expect(view().actions[view().cursor].label === T('Ouvrir le médecin de la table'), 'la sélection devrait être sur la première ligne bloquante');
   // La pastille remonte jusqu'à la rubrique et à la racine.
-  await key(KEYS.exit[0]);
+  await leave();
   await shot('rubrique-borne-pastille');
   expect(view().actions.find((a) => a.label === HEALTH)?.attention, 'pas de pastille sur « Santé de la borne »');
   library.openSystemRoot();
@@ -251,7 +282,7 @@ async function scenario(sc, box, report) {
   // 4. La configuration de la borne, puis retour.
   await act(T('Ouvrir la configuration de la borne'));
   await shot('configuration');
-  await key(KEYS.exit[0]);
+  await leave();
   onHealth('Retour de la configuration');
 
   // 5. VPX : la ligne mène à l'installation (comptée ici, jamais lancée).
@@ -290,7 +321,7 @@ app.whenReady().then(async () => {
   const report = new LayoutReport(CAPTURES);
   const results = [];
   try {
-    for (const sc of SCENARIOS) results.push(...(await scenario(sc, sandbox(`${sc.name}-${sc.lang}`), report)));
+    for (const sc of SCENARIOS) results.push(...(await scenario(sc, sandbox(`${sc.name}-${sc.lang}`, sc.lang), report)));
   } catch (error) {
     results.push(`ÉCHEC : ${error.stack}`);
     process.exitCode = 1;
@@ -306,5 +337,6 @@ app.whenReady().then(async () => {
   }
   fs.writeFileSync(path.join(CAPTURES, 'resultat.txt'), results.join('\n') + '\n', 'utf8');
   console.log(results.join('\n'));
-  app.quit();
+  // app.quit() rendrait 0 même en échec : le script PowerShell n'y verrait rien.
+  app.exit(process.exitCode ?? 0);
 });

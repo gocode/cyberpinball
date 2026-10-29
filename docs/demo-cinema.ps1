@@ -15,10 +15,16 @@
 # sans-cinema (lancement). Le garde-fou de mise en page doit rester muet.
 #   .\docs\demo-cinema.ps1 [-Montages borne, bureau] [-SansLancement]
 #   (-Montages : seulement ces montages des images clés ; -SansLancement : sans la partie simulée)
+#   .\docs\demo-cinema.ps1 -Accueil
+#   (seulement l'animation de la page du projet : docs\images\en\launch.webp et fr\launch.webp,
+#   la même image, sans texte traduit ; la borne entière, playfield debout, topper, fronton et
+#   DMD, avec Neon Abyss, un jeu inventé aux illustrations de docs\demo-captures-medias, du Start
+#   au relais, en WebP animé ; images clés dans tmp\captures\cinema-accueil ; sans partie simulée)
 # VPX n'est jamais lancé ; ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont touchés.
 param(
   [string[]]$Montages = @(),
-  [switch]$SansLancement
+  [switch]$SansLancement,
+  [switch]$Accueil
 )
 $ErrorActionPreference = 'Stop'
 $wt = Split-Path $PSScriptRoot -Parent
@@ -32,6 +38,27 @@ $electron = node -p "require('electron')"
 
 Push-Location $wt
 try { npm run build | Out-Null } finally { Pop-Location }
+
+if ($Accueil) {
+  # Les jeux inventés de la page du projet, refaits à chaque fois : une illustration ajoutée dans
+  # docs\demo-captures-medias passe dans l'animation.
+  $accueilRoot = "$base\accueil\root"
+  $accueilCaptures = "$wt\tmp\captures\cinema-accueil"
+  '== jeux inventés de la page du projet et leurs médias'
+  Push-Location $wt
+  try { & $electron docs\demo-captures.cjs $accueilRoot 2>&1 | ForEach-Object { "   $_" } } finally { Pop-Location }
+  if ($LASTEXITCODE -ne 0) { throw 'Génération des médias en échec.' }
+  if (Test-Path $accueilCaptures) { Remove-Item -Recurse -Force $accueilCaptures }
+  New-Item -ItemType Directory -Force $accueilCaptures | Out-Null
+  $images = @("$wt\docs\images\en\launch.webp", "$wt\docs\images\fr\launch.webp")
+  @{ root = $accueilRoot; out = $accueilCaptures; montages = @('accueil'); animation = $images } | ConvertTo-Json | Set-Content -Path "$base\accueil\spec.json" -Encoding UTF8
+  '== animation de la page du projet'
+  Push-Location $wt
+  try { & $electron docs\demo-cinema.cjs "$base\accueil\spec.json" 2>&1 | Where-Object { "$_" -notmatch 'disk_cache|gpu_disk_cache|Security Warning' } | ForEach-Object { "   $_" } } finally { Pop-Location }
+  if ($LASTEXITCODE -ne 0) { throw "Animation de la page du projet : voir $accueilCaptures\mise-en-page.txt" }
+  "Lancement en cinéma : $($images -join ', ')."
+  exit 0
+}
 
 if (-not (Test-Path "$root\tables")) {
   '== tables inventées et leurs médias'

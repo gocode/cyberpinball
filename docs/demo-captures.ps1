@@ -1,21 +1,27 @@
 ﻿# Captures d'écran de la page du projet (README.md en anglais, README.fr.md en français),
 # rangées dans docs\images. Tout est fabriqué ici, hors écran, sur un bureau Windows caché :
-# des tables inventées et leurs médias dessinés par docs\demo-captures.cjs (aucune œuvre de
-# tiers, aucun nom de jeu réel), une borne simulée (docs\ecrans\borne.json : playfield 4K
-# couché, fronton, DMD, topper) et son modèle (docs\demo-medias.cjs modele), une version
-# suivante annoncée par un site local, au flux signé par une clé d'essai.
+# des tables inventées (docs\demo-jeux.cjs) et leurs médias, illustrés ou dessinés par
+# docs\demo-captures.cjs (aucune œuvre de tiers, aucun nom de jeu réel), une borne simulée
+# (docs\ecrans\borne.json : playfield 4K couché, fronton, DMD, topper) et son modèle
+# (docs\demo-medias.cjs modele), une version suivante annoncée par un site local, au flux signé
+# par une clé d'essai.
 # Étapes, pour chaque langue :
 #   menu     : le menu des tables sur les quatre écrans, la fiche d'un jeu, le menu système,
 #              « Mise à jour de Cyber Pinball » avec une version disponible ;
+#   fiche    : « Médias du jeu » de Neon Abyss sur la borne ;
+#   bureau   : le menu des tables sur un PC de bureau à deux écrans (plateau dans son cadre 9:16) ;
 #   assistant: l'étape « Écrans et rôles » sur les quatre écrans ;
 #   reglages : l'écran des réglages de VPX ;
+# puis, une fois pour les deux langues :
+#   demonstrations : les démonstrations des autres fonctions, en mode accueil (-Accueil) : lancement
+#              cinématique, DMD vivant, santé de la borne, « Ce qu'il manque pour jouer », amis ;
 #   images   : assemblage et remise à l'endroit (playfield couché) dans docs\images, en WebP.
 # Le garde-fou de mise en page et le guet hors écran doivent rester muets, sinon le script échoue.
-#   .\docs\demo-captures.ps1 [-Langues en, fr] [-Etapes medias, menu, assistant, reglages, images]
+#   .\docs\demo-captures.ps1 [-Langues en, fr] [-Etapes medias, menu, fiche, bureau, assistant, reglages, demonstrations, images]
 # Ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont lus ni touchés ; VPX n'est jamais lancé.
 param(
   [string[]]$Langues = @('en', 'fr'),
-  [string[]]$Etapes = @('medias', 'menu', 'assistant', 'reglages', 'images'),
+  [string[]]$Etapes = @('medias', 'menu', 'fiche', 'bureau', 'assistant', 'reglages', 'demonstrations', 'images'),
   [int]$Port = 8766
 )
 $ErrorActionPreference = 'Stop'
@@ -50,7 +56,8 @@ const c = require(core);
 const fs = require('fs'), path = require('path'), crypto = require('crypto');
 const { privateKey, publicKey } = crypto.generateKeyPairSync('ed25519');
 fs.writeFileSync(path.join(dir, 'cle.pem'), publicKey.export({ type: 'spki', format: 'pem' }));
-const v = current.split('.'); v[1] = String(Number(v[1]) + 1); v[2] = '0';
+// Version suivante de la version stable (0.1.4-essai.22 → 0.2.0) : une préversion n'est jamais annoncée.
+const v = current.replace(/[-+].*$/, '').split('.'); v[1] = String(Number(v[1]) + 1); v[2] = '0';
 const manifest = {
   version: v.join('.'),
   date: '2026-11-02T10:00:00.000Z',
@@ -121,6 +128,34 @@ try {
         'action:Mise à jour de Cyber Pinball', 'wait:2500'
       ) @()
     }
+    if ($Etapes -contains 'fiche') {
+      # « Médias du jeu » de Neon Abyss : chaque média de la table, tel que le menu le montre.
+      Invoke-Capture $langue 'fiche' @(
+        'Escape', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'wait:2000',
+        'Digit1', 'wait:1200', 'action:Médias du jeu', 'wait:3000'
+      ) @()
+    }
+    if ($Etapes -contains 'bureau') {
+      # Le même menu sur un PC de bureau à deux écrans (docs\ecrans\poste-deux-ecrans.json) : le
+      # plateau dans son cadre 9:16, la roue et les informations à côté, le fronton sur le second écran.
+      $homeBureau = "$base\$langue\home-bureau"
+      if (Test-Path $homeBureau) { Remove-Item -Recurse -Force $homeBureau }
+      New-Item -ItemType Directory -Force "$homeBureau\sandbox" | Out-Null
+      Set-Content "$homeBureau\sandbox\VPinballX.ini" '' -Encoding UTF8
+      node "$PSScriptRoot\demo-medias.cjs" modele "$PSScriptRoot\ecrans\poste-deux-ecrans.json" "$homeBureau\cabinet.json" "$homeBureau\sandbox\VPinballX.ini" | Out-Null
+      if ($LASTEXITCODE -ne 0) { throw 'Modèle du poste à deux écrans impossible.' }
+      Use-HorsEcran 'poste-deux-ecrans'
+      $env:CYBERPINBALL_HOME = $homeBureau
+      try {
+        Invoke-Capture $langue 'bureau' @(
+          'Escape', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'wait:2500',
+          'Digit1', 'wait:1500'
+        ) @()
+      } finally {
+        Use-HorsEcran 'borne'
+        $env:CYBERPINBALL_HOME = $home_
+      }
+    }
     if ($Etapes -contains 'assistant') {
       Invoke-Capture $langue 'assistant' @('wait:1500') @('--assistant', '--ecrans')
     }
@@ -145,6 +180,16 @@ try {
 }
 
 if ($failures.Count) { throw "Captures en échec :`n  $($failures -join "`n  ")" }
+
+# Les autres images de la page viennent des démonstrations de leur fonction, en mode accueil (les
+# mêmes jeux inventés, docs\demo-jeux.cjs) : chacune écrit les siennes dans docs\images\<langue>.
+if ($Etapes -contains 'demonstrations') {
+  foreach ($demo in 'demo-cinema', 'demo-dmd-vivant', 'demo-sante', 'demo-parcours', 'demo-amis') {
+    "== $demo -Accueil"
+    & "$PSScriptRoot\$demo.ps1" -Accueil
+    if (-not $?) { throw "Démonstration en échec : $demo -Accueil" }
+  }
+}
 
 # Images de la page du projet : le playfield couché (joueur au bord gauche de l'image) est remis
 # d'un quart de tour à l'endroit ; la borne entière est assemblée écran par écran.
@@ -188,6 +233,9 @@ if ($Etapes -contains 'images') {
       (Layer "$c\assistant\01-wait_1500-ecran4.png" $sx ($top + 390 + 2 * $g) $sw 135)
     )
     Write-Planche "$out\vpx-settings.webp" 1600 900 @(@{ src = "$c\reglages\reglages-01-ArrowDown.png"; x = 0; y = 0; w = 1600; h = 900 })
+    # « Médias du jeu » sur la borne (playfield remis debout), et le menu des tables d'un PC de bureau.
+    if (Test-Path "$c\fiche") { Write-Planche "$out\game-media.webp" 720 1280 @(@{ src = "$c\fiche\10-wait_3000.png"; x = 0; y = 0; w = 720; h = 1280; turn = -1 }) }
+    if (Test-Path "$c\bureau") { Write-Planche "$out\desktop.webp" 1600 900 @(@{ src = "$c\bureau\06-wait_2500.png"; x = 0; y = 0; w = 1600; h = 900 }) }
   }
   # Chaque image change d'adresse quand son contenu change (?v=<empreinte>) : un navigateur ou
   # GitHub ne montre jamais l'ancienne image gardée en cache sous le même nom.

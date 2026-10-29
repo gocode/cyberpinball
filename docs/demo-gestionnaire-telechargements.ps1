@@ -53,7 +53,7 @@ function Get-Etapes([string]$Demarrage, $l) {
     return @(
       'wait:1500', $Exit, 'wait:800', $Exit, 'wait:4000',
       "action:$($l.Amis)", "action:$($l.MesAmis)", 'wait:1200', 'action:Bruno', 'wait:400', "action:$($l.Biblio)", 'wait:2500',
-      'action:Bride', 'wait:600', "action:$($l.Toute)", 'wait:2500', "action:$($l.Prendre)", 'wait:2000',
+      'action:Glass Lagoon', 'wait:600', "action:$($l.Toute)", 'wait:2500', "action:$($l.Prendre)", 'wait:2000',
       "action:$($l.Fond)", 'wait:400',
       'click:.gear', 'wait:800',
       "action:$($l.Telechargements)", 'wait:1500',
@@ -118,8 +118,8 @@ try {
       if (-not ($logs['retour'] -match 'Bruno : Bibliothèque partagée : envoi repris à partir de [1-9]\d* octets')) { $failures += "$id : l'envoi n'a pas repris là où il s'était arrêté" }
       if (-not ($logs['retour'] -match 'Téléchargements : .* fini')) { $failures += "$id : le téléchargement n'a pas fini après le retour de Bruno" }
       # Le fichier reçu est celui de Bruno, à l'octet près.
-      $recu = Get-ChildItem $home_ -Recurse -Filter 'Bride of Pin-bot (Williams 1991).vpx' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\amis\\tables\\' } | Select-Object -First 1
-      $source = Get-ChildItem "$home_" -Recurse -Filter 'Bride of Pin-bot (Williams 1991).vpx' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\reseau-simule\\Bruno\\' } | Select-Object -First 1
+      $recu = Get-ChildItem $home_ -Recurse -Filter 'Glass Lagoon (Gulfstream 1993).vpx' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\amis\\tables\\' } | Select-Object -First 1
+      $source = Get-ChildItem "$home_" -Recurse -Filter 'Glass Lagoon (Gulfstream 1993).vpx' -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\reseau-simule\\Bruno\\' } | Select-Object -First 1
       if (-not $recu -or -not $source) { $failures += "$id : fichier reçu ou fichier de Bruno introuvable" }
       elseif ((Get-FileHash $recu.FullName -Algorithm SHA256).Hash -ne (Get-FileHash $source.FullName -Algorithm SHA256).Hash) { $failures += "$id : le fichier reçu n'est pas celui de Bruno" }
       else { "   Fichier reçu identique à celui de Bruno ($([math]::Round($recu.Length / 1MB, 1)) Mo)." }

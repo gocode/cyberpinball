@@ -292,3 +292,14 @@ test('un libellé que l’application n’a plus est relevé', () => {
   ].join('\n');
   assert.deepEqual(unknownTexts(parse('témoin.cjs', script)), { problems: ['témoin.cjs : « Fichiers téléchargés de jadis »'], named: 3 });
 });
+
+// Incident du 29/10/2026 : demo-sante.cjs échouait (« ÉCHEC » dans son relevé) et
+// demo-sante.ps1 finissait comme une réussite. Electron rend 0 après app.quit(), quel que soit
+// process.exitCode : le script PowerShell, qui juge sur $LASTEXITCODE, ne voyait rien.
+test('une démonstration qui note son échec (process.exitCode) le rend au script : app.exit, pas app.quit', () => {
+  const lost = SCRIPTS.filter((script) => {
+    const text = fs.readFileSync(path.join(DOCS, script), 'utf8');
+    return /process\.exitCode\s*=/.test(text) && /\bapp\.quit\(\)/.test(text.replace(/\/\/.*$/gm, ''));
+  });
+  assert.deepEqual(lost, [], 'finir par app.exit(process.exitCode ?? 0)');
+});

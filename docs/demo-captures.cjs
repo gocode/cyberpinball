@@ -28,7 +28,6 @@ const ROOT = path.resolve(ARGS.find((a) => !a.startsWith('-') && a !== boardArg)
 
 app.setPath('userData', path.join(BOARD ? path.dirname(BOARD) : path.join(ROOT, '..'), 'generateur'));
 
-/** Jeux inventés : titre, fabricant, année, teintes (principale, secondaire). */
 /** Illustrations réalistes des jeux principaux, s'il y en a : <slug>-playfield|backglass|topper.<ext>. */
 const ARTWORK = path.join(__dirname, 'demo-captures-medias');
 function artwork(game, kind) {
@@ -40,15 +39,7 @@ function artwork(game, kind) {
   return undefined;
 }
 
-const GAMES = [
-  { title: 'Neon Abyss', maker: 'Orbital Works', year: 1994, hues: [188, 312], focus: [0.55, 0.62], starts: 42, minutes: 318 },
-  { title: 'Star Courier', maker: 'Halcyon', year: 1987, hues: [28, 210], focus: [0.24, 0.36], starts: 17, minutes: 96 },
-  { title: 'Midnight Circuit', maker: 'Voltage Games', year: 1998, hues: [276, 128], starts: 63, minutes: 541 },
-  { title: 'Atlas Rising', maker: 'Meridian', year: 1979, hues: [44, 356], starts: 8, minutes: 37 },
-  { title: 'Thunder Reef', maker: 'Gulfstream', year: 1991, hues: [172, 52], starts: 25, minutes: 140 },
-  { title: 'Lunar Diner', maker: 'Halcyon', year: 1964, hues: [330, 160], starts: 4, minutes: 12 },
-  { title: 'Copper Comet', maker: 'Meridian', year: 1983, hues: [18, 196], starts: 11, minutes: 58 },
-];
+const { GAMES } = require('./demo-jeux.cjs');
 
 // Dessins, exécutés dans la page du générateur. Chaque fonction reçoit (g, w, h, spec).
 const PAINTER = String.raw`
@@ -287,7 +278,7 @@ async function wheel(g, w, h, s) {
   // Point d'intérêt de l'illustration (fractions de l'image : un visage, la scène sous le titre du
   // fronton), placé un peu au-dessus du centre puisque le titre couvre le bas ; le disque reste couvert.
   const [fx, fy] = s.focus || (s.art ? [0.5, 0.6] : [0.5, 0.62]);
-  const scale = (2 * r * (s.art ? 1.25 : 1.15)) / art.height;
+  const scale = (2 * r * (s.art ? (s.zoom ?? 1.25) : 1.15)) / art.height;
   const dw = art.width * scale, dh = art.height * scale;
   const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
   const x = clamp(cx - fx * dw, cx + r - dw, cx - r);

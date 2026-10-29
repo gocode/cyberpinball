@@ -1,43 +1,108 @@
 # Cyber Pinball
 
-**An open-source frontend for virtual pinball cabinets that configures the whole cabinet from a single model.**
+**A free, open-source frontend for virtual pinball cabinets. Describe your cabinet once: Cyber Pinball sets up everything else, you drive it all from the flipper buttons, and you play online with your friends' cabinets.**
 
-[Français](README.fr.md) · [Technical manual](docs/manual.md) · [Releases](https://github.com/gocode/cyberpinball/releases) · [Changelog](CHANGELOG.en.md)
+[Français](README.fr.md) · [Download](https://github.com/gocode/cyberpinball/releases) · [Technical manual](docs/manual.md) · [What's new](CHANGELOG.en.md)
 
-You describe your cabinet once: its screens, buttons and speakers. Cyber Pinball then writes and maintains the configuration of every component for you: Visual Pinball X, its backglass, PuP and DMD plugins, screen positions, sound outputs and keys. No more hand-editing `.ini` files, and no more broken setup when Windows renumbers your monitors.
+<p align="center"><img src="docs/images/en/cabinet.webp?v=6c63b0c2a8" width="900" alt="The table menu on a four-screen cabinet: the playfield screen, shown upright, with the selected table's playfield, the wheel of round table medallions and the button hints; next to it the topper, the backglass and the DMD showing the same game, Neon Abyss."></p>
 
-> **Status: early prototype (0.1.0).** Windows only, built around Visual Pinball X 10.8.1 in plugin mode. Expect rough edges, and back up your tables before trying it.
+<p align="center"><sub>Tables shown are fictional.</sub></p>
 
-<p align="center"><img src="docs/images/en/cabinet.webp?v=7a6c78df66" width="880" alt="The table menu on a four-screen cabinet: the playfield screen, shown upright, with the selected table's playfield image, the wheel of table logos and the button hints; next to it the topper, the backglass and the DMD showing the same game, Neon Abyss."></p>
+Cyber Pinball turns a PC full of Visual Pinball X tables into a real arcade cabinet: a table wheel worthy of the machine, every screen of the cabinet used, and no keyboard, mouse or `.ini` file in sight. It writes and maintains the configuration of every component for you (VPX, backglass, PuP-Packs and DMD, screen positions, sound outputs, keys), finds what a table needs before you can play it, gathers its media from the community sites, and links your cabinet to your friends' cabinets to share tables and play live together, with no server in between.
 
-## Features
+> **Status: early prototype (0.1.x).** Windows only, built around Visual Pinball X 10.8.1 in plugin mode. Expect rough edges, and back up your tables before trying it.
 
-- **Screens, detected and recognised.** Each monitor is identified by its EDID fingerprint, not by its Windows number. A wizard, driven entirely by the cabinet buttons, assigns the roles (playfield, backglass, DMD, topper), the flipper edge and the playfield diagonal. `VPinballX.ini` is rewritten at every start, so the cabinet survives monitors being swapped, renumbered or woken up in a different order.
-- **Several setups, one installation.** The same install can serve a desk PC and a cabinet. The connected setup is recognised automatically, each with its own screens, sound, buttons and `VPinballX.ini`.
-- **Sound.** A wizard step plays a sound on every output, lets you pick the backglass and playfield outputs, and tests the speakers of a 5.1 or 7.1 card.
-- **A table menu made for cabinets.** One window per cabinet screen, a menu rotated for a player standing at the flippers, a loading screen with the game controls, play statistics, and VPX errors explained in plain words. No screen ever shows the Windows desktop, from start-up to the end of a game.
-- **Table management from the cabinet.** Add tables from an import folder, a USB stick or the PC; each table is named from the [Virtual Pinball Spreadsheet](https://github.com/VirtualPinballSpreadsheet/vps-db) database. There is a shared ROM library (each ROM stored once, hard-linked into every table that uses it), automatic choice of the PuP-Pack option that fits your screens, and a "doctor" that explains why a table fails, then a step-by-step "What's missing to play" path that leads to the right download page, installs what you fetched and ends on "Play".
-- **Find a table.** A catalogue of the VPS database shows every game, its versions and what this cabinet needs to play it, plus a download queue for the files you download yourself. Cyber Pinball never downloads tables or ROMs on your behalf.
-- **Game media.** Logos, playfield videos, backglasses, DMD, topper, loading videos, music, flyers and rules can be imported from PinUP Popper or PinballX, or downloaded on demand from [VPinMediaDB](https://github.com/superhac/vpinmediadb). Each media item also lists what the community sites offer, with your own free account: VPForums, then VPUniverse (whose free accounts wait about 45 seconds per file: Cyber Pinball queues them and waits). When a media file is missing, a built-in fallback is drawn instead. There is also an attract mode.
-- **Alongside PinUP Popper, PinballX or PinballY.** Cyber Pinball keeps everything in its own folder, with its own copy of VPX and its own `VPinballX.ini`, and registers nothing in Windows. If another frontend is running, it waits for it to close instead of fighting over the screens; it warns before flipping a screen in Windows, and only restores the taskbars it hid itself.
-- **VPX settings without the `.ini`.** All VPX settings, read from VPX's own source code, are editable globally or per table. Visual settings (each table's framing, the position of the backglass, DMD and topper) are made on the running table: "Adjust display in game" opens VPX's menu mid-game.
-- **In-app updates.** System menu > "Cyber Pinball" > "Cyber Pinball update" checks GitHub on demand, shows what's new, then downloads and installs the new version. Every release is signed: the cabinet refuses anything that was not signed with the publisher's key. Your tables, media and settings are kept.
-- **Friends, with no server.** System menu > "Amis" (Friends): find a player by name in a directory that cabinets pass to each other, send a friend request they accept on their side, then see who is online, which table they are playing right now, and their latest event (new high score, badge earned). Cabinets on the same local network find each other even without the Internet. Friends share their library by default: their tables and media (logo, backglass, videos, rules), and a whole table part by part (table, backglass, sounds; the ROM and the PuP-Pack only if ticked), checked on arrival and shown in the add plan before anything is installed. Invite a friend to a live game: the same table on each cabinet, a shared countdown, then everyone's results. Built on [Holepunch](https://holepunch.to)'s Hyperswarm: cabinets talk directly, nothing goes through a server, and never saves or high scores. Sharing is on by default and can be turned off, library included.
-- **English or French.** Every screen follows the language you choose in the system menu ("Language / Langue"), with dates and numbers to match. By default, Cyber Pinball speaks French if Windows does, and English otherwise.
+## Highlights
 
-## Screenshots
+- **[Play with friends, cabinet to cabinet](#play-with-friends-cabinet-to-cabinet)**: live online games on up to four cabinets, shared tables and media, who is playing and on which table. No server, no account.
+- **[Set up from the cabinet itself](#set-up-from-the-cabinet-itself)**: a wizard driven by the flipper buttons, screens recognised by their hardware fingerprint, so nothing breaks when Windows renumbers them.
+- **[A menu with real cabinet presence](#a-menu-with-real-cabinet-presence)**: wheel of medallions, live DMD, cinematic launch, interface sounds, and never a glimpse of the Windows desktop.
+- **[From "I want this table" to "Play"](#from-i-want-this-table-to-play)**: the VPS catalogue, a guided "What's missing to play" path, a table doctor, every downloaded file sent where it belongs.
+- **[Media from every source, chosen by you](#media-from-every-source-chosen-by-you)**: galleries of what each site offers, a built-in browser, and your own games recorded as wheel videos.
+- **[A cabinet that looks after itself](#a-cabinet-that-looks-after-itself)**: a health check, signed updates, a night schedule, guest mode for parties.
 
-Every screenshot is taken off-screen by [`docs/demo-captures.ps1`](docs/demo-captures.ps1) on a simulated cabinet (4K playfield lying flat, backglass, DMD and topper). The games are made up: their playfields, backglasses and toppers are original illustrations generated with an image model for these screenshots ([`docs/demo-captures-medias`](docs/demo-captures-medias)), and the rest is drawn by the script.
+## Play with friends, cabinet to cabinet
+
+<p align="center"><img src="docs/images/en/friends.webp?v=6a33108121" width="760" alt="My friends: Bruno is online and playing Star Courier, with his new high score just now, and Émile is offline; next to it, Bruno's page with his latest events and See their library."></p>
+
+<p align="center"><img src="docs/images/en/friends-library.webp?v=e86981f398" width="760" alt="Bruno's library: the tables on both cabinets and the one this cabinet does not have, Glass Lagoon, with its media and Get the whole table."></p>
+
+Your cabinet is no longer an island. Cyber Pinball links cabinets directly to each other, over the Internet or the local network, with no account to create and no server in between.
+
+- **Live online games.** Invite up to three friends on the same table: the invitation opens on their cabinet, the table version is checked, a shared countdown starts the game on every cabinet at once, then everyone sees the results side by side.
+- **Who's playing, right now.** Your friends online, the table they are on, their latest high scores and badges, with small notifications on the wheel, never during a game.
+- **Shared tables and media.** Browse a friend's library: the tables you don't have, the media you are missing. Fetch a whole table, or part by part (table, backglass, sounds, media), their version and yours side by side. Everything is checked on arrival and shown in the add plan before anything is installed; ROM and PuP-Pack are unticked by default.
+- **Find players.** Search for a player by name in a directory the cabinets pass to each other, or find the cabinets around you on the local network, even without the Internet. Send a friend request; they accept on their side.
+- **Your cabinet, your rules.** Saves, high-score files and programs never leave your cabinet. Sharing is on by default and turned off in one place, "Sharing and network", which also shows what other cabinets can see. Built on [Holepunch](https://holepunch.to)'s Hyperswarm.
+
+## Set up from the cabinet itself
+
+<p align="center"><img src="docs/images/en/wizard.webp?v=27678de49a" width="900" alt="The setup wizard, screens and roles step: each of the four screens shows its number, and the playfield screen asks “Playfield?” with the flipper and Start hints."></p>
+
+- **A wizard you follow standing at the flippers.** Buttons (keyboard encoder, gamepad or Pinscape KL25Z), analog plunger, accelerometer and tilt bob, screens, playfield orientation and diagonal, sound outputs: each step is answered with the cabinet's own buttons.
+- **Screens recognised, not numbered.** Each monitor is identified by its EDID fingerprint, and `VPinballX.ini` is rewritten at every start. Swap a monitor, wake the screens in a different order, let Windows renumber everything: the playfield stays the playfield.
+- **Sound where it belongs.** One step plays a sound on every output, lets you pick the backglass and playfield outputs, and tests each speaker of a 5.1 or 7.1 card. The menu, its music and every video go through the cabinet speakers.
+- **Several setups, one install.** The same installation serves a cabinet and a desk PC: the connected setup is recognised on its own, each with its screens, sound, buttons and `VPinballX.ini`.
+- **VPX settings without the `.ini`.** Every VPX setting, read from VPX's own source code, is editable globally or table by table. Framing and the position of the backglass, DMD and topper are adjusted on the running table, from VPX's menu.
+
+<p align="center"><img src="docs/images/en/vpx-settings.webp?v=38fcfb008f" width="760" alt="The VPX settings screen: the Essentials tab with table view and sound settings, the values managed by Cyber Pinball, and the description of the selected setting."></p>
+
+## A menu with real cabinet presence
+
+<p align="center"><img src="docs/images/en/launch.webp?v=a90b793d83" width="900" alt="Animation of the launch on a four-screen cabinet: after Start, the Neon Abyss logo lights up on the playfield, flies up through the DMD and lands on the backglass, then the screens fade out as Visual Pinball X takes over."></p>
+
+- **A wheel of medallions** over the table's own playfield video, one window per cabinet screen: the topper, backglass and DMD follow the selected game.
+- **A living DMD.** Cyber Pinball draws the display itself, with its own dot font: the title, PRESS START, credits, the clock and high scores, in the colour you choose.
+- **A cinematic launch.** On Start, the game's logo flies from the playfield to the backglass, the DMD shows the loading, and a coil thumps when VPX takes over. VPX never waits for the show.
+- **Sounds of the machine.** A solenoid click when changing table, a coin on Start, the knocker when a high score falls; and each game's music on the wheel.
+- **Never a white flash, never the desktop.** From start-up to the end of a game and back, every screen stays covered; Ctrl+Shift+D frees all of them when you want Windows back.
+- **On a desk PC too.** The playfield in a 9:16 frame, the wheel and the game beside it, the backglass on a second monitor if you have one.
+
+<p align="center"><img src="docs/images/en/live-dmd.webp?v=7a6e43e169" width="760" alt="The menu's live DMD drawn by Cyber Pinball: the game title, PRESS START, the top high score and the clock, in turn."></p>
+
+<p align="center"><img src="docs/images/en/desktop.webp?v=517a956156" width="900" alt="The table menu on a desk PC: the playfield of Neon Abyss in an upright 9:16 frame on the left; on the right its backglass, the wheel of medallions (Copper Comet, Lunar Diner, Midnight Circuit, Neon Abyss, Star Courier, Thunder Reef, Atlas Rising) and the title panel."></p>
+
+## From "I want this table" to "Play"
+
+<p align="center"><img src="docs/images/en/missing-to-play.webp?v=8b4e90863c" width="760" alt="What's missing to play, for Neon Abyss: on the left, step 3 of 4, the ROM is still to do and the suggested action is to get it from vpforums.org, or to play with a neighbouring revision already on the cabinet; on the right, once the ROM is installed, All set to play, with Play as the first action."></p>
+
+- **"Add a table" gathers every way in.** An import folder, a USB stick, the PC, your Downloads folder or the [Virtual Pinball Spreadsheet](https://github.com/VirtualPinballSpreadsheet/vps-db) catalogue: every game, its versions and what this cabinet still needs to play it. Each table is named from that database.
+- **"What's missing to play".** A step-by-step path, from a missing ROM or backglass to the right download page, then the install of what you fetched, ending on "Play". Only the table and its ROM are required; the rest is offered as extras.
+- **Every file goes where it belongs.** A file you download is recognised by its content (table, backglass, ROM, PuP-Pack, DMD colours, sounds, music…) and filed into that part of the game, even when something else was expected. A table's "Game parts" lets you add, replace, reassign or remove each part.
+- **A table doctor.** "Diagnose and fix" explains in plain words why a table fails, and repairs what it can: a ROM in the wrong folder, a PuP-Pack its script keeps switched off, a backglass on the wrong screen.
+- **A shared ROM library.** Each ROM stored once, hard-linked into every table that uses it.
+- **PuP-Packs that just work.** The pack option is chosen from your screens, the pack is checked before each game, and known pack problems (images under a video name, accented file names, videos triggered by the DMD) are fixed for every pack.
+- **Downloads that resume** the next day if the connection drops, and bring you back in one move to the screen you started from. Cyber Pinball never downloads tables or ROMs on your behalf: you choose, from their authors' sites.
+
+## Media from every source, chosen by you
 
 <p align="center">
-  <img src="docs/images/en/game-page.webp?v=7ba374c8d0" width="270" alt="The game page of Neon Abyss: play statistics, files, and the actions Play, Flyer, Rules, Edit info, Game media, Settings for this table, Diagnose and fix, Remove table.">
-  <img src="docs/images/en/system-menu.webp?v=395397ca9f" width="270" alt="The system menu, Menu and setup: add a table, VPX settings, cabinet setup, VPS catalog, download queue, table updates, site accounts, ROM library, media import and download, media, sound and attract mode.">
-  <img src="docs/images/en/update.webp?v=94e1b361a1" width="270" alt="An update is available: Cyber Pinball 0.2.0, its release date, what's new, the size of the signed installer, and the Update now and Later buttons.">
+  <img src="docs/images/en/game-page.webp?v=288bd5f7e2" width="360" alt="The game page of Neon Abyss: play statistics, files, and the actions Play, Flyer, Rules, Edit info, Game media, Settings for this table, Diagnose and fix, Remove table.">
+  <img src="docs/images/en/game-media.webp?v=08cb8e257b" width="360" alt="The Game media screen of Neon Abyss: each media item with its preview, where the menu shows it and its role (wheel logo, playfield, backglass, DMD…), and the actions Find media and Search the web.">
 </p>
 
-<p align="center"><img src="docs/images/en/wizard.webp?v=6d53e1887b" width="880" alt="The setup wizard, screens and roles step: each of the four screens shows its number, and the playfield screen asks “Playfield?” with the flipper and Start hints."></p>
+- **Every media item, side by side.** Wheel logo, playfield video, backglass, DMD, topper, loading video, music, flyer and rules: "Game media" shows what each one is, where the menu uses it, and lets you replace it.
+- **Galleries, not guesses.** Each item lists what [VPinMediaDB](https://github.com/superhac/vpinmediadb), VPForums and VPUniverse offer, with previews, download counts, ratings, authors and dates; you pick, and the file you picked is the one saved. Sites that need an account use your own free account; their waiting times are queued for you.
+- **A built-in browser** on every add or choice screen, with the search already filled in. A YouTube or Vimeo page? "Get the sound" or "Get the video", trimmed and assigned in one go.
+- **Play and record.** From a table's page, Cyber Pinball films your game; back in the menu, the video can become the table's presentation on the wheel.
+- **Never an empty wheel.** When a media file is missing, a fallback is drawn in the table's colours. Already have media from another frontend? Import it.
 
-<p align="center"><img src="docs/images/en/vpx-settings.webp?v=133ac0549e" width="880" alt="The VPX settings screen: the Essentials tab with table view and sound settings, the values managed by Cyber Pinball, and the description of the selected setting."></p>
+## A cabinet that looks after itself
+
+<p align="center">
+  <img src="docs/images/en/health.webp?v=5e114520e0" width="360" alt="Cabinet health: 1 blocking, 2 to check, 3 OK. Disk space is fine, Midnight Circuit won't start because its ROM is missing (selected, with Open the table doctor), VPinMediaDB has media for 2 tables, the living-room cabinet is recognised with all 4 screens, and a newer VPX is available to install.">
+  <img src="docs/images/en/update.webp?v=5a7a736a90" width="360" alt="An update is available: Cyber Pinball 0.2.0, its release date, what's new, the size of the signed installer, and the Update now and Later buttons.">
+</p>
+
+- **Cabinet health.** Disk space, tables that don't start, missing media, screens and VPX version on one screen, each with its repair.
+- **Signed updates, from the cabinet.** A red dot on the gear when a release is out; what's new in your language; one press installs it. Every release is signed, and the cabinet refuses anything that does not carry the publisher's signature. Tables, media and settings are kept.
+- **Arcade hours.** The cabinet dims and goes quiet at night, then sleeps or shuts down at the chosen time if nobody is playing, after a warning any button cancels.
+- **Guest mode** for a party or the kids: guests can choose a table, play and read its page, nothing else; holding both flippers and both MagnaSaves unlocks it.
+- **A dedicated cabinet.** Optionally, Cyber Pinball replaces the Windows shell, with a way to bring it back; shut down, restart and sleep from the menu, every screen black until the end.
+- **The desktop put back as it was.** The playfield screen is rotated only while Cyber Pinball runs; every exit, even after a crash, restores its orientation.
+- **English or French**, chosen in the system menu ("Language / Langue"), with dates and numbers to match.
+
+<p align="center"><img src="docs/images/en/system-menu.webp?v=d6869d2503" width="360" alt="The system menu: Friends, Tables, Media, Downloads, Cabinet and Cyber Pinball sections, each with what it holds."></p>
 
 ## Requirements
 
@@ -54,7 +119,7 @@ Download an installer from the [Releases](https://github.com/gocode/cyberpinball
 | `CyberPinball-Setup.exe` | about 110 MiB | downloaded on first launch from its official page, checked by SHA-256 |
 | `CyberPinball-Setup-complet.exe` | about 280 MiB | official archive included, for a cabinet without Internet access |
 
-- Everything lives in **one root folder** that you choose (for example `D:\CyberPinball`): the application in `app\`, and next to it the tables, media, configuration, data and emulators.
+- Everything lives in **one root folder** that you choose (for example `D:\CyberPinball`): the application in `app\`, and next to it the tables, media, configuration, data and emulators. Cyber Pinball keeps its own copy of VPX and its own `VPinballX.ini`, and registers nothing in Windows.
 - No administrator rights are needed: it installs for the current user. For Friends, Windows asks once for permission to let Cyber Pinball through its firewall; declining only makes the local network less reliable.
 - Options: a desktop shortcut, and start with Windows (for a dedicated cabinet). Silent install: `/S`, `/DEMARRAGE` (start with Windows), `/SANSBUREAU` (no desktop shortcut), `/PAREFEU` (ask for the firewall rule even when silent), `/D=D:\Cabinet` (root folder, last and without quotes).
 - **Uninstalling removes the application only.** Tables, media, configuration and data stay in the root folder; reinstalling into the same folder finds them as they were.
