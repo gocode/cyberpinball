@@ -9,47 +9,47 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.4
 
+- Friends (System menu > Friends), between cabinets and with no central server: your friends online with the table they are playing and their latest high scores, finding a player by name or on the local network, friend requests, first badges. Sharing is on by default and is turned off in "Sharing and network", which also says what other cabinets see; Windows asks once to allow Cyber Pinball through its firewall.
+- Friends' library, shared by default between friends (turned off in "Sharing and network"): "See their library" on a friend's page shows their tables and the media you are missing. You can fetch a whole table you don't have, or pick part by part those of a table you already have, their version and yours side by side; ROM and PuP-Pack are unticked by default, with a note on rights. Everything goes through the add plan before it is installed; saves, high scores and programs are never sent.
+- Live game between friends, up to 4 cabinets: the invitation opens on the friend's cabinet on the same table (version checked), a 5-second countdown starts the game everywhere, then everyone sees the results.
+- Friends online at a glance on the tables menu, and small, discreet notifications, one at a time: a friend coming online, a friend request, a finished download. Nothing shows during a game: a summary waits for you when you come back. Can be turned off in "Médias, son et attente" (Media, sound and attract mode).
+- A friend's name always follows their latest rename, and a pending friend request is sent again when the cabinets meet.
+- Downloads, in the system menu and as a pill on the tables menu: follows everything coming from sites and your friends, resumes by itself where it stopped if the connection drops, even the next day, and takes you back in one move to the screen you asked from.
+- Game parts: every file received goes to the part its content calls for (table, PuP-Pack, backglass, ROM, colours, sounds, music…), even when something else was expected; a file to fix no longer blocks installing the rest. A table's sheet has a "Game parts" section to add, replace, reassign or remove each part.
+- Downloads: a file can be added to a table, to another game, or installed as a new table.
+- Every file to choose (media, backglass, table, PuP-Pack…) is shown as a gallery: preview, download count and rating read from the site, author, version and date, with a sort by popularity; the media saved is always the one you picked.
+- "Search the web…" on every add or choice screen: the built-in browser opens on a search already filled in. A part missing from a game starts a search on VPS, Downloads, VPForums and VPUniverse right away.
+- More reliable VPUniverse search: short words in the title ("say", "die") no longer empty the search, and the wait imposed by the site is no longer taken for "no results".
+- "Jouer et enregistrer" (Play and record), on a table's page: Cyber Pinball films the game, from the moment you chose until the length you chose or until you leave the table, with a small witness in the corner of the playfield. Back in the menu, the video can become the table's presentation on the wheel, after confirmation, or be kept aside.
 - System menu in five sections, in this order: Friends, Tables, Media, then Downloads, Cabinet and Cyber Pinball; what is only used when coming from another frontend sits in "Migration".
 - Live menu DMD: Cyber Pinball draws the display itself, with the title, PRESS START, credits, the clock and high scores.
+- Cinematic launch: on Start, the game logo flies from the playfield to the backglass, the DMD shows loading, a coil thumps when VPX takes over; VPX never waits, and "Media, sound and attract mode" turns it off.
 - Interface sounds: a solenoid click when changing table, a coin on Start, the knocker when a high score falls; can be turned off in "Media, sound and attract mode".
+- Backglass and DMD in the brand's colours, with a dot font drawn for Cyber Pinball; the DMD colour is adjustable (signal green by default, presets or a free colour).
+- The table wheel has sound right after installation: each game's music plays by default, and a table without music plays its playfield video (40%). Cabinets already set up keep their choice: turn "Game music" back on in System menu > Media > "Media, sound and attract mode".
+- All sound goes through the cabinet speakers: the music and sounds offered in "Game media", and videos watched in "Get" (YouTube…), no longer go to the Windows default output, often silent on a PinCab.
+- Menu lists: a list too long for the screen is marked by a rule at the top or bottom instead of a fade, the selected entry stays whole and every list starts just below its title.
+- Long lists: in a content list (games, media, files…), marked by its frame and the "Exit · Leave the list" cue, Exit takes you back to the screen's actions instead of leaving it; MagnaSave (F6 on the keyboard) switches between the two and keeps your place, and holding a flipper scrolls letter by letter.
+- Lists no longer move during a download: only a user gesture scrolls them.
+- The names under the small medallions of the wheel are larger and can be read from a distance, like every text of the menu.
+- Tables menu on a desktop, on a screen narrower than 16:9 (5:4, 4:3): the playfield and the rest of the menu no longer overlap.
+- "Récupérer" (Fetch) window: its banner follows the size of the screen, and its texts read as well in 4K as on a small screen; in portrait, its buttons move below.
 - Cabinet health (Cabinet section): disk space, tables that don't start, missing media, screens and VPX version on a single screen.
 - Dedicated cabinet (Cabinet section), off by default: Cyber Pinball can replace the Windows Explorer, with a way to bring it back.
 - Shut down, restart and sleep from the Cyber Pinball section, right after "Quit Cyber Pinball": one confirmation, then settings are saved and every screen turns black, never showing the desktop; on wake, the menu comes back as it was.
 - Guest mode (Cabinet section): for a party or the kids, guests can only choose a table, play and read its game page; holding both flippers and both MagnaSaves for 3 seconds unlocks it.
-- Accelerometer nudge strength, adjustable in the "Tilt" step of the cabinet setup: ×2 is proposed for a Pinscape, which VPX almost ignored at the original scale.
-- Cinematic launch: on Start, the game logo flies from the playfield to the backglass, the DMD shows loading, a coil thumps when VPX takes over; VPX never waits, and "Media, sound and attract mode" turns it off.
-- Menu lists: a list too long for the screen is marked by a rule at the top or bottom instead of a fade, the selected entry stays whole and every list starts just below its title.
 - Cabinet schedule ("Media, sound and attract mode", off by default): like in an arcade, the cabinet dims its screens and goes quiet at night, then sleeps or shuts down at the chosen time if nobody is playing, after a 30-second warning that any button cancels.
+- Accelerometer nudge strength, adjustable in the "Tilt" step of the cabinet setup: ×2 is proposed for a Pinscape, which VPX almost ignored at the original scale.
 - Windows desktop given back the right way up: Cyber Pinball no longer rotates the playfield screen in the Windows setting, only while it is open; every exit, even after a crash, gives the desktop its previous orientation back. A cabinet already left rotated offers it on first start.
 - Table orientation kept from one start to the next: after a restart or a reconnection, tables no longer show upside down in game. "Cabinet health" says whether they face you, and repairs those that were turned in the VPX menu.
-- Game parts: every file received goes to the part its content calls for (table, PuP-Pack, backglass, ROM, colours, sounds, music…), even when something else was expected; a file to fix no longer blocks installing the rest. A table's sheet has a "Game parts" section to add, replace, reassign or remove each part.
-- Downloads: a file can be added to a table, to another game, or installed as a new table.
-- Every file to choose (media, backglass, table, PuP-Pack…) is shown as a gallery: preview, download count and rating read from the site, author, version and date, with a sort by popularity; the media saved is always the one you picked.
-- Lists no longer move during a download: only a user gesture scrolls them.
-- Backglass and DMD in the brand's colours, with a dot font drawn for Cyber Pinball; the DMD colour is adjustable (signal green by default, presets or a free colour).
-- Game buttons: keyboard keys can be captured again.
-- "Search the web…" on every add or choice screen: the built-in browser opens on a search already filled in. A part missing from a game starts a search on VPS, Downloads, VPForums and VPUniverse right away.
-- More reliable VPUniverse search: short words in the title ("say", "die") no longer empty the search, and the wait imposed by the site is no longer taken for "no results".
-- PuP-Packs visible in game: when a table's script keeps its PuP-Pack or PuP-DMD switched off, Cyber Pinball switches it on at install and before each game.
+- The Windows taskbar no longer shows over the DMD, backglass or playfield when you come back from a game: Cyber Pinball puts it straight back behind, and "Cabinet health" tells you if it had to.
 - VPX windows in their place in game: when two screens share the same name, the backglass, the DMD and the score view no longer pile up; Cyber Pinball moves each one back to the screen of its role.
-- Friends (System menu > Friends), between cabinets and with no central server: your friends online with the table they are playing and their latest high scores, finding a player by name or on the local network, friend requests, first badges. Sharing is on by default and is turned off in "Sharing and network", which also says what other cabinets see; Windows asks once to allow Cyber Pinball through its firewall.
+- Game buttons: keyboard keys can be captured again.
+- PuP-Packs visible in game: when a table's script keeps its PuP-Pack or PuP-DMD switched off, Cyber Pinball switches it on at install and before each game.
 - PuP-Packs the table does not start itself (Game of Thrones LE): Cyber Pinball stores them under the right name and starts them before each game; the doctor says which of the pack's videos cannot trigger with the table's DMD.
 - PuP-Pack videos triggered by DMD frames on FlexDMD tables without ROM (Game of Thrones LE): Cyber Pinball recognises these frames during the game and starts the videos, like PinUP Player.
 - PuP-Packs: the backglass no longer flickers when the same background video is requested several times in a row (Game of Thrones LE, house selection screen).
 - PuP-Packs: images shipped under a video name (Game of Thrones LE) finally show as images, with no flicker, and files with accented names are found; Cyber Pinball fixes this for every pack, on install and before each game.
-- The table wheel has sound right after installation: each game's music plays by default, and a table without music plays its playfield video (40%). Cabinets already set up keep their choice: turn "Game music" back on in System menu > Media > "Media, sound and attract mode".
-- All sound goes through the cabinet speakers: the music and sounds offered in "Game media", and videos watched in "Get" (YouTube…), no longer go to the Windows default output, often silent on a PinCab.
-- Friends' library, shared by default between friends (turned off in "Sharing and network"): "See their library" on a friend's page shows their tables and the media you are missing. You can fetch a whole table you don't have, or pick part by part those of a table you already have, their version and yours side by side; ROM and PuP-Pack are unticked by default, with a note on rights. Everything goes through the add plan before it is installed; saves, high scores and programs are never sent.
-- Live game between friends, up to 4 cabinets: the invitation opens on the friend's cabinet on the same table (version checked), a 5-second countdown starts the game everywhere, then everyone sees the results.
-- A friend's name always follows their latest rename, and a pending friend request is sent again when the cabinets meet.
-- The Windows taskbar no longer shows over the DMD, backglass or playfield when you come back from a game: Cyber Pinball puts it straight back behind, and "Cabinet health" tells you if it had to.
-- Long lists: in a content list (games, media, files…), marked by its frame and the "Exit · Leave the list" cue, Exit takes you back to the screen's actions instead of leaving it; MagnaSave (F6 on the keyboard) switches between the two and keeps your place, and holding a flipper scrolls letter by letter.
-- Downloads, in the system menu and as a pill on the tables menu: follows everything coming from sites and your friends, resumes by itself where it stopped if the connection drops, even the next day, and takes you back in one move to the screen you asked from.
-- The names under the small medallions of the wheel are larger and can be read from a distance, like every text of the menu.
-- Friends online at a glance on the tables menu, and small, discreet notifications, one at a time: a friend coming online, a friend request, a finished download. Nothing shows during a game: a summary waits for you when you come back. Can be turned off in "Médias, son et attente" (Media, sound and attract mode).
-- "Jouer et enregistrer" (Play and record), on a table's page: Cyber Pinball films the game, from the moment you chose until the length you chose or until you leave the table, with a small witness in the corner of the playfield. Back in the menu, the video can become the table's presentation on the wheel, after confirmation, or be kept aside.
-- Tables menu on a desktop, on a screen narrower than 16:9 (5:4, 4:3): the playfield and the rest of the menu no longer overlap.
-- "Récupérer" (Fetch) window: its banner follows the size of the screen, and its texts read as well in 4K as on a small screen; in portrait, its buttons move below.
 
 ## 0.1.3
 
