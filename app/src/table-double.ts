@@ -12,12 +12,14 @@ import {
   applyHostSettings,
   folderChanges,
   folderPrint,
+  injectGroupRecords,
   makeTableDouble,
   planTableDouble,
   readVpxScript,
   removeTableDouble,
   t,
   usesPinmameCode,
+  type GroupRecord,
   type HostSetting,
   type TableEntry,
 } from '@cyberpinball/core';
@@ -47,9 +49,10 @@ export function createTableDoubles(opts: TableDoublesOptions) {
   return {
     /**
      * Le double de la table pour la partie `id`, ou la raison de son absence ; `settings` : les
-     * réglages de l'hôte (invité), posés dans le double à la place des siens.
+     * réglages de l'hôte (invité), posés dans le double à la place des siens ; `board` : les records
+     * du groupe, posés dans le VPReg.stg du double (groupboard.ts).
      */
-    start(table: TableEntry, id: string, settings?: readonly HostSetting[]): { ok: true; double: TableDouble } | { ok: false; reason: string } {
+    start(table: TableEntry, id: string, settings?: readonly HostSetting[], board?: readonly GroupRecord[]): { ok: true; double: TableDouble } | { ok: false; reason: string } {
       const parties = partiesDir();
       const tablesDir = opts.tablesDir();
       if (!parties || !tablesDir) return { ok: false, reason: t('pas de dossier Cyber Pinball') };
@@ -78,6 +81,16 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           removeTableDouble(path.join(parties, id), parties);
           dropIfEmpty(parties);
           return { ok: false, reason: t('réglages de l’hôte impossibles à poser : {error}', { error: (error as Error).message }) };
+        }
+      }
+      // Le tableau de la table, dans la partie : les records du groupe, la dernière place à zéro.
+      const reg = path.join(plan.dir, 'user', 'VPReg.stg');
+      if (board && fs.existsSync(reg)) {
+        try {
+          const posed = injectGroupRecords(reg, board);
+          log(posed ? `Partie entre amis (${table.id}) : records du groupe posés (${Math.min(board.length, posed.places - 1)} sur ${posed.places} places, « ${posed.storage} »).` : `Partie entre amis (${table.id}) : pas de tableau dans VPReg.stg, records du groupe non posés.`); // i18n-ignore : journal
+        } catch (error) {
+          log(`Partie entre amis (${table.id}) : records du groupe non posés (${(error as Error).message}).`); // i18n-ignore : journal
         }
       }
       log(`Partie entre amis (${table.id}) : double prêt, ${plan.links.length} fichiers liés, ${plan.copies.length} copiés, dans ${plan.dir}.`); // i18n-ignore : journal

@@ -10,6 +10,7 @@ import {
   countdownLeft,
   displayName,
   formatNumber,
+  language,
   LIVE_INVITE_MS,
   LIVE_MAX_PLAYERS,
   liveMatchLabel,
@@ -105,6 +106,25 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
 
   function tableRow(game: Pick<LiveGame, 'title' | 'table'>): Row {
     return { text: game.title, detail: game.table.version ? t('Version : {version}', { version: game.table.version }) : undefined, icon: 'play' };
+  }
+
+  /** Le record du groupe à battre, sur cette version de la table (groupboard.ts). */
+  function boardRow(): Row {
+    const best = games.board()[0];
+    return best
+      ? { text: t('Record du groupe à battre : {score}', { score: formatNumber(best.score) }), detail: t('{name}, le {date}', { name: best.name, date: new Date(best.at).toLocaleDateString(language() === 'en' ? 'en-GB' : 'fr-FR') }), icon: 'star', tone: 'info' }
+      : { text: t('Pas encore de record du groupe sur cette version'), detail: t('Le meilleur score de cette partie l’ouvrira'), icon: 'star', tone: 'quiet' };
+  }
+
+  /** Le tableau du groupe sur cette version, après la partie : les cinq meilleurs. */
+  function boardSection(): Section {
+    const board = games.board().slice(0, 5);
+    return {
+      title: t('Records du groupe sur cette version'),
+      rows: board.length
+        ? board.map((r, i) => ({ text: `${i + 1}. ${label(r.player, r.name)} — ${formatNumber(r.score)}`, detail: new Date(r.at).toLocaleDateString(language() === 'en' ? 'en-GB' : 'fr-FR'), icon: 'star' as const, ...(i === 0 ? { tone: 'ok' as const } : {}) }))
+        : [{ text: t('Aucun score classé pour l’instant'), detail: t('Seuls les scores lisibles comptent (tables qui gardent leurs records dans VPReg.stg)'), tone: 'quiet' as const }],
+    };
   }
 
   /** Mon nombre de billes par partie, quand il diffère de celui de celui qui invite : rien sinon. */
@@ -261,7 +281,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       lead: hosting ? t('Lancez quand vos amis sont prêts : un compte à rebours commun, puis la table se lance sur chaque borne.') : t('En attente du départ donné par {name}.', { name: hostPlayer?.name ?? '?' }),
       sections: [
         ...takeFlash(),
-        { rows: [tableRow(game), ...(myself?.host ? [] : ballsRow(myself?.balls, game.table.balls))] },
+        { rows: [tableRow(game), ...(myself?.host ? [] : ballsRow(myself?.balls, game.table.balls)), boardRow()] },
         { title: t('Joueurs ({n} sur {max})', { n: seats, max: LIVE_MAX_PLAYERS }), rows: playerRows(game) },
       ],
       actions,
@@ -357,6 +377,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
         ...takeFlash(),
         ...(otherBalls ? [{ rows: [{ text: t('Autre nombre de billes : score hors classement'), detail: t('{n} billes par partie chez celui qui invite', { n: game.table.balls! }), tone: 'warning' as const, icon: 'rules' as const }] }] : []),
         { rows: standings.map((p) => resultRow(p, ranked.includes(p) ? ranked.indexOf(p) + 1 : undefined, standings.length > 1, game.table.balls)) },
+        ...(finished ? [boardSection()] : []),
       ],
       actions,
       back,

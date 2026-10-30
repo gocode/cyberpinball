@@ -19,6 +19,7 @@ son interface).
 - Partie en direct : le nombre de billes par partie compte. Réglées autrement que chez celui qui invite (5 contre 3), vous jouez quand même, mais votre score reste hors classement ; l'invitation le dit avant d'accepter. Il se lit dans la ROM (tables à ROM décrites par le projet Pinball Memory Maps), le script ou le menu de service de la table.
 - Partie en direct : votre table habituelle n'est jamais modifiée. La partie se joue sur un double de la table, fait juste avant le lancement et supprimé au retour : la mémoire de la ROM, vos records et vos réglages restent tels quels.
 - Partie en direct : tout le monde joue avec les réglages de celui qui invite (nombre de billes, sauvetage de bille, tilt…), envoyés à chaque ami qui accepte et posés dans le double de sa table. Pour jouer à 5 billes, réglez votre table sur 5 avant d'inviter. Un ami qui ne les a pas reçus joue hors classement.
+- Partie en direct : le tableau des records du groupe, par version de table. Le salon donne le record à battre, les résultats les cinq meilleurs, et dans la partie la machine affiche les records du groupe à la place de ceux de l'hôte. Pour l'instant, seulement les tables qui gardent leurs records hors de la ROM (Game of Thrones, GOTG, The Goonies…).
 
 ## 0.1.4
 

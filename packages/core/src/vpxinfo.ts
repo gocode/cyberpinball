@@ -65,6 +65,7 @@ export class CompoundFile {
   readonly entries: DirEntry[];
   private miniFat?: Uint32Array;
   private miniStream?: Buffer;
+  private readonly dirStart: number;
 
   constructor(private readonly fd: number) {
     this.fileSize = fs.fstatSync(fd).size;
@@ -89,7 +90,8 @@ export class CompoundFile {
     const fat = Buffer.concat(fatSectors.map((s) => this.sector(s)));
     this.fat = new Uint32Array(fat.buffer, fat.byteOffset, fat.length / 4);
 
-    const dir = this.chain(header.readUInt32LE(0x30));
+    this.dirStart = header.readUInt32LE(0x30);
+    const dir = this.chain(this.dirStart);
     this.entries = [];
     for (let off = 0; off + 128 <= dir.length; off += 128) {
       const nameLen = Math.min(64, dir.readUInt16LE(off + 0x40));
@@ -156,6 +158,48 @@ export class CompoundFile {
       total += part.length;
     }
     return Buffer.concat(parts).subarray(0, size);
+  }
+
+  /** Les secteurs d'une chaîne, dans l'ordre. */
+  private sectors(start: number): number[] {
+    const out: number[] = [];
+    const seen = new Set<number>();
+    for (let s = start; s <= MAX_SECTOR; s = this.fat[s] ?? END_OF_CHAIN) {
+      if (seen.has(s)) throw new Error('chaîne de secteurs en boucle'); // i18n-ignore : erreur interne, toujours rattrapée
+      seen.add(s);
+      out.push(s);
+    }
+    return out;
+  }
+
+  /**
+   * Où vivent les octets d'un flux dans le fichier : chaque secteur (ou mini-secteur de 64 octets,
+   * pour un petit flux) de sa chaîne, avec sa place. Sert à réécrire une valeur sur place
+   * (highscores.ts, patchVpRegValues), sans toucher à la structure du fichier.
+   */
+  spans(entry: DirEntry): { offset: number; length: number }[] {
+    if (entry.size >= this.miniCutoff) return this.sectors(entry.start).map((s) => ({ offset: (s + 1) * this.sectorSize, length: this.sectorSize }));
+    const root = this.sectors(this.entries[0]!.start);
+    const out: { offset: number; length: number }[] = [];
+    const seen = new Set<number>();
+    for (let s = entry.start; s <= MAX_SECTOR; s = this.miniFat?.[s] ?? END_OF_CHAIN) {
+      if (seen.has(s)) throw new Error('chaîne de mini-secteurs en boucle'); // i18n-ignore : erreur interne, toujours rattrapée
+      seen.add(s);
+      const at = s * this.miniSectorSize;
+      const sector = root[Math.floor(at / this.sectorSize)];
+      if (sector === undefined) throw new Error('mini-secteur hors du mini-flux'); // i18n-ignore : erreur interne, toujours rattrapée
+      out.push({ offset: (sector + 1) * this.sectorSize + (at % this.sectorSize), length: this.miniSectorSize });
+    }
+    return out;
+  }
+
+  /** Position dans le fichier de l'entrée de répertoire `entry` (128 octets ; sa taille à +0x78). */
+  entryOffset(entry: DirEntry): number {
+    const index = this.entries.indexOf(entry);
+    if (index < 0) throw new Error('entrée inconnue'); // i18n-ignore : erreur interne, toujours rattrapée
+    const sector = this.sectors(this.dirStart)[Math.floor((index * 128) / this.sectorSize)];
+    if (sector === undefined) throw new Error('entrée hors du répertoire'); // i18n-ignore : erreur interne, toujours rattrapée
+    return (sector + 1) * this.sectorSize + ((index * 128) % this.sectorSize);
   }
 
   /** Enfants d'un stockage : l'arbre rouge-noir de ses entrées, parcouru en entier. */

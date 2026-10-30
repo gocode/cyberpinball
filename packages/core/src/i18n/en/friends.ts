@@ -130,6 +130,14 @@ export const messages: Record<string, string> = {
   'Score non disponible': 'Score not available',
   'Meilleur score connu': 'Best known score',
   'Seuls les scores inscrits au tableau d’honneur sont disponibles.': 'Only scores entered on the high score table are available.',
+  // Le tableau des records du groupe (30/10/2026)
+  'Record du groupe à battre : {score}': 'Group record to beat: {score}',
+  '{name}, le {date}': '{name}, on {date}',
+  'Pas encore de record du groupe sur cette version': 'No group record on this version yet',
+  'Le meilleur score de cette partie l’ouvrira': 'The best score of this game will open it',
+  'Records du groupe sur cette version': 'Group records on this version',
+  'Aucun score classé pour l’instant': 'No ranked score yet',
+  'Seuls les scores lisibles comptent (tables qui gardent leurs records dans VPReg.stg)': 'Only readable scores count (tables that keep their high scores in VPReg.stg)',
   // La même version pour tous (30/10/2026)
   'Prêt, réglages de l’hôte non reçus : score hors classement': 'Ready, host’s settings not received: score not ranked',
   'Prêt, réglages de l’hôte en route': 'Ready, host’s settings on their way',

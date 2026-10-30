@@ -22,6 +22,8 @@ import {
   answerGame,
   applyRoom,
   closeIfDone,
+  addGameToBoard,
+  boardFor,
   countdownFrom,
   createSettingsReceiver,
   expireInvites,
@@ -30,6 +32,7 @@ import {
   inviteExpired,
   inviteToGame,
   liveInvite,
+  loadBoards,
   LIVE_COUNTDOWN_S,
   matchLiveTable,
   newLiveGame,
@@ -37,9 +40,12 @@ import {
   roomMessage,
   scriptPatchState,
   settingsMessages,
+  saveBoards,
   settingsReceived,
   startGame,
   tableIdentity,
+  type GroupBoards,
+  type GroupRecord,
   type HostSetting,
   type LiveGame,
   type LiveInvite,
@@ -73,8 +79,11 @@ export interface LiveGamesOptions {
   onInvite?(invite: LiveInvite): void;
   /** Réglages de ma table à envoyer aux invités (readHostSettings) ; undefined : trop gros pour voyager. */
   settingsOf?(table: TableEntry): HostSetting[] | undefined;
-  /** C'est parti : lancer la table ; `playing` quand VPX l'affiche ; `settings` : ceux de l'hôte, reçus (invité). */
-  play(table: TableEntry, playing: () => void, settings?: HostSetting[]): Promise<LivePlayResult | undefined>;
+  /**
+   * C'est parti : lancer la table ; `playing` quand VPX l'affiche ; `settings` : ceux de l'hôte,
+   * reçus (invité) ; `board` : les records du groupe sur cette version, à poser dans le double.
+   */
+  play(table: TableEntry, playing: () => void, settings?: HostSetting[], board?: GroupRecord[]): Promise<LivePlayResult | undefined>;
   onChange?(): void;
   now?(): Date;
   log?(line: string): void;
@@ -83,6 +92,8 @@ export interface LiveGamesOptions {
 export interface LiveGames {
   /** La partie où je suis (salon, compte à rebours, partie, résultats). */
   current(): LiveGame | undefined;
+  /** Les records du groupe sur la version de la table de la partie en cours (groupboard.ts). */
+  board(): GroupRecord[];
   /** Ma table pour la partie en cours. */
   table(): TableEntry | undefined;
   /** Invitations reçues, sans les expirées. */
@@ -129,7 +140,23 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   let receiver: ReturnType<typeof createSettingsReceiver> | undefined;
   let hostSettings: HostSetting[] | undefined;
   const prints = createPrints(path.join(opts.dataDir, 'amis', 'empreintes.json'));
-  const changed = () => opts.onChange?.();
+  // Le tableau du groupe : chaque partie finie y entre, une fois (groupboard.ts).
+  const boardsFile = path.join(opts.dataDir, 'amis', 'records.json');
+  let boards: GroupBoards | undefined;
+  const loadedBoards = () => (boards ??= loadBoards(boardsFile));
+  const remember = () => {
+    if (game?.phase !== 'finished' || !addGameToBoard(loadedBoards(), game, now())) return;
+    try {
+      saveBoards(boardsFile, loadedBoards());
+      log(`Partie en direct : résultats de « ${game.title} » au tableau du groupe.`); // i18n-ignore : journal
+    } catch (error) {
+      log(`Partie en direct : tableau du groupe non enregistré (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+  };
+  const changed = () => {
+    remember();
+    opts.onChange?.();
+  };
 
   const isHost = () => !!game && game.host === me().key;
   const ongoing = () => !!game && game.phase !== 'finished' && game.phase !== 'cancelled';
@@ -177,6 +204,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         if (game?.id === id) report('playing');
       },
       isHost() ? undefined : hostSettings,
+      boardFor(loadedBoards(), game.table),
     );
     if (game?.id !== id) return;
     report(result?.ok ? 'done' : 'failed', result);
@@ -314,6 +342,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
 
   return {
     current: () => game,
+    board: () => (game ? boardFor(loadedBoards(), game.table) : []),
     table: () => mine,
     invites: () => invites.filter((i) => !inviteExpired(i, now())),
     async create(table) {

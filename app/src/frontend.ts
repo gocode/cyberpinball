@@ -99,6 +99,7 @@ import {
   type ConfigurationSelection,
   type ManualEdit,
   type ObservedDisplay,
+  type GroupRecord,
   type HostSetting,
   type RoleId,
   type Rotation,
@@ -812,11 +813,11 @@ const liveGames = createLiveGames({
     if (playing) gameNotices.show(invite);
     else if (liveCanShow()) friendsMenu.live.openInvite(invite.id, () => library.leave());
   },
-  play: async (table, onPlaying, settings) => {
+  play: async (table, onPlaying, settings, board) => {
     // Le départ commun ferme l'écran ouvert (le compte à rebours), comme Start sur une table.
     if (library.isActive()) library.leave();
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
-    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying, double: `${Date.now().toString(36)}`, ...(settings ? { settings } : {}) });
+    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying, double: `${Date.now().toString(36)}`, ...(settings ? { settings } : {}), ...(board ? { board } : {}) });
     // De retour au menu : les résultats, qui se complètent à mesure que les autres reviennent.
     if (report && state.phase === 'menu') setImmediate(() => friendsMenu.live.open(() => library.leave()));
     return report ? { ok: report.result.ok, seconds: report.result.seconds, records: report.entered.map((s) => ({ score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) })) } : undefined;
@@ -1566,7 +1567,7 @@ export interface PlayReport {
  * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
  * l'a demandée (la fiche) reprend la main.
  */
-async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[] } = {}): Promise<PlayReport | undefined> {
+async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[] } = {}): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
   if (!install) return undefined;
   // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
@@ -1626,7 +1627,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // La pièce tombe au Start d'une vraie partie (pas au réglage de l'affichage), avant que VPX ne prenne les écrans.
   if (!displayMode) playUiSound('coin');
   // Records d'avant la partie (VPReg.stg de la table, highscores.ts), pour savoir au retour si l'un est tombé (knocker).
-  const recordsBefore = readTableRecords(table);
+  // Pour une partie entre amis, relus dans le double une fois fait (réglages de l'hôte, records du groupe).
+  let recordsBefore = readTableRecords(table);
   const loadingMs = Number(process.env.CYBERPINBALL_LOADING_MS ?? 2500);
   await delay(Math.min(400, loadingMs));
   const captured = Date.now();
@@ -1670,7 +1672,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Partie entre amis : VPX joue un double de la table, fait après les préparations ci-dessus ; le
   // dossier habituel n'est jamais ouvert en écriture. Sans double possible, pas de partie : jamais
   // de repli sur le dossier habituel.
-  const doubled = hooks.double && !displayMode ? tableDoubles.start(table, hooks.double, hooks.settings) : undefined;
+  const doubled = hooks.double && !displayMode ? tableDoubles.start(table, hooks.double, hooks.settings, hooks.board) : undefined;
   if (doubled && !doubled.ok) {
     console.log(`Partie entre amis (${table.id}) : pas de double, partie non lancée (${doubled.reason}).`);
     dressing = undefined;
@@ -1681,6 +1683,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   }
   const double = doubled?.ok ? doubled.double : undefined;
   const played = double?.table ?? table;
+  if (double) recordsBefore = readTableRecords(played);
 
   // Les fenêtres du menu restent derrière VPX, sans jamais lui prendre le focus : l'écran de
   // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque
@@ -1754,7 +1757,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     // Pour les amis : les records entrés au tableau, la partie, puis les badges qu'ils valent.
     if (!autoStopAfterMs) {
       const seen = presenceTable(table);
-      for (const s of [...entered].sort((a, b) => a.rank - b.rank)) socialNet.publish({ kind: 'record', table: seen, score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) });
+      // Pas pour une partie entre amis : son tableau est celui du groupe, posé dans le double, pas celui de la table.
+      if (!double) for (const s of [...entered].sort((a, b) => a.rank - b.rank)) socialNet.publish({ kind: 'record', table: seen, score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) });
       if (result.seconds >= 60) socialNet.publish({ kind: 'played', table: seen, seconds: Math.round(result.seconds) });
       socialNet.checkBadges(playStats(tables));
     }
@@ -1769,7 +1773,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // écrans, le menu les reprend en redémarrant.
   if (selection?.previous && result.ok) relaunchMenu();
   broadcast();
-  if (entered.length) playUiSound('knocker');
+  // Le knocker : un score entré au tableau ; entre amis, seulement le record du groupe battu (la première place).
+  if (double ? entered.some((s) => s.rank === 1 && (hooks.board?.length ?? 0) > 0) : entered.length) playUiSound('knocker');
   // Une invitation reçue pendant la partie, encore valable : elle s'ouvre au retour au menu.
   const invite = state.phase === 'menu' && !liveGames.current() ? liveGames.invites()[0] : undefined;
   if (invite) friendsMenu.live.openInvite(invite.id, () => library.leave());

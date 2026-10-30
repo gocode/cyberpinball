@@ -17,6 +17,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Live game: the number of balls per game counts. Set differently from the host (5 against 3), you still play, but your score stays out of the ranking; the invitation says so before you accept. It is read from the ROM (ROM tables described by the Pinball Memory Maps project), the script or the table's service menu.
 - Live game: your usual table is never modified. The game is played on a copy of the table, made just before launch and deleted on return: the ROM memory, your high scores and your settings stay as they are.
 - Live game: everyone plays with the host's settings (balls per game, ball save, tilt…), sent to each friend who accepts and applied to their copy of the table. To play with 5 balls, set your table to 5 before inviting. A friend who did not receive them plays out of the ranking.
+- Live game: the group's high score board, per table version. The room gives the record to beat, the results the top five, and in the game the machine shows the group's records instead of the host's. For now, only tables that keep their high scores outside the ROM (Game of Thrones, GOTG, The Goonies…).
 
 ## 0.1.4
 

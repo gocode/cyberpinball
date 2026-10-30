@@ -52,6 +52,7 @@ function fakeGames() {
     game: undefined as LiveGame | undefined,
     pending: undefined as LiveInvite | undefined,
     current: () => games.game,
+    board: () => [] as { player: string; name: string; score: number; at: string; game: string }[],
     table: () => undefined,
     invites: () => (games.pending ? [games.pending] : []),
     create: async () => games.game!,
@@ -249,7 +250,7 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
     // Le record entré passe devant la partie sans record, qui n'a pas de rang (score inconnu).
     if (game.phase === 'finished') {
       const texts = built.sections.flatMap((s) => s.rows.map((r) => r.text));
-      assert.match(texts.join('|'), /(^|\|)1\. Bruno #[0-9A-F]{4} — 2\s?000\s?000\|Alice #[0-9A-F]{4} \(vous\) — Score non disponible$/u);
+      assert.match(texts.join('|'), /(^|\|)1\. Bruno #[0-9A-F]{4} — 2\s?000\s?000\|Alice #[0-9A-F]{4} \(vous\) — Score non disponible\|Aucun score classé pour l’instant$/u);
       // La même version, mais 5 billes par partie contre 3 : hors classement, avec la raison.
       games.game = { ...game, table: { ...game.table, balls: 3 }, players: game.players.map((p) => (p.host ? { ...p, balls: 3 } : { ...p, balls: 5 })) };
       menu.live.open(() => undefined);
@@ -257,6 +258,16 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
       assert.equal(balls[0]!.text, 'Autre nombre de billes : score hors classement');
       assert.match(balls.map((r) => r.text).join('|'), /\|Bruno #[0-9A-F]{4} — 2\s?000\s?000\|/u);
       assert.match(balls.find((r) => r.text.startsWith('Bruno'))!.detail as string, /Hors classement : 5 billes au lieu de 3/);
+      // Le tableau du groupe sur cette version, sous les résultats ; le record à battre, dans le salon.
+      games.board = () => [{ player: FRIEND, name: 'Bruno', score: 2_000_000, at: '2026-10-30T20:00:00.000Z', game: 'g' }];
+      menu.live.open(() => undefined);
+      const boardSection = last().build().sections.at(-1)!;
+      assert.equal(boardSection.title, 'Records du groupe sur cette version');
+      assert.match(boardSection.rows[0]!.text, /^1\. Bruno #[0-9A-F]{4} — 2\s?000\s?000$/u);
+      games.game = base;
+      menu.live.open(() => undefined);
+      assert.ok(last().build().sections.flatMap((s) => s.rows).some((r) => /^Record du groupe à battre : 2\s?000\s?000$/u.test(r.text)));
+      games.board = () => [];
     }
   }
   // Salon d'un invité : le curseur sur « Retour », pas sur « Quitter la partie ».

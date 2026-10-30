@@ -61,6 +61,7 @@ export * from './vpxinfo';
 export * from './ballcount';
 export * from './tabledouble';
 export * from './hostsettings';
+export * from './groupboard';
 export * from './highscores';
 export * from './dmdfont';
 export * from './dmdcolor';

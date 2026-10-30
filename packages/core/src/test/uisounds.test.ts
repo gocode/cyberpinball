@@ -267,12 +267,15 @@ test('knocker : records lus avant la partie et au retour, sonné seulement si un
   const start = main.indexOf('async function play(');
   // Jusqu'à l'accolade qui ferme la fonction, en début de ligne.
   const play = main.slice(start, start + main.slice(start).search(/\r?\n\}\r?\n/));
-  assert.match(play, /const recordsBefore = readTableRecords\(table\);/);
+  assert.match(play, /let recordsBefore = readTableRecords\(table\);/);
+  // Entre amis, relus dans le double une fois fait : réglages de l'hôte et records du groupe y sont déjà.
+  assert.match(play, /const played = double\?\.table \?\? table;\s+if \(double\) recordsBefore = readTableRecords\(played\);/);
   // Au retour, lus là où VPX les a écrits : le double d'une partie entre amis (table-double.ts), sinon la table.
   assert.match(play, /const played = double\?\.table \?\? table;/);
   assert.match(play, /const recordsAfter = readTableRecords\(played\);\s+double\?\.finish\(\);/);
   assert.match(play, /const entered = result\.ok \? newRecords\(recordsBefore, recordsAfter\) : \[\];/);
-  assert.match(play, /if \(entered\.length\) playUiSound\('knocker'\);/);
+  // Entre amis, seulement le record du groupe battu (la première place d'un tableau qui en avait une).
+  assert.match(play, /if \(double \? entered\.some\(\(s\) => s\.rank === 1 && \(hooks\.board\?\.length \?\? 0\) > 0\) : entered\.length\) playUiSound\('knocker'\);/);
   // Lecture d'avant au lancement, avant la partie ; le knocker après le retour au menu (broadcast).
   assert.ok(play.indexOf('recordsBefore = readTableRecords') < play.indexOf('launchVpx('));
   assert.ok(play.lastIndexOf('broadcast();') < play.indexOf("playUiSound('knocker')"));
