@@ -160,3 +160,111 @@ body {
   right: calc(20 * var(--u));
   bottom: calc(6 * var(--u));
 }
+
+/* La bande de la partie entre amis (liveBoardView) : un titre, puis un joueur par ligne, son nom, son
+   score (chiffres tabulaires) et où il en est (« Bille 2 sur 3 »). La taille suit la largeur de la
+   carte vue du joueur (--b : un 560e), sa hauteur suivant le nombre de joueurs ; le joueur de la borne
+   est souligné d'un filet, celui en tête a son score en vert signal. */
+.board {
+  --b: calc(var(--w, 560px) / 560);
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: calc(6 * var(--b));
+  padding: calc(12 * var(--b)) calc(22 * var(--b));
+  border: calc(1 * var(--b)) solid var(--line-strong);
+  border-radius: calc(18 * var(--b));
+  background: var(--scrim-strong);
+  box-shadow: var(--halo-panel);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+  overflow: hidden;
+}
+
+.board[hidden] {
+  display: none;
+}
+
+.board-head {
+  display: flex;
+  align-items: center;
+  gap: calc(12 * var(--b));
+  min-height: calc(32 * var(--b));
+}
+
+.board-icon {
+  display: flex;
+  color: var(--signal);
+  font-size: calc(30 * var(--b));
+}
+
+.board-title {
+  font-size: calc(22 * var(--b));
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: calc(4 * var(--b));
+}
+
+.board-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'name score'
+    'detail detail';
+  column-gap: calc(14 * var(--b));
+  padding-left: calc(10 * var(--b));
+  border-left: calc(3 * var(--b)) solid transparent;
+  min-height: calc(46 * var(--b));
+}
+
+.board-row.me {
+  border-left-color: var(--line-strong);
+}
+
+.board-name {
+  grid-area: name;
+  min-width: 0;
+  font-size: calc(22 * var(--b));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.board-score {
+  grid-area: score;
+  font-size: calc(24 * var(--b));
+  font-weight: 700;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.board-row.lead .board-score {
+  color: var(--signal);
+}
+
+.board-detail {
+  grid-area: detail;
+  font-size: calc(20 * var(--b));
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

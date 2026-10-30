@@ -63,6 +63,18 @@ export interface LivePlayResult {
   ok: boolean;
   seconds: number;
   records: LiveRecord[];
+  /** Score final lu en direct (livestate.ts), même s'il n'est pas entré au tableau de la table. */
+  score?: number;
+  /** Plus d'un joueur dans la table : hors classement. */
+  multi?: boolean;
+}
+
+/** Où en est le joueur, d'après le relevé posé dans le script du double (livestate.ts). */
+export interface LiveProgress {
+  score: number;
+  ball: number;
+  balls: number;
+  players: number;
 }
 
 export interface LiveGamesOptions {
@@ -83,7 +95,7 @@ export interface LiveGamesOptions {
    * C'est parti : lancer la table ; `playing` quand VPX l'affiche ; `settings` : ceux de l'hôte,
    * reçus (invité) ; `board` : les records du groupe sur cette version, à poser dans le double.
    */
-  play(table: TableEntry, playing: () => void, settings?: HostSetting[], board?: GroupRecord[]): Promise<LivePlayResult | undefined>;
+  play(table: TableEntry, playing: () => void, settings?: HostSetting[], board?: GroupRecord[], progress?: (p: LiveProgress) => void): Promise<LivePlayResult | undefined>;
   onChange?(): void;
   now?(): Date;
   log?(line: string): void;
@@ -183,9 +195,15 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   }
 
   /** Mon état dans la partie : appliqué chez moi si j'invite, envoyé à celui qui invite sinon. */
-  function report(state: LiveStatus, result?: LivePlayResult): void {
+  function report(state: LiveStatus, result?: LivePlayResult, live?: LiveProgress): void {
     if (!game) return;
-    const status = { state, ...(result ? { seconds: Math.round(result.seconds), records: result.records } : {}) };
+    const status = {
+      state,
+      ...(result ? { seconds: Math.round(result.seconds), records: result.records } : {}),
+      ...(result?.score !== undefined ? { score: result.score } : {}),
+      ...(live ? { score: live.score, ball: live.ball, ...(live.balls ? { balls: live.balls } : {}) } : {}),
+      ...(result?.multi || (live && live.players > 1) ? { multi: true as const } : {}),
+    };
     if (isHost()) setGame(gameStatus(game, me().key, status, now()));
     else {
       net.send(game.host, { t: 'game-status', game: game.id, ...status });
@@ -198,6 +216,19 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     if (!game || game.phase === 'cancelled' || !mine) return;
     const id = game.id;
     report('loading');
+    // Le score et la bille partent vers les autres à chaque changement, au plus deux fois par seconde ;
+    // une nouvelle bille ou un joueur en trop, tout de suite.
+    let sent: LiveProgress | undefined;
+    let sentAt = 0;
+    const progress = (p: LiveProgress) => {
+      if (game?.id !== id || game.phase === 'finished' || game.phase === 'cancelled') return;
+      const changedBall = !sent || sent.ball !== p.ball || (sent.players > 1) !== (p.players > 1);
+      if (sent && sent.score === p.score && !changedBall) return;
+      if (!changedBall && now().getTime() - sentAt < 500) return;
+      sent = p;
+      sentAt = now().getTime();
+      report('playing', undefined, p);
+    };
     const result = await opts.play(
       mine,
       () => {
@@ -205,6 +236,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       },
       isHost() ? undefined : hostSettings,
       boardFor(loadedBoards(), game.table),
+      progress,
     );
     if (game?.id !== id) return;
     report(result?.ok ? 'done' : 'failed', result);

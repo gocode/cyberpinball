@@ -78,8 +78,16 @@ export function liveOtherBalls(p: Pick<LivePlayer, 'balls'>, hostBalls: number |
  * Un score qui compte au classement : celui de l'hôte, ou d'un invité qui a joué avec les réglages
  * de l'hôte (reçus entiers) et pas un autre nombre de billes par partie (`hostBalls`).
  */
-export function liveRanked(p: Pick<LivePlayer, 'host' | 'balls' | 'settings'>, hostBalls?: number): boolean {
+export function liveRanked(p: Pick<LivePlayer, 'host' | 'balls' | 'settings' | 'multi'>, hostBalls?: number): boolean {
+  if (p.multi) return false;
   return p.host === true || (p.settings === 'ok' && !liveOtherBalls(p, hostBalls));
+}
+
+/** Le score d'un joueur : celui lu en direct (livestate.ts), sinon son meilleur record entré au tableau. */
+export function liveScore(p: Pick<LivePlayer, 'score' | 'records'>): number | undefined {
+  if (p.score !== undefined) return p.score;
+  const best = Math.max(-1, ...(p.records ?? []).map((r) => r.score));
+  return best >= 0 ? best : undefined;
 }
 
 export type LivePlayerState =
@@ -120,6 +128,14 @@ export interface LivePlayer {
   /** Fin de partie : durée jouée et records entrés. */
   seconds?: number;
   records?: LiveRecord[];
+  /**
+   * En direct, d'après le relevé posé dans le script du double (livestate.ts) : son score et sa bille
+   * (le nombre de billes : `balls`) ; à la fin, son score final, même s'il n'est pas entré au tableau.
+   */
+  score?: number;
+  ball?: number;
+  /** Plus d'un joueur dans sa table (un Start de plus en première bille) : hors classement. */
+  multi?: true;
 }
 
 export type LivePhase = 'gathering' | 'countdown' | 'playing' | 'finished' | 'cancelled';
@@ -158,7 +174,7 @@ export type LiveMessage =
   | { t: 'game-room'; game: string; phase: LivePhase; players: LivePlayer[] }
   /** Départ dans `in` millisecondes, à compter de la réception. */
   | { t: 'game-start'; game: string; in: number }
-  | { t: 'game-status'; game: string; state: LiveStatus; seconds?: number; records?: LiveRecord[] }
+  | { t: 'game-status'; game: string; state: LiveStatus; seconds?: number; records?: LiveRecord[]; score?: number; ball?: number; balls?: number; multi?: true }
   | { t: 'game-cancel'; game: string }
   /** Réglages de l'hôte : chaque fichier, son empreinte et sa taille, ou absent (pas de sha). */
   | { t: 'game-settings'; game: string; files: { rel: string; sha?: string; bytes?: number }[] }
@@ -216,6 +232,14 @@ function parseRecords(raw: unknown): LiveRecord[] | undefined {
     .filter((r): r is LiveRecord => !!r);
 }
 
+/** Score, bille, nombre de billes et joueur en trop, d'un message ou d'un joueur reçu ; vérifiés. */
+function parseProgress(r: Record<string, unknown>): { score?: number; ball?: number; balls?: number; multi?: true } {
+  const score = typeof r.score === 'number' && Number.isSafeInteger(r.score) && r.score >= 0 ? r.score : undefined;
+  const ball = typeof r.ball === 'number' && Number.isInteger(r.ball) && r.ball >= 1 && r.ball <= 20 ? r.ball : undefined;
+  const balls = isBallCount(r.balls) ? r.balls : undefined;
+  return { ...(score !== undefined ? { score } : {}), ...(ball ? { ball } : {}), ...(balls ? { balls } : {}), ...(r.multi === true ? { multi: true as const } : {}) };
+}
+
 const seconds = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 7 * 24 * 3600 ? Math.round(v) : undefined);
 
 function parsePlayer(raw: unknown): LivePlayer | undefined {
@@ -232,6 +256,7 @@ function parsePlayer(raw: unknown): LivePlayer | undefined {
     ...(MATCHES.includes(r.match as LiveTableMatch) ? { match: r.match as LiveTableMatch } : {}),
     ...(isBallCount(r.balls) ? { balls: r.balls } : {}),
     ...(r.settings === 'ok' || r.settings === 'failed' ? { settings: r.settings } : {}),
+    ...parseProgress(r),
     ...(s !== undefined ? { seconds: s } : {}),
     ...(records?.length ? { records } : {}),
   };
@@ -268,7 +293,8 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
       if (!isId(m.game) || !['loading', 'playing', 'done', 'failed', 'left'].includes(m.state as string)) return undefined;
       const s = seconds(m.seconds);
       const records = parseRecords(m.records);
-      return { t: 'game-status', game: m.game, state: m.state as LiveStatus, ...(s !== undefined ? { seconds: s } : {}), ...(records?.length ? { records } : {}) };
+      const progress = parseProgress(m);
+      return { t: 'game-status', game: m.game, state: m.state as LiveStatus, ...(s !== undefined ? { seconds: s } : {}), ...(records?.length ? { records } : {}), ...progress };
     }
     case 'game-cancel':
       return isId(m.game) ? { t: 'game-cancel', game: m.game } : undefined;
@@ -402,7 +428,12 @@ export function livePlayers(game: Pick<LiveGame, 'players'>): LivePlayer[] {
 }
 
 /** État d'un joueur pendant la partie ; la partie se clôt quand tous sont revenus. */
-export function gameStatus(game: LiveGame, key: string, status: { state: LiveStatus; seconds?: number; records?: LiveRecord[] }, now = new Date()): LiveGame {
+export function gameStatus(
+  game: LiveGame,
+  key: string,
+  status: { state: LiveStatus; seconds?: number; records?: LiveRecord[]; score?: number; ball?: number; balls?: number; multi?: true },
+  now = new Date(),
+): LiveGame {
   const p = game.players.find((x) => x.key === key);
   if (!p || (game.phase !== 'countdown' && game.phase !== 'playing') || !livePlayers(game).includes(p)) {
     // Parti avant le départ : il sort du salon.
@@ -410,7 +441,16 @@ export function gameStatus(game: LiveGame, key: string, status: { state: LiveSta
     return game;
   }
   if (p.state === 'done' || p.state === 'failed') return game;
-  let next = setPlayer(game, key, (x) => ({ ...x, state: status.state, ...(status.seconds !== undefined ? { seconds: status.seconds } : {}), ...(status.records?.length ? { records: status.records } : {}) }));
+  let next = setPlayer(game, key, (x) => ({
+    ...x,
+    state: status.state,
+    ...(status.seconds !== undefined ? { seconds: status.seconds } : {}),
+    ...(status.records?.length ? { records: status.records } : {}),
+    ...(status.score !== undefined ? { score: status.score } : {}),
+    ...(status.ball ? { ball: status.ball } : {}),
+    ...(status.balls ? { balls: status.balls } : {}),
+    ...(status.multi || x.multi ? { multi: true as const } : {}),
+  }));
   if (next.phase === 'countdown' && (status.state === 'loading' || status.state === 'playing')) next = { ...next, phase: 'playing' };
   if ((status.state === 'done' || status.state === 'failed' || status.state === 'left') && !next.firstDoneAt) next = { ...next, firstDoneAt: now.toISOString() };
   return closeIfDone(next, now);
@@ -518,7 +558,7 @@ export function liveMatchLabel(match: LiveTableMatch): string {
  * est entré au tableau d'honneur de la table.
  */
 export function liveStandings(game: Pick<LiveGame, 'players'> & { table?: Pick<LiveTable, 'balls'> }): LivePlayer[] {
-  const best = (p: LivePlayer) => Math.max(-1, ...(p.records ?? []).map((r) => r.score));
-  const order = (p: LivePlayer) => (p.records?.length && liveRanked(p, game.table?.balls) ? 0 : p.state === 'done' ? 1 : 2);
+  const best = (p: LivePlayer) => liveScore(p) ?? -1;
+  const order = (p: LivePlayer) => (liveScore(p) !== undefined && liveRanked(p, game.table?.balls) ? 0 : p.state === 'done' ? 1 : 2);
   return livePlayers(game).sort((a, b) => order(a) - order(b) || best(b) - best(a) || (b.seconds ?? 0) - (a.seconds ?? 0));
 }

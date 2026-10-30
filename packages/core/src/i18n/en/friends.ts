@@ -130,6 +130,14 @@ export const messages: Record<string, string> = {
   'Score non disponible': 'Score not available',
   'Meilleur score connu': 'Best known score',
   'Seuls les scores inscrits au tableau d’honneur sont disponibles.': 'Only scores entered on the high score table are available.',
+  // La bande de la partie entre amis (30/10/2026)
+  'Partie entre amis': 'Game with friends',
+  'Chargement': 'Loading',
+  'Pas démarrée': 'Did not start',
+  'A quitté': 'Left',
+  'Bille {ball} sur {balls}': 'Ball {ball} of {balls}',
+  'Bille {ball}': 'Ball {ball}',
+  '{state} · hors classement': '{state} · not ranked',
   // Le tableau des records du groupe (30/10/2026)
   'Record du groupe à battre : {score}': 'Group record to beat: {score}',
   '{name}, le {date}': '{name}, on {date}',

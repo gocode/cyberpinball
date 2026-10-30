@@ -9,6 +9,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.5
 
+- Game with friends, on original tables (Game of Thrones, GOTG, The Goonies, The Matrix): the game starts by itself (a credit, then Start), the coin door and Start are then ignored; a strip in the playfield corner shows everyone's score and ball live; once the game is over, VPX closes by itself and the results open with everyone's score, even without initials entered.
+- A game that ran counts as played even if VPX closes badly ("The game did not start on their side" no longer shows by mistake).
 - Text longer than the screen can be read with the buttons: the release notes of an update, a message… Left flipper on the first action to enter the text (or MagnaSave), right flipper or Start to go down one page, and at the bottom of the text the first action; Exit goes back to the actions. The text frame shows how much has been read. In the VPX settings, MagnaSave scrolls the details of the chosen setting.
 - An application log, `data\logs\journal.txt`: everything it does is written down, dated, to understand afterwards what happened on a cabinet.
 - Cinema launch: the game logo now lands whole and centered on the backglass, and leaves the playfield whole; a large wheel (medallion) used to spill out the bottom, cut off. A logo taller than it is wide also stays in its slot on the menu wheel.

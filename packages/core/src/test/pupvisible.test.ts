@@ -343,7 +343,7 @@ test('pendant la partie, aucune fenêtre de Cyber Pinball ne reste au-dessus des
   assert.match(notice, /setIgnoreMouseEvents\(true\)/);
   assert.match(front, /if \(playing\) gameNotices\.show\(invite\);/);
   assert.ok(front.indexOf('  closeTopmostWindows();') < front.indexOf('  playing = table;'), 'l’invitation ne naît qu’après closeTopmostWindows');
-  assert.match(front, /const result = await game\.done;\r?\n\s+gameNotices\.close\(\);/);
+  assert.match(front, /const result = await game\.done;\r?\n\s+if \(watchLive\) clearInterval\(watchLive\);\r?\n\s+gameNotices\.close\(\);/);
   const frontend = fs.readFileSync(path.join(SOURCES, 'frontend.ts'), 'utf8');
   const close = frontend.indexOf('  closeTopmostWindows();');
   const launch = frontend.indexOf('launchVpx({');

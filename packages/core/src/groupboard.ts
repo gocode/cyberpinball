@@ -14,7 +14,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { CompoundFile } from './vpxinfo';
 import { readVpReg } from './highscores';
-import { liveRanked, type LiveGame, type LiveTable } from './livegame';
+import { liveRanked, liveScore, type LiveGame, type LiveTable } from './livegame';
 
 export interface GroupRecord {
   /** Clé publique du joueur, son nom. */
@@ -66,9 +66,12 @@ export function addGameToBoard(boards: GroupBoards, game: LiveGame, now = new Da
   if (board.some((r) => r.game === game.id)) return false;
   const added: GroupRecord[] = [];
   for (const p of game.players) {
+    // Le score lu en direct d'abord (il ne dépend pas des initiales saisies), sinon le meilleur record entré.
     const best = [...(p.records ?? [])].sort((a, b) => b.score - a.score)[0];
-    if (!best || !liveRanked(p, game.table.balls)) continue;
-    added.push({ player: p.key, name: p.name, score: best.score, ...(best.initials ? { initials: best.initials } : {}), at: now.toISOString(), game: game.id });
+    const score = liveScore(p);
+    if (score === undefined || !liveRanked(p, game.table.balls)) continue;
+    const initials = best && best.score === score ? best.initials : undefined;
+    added.push({ player: p.key, name: p.name, score, ...(initials ? { initials } : {}), at: now.toISOString(), game: game.id });
   }
   if (!added.length) return false;
   boards[key] = [...board, ...added].sort((a, b) => b.score - a.score).slice(0, GROUP_BOARD_MAX);

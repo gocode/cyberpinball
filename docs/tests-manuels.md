@@ -1124,6 +1124,10 @@ Aux boutons seuls (flippers, Start, Exit, MagnaSave), sur la borne. La preuve sa
 | 585 | Revenir sans tout lire | Dans le texte, au milieu : Exit ; puis MagnaSave deux fois. | Exit ramène sur l'action d'où l'on venait, le texte reste où on l'a laissé ; un second Exit quitte l'écran. MagnaSave entre dans le texte et en ressort sans autre geste. |
 | 586 | Flipper tenu, Start | Dans le texte, tenir le flipper droit ; puis, en haut, appuyer sur Start plusieurs fois. | Tenu, le texte défile page après page et s'arrête en bas, sans passer aux actions. Start avance d'une page, puis passe à la première action au bout ; il ne lance jamais une action sans qu'on l'ait choisie. |
 | 587 | Détail des réglages de VPX | Fiche d'une table > « Réglages de VPX » > Avancé, un réglage à la longue description d'origine. MagnaSave droit, puis gauche. | Le détail descend d'une page, puis remonte ; la ligne choisie dans la liste ne change pas. Le bandeau d'aide dit « MagnaSave : faire défiler le détail ». |
+| 588 | Départ automatique | A et B, partie entre amis sur Game of Thrones, sans toucher aux boutons au lancement. | Sur chaque borne, la table prête, un crédit tombe puis la partie démarre seule ; la première bille arrive. Start et le monnayeur, appuyés avant le départ, ne font rien. |
+| 589 | Les autres en direct | Jouer la partie. | Dans le coin du plateau, la bande « Partie entre amis » : chaque joueur, son score et sa bille, mis à jour en jouant ; le meilleur en tête. |
+| 590 | Fin de partie | Finir sa partie, saisir ses initiales. | Quelques secondes après, VPX se ferme seul et les résultats s'ouvrent, avec le score de chacun (même sans initiales saisies). Le journal (`data\logs\journal.txt`) dit « relevé de l'état de jeu et départ automatique posés », puis « partie terminée ». |
+| 591 | Joueur en trop | Pendant la première bille, appuyer sur Start. | Un deuxième joueur s'ajoute dans la table ; la bande dit « hors classement » pour ce joueur, et son score n'entre pas au tableau du groupe. |
 
 ## Ce qui ne peut pas encore être testé
 

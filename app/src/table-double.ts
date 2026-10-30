@@ -15,9 +15,13 @@ import {
   folderPrint,
   groupInitials,
   injectGroupRecords,
+  liveStateHook,
+  parseLiveState,
+  readVpxElements,
   readRomRecords,
   readTableRecords,
   writeRomRecords,
+  type LiveGameState,
   type TableRecords,
   makeTableDouble,
   planTableDouble,
@@ -46,6 +50,10 @@ export interface TableDouble {
   table: TableEntry;
   /** Le tableau de la table dans le double, maintenant : VPReg.stg, sinon la mémoire de sa ROM (d'après sa carte). */
   records(): TableRecords | undefined;
+  /** Le relevé posé dans le script du double (livestate.ts) : vrai si la table en a un. */
+  live: boolean;
+  /** L'état de jeu que le relevé a écrit, maintenant ; undefined avant le premier ou s'il n'y en a pas. */
+  liveState(): LiveGameState | undefined;
   /** Après la partie : compare le dossier habituel à son empreinte d'avant, puis supprime le double. */
   finish(): void;
 }
@@ -127,6 +135,35 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           }
         }
       }
+      // L'état de jeu en direct : le relevé et le départ automatique ajoutés au script du double (livestate.ts).
+      const stateFile = path.join(plan.dir, 'cyberpinball-etat.txt');
+      let live = false;
+      if (board) {
+        try {
+          const base = path.basename(plan.file, path.extname(plan.file)).toLowerCase();
+          const vbsName = fs.readdirSync(plan.dir).find((f) => f.toLowerCase() === `${base}.vbs`);
+          const vbs = path.join(plan.dir, vbsName ?? `${path.basename(plan.file, path.extname(plan.file))}.vbs`);
+          const script = vbsName ? fs.readFileSync(vbs, 'latin1') : readVpxScript(plan.file);
+          const hook = script ? liveStateHook(script, readVpxElements(plan.file), stateFile) : { ok: false as const, reason: 'script illisible ou protégé' }; // i18n-ignore : journal
+          if (hook.ok) {
+            // Le .vbs du double est une copie (jamais un lien vers l'original) : remplacé, pas réécrit sur place.
+            fs.rmSync(vbs, { force: true });
+            fs.writeFileSync(vbs, hook.script, 'latin1');
+            live = true;
+          }
+          log(hook.ok ? `Partie entre amis (${table.id}) : relevé de l'état de jeu et départ automatique posés (minuteur de ${hook.element}).` : `Partie entre amis (${table.id}) : pas de relevé de l'état de jeu (${hook.reason}).`); // i18n-ignore : journal
+        } catch (error) {
+          log(`Partie entre amis (${table.id}) : relevé de l'état de jeu non posé (${(error as Error).message}).`); // i18n-ignore : journal
+        }
+      }
+      const liveState = (): LiveGameState | undefined => {
+        if (!live) return undefined;
+        try {
+          return parseLiveState(fs.readFileSync(stateFile, 'utf8'));
+        } catch {
+          return undefined;
+        }
+      };
       const records = (): TableRecords | undefined => {
         const reg = readTableRecords({ folder: plan.dir, file: plan.file, title: table.title });
         if (reg) return reg;
@@ -148,6 +185,8 @@ export function createTableDoubles(opts: TableDoublesOptions) {
         double: {
           table: { ...table, file: plan.file, folder: plan.dir },
           records,
+          live,
+          liveState,
           finish() {
             if (finished) return;
             finished = true;

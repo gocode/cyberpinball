@@ -34,6 +34,7 @@ import {
   joysticksUnseenByVpx,
   keepManualEdits,
   layoutOf,
+  liveBoardView,
   loadCabinet,
   playfieldOrientation,
   readInfo,
@@ -101,6 +102,7 @@ import {
   type ObservedDisplay,
   type GroupRecord,
   type HostSetting,
+  type LiveGameState,
   type RoleId,
   type Rotation,
   type ScreenSurface,
@@ -183,7 +185,7 @@ import { friendTransport } from './download-sources';
 import { createGameNotices } from './game-notice';
 import { createBallCounts } from './ball-count';
 import { createTableDoubles } from './table-double';
-import { createLiveGames } from './live-game';
+import { createLiveGames, type LiveProgress } from './live-game';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
 import { seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
@@ -820,17 +822,31 @@ const liveGames = createLiveGames({
     if (playing) gameNotices.show(invite);
     else if (liveCanShow()) friendsMenu.live.openInvite(invite.id, () => library.leave());
   },
-  play: async (table, onPlaying, settings, board) => {
+  play: async (table, onPlaying, settings, board, progress) => {
     // Le départ commun ferme l'écran ouvert (le compte à rebours), comme Start sur une table.
     if (library.isActive()) library.leave();
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
-    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying, double: `${Date.now().toString(36)}`, ...(settings ? { settings } : {}), ...(board ? { board } : {}) });
+    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying, double: `${Date.now().toString(36)}`, ...(settings ? { settings } : {}), ...(board ? { board } : {}), ...(progress ? { onProgress: progress } : {}) });
     // De retour au menu : les résultats, qui se complètent à mesure que les autres reviennent.
     if (report && state.phase === 'menu') setImmediate(() => friendsMenu.live.open(() => library.leave()));
-    return report ? { ok: report.result.ok, seconds: report.result.seconds, records: report.entered.map((s) => ({ score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) })) } : undefined;
+    if (!report) return undefined;
+    // Une partie qui a tourné compte comme jouée, même si VPX a planté ou rendu un code d'erreur en se fermant
+    // (essai du 30/10/2026 : « La partie n'a pas démarré de son côté » après plusieurs minutes de jeu).
+    const played = report.result.ok || report.result.seconds >= PLAYED_SECONDS;
+    if (played && !report.result.ok) console.log(`Partie entre amis : VPX s'est mal fermé (${report.result.message ?? report.result.failure}), mais la partie a tourné ${Math.round(report.result.seconds)} s : jouée.`); // i18n-ignore : journal
+    return {
+      ok: played,
+      seconds: report.result.seconds,
+      records: report.entered.map((s) => ({ score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) })),
+      ...(report.live?.score !== undefined ? { score: report.live.score } : {}),
+      ...(report.live?.multi ? { multi: true } : {}),
+    };
   },
   onChange: () => {
     socialChanged();
+    // Pendant la partie entre amis : la bande de la partie par-dessus VPX, chaque joueur, son score et sa bille.
+    const current = liveGames.current();
+    gameNotices.board(playing && current ? liveBoardView(current, socialNet.state().key.publicKey) : undefined);
     // Le compte à rebours et l'annulation s'affichent d'eux-mêmes ; dans la gestion des tables aussi, une fois la partie acceptée.
     friendsMenu.live.follow(() => !closing && (state.phase === 'menu' || state.phase === 'library'), () => library.leave());
   },
@@ -1569,14 +1585,34 @@ export interface PlayReport {
   focusReturned: boolean;
   /** Scores entrés au tableau d'honneur de la table pendant la partie. */
   entered: HighScore[];
+  /** Partie entre amis : le dernier état lu par le relevé du double (score final, plusieurs joueurs). */
+  live?: { score?: number; multi?: boolean };
 }
+
+/**
+ * Relevé simulé d'une partie simulée (hors écran) : départ après une seconde, le score qui monte,
+ * trois billes, puis la partie finie deux secondes avant l'arrêt prévu.
+ */
+function simulatedLiveState(startedAt: number, durationMs: number): () => LiveGameState {
+  return () => {
+    const elapsed = Date.now() - startedAt;
+    const playing = Math.max(0, elapsed - 1000);
+    const span = Math.max(1000, durationMs - 3000);
+    return { inGame: elapsed >= 1000 && playing < span, started: elapsed >= 1000, players: 1, player: 1, ball: Math.min(3, 1 + Math.floor((playing / span) * 3)), balls: 3, score: Math.floor(playing / 500) * 12_340 };
+  };
+}
+
+/** Une partie qui a tourné au moins ce temps compte comme jouée, même si VPX s'est mal fermé. */
+const PLAYED_SECONDS = 20;
+/** La partie finie (initiales saisies), VPX se ferme après ce délai : le temps de voir son score. */
+const LIVE_CLOSE_AFTER_MS = 4000;
 
 /**
  * Partie d'une table. En mode réglage de l'affichage (`display`), VPX démarre son menu ouvert
  * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
  * l'a demandée (la fiche) reprend la main.
  */
-async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[] } = {}): Promise<PlayReport | undefined> {
+async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void } = {}): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
   if (!install) return undefined;
   // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
@@ -1728,7 +1764,29 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
       : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying, onForeground });
   // Une partie simulée ne prend aucun raccourci global au poste.
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
+  // Partie entre amis : l'état de jeu que le relevé du double écrit (livestate.ts), deux fois par seconde ;
+  // score et bille partent aux autres ; la partie finie (initiales saisies), VPX se ferme seul.
+  let live: { score?: number; multi?: boolean } | undefined;
+  let overAt: number | undefined;
+  // Hors écran, la partie simulée n'exécute aucun script : son relevé est simulé, pour la bande et la fin de partie.
+  const liveSource = double?.live ? () => double.liveState() : simulated !== undefined && double ? simulatedLiveState(Date.now(), autoStopAfterMs ?? 10_000) : undefined;
+  const watchLive = liveSource
+    ? setInterval(() => {
+        const st = liveSource();
+        if (!st?.started) return;
+        live = { score: st.score, multi: (live?.multi ?? false) || st.players > 1 };
+        hooks.onProgress?.({ score: st.score, ball: st.ball, balls: st.balls, players: st.players });
+        if (st.inGame) return void (overAt = undefined);
+        overAt ??= Date.now();
+        if (Date.now() - overAt >= LIVE_CLOSE_AFTER_MS) {
+          console.log(`Partie entre amis (${table.id}) : partie terminée (${st.score} points), VPX se ferme.`); // i18n-ignore : journal
+          clearInterval(watchLive);
+          game.stop();
+        }
+      }, 500)
+    : undefined;
   const result = await game.done;
+  if (watchLive) clearInterval(watchLive);
   gameNotices.close();
   // Les records de la partie, lus où VPX les a écrits (le double, pour une partie entre amis) ; puis le double s'en va.
   const recordsAfter = double ? double.records() : readTableRecords(played);
@@ -1787,7 +1845,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Une invitation reçue pendant la partie, encore valable : elle s'ouvre au retour au menu.
   const invite = state.phase === 'menu' && !liveGames.current() ? liveGames.invites()[0] : undefined;
   if (invite) friendsMenu.live.openInvite(invite.id, () => library.leave());
-  return { result, focusReturned, entered };
+  return { result, focusReturned, entered, ...(live ? { live } : {}) };
 }
 
 /** Zone du plateau à l'écran, en pixels physiques, et le sens de sa mise en page : où se pose une notification pendant la partie. */

@@ -6,8 +6,8 @@
 // jusqu'à ce qu'elle expire, soit annulée ou que la partie finisse. Rien à faire pour
 // l'ignorer ; quitter sa partie ramène au menu, où l'invitation s'ouvre d'elle-même.
 
-import { t } from './i18n';
-import { LIVE_INVITE_MS, type LiveInvite } from './livegame';
+import { formatNumber, t } from './i18n';
+import { LIVE_INVITE_MS, livePlayers, liveRanked, liveScore, type LiveGame, type LiveInvite } from './livegame';
 import type { Rect, Rotation } from './model';
 
 /** Durée de la carte entière, avant la pastille. */
@@ -70,4 +70,68 @@ export function gameNoticeBounds(zone: Rect, rotation: Rotation, size: { width: 
   const x = cx > 0 ? zone.x + zone.width - margin - w : zone.x + margin;
   const y = cy > 0 ? zone.y + zone.height - margin - h : zone.y + margin;
   return { x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) };
+}
+
+// ---------------------------------------------------------------------------
+// La partie entre amis en cours (essai réel du 30/10/2026 : « on ne voit absolument pas où en sont
+// les autres ») : une bande dans le même coin, chaque joueur avec son score et sa bille, lus en direct
+// (livestate.ts), le meilleur en tête. Elle remplace l'invitation, qui ne peut pas arriver pendant
+// une partie entre amis (la borne répond « occupé »).
+
+/** Taille de la bande, sur un plateau de 1080 px de petit côté : un titre, puis une ligne par joueur. */
+export const LIVE_BOARD_SIZE = { width: 560, title: 56, row: 50, padding: 18 } as const;
+
+export function liveBoardSize(rows: number): { width: number; height: number } {
+  return { width: LIVE_BOARD_SIZE.width, height: LIVE_BOARD_SIZE.title + rows * LIVE_BOARD_SIZE.row + LIVE_BOARD_SIZE.padding };
+}
+
+export interface LiveBoardRow {
+  name: string;
+  /** « 1 240 500 », ou « — » tant qu'aucun score n'est lu. */
+  score: string;
+  /** « Bille 2 sur 3 », « Partie terminée », « Chargement »… */
+  detail: string;
+  /** Le joueur de cette borne. */
+  me: boolean;
+  /** En tête. */
+  lead: boolean;
+}
+
+export interface LiveBoardView {
+  mode: 'board';
+  title: string;
+  rows: LiveBoardRow[];
+}
+
+/** La bande de la partie en cours, vue de la borne `me` ; undefined hors d'une partie lancée. */
+export function liveBoardView(game: LiveGame, me: string): LiveBoardView | undefined {
+  if (game.phase !== 'playing' && game.phase !== 'countdown') return undefined;
+  const players = livePlayers(game).filter((p) => !['declined', 'busy', 'expired'].includes(p.state));
+  const sorted = [...players].sort((a, b) => (liveScore(b) ?? -1) - (liveScore(a) ?? -1));
+  const top = liveScore(sorted[0] ?? {});
+  const detail = (p: (typeof players)[number]) => {
+    const state =
+      p.state === 'done'
+        ? t('Partie terminée')
+        : p.state === 'failed'
+          ? t('Pas démarrée')
+          : p.state === 'left'
+            ? t('A quitté')
+            : p.ball
+              ? p.balls
+                ? t('Bille {ball} sur {balls}', { ball: p.ball, balls: p.balls })
+                : t('Bille {ball}', { ball: p.ball })
+              : p.state === 'playing'
+                ? t('En partie')
+                : t('Chargement');
+    return liveRanked(p, game.table.balls) ? state : t('{state} · hors classement', { state });
+  };
+  return {
+    mode: 'board',
+    title: t('Partie entre amis'),
+    rows: sorted.map((p) => {
+      const score = liveScore(p);
+      return { name: p.name, score: score === undefined ? '—' : formatNumber(score), detail: detail(p), me: p.key === me, lead: score !== undefined && score === top && score > 0 };
+    }),
+  };
 }

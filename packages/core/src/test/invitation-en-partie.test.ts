@@ -136,7 +136,7 @@ test('branchements : carillon à chaque invitation, carte pendant la partie, fer
   assert.match(live, /onInvite: \(invite\) => \{\s+playUiSound\('invite'\);\s+if \(playing\) gameNotices\.show\(invite\);\s+else if \(liveCanShow\(\)\) friendsMenu\.live\.openInvite/);
   const start = main.indexOf('async function play(');
   const play = main.slice(start, start + main.slice(start).search(/\r?\n\}\r?\n/));
-  assert.match(play, /const result = await game\.done;\r?\n\s+gameNotices\.close\(\);/);
+  assert.match(play, /const result = await game\.done;\r?\n\s+if \(watchLive\) clearInterval\(watchLive\);\r?\n\s+gameNotices\.close\(\);/);
   assert.match(play, /const invite = state\.phase === 'menu' && !liveGames\.current\(\) \? liveGames\.invites\(\)\[0\] : undefined;\r?\n\s+if \(invite\) friendsMenu\.live\.openInvite\(invite\.id/);
   // La fenêtre : naît par createWindow, sans focus, traversée par les clics, hors des captures, au-dessus de VPX, montrée sans activation.
   const notice = read('app', 'src', 'game-notice.ts');

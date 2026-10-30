@@ -254,9 +254,13 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       tables: brunoTables,
       // Ses réglages partent vers la borne, comme ceux d'une vraie borne (hostsettings.ts).
       settingsOf: (table) => readHostSettings({ folder: table.folder, roms: [] }),
-      play: async (_table, playing) => {
+      play: async (_table, playing, _settings, _board, progress) => {
         playing();
-        await new Promise((r) => setTimeout(r, 4000));
+        // Sa progression, comme le relevé d'une vraie borne : le score monte, bille après bille.
+        for (let i = 1; i <= 8; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          progress?.({ score: i * 355_168_765, ball: Math.min(3, 1 + Math.floor(i / 3)), balls: 3, players: 1 });
+        }
         return { ok: true, seconds: 254, records: [{ score: 2_841_350_120, rank: 1, initials: 'BRU' }] };
       },
       // La borne a accepté : Bruno donne le départ un peu après.

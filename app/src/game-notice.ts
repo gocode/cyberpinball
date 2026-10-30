@@ -4,10 +4,13 @@
 // (un enregistrement de la partie ne la contient pas) : VPX garde la main, le joueur ne fait rien
 // pour l'ignorer. Carte entière, puis pastille qui compte le temps de l'invitation ; elle part
 // quand l'invitation expire, est annulée ou répondue, et à la fin de la partie.
+//
+// Pendant une partie entre amis, la même fenêtre montre la bande de la partie (liveBoardView) :
+// chaque joueur, son score et sa bille, lus en direct ; aucune invitation ne peut alors arriver.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { GAME_NOTICE_SIZE, gameNoticeBounds, gameNoticeView, type GameNoticeView, type LiveInvite, type Rect, type Rotation } from '@cyberpinball/core';
+import { GAME_NOTICE_SIZE, gameNoticeBounds, gameNoticeView, liveBoardSize, type GameNoticeView, type LiveBoardView, type LiveInvite, type Rect, type Rotation } from '@cyberpinball/core';
 import type { BrowserWindow } from 'electron';
 import { checkLayout } from './layout-check';
 import { createWindow, isShown, windowRect } from './offscreen';
@@ -25,6 +28,8 @@ export interface GameNoticesOptions {
 export interface GameNotices {
   /** Une invitation arrive pendant la partie : la montrer. */
   show(invite: LiveInvite): void;
+  /** Partie entre amis : la bande de la partie, à jour (undefined : plus de bande). */
+  board(view: LiveBoardView | undefined): void;
   /** Fin de la partie : plus rien par-dessus VPX. */
   close(): void;
 }
@@ -42,17 +47,27 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   let rotation: Rotation = 0;
   /** États déjà capturés (essais). */
   const captured = new Set<string>();
+  /** La bande de la partie entre amis montrée, et sa taille (en lignes). */
+  let boardView: LiveBoardView | undefined;
+  let boardRows = 0;
 
-  function open(): BrowserWindow | undefined {
-    if (win && !win.isDestroyed()) return win;
+  /** Place de la fenêtre pour une carte de `base` (vue du joueur, à 1080 px), dans le coin du plateau. */
+  function boundsFor(base: { width: number; height: number }) {
     const place = opts.place();
-    if (!place) {
+    if (!place) return undefined;
+    const unit = Math.min(place.zone.width, place.zone.height) / 1080;
+    const size = { width: Math.round(base.width * unit), height: Math.round(base.height * unit) };
+    return { place, bounds: gameNoticeBounds(place.zone, place.rotation, size, Math.round(GAME_NOTICE_SIZE.margin * unit)) };
+  }
+
+  function open(base: { width: number; height: number } = GAME_NOTICE_SIZE.full): BrowserWindow | undefined {
+    if (win && !win.isDestroyed()) return win;
+    const at = boundsFor(base);
+    if (!at) {
       opts.log?.('Invitation pendant la partie : pas d’écran du plateau retrouvé, rien n’est montré.'); // i18n-ignore : journal
       return undefined;
     }
-    const unit = Math.min(place.zone.width, place.zone.height) / 1080;
-    const size = { width: Math.round(GAME_NOTICE_SIZE.full.width * unit), height: Math.round(GAME_NOTICE_SIZE.full.height * unit) };
-    const bounds = gameNoticeBounds(place.zone, place.rotation, size, Math.round(GAME_NOTICE_SIZE.margin * unit));
+    const { place, bounds } = at;
     const created = createWindow({
       show: false,
       frame: false,
@@ -92,6 +107,7 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   }
 
   function refresh(): void {
+    if (boardView) return showBoard();
     const now = current();
     if (!now) return close();
     if (!win || win.isDestroyed() || !loaded) return;
@@ -110,15 +126,42 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   async function snapshot(state: string): Promise<void> {
     if (!win || win.isDestroyed()) return;
     fs.mkdirSync(opts.captureDir!, { recursive: true });
-    fs.writeFileSync(path.join(opts.captureDir!, `invitation-en-partie-${state}.png`), (await win.webContents.capturePage()).toPNG()); // i18n-ignore : nom de fichier des essais
+    const name = state === 'partie' ? 'bande-partie-entre-amis' : `invitation-en-partie-${state}`; // i18n-ignore : nom de fichier des essais
+    fs.writeFileSync(path.join(opts.captureDir!, `${name}.png`), (await win.webContents.capturePage()).toPNG());
     const problems = await checkLayout(win.webContents);
-    opts.log?.(`Invitation pendant la partie (${state}) : ${problems.length ? problems.join(' ; ') : 'mise en page conforme'}.`); // i18n-ignore : journal
+    opts.log?.(`${state === 'partie' ? 'Bande de la partie entre amis' : `Invitation pendant la partie (${state})`} : ${problems.length ? problems.join(' ; ') : 'mise en page conforme'}.`); // i18n-ignore : journal
+  }
+
+  /** La bande de la partie : la fenêtre à sa taille (une ligne par joueur), puis son contenu. */
+  function showBoard(): void {
+    if (!boardView) return;
+    // Un joueur de plus ou de moins : la bande renaît à sa nouvelle taille (aucune fenêtre n'est redimensionnée à la main).
+    if (win && !win.isDestroyed() && boardView.rows.length !== boardRows) {
+      win.destroy();
+      win = undefined;
+    }
+    if (!win || win.isDestroyed()) {
+      boardRows = boardView.rows.length;
+      if (!open(liveBoardSize(boardRows))) return;
+    }
+    if (!loaded) return;
+    const key = JSON.stringify(boardView);
+    if (key === last) return;
+    last = key;
+    win!.webContents.send('notice:state', { view: boardView, rotation });
+    if (!isShown(win!)) win!.showInactive();
+    if (opts.captureDir && !captured.has('partie')) {
+      captured.add('partie');
+      setTimeout(() => void snapshot('partie'), 300);
+    }
   }
 
   function close(): void {
     if (ticker) clearInterval(ticker);
     ticker = undefined;
     shown = undefined;
+    boardView = undefined;
+    boardRows = 0;
     if (win && !win.isDestroyed()) win.destroy();
     win = undefined;
   }
@@ -133,6 +176,14 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
         ticker = setInterval(refresh, TICK_MS);
         ticker.unref?.();
       }
+    },
+    board(view) {
+      if (!view) {
+        if (boardView) close();
+        return;
+      }
+      boardView = view;
+      showBoard();
     },
     close,
   };

@@ -11,6 +11,8 @@ son interface).
 
 ## 0.1.5
 
+- Partie entre amis, sur les tables originales (Game of Thrones, GOTG, The Goonies, The Matrix) : la partie démarre seule (un crédit, puis Start), le monnayeur et Start sont ignorés ensuite ; une bande dans le coin du plateau montre le score et la bille de chacun en direct ; la partie finie, VPX se ferme seul et les résultats s'ouvrent avec le score de chacun, même sans initiales saisies.
+- Une partie qui a tourné compte comme jouée même si VPX se ferme mal (« La partie n'a pas démarré de son côté » ne s'affiche plus à tort).
 - Un texte plus long que l'écran se lit aux boutons : les nouveautés d'une mise à jour, un message… Flipper gauche sur la première action pour entrer dans le texte (ou MagnaSave), flipper droit ou Start pour descendre d'une page, et au bas du texte la première action ; Exit revient aux actions. Le cadre du texte montre la part lue. Dans les réglages de VPX, MagnaSave fait défiler le détail du réglage choisi.
 - Un journal de l'application, `data\logs\journal.txt` : tout ce qu'elle fait est noté, daté, pour comprendre après coup ce qui s'est passé sur une borne.
 - Lancement en cinéma : le logo du jeu se pose entier et centré sur le fronton, et part entier du plateau ; une grande roue (médaillon) sortait par le bas, coupée. Un logo plus haut que large reste aussi dans sa place sur la roue du menu.

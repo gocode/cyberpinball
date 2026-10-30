@@ -1124,6 +1124,10 @@ With the buttons only (flippers, Start, Exit, MagnaSave), on the cabinet. The pr
 | 585 | Going back without reading everything | In the text, halfway: Exit; then MagnaSave twice. | Exit brings you back to the action you came from, the text stays where you left it; a second Exit leaves the screen. MagnaSave enters the text and leaves it with no other gesture. |
 | 586 | Held flipper, Start | In the text, hold the right flipper; then, at the top, press Start several times. | Held, the text scrolls page after page and stops at the bottom, without moving to the actions. Start moves one page, then to the first action at the end; it never runs an action you have not chosen. |
 | 587 | VPX settings details | Table page > "Réglages de VPX" (VPX settings) > Advanced, a setting with a long original description. Right MagnaSave, then left. | The details go down one page, then back up; the chosen line in the list does not change. The help strip says "MagnaSave : faire défiler le détail" (MagnaSave: scroll the details). |
+| 588 | Automatic start | A and B, game with friends on Game of Thrones, without touching the buttons at launch. | On each cabinet, once the table is ready, a credit drops then the game starts by itself; the first ball comes. Start and the coin door, pressed before the start, do nothing. |
+| 589 | The others live | Play the game. | In the playfield corner, the "Partie entre amis" (Game with friends) strip: each player, their score and ball, updated while playing; the best at the top. |
+| 590 | End of game | Finish your game, enter your initials. | A few seconds later, VPX closes by itself and the results open, with everyone's score (even without initials entered). The log (`data\logs\journal.txt`) says "relevé de l'état de jeu et départ automatique posés" (live state and automatic start set), then "partie terminée" (game over). |
+| 591 | Extra player | During the first ball, press Start. | A second player is added in the table; the strip says "hors classement" (not ranked) for that player, and their score does not enter the group board. |
 
 ## What cannot be tested yet
 

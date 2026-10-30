@@ -65,6 +65,7 @@ export * from './hostsettings';
 export * from './groupboard';
 export * from './romscores';
 export * from './journal';
+export * from './livestate';
 export * from './highscores';
 export * from './dmdfont';
 export * from './dmdcolor';

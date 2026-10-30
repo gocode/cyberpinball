@@ -502,3 +502,48 @@ export function readVpxScript(file: string): string | undefined {
     if (fd !== undefined) fs.closeSync(fd);
   }
 }
+
+/** Un élément de la table : son type (ItemTypeEnum de VPX : 0 mur, 2 minuteur, 7 lampe…) et son nom. */
+export interface VpxElement {
+  type: number;
+  name: string;
+}
+
+/**
+ * Les éléments de la table, d'après GameStg/GameItemN : le type en tête du flux, puis
+ * l'enregistrement NAME (longueur en octets, texte UTF-16LE). Lit le début de chaque flux
+ * seulement, jamais les maillages. [] si la table est illisible.
+ */
+export function readVpxElements(file: string): VpxElement[] {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const cfb = new CompoundFile(fd);
+    const game = cfb.children(cfb.entries[0]!).find((e) => e.type === 1 && e.name === 'GameStg');
+    if (!game) return [];
+    const out: VpxElement[] = [];
+    for (const item of cfb.children(game)) {
+      if (item.type !== 2 || !/^GameItem\d+$/.test(item.name)) continue;
+      const data = cfb.stream(item, 16 * 1024);
+      if (data.length < 4) continue;
+      const type = data.readUInt32LE(0);
+      for (let pos = 4; pos + 12 <= data.length; ) {
+        const size = data.readUInt32LE(pos);
+        const tag = data.toString('latin1', pos + 4, pos + 8);
+        if (size < 4) break;
+        if (tag === 'NAME') {
+          const length = data.readUInt32LE(pos + 8);
+          const name = data.toString('utf16le', pos + 12, Math.min(data.length, pos + 12 + length)).replace(/\0+$/, '').trim();
+          if (/^\w+$/.test(name)) out.push({ type, name });
+          break;
+        }
+        pos += 4 + size;
+      }
+    }
+    return out;
+  } catch {
+    return [];
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
