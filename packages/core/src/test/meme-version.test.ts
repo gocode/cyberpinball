@@ -93,10 +93,10 @@ test('service : le .vbs de Cyber Pinball ne compte pas ; un .vbs venu d’ailleu
   const same = await invitation(undefined, ours);
   assert.equal(same.sent.script, undefined);
   assert.equal(same.found.match, 'same', 'les réparations PuP de Cyber Pinball ne changent pas la version');
-  assert.deepEqual(same.answer, { t: 'game-answer', game: '0123456789abcdef', answer: 'accept', match: 'same' });
+  assert.deepEqual(same.answer, { t: 'game-answer', game: '0123456789abcdef', answer: 'accept', match: 'same', proto: 3 });
   const modified = await invitation(undefined, foreign);
   assert.deepEqual([modified.found.match, modified.found.scriptDiffers], ['other-version', true]);
-  assert.deepEqual(modified.answer, { t: 'game-answer', game: '0123456789abcdef', answer: 'decline', match: 'other-version' });
+  assert.deepEqual(modified.answer, { t: 'game-answer', game: '0123456789abcdef', answer: 'decline', match: 'other-version', proto: 3 });
   const both = await invitation(foreign, foreign);
   assert.match(both.sent.script!, /^[0-9a-f]{64}$/);
   assert.equal(both.found.match, 'same', 'le même .vbs des deux côtés');

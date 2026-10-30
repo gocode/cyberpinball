@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.5
 
+- Game with friends: a cabinet left on an old Cyber Pinball version is flagged in the room, the invitation and the strip ("no automatic start or live score, needs updating"), instead of looking buggy. The results give each player's rank in the game and their score, no longer "place 1 of the table".
 - Game with friends, on original tables (Game of Thrones, GOTG, The Goonies, The Matrix): the game starts by itself (a credit, then Start), the coin door and Start are then ignored; a strip in the playfield corner shows everyone's score and ball live; once the game is over, VPX closes by itself and the results open with everyone's score, even without initials entered.
 - Game with friends, on Williams WPC ROM tables (Terminator 2): the same automatic start, live strip and end of game as on original tables, read from the ROM's memory; while entering initials, VPX stays open and Start confirms the letters. Stern SAM tables (Star Trek, The Walking Dead) still play as before: their memory does not reliably tell whether a game is in progress.
 - A table that loads another revision of its ROM (an alias, like Star Trek) now gets the group's records, the right ball count and the host's settings in a game with friends: its memory is looked up under the name of the loaded ROM.

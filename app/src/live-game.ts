@@ -34,6 +34,7 @@ import {
   liveInvite,
   loadBoards,
   LIVE_COUNTDOWN_S,
+  LIVE_PROTOCOL,
   matchLiveTable,
   newLiveGame,
   readVpxScript,
@@ -99,6 +100,8 @@ export interface LiveGamesOptions {
   onChange?(): void;
   now?(): Date;
   log?(line: string): void;
+  /** Version de Cyber Pinball de cette borne (app.getVersion()), annoncée aux autres. */
+  appVersion?: string;
 }
 
 export interface LiveGames {
@@ -144,6 +147,8 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   const net = opts.net;
   const log = (line: string) => opts.log?.(line);
   const me = () => ({ key: net.state().key.publicKey, name: net.state().name });
+  // Ce que sait faire cette borne, annoncé à l'invitation et à la réponse : une borne en retard se voit (liveBehind).
+  const version = { proto: LIVE_PROTOCOL, ...(opts.appVersion ? { app: opts.appVersion } : {}) };
   let game: LiveGame | undefined;
   let mine: TableEntry | undefined;
   let invites: LiveInvite[] = [];
@@ -307,7 +312,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       case 'game-answer': {
         if (!game || !isHost() || m.game !== game.id) return;
         const before = game.players.find((p) => p.key === key)?.state;
-        setGame(answerGame(game, key, m.answer, m.match, m.balls));
+        setGame(answerGame(game, key, m.answer, m.match, m.balls, { ...(m.proto ? { proto: m.proto } : {}), ...(m.app ? { app: m.app } : {}) }));
         // Il vient d'accepter : mes réglages partent vers lui, à poser dans le double de sa table.
         if (before === 'invited' && game.players.find((p) => p.key === key)?.state === 'accepted' && mine) sendSettings(key, game.id, mine);
         return;
@@ -381,7 +386,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       if (game && ongoing() && !isHost()) net.send(game.host, { t: 'game-cancel', game: game.id });
       const live = await liveTable(table);
       mine = table;
-      setGame(newLiveGame(me(), live, displayTitle(table), now()));
+      setGame(newLiveGame({ ...me(), ...version }, live, displayTitle(table), now()));
       log(`Partie en direct : salon ouvert sur ${table.title}.`); // i18n-ignore : journal
       return game!;
     },
@@ -390,7 +395,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const next = inviteToGame(game, { key, name }, now());
       if (!next) return false;
       const players = next.players.filter((p) => p.state === 'accepted' || p.state === 'invited').map((p) => ({ key: p.key, name: p.name }));
-      if (!net.send(key, { t: 'game-invite', game: { id: next.id, table: next.table, title: next.title, players } })) return false;
+      if (!net.send(key, { t: 'game-invite', game: { id: next.id, table: next.table, title: next.title, players, ...version } })) return false;
       setGame(next);
       return true;
     },
@@ -402,13 +407,13 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       invites = invites.filter((i) => i.id !== id);
       // Pas la même version : la partie ne se joue pas (décision du 30/10/2026), il récupère la sienne.
       if (found.match !== 'same') {
-        net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'decline', match: found.match });
+        net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'decline', match: found.match, ...version });
         changed();
         return found;
       }
-      net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'accept', match: found.match, ...(found.balls ? { balls: found.balls } : {}) });
+      net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'accept', match: found.match, ...(found.balls ? { balls: found.balls } : {}), ...version });
       mine = found.table;
-      game = guestGame(invite, me(), found.match, found.balls);
+      game = guestGame(invite, { ...me(), ...version }, found.match, found.balls);
       // Les réglages de l'hôte arrivent juste après ma réponse.
       receiver = createSettingsReceiver(id);
       hostSettings = undefined;

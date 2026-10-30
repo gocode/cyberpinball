@@ -36,6 +36,21 @@ import { t, tn } from './i18n';
 import { normalizeName } from './social';
 import { isPlayerPublicKey, parseTableIdentity, sameTable, type TableIdentity } from './sharing';
 
+/**
+ * Ce que sait faire la borne dans une partie entre amis, annoncé à l'invitation et à la réponse
+ * (essai réel du 30/10/2026 : une borne restée en 0.1.5-essai.10 ne démarrait pas seule et
+ * n'envoyait pas son score ; rien ne le disait, on aurait cru un bug).
+ * 1 (absent) : invitation, même table par l'empreinte (0.1.4).
+ * 2 : réglages de l'hôte, tableau du groupe (0.1.5-essai.8).
+ * 3 : relevé en direct, départ automatique, score final lu en direct (0.1.5-essai.13).
+ */
+export const LIVE_PROTOCOL = 3;
+
+/** Une borne en retard sur la nôtre : pas de départ automatique ni de score en direct chez elle. */
+export function liveBehind(p: { proto?: number }): boolean {
+  return (p.proto ?? 1) < LIVE_PROTOCOL;
+}
+
 /** Joueurs au plus, celui qui invite compris (§ 13.2). */
 export const LIVE_MAX_PLAYERS = 4;
 /** Une invitation sans réponse expire après ce délai. */
@@ -123,6 +138,9 @@ export interface LivePlayer {
   balls?: number;
   /** Réglages de l'hôte reçus entiers (ok) ou non (failed) ; absent : pas encore de réponse. */
   settings?: 'ok' | 'failed';
+  /** Ce que sait faire sa borne (LIVE_PROTOCOL) et sa version de Cyber Pinball ; absents : une borne d'avant le 30/10/2026. */
+  proto?: number;
+  app?: string;
   /** Invité le (ISO), pour l'expiration. */
   invitedAt?: string;
   /** Fin de partie : durée jouée et records entrés. */
@@ -158,7 +176,7 @@ export interface LiveGame {
 /** Une invitation reçue, telle que l'invité la voit. */
 export interface LiveInvite {
   id: string;
-  host: { key: string; name: string };
+  host: { key: string; name: string; proto?: number; app?: string };
   table: LiveTable;
   title: string;
   players: { key: string; name: string }[];
@@ -169,8 +187,8 @@ export type LiveAnswer = 'accept' | 'decline' | 'busy';
 export type LiveStatus = 'loading' | 'playing' | 'done' | 'failed' | 'left';
 
 export type LiveMessage =
-  | { t: 'game-invite'; game: { id: string; table: LiveTable; title: string; players: { key: string; name: string }[] } }
-  | { t: 'game-answer'; game: string; answer: LiveAnswer; match?: LiveTableMatch; balls?: number }
+  | { t: 'game-invite'; game: { id: string; table: LiveTable; title: string; players: { key: string; name: string }[]; proto?: number; app?: string } }
+  | { t: 'game-answer'; game: string; answer: LiveAnswer; match?: LiveTableMatch; balls?: number; proto?: number; app?: string }
   | { t: 'game-room'; game: string; phase: LivePhase; players: LivePlayer[] }
   /** Départ dans `in` millisecondes, à compter de la réception. */
   | { t: 'game-start'; game: string; in: number }
@@ -232,6 +250,13 @@ function parseRecords(raw: unknown): LiveRecord[] | undefined {
     .filter((r): r is LiveRecord => !!r);
 }
 
+/** Ce que sait faire la borne et sa version de Cyber Pinball, d'un message ou d'un joueur reçu ; vérifiés. */
+function parseVersion(r: Record<string, unknown>): { proto?: number; app?: string } {
+  const proto = typeof r.proto === 'number' && Number.isInteger(r.proto) && r.proto >= 1 && r.proto <= 1000 ? r.proto : undefined;
+  const app = typeof r.app === 'string' && /^\d+\.\d+\.\d+[\w.+-]{0,24}$/.test(r.app) ? r.app : undefined;
+  return { ...(proto ? { proto } : {}), ...(app ? { app } : {}) };
+}
+
 /** Score, bille, nombre de billes et joueur en trop, d'un message ou d'un joueur reçu ; vérifiés. */
 function parseProgress(r: Record<string, unknown>): { score?: number; ball?: number; balls?: number; multi?: true } {
   const score = typeof r.score === 'number' && Number.isSafeInteger(r.score) && r.score >= 0 ? r.score : undefined;
@@ -257,6 +282,7 @@ function parsePlayer(raw: unknown): LivePlayer | undefined {
     ...(isBallCount(r.balls) ? { balls: r.balls } : {}),
     ...(r.settings === 'ok' || r.settings === 'failed' ? { settings: r.settings } : {}),
     ...parseProgress(r),
+    ...parseVersion(r),
     ...(s !== undefined ? { seconds: s } : {}),
     ...(records?.length ? { records } : {}),
   };
@@ -271,7 +297,7 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
       const table = parseLiveTable(g.table);
       const title = typeof g.title === 'string' && g.title.length > 0 && g.title.length <= 160 && !/[\x00-\x1f\x7f]/.test(g.title) ? g.title : undefined;
       const players = (Array.isArray(g.players) ? g.players.slice(0, LIVE_MAX_PLAYERS) : []).map(parsePeer).filter((p): p is { key: string; name: string } => !!p);
-      return table && title ? { t: 'game-invite', game: { id: g.id, table, title, players } } : undefined;
+      return table && title ? { t: 'game-invite', game: { id: g.id, table, title, players, ...parseVersion(g) } } : undefined;
     }
     case 'game-answer':
       if (!isId(m.game) || (m.answer !== 'accept' && m.answer !== 'decline' && m.answer !== 'busy')) return undefined;
@@ -281,6 +307,7 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
         answer: m.answer,
         ...(MATCHES.includes(m.match as LiveTableMatch) ? { match: m.match as LiveTableMatch } : {}),
         ...(isBallCount(m.balls) ? { balls: m.balls } : {}),
+        ...parseVersion(m),
       };
     case 'game-room': {
       if (!isId(m.game) || !PHASES.includes(m.phase as LivePhase) || !Array.isArray(m.players)) return undefined;
@@ -328,7 +355,8 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
 
 /** Invitation reçue d'un pair (sa clé authentifiée par la connexion). */
 export function liveInvite(message: Extract<LiveMessage, { t: 'game-invite' }>, host: { key: string; name: string }, now = new Date()): LiveInvite {
-  return { id: message.game.id, host, table: message.game.table, title: message.game.title, players: message.game.players.filter((p) => p.key !== host.key), receivedAt: now.toISOString() };
+  const version = { ...(message.game.proto ? { proto: message.game.proto } : {}), ...(message.game.app ? { app: message.game.app } : {}) };
+  return { id: message.game.id, host: { ...host, ...version }, table: message.game.table, title: message.game.title, players: message.game.players.filter((p) => p.key !== host.key), receivedAt: now.toISOString() };
 }
 
 export function inviteExpired(invite: Pick<LiveInvite, 'receivedAt'>, now = new Date()): boolean {
@@ -358,13 +386,13 @@ export function matchLiveTable<T>(theirs: LiveTable, mine: readonly { entry: T; 
 // ---------------------------------------------------------------------------
 // La partie, côté de celui qui invite
 
-export function newLiveGame(host: { key: string; name: string }, table: LiveTable, title: string, now = new Date()): LiveGame {
+export function newLiveGame(host: { key: string; name: string; proto?: number; app?: string }, table: LiveTable, title: string, now = new Date()): LiveGame {
   return {
     id: randomBytes(8).toString('hex'),
     host: host.key,
     table,
     title,
-    players: [{ key: host.key, name: host.name, state: 'accepted', host: true, match: 'same', ...(table.balls ? { balls: table.balls } : {}) }],
+    players: [{ ...host, state: 'accepted', host: true, match: 'same', ...(table.balls ? { balls: table.balls } : {}) }],
     phase: 'gathering',
     createdAt: now.toISOString(),
   };
@@ -385,12 +413,12 @@ export function inviteToGame(game: LiveGame, peer: { key: string; name: string }
 }
 
 /** Réponse d'un invité ; ignorée s'il n'est pas invité ou si la partie est partie. */
-export function answerGame(game: LiveGame, key: string, answer: LiveAnswer, match?: LiveTableMatch, balls?: number): LiveGame {
+export function answerGame(game: LiveGame, key: string, answer: LiveAnswer, match?: LiveTableMatch, balls?: number, version: { proto?: number; app?: string } = {}): LiveGame {
   const p = game.players.find((x) => x.key === key);
   if (!p || p.host || game.phase !== 'gathering' || p.state !== 'invited') return game;
   // Sans la même version, accepter ne mène à rien : compté comme un refus (une borne d'avant le 30/10/2026 acceptait une autre version).
   const state: LivePlayerState = answer === 'accept' && (match === undefined || match === 'same') ? 'accepted' : answer === 'busy' ? 'busy' : 'declined';
-  return setPlayer(game, key, (x) => ({ ...x, state, ...(match ? { match } : {}), ...(isBallCount(balls) ? { balls } : {}) }));
+  return setPlayer(game, key, (x) => ({ ...x, state, ...(match ? { match } : {}), ...(isBallCount(balls) ? { balls } : {}), ...(version.proto ? { proto: version.proto } : {}), ...(version.app ? { app: version.app } : {}) }));
 }
 
 /** L'invité dit s'il a reçu les réglages de l'hôte entiers ; ignoré s'il n'a pas accepté. */
@@ -479,7 +507,7 @@ export function applyRoom(game: LiveGame, room: Extract<LiveMessage, { t: 'game-
 }
 
 /** Côté invité : la partie telle qu'il la suit après avoir accepté. */
-export function guestGame(invite: LiveInvite, me: { key: string; name: string }, match: LiveTableMatch, balls?: number): LiveGame {
+export function guestGame(invite: LiveInvite, me: { key: string; name: string; proto?: number; app?: string }, match: LiveTableMatch, balls?: number): LiveGame {
   return {
     id: invite.id,
     host: invite.host.key,
@@ -533,6 +561,13 @@ export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'ba
     case 'failed':
       return t('La partie n’a pas démarré de son côté');
   }
+}
+
+/** Une borne en retard (liveBehind) : ce qui lui manque, et quoi faire. */
+export function liveBehindLabel(p: { app?: string }): string {
+  return p.app
+    ? t('Cyber Pinball {app} sur sa borne : ni départ automatique ni score en direct, à mettre à jour', { app: p.app })
+    : t('Ancienne version de Cyber Pinball sur sa borne : ni départ automatique ni score en direct, à mettre à jour');
 }
 
 /** « 5 billes au lieu de 3 ». */

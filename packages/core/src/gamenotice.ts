@@ -7,7 +7,7 @@
 // l'ignorer ; quitter sa partie ramène au menu, où l'invitation s'ouvre d'elle-même.
 
 import { formatNumber, t } from './i18n';
-import { LIVE_INVITE_MS, livePlayers, liveRanked, liveScore, type LiveGame, type LiveInvite } from './livegame';
+import { LIVE_INVITE_MS, liveBehind, livePlayers, liveRanked, liveScore, type LiveGame, type LiveInvite } from './livegame';
 import type { Rect, Rotation } from './model';
 
 /** Durée de la carte entière, avant la pastille. */
@@ -121,9 +121,11 @@ export function liveBoardView(game: LiveGame, me: string): LiveBoardView | undef
               ? p.balls
                 ? t('Bille {ball} sur {balls}', { ball: p.ball, balls: p.balls })
                 : t('Bille {ball}', { ball: p.ball })
-              : p.state === 'playing'
-                ? t('En partie')
-                : t('Chargement');
+              : liveBehind(p) && p.key !== me
+                ? t('Ancienne version : pas de score en direct')
+                : p.state === 'playing'
+                  ? t('En partie')
+                  : t('Chargement');
     return liveRanked(p, game.table.balls) ? state : t('{state} · hors classement', { state });
   };
   return {

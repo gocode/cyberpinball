@@ -811,6 +811,7 @@ tableDoubles.sweep();
 const liveGames = createLiveGames({
   net: socialNet,
   dataDir: loc.dataDir,
+  appVersion: app.getVersion(),
   tables: () => tables,
   romsOf,
   ballsOf: async (table) => (await ballCounts.of(table))?.balls,

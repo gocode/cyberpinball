@@ -16,8 +16,11 @@ import {
   liveMatchLabel,
   livePlayerStateLabel,
   liveBallsAgainst,
+  liveBehind,
+  liveBehindLabel,
   liveOtherBalls,
   liveRanked,
+  liveScore,
   liveStandings,
   playDuration,
   t,
@@ -95,13 +98,18 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   const playingNow = (key: string) => host.net.online(key) && host.net.presenceOf(key)?.status === 'playing';
 
   function playerRows(game: LiveGame): Row[] {
-    return game.players.map((p) => ({
-      text: p.key === myKey() ? t('{name} (vous)', { name: label(p.key, p.name) }) : label(p.key, p.name),
-      detail: p.state === 'invited' && playingNow(p.key) ? t('Invité, en partie : notifié sur sa table, il peut quitter la sienne pour vous rejoindre') : livePlayerStateLabel(p, game.table.balls),
-      icon: p.host ? 'gamepad' : 'friend-list',
-      tone: stateTone(p),
-      ...(p.host ? { badges: [t('Hôte')] } : {}),
-    }));
+    return game.players.map((p) => {
+      // Une borne en retard (pas de départ automatique ni de score en direct chez elle) : dit tout de suite, pas pris pour un bug.
+      const behind = p.key !== myKey() && p.state !== 'invited' && p.state !== 'declined' && liveBehind(p);
+      const state = p.state === 'invited' && playingNow(p.key) ? t('Invité, en partie : notifié sur sa table, il peut quitter la sienne pour vous rejoindre') : livePlayerStateLabel(p, game.table.balls);
+      return {
+        text: p.key === myKey() ? t('{name} (vous)', { name: label(p.key, p.name) }) : label(p.key, p.name),
+        detail: behind ? `${state} · ${liveBehindLabel(p)}` : state,
+        icon: p.host ? 'gamepad' : 'friend-list',
+        tone: behind ? 'warning' : stateTone(p),
+        ...(p.host ? { badges: [t('Hôte')] } : {}),
+      };
+    });
   }
 
   function tableRow(game: Pick<LiveGame, 'title' | 'table'>): Row {
@@ -332,25 +340,29 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
    * Un joueur aux résultats : son score s'il est entré au tableau d'honneur (rang et score mis en
    * avant), sinon « Score non disponible », sans rang : on ne classe pas un score inconnu.
    */
+  /**
+   * Un joueur aux résultats : son score de la partie (lu en direct, sinon entré au tableau de la
+   * table), son rang dans la partie, et pourquoi il est hors classement ; jamais sa place au tableau
+   * de sa table, qui ne dit rien de la partie (essai du 30/10/2026 : « place 1 du tableau » pour les deux).
+   */
   function resultRow(p: LivePlayer, place: number | undefined, compared: boolean, hostBalls: number | undefined): Row {
-    const record = p.records?.[0];
+    const score = liveScore(p);
     const who = p.key === myKey() ? t('{name} (vous)', { name: label(p.key, p.name) }) : label(p.key, p.name);
     const played = p.seconds !== undefined ? playDuration(p.seconds) : undefined;
-    const version = p.host
-      ? undefined
-      : p.settings !== 'ok'
-        ? t('Hors classement : réglages de l’hôte non reçus')
-        : liveOtherBalls(p, hostBalls)
-          ? t('Hors classement : {balls}', { balls: liveBallsAgainst(p.balls!, hostBalls!) })
-          : undefined;
-    const detail =
-      p.state === 'done'
-        ? [record ? t('Record enregistré, place {rank} du tableau', { rank: record.rank }) : t('Partie terminée'), version, played].filter(Boolean).join(' · ')
-        : livePlayerStateLabel(p, hostBalls);
+    const reason = p.multi
+      ? t('Hors classement : plusieurs joueurs dans sa table')
+      : p.host
+        ? undefined
+        : p.settings !== 'ok'
+          ? t('Hors classement : réglages de l’hôte non reçus')
+          : liveOtherBalls(p, hostBalls)
+            ? t('Hors classement : {balls}', { balls: liveBallsAgainst(p.balls!, hostBalls!) })
+            : undefined;
+    const detail = p.state === 'done' ? [reason ?? t('Partie terminée'), played].filter(Boolean).join(' · ') : livePlayerStateLabel(p, hostBalls);
     return {
-      text: record && place ? `${place}. ${who} — ${formatNumber(record.score)}` : record ? `${who} — ${formatNumber(record.score)}` : p.state === 'done' ? `${who} — ${t('Score non disponible')}` : who,
+      text: score !== undefined && place ? `${place}. ${who} — ${formatNumber(score)}` : score !== undefined ? `${who} — ${formatNumber(score)}` : p.state === 'done' ? `${who} — ${t('Score non disponible')}` : who,
       detail,
-      icon: record ? 'star' : 'friend-list',
+      icon: score !== undefined ? 'star' : 'friend-list',
       tone: p.state === 'done' ? 'ok' : p.state === 'playing' || p.state === 'loading' ? 'info' : 'quiet',
       ...(place === 1 && compared ? { badges: [t('Meilleur score connu')] } : p.state === 'playing' || p.state === 'loading' ? { badges: [t('En partie')] } : {}),
     };
@@ -366,13 +378,13 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       if (again.length) actions.push({ label: t('Rejouer avec les mêmes joueurs'), detail: again.map((p) => p.name).join(', '), icon: 'restart', tone: 'ok', run: () => replay(again) });
     }
     actions.push({ label: finished ? t('Fermer') : t('Retour'), detail: finished ? undefined : t('Les résultats arrivent dans « Mes amis »'), icon: finished ? 'check' : 'back', run: () => { if (finished) games.close(); back(); } });
-    const ranked = standings.filter((p) => p.records?.length && liveRanked(p, game.table.balls));
+    const ranked = standings.filter((p) => liveScore(p) !== undefined && liveRanked(p, game.table.balls));
     const otherBalls = game.players.some((p) => !p.host && liveOtherBalls(p, game.table.balls));
     return {
       heading: finished ? t('Résultats') : t('Partie en direct en cours'),
       icon: 'gamepad',
       subheading: game.title,
-      lead: t('Seuls les scores inscrits au tableau d’honneur sont disponibles.'),
+      lead: t('Les scores arrivent à mesure que chacun finit sa partie.'),
       sections: [
         ...takeFlash(),
         ...(otherBalls ? [{ rows: [{ text: t('Autre nombre de billes : score hors classement'), detail: t('{n} billes par partie chez celui qui invite', { n: game.table.balls! }), tone: 'warning' as const, icon: 'rules' as const }] }] : []),
@@ -433,6 +445,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const match = found?.match;
     const rows: Row[] = [
       tableRow(invite),
+      ...(liveBehind(invite.host) ? [{ text: t('Ancienne version chez {name}', { name: invite.host.name }), detail: liveBehindLabel(invite.host), tone: 'warning', icon: 'alert' } as Row] : []),
       ...(!match
         ? [{ text: t('Vérification de la table sur votre borne…'), tone: 'quiet' } as Row]
         : match === 'other-version'

@@ -104,9 +104,9 @@ function playing(): LiveGame {
     table: { table: { title: 'Game of Thrones LE' }, print: 'a'.repeat(64), balls: 3 },
     title: 'Game of Thrones LE (Stern 2015)',
     players: [
-      { key: 'alexis', name: 'Alexis', state: 'playing', host: true },
-      { key: 'bruno', name: 'Bruno', state: 'playing', settings: 'ok' },
-      { key: 'chloe', name: 'Chloé', state: 'loading', settings: 'ok' },
+      { key: 'alexis', name: 'Alexis', state: 'playing', host: true, proto: 3 },
+      { key: 'bruno', name: 'Bruno', state: 'playing', settings: 'ok', proto: 3 },
+      { key: 'chloe', name: 'Chloé', state: 'loading', settings: 'ok', proto: 3 },
       { key: 'dora', name: 'Dora', state: 'declined' },
     ],
     phase: 'playing',

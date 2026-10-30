@@ -181,7 +181,7 @@ test('service : l’invitation dit 3 billes, l’invité répond 5, le journal l
     deliver!('hote', { t: 'game-invite', game: { id: '0123456789abcdef', table: sent, title: 'Terminator 2 (Williams 1991)', players: [{ key: 'hote', name: 'Alice' }] } });
     const found = await guest.accept('0123456789abcdef');
     assert.equal(found.balls, 5);
-    assert.deepEqual(out.at(-1), { t: 'game-answer', game: '0123456789abcdef', answer: 'accept', match: 'same', balls: 5 });
+    assert.deepEqual(out.at(-1), { t: 'game-answer', game: '0123456789abcdef', answer: 'accept', match: 'same', balls: 5, proto: 3 });
     assert.match(lines.join('\n'), /5 billes par partie ici, 3 chez lui : score hors classement/);
   } finally {
     guest.stop();
