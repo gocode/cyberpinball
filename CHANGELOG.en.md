@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.5
 
+- An application log, `data\logs\journal.txt`: everything it does is written down, dated, to understand afterwards what happened on a cabinet.
 - Cinema launch: the game logo now lands whole and centered on the backglass, and leaves the playfield whole; a large wheel (medallion) used to spill out the bottom, cut off. A logo taller than it is wide also stays in its slot on the menu wheel.
 - "Play with a friend" on a table's page, right under "Play": choose the friend to invite to a live game. An invitation that cannot be sent is no longer hidden: it stays visible, greyed out with its reason ("Offline", "No friend online right now").
 - An invitation now arrives even during a game: a chime and a discreet card in the playfield corner (who sends it, the table, the time left), without getting in the way. Leave your game to join your friend, the invitation opens back in the menu; or keep playing, it fades away by itself.

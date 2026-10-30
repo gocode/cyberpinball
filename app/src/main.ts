@@ -21,10 +21,13 @@ import { locations } from './paths';
 import { otherFrontendsGate } from './frontend-gate';
 import { guardScreens } from './screen-guard';
 import { startSettingsAlone } from './settings';
+import { journalConsole } from './journal';
 import { journalUncaught } from './uncaught';
 import { startWizard } from './wizard';
 
 const loc = locations();
+// Tout ce que l'application écrit dans sa console, aussi dans <données>\logs\journal.txt : un essai sur la borne s'explique après coup.
+journalConsole(loc.dataDir);
 // À l'écran, une erreur non rattrapée est notée dans <données>\logs\erreurs.txt et
 // l'application continue, sans boîte modale (hors écran : l'essai s'arrête, offscreen.ts).
 if (!OFFSCREEN) journalUncaught(loc.dataDir);
