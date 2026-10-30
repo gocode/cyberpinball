@@ -53,6 +53,7 @@ function fakeGames() {
     pending: undefined as LiveInvite | undefined,
     current: () => games.game,
     board: () => [] as { player: string; name: string; score: number; at: string; game: string }[],
+    history: () => [],
     table: () => undefined,
     invites: () => (games.pending ? [games.pending] : []),
     create: async () => games.game!,
@@ -117,7 +118,7 @@ function uniqueIcons(built: Built, what: string): void {
 
 test('chaque entrée de la rubrique Amis ouvre son écran, aux actions toutes différentes', () => {
   const { menu, last } = setup();
-  for (const [id, heading] of [['friends', 'Mes amis'], ['find-player', 'Trouver un joueur'], ['friend-requests', 'Demandes d’amis'], ['badges', 'Mes badges'], ['sharing', 'Partage et réseau']] as const) {
+  for (const [id, heading] of [['friends', 'Mes amis'], ['game-history', 'Historique des parties'], ['find-player', 'Trouver un joueur'], ['friend-requests', 'Demandes d’amis'], ['badges', 'Mes badges'], ['sharing', 'Partage et réseau']] as const) {
     menu.items[id]!.run();
     const built = last().build();
     assert.equal(built.heading, heading);

@@ -1142,6 +1142,16 @@ Deux bornes amies, A et B, sur le vrai réseau, chacune avec la même table. La 
 | 596 | Table Stern SAM | A et B, partie entre amis sur Star Trek (ou The Walking Dead). | La partie se joue comme avant : crédit et Start à la main, pas de bande en direct, VPX à quitter soi-même. Le journal dit « pas de relevé de l'état de jeu (carte de la ROM : état de jeu hors de la NVRAM ou illisible (current_player, current_ball, game_over)) ». |
 | 597 | Borne en retard | Laisser B sur une version d'avant la 0.1.5-essai.13 ; A invite B, B accepte. | Chez A, le salon dit pour B « Cyber Pinball … sur sa borne : ni départ automatique ni score en direct, à mettre à jour » ; pendant la partie, la bande de A dit pour B « Ancienne version : pas de score en direct ». Aux résultats, chaque joueur a son rang dans la partie et son score, jamais « place … du tableau ». |
 
+## Historique des parties entre amis
+
+Deux bornes A et B, amies, avec la même version d'une table. La preuve sans opérateur : `packages/core/src/test/historique-des-parties.test.ts` et `docs\demo-amis.ps1 -Parcours partie` ; le manuel : « Historique des parties ».
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 598 | Une partie entre à l'historique | A et B jouent une partie en direct jusqu'au bout ; puis, sur chaque borne, Menu système > Amis > « Historique des parties ». | La partie est en tête, sous la date du jour : la table, l'heure, puis les joueurs avec leur rang et leur score, dans l'ordre des résultats. Le gagnant a une étoile sur sa borne. |
+| 599 | Le détail d'une partie | Choisir la partie, Start ; puis Exit. | La version de la table et son nombre de billes, l'hôte, puis chaque joueur : rang, score, place au tableau, durée ; un joueur hors classement dit pourquoi. Exit ramène la liste, le curseur sur cette partie. |
+| 600 | Après un redémarrage | Quitter Cyber Pinball, le relancer ; rouvrir l'historique. | La partie y est toujours, une seule fois ; `data\amis\parties.json` la garde. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

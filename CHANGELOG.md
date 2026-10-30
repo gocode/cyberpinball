@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.5
 
+- Historique des parties entre amis (Menu système > Amis > « Historique des parties ») : chaque partie en direct finie est gardée sur la borne, de la plus récente à la plus ancienne, la table en titre et les joueurs dessous avec leur rang et leur score. Ouvrez une partie pour revoir son détail : version de la table, durée de chacun, pourquoi un score était hors classement.
 - Partie entre amis : une borne restée sur une ancienne version de Cyber Pinball est signalée dans le salon, l'invitation et la bande (« ni départ automatique ni score en direct, à mettre à jour »), au lieu de sembler boguée. Les résultats donnent le rang de chacun dans la partie et son score, plus « place 1 du tableau ».
 - Partie entre amis, sur les tables originales (Game of Thrones, GOTG, The Goonies, The Matrix) : la partie démarre seule (un crédit, puis Start), le monnayeur et Start sont ignorés ensuite ; une bande dans le coin du plateau montre le score et la bille de chacun en direct ; la partie finie, VPX se ferme seul et les résultats s'ouvrent avec le score de chacun, même sans initiales saisies.
 - Partie entre amis, sur les tables à ROM Williams WPC (Terminator 2) : même départ automatique, même bande en direct et même fin de partie que sur les tables originales, lus dans la mémoire de la ROM ; pendant la saisie des initiales, VPX reste ouvert et Start valide les lettres. Les tables Stern SAM (Star Trek, The Walking Dead) se jouent encore comme avant : leur mémoire ne dit pas sûrement si une partie est en cours.

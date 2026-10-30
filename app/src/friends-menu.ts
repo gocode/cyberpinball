@@ -1,5 +1,6 @@
 // Menu système > Amis : le réseau des bornes à l'écran (social.ts, social-net.ts). « Mes amis »
-// (en ligne, en partie et sur quelle table, dernier évènement), « Trouver un joueur » (l'annuaire :
+// (en ligne, en partie et sur quelle table, dernier évènement), « Historique des parties » (les
+// parties entre amis finies sur cette borne : game-history-menu.ts), « Trouver un joueur » (l'annuaire :
 // chercher un nom, les bornes à proximité sur le réseau local), « Demandes d'amis » (reçues à
 // valider, envoyées en attente), « Mes badges », « Partage et réseau » (activé par défaut, nom,
 // réseau local, bibliothèque partagée, pare-feu de Windows, ce que voient les autres, joueurs
@@ -39,6 +40,7 @@ import {
 import type { FirewallRule } from './firewall-rule';
 import type { FriendContent } from './friend-content';
 import { createFriendLibraryMenu, type FriendDownloads } from './friend-library-menu';
+import { createGameHistoryMenu } from './game-history-menu';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
 import type { LiveGames } from './live-game';
 import { createLiveMenu, type LiveMenu } from './live-game-menu';
@@ -81,6 +83,7 @@ export interface FriendsMenu {
   live: LiveMenu;
   items: {
     friends: ProvidedSystemItem;
+    'game-history': ProvidedSystemItem;
     'find-player': ProvidedSystemItem;
     'friend-requests': ProvidedSystemItem;
     badges: ProvidedSystemItem;
@@ -117,6 +120,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     redraw: host.redraw,
     ...(host.now ? { now: host.now } : {}),
   });
+  const historyMenu = createGameHistoryMenu({ library: host.library, history: () => host.games.history(), back });
   const libraryMenu = createFriendLibraryMenu({
     library: host.library,
     net,
@@ -548,6 +552,12 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
           return live.attention();
         },
         run: () => openFriends(),
+      },
+      'game-history': {
+        get detail() {
+          return historyMenu.detail();
+        },
+        run: () => historyMenu.open(),
       },
       'find-player': {
         get detail() {

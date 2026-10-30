@@ -12,8 +12,10 @@
 #   borne a aussi : ses parties au choix, et ses médias qui manquent, pris jusqu'au brouillon.
 #   Parcours « partie » : Bruno invite la borne à une partie en direct ; l'invitation s'ouvre
 #   d'elle-même sur le menu des tables ; accepter, le salon, le compte à rebours, la partie
-#   (simulée : VPX n'est jamais lancé, CYBERPINBALL_PARTIE_SIMULEE), puis les résultats. La racine
-#   a une fausse installation de VPX (New-FauxVpx, docs\hors-ecran.ps1), jamais les vrais émulateurs.
+#   (simulée : VPX n'est jamais lancé, CYBERPINBALL_PARTIE_SIMULEE), puis les résultats ; enfin
+#   Menu système > Amis > « Historique des parties » (la partie qu'on vient de jouer, au-dessus de
+#   deux soirées plus anciennes avec Émile) et le détail de cette partie. La racine a une fausse
+#   installation de VPX (New-FauxVpx, docs\hors-ecran.ps1), jamais les vrais émulateurs.
 #   Parcours « en-jeu » : Start lance une partie (simulée) ; Bruno invite la borne pendant qu'elle
 #   joue : carillon, carte dans le coin du plateau (captures invitation-en-partie-full puis
 #   -compact), puis, au retour au menu, l'invitation ouverte d'elle-même. Fausse installation de
@@ -76,8 +78,8 @@ function New-Racine([string]$Nom, [switch]$Vpx, [switch]$Neuve) {
 $Exit = 'Escape'
 # Libellés : ceux de la langue de l'essai (l'autopilote choisit une action par son libellé).
 $libelles = @{
-  'fr' = @{ Plus = 'Répondre plus tard'; Amis = 'Amis'; MesAmis = 'Mes amis'; Trouver = 'Trouver un joueur'; Chercher = 'Chercher un nom'; Demandes = 'Demandes d'; Badges = 'Mes badges'; Partage = 'Partage et réseau'; Biblio = 'Voir sa bibliothèque'; Prendre = 'Récupérer le'; Toute = 'Récupérer toute la table'; Parties = 'Choisir les parties'; Accepter = 'Accepter'; Fermer = 'Fermer' }
-  'en' = @{ Plus = 'Answer later'; Amis = 'Friends'; MesAmis = 'My friends'; Trouver = 'Find a player'; Chercher = 'Search for a name'; Demandes = 'Friend requests'; Badges = 'My badges'; Partage = 'Sharing and network'; Biblio = 'See their library'; Prendre = 'Get the'; Toute = 'Get the whole table'; Parties = 'Choose parts'; Accepter = 'Accept'; Fermer = 'Close' }
+  'fr' = @{ Plus = 'Répondre plus tard'; Amis = 'Amis'; MesAmis = 'Mes amis'; Historique = 'Historique des parties'; Trouver = 'Trouver un joueur'; Chercher = 'Chercher un nom'; Demandes = 'Demandes d'; Badges = 'Mes badges'; Partage = 'Partage et réseau'; Biblio = 'Voir sa bibliothèque'; Prendre = 'Récupérer le'; Toute = 'Récupérer toute la table'; Parties = 'Choisir les parties'; Accepter = 'Accepter'; Fermer = 'Fermer' }
+  'en' = @{ Plus = 'Answer later'; Amis = 'Friends'; MesAmis = 'My friends'; Historique = 'Game history'; Trouver = 'Find a player'; Chercher = 'Search for a name'; Demandes = 'Friend requests'; Badges = 'My badges'; Partage = 'Sharing and network'; Biblio = 'See their library'; Prendre = 'Get the'; Toute = 'Get the whole table'; Parties = 'Choose parts'; Accepter = 'Accept'; Fermer = 'Close' }
 }
 
 function Get-Etapes([string]$Nom, $l) {
@@ -94,12 +96,15 @@ function Get-Etapes([string]$Nom, $l) {
   }
   if ($Nom -eq 'partie') {
     # Le menu des tables, puis l'invitation de Bruno (six secondes après l'amitié), ouverte d'elle-même ;
-    # Bruno donne le départ peu après l'acceptation ; la partie simulée dure dix secondes.
+    # Bruno donne le départ peu après l'acceptation ; la partie simulée dure dix secondes. Puis
+    # l'historique des parties (la partie jouée en tête, le curseur dessus) et son détail.
     return @(
       'wait:1500', 'wait:9000', 'wait:1000',
       "action:$($l.Accepter)", 'wait:1000', 'wait:4000',
       'until:playing', 'until:library', 'wait:2500',
-      "action:$($l.Fermer)"
+      "action:$($l.Fermer)", 'wait:800',
+      $Exit, 'wait:800', "action:$($l.Historique)", 'wait:800',
+      'Enter', 'wait:800'
     )
   }
   # Au départ, le message « VPX n'est pas installé » (le bac à sable n'a pas VPX) : Exit le ferme,
@@ -165,6 +170,12 @@ try {
         # Deux réceptions (ses médias, puis toute sa table), chacune une ligne « fini » du gestionnaire (titre dans la langue de l'essai).
         if ($nom -eq 'amis' -and @($log | Select-String -Pattern 'Téléchargements : « .+ » fini \([1-9]\d* fichier\(s\)\)').Count -lt 2) { $failures += "$id : les médias ou la table de Bruno ne sont pas arrivés" }
         if ($nom -eq 'amis' -and ($log -match 'Téléchargements : .* en échec')) { $failures += "$id : une réception de Bruno a échoué" }
+        # La partie finie est entrée à l'historique des parties, gardé sur la borne, après les deux soirées d'avant.
+        if ($nom -eq 'partie') {
+          if (-not ($log -match "Partie en direct : « .+ » à l'historique des parties")) { $failures += "$id : la partie n'est pas entrée à l'historique" }
+          $parties = "$home_\amis\parties.json"
+          if (-not (Test-Path $parties) -or @((Get-Content $parties -Raw -Encoding UTF8 | ConvertFrom-Json).games).Count -ne 3) { $failures += "$id : parties.json ne garde pas les trois parties" }
+        }
         # La ROM attestée est arrivée avec la table ; le PuP-Pack, laissé sans attestation, jamais.
         if ($nom -eq 'amis') {
           $recus = @(Get-ChildItem -Recurse -File "$home_" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\amis\\tables\\' })

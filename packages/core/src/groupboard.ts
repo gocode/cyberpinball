@@ -15,6 +15,7 @@ import * as path from 'node:path';
 import { CompoundFile } from './vpxinfo';
 import { readVpReg } from './highscores';
 import { liveRanked, liveScore, type LiveGame, type LiveTable } from './livegame';
+import { readKeptJson } from './store';
 
 export interface GroupRecord {
   /** Clé publique du joueur, son nom. */
@@ -39,13 +40,11 @@ export function boardKey(table: Pick<LiveTable, 'print' | 'script'>): string | u
   return table.print ? `${table.print}:${table.script ?? ''}` : undefined;
 }
 
-export function loadBoards(file: string): GroupBoards {
-  try {
-    const raw = JSON.parse(fs.readFileSync(file, 'utf8')) as unknown;
-    return raw && typeof raw === 'object' ? (raw as GroupBoards) : {};
-  } catch {
-    return {};
-  }
+/** Le tableau gardé ; un fichier illisible est mis de côté (readKeptJson), jamais écrasé : `setAside` dit où. */
+export function loadBoards(file: string, setAside?: (where: string) => void): GroupBoards {
+  const kept = readKeptJson(file);
+  if (kept.setAside) setAside?.(kept.setAside);
+  return kept.value && typeof kept.value === 'object' && !Array.isArray(kept.value) ? (kept.value as GroupBoards) : {};
 }
 
 export function saveBoards(file: string, boards: GroupBoards): void {

@@ -183,6 +183,34 @@ export function readJsonFile(file: string): unknown {
   return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, ''));
 }
 
+/**
+ * Lit un fichier JSON gardé par la borne. Absent : undefined. Illisible (abîmé, tronqué) : il est
+ * mis de côté à son nom suivi de « .illisible-<date> », pour qu'un enregistrement ne l'écrase pas
+ * (`setAside` : où il est) ; la lecture repart de rien.
+ */
+export function readKeptJson(file: string, now = new Date()): { value?: unknown; setAside?: string } {
+  let text: string;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch {
+    return {};
+  }
+  try {
+    return { value: JSON.parse(text.replace(/^﻿/, '')) as unknown };
+  } catch {
+    const ext = path.extname(file);
+    const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '');
+    const setAside = path.join(path.dirname(file), `${path.basename(file, ext)}.illisible-${stamp}${ext}`);
+    try {
+      fs.renameSync(file, setAside);
+      return { setAside };
+    } catch {
+      // Pas déplaçable (verrouillé) : signalé quand même ; l'enregistrement suivant échouera ou le remplacera.
+      return { setAside: file };
+    }
+  }
+}
+
 export function readTextIfExists(file: string): string {
   return fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
 }

@@ -4,7 +4,7 @@
 export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts
   'Amis': 'Friends',
-  'Mes amis, trouver un joueur, demandes, badges, partage': 'My friends, find a player, requests, badges, sharing',
+  'Mes amis, historique des parties, trouver un joueur, demandes, badges, partage': 'My friends, game history, find a player, requests, badges, sharing',
   'Mes amis': 'My friends',
   'Trouver un joueur': 'Find a player',
   'Demandes d’amis': 'Friend requests',

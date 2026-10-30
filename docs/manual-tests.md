@@ -1142,6 +1142,16 @@ Two friend cabinets, A and B, on the real network, each with the same table. The
 | 596 | Stern SAM table | A and B, game with friends on Star Trek (or The Walking Dead). | The game plays as before: credit and Start by hand, no live strip, quit VPX yourself. The log says "pas de relevé de l'état de jeu (carte de la ROM : état de jeu hors de la NVRAM ou illisible (current_player, current_ball, game_over))" (no live state: the ROM map puts the game state outside the NVRAM). |
 | 597 | Cabinet lagging behind | Leave B on a version before 0.1.5-essai.13; A invites B, B accepts. | On A, the room says for B "Cyber Pinball … sur sa borne : ni départ automatique ni score en direct, à mettre à jour" (on their cabinet: no automatic start or live score, needs updating); during the game, A's strip says for B "Ancienne version : pas de score en direct" (Old version: no live score). In the results, each player has their rank in the game and their score, never "place … du tableau". |
 
+## Game history with friends
+
+Two cabinets A and B, friends, with the same version of a table. The proof without an operator: `packages/core/src/test/historique-des-parties.test.ts` and `docs\demo-amis.ps1 -Parcours partie`; the manual: "Game history".
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 598 | A game enters the history | A and B play a live game to the end; then, on each cabinet, System menu > Friends > "Historique des parties" (Game history). | The game is at the top, under today's date: the table, the time, then the players with their rank and score, in the order of the results. The winner has a star on their cabinet. |
+| 599 | A game's details | Choose the game, Start; then Exit. | The table version and its number of balls, the host, then each player: rank, score, place on the board, time played; a player who was not ranked says why. Exit returns to the list, the cursor on that game. |
+| 600 | After a restart | Quit Cyber Pinball, start it again; reopen the history. | The game is still there, once; `data\amis\parties.json` keeps it. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

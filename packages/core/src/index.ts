@@ -63,6 +63,7 @@ export * from './ballcount';
 export * from './tabledouble';
 export * from './hostsettings';
 export * from './groupboard';
+export * from './gamehistory';
 export * from './romscores';
 export * from './journal';
 export * from './livestate';

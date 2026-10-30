@@ -1,0 +1,32 @@
+// Catalogue anglais : historique des parties entre amis (packages/core/src/gamehistory.ts,
+// app/src/game-history-menu.ts). Clé : le texte français tel qu'il est passé à t() ou tn().
+export const messages: Record<string, string> = {
+  // packages/core/src/gamehistory.ts
+  'Hors classement : plus d’un joueur dans sa table': 'Not ranked: more than one player on their table',
+  'Hors classement : autre nombre de billes': 'Not ranked: different number of balls',
+  'Résultat pas arrivé à temps': 'Result did not arrive in time',
+  // app/src/game-history-menu.ts
+  'Historique des parties': 'Game history',
+  '{rank}. {name} {score}': '{rank}. {name} {score}',
+  '{name} {score}, hors classement': '{name} {score}, not ranked',
+  '{name}, score inconnu': '{name}, score unknown',
+  '{n} partie entre amis sur cette borne': '{n} game with friends on this cabinet',
+  '{n} parties entre amis sur cette borne': '{n} games with friends on this cabinet',
+  'Chaque partie en direct finie, de la plus récente à la plus ancienne : la table, puis les joueurs avec leur rang et leur score.': 'Every finished live game, newest first: the table, then the players with their rank and score.',
+  'Aucune partie entre amis pour l’instant': 'No game with friends yet',
+  'Chaque partie en direct finie s’inscrit ici, avec la table, les joueurs et leurs scores': 'Every finished live game is listed here, with the table, the players and their scores',
+  'Meilleur score': 'Best score',
+  'Record enregistré, place {rank} du tableau': 'High score recorded, rank {rank} on the table',
+  'Cette partie n’est plus dans l’historique': 'This game is no longer in the history',
+  '{day}, {time}': '{day}, {time}',
+  'Version de la table : celle de l’hôte': 'Table version: the host’s',
+  '{n} bille par partie': '{n} ball per game',
+  '{n} billes par partie': '{n} balls per game',
+  'Hôte : {name}': 'Host: {name}',
+  'Classement': 'Standings',
+  '{n} score hors classement': '{n} score not ranked',
+  '{n} scores hors classement': '{n} scores not ranked',
+  'Gardé ici, il ne compte ni au classement de la partie ni aux records du groupe': 'Kept here, it counts neither in the game standings nor in the group records',
+  'Dernière : {table}, {day}': 'Latest: {table}, {day}',
+  'Les parties entre amis jouées sur cette borne': 'Games with friends played on this cabinet',
+};

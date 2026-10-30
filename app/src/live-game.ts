@@ -19,6 +19,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  addToHistory,
   answerGame,
   applyRoom,
   closeIfDone,
@@ -33,6 +34,7 @@ import {
   inviteToGame,
   liveInvite,
   loadBoards,
+  loadHistory,
   LIVE_COUNTDOWN_S,
   LIVE_PROTOCOL,
   matchLiveTable,
@@ -42,11 +44,14 @@ import {
   scriptPatchState,
   settingsMessages,
   saveBoards,
+  saveHistory,
   settingsReceived,
   startGame,
   tableIdentity,
   type GroupBoards,
+  type GameHistory,
   type GroupRecord,
+  type HistoryGame,
   type HostSetting,
   type LiveGame,
   type LiveInvite,
@@ -109,6 +114,8 @@ export interface LiveGames {
   current(): LiveGame | undefined;
   /** Les records du groupe sur la version de la table de la partie en cours (groupboard.ts). */
   board(): GroupRecord[];
+  /** Les parties entre amis finies, gardées sur la borne, de la plus récente à la plus ancienne (gamehistory.ts). */
+  history(): readonly HistoryGame[];
   /** Ma table pour la partie en cours. */
   table(): TableEntry | undefined;
   /** Invitations reçues, sans les expirées. */
@@ -160,14 +167,34 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   // Le tableau du groupe : chaque partie finie y entre, une fois (groupboard.ts).
   const boardsFile = path.join(opts.dataDir, 'amis', 'records.json');
   let boards: GroupBoards | undefined;
-  const loadedBoards = () => (boards ??= loadBoards(boardsFile));
+  const loadedBoards = () => (boards ??= loadBoards(boardsFile, (where) => log(`Partie en direct : tableau du groupe illisible, mis de côté (${where}).`))); // i18n-ignore : journal
+  // L'historique : chaque partie finie, une fois, avec chaque joueur (gamehistory.ts).
+  const historyFile = path.join(opts.dataDir, 'amis', 'parties.json');
+  let history: GameHistory | undefined;
+  const loadedHistory = () => {
+    if (history) return history;
+    const loaded = loadHistory(historyFile, now());
+    if (loaded.setAside) log(`Partie en direct : historique des parties illisible, mis de côté (${loaded.setAside}).`); // i18n-ignore : journal
+    if (loaded.newer) log(`Partie en direct : historique des parties d'un format plus récent (${loaded.history.v}) : montré, plus complété.`); // i18n-ignore : journal
+    return (history = loaded.history);
+  };
   const remember = () => {
-    if (game?.phase !== 'finished' || !addGameToBoard(loadedBoards(), game, now())) return;
-    try {
-      saveBoards(boardsFile, loadedBoards());
-      log(`Partie en direct : résultats de « ${game.title} » au tableau du groupe.`); // i18n-ignore : journal
-    } catch (error) {
-      log(`Partie en direct : tableau du groupe non enregistré (${(error as Error).message}).`); // i18n-ignore : journal
+    if (game?.phase !== 'finished') return;
+    if (addGameToBoard(loadedBoards(), game, now())) {
+      try {
+        saveBoards(boardsFile, loadedBoards());
+        log(`Partie en direct : résultats de « ${game.title} » au tableau du groupe.`); // i18n-ignore : journal
+      } catch (error) {
+        log(`Partie en direct : tableau du groupe non enregistré (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+    }
+    if (addToHistory(loadedHistory(), game, me().key, now())) {
+      try {
+        saveHistory(historyFile, loadedHistory());
+        log(`Partie en direct : « ${game.title} » à l'historique des parties.`); // i18n-ignore : journal
+      } catch (error) {
+        log(`Partie en direct : historique des parties non enregistré (${(error as Error).message}).`); // i18n-ignore : journal
+      }
     }
   };
   const changed = () => {
@@ -380,6 +407,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   return {
     current: () => game,
     board: () => (game ? boardFor(loadedBoards(), game.table) : []),
+    history: () => loadedHistory().games,
     table: () => mine,
     invites: () => invites.filter((i) => !inviteExpired(i, now())),
     async create(table) {

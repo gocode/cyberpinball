@@ -9,7 +9,8 @@
 //   Émile  : ami hors ligne depuis trois heures (écrit dans social.json avant le démarrage).
 // CYBERPINBALL_RESEAU_DEMO=partie : de plus, Bruno invite la borne à une partie en direct sur la
 // table qu'ils ont tous deux, ici dans la même version (la partie se montre sans avertissement),
-// lance le départ dès qu'elle accepte, joue quatre secondes et bat son record. =en-jeu : Bruno
+// lance le départ dès qu'elle accepte, joue quatre secondes et bat son record ; l'historique des
+// parties a déjà deux soirées avec Émile (seedSimulatedFriends). =en-jeu : Bruno
 // attend que la borne soit en partie, puis l'invite (la notification pendant la partie,
 // game-notice.ts) ; l'invitation s'ouvre au retour au menu.
 // CYBERPINBALL_RESEAU_DEMO=coupure (gestionnaire de téléchargements, docs\demo-gestionnaire-telechargements.ps1) :
@@ -30,7 +31,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { addEvent, encodePng, layoutOf, loadSocial, newSocialState, readHostSettings, saveSocial, scanTables, setName, socialFile, tableContents, type SocialState, type TableEntry } from '@cyberpinball/core';
+import { addEvent, addToHistory, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, readHostSettings, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, type LiveGame, type SocialState, type TableEntry } from '@cyberpinball/core';
 import { createFriendContent, type FriendContent } from './friend-content';
 import { createLiveGames, type LiveGames } from './live-game';
 import { createSocialNet, type SocialNet } from './social-net';
@@ -101,6 +102,7 @@ export function seedSimulatedFriends(dataDir: string, now = new Date(), env: Nod
   const others = env.CYBERPINBALL_RESEAU_DEMO === 'notifications' ? ['David', 'Fanny'].map((name) => setName(newSocialState(now), name)!) : [];
   const since = state.friends[0]!.since;
   saveSocial(dataDir, { ...state, friends: [...state.friends, ...others.map((o) => ({ key: o.key.publicKey, name: o.name, since, lastSeen: threeHours.toISOString(), events: [] }))] });
+  if (env.CYBERPINBALL_RESEAU_DEMO === 'partie') seedHistory(dataDir, me.key.publicKey, emile.key.publicKey, now);
   if (env.CYBERPINBALL_RESEAU_DEMO === 'notifications') {
     for (const friend of [emile, ...others]) {
       const dir = path.join(dataDir, 'reseau-simule', friend.name);
@@ -108,6 +110,35 @@ export function seedSimulatedFriends(dataDir: string, now = new Date(), env: Nod
       saveSocial(dir, { ...friend, friends: [{ key: me.key.publicKey, name: me.name, since, events: [] }] });
     }
   }
+}
+
+/** Deux parties entre amis déjà jouées avec Émile (hier soir, et trois jours plus tôt), dans <données>\amis\parties.json. */
+function seedHistory(dataDir: string, me: string, emile: string, now: Date): void {
+  const day = (days: number, hour: number) => {
+    const d = new Date(now.getTime() - days * 86_400_000);
+    d.setHours(hour, 40, 0, 0);
+    return d.toISOString();
+  };
+  const game = (id: string, table: { title: string; manufacturer: string; year: number }, at: string, players: LiveGame['players']): LiveGame => ({
+    id,
+    host: me,
+    table: { table, balls: 3 },
+    title: `${table.title} (${table.manufacturer} ${table.year})`,
+    players,
+    phase: 'finished',
+    createdAt: at,
+    startAt: at,
+  });
+  const history = emptyHistory();
+  addToHistory(history, game('d0d0d0d0d0d00001', DEMO_TABLES.emileRecord, day(1, 21), [
+    { key: me, name: 'Alexis', state: 'done', host: true, score: 31_870_400, seconds: 512 },
+    { key: emile, name: 'Émile', state: 'done', settings: 'ok', score: 48_250_110, seconds: 655, records: [{ score: 48_250_110, rank: 2, initials: 'EMI' }] }, // i18n-ignore : nom d'un joueur fictif
+  ]), me);
+  addToHistory(history, game('d0d0d0d0d0d00002', DEMO_TABLES.brunoPlaysAgain, day(3, 20), [
+    { key: me, name: 'Alexis', state: 'done', host: true, score: 12_400_950, seconds: 431 },
+    { key: emile, name: 'Émile', state: 'done', settings: 'ok', balls: 5, score: 19_007_320, seconds: 803 }, // i18n-ignore : nom d'un joueur fictif
+  ]), me);
+  saveHistory(path.join(dataDir, 'amis', 'parties.json'), history);
 }
 
 async function bot(dataDir: string, name: string, lan: boolean, bootstrap: { host: string; port: number }[], extra: Partial<SocialState> = {}): Promise<SocialNet> {

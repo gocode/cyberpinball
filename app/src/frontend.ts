@@ -887,6 +887,7 @@ const friendsMenu = createFriendsMenu({
   },
 });
 library.provideSystemItem('friends', friendsMenu.items.friends);
+library.provideSystemItem('game-history', friendsMenu.items['game-history']);
 library.provideSystemItem('find-player', friendsMenu.items['find-player']);
 library.provideSystemItem('friend-requests', friendsMenu.items['friend-requests']);
 library.provideSystemItem('badges', friendsMenu.items.badges);
