@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.5
 
+- Au bureau, le fronton en fond du menu des tables montre aussi une vidéo : une table dont le fronton (Backglass) est une vidéo gardait l'image d'avant, voire celle de la table précédente, alors que l'écran du fronton montrait bien la vidéo.
 - Les tables dont le script appelle vpmInit deux fois, comme Back to the Future (Data East 1990), démarrent : VPX 10.8 les arrêtait à chaque lancement (« Table script bug: cvpmFlips2.Init is called twice »). Cyber Pinball fait jouer une copie corrigée de leur script, sans modifier la table, dès l'installation et avant chaque partie ; si une partie s'arrête encore sur ce message, le script est corrigé pour la suivante.
 - Historique des parties entre amis (Menu système > Amis > « Historique des parties ») : chaque partie en direct finie est gardée sur la borne, de la plus récente à la plus ancienne, la table en titre et les joueurs dessous avec leur rang et leur score. Ouvrez une partie pour revoir son détail : version de la table, durée de chacun, pourquoi un score était hors classement.
 - Partie entre amis : une borne restée sur une ancienne version de Cyber Pinball est signalée dans le salon, l'invitation et la bande (« ni départ automatique ni score en direct, à mettre à jour »), au lieu de sembler boguée. Les résultats donnent le rang de chacun dans la partie et son score, plus « place 1 du tableau ».

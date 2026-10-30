@@ -322,8 +322,9 @@ function syncMenuShape() {
   document.documentElement.classList.toggle('menu-cab', !desktop);
   return changed;
 }
-// L'écran de chargement n'a pas la même composition en borne et au bureau : il est refait.
-new ResizeObserver(() => syncMenuShape() && lastState?.phase === 'loading' && !lastState.game && role === 'playfield' && renderPlayfield(lastState)).observe(root);
+// L'écran de chargement n'a pas la même composition en borne et au bureau : il est refait ; le
+// menu des tables aussi, dont le fronton en fond n'existe qu'au bureau.
+new ResizeObserver(() => syncMenuShape() && ['loading', 'menu'].includes(lastState?.phase) && !lastState.game && role === 'playfield' && renderPlayfield(lastState)).observe(root);
 syncMenuShape();
 
 /**
@@ -332,6 +333,8 @@ syncMenuShape();
  * le nom et fabricant · année seulement : la table filmée reste la vedette.
  */
 let menuView;
+/** Couche du fronton en fond du menu (bureau) : image ou vidéo, comme sur l'écran du fronton. */
+let menuBackglass;
 
 function menuPanel(s) {
   if (!menuView) {
@@ -361,6 +364,7 @@ function menuPanel(s) {
     for (const zone of [frames[1], backglass, nav, label, title, meta, counter]) zone.dataset.frame = 'menu';
     node.append(scrim, ...frames, backglass, nav, label, title, meta, counter);
     menuView = { node, nav, text, meta, counter, backglass };
+    menuBackglass = CyberMedia.layer(backglass, { className: 'background' });
   }
   const v = menuView;
   const style = WHEEL_STYLES.includes(s.menuLayout) ? s.menuLayout : undefined;
@@ -369,7 +373,7 @@ function menuPanel(s) {
   document.documentElement.dataset.menuLayout = s.menuLayout;
   if (style) document.documentElement.dataset.menuBand = style;
   else delete document.documentElement.dataset.menuBand;
-  showBackglass(v.backglass, s.backglass?.url);
+  showBackglass(s, Boolean(style));
   v.node.dataset.stableShape = style ?? 'list';
   if (style) {
     const stage = wheelStage(s, style);
@@ -388,23 +392,16 @@ function menuPanel(s) {
 }
 
 /**
- * Fronton du jeu choisi en fond (bureau) : la nouvelle image remplace l'ancienne une fois
- * chargée, sans passer par un fond vide ; sans fronton, la place reste sombre.
+ * Fronton du jeu choisi en fond (bureau, roues à bandeau) : son média Backglass, image ou
+ * vidéo, par la couche de media.js comme sur l'écran du fronton (fondu enchaîné, erreur
+ * remontée au médecin). Sans fronton, ou illisible, la place reste sombre. En borne la zone
+ * est cachée (frontend.css) : rien n'y est chargé.
  */
-function showBackglass(holder, url) {
-  if (holder.dataset.url === (url ?? '')) return;
-  holder.dataset.url = url ?? '';
-  if (!url) {
-    holder.replaceChildren();
-    return;
-  }
-  const img = new Image();
-  img.alt = '';
-  img.decoding = 'async';
-  img.onload = () => {
-    if (holder.dataset.url === url) holder.replaceChildren(img);
-  };
-  img.src = url;
+function showBackglass(s, band) {
+  const view = band && document.documentElement.classList.contains('menu-desktop') && s.backglass?.url ? s.backglass : undefined;
+  menuBackglass.show(view && { ...view, fit: 'cover', fallback: 'none' });
+  // La vidéo ne joue que si elle se voit, comme le fond du playfield.
+  menuBackglass.setActive(Boolean(view) && backgroundVisible(s));
 }
 
 /**
@@ -781,6 +778,8 @@ function cornerBox(s) {
 function renderPlayfield(s) {
   menuScroll.capture(root);
   drawPlayfield(s);
+  // Menu des tables retiré (attente, chargement) : la vidéo de son fronton s'arrête.
+  if (menuView && !menuView.node.isConnected) menuBackglass.setActive(false);
   const l = s.phase === 'library' ? s.library : undefined;
   revealSelection(root, l ? ['library', l.screen, l.variant ?? '', l.heading].join('|') : s.attract ? 'attract' : s.phase);
 }
@@ -1077,6 +1076,7 @@ function renderGame(s) {
   };
   if (background) show(background, 'playfield');
   for (const z of zones) show(z.layer, z.role);
+  menuBackglass?.setActive(false);
   // Éteints : du noir et le titre en discret, sans les zones par-dessus. Un FullDMD habillé
   // (le DMD de VPX dans le cadre de son média) garde son habillage : il fait partie de l'afficheur.
   const parts = [...(background ? ['playfield'] : []), ...zones.map((z) => z.role)];
@@ -1125,6 +1125,7 @@ function syncNight(s) {
 function pauseUnderVeil() {
   if (!veilOpaque) return;
   background?.setActive(false);
+  menuBackglass?.setActive(false);
   for (const z of zones) z.layer.setActive(false);
 }
 
@@ -1204,7 +1205,8 @@ window.cyberEtat = () => ({
   dmd: liveDmd && { visible: !liveDmd.holder.hidden, cadre: Boolean(liveDmd.framed), points: lastDmdShot?.dots ? lastDmdShot.dots.filter((v) => v > 0).length : 0 },
   // Lancement en cinéma : les scènes posées (départ, arrivée), le logo ou le médaillon, et si elles s'effacent.
   cinema: [...document.querySelectorAll('.cinema')].map((n) => ({ scene: n.dataset.cinema, visage: n.querySelector('.cine-disc') ? 'médaillon' : 'logo', fin: n.classList.contains('cine-fin') })), // i18n-ignore : relevé des essais
-  couches: [...(background ? [['playfield', background]] : []), ...zones.map((z) => [z.role, z.layer])].map(([part, layer]) => ({ role: part, ...layer.state() })),
+  // « fronton-menu » : le fronton en fond du menu au bureau, à part de l'écran du fronton (backglass).
+  couches: [...(background ? [['playfield', background]] : []), ...(menuBackglass ? [['fronton-menu', menuBackglass]] : []), ...zones.map((z) => [z.role, z.layer])].map(([part, layer]) => ({ role: part, ...layer.state() })),
 });
 
 window.cyber.onState((s) => {

@@ -886,12 +886,6 @@ html.menu-desktop .menu-band .menu-backglass {
   background: var(--surface-sunken);
 }
 
-.menu-backglass img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
 /* Le bas du fronton s'assombrit sous le bandeau. */
 .menu-backglass::after {
   content: '';

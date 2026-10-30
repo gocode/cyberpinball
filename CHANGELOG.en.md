@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.5
 
+- On a desktop, the backglass behind the table menu now shows a video too: a table whose backglass is a video kept the previous image, or even the previous table's, while the backglass screen showed the video.
 - Tables whose script calls vpmInit twice, such as Back to the Future (Data East 1990), now start: VPX 10.8 stopped them at every launch ("Table script bug: cvpmFlips2.Init is called twice"). Cyber Pinball plays a fixed copy of their script, without modifying the table, from installation and before each game; if a game still stops on that message, the script is fixed for the next one.
 - Game history with friends (System menu > Friends > "Game history"): every finished live game is kept on the cabinet, newest first, the table as the title and the players below with their rank and score. Open a game to review its details: table version, each player's time, why a score was not ranked.
 - Game with friends: a cabinet left on an old Cyber Pinball version is flagged in the room, the invitation and the strip ("no automatic start or live score, needs updating"), instead of looking buggy. The results give each player's rank in the game and their score, no longer "place 1 of the table".
