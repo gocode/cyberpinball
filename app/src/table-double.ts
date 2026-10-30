@@ -14,7 +14,10 @@ import {
   cachedRomMemory,
   folderPrint,
   groupInitials,
+  iniChanges,
+  iniWithInspector,
   injectGroupRecords,
+  inspectorMemMapFiles,
   liveStateHook,
   loadedRoms,
   parseLiveState,
@@ -43,6 +46,8 @@ export interface TableDoublesOptions {
   romsOf?(table: TableEntry): readonly string[];
   /** Cache des cartes mémoire des ROM (ball-count.ts les y met) : records d'une table à ROM. */
   memoryCacheDir?: string;
+  /** Le VPinballX.ini de la borne : copié dans le double quand l'inspector de VPX sert à la partie. */
+  cabinetIni?(): string | undefined;
   log?(line: string): void;
 }
 
@@ -55,6 +60,11 @@ export interface TableDouble {
   live: boolean;
   /** L'état de jeu que le relevé a écrit, maintenant ; undefined avant le premier ou s'il n'y en a pas. */
   liveState(): LiveGameState | undefined;
+  /**
+   * Le VPinballX.ini de cette partie, à passer à VPX par -Ini : une copie de celui de la borne,
+   * l'inspector activé (table Stern SAM) ; undefined : celui de la borne.
+   */
+  ini?: string;
   /** Après la partie : compare le dossier habituel à son empreinte d'avant, puis supprime le double. */
   finish(): void;
 }
@@ -69,9 +79,10 @@ export function createTableDoubles(opts: TableDoublesOptions) {
     /**
      * Le double de la table pour la partie `id`, ou la raison de son absence ; `settings` : les
      * réglages de l'hôte (invité), posés dans le double à la place des siens ; `board` : les records
-     * du groupe, posés dans le VPReg.stg du double (groupboard.ts).
+     * du groupe, posés dans le VPReg.stg du double (groupboard.ts) ; `inspector` : l'inspector de VPX
+     * peut servir à cette partie, sur ce port (la règle du pare-feu qui ferme VPX au réseau est posée).
      */
-    start(table: TableEntry, id: string, settings?: readonly HostSetting[], board?: readonly GroupRecord[]): { ok: true; double: TableDouble } | { ok: false; reason: string } {
+    start(table: TableEntry, id: string, settings?: readonly HostSetting[], board?: readonly GroupRecord[], inspector?: { port: number }): { ok: true; double: TableDouble } | { ok: false; reason: string } {
       const parties = partiesDir();
       const tablesDir = opts.tablesDir();
       if (!parties || !tablesDir) return { ok: false, reason: t('pas de dossier Cyber Pinball') };
@@ -140,6 +151,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
       // L'état de jeu en direct : le relevé et le départ automatique ajoutés au script du double (livestate.ts).
       const stateFile = path.join(plan.dir, 'cyberpinball-etat.txt');
       let live = false;
+      let ini: { file: string; text: string } | undefined;
       if (board) {
         try {
           const base = path.basename(plan.file, path.extname(plan.file)).toLowerCase();
@@ -148,7 +160,30 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           const script = vbsName ? fs.readFileSync(vbs, 'latin1') : readVpxScript(plan.file);
           // Une table à ROM : le relevé lit la mémoire de la ROM, d'après sa carte (en cache : ball-count.ts l'y a mise).
           const rom = roms.map((name) => ({ name, memory: romBoard(name).memory })).find((r) => r.memory);
-          const hook = script ? liveStateHook(script, readVpxElements(plan.file), stateFile, rom?.memory) : { ok: false as const, reason: 'script illisible ou protégé' }; // i18n-ignore : journal
+          // L'inspector de VPX, seulement si la copie du VPinballX.ini de la borne peut se faire.
+          const iniSource = inspector ? opts.cabinetIni?.() : undefined;
+          let iniText: string | undefined;
+          try {
+            iniText = iniSource ? fs.readFileSync(iniSource, 'utf8') : undefined;
+          } catch (error) {
+            log(`Partie entre amis (${table.id}) : VPinballX.ini illisible (${(error as Error).message}), pas d'inspector.`); // i18n-ignore : journal
+          }
+          const offered = iniText !== undefined ? inspector : undefined;
+          const hook = script ? liveStateHook(script, readVpxElements(plan.file), stateFile, rom?.memory, offered) : { ok: false as const, reason: 'script illisible ou protégé' }; // i18n-ignore : journal
+          if (hook.ok && hook.inspector.length) {
+            // La carte réduite et le VPinballX.ini de la partie, dans le double seulement ; un fichier lié à l'original est remplacé, jamais réécrit.
+            const games = [...new Set([...(opts.romsOf?.(table) ?? []), ...roms])];
+            for (const f of inspectorMemMapFiles(hook.inspector, games)) {
+              const out = path.join(plan.dir, ...f.rel.split('/'));
+              fs.mkdirSync(path.dirname(out), { recursive: true });
+              fs.rmSync(out, { force: true });
+              fs.writeFileSync(out, f.text, 'utf8');
+            }
+            const file = path.join(plan.dir, 'VPinballX.ini');
+            fs.rmSync(file, { force: true });
+            fs.writeFileSync(file, iniWithInspector(iniText!, offered!.port), 'utf8');
+            ini = { file, text: iniText! };
+          }
           if (hook.ok) {
             // Le .vbs du double est une copie (jamais un lien vers l'original) : remplacé, pas réécrit sur place.
             fs.rmSync(vbs, { force: true });
@@ -157,8 +192,8 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           }
           log(
             hook.ok
-              ? `Partie entre amis (${table.id}) : relevé de l'état de jeu et départ automatique posés (${hook.source === 'rom' ? `mémoire de la ROM ${rom?.name}, ` : ''}minuteur de ${hook.element}).` // i18n-ignore : journal
-              : `Partie entre amis (${table.id}) : pas de relevé de l'état de jeu (${hook.reason}${roms.length && !rom ? ` ; pas de carte mémoire en cache pour ${roms.join(', ')}` : ''}).`, // i18n-ignore : journal
+              ? `Partie entre amis (${table.id}) : relevé de l'état de jeu et départ automatique posés (${hook.source === 'rom' ? `mémoire de la ROM ${rom?.name}, ` : ''}${hook.inspector.length ? `inspector de VPX sur 127.0.0.1:${offered!.port} pour ${hook.inspector.map((s) => s.name.replace(/^cyberpinball_/, '')).join(', ')}, ` : ''}minuteur de ${hook.element}).` // i18n-ignore : journal
+              : `Partie entre amis (${table.id}) : pas de relevé de l'état de jeu (${hook.reason}${roms.length && !rom ? ` ; pas de carte mémoire en cache pour ${roms.join(', ')}` : ''}${!inspector && /inspector/.test(hook.reason) ? ' ; règle du pare-feu de VPX absente : Menu système > Amis > Partage et réseau' : ''}).`, // i18n-ignore : journal
           );
         } catch (error) {
           log(`Partie entre amis (${table.id}) : relevé de l'état de jeu non posé (${(error as Error).message}).`); // i18n-ignore : journal
@@ -195,9 +230,18 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           records,
           live,
           liveState,
+          ...(ini ? { ini: ini.file } : {}),
           finish() {
             if (finished) return;
             finished = true;
+            if (ini) {
+              try {
+                const changed = iniChanges(ini.text, fs.readFileSync(ini.file, 'utf8'));
+                if (changed.length) log(`Partie entre amis (${table.id}) : réglages de VPX changés pendant la partie, non repris dans le VPinballX.ini de la borne : ${changed.slice(0, 20).join(' ; ')}.`); // i18n-ignore : journal
+              } catch {
+                // Copie absente : rien à dire.
+              }
+            }
             const changes = folderChanges(before, folderPrint(table.folder, { contents: false }));
             if (changes.length) log(`Partie entre amis (${table.id}) : ATTENTION, le dossier de la table a changé pendant la partie : ${changes.slice(0, 20).join(' ; ')}.`); // i18n-ignore : journal
             else log(`Partie entre amis (${table.id}) : dossier de la table intact (${before.size} fichiers comparés).`); // i18n-ignore : journal

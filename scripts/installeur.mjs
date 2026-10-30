@@ -123,7 +123,12 @@ export async function buildInstallers({ complete = true } = {}) {
   const version = process.env.CYBERPINBALL_VERSION_ESSAI || pkg.version;
   // Le site de « Programmes et fonctionnalités » : le dépôt, celui des mises à jour.
   const site = pkg.repository.url.replace(/\.git$/, '');
-  const common = { VERSION: version, VERSION_WIN: windowsVersion(version), ICONE: icon, BANDEAU: banner, SITE: site };
+  // La règle « Cyber Pinball VPX » du pare-feu vise la version de VPX que l'application installera,
+  // par le dossier de sa version et par la jonction current (packages/core/src/firewall.ts).
+  const vpx = JSON.parse(fs.readFileSync(path.join(repo, 'packages', 'installer', 'components.json'), 'utf8')).components.find((c) => c.id === 'vpx');
+  if (!vpx?.executable || !new RegExp(vpx.executablePattern).test(vpx.executable)) throw new Error('components.json : l’exécutable de VPX (executable) manque ou ne répond pas à executablePattern.');
+  const vpxDir = vpx.installDir.split('/').join('\\');
+  const common = { VERSION: version, VERSION_WIN: windowsVersion(version), ICONE: icon, BANDEAU: banner, SITE: site, VPX_PAREFEU_REEL: `${vpxDir}\\${vpx.version}\\${vpx.executable}`, VPX_PAREFEU_JONCTION: `${vpxDir}\\current\\${vpx.executable}` };
   fs.rmSync(work, { recursive: true, force: true });
   fs.mkdirSync(work, { recursive: true });
 

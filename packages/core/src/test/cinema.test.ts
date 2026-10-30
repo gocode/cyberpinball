@@ -64,9 +64,11 @@ test('VPX n’attend jamais l’animation : play() lance VPX comme sans elle', (
   assert.ok(start > 0 && launch > start, 'la chorégraphie part au Start, avant le lancement de VPX');
   assert.match(play.slice(0, start), /state = \{ \.\.\.state, phase: 'loading'/, 'au Start, avec l’écran de chargement');
   // Entre le Start et le lancement, les seules attentes sont celles d'avant le cinéma : l'écran de
-  // chargement (délai réglé), sa capture pour les essais, l'habillage FullDMD. Aucune ne dépend de lui.
+  // chargement (délai réglé), sa capture pour les essais, l'habillage FullDMD, et pour une partie
+  // entre amis la règle du pare-feu de VPX, lue pendant le chargement (inspector). Aucune ne dépend de lui.
   const awaits = [...play.slice(start, launch).matchAll(/await ([^;]+);/g)].map((m) => m[1]!.replace(/\s+/g, ' ').slice(0, 40));
-  assert.deepEqual(awaits, ['delay(Math.min(400, loadingMs))', "capture('chargement')", 'delay(Math.max(0, loadingMs - 400))', 'prepareDressing(table, { root: loc.root,']);
+  assert.deepEqual(awaits, ['delay(Math.min(400, loadingMs))', "capture('chargement')", 'delay(Math.max(0, loadingMs - 400))', 'prepareDressing(table, { root: loc.root,', 'inspectorReady']);
+  assert.ok(play.indexOf('const inspectorReady = ') < start, 'la lecture part avant le chargement, sans le retarder');
   assert.match(play, /const loadingMs = Number\(process\.env\.CYBERPINBALL_LOADING_MS \?\? 2500\);/, 'délai du chargement indépendant du cinéma');
   // Nulle part dans le menu on n'attend une animation (DMD, chorégraphie) : seule la partie s'attend.
   for (const m of main.matchAll(/await ([^;\n]+)/g)) assert.doesNotMatch(m[1]!, /cinema|Cinema|loadingDmd|liveDmd|playDmdAnimation|\.done\b(?<!game\.done)/, m[0]);

@@ -218,6 +218,11 @@ test('seul social-net.ts ouvre des sockets réseau, et Hyperswarm n’est charg�
     for (const name of fs.readdirSync(dir)) {
       if (!name.endsWith('.ts') || name === 'social-net.ts') continue;
       const text = fs.readFileSync(path.join(dir, name), 'utf8');
+      // vpx-inspector.ts : une connexion de client à 127.0.0.1 seulement (un port libre pour l'inspector de VPX), jamais d'écoute.
+      if (name === 'vpx-inspector.ts' && dir.endsWith(path.join('app', 'src'))) {
+        const uses = [...text.matchAll(/\bnet\.(\w+)\(([^)]{0,40})/g)].map((m) => `${m[1]}(${m[2]}`);
+        if (uses.length === 1 && uses[0] === "connect({ host: '127.0.0.1', port }" && !/\.listen\(|createServer|node:dgram/.test(text)) continue;
+      }
       if (/node:(dgram|net)['"]|require\(['"](hyperswarm|hyperdht|protomux|@hyperswarm\/secret-stream)/.test(text) || /from ['"](hyperswarm|hyperdht|protomux|@hyperswarm\/secret-stream)['"]/.test(text)) offenders.push(path.relative(REPO_ROOT, path.join(dir, name)));
     }
   }

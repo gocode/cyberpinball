@@ -11,6 +11,8 @@
 ;   passe 2 : SORTIE, APP_DIR (release\win-unpacked), DESINSTALLEUR (désinstalleur signé ou non),
 ;             et pour la version complète : COMPLET, VPX_ARCHIVE, VPX_ARCHIVE_NOM, VPX_NOTICE, VPX_VERSION.
 ;   SITE : adresse du dépôt (« repository » du package.json racine).
+;   VPX_PAREFEU_REEL, VPX_PAREFEU_JONCTION : l'exécutable de VPX sous la racine, par le dossier de sa
+;   version et par la jonction current (règle « Cyber Pinball VPX » du pare-feu).
 ;
 ; Mise à jour depuis l'application (/MAJ, lancé par le menu système, voir
 ; packages/core/src/update.ts) : seule la page de progression s'affiche ; l'installeur
@@ -246,10 +248,12 @@ Section "Uninstall"
     DeleteRegKey HKCU "${CLE_DESINSTALLATION}"
   ${EndIf}
 
-  ; Règle du pare-feu de cette application (section SEC_PAREFEU) : retirée avec l'autorisation de
-  ; Windows, seulement si elle vise bien cette racine et que quelqu'un est devant l'écran.
+  ; Règles du pare-feu de cette application (section SEC_PAREFEU) : retirées avec l'autorisation de
+  ; Windows, chacune seulement si elle vise bien cette racine, en une seule demande, et que quelqu'un
+  ; est devant l'écran.
   ${If} $BacASable == ""
   ${AndIfNot} ${Silent}
+    StrCpy $4 ""
     nsExec::ExecToStack '"$SYSDIR\netsh.exe" advfirewall firewall show rule name="Cyber Pinball" verbose'
     Pop $1
     Pop $2
@@ -257,8 +261,23 @@ Section "Uninstall"
     ${WordFind} "$2" "$INSTDIR\${EXE}" "E#" $3
     ${If} $1 == "0"
     ${AndIfNot} ${Errors}
-      DetailPrint "Pare-feu de Windows : règle de Cyber Pinball retirée (autorisation demandée)."
-      ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c netsh advfirewall firewall delete rule name="Cyber Pinball"' SW_HIDE
+      StrCpy $4 'netsh advfirewall firewall delete rule name="Cyber Pinball"'
+    ${EndIf}
+    nsExec::ExecToStack '"$SYSDIR\netsh.exe" advfirewall firewall show rule name="Cyber Pinball VPX" verbose'
+    Pop $1
+    Pop $2
+    ClearErrors
+    ${WordFind} "$2" "$Racine\emulators\vpx\" "E#" $3
+    ${If} $1 == "0"
+    ${AndIfNot} ${Errors}
+      ${If} $4 != ""
+        StrCpy $4 "$4 & "
+      ${EndIf}
+      StrCpy $4 '$4netsh advfirewall firewall delete rule name="Cyber Pinball VPX"'
+    ${EndIf}
+    ${If} $4 != ""
+      DetailPrint "Pare-feu de Windows : règles de Cyber Pinball retirées (autorisation demandée)."
+      ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c $4' SW_HIDE
     ${EndIf}
   ${EndIf}
 
@@ -570,10 +589,15 @@ SectionEnd
 
 ; Réseau des bornes (Menu système > Amis) : la règle du pare-feu de Windows pour CyberPinball.exe,
 ; pour que Windows n'affiche pas son invite « Autoriser l'accès » sur une borne sans souris (décidé
-; le 28/10/2026). Même nom et mêmes arguments que packages/core/src/firewall.ts (relu par
-; firewall.test.ts). L'autorisation de Windows (UAC) n'est demandée que si la règle manque ou vise
-; un autre dossier, et seulement pendant une installation où quelqu'un est devant l'écran : jamais
-; en mise à jour (/MAJ), en silence (/S, sauf /PAREFEU) ni dans un bac à sable d'essai.
+; le 28/10/2026) ; et, sous la même autorisation, celle qui ferme VPX au réseau (entrée bloquée,
+; décidé le 30/10/2026) : l'inspector de VPX, qui donne l'état en direct des tables Stern SAM
+; pendant une partie entre amis, n'est activé que si elle est posée. Elle vise la version de VPX
+; que l'application installera (VPX_PAREFEU_REEL, d'après packages/installer/components.json) et la
+; jonction emulators\vpx\current (VPX_PAREFEU_JONCTION). Mêmes noms et mêmes arguments que
+; packages/core/src/firewall.ts (relu par firewall.test.ts). L'autorisation de Windows (UAC) n'est
+; demandée que si une règle manque ou vise un autre dossier, et seulement pendant une installation
+; où quelqu'un est devant l'écran : jamais en mise à jour (/MAJ), en silence (/S, sauf /PAREFEU) ni
+; dans un bac à sable d'essai.
 Section "Partage entre bornes : autoriser dans le pare-feu de Windows" SEC_PAREFEU
   ${If} $BacASable != ""
     DetailPrint "Pare-feu de Windows : bac à sable d'essai, rien n'est demandé."
@@ -581,7 +605,7 @@ Section "Partage entre bornes : autoriser dans le pare-feu de Windows" SEC_PAREF
   ${EndIf}
   Call RegleParefeuPresente
   ${If} $0 == "1"
-    DetailPrint "Pare-feu de Windows : Cyber Pinball est déjà autorisé."
+    DetailPrint "Pare-feu de Windows : Cyber Pinball est déjà autorisé, VPX déjà fermé au réseau."
     WriteINIStr "$Racine\app\installation.ini" "installation" "pare_feu" "1"
     Return
   ${EndIf}
@@ -595,28 +619,41 @@ Section "Partage entre bornes : autoriser dans le pare-feu de Windows" SEC_PAREF
     Return
   ${EndIf}
   DetailPrint "Pare-feu de Windows : autorisation demandée à Windows."
-  ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c netsh advfirewall firewall delete rule name="Cyber Pinball" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball" dir=in action=allow program="$Racine\app\${EXE}" enable=yes profile=any' SW_HIDE
+  ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c netsh advfirewall firewall delete rule name="Cyber Pinball" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball" dir=in action=allow program="$Racine\app\${EXE}" enable=yes profile=any & netsh advfirewall firewall delete rule name="Cyber Pinball VPX" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball VPX" dir=in action=block program="$Racine\${VPX_PAREFEU_REEL}" enable=yes profile=any & netsh advfirewall firewall add rule name="Cyber Pinball VPX" dir=in action=block program="$Racine\${VPX_PAREFEU_JONCTION}" enable=yes profile=any' SW_HIDE
   Call RegleParefeuPresente
   WriteINIStr "$Racine\app\installation.ini" "installation" "pare_feu" "$0"
   ${If} $0 == "1"
-    DetailPrint "Pare-feu de Windows : Cyber Pinball autorisé."
+    DetailPrint "Pare-feu de Windows : Cyber Pinball autorisé, VPX fermé au réseau."
   ${Else}
     DetailPrint "Pare-feu de Windows : pas autorisé (refusé ?) ; Menu système > Amis > Partage et réseau le propose."
   ${EndIf}
 SectionEnd
 
-; $0 = "1" si la règle « Cyber Pinball » existe et vise $Racine\app\CyberPinball.exe (lecture sans élévation).
+; $0 = "1" si la règle « Cyber Pinball » vise $Racine\app\CyberPinball.exe et que la règle
+; « Cyber Pinball VPX » vise la version de VPX à installer (lecture sans élévation).
 Function RegleParefeuPresente
+  StrCpy $0 "0"
   nsExec::ExecToStack '"$SYSDIR\netsh.exe" advfirewall firewall show rule name="Cyber Pinball" verbose'
   Pop $1
   Pop $2
-  StrCpy $0 "0"
-  ${If} $1 == "0"
-    ClearErrors
-    ${WordFind} "$2" "$Racine\app\${EXE}" "E#" $3
-    ${IfNot} ${Errors}
-      StrCpy $0 "1"
-    ${EndIf}
+  ${If} $1 != "0"
+    Return
+  ${EndIf}
+  ClearErrors
+  ${WordFind} "$2" "$Racine\app\${EXE}" "E#" $3
+  ${If} ${Errors}
+    Return
+  ${EndIf}
+  nsExec::ExecToStack '"$SYSDIR\netsh.exe" advfirewall firewall show rule name="Cyber Pinball VPX" verbose'
+  Pop $1
+  Pop $2
+  ${If} $1 != "0"
+    Return
+  ${EndIf}
+  ClearErrors
+  ${WordFind} "$2" "$Racine\${VPX_PAREFEU_REEL}" "E#" $3
+  ${IfNot} ${Errors}
+    StrCpy $0 "1"
   ${EndIf}
 FunctionEnd
 
@@ -627,7 +664,7 @@ FunctionEnd
   !endif
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_BUREAU} "Un raccourci Cyber Pinball sur le bureau."
   !insertmacro MUI_DESCRIPTION_TEXT ${SEC_DEMARRAGE} "Pour une borne dédiée : Cyber Pinball s'ouvre dès l'ouverture de la session Windows."
-  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_PAREFEU} "Amis et partage entre bornes : Windows demande une fois son autorisation, pour que son pare-feu ne bloque pas Cyber Pinball et n'affiche pas son invite sur la borne."
+  !insertmacro MUI_DESCRIPTION_TEXT ${SEC_PAREFEU} "Amis et partage entre bornes : Windows demande une fois son autorisation, pour que son pare-feu ne bloque pas Cyber Pinball, ferme VPX au réseau, et n'affiche pas son invite sur la borne."
 !insertmacro MUI_FUNCTION_DESCRIPTION_END
 
 Function PasserEnMiseAJour

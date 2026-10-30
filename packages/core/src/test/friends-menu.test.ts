@@ -40,7 +40,7 @@ const { createFriendsMenu } = require(path.join(APP_DIST, 'friends-menu.js')) as
   createFriendsMenu(host: object): { items: Record<string, Item>; live: { open(back: () => void): void; sheetAction(table: object, back: () => void): Action } };
 };
 const { createSocialNet } = require(path.join(APP_DIST, 'social-net.js')) as { createSocialNet(o: object): { state(): { shareLibrary: boolean; key: { publicKey: string } } } };
-const { createFirewallRule } = require(path.join(APP_DIST, 'firewall-rule.js')) as { createFirewallRule(o: object): { check(): Promise<string> } };
+const { createFirewallRule } = require(path.join(APP_DIST, 'firewall-rule.js')) as { createFirewallRule(o: object): { check(): Promise<string>; checkVpx(): Promise<string | undefined> } };
 const { createFriendContent } = require(path.join(APP_DIST, 'friend-content.js')) as { createFriendContent(o: object): object };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
@@ -69,15 +69,15 @@ function fakeGames() {
   return games;
 }
 
-/** `presence` : Bruno vu en ligne, dans le menu ou en partie (le réseau reste coupé). */
-function setup(content?: object, presence?: 'menu' | 'playing') {
+/** `presence` : Bruno vu en ligne, dans le menu ou en partie (le réseau reste coupé) ; `vpx` : les programmes de VPX à fermer au réseau. */
+function setup(content?: object, presence?: 'menu' | 'playing', vpx?: () => string[] | undefined) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-friends-menu-'));
   // Un ami déjà là (hors ligne : réseau coupé).
   fs.writeFileSync(path.join(dir, 'social.json'), JSON.stringify({ ...newSocialState(), friends: [{ key: FRIEND, name: 'Bruno', since: new Date().toISOString(), events: [] }] }));
   const opened: { build: Build; at?: number }[] = [];
   const off = createSocialNet({ dataDir: dir, mode: 'off' });
   const net = presence ? { ...off, online: () => true, presenceOf: () => ({ status: presence, since: new Date().toISOString(), ...(presence === 'playing' ? { table: { title: 'Glass Lagoon' } } : {}) }) } : off;
-  const firewall = createFirewallRule({ exe: 'C:\\x\\CyberPinball.exe', simulated: true });
+  const firewall = createFirewallRule({ exe: 'C:\\x\\CyberPinball.exe', simulated: true, vpx });
   const games = fakeGames();
   const manager = createDownloadManager({ dataDir: dir, transports: {} });
   const menu = createFriendsMenu({
@@ -126,6 +126,34 @@ test('chaque entrée de la rubrique Amis ouvre son écran, aux actions toutes di
     uniqueIcons(built, id);
   }
   assert.equal(menu.items['friend-requests']!.attention, false);
+});
+
+test('« Partage et réseau » : l’état en direct des tables Stern SAM, grisé avec sa raison tant que VPX n’est pas fermé au réseau pour sa version', async () => {
+  let version = '10.8.1-5436';
+  const programs = () => [`D:\\CP\\emulators\\vpx\\${version}\\VPinballX_BGFX64.exe`, 'D:\\CP\\emulators\\vpx\\current\\VPinballX_BGFX64.exe'];
+  let installed = false;
+  const { menu, last, firewall } = setup(undefined, undefined, () => (installed ? programs() : undefined));
+  const row = () => last().build().sections.flatMap((s) => s.rows).find((r) => r.text === 'État en direct des tables Stern SAM')! as { text: string; detail?: string; tone?: string };
+  const allow = () => last().build().actions.find((a) => a.label === 'Autoriser dans le pare-feu de Windows');
+  await firewall.check();
+  menu.items.sharing!.run();
+  assert.deepEqual([row().tone, row().detail], ['quiet', 'Indisponible : VPX n’est pas encore installé'], 'visible avant même l’installation de VPX');
+  installed = true;
+  await firewall.check();
+  menu.items.sharing!.run();
+  assert.equal(row().tone, 'quiet');
+  assert.match(row().detail!, /^Indisponible : le pare-feu de Windows doit d’abord fermer VPX au réseau/);
+  await allow()!.run();
+  assert.equal(row().tone, 'ok');
+  assert.equal(allow(), undefined, 'les deux règles posées : plus rien à autoriser');
+  // VPX change de version : la règle vise l'ancien dossier, l'état en direct redevient indisponible.
+  version = '10.8.2-6000';
+  await firewall.checkVpx();
+  menu.items.sharing!.run();
+  assert.match(row().detail!, /^Indisponible : VPX a changé de version/);
+  assert.ok(allow(), 'la règle est à reposer');
+  await allow()!.run();
+  assert.equal(row().tone, 'ok');
 });
 
 test('« Partage et réseau » : sélection sur Retour ; pare-feu à autoriser seulement s’il manque', async () => {

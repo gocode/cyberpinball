@@ -455,6 +455,33 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     }
   }
 
+  /**
+   * L'état en direct des tables Stern SAM (inspector de VPX) : toujours là, grisé avec sa raison tant
+   * que la règle qui ferme VPX au réseau n'est pas posée pour sa version active.
+   */
+  function vpxRow(): Row {
+    const text = t('État en direct des tables Stern SAM');
+    switch (host.firewall.vpxState()) {
+      case 'closed':
+        return { text, detail: t('Prêt : VPX est fermé au réseau, Cyber Pinball le lit sur cette borne seulement'), tone: 'ok', badges: [t('OK')], icon: 'gamepad' };
+      case 'missing':
+        return { text, detail: t('Indisponible : le pare-feu de Windows doit d’abord fermer VPX au réseau (« Autoriser dans le pare-feu de Windows »)'), tone: 'quiet', badges: [t('À autoriser')], icon: 'gamepad' };
+      case 'other-version':
+        return { text, detail: t('Indisponible : VPX a changé de version, sa règle du pare-feu est à reposer (« Autoriser dans le pare-feu de Windows »)'), tone: 'quiet', badges: [t('À autoriser')], icon: 'gamepad' };
+      case 'unknown':
+        return { text, detail: t('Indisponible : la règle du pare-feu de VPX est illisible'), tone: 'quiet', badges: [t('À vérifier')], icon: 'gamepad' };
+      default:
+        return { text, detail: t('Indisponible : VPX n’est pas encore installé'), tone: 'quiet', icon: 'gamepad' };
+    }
+  }
+
+  /** L'action « Autoriser » : la règle de Cyber Pinball manque, ou celle de VPX (absente, autre version). */
+  function firewallToAllow(): boolean {
+    const fw = host.firewall.state();
+    const vpx = host.firewall.vpxState();
+    return fw === 'missing' || fw === 'other-program' || vpx === 'missing' || vpx === 'other-version';
+  }
+
   function buildSharing(): Built {
     const s = net.state();
     const status = net.status();
@@ -467,10 +494,10 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         ? { text: t('Bibliothèque partagée avec vos amis'), detail: t('Ils voient vos tables et peuvent les récupérer, avec leurs médias'), tone: 'ok', badges: [t('Partagée')], icon: 'tables' }
         : { text: t('Bibliothèque pas partagée'), detail: t('Vos amis ne voient pas vos tables'), tone: 'quiet', icon: 'tables' },
       firewallRow(),
+      vpxRow(),
     ];
     const actions: Action[] = [{ label: t('Changer de nom…'), detail: t('{min} à {max} caractères', { min: NAME_MIN, max: NAME_MAX }), icon: 'edit', run: () => askName() }];
-    const fw = host.firewall.state();
-    if (fw === 'missing' || fw === 'other-program') actions.push({ label: t('Autoriser dans le pare-feu de Windows'), detail: t('Windows demande votre autorisation, une seule fois'), icon: 'lock', run: () => allowFirewall() });
+    if (firewallToAllow()) actions.push({ label: t('Autoriser dans le pare-feu de Windows'), detail: t('Windows demande votre autorisation, une seule fois : Cyber Pinball ouvert aux autres bornes, VPX fermé au réseau'), icon: 'lock', run: () => allowFirewall() });
     if (s.blocked.length) actions.push({ label: tn(s.blocked.length, '{n} joueur bloqué', '{n} joueurs bloqués'), icon: 'eye', run: () => openBlocked() });
     actions.push(
       s.shareLibrary
@@ -522,7 +549,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
 
   async function allowFirewall(): Promise<void> {
     const r = await host.firewall.allow();
-    flash = 'ok' in r ? { text: t('Pare-feu de Windows : Cyber Pinball autorisé'), tone: 'ok' } : 'cancelled' in r ? { text: t('Autorisation refusée : rien n’a changé'), tone: 'warning' } : { text: t('Pare-feu de Windows : {error}', { error: r.error }), tone: 'error' };
+    flash = 'ok' in r ? { text: host.firewall.vpxState() === 'closed' ? t('Pare-feu de Windows : Cyber Pinball autorisé, VPX fermé au réseau') : t('Pare-feu de Windows : Cyber Pinball autorisé'), tone: 'ok' } : 'cancelled' in r ? { text: t('Autorisation refusée : rien n’a changé'), tone: 'warning' } : { text: t('Pare-feu de Windows : {error}', { error: r.error }), tone: 'error' };
     host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER);
   }
 

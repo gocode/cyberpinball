@@ -89,7 +89,12 @@ test('ROM : « Balls Per Game » lu dans le .nv d’après la carte ; sans .nv, 
   assert.equal(romBallsPerGame(little, nvWith(4, [3, 0], 0x20000)), 3);
   const nibble = { ...T2, platform: { memory_layout: [{ type: 'nvram', address: 0, size: 0x2000, nibble: 'low' }] } };
   assert.equal(romBallsPerGame(nibble, nvWith(6943, [0, 5])), undefined, 'mémoire en demi-octets : pas lue');
-  assert.equal(romBallsPerGame({ ...T2, map: { adjustments: {} } }, nvWith(6943, [0, 5])), undefined, 'carte sans ce réglage (Stern SAM)');
+  assert.equal(romBallsPerGame({ ...T2, map: { adjustments: {} } }, nvWith(6943, [0, 5])), undefined, 'carte sans ce réglage');
+  // The Walking Dead (twd_160h) : le réglage n'est que dans « game_state » (ball_count).
+  const twd = { map: { game_state: { ball_count: { label: 'Balls Per Game', encoding: 'int', start: '0x02102108' } } }, platform: { endian: 'little', memory_layout: [{ type: 'nvram', address: '0x02100000', size: '0x20000' }] } } as unknown as RomMemory;
+  assert.equal(romBallsPerGame(twd, nvWith(0x2108, [5], 0x20000)), 5);
+  const other = { ...twd, map: { game_state: { ball_count: { label: 'Ball Save Time', encoding: 'int', start: '0x02102108' } } } } as unknown as RomMemory;
+  assert.equal(romBallsPerGame(other, nvWith(0x2108, [5], 0x20000)), undefined, 'un autre réglage sous ce nom : pas lu');
 });
 
 test('cartes : index, carte et plateforme téléchargés une fois, puis lus du cache ; sans réseau, le cache ; rien d’autre', async () => {

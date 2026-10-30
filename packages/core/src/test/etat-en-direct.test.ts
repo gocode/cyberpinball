@@ -6,11 +6,14 @@
 // complétés, ils se compilent (cscript), comme leurs originaux. Tables à ROM : le relevé lit la
 // mémoire de la ROM d'après sa carte ; exécuté ici par cscript sur un faux Controller dont la NVRAM
 // suit celle de la vraie ROM de T2, relevée sur la libpinmame de la borne (le script complété des
-// deux versions de T2 de la borne se compile aussi). Stern SAM : hors de portée, refusé.
+// deux versions de T2 de la borne se compile aussi). Stern SAM : joueur, bille et fin de partie hors
+// de la NVRAM, lus par l'inspector de VPX à 127.0.0.1 (exécuté ici contre un faux inspector), et
+// seulement quand il peut être activé (règle du pare-feu de VPX posée, vpx-inspector.test.ts).
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
@@ -320,6 +323,160 @@ test('ROM, exécuté : départ après l’attente de la table, partie lue, initi
 });
 
 // ---------------------------------------------------------------------------
+// Stern SAM : joueur, bille et fin de partie par l'inspector de VPX (lu par 127.0.0.1)
+
+/** Star Trek (st_161h) avec le nombre de billes, comme sa carte. */
+const ST_FULL: RomMemory = {
+  ...ST,
+  map: { ...ST.map, adjustments: { Standard: { '21': { label: 'Balls Per Game', start: '0x021020F8', encoding: 'int' } } } } as RomMemory['map'],
+};
+
+test('ROM Stern SAM : joueur, bille et fin par l’inspector de VPX, seulement s’il peut être activé ; la NVRAM d’abord', () => {
+  const st = romLivePlan(ST_FULL, { inspector: true });
+  assert.ok(st.ok);
+  assert.deepEqual(st.plan.states.map((s) => [s.name, s.start, s.length, s.little]), [
+    ['cyberpinball_joueur', 0x31988, 1, true],
+    ['cyberpinball_bille', 0x31989, 1, true],
+    ['cyberpinball_fin', 0x319ba, 1, true],
+  ]);
+  assert.deepEqual([st.plan.over.mask, st.plan.over.bool], [0xfe, { invert: true }], 'masque et inversion appliqués par le relevé, pas par la carte');
+  assert.equal(st.plan.scores[0]!.state, undefined, 'scores et nombre de joueurs dans la NVRAM');
+  // Sans inspector possible (règle du pare-feu de VPX absente), pas de relevé, et le journal dit pourquoi.
+  const without = liveStateHook(ROM_SCRIPT, ELEMENTS, FILE, ST_FULL);
+  assert.equal(without.ok, false);
+  assert.match(!without.ok ? without.reason : '', /current_player, current_ball, game_over\) ; l'inspector de VPX les lirait/);
+  const hook = liveStateHook(ROM_SCRIPT, ELEMENTS, FILE, ST_FULL, { port: 2114 });
+  assert.ok(hook.ok);
+  assert.deepEqual(hook.inspector.map((s) => s.name), ['cyberpinball_joueur', 'cyberpinball_bille', 'cyberpinball_fin']);
+  assert.match(hook.script, /"http:\/\/127\.0\.0\.1:2114" & page/, 'lu par 127.0.0.1 seulement');
+  assert.ok(!/0\.0\.0\.0|localhost/i.test(hook.script));
+  // T2 : tout est dans la NVRAM, l'inspector n'est pas utilisé même s'il est offert.
+  const t2 = liveStateHook(ROM_SCRIPT, ELEMENTS, FILE, T2, { port: 2114 });
+  assert.ok(t2.ok);
+  assert.deepEqual(t2.inspector, []);
+  assert.ok(!/WinHttp/.test(t2.script));
+  assert.equal(liveStateHook(ROM_SCRIPT, ELEMENTS, FILE, ST_FULL, { port: 80 }).ok, false, 'port hors de ce que VPX accepte');
+});
+
+/**
+ * Le script complété exécuté par cscript, sur un faux Controller (NVRAM de Star Trek) et un faux
+ * inspector servi ici à 127.0.0.1 (/api/tree et /api/states, au format de VPX 10.8.1). Chaque
+ * étape : octets de la NVRAM, valeurs de l'inspector (fichier lu par le serveur), quatre tours de
+ * minuteur (un relevé toutes les deux secondes, NVRAM de 128 Ko), puis les touches du joueur.
+ */
+async function runSamHook(steps: { tree?: boolean; vals?: [number, number, number]; set?: [number, number[]][]; press?: string[] }[]): Promise<{ state: string; keys: string }[]> {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-etat-sam-'));
+  const valsFile = path.join(dir, 'inspector.txt');
+  fs.writeFileSync(valsFile, '0;0;0;0');
+  const ids = { cyberpinball_joueur: '101', cyberpinball_bille: '102', cyberpinball_fin: '103' };
+  // Comme nlohmann::json : clés en ordre alphabétique, sans espace.
+  const item = (name: string, mapping: string) => ({ dataType: 64, desc: `cyberpinball\\${name}\\${name}`, mapping, name, type: 'state', writable: false });
+  const server = http.createServer((req, res) => {
+    const [tree, joueur, bille, fin] = fs.readFileSync(valsFile, 'utf8').split(';');
+    res.setHeader('Content-Type', 'application/json');
+    if (req.url === '/api/tree') {
+      const states = [item('Playfield #01', '7'), ...(tree === '1' ? Object.entries(ids).map(([n, m]) => item(n, m)) : [])];
+      res.end(JSON.stringify({ tree: [{ children: [{ children: [{ children: states, id: 9, name: 'Game States', type: 'group' }], name: 'Game States', type: 'category' }], id: 1, name: 'PinMAME', type: 'controller' }], treeId: 3 }));
+    } else if (req.url === '/api/states') {
+      const values = tree === '1' ? [['101', joueur], ['102', bille], ['103', fin]] : [];
+      res.end(JSON.stringify({ states: [{ id: '7', state: 1, type: 'uint8' }, ...values.map(([id, v]) => ({ id, state: v, type: 'int64' }))], treeId: 3 }));
+    } else {
+      res.statusCode = 404;
+      res.end();
+    }
+  });
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const port = (server.address() as { port: number }).port;
+  try {
+    const stateFile = path.join(dir, 'cyberpinball-etat.txt');
+    const hook = liveStateHook(ROM_SCRIPT, ELEMENTS, stateFile, ST_FULL, { port });
+    assert.ok(hook.ok);
+    const size = 0x10a10;
+    const prelude = [
+      'Const AddCreditKey = 6, AddCreditKey2 = 4, StartGameKey = 2, LockBarKey = 29, LeftFlipperKey = 42',
+      'Class CPElement : Public TimerInterval, TimerEnabled : End Class',
+      'Class CPController : Public NVRAM, GameName : End Class',
+      `Dim ${hook.element} : Set ${hook.element} = New CPElement`,
+      'Dim Controller : Set Controller = New CPController',
+      `Dim CPMem(${size - 1}), CPKeys, CPi, CPFso`,
+      `For CPi = 0 To ${size - 1} : CPMem(CPi) = CByte(0) : Next`,
+      'Controller.NVRAM = CPMem',
+      'Set CPFso = CreateObject("Scripting.FileSystemObject")',
+      'Sub SoundStartButton : End Sub',
+      'Function vpmKeyDown(ByVal k) : CPKeys = CPKeys & "D" & k & " " : vpmKeyDown = True : End Function',
+      'Function vpmKeyUp(ByVal k) : CPKeys = CPKeys & "U" & k & " " : vpmKeyUp = True : End Function',
+      'Sub CPSet(ByVal at, ByVal v) : CPMem(at) = CByte(v) : End Sub',
+      `Sub CPVals(ByVal s) : Dim f : Set f = CPFso.CreateTextFile("${valsFile}", True) : f.Write s : f.Close : End Sub`,
+    ];
+    let vals = '0;0;0;0';
+    const driver = steps.flatMap((s, i) => {
+      if (s.tree !== undefined || s.vals) vals = `${s.tree === false ? 0 : 1};${(s.vals ?? [0, 0, 0]).join(';')}`;
+      return [
+        'CPKeys = ""',
+        ...(s.set ?? []).flatMap(([at, bytes]) => bytes.map((b, j) => `CPSet ${at + j}, ${b}`)),
+        'Controller.NVRAM = CPMem',
+        `CPVals "${vals}"`,
+        ...Array.from({ length: 4 }, () => `${hook.element}_Timer`),
+        ...(s.press ?? []).map((k) => `table1_KeyDown ${k} : table1_KeyUp ${k}`),
+        `WScript.Echo "${i}|" & CyberPinball_Last & "|" & CPKeys`,
+      ];
+    });
+    const script = hook.script.replace(/^Option Explicit\r\n/, `Option Explicit\r\n${prelude.join('\r\n')}\r\n`) + '\r\n' + driver.join('\r\n') + '\r\n';
+    const file = path.join(dir, 'essai.vbs');
+    fs.writeFileSync(file, script, 'latin1');
+    // cscript en parallèle : le serveur de ce processus doit pouvoir répondre.
+    const run = await new Promise<{ status: number | null; out: string }>((resolve) => {
+      const child = spawn('cscript', ['//NoLogo', '//E:vbscript', file], { windowsHide: true });
+      let out = '';
+      child.stdout.on('data', (d: Buffer) => (out += d.toString('latin1')));
+      child.stderr.on('data', (d: Buffer) => (out += d.toString('latin1')));
+      const timer = setTimeout(() => child.kill(), 90_000);
+      child.on('close', (status) => {
+        clearTimeout(timer);
+        resolve({ status, out });
+      });
+    });
+    assert.equal(run.status, 0, run.out);
+    return run.out.trim().split(/\r?\n/).map((l) => l.split('|')).map(([, state, keys]) => ({ state: state!, keys: keys!.trim() }));
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+test('ROM Stern SAM, exécuté : l’inspector attendu, départ après l’attente, partie lue, fin de partie, Start et monnayeur filtrés', { skip: process.platform !== 'win32' }, async () => {
+  const at = (addr: number) => addr - 0x02100000;
+  const le = (n: number) => [n & 255, (n >> 8) & 255, (n >> 16) & 255, (n >>> 24) & 255];
+  const r = await runSamHook([
+    // La ROM démarre : l'inspector n'a pas encore ses valeurs (arbre sans la carte) : aucun relevé.
+    { tree: false, set: [[at(0x021020f8), [3]]], press: ['2'] },
+    // En attente (fin de partie : octet d'état sans bit au-delà du premier).
+    { vals: [0, 0, 0] },
+    { vals: [0, 0, 1] },
+    { vals: [0, 0, 0] },
+    // Quatrième relevé en attente : le crédit, tenu jusqu'au tour suivant ; Start quatre tours plus tard.
+    { vals: [0, 0, 0] },
+    { vals: [0, 0, 0] },
+    // Notre partie part.
+    { vals: [1, 1, 0x80], set: [[at(0x02110900), [1]]] },
+    { vals: [1, 2, 0x80], set: [[at(0x02110a0c), le(1_234_560)]], press: ['42', '6', '2'] },
+    // Dernière bille perdue : fin de partie (pas de tableau dans cette carte réduite : la partie est finie).
+    { vals: [1, 3, 0x01], set: [[at(0x02110a0c), le(2_500_010)]], press: ['2'] },
+  ]);
+  assert.equal(r[0]!.state, '', 'rien tant que l’inspector ne rend pas les valeurs');
+  assert.equal(r[0]!.keys, '', 'Start du joueur ignoré hors partie');
+  assert.equal(r[1]!.state, 'jeu=0;vu=0;joueurs=1;joueur=1;bille=0;billes=3;score=0');
+  assert.equal(r.slice(1, 4).map((s) => s.keys).join(''), '', 'pas de départ avant quatre relevés en attente');
+  assert.equal(r[4]!.keys, 'D6 U6');
+  assert.equal(r[5]!.keys, 'D2 U2');
+  assert.equal(r[6]!.state, 'jeu=1;vu=1;joueurs=1;joueur=1;bille=1;billes=3;score=0');
+  assert.equal(r[7]!.state, 'jeu=1;vu=1;joueurs=1;joueur=1;bille=2;billes=3;score=1234560');
+  assert.equal(r[7]!.keys, 'D42 U42 D2 U2', 'en partie : flipper et Start passent, le monnayeur jamais');
+  assert.equal(r[8]!.state, 'jeu=0;vu=1;joueurs=1;joueur=1;bille=3;billes=3;score=2500010');
+  assert.equal(r[8]!.keys, '');
+});
+
+// ---------------------------------------------------------------------------
 // Service (app/src/live-game.ts) et application
 
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -372,6 +529,6 @@ test('application : le relevé lu pendant la partie, la fin ferme VPX, une parti
   assert.match(front, /gameNotices\.board\(playing && state\.phase === 'playing' && settled && current \? liveBoardView\(current, socialNet\.state\(\)\.key\.publicKey\) : undefined\);/);
   assert.match(front, /console\.log\(`Partie : écrans occupés par VPX[^\n]*\r?\n\s+broadcast\(\);\r?\n[^\n]*\r?\n\s+showLiveBoard\(\);/);
   const doubles = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'table-double.ts'), 'utf8');
-  assert.match(doubles, /liveStateHook\(script, readVpxElements\(plan\.file\), stateFile, rom\?\.memory\)/);
+  assert.match(doubles, /liveStateHook\(script, readVpxElements\(plan\.file\), stateFile, rom\?\.memory, offered\)/);
   assert.match(doubles, /const rom = roms\.map\(\(name\) => \(\{ name, memory: romBoard\(name\)\.memory \}\)\)\.find\(\(r\) => r\.memory\);/);
 });

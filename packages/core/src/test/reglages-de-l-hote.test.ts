@@ -227,5 +227,5 @@ test('deux bornes : l’invité accepte, reçoit les réglages de l’hôte, le 
 test('application : les réglages lus pour l’hôte, posés dans le double pour l’invité', () => {
   const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(front, /settingsOf: \(table\) => readHostSettings\(/);
-  assert.match(front, /tableDoubles\.start\(table, hooks\.double, hooks\.settings, hooks\.board\)/);
+  assert.match(front, /tableDoubles\.start\(table, hooks\.double, hooks\.settings, hooks\.board, inspector\)/);
 });

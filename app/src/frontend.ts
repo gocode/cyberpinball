@@ -187,6 +187,7 @@ import { friendTransport } from './download-sources';
 import { createGameNotices } from './game-notice';
 import { createBallCounts } from './ball-count';
 import { createTableDoubles } from './table-double';
+import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
 import { createLiveGames, type LiveProgress } from './live-game';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
@@ -749,7 +750,8 @@ function downloadsChanged(): void {
     }
   }, 250);
 }
-const socialFirewall = createFirewallRule({ exe: process.execPath, simulated: socialMode !== 'public', log: (line) => console.log(line) });
+// Et la règle qui ferme VPX au réseau (l'inspector des parties entre amis), pour sa version active.
+const socialFirewall = createFirewallRule({ exe: process.execPath, simulated: socialMode !== 'public', vpx: () => vpxFirewallTargets(vpxInstall(loc)?.exe), log: (line) => console.log(line) });
 const romsOf = (table: TableEntry) => cachedScript(table.file, loc.dataDir)?.roms ?? [];
 // Bibliothèque partagée entre amis : la mienne servie si je la partage, la leur et leurs médias.
 /** L'inventaire du dossier d'une table, celui de « Fichiers de la table » : ses parties, à transmettre ou déjà là. */
@@ -806,6 +808,8 @@ const tableDoubles = createTableDoubles({
   romsOf,
   // Les cartes mémoire des ROM, mises en cache par ball-count.ts : le tableau d'une table à ROM.
   memoryCacheDir: path.join(loc.dataDir, 'cache', 'cartes-memoire'),
+  // Copié dans le double, l'inspector activé, quand il sert à la partie (Stern SAM) : jamais modifié.
+  cabinetIni: () => activeVpxIni(loc),
   log: (line) => console.log(line),
 });
 tableDoubles.sweep();
@@ -1673,6 +1677,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 
   // Dès le chargement : son écran rappelle les boutons du menu de VPX, pas ceux du jeu.
   displayMode = mode === 'display';
+  // Partie entre amis : la règle du pare-feu de VPX relue pendant le chargement, pour l'inspector de VPX (vpx-inspector.ts).
+  const inspectorReady = hooks.double && !displayMode && simulated === undefined ? inspectorFor(socialFirewall, (line) => console.log(line)) : Promise.resolve(undefined);
   guest.releaseAll();
   state = { ...state, phase: 'loading', help: false };
   launchCount++;
@@ -1729,7 +1735,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Partie entre amis : VPX joue un double de la table, fait après les préparations ci-dessus ; le
   // dossier habituel n'est jamais ouvert en écriture. Sans double possible, pas de partie : jamais
   // de repli sur le dossier habituel.
-  const doubled = hooks.double && !displayMode ? tableDoubles.start(table, hooks.double, hooks.settings, hooks.board) : undefined;
+  // L'inspector de VPX lui est proposé si la règle du pare-feu qui ferme VPX au réseau est posée (lue pendant le chargement).
+  const inspector = await inspectorReady;
+  const doubled = hooks.double && !displayMode ? tableDoubles.start(table, hooks.double, hooks.settings, hooks.board, inspector) : undefined;
   if (doubled && !doubled.ok) {
     console.log(`Partie entre amis (${table.id}) : pas de double, partie non lancée (${doubled.reason}).`);
     dressing = undefined;
@@ -1776,7 +1784,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground })
-      : launchVpx({ exe: install.exe, ini: activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying, onForeground });
+      : launchVpx({ exe: install.exe, ini: double?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying, onForeground });
   // Une partie simulée ne prend aucun raccourci global au poste.
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   // Partie entre amis : l'état de jeu que le relevé du double écrit (livestate.ts), deux fois par seconde ;

@@ -32,6 +32,11 @@ export interface Component {
   /** Expression régulière du nom de l'exécutable principal, cherché après extraction. */
   executablePattern: string;
   /**
+   * Nom de cet exécutable une fois installé (VPX : la règle « Cyber Pinball VPX » du pare-feu, que
+   * l'installeur pose avant que l'application n'installe VPX). Il répond à executablePattern.
+   */
+  executable?: string;
+  /**
    * Ce que l'adaptateur du même id doit savoir de cette version précise
    * (pour VPX : format des noms d'écran, plugins à activer). Lu par l'adaptateur, opaque ici.
    */

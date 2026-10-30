@@ -97,9 +97,16 @@ const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : typ
 
 /** Le réglage « Balls Per Game » que décrit la carte (livestate.ts le lit aussi pendant la partie). */
 export function romBallsEntry(memory: RomMemory): AdjustmentEntry | undefined {
-  return Object.values(memory.map.adjustments ?? {})
-    .flatMap((group) => Object.values(group ?? {}))
-    .find((e) => typeof e?.label === 'string' && /^balls?\s*(per|\/)\s*game$/i.test(e.label.trim()));
+  const isBalls = (e: AdjustmentEntry | undefined) => typeof e?.label === 'string' && /^balls?\s*(per|\/)\s*game$/i.test(e.label.trim());
+  // Dans les réglages d'abord ; certaines cartes (The Walking Dead, twd_160h) ne le mettent que dans
+  // « game_state » (ball_count).
+  const state = (memory.map as { game_state?: Record<string, unknown> }).game_state;
+  const fromState = state && typeof state === 'object' ? (state.ball_count as AdjustmentEntry | undefined) : undefined;
+  return (
+    Object.values(memory.map.adjustments ?? {})
+      .flatMap((group) => Object.values(group ?? {}))
+      .find(isBalls) ?? (fromState && typeof fromState === 'object' && (isBalls(fromState) || fromState.label === undefined) ? fromState : undefined)
+  );
 }
 
 /**

@@ -15,6 +15,7 @@
       "sha256": "0a5973ea4597c7819583c7379ebe99dee12af4d526a54438f8c121796cc68232",
       "size": 172566470,
       "executablePattern": "^VPinballX.*64\\.exe$",
+      "executable": "VPinballX_BGFX64.exe",
       "adapterSettings": {
         "displayIdFormat": "name",
         "enabledPlugins": ["PinMAME", "AlphaDMD", "B2S", "ScoreView", "PUP", "AltSound", "Serum", "VNI", "FlexDMD", "WMP"]

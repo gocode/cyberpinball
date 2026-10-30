@@ -31,13 +31,20 @@
 //   valide les lettres), deux minutes au plus ;
 // - les touches passent par vpmKeyDown : un crédit pris 750 ms après la touche, Start tenu une
 //   demi-seconde (la ROM lit ses contacts, un appui sans durée ne se voit pas).
-// Seules les ROM dont la carte met tout cela dans la NVRAM ont un relevé : sur Williams WPC, toute
-// la RAM est la NVRAM ; sur Stern SAM, joueur, bille et fin de partie sont en RAM principale, hors
-// de portée du script. Le banc l'a confirmé sur Star Trek (st_161h) et The Walking Dead
-// (twd_160h) : scores et nombre de joueurs se lisent en direct dans la NVRAM, un compteur de billes
-// s'y trouve aussi (hors carte), mais il garde la bille d'une partie coupée jusqu'à la partie
-// suivante, et aucun mot n'y dit « partie en cours » d'une partie à l'autre (un candidat de la
-// première partie est resté à 0 pendant la seconde) : ni départ sûr, ni fin sûre, pas de relevé.
+// Sur Williams WPC, toute la RAM est la NVRAM : la carte entière se lit par Controller.NVRAM. Sur
+// Stern SAM, joueur, bille et fin de partie sont en RAM principale, hors de portée du script. Le
+// banc l'a confirmé sur Star Trek (st_161h) et The Walking Dead (twd_160h) : scores et nombre de
+// joueurs se lisent en direct dans la NVRAM, un compteur de billes s'y trouve aussi (hors carte),
+// mais il garde la bille d'une partie coupée jusqu'à la partie suivante, et aucun mot n'y dit
+// « partie en cours » d'une partie à l'autre : ni départ sûr, ni fin sûre par la NVRAM seule.
+// Ces valeurs-là passent par l'inspector de VPX (accord du 30/10/2026) : le module PinMAME de VPX
+// lit la carte posée dans le double (pinmame\memmaps, inspectorMemMapFiles), puis publie chaque
+// valeur lue dans la mémoire du processeur, RAM principale comprise ; l'inspector les sert en HTTP,
+// et le relevé les lit par 127.0.0.1 (/api/tree pour leur numéro, /api/states pour leur valeur).
+// L'inspector n'est activé que pour la partie entre amis (VPinballX.ini du double), et seulement
+// quand la règle du pare-feu qui ferme VPX au réseau est posée (firewall.ts) ; une table qui peut
+// tout lire dans sa NVRAM ne l'utilise pas. La RAM principale est effacée au démarrage de la ROM :
+// pas de partie d'avant à écarter, mais le départ attend toujours la table en attente.
 // Une table qui n'a ni ce socle ni cette carte n'a pas d'état en direct : la partie se joue comme
 // avant.
 
@@ -64,12 +71,31 @@ const NEEDED = [/\bDim\s+Score\s*\(/i, /\bCurrentPlayer\b/i, /\bPlayersPlayingGa
 /** Types d'éléments au minuteur intégré qu'on peut emprunter : mur, lampe. */
 const TIMER_HOSTS = [0, 7];
 
-export type LiveHook = { ok: true; script: string; element: string; table: string; source: 'script' | 'rom' } | { ok: false; reason: string };
+/** Une valeur lue par l'inspector de VPX : son nom dans la carte posée dans le double, et où la ROM la tient. */
+export interface InspectorState {
+  name: string;
+  start: number;
+  length: number;
+  bcd: boolean;
+  little: boolean;
+}
+
+export type LiveHook =
+  | {
+      ok: true;
+      script: string;
+      element: string;
+      table: string;
+      source: 'script' | 'rom';
+      /** Les valeurs que le relevé lit par l'inspector de VPX (sa carte est à poser dans le double) ; vide sans inspector. */
+      inspector: InspectorState[];
+    }
+  | { ok: false; reason: string };
 
 // ---------------------------------------------------------------------------
 // La mémoire d'une ROM
 
-/** Une valeur de la NVRAM : sa place dans Controller.NVRAM (le .nv) et son codage. */
+/** Une valeur de la mémoire de la ROM : sa place dans Controller.NVRAM (le .nv) et son codage. */
 interface NvField {
   at: number;
   length: number;
@@ -78,6 +104,8 @@ interface NvField {
   mask?: number;
   /** Booléen : vrai si non nul (après le masque), inversé si `invert`. */
   bool?: { invert: boolean };
+  /** Hors de la NVRAM : lue par l'inspector de VPX, sous ce nom (`at` n'a alors pas de sens). */
+  state?: InspectorState;
 }
 
 /** Ce que le relevé lit dans la NVRAM d'une ROM. */
@@ -93,6 +121,8 @@ export interface RomLivePlan {
   board: NvField[];
   /** Taille de NVRAM qu'il faut au moins. */
   size: number;
+  /** Les valeurs hors de la NVRAM, lues par l'inspector de VPX (vide sans inspector). */
+  states: InspectorState[];
 }
 
 interface Descriptor {
@@ -109,10 +139,11 @@ interface Descriptor {
 const num = (v: unknown): number | undefined => (typeof v === 'number' && Number.isFinite(v) ? v : typeof v === 'string' && /^(0x[0-9a-f]+|\d+)$/i.test(v) ? Number(v) : undefined);
 
 /**
- * Ce que le relevé peut lire dans la NVRAM d'une ROM, d'après sa carte ; ou la raison (les valeurs
- * de « game_state » absentes, hors de la NVRAM, ou d'un codage inconnu).
+ * Ce que le relevé peut lire dans la mémoire d'une ROM, d'après sa carte ; ou la raison (les
+ * valeurs de « game_state » absentes, hors de la NVRAM, ou d'un codage inconnu). `inspector` : une
+ * valeur hors de la NVRAM se lit par l'inspector de VPX (sinon, pas de relevé).
  */
-export function romLivePlan(memory: RomMemory): { ok: true; plan: RomLivePlan } | { ok: false; reason: string } {
+export function romLivePlan(memory: RomMemory, opts: { inspector?: boolean } = {}): { ok: true; plan: RomLivePlan } | { ok: false; reason: string } {
   const map = memory.map as RomMemory['map'] & { game_state?: Record<string, unknown>; high_scores?: { score?: Descriptor }[] };
   const state = map.game_state;
   if (!state || typeof state !== 'object') return { ok: false, reason: 'carte sans état de jeu (game_state)' }; // i18n-ignore : journal
@@ -121,43 +152,54 @@ export function romLivePlan(memory: RomMemory): { ok: true; plan: RomLivePlan } 
   if (region?.base === undefined || region.size === undefined) return { ok: false, reason: 'carte sans NVRAM lisible' }; // i18n-ignore : journal
   const little = memory.platform.endian === 'little';
   let size = 0;
-  const field = (d: unknown, kind: 'number' | 'bool'): NvField | undefined => {
+  const states: InspectorState[] = [];
+  /** `name` : son nom pour l'inspector, si elle est hors de la NVRAM ; sans nom, la NVRAM seule. */
+  const field = (d: unknown, kind: 'number' | 'bool', name?: string): NvField | undefined => {
     if (!d || typeof d !== 'object') return undefined;
     const e = d as Descriptor;
     const start = num(e.start);
     const length = num(e.length) ?? 1;
     if (start === undefined || length < 1 || length > 8 || (e.nibble ?? 'both') !== 'both') return undefined;
-    const at = start - region.base!;
-    if (at < 0 || at + length > region.size!) return undefined;
     const mask = num(e.mask);
     const encoding = e.encoding;
     if (kind === 'bool' ? encoding !== 'bool' : encoding !== 'int' && encoding !== 'bcd') return undefined;
-    size = Math.max(size, at + length);
-    return {
-      at,
+    // Un masque s'applique octet par octet : sur une valeur de plusieurs octets, la carte le dit autrement.
+    if (mask !== undefined && length > 1) return undefined;
+    const value = {
       length,
       bcd: encoding === 'bcd',
       little: (e.endian ?? (little ? 'little' : 'big')) === 'little',
       ...(mask !== undefined ? { mask } : {}),
       ...(kind === 'bool' ? { bool: { invert: e.invert === true } } : {}),
     };
+    const at = start - region.base!;
+    if (at >= 0 && at + length <= region.size!) {
+      size = Math.max(size, at + length);
+      return { at, ...value };
+    }
+    if (!opts.inspector || !name) return undefined;
+    // L'inspector rend la valeur brute (entier ou BCD) ; masque et booléen s'appliquent dans le relevé.
+    const s: InspectorState = { name: `cyberpinball_${name}`, start, length, bcd: value.bcd, little: value.little };
+    states.push(s);
+    return { at: -1, ...value, state: s };
   };
-  const scores = Array.isArray(state.scores) ? state.scores.map((s) => field(s, 'number')) : [];
-  const player = field(state.current_player, 'number');
-  const ball = field(state.current_ball, 'number');
-  const over = field(state.game_over, 'bool');
+  const scores = Array.isArray(state.scores) ? state.scores.map((s, i) => field(s, 'number', `score${i + 1}`)) : [];
+  const player = field(state.current_player, 'number', 'joueur');
+  const ball = field(state.current_ball, 'number', 'bille');
+  const over = field(state.game_over, 'bool', 'fin');
   const missing = [...(!scores.length || scores.some((s) => !s) ? ['scores'] : []), ...(player ? [] : ['current_player']), ...(ball ? [] : ['current_ball']), ...(over ? [] : ['game_over'])];
   if (missing.length) return { ok: false, reason: `état de jeu hors de la NVRAM ou illisible (${missing.join(', ')})` }; // i18n-ignore : journal
-  const players = field(state.player_count, 'number');
+  const players = field(state.player_count, 'number', 'joueurs');
   const ballsEntry = romBallsEntry(memory);
   const balls = field(ballsEntry, 'number');
+  // Le tableau des records, dans la NVRAM seulement (il y est sur WPC comme sur SAM).
   const board = (Array.isArray(map.high_scores) ? map.high_scores : []).map((h) => field(h?.score, 'number')).filter((f): f is NvField => !!f);
-  return { ok: true, plan: { scores: scores as NvField[], player: player!, ball: ball!, over: over!, ...(players ? { players } : {}), ...(balls ? { balls } : {}), board, size } };
+  return { ok: true, plan: { scores: scores as NvField[], player: player!, ball: ball!, over: over!, ...(players ? { players } : {}), ...(balls ? { balls } : {}), board, size, states } };
 }
 
-/** L'expression VBScript qui lit une valeur dans `nv` (le tableau de Controller.NVRAM). */
+/** L'expression VBScript qui lit une valeur dans `nv` (le tableau de Controller.NVRAM), ou celle que l'inspector a rendue. */
 function read(f: NvField): string {
-  const raw = `CyberPinball_Rd(nv, ${f.at}, ${f.length}, ${f.bcd ? 'True' : 'False'}, ${f.little ? 'True' : 'False'})`;
+  const raw = f.state ? `CyberPinball_Vals("${f.state.name}")` : `CyberPinball_Rd(nv, ${f.at}, ${f.length}, ${f.bcd ? 'True' : 'False'}, ${f.little ? 'True' : 'False'})`;
   const masked = f.mask !== undefined ? `(${raw} And ${f.mask})` : raw;
   if (!f.bool) return masked;
   return f.bool.invert ? `(${masked} = 0)` : `(${masked} <> 0)`;
@@ -169,17 +211,22 @@ function read(f: NvField): string {
 /**
  * Le script du double, avec le relevé et le départ automatique ; `stateFile` : le fichier où le
  * relevé écrit (dans le double). `elements` : ceux de la table (readVpxElements). `rom` : la carte
- * de la ROM que joue la table (le jeu chargé), pour une table à ROM (romLivePlan).
+ * de la ROM que joue la table (le jeu chargé), pour une table à ROM (romLivePlan). `inspector` :
+ * l'inspector de VPX peut être activé pour cette partie, sur ce port ; il ne sert que pour les
+ * valeurs hors de la NVRAM (Stern SAM), la NVRAM d'abord.
  */
-export function liveStateHook(script: string, elements: readonly { type: number; name: string }[], stateFile: string, rom?: RomMemory): LiveHook {
+export function liveStateHook(script: string, elements: readonly { type: number; name: string }[], stateFile: string, rom?: RomMemory, inspector?: { port: number }): LiveHook {
   const original = NEEDED.every((re) => re.test(script));
   let plan: RomLivePlan | undefined;
   if (!original) {
     if (!rom) return { ok: false, reason: 'script hors du socle commun (Score, CurrentPlayer, BallsRemaining, bGameInPlay)' }; // i18n-ignore : journal
     if (!/\bController\b/.test(script) || !/\bvpmKeyDown\s*\(/i.test(script)) return { ok: false, reason: 'table à ROM sans Controller ni vpmKeyDown' }; // i18n-ignore : journal
-    const planned = romLivePlan(rom);
+    let planned = romLivePlan(rom);
+    if (!planned.ok && inspector) planned = romLivePlan(rom, { inspector: true });
+    else if (!planned.ok && romLivePlan(rom, { inspector: true }).ok) return { ok: false, reason: `carte de la ROM : ${planned.reason} ; l'inspector de VPX les lirait, s'il pouvait être activé` }; // i18n-ignore : journal
     if (!planned.ok) return { ok: false, reason: `carte de la ROM : ${planned.reason}` }; // i18n-ignore : journal
     plan = planned.plan;
+    if (plan.states.length && !(inspector && Number.isInteger(inspector.port) && inspector.port >= 1024 && inspector.port <= 65535)) return { ok: false, reason: 'port de l’inspector invalide' }; // i18n-ignore : journal
   }
   const down = /^([ \t]*)Sub\s+(\w+)_KeyDown\s*\(\s*(?:ByVal\s+)?(\w+)\s*\)/im.exec(script);
   if (!down) return { ok: false, reason: 'pas de procédure _KeyDown' }; // i18n-ignore : journal
@@ -200,8 +247,8 @@ export function liveStateHook(script: string, elements: readonly { type: number;
   if (up) text = text.replace(up[0], `${up[1]}Sub CyberPinball_OrigKeyUp(ByVal ${up[2]})`);
   const eol = /\r\n/.test(script) ? '\r\n' : '\n';
   const e = host.name;
-  const block = plan ? romBlock(plan, e, table, !!up, stateFile) : scriptBlock(e, table, !!up, stateFile);
-  return { ok: true, script: text.replace(/\s*$/, '') + eol + block.join(eol), element: e, table, source: plan ? 'rom' : 'script' };
+  const block = plan ? romBlock(plan, e, table, !!up, stateFile, inspector?.port) : scriptBlock(e, table, !!up, stateFile);
+  return { ok: true, script: text.replace(/\s*$/, '') + eol + block.join(eol), element: e, table, source: plan ? 'rom' : 'script', inspector: plan?.states ?? [] };
 }
 
 const HEADER = [
@@ -276,17 +323,20 @@ function scriptBlock(e: string, table: string, up: boolean, stateFile: string): 
 /**
  * Table à ROM : le relevé lit la NVRAM de la ROM, toutes les demi-secondes ; toutes les deux
  * secondes pour une grande mémoire (au-delà de 32 Ko : la copie des 128 Ko de Stern SAM coûte
- * environ 3 ms au script, sur le fil de VPX).
+ * environ 3 ms au script, sur le fil de VPX). `port` : celui de l'inspector, pour les valeurs hors
+ * de la NVRAM.
  */
-function romBlock(plan: RomLivePlan, e: string, table: string, up: boolean, stateFile: string): string[] {
+function romBlock(plan: RomLivePlan, e: string, table: string, up: boolean, stateFile: string, port?: number): string[] {
   const scoreOf = (v: string, k: string) => ['  Select Case ' + k, ...plan.scores.map((f, i) => `    Case ${i + 1} : ${v} = ${read(f)}`), '  End Select'];
   const every = plan.size > 32 * 1024 ? 4 : 1;
   // Les initiales : deux minutes au plus, comptées en relevés.
   const initials = Math.ceil(120 / (every * 0.5));
+  const states = plan.states;
   return [
     ...HEADER,
     'Dim CyberPinball_Fso, CyberPinball_Last, CyberPinball_Ticks, CyberPinball_Seen, CyberPinball_Tries, CyberPinball_InGame, CyberPinball_Ready, CyberPinball_Step, CyberPinball_Held, CyberPinball_Over, CyberPinball_Score',
     'Set CyberPinball_Fso = CreateObject("Scripting.FileSystemObject")',
+    ...(states.length ? inspectorBlock(states, port!) : []),
     'CyberPinball_Ticks = 0 : CyberPinball_Seen = False : CyberPinball_Tries = 0 : CyberPinball_InGame = False : CyberPinball_Ready = 0 : CyberPinball_Step = 0 : CyberPinball_Held = 0 : CyberPinball_Over = 0 : CyberPinball_Score = 0',
     `${e}.TimerInterval = 500`,
     `${e}.TimerEnabled = True`,
@@ -338,6 +388,7 @@ function romBlock(plan: RomLivePlan, e: string, table: string, up: boolean, stat
     '  If Err.Number <> 0 Then Err.Clear : Exit Sub',
     '  If Not IsArray(nv) Then Exit Sub',
     `  If UBound(nv) < ${plan.size - 1} Then Exit Sub`,
+    ...(states.length ? ['  If Not CyberPinball_Inspect() Then Exit Sub'] : []),
     '  Dim p, b, n, over, playing, sc',
     `  p = ${read(plan.player)}`,
     `  b = ${read(plan.ball)}`,
@@ -381,6 +432,79 @@ function romBlock(plan: RomLivePlan, e: string, table: string, up: boolean, stat
     '  End If',
     'End Sub',
     '',
+  ];
+}
+
+/**
+ * Les valeurs hors de la NVRAM, lues par l'inspector de VPX à 127.0.0.1 : le numéro de chacune dans
+ * /api/tree (par son nom, une fois), puis sa valeur dans /api/states, à chaque relevé. Un appel
+ * attend 600 ms au plus (le relevé tourne sur le fil de VPX) ; sans réponse, ce relevé est sauté.
+ */
+function inspectorBlock(states: readonly InspectorState[], port: number): string[] {
+  const names = states.map((s) => `"${s.name}"`).join(', ');
+  return [
+    "' L'inspector de VPX, activé pour cette partie seulement, lu par 127.0.0.1 : les valeurs hors de la NVRAM.", // i18n-ignore : commentaire du script ajouté à la table
+    'Dim CyberPinball_Http, CyberPinball_Ids, CyberPinball_Vals',
+    'Set CyberPinball_Ids = CreateObject("Scripting.Dictionary")',
+    'Set CyberPinball_Vals = CreateObject("Scripting.Dictionary")',
+    'Function CyberPinball_Get(ByVal page)',
+    '  On Error Resume Next',
+    '  CyberPinball_Get = ""',
+    '  If IsEmpty(CyberPinball_Http) Then Set CyberPinball_Http = CreateObject("WinHttp.WinHttpRequest.5.1")',
+    `  CyberPinball_Http.Open "GET", "http://127.0.0.1:${port}" & page, False`,
+    "  CyberPinball_Http.SetProxy 1 ' direct, jamais par un proxy", // i18n-ignore : commentaire du script ajouté à la table
+    '  CyberPinball_Http.SetTimeouts 300, 300, 300, 600',
+    '  CyberPinball_Http.Send',
+    '  If Err.Number = 0 Then',
+    '    If CyberPinball_Http.Status = 200 Then CyberPinball_Get = CyberPinball_Http.ResponseText',
+    '  End If',
+    '  Err.Clear',
+    'End Function',
+    "' La valeur d'une clé, dans l'objet JSON (sans objet imbriqué) qui contient la position at.", // i18n-ignore : commentaire du script ajouté à la table
+    'Function CyberPinball_Json(ByRef text, ByVal at, ByVal key)',
+    '  CyberPinball_Json = ""',
+    '  Dim a, z, obj, k, i, c, v',
+    '  a = InStrRev(text, "{", at)',
+    '  z = InStr(at, text, "}")',
+    '  If a = 0 Or z = 0 Then Exit Function',
+    '  obj = Mid(text, a, z - a + 1)',
+    '  k = InStr(obj, """" & key & """:")',
+    '  If k = 0 Then Exit Function',
+    '  v = ""',
+    '  For i = k + Len(key) + 3 To Len(obj)',
+    '    c = Mid(obj, i, 1)',
+    '    If c = "," Or c = "}" Then Exit For',
+    '    If c <> """" And c <> " " Then v = v & c',
+    '  Next',
+    '  If InStr(v, ".") > 0 Then v = Left(v, InStr(v, ".") - 1)',
+    '  CyberPinball_Json = v',
+    'End Function',
+    'Function CyberPinball_Inspect()',
+    '  CyberPinball_Inspect = False',
+    `  Dim names, nm, t, at, v : names = Array(${names})`,
+    "  ' Les numéros, tant qu'ils ne sont pas tous connus (l'arbre se remplit quand la ROM démarre).", // i18n-ignore : commentaire du script ajouté à la table
+    `  If CyberPinball_Ids.Count < ${states.length} Then`,
+    '    CyberPinball_Ids.RemoveAll',
+    '    t = CyberPinball_Get("/api/tree")',
+    '    For Each nm In names',
+    '      at = InStr(t, """name"":""" & nm & """")',
+    '      If at > 0 Then',
+    '        v = CyberPinball_Json(t, at, "mapping")',
+    '        If IsNumeric(v) Then CyberPinball_Ids(nm) = v',
+    '      End If',
+    '    Next',
+    `    If CyberPinball_Ids.Count < ${states.length} Then Exit Function`,
+    '  End If',
+    '  t = CyberPinball_Get("/api/states")',
+    '  For Each nm In names',
+    '    at = InStr(t, """id"":""" & CyberPinball_Ids(nm) & """")',
+    '    If at = 0 Then CyberPinball_Ids.RemoveAll : Exit Function',
+    '    v = CyberPinball_Json(t, at, "state")',
+    '    If Not IsNumeric(v) Then Exit Function',
+    '    CyberPinball_Vals(nm) = CDbl(v)',
+    '  Next',
+    '  CyberPinball_Inspect = True',
+    'End Function',
   ];
 }
 
