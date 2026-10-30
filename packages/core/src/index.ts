@@ -58,7 +58,6 @@ export * from './menumoments';
 export * from './audiosink';
 export * from './mediadb';
 export * from './vpxinfo';
-export * from './vpxid';
 export * from './ballcount';
 export * from './tabledouble';
 export * from './highscores';

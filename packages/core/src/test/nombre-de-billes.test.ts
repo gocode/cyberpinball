@@ -120,7 +120,7 @@ test('cartes : index, carte et plateforme téléchargés une fois, puis lus du c
 });
 
 test('partie : les billes voyagent, et 5 contre 3 passe hors classement, même pour la même table', () => {
-  const table: LiveTable = { table: { title: 'Terminator 2' }, rules: 'rom:t2_l8', balls: 3 };
+  const table: LiveTable = { table: { title: 'Terminator 2' }, balls: 3 };
   const parsed = parseLiveMessage({ t: 'game-invite', game: { id: '0123456789abcdef', title: 'T2', players: [], table } }) as Extract<LiveMessage, { t: 'game-invite' }>;
   assert.equal(parsed.game.table.balls, 3);
   assert.equal((parseLiveMessage({ t: 'game-answer', game: '0123456789abcdef', answer: 'accept', match: 'same', balls: 5 }) as { balls?: number }).balls, 5);
@@ -129,12 +129,12 @@ test('partie : les billes voyagent, et 5 contre 3 passe hors classement, même p
   assert.equal(game.players[0]!.balls, 3);
   game = { ...game, players: [...game.players, { key: 'bruno', name: 'Bruno', state: 'invited' }, { key: 'chloe', name: 'Chloé', state: 'invited' }] };
   game = answerGame(game, 'bruno', 'accept', 'same', 5);
-  game = answerGame(game, 'chloe', 'accept', 'same-rules', 3);
+  game = answerGame(game, 'chloe', 'accept', 'same', 3);
   assert.equal(game.players[1]!.balls, 5);
   assert.ok(!liveRanked(game.players[1]!, 3), '5 billes contre 3');
   assert.ok(liveRanked(game.players[2]!, 3));
-  assert.ok(liveRanked({ match: 'same', balls: 5 }, undefined), 'inconnu chez l’hôte : rien à juger');
-  assert.ok(liveRanked({ match: 'same' }, 3), 'inconnu chez l’invité : rien à juger');
+  assert.ok(liveRanked({ balls: 5 }, undefined), 'inconnu chez l’hôte : rien à juger');
+  assert.ok(liveRanked({}, 3), 'inconnu chez l’invité : rien à juger');
   const done = (p: LivePlayer, score: number): LivePlayer => ({ ...p, state: 'done', records: [{ score, rank: 1 }] });
   const order = liveStandings({ table, players: [done(game.players[0]!, 1_000), done(game.players[1]!, 9_000), done(game.players[2]!, 2_000)] }).map((p) => p.name);
   assert.deepEqual(order, ['Chloé', 'Alice', 'Bruno']);

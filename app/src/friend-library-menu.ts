@@ -108,7 +108,8 @@ export interface FriendLibraryMenu {
   /** Sa bibliothèque connue a cette table (pour mettre en tête le choix d'une partie en direct). */
   has(key: string, table: TableEntry): boolean;
   /** Le même jeu dans sa bibliothèque (une invitation sur une table qu'on n'a pas) ; sinon sa bibliothèque. */
-  openMatching(key: string, identity: TableIdentity, back: () => void): void;
+  /** La table de l'ami qui correspond ; `want` : quand on a déjà le jeu, ses parties à prendre, cochées d'office. */
+  openMatching(key: string, identity: TableIdentity, back: () => void, want?: readonly GamePart[]): void;
 }
 
 /** Tables montrées par section avant « … et n autres ». */
@@ -294,7 +295,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     return contents ? installedParts(contents) : new Map();
   }
 
-  function openParts(key: string, tableId: string, back: () => void): void {
+  function openParts(key: string, tableId: string, back: () => void, want: readonly GamePart[] = []): void {
     const job: NonNullable<typeof parts> = { key, tableId, take: new Map(), attested: new Set() };
     parts = job;
     awaiting = `parts:${key}/${tableId}`;
@@ -307,7 +308,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
         job.files = files;
         const owned = matchOf(key, tableId)?.mine;
         const have = mineParts(owned);
-        for (const p of friendParts(files)) job.take.set(p.part, defaultPartChoice(p.part, have.has(p.part)));
+        for (const p of friendParts(files)) job.take.set(p.part, want.includes(p.part) || defaultPartChoice(p.part, have.has(p.part)));
       }
       host.redraw();
     });
@@ -619,10 +620,12 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
   return {
     open,
     detail,
-    openMatching(key, identity, back) {
+    openMatching(key, identity, back, want) {
       const entry = ready(key)?.tables.find((x) => sameTable(x.table, identity));
-      if (entry) openTable(key, entry.id, back);
-      else open(key, back);
+      if (!entry) return open(key, back);
+      // Sa version d'une table qu'on a : droit au choix des parties, celles demandées cochées.
+      if (want?.length && matchOf(key, entry.id)?.mine) return openParts(key, entry.id, () => openTable(key, entry.id, back), want);
+      openTable(key, entry.id, back);
     },
     has(key, table) {
       const library = ready(key);

@@ -223,7 +223,7 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
     title: 'Terminator 2 (Williams 1991)',
     players: [
       { key: me, name: 'Alice', state: 'accepted', host: true, match: 'same' },
-      { key: FRIEND, name: 'Bruno', state: 'accepted', match: 'other-version' },
+      { key: FRIEND, name: 'Bruno', state: 'accepted', match: 'same' },
     ],
     phase: 'gathering',
     createdAt: new Date().toISOString(),
@@ -246,23 +246,12 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
       assert.equal(last().at, Number.MAX_SAFE_INTEGER);
       assert.equal(built.sections[0]!.rows[0]!.text, '3');
     }
-    // Le record entré passe devant la partie sans record, qui n'a pas de rang (score inconnu) ;
-    // une autre version (d'autres règles de score) : son score s'affiche, hors classement.
+    // Le record entré passe devant la partie sans record, qui n'a pas de rang (score inconnu).
     if (game.phase === 'finished') {
       const texts = built.sections.flatMap((s) => s.rows.map((r) => r.text));
-      assert.match(texts.join('|'), /\|Bruno #[0-9A-F]{4} — 2\s?000\s?000\|Alice #[0-9A-F]{4} \(vous\) — Score non disponible$/u);
-      assert.equal(texts[0], 'Autre version : score hors classement');
-      assert.match(built.sections.flatMap((s) => s.rows).find((r) => r.text.startsWith('Bruno'))!.detail as string, /Hors classement : autre version/);
-      // Une version proche (mêmes règles de score) : classée, avec sa mention.
-      games.game = { ...game, players: game.players.map((p) => (p.match === 'other-version' ? { ...p, match: 'same-rules' as const } : p)) };
-      menu.live.open(() => undefined);
-      const near = last().build();
-      const rows = near.sections.flatMap((s) => s.rows);
-      assert.equal(rows[0]!.text, 'Versions proches : mêmes règles de score, la physique peut différer');
-      assert.match(rows.map((r) => r.text).join('|'), /\|1\. Bruno #[0-9A-F]{4} — 2\s?000\s?000\|/u);
-      assert.match(rows.find((r) => r.text.startsWith('1. Bruno'))!.detail as string, /Version proche/);
-      // La même table, mais 5 billes par partie contre 3 : hors classement, avec la raison.
-      games.game = { ...game, table: { ...game.table, balls: 3 }, players: game.players.map((p) => (p.match === 'other-version' ? { ...p, match: 'same' as const, balls: 5 } : { ...p, balls: 3 })) };
+      assert.match(texts.join('|'), /(^|\|)1\. Bruno #[0-9A-F]{4} — 2\s?000\s?000\|Alice #[0-9A-F]{4} \(vous\) — Score non disponible$/u);
+      // La même version, mais 5 billes par partie contre 3 : hors classement, avec la raison.
+      games.game = { ...game, table: { ...game.table, balls: 3 }, players: game.players.map((p) => (p.host ? { ...p, balls: 3 } : { ...p, balls: 5 })) };
       menu.live.open(() => undefined);
       const balls = last().build().sections.flatMap((s) => s.rows);
       assert.equal(balls[0]!.text, 'Autre nombre de billes : score hors classement');
@@ -286,6 +275,19 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
   assert.equal(last().at, Number.MAX_SAFE_INTEGER, 'ouverte d’elle-même : le curseur sur « Répondre plus tard »');
   assert.equal(invite.actions.at(-1)!.label, 'Répondre plus tard');
   uniqueIcons(invite, 'invitation');
+  assert.equal(invite.actions[0]!.label, 'Accepter');
+  // Pas la même version (30/10/2026) : pas d'« Accepter », mais sa version chez lui, la table cochée d'office.
+  for (const [scriptDiffers, row] of [[false, 'Autre version de cette table'], [true, 'Même table, autre script']] as const) {
+    games.pending = { ...games.pending!, id: scriptDiffers ? '00000000000000a2' : '00000000000000a1' };
+    games.matchFor = (async () => ({ match: 'other-version' as const, ...(scriptDiffers ? { scriptDiffers: true } : {}) })) as unknown as typeof games.matchFor;
+    (menu.live as unknown as { openInvite(id: string, back: () => void): void }).openInvite(games.pending.id, () => undefined);
+    await new Promise((r) => setImmediate(r));
+    const other = last().build();
+    assert.ok(other.sections.flatMap((s) => s.rows).some((r) => r.text === row), row);
+    assert.ok(!other.actions.some((a) => a.label === 'Accepter'));
+    assert.equal(other.actions[0]!.label, 'Récupérer sa version chez Bruno');
+    uniqueIcons(other, row);
+  }
 });
 
 test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le PuP-Pack décochés jusqu’à l’attestation des droits, la réception d’abord', async () => {

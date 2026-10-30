@@ -6,9 +6,8 @@
 // La même version de la table se reconnaît à l'empreinte SHA-256 du .vpx, calculée sans bloquer
 // le menu et gardée dans <données>\amis\empreintes.json (par chemin, taille et date). Elle vaut
 // même quand les deux bornes nomment la table autrement : l'invité calcule celle des tables du
-// même jeu et de celles qui ont la taille du .vpx annoncé. L'identifiant de table et les règles
-// de score (packages/core/src/vpxid.ts) donnent les deux autres niveaux, « version proche » et
-// « autre version » ; ils sont gardés dans <données>\amis\identifiants.json.
+// même jeu et de celles qui ont la taille du .vpx annoncé. Le script joué compte aussi : un .vbs
+// posé à côté de la table qui remplace son script (scriptPrint), sauf celui de Cyber Pinball.
 //
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
@@ -29,9 +28,9 @@ import {
   LIVE_COUNTDOWN_S,
   matchLiveTable,
   newLiveGame,
-  readVpxKeys,
+  readVpxScript,
   roomMessage,
-  rulesKey,
+  scriptPatchState,
   startGame,
   tableIdentity,
   type LiveGame,
@@ -42,7 +41,6 @@ import {
   type LiveTable,
   type LiveTableMatch,
   type TableEntry,
-  type VpxKeys,
 } from '@cyberpinball/core';
 import type { FriendMessage, SocialNet } from './social-net';
 
@@ -101,6 +99,8 @@ export interface LiveTableFound {
   match: LiveTableMatch;
   table?: TableEntry;
   balls?: number;
+  /** Le même .vpx, mais un autre script joué (un .vbs à côté de la table). */
+  scriptDiffers?: boolean;
 }
 
 /** Vérification des invitations expirées et des retardataires. */
@@ -116,7 +116,6 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   let invites: LiveInvite[] = [];
   let launch: NodeJS.Timeout | undefined;
   const prints = createPrints(path.join(opts.dataDir, 'amis', 'empreintes.json'));
-  const tableKeys = createKeys(path.join(opts.dataDir, 'amis', 'identifiants.json'));
   const changed = () => opts.onChange?.();
 
   const isHost = () => !!game && game.host === me().key;
@@ -167,10 +166,11 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   }
 
   /** Empreinte du fichier, identifiant de table et règles de score d'une de mes tables. */
-  async function versionOf(table: TableEntry): Promise<{ print?: string; id?: string; rules?: string }> {
-    const [print, keys] = await Promise.all([prints.of(table.file), tableKeys.of(table.file)]);
-    const rules = rulesKey(opts.romsOf?.(table) ?? [], keys?.script);
-    return { ...(print ? { print } : {}), ...(keys?.id ? { id: keys.id } : {}), ...(rules ? { rules } : {}) };
+  /** Empreinte du .vpx et du script joué d'une de mes tables. */
+  async function versionOf(table: TableEntry): Promise<{ print?: string; script?: string }> {
+    const print = await prints.of(table.file);
+    const script = scriptPrint(table.file);
+    return { ...(print ? { print } : {}), ...(script ? { script } : {}) };
   }
 
   async function liveTable(table: TableEntry): Promise<LiveTable> {
@@ -190,7 +190,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     const versions = await Promise.all(candidates.filter((c) => sameGame(c) || sameSize(c)).map(async (c) => ({ ...c, ...(await versionOf(c.entry)) })));
     const found = matchLiveTable(theirs, versions);
     const named = [theirs.table.title, theirs.table.manufacturer, theirs.table.year, theirs.table.vpsId && `VPS ${theirs.table.vpsId}`].filter(Boolean).join(', ');
-    const level = { same: 'la même table', 'same-rules': 'une version proche, mêmes règles de score', 'other-version': 'une autre version, hors classement', missing: '' }[found.match]; // i18n-ignore : journal
+    const level = found.match === 'same' ? 'la même version' : found.scriptDiffers ? 'le même .vpx, mais un autre script (.vbs à côté de la table) : partie refusée' : 'une autre version : partie refusée'; // i18n-ignore : journal
     if (found.match === 'missing') log(`Invitation de ${invite.host.name} : « ${named} » introuvable ici (aucun jeu du même nom, aucun .vpx identique).`); // i18n-ignore : journal
     else if (found.entry) {
       const how = sameGame({ entry: found.entry, identity: tableIdentity(found.entry, opts.romsOf?.(found.entry) ?? []) }) ? '' : ", reconnue par l'empreinte de son .vpx"; // i18n-ignore : journal
@@ -198,7 +198,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     }
     const balls = found.entry ? await opts.ballsOf?.(found.entry) : undefined;
     if (balls && theirs.balls && balls !== theirs.balls) log(`Invitation de ${invite.host.name} : ${balls} billes par partie ici, ${theirs.balls} chez lui : score hors classement.`); // i18n-ignore : journal
-    return { match: found.match, ...(found.entry ? { table: found.entry } : {}), ...(balls ? { balls } : {}) };
+    return { match: found.match, ...(found.entry ? { table: found.entry } : {}), ...(balls ? { balls } : {}), ...(found.scriptDiffers ? { scriptDiffers: true } : {}) };
   }
 
   const unsubscribe = net.onMessage((key: string, message: FriendMessage) => {
@@ -288,8 +288,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       if (!invite) return { match: 'missing' };
       const found = await matchFor(invite);
       invites = invites.filter((i) => i.id !== id);
-      if (found.match === 'missing') {
-        net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'decline', match: 'missing' });
+      // Pas la même version : la partie ne se joue pas (décision du 30/10/2026), il récupère la sienne.
+      if (found.match !== 'same') {
+        net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'decline', match: found.match });
         changed();
         return found;
       }
@@ -365,12 +366,28 @@ function createPrints(file: string): { of(vpx: string): Promise<string | undefin
   });
 }
 
-/** Identifiant de table et empreinte du script (vpxid.ts), gardés de même. */
-function createKeys(file: string): { of(vpx: string): Promise<VpxKeys | undefined> } {
-  return createFileCache(file, async (vpx) => {
-    const keys = await readVpxKeys(vpx);
-    return keys.id ? keys : undefined;
-  });
+/**
+ * Empreinte (SHA-256) du .vbs posé à côté de la table quand il remplace son script : un .vbs venu
+ * d'ailleurs, ou celui d'une version précédente ; undefined sans .vbs, ou pour celui que Cyber
+ * Pinball a tiré du script de la table (réparations PuP, d'une borne à l'autre).
+ */
+function scriptPrint(vpx: string): string | undefined {
+  const dir = path.dirname(vpx);
+  const base = path.basename(vpx, path.extname(vpx)).toLowerCase();
+  let name: string | undefined;
+  try {
+    name = fs.readdirSync(dir).find((f) => f.toLowerCase() === `${base}.vbs`);
+  } catch {
+    return undefined;
+  }
+  if (!name) return undefined;
+  try {
+    const bytes = fs.readFileSync(path.join(dir, name));
+    if (scriptPatchState(bytes.toString('latin1'), readVpxScript(vpx)).kind === 'ours') return undefined;
+    return createHash('sha256').update(bytes).digest('hex');
+  } catch {
+    return undefined;
+  }
 }
 
 /** Ce qu'on calcule d'un .vpx, une fois par fichier (chemin, taille et date de modification). */

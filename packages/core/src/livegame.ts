@@ -5,18 +5,19 @@
 // Celui qui invite tient la partie : il reçoit les réponses et l'état de chacun, et renvoie à tous
 // la salle à jour (game-room). Les invités n'ont pas besoin d'être amis entre eux.
 //
-// Avant le départ, chaque invité dit ce qu'il a de la table de celui qui invite (décision du
-// 29/10/2026 : personne n'est refusé, seul le classement change) :
-// - « same » : la même table, le même .vpx (empreinte SHA-256) ou le même identifiant de table
-//   (vpxid.ts : objets et physique, sans images, sons ni script) ; classé.
-// - « same-rules » : une version proche, mêmes règles de score (même ROM, ou même script hors
-//   options) ; classé, la physique peut différer.
-// - « other-version » : le même jeu (sameTable : identifiant VPS, ROM, titre et année), d'autres
-//   règles ; il joue avec les autres, son score reste hors classement.
+// Avant le départ, chaque invité dit ce qu'il a de la table de celui qui invite. Décision du
+// 30/10/2026 : on joue la même version, obligatoirement, pour un score sur lequel se défier (et
+// plus tard des tournois) :
+// - « same » : le même .vpx (empreinte SHA-256) et le même script joué (script : l'empreinte du
+//   .vbs posé à côté de la table quand il remplace son script ; aucun, le script de la table). Le
+//   .vbs que Cyber Pinball pose lui-même (réparations PuP, d'une borne à l'autre) ne compte pas.
+// - « other-version » : le même jeu (sameTable : identifiant VPS, ROM, titre et année), ou le même
+//   .vpx avec un autre script ; il ne peut pas accepter, il récupère la version de celui qui
+//   invite (« Récupérer sa version chez … »).
 // - « missing » : il ne l'a pas, il ne peut que refuser (il la récupère chez l'ami ou par le
 //   catalogue).
 // Le nombre de billes par partie compte aussi (ballcount.ts) : connu des deux côtés et différent
-// (5 contre 3), le score passe hors classement, quel que soit le niveau ; inconnu, il ne juge rien.
+// (5 contre 3), le score passe hors classement ; inconnu, il ne juge rien.
 //
 // Pendant la partie, le score n'est pas lisible (VPX n'écrit ses records qu'à la fin) : chacun
 // envoie sa durée de jeu et les records entrés au tableau d'honneur de la table. Voir le score,
@@ -51,29 +52,26 @@ export interface LiveTable {
    * d'après VPS à l'installation).
    */
   bytes?: number;
-  /** Identifiant de table (vpxid.ts) : la même table, même renommée ou réenregistrée. */
-  id?: string;
-  /** Règles de score (rulesKey) : « rom:… » ou « vbs:<empreinte du script hors options> ». */
-  rules?: string;
+  /**
+   * Empreinte SHA-256 du .vbs posé à côté de la table quand il remplace son script (un .vbs
+   * modifié, celui d'une autre version) ; absente : la table joue son propre script.
+   */
+  script?: string;
   /** Billes par partie de celui qui invite (ballcount.ts), s'il le sait. */
   balls?: number;
 }
 
 /** Ce que l'invité a de cette table. */
-export type LiveTableMatch = 'same' | 'same-rules' | 'other-version' | 'missing';
+export type LiveTableMatch = 'same' | 'other-version' | 'missing';
 
 /** Billes par partie connues des deux côtés et différentes : les scores ne se comparent pas. */
 export function liveOtherBalls(p: Pick<LivePlayer, 'balls'>, hostBalls: number | undefined): boolean {
   return !!p.balls && !!hostBalls && p.balls !== hostBalls;
 }
 
-/**
- * Un score qui compte au classement : la même table, ou les mêmes règles de score, et pas un autre
- * nombre de billes par partie que celui qui invite (`hostBalls`).
- */
-export function liveRanked(p: Pick<LivePlayer, 'host' | 'match' | 'balls'>, hostBalls?: number): boolean {
-  if (p.host === true) return true;
-  return (p.match === undefined || p.match === 'same' || p.match === 'same-rules') && !liveOtherBalls(p, hostBalls);
+/** Un score qui compte au classement : pas un autre nombre de billes par partie que celui qui invite (`hostBalls`). */
+export function liveRanked(p: Pick<LivePlayer, 'host' | 'balls'>, hostBalls?: number): boolean {
+  return p.host === true || !liveOtherBalls(p, hostBalls);
 }
 
 export type LivePlayerState =
@@ -160,8 +158,7 @@ const isId = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{16
 const isPrint = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
 const STATES: readonly LivePlayerState[] = ['invited', 'accepted', 'declined', 'busy', 'expired', 'left', 'loading', 'playing', 'done', 'failed'];
 const PHASES: readonly LivePhase[] = ['gathering', 'countdown', 'playing', 'finished', 'cancelled'];
-const MATCHES: readonly LiveTableMatch[] = ['same', 'same-rules', 'other-version', 'missing'];
-const isRules = (v: unknown): v is string => typeof v === 'string' && /^(rom:[a-z0-9_,-]{1,196}|vbs:[0-9a-f]{64})$/.test(v);
+const MATCHES: readonly LiveTableMatch[] = ['same', 'other-version', 'missing'];
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 
 function parseLiveTable(raw: unknown): LiveTable | undefined {
@@ -176,8 +173,7 @@ function parseLiveTable(raw: unknown): LiveTable | undefined {
     ...(version ? { version } : {}),
     ...(isPrint(r.print) ? { print: r.print } : {}),
     ...(bytes ? { bytes } : {}),
-    ...(isPrint(r.id) ? { id: r.id } : {}),
-    ...(isRules(r.rules) ? { rules: r.rules } : {}),
+    ...(isPrint(r.script) ? { script: r.script } : {}),
     ...(isBallCount(r.balls) ? { balls: r.balls } : {}),
   };
 }
@@ -277,22 +273,20 @@ export function inviteExpired(invite: Pick<LiveInvite, 'receivedAt'>, now = new 
 // La table
 
 /**
- * Ma table qui correspond à celle de l'invitation : la même version d'abord (même empreinte),
- * sinon le même jeu dans une autre version ; « missing » si je n'ai pas ce jeu. Le même fichier
- * est la même table, quel que soit le nom que chaque borne lui donne : une table reçue d'un ami
- * prend à l'installation le nom du jeu chez VPS (« Game of Thrones (Limited Edition) » chez l'un,
- * « Game of Thrones LE » chez l'autre).
+ * Ma table qui correspond à celle de l'invitation : la même version (même .vpx et même script
+ * joué), sinon une autre version du même jeu (le même .vpx avec un autre script en est une) ;
+ * « missing » si je n'ai pas ce jeu. Le même fichier est la même table, quel que soit le nom que
+ * chaque borne lui donne : une table reçue d'un ami prend à l'installation le nom du jeu chez VPS
+ * (« Game of Thrones (Limited Edition) » chez l'un, « Game of Thrones LE » chez l'autre). Sans
+ * empreinte, rien ne prouve la même version : une autre.
  */
-export function matchLiveTable<T>(theirs: LiveTable, mine: readonly { entry: T; identity: TableIdentity; print?: string; id?: string; rules?: string }[]): { match: LiveTableMatch; entry?: T } {
-  const exact = mine.find((m) => (theirs.print && m.print === theirs.print) || (theirs.id && m.id === theirs.id));
+export function matchLiveTable<T>(theirs: LiveTable, mine: readonly { entry: T; identity: TableIdentity; print?: string; script?: string }[]): { match: LiveTableMatch; entry?: T; scriptDiffers?: boolean } {
+  const file = theirs.print ? mine.filter((m) => m.print === theirs.print) : [];
+  const exact = file.find((m) => (m.script ?? '') === (theirs.script ?? ''));
   if (exact) return { match: 'same', entry: exact.entry };
-  const rules = theirs.rules ? mine.find((m) => m.rules === theirs.rules) : undefined;
-  if (rules) return { match: 'same-rules', entry: rules.entry };
-  const same = mine.filter((m) => sameTable(theirs.table, m.identity));
-  // Sans rien pour comparer les versions (une borne d'avant l'empreinte), le même jeu passe pour la même table.
-  const known = (x: { print?: string; id?: string; rules?: string }) => !!(x.print || x.id || x.rules);
-  if (same[0]) return { match: known(theirs) && known(same[0]) ? 'other-version' : 'same', entry: same[0].entry };
-  return { match: 'missing' };
+  if (file[0]) return { match: 'other-version', entry: file[0].entry, scriptDiffers: true };
+  const same = mine.find((m) => sameTable(theirs.table, m.identity));
+  return same ? { match: 'other-version', entry: same.entry } : { match: 'missing' };
 }
 
 // ---------------------------------------------------------------------------
@@ -328,8 +322,8 @@ export function inviteToGame(game: LiveGame, peer: { key: string; name: string }
 export function answerGame(game: LiveGame, key: string, answer: LiveAnswer, match?: LiveTableMatch, balls?: number): LiveGame {
   const p = game.players.find((x) => x.key === key);
   if (!p || p.host || game.phase !== 'gathering' || p.state !== 'invited') return game;
-  // Sans la table, accepter ne mène à rien : compté comme un refus.
-  const state: LivePlayerState = answer === 'accept' && match !== 'missing' ? 'accepted' : answer === 'busy' ? 'busy' : 'declined';
+  // Sans la même version, accepter ne mène à rien : compté comme un refus (une borne d'avant le 30/10/2026 acceptait une autre version).
+  const state: LivePlayerState = answer === 'accept' && (match === undefined || match === 'same') ? 'accepted' : answer === 'busy' ? 'busy' : 'declined';
   return setPlayer(game, key, (x) => ({ ...x, state, ...(match ? { match } : {}), ...(isBallCount(balls) ? { balls } : {}) }));
 }
 
@@ -432,9 +426,9 @@ export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'ba
       return t('Invité, en attente de sa réponse');
     case 'accepted':
       if (liveOtherBalls(p, hostBalls)) return t('Prêt, {balls} : score hors classement', { balls: liveBallsAgainst(p.balls!, hostBalls!) });
-      return p.match === 'other-version' ? t('Prêt, autre version : score hors classement') : p.match === 'same-rules' ? t('Prêt, version proche : mêmes règles de score') : t('Prêt');
+      return t('Prêt');
     case 'declined':
-      return p.match === 'missing' ? t('N’a pas cette table') : t('A refusé');
+      return p.match === 'missing' ? t('N’a pas cette table') : p.match === 'other-version' ? t('N’a pas la même version : il peut récupérer la vôtre') : t('A refusé');
     case 'busy':
       return t('Occupé pour l’instant');
     case 'expired':
@@ -461,10 +455,8 @@ export function liveMatchLabel(match: LiveTableMatch): string {
   switch (match) {
     case 'same':
       return t('Vous avez cette table');
-    case 'same-rules':
-      return t('Vous avez une version proche : mêmes règles de score, votre score compte au classement');
     case 'other-version':
-      return t('Vous avez cette table dans une autre version : vous jouez ensemble, votre score reste hors classement');
+      return t('Vous avez cette table dans une autre version : la partie se joue sur la même version pour tous, récupérez la sienne');
     case 'missing':
       return t('Vous n’avez pas cette table : récupérez-la par le catalogue, puis demandez une nouvelle invitation');
   }
@@ -472,9 +464,9 @@ export function liveMatchLabel(match: LiveTableMatch): string {
 
 /**
  * Classement de fin : d'abord ceux qui ont un record entré et comptent au classement (liveRanked :
- * la même table ou les mêmes règles, le meilleur score d'abord), puis ceux qui ont joué (une autre
- * version : hors classement, même avec un record), puis les autres. Le score de la partie n'est
- * connu que s'il est entré au tableau d'honneur de la table.
+ * pas un autre nombre de billes ; le meilleur score d'abord), puis ceux qui ont joué (hors
+ * classement, même avec un record), puis les autres. Le score de la partie n'est connu que s'il
+ * est entré au tableau d'honneur de la table.
  */
 export function liveStandings(game: Pick<LiveGame, 'players'> & { table?: Pick<LiveTable, 'balls'> }): LivePlayer[] {
   const best = (p: LivePlayer) => Math.max(-1, ...(p.records ?? []).map((r) => r.score));

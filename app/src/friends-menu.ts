@@ -113,7 +113,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     games: host.games,
     tables: host.tables,
     friendHas: (key, table) => libraryMenu.has(key, table),
-    openFriendTable: (key, identity, back) => libraryMenu.openMatching(key, identity, back),
+    openFriendTable: (key, identity, back, want) => libraryMenu.openMatching(key, identity, back, want),
     redraw: host.redraw,
     ...(host.now ? { now: host.now } : {}),
   });

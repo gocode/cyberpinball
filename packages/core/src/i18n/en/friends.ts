@@ -111,8 +111,6 @@ export const messages: Record<string, string> = {
   'annulé': 'cancelled',
   // packages/core/src/livegame.ts
   'Invité, en attente de sa réponse': 'Invited, waiting for their answer',
-  'Prêt, autre version : score hors classement': 'Ready, another version: score not ranked',
-  'Prêt, version proche : mêmes règles de score': 'Ready, close version: same scoring rules',
   'N’a pas cette table': 'Does not have this table',
   'A refusé': 'Declined',
   'Occupé pour l’instant': 'Busy for now',
@@ -122,10 +120,6 @@ export const messages: Record<string, string> = {
   'Partie terminée': 'Game over',
   'La partie n’a pas démarré de son côté': 'The game did not start on their side',
   'Vous avez cette table': 'You have this table',
-  'Vous avez une version proche : mêmes règles de score, votre score compte au classement':
-    'You have a close version: same scoring rules, your score counts in the ranking',
-  'Vous avez cette table dans une autre version : vous jouez ensemble, votre score reste hors classement':
-    'You have this table in another version: you play together, your score stays out of the ranking',
   'Vous n’avez pas cette table : récupérez-la par le catalogue, puis demandez une nouvelle invitation':
     'You do not have this table: get it through the catalogue, then ask for a new invitation',
   // Revue du directeur artistique du 28/10/2026
@@ -136,15 +130,16 @@ export const messages: Record<string, string> = {
   'Score non disponible': 'Score not available',
   'Meilleur score connu': 'Best known score',
   'Seuls les scores inscrits au tableau d’honneur sont disponibles.': 'Only scores entered on the high score table are available.',
-  // Identifiant de table et règles de score (29/10/2026)
-  'Version proche': 'Close version',
-  'Mêmes règles de score, la physique peut différer : votre score compte au classement.': 'Same scoring rules, the physics may differ: your score counts in the ranking.',
-  'Autre version': 'Another version',
-  'Vous jouez ensemble ; d’autres règles de score : votre score reste hors classement.': 'You play together; other scoring rules: your score stays out of the ranking.',
-  'Hors classement : autre version': 'Not ranked: another version',
-  'Versions proches : mêmes règles de score, la physique peut différer': 'Close versions: same scoring rules, the physics may differ',
-  'Autre version : score hors classement': 'Another version: score not ranked',
-  'D’autres règles de score que la table de celui qui invite': 'Other scoring rules than the host’s table',
+  // La même version pour tous (30/10/2026)
+  'N’a pas la même version : il peut récupérer la vôtre': 'Does not have the same version: they can fetch yours',
+  'Vous avez cette table dans une autre version : la partie se joue sur la même version pour tous, récupérez la sienne':
+    'You have this table in another version: the game is played on the same version for everyone, fetch theirs',
+  'Même table, autre script': 'Same table, another script',
+  'Un .vbs posé à côté de votre table remplace son script : la partie demande le même script que {name}.': 'A .vbs next to your table replaces its script: the game needs the same script as {name}.',
+  'Autre version de cette table': 'Another version of this table',
+  'La partie se joue sur la même version pour tous : récupérez celle de {name}.': 'The game is played on the same version for everyone: fetch {name}’s.',
+  'Récupérer sa version chez {name}': 'Fetch {name}’s version',
+  'Sa table, cochée d’office dans sa bibliothèque partagée ; puis le plan d’ajout, et une nouvelle invitation': 'Their table, ticked in their shared library; then the add plan, and a new invitation',
   // Billes par partie (29/10/2026)
   'Prêt, {balls} : score hors classement': 'Ready, {balls}: score not ranked',
   '{mine} au lieu de {host}': '{mine} instead of {host}',
