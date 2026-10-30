@@ -504,6 +504,22 @@ body.mouse .lib-zone-tag:hover {
   opacity: 0.8;
 }
 
+/* Texte à lire (reading.ts) : son cadre ne se voit que s'il dépasse (library.js, measureReading). */
+.lib-reading:not(.overflows) {
+  border-color: transparent;
+  background: none;
+  box-shadow: none;
+}
+
+.lib-reading:not(.overflows) > .lib-zone-bar {
+  display: none;
+}
+
+.lib-reading:not(.overflows) > .lib-content {
+  padding: 0 1cqmin 0 0;
+  opacity: 1;
+}
+
 /* Le bandeau garde ses repères entiers, même quand le texte du repère doit se couper. */
 .lib-zone-count,
 .lib-zone-letter,

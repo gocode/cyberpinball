@@ -61,6 +61,8 @@ function list(s) {
     box.append(el('div', 'crumb', `${t('Sections')}  /  ${s.breadcrumb}`));
   }
   const ul = el('ul');
+  // Liste de réglages : sur les onglets, aucun n'est choisi (garde-fou de mise en page).
+  ul.dataset.choices = '';
   s.rows.forEach((row, index) => {
     if (row.kind === 'group') {
       const group = el('li', 'group');
@@ -84,6 +86,8 @@ function list(s) {
 
 function detail(d) {
   const box = el('aside', 'detail');
+  // Texte à lire, rien à choisir : MagnaSave le fait défiler (settings.ts, detailMove).
+  box.dataset.reading = '';
   if (!d) return box;
   // Le détail d'un autre réglage repart du haut ; celui du même réglage reste où il était.
   box.dataset.scrollKey = d.title;
@@ -116,6 +120,7 @@ function panel(p) {
   if (p.kind === 'info') {
     for (const line of p.lines) box.append(el('p', 'help', line));
     const ul = el('ul', 'choices');
+    ul.dataset.choices = '';
     p.actions.forEach((label, index) => {
       const li = el('li', index === p.index ? 'selected' : '', label);
       li.addEventListener('click', () => act({ type: 'choice', index }));
@@ -124,6 +129,7 @@ function panel(p) {
     box.append(ul);
   } else if (p.kind === 'choices') {
     const ul = el('ul', 'choices wheel');
+    ul.dataset.choices = '';
     p.choices.forEach((c, index) => {
       const li = el('li', index === p.index ? 'selected' : '');
       li.append(el('span', '', c.label));
@@ -165,6 +171,9 @@ const scroll = CyberScroll.keeper([
   ['.wheel .selected', 'center'],
 ]);
 
+/** Dernier défilement du détail fait (settings.ts, detailMove). */
+let detailSeen = 0;
+
 function render(s) {
   scroll.capture(root);
   const frag = document.createDocumentFragment();
@@ -180,6 +189,12 @@ function render(s) {
 
   // La ligne choisie est ramenée dans la vue quand le choix change, jamais à une simple mise à jour.
   scroll.settle(root, [s.title, s.breadcrumb ?? '', s.tabs.find((tab) => tab.active)?.id ?? '', s.panel?.title ?? ''].join('|'));
+  // MagnaSave : une page du détail, une seule fois par appui.
+  const detailBox = root.querySelector('.detail');
+  if (s.detailMove && s.detailMove.id > detailSeen) {
+    detailSeen = s.detailMove.id;
+    if (detailBox && CyberScroll.readingAt(detailBox).overflow) CyberScroll.page(detailBox, s.detailMove.dir);
+  }
   const input = root.querySelector('input.text');
   if (input) {
     input.focus();

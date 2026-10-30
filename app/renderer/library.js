@@ -57,6 +57,8 @@ function renderLibrary(v) {
   );
   // Écran à deux zones (listzones.ts) : celle du choix est soulignée, l'autre s'éteint un peu.
   if (v.zone) body.classList.add(v.zone.active === 'list' ? 'zone-list' : 'zone-actions');
+  // Texte en lecture (reading.ts) : de même, les actions s'éteignent un peu.
+  else if (v.reading?.active) body.classList.add('zone-list');
   if (v.pages) body.append(renderPages(v.pages));
   else if (v.journey) body.append(renderJourney(v.journey));
   else if (v.health) body.append(zoneFrame(renderHealth(v.health, v.cursor), v.zone));
@@ -110,7 +112,8 @@ function renderLibrary(v) {
       const column = libEl('div', `lib-gallery${v.media.files ? ' files' : ''}`);
       column.append(zoneFrame(content, v.zone), detail);
       body.append(column);
-    } else body.append(zoneFrame(content, v.zone));
+    } else if (v.reading) body.append(readingFrame(content, v.reading));
+    else body.append(zoneFrame(content, v.zone));
   }
 
   // Prospectus et règles : les flippers tournent les pages ; les actions restent là pour la souris.
@@ -193,6 +196,63 @@ function zoneFrame(content, z) {
   bar.append(tag);
   frame.append(bar, content);
   return frame;
+}
+
+/**
+ * Texte de l'écran où il n'y a rien à choisir (packages/core/src/reading.ts) : s'il dépasse, il
+ * prend le cadre d'une liste de contenu, avec la part lue et son repère (« MagnaSave · Faire défiler
+ * le texte » hors de lui, « Exit · Revenir aux actions » dedans). Sinon le cadre ne se voit pas :
+ * settleReading le mesure après la mise en page.
+ */
+function readingFrame(content, r) {
+  const frame = libEl('div', `lib-zone lib-reading ${r.active ? 'active' : 'idle'}`);
+  frame.dataset.reading = '';
+  const bar = libEl('div', 'lib-zone-bar');
+  bar.append(libEl('span', 'lib-zone-count lib-reading-read'));
+  const tag = actOn(libEl('span', 'lib-zone-tag'), { type: 'zone' });
+  tag.append(libEl('span', 'lib-keycap', r.tag.key), libEl('span', 'lib-zone-tag-text', r.tag.text));
+  bar.append(tag);
+  frame.append(bar, content);
+  return frame;
+}
+
+/** Dernière zone de lecture vue : son écran (`key`), le dernier défilement fait, la dernière mesure envoyée. */
+let readingSeen = { key: undefined, move: 0, sent: '' };
+
+/**
+ * Avant de remettre les listes en place : le cadre du texte ne se montre que s'il dépasse, mesuré
+ * le bandeau caché (le montrer ne fait que réduire la place : le texte dépasse toujours).
+ */
+function measureReading() {
+  const frame = document.querySelector('.lib-reading');
+  const content = frame?.querySelector(':scope > .lib-content');
+  if (content) frame.classList.toggle('overflows', CyberScroll.readingAt(content).overflow);
+}
+
+/**
+ * Après : la page demandée par un flipper (une seule fois chacune), puis la mesure envoyée au
+ * processus principal quand elle change, et à chaque défilement (molette comprise).
+ */
+function settleReading(v) {
+  const frame = document.querySelector('.lib-reading');
+  const content = frame?.querySelector(':scope > .lib-content');
+  if (!content || !v?.reading) return;
+  const r = v.reading;
+  if (readingSeen.key !== r.key) readingSeen = { key: r.key, move: 0, sent: '' };
+  if (r.move.id > readingSeen.move) {
+    readingSeen.move = r.move.id;
+    if (frame.classList.contains('overflows')) CyberScroll.page(content, r.move.dir);
+  }
+  const report = () => {
+    const at = CyberScroll.readingAt(content);
+    frame.querySelector('.lib-reading-read').replaceChildren(libEl('b', '', `${at.read} %`), libEl('span', 'of', t('lu')));
+    const sent = `${at.overflow}|${at.top}|${at.bottom}`;
+    if (sent === readingSeen.sent || readingSeen.key !== r.key) return;
+    readingSeen.sent = sent;
+    window.cyber.act({ type: 'reading', key: r.key, overflow: at.overflow, top: at.top, bottom: at.bottom });
+  };
+  report();
+  content.addEventListener('scroll', report, { passive: true });
 }
 
 // ---------- Ce qu'il manque pour jouer (journey.ts) ----------
@@ -606,7 +666,9 @@ const menuScroll = CyberScroll.keeper([['.lib-row.selected, .health-line.selecte
  * à un tic de progression. `screen` nomme l'écran affiché.
  */
 function revealSelection(root, screen) {
+  measureReading();
   menuScroll.settle(root, screen);
+  settleReading(drawn);
   for (const list of document.querySelectorAll('.lib-actions, .lib-content')) {
     markOverflow(list);
     if (list.dataset.overflowWatch) continue;

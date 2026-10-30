@@ -238,13 +238,13 @@ test('rendu : chaque conteneur de liste de contenu de library.js passe par le ca
  * cadre d'une zone), liste d'actions, ou autre, avec sa raison.
  */
 const SCROLLING: Record<string, string> = {
-  'library.css | .lib-content': 'liste de contenu : dans le cadre de sa zone (zoneFrame) dès que l’écran a d’autres actions',
+  'library.css | .lib-content': 'liste de contenu : dans le cadre de sa zone (zoneFrame) dès que l’écran a d’autres actions ; texte sans rien à choisir : zone de lecture aux flippers (readingFrame, reading.ts, lecture.test.ts)',
   'library.css | .lib-actions': 'actions de l’écran : Exit y revient en arrière',
   'library.css | .lib-body.lib-health > .health, .lib-body.lib-health > .lib-zone > .health': 'liste de contenu (Santé de la borne) : dans le cadre de sa zone',
   'library.css | .lib-picker .kind-places': 'liste de contenu (emplacements du sélecteur de fichiers) : dans le cadre de la zone, avec les fichiers',
   'library.css | .lib-picker .kind-entries': 'liste de contenu (fichiers du sélecteur) : dans le cadre de la zone',
   'settings.css | .list ul': 'réglages de VPX (settings.ts) : une liste de réglages, pas de contenu ; Exit y remonte d’un niveau, Page préc./suiv. y sautent de dix',
-  'settings.css | .detail': 'réglages de VPX : le détail du réglage choisi, rien à choisir',
+  'settings.css | .detail': 'réglages de VPX : le détail du réglage choisi, rien à choisir ; MagnaSave le fait défiler (data-reading, lecture.test.ts)',
   'settings.css | .choices': 'réglages de VPX : les valeurs d’un réglage, panneau qu’Exit referme',
 };
 
@@ -263,7 +263,8 @@ test('toute liste qui défile dans app/renderer est relevée et rangée', () => 
 test('le processus principal passe par les zones : Exit, bascule au relâchement, garde-fou de mise en page', () => {
   const library = read('src', 'library.ts');
   // Exit : leaveList quand le choix est dans la liste, l'écran ne se ferme que hors d'elle.
-  assert.match(library, /is\(KEYS\.exit\)\) \{\s*if \(zones && zoneOf\(zones, cursor\) === 'list'\) cursor = leaveList\(/);
+  // Un texte en lecture (reading.ts) rend d'abord la main aux actions : lecture.test.ts.
+  assert.match(library, /is\(KEYS\.exit\)\) \{\s*(?:if \(edges && reading\.active\) reading\.active = false;\s*else )?if \(zones && zoneOf\(zones, cursor\) === 'list'\) cursor = leaveList\(/);
   // Les zones se décident pour chaque écran décrit (build), jamais écran par écran.
   assert.ok((library.match(/screenZones\(built, /g) ?? []).length >= 3);
   // La bascule se fait au relâchement de MagnaSave (jamais sur le Ctrl d'un raccourci) ; le menu transmet les relâchements.

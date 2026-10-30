@@ -233,8 +233,50 @@ const CyberScroll = (() => {
     };
   }
 
+  // ---------- Texte lu aux boutons (zone de lecture, packages/core/src/reading.ts) ----------
+
+  /** Part de la vue qu'avance une page : deux lignes de la précédente restent, pour ne pas perdre le fil. */
+  const READING_PAGE = 0.85;
+  /** Page en cours d'animation : sa cible, le temps qu'elle l'atteigne. */
+  const paging = new WeakMap();
+
+  /**
+   * Une page plus bas (`dir` 1) ou plus haut (-1) dans `list`, en douceur. C'est un geste de
+   * l'utilisateur (un flipper, que la page ne voit pas passer) : la liste ne ramène plus le choix.
+   */
+  function page(list, dir) {
+    gesture();
+    const max = list.scrollHeight - list.clientHeight;
+    const target = Math.max(0, Math.min(max, Math.round((list.scrollTop || 0) + dir * list.clientHeight * READING_PAGE)));
+    list.dataset.userScroll = '';
+    paging.set(list, { target, until: Date.now() + 800 });
+    if (typeof list.scrollTo === 'function') list.scrollTo({ top: target, behavior: 'smooth' });
+    else list.scrollTop = target;
+  }
+
+  /**
+   * Où en est la lecture de `list` : dépasse-t-elle, haut et bas visibles, part lue (en %). Pendant
+   * une page animée, d'après sa cible : un second appui rapide sait déjà qu'on est au bout.
+   */
+  function readingAt(list) {
+    const slack = 2;
+    const max = list.scrollHeight - list.clientHeight;
+    const pending = paging.get(list);
+    const now = list.scrollTop || 0;
+    const at = pending && Date.now() < pending.until && Math.abs(now - pending.target) > 1 ? pending.target : now;
+    const overflow = max > slack;
+    return {
+      overflow,
+      top: at <= slack,
+      bottom: at >= max - slack,
+      read: overflow ? Math.min(100, Math.round(((at + list.clientHeight) / list.scrollHeight) * 100)) : 100,
+    };
+  }
+
   return {
     keeper,
+    page,
+    readingAt,
     /** Geste simulé (autopilote des essais) : le défilement qui suit est voulu. */
     gesture,
     /** Défilements sans geste relevés depuis le dernier appel (garde-fou de mise en page). */

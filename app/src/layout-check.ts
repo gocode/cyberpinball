@@ -323,6 +323,16 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     const loose = [...body.querySelectorAll('.lib-row.pick[data-act], .media-card[data-act], .health-line[data-act]')].find((el) => !el.closest('.lib-section.options') && !el.closest('.lib-zone')?.querySelector(':scope > .lib-zone-bar .lib-zone-tag'));
     if (loose) problems.add('liste de contenu sans cadre ni repère : ' + label(loose).slice(0, 60));
   }
+  // Texte qui défile sans rien à choisir dedans : les boutons doivent pouvoir le faire défiler
+  // (packages/core/src/reading.ts), ce qu'il dit par data-reading (texte d'un écran du menu, détail
+  // des réglages de VPX). Sans lui, seules la molette et la barre de défilement l'atteignent : les
+  // nouveautés d'une mise à jour restaient hors d'atteinte sur le PinCab (30 octobre 2026). Une
+  // liste de choix sans choix courant le dit par data-choices.
+  for (const el of document.querySelectorAll('*')) {
+    if (!scrollsY(el) || !shown(el) || el.closest('[data-reading], [data-choices]')) continue;
+    if (el.querySelector('[data-act], .selected, .current')) continue;
+    problems.add('texte qui défile hors d’atteinte des boutons : ' + label(el).slice(0, 60));
+  }
   // Image chargée sans pixels, vidéo en erreur : l'écran montrerait un aperçu cassé.
   for (const img of document.images) if (img.complete && img.getAttribute('src') && img.naturalWidth === 0) problems.add('image non chargée : ' + img.getAttribute('src').slice(0, 120));
   for (const video of document.querySelectorAll('video')) if (video.error) problems.add('vidéo non chargée : ' + (video.getAttribute('src') || '').slice(0, 120));

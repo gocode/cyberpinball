@@ -17,6 +17,8 @@ import {
   applySetting,
   describeMapping,
   navigationKeys,
+  buttonKeys,
+  zoneSwitchKeys,
   vpxActionLabel,
   withoutButtonKeys,
   edgeRotation,
@@ -110,8 +112,14 @@ export function menuRotation(cabinet: Cabinet | undefined, playfield: ObservedDi
  * flippers, Start et Exit du jeu), plus celles d'un clavier, tant qu'aucun bouton ne les envoie.
  */
 function settingsKeys(cabinet: ButtonsSource) {
+  // MagnaSave : le détail du réglage choisi, qui peut dépasser (description d'origine de VPX), défile
+  // sans quitter la liste ; le gauche remonte, le droit (ou F6) descend (packages/core/src/reading.ts).
+  const magna = zoneSwitchKeys(cabinet);
+  const leftMagna = buttonKeys(cabinet?.buttons).leftMagna;
   return {
     ...navigationKeys(cabinet),
+    detailUp: magna.filter((k) => k === leftMagna),
+    detailDown: magna.filter((k) => k !== leftMagna),
     pageUp: withoutButtonKeys(['PageUp'], cabinet),
     pageDown: withoutButtonKeys(['PageDown'], cabinet),
     tab: withoutButtonKeys(['Tab'], cabinet),
@@ -119,6 +127,8 @@ function settingsKeys(cabinet: ButtonsSource) {
   };
 }
 let KEYS = settingsKeys(undefined);
+/** Dernier défilement du détail demandé (MagnaSave) : numéroté, le rendu ne le fait qu'une fois. */
+let detailMove: { id: number; dir: -1 | 1 } = { id: 0, dir: 1 };
 
 type Tab = 'essentials' | 'advanced';
 
@@ -617,6 +627,7 @@ export function handleKey(input: Pick<Input, 'code' | 'control'>): boolean {
   else if (is(KEYS.pageUp)) s.cursor = Math.max(firstSelectable(list, 0, 1), firstSelectable(list, Math.max(0, s.cursor - 10), 1));
   else if (is(KEYS.pageDown)) s.cursor = firstSelectable(list, Math.min(list.length - 1, s.cursor + 10), -1);
   else if (is(KEYS.tab)) switchTab(s.tab === 'essentials' ? 'advanced' : 'essentials');
+  else if (is(KEYS.detailUp) || is(KEYS.detailDown)) detailMove = { id: detailMove.id + 1, dir: is(KEYS.detailUp) ? -1 : 1 };
   else if (is(KEYS.reset)) resetSelected(list);
   else if (is(KEYS.confirm)) {
     if (s.cursor === -1) switchTab(s.tab === 'essentials' ? 'advanced' : 'essentials');
@@ -1025,11 +1036,12 @@ function view() {
     rows: list.map(rowView),
     cursor: s.cursor,
     detail: detailView(list[s.cursor]),
+    detailMove,
     panel: panelView(s.panel),
     notice: s.notice,
     hints: s.panel
       ? t('Flippers : choisir · Start : valider · Exit : annuler')
-      : t('Flippers : se déplacer · Start : {start} · Exit : {exit} · Suppr : valeur par défaut · Tab : onglet', {
+      : t('Flippers : se déplacer · Start : {start} · Exit : {exit} · Suppr : valeur par défaut · Tab : onglet · MagnaSave : faire défiler le détail', {
           start: s.cursor === -1 ? t('changer d’onglet') : t('modifier'),
           exit: s.tab === 'advanced' && s.section !== undefined ? t('retour aux sections') : t('fermer'),
         }),

@@ -53,6 +53,7 @@ export * from './mediawatch';
 export * from './mediaedit';
 export * from './focus';
 export * from './listzones';
+export * from './reading';
 export * from './offscreen';
 export * from './menumoments';
 export * from './audiosink';

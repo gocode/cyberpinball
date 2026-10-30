@@ -1114,6 +1114,17 @@ Two friend cabinets, A and B, on the real network, each with the same table. The
 | 582 | Group board | A and B play Game of Thrones together (or another table without a ROM); then a second game. | During the first, the machine's high score table is empty (zeros); in the results, "Records du groupe sur cette version" (Group records on this version) with both scores. In the second, the room says "Record du groupe à battre : …" (Group record to beat), and the machine shows the group's records with their initials; the knocker only rings if that record falls. The table's usual high scores, outside games with friends, have not changed. |
 | 583 | Group board, ROM table | A and B play Terminator 2 together twice in a row. | During the first game, the machine's high score table (attract) is at zero; each score enters it with its initials, and in the results "Records du groupe sur cette version" (Group records on this version) shows them. In the second, the machine shows the group's Grand Champion. The table played alone afterwards keeps its usual high scores (the log: "records du groupe posés dans la mémoire de t2_l8", group records written in t2_l8's memory). |
 
+## Reading text longer than the screen
+
+With the buttons only (flippers, Start, Exit, MagnaSave), on the cabinet. The proof without an operator: `packages/core/src/test/lecture.test.ts`; the manual: "Reading text longer than the screen".
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 584 | Release notes of an update | Pre-releases received, an older version installed: System menu > "Cyber Pinball" > "Mise à jour de Cyber Pinball" (Cyber Pinball update). Left flipper on "Mettre à jour maintenant" (Update now). | The release notes are in a frame, "MagnaSave · Faire défiler le texte" (Scroll the text) on the right and the part read on the left. The left flipper lights the frame, no action is green any more; each right flipper goes down one page (two lines of the previous one stay); at the bottom, the right flipper moves to "Mettre à jour maintenant", which only runs on the next Start press. |
+| 585 | Going back without reading everything | In the text, halfway: Exit; then MagnaSave twice. | Exit brings you back to the action you came from, the text stays where you left it; a second Exit leaves the screen. MagnaSave enters the text and leaves it with no other gesture. |
+| 586 | Held flipper, Start | In the text, hold the right flipper; then, at the top, press Start several times. | Held, the text scrolls page after page and stops at the bottom, without moving to the actions. Start moves one page, then to the first action at the end; it never runs an action you have not chosen. |
+| 587 | VPX settings details | Table page > "Réglages de VPX" (VPX settings) > Advanced, a setting with a long original description. Right MagnaSave, then left. | The details go down one page, then back up; the chosen line in the list does not change. The help strip says "MagnaSave : faire défiler le détail" (MagnaSave: scroll the details). |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

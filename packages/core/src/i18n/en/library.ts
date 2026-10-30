@@ -291,6 +291,12 @@ export const messages: Record<string, string> = {
   'Revenir à la liste': 'Back to the list',
   'Flippers : parcourir, tenus pour aller vite · Start ou Entrée : valider · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran': 'Flippers: browse, hold to go faster · Start or Enter: confirm · Exit or Esc: leave the list · MagnaSave or F6: screen actions',
   'MagnaSave ou F6 : la liste': 'MagnaSave or F6: the list',
+  // Texte plus long que l'écran (reading.ts) : repère du cadre, part lue et bandeau d'aide.
+  'Revenir aux actions': 'Back to the actions',
+  'Faire défiler le texte': 'Scroll the text',
+  lu: 'read',
+  'Flippers : faire défiler, tenus pour aller vite · Start ou Entrée : page suivante · Exit ou Échap : revenir aux actions · MagnaSave ou F6 : actions de l’écran': 'Flippers: scroll, hold to go faster · Start or Enter: next page · Exit or Esc: back to the actions · MagnaSave or F6: screen actions',
+  'MagnaSave ou F6 : le texte': 'MagnaSave or F6: the text',
   'bureau, un seul écran': 'desktop, single screen',
   'non géré par le plugin PUP': 'not supported by the PUP plugin',
   'sans topper': 'no topper',

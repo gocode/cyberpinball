@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.5
 
+- Text longer than the screen can be read with the buttons: the release notes of an update, a message… Left flipper on the first action to enter the text (or MagnaSave), right flipper or Start to go down one page, and at the bottom of the text the first action; Exit goes back to the actions. The text frame shows how much has been read. In the VPX settings, MagnaSave scrolls the details of the chosen setting.
 - An application log, `data\logs\journal.txt`: everything it does is written down, dated, to understand afterwards what happened on a cabinet.
 - Cinema launch: the game logo now lands whole and centered on the backglass, and leaves the playfield whole; a large wheel (medallion) used to spill out the bottom, cut off. A logo taller than it is wide also stays in its slot on the menu wheel.
 - "Play with a friend" on a table's page, right under "Play": choose the friend to invite to a live game. An invitation that cannot be sent is no longer hidden: it stays visible, greyed out with its reason ("Offline", "No friend online right now").

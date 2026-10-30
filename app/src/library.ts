@@ -151,6 +151,10 @@ import {
   switchZone,
   zoneOf,
   zoneStep,
+  entersReading,
+  readingStep,
+  type ReadingEdges,
+  type ReadingMove,
   type ZoneMemory,
   type Zones,
   type FocusAnchor,
@@ -335,6 +339,8 @@ export type UiAction =
   | { type: 'friend-requests' }
   /** Repère de la liste de contenu (« Sortir de la liste », « Revenir à la liste ») : comme MagnaSave. */
   | { type: 'zone' }
+  /** Mesure du texte de l'écran par le rendu (zone de lecture, reading.ts) : `key` désigne l'écran mesuré. */
+  | { type: 'reading'; key: number; overflow: boolean; top: boolean; bottom: boolean }
   | { type: 'wheel'; offset: number };
 
 export type Tone = 'error' | 'warning' | 'info' | 'ok' | 'quiet';
@@ -541,6 +547,9 @@ const GUEST_SCREENS: Partial<Record<Screen['kind'], GuestDoor>> = { sheet: 'menu
 type AddPlan = Extract<Screen, { kind: 'addPlan' }>;
 type PagesScreen = Extract<Screen, { kind: 'pages' }>;
 
+/** Page préc. / Page suiv. d'un clavier : le texte de l'écran défile de partout (reading.ts). */
+const PAGE_KEYS: Record<string, -1 | 1> = { PageUp: -1, PageDown: 1 };
+
 export function createLibrary(host: LibraryHost) {
   let screen: Screen | undefined;
   let cursor = 0;
@@ -556,6 +565,12 @@ export function createLibrary(host: LibraryHost) {
   let hold: { code: string; since: number; jumped: number } | undefined;
   /** MagnaSave (ou F6) appuyé seul : la bascule se fait au relâchement, jamais sur le Ctrl d'un raccourci (Ctrl+Maj+D). */
   let zonePress: string | undefined;
+  /**
+   * Zone de lecture (reading.ts) : le texte de l'écran, quand il dépasse, mesuré par le rendu.
+   * `key` change avec l'écran : une mesure arrivée d'un écran précédent est ignorée. `move` : dernier
+   * défilement demandé, numéroté pour que le rendu ne l'applique qu'une fois.
+   */
+  let reading: { screen: unknown; key: number; edges?: ReadingEdges; active: boolean; move: { id: number; dir: -1 | 1 } } = { screen: undefined, key: 0, active: false, move: { id: 0, dir: 1 } };
   /** L'écran affiché fait écouter des sons (propositions, sons de la table) : relevé à chaque vue. */
   let soundPreview = false;
   // Opérations longues en cours (l'installation enchaîne sur l'analyse) et leur message.
@@ -2959,8 +2974,9 @@ export function createLibrary(host: LibraryHost) {
     // Start valide l'élément que la dernière vue montrait sous le curseur, même si la liste a bougé.
     cursor = followCursor(ids, cursor, screen, anchor);
     const zones = screenZones(built, n);
+    const edges = readingEdges(built, zones);
     // MagnaSave (F6) : la bascule attend le relâchement ; une autre touche entre-temps l'annule.
-    if (zones && (host.zoneKeys?.() ?? []).includes(input.code)) {
+    if ((zones || edges) && (host.zoneKeys?.() ?? []).includes(input.code)) {
       if (!input.isAutoRepeat) zonePress = input.code;
       return true;
     }
@@ -2969,11 +2985,24 @@ export function createLibrary(host: LibraryHost) {
     if (!moving || !input.isAutoRepeat || hold?.code !== input.code) hold = moving && !input.isAutoRepeat ? { code: input.code, since: Date.now(), jumped: 0 } : undefined;
     zoneMemory.letter = undefined;
     // Tab / Maj+Tab : se déplacer au clavier quels que soient les boutons relevés.
-    if (input.code === CONFIG_KEY) cursor = zoneStep(zones, n, cursor, input.shift ? -1 : 1);
-    else if (moving) {
+    // Texte qui dépasse (reading.ts) : il fait partie du parcours, avant la première action.
+    const read = (dir: -1 | 1, held: boolean): boolean => {
+      if (!edges) return false;
+      if (reading.active) applyReading(readingStep(edges, n, dir, held));
+      else if (entersReading(edges, n, cursor, dir)) reading.active = true;
+      else return false;
+      return true;
+    };
+    if (input.code === CONFIG_KEY) {
+      const dir = input.shift ? -1 : 1;
+      if (!read(dir, false)) cursor = zoneStep(zones, n, cursor, dir);
+    } else if (moving) {
       const dir = is(KEYS.previous) ? -1 : 1;
-      // Flipper tenu sur un écran à zones : il reste dans la sienne, s'arrête à son bout, puis accélère (par lettre sur une liste triée par nom).
-      if (zones && hold && input.isAutoRepeat) {
+      const held = Boolean(hold && input.isAutoRepeat);
+      if (read(dir, held)) {
+        // Dans le texte ou vers lui : read l'a fait défiler, ou est passé du texte aux actions.
+      } else if (zones && hold && input.isAutoRepeat) {
+        // Flipper tenu sur un écran à zones : il reste dans la sienne, s'arrête à son bout, puis accélère (par lettre sur une liste triée par nom).
         const now = Date.now();
         const moved = holdMove(zones, built.actions.map((a) => a.label), cursor, dir, now - hold.since, now - hold.jumped);
         if (moved.letter !== undefined) {
@@ -2982,15 +3011,22 @@ export function createLibrary(host: LibraryHost) {
         }
         cursor = moved.cursor;
       } else cursor = zoneStep(zones, n, cursor, dir);
-    } else if (is(KEYS.confirm)) void built.actions[cursor]?.run();
-    // Exit dans la liste de contenu : retour aux actions de l'écran ; Exit dans les actions : l'écran se ferme.
+    } else if (is(KEYS.confirm)) {
+      // Start dans le texte : la page suivante, puis la première action ; jamais une action sans l'avoir choisie.
+      if (edges && reading.active) applyReading(readingStep(edges, n, 1));
+      else void built.actions[cursor]?.run();
+    }
+    // Exit dans le texte ou dans la liste de contenu : retour aux actions de l'écran ; Exit dans les actions : l'écran se ferme.
     else if (is(KEYS.exit)) {
-      if (zones && zoneOf(zones, cursor) === 'list') cursor = leaveList(zones, ids, zonesMemory(), backIndex(built));
+      if (edges && reading.active) reading.active = false;
+      else if (zones && zoneOf(zones, cursor) === 'list') cursor = leaveList(zones, ids, zonesMemory(), backIndex(built));
       else built.back();
-    } else {
+    } else if (edges && PAGE_KEYS[input.code]) scrollReading(PAGE_KEYS[input.code]!);
+    else {
       // Raccourci d'une entrée (affiché à droite de son libellé) : elle, sans s'y déplacer.
       const hit = built.actions.find((a) => a.shortcut?.matches(input));
       if (!hit) return false;
+      reading.active = false;
       void hit.run();
     }
     host.broadcast();
@@ -3010,6 +3046,46 @@ export function createLibrary(host: LibraryHost) {
     if (zonePress !== input.code) return;
     zonePress = undefined;
     handleAction({ type: 'zone' });
+  }
+
+  /** Zone de lecture de l'écran affiché : remise à zéro quand un autre écran s'ouvre. */
+  function readingState() {
+    if (reading.screen !== screen) reading = { screen, key: reading.key + 1, active: false, move: { id: 0, dir: 1 } };
+    return reading;
+  }
+
+  /**
+   * L'écran peut avoir une zone de lecture : des sections, sans liste de contenu (qui se parcourt
+   * déjà élément par élément), ni pages, ni clavier à l'écran. Le parcours d'une table n'en a pas :
+   * chacune de ses étapes est rattachée à une action, que choisir amène dans la vue.
+   */
+  function readable(built: Built, zones: Zones | undefined): boolean {
+    if (!screen || zones || screen.kind === 'pages' || built.media || built.health || built.journey) return false;
+    if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) return false;
+    return built.sections.length > 0;
+  }
+
+  /** Mesures du texte de l'écran s'il dépasse ; undefined sinon (ou pas encore mesuré). */
+  function readingEdges(built: Built, zones: Zones | undefined): ReadingEdges | undefined {
+    const r = readingState();
+    if (readable(built, zones) && r.edges?.overflow) return r.edges;
+    r.active = false;
+    return undefined;
+  }
+
+  /** Une page de plus (`dir` 1) ou de moins dans le texte : le rendu la fait défiler. */
+  function scrollReading(dir: -1 | 1): void {
+    const r = readingState();
+    r.move = { id: r.move.id + 1, dir };
+  }
+
+  function applyReading(move: ReadingMove): void {
+    if (move.reading) {
+      if (move.scroll) scrollReading(move.scroll);
+      return;
+    }
+    reading.active = false;
+    cursor = move.cursor;
   }
 
   /** Mémoire des zones de l'écran affiché : oubliée quand un autre écran s'ouvre. */
@@ -3126,6 +3202,18 @@ export function createLibrary(host: LibraryHost) {
   }
 
   function handleAction(action: UiAction): void {
+    // Mesure du texte : même pendant une opération, sinon elle serait perdue (le rendu ne la renvoie qu'au changement).
+    if (action.type === 'reading') {
+      if (!screen) return;
+      const r = readingState();
+      if (action.key !== r.key) return;
+      const was = r.edges?.overflow;
+      r.edges = { overflow: action.overflow, top: action.top, bottom: action.bottom };
+      if (!action.overflow) r.active = false;
+      // Le texte se met à dépasser, ou plus : repère et aide changent.
+      if (was !== action.overflow) host.broadcast();
+      return;
+    }
     if (busy) return;
     if (action.type === 'drop') {
       if (!action.paths.length || !host.guest.knock('files.drop')) return;
@@ -3147,6 +3235,11 @@ export function createLibrary(host: LibraryHost) {
       if (screen.kind === 'pages' || ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor)) return;
       const built = build();
       const zones = screenZones(built, built.actions.length);
+      // Texte qui dépasse : MagnaSave y entre, ou en ressort sur l'action d'où l'on venait.
+      if (!zones && readingEdges(built, zones)) {
+        reading.active = !reading.active;
+        return host.broadcast();
+      }
       if (!zones) return;
       const ids = actionIds(built.actions);
       cursor = switchZone(zones, ids, followCursor(ids, cursor, screen, anchor), zonesMemory(), backIndex(built));
@@ -3157,6 +3250,7 @@ export function createLibrary(host: LibraryHost) {
       const index = resolveActivation(actionIds(built.actions), action.index, action.id);
       if (index === undefined) return host.broadcast();
       cursor = index;
+      reading.active = false;
       host.broadcast();
       void built.actions[index]!.run();
     }
@@ -3178,6 +3272,8 @@ export function createLibrary(host: LibraryHost) {
     anchor = anchorOf(screen, cursor, ids, Boolean(busy));
     warnUnkeyed(built, ids);
     const zone = zoneView(zones, ids);
+    const readingOn = Boolean(readingEdges(built, zones));
+    const read = readable(built, zones) ? readingState() : undefined;
     soundPreview = playsSoundPreview(built.media);
     const editorView = (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor ? viewEditor(screen.editor) : undefined;
     // « Chercher sur le web… » n'a son icône que dans un menu à icônes : seule, elle décalerait tous les libellés.
@@ -3196,7 +3292,17 @@ export function createLibrary(host: LibraryHost) {
       journey: built.journey,
       health: built.health,
       zone,
-      cursor,
+      // Zone de lecture : le rendu mesure le texte, le met dans un cadre s'il dépasse et le fait défiler.
+      reading: read
+        ? {
+            key: read.key,
+            active: read.active,
+            move: read.move,
+            tag: read.active ? { key: 'Exit', text: t('Revenir aux actions') } : { key: 'MagnaSave', text: t('Faire défiler le texte') },
+          }
+        : undefined,
+      // Dans le texte, aucune action n'est choisie : le cadre du texte porte le choix.
+      cursor: read?.active ? -1 : cursor,
       busy,
       editor: editorView,
       pages: screen.kind === 'pages' ? pagesView(screen) : undefined,
@@ -3208,9 +3314,11 @@ export function createLibrary(host: LibraryHost) {
         ? editorView.kind === 'choice'
           ? t('Flippers : choisir · Start : valider · Exit : annuler')
           : t('Flippers : choisir une touche · Start : la taper · Exit : annuler · ou tapez au clavier, Entrée pour valider')
+        : read?.active
+          ? t('Flippers : faire défiler, tenus pour aller vite · Start ou Entrée : page suivante · Exit ou Échap : revenir aux actions · MagnaSave ou F6 : actions de l’écran')
         : zone?.active === 'list'
           ? t('Flippers : parcourir, tenus pour aller vite · Start ou Entrée : valider · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran')
-          : `${built.hint ?? t('Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris')}${zone ? ` · ${t('MagnaSave ou F6 : la liste')}` : ''}`,
+          : `${built.hint ?? t('Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris')}${zone ? ` · ${t('MagnaSave ou F6 : la liste')}` : readingOn ? ` · ${t('MagnaSave ou F6 : le texte')}` : ''}`,
     };
   }
 

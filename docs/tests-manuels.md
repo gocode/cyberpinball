@@ -1114,6 +1114,17 @@ Deux bornes amies, A et B, sur le vrai réseau, chacune avec la même table. La 
 | 582 | Tableau du groupe | A et B jouent ensemble Game of Thrones (ou une autre table sans ROM) ; puis une seconde partie. | Pendant la première, le tableau de la machine est vide (zéros) ; aux résultats, « Records du groupe sur cette version » avec les deux scores. Dans la seconde, le salon dit « Record du groupe à battre : … », et la machine montre les records du groupe avec leurs initiales ; le knocker ne sonne que si ce record tombe. Les records habituels de la table, hors partie entre amis, n'ont pas changé. |
 | 583 | Tableau du groupe, table à ROM | A et B jouent ensemble Terminator 2 deux fois de suite. | Pendant la première partie, le tableau de la machine (attract) est à zéro ; le score de chacun y entre, avec ses initiales, et aux résultats « Records du groupe sur cette version » les montre. Dans la seconde, la machine affiche le Grand Champion du groupe. La table jouée seule ensuite garde ses records habituels (le journal : « records du groupe posés dans la mémoire de t2_l8 »). |
 
+## Lire un texte plus long que l'écran
+
+Aux boutons seuls (flippers, Start, Exit, MagnaSave), sur la borne. La preuve sans opérateur : `packages/core/src/test/lecture.test.ts` ; le manuel : « Lire un texte plus long que l'écran ».
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 584 | Nouveautés d'une mise à jour | Préversions reçues, une version plus ancienne installée : Menu système > « Cyber Pinball » > « Mise à jour de Cyber Pinball ». Flipper gauche sur « Mettre à jour maintenant ». | Les nouveautés sont dans un cadre, « MagnaSave · Faire défiler le texte » à droite et la part lue à gauche. Le flipper gauche éclaire le cadre, plus aucune action en vert ; chaque flipper droit descend d'une page (deux lignes de la précédente restent) ; en bas, le flipper droit passe à « Mettre à jour maintenant », qui n'est validée qu'à l'appui suivant sur Start. |
+| 585 | Revenir sans tout lire | Dans le texte, au milieu : Exit ; puis MagnaSave deux fois. | Exit ramène sur l'action d'où l'on venait, le texte reste où on l'a laissé ; un second Exit quitte l'écran. MagnaSave entre dans le texte et en ressort sans autre geste. |
+| 586 | Flipper tenu, Start | Dans le texte, tenir le flipper droit ; puis, en haut, appuyer sur Start plusieurs fois. | Tenu, le texte défile page après page et s'arrête en bas, sans passer aux actions. Start avance d'une page, puis passe à la première action au bout ; il ne lance jamais une action sans qu'on l'ait choisie. |
+| 587 | Détail des réglages de VPX | Fiche d'une table > « Réglages de VPX » > Avancé, un réglage à la longue description d'origine. MagnaSave droit, puis gauche. | Le détail descend d'une page, puis remonte ; la ligne choisie dans la liste ne change pas. Le bandeau d'aide dit « MagnaSave : faire défiler le détail ». |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

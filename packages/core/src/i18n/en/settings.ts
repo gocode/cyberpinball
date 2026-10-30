@@ -106,8 +106,8 @@ export const messages: Record<string, string> = {
   Essentiels: 'Essentials',
   Avancé: 'Advanced',
   'Flippers : choisir · Start : valider · Exit : annuler': 'Flippers: choose · Start: confirm · Exit: cancel',
-  'Flippers : se déplacer · Start : {start} · Exit : {exit} · Suppr : valeur par défaut · Tab : onglet':
-    'Flippers: move · Start: {start} · Exit: {exit} · Delete: default value · Tab: tab',
+  'Flippers : se déplacer · Start : {start} · Exit : {exit} · Suppr : valeur par défaut · Tab : onglet · MagnaSave : faire défiler le détail':
+    'Flippers: move · Start: {start} · Exit: {exit} · Delete: default value · Tab: tab · MagnaSave: scroll the details',
   'changer d’onglet': 'switch tab',
   modifier: 'edit',
   'retour aux sections': 'back to sections',

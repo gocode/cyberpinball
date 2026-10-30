@@ -1049,6 +1049,8 @@ export function startFrontend(): void {
   });
   ipcMain.on('media-error', (_event, error: MediaErrorReport) => recordMediaError(error));
   ipcMain.on('action', (_event, action: UiAction) => {
+    // Mesure du texte par le rendu (zone de lecture) : pas un geste, elle ne réveille rien.
+    if (action.type === 'reading') return library.handleAction(action);
     // Un clic en mode attente y met fin, sans autre effet ; de même pour le préavis d'arrêt de l'horaire.
     const noticed = hours.activity();
     if (attract.activity() || noticed) return void leaveAttract();
