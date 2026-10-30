@@ -9,6 +9,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  applyHostSettings,
   folderChanges,
   folderPrint,
   makeTableDouble,
@@ -17,6 +18,7 @@ import {
   removeTableDouble,
   t,
   usesPinmameCode,
+  type HostSetting,
   type TableEntry,
 } from '@cyberpinball/core';
 
@@ -43,8 +45,11 @@ export function createTableDoubles(opts: TableDoublesOptions) {
     return root ? path.join(root, 'parties') : undefined;
   };
   return {
-    /** Le double de la table pour la partie `id`, ou la raison de son absence. */
-    start(table: TableEntry, id: string): { ok: true; double: TableDouble } | { ok: false; reason: string } {
+    /**
+     * Le double de la table pour la partie `id`, ou la raison de son absence ; `settings` : les
+     * réglages de l'hôte (invité), posés dans le double à la place des siens.
+     */
+    start(table: TableEntry, id: string, settings?: readonly HostSetting[]): { ok: true; double: TableDouble } | { ok: false; reason: string } {
       const parties = partiesDir();
       const tablesDir = opts.tablesDir();
       if (!parties || !tablesDir) return { ok: false, reason: t('pas de dossier Cyber Pinball') };
@@ -65,6 +70,16 @@ export function createTableDoubles(opts: TableDoublesOptions) {
       const made = makeTableDouble(planned.plan, parties);
       if (!made.ok) return made;
       const plan = planned.plan;
+      if (settings) {
+        try {
+          applyHostSettings(plan.dir, settings);
+          log(`Partie entre amis (${table.id}) : réglages de l'hôte posés dans le double (${settings.map((s) => `${s.rel}${s.data ? '' : ' retiré'}`).join(', ')}).`); // i18n-ignore : journal
+        } catch (error) {
+          removeTableDouble(path.join(parties, id), parties);
+          dropIfEmpty(parties);
+          return { ok: false, reason: t('réglages de l’hôte impossibles à poser : {error}', { error: (error as Error).message }) };
+        }
+      }
       log(`Partie entre amis (${table.id}) : double prêt, ${plan.links.length} fichiers liés, ${plan.copies.length} copiés, dans ${plan.dir}.`); // i18n-ignore : journal
       let finished = false;
       return {

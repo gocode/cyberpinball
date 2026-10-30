@@ -9,6 +9,10 @@
 // même jeu et de celles qui ont la taille du .vpx annoncé. Le script joué compte aussi : un .vbs
 // posé à côté de la table qui remplace son script (scriptPrint), sauf celui de Cyber Pinball.
 //
+// Les réglages de celui qui invite (packages/core/src/hostsettings.ts) partent vers chaque invité
+// qui accepte ; l'invité les vérifie, le dit (game-settings-ok), et les passe au lancement, qui les
+// pose dans le double de sa table.
+//
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
 import { createHash } from 'node:crypto';
@@ -19,6 +23,7 @@ import {
   applyRoom,
   closeIfDone,
   countdownFrom,
+  createSettingsReceiver,
   expireInvites,
   gameStatus,
   guestGame,
@@ -31,8 +36,11 @@ import {
   readVpxScript,
   roomMessage,
   scriptPatchState,
+  settingsMessages,
+  settingsReceived,
   startGame,
   tableIdentity,
+  type HostSetting,
   type LiveGame,
   type LiveInvite,
   type LiveMessage,
@@ -63,8 +71,10 @@ export interface LiveGamesOptions {
    * cours répond « occupé ») : au joueur de choisir, quitter sa partie ou l'ignorer.
    */
   onInvite?(invite: LiveInvite): void;
-  /** C'est parti : lancer la table ; `playing` quand VPX l'affiche. */
-  play(table: TableEntry, playing: () => void): Promise<LivePlayResult | undefined>;
+  /** Réglages de ma table à envoyer aux invités (readHostSettings) ; undefined : trop gros pour voyager. */
+  settingsOf?(table: TableEntry): HostSetting[] | undefined;
+  /** C'est parti : lancer la table ; `playing` quand VPX l'affiche ; `settings` : ceux de l'hôte, reçus (invité). */
+  play(table: TableEntry, playing: () => void, settings?: HostSetting[]): Promise<LivePlayResult | undefined>;
   onChange?(): void;
   now?(): Date;
   log?(line: string): void;
@@ -115,6 +125,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   let mine: TableEntry | undefined;
   let invites: LiveInvite[] = [];
   let launch: NodeJS.Timeout | undefined;
+  /** Invité : la réception des réglages de l'hôte, puis ces réglages, vérifiés. */
+  let receiver: ReturnType<typeof createSettingsReceiver> | undefined;
+  let hostSettings: HostSetting[] | undefined;
   const prints = createPrints(path.join(opts.dataDir, 'amis', 'empreintes.json'));
   const changed = () => opts.onChange?.();
 
@@ -158,14 +171,17 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     if (!game || game.phase === 'cancelled' || !mine) return;
     const id = game.id;
     report('loading');
-    const result = await opts.play(mine, () => {
-      if (game?.id === id) report('playing');
-    });
+    const result = await opts.play(
+      mine,
+      () => {
+        if (game?.id === id) report('playing');
+      },
+      isHost() ? undefined : hostSettings,
+    );
     if (game?.id !== id) return;
     report(result?.ok ? 'done' : 'failed', result);
   }
 
-  /** Empreinte du fichier, identifiant de table et règles de score d'une de mes tables. */
   /** Empreinte du .vpx et du script joué d'une de mes tables. */
   async function versionOf(table: TableEntry): Promise<{ print?: string; script?: string }> {
     const print = await prints.of(table.file);
@@ -201,6 +217,18 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     return { match: found.match, ...(found.entry ? { table: found.entry } : {}), ...(balls ? { balls } : {}), ...(found.scriptDiffers ? { scriptDiffers: true } : {}) };
   }
 
+  /** Hôte : mes réglages vers un invité qui accepte ; trop gros pour voyager, il jouera hors classement. */
+  function sendSettings(key: string, id: string, table: TableEntry): void {
+    if (!opts.settingsOf) return;
+    const settings = opts.settingsOf(table);
+    if (!settings) {
+      log(`Partie en direct : réglages de ${table.title} trop gros pour voyager, ${key} jouera hors classement.`); // i18n-ignore : journal
+      if (game) setGame(settingsReceived(game, key, false));
+      return;
+    }
+    for (const message of settingsMessages(id, settings)) net.send(key, message);
+  }
+
   const unsubscribe = net.onMessage((key: string, message: FriendMessage) => {
     const m = message as LiveMessage;
     switch (m.t) {
@@ -216,9 +244,32 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         changed();
         return;
       }
-      case 'game-answer':
-        if (game && isHost() && m.game === game.id) setGame(answerGame(game, key, m.answer, m.match, m.balls));
+      case 'game-answer': {
+        if (!game || !isHost() || m.game !== game.id) return;
+        const before = game.players.find((p) => p.key === key)?.state;
+        setGame(answerGame(game, key, m.answer, m.match, m.balls));
+        // Il vient d'accepter : mes réglages partent vers lui, à poser dans le double de sa table.
+        if (before === 'invited' && game.players.find((p) => p.key === key)?.state === 'accepted' && mine) sendSettings(key, game.id, mine);
         return;
+      }
+      case 'game-settings-ok':
+        if (game && isHost() && m.game === game.id) {
+          log(`Partie en direct : réglages ${m.ok ? 'reçus' : 'NON reçus'} par ${game.players.find((p) => p.key === key)?.name ?? key}.`); // i18n-ignore : journal
+          setGame(settingsReceived(game, key, m.ok));
+        }
+        return;
+      case 'game-settings':
+      case 'game-settings-part': {
+        if (!game || isHost() || key !== game.host || m.game !== game.id || !receiver) return;
+        const done = receiver.take(m);
+        if (!done) return;
+        receiver = undefined;
+        hostSettings = done.ok ? done.settings : undefined;
+        log(`Partie en direct : réglages de l'hôte ${done.ok ? `reçus (${done.settings.filter((x) => x.data).map((x) => x.rel).join(', ') || 'aucun fichier : réglages d’usine'})` : 'abîmés en route : partie hors classement'}.`); // i18n-ignore : journal
+        net.send(game.host, { t: 'game-settings-ok', game: game.id, ok: done.ok });
+        changed();
+        return;
+      }
       case 'game-room':
         if (game && !isHost() && key === game.host) {
           game = applyRoom(game, m);
@@ -297,6 +348,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'accept', match: found.match, ...(found.balls ? { balls: found.balls } : {}) });
       mine = found.table;
       game = guestGame(invite, me(), found.match, found.balls);
+      // Les réglages de l'hôte arrivent juste après ma réponse.
+      receiver = createSettingsReceiver(id);
+      hostSettings = undefined;
       changed();
       return found;
     },

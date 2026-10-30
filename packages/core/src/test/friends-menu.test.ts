@@ -223,7 +223,7 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
     title: 'Terminator 2 (Williams 1991)',
     players: [
       { key: me, name: 'Alice', state: 'accepted', host: true, match: 'same' },
-      { key: FRIEND, name: 'Bruno', state: 'accepted', match: 'same' },
+      { key: FRIEND, name: 'Bruno', state: 'accepted', match: 'same', settings: 'ok' },
     ],
     phase: 'gathering',
     createdAt: new Date().toISOString(),

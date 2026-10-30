@@ -16,6 +16,10 @@
 //   invite (« Récupérer sa version chez … »).
 // - « missing » : il ne l'a pas, il ne peut que refuser (il la récupère chez l'ami ou par le
 //   catalogue).
+// Les réglages de celui qui invite (hostsettings.ts : mémoire et interrupteurs de la ROM, valeurs
+// enregistrées par la table) partent vers chaque invité qui accepte, et se posent dans le double de
+// sa table : tout le monde part du même état de machine. Un invité qui ne les a pas reçus entiers
+// (une borne d'avant le 30/10/2026, un transfert raté) joue hors classement.
 // Le nombre de billes par partie compte aussi (ballcount.ts) : connu des deux côtés et différent
 // (5 contre 3), le score passe hors classement ; inconnu, il ne juge rien.
 //
@@ -27,6 +31,7 @@
 
 import { randomBytes } from 'node:crypto';
 import { isBallCount } from './ballcount';
+import { isSettingsRel, SETTINGS_MAX_BYTES, SETTINGS_MAX_FILES } from './hostsettings';
 import { t, tn } from './i18n';
 import { normalizeName } from './social';
 import { isPlayerPublicKey, parseTableIdentity, sameTable, type TableIdentity } from './sharing';
@@ -69,9 +74,12 @@ export function liveOtherBalls(p: Pick<LivePlayer, 'balls'>, hostBalls: number |
   return !!p.balls && !!hostBalls && p.balls !== hostBalls;
 }
 
-/** Un score qui compte au classement : pas un autre nombre de billes par partie que celui qui invite (`hostBalls`). */
-export function liveRanked(p: Pick<LivePlayer, 'host' | 'balls'>, hostBalls?: number): boolean {
-  return p.host === true || !liveOtherBalls(p, hostBalls);
+/**
+ * Un score qui compte au classement : celui de l'hôte, ou d'un invité qui a joué avec les réglages
+ * de l'hôte (reçus entiers) et pas un autre nombre de billes par partie (`hostBalls`).
+ */
+export function liveRanked(p: Pick<LivePlayer, 'host' | 'balls' | 'settings'>, hostBalls?: number): boolean {
+  return p.host === true || (p.settings === 'ok' && !liveOtherBalls(p, hostBalls));
 }
 
 export type LivePlayerState =
@@ -105,6 +113,8 @@ export interface LivePlayer {
   match?: LiveTableMatch;
   /** Billes par partie de sa table, s'il le sait. */
   balls?: number;
+  /** Réglages de l'hôte reçus entiers (ok) ou non (failed) ; absent : pas encore de réponse. */
+  settings?: 'ok' | 'failed';
   /** Invité le (ISO), pour l'expiration. */
   invitedAt?: string;
   /** Fin de partie : durée jouée et records entrés. */
@@ -149,7 +159,13 @@ export type LiveMessage =
   /** Départ dans `in` millisecondes, à compter de la réception. */
   | { t: 'game-start'; game: string; in: number }
   | { t: 'game-status'; game: string; state: LiveStatus; seconds?: number; records?: LiveRecord[] }
-  | { t: 'game-cancel'; game: string };
+  | { t: 'game-cancel'; game: string }
+  /** Réglages de l'hôte : chaque fichier, son empreinte et sa taille, ou absent (pas de sha). */
+  | { t: 'game-settings'; game: string; files: { rel: string; sha?: string; bytes?: number }[] }
+  /** Un morceau d'un fichier de réglages, en base64. */
+  | { t: 'game-settings-part'; game: string; rel: string; index: number; count: number; data: string }
+  /** L'invité a reçu les réglages entiers et vérifiés (ok), ou non. */
+  | { t: 'game-settings-ok'; game: string; ok: boolean };
 
 // ---------------------------------------------------------------------------
 // Messages reçus
@@ -215,6 +231,7 @@ function parsePlayer(raw: unknown): LivePlayer | undefined {
     ...(r.host === true ? { host: true } : {}),
     ...(MATCHES.includes(r.match as LiveTableMatch) ? { match: r.match as LiveTableMatch } : {}),
     ...(isBallCount(r.balls) ? { balls: r.balls } : {}),
+    ...(r.settings === 'ok' || r.settings === 'failed' ? { settings: r.settings } : {}),
     ...(s !== undefined ? { seconds: s } : {}),
     ...(records?.length ? { records } : {}),
   };
@@ -255,6 +272,29 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
     }
     case 'game-cancel':
       return isId(m.game) ? { t: 'game-cancel', game: m.game } : undefined;
+    case 'game-settings': {
+      if (!isId(m.game) || !Array.isArray(m.files) || m.files.length > SETTINGS_MAX_FILES) return undefined;
+      const files: { rel: string; sha?: string; bytes?: number }[] = [];
+      for (const raw of m.files as unknown[]) {
+        const f = (raw ?? {}) as Record<string, unknown>;
+        if (!isSettingsRel(f.rel) || files.some((x) => x.rel === f.rel)) return undefined;
+        if (f.sha === undefined) files.push({ rel: f.rel });
+        else if (isPrint(f.sha) && typeof f.bytes === 'number' && Number.isSafeInteger(f.bytes) && f.bytes >= 0 && f.bytes <= SETTINGS_MAX_BYTES) files.push({ rel: f.rel, sha: f.sha, bytes: f.bytes });
+        else return undefined;
+      }
+      return { t: 'game-settings', game: m.game, files };
+    }
+    case 'game-settings-part': {
+      const ok =
+        isId(m.game) &&
+        isSettingsRel(m.rel) &&
+        typeof m.count === 'number' && Number.isInteger(m.count) && m.count >= 1 && m.count <= 16 &&
+        typeof m.index === 'number' && Number.isInteger(m.index) && m.index >= 0 && m.index < m.count &&
+        typeof m.data === 'string' && m.data.length <= 140_000 && /^[A-Za-z0-9+/]*={0,2}$/.test(m.data);
+      return ok ? { t: 'game-settings-part', game: m.game as string, rel: m.rel as string, index: m.index as number, count: m.count as number, data: m.data as string } : undefined;
+    }
+    case 'game-settings-ok':
+      return isId(m.game) && typeof m.ok === 'boolean' ? { t: 'game-settings-ok', game: m.game, ok: m.ok } : undefined;
     default:
       return undefined;
   }
@@ -325,6 +365,13 @@ export function answerGame(game: LiveGame, key: string, answer: LiveAnswer, matc
   // Sans la même version, accepter ne mène à rien : compté comme un refus (une borne d'avant le 30/10/2026 acceptait une autre version).
   const state: LivePlayerState = answer === 'accept' && (match === undefined || match === 'same') ? 'accepted' : answer === 'busy' ? 'busy' : 'declined';
   return setPlayer(game, key, (x) => ({ ...x, state, ...(match ? { match } : {}), ...(isBallCount(balls) ? { balls } : {}) }));
+}
+
+/** L'invité dit s'il a reçu les réglages de l'hôte entiers ; ignoré s'il n'a pas accepté. */
+export function settingsReceived(game: LiveGame, key: string, ok: boolean): LiveGame {
+  const p = game.players.find((x) => x.key === key);
+  if (!p || p.host || p.state === 'invited' || p.state === 'declined') return game;
+  return setPlayer(game, key, (x) => ({ ...x, settings: ok ? 'ok' : 'failed' }));
 }
 
 /** Invitations restées sans réponse trop longtemps : expirées. */
@@ -420,13 +467,15 @@ export function countdownLeft(game: Pick<LiveGame, 'startAt'>, now = new Date())
 // ---------------------------------------------------------------------------
 // Textes
 
-export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'balls'>, hostBalls?: number): string {
+export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'balls' | 'settings' | 'host'>, hostBalls?: number): string {
   switch (p.state) {
     case 'invited':
       return t('Invité, en attente de sa réponse');
     case 'accepted':
+      if (!p.host && p.settings === 'failed') return t('Prêt, réglages de l’hôte non reçus : score hors classement');
+      if (!p.host && p.settings !== 'ok') return t('Prêt, réglages de l’hôte en route');
       if (liveOtherBalls(p, hostBalls)) return t('Prêt, {balls} : score hors classement', { balls: liveBallsAgainst(p.balls!, hostBalls!) });
-      return t('Prêt');
+      return p.host ? t('Prêt') : t('Prêt, réglages de l’hôte reçus');
     case 'declined':
       return p.match === 'missing' ? t('N’a pas cette table') : p.match === 'other-version' ? t('N’a pas la même version : il peut récupérer la vôtre') : t('A refusé');
     case 'busy':
@@ -464,7 +513,7 @@ export function liveMatchLabel(match: LiveTableMatch): string {
 
 /**
  * Classement de fin : d'abord ceux qui ont un record entré et comptent au classement (liveRanked :
- * pas un autre nombre de billes ; le meilleur score d'abord), puis ceux qui ont joué (hors
+ * réglages de l'hôte reçus, pas un autre nombre de billes ; le meilleur score d'abord), puis ceux qui ont joué (hors
  * classement, même avec un record), puis les autres. Le score de la partie n'est connu que s'il
  * est entré au tableau d'honneur de la table.
  */

@@ -19,6 +19,7 @@ import {
   parseLiveMessage,
   romBallsPerGame,
   scriptBallSetting,
+  settingsReceived,
   tableBallCount,
   type LiveInvite,
   type LiveMessage,
@@ -130,11 +131,12 @@ test('partie : les billes voyagent, et 5 contre 3 passe hors classement, même p
   game = { ...game, players: [...game.players, { key: 'bruno', name: 'Bruno', state: 'invited' }, { key: 'chloe', name: 'Chloé', state: 'invited' }] };
   game = answerGame(game, 'bruno', 'accept', 'same', 5);
   game = answerGame(game, 'chloe', 'accept', 'same', 3);
+  game = settingsReceived(settingsReceived(game, 'bruno', true), 'chloe', true);
   assert.equal(game.players[1]!.balls, 5);
   assert.ok(!liveRanked(game.players[1]!, 3), '5 billes contre 3');
   assert.ok(liveRanked(game.players[2]!, 3));
-  assert.ok(liveRanked({ balls: 5 }, undefined), 'inconnu chez l’hôte : rien à juger');
-  assert.ok(liveRanked({}, 3), 'inconnu chez l’invité : rien à juger');
+  assert.ok(liveRanked({ settings: 'ok', balls: 5 }, undefined), 'inconnu chez l’hôte : rien à juger');
+  assert.ok(liveRanked({ settings: 'ok' }, 3), 'inconnu chez l’invité : rien à juger');
   const done = (p: LivePlayer, score: number): LivePlayer => ({ ...p, state: 'done', records: [{ score, rank: 1 }] });
   const order = liveStandings({ table, players: [done(game.players[0]!, 1_000), done(game.players[1]!, 9_000), done(game.players[2]!, 2_000)] }).map((p) => p.name);
   assert.deepEqual(order, ['Chloé', 'Alice', 'Bruno']);

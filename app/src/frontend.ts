@@ -99,6 +99,7 @@ import {
   type ConfigurationSelection,
   type ManualEdit,
   type ObservedDisplay,
+  type HostSetting,
   type RoleId,
   type Rotation,
   type ScreenSurface,
@@ -127,6 +128,7 @@ import {
   cachedFrame,
   frameCacheFile,
   liveDmdArea,
+  readHostSettings,
   readTableRecords,
   vpRegFile,
   playStats,
@@ -801,6 +803,8 @@ const liveGames = createLiveGames({
   tables: () => tables,
   romsOf,
   ballsOf: async (table) => (await ballCounts.of(table))?.balls,
+  // Mes réglages (mémoire et interrupteurs de la ROM, valeurs enregistrées) pour le double de chaque invité.
+  settingsOf: (table) => readHostSettings({ folder: table.folder, roms: romsOf(table), ...(loc.root ? { pinmameDir: path.join(loc.root, 'pinmame') } : {}) }),
   // Le carillon d'invitation sonne au menu comme pendant une partie ; en partie, la notification
   // se pose sur le plateau, par-dessus VPX : quitter sa partie ramène au menu, où l'invitation s'ouvre.
   onInvite: (invite) => {
@@ -808,11 +812,11 @@ const liveGames = createLiveGames({
     if (playing) gameNotices.show(invite);
     else if (liveCanShow()) friendsMenu.live.openInvite(invite.id, () => library.leave());
   },
-  play: async (table, onPlaying) => {
+  play: async (table, onPlaying, settings) => {
     // Le départ commun ferme l'écran ouvert (le compte à rebours), comme Start sur une table.
     if (library.isActive()) library.leave();
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
-    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying, double: `${Date.now().toString(36)}` });
+    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying, double: `${Date.now().toString(36)}`, ...(settings ? { settings } : {}) });
     // De retour au menu : les résultats, qui se complètent à mesure que les autres reviennent.
     if (report && state.phase === 'menu') setImmediate(() => friendsMenu.live.open(() => library.leave()));
     return report ? { ok: report.result.ok, seconds: report.result.seconds, records: report.entered.map((s) => ({ score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) })) } : undefined;
@@ -1562,7 +1566,7 @@ export interface PlayReport {
  * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
  * l'a demandée (la fiche) reprend la main.
  */
-async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string } = {}): Promise<PlayReport | undefined> {
+async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[] } = {}): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
   if (!install) return undefined;
   // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
@@ -1666,7 +1670,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Partie entre amis : VPX joue un double de la table, fait après les préparations ci-dessus ; le
   // dossier habituel n'est jamais ouvert en écriture. Sans double possible, pas de partie : jamais
   // de repli sur le dossier habituel.
-  const doubled = hooks.double && !displayMode ? tableDoubles.start(table, hooks.double) : undefined;
+  const doubled = hooks.double && !displayMode ? tableDoubles.start(table, hooks.double, hooks.settings) : undefined;
   if (doubled && !doubled.ok) {
     console.log(`Partie entre amis (${table.id}) : pas de double, partie non lancée (${doubled.reason}).`);
     dressing = undefined;

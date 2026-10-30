@@ -30,7 +30,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { addEvent, encodePng, layoutOf, loadSocial, newSocialState, saveSocial, scanTables, setName, socialFile, tableContents, type SocialState, type TableEntry } from '@cyberpinball/core';
+import { addEvent, encodePng, layoutOf, loadSocial, newSocialState, readHostSettings, saveSocial, scanTables, setName, socialFile, tableContents, type SocialState, type TableEntry } from '@cyberpinball/core';
 import { createFriendContent, type FriendContent } from './friend-content';
 import { createLiveGames, type LiveGames } from './live-game';
 import { createSocialNet, type SocialNet } from './social-net';
@@ -252,6 +252,8 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       net: bruno,
       dataDir: brunoDir,
       tables: brunoTables,
+      // Ses réglages partent vers la borne, comme ceux d'une vraie borne (hostsettings.ts).
+      settingsOf: (table) => readHostSettings({ folder: table.folder, roms: [] }),
       play: async (_table, playing) => {
         playing();
         await new Promise((r) => setTimeout(r, 4000));

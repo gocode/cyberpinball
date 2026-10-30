@@ -316,7 +316,13 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const record = p.records?.[0];
     const who = p.key === myKey() ? t('{name} (vous)', { name: label(p.key, p.name) }) : label(p.key, p.name);
     const played = p.seconds !== undefined ? playDuration(p.seconds) : undefined;
-    const version = liveOtherBalls(p, hostBalls) && !p.host ? t('Hors classement : {balls}', { balls: liveBallsAgainst(p.balls!, hostBalls!) }) : undefined;
+    const version = p.host
+      ? undefined
+      : p.settings !== 'ok'
+        ? t('Hors classement : réglages de l’hôte non reçus')
+        : liveOtherBalls(p, hostBalls)
+          ? t('Hors classement : {balls}', { balls: liveBallsAgainst(p.balls!, hostBalls!) })
+          : undefined;
     const detail =
       p.state === 'done'
         ? [record ? t('Record enregistré, place {rank} du tableau', { rank: record.rank }) : t('Partie terminée'), version, played].filter(Boolean).join(' · ')

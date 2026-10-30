@@ -18,6 +18,7 @@ son interface).
 - Partie en direct : tout le monde joue la même version de la table, obligatoirement, pour un score sur lequel se défier : le même fichier `.vpx` et le même script. Sans elle, pas d'« Accepter » : « Récupérer sa version chez … » ouvre sa table dans sa bibliothèque partagée, cochée d'office.
 - Partie en direct : le nombre de billes par partie compte. Réglées autrement que chez celui qui invite (5 contre 3), vous jouez quand même, mais votre score reste hors classement ; l'invitation le dit avant d'accepter. Il se lit dans la ROM (tables à ROM décrites par le projet Pinball Memory Maps), le script ou le menu de service de la table.
 - Partie en direct : votre table habituelle n'est jamais modifiée. La partie se joue sur un double de la table, fait juste avant le lancement et supprimé au retour : la mémoire de la ROM, vos records et vos réglages restent tels quels.
+- Partie en direct : tout le monde joue avec les réglages de celui qui invite (nombre de billes, sauvetage de bille, tilt…), envoyés à chaque ami qui accepte et posés dans le double de sa table. Pour jouer à 5 billes, réglez votre table sur 5 avant d'inviter. Un ami qui ne les a pas reçus joue hors classement.
 
 ## 0.1.4
 

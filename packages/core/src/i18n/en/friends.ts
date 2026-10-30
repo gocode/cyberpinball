@@ -131,6 +131,11 @@ export const messages: Record<string, string> = {
   'Meilleur score connu': 'Best known score',
   'Seuls les scores inscrits au tableau d’honneur sont disponibles.': 'Only scores entered on the high score table are available.',
   // La même version pour tous (30/10/2026)
+  'Prêt, réglages de l’hôte non reçus : score hors classement': 'Ready, host’s settings not received: score not ranked',
+  'Prêt, réglages de l’hôte en route': 'Ready, host’s settings on their way',
+  'Prêt, réglages de l’hôte reçus': 'Ready, host’s settings received',
+  'Hors classement : réglages de l’hôte non reçus': 'Not ranked: host’s settings not received',
+  'réglages de l’hôte impossibles à poser : {error}': 'host’s settings could not be applied: {error}',
   'N’a pas la même version : il peut récupérer la vôtre': 'Does not have the same version: they can fetch yours',
   'Vous avez cette table dans une autre version : la partie se joue sur la même version pour tous, récupérez la sienne':
     'You have this table in another version: the game is played on the same version for everyone, fetch theirs',
