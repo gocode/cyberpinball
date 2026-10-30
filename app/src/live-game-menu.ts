@@ -123,7 +123,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       title: t('Records du groupe sur cette version'),
       rows: board.length
         ? board.map((r, i) => ({ text: `${i + 1}. ${label(r.player, r.name)} — ${formatNumber(r.score)}`, detail: new Date(r.at).toLocaleDateString(language() === 'en' ? 'en-GB' : 'fr-FR'), icon: 'star' as const, ...(i === 0 ? { tone: 'ok' as const } : {}) }))
-        : [{ text: t('Aucun score classé pour l’instant'), detail: t('Seuls les scores lisibles comptent (tables qui gardent leurs records dans VPReg.stg)'), tone: 'quiet' as const }],
+        : [{ text: t('Aucun score classé pour l’instant'), detail: t('Seuls les scores lisibles comptent : VPReg.stg, ou la mémoire d’une ROM que sa carte décrit'), tone: 'quiet' as const }],
     };
   }
 

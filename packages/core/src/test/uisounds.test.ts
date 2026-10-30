@@ -269,10 +269,11 @@ test('knocker : records lus avant la partie et au retour, sonné seulement si un
   const play = main.slice(start, start + main.slice(start).search(/\r?\n\}\r?\n/));
   assert.match(play, /let recordsBefore = readTableRecords\(table\);/);
   // Entre amis, relus dans le double une fois fait : réglages de l'hôte et records du groupe y sont déjà.
-  assert.match(play, /const played = double\?\.table \?\? table;\s+if \(double\) recordsBefore = readTableRecords\(played\);/);
+  assert.match(play, /const played = double\?\.table \?\? table;\s+if \(double\) recordsBefore = double\.records\(\);/);
   // Au retour, lus là où VPX les a écrits : le double d'une partie entre amis (table-double.ts), sinon la table.
   assert.match(play, /const played = double\?\.table \?\? table;/);
-  assert.match(play, /const recordsAfter = readTableRecords\(played\);\s+double\?\.finish\(\);/);
+  // Le double relit son tableau : VPReg.stg, ou la mémoire de la ROM d'après sa carte (table-double.ts).
+  assert.match(play, /const recordsAfter = double \? double\.records\(\) : readTableRecords\(played\);\s+double\?\.finish\(\);/);
   assert.match(play, /const entered = result\.ok \? newRecords\(recordsBefore, recordsAfter\) : \[\];/);
   // Entre amis, seulement le record du groupe battu (la première place d'un tableau qui en avait une).
   assert.match(play, /if \(double \? entered\.some\(\(s\) => s\.rank === 1 && \(hooks\.board\?\.length \?\? 0\) > 0\) : entered\.length\) playUiSound\('knocker'\);/);

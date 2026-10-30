@@ -137,7 +137,7 @@ export const messages: Record<string, string> = {
   'Le meilleur score de cette partie l’ouvrira': 'The best score of this game will open it',
   'Records du groupe sur cette version': 'Group records on this version',
   'Aucun score classé pour l’instant': 'No ranked score yet',
-  'Seuls les scores lisibles comptent (tables qui gardent leurs records dans VPReg.stg)': 'Only readable scores count (tables that keep their high scores in VPReg.stg)',
+  'Seuls les scores lisibles comptent : VPReg.stg, ou la mémoire d’une ROM que sa carte décrit': 'Only readable scores count: VPReg.stg, or the memory of a ROM its map describes',
   // La même version pour tous (30/10/2026)
   'Prêt, réglages de l’hôte non reçus : score hors classement': 'Ready, host’s settings not received: score not ranked',
   'Prêt, réglages de l’hôte en route': 'Ready, host’s settings on their way',

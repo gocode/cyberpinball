@@ -11,8 +11,14 @@ import * as path from 'node:path';
 import {
   applyHostSettings,
   folderChanges,
+  cachedRomMemory,
   folderPrint,
+  groupInitials,
   injectGroupRecords,
+  readRomRecords,
+  readTableRecords,
+  writeRomRecords,
+  type TableRecords,
   makeTableDouble,
   planTableDouble,
   readVpxScript,
@@ -30,12 +36,16 @@ export interface TableDoublesOptions {
   /** Dossier des tables (une table qui y est directement partage son dossier). */
   tablesDir(): string | undefined;
   romsOf?(table: TableEntry): readonly string[];
+  /** Cache des cartes mémoire des ROM (ball-count.ts les y met) : records d'une table à ROM. */
+  memoryCacheDir?: string;
   log?(line: string): void;
 }
 
 export interface TableDouble {
   /** La table à lancer : le double. */
   table: TableEntry;
+  /** Le tableau de la table dans le double, maintenant : VPReg.stg, sinon la mémoire de sa ROM (d'après sa carte). */
+  records(): TableRecords | undefined;
   /** Après la partie : compare le dossier habituel à son empreinte d'avant, puis supprime le double. */
   finish(): void;
 }
@@ -93,12 +103,51 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           log(`Partie entre amis (${table.id}) : records du groupe non posés (${(error as Error).message}).`); // i18n-ignore : journal
         }
       }
+      // Une table à ROM : son tableau est dans la mémoire de la ROM, écrit d'après sa carte, sommes de contrôle comprises.
+      const romBoard = (rom: string) => {
+        const nv = path.join(plan.dir, 'pinmame', 'nvram', `${rom.toLowerCase()}.nv`);
+        const memory = opts.memoryCacheDir ? cachedRomMemory(opts.memoryCacheDir, rom) : undefined;
+        return { nv, memory };
+      };
+      if (board) {
+        for (const rom of roms) {
+          const { nv, memory } = romBoard(rom);
+          if (!memory || !fs.existsSync(nv)) continue;
+          try {
+            const before = fs.readFileSync(nv);
+            const places = readRomRecords(memory, before)?.length ?? 0;
+            const out = places > 1 ? writeRomRecords(memory, before, board.slice(0, places - 1).map((r) => ({ score: r.score, initials: groupInitials(r) }))) : undefined;
+            if (out) {
+              fs.rmSync(nv, { force: true });
+              fs.writeFileSync(nv, out);
+            }
+            log(out ? `Partie entre amis (${table.id}) : records du groupe posés dans la mémoire de ${rom} (${Math.min(board.length, places - 1)} sur ${places} places).` : `Partie entre amis (${table.id}) : la carte de ${rom} ne permet pas d'écrire son tableau, records du groupe non posés.`); // i18n-ignore : journal
+          } catch (error) {
+            log(`Partie entre amis (${table.id}) : records du groupe non posés dans ${rom} (${(error as Error).message}).`); // i18n-ignore : journal
+          }
+        }
+      }
+      const records = (): TableRecords | undefined => {
+        const reg = readTableRecords({ folder: plan.dir, file: plan.file, title: table.title });
+        if (reg) return reg;
+        for (const rom of roms) {
+          const { nv, memory } = romBoard(rom);
+          try {
+            const scores = memory && fs.existsSync(nv) ? readRomRecords(memory, fs.readFileSync(nv)) : undefined;
+            if (scores) return { file: nv, storage: rom, scores };
+          } catch {
+            // Illisible : la suivante.
+          }
+        }
+        return undefined;
+      };
       log(`Partie entre amis (${table.id}) : double prêt, ${plan.links.length} fichiers liés, ${plan.copies.length} copiés, dans ${plan.dir}.`); // i18n-ignore : journal
       let finished = false;
       return {
         ok: true,
         double: {
           table: { ...table, file: plan.file, folder: plan.dir },
+          records,
           finish() {
             if (finished) return;
             finished = true;

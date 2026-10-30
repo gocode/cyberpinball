@@ -796,7 +796,14 @@ const ballCounts = createBallCounts({ dataDir: loc.dataDir, romsOf, pinmameDirs:
 // Une partie entre amis se joue sur un double de la table : sa mémoire de ROM, ses records et ses
 // réglages habituels ne sont jamais ouverts en écriture (table-double.ts). Ceux d'une partie
 // interrompue par un plantage partent au démarrage.
-const tableDoubles = createTableDoubles({ root: () => loc.root, tablesDir: () => (loc.root ? layoutOf(loc.root).tables : undefined), romsOf, log: (line) => console.log(line) });
+const tableDoubles = createTableDoubles({
+  root: () => loc.root,
+  tablesDir: () => (loc.root ? layoutOf(loc.root).tables : undefined),
+  romsOf,
+  // Les cartes mémoire des ROM, mises en cache par ball-count.ts : le tableau d'une table à ROM.
+  memoryCacheDir: path.join(loc.dataDir, 'cache', 'cartes-memoire'),
+  log: (line) => console.log(line),
+});
 tableDoubles.sweep();
 const liveGames = createLiveGames({
   net: socialNet,
@@ -1683,7 +1690,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   }
   const double = doubled?.ok ? doubled.double : undefined;
   const played = double?.table ?? table;
-  if (double) recordsBefore = readTableRecords(played);
+  if (double) recordsBefore = double.records();
 
   // Les fenêtres du menu restent derrière VPX, sans jamais lui prendre le focus : l'écran de
   // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque
@@ -1722,7 +1729,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const result = await game.done;
   gameNotices.close();
   // Les records de la partie, lus où VPX les a écrits (le double, pour une partie entre amis) ; puis le double s'en va.
-  const recordsAfter = readTableRecords(played);
+  const recordsAfter = double ? double.records() : readTableRecords(played);
   double?.finish();
   recording?.gameEnded();
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
