@@ -71,7 +71,7 @@ export const MEMORY_MAPS_BASE = 'https://raw.githubusercontent.com/tomlogic/pinb
 const INDEX_EVERY_MS = 7 * 24 * 3600_000;
 const MAP_EVERY_MS = 30 * 24 * 3600_000;
 
-interface AdjustmentEntry {
+export interface AdjustmentEntry {
   label?: unknown;
   start?: unknown;
   length?: unknown;
@@ -95,15 +95,20 @@ export interface RomMemory {
 
 const num = (v: unknown): number | undefined => (typeof v === 'number' ? v : typeof v === 'string' && /^(0x[0-9a-f]+|\d+)$/i.test(v) ? Number(v) : undefined);
 
+/** Le réglage « Balls Per Game » que décrit la carte (livestate.ts le lit aussi pendant la partie). */
+export function romBallsEntry(memory: RomMemory): AdjustmentEntry | undefined {
+  return Object.values(memory.map.adjustments ?? {})
+    .flatMap((group) => Object.values(group ?? {}))
+    .find((e) => typeof e?.label === 'string' && /^balls?\s*(per|\/)\s*game$/i.test(e.label.trim()));
+}
+
 /**
  * Billes par partie d'après la carte de la ROM et son .nv (undefined : pas de .nv, la ROM part
  * de son réglage d'usine). Seuls les réglages en octets entiers d'une seule zone de NVRAM se
  * lisent ; une carte qui ne décrit pas ce réglage, ou un encodage inconnu : rien.
  */
 export function romBallsPerGame(memory: RomMemory, nv: Buffer | undefined): number | undefined {
-  const entry = Object.values(memory.map.adjustments ?? {})
-    .flatMap((group) => Object.values(group ?? {}))
-    .find((e) => typeof e?.label === 'string' && /^balls?\s*(per|\/)\s*game$/i.test(e.label.trim()));
+  const entry = romBallsEntry(memory);
   if (!entry) return undefined;
   if (!nv) return isBallCount(entry.default) ? entry.default : undefined;
   const start = num(entry.start);

@@ -1124,10 +1124,22 @@ With the buttons only (flippers, Start, Exit, MagnaSave), on the cabinet. The pr
 | 585 | Going back without reading everything | In the text, halfway: Exit; then MagnaSave twice. | Exit brings you back to the action you came from, the text stays where you left it; a second Exit leaves the screen. MagnaSave enters the text and leaves it with no other gesture. |
 | 586 | Held flipper, Start | In the text, hold the right flipper; then, at the top, press Start several times. | Held, the text scrolls page after page and stops at the bottom, without moving to the actions. Start moves one page, then to the first action at the end; it never runs an action you have not chosen. |
 | 587 | VPX settings details | Table page > "Réglages de VPX" (VPX settings) > Advanced, a setting with a long original description. Right MagnaSave, then left. | The details go down one page, then back up; the chosen line in the list does not change. The help strip says "MagnaSave : faire défiler le détail" (MagnaSave: scroll the details). |
+
+## Live game state of a game with friends
+
+Two friend cabinets, A and B, on the real network, each with the same table. The unattended proof: `packages/core/src/test/etat-en-direct.test.ts` (the ROM tables' live state run by cscript on T2's memory captured on the test bench) and the demo `.\docs\demo-amis.ps1 -Parcours partie` (simulated game); the manual: "Live game", the live game state.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
 | 588 | Automatic start | A and B, game with friends on Game of Thrones, without touching the buttons at launch. | On each cabinet, once the table is ready, a credit drops then the game starts by itself; the first ball comes. Start and the coin door, pressed before the start, do nothing. |
 | 589 | The others live | Play the game. | In the playfield corner, the "Partie entre amis" (Game with friends) strip: each player, their score and ball, updated while playing; the best at the top. |
 | 590 | End of game | Finish your game, enter your initials. | A few seconds later, VPX closes by itself and the results open, with everyone's score (even without initials entered). The log (`data\logs\journal.txt`) says "relevé de l'état de jeu et départ automatique posés" (live state and automatic start set), then "partie terminée" (game over). |
 | 591 | Extra player | During the first ball, press Start. | A second player is added in the table; the strip says "hors classement" (not ranked) for that player, and their score does not enter the group board. |
+| 592 | Automatic start, ROM table | A and B, game with friends on Terminator 2, without touching the buttons at launch. | The ROM boots then goes to attract mode; two seconds later a credit drops, then Start: the game starts by itself, ball 1. Start and the coin door, pressed before the start, do nothing. The log says "relevé de l'état de jeu et départ automatique posés (mémoire de la ROM t2_l8, minuteur de … )" (live state and automatic start set, ROM memory). |
+| 593 | Live score and ball, ROM table | Play the Terminator 2 game. | The "Partie entre amis" (Game with friends) strip follows everyone's score and ball ("Ball 2 of 3"), updated while playing. During the game Start goes through; the coin door never does. |
+| 594 | Initials, ROM table | Finish the game with a score that enters the group board; enter your initials (flippers for the letter, Start to confirm it). | While entering them, VPX stays open and Start confirms the letters. A few seconds after the last letter, VPX closes by itself; the results have the final score. Without entering them, VPX closes when the ROM gives up waiting (about a minute and a half). |
+| 595 | Interrupted game, then a game with friends | On A, play Terminator 2 alone and quit VPX in the middle of the game; then start a game with friends on Terminator 2. | Nothing counts before the start: the previous game does not show in the strip; the ROM goes to attract mode, then the game starts by itself, ball 1, score zero. |
+| 596 | Stern SAM table | A and B, game with friends on Star Trek (or The Walking Dead). | The game plays as before: credit and Start by hand, no live strip, quit VPX yourself. The log says "pas de relevé de l'état de jeu (carte de la ROM : état de jeu hors de la NVRAM ou illisible (current_player, current_ball, game_over))" (no live state: the ROM map puts the game state outside the NVRAM). |
 
 ## What cannot be tested yet
 

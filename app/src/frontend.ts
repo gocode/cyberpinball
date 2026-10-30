@@ -132,6 +132,7 @@ import {
   frameCacheFile,
   liveDmdArea,
   readHostSettings,
+  loadedRoms,
   readTableRecords,
   vpRegFile,
   playStats,
@@ -814,7 +815,7 @@ const liveGames = createLiveGames({
   romsOf,
   ballsOf: async (table) => (await ballCounts.of(table))?.balls,
   // Mes réglages (mémoire et interrupteurs de la ROM, valeurs enregistrées) pour le double de chaque invité.
-  settingsOf: (table) => readHostSettings({ folder: table.folder, roms: romsOf(table), ...(loc.root ? { pinmameDir: path.join(loc.root, 'pinmame') } : {}) }),
+  settingsOf: (table) => readHostSettings({ folder: table.folder, roms: loadedRoms(table.folder, romsOf(table)), ...(loc.root ? { pinmameDir: path.join(loc.root, 'pinmame') } : {}) }),
   // Le carillon d'invitation sonne au menu comme pendant une partie ; en partie, la notification
   // se pose sur le plateau, par-dessus VPX : quitter sa partie ramène au menu, où l'invitation s'ouvre.
   onInvite: (invite) => {

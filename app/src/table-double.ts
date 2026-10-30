@@ -16,6 +16,7 @@ import {
   groupInitials,
   injectGroupRecords,
   liveStateHook,
+  loadedRoms,
   parseLiveState,
   readVpxElements,
   readRomRecords,
@@ -74,7 +75,8 @@ export function createTableDoubles(opts: TableDoublesOptions) {
       const parties = partiesDir();
       const tablesDir = opts.tablesDir();
       if (!parties || !tablesDir) return { ok: false, reason: t('pas de dossier Cyber Pinball') };
-      const roms = opts.romsOf?.(table) ?? [];
+      // Le jeu que PinMAME charge (alias.txt de la table) : sa mémoire et sa carte, pas celles du nom demandé.
+      const roms = loadedRoms(table.folder, opts.romsOf?.(table) ?? []);
       const planned = planTableDouble(
         {
           file: table.file,
@@ -144,14 +146,20 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           const vbsName = fs.readdirSync(plan.dir).find((f) => f.toLowerCase() === `${base}.vbs`);
           const vbs = path.join(plan.dir, vbsName ?? `${path.basename(plan.file, path.extname(plan.file))}.vbs`);
           const script = vbsName ? fs.readFileSync(vbs, 'latin1') : readVpxScript(plan.file);
-          const hook = script ? liveStateHook(script, readVpxElements(plan.file), stateFile) : { ok: false as const, reason: 'script illisible ou protégé' }; // i18n-ignore : journal
+          // Une table à ROM : le relevé lit la mémoire de la ROM, d'après sa carte (en cache : ball-count.ts l'y a mise).
+          const rom = roms.map((name) => ({ name, memory: romBoard(name).memory })).find((r) => r.memory);
+          const hook = script ? liveStateHook(script, readVpxElements(plan.file), stateFile, rom?.memory) : { ok: false as const, reason: 'script illisible ou protégé' }; // i18n-ignore : journal
           if (hook.ok) {
             // Le .vbs du double est une copie (jamais un lien vers l'original) : remplacé, pas réécrit sur place.
             fs.rmSync(vbs, { force: true });
             fs.writeFileSync(vbs, hook.script, 'latin1');
             live = true;
           }
-          log(hook.ok ? `Partie entre amis (${table.id}) : relevé de l'état de jeu et départ automatique posés (minuteur de ${hook.element}).` : `Partie entre amis (${table.id}) : pas de relevé de l'état de jeu (${hook.reason}).`); // i18n-ignore : journal
+          log(
+            hook.ok
+              ? `Partie entre amis (${table.id}) : relevé de l'état de jeu et départ automatique posés (${hook.source === 'rom' ? `mémoire de la ROM ${rom?.name}, ` : ''}minuteur de ${hook.element}).` // i18n-ignore : journal
+              : `Partie entre amis (${table.id}) : pas de relevé de l'état de jeu (${hook.reason}${roms.length && !rom ? ` ; pas de carte mémoire en cache pour ${roms.join(', ')}` : ''}).`, // i18n-ignore : journal
+          );
         } catch (error) {
           log(`Partie entre amis (${table.id}) : relevé de l'état de jeu non posé (${(error as Error).message}).`); // i18n-ignore : journal
         }

@@ -2,8 +2,11 @@
 // VPinMAME, écriture et retrait des lignes d'alias.txt.
 
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
+import * as path from 'node:path';
 import { test } from 'node:test';
-import { historicAlias, neighbourRom, parseAliases, romFamilyOf, withAlias, withoutAlias } from '../romalias';
+import { historicAlias, loadedRoms, neighbourRom, parseAliases, romFamilyOf, withAlias, withoutAlias } from '../romalias';
 import { HISTORIC_ROM_ALIASES } from '../vpmalias';
 
 test('révision voisine : même famille, même sorte de révision d’abord, la plus récente', () => {
@@ -34,4 +37,25 @@ test('alias.txt : ligne ajoutée ou remplacée, commentaires gardés, retrait ju
   assert.equal(withoutAlias(less, 'goldfinger'), '', 'plus aucun alias');
   // Fichier écrit à la main : ses commentaires restent.
   assert.match(withAlias('# mes alias\r\nabc_1,abc_2\r\n', 't2_l8', 't2_l6'), /^# mes alias\r\nabc_1,abc_2\r\n/);
+});
+
+test('jeu chargé : l’alias de la table remplace le nom demandé (mémoire, carte, réglages), seulement si la table a ses ROM', () => {
+  // Star Trek sur la borne (30/10/2026) : le script demande st_162h, alias.txt fait charger st_161h ; sa mémoire est st_161h.nv.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-jeu-charge-'));
+  try {
+    fs.mkdirSync(path.join(dir, 'pinmame'));
+    fs.writeFileSync(path.join(dir, 'pinmame', 'alias.txt'), withAlias('', 'st_162h', 'st_161h', 'révision voisine'));
+    assert.deepEqual(loadedRoms(dir, ['st_162h']), ['st_162h'], 'sans pinmame\roms, le plugin ne lit pas alias.txt');
+    fs.mkdirSync(path.join(dir, 'pinmame', 'roms'));
+    assert.deepEqual(loadedRoms(dir, ['ST_162H', 'twd_160h']), ['st_161h', 'twd_160h']);
+    assert.deepEqual(loadedRoms(path.join(dir, 'absent'), ['t2_l8']), ['t2_l8']);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+  // Partout où la mémoire d'une ROM est lue, c'est celle du jeu chargé.
+  const root = path.resolve(__dirname, '..', '..', '..', '..');
+  const read = (f: string) => fs.readFileSync(path.join(root, f), 'utf8');
+  assert.match(read('app/src/table-double.ts'), /const roms = loadedRoms\(table\.folder, opts\.romsOf\?\.\(table\) \?\? \[\]\);/);
+  assert.match(read('app/src/ball-count.ts'), /const roms = loadedRoms\(table\.folder, opts\.romsOf\?\.\(table\) \?\? \[\]\);/);
+  assert.match(read('app/src/frontend.ts'), /readHostSettings\(\{ folder: table\.folder, roms: loadedRoms\(table\.folder, romsOf\(table\)\)/);
 });

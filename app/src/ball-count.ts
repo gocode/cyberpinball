@@ -7,7 +7,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { loadRomMemory, readVpReg, readVpxScript, tableBallCount, vpRegFile, type BallCount, type MemoryMapOptions, type TableEntry } from '@cyberpinball/core';
+import { loadedRoms, loadRomMemory, readVpReg, readVpxScript, tableBallCount, vpRegFile, type BallCount, type MemoryMapOptions, type TableEntry } from '@cyberpinball/core';
 
 export interface BallCountsOptions {
   dataDir: string;
@@ -22,7 +22,8 @@ export function createBallCounts(opts: BallCountsOptions): { of(table: TableEntr
   return {
     async of(table) {
       try {
-        const roms = opts.romsOf?.(table) ?? [];
+        // Le jeu que PinMAME charge (alias.txt de la table) : sa mémoire et sa carte, pas celles du nom demandé.
+        const roms = loadedRoms(table.folder, opts.romsOf?.(table) ?? []);
         const dirs = [path.join(table.folder, 'pinmame'), ...(opts.pinmameDirs?.() ?? [])];
         return await tableBallCount({
           roms,

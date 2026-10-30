@@ -87,6 +87,22 @@ export function withoutAlias(text: string, alias: string): string {
 
 const HISTORIC = new Map(HISTORIC_ROM_ALIASES.map(([alias, rom]) => [alias.toLowerCase(), rom]));
 
+/**
+ * Les jeux que PinMAME charge vraiment pour la table : chaque ROM demandée par le script, remplacée
+ * par son alias de <table>\pinmame\alias.txt (le plugin ne le lit que si <table>\pinmame\roms
+ * existe). La mémoire (<jeu>.nv), sa carte et ses réglages sont ceux du jeu chargé : Star Trek
+ * demande st_162h et charge st_161h, sa mémoire est st_161h.nv (relevé sur la borne le 30/10/2026).
+ */
+export function loadedRoms(folder: string, roms: readonly string[]): string[] {
+  let lines: AliasLine[] = [];
+  try {
+    if (fs.statSync(path.join(folder, 'pinmame', 'roms')).isDirectory()) lines = readTableAliases(folder).lines;
+  } catch {
+    // Pas de ROM à côté de la table : le dossier PinMAME commun, sans alias.txt de la table.
+  }
+  return [...new Set(roms.map((r) => aliasFor(lines, r)?.rom ?? r))];
+}
+
 /** Jeu réel d'un ancien nom de VPinMAME (« goldfinger » : « bond ») ; undefined sinon. */
 export function historicAlias(name: string): string | undefined {
   return HISTORIC.get(name.toLowerCase());

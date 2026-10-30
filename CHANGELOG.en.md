@@ -10,6 +10,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 ## 0.1.5
 
 - Game with friends, on original tables (Game of Thrones, GOTG, The Goonies, The Matrix): the game starts by itself (a credit, then Start), the coin door and Start are then ignored; a strip in the playfield corner shows everyone's score and ball live; once the game is over, VPX closes by itself and the results open with everyone's score, even without initials entered.
+- Game with friends, on Williams WPC ROM tables (Terminator 2): the same automatic start, live strip and end of game as on original tables, read from the ROM's memory; while entering initials, VPX stays open and Start confirms the letters. Stern SAM tables (Star Trek, The Walking Dead) still play as before: their memory does not reliably tell whether a game is in progress.
+- A table that loads another revision of its ROM (an alias, like Star Trek) now gets the group's records, the right ball count and the host's settings in a game with friends: its memory is looked up under the name of the loaded ROM.
 - A game that ran counts as played even if VPX closes badly ("The game did not start on their side" no longer shows by mistake).
 - Text longer than the screen can be read with the buttons: the release notes of an update, a message… Left flipper on the first action to enter the text (or MagnaSave), right flipper or Start to go down one page, and at the bottom of the text the first action; Exit goes back to the actions. The text frame shows how much has been read. In the VPX settings, MagnaSave scrolls the details of the chosen setting.
 - An application log, `data\logs\journal.txt`: everything it does is written down, dated, to understand afterwards what happened on a cabinet.

@@ -1124,10 +1124,22 @@ Aux boutons seuls (flippers, Start, Exit, MagnaSave), sur la borne. La preuve sa
 | 585 | Revenir sans tout lire | Dans le texte, au milieu : Exit ; puis MagnaSave deux fois. | Exit ramène sur l'action d'où l'on venait, le texte reste où on l'a laissé ; un second Exit quitte l'écran. MagnaSave entre dans le texte et en ressort sans autre geste. |
 | 586 | Flipper tenu, Start | Dans le texte, tenir le flipper droit ; puis, en haut, appuyer sur Start plusieurs fois. | Tenu, le texte défile page après page et s'arrête en bas, sans passer aux actions. Start avance d'une page, puis passe à la première action au bout ; il ne lance jamais une action sans qu'on l'ait choisie. |
 | 587 | Détail des réglages de VPX | Fiche d'une table > « Réglages de VPX » > Avancé, un réglage à la longue description d'origine. MagnaSave droit, puis gauche. | Le détail descend d'une page, puis remonte ; la ligne choisie dans la liste ne change pas. Le bandeau d'aide dit « MagnaSave : faire défiler le détail ». |
+
+## État de jeu en direct d'une partie entre amis
+
+Deux bornes amies, A et B, sur le vrai réseau, chacune avec la même table. La preuve sans opérateur : `packages/core/src/test/etat-en-direct.test.ts` (le relevé des tables à ROM exécuté par cscript sur la mémoire de T2 relevée au banc) et la démonstration `.\docs\demo-amis.ps1 -Parcours partie` (partie simulée) ; le manuel : « Partie en direct », l'état de jeu en direct.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
 | 588 | Départ automatique | A et B, partie entre amis sur Game of Thrones, sans toucher aux boutons au lancement. | Sur chaque borne, la table prête, un crédit tombe puis la partie démarre seule ; la première bille arrive. Start et le monnayeur, appuyés avant le départ, ne font rien. |
 | 589 | Les autres en direct | Jouer la partie. | Dans le coin du plateau, la bande « Partie entre amis » : chaque joueur, son score et sa bille, mis à jour en jouant ; le meilleur en tête. |
 | 590 | Fin de partie | Finir sa partie, saisir ses initiales. | Quelques secondes après, VPX se ferme seul et les résultats s'ouvrent, avec le score de chacun (même sans initiales saisies). Le journal (`data\logs\journal.txt`) dit « relevé de l'état de jeu et départ automatique posés », puis « partie terminée ». |
 | 591 | Joueur en trop | Pendant la première bille, appuyer sur Start. | Un deuxième joueur s'ajoute dans la table ; la bande dit « hors classement » pour ce joueur, et son score n'entre pas au tableau du groupe. |
+| 592 | Départ automatique, table à ROM | A et B, partie entre amis sur Terminator 2, sans toucher aux boutons au lancement. | La ROM démarre puis passe en attente ; deux secondes après, un crédit tombe, puis Start : la partie démarre seule, bille 1. Start et le monnayeur, appuyés avant le départ, ne font rien. Le journal dit « relevé de l'état de jeu et départ automatique posés (mémoire de la ROM t2_l8, minuteur de … ) ». |
+| 593 | Score et bille en direct, table à ROM | Jouer la partie de Terminator 2. | La bande « Partie entre amis » suit le score et la bille de chacun (« Bille 2 sur 3 »), mis à jour en jouant. Pendant la partie, Start passe ; le monnayeur, jamais. |
+| 594 | Initiales, table à ROM | Finir la partie avec un score qui entre au tableau du groupe ; saisir ses initiales (flippers pour la lettre, Start pour la valider). | Pendant la saisie, VPX reste ouvert et Start valide les lettres. Quelques secondes après la dernière lettre, VPX se ferme seul ; les résultats ont le score final. Sans saisie, VPX se ferme quand la ROM abandonne la saisie (une minute et demie environ). |
+| 595 | Partie coupée, puis partie entre amis | Sur A, jouer Terminator 2 seul et quitter VPX en pleine partie ; puis lancer une partie entre amis sur Terminator 2. | Rien ne compte avant le départ : la partie d'avant n'apparaît pas dans la bande ; la ROM passe en attente, puis la partie part seule, bille 1, score à zéro. |
+| 596 | Table Stern SAM | A et B, partie entre amis sur Star Trek (ou The Walking Dead). | La partie se joue comme avant : crédit et Start à la main, pas de bande en direct, VPX à quitter soi-même. Le journal dit « pas de relevé de l'état de jeu (carte de la ROM : état de jeu hors de la NVRAM ou illisible (current_player, current_ball, game_over)) ». |
 
 ## Ce qui ne peut pas encore être testé
 
