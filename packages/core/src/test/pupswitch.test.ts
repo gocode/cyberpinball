@@ -178,7 +178,7 @@ test('médecin, cas 2001 : le constat dit pourquoi, la correction allume le pack
   // Notre .vbs n'est pas un « script remplacé » : plus rien à signaler.
   assert.deepEqual(diagnose(entry(), { tablesDir, script: scriptFacts(SCRIPT_2001) }), []);
   assert.equal(inventory(entry().file, true).scriptOverride, false);
-  assert.equal(inventory(entry().file, true).scriptPatched, true);
+  assert.deepEqual(inventory(entry().file, true).scriptPatched, { pup: true, compat: false });
   // Table mise à jour : le .vbs est refait d'après le nouveau script.
   const v2 = SCRIPT_2001.replace('PlaySound "2001_music", -1', 'PlaySound "2001_theme", -1');
   fs.writeFileSync(vpx, vpxWithScript(v2));
@@ -240,7 +240,7 @@ test('import : table et PuP-Pack ensemble, script qui coupe le pack, allumé d�
   assert.ok(t.warnings.some((w) => /usePUP = False/.test(w)));
   applyImport(t, { trashDir: path.join(root, 'trash'), cleanupRoots: [] });
   const entry = scanTables(tablesDir)[0]!;
-  assert.equal(inventory(entry.file, true).scriptPatched, true);
+  assert.deepEqual(inventory(entry.file, true).scriptPatched, { pup: true, compat: false });
   assert.ok(!diagnose(entry, { tablesDir, script: scriptFacts(SCRIPT_2001) }).some((f) => f.code === 'pupDisabledByScript' || f.code === 'scriptOverride'));
 
   // Le pack arrive après la table (table déjà installée, script déjà lu) : allumé aussi.

@@ -478,8 +478,17 @@ export const messages: Record<string, string> = {
   'Le DMD de la ROM s’affiche à l’emplacement du DMD ; si le script s’arrête sur « Type incompatible », c’est ce dossier qui manque.': 'The ROM’s DMD shows in the DMD’s place; if the script stops on “Type mismatch”, this folder is what’s missing.',
   'Sans lui, ce DMD reste vide ; si le script s’arrête sur « Type incompatible », c’est ce dossier qui manque.': 'Without it, this DMD stays empty; if the script stops on “Type mismatch”, this folder is what’s missing.',
   'Script adapté pour une ancienne version de la table': 'Script adapted for an older version of the table',
-  'Cyber Pinball a écrit {file} (PuP-Pack allumé) d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.': 'Cyber Pinball wrote {file} (PuP-Pack switched on) from the script of a previous version of the table: VPX plays that old script with the new table.',
+  'Cyber Pinball a écrit {file} d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.': 'Cyber Pinball wrote {file} from the script of a previous version of the table: VPX plays that old script with the new table.',
   'Refaire {file} d’après le nouveau script': 'Rewrite {file} from the new script',
+  'Script écrit pour un ancien core.vbs': 'Script written for an older core.vbs',
+  'Le script appelle vpmInit {n} fois. Les anciens core.vbs le laissaient faire ; celui de VPX 10.8 arrête la partie dès son lancement (« cvpmFlips2.Init is called twice »).':
+    'The script calls vpmInit {n} times. Older core.vbs versions let it through; the one in VPX 10.8 stops the game as soon as it starts (“cvpmFlips2.Init is called twice”).',
+  'Le script appelle vpmInit plus d’une fois pendant la partie. Les anciens core.vbs le laissaient faire ; celui de VPX 10.8 arrête la partie (« cvpmFlips2.Init is called twice »).':
+    'The script calls vpmInit more than once during the game. Older core.vbs versions let it through; the one in VPX 10.8 stops the game (“cvpmFlips2.Init is called twice”).',
+  'Le script de la table est protégé : retirez l’appel en trop à vpmInit dans l’éditeur de VPX.': 'The table’s script is protected: remove the extra vpmInit call in the VPX editor.',
+  'Corrigé dans {file}, le script que VPX joue à la place de celui de la table.': 'Fixed in {file}, the script VPX plays instead of the table’s own.',
+  'La table n’est pas modifiée : VPX joue {file}, une copie de son script où vpmInit ne s’exécute qu’une fois.': 'The table is not modified: VPX plays {file}, a copy of its script where vpmInit runs only once.',
+  'N’exécuter vpmInit qu’une fois (dans {file})': 'Run vpmInit only once (in {file})',
   'Le script met {variable} = {value} : il ne lance jamais le PuP-Pack, et la partie n’affiche que le fronton et le DMD habituels, même avec pupvideos\\{pack} bien rangé.': 'The script sets {variable} = {value}: it never starts the PuP-Pack, and the game shows only the usual backglass and DMD, even with pupvideos\\{pack} in the right place.',
   'La table n’est pas modifiée : VPX joue {file}, une copie de son script où seules ces valeurs changent.': 'The table is not modified: VPX plays {file}, a copy of its script where only these values change.',
   'Mettez {enables} dans le script de la table (éditeur de VPX).': 'Set {enables} in the table’s script (VPX editor).',

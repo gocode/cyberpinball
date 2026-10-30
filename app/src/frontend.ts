@@ -120,6 +120,7 @@ import {
   type OtherFrontend,
   pupCabinet,
   repairPupForPlay,
+  repairScriptAfterStop,
   trashDirFor,
   accelerator,
   shownKeys,
@@ -1554,7 +1555,8 @@ function handleKey(input: Input): boolean {
 }
 
 /**
- * Réparations des PuP-Packs avant une partie (doctor.ts, PUP_PLAY_REPAIRS) : pack mal rangé,
+ * Réparations avant une partie (doctor.ts, PUP_PLAY_REPAIRS) : script que le core.vbs actuel
+ * arrête (vpmInit appelé deux fois), puis PuP-Packs : pack mal rangé,
  * option qui laisse le fronton vide ou faite pour une autre borne, script qui coupe le pack.
  * Seuls le pack et le .vbs de Cyber Pinball changent ; l'ancien va à la corbeille.
  */
@@ -1570,6 +1572,30 @@ function preparePupPack(table: TableEntry): void {
     for (const f of done) console.log(`PuP-Pack (${table.id}) : ${f.title} → ${f.fix!.label}`);
   } catch (error) {
     console.log(`PuP-Pack (${table.id}) : réparation avant la partie impossible (${(error as Error).message}).`);
+  }
+}
+
+/**
+ * Partie arrêtée par une boîte de dialogue qui trahit un script que le core.vbs actuel refuse
+ * (scriptcompat.ts, vpmInit appelé deux fois) : le .vbs de Cyber Pinball est corrigé aussitôt,
+ * la partie suivante démarre. Renvoie ce qui a été fait, pour le message.
+ */
+function repairScriptStop(table: TableEntry, message: string): string | undefined {
+  if (!loc.root) return undefined;
+  const layout = layoutOf(loc.root);
+  try {
+    const done = repairScriptAfterStop(
+      table,
+      { tablesDir: layout.tables, script: cachedScript(table.file, loc.dataDir) },
+      { trashDir: trashDirFor(layout.trash, `Après la partie ${path.basename(table.folder)}`) }, // i18n-ignore : nom de dossier
+      message,
+    );
+    if (!done) return undefined;
+    console.log(`Script (${table.id}) : ${done.title} → ${done.fix!.label}`); // i18n-ignore : journal
+    return done.fix!.label;
+  } catch (error) {
+    console.log(`Script (${table.id}) : correction après la partie impossible (${(error as Error).message}).`); // i18n-ignore : journal
+    return undefined;
   }
 }
 
@@ -1857,7 +1883,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     // Partie enregistrée : son écran (aperçu, utiliser pour la roue, garder, jeter) avant la roue.
     if (recorded && !unseen) showRecording({ ...recorded, table: tables.find((t) => t.id === table.id) ?? recorded.table });
   } else {
-    state = { ...state, phase: 'message', message: explain(result, table) };
+    const repaired = result.failure === 'dialog' && result.message ? repairScriptStop(table, result.message) : undefined;
+    state = { ...state, phase: 'message', message: explain(result, table, repaired) };
   }
   // Configuration de la borne changée juste avant la partie : VPX avait déjà les bons
   // écrans, le menu les reprend en redémarrant.
@@ -2094,10 +2121,12 @@ function joystickMessage(version: string): Message | undefined {
  * Partie échouée : ce qu'en dit VPX, puis Start mène à « Ce qu'il manque pour jouer », qui
  * relit la table, dit ce qui manque et où le trouver. Seule la ROM empêche une table de
  * démarrer (playable.ts) ; un script arrêté par un DMD sans son dossier est signalé comme
- * tel, le dossier restant proposé (« Pour aller plus loin »), pas exigé.
+ * tel, le dossier restant proposé (« Pour aller plus loin »), pas exigé. `repaired` : le script
+ * vient d'être corrigé pour le core.vbs actuel (repairScriptStop), la partie suivante démarre.
  */
-function explain(result: LaunchResult, table: TableEntry): Message {
+function explain(result: LaunchResult, table: TableEntry, repaired?: string): Message {
   const lines = [result.message ?? t('Erreur inconnue.')];
+  if (repaired) lines.push(t('Cyber Pinball a corrigé le script de la table ({fix}) : relancez-la.', { fix: repaired }));
   if (result.message && /can't start game/i.test(result.message)) {
     lines.push(t('La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.'));
   }

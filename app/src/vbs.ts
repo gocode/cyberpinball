@@ -19,11 +19,11 @@ interface CacheEntry {
   size: number;
   mtimeMs: number;
   facts: ScriptFacts;
-  /** Version de la lecture : une entrée plus ancienne est relue (2 : dossier DMD, 3 : appels PuP, 4 : interrupteur du PuP, 5 : DMD dessiné par la table, 6 : interrupteur relayé par une autre variable et PuP-DMD, 7 : nom du jeu pour B2S et déclencheurs D envoyés par le script). */
+  /** Version de la lecture : une entrée plus ancienne est relue (2 : dossier DMD, 3 : appels PuP, 4 : interrupteur du PuP, 5 : DMD dessiné par la table, 6 : interrupteur relayé par une autre variable et PuP-DMD, 7 : nom du jeu pour B2S et déclencheurs D envoyés par le script, 8 : ce que le core.vbs actuel refuse). */
   v?: number;
 }
 
-const FACTS_VERSION = 7;
+const FACTS_VERSION = 8;
 
 function fresh(entry: CacheEntry | undefined, stat: fs.Stats): entry is CacheEntry {
   return Boolean(entry && entry.v === FACTS_VERSION && entry.size === stat.size && entry.mtimeMs === stat.mtimeMs);

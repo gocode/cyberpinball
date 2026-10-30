@@ -42,6 +42,7 @@ import { parseTableName, readInfo, type TableInfoFile } from './tables';
 import { HISTORIC_ROM_ALIASES } from './vpmalias';
 import { ipdbIdOf, matchVps, type VpsCandidate, type VpsDb } from './vps';
 import { buildScriptPatch, readScriptPatch } from './scriptpatch';
+import { compatFixesApplicable, compatFixesFound } from './scriptcompat';
 import { scriptCode } from './vbscript';
 import { readVpxScript } from './vpxinfo';
 
@@ -1014,7 +1015,8 @@ function planScriptPatches(game: Game, steps: ImportStep[], opts: PlanOptions, w
     const file = path.basename(to);
     if (steps.some((s) => samePath(s.to, to))) return;
     const existing = readLatin1(to);
-    const ours = existing !== undefined && readScriptPatch(existing) !== undefined;
+    const own = existing !== undefined ? readScriptPatch(existing) : undefined;
+    const ours = own !== undefined;
     if (existing !== undefined && !ours) return;
     // Le script est relu quand le pack est là, même si une lecture gardée ne voyait rien de coupé.
     const packThere = names.some((n) => packsThere.includes(n.toLowerCase()));
@@ -1024,7 +1026,14 @@ function planScriptPatches(game: Game, steps: ImportStep[], opts: PlanOptions, w
     const wanted = packThere && (off || switches.length > 0);
     if (!wanted && !ours) return;
     const sw = switches[0];
-    const content = script !== undefined && switches.length ? buildScriptPatch(script, switches) : undefined;
+    // Les correctifs pour le core.vbs (scriptcompat.ts) suivent le .vbs refait ; seuls, ils le gardent.
+    const compat = script !== undefined ? [...new Set([...compatFixesFound(scriptCode(script)), ...compatFixesApplicable(own?.compat ?? [], scriptCode(script))])] : [];
+    if (!switches.length && compat.length) {
+      const kept = buildScriptPatch(script!, [], undefined, undefined, compat);
+      if (kept !== undefined && kept !== existing) out.push({ to, content: kept });
+      return;
+    }
+    const content = script !== undefined && switches.length ? buildScriptPatch(script, switches, undefined, undefined, compat) : undefined;
     if (content !== undefined && content === existing) return;
     const params = { table: game.title, file, values: describeSwitches(switches, 'value'), enables: describeSwitches(switches, 'enable') };
     if (content) {

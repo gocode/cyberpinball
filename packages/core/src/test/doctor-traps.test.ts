@@ -27,6 +27,8 @@ const TABLE = 'Attack from Mars (Bally 1995)';
 const PUP_SCRIPT = `${SCRIPT}Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\nPuPlayer.B2SInit "", cGameName\r\n`;
 /** Même table, dont le script coupe le pack (« usePUP = False », comme 2001 : A Space Odyssey). */
 const PUP_OFF_SCRIPT = `${SCRIPT}usePUP = False\r\nIf usePUP = True Then\r\n  Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\n  PuPlayer.B2SInit "", cGameName\r\nEnd If\r\n`;
+/** Même table, dont le script appelle vpmInit deux fois : le core.vbs de VPX 10.8 arrête la partie. */
+const VPMINIT_TWICE_SCRIPT = `${SCRIPT}Sub Table1_Init\r\n  vpmInit Me\r\n  vpmInit Me\r\nEnd Sub\r\n`;
 /** Même table refaite sans ROM, en FlexDMD, dont le script ne lance jamais PuP (Game of Thrones LE, VPW). */
 const NO_PUP_SCRIPT = 'Const cGameName="afm_113b"\r\nSub Table1_Init\r\n  LoadEM\r\n  Set FlexDMD = CreateObject("FlexDMD.FlexDMD")\r\nEnd Sub\r\n';
 /** Borne à trois écrans : backglass, DMD 4:1, pas de topper ; playfield 16:9 couché, Windows en paysage. */
@@ -152,6 +154,12 @@ const TRAPS: Trap[] = [
       write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(PUP_OFF_SCRIPT.replace('3.26', '3.27')));
       write(path.join(folder, `${TABLE}.vbs`), buildScriptPatch(PUP_OFF_SCRIPT, [scriptFacts(PUP_OFF_SCRIPT).pup!.disabledBy!])!);
     },
+  },
+  // Script écrit pour un ancien core.vbs : vpmInit appelé deux fois (Back to the Future, scriptcompat.test.ts).
+  {
+    code: 'scriptCoreCompat',
+    arm: (folder) => write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(VPMINIT_TWICE_SCRIPT)),
+    script: scriptFacts(VPMINIT_TWICE_SCRIPT),
   },
   { code: 'backglassMissing', arm: (folder) => fs.rmSync(path.join(folder, `${TABLE}.directb2s`)) },
   {

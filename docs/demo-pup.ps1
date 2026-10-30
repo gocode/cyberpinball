@@ -105,7 +105,7 @@ const cache = {};
 for (let i = 0; i < pairs.length; i += 2) {
   const stat = fs.statSync(pairs[i]);
   const rom = pairs[i + 1];
-  cache[pairs[i].toLowerCase()] = { size: stat.size, mtimeMs: stat.mtimeMs, v: 7, facts: { usesPinmame: true, roms: [rom], pup: { packNames: [rom], playlistAdd: false } } };
+  cache[pairs[i].toLowerCase()] = { size: stat.size, mtimeMs: stat.mtimeMs, v: 8, facts: { usesPinmame: true, roms: [rom], pup: { packNames: [rom], playlistAdd: false } } };
 }
 fs.mkdirSync(path.join(home, 'cache'), { recursive: true });
 fs.writeFileSync(path.join(home, 'cache', 'scripts.json'), JSON.stringify(cache, null, 2) + '\n');

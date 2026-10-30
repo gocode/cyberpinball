@@ -108,6 +108,7 @@ export const messages: Record<string, string> = {
   'La ROM de cette table est introuvable : elle doit être dans le dossier pinmame\\roms de la table.': 'This table’s ROM is missing: it must be in the table’s pinmame\\roms folder.',
   'Fin du journal de VPX :': 'End of the VPX log:',
   'La partie n’a pas pu se dérouler': 'The game couldn’t run',
+  'Cyber Pinball a corrigé le script de la table ({fix}) : relancez-la.': 'Cyber Pinball fixed the table’s script ({fix}): start it again.',
   'Installation de VPX': 'Installing VPX',
   'Préparation…': 'Preparing…',
   'Téléchargement : {percent} % ({received} / {total} Mo)': 'Downloading: {percent}% ({received} / {total} MB)',

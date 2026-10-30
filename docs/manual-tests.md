@@ -1158,6 +1158,17 @@ Two cabinets A and B, friends, with the same version of a table. The proof witho
 | 599 | A game's details | Choose the game, Start; then Exit. | The table version and its number of balls, the host, then each player: rank, score, place on the board, time played; a player who was not ranked says why. Exit returns to the list, the cursor on that game. |
 | 600 | After a restart | Quit Cyber Pinball, start it again; reopen the history. | The game is still there, once; `data\amis\parties.json` keeps it. |
 
+## Script written for an older core.vbs
+
+A table whose script calls `vpmInit` twice: *Back to the Future (Data East 1990)*. The proof without an operator: `packages/core/src/test/scriptcompat.test.ts` (the fixed script run by `cscript` on a fake core.vbs); the manual: "Launching a game".
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 607 | The game starts | After the update, launch Back to the Future from the menu, without going through the doctor. | The game starts, without "Table script bug: cvpmFlips2.Init is called twice". In the table's folder, `Back To The Future (Data East 1990).vbs` has appeared; the `.vpx` keeps its date. |
+| 608 | Flippers and ROM | Play a ball. | The flippers respond, the ROM runs (sounds, DMD), as on a table with no fix. |
+| 609 | The details screen says so | Table details > files. | "Script adapté : vpmInit exécuté une seule fois" (Adapted script: vpmInit run only once); the `.vbs` is "script de la table adapté par Cyber Pinball : vpmInit exécuté une seule fois" (table script adapted by Cyber Pinball: vpmInit run only once), never "remplace le script écrit dans la table" (replaces the script written in the table). |
+| 610 | Another cabinet | On the PinCab, after the prerelease: install Back to the Future (or keep it if it is already there), then launch it. | As 607, from the first game. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

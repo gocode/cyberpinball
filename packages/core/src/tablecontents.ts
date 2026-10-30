@@ -11,7 +11,7 @@ import { romBlockers } from './doctor';
 import { t } from './i18n';
 import { isJunkName } from './puppack';
 import { romFile, sameRomFile, storedRom } from './romlibrary';
-import { isScriptPatchFile } from './scriptpatch';
+import { readScriptPatchFile } from './scriptpatch';
 import { classifyDir, classifyFile, companion, type FileKind } from './tablefiles';
 
 export type TableFileState = 'ok' | 'info' | 'warning' | 'error' | 'quiet';
@@ -108,11 +108,19 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
       case 'tableIni':
         fileEntry(name, kind, sameBase(name) ? 'ok' : 'quiet', sameBase(name) ? t('réglages propres à cette table') : t('réglages d’une autre version'));
         break;
-      case 'script':
-        if (sameBase(name) && isScriptPatchFile(path.join(folder, name))) fileEntry(name, 'scriptOverride', 'ok', t('script de la table adapté par Cyber Pinball : PuP-Pack allumé'));
-        else if (sameBase(name)) fileEntry(name, 'scriptOverride', 'warning', t('remplace le script écrit dans la table'));
+      case 'script': {
+        // Le .vbs de Cyber Pinball dit ce qu'il change : PuP-Pack allumé, script corrigé pour le core.vbs.
+        const patch = sameBase(name) ? readScriptPatchFile(path.join(folder, name)) : undefined;
+        if (patch) {
+          const what = [
+            ...(patch.switches.length || patch.loader || patch.capture ? [t('PuP-Pack allumé')] : []),
+            ...(patch.compat?.length ? [t('vpmInit exécuté une seule fois')] : []),
+          ];
+          fileEntry(name, 'scriptOverride', 'ok', t('script de la table adapté par Cyber Pinball : {what}', { what: what.join(', ') }));
+        } else if (sameBase(name)) fileEntry(name, 'scriptOverride', 'warning', t('remplace le script écrit dans la table'));
         else fileEntry(name, kind, 'quiet', t('script complémentaire'));
         break;
+      }
       case 'pov':
         fileEntry(name, kind, 'ok', t('point de vue de la caméra'));
         break;

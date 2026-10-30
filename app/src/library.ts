@@ -1547,7 +1547,10 @@ export function createLibrary(host: LibraryHost) {
     if (inv.tableIni) files.push({ text: t('Réglages propres'), detail: t('oui'), tone: 'ok' });
     else absent.push(t('réglages propres'));
     files.push(mediaRow(table));
-    if (inv.scriptPatched) files.push({ text: t('Script adapté'), detail: t('PuP-Pack allumé par Cyber Pinball'), tone: 'ok' });
+    if (inv.scriptPatched) {
+      const what = [...(inv.scriptPatched.pup ? [t('PuP-Pack allumé par Cyber Pinball')] : []), ...(inv.scriptPatched.compat ? [t('vpmInit exécuté une seule fois')] : [])];
+      files.push({ text: t('Script adapté'), detail: what.join(', '), tone: 'ok' });
+    }
     if (inv.scriptOverride) check.push(t('un .vbs remplace le script de la table'));
     if (inv.crashReports.length) check.push(t('un rapport de plantage laissé par VPX'));
     if (absent.length) files.push({ text: t('Absents'), detail: absent.join(', '), tone: 'quiet' });

@@ -64,6 +64,7 @@ import {
 } from './puppack';
 import { addCaptureWatch, backgroundTriggers, captureBlock, captureSettings, captureWatchLines, readCaptures, sameCapture, type CaptureBlocker } from './pupcapture';
 import { buildScriptPatch, ownCapture, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
+import { applyCompatFixes, compatFixesApplied, compatFixesForStop, compatFixesFound, vpmInitCallCount, type CompatFix } from './scriptcompat';
 import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
@@ -92,6 +93,7 @@ export const FINDING_CODES = [
   'outsideFolder',
   'scriptOverride',
   'scriptPatchStale',
+  'scriptCoreCompat',
   'backglassMissing',
   'backglassMisnamed',
   'backglassStray',
@@ -179,6 +181,11 @@ export interface ScriptFacts {
    * PinUP Player cherchait le pack quand le script ne le lance pas (pupLoaderNeeded).
    */
   b2sName?: string;
+  /**
+   * Ce que le core.vbs actuel refuse dans le script et que les anciens laissaient passer
+   * (scriptcompat.ts) : corrigé dans le .vbs de Cyber Pinball (scriptCoreCompat).
+   */
+  coreCompat?: CompatFix[];
 }
 
 export interface DoctorContext {
@@ -354,6 +361,8 @@ export function scriptFacts(vbs: string): ScriptFacts {
     const b2s = /\.B2SName\s*=\s*"([^"\r\n]+)"/i.exec(code)?.[1] ?? /\bcGameName\s*=\s*"([^"\r\n]+)"/i.exec(code)?.[1];
     if (b2s?.trim()) facts.b2sName = b2s.trim();
   }
+  const compat = compatFixesFound(code);
+  if (compat.length) facts.coreCompat = compat;
   return facts;
 }
 
@@ -415,7 +424,8 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   }
 
   // 2. Un .vbs nommé comme la table remplace son script ; celui de Cyber Pinball (PuP-Pack
-  // allumé, scriptpatch.ts) est le bienvenu tant qu'il est tiré du script actuel de la table.
+  // allumé, script corrigé pour le core.vbs, scriptpatch.ts) est le bienvenu tant qu'il est
+  // tiré du script actuel de la table.
   const vbs = has(`${base}.vbs`);
   const override = vbs ? readOverride(entry, path.join(folder, vbs)) : undefined;
   if (override?.state.kind === 'stale') {
@@ -428,6 +438,11 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
       detail: t("{file} remplace le script contenu dans la table. C'est parfois voulu (correctif), souvent un reste d'extraction qui rend la table injouable après une mise à jour.", { file: vbs }),
       fix: { label: t('Mettre {file} à la corbeille', { file: vbs }), ops: [{ op: 'trash', path: path.join(folder, vbs) }] },
     });
+  }
+  // Script que le core.vbs actuel arrête (vpmInit appelé deux fois) : corrigé dans le .vbs.
+  if (ownFolder) {
+    const compat = coreCompatFinding(entry, ctx, override);
+    if (compat) findings.push(compat);
   }
 
   // 3. Backglass.
@@ -766,7 +781,7 @@ function staleFinding(override: Override): Finding {
     code: 'scriptPatchStale',
     severity: 'warning',
     title: t('Script adapté pour une ancienne version de la table'),
-    detail: t('Cyber Pinball a écrit {file} (PuP-Pack allumé) d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.', { file }),
+    detail: t('Cyber Pinball a écrit {file} d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.', { file }),
     fix: content
       ? { label: t('Refaire {file} d’après le nouveau script', { file }), ops: [{ op: 'write', path: override.file, content, encoding: 'latin1' }] }
       : { label: t('Mettre {file} à la corbeille', { file }), ops: [{ op: 'trash', path: override.file }] },
@@ -774,13 +789,85 @@ function staleFinding(override: Override): Finding {
 }
 
 /**
- * Réparations des PuP-Packs que le menu fait seul avant chaque partie : elles ne touchent
- * qu'au pack (renommé, remonté, option recopiée, les anciens fichiers à la corbeille) et
- * au .vbs de Cyber Pinball, jamais à la table ; une option choisie dans la fiche est
- * gardée. Sans elles, un pack installé reste éteint tant qu'on n'ouvre pas le médecin
- * (2001 - A Space Odyssey, 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack).
+ * Script que le core.vbs actuel arrête et que les anciens laissaient passer (scriptcompat.ts) :
+ * VPX joue le .vbs de Cyber Pinball, corrigé ligne pour ligne ; un .vbs venu d'ailleurs est
+ * corrigé lui-même. `forced` : correctifs réclamés par le message d'une partie arrêtée, que le
+ * texte seul ne montrait pas (repairScriptAfterStop). undefined quand rien n'est à corriger.
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupPlaylistOrder', 'pupFileNames'];
+function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Override | undefined, forced: CompatFix[] = []): Finding | undefined {
+  // Un .vbs tiré d'une ancienne version de la table est d'abord refait (scriptPatchStale).
+  if (override?.state.kind === 'stale') return undefined;
+  const foreign = override?.state.kind === 'foreign' ? override : undefined;
+  const own = ownParts(override);
+  const facts = ctx.script && !('error' in ctx.script) ? ctx.script : undefined;
+  // Le script de la table n'est relu que s'il le faut : la lecture en cache dit déjà ce qu'il réclame.
+  if (!foreign && facts && [...(facts.coreCompat ?? []), ...forced].every((f) => own.compat.includes(f))) return undefined;
+  const source = foreign ? foreign.text : readVpxScript(entry.file);
+  const code = source !== undefined ? scriptCode(source) : undefined;
+  const wanted = [...new Set([...(code !== undefined ? compatFixesFound(code) : (facts?.coreCompat ?? [])), ...forced])];
+  const done = foreign ? compatFixesApplied(foreign.text) : own.compat;
+  const missing = wanted.filter((f) => !done.includes(f));
+  if (!missing.length) return undefined;
+  const base = path.basename(entry.file).replace(/\.vpx$/i, '');
+  const target = override?.file ?? path.join(entry.folder, `${base}.vbs`);
+  const file = path.basename(target);
+  let content: string | undefined;
+  if (foreign) content = applyCompatFixes(foreign.text, missing);
+  else if (source !== undefined) {
+    const compat = [...new Set([...own.compat, ...missing])];
+    content = buildScriptPatch(source, own.switches, own.loader, own.capture, compat) ?? buildScriptPatch(source, own.switches, own.loader, undefined, compat);
+  }
+  const calls = code !== undefined ? vpmInitCallCount(code) : 0;
+  const detail = [
+    calls >= 2
+      ? t('Le script appelle vpmInit {n} fois. Les anciens core.vbs le laissaient faire ; celui de VPX 10.8 arrête la partie dès son lancement (« cvpmFlips2.Init is called twice »).', { n: calls })
+      : t('Le script appelle vpmInit plus d’une fois pendant la partie. Les anciens core.vbs le laissaient faire ; celui de VPX 10.8 arrête la partie (« cvpmFlips2.Init is called twice »).'),
+    !content
+      ? t('Le script de la table est protégé : retirez l’appel en trop à vpmInit dans l’éditeur de VPX.')
+      : foreign
+        ? t('Corrigé dans {file}, le script que VPX joue à la place de celui de la table.', { file })
+        : t('La table n’est pas modifiée : VPX joue {file}, une copie de son script où vpmInit ne s’exécute qu’une fois.', { file }),
+  ];
+  return {
+    code: 'scriptCoreCompat',
+    severity: 'warning',
+    title: t('Script écrit pour un ancien core.vbs'),
+    detail: detail.join(' '),
+    fix: content ? { label: t('N’exécuter vpmInit qu’une fois (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
+  };
+}
+
+/**
+ * Partie arrêtée par une boîte de dialogue de VPX : si son message est celui d'un script que le
+ * core.vbs actuel refuse (scriptcompat.ts), le .vbs de Cyber Pinball est corrigé aussitôt, pour la
+ * partie suivante. Couvre ce que le texte du script ne montre pas (un seul vpmInit, dans une Sub
+ * appelée deux fois). Renvoie le constat réglé, ou undefined.
+ */
+export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops: OpContext, message: string): Finding | undefined {
+  if (path.resolve(entry.folder).toLowerCase() === path.resolve(ctx.tablesDir).toLowerCase()) return undefined;
+  const base = path.basename(entry.file).replace(/.vpx$/i, '');
+  const vbs = listSafe(entry.folder).find((f) => f.toLowerCase() === `${base.toLowerCase()}.vbs`);
+  const override = vbs ? readOverride(entry, path.join(entry.folder, vbs)) : undefined;
+  const played = override?.state.kind === 'foreign' ? override.text : readVpxScript(entry.file);
+  if (played === undefined) return undefined;
+  const forced = compatFixesForStop(message, scriptCode(played));
+  if (!forced.length) return undefined;
+  const finding = coreCompatFinding(entry, ctx, override, forced);
+  if (!finding?.fix) return undefined;
+  applyOps(finding.fix.ops, ops);
+  return finding;
+}
+
+/**
+ * Réparations que le menu fait seul avant chaque partie, et dès l'installation : script que
+ * le core.vbs actuel arrête (scriptCoreCompat), et PuP-Packs. Elles ne touchent qu'au pack
+ * (renommé, remonté, option recopiée, les anciens fichiers à la corbeille) et au .vbs de
+ * Cyber Pinball, jamais à la table ; une option choisie dans la fiche est gardée. Sans elles,
+ * un pack installé reste éteint tant qu'on n'ouvre pas le médecin (2001 - A Space Odyssey,
+ * 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack), et une table que le core.vbs
+ * arrête ne démarre pas (Back to the Future, 30 octobre 2026 : vpmInit appelé deux fois).
+ */
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['scriptCoreCompat', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupPlaylistOrder', 'pupFileNames'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -798,6 +885,8 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   const override = vbs ? readOverride(entry, path.join(entry.folder, vbs)) : undefined;
   const found: Finding[] = [];
   if (override?.state.kind === 'stale') found.push(staleFinding(override));
+  const compat = coreCompatFinding(entry, { ...ctx, script }, override);
+  if (compat) found.push(compat);
   found.push(...checkPup(entry, { ...ctx, script, vpxLog: undefined }, override));
   return found.filter((f) => f.fix && PUP_PLAY_REPAIRS.includes(f.code));
 }
@@ -896,7 +985,7 @@ function pupSwitchFinding(entry: TableEntry, pack: string, offs: PupSwitch[], ov
     const embedded = readVpxScript(entry.file);
     const switches = embedded !== undefined ? pupSwitchesToEnable(scriptCode(embedded), drawsDmd) : [];
     const own = ownParts(override);
-    if (embedded !== undefined && switches.length) content = buildScriptPatch(embedded, switches, own.loader, own.capture) ?? buildScriptPatch(embedded, switches);
+    if (embedded !== undefined && switches.length) content = buildScriptPatch(embedded, switches, own.loader, own.capture, own.compat) ?? buildScriptPatch(embedded, switches, undefined, undefined, own.compat);
   }
   const main = offs.find((s) => s.kind !== 'dmd');
   const dmd = offs.find((s) => s.kind === 'dmd');
@@ -947,7 +1036,7 @@ function pupLoaderFinding(entry: TableEntry, pack: string, override: Override | 
     // Notre .vbs est refait (la ligne qui le marque resterait sinon avant le lancement ajouté).
     const embedded = readVpxScript(entry.file);
     const own = ownParts(override);
-    if (embedded !== undefined) content = buildScriptPatch(embedded, own.switches, loader, own.capture) ?? buildScriptPatch(embedded, own.switches, loader);
+    if (embedded !== undefined) content = buildScriptPatch(embedded, own.switches, loader, own.capture, own.compat) ?? buildScriptPatch(embedded, own.switches, loader, undefined, own.compat);
   }
   const params = { pack, file, init: table ? `${table}_Init` : '' };
   return {
@@ -971,10 +1060,10 @@ function pupLoaderFinding(entry: TableEntry, pack: string, override: Override | 
 }
 
 /** Ce qu'un .vbs de Cyber Pinball garde quand il est refait : interrupteurs, lancement du pack, reconnaissance. */
-function ownParts(override: Override | undefined): { switches: PupSwitch[]; loader?: PupLoader; capture?: ReturnType<typeof ownCapture> } {
-  if (override?.state.kind !== 'ours') return { switches: [] };
+function ownParts(override: Override | undefined): { switches: PupSwitch[]; loader?: PupLoader; capture?: ReturnType<typeof ownCapture>; compat: CompatFix[] } {
+  if (override?.state.kind !== 'ours') return { switches: [], compat: [] };
   const { patch } = override.state;
-  return { switches: patch.switches, loader: patch.loader, capture: ownCapture(override.text, patch) };
+  return { switches: patch.switches, loader: patch.loader, capture: ownCapture(override.text, patch), compat: patch.compat ?? [] };
 }
 
 /** Pourquoi Cyber Pinball ne peut pas reconnaître les images du DMD de cette table. */
@@ -1042,7 +1131,7 @@ function pupCaptureFinding(entry: TableEntry, pack: string, root: string, overri
   else {
     const table = readVpxTableName(entry.file);
     const loader = own.loader ?? (loaderNeeded ? (table ? { pack, table } : { pack }) : undefined);
-    content = buildScriptPatch(source, own.switches, loader, block);
+    content = buildScriptPatch(source, own.switches, loader, block, own.compat);
   }
   if (!content) return unseen('timer');
   return {

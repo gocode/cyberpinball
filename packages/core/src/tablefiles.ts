@@ -7,7 +7,7 @@ import * as path from 'node:path';
 import { t } from './i18n';
 import { findPackRoot, isJunkName } from './puppack';
 import { romContent } from './romzip';
-import { isScriptPatchFile } from './scriptpatch';
+import { readScriptPatchFile } from './scriptpatch';
 
 export type FileKind =
   | 'table'
@@ -140,8 +140,11 @@ export interface TableInventory {
   tableIni: boolean;
   /** Un .vbs venu d'ailleurs remplace le script de la table. */
   scriptOverride: boolean;
-  /** Le .vbs est celui de Cyber Pinball : le script de la table, PuP-Pack allumé (scriptpatch.ts). */
-  scriptPatched: boolean;
+  /**
+   * Le .vbs est celui de Cyber Pinball (scriptpatch.ts) : le script de la table, PuP-Pack allumé
+   * (`pup`), corrigé pour le core.vbs actuel (`compat`, scriptcompat.ts) ; undefined sinon.
+   */
+  scriptPatched?: { pup: boolean; compat: boolean };
   medias: number;
   crashReports: string[];
 }
@@ -153,6 +156,7 @@ export function inventory(tableFile: string, ownFolder: boolean): TableInventory
   const lower = (f: string) => f.toLowerCase();
   const b2s = files.filter((f) => lower(f).endsWith('.directb2s'));
   const backglass = companion(folder, base, ownFolder, '.directb2s');
+  const patch = readScriptPatchFile(path.join(folder, `${base}.vbs`));
   return {
     versions: files.filter((f) => lower(f).endsWith('.vpx')),
     backglass: backglass ? path.basename(backglass) : undefined,
@@ -164,8 +168,8 @@ export function inventory(tableFile: string, ownFolder: boolean): TableInventory
     altsound: ownFolder ? listDirs(path.join(folder, 'altsound')) : [],
     music: ownFolder ? countFiles(path.join(folder, 'music')) : 0,
     tableIni: fs.existsSync(path.join(folder, `${base}.ini`)),
-    scriptOverride: fs.existsSync(path.join(folder, `${base}.vbs`)) && !isScriptPatchFile(path.join(folder, `${base}.vbs`)),
-    scriptPatched: isScriptPatchFile(path.join(folder, `${base}.vbs`)),
+    scriptOverride: fs.existsSync(path.join(folder, `${base}.vbs`)) && !patch,
+    scriptPatched: patch ? { pup: Boolean(patch.switches.length || patch.loader || patch.capture), compat: Boolean(patch.compat?.length) } : undefined,
     medias: ownFolder ? countFiles(path.join(folder, 'medias')) : 0,
     crashReports: ownFolder ? files.filter((f) => ['crash.txt', 'crash.dmp'].includes(lower(f))) : [],
   };

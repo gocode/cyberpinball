@@ -303,7 +303,7 @@ function setupStep(input: JourneyInput): JourneyStep {
 }
 
 /** Constats de rangement de la table : proposés, jamais indispensables (la table se lance). */
-const TIDY_CODES: readonly Finding['code'][] = ['outsideFolder', 'scriptOverride', 'scriptPatchStale', 'crashReport'];
+const TIDY_CODES: readonly Finding['code'][] = ['outsideFolder', 'scriptOverride', 'scriptPatchStale', 'scriptCoreCompat', 'crashReport'];
 
 /** Le fichier .vpx : là, puisque la table est installée ; ce que demande son script. */
 function tableStep(input: JourneyInput): JourneyStep {

@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.5
 
+- Les tables dont le script appelle vpmInit deux fois, comme Back to the Future (Data East 1990), démarrent : VPX 10.8 les arrêtait à chaque lancement (« Table script bug: cvpmFlips2.Init is called twice »). Cyber Pinball fait jouer une copie corrigée de leur script, sans modifier la table, dès l'installation et avant chaque partie ; si une partie s'arrête encore sur ce message, le script est corrigé pour la suivante.
 - Historique des parties entre amis (Menu système > Amis > « Historique des parties ») : chaque partie en direct finie est gardée sur la borne, de la plus récente à la plus ancienne, la table en titre et les joueurs dessous avec leur rang et leur score. Ouvrez une partie pour revoir son détail : version de la table, durée de chacun, pourquoi un score était hors classement.
 - Partie entre amis : une borne restée sur une ancienne version de Cyber Pinball est signalée dans le salon, l'invitation et la bande (« ni départ automatique ni score en direct, à mettre à jour »), au lieu de sembler boguée. Les résultats donnent le rang de chacun dans la partie et son score, plus « place 1 du tableau ».
 - Partie entre amis, sur les tables originales (Game of Thrones, GOTG, The Goonies, The Matrix) : la partie démarre seule (un crédit, puis Start), le monnayeur et Start sont ignorés ensuite ; une bande montre le score et la bille de chacun en direct ; la partie finie, VPX se ferme seul et les résultats s'ouvrent avec le score de chacun, même sans initiales saisies.

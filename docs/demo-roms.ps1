@@ -65,7 +65,7 @@ function New-Table($name, [string[]]$roms, [string]$vpxName = $name) {
     size = (Get-Item $vpx).Length
     mtimeMs = [DateTimeOffset]::new($date).ToUnixTimeMilliseconds()
     facts = [ordered]@{ usesPinmame = $true; roms = $roms }
-    v = 7
+    v = 8
   }
   return "$root\tables\$name"
 }

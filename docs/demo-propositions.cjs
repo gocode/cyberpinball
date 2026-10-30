@@ -113,7 +113,7 @@ async function sandbox(name, shared) {
   const stat = fs.statSync(vpx);
   put(
     path.join(L.data, 'cache', 'scripts.json'),
-    JSON.stringify({ [vpx.toLowerCase()]: { size: stat.size, mtimeMs: stat.mtimeMs, v: 7, facts: { usesPinmame: false, roms: [], dmdFolder: 'GOTG.UltraDMD', pup: { packNames: ['gotg_2020'], playlistAdd: false } } } }),
+    JSON.stringify({ [vpx.toLowerCase()]: { size: stat.size, mtimeMs: stat.mtimeMs, v: 8, facts: { usesPinmame: false, roms: [], dmdFolder: 'GOTG.UltraDMD', pup: { packNames: ['gotg_2020'], playlistAdd: false } } } }),
   );
   const pack = path.join(folder, 'pupvideos', 'gotg_2020');
   put(path.join(pack, 'PuPFrames', 'GuardiansBackglass2.png'), await drawing(2048, 1302, 'FRONTON DU PUP-PACK', '#7c3aed'));
