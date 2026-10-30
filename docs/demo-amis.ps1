@@ -22,7 +22,11 @@
 #   VPX comme « partie ».
 # Le garde-fou de mise en page (chevauchement, rognure, texte trop petit) et le guet hors écran
 # doivent rester muets.
-#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans]
+#   La bande de la partie entre amis, au parcours « partie » : sur la borne, les scores sur le DMD
+#   (bande-partie-entre-amis-dmd.png) et les cartes sur le topper, que la partie simulée laisse
+#   libre (bande-partie-entre-amis.png) ; au poste, le DMD seul (fronton occupé) ; sur un écran
+#   (-Ecrans un-ecran), l'encart au bas du plateau. Jamais en haut du plateau.
+#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans, un-ecran]
 # Captures dans tmp\demo-amis\<parcours>\<écrans>\<langue>\captures.
 #   .\docs\demo-amis.ps1 -Accueil [-Langues en, fr]
 # Images de la rubrique Amis de la page d'accueil (README) : les deux parcours, sur l'écran
@@ -161,7 +165,7 @@ try {
         if (Test-Path $env:CYBERPINBALL_CAPTURE) { Remove-Item -Recurse -Force $env:CYBERPINBALL_CAPTURE }
         Push-Location $wt
         try { $log = & $electron app 2>&1 | ForEach-Object { "$_" } } finally { Pop-Location }
-        $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Réseau|Partie en direct|Invitation pendant la partie|Bibliothèque partagée|Téléchargements)' } | ForEach-Object { Write-Host "   $_" }
+        $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Réseau|Partie en direct|Invitation pendant la partie|Bande de la partie|Bibliothèque partagée|Téléchargements)' } | ForEach-Object { Write-Host "   $_" }
         $id = "$nom/$jeu/$langue"
         if ($log -match 'Autopilote : (aucun|phase)') { $failures += "$id : une étape rejouée n'a pas trouvé son écran ou sa phase" }
         if ($log -match 'Traduction manquante') { $failures += "$id : texte sans traduction" }
@@ -181,6 +185,19 @@ try {
           $recus = @(Get-ChildItem -Recurse -File "$home_" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\amis\\tables\\' })
           if (-not ($recus | Where-Object Name -eq 'glag_l1.zip')) { $failures += "$id : la ROM attestée de Bruno n'est pas arrivée" }
           if ($recus | Where-Object Name -eq 'screens.pup') { $failures += "$id : le PuP-Pack non attesté de Bruno est arrivé" }
+        }
+        if ($nom -eq 'partie') {
+          # Où va la bande, selon les écrans : jamais sur le plateau quand le DMD ou un écran libre la porte.
+          $bande = @{
+            'borne' = @{ Place = 'topper \(cards'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
+            'poste-deux-ecrans' = @{ Place = 'aucune bande permanente, scores sur le DMD'; Captures = @('bande-partie-entre-amis-dmd') }
+            'un-ecran' = @{ Place = 'playfield \(insert'; Captures = @('bande-partie-entre-amis') }
+          }[$jeu]
+          if ($bande) {
+            if (-not ($log -match "Bande de la partie entre amis, place : $($bande.Place)")) { $failures += "$id : la bande n'est pas à sa place ($($bande.Place))" }
+            foreach ($c in $bande.Captures) { if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\$c.png")) { $failures += "$id : pas de capture $c" } }
+          }
+          if ($log -match 'Bande de la partie entre amis( \(DMD\))? : (?!mise en page conforme)') { $failures += "$id : mise en page de la bande de la partie" }
         }
         if ($nom -eq 'en-jeu') {
           foreach ($etat in 'full', 'compact') {

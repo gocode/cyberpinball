@@ -35,6 +35,7 @@ import {
   keepManualEdits,
   layoutOf,
   liveBoardView,
+  type LiveBoardScreens,
   loadCabinet,
   playfieldOrientation,
   readInfo,
@@ -846,9 +847,7 @@ const liveGames = createLiveGames({
   },
   onChange: () => {
     socialChanged();
-    // Pendant la partie entre amis : la bande de la partie par-dessus VPX, chaque joueur, son score et sa bille.
-    const current = liveGames.current();
-    gameNotices.board(playing && current ? liveBoardView(current, socialNet.state().key.publicKey) : undefined);
+    showLiveBoard();
     // Le compte à rebours et l'annulation s'affichent d'eux-mêmes ; dans la gestion des tables aussi, une fois la partie acceptée.
     friendsMenu.live.follow(() => !closing && (state.phase === 'menu' || state.phase === 'library'), () => library.leave());
   },
@@ -857,6 +856,8 @@ const liveGames = createLiveGames({
 // Invitation reçue pendant la partie : carte discrète dans le coin du plateau (game-notice.ts).
 const gameNotices = createGameNotices({
   place: playfieldPlace,
+  boardScreens: liveBoardScreens,
+  dmdColor: () => mediaSettings.dmdColor,
   invites: () => liveGames.invites(),
   captureDir: process.env.CYBERPINBALL_CAPTURE,
   log: (line) => console.log(line),
@@ -1609,6 +1610,14 @@ function simulatedLiveState(startedAt: number, durationMs: number): () => LiveGa
 const PLAYED_SECONDS = 20;
 /** La partie finie (initiales saisies), VPX se ferme après ce délai : le temps de voir son score. */
 const LIVE_CLOSE_AFTER_MS = 4000;
+/**
+ * La table à l'écran, la bande d'une partie entre amis attend ce temps : VPX ouvre son fronton
+ * (B2S), son DMD ou son PuP-Pack un peu après le plateau, et la bande posée sur un écran qu'il
+ * prend ensuite changerait aussitôt de place (démonstration du 30/10/2026).
+ */
+const LIVE_BOARD_SETTLE_MS = 3000;
+/** Heure où la table de la partie en cours est arrivée à l'écran (Date.now()). */
+let playingSince = 0;
 
 /**
  * Partie d'une table. En mode réglage de l'affichage (`display`), VPX démarre son menu ouvert
@@ -1744,6 +1753,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const recording = hooks.record && !displayMode ? armGameRecording(table, hooks.record, simulated !== undefined) : undefined;
   const startedAt = new Date();
   const onPlaying = () => {
+    // Avant tout ce qui peut redessiner la bande d'une partie entre amis (hooks.onPlaying : le statut part aux autres).
+    playingSince = Date.now();
     state = { ...state, phase: 'playing' };
     // Journal des écrans : la pile des fenêtres, la fenêtre de jeu de VPX affichée (le gardien des barres n'y touche pas).
     settleScreens('vpx');
@@ -1752,6 +1763,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     hooks.onPlaying?.();
     watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)));
     broadcast();
+    setTimeout(showLiveBoard, LIVE_BOARD_SETTLE_MS);
     if (autoStopAfterMs) setTimeout(() => game.stop(), autoStopAfterMs);
   };
   // VPX prend la main (sa fenêtre de jeu au premier plan, dit le lanceur) : le coup de bobine, une fois.
@@ -1851,6 +1863,33 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   return { result, focusReturned, entered, ...(live ? { live } : {}) };
 }
 
+/**
+ * Pendant la partie entre amis, la table à l'écran : la bande de la partie, chaque joueur, son
+ * score et sa bille, là où elle ne cache pas la bille (game-notice.ts, liveBoardPlacement).
+ */
+function showLiveBoard(): void {
+  const current = liveGames.current();
+  const settled = Date.now() - playingSince >= LIVE_BOARD_SETTLE_MS;
+  gameNotices.board(playing && state.phase === 'playing' && settled && current ? liveBoardView(current, socialNet.state().key.publicKey) : undefined);
+}
+
+/**
+ * Ce que la partie laisse à la bande, en pixels physiques : la place du DMD de VPX (celle de
+ * l'habillage FullDMD, sinon la zone du DMD), les écrans que VPX n'occupe pas (fronton sans
+ * .directb2s, topper : occupiedRoles, relu toutes les 2 s), et le plateau en dernier recours.
+ */
+function liveBoardScreens(): LiveBoardScreens {
+  const rect = (role: RoleId) => roleRects.find((r) => r.role === role)?.rect;
+  const screen = menuAssignments.dmd?.bounds;
+  const framed = dressing?.plan.dressed && screen ? dressing.plan.window : undefined;
+  const dmd = framed && screen ? { x: screen.x + framed.x, y: screen.y + framed.y, width: framed.width, height: framed.height } : rect('dmd');
+  const free = (['backglass', 'topper'] as const).flatMap((role) => {
+    const zone = rect(role);
+    return zone && !occupied.has(role) ? [{ role, zone }] : [];
+  });
+  return { playfield: playfieldPlace(), ...(dmd ? { dmd } : {}), free };
+}
+
 /** Zone du plateau à l'écran, en pixels physiques, et le sens de sa mise en page : où se pose une notification pendant la partie. */
 function playfieldPlace(): { zone: Rect; rotation: Rotation } | undefined {
   const display = menuAssignments.playfield;
@@ -1926,6 +1965,8 @@ function watchOccupied(simulated: RoleId[] | undefined): void {
     occupied = next;
     console.log(`Partie : écrans occupés par VPX : ${[...occupied].join(', ') || 'aucun'}.`);
     broadcast();
+    // Un écran que VPX prend ou rend : la bande de la partie entre amis change de place.
+    showLiveBoard();
   };
   if (simulated) return update(simulated);
   dressCoveredSeen = false;

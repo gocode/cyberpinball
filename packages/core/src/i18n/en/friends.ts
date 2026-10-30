@@ -142,6 +142,9 @@ export const messages: Record<string, string> = {
   'Bille {ball} sur {balls}': 'Ball {ball} of {balls}',
   'Bille {ball}': 'Ball {ball}',
   '{state} · hors classement': '{state} · not ranked',
+  // Ses formes courtes, dans l'encart du plateau et sur le DMD
+  'B{ball}': 'B{ball}',
+  'Fin': 'End',
   // Le tableau des records du groupe (30/10/2026)
   'Record du groupe à battre : {score}': 'Group record to beat: {score}',
   '{name}, le {date}': '{name}, on {date}',

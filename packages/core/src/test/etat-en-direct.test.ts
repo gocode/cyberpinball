@@ -19,7 +19,7 @@ import {
   addGameToBoard,
   boardFor,
   gameStatus,
-  liveBoardSize,
+  liveInsertSize,
   liveBoardView,
   liveRanked,
   liveScore,
@@ -122,14 +122,15 @@ test('progression : score, bille et joueur en trop voyagent ; la bande les montr
   const view = liveBoardView(game, 'alexis')!;
   assert.equal(view.title, 'Partie entre amis');
   assert.deepEqual(
-    view.rows.map((r) => [r.name, r.score.replace(/\s/g, ' '), r.detail, r.me, r.lead]),
+    view.rows.map((r) => [r.name, r.score.replace(/\s/g, ' '), r.detail, r.short, r.ball, r.me, r.lead]),
     [
-      ['Bruno', '910 000', 'Bille 1', false, true],
-      ['Alexis', '148 030', 'Bille 2 sur 3', true, false],
-      ['Chloé', '—', 'Chargement', false, false],
+      ['Bruno', '910 000', 'Bille 1', 'B1', 1, false, true],
+      ['Alexis', '148 030', 'Bille 2 sur 3', 'B2', 2, true, false],
+      ['Chloé', '—', 'Chargement', '', 0, false, false],
     ],
   );
-  assert.deepEqual(liveBoardSize(3), { width: 560, height: 56 + 150 + 18 });
+  // Encart du plateau (repli) : une ligne de 34 par joueur, à 1 080 px.
+  assert.deepEqual(liveInsertSize(3), { width: 340, height: 3 * 34 + 16 });
   // Un Start de plus en première bille : plus d'un joueur, hors classement, et la bande le dit.
   game = gameStatus(game, 'bruno', { state: 'playing', score: 920_000, ball: 1, multi: true });
   game = gameStatus(game, 'bruno', { state: 'playing', score: 930_000, ball: 2 });
@@ -365,7 +366,11 @@ test('application : le relevé lu pendant la partie, la fin ferme VPX, une parti
   assert.match(front, /const liveSource = double\?\.live \? \(\) => double\.liveState\(\)/);
   assert.match(front, /if \(Date\.now\(\) - overAt >= LIVE_CLOSE_AFTER_MS\) \{[\s\S]*?game\.stop\(\);/);
   assert.match(front, /const played = report\.result\.ok \|\| report\.result\.seconds >= PLAYED_SECONDS;/);
-  assert.match(front, /gameNotices\.board\(playing && current \? liveBoardView\(current, socialNet\.state\(\)\.key\.publicKey\) : undefined\);/);
+  // La bande ne naît qu'avec la table à l'écran (phase playing), une fois VPX installé sur ses écrans, et suit ceux qu'il prend ou rend.
+  assert.match(front, /const onPlaying = \(\) => \{\r?\n[^\n]*\r?\n\s+playingSince = Date\.now\(\);\r?\n\s+state = \{ \.\.\.state, phase: 'playing' \};/);
+  assert.match(front, /broadcast\(\);\r?\n\s+setTimeout\(showLiveBoard, LIVE_BOARD_SETTLE_MS\);/);
+  assert.match(front, /gameNotices\.board\(playing && state\.phase === 'playing' && settled && current \? liveBoardView\(current, socialNet\.state\(\)\.key\.publicKey\) : undefined\);/);
+  assert.match(front, /console\.log\(`Partie : écrans occupés par VPX[^\n]*\r?\n\s+broadcast\(\);\r?\n[^\n]*\r?\n\s+showLiveBoard\(\);/);
   const doubles = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'table-double.ts'), 'utf8');
   assert.match(doubles, /liveStateHook\(script, readVpxElements\(plan\.file\), stateFile, rom\?\.memory\)/);
   assert.match(doubles, /const rom = roms\.map\(\(name\) => \(\{ name, memory: romBoard\(name\)\.memory \}\)\)\.find\(\(r\) => r\.memory\);/);

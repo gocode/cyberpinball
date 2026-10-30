@@ -35,6 +35,8 @@ const LAYOUTS = {
   // Poste de bureau : playfield en paysage sur un écran, fronton et DMD en bande sur l'autre ;
   // l'écran principal (celui du développeur) reste libre.
   'poste-deux-ecrans': { flipperEdge: 'bottom', roles: { playfield: 2, backglass: 0, dmd: 0 }, dmdUnderBackglass: true },
+  // Un seul écran, le plateau en paysage : ni DMD ni fronton (repli de la bande d'une partie entre amis).
+  'un-ecran': { flipperEdge: 'bottom', roles: { playfield: 0 } },
 };
 
 function writeModel(screensFile, out, ini) {
