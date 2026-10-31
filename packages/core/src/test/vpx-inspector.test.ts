@@ -185,9 +185,11 @@ test('le double : carte réduite sous les deux noms du jeu, VPinballX.ini copié
   assert.deepEqual(iniChanges(ini, iniWithInspector(ini, 2115).replace('BallTrail = 1', 'BallTrail = 0')), ['[Player] BallTrail'], 'l’inspector ne compte pas comme un réglage changé');
   // Le double : la copie seulement quand l'inspector sert ; le fichier lié à l'original remplacé, jamais réécrit ; -Ini de la copie.
   const doubles = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'table-double.ts'), 'utf8');
-  assert.match(doubles, /if \(hook\.ok && hook\.inspector\.length\) \{/);
+  // Posé aussi pour lire le DMD (scores des amis sur son écran de score), même quand le relevé n'en a pas besoin ; la carte réduite seulement pour le relevé.
+  assert.match(doubles, /if \(hook\.ok && \(hook\.inspector\.length \|\| offered\?\.dmd\)\) \{/);
+  assert.match(doubles, /if \(hook\.inspector\.length\)\r?\n\s+for \(const f of inspectorMemMapFiles/);
   assert.match(doubles, /fs\.rmSync\(out, \{ force: true \}\);\s*fs\.writeFileSync\(out, f\.text, 'utf8'\);/);
-  assert.match(doubles, /fs\.writeFileSync\(file, iniWithInspector\(iniText!, offered!\.port\), 'utf8'\);\s*ini = \{ file, text: iniText! \};/);
+  assert.match(doubles, /fs\.writeFileSync\(file, iniWithInspector\(iniText!, offered!\.port\), 'utf8'\);\s*ini = \{ file, text: iniText!, port: offered!\.port \};/);
   assert.ok(!/writeFileSync\(iniSource/.test(doubles), 'le VPinballX.ini de la borne n’est jamais écrit');
   const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(front, /ini: double\?\.ini \?\? activeVpxIni\(loc\)/);

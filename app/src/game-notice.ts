@@ -32,6 +32,7 @@ import {
   type GameNoticeView,
   type LiveBoardScreens,
   type LiveBoardView,
+  type LiveScoresPlace,
   type LiveInvite,
   type NoticeView,
   type LiveWaitView,
@@ -47,6 +48,15 @@ export interface GameNoticesOptions {
   place(): { zone: Rect; rotation: Rotation } | undefined;
   /** Partie entre amis : les écrans que la bande peut prendre (DMD, écrans libres, plateau). */
   boardScreens(): LiveBoardScreens | undefined;
+  /** Où le joueur veut voir les scores des amis (Menu système > Amis). */
+  scoresPlace?(): LiveScoresPlace;
+  /** Le DMD montre son écran de score, maintenant (dmd-watch.ts) : sans réponse, jamais de scores sur le DMD. */
+  dmdScoreScreen?(): boolean;
+  /**
+   * La fenêtre étrangère (VPX, PuP, B2S, FlexDMD, DMD externe…) qui passe devant cette fenêtre de la
+   * bande et la recouvre en partie, décrite pour le journal ; undefined : rien devant.
+   */
+  coveredBy?(win: BrowserWindow): string | undefined;
   /** Couleur des points du DMD (« Couleur du DMD » des médias). */
   dmdColor(): string | undefined;
   /** Invitations encore valables (live-game.ts). */
@@ -113,6 +123,16 @@ function overlay(bounds: Rect, key: string, onLoad: (o: Overlay) => void): Overl
 
 const alive = (o: Overlay | undefined): o is Overlay => !!o && !o.win.isDestroyed();
 
+/**
+ * Ferme une fenêtre de la bande, de la nouvelle ou de l'attente. Toujours par close(), jamais par
+ * destroy() : détruite pendant qu'une autre charge game-notice.html, elle emporte le processus de
+ * rendu qu'elles partagent, et l'autre ne se charge pas (démonstration du 31/10/2026 : la carte
+ * d'attente du départ commun restait vide quand la bande quittait le topper au même moment).
+ */
+function dispose(o: Overlay | undefined): void {
+  if (alive(o)) o.win.close();
+}
+
 export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   let notice: Overlay | undefined;
   let shown: { id: string; at: Date } | undefined;
@@ -129,6 +149,8 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   let boardTicker: NodeJS.Timeout | undefined;
   /** Dernière place annoncée au journal. */
   let placed = '';
+  /** Recouvrements déjà signalés au journal (fenêtre de la bande et ce qui la recouvre). */
+  const covers = new Map<string, number>();
   /** La nouvelle de la partie entre amis : sa fenêtre et ce qu'elle montre. */
   let line: Overlay | undefined;
   let lineView: NoticeView | undefined;
@@ -201,7 +223,7 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
 
   /** Une couche de la bande (ou de l'attente) à sa place : la même fenêtre si rien n'a bougé, sinon une neuve. */
   function layer(o: Overlay | undefined, bounds: Rect | undefined, key: string, onLoad: () => void = showBoard): Overlay | undefined {
-    if (alive(o) && (!bounds || o.key !== key)) o.win.destroy();
+    if (alive(o) && (!bounds || o.key !== key)) dispose(o);
     if (!bounds) return undefined;
     if (alive(o) && o.key === key) return o;
     return overlay(bounds, key, () => onLoad());
@@ -222,26 +244,58 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     capture(o, captureAs);
   }
 
-  /** La bande de la partie : sa place selon les écrans du moment, son contenu, les scores sur le DMD de temps à autre. */
+  /**
+   * La bande reste au-dessus de toute fenêtre de média de VPX (PuP, B2S, FlexDMD, DMD externe), sur
+   * tout écran (essai du 31/10/2026 avec un PuP-Pack : « on n'a pas l'affichage des scores ») : une
+   * fenêtre étrangère passée devant est signalée au journal, une fois, et la bande repasse devant.
+   */
+  function keepInFront(o: Overlay, name: string): void {
+    if (!opts.coveredBy || !isShown(o.win)) return;
+    const by = opts.coveredBy(o.win);
+    if (!by) return;
+    const key = `${name} ${by}`;
+    const seen = (covers.get(key) ?? 0) + 1;
+    covers.set(key, seen);
+    if (seen === 1) opts.log?.(`Bande de la partie entre amis${name === 'dmd' ? ' (DMD)' : ''} recouverte par ${by} : remise devant.`); // i18n-ignore : journal
+    if (seen === 10) opts.log?.(`Bande de la partie entre amis${name === 'dmd' ? ' (DMD)' : ''} : ${by} repasse sans cesse devant.`); // i18n-ignore : journal
+    o.win.setAlwaysOnTop(true, 'screen-saver');
+    o.win.moveTop();
+  }
+
+  /** La bande de la partie : sa place selon les écrans du moment et le choix du joueur, son contenu, les scores sur le DMD quand il montre l'écran de score. */
   function showBoard(): void {
     if (!boardView) return;
+    // L'attente du départ commun (sa carte au milieu du plateau) dit déjà où en est chacun : la bande
+    // attend le départ, et rien ne se chevauche.
+    if (waitView) {
+      band = layer(band, undefined, '');
+      dmd = layer(dmd, undefined, '');
+      return;
+    }
     const screens = opts.boardScreens();
-    const placement = screens ? liveBoardPlacement(screens, boardView.rows.length) : {};
-    const where = JSON.stringify([placement.band?.role, placement.band?.bounds, placement.dmd]);
+    const place = opts.scoresPlace?.() ?? 'auto';
+    const placement = screens ? liveBoardPlacement(screens, boardView.rows.length, place) : {};
+    const where = JSON.stringify([placement.band?.role, placement.band?.bounds, placement.dmd, placement.fallback]);
     if (where !== placed) {
       placed = where;
       const b = placement.band;
       const r = (x: Rect) => `${x.width} × ${x.height} en ${x.x}, ${x.y}`; // i18n-ignore : journal
-      opts.log?.(`Bande de la partie entre amis, place : ${b ? `${b.role} (${b.layout}, ${r(b.bounds)})` : 'aucune bande permanente'}${placement.dmd ? `, scores sur le DMD de temps à autre (${r(placement.dmd)})` : ''}.`); // i18n-ignore : journal
+      opts.log?.(`Bande de la partie entre amis, place : ${b ? `${b.role} (${b.layout}, ${r(b.bounds)})` : 'aucune bande permanente'}${placement.dmd ? `, scores sur le DMD quand il montre l'écran de score (${r(placement.dmd)})` : ''}${place !== 'auto' ? ` ; choix du joueur : ${place}${placement.fallback ? `, impossible ici (${placement.fallback}) : automatique` : ''}` : ''}.`); // i18n-ignore : journal
     }
     const b = placement.band;
     band = layer(band, b?.bounds, JSON.stringify([b?.bounds, b?.layout, b?.rotation]));
-    if (alive(band) && b) send(band, { view: { ...boardView, layout: b.layout }, rotation: b.rotation }, 'partie');
-    // Les points sur le DMD : une fenêtre le temps d'un passage, fermée ensuite (le DMD de VPX revient).
+    if (alive(band) && b) {
+      send(band, { view: { ...boardView, layout: b.layout }, rotation: b.rotation }, 'partie');
+      keepInFront(band, 'bande');
+    }
+    // Les points sur le DMD : une fenêtre le temps d'un passage, fermée dès que le DMD montre autre chose.
     if (placement.dmd) flash ??= new LiveBoardFlash(Date.now());
-    const onDmd = placement.dmd && flash?.visible(boardView, Date.now()) ? placement.dmd : undefined;
+    const onDmd = placement.dmd && flash?.visible(boardView, Date.now(), opts.dmdScoreScreen?.() ?? false) ? placement.dmd : undefined;
     dmd = layer(dmd, onDmd, JSON.stringify(onDmd));
-    if (alive(dmd)) send(dmd, { view: { mode: 'board', layout: 'dmd', dots: Array.from(liveBoardDots(boardView)), color: opts.dmdColor() }, rotation: 0 }, 'partie-dmd');
+    if (alive(dmd)) {
+      send(dmd, { view: { mode: 'board', layout: 'dmd', dots: Array.from(liveBoardDots(boardView)), color: opts.dmdColor() }, rotation: 0 }, 'partie-dmd');
+      keepInFront(dmd, 'dmd');
+    }
   }
 
   /** La nouvelle de la partie entre amis : dans le coin du joueur, sous l'invitation si elle est là. */
@@ -263,7 +317,7 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
 
   function closeLine(): void {
     lineView = undefined;
-    if (alive(line)) line.win.destroy();
+    dispose(line);
     line = undefined;
   }
 
@@ -279,7 +333,7 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
 
   function closeWait(): void {
     waitView = undefined;
-    if (alive(waitCard)) waitCard.win.destroy();
+    dispose(waitCard);
     waitCard = undefined;
   }
 
@@ -287,7 +341,7 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     if (ticker) clearInterval(ticker);
     ticker = undefined;
     shown = undefined;
-    if (alive(notice)) notice.win.destroy();
+    dispose(notice);
     notice = undefined;
     // La nouvelle de la partie entre amis remonte à sa place.
     if (lineView) showLine();
@@ -302,7 +356,8 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     boardView = undefined;
     flash = undefined;
     placed = '';
-    for (const o of [band, dmd]) if (alive(o)) o.win.destroy();
+    covers.clear();
+    for (const o of [band, dmd]) dispose(o);
     band = undefined;
     dmd = undefined;
   }

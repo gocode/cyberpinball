@@ -1,11 +1,12 @@
 // Banc hors écran de la bande d'une partie entre amis (lancé par docs\demo-bande-partie.ps1) : pour
-// chaque jeu d'écrans simulés (docs\ecrans : borne, poste à deux écrans, un écran), chaque sens du
+// chaque jeu d'écrans simulés (docs\ecrans : borne, poste à deux écrans, un écran), chaque place
+// au choix du joueur (automatique, DMD, fronton, topper, bas ou côté du plateau), chaque sens du
 // plateau, un à quatre joueurs, et ce que VPX occupe (rien, le fronton), la place que choisit
 // liveBoardPlacement (packages/core/src/gamenotice.ts) ; puis la vraie page de la bande
 // (app/renderer/game-notice.html, son preload) rendue à cette taille, avec l'état que
 // game-notice.ts lui enverrait : cartes d'un écran libre, encart du plateau, points du DMD. Chaque
 // rendu passe le garde-fou de mise en page (chevauchement, rognure, texte sous 20 px) ; une planche
-// par jeu d'écrans montre où se pose chaque forme, à l'échelle, le plateau tourné.
+// par jeu d'écrans et par place montre où se pose la bande, à l'échelle (quatre joueurs, plateau à 0°).
 //   electron docs/demo-bande-partie.cjs <spec.json>   { "out": dossier des captures, "langue": "fr" | "en" }
 // Noms et scores inventés. Fenêtres jamais montrées (show: false, rendu hors écran).
 
@@ -22,6 +23,8 @@ const core = require(path.join(REPO, 'packages', 'core', 'dist', 'index.js'));
 const { checkLayout } = require(path.join(REPO, 'app', 'dist', 'layout-check.js'));
 
 app.commandLine.appendSwitch('force-device-scale-factor', '1');
+// Sur le bureau caché, le compositeur graphique refuse parfois la capture (UnknownVizError) : rendu logiciel.
+app.disableHardwareAcceleration();
 for (const event of ['uncaughtException', 'unhandledRejection']) process.on(event, (error) => (console.error(error), app.exit(1)));
 
 /** Rôles des écrans simulés, comme docs\demo-medias.cjs (modele) les pose. */
@@ -113,6 +116,7 @@ app.whenReady().then(async () => {
   const rendered = new Map();
   for (const name of Object.keys(LAYOUTS)) {
     const rects = roleRects(name);
+    for (const place of core.LIVE_SCORES_PLACES) {
     const sheet = [];
     for (const occupied of [[], ['backglass']]) {
       for (const rotation of [0, 90, 180, 270]) {
@@ -120,9 +124,11 @@ app.whenReady().then(async () => {
           const screens = {
             playfield: { zone: rects.playfield, rotation },
             ...(rects.dmd ? { dmd: rects.dmd } : {}),
+            dmdReadable: true,
             free: ['backglass', 'topper'].flatMap((role) => (rects[role] && !occupied.includes(role) ? [{ role, zone: rects[role] }] : [])),
+            zones: { ...(rects.backglass ? { backglass: rects.backglass } : {}), ...(rects.topper ? { topper: rects.topper } : {}) },
           };
-          const placed = core.liveBoardPlacement(screens, n);
+          const placed = core.liveBoardPlacement(screens, n, place);
           const v = view(n);
           const layers = [];
           if (placed.band) layers.push({ kind: placed.band.layout, role: placed.band.role, bounds: placed.band.bounds, state: { view: { ...v, layout: placed.band.layout }, rotation: placed.band.rotation } });
@@ -135,12 +141,13 @@ app.whenReady().then(async () => {
               rendered.set(key, image);
               report.push(`${name} ${key} : ${problems.length ? problems.join(' ; ') : 'conforme'}`);
             }
-            sheet.push({ ...layer, image: rendered.get(key), where: `${occupied.join('+') || 'libre'}, ${rotation}°, ${n} j.` });
+            if (!occupied.length && rotation === 0 && n === 4) sheet.push({ ...layer, image: rendered.get(key) });
           }
         }
       }
     }
-    await drawSheet(name, rects, sheet);
+    await drawSheet(`${name}-${place}`, rects, sheet);
+    }
   }
   fs.writeFileSync(path.join(spec.out, 'mise-en-page.txt'), report.join('\n') + '\n');
   const bad = report.filter((l) => !l.endsWith(': conforme'));
@@ -150,12 +157,10 @@ app.whenReady().then(async () => {
 });
 
 /**
- * Planche d'un jeu d'écrans : les écrans à l'échelle, chaque forme posée à sa place (fronton libre,
- * quatre joueurs, plateau à 0°), pour voir d'un coup d'œil qu'aucune ne touche le haut du plateau.
+ * Planche d'un jeu d'écrans et d'une place : les écrans à l'échelle, la bande posée (fronton libre,
+ * quatre joueurs, plateau à 0°), pour voir d'un coup d'œil qu'elle ne touche pas le haut du plateau.
  */
-async function drawSheet(name, rects, sheet) {
-  const pick = (kind) => sheet.find((s) => s.kind === kind && s.where.startsWith('libre, 0°, 4')) ?? sheet.find((s) => s.kind === kind && s.where.includes('0°, 4'));
-  const layers = ['cards', 'insert', 'dmd'].map(pick).filter(Boolean);
+async function drawSheet(name, rects, layers) {
   const all = Object.values(rects);
   const minX = Math.min(...all.map((r) => r.x));
   const minY = Math.min(...all.map((r) => r.y));

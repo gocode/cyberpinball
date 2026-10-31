@@ -11,6 +11,7 @@ import { LIVE_INVITE_MS, liveNoLiveState, livePlayers, liveRanked, liveScore, ty
 import { DMD_FONT_SMALL, dmdText, textWidth } from './dmdfont';
 import { DMD_HEIGHT, DMD_LEVEL, DMD_MARGIN, DMD_WIDTH, blankDots, drawCentered, drawText, scoreText, type DmdDots } from './livedmd';
 import type { Rect, Rotation } from './model';
+import { TASKBAR_CLASSES, type StackedWindow } from './screencover';
 
 /** Durée de la carte entière, avant la pastille. */
 export const GAME_NOTICE_FULL_MS = 12_000;
@@ -58,20 +59,22 @@ export function gameNoticeView(invite: LiveInvite, shownAt: Date, now = new Date
 
 /**
  * Place de la notification, en pixels de l'écran : dans le coin du plateau en haut à gauche pour
- * le joueur (ou en bas à gauche, `corner`), quel que soit le sens de l'écran. `rotation` : celle
- * de la mise en page du plateau (menuRotation), `size` : la taille vue du joueur ; `below` : la
- * place d'une autre carte déjà dans ce coin, qu'elle laisse au-dessus d'elle (vers le bas du joueur).
+ * le joueur (en bas à gauche, ou au milieu du bord gauche : `corner`), quel que soit le sens de
+ * l'écran. `rotation` : celle de la mise en page du plateau (menuRotation), `size` : la taille vue
+ * du joueur ; `below` : la place d'une autre carte déjà dans ce coin, qu'elle laisse au-dessus d'elle
+ * (vers le bas du joueur).
  */
-export function gameNoticeBounds(zone: Rect, rotation: Rotation, size: { width: number; height: number }, margin: number, corner: 'top-left' | 'bottom-left' = 'top-left', below = 0): Rect {
+export function gameNoticeBounds(zone: Rect, rotation: Rotation, size: { width: number; height: number }, margin: number, corner: 'top-left' | 'bottom-left' | 'middle-left' = 'top-left', below = 0): Rect {
   const quarter = rotation === 90 || rotation === 270;
   const w = quarter ? size.height : size.width;
   const h = quarter ? size.width : size.height;
-  // Coin du joueur, tourné dans le repère de l'écran : (x, y) → (-y, x) par quart de tour horaire.
+  // Coin du joueur, tourné dans le repère de l'écran : (x, y) → (-y, x) par quart de tour horaire ; 0 : centré.
   let cx = -1;
-  let cy = corner === 'bottom-left' ? 1 : -1;
+  let cy = corner === 'bottom-left' ? 1 : corner === 'middle-left' ? 0 : -1;
   for (let r = 0; r < rotation; r += 90) [cx, cy] = [-cy, cx];
-  let x = cx > 0 ? zone.x + zone.width - margin - w : zone.x + margin;
-  let y = cy > 0 ? zone.y + zone.height - margin - h : zone.y + margin;
+  const along = (c: number, start: number, length: number, size: number) => (c > 0 ? start + length - margin - size : c < 0 ? start + margin : start + (length - size) / 2);
+  let x = along(cx, zone.x, zone.width, w);
+  let y = along(cy, zone.y, zone.height, h);
   // Le bas du joueur, dans le repère de l'écran (même rotation que le coin).
   let dx = 0;
   let dy = 1;
@@ -99,13 +102,18 @@ export const GAME_NOTICE_LINE = { width: 720, height: 76, gap: 14 } as const;
 //
 // Où (second essai du même jour : la bande en haut du plateau « cache très souvent des endroits où
 // on est censé voir la bille ») : jamais sur le plateau tant qu'un autre écran peut la porter.
-//   1. Sur le DMD, de temps à autre (LiveBoardFlash) : le DMD que VPX ou PinMAME dessine ne
-//      s'écrit pas de l'extérieur, alors Cyber Pinball pose ses propres points par-dessus, à sa
-//      place, quelques secondes (liveBoardDots), comme un vrai flipper montre les scores des autres.
+//   1. Sur le DMD, quand il montre l'écran de score de la table (dmdscreen.ts, lu par l'inspector
+//      de VPX), jamais pendant une animation ni la saisie des initiales (essai du 31/10/2026 : « par
+//      moment c'est gênant pendant le jeu ») : le DMD que VPX ou PinMAME dessine ne s'écrit pas de
+//      l'extérieur, alors Cyber Pinball pose ses propres points par-dessus, à sa place, quelques
+//      secondes (liveBoardDots), comme un vrai flipper montre les scores des autres.
 //   2. Sur un écran que VPX laisse libre (fronton sans .directb2s, topper), en permanence : des
 //      cartes, une par joueur, en bas du fronton comme les compteurs d'un électromécanique.
 //   3. Sans l'un ni l'autre : un encart au bas du plateau, coin gauche pour le joueur, sur le
 //      tablier, sous la sortie des couloirs extérieurs (le couloir de lancement est à droite).
+// Le joueur peut aussi choisir sa place (Menu système > Amis > « Scores des amis pendant la
+// partie », LiveScoresPlace) : un choix que la borne ou la table ne permet pas revient à
+// l'automatique, et le journal le dit.
 
 export interface LiveBoardRow {
   name: string;
@@ -188,14 +196,23 @@ export interface LiveBoardScreens {
   playfield?: { zone: Rect; rotation: Rotation };
   /** Où VPX montre le DMD : la zone du DMD de la borne, ou la place de l'habillage FullDMD. */
   dmd?: Rect;
+  /** Le DMD de la table se lit (inspector de VPX) : les scores s'y posent quand il montre l'écran de score. */
+  dmdReadable?: boolean;
   /** Écrans que VPX laisse libres pendant la partie (rien d'autre que le fond de partie de Cyber Pinball), par ordre de préférence. */
   free: { role: 'backglass' | 'topper'; zone: Rect }[];
+  /** Zones du fronton et du topper de la borne, libres ou non : pour un choix du joueur. */
+  zones?: { backglass?: Rect; topper?: Rect };
 }
+
+/** Où le joueur veut voir les scores des amis (Menu système > Amis > « Scores des amis pendant la partie »). */
+export type LiveScoresPlace = 'auto' | 'dmd' | 'backglass' | 'topper' | 'playfield-bottom' | 'playfield-side';
+
+export const LIVE_SCORES_PLACES: readonly LiveScoresPlace[] = ['auto', 'dmd', 'backglass', 'topper', 'playfield-bottom', 'playfield-side'];
 
 export interface LiveBoardBand {
   /** Écran qui porte la bande. */
   role: 'backglass' | 'topper' | 'playfield';
-  /** Cartes côte à côte (écran libre), ou encart d'une ligne par joueur (plateau). */
+  /** Cartes côte à côte (fronton, topper), ou encart d'une ligne par joueur (plateau). */
   layout: 'cards' | 'insert';
   bounds: Rect;
   /** Sens de la bande : celui du plateau pour l'encart, droit ailleurs. */
@@ -203,10 +220,12 @@ export interface LiveBoardBand {
 }
 
 export interface LiveBoardPlacement {
-  /** Les points posés de temps à autre sur le DMD, à sa place. */
+  /** Les points posés sur le DMD, à sa place, quand il montre l'écran de score. */
   dmd?: Rect;
   /** La bande permanente. */
   band?: LiveBoardBand;
+  /** Le choix du joueur n'a pas pu être suivi : pourquoi (journal) ; la place est alors l'automatique. */
+  fallback?: string;
 }
 
 /**
@@ -231,7 +250,7 @@ export function liveInsertSize(rows: number): { width: number; height: number } 
   return { width: LIVE_INSERT_SIZE.width, height: Math.max(1, rows) * LIVE_INSERT_SIZE.row + 2 * LIVE_INSERT_SIZE.padding };
 }
 
-/** Les cartes sur un écran libre : la plus grande échelle qui tient (au plus celle de sa largeur), en bas du fronton, au centre du topper. */
+/** Les cartes sur un écran : la plus grande échelle qui tient (au plus celle de sa largeur), en bas du fronton, au centre du topper. */
 function cardsOn(screen: LiveBoardScreens['free'][number], rows: number): LiveBoardBand | undefined {
   const { zone } = screen;
   const base = liveCardsSize(rows);
@@ -245,33 +264,117 @@ function cardsOn(screen: LiveBoardScreens['free'][number], rows: number): LiveBo
   return { role: screen.role, layout: 'cards', bounds: { x, y, width, height }, rotation: 0 };
 }
 
-/**
- * Où va la bande de `rows` joueurs : le DMD quand la borne en a un (de temps à autre), un écran
- * libre en permanence, et le plateau seulement quand il n'y a ni l'un ni l'autre.
- */
-export function liveBoardPlacement(screens: LiveBoardScreens, rows: number): LiveBoardPlacement {
-  const dmd = screens.dmd && screens.dmd.width > 0 && screens.dmd.height > 0 ? screens.dmd : undefined;
-  for (const screen of screens.free) {
-    const band = cardsOn(screen, rows);
-    if (band) return { ...(dmd ? { dmd } : {}), band };
-  }
-  if (dmd) return { dmd };
-  if (!screens.playfield) return {};
-  const { zone, rotation } = screens.playfield;
+/** L'encart du plateau : au bas, coin gauche du joueur, ou au milieu de son bord gauche. */
+function insertOn(playfield: NonNullable<LiveBoardScreens['playfield']>, rows: number, corner: 'bottom-left' | 'middle-left'): LiveBoardBand {
+  const { zone, rotation } = playfield;
   const unit = Math.min(zone.width, zone.height) / 1080;
   const base = liveInsertSize(rows);
   const size = { width: Math.round(base.width * unit), height: Math.round(base.height * unit) };
-  return { band: { role: 'playfield', layout: 'insert', bounds: gameNoticeBounds(zone, rotation, size, Math.round(LIVE_INSERT_SIZE.margin * unit), 'bottom-left'), rotation } };
+  return { role: 'playfield', layout: 'insert', bounds: gameNoticeBounds(zone, rotation, size, Math.round(LIVE_INSERT_SIZE.margin * unit), corner), rotation };
+}
+
+/**
+ * Où va la bande de `rows` joueurs. Automatique : le DMD quand il se lit (ses scores quand il
+ * montre l'écran de score), un écran libre en permanence, et le plateau seulement quand il n'y a ni
+ * l'un ni l'autre. Le choix du joueur (`place`) prime quand la borne et la table le permettent ;
+ * le fronton et le topper choisis portent la bande même quand la table s'en sert (B2S, PuP).
+ */
+export function liveBoardPlacement(screens: LiveBoardScreens, rows: number, place: LiveScoresPlace = 'auto'): LiveBoardPlacement {
+  const dmd = screens.dmd && screens.dmd.width > 0 && screens.dmd.height > 0 && screens.dmdReadable ? screens.dmd : undefined;
+  const auto = (fallback?: string): LiveBoardPlacement => {
+    const tail = fallback ? { fallback } : {};
+    for (const screen of screens.free) {
+      const band = cardsOn(screen, rows);
+      if (band) return { ...(dmd ? { dmd } : {}), band, ...tail };
+    }
+    if (dmd) return { dmd, ...tail };
+    return screens.playfield ? { band: insertOn(screens.playfield, rows, 'bottom-left'), ...tail } : tail;
+  };
+  switch (place) {
+    case 'dmd':
+      if (dmd) return { dmd };
+      return auto(!screens.dmd ? 'pas d’écran du DMD' : 'DMD de la table illisible (inspector de VPX)'); // i18n-ignore : journal
+    case 'backglass':
+    case 'topper': {
+      const zone = screens.zones?.[place];
+      const band = zone ? cardsOn({ role: place, zone }, rows) : undefined;
+      return band ? { band } : auto(zone ? `${place} trop petit` : `pas de ${place}`); // i18n-ignore : journal
+    }
+    case 'playfield-bottom':
+    case 'playfield-side':
+      if (screens.playfield) return { band: insertOn(screens.playfield, rows, place === 'playfield-bottom' ? 'bottom-left' : 'middle-left') };
+      return auto('pas d’écran du plateau'); // i18n-ignore : journal
+    default:
+      return auto();
+  }
+}
+
+/**
+ * La fenêtre d'un autre processus qui passe devant `handle` (pile de Windows, du dessus vers le
+ * dessous) et le recouvre en partie : VPX, son PuP-Pack, son B2S, FlexDMD, un DMD externe. Les
+ * barres des tâches, fenêtres réduites et vides ne comptent pas.
+ */
+export function overlayCoveredBy(stack: readonly StackedWindow[], handle: bigint, ownPid: number): StackedWindow | undefined {
+  const at = stack.findIndex((w) => w.handle === handle);
+  if (at <= 0) return undefined;
+  const me = stack[at]!.rect;
+  const overlaps = (r: StackedWindow['rect']) => Math.min(r.x + r.width, me.x + me.width) - Math.max(r.x, me.x) > 0 && Math.min(r.y + r.height, me.y + me.height) - Math.max(r.y, me.y) > 0;
+  return stack.slice(0, at).find((w) => w.pid !== ownPid && !w.minimized && w.rect.width > 1 && w.rect.height > 1 && !(TASKBAR_CLASSES as readonly string[]).includes(w.className) && overlaps(w.rect));
+}
+
+/** Ce que la borne permet pour chaque place : chaque choix, et la raison quand il est grisé. */
+export interface LiveScoresCabinet {
+  backglass: boolean;
+  topper: boolean;
+  /** Un écran du DMD (ou une zone du DMD) : un DMD matériel seul ne se recouvre pas. */
+  dmd: boolean;
+  /** L'inspector de VPX peut être activé (règle du pare-feu qui ferme VPX au réseau) : le DMD se lit. */
+  inspector: boolean;
+}
+
+export interface LiveScoresChoice {
+  place: LiveScoresPlace;
+  label: string;
+  detail: string;
+  /** Grisé : pourquoi (jamais caché). */
+  unavailable?: string;
+}
+
+export function liveScoresChoices(cabinet: LiveScoresCabinet): LiveScoresChoice[] {
+  const dmdReason = !cabinet.dmd
+    ? t('Pas d’écran du DMD sur cette borne : un DMD matériel ne peut pas être recouvert')
+    : !cabinet.inspector
+      ? t('Le DMD se lit par l’inspector de VPX : Amis > Partage et réseau > « Autoriser dans le pare-feu de Windows »')
+      : undefined;
+  const choices: LiveScoresChoice[] = [
+    { place: 'auto', label: t('Automatique'), detail: t('Sur le DMD quand il montre les scores, sur le fronton ou le topper quand la table les laisse libres, sinon en bas du plateau') },
+    { place: 'dmd', label: t('Sur le DMD'), detail: t('Quand il montre l’écran de score de la table, jamais pendant une animation ni la saisie des initiales'), ...(dmdReason ? { unavailable: dmdReason } : {}) },
+    { place: 'backglass', label: t('Sur le fronton'), detail: t('En bas du fronton, par-dessus son image ou son PuP-Pack'), ...(cabinet.backglass ? {} : { unavailable: t('Pas d’écran de fronton sur cette borne') }) },
+    { place: 'topper', label: t('Sur le topper'), detail: t('Au centre du topper, par-dessus son image ou son PuP-Pack'), ...(cabinet.topper ? {} : { unavailable: t('Pas de topper sur cette borne') }) },
+    { place: 'playfield-bottom', label: t('En bas du plateau'), detail: t('Un encart sur le tablier, coin gauche, sous les couloirs extérieurs') },
+    { place: 'playfield-side', label: t('Sur le côté du plateau'), detail: t('Un encart au milieu du bord gauche') },
+  ];
+  return choices;
+}
+
+/** Le réglage enregistré (`<données>\amis\scores-en-partie.json`), lu sans confiance : un choix inconnu est l'automatique. */
+export function parseLiveScoresPlace(raw: unknown): LiveScoresPlace {
+  const place = raw && typeof raw === 'object' ? (raw as { place?: unknown }).place : undefined;
+  return LIVE_SCORES_PLACES.includes(place as LiveScoresPlace) ? (place as LiveScoresPlace) : 'auto';
 }
 
 // --- Sur le DMD ---
 
 /**
- * Les scores sur le DMD : 6 s, à l'arrivée en partie (la liste des joueurs), puis à chaque bille
- * du joueur (le DMD compte alors le bonus), quand un autre prend la tête ou finit sa partie, et au
- * plus tard toutes les 45 s ; jamais deux fois en moins de 15 s.
+ * Les scores sur le DMD : seulement quand il montre l'écran de score de la table (dmdscore.ts), et
+ * jamais au hasard (essai du 31/10/2026) : au premier repos de la partie (la liste des joueurs),
+ * puis au repos qui suit une bille du joueur, un autre qui prend la tête ou finit sa partie, et au
+ * plus tard toutes les 45 s ; jamais deux fois en moins de 15 s ; 6 s au plus, et ils partent dès
+ * que le DMD montre autre chose ou que le score bouge. Un passage ne commence que sur un écran de
+ * score vu depuis 1,5 s : un instant reconnu à tort (Star Trek : une seconde d'une animation presque
+ * immobile, mesurée au banc) ne suffit pas.
  */
-export const LIVE_FLASH = { firstMs: 3000, showMs: 6000, everyMs: 45_000, gapMs: 15_000 } as const;
+export const LIVE_FLASH = { showMs: 6000, everyMs: 45_000, gapMs: 15_000, settleMs: 1500 } as const;
 
 /** Ce qui fait revenir les scores sur le DMD : ma bille, le joueur en tête, les parties finies. */
 export function liveFlashKey(view: LiveBoardView): string {
@@ -286,16 +389,25 @@ export class LiveBoardFlash {
   private until = 0;
   private key?: string;
   private pending = true;
+  /** Depuis quand le DMD montre l'écran de score sans interruption. */
+  private screenSince?: number;
 
   constructor(private readonly start: number) {}
 
-  /** Les scores se voient-ils sur le DMD à `now` ? */
-  visible(view: LiveBoardView, now: number): boolean {
+  /** Les scores se voient-ils sur le DMD à `now` ? `scoreScreen` : le DMD montre son écran de score. */
+  visible(view: LiveBoardView, now: number, scoreScreen: boolean): boolean {
     const key = liveFlashKey(view);
     if (this.key !== undefined && key !== this.key) this.pending = true;
     this.key = key;
+    if (!scoreScreen) {
+      // Le DMD montre autre chose : les points partent tout de suite, et ce passage est fini.
+      this.until = 0;
+      this.screenSince = undefined;
+      return false;
+    }
+    this.screenSince ??= now;
     if (now < this.until) return true;
-    if (now - this.start < LIVE_FLASH.firstMs) return false;
+    if (now - this.screenSince < LIVE_FLASH.settleMs) return false;
     const due = this.pending || now - (this.lastAt ?? this.start) >= LIVE_FLASH.everyMs;
     if (!due || (this.lastAt !== undefined && now - this.lastAt < LIVE_FLASH.gapMs)) return false;
     this.lastAt = now;

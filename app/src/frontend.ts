@@ -34,6 +34,7 @@ import {
   joysticksUnseenByVpx,
   keepManualEdits,
   layoutOf,
+  overlayCoveredBy,
   liveBoardView,
   type LiveBoardScreens,
   loadCabinet,
@@ -189,6 +190,9 @@ import { createGameNotices } from './game-notice';
 import { createBallCounts } from './ball-count';
 import { createTableDoubles } from './table-double';
 import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
+import { simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
+import { readLiveScoresPlace, writeLiveScoresPlace } from './live-scores-setting';
+import { createLiveScoresMenu } from './live-scores-menu';
 import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
@@ -312,6 +316,10 @@ let windowRoles = new Map<RoleId, RoleId[]>();
 let roleRects: RoleRect[] = [];
 /** Rôles que VPX occupe pendant la partie (sa fenêtre passe devant la nôtre) : figés, quel que soit le réglage. */
 let occupied = new Set<RoleId>();
+/** Écrans que VPX a occupés depuis le début de la partie en cours : la bande ne s'y pose plus. */
+let occupiedThisGame = new Set<RoleId>();
+/** Le DMD de la partie entre amis en cours, lu par l'inspector de VPX (dmd-watch.ts). */
+let dmdWatch: DmdWatch | undefined;
 let occupiedWatch: NodeJS.Timeout | undefined;
 /** Relecture des fenêtres pendant la partie : B2S, DMD et PuP s'ouvrent après la fenêtre de jeu. */
 const OCCUPIED_CHECK_MS = 2000;
@@ -877,6 +885,10 @@ const gameNotices = createGameNotices({
   place: playfieldPlace,
   boardScreens: liveBoardScreens,
   dmdColor: () => mediaSettings.dmdColor,
+  scoresPlace: () => readLiveScoresPlace(loc.dataDir),
+  dmdScoreScreen: () => dmdWatch?.verdict().scoreScreen ?? false,
+  // Hors écran, la pile des fenêtres est celle du vrai bureau : rien à y chercher.
+  coveredBy: (win) => (OFFSCREEN ? undefined : describeCover(win)),
   invites: () => liveGames.invites(),
   captureDir: process.env.CYBERPINBALL_CAPTURE,
   log: (line) => console.log(line),
@@ -912,6 +924,21 @@ library.provideSystemItem('find-player', friendsMenu.items['find-player']);
 library.provideSystemItem('friend-requests', friendsMenu.items['friend-requests']);
 library.provideSystemItem('badges', friendsMenu.items.badges);
 library.provideSystemItem('sharing', friendsMenu.items.sharing);
+// Scores des amis pendant la partie : la place de la bande, au choix du joueur (live-scores-menu.ts).
+library.provideSystemItem(
+  'live-scores',
+  createLiveScoresMenu({
+    library,
+    get: () => readLiveScoresPlace(loc.dataDir),
+    set: (place) => writeLiveScoresPlace(loc.dataDir, place),
+    cabinet: () => ({
+      backglass: Boolean(menuAssignments.backglass),
+      topper: Boolean(menuAssignments.topper),
+      dmd: roleRects.some((r) => r.role === 'dmd'),
+      inspector: socialFirewall.vpxState() === 'closed',
+    }),
+  }),
+);
 
 /** Horloge de l'horaire et des actions programmées : celle du PC, décalée seulement dans un essai qui le demande. */
 const hoursClock = arcadeHoursClock(process.env, powerSimulated(process.env));
@@ -1786,7 +1813,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // de repli sur le dossier habituel.
   // L'inspector de VPX lui est proposé si la règle du pare-feu qui ferme VPX au réseau est posée (lue pendant le chargement).
   const inspector = await inspectorReady;
-  const doubled = hooks.double && !displayMode ? tableDoubles.start(table, hooks.double, hooks.settings, hooks.board, inspector) : undefined;
+  // Il sert aussi à lire le DMD quand le joueur y veut les scores des amis (automatique, ou sur le DMD).
+  const readDmd = ['auto', 'dmd'].includes(readLiveScoresPlace(loc.dataDir));
+  const doubled = hooks.double && !displayMode ? tableDoubles.start(table, hooks.double, hooks.settings, hooks.board, inspector && { ...inspector, dmd: readDmd }) : undefined;
   if (doubled && !doubled.ok) {
     console.log(`Partie entre amis (${table.id}) : pas de double, partie non lancée (${doubled.reason}).`);
     dressing = undefined;
@@ -1848,11 +1877,14 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   let overAt: number | undefined;
   // Hors écran, la partie simulée n'exécute aucun script : son relevé est simulé, pour la bande et la fin de partie.
   const liveSource = double?.live ? () => double.liveState() : simulated !== undefined && double ? simulatedLiveState(Date.now(), autoStopAfterMs ?? 10_000, () => goneAt) : undefined;
+  // Le DMD de la table, lu par l'inspector de VPX : les scores des amis ne s'y posent que sur son écran de score (dmdscore.ts).
+  dmdWatch = double?.inspectorPort && readDmd ? watchVpxDmd(double.inspectorPort, (line) => console.log(line)) : simulated !== undefined && double && readDmd ? simulatedDmdWatch() : undefined;
   // Départ commun (livestart.ts) : la table prête (le relevé répond « pret »), elle le dit aux
   // autres ; au « partez », le fichier du double que le relevé surveille : alors seulement, crédit et Start.
   const watchLive = double
     ? setInterval(() => {
         const st = liveSource?.();
+        dmdWatch?.game({ inGame: Boolean(st?.inGame), ...(st ? { score: st.score } : {}) });
         if (st?.ready || st?.started) hooks.gate?.ready();
         if (goneAt === undefined && (!hooks.gate || hooks.gate.go())) {
           goneAt = Date.now();
@@ -1874,6 +1906,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const result = await game.done;
   if (watchLive) clearInterval(watchLive);
   gameNotices.close();
+  dmdWatch?.stop();
+  dmdWatch = undefined;
   // Les records de la partie, lus où VPX les a écrits (le double, pour une partie entre amis) ; puis le double s'en va.
   const recordsAfter = double ? double.records() : readTableRecords(played);
   double?.finish();
@@ -1967,11 +2001,25 @@ function liveBoardScreens(): LiveBoardScreens {
   const screen = menuAssignments.dmd?.bounds;
   const framed = dressing?.plan.dressed && screen ? dressing.plan.window : undefined;
   const dmd = framed && screen ? { x: screen.x + framed.x, y: screen.y + framed.y, width: framed.width, height: framed.height } : rect('dmd');
+  // Un écran que VPX a pris pendant cette partie reste à lui : à la fermeture de VPX, la bande sautait
+  // un instant sur le fronton qu'il venait de rendre (journal du 31/10/2026).
   const free = (['backglass', 'topper'] as const).flatMap((role) => {
     const zone = rect(role);
-    return zone && !occupied.has(role) ? [{ role, zone }] : [];
+    return zone && !occupiedThisGame.has(role) ? [{ role, zone }] : [];
   });
-  return { playfield: playfieldPlace(), ...(dmd ? { dmd } : {}), free };
+  const backglass = rect('backglass');
+  const topper = rect('topper');
+  return { playfield: playfieldPlace(), ...(dmd ? { dmd } : {}), dmdReadable: dmdWatch?.readable() ?? false, free, zones: { ...(backglass ? { backglass } : {}), ...(topper ? { topper } : {}) } };
+}
+
+/** La fenêtre de VPX, PuP, B2S… qui passe devant une fenêtre de la bande, décrite pour le journal. */
+function describeCover(win: BrowserWindow): string | undefined {
+  try {
+    const by = overlayCoveredBy(listWindows((w) => w.visible), win.getNativeWindowHandle().readBigUInt64LE(0), process.pid);
+    return by ? `« ${by.title || '(sans titre)'} » (${by.className}, processus ${by.pid}${by.topmost ? ', au premier plan permanent' : ''})` : undefined; // i18n-ignore : journal
+  } catch {
+    return undefined;
+  }
 }
 
 /** Zone du plateau à l'écran, en pixels physiques, et le sens de sa mise en page : où se pose une notification pendant la partie. */
@@ -2047,11 +2095,13 @@ function watchOccupied(simulated: RoleId[] | undefined): void {
     const next = new Set(roles);
     if (next.size === occupied.size && [...next].every((r) => occupied.has(r))) return;
     occupied = next;
+    for (const role of next) occupiedThisGame.add(role);
     console.log(`Partie : écrans occupés par VPX : ${[...occupied].join(', ') || 'aucun'}.`);
     broadcast();
     // Un écran que VPX prend ou rend : la bande de la partie entre amis change de place.
     showLiveBoard();
   };
+  occupiedThisGame = new Set();
   if (simulated) return update(simulated);
   dressCoveredSeen = false;
   const check = () => {

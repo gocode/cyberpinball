@@ -67,9 +67,11 @@ export interface TableDouble {
   go(): void;
   /**
    * Le VPinballX.ini de cette partie, à passer à VPX par -Ini : une copie de celui de la borne,
-   * l'inspector activé (table Stern SAM) ; undefined : celui de la borne.
+   * l'inspector activé (table Stern SAM, ou DMD lu pour les scores des amis) ; undefined : celui de la borne.
    */
   ini?: string;
+  /** Port de l'inspector de VPX quand il est activé pour cette partie (127.0.0.1) : le DMD s'y lit (dmd-watch.ts). */
+  inspectorPort?: number;
   /** Après la partie : compare le dossier habituel à son empreinte d'avant, puis supprime le double. */
   finish(): void;
 }
@@ -85,9 +87,11 @@ export function createTableDoubles(opts: TableDoublesOptions) {
      * Le double de la table pour la partie `id`, ou la raison de son absence ; `settings` : les
      * réglages de l'hôte (invité), posés dans le double à la place des siens ; `board` : les records
      * du groupe, posés dans le VPReg.stg du double (groupboard.ts) ; `inspector` : l'inspector de VPX
-     * peut servir à cette partie, sur ce port (la règle du pare-feu qui ferme VPX au réseau est posée).
+     * peut servir à cette partie, sur ce port (la règle du pare-feu qui ferme VPX au réseau est posée) ;
+     * `inspector.dmd` : il est activé aussi pour lire le DMD (les scores des amis s'y posent quand il
+     * montre l'écran de score), même quand le relevé n'en a pas besoin.
      */
-    start(table: TableEntry, id: string, settings?: readonly HostSetting[], board?: readonly GroupRecord[], inspector?: { port: number }): { ok: true; double: TableDouble } | { ok: false; reason: string } {
+    start(table: TableEntry, id: string, settings?: readonly HostSetting[], board?: readonly GroupRecord[], inspector?: { port: number; dmd?: boolean }): { ok: true; double: TableDouble } | { ok: false; reason: string } {
       const parties = partiesDir();
       const tablesDir = opts.tablesDir();
       if (!parties || !tablesDir) return { ok: false, reason: t('pas de dossier Cyber Pinball') };
@@ -158,7 +162,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
       // Départ commun : le relevé attend ce fichier pour mettre le crédit et appuyer sur Start.
       const goFile = path.join(plan.dir, 'cyberpinball-partez.txt');
       let live = false;
-      let ini: { file: string; text: string } | undefined;
+      let ini: { file: string; text: string; port: number } | undefined;
       if (board) {
         try {
           const base = path.basename(plan.file, path.extname(plan.file)).toLowerCase();
@@ -177,19 +181,20 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           }
           const offered = iniText !== undefined ? inspector : undefined;
           const hook = script ? liveStateHook(script, readVpxElements(plan.file), stateFile, rom?.memory, offered, goFile) : { ok: false as const, reason: 'script illisible ou protégé' }; // i18n-ignore : journal
-          if (hook.ok && hook.inspector.length) {
+          if (hook.ok && (hook.inspector.length || offered?.dmd)) {
             // La carte réduite et le VPinballX.ini de la partie, dans le double seulement ; un fichier lié à l'original est remplacé, jamais réécrit.
             const games = [...new Set([...(opts.romsOf?.(table) ?? []), ...roms])];
-            for (const f of inspectorMemMapFiles(hook.inspector, games)) {
-              const out = path.join(plan.dir, ...f.rel.split('/'));
-              fs.mkdirSync(path.dirname(out), { recursive: true });
-              fs.rmSync(out, { force: true });
-              fs.writeFileSync(out, f.text, 'utf8');
-            }
+            if (hook.inspector.length)
+              for (const f of inspectorMemMapFiles(hook.inspector, games)) {
+                const out = path.join(plan.dir, ...f.rel.split('/'));
+                fs.mkdirSync(path.dirname(out), { recursive: true });
+                fs.rmSync(out, { force: true });
+                fs.writeFileSync(out, f.text, 'utf8');
+              }
             const file = path.join(plan.dir, 'VPinballX.ini');
             fs.rmSync(file, { force: true });
             fs.writeFileSync(file, iniWithInspector(iniText!, offered!.port), 'utf8');
-            ini = { file, text: iniText! };
+            ini = { file, text: iniText!, port: offered!.port };
           }
           if (hook.ok) {
             // Le .vbs du double est une copie (jamais un lien vers l'original) : remplacé, pas réécrit sur place.
@@ -199,7 +204,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           }
           log(
             hook.ok
-              ? `Partie entre amis (${table.id}) : relevé de l'état de jeu et départ automatique posés (${hook.source === 'rom' ? `mémoire de la ROM ${rom?.name}, ` : ''}${hook.inspector.length ? `inspector de VPX sur 127.0.0.1:${offered!.port} pour ${hook.inspector.map((s) => s.name.replace(/^cyberpinball_/, '')).join(', ')}, ` : ''}minuteur de ${hook.element}).` // i18n-ignore : journal
+              ? `Partie entre amis (${table.id}) : relevé de l'état de jeu et départ automatique posés (${hook.source === 'rom' ? `mémoire de la ROM ${rom?.name}, ` : ''}${ini ? `inspector de VPX sur 127.0.0.1:${offered!.port} pour ${[...hook.inspector.map((s) => s.name.replace(/^cyberpinball_/, '')), ...(offered?.dmd ? ['le DMD'] : [])].join(', ')}, ` : ''}minuteur de ${hook.element}).` // i18n-ignore : journal
               : `Partie entre amis (${table.id}) : pas de relevé de l'état de jeu (${hook.reason}${roms.length && !rom ? ` ; pas de carte mémoire en cache pour ${roms.join(', ')}` : ''}${!inspector && /inspector/.test(hook.reason) ? ' ; règle du pare-feu de VPX absente : Menu système > Amis > Partage et réseau' : ''}).`, // i18n-ignore : journal
           );
         } catch (error) {
@@ -248,7 +253,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
               log(`Partie entre amis (${table.id}) : « partez » non posé (${(error as Error).message}), nouvel essai.`); // i18n-ignore : journal
             }
           },
-          ...(ini ? { ini: ini.file } : {}),
+          ...(ini ? { ini: ini.file, inspectorPort: ini.port } : {}),
           finish() {
             if (finished) return;
             finished = true;

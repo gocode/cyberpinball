@@ -121,3 +121,4 @@ export * from './notices';
 export * from './livenotices';
 export * from './gamerecording';
 export * from './gamenotice';
+export * from './dmdscore';

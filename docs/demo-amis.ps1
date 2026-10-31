@@ -25,7 +25,8 @@
 #   La bande de la partie entre amis, au parcours « partie » : sur la borne, les scores sur le DMD
 #   (bande-partie-entre-amis-dmd.png) et les cartes sur le topper, que la partie simulée laisse
 #   libre (bande-partie-entre-amis.png) ; au poste, le DMD seul (fronton occupé) ; sur un écran
-#   (-Ecrans un-ecran), l'encart au bas du plateau. Jamais en haut du plateau.
+#   (-Ecrans un-ecran), l'encart au bas du plateau. Jamais en haut du plateau. Puis le réglage
+#   « Scores des amis pendant la partie ».
 #   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans, un-ecran]
 # Captures dans tmp\demo-amis\<parcours>\<écrans>\<langue>\captures.
 #   .\docs\demo-amis.ps1 -Accueil [-Langues en, fr]
@@ -82,8 +83,8 @@ function New-Racine([string]$Nom, [switch]$Vpx, [switch]$Neuve) {
 $Exit = 'Escape'
 # Libellés : ceux de la langue de l'essai (l'autopilote choisit une action par son libellé).
 $libelles = @{
-  'fr' = @{ Plus = 'Répondre plus tard'; Amis = 'Amis'; MesAmis = 'Mes amis'; Historique = 'Historique des parties'; Trouver = 'Trouver un joueur'; Chercher = 'Chercher un nom'; Demandes = 'Demandes d'; Badges = 'Mes badges'; Partage = 'Partage et réseau'; Biblio = 'Voir sa bibliothèque'; Prendre = 'Récupérer le'; Toute = 'Récupérer toute la table'; Parties = 'Choisir les parties'; Accepter = 'Accepter'; Fermer = 'Fermer' }
-  'en' = @{ Plus = 'Answer later'; Amis = 'Friends'; MesAmis = 'My friends'; Historique = 'Game history'; Trouver = 'Find a player'; Chercher = 'Search for a name'; Demandes = 'Friend requests'; Badges = 'My badges'; Partage = 'Sharing and network'; Biblio = 'See their library'; Prendre = 'Get the'; Toute = 'Get the whole table'; Parties = 'Choose parts'; Accepter = 'Accept'; Fermer = 'Close' }
+  'fr' = @{ Plus = 'Répondre plus tard'; Amis = 'Amis'; MesAmis = 'Mes amis'; Historique = 'Historique des parties'; Trouver = 'Trouver un joueur'; Chercher = 'Chercher un nom'; Demandes = 'Demandes d'; Badges = 'Mes badges'; Partage = 'Partage et réseau'; Biblio = 'Voir sa bibliothèque'; Prendre = 'Récupérer le'; Toute = 'Récupérer toute la table'; Parties = 'Choisir les parties'; Accepter = 'Accepter'; Fermer = 'Fermer'; Retour = 'Retour'; Scores = 'Scores des amis'; Topper = 'Sur le topper'; Auto = 'Automatique' }
+  'en' = @{ Plus = 'Answer later'; Amis = 'Friends'; MesAmis = 'My friends'; Historique = 'Game history'; Trouver = 'Find a player'; Chercher = 'Search for a name'; Demandes = 'Friend requests'; Badges = 'My badges'; Partage = 'Sharing and network'; Biblio = 'See their library'; Prendre = 'Get the'; Toute = 'Get the whole table'; Parties = 'Choose parts'; Accepter = 'Accept'; Fermer = 'Close'; Retour = 'Back'; Scores = 'Friends'; Topper = 'On the topper'; Auto = 'Automatic' }
 }
 
 function Get-Etapes([string]$Nom, $l) {
@@ -101,15 +102,18 @@ function Get-Etapes([string]$Nom, $l) {
   if ($Nom -eq 'partie') {
     # Le menu des tables, puis l'invitation de Bruno (six secondes après l'amitié), ouverte d'elle-même ;
     # Bruno donne le départ peu après l'acceptation ; sa table charge six secondes (la borne l'attend :
-    # départ commun), puis la partie simulée dure dix secondes. Puis
-    # l'historique des parties (la partie jouée en tête, le curseur dessus) et son détail.
+    # départ commun), puis la partie simulée dure dix secondes. Puis l'historique des parties (la
+    # partie jouée en tête, le curseur dessus) et son détail ; puis « Scores des amis pendant la
+    # partie » (le DMD grisé : pas d'inspector de VPX ici), le topper choisi, et l'automatique remis.
     return @(
       'wait:1500', 'wait:9000', 'wait:1000',
       "action:$($l.Accepter)", 'wait:1000', 'wait:4000',
       'until:playing', 'until:library', 'wait:2500',
       "action:$($l.Fermer)", 'wait:800',
       $Exit, 'wait:800', "action:$($l.Historique)", 'wait:800',
-      'Enter', 'wait:800'
+      'Enter', 'wait:800',
+      "action:$($l.Retour)", 'wait:600', "action:$($l.Retour)", 'wait:800', "action:$($l.Scores)", 'wait:800',
+      "action:$($l.Topper)", 'wait:800', "action:$($l.Auto)", 'wait:800'
     )
   }
   # Au départ, le message « VPX n'est pas installé » (le bac à sable n'a pas VPX) : Exit le ferme,

@@ -14,15 +14,20 @@ import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import {
   LIVE_FLASH,
+  LIVE_SCORES_PLACES,
   LiveBoardFlash,
   gameNoticeBounds,
   liveBoardDots,
   liveBoardPlacement,
   liveCardsSize,
+  liveScoresChoices,
+  overlayCoveredBy,
+  parseLiveScoresPlace,
   type LiveBoardRow,
   type LiveBoardScreens,
   type LiveBoardView,
 } from '../gamenotice';
+import type { StackedWindow } from '../screencover';
 import { indicatorBounds } from '../gamerecording';
 import { DMD_HEIGHT, DMD_WIDTH } from '../livedmd';
 import type { Rect, RoleId, Rotation } from '../model';
@@ -80,19 +85,21 @@ test('écrans simulés : la bande quitte le plateau dès qu’un autre écran la
     for (const occupied of [[], ['backglass'], ['backglass', 'topper']] as RoleId[][]) {
       for (const rotation of ROTATIONS) {
         for (let rows = 1; rows <= 4; rows++) {
+        for (const dmdReadable of [true, false]) {
           const screens: LiveBoardScreens = {
             playfield: { zone: rects.playfield!, rotation },
             ...(rects.dmd ? { dmd: rects.dmd } : {}),
+            dmdReadable,
             free: (['backglass', 'topper'] as const).flatMap((role) => (rects[role] && !occupied.includes(role) ? [{ role, zone: rects[role]! }] : [])),
           };
           const placed = liveBoardPlacement(screens, rows);
-          const where = `${name}, ${occupied.join('+') || 'rien'} occupé, ${rotation}°, ${rows} joueur(s)`;
-          // Le DMD : les points à sa place, quand la borne en a un.
-          assert.deepEqual(placed.dmd, rects.dmd, `${where} : DMD`);
+          const where = `${name}, ${occupied.join('+') || 'rien'} occupé, ${rotation}°, ${rows} joueur(s), DMD ${dmdReadable ? 'lisible' : 'illisible'}`;
+          // Le DMD : les points à sa place, quand la borne en a un et qu'il se lit (inspector de VPX).
+          assert.deepEqual(placed.dmd, dmdReadable ? rects.dmd : undefined, `${where} : DMD`);
           const band = placed.band;
           if (screens.free.length) {
             assert.ok(band && band.layout === 'cards' && band.role === screens.free[0]!.role, `${where} : cartes sur le premier écran libre`);
-          } else if (rects.dmd) {
+          } else if (rects.dmd && dmdReadable) {
             assert.equal(band, undefined, `${where} : le DMD suffit, rien sur le plateau`);
           } else {
             assert.ok(band && band.role === 'playfield' && band.layout === 'insert', `${where} : encart du plateau`);
@@ -136,6 +143,7 @@ test('écrans simulés : la bande quitte le plateau dès qu’un autre écran la
           const witness = indicatorBounds(z, rotation, { width: Math.round((420 * short) / 1080), height: Math.round((72 * short) / 1080) }, Math.round((28 * short) / 1080));
           assert.ok(!overlap(b, witness), `${where} : jamais sur le témoin d’enregistrement`);
         }
+        }
       }
     }
   }
@@ -156,21 +164,35 @@ test('encart : le coin bas-gauche du joueur, quel que soit le sens du plateau', 
   }
 });
 
-test('DMD : les scores de temps à autre, aux moments où le DMD ne dit rien d’essentiel', () => {
+test('DMD : les scores seulement sur l’écran de score, jamais au hasard', () => {
   const start = 1_000_000;
   const flash = new LiveBoardFlash(start);
   let v = view(2);
-  const at = (ms: number) => flash.visible(v, start + ms);
-  assert.equal(at(0), false, 'pas pendant le lancement de la table');
-  assert.equal(at(LIVE_FLASH.firstMs), true, 'la liste des joueurs, peu après l’arrivée en partie');
-  assert.equal(at(LIVE_FLASH.firstMs + LIVE_FLASH.showMs - 1), true);
-  assert.equal(at(LIVE_FLASH.firstMs + LIVE_FLASH.showMs), false, `${LIVE_FLASH.showMs / 1000} s, puis le DMD de VPX revient`);
-  // Ma bille change (le DMD compte le bonus) : de retour, mais jamais moins de 15 s après la dernière fois.
+  let scoreScreen = false;
+  const at = (ms: number) => flash.visible(v, start + ms, scoreScreen);
+  // Pas d'écran de score (lancement, animation) : rien, quel que soit le temps passé.
+  assert.equal(at(0), false);
+  assert.equal(at(60_000), false, 'jamais sans l’écran de score');
+  // Le premier repos de la partie, vu depuis 1,5 s : la liste des joueurs.
+  scoreScreen = true;
+  assert.equal(at(60_000), false, 'écran de score à peine vu');
+  const first = 60_000 + LIVE_FLASH.settleMs;
+  assert.equal(at(first), true, 'premier écran de score : la liste des joueurs');
+  assert.equal(at(first + 3000), true);
+  // Le DMD montre autre chose (une animation, le score qui bouge) : les points partent tout de suite.
+  scoreScreen = false;
+  assert.equal(at(first + 3001), false, 'animation : les points partent');
+  scoreScreen = true;
+  assert.equal(at(first + 3500), false, 'le passage est fini, rien de nouveau');
+  // Ma bille change : de retour au prochain écran de score, jamais moins de 15 s après la dernière fois.
   v = { ...v, rows: v.rows.map((r) => (r.me ? { ...r, ball: 3, short: 'B3' } : r)) };
-  assert.equal(at(LIVE_FLASH.firstMs + 10_000), false, 'trop tôt');
-  assert.equal(at(LIVE_FLASH.firstMs + LIVE_FLASH.gapMs), true, 'ma bille a changé');
-  const shownAt = LIVE_FLASH.firstMs + LIVE_FLASH.gapMs;
-  // Rien ne change : au plus tard toutes les 45 s.
+  assert.equal(at(first + 4000), false, 'écran de score revu, pas encore 1,5 s');
+  assert.equal(at(first + 10_000), false, 'trop tôt');
+  assert.equal(at(first + LIVE_FLASH.gapMs), true, 'ma bille a changé');
+  const shownAt = first + LIVE_FLASH.gapMs;
+  assert.equal(at(shownAt + LIVE_FLASH.showMs - 1), true);
+  assert.equal(at(shownAt + LIVE_FLASH.showMs), false, `${LIVE_FLASH.showMs / 1000} s au plus`);
+  // Rien ne change : au plus tard toutes les 45 s, pourvu que le DMD montre l'écran de score.
   assert.equal(at(shownAt + LIVE_FLASH.everyMs - 1), false);
   assert.equal(at(shownAt + LIVE_FLASH.everyMs), true);
   // Un autre prend la tête : de retour dès que l'écart le permet.
@@ -178,6 +200,70 @@ test('DMD : les scores de temps à autre, aux moments où le DMD ne dit rien d�
   v = { ...v, rows: v.rows.map((r) => ({ ...r, lead: r.me })) };
   assert.equal(at(next + LIVE_FLASH.showMs + 1), false);
   assert.equal(at(next + LIVE_FLASH.gapMs), true, 'nouveau joueur en tête');
+});
+
+test('choix du joueur : chaque place, et l’automatique quand la borne ou la table ne la permet pas', () => {
+  const rects = roleRects('borne');
+  for (const rotation of ROTATIONS) {
+    const screens: LiveBoardScreens = { playfield: { zone: rects.playfield!, rotation }, dmd: rects.dmd!, dmdReadable: true, free: [], zones: { backglass: rects.backglass!, topper: rects.topper! } };
+    // Fronton et topper choisis : la bande s'y pose même quand la table s'en sert (B2S, PuP), rien sur le DMD.
+    for (const role of ['backglass', 'topper'] as const) {
+      const p = liveBoardPlacement(screens, 3, role);
+      assert.equal(p.band?.role, role);
+      assert.equal(p.dmd, undefined);
+      assert.ok(inside(p.band!.bounds, rects[role]!));
+    }
+    assert.deepEqual(liveBoardPlacement(screens, 3, 'dmd'), { dmd: rects.dmd });
+    // Bas et côté du plateau : l'encart, au bord des flippers ou au milieu du bord gauche du joueur.
+    const bottom = liveBoardPlacement(screens, 3, 'playfield-bottom').band!;
+    const side = liveBoardPlacement(screens, 3, 'playfield-side').band!;
+    for (const b of [bottom, side]) assert.ok(b.role === 'playfield' && b.layout === 'insert' && inside(b.bounds, rects.playfield!));
+    const quarter = rotation === 90 || rotation === 270;
+    const z = rects.playfield!;
+    const middle = quarter ? side.bounds.x + side.bounds.width / 2 - (z.x + z.width / 2) : side.bounds.y + side.bounds.height / 2 - (z.y + z.height / 2);
+    assert.ok(Math.abs(middle) <= 1, `${rotation}° : à mi-hauteur du joueur (${middle})`);
+  }
+  // Ce que la table ne permet pas : l'automatique, et la raison au journal.
+  const screens: LiveBoardScreens = { playfield: { zone: rects.playfield!, rotation: 0 }, dmd: rects.dmd!, dmdReadable: false, free: [{ role: 'topper', zone: rects.topper! }] };
+  const dmd = liveBoardPlacement(screens, 2, 'dmd');
+  assert.equal(dmd.band?.role, 'topper');
+  assert.match(dmd.fallback!, /illisible/);
+  assert.match(liveBoardPlacement({ ...screens, zones: {} }, 2, 'backglass').fallback!, /pas de backglass/);
+  // Un réglage illisible ou inconnu : l'automatique.
+  assert.equal(parseLiveScoresPlace({ place: 'dmd' }), 'dmd');
+  assert.equal(parseLiveScoresPlace({ place: 'plafond' }), 'auto');
+  assert.equal(parseLiveScoresPlace(null), 'auto');
+});
+
+test('réglage : chaque choix visible, grisé avec sa raison quand la borne ne le permet pas', () => {
+  const all = liveScoresChoices({ backglass: true, topper: true, dmd: true, inspector: true });
+  assert.deepEqual(all.map((c) => c.place), [...LIVE_SCORES_PLACES]);
+  assert.ok(all.every((c) => !c.unavailable));
+  const poor = liveScoresChoices({ backglass: false, topper: false, dmd: true, inspector: false });
+  assert.deepEqual(poor.map((c) => c.place), [...LIVE_SCORES_PLACES], 'jamais caché');
+  const why = Object.fromEntries(poor.map((c) => [c.place, c.unavailable]));
+  assert.match(why.dmd!, /inspector de VPX/);
+  assert.match(why.backglass!, /Pas d’écran de fronton/);
+  assert.match(why.topper!, /Pas de topper/);
+  assert.equal(why.auto, undefined);
+  assert.equal(why['playfield-bottom'], undefined);
+  assert.match(liveScoresChoices({ backglass: true, topper: true, dmd: false, inspector: true }).find((c) => c.place === 'dmd')!.unavailable!, /DMD matériel/);
+});
+
+test('recouvrement : la fenêtre d’un autre processus passée devant la bande est trouvée', () => {
+  const win = (handle: number, pid: number, rect: StackedWindow['rect'], extra: Partial<StackedWindow> = {}): StackedWindow => ({ handle: BigInt(handle), pid, className: 'X', title: `w${handle}`, rect, minimized: false, ...extra });
+  const band = win(10, 1, { x: 100, y: 100, width: 400, height: 100 });
+  const stack = [
+    win(1, 50, { x: 0, y: 1040, width: 1920, height: 40 }, { className: 'Shell_TrayWnd' }),
+    win(2, 60, { x: 600, y: 0, width: 200, height: 200 }),
+    win(3, 70, { x: 0, y: 0, width: 1920, height: 1080 }, { minimized: true }),
+    win(4, 80, { x: 50, y: 50, width: 1920, height: 1080 }, { title: 'PUPSCREEN2', className: 'PuPScreen', topmost: true }),
+    band,
+    win(5, 90, { x: 0, y: 0, width: 1920, height: 1080 }),
+  ];
+  assert.equal(overlayCoveredBy(stack, 10n, 1)?.title, 'PUPSCREEN2', 'le PuP devant, pas la barre des tâches ni une fenêtre réduite ou à côté');
+  assert.equal(overlayCoveredBy(stack.slice(4), 10n, 1), undefined, 'rien devant');
+  assert.equal(overlayCoveredBy([win(7, 1, band.rect), band], 10n, 1), undefined, 'une fenêtre de Cyber Pinball ne compte pas');
 });
 
 test('DMD : une ligne par joueur dans les 128 × 32 points, le nom raccourci plutôt que le score', () => {
@@ -201,12 +287,26 @@ test('application : les fenêtres de la bande et du DMD, et ce que frontend.ts l
   const notice = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'game-notice.ts'), 'utf8');
   // Une seule façon de créer une fenêtre par-dessus VPX : transparente, sans focus, hors des captures.
   assert.equal(notice.match(/createWindow\(\{/g)?.length, 1);
-  assert.match(notice, /liveBoardPlacement\(screens, boardView\.rows\.length\)/);
-  // Les points du DMD : une fenêtre le temps d'un passage, fermée ensuite, jamais cachée (screencover.test.ts).
-  assert.match(notice, /const onDmd = placement\.dmd && flash\?\.visible\(boardView, Date\.now\(\)\) \? placement\.dmd : undefined;/);
+  assert.match(notice, /liveBoardPlacement\(screens, boardView\.rows\.length, place\)/);
+  // Les points du DMD : seulement sur l'écran de score ; une fenêtre le temps d'un passage, fermée ensuite, jamais cachée (screencover.test.ts).
+  assert.match(notice, /const onDmd = placement\.dmd && flash\?\.visible\(boardView, Date\.now\(\), opts\.dmdScoreScreen\?\.\(\) \?\? false\) \? placement\.dmd : undefined;/);
+  // Au-dessus de toute fenêtre de VPX, PuP, B2S : remise devant, et le journal le dit.
+  assert.match(notice, /keepInFront\(band, 'bande'\);/);
+  // Ses fenêtres se ferment par close(), jamais par destroy() : détruite pendant qu'une autre charge, elle emporte leur processus de rendu.
+  assert.doesNotMatch(notice, /\.destroy\(\)/);
+  assert.match(notice, /function dispose\(o: Overlay \| undefined\): void \{\s+if \(alive\(o\)\) o\.win\.close\(\);/);
+  // Pendant l'attente du départ commun, sa carte seule sur le plateau : pas de bande par-dessus.
+  assert.match(notice, /if \(waitView\) \{\s+band = layer\(band, undefined, ''\);\s+dmd = layer\(dmd, undefined, ''\);/);
+  assert.match(notice, /keepInFront\(dmd, 'dmd'\);/);
+  assert.match(notice, /recouverte par \$\{by\} : remise devant/);
   assert.match(notice, /dmd = layer\(dmd, onDmd, JSON\.stringify\(onDmd\)\);/);
   const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
-  assert.match(front, /return zone && !occupied\.has\(role\) \? \[\{ role, zone \}\] : \[\];/);
+  // Un écran pris par VPX pendant la partie le reste pour la bande (elle sautait sur le fronton rendu à la fermeture).
+  assert.match(front, /return zone && !occupiedThisGame\.has\(role\) \? \[\{ role, zone \}\] : \[\];/);
+  assert.match(front, /for \(const role of next\) occupiedThisGame\.add\(role\);/);
+  // Le DMD lu par l'inspector quand le joueur y veut les scores, et les signaux du relevé.
+  assert.match(front, /dmdWatch = double\?\.inspectorPort && readDmd \? watchVpxDmd\(/);
+  assert.match(front, /dmdWatch\?\.game\(\{ inGame: Boolean\(st\?\.inGame\)/);
   assert.match(front, /const dmd = framed && screen \?/);
   // La page : les points du DMD par l'afficheur du menu (fallback.js), à sa couleur.
   const page = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'game-notice.html'), 'utf8');
