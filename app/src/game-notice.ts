@@ -10,20 +10,31 @@
 // alors arriver. Jamais sur le plateau tant qu'un autre écran la porte (liveBoardPlacement) : sur
 // le DMD de temps à autre (LiveBoardFlash), en cartes sur un écran que VPX laisse libre, sinon en
 // encart au bas du plateau.
+//
+// Pendant la partie d'une autre table, une nouvelle de la partie entre amis (un invité accepte ou
+// décline, la partie est finie : notices.ts, NoticeRule.live) se pose en une ligne dans le même
+// coin, sous l'invitation si elle est là ; la file des notifications du menu décide quand.
+// Avant, l'attente du départ commun (packages/core/src/livestart.ts, liveWaitView) : une carte au
+// centre du plateau, dans son tiers haut (aucune bille n'est en jeu) : chaque joueur et son statut,
+// pourquoi la partie n'a pas encore démarré, puis « Partez ! » quelques secondes.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
+  GAME_NOTICE_LINE,
   GAME_NOTICE_SIZE,
   LiveBoardFlash,
   gameNoticeBounds,
   gameNoticeView,
   liveBoardDots,
   liveBoardPlacement,
+  liveWaitBounds,
   type GameNoticeView,
   type LiveBoardScreens,
   type LiveBoardView,
   type LiveInvite,
+  type NoticeView,
+  type LiveWaitView,
   type Rect,
   type Rotation,
 } from '@cyberpinball/core';
@@ -50,6 +61,10 @@ export interface GameNotices {
   show(invite: LiveInvite): void;
   /** Partie entre amis : la bande de la partie, à jour (undefined : plus de bande). */
   board(view: LiveBoardView | undefined): void;
+  /** Une nouvelle de la partie entre amis, d'une ligne (undefined : plus rien). */
+  line(view: NoticeView | undefined): void;
+  /** Partie entre amis : l'attente du départ commun, à jour (undefined : plus d'attente). */
+  wait(view: LiveWaitView | undefined): void;
   /** Fin de la partie : plus rien par-dessus VPX. */
   close(): void;
 }
@@ -114,14 +129,20 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   let boardTicker: NodeJS.Timeout | undefined;
   /** Dernière place annoncée au journal. */
   let placed = '';
+  /** La nouvelle de la partie entre amis : sa fenêtre et ce qu'elle montre. */
+  let line: Overlay | undefined;
+  let lineView: NoticeView | undefined;
+  /** L'attente du départ commun : sa vue, sa carte sur le plateau. */
+  let waitView: LiveWaitView | undefined;
+  let waitCard: Overlay | undefined;
 
   /** Place de la fenêtre pour une carte de `base` (vue du joueur, à 1080 px), dans le coin du plateau. */
-  function boundsFor(base: { width: number; height: number }) {
+  function boundsFor(base: { width: number; height: number }, below = 0) {
     const place = opts.place();
     if (!place) return undefined;
     const unit = Math.min(place.zone.width, place.zone.height) / 1080;
     const size = { width: Math.round(base.width * unit), height: Math.round(base.height * unit) };
-    return { place, bounds: gameNoticeBounds(place.zone, place.rotation, size, Math.round(GAME_NOTICE_SIZE.margin * unit)) };
+    return { place, bounds: gameNoticeBounds(place.zone, place.rotation, size, Math.round(GAME_NOTICE_SIZE.margin * unit), 'top-left', Math.round(below * unit)) };
   }
 
   function open(): Overlay | undefined {
@@ -170,18 +191,20 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     if (!alive(o)) return;
     fs.mkdirSync(opts.captureDir!, { recursive: true });
     const board = state.startsWith('partie');
-    const name = board ? `bande-partie-entre-amis${state === 'partie-dmd' ? '-dmd' : ''}` : `invitation-en-partie-${state}`; // i18n-ignore : noms de fichier des essais
+    const news = state.startsWith('nouvelle');
+    const wait = state.startsWith('depart');
+    const name = board ? `bande-partie-entre-amis${state === 'partie-dmd' ? '-dmd' : ''}` : news ? `notification-en-partie-${state.slice('nouvelle-'.length)}` : wait ? `${state}-commun` : `invitation-en-partie-${state}`; // i18n-ignore : noms de fichier des essais
     fs.writeFileSync(path.join(opts.captureDir!, `${name}.png`), (await o.win.webContents.capturePage()).toPNG());
     const problems = await checkLayout(o.win.webContents);
-    opts.log?.(`${board ? `Bande de la partie entre amis${state === 'partie-dmd' ? ' (DMD)' : ''}` : `Invitation pendant la partie (${state})`} : ${problems.length ? problems.join(' ; ') : 'mise en page conforme'}.`); // i18n-ignore : journal
+    opts.log?.(`${board ? `Bande de la partie entre amis${state === 'partie-dmd' ? ' (DMD)' : ''}` : news ? `Notification de la partie entre amis pendant la partie (${state})` : wait ? `Départ commun (${state === 'depart-partez' ? 'partez' : 'attente'})` : `Invitation pendant la partie (${state})`} : ${problems.length ? problems.join(' ; ') : 'mise en page conforme'}.`); // i18n-ignore : journal
   }
 
-  /** Une couche de la bande à sa place : la même fenêtre si rien n'a bougé, sinon une neuve. */
-  function layer(o: Overlay | undefined, bounds: Rect | undefined, key: string): Overlay | undefined {
+  /** Une couche de la bande (ou de l'attente) à sa place : la même fenêtre si rien n'a bougé, sinon une neuve. */
+  function layer(o: Overlay | undefined, bounds: Rect | undefined, key: string, onLoad: () => void = showBoard): Overlay | undefined {
     if (alive(o) && (!bounds || o.key !== key)) o.win.destroy();
     if (!bounds) return undefined;
     if (alive(o) && o.key === key) return o;
-    return overlay(bounds, key, () => showBoard());
+    return overlay(bounds, key, () => onLoad());
   }
 
   function send(o: Overlay, state: object, captureAs: string): void {
@@ -221,16 +244,59 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     if (alive(dmd)) send(dmd, { view: { mode: 'board', layout: 'dmd', dots: Array.from(liveBoardDots(boardView)), color: opts.dmdColor() }, rotation: 0 }, 'partie-dmd');
   }
 
+  /** La nouvelle de la partie entre amis : dans le coin du joueur, sous l'invitation si elle est là. */
+  function showLine(): void {
+    if (!lineView) return;
+    const below = alive(notice) ? GAME_NOTICE_SIZE.full.height + GAME_NOTICE_LINE.gap : 0;
+    const at = boundsFor(GAME_NOTICE_LINE, below);
+    if (!at) {
+      opts.log?.('Partie entre amis, notification pendant la partie : pas d’écran du plateau retrouvé, rien n’est montré.'); // i18n-ignore : journal
+      return;
+    }
+    rotation = at.place.rotation;
+    line = layer(line, at.bounds, JSON.stringify(at.bounds), showLine);
+    if (!alive(line)) return;
+    if (!line.loaded) return;
+    // Une capture de chaque nouvelle, à son entrée (son départ a le même nom : pas de seconde).
+    send(line, { view: { ...lineView, mode: 'line' }, rotation }, `nouvelle-${lineView.id}`);
+  }
+
+  function closeLine(): void {
+    lineView = undefined;
+    if (alive(line)) line.win.destroy();
+    line = undefined;
+  }
+
+  /** L'attente du départ commun, sur le plateau : la carte à sa place (une ligne par joueur), à jour. */
+  function showWait(): void {
+    if (!waitView) return;
+    const place = opts.place();
+    const bounds = place ? liveWaitBounds(place.zone, place.rotation, waitView.rows.length) : undefined;
+    if (!bounds && !waitCard) opts.log?.('Départ commun : pas d’écran du plateau retrouvé, l’attente n’est pas montrée sur la table.'); // i18n-ignore : journal
+    waitCard = layer(waitCard, bounds, JSON.stringify(['attente', bounds, place?.rotation]), showWait);
+    if (alive(waitCard) && place) send(waitCard, { view: waitView, rotation: place.rotation }, waitView.go ? 'depart-partez' : 'depart-attente');
+  }
+
+  function closeWait(): void {
+    waitView = undefined;
+    if (alive(waitCard)) waitCard.win.destroy();
+    waitCard = undefined;
+  }
+
   function closeNotice(): void {
     if (ticker) clearInterval(ticker);
     ticker = undefined;
     shown = undefined;
     if (alive(notice)) notice.win.destroy();
     notice = undefined;
+    // La nouvelle de la partie entre amis remonte à sa place.
+    if (lineView) showLine();
   }
 
   function close(): void {
+    closeLine();
     closeNotice();
+    closeWait();
     if (boardTicker) clearInterval(boardTicker);
     boardTicker = undefined;
     boardView = undefined;
@@ -247,10 +313,21 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
       if (!open()) return;
       opts.log?.(`Invitation pendant la partie : ${invite.host.name}, ${invite.title}.`); // i18n-ignore : journal
       refresh();
+      // La nouvelle de la partie entre amis passe sous l'invitation.
+      if (lineView) showLine();
       if (!ticker) {
         ticker = setInterval(refresh, TICK_MS);
         ticker.unref?.();
       }
+    },
+    wait(view) {
+      if (!view) {
+        if (waitView || waitCard) closeWait();
+        return;
+      }
+      if (!waitView) closeNotice();
+      waitView = view;
+      showWait();
     },
     board(view) {
       if (!view) {
@@ -264,6 +341,13 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
         boardTicker = setInterval(showBoard, BOARD_TICK_MS);
         boardTicker.unref?.();
       }
+    },
+    line(view) {
+      if (!view) return closeLine();
+      if (JSON.stringify(view) === JSON.stringify(lineView) && alive(line)) return;
+      if (!lineView || view.id !== lineView.id) opts.log?.(`Partie entre amis, notification pendant la partie : « ${view.title} »${view.detail ? ` (${view.detail})` : ''}.`); // i18n-ignore : journal
+      lineView = view;
+      showLine();
     },
     close,
   };

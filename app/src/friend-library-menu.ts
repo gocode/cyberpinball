@@ -35,6 +35,7 @@ import {
   rightsAttestation,
   attestedTableFiles,
   librarySize,
+  liveCandidate,
   MANAGED_MEDIA_TYPES,
   matchLibrary,
   mediaTypeInfo,
@@ -50,6 +51,7 @@ import {
   type InstalledPart,
   type LibraryMatch,
   type LibraryMedia,
+  type LiveFriendTables,
   type MediaOriginDraft,
   type MediaType,
   type TableContents,
@@ -105,8 +107,11 @@ export interface FriendLibraryMenu {
   open(key: string, back: () => void): void;
   /** Ce que la fiche de l'ami dit de sa bibliothèque. */
   detail(key: string): string;
-  /** Sa bibliothèque connue a cette table (pour mettre en tête le choix d'une partie en direct). */
-  has(key: string, table: TableEntry): boolean;
+  /**
+   * Ses tables pour choisir celle d'une partie en direct (livechoice.ts) : le jeu, la taille du
+   * .vpx, et la version stricte de celles qui peuvent être les miennes, demandée à sa borne.
+   */
+  liveView(key: string): LiveFriendTables;
   /** Le même jeu dans sa bibliothèque (une invitation sur une table qu'on n'a pas) ; sinon sa bibliothèque. */
   /** La table de l'ami qui correspond ; `want` : quand on a déjà le jeu, ses parties à prendre, cochées d'office. */
   openMatching(key: string, identity: TableIdentity, back: () => void, want?: readonly GamePart[]): void;
@@ -142,6 +147,22 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       ownedTypes.set(table.file, known);
     }
     return known.types.has(type);
+  };
+  // Taille du .vpx de mes tables, relue au plus toutes les 5 s (comme leurs médias).
+  const sizes = new Map<string, { at: number; bytes: number | undefined }>();
+  const sizeOf = (file: string) => {
+    let known = sizes.get(file);
+    if (!known || Date.now() - known.at > 5000) {
+      let bytes: number | undefined;
+      try {
+        bytes = fs.statSync(file).size;
+      } catch {
+        bytes = undefined;
+      }
+      known = { at: Date.now(), bytes };
+      sizes.set(file, known);
+    }
+    return known.bytes;
   };
   const titleOf = (id: TableIdentity) => (id.manufacturer && id.year ? `${id.title} (${id.manufacturer} ${id.year})` : id.title);
   const ready = (key: string): FriendLibrary | undefined => {
@@ -627,11 +648,27 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       if (want?.length && matchOf(key, entry.id)?.mine) return openParts(key, entry.id, () => openTable(key, entry.id, back), want);
       openTable(key, entry.id, back);
     },
-    has(key, table) {
-      const library = ready(key);
-      if (!library) return false;
-      const id = tableIdentity(table, host.romsOf?.(table) ?? []);
-      return matchLibrary(library, [{ table, identity: id }]).some((m) => m.mine);
+    liveView(key) {
+      const name = friendName(key);
+      const s = content.library(key);
+      if (s.state !== 'ready') return { key, name, library: s.state, tables: [] };
+      const theirs = s.library.tables;
+      const plain = theirs.map((x) => ({ table: x.table, ...(x.bytes ? { bytes: x.bytes } : {}) }));
+      // Une borne d'avant le 31/10/2026 ne donne pas ses versions : ses tables, sans jugement de version.
+      if (!s.library.versions) return { key, name, library: 'old', tables: plain };
+      // Les versions seulement des tables qui peuvent être les miennes : sa borne ne lit que celles-là.
+      const own = mine().map((m) => ({ identity: m.identity, ...(sizeOf(m.table.file) ? { bytes: sizeOf(m.table.file)! } : {}) }));
+      const wanted = theirs.filter((x) => own.some((m) => liveCandidate(m, x)));
+      const known = content.tableVersions(key, wanted.map((x) => x.id));
+      return {
+        key,
+        name,
+        library: 'ready',
+        tables: theirs.map((x, i) => {
+          const v = known.get(x.id);
+          return { ...plain[i]!, ...(v === 'pending' ? { pending: true } : v ? { ...(v.print ? { print: v.print } : {}), ...(v.script ? { script: v.script } : {}) } : {}) };
+        }),
+      };
     },
   };
 }

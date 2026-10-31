@@ -100,7 +100,8 @@ function Get-Etapes([string]$Nom, $l) {
   }
   if ($Nom -eq 'partie') {
     # Le menu des tables, puis l'invitation de Bruno (six secondes après l'amitié), ouverte d'elle-même ;
-    # Bruno donne le départ peu après l'acceptation ; la partie simulée dure dix secondes. Puis
+    # Bruno donne le départ peu après l'acceptation ; sa table charge six secondes (la borne l'attend :
+    # départ commun), puis la partie simulée dure dix secondes. Puis
     # l'historique des parties (la partie jouée en tête, le curseur dessus) et son détail.
     return @(
       'wait:1500', 'wait:9000', 'wait:1000',
@@ -165,7 +166,7 @@ try {
         if (Test-Path $env:CYBERPINBALL_CAPTURE) { Remove-Item -Recurse -Force $env:CYBERPINBALL_CAPTURE }
         Push-Location $wt
         try { $log = & $electron app 2>&1 | ForEach-Object { "$_" } } finally { Pop-Location }
-        $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Réseau|Partie en direct|Invitation pendant la partie|Bande de la partie|Bibliothèque partagée|Téléchargements)' } | ForEach-Object { Write-Host "   $_" }
+        $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Réseau|Partie en direct|Invitation pendant la partie|Bande de la partie|Départ commun|Bibliothèque partagée|Téléchargements)' } | ForEach-Object { Write-Host "   $_" }
         $id = "$nom/$jeu/$langue"
         if ($log -match 'Autopilote : (aucun|phase)') { $failures += "$id : une étape rejouée n'a pas trouvé son écran ou sa phase" }
         if ($log -match 'Traduction manquante') { $failures += "$id : texte sans traduction" }
@@ -198,6 +199,9 @@ try {
             foreach ($c in $bande.Captures) { if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\$c.png")) { $failures += "$id : pas de capture $c" } }
           }
           if ($log -match 'Bande de la partie entre amis( \(DMD\))? : (?!mise en page conforme)') { $failures += "$id : mise en page de la bande de la partie" }
+          # Le départ commun : la borne prête attend Bruno (six secondes de chargement), la carte de l'attente sur le plateau.
+          if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\depart-attente-commun.png")) { $failures += "$id : pas de capture de l'attente du départ commun" }
+          if ($log -match 'Départ commun \((attente|partez)\) : (?!mise en page conforme)') { $failures += "$id : mise en page de l'attente du départ commun" }
         }
         if ($nom -eq 'en-jeu') {
           foreach ($etat in 'full', 'compact') {

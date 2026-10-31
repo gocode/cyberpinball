@@ -201,10 +201,10 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         label: v.notices === 'all' ? t('Notifications du menu : affichées') : v.notices === 'count' ? t('Notifications du menu : compteur seul') : t('Notifications du menu : coupées'),
         detail:
           v.notices === 'all'
-            ? t('Nombre d’amis en ligne, et un message discret quand un ami se connecte, une demande arrive, un téléchargement finit ; jamais pendant une partie (Start : compteur seul)')
+            ? t('Nombre d’amis en ligne, et un message discret quand un ami se connecte, une demande arrive, un téléchargement finit ; pendant une partie, seulement les nouvelles d’une partie entre amis (Start : compteur seul)')
             : v.notices === 'count'
-              ? t('Le nombre d’amis en ligne, sans message (Start : rien)')
-              : t('Ni compteur ni message ; la pastille des téléchargements reste (Start : tout afficher)'),
+              ? t('Le nombre d’amis en ligne ; seulement les nouvelles d’une partie entre amis (Start : rien)')
+              : t('Ni compteur ni message, sauf les nouvelles d’une partie entre amis ; la pastille des téléchargements reste (Start : tout afficher)'),
         icon: 'bell',
         run: () => set({ notices: NOTICES_MODES[(NOTICES_MODES.indexOf(v.notices) + 1) % NOTICES_MODES.length]! }),
       },

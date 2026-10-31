@@ -53,6 +53,11 @@ export interface LibraryTable {
   table: TableIdentity;
   /** Ce qui distingue cette version (« VPW 1.2 »), d'après le nom du fichier. */
   version?: string;
+  /**
+   * Taille du .vpx, en octets : avec le jeu, ce qui désigne les tables dont la version stricte
+   * se demande avant une partie en direct (livechoice.ts) ; le même fichier peut porter un autre nom.
+   */
+  bytes?: number;
   medias: LibraryMedia[];
 }
 
@@ -60,7 +65,22 @@ export interface FriendLibrary {
   /** Relevée le (ISO). */
   at: string;
   tables: LibraryTable[];
+  /**
+   * Sa borne donne la version stricte de ses tables (table-versions-get) ; absent : une borne
+   * d'avant le 31/10/2026, dont on ne sait pas juger les versions avant l'invitation.
+   */
+  versions?: true;
 }
+
+/** Version stricte d'une table de sa bibliothèque : empreintes SHA-256 du .vpx et du script joué (livegame.ts, LiveTable). */
+export interface LibraryVersion {
+  id: string;
+  print?: string;
+  script?: string;
+}
+
+/** Tables dont la version se demande en un message. */
+export const LIBRARY_VERSIONS_ASK = 200;
 
 /** Fichier que désigne un identifiant de ma bibliothèque. */
 export interface SharedFile {
@@ -79,7 +99,7 @@ const isOpaque = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f
  */
 export function buildLibrary(
   tables: readonly TableEntry[],
-  opts: { root: string; romsOf?: (table: TableEntry) => readonly string[]; size: (file: string) => number | undefined; now?: Date },
+  opts: { root: string; romsOf?: (table: TableEntry) => readonly string[]; size: (file: string) => number | undefined; now?: Date; versions?: boolean },
 ): { library: FriendLibrary; files: Map<string, SharedFile> } {
   const files = new Map<string, SharedFile>();
   const out: LibraryTable[] = [];
@@ -100,9 +120,10 @@ export function buildLibrary(
         medias.push({ id, type, kind, format, bytes, ...(i > 0 ? { page: i + 1 } : {}) });
       });
     }
-    out.push({ id: tableId, table: tableIdentity(table, opts.romsOf?.(table) ?? []), ...(table.version ? { version: table.version.slice(0, 60) } : {}), medias });
+    const bytes = opts.size(table.file);
+    out.push({ id: tableId, table: tableIdentity(table, opts.romsOf?.(table) ?? []), ...(table.version ? { version: table.version.slice(0, 60) } : {}), ...(bytes ? { bytes } : {}), medias });
   }
-  return { library: { at: (opts.now ?? new Date()).toISOString(), tables: out }, files };
+  return { library: { at: (opts.now ?? new Date()).toISOString(), tables: out, ...(opts.versions ? { versions: true as const } : {}) }, files };
 }
 
 /** Une table reçue d'un ami, vérifiée ; undefined : ignorée. Les médias douteux sont retirés, pas la table. */
@@ -113,7 +134,8 @@ export function parseLibraryTable(raw: unknown): LibraryTable | undefined {
   if (!isOpaque(r.id) || !table || !table.title) return undefined;
   const version = typeof r.version === 'string' && r.version.length <= 60 && !/[\x00-\x1f\x7f]/.test(r.version) ? r.version : undefined;
   const medias = (Array.isArray(r.medias) ? r.medias.slice(0, LIBRARY_MAX_MEDIAS) : []).map(parseLibraryMedia).filter((m): m is LibraryMedia => !!m);
-  return { id: r.id, table, ...(version ? { version } : {}), medias };
+  const bytes = typeof r.bytes === 'number' && Number.isSafeInteger(r.bytes) && r.bytes > 0 ? r.bytes : undefined;
+  return { id: r.id, table, ...(version ? { version } : {}), ...(bytes ? { bytes } : {}), medias };
 }
 
 function parseLibraryMedia(raw: unknown): LibraryMedia | undefined {
@@ -306,8 +328,15 @@ export function attestedTableFiles(files: readonly TableFile[], attested: Readon
 
 export type LibraryMessage =
   | { t: 'library-get' }
-  /** Une part de la bibliothèque (`part` de 0 à `parts` - 1). */
-  | { t: 'library'; at: string; part: number; parts: number; tables: LibraryTable[] }
+  /** Une part de la bibliothèque (`part` de 0 à `parts` - 1) ; `versions` : FriendLibrary. */
+  | { t: 'library'; at: string; part: number; parts: number; tables: LibraryTable[]; versions?: true }
+  /**
+   * La version stricte de ces tables (identifiants de sa bibliothèque), avant une partie en direct ;
+   * une borne d'avant le 31/10/2026 ne répond pas (sa bibliothèque n'annonce pas `versions`).
+   */
+  | { t: 'table-versions-get'; tables: string[] }
+  /** Leurs versions, à mesure qu'elles se calculent ; sans empreinte : illisible chez lui. */
+  | { t: 'table-versions'; versions: LibraryVersion[] }
   /** Bibliothèque pas partagée (ou demandeur qui n'est pas un ami). */
   | { t: 'library-off' }
   /** Les fichiers d'une table, par paquets de TABLE_FILES_CHUNK. */
@@ -326,6 +355,7 @@ export type LibraryMessage =
   | { t: 'file-end'; req: number; sha256: string }
   | { t: 'file-cancel'; req: number };
 
+const isSha = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]{64}$/.test(v);
 const isReq = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v > 0 && v < 2 ** 31;
 const isCount = (v: unknown, max: number): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && v <= max;
 
@@ -340,7 +370,19 @@ export function parseLibraryMessage(m: Record<string, unknown>): LibraryMessage 
       if (typeof parts !== 'number' || !Number.isInteger(parts) || parts < 1 || parts > Math.ceil(LIBRARY_MAX_TABLES / LIBRARY_PART_TABLES)) return undefined;
       if (typeof part !== 'number' || !Number.isInteger(part) || part < 0 || part >= parts) return undefined;
       if (typeof m.at !== 'string' || m.at.length > 40 || Number.isNaN(Date.parse(m.at)) || !Array.isArray(m.tables)) return undefined;
-      return { t: 'library', at: m.at, part, parts, tables: m.tables.slice(0, LIBRARY_PART_TABLES).map(parseLibraryTable).filter((x): x is LibraryTable => !!x) };
+      return { t: 'library', at: m.at, part, parts, tables: m.tables.slice(0, LIBRARY_PART_TABLES).map(parseLibraryTable).filter((x): x is LibraryTable => !!x), ...(m.versions === true ? { versions: true as const } : {}) };
+    }
+    case 'table-versions-get':
+      return Array.isArray(m.tables) && m.tables.length <= LIBRARY_VERSIONS_ASK && m.tables.every(isOpaque) ? { t: 'table-versions-get', tables: [...new Set(m.tables)] } : undefined;
+    case 'table-versions': {
+      if (!Array.isArray(m.versions) || m.versions.length > LIBRARY_VERSIONS_ASK) return undefined;
+      const versions: LibraryVersion[] = [];
+      for (const raw of m.versions as unknown[]) {
+        const v = (raw ?? {}) as Record<string, unknown>;
+        if (!isOpaque(v.id)) return undefined;
+        versions.push({ id: v.id, ...(isSha(v.print) ? { print: v.print } : {}), ...(isSha(v.script) ? { script: v.script } : {}) });
+      }
+      return { t: 'table-versions', versions };
     }
     case 'table-files-get':
       return isReq(m.req) && isOpaque(m.table) ? { t: 'table-files-get', req: m.req, table: m.table } : undefined;
@@ -380,7 +422,7 @@ export function fileId(file: string): string {
 /** Ma bibliothèque en messages, `LIBRARY_PART_TABLES` tables chacun (une bibliothèque vide : un message vide). */
 export function libraryMessages(library: FriendLibrary): Extract<LibraryMessage, { t: 'library' }>[] {
   const parts = Math.max(1, Math.ceil(library.tables.length / LIBRARY_PART_TABLES));
-  return Array.from({ length: parts }, (_, part) => ({ t: 'library' as const, at: library.at, part, parts, tables: library.tables.slice(part * LIBRARY_PART_TABLES, (part + 1) * LIBRARY_PART_TABLES) }));
+  return Array.from({ length: parts }, (_, part) => ({ t: 'library' as const, at: library.at, part, parts, tables: library.tables.slice(part * LIBRARY_PART_TABLES, (part + 1) * LIBRARY_PART_TABLES), ...(library.versions ? { versions: true as const } : {}) }));
 }
 
 /** Morceau de fichier : le numéro de la demande sur 4 octets, puis les données. */

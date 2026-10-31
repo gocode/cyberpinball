@@ -31,6 +31,7 @@ import {
   FILE_CHUNK,
   fileId,
   isSafeTableRel,
+  LIBRARY_VERSIONS_ASK,
   libraryMessages,
   readChunkFrame,
   shareableTableFiles,
@@ -41,6 +42,7 @@ import {
   type GamePart,
   type LibraryMedia,
   type LibraryMessage,
+  type LibraryVersion,
   type SharedFile,
   type TableContents,
   type TableEntry,
@@ -61,6 +63,11 @@ export interface FriendContentOptions {
   onChange?(): void;
   /** Ce fichier ou dossier appartient à un téléchargement de la file : le ménage du démarrage l'épargne. */
   keep?(file: string): boolean;
+  /**
+   * Version stricte d'une de mes tables (empreintes du .vpx et du script, live-game.ts) : donnée
+   * aux amis qui la demandent avant une partie en direct ; sans elle, ma bibliothèque ne l'annonce pas.
+   */
+  versionOf?(table: TableEntry): Promise<{ print?: string; script?: string }>;
   log?(line: string): void;
 }
 
@@ -109,6 +116,11 @@ export interface FriendContent {
   library(key: string): FriendLibraryState;
   /** Redemande sa bibliothèque. */
   refresh(key: string): void;
+  /**
+   * Version stricte de ces tables de sa bibliothèque : celles déjà reçues, `pending` pour celles
+   * demandées à sa borne (au premier appel, puis de nouveau sans réponse) ; onChange à leur arrivée.
+   */
+  tableVersions(key: string, ids: readonly string[]): Map<string, LibraryVersion | 'pending'>;
   /** Prend ces médias d'une de ses tables, l'un après l'autre ; `signal` : « Annuler » à l'écran. */
   fetch(key: string, tableId: string, medias: readonly LibraryMedia[], progress?: (p: FetchProgress) => void, signal?: AbortSignal): Promise<FetchResult>;
   /** Les fichiers d'une de ses tables, partie par partie. */
@@ -130,6 +142,8 @@ export interface FriendContent {
 
 /** Bibliothèque d'un ami redemandée après ce délai. */
 const LIBRARY_STALE_MS = 2 * 60_000;
+/** Version d'une table demandée et restée sans réponse : redemandée après ce délai. */
+const VERSION_RETRY_MS = 30_000;
 /** Ma bibliothèque relue au plus une fois par ce délai. */
 const OWN_LIBRARY_MS = 30_000;
 /** Sans en-tête ou sans morceau pendant ce délai, la demande échoue. */
@@ -176,6 +190,13 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
   const listings = new Map<number, { key: string; chunks: Map<number, TableFile[]>; done(r: TableFile[] | FetchFailure): void; timer: NodeJS.Timeout }>();
   let nextReq = 1;
   const changed = () => opts.onChange?.();
+  /**
+   * Versions strictes des tables de chaque ami : reçue (`version`), demandée (`asked`, horloge
+   * locale), à redemander (`stale` : sa bibliothèque est revenue, la version reçue reste montrée).
+   */
+  const versions = new Map<string, Map<string, { version?: LibraryVersion; asked?: number; stale?: boolean }>>();
+  /** Mes versions demandées par un ami : calculées l'une après l'autre, une file par ami. */
+  const versionQueues = new Map<string, Promise<void>>();
 
   clean(dir, opts.keep);
   clean(tablesDir, opts.keep);
@@ -187,7 +208,7 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     const root = opts.root();
     const tables = opts.tables();
     const built = root
-      ? buildLibrary(tables, { root, ...(opts.romsOf ? { romsOf: opts.romsOf } : {}), size: (file) => fileSize(file) })
+      ? buildLibrary(tables, { root, ...(opts.romsOf ? { romsOf: opts.romsOf } : {}), size: (file) => fileSize(file), versions: !!opts.versionOf })
       : { library: { at: new Date().toISOString(), tables: [] }, files: new Map<string, SharedFile>() };
     own = { at: Date.now(), ...built, byId: new Map(tables.map((t, i) => [built.library.tables[i]?.id ?? '', t])) };
     return own;
@@ -273,6 +294,32 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     for (const message of tableFilesMessages(req, files)) net.send(key, message);
   }
 
+  /**
+   * Un ami demande la version stricte de mes tables avant de m'inviter : chacune part dès qu'elle
+   * est connue (une empreinte se calcule une fois par fichier, gardée ensuite).
+   */
+  function serveVersions(key: string, ids: readonly string[]): void {
+    const versionOf = opts.versionOf;
+    if (!versionOf || !net.state().shareLibrary) return;
+    const run = async () => {
+      for (const id of ids) {
+        const table = ownLibrary().byId.get(id);
+        let version: { print?: string; script?: string } = {};
+        try {
+          if (table) version = await versionOf(table);
+        } catch {
+          // Illisible : sans empreinte, l'ami ne la compte pas comme la même version.
+        }
+        if (!net.send(key, { t: 'table-versions', versions: [{ id, ...version }] })) return;
+      }
+    };
+    const queued = (versionQueues.get(key) ?? Promise.resolve()).then(run, run);
+    versionQueues.set(key, queued);
+    void queued.finally(() => {
+      if (versionQueues.get(key) === queued) versionQueues.delete(key);
+    });
+  }
+
   // ---------- Bibliothèques et fichiers de mes amis ----------
 
   function onLibraryPart(key: string, part: Extract<LibraryMessage, { t: 'library' }>): void {
@@ -282,9 +329,12 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     entry.parts.set(part.part, part);
     if (entry.parts.size < part.parts) return;
     const parts = [...entry.parts.values()].sort((a, b) => a.part - b.part);
-    entry.last = { at: part.at, tables: parts.flatMap((p) => p.tables) };
+    entry.last = { at: part.at, tables: parts.flatMap((p) => p.tables), ...(parts.every((p) => p.versions) ? { versions: true as const } : {}) };
     entry.state = { state: 'ready', library: entry.last };
     entry.parts = undefined;
+    // Une bibliothèque neuve : une table a pu changer de fichier sous le même chemin, ses versions se
+    // redemandent ; celles reçues restent montrées jusqu'à la réponse (un écran ouvert ne clignote pas).
+    for (const v of versions.get(key)?.values() ?? []) v.stale = true;
     changed();
   }
 
@@ -415,6 +465,15 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
           return onLibraryPart(key, message);
         case 'table-files-get':
           return serveTableFiles(key, message.req, message.table);
+        case 'table-versions-get':
+          return serveVersions(key, message.tables);
+        case 'table-versions': {
+          const known = versions.get(key);
+          if (!known) return;
+          for (const v of message.versions) if (known.has(v.id)) known.set(v.id, { version: v });
+          changed();
+          return;
+        }
         case 'table-files':
           return onTableFiles(key, message);
         case 'file-get':
@@ -516,6 +575,23 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
       const now = libraries.get(key)!;
       // Redemandée : l'ancienne reste montrée jusqu'à l'arrivée de la nouvelle (un écran ouvert ne se vide pas).
       return now.state.state === 'loading' && now.last ? { state: 'ready', library: now.last } : now.state;
+    },
+    tableVersions(key, ids) {
+      const known = versions.get(key) ?? new Map<string, { version?: LibraryVersion; asked?: number; stale?: boolean }>();
+      versions.set(key, known);
+      const now = Date.now();
+      const ask = ids.filter((id) => {
+        const v = known.get(id);
+        if (!v) return true;
+        if (v.asked !== undefined) return now - v.asked > VERSION_RETRY_MS;
+        return !!v.stale;
+      });
+      for (let i = 0; i < ask.length; i += LIBRARY_VERSIONS_ASK) {
+        const tables = ask.slice(i, i + LIBRARY_VERSIONS_ASK);
+        if (!net.send(key, { t: 'table-versions-get', tables })) break;
+        for (const id of tables) known.set(id, { ...known.get(id), asked: now, stale: false });
+      }
+      return new Map(ids.map((id) => [id, known.get(id)?.version ?? 'pending'] as const));
     },
     refresh(key) {
       const last = libraries.get(key)?.last;

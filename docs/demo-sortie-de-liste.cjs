@@ -299,6 +299,7 @@ async function scenario(sc, box, report, log) {
     content: {
       library: () => ({ state: 'ready', library: { at: new Date().toISOString(), tables: friendTables } }),
       refresh() {},
+      tableVersions: () => new Map(),
       fetch: async (_key, _id, medias) => ({ received: [], failed: medias.map((media) => ({ media, reason: 'offline' })) }),
       tableFiles: async () => 'offline',
       fetchTable: async (_key, _id, folder, files) => ({ dir: path.join(L.data, 'reçu', folder), received: [], failed: files.map((file) => ({ file, reason: 'offline' })) }),

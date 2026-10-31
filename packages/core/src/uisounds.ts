@@ -14,7 +14,7 @@ import type { MenuMediaSettings } from './mediaview';
 import type { MenuMoment } from './menumoments';
 import { playVolume } from './menumoments';
 
-export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil', 'invite'] as const;
+export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil', 'invite', 'news'] as const;
 export type UiSoundId = (typeof UI_SOUND_IDS)[number];
 
 export interface UiSoundSpec {
@@ -93,6 +93,16 @@ export const UI_SOUNDS: Readonly<Record<UiSoundId, UiSoundSpec>> = {
     source: SYNTH_SOURCE,
     license: OWN_LICENSE,
     call: true,
+  },
+  news: {
+    get label() {
+      return t('Tintement de la partie entre amis');
+    },
+    get when() {
+      return t('Une nouvelle de la partie entre amis au menu : un invité accepte ou décline, la partie est finie');
+    },
+    source: SYNTH_SOURCE,
+    license: OWN_LICENSE,
   },
 };
 

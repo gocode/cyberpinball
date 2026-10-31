@@ -1185,6 +1185,26 @@ html.menu-desktop .status-corner {
   flex-wrap: nowrap;
 }
 
+/*
+ * Menu système (une nouvelle de la partie entre amis, seule) : sur la ligne de la roue dentée, à
+ * droite de la marque (36 cqmin, comme au bureau), en borne comme au bureau, à la hauteur de la
+ * roue (0,4 cqmin) et un peu moins haute (58 px) : l'en-tête de l'écran commence dessous
+ * (library.css, .lib : 6 cqmin de marge en haut).
+ */
+.status-corner.over-library {
+  top: 0.4cqmin;
+  left: 36cqmin;
+  flex-wrap: nowrap;
+}
+
+.status-corner.over-library .notice-line {
+  flex: 1 1 auto;
+}
+
+.status-corner.over-library .notice-toast {
+  height: 5.4cqmin;
+}
+
 /* La ligne de la notification : toute la largeur en borne (elle passe à la ligne), sa place au bureau. */
 .notice-line {
   display: flex;

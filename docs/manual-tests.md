@@ -1169,6 +1169,47 @@ A table whose script calls `vpmInit` twice: *Back to the Future (Data East 1990)
 | 609 | The details screen says so | Table details > files. | "Script adapté : vpmInit exécuté une seule fois" (Adapted script: vpmInit run only once); the `.vbs` is "script de la table adapté par Cyber Pinball : vpmInit exécuté une seule fois" (table script adapted by Cyber Pinball: vpmInit run only once), never "remplace le script écrit dans la table" (replaces the script written in the table). |
 | 610 | Another cabinet | On the PinCab, after the prerelease: install Back to the Future (or keep it if it is already there), then launch it. | As 607, from the first game. |
 
+## Choosing the table of a live game
+
+Three friend cabinets on the real network: A (the one inviting), B and C, up to date; A has four tables: T2 that B and C have identically, Fish Tales that B has in another version, Medieval Madness that B does not have, and a fourth that only C has. The unattended proof: `packages/core/src/test/tables-compatibles.test.ts` (the order, the reasons, the same judgement as at acceptance for every combination, the messages, two cabinets linked in memory), `packages/core/src/test/friends-menu.test.ts` (the screen with two friends) and the demonstration `.\docs\demo-tables-compatibles.ps1`; the manual: "Choosing the table of a live game".
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 611 | One friend, their tables first | On A: System menu > Friends > "Mes amis" (My friends) > B > "Inviter à une partie en direct" (Invite to a live game). | First "Même version chez tous" (Same version for everyone): T2, "Même version chez B" (Same version at B's). Then "Indisponibles" (Unavailable), greyed out: Fish Tales "Autre version chez B · Start : récupérer sa version chez B" (Other version at B's · Start: get B's version), then Medieval Madness "B n'a pas cette table" (B does not have this table). On the first pass, a row may say "Version de B en cours de vérification…" (Checking B's version…) for a few seconds, then moves into place by itself. |
+| 612 | Their version, to get | Start on Fish Tales. | The parts of their table in their shared library, the table ticked by default. Back returns to the choice. |
+| 613 | A missing table | Start on Medieval Madness. | Nothing opens, no invitation is sent. |
+| 614 | Two guests | Invite B on T2, then in the room "Changer de table" (Change table). | The screen is titled "Partie en direct avec B, C" (Live game with B, C) if C is invited too ("Inviter un autre ami", Invite another friend, first); a table is at the top only if B and C both have it identically; each greyed-out table names who blocks ("B n'a pas cette table", "Autre version chez B"). Choose T2: B and C get a new invitation. |
+| 615 | An older cabinet | C on 0.1.5-essai.20 or older: invite them from A. | Their tables go to "À vérifier" (To be checked), "Bibliothèque de C inconnue (ancienne version de Cyber Pinball)" (C's library unknown, older version of Cyber Pinball), and can be chosen; the invitation is sent, the check at acceptance decides as before. |
+| 616 | Library not shared | On B: "Partage et réseau" (Sharing and network) > "Ne plus partager ma bibliothèque" (Stop sharing my library); on A, invite B. | All tables "À vérifier", "Bibliothèque de B inconnue (il ne la partage pas)" (B's library unknown, not shared); nothing is refused outright. |
+
+## Game with friends news
+
+Two or three cabinets A, B and C, friends, with the same version of a table, plus another table on A. The proof without an operator: `packages/core/src/test/notifications-partie.test.ts` and `.\docs\demo-notifications-partie.ps1` (the banners drawn on the tables menu, in the system menu and over VPX); the manual: "Game with friends" in "Tables menu notifications", and "Game news".
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 617 | A guest accepts, you left the room | A invites B, then "Retour" (Back) down to the tables menu; B accepts. | On A, within a second or two, top right: "B a accepté votre invitation" (B accepted your invitation), "Pour lancer : Menu système > Amis > Mes amis" (To start: System menu > Friends > My friends), green edge, a discreet ding. It stays about ten seconds. A click opens it on the room; with the buttons, System menu > Friends > "Mes amis" (My friends) has "Partie en direct" (Live game) at the top. |
+| 618 | Two answers together, in the system menu | A invites B and C, then opens System menu > Médias (Media); B and C accept almost at the same time. | A single notification, on the gear's line: "B et C ont accepté" (B and C accepted). Nothing overlaps, the screen's header stays readable. |
+| 619 | A refusal, with its reason | A invites C, who does not have the table (or declines, or does not answer for two minutes). | On A: "C a décliné votre invitation" (C declined your invitation) · "N'a pas cette table" (Does not have this table) ("Pas de réponse de C", No answer from C, if they did not answer), blue edge. |
+| 620 | On the game's screen, nothing more | A stays on the room; B accepts. | The room says "Prêt" (Ready) for B; no notification on top, and nothing comes back when leaving the room. |
+| 621 | Finish before the others, play another table | A, B and C start the game; A finishes quickly, closes the results, starts another table; B and C finish afterwards. | During A's game, in the playfield's top-left corner for the player, over VPX: "Partie entre amis : B gagne" (Game with friends: B wins), "Résultats : Menu système > Amis · vous : place 2 sur 3" (Results: System menu > Friends · you: rank 2 of 3) (or "vous gagnez !", you win!), without taking focus from VPX and without sound. When VPX closes, the results open by themselves. |
+| 622 | Notifications off | System menu > Médias (Media) > "Médias, son et attente" (Media, sound and attract) > "Notifications du menu : coupées" (Menu notifications: off); redo 617. | The friends pill is gone, but "B a accepté votre invitation" still shows. |
+
+## Shared start of a game with friends
+
+Two friend cabinets, A and B, on the real network, each with the same table; B the slower one to load (the cabinet, a PuP-Pack). The unattended proof: `packages/core/src/test/depart-commun.test.ts` (the state machine, two cabinets on a test network, the state reader run by cscript: nothing starts before the “go” file) and the bench `.\docs\demo-depart-commun.ps1` (the waiting card at each place); the manual: “Live game”, the shared start.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 623 | Waiting for the other | A invites B on The Matrix, then starts the game; touch nothing. | On A, once the table has loaded: in the middle of the playfield, “Waiting for players”, “Waiting for B — Loading table…”, A ticked green “Ready”, and “Starting without B in … s if their table is not ready”. On B while loading: “Your table is loading…”. As soon as B’s table is ready: “Go!” on both tables within a few tenths of a second, then credit and Start on each; the game strip takes over. |
+| 624 | Start while waiting | While waiting, on A, press Start and the coin door. | Nothing starts, no credit is inserted; A’s game only starts with “Go!”. |
+| 625 | The log | After the game, open `data\logs\journal.txt` on A (the host) and on B. | On each: “ma table est prête”, then “« partez » posé pour le relevé”; on A, in between, “« partez » donné (tous prêts)”. |
+| 626 | Player who quits | Repeat 623; while waiting, on B, quit VPX (Exit). | On A, B changes to “Left the game” and, A being ready, “Go!” arrives at once. In the results, B “Left the game”. |
+| 627 | Player never ready | Repeat 623; during the countdown, close Cyber Pinball on B. | On A, the delay counts down; 90 s after A is ready: “Go!”, “Starting without B: table not ready in time, starts as soon as it is”; A’s game starts. |
+| 628 | Old cabinet | Leave B on 0.1.5-essai.20; A invites B, B accepts, A starts. | In A’s room: “Cyber Pinball 0.1.5-essai.20 on their cabinet: their table starts without waiting for the others, needs updating”. On A’s table, B “Old version: starts without waiting”: A does not wait for B. |
+| 629 | ROM tables | Repeat 623 on Terminator 2, then on Star Trek (VPX firewall rule in place). | The ROM goes into attract mode; no credit until both are ready; at “Go!”, a credit, then Start two seconds later, on each cabinet. |
+| 630 | Table without state reader | Repeat 623 on a ROM table whose map does not describe the game state. | The card says “Wait for “Go!” before pressing Start”; at the start, “Go!” and “Press Start”. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

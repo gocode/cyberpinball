@@ -13,6 +13,10 @@
 // qui accepte ; l'invité les vérifie, le dit (game-settings-ok), et les passe au lancement, qui les
 // pose dans le double de sa table.
 //
+// Départ commun (packages/core/src/livestart.ts) : chaque borne lance sa table, dit « prêt » quand
+// elle est chargée (LiveStartGate.ready), et son relevé ne met le crédit et n'appuie sur Start
+// qu'au « partez » de l'hôte (LiveStartGate.go), donné quand tous sont prêts.
+//
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
 import { createHash } from 'node:crypto';
@@ -29,6 +33,10 @@ import {
   createSettingsReceiver,
   expireInvites,
   gameStatus,
+  giveGo,
+  liveGoDue,
+  liveGuestGo,
+  liveWaitView,
   guestGame,
   inviteExpired,
   inviteToGame,
@@ -60,6 +68,7 @@ import {
   type LiveStatus,
   type LiveTable,
   type LiveTableMatch,
+  type LiveWaitView,
   type TableEntry,
 } from '@cyberpinball/core';
 import type { FriendMessage, SocialNet } from './social-net';
@@ -73,6 +82,16 @@ export interface LivePlayResult {
   score?: number;
   /** Plus d'un joueur dans la table : hors classement. */
   multi?: boolean;
+}
+
+/**
+ * Le départ commun, vu de la partie lancée (livestart.ts) : `ready`, ma table est chargée (le relevé
+ * répond, ou sans relevé : la table à l'écran) ; `go`, « partez » est donné pour ma borne : le
+ * fichier du double est à poser (vrai une fois pour toutes).
+ */
+export interface LiveStartGate {
+  ready(): void;
+  go(): boolean;
 }
 
 /** Où en est le joueur, d'après le relevé posé dans le script du double (livestate.ts). */
@@ -101,7 +120,7 @@ export interface LiveGamesOptions {
    * C'est parti : lancer la table ; `playing` quand VPX l'affiche ; `settings` : ceux de l'hôte,
    * reçus (invité) ; `board` : les records du groupe sur cette version, à poser dans le double.
    */
-  play(table: TableEntry, playing: () => void, settings?: HostSetting[], board?: GroupRecord[], progress?: (p: LiveProgress) => void): Promise<LivePlayResult | undefined>;
+  play(table: TableEntry, playing: () => void, settings?: HostSetting[], board?: GroupRecord[], progress?: (p: LiveProgress) => void, gate?: LiveStartGate): Promise<LivePlayResult | undefined>;
   onChange?(): void;
   now?(): Date;
   log?(line: string): void;
@@ -118,6 +137,12 @@ export interface LiveGames {
   history(): readonly HistoryGame[];
   /** Ma table pour la partie en cours. */
   table(): TableEntry | undefined;
+  /** Version stricte d'une de mes tables (empreintes du .vpx et du script joué), celle qu'annonce une invitation. */
+  versionOf(table: TableEntry): Promise<{ print?: string; script?: string }>;
+  /** Taille du .vpx d'une de mes tables ; undefined : illisible. */
+  bytesOf(table: TableEntry): number | undefined;
+  /** L'attente du départ commun, pendant que ma table est lancée (livestart.ts) ; `manual` : ma table n'a pas de relevé. */
+  waitView(opts?: { manual?: boolean }): LiveWaitView | undefined;
   /** Invitations reçues, sans les expirées. */
   invites(): LiveInvite[];
   /** Crée un salon sur cette table (l'empreinte du .vpx se calcule d'abord). */
@@ -163,7 +188,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   /** Invité : la réception des réglages de l'hôte, puis ces réglages, vérifiés. */
   let receiver: ReturnType<typeof createSettingsReceiver> | undefined;
   let hostSettings: HostSetting[] | undefined;
-  const prints = createPrints(path.join(opts.dataDir, 'amis', 'empreintes.json'));
+  /** Ma table lancée pour la partie `id` : quand elle a été prête (ms), « partez » reçu, partie démarrée. */
+  let running: { id: string; readyAt?: number; released: boolean; started: boolean } | undefined;
+  const strict = createTableVersions(opts.dataDir);
   // Le tableau du groupe : chaque partie finie y entre, une fois (groupboard.ts).
   const boardsFile = path.join(opts.dataDir, 'amis', 'records.json');
   let boards: GroupBoards | undefined;
@@ -208,7 +235,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   /** Celui qui invite : la salle à jour pour chaque invité relié. */
   function broadcastRoom(): void {
     if (!game || !isHost()) return;
-    const room = roomMessage(game);
+    const room = roomMessage(game, now());
     for (const p of game.players) if (!p.host && p.state !== 'declined' && p.state !== 'busy' && p.state !== 'expired') net.send(p.key, room);
   }
 
@@ -227,27 +254,86 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   }
 
   /** Mon état dans la partie : appliqué chez moi si j'invite, envoyé à celui qui invite sinon. */
-  function report(state: LiveStatus, result?: LivePlayResult, live?: LiveProgress): void {
+  function report(state: LiveStatus, result?: LivePlayResult, live?: LiveProgress, ready?: boolean): void {
     if (!game) return;
     const status = {
       state,
+      ...(ready ? { ready: true as const } : {}),
       ...(result ? { seconds: Math.round(result.seconds), records: result.records } : {}),
       ...(result?.score !== undefined ? { score: result.score } : {}),
       ...(live ? { score: live.score, ball: live.ball, ...(live.balls ? { balls: live.balls } : {}) } : {}),
       ...(result?.multi || (live && live.players > 1) ? { multi: true as const } : {}),
     };
-    if (isHost()) setGame(gameStatus(game, me().key, status, now()));
-    else {
+    if (isHost()) {
+      setGame(gameStatus(game, me().key, status, now()));
+      maybeGo();
+    } else {
       net.send(game.host, { t: 'game-status', game: game.id, ...status });
       changed();
     }
+  }
+
+  /** L'hôte : « partez », quand tous sont prêts ou que le délai des derniers est passé. */
+  function maybeGo(): void {
+    if (!game || !isHost()) return;
+    const why = liveGoDue(game, now());
+    if (!why) return;
+    const next = giveGo(game, why, now());
+    const late = next.players.filter((p) => next.goLate?.includes(p.key)).map((p) => p.name);
+    log(`Partie en direct : « partez » donné (${late.length ? `sans ${late.join(', ')}, pas prêts à temps` : 'tous prêts'}).`); // i18n-ignore : journal
+    setGame(next);
+  }
+
+  /**
+   * « Partez » pour ma borne : donné par l'hôte ; ou, invité, sans attendre un hôte d'une version
+   * sans départ commun ou resté muet ; ou la partie n'est plus (annulée : ma table n'attend pas pour
+   * rien). Ma table prête, la partie est partie de mon côté.
+   */
+  function released(): boolean {
+    const run = running;
+    if (!run || run.released) return true;
+    if (!game || game.id !== run.id || game.phase === 'cancelled') {
+      log('Partie en direct : partie annulée pendant l’attente du départ, la table part seule.'); // i18n-ignore : journal
+      run.released = true;
+      return true;
+    }
+    const guestWhy = !isHost() && run.readyAt !== undefined ? liveGuestGo(game, run.readyAt, now()) : undefined;
+    if (guestWhy) {
+      log(`Partie en direct : départ sans attendre ${guestWhy === 'host-behind' ? 'les autres, l’hôte a une version sans départ commun' : 'l’hôte, plus aucune nouvelle de lui'}.`); // i18n-ignore : journal
+      game = giveGo(game, guestWhy, now());
+      changed();
+    }
+    if (!game.goAt) return false;
+    run.released = true;
+    if (run.readyAt !== undefined) started();
+    return true;
+  }
+
+  /** Ma table prête et « partez » donné : partie de mon côté (le score arrive avec le relevé). */
+  function started(): void {
+    if (!running || running.started) return;
+    running.started = true;
+    report('playing');
   }
 
   async function run(): Promise<void> {
     launch = undefined;
     if (!game || game.phase === 'cancelled' || !mine) return;
     const id = game.id;
+    const run: NonNullable<typeof running> = { id, released: false, started: false };
+    running = run;
     report('loading');
+    const gate: LiveStartGate = {
+      ready: () => {
+        if (game?.id !== id || run.readyAt !== undefined) return;
+        run.readyAt = now().getTime();
+        log('Partie en direct : ma table est prête.'); // i18n-ignore : journal
+        if (run.released) started();
+        else report('loading', undefined, undefined, true);
+        released();
+      },
+      go: () => (running === run ? released() : true),
+    };
     // Le score et la bille partent vers les autres à chaque changement, au plus deux fois par seconde ;
     // une nouvelle bille ou un joueur en trop, tout de suite.
     let sent: LiveProgress | undefined;
@@ -259,27 +345,28 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       if (!changedBall && now().getTime() - sentAt < 500) return;
       sent = p;
       sentAt = now().getTime();
+      run.started = true;
       report('playing', undefined, p);
     };
     const result = await opts.play(
       mine,
+      // VPX montre la table : partie démarrée seulement si « partez » était déjà là (sinon, au signal).
       () => {
-        if (game?.id === id) report('playing');
+        if (game?.id === id && run.released && run.readyAt !== undefined) started();
       },
       isHost() ? undefined : hostSettings,
       boardFor(loadedBoards(), game.table),
       progress,
+      gate,
     );
+    if (running === run) running = undefined;
     if (game?.id !== id) return;
-    report(result?.ok ? 'done' : 'failed', result);
+    // Quitté pendant l'attente du départ (table prête, jamais partie) : il n'a pas joué, les autres ne l'attendent plus.
+    if (result && run.readyAt !== undefined && !run.started && result.score === undefined) report('left', result);
+    else report(result?.ok ? 'done' : 'failed', result);
   }
 
-  /** Empreinte du .vpx et du script joué d'une de mes tables. */
-  async function versionOf(table: TableEntry): Promise<{ print?: string; script?: string }> {
-    const print = await prints.of(table.file);
-    const script = scriptPrint(table.file);
-    return { ...(print ? { print } : {}), ...(script ? { script } : {}) };
-  }
+  const versionOf = (table: TableEntry) => strict.of(table);
 
   async function liveTable(table: TableEntry): Promise<LiveTable> {
     const version = await versionOf(table);
@@ -364,7 +451,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       }
       case 'game-room':
         if (game && !isHost() && key === game.host) {
-          game = applyRoom(game, m);
+          game = applyRoom(game, m, now());
           changed();
         }
         return;
@@ -376,7 +463,10 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         }
         return;
       case 'game-status':
-        if (game && isHost() && m.game === game.id) setGame(gameStatus(game, key, m, now()));
+        if (game && isHost() && m.game === game.id) {
+          setGame(gameStatus(game, key, m, now()));
+          maybeGo();
+        }
         return;
       case 'game-cancel':
         // Celui qui invite annule ; un invité, lui, quitte la partie.
@@ -398,17 +488,30 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     // Une invitation en attente : son temps restant à l'écran, une fois par seconde.
     if (invites.length) changed();
     if (!game) return;
-    if (isHost()) setGame(closeIfDone(expireInvites(game, now()), now()));
-    // Compte à rebours à l'écran : une fois par seconde.
-    if (game.phase === 'countdown') changed();
+    if (isHost()) {
+      setGame(closeIfDone(expireInvites(game, now()), now()));
+      maybeGo();
+    }
+    // Invité : un hôte resté muet se voit au fil du temps.
+    if (running && !running.released) released();
+    // Compte à rebours, et attente du départ commun (le délai des derniers) : une fois par seconde.
+    if (game?.phase === 'countdown' || waitView()) changed();
   }, TICK_MS);
   ticker.unref?.();
+
+  function waitView(opts: { manual?: boolean } = {}): LiveWaitView | undefined {
+    const run = running;
+    return game && run?.id === game.id ? liveWaitView(game, me().key, now(), { ...opts, ...(run.readyAt !== undefined ? { readyAt: run.readyAt } : {}) }) : undefined;
+  }
 
   return {
     current: () => game,
     board: () => (game ? boardFor(loadedBoards(), game.table) : []),
     history: () => loadedHistory().games,
     table: () => mine,
+    versionOf,
+    bytesOf: (table) => fileSize(table.file),
+    waitView,
     invites: () => invites.filter((i) => !inviteExpired(i, now())),
     async create(table) {
       if (game && ongoing() && !isHost()) net.send(game.host, { t: 'game-cancel', game: game.id });
@@ -503,6 +606,22 @@ function fileSize(file: string): number | undefined {
 function displayTitle(table: TableEntry): string {
   const base = table.manufacturer && table.year ? `${table.title} (${table.manufacturer} ${table.year})` : table.title;
   return base.slice(0, 160);
+}
+
+/**
+ * Version stricte des tables de cette borne : empreinte du .vpx (gardée dans
+ * <données>\amis\empreintes.json) et du script joué. La même pour l'invitation, la réponse, et la
+ * bibliothèque partagée qui la donne aux amis avant qu'ils invitent (friend-content.ts).
+ */
+export function createTableVersions(dataDir: string): { of(table: Pick<TableEntry, 'file'>): Promise<{ print?: string; script?: string }> } {
+  const prints = createPrints(path.join(dataDir, 'amis', 'empreintes.json'));
+  return {
+    async of(table) {
+      const print = await prints.of(table.file);
+      const script = scriptPrint(table.file);
+      return { ...(print ? { print } : {}), ...(script ? { script } : {}) };
+    },
+  };
 }
 
 /** Empreintes SHA-256 des .vpx, gardées par chemin, taille et date de modification. */

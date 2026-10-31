@@ -47,6 +47,15 @@
 // pas de partie d'avant à écarter, mais le départ attend toujours la table en attente.
 // Une table qui n'a ni ce socle ni cette carte n'a pas d'état en direct : la partie se joue comme
 // avant.
+//
+// Départ commun (livestart.ts, essai réel du 31/10/2026) : posé avec un fichier « partez », le
+// relevé ne donne plus le départ dès que la table est prête. Il écrit « pret=1 » dans sa ligne
+// (table à l'écran depuis trois secondes ; table à ROM en attente, comme pour le départ), puis
+// regarde à chaque tour si le fichier « partez » est apparu dans le double ; alors seulement, le
+// crédit puis Start. D'ici là, Start reste bloqué (hors partie). Un fichier plutôt qu'une touche
+// envoyée à VPX : aucune fenêtre à viser, aucun focus à prendre, rien qui puisse se perdre si VPX
+// est occupé ; le script le voit au tour suivant (un quart de seconde, une demi-seconde à ROM),
+// et le fichier reste là : un relevé plus lent, ou une table encore en chargement, le trouve aussi.
 
 import { romBallsEntry, type RomMemory } from './ballcount';
 
@@ -63,6 +72,11 @@ export interface LiveGameState {
   balls: number;
   /** Score du joueur en cours. */
   score: number;
+  /**
+   * Départ commun (relevé posé avec un fichier « partez ») : la table est prête à partir, ou partie ;
+   * absent sans départ commun.
+   */
+  ready?: boolean;
 }
 
 /** Le relevé est-il possible : le socle de script commun, et ses procédures de touches. */
@@ -213,9 +227,10 @@ function read(f: NvField): string {
  * relevé écrit (dans le double). `elements` : ceux de la table (readVpxElements). `rom` : la carte
  * de la ROM que joue la table (le jeu chargé), pour une table à ROM (romLivePlan). `inspector` :
  * l'inspector de VPX peut être activé pour cette partie, sur ce port ; il ne sert que pour les
- * valeurs hors de la NVRAM (Stern SAM), la NVRAM d'abord.
+ * valeurs hors de la NVRAM (Stern SAM), la NVRAM d'abord. `goFile` : départ commun, le crédit et
+ * Start attendent que ce fichier existe (sans : dès que la table est prête).
  */
-export function liveStateHook(script: string, elements: readonly { type: number; name: string }[], stateFile: string, rom?: RomMemory, inspector?: { port: number }): LiveHook {
+export function liveStateHook(script: string, elements: readonly { type: number; name: string }[], stateFile: string, rom?: RomMemory, inspector?: { port: number }, goFile?: string): LiveHook {
   const original = NEEDED.every((re) => re.test(script));
   let plan: RomLivePlan | undefined;
   if (!original) {
@@ -242,12 +257,12 @@ export function liveStateHook(script: string, elements: readonly { type: number;
   }
   const host = elements.find((e) => TIMER_HOSTS.includes(e.type) && /^[A-Za-z]\w*$/.test(e.name) && !words.has(e.name.toLowerCase()));
   if (!host) return { ok: false, reason: 'aucun élément libre pour le minuteur' }; // i18n-ignore : journal
-  if (/"/.test(stateFile) || /[\r\n]/.test(stateFile)) return { ok: false, reason: 'chemin du relevé invalide' }; // i18n-ignore : journal
+  if ([stateFile, goFile ?? ''].some((f) => /"/.test(f) || /[\r\n]/.test(f))) return { ok: false, reason: 'chemin du relevé invalide' }; // i18n-ignore : journal
   let text = script.replace(down[0], `${down[1]}Sub CyberPinball_OrigKeyDown(ByVal ${down[3]})`);
   if (up) text = text.replace(up[0], `${up[1]}Sub CyberPinball_OrigKeyUp(ByVal ${up[2]})`);
   const eol = /\r\n/.test(script) ? '\r\n' : '\n';
   const e = host.name;
-  const block = plan ? romBlock(plan, e, table, !!up, stateFile, inspector?.port) : scriptBlock(e, table, !!up, stateFile);
+  const block = plan ? romBlock(plan, e, table, !!up, stateFile, inspector?.port, goFile) : scriptBlock(e, table, !!up, stateFile, goFile);
   return { ok: true, script: text.replace(/\s*$/, '') + eol + block.join(eol), element: e, table, source: plan ? 'rom' : 'script', inspector: plan?.states ?? [] };
 }
 
@@ -285,13 +300,30 @@ const writeState = (stateFile: string) => [
   '  End If',
 ];
 
-/** Table originale : le relevé lit les variables du socle commun. */
-function scriptBlock(e: string, table: string, up: boolean, stateFile: string): string[] {
+/** Table originale : le relevé lit les variables du socle commun. `goFile` : départ commun (le fichier « partez »). */
+function scriptBlock(e: string, table: string, up: boolean, stateFile: string, goFile?: string): string[] {
+  const start = goFile
+    ? [
+        "  ' Départ commun : la table prête (trois secondes à l'écran), le fichier « partez » attendu ; puis un crédit, Start, et encore s'il ne part pas.", // i18n-ignore : commentaire du script ajouté à la table
+        `  If Not CyberPinball_Go And CyberPinball_Ticks >= 12 Then CyberPinball_Go = CyberPinball_Fso.FileExists("${goFile}")`,
+        '  If CyberPinball_Go And Not CyberPinball_Seen And CyberPinball_Tries < 4 Then',
+        '    CyberPinball_Step = CyberPinball_Step + 1',
+        '    If CyberPinball_Step Mod 16 = 1 Then CyberPinball_Press AddCreditKey',
+        '    If CyberPinball_Step Mod 16 = 3 Then CyberPinball_Press StartGameKey : CyberPinball_Tries = CyberPinball_Tries + 1',
+        '  End If',
+      ]
+    : [
+        "  ' Départ : un crédit, puis Start ; encore, s'il ne part pas.", // i18n-ignore : commentaire du script ajouté à la table
+        '  If Not CyberPinball_Seen And CyberPinball_Tries < 4 Then',
+        '    If CyberPinball_Ticks Mod 16 = 12 Then CyberPinball_Press AddCreditKey',
+        '    If CyberPinball_Ticks Mod 16 = 14 Then CyberPinball_Press StartGameKey : CyberPinball_Tries = CyberPinball_Tries + 1',
+        '  End If',
+      ];
   return [
     ...HEADER,
-    'Dim CyberPinball_Fso, CyberPinball_Last, CyberPinball_Ticks, CyberPinball_Seen, CyberPinball_Tries',
+    `Dim CyberPinball_Fso, CyberPinball_Last, CyberPinball_Ticks, CyberPinball_Seen, CyberPinball_Tries${goFile ? ', CyberPinball_Go, CyberPinball_Step' : ''}`,
     'Set CyberPinball_Fso = CreateObject("Scripting.FileSystemObject")',
-    'CyberPinball_Ticks = 0 : CyberPinball_Seen = False : CyberPinball_Tries = 0',
+    `CyberPinball_Ticks = 0 : CyberPinball_Seen = False : CyberPinball_Tries = 0${goFile ? ' : CyberPinball_Go = False : CyberPinball_Step = 0' : ''}`,
     `${e}.TimerInterval = 250`,
     `${e}.TimerEnabled = True`,
     '',
@@ -305,15 +337,12 @@ function scriptBlock(e: string, table: string, up: boolean, stateFile: string): 
     '  On Error Resume Next',
     '  CyberPinball_Ticks = CyberPinball_Ticks + 1',
     '  If bGameInPlay Then CyberPinball_Seen = True',
-    "  ' Départ : un crédit, puis Start ; encore, s'il ne part pas.", // i18n-ignore : commentaire du script ajouté à la table
-    '  If Not CyberPinball_Seen And CyberPinball_Tries < 4 Then',
-    '    If CyberPinball_Ticks Mod 16 = 12 Then CyberPinball_Press AddCreditKey',
-    '    If CyberPinball_Ticks Mod 16 = 14 Then CyberPinball_Press StartGameKey : CyberPinball_Tries = CyberPinball_Tries + 1',
-    '  End If',
+    ...start,
     '  Dim s, g, v',
     '  If bGameInPlay Then g = 1 Else g = 0',
     '  If CyberPinball_Seen Then v = 1 Else v = 0',
     '  s = "jeu=" & g & ";vu=" & v & ";joueurs=" & PlayersPlayingGame & ";joueur=" & CurrentPlayer & ";bille=" & (BallsPerGame - BallsRemaining(CurrentPlayer) + 1) & ";billes=" & BallsPerGame & ";score=" & Score(CurrentPlayer)', // i18n-ignore : clés du relevé, lues par parseLiveState
+    ...(goFile ? ['  If CyberPinball_Ticks >= 12 Or CyberPinball_Seen Then s = s & ";pret=1" Else s = s & ";pret=0"'] : []), // i18n-ignore : clé du relevé, lue par parseLiveState
     ...writeState(stateFile),
     'End Sub',
     '',
@@ -324,9 +353,9 @@ function scriptBlock(e: string, table: string, up: boolean, stateFile: string): 
  * Table à ROM : le relevé lit la NVRAM de la ROM, toutes les demi-secondes ; toutes les deux
  * secondes pour une grande mémoire (au-delà de 32 Ko : la copie des 128 Ko de Stern SAM coûte
  * environ 3 ms au script, sur le fil de VPX). `port` : celui de l'inspector, pour les valeurs hors
- * de la NVRAM.
+ * de la NVRAM. `goFile` : départ commun, le crédit attend aussi le fichier « partez ».
  */
-function romBlock(plan: RomLivePlan, e: string, table: string, up: boolean, stateFile: string, port?: number): string[] {
+function romBlock(plan: RomLivePlan, e: string, table: string, up: boolean, stateFile: string, port?: number, goFile?: string): string[] {
   const scoreOf = (v: string, k: string) => ['  Select Case ' + k, ...plan.scores.map((f, i) => `    Case ${i + 1} : ${v} = ${read(f)}`), '  End Select'];
   const every = plan.size > 32 * 1024 ? 4 : 1;
   // Les initiales : deux minutes au plus, comptées en relevés.
@@ -334,10 +363,10 @@ function romBlock(plan: RomLivePlan, e: string, table: string, up: boolean, stat
   const states = plan.states;
   return [
     ...HEADER,
-    'Dim CyberPinball_Fso, CyberPinball_Last, CyberPinball_Ticks, CyberPinball_Seen, CyberPinball_Tries, CyberPinball_InGame, CyberPinball_Ready, CyberPinball_Step, CyberPinball_Held, CyberPinball_Over, CyberPinball_Score',
+    `Dim CyberPinball_Fso, CyberPinball_Last, CyberPinball_Ticks, CyberPinball_Seen, CyberPinball_Tries, CyberPinball_InGame, CyberPinball_Ready, CyberPinball_Step, CyberPinball_Held, CyberPinball_Over, CyberPinball_Score${goFile ? ', CyberPinball_Go' : ''}`,
     'Set CyberPinball_Fso = CreateObject("Scripting.FileSystemObject")',
     ...(states.length ? inspectorBlock(states, port!) : []),
-    'CyberPinball_Ticks = 0 : CyberPinball_Seen = False : CyberPinball_Tries = 0 : CyberPinball_InGame = False : CyberPinball_Ready = 0 : CyberPinball_Step = 0 : CyberPinball_Held = 0 : CyberPinball_Over = 0 : CyberPinball_Score = 0',
+    `CyberPinball_Ticks = 0 : CyberPinball_Seen = False : CyberPinball_Tries = 0 : CyberPinball_InGame = False : CyberPinball_Ready = 0 : CyberPinball_Step = 0 : CyberPinball_Held = 0 : CyberPinball_Over = 0 : CyberPinball_Score = 0${goFile ? ' : CyberPinball_Go = False' : ''}`,
     `${e}.TimerInterval = 500`,
     `${e}.TimerEnabled = True`,
     '',
@@ -412,6 +441,7 @@ function romBlock(plan: RomLivePlan, e: string, table: string, up: boolean, stat
     '  If CyberPinball_Seen Then v = 1 Else v = 0',
     plan.balls ? `  balls = ${read(plan.balls)}` : '  balls = 0',
     '  s = "jeu=" & g & ";vu=" & v & ";joueurs=" & n & ";joueur=" & p & ";bille=" & b & ";billes=" & balls & ";score=" & CyberPinball_Score', // i18n-ignore : clés du relevé, lues par parseLiveState
+    ...(goFile ? ['  If CyberPinball_Ready >= 4 Or CyberPinball_Seen Then s = s & ";pret=1" Else s = s & ";pret=0"'] : []), // i18n-ignore : clé du relevé, lue par parseLiveState
     ...writeState(stateFile),
     'End Sub',
     '',
@@ -424,7 +454,13 @@ function romBlock(plan: RomLivePlan, e: string, table: string, up: boolean, stat
     '  End If',
     ...(every > 1 ? [`  If CyberPinball_Ticks Mod ${every} = 1 Then CyberPinball_Read`] : ['  CyberPinball_Read']),
     "  ' Départ : la table en attente, un crédit, puis Start deux secondes après ; encore toutes les dix secondes, deux minutes, s'il ne part pas.", // i18n-ignore : commentaire du script ajouté à la table
-    '  If Not CyberPinball_Seen And CyberPinball_Tries < 12 And CyberPinball_Ready >= 4 Then',
+    ...(goFile
+      ? [
+          "  ' Départ commun : la table en attente, le fichier « partez » attendu.", // i18n-ignore : commentaire du script ajouté à la table
+          `  If Not CyberPinball_Go And CyberPinball_Ready >= 4 Then CyberPinball_Go = CyberPinball_Fso.FileExists("${goFile}")`,
+          '  If CyberPinball_Go And Not CyberPinball_Seen And CyberPinball_Tries < 12 And CyberPinball_Ready >= 4 Then',
+        ]
+      : ['  If Not CyberPinball_Seen And CyberPinball_Tries < 12 And CyberPinball_Ready >= 4 Then']),
     '    CyberPinball_Step = CyberPinball_Step + 1',
     '    If CyberPinball_Step = 1 Then CyberPinball_Hold AddCreditKey',
     '    If CyberPinball_Step = 5 Then CyberPinball_Hold StartGameKey : CyberPinball_Tries = CyberPinball_Tries + 1',
@@ -518,5 +554,7 @@ export function parseLiveState(text: string): LiveGameState | undefined {
   const inGame = int('jeu'), started = int('vu'), players = int('joueurs'), player = int('joueur'), ball = int('bille'), balls = int('billes'), score = int('score');
   if ([inGame, started, players, player, ball, balls, score].some((v) => v === undefined)) return undefined;
   if (score! < 0 || !Number.isSafeInteger(score!)) return undefined;
-  return { inGame: inGame === 1, started: started === 1, players: players!, player: player!, ball: Math.max(1, Math.min(ball!, balls! || ball!)), balls: balls!, score: score! };
+  // « pret » : seulement avec le départ commun (livestart.ts).
+  const ready = int('pret');
+  return { inGame: inGame === 1, started: started === 1, players: players!, player: player!, ball: Math.max(1, Math.min(ball!, balls! || ball!)), balls: balls!, score: score!, ...(ready !== undefined ? { ready: ready === 1 } : {}) };
 }

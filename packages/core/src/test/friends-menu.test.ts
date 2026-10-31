@@ -2,7 +2,8 @@
 // ouvre, la sélection de « Partage et réseau » sur « Retour » (un Start par mégarde ne coupe pas
 // le partage), le pare-feu à autoriser seulement quand la règle manque, les actions uniques ; la
 // bibliothèque partagée seulement après l'avertissement ; chaque écran d'une partie en direct ;
-// l'invitation toujours là, grisée avec sa raison, et « Jouer avec un ami » sur la fiche d'une table.
+// l'invitation toujours là, grisée avec sa raison, et « Jouer avec un ami » sur la fiche d'une table ;
+// le choix de la table avec deux amis : la même version chez tous en tête, les autres grisées avec qui bloque.
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -25,7 +26,7 @@ interface Action {
 }
 interface Built {
   heading: string;
-  sections: { title?: string; rows: { text: string; detail?: string }[] }[];
+  sections: { title?: string; rows: { text: string; detail?: string; tone?: string; action?: number }[] }[];
   actions: Action[];
 }
 type Build = () => Built;
@@ -37,7 +38,7 @@ interface Item {
 
 /* eslint-disable @typescript-eslint/no-require-imports */
 const { createFriendsMenu } = require(path.join(APP_DIST, 'friends-menu.js')) as {
-  createFriendsMenu(host: object): { items: Record<string, Item>; live: { open(back: () => void): void; sheetAction(table: object, back: () => void): Action } };
+  createFriendsMenu(host: object): { items: Record<string, Item>; live: { open(back: () => void): void; sheetAction(table: object, back: () => void): Action; inviteFriends(keys: string[], back: () => void): void } };
 };
 const { createSocialNet } = require(path.join(APP_DIST, 'social-net.js')) as { createSocialNet(o: object): { state(): { shareLibrary: boolean; key: { publicKey: string } } } };
 const { createFirewallRule } = require(path.join(APP_DIST, 'firewall-rule.js')) as { createFirewallRule(o: object): { check(): Promise<string>; checkVpx(): Promise<string | undefined> } };
@@ -55,10 +56,15 @@ function fakeGames() {
     board: () => [] as { player: string; name: string; score: number; at: string; game: string }[],
     history: () => [],
     table: () => undefined,
+    waitView: () => undefined,
     invites: () => (games.pending ? [games.pending] : []),
     create: async () => games.game!,
     invite: () => true,
     matchFor: async () => ({ match: 'same' as const }),
+    /** Empreinte de mes tables, par titre (live-game.ts la calcule) ; sans : illisible. */
+    prints: new Map<string, string>(),
+    versionOf: async (table: { title: string }) => (games.prints.has(table.title) ? { print: games.prints.get(table.title) } : {}),
+    bytesOf: () => undefined,
     accept: async () => ({ match: 'same' as const }),
     decline: () => undefined,
     start: () => true,
@@ -69,11 +75,15 @@ function fakeGames() {
   return games;
 }
 
-/** `presence` : Bruno vu en ligne, dans le menu ou en partie (le réseau reste coupé) ; `vpx` : les programmes de VPX à fermer au réseau. */
-function setup(content?: object, presence?: 'menu' | 'playing', vpx?: () => string[] | undefined) {
+/**
+ * `presence` : Bruno vu en ligne, dans le menu ou en partie (le réseau reste coupé) ; `vpx` : les
+ * programmes de VPX à fermer au réseau ; `extra` : d'autres amis, et les tables de la borne.
+ */
+function setup(content?: object, presence?: 'menu' | 'playing', vpx?: () => string[] | undefined, extra: { friends?: { key: string; name: string }[]; tables?: object[] } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-friends-menu-'));
   // Un ami déjà là (hors ligne : réseau coupé).
-  fs.writeFileSync(path.join(dir, 'social.json'), JSON.stringify({ ...newSocialState(), friends: [{ key: FRIEND, name: 'Bruno', since: new Date().toISOString(), events: [] }] }));
+  const friends = [{ key: FRIEND, name: 'Bruno' }, ...(extra.friends ?? [])].map((f) => ({ ...f, since: new Date().toISOString(), events: [] }));
+  fs.writeFileSync(path.join(dir, 'social.json'), JSON.stringify({ ...newSocialState(), friends }));
   const opened: { build: Build; at?: number }[] = [];
   const off = createSocialNet({ dataDir: dir, mode: 'off' });
   const net = presence ? { ...off, online: () => true, presenceOf: () => ({ status: presence, since: new Date().toISOString(), ...(presence === 'playing' ? { table: { title: 'Glass Lagoon' } } : {}) }) } : off;
@@ -104,7 +114,7 @@ function setup(content?: object, presence?: 'menu' | 'playing', vpx?: () => stri
     },
     content: content ?? createFriendContent({ net, dataDir: dir, tables: () => [], root: () => undefined, contents: () => undefined }),
     games,
-    tables: () => [],
+    tables: () => extra.tables ?? [],
     root: () => undefined,
     redraw: () => undefined,
   });
@@ -222,9 +232,11 @@ test('« Jouer avec un ami » : grisée sans ami en ligne ; sinon le choix de l�
   await active.run();
   const choose = playing.last().build();
   assert.equal(choose.heading, 'Jouer avec un ami');
-  const row = choose.sections[0]!.rows[0] as { text: string; detail?: string };
+  const row = choose.sections[0]!.rows[0] as { text: string; detail?: string; tone?: string };
   assert.ok(row.text.startsWith('Bruno'));
-  assert.equal(row.detail, 'En partie : notifié sur sa table');
+  // Sa bibliothèque injoignable (réseau coupé) : signalé, pas refusé.
+  assert.equal(row.detail, 'En partie : notifié sur sa table · Bibliothèque de Bruno injoignable pour l’instant');
+  assert.equal(row.tone, 'warning');
   assert.deepEqual(choose.actions.map((a) => a.label), ['Bruno', 'Retour']);
   uniqueIcons(choose, 'Jouer avec un ami');
 });
@@ -411,4 +423,76 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
   assert.deepEqual(job.files.map((f) => f.name).sort(), ['Bride of Pin-bot (Williams 1991).directb2s', 'Bride of Pin-bot (Williams 1991).vpx', 'pinmame/roms/bop_l7.zip']);
   assert.deepEqual(job.data?.attested, ['rom']);
   assert.ok(typeof job.data?.attestedAt === 'string');
+});
+
+test('choix de la table avec deux amis : la même version chez tous en tête, les autres grisées avec qui bloque, sa version à récupérer', async () => {
+  const EMILE = newSocialState().key.publicKey;
+  const P = (c: string) => c.repeat(64);
+  const table = (title: string) => ({ file: `C:\\t\\${title}.vpx`, folder: 'C:\\t', title, manufacturer: 'Williams', year: 1991, info: {} });
+  const tables = ['Fish Tales', 'Medieval Madness', 'Terminator 2', 'Twilight Zone'].map(table);
+  const theirs = (id: number, title: string) => ({ id: id.toString(16).padStart(16, '0'), table: { title, manufacturer: 'Williams', year: 1991 }, medias: [] });
+  // Bruno : T2 et Twilight Zone à l'identique, Fish Tales dans une autre version, pas Medieval.
+  // Émile : T2, Fish Tales et Medieval à l'identique ; Twilight Zone, sa version encore en route.
+  const libraries: Record<string, { tables: ReturnType<typeof theirs>[]; prints: Record<string, string | 'pending'> }> = {
+    [FRIEND]: { tables: [theirs(1, 'Terminator 2'), theirs(2, 'Fish Tales'), theirs(3, 'Twilight Zone')], prints: { [theirs(1, '').id]: P('a'), [theirs(2, '').id]: P('e'), [theirs(3, '').id]: P('d') } },
+    [EMILE]: { tables: [theirs(4, 'Terminator 2'), theirs(5, 'Fish Tales'), theirs(6, 'Medieval Madness'), theirs(7, 'Twilight Zone')], prints: { [theirs(4, '').id]: P('a'), [theirs(5, '').id]: P('b'), [theirs(6, '').id]: P('c'), [theirs(7, '').id]: 'pending' } },
+  };
+  const asked: string[] = [];
+  const content = {
+    library: (key: string) => ({ state: 'ready', library: { at: new Date().toISOString(), versions: true, tables: libraries[key]!.tables } }),
+    refresh: () => undefined,
+    tableVersions: (key: string, ids: readonly string[]) => {
+      asked.push(...ids);
+      return new Map(ids.map((id) => [id, libraries[key]!.prints[id] === 'pending' ? 'pending' : { id, print: libraries[key]!.prints[id] }]));
+    },
+    tableFiles: async () => 'offline',
+    receivedDir: () => '',
+    tableDir: () => '',
+    stop: () => undefined,
+  };
+  const { menu, last, games } = setup(content, 'menu', undefined, { friends: [{ key: EMILE, name: 'Émile' }], tables });
+  for (const [title, print] of [['Terminator 2', P('a')], ['Fish Tales', P('b')], ['Medieval Madness', P('c')], ['Twilight Zone', P('d')]] as const) games.prints.set(title, print);
+  menu.live.inviteFriends([FRIEND, EMILE], () => undefined);
+  // Mes empreintes se calculent d'abord (en arrière-plan) : « à vérifier », jamais « autre version ».
+  const first = last().build();
+  assert.deepEqual(first.sections.map((s) => s.title), ['À vérifier (3)', 'Indisponibles (1)']);
+  const opened = last();
+  await new Promise((r) => setImmediate(r));
+  // Mes empreintes arrivées : les tables se rangent, l'écran se rouvre une fois, le curseur sur la première.
+  opened.build();
+  await new Promise((r) => setImmediate(r));
+  assert.notEqual(last(), opened, 'rouvert une fois les empreintes connues');
+  assert.equal(last().at, undefined);
+  const built = last().build();
+  assert.equal(built.heading, 'Partie en direct avec Bruno, Émile');
+  assert.deepEqual(
+    built.sections.map((s) => [s.title, s.rows.map((r) => [r.text, r.detail, r.tone])]),
+    [
+      ['Même version chez tous (1)', [['Terminator 2 (Williams 1991)', 'Même version chez Bruno, Émile', 'ok']]],
+      ['À vérifier (1)', [['Twilight Zone (Williams 1991)', 'Version de Émile en cours de vérification…', 'warning']]],
+      [
+        'Indisponibles (2)',
+        [
+          ['Fish Tales (Williams 1991)', 'Autre version chez Bruno · Start : récupérer sa version chez Bruno', 'quiet'],
+          ['Medieval Madness (Williams 1991)', 'Bruno n’a pas cette table', 'quiet'],
+        ],
+      ],
+    ],
+  );
+  // Les versions demandées : celles des seules tables qui peuvent être les miennes.
+  assert.ok(asked.length > 0 && asked.every((id) => Object.values(libraries).some((l) => l.tables.some((x) => x.id === id))));
+  // Une table absente chez Bruno : Start n'ouvre rien.
+  const rowAction = (text: string) => built.actions[built.sections.flatMap((s) => s.rows).find((r) => r.text.startsWith(text))!.action!]!;
+  const before = last();
+  await rowAction('Medieval Madness').run();
+  assert.equal(last(), before, 'grisée : Start n’ouvre rien');
+  // Une autre version chez Bruno : les parties de sa table, la table cochée d'office.
+  await rowAction('Fish Tales').run();
+  assert.equal(last().build().heading, 'Parties de sa table');
+  // La même version chez tous : l'invitation part vers les deux.
+  const invited: string[] = [];
+  (games as unknown as { invite(key: string): boolean }).invite = (key: string) => (invited.push(key), true);
+  await rowAction('Terminator 2').run();
+  await new Promise((r) => setImmediate(r));
+  assert.deepEqual(invited, [FRIEND, EMILE]);
 });

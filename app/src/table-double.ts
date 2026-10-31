@@ -61,6 +61,11 @@ export interface TableDouble {
   /** L'état de jeu que le relevé a écrit, maintenant ; undefined avant le premier ou s'il n'y en a pas. */
   liveState(): LiveGameState | undefined;
   /**
+   * Départ commun (livestart.ts) : pose le fichier « partez » que le relevé surveille ; il met alors
+   * le crédit et appuie sur Start. Sans relevé, rien (le joueur appuie lui-même). Une fois suffit.
+   */
+  go(): void;
+  /**
    * Le VPinballX.ini de cette partie, à passer à VPX par -Ini : une copie de celui de la borne,
    * l'inspector activé (table Stern SAM) ; undefined : celui de la borne.
    */
@@ -150,6 +155,8 @@ export function createTableDoubles(opts: TableDoublesOptions) {
       }
       // L'état de jeu en direct : le relevé et le départ automatique ajoutés au script du double (livestate.ts).
       const stateFile = path.join(plan.dir, 'cyberpinball-etat.txt');
+      // Départ commun : le relevé attend ce fichier pour mettre le crédit et appuyer sur Start.
+      const goFile = path.join(plan.dir, 'cyberpinball-partez.txt');
       let live = false;
       let ini: { file: string; text: string } | undefined;
       if (board) {
@@ -169,7 +176,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
             log(`Partie entre amis (${table.id}) : VPinballX.ini illisible (${(error as Error).message}), pas d'inspector.`); // i18n-ignore : journal
           }
           const offered = iniText !== undefined ? inspector : undefined;
-          const hook = script ? liveStateHook(script, readVpxElements(plan.file), stateFile, rom?.memory, offered) : { ok: false as const, reason: 'script illisible ou protégé' }; // i18n-ignore : journal
+          const hook = script ? liveStateHook(script, readVpxElements(plan.file), stateFile, rom?.memory, offered, goFile) : { ok: false as const, reason: 'script illisible ou protégé' }; // i18n-ignore : journal
           if (hook.ok && hook.inspector.length) {
             // La carte réduite et le VPinballX.ini de la partie, dans le double seulement ; un fichier lié à l'original est remplacé, jamais réécrit.
             const games = [...new Set([...(opts.romsOf?.(table) ?? []), ...roms])];
@@ -223,6 +230,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
       };
       log(`Partie entre amis (${table.id}) : double prêt, ${plan.links.length} fichiers liés, ${plan.copies.length} copiés, dans ${plan.dir}.`); // i18n-ignore : journal
       let finished = false;
+      let gone = false;
       return {
         ok: true,
         double: {
@@ -230,6 +238,16 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           records,
           live,
           liveState,
+          go() {
+            if (gone || !live || finished) return;
+            try {
+              fs.writeFileSync(goFile, new Date().toISOString(), 'utf8');
+              gone = true;
+              log(`Partie entre amis (${table.id}) : « partez » posé pour le relevé.`); // i18n-ignore : journal
+            } catch (error) {
+              log(`Partie entre amis (${table.id}) : « partez » non posé (${(error as Error).message}), nouvel essai.`); // i18n-ignore : journal
+            }
+          },
           ...(ini ? { ini: ini.file } : {}),
           finish() {
             if (finished) return;

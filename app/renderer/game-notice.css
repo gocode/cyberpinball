@@ -342,3 +342,257 @@ body {
   width: min(100%, calc(var(--h, 32px) * 4));
   aspect-ratio: 4 / 1;
 }
+
+/* Une nouvelle de la partie entre amis pendant la partie d'une autre table (notices.ts,
+   NoticeRule.live) : la notification d'une ligne du menu des tables (frontend.css, .notice-toast),
+   à l'échelle de sa fenêtre (--l : un 76e de sa hauteur vue du joueur, 720 × 76 sur un plateau de
+   1 080 px). Opaque, lisible sur n'importe quelle table ; filet de 5 et icône dans la couleur de
+   son ton (vert : acceptée, partie finie ; bleu méta : déclinée ; ambre : un joueur parti, partie
+   annulée). Titre de 26 px, précision de 21 px, chacun sur sa ligne, coupés par « … » plutôt que
+   de déborder. Elle glisse en entrant et s'estompe en partant, une fois. */
+.line {
+  --l: calc(var(--h, 76px) / 76);
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--l));
+  padding: 0 calc(22 * var(--l)) 0 calc(18 * var(--l));
+  border: calc(1 * var(--l)) solid var(--line-strong);
+  border-left: calc(5 * var(--l)) solid var(--tone, var(--meta));
+  border-radius: calc(10 * var(--l));
+  background: var(--surface-raised);
+  box-shadow: var(--halo-panel);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  line-height: 1.2;
+  overflow: hidden;
+  animation: line-in 260ms ease-out both;
+}
+
+.line[hidden] {
+  display: none;
+}
+
+.line.leaving {
+  animation: line-out 320ms ease-in both;
+}
+
+.line.tone-ok {
+  --tone: var(--signal);
+}
+
+.line.tone-warning {
+  --tone: var(--warning);
+}
+
+.line.tone-error {
+  --tone: var(--danger);
+}
+
+.line-icon {
+  flex: none;
+  display: flex;
+  font-size: calc(30 * var(--l));
+  color: var(--tone, var(--meta));
+}
+
+.line-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.line-title {
+  font-size: calc(26 * var(--l));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.line-detail {
+  font-size: calc(21 * var(--l));
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.line-detail[hidden] {
+  display: none;
+}
+
+@keyframes line-in {
+  from {
+    opacity: 0;
+    transform: translateY(calc(-10 * var(--l)));
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes line-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* L'attente du départ commun (livestart.ts, liveWaitView) : au centre du plateau, dans son tiers
+   haut, avant que la partie parte (aucune bille en jeu). Pourquoi elle n'a pas démarré, le délai des
+   derniers, puis une ligne par joueur : une coche verte quand il est prêt, un anneau tant qu'il
+   charge, éteint quand il n'est plus attendu. Au départ, « Partez ! » en vert signal. Taille : --a,
+   un 640e de la largeur vue du joueur (LIVE_WAIT_SIZE : texte de 20 px au moins à 1 080 px). */
+.wait {
+  --a: calc(var(--w, 640px) / 640);
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  /* Sans ligne de délai (« Partez ! »), le contenu reste centré dans la carte. */
+  justify-content: center;
+  gap: calc(8 * var(--a));
+  padding: calc(24 * var(--a)) calc(30 * var(--a));
+  border: 1px solid var(--line-strong);
+  border-radius: calc(20 * var(--a));
+  background: var(--scrim-strong);
+  box-shadow: var(--halo-panel);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  line-height: 1.2;
+  overflow: hidden;
+}
+
+.wait[hidden],
+.wait-note[hidden] {
+  display: none;
+}
+
+.wait.go {
+  border-color: var(--signal);
+  box-shadow: var(--glow-signal);
+}
+
+.wait-head {
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--a));
+  min-height: calc(44 * var(--a));
+}
+
+.wait-icon {
+  display: flex;
+  color: var(--signal);
+  font-size: calc(36 * var(--a));
+}
+
+.wait-title {
+  min-width: 0;
+  font-size: calc(34 * var(--a));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wait.go .wait-title {
+  font-size: calc(40 * var(--a));
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--signal);
+}
+
+.wait-lead,
+.wait-note {
+  margin: 0;
+  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wait-lead {
+  font-size: calc(24 * var(--a));
+  -webkit-line-clamp: 2;
+}
+
+.wait-note {
+  font-size: calc(20 * var(--a));
+  color: var(--ink-muted);
+  -webkit-line-clamp: 1;
+}
+
+.wait-rows {
+  margin: calc(6 * var(--a)) 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line-soft);
+}
+
+.wait-row {
+  display: grid;
+  grid-template-columns: calc(28 * var(--a)) minmax(0, auto) minmax(0, 1fr);
+  align-items: center;
+  column-gap: calc(14 * var(--a));
+  height: calc(46 * var(--a));
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.wait-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: calc(26 * var(--a));
+  height: calc(26 * var(--a));
+  border: calc(2 * var(--a)) solid var(--line-strong);
+  border-radius: 50%;
+  font-size: calc(18 * var(--a));
+}
+
+.wait-row.ready .wait-mark {
+  border-color: var(--signal);
+  background: var(--signal);
+  color: var(--on-signal);
+}
+
+.wait-row.out .wait-mark {
+  border-color: var(--line-soft);
+}
+
+.wait-name,
+.wait-status {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wait-name {
+  font-size: calc(24 * var(--a));
+  font-weight: 600;
+}
+
+.wait-row.me .wait-name {
+  color: var(--signal);
+}
+
+.wait-status {
+  justify-self: end;
+  max-width: 100%;
+  font-size: calc(20 * var(--a));
+  color: var(--ink-muted);
+}
+
+.wait-row.out .wait-name,
+.wait-row.out .wait-status {
+  color: var(--ink-faint);
+}

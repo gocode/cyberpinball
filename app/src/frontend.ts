@@ -189,7 +189,7 @@ import { createGameNotices } from './game-notice';
 import { createBallCounts } from './ball-count';
 import { createTableDoubles } from './table-double';
 import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
-import { createLiveGames, type LiveProgress } from './live-game';
+import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
 import { seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
@@ -772,6 +772,8 @@ const friendContent = createFriendContent({
   onChange: socialChanged,
   // Un partiel ou une table reçue que la file des téléchargements reprendra : le ménage l'épargne.
   keep: (file) => library.downloads.manager.owns(file),
+  // La version stricte de mes tables, donnée aux amis avant qu'ils invitent : celle de mes invitations.
+  versionOf: (table) => liveGames.versionOf(table),
   log: (line) => console.log(line),
 });
 // Gestionnaire de téléchargements : un ami est une source ; il reprend dès que l'ami est relié.
@@ -792,6 +794,18 @@ const menuNotices = createMenuNotices({
   canShow: () => !closing && state.phase === 'menu' && !state.help && !state.banner && !attract.active && !guest.active && !stopNotice && !desktop.active && tables.length > 0,
   redraw: () => {
     if (!closing) broadcast();
+  },
+  // La partie entre amis : ses nouvelles aussi dans le menu système (hors de l'écran de la partie)
+  // et par-dessus la partie d'une autre table (game-notice.ts), tant que la bande de la partie
+  // n'est pas là (elle le dit déjà) ; le tintement au menu, jamais pendant une partie.
+  live: {
+    game: () => liveGames.current(),
+    me: () => socialNet.state().key.publicKey,
+    onScreen: () => friendsMenu.live.onScreen(),
+    canShow: () =>
+      !closing && !state.help && !state.banner && !attract.active && !guest.active && !stopNotice && !desktop.active && !friendsMenu.live.onScreen() &&
+      (state.phase === 'menu' || state.phase === 'library' || (state.phase === 'playing' && !!playing && !liveBoardUp())),
+    shown: () => playUiSound('news'),
   },
   log: (line) => console.log(line),
 });
@@ -830,11 +844,11 @@ const liveGames = createLiveGames({
     if (playing) gameNotices.show(invite);
     else if (liveCanShow()) friendsMenu.live.openInvite(invite.id, () => library.leave());
   },
-  play: async (table, onPlaying, settings, board, progress) => {
+  play: async (table, onPlaying, settings, board, progress, gate) => {
     // Le départ commun ferme l'écran ouvert (le compte à rebours), comme Start sur une table.
     if (library.isActive()) library.leave();
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
-    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying, double: `${Date.now().toString(36)}`, ...(settings ? { settings } : {}), ...(board ? { board } : {}), ...(progress ? { onProgress: progress } : {}) });
+    const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, undefined, { onPlaying, double: `${Date.now().toString(36)}`, ...(settings ? { settings } : {}), ...(board ? { board } : {}), ...(progress ? { onProgress: progress } : {}), ...(gate ? { gate } : {}) });
     // De retour au menu : les résultats, qui se complètent à mesure que les autres reviennent.
     if (report && state.phase === 'menu') setImmediate(() => friendsMenu.live.open(() => library.leave()));
     if (!report) return undefined;
@@ -1089,6 +1103,10 @@ export function startFrontend(): void {
     // Pastille des amis en ligne, notification d'un ami ou d'une demande : l'écran qu'elle annonce.
     else if (action.type === 'friends' || action.type === 'friend-requests') {
       if (state.phase === 'menu' && guest.knock('menu.system')) friendsMenu.items[action.type].run();
+    }
+    // Nouvelle de la partie entre amis (au menu des tables ou dans le menu système) : l'écran de la partie.
+    else if (action.type === 'live-game') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) friendsMenu.live.open(() => library.leave());
     }
     else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
       if (action.offset === 0) guest.knock('menu.sheet') && library.openSheet(tables[state.index]!);
@@ -1624,15 +1642,18 @@ export interface PlayReport {
 }
 
 /**
- * Relevé simulé d'une partie simulée (hors écran) : départ après une seconde, le score qui monte,
+ * Relevé simulé d'une partie simulée (hors écran) : la table prête après une seconde ; départ une
+ * seconde après « partez » (`goAt` : quand le fichier du double a été posé), le score qui monte,
  * trois billes, puis la partie finie deux secondes avant l'arrêt prévu.
  */
-function simulatedLiveState(startedAt: number, durationMs: number): () => LiveGameState {
+function simulatedLiveState(startedAt: number, durationMs: number, goAt: () => number | undefined): () => LiveGameState {
   return () => {
-    const elapsed = Date.now() - startedAt;
+    const ready = Date.now() - startedAt >= 1000;
+    const go = goAt();
+    const elapsed = go === undefined ? 0 : Date.now() - go;
     const playing = Math.max(0, elapsed - 1000);
     const span = Math.max(1000, durationMs - 3000);
-    return { inGame: elapsed >= 1000 && playing < span, started: elapsed >= 1000, players: 1, player: 1, ball: Math.min(3, 1 + Math.floor((playing / span) * 3)), balls: 3, score: Math.floor(playing / 500) * 12_340 };
+    return { inGame: elapsed >= 1000 && playing < span, started: elapsed >= 1000, players: 1, player: 1, ball: Math.min(3, 1 + Math.floor((playing / span) * 3)), balls: 3, score: Math.floor(playing / 500) * 12_340, ready };
   };
 }
 
@@ -1648,13 +1669,15 @@ const LIVE_CLOSE_AFTER_MS = 4000;
 const LIVE_BOARD_SETTLE_MS = 3000;
 /** Heure où la table de la partie en cours est arrivée à l'écran (Date.now()). */
 let playingSince = 0;
+/** Partie entre amis sur une table sans relevé : Start n'y est pas bloqué, le joueur l'appuie au « Partez ! ». */
+let liveManual = false;
 
 /**
  * Partie d'une table. En mode réglage de l'affichage (`display`), VPX démarre son menu ouvert
  * sur le cadrage ; la partie ne compte pas dans les statistiques et, à la fin, l'écran qui
  * l'a demandée (la fiche) reprend la main.
  */
-async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void } = {}): Promise<PlayReport | undefined> {
+async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void; gate?: LiveStartGate } = {}): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
   if (!install) return undefined;
   // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
@@ -1775,6 +1798,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const double = doubled?.ok ? doubled.double : undefined;
   const played = double?.table ?? table;
   if (double) recordsBefore = double.records();
+  // Départ commun (livestart.ts) : une table sans relevé est prête dès qu'elle est à l'écran ; c'est au joueur d'appuyer sur Start au signal.
+  liveManual = !!double && !double.live && simulated === undefined;
+  // Quand « partez » a été posé dans le double (la partie simulée part de là).
+  let goneAt: number | undefined;
 
   // Les fenêtres du menu restent derrière VPX, sans jamais lui prendre le focus : l'écran de
   // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque
@@ -1798,7 +1825,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)));
     broadcast();
     setTimeout(showLiveBoard, LIVE_BOARD_SETTLE_MS);
-    if (autoStopAfterMs) setTimeout(() => game.stop(), autoStopAfterMs);
+    if (liveManual) hooks.gate?.ready();
+    // Partie entre amis : l'arrêt automatique (essais) se compte depuis « partez ».
+    if (autoStopAfterMs && !hooks.gate) setTimeout(() => game.stop(), autoStopAfterMs);
   };
   // VPX prend la main (sa fenêtre de jeu au premier plan, dit le lanceur) : le coup de bobine, une fois.
   const onForeground = () => {
@@ -1818,10 +1847,18 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   let live: { score?: number; multi?: boolean } | undefined;
   let overAt: number | undefined;
   // Hors écran, la partie simulée n'exécute aucun script : son relevé est simulé, pour la bande et la fin de partie.
-  const liveSource = double?.live ? () => double.liveState() : simulated !== undefined && double ? simulatedLiveState(Date.now(), autoStopAfterMs ?? 10_000) : undefined;
-  const watchLive = liveSource
+  const liveSource = double?.live ? () => double.liveState() : simulated !== undefined && double ? simulatedLiveState(Date.now(), autoStopAfterMs ?? 10_000, () => goneAt) : undefined;
+  // Départ commun (livestart.ts) : la table prête (le relevé répond « pret »), elle le dit aux
+  // autres ; au « partez », le fichier du double que le relevé surveille : alors seulement, crédit et Start.
+  const watchLive = double
     ? setInterval(() => {
-        const st = liveSource();
+        const st = liveSource?.();
+        if (st?.ready || st?.started) hooks.gate?.ready();
+        if (goneAt === undefined && (!hooks.gate || hooks.gate.go())) {
+          goneAt = Date.now();
+          double.go();
+          if (autoStopAfterMs && hooks.gate) setTimeout(() => game.stop(), autoStopAfterMs);
+        }
         if (!st?.started) return;
         live = { score: st.score, multi: (live?.multi ?? false) || st.players > 1 };
         hooks.onProgress?.({ score: st.score, ball: st.ball, balls: st.balls, players: st.players });
@@ -1895,7 +1932,16 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Une invitation reçue pendant la partie, encore valable : elle s'ouvre au retour au menu.
   const invite = state.phase === 'menu' && !liveGames.current() ? liveGames.invites()[0] : undefined;
   if (invite) friendsMenu.live.openInvite(invite.id, () => library.leave());
+  // La partie entre amis s'est finie pendant celle d'une autre table (on avait fini avant les
+  // autres) : ses résultats, pas encore vus, s'ouvrent au retour ; la notification l'a annoncé.
+  else if (!hooks.double && state.phase === 'menu' && friendsMenu.live.unseenResults()) friendsMenu.live.open(() => library.leave());
   return { result, focusReturned, entered, ...(live ? { live } : {}) };
+}
+
+/** La bande de la partie entre amis est (ou va être) sur les écrans : la partie lancée, celle d'une autre table comprise. */
+function liveBoardUp(): boolean {
+  const phase = liveGames.current()?.phase;
+  return phase === 'playing' || phase === 'countdown';
 }
 
 /**
@@ -1905,7 +1951,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
 function showLiveBoard(): void {
   const current = liveGames.current();
   const settled = Date.now() - playingSince >= LIVE_BOARD_SETTLE_MS;
-  gameNotices.board(playing && state.phase === 'playing' && settled && current ? liveBoardView(current, socialNet.state().key.publicKey) : undefined);
+  // L'attente du départ commun d'abord, sur le plateau ; la bande vient après « Partez ! » (livestart.ts).
+  const wait = playing && state.phase === 'playing' && current ? liveGames.waitView({ manual: liveManual }) : undefined;
+  gameNotices.wait(wait);
+  gameNotices.board(!wait && playing && state.phase === 'playing' && settled && current ? liveBoardView(current, socialNet.state().key.publicKey) : undefined);
 }
 
 /**
@@ -2403,11 +2452,18 @@ function viewFor(role: RoleId) {
   };
 }
 
-/** Coin du menu des tables (fenêtre du plateau) : amis en ligne et notification, au menu des tables seulement. */
+/**
+ * Coin du menu des tables (fenêtre du plateau) : amis en ligne et notification, au menu des
+ * tables ; dans le menu système, seulement une nouvelle de la partie entre amis ; pendant la
+ * partie d'une autre table, cette nouvelle va par-dessus VPX (game-notice.ts).
+ */
 function menuCorner(): { friendsOnline?: { count: number; title: string }; notice?: NoticeView } {
   // La file avance à chaque rendu, même hors du menu : une notification ouverte part quand un écran la recouvre.
   const corner = menuNotices.view();
-  if (state.phase !== 'menu' || guest.active) return {};
+  gameNotices.line(state.phase === 'playing' && playing && corner.notice?.live ? corner.notice : undefined);
+  if (guest.active) return {};
+  if (state.phase === 'library') return corner.notice?.live ? { notice: corner.notice } : {};
+  if (state.phase !== 'menu') return {};
   return corner;
 }
 

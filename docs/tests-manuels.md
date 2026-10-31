@@ -1169,6 +1169,47 @@ Une table dont le script appelle `vpmInit` deux fois : *Back to the Future (Data
 | 609 | La fiche le dit | Fiche de la table > fichiers. | « Script adapté : vpmInit exécuté une seule fois » ; le `.vbs` est « script de la table adapté par Cyber Pinball : vpmInit exécuté une seule fois », jamais « remplace le script écrit dans la table ». |
 | 610 | Autre borne | Sur le PinCab, après la préversion : installer Back to the Future (ou la garder si elle y est déjà), puis la lancer. | Comme 607, dès la première partie. |
 
+## Choisir la table d'une partie en direct
+
+Trois bornes amies sur le vrai réseau : A (celle qui invite), B et C, à jour ; A a quatre tables : T2 que B et C ont à l'identique, Fish Tales que B a dans une autre version, Medieval Madness que B n'a pas, et une quatrième que seul C a. La preuve sans opérateur : `packages/core/src/test/tables-compatibles.test.ts` (le tri, les raisons, le même jugement qu'à l'acceptation pour toute combinaison, les messages, deux bornes reliées en mémoire), `packages/core/src/test/friends-menu.test.ts` (l'écran à deux amis) et la démonstration `.\docs\demo-tables-compatibles.ps1` ; le manuel : « Choisir la table d'une partie en direct ».
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 611 | Un ami, ses tables d'abord | Sur A : Menu système > Amis > « Mes amis » > B > « Inviter à une partie en direct ». | En tête « Même version chez tous » : T2, « Même version chez B ». Puis « Indisponibles », grisées : Fish Tales « Autre version chez B · Start : récupérer sa version chez B », puis Medieval Madness « B n'a pas cette table ». Au premier passage, une ligne peut dire « Version de B en cours de vérification… » quelques secondes, puis se range seule. |
+| 612 | Sa version, à récupérer | Start sur Fish Tales. | Les parties de sa table dans sa bibliothèque partagée, la table cochée d'office. Retour ramène au choix. |
+| 613 | Une table absente | Start sur Medieval Madness. | Rien ne s'ouvre, aucune invitation ne part. |
+| 614 | Deux invités | Inviter B sur T2, puis dans le salon « Changer de table ». | L'écran s'intitule « Partie en direct avec B, C » si C est aussi invité (« Inviter un autre ami » d'abord) ; une table n'est en tête que si B et C l'ont tous deux à l'identique ; chaque table grisée nomme qui bloque (« B n'a pas cette table », « Autre version chez B »). Choisir T2 : B et C reçoivent une nouvelle invitation. |
+| 615 | Une borne d'avant | C en 0.1.5-essai.20 ou plus ancienne : depuis A, l'inviter. | Ses tables passent « À vérifier », « Bibliothèque de C inconnue (ancienne version de Cyber Pinball) », choisissables ; l'invitation part, la vérification à l'acceptation tranche comme avant. |
+| 616 | Bibliothèque pas partagée | Sur B : « Partage et réseau » > « Ne plus partager ma bibliothèque » ; sur A, inviter B. | Toutes les tables « À vérifier », « Bibliothèque de B inconnue (il ne la partage pas) » ; rien n'est refusé d'office. |
+
+## Nouvelles de la partie entre amis
+
+Deux ou trois bornes A, B et C, amies, avec la même version d'une table, plus une autre table sur A. La preuve sans opérateur : `packages/core/src/test/notifications-partie.test.ts` et `.\docs\demo-notifications-partie.ps1` (les bandeaux dessinés au menu des tables, dans le menu système et par-dessus VPX) ; le manuel : « Partie entre amis » dans « Notifications du menu des tables », et « Nouvelles de la partie ».
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 617 | Un invité accepte, on est sorti du salon | A invite B, puis « Retour » jusqu'au menu des tables ; B accepte. | Sur A, en une ou deux secondes, en haut à droite : « B a accepté votre invitation », « Pour lancer : Menu système > Amis > Mes amis », filet vert, un tintement discret. Elle reste une dizaine de secondes. Un clic l'ouvre sur le salon ; aux boutons, Menu système > Amis > « Mes amis » a « Partie en direct » en tête. |
+| 618 | Deux réponses ensemble, dans le menu système | A invite B et C, puis ouvre Menu système > Médias ; B et C acceptent presque en même temps. | Une seule notification, sur la ligne de la roue dentée : « B et C ont accepté ». Rien ne se recouvre, l'en-tête de l'écran reste lisible. |
+| 619 | Un refus, avec sa raison | A invite C, qui n'a pas la table (ou la refuse, ou ne répond pas pendant deux minutes). | Sur A : « C a décliné votre invitation » · « N'a pas cette table » (« Pas de réponse de C » s'il n'a pas répondu), filet bleu. |
+| 620 | Sur l'écran de la partie, rien de plus | A reste sur le salon ; B accepte. | Le salon dit « Prêt » pour B ; aucune notification par-dessus, et rien ne revient en quittant le salon. |
+| 621 | Finir avant les autres, jouer une autre table | A, B et C lancent la partie ; A finit vite, ferme les résultats, lance une autre table ; B et C finissent ensuite. | Pendant la partie de A, dans le coin du plateau en haut à gauche pour le joueur, par-dessus VPX : « Partie entre amis : B gagne », « Résultats : Menu système > Amis · vous : place 2 sur 3 » (ou « vous gagnez ! »), sans prendre la main à VPX ni de son. À la sortie de VPX, les résultats s'ouvrent d'eux-mêmes. |
+| 622 | Notifications coupées | Menu système > Médias > « Médias, son et attente » > « Notifications du menu : coupées » ; refaire 617. | La pastille des amis a disparu, mais « B a accepté votre invitation » s'affiche quand même. |
+
+## Départ commun d'une partie entre amis
+
+Deux bornes amies, A et B, sur le vrai réseau, chacune avec la même table ; B la plus lente à charger (le PinCab, un PuP-Pack). La preuve sans opérateur : `packages/core/src/test/depart-commun.test.ts` (la machine d'états, deux bornes sur un réseau d'essai, le relevé exécuté par cscript : rien ne part avant le fichier « partez ») et le banc `.\docs\demo-depart-commun.ps1` (la carte de l'attente à chaque place) ; le manuel : « Partie en direct », le départ commun.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 623 | Attendre l'autre | A invite B sur The Matrix, puis lance la partie ; ne toucher à rien. | Sur A, la table chargée : au centre du plateau, « En attente des joueurs », « En attente : B — Chargement de la table… », A coché vert « Prêt », et « Départ sans B dans … s si sa table n'est pas prête ». Sur B pendant son chargement : « Votre table se charge… ». Dès que la table de B est prête : « Partez ! » sur les deux tables à quelques dixièmes de seconde près, puis crédit et Start sur chacune ; la bande de la partie prend la suite. |
+| 624 | Start pendant l'attente | Pendant l'attente, sur A, appuyer sur Start et sur le monnayeur. | Rien ne part, aucun crédit ne tombe ; la partie de A ne démarre qu'avec « Partez ! ». |
+| 625 | Le journal | Après la partie, ouvrir `data\logs\journal.txt` sur A (l'hôte) et sur B. | Sur chacun : « ma table est prête », puis « « partez » posé pour le relevé » ; chez A, entre les deux, « « partez » donné (tous prêts) ». |
+| 626 | Joueur qui quitte | Refaire 623 ; pendant l'attente, sur B, quitter VPX (Exit). | Sur A, B passe à « A quitté la partie » et, A étant prêt, « Partez ! » arrive aussitôt. Aux résultats, B « A quitté la partie ». |
+| 627 | Joueur jamais prêt | Refaire 623 ; pendant le compte à rebours, fermer Cyber Pinball sur B. | Sur A, le délai décompte ; 90 s après qu'A est prêt : « Partez ! », « Départ sans B : table pas prête à temps, départ dès qu'elle le sera » ; la partie de A part. |
+| 628 | Borne ancienne | Laisser B sur la 0.1.5-essai.20 ; A invite B, B accepte, A lance. | Dans le salon de A : « Cyber Pinball 0.1.5-essai.20 sur sa borne : sa table part sans attendre les autres, à mettre à jour ». Sur la table de A, B « Ancienne version : part sans attendre » : A ne l'attend pas. |
+| 629 | Tables à ROM | Refaire 623 sur Terminator 2, puis sur Star Trek (règle du pare-feu de VPX posée). | La ROM passe en attente ; aucun crédit tant que les deux ne sont pas prêtes ; à « Partez ! », un crédit, puis Start deux secondes après, sur chaque borne. |
+| 630 | Table sans relevé | Refaire 623 sur une table à ROM dont la carte ne décrit pas l'état de jeu. | La carte dit « Attendez « Partez ! » pour appuyer sur Start » ; au départ, « Partez ! » et « Appuyez sur Start ». |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

@@ -7,7 +7,7 @@
 // l'ignorer ; quitter sa partie ramène au menu, où l'invitation s'ouvre d'elle-même.
 
 import { formatNumber, t } from './i18n';
-import { LIVE_INVITE_MS, liveBehind, livePlayers, liveRanked, liveScore, type LiveGame, type LiveInvite } from './livegame';
+import { LIVE_INVITE_MS, liveNoLiveState, livePlayers, liveRanked, liveScore, type LiveGame, type LiveInvite } from './livegame';
 import { DMD_FONT_SMALL, dmdText, textWidth } from './dmdfont';
 import { DMD_HEIGHT, DMD_LEVEL, DMD_MARGIN, DMD_WIDTH, blankDots, drawCentered, drawText, scoreText, type DmdDots } from './livedmd';
 import type { Rect, Rotation } from './model';
@@ -59,9 +59,10 @@ export function gameNoticeView(invite: LiveInvite, shownAt: Date, now = new Date
 /**
  * Place de la notification, en pixels de l'écran : dans le coin du plateau en haut à gauche pour
  * le joueur (ou en bas à gauche, `corner`), quel que soit le sens de l'écran. `rotation` : celle
- * de la mise en page du plateau (menuRotation), `size` : la taille vue du joueur.
+ * de la mise en page du plateau (menuRotation), `size` : la taille vue du joueur ; `below` : la
+ * place d'une autre carte déjà dans ce coin, qu'elle laisse au-dessus d'elle (vers le bas du joueur).
  */
-export function gameNoticeBounds(zone: Rect, rotation: Rotation, size: { width: number; height: number }, margin: number, corner: 'top-left' | 'bottom-left' = 'top-left'): Rect {
+export function gameNoticeBounds(zone: Rect, rotation: Rotation, size: { width: number; height: number }, margin: number, corner: 'top-left' | 'bottom-left' = 'top-left', below = 0): Rect {
   const quarter = rotation === 90 || rotation === 270;
   const w = quarter ? size.height : size.width;
   const h = quarter ? size.width : size.height;
@@ -69,10 +70,26 @@ export function gameNoticeBounds(zone: Rect, rotation: Rotation, size: { width: 
   let cx = -1;
   let cy = corner === 'bottom-left' ? 1 : -1;
   for (let r = 0; r < rotation; r += 90) [cx, cy] = [-cy, cx];
-  const x = cx > 0 ? zone.x + zone.width - margin - w : zone.x + margin;
-  const y = cy > 0 ? zone.y + zone.height - margin - h : zone.y + margin;
+  let x = cx > 0 ? zone.x + zone.width - margin - w : zone.x + margin;
+  let y = cy > 0 ? zone.y + zone.height - margin - h : zone.y + margin;
+  // Le bas du joueur, dans le repère de l'écran (même rotation que le coin).
+  let dx = 0;
+  let dy = 1;
+  for (let r = 0; r < rotation; r += 90) [dx, dy] = [-dy, dx];
+  x += dx * below;
+  y += dy * below;
   return { x: Math.round(x), y: Math.round(y), width: Math.round(w), height: Math.round(h) };
 }
+
+// ---------------------------------------------------------------------------
+// Une nouvelle de la partie entre amis pendant la partie d'une autre table (essai réel du
+// 31/10/2026 : on finit plus tôt que les autres, on joue autre chose ; un ami accepte pendant
+// qu'on joue en attendant les réponses) : la notification d'une ligne du menu des tables
+// (notices.ts, NoticeRule.live), posée par-dessus VPX dans le même coin que l'invitation, sous
+// elle si les deux se montrent. La file des notifications décide quand ; la fenêtre suit.
+
+/** Taille vue du joueur, sur un plateau de 1 080 px de petit côté ; `gap` : sous une invitation. */
+export const GAME_NOTICE_LINE = { width: 720, height: 76, gap: 14 } as const;
 
 // ---------------------------------------------------------------------------
 // La partie entre amis en cours (essai réel du 30/10/2026 : « on ne voit absolument pas où en sont
@@ -135,7 +152,7 @@ export function liveBoardView(game: LiveGame, me: string): LiveBoardView | undef
               ? p.balls
                 ? t('Bille {ball} sur {balls}', { ball: p.ball, balls: p.balls })
                 : t('Bille {ball}', { ball: p.ball })
-              : liveBehind(p) && p.key !== me
+              : liveNoLiveState(p) && p.key !== me
                 ? t('Ancienne version : pas de score en direct')
                 : p.state === 'playing'
                   ? t('En partie')

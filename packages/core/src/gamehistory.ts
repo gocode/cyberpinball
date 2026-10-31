@@ -22,7 +22,7 @@ import * as path from 'node:path';
 import { isBallCount } from './ballcount';
 import { boardKey } from './groupboard';
 import { t, tn } from './i18n';
-import { liveBallsAgainst, liveBehind, liveBehindLabel, liveOtherBalls, liveScore, liveStandings, type LiveGame, type LivePlayer, type LivePlayerState, type LiveTable } from './livegame';
+import { liveBallsAgainst, liveBehindLabel, liveNoLiveState, liveOtherBalls, liveScore, liveStandings, type LiveGame, type LivePlayer, type LivePlayerState, type LiveTable } from './livegame';
 import { normalizeName } from './social';
 import { isPlayerPublicKey, parseTableIdentity } from './sharing';
 import { readKeptJson } from './store';
@@ -239,7 +239,7 @@ export function historyOffLabel(p: Pick<HistoryPlayer, 'off' | 'balls'>, hostBal
 export function historyStateLabel(p: Pick<HistoryPlayer, 'state' | 'score' | 'host' | 'proto' | 'app'>): string | undefined {
   switch (p.state) {
     case 'done':
-      return p.score === undefined && !p.host && liveBehind(p) ? liveBehindLabel(p) : undefined;
+      return p.score === undefined && !p.host && liveNoLiveState(p) ? liveBehindLabel(p) : undefined;
     case 'failed':
       return t('La partie n’a pas démarré de son côté');
     case 'left':

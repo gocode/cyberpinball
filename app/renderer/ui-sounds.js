@@ -178,6 +178,23 @@
       }
       return 0.6;
     },
+    // Tintement de la partie entre amis (un invité accepte ou décline, la partie est finie,
+    // notices.ts) : deux notes de cloche douces qui montent d'une quarte, mi puis la, à 120 ms
+    // d'écart, deux fois moins fortes que le carillon d'invitation, sans son attaque de métal :
+    // de la même famille, mais une nouvelle, pas un appel. 0,45 s, sans réverbération.
+    news(ac, out, t) {
+      const notes = [
+        [0, 1318.5, 0.22],
+        [0.12, 1760, 0.3],
+      ];
+      const partials = [
+        [1, 0.16],
+        [2, 0.05],
+        [2.76, 0.03],
+      ];
+      for (const [at, freq, decay] of notes) for (const [ratio, peak] of partials) tone(ac, out, t + at, { from: freq * ratio, peak, attack: 0.004, decay: decay / Math.sqrt(ratio) });
+      return 0.45;
+    },
   };
 
   function forget(entry) {

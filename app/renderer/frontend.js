@@ -766,6 +766,8 @@ function cornerBox(s) {
   const nodes = cornerNodes(s);
   if (!nodes.length) return undefined;
   statusCorner ??= { box: el('div', 'status-corner') };
+  // Menu système : sur la ligne de la roue dentée, à droite de la marque, au-dessus de l'en-tête (frontend.css).
+  statusCorner.box.classList.toggle('over-library', s.phase === 'library');
   statusCorner.line = nodes.find((n) => n.classList.contains('notice-line')) ?? statusCorner.line;
   placeInto(statusCorner.box, nodes);
   return statusCorner.box;
@@ -804,8 +806,9 @@ function drawPlayfield(s) {
   // Mode invité : le cadenas prend la place de la roue dentée, le menu système est fermé.
   if (!(s.phase === 'message' && s.message?.action === 'power')) nodes.push(s.guest ? guestLock(s.guest) : gearButton(s));
   // Au menu des tables seulement : un écran plein a son propre accès (première entrée du menu
-  // système). Pastilles et notification, jamais en mode invité.
-  const corner = s.phase === 'menu' && !s.guest ? cornerBox(s) : undefined;
+  // système). Pastilles et notification, jamais en mode invité. Dans le menu système, une
+  // nouvelle de la partie entre amis seule (notices.ts, NoticeRule.live), au même endroit.
+  const corner = s.phase === 'menu' && !s.guest ? cornerBox(s) : s.phase === 'library' && s.notice?.live ? cornerBox(s) : undefined;
   if (corner) nodes.push(corner);
   else noticeShown = undefined;
 

@@ -521,14 +521,16 @@ test('service : la progression de l’hôte entre dans la partie à chaque chang
 test('application : le relevé lu pendant la partie, la fin ferme VPX, une partie qui a tourné compte comme jouée', () => {
   const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(front, /const liveSource = double\?\.live \? \(\) => double\.liveState\(\)/);
+  // Le relevé simulé (hors écran) part, lui aussi, au « partez » posé dans le double (départ commun, depart-commun.test.ts).
+  assert.match(front, /simulatedLiveState\(Date\.now\(\), autoStopAfterMs \?\? 10_000, \(\) => goneAt\)/);
   assert.match(front, /if \(Date\.now\(\) - overAt >= LIVE_CLOSE_AFTER_MS\) \{[\s\S]*?game\.stop\(\);/);
   assert.match(front, /const played = report\.result\.ok \|\| report\.result\.seconds >= PLAYED_SECONDS;/);
   // La bande ne naît qu'avec la table à l'écran (phase playing), une fois VPX installé sur ses écrans, et suit ceux qu'il prend ou rend.
   assert.match(front, /const onPlaying = \(\) => \{\r?\n[^\n]*\r?\n\s+playingSince = Date\.now\(\);\r?\n\s+state = \{ \.\.\.state, phase: 'playing' \};/);
   assert.match(front, /broadcast\(\);\r?\n\s+setTimeout\(showLiveBoard, LIVE_BOARD_SETTLE_MS\);/);
-  assert.match(front, /gameNotices\.board\(playing && state\.phase === 'playing' && settled && current \? liveBoardView\(current, socialNet\.state\(\)\.key\.publicKey\) : undefined\);/);
+  assert.match(front, /gameNotices\.board\(!wait && playing && state\.phase === 'playing' && settled && current \? liveBoardView\(current, socialNet\.state\(\)\.key\.publicKey\) : undefined\);/);
   assert.match(front, /console\.log\(`Partie : écrans occupés par VPX[^\n]*\r?\n\s+broadcast\(\);\r?\n[^\n]*\r?\n\s+showLiveBoard\(\);/);
   const doubles = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'table-double.ts'), 'utf8');
-  assert.match(doubles, /liveStateHook\(script, readVpxElements\(plan\.file\), stateFile, rom\?\.memory, offered\)/);
+  assert.match(doubles, /liveStateHook\(script, readVpxElements\(plan\.file\), stateFile, rom\?\.memory, offered, goFile\)/);
   assert.match(doubles, /const rom = roms\.map\(\(name\) => \(\{ name, memory: romBoard\(name\)\.memory \}\)\)\.find\(\(r\) => r\.memory\);/);
 });

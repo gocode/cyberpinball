@@ -10,7 +10,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { vpxWithScript } from './fixtures';
 import { REPO_ROOT } from './i18n-scan';
-import { answerGame, buildScriptPatch, livePlayerStateLabel, matchLiveTable, newLiveGame, parseLiveMessage, type LiveInvite, type LiveMessage, type LiveTable, type TableEntry, type TableIdentity } from '../index';
+import { answerGame, buildScriptPatch, LIVE_PROTOCOL, livePlayerStateLabel, matchLiveTable, newLiveGame, parseLiveMessage, type LiveInvite, type LiveMessage, type LiveTable, type TableEntry, type TableIdentity } from '../index';
 
 const T2: TableIdentity = { title: 'Terminator 2', manufacturer: 'Williams', year: 1991 };
 const A = 'a'.repeat(64), B = 'b'.repeat(64), S = 'c'.repeat(64);
@@ -93,10 +93,10 @@ test('service : le .vbs de Cyber Pinball ne compte pas ; un .vbs venu d’ailleu
   const same = await invitation(undefined, ours);
   assert.equal(same.sent.script, undefined);
   assert.equal(same.found.match, 'same', 'les réparations PuP de Cyber Pinball ne changent pas la version');
-  assert.deepEqual(same.answer, { t: 'game-answer', game: '0123456789abcdef', answer: 'accept', match: 'same', proto: 3 });
+  assert.deepEqual(same.answer, { t: 'game-answer', game: '0123456789abcdef', answer: 'accept', match: 'same', proto: LIVE_PROTOCOL });
   const modified = await invitation(undefined, foreign);
   assert.deepEqual([modified.found.match, modified.found.scriptDiffers], ['other-version', true]);
-  assert.deepEqual(modified.answer, { t: 'game-answer', game: '0123456789abcdef', answer: 'decline', match: 'other-version', proto: 3 });
+  assert.deepEqual(modified.answer, { t: 'game-answer', game: '0123456789abcdef', answer: 'decline', match: 'other-version', proto: LIVE_PROTOCOL });
   const both = await invitation(foreign, foreign);
   assert.match(both.sent.script!, /^[0-9a-f]{64}$/);
   assert.equal(both.found.match, 'same', 'le même .vbs des deux côtés');

@@ -166,6 +166,8 @@ export const messages: Record<string, string> = {
   'Lancement en cinéma : VPX prend la main': 'Cinematic launch: VPX takes over',
   'Carillon d’invitation': 'Invitation chime',
   'Invitation d’un ami à une partie en direct, même pendant une partie': 'A friend’s invitation to a live game, even during a game',
+  'Tintement de la partie entre amis': 'Game-with-friends chime',
+  'Une nouvelle de la partie entre amis au menu : un invité accepte ou décline, la partie est finie': 'News of a game with friends in the menu: a guest accepts or declines, the game is over',
   'Mode attente : {delay}': 'Attract mode: {delay}',
   'Tables tirées au hasard avec leurs médias ; n’importe quel bouton revient au menu': 'Random tables with their media; any button returns to the menu',
   'Après {duration} sans bouton': 'After {duration} idle',

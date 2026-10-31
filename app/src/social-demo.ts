@@ -9,7 +9,8 @@
 //   Émile  : ami hors ligne depuis trois heures (écrit dans social.json avant le démarrage).
 // CYBERPINBALL_RESEAU_DEMO=partie : de plus, Bruno invite la borne à une partie en direct sur la
 // table qu'ils ont tous deux, ici dans la même version (la partie se montre sans avertissement),
-// lance le départ dès qu'elle accepte, joue quatre secondes et bat son record ; l'historique des
+// lance le départ dès qu'elle accepte, charge sa table six secondes (la borne l'attend au départ
+// commun), joue quatre secondes et bat son record ; l'historique des
 // parties a déjà deux soirées avec Émile (seedSimulatedFriends). =en-jeu : Bruno
 // attend que la borne soit en partie, puis l'invite (la notification pendant la partie,
 // game-notice.ts) ; l'invitation s'ouvre au retour au menu.
@@ -33,7 +34,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { addEvent, addToHistory, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, readHostSettings, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, type LiveGame, type SocialState, type TableEntry } from '@cyberpinball/core';
 import { createFriendContent, type FriendContent } from './friend-content';
-import { createLiveGames, type LiveGames } from './live-game';
+import { createLiveGames, createTableVersions, type LiveGames } from './live-game';
 import { createSocialNet, type SocialNet } from './social-net';
 
 export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
@@ -52,6 +53,8 @@ export const DEMO_TABLES = {
   notOnCabinet: 'Glass Lagoon (Gulfstream 1993)',
 };
 
+/** Partie en direct : la table de Bruno charge ce temps, la borne l'attend au départ commun (livestart.ts). */
+const BRUNO_LOADING_MS = 6000;
 /** Table que la borne n'a pas, dans la démonstration de la coupure : assez lourde pour voir l'envoi avancer, s'arrêter, reprendre. */
 const CUT_TABLE_BYTES = 24 * 1024 * 1024;
 /** Débit de Bruno dans la démonstration de la coupure : un morceau de 64 Kio toutes les 25 ms (environ 2,5 Mo/s). */
@@ -243,6 +246,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       return bruno.sendChunk(key, frame);
     },
   };
+  const brunoVersions = createTableVersions(brunoDir);
   const content: FriendContent = createFriendContent({
     net: cut ? throttled : bruno,
     dataDir: brunoDir,
@@ -250,6 +254,8 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     tables: brunoTables,
     root: () => root,
     contents: (table) => (root ? tableContents(table.file, { ownFolder: true, romLibrary: layoutOf(root).roms }) : undefined),
+    // Sa bibliothèque donne la version de ses tables, comme celle d'une borne à jour.
+    versionOf: (table) => brunoVersions.of(table),
   });
   const timers: NodeJS.Timeout[] = [];
   // Notifications : David et Fanny se connectent ensemble, Émile plus tard (amis déjà connus, seedSimulatedFriends).
@@ -285,8 +291,12 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       tables: brunoTables,
       // Ses réglages partent vers la borne, comme ceux d'une vraie borne (hostsettings.ts).
       settingsOf: (table) => readHostSettings({ folder: table.folder, roms: [] }),
-      play: async (_table, playing, _settings, _board, progress) => {
+      play: async (_table, playing, _settings, _board, progress, gate) => {
         playing();
+        // Départ commun : sa table charge six secondes (la borne l'attend, et le dit), puis il attend « partez ».
+        await new Promise((r) => setTimeout(r, BRUNO_LOADING_MS));
+        gate?.ready();
+        while (gate && !gate.go()) await new Promise((r) => setTimeout(r, 250));
         // Sa progression, comme le relevé d'une vraie borne : le score monte, bille après bille.
         for (let i = 1; i <= 8; i++) {
           await new Promise((r) => setTimeout(r, 500));

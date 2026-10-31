@@ -88,7 +88,7 @@ function namesOf(id: SystemEntryId): string[] {
   return names;
 }
 
-/** Segments d'un chemin « Menu système > A > B » : le texte entre guillemets, sinon le texte jusqu'à la ponctuation. */
+/** Segments d'un chemin « Menu système > A > B » : le texte entre guillemets, sinon le texte jusqu'à la ponctuation (« · » compris : la suite d'une notification). */
 function segments(rest: string): string[] {
   const out: string[] = [];
   let text = rest;
@@ -101,7 +101,7 @@ function segments(rest: string): string[] {
       text = text.slice(quoted[0].length);
     } else {
       // L'apostrophe droite ferme une chaîne de code (t('Menu système > Amis')) ; celle des noms est typographique.
-      const plain = /^([^.;:,()«»"“”*>`']+?)(?=\s*(?:>|[.;:,()`']|$))/.exec(text);
+      const plain = /^([^.;:,()«»"“”*>`'·]+?)(?=\s*(?:>|[.;:,()`'·]|$))/.exec(text);
       if (!plain) break;
       segment = plain[1]!;
       text = text.slice(plain[0].length);
@@ -160,6 +160,7 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.deepEqual(segments('"Borne" (Cabinet) > "Configuration de la borne" (Cabinet setup) > "Tilt" (`npm run`)'), ['Borne', 'Configuration de la borne', 'Tilt']);
   assert.deepEqual(segments('Borne > Configuration de la borne > Écran du DMD.'), ['Borne', 'Configuration de la borne', 'Écran du DMD']);
   assert.deepEqual(segments("Amis > Demandes d’amis'),"), ['Amis', 'Demandes d’amis'], 'chemin dans une chaîne de code');
+  assert.deepEqual(segments('Amis · vous : place 2 sur 3 »'), ['Amis'], 'la suite d’une notification, après « · »');
   assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Amis, Tables, Médias, Téléchargements, Borne, Cyber Pinball)');
   assert.equal(checkPath(['Téléchargements']), undefined, 'Téléchargements, à la racine');
   assert.equal(checkPath(['Tables', 'Téléchargements']), undefined, 'et toujours dans Tables');

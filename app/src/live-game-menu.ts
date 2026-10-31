@@ -1,7 +1,8 @@
 // Partie en direct à l'écran (live-game.ts, packages/core/src/livegame.ts) : choisir la table et
 // inviter un ami (depuis sa fiche, ou « Jouer avec un ami » sur la fiche d'une table), le salon
 // (qui est prêt, qui a refusé, qui a une autre version), l'invitation reçue, le compte à rebours
-// du départ commun, puis les résultats de chacun.
+// du départ commun, puis les résultats de chacun. Le choix de la table met en tête celles que
+// chaque invité a dans la même version (livechoice.ts) ; les autres sont grisées avec leur raison.
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec des services d'essai.
 
@@ -18,14 +19,22 @@ import {
   liveBallsAgainst,
   liveBehind,
   liveBehindLabel,
+  liveCandidate,
+  liveChoiceDetail,
+  liveFitLabel,
   liveOtherBalls,
   liveRanked,
   liveScore,
   liveStandings,
+  liveTableChoices,
+  liveWaitView,
   playDuration,
   t,
   tn,
+  type LiveFriendFit,
+  type LiveFriendTables,
   type LiveGame,
+  type LiveMineTable,
   type LivePlayer,
   type GamePart,
   type LiveTableMatch,
@@ -41,13 +50,16 @@ export interface LiveMenuHost {
     openCustom(build: () => Built, at?: number): void;
     task(message: string, work: () => Promise<void> | void): Promise<void>;
     catalogFor(identity: TableIdentity): void;
+    /** Cet écran décrit est affiché. */
+    isShowing?(build: () => Built): boolean;
   };
   net: Pick<SocialNet, 'state' | 'online' | 'presenceOf'>;
   games: LiveGames;
   tables(): readonly TableEntry[];
-  /** La bibliothèque de cet ami (si elle est connue) a cette table : elle passe en tête du choix. */
-  friendHas?(key: string, table: TableEntry): boolean;
-  /** Cette table chez cet ami, dans sa bibliothèque partagée (« Récupérer toute la table »). */
+  /** Ce qu'on sait des tables de cet ami (sa bibliothèque partagée, la version de chacune) : le choix de la table en tient compte. */
+  friendTables(key: string): LiveFriendTables;
+  /** Le jeu d'une de mes tables (titre, fabricant, année, VPS, ROM). */
+  identityOf(table: TableEntry): TableIdentity;
   /** La table de l'ami dans sa bibliothèque ; `want` : les parties à cocher d'office quand on a déjà le jeu (sa version : 'table'). */
   openFriendTable?(key: string, identity: TableIdentity, back: () => void, want?: readonly GamePart[]): void;
   redraw(): void;
@@ -55,8 +67,10 @@ export interface LiveMenuHost {
 }
 
 export interface LiveMenu {
-  /** Inviter cet ami : choisir la table, ouvrir le salon. */
+  /** Inviter cet ami : choisir la table (celles qu'il a dans la même version en tête), ouvrir le salon. */
   inviteFriend(key: string, back: () => void): void;
+  /** Inviter ces amis ensemble : une table est jouable si elle l'est chez tous. */
+  inviteFriends(keys: readonly string[], back: () => void): void;
   /** Inviter cet ami sur cette table. */
   inviteOn(table: TableEntry, key: string, back: () => void): void;
   /** Entrée « Jouer avec un ami » de la fiche d'une table : active quand un ami est en ligne, grisée avec sa raison sinon. */
@@ -72,6 +86,10 @@ export interface LiveMenu {
   /** Action à mettre en tête de « Mes amis » quand une partie ou une invitation attend. */
   pendingAction(back: () => void): Action | undefined;
   attention(): boolean;
+  /** L'écran de la partie (salon, départ, résultats) est ouvert : ses nouvelles s'y voient déjà (menu-notices.ts). */
+  onScreen(): boolean;
+  /** La partie est finie et ses résultats pas encore montrés : ils s'ouvrent au retour d'une partie d'une autre table. */
+  unseenResults(): boolean;
 }
 
 export function createLiveMenu(host: LiveMenuHost): LiveMenu {
@@ -90,9 +108,11 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   /** Ce que j'ai de la table de chaque invitation, vérifié à son ouverture. */
   const matches = new Map<string, { match: LiveTableMatch; balls?: number; scriptDiffers?: boolean }>();
   let followed: { id: string; phase: LiveGame['phase'] } | undefined;
+  /** La dernière partie dont les résultats, finis, ont été montrés. */
+  let resultsSeen: string | undefined;
 
   const stateTone = (p: LivePlayer): Tone | undefined =>
-    p.state === 'accepted' || p.state === 'playing' || p.state === 'done' ? 'ok' : p.state === 'declined' || p.state === 'failed' || p.state === 'left' ? 'quiet' : p.state === 'busy' || p.state === 'expired' ? 'warning' : undefined;
+    p.state === 'accepted' || p.state === 'playing' || p.state === 'done' || (p.state === 'loading' && p.ready) ? 'ok' : p.state === 'declined' || p.state === 'failed' || p.state === 'left' ? 'quiet' : p.state === 'busy' || p.state === 'expired' ? 'warning' : undefined;
 
   /** En partie sur sa borne : une invitation lui arrive en notification discrète sur sa table. */
   const playingNow = (key: string) => host.net.online(key) && host.net.presenceOf(key)?.status === 'playing';
@@ -147,6 +167,63 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       ? { text: t('Même table, autre script'), detail: t('Un .vbs posé à côté de votre table remplace son script : la partie demande le même script que {name}.', { name }), tone: 'warning', icon: 'alert' }
       : { text: t('Autre version de cette table'), detail: t('La partie se joue sur la même version pour tous : récupérez celle de {name}.', { name }), tone: 'warning', icon: 'alert' };
 
+  // ---------- La table, chez mes invités ----------
+
+  /**
+   * Version stricte de mes tables, calculée à la demande (une empreinte se lit une fois par
+   * fichier, live-game.ts la garde) : le choix se redessine à chaque arrivée. Relue en arrière-plan
+   * après une minute (un .vbs posé à côté), la dernière connue restant montrée.
+   */
+  const mineVersions = new Map<string, { at: number; bytes?: number; version?: { print?: string; script?: string }; running?: boolean }>();
+  function versionOfMine(table: TableEntry, bytes: number | undefined): { print?: string; script?: string; pending?: true } {
+    let known = mineVersions.get(table.file);
+    if (known && known.bytes !== bytes) known = undefined;
+    if (!known || (!known.running && Date.now() - known.at > 60_000)) {
+      const next: NonNullable<typeof known> = { at: Date.now(), ...(bytes ? { bytes } : {}), ...(known?.version ? { version: known.version } : {}), running: true };
+      mineVersions.set(table.file, next);
+      const done = (version: { print?: string; script?: string }) => {
+        if (mineVersions.get(table.file) !== next) return;
+        mineVersions.set(table.file, { at: Date.now(), ...(bytes ? { bytes } : {}), version });
+        host.redraw();
+      };
+      void games.versionOf(table).then(done, () => done({}));
+      known = next;
+    }
+    return known.version ?? { pending: true };
+  }
+
+  /** Mes tables pour une partie avec ces amis : jouables avec tous en tête, puis à vérifier, puis indisponibles. */
+  function choicesFor(tables: readonly TableEntry[], keys: readonly string[]) {
+    return choicesOf(tables, keys).choices;
+  }
+
+  /** Les choix, et si une de mes empreintes se calcule encore (l'ordre va changer). */
+  function choicesOf(tables: readonly TableEntry[], keys: readonly string[]) {
+    const friends = keys.map((k) => host.friendTables(k));
+    const mine = tables.map((table): LiveMineTable<TableEntry> => {
+      const bytes = games.bytesOf(table);
+      const base = { entry: table, title: table.title, identity: host.identityOf(table), ...(bytes ? { bytes } : {}) };
+      // Mon empreinte seulement pour une table qu'un ami a peut-être (même jeu, même taille) : les autres sont absentes chez lui sans rien lire.
+      return friends.some((f) => f.library === 'ready' && f.tables.some((x) => liveCandidate(base, x))) ? { ...base, ...versionOfMine(table, bytes) } : base;
+    });
+    return { choices: liveTableChoices(mine, friends), pending: mine.some((m) => m.pending) };
+  }
+
+  /**
+   * Choix ouvert avant que mes empreintes soient connues : les tables se rangent à leur arrivée, et
+   * l'écran se rouvre alors une fois, le curseur sur la première (il restait sur une table « à
+   * vérifier » descendue parmi les indisponibles).
+   */
+  let settling: { id: string; pending: boolean } | undefined;
+
+  /** Ce qu'a cet ami de cette table. */
+  const fitFor = (table: TableEntry, key: string): LiveFriendFit => choicesFor([table], [key])[0]!.friends[0]!;
+  const fitRank = (f: LiveFriendFit) => ({ same: 0, unknown: 1, 'other-version': 2, missing: 3 })[f.fit];
+  const fitTone = (f: LiveFriendFit): Tone => (f.fit === 'same' ? 'ok' : f.fit === 'unknown' ? 'warning' : 'quiet');
+
+  /** « Récupérer sa version chez … » : sa table, cochée d'office dans sa bibliothèque partagée. */
+  const fetchVersion = (key: string, table: TableEntry, back: () => void) => host.openFriendTable?.(key, host.identityOf(table), back, ['table']);
+
   // ---------- Depuis une fiche : l'entrée, toujours là ----------
 
   function friendAction(key: string, back: () => void): Action {
@@ -165,18 +242,25 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     return { ...base, detail: tn(online, '{n} ami en ligne : chacun sur sa borne, au même moment', '{n} amis en ligne : chacun sur sa borne, au même moment'), tone: 'ok', run: () => host.library.openCustom(() => buildChooseFriend(table, back)) };
   }
 
-  /** Les amis à inviter sur cette table : ceux en ligne en tête (qui l'a aussi d'abord), les autres grisés. */
+  /**
+   * Les amis à inviter sur cette table : ceux en ligne en tête, qui l'a dans la même version
+   * d'abord ; ceux qui ne l'ont pas, ou dans une autre version, grisés avec leur raison ; les autres hors ligne.
+   */
   function buildChooseFriend(table: TableEntry, back: () => void): Built {
-    const has = (key: string) => host.friendHas?.(key, table) ?? false;
-    const friends = [...host.net.state().friends].sort((a, b) => Number(has(b.key)) - Number(has(a.key)) || a.name.localeCompare(b.name));
-    const online = friends.filter((f) => host.net.online(f.key));
-    const offline = friends.filter((f) => !host.net.online(f.key));
+    const all = [...host.net.state().friends];
+    const fits = new Map(all.filter((f) => host.net.online(f.key)).map((f) => [f.key, fitFor(table, f.key)]));
+    const online = all.filter((f) => fits.has(f.key)).sort((a, b) => fitRank(fits.get(a.key)!) - fitRank(fits.get(b.key)!) || a.name.localeCompare(b.name));
+    const offline = all.filter((f) => !fits.has(f.key)).sort((a, b) => a.name.localeCompare(b.name));
     const reopen = () => host.library.openCustom(() => buildChooseFriend(table, back));
     const actions: Action[] = [];
     const rows: Row[] = online.map((f) => {
-      const index = actions.push({ label: f.name, key: `friend:${f.key}`, icon: 'friend-list', run: () => inviteOn(table, f.key, reopen) }) - 1;
+      const fit = fits.get(f.key)!;
+      const fetch = fit.fit === 'other-version' && host.openFriendTable;
+      const run = fit.fit === 'same' || fit.fit === 'unknown' ? () => inviteOn(table, f.key, reopen) : fetch ? () => fetchVersion(f.key, table, reopen) : () => undefined;
+      const index = actions.push({ label: f.name, key: `friend:${f.key}`, icon: 'friend-list', run }) - 1;
       const doing = playingNow(f.key) ? t('En partie : notifié sur sa table') : t('Dans le menu des tables');
-      return { text: label(f.key, f.name), detail: [doing, has(f.key) ? t('{name} l’a aussi', { name: f.name }) : undefined].filter(Boolean).join(' · '), icon: 'friend-list', tone: 'ok', action: index, pick: true };
+      const detail = [doing, liveFitLabel(fit), fetch ? t('Start : récupérer sa version chez {name}', { name: f.name }) : undefined].filter(Boolean).join(' · ');
+      return { text: label(f.key, f.name), detail, icon: 'friend-list', tone: fitTone(fit), action: index, pick: true };
     });
     actions.push({ label: t('Retour'), icon: 'back', run: back });
     const sections: Section[] = [];
@@ -187,7 +271,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       heading: t('Jouer avec un ami'),
       icon: 'gamepad',
       subheading: table.title,
-      lead: t('Choisissez qui inviter : il doit avoir la table aussi. Chacun joue sa partie sur sa borne, au même moment, puis les résultats arrivent.'),
+      lead: t('Choisissez qui inviter : en tête, ceux qui ont cette table dans la même version. Chacun joue sa partie sur sa borne, au même moment, puis les résultats arrivent.'),
       sections,
       actions,
       back,
@@ -197,47 +281,98 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   // ---------- Choisir la table ----------
 
   function inviteFriend(key: string, back: () => void): void {
-    host.library.openCustom(() => buildChoose(key, back));
+    inviteFriends([key], back);
   }
 
-  function buildChoose(key: string, back: () => void): Built {
-    const friend = host.net.state().friends.find((f) => f.key === key);
-    const plain = friend?.name ?? '?';
-    const has = (table: TableEntry) => host.friendHas?.(key, table) ?? false;
-    const tables = [...host.tables()].sort((a, b) => Number(has(b)) - Number(has(a)) || a.title.localeCompare(b.title));
+  function inviteFriends(keys: readonly string[], back: () => void): void {
+    settling = { id: keys.join(','), pending: false };
+    host.library.openCustom(() => buildChoose(keys, back));
+  }
+
+  const nameOf = (key: string) => host.net.state().friends.find((f) => f.key === key)?.name ?? '?';
+  const fullTitle = (table: TableEntry) => (table.manufacturer && table.year ? `${table.title} (${table.manufacturer} ${table.year})` : table.title);
+
+  /**
+   * Le choix de la table pour ces amis : en tête celles que tous ont dans la même version ; puis
+   * celles à vérifier (une borne qui ne dit pas ses versions : signalée, pas refusée) ; puis les
+   * indisponibles, grisées avec qui bloque et pourquoi. Une autre version chez un ami garde
+   * « Récupérer sa version chez … » ; une table qu'un ami n'a pas ne lance rien.
+   */
+  function buildChoose(keys: readonly string[], back: () => void): Built {
+    const plain = keys.map(nameOf).join(', ');
+    const reopen = () => host.library.openCustom(() => buildChoose(keys, back));
+    const { choices, pending } = choicesOf(host.tables(), keys);
+    if (settling?.id === keys.join(',')) {
+      if (pending) settling.pending = true;
+      else {
+        if (settling.pending) setImmediate(reopen);
+        settling = undefined;
+      }
+    }
     const actions: Action[] = [];
-    const rows: Row[] = tables.map((table) => {
-      const index = actions.push({ label: table.title, key: `table:${table.file}`, icon: 'play', run: () => inviteOn(table, key, back) }) - 1;
+    const row = (c: (typeof choices)[number]): Row => {
+      const other = c.fit === 'blocked' && host.openFriendTable ? c.friends.find((f) => f.fit === 'other-version') : undefined;
+      const run = c.fit !== 'blocked' ? () => inviteAll(c.entry, keys, back) : other ? () => fetchVersion(other.key, c.entry, reopen) : () => undefined;
+      const index = actions.push({ label: c.entry.title, key: `table:${c.entry.file}`, icon: 'play', run }) - 1;
       return {
-        text: table.manufacturer && table.year ? `${table.title} (${table.manufacturer} ${table.year})` : table.title,
-        detail: [table.version, has(table) ? t('{name} l’a aussi', { name: plain }) : undefined].filter(Boolean).join(' · ') || undefined,
-        tone: has(table) ? 'ok' : undefined,
+        text: fullTitle(c.entry),
+        detail: [c.entry.version, liveChoiceDetail(c), other ? t('Start : récupérer sa version chez {name}', { name: other.name }) : undefined].filter(Boolean).join(' · '),
+        tone: c.fit === 'same' ? 'ok' : c.fit === 'unknown' ? 'warning' : 'quiet',
         action: index,
         pick: true,
       };
-    });
+    };
+    const same = choices.filter((c) => c.fit === 'same');
+    const unsure = choices.filter((c) => c.fit === 'unknown');
+    const blocked = choices.filter((c) => c.fit === 'blocked');
+    const sections: Section[] = [];
+    if (!choices.length) sections.push({ rows: [{ text: t('Aucune table sur cette borne'), tone: 'info' }] });
+    if (same.length) sections.push({ title: t('Même version chez tous ({n})', { n: same.length }), rows: same.map(row) });
+    else if (choices.length && !unsure.length) sections.push({ rows: [{ text: t('Aucune table en commun dans la même version'), detail: t('Récupérez la version d’un ami (Start sur une table grisée), ou laissez-le prendre la vôtre dans votre bibliothèque partagée.'), tone: 'info' }] });
+    if (unsure.length) sections.push({ title: t('À vérifier ({n})', { n: unsure.length }), rows: unsure.map(row) });
+    if (blocked.length) sections.push({ title: t('Indisponibles ({n})', { n: blocked.length }), rows: blocked.map(row) });
     actions.push({ label: t('Retour'), icon: 'back', run: back });
     return {
       heading: t('Partie en direct avec {name}', { name: plain }),
       icon: 'gamepad',
-      lead: t('Choisissez la table : {name} doit l’avoir aussi. Chacun joue sa partie sur sa borne, au même moment, puis les résultats arrivent.', { name: plain }),
-      sections: rows.length ? [{ title: t('Tables de votre borne'), rows }] : [{ rows: [{ text: t('Aucune table sur cette borne'), tone: 'info' }] }],
+      lead:
+        keys.length > 1
+          ? t('Choisissez la table : en tête, celles que {names} ont tous dans la même version que vous. Les autres sont grisées, avec leur raison. Chacun joue sa partie sur sa borne, au même moment.', { names: plain })
+          : t('Choisissez la table : en tête, celles que {name} a dans la même version que vous. Les autres sont grisées, avec leur raison. Chacun joue sa partie sur sa borne, au même moment.', { name: plain }),
+      sections,
       actions,
       back,
     };
   }
 
   function inviteOn(table: TableEntry, key: string, back: () => void): void {
-    const friend = host.net.state().friends.find((f) => f.key === key);
-    const plain = friend?.name ?? '?';
+    inviteAll(table, [key], back);
+  }
+
+  /** Un salon sur cette table (celui ouvert dessus, sinon un nouveau : l'ancien est annulé, ses invités prévenus), puis chaque invitation. */
+  function inviteAll(table: TableEntry, keys: readonly string[], back: () => void): void {
     gameBack = back;
     void host.library.task(t('Préparation de la partie : empreinte de la table…'), async () => {
       const current = games.current();
-      // Déjà un salon sur cette table : l'ami y est ajouté ; sinon un nouveau salon.
-      if (!current || current.host !== myKey() || current.phase !== 'gathering' || games.table()?.file !== table.file) await games.create(table);
-      flash = games.invite(key, plain)
-        ? { text: t('Invitation envoyée à {name}', { name: plain }), detail: t('Elle reste valable deux minutes'), tone: 'ok' }
-        : { text: host.net.online(key) ? t('Salon complet : {max} joueurs au plus', { max: LIVE_MAX_PLAYERS }) : t('{name} n’est plus en ligne', { name: plain }), tone: 'warning' };
+      // Déjà un salon sur cette table : les amis y sont ajoutés ; sinon un nouveau salon.
+      if (!current || current.host !== myKey() || current.phase !== 'gathering' || games.table()?.file !== table.file) {
+        if (current?.phase === 'finished' || current?.phase === 'cancelled') games.close();
+        else if (current?.host === myKey()) games.leave();
+        await games.create(table);
+      }
+      const sent = keys.filter((key) => games.invite(key, nameOf(key)));
+      const missed = keys.filter((key) => !sent.includes(key));
+      if (keys.length === 1) {
+        const plain = nameOf(keys[0]!);
+        flash = sent.length
+          ? { text: t('Invitation envoyée à {name}', { name: plain }), detail: t('Elle reste valable deux minutes'), tone: 'ok' }
+          : { text: host.net.online(keys[0]!) ? t('Salon complet : {max} joueurs au plus', { max: LIVE_MAX_PLAYERS }) : t('{name} n’est plus en ligne', { name: plain }), tone: 'warning' };
+      } else {
+        const text = tn(sent.length, 'Invitation envoyée à {n} ami', 'Invitations envoyées à {n} amis');
+        flash = missed.length
+          ? { text, detail: t('Pas d’invitation pour {names} : plus en ligne, ou salon complet', { names: missed.map(nameOf).join(', ') }), tone: 'warning' }
+          : { text, detail: t('Elles restent valables deux minutes'), tone: 'ok' };
+      }
     }).then(() => openGame());
   }
 
@@ -275,6 +410,9 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       });
       const others = host.net.state().friends.filter((f) => host.net.online(f.key) && !game.players.some((p) => p.key === f.key && ['invited', 'accepted'].includes(p.state)));
       if (seats < LIVE_MAX_PLAYERS && others.length) actions.push({ label: t('Inviter un autre ami'), detail: tn(others.length, '{n} ami en ligne', '{n} amis en ligne'), icon: 'friend-add', run: () => openAddFriend() });
+      // Une autre table pour les mêmes invités : celles qu'ils ont tous dans la même version en tête.
+      const guests = game.players.filter((p) => !p.host && ['invited', 'accepted', 'declined'].includes(p.state) && host.net.online(p.key)).map((p) => p.key);
+      if (guests.length) actions.push({ label: t('Changer de table'), detail: t('Les tables qu’ils ont aussi dans la même version en tête ; ils reçoivent une nouvelle invitation'), icon: 'tables', run: () => inviteFriends(guests, () => openGame()) });
       actions.push({ label: t('Annuler la partie'), detail: t('Les invités en sont prévenus'), icon: 'close', run: () => { games.leave(); back(); } });
     } else {
       actions.push({ label: t('Quitter la partie'), icon: 'close', run: () => { games.leave(); back(); } });
@@ -302,13 +440,28 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       const game = games.current();
       const back = () => openGame();
       const actions: Action[] = [];
-      const friends = host.net.state().friends.filter((f) => host.net.online(f.key) && !game?.players.some((p) => p.key === f.key && ['invited', 'accepted'].includes(p.state)));
+      const table = games.table();
+      const free = host.net.state().friends.filter((f) => host.net.online(f.key) && !game?.players.some((p) => p.key === f.key && ['invited', 'accepted'].includes(p.state)));
+      const fits = new Map(free.map((f) => [f.key, table ? fitFor(table, f.key) : undefined]));
+      const rank = (key: string) => (fits.get(key) ? fitRank(fits.get(key)!) : 0);
+      const friends = free.sort((a, b) => rank(a.key) - rank(b.key) || a.name.localeCompare(b.name));
       const rows: Row[] = friends.map((f) => {
-        const index = actions.push({ label: label(f.key, f.name), key: `friend:${f.key}`, icon: 'friend-add', run: () => {
+        const fit = fits.get(f.key);
+        const invite = () => {
           flash = games.invite(f.key, f.name) ? { text: t('Invitation envoyée à {name}', { name: f.name }), tone: 'ok' } : { text: t('Invitation impossible : salon complet, ou ami plus en ligne'), tone: 'warning' };
           openGame();
-        } }) - 1;
-        return { text: label(f.key, f.name), detail: t('En ligne'), tone: 'ok', action: index, pick: true };
+        };
+        // Sans la même version, il ne pourrait que refuser : grisé, avec sa raison (et sa version à récupérer).
+        const fetch = fit?.fit === 'other-version' && table && host.openFriendTable ? () => fetchVersion(f.key, table, () => openAddFriend()) : undefined;
+        const run = !fit || fit.fit === 'same' || fit.fit === 'unknown' ? invite : (fetch ?? (() => undefined));
+        const index = actions.push({ label: label(f.key, f.name), key: `friend:${f.key}`, icon: 'friend-add', run }) - 1;
+        return {
+          text: label(f.key, f.name),
+          detail: fit ? [liveFitLabel(fit), fetch ? t('Start : récupérer sa version chez {name}', { name: f.name }) : undefined].filter(Boolean).join(' · ') : t('En ligne'),
+          tone: fit ? fitTone(fit) : 'ok',
+          action: index,
+          pick: true,
+        };
       });
       actions.push({ label: t('Retour'), icon: 'back', run: back });
       return { heading: t('Inviter un autre ami'), icon: 'friend-add', subheading: game?.title, sections: rows.length ? [{ rows }] : [{ rows: [{ text: t('Aucun autre ami en ligne'), tone: 'info' }] }], actions, back };
@@ -363,7 +516,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       text: score !== undefined && place ? `${place}. ${who} — ${formatNumber(score)}` : score !== undefined ? `${who} — ${formatNumber(score)}` : p.state === 'done' ? `${who} — ${t('Score non disponible')}` : who,
       detail,
       icon: score !== undefined ? 'star' : 'friend-list',
-      tone: p.state === 'done' ? 'ok' : p.state === 'playing' || p.state === 'loading' ? 'info' : 'quiet',
+      tone: p.state === 'done' || (p.state === 'loading' && p.ready) ? 'ok' : p.state === 'playing' || p.state === 'loading' ? 'info' : 'quiet',
       ...(place === 1 && compared ? { badges: [t('Meilleur score connu')] } : p.state === 'playing' || p.state === 'loading' ? { badges: [t('En partie')] } : {}),
     };
   }
@@ -371,15 +524,20 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   function buildResults(game: LiveGame, back: () => void): Built {
     const standings = liveStandings(game);
     const finished = game.phase === 'finished';
+    if (finished) resultsSeen = game.id;
     const hosting = game.host === myKey();
     const actions: Action[] = [];
     if (finished && hosting && games.table()) {
       const again = game.players.filter((p) => !p.host && ['done', 'failed', 'playing', 'loading', 'accepted'].includes(p.state) && host.net.online(p.key));
       if (again.length) actions.push({ label: t('Rejouer avec les mêmes joueurs'), detail: again.map((p) => p.name).join(', '), icon: 'restart', tone: 'ok', run: () => replay(again) });
+      if (again.length) actions.push({ label: t('Autre table, mêmes joueurs'), detail: t('Les tables qu’ils ont aussi dans la même version en tête'), icon: 'tables', run: () => inviteFriends(again.map((p) => p.key), () => openGame()) });
     }
     actions.push({ label: finished ? t('Fermer') : t('Retour'), detail: finished ? undefined : t('Les résultats arrivent dans « Mes amis »'), icon: finished ? 'check' : 'back', run: () => { if (finished) games.close(); back(); } });
     const ranked = standings.filter((p) => liveScore(p) !== undefined && liveRanked(p, game.table.balls));
     const otherBalls = game.players.some((p) => !p.host && liveOtherBalls(p, game.table.balls));
+    // Départ commun pas encore donné : pourquoi la partie n'a pas démarré (livestart.ts) ; le statut de chacun est dans sa ligne.
+    const wait = game.phase === 'playing' ? (games.waitView() ?? liveWaitView(game, myKey(), now())) : undefined;
+    const waitRow: Row[] = wait && !wait.go ? [{ text: wait.title, detail: [wait.lead, wait.note].filter(Boolean).join(' · '), tone: 'info', icon: 'clock' }] : [];
     return {
       heading: finished ? t('Résultats') : t('Partie en direct en cours'),
       icon: 'gamepad',
@@ -387,6 +545,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       lead: t('Les scores arrivent à mesure que chacun finit sa partie.'),
       sections: [
         ...takeFlash(),
+        ...(waitRow.length ? [{ rows: waitRow }] : []),
         ...(otherBalls ? [{ rows: [{ text: t('Autre nombre de billes : score hors classement'), detail: t('{n} billes par partie chez celui qui invite', { n: game.table.balls! }), tone: 'warning' as const, icon: 'rules' as const }] }] : []),
         { rows: standings.map((p) => resultRow(p, ranked.includes(p) ? ranked.indexOf(p) + 1 : undefined, standings.length > 1, game.table.balls)) },
         ...(finished ? [boardSection()] : []),
@@ -501,6 +660,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
 
   return {
     inviteFriend,
+    inviteFriends,
     inviteOn,
     sheetAction,
     friendAction,
@@ -535,5 +695,10 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       return invite ? { label: t('Invitation de {name} : {table}', { name: invite.host.name, table: invite.title }), icon: 'gamepad', attention: true, run: () => openInvite(invite.id, back) } : undefined;
     },
     attention: () => games.invites().length > 0 || games.current()?.phase === 'finished',
+    onScreen: () => host.library.isShowing?.(buildGame) ?? false,
+    unseenResults: () => {
+      const game = games.current();
+      return game?.phase === 'finished' && game.id !== resultsSeen;
+    },
   };
 }

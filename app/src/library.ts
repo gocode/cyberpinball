@@ -337,6 +337,8 @@ export type UiAction =
   /** Pastille des amis en ligne, notification d'un ami (Mes amis) ou d'une demande (Demandes d'amis). */
   | { type: 'friends' }
   | { type: 'friend-requests' }
+  /** Notification de la partie entre amis (un invité accepte, la partie est finie) : l'écran de la partie. */
+  | { type: 'live-game' }
   /** Repère de la liste de contenu (« Sortir de la liste », « Revenir à la liste ») : comme MagnaSave. */
   | { type: 'zone' }
   /** Mesure du texte de l'écran par le rendu (zone de lecture, reading.ts) : `key` désigne l'écran mesuré. */
