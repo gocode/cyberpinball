@@ -59,17 +59,17 @@ export function gameNoticeView(invite: LiveInvite, shownAt: Date, now = new Date
 
 /**
  * Place de la notification, en pixels de l'écran : dans le coin du plateau en haut à gauche pour
- * le joueur (en bas à gauche, ou au milieu du bord gauche : `corner`), quel que soit le sens de
+ * le joueur (en bas à gauche, au milieu du bord gauche, ou au milieu du haut : `corner`), quel que soit le sens de
  * l'écran. `rotation` : celle de la mise en page du plateau (menuRotation), `size` : la taille vue
  * du joueur ; `below` : la place d'une autre carte déjà dans ce coin, qu'elle laisse au-dessus d'elle
  * (vers le bas du joueur).
  */
-export function gameNoticeBounds(zone: Rect, rotation: Rotation, size: { width: number; height: number }, margin: number, corner: 'top-left' | 'bottom-left' | 'middle-left' = 'top-left', below = 0): Rect {
+export function gameNoticeBounds(zone: Rect, rotation: Rotation, size: { width: number; height: number }, margin: number, corner: 'top-left' | 'bottom-left' | 'middle-left' | 'top-center' = 'top-left', below = 0): Rect {
   const quarter = rotation === 90 || rotation === 270;
   const w = quarter ? size.height : size.width;
   const h = quarter ? size.width : size.height;
   // Coin du joueur, tourné dans le repère de l'écran : (x, y) → (-y, x) par quart de tour horaire ; 0 : centré.
-  let cx = -1;
+  let cx = corner === 'top-center' ? 0 : -1;
   let cy = corner === 'bottom-left' ? 1 : corner === 'middle-left' ? 0 : -1;
   for (let r = 0; r < rotation; r += 90) [cx, cy] = [-cy, cx];
   const along = (c: number, start: number, length: number, size: number) => (c > 0 ? start + length - margin - size : c < 0 ? start + margin : start + (length - size) / 2);

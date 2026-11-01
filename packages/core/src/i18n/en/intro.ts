@@ -6,8 +6,8 @@ export const messages: Record<string, string> = {
   'Afficheur (DMD)': 'Display (DMD)',
   'Afficheur large (FullDMD)': 'Wide display (FullDMD)',
   'Musique de fond': 'Background music',
-  'La bille part du lanceur, prend l’orbite et frappe la cible ; le plateau s’allume, puis la marque':
-    'The ball leaves the plunger, takes the orbit and hits the target; the playfield lights up, then the brand',
+  'Une étincelle monte, s’embrase au cœur et déploie des fils de lumière, puis la marque se forme':
+    'A spark rises, ignites at the core and unfolds threads of light, then the brand takes shape',
   'Le fronton s’allume comme ses lampes à la mise sous tension, puis la marque, lettre par lettre':
     'The backglass lights up like its lamps at power-on, then the brand, letter by letter',
   'Un trait de lumière traverse le topper et y laisse le logo et la marque': 'A streak of light crosses the topper and leaves the logo and the brand',

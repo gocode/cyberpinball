@@ -28,8 +28,9 @@ import { messages as notices } from './notices';
 import { messages as recording } from './recording';
 import { messages as history } from './history';
 import { messages as intro } from './intro';
+import { messages as ingame } from './ingame';
 
 /** Chaque partie du catalogue, par nom de fichier (pour le test des doublons). */
-export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro };
+export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame };
 
 export const EN_MESSAGES: Catalog = Object.assign({}, ...Object.values(EN_PARTS));

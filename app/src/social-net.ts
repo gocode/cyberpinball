@@ -50,6 +50,7 @@ import {
   unblockPlayer,
   verifyProfile,
   type FriendsListSync,
+  type ByteRate,
   type LibraryMessage,
   type LiveMessage,
   type PlayStats,
@@ -239,6 +240,8 @@ export interface SocialNet {
   unblock(key: string): void;
   /** Bibliothèque partagée avec mes amis (désactivée par défaut). */
   setShareLibrary(on: boolean): void;
+  /** Débit des téléchargements depuis les amis, en octets par seconde (ratelimit.ts) ; 0 : sans limite. */
+  setDownloadRate(rate: ByteRate): void;
   /**
    * Message d'un service (bibliothèque, partie en direct) à un ami relié ; false : pas relié,
    * ou pas un ami. Rien de ces services ne part vers un joueur qui n'est pas un ami.
@@ -833,6 +836,10 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     },
     unblock: (key) => commit(unblockPlayer(state, key)),
     setShareLibrary: (on) => commit({ ...state, shareLibrary: on, shareLibraryChosen: true }),
+    setDownloadRate: (rate) => {
+      const { downloadRate: _, ...rest } = state;
+      commit(rate > 0 ? { ...rest, downloadRate: rate } : rest);
+    },
     send(key, message) {
       const link = friendLink(key);
       if (!link) return false;

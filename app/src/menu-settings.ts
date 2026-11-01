@@ -20,6 +20,10 @@ import {
   MEDIADB_4K_ABOVE,
   MEDIADB_QUALITY_LABELS,
   MEDIADB_QUALITY_SETTINGS,
+  START_TABLE_LABELS,
+  START_TABLES,
+  TABLE_ORDER_LABELS,
+  TABLE_ORDERS,
   VOLUME_CHOICES,
   arcadeHoursSummary,
   attractDelayLabel,
@@ -41,6 +45,8 @@ import {
   type IconName,
   type MenuLayout,
   type MenuMediaSettings,
+  type StartTable,
+  type TableOrder,
   type UiSoundId,
 } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row as SectionRow } from './library';
@@ -74,6 +80,39 @@ export interface MenuSettingsHost {
 const heading = () => t('Médias, son et attente');
 // La présentation du menu (une des quatre roues, ou la liste) est rangée ici aussi : c'est un réglage du menu, gardé dans medias.json.
 
+const ORDER_DETAILS: Record<TableOrder, string> = {
+  get title() {
+    return t('De A à Z, comme les noms des tables');
+  },
+  get recent() {
+    return t('La dernière table lancée en tête, les tables jamais jouées à la fin');
+  },
+  get played() {
+    return t('Les tables lancées le plus souvent en tête, les tables jamais jouées à la fin');
+  },
+  get year() {
+    return t('Des plus anciennes aux plus récentes ; année inconnue à la fin');
+  },
+  get manufacturer() {
+    return t('Regroupées par fabricant (Bally, Stern, Williams…), puis par année');
+  },
+  get shuffle() {
+    return t('Un ordre tiré au hasard à chaque démarrage de la borne, gardé jusqu’au suivant');
+  },
+};
+
+const START_DETAILS: Record<StartTable, string> = {
+  get first() {
+    return t('La première table dans l’ordre choisi');
+  },
+  get random() {
+    return t('Une table tirée au hasard : la borne ne s’ouvre pas toujours sur la même');
+  },
+  get last() {
+    return t('La dernière table lancée, pour reprendre où l’on s’était arrêté');
+  },
+};
+
 const LAYOUT_DETAILS: Record<MenuLayout, string> = {
   get medaillons() {
     return t('Médaillons sur un bandeau de verre éclairé au néon, la table choisie au centre dans un anneau vert');
@@ -104,6 +143,8 @@ type ChoiceKey = 'attractDelay' | 'attractInterval';
  */
 export const MENU_SETTINGS_ROWS = [
   'menuLayout',
+  'tableOrder',
+  'startTable',
   'music',
   'musicVolume',
   'videoVolume',
@@ -146,6 +187,18 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         detail: t('{detail} (Start : choisir)', { detail: LAYOUT_DETAILS[v.menuLayout] }),
         icon: 'layout-menu',
         run: () => openLayout(),
+      },
+      tableOrder: {
+        label: t('Ordre des tables : {order}', { order: TABLE_ORDER_LABELS[v.tableOrder] }),
+        detail: t('{detail} (Start : choisir)', { detail: ORDER_DETAILS[v.tableOrder] }),
+        icon: 'sort',
+        run: () => openTableOrder(),
+      },
+      startTable: {
+        label: t('Table au démarrage : {start}', { start: START_TABLE_LABELS[v.startTable] }),
+        detail: t('{detail} (Start : changer)', { detail: START_DETAILS[v.startTable] }),
+        icon: 'pin',
+        run: () => set({ startTable: START_TABLES[(START_TABLES.indexOf(v.startTable) + 1) % START_TABLES.length]! }),
       },
       music: {
         label: v.music ? t('Musique des jeux : jouée') : t('Musique des jeux : coupée'),
@@ -353,6 +406,32 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         back: () => open(row('menuLayout')),
       }),
       Math.max(0, MENU_LAYOUTS.indexOf(s().menuLayout)),
+    );
+  }
+
+  function openTableOrder(): void {
+    const back = row('tableOrder');
+    host.library.openCustom(
+      () => ({
+        heading: t('Ordre des tables'),
+        icon: 'sort',
+        lead: t('Comment les médaillons se suivent dans la roue, et les titres dans la liste. La table choisie reste la même quand l’ordre change.'),
+        sections: [],
+        actions: [
+          ...TABLE_ORDERS.map((order) => ({
+            label: capitalized(TABLE_ORDER_LABELS[order]),
+            detail: order === s().tableOrder ? t('{detail} · choix actuel', { detail: ORDER_DETAILS[order] }) : ORDER_DETAILS[order],
+            tone: order === s().tableOrder ? ('ok' as const) : undefined,
+            run: () => {
+              set({ tableOrder: order });
+              open(back);
+            },
+          })),
+          { label: t('Retour'), run: () => open(back) },
+        ],
+        back: () => open(back),
+      }),
+      Math.max(0, TABLE_ORDERS.indexOf(s().tableOrder)),
     );
   }
 

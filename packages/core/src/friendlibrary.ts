@@ -22,6 +22,7 @@ import { t } from './i18n';
 import { MANAGED_MEDIA_TYPES, ownMediaPages } from './mediaedit';
 import { mediaKind, mediaTypeInfo, type MediaKind, type MediaType } from './medias';
 import { isJunkName } from './puppack';
+import { parseRate } from './ratelimit';
 import { isShareableType, parseTableIdentity, sameTable, shareableType, SHARE_MAX_BYTES, tableIdentity, type SameTableHow, type TableIdentity } from './sharing';
 import type { TableContents } from './tablecontents';
 import type { FileKind } from './tablefiles';
@@ -347,7 +348,13 @@ export type LibraryMessage =
    * coupé, la borne qui partage envoie la suite (une borne d'avant la reprise l'ignore et
    * renvoie tout : son en-tête n'a pas de `from`, le receveur repart de zéro).
    */
-  | { t: 'file-get'; req: number; table: string; file: string; from?: number }
+  | { t: 'file-get'; req: number; table: string; file: string; from?: number; rate?: number }
+  /**
+   * Débit voulu par le receveur pour cet envoi, en octets par seconde (ratelimit.ts) : dans la
+   * demande (`rate` de file-get), puis corrigé en cours de route ; 0 ou absent : sans limite.
+   * Une borne d'avant la limite les ignore et envoie à pleine vitesse.
+   */
+  | { t: 'file-rate'; req: number; rate: number }
   /** `from` : premier octet envoyé (la reprise acceptée). */
   | { t: 'file-head'; req: number; bytes: number; from?: number }
   | { t: 'file-refused'; req: number; reason: FileRefusal }
@@ -393,7 +400,12 @@ export function parseLibraryMessage(m: Record<string, unknown>): LibraryMessage 
     }
     case 'file-get':
       if (!isReq(m.req) || !isOpaque(m.table) || !isOpaque(m.file) || (m.from !== undefined && !isCount(m.from, TABLE_FILE_MAX))) return undefined;
-      return { t: 'file-get', req: m.req, table: m.table, file: m.file, ...(m.from ? { from: m.from as number } : {}) };
+      if (m.rate !== undefined && parseRate(m.rate) === undefined) return undefined;
+      return { t: 'file-get', req: m.req, table: m.table, file: m.file, ...(m.from ? { from: m.from as number } : {}), ...(m.rate ? { rate: m.rate as number } : {}) };
+    case 'file-rate': {
+      const rate = parseRate(m.rate);
+      return isReq(m.req) && rate !== undefined ? { t: 'file-rate', req: m.req, rate } : undefined;
+    }
     case 'file-head':
       if (!isReq(m.req) || !isCount(m.bytes, TABLE_FILE_MAX) || (m.from !== undefined && !isCount(m.from, m.bytes))) return undefined;
       return { t: 'file-head', req: m.req, bytes: m.bytes, ...(m.from ? { from: m.from as number } : {}) };

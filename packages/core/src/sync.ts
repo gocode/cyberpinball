@@ -1,7 +1,7 @@
 import { vpxAudioSettings } from './audio';
 import { managedJoysticks, noAutoLayoutSettings, vpxAnalogSettings } from './plunger';
 import { tiltFindings, VPX_STILL_TABLE, vpxTiltSettings } from './tilt';
-import { buttonInfo, buttonProblems, DEFAULT_BUTTONS, inGameMenuSetting, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, type SilencedAction } from './buttons';
+import { buttonInfo, buttonProblems, DEFAULT_BUTTONS, inGameMenuSetting, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, vpxVolumeSettings, type SilencedAction } from './buttons';
 import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxFolderDefaults, type DetectedDmd, type GlobalDmdFolders } from './dmd';
 import { t } from './i18n';
 import { IniDocument } from './ini';
@@ -296,7 +296,7 @@ export function planVpxSync(
     });
     for (const [id, written] of Object.entries(options.memory ?? {})) if (isInputKey(id)) memory[id] = written;
   } else if (!cabinet.buttons) {
-    applyOwned([inGameMenuSetting(DEFAULT_BUTTONS, doc, options.memory)]);
+    applyOwned([inGameMenuSetting(DEFAULT_BUTTONS, doc, options.memory), ...vpxVolumeSettings(doc, options.memory)]);
   } else {
     const plan = vpxInputSettings(cabinet.buttons, doc, options.memory);
     silenced = plan.silenced;

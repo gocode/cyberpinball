@@ -278,3 +278,32 @@ test('rendu : le fichier de l’utilisateur se joue une fois, garde sa dernière
   assert.ok(p.document.querySelector('.intro-hint'), 'l’invite paraît à la fin de la vidéo');
   assert.deepEqual(p.mounted, [], 'pas d’animation de Cyber Pinball par-dessus');
 });
+
+test('plateau : le shader dessine la même image sur toutes les cartes graphiques, sans table lente', async () => {
+  // fract(sin(x)) varie d'une carte à l'autre (précision du sinus) : la borne dessinerait d'autres
+  // fils que ceux validés. Les fils viennent de valeurs figées, fournies en tableaux uniformes ;
+  // une table constante lue avec l'indice d'une boucle est recopiée à chaque pixel par ANGLE sous
+  // Direct3D (trois fois plus lente).
+  const vm = await import('node:vm');
+  const box: { window: { CyberIntroShaders?: { playfield: string; playfieldUniforms: Record<string, number[]> } } } = { window: {} };
+  vm.runInNewContext(read('app', 'renderer', 'intro-shaders.js'), box);
+  const shaders = box.window.CyberIntroShaders;
+  assert.ok(shaders, 'intro-shaders.js déclare window.CyberIntroShaders');
+  assert.match(shaders.playfield, /^#version 300 es\n/);
+  // Le code seul : les commentaires peuvent nommer ce qu'il ne faut pas faire.
+  const frag = shaders.playfield.replace(/\/\/[^\n]*/g, '');
+  assert.doesNotMatch(frag, /fract\s*\(\s*sin\s*\(/, 'aucun hachage fract(sin()) : il dépend de la carte graphique');
+  assert.doesNotMatch(frag, /\bconst\s+\w+\s+\w+\s*\[/, 'aucune table constante : en tableau uniforme');
+  for (const [name, values] of Object.entries(shaders.playfieldUniforms)) {
+    const declared = new RegExp(`uniform vec4 ${name}\\[(\\d+)\\];`).exec(frag);
+    assert.ok(declared, `${name} est déclaré dans le shader`);
+    assert.equal(values.length, Number(declared[1]) * 4, `${name} : quatre valeurs par fil`);
+    assert.ok(values.every(Number.isFinite), `${name} : des nombres`);
+  }
+  for (const [, id = ''] of frag.matchAll(/uniform vec4 (\w+)\[/g)) {
+    assert.ok(id in shaders.playfieldUniforms, `${id} est fourni par l'application`);
+  }
+  // Chargé avant intro.js, qui le lit au montage du plateau.
+  const html = read('app', 'renderer', 'frontend.html');
+  assert.ok(html.indexOf('intro-shaders.js') > 0 && html.indexOf('intro-shaders.js') < html.indexOf('intro.js"'), 'intro-shaders.js avant intro.js');
+});

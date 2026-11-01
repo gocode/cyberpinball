@@ -34,11 +34,13 @@ import {
   applyOps,
   applyRomImport,
   readInfo,
+  readDmdPlaces,
   setTableSource,
   type WaitItem,
   classifyFile,
   describePupCabinet,
   diagnose,
+  dmdPlaceOf,
   expectedPackNames,
   formatSize,
   gameKeys,
@@ -69,6 +71,7 @@ import {
   sheetPages,
   SHEET_PAGE_TYPES,
   samePath,
+  sortTables,
   tableGame,
   partWebQuery,
   tableSourceOf,
@@ -596,6 +599,17 @@ export function createLibrary(host: LibraryHost) {
    */
   const systemItems = new Map<SystemItemId, ProvidedSystemItem>([
     [
+      // Toutes les tables, chacune vers sa fiche : les mêmes actions que depuis la roue.
+      'all-tables',
+      {
+        get detail() {
+          const n = host.tables().length;
+          return n ? tn(n, '{n} table : sa fiche, comme depuis la roue (Jouer, Modifier, médias…)', '{n} tables : leur fiche, comme depuis la roue (Jouer, Modifier, médias…)') : t('Aucune table pour le moment');
+        },
+        run: () => openAllTables(),
+      },
+    ],
+    [
       // Une seule entrée pour toutes les façons d'ajouter une table : l'entonnoir (openAdd).
       'add-table',
       {
@@ -649,6 +663,12 @@ export function createLibrary(host: LibraryHost) {
    * appelle openSystem, y ramène. Oublié au retour aux tables et à la roue dentée.
    */
   let systemReturn: (() => void) | undefined;
+  /**
+   * Fiche ouverte depuis « Toutes les tables » : son « Retour » ramène à la liste, sur cette
+   * table, au lieu de la roue. Les écrans ouverts de la fiche y reviennent par openSheet, qui le
+   * garde ; oublié au retour aux tables, au lancement d'une partie et quand la roue ouvre une fiche.
+   */
+  let sheetReturn: (() => void) | undefined;
 
   /** Ajoute une entrée du menu système ; l'arbre des rubriques (systemmenu.ts, core) dit où elle va. */
   function provideSystemItem(id: SystemItemId, item: ProvidedSystemItem): void {
@@ -731,6 +751,7 @@ export function createLibrary(host: LibraryHost) {
     systemGroup = undefined;
     systemChosen = undefined;
     systemReturn = undefined;
+    sheetReturn = undefined;
     host.leave();
     host.broadcast();
   }
@@ -795,6 +816,8 @@ export function createLibrary(host: LibraryHost) {
   /** Ouvre une rubrique, la sélection sur `at`, sinon sur la première entrée à pastille. */
   function openSystemGroup(group: SystemGroupId | undefined, at?: SystemEntryId): void {
     section = undefined;
+    // Revenu au menu système : une fiche ouverte ensuite d'ailleurs ne ramène plus à « Toutes les tables ».
+    sheetReturn = undefined;
     systemGroup = group;
     const entries = systemEntries(group);
     const chosen = at ? entries.indexOf(at) : -1;
@@ -837,6 +860,49 @@ export function createLibrary(host: LibraryHost) {
 
   function openSheet(table: TableEntry, flash?: string): void {
     go({ kind: 'sheet', file: table.file, flash });
+  }
+
+  /** Menu système > Tables > Toutes les tables : la liste, la sélection sur `focus` (une table). */
+  function openAllTables(focus?: string): void {
+    const at = focus ? sortTables(host.tables(), 'title').findIndex((x) => samePath(x.file, focus)) : -1;
+    openCustom(buildAllTables, Math.max(0, at));
+  }
+
+  function buildAllTables(): Built {
+    const back = () => openSystem();
+    const list = sortTables(host.tables(), 'title');
+    const actions: Action[] = [];
+    const rows: Row[] = list.map((table) => {
+      const plays = table.info.User?.StartCount ?? 0;
+      const action =
+        actions.push({
+          label: table.title,
+          key: `table:${table.file}`,
+          run: () => {
+            sheetReturn = () => openAllTables(table.file);
+            openSheet(table);
+          },
+        }) - 1;
+      return {
+        text: table.title,
+        detail: [table.manufacturer, table.year, table.version].filter(Boolean).join(' · ') || undefined,
+        badges: [plays ? tn(plays, 'Jouée {n} fois', 'Jouée {n} fois') : t('Jamais jouée')],
+        action,
+        pick: true,
+      };
+    });
+    actions.push({ label: t('Ajouter une table'), icon: 'table-add', key: 'add', run: () => runSystemItem('add-table', () => openAllTables()) });
+    actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: back });
+    return {
+      heading: SYSTEM_ITEMS['all-tables'].label,
+      icon: SYSTEM_ITEMS['all-tables'].icon,
+      lead: list.length
+        ? t('Start : la fiche de la table, avec les mêmes actions que depuis la roue. Exit, dans la fiche, revient ici.')
+        : t('Aucune table pour le moment : « Ajouter une table » en installe une.'),
+      sections: [{ title: tn(list.length, '{n} table', '{n} tables'), rows }],
+      actions,
+      back,
+    };
   }
 
   const progress = (message: string) => {
@@ -1325,6 +1391,7 @@ export function createLibrary(host: LibraryHost) {
       otherPackNames: otherPackNames(table),
       romLibrary: layout()?.roms,
       orientation: host.playfieldOrientation?.(),
+      dmdPlaced: Boolean(cabinet && dmdPlaceOf(readDmdPlaces(host.dataDir), cabinet.id, table.id)),
     });
     return { script, findings };
   }
@@ -1507,7 +1574,10 @@ export function createLibrary(host: LibraryHost) {
 
   function buildSheet(s: Extract<Screen, { kind: 'sheet' }>): Built {
     const table = find(s.file);
-    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), door: 'sheet.back', run: leave }], back: leave };
+    // Ouverte depuis « Toutes les tables » : Exit et « Retour » y ramènent.
+    const exit = sheetReturn ?? leave;
+    const exitLabel = sheetReturn ? t('Retour à la liste des tables') : t('Retour au menu');
+    if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: exitLabel, door: 'sheet.back', run: exit }], back: exit };
     const own = !samePath(table.folder, tablesDir());
     const inv = inventory(table.file, own);
     const user = table.info.User ?? {};
@@ -1600,6 +1670,7 @@ export function createLibrary(host: LibraryHost) {
         door: 'sheet.play',
         run: () => {
           screen = undefined;
+          sheetReturn = undefined;
           host.play(table);
         },
       },
@@ -1622,7 +1693,7 @@ export function createLibrary(host: LibraryHost) {
         : []),
       { label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) },
       { label: t('Supprimer la table'), detail: t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
-      { label: t('Retour au menu'), icon: 'back', door: 'sheet.back', run: leave },
+      { label: exitLabel, icon: 'back', door: 'sheet.back', run: exit },
     ];
 
     return {
@@ -1631,7 +1702,7 @@ export function createLibrary(host: LibraryHost) {
       lead: s.flash ?? table.version,
       sections: [{ title: t('Statistiques'), rows: stats }, ...(guest ? [] : [{ title: t('Fichiers'), rows: files }])],
       actions,
-      back: leave,
+      back: exit,
     };
   }
 
@@ -1808,6 +1879,7 @@ export function createLibrary(host: LibraryHost) {
         detail: t('Voir l’option appliquée sur la borne'),
         run: () => {
           screen = undefined;
+          sheetReturn = undefined;
           host.play(table);
         },
       },
@@ -2273,7 +2345,8 @@ export function createLibrary(host: LibraryHost) {
             const trashDir = trashDirFor(layout()!.trash, `Table ${table.title}`); // i18n-ignore : nom de dossier
             applyOps(targets.paths.map((p) => ({ op: 'trash', path: p })), { trashDir });
             host.reload();
-            go({ kind: 'notice', heading: t('« {title} » est dans la corbeille', { title: table.title }), lines: [trashDir], then: leave });
+            // Supprimée depuis « Toutes les tables » : la liste, sinon la roue.
+            go({ kind: 'notice', heading: t('« {title} » est dans la corbeille', { title: table.title }), lines: [trashDir], then: sheetReturn ?? leave });
           },
         },
       ],
@@ -3533,7 +3606,11 @@ export function createLibrary(host: LibraryHost) {
     /** Sélecteur de fichiers de Cyber Pinball ; undefined à l'abandon, l'écran d'où l'on vient revient tel quel. */
     pick: pickPaths,
     openNotice,
-    openSheet,
+    /** Fiche ouverte depuis la roue : son « Retour » y ramène. */
+    openSheet: (table: TableEntry, flash?: string) => {
+      sheetReturn = undefined;
+      openSheet(table, flash);
+    },
     openAdd,
     /** Opération longue : le message à l'écran, les touches ignorées (borne dédiée : l'autorisation de Windows). */
     task,

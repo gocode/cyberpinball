@@ -77,7 +77,7 @@ export const INTRO_SLOT_LABELS: Readonly<Record<IntroSlot, string>> = {
 /** Ce que joue l'animation de Cyber Pinball sur chaque écran, en une phrase. */
 export const INTRO_DEFAULT_DETAILS: Readonly<Record<IntroScreen, string>> = {
   get playfield() {
-    return t('La bille part du lanceur, prend l’orbite et frappe la cible ; le plateau s’allume, puis la marque');
+    return t('Une étincelle monte, s’embrase au cœur et déploie des fils de lumière, puis la marque se forme');
   },
   get backglass() {
     return t('Le fronton s’allume comme ses lampes à la mise sous tension, puis la marque, lettre par lettre');
@@ -235,26 +235,12 @@ export const INTRO_SKIP_FLAG = '--sans-ouverture';
 /**
  * Rythme des animations de Cyber Pinball, en millisecondes depuis le départ de l'ouverture
  * (toutes les fenêtres prêtes). Envoyé aux fenêtres avec leur état : app/renderer/intro.js ne
- * garde aucun temps à lui. La bille part du plateau, traverse le DMD, puis le fronton et le
- * topper s'allument, comme l'énergie qui monte dans la borne.
+ * garde aucun temps à lui, sauf le plateau, dont le shader (app/renderer/intro-shaders.js) écrit sa
+ * propre partition sur ce rythme : une étincelle monte (250–1 250 ms) pendant que la bille traverse
+ * le DMD, l'ignition du plateau tombe avec l'allumage du fronton (1 250 ms), sa marque se forme de
+ * 1 950 à 2 900 ms, le reflet passe avec celui des autres marques (sheen), tout est figé à `end`.
  */
 export const INTRO_TIMELINE = {
-  /** Plateau (« Impulsion ») : les rails s'éveillent, la bille charge dans le lanceur droit. */
-  wake: 130,
-  /** Accélération verticale, orbite haute puis frappe oblique sur la cible décentrée. */
-  launch: 600,
-  launchLength: 650,
-  /** Choc local, trois anneaux nets et éclats ; les passages hauts s'allument. */
-  impact: 1250,
-  impactLength: 520,
-  /** Chevrons allumés du bas vers la marque ; les batteurs battent une fois (droit +90 ms). */
-  inserts: 1510,
-  flippers: 1650,
-  /** La marque du plateau, du centre des mots vers leurs bords, puis le filet dessous. */
-  brand: 1830,
-  rule: 2150,
-  /** La lumière du plateau se calme un peu jusqu'à la fin. */
-  settle: 3000,
   /** DMD et FullDMD : mise sous tension des points (ou du cadre de lampes). */
   dmdPower: 250,
   /** La bille traverse l'afficheur de bas en haut. */

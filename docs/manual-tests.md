@@ -1287,12 +1287,30 @@ On the cabinet, Cyber Pinball closed then reopened from its shortcut. The proof 
 
 | # | Scenario | How | Expected result |
 | --- | --- | --- | --- |
-| 673 | The Cyber Pinball animations | Open Cyber Pinball without touching anything. | On every screen, at the same time: the ball leaves the plunger, takes the orbit and hits the target, the playfield lights up and the flippers flip, the ball crosses the DMD, the backglass flickers on, a streak sweeps the topper, the brand appears everywhere. Then each screen holds its last frame; "Appuyez sur un bouton pour choisir une table" (Press a button to choose a table) appears on the playfield. Never a white or grey screen. |
+| 673 | The Cyber Pinball animations | Open Cyber Pinball without touching anything. | On every screen, at the same time: a spark rises and ignites into threads of light on the playfield, the ball crosses the DMD, the backglass flickers on, a streak sweeps the topper, the brand appears everywhere. Then each screen holds its last frame; "Appuyez sur un bouton pour choisir une table" (Press a button to choose a table) appears on the playfield. Never a white or grey screen. |
 | 674 | The first button | Wait, then press a flipper; again, pressing during the animation. | The wheel appears, on the previous table, without changing table or opening the game page; during the animation, the button skips the intro. |
 | 675 | Your files | System menu > Médias (Media) > "Médias, son et attente" > "Ouverture au démarrage" (Startup intro) > Plateau (Playfield) > "Choisir une image ou une vidéo…" (a video), Fronton (Backglass; an image), "Musique de fond" (Background music; an mp3); "Voir l'ouverture" (Watch the intro). | The video plays once on the playfield, the right way up, and holds its last frame; the image appears on the backglass; the music plays until the button, which goes back to the settings. The files are in the root's `media\`, `(IntroPlayfield).mp4`, `(IntroBackglass).png`, `(IntroAudio).mp3`. |
 | 676 | Back to the animations | Plateau > "Animation de Cyber Pinball", then "Tout revenir aux animations de Cyber Pinball". | The Cyber Pinball animations come back, no music; the line says "gardé, prêt à reprendre" (kept, ready to use again); the files are still in `media\`; "Votre fichier : …" (Your file: …) takes them back. |
 | 677 | Replacing a file | Choose another video for the playfield. | The new one plays; the old one is in `trash\<date> Ouverture`, not deleted. |
 | 678 | Intro off | "Ouverture au démarrage : jouée" > Start (off), close and reopen Cyber Pinball; then change the language. | Off: the menu opens straight on the wheel. When played, a language change (menu relaunch) does not replay it. |
+
+## DMD position during a game
+
+On the cabinet, a game launched from the menu (a ROM table, DMD visible). The proof without an operator: `packages/core/src/test/dmdplace.test.ts` and `.\docs\demo-position-dmd.ps1` (the real menu page, on simulated screens, in every state; captures in `tmp\captures\position-dmd`).
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 679 | Opening the menu | Mid-game, press both MagnaSave buttons together. | The game pauses; the "Réglages en partie" (In-game settings) panel appears on the playfield, facing the player, "Position du DMD" (DMD position) first; a green frame surrounds the real DMD, with its size. VPX's menu does not open on top. |
+| 680 | Moving with the buttons | Right flipper to "Position horizontale" (Horizontal position), Start; flippers, then MagnaSave; Start. Then "Taille" (Size), Start, flippers (held). | VPX's real DMD follows each press, to the pixel, and speeds up when held; MagnaSave moves it up and down; the size keeps the 4:1 format. |
+| 681 | Changing screen | "Écran" (Screen), Start, right flipper: each cabinet screen in turn; Start. | The DMD goes from screen to screen, same size, same relative place; the frame follows it. |
+| 682 | With the mouse | Drag the DMD frame, even onto another screen; drag a corner. | The DMD follows the pointer and changes screen under it; a corner resizes it, format kept; holding Alt: no snapping. |
+| 683 | Hiding | "DMD" line, Start. | The DMD disappears; the position lines are greyed out with their reason; Start again brings it back. |
+| 684 | Saving for the table | "Enregistrer pour cette table" (Save for this table), then "Reprendre la partie" (Resume the game). Quit, relaunch the same table, then another table. | The game resumes where it was. Relaunched, the table opens its DMD at the saved position; the other table keeps the general position. The table's doctor reports nothing about the DMD. |
+| 685 | Leaving without saving | Move the DMD, then Exit. | "La position du DMD a changé sans être enregistrée" (The DMD position changed and hasn't been saved): Save, Discard (the DMD goes back where it was, the game resumes) or Keep adjusting. |
+| 686 | Another configuration | On another cabinet configuration (System menu > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration) > "Configurations de la borne" (Cabinet configurations)), relaunch the table from 684. | The table follows that configuration's general position; its saved position comes back as soon as the first one is plugged in again. |
+| 687 | VPX menu | "Tous les réglages de VPX" (All VPX settings). | The panel closes, the game resumes and VPX's menu opens (F12); its settings work as before. Later, both MagnaSave buttons open Cyber Pinball's settings again. |
+| 688 | Without MagnaSave, on a keyboard | On a cabinet without MagnaSave: Credit and Start together; on a keyboard: left Ctrl and right Ctrl, arrows, + and −. | The same menu opens; the arrows move the DMD both ways, + and − change its size. |
+| 689 | Guest mode | Guest mode on, in a game: both MagnaSave buttons. | Nothing opens, the game goes on; the log says "Réglages en partie : fermés en mode invité." (In-game settings: closed in guest mode). |
 
 ## What cannot be tested yet
 

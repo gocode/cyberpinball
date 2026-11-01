@@ -46,6 +46,9 @@ import {
   ROLES,
   saveCabinet,
   scanTables,
+  ShuffleKeys,
+  sortTables,
+  startIndex,
   cabinetRoleLabel,
   cabinetZones,
   dmdKindChoices,
@@ -163,6 +166,7 @@ import {
   introSource,
   mediaUrl,
   type IntroFiles,
+  volumeOutputIds,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -200,6 +204,8 @@ import { guardFirewall } from './firewall-guard';
 import { createFriendContent } from './friend-content';
 import { friendTransport } from './download-sources';
 import { createGameNotices } from './game-notice';
+import { createInGameMenu, prepareDmdPlace } from './in-game-menu';
+import { startCabinetVolume, type CabinetVolume } from './cabinet-volume';
 import { createBallCounts } from './ball-count';
 import { createTableDoubles } from './table-double';
 import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
@@ -317,6 +323,8 @@ interface State {
 const loc = locations();
 const { profile } = vpxProfile(loc);
 let tables: TableEntry[] = [];
+// Ordre mélangé : tiré au démarrage, gardé jusqu'au prochain (tableorder.ts).
+const shuffleKeys = new ShuffleKeys();
 let windows = new Map<RoleId, BrowserWindow>();
 /** Rotation des fenêtres du playfield, pour un joueur placé au bord des flippers. */
 let rotation: Rotation = 0;
@@ -711,7 +719,14 @@ function openCabinetSetup(): void {
 }
 /** Enregistre les réglages des médias et les applique (état renvoyé aux fenêtres). */
 function saveMediaSettings(next: MenuMediaSettings): void {
+  const reorder = next.tableOrder !== mediaSettings.tableOrder;
   mediaSettings = next;
+  // Ordre changé : les tables se rangent autrement, la table choisie reste la même.
+  if (reorder) {
+    const current = tables[state.index];
+    tables = sortTables(tables, next.tableOrder, shuffleKeys);
+    state = { ...state, index: Math.max(0, current ? tables.indexOf(current) : 0) };
+  }
   attract.reschedule();
   hours.update();
   try {
@@ -989,6 +1004,10 @@ const liveGames = createLiveGames({
   },
   log: (line) => console.log(line),
 });
+// Volume −, Volume + et Muet : le son de Windows, au menu comme en partie (cabinet-volume.ts).
+let cabinetVolume: CabinetVolume | undefined;
+// Les deux MagnaSave pendant la partie : position du DMD, puis le menu de VPX (in-game-menu.ts).
+const inGameMenu = createInGameMenu({ log: (line) => console.log(line), allowed: () => guest.allows('game.settings') });
 // Invitation reçue pendant la partie : carte discrète dans le coin du plateau (game-notice.ts).
 const gameNotices = createGameNotices({
   place: playfieldPlace,
@@ -1256,7 +1275,9 @@ export function startFrontend(): void {
 
   const install = vpxInstall(loc);
   const { assignments, problem, manual, choose, selection } = syncScreens();
-  tables = loc.root ? scanTables(layoutOf(loc.root).tables) : [];
+  tables = scanOrdered();
+  // Table au démarrage : la première de l'ordre choisi, une au hasard, ou la dernière jouée.
+  state = { ...state, index: startIndex(tables, mediaSettings.startTable) };
   // Configuration à choisir : le menu s'ouvre droit sur l'écran principal, avec les boutons de la dernière utilisée.
   const cabinet = loadCabinet(loc.dataDir);
   menuDmdKind = cabinet && !choose ? dmdKindOf(cabinet) : undefined;
@@ -1268,6 +1289,16 @@ export function startFrontend(): void {
   navigation = cabinet?.navigation;
   KEYS = menuKeysFor(cabinet);
   audioOutput = choose ? undefined : menuAudioOutput(cabinet)?.friendlyName;
+  // Les boutons de volume règlent le son de toute la borne (Windows), sur les sorties de l'étape « Son ».
+  cabinetVolume = startCabinetVolume({
+    config: () => {
+      const current = loadCabinet(loc.dataDir);
+      return { buttons: current?.buttons, outputs: choose ? [] : volumeOutputIds(current?.audio) };
+    },
+    place: playfieldPlace,
+    captureDir: process.env.CYBERPINBALL_CAPTURE,
+    log: (line) => console.log(line),
+  });
   medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, onChange: () => broadcast() });
   serveMedias(() => medias!.allowedDirs(tables));
   // Média ajouté, remplacé ou supprimé, table ajoutée, renommée ou supprimée, par
@@ -1286,6 +1317,7 @@ export function startFrontend(): void {
   }
   app.on('before-quit', () => {
     closing = true;
+    cabinetVolume?.stop();
     guest.dispose();
     mediaWatch?.close();
     saveSettings();
@@ -1408,6 +1440,11 @@ export function startFrontend(): void {
   if (autopilot && !stress) void library.autopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE, (input) => (input.type === 'keyUp' ? handleKeyUp(input) : handleKey(input)), () => state.phase);
 }
 
+/** Les tables du disque, dans l'ordre choisi pour le menu. */
+function scanOrdered(): TableEntry[] {
+  return loc.root ? sortTables(scanTables(layoutOf(loc.root).tables), mediaSettings.tableOrder, shuffleKeys) : [];
+}
+
 function noTables(): Message {
   return { title: t('Aucune table'), lines: [t('Start : ajouter une table.'), t('Exit : menu.')], action: 'addTable' };
 }
@@ -1415,7 +1452,7 @@ function noTables(): Message {
 /** Relit les tables après un ajout, une réparation ou une suppression, en gardant la sélection. */
 function reloadTables(selectFile?: string): void {
   const current = tables[state.index]?.file;
-  tables = loc.root ? scanTables(layoutOf(loc.root).tables) : [];
+  tables = scanOrdered();
   // Médias ajoutés, remplacés ou supprimés avec les tables : tout est recherché à nouveau.
   medias?.invalidate();
   // Dossier des tables ou des médias créé depuis le démarrage (première table) : guetté aussi.
@@ -1621,6 +1658,7 @@ function unlockListening(): boolean {
 
 /** Touche ou bouton relâché : la combinaison de déverrouillage, et la bascule des zones (MagnaSave, F6). */
 function handleKeyUp(input: Input): void {
+  cabinetVolume?.windowInput(input);
   guest.input(input.code, false, unlockListening());
   // Gestion des tables : MagnaSave (F6) relâché bascule entre la liste et les actions de l'écran.
   if (state.phase === 'library') library.handleKeyUp(input);
@@ -1631,6 +1669,7 @@ function handleKeyUp(input: Input): void {
  * fermée, rien ne se passe que l'indice « Verrouillé » près du cadenas.
  */
 function handleKey(input: Input): boolean {
+  cabinetVolume?.windowInput(input);
   const is = (group: string[]) => group.includes(input.code);
   // Un bouton de la combinaison appuyé pendant qu'un autre est tenu ne fait rien d'autre.
   if (guest.input(input.code, true, unlockListening())) return true;
@@ -1934,6 +1973,16 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
         trashDir: trashDirFor(layoutOf(loc.root).trash, `Avant la partie ${path.basename(table.folder)}`), // i18n-ignore : nom de dossier
       })
     : undefined;
+  // Position du DMD réglée en partie pour cette table et cette configuration (in-game-menu.ts) : par-dessus l'habillage.
+  const configuration = loadCabinet(loc.dataDir);
+  if (configuration) {
+    try {
+      const placed = prepareDmdPlace(table, { cabinet: configuration, displays: observedDisplays(), dataDir: loc.dataDir, format: profile.displayIdFormat });
+      if (placed) console.log(placed);
+    } catch (error) {
+      console.log(`Position du DMD (${table.id}) : préparation impossible (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+  }
 
   // Partie entre amis : VPX joue un double de la table, fait après les préparations ci-dessus ; le
   // dossier habituel n'est jamais ouvert en écriture. Sans double possible, pas de partie : jamais
@@ -1989,6 +2038,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     setTimeout(showLiveBoard, LIVE_BOARD_SETTLE_MS);
     onScreen = true;
     if (liveManual) hooks.gate?.ready({ manual: true });
+    // Les deux MagnaSave ouvrent désormais les réglages en partie (position du DMD, puis menu de VPX).
+    if (configuration) inGameMenu.arm({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), place: playfieldPlace(), configurationIni: activeVpxIni(loc), dataDir: loc.dataDir });
     // Partie entre amis : l'arrêt automatique (essais) se compte depuis « partez ».
     if (autoStopAfterMs && !hooks.gate) setTimeout(() => game.stop(), autoStopAfterMs);
   };
@@ -2043,6 +2094,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const result = await game.done;
   if (watchLive) clearInterval(watchLive);
   gameNotices.close();
+  inGameMenu.disarm();
   dmdWatch?.stop();
   dmdWatch = undefined;
   // Les records de la partie, lus où VPX les a écrits (le double, pour une partie entre amis) ; puis le double s'en va.
@@ -2064,6 +2116,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   restoreTaskbars();
   const focusReturned = await showMenuAgain();
   settleScreens('return');
+  // Son coupé pendant la partie (ou avant) : la pastille le rappelle au retour.
+  cabinetVolume?.remindIfMuted();
   // Les fichiers de l'enregistrement : rendus quelques instants après la fermeture de VPX.
   const recorded = recording ? await recording.finished : undefined;
   // Fenêtres de l'éditeur de VPX masquées ou fermées pendant la partie : rien à faire

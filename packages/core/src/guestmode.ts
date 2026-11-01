@@ -34,6 +34,7 @@ export const GUEST_DOORS = {
   'window.close': false, // Fermer une fenêtre de Cyber Pinball : Alt+F4
   'files.drop': false, // Fichiers glissés sur la fenêtre : ajout d’une table, d’un média
   'game.force-stop': true, // Arrêter une partie bloquée : Ctrl+Maj+K, pendant la partie
+  'game.settings': false, // Réglages en partie (position du DMD, menu de VPX) : les deux MagnaSave, pendant la partie
   // Messages du menu (frontend.ts, Message.action) : Start fait leur action ; Exit les ferme toujours, sans rien faire d'autre.
   'message.other-frontend': true, // Jouer quand même, un autre menu de borne ouvert
   'message.power': true, // Extinction, veille ou redémarrage en cours (une action programmée peut arriver en mode invité) : l'écran noir reste, Start et Exit n'y font rien
@@ -97,7 +98,7 @@ export function guestUnlockSlots(buttons: CabinetButtons | undefined): UnlockSlo
   const keys = buttonKeys(buttons);
   const taken = (code: string, id: ButtonId) => Object.entries(keys).some(([other, c]) => other !== id && c === code);
   return GUEST_UNLOCK_BUTTONS.map((id) => {
-    const fallback = BUTTONS.find((b) => b.id === id)!.default;
+    const fallback = BUTTONS.find((b) => b.id === id)!.default!;
     const own = keys[id];
     return { button: id, codes: [...new Set([...(own ? [own] : []), ...(taken(fallback, id) ? [] : [fallback])])] };
   });
@@ -107,7 +108,7 @@ export function guestUnlockSlots(buttons: CabinetButtons | undefined): UnlockSlo
 export function guestUnlockHands(buttons: CabinetButtons | undefined): { left: string; right: string } {
   const keys = buttonKeys(buttons);
   // MagnaSave sans touche relevée : celle d'un clavier, nommée.
-  const magna = (id: ButtonId, label: string) => (keys[id] ? label : t('{button} ({key} d’un clavier)', { button: label, key: keyLabel(BUTTONS.find((b) => b.id === id)!.default) }));
+  const magna = (id: ButtonId, label: string) => (keys[id] ? label : t('{button} ({key} d’un clavier)', { button: label, key: keyLabel(BUTTONS.find((b) => b.id === id)!.default!) }));
   return {
     left: t('Flipper gauche + {magna}', { magna: magna('leftMagna', t('MagnaSave gauche')) }),
     right: t('Flipper droit + {magna}', { magna: magna('rightMagna', t('MagnaSave droit')) }),

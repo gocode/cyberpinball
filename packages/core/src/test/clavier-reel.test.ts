@@ -104,6 +104,7 @@ const GAME_BY_KEYBOARD: Record<string, string> = {
   nudgeCenter: 'Space',
   volumeDown: 'Minus',
   volumeUp: 'Equal',
+  volumeMute: 'KeyM',
 };
 
 test('boutons du jeu au clavier : chaque action relevée et enregistrée, un bouton refait seul, touche prise refusée, Retour arrière et Échap', { skip, timeout: 200_000 }, () => {

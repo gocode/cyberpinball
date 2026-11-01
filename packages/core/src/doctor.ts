@@ -217,6 +217,12 @@ export interface DoctorContext {
    * FullDMD et place du DMD dans son .ini ; absent, l'habillage n'est pas vérifié.
    */
   dressing?: TableDressing;
+  /**
+   * Le DMD de la table a une place réglée en partie pour la configuration branchée (dmdplace.ts,
+   * « Position du DMD ») : Cyber Pinball la réécrit dans [ScoreView] du .ini avant chaque partie.
+   * Ni « Écrans placés pour cette table » pour le DMD, ni « Le DMD cacherait l'habillage FullDMD ».
+   */
+  dmdPlaced?: boolean;
 }
 
 /** Mémoire de Cyber Pinball dans le .info : option et nom d'origine de chaque pack installé. */
@@ -548,9 +554,10 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   if (manual) findings.push(manual);
 
   // 7 bis. Écrans placés pour cette table seulement (menu de VPX, « Save as Table Override »),
-  // dont le DMD qui recouvrirait l'habillage FullDMD : ce constat-là garde la fenêtre du DMD.
-  const hidden = ctx.dressing && dressHiddenFinding(entry, ctx.dressing);
-  const windows = tableWindowsFinding(entry.file, dressRecord(entry.info), Boolean(hidden));
+  // dont le DMD qui recouvrirait l'habillage FullDMD : ce constat-là garde la fenêtre du DMD. Le DMD
+  // placé en partie (« Position du DMD ») est voulu et géré par Cyber Pinball : ni l'un ni l'autre.
+  const hidden = !ctx.dmdPlaced && ctx.dressing && dressHiddenFinding(entry, ctx.dressing);
+  const windows = tableWindowsFinding(entry.file, dressRecord(entry.info), Boolean(hidden) || Boolean(ctx.dmdPlaced));
   if (windows) findings.push(windows);
   if (hidden) findings.push(hidden);
 

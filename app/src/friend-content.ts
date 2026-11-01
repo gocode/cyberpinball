@@ -53,6 +53,8 @@ import {
   type TableContents,
   type TableEntry,
   type TableFile,
+  rateShare,
+  RatePacer,
   renameWithRetry,
 } from '@cyberpinball/core';
 import type { FriendMessage, SocialNet } from './social-net';
@@ -173,6 +175,8 @@ interface Incoming {
   /** Taille annoncée par la bibliothèque de l'ami quand le téléchargement a été demandé. */
   expect?: number;
   bytes: number;
+  /** Débit demandé à l'ami pour cet envoi (file-get, puis file-rate) ; 0 : sans limite. */
+  rate: number;
   first: Buffer;
   hash: ReturnType<typeof createHash>;
   timer?: NodeJS.Timeout;
@@ -195,7 +199,8 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
   const mediaChecks = new Map<string, { size: number; mtime: number; refusal: string | undefined }>();
   /** Fichiers de mes tables déjà décrits à un ami, par table : leurs identifiants le désignent. */
   const ownTableFiles = new Map<string, Map<string, { file: string; part: GamePart }>>();
-  const uploads = new Map<string, { req: number; cancelled: boolean }>();
+  /** Envoi en cours vers chaque ami, au rythme qu'il demande (ratelimit.ts). */
+  const uploads = new Map<string, { req: number; cancelled: boolean; pacer: RatePacer }>();
   const incoming = new Map<number, Incoming>();
   const listings = new Map<number, { key: string; chunks: Map<number, TableFile[]>; done(r: TableFile[] | FetchFailure): void; timer: NodeJS.Timeout }>();
   let nextReq = 1;
@@ -287,7 +292,7 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     return ownTableFiles.get(tableId)?.get(id);
   }
 
-  async function serveFile(key: string, req: number, tableId: string, id: string, asked = 0): Promise<void> {
+  async function serveFile(key: string, req: number, tableId: string, id: string, asked = 0, rate = 0): Promise<void> {
     const refuse = (reason: FileRefusal) => net.send(key, { t: 'file-refused', req, reason });
     if (!net.state().shareLibrary) return void refuse('not-shared');
     // Un fichier à la fois par ami : les autres attendent leur tour chez lui.
@@ -299,7 +304,7 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
       what = served(tableId, id);
     }
     if (!what) return void refuse('not-found');
-    const upload = { req, cancelled: false };
+    const upload = { req, cancelled: false, pacer: new RatePacer(rate) };
     uploads.set(key, upload);
     let fd: number | undefined;
     try {
@@ -333,6 +338,9 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
         const n = fs.readSync(fd, buf, 0, Math.min(FILE_CHUNK, bytes - sent), sent);
         if (n <= 0) break;
         hash.update(buf.subarray(0, n));
+        // Au rythme voulu par l'ami (sa limite de débit) ; une annulation pendant l'attente arrête tout.
+        await upload.pacer.take(n);
+        if (upload.cancelled) break;
         if (!(await net.sendChunk(key, chunkFrame(req, buf.subarray(0, n))))) return;
         sent += n;
       }
@@ -533,11 +541,16 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
         case 'table-files':
           return onTableFiles(key, message);
         case 'file-get':
-          void serveFile(key, message.req, message.table, message.file, message.from).catch((error: Error) => log(`Bibliothèque partagée : envoi impossible (${error.message}).`)); // i18n-ignore : journal
+          void serveFile(key, message.req, message.table, message.file, message.from, message.rate).catch((error: Error) => log(`Bibliothèque partagée : envoi impossible (${error.message}).`)); // i18n-ignore : journal
           return;
         case 'file-cancel': {
           const upload = uploads.get(key);
           if (upload?.req === message.req) upload.cancelled = true;
+          return;
+        }
+        case 'file-rate': {
+          const upload = uploads.get(key);
+          if (upload?.req === message.req) upload.pacer.setRate(message.rate);
           return;
         }
         case 'file-head':
@@ -561,6 +574,9 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     net.onChunk(onChunk),
   ];
 
+  /** Part de ma limite de débit pour chaque réception en cours ; 0 : sans limite. */
+  const downloadShare = () => rateShare(net.state().downloadRate ?? 0, incoming.size);
+
   /** `kept` : partiel du gestionnaire, repris s'il a déjà des octets et gardé en cas de coupure. */
   function fetchOne(key: string, tableId: string, id: string, target: Target, onBytes: (bytes: number) => void, signal?: AbortSignal, kept?: string, expect?: number): Promise<FetchedFile | { reason: FetchFailure }> {
     return new Promise((resolve) => {
@@ -575,14 +591,23 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
         keep: Boolean(kept),
         ...(expect !== undefined ? { expect } : {}),
         bytes: from,
+        rate: 0,
         first: Buffer.alloc(0),
         hash: createHash('sha256'),
         done: resolve,
       };
       incoming.set(req, job);
+      // Ma limite de débit, partagée entre les réceptions en cours : redemandée à chaque ami quand
+      // elle change ou qu'une réception commence ou finit.
+      job.rate = downloadShare();
       const watch = setInterval(() => {
         onBytes(job.bytes);
-        if (!net.online(key)) finish(req, { reason: 'offline' });
+        if (!net.online(key)) return finish(req, { reason: 'offline' });
+        const rate = downloadShare();
+        if (rate !== job.rate) {
+          job.rate = rate;
+          net.send(key, { t: 'file-rate', req, rate });
+        }
       }, 200);
       watch.unref?.();
       const abort = () => {
@@ -598,7 +623,7 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
         done(result);
       };
       arm(job, req);
-      if (!net.send(key, { t: 'file-get', req, table: tableId, file: id, ...(from ? { from } : {}) })) finish(req, { reason: 'offline' });
+      if (!net.send(key, { t: 'file-get', req, table: tableId, file: id, ...(from ? { from } : {}), ...(job.rate ? { rate: job.rate } : {}) })) finish(req, { reason: 'offline' });
     });
   }
 

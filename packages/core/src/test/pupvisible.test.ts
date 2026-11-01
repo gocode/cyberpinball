@@ -324,7 +324,7 @@ test('pendant la partie, aucune fenêtre de Cyber Pinball ne reste au-dessus des
     .readdirSync(SOURCES)
     .filter((f) => f.endsWith('.ts'))
     .filter((f) => /setAlwaysOnTop\(\s*true|alwaysOnTop:\s*true/.test(fs.readFileSync(path.join(SOURCES, f), 'utf8')));
-  assert.deepEqual(topmost, ['acquire-window.ts', 'game-notice.ts', 'game-recording.ts'], 'toute fenêtre au premier plan doit être fermée par closeTopmostWindows avant la partie');
+  assert.deepEqual(topmost, ['acquire-window.ts', 'game-notice.ts', 'game-recording.ts', 'in-game-menu.ts'], 'toute fenêtre au premier plan doit être fermée par closeTopmostWindows avant la partie');
   // Seule exception : le témoin de l'enregistrement d'une partie, voulu au-dessus de VPX. Il ne couvre
   // qu'un coin du plateau (420 × 72 pour 1080 px), naît après closeTopmostWindows, ignore la souris,
   // n'apparaît pas dans la capture, et disparaît à la fin de l'enregistrement.
@@ -343,7 +343,17 @@ test('pendant la partie, aucune fenêtre de Cyber Pinball ne reste au-dessus des
   assert.match(notice, /setIgnoreMouseEvents\(true\)/);
   assert.match(front, /if \(playing\) gameNotices\.show\(invite\);/);
   assert.ok(front.indexOf('  closeTopmostWindows();') < front.indexOf('  playing = table;'), 'l’invitation ne naît qu’après closeTopmostWindows');
-  assert.match(front, /const result = await game\.done;\r?\n\s+if \(watchLive\) clearInterval\(watchLive\);\r?\n\s+gameNotices\.close\(\);/);
+  assert.match(front, /const result = await game\.done;\r?\n\s+if \(watchLive\) clearInterval\(watchLive\);\r?\n\s+gameNotices\.close\(\);\r?\n\s+inGameMenu\.disarm\(\);/);
+  // Troisième exception : les réglages en partie (in-game-menu.ts), voulus au-dessus de VPX, mais
+  // seulement quand le joueur les ouvre (les deux MagnaSave), VPX en pause pendant ce temps (il a perdu
+  // le premier plan). Guettés une fois la table à l'écran (onPlaying, après closeTopmostWindows),
+  // absents de la capture, fermés à la sortie du menu, et au plus tard à la fin de la partie (disarm).
+  const menu = fs.readFileSync(path.join(SOURCES, 'in-game-menu.ts'), 'utf8');
+  assert.match(menu, /setContentProtection\(true\)/);
+  assert.match(menu, /disarm\(\) \{\r?\n\s+if \(menu\) close\(false\);/);
+  assert.match(menu, /for \(const sw of closing\.windows\) if \(!sw\.win\.isDestroyed\(\)\) sw\.win\.close\(\);/);
+  assert.ok(front.indexOf('  closeTopmostWindows();') < front.indexOf('inGameMenu.arm('), 'le menu n’est guetté qu’après closeTopmostWindows');
+  assert.ok(front.indexOf('const onPlaying = () => {') < front.indexOf('inGameMenu.arm('), 'guetté une fois la table à l’écran');
   const frontend = fs.readFileSync(path.join(SOURCES, 'frontend.ts'), 'utf8');
   const close = frontend.indexOf('  closeTopmostWindows();');
   const launch = frontend.indexOf('launchVpx({');

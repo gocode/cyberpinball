@@ -16,6 +16,7 @@ import * as path from 'node:path';
 import { renameWithRetry, writeFileAtomic } from './atomicwrite';
 import { dmdScore } from './highscores';
 import { t } from './i18n';
+import { parseRate, type ByteRate } from './ratelimit';
 import { createPlayerKey, isPlayerPublicKey, playerFingerprint, signText, tableIdentity, verifyText, type PlayerKey } from './sharing';
 import type { TableEntry } from './tables';
 
@@ -135,6 +136,11 @@ export interface SocialState {
   shareLibrary: boolean;
   /** Le joueur a lui-même choisi de partager ou non : seul ce choix l'emporte sur le partage par défaut. */
   shareLibraryChosen?: boolean;
+  /**
+   * Débit des téléchargements depuis les amis, en octets par seconde, pour l'ensemble des envois
+   * en cours (ratelimit.ts) ; absent : sans limite.
+   */
+  downloadRate?: ByteRate;
   name: string;
   /** Date du nom actuel : le profil signé la porte. */
   nameAt: string;
@@ -257,6 +263,7 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     // Un fichier écrit avant le partage par défaut porte « false » sans que le joueur l'ait choisi.
     shareLibrary: s.shareLibraryChosen === true ? s.shareLibrary === true : true,
     ...(s.shareLibraryChosen === true ? { shareLibraryChosen: true } : {}),
+    ...(parseRate(s.downloadRate) ? { downloadRate: s.downloadRate as ByteRate } : {}),
     name: normalizeName(s.name) ?? defaultName(key.publicKey),
     nameAt: isIso(s.nameAt) ? s.nameAt : new Date(0).toISOString(),
     key: { publicKey: key.publicKey, privateKey: key.privateKey },

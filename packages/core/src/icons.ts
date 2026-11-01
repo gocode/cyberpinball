@@ -74,6 +74,7 @@ export const ICON_NAMES = [
   'attract',
   'shuffle',
   'volume-low',
+  'volume-mute',
   'film',
   'quality',
   // Réglages de VPX

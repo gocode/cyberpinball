@@ -24,8 +24,11 @@ export interface ButtonInfo {
   label: string;
   /** Obligatoire : l'assistant attend ce bouton. Facultatif : Exit le passe. */
   required: boolean;
-  /** Touche émise par défaut par les encodeurs de borne (celle de VPX), en KeyboardEvent.code. */
-  default: string;
+  /**
+   * Touche émise par défaut par les encodeurs de borne (celle de VPX), en KeyboardEvent.code ;
+   * absente : aucun encodeur ne l'envoie d'office (Muet), le bouton n'existe qu'une fois relevé.
+   */
+  default?: string;
   /** Actions de VPX que ce bouton déclenche (« Mapping.<action> »). */
   vpx: string[];
   /** Question du relevé quand ce n'est pas un bouton qu'on appuie (le balancier). */
@@ -71,8 +74,18 @@ export const BUTTONS: readonly ButtonInfo[] = [
   { id: 'nudgeLeft', get label() { return t('Tremblement à gauche'); }, required: false, default: 'KeyZ', vpx: ['LeftNudge'] },
   { id: 'nudgeRight', get label() { return t('Tremblement à droite'); }, required: false, default: 'Slash', vpx: ['RightNudge'] },
   { id: 'nudgeCenter', get label() { return t('Tremblement vers l’avant'); }, required: false, default: 'Space', vpx: ['CenterNudge'] },
-  { id: 'volumeDown', label: 'Volume −', required: false, default: 'Minus', vpx: ['VolumeDown'] },
-  { id: 'volumeUp', label: 'Volume +', required: false, default: 'Equal', vpx: ['VolumeUp'] },
+  // Le son de toute la borne, celui de Windows : Cyber Pinball lit ces boutons lui-même, au menu
+  // comme en partie (cabinetvolume.ts) ; les actions de volume de VPX n'ont plus de touche.
+  {
+    id: 'volumeDown',
+    label: 'Volume −',
+    get how() { return t('Le son de toute la borne baisse de 5 % ; maintenu une seconde, il se coupe (ou revient)'); },
+    required: false,
+    default: 'Minus',
+    vpx: [],
+  },
+  { id: 'volumeUp', label: 'Volume +', get how() { return t('Le son de toute la borne monte de 5 %'); }, required: false, default: 'Equal', vpx: [] },
+  { id: 'volumeMute', get label() { return t('Muet'); }, get how() { return t('Coupe ou rétablit le son de toute la borne'); }, required: false, vpx: [] },
 ];
 
 export function buttonInfo(id: ButtonId): ButtonInfo {
@@ -80,7 +93,7 @@ export function buttonInfo(id: ButtonId): ButtonInfo {
 }
 
 /** Touches par défaut des encodeurs : celles d'une borne dont l'étape « Boutons » n'a pas été faite. */
-export const DEFAULT_BUTTONS: Readonly<CabinetButtons> = Object.fromEntries(BUTTONS.map((b) => [b.id, b.default])) as CabinetButtons;
+export const DEFAULT_BUTTONS: Readonly<CabinetButtons> = Object.fromEntries(BUTTONS.filter((b) => b.default).map((b) => [b.id, b.default])) as CabinetButtons;
 
 /**
  * Touche de chaque bouton : celles de l'étape « Boutons » ; sans elle, ou si le relevé
@@ -624,15 +637,16 @@ export function gameKeys(buttons: CabinetButtons | undefined, tilt?: CabinetTilt
     const labels = ids.map(label);
     return labels.join(labels.some((l) => l.includes('/')) ? ' · ' : ' / ');
   };
-  // VPX 10.8.1 quitte la partie dès qu'Exit est appuyé (ExitGame, InputManager.cpp) ;
-  // son menu (réglages, placement des écrans) s'ouvre par la combinaison de inGameMenuButtons.
+  // VPX 10.8.1 quitte la partie dès qu'Exit est appuyé (ExitGame, InputManager.cpp). La combinaison
+  // de inGameMenuButtons ouvre les réglages en partie de Cyber Pinball (dmdplace.ts) : position du
+  // DMD, puis le menu de VPX.
   const rows: [string, string][] = [
     ['Flippers', list(['leftFlipper', 'rightFlipper'])],
     [t('Lanceur'), label('plunger')],
     [t('Crédit'), label('credit')],
     ['Start', label('start')],
     [t('Quitter la partie'), label('exit')],
-    [t('Menu de VPX'), inGameMenuButtons(keys).map(label).join(' + ')],
+    [t('Position du DMD, menu de VPX'), inGameMenuButtons(keys).map(label).join(' + ')],
   ];
   const optional = (title: string, ids: ButtonId[]) => {
     const present = ids.filter((id) => keys[id]);
@@ -650,7 +664,7 @@ export function gameKeys(buttons: CabinetButtons | undefined, tilt?: CabinetTilt
   ];
   if (tiltWays.length) rows.push(['Tilt', tiltWays.join(' · ')]);
   optional(t('Tremblements'), ['nudgeLeft', 'nudgeRight', 'nudgeCenter']);
-  optional('Volume', ['volumeDown', 'volumeUp']);
+  optional('Volume', ['volumeDown', 'volumeUp', 'volumeMute']);
   return rows;
 }
 
@@ -669,19 +683,19 @@ export function displayKeys(buttons: CabinetButtons | undefined): [string, strin
     [t('Annuler les changements'), label('credit')],
     [t('Valeur par défaut'), label('plunger')],
     [t('Page précédente, puis fermer'), label('exit')],
-    [t('Rouvrir le menu'), inGameMenuButtons(keys).map(label).join(' + ')],
+    [t('Réglages en partie, menu de VPX'), inGameMenuButtons(keys).map(label).join(' + ')],
     [t('Quitter, menu fermé'), label('exit')],
   ];
 }
 
 /**
- * Boutons qui, appuyés ensemble, ouvrent le menu de VPX pendant une partie (action
- * InGameUI, F12 au clavier) : les deux MagnaSave, qui y choisissent ensuite la ligne
- * (UIUp, UIDown) ; sans eux, Crédit et Start. Dans ce menu, « Display Settings » place
- * et redimensionne en direct le fronton, le DMD et le topper, puis les enregistre pour
- * toutes les tables ou pour celle-ci seulement (docs/manuel.md, « Régler l'affichage en
- * partie »). Exit seul quitterait la partie : il n'entre dans aucune
- * combinaison.
+ * Boutons qui, appuyés ensemble pendant une partie, ouvrent les réglages en partie de Cyber
+ * Pinball (dmdplace.ts, app/src/in-game-menu.ts) : les deux MagnaSave ; sans eux, Crédit et
+ * Start. « Position du DMD » y vient en tête (place et taille du DMD, sur n'importe quel écran,
+ * enregistrées pour la table) ; « Tous les réglages de VPX » ouvre ensuite le menu de VPX (action
+ * InGameUI, F12 au clavier), où « Display Settings » place le fronton et le topper. Cyber
+ * Pinball lit la combinaison lui-même : elle n'est plus écrite dans [Input] Mapping.InGameUI
+ * (01/11/2026). Exit seul quitterait la partie : il n'entre dans aucune combinaison.
  */
 export function inGameMenuButtons(keys: CabinetButtons): ButtonId[] {
   return keys.leftMagna && keys.rightMagna ? ['leftMagna', 'rightMagna'] : ['credit', 'start'];
@@ -911,7 +925,7 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
   // Doublon voulu par VPX : la même touche par défaut, laissée par défaut sur le bouton.
   const intended = (action: string, scancode: number) => {
     const holder = taken.get(scancode)!;
-    return VPX_INPUT_DEFAULTS[action] === scancode && sdlScancode(holder.default) === scancode;
+    return VPX_INPUT_DEFAULTS[action] === scancode && holder.default !== undefined && sdlScancode(holder.default) === scancode;
   };
   const free = (action: string, keys: number[], owner?: ButtonId) => {
     const kept: number[] = [];
@@ -934,6 +948,10 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
       put(action, scancode !== undefined ? [scancode] : free(action, [VPX_INPUT_DEFAULTS[action]!]), joystick);
     }
   }
+
+  // Volume − et Volume + de VPX : sans touche, les boutons de la borne règlent le son de Windows.
+  settings.push(...vpxVolumeSettings(doc, written));
+  for (const action of VPX_VOLUME_ACTIONS) driven.add(action);
 
   for (const action of Object.keys(VPX_INPUT_DEFAULTS)) {
     if (driven.has(action)) continue;
@@ -959,18 +977,120 @@ export function vpxInputSettings(buttons: CabinetButtons, doc: IniDocument, writ
 const IN_GAME_MENU = 'InGameUI';
 
 /**
+ * Actions de VPX que Cyber Pinball tient lui-même : VolumeDown et VolumeUp ne bougent que le mixage
+ * de VPX, de 1 % par appui (InputManager.cpp, 10.8.1), sans effet audible ; les boutons de volume de
+ * la borne règlent le son de Windows (cabinetvolume.ts). Elles n'ont plus de touche du clavier
+ * (sinon - et = régleraient aussi VPX, qui montrerait un autre volume), avec ou sans étape « Boutons ».
+ */
+export const VPX_VOLUME_ACTIONS: readonly string[] = ['VolumeDown', 'VolumeUp'];
+
+/**
+ * [Input] Mapping.VolumeDown et Mapping.VolumeUp : ni touche seule du clavier, ni bouton de joystick
+ * écrit la dernière fois (`written`) ; manettes et combinaisons ajoutées dans VPX sont gardées.
+ */
+export function vpxVolumeSettings(doc: IniDocument, written: Record<string, string> = {}): VpxSetting[] {
+  return VPX_VOLUME_ACTIONS.map((action) => {
+    const key = mappingKey(action);
+    return { section: VPX_INPUT_SECTION, key, value: withButtonMapping(doc.get(VPX_INPUT_SECTION, key) ?? '', [], undefined, written[`${VPX_INPUT_SECTION}.${key}`]) };
+  });
+}
+
+/**
  * Valeur de [Input] Mapping.InGameUI : ses touches seules du clavier (F12, sauf si un
- * bouton l'a prise), puis la combinaison des boutons de inGameMenuButtons. La combinaison
- * écrite la dernière fois (`before`) est retirée, pour qu'un changement de boutons ne
- * laisse pas l'ancienne ; manettes et combinaisons ajoutées dans VPX sont gardées.
+ * bouton l'a prise). La combinaison des boutons de inGameMenuButtons n'y est plus : Cyber
+ * Pinball la lit lui-même et ouvre ses réglages en partie, d'où « Tous les réglages de VPX »
+ * mène au menu de VPX par sa touche. Celle des boutons d'aujourd'hui, et toute combinaison
+ * écrite la dernière fois (`before`), sont retirées ; manettes et combinaisons ajoutées dans
+ * VPX sont gardées.
  */
 function inGameMenuMapping(buttons: CabinetButtons, current: string, before: string | undefined, keys: number[]): string {
   const combo = inGameMenuButtons(buttons).map((id) => mappingToken(buttons[id]!));
   const stale = new Set([formatMapping([combo]), ...parseMapping(before ?? '').filter((alt) => alt.length > 1).map((alt) => formatMapping([alt]))]);
   const others = parseMapping(current).filter((alt) => !stale.has(formatMapping([alt])));
   const base = parseMapping(withKeyboardKeys(formatMapping(others), keys)).filter((alt) => singleKey(alt) !== NO_KEY);
-  return formatMapping([...base, combo]);
+  return formatMapping(base);
 }
+
+/**
+ * Touches du clavier (KeyboardEvent.code) qui ouvrent le menu de VPX d'après [Input]
+ * Mapping.InGameUI (F12 quand la clé est vide) : « Tous les réglages de VPX » en appuie une
+ * pour VPX. Vide : aucune touche seule ne l'ouvre.
+ */
+export function vpxMenuKeys(doc: IniDocument): string[] {
+  return keyboardKeys(doc.get(VPX_INPUT_SECTION, mappingKey(IN_GAME_MENU)), IN_GAME_MENU)
+    .map(codeOfScancode)
+    .filter((c): c is string => Boolean(c));
+}
+
+/**
+ * Code de touche virtuelle de Windows d'une touche (KeyboardEvent.code), pour la lire pendant une
+ * partie (GetAsyncKeyState) ou l'appuyer pour VPX (keybd_event). Les lettres et la ponctuation
+ * suivent la disposition du clavier (une borne a des encodeurs : Maj, Ctrl, chiffres, F1-F24
+ * ne changent pas). undefined : touche sans code connu.
+ */
+export function windowsVk(code: string): number | undefined {
+  const letter = /^Key([A-Z])$/.exec(code)?.[1];
+  if (letter) return letter.charCodeAt(0);
+  const digit = /^Digit(\d)$/.exec(code)?.[1];
+  if (digit) return 0x30 + Number(digit);
+  const pad = /^Numpad(\d)$/.exec(code)?.[1];
+  if (pad) return 0x60 + Number(pad);
+  const fn = /^F(\d{1,2})$/.exec(code)?.[1];
+  if (fn && Number(fn) >= 1 && Number(fn) <= 24) return 0x6f + Number(fn);
+  return WINDOWS_VK[code];
+}
+
+const WINDOWS_VK: Readonly<Record<string, number>> = {
+  Backspace: 0x08,
+  Tab: 0x09,
+  Enter: 0x0d,
+  NumpadEnter: 0x0d,
+  Pause: 0x13,
+  CapsLock: 0x14,
+  Escape: 0x1b,
+  Space: 0x20,
+  PageUp: 0x21,
+  PageDown: 0x22,
+  End: 0x23,
+  Home: 0x24,
+  ArrowLeft: 0x25,
+  ArrowUp: 0x26,
+  ArrowRight: 0x27,
+  ArrowDown: 0x28,
+  Insert: 0x2d,
+  Delete: 0x2e,
+  MetaLeft: 0x5b,
+  MetaRight: 0x5c,
+  ContextMenu: 0x5d,
+  NumpadMultiply: 0x6a,
+  NumpadAdd: 0x6b,
+  NumpadSubtract: 0x6d,
+  NumpadDecimal: 0x6e,
+  NumpadDivide: 0x6f,
+  NumLock: 0x90,
+  ScrollLock: 0x91,
+  ShiftLeft: 0xa0,
+  ShiftRight: 0xa1,
+  ControlLeft: 0xa2,
+  ControlRight: 0xa3,
+  AltLeft: 0xa4,
+  AltRight: 0xa5,
+  AudioVolumeMute: 0xad,
+  AudioVolumeDown: 0xae,
+  AudioVolumeUp: 0xaf,
+  Semicolon: 0xba,
+  Equal: 0xbb,
+  Comma: 0xbc,
+  Minus: 0xbd,
+  Period: 0xbe,
+  Slash: 0xbf,
+  Backquote: 0xc0,
+  BracketLeft: 0xdb,
+  Backslash: 0xdc,
+  BracketRight: 0xdd,
+  Quote: 0xde,
+  IntlBackslash: 0xe2,
+};
 
 /**
  * [Input] Mapping.InGameUI pour ces boutons. Sans étape « Boutons », c'est la seule clé de
@@ -990,7 +1110,7 @@ export function inGameMenuSetting(buttons: CabinetButtons, doc: IniDocument, wri
 
 /** Clés [Input] que Cyber Pinball écrit pour ces boutons, hors actions privées de leur touche (qui varient avec le fichier). */
 export function vpxInputOwnedKeys(): string[] {
-  return [...BUTTONS.flatMap((b) => b.vpx.map(mappingKey)), mappingKey(IN_GAME_MENU)];
+  return [...BUTTONS.flatMap((b) => b.vpx.map(mappingKey)), ...VPX_VOLUME_ACTIONS.map(mappingKey), mappingKey(IN_GAME_MENU)];
 }
 
 /** Texte d'une valeur Mapping.* pour l'écran : « Maj gauche », « Maj gauche ou bouton de manette ». */

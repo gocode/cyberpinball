@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+    <title data-i18n>Cyber Pinball — Réglages en partie</title>
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="in-game-menu.css" />
+  </head>
+  <body>
+    <div id="frame" class="dmd-frame" hidden>
+      <span class="dmd-label" id="frame-label"></span>
+      <span class="handle nw" data-handle="nw"></span>
+      <span class="handle ne" data-handle="ne"></span>
+      <span class="handle sw" data-handle="sw"></span>
+      <span class="handle se" data-handle="se"></span>
+    </div>
+    <div id="zone" class="zone" hidden>
+      <div id="turn" class="turn">
+        <section id="panel" class="panel">
+          <header class="panel-head">
+            <span class="panel-icon" id="panel-icon"></span>
+            <h1 id="title"></h1>
+            <p class="panel-detail" id="detail"></p>
+          </header>
+          <div id="sections" class="sections"></div>
+          <ol id="choices" class="choices" hidden></ol>
+          <p id="live" class="live" hidden></p>
+          <p id="notice" class="notice" role="status" hidden></p>
+          <p id="hint" class="hint"></p>
+          <p id="mouse" class="mouse"></p>
+          <div id="leaving" class="leaving" hidden>
+            <p class="leaving-title" id="leaving-title"></p>
+            <ol class="leaving-choices" id="leaving-choices"></ol>
+            <p class="hint" id="leaving-hint"></p>
+          </div>
+        </section>
+      </div>
+    </div>
+    <script src="i18n.js"></script>
+    <script src="icons.js"></script>
+    <script src="in-game-menu.js"></script>
+  </body>
+</html>

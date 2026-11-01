@@ -5,9 +5,10 @@
 # Bruno (ami, en partie, record battu, bibliothèque partagée), Chloé (demande d'ami), Dora (à
 # proximité), Émile (ami hors ligne). Aucune borne réelle, aucun nœud d'amorçage public, aucune
 # invite du pare-feu.
-#   Parcours « amis » : la rubrique Amis, « Mes amis », la fiche de Bruno, « Trouver un joueur »
+#   Parcours « amis » : Menu système > Tables > « Toutes les tables » et la fiche d'une table, l'ordre
+#   des tables et la table au démarrage ; la rubrique Amis, « Mes amis », la fiche de Bruno, « Trouver un joueur »
 #   (à proximité, vus récemment), une recherche « chlo », « Demandes d'amis » et la demande de
-#   Chloé, « Mes badges », « Partage et réseau », puis la bibliothèque de Bruno, sa table que la
+#   Chloé, « Mes badges », « Partage et réseau » (le débit des téléchargements limité puis levé), puis la bibliothèque de Bruno, sa table que la
 #   borne n'a pas, prise tout entière jusqu'au plan d'ajout (jamais installée), puis celle que la
 #   borne a aussi : ses parties au choix, et ses médias qui manquent, pris jusqu'au brouillon.
 #   Parcours « partie » : Bruno invite la borne à une partie en direct ; l'invitation s'ouvre
@@ -89,8 +90,8 @@ function New-Racine([string]$Nom, [switch]$Vpx, [switch]$Neuve) {
 $Exit = 'Escape'
 # Libellés : ceux de la langue de l'essai (l'autopilote choisit une action par son libellé).
 $libelles = @{
-  'fr' = @{ Plus = 'Répondre plus tard'; Amis = 'Amis'; MesAmis = 'Mes amis'; Historique = 'Historique des parties'; Trouver = 'Trouver un joueur'; Chercher = 'Chercher un nom'; Demandes = 'Demandes d'; Badges = 'Mes badges'; Partage = 'Partage et réseau'; Biblio = 'Voir sa bibliothèque'; Prendre = 'Récupérer le'; Toute = 'Récupérer toute la table'; Parties = 'Choisir les parties'; Accepter = 'Accepter'; Fermer = 'Fermer'; Retour = 'Retour'; Scores = 'Scores des amis'; Topper = 'Sur le topper'; Auto = 'Automatique' }
-  'en' = @{ Plus = 'Answer later'; Amis = 'Friends'; MesAmis = 'My friends'; Historique = 'Game history'; Trouver = 'Find a player'; Chercher = 'Search for a name'; Demandes = 'Friend requests'; Badges = 'My badges'; Partage = 'Sharing and network'; Biblio = 'See their library'; Prendre = 'Get the'; Toute = 'Get the whole table'; Parties = 'Choose parts'; Accepter = 'Accept'; Fermer = 'Close'; Retour = 'Back'; Scores = 'Friends'; Topper = 'On the topper'; Auto = 'Automatic' }
+  'fr' = @{ Plus = 'Répondre plus tard'; Amis = 'Amis'; MesAmis = 'Mes amis'; Historique = 'Historique des parties'; Trouver = 'Trouver un joueur'; Chercher = 'Chercher un nom'; Demandes = 'Demandes d'; Badges = 'Mes badges'; Partage = 'Partage et réseau'; Biblio = 'Voir sa bibliothèque'; Prendre = 'Récupérer le'; Toute = 'Récupérer toute la table'; Parties = 'Choisir les parties'; Accepter = 'Accepter'; Fermer = 'Fermer'; Retour = 'Retour'; Scores = 'Scores des amis'; Topper = 'Sur le topper'; Auto = 'Automatique'; Annee = 'Par année' }
+  'en' = @{ Plus = 'Answer later'; Amis = 'Friends'; MesAmis = 'My friends'; Historique = 'Game history'; Trouver = 'Find a player'; Chercher = 'Search for a name'; Demandes = 'Friend requests'; Badges = 'My badges'; Partage = 'Sharing and network'; Biblio = 'See their library'; Prendre = 'Get the'; Toute = 'Get the whole table'; Parties = 'Choose parts'; Accepter = 'Accept'; Fermer = 'Close'; Retour = 'Back'; Scores = 'Friends'; Topper = 'On the topper'; Auto = 'Automatic'; Annee = 'By year' }
 }
 
 function Get-Etapes([string]$Nom, $l) {
@@ -139,6 +140,12 @@ function Get-Etapes([string]$Nom, $l) {
   $ap = [char]0x2019
   return @(
     'wait:1500', $Exit, 'wait:800', $Exit, 'wait:4000',
+    # Menu système > Tables > « Toutes les tables » : la fiche d'une table (Start), Exit y ramène la
+    # liste ; puis l'ordre des tables et la table au démarrage (Médias, son et attente).
+    'action:Toutes les tables', 'wait:600', 'Enter', 'wait:600', $Exit, 'wait:600', 'action:Retour', 'wait:400',
+    # Les étapes se séparent par des virgules : « Médias, son et attente » s'atteint par la rubrique Médias, puis son entrée « Médias… ».
+    'action:Médias', 'wait:400', 'action:Médias', 'wait:400', 'action:Ordre des tables', 'wait:400', "action:$($l.Annee)", 'wait:400',
+    'action:Table au démarrage', 'wait:400', 'action:Retour', 'wait:400',
     "action:$($l.Amis)", "action:$($l.MesAmis)", 'wait:1200',
     'action:Bruno', 'wait:400', $Exit, 'wait:300', $Exit,
     "action:$($l.Trouver)", 'wait:600',
@@ -146,7 +153,9 @@ function Get-Etapes([string]$Nom, $l) {
     "action:$($l.Chercher)", 'type:chlo', 'Enter', 'wait:400', $Exit, 'wait:300', $Exit, 'wait:300', $Exit,
     "action:$($l.Demandes)", 'action:Chlo', 'wait:300', $Exit, 'wait:300', $Exit, 'wait:300', $Exit,
     "action:$($l.Badges)", $Exit,
-    "action:$($l.Partage)", 'wait:800', $Exit,
+    # La limite du débit des téléchargements : choisie, puis levée (la suite reçoit à pleine vitesse).
+    "action:$($l.Partage)", 'wait:800', 'action:Limiter le débit des téléchargements', 'wait:600', 'action:1', 'wait:800',
+    'action:Limiter le débit des téléchargements', 'wait:400', 'action:Sans limite', 'wait:600', $Exit,
     # Bibliothèque de Bruno : d'abord la table qu'on n'a pas, prise tout entière jusqu'au plan d'ajout
     # (jamais installée ici) ; puis celle qu'on a aussi (curseur dessus) : ses parties au choix, et ses médias.
     "action:$($l.MesAmis)", 'wait:400', 'action:Bruno', 'wait:400', "action:$($l.Biblio)", 'wait:2000',
@@ -155,7 +164,8 @@ function Get-Etapes([string]$Nom, $l) {
     'action:ROM', 'wait:800', 'action:Prendre la ROM', 'wait:400', "action:J$($ap)atteste et je m$($ap)engage", 'wait:800', 'action:Prendre la ROM', 'wait:800',
     "action:$($l.Prendre)", 'wait:6000',
     $Exit, 'wait:800', $Exit, 'wait:800',
-    'Enter', 'wait:600', "action:$($l.Parties)", 'wait:2500', $Exit, 'wait:600',
+    # L'écran des parties s'ouvre dans sa liste : un Exit passe aux actions, le second en sort.
+    'Enter', 'wait:600', "action:$($l.Parties)", 'wait:2500', $Exit, 'wait:600', $Exit, 'wait:600',
     "action:$($l.Prendre)", 'wait:4000'
   )
 }

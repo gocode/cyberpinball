@@ -29,6 +29,13 @@ export const messages: Record<string, string> = {
   Continuer: 'Continue',
   'Table introuvable': 'Table not found',
   'Retour au menu': 'Back to menu',
+  // Menu système > Tables > Toutes les tables (app/src/library.ts)
+  'Retour à la liste des tables': 'Back to the table list',
+  '{n} table : sa fiche, comme depuis la roue (Jouer, Modifier, médias…)': '{n} table: its page, as from the wheel (Play, Edit, media…)',
+  '{n} tables : leur fiche, comme depuis la roue (Jouer, Modifier, médias…)': '{n} tables: their page, as from the wheel (Play, Edit, media…)',
+  'Aucune table pour le moment': 'No table yet',
+  'Start : la fiche de la table, avec les mêmes actions que depuis la roue. Exit, dans la fiche, revient ici.': 'Start: the table’s page, with the same actions as from the wheel. Exit, on the page, comes back here.',
+  'Aucune table pour le moment : « Ajouter une table » en installe une.': 'No table yet: “Add a table” installs one.',
   'Jouée {n} fois': 'Times played: {n}',
   'Jamais jouée': 'Never played',
   aucun: 'none',

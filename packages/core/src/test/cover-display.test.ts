@@ -29,10 +29,13 @@ test('chaque module qui crée une fenêtre la fait couvrir son écran par coverD
   assert.ok(creators.length >= 3, 'menu, réglages et assistant créent leurs fenêtres');
   // Fenêtres qui ne sont pas un écran : l'enregistreur d'une partie, jamais montré, et son témoin,
   // pastille transparente posée au coin du plateau (indicatorBounds), à sa taille ; l'invitation
-  // d'un ami pendant la partie, carte transparente posée à l'autre coin (gameNoticeBounds).
+  // d'un ami pendant la partie, carte transparente posée à l'autre coin (gameNoticeBounds) ; les
+  // réglages en partie, calques transparents posés sur chaque écran par-dessus VPX (menuScreens), le
+  // temps du réglage : VPX garde ses fenêtres plein écran dessous, et on le voit au travers.
   const notScreens: Record<string, RegExp[]> = {
     'game-recording.ts': [/show: false,\s+width: 320,/, /transparent: true,[\s\S]*?\.\.\.windowRect\(bounds\)/],
     'game-notice.ts': [/gameNoticeBounds\(/, /transparent: true,[\s\S]*?\.\.\.windowRect\(bounds\)/],
+    'in-game-menu.ts': [/menuScreens\(/, /transparent: true,[\s\S]*?\.\.\.windowRect\(screen\.bounds\)/],
   };
   for (const s of creators) {
     if (notScreens[s.file]) for (const re of notScreens[s.file]!) assert.match(s.text, re, `${s.file} : fenêtre qui n'est pas un écran`);

@@ -8,6 +8,8 @@
 // la notification du menu des tables (notices.ts : icône et filet de son ton, titre, précision).
 // Avant le départ : l'attente du départ commun (livestart.ts, liveWaitView), chaque joueur et
 // son statut, puis « Partez ! ».
+// Au menu comme en partie : la pastille du volume de la borne (cabinetvolume.ts, volumeView), le
+// temps d'un appui sur Volume −, Volume + ou Muet.
 
 const frame = document.getElementById('frame');
 const notice = document.getElementById('notice');
@@ -23,6 +25,9 @@ const lineIcon = document.getElementById('line-icon');
 const lineTitle = document.getElementById('line-title');
 const lineDetail = document.getElementById('line-detail');
 let lineIconName;
+const volume = document.getElementById('volume');
+const volumeIcon = document.getElementById('volume-icon');
+let volumeIconName;
 const wait = document.getElementById('wait');
 const waitRows = document.getElementById('wait-rows');
 const waitIcon = document.getElementById('wait-icon');
@@ -132,8 +137,32 @@ function fitLine(full) {
   }
 }
 
+/** Le volume de la borne : niveau et barre, ou le son coupé et comment le rétablir. */
+function renderVolume(view) {
+  const muted = Boolean(view.muted);
+  volume.className = `volume${muted ? ' muted' : ''}`;
+  const icon = muted ? 'volume-mute' : Number(view.percent) < 35 ? 'volume-low' : 'volume';
+  if (volumeIconName !== icon) {
+    volumeIconName = icon;
+    volumeIcon.replaceChildren(cyberIcon(icon));
+  }
+  document.getElementById('volume-title').textContent = view.title ?? '';
+  const percent = Math.max(0, Math.min(100, Number(view.percent) || 0));
+  document.getElementById('volume-value').textContent = muted ? '' : `${percent} %`;
+  volume.style.setProperty('--level', `${percent}%`);
+  const detail = document.getElementById('volume-detail');
+  detail.textContent = muted ? (view.detail ?? '') : '';
+  detail.hidden = !muted;
+  volume.hidden = false;
+}
+
 function render(state) {
   const view = state?.view;
+  volume.hidden = view?.mode !== 'volume';
+  if (view?.mode === 'volume') {
+    turnFrame(Number(state.rotation));
+    return renderVolume(view);
+  }
   line.hidden = view?.mode !== 'line';
   if (view?.mode === 'line') {
     turnFrame(Number(state.rotation));
@@ -179,5 +208,6 @@ window.cyberEtat = () => ({
   bande: board.hidden ? null : [...boardRows.children].map((li) => li.innerText.replace(/\s+/g, ' ').trim()),
   dmd: !dmd.hidden,
   ligne: line.hidden ? null : { titre: lineTitle.textContent, precision: lineDetail.hidden ? '' : lineDetail.textContent, depart: line.classList.contains('leaving') },
+  volume: volume.hidden ? null : volume.innerText.replace(/\s+/g, ' ').trim(),
   attente: wait.hidden ? null : { titre: document.getElementById('wait-title').textContent, joueurs: [...waitRows.children].map((li) => li.innerText.replace(/\s+/g, ' ').trim()) },
 });

@@ -596,3 +596,103 @@ body {
 .wait-row.out .wait-status {
   color: var(--ink-faint);
 }
+
+/* Volume de la borne : icône, « Volume » et le niveau, la barre ; son coupé, la façon de le rétablir à la place. */
+.volume {
+  --v: calc(var(--h, 104px) / 104);
+  position: absolute;
+  inset: 0;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: calc(48 * var(--v)) minmax(0, 1fr) auto;
+  grid-template-areas:
+    'icon title value'
+    'icon track track';
+  align-content: center;
+  align-items: center;
+  column-gap: calc(18 * var(--v));
+  row-gap: calc(12 * var(--v));
+  padding: 0 calc(26 * var(--v)) 0 calc(22 * var(--v));
+  border: calc(1 * var(--v)) solid var(--line-strong);
+  border-radius: calc(12 * var(--v));
+  background: var(--surface-raised);
+  box-shadow: var(--halo-panel);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  line-height: 1.2;
+  overflow: hidden;
+  animation: line-in 200ms ease-out both;
+}
+
+.volume[hidden] {
+  display: none;
+}
+
+.volume.muted {
+  grid-template-areas:
+    'icon title value'
+    'icon detail detail';
+  border-color: var(--warning);
+}
+
+.volume-icon {
+  grid-area: icon;
+  display: flex;
+  font-size: calc(44 * var(--v));
+  color: var(--signal);
+}
+
+.volume.muted .volume-icon {
+  color: var(--warning);
+}
+
+.volume-title {
+  grid-area: title;
+  font-size: calc(28 * var(--v));
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.volume-value {
+  grid-area: value;
+  font-size: calc(28 * var(--v));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--signal);
+}
+
+.volume-track {
+  grid-area: track;
+  position: relative;
+  height: calc(10 * var(--v));
+  border-radius: calc(5 * var(--v));
+  background: var(--line-strong);
+  overflow: hidden;
+}
+
+.volume-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--level, 0%);
+  background: var(--signal);
+  transition: width 120ms ease-out;
+}
+
+.volume.muted .volume-track {
+  display: none;
+}
+
+.volume-detail {
+  grid-area: detail;
+  font-size: calc(20 * var(--v));
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.volume-detail[hidden] {
+  display: none;
+}

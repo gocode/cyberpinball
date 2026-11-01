@@ -95,7 +95,7 @@ const TICK_MS = 1000;
 const BOARD_TICK_MS = 500;
 
 /** Une fenêtre posée par-dessus VPX, et ce qu'elle montre. */
-interface Overlay {
+export interface Overlay {
   win: BrowserWindow;
   loaded: boolean;
   /** Dernier état envoyé. */
@@ -104,8 +104,8 @@ interface Overlay {
   key: string;
 }
 
-/** La fenêtre transparente, sans focus, que les clics traversent, hors des captures, au-dessus de VPX. */
-function overlay(bounds: Rect, key: string, onLoad: (o: Overlay) => void): Overlay {
+/** La fenêtre transparente, sans focus, que les clics traversent, hors des captures, au-dessus de VPX (et du menu). */
+export function overlay(bounds: Rect, key: string, onLoad: (o: Overlay) => void): Overlay {
   const created = createWindow({
     show: false,
     frame: false,
@@ -131,7 +131,14 @@ function overlay(bounds: Rect, key: string, onLoad: (o: Overlay) => void): Overl
   return o;
 }
 
-const alive = (o: Overlay | undefined): o is Overlay => !!o && !o.win.isDestroyed();
+/** Montre la fenêtre sans lui donner le focus, devant ce qui est passé devant elle depuis (VPX, le menu). */
+export function raise(o: Overlay): void {
+  if (!isShown(o.win)) o.win.showInactive();
+  o.win.setAlwaysOnTop(true, 'screen-saver');
+  o.win.moveTop();
+}
+
+export const alive = (o: Overlay | undefined): o is Overlay => !!o && !o.win.isDestroyed();
 
 /**
  * Ferme une fenêtre de la bande, de la nouvelle ou de l'attente. Toujours par close(), jamais par
@@ -139,7 +146,7 @@ const alive = (o: Overlay | undefined): o is Overlay => !!o && !o.win.isDestroye
  * rendu qu'elles partagent, et l'autre ne se charge pas (démonstration du 31/10/2026 : la carte
  * d'attente du départ commun restait vide quand la bande quittait le topper au même moment).
  */
-function dispose(o: Overlay | undefined): void {
+export function dispose(o: Overlay | undefined): void {
   if (alive(o)) o.win.close();
 }
 

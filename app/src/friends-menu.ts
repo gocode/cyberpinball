@@ -11,6 +11,8 @@
 
 import {
   BADGES,
+  DOWNLOAD_RATE_CHOICES,
+  rateLabel,
   badgeDefinition,
   badgeLabel,
   displayName,
@@ -549,6 +551,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       s.shareLibrary
         ? { text: t('Bibliothèque partagée avec vos amis'), detail: t('Ils voient vos tables et peuvent les récupérer, avec leurs médias'), tone: 'ok', badges: [t('Partagée')], icon: 'tables' }
         : { text: t('Bibliothèque pas partagée'), detail: t('Vos amis ne voient pas vos tables'), tone: 'quiet', icon: 'tables' },
+      s.downloadRate
+        ? { text: t('Débit des téléchargements : {rate}', { rate: rateLabel(s.downloadRate) }), detail: t('Tables et médias reçus de vos amis, tous envois confondus'), tone: 'ok', badges: [t('Limité')], icon: 'gauge' }
+        : { text: t('Débit des téléchargements : sans limite'), detail: t('Tables et médias reçus de vos amis, aussi vite que vos connexions le permettent'), tone: 'quiet', icon: 'gauge' },
       firewallRow(),
       vpxRow(),
       ...[repairRow()].filter((r): r is Row => !!r),
@@ -561,6 +566,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         ? { label: t('Ne plus partager ma bibliothèque'), detail: t('Vos amis ne voient plus vos tables ni vos médias'), icon: 'tables', run: () => { net.setShareLibrary(false); flash = { text: t('Bibliothèque plus partagée'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
         : { label: t('Partager ma bibliothèque avec mes amis'), detail: t('Vos tables, leurs parties et leurs médias, entre amis seulement'), icon: 'tables', run: () => { net.setShareLibrary(true); flash = { text: t('Bibliothèque partagée avec vos amis'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
     );
+    actions.push({ label: t('Limiter le débit des téléchargements…'), detail: t('Actuellement : {rate}', { rate: rateLabel(s.downloadRate ?? 0) }), icon: 'gauge', run: () => openDownloadRate() });
     actions.push({ label: s.lan ? t('Désactiver le réseau local') : t('Activer le réseau local'), icon: 'monitor', run: async () => { await net.setLan(!s.lan); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } });
     // La coupure en dernier, juste avant « Retour » (sélection d'office).
     actions.push(
@@ -594,6 +600,35 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       actions,
       back,
     };
+  }
+
+  /** Limite du débit des téléchargements depuis les amis (ratelimit.ts), choisie dans une liste. */
+  function openDownloadRate(): void {
+    const current = () => net.state().downloadRate ?? 0;
+    const done = () => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER);
+    host.library.openCustom(
+      () => ({
+        heading: t('Débit des téléchargements'),
+        icon: 'gauge',
+        lead: t('Ce que vos amis vous envoient (tables, parties, médias) ne dépasse pas ce débit, tous envois confondus : la connexion reste libre pour le reste de la maison. Un ami dont la borne n’est pas à jour envoie encore à pleine vitesse.'),
+        sections: [],
+        actions: [
+          ...DOWNLOAD_RATE_CHOICES.map((rate) => ({
+            label: rate ? rateLabel(rate) : t('Sans limite'),
+            detail: rate === current() ? t('choix actuel') : undefined,
+            tone: rate === current() ? ('ok' as const) : undefined,
+            run: () => {
+              net.setDownloadRate(rate);
+              flash = { text: rate ? t('Débit des téléchargements limité à {rate}', { rate: rateLabel(rate) }) : t('Débit des téléchargements sans limite'), tone: 'ok' };
+              done();
+            },
+          })),
+          { label: t('Retour'), icon: 'back', run: done },
+        ],
+        back: done,
+      }),
+      Math.max(0, DOWNLOAD_RATE_CHOICES.indexOf(current())),
+    );
   }
 
   function askName(): void {

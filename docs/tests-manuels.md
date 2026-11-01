@@ -1287,12 +1287,30 @@ Sur la borne, Cyber Pinball fermé puis rouvert par son raccourci. La preuve san
 
 | # | Scénario | Comment | Résultat attendu |
 | --- | --- | --- | --- |
-| 673 | Les animations de Cyber Pinball | Ouvrir Cyber Pinball sans rien toucher. | Sur chaque écran, en même temps : la bille part du lanceur, prend l'orbite et frappe la cible, le plateau s'allume et les batteurs battent, la bille traverse le DMD, le fronton s'allume en vacillant, le topper est balayé, la marque paraît partout. Puis chaque écran reste sur sa dernière image ; « Appuyez sur un bouton pour choisir une table » paraît sur le plateau. Jamais d'écran blanc ou gris. |
+| 673 | Les animations de Cyber Pinball | Ouvrir Cyber Pinball sans rien toucher. | Sur chaque écran, en même temps : une étincelle monte et s'embrase en fils de lumière sur le plateau, la bille traverse le DMD, le fronton s'allume en vacillant, le topper est balayé, la marque paraît partout. Puis chaque écran reste sur sa dernière image ; « Appuyez sur un bouton pour choisir une table » paraît sur le plateau. Jamais d'écran blanc ou gris. |
 | 674 | Le premier bouton | Attendre, puis appuyer sur un flipper ; recommencer en appuyant pendant l'animation. | La roue paraît, sur la table d'avant, sans changer de table ni ouvrir la fiche ; pendant l'animation, le bouton passe l'ouverture. |
 | 675 | Vos fichiers | Menu système > Médias > « Médias, son et attente » > « Ouverture au démarrage » > Plateau > « Choisir une image ou une vidéo… » (une vidéo), Fronton (une image), « Musique de fond » (un mp3) ; « Voir l'ouverture ». | La vidéo se joue une fois sur le plateau, dans le bon sens, et garde sa dernière image ; l'image paraît sur le fronton ; la musique joue jusqu'au bouton, qui revient aux réglages. Les fichiers sont dans `media\` de la racine, `(IntroPlayfield).mp4`, `(IntroBackglass).png`, `(IntroAudio).mp3`. |
 | 676 | Revenir aux animations | Plateau > « Animation de Cyber Pinball », puis « Tout revenir aux animations de Cyber Pinball ». | Les animations de Cyber Pinball reviennent, sans musique ; la ligne dit « gardé, prêt à reprendre » ; les fichiers sont toujours dans `media\` ; « Votre fichier : … » les reprend. |
 | 677 | Remplacer un fichier | Choisir une autre vidéo pour le plateau. | La nouvelle se joue ; l'ancienne est dans `trash\<date> Ouverture`, pas effacée. |
 | 678 | Ouverture coupée | « Ouverture au démarrage : jouée » > Start (coupée), fermer et rouvrir Cyber Pinball ; puis changer de langue. | Coupée : le menu s'ouvre droit sur la roue. Jouée, un changement de langue (relance du menu) ne la rejoue pas. |
+
+## Position du DMD en partie
+
+Sur la borne, une partie lancée depuis le menu (une table à ROM, DMD visible). La preuve sans opérateur : `packages/core/src/test/dmdplace.test.ts` et `.\docs\demo-position-dmd.ps1` (la vraie page du menu, sur des écrans simulés, dans chaque état ; captures dans `tmp\captures\position-dmd`).
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 679 | Ouvrir le menu | En pleine partie, appuyer sur les deux MagnaSave ensemble. | La partie se met en pause ; le panneau « Réglages en partie » paraît sur le plateau, tourné vers le joueur, « Position du DMD » en tête ; un cadre vert entoure le vrai DMD, avec ses dimensions. Le menu de VPX ne s'ouvre pas par-dessus. |
+| 680 | Déplacer aux boutons | Flipper droit jusqu'à « Position horizontale », Start ; flippers, puis MagnaSave ; Start. Puis « Taille », Start, flippers (maintenus). | Le vrai DMD de VPX suit chaque appui, au pixel, et accélère quand on maintient ; MagnaSave le monte et le descend ; la taille garde le format 4:1. |
+| 681 | Changer d'écran | « Écran », Start, flipper droit : chaque écran de la borne tour à tour ; Start. | Le DMD passe d'écran en écran, même taille, même place relative ; le cadre le suit. |
+| 682 | À la souris | Tirer le cadre du DMD, jusque sur un autre écran ; tirer un coin. | Le DMD suit le pointeur et change d'écran sous lui ; un coin le redimensionne, format gardé ; Alt maintenu : sans aimantation. |
+| 683 | Masquer | Ligne « DMD », Start. | Le DMD disparaît ; les lignes de place sont grisées avec leur raison ; Start de nouveau le rend. |
+| 684 | Enregistrer pour la table | « Enregistrer pour cette table », puis « Reprendre la partie ». Quitter, relancer la même table, puis une autre table. | La partie reprend où elle était. Relancée, la table ouvre son DMD à la place enregistrée ; l'autre table garde la position générale. Le médecin de la table ne signale rien sur le DMD. |
+| 685 | Quitter sans enregistrer | Déplacer le DMD, puis Exit. | « La position du DMD a changé sans être enregistrée » : Enregistrer, Abandonner (le DMD revient où il était, la partie reprend) ou Continuer le réglage. |
+| 686 | Autre configuration | Sur une autre configuration de la borne (Menu système > « Borne » > « Configuration de la borne » > « Configurations de la borne »), relancer la table de 684. | La table suit la position générale de cette configuration ; sa place enregistrée revient dès qu'on rebranche la première. |
+| 687 | Menu de VPX | « Tous les réglages de VPX ». | Le panneau se ferme, la partie reprend et le menu de VPX s'ouvre (F12) ; ses réglages marchent comme avant. Les deux MagnaSave, plus tard, rouvrent les réglages de Cyber Pinball. |
+| 688 | Sans MagnaSave, au clavier | Sur une borne sans MagnaSave : Crédit et Start ensemble ; au clavier : Ctrl gauche et Ctrl droit, flèches, + et −. | Le même menu s'ouvre ; les flèches déplacent le DMD dans les deux sens, + et − changent sa taille. |
+| 689 | Mode invité | Mode invité actif, en partie : les deux MagnaSave. | Rien ne s'ouvre, la partie continue ; le journal dit « Réglages en partie : fermés en mode invité. ». |
 
 ## Ce qui ne peut pas encore être testé
 

@@ -237,7 +237,8 @@ export type ButtonId =
   | 'nudgeRight'
   | 'nudgeCenter'
   | 'volumeDown'
-  | 'volumeUp';
+  | 'volumeUp'
+  | 'volumeMute';
 
 /**
  * Bouton -> touche qu'il envoie (KeyboardEvent.code : « ShiftLeft », « Digit1 »…).

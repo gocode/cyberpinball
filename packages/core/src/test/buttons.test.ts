@@ -35,6 +35,8 @@ import {
   type SetKeys,
   sdlScancode,
   vpxInputSettings,
+  vpxMenuKeys,
+  windowsVk,
   VPX_INPUT_DEFAULTS,
   withKeyboardKeys,
   withoutButtonKeys,
@@ -76,7 +78,7 @@ const input = (ini: string, action: string) => IniDocument.parse(ini).get('Input
 test('les touches par défaut des boutons sont celles de VPX', () => {
   for (const b of BUTTONS) {
     for (const action of b.vpx) {
-      assert.equal(VPX_INPUT_DEFAULTS[action], sdlScancode(b.default), `${b.label} -> ${action}`);
+      assert.equal(VPX_INPUT_DEFAULTS[action], sdlScancode(b.default!), `${b.label} -> ${action}`);
     }
   }
   // Valeurs de SDL_scancode.h : usages HID du clavier.
@@ -155,10 +157,10 @@ test('aide-mémoire de la partie : les boutons affectés seulement', () => {
   assert.deepEqual(rows[0], ['Flippers', 'Maj gauche / Maj droite']);
   assert.deepEqual(rows.at(-1), ['Tilt', 'T']);
   assert.ok(!rows.some(([title]) => title === 'MagnaSave'));
-  // VPX 10.8.1 quitte dès l'appui sur Exit ; son menu s'ouvre par deux boutons ensemble.
+  // VPX 10.8.1 quitte dès l'appui sur Exit ; les réglages en partie s'ouvrent par deux boutons ensemble.
   assert.ok(rows.some(([title, keys]) => title === 'Quitter la partie' && keys === 'Échap'));
-  assert.ok(rows.some(([title, keys]) => title === 'Menu de VPX' && keys === '5 + 1'), 'sans MagnaSave : Crédit et Start');
-  assert.ok(gameKeys(undefined).some(([title, keys]) => title === 'Menu de VPX' && keys === 'Ctrl gauche + Ctrl droit'));
+  assert.ok(rows.some(([title, keys]) => title === 'Position du DMD, menu de VPX' && keys === '5 + 1'), 'sans MagnaSave : Crédit et Start');
+  assert.ok(gameKeys(undefined).some(([title, keys]) => title === 'Position du DMD, menu de VPX' && keys === 'Ctrl gauche + Ctrl droit'));
   assert.ok(gameKeys(undefined).some(([title, keys]) => title === 'Volume' && keys === '- / ='));
   // Touche « / » (tremblement à droite par défaut) : séparateur « · », sinon « Z / / / Espace ».
   assert.ok(gameKeys(undefined).some(([title, keys]) => title === 'Tremblements' && keys === 'Z · / · Espace'));
@@ -169,7 +171,7 @@ test('aide-mémoire du réglage de l’affichage : les boutons du menu de VPX', 
   assert.equal(rows['Changer de ligne'], 'Ctrl gauche / Ctrl droit');
   assert.equal(rows['Régler'], 'Maj gauche / Maj droite');
   assert.equal(rows['Enregistrer : cette table ou toutes'], '1');
-  assert.equal(rows['Rouvrir le menu'], 'Ctrl gauche + Ctrl droit');
+  assert.equal(rows['Réglages en partie, menu de VPX'], 'Ctrl gauche + Ctrl droit');
 });
 
 test('valeurs Mapping.* : touches du clavier remplacées, manettes gardées', () => {
@@ -185,15 +187,16 @@ test('valeurs Mapping.* : touches du clavier remplacées, manettes gardées', ()
   assert.equal(describeMapping('', 'GenTournament'), 'aucune touche');
 });
 
-test('sans étape « Boutons », [Input] reste tel quel, sauf le menu de VPX en partie', () => {
+test('sans étape « Boutons », [Input] reste tel quel, sauf le menu de VPX en partie et ses actions de volume', () => {
   const plan = planVpxSync(cabinetWith(), devPcDisplays(), VPX_FIRST_RUN);
   assert.equal(input(plan.nextIni!, 'LeftFlipper'), '');
-  // Touches par défaut des encodeurs : les deux MagnaSave (Ctrl gauche et droit), F12 gardée.
+  // F12 seule : les deux MagnaSave ouvrent les réglages en partie de Cyber Pinball, qui mènent au menu de VPX.
+  // Volume − et Volume + : Cyber Pinball règle le son de Windows (cabinetvolume.ts), VPX n'a plus de touche.
   assert.deepEqual(
     plan.changes.filter((c) => c.section === 'Input').map((c) => `${c.key}=${c.value}`),
-    ['Mapping.InGameUI=Key;69 | Key;224 & Key;228'],
+    ['Mapping.InGameUI=Key;69', 'Mapping.VolumeDown=Key;0', 'Mapping.VolumeUp=Key;0'],
   );
-  assert.deepEqual(Object.keys(plan.memory).filter((id) => id.startsWith('Input.')), ['Input.Mapping.InGameUI']);
+  assert.deepEqual(Object.keys(plan.memory).filter((id) => id.startsWith('Input.')), ['Input.Mapping.InGameUI', 'Input.Mapping.VolumeDown', 'Input.Mapping.VolumeUp']);
   const again = planVpxSync(cabinetWith(), devPcDisplays(), plan.nextIni!, undefined, { memory: plan.memory });
   assert.deepEqual(again.changes, []);
 });
@@ -207,13 +210,16 @@ test('touches par défaut des encodeurs : écrites telles que VPX les écrit, ri
   assert.equal(input(plan.nextIni!, 'ExitGame'), 'Key;41');
   assert.equal(input(plan.nextIni!, 'Credit1'), 'Key;34');
   assert.equal(input(plan.nextIni!, 'LaunchBall'), 'Key;40');
-  assert.equal(input(plan.nextIni!, 'VolumeDown'), 'Key;45');
-  // Volume − et Service 7 partagent - par défaut dans VPX : ce doublon voulu reste.
+  // Volume − et Volume + : Cyber Pinball règle le son de Windows, les actions de VPX n'ont plus de touche.
+  assert.equal(input(plan.nextIni!, 'VolumeDown'), 'Key;0');
+  assert.equal(input(plan.nextIni!, 'VolumeUp'), 'Key;0');
+  // Service 7 garde -, sa touche dans VPX (doublon voulu avec Volume −).
+  assert.equal(input(plan.nextIni!, 'Service7'), undefined);
   assert.deepEqual(plan.silenced, []);
   assert.equal(input(plan.nextIni!, 'Pause'), 'Key;19', 'bouton Pause sur P, la touche de VPX');
   assert.equal(plan.memory['Input.Mapping.Start'], 'Key;30');
-  // Menu de VPX : F12 au clavier, les deux MagnaSave sur la borne.
-  assert.equal(input(plan.nextIni!, 'InGameUI'), 'Key;69 | Key;224 & Key;228');
+  // Menu de VPX : F12 au clavier ; les deux MagnaSave sont lus par Cyber Pinball.
+  assert.equal(input(plan.nextIni!, 'InGameUI'), 'Key;69');
   // Deuxième passage : rien à écrire.
   const again = planVpxSync(cabinetWith({ ...DEFAULT_BUTTONS }), devPcDisplays(), plan.nextIni!, undefined, { memory: plan.memory });
   assert.deepEqual(again.changes, []);
@@ -243,20 +249,41 @@ test('encodeur sur d’autres touches : chaque action suit son bouton', () => {
   assert.equal(input(ini, 'UIUp'), 'Key;224');
 });
 
-test('menu de VPX pendant la partie : combinaison de boutons suivie, ajouts de VPX gardés', () => {
+test('menu de VPX pendant la partie : la combinaison des boutons n’y est plus, ajouts de VPX gardés', () => {
   const noMagna: CabinetButtons = { ...DEFAULT_BUTTONS };
   delete noMagna.leftMagna;
   delete noMagna.rightMagna;
+  // Un VPinballX.ini écrit avant le 01/11/2026 : la combinaison des MagnaSave y était.
+  const old = IniDocument.parse(['[Input]', 'Mapping.InGameUI = Key;69 | Key;224 & Key;228', ''].join('\n'));
+  const cleaned = vpxInputSettings({ ...DEFAULT_BUTTONS }, old, { 'Input.Mapping.InGameUI': 'Key;69 | Key;224 & Key;228' });
+  assert.equal(cleaned.settings.find((x) => x.key === 'Mapping.InGameUI')!.value, 'Key;69');
+  // MagnaSave retirés de la borne : ni l'ancienne combinaison, ni Crédit + Start.
   const first = planVpxSync(cabinetWith({ ...DEFAULT_BUTTONS }), devPcDisplays(), VPX_FIRST_RUN);
-  // MagnaSave retirés de la borne : l'ancienne combinaison part, Crédit + Start la remplace.
   const next = planVpxSync(cabinetWith(noMagna), devPcDisplays(), first.nextIni!, undefined, { memory: first.memory });
-  assert.equal(input(next.nextIni!, 'InGameUI'), 'Key;69 | Key;34 & Key;30');
-  // Une manette ajoutée dans VPX reste ; F12 pris par un bouton : la combinaison seule.
+  assert.equal(input(next.nextIni ?? first.nextIni!, 'InGameUI'), 'Key;69');
+  // Une manette ajoutée dans VPX reste ; F12 pris par un bouton : la manette seule.
   const doc = IniDocument.parse(['[Input]', 'Mapping.InGameUI = Key;69 | Key;34 & Key;30 | SDLJoy_0300_1;9', ''].join('\n'));
   const joy = vpxInputSettings({ ...noMagna, extraBall: 'F12' }, doc, { 'Input.Mapping.InGameUI': 'Key;69 | Key;34 & Key;30' });
   const value = joy.settings.find((x) => x.key === 'Mapping.InGameUI')!.value;
-  assert.equal(value, 'SDLJoy_0300_1;9 | Key;34 & Key;30');
-  assert.equal(describeMapping(value, 'InGameUI'), 'bouton de manette ou 5 + 1');
+  assert.equal(value, 'SDLJoy_0300_1;9');
+  assert.equal(describeMapping(value, 'InGameUI'), 'bouton de manette');
+  // « Tous les réglages de VPX » appuie la touche du menu de VPX : F12, ou aucune quand un bouton l'a prise.
+  assert.deepEqual(vpxMenuKeys(IniDocument.parse(next.nextIni ?? first.nextIni!)), ['F12']);
+  assert.deepEqual(vpxMenuKeys(IniDocument.parse(['[Input]', `Mapping.InGameUI = ${value}`, ''].join('\n'))), []);
+  assert.deepEqual(vpxMenuKeys(IniDocument.parse('')), ['F12'], 'clé absente : la touche par défaut de VPX');
+});
+
+test('touches de Windows : les boutons d’une borne lus pendant la partie', () => {
+  assert.equal(windowsVk('ControlLeft'), 0xa2);
+  assert.equal(windowsVk('ControlRight'), 0xa3);
+  assert.equal(windowsVk('ShiftLeft'), 0xa0);
+  assert.equal(windowsVk('Digit1'), 0x31);
+  assert.equal(windowsVk('KeyA'), 0x41);
+  assert.equal(windowsVk('F12'), 0x7b);
+  assert.equal(windowsVk('Numpad3'), 0x63);
+  assert.equal(windowsVk('SDLJoy_03000000_1;3'), undefined);
+  // Chaque bouton par défaut des encodeurs a son code.
+  for (const [id, code] of Object.entries(DEFAULT_BUTTONS)) assert.ok(windowsVk(code!) !== undefined, `${id} (${code})`);
 });
 
 test('un bouton facultatif sur la touche d’une autre action la fait taire, puis la lui rend', () => {
@@ -292,7 +319,7 @@ test('bouton Pause : facultatif, sur P comme dans VPX, et un relevé fait sans l
   const pause = buttonInfo('pause');
   assert.equal(pause.required, false);
   assert.deepEqual(pause.vpx, ['Pause']);
-  assert.equal(sdlScancode(pause.default), VPX_INPUT_DEFAULTS.Pause, 'la touche des encodeurs est celle de VPX');
+  assert.equal(sdlScancode(pause.default!), VPX_INPUT_DEFAULTS.Pause, 'la touche des encodeurs est celle de VPX');
   assert.equal(DEFAULT_BUTTONS.pause, 'KeyP');
   assert.equal(input(planVpxSync(cabinetWith({ ...DEFAULT_BUTTONS }), devPcDisplays(), VPX_FIRST_RUN).nextIni!, 'Pause'), 'Key;19');
   assert.ok(gameKeys(undefined).some(([title, keys]) => title === 'Pause' && keys === 'P'));
@@ -438,8 +465,8 @@ test('joysticks : [Input] reçoit le bouton, garde la touche du clavier de VPX, 
   assert.equal(input(ini, 'UILeft'), `${joy(0)} | Key;225`);
   assert.equal(input(ini, 'Start'), `${joy(2)} | Key;30`);
   assert.equal(input(ini, 'ExitGame'), `${joy(3)} | Key;41`);
-  // Le menu de VPX en partie : les deux MagnaSave du joystick ensemble.
-  assert.equal(input(ini, 'InGameUI'), `Key;69 | ${joy(6)} & ${joy(7)}`);
+  // Le menu de VPX en partie : F12 ; les deux MagnaSave du joystick sont lus par Cyber Pinball.
+  assert.equal(input(ini, 'InGameUI'), 'Key;69');
   assert.equal(describeMapping(input(ini, 'LeftFlipper'), 'LeftFlipper'), 'Bouton 1 du joystick ou Maj gauche');
 
   // Un bouton ajouté dans VPX : pas une modification à la main, rien à réécrire.
@@ -455,7 +482,7 @@ test('joysticks : [Input] reçoit le bouton, garde la touche du clavier de VPX, 
   // Retour aux touches de l'encodeur : plus aucun bouton de joystick relevé.
   const back = planVpxSync(cabinetWith({ ...DEFAULT_BUTTONS }), devPcDisplays(), first.nextIni!, undefined, { memory: first.memory });
   assert.equal(input(back.nextIni!, 'LeftFlipper'), 'Key;225');
-  assert.equal(input(back.nextIni!, 'InGameUI'), 'Key;69 | Key;224 & Key;228');
+  assert.equal(input(back.nextIni!, 'InGameUI'), 'Key;69');
 });
 
 test('joysticks : touche du clavier de VPX prise par un autre bouton, le joystick seul', () => {
@@ -501,6 +528,7 @@ test('relevé mixte : touches du clavier et boutons du joystick, librement d’u
     nudgeCenter: 'Escape',
     volumeDown: 'Minus',
     volumeUp: joy(14),
+    volumeMute: joy(16),
   };
   let keys: CabinetButtons = {};
   for (const b of BUTTONS) {
@@ -538,10 +566,12 @@ test('relevé mixte : touches du clavier et boutons du joystick, librement d’u
   assert.equal(input(ini, 'RightMagna'), `${joy(7)} | Key;228`);
   assert.equal(input(ini, 'Tilt'), `${joy(9)} | Key;23`);
   assert.equal(input(ini, 'SlamTilt'), `${joy(10)} | Key;74`);
-  assert.equal(input(ini, 'VolumeUp'), `${joy(14)} | Key;46`);
+  // Les boutons de volume sont lus par Cyber Pinball (son de Windows) : VPX n'en reçoit aucun.
+  assert.equal(input(ini, 'VolumeUp'), 'Key;0');
+  assert.equal(input(ini, 'VolumeDown'), 'Key;0');
   assert.equal(input(ini, 'Pause'), `${joy(15)} | Key;19`);
-  // Le menu de VPX en partie : un MagnaSave au clavier, l'autre au joystick.
-  assert.equal(input(ini, 'InGameUI'), `Key;69 | Key;224 & ${joy(7)}`);
+  // Le menu de VPX en partie : F12 (les MagnaSave, l'un au clavier, l'autre au joystick, sont lus par Cyber Pinball).
+  assert.equal(input(ini, 'InGameUI'), 'Key;69');
 });
 
 test('clavier et joystick : le clavier suit les boutons du joystick, et l’assistant ne perd pas une touche en changeant d’écran', () => {
@@ -731,6 +761,10 @@ test('fenêtre au-dessus du menu (« Récupérer ») : aucune fenêtre de la bor
     assert.match(source, /showInactive\(\)/, `${f} : montrée sans prendre le focus`);
     assert.doesNotMatch(source, /\.focus\(\)|\.show\(\)/, `${f} : jamais de focus`);
   }
+  // Pastille du volume de la borne, au menu comme en partie : la fenêtre de game-notice.ts, remise devant par elle.
+  const badge = fs.readFileSync(path.join(dir, 'cabinet-volume.ts'), 'utf8');
+  assert.match(badge, /\boverlay\(/,'cabinet-volume.ts : la fenêtre non focalisable de game-notice.ts');
+  assert.doesNotMatch(badge, /\.focus\(\)|\.show\(\)|createWindow/, 'cabinet-volume.ts : jamais de focus');
   for (const f of onTop.filter((f) => !neverFocused.includes(f))) {
     const source = fs.readFileSync(path.join(dir, f), 'utf8');
     assert.match(source, /app\.on\('browser-window-focus'[\s\S]*?app\.off\('browser-window-focus'/, `${f} : le focus pris par une autre fenêtre doit lui revenir`);

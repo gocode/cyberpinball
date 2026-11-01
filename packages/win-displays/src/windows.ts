@@ -56,6 +56,7 @@ interface Api {
   SetCursorPos: NativeFn;
   SetWindowPos: NativeFn;
   GetWindowLongPtrW: NativeFn;
+  GetAsyncKeyState: NativeFn;
 }
 
 let api: Api | undefined;
@@ -90,6 +91,7 @@ function loadApi(): Api {
     SetCursorPos: user32.func('bool __stdcall SetCursorPos(int x, int y)'),
     SetWindowPos: user32.func('bool __stdcall SetWindowPos(void *hwnd, void *after, int x, int y, int cx, int cy, uint32_t flags)'),
     GetWindowLongPtrW: user32.func('intptr_t __stdcall GetWindowLongPtrW(void *hwnd, int index)'),
+    GetAsyncKeyState: user32.func('int16_t __stdcall GetAsyncKeyState(int vk)'),
   };
   return api;
 }
@@ -248,6 +250,37 @@ export function showWindowInactive(target: WindowInfo): void {
 export function moveWindow(target: WindowInfo, x: number, y: number): boolean {
   const flags = SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOSIZE | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS;
   return Boolean(loadApi().SetWindowPos(target.hwnd, null, Math.round(x), Math.round(y), 0, 0, flags));
+}
+
+/**
+ * Pose la fenêtre d'un autre processus sur `rect` (pixels physiques du bureau), position et taille,
+ * sans l'activer ni changer sa place dans la pile, et sans attendre son processus (comme
+ * moveWindow). VPX 10.8.1 suit une fenêtre annexe redimensionnée de l'extérieur : SDL lui envoie
+ * SDL_EVENT_WINDOW_RESIZED, et il refait sa surface de rendu (player.cpp, Window::OnResized).
+ */
+export function setWindowBounds(target: WindowInfo, rect: { x: number; y: number; width: number; height: number }): boolean {
+  const flags = SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER | SWP_ASYNCWINDOWPOS;
+  return Boolean(loadApi().SetWindowPos(target.hwnd, null, Math.round(rect.x), Math.round(rect.y), Math.max(1, Math.round(rect.width)), Math.max(1, Math.round(rect.height)), flags));
+}
+
+/**
+ * Touches du clavier enfoncées en ce moment, quel que soit le premier plan (GetAsyncKeyState) :
+ * pendant une partie, VPX a le clavier, et Cyber Pinball lit ainsi ses propres combinaisons.
+ * `vks` : codes de touche virtuelle de Windows ; rend ceux qui sont enfoncés.
+ */
+export function keysDown(vks: readonly number[]): number[] {
+  const w = loadApi();
+  return vks.filter((vk) => ((w.GetAsyncKeyState(vk) as number) & 0x8000) !== 0);
+}
+
+/**
+ * Appuie puis relâche une touche (code de touche virtuelle) pour la fenêtre au premier plan :
+ * F12 rend à VPX l'ouverture de son propre menu.
+ */
+export function tapKey(vk: number): void {
+  const w = loadApi();
+  w.keybd_event(vk, 0, 0, 0);
+  w.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0);
 }
 
 /**

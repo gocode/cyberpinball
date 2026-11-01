@@ -10,6 +10,22 @@ export const messages: Record<string, string> = {
   'Demandes d’amis': 'Friend requests',
   'Mes badges': 'My badges',
   'Partage et réseau': 'Sharing and network',
+  // Débit des téléchargements depuis les amis (app/src/friends-menu.ts, packages/core/src/ratelimit.ts)
+  'Débit des téléchargements : {rate}': 'Download speed: {rate}',
+  'Débit des téléchargements : sans limite': 'Download speed: no limit',
+  'Tables et médias reçus de vos amis, tous envois confondus': 'Tables and media received from your friends, all transfers together',
+  'Tables et médias reçus de vos amis, aussi vite que vos connexions le permettent': 'Tables and media received from your friends, as fast as your connections allow',
+  'Limité': 'Limited',
+  'Limiter le débit des téléchargements…': 'Limit download speed…',
+  'Actuellement : {rate}': 'Currently: {rate}',
+  'Débit des téléchargements': 'Download speed',
+  'Ce que vos amis vous envoient (tables, parties, médias) ne dépasse pas ce débit, tous envois confondus : la connexion reste libre pour le reste de la maison. Un ami dont la borne n’est pas à jour envoie encore à pleine vitesse.':
+    'What your friends send you (tables, game parts, media) never goes above this speed, all transfers together: the connection stays free for the rest of the house. A friend whose cabinet is not up to date still sends at full speed.',
+  'Sans limite': 'No limit',
+  'Débit des téléchargements limité à {rate}': 'Download speed limited to {rate}',
+  'Débit des téléchargements sans limite': 'Download speed: no limit',
+  'sans limite': 'no limit',
+  '{rate} ({bits} Mbit/s)': '{rate} ({bits} Mbit/s)',
   // packages/core/src/social.ts
   'Joueur {tag}': 'Player {tag}',
   'à l’instant': 'just now',

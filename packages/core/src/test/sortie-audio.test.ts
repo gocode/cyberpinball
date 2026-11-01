@@ -63,6 +63,20 @@ test('invariant : une vue de page web d’Electron est muette ou routée vers la
   assert.match(fs.readFileSync(path.join(dir, 'acquire-window.ts'), 'utf8'), /did-frame-finish-load[\s\S]{0,300}audioSinkScript\(/);
 });
 
+// Novembre 2026 : une vidéo lancée dans le navigateur intégré s'entendait encore après sa
+// fermeture. Electron ne détruit pas la vue d'une fenêtre fermée : la page continuait de vivre.
+test('invariant : une vue de page web posée dans une fenêtre est fermée avec elle', () => {
+  const dir = path.join(APP, 'src');
+  let hosts = 0;
+  for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.ts'))) {
+    const text = fs.readFileSync(path.join(dir, file), 'utf8');
+    if (!/\.addChildView\(/.test(text)) continue;
+    hosts++;
+    assert.match(text, /\.on\('closed', \(\) => \{[\s\S]{0,600}?\b(?:contents|webContents)\.close\(\)/, `${file} pose une page web dans une fenêtre sans la fermer avec elle : son et vidéo continueraient après la fermeture`);
+  }
+  assert.ok(hosts >= 1, 'fenêtre « Récupérer » trouvée');
+});
+
 // ---------------------------------------------------------------------------
 // Rendu réel du menu : menu-audio.js et library.js
 

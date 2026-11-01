@@ -216,3 +216,4 @@ export * from './desktop';
 export * from './processes';
 export * from './joystick';
 export * from './power';
+export * from './system-volume';

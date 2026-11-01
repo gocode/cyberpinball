@@ -1,6 +1,6 @@
 // Ouverture au démarrage (packages/core/src/intro.ts) : l'animation de Cyber Pinball de chaque
-// écran de la borne. La bille part du lanceur et frappe la cible du plateau, traverse le DMD,
-// puis le fronton et le topper s'allument, comme l'énergie qui monte dans la borne. Chaque
+// écran de la borne. Une étincelle monte sur le plateau pendant que la bille traverse le DMD,
+// le plateau s'embrase avec le fronton, le topper s'allume, comme l'énergie qui monte dans la borne. Chaque
 // animation se joue une fois et garde sa dernière image : c'est le premier bouton, côté
 // processus principal, qui affiche la roue.
 //
@@ -158,426 +158,209 @@
 
   // ---------- Plateau ----------
 
-  // « Impulsion / circuit de puissance » : lanceur à droite, orbite haute et cible décentrée.
-  // Un plateau mécanique à pans coupés, des rampes et slingshots sculptés, des chevrons larges.
-  // Le choc reste local ; la marque HTML se pose dans un cartouche de verre sombre. Repère :
-  // W la largeur, H la hauteur du canevas ; les objets ronds se mesurent en W.
+  // Dessinée par un shader WebGL2 plein écran (window.CyberIntroShaders.playfield, intro-shaders.js,
+  // conçu avec Codex) : lumière, profondeur et grain calculés au pixel, image fonction du seul
+  // instant. La marque lui est donnée en texture, au cadrage de l'écran : R « CYBER », G
+  // « PINBALL » (nets), B les deux floutés (lueurs) ; les fils, en tableaux uniformes
+  // (CyberIntroShaders.playfieldUniforms). Pendant l'animation, le canevas compte au plus 1920
+  // points sur son grand côté (la moitié d'un écran 4K), moins si la carte graphique ne suit pas
+  // (images espacées de plus de 26 ms) ; la dernière image est repeinte une fois à pleine
+  // résolution. Sans WebGL2 (ou shader refusé), la marque en HTML.
 
-  const TAU = Math.PI * 2;
-  const TEAL = [54, 201, 180];
-  const GREEN = [139, 226, 58];
-  const INK = [230, 240, 236];
-  const smooth = (k) => k * k * (3 - 2 * k);
-  const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${clamp(a)})`;
+  /** Où se pose la marque dans la texture : centre, largeur de PINBALL, hauteur du bloc au plus. */
+  const PLAYFIELD_BRAND = { y: 0.79, width: 0.72, maxHeight: 0.12 };
+  /** Grand côté du canevas pendant l'animation, et le plus petit auquel on descend si la carte peine. */
+  const PLAYFIELD_LIVE_MAX = 1920;
+  const PLAYFIELD_LIVE_MIN = 960;
+  const BRAND_FONT = "'CP Saira', 'Segoe UI', sans-serif"; // i18n-ignore : pile de polices
 
-  /** Chemin en fractions de W et H (miroir : symétrique autour du milieu). */
-  function path2d(commands, W, H, mirror = false) {
-    const p = new Path2D();
-    for (const [op, ...v] of commands) {
-      const a = v.map((n, i) => (i % 2 ? n * H : (mirror ? 1 - n : n) * W));
-      if (op === 'M') p.moveTo(...a);
-      else if (op === 'L') p.lineTo(...a);
-      else if (op === 'C') p.bezierCurveTo(...a);
-      else if (op === 'Q') p.quadraticCurveTo(...a);
-      else if (op === 'Z') p.closePath();
-    }
-    return p;
-  }
-
-  function strokeIn(ctx, p, color, width, alpha) {
-    if (alpha <= 0) return;
-    ctx.strokeStyle = rgba(color, alpha);
-    ctx.lineWidth = width;
-    ctx.stroke(p);
-  }
-
-  /** Lueur elliptique en dégradé radial (aucune ombre floutée sur un écran 4K). */
-  function glow(ctx, x, y, rx, ry, color, alpha) {
-    if (alpha <= 0 || rx <= 0 || ry <= 0) return;
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.scale(rx, ry);
-    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
-    g.addColorStop(0, rgba(color, alpha));
-    g.addColorStop(0.28, rgba(color, alpha * 0.48));
-    g.addColorStop(0.65, rgba(color, alpha * 0.12));
-    g.addColorStop(1, rgba(color, 0));
-    ctx.fillStyle = g;
-    ctx.fillRect(-1, -1, 2, 2);
-    ctx.restore();
-  }
-
-  function ring(ctx, x, y, rx, ry, color, width, alpha, from = 0, to = TAU) {
-    if (alpha <= 0) return;
-    ctx.beginPath();
-    ctx.ellipse(x, y, rx, ry, 0, from, to);
-    ctx.strokeStyle = rgba(color, alpha);
-    ctx.lineWidth = width;
-    ctx.stroke();
-  }
-
-  /** Bille : chrome noir opaque, une bande sombre, deux reflets de sources distinctes. */
-  function sphere(ctx, x, y, r, energy, alpha) {
-    if (alpha <= 0) return;
-    ctx.save();
-    ctx.globalAlpha *= alpha;
-    glow(ctx, x, y + r * 0.8, r * 1.7, r * 0.55, TEAL, 0.29 * energy);
-    const g = ctx.createRadialGradient(x - r * 0.34, y - r * 0.4, r * 0.02, x, y, r);
-    g.addColorStop(0, '#9bcdc0');
-    g.addColorStop(0.12, '#4a8277');
-    g.addColorStop(0.35, '#173f36');
-    g.addColorStop(0.6, '#030807');
-    g.addColorStop(0.82, '#010403');
-    g.addColorStop(0.94, '#21645a');
-    g.addColorStop(1, '#071410');
-    ctx.fillStyle = g;
-    ctx.beginPath();
-    ctx.arc(x, y, r, 0, TAU);
-    ctx.fill();
-    ring(ctx, x, y, r * 0.98, r * 0.98, TEAL, r * 0.024, 0.6 * energy);
-    ring(ctx, x, y, r * 0.92, r * 0.93, INK, r * 0.025, 0.8, 3.48, 4.76);
-    ring(ctx, x, y, r * 0.91, r * 0.92, GREEN, r * 0.043, 0.8 * energy, 0.26, 1.55);
-    glow(ctx, x - r * 0.35, y - r * 0.43, r * 0.32, r * 0.22, INK, 0.62);
-    ctx.restore();
-  }
-
-  /** Batteur de verre (side 0 : gauche, 1 : droit), qui bat une fois. */
-  function flipperAt(ctx, g, side, e, tl, power) {
-    const { W, H } = g;
-    const k = span(e, tl.flippers + side * 90, 360);
-    const swing = Math.sin(k * Math.PI) ** 2 * 0.48;
-    ctx.save();
-    ctx.translate((side ? 0.79 : 0.21) * W, H * 0.875);
-    ctx.scale(side ? -1 : 1, 1);
-    ctx.rotate(0.39 - swing);
-    glow(ctx, W * 0.13, W * 0.047, W * 0.22, W * 0.095, TEAL, 0.24 * power);
-    ctx.save();
-    ctx.translate(0, W * 0.016);
-    ctx.fillStyle = '#010403';
-    ctx.fill(g.flipper);
-    strokeIn(ctx, g.flipper, TEAL, W * 0.002, 0.23 * power);
-    ctx.restore();
-    const face = ctx.createLinearGradient(0, -W * 0.04, 0, W * 0.045);
-    face.addColorStop(0, '#35685c');
-    face.addColorStop(0.25, '#163d32');
-    face.addColorStop(0.62, '#06110e');
-    face.addColorStop(1, '#286b5e');
-    ctx.fillStyle = face;
-    ctx.fill(g.flipper);
-    strokeIn(ctx, g.flipper, TEAL, W * 0.0025, 0.5 * power);
-    strokeIn(ctx, g.flipperEdge, TEAL, W * 0.015, 0.07 * power);
-    strokeIn(ctx, g.flipperEdge, TEAL, W * 0.006, 0.75 * power);
-    strokeIn(ctx, g.flipperEdge, INK, W * 0.0018, 0.68 * power);
-    sphere(ctx, 0, 0, W * 0.018, power, 1);
-    ctx.restore();
-  }
-
-  /** Accélération dans le lanceur, virage en haut, puis frappe oblique vers la cible. */
-  function ballAt(k, W, H) {
-    k = clamp(k);
-    if (k < 0.66) return { x: W * 0.937, y: H * (0.86 - 0.71 * (k / 0.66) ** 1.65), r: W * 0.035 };
-    const t = (k - 0.66) / 0.34;
-    const u = 1 - t;
-    return { x: W * (u ** 3 * 0.937 + 3 * u * u * t * 0.937 + 3 * u * t * t * 0.55 + t ** 3 * 0.34),
-      y: H * (u ** 3 * 0.15 + 3 * u * u * t * -0.025 + 3 * u * t * t * 0.065 + t ** 3 * 0.235),
-      r: W * (0.035 + 0.023 * t) };
-  }
-
-  /** Chemins précalculés : rails continus, rampes, couloirs, inserts et pièces mécaniques. */
-  function playfieldGeometry(W, H, tl) {
-    const path = (c, mirror = false) => path2d(c, W, H, mirror);
-    const outline = [['M', 0.21, 0.90], ['L', 0.075, 0.80], ['Q', 0.045, 0.77, 0.055, 0.70],
-      ['L', 0.13, 0.13], ['Q', 0.14, 0.065, 0.23, 0.055], ['L', 0.79, 0.055],
-      ['Q', 0.96, 0.055, 0.975, 0.15], ['L', 0.975, 0.91]];
-    const sling = [['M', 0.165, 0.715], ['Q', 0.175, 0.695, 0.20, 0.72],
-      ['L', 0.36, 0.815], ['Q', 0.38, 0.839, 0.35, 0.835], ['L', 0.16, 0.805], ['Z']];
-    const guide = [['M', 0.12, 0.70], ['L', 0.115, 0.80], ['Q', 0.12, 0.825, 0.18, 0.845]];
-    const ramp = [['M', 0.135, 0.575], ['L', 0.19, 0.36], ['Q', 0.21, 0.32, 0.28, 0.31],
-      ['L', 0.68, 0.235], ['Q', 0.77, 0.215, 0.76, 0.155]];
-    const inserts = [];
-    for (const side of [0, 1]) {
-      // Deux flèches sous la marque, deux au-dessus des slingshots : l'invite reste dégagée.
-      for (let i = 0; i < 4; i++) {
-        const y = [0.775, 0.72, 0.575, 0.535][i];
-        const x = side ? 0.62 : 0.38;
-        inserts.push({ x, y, start: tl.inserts + i * 105 + side * 55,
-          p: path([['M', x, y - 0.015], ['L', x + 0.044, y + 0.002],
-            ['L', x + 0.044, y + 0.014], ['L', x, y - 0.001],
-            ['L', x - 0.044, y + 0.014], ['L', x - 0.044, y + 0.002], ['Z']]) });
-      }
-    }
-    return {
-      W, H,
-      rail: path(outline),
-      shooter: path([['M', 0.90, 0.91], ['L', 0.90, 0.17], ['Q', 0.90, 0.10, 0.78, 0.10],
-        ['L', 0.58, 0.10]]),
-      shooterOuter: path([['M', 0.96, 0.91], ['L', 0.96, 0.17], ['Q', 0.96, 0.075, 0.78, 0.075],
-        ['L', 0.58, 0.075]]),
-      ramp: path(ramp),
-      rampInner: path([['M', 0.165, 0.575], ['L', 0.22, 0.37], ['Q', 0.235, 0.345, 0.29, 0.337],
-        ['L', 0.70, 0.26], ['Q', 0.80, 0.235, 0.795, 0.155]]),
-      target: path([['M', 0.225, 0.185], ['L', 0.34, 0.155], ['L', 0.455, 0.205],
-        ['L', 0.44, 0.275], ['L', 0.325, 0.305], ['L', 0.21, 0.255], ['Z']]),
-      targetEdge: path([['M', 0.225, 0.185], ['L', 0.34, 0.155], ['L', 0.455, 0.205]]),
-      lanes: Array.from({ length: 3 }, (_, i) => {
-        const x = 0.54 + i * 0.095;
-        return path([['M', x, 0.19], ['L', x, 0.125], ['Q', x, 0.111, x + 0.027, 0.111],
-          ['Q', x + 0.055, 0.111, x + 0.055, 0.125], ['L', x + 0.055, 0.18]]);
-      }),
-      slings: [path(sling), path(sling, true)],
-      guides: [path(guide), path(guide, true)],
-      slingEdges: [false, true].map((m) => path([['M', 0.18, 0.72], ['L', 0.35, 0.821], ['L', 0.17, 0.792]], m)),
-      cartouche: path([['M', 0.17, 0.335], ['L', 0.79, 0.335], ['L', 0.89, 0.365],
-        ['L', 0.89, 0.49], ['L', 0.80, 0.515], ['L', 0.10, 0.515], ['L', 0.10, 0.365], ['Z']]),
-      flipper: path2d([
-        ['M', 0, -0.04], ['C', 0.08, -0.036, 0.19, -0.022, 0.257, -0.014],
-        ['C', 0.284, -0.011, 0.284, 0.024, 0.255, 0.027],
-        ['L', 0, 0.041], ['C', -0.055, 0.042, -0.055, -0.039, 0, -0.04], ['Z'],
-      ], W, W),
-      flipperEdge: path2d([['M', -0.025, 0.026], ['Q', 0, 0.038, 0.06, 0.03], ['L', 0.253, 0.02]], W, W),
-      inserts,
-      sparks: Array.from({ length: 12 }, (_, i) => ({
-        angle: hash(i * 3 + 1) * TAU,
-        speed: 0.04 + hash(i * 3 + 2) * 0.12,
-        size: 0.002 + hash(i * 3 + 3) * 0.003,
-      })),
+  /** Programme du shader sur un triangle plein écran ; undefined si WebGL2 refuse. */
+  function glProgram(gl, fragment) {
+    const vertex = '#version 300 es\nin vec2 p;\nvoid main() { gl_Position = vec4(p, 0.0, 1.0); }';
+    const compile = (type, source) => {
+      const shader = gl.createShader(type);
+      gl.shaderSource(shader, source);
+      gl.compileShader(shader);
+      if (gl.getShaderParameter(shader, gl.COMPILE_STATUS)) return shader;
+      console.error(`Ouverture : shader refusé : ${gl.getShaderInfoLog(shader)}`);
+      return undefined;
     };
+    const vs = compile(gl.VERTEX_SHADER, vertex);
+    const fs = compile(gl.FRAGMENT_SHADER, fragment);
+    if (!vs || !fs) return undefined;
+    const program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.bindAttribLocation(program, 0, 'p');
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      console.error(`Ouverture : programme refusé : ${gl.getProgramInfoLog(program)}`);
+      return undefined;
+    }
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+    return program;
   }
 
-  /** Peint e uniquement : aucun historique de traînée, aucun hasard, aucune horloge locale. */
-  function paintPlayfield(ctx, g, e, tl) {
-    const { W, H } = g;
-    e = Math.min(e, tl.end);
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.globalAlpha = 1;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.fillStyle = '#030807';
+  /**
+   * Masque de la marque à la taille du canevas (W × H) : la marque du design system
+   * (.cp-wordmark-stack : Saira 300, chasse 125 %, espacement 0,28 em, interligne 1,35).
+   */
+  function brandMask(W, H) {
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, W, H);
-    if (e < 0) return ctx.restore();
-    const awake = smooth(span(e, tl.wake, 420));
-    const arrival = smooth(span(e, tl.impact, 360));
-    const settle = smooth(span(e, tl.settle, tl.end - tl.settle));
-    const power = (0.23 * awake + 0.77 * arrival) * (1 - 0.12 * settle);
-    const launch = (t) => span(t, tl.launch, tl.launchLength);
-    const path = (c) => path2d(c, W, H);
-    const metal = ctx.createLinearGradient(0, H * 0.68, W * 0.4, H * 0.86);
-    metal.addColorStop(0, '#20483f');
-    metal.addColorStop(0.38, '#0e2821');
-    metal.addColorStop(0.7, '#040c0a');
-    metal.addColorStop(1, '#183c33');
-
-    // La place de l'invite (0,605–0,675 H) n'a aucun décor : seuls les rails passent à ses côtés.
-    ctx.save();
-    glow(ctx, W * 0.35, H * 0.23, W * 0.40, H * 0.18, TEAL, 0.24 * power);
-    glow(ctx, W * 0.5, H * 0.85, W * 0.5, H * 0.17, TEAL, 0.21 * power);
-
-    // Nervures en perspective et petites traverses : matière sombre, lisible en arrêt sur image.
-    for (const side of [0, 1]) {
-      const x = (n) => side ? 1 - n : n;
-      for (let i = 0; i < 3; i++) {
-        const rib = path([['M', x(0.17 + i * 0.026), 0.30], ['L', x(0.085 + i * 0.025), 0.79]]);
-        strokeIn(ctx, rib, TEAL, W * 0.002, power * (i === 0 ? 0.24 : 0.09));
-      }
-      for (let i = 0; i < 5; i++) {
-        const y = 0.43 + i * 0.033;
-        strokeIn(ctx, path([['M', x(0.105), y], ['L', x(0.135), y - 0.01]]), TEAL, W * 0.004, power * 0.26);
-      }
-    }
-    for (const rail of [g.rail, g.shooter, g.shooterOuter]) {
-      strokeIn(ctx, rail, TEAL, W * 0.025, power * 0.09);
-      strokeIn(ctx, rail, TEAL, W * 0.007, power * 0.68);
-      strokeIn(ctx, rail, INK, W * 0.0016, power * 0.62);
-    }
-    // Lanceur : ressort et sabot visibles, sans nouvelle paire de formes rondes.
-    for (let i = 0; i < 7; i++) {
-      const y = 0.89 + i * 0.006;
-      strokeIn(ctx, path([['M', 0.916, y], ['L', 0.952, y + 0.004]]), INK, W * 0.0025, awake * 0.32);
-    }
-    const charge = awake * (1 - smooth(launch(e)));
-    glow(ctx, W * 0.937, H * 0.86, W * 0.065, H * 0.095, GREEN, charge * 0.58);
-
-    // Rampe oblique derrière la cible ; rails doubles et traverses donnent une vraie épaisseur.
-    for (const ramp of [g.ramp, g.rampInner]) {
-      strokeIn(ctx, ramp, [1, 5, 4], W * 0.025, power);
-      strokeIn(ctx, ramp, TEAL, W * 0.008, power * 0.42);
-      strokeIn(ctx, ramp, INK, W * 0.0018, power * 0.54);
-    }
-    for (let i = 0; i < 6; i++) {
-      const x = 0.31 + i * 0.06;
-      const y = 0.304 - i * 0.0113;
-      strokeIn(ctx, path([['M', x, y], ['L', x + 0.012, y + 0.023]]), TEAL, W * 0.002, power * 0.28);
-    }
-    g.lanes.forEach((lane, i) => {
-      const a = easeOut(span(e, tl.impact + i * 70, 180));
-      strokeIn(ctx, lane, TEAL, W * 0.017, power * 0.16);
-      strokeIn(ctx, lane, TEAL, W * 0.004, power * 0.75);
-      ctx.fillStyle = rgba(GREEN, a * 0.8);
-      ctx.fillRect(W * (0.558 + i * 0.095), H * 0.145, W * 0.02, H * 0.021);
-    });
-
-    ctx.globalAlpha = power;
-    ctx.fillStyle = metal;
-    ctx.fill(g.target);
-    ctx.globalAlpha = 1;
-    strokeIn(ctx, g.target, TEAL, W * 0.004, power * 0.7);
-    strokeIn(ctx, g.targetEdge, INK, W * 0.003, power * 0.75);
-    // Un seul noyau décentré, cerclé de segments techniques : ni yeux, ni berceau souriant.
-    for (let i = 0; i < 3; i++) {
-      ring(ctx, W * 0.34, H * 0.235, W * 0.09, W * 0.09, i === 1 ? GREEN : TEAL,
-        W * 0.008, power * 0.8, i * TAU / 3 + 0.15, (i + 1) * TAU / 3 - 0.22);
-    }
-    for (let side = 0; side < 2; side++) {
-      ctx.globalAlpha = power;
-      ctx.fillStyle = metal;
-      ctx.fill(g.slings[side]);
-      ctx.globalAlpha = 1;
-      strokeIn(ctx, g.slings[side], TEAL, W * 0.004, power * 0.6);
-      strokeIn(ctx, g.slingEdges[side], TEAL, W * 0.025, power * 0.11);
-      strokeIn(ctx, g.slingEdges[side], GREEN, W * 0.006, power * 0.66);
-      strokeIn(ctx, g.slingEdges[side], INK, W * 0.0015, power * 0.85);
-      strokeIn(ctx, g.guides[side], TEAL, W * 0.009, power * 0.55);
-      strokeIn(ctx, g.guides[side], INK, W * 0.002, power * 0.7);
-      for (const [x, y] of [[0.175, 0.735], [0.19, 0.79]]) {
-        sphere(ctx, W * (side ? 1 - x : x), H * y, W * 0.009, power, awake);
-      }
-    }
-
-    for (const lamp of g.inserts) {
-      const lit = easeOut(span(e, lamp.start, 170));
-      const pulse = Math.sin(Math.PI * span(e, lamp.start, 450)) ** 2;
-      const a = lit * (0.56 + pulse * 0.44) * (1 - 0.25 * settle);
-      ctx.fillStyle = rgba([13, 35, 26], awake);
-      ctx.fill(lamp.p);
-      glow(ctx, lamp.x * W, lamp.y * H, W * 0.085, H * 0.035, GREEN, a * 0.25);
-      ctx.fillStyle = rgba(GREEN, a);
-      ctx.fill(lamp.p);
-      strokeIn(ctx, lamp.p, INK, W * 0.0015, a * 0.6);
-    }
-    ctx.save();
-    ctx.globalAlpha = awake;
-    flipperAt(ctx, g, 0, e, tl, power);
-    flipperAt(ctx, g, 1, e, tl, power);
-    ctx.restore();
-
-    // Cartouche de verre et reflet de pose, toujours derrière la marque HTML.
-    const brand = easeOut(span(e, tl.brand, 500));
-    ctx.fillStyle = rgba([3, 8, 7], brand * 0.9);
-    ctx.fill(g.cartouche);
-    strokeIn(ctx, g.cartouche, TEAL, W * 0.0015, brand * 0.22);
-    const flash = Math.sin(Math.PI * span(e, tl.brand, 480)) ** 2;
-    glow(ctx, W * 0.5, H * 0.425, W * 0.43, H * 0.095, TEAL, flash * 0.32);
-    ctx.restore();
-
-    // Ruban continu : un tracé par couche évite les perles aux raccords en mode additif.
-    if (e > tl.launch && e < tl.impact + 170) {
-      const fade = 1 - smooth(span(e, tl.impact, 170));
-      const tail = ballAt(launch(e - 144), W, H);
-      const head = ballAt(launch(e), W, H);
-      const trail = new Path2D();
-      trail.moveTo(tail.x, tail.y);
-      for (let i = 23; i >= 0; i--) {
-        const p = ballAt(launch(e - i * 6), W, H);
-        trail.lineTo(p.x, p.y);
-      }
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      for (const [width, color, opacity] of [[0.065, TEAL, 0.18], [0.024, GREEN, 0.65], [0.006, INK, 0.95]]) {
-        const light = ctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
-        light.addColorStop(0, rgba(color, 0));
-        light.addColorStop(0.35, rgba(color, fade * opacity * 0.18));
-        light.addColorStop(1, rgba(color, fade * opacity));
-        ctx.lineWidth = W * width;
-        ctx.strokeStyle = light;
-        ctx.stroke(trail);
-      }
-      ctx.restore();
-    }
-
-    // Choc contenu dans le quart haut : deux fronts et quelques éclats brefs, noyau dégagé.
-    const impact = span(e, tl.impact, tl.impactLength);
-    if (impact > 0 && impact < 1) {
-      const hit = Math.sin(Math.PI * span(e, tl.impact, 180));
-      glow(ctx, W * 0.34, H * 0.235, W * 0.24, W * 0.24, INK, hit * 0.58);
-      for (let i = 0; i < 2; i++) {
-        const k = span(e, tl.impact + i * 55, tl.impactLength - i * 55);
-        if (k <= 0 || k >= 1) continue;
-        const r = W * (0.065 + easeOut(k) * (0.15 - i * 0.025));
-        const a = (1 - k) ** 2 * Math.min(1, k * 18);
-        ring(ctx, W * 0.34, H * 0.235, r, r, i === 1 ? INK : TEAL, W * (0.009 - i * 0.002), a * 0.85);
-      }
-      for (const s of g.sparks) {
-        const d = W * (0.09 + s.speed * easeOut(impact));
-        const x = W * 0.34 + Math.cos(s.angle) * d;
-        const y = H * 0.235 + Math.sin(s.angle) * d;
-        ctx.beginPath();
-        ctx.moveTo(x, y);
-        ctx.lineTo(x + Math.cos(s.angle) * W * 0.012, y + Math.sin(s.angle) * W * 0.012);
-        ctx.lineWidth = W * s.size;
-        ctx.strokeStyle = rgba(s.size > 0.0035 ? GREEN : INK, (1 - span(e, tl.impact, 240)) ** 2);
-        ctx.stroke();
-      }
-    }
-    const ball = ballAt(launch(e), W, H);
-    const shown = easeOut(span(e, tl.wake, 220));
-    glow(ctx, ball.x, ball.y, ball.r * 2, ball.r * 2, TEAL, shown * 0.23);
-    sphere(ctx, ball.x, ball.y, ball.r, 0.85, shown);
-
-    const mark = easeOut(span(e, tl.rule, 400));
-    if (mark > 0) {
-      const rule = ctx.createLinearGradient(W * 0.25, 0, W * 0.75, 0);
-      rule.addColorStop(0, rgba(TEAL, 0));
-      rule.addColorStop(0.5, rgba(TEAL, 0.52 * mark));
-      rule.addColorStop(1, rgba(TEAL, 0));
-      ctx.fillStyle = rule;
-      ctx.fillRect(W * 0.25, H * 0.513, W * 0.5, Math.max(1, W * 0.0018));
-    }
-    ctx.restore();
+    const font = (size) => `300 expanded ${size}px ${BRAND_FONT}`;
+    const spaced = (size) => {
+      ctx.font = font(size);
+      ctx.fontStretch = 'expanded';
+      ctx.letterSpacing = `${size * 0.28}px`;
+    };
+    // PINBALL sur `width` de la largeur, le bloc des deux lignes sur `maxHeight` de la hauteur au plus.
+    spaced(100);
+    const per = ctx.measureText('PINBALL').width / 100;
+    const size = Math.min((W * PLAYFIELD_BRAND.width) / per, (H * PLAYFIELD_BRAND.maxHeight) / 2.1);
+    spaced(size);
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    // L'espacement suit aussi la dernière lettre : on le rend à gauche pour centrer le mot.
+    const x = W / 2 + size * 0.14;
+    const yC = H * PLAYFIELD_BRAND.y - size * 0.675;
+    const yP = H * PLAYFIELD_BRAND.y + size * 0.675;
+    const words = (cyber, pinball) => {
+      ctx.fillStyle = cyber;
+      ctx.fillText('CYBER', x, yC);
+      ctx.fillStyle = pinball;
+      ctx.fillText('PINBALL', x, yP);
+    };
+    ctx.globalCompositeOperation = 'lighter';
+    words('#f00', '#0f0');
+    ctx.filter = `blur(${Math.max(1, size * 0.35)}px)`;
+    words('#00f', '#00f');
+    ctx.filter = 'none';
+    return c;
   }
 
-  /** Plateau au repos : cible à gauche, rampe oblique, trois passages hauts et lanceur droit.
-   * Marque centrale en HTML ; l'invite entre 60,5 et 67,5 % reste sur le fond noir sarcelle. */
+  /**
+   * Plateau : l'animation du shader, puis sa dernière image, immobile, en pleine résolution.
+   * L'invite de l'application se pose vers 64 % de la hauteur, sur une zone que le shader laisse sombre.
+   */
   function playfield(container, game, options) {
     return scene(container, 'playfield', options, (root, tl) => {
-      const canvas = root.appendChild(el('canvas', 'cp-in-canvas'));
-      const ctx = canvas.getContext('2d');
-      const { mark, letters } = stackedLetters('cp-in-mark');
-      const brand = root.appendChild(el('div', 'cp-in-brand'));
-      brand.append(mark);
-      const passSheen = sheen(brand);
-      let geometry;
-      return {
+      const canvas = root.appendChild(el('canvas', 'cp-in-gl'));
+      const { mark } = stackedLetters('cp-in-mark');
+      const fallback = root.appendChild(el('div', 'cp-in-brand'));
+      fallback.append(mark);
+      const source = window.CyberIntroShaders?.playfield;
+      const gl = source ? canvas.getContext('webgl2', { alpha: false, antialias: false, depth: false, preserveDrawingBuffer: true, powerPreference: 'high-performance' }) : null;
+      const program = gl ? glProgram(gl, source) : undefined;
+      let working = Boolean(program);
+      let texture;
+      let size = '';
+      let fontsAsked = false;
+      const uniform = (name) => (program ? gl.getUniformLocation(program, name) : null);
+      const u = { res: uniform('u_res'), time: uniform('u_time'), brand: uniform('u_brand') };
+      if (working) {
+        gl.useProgram(program);
+        for (const [name, values] of Object.entries(window.CyberIntroShaders.playfieldUniforms ?? {})) {
+          gl.uniform4fv(gl.getUniformLocation(program, name), new Float32Array(values));
+        }
+        texture = gl.createTexture();
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+        canvas.addEventListener('webglcontextlost', () => {
+          working = false;
+          root.classList.add('cp-in-flat');
+        });
+      } else {
+        root.classList.add('cp-in-flat');
+      }
+      let liveMax = PLAYFIELD_LIVE_MAX;
+      let lastAt = 0;
+      let slow = 0;
+      /** Six images de suite trop espacées : le canevas de l'animation perd un quart de sa taille. */
+      const pace = () => {
+        const now = performance.now();
+        const dt = now - lastAt;
+        lastAt = now;
+        if (dt > 100) return;
+        slow = dt > 26 ? slow + 1 : Math.max(0, slow - 1);
+        if (slow < 6 || liveMax <= PLAYFIELD_LIVE_MIN) return;
+        liveMax = Math.max(PLAYFIELD_LIVE_MIN, Math.round(liveMax * 0.75));
+        slow = 0;
+      };
+      /** Taille du canevas : réduite pendant l'animation, pleine pour la dernière image. */
+      const fit = (full) => {
+        const W = root.clientWidth || 1;
+        const H = root.clientHeight || 1;
+        const dpr = window.devicePixelRatio || 1;
+        const k = (full ? 1 : Math.min(1, liveMax / Math.max(W, H))) * dpr;
+        const w = Math.max(1, Math.round(W * k));
+        const h = Math.max(1, Math.round(H * k));
+        const key = `${w}x${h}`;
+        if (key === size) return;
+        size = key;
+        canvas.width = w;
+        canvas.height = h;
+        uploadBrand();
+      };
+      const uploadBrand = () => {
+        if (!working) return;
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false);
+        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, brandMask(canvas.width, canvas.height));
+        // La police de la marque peut arriver après le premier tracé : texture refaite, image repeinte.
+        if (!fontsAsked && document.fonts && !document.fonts.check(`300 expanded 100px ${BRAND_FONT}`)) {
+          fontsAsked = true;
+          document.fonts.load(`300 expanded 100px ${BRAND_FONT}`).then(() => {
+            size = '';
+            handle.repaint();
+          }, () => undefined);
+        }
+      };
+      let lastE = -1;
+      const draw = (e) => {
+        lastE = e;
+        if (!working) return;
+        if (e >= 0 && e < tl.end) pace();
+        fit(e >= tl.end);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        gl.useProgram(program);
+        gl.uniform2f(u.res, canvas.width, canvas.height);
+        gl.uniform1f(u.time, clamp(e, 0, tl.end));
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.uniform1i(u.brand, 0);
+        if (e < 0) {
+          gl.clearColor(0, 0, 0, 1);
+          gl.clear(gl.COLOR_BUFFER_BIT);
+        } else gl.drawArrays(gl.TRIANGLES, 0, 3);
+      };
+      const handle = {
         resize() {
-          const W = root.clientWidth || 1;
-          const H = root.clientHeight || 1;
-          // Au plus 1920 points sur le grand côté (la moitié d'un écran 4K) : les lueurs n'y perdent rien.
-          const k = Math.min(1, 1920 / Math.max(W, H)) * (window.devicePixelRatio || 1);
-          canvas.width = Math.max(1, Math.round(W * k));
-          canvas.height = Math.max(1, Math.round(H * k));
-          geometry = playfieldGeometry(canvas.width, canvas.height, tl);
-          // Marque entière dans son cartouche (0,335–0,515 H) : PINBALL (6,4 em) sur 62 % de la
-          // largeur, le bloc des deux lignes (2,1 em) sur 13 % de la hauteur au plus (en 3:4).
-          const base = Math.min(W * 0.094, H * 0.054);
-          const size = Math.min((W * 0.62) / 6.4, (H * 0.13) / 2.1);
-          brand.style.setProperty('--cp-in-scale', String(base > 0 ? size / base : 1));
+          size = '';
         },
-        paint(e) {
-          if (ctx && geometry) paintPlayfield(ctx, geometry, e, tl);
-          // Marque : CYBER puis PINBALL, chaque mot du centre vers ses bords ; elle descend un peu en se posant.
-          const enter = easeOut(span(e, tl.brand, 500));
-          brand.style.opacity = String(enter);
-          brand.style.transform = `translateY(calc(-50% + ${(1 - enter) * 1.4}cqh)) scale(${1.04 - 0.04 * enter})`;
-          letters.forEach((letter, i) => {
-            const distance = i < 5 ? Math.abs(i - 2) : Math.abs(i - 8);
-            letter.style.opacity = String(easeOut(span(e, (i < 5 ? tl.brand : tl.brand + 220) + distance * 45, 330)));
-          });
-          passSheen(e, tl);
-        },
+        paint: draw,
         reset() {
-          geometry = canvas.width ? playfieldGeometry(canvas.width, canvas.height, tl) : geometry;
+          size = '';
+        },
+        repaint() {
+          draw(lastE);
+        },
+        destroy() {
+          gl?.getExtension('WEBGL_lose_context')?.loseContext();
         },
       };
+      return handle;
     });
   }
 

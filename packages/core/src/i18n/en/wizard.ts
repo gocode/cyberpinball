@@ -346,6 +346,9 @@ export const messages: Record<string, string> = {
   '= du pavé': 'Numpad =',
   ', du pavé': 'Numpad ,',
   Muet: 'Mute',
+  'Le son de toute la borne baisse de 5 % ; maintenu une seconde, il se coupe (ou revient)': 'The whole cabinet’s sound goes down 5%; held for a second, it mutes (or comes back)',
+  'Le son de toute la borne monte de 5 %': 'The whole cabinet’s sound goes up 5%',
+  'Coupe ou rétablit le son de toute la borne': 'Mutes or restores the whole cabinet’s sound',
   'Volume + (multimédia)': 'Volume + (media)',
   'Volume − (multimédia)': 'Volume − (media)',
   '{n} du pavé': 'Numpad {n}',
@@ -493,7 +496,7 @@ export const messages: Record<string, string> = {
   'Régler': 'Adjust',
   'Enregistrer : cette table ou toutes': 'Save: this table or all',
   'Page précédente, puis fermer': 'Previous page, then close',
-  'Rouvrir le menu': 'Reopen the menu',
+  'Réglages en partie, menu de VPX': 'In-game settings, VPX menu',
   'Quitter, menu fermé': 'Quit, menu closed',
   // Étape « Lanceur » (app/src/plunger-step.ts, packages/core/src/plunger.ts)
   'Axe {axis} de {device}': 'Axis {axis} of {device}',

@@ -13,6 +13,7 @@ import type { IconName } from './icons';
 
 /** Entrées fournies par l'application. */
 export const SYSTEM_ITEM_IDS = [
+  'all-tables',
   'add-table',
   'downloads',
   'roms',
@@ -86,8 +87,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'tables',
     icon: 'tables',
     get label() { return t('Tables'); },
-    get detail() { return t('Ajouter une table, téléchargements, bibliothèque de ROM'); },
-    entries: ['add-table', 'downloads', 'roms'],
+    get detail() { return t('Toutes les tables et leur fiche, ajouter une table, téléchargements, bibliothèque de ROM'); },
+    entries: ['all-tables', 'add-table', 'downloads', 'roms'],
   },
   medias: {
     id: 'medias',
@@ -129,6 +130,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
 };
 
 export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
+  'all-tables': { icon: 'list', get label() { return t('Toutes les tables'); } },
   'add-table': { icon: 'table-add', get label() { return t('Ajouter une table'); } },
   downloads: { icon: 'download', get label() { return t('Téléchargements'); } },
   roms: { icon: 'chip', get label() { return t('Bibliothèque de ROM'); } },

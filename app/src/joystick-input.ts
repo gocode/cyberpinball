@@ -57,6 +57,24 @@ export function onJoystickInput(win: BrowserWindow, listener: Listener): void {
   start();
 }
 
+/** Écouteurs de tous les boutons, quelle que soit la fenêtre au premier plan. */
+const watchers = new Set<(code: string, down: boolean) => void>();
+
+/**
+ * Chaque bouton du joystick appuyé ou relâché, même quand VPX a le premier plan (une partie :
+ * la combinaison qui ouvre les réglages en partie, in-game-menu.ts). Rend de quoi arrêter.
+ */
+export function watchJoystickButtons(listener: (code: string, down: boolean) => void): () => void {
+  watchers.add(listener);
+  start();
+  return () => watchers.delete(listener);
+}
+
+/** Boutons du joystick tenus en ce moment (jetons de VPX). */
+export function joystickButtonsHeld(): string[] {
+  return [...held.keys()];
+}
+
 /** Ce que l'étape « Boutons » dit des joysticks. */
 export function joystickStatus(): JoystickStatus {
   if (status.state === 'ready' && reader) return { ...status, devices: reader.devices() };
@@ -176,6 +194,7 @@ function tick(): void {
   const now = Date.now();
   for (const e of reader.poll()) {
     const code = joystickCode(e.device, e.button);
+    for (const watcher of watchers) watcher(code, e.down);
     if (e.down) {
       held.set(code, now + REPEAT_DELAY_MS);
       send(code, 'keyDown');

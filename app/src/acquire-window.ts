@@ -482,8 +482,10 @@ export function createAcquirer(events: AcquireEvents) {
 
   /** Taille d'un fichier d'après la page d'où il part (celle-ci, sinon la précédente de la même vue). */
   async function expectedFrom(contents: Electron.WebContents, filename: string): Promise<number | undefined> {
+    // Lu avant l'attente : la fenêtre fermée entre-temps détruit la page (id illisible).
+    const id = contents.id;
     const now = await readSizes(contents);
-    return expectedSizeFromPage(now, filename) ?? expectedSizeFromPage(pageHints.get(contents.id) ?? [], filename);
+    return expectedSizeFromPage(now, filename) ?? expectedSizeFromPage(pageHints.get(id) ?? [], filename);
   }
   let nextDownload = 1;
   let sampler: NodeJS.Timeout | undefined;
@@ -943,6 +945,10 @@ export function createAcquirer(events: AcquireEvents) {
     });
     keepInFront(win);
     win.on('closed', () => {
+      // La fenêtre fermée ne détruit pas sa vue (Electron, WebContentsView) : la page du site
+      // continuait de vivre, et une vidéo lancée dedans (YouTube) de jouer. Fermée ici ; ses
+      // téléchargements, tenus par la session, continuent.
+      if (!contents.isDestroyed()) contents.close();
       claims.delete(viewId);
       open = undefined;
       barTyping = false;
