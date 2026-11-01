@@ -522,7 +522,7 @@ test('application : le relevé lu pendant la partie, la fin ferme VPX, une parti
   const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(front, /const liveSource = double\?\.live \? \(\) => double\.liveState\(\)/);
   // Le relevé simulé (hors écran) part, lui aussi, au « partez » posé dans le double (départ commun, depart-commun.test.ts).
-  assert.match(front, /simulatedLiveState\(Date\.now\(\), autoStopAfterMs \?\? 10_000, \(\) => goneAt\)/);
+  assert.match(front, /simulatedLiveState\(Date\.now\(\), liveRunMs, \(\) => goneAt\)/);
   assert.match(front, /if \(Date\.now\(\) - overAt >= LIVE_CLOSE_AFTER_MS\) \{[\s\S]*?game\.stop\(\);/);
   assert.match(front, /const played = report\.result\.ok \|\| report\.result\.seconds >= PLAYED_SECONDS;/);
   // La bande ne naît qu'avec la table à l'écran (phase playing), une fois VPX installé sur ses écrans, et suit ceux qu'il prend ou rend.

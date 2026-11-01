@@ -203,8 +203,16 @@ try {
             foreach ($c in $bande.Captures) { if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\$c.png")) { $failures += "$id : pas de capture $c" } }
           }
           if ($log -match 'Bande de la partie entre amis( \(DMD\))? : (?!mise en page conforme)') { $failures += "$id : mise en page de la bande de la partie" }
-          # Le départ commun : la borne prête attend Bruno (six secondes de chargement), la carte de l'attente sur le plateau.
-          if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\depart-attente-commun.png")) { $failures += "$id : pas de capture de l'attente du départ commun" }
+          # Le départ commun : la borne prête attend Bruno (prêt cinq secondes après elle). Ce qui compte : le
+          # joueur a vu l'attente, puis « Partez ! » assez longtemps pour le lire (le journal le mesure à l'écran,
+          # pas à l'heure du signal), mise en page conforme ; et les deux captures.
+          $vu = $log | Where-Object { $_ -match "^Départ commun : carte montrée ([\d.]+) s en attente, « Partez ! » ([\d.]+) s\." } | Select-Object -First 1
+          if (-not $vu) { $failures += "$id : l'attente du départ commun n'a pas été montrée (attente et « Partez ! »)" }
+          elseif ($vu -match 'montrée ([\d.]+) s en attente, « Partez ! » ([\d.]+) s') {
+            if ([double]$Matches[1] -lt 1) { $failures += "$id : attente montrée $($Matches[1]) s seulement (Bruno est prêt cinq secondes après la borne)" }
+            if ([double]$Matches[2] -lt 3.9) { $failures += "$id : « Partez ! » montré $($Matches[2]) s seulement (4 s attendues)" }
+          }
+          foreach ($c in 'depart-attente-commun', 'depart-partez-commun') { if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\$c.png")) { $failures += "$id : pas de capture $c" } }
           if ($log -match 'Départ commun \((attente|partez)\) : (?!mise en page conforme)') { $failures += "$id : mise en page de l'attente du départ commun" }
         }
         if ($nom -eq 'en-jeu') {

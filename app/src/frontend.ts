@@ -36,6 +36,7 @@ import {
   layoutOf,
   overlayCoveredBy,
   liveBoardView,
+  LIVE_GO_SHOW_MS,
   type LiveBoardScreens,
   loadCabinet,
   playfieldOrientation,
@@ -1831,6 +1832,11 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   liveManual = !!double && !double.live && simulated === undefined;
   // Quand « partez » a été posé dans le double (la partie simulée part de là).
   let goneAt: number | undefined;
+  // La table à l'écran : une borne ne se dit pas prête avant (journal du 31/10/2026, borne chargée :
+  // « prête » 0,2 s avant que sa table paraisse, la carte de l'attente pas encore là).
+  let onScreen = false;
+  // Essais (arrêt automatique) : « Partez ! » couvre le début de la partie ; elle dure d'autant plus.
+  const liveRunMs = (autoStopAfterMs ?? 10_000) + (hooks.gate ? LIVE_GO_SHOW_MS : 0);
 
   // Les fenêtres du menu restent derrière VPX, sans jamais lui prendre le focus : l'écran de
   // chargement jusqu'à ce que sa fenêtre de jeu s'affiche, puis le fond de partie de chaque
@@ -1854,6 +1860,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)));
     broadcast();
     setTimeout(showLiveBoard, LIVE_BOARD_SETTLE_MS);
+    onScreen = true;
     if (liveManual) hooks.gate?.ready();
     // Partie entre amis : l'arrêt automatique (essais) se compte depuis « partez ».
     if (autoStopAfterMs && !hooks.gate) setTimeout(() => game.stop(), autoStopAfterMs);
@@ -1869,6 +1876,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground })
       : launchVpx({ exe: install.exe, ini: double?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying, onForeground });
+  // Départ commun : la carte de l'attente se charge, cachée, pendant que VPX charge la table ; elle
+  // paraît dès la première vue, même quand l'attente ne dure qu'un instant (borne lente à créer ses fenêtres).
+  if (hooks.gate) gameNotices.prepareWait(liveGames.waitView({ manual: liveManual }));
   // Une partie simulée ne prend aucun raccourci global au poste.
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   // Partie entre amis : l'état de jeu que le relevé du double écrit (livestate.ts), deux fois par seconde ;
@@ -1876,7 +1886,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   let live: { score?: number; multi?: boolean } | undefined;
   let overAt: number | undefined;
   // Hors écran, la partie simulée n'exécute aucun script : son relevé est simulé, pour la bande et la fin de partie.
-  const liveSource = double?.live ? () => double.liveState() : simulated !== undefined && double ? simulatedLiveState(Date.now(), autoStopAfterMs ?? 10_000, () => goneAt) : undefined;
+  const liveSource = double?.live ? () => double.liveState() : simulated !== undefined && double ? simulatedLiveState(Date.now(), liveRunMs, () => goneAt) : undefined;
   // Le DMD de la table, lu par l'inspector de VPX : les scores des amis ne s'y posent que sur son écran de score (dmdscore.ts).
   dmdWatch = double?.inspectorPort && readDmd ? watchVpxDmd(double.inspectorPort, (line) => console.log(line)) : simulated !== undefined && double && readDmd ? simulatedDmdWatch() : undefined;
   // Départ commun (livestart.ts) : la table prête (le relevé répond « pret »), elle le dit aux
@@ -1885,11 +1895,11 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     ? setInterval(() => {
         const st = liveSource?.();
         dmdWatch?.game({ inGame: Boolean(st?.inGame), ...(st ? { score: st.score } : {}) });
-        if (st?.ready || st?.started) hooks.gate?.ready();
+        if (onScreen && (st?.ready || st?.started)) hooks.gate?.ready();
         if (goneAt === undefined && (!hooks.gate || hooks.gate.go())) {
           goneAt = Date.now();
           double.go();
-          if (autoStopAfterMs && hooks.gate) setTimeout(() => game.stop(), autoStopAfterMs);
+          if (autoStopAfterMs && hooks.gate) setTimeout(() => game.stop(), liveRunMs);
         }
         if (!st?.started) return;
         live = { score: st.score, multi: (live?.multi ?? false) || st.players > 1 };

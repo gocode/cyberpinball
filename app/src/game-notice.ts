@@ -23,6 +23,7 @@ import * as path from 'node:path';
 import {
   GAME_NOTICE_LINE,
   GAME_NOTICE_SIZE,
+  LIVE_GO_SHOW_MS,
   LiveBoardFlash,
   gameNoticeBounds,
   gameNoticeView,
@@ -73,8 +74,16 @@ export interface GameNotices {
   board(view: LiveBoardView | undefined): void;
   /** Une nouvelle de la partie entre amis, d'une ligne (undefined : plus rien). */
   line(view: NoticeView | undefined): void;
-  /** Partie entre amis : l'attente du départ commun, à jour (undefined : plus d'attente). */
+  /**
+   * Partie entre amis : l'attente du départ commun, à jour (undefined : plus d'attente). « Partez ! »
+   * reste à l'écran LIVE_GO_SHOW_MS à compter de son apparition réelle, même si la vue s'arrête avant.
+   */
   wait(view: LiveWaitView | undefined): void;
+  /**
+   * Au lancement de VPX : la carte de l'attente, chargée d'avance et cachée, à la place qu'elle aura ;
+   * elle paraît dès la première vue, même quand l'attente ne dure qu'un instant.
+   */
+  prepareWait(view: LiveWaitView | undefined): void;
   /** Fin de la partie : plus rien par-dessus VPX. */
   close(): void;
 }
@@ -157,6 +166,11 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   /** L'attente du départ commun : sa vue, sa carte sur le plateau. */
   let waitView: LiveWaitView | undefined;
   let waitCard: Overlay | undefined;
+  /**
+   * Ce que la carte a vraiment montré, et quand (Date.now()) : l'attente, puis « Partez ! » ; `hold` :
+   * la vue n'est plus là, la carte garde « Partez ! » jusqu'à son temps de lecture.
+   */
+  let waitSeen: { attente?: number; partez?: number; hold?: NodeJS.Timeout; since?: number } = {};
 
   /** Place de la fenêtre pour une carte de `base` (vue du joueur, à 1080 px), dans le coin du plateau. */
   function boundsFor(base: { width: number; height: number }, below = 0) {
@@ -321,20 +335,62 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     line = undefined;
   }
 
+  /** La carte de l'attente à sa place pour `rows` joueurs (une autre place, une autre fenêtre). */
+  function placeWait(rows: number): { place: { zone: Rect; rotation: Rotation }; bounds: Rect } | undefined {
+    const place = opts.place();
+    if (!place) {
+      if (!waitCard) opts.log?.('Départ commun : pas d’écran du plateau retrouvé, l’attente n’est pas montrée sur la table.'); // i18n-ignore : journal
+      waitCard = layer(waitCard, undefined, '', showWait);
+      return undefined;
+    }
+    const bounds = liveWaitBounds(place.zone, place.rotation, rows);
+    waitCard = layer(waitCard, bounds, JSON.stringify(['attente', bounds, place.rotation]), showWait);
+    return { place, bounds };
+  }
+
   /** L'attente du départ commun, sur le plateau : la carte à sa place (une ligne par joueur), à jour. */
   function showWait(): void {
     if (!waitView) return;
-    const place = opts.place();
-    const bounds = place ? liveWaitBounds(place.zone, place.rotation, waitView.rows.length) : undefined;
-    if (!bounds && !waitCard) opts.log?.('Départ commun : pas d’écran du plateau retrouvé, l’attente n’est pas montrée sur la table.'); // i18n-ignore : journal
-    waitCard = layer(waitCard, bounds, JSON.stringify(['attente', bounds, place?.rotation]), showWait);
-    if (alive(waitCard) && place) send(waitCard, { view: waitView, rotation: place.rotation }, waitView.go ? 'depart-partez' : 'depart-attente');
+    const at = placeWait(waitView.rows.length);
+    if (!at || !alive(waitCard) || !waitCard.loaded) return;
+    send(waitCard, { view: waitView, rotation: at.place.rotation }, waitView.go ? 'depart-partez' : 'depart-attente');
+    // Ce que le joueur a vraiment vu : « Partez ! » se compte de là.
+    const now = Date.now();
+    if (waitView.go) waitSeen.partez ??= now;
+    else waitSeen.attente ??= now;
   }
 
   function closeWait(): void {
+    if (waitSeen.hold) clearTimeout(waitSeen.hold);
+    if (waitSeen.attente !== undefined || waitSeen.partez !== undefined) {
+      const end = Date.now();
+      const s = (from: number | undefined, to: number) => (from === undefined ? 'pas montrée' : `${((to - from) / 1000).toFixed(1)} s`); // i18n-ignore : journal
+      opts.log?.(`Départ commun : carte montrée ${s(waitSeen.attente, waitSeen.partez ?? end)} en attente, « Partez ! » ${s(waitSeen.partez, end)}.`); // i18n-ignore : journal
+    }
+    waitSeen = {};
     waitView = undefined;
     dispose(waitCard);
     waitCard = undefined;
+    // La bande attendait la fin de la carte (showBoard) : elle vient tout de suite.
+    if (boardView) showBoard();
+  }
+
+  /**
+   * Plus de vue d'attente : la carte part, sauf « Partez ! » qui reste lisible LIVE_GO_SHOW_MS après
+   * son apparition réelle (une fenêtre lente à charger, une borne chargée : l'heure du signal ne dit
+   * pas ce que le joueur a vu). Une carte encore en chargement garde « Partez ! » jusqu'à ce qu'elle
+   * paraisse, dix secondes au plus.
+   */
+  function endWait(): void {
+    if (!waitView?.go) return closeWait();
+    if (waitSeen.hold) return;
+    waitSeen.since ??= Date.now();
+    const left = waitSeen.partez !== undefined ? waitSeen.partez + LIVE_GO_SHOW_MS - Date.now() : Math.max(0, waitSeen.since + 10_000 - Date.now());
+    if (left <= 0) return closeWait();
+    waitSeen.hold = setTimeout(() => {
+      waitSeen.hold = undefined;
+      endWait();
+    }, Math.min(left, 250));
   }
 
   function closeNotice(): void {
@@ -348,6 +404,8 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   }
 
   function close(): void {
+    // Fin de partie : la bande ne revient pas après la carte de l’attente.
+    boardView = undefined;
     closeLine();
     closeNotice();
     closeWait();
@@ -377,12 +435,21 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     },
     wait(view) {
       if (!view) {
-        if (waitView || waitCard) closeWait();
+        if (waitView) endWait();
+        else if (waitCard) closeWait();
         return;
       }
+      // La vue revient (une attente qui reprend) : plus de « Partez ! » gardé.
+      if (waitSeen.hold) clearTimeout(waitSeen.hold);
+      waitSeen.hold = undefined;
+      waitSeen.since = undefined;
       if (!waitView) closeNotice();
       waitView = view;
       showWait();
+    },
+    prepareWait(view) {
+      if (!view || alive(waitCard)) return;
+      placeWait(view.rows.length);
     },
     board(view) {
       if (!view) {

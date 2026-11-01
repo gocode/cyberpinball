@@ -494,7 +494,16 @@ test('service : l’hôte prêt attend son invité ; « partez » arrive aux deu
 test('application : le fichier « partez » posé au signal, la table sans relevé prête à l’écran, l’attente avant la bande', () => {
   const read = (...p: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...p), 'utf8');
   const front = read('app', 'src', 'frontend.ts');
-  assert.match(front, /if \(st\?\.ready \|\| st\?\.started\) hooks\.gate\?\.ready\(\);/);
+  // Prête seulement table à l'écran ; la carte de l'attente chargée d'avance, dès le lancement de VPX (borne lente du 31/10/2026).
+  assert.match(front, /if \(onScreen && \(st\?\.ready \|\| st\?\.started\)\) hooks\.gate\?\.ready\(\);/);
+  assert.match(front, /onScreen = true;\r?\n\s+if \(liveManual\) hooks\.gate\?\.ready\(\);/);
+  assert.match(front, /if \(hooks\.gate\) gameNotices\.prepareWait\(liveGames\.waitView\(\{ manual: liveManual \}\)\);/);
+  // « Partez ! » lisible LIVE_GO_SHOW_MS après son apparition réelle, pas après l'heure du signal ; le journal mesure ce qui a été vu.
+  const notice = read('app', 'src', 'game-notice.ts');
+  assert.match(notice, /waitSeen\.partez !== undefined \? waitSeen\.partez \+ LIVE_GO_SHOW_MS - Date\.now\(\)/);
+  assert.match(notice, /if \(waitView\.go\) waitSeen\.partez \?\?= now;/);
+  assert.match(notice, /Départ commun : carte montrée \$\{/);
+  assert.match(notice, /if \(waitView\) endWait\(\);/);
   assert.match(front, /if \(goneAt === undefined && \(!hooks\.gate \|\| hooks\.gate\.go\(\)\)\) \{\r?\n\s+goneAt = Date\.now\(\);\r?\n\s+double\.go\(\);/);
   assert.match(front, /if \(liveManual\) hooks\.gate\?\.ready\(\);/);
   assert.match(front, /gameNotices\.wait\(wait\);\r?\n\s+gameNotices\.board\(!wait && /);

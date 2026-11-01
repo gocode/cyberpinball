@@ -9,7 +9,7 @@
 //   Émile  : ami hors ligne depuis trois heures (écrit dans social.json avant le démarrage).
 // CYBERPINBALL_RESEAU_DEMO=partie : de plus, Bruno invite la borne à une partie en direct sur la
 // table qu'ils ont tous deux, ici dans la même version (la partie se montre sans avertissement),
-// lance le départ dès qu'elle accepte, charge sa table six secondes (la borne l'attend au départ
+// lance le départ dès qu'elle accepte, charge sa table (prête cinq secondes après la borne, qui l'attend au départ
 // commun), joue quatre secondes et bat son record ; l'historique des
 // parties a déjà deux soirées avec Émile (seedSimulatedFriends). =en-jeu : Bruno
 // attend que la borne soit en partie, puis l'invite (la notification pendant la partie,
@@ -53,8 +53,13 @@ export const DEMO_TABLES = {
   notOnCabinet: 'Glass Lagoon (Gulfstream 1993)',
 };
 
-/** Partie en direct : la table de Bruno charge ce temps, la borne l'attend au départ commun (livestart.ts). */
+/**
+ * Partie en direct : la table de Bruno charge au moins ce temps, et finit toujours ce temps-ci après
+ * celle de la borne : la borne l'attend au départ commun (livestart.ts) quelle que soit sa vitesse
+ * (une borne lente à charger était prête en même temps que lui, et l'attente ne se voyait pas).
+ */
 const BRUNO_LOADING_MS = 6000;
+const BRUNO_LATE_MS = 5000;
 /** Table que la borne n'a pas, dans la démonstration de la coupure : assez lourde pour voir l'envoi avancer, s'arrêter, reprendre. */
 const CUT_TABLE_BYTES = 24 * 1024 * 1024;
 /** Débit de Bruno dans la démonstration de la coupure : un morceau de 64 Kio toutes les 25 ms (environ 2,5 Mo/s). */
@@ -293,8 +298,11 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       settingsOf: (table) => readHostSettings({ folder: table.folder, roms: [] }),
       play: async (_table, playing, _settings, _board, progress, gate) => {
         playing();
-        // Départ commun : sa table charge six secondes (la borne l'attend, et le dit), puis il attend « partez ».
-        await new Promise((r) => setTimeout(r, BRUNO_LOADING_MS));
+        // Départ commun : sa table charge, et n'est prête qu'après celle de la borne (la borne l'attend, et le dit), puis il attend « partez ».
+        const loading = Date.now();
+        const guestReady = () => games?.current()?.players.some((p) => !p.host && p.ready) ?? true;
+        while (!guestReady() && Date.now() - loading < 60_000) await new Promise((r) => setTimeout(r, 100));
+        await new Promise((r) => setTimeout(r, Math.max(BRUNO_LATE_MS, BRUNO_LOADING_MS - (Date.now() - loading))));
         gate?.ready();
         while (gate && !gate.go()) await new Promise((r) => setTimeout(r, 250));
         // Sa progression, comme le relevé d'une vraie borne : le score monte, bille après bille.
