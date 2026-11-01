@@ -11,6 +11,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { renameWithRetry } from './atomicwrite';
 
 export const JOURNAL_FILE = 'journal.txt';
 export const JOURNAL_OLD_FILE = 'journal-ancien.txt';
@@ -38,7 +39,7 @@ export function appendJournal(logsDir: string, line: string, max = JOURNAL_MAX):
   const file = path.join(logsDir, JOURNAL_FILE);
   fs.mkdirSync(logsDir, { recursive: true });
   try {
-    if (fs.statSync(file).size + Buffer.byteLength(line) > max) fs.renameSync(file, path.join(logsDir, JOURNAL_OLD_FILE));
+    if (fs.statSync(file).size + Buffer.byteLength(line) > max) renameWithRetry(file, path.join(logsDir, JOURNAL_OLD_FILE));
   } catch {
     // Pas encore de journal : il commence.
   }

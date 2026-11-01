@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { renameWithRetry } from './atomicwrite';
 import { formatNumber, t } from './i18n';
 import { buildZip, writeZipData, type RomZipMember } from './romzip';
 
@@ -209,12 +210,12 @@ export function movePath(from: string, to: string): void {
   // Changement de casse seule (« t2.vpx » -> « T2.vpx ») : Windows le voit comme le même fichier.
   if (samePath(from, to) && from !== to) {
     const tmp = `${to}.renommage-${process.pid}`;
-    fs.renameSync(from, tmp);
-    fs.renameSync(tmp, to);
+    renameWithRetry(from, tmp);
+    renameWithRetry(tmp, to);
     return;
   }
   try {
-    fs.renameSync(from, to);
+    renameWithRetry(from, to);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
     fs.cpSync(from, to, { recursive: true, errorOnExist: true, force: false });

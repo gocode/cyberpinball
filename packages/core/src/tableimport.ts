@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { bestMatch, pupMemory, setPupMemory, tableFolderName, type ScriptFacts } from './doctor';
 import { applyOps, isInside, moveToTrash, pruneEmptyDirs, samePath, sameVolume, type FileOp, type OpContext } from './fileops';
 import { t } from './i18n';
@@ -1094,9 +1095,7 @@ export function applyImport(plan: TablePlan, ctx: ImportContext): void {
     (plan.scripts ?? []).map((s): FileOp => (s.content !== undefined ? { op: 'write', path: s.to, content: s.content, encoding: 'latin1' } : { op: 'trash', path: s.to })),
     ctx,
   );
-  const tmp = `${plan.infoFile}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(plan.info, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, plan.infoFile);
+  writeFileAtomic(plan.infoFile, JSON.stringify(plan.info, null, 2) + '\n');
   for (const src of plan.infoSources) {
     if (src.mode === 'move' && fs.existsSync(src.from) && !samePath(src.from, plan.infoFile)) moveToTrash(src.from, ctx);
   }

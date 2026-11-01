@@ -54,6 +54,7 @@ import {
   type MediaKind,
   type WebEngine,
   type WebReceipt,
+  renameWithRetry,
 } from '@cyberpinball/core';
 import type { Acquirer } from './acquire-window';
 import { unpackArchive } from './archives';
@@ -431,7 +432,7 @@ export function createMediaSites(ctx: MediaSitesContext) {
       if (await unpackArchive(file, files)) fs.rmSync(file, { force: true });
       else {
         fs.mkdirSync(files, { recursive: true });
-        fs.renameSync(file, path.join(files, path.basename(file)));
+        renameWithRetry(file, path.join(files, path.basename(file)));
       }
     } catch (error) {
       return fail(
@@ -634,7 +635,7 @@ export function createMediaSites(ctx: MediaSitesContext) {
       else {
         fs.mkdirSync(files, { recursive: true });
         // Le nom d'origine, sans le préfixe de la copie faite depuis Téléchargements de Windows.
-        fs.renameSync(file, path.join(files, windows ? filename : path.basename(file)));
+        renameWithRetry(file, path.join(files, windows ? filename : path.basename(file)));
       }
     } catch (error) {
       fs.rmSync(file, { force: true });
@@ -649,7 +650,7 @@ export function createMediaSites(ctx: MediaSitesContext) {
       if (j.verdict.status !== 'accepted' || !j.verdict.ext) continue;
       const fixed = path.join(path.dirname(j.file), `${path.basename(j.file, path.extname(j.file))}.${j.verdict.ext}`);
       if (fs.existsSync(fixed)) continue;
-      fs.renameSync(j.file, fixed);
+      renameWithRetry(j.file, fixed);
     }
     judged = judgeWebFiles(files, request.type);
     const medias = receivedMedias(files, { types: [request.type] });

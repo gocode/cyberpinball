@@ -16,6 +16,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { BUTTONS, buttonKeys, keyLabel } from './buttons';
 import { t } from './i18n';
 import type { ButtonId, CabinetButtons } from './model';
@@ -127,9 +128,7 @@ export function loadGuestMode(dataDir: string): boolean {
 export function saveGuestMode(dataDir: string, active: boolean): void {
   const file = settingsFile(dataDir);
   fs.mkdirSync(dataDir, { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify({ active }, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, file);
+  writeFileAtomic(file, JSON.stringify({ active }, null, 2) + '\n');
 }
 
 /**

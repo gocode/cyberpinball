@@ -4,6 +4,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { renameWithRetry, writeFileAtomic } from './atomicwrite';
 import {
   activeConfiguration,
   addConfiguration,
@@ -46,7 +47,7 @@ export function loadCabinetSet(home: string): CabinetSet | undefined {
 
 export function saveCabinetSet(home: string, set: CabinetSet): string {
   const file = path.join(home, CABINET_FILE);
-  writeAtomic(file, JSON.stringify({ ...set, updatedAt: new Date().toISOString() }, null, 2) + '\n');
+  writeFileAtomic(file, JSON.stringify({ ...set, updatedAt: new Date().toISOString() }, null, 2) + '\n');
   return file;
 }
 
@@ -171,7 +172,7 @@ export function loadOwnedMemory(home: string, iniPath: string): OwnedMemory | un
 export function saveOwnedMemory(home: string, iniPath: string, values: OwnedMemory): void {
   const memory = readOwnedMemoryFile(home);
   const files = [...memory.files.filter((f) => !samePath(f.iniPath, iniPath)), { iniPath, values }];
-  writeAtomic(path.join(home, OWNED_MEMORY_FILE), JSON.stringify({ version: 2, files }, null, 2) + '\n');
+  writeFileAtomic(path.join(home, OWNED_MEMORY_FILE), JSON.stringify({ version: 2, files }, null, 2) + '\n');
 }
 
 /**
@@ -202,7 +203,7 @@ export function readKeptJson(file: string, now = new Date()): { value?: unknown;
     const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '');
     const setAside = path.join(path.dirname(file), `${path.basename(file, ext)}.illisible-${stamp}${ext}`);
     try {
-      fs.renameSync(file, setAside);
+      renameWithRetry(file, setAside);
       return { setAside };
     } catch {
       // Pas déplaçable (verrouillé) : signalé quand même ; l'enregistrement suivant échouera ou le remplacera.
@@ -233,18 +234,11 @@ export function writeWithBackup(file: string, content: string, backupDir: string
     fs.copyFileSync(file, backup);
     pruneBackups(backupDir, path.basename(file));
   }
-  writeAtomic(file, content);
+  writeFileAtomic(file, content);
   if (fs.readFileSync(file, 'utf8') !== content) {
     throw new Error(t('Relecture de {file} : le contenu ne correspond pas à ce qui a été écrit.', { file }));
   }
   return { path: file, backup };
-}
-
-function writeAtomic(file: string, content: string): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, content, 'utf8');
-  fs.renameSync(tmp, file);
 }
 
 function pruneBackups(dir: string, base: string): void {

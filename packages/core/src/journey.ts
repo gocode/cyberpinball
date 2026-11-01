@@ -22,6 +22,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import {
   liveLinks,
   NEED_LABELS,
@@ -596,9 +597,7 @@ export function loadJourneys(dataDir: string): JourneyMemory {
 export function saveJourneys(dataDir: string, memory: JourneyMemory): void {
   const file = journeysFile(dataDir);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(memory, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, file);
+  writeFileAtomic(file, JSON.stringify(memory, null, 2) + '\n');
 }
 
 export function journeyRecord(memory: JourneyMemory, file: string): JourneyRecord | undefined {

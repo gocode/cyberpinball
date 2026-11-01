@@ -9,6 +9,10 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.6
+
+- Cyber Pinball ne se ferme plus tout seul quand Windows refuse un instant l'enregistrement d'un fichier (antivirus, indexation) : l'enregistrement est réessayé, et s'il échoue encore, il est noté au journal et refait au suivant. Pendant une partie entre amis, la borne ne redémarrait plus et ne passait plus hors ligne chez les autres.
+
 ## 0.1.5
 
 - Partie entre amis : en choisissant la table, celles que vos amis ont dans la même version passent en tête. Les autres restent visibles, grisées avec la raison et le nom de qui bloque (« Autre version chez Bruno », « Bruno n’a pas cette table ») ; Start sur une autre version ouvre la sienne dans sa bibliothèque, à récupérer. Plus de refus à l’invitation pour une version différente. Avec plusieurs amis, « Changer de table » dans le salon et « Autre table, mêmes joueurs » aux résultats.

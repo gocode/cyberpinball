@@ -11,7 +11,7 @@
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { readVpxScript, scriptFacts, t, type ScriptFacts } from '@cyberpinball/core';
+import { readVpxScript, saveOrWarn, scriptFacts, t, writeFileAtomic, type ScriptFacts } from '@cyberpinball/core';
 
 export type ScriptResult = ScriptFacts | { error: string };
 
@@ -101,11 +101,9 @@ function loadCache(file: string): Record<string, CacheEntry> {
   }
 }
 
+/** Un cache refusé (fichier tenu un instant, disque plein) ne fait jamais échouer la lecture du script. */
 function saveCache(file: string, cache: Record<string, CacheEntry>): void {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(cache, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, file);
+  saveOrWarn(file, () => writeFileAtomic(file, JSON.stringify(cache, null, 2) + '\n'));
 }
 
 /** Reporte la lecture d'un script sur le chemin d'arrivée d'une table importée. */

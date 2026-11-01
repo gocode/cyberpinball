@@ -29,6 +29,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import type { MediaTarget, MediaType } from './medias';
 
 export const MEDIA_ERRORS_FILE = 'medias-erreurs.json';
@@ -153,9 +154,7 @@ export function recordMediaError(logFile: string, report: MediaErrorReport, now 
   };
   const next = [entry, ...errors.filter((e) => e !== previous)].sort((a, b) => b.last.localeCompare(a.last)).slice(0, MAX_MEDIA_ERRORS);
   fs.mkdirSync(path.dirname(logFile), { recursive: true });
-  const tmp = `${logFile}.tmp-${process.pid}`;
   const log: MediaErrorLog = { version: 1, errors: next };
-  fs.writeFileSync(tmp, JSON.stringify(log, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, logFile);
+  writeFileAtomic(logFile, JSON.stringify(log, null, 2) + '\n');
   return entry;
 }

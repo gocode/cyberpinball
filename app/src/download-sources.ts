@@ -9,7 +9,7 @@
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un réseau d'essai.
 
 import * as fs from 'node:fs';
-import { fetchResumable, ResumableError, type DownloadReason, type DownloadTransport, type LibraryMedia, type TransportResult } from '@cyberpinball/core';
+import { fetchResumable, renameWithRetry, ResumableError, type DownloadReason, type DownloadTransport, type LibraryMedia, type TransportResult } from '@cyberpinball/core';
 import type { FetchFailure, FriendContent } from './friend-content';
 import type { SocialNet } from './social-net';
 
@@ -88,7 +88,7 @@ export function httpTransport(fetchImpl?: typeof fetch): DownloadTransport {
         if (expected && got.sha256 !== expected) return { ok: false, reason: 'sha' };
         const dest = file.dest ?? file.part.replace(/\.part$/i, '');
         fs.rmSync(dest, { force: true });
-        fs.renameSync(file.part, dest);
+        renameWithRetry(file.part, dest);
         return { ok: true, file: dest, bytes: got.received, ...(got.sha256 ? { sha256: got.sha256 } : {}) };
       } catch (error) {
         return { ok: false, ...httpReason(error) };

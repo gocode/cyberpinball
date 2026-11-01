@@ -11,6 +11,7 @@ import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as zlib from 'node:zlib';
+import { renameWithRetry } from './atomicwrite';
 import { romFamilyOf } from './romalias';
 
 /** Un fichier dans un zip, d'après son répertoire central. */
@@ -174,7 +175,7 @@ export function writeZipData(to: string, data: Buffer, mtimeMs?: number): void {
   const tmp = `${to}.tmp-${process.pid}`;
   fs.writeFileSync(tmp, data);
   if (mtimeMs !== undefined) fs.utimesSync(tmp, new Date(mtimeMs), new Date(mtimeMs));
-  fs.renameSync(tmp, to);
+  renameWithRetry(tmp, to);
 }
 
 function dosDateTime(d: Date): { time: number; date: number } {

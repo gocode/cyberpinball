@@ -13,6 +13,7 @@
 import { createPrivateKey } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { renameWithRetry, writeFileAtomic } from './atomicwrite';
 import { dmdScore } from './highscores';
 import { t } from './i18n';
 import { createPlayerKey, isPlayerPublicKey, playerFingerprint, signText, tableIdentity, verifyText, type PlayerKey } from './sharing';
@@ -295,7 +296,7 @@ export function loadSocial(dataDir: string, now = new Date()): SocialState {
       parsed = undefined;
     }
     if (parsed) return parsed;
-    fs.renameSync(file, `${file}.illisible-${now.toISOString().replace(/[:.]/g, '-')}`);
+    renameWithRetry(file, `${file}.illisible-${now.toISOString().replace(/[:.]/g, '-')}`);
   }
   const state = newSocialState(now);
   saveSocial(dataDir, state);
@@ -305,9 +306,7 @@ export function loadSocial(dataDir: string, now = new Date()): SocialState {
 export function saveSocial(dataDir: string, state: SocialState): void {
   const file = socialFile(dataDir);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(state, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, file);
+  writeFileAtomic(file, JSON.stringify(state, null, 2) + '\n');
 }
 
 // ---------------------------------------------------------------------------

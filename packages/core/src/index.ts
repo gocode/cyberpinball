@@ -11,6 +11,7 @@ export * from './store';
 export * from './configurations';
 export * from './locations';
 export * from './tables';
+export * from './atomicwrite';
 export * from './fileops';
 export * from './transfer';
 export * from './tablefiles';

@@ -36,10 +36,12 @@ import {
   relationOf,
   removeFriend,
   requestFriend,
+  saveOrWarn,
   saveSocial,
   setName,
   signProfile,
   SOCIAL_PROTOCOL,
+  socialFile,
   syncReply,
   unblockPlayer,
   verifyProfile,
@@ -213,7 +215,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   function commit(next: SocialState): void {
     if (next === state) return;
     state = next;
-    saveSocial(opts.dataDir, state);
+    // Appelé depuis le réseau (connexion fermée, message reçu) et la fin de partie : un social.json
+    // refusé par Windows est noté au journal, jamais levé ; la sauvegarde suivante réécrit tout.
+    saveOrWarn(socialFile(opts.dataDir), () => saveSocial(opts.dataDir, state));
     changed();
   }
 

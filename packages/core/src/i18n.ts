@@ -10,6 +10,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { EN_MESSAGES } from './i18n/en';
 
 export type Language = 'fr' | 'en';
@@ -139,9 +140,7 @@ export function loadLanguageSetting(dataDir: string): Language | undefined {
 export function saveLanguageSetting(dataDir: string, lang: Language): void {
   const file = languageFile(dataDir);
   fs.mkdirSync(dataDir, { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify({ language: lang }, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, file);
+  writeFileAtomic(file, JSON.stringify({ language: lang }, null, 2) + '\n');
 }
 
 /** Langue du processus : CYBERPINBALL_LANGUE, sinon le choix enregistré, sinon celle de Windows. */

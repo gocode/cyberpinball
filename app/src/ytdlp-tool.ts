@@ -27,6 +27,7 @@ import {
   type GrabKind,
   type YtDlpRelease,
   type YtDlpState,
+  renameWithRetry,
 } from '@cyberpinball/core';
 
 export interface YtDlpOptions {
@@ -120,7 +121,7 @@ export function createYtDlp(opts: YtDlpOptions) {
       throw new Error(t('yt-dlp refusé : {reason} ; fichier supprimé', { reason: refusal }));
     }
     fs.rmSync(exePath()!, { force: true });
-    fs.renameSync(part, exePath()!);
+    renameWithRetry(part, exePath()!);
     const now = new Date().toISOString();
     saveState({ version: release.tag, sha256: actual, installed: now, checked: now });
   }

@@ -19,6 +19,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { isBallCount } from './ballcount';
 import { boardKey } from './groupboard';
 import { t, tn } from './i18n';
@@ -214,8 +215,7 @@ export function loadHistory(file: string, now = new Date()): { history: GameHist
 
 export function saveHistory(file: string, history: GameHistory): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(`${file}.part`, JSON.stringify(history, null, 1) + '\n', 'utf8');
-  fs.renameSync(`${file}.part`, file);
+  writeFileAtomic(file, JSON.stringify(history, null, 1) + '\n');
 }
 
 // ---------------------------------------------------------------------------

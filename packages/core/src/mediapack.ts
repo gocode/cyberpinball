@@ -25,6 +25,7 @@ import * as path from 'node:path';
 import { Transform } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import * as zlib from 'node:zlib';
+import { renameWithRetry } from './atomicwrite';
 import { t } from './i18n';
 import { mediaKind, mediaTypeInfo, type MediaKind, type MediaType } from './medias';
 import {
@@ -465,7 +466,7 @@ export async function writeMediaPack(to: string, tables: PackTableInput[], opts:
     const bytes = offset + directory.length + 22;
     await out.truncate(bytes);
     await out.close();
-    fs.renameSync(tmp, to);
+    renameWithRetry(tmp, to);
     return { written: count, bytes, refused, manifest };
   } catch (err) {
     await out.close().catch(() => undefined);
@@ -690,7 +691,7 @@ export async function extractMediaPack(pack: MediaPack, dir: string, opts: { onl
         continue;
       }
       if (fs.existsSync(final)) fs.rmSync(tmp, { force: true });
-      else fs.renameSync(tmp, final);
+      else renameWithRetry(tmp, final);
       out.push({ item, file: final });
     }
   } finally {

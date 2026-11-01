@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { readJsonFile } from './store';
 
 /** Format .info de VPX : champs connus, les autres sont conservés tels quels. */
@@ -123,9 +124,7 @@ export function recordPlay(entry: TableEntry, startedAt: Date, seconds: number):
     LastRun: startedAt.toISOString(),
     RunTime: Math.round((user.RunTime ?? 0) + seconds),
   };
-  const tmp = `${entry.infoFile}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(info, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, entry.infoFile);
+  writeFileAtomic(entry.infoFile, JSON.stringify(info, null, 2) + '\n');
   return info;
 }
 
@@ -154,9 +153,7 @@ export function updateInfo(file: string, fields: InfoFields): TableInfoFile {
     else next[key] = typeof value === 'string' ? value.trim() : value;
   }
   info.Info = next as TableInfoFile['Info'];
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(info, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, file);
+  writeFileAtomic(file, JSON.stringify(info, null, 2) + '\n');
   return info;
 }
 

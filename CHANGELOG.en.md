@@ -7,6 +7,10 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.6
+
+- Cyber Pinball no longer closes by itself when Windows briefly refuses to save a file (antivirus, indexing): the save is retried, and if it still fails, it is noted in the log and done again at the next one. During a game with friends, the cabinet no longer restarted and no longer went offline for the others.
+
 ## 0.1.5
 
 - Game with friends: when choosing the table, the ones your friends have in the same version come first. The others stay visible, greyed out with the reason and the name of who blocks ("Other version at Bruno’s", "Bruno does not have this table"); Start on another version opens theirs in their library, to get it. No more refusal at the invitation because of a different version. With several friends, "Change table" in the room and "Another table, same players" on the results.

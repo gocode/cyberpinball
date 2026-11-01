@@ -17,6 +17,7 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { saveOrWarn, writeFileAtomic } from './atomicwrite';
 import { t } from './i18n';
 import { IniDocument } from './ini';
 import type { MediaSource, MediaType } from './medias';
@@ -293,10 +294,8 @@ export function storeFrame(cacheFile: string, media: string, record: FrameRecord
   if (!key) return;
   const cache = readFrameCache(cacheFile);
   cache.entries[key] = record;
-  fs.mkdirSync(path.dirname(cacheFile), { recursive: true });
-  const tmp = `${cacheFile}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(cache, null, 1) + '\n', 'utf8');
-  fs.renameSync(tmp, cacheFile);
+  // Appelé après une conversion asynchrone : un cache refusé est noté au journal, jamais levé.
+  saveOrWarn(cacheFile, () => writeFileAtomic(cacheFile, JSON.stringify(cache, null, 1) + '\n'));
 }
 
 /** Cadre d'une image PNG lue sur le disque (sans navigateur) ; undefined si elle n'est pas lisible ainsi. */

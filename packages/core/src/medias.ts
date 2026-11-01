@@ -9,6 +9,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { saveOrWarn, writeFileAtomic } from './atomicwrite';
 import { t } from './i18n';
 import { layoutOf } from './locations';
 import { edgeRotation, type Cabinet, type FlipperEdge, type RoleId, type Rotation } from './model';
@@ -856,9 +857,7 @@ export function saveHalfTurn(infoFile: string, type: MediaType, halfTurn: boolea
   const next: MediaMemory = { ...memory, halfTurn: turns };
   if (Object.keys(turns).length === 0) delete next.halfTurn;
   const written = setMediaMemory(info, next);
-  const tmp = `${infoFile}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(written, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, infoFile);
+  writeFileAtomic(infoFile, JSON.stringify(written, null, 2) + '\n');
   return written;
 }
 
@@ -1144,11 +1143,9 @@ export class MediaDimensionCache {
 
   save(): void {
     if (!this.file || !this.dirty) return;
-    fs.mkdirSync(path.dirname(this.file), { recursive: true });
-    const tmp = `${this.file}.tmp-${process.pid}`;
-    fs.writeFileSync(tmp, JSON.stringify(Object.fromEntries(this.entries)) + '\n', 'utf8');
-    fs.renameSync(tmp, this.file);
-    this.dirty = false;
+    const file = this.file;
+    // Refusé : noté au journal, le cache reste à écrire et la sauvegarde suivante le réessaie.
+    if (saveOrWarn(file, () => writeFileAtomic(file, JSON.stringify(Object.fromEntries(this.entries)) + '\n'))) this.dirty = false;
   }
 }
 

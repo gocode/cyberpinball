@@ -47,6 +47,7 @@ import {
   type TableContents,
   type TableEntry,
   type TableFile,
+  renameWithRetry,
 } from '@cyberpinball/core';
 import type { FriendMessage, SocialNet } from './social-net';
 
@@ -441,7 +442,7 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     job.fd = undefined;
     fs.mkdirSync(path.dirname(file), { recursive: true });
     fs.rmSync(file, { force: true });
-    fs.renameSync(job.part, file);
+    renameWithRetry(job.part, file);
     finish(req, { file, bytes: job.bytes, sha256: sha });
   }
 

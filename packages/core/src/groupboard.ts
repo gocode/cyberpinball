@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { CompoundFile } from './vpxinfo';
 import { readVpReg } from './highscores';
 import { liveRanked, liveScore, type LiveGame, type LiveTable } from './livegame';
@@ -49,8 +50,7 @@ export function loadBoards(file: string, setAside?: (where: string) => void): Gr
 
 export function saveBoards(file: string, boards: GroupBoards): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  fs.writeFileSync(`${file}.part`, JSON.stringify(boards, null, 1) + '\n', 'utf8');
-  fs.renameSync(`${file}.part`, file);
+  writeFileAtomic(file, JSON.stringify(boards, null, 1) + '\n');
 }
 
 /**

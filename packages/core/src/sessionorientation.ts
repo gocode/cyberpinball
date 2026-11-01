@@ -22,6 +22,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { fingerprintOf } from './fingerprint';
 import { t } from './i18n';
 import { edgeAfterRotation, rotatedDisplay, rotationDelta } from './layout';
@@ -355,11 +356,8 @@ export class SessionOrientation {
     try {
       if (turned.length === 0) fs.rmSync(this.options.file, { force: true });
       else {
-        fs.mkdirSync(path.dirname(this.options.file), { recursive: true });
         const body: OrientationRecordFile = { version: 1, screens: this.records, ...(problems.length && { problems }) };
-        const tmp = `${this.options.file}.tmp`;
-        fs.writeFileSync(tmp, JSON.stringify(body, null, 2) + '\n');
-        fs.renameSync(tmp, this.options.file);
+        writeFileAtomic(this.options.file, JSON.stringify(body, null, 2) + '\n');
       }
     } catch {
       // Disque plein ou en lecture seule : la session continue, la reprise après plantage manquera.

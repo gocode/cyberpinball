@@ -34,6 +34,7 @@ import { createHash, createPublicKey, createPrivateKey, sign, verify } from 'nod
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pipeline } from 'node:stream/promises';
+import { renameWithRetry } from './atomicwrite';
 import { formatNumber, language, t, type Language } from './i18n';
 import { UPDATE_PUBLIC_KEY } from './update-key';
 import { fetchResumable, ResumableError } from './resumable';
@@ -463,7 +464,7 @@ async function downloadAsset(asset: UpdateAsset, file: string, opts: DownloadOpt
         : t('Empreinte SHA-256 du fichier téléchargé incorrecte (attendu {expected}, obtenu {actual}) : fichier supprimé.', { expected: asset.sha256, actual: String(actual) }),
     );
   }
-  fs.renameSync(part, file);
+  renameWithRetry(part, file);
   return file;
 }
 
@@ -563,7 +564,7 @@ export async function swapAppDir(appDir: string, staged: string, opts: { retryMs
   }
   try {
     try {
-      fs.renameSync(staged, appDir);
+      renameWithRetry(staged, appDir);
     } catch {
       // Autre disque (EXDEV) : copie, puis effacement du paquet déplié.
       fs.cpSync(staged, appDir, { recursive: true });
@@ -571,7 +572,7 @@ export async function swapAppDir(appDir: string, staged: string, opts: { retryMs
     }
   } catch (error) {
     fs.rmSync(appDir, { recursive: true, force: true });
-    fs.renameSync(previous, appDir);
+    renameWithRetry(previous, appDir);
     throw error;
   }
   return removePreviousApp(appDir);

@@ -8,6 +8,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { b2sCacheDir, b2sImages } from './b2simage';
 import { DEFAULT_ARCADE_HOURS, normalizeArcadeHours, type ArcadeHoursSettings } from './arcadehours';
 import { DEFAULT_DMD_COLOR, normalizeDmdColor } from './dmdcolor';
@@ -605,9 +606,7 @@ export function loadMenuMediaSettings(dataDir: string): MenuMediaSettings {
 export function saveMenuMediaSettings(dataDir: string, settings: MenuMediaSettings): void {
   const file = menuMediaSettingsFile(dataDir);
   fs.mkdirSync(dataDir, { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(settings, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, file);
+  writeFileAtomic(file, JSON.stringify(settings, null, 2) + '\n');
 }
 
 /** Mode suivant, dans l'ordre de GAME_MEDIA_MODES (choix au bouton Start dans le menu système). */

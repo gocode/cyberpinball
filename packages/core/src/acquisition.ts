@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import type { Cabinet } from './model';
 import { formatDate, formatList, t, tn } from './i18n';
 import { dmdMediaType } from './medias';
@@ -635,9 +636,7 @@ export function loadWaitList(dataDir: string): WaitList {
 export function saveWaitList(dataDir: string, list: WaitList): void {
   const file = waitListFile(dataDir);
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(list, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, file);
+  writeFileAtomic(file, JSON.stringify(list, null, 2) + '\n');
 }
 
 /**

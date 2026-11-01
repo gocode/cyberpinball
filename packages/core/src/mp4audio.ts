@@ -12,6 +12,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { renameWithRetry } from './atomicwrite';
 
 /** Extensions des vidéos au format ISO BMFF. */
 export const MP4_VIDEO_EXTENSIONS = ['mp4', 'm4v', 'mov'] as const;
@@ -268,7 +269,7 @@ export function extractMp4Sound(src: string, dest: string): { ok: true; sound: M
     } finally {
       fs.closeSync(out);
     }
-    fs.renameSync(partial, dest);
+    renameWithRetry(partial, dest);
     return { ok: true, sound: found.sound, bytes: at };
   } finally {
     fs.closeSync(mp4.fd);

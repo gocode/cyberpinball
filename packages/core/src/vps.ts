@@ -10,6 +10,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { t } from './i18n';
 import { parseTableName } from './tables';
 
@@ -278,9 +279,7 @@ export async function refreshVpsDb(downloadsDir: string, opts: VpsRefreshOptions
       throw new Error(t('la base téléchargée n’a pas le format attendu'));
     }
     fs.mkdirSync(downloadsDir, { recursive: true });
-    const part = `${file}.part`;
-    fs.writeFileSync(part, text, 'utf8');
-    fs.renameSync(part, file);
+    writeFileAtomic(file, text);
     writeMeta(downloadsDir, { lastUpdated, downloadedAt: now.toISOString(), checkedAt: now.toISOString() });
     return { status: 'updated' };
   } catch (error) {

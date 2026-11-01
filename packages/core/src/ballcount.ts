@@ -18,6 +18,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 
 /** Un nombre de billes plausible. */
 export const isBallCount = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 1 && v <= 10;
@@ -180,8 +181,7 @@ async function cachedJson<T>(cacheDir: string, remote: string, local: string, ev
     const value = JSON.parse(text) as T;
     if (!value || typeof value !== 'object') return cached;
     fs.mkdirSync(cacheDir, { recursive: true });
-    fs.writeFileSync(`${file}.part`, text, 'utf8');
-    fs.renameSync(`${file}.part`, file);
+    writeFileAtomic(file, text);
     return value;
   } catch {
     return cached;

@@ -17,6 +17,7 @@
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { renameWithRetryAsync, writeFileAtomicAsync } from './atomicwrite';
 import { decodePng, drawOver, encodePng, resizeRgba } from './png';
 
 /** Éléments de <Images> qui nous servent, dans l'ordre de préférence pour le fronton. */
@@ -159,7 +160,7 @@ async function loadOrExtract(file: string, cacheDir: string): Promise<B2sImages>
         ...(result.dmd ? { dmd: { ...result.dmd, file: path.basename(result.dmd.file) } } : {}),
         ...(result.problems ? { problems: result.problems } : {}),
       };
-      await writeAtomic(manifestFile, JSON.stringify(manifest, null, 2));
+      await writeFileAtomicAsync(manifestFile, JSON.stringify(manifest, null, 2));
       await removeStaleImages(cacheDir, base, stamp);
     }
   } catch {
@@ -204,12 +205,6 @@ async function removeStaleImages(cacheDir: string, base: string, stamp: string):
       await fs.promises.rm(path.join(cacheDir, name), { force: true });
     }
   }
-}
-
-async function writeAtomic(file: string, content: string): Promise<void> {
-  const temp = `${file}${TEMP_MARK}${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
-  await fs.promises.writeFile(temp, content);
-  await fs.promises.rename(temp, file);
 }
 
 // ---------- Premier passage : où sont les valeurs ----------
@@ -472,7 +467,7 @@ async function extract(file: string, range: ValueRange, target: string, problems
       return undefined;
     }
     const final = `${target}.${EXTENSION[format]}`;
-    await fs.promises.rename(temp, final);
+    await renameWithRetryAsync(temp, final);
     return { file: final, width: size.width, height: size.height, format, element: range.element, bytes };
   } finally {
     await fs.promises.rm(temp, { force: true });
@@ -722,9 +717,7 @@ export async function b2sLitImages(file: string, cacheDir: string): Promise<B2sL
       if (!posed) continue;
       const png = encodePng(canvas);
       const target = path.join(cacheDir, `${stamp}.lit-${kind}.png`);
-      const temp = `${target}${TEMP_MARK}${process.pid}-${Math.random().toString(36).slice(2, 8)}`;
-      await fs.promises.writeFile(temp, png);
-      await fs.promises.rename(temp, target);
+      await writeFileAtomicAsync(target, png);
       result[kind] = { file: target, width: canvas.width, height: canvas.height, bytes: png.length, base: ground.element, bulbs: posed };
     }
   } catch (err) {
@@ -740,7 +733,7 @@ export async function b2sLitImages(file: string, cacheDir: string): Promise<B2sL
         if (img) manifest[kind] = { ...img, file: path.basename(img.file) };
       }
       if (result.problems) manifest.problems = result.problems;
-      await writeAtomic(manifestFile, JSON.stringify(manifest, null, 2));
+      await writeFileAtomicAsync(manifestFile, JSON.stringify(manifest, null, 2));
     }
   } catch {
     // Cache impossible à écrire : l'image composée sert quand même cette fois.

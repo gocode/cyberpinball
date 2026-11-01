@@ -19,6 +19,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { writeFileAtomic } from './atomicwrite';
 import { formatSize } from './fileops';
 import { formatDateTime, formatNumber, t, tn } from './i18n';
 import { partSize } from './resumable';
@@ -208,9 +209,7 @@ export function loadDownloadQueue(dataDir: string): DownloadQueue {
 export function saveDownloadQueue(dataDir: string, queue: DownloadQueue): void {
   fs.mkdirSync(dataDir, { recursive: true });
   const file = downloadQueueFile(dataDir);
-  const tmp = `${file}.${process.pid}.tmp`;
-  fs.writeFileSync(tmp, `${JSON.stringify({ version: 1, jobs: queue.jobs }, null, 2)}\n`, 'utf8');
-  fs.renameSync(tmp, file);
+  writeFileAtomic(file, `${JSON.stringify({ version: 1, jobs: queue.jobs }, null, 2)}\n`);
 }
 
 export const isActive = (j: DownloadJob) => j.state === 'queued' || j.state === 'running' || j.state === 'waiting' || j.state === 'paused';

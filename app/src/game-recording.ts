@@ -48,6 +48,7 @@ import {
   type Rect,
   type Rotation,
   type TableEntry,
+  renameWithRetry,
 } from '@cyberpinball/core';
 import { checkLayout } from './layout-check';
 import { createWindow, isShown, windowRect } from './offscreen';
@@ -314,7 +315,7 @@ export function armRecording(req: RecordingRequest): RecordingRun {
         continue;
       }
       const file = part.replace(/\.mp4\.part$/, `.${extOfMime(rendered.mime ?? exts.get(key) ?? 'mp4')}`);
-      fs.renameSync(part, file);
+      renameWithRetry(part, file);
       const dims = readMediaDimensions(file);
       const target = plan.targets.find((t) => t.key === key)!;
       files.push({ role: key, type: req.screens.find((s) => s.role === key)!.type, file, bytes, width: dims?.width ?? target.width, height: dims?.height ?? target.height });

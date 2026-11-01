@@ -25,6 +25,7 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { renameWithRetry, writeFileAtomic } from './atomicwrite';
 import { applyOps, samePath, type FileOp } from './fileops';
 import { formatDate, formatNumber, t } from './i18n';
 import { fetchResumable, partSize, ResumableError } from './resumable';
@@ -181,9 +182,7 @@ function readMeta(downloadsDir: string): Meta {
 
 function writeJsonAtomic(file: string, value: unknown): void {
   fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = `${file}.tmp-${process.pid}`;
-  fs.writeFileSync(tmp, JSON.stringify(value, null, 2) + '\n', 'utf8');
-  fs.renameSync(tmp, file);
+  writeFileAtomic(file, JSON.stringify(value, null, 2) + '\n');
 }
 
 /** Index en cache dans downloads, ou undefined s'il n'a jamais été téléchargé (ou est illisible). */
@@ -245,9 +244,7 @@ export async function refreshMediaDb(downloadsDir: string, opts: MediaDbRefreshO
     const text = await response.text();
     if (!parseMediaDbIndex(JSON.parse(text), source)) throw new Error(t('l’index téléchargé n’a pas le format attendu'));
     fs.mkdirSync(downloadsDir, { recursive: true });
-    const part = `${file}.part`;
-    fs.writeFileSync(part, text, 'utf8');
-    fs.renameSync(part, file);
+    writeFileAtomic(file, text);
     writeJsonAtomic(path.join(downloadsDir, META_FILE), {
       etag: response.headers.get('etag') ?? undefined,
       downloadedAt: now.toISOString(),
@@ -667,7 +664,7 @@ export async function downloadMediaDbFile(file: MediaDbFile, dest: string, opts:
       throw new MediaDbDownloadError(t('somme MD5 différente de celle de l’index : fichier abîmé ou modifié sur le dépôt'), 'md5');
     }
     fs.rmSync(dest, { force: true });
-    fs.renameSync(part, dest);
+    renameWithRetry(part, dest);
     return { size: got.received, md5: got.md5! };
   } catch (error) {
     if (error instanceof MediaDbDownloadError) throw error;

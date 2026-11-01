@@ -15,6 +15,7 @@ import {
   journeyChoices,
   journeyPosition,
   journeyRecord,
+  journeysFile,
   journeySummary,
   loadCabinet,
   loadJourneys,
@@ -23,6 +24,7 @@ import {
   rememberJourney,
   samePath,
   saveJourneys,
+  saveOrWarn,
   t,
   tn,
   tableSourceOf,
@@ -112,7 +114,7 @@ export function createJourney(ctx: JourneyContext) {
         seen: journeyRecord(mem, table.file)?.steps,
       });
       rememberJourney(mem, table.file, table.title, journey);
-      saveJourneys(host.dataDir, mem);
+      saveOrWarn(journeysFile(host.dataDir), () => saveJourneys(host.dataDir, mem));
       if (!open || !samePath(open.file, table.file)) return;
       open.journey = journey;
       ctx.show(() => build(table.file), at ?? 0, table.file);
@@ -128,7 +130,7 @@ export function createJourney(ctx: JourneyContext) {
         // Parcours terminé : il n'est plus proposé à la reprise.
         {
           const mem = memory();
-          if (forgetJourney(mem, table.file)) saveJourneys(host.dataDir, mem);
+          if (forgetJourney(mem, table.file)) saveOrWarn(journeysFile(host.dataDir), () => saveJourneys(host.dataDir, mem));
         }
         ctx.catalog.setRefresh(undefined);
         open = undefined;
