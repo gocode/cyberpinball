@@ -673,7 +673,8 @@ function downloadsPill(d) {
  * rien à qui passe devant la borne.
  */
 function friendsPill(f) {
-  const pill = el('button', 'friends-pill');
+  // En recherche (démarrage, liaison tombée) : la pastille le montre, même à zéro, point évidé.
+  const pill = el('button', `friends-pill${f.searching ? ' searching' : ''}`);
   pill.type = 'button';
   pill.title = f.title;
   pill.dataset.act = JSON.stringify({ type: 'friends' });

@@ -349,5 +349,16 @@ export const messages: Record<string, string> = {
   'Tout le monde est prêt : départ…': 'Everyone is ready: starting…',
   'Départ sans {names} dans {s} s si sa table n’est pas prête': 'Starting without {names} in {s} s if their table is not ready',
   'Attendez « Partez ! » pour appuyer sur Start': 'Wait for “Go!” before pressing Start',
+  // packages/core/src/livestart.ts : table sans relevé de l'état de jeu (départ manuel)
+  'Table sans relevé : quittez-la à la fin de votre partie ; votre score compte s’il entre à son tableau d’honneur': 'Table without live tracking: quit it when your game is over; your score counts if it enters its high score table',
+  'Départ manuel, pas de score en direct': 'Manual start, no live score',
+  'son script ne donne pas l’état de jeu (score, bille, fin de partie)': 'its script does not expose the game state (score, ball, game over)',
+  'la mémoire de sa ROM n’est pas décrite (carte absente ou incomplète)': 'its ROM memory is not described (map missing or incomplete)',
+  'il faudrait l’inspector de VPX : Menu système > Amis > Partage et réseau, règle du pare-feu de VPX': 'the VPX inspector would be needed: System menu > Friends > Sharing and network, VPX firewall rule',
+  'le relevé ne s’ajoute pas à son script': 'live tracking cannot be added to its script',
+  '{why} ; chacun appuie sur Start à « Partez ! », et son score compte s’il entre au tableau d’honneur': '{why}; everyone presses Start at “Go!”, and a score counts if it enters the high score table',
+  'Score non lu : table sans relevé, et score pas entré à son tableau d’honneur': 'Score not read: table without live tracking, and the score did not enter its high score table',
+  // app/src/live-game-menu.ts
+  'Départ manuel': 'Manual start',
   'En attente des joueurs': 'Waiting for players',
 };

@@ -25,6 +25,7 @@
 
 import { t } from './i18n';
 import { LIVE_PROTOCOL, LIVE_READY_WAIT_MS, livePlayers, type LiveGame, type LiveGoReason, type LivePlayer } from './livegame';
+import type { LiveManualReason } from './livestate';
 import type { Rect, Rotation } from './model';
 
 /** Le départ commun existe chez cette borne (LIVE_PROTOCOL 4). */
@@ -36,6 +37,44 @@ export function liveCommonStart(p: { proto?: number }): boolean {
 export const LIVE_GO_FALLBACK_MS = LIVE_READY_WAIT_MS + 30_000;
 /** « Partez ! » reste à l'écran ce temps, puis la bande de la partie prend la suite. */
 export const LIVE_GO_SHOW_MS = 4000;
+/**
+ * Connexion qui tombe et revient (essai réel du 01/11/2026) : tant que l'autre n'a pas pris en compte
+ * un message du départ commun, il repart à ce rythme. L'invité renvoie son état (« prêt », sa partie
+ * finie) quand la salle de l'hôte ne le montre pas encore ; l'hôte renvoie la salle (« partez »
+ * compris) pendant toute la partie, et tout de suite à un invité revenu en ligne.
+ */
+export const LIVE_RESEND_MS = 3000;
+/**
+ * La carte de l'attente ne reste jamais plus longtemps, même sans aucune nouvelle du réseau : au-delà
+ * du départ sans l'hôte (LIVE_GO_FALLBACK_MS) et de « Partez ! », elle n'a plus rien de vrai à dire.
+ */
+export const LIVE_WAIT_MAX_MS = LIVE_GO_FALLBACK_MS + LIVE_GO_SHOW_MS + 15_000;
+
+/**
+ * La carte de l'attente, déjà à l'écran, part-elle d'elle-même ? « Partez ! » lu (LIVE_GO_SHOW_MS
+ * depuis son apparition réelle), ou la carte là depuis LIVE_WAIT_MAX_MS. Essai réel du 01/11/2026 :
+ * « Partez ! » est resté 90 s chez l'invité (table sans relevé : aucun événement de la partie ne
+ * venait plus redessiner la carte), indéfiniment chez l'hôte. La carte ne dépend plus d'un message.
+ * `seen` : quand elle a montré l'attente, puis « Partez ! » (ms).
+ */
+export function liveWaitCardEnd(seen: { attente?: number; partez?: number }, now: number): 'partez-lu' | 'trop-long' | undefined {
+  if (seen.partez !== undefined && now - seen.partez >= LIVE_GO_SHOW_MS) return 'partez-lu';
+  const first = Math.min(seen.attente ?? Infinity, seen.partez ?? Infinity);
+  return Number.isFinite(first) && now - first >= LIVE_WAIT_MAX_MS ? 'trop-long' : undefined;
+}
+
+/**
+ * Côté invité : mon état est-il à renvoyer à l'hôte ? Sa salle (`room`, mon joueur dedans) ne montre
+ * pas encore ce que je lui ai dit (`sent`) : « prêt », ou une partie partie ou finie. Un message perdu
+ * pendant une coupure ne laisse pas l'autre attendre le délai pour rien.
+ */
+export function liveStatusBehind(room: Pick<LivePlayer, 'state' | 'ready'> | undefined, sent: { state: LivePlayer['state']; ready?: boolean }): boolean {
+  if (!room) return true;
+  const order: Partial<Record<LivePlayer['state'], number>> = { accepted: 0, loading: 1, playing: 2, done: 3, failed: 3, left: 3 };
+  const theirs = order[room.state] ?? 0;
+  const mine = order[sent.state] ?? 0;
+  return theirs < mine || (sent.ready === true && !room.ready && room.state === 'loading' && sent.state === 'loading');
+}
 
 /** Les joueurs dont on attend encore le « prêt » : la partie lancée de leur côté, la table pas encore prête. */
 export function liveAwaited(game: Pick<LiveGame, 'players'>): LivePlayer[] {
@@ -150,7 +189,7 @@ export function liveWaitView(game: LiveGame, me: string, now = new Date(), opts:
             : late.length
               ? t('Départ sans {names} : table pas prête à temps, départ dès qu’elle le sera', { names: names(late) })
               : t('Tout le monde est prêt');
-    return { mode: 'wait', title: t('Partez !'), go: true, lead: opts.manual ? t('{lead} · Appuyez sur Start', { lead }) : lead, rows };
+    return { mode: 'wait', title: t('Partez !'), go: true, lead: opts.manual ? t('{lead} · Appuyez sur Start', { lead }) : lead, ...(opts.manual ? { note: liveManualHint() } : {}), rows };
   }
   const awaited = players.filter((p) => !waitStatus(p, game).ready && !waitStatus(p, game).out);
   const others = awaited.filter((p) => p.key !== me);
@@ -167,8 +206,39 @@ export function liveWaitView(game: LiveGame, me: string, now = new Date(), opts:
   const deadline = liveGoDeadline(game);
   const left = deadline !== undefined && others.length ? Math.max(0, Math.ceil((deadline - now.getTime()) / 1000)) : undefined;
   const note = left !== undefined && !meWaiting ? t('Départ sans {names} dans {s} s si sa table n’est pas prête', { names: names(others), s: left }) : undefined;
-  const hint = opts.manual ? t('Attendez « Partez ! » pour appuyer sur Start') : undefined;
+  const hint = opts.manual ? `${t('Attendez « Partez ! » pour appuyer sur Start')} · ${liveManualHint()}` : undefined;
   return { mode: 'wait', title: t('En attente des joueurs'), go: false, lead, ...(note || hint ? { note: [note, hint].filter(Boolean).join(' · ') } : {}), rows };
+}
+
+/**
+ * Table sans relevé (départ manuel) : ni départ automatique, ni score en direct, ni fin de partie vue
+ * par Cyber Pinball. Le joueur appuie sur Start au signal, et quitte la table à la fin de sa partie ;
+ * son score compte s'il entre au tableau d'honneur de la table (lu dans le double à la fermeture).
+ */
+export function liveManualHint(): string {
+  return t('Table sans relevé : quittez-la à la fin de votre partie ; votre score compte s’il entre à son tableau d’honneur');
+}
+
+/**
+ * La marque d'une table sans relevé, avant la partie (choix de la table, salon, invitation) : ce
+ * qu'elle n'aura pas, et pourquoi. Jamais cachée : la table reste jouable, en départ manuel.
+ */
+export function liveManualLabel(reason: LiveManualReason): { text: string; detail: string } {
+  const text = t('Départ manuel, pas de score en direct');
+  const why =
+    reason === 'script'
+      ? t('son script ne donne pas l’état de jeu (score, bille, fin de partie)')
+      : reason === 'rom'
+        ? t('la mémoire de sa ROM n’est pas décrite (carte absente ou incomplète)')
+        : reason === 'inspector'
+          ? t('il faudrait l’inspector de VPX : Menu système > Amis > Partage et réseau, règle du pare-feu de VPX')
+          : t('le relevé ne s’ajoute pas à son script');
+  return { text, detail: t('{why} ; chacun appuie sur Start à « Partez ! », et son score compte s’il entre au tableau d’honneur', { why }) };
+}
+
+/** Aux résultats : pourquoi le score d'un joueur sur une table sans relevé n'est pas connu. */
+export function liveManualScoreLabel(): string {
+  return t('Score non lu : table sans relevé, et score pas entré à son tableau d’honneur');
 }
 
 // --- Sur la table ---

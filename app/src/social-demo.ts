@@ -14,6 +14,11 @@
 // parties a déjà deux soirées avec Émile (seedSimulatedFriends). =en-jeu : Bruno
 // attend que la borne soit en partie, puis l'invite (la notification pendant la partie,
 // game-notice.ts) ; l'invitation s'ouvre au retour au menu.
+// =partie-coupure : la même partie, mais la liaison de Bruno tombe pendant l'attente du départ
+// commun (LIVE_CUT_MS, dès que la borne lance sa table) : le « prêt » de la borne se perd, comme
+// la salle de Bruno ; la borne le renvoie, et le départ se fait sans attendre le délai (essai réel du
+// 01/11/2026). =partie-sans-releve : la même partie sur une table sans relevé (départ manuel, pas
+// de score en direct) : marquée dans l'invitation, « Partez ! » qui part seul, un score inconnu.
 // CYBERPINBALL_RESEAU_DEMO=coupure (gestionnaire de téléchargements, docs\demo-gestionnaire-telechargements.ps1) :
 // la table que la borne n'a pas pèse 24 Mo, Bruno l'envoie à débit bridé et se déconnecte en
 // plein envoi ; =retour : au démarrage suivant de Cyber Pinball, Bruno (même borne, même clé)
@@ -38,8 +43,13 @@ import { createLiveGames, createTableVersions, type LiveGames } from './live-gam
 import { createSocialNet, type SocialNet } from './social-net';
 
 export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
-  return ['1', 'partie', 'en-jeu', 'coupure', 'retour', 'notifications'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
+  return ['1', ...LIVE_DEMOS, 'coupure', 'retour', 'notifications'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '');
 }
+
+/** Les démonstrations de la partie en direct : Bruno invite la borne (`en-jeu` : pendant qu'elle joue). */
+const LIVE_DEMOS = ['partie', 'en-jeu', 'partie-coupure', 'partie-sans-releve'];
+/** Partie en direct, démonstration de la coupure : la liaison de Bruno tombe ce temps, dès que la borne lance sa table ; assez pour couvrir son « prêt » (table chargée quelques secondes après). */
+const LIVE_CUT_MS = 12_000;
 
 /**
  * Tables des bornes fictives, toutes inventées : Bruno joue à une table que la borne a aussi
@@ -110,7 +120,7 @@ export function seedSimulatedFriends(dataDir: string, now = new Date(), env: Nod
   const others = env.CYBERPINBALL_RESEAU_DEMO === 'notifications' ? ['David', 'Fanny'].map((name) => setName(newSocialState(now), name)!) : [];
   const since = state.friends[0]!.since;
   saveSocial(dataDir, { ...state, friends: [...state.friends, ...others.map((o) => ({ key: o.key.publicKey, name: o.name, since, lastSeen: threeHours.toISOString(), events: [] }))] });
-  if (env.CYBERPINBALL_RESEAU_DEMO === 'partie') seedHistory(dataDir, me.key.publicKey, emile.key.publicKey, now);
+  if (['partie', 'partie-coupure', 'partie-sans-releve'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '')) seedHistory(dataDir, me.key.publicKey, emile.key.publicKey, now);
   if (env.CYBERPINBALL_RESEAU_DEMO === 'notifications') {
     for (const friend of [emile, ...others]) {
       const dir = path.join(dataDir, 'reseau-simule', friend.name);
@@ -289,13 +299,37 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   }
   let games: LiveGames | undefined;
   let starting = false;
-  if (mode === 'partie' || mode === 'en-jeu') {
+  const liveDemo = LIVE_DEMOS.includes(mode ?? '');
+  const manual = mode === 'partie-sans-releve';
+  // Coupure pendant l'attente : rien ne passe, dans un sens ni dans l'autre, et la borne de Bruno ne voit plus la sienne.
+  let cutUntil = 0;
+  const cutNow = () => Date.now() < cutUntil;
+  const liveNet: Pick<SocialNet, 'state' | 'online' | 'send' | 'onMessage'> = {
+    state: () => bruno.state(),
+    online: (key) => !cutNow() && bruno.online(key),
+    send: (key, message) => !cutNow() && bruno.send(key, message),
+    onMessage: (listener) =>
+      bruno.onMessage((key, message) => {
+        if (cutNow()) return;
+        // La borne lance sa table : la liaison tombe, son « prêt » se perdra (une fois).
+        const m = message as { t?: string; state?: string; ready?: boolean };
+        if (mode === 'partie-coupure' && !cutUntil && m.t === 'game-status' && m.state === 'loading' && !m.ready) {
+          cutUntil = Date.now() + LIVE_CUT_MS;
+          log(`Réseau simulé : liaison de Bruno coupée ${LIVE_CUT_MS / 1000} s pendant l'attente du départ.`); // i18n-ignore : journal
+          timers.push(setTimeout(() => log('Réseau simulé : liaison de Bruno rétablie.'), LIVE_CUT_MS)); // i18n-ignore : journal
+        }
+        listener(key, message);
+      }),
+  };
+  if (liveDemo) {
     games = createLiveGames({
-      net: bruno,
+      net: liveNet,
       dataDir: brunoDir,
       tables: brunoTables,
       // Ses réglages partent vers la borne, comme ceux d'une vraie borne (hostsettings.ts).
       settingsOf: (table) => readHostSettings({ folder: table.folder, roms: [] }),
+      // Sans relevé : sa table le dit dans l'invitation (départ manuel, pas de score en direct).
+      ...(manual ? { manualOf: async () => 'script' as const } : {}),
       play: async (_table, playing, _settings, _board, progress, gate) => {
         playing();
         // Départ commun : sa table charge, et n'est prête qu'après celle de la borne (la borne l'attend, et le dit), puis il attend « partez ».
@@ -303,12 +337,12 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
         const guestReady = () => games?.current()?.players.some((p) => !p.host && p.ready) ?? true;
         while (!guestReady() && Date.now() - loading < 60_000) await new Promise((r) => setTimeout(r, 100));
         await new Promise((r) => setTimeout(r, Math.max(BRUNO_LATE_MS, BRUNO_LOADING_MS - (Date.now() - loading))));
-        gate?.ready();
+        gate?.ready({ manual });
         while (gate && !gate.go()) await new Promise((r) => setTimeout(r, 250));
-        // Sa progression, comme le relevé d'une vraie borne : le score monte, bille après bille.
+        // Sa progression, comme le relevé d'une vraie borne : le score monte, bille après bille (sans relevé : rien, sa partie dure autant).
         for (let i = 1; i <= 8; i++) {
           await new Promise((r) => setTimeout(r, 500));
-          progress?.({ score: i * 355_168_765, ball: Math.min(3, 1 + Math.floor(i / 3)), balls: 3, players: 1 });
+          if (!manual) progress?.({ score: i * 355_168_765, ball: Math.min(3, 1 + Math.floor(i / 3)), balls: 3, players: 1 });
         }
         return { ok: true, seconds: 254, records: [{ score: 2_841_350_120, rank: 1, initials: 'BRU' }] };
       },
@@ -326,12 +360,12 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   // Bruno devient ami (la démonstration accepte à la place du joueur), puis joue. Déjà ami (retour) : sa bibliothèque tout de suite.
   const accept = setInterval(() => {
     if (main.state().friends.some((f) => f.key === bruno.state().key.publicKey)) {
-      root ??= brunoRoot(brunoDir, mine(), cut, mode === 'partie' || mode === 'en-jeu');
+      root ??= brunoRoot(brunoDir, mine(), cut, liveDemo);
       clearInterval(accept);
       return;
     }
     if (main.state().incoming.some((r) => r.key === bruno.state().key.publicKey)) {
-      root ??= brunoRoot(brunoDir, mine(), cut, mode === 'partie' || mode === 'en-jeu');
+      root ??= brunoRoot(brunoDir, mine(), cut, liveDemo);
       main.accept(bruno.state().key.publicKey);
       clearInterval(accept);
       // Notifications : Bruno suit l'horaire de la démonstration (NOTIFICATIONS_SCRIPT).
@@ -343,12 +377,16 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       // Partie en direct : l'invitation, une fois la borne reliée et le menu affiché ; en-jeu, une
       // fois la borne en partie (sa présence le dit).
       if (games) {
-        const invite = async () => {
+        // La borne pas encore vue en ligne chez Bruno (liaison qui se refait) : l'invitation ne part pas ;
+        // il réessaie, comme un joueur, toutes les deux secondes, une minute au plus, et le journal le dit.
+        const invite = async (tries = 0) => {
           bruno.setPresence({ status: 'menu', since: new Date().toISOString() });
           const shared = brunoTables()[0];
           if (!shared) return;
-          await games!.create(shared);
-          games!.invite(me.key, me.name);
+          if (!games!.current()) await games!.create(shared);
+          if (games!.invite(me.key, me.name) || tries >= 30) return;
+          if (!tries) log('Réseau simulé : invitation de Bruno pas partie (borne pas encore en ligne chez lui), nouvel essai toutes les 2 s.'); // i18n-ignore : journal
+          timers.push(setTimeout(() => void invite(tries + 1), 2000));
         };
         if (mode !== 'en-jeu') timers.push(setTimeout(invite, 6000));
         else {

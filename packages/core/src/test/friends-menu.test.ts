@@ -56,6 +56,7 @@ function fakeGames() {
     board: () => [] as { player: string; name: string; score: number; at: string; game: string }[],
     history: () => [],
     table: () => undefined,
+    manualOf: async () => undefined,
     waitView: () => undefined,
     invites: () => (games.pending ? [games.pending] : []),
     create: async () => games.game!,

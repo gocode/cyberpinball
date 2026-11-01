@@ -104,7 +104,30 @@ export type LiveHook =
       /** Les valeurs que le relevé lit par l'inspector de VPX (sa carte est à poser dans le double) ; vide sans inspector. */
       inspector: InspectorState[];
     }
-  | { ok: false; reason: string };
+  | { ok: false; reason: string; code: LiveManualReason };
+
+/**
+ * Pourquoi une table n'a pas de relevé (départ manuel, pas de score en direct) : son script ne donne
+ * pas l'état de jeu ; la carte de sa ROM manque ou ne le décrit pas ; il faudrait l'inspector de VPX ;
+ * autre chose (script protégé, pas de _KeyDown, aucun élément libre…).
+ */
+export type LiveManualReason = 'script' | 'rom' | 'inspector' | 'other';
+
+/**
+ * Avant la partie : la table aura-t-elle un relevé ? Le même calcul que le double (liveStateHook),
+ * sur le script joué et les éléments de la table ; `rom` : la carte de la ROM qu'elle charge, si
+ * elle en a une en cache ; `roms` : elle charge une ROM (sans carte : « rom ») ; `inspector` : la
+ * règle du pare-feu qui permet l'inspector de VPX est posée. Essai réel du 01/11/2026 (2001 - A Space
+ * Odyssey) : rien ne disait avant la partie qu'elle se jouerait sans départ ni score en direct.
+ */
+export function liveStateSupport(script: string | undefined, elements: readonly { type: number; name: string }[], opts: { rom?: RomMemory; roms?: number; inspector?: boolean } = {}): { live: true } | { live: false; reason: LiveManualReason; detail: string } {
+  if (!script) return { live: false, reason: 'other', detail: 'script illisible ou protégé' }; // i18n-ignore : journal
+  const hook = liveStateHook(script, elements, 'C:\cyberpinball-etat.txt', opts.rom, opts.inspector ? { port: 50_000 } : undefined, 'C:\cyberpinball-partez.txt');
+  if (hook.ok) return { live: true };
+  // Une table à ROM sans carte en cache : c'est la carte qui manque, pas le script.
+  const reason = hook.code === 'script' && opts.roms && !opts.rom ? 'rom' : hook.code;
+  return { live: false, reason, detail: hook.reason };
+}
 
 // ---------------------------------------------------------------------------
 // La mémoire d'une ROM
@@ -234,20 +257,20 @@ export function liveStateHook(script: string, elements: readonly { type: number;
   const original = NEEDED.every((re) => re.test(script));
   let plan: RomLivePlan | undefined;
   if (!original) {
-    if (!rom) return { ok: false, reason: 'script hors du socle commun (Score, CurrentPlayer, BallsRemaining, bGameInPlay)' }; // i18n-ignore : journal
-    if (!/\bController\b/.test(script) || !/\bvpmKeyDown\s*\(/i.test(script)) return { ok: false, reason: 'table à ROM sans Controller ni vpmKeyDown' }; // i18n-ignore : journal
+    if (!rom) return { ok: false, reason: 'script hors du socle commun (Score, CurrentPlayer, BallsRemaining, bGameInPlay)', code: 'script' }; // i18n-ignore : journal
+    if (!/\bController\b/.test(script) || !/\bvpmKeyDown\s*\(/i.test(script)) return { ok: false, reason: 'table à ROM sans Controller ni vpmKeyDown', code: 'script' }; // i18n-ignore : journal
     let planned = romLivePlan(rom);
     if (!planned.ok && inspector) planned = romLivePlan(rom, { inspector: true });
-    else if (!planned.ok && romLivePlan(rom, { inspector: true }).ok) return { ok: false, reason: `carte de la ROM : ${planned.reason} ; l'inspector de VPX les lirait, s'il pouvait être activé` }; // i18n-ignore : journal
-    if (!planned.ok) return { ok: false, reason: `carte de la ROM : ${planned.reason}` }; // i18n-ignore : journal
+    else if (!planned.ok && romLivePlan(rom, { inspector: true }).ok) return { ok: false, reason: `carte de la ROM : ${planned.reason} ; l'inspector de VPX les lirait, s'il pouvait être activé`, code: 'inspector' }; // i18n-ignore : journal
+    if (!planned.ok) return { ok: false, reason: `carte de la ROM : ${planned.reason}`, code: 'rom' }; // i18n-ignore : journal
     plan = planned.plan;
-    if (plan.states.length && !(inspector && Number.isInteger(inspector.port) && inspector.port >= 1024 && inspector.port <= 65535)) return { ok: false, reason: 'port de l’inspector invalide' }; // i18n-ignore : journal
+    if (plan.states.length && !(inspector && Number.isInteger(inspector.port) && inspector.port >= 1024 && inspector.port <= 65535)) return { ok: false, reason: 'port de l’inspector invalide', code: 'other' }; // i18n-ignore : journal
   }
   const down = /^([ \t]*)Sub\s+(\w+)_KeyDown\s*\(\s*(?:ByVal\s+)?(\w+)\s*\)/im.exec(script);
-  if (!down) return { ok: false, reason: 'pas de procédure _KeyDown' }; // i18n-ignore : journal
+  if (!down) return { ok: false, reason: 'pas de procédure _KeyDown', code: 'other' }; // i18n-ignore : journal
   const table = down[2]!;
   const up = new RegExp(`^([ \\t]*)Sub\\s+${table}_KeyUp\\s*\\(\\s*(?:ByVal\\s+)?(\\w+)\\s*\\)`, 'im').exec(script);
-  if (/\bCyberPinball_OrigKeyDown\b/.test(script)) return { ok: false, reason: 'script déjà complété' }; // i18n-ignore : journal
+  if (/\bCyberPinball_OrigKeyDown\b/.test(script)) return { ok: false, reason: 'script déjà complété', code: 'other' }; // i18n-ignore : journal
   // Un élément dont le nom n'apparaît nulle part dans le script : son minuteur est libre.
   // Un nom compte aussi par ses événements (« Wall1_Hit », « PinCab_Floor_Timer ») : chaque préfixe avant un « _ ».
   const words = new Set<string>();
@@ -256,8 +279,8 @@ export function liveStateHook(script: string, elements: readonly { type: number;
     for (let i = word.indexOf('_'); i > 0; i = word.indexOf('_', i + 1)) words.add(word.slice(0, i));
   }
   const host = elements.find((e) => TIMER_HOSTS.includes(e.type) && /^[A-Za-z]\w*$/.test(e.name) && !words.has(e.name.toLowerCase()));
-  if (!host) return { ok: false, reason: 'aucun élément libre pour le minuteur' }; // i18n-ignore : journal
-  if ([stateFile, goFile ?? ''].some((f) => /"/.test(f) || /[\r\n]/.test(f))) return { ok: false, reason: 'chemin du relevé invalide' }; // i18n-ignore : journal
+  if (!host) return { ok: false, reason: 'aucun élément libre pour le minuteur', code: 'other' }; // i18n-ignore : journal
+  if ([stateFile, goFile ?? ''].some((f) => /"/.test(f) || /[\r\n]/.test(f))) return { ok: false, reason: 'chemin du relevé invalide', code: 'other' }; // i18n-ignore : journal
   let text = script.replace(down[0], `${down[1]}Sub CyberPinball_OrigKeyDown(ByVal ${down[3]})`);
   if (up) text = text.replace(up[0], `${up[1]}Sub CyberPinball_OrigKeyUp(ByVal ${up[2]})`);
   const eol = /\r\n/.test(script) ? '\r\n' : '\n';

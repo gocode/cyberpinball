@@ -35,6 +35,7 @@ import { isSettingsRel, SETTINGS_MAX_BYTES, SETTINGS_MAX_FILES } from './hostset
 import { t, tn } from './i18n';
 import { normalizeName } from './social';
 import { isPlayerPublicKey, parseTableIdentity, sameTable, type TableIdentity } from './sharing';
+import type { LiveManualReason } from './livestate';
 
 /**
  * Ce que sait faire la borne dans une partie entre amis, annoncé à l'invitation et à la réponse
@@ -92,6 +93,11 @@ export interface LiveTable {
   script?: string;
   /** Billes par partie de celui qui invite (ballcount.ts), s'il le sait. */
   balls?: number;
+  /**
+   * Sa table n'aura pas de relevé de l'état de jeu chez celui qui invite (liveStateSupport) : départ
+   * manuel, pas de score en direct, et pourquoi. Dit à l'invitation, avant la partie.
+   */
+  manual?: LiveManualReason;
 }
 
 /** Ce que l'invité a de cette table. */
@@ -169,6 +175,11 @@ export interface LivePlayer {
   multi?: true;
   /** Sa table est chargée et attend le départ commun (livestart.ts). */
   ready?: true;
+  /**
+   * Sa table n'a pas de relevé de l'état de jeu (départ manuel) : pas de score en direct ; son score
+   * n'est connu que s'il entre au tableau d'honneur de la table (records).
+   */
+  manual?: true;
 }
 
 /**
@@ -220,11 +231,11 @@ export type LiveMessage =
    * Départ commun (livestart.ts) : `readyFor`, depuis combien de millisecondes le premier joueur est
    * prêt ; `go`, « partez » est donné, et ceux qui n'étaient pas prêts.
    */
-  | { t: 'game-room'; game: string; phase: LivePhase; players: LivePlayer[]; readyFor?: number; go?: { why: 'all-ready' | 'timeout'; late: string[] } }
+  | { t: 'game-room'; game: string; phase: LivePhase; players: LivePlayer[]; readyFor?: number; go?: { why: 'all-ready' | 'timeout'; late: string[] }; startIn?: number }
   /** Départ dans `in` millisecondes, à compter de la réception. */
   | { t: 'game-start'; game: string; in: number }
-  /** `ready` (avec « loading ») : sa table est chargée, elle attend « partez ». */
-  | { t: 'game-status'; game: string; state: LiveStatus; seconds?: number; records?: LiveRecord[]; score?: number; ball?: number; balls?: number; multi?: true; ready?: true }
+  /** `ready` (avec « loading ») : sa table est chargée, elle attend « partez » ; `manual` : sa table n'a pas de relevé. */
+  | { t: 'game-status'; game: string; state: LiveStatus; seconds?: number; records?: LiveRecord[]; score?: number; ball?: number; balls?: number; multi?: true; ready?: true; manual?: true }
   | { t: 'game-cancel'; game: string }
   /** Réglages de l'hôte : chaque fichier, son empreinte et sa taille, ou absent (pas de sha). */
   | { t: 'game-settings'; game: string; files: { rel: string; sha?: string; bytes?: number }[] }
@@ -241,6 +252,7 @@ const isPrint = (v: unknown): v is string => typeof v === 'string' && /^[0-9a-f]
 const STATES: readonly LivePlayerState[] = ['invited', 'accepted', 'declined', 'busy', 'expired', 'left', 'loading', 'playing', 'done', 'failed'];
 const PHASES: readonly LivePhase[] = ['gathering', 'countdown', 'playing', 'finished', 'cancelled'];
 const MATCHES: readonly LiveTableMatch[] = ['same', 'other-version', 'missing'];
+const MANUAL: readonly LiveManualReason[] = ['script', 'rom', 'inspector', 'other'];
 const isIso = (v: unknown): v is string => typeof v === 'string' && v.length <= 40 && !Number.isNaN(Date.parse(v));
 
 function parseLiveTable(raw: unknown): LiveTable | undefined {
@@ -257,6 +269,7 @@ function parseLiveTable(raw: unknown): LiveTable | undefined {
     ...(bytes ? { bytes } : {}),
     ...(isPrint(r.script) ? { script: r.script } : {}),
     ...(isBallCount(r.balls) ? { balls: r.balls } : {}),
+    ...(MANUAL.includes(r.manual as LiveManualReason) ? { manual: r.manual as LiveManualReason } : {}),
   };
 }
 
@@ -318,6 +331,7 @@ function parsePlayer(raw: unknown): LivePlayer | undefined {
     ...(s !== undefined ? { seconds: s } : {}),
     ...(records?.length ? { records } : {}),
     ...(r.ready === true ? { ready: true as const } : {}),
+    ...(r.manual === true ? { manual: true as const } : {}),
   };
 }
 
@@ -349,7 +363,8 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
       const go = m.go && typeof m.go === 'object' ? (m.go as Record<string, unknown>) : undefined;
       const why = go?.why === 'all-ready' || go?.why === 'timeout' ? go.why : undefined;
       const late = Array.isArray(go?.late) ? go.late.filter((k): k is string => typeof k === 'string' && players.some((p) => p.key === k)).slice(0, LIVE_MAX_PLAYERS) : [];
-      return { t: 'game-room', game: m.game, phase: m.phase as LivePhase, players, ...(readyFor !== undefined ? { readyFor } : {}), ...(why ? { go: { why, late } } : {}) };
+      const startIn = typeof m.startIn === 'number' && Number.isFinite(m.startIn) && m.startIn >= 0 && m.startIn <= 60_000 ? Math.round(m.startIn) : undefined;
+      return { t: 'game-room', game: m.game, phase: m.phase as LivePhase, players, ...(readyFor !== undefined ? { readyFor } : {}), ...(why ? { go: { why, late } } : {}), ...(startIn !== undefined ? { startIn } : {}) };
     }
     case 'game-start':
       return isId(m.game) && typeof m.in === 'number' && m.in >= 0 && m.in <= 60_000 ? { t: 'game-start', game: m.game, in: m.in } : undefined;
@@ -358,7 +373,7 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
       const s = seconds(m.seconds);
       const records = parseRecords(m.records);
       const progress = parseProgress(m);
-      return { t: 'game-status', game: m.game, state: m.state as LiveStatus, ...(s !== undefined ? { seconds: s } : {}), ...(records?.length ? { records } : {}), ...progress, ...(m.ready === true ? { ready: true as const } : {}) };
+      return { t: 'game-status', game: m.game, state: m.state as LiveStatus, ...(s !== undefined ? { seconds: s } : {}), ...(records?.length ? { records } : {}), ...progress, ...(m.ready === true ? { ready: true as const } : {}), ...(m.manual === true ? { manual: true as const } : {}) };
     }
     case 'game-cancel':
       return isId(m.game) ? { t: 'game-cancel', game: m.game } : undefined;
@@ -496,7 +511,7 @@ export function livePlayers(game: Pick<LiveGame, 'players'>): LivePlayer[] {
 export function gameStatus(
   game: LiveGame,
   key: string,
-  status: { state: LiveStatus; seconds?: number; records?: LiveRecord[]; score?: number; ball?: number; balls?: number; multi?: true; ready?: true },
+  status: { state: LiveStatus; seconds?: number; records?: LiveRecord[]; score?: number; ball?: number; balls?: number; multi?: true; ready?: true; manual?: true },
   now = new Date(),
 ): LiveGame {
   const p = game.players.find((x) => x.key === key);
@@ -506,9 +521,11 @@ export function gameStatus(
     return game;
   }
   if (p.state === 'done' || p.state === 'failed') return game;
+  // Un état renvoyé après une coupure (live-game.ts) ne fait pas reculer : déjà parti, il le reste.
+  const state = status.state === 'loading' && p.state === 'playing' ? 'playing' : status.state;
   let next = setPlayer(game, key, (x) => ({
     ...x,
-    state: status.state,
+    state,
     ...(status.seconds !== undefined ? { seconds: status.seconds } : {}),
     ...(status.records?.length ? { records: status.records } : {}),
     ...(status.score !== undefined ? { score: status.score } : {}),
@@ -516,6 +533,7 @@ export function gameStatus(
     ...(status.balls ? { balls: status.balls } : {}),
     ...(status.multi || x.multi ? { multi: true as const } : {}),
     ...(status.ready || x.ready ? { ready: true as const } : {}),
+    ...(status.manual || x.manual ? { manual: true as const } : {}),
   }));
   if (next.phase === 'countdown' && (status.state === 'loading' || status.state === 'playing')) next = { ...next, phase: 'playing' };
   // Le premier prêt : le délai des autres part de là (départ commun, livestart.ts).
@@ -537,18 +555,27 @@ export function closeIfDone(game: LiveGame, now = new Date()): LiveGame {
 export function roomMessage(game: LiveGame, now = new Date()): Extract<LiveMessage, { t: 'game-room' }> {
   const go = game.goAt && (game.goWhy === 'all-ready' || game.goWhy === 'timeout') ? { go: { why: game.goWhy, late: game.goLate ?? [] } } : {};
   const readyFor = game.firstReadyAt && !game.goAt ? { readyFor: Math.max(0, now.getTime() - Date.parse(game.firstReadyAt)) } : {};
-  return { t: 'game-room', game: game.id, phase: game.phase, players: game.players.map(({ invitedAt: _invitedAt, ...p }) => p), ...readyFor, ...go };
+  // Le temps avant le lancement : un invité dont « game-start » s'est perdu part avec la salle.
+  const startIn = game.phase === 'countdown' && game.startAt ? { startIn: Math.max(0, Date.parse(game.startAt) - now.getTime()) } : {};
+  return { t: 'game-room', game: game.id, phase: game.phase, players: game.players.map(({ invitedAt: _invitedAt, ...p }) => p), ...readyFor, ...go, ...startIn };
 }
 
 /** Côté invité : la salle reçue de celui qui invite remplace la sienne ; « partez » s'y lit, une fois. */
-export function applyRoom(game: LiveGame, room: Extract<LiveMessage, { t: 'game-room' }>, now = new Date()): LiveGame {
+export function applyRoom(game: LiveGame, room: Extract<LiveMessage, { t: 'game-room' }>, now = new Date(), me?: string): LiveGame {
   if (room.game !== game.id || game.phase === 'cancelled') return game;
-  // Le départ se compte à la réception de game-start, pas à la salle.
-  const phase = room.phase === 'countdown' && game.phase === 'gathering' ? 'gathering' : room.phase;
+  // Le départ se compte à la réception de game-start ; perdu (connexion coupée, essai réel du
+  // 01/11/2026), la salle d'une partie lancée le remplace, si j'en suis (`me` accepté chez l'hôte) :
+  // compte à rebours de ce qu'il en reste (`startIn`), tout de suite si elle est déjà partie.
+  // live-game.ts lance alors la table.
+  const mine = me ? room.players.find((p) => p.key === me) : undefined;
+  const inGame = !!mine && (mine.state === 'accepted' || mine.state === 'loading' || mine.state === 'playing');
+  const launched = game.phase === 'gathering' && (room.phase === 'countdown' || room.phase === 'playing') && inGame;
+  const phase = launched ? 'countdown' : room.phase === 'countdown' && game.phase === 'gathering' ? 'gathering' : room.phase;
+  const start = launched ? { startAt: new Date(now.getTime() + (room.phase === 'countdown' ? (room.startIn ?? 0) : 0)).toISOString() } : {};
   // Les heures, à l'horloge de cette borne : celle de l'hôte peut avancer ou retarder.
   const ready = room.readyFor !== undefined && !game.goAt ? { firstReadyAt: new Date(now.getTime() - room.readyFor).toISOString() } : {};
   const go = room.go && !game.goAt ? { goAt: now.toISOString(), goWhy: room.go.why, goLate: room.go.late } : {};
-  return { ...game, phase, players: room.players, ...ready, ...go };
+  return { ...game, phase, players: room.players, ...start, ...ready, ...go };
 }
 
 /** Côté invité : la partie telle qu'il la suit après avoir accepté. */

@@ -594,7 +594,8 @@ function galleryDetail(m, cursor) {
  * attente, en pause, fini). Le mot de l'état est dans la ligne : la couleur ne le dit jamais seule.
  */
 function rowProgress(p) {
-  const bar = libEl('div', `lib-row-progress tone-${p.tone ?? 'info'}${typeof p.value === 'number' ? '' : ' unknown'}`);
+  // busy : une recherche en cours (Amis : « Recherche des amis… ») ; une bande qui va et vient.
+  const bar = libEl('div', `lib-row-progress tone-${p.tone ?? 'info'}${typeof p.value === 'number' ? '' : p.busy ? ' busy' : ' unknown'}`);
   const fill = libEl('span', '');
   if (typeof p.value === 'number') fill.style.width = `${Math.round(Math.max(0, Math.min(1, p.value)) * 1000) / 10}%`;
   bar.append(fill);

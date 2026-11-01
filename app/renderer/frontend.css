@@ -1338,6 +1338,33 @@ body.mouse .friends-pill:hover {
   box-shadow: 0 0 0 0.19cqmin var(--surface-raised);
 }
 
+/* Liste des amis en cours de recherche : point évidé qui respire, compte en retrait. */
+.friends-pill.searching .friends-pill-dot {
+  background: var(--surface-raised);
+  border: 0.19cqmin solid var(--meta);
+  box-sizing: border-box;
+  animation: friends-pill-searching 1.4s ease-in-out infinite alternate;
+}
+
+.friends-pill.searching .friends-pill-count {
+  color: var(--ink-faint);
+}
+
+@keyframes friends-pill-searching {
+  from {
+    opacity: 0.35;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .friends-pill.searching .friends-pill-dot {
+    animation: none;
+  }
+}
+
 /*
  * Notification (revue de Codex, 29/10/2026) : une seule à la fois, opaque (surface pleine, lisible
  * sur n'importe quel média), 620 px de large au plus, filet de 4 px, rayon de 8 px, 16 px de

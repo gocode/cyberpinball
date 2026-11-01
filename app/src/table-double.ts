@@ -19,6 +19,7 @@ import {
   injectGroupRecords,
   inspectorMemMapFiles,
   liveStateHook,
+  liveStateSupport,
   loadedRoms,
   parseLiveState,
   readVpxElements,
@@ -35,6 +36,7 @@ import {
   usesPinmameCode,
   type GroupRecord,
   type HostSetting,
+  type LiveManualReason,
   type TableEntry,
 } from '@cyberpinball/core';
 
@@ -78,6 +80,8 @@ export interface TableDouble {
 
 export function createTableDoubles(opts: TableDoublesOptions) {
   const log = (line: string) => opts.log?.(line);
+  /** Le relevé prévu de chaque table (manualOf), par fichier, taille et date. */
+  const support = new Map<string, LiveManualReason | undefined>();
   const partiesDir = () => {
     const root = opts.root();
     return root ? path.join(root, 'parties') : undefined;
@@ -277,6 +281,46 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           },
         },
       };
+    },
+    /**
+     * Avant la partie : cette table aura-t-elle un relevé dans son double ? Le même calcul que
+     * start() (le .vbs posé à côté, sinon le script du .vpx ; la carte de sa ROM en cache) ;
+     * `inspector` : la règle du pare-feu qui permet l'inspector de VPX est posée. undefined : elle en
+     * aura un ; sinon pourquoi pas (départ manuel, pas de score en direct). Gardé par fichier, taille
+     * et date du .vpx et du .vbs.
+     */
+    manualOf(table: TableEntry, inspector: boolean): LiveManualReason | undefined {
+      const base = path.basename(table.file, path.extname(table.file)).toLowerCase();
+      let vbs: string | undefined;
+      try {
+        const name = fs.readdirSync(table.folder).find((f) => f.toLowerCase() === `${base}.vbs`);
+        vbs = name ? path.join(table.folder, name) : undefined;
+      } catch {
+        vbs = undefined;
+      }
+      const stamp = (file: string | undefined) => {
+        try {
+          const s = file ? fs.statSync(file) : undefined;
+          return s ? `${s.size}|${Math.round(s.mtimeMs)}` : '-';
+        } catch {
+          return '-';
+        }
+      };
+      const key = `${table.file.toLowerCase()}|${stamp(table.file)}|${stamp(vbs)}|${inspector}`;
+      if (support.has(key)) return support.get(key);
+      const roms = loadedRoms(table.folder, opts.romsOf?.(table) ?? []);
+      const memory = opts.memoryCacheDir ? roms.map((rom) => cachedRomMemory(opts.memoryCacheDir!, rom)).find(Boolean) : undefined;
+      let script: string | undefined;
+      try {
+        script = vbs ? fs.readFileSync(vbs, 'latin1') : readVpxScript(table.file);
+      } catch {
+        script = undefined;
+      }
+      const found = liveStateSupport(script, script ? readVpxElements(table.file) : [], { ...(memory ? { rom: memory } : {}), roms: roms.length, inspector });
+      const reason = found.live ? undefined : found.reason;
+      support.set(key, reason);
+      if (!found.live) log(`Partie entre amis (${table.id}) : pas de relevé prévu de l'état de jeu (${found.detail}) : départ manuel, pas de score en direct.`); // i18n-ignore : journal
+      return reason;
     },
     /** Au démarrage : les doubles d'une partie interrompue (plantage) s'en vont. */
     sweep(): void {

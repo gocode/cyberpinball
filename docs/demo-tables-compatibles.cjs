@@ -121,6 +121,7 @@ async function scenario(sc, box, report, log) {
       state: () => ({ key: { publicKey: 'moi' }, name: 'Alice', friends: Object.entries(FRIENDS).map(([key, f]) => ({ key, name: f.name })) }),
       online: () => true,
       presenceOf: () => ({ status: 'menu', since: new Date().toISOString() }),
+      listSync: () => 'settled',
     },
     // Rien ne part : la démonstration s'arrête au choix de la table.
     games: {
@@ -130,6 +131,8 @@ async function scenario(sc, box, report, log) {
       table: () => undefined,
       versionOf: async (table) => ({ print: P(byTitle.get(table.title)?.print ?? 'z') }),
       bytesOf: () => undefined,
+      // Toutes avec un relevé : la démonstration ne montre que l'ordre des tables.
+      manualOf: async () => undefined,
       waitView: () => undefined,
       invites: () => [],
       create: async () => {

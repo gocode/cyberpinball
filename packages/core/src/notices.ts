@@ -22,6 +22,7 @@ import { t, tn, formatNumber } from './i18n';
 import type { IconName } from './icons';
 import type { DownloadJob } from './downloadqueue';
 import type { SocialEvent, SocialState, Presence } from './social';
+import type { FriendsListSync } from './friendpresence';
 
 export type NoticeKind =
   | 'live-finished'
@@ -564,8 +565,14 @@ export function downloadNotices(prev: DownloadSnapshot | undefined, jobs: readon
 }
 
 /** Pastille des amis en ligne ; undefined quand aucun ami n'est en ligne (ou le partage coupé). */
-export function friendsOnlineView(snap: SocialSnapshot): { count: number; title: string } | undefined {
-  if (!snap.enabled || !snap.online.size) return undefined;
+/**
+ * Pastille des amis en ligne. Pendant la recherche des amis (démarrage, liaison tombée :
+ * friendpresence.ts), elle se montre même à zéro et le dit : un ami absent n'est pas encore sûr.
+ */
+export function friendsOnlineView(snap: SocialSnapshot, sync: FriendsListSync = 'settled'): { count: number; title: string; searching?: boolean } | undefined {
+  const searching = (sync === 'searching' || sync === 'updating') && snap.friends.size > 0;
+  if (!snap.enabled || (!snap.online.size && !searching)) return undefined;
   const names = [...snap.online.keys()].map((k) => snap.friends.get(k) ?? '?');
-  return { count: names.length, title: tn(names.length, '{n} ami en ligne : {names}', '{n} amis en ligne : {names}', { names: nameList(names, 200) }) };
+  const title = names.length ? tn(names.length, '{n} ami en ligne : {names}', '{n} amis en ligne : {names}', { names: nameList(names, 200) }) : t('Aucun ami en ligne pour l’instant');
+  return searching ? { count: names.length, title: t('{seen} · recherche en cours', { seen: title }), searching: true } : { count: names.length, title };
 }

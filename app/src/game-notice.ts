@@ -30,6 +30,7 @@ import {
   liveBoardDots,
   liveBoardPlacement,
   liveWaitBounds,
+  liveWaitCardEnd,
   type GameNoticeView,
   type LiveBoardScreens,
   type LiveBoardView,
@@ -171,6 +172,15 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
    * la vue n'est plus là, la carte garde « Partez ! » jusqu'à son temps de lecture.
    */
   let waitSeen: { attente?: number; partez?: number; hold?: NodeJS.Timeout; since?: number } = {};
+  /**
+   * La carte part d'elle-même (liveWaitCardEnd : « Partez ! » lu, ou là depuis trop longtemps), sans
+   * attendre une vue de plus : essai réel du 01/11/2026, « Partez ! » resté 90 s, faute d'un message
+   * qui la redessine. Partie ainsi, aucune vue ne la rouvre avant la fin de l'attente.
+   */
+  let waitClock: NodeJS.Timeout | undefined;
+  let waitEnded = false;
+  /** La dernière vue annoncée au journal (titre et raison). */
+  let waitTold = '';
 
   /** Place de la fenêtre pour une carte de `base` (vue du joueur, à 1080 px), dans le coin du plateau. */
   function boundsFor(base: { width: number; height: number }, below = 0) {
@@ -358,14 +368,26 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     const now = Date.now();
     if (waitView.go) waitSeen.partez ??= now;
     else waitSeen.attente ??= now;
+    if (!waitClock) {
+      waitClock = setInterval(() => {
+        const end = liveWaitCardEnd(waitSeen, Date.now());
+        if (!end) return;
+        closeWait(end === 'partez-lu' ? '« Partez ! » lu' : 'restée trop longtemps, fermée d’office'); // i18n-ignore : journal
+        waitEnded = true;
+      }, 250);
+      waitClock.unref?.();
+    }
   }
 
-  function closeWait(): void {
+  function closeWait(why = 'plus d’attente'): void { // i18n-ignore : journal
     if (waitSeen.hold) clearTimeout(waitSeen.hold);
+    if (waitClock) clearInterval(waitClock);
+    waitClock = undefined;
+    waitTold = '';
     if (waitSeen.attente !== undefined || waitSeen.partez !== undefined) {
       const end = Date.now();
       const s = (from: number | undefined, to: number) => (from === undefined ? 'pas montrée' : `${((to - from) / 1000).toFixed(1)} s`); // i18n-ignore : journal
-      opts.log?.(`Départ commun : carte montrée ${s(waitSeen.attente, waitSeen.partez ?? end)} en attente, « Partez ! » ${s(waitSeen.partez, end)}.`); // i18n-ignore : journal
+      opts.log?.(`Départ commun : carte montrée ${s(waitSeen.attente, waitSeen.partez ?? end)} en attente, « Partez ! » ${s(waitSeen.partez, end)} ; partie : ${why}.`); // i18n-ignore : journal
     }
     waitSeen = {};
     waitView = undefined;
@@ -408,7 +430,8 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     boardView = undefined;
     closeLine();
     closeNotice();
-    closeWait();
+    closeWait('fin de la partie'); // i18n-ignore : journal
+    waitEnded = false;
     if (boardTicker) clearInterval(boardTicker);
     boardTicker = undefined;
     boardView = undefined;
@@ -435,9 +458,18 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     },
     wait(view) {
       if (!view) {
+        waitEnded = false;
         if (waitView) endWait();
         else if (waitCard) closeWait();
         return;
+      }
+      // Partie d'elle-même : elle ne revient pas pour cette attente (live-game.ts finit par dire qu'il n'y en a plus).
+      if (waitEnded) return;
+      // Ce que la carte montre, et pourquoi, au journal : à chaque changement de titre ou de raison.
+      const told = `${view.title} — ${view.lead}`;
+      if (told !== waitTold) {
+        waitTold = told;
+        opts.log?.(`Départ commun, carte : « ${told} ».`); // i18n-ignore : journal
       }
       // La vue revient (une attente qui reprend) : plus de « Partez ! » gardé.
       if (waitSeen.hold) clearTimeout(waitSeen.hold);

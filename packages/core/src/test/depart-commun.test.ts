@@ -96,7 +96,7 @@ test('machine d’états : chargement, prêt, partez quand tous les attendus son
   );
   // Vue de Bruno : sa table charge ; sans relevé, il sait quand appuyer sur Start.
   assert.equal(liveWaitView(game, 'bruno', at(20_000))!.lead, 'Votre table se charge…');
-  assert.equal(liveWaitView(game, 'bruno', at(20_000), { manual: true })!.note, 'Attendez « Partez ! » pour appuyer sur Start');
+  assert.match(liveWaitView(game, 'bruno', at(20_000), { manual: true })!.note!, /^Attendez « Partez ! » pour appuyer sur Start · Table sans relevé : quittez-la à la fin de votre partie/);
   // Bruno prêt : tous les attendus le sont, « partez ».
   game = gameStatus(game, 'bruno', { state: 'loading', ready: true }, at(30_000));
   assert.equal(liveGoDue(game, at(30_000)), 'all-ready');
@@ -455,7 +455,8 @@ test('service : l’hôte prêt attend son invité ; « partez » arrive aux deu
     await new Promise((r) => setTimeout(r, loadMs));
     timeline.push(`${who} prêt`);
     gate.ready();
-    while (!gate.go()) await new Promise((r) => setTimeout(r, 20));
+    // Borné : un test raté sous charge échoue, il ne laisse jamais le processus tourner sans fin.
+    for (const end = Date.now() + 60_000; !gate.go() && Date.now() < end; ) await new Promise((r) => setTimeout(r, 20));
     timeline.push(`${who} part`);
     return { ok: true, seconds: 60, records: [], score: who === 'Alexis' ? 1000 : 2000 };
   };
@@ -496,7 +497,7 @@ test('application : le fichier « partez » posé au signal, la table sans relev
   const front = read('app', 'src', 'frontend.ts');
   // Prête seulement table à l'écran ; la carte de l'attente chargée d'avance, dès le lancement de VPX (borne lente du 31/10/2026).
   assert.match(front, /if \(onScreen && \(st\?\.ready \|\| st\?\.started\)\) hooks\.gate\?\.ready\(\);/);
-  assert.match(front, /onScreen = true;\r?\n\s+if \(liveManual\) hooks\.gate\?\.ready\(\);/);
+  assert.match(front, /onScreen = true;\r?\n\s+if \(liveManual\) hooks\.gate\?\.ready\(\{ manual: true \}\);/);
   assert.match(front, /if \(hooks\.gate\) gameNotices\.prepareWait\(liveGames\.waitView\(\{ manual: liveManual \}\)\);/);
   // « Partez ! » lisible LIVE_GO_SHOW_MS après son apparition réelle, pas après l'heure du signal ; le journal mesure ce qui a été vu.
   const notice = read('app', 'src', 'game-notice.ts');
@@ -505,7 +506,7 @@ test('application : le fichier « partez » posé au signal, la table sans relev
   assert.match(notice, /Départ commun : carte montrée \$\{/);
   assert.match(notice, /if \(waitView\) endWait\(\);/);
   assert.match(front, /if \(goneAt === undefined && \(!hooks\.gate \|\| hooks\.gate\.go\(\)\)\) \{\r?\n\s+goneAt = Date\.now\(\);\r?\n\s+double\.go\(\);/);
-  assert.match(front, /if \(liveManual\) hooks\.gate\?\.ready\(\);/);
+  assert.match(front, /if \(liveManual\) hooks\.gate\?\.ready\(\{ manual: true \}\);/);
   assert.match(front, /gameNotices\.wait\(wait\);\r?\n\s+gameNotices\.board\(!wait && /);
   const doubles = read('app', 'src', 'table-double.ts');
   assert.match(doubles, /const goFile = path\.join\(plan\.dir, 'cyberpinball-partez\.txt'\);/);

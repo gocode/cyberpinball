@@ -17,6 +17,11 @@
 // elle est chargée (LiveStartGate.ready), et son relevé ne met le crédit et n'appuie sur Start
 // qu'au « partez » de l'hôte (LiveStartGate.go), donné quand tous sont prêts.
 //
+// Connexion qui tombe et revient (essai réel du 01/11/2026) : rien du départ ne dépend d'un message
+// unique. L'hôte renvoie la salle (« partez » compris) toutes les LIVE_RESEND_MS pendant la partie, et
+// tout de suite à un invité revenu en ligne ; l'invité renvoie son état tant que la salle ne le montre
+// pas (liveStatusBehind). Le journal dit chaque message du départ envoyé, reçu ou renvoyé.
+//
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
 import { createHash } from 'node:crypto';
@@ -30,13 +35,17 @@ import {
   addGameToBoard,
   boardFor,
   countdownFrom,
+  countdownLeft,
+  livePlayers,
   createSettingsReceiver,
   expireInvites,
   gameStatus,
   giveGo,
   liveGoDue,
   liveGuestGo,
+  liveStatusBehind,
   liveWaitView,
+  LIVE_RESEND_MS,
   guestGame,
   inviteExpired,
   inviteToGame,
@@ -63,6 +72,7 @@ import {
   type HostSetting,
   type LiveGame,
   type LiveInvite,
+  type LiveManualReason,
   type LiveMessage,
   type LiveRecord,
   type LiveStatus,
@@ -90,7 +100,8 @@ export interface LivePlayResult {
  * fichier du double est à poser (vrai une fois pour toutes).
  */
 export interface LiveStartGate {
-  ready(): void;
+  /** `manual` : ma table n'a pas de relevé (départ manuel, pas de score en direct) ; l'hôte le saura, et les résultats le diront. */
+  ready(opts?: { manual?: boolean }): void;
   go(): boolean;
 }
 
@@ -117,6 +128,11 @@ export interface LiveGamesOptions {
   /** Réglages de ma table à envoyer aux invités (readHostSettings) ; undefined : trop gros pour voyager. */
   settingsOf?(table: TableEntry): HostSetting[] | undefined;
   /**
+   * Ma table aura-t-elle un relevé de l'état de jeu (liveStateSupport) ? Sans : départ manuel, pas de
+   * score en direct, et pourquoi ; dit avant la partie (choix, salon, invitation). undefined : elle en a un, ou inconnu.
+   */
+  manualOf?(table: TableEntry): Promise<LiveManualReason | undefined>;
+  /**
    * C'est parti : lancer la table ; `playing` quand VPX l'affiche ; `settings` : ceux de l'hôte,
    * reçus (invité) ; `board` : les records du groupe sur cette version, à poser dans le double.
    */
@@ -141,6 +157,8 @@ export interface LiveGames {
   versionOf(table: TableEntry): Promise<{ print?: string; script?: string }>;
   /** Taille du .vpx d'une de mes tables ; undefined : illisible. */
   bytesOf(table: TableEntry): number | undefined;
+  /** Une de mes tables sans relevé de l'état de jeu : pourquoi (départ manuel, pas de score en direct) ; undefined : elle en a un, ou inconnu. */
+  manualOf(table: TableEntry): Promise<LiveManualReason | undefined>;
   /** L'attente du départ commun, pendant que ma table est lancée (livestart.ts) ; `manual` : ma table n'a pas de relevé. */
   waitView(opts?: { manual?: boolean }): LiveWaitView | undefined;
   /** Invitations reçues, sans les expirées. */
@@ -169,6 +187,8 @@ export interface LiveTableFound {
   balls?: number;
   /** Le même .vpx, mais un autre script joué (un .vbs à côté de la table). */
   scriptDiffers?: boolean;
+  /** Ma table n'aura pas de relevé de l'état de jeu : départ manuel, pas de score en direct, et pourquoi. */
+  manual?: LiveManualReason;
 }
 
 /** Vérification des invitations expirées et des retardataires. */
@@ -190,6 +210,16 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   let hostSettings: HostSetting[] | undefined;
   /** Ma table lancée pour la partie `id` : quand elle a été prête (ms), « partez » reçu, partie démarrée. */
   let running: { id: string; readyAt?: number; released: boolean; started: boolean } | undefined;
+  /** Partie où ma table joue sans relevé (départ manuel) : chaque état envoyé le dit. */
+  let manualIn: string | undefined;
+  /** Invité : le dernier état envoyé à l'hôte (renvoyé tant que sa salle ne le montre pas), et quand. */
+  let lastStatus: { id: string; status: Omit<Extract<LiveMessage, { t: 'game-status' }>, 't' | 'game'>; at: number } | undefined;
+  /** Hôte : à qui la salle a déjà porté « partez » ; qui était en ligne au dernier tour (revenu : la salle tout de suite). */
+  const goSentTo = new Set<string>();
+  const wasOnline = new Map<string, boolean>();
+  let roomSentAt = 0;
+  /** La carte de l'attente avait quelque chose à montrer au dernier tour : sa fin aussi doit être portée (essai réel du 01/11/2026). */
+  let waitWas = false;
   const strict = createTableVersions(opts.dataDir);
   // Le tableau du groupe : chaque partie finie y entre, une fois (groupboard.ts).
   const boardsFile = path.join(opts.dataDir, 'amis', 'records.json');
@@ -233,10 +263,19 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   const ongoing = () => !!game && game.phase !== 'finished' && game.phase !== 'cancelled';
 
   /** Celui qui invite : la salle à jour pour chaque invité relié. */
-  function broadcastRoom(): void {
+  function broadcastRoom(only?: string): void {
     if (!game || !isHost()) return;
     const room = roomMessage(game, now());
-    for (const p of game.players) if (!p.host && p.state !== 'declined' && p.state !== 'busy' && p.state !== 'expired') net.send(p.key, room);
+    if (!only) roomSentAt = now().getTime();
+    for (const p of game.players) {
+      if (p.host || p.state === 'declined' || p.state === 'busy' || p.state === 'expired' || (only && p.key !== only)) continue;
+      const sent = net.send(p.key, room);
+      // Le journal : « partez » porté à chacun, la première fois (et s'il n'a pas pu partir).
+      if (room.go && !goSentTo.has(p.key)) {
+        if (sent) goSentTo.add(p.key);
+        log(`Départ commun : « partez » ${sent ? 'envoyé' : 'NON envoyé (hors ligne : renvoyé à son retour)'} à ${p.name}.`); // i18n-ignore : journal
+      }
+    }
   }
 
   function setGame(next: LiveGame | undefined): void {
@@ -263,14 +302,31 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       ...(result?.score !== undefined ? { score: result.score } : {}),
       ...(live ? { score: live.score, ball: live.ball, ...(live.balls ? { balls: live.balls } : {}) } : {}),
       ...(result?.multi || (live && live.players > 1) ? { multi: true as const } : {}),
+      ...(manualIn === game.id ? { manual: true as const } : {}),
     };
     if (isHost()) {
       setGame(gameStatus(game, me().key, status, now()));
       maybeGo();
     } else {
-      net.send(game.host, { t: 'game-status', game: game.id, ...status });
+      // « prêt » garde son drapeau tant que ma table attend : un renvoi le redit.
+      const kept = lastStatus?.id === game.id && lastStatus.status.ready && state === 'loading' ? { ...status, ready: true as const } : status;
+      lastStatus = { id: game.id, status: kept, at: now().getTime() };
+      const sent = net.send(game.host, { t: 'game-status', game: game.id, ...kept });
+      // Le score en partie part souvent : seuls les messages du départ et le retour vont au journal.
+      if (ready || state !== 'playing' || result || !sent) log(`Départ commun : mon état « ${ready ? 'prêt' : state} » ${sent ? 'envoyé' : 'NON envoyé (hôte hors ligne : renvoyé à son retour)'} à l'hôte.`); // i18n-ignore : journal
       changed();
     }
+  }
+
+  /** Invité : mon état renvoyé à l'hôte, tant que sa salle ne le montre pas (message perdu pendant une coupure). */
+  function resendStatus(why: 'salle' | 'tour' | 'retour'): void {
+    if (!game || isHost() || lastStatus?.id !== game.id || game.phase === 'finished' || game.phase === 'cancelled') return;
+    if (!liveStatusBehind(game.players.find((p) => p.key === me().key), lastStatus.status)) return;
+    if (why !== 'retour' && now().getTime() - lastStatus.at < LIVE_RESEND_MS) return;
+    lastStatus.at = now().getTime();
+    const sent = net.send(game.host, { t: 'game-status', game: game.id, ...lastStatus.status });
+    const what = lastStatus.status.ready && lastStatus.status.state === 'loading' ? 'prêt' : lastStatus.status.state; // i18n-ignore : journal
+    log(`Départ commun : mon état « ${what} » renvoyé à l'hôte (${why === 'retour' ? 'hôte revenu en ligne' : 'sa salle ne le montre pas'})${sent ? '' : ', sans succès'}.`); // i18n-ignore : journal
   }
 
   /** L'hôte : « partez », quand tous sont prêts ou que le délai des derniers est passé. */
@@ -324,10 +380,11 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     running = run;
     report('loading');
     const gate: LiveStartGate = {
-      ready: () => {
+      ready: (o) => {
         if (game?.id !== id || run.readyAt !== undefined) return;
         run.readyAt = now().getTime();
-        log('Partie en direct : ma table est prête.'); // i18n-ignore : journal
+        if (o?.manual) manualIn = id;
+        log(`Partie en direct : ma table est prête${o?.manual ? ' (sans relevé : départ manuel, pas de score en direct)' : ''}.`); // i18n-ignore : journal
         if (run.released) started();
         else report('loading', undefined, undefined, true);
         released();
@@ -348,17 +405,26 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       run.started = true;
       report('playing', undefined, p);
     };
-    const result = await opts.play(
-      mine,
-      // VPX montre la table : partie démarrée seulement si « partez » était déjà là (sinon, au signal).
-      () => {
-        if (game?.id === id && run.released && run.readyAt !== undefined) started();
-      },
-      isHost() ? undefined : hostSettings,
-      boardFor(loadedBoards(), game.table),
-      progress,
-      gate,
-    );
+    // Ce qui suit la partie (badges, statistiques…) peut échouer : la partie jouée compte quand même, et
+    // l'hôte reçoit toujours mon retour (essai réel du 01/11/2026 : une écriture refusée après la partie
+    // avait interrompu run() avant son résultat ; l'hôte l'attendait encore).
+    let result: LivePlayResult | undefined;
+    try {
+      result = await opts.play(
+        mine,
+        // VPX montre la table : partie démarrée seulement si « partez » était déjà là (sinon, au signal).
+        () => {
+          if (game?.id === id && run.released && run.readyAt !== undefined) started();
+        },
+        isHost() ? undefined : hostSettings,
+        boardFor(loadedBoards(), game.table),
+        progress,
+        gate,
+      );
+    } catch (error) {
+      log(`Partie en direct : fin de partie en erreur (${(error as Error).message}) ; mon retour part quand même.`); // i18n-ignore : journal
+      result = { ok: run.started, seconds: run.readyAt !== undefined ? (now().getTime() - run.readyAt) / 1000 : 0, records: [] };
+    }
     if (running === run) running = undefined;
     if (game?.id !== id) return;
     // Quitté pendant l'attente du départ (table prête, jamais partie) : il n'a pas joué, les autres ne l'attendent plus.
@@ -367,12 +433,21 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   }
 
   const versionOf = (table: TableEntry) => strict.of(table);
+  const manualOf = async (table: TableEntry): Promise<LiveManualReason | undefined> => {
+    try {
+      return await opts.manualOf?.(table);
+    } catch {
+      return undefined;
+    }
+  };
 
   async function liveTable(table: TableEntry): Promise<LiveTable> {
     const version = await versionOf(table);
     const bytes = fileSize(table.file);
     const balls = await opts.ballsOf?.(table);
-    return { table: tableIdentity(table, opts.romsOf?.(table) ?? []), ...(table.version ? { version: table.version.slice(0, 60) } : {}), ...version, ...(bytes ? { bytes } : {}), ...(balls ? { balls } : {}) };
+    const manual = await manualOf(table);
+    if (manual) log(`Partie en direct : ${table.title} n'aura pas de relevé de l'état de jeu (${manual}) : départ manuel, pas de score en direct, dit aux invités.`); // i18n-ignore : journal
+    return { table: tableIdentity(table, opts.romsOf?.(table) ?? []), ...(table.version ? { version: table.version.slice(0, 60) } : {}), ...version, ...(bytes ? { bytes } : {}), ...(balls ? { balls } : {}), ...(manual ? { manual } : {}) };
   }
 
   async function matchFor(invite: LiveInvite): Promise<LiveTableFound> {
@@ -393,7 +468,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     }
     const balls = found.entry ? await opts.ballsOf?.(found.entry) : undefined;
     if (balls && theirs.balls && balls !== theirs.balls) log(`Invitation de ${invite.host.name} : ${balls} billes par partie ici, ${theirs.balls} chez lui : score hors classement.`); // i18n-ignore : journal
-    return { match: found.match, ...(found.entry ? { table: found.entry } : {}), ...(balls ? { balls } : {}), ...(found.scriptDiffers ? { scriptDiffers: true } : {}) };
+    const manual = found.entry && found.match === 'same' ? await manualOf(found.entry) : undefined;
+    if (manual) log(`Invitation de ${invite.host.name} : ma table n'aura pas de relevé de l'état de jeu (${manual}) : départ manuel, pas de score en direct.`); // i18n-ignore : journal
+    return { match: found.match, ...(found.entry ? { table: found.entry } : {}), ...(balls ? { balls } : {}), ...(found.scriptDiffers ? { scriptDiffers: true } : {}), ...(manual ? { manual } : {}) };
   }
 
   /** Hôte : mes réglages vers un invité qui accepte ; trop gros pour voyager, il jouera hors classement. */
@@ -451,7 +528,16 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       }
       case 'game-room':
         if (game && !isHost() && key === game.host) {
-          game = applyRoom(game, m, now());
+          const before = game;
+          game = applyRoom(game, m, now(), me().key);
+          const after = game;
+          if (after.goAt && !before.goAt) log(`Départ commun : « partez » reçu de l'hôte (${after.goWhy === 'timeout' ? `délai passé, sans ${after.players.filter((p) => after.goLate?.includes(p.key)).map((p) => p.name).join(', ') || 'personne'}` : 'tous prêts'}).`); // i18n-ignore : journal
+          // « game-start » perdu : la salle dit que la partie est lancée, elle part d'ici.
+          if (before.phase === 'gathering' && after.phase === 'countdown') {
+            log(`Départ commun : départ appris par la salle (message de départ perdu), lancement dans ${countdownLeft(after, now())} s.`); // i18n-ignore : journal
+            scheduleLaunch();
+          }
+          resendStatus('salle');
           changed();
         }
         return;
@@ -464,7 +550,12 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         return;
       case 'game-status':
         if (game && isHost() && m.game === game.id) {
-          setGame(gameStatus(game, key, m, now()));
+          const was = game.players.find((p) => p.key === key);
+          if (m.ready && was && !was.ready) log(`Départ commun : ${was.name} prêt (reçu)${m.manual ? ', table sans relevé' : ''}.`); // i18n-ignore : journal
+          const next = gameStatus(game, key, m, now());
+          // Un état renvoyé, déjà connu : c'est la salle qu'il n'a pas reçue, elle repart vers lui.
+          if (next === game || JSON.stringify(next) === JSON.stringify(game)) broadcastRoom(key);
+          setGame(next);
           maybeGo();
         }
         return;
@@ -487,15 +578,40 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     if (invites.some((i) => inviteExpired(i, now()))) invites = invites.filter((i) => !inviteExpired(i, now()));
     // Une invitation en attente : son temps restant à l'écran, une fois par seconde.
     if (invites.length) changed();
-    if (!game) return;
+    if (!game) {
+      waitWas = false;
+      return;
+    }
     if (isHost()) {
       setGame(closeIfDone(expireInvites(game, now()), now()));
       maybeGo();
+      // La salle renvoyée pendant la partie : un « partez » perdu arrive au tour suivant ; un invité revenu en ligne l'a tout de suite.
+      if (game?.phase === 'countdown' || game?.phase === 'playing') {
+        for (const p of game.players) {
+          if (p.host || !livePlayers(game).includes(p)) continue;
+          const online = net.online(p.key);
+          if (online && wasOnline.get(p.key) === false) {
+            log(`Départ commun : ${p.name} revenu en ligne, la salle lui est renvoyée.`); // i18n-ignore : journal
+            broadcastRoom(p.key);
+          }
+          wasOnline.set(p.key, online);
+        }
+        if (now().getTime() - roomSentAt >= LIVE_RESEND_MS) broadcastRoom();
+      }
+    } else {
+      // Invité : l'hôte revenu en ligne reçoit mon état tout de suite ; sinon, renvoyé tant que sa salle ne le montre pas.
+      const online = net.online(game.host);
+      const back = online && wasOnline.get(game.host) === false;
+      wasOnline.set(game.host, online);
+      if (online) resendStatus(back ? 'retour' : 'tour');
     }
     // Invité : un hôte resté muet se voit au fil du temps.
     if (running && !running.released) released();
-    // Compte à rebours, et attente du départ commun (le délai des derniers) : une fois par seconde.
-    if (game?.phase === 'countdown' || waitView()) changed();
+    // Compte à rebours, et attente du départ commun (le délai des derniers) : une fois par seconde ; et
+    // une fois encore quand elle n'a plus rien à montrer, pour que la carte parte (« Partez ! » lu).
+    const waiting = !!waitView();
+    if (game?.phase === 'countdown' || waiting || waitWas) changed();
+    waitWas = waiting;
   }, TICK_MS);
   ticker.unref?.();
 
@@ -511,12 +627,15 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     table: () => mine,
     versionOf,
     bytesOf: (table) => fileSize(table.file),
+    manualOf,
     waitView,
     invites: () => invites.filter((i) => !inviteExpired(i, now())),
     async create(table) {
       if (game && ongoing() && !isHost()) net.send(game.host, { t: 'game-cancel', game: game.id });
       const live = await liveTable(table);
       mine = table;
+      goSentTo.clear();
+      wasOnline.clear();
       setGame(newLiveGame({ ...me(), ...version }, live, displayTitle(table), now()));
       log(`Partie en direct : salon ouvert sur ${table.title}.`); // i18n-ignore : journal
       return game!;

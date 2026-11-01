@@ -846,6 +846,13 @@ const liveGames = createLiveGames({
   ballsOf: async (table) => (await ballCounts.of(table))?.balls,
   // Mes réglages (mémoire et interrupteurs de la ROM, valeurs enregistrées) pour le double de chaque invité.
   settingsOf: (table) => readHostSettings({ folder: table.folder, roms: loadedRoms(table.folder, romsOf(table)), ...(loc.root ? { pinmameDir: path.join(loc.root, 'pinmame') } : {}) }),
+  // Ma table aura-t-elle un relevé (départ automatique, score en direct) ? Dit avant la partie : choix, salon, invitation.
+  // Hors écran, la partie simulée en décide (aucun vrai script) : sans relevé seulement si on le lui demande.
+  manualOf: async (table) => {
+    await new Promise((resolve) => setImmediate(resolve));
+    if (OFFSCREEN && process.env.CYBERPINBALL_PARTIE_SIMULEE !== undefined) return SIMULATED_MANUAL ? 'script' : undefined;
+    return tableDoubles.manualOf(table, socialFirewall.vpxState() === 'closed');
+  },
   // Le carillon d'invitation sonne au menu comme pendant une partie ; en partie, la notification
   // se pose sur le plateau, par-dessus VPX : quitter sa partie ramène au menu, où l'invitation s'ouvre.
   onInvite: (invite) => {
@@ -1699,6 +1706,8 @@ const LIVE_BOARD_SETTLE_MS = 3000;
 let playingSince = 0;
 /** Partie entre amis sur une table sans relevé : Start n'y est pas bloqué, le joueur l'appuie au « Partez ! ». */
 let liveManual = false;
+/** Hors écran : la partie simulée joue une table sans relevé (CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE, démonstration « sans-releve »). */
+const SIMULATED_MANUAL = OFFSCREEN && !!process.env.CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE;
 
 /**
  * Partie d'une table. En mode réglage de l'affichage (`display`), VPX démarre son menu ouvert
@@ -1829,7 +1838,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const played = double?.table ?? table;
   if (double) recordsBefore = double.records();
   // Départ commun (livestart.ts) : une table sans relevé est prête dès qu'elle est à l'écran ; c'est au joueur d'appuyer sur Start au signal.
-  liveManual = !!double && !double.live && simulated === undefined;
+  // Hors écran, la partie simulée joue une table sans relevé si on le lui demande (démonstration « sans-releve »).
+  liveManual = !!double && (simulated === undefined ? !double.live : SIMULATED_MANUAL);
   // Quand « partez » a été posé dans le double (la partie simulée part de là).
   let goneAt: number | undefined;
   // La table à l'écran : une borne ne se dit pas prête avant (journal du 31/10/2026, borne chargée :
@@ -1861,7 +1871,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     broadcast();
     setTimeout(showLiveBoard, LIVE_BOARD_SETTLE_MS);
     onScreen = true;
-    if (liveManual) hooks.gate?.ready();
+    if (liveManual) hooks.gate?.ready({ manual: true });
     // Partie entre amis : l'arrêt automatique (essais) se compte depuis « partez ».
     if (autoStopAfterMs && !hooks.gate) setTimeout(() => game.stop(), autoStopAfterMs);
   };
@@ -1886,7 +1896,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   let live: { score?: number; multi?: boolean } | undefined;
   let overAt: number | undefined;
   // Hors écran, la partie simulée n'exécute aucun script : son relevé est simulé, pour la bande et la fin de partie.
-  const liveSource = double?.live ? () => double.liveState() : simulated !== undefined && double ? simulatedLiveState(Date.now(), liveRunMs, () => goneAt) : undefined;
+  const liveSource = double?.live ? () => double.liveState() : simulated !== undefined && double && !liveManual ? simulatedLiveState(Date.now(), liveRunMs, () => goneAt) : undefined;
   // Le DMD de la table, lu par l'inspector de VPX : les scores des amis ne s'y posent que sur son écran de score (dmdscore.ts).
   dmdWatch = double?.inspectorPort && readDmd ? watchVpxDmd(double.inspectorPort, (line) => console.log(line)) : simulated !== undefined && double && readDmd ? simulatedDmdWatch() : undefined;
   // Départ commun (livestart.ts) : la table prête (le relevé répond « pret »), elle le dit aux
@@ -1952,12 +1962,18 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     if (!autoStopAfterMs) recordPlay(table, startedAt, result.seconds);
     tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
     // Pour les amis : les records entrés au tableau, la partie, puis les badges qu'ils valent.
+    // Une erreur ici (écriture refusée de social.json, essai réel du 01/11/2026) ne perd jamais la
+    // partie : son résultat, celui d'une partie entre amis compris, est rendu quand même.
     if (!autoStopAfterMs) {
-      const seen = presenceTable(table);
-      // Pas pour une partie entre amis : son tableau est celui du groupe, posé dans le double, pas celui de la table.
-      if (!double) for (const s of [...entered].sort((a, b) => a.rank - b.rank)) socialNet.publish({ kind: 'record', table: seen, score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) });
-      if (result.seconds >= 60) socialNet.publish({ kind: 'played', table: seen, seconds: Math.round(result.seconds) });
-      socialNet.checkBadges(playStats(tables));
+      try {
+        const seen = presenceTable(table);
+        // Pas pour une partie entre amis : son tableau est celui du groupe, posé dans le double, pas celui de la table.
+        if (!double) for (const s of [...entered].sort((a, b) => a.rank - b.rank)) socialNet.publish({ kind: 'record', table: seen, score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) });
+        if (result.seconds >= 60) socialNet.publish({ kind: 'played', table: seen, seconds: Math.round(result.seconds) });
+        socialNet.checkBadges(playStats(tables));
+      } catch (error) {
+        console.log(`Partie (${table.id}) : nouvelles pour les amis et badges pas mis à jour (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
+      }
     }
     const unseen = simulated === undefined ? joystickMessage(install.version) : undefined;
     state = unseen ? { ...state, phase: 'message', message: unseen } : { ...state, phase: 'menu' };
@@ -2517,7 +2533,7 @@ function viewFor(role: RoleId) {
  * tables ; dans le menu système, seulement une nouvelle de la partie entre amis ; pendant la
  * partie d'une autre table, cette nouvelle va par-dessus VPX (game-notice.ts).
  */
-function menuCorner(): { friendsOnline?: { count: number; title: string }; notice?: NoticeView } {
+function menuCorner(): { friendsOnline?: { count: number; title: string; searching?: boolean }; notice?: NoticeView } {
   // La file avance à chaque rendu, même hors du menu : une notification ouverte part quand un écran la recouvre.
   const corner = menuNotices.view();
   gameNotices.line(state.phase === 'playing' && playing && corner.notice?.live ? corner.notice : undefined);

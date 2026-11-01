@@ -112,6 +112,7 @@ export * from './sessionorientation';
 export * from './sharing';
 export * from './mediapack';
 export * from './social';
+export * from './friendpresence';
 export * from './badges';
 export * from './firewall';
 export * from './friendlibrary';

@@ -26,6 +26,7 @@ import {
   socialSnapshot,
   type DownloadJob,
   type DownloadSnapshot,
+  type FriendsListSync,
   type LiveGame,
   type LiveSnapshot,
   type NoticeEvent,
@@ -41,6 +42,8 @@ export interface MenuNoticesHost {
     state(): SocialState;
     online(key: string): boolean;
     presenceOf(key: string): Presence | undefined;
+    /** La liste des amis est-elle sûre (friendpresence.ts) ? Sans lui : à jour. */
+    listSync?(): FriendsListSync;
   };
   jobs(): readonly DownloadJob[];
   /** Raison d'un téléchargement bloqué, courte (« plus de place »). */
@@ -73,7 +76,7 @@ export interface MenuNotices {
   /** Déjà dit ailleurs (le bandeau d'un écran plein) : la notification ne le redira pas. */
   said(kind: NoticeEvent['kind'], key: string): void;
   /** Ce que le menu des tables dessine maintenant (à chaque rendu de la fenêtre du plateau). */
-  view(): { notice?: NoticeView; friendsOnline?: { count: number; title: string } };
+  view(): { notice?: NoticeView; friendsOnline?: { count: number; title: string; searching?: boolean } };
   stop(): void;
 }
 
@@ -161,7 +164,8 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     born = true;
     const nextLive = liveSnapshot(game, me);
     const events = [...liveNotices(live, nextLive, game, me, t), ...socialNotices(social, nextSocial, s, t, host.badgeLabel), ...downloadNotices(downloads, jobs, t, host.reason)]
-      .filter((e) => t >= quietUntil || e.kind !== 'friend-online')
+      // Au démarrage, et tant que la borne cherche ses amis, c'est elle qui arrive : pas une nouvelle.
+      .filter((e) => (t >= quietUntil && host.social.listSync?.() !== 'searching') || e.kind !== 'friend-online')
       // Notifications coupées : seule la partie entre amis reste.
       .filter((e) => host.mode() === 'all' || isLiveNotice(e.kind));
     social = nextSocial;
@@ -185,7 +189,7 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     }
     shown = next;
     schedule(r.nextAt);
-    const friends = mode === 'off' ? undefined : friendsOnlineView(socialSnapshot(host.social.state(), (k) => host.social.online(k), (k) => host.social.presenceOf(k)));
+    const friends = mode === 'off' ? undefined : friendsOnlineView(socialSnapshot(host.social.state(), (k) => host.social.online(k), (k) => host.social.presenceOf(k)), host.social.listSync?.());
     return { ...(r.view ? { notice: r.view } : {}), ...(friends ? { friendsOnline: friends } : {}) };
   }
 

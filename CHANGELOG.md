@@ -12,6 +12,10 @@ son interface).
 ## 0.1.6
 
 - Cyber Pinball ne se ferme plus tout seul quand Windows refuse un instant l'enregistrement d'un fichier (antivirus, indexation) : l'enregistrement est réessayé, et s'il échoue encore, il est noté au journal et refait au suivant. Pendant une partie entre amis, la borne ne redémarrait plus et ne passait plus hors ligne chez les autres.
+- Amis : la présence ne clignote plus. Un ami reste en ligne tant qu'une liaison le relie à votre borne, par Internet ou le réseau local, et une liaison qui tombe se refait sans le faire passer hors ligne (15 s de tolérance) ; les deux bornes se voient de la même façon. Une borne allumée en même temps qu'une autre la trouve en moins d'une minute, et plus après plusieurs minutes. « Vu » date le dernier moment où l'ami était vraiment en ligne.
+- Amis : la liste dit si elle est sûre. « Recherche des amis… » au démarrage, « Mise à jour en cours… » quand une liaison vient de tomber, puis « Liste à jour : 1 ami en ligne » ; dans « Mes amis », « Jouer avec un ami », le menu système et la pastille du menu des tables. La fiche d'un ami dit par où il est relié (Internet, réseau local).
+- Partie entre amis : « Partez ! » s'efface toujours au bout de 4 s, même sur une table sans relevé ou quand la connexion se tait (il pouvait rester affiché). Un « prêt » ou un « partez » perdu pendant une coupure est renvoyé : plus personne n'attend le délai pour rien.
+- Partie entre amis : une table sans relevé de l'état de jeu est marquée « Départ manuel, pas de score en direct », avec la raison, dans le choix de la table, le salon et l'invitation. Son score compte s'il entre au tableau d'honneur de la table ; sinon les résultats disent pourquoi il manque. Une erreur après la partie ne fait plus perdre son résultat.
 
 ## 0.1.5
 

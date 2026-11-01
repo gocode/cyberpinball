@@ -10,6 +10,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 ## 0.1.6
 
 - Cyber Pinball no longer closes by itself when Windows briefly refuses to save a file (antivirus, indexing): the save is retried, and if it still fails, it is noted in the log and done again at the next one. During a game with friends, the cabinet no longer restarted and no longer went offline for the others.
+- Friends: presence no longer flickers. A friend stays online as long as a link connects them to your cabinet, over the Internet or the local network, and a link that drops is remade without taking them offline (15 s of grace); both cabinets see each other the same way. A cabinet turned on at the same time as another finds it within a minute, no longer after several minutes. "Seen" dates the last moment the friend was really online.
+- Friends: the list says whether it can be trusted. "Looking for friends…" at startup, "Updating…" when a link just dropped, then "List up to date: 1 friend online"; in "My friends", "Play with a friend", the system menu and the table menu pill. A friend's sheet says how they are linked (Internet, local network).
+- Game with friends: "Go!" always fades after 4 s, even on a table without live tracking or when the connection goes quiet (it could stay on screen). A "ready" or a "go" lost during a cut is sent again: nobody waits for the delay for nothing any more.
+- Game with friends: a table without live tracking of the game state is marked "Manual start, no live score", with the reason, when choosing the table, in the room and in the invitation. Its score counts if it enters the table's high score table; otherwise the results say why it is missing. An error after the game no longer loses its result.
 
 ## 0.1.5
 

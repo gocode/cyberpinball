@@ -2,7 +2,9 @@
 // sur un réseau d'essai HyperDHT et un réseau local simulé, tous deux sur 127.0.0.1 : aucune
 // socket n'écoute ailleurs (pas d'invite du pare-feu, pas de borne réelle). Vérifie le parcours
 // complet : annuaire, demande d'ami, acceptation (aussi quand l'une des bornes était éteinte),
-// présence, évènements, retrait, blocage ; et que le mode « off » n'ouvre rien.
+// présence, évènements, retrait, blocage ; et que le mode « off » n'ouvre rien. Puis les
+// invariants de la présence (friendpresence.ts) : une liaison qui tombe quand une autre vit,
+// une reconnexion rapide, une balise qui ne passe que dans un sens, une borne arrêtée.
 
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -11,7 +13,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
-import { nearbyPlayers, newSocialState, searchDirectory, type Presence, type SocialEvent, type SocialNetMode, type SocialState } from '../social';
+import { loadSocial, nearbyPlayers, newSocialState, searchDirectory, type Presence, type SocialEvent, type SocialNetMode, type SocialState } from '../social';
 
 const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
 /** Ce que le test utilise du service (app/src/social-net.ts). */
@@ -20,6 +22,9 @@ interface Net {
   status(): { running: boolean };
   online(key: string): boolean;
   presenceOf(key: string): Presence | undefined;
+  listSync(): 'off' | 'searching' | 'updating' | 'settled';
+  linksOf(key: string): ('internet' | 'lan')[];
+  setLan(on: boolean): Promise<void>;
   start(): Promise<void>;
   stop(): Promise<void>;
   setEnabled(on: boolean): Promise<void>;
@@ -227,4 +232,194 @@ test('seul social-net.ts ouvre des sockets réseau, et Hyperswarm n’est charg�
     }
   }
   assert.deepEqual(offenders, []);
+});
+
+// ---------- Présence : invariants (friendpresence.ts) ----------
+
+type Beacon = { profile: { key: string }; port: number };
+type BeaconListener = (beacon: Beacon, host: string) => void;
+
+/**
+ * Deux bornes déjà amies (social.json écrit d'avance, comme après une amitié faite) : ouvertes
+ * avec les options données (tolérance, recherche courtes), pas encore démarrées.
+ */
+function friendsPair(opts: { bootstrap?: { host: string; port: number }[]; lan?: boolean; beacons?: (key: string) => unknown; graceMs?: number; searchMs?: number; refuseIncoming?: (i: number) => boolean }) {
+  const made = ['Alice', 'Bruno'].map((name) => cabinet(name, { bootstrap: [] }));
+  const states = made.map((m) => m.net.state());
+  const since = new Date().toISOString();
+  made.forEach((m, i) => {
+    const other = states[1 - i]!;
+    const seeded: SocialState = { ...states[i]!, lan: opts.lan ?? true, friends: [{ key: other.key.publicKey, name: other.name, since, events: [] }] };
+    fs.writeFileSync(path.join(m.dir, 'social.json'), JSON.stringify(seeded));
+  });
+  const logs: string[][] = [[], []];
+  const open = (i: number) =>
+    net.createSocialNet({
+      dataDir: made[i]!.dir,
+      mode: 'simulated',
+      host: '127.0.0.1',
+      bootstrap: opts.bootstrap ?? [],
+      ...(opts.beacons ? { beacons: opts.beacons(states[i]!.key.publicKey) } : {}),
+      ...(opts.graceMs !== undefined ? { graceMs: opts.graceMs } : {}),
+      ...(opts.searchMs !== undefined ? { searchMs: opts.searchMs } : {}),
+      ...(opts.refuseIncoming?.(i) ? { refuseIncoming: true } : {}),
+      log: (line: string) => logs[i]!.push(line),
+    });
+  return { a: open(0), b: open(1), keyA: states[0]!.key.publicKey, keyB: states[1]!.key.publicKey, dirs: made.map((m) => m.dir), logs, reopen: open };
+}
+
+/** Relève une condition toutes les 10 ms ; `misses` : combien de fois elle a manqué. */
+function watch(check: () => boolean): { misses(): number; stop(): void } {
+  let misses = 0;
+  const timer = setInterval(() => {
+    if (!check()) misses++;
+  }, 10);
+  return { misses: () => misses, stop: () => clearInterval(timer) };
+}
+
+const linkedBoth = (p: ReturnType<typeof friendsPair>, a: Net = p.a, b: Net = p.b) => a.linksOf(p.keyB).length > 0 && b.linksOf(p.keyA).length > 0;
+
+test('présence : liaisons Internet et locale, la locale tombe, l’ami reste en ligne des deux côtés', async () => {
+  const testnet = await createTestnet(3, { host: '127.0.0.1' });
+  const bus = new Set<unknown>();
+  // Tolérance très courte : seule l'autre liaison peut garder l'ami en ligne.
+  const p = friendsPair({ bootstrap: testnet.bootstrap, beacons: () => net.memoryBeacons(bus), graceMs: 200 });
+  try {
+    await Promise.all([p.a.start(), p.b.start()]);
+    const both = (n: Net, key: string) => n.linksOf(key).includes('internet') && n.linksOf(key).includes('lan');
+    await until('reliées par Internet et le réseau local, des deux côtés', () => both(p.a, p.keyB) && both(p.b, p.keyA), 20_000);
+    const seen = watch(() => p.a.online(p.keyB) && p.b.online(p.keyA));
+    await p.a.setLan(false);
+    await new Promise((r) => setTimeout(r, 1_200));
+    seen.stop();
+    assert.equal(seen.misses(), 0, 'jamais hors ligne, d’un côté comme de l’autre');
+    assert.deepEqual(p.a.linksOf(p.keyB), ['internet']);
+    assert.deepEqual(p.b.linksOf(p.keyA), ['internet']);
+    assert.ok(!p.logs.flat().some((l) => / hors ligne \(/.test(l)), 'pas de passage hors ligne au journal');
+    assert.ok(p.logs[0]!.some((l) => /liaison réseau local avec Bruno fermée .*1 autre\(s\) liaison\(s\)/.test(l)), 'la chute et ce qui reste sont au journal');
+  } finally {
+    await Promise.all([p.a.stop(), p.b.stop()]);
+    await testnet.destroy();
+  }
+});
+
+test('présence : reconnexion rapide sans clignotement, « vu » inchangé, « mise à jour » puis « à jour »', async () => {
+  const bus = new Set<unknown>();
+  const p = friendsPair({ beacons: () => net.memoryBeacons(bus), graceMs: 8_000, searchMs: 300 });
+  try {
+    assert.equal(p.a.listSync(), 'searching', 'pas encore démarrée : la liste se fait');
+    await Promise.all([p.a.start(), p.b.start()]);
+    await until('en ligne des deux côtés', () => linkedBoth(p));
+    await until('liste à jour', () => p.a.listSync() === 'settled' && p.b.listSync() === 'settled');
+    const seenBefore = loadSocial(p.dirs[0]!).friends[0]!.lastSeen;
+    const states = new Set<string>();
+    const seen = watch(() => {
+      states.add(p.a.listSync());
+      return p.a.online(p.keyB) && p.b.online(p.keyA);
+    });
+    // La liaison tombe et se refait (réseau local coupé puis rétabli sur une borne).
+    await p.a.setLan(false);
+    await new Promise((r) => setTimeout(r, 200));
+    await p.a.setLan(true);
+    await until('reliées de nouveau', () => linkedBoth(p), 7_000);
+    await until('liste à jour de nouveau', () => p.a.listSync() === 'settled');
+    seen.stop();
+    assert.equal(seen.misses(), 0, 'jamais hors ligne pendant la reconnexion');
+    assert.ok(states.has('updating'), 'la liste a dit « mise à jour en cours »');
+    assert.equal(loadSocial(p.dirs[0]!).friends[0]!.lastSeen, seenBefore, '« vu » n’est pas redaté par une liaison qui se refait');
+    assert.ok(!p.logs.flat().some((l) => / hors ligne \(/.test(l)));
+  } finally {
+    await Promise.all([p.a.stop(), p.b.stop()]);
+  }
+});
+
+test('présence : balise qui ne passe que dans un sens, les deux bornes convergent', async () => {
+  // Réseau local simulé où la balise de la borne qui appelle d'habitude (la plus petite clé) se
+  // perd : avant, aucune des deux n'appelait. L'autre appelle à son tour après deux balises.
+  const listeners = new Map<string, BeaconListener>();
+  let muted = '';
+  const oneWay = (me: string) => ({
+    async start(onBeacon: BeaconListener) {
+      listeners.set(me, onBeacon);
+    },
+    announce(beacon: Beacon) {
+      if (beacon.profile.key === muted) return;
+      for (const [key, l] of listeners) if (key !== me) l(beacon, '127.0.0.1');
+    },
+    async stop() {
+      listeners.delete(me);
+    },
+  });
+  const p = friendsPair({ beacons: oneWay, graceMs: 2_000 });
+  muted = p.keyA < p.keyB ? p.keyA : p.keyB;
+  try {
+    await Promise.all([p.a.start(), p.b.start()]);
+    await until('en ligne des deux côtés malgré la balise perdue', () => linkedBoth(p), 20_000);
+    assert.deepEqual(p.a.linksOf(p.keyB), ['lan']);
+    assert.deepEqual(p.b.linksOf(p.keyA), ['lan']);
+  } finally {
+    await Promise.all([p.a.stop(), p.b.stop()]);
+  }
+});
+
+test('présence : borne arrêtée, hors ligne après la tolérance, vue à l’arrêt ; redémarrée, les deux reconvergent', async () => {
+  const bus = new Set<unknown>();
+  const p = friendsPair({ beacons: () => net.memoryBeacons(bus), graceMs: 1_000, searchMs: 300 });
+  let b2: Net | undefined;
+  try {
+    await Promise.all([p.a.start(), p.b.start()]);
+    await until('en ligne des deux côtés', () => linkedBoth(p));
+    const stoppedAt = Date.now();
+    await p.b.stop();
+    assert.equal(p.a.online(p.keyB), true, 'pendant la tolérance, encore en ligne');
+    assert.equal(p.a.listSync(), 'updating');
+    await until('hors ligne', () => !p.a.online(p.keyB), 3_000);
+    const offlineAt = Date.now();
+    const lastSeen = Date.parse(p.a.state().friends[0]!.lastSeen!);
+    // « Vu » : à la chute de la liaison, pas à la fin de la tolérance.
+    assert.ok(lastSeen >= stoppedAt - 50 && lastSeen <= stoppedAt + 500, `vu ${lastSeen - stoppedAt} ms après l’arrêt`);
+    assert.ok(offlineAt - lastSeen >= 900, 'hors ligne seulement passé la tolérance');
+    assert.equal(p.a.listSync(), 'settled');
+    assert.ok(p.logs[0]!.some((l) => /Bruno hors ligne \(dernière liaison fermée il y a \d+ s\)/.test(l)));
+    // Bruno redémarre : chacun revoit l'autre.
+    b2 = p.reopen(1);
+    await b2.start();
+    await until('en ligne de nouveau, des deux côtés', () => linkedBoth(p, p.a, b2!), 10_000);
+  } finally {
+    await Promise.all([p.a.stop(), p.b.stop(), b2?.stop()]);
+  }
+});
+
+test('présence : entrant bloqué d’un côté (pare-feu), la liaison sortante suffit aux deux, sans clignotement', async () => {
+  const testnet = await createTestnet(3, { host: '127.0.0.1' });
+  // Alice refuse l'entrant : sa balise sort, celle de Bruno ne lui arrive pas, les appels de Bruno échouent.
+  const listeners = new Map<string, BeaconListener>();
+  let deaf = '';
+  const beacons = (me: string) => ({
+    async start(onBeacon: BeaconListener) {
+      listeners.set(me, onBeacon);
+    },
+    announce(beacon: Beacon) {
+      for (const [key, l] of listeners) if (key !== me && key !== deaf) l(beacon, '127.0.0.1');
+    },
+    async stop() {
+      listeners.delete(me);
+    },
+  });
+  const p = friendsPair({ bootstrap: testnet.bootstrap, beacons, graceMs: 300, refuseIncoming: (i) => i === 0 });
+  deaf = p.keyA;
+  try {
+    await Promise.all([p.a.start(), p.b.start()]);
+    await until('en ligne des deux côtés par la liaison sortante d’Alice', () => linkedBoth(p), 20_000);
+    const seen = watch(() => p.a.online(p.keyB) && p.b.online(p.keyA));
+    await new Promise((r) => setTimeout(r, 2_000));
+    seen.stop();
+    assert.equal(seen.misses(), 0, 'présence cohérente et stable des deux côtés');
+    assert.deepEqual(p.a.linksOf(p.keyB), ['internet']);
+    assert.ok(p.logs[0]!.some((l) => /liaison Internet sortante avec Bruno ouverte/.test(l)), 'le sens est au journal');
+    assert.ok(p.logs[1]!.some((l) => /liaison Internet entrante avec Alice ouverte/.test(l)));
+  } finally {
+    await Promise.all([p.a.stop(), p.b.stop()]);
+    await testnet.destroy();
+  }
 });

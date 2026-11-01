@@ -1055,6 +1055,32 @@ body.mouse .media-card[data-act]:hover {
   background: repeating-linear-gradient(135deg, var(--line-strong) 0 1.1cqmin, transparent 1.1cqmin 2.2cqmin);
 }
 
+/*
+ * Recherche en cours (la liste des amis se fait) : une bande qui va et vient, la seule à bouger
+ * sans geste parce que quelque chose est attendu du réseau. Mouvement réduit : bande fixe.
+ */
+.lib-row-progress.busy > span {
+  width: 30%;
+  animation: lib-row-busy 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes lib-row-busy {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(233%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lib-row-progress.busy > span {
+    width: 100%;
+    animation: none;
+    background: repeating-linear-gradient(135deg, var(--meta) 0 1.1cqmin, transparent 1.1cqmin 2.2cqmin);
+  }
+}
+
 /* Attente d'un site ou téléchargement en cours : barre sous les faits. */
 .media-progress {
   height: 0.6vmin;

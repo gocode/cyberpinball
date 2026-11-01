@@ -362,7 +362,7 @@ export interface Row {
   /** Seconde ligne, mot et signe : à quoi sert un fichier (« ✓ Installé avec… », « ! À installer… »). */
   note?: { text: string; sign: string; tone: Tone };
   /** Barre d'un téléchargement sous la ligne (Téléchargements) : `value` de 0 à 1, absente si la taille est inconnue. */
-  progress?: { value?: number; tone?: Tone };
+  progress?: { value?: number; tone?: Tone; busy?: boolean };
   /** Schéma de l'écran du DMD à droite de la ligne (« Écran du DMD ») : FullDMD ou DMD seul en bande. */
   figure?: 'fulldmd' | 'dmd';
 }
@@ -3373,7 +3373,9 @@ export function createLibrary(host: LibraryHost) {
    * ne dépend pas du rang des actions, qui change quand on en ajoute une), et
    * « until:phase » (attendre que le menu passe à cette phase, playing ou menu par
    * exemple, deux minutes au plus : une démonstration ne parie pas sur la durée des
-   * étapes, qui varie avec le nombre d'écrans et leur définition), « copy:source|destination »
+   * étapes, qui varie avec le nombre d'écrans et leur définition), « until-action:libellé »
+   * (attendre que l'écran affiché ait cette action, deux minutes au plus : une invitation d'ami
+   * arrive quand sa liaison est faite), « copy:source|destination »
    * et « remove:chemin » (fichier posé ou retiré pendant que le menu tourne, comme à la main :
    * le guet des dossiers, mediawatch.ts, doit le faire voir sans redémarrer), « hold:code » et
    * « release:code » (bouton tenu puis relâché : combinaison de déverrouillage du mode invité ;
@@ -3407,6 +3409,12 @@ export function createLibrary(host: LibraryHost) {
           const wanted = step.slice(6);
           for (let waited = 0; phase() !== wanted && waited < 120_000; waited += 100) await delay(100);
           if (phase() !== wanted) console.log(`Autopilote : phase « ${wanted} » jamais atteinte (encore « ${phase()} » après deux minutes).`);
+        } else if (step.startsWith('until-action:')) {
+          // Une action qui dépend du réseau (l'invitation d'un ami, sa liaison faite) : attendue, pas pariée.
+          const wanted = step.slice('until-action:'.length);
+          const present = () => actionIndex(screen ? build().actions : [], wanted) >= 0;
+          for (let waited = 0; !present() && waited < 120_000; waited += 200) await delay(200);
+          if (!present()) console.log(`Autopilote : action « ${wanted} » jamais apparue (deux minutes).`);
         }
         else if (step.startsWith('click:')) await click(playfield, step.slice(6));
         else if (step.startsWith('copy:')) {
@@ -3459,20 +3467,8 @@ export function createLibrary(host: LibraryHost) {
   /** Étape « action:libellé » de l'autopilote ; une action introuvable est signalée (les démonstrations la cherchent). */
   function activateByLabel(wanted: string): void {
     const actions = screen ? build().actions : [];
-    // Les démonstrations nomment l'action en français (la clé du catalogue) : dans une
-    // autre langue, on cherche aussi sa traduction, et celles des libellés qu'elle commence.
-    const catalog = messagesOf(language());
-    const names = [wanted, catalog[wanted]].filter((n): n is string => Boolean(n));
-    const starts = Object.entries(catalog)
-      .filter(([source]) => source !== wanted && source.startsWith(wanted))
-      .map(([, text]) => text.split('{')[0]!)
-      .filter(Boolean);
-    const exact = actions.findIndex((a) => names.includes(a.label));
-    const prefix = exact >= 0 ? exact : actions.findIndex((a) => names.some((n) => a.label.startsWith(n)));
-    const start = prefix >= 0 ? prefix : actions.findIndex((a) => starts.some((n) => a.label.startsWith(n)));
-    // Ou qui le contient : un libellé à virgule (« Médias, son et attente ») ne s'écrit pas en
-    // entier, les étapes de CYBERPINBALL_AUTOPILOT étant séparées par des virgules.
-    const index = start >= 0 ? start : actions.findIndex((a) => names.some((n) => a.label.includes(n)));
+    const names = labelNames(wanted);
+    const index = actionIndex(actions, wanted);
     // Entrée du menu système rangée dans une autre rubrique : on y va, comme on l'aurait ouverte
     // (les démonstrations nomment l'entrée, pas le chemin, qui change quand l'arbre change).
     if (index < 0 && screen?.kind === 'system') {
@@ -3488,6 +3484,29 @@ export function createLibrary(host: LibraryHost) {
     }
     if (index < 0) return console.log(`Autopilote : aucune action « ${wanted} » sur cet écran (${actions.map((a) => a.label).join(' · ') || 'aucune action'}).`);
     handleAction({ type: 'activate', index });
+  }
+
+  /** Le libellé cherché par l'autopilote, et sa traduction : les démonstrations nomment l'action en français (la clé du catalogue). */
+  function labelNames(wanted: string): string[] {
+    const catalog = messagesOf(language());
+    return [wanted, catalog[wanted]].filter((n): n is string => Boolean(n));
+  }
+
+  /** L'action de `actions` qui porte ce libellé (« action:libellé », « until-action:libellé »), ou -1. */
+  function actionIndex(actions: readonly { label: string }[], wanted: string): number {
+    // Dans une autre langue, on cherche aussi sa traduction, et celles des libellés qu'elle commence.
+    const catalog = messagesOf(language());
+    const names = labelNames(wanted);
+    const starts = Object.entries(catalog)
+      .filter(([source]) => source !== wanted && source.startsWith(wanted))
+      .map(([, text]) => text.split('{')[0]!)
+      .filter(Boolean);
+    const exact = actions.findIndex((a) => names.includes(a.label));
+    const prefix = exact >= 0 ? exact : actions.findIndex((a) => names.some((n) => a.label.startsWith(n)));
+    const start = prefix >= 0 ? prefix : actions.findIndex((a) => starts.some((n) => a.label.startsWith(n)));
+    // Ou qui le contient : un libellé à virgule (« Médias, son et attente ») ne s'écrit pas en
+    // entier, les étapes de CYBERPINBALL_AUTOPILOT étant séparées par des virgules.
+    return start >= 0 ? start : actions.findIndex((a) => names.some((n) => a.label.includes(n)));
   }
 
   return {

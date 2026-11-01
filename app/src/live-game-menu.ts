@@ -11,6 +11,7 @@ import {
   countdownLeft,
   displayName,
   formatNumber,
+  friendsListLine,
   language,
   LIVE_INVITE_MS,
   LIVE_MAX_PLAYERS,
@@ -22,6 +23,8 @@ import {
   liveCandidate,
   liveChoiceDetail,
   liveFitLabel,
+  liveManualLabel,
+  liveManualScoreLabel,
   liveOtherBalls,
   liveRanked,
   liveScore,
@@ -34,6 +37,7 @@ import {
   type LiveFriendFit,
   type LiveFriendTables,
   type LiveGame,
+  type LiveManualReason,
   type LiveMineTable,
   type LivePlayer,
   type GamePart,
@@ -53,7 +57,7 @@ export interface LiveMenuHost {
     /** Cet écran décrit est affiché. */
     isShowing?(build: () => Built): boolean;
   };
-  net: Pick<SocialNet, 'state' | 'online' | 'presenceOf'>;
+  net: Pick<SocialNet, 'state' | 'online' | 'presenceOf' | 'listSync'>;
   games: LiveGames;
   tables(): readonly TableEntry[];
   /** Ce qu'on sait des tables de cet ami (sa bibliothèque partagée, la version de chacune) : le choix de la table en tient compte. */
@@ -106,7 +110,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   /** Écran d'où l'on est venu dans la partie en cours. */
   let gameBack: () => void = () => undefined;
   /** Ce que j'ai de la table de chaque invitation, vérifié à son ouverture. */
-  const matches = new Map<string, { match: LiveTableMatch; balls?: number; scriptDiffers?: boolean }>();
+  const matches = new Map<string, { match: LiveTableMatch; balls?: number; scriptDiffers?: boolean; manual?: LiveManualReason }>();
   let followed: { id: string; phase: LiveGame['phase'] } | undefined;
   /** La dernière partie dont les résultats, finis, ont été montrés. */
   let resultsSeen: string | undefined;
@@ -115,6 +119,8 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     p.state === 'accepted' || p.state === 'playing' || p.state === 'done' || (p.state === 'loading' && p.ready) ? 'ok' : p.state === 'declined' || p.state === 'failed' || p.state === 'left' ? 'quiet' : p.state === 'busy' || p.state === 'expired' ? 'warning' : undefined;
 
   /** En partie sur sa borne : une invitation lui arrive en notification discrète sur sa table. */
+  /** La liste des amis se fait encore (friendpresence.ts) : un ami absent n'est pas sûr. */
+  const searching = () => ['searching', 'updating'].includes(host.net.listSync());
   const playingNow = (key: string) => host.net.online(key) && host.net.presenceOf(key)?.status === 'playing';
 
   function playerRows(game: LiveGame): Row[] {
@@ -134,6 +140,32 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
 
   function tableRow(game: Pick<LiveGame, 'title' | 'table'>): Row {
     return { text: game.title, detail: game.table.version ? t('Version : {version}', { version: game.table.version }) : undefined, icon: 'play' };
+  }
+
+  /**
+   * Une table sans relevé de l'état de jeu (départ manuel, pas de score en direct) : dit avant la
+   * partie, avec sa raison, sans la cacher ni l'interdire (essai réel du 01/11/2026, 2001 - A Space Odyssey).
+   */
+  const manualRows = (reason: LiveManualReason | undefined): Row[] => {
+    if (!reason) return [];
+    const label = liveManualLabel(reason);
+    return [{ text: label.text, detail: label.detail, tone: 'warning', icon: 'alert' }];
+  };
+
+  /** Le relevé prévu de mes tables, calculé à la demande (script lu une fois par fichier) : le choix se redessine à l'arrivée. */
+  const mineManual = new Map<string, { reason?: LiveManualReason; done: boolean }>();
+  function manualOfMine(table: TableEntry): LiveManualReason | undefined {
+    const known = mineManual.get(table.file);
+    if (known) return known.reason;
+    mineManual.set(table.file, { done: false });
+    void games.manualOf(table).then(
+      (reason) => {
+        mineManual.set(table.file, { ...(reason ? { reason } : {}), done: true });
+        if (reason) host.redraw();
+      },
+      () => mineManual.set(table.file, { done: true }),
+    );
+    return undefined;
   }
 
   /** Le record du groupe à battre, sur cette version de la table (groupboard.ts). */
@@ -228,7 +260,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
 
   function friendAction(key: string, back: () => void): Action {
     const base = { label: t('Inviter à une partie en direct'), icon: 'gamepad' as const };
-    if (!host.net.online(key)) return { ...base, detail: t('Hors ligne : invitez-le quand il sera connecté'), tone: 'quiet', run: () => undefined };
+    if (!host.net.online(key)) return { ...base, detail: searching() ? t('Hors ligne pour l’instant : la recherche des amis continue') : t('Hors ligne : invitez-le quand il sera connecté'), tone: 'quiet', run: () => undefined };
     const detail = playingNow(key) ? t('En partie : il recevra une notification discrète sur sa table') : t('Chacun sur sa borne, au même moment');
     return { ...base, detail, tone: 'ok', run: () => inviteFriend(key, back) };
   }
@@ -238,7 +270,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const online = friends.filter((f) => host.net.online(f.key)).length;
     const base = { label: t('Jouer avec un ami'), icon: 'gamepad' as const };
     if (!friends.length) return { ...base, detail: t('Pas encore d’ami : Menu système > Amis > Trouver un joueur'), tone: 'quiet', run: () => undefined };
-    if (!online) return { ...base, detail: t('Aucun ami en ligne pour l’instant'), tone: 'quiet', run: () => undefined };
+    if (!online) return { ...base, detail: searching() ? t('Recherche des amis…') : t('Aucun ami en ligne pour l’instant'), tone: 'quiet', run: () => undefined };
     return { ...base, detail: tn(online, '{n} ami en ligne : chacun sur sa borne, au même moment', '{n} amis en ligne : chacun sur sa borne, au même moment'), tone: 'ok', run: () => host.library.openCustom(() => buildChooseFriend(table, back)) };
   }
 
@@ -253,6 +285,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const offline = all.filter((f) => !fits.has(f.key)).sort((a, b) => a.name.localeCompare(b.name));
     const reopen = () => host.library.openCustom(() => buildChooseFriend(table, back));
     const actions: Action[] = [];
+    const manual = manualRows(manualOfMine(table));
     const rows: Row[] = online.map((f) => {
       const fit = fits.get(f.key)!;
       const fetch = fit.fit === 'other-version' && host.openFriendTable;
@@ -263,10 +296,13 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       return { text: label(f.key, f.name), detail, icon: 'friend-list', tone: fitTone(fit), action: index, pick: true };
     });
     actions.push({ label: t('Retour'), icon: 'back', run: back });
-    const sections: Section[] = [];
+    const sections: Section[] = manual.length ? [{ rows: manual }] : [];
+    // La liste est-elle sûre ? Un ami encore cherché n'est pas donné pour absent.
+    const sync = friendsListLine(host.net.listSync(), online.length);
+    if (sync) sections.push({ rows: [{ text: sync.text, detail: sync.detail, tone: sync.tone, icon: 'network', ...(sync.busy ? { progress: { tone: 'info', busy: true } } : {}) }] });
     if (rows.length) sections.push({ title: t('En ligne ({n})', { n: online.length }), rows });
     else sections.push({ rows: [{ text: t('Aucun ami en ligne pour l’instant'), detail: t('Ils apparaissent ici dès qu’ils allument leur borne'), tone: 'info' }] });
-    if (offline.length) sections.push({ title: t('Hors ligne ({n})', { n: offline.length }), rows: offline.map((f) => ({ text: label(f.key, f.name), detail: t('Hors ligne'), icon: 'friend-list', tone: 'quiet' })) });
+    if (offline.length) sections.push({ title: t('Hors ligne ({n})', { n: offline.length }), rows: offline.map((f) => ({ text: label(f.key, f.name), detail: searching() ? t('Hors ligne pour l’instant : la recherche des amis continue') : t('Hors ligne'), icon: 'friend-list', tone: 'quiet' })) });
     return {
       heading: t('Jouer avec un ami'),
       icon: 'gamepad',
@@ -314,10 +350,14 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       const other = c.fit === 'blocked' && host.openFriendTable ? c.friends.find((f) => f.fit === 'other-version') : undefined;
       const run = c.fit !== 'blocked' ? () => inviteAll(c.entry, keys, back) : other ? () => fetchVersion(other.key, c.entry, reopen) : () => undefined;
       const index = actions.push({ label: c.entry.title, key: `table:${c.entry.file}`, icon: 'play', run }) - 1;
+      // Jouable, mais sans relevé : la marque et sa raison, jamais cachée.
+      const manual = c.fit !== 'blocked' ? manualOfMine(c.entry) : undefined;
+      const marked = manual ? liveManualLabel(manual) : undefined;
       return {
         text: fullTitle(c.entry),
-        detail: [c.entry.version, liveChoiceDetail(c), other ? t('Start : récupérer sa version chez {name}', { name: other.name }) : undefined].filter(Boolean).join(' · '),
+        detail: [c.entry.version, liveChoiceDetail(c), marked ? `${marked.text} : ${marked.detail}` : undefined, other ? t('Start : récupérer sa version chez {name}', { name: other.name }) : undefined].filter(Boolean).join(' · '),
         tone: c.fit === 'same' ? 'ok' : c.fit === 'unknown' ? 'warning' : 'quiet',
+        ...(marked ? { badges: [t('Départ manuel')] } : {}),
         action: index,
         pick: true,
       };
@@ -427,7 +467,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       lead: hosting ? t('Lancez quand vos amis sont prêts : un compte à rebours commun, puis la table se lance sur chaque borne.') : t('En attente du départ donné par {name}.', { name: hostPlayer?.name ?? '?' }),
       sections: [
         ...takeFlash(),
-        { rows: [tableRow(game), ...(myself?.host ? [] : ballsRow(myself?.balls, game.table.balls)), boardRow()] },
+        { rows: [tableRow(game), ...manualRows(game.table.manual), ...(myself?.host ? [] : ballsRow(myself?.balls, game.table.balls)), boardRow()] },
         { title: t('Joueurs ({n} sur {max})', { n: seats, max: LIVE_MAX_PLAYERS }), rows: playerRows(game) },
       ],
       actions,
@@ -502,7 +542,9 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     const score = liveScore(p);
     const who = p.key === myKey() ? t('{name} (vous)', { name: label(p.key, p.name) }) : label(p.key, p.name);
     const played = p.seconds !== undefined ? playDuration(p.seconds) : undefined;
-    const reason = p.multi
+    const reason = p.manual && score === undefined
+      ? liveManualScoreLabel()
+      : p.multi
       ? t('Hors classement : plusieurs joueurs dans sa table')
       : p.host
         ? undefined
@@ -588,7 +630,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     // La table vérifiée d'abord : l'écran s'ouvre avec toutes ses actions, le curseur sur la première.
     void games.matchFor(invite).then(
       (m) => {
-        matches.set(id, { match: m.match, ...(m.balls ? { balls: m.balls } : {}), ...(m.scriptDiffers ? { scriptDiffers: true } : {}) });
+        matches.set(id, { match: m.match, ...(m.balls ? { balls: m.balls } : {}), ...(m.scriptDiffers ? { scriptDiffers: true } : {}), ...(m.manual ? { manual: m.manual } : {}) });
         show();
       },
       () => show(),
@@ -611,6 +653,8 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
           ? [otherVersionRow(invite.host.name, found?.scriptDiffers)]
           : [{ text: liveMatchLabel(match), tone: match === 'same' ? 'ok' : 'error' } as Row]),
       ...(match === 'same' ? ballsRow(found?.balls, invite.table.balls) : []),
+      // Sans relevé chez lui ou chez moi : départ manuel, pas de score en direct, dit avant d'accepter.
+      ...manualRows(found?.manual ?? invite.table.manual),
     ];
     if (invite.players.length) rows.push({ text: t('Avec {names}', { names: invite.players.map((p) => p.name).join(', ') }), icon: 'friends' });
     const actions: Action[] = [];

@@ -18,11 +18,14 @@ import {
   addEvent,
   blockPlayer,
   cancelRequest,
+  createPresenceBook,
   declineRequest,
   directorySample,
   DIRECTORY_TOPIC,
   FILE_CHUNK,
   friendSeen,
+  friendsListSync,
+  knownName,
   grantBadges,
   learnProfiles,
   loadSocial,
@@ -31,6 +34,7 @@ import {
   parseSocialMessage,
   peerProfile,
   playerSeed,
+  PRESENCE_SEARCH_MS,
   receiveEvents,
   receiveReply,
   relationOf,
@@ -45,6 +49,7 @@ import {
   syncReply,
   unblockPlayer,
   verifyProfile,
+  type FriendsListSync,
   type LibraryMessage,
   type LiveMessage,
   type PlayStats,
@@ -59,9 +64,20 @@ import {
 } from '@cyberpinball/core';
 
 /* eslint-disable @typescript-eslint/no-require-imports -- paquets sans types, chargés seulement quand le réseau démarre */
-type Duplex = NodeJS.ReadWriteStream & { remotePublicKey: Buffer; isInitiator: boolean; destroy(err?: Error): void; on(event: string, fn: (...args: never[]) => void): Duplex };
+type Duplex = NodeJS.ReadWriteStream & {
+  remotePublicKey: Buffer;
+  isInitiator: boolean;
+  destroyed?: boolean;
+  destroying?: boolean;
+  /** NoiseSecretStream : fermé si rien n'est reçu pendant ce délai. */
+  setTimeout?(ms: number): void;
+  destroy(err?: Error): void;
+  on(event: string, fn: (...args: never[]) => void): Duplex;
+};
 interface Swarm {
   keyPair: { publicKey: Buffer };
+  /** Pairs connus de Hyperswarm (clé hex) : `attempts` compte les échecs depuis la dernière liaison durable. */
+  peers: Map<string, { attempts: number }>;
   on(event: 'connection', fn: (conn: Duplex) => void): void;
   join(topic: Buffer, opts: { server: boolean; client: boolean }): { flushed(): Promise<void>; refresh(opts: { server: boolean; client: boolean }): Promise<void> };
   leave(topic: Buffer): Promise<void>;
@@ -87,6 +103,25 @@ const DIRECTORY_REFRESH_MS = 3 * 60_000;
 const MESSAGE_MAX = 256 * 1024;
 /** Évènements envoyés à un ami à la connexion (les plus récents). */
 const EVENTS_ON_CONNECT = 10;
+/**
+ * Liaison Internet muette au-delà de ce délai : fermée. HyperDHT envoie un signe de vie toutes
+ * les 5 s des deux côtés (toutes versions) ; sans ce délai, une borne qui a planté ou changé de
+ * réseau resterait « en ligne » chez l'autre, qui ne la voit plus (présence asymétrique).
+ */
+const LINK_TIMEOUT_MS = 20_000;
+/** Liaison du réseau local : sondes TCP (le système ferme la socket si la borne ne répond plus). */
+const LAN_KEEPALIVE_MS = 5_000;
+/**
+ * Ami suivi sans liaison : on relance Hyperswarm à ce rythme. Après quatre échecs (borne éteinte,
+ * réseau pas encore prêt au démarrage, connexions brèves), Hyperswarm attend dix minutes avant
+ * de réessayer un pair, et ne le reprend même plus quand l'annuaire le retrouve.
+ */
+const REDIAL_FAST_MS = 5_000;
+const REDIAL_SLOW_MS = 30_000;
+/** Durée de la relance rapide, depuis le démarrage ou un changement de réseau. */
+const REDIAL_FAST_FOR_MS = 2 * 60_000;
+/** Balise d'un ami reçue sans liaison locale : la borne qui n'appelle pas d'habitude appelle passé ce délai. */
+const LAN_FALLBACK_MS = 2 * BEACON_MS;
 
 export interface NetStatus {
   mode: SocialNetMode;
@@ -125,6 +160,11 @@ export interface SocialNetOptions {
   /** Quelque chose a changé (un ami en ligne, une demande reçue) : redessiner. */
   onChange?: () => void;
   log?: (line: string) => void;
+  /** Essais : tolérance avant « hors ligne » et durée de la recherche du démarrage (friendpresence.ts). */
+  graceMs?: number;
+  searchMs?: number;
+  /** Essais : l'entrant refusé, comme derrière un pare-feu qui le bloque (seules les liaisons sortantes passent). */
+  refuseIncoming?: boolean;
 }
 
 /** Messages des services posés sur le réseau des amis : bibliothèque partagée, partie en direct. */
@@ -138,6 +178,10 @@ interface Link {
   via: 'internet' | 'lan';
   /** Bonjour reçu sur cette connexion : la resynchronisation (syncReply) se fait à chacune. */
   greeted?: boolean;
+  /** Ouverture (ms), pour la durée au journal. */
+  opened: number;
+  /** Dernière erreur du flux : la raison de sa fermeture au journal. */
+  error?: string;
 }
 
 interface Peer {
@@ -146,6 +190,8 @@ interface Peer {
   profile?: Profile;
   presence?: Presence;
   lan?: { host: string; port: number };
+  /** Première balise reçue sans liaison locale (ms) : passé LAN_FALLBACK_MS, cette borne appelle aussi. */
+  lanWaiting?: number;
 }
 
 export interface SocialNet {
@@ -153,9 +199,16 @@ export interface SocialNet {
   /** Réseau simulé : ses nœuds d'amorçage (127.0.0.1), pour les bornes fictives de la démonstration. */
   simulatedBootstrap(): { host: string; port: number }[] | undefined;
   status(): NetStatus;
-  /** Ami relié en ce moment. */
+  /**
+   * Ami en ligne : au moins une liaison saluée, quelle qu'elle soit, ou la dernière tombée il y a
+   * moins que la tolérance (friendpresence.ts).
+   */
   online(key: string): boolean;
   presenceOf(key: string): Presence | undefined;
+  /** La liste des amis est-elle sûre, ou encore en train de se faire ? */
+  listSync(): FriendsListSync;
+  /** Liaisons saluées avec ce pair en ce moment (fiche d'un ami, essais) : par où passe la présence. */
+  linksOf(key: string): Link['via'][];
   start(): Promise<void>;
   stop(): Promise<void>;
   setEnabled(on: boolean): Promise<void>;
@@ -195,17 +248,25 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   const log = (line: string) => opts.log?.(line);
   let state = loadSocial(opts.dataDir, now());
   const peers = new Map<string, Peer>();
+  /** Qui est en ligne : liaisons saluées, tolérance après la dernière (friendpresence.ts). */
+  const book = createPresenceBook(opts.graceMs);
   let swarm: Swarm | undefined;
-  let dht: { destroy(): Promise<void> } | undefined;
+  let dht: { destroy(): Promise<void>; on?(event: string, fn: () => void): void } | undefined;
   let testnet: { destroy(): Promise<void>; bootstrap: { host: string; port: number }[] } | undefined;
   let tcp: net.Server | undefined;
   let tcpPort = 0;
   let beacons: LanBeacons | undefined;
   let beaconTimer: NodeJS.Timeout | undefined;
   let refreshTimer: NodeJS.Timeout | undefined;
+  let graceTimer: NodeJS.Timeout | undefined;
+  let searchTimer: NodeJS.Timeout | undefined;
+  let redialTimer: NodeJS.Timeout | undefined;
+  /** Démarrage du réseau, ou dernier changement de réseau (ms) : la recherche des amis part de là. */
+  let startedAt: number | undefined;
   let presence: Presence = { status: 'menu', since: now().toISOString() };
   let status: NetStatus = { mode: opts.mode, running: false, internet: false, lan: false, peers: 0 };
   let starting: Promise<void> | undefined;
+  const ms = () => now().getTime();
 
   const changed = () => {
     status = { ...status, peers: [...peers.values()].filter((p) => p.links.size).length };
@@ -221,8 +282,52 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     changed();
   }
 
+  /** Depuis un minuteur ou la fermeture d'un flux : un enregistrement impossible se dit au journal, sans tout arrêter. */
+  function commitQuietly(next: SocialState): void {
+    try {
+      commit(next);
+    } catch (error) {
+      log(`Réseau des bornes : enregistrement impossible (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+  }
+
+  // ---------- Journal ----------
+
+  const nameOf = (key: string) => peers.get(key)?.profile?.name ?? knownName(state, key) ?? key.slice(0, 8);
+  /** Amis et demandes suivis : leurs liaisons vont au journal ; celles des inconnus de l'annuaire, non. */
+  const followed = new Set<string>();
+  const traced = (key: string) => followed.has(key) || relationOf(state, key) === 'friend';
+  const said = new Map<string, number>();
+  /** Une même ligne au plus une fois par période (un appel local qui échoue à chaque balise). */
+  function logEvery(id: string, everyMs: number, line: string): void {
+    const last = said.get(id);
+    if (last !== undefined && ms() - last < everyMs) return;
+    said.set(id, ms());
+    log(line);
+  }
+  const viaText = (v: Link['via']) => (v === 'lan' ? 'réseau local' : 'Internet'); // i18n-ignore : journal
+  /**
+   * Liaisons saluées avec des amis depuis le démarrage, par sens. Une borne dont l'entrant est
+   * bloqué (pare-feu de Windows) n'a que des sortantes : la présence tient par elles, mais les
+   * appels de l'autre borne échouent ; le journal le dit.
+   */
+  const opened = { outgoing: 0, incoming: 0 };
+  function countDirection(link: Link): void {
+    if (link.stream.isInitiator) opened.outgoing++;
+    else opened.incoming++;
+    if (opened.outgoing >= 3 && opened.incoming === 0) logEvery('only-outgoing', 30 * 60_000, `Réseau des bornes : seules des liaisons sortantes ont abouti (${opened.outgoing}, aucune entrante) ; si l'autre borne note « appel local … impossible », l'entrant de celle-ci est bloqué (pare-feu de Windows).`); // i18n-ignore : journal
+  }
+
+  // ---------- Envoi ----------
+
+  /** La liaison où écrire : vivante, saluée de préférence, la plus récente d'abord (l'ancienne d'un doublon se ferme). */
+  function bestLink(key: string): Link | undefined {
+    const links = [...(peers.get(key)?.links ?? [])].filter((l) => !l.stream.destroyed && !l.stream.destroying).reverse();
+    return links.find((l) => l.greeted) ?? links[0];
+  }
+
   function sendTo(key: string, message: SocialMessage): boolean {
-    const link = [...(peers.get(key)?.links ?? [])][0];
+    const link = bestLink(key);
     if (!link) return false;
     link.send(message);
     return true;
@@ -244,6 +349,66 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     sendTo(key, { t: 'events', events: state.events.slice(0, EVENTS_ON_CONNECT) });
   }
 
+  // ---------- Présence ----------
+
+  /**
+   * Fin de tolérance : l'ami sans nouvelle liaison est hors ligne, vu pour la dernière fois à la
+   * chute de sa dernière liaison (pas à l'heure où on s'en aperçoit).
+   */
+  function expireGrace(): void {
+    graceTimer = undefined;
+    for (const { key, lastAlive } of book.expire(ms())) {
+      const peer = peers.get(key);
+      if (peer) peer.presence = undefined;
+      if (relationOf(state, key) !== 'friend') continue;
+      commitQuietly(friendSeen(state, key, new Date(lastAlive)));
+      log(`Réseau des bornes : ${nameOf(key)} hors ligne (dernière liaison fermée il y a ${Math.round((ms() - lastAlive) / 1000)} s).`); // i18n-ignore : journal
+    }
+    scheduleGrace();
+    changed();
+  }
+
+  function scheduleGrace(): void {
+    if (graceTimer) clearTimeout(graceTimer);
+    graceTimer = undefined;
+    const at = book.nextExpiry();
+    if (at === undefined) return;
+    graceTimer = setTimeout(expireGrace, Math.max(0, at - ms()) + 10);
+    graceTimer.unref?.();
+  }
+
+  /** Recherche des amis : au démarrage, et après un changement de réseau. */
+  function beginSearch(): void {
+    startedAt = ms();
+    if (searchTimer) clearTimeout(searchTimer);
+    // Fin de la recherche : la liste devient sûre, le dire à l'écran.
+    searchTimer = setTimeout(changed, (opts.searchMs ?? PRESENCE_SEARCH_MS) + 10);
+    searchTimer.unref?.();
+    scheduleRedial(REDIAL_FAST_MS);
+  }
+
+  /**
+   * Amis et demandes suivis sans liaison : on redemande à Hyperswarm de les joindre. Il a pu
+   * renoncer pour dix minutes (quatre échecs), et l'annuaire ne les lui rend pas dans cet état.
+   */
+  function redial(): void {
+    redialTimer = undefined;
+    if (!swarm) return;
+    for (const key of followed) {
+      if (peers.get(key)?.links.size) continue;
+      const attempts = swarm.peers.get(key)?.attempts ?? 0;
+      if (attempts > 3) logEvery(`redial:${key}`, 10 * 60_000, `Réseau des bornes : ${nameOf(key)} injoignable après ${attempts} essais ; Hyperswarm relancé sans attendre ses dix minutes.`); // i18n-ignore : journal
+      swarm.joinPeer(Buffer.from(key, 'hex'));
+    }
+    scheduleRedial(startedAt !== undefined && ms() - startedAt < REDIAL_FAST_FOR_MS ? REDIAL_FAST_MS : REDIAL_SLOW_MS);
+  }
+
+  function scheduleRedial(delay: number): void {
+    if (redialTimer) clearTimeout(redialTimer);
+    redialTimer = setTimeout(redial, delay);
+    redialTimer.unref?.();
+  }
+
   // ---------- Connexions ----------
 
   function attach(stream: Duplex, via: Link['via']): void {
@@ -257,6 +422,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     const mux = Protomux.from(stream);
     const channel = mux.createChannel({ protocol: SOCIAL_PROTOCOL, onclose: () => detach() });
     if (!channel) return; // canal déjà ouvert sur ce flux
+    // Liaison Internet muette (borne plantée, réseau changé) : fermée ; le réseau local a ses sondes TCP.
+    if (via === 'internet') stream.setTimeout?.(LINK_TIMEOUT_MS);
     const message = channel.addMessage({
       encoding: c.string,
       onmessage: (text: string) => {
@@ -282,23 +449,32 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         for (const listener of chunkListeners) listener(key, frame);
       },
     });
-    const link: Link = { stream, via, send: (m) => message.send(JSON.stringify(m)), sendChunk: (frame) => chunk.send(frame) !== false };
+    const link: Link = { stream, via, opened: ms(), send: (m) => message.send(JSON.stringify(m)), sendChunk: (frame) => chunk.send(frame) !== false };
     const peer = peers.get(key) ?? { key, links: new Set<Link>() };
     peers.set(key, peer);
     peer.links.add(link);
+    if (via === 'lan') peer.lanWaiting = undefined;
     let gone = false;
+    // Une liaison qui tombe ne retire pas l'ami : il reste en ligne par une autre, ou le temps de la tolérance.
+    // Rien ne s'enregistre ici : « vu » se date à la fin de la tolérance.
     const detach = () => {
       if (gone) return;
       gone = true;
       peer.links.delete(link);
-      if (!peer.links.size) {
-        peer.presence = undefined;
-        if (relationOf(state, key) === 'friend') commit(friendSeen(state, key, now()));
+      book.down(key, link, ms());
+      if (traced(key)) {
+        const rest = book.links(key);
+        const after = rest ? `${rest} autre(s) liaison(s)` : book.pending(key) ? 'tolérance avant « hors ligne »' : 'plus de liaison'; // i18n-ignore : journal
+        log(`Réseau des bornes : liaison ${viaText(via)} avec ${nameOf(key)} fermée (${link.error ?? 'fin normale'}${link.greeted ? '' : ', avant le bonjour'}, après ${Math.round((ms() - link.opened) / 1000)} s ; ${after}).`); // i18n-ignore : journal
       }
+      scheduleGrace();
       changed();
     };
     stream.on('close', detach);
-    stream.on('error', () => detach());
+    stream.on('error', (error: Error) => {
+      link.error ??= error?.message ?? String(error);
+      detach();
+    });
     channel.open();
     link.send({ t: 'hello', profile: signProfile(state), dir: directorySample(state) });
     changed();
@@ -316,11 +492,19 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         const lan = [...peer.links].some((l) => l.via === 'lan');
         learn([message.profile], lan);
         learn(message.dir, false); // relayés : vus par lui, pas forcément à proximité
-        if (relationOf(state, key) === 'friend') commit(friendSeen(state, key, now()));
         if (first) {
+          // Bonjour reçu sur cette liaison : elle compte pour la présence.
+          const appeared = book.up(key, link, ms());
+          if (traced(key)) {
+            log(`Réseau des bornes : liaison ${viaText(link.via)} ${link.stream.isInitiator ? 'sortante' : 'entrante'} avec ${nameOf(key)} ouverte (${book.links(key)} liaison(s))${appeared ? ' : en ligne' : ''}.`); // i18n-ignore : journal
+            countDirection(link);
+          }
+          if (appeared && relationOf(state, key) === 'friend') commitQuietly(friendSeen(state, key, now()));
+          scheduleGrace();
           const sync = syncReply(state, key);
           if (sync) sendTo(key, { t: sync });
           if (relationOf(state, key) === 'friend') greetFriend(key);
+          changed();
         }
         return;
       }
@@ -361,7 +545,6 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   }
 
   /** Amis et demandes en cours : Hyperswarm les rejoint par leur clé ; les autres sont laissés. */
-  const followed = new Set<string>();
   function followPeers(): void {
     if (!swarm) return;
     const want = new Set([...state.friends.map((f) => f.key), ...state.outgoing.map((r) => r.key), ...state.incoming.map((r) => r.key)]);
@@ -369,10 +552,10 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     for (const key of followed) if (!want.has(key)) swarm.leavePeer(Buffer.from(key, 'hex'));
     followed.clear();
     for (const key of want) followed.add(key);
-    // Réseau local : se relier aux voisins qu'on suit, s'ils ne le sont pas déjà.
+    // Réseau local : se relier aux voisins qu'on suit, s'ils n'y sont pas déjà reliés par lui.
     for (const key of want) {
       const peer = peers.get(key);
-      if (peer?.lan && !peer.links.size) connectLan(key, peer.lan.host, peer.lan.port);
+      if (peer?.lan && !hasLanLink(peer)) connectLan(key, peer.lan.host, peer.lan.port);
     }
   }
 
@@ -384,20 +567,29 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     return new SecretStream(isInitiator, socket, { keyPair: DHT.keyPair(playerSeed(state.key)), ...(remotePublicKey ? { remotePublicKey } : {}) });
   }
 
+  const hasLanLink = (peer: Peer) => [...peer.links].some((l) => l.via === 'lan');
+
+  /** Réseau local en marche : un appel encore en vol quand on le coupe ne s'attache pas après. */
+  let lanActive = false;
   const dialing = new Set<string>();
   function connectLan(key: string, host: string, port: number): void {
-    if (dialing.has(key)) return;
+    if (!lanActive || dialing.has(key)) return;
     dialing.add(key);
     const socket = net.connect({ host, port });
+    socket.setKeepAlive(true, LAN_KEEPALIVE_MS);
     const stream = secretStream(true, socket, Buffer.from(key, 'hex'));
     const done = () => dialing.delete(key);
     stream.on('connect', () => {
       done();
       // La borne qui répond doit être celle de la balise.
-      if (hex(stream.remotePublicKey) !== key) return stream.destroy();
+      if (!lanActive || hex(stream.remotePublicKey) !== key) return stream.destroy();
       attach(stream, 'lan');
     });
-    stream.on('error', done);
+    stream.on('error', (error: Error) => {
+      done();
+      // Pare-feu, adresse injoignable : dit une fois, pas à chaque balise.
+      if (traced(key)) logEvery(`lan-fail:${key}`, 5 * 60_000, `Réseau des bornes : appel local vers ${nameOf(key)} (${host}:${port}) impossible (${error?.message ?? error}).`); // i18n-ignore : journal
+    });
     stream.on('close', done);
   }
 
@@ -406,20 +598,33 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (!profile || profile.key === state.key.publicKey || state.blocked.includes(profile.key)) return;
     const peer = peers.get(profile.key) ?? { key: profile.key, links: new Set<Link>() };
     peers.set(profile.key, peer);
+    const moved = peer.lan?.host !== host || peer.lan?.port !== beacon.port;
     peer.lan = { host, port: beacon.port };
     learn([profile], true);
-    // Une seule des deux bornes appelle : celle qui suit l'autre, sinon la plus petite clé.
     const relation = relationOf(state, profile.key);
     const follows = relation === 'friend' || relation === 'outgoing' || relation === 'incoming';
-    if (follows && !peer.links.size && (relation === 'outgoing' || state.key.publicKey < profile.key)) connectLan(profile.key, host, beacon.port);
+    if (moved && follows) log(`Réseau des bornes : balise locale de ${nameOf(profile.key)} (${host}:${beacon.port}).`); // i18n-ignore : journal
+    if (!follows || hasLanLink(peer)) {
+      peer.lanWaiting = undefined;
+      return;
+    }
+    // D'habitude une seule des deux bornes appelle : celle qui suit l'autre, sinon la plus petite clé.
+    // Si sa balise ne passe que dans un sens (pare-feu, plusieurs cartes réseau), l'autre appelle
+    // à son tour après deux balises sans liaison locale. Une liaison Internet n'y change rien : la
+    // locale tient mieux, et l'ami reste en ligne tant que l'une des deux vit.
+    peer.lanWaiting ??= ms();
+    const caller = relation === 'outgoing' || state.key.publicKey < profile.key;
+    if (caller || ms() - peer.lanWaiting >= LAN_FALLBACK_MS) connectLan(profile.key, host, beacon.port);
   }
 
   async function startLan(): Promise<void> {
     if (!state.lan || opts.mode === 'off') return;
     const host = opts.host ?? '0.0.0.0';
     tcp = net.createServer((socket) => {
+      if (opts.refuseIncoming) return socket.destroy();
+      socket.setKeepAlive(true, LAN_KEEPALIVE_MS);
       const stream = secretStream(false, socket);
-      stream.on('connect', () => attach(stream, 'lan'));
+      stream.on('connect', () => (lanActive ? attach(stream, 'lan') : stream.destroy()));
       stream.on('error', () => undefined);
     });
     await new Promise<void>((resolve, reject) => {
@@ -427,6 +632,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       tcp!.listen(0, host, () => resolve());
     });
     tcpPort = (tcp.address() as net.AddressInfo).port;
+    lanActive = true;
     beacons = opts.beacons ?? (opts.mode === 'public' ? multicastBeacons() : memoryBeacons(SIMULATED_LAN));
     if (!beacons) return;
     await beacons.start(onBeacon);
@@ -438,6 +644,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   }
 
   async function stopLan(): Promise<void> {
+    lanActive = false;
     if (beaconTimer) clearInterval(beaconTimer);
     beaconTimer = undefined;
     await beacons?.stop();
@@ -462,8 +669,14 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     }
     const node = new DHT({ ...(bootstrap ? { bootstrap } : {}), ...(host ? { host } : {}) });
     dht = node;
+    // Réseau changé (câble, Wi-Fi, mise en veille) : les liaisons se refont, la liste redevient incertaine.
+    node.on?.('network-change', () => {
+      log('Réseau des bornes : changement de réseau, recherche des amis relancée.'); // i18n-ignore : journal
+      beginSearch();
+      changed();
+    });
     swarm = new Hyperswarm({ keyPair: DHT.keyPair(playerSeed(state.key)), dht: node, maxPeers: 32, firewall: (key: Buffer) => state.blocked.includes(hex(key)) }) as Swarm;
-    swarm.on('connection', (conn) => attach(conn, 'internet'));
+    swarm.on('connection', (conn) => (opts.refuseIncoming && !conn.isInitiator ? conn.destroy() : attach(conn, 'internet')));
     const discovery = swarm.join(topicOf(DIRECTORY_TOPIC), { server: true, client: true });
     const refresh = () => discovery.refresh({ server: true, client: true }).catch(() => undefined);
     // Annoncée, la borne cherche une fois de plus : celles qui ont démarré en même temps qu'elle.
@@ -481,7 +694,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         await startInternet();
         await startLan();
         status = { ...status, running: true, error: undefined };
-        log(`Réseau des bornes : démarré (${opts.mode}, borne ${signProfile(state).name}).`); // i18n-ignore : journal
+        beginSearch();
+        log(`Réseau des bornes : démarré (${opts.mode}, borne ${signProfile(state).name}, ${state.friends.length} ami(s) à chercher).`); // i18n-ignore : journal
       } catch (error) {
         status = { ...status, error: (error as Error).message };
         log(`Réseau des bornes : démarrage impossible (${(error as Error).message}).`); // i18n-ignore : journal
@@ -498,8 +712,12 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     await stopLan();
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = undefined;
+    for (const timer of [graceTimer, searchTimer, redialTimer]) if (timer) clearTimeout(timer);
+    graceTimer = searchTimer = redialTimer = undefined;
+    startedAt = undefined;
     for (const peer of peers.values()) for (const link of peer.links) link.stream.destroy();
     peers.clear();
+    book.clear();
     followed.clear();
     await swarm?.destroy();
     swarm = undefined;
@@ -513,7 +731,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   const messageListeners = new Set<(key: string, message: FriendMessage) => void>();
   const chunkListeners = new Set<(key: string, frame: Buffer) => void>();
-  const friendLink = (key: string) => (relationOf(state, key) === 'friend' ? [...(peers.get(key)?.links ?? [])][0] : undefined);
+  const friendLink = (key: string) => (relationOf(state, key) === 'friend' ? bestLink(key) : undefined);
 
   function broadcastFriends(message: SocialMessage): void {
     for (const f of state.friends) sendTo(f.key, message);
@@ -523,8 +741,21 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     state: () => state,
     simulatedBootstrap: () => (opts.mode === 'simulated' ? (testnet?.bootstrap ?? opts.bootstrap) : undefined),
     status: () => status,
-    online: (key) => !!peers.get(key)?.links.size,
+    online: (key) => book.online(key),
     presenceOf: (key) => peers.get(key)?.presence,
+    linksOf: (key) => [...(peers.get(key)?.links ?? [])].filter((l) => l.greeted).map((l) => l.via),
+    listSync: () =>
+      friendsListSync({
+        enabled: state.enabled,
+        running: status.running,
+        unavailable: opts.mode === 'off' || !!status.error,
+        ...(startedAt !== undefined ? { startedAt } : {}),
+        now: ms(),
+        friends: state.friends.map((f) => f.key),
+        online: (k) => book.online(k),
+        pending: (k) => book.pending(k),
+        ...(opts.searchMs !== undefined ? { searchMs: opts.searchMs } : {}),
+      }),
     start,
     stop,
     async setEnabled(on) {
@@ -570,6 +801,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     block(key) {
       apply(key, blockPlayer(state, key));
       for (const link of peers.get(key)?.links ?? []) link.stream.destroy();
+      book.forget(key);
     },
     unblock: (key) => commit(unblockPlayer(state, key)),
     setShareLibrary: (on) => commit({ ...state, shareLibrary: on, shareLibraryChosen: true }),

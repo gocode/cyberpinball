@@ -20,6 +20,12 @@
 #   joue : carillon, carte dans le coin du plateau (captures invitation-en-partie-full puis
 #   -compact), puis, au retour au menu, l'invitation ouverte d'elle-même. Fausse installation de
 #   VPX comme « partie ».
+#   Parcours « partie-coupure » : la partie de « partie », mais la liaison de Bruno tombe douze
+#   secondes pendant l'attente du départ commun : le « prêt » de la borne se perd ; elle le renvoie
+#   et part avec Bruno (« tous prêts »), sans attendre le délai des derniers (essai du 01/11/2026).
+#   Parcours « partie-sans-releve » : la partie sur une table sans relevé de l'état de jeu (départ
+#   manuel, pas de score en direct) : marquée dans l'invitation, « Partez ! » qui part seul au bout
+#   de 4 s sans aucun événement de la partie, le score inconnu de la borne expliqué aux résultats.
 # Le garde-fou de mise en page (chevauchement, rognure, texte trop petit) et le guet hors écran
 # doivent rester muets.
 #   La bande de la partie entre amis, au parcours « partie » : sur la borne, les scores sur le DMD
@@ -27,7 +33,7 @@
 #   libre (bande-partie-entre-amis.png) ; au poste, le DMD seul (fronton occupé) ; sur un écran
 #   (-Ecrans un-ecran), l'encart au bas du plateau. Jamais en haut du plateau. Puis le réglage
 #   « Scores des amis pendant la partie ».
-#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans, un-ecran]
+#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu, partie-coupure, partie-sans-releve] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans, un-ecran]
 # Captures dans tmp\demo-amis\<parcours>\<écrans>\<langue>\captures.
 #   .\docs\demo-amis.ps1 -Accueil [-Langues en, fr]
 # Images de la rubrique Amis de la page d'accueil (README) : les deux parcours, sur l'écran
@@ -99,14 +105,25 @@ function Get-Etapes([string]$Nom, $l) {
       "action:$($l.Plus)", 'wait:800'
     )
   }
+  if ($Nom -in 'partie-coupure', 'partie-sans-releve') {
+    # La partie de « partie », jusqu'aux résultats : accepter l'invitation, le départ commun (sa
+    # coupure, ou sa table sans relevé), la partie simulée, puis les résultats fermés.
+    return @(
+      'wait:1500', "until-action:$($l.Accepter)", 'wait:1000',
+      "action:$($l.Accepter)", 'wait:1000', 'wait:4000',
+      'until:playing', 'until:library', 'wait:2500',
+      "action:$($l.Fermer)", 'wait:800'
+    )
+  }
   if ($Nom -eq 'partie') {
-    # Le menu des tables, puis l'invitation de Bruno (six secondes après l'amitié), ouverte d'elle-même ;
+    # Le menu des tables, puis l'invitation de Bruno (six secondes après l'amitié, attendue tant que sa
+    # liaison avec la borne se fait : until-action), ouverte d'elle-même ;
     # Bruno donne le départ peu après l'acceptation ; sa table charge six secondes (la borne l'attend :
     # départ commun), puis la partie simulée dure dix secondes. Puis l'historique des parties (la
     # partie jouée en tête, le curseur dessus) et son détail ; puis « Scores des amis pendant la
     # partie » (le DMD grisé : pas d'inspector de VPX ici), le topper choisi, et l'automatique remis.
     return @(
-      'wait:1500', 'wait:9000', 'wait:1000',
+      'wait:1500', "until-action:$($l.Accepter)", 'wait:1000',
       "action:$($l.Accepter)", 'wait:1000', 'wait:4000',
       'until:playing', 'until:library', 'wait:2500',
       "action:$($l.Fermer)", 'wait:800',
@@ -145,7 +162,8 @@ function Get-Etapes([string]$Nom, $l) {
 
 try {
   foreach ($nom in $parcoursJoues) {
-    $root = New-Racine $nom -Vpx:($nom -in 'partie', 'en-jeu') -Neuve:$Accueil
+    $partie = $nom -in 'partie', 'en-jeu', 'partie-coupure', 'partie-sans-releve'
+    $root = New-Racine $nom -Vpx:$partie -Neuve:$Accueil
     foreach ($jeu in $ecransJoues) {
       Use-HorsEcran $jeu
       foreach ($langue in $Langues) {
@@ -162,8 +180,10 @@ try {
         $env:CYBERPINBALL_ROOT = $root
         $env:CYBERPINBALL_LANGUE = $langue
         $env:CYBERPINBALL_RESEAU = 'simule'
-        $env:CYBERPINBALL_RESEAU_DEMO = if ($nom -in 'partie', 'en-jeu') { $nom } else { '1' }
-        if ($nom -in 'partie', 'en-jeu') { $env:CYBERPINBALL_PARTIE_SIMULEE = 'backglass' } else { Remove-Item Env:CYBERPINBALL_PARTIE_SIMULEE -ErrorAction SilentlyContinue }
+        $env:CYBERPINBALL_RESEAU_DEMO = if ($partie) { $nom } else { '1' }
+        if ($partie) { $env:CYBERPINBALL_PARTIE_SIMULEE = 'backglass' } else { Remove-Item Env:CYBERPINBALL_PARTIE_SIMULEE -ErrorAction SilentlyContinue }
+        # Table sans relevé : la partie simulée n'écrit aucun état de jeu (frontend.ts, SIMULATED_MANUAL).
+        if ($nom -eq 'partie-sans-releve') { $env:CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE = '1' } else { Remove-Item Env:CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE -ErrorAction SilentlyContinue }
         if ($nom -eq 'en-jeu') { $env:CYBERPINBALL_PARTIE_MS = '24000' } else { Remove-Item Env:CYBERPINBALL_PARTIE_MS -ErrorAction SilentlyContinue }
         $env:CYBERPINBALL_AUTOPILOT = (Get-Etapes $nom $l) -join ','
         $env:CYBERPINBALL_CAPTURE = "$dossier\captures"
@@ -172,7 +192,7 @@ try {
         try { $log = & $electron app 2>&1 | ForEach-Object { "$_" } } finally { Pop-Location }
         $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Réseau|Partie en direct|Invitation pendant la partie|Bande de la partie|Départ commun|Bibliothèque partagée|Téléchargements)' } | ForEach-Object { Write-Host "   $_" }
         $id = "$nom/$jeu/$langue"
-        if ($log -match 'Autopilote : (aucun|phase)') { $failures += "$id : une étape rejouée n'a pas trouvé son écran ou sa phase" }
+        if ($log -match 'Autopilote : (aucun|phase|action)') { $failures += "$id : une étape rejouée n'a pas trouvé son écran ou sa phase" }
         if ($log -match 'Traduction manquante') { $failures += "$id : texte sans traduction" }
         if (-not ($log -match 'Réseau des bornes : démarré \(simulated')) { $failures += "$id : le réseau simulé n'a pas démarré" }
         if ($log -match 'Réseau des bornes : démarré \(public') { $failures += "$id : le vrai réseau a démarré pendant l'essai" }
@@ -180,7 +200,7 @@ try {
         if ($nom -eq 'amis' -and @($log | Select-String -Pattern 'Téléchargements : « .+ » fini \([1-9]\d* fichier\(s\)\)').Count -lt 2) { $failures += "$id : les médias ou la table de Bruno ne sont pas arrivés" }
         if ($nom -eq 'amis' -and ($log -match 'Téléchargements : .* en échec')) { $failures += "$id : une réception de Bruno a échoué" }
         # La partie finie est entrée à l'historique des parties, gardé sur la borne, après les deux soirées d'avant.
-        if ($nom -eq 'partie') {
+        if ($nom -in 'partie', 'partie-coupure', 'partie-sans-releve') {
           if (-not ($log -match "Partie en direct : « .+ » à l'historique des parties")) { $failures += "$id : la partie n'est pas entrée à l'historique" }
           $parties = "$home_\amis\parties.json"
           if (-not (Test-Path $parties) -or @((Get-Content $parties -Raw -Encoding UTF8 | ConvertFrom-Json).games).Count -ne 3) { $failures += "$id : parties.json ne garde pas les trois parties" }
@@ -203,14 +223,30 @@ try {
             foreach ($c in $bande.Captures) { if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\$c.png")) { $failures += "$id : pas de capture $c" } }
           }
           if ($log -match 'Bande de la partie entre amis( \(DMD\))? : (?!mise en page conforme)') { $failures += "$id : mise en page de la bande de la partie" }
+        }
+        if ($nom -eq 'partie-coupure') {
+          # La coupure a eu lieu, le « prêt » perdu a été renvoyé, et le départ s'est fait « tous prêts ».
+          if (-not ($log -match "Réseau simulé : liaison de Bruno coupée")) { $failures += "$id : la liaison de Bruno n'a pas été coupée" }
+          if (-not ($log -match "Départ commun : mon état « prêt » renvoyé à l'hôte")) { $failures += "$id : le « prêt » perdu n'a pas été renvoyé" }
+          if (-not ($log -match "Départ commun : « partez » reçu de l'hôte \(tous prêts\)")) { $failures += "$id : « partez » pas reçu, ou par le délai des derniers" }
+        }
+        if ($nom -eq 'partie-sans-releve') {
+          # La table sans relevé est dite avant la partie, prête à l'écran, et la partie finit quand même.
+          if (-not ($log -match "Invitation de Bruno : ma table n'aura pas de relevé")) { $failures += "$id : l'invitation ne dit pas : départ manuel, pas de score en direct" }
+          if (-not ($log -match "Partie en direct : ma table est prête \(sans relevé")) { $failures += "$id : la table sans relevé ne s'est pas dite prête" }
+          if (-not ($log -match "Départ commun : mon état « done » envoyé à l'hôte")) { $failures += "$id : le retour de la borne n'est pas parti" }
+        }
+        if ($nom -in 'partie', 'partie-coupure', 'partie-sans-releve') {
           # Le départ commun : la borne prête attend Bruno (prêt cinq secondes après elle). Ce qui compte : le
           # joueur a vu l'attente, puis « Partez ! » assez longtemps pour le lire (le journal le mesure à l'écran,
           # pas à l'heure du signal), mise en page conforme ; et les deux captures.
-          $vu = $log | Where-Object { $_ -match "^Départ commun : carte montrée ([\d.]+) s en attente, « Partez ! » ([\d.]+) s\." } | Select-Object -First 1
+          $vu = $log | Where-Object { $_ -match "^Départ commun : carte montrée ([\d.]+) s en attente, « Partez ! » ([\d.]+) s ; partie : " } | Select-Object -First 1
           if (-not $vu) { $failures += "$id : l'attente du départ commun n'a pas été montrée (attente et « Partez ! »)" }
           elseif ($vu -match 'montrée ([\d.]+) s en attente, « Partez ! » ([\d.]+) s') {
             if ([double]$Matches[1] -lt 1) { $failures += "$id : attente montrée $($Matches[1]) s seulement (Bruno est prêt cinq secondes après la borne)" }
             if ([double]$Matches[2] -lt 3.9) { $failures += "$id : « Partez ! » montré $($Matches[2]) s seulement (4 s attendues)" }
+            # Essai réel du 01/11/2026 : « Partez ! » resté 90 s. La carte part d'elle-même, quoi qu'il arrive.
+            if ([double]$Matches[2] -gt 6) { $failures += "$id : « Partez ! » resté $($Matches[2]) s (4 s attendues : la carte doit partir seule)" }
           }
           foreach ($c in 'depart-attente-commun', 'depart-partez-commun') { if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\$c.png")) { $failures += "$id : pas de capture $c" } }
           if ($log -match 'Départ commun \((attente|partez)\) : (?!mise en page conforme)') { $failures += "$id : mise en page de l'attente du départ commun" }

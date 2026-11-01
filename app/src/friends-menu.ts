@@ -22,6 +22,8 @@ import {
   presenceTableLabel,
   relationOf,
   searchDirectory,
+  friendsListLine,
+  offlineText,
   socialAgo,
   t,
   tableIdentity,
@@ -147,9 +149,26 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   }
 
   function presenceText(p: Presence | undefined, online: boolean, friend: Friend): string {
-    if (!online) return friend.lastSeen ? t('Vu {ago}', { ago: socialAgo(friend.lastSeen, now()) }) : t('Pas encore vu en ligne');
+    // Hors ligne : « vu » date la chute de sa dernière liaison ; pendant une recherche, le libellé le dit.
+    if (!online) return offlineText(net.listSync(), friend.lastSeen, now());
     if (p?.status === 'playing' && p.table) return t('En partie : {table} · depuis {duration}', { table: presenceTableLabel(p.table), duration: playDuration((now().getTime() - Date.parse(p.since)) / 1000) });
     return t('Dans le menu des tables');
+  }
+
+  /** Par où passe sa présence : « Relié par Internet et le réseau local », ou la tolérance après une liaison tombée. */
+  function linksText(key: string): string {
+    const via = new Set(net.linksOf(key));
+    if (via.has('internet') && via.has('lan')) return t('Relié par Internet et le réseau local');
+    if (via.has('lan')) return t('Relié par le réseau local');
+    if (via.has('internet')) return t('Relié par Internet');
+    return t('Liaison tombée : reconnexion en cours');
+  }
+
+  /** Ligne d'état de la liste des amis (friendpresence.ts) ; rien quand rien ne passe (offRows le dit). */
+  function listSyncRow(online: number): Row | undefined {
+    const line = friendsListLine(net.listSync(), online);
+    if (!line) return undefined;
+    return { text: line.text, detail: line.detail, tone: line.tone, icon: 'network', ...(line.busy ? { progress: { tone: 'info', busy: true } } : {}) };
   }
 
   const lastEvent = (events: readonly SocialEvent[]): Row['note'] | undefined => {
@@ -185,6 +204,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const online = sorted.filter((f) => net.online(f.key));
     const offline = sorted.filter((f) => !net.online(f.key));
     const sections: Section[] = [...takeFlash(), ...(offRows().length ? [{ rows: offRows() }] : [])];
+    // La liste est-elle sûre ? « Recherche des amis… », « Mise à jour en cours… » ou « Liste à jour ».
+    const sync = s.friends.length ? listSyncRow(online.length) : undefined;
+    if (sync) sections.push({ rows: [sync] });
     // Une partie en direct ou une invitation en attente : en tête.
     const pending = live.pendingAction(() => openFriends());
     if (pending) actions.push(pending);
@@ -222,7 +244,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       subheading: presenceText(p, online, f),
       sections: [
         ...takeFlash(),
-        { rows: [{ text: online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : t('Hors ligne'), detail: t('Amis depuis le {date}', { date: new Date(f.since).toLocaleDateString() }), tone: online ? 'ok' : 'quiet' }, { text: t('Bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', tone: libraryState === 'ready' ? 'ok' : 'quiet' }] },
+        { rows: [{ text: online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : t('Hors ligne'), detail: [t('Amis depuis le {date}', { date: new Date(f.since).toLocaleDateString() }), online ? linksText(key) : undefined].filter(Boolean).join(' · '), tone: online ? 'ok' : 'quiet' }, { text: t('Bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', tone: libraryState === 'ready' ? 'ok' : 'quiet' }] },
         { title: t('Derniers évènements'), rows: events.length ? events : [{ text: t('Rien encore : ses records, badges et parties s’afficheront ici'), tone: 'quiet' }] },
       ],
       actions: [
@@ -575,7 +597,10 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
           const invite = host.games.invites()[0];
           if (invite) return t('Invitation de {name} : {table}', { name: invite.host.name, table: invite.title });
           const online = net.state().friends.filter((f) => net.online(f.key)).length;
-          return net.state().friends.length ? tn(online, '{n} en ligne', '{n} en ligne') : t('En ligne, en partie, derniers records');
+          if (!net.state().friends.length) return t('En ligne, en partie, derniers records');
+          const count = tn(online, '{n} en ligne', '{n} en ligne');
+          const sync = net.listSync();
+          return sync === 'searching' || sync === 'updating' ? t('{seen} · recherche en cours', { seen: count }) : count;
         },
         get attention() {
           return live.attention();
