@@ -160,12 +160,17 @@ export const WINDOWS_CHANGES: WindowsChange[] = [
   { call: '$DemarrageDir', files: ['scripts/installeur/cyberpinball.nsi'] },
   // Retrait de cette entrée à la désinstallation.
   { call: 'DeleteRegKey', files: ['scripts/installeur/cyberpinball.nsi'] },
+  // Tâche planifiée « Cyber Pinball pare-feu » (01/11/2026) : enregistrée sous l’autorisation de Windows donnée dans « Partage et réseau », sans déclencheur (jamais à l’ouverture de session), elle ne fait que reposer les deux règles du pare-feu de Cyber Pinball (firewall.ts). Aucun effet sur un autre menu.
+  { call: 'Register-ScheduledTask', files: ['packages/core/src/firewall.ts'] },
+  // La même tâche : ses arguments (firewall.ts), cherchée et lancée par l’application quand une règle manque, retirée à la désinstallation.
+  { call: 'schtasks', files: ['packages/core/src/firewall.ts', 'app/src/firewall-rule.ts', 'scripts/installeur/cyberpinball.nsi'] },
 ];
 
 /**
  * Appels qui modifieraient Windows et n'ont aucune place dans Cyber Pinball : registre
- * (hors installeur), son par défaut, lancement à l'ouverture de session par l'application,
- * paramètres système, processus arrêtés par leur nom.
+ * (hors installeur), son par défaut, lancement à l'ouverture de session par l'application
+ * (y compris par une tâche planifiée qui aurait un déclencheur), paramètres système, processus
+ * arrêtés par leur nom.
  */
 export const FORBIDDEN_WINDOWS_CALLS: string[] = [
   'RegSetValue',
@@ -183,5 +188,8 @@ export const FORBIDDEN_WINDOWS_CALLS: string[] = [
   "'/IM'",
   'powercfg',
   'bcdedit',
-  'schtasks',
+  // Une tâche planifiée qui démarrerait quoi que ce soit d’elle-même (ouverture de session, horaire) : la seule permise n’a aucun déclencheur.
+  'New-ScheduledTaskTrigger',
+  '/sc onlogon',
+  '/create /tn',
 ];

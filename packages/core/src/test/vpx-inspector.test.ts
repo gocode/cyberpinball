@@ -69,16 +69,19 @@ test('une seule élévation : la règle de Cyber Pinball puis celle de VPX, chac
     line,
     [
       `netsh advfirewall firewall delete rule name="${FIREWALL_RULE}" >nul 2>&1`,
+      // Toute règle d'entrée sur l'exécutable, dont celles que pose l'invite de Windows (pare-feu-maj.test.ts).
+      `netsh advfirewall firewall delete rule name="all" dir="in" program="${app}" >nul 2>&1`,
       `netsh advfirewall firewall add rule name="${FIREWALL_RULE}" dir="in" action="allow" program="${app}" enable="yes" profile="any"`,
       `netsh advfirewall firewall delete rule name="${VPX_FIREWALL_RULE}" >nul 2>&1`,
       `netsh advfirewall firewall add rule name="${VPX_FIREWALL_RULE}" dir="in" action="block" program="${REAL}" enable="yes" profile="any"`,
       `netsh advfirewall firewall add rule name="${VPX_FIREWALL_RULE}" dir="in" action="block" program="${CURRENT}" enable="yes" profile="any"`,
     ].join(' & '),
   );
-  assert.equal(firewallCommandLine({ app }), line.split(' & ').slice(0, 2).join(' & '), 'sans VPX installé : la règle de Cyber Pinball seule');
+  assert.equal(firewallCommandLine({ app }), line.split(' & ').slice(0, 3).join(' & '), 'sans VPX installé : la règle de Cyber Pinball seule');
+  // L'application : le même travail par PowerShell (firewallSetupScript), avec la tâche de réparation, sous une seule demande.
   const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'firewall-rule.ts'), 'utf8');
   assert.equal((src.match(/-Verb RunAs/g) ?? []).length, 1, 'une seule demande d’autorisation pour les deux règles');
-  assert.match(src, /firewallCommandLine\(\{ app: opts\.exe, \.\.\.\(vpx\?\.length \? \{ vpx \} : \{\}\) \}\)/);
+  assert.match(src, /firewallSetupScript\(\{ exe: opts\.exe, \.\.\.\(vpxDir \? \{ vpxDir \} : \{\}\) \}\)/);
 });
 
 test('l’installeur pose la règle de VPX sous la même autorisation, pour la version que l’application installera', () => {

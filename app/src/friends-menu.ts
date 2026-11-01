@@ -15,6 +15,8 @@ import {
   badgeLabel,
   displayName,
   eventText,
+  firewallBlocksNetwork,
+  firewallProblems,
   nearbyPlayers,
   NAME_MAX,
   NAME_MIN,
@@ -84,6 +86,8 @@ export interface FriendsMenuHost {
 export interface FriendsMenu {
   /** Partie en direct : invitations, salon, départ et résultats (le menu les ouvre de lui-même). */
   live: LiveMenu;
+  /** L'écran « Pare-feu de Windows » : ce qui manque, pourquoi, et l'autorisation (ouvert après une mise à jour). */
+  openFirewall(back?: () => void): void;
   items: {
     friends: ProvidedSystemItem;
     'game-history': ProvidedSystemItem;
@@ -145,7 +149,17 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     if (!net.state().enabled) return [{ text: t('Partage désactivé : personne ne vous voit, vous ne voyez personne'), detail: t('Partage et réseau : « Activer le partage »'), tone: 'warning', badges: [t('Désactivé')] }];
     if (status.mode === 'off') return [{ text: t('Réseau coupé pendant les essais sans opérateur'), tone: 'info' }];
     if (status.error) return [{ text: t('Réseau indisponible : {error}', { error: status.error }), tone: 'error', badges: [t('Bloquant')] }];
+    if (firewallBlocked()) return [firewallBlockedRow()];
     return [];
+  }
+
+  /** Le pare-feu de Windows gêne le réseau des bornes : la présence des amis le dit, au lieu de « hors ligne ». */
+  // Réseau simulé : son pare-feu l'est aussi, il ne bloque rien.
+  const firewallBlocked = () => !host.firewall.simulated && net.state().enabled && net.status().mode !== 'off' && firewallBlocksNetwork(host.firewall.state());
+
+  function firewallBlockedRow(): Row {
+    const reason = firewallProblems(host.firewall.state(), undefined)[0]?.reason ?? '';
+    return { text: t('Réseau des bornes bloqué par le pare-feu de Windows'), detail: t('{reason} · Partage et réseau : « Autoriser dans le pare-feu de Windows »', { reason }), tone: 'error', badges: [t('Bloquant')], icon: 'lock' };
   }
 
   function presenceText(p: Presence | undefined, online: boolean, friend: Friend): string {
@@ -185,6 +199,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   function buildFriends(): Built {
     const s = net.state();
     const actions: Action[] = [];
+    const blocked = firewallBlocked();
     const rows = (list: Friend[]): Row[] =>
       list.map((f) => {
         const online = net.online(f.key);
@@ -192,9 +207,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         const index = actions.push({ label: name(f.key, f.name), key: `friend:${f.key}`, icon: 'friend-list', run: () => openFriend(f.key) }) - 1;
         return {
           text: name(f.key, f.name),
-          detail: presenceText(p, online, f),
+          detail: !online && blocked ? t('Sa présence ne vous parvient pas : le pare-feu de Windows bloque le réseau des bornes') : presenceText(p, online, f),
           tone: online ? 'ok' : undefined,
-          badges: [online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : t('Hors ligne')],
+          badges: [online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : blocked ? t('Bloqué par le pare-feu') : t('Hors ligne')],
           note: lastEvent(f.events),
           action: index,
           pick: true,
@@ -212,7 +227,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     if (pending) actions.push(pending);
     if (!s.friends.length) sections.push({ rows: [{ text: t('Pas encore d’ami'), detail: t('« Trouver un joueur » : cherchez un nom dans l’annuaire, ou une borne de votre réseau local'), tone: 'info' }] });
     if (online.length) sections.push({ title: t('En ligne ({n})', { n: online.length }), rows: rows(online) });
-    if (offline.length) sections.push({ title: t('Hors ligne ({n})', { n: offline.length }), rows: rows(offline) });
+    if (offline.length) sections.push({ title: blocked ? t('Injoignables : pare-feu de Windows ({n})', { n: offline.length }) : t('Hors ligne ({n})', { n: offline.length }), rows: rows(offline) });
     if (s.incoming.length) actions.push({ label: t('Demandes reçues ({n})', { n: s.incoming.length }), detail: tn(s.incoming.length, '{n} à valider', '{n} à valider'), icon: 'friend-request', attention: true, run: () => openRequests() });
     actions.push({ label: t('Trouver un joueur'), detail: t('Chercher un nom, voir les bornes à proximité'), icon: 'friend-add', run: () => openFind() });
     actions.push(backAction());
@@ -468,14 +483,31 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   }
 
   function firewallRow(): Row {
-    switch (host.firewall.state()) {
+    const state = host.firewall.state();
+    const reason = firewallProblems(state, undefined)[0]?.reason;
+    switch (state) {
       case 'allowed':
         return { text: t('Pare-feu de Windows : Cyber Pinball autorisé'), tone: 'ok', badges: [t('OK')], icon: 'lock' };
+      case 'blocked':
+        return { text: t('Pare-feu de Windows : Cyber Pinball bloqué'), detail: reason, tone: 'error', badges: [t('À reposer')], icon: 'lock' };
       case 'missing':
+      case 'partial':
       case 'other-program':
-        return { text: t('Pare-feu de Windows : pas encore autorisé'), detail: t('Les amis par Internet passent quand même ; le réseau local et les bornes qui vous appellent, moins bien'), tone: 'warning', badges: [t('À autoriser')], icon: 'lock' };
+        return { text: t('Pare-feu de Windows : pas encore autorisé'), detail: reason, tone: 'warning', badges: [t('À autoriser')], icon: 'lock' };
       default:
         return { text: t('Pare-feu de Windows : état illisible'), tone: 'warning', badges: [t('À vérifier')], icon: 'lock' };
+    }
+  }
+
+  /** La tâche de réparation : les règles reposées d'elles-mêmes, sans invite, dès qu'une manque. */
+  function repairRow(): Row | undefined {
+    switch (host.firewall.taskState()) {
+      case true:
+        return { text: t('Réparation automatique du pare-feu : prête'), detail: t('Une règle qui manque après une mise à jour est reposée au démarrage, sans rien à valider'), tone: 'ok', badges: [t('OK')], icon: 'refresh' };
+      case false:
+        return { text: t('Réparation automatique du pare-feu : pas encore autorisée'), detail: t('« Autoriser dans le pare-feu de Windows » la pose avec les règles, sous la même autorisation'), tone: 'warning', badges: [t('À autoriser')], icon: 'refresh' };
+      default:
+        return undefined;
     }
   }
 
@@ -499,12 +531,12 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     }
   }
 
-  /** L'action « Autoriser » : la règle de Cyber Pinball manque, ou celle de VPX (absente, autre version). */
+  /** L'action « Autoriser » : une règle à reposer (absente, bloquée, autre version), ou la réparation automatique pas encore posée. */
   function firewallToAllow(): boolean {
-    const fw = host.firewall.state();
-    const vpx = host.firewall.vpxState();
-    return fw === 'missing' || fw === 'other-program' || vpx === 'missing' || vpx === 'other-version';
+    return firewallProblems(host.firewall.state(), host.firewall.vpxState()).length > 0 || host.firewall.taskState() === false;
   }
+
+  const allowAction = (after: () => void): Action => ({ label: t('Autoriser dans le pare-feu de Windows'), detail: t('Windows demande votre autorisation, une seule fois : Cyber Pinball ouvert aux autres bornes, VPX fermé au réseau'), icon: 'lock', run: () => allowFirewall(after) });
 
   function buildSharing(): Built {
     const s = net.state();
@@ -519,9 +551,10 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         : { text: t('Bibliothèque pas partagée'), detail: t('Vos amis ne voient pas vos tables'), tone: 'quiet', icon: 'tables' },
       firewallRow(),
       vpxRow(),
+      ...[repairRow()].filter((r): r is Row => !!r),
     ];
     const actions: Action[] = [{ label: t('Changer de nom…'), detail: t('{min} à {max} caractères', { min: NAME_MIN, max: NAME_MAX }), icon: 'edit', run: () => askName() }];
-    if (firewallToAllow()) actions.push({ label: t('Autoriser dans le pare-feu de Windows'), detail: t('Windows demande votre autorisation, une seule fois : Cyber Pinball ouvert aux autres bornes, VPX fermé au réseau'), icon: 'lock', run: () => allowFirewall() });
+    if (firewallToAllow()) actions.push(allowAction(() => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER)));
     if (s.blocked.length) actions.push({ label: tn(s.blocked.length, '{n} joueur bloqué', '{n} joueurs bloqués'), icon: 'eye', run: () => openBlocked() });
     actions.push(
       s.shareLibrary
@@ -571,10 +604,38 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     });
   }
 
-  async function allowFirewall(): Promise<void> {
+  async function allowFirewall(after: () => void): Promise<void> {
     const r = await host.firewall.allow();
     flash = 'ok' in r ? { text: host.firewall.vpxState() === 'closed' ? t('Pare-feu de Windows : Cyber Pinball autorisé, VPX fermé au réseau') : t('Pare-feu de Windows : Cyber Pinball autorisé'), tone: 'ok' } : 'cancelled' in r ? { text: t('Autorisation refusée : rien n’a changé'), tone: 'warning' } : { text: t('Pare-feu de Windows : {error}', { error: r.error }), tone: 'error' };
-    host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER);
+    after();
+  }
+
+  // ---------- Pare-feu de Windows (après une mise à jour) ----------
+
+  /**
+   * Ouvert d'office au démarrage qui suit une mise à jour, quand une règle reste à reposer et que la
+   * réparation automatique n'a pas pu le faire : ce qui manque, pourquoi, et l'autorisation de
+   * Windows, sélectionnée d'office. Une fois tout en ordre, l'écran le dit et ne propose plus que Retour.
+   */
+  function openFirewall(up: () => void = back): void {
+    const build = (): Built => {
+      const problems = firewallProblems(host.firewall.state(), host.firewall.vpxState());
+      const rows: Row[] = problems.length
+        ? problems.map((p): Row => ({ text: p.rule === 'app' ? t('Réseau des bornes') : t('État en direct des tables Stern SAM'), detail: p.reason, tone: p.rule === 'app' ? 'error' : 'warning', badges: [t('À reposer')], icon: p.rule === 'app' ? 'network' : 'gamepad' }))
+        : [{ text: t('Règles du pare-feu en place'), detail: t('Cyber Pinball ouvert aux autres bornes, VPX fermé au réseau'), tone: 'ok', badges: [t('OK')], icon: 'lock' }];
+      const repair = repairRow();
+      const actions: Action[] = firewallToAllow() ? [allowAction(() => host.library.openCustom(build, 0))] : [];
+      actions.push(backAction(up));
+      return {
+        heading: t('Pare-feu de Windows'),
+        icon: 'lock',
+        lead: t('Vérifié après la mise à jour : une règle du pare-feu de Windows est à reposer. Windows demande son autorisation une seule fois ; ensuite, Cyber Pinball la repose de lui-même à chaque démarrage.'),
+        sections: [...takeFlash(), { rows: repair ? [...rows, repair] : rows }],
+        actions,
+        back: up,
+      };
+    };
+    host.library.openCustom(build, 0);
   }
 
   function openBlocked(): void {
@@ -591,6 +652,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
 
   return {
     live,
+    openFirewall,
     items: {
       friends: {
         get detail() {

@@ -8,6 +8,7 @@
 //   const layer = CyberMedia.layer(conteneur, { role: 'backglass', minimal });
 //   layer.show(vue);                  // vue : MediaView de packages/core/src/mediaview.ts
 //   layer.show(vue, { still: true }); // première image, figée (fond de partie)
+//   layer.show(vue, { once: true, onEnd }); // vidéo jouée une fois, sa dernière image gardée (ouverture)
 //   layer.setActive(false);           // vidéo en pause (écran recouvert)
 //   layer.setVolume(0.4);             // son de la vidéo (muette par défaut), en fondu
 //   CyberMedia.setSink(id);           // sortie audio des vidéos (menu-audio.js)
@@ -36,6 +37,15 @@
     'wheel-title': 'wheel',
     'playfield-gradient': 'playfield',
     'loading-screen': 'loading',
+  };
+
+  /** Animations de l'ouverture au démarrage (intro.js) : sans fichier, ou à la place d'un fichier illisible. */
+  const INTRO_KINDS = {
+    'intro-playfield': 'playfield',
+    'intro-backglass': 'backglass',
+    'intro-topper': 'topper',
+    'intro-dmd': 'dmd',
+    'intro-fulldmd': 'fullDmd',
   };
 
   const EDGE_ROTATION = { bottom: 0, left: 90, top: 180, right: 270 };
@@ -240,6 +250,8 @@
 
     function keyOf(view, opts) {
       if (!view) return 'vide';
+      // Ouverture : une par départ, l'animation de Cyber Pinball ou le fichier de l'utilisateur.
+      if (view.intro) return `ouverture:${view.intro.id}:${view.url ?? view.fallback}`; // i18n-ignore : clé interne
       const still = opts.still ? ':figé' : ''; // i18n-ignore : clé interne
       if (view.url) return `${view.url}${still}`;
       const card = view.card ?? {};
@@ -248,6 +260,13 @@
 
     function fallbackContent(view, opts, slot) {
       const card = view.card ?? {};
+      const intro = INTRO_KINDS[view.fallback];
+      if (intro && typeof window.CyberIntro?.[intro] === 'function') {
+        const box = el('div', 'media-fallback intro-fallback');
+        slot.handle = window.CyberIntro[intro](box, card, { intro: view.intro });
+        opts.onEnd && setTimeout(opts.onEnd, Math.max(0, (view.intro?.timeline?.end ?? 0) - (Date.now() - (view.intro?.startedAt ?? Date.now()))));
+        return box;
+      }
       const kit = window.CyberFallback;
       let kind = opts.game ? 'inGame' : FALLBACK_KINDS[view.fallback];
       if (kind === 'dmd' && view.type === 'FullDMD') kind = 'fullDmd';
@@ -274,6 +293,7 @@
       if (slot.revealed || slot !== current) return;
       slot.revealed = true;
       clearTimeout(slot.timer);
+      slot.onReveal?.();
       requestAnimationFrame(() => slot.node.classList.add('visible'));
       setTimeout(() => {
         for (const other of [...slots]) if (other !== slot && other !== current) retire(other);
@@ -283,6 +303,8 @@
     function play(slot) {
       const video = slot.media;
       if (video?.tagName !== 'VIDEO') return;
+      // Ouverture finie : la vidéo garde sa dernière image, un nouvel état ne la relance pas.
+      if (slot.once && video.ended) return;
       if (active && !document.hidden) {
         video.play().catch(() => {});
         // La vidéo affichée a son son dès qu'elle part, même avant sa première image.
@@ -299,7 +321,7 @@
       const node = el('div', 'media-slot');
       const frame = el('div', 'media-frame');
       node.append(frame);
-      const slot = { key, node, url: view?.url, view };
+      const slot = { key, node, url: view?.url, view, once: Boolean(opts.once) };
       slots.add(slot);
       const previous = current;
       // L'ancienne vidéo se tait pendant le fondu enchaîné.
@@ -324,6 +346,12 @@
       frame.classList.toggle('contain', view.fit !== 'cover');
       const media = take(view);
       slot.media = media;
+      // Ouverture : jouée une fois, la dernière image reste (une vidéo finie garde son image).
+      if (media.tagName === 'VIDEO') media.loop = !opts.once;
+      if (opts.once && opts.onEnd) {
+        if (media.tagName === 'VIDEO') media.addEventListener('ended', () => slot === current && opts.onEnd(), { once: true });
+        else slot.onReveal = opts.onEnd;
+      }
       media.classList.add('media-element');
       media.style.objectFit = view.fit;
 

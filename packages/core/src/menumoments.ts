@@ -48,10 +48,13 @@ export function momentScreen(moment: MenuMoment, role: RoleId, opts: { game: Gam
   return { media: 'role', play: opts.game };
 }
 
-/** Phase du menu (app/src/frontend.ts) : tables, chargement, partie, message, confirmation de sortie, menu système. */
-export type MenuPhase = 'menu' | 'loading' | 'playing' | 'message' | 'confirmQuit' | 'library';
+/**
+ * Phase du menu (app/src/frontend.ts) : ouverture au démarrage (intro.ts), tables, chargement,
+ * partie, message, confirmation de sortie, menu système.
+ */
+export type MenuPhase = 'intro' | 'menu' | 'loading' | 'playing' | 'message' | 'confirmQuit' | 'library';
 
-export const MENU_PHASES: readonly MenuPhase[] = ['menu', 'loading', 'playing', 'message', 'confirmQuit', 'library'];
+export const MENU_PHASES: readonly MenuPhase[] = ['intro', 'menu', 'loading', 'playing', 'message', 'confirmQuit', 'library'];
 
 /** Ce qui est ouvert, pour savoir de quelle table parlent les écrans de la borne. */
 export interface ScreensContext {
@@ -78,6 +81,8 @@ export interface ScreensContext {
  * défaut : l'enregistrement est exhaustif, une nouvelle phase doit dire de quelle table elle parle.
  */
 const PHASE_TABLE: Record<MenuPhase, (s: ScreensContext) => TableEntry | undefined> = {
+  // Ouverture : les animations de la borne, d'aucune table (la roue n'est pas encore là).
+  intro: () => undefined,
   menu: (s) => (s.help ? undefined : s.selected),
   loading: (s) => s.playing ?? s.selected,
   playing: (s) => s.playing ?? s.selected,
@@ -204,6 +209,19 @@ export function menuSound(
     return volume > 0 ? { music: { url: sources.music, volume }, video: 0 } : { video: 0 };
   }
   return { video: at(settings.videoVolume, factor) };
+}
+
+/**
+ * Son de l'ouverture au démarrage (intro.ts) : la musique de fond choisie par l'utilisateur, en
+ * boucle, au volume de la musique, jusqu'au premier bouton (la roue reprend alors la musique du
+ * jeu, en fondu) ; sans elle, le son de la vidéo d'ouverture du plateau, s'il y en a une, au
+ * volume du son des vidéos du menu. Les animations de Cyber Pinball sont muettes. Indépendante
+ * de « Musique des jeux » : c'est celle de la borne, pas d'un jeu.
+ */
+export function introSound(settings: Pick<MenuMediaSettings, 'musicVolume' | 'videoVolume'>, music: string | undefined): MenuSoundPlan {
+  const volume = playVolume(settings.musicVolume);
+  if (music) return volume > 0 ? { music: { url: music, volume }, video: 0 } : { video: 0 };
+  return { video: playVolume(settings.videoVolume) };
 }
 
 /**

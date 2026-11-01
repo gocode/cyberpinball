@@ -2468,6 +2468,48 @@ html.attract-mode #media-bg::after {
   }
 }
 
+/*
+ * Ouverture : l'invite paraît quand l'animation du plateau est finie, entre la marque et les
+ * batteurs (en borne), en bas de l'écran au bureau (le fronton en plein écran, sa marque à gauche).
+ */
+.intro-hint-box {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 64%;
+  display: flex;
+  justify-content: center;
+  padding: 0 4vmin;
+  pointer-events: none;
+  animation: intro-hint-in 600ms ease-out both;
+}
+
+html.menu-desktop .intro-hint-box {
+  top: auto;
+  bottom: 7%;
+}
+
+.intro-hint {
+  max-width: 80%;
+  text-align: center;
+  background: rgb(3 8 7 / 0.9);
+  /* Deux battements puis l'invite reste allumée : la dernière image ne bouge plus (revue de Codex). */
+  animation: intro-pulse 1200ms ease-in-out 2;
+}
+
+@keyframes intro-pulse {
+  50% {
+    color: rgb(230 240 236 / 0.65);
+  }
+}
+
+@keyframes intro-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(1vmin);
+  }
+}
+
 /* ---------- Horaire de la borne : voile de nuit, préavis d'arrêt ----------
  * Maquette revue par Codex (tmp/maquette-attente) : la nuit, en attente, un voile noir sur toute
  * la fenêtre (médias, zones, menu), invite comprise ; il descend en 4 s et se lève d'un coup au
@@ -2648,7 +2690,7 @@ html:not(.in-game) #media-bg::after {
 }
 
 /* Menu des tables en borne : le média se voit en entier, le voile est celui du menu (.menu-scrim, tourné avec le joueur). */
-html.menu-cab:not(html.in-game):not(html.attract-mode) #media-bg::after {
+html.menu-cab:not(html.in-game):not(html.attract-mode):not(html.intro-phase) #media-bg::after {
   background: rgba(3, 8, 7, 0.08);
 }
 
@@ -2658,7 +2700,7 @@ html.menu-cab:not(html.in-game):not(html.attract-mode) #media-bg::after {
  * média en largeur y est tourné par media.js, flippers en bas, et le remplit sans être rogné
  * en paysage. Le cadre (bord sombre, chant sarcelle, ombre) est dessiné par des ombres.
  */
-html.menu-desktop:not(html.in-game):not(html.attract-mode) #media-bg {
+html.menu-desktop:not(html.in-game):not(html.attract-mode):not(html.intro-phase) #media-bg {
   --px: calc(var(--pf-h, 1) * 100vh / 1080);
   inset: auto;
   top: calc(var(--pf-y, 0) * 100vh + 92 * var(--px));
@@ -2677,7 +2719,7 @@ html.menu-desktop:not(html.in-game):not(html.attract-mode) #media-bg {
     var(--halo-panel);
 }
 
-html.menu-desktop:not(html.in-game):not(html.attract-mode) #media-bg::after {
+html.menu-desktop:not(html.in-game):not(html.attract-mode):not(html.intro-phase) #media-bg::after {
   background: transparent;
 }
 
@@ -2764,6 +2806,26 @@ html.in-game[data-rotation='270'] #media-bg .media-fallback {
   width: var(--turned-width);
   height: var(--turned-height);
   transform: translate(-50%, -50%) rotate(var(--turned));
+}
+
+/*
+ * Ouverture au démarrage (intro.js) : l'animation de Cyber Pinball du plateau est tournée pour
+ * le joueur, comme la racine ; un fichier de l'utilisateur l'est par media.js (bord des
+ * flippers). Rien n'assombrit l'écran : la scène est le seul contenu.
+ */
+html.intro-phase[data-rotation='90'] #media-bg .media-fallback,
+html.intro-phase[data-rotation='180'] #media-bg .media-fallback,
+html.intro-phase[data-rotation='270'] #media-bg .media-fallback {
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  width: var(--turned-width);
+  height: var(--turned-height);
+  transform: translate(-50%, -50%) rotate(var(--turned));
+}
+
+html.intro-phase #media-bg::after {
+  display: none;
 }
 
 /* Les textes du menu sur un fond animé : ombre portée, liste sur un fond translucide. */

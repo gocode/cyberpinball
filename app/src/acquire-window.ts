@@ -281,6 +281,15 @@ export function createAcquirer(events: AcquireEvents) {
         return resumed(item);
       }
       const id = contents?.id ?? -1;
+      // Le même lien cliqué une seconde fois pendant qu'il se télécharge : le premier continue, aucun
+      // doublon (01/11/2026, une action longue ne se lance qu'une fois). Une vue cachée qui attend
+      // son téléchargement direct le reçoit toujours.
+      const twin = directWaiters.has(id) ? undefined : [...downloads.values()].find((d) => d.item.getURL() === item.getURL() && d.item.getState() === 'progressing');
+      if (twin) {
+        _event.preventDefault();
+        setStatus(t('Déjà en cours : {file}. Il continue, rien n’est relancé.', { file: twin.filename }), true);
+        return;
+      }
       // Téléchargement direct : la vue cachée qui l'a déclenché l'attend.
       directWaiters.get(id)?.(item);
       // Un média demandé depuis ses propositions : rangé à part, rendu à qui l'a demandé.

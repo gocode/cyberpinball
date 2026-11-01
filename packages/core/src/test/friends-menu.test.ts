@@ -343,7 +343,7 @@ test('partie en direct : salon, départ, résultats, invitation ; chaque écran 
   }
 });
 
-test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le PuP-Pack décochés jusqu’à l’attestation des droits, la réception d’abord', async () => {
+test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le PuP-Pack décochés jusqu’à l’attestation des droits, l’écran ouvert dans la liste', async () => {
   const id = (n: number) => n.toString(16).padStart(16, '0');
   const files = [
     { id: id(1), rel: 'Bride of Pin-bot (Williams 1991).vpx', bytes: 200_000, part: 'table' },
@@ -369,20 +369,22 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
   await last().build().actions.find((a) => a.label.startsWith('Bride of Pin-bot'))!.run();
   await last().build().actions.find((a) => a.label === 'Récupérer toute la table')!.run();
   await new Promise((r) => setImmediate(r));
-  // Les parties arrivées pendant que l'écran est montré : il se rouvre, le curseur sur la réception.
+  // Les parties arrivées pendant que l'écran est montré : il se rouvre, le curseur sur la première partie (01/11/2026).
   const opened = last();
   opened.build();
   await new Promise((r) => setImmediate(r));
   assert.notEqual(last(), opened, 'l’écran se rouvre une fois les parties arrivées');
-  assert.ok(!last().at, 'le curseur sur la première action, pas sur « Retour »');
+  assert.ok(!last().at, 'le curseur sur la première partie, dans la liste, pas sur « Retour »');
   const built = last().build() as unknown as { heading: string; actions: Action[]; sections: { rows: { text: string; action?: number; badges?: string[] }[] }[] };
   assert.equal(built.heading, 'Récupérer toute la table');
-  assert.equal(built.actions[0]!.label, 'Récupérer les 2 parties choisies', 'la réception d’abord, la ROM et le PuP-Pack laissés de côté');
+  assert.equal(built.actions[0]!.label, 'Table', 'les parties d’abord : l’écran s’ouvre dans la liste');
+  const getLabel = () => last().build().actions.find((a) => a.label.startsWith('Récupérer les '))?.label;
+  assert.equal(getLabel(), 'Récupérer les 2 parties cochées', 'la ROM et le PuP-Pack laissés de côté');
   const rows = built.sections.flatMap((x) => x.rows).filter((r) => r.action !== undefined);
   assert.equal(rows.length, 4);
   for (const row of rows) assert.equal(built.actions[row.action!]!.label, row.text, `la ligne « ${row.text} » mène à sa propre action`);
-  assert.deepEqual(rows.find((r) => r.text === 'ROM')!.badges, ['Pas prise']);
-  assert.deepEqual(rows.find((r) => r.text === 'PuP-Pack')!.badges, ['Pas prise']);
+  assert.deepEqual(rows.find((r) => r.text === 'ROM')!.badges, ['Non cochée']);
+  assert.deepEqual(rows.find((r) => r.text === 'PuP-Pack')!.badges, ['Non cochée']);
   // Start sur la ROM ouvre sa mention légale : rien n'est coché tant que l'attestation ne l'est pas.
   await built.actions[rows.find((r) => r.text === 'ROM')!.action!]!.run();
   type Shown = { heading: string; lead?: string; actions: Action[]; sections: { rows: { text: string; action?: number; badges?: string[]; pick?: boolean }[] }[] };
@@ -398,17 +400,17 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
   const before = screens();
   await attest().actions.find((a) => a.label === 'Prendre la ROM')!.run();
   assert.equal(screens(), before, 'sans l’attestation cochée, « Prendre la ROM » ne fait rien');
-  // Retour sans cocher : la ROM reste « Pas prise ».
+  // Retour sans cocher : la ROM reste « Non cochée ».
   await attest().actions.find((a) => a.label === 'Retour')!.run();
-  assert.equal(last().build().actions[0]!.label, 'Récupérer les 2 parties choisies');
+  assert.equal(getLabel(), 'Récupérer les 2 parties cochées');
   // Cochée puis prise : la ROM rejoint les parties choisies.
   const romRow = () => (last().build() as unknown as Shown).sections.flatMap((x) => x.rows).find((r) => r.text === 'ROM')!;
   await last().build().actions[romRow().action!]!.run();
   await attest().actions[0]!.run();
   assert.deepEqual(attest().sections.flatMap((x) => x.rows).find((r) => r.pick)!.badges, ['Cochée']);
   await attest().actions.find((a) => a.label === 'Prendre la ROM')!.run();
-  assert.equal(last().build().actions[0]!.label, 'Récupérer les 3 parties choisies');
-  assert.deepEqual(romRow().badges, ['La sienne']);
+  assert.equal(getLabel(), 'Récupérer les 3 parties cochées');
+  assert.deepEqual(romRow().badges, ['Cochée']);
   // Décochée puis recochée : l'attestation vaut pour l'écran, la mention ne revient pas.
   await last().build().actions[romRow().action!]!.run();
   await last().build().actions[romRow().action!]!.run();
@@ -419,7 +421,7 @@ test('toute une table d’un ami : chaque ligne mène à sa partie, la ROM et le
   assert.equal(attest().heading, 'Le PuP-Pack : vos droits');
   await attest().actions.find((a) => a.label === 'Retour')!.run();
   // La réception : la ROM attestée part, avec la trace de l'attestation ; le PuP-Pack non attesté, jamais.
-  await last().build().actions[0]!.run();
+  await last().build().actions.find((a) => a.label.startsWith('Récupérer les '))!.run();
   const job = manager.jobs().at(-1)!;
   assert.deepEqual(job.files.map((f) => f.name).sort(), ['Bride of Pin-bot (Williams 1991).directb2s', 'Bride of Pin-bot (Williams 1991).vpx', 'pinmame/roms/bop_l7.zip']);
   assert.deepEqual(job.data?.attested, ['rom']);

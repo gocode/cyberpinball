@@ -166,7 +166,7 @@ function chant(css: string, selector: string): number {
 
 test('chargement au bureau : l’encart a les cotes du cadre du média et ne le recouvre pas', () => {
   const css = fs.readFileSync(path.join(APP, 'renderer', 'frontend.css'), 'utf8').replace(/\r\n/g, '\n');
-  const FRAME = 'html.menu-desktop:not(html.in-game):not(html.attract-mode) #media-bg';
+  const FRAME = 'html.menu-desktop:not(html.in-game):not(html.attract-mode):not(html.intro-phase) #media-bg';
   const frame = { left: cote(css, FRAME, 'left'), top: cote(css, FRAME, 'top'), width: cote(css, FRAME, 'width'), height: cote(css, FRAME, 'height'), chant: chant(css, FRAME) };
   const card = { left: cote(css, '.loading-card', 'left'), right: cote(css, '.loading-card', 'right'), top: cote(css, '.loading-card', 'top'), height: cote(css, '.loading-card', 'height'), chant: chant(css, '.loading-card') };
   assert.equal(card.top, frame.top, 'même haut que le cadre');

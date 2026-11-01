@@ -493,6 +493,9 @@ export function createUpdatesMenu(host: UpdatesHost) {
     }
   }
 
+  /** La mise à jour que ce démarrage vient de constater (startupNotice) : le pare-feu est vérifié en conséquence. */
+  let installed: { from: string; to: string } | undefined;
+
   /**
    * Au démarrage : constat de la mise à jour lancée avant la fermeture (version attendue
    * là, ou ancienne version restée en place). Undefined s'il n'y en avait pas.
@@ -502,6 +505,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
     if (swappable() && fs.existsSync(`${host.appDir}.precedente`)) console.log(`Mise à jour légère : ancienne version ${removePreviousApp(host.appDir) ? 'retirée' : 'toujours tenue'}.`); // i18n-ignore : journal
     const outcome = takeUpdateOutcome(host.loc.dataDir, host.version);
     if (!outcome) return undefined;
+    if (outcome.kind === 'installed') installed = { from: outcome.from, to: outcome.to };
     const text =
       outcome.kind === 'installed'
         ? t('Cyber Pinball {to} est installé (avant : {from}).', { to: outcome.to, from: outcome.from })
@@ -510,5 +514,5 @@ export function createUpdatesMenu(host: UpdatesHost) {
     return text;
   }
 
-  return { systemItem, startupNotice, startBackgroundChecks };
+  return { systemItem, startupNotice, justInstalled: () => installed, startBackgroundChecks };
 }

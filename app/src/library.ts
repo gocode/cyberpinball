@@ -180,7 +180,7 @@ import { createMedias, playsSoundPreview, type MediaView } from './library-media
 import { createTableFiles } from './table-files';
 import { createFilePicker, type PickRequest } from './file-picker';
 import { createDownloadsScreen } from './downloads-screen';
-import { createDownloadCenter } from './download-center';
+import { createDownloadCenter, type DownloadNextStep } from './download-center';
 import { httpTransport } from './download-sources';
 import { createHealth, type HealthView } from './health';
 import { isShown, refuseOffscreen } from './offscreen';
@@ -425,6 +425,12 @@ export interface Built {
   health?: HealthView;
   /** Bandeau d'aide propre à l'écran (sélecteur de fichiers : Exit remonte d'un dossier). */
   hint?: string;
+  /**
+   * Ce que Start fait sur un élément de la liste de contenu (« cocher ou décocher »), dit par le
+   * bandeau d'aide tant qu'on y est ; sans lui, « valider ». Une liste de cases à cocher le dit :
+   * sinon rien n'indique qu'on y coche (la ROM d'un ami, 01/11/2026).
+   */
+  listStart?: string;
 }
 
 /** Ce que le rendu montre du parcours d'une table (app/renderer/library.js, renderJourney). */
@@ -851,6 +857,8 @@ export function createLibrary(host: LibraryHost) {
   const downloadFinishers = new Map<DownloadJobKind, (job: DownloadJob) => boolean>();
   /** « Revenir à… » d'un téléchargement fini, par sorte : vrai s'il l'a rendu (sinon l'écran d'origine s'ouvre). */
   const downloadDeliverers = new Map<DownloadJobKind, (job: DownloadJob) => boolean>();
+  /** La suite d'un téléchargement fini, par sorte (installer une table reçue…) : proposée d'abord dans sa fiche. */
+  const downloadNextSteps = new Map<DownloadJobKind, (job: DownloadJob) => DownloadNextStep | undefined>();
   const returnOpeners = new Map<DownloadScreen, (back: DownloadReturn) => void>();
   let downloadFriends: { has(key: string): boolean; name(key: string): string | undefined } | undefined;
   const downloadWorld: ReturnWorld = {
@@ -912,6 +920,7 @@ export function createLibrary(host: LibraryHost) {
     manager: downloads,
     show: (build, at) => openCustom(build, at),
     world: downloadWorld,
+    nextStep: (job) => downloadNextSteps.get(job.kind)?.(job),
     deliver: (job) => deliverDownload(job),
     files: {
       detail: () => {
@@ -3322,7 +3331,9 @@ export function createLibrary(host: LibraryHost) {
         : read?.active
           ? t('Flippers : faire défiler, tenus pour aller vite · Start ou Entrée : page suivante · Exit ou Échap : revenir aux actions · MagnaSave ou F6 : actions de l’écran')
         : zone?.active === 'list'
-          ? t('Flippers : parcourir, tenus pour aller vite · Start ou Entrée : valider · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran')
+          ? built.listStart
+            ? t('Flippers : parcourir, tenus pour aller vite · Start ou Entrée : {start} · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran', { start: built.listStart })
+            : t('Flippers : parcourir, tenus pour aller vite · Start ou Entrée : valider · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran')
           : `${built.hint ?? t('Flippers ou Tab : choisir · Start ou Entrée : valider · Exit ou Échap : revenir · souris')}${zone ? ` · ${t('MagnaSave ou F6 : la liste')}` : readingOn ? ` · ${t('MagnaSave ou F6 : le texte')}` : ''}`,
     };
   }
@@ -3519,6 +3530,8 @@ export function createLibrary(host: LibraryHost) {
     openSystemRoot,
     openCustom,
     openPrompt,
+    /** Sélecteur de fichiers de Cyber Pinball ; undefined à l'abandon, l'écran d'où l'on vient revient tel quel. */
+    pick: pickPaths,
     openNotice,
     openSheet,
     openAdd,
@@ -3568,6 +3581,7 @@ export function createLibrary(host: LibraryHost) {
       pill: () => downloadsPill(summarize(downloads.jobs())),
       finisher: (kind: DownloadJobKind, fn: (job: DownloadJob) => boolean) => void downloadFinishers.set(kind, fn),
       deliverer: (kind: DownloadJobKind, fn: (job: DownloadJob) => boolean) => void downloadDeliverers.set(kind, fn),
+      nextStep: (kind: DownloadJobKind, fn: (job: DownloadJob) => DownloadNextStep | undefined) => void downloadNextSteps.set(kind, fn),
       opener: (screenName: DownloadScreen, fn: (back: DownloadReturn) => void) => void returnOpeners.set(screenName, fn),
       friends: (f: { has(key: string): boolean; name(key: string): string | undefined }) => void (downloadFriends = f),
       setTransport: (kind: DownloadSourceKind, transport: DownloadTransport) => downloads.setTransport(kind, transport),

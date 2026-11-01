@@ -108,6 +108,7 @@ export * from './uisounds';
 export * from './power';
 export * from './arcadehours';
 export * from './cinema';
+export * from './intro';
 export * from './sessionorientation';
 export * from './sharing';
 export * from './mediapack';

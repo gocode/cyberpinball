@@ -153,6 +153,16 @@ import {
   recordedMediaType,
   type RecordedRole,
   type RecordingSettings,
+  IntroRun,
+  INTRO_SKIP_FLAG,
+  introAtStartup,
+  introFiles,
+  introMediaView,
+  introScreenOf,
+  introSound,
+  introSource,
+  mediaUrl,
+  type IntroFiles,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -180,11 +190,13 @@ import { describeReset, resetButtons } from './buttons-reset';
 import { forcedRotation, menuRotation, openSettings } from './settings';
 import { serveMedias } from './media-protocol';
 import { createMenuSettings } from './menu-settings';
+import { createIntroMenu } from './intro-menu';
 import { createLanguageMenu } from './language-menu';
 import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
 import { createFriendsMenu } from './friends-menu';
 import { createFirewallRule } from './firewall-rule';
+import { guardFirewall } from './firewall-guard';
 import { createFriendContent } from './friend-content';
 import { friendTransport } from './download-sources';
 import { createGameNotices } from './game-notice';
@@ -350,6 +362,74 @@ let launchCount = 0;
  * (viewFor, cinemaFor). Rien ici ne l'attend : VPX part quand il partait, le relais vient du lanceur.
  */
 const cinema = new LaunchCinema();
+
+/**
+ * Ouverture au démarrage (intro.ts) : chaque écran joue son animation, puis garde sa dernière
+ * image ; le premier bouton (ou un clic) affiche la roue, ou revient aux réglages après « Voir
+ * l'ouverture ». Les animations partent quand toutes les fenêtres sont prêtes (introReady).
+ */
+const introRun = new IntroRun();
+/** Fenêtres du menu qui ont dit « prête » (webContents.id) : l'ouverture part quand toutes le sont. */
+const introReady = new Set<number>();
+/** Au plus ce délai après l'ouverture des fenêtres : une fenêtre qui ne répond pas ne la retient pas. */
+const INTRO_READY_MAX_MS = 5000;
+/** Fichiers d'ouverture de <racine>\media, relus quand ce dossier change (guet des médias) ou qu'un fichier est rangé. */
+let introFileCache: IntroFiles | undefined;
+/** Constats brefs arrivés pendant l'ouverture : montrés sur la roue, pas par-dessus les animations. */
+let pendingBanners: string[] = [];
+
+function introFilesNow(): IntroFiles {
+  return (introFileCache ??= loc.root ? introFiles(layoutOf(loc.root).media) : {});
+}
+
+/** Pose l'ouverture : au démarrage (retour à la roue), ou « Voir l'ouverture » (retour aux réglages). */
+function beginIntro(returnTo: 'menu' | 'library'): void {
+  // Fenêtres déjà prêtes (« Voir l'ouverture ») : les animations partent tout de suite.
+  introRun.begin(returnTo, returnTo === 'library');
+  state = { ...state, phase: 'intro', help: false };
+  broadcast();
+}
+
+/** Une fenêtre est prête : quand toutes le sont, les animations partent ensemble. */
+function introWindowReady(id: number): void {
+  introReady.add(id);
+  const all = [...windows.values()].every((w) => w.isDestroyed() || introReady.has(w.webContents.id));
+  if (all && introRun.start()) broadcast();
+}
+
+/** Premier bouton pendant l'ouverture : la roue (ou les réglages), et rien d'autre. */
+function leaveIntro(): boolean {
+  const back = introRun.end();
+  if (back === 'library') state = { ...state, phase: 'library' };
+  else state = tables.length ? { ...state, phase: 'menu' } : { ...state, phase: 'message', message: noTables() };
+  broadcast();
+  const banners = pendingBanners;
+  pendingBanners = [];
+  for (const text of banners) showBanner(text);
+  return true;
+}
+
+/** Part de l'ouverture d'une fenêtre : l'écran de chaque rôle qu'elle dessine, et l'invite du plateau. */
+function introFor(role: RoleId) {
+  const run = introRun.current;
+  if (!run) return undefined;
+  const files = introFilesNow();
+  const dmdType = medias?.defaultMedia('dmd').type === 'FullDMD' ? 'FullDMD' : 'DMD';
+  const edge = edgeOfRotation(rotation);
+  const viewOf = (r: RoleId, desktop = false) => {
+    const screen = desktop ? 'backglass' : introScreenOf(r, dmdType);
+    return introMediaView({ role: r, screen, source: introSource(mediaSettings.intro, files, screen), run, rotation, edge, url: mediaUrl, desktop });
+  };
+  const roles = windowRoles.get(role) ?? [role];
+  return {
+    id: run.id,
+    startedAt: run.startedAt,
+    screens: Object.fromEntries(roles.map((r) => [r, viewOf(r)])),
+    // Plateau en largeur (poste de bureau) : l'ouverture du fronton, plein écran.
+    desktop: role === 'playfield' ? viewOf('playfield', true) : undefined,
+    hint: introRun.returnTo === 'library' ? t('Appuyez sur un bouton pour revenir aux réglages') : t('Appuyez sur un bouton pour choisir une table'),
+  };
+}
 
 /**
  * Mode attente (§ 5.2) : après le délai réglé sans bouton, une table tirée au hasard toutes
@@ -629,27 +709,48 @@ function openCabinetSetup(): void {
     // La sélection va d'office sur l'entrée qui attend l'utilisateur (pastille rouge).
   }), Math.max(0, cabinetSetupItems().findIndex((i) => i.attention)));
 }
+/** Enregistre les réglages des médias et les applique (état renvoyé aux fenêtres). */
+function saveMediaSettings(next: MenuMediaSettings): void {
+  mediaSettings = next;
+  attract.reschedule();
+  hours.update();
+  try {
+    saveMenuMediaSettings(loc.dataDir, mediaSettings);
+  } catch (error) {
+    console.log(`Médias : réglage non enregistré (${(error as Error).message}).`);
+  }
+  broadcast();
+}
+// Ouverture au démarrage : jouée ou coupée, l'animation de Cyber Pinball ou un fichier par écran, la musique de fond.
+const introMenu = createIntroMenu({
+  library,
+  settings: () => mediaSettings.intro,
+  save: (intro) => saveMediaSettings({ ...mediaSettings, intro }),
+  mediaDir: () => (loc.root ? layoutOf(loc.root).media : undefined),
+  trashRoot: () => (loc.root ? layoutOf(loc.root).trash : undefined),
+  files: () => introFilesNow(),
+  filesChanged: () => {
+    introFileCache = undefined;
+    medias?.invalidate();
+  },
+  screens: () => {
+    const dmdType = medias?.defaultMedia('dmd').type === 'FullDMD' ? 'FullDMD' : 'DMD';
+    return new Set([...windowRoles.values()].flat().map((r) => introScreenOf(r, dmdType)));
+  },
+  preview: () => beginIntro('library'),
+});
 // Médias, son et attente (musique, volumes, mode attente, médias pendant la partie) : un écran à part.
 library.provideSystemItem(
   'menu-media',
   createMenuSettings({
     library,
     settings: () => mediaSettings,
-    save: (next) => {
-      mediaSettings = next;
-      attract.reschedule();
-      hours.update();
-      try {
-        saveMenuMediaSettings(loc.dataDir, mediaSettings);
-      } catch (error) {
-        console.log(`Médias : réglage non enregistré (${(error as Error).message}).`);
-      }
-      broadcast();
-    },
+    save: (next) => saveMediaSettings(next),
     output: () => audioOutput,
     preview: (id) => playUiSound(id),
     wakeDevices: () => wakeDevices(),
     sleepAllowed: () => !powerUnavailable('sleep', power.capabilities()),
+    intro: introMenu,
   }),
 );
 // Langue de l'interface : le choix relance le menu, comme un changement de configuration.
@@ -1116,7 +1217,8 @@ export function startFrontend(): void {
   // Chromium ne donne le nom des sorties audio, et n'autorise setSinkId (sortie du fronton
   // pour la musique du menu), qu'avec ces permissions ; les pages du menu sont locales.
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media' || permission === 'speaker-selection');
-  ipcMain.on('ready', () => {
+  ipcMain.on('ready', (event) => {
+    if (introRun.active) introWindowReady(event.sender.id);
     broadcast();
     // Fenêtre (re)chargée : elle n'a pas encore l'image du DMD vivant.
     liveDmd.resend();
@@ -1128,6 +1230,8 @@ export function startFrontend(): void {
     // Un clic en mode attente y met fin, sans autre effet ; de même pour le préavis d'arrêt de l'horaire.
     const noticed = hours.activity();
     if (attract.activity() || noticed) return void leaveAttract();
+    // Un clic pendant l'ouverture affiche la roue, comme un bouton.
+    if (state.phase === 'intro') return void leaveIntro();
     if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
     // Roue dentée (ou cadenas, en mode invité).
     else if (action.type === 'config') guest.knock('menu.system') && openConfig();
@@ -1173,6 +1277,7 @@ export function startFrontend(): void {
     mediaWatch = watchMediaChanges({
       dirs: [layout.tables, layout.media],
       onChange: (changes) => {
+        introFileCache = undefined;
         if (changes.has('tables')) reloadTables();
         else medias?.invalidate();
         broadcast();
@@ -1202,8 +1307,11 @@ export function startFrontend(): void {
   // Réseau des bornes : présence aux amis, annuaire ; un échec s'affiche dans « Partage et réseau ».
   void socialNet.start().then(async () => {
     socialNet.checkBadges(playStats(tables));
-    // La règle du pare-feu, lue sans élévation : « Partage et réseau » dit si elle manque.
-    if (socialMode !== 'off') void socialFirewall.check().catch(() => undefined);
+    // Les règles du pare-feu, à chaque démarrage et après une mise à jour : lues, écrites au
+    // journal, reposées d'elles-mêmes par la tâche de réparation si l'une manque (firewall-guard.ts).
+    // Ce qui reste à reposer reste visible : « Partage et réseau », la présence des amis ; et juste
+    // après une mise à jour, l'écran « Pare-feu de Windows », jamais au milieu d'une partie.
+    if (socialMode !== 'off') void checkFirewallAtStart().catch(() => undefined);
     if (socialDemo) stopSimulatedPlayers = await startSimulatedPlayers(socialNet, loc.dataDir, () => tables, (line) => console.log(line));
   });
   for (const f of selection?.findings ?? []) console.log(`Configuration de la borne : ${f.message}`);
@@ -1280,6 +1388,13 @@ export function startFrontend(): void {
     };
   } else if (tables.length === 0) {
     state = { ...state, phase: 'message', message: noTables() };
+  }
+
+  // Ouverture : quand le démarrage arrive sur le menu des tables, avant la roue.
+  if (!choose && introAtStartup({ settings: mediaSettings.intro, landing: state.phase, argv: process.argv, env: process.env })) {
+    beginIntro('menu');
+    // Une fenêtre qui ne dit jamais « prête » ne retient pas les autres.
+    setTimeout(() => introRun.start() && broadcast(), INTRO_READY_MAX_MS);
   }
 
   const stress = process.env.CYBERPINBALL_STRESS;
@@ -1528,6 +1643,8 @@ function handleKey(input: Input): boolean {
   // Le préavis d'arrêt de l'horaire aussi : la borne reste allumée tant qu'on joue.
   const noticed = hours.activity();
   if (attract.activity() || noticed) return leaveAttract();
+  // Ouverture : n'importe quel bouton affiche la roue (pendant la lecture aussi), sans autre effet.
+  if (state.phase === 'intro') return leaveIntro();
 
   // Tab : menu et configuration, quels que soient les boutons relevés (dans le menu, Tab s'y déplace).
   if (input.code === CONFIG_KEY && ['menu', 'message', 'confirmQuit'].includes(state.phase)) return guest.knock('menu.system') ? openConfig() : true;
@@ -2397,11 +2514,23 @@ function relaunchWizard(stepFlag?: string, newConfiguration = false): boolean {
 /** Relance le menu : une autre configuration de la borne rouvre ses fenêtres sur ses écrans. */
 function relaunchMenu(): void {
   // Par le gardien des écrans, comme toute relance : aucun écran ne montre le bureau entre les deux.
-  relaunchCovered(process.argv.slice(1));
+  // La borne était déjà ouverte : pas d'ouverture à la relance.
+  relaunchCovered([...process.argv.slice(1).filter((a) => a !== INTRO_SKIP_FLAG), INTRO_SKIP_FLAG]);
+}
+
+/** Les règles du pare-feu au démarrage (firewall-guard.ts) ; après une mise à jour, l'écran qui demande de les reposer. */
+async function checkFirewallAtStart(): Promise<void> {
+  const update = updates.justInstalled();
+  const report = await guardFirewall(socialFirewall, { ...(update ? { update } : {}), log: (line) => console.log(line) });
+  if (socialFirewall.simulated || !report.problems.length) return;
+  if (update && state.phase === 'menu' && !guest.active && !closing) friendsMenu.openFirewall(() => library.leave());
+  else showBanner(t('Pare-feu de Windows : {reason}. Menu système > Amis > Partage et réseau.', { reason: report.problems[0]!.reason }));
 }
 
 /** Constat bref en haut du menu, qui s'efface seul : il ne demande aucun bouton. */
 function showBanner(text: string): void {
+  // Pendant l'ouverture, il attend la roue : rien ne se pose sur les animations.
+  if (state.phase === 'intro') return void pendingBanners.push(text);
   state = { ...state, banner: text };
   broadcast();
   setTimeout(() => {
@@ -2478,6 +2607,8 @@ function viewFor(role: RoleId) {
     liveDmd: liveDmdView(role),
     medias: subject ? mediasOf(subject) : defaults,
     preload,
+    // Ouverture au démarrage : l'écran de chaque rôle de cette fenêtre, et l'invite du plateau.
+    intro: state.phase === 'intro' ? introFor(role) : undefined,
     // Lancement en cinéma : la part de cette fenêtre (le plateau d'où part le logo, le fronton où il se pose).
     cinema: state.phase === 'loading' ? cinemaFor(role) : undefined,
     // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
@@ -2581,6 +2712,11 @@ function soundView() {
   // Hors du menu des tables, seule la table dont parle l'écran ouvert se fait entendre (screensSubject),
   // et rien quand cet écran fait écouter des sons (propositions, sons de la table) : un seul son à la fois.
   const table = state.phase === 'library' && library.previewsSound() ? undefined : screensSubject();
+  // Ouverture : la musique de fond choisie, sinon le son de la vidéo d'ouverture du plateau.
+  if (state.phase === 'intro') {
+    const music = introSource(mediaSettings.intro, introFilesNow(), 'music');
+    return { ...introSound(mediaSettings, music.source === 'file' ? mediaUrl(music.file) : undefined), launchId: undefined, output: audioOutput };
+  }
   const now = moment();
   const plan =
     table && medias
@@ -2626,7 +2762,7 @@ function dmdWindow(): BrowserWindow | undefined {
 
 /** Le DMD vivant se montre : réglé ainsi, un écran du DMD, ni partie ni mode bureau. */
 function liveDmdOn(): boolean {
-  return mediaSettings.dmd === 'live' && Boolean(dmdWindow()) && state.phase !== 'playing' && !desktop.active;
+  return mediaSettings.dmd === 'live' && Boolean(dmdWindow()) && state.phase !== 'playing' && state.phase !== 'intro' && !desktop.active;
 }
 
 function tableRecords(table: TableEntry): TableRecords | undefined {

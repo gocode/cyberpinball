@@ -9,7 +9,7 @@
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un réseau d'essai.
 
 import * as fs from 'node:fs';
-import { fetchResumable, renameWithRetry, ResumableError, type DownloadReason, type DownloadTransport, type LibraryMedia, type TransportResult } from '@cyberpinball/core';
+import { fetchResumable, renameWithRetry, ResumableError, t, type DownloadReason, type DownloadTransport, type LibraryMedia, type TransportResult } from '@cyberpinball/core';
 import type { FetchFailure, FriendContent } from './friend-content';
 import type { SocialNet } from './social-net';
 
@@ -25,10 +25,32 @@ export function friendReason(reason: FetchFailure): DownloadReason {
       return 'size';
     case 'sha':
       return 'sha';
+    // Refusé par les contrôles de l'ami (un média qui n'en est pas un) : le contenu, pas le partage.
     case 'check':
+    case 'refused':
       return 'check';
     default:
       return 'refused';
+  }
+}
+
+/**
+ * Ce qui s'est passé, avec le fichier en cause : la raison exacte au résultat, jamais « ne le
+ * partage plus » pour un fichier que ses contrôles refusent (01/11/2026).
+ */
+export function friendDetail(reason: FetchFailure, file: string): string | undefined {
+  switch (reason) {
+    case 'refused':
+      return t('média refusé par les contrôles : {file}', { file });
+    case 'check':
+      return t('contenu refusé à l’arrivée : {file}', { file });
+    case 'not-found':
+      return t('introuvable chez votre ami : {file}', { file });
+    case 'size':
+    case 'sha':
+      return t('fichier abîmé ou changé : {file}', { file });
+    default:
+      return undefined;
   }
 }
 
@@ -47,7 +69,8 @@ export function friendTransport(content: Pick<FriendContent, 'fetchFile'>, net: 
       if (!target) return { ok: false, reason: 'refused', detail: 'destination inconnue' }; // i18n-ignore : journal
       const r = await content.fetchFile(key, table, file.ref, target, file.part, (bytes) => progress(bytes, file.bytes), signal, file.bytes);
       if ('file' in r) return { ok: true, file: r.file, bytes: r.bytes, sha256: r.sha256 };
-      return { ok: false, reason: friendReason(r.reason) };
+      const detail = friendDetail(r.reason, file.name);
+      return { ok: false, reason: friendReason(r.reason), ...(detail ? { detail } : {}) };
     },
   };
 }

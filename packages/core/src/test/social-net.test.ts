@@ -46,10 +46,11 @@ const net = require(path.join(APP_DIST, 'social-net.js')) as NetModule;
 const createTestnet = require(path.join(REPO_ROOT, 'node_modules', 'hyperdht', 'testnet.js')) as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 
 
-async function until(what: string, check: () => boolean, ms = 15_000): Promise<void> {
+/** `detail` : ce qu'on sait au moment de l'échec (liaisons, journal), pour qu'un délai dépassé s'explique. */
+async function until(what: string, check: () => boolean, ms = 15_000, detail?: () => string): Promise<void> {
   const end = Date.now() + ms;
   while (!check()) {
-    if (Date.now() > end) throw new Error(`attendu : ${what}`);
+    if (Date.now() > end) throw new Error(`attendu : ${what}${detail ? `\n${detail()}` : ''}`);
     await new Promise((r) => setTimeout(r, 25));
   }
 }
@@ -243,7 +244,7 @@ type BeaconListener = (beacon: Beacon, host: string) => void;
  * Deux bornes déjà amies (social.json écrit d'avance, comme après une amitié faite) : ouvertes
  * avec les options données (tolérance, recherche courtes), pas encore démarrées.
  */
-function friendsPair(opts: { bootstrap?: { host: string; port: number }[]; lan?: boolean; beacons?: (key: string) => unknown; graceMs?: number; searchMs?: number; refuseIncoming?: (i: number) => boolean }) {
+function friendsPair(opts: { bootstrap?: { host: string; port: number }[]; lan?: boolean; beacons?: (key: string) => unknown; graceMs?: number; searchMs?: number; refuseIncoming?: (i: number, keys: string[]) => boolean }) {
   const made = ['Alice', 'Bruno'].map((name) => cabinet(name, { bootstrap: [] }));
   const states = made.map((m) => m.net.state());
   const since = new Date().toISOString();
@@ -262,7 +263,7 @@ function friendsPair(opts: { bootstrap?: { host: string; port: number }[]; lan?:
       ...(opts.beacons ? { beacons: opts.beacons(states[i]!.key.publicKey) } : {}),
       ...(opts.graceMs !== undefined ? { graceMs: opts.graceMs } : {}),
       ...(opts.searchMs !== undefined ? { searchMs: opts.searchMs } : {}),
-      ...(opts.refuseIncoming?.(i) ? { refuseIncoming: true } : {}),
+      ...(opts.refuseIncoming?.(i, states.map((st) => st.key.publicKey)) ? { refuseIncoming: true } : {}),
       log: (line: string) => logs[i]!.push(line),
     });
   return { a: open(0), b: open(1), keyA: states[0]!.key.publicKey, keyB: states[1]!.key.publicKey, dirs: made.map((m) => m.dir), logs, reopen: open };
@@ -278,6 +279,9 @@ function watch(check: () => boolean): { misses(): number; stop(): void } {
 }
 
 const linkedBoth = (p: ReturnType<typeof friendsPair>, a: Net = p.a, b: Net = p.b) => a.linksOf(p.keyB).length > 0 && b.linksOf(p.keyA).length > 0;
+/** Les liaisons de chaque côté et la fin de leur journal. */
+const pairState = (p: ReturnType<typeof friendsPair>, a: Net = p.a, b: Net = p.b) => () =>
+  [`Alice → Bruno : [${a.linksOf(p.keyB).join(', ')}], Bruno → Alice : [${b.linksOf(p.keyA).join(', ')}]`, ...p.logs.flatMap((l, i) => l.slice(-12).map((line) => `  ${i ? 'Bruno' : 'Alice'} : ${line}`))].join('\n');
 
 test('présence : liaisons Internet et locale, la locale tombe, l’ami reste en ligne des deux côtés', async () => {
   const testnet = await createTestnet(3, { host: '127.0.0.1' });
@@ -287,7 +291,7 @@ test('présence : liaisons Internet et locale, la locale tombe, l’ami reste en
   try {
     await Promise.all([p.a.start(), p.b.start()]);
     const both = (n: Net, key: string) => n.linksOf(key).includes('internet') && n.linksOf(key).includes('lan');
-    await until('reliées par Internet et le réseau local, des deux côtés', () => both(p.a, p.keyB) && both(p.b, p.keyA), 20_000);
+    await until('reliées par Internet et le réseau local, des deux côtés', () => both(p.a, p.keyB) && both(p.b, p.keyA), 20_000, pairState(p));
     const seen = watch(() => p.a.online(p.keyB) && p.b.online(p.keyA));
     await p.a.setLan(false);
     await new Promise((r) => setTimeout(r, 1_200));
@@ -309,7 +313,7 @@ test('présence : reconnexion rapide sans clignotement, « vu » inchangé, « m
   try {
     assert.equal(p.a.listSync(), 'searching', 'pas encore démarrée : la liste se fait');
     await Promise.all([p.a.start(), p.b.start()]);
-    await until('en ligne des deux côtés', () => linkedBoth(p));
+    await until('en ligne des deux côtés', () => linkedBoth(p), 15_000, pairState(p));
     await until('liste à jour', () => p.a.listSync() === 'settled' && p.b.listSync() === 'settled');
     const seenBefore = loadSocial(p.dirs[0]!).friends[0]!.lastSeen;
     const states = new Set<string>();
@@ -321,7 +325,7 @@ test('présence : reconnexion rapide sans clignotement, « vu » inchangé, « m
     await p.a.setLan(false);
     await new Promise((r) => setTimeout(r, 200));
     await p.a.setLan(true);
-    await until('reliées de nouveau', () => linkedBoth(p), 7_000);
+    await until('reliées de nouveau', () => linkedBoth(p), 7_000, pairState(p));
     await until('liste à jour de nouveau', () => p.a.listSync() === 'settled');
     seen.stop();
     assert.equal(seen.misses(), 0, 'jamais hors ligne pendant la reconnexion');
@@ -354,7 +358,7 @@ test('présence : balise qui ne passe que dans un sens, les deux bornes converge
   muted = p.keyA < p.keyB ? p.keyA : p.keyB;
   try {
     await Promise.all([p.a.start(), p.b.start()]);
-    await until('en ligne des deux côtés malgré la balise perdue', () => linkedBoth(p), 20_000);
+    await until('en ligne des deux côtés malgré la balise perdue', () => linkedBoth(p), 20_000, pairState(p));
     assert.deepEqual(p.a.linksOf(p.keyB), ['lan']);
     assert.deepEqual(p.b.linksOf(p.keyA), ['lan']);
   } finally {
@@ -368,7 +372,7 @@ test('présence : borne arrêtée, hors ligne après la tolérance, vue à l’a
   let b2: Net | undefined;
   try {
     await Promise.all([p.a.start(), p.b.start()]);
-    await until('en ligne des deux côtés', () => linkedBoth(p));
+    await until('en ligne des deux côtés', () => linkedBoth(p), 15_000, pairState(p));
     const stoppedAt = Date.now();
     await p.b.stop();
     assert.equal(p.a.online(p.keyB), true, 'pendant la tolérance, encore en ligne');
@@ -384,15 +388,17 @@ test('présence : borne arrêtée, hors ligne après la tolérance, vue à l’a
     // Bruno redémarre : chacun revoit l'autre.
     b2 = p.reopen(1);
     await b2.start();
-    await until('en ligne de nouveau, des deux côtés', () => linkedBoth(p, p.a, b2!), 10_000);
+    await until('en ligne de nouveau, des deux côtés', () => linkedBoth(p, p.a, b2!), 10_000, pairState(p, p.a, b2!));
   } finally {
     await Promise.all([p.a.stop(), p.b.stop(), b2?.stop()]);
   }
 });
 
-test('présence : entrant bloqué d’un côté (pare-feu), la liaison sortante suffit aux deux, sans clignotement', async () => {
+test('présence : entrant bloqué d’un côté (pare-feu), la liaison sortante suffit aux deux, sans clignotement', async (t) => {
   const testnet = await createTestnet(3, { host: '127.0.0.1' });
-  // Alice refuse l'entrant : sa balise sort, celle de Bruno ne lui arrive pas, les appels de Bruno échouent.
+  // L'entrant est bloqué chez la plus petite clé : le pire cas. Les deux bornes s'appellent en même
+  // temps, et Hyperswarm garde chez la plus grande son propre appel, que l'autre refuse, en coupant
+  // celui qui aurait abouti. Sa balise sort, celle de l'autre ne lui arrive pas.
   const listeners = new Map<string, BeaconListener>();
   let deaf = '';
   const beacons = (me: string) => ({
@@ -406,18 +412,28 @@ test('présence : entrant bloqué d’un côté (pare-feu), la liaison sortante 
       listeners.delete(me);
     },
   });
-  const p = friendsPair({ bootstrap: testnet.bootstrap, beacons, graceMs: 300, refuseIncoming: (i) => i === 0 });
-  deaf = p.keyA;
+  const p = friendsPair({ bootstrap: testnet.bootstrap, beacons, graceMs: 300, refuseIncoming: (i, keys) => keys[i]! < keys[1 - i]! });
+  const r = p.keyA < p.keyB ? 0 : 1; // la borne qui refuse l'entrant
+  const [refuser, other] = r === 0 ? [p.a, p.b] : [p.b, p.a];
+  const [refuserKey, otherKey] = r === 0 ? [p.keyA, p.keyB] : [p.keyB, p.keyA];
+  const [refuserName, otherName] = r === 0 ? ['Alice', 'Bruno'] : ['Bruno', 'Alice'];
+  deaf = refuserKey;
   try {
+    const begin = Date.now();
     await Promise.all([p.a.start(), p.b.start()]);
-    await until('en ligne des deux côtés par la liaison sortante d’Alice', () => linkedBoth(p), 20_000);
+    // Relances tirées au hasard, appel coupé relancé vite : quelques secondes, même sous charge
+    // (avant : jusqu'aux 1 s, 5 s puis 15 s de Hyperswarm, les deux bornes retombant ensemble).
+    await until('en ligne des deux côtés par la liaison sortante de la borne qui refuse l’entrant', () => linkedBoth(p), 20_000, pairState(p));
+    t.diagnostic(`liaison faite en ${Date.now() - begin} ms`);
     const seen = watch(() => p.a.online(p.keyB) && p.b.online(p.keyA));
-    await new Promise((r) => setTimeout(r, 2_000));
+    await new Promise((res) => setTimeout(res, 2_000));
     seen.stop();
     assert.equal(seen.misses(), 0, 'présence cohérente et stable des deux côtés');
-    assert.deepEqual(p.a.linksOf(p.keyB), ['internet']);
-    assert.ok(p.logs[0]!.some((l) => /liaison Internet sortante avec Bruno ouverte/.test(l)), 'le sens est au journal');
-    assert.ok(p.logs[1]!.some((l) => /liaison Internet entrante avec Alice ouverte/.test(l)));
+    assert.deepEqual(refuser.linksOf(otherKey), ['internet']);
+    assert.deepEqual(other.linksOf(refuserKey), ['internet']);
+    const opened = new RegExp(`liaison Internet sortante avec ${otherName} ouverte \\(1 liaison\\(s\\)\\) : en ligne, \\d+\\.\\d s après le début de la recherche`);
+    assert.ok(p.logs[r]!.some((l) => opened.test(l)), 'le sens et le délai sont au journal');
+    assert.ok(p.logs[1 - r]!.some((l) => new RegExp(`liaison Internet entrante avec ${refuserName} ouverte`).test(l)));
   } finally {
     await Promise.all([p.a.stop(), p.b.stop()]);
     await testnet.destroy();

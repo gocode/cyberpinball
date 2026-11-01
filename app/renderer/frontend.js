@@ -1089,6 +1089,57 @@ function renderGame(s) {
   root.replaceChildren(...(off ? [gameCard(game.table)] : []));
 }
 
+// ---------- Ouverture au démarrage (intro.ts, intro.js) ----------
+
+/** Ouverture dont l'animation du plateau est finie : l'invite à appuyer sur un bouton est posée. */
+let introHintFor;
+/** Ouverture dont les seconds tracés sont programmés. */
+let introRepaintFor;
+
+/**
+ * Ouverture : chaque couche de la fenêtre (le fond du plateau, chaque zone) joue l'écran de son
+ * rôle une fois, l'animation de Cyber Pinball ou le fichier de l'utilisateur, et garde sa
+ * dernière image. Au bureau (plateau en largeur), le fond joue l'ouverture du fronton, plein
+ * écran. Avant le départ (toutes les fenêtres prêtes), du noir. Le plateau dit comment
+ * continuer quand son animation est finie ; c'est le processus principal qui reçoit le bouton.
+ */
+function renderIntro(s) {
+  const intro = s.intro;
+  const started = intro.startedAt !== undefined;
+  const play = (layer, view, onEnd) => {
+    layer.show(started ? view : undefined, { once: true, onEnd });
+    layer.setActive(true);
+  };
+  zoneLayer.classList.remove('off');
+  menuBackglass?.setActive(false);
+  if (role === 'playfield') {
+    dropLoadingFallback();
+    dropAttractLogo();
+    document.documentElement.classList.remove('has-backdrop');
+    document.documentElement.classList.remove('loading-video');
+    document.documentElement.classList.remove('loading-phase');
+    document.documentElement.classList.remove('attract-mode');
+    document.documentElement.classList.remove('power-phase');
+    const desktop = document.documentElement.classList.contains('menu-desktop');
+    play(background, desktop ? intro.desktop : intro.screens.playfield, () => {
+      introHintFor = intro.id;
+      if (lastState?.intro?.id === intro.id) renderIntro(lastState);
+    });
+    const hint = el('section', 'intro-hint-box');
+    hint.append(el('div', 'attract-hint intro-hint', intro.hint));
+    root.replaceChildren(...(started && introHintFor === intro.id ? [hint] : []));
+  } else root.replaceChildren();
+  for (const z of zones) play(z.layer, intro.screens[z.role]);
+  // Un canevas de points posé avant la première peinture de la fenêtre peut ne pas être composé :
+  // la dernière image, tenue sans changer, est redessinée une fois posée (comme le DMD vivant).
+  if (started && introRepaintFor !== intro.id) {
+    introRepaintFor = intro.id;
+    const end = intro.screens.playfield?.intro?.timeline?.end ?? Object.values(intro.screens)[0]?.intro?.timeline?.end ?? 4000;
+    for (const at of [400, end + 300]) setTimeout(() => window.CyberIntro?.repaint(), Math.max(0, at - (Date.now() - intro.startedAt)));
+  }
+  pauseUnderVeil();
+}
+
 /** Le fond du playfield ne joue que s'il se voit : les superpositions et la fiche sont opaques. */
 function backgroundVisible(s) {
   return s.phase === 'menu' && !s.help;
@@ -1207,6 +1258,8 @@ window.cyberEtat = () => ({
   }),
   // DMD du menu vivant : affiché ou non (page du média), dans le cadre du FullDMD ou sur du noir, points allumés.
   dmd: liveDmd && { visible: !liveDmd.holder.hidden, cadre: Boolean(liveDmd.framed), points: lastDmdShot?.dots ? lastDmdShot.dots.filter((v) => v > 0).length : 0 },
+  // Ouverture : son numéro, si elle est partie, chaque animation de Cyber Pinball montée (instant, au bout) et l'invite.
+  ouverture: lastState?.intro && { id: lastState.intro.id, partie: lastState.intro.startedAt !== undefined, scenes: window.CyberIntro?.scenes() ?? [], invite: Boolean(root.querySelector('.intro-hint')) },
   // Lancement en cinéma : les scènes posées (départ, arrivée), le logo ou le médaillon, et si elles s'effacent.
   cinema: [...document.querySelectorAll('.cinema')].map((n) => ({ scene: n.dataset.cinema, visage: n.querySelector('.cine-disc') ? 'médaillon' : 'logo', fin: n.classList.contains('cine-fin') })), // i18n-ignore : relevé des essais
   // « fronton-menu » : le fronton en fond du menu au bureau, à part de l'écran du fronton (backglass).
@@ -1239,6 +1292,8 @@ window.cyber.onState((s) => {
   syncNight(powering ? { ...s, night: 0 } : s);
   syncStop(powering ? { ...s, stop: undefined } : s);
   if (s.game) return renderGame(s);
+  document.documentElement.classList.toggle('intro-phase', Boolean(s.intro));
+  if (s.intro) return renderIntro(s);
   // Extinction, veille ou redémarrage : du noir sur chaque écran, sans média ni décor ; le
   // playfield seul dit ce qui se passe (frontend.css, html.power-phase).
   const power = s.phase === 'message' && s.message?.action === 'power';

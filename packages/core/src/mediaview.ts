@@ -13,6 +13,7 @@ import { b2sCacheDir, b2sImages } from './b2simage';
 import { DEFAULT_ARCADE_HOURS, normalizeArcadeHours, type ArcadeHoursSettings } from './arcadehours';
 import { DEFAULT_DMD_COLOR, normalizeDmdColor } from './dmdcolor';
 import { t } from './i18n';
+import { DEFAULT_INTRO_SETTINGS, normalizeIntroSettings, type IntroSettings } from './intro';
 import { layoutOf } from './locations';
 import { MEDIADB_QUALITY_SETTINGS, type MediaDbQualitySetting } from './mediadb';
 import { NOTICES_MODES, type NoticesMode } from './notices';
@@ -538,6 +539,11 @@ export interface MenuMediaSettings {
    * défaut), la pastille seule, ou rien. La pastille des téléchargements reste dans tous les cas.
    */
   notices: NoticesMode;
+  /**
+   * Ouverture au démarrage (intro.ts) : chaque écran joue son animation, puis garde sa dernière
+   * image jusqu'au premier bouton ; l'animation de Cyber Pinball, ou un fichier de l'utilisateur.
+   */
+  intro: IntroSettings;
 }
 
 export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
@@ -558,6 +564,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   dmdColor: DEFAULT_DMD_COLOR,
   hours: DEFAULT_ARCADE_HOURS,
   notices: 'all',
+  intro: DEFAULT_INTRO_SETTINGS,
 };
 
 /** <données>\medias.json */
@@ -592,6 +599,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     dmdColor: normalizeDmdColor(r.dmdColor),
     hours: normalizeArcadeHours(r.hours),
     notices: NOTICES_MODES.includes(r.notices as NoticesMode) ? (r.notices as NoticesMode) : d.notices,
+    intro: normalizeIntroSettings(r.intro),
   };
 }
 

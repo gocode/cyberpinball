@@ -106,15 +106,11 @@ export const messages: Record<string, string> = {
   'Toute la table : {table}': 'Whole table: {table}',
   '{n} médias de {table}': '{n} media of {table}',
   'La réception continue': 'Receiving carries on',
-  'Téléchargements, dans le menu système, pour la suivre': 'Downloads, in the system menu, to follow it',
   'Réception retirée de la liste': 'Transfer removed from the list',
   'reprise automatique à son retour': 'resumes automatically when they are back',
   'Réception arrêtée': 'Transfer stopped',
-  'Reçu et vérifié': 'Received and verified',
   'Continuer en arrière-plan': 'Carry on in the background',
-  'Suivi dans Téléchargements ; il ramène ici une fois fini': 'Followed in Downloads; it brings you back here once done',
   'Annuler la réception': 'Cancel the transfer',
-  'Ouvrir ce qui est reçu': 'Open what was received',
   'Chaque fichier est vérifié à l’arrivée (taille, empreinte), puis le plan d’ajout montre tout avant d’installer. Si {name} se déconnecte, la réception reprend seule à son retour.':
     'Each file is checked on arrival (size, fingerprint), then the add plan shows everything before installing. If {name} goes offline, the transfer resumes by itself when they are back.',
   'Chaque fichier est vérifié à l’arrivée (taille, empreinte, contenu) avant d’entrer dans le brouillon des médias de votre table. Si {name} se déconnecte, la réception reprend seule à son retour.':

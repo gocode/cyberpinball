@@ -167,10 +167,17 @@ body.mouse .lib-back:hover {
   box-sizing: border-box;
 }
 
+/*
+ * En borne (portrait) : le contenu à sa hauteur, les actions juste dessous, le vide en bas. Avec
+ * `1fr auto`, un écran court (la fiche d'un téléchargement fini, les parties d'une table) gardait
+ * ses actions collées au bas de l'écran sous un grand vide (retours du 01/11/2026). Le contenu ne
+ * dépasse jamais la place que lui laissent les actions : une longue liste défile dans son cadre.
+ */
 @container (orientation: portrait) {
   .lib-body {
     grid-template-columns: 1fr;
-    grid-template-rows: 1fr auto;
+    grid-template-rows: minmax(0, max-content) auto;
+    align-content: start;
   }
 }
 

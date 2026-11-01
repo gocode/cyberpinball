@@ -107,7 +107,8 @@ test('application : « Récupérer sa version » coche sa table d’office ; l�
   assert.match(menu, /host\.openFriendTable!\(invite\.host\.key, invite\.table\.table, \(\) => openInvite\(id, back\), \['table'\]\)/);
   assert.match(menu, /if \(match === 'same'\) \{\s+actions\.push\(\{\s+label: t\('Accepter'\)/);
   const library = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'friend-library-menu.ts'), 'utf8');
-  assert.match(library, /job\.take\.set\(p\.part, want\.includes\(p\.part\) \|\| defaultPartChoice\(p\.part, have\.has\(p\.part\)\)\)/);
+  // Une partie demandée est cochée d'office, sauf sous droits (la ROM attend l'attestation, 01/11/2026).
+  assert.match(library, /job\.take\.set\(p\.part, \(want\.includes\(p\.part\) && !RIGHTS_PARTS\.includes\(p\.part\)\) \|\| defaultPartChoice\(p\.part, have\.has\(p\.part\)\)\)/);
   for (const file of ['live-game.ts', 'live-game-menu.ts']) assert.doesNotMatch(fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', file), 'utf8'), /same-rules|readVpxKeys|rulesKey/, file);
   assert.ok(!fs.existsSync(path.join(REPO_ROOT, 'packages', 'core', 'src', 'vpxid.ts')));
 });

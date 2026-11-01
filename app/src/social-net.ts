@@ -120,6 +120,17 @@ const REDIAL_FAST_MS = 5_000;
 const REDIAL_SLOW_MS = 30_000;
 /** Durée de la relance rapide, depuis le démarrage ou un changement de réseau. */
 const REDIAL_FAST_FOR_MS = 2 * 60_000;
+/**
+ * Deux bornes qui s'appellent au même instant : Hyperswarm garde chez la plus grande clé son propre
+ * appel encore en cours et coupe celui de l'autre, même si cet appel va échouer (entrant bloqué
+ * chez l'autre). Chaque relance est donc tirée au hasard autour de son rythme, pour que les deux
+ * bornes ne retombent pas ensemble ; et un appel coupé avant le bonjour est relancé vite, sans
+ * attendre les 1 s, 5 s puis 15 s de Hyperswarm.
+ */
+const REDIAL_SOON_MS = [300, 1_500] as const;
+/** Au plus tant de relances avancées par ami et par minute : un ami qui coupe toujours avant le bonjour ne fait pas boucler. */
+const REDIAL_SOON_MAX = 6;
+const jittered = (delay: number) => Math.round(delay * (0.5 + Math.random()));
 /** Balise d'un ami reçue sans liaison locale : la borne qui n'appelle pas d'habitude appelle passé ce délai. */
 const LAN_FALLBACK_MS = 2 * BEACON_MS;
 
@@ -261,6 +272,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   let graceTimer: NodeJS.Timeout | undefined;
   let searchTimer: NodeJS.Timeout | undefined;
   let redialTimer: NodeJS.Timeout | undefined;
+  let redialAt = 0;
+  const redialsSoon = new Map<string, number[]>();
   /** Démarrage du réseau, ou dernier changement de réseau (ms) : la recherche des amis part de là. */
   let startedAt: number | undefined;
   let presence: Presence = { status: 'menu', since: now().toISOString() };
@@ -384,7 +397,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     // Fin de la recherche : la liste devient sûre, le dire à l'écran.
     searchTimer = setTimeout(changed, (opts.searchMs ?? PRESENCE_SEARCH_MS) + 10);
     searchTimer.unref?.();
-    scheduleRedial(REDIAL_FAST_MS);
+    scheduleRedial(jittered(REDIAL_FAST_MS));
   }
 
   /**
@@ -400,13 +413,24 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       if (attempts > 3) logEvery(`redial:${key}`, 10 * 60_000, `Réseau des bornes : ${nameOf(key)} injoignable après ${attempts} essais ; Hyperswarm relancé sans attendre ses dix minutes.`); // i18n-ignore : journal
       swarm.joinPeer(Buffer.from(key, 'hex'));
     }
-    scheduleRedial(startedAt !== undefined && ms() - startedAt < REDIAL_FAST_FOR_MS ? REDIAL_FAST_MS : REDIAL_SLOW_MS);
+    scheduleRedial(jittered(startedAt !== undefined && ms() - startedAt < REDIAL_FAST_FOR_MS ? REDIAL_FAST_MS : REDIAL_SLOW_MS));
   }
 
   function scheduleRedial(delay: number): void {
     if (redialTimer) clearTimeout(redialTimer);
+    redialAt = Date.now() + delay;
     redialTimer = setTimeout(redial, delay);
     redialTimer.unref?.();
+  }
+
+  /** Appel coupé avant le bonjour, plus aucune liaison : relance avancée, à un instant tiré au hasard. */
+  function redialSoon(key: string): void {
+    const recent = (redialsSoon.get(key) ?? []).filter((at) => Date.now() - at < 60_000);
+    if (recent.length >= REDIAL_SOON_MAX) return;
+    redialsSoon.set(key, [...recent, Date.now()]);
+    const [min, max] = REDIAL_SOON_MS;
+    const delay = min + Math.round(Math.random() * (max - min));
+    if (swarm && (!redialTimer || redialAt > Date.now() + delay)) scheduleRedial(delay);
   }
 
   // ---------- Connexions ----------
@@ -467,6 +491,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         const after = rest ? `${rest} autre(s) liaison(s)` : book.pending(key) ? 'tolérance avant « hors ligne »' : 'plus de liaison'; // i18n-ignore : journal
         log(`Réseau des bornes : liaison ${viaText(via)} avec ${nameOf(key)} fermée (${link.error ?? 'fin normale'}${link.greeted ? '' : ', avant le bonjour'}, après ${Math.round((ms() - link.opened) / 1000)} s ; ${after}).`); // i18n-ignore : journal
       }
+      if (via === 'internet' && !link.greeted && !peer.links.size && followed.has(key)) redialSoon(key);
       scheduleGrace();
       changed();
     };
@@ -496,7 +521,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
           // Bonjour reçu sur cette liaison : elle compte pour la présence.
           const appeared = book.up(key, link, ms());
           if (traced(key)) {
-            log(`Réseau des bornes : liaison ${viaText(link.via)} ${link.stream.isInitiator ? 'sortante' : 'entrante'} avec ${nameOf(key)} ouverte (${book.links(key)} liaison(s))${appeared ? ' : en ligne' : ''}.`); // i18n-ignore : journal
+            // Trouvé pendant la recherche : le délai depuis son début, au journal (découverte lente).
+            const found = appeared && startedAt !== undefined && ms() - startedAt < REDIAL_FAST_FOR_MS ? `, ${((ms() - startedAt) / 1000).toFixed(1)} s après le début de la recherche` : ''; // i18n-ignore : journal
+            log(`Réseau des bornes : liaison ${viaText(link.via)} ${link.stream.isInitiator ? 'sortante' : 'entrante'} avec ${nameOf(key)} ouverte (${book.links(key)} liaison(s))${appeared ? ` : en ligne${found}` : ''}.`); // i18n-ignore : journal
             countDirection(link);
           }
           if (appeared && relationOf(state, key) === 'friend') commitQuietly(friendSeen(state, key, now()));
@@ -714,6 +741,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     refreshTimer = undefined;
     for (const timer of [graceTimer, searchTimer, redialTimer]) if (timer) clearTimeout(timer);
     graceTimer = searchTimer = redialTimer = undefined;
+    redialsSoon.clear();
     startedAt = undefined;
     for (const peer of peers.values()) for (const link of peer.links) link.stream.destroy();
     peers.clear();

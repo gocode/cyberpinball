@@ -1121,6 +1121,14 @@
     loading,
     inGame,
     palette,
+    /**
+     * Textes en points, pour les afficheurs calculés ailleurs (ouverture, intro.js) : la police de
+     * la marque et du DMD vivant. text(texte, 'petit' | 'grand' | 'marque', nuance, agrandissement) : { w, h, px }.
+     */
+    points: {
+      text: (text, name, level = LEVEL.main, scale = 1) => rasterize(dmdText(text), pointsFont(name, scale), level),
+      levels: { ...LEVEL },
+    },
     /** Pour les essais : minuteries en cours et trames dessinées depuis le chargement. */
     stats: () => ({ tasks: tasks.size, scheduled: [...tasks].filter((task) => task.id).length, frames }),
   };

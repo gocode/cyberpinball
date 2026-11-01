@@ -19,6 +19,12 @@
 // fichier entier, et le receveur, qui a haché son début, vérifie le fichier repris en entier. Une
 // borne d'avant la reprise renvoie tout (en-tête sans `from`) : le partiel repart de zéro.
 //
+// Ce qui est annoncé est ce qui est servi (01/11/2026 : un « (GameInfo) ….png » qui était un JPEG
+// était annoncé comme fichier de la table, puis refusé à l'envoi par les contrôles des médias ; la
+// réception de toute la table s'arrêtait au fichier 365 sur 368, « ne le partage plus ») : un média
+// de ma bibliothèque passe les contrôles de l'import (checkShareable) dès l'annonce, et celui qui
+// les échoue n'est annoncé ni dans ma bibliothèque ni dans les fichiers de sa table (mediaRefusal).
+//
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
 import { createHash } from 'node:crypto';
@@ -183,7 +189,10 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
   const tablesDir = path.join(opts.dataDir, 'amis', 'tables');
   /** `last` : la dernière bibliothèque reçue, montrée pendant qu'on redemande la suivante. */
   const libraries = new Map<string, { state: FriendLibraryState; asked: number; last?: FriendLibrary; parts?: Map<number, Extract<LibraryMessage, { t: 'library' }>> }>();
-  let own: { at: number; files: Map<string, SharedFile>; library: FriendLibrary; byId: Map<string, TableEntry> } | undefined;
+  /** `refused` : médias de mes tables qui échouent les contrôles (« <table>/<fichier> » : raison), jamais annoncés. */
+  let own: { at: number; files: Map<string, SharedFile>; refused: Map<string, string>; library: FriendLibrary; byId: Map<string, TableEntry> } | undefined;
+  /** Contrôle d'un média, gardé tant que le fichier garde sa taille et sa date. */
+  const mediaChecks = new Map<string, { size: number; mtime: number; refusal: string | undefined }>();
   /** Fichiers de mes tables déjà décrits à un ami, par table : leurs identifiants le désignent. */
   const ownTableFiles = new Map<string, Map<string, { file: string; part: GamePart }>>();
   const uploads = new Map<string, { req: number; cancelled: boolean }>();
@@ -211,8 +220,52 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     const built = root
       ? buildLibrary(tables, { root, ...(opts.romsOf ? { romsOf: opts.romsOf } : {}), size: (file) => fileSize(file), versions: !!opts.versionOf })
       : { library: { at: new Date().toISOString(), tables: [] }, files: new Map<string, SharedFile>() };
-    own = { at: Date.now(), ...built, byId: new Map(tables.map((t, i) => [built.library.tables[i]?.id ?? '', t])) };
+    // Un média que l'envoi refuserait n'est pas annoncé : ni dans ma bibliothèque, ni dans sa table.
+    const refused = new Map<string, string>();
+    for (const [key, media] of built.files) {
+      const refusal = mediaRefusal(media);
+      if (refusal === undefined) continue;
+      refused.set(key, refusal);
+      built.files.delete(key);
+    }
+    const library: FriendLibrary = refused.size ? { ...built.library, tables: built.library.tables.map((x) => ({ ...x, medias: x.medias.filter((m) => !refused.has(`${x.id}/${m.id}`)) })) } : built.library;
+    own = { at: Date.now(), files: built.files, refused, library, byId: new Map(tables.map((t, i) => [built.library.tables[i]?.id ?? '', t])) };
     return own;
+  }
+
+  /**
+   * Les contrôles de l'import (checkShareable) sur un média de ma bibliothèque : undefined s'il se
+   * partage, sinon la raison. Les mêmes qu'à l'envoi (serveFile) ; gardés par fichier, taille et date.
+   */
+  function mediaRefusal(media: SharedFile): string | undefined {
+    let size: number;
+    let mtime: number;
+    try {
+      const st = fs.statSync(media.file);
+      size = st.size;
+      mtime = st.mtimeMs;
+    } catch {
+      return 'introuvable'; // i18n-ignore : journal
+    }
+    const known = mediaChecks.get(media.file);
+    if (known && known.size === size && known.mtime === mtime) return known.refusal;
+    let refusal: string | undefined;
+    try {
+      const fd = fs.openSync(media.file, 'r');
+      try {
+        const head = Buffer.alloc(512);
+        const n = fs.readSync(fd, head, 0, 512, 0);
+        const check = checkShareable(media.type, media.file, head.subarray(0, n), size);
+        refusal = check.ok ? undefined : check.reason;
+      } finally {
+        fs.closeSync(fd);
+      }
+    } catch (error) {
+      refusal = (error as Error).message;
+    }
+    mediaChecks.set(media.file, { size, mtime, refusal });
+    if (refusal) log(`Bibliothèque partagée : « ${path.basename(media.file)} » n'est pas annoncé (${refusal}).`); // i18n-ignore : journal
+    return refusal;
   }
 
   /** Fichiers d'une de mes tables à transmettre, avec leurs identifiants. */
@@ -220,7 +273,9 @@ export function createFriendContent(opts: FriendContentOptions): FriendContent {
     const table = ownLibrary().byId.get(tableId);
     const contents = table && opts.contents(table);
     if (!table || !contents) return undefined;
-    const files = shareableTableFiles(contents, table.folder);
+    // Les médias refusés par les contrôles ne font pas partie de la table annoncée : ils ne seraient pas servis.
+    const refused = ownLibrary().refused;
+    const files = shareableTableFiles(contents, table.folder).filter((f) => !refused.has(`${tableId}/${fileId(f.file)}`));
     ownTableFiles.set(tableId, new Map(files.map((f) => [fileId(f.file), { file: f.file, part: f.part }])));
     return files.map((f) => ({ id: fileId(f.file), rel: f.rel, bytes: f.bytes, part: f.part }));
   }

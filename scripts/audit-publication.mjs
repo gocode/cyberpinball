@@ -28,11 +28,12 @@ const THIRD_PARTY = /(^|\/)(OFL|LICENSE)[^/]*$|(^|\/)package-lock\.json$/i;
 const BINARY = /\.(png|jpe?g|webp|gif|bmp|ico|ttf|otf|woff2?|mp4|webm|mp3|wav|ogg|zip|7z|exe|dll|node|pdf)$/i;
 
 /**
- * Documents de travail : notes de recherche (docs/recherche), critiques, consignes et
- * réponses échangées avec les outils d'aide (critique-*.md, BRIEF*.md, reponse*.md…).
+ * Documents de travail : notes de recherche (docs/recherche), maquettes et relevés de design
+ * (docs/Design : logos de tables sous licence, impressions de pages de travail), critiques,
+ * consignes et réponses échangées avec les outils d'aide (critique-*.md, BRIEF*.md, reponse*.md…).
  * Ils servent au développement, pas aux lecteurs du projet.
  */
-const PRIVATE = [/^docs\/recherche\//, /(^|\/)(critique|brief|r[eé]ponse|consigne)[^/]*\.md$/i];
+const PRIVATE = [/^docs\/recherche\//, /^docs\/design\//i, /(^|\/)(critique|brief|r[eé]ponse|consigne)[^/]*\.md$/i];
 export function isPrivate(file) {
   return PRIVATE.some((re) => re.test(file.replace(/\\/g, '/')));
 }

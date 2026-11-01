@@ -20,11 +20,13 @@ import * as fs from 'node:fs';
 import {
   isActive,
   loadDownloadQueue,
+  pendingDownload,
   reasonRetries,
   retryDelayMs,
   reviveQueue,
   saveDownloadQueue,
   shouldResume,
+  SKIPPABLE_REASONS,
   trimQueue,
   type DownloadFile,
   type DownloadJob,
@@ -98,8 +100,13 @@ export interface DownloadManager {
   get(id: string): DownloadJob | undefined;
   /** Progression mesurée (débit, temps restant) d'un téléchargement qui tourne. */
   progress(id: string): TransferProgress | undefined;
-  /** Ajoute un téléchargement et le lance si sa source est là ; rend son identifiant. */
+  /**
+   * Ajoute un téléchargement et le lance si sa source est là ; rend son identifiant. Avec une clé
+   * (`dedupe`) déjà en cours ou pas encore rendue (pendingDownload) : rend celui-là, rien n'est relancé.
+   */
   add(spec: DownloadSpec): DownloadJob;
+  /** Le téléchargement en cours ou pas encore rendu de cette clé (DownloadJob.dedupe). */
+  pending(dedupe: string): DownloadJob | undefined;
   /**
    * Téléchargement que fait tourner un autre : son écran (attached, par défaut), ou le navigateur
    * intégré (`attached: false`) ; `relaunch` : relancer l'écran quand la source revient (tant qu'il est là).
@@ -269,6 +276,15 @@ export function createDownloadManager(opts: DownloadManagerOptions): DownloadMan
           log(`Téléchargements : « ${file.name} » repris faux (${result.reason}), reçu de nouveau depuis le début.`); // i18n-ignore : journal
           continue;
         }
+        // Un fichier facultatif refusé (contrôles, introuvable, abîmé) est sauté, avec sa raison : les autres arrivent.
+        if (file.optional && SKIPPABLE_REASONS.includes(result.reason)) {
+          update(id, { files: current.files.map((f, k) => (k === index ? { ...f, done: true, skipped: { reason: result.reason, ...(result.detail ? { detail: result.detail } : {}) } } : f)) });
+          fs.rmSync(file.part, { force: true });
+          log(`Téléchargements : « ${file.name} » sauté (${result.reason}${result.detail ? ` : ${result.detail}` : ''}), la suite continue.`); // i18n-ignore : journal
+          save();
+          changed();
+          continue;
+        }
         if (reasonRetries(result.reason)) {
           const tries = current.tries + 1;
           const retryAt = current.source.kind === 'friend' && result.reason !== 'busy' ? undefined : new Date(now().getTime() + retryDelayMs(tries)).toISOString();
@@ -329,11 +345,20 @@ export function createDownloadManager(opts: DownloadManagerOptions): DownloadMan
     get: find,
     progress: (id) => running.get(id)?.progress,
     add(s) {
+      const twin = s.dedupe ? pendingDownload(queue.jobs, s.dedupe) : undefined;
+      if (twin) {
+        log(`Téléchargements : « ${twin.title} » déjà demandé (${twin.state}), pas relancé.`); // i18n-ignore : journal
+        return twin;
+      }
       const job = spec(s, {});
       setImmediate(pump);
       return job;
     },
+    pending: (dedupe) => pendingDownload(queue.jobs, dedupe),
     track(s, relaunch) {
+      // Un écran qui relance le téléchargement qu'il suit déjà : deux propriétaires écriraient le
+      // même partiel. Signalé au journal pour le corriger (chaque écran ne lance qu'une fois).
+      if (s.id && running.has(s.id)) log(`Téléchargements : « ${s.title} » relancé alors qu'il tournait déjà (${s.id}).`); // i18n-ignore : journal
       let job = spec({ ...s, attached: s.attached ?? true }, { state: 'running' });
       const id = job.id;
       const meter = createTransferMeter();

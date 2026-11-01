@@ -29,6 +29,14 @@
 #                coup de bobine sonne au passage de relais ; le journal dit quand VPX est parti ;
 #   sans-cinema: la même partie, le réglage coupé : aucune scène, pas de coup de bobine, et VPX
 #                part au même moment qu'avec le cinéma (docs\demo-cinema.ps1 lance les deux) ;
+#   ouverture  : ouverture au démarrage (intro.ts) : chaque écran joue l'animation de Cyber Pinball
+#                et garde sa dernière image, l'invite paraît sur le plateau ; un flipper affiche
+#                la roue sans rien faire d'autre (la sélection ne bouge pas) ;
+#   ouverture-pivotee : la même, plateau couché et tourné (forme borne) : l'animation du plateau
+#                tournée pour le joueur ;
+#   ouverture-fichiers : plateau tourné, avec une vidéo de l'utilisateur sur le plateau, une image sur le
+#                fronton et une musique de fond (<racine>\media\(IntroPlayfield)…) : jouées à la
+#                place des animations, la musique au volume de la musique, puis la roue ;
 #   attente    : mode attente après 5 s sans bouton, une table au hasard toutes les 3 s avec
 #                ses médias et sa musique au volume réduit ; un flipper, Start puis Exit en
 #                sortent sans changer la sélection, sans ouvrir la fiche ni le menu système.
@@ -43,7 +51,7 @@
 #   .\docs\demo-moments.ps1 [-Scenarios navigation, silence, partie] [-Ecrans pc-dev]
 # VPX n'est jamais lancé ; ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont touchés.
 param(
-  [string[]]$Scenarios = @('navigation', 'silence', 'menus', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'habillage', 'interface', 'cinema', 'sans-cinema', 'attente'),
+  [string[]]$Scenarios = @('navigation', 'silence', 'menus', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'habillage', 'interface', 'cinema', 'sans-cinema', 'ouverture', 'ouverture-pivotee', 'ouverture-fichiers', 'attente'),
   [string]$Source = 'D:\CyberPinball',
   [string]$Ecrans = 'pc-dev'
 )
@@ -374,6 +382,61 @@ $scenes = @{
       '09-until_menu' = @{ phase = 'menu'; couches = @{ 'dmd/dmd' = 'image' } }
     }
   }
+  # Ouverture au démarrage : chaque fenêtre monte la scène de son écran (cyberEtat.ouverture : scène,
+  # au bout ou non, invite) ; un flipper affiche la roue, la sélection reste sur la première table.
+  ouverture = @{
+    Reglages = @{ music = $false }
+    Ouverture = $true
+    Etapes = @(
+      'wait:1200',                # 01 l'ouverture se joue
+      'wait:6000',                # 02 tout est posé : dernières images, invite sur le plateau
+      $Down,                      # 03 un flipper : la roue, sans changer de table
+      'wait:1000'                 # 04 le menu des tables
+    )
+    Attendu = @{
+      '01-wait_1200' = @{ phase = 'intro'; musique = $null }
+      '02-wait_6000' = @{ phase = 'intro'; musique = $null; ouverture = @{ playfield = '^(playfield|backglass) fin \+invite$'; backglass = '^backglass fin$'; topper = '^topper fin$'; dmd = '^(dmd|fullDmd) fin$' } }
+      '04-wait_1000' = @{ etat = @{ attente = $false; phase = 'menu'; position = 1 }; ouverture = @{ playfield = '^aucune$' } }
+      # Au bureau (pc-dev : plateau en largeur), le plateau joue l'ouverture du fronton ; en borne, la sienne.
+    }
+  }
+  # Plateau couché et tourné (flippers à gauche) : forme borne, l'animation du plateau tournée pour le joueur.
+  'ouverture-pivotee' = @{
+    Reglages = @{ music = $false }
+    Ouverture = $true
+    Flippers = 'left'
+    Etapes = @('wait:1200', 'wait:6000', $Down, 'wait:1000')
+    Attendu = @{
+      '02-wait_6000' = @{ phase = 'intro'; ouverture = @{ playfield = '^playfield fin \+invite$' } }
+      '04-wait_1000' = @{ etat = @{ attente = $false; phase = 'menu'; position = 1 } }
+    }
+  }
+  'ouverture-fichiers' = @{
+    Reglages = @{ music = $false; musicVolume = 60; videoVolume = 40 }
+    Ouverture = $true
+    Flippers = 'left'
+    Avant = {
+      param($root)
+      New-Item -ItemType Directory -Force "$root\media" | Out-Null
+      $video = Get-ChildItem -LiteralPath "$root\tables" -Recurse -File -Filter '(Playfield)*.webm' | Select-Object -First 1
+      $image = Get-ChildItem -LiteralPath "$root\tables" -Recurse -File -Filter '(Backglass)*.png' | Select-Object -First 1
+      $music = Get-ChildItem -LiteralPath "$root\tables" -Recurse -File -Filter '(Audio)*.wav' | Select-Object -First 1
+      Copy-Item -LiteralPath $video.FullName "$root\media\(IntroPlayfield).webm"
+      Copy-Item -LiteralPath $image.FullName "$root\media\(IntroBackglass).png"
+      Copy-Item -LiteralPath $music.FullName "$root\media\(IntroAudio).wav"
+    }
+    Apres = {
+      param($root, $captures)
+      Get-ChildItem -LiteralPath "$root\media" -File -Filter '(Intro*' | Remove-Item -Force
+    }
+    Etapes = @('wait:1200', 'wait:6000', $Down, 'wait:1000')
+    Attendu = @{
+      '01-wait_1200' = @{ phase = 'intro'; musique = '(IntroAudio).wav'; volume = 0.6; couches = @{ 'backglass/backglass' = 'image' } }
+      # La vidéo du plateau (2 s) est finie : elle garde sa dernière image, aucun nouvel état ne la relance.
+      '02-wait_6000' = @{ phase = 'intro'; musique = '(IntroAudio).wav'; ouverture = @{ playfield = '\+invite$'; topper = '^topper fin$' }; couches = @{ 'playfield/playfield' = 'vidéo en pause'; 'backglass/backglass' = 'image' } }
+      '04-wait_1000' = @{ etat = @{ attente = $false; phase = 'menu'; position = 1 } }
+    }
+  }
   attente = @{
     Reglages = @{ music = $true; musicVolume = 60; videoVolume = 50; launchVolume = 80; attractDelay = 5; attractInterval = 3; attractSound = 'reduced' }
     Etapes = @(
@@ -462,6 +525,8 @@ foreach ($name in $Scenarios) {
   # borne aux quatre écrans 4K. La partie et le retour au menu s'attendent par leur phase (until:).
   if ($scene.Simulee) { $env:CYBERPINBALL_LOADING_MS = '16000' } else { Remove-Item Env:CYBERPINBALL_LOADING_MS -ErrorAction SilentlyContinue }
   if ($scene.Flippers) { $env:CYBERPINBALL_FLIPPERS = $scene.Flippers } else { Remove-Item Env:CYBERPINBALL_FLIPPERS -ErrorAction SilentlyContinue }
+  # Ouverture au démarrage : jamais sous l'autopilote, sauf demandée.
+  if ($scene.Ouverture) { $env:CYBERPINBALL_OUVERTURE = '1' } else { Remove-Item Env:CYBERPINBALL_OUVERTURE -ErrorAction SilentlyContinue }
   "`n=== $name"
   $line = "`"$electron`" app --user-data-dir=`"$dir\chromium`" > `"$captures\sortie.txt`" 2> `"$captures\erreurs.txt`""
   Start-Process -FilePath cmd.exe -ArgumentList '/d', '/c', "`"$line`"" -WorkingDirectory $wt -NoNewWindow -Wait
@@ -508,6 +573,18 @@ foreach ($name in $Scenarios) {
         if ($shown -ne $want.cinema[$win]) { $ok = $false; $cinemaParts[-1] += " (attendu : $(if ($want.cinema[$win]) { $want.cinema[$win] } else { 'aucune' }))" }
       }
       $state += " · cinéma : $($cinemaParts -join ', ')"
+    }
+    # Ouverture : la scène montée dans chaque fenêtre (« au bout » ou non), l'invite du plateau.
+    if ($want.ouverture) {
+      $introParts = @()
+      foreach ($win in ($want.ouverture.Keys | Sort-Object)) {
+        $o = $got.ecrans.$win.ouverture
+        $shown = if ($o) { ((@($o.scenes | ForEach-Object { "$($_.scene)$(if ($_.fin) { ' fin' })" }) -join ',') + $(if ($o.invite) { ' +invite' } else { '' })).Trim() } else { 'aucune' }
+        if (-not $shown) { $shown = 'fichier' }
+        $introParts += "$win $shown"
+        if ($shown -notmatch $want.ouverture[$win]) { $ok = $false; $introParts[-1] += " (attendu : $($want.ouverture[$win]))" }
+      }
+      $state += " · ouverture : $($introParts -join ', ')"
     }
     if ($want.etat) {
       $ok = $ok -and [bool]$menu.attente -eq $want.etat.attente -and $menu.phase -eq $want.etat.phase -and $menu.position -eq $want.etat.position

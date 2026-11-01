@@ -1,0 +1,115 @@
+/*
+ * Ouverture au démarrage (intro.js, packages/core/src/intro.ts) : les animations de Cyber
+ * Pinball de chaque écran. intro.js calcule chaque instant et ne pose que transform, opacity,
+ * le tracé des traits et le découpage du topper : rien ici n'a de minuterie. Matière, couleurs
+ * et marque viennent des replis (fallback.css) et du design system : noir sarcelle, filets
+ * sarcelle, vert signal pour la bille, les batteurs et PINBALL. Tout est mesuré dans la scène
+ * (cq*) : elle se met en page dans sa zone, quelle que soit la fenêtre.
+ */
+
+.cp-in {
+  background: var(--cp-void);
+}
+
+/* ---------- Plateau ---------- */
+
+/* Circuit mécanique à pans coupés, lueurs locales et bille, peints par intro.js. */
+.cp-in-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+/* Grande marque empilée dans son cartouche, centrée à 42,5 % de la hauteur (taille : --cp-in-scale, intro.js). */
+.cp-in-brand {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 42.5%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: calc(min(9.4cqw, 5.4cqh) * var(--cp-in-scale, 1));
+  opacity: 0;
+}
+
+.cp-in-mark > span {
+  margin-left: auto;
+  margin-right: auto;
+  /* L'espace après la dernière lettre, rendu à gauche : le mot reste centré. */
+  padding-left: 0.28em;
+}
+
+/* Un peu plus de matière dans les lettres, sans changer leur chasse ni leur cadrage. */
+.cp-in-playfield .cp-in-mark > span {
+  font-weight: 350;
+}
+
+.cp-in-letter {
+  display: inline-block;
+  opacity: 0;
+  will-change: opacity;
+}
+
+.cp-in .cp-pin .cp-in-letter {
+  text-shadow: 0 0 0.32em rgb(139 226 58 / 0.35);
+}
+
+/* Reflet qui passe une fois sur la marque seule, comme celui du verre des replis (fallback.css, .cp-sweep). */
+.cp-in-sheen-zone {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.cp-in-sheen {
+  position: absolute;
+  top: -10%;
+  bottom: -10%;
+  left: -50%;
+  width: 40%;
+  background: linear-gradient(105deg, transparent 30%, rgb(230 240 236 / 0.08) 50%, transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ---------- Fronton ---------- */
+
+.cp-in-backglass .cp-bg-art {
+  opacity: 0;
+  transform-origin: 80% 50%;
+}
+
+/* ---------- Topper ---------- */
+
+.cp-in-reveal {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 100% 0 0);
+}
+
+.cp-in-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: max(3px, 0.9cqw);
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgb(230 240 236 / 0.92), transparent);
+  box-shadow: 0 0 3cqh 1.2cqh rgb(54 201 180 / 0.55);
+  opacity: 0;
+}
+
+.cp-in-topper .cp-logo {
+  opacity: 0.15;
+}
+
+/* ---------- Afficheurs à points ---------- */
+
+.cp-in-dmd,
+.cp-in-fulldmd {
+  background: #000;
+}

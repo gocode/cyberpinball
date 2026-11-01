@@ -129,6 +129,7 @@ test('réglage « Couleur du DMD » : préréglage, couleur libre, couleur refus
     preview() {},
     wakeDevices: () => [],
     sleepAllowed: () => true,
+    intro: { open() {}, summary: () => 'jouée' },
   }).run();
   const row = MENU_SETTINGS_ROWS.indexOf('dmdColor');
   assert.ok(row >= 0);

@@ -67,6 +67,8 @@ export interface MenuSettingsHost {
   wakeDevices(): readonly string[] | null | undefined;
   /** La veille est-elle possible sur ce PC (pas de veille moderne seule) ? */
   sleepAllowed(): boolean;
+  /** Ouverture au démarrage (intro-menu.ts) : son écran, et ce qu'en dit la ligne. */
+  intro: { open(back: () => void): void; summary(): string };
 }
 
 const heading = () => t('Médias, son et attente');
@@ -107,6 +109,7 @@ export const MENU_SETTINGS_ROWS = [
   'videoVolume',
   'launchVolume',
   'cinema',
+  'intro',
   'uiSounds',
   'uiSoundsVolume',
   'notices',
@@ -179,6 +182,12 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
           // Rétabli : le coup de bobine se fait entendre (s'il est permis : sons de l'interface joués).
           if (!v.cinema) host.preview('coil');
         },
+      },
+      intro: {
+        label: t('Ouverture au démarrage : {summary}', { summary: host.intro.summary() }),
+        detail: t('Une animation sur chaque écran, gardée sur sa dernière image jusqu’au premier bouton ; vos images, vidéos et musique de fond (Start : régler)'),
+        icon: 'play',
+        run: () => host.intro.open(() => open(row('intro'))),
       },
       uiSounds: {
         label: v.uiSounds ? t('Sons de l’interface : joués') : t('Sons de l’interface : coupés'),

@@ -97,6 +97,14 @@ export interface DownloadFile {
   sha256?: string;
   /** Ce que la source doit savoir pour reprendre (adresses traversées, ETag, type d'un média…). */
   meta?: Record<string, unknown>;
+  /**
+   * Facultatif (un média, une partie d'une table, jamais son .vpx) : refusé par la source ou par ses
+   * contrôles, il est sauté avec sa raison (`skipped`) et les autres arrivent (01/11/2026 : un seul
+   * média refusé arrêtait toute une table).
+   */
+  optional?: boolean;
+  /** Sauté : pourquoi. Compté fini, sans octet reçu. */
+  skipped?: { reason: DownloadReason; detail?: string };
 }
 
 /**
@@ -155,6 +163,12 @@ export interface DownloadJob {
   seen?: boolean;
   /** Rendu à son écran (« Revenir à… » fait, ou ouvert de lui-même à la fin). */
   delivered?: boolean;
+  /**
+   * Ce qu'il récupère, pour ne jamais le lancer deux fois (« friend-table:<ami>:<table> ») : tant
+   * qu'un téléchargement de même clé tourne, attend ou n'a pas été rendu, le redemander le montre
+   * au lieu d'en lancer un second (pendingDownload, DownloadManager.add).
+   */
+  dedupe?: string;
 }
 
 export interface DownloadQueue {
@@ -216,6 +230,20 @@ export const isActive = (j: DownloadJob) => j.state === 'queued' || j.state === 
 export const isFinished = (j: DownloadJob) => !isActive(j);
 
 /**
+ * Le téléchargement déjà demandé pour cette clé (DownloadJob.dedupe) : en cours, en attente, en
+ * pause, ou fini mais pas encore rendu à son écran. Le relancer ferait un doublon (01/11/2026 : la
+ * même table d'un ami récupérée trois fois, faute de voir que la première tournait) ; l'écran qui
+ * le redemande montre celui-là. undefined : rien en cours, on peut le lancer.
+ */
+export function pendingDownload(jobs: readonly DownloadJob[], dedupe: string): DownloadJob | undefined {
+  for (let i = jobs.length - 1; i >= 0; i--) {
+    const j = jobs[i]!;
+    if (j.dedupe === dedupe && (isActive(j) || (j.state === 'done' && !j.delivered))) return j;
+  }
+  return undefined;
+}
+
+/**
  * La file relue au démarrage : un téléchargement qui tournait attend sa source (il reprendra
  * seul) ; celui que suivait un écran fermé depuis attend qu'on le relance ; les finis trop anciens
  * sont oubliés. Les fichiers déjà reçus et disparus depuis font revenir leur fichier à recevoir.
@@ -244,6 +272,7 @@ export function trimQueue(queue: DownloadQueue): DownloadQueue {
 
 /** Octets reçus d'un fichier : sa taille s'il est fini, sinon celle de son partiel sur le disque. */
 export function fileReceived(f: DownloadFile): number {
+  if (f.skipped) return 0;
   if (f.done) return f.bytes ?? (f.file ? partSize(f.file) : 0);
   const have = partSize(f.part);
   return f.bytes !== undefined ? Math.min(have, f.bytes) : have;
@@ -252,9 +281,19 @@ export function fileReceived(f: DownloadFile): number {
 /** Octets reçus et attendus du téléchargement ; `total` absent si un fichier n'a pas de taille connue. */
 export function jobBytes(j: DownloadJob): { received: number; total?: number } {
   const received = j.files.reduce((n, f) => n + fileReceived(f), 0);
-  const known = j.files.every((f) => f.bytes !== undefined || f.done);
-  const total = known ? j.files.reduce((n, f) => n + (f.bytes ?? fileReceived(f)), 0) : undefined;
+  // Un fichier sauté ne compte ni dans le reçu ni dans l'attendu.
+  const kept = j.files.filter((f) => !f.skipped);
+  const known = kept.every((f) => f.bytes !== undefined || f.done);
+  const total = known ? kept.reduce((n, f) => n + (f.bytes ?? fileReceived(f)), 0) : undefined;
   return { received, ...(total !== undefined ? { total } : {}) };
+}
+
+/** Raisons qui sautent un fichier facultatif : la source ou ses contrôles le refusent, il est abîmé. */
+export const SKIPPABLE_REASONS: readonly DownloadReason[] = ['refused', 'check', 'size', 'sha', 'http'];
+
+/** Fichiers sautés d'un téléchargement, avec leur raison en mots (« média refusé par les contrôles : … »). */
+export function skippedFiles(j: Pick<DownloadJob, 'files' | 'source'>): { file: DownloadFile; why: string }[] {
+  return j.files.filter((f) => f.skipped).map((f) => ({ file: f, why: downloadReasonText({ reason: f.skipped!.reason, ...(f.skipped!.detail ? { detail: f.skipped!.detail } : {}), source: j.source }) ?? f.name }));
 }
 
 /** Rang du fichier en cours (de 1 à n) : le premier pas fini. */
@@ -422,9 +461,9 @@ export function downloadReasonText(j: Pick<DownloadJob, 'reason' | 'detail' | 's
     case 'sha':
       return t('empreinte différente : fichier abîmé ou changé');
     case 'check':
-      return t('le contenu ne correspond pas à ce qui était annoncé');
+      return j.detail ?? t('le contenu ne correspond pas à ce qui était annoncé');
     case 'refused':
-      return t('{name} ne le partage plus', { name });
+      return j.detail ?? t('{name} ne le partage plus', { name });
     case 'login':
       return t('la page demande de se reconnecter');
     case 'disk':

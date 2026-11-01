@@ -275,6 +275,16 @@ Section "Uninstall"
       ${EndIf}
       StrCpy $4 '$4netsh advfirewall firewall delete rule name="Cyber Pinball VPX"'
     ${EndIf}
+    ; La tâche de réparation des règles (posée par l'application), sous la même autorisation.
+    nsExec::ExecToStack '"$SYSDIR\schtasks.exe" /query /tn "Cyber Pinball pare-feu"'
+    Pop $1
+    Pop $2
+    ${If} $1 == "0"
+      ${If} $4 != ""
+        StrCpy $4 "$4 & "
+      ${EndIf}
+      StrCpy $4 '$4schtasks /delete /tn "Cyber Pinball pare-feu" /f'
+    ${EndIf}
     ${If} $4 != ""
       DetailPrint "Pare-feu de Windows : règles de Cyber Pinball retirées (autorisation demandée)."
       ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c $4' SW_HIDE
@@ -597,7 +607,10 @@ SectionEnd
 ; packages/core/src/firewall.ts (relu par firewall.test.ts). L'autorisation de Windows (UAC) n'est
 ; demandée que si une règle manque ou vise un autre dossier, et seulement pendant une installation
 ; où quelqu'un est devant l'écran : jamais en mise à jour (/MAJ), en silence (/S, sauf /PAREFEU) ni
-; dans un bac à sable d'essai.
+; dans un bac à sable d'essai. Toute règle d'entrée sur CyberPinball.exe est retirée d'abord (dont
+; celles, bloquantes, que Windows pose quand son invite « Autoriser l'accès » reste sans réponse).
+; En mise à jour, c'est l'application qui vérifie les règles à sa relance et les repose
+; (app/src/firewall-guard.ts : par la tâche de réparation, sans invite, ou en le demandant une fois).
 Section "Partage entre bornes : autoriser dans le pare-feu de Windows" SEC_PAREFEU
   ${If} $BacASable != ""
     DetailPrint "Pare-feu de Windows : bac à sable d'essai, rien n'est demandé."
@@ -619,7 +632,7 @@ Section "Partage entre bornes : autoriser dans le pare-feu de Windows" SEC_PAREF
     Return
   ${EndIf}
   DetailPrint "Pare-feu de Windows : autorisation demandée à Windows."
-  ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c netsh advfirewall firewall delete rule name="Cyber Pinball" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball" dir=in action=allow program="$Racine\app\${EXE}" enable=yes profile=any & netsh advfirewall firewall delete rule name="Cyber Pinball VPX" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball VPX" dir=in action=block program="$Racine\${VPX_PAREFEU_REEL}" enable=yes profile=any & netsh advfirewall firewall add rule name="Cyber Pinball VPX" dir=in action=block program="$Racine\${VPX_PAREFEU_JONCTION}" enable=yes profile=any' SW_HIDE
+  ExecShellWait "runas" "$SYSDIR\cmd.exe" '/d /c netsh advfirewall firewall delete rule name="Cyber Pinball" >nul 2>&1 & netsh advfirewall firewall delete rule name="all" dir=in program="$Racine\app\${EXE}" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball" dir=in action=allow program="$Racine\app\${EXE}" enable=yes profile=any & netsh advfirewall firewall delete rule name="Cyber Pinball VPX" >nul 2>&1 & netsh advfirewall firewall add rule name="Cyber Pinball VPX" dir=in action=block program="$Racine\${VPX_PAREFEU_REEL}" enable=yes profile=any & netsh advfirewall firewall add rule name="Cyber Pinball VPX" dir=in action=block program="$Racine\${VPX_PAREFEU_JONCTION}" enable=yes profile=any' SW_HIDE
   Call RegleParefeuPresente
   WriteINIStr "$Racine\app\installation.ini" "installation" "pare_feu" "$0"
   ${If} $0 == "1"

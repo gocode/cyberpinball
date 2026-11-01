@@ -8,7 +8,10 @@
 //   progression ; le curseur suit le téléchargement, pas son rang ;
 // - la fiche d'un téléchargement : « Revenir à… » (l'écran d'où il a été demandé, ou son repli
 //   s'il n'existe plus), mettre en pause, reprendre, réessayer, annuler (après confirmation),
-//   retirer de la liste ;
+//   retirer de la liste. Fini, la suite logique d'abord (DownloadNextStep : « Installer dans ma
+//   bibliothèque » pour une table reçue d'un ami, avec « Reçue, pas encore installée »), jamais le
+//   retour d'où l'on vient (01/11/2026 : « Revenir à bibliothèque de … » ne disait pas que la table
+//   n'était pas encore installée) ; un fichier sauté est dit, avec sa raison ;
 // - « Fichiers téléchargés » : l'inventaire de ce qui est gardé (downloads-screen.ts).
 // Maquette et revue de Codex : docs/recherche/maquettes/gestionnaire-telechargements.cjs.
 
@@ -27,6 +30,7 @@ import {
   isActive,
   resolveReturn,
   returnLabel,
+  skippedFiles,
   summarize,
   summaryText,
   t,
@@ -38,8 +42,23 @@ import {
 } from '@cyberpinball/core';
 import type { Action, Built, Row, Section, Tone } from './library';
 
+/** La suite d'un travail fini : son état en mots, et le geste qui la fait (deliver). */
+export interface DownloadNextStep {
+  /** « Reçue, pas encore installée ». */
+  state: string;
+  /** « Installer dans ma bibliothèque ». */
+  label: string;
+  detail: string;
+  icon: IconName;
+}
+
 export interface DownloadCenterContext {
   manager: DownloadManager;
+  /**
+   * La suite d'un téléchargement fini, selon sa sorte (installer une table reçue, vérifier des
+   * médias) : proposée d'abord, à la place de « Revenir à… » ; undefined : déjà faite.
+   */
+  nextStep?(job: DownloadJob): DownloadNextStep | undefined;
   show(build: () => Built, at?: number): void;
   world: ReturnWorld;
   /** « Revenir à… » : l'écran d'origine (ou son repli), avec ce qui a été reçu. */
@@ -108,8 +127,11 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
         return { sign: '↻', text: j.retryAt ? t('Nouvel essai à {time}, à partir des données reçues', { time: downloadClock(j.retryAt) }) : t('Reprise automatique, à partir des données reçues'), tone: 'warning' };
       case 'paused':
         return { sign: '‖', text: t('En pause : reprise manuelle'), tone: 'quiet' };
-      case 'done':
+      case 'done': {
+        const step = ctx.nextStep?.(j);
+        if (step) return { sign: '→', text: t('{state} · Start : {action}', { state: step.state, action: step.label }), tone: 'ok' };
         return j.delivered ? { sign: '✓', text: t('Rendu à : {screen}', { screen: to }), tone: 'ok' } : { sign: '↩', text: t('Revenir à : {screen}', { screen: to }), tone: 'ok' };
+      }
       case 'failed':
         return j.attached || j.reason === 'login'
           ? { sign: '!', text: t('Start : rouvrir {screen} pour reprendre', { screen: to }), tone: 'error' }
@@ -229,11 +251,14 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
     const received = [downloadVolume(j), fileRank(j), p?.rate !== undefined ? formatRate(p.rate) : undefined, p?.remaining !== undefined ? formatRemaining(p.remaining) : undefined].filter(Boolean).join(' · ');
     const why = downloadReasonText(j);
     const sign = { running: '↓', queued: '…', waiting: '↻', paused: '‖', done: '✓', failed: '!', cancelled: '×' }[j.state];
+    const step = j.state === 'done' ? ctx.nextStep?.(j) : undefined;
     const rows: Row[] = [
-      { text: t('État'), detail: `${sign} ${downloadStateLabel(j)}${why && j.state !== 'done' ? ` : ${why}` : ''}`, tone: j.state === 'paused' ? undefined : tone, progress: { ...(fraction !== undefined ? { value: fraction } : {}), tone } },
+      { text: t('État'), detail: step ? `${sign} ${step.state}` : `${sign} ${downloadStateLabel(j)}${why && j.state !== 'done' ? ` : ${why}` : ''}`, tone: j.state === 'paused' ? undefined : tone, progress: { ...(fraction !== undefined ? { value: fraction } : {}), tone } },
       { text: t('Reçu'), detail: received },
       { text: t('Source'), detail: j.source.label },
     ];
+    const skipped = skippedFiles(j);
+    if (skipped.length) rows.push({ text: tn(skipped.length, '{n} fichier sauté', '{n} fichiers sautés'), detail: skipped.map((s) => s.why).join(' · '), tone: 'warning' });
     if (j.state === 'waiting' && !j.attached)
       rows.push({ text: t('Reprise'), detail: j.source.kind === 'friend' ? t('Automatique au retour de {name}, à partir des données déjà reçues. Le fichier repris est vérifié en entier.', { name: j.source.label }) : t('Automatique, à partir des données déjà reçues. Le fichier repris est vérifié en entier.') });
     rows.push({ text: t('Retour vers'), detail: r.lost ? `! ${r.lost} ${t('Retour vers : {screen}', { screen: to })}` : to, tone: r.lost ? 'warning' : undefined });
@@ -254,7 +279,9 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
     const remove: Action = { label: t('Retirer de la liste'), detail: t('Les fichiers reçus restent où ils ont été rangés'), icon: 'broom', key: 'remove', run: () => (m.remove(id), open()) };
     switch (j.state) {
       case 'done':
-        actions.push(returnAction(true), remove);
+        // La suite logique d'abord (installer la table reçue…) ; sans suite, le retour à son écran.
+        if (step) actions.push({ label: step.label, detail: step.detail, icon: step.icon, tone: 'ok', key: 'next', run: () => ctx.deliver(j) }, remove);
+        else actions.push(returnAction(true), remove);
         break;
       case 'running':
       case 'queued':
@@ -285,7 +312,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
     // Deux actions ne portent jamais la même icône : « Revenir à » prend celle de son écran.
     const ret = actions.find((a) => a.key === 'return');
     if (ret) ret.icon = r.to.screen === 'table-medias' ? 'image' : r.to.screen === 'game-parts' ? 'layers' : r.to.screen === 'friend-library' ? 'friends' : r.to.screen === 'wait-list' ? 'inbox' : r.to.screen === 'updates' ? 'upgrade' : r.to.screen === 'table-sheet' ? 'tables' : 'download';
-    const head = [t('de {source}', { source: j.source.label }), j.state === 'done' && j.finished ? t('terminé à {time}', { time: downloadClock(j.finished) }) : fraction !== undefined ? t('{pct} %', { pct: Math.floor(fraction * 100) }) : undefined, downloadStateLabel(j).toLowerCase()]
+    const head = [t('de {source}', { source: j.source.label }), j.state === 'done' && j.finished ? t('terminé à {time}', { time: downloadClock(j.finished) }) : fraction !== undefined ? t('{pct} %', { pct: Math.floor(fraction * 100) }) : undefined, (step?.state ?? downloadStateLabel(j)).toLowerCase()]
       .filter(Boolean)
       .join(' · ');
     return { heading: j.title, icon: 'download', subheading: head, sections: [{ rows }], actions, back: list, variant: 'facts' };

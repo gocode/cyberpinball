@@ -290,6 +290,7 @@ export const messages: Record<string, string> = {
   'Sortir de la liste': 'Leave the list',
   'Revenir à la liste': 'Back to the list',
   'Flippers : parcourir, tenus pour aller vite · Start ou Entrée : valider · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran': 'Flippers: browse, hold to go faster · Start or Enter: confirm · Exit or Esc: leave the list · MagnaSave or F6: screen actions',
+  'Flippers : parcourir, tenus pour aller vite · Start ou Entrée : {start} · Exit ou Échap : sortir de la liste · MagnaSave ou F6 : actions de l’écran': 'Flippers: browse, hold to go faster · Start or Enter: {start} · Exit or Esc: leave the list · MagnaSave or F6: screen actions',
   'MagnaSave ou F6 : la liste': 'MagnaSave or F6: the list',
   // Texte plus long que l'écran (reading.ts) : repère du cadre, part lue et bandeau d'aide.
   'Revenir aux actions': 'Back to the actions',

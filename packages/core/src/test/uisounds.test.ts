@@ -307,6 +307,7 @@ test('réglages du menu : chaque sous-écran revient sur sa propre ligne ; aper�
     preview: (id: string) => previews.push(id),
     wakeDevices: () => [],
     sleepAllowed: () => true,
+    intro: { open() {}, summary: () => 'jouée' },
   });
   item.run();
   const main = opened[0]!.build;
