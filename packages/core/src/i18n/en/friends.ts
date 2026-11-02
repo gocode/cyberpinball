@@ -171,7 +171,7 @@ export const messages: Record<string, string> = {
   'Fin': 'End',
   // La place de la bande, au choix du joueur (live-scores-menu.ts, liveScoresChoices) (31/10/2026)
   'Scores des amis pendant la partie': 'Friends’ scores during the game',
-  'Sur le DMD quand il montre les scores, sur le fronton ou le topper quand la table les laisse libres, sinon en bas du plateau': 'On the DMD when it shows scores, on the backglass or topper when the table leaves them free, otherwise at the bottom of the playfield',
+  'Sur le fronton ou le topper quand la table les laisse libres, sinon en bas du plateau ; en plus sur le DMD quand il montre les scores': 'On the backglass or topper when the table leaves them free, otherwise at the bottom of the playfield; also on the DMD when it shows scores',
   'Sur le DMD': 'On the DMD',
   'Quand il montre l’écran de score de la table, jamais pendant une animation ni la saisie des initiales': 'When it shows the table’s score screen, never during an animation or initials entry',
   'Sur le fronton': 'On the backglass',

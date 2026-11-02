@@ -44,6 +44,8 @@ const LAYOUTS: Record<string, { roles: Partial<Record<RoleId, number>>; dmdUnder
   borne: { roles: { playfield: 0, backglass: 1, dmd: 2, topper: 3 } },
   'poste-deux-ecrans': { roles: { playfield: 2, backglass: 0, dmd: 0 }, dmdUnderBackglass: true },
   'un-ecran': { roles: { playfield: 0 } },
+  // Le PinCab de l'essai du 02/11/2026 : plateau 4K couché, fronton, FullDMD 16:9, sans topper.
+  pincab: { roles: { playfield: 0, backglass: 1, dmd: 2 } },
 };
 
 function roleRects(name: string): Partial<Record<RoleId, Rect>> {
@@ -99,9 +101,8 @@ test('écrans simulés : la bande quitte le plateau dès qu’un autre écran la
           const band = placed.band;
           if (screens.free.length) {
             assert.ok(band && band.layout === 'cards' && band.role === screens.free[0]!.role, `${where} : cartes sur le premier écran libre`);
-          } else if (rects.dmd && dmdReadable) {
-            assert.equal(band, undefined, `${where} : le DMD suffit, rien sur le plateau`);
           } else {
+            // Le DMD n'est jamais la seule place (essai du 02/11/2026 : rien ne s'affichait sur le PinCab).
             assert.ok(band && band.role === 'playfield' && band.layout === 'insert', `${where} : encart du plateau`);
           }
           if (!band) continue;
@@ -148,7 +149,79 @@ test('écrans simulés : la bande quitte le plateau dès qu’un autre écran la
     }
   }
   // Les trois formes ont servi : cartes du fronton, du topper, encart du plateau.
+  // (L'invariant sur toutes les combinaisons d'écrans : le test suivant.)
   assert.deepEqual([...seen].sort(), ['backglass/cards', 'playfield/insert', 'topper/cards']);
+});
+
+test('invariant : l’automatique, et tout choix impossible, donnent toujours une bande visible, sur toute combinaison d’écrans', () => {
+  // Les combinaisons d'écrans d'une borne : plateau seul, plateau + fronton, plateau + DMD, plateau +
+  // fronton + DMD (le PinCab), + topper (la borne type), DMD en bande sous le fronton (le poste).
+  const pincab = roleRects('pincab');
+  const borne = roleRects('borne');
+  const combos: [string, Partial<Record<RoleId, Rect>>][] = [
+    ['plateau seul', roleRects('un-ecran')],
+    ['plateau + fronton', { playfield: pincab.playfield!, backglass: pincab.backglass! }],
+    ['plateau + DMD', { playfield: pincab.playfield!, dmd: pincab.dmd! }],
+    ['plateau + fronton + DMD (PinCab)', pincab],
+    ['plateau + fronton + DMD + topper', borne],
+    ['plateau + topper', { playfield: borne.playfield!, topper: borne.topper! }],
+    ['DMD sous le fronton (poste)', roleRects('poste-deux-ecrans')],
+  ];
+  const subsets = <T,>(xs: T[]): T[][] => xs.reduce<T[][]>((all, x) => [...all, ...all.map((a) => [...a, x])], [[]]);
+  let cases = 0;
+  for (const [name, rects] of combos) {
+    // Ce que la table prend : tous les sous-ensembles des écrans de la borne autres que le plateau (B2S, PuP, DMD de VPX).
+    for (const taken of subsets((['backglass', 'topper', 'dmd'] as const).filter((r) => rects[r]))) {
+      for (const dmdReadable of [true, false]) {
+        for (const rotation of ROTATIONS) {
+          for (let rows = 1; rows <= 4; rows++) {
+            const screens: LiveBoardScreens = {
+              playfield: { zone: rects.playfield!, rotation },
+              ...(rects.dmd ? { dmd: rects.dmd } : {}),
+              dmdReadable,
+              free: (['backglass', 'topper'] as const).flatMap((role) => (rects[role] && !taken.includes(role) ? [{ role, zone: rects[role]! }] : [])),
+              zones: { ...(rects.backglass ? { backglass: rects.backglass } : {}), ...(rects.topper ? { topper: rects.topper } : {}) },
+            };
+            for (const place of LIVE_SCORES_PLACES) {
+              const p = liveBoardPlacement(screens, rows, place);
+              const where = `${name}, pris : ${taken.join('+') || 'rien'}, DMD ${dmdReadable ? 'lisible' : 'illisible'}, ${rotation}°, ${rows} joueur(s), ${place}`;
+              cases++;
+              assert.ok(p.why, `${where} : le journal dit pourquoi`);
+              // Le choix « Sur le DMD » possible : ses moments d'écran de score, c'est le choix du joueur.
+              if (place === 'dmd' && rects.dmd && dmdReadable) {
+                assert.deepEqual(p.dmd, rects.dmd, where);
+                continue;
+              }
+              const band = p.band;
+              assert.ok(band, `${where} : une bande visible`);
+              const screen = rects[band.role]!;
+              assert.ok(band.bounds.width > 0 && band.bounds.height > 0 && inside(band.bounds, screen), `${where} : dans son écran`);
+              if (place === 'auto' || p.fallback) {
+                // L'automatique ne se pose que sur un écran que la table laisse libre, ou sur le plateau, jamais sur le DMD.
+                assert.ok(band.role === 'playfield' || screens.free.some((f) => f.role === band.role), `${where} : écran libre (${band.role})`);
+                if (rects.dmd) assert.ok(!overlap(band.bounds, rects.dmd), `${where} : pas sur le DMD`);
+                // En plus, sur le DMD quand il se lit.
+                assert.deepEqual(p.dmd, dmdReadable ? rects.dmd : undefined, `${where} : DMD en plus`);
+              }
+              // Un choix impossible : l'automatique, et la raison au journal.
+              const possible =
+                place === 'auto' ||
+                place === 'playfield-bottom' ||
+                place === 'playfield-side' ||
+                (place === 'dmd' ? Boolean(rects.dmd && dmdReadable) : Boolean(rects[place]));
+              assert.equal(Boolean(p.fallback), !possible, `${where} : repli ${possible ? 'inutile' : 'attendu'}`);
+            }
+          }
+        }
+      }
+    }
+  }
+  assert.ok(cases > 3000, `${cases} cas`);
+  // Le PinCab de l'essai du 02/11/2026, fronton pris par le B2S, FullDMD lu : l'encart du plateau, et le DMD en plus.
+  const pin = liveBoardPlacement({ playfield: { zone: pincab.playfield!, rotation: 90 }, dmd: pincab.dmd!, dmdReadable: true, free: [], zones: { backglass: pincab.backglass! } }, 2);
+  assert.equal(pin.band?.role, 'playfield');
+  assert.deepEqual(pin.dmd, pincab.dmd);
+  assert.match(pin.why!, /fronton pris par la table, bas du plateau, et sur le DMD/);
 });
 
 test('encart : le coin bas-gauche du joueur, quel que soit le sens du plateau', () => {
@@ -213,7 +286,8 @@ test('choix du joueur : chaque place, et l’automatique quand la borne ou la ta
       assert.equal(p.dmd, undefined);
       assert.ok(inside(p.band!.bounds, rects[role]!));
     }
-    assert.deepEqual(liveBoardPlacement(screens, 3, 'dmd'), { dmd: rects.dmd });
+    const onDmd = liveBoardPlacement(screens, 3, 'dmd');
+    assert.deepEqual([onDmd.dmd, onDmd.band], [rects.dmd, undefined], 'le DMD seul, sur son écran de score');
     // Bas et côté du plateau : l'encart, au bord des flippers ou au milieu du bord gauche du joueur.
     const bottom = liveBoardPlacement(screens, 3, 'playfield-bottom').band!;
     const side = liveBoardPlacement(screens, 3, 'playfield-side').band!;

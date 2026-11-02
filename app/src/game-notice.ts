@@ -311,7 +311,9 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
       placed = where;
       const b = placement.band;
       const r = (x: Rect) => `${x.width} × ${x.height} en ${x.x}, ${x.y}`; // i18n-ignore : journal
-      opts.log?.(`Bande de la partie entre amis, place : ${b ? `${b.role} (${b.layout}, ${r(b.bounds)})` : 'aucune bande permanente'}${placement.dmd ? `, scores sur le DMD quand il montre l'écran de score (${r(placement.dmd)})` : ''}${place !== 'auto' ? ` ; choix du joueur : ${place}${placement.fallback ? `, impossible ici (${placement.fallback}) : automatique` : ''}` : ''}.`); // i18n-ignore : journal
+      opts.log?.(`Bande de la partie entre amis, place : ${b ? `${b.role} (${b.layout}, ${r(b.bounds)})` : 'aucune bande permanente'}${placement.dmd ? `, scores sur le DMD quand il montre l'écran de score (${r(placement.dmd)})` : ''}${place !== 'auto' ? ` ; choix du joueur : ${place}${placement.fallback ? `, impossible ici (${placement.fallback}) : automatique` : ''}` : ''}${placement.why ? ` ; pourquoi : ${placement.why}` : ''}.`); // i18n-ignore : journal
+      // Rien de visible en permanence : seulement sur le choix « Sur le DMD » (ses moments d'écran de score) ; sinon, une erreur de place.
+      if (!b && place !== 'dmd') opts.log?.(`Bande de la partie entre amis : aucune place visible (${screens ? 'écrans sans plateau' : 'écrans de la borne inconnus'}).`); // i18n-ignore : journal
     }
     const b = placement.band;
     band = layer(band, b?.bounds, JSON.stringify([b?.bounds, b?.layout, b?.rotation]));

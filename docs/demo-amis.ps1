@@ -31,10 +31,11 @@
 # doivent rester muets.
 #   La bande de la partie entre amis, au parcours « partie » : sur la borne, les scores sur le DMD
 #   (bande-partie-entre-amis-dmd.png) et les cartes sur le topper, que la partie simulée laisse
-#   libre (bande-partie-entre-amis.png) ; au poste, le DMD seul (fronton occupé) ; sur un écran
-#   (-Ecrans un-ecran), l'encart au bas du plateau. Jamais en haut du plateau. Puis le réglage
+#   libre (bande-partie-entre-amis.png) ; au poste et sur le PinCab (-Ecrans pincab : fronton pris,
+#   FullDMD, sans topper), l'encart au bas du plateau et les scores sur le DMD ; sur un écran
+#   (-Ecrans un-ecran), l'encart. Jamais en haut du plateau, jamais rien de visible. Puis le réglage
 #   « Scores des amis pendant la partie ».
-#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu, partie-coupure, partie-sans-releve] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans, un-ecran]
+#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu, partie-coupure, partie-sans-releve] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans, pincab, un-ecran]
 # Captures dans tmp\demo-amis\<parcours>\<écrans>\<langue>\captures.
 #   .\docs\demo-amis.ps1 -Accueil [-Langues en, fr]
 # Images de la rubrique Amis de la page d'accueil (README) : les deux parcours, sur l'écran
@@ -225,7 +226,9 @@ try {
           # Où va la bande, selon les écrans : jamais sur le plateau quand le DMD ou un écran libre la porte.
           $bande = @{
             'borne' = @{ Place = 'topper \(cards'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
-            'poste-deux-ecrans' = @{ Place = 'aucune bande permanente, scores sur le DMD'; Captures = @('bande-partie-entre-amis-dmd') }
+            'poste-deux-ecrans' = @{ Place = 'playfield \(insert.*scores sur le DMD'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
+            # Le PinCab de l'essai du 02/11/2026 : fronton pris (B2S), FullDMD lu ; rien ne s'affichait.
+            'pincab' = @{ Place = 'playfield \(insert.*scores sur le DMD.*pourquoi : automatique : fronton pris par la table, bas du plateau'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
             'un-ecran' = @{ Place = 'playfield \(insert'; Captures = @('bande-partie-entre-amis') }
           }[$jeu]
           if ($bande) {

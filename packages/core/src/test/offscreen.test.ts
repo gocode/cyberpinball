@@ -29,7 +29,7 @@ test('hors écran : imposé, automatique sans opérateur, sauf CYBERPINBALL_A_L_
 
 test('les jeux d’écrans de docs\\ecrans sont valides', () => {
   const files = fs.readdirSync(SCREENS).filter((f) => f.endsWith('.json'));
-  assert.deepEqual(files.sort(), ['borne.json', 'pc-dev.json', 'poste-deux-ecrans.json', 'un-ecran.json']);
+  assert.deepEqual(files.sort(), ['borne.json', 'pc-dev.json', 'pincab.json', 'poste-deux-ecrans.json', 'un-ecran.json']);
   for (const f of files) assert.ok(screens(f.replace('.json', '')).length >= 1, f);
 });
 
@@ -46,6 +46,11 @@ test('borne.json : playfield 4K couché, fronton, DMD 4:1 et topper, chacun reco
   assert.ok(d.some((s) => s.bounds.width / s.bounds.height === 4), 'un DMD 4:1');
   assert.equal(new Set(d.map((s) => fingerprintOf(s).key)).size, 4, 'quatre empreintes distinctes');
   assert.ok(d.every((s) => s.edid), 'EDID de chaque écran');
+});
+
+test('pincab.json : la borne de l’essai du 02/11/2026, plateau 4K, fronton et FullDMD 16:9, sans topper', () => {
+  const d = screens('pincab');
+  assert.deepEqual(d.map((s) => [s.bounds.width, s.bounds.height]), [[3840, 2160], [1920, 1080], [1920, 1080]]);
 });
 
 test('poste-deux-ecrans.json et un-ecran.json : le principal et deux écrans, ou le principal seul', () => {

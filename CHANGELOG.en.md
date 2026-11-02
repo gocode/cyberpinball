@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.6
 
+- Game with friends: on automatic, the others' scores always show. On a cabinet without a topper whose backglass is taken by the table (B2S, PuP), they appeared nowhere when the DMD was read: they now go at the bottom left of the playfield, on the apron, and also on the DMD when it shows its scores.
 - The built-in browser blocks ads: on YouTube (before and during videos), in search results and on the pages you look at before downloading a media file. The table forums are never filtered, so signing in and downloading there work as before. "Bloquer les publicités" (Block ads) setting in Site accounts, on by default; the filter lists are updated every day.
 - The cabinet no longer always opens on the same table: in "Médias, son et attente" (Media, sound and attract mode), "Table au démarrage" (Table at startup) picks the first one, a random table or the last one played, and "Ordre des tables" (Table order) sorts the wheel's medallions by title, last played, most played, year, manufacturer, or in an order shuffled at every start.
 - System menu > Tables > "Toutes les tables" (All tables): the list of all your tables; Start opens the table's page, the same as from the wheel (Play, Edit, media, parts, files, settings…), and its "Retour" (Back) goes back to the list.

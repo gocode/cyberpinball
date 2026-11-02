@@ -32,6 +32,8 @@ const LAYOUTS = {
   borne: { roles: { playfield: 0, backglass: 1, dmd: 2, topper: 3 } },
   'poste-deux-ecrans': { roles: { playfield: 2, backglass: 0, dmd: 0 }, dmdUnderBackglass: true },
   'un-ecran': { roles: { playfield: 0 } },
+  // Le PinCab de l'essai du 02/11/2026 : plateau 4K couché, fronton, FullDMD 16:9, sans topper.
+  pincab: { roles: { playfield: 0, backglass: 1, dmd: 2 } },
 };
 
 function roleRects(name) {
