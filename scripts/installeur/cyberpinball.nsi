@@ -228,6 +228,15 @@ Function un.onInit
   ${EndIf}
   ReadINIStr $BacASable "$INSTDIR\installation.ini" "installation" "bac_a_sable"
   Call un.Emplacements
+  ; Borne dédiée active (Shell Launcher, ou réglage « Interface utilisateur personnalisée » du
+  ; compte) : sans l'application, la session s'ouvrirait sur un écran noir. Le désinstalleur
+  ; n'a pas les droits pour la défaire : on le dit, et on n'avance qu'à la demande.
+  ${If} ${FileExists} "$Racine\data\borne-dediee\etat.json"
+  ${OrIf} ${FileExists} "$Racine\data\borne-dediee\reglages-windows.json"
+    MessageBox MB_YESNO|MB_ICONEXCLAMATION|MB_DEFBUTTON2 "Cyber Pinball s'ouvre encore avec Windows (menu Borne > « Borne dédiée »).$\r$\n$\r$\nDésactivez-le d'abord dans Cyber Pinball : sans lui, la session de ce compte pourrait s'ouvrir sur un écran noir. En secours, les scripts du dossier :$\r$\n$Racine\data\borne-dediee$\r$\n$\r$\nDésinstaller quand même ?" /SD IDYES IDYES +3
+    SetErrorLevel 2
+    Quit
+  ${EndIf}
 FunctionEnd
 
 Section "Uninstall"

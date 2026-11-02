@@ -8,16 +8,24 @@
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import {
   dedicatedDir,
   elevatedScript,
   freshWindows,
+  freshSettings,
   readElevatedOutcome,
   readJsonFile,
+  readSettingsOutcome,
+  settingsScript,
   simulateRun,
+  simulateSettingsRun,
   type ElevatedOutcome,
   type ElevatedRun,
+  type SettingsOutcome,
+  type SettingsRun,
+  type SimulatedSettings,
   type SimulatedWindows,
 } from '@cyberpinball/core';
 import { listWindows } from '@cyberpinball/win-displays';
@@ -34,6 +42,7 @@ export interface DedicatedProbe {
 }
 
 export type ElevatedResult = { outcome: ElevatedOutcome } | { cancelled: true } | { error: string };
+export type SettingsResult = { outcome: SettingsOutcome } | { cancelled: true } | { error: string };
 
 export interface DedicatedSystem {
   /** Windows simulé : rien n'est écrit, rien n'est lancé. */
@@ -42,6 +51,15 @@ export interface DedicatedSystem {
   probe(): Promise<DedicatedProbe>;
   /** Seule écriture : le script élevé, après l'autorisation de Windows (UAC). */
   runElevated(run: ElevatedRun): Promise<ElevatedResult>;
+  /**
+   * Réglages de Windows de la borne (windowssettings.ts) : relevé si `run.want` est vide, sinon
+   * écriture ; avec l'autorisation de Windows (UAC) si `elevate`, sinon dans la session.
+   */
+  runSettings(run: SettingsRun, elevate: boolean): Promise<SettingsResult>;
+  /** Dossier Démarrage du compte de la session. */
+  startupDir(): string;
+  /** Heure du démarrage de Windows (ms). */
+  bootTime(): number;
   /** Une fenêtre de l'Explorateur (un processus ; rien n'est écrit). */
   openExplorer(): void;
   /** Une fenêtre de l'Explorateur, ou sa barre des tâches, est à l'écran. */
@@ -87,6 +105,14 @@ function powershell(args: string[]): Promise<{ status: number | null; stdout: st
   });
 }
 
+/** Un script PowerShell, dans la session, ou élevé (UAC) : Start-Process -Verb RunAs, code 1223 si refusé. */
+function runScriptFile(script: string, elevate: boolean): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  if (!elevate) return powershell(['-File', script]);
+  const quoted = script.replace(/'/g, "''");
+  const elevated = `try { $p = Start-Process -FilePath '${POWERSHELL}' -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '"${quoted}"'); exit $p.ExitCode } catch { [Console]::Error.WriteLine($_.Exception.Message); if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { exit 1 } }`;
+  return powershell(['-Command', elevated]);
+}
+
 function realSystem(dataDir: string): DedicatedSystem {
   return {
     simulated: false,
@@ -105,15 +131,30 @@ function realSystem(dataDir: string): DedicatedSystem {
       fs.rmSync(result, { force: true });
       // BOM : Windows PowerShell lit sinon le script en ANSI (accents des chemins).
       fs.writeFileSync(script, '\ufeff' + elevatedScript(run, result), 'utf8');
-      const quoted = script.replace(/'/g, "''");
-      const elevate = `try { $p = Start-Process -FilePath '${POWERSHELL}' -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '"${quoted}"'); exit $p.ExitCode } catch { [Console]::Error.WriteLine($_.Exception.Message); if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { exit 1 } }`;
       console.log(`Borne dédiée : ${run.kind === 'activate' ? 'activation' : 'désactivation'} demandée à Windows (UAC), script ${script}.`);
-      const r = await powershell(['-Command', elevate]);
+      const r = await runScriptFile(script, true);
       const outcome = readElevatedOutcome(result);
       if (outcome) return { outcome };
       if (r.status === CANCELLED) return { cancelled: true };
       return { error: r.stderr.trim() || `PowerShell : code ${r.status}` };
     },
+    async runSettings(run, elevate) {
+      const dir = dedicatedDir(dataDir);
+      fs.mkdirSync(dir, { recursive: true });
+      const write = Object.keys(run.want).length > 0;
+      const script = path.join(dir, write ? 'reglages-ecrire.ps1' : 'reglages-relever.ps1');
+      const result = path.join(dir, write ? 'resultat-reglages.json' : 'resultat-releve.json');
+      fs.rmSync(result, { force: true });
+      fs.writeFileSync(script, '\ufeff' + settingsScript(run, result), 'utf8');
+      if (write) console.log(`Réglages de Windows de la borne : écriture${elevate ? ' demandée à Windows (UAC)' : ''}, script ${script}.`);
+      const r = await runScriptFile(script, elevate);
+      const outcome = readSettingsOutcome(result);
+      if (outcome) return { outcome };
+      if (r.status === CANCELLED) return { cancelled: true };
+      return { error: r.stderr.trim() || `PowerShell : code ${r.status}` };
+    },
+    startupDir: () => path.join(process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'),
+    bootTime: () => Date.now() - os.uptime() * 1000,
     openExplorer() {
       // Fenêtre voulue : celle de l'Explorateur (windowsHide la cacherait).
       spawn(path.join(process.env.SystemRoot ?? 'C:\\Windows', 'explorer.exe'), [], { detached: true, stdio: 'ignore' }).unref(); // fenêtre voulue
@@ -130,7 +171,11 @@ function realSystem(dataDir: string): DedicatedSystem {
 /** Fichier de la simulation : l'état de Windows, ce que voit l'écran, et l'autorisation refusée ou non. */
 interface Simulation {
   windows: SimulatedWindows;
+  /** Réglages du compte (windowssettings.ts). */
+  settings?: SimulatedSettings;
   probe: DedicatedProbe;
+  /** Démarrage de Windows simulé (ms) ; absent : il y a une heure. */
+  bootTime?: number;
   /** L'utilisateur refuse l'autorisation de Windows à la prochaine demande. */
   cancel?: boolean;
   /** Ce que la simulation a fait, dans l'ordre (vérifié par les démonstrations). */
@@ -167,6 +212,20 @@ function simulatedSystem(file: string): DedicatedSystem {
       save({ ...simulation, windows }, `${run.kind} : ${outcome.status}${outcome.error ? ` (${outcome.error})` : ''}`);
       return { outcome };
     },
+    async runSettings(run, elevate) {
+      const simulation = load();
+      const write = Object.keys(run.want).length > 0;
+      if (write) await new Promise((r) => setTimeout(r, 400));
+      if (write && elevate && simulation.cancel) {
+        save({ ...simulation, cancel: false }, 'réglages : refusé dans la fenêtre de Windows'); // i18n-ignore : journal de la simulation
+        return { cancelled: true };
+      }
+      const { windows, outcome } = simulateSettingsRun(simulation.settings ?? freshSettings(), run);
+      if (write) save({ ...simulation, settings: windows }, `réglages${elevate ? ' (UAC)' : ''} : ${outcome.status}${outcome.error ? ` (${outcome.error})` : ''} ; ${(outcome.log ?? []).join(' ; ')}`); // i18n-ignore : journal de la simulation
+      return { outcome };
+    },
+    startupDir: () => path.join(path.dirname(file), 'demarrage-simule'),
+    bootTime: () => load().bootTime ?? Date.now() - 3_600_000,
     openExplorer() {
       explorer = true;
       console.log('Borne dédiée (simulée) : Explorateur ouvert.');

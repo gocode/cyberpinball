@@ -109,6 +109,7 @@ export * from './vbscript';
 export * from './fulldmdframe';
 export * from './fulldmdtable';
 export * from './dedicated';
+export * from './windowssettings';
 export * from './uisounds';
 export * from './power';
 export * from './arcadehours';

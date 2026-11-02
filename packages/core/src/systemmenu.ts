@@ -33,6 +33,7 @@ export const SYSTEM_ITEM_IDS = [
   'desktop',
   'explorer',
   'dedicated',
+  'startup',
   'guest-mode',
   'language',
   'updates',
@@ -110,7 +111,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'cabinet',
     get label() { return t('Borne'); },
     get detail() { return t('Boutons, écrans, son, réglages de VPX, bureau Windows, mode invité'); },
-    entries: ['health', 'cabinet', 'vpx-settings', 'controls', 'desktop', 'explorer', 'dedicated', 'guest-mode'],
+    entries: ['health', 'cabinet', 'vpx-settings', 'controls', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -151,6 +152,7 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // Seulement quand Cyber Pinball est le shell de Windows (borne dédiée) : à la place de « Bureau Windows ».
   explorer: { icon: 'folder', get label() { return t('Ouvrir l’Explorateur Windows'); } },
   dedicated: { icon: 'lock', get label() { return t('Borne dédiée'); } },
+  startup: { icon: 'power', get label() { return t('Lancement au démarrage'); } },
   'guest-mode': { icon: 'guest', get label() { return t('Mode invité'); } },
   // Nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée.
   language: { icon: 'language', label: 'Langue / Language' }, // i18n-ignore

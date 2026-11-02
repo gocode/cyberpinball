@@ -21,6 +21,7 @@ import { locations } from './paths';
 import { otherFrontendsGate } from './frontend-gate';
 import { guardScreens } from './screen-guard';
 import { startSettingsAlone } from './settings';
+import { superviseCabinet } from './supervisor';
 import { journalConsole } from './journal';
 import { journalUncaught } from './uncaught';
 import { startWizard } from './wizard';
@@ -34,8 +35,10 @@ if (!OFFSCREEN) journalUncaught(loc.dataDir);
 const wantsSettings = process.argv.includes('--reglages');
 const wantsWizard = !wantsSettings && (process.argv.includes('--assistant') || wizardStepOf(process.argv) !== undefined || !loadCabinet(loc.dataDir));
 
-// Essai sans opérateur lancé sur le bureau de l'utilisateur : il se refait sur le bureau caché.
-if (!relaunchOnHiddenDesktop()) {
+// Shell du compte (« Borne dédiée » sans Shell Launcher) : ce processus n'est que le surveillant
+// qui lance et relance Cyber Pinball. Sinon, un essai sans opérateur lancé sur le bureau de
+// l'utilisateur se refait sur le bureau caché.
+if (!superviseCabinet(loc.dataDir) && !relaunchOnHiddenDesktop()) {
   app.whenReady().then(async () => {
     // Un autre menu de borne ouvert (PinUP Popper…) : aucun écran n'est pris avant qu'il soit
     // fermé, ou que l'utilisateur choisisse de continuer quand même.

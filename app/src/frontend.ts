@@ -188,7 +188,7 @@ import { createConfigurationsMenu } from './configurations-menu';
 import { coverDisplay, hideCovered, minimizeCovered } from './cover-display';
 import { DesktopMode } from './desktop-mode';
 import { answerLegacy, legacyDesktopTurned, orientationForDesktop, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
-import { acceptFrontends, unacceptedFrontends } from './frontend-gate';
+import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './frontend-gate';
 import { hideTaskbars, isVeil, nameScreen, relaunchCovered, restoreTaskbars, setDesktopMode, settleScreens, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
 import { forcedRotation, menuRotation, openSettings } from './settings';
@@ -816,8 +816,13 @@ const dedicated = createDedicatedMenu({
   shellSession: shellSession(),
   desktopKeys: shortcutLabel(SHORTCUTS.desktop),
   showDesktop: () => void showDesktop(),
+  otherFrontends: () => {
+    const others = otherFrontendsOnThisPc();
+    return others.length ? frontendNames(others) : undefined;
+  },
 });
 library.provideSystemItem('dedicated', dedicated.dedicatedItem);
+library.provideSystemItem('startup', dedicated.startupItem);
 if (shellSession()) {
   library.provideSystemItem('explorer', dedicated.explorerItem);
   library.provideSystemItem('quit', {

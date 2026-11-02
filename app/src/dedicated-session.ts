@@ -1,5 +1,6 @@
 // Session de la borne dédiée (dedicated.ts, core) : Cyber Pinball est le shell de Windows pour
-// ce compte, lancé par Shell Launcher avec --borne-dediee. Importé tôt par main.ts, avant les
+// ce compte, lancé avec --borne-dediee par Shell Launcher ou, sans lui (Windows Pro, Famille),
+// par le surveillant (supervisor.ts), qui fait la même chose. Importé tôt par main.ts, avant les
 // modules qui lisent les arguments (assistant, étape…).
 //
 // Shell Launcher surveille le processus qu'il a lancé, et lui seul : à sa sortie, il le relance

@@ -160,6 +160,8 @@ export const WINDOWS_CHANGES: WindowsChange[] = [
   { call: '$DemarrageDir', files: ['scripts/installeur/cyberpinball.nsi'] },
   // Retrait de cette entrée à la désinstallation.
   { call: 'DeleteRegKey', files: ['scripts/installeur/cyberpinball.nsi'] },
+  // Réglages de Windows du compte de la borne (02/11/2026, windowssettings.ts), seulement à l’action choisie dans « Borne dédiée » ou « Lancement au démarrage », décochés par défaut : stratégie « Interface utilisateur personnalisée » (Shell) du compte, raccourci du dossier Démarrage, fond d’écran, couleur de fond, icônes du bureau masquées. Chacun est relevé avant d’être écrit (la sauvegarde) et remis tel quel à la désactivation, vérifié. Un autre menu lancé lui aussi à l’ouverture de session se disputerait les écrans : l’écran le signale avant d’activer.
+  { call: 'Sys-Set', files: ['packages/core/src/windowssettings.ts'] },
   // Tâche planifiée « Cyber Pinball pare-feu » (01/11/2026) : enregistrée sous l’autorisation de Windows donnée dans « Partage et réseau », sans déclencheur (jamais à l’ouverture de session), elle ne fait que reposer les deux règles du pare-feu de Cyber Pinball (firewall.ts). Aucun effet sur un autre menu.
   { call: 'Register-ScheduledTask', files: ['packages/core/src/firewall.ts'] },
   // La même tâche : ses arguments (firewall.ts), cherchée et lancée par l’application quand une règle manque, retirée à la désinstallation.

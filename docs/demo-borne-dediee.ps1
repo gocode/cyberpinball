@@ -8,14 +8,18 @@
 #                  Windows », écran « activée pour cette session », Explorateur (simulé) puis
 #                  retour au menu par Ctrl+Maj+D, « Redémarrer Cyber Pinball » à la place de « Quitter » ;
 #   refus        : autorisation de Windows refusée ; puis sans autre compte administrateur
-#                  (Bloquant), puis Windows Pro (non disponible).
+#                  (Bloquant), puis Windows Pro (rien d'écrit sans action) ;
+#   pro          : Windows Pro, sans Shell Launcher : « Remplacer le bureau pour ce compte »
+#                  (réglage du compte, sauvegardé) puis « Désactiver et rétablir le bureau » ;
+#                  « Lancement au démarrage » puis « Ne plus lancer au démarrage » ; les réglages
+#                  du compte simulé reviennent exactement à leur état de départ.
 # Le Windows simulé, à la fin de l'aller-retour, doit être exactement celui du départ ; le
 # garde-fou de mise en page et le guet hors écran doivent rester muets.
-#   .\docs\demo-borne-dediee.ps1 [-Langues fr, en] [-Scenarios aller-retour, session, refus]
+#   .\docs\demo-borne-dediee.ps1 [-Langues fr, en] [-Scenarios aller-retour, session, refus, pro]
 # Captures dans tmp\demo-borne-dediee\<scénario>\<langue>\captures.
 param(
   [string[]]$Langues = @('fr', 'en'),
-  [string[]]$Scenarios = @('aller-retour', 'session', 'refus')
+  [string[]]$Scenarios = @('aller-retour', 'session', 'refus', 'pro')
 )
 $ErrorActionPreference = 'Stop'
 $wt = Split-Path $PSScriptRoot -Parent
@@ -56,7 +60,7 @@ function Invoke-Borne([string]$Dossier, [string[]]$Touches, [string[]]$Arguments
   if (Test-Path $env:CYBERPINBALL_CAPTURE) { Remove-Item -Recurse -Force $env:CYBERPINBALL_CAPTURE }
   Push-Location $wt
   try { $log = & $electron app @Arguments 2>&1 | ForEach-Object { "$_" } } finally { Pop-Location }
-  $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Mode bureau|Borne dédiée)' } | ForEach-Object { Write-Host "   $_" }
+  $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Mode bureau|Borne dédiée|Réglages de Windows)' } | ForEach-Object { Write-Host "   $_" }
   return $log
 }
 
@@ -127,6 +131,23 @@ try {
           Test-Partie "$id (pro)" "$dossier\pro" $log
           $etat = Get-Content $sim -Raw -Encoding UTF8 | ConvertFrom-Json
           if (@($etat.journal | Where-Object { $_ }).Count) { $failures += "$id : écriture simulée sans activation ($(@($etat.journal | Where-Object { $_ }) -join ' | '))" }
+        }
+        'pro' {
+          New-Simulation $sim -Probe @{ editionId = 'Professional'; build = 26100 }
+          $log = Invoke-Borne "$dossier\bureau" @('Tab', 'wait:1200', 'action:Borne', 'wait:1000', 'action:Borne dédiée', $w,
+            'action:Remplacer le bureau pour ce compte', $w, 'action:Retour', 'wait:1000', 'action:Borne dédiée', $w,
+            'action:Désactiver et rétablir le bureau', $w)
+          Test-Partie "$id (bureau)" "$dossier\bureau" $log
+          $log = Invoke-Borne "$dossier\demarrage" @('Tab', 'wait:1200', 'action:Borne', 'wait:1000', 'action:Lancement au démarrage', $w,
+            'action:Lancer au démarrage de Windows', $w, 'action:Retour', 'wait:1000', 'action:Lancement au démarrage', $w,
+            'action:Ne plus lancer au démarrage', $w)
+          Test-Partie "$id (démarrage)" "$dossier\demarrage" $log
+          $etat = Get-Content $sim -Raw -Encoding UTF8 | ConvertFrom-Json
+          $journal = @($etat.journal | Where-Object { $_ })
+          if ($journal.Count -ne 4 -or $journal[0] -notmatch '^réglages \(UAC\) : done ; set shell' -or $journal[1] -notmatch '^réglages \(UAC\) : done ; removed shell' -or $journal[2] -notmatch '^réglages : done ; set startup' -or $journal[3] -notmatch '^réglages : done ; removed startup') { $failures += "$id : journal de la simulation inattendu ($($journal -join ' | '))" }
+          $depart = node -e "process.stdout.write(JSON.stringify(require('./packages/core/dist/windowssettings').freshSettings()))"
+          if (($etat.settings | ConvertTo-Json -Depth 4 -Compress) -ne ($depart | ConvertFrom-Json | ConvertTo-Json -Depth 4 -Compress)) { $failures += "$id : réglages du compte différents de l'état de départ" }
+          if (Test-Path "$home_\borne-dediee\reglages-windows.json") { $failures += "$id : sauvegarde restée après la désactivation" }
         }
       }
     }
