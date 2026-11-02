@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { runElectron } from './electron-run';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -272,7 +272,7 @@ test('démo hors écran : aucune fenêtre visible ni au premier plan, captures �
     // Lancé sur le bureau de l'utilisateur, l'essai doit se relancer de lui-même sur le bureau
     // Windows caché : même si le mode hors écran cassait, rien n'apparaîtrait sur les écrans du
     // poste (le guet, lui, le signalerait).
-    const run = spawnSync(electron, ['app', '--assistant', `--user-data-dir=${path.join(dir, 'chromium')}`], { cwd: REPO, env, encoding: 'utf8', timeout: 100_000, windowsHide: true });
+    const run = runElectron(electron, ['app', '--assistant', `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, cwd: REPO, env, timeout: 100_000 });
     const output = `${run.stdout}\n${run.stderr}`;
     assert.equal(run.status, 0, output);
     assert.match(output, /relancé sur le bureau Windows caché « CyberPinballEssais »/);

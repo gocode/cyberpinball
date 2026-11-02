@@ -91,6 +91,7 @@ export * from './resumable';
 export * from './filepicker';
 export * from './journey';
 export * from './sitesessions';
+export * from './adblock';
 export * from './mediasites';
 export * from './sitefiles';
 export * from './webmedia';

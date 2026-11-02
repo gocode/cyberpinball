@@ -1312,6 +1312,17 @@ On the cabinet, a game launched from the menu (a ROM table, DMD visible). The pr
 | 688 | Without MagnaSave, on a keyboard | On a cabinet without MagnaSave: Credit and Start together; on a keyboard: left Ctrl and right Ctrl, arrows, + and −. | The same menu opens; the arrows move the DMD both ways, + and − change its size. |
 | 689 | Guest mode | Guest mode on, in a game: both MagnaSave buttons. | Nothing opens, the game goes on; the log says "Réglages en partie : fermés en mode invité." (In-game settings: closed in guest mode). |
 
+## Ads in the built-in browser
+
+The proof without an operator: `packages/core/src/test/adblock.test.ts` (exempt forums, list refresh, setting) and the off-screen run `.\docs\demo-publicites.ps1` (ad server, banner, scriptlet run before the page's first script, forum, setting off, kept lists, first start offline), on fake pages. The real YouTube can only be checked here.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 690 | YouTube without ads | A game's page > "Médias du jeu" (Game media) > a media > "Chercher moi-même sur le web…" (Search the web myself…), YouTube engine; open three or four videos, one of them long (over 10 min). | No ad before or during the videos, nor in the results list. The log says "Bloqueur de publicités : listes reçues" the first time. |
+| 691 | The setting | System menu > "Tables" > "Ajouter une table" (Add a table) > "Comptes des sites" (Site accounts): "Bloquer les publicités : oui" (Block ads: on), then Start on it. | The label turns to "non" (off) and its detail says so; the next YouTube video shows its ads. Start again: "oui" (on), no more ads from the next page. |
+| 692 | The table forums | "Récupérer" (Get) a table from vpuniverse.com, account signed in, direct download off then on. | The page, the sign-in and the download work as without the blocker. |
+| 693 | Offline | Unplug the network, delete `data\adblock\filtres.bin`, restart, open "Comptes des sites" (Site accounts). | The setting's detail says "Listes de filtres pas encore reçues (hors ligne ?)" (Filter lists not received yet (offline?)). Network back, the next time "Récupérer" opens the lists arrive and the detail goes back to normal. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

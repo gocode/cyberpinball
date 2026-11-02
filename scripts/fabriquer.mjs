@@ -50,13 +50,17 @@ fs.rmSync(path.join(repo, 'build'), { recursive: true, force: true });
 const esbuild = require('esbuild');
 // Modules natifs du réseau des bornes : chargés par require-addon depuis le dossier de leur paquet.
 const NATIVE_NET = ['sodium-native', 'udx-native'];
-const common = { bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: ['electron', 'koffi', ...NATIVE_NET], logLevel: 'warning' };
+// Le script préchargé du bloqueur de publicités est copié à part (plus bas) : laissé hors du regroupement.
+const common = { bundle: true, platform: 'node', format: 'cjs', target: 'node22', external: ['electron', 'koffi', '@ghostery/adblocker-electron-preload', ...NATIVE_NET], logLevel: 'warning' };
 await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', 'main.js')], outfile: path.join(stage, 'dist', 'main.js') });
 // Un preload par type de fenêtre (preload.js, settings-preload.js…) : on les prend tous. Et la
 // mise en place de la mise à jour légère, lancée à part par l'exécutable en mode Node.
 for (const name of fs.readdirSync(path.join(repo, 'app', 'dist')).filter((f) => /preload\.js$/.test(f) || f === 'maj-legere.js')) {
   await esbuild.build({ ...common, entryPoints: [path.join(repo, 'app', 'dist', name)], outfile: path.join(stage, 'dist', name) });
 }
+// Script préchargé du bloqueur de publicités (app/src/ad-blocker.ts), injecté par la session
+// dans les pages du navigateur intégré : déjà regroupé par Ghostery, il ne requiert qu'electron.
+fs.copyFileSync(require.resolve('@ghostery/adblocker-electron-preload'), path.join(stage, 'dist', 'adblock-preload.js'));
 
 step('Fichiers de l’application');
 // Mêmes chemins relatifs qu'en développement : dist\..\renderer, dist\..\components.json.

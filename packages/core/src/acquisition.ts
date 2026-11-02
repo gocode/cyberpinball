@@ -602,6 +602,8 @@ export interface WaitList {
   watchDownloads?: boolean;
   /** « Récupérer » télécharge directement avec la connexion gardée, sans montrer la page (choix de l'utilisateur). */
   directDownload?: boolean;
+  /** Le navigateur intégré montre les publicités (choix de l'utilisateur) ; absent : il les bloque (adblock.ts). */
+  adsShown?: boolean;
 }
 
 /** Avertissement montré au premier usage du catalogue. */
@@ -627,6 +629,7 @@ export function loadWaitList(dataDir: string): WaitList {
     if (typeof r.noticeAcceptedAt === 'string') list.noticeAcceptedAt = r.noticeAcceptedAt;
     if (r.watchDownloads === true) list.watchDownloads = true;
     if (r.directDownload === true) list.directDownload = true;
+    if (r.adsShown === true) list.adsShown = true;
     return list;
   } catch {
     return { items: [] };

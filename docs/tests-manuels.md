@@ -1312,6 +1312,17 @@ Sur la borne, une partie lancée depuis le menu (une table à ROM, DMD visible).
 | 688 | Sans MagnaSave, au clavier | Sur une borne sans MagnaSave : Crédit et Start ensemble ; au clavier : Ctrl gauche et Ctrl droit, flèches, + et −. | Le même menu s'ouvre ; les flèches déplacent le DMD dans les deux sens, + et − changent sa taille. |
 | 689 | Mode invité | Mode invité actif, en partie : les deux MagnaSave. | Rien ne s'ouvre, la partie continue ; le journal dit « Réglages en partie : fermés en mode invité. ». |
 
+## Publicités dans le navigateur intégré
+
+La preuve sans opérateur : `packages/core/src/test/adblock.test.ts` (forums exemptés, rafraîchissement des listes, réglage) et l'essai hors écran `.\docs\demo-publicites.ps1` (régie, bannière, scriptlet exécuté avant le premier script de la page, forum, réglage coupé, listes gardées, premier démarrage hors ligne), sur de fausses pages. Le vrai YouTube ne se vérifie qu'ici.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 690 | YouTube sans publicité | Fiche d'un jeu > « Médias du jeu » > un média > « Chercher moi-même sur le web… », moteur YouTube ; ouvrir trois ou quatre vidéos, dont une longue (plus de 10 min). | Aucune publicité avant ni pendant les vidéos, ni dans la liste des résultats. Le journal dit « Bloqueur de publicités : listes reçues » la première fois. |
+| 691 | Le réglage | Menu système > « Tables » > « Ajouter une table » > « Comptes des sites » : « Bloquer les publicités : oui », puis Start dessus. | Le libellé passe à « non » et son détail le dit ; la vidéo suivante sur YouTube montre ses publicités. Start de nouveau : « oui », plus de publicités dès la page suivante. |
+| 692 | Les forums des tables | « Récupérer » une table de vpuniverse.com, compte connecté, téléchargement direct coupé puis activé. | La page, la connexion et le téléchargement marchent comme sans bloqueur. |
+| 693 | Hors ligne | Débrancher le réseau, supprimer `data\adblock\filtres.bin`, redémarrer, ouvrir « Comptes des sites ». | Le détail du réglage dit « Listes de filtres pas encore reçues (hors ligne ?) ». Réseau rebranché, à la prochaine ouverture de « Récupérer » les listes arrivent et le détail redevient normal. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

@@ -185,6 +185,13 @@ export const messages: Record<string, string> = {
   '« Récupérer » télécharge sans montrer la page quand vous êtes connecté': '“Get” downloads without showing the page when you’re signed in',
   '« Récupérer » ouvre la page ; vous cliquez vous-même': '“Get” opens the page; you click yourself',
   'Comptes des sites': 'Site accounts',
+  // packages/core/src/adblock.ts
+  'Bloquer les publicités : non': 'Block ads: off',
+  'Bloquer les publicités : oui': 'Block ads: on',
+  'Le navigateur intégré montre les pages telles quelles, publicités comprises': 'The built-in browser shows pages as they are, ads included',
+  'Listes de filtres en cours de réception : les publicités passent encore': 'Filter lists on their way: ads still get through',
+  'Listes de filtres pas encore reçues (hors ligne ?) : les publicités passent jusqu’à la prochaine connexion': 'Filter lists not received yet (offline?): ads get through until the next connection',
+  'Publicités retirées des pages et des vidéos (YouTube compris) ; jamais sur les forums des tables': 'Ads removed from pages and videos (YouTube included); never on the table forums',
   '{n} connecté sur {total}': '{n} of {total} signed in',
   '{n} connectés sur {total}': '{n} of {total} signed in',
   'Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. Avec le téléchargement direct, « Récupérer » télécharge le fichier sans montrer la page, et ouvre la page dès que le site demande quelque chose (vérification, choix, délai).':

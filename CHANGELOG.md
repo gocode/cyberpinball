@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.6
 
+- Le navigateur intégré bloque les publicités : sur YouTube (avant et pendant les vidéos), dans les résultats de recherche et sur les pages que vous consultez avant de télécharger un média. Les forums des tables ne sont jamais filtrés, pour que la connexion et les téléchargements y marchent comme avant. Réglage « Bloquer les publicités » dans Comptes des sites, activé par défaut ; les listes de filtres sont mises à jour chaque jour.
 - La borne ne s'ouvre plus toujours sur la même table : dans « Médias, son et attente », « Table au démarrage » choisit la première, une table au hasard ou la dernière jouée, et « Ordre des tables » range les médaillons de la roue par titre, dernières jouées, plus jouées, année, fabricant, ou dans un ordre mélangé à chaque démarrage.
 - Menu système > Tables > « Toutes les tables » : la liste de toutes vos tables ; Start ouvre la fiche de la table, la même que depuis la roue (Jouer, Modifier, médias, parties, fichiers, réglages…), et son « Retour » ramène à la liste.
 - Partage et réseau : « Limiter le débit des téléchargements… » plafonne ce que vos amis vous envoient (de 256 ko/s à 20 Mo/s, ou sans limite), tous envois confondus, pour laisser la connexion libre au reste de la maison. Un ami dont la borne n'est pas à jour envoie encore à pleine vitesse.

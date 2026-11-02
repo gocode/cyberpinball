@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { runElectron } from './electron-run';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -72,7 +72,7 @@ function runWizard(home: string, codes: string[], args: string[], extra: NodeJS.
   };
   delete env.CYBERPINBALL_A_L_ECRAN;
   delete env.CYBERPINBALL_CAPTURE;
-  const run = spawnSync(electron!, ['app', '--assistant', ...args, `--user-data-dir=${path.join(dir, 'chromium')}`], { cwd: REPO, env, encoding: 'utf8', timeout: 170_000, windowsHide: true });
+  const run = runElectron(electron!, ['app', '--assistant', ...args, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, cwd: REPO, env, timeout: 170_000 });
   const output = `${run.stdout}\n${run.stderr}`;
   assert.equal(run.status, 0, output);
   assert.doesNotMatch(output, /Autopilote : .* n’est pas arrivée|sans joystick lisible/, output);

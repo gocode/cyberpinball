@@ -12,6 +12,7 @@ import * as path from 'node:path';
 import { app } from 'electron';
 import {
   acquisitionNotice,
+  adBlockLabel,
   addPart,
   addToWaitList,
   applyOps,
@@ -119,6 +120,7 @@ import {
 } from '@cyberpinball/core';
 import { createAcquirer } from './acquire-window';
 import { createYtDlp } from './ytdlp-tool';
+import { createAdBlocker } from './ad-blocker';
 import { archiveEntries } from './archives';
 import { recentDownloads, watchDownloads } from './downloads-watch';
 import type { PickRequest } from './file-picker';
@@ -464,8 +466,14 @@ export function createCatalog(ctx: CatalogContext) {
   // yt-dlp, téléchargé à la première demande (<racine>\tools\yt-dlp) ; Cyber Pinball lui sert de moteur JavaScript.
   // CYBERPINBALL_YTDLP : un outil tout prêt, sans installation (essais).
   const ytdlp = createYtDlp({ root: () => ctx.layout()?.root, node: process.execPath, override: () => process.env.CYBERPINBALL_YTDLP || undefined });
+  // Publicités bloquées dans le navigateur intégré, sauf si l'utilisateur les veut (Comptes des sites).
+  const adBlocker = createAdBlocker({
+    cacheFile: () => path.join(dataDir(), 'adblock', 'filtres.bin'),
+    enabled: () => !waitList().adsShown,
+  });
   const acquirer = createAcquirer({
     dir: acquisitionDir,
+    adBlocker,
     received: (file, facts) => void received(file, facts, 'window', vpsCache),
     progress: (filename, progress) => {
       notice = {
@@ -2006,6 +2014,16 @@ export function createCatalog(ctx: CatalogContext) {
         run: () => {
           l.directDownload = !direct || undefined;
           save();
+          openAccounts(ctx.cursor());
+        },
+      },
+      {
+        ...adBlockLabel(adBlocker.state()),
+        run: () => {
+          l.adsShown = !l.adsShown || undefined;
+          save();
+          // Remis en marche : les listes manquantes ou trop vieilles sont demandées aussitôt.
+          if (!l.adsShown) adBlocker.refresh();
           openAccounts(ctx.cursor());
         },
       },

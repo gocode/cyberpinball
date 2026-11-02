@@ -3,6 +3,11 @@
 // lequel un processus est lancé (CreateProcessW, STARTUPINFO.lpDesktop). L'utilisateur ne
 // le voit jamais : quoi que fassent ses fenêtres, rien n'apparaît sur ses écrans ni ne lui
 // prend le focus. Ses enfants y restent, et partagent sa console sans fenêtre.
+// Il est lié à son lanceur par un objet tâche de Windows (job) : quand le lanceur meurt, de
+// quelque façon que ce soit (fin normale, délai d'un test qui le tue), tout l'arbre lancé sur le
+// bureau caché meurt avec lui. Il n'hérite pas non plus de la console du lanceur : seul le
+// journal lui est confié. Sans cela, un essai tué au délai laissait son relais vivant, qui tenait
+// les tuyaux de sortie du test (spawnSync attendait leur fermeture : 41 min, 01/11/2026).
 // Même bureau que docs\hors-ecran.ps1 (Enter-BureauCache).
 
 import * as koffi from 'koffi';
@@ -24,6 +29,14 @@ const SW_HIDE = 0;
 /** Console sans fenêtre : une nouvelle console serait confiée au Terminal, sur le bureau de l'utilisateur. */
 const CREATE_NO_WINDOW = 0x08000000;
 const WAIT_OBJECT_0 = 0;
+/** Créé suspendu : rangé dans le job avant d'avoir pu lancer le moindre enfant. */
+const CREATE_SUSPENDED = 0x4;
+const JOB_OBJECT_EXTENDED_LIMIT_INFORMATION = 9;
+/** JOBOBJECT_EXTENDED_LIMIT_INFORMATION en 64 bits ; LimitFlags à l'octet 16. */
+const JOB_LIMIT_SIZE = 144;
+const JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE = 0x2000;
+const STD_HANDLES = [-10, -11, -12];
+const HANDLE_FLAG_INHERIT = 0x1;
 
 interface Api {
   GetCurrentThreadId: NativeFn;
@@ -36,6 +49,13 @@ interface Api {
   WaitForSingleObject: NativeFn;
   GetExitCodeProcess: NativeFn;
   CloseHandle: NativeFn;
+  CreateJobObjectW: NativeFn;
+  SetInformationJobObject: NativeFn;
+  AssignProcessToJobObject: NativeFn;
+  ResumeThread: NativeFn;
+  TerminateProcess: NativeFn;
+  GetStdHandle: NativeFn;
+  SetHandleInformation: NativeFn;
 }
 
 let api: Api | undefined;
@@ -79,6 +99,13 @@ function loadApi(): Api {
     WaitForSingleObject: kernel32.func('uint32_t __stdcall WaitForSingleObject(void *handle, uint32_t ms)'),
     GetExitCodeProcess: kernel32.func('bool __stdcall GetExitCodeProcess(void *process, _Out_ uint32_t *code)'),
     CloseHandle: kernel32.func('bool __stdcall CloseHandle(void *handle)'),
+    CreateJobObjectW: kernel32.func('void * __stdcall CreateJobObjectW(void *sa, void *name)'),
+    SetInformationJobObject: kernel32.func('bool __stdcall SetInformationJobObject(void *job, int infoClass, void *info, uint32_t length)'),
+    AssignProcessToJobObject: kernel32.func('bool __stdcall AssignProcessToJobObject(void *job, void *process)'),
+    ResumeThread: kernel32.func('uint32_t __stdcall ResumeThread(void *thread)'),
+    TerminateProcess: kernel32.func('bool __stdcall TerminateProcess(void *process, uint32_t code)'),
+    GetStdHandle: kernel32.func('void * __stdcall GetStdHandle(int which)'),
+    SetHandleInformation: kernel32.func('bool __stdcall SetHandleInformation(void *handle, uint32_t mask, uint32_t flags)'),
   };
   return api;
 }
@@ -135,15 +162,40 @@ export function startOnHiddenDesktop(commandLine: string, directory: string, log
     hStdOutput: file,
     hStdError: file,
   };
+  // Le job : poignée non héritable, gardée par le lanceur seul ; sa fermeture tue l'arbre.
+  const job = w.CreateJobObjectW(null, null);
+  const limits = Buffer.alloc(JOB_LIMIT_SIZE);
+  limits.writeUInt32LE(JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE, 16);
+  if (!job || !w.SetInformationJobObject(job, JOB_OBJECT_EXTENDED_LIMIT_INFORMATION, limits, JOB_LIMIT_SIZE)) {
+    if (job) w.CloseHandle(job);
+    w.CloseHandle(file);
+    w.CloseDesktop(desktop);
+    throw new Error('Bureau caché : objet tâche (job) impossible à préparer.');
+  }
+  // La console du lanceur (tuyaux d'un test, par exemple) ne passe pas à l'enfant : seul le journal.
+  for (const which of STD_HANDLES) {
+    const std = w.GetStdHandle(which);
+    if (std && koffi.address(std) !== BigInt('0xffffffffffffffff')) w.SetHandleInformation(std, HANDLE_FLAG_INHERIT, 0);
+  }
   const pi: Record<string, unknown> = {};
   // CreateProcessW peut écrire dans la ligne de commande : une copie modifiable.
   const command = Buffer.from(`${commandLine}\0`, 'utf16le');
-  const ok = w.CreateProcessW(null, command, null, null, true, CREATE_NO_WINDOW, null, directory, si, pi);
+  const ok = w.CreateProcessW(null, command, null, null, true, CREATE_NO_WINDOW | CREATE_SUSPENDED, null, directory, si, pi);
   w.CloseHandle(file);
   if (!ok) {
+    w.CloseHandle(job);
     w.CloseDesktop(desktop);
     throw new Error('Bureau caché : CreateProcessW a échoué.');
   }
+  if (!w.AssignProcessToJobObject(job, pi.hProcess)) {
+    w.TerminateProcess(pi.hProcess, 1);
+    w.CloseHandle(pi.hThread);
+    w.CloseHandle(pi.hProcess);
+    w.CloseHandle(job);
+    w.CloseDesktop(desktop);
+    throw new Error('Bureau caché : le processus n’a pas pu être rangé dans son objet tâche (job).');
+  }
+  w.ResumeThread(pi.hThread);
   w.CloseHandle(pi.hThread);
   return {
     pid: pi.dwProcessId as number,
@@ -152,6 +204,8 @@ export function startOnHiddenDesktop(commandLine: string, directory: string, log
       const code = [0];
       w.GetExitCodeProcess(pi.hProcess, code);
       w.CloseHandle(pi.hProcess);
+      // Le relais est fini : ce qu'il aurait laissé derrière lui sur le bureau caché aussi.
+      w.CloseHandle(job);
       w.CloseDesktop(desktop);
       return code[0]!;
     },

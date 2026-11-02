@@ -76,6 +76,7 @@ import {
   type TransportResult,
 } from '@cyberpinball/core';
 import { setCursorPosition } from '@cyberpinball/win-displays';
+import type { AdBlocker } from './ad-blocker';
 import { coverDisplay, fillBelow } from './cover-display';
 import { onJoystickInput } from './joystick-input';
 import { createWindow, OFFSCREEN, primaryRect } from './offscreen';
@@ -188,6 +189,8 @@ export interface AcquireEvents {
    * Recherche libre : la vidéo ou le son d'une page vidéo qui ne lit pas de fichier ordinaire
    * (YouTube, Vimeo…), par yt-dlp (ytdlp-tool.ts) ; absent : pas proposé.
    */
+  /** Bloqueur de publicités de la session (ad-blocker.ts) ; absent : les pages restent telles quelles. */
+  adBlocker?: Pick<AdBlocker, 'attach' | 'refresh'>;
   grabVideo?: {
     installed(): boolean;
     grab(request: { url: string; want: GrabKind; out: string; signal: AbortSignal; progress(p: GrabProgress): void }): Promise<GrabResult>;
@@ -273,6 +276,8 @@ export function createAcquirer(events: AcquireEvents) {
     const s = session.fromPartition(ACQUIRE_PARTITION);
     // Un navigateur ordinaire : sans les mentions de l'application et d'Electron, que des sites refusent.
     s.setUserAgent(s.getUserAgent().replace(/\s(cyberpinball|Electron)\/\S+/gi, ''));
+    // Publicités bloquées (ad-blocker.ts), sauf sur les sites sources ou si l'utilisateur les veut.
+    events.adBlocker?.attach(s);
     s.on('will-download', (_event, item, contents) => {
       // Reprise d'un téléchargement recréé depuis son état (redémarrage) : son chemin est déjà posé.
       const resumed = resumeWaiters.get(item.getSavePath().toLowerCase());
@@ -825,6 +830,8 @@ export function createAcquirer(events: AcquireEvents) {
   function show(request: AcquireRequest): void {
     registerIpc();
     const s = acquireSession();
+    // Listes du bloqueur de publicités datées de plus d'un jour : reçues de nouveau, en arrière-plan.
+    events.adBlocker?.refresh();
     if (open && !open.win.isDestroyed()) {
       const contents = open.view.webContents;
       const resume = open.request.url === request.url && Boolean(contents.getURL()) && contents.getURL() !== 'about:blank';

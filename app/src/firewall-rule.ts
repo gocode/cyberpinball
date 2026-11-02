@@ -17,7 +17,7 @@
 // (le dossier réel de la version et la jonction current) ; une règle posée pour une autre version
 // se lit « other-version ». `checkVpx`, relu avant chaque partie entre amis, reste sur netsh (rapide).
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -49,7 +49,7 @@ const CANCELLED = 1223;
 export type FirewallAllow = { ok: true } | { cancelled: true } | { error: string };
 
 export type RunResult = { status: number | null; stdout: string; stderr: string };
-export type Run = (file: string, args: string[]) => Promise<RunResult>;
+export type Run = (file: string, args: string[], ms?: number) => Promise<RunResult>;
 
 export interface FirewallRule {
   simulated: boolean;
@@ -69,15 +69,50 @@ export interface FirewallRule {
   repair(): Promise<boolean>;
 }
 
-function spawnRun(file: string, args: string[]): Promise<RunResult> {
+/** Délai d'une commande du pare-feu ; l'autorisation de Windows (UAC) attend une réponse : plus long. */
+export const FIREWALL_COMMAND_MS = 30_000;
+export const FIREWALL_ELEVATION_MS = 5 * 60_000;
+
+/** Commandes du pare-feu en cours : arrêtées, arbre compris, à la fermeture de l'application. */
+const running = new Set<number>();
+const killTree = (pid: number) => {
+  spawnSync('taskkill.exe', ['/T', '/F', '/PID', String(pid)], { stdio: 'ignore', windowsHide: true });
+  running.delete(pid);
+};
+process.once('exit', () => running.forEach(killTree));
+
+/**
+ * Une commande du pare-feu (PowerShell, netsh, schtasks) : entrée fermée, rien d'hérité de la
+ * console de l'application, résultat rendu à la fin du processus (pas à la fermeture de ses
+ * tuyaux, qu'un petit-enfant pourrait tenir), et au délai, arbre compris tué : jamais elle ne
+ * retient l'application ni la sortie de qui l'a lancée.
+ */
+export function spawnRun(file: string, args: string[], ms = FIREWALL_COMMAND_MS): Promise<RunResult> {
   return new Promise((resolve) => {
-    const child = spawn(file, args, { windowsHide: true });
+    const child = spawn(file, args, { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
     let stdout = '';
     let stderr = '';
+    let done = false;
+    const end = (result: RunResult) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (child.pid) running.delete(child.pid);
+      child.stdout.destroy();
+      child.stderr.destroy();
+      resolve(result);
+    };
+    if (child.pid) running.add(child.pid);
+    const timer = setTimeout(() => {
+      if (child.pid) killTree(child.pid);
+      end({ status: null, stdout, stderr: `${stderr}\n${path.basename(file)} : sans réponse après ${Math.round(ms / 1000)} s, arrêté.`.trim() }); // i18n-ignore : journal
+    }, ms);
+    timer.unref();
     child.stdout.on('data', (d) => (stdout += d));
     child.stderr.on('data', (d) => (stderr += d));
-    child.on('error', (error) => resolve({ status: null, stdout, stderr: error.message }));
-    child.on('close', (status) => resolve({ status, stdout, stderr }));
+    child.on('error', (error) => end({ status: null, stdout, stderr: error.message }));
+    // « exit » plutôt que « close » : la sortie déjà lue suffit, un tuyau tenu ailleurs n'attend pas.
+    child.on('exit', (status) => setImmediate(() => end({ status, stdout, stderr })));
   });
 }
 
@@ -176,7 +211,7 @@ export function createFirewallRule(opts: { exe: string; simulated: boolean; vpx?
       const elevate = `try { $p = Start-Process -FilePath ${psQuote(POWERSHELL)} -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ${psQuote(`"${script}"`)}); exit $p.ExitCode } catch { [Console]::Error.WriteLine($_.Exception.Message); if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { exit 1 } }`;
       opts.log?.(`Pare-feu : règles et réparation automatique demandées à Windows (UAC) pour ${opts.exe}${vpx?.length ? ` et pour VPX (${vpxDir})` : ''}.`); // i18n-ignore : journal
       try {
-        const r = await run(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', elevate]);
+        const r = await run(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', elevate], FIREWALL_ELEVATION_MS);
         await this.check();
         if (good()) return { ok: true };
         if (r.status === CANCELLED) return { cancelled: true };

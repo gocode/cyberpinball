@@ -10,7 +10,7 @@
 //   déclaré ne l'est pas ; ce qu'un clip-path laisse voir ne sort pas de la fenêtre.
 
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { runElectron } from './electron-run';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
@@ -209,7 +209,7 @@ test('garde-fou : un texte réduit par un transform ou une pulsation est signal�
     fs.writeFileSync(path.join(dir, 'cas.json'), JSON.stringify(CASES));
     const env: NodeJS.ProcessEnv = { ...process.env, CP_LAYOUT_CHECK: path.join(APP, 'dist', 'layout-check.js'), CP_CASES: path.join(dir, 'cas.json'), CP_OUT: path.join(dir, 'out.json') };
     delete env.ELECTRON_RUN_AS_NODE;
-    const run = spawnSync(electron!, [script, `--user-data-dir=${path.join(dir, 'chromium')}`], { env, encoding: 'utf8', timeout: 170_000, windowsHide: true });
+    const run = runElectron(electron!, [script, `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 170_000 });
     assert.equal(run.status, 0, `${run.stdout}\n${run.stderr}`);
     const found = JSON.parse(fs.readFileSync(path.join(dir, 'out.json'), 'utf8')) as Record<string, string[]>;
     assert.deepEqual(found.window, [1920, 1080]);
