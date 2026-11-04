@@ -14,7 +14,7 @@ import type { MenuMediaSettings } from './mediaview';
 import type { MenuMoment } from './menumoments';
 import { playVolume } from './menumoments';
 
-export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil', 'invite', 'news'] as const;
+export const UI_SOUND_IDS = ['solenoid', 'coin', 'knocker', 'coil', 'invite', 'news', 'friend'] as const;
 export type UiSoundId = (typeof UI_SOUND_IDS)[number];
 
 export interface UiSoundSpec {
@@ -36,6 +36,12 @@ export interface UiSoundSpec {
    * partie, une fois, pour que le joueur choisisse de quitter la sienne ou de l'ignorer.
    */
   readonly call?: boolean;
+  /**
+   * Son d'une notification qui se montre aussi pendant la partie (notices.ts, NoticeRule.sound) :
+   * il sonne avec elle, une fois, sauf réglage « Masquer les notifications pendant les parties »
+   * (essai réel du 04/11/2026).
+   */
+  readonly notice?: boolean;
 }
 
 const SYNTH_SOURCE = 'synthèse WebAudio, app/renderer/ui-sounds.js'; // i18n-ignore : provenance, citée telle quelle
@@ -99,10 +105,22 @@ export const UI_SOUNDS: Readonly<Record<UiSoundId, UiSoundSpec>> = {
       return t('Tintement de la partie entre amis');
     },
     get when() {
-      return t('Une nouvelle de la partie entre amis au menu : un invité accepte ou décline, la partie est finie');
+      return t('Une nouvelle de la partie entre amis, au menu comme pendant une partie : un invité accepte ou décline, la partie est finie');
     },
     source: SYNTH_SOURCE,
     license: OWN_LICENSE,
+    notice: true,
+  },
+  friend: {
+    get label() {
+      return t('Signal d’un ami');
+    },
+    get when() {
+      return t('Un ami vient de se connecter, au menu comme pendant une partie ; une fois par ami en un quart d’heure');
+    },
+    source: SYNTH_SOURCE,
+    license: OWN_LICENSE,
+    notice: true,
   },
 };
 
@@ -112,7 +130,7 @@ export interface UiSoundCue {
   volume: number;
   /** Son du passage de relais : la fenêtre le laisse partir et sonner au début de la partie. */
   handover?: true;
-  /** Son d'un appel : la fenêtre le laisse sonner pendant la partie. */
+  /** Son d'un appel, ou d'une notification qui se montre pendant la partie : la fenêtre le laisse y sonner. */
   call?: true;
 }
 
@@ -125,7 +143,8 @@ export interface UiSoundCue {
  */
 export function uiSoundCue(id: UiSoundId, settings: Pick<MenuMediaSettings, 'uiSounds' | 'uiSoundsVolume'>, moment: MenuMoment): UiSoundCue | undefined {
   const handover = UI_SOUNDS[id].handover === true;
-  const call = UI_SOUNDS[id].call === true;
+  // Un appel, ou le son d'une notification qui se montre aussi pendant la partie : la fenêtre les laisse sonner.
+  const call = UI_SOUNDS[id].call === true || UI_SOUNDS[id].notice === true;
   if (!settings.uiSounds || (moment === 'game' && !handover && !call) || moment === 'attract') return undefined;
   const volume = playVolume(settings.uiSoundsVolume);
   if (!(volume > 0)) return undefined;

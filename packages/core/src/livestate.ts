@@ -356,15 +356,28 @@ function scriptBlock(e: string, table: string, up: boolean, stateFile: string, g
     ...(up ? ['  CyberPinball_OrigKeyUp keycode'] : []),
     'End Sub',
     '',
+    // Essai réel du 04/11/2026 (The Goonies, The Matrix) : le script ne pose joueur, nombre de joueurs
+    // et scores qu'au Start ; avant, ils sont vides, la ligne illisible, et « prêt » jamais lu.
+    "' Une valeur du jeu, ou 0 tant que le script ne l'a pas posée (avant la première partie).", // i18n-ignore : commentaire du script ajouté à la table
+    'Function CyberPinball_N(ByVal v)',
+    '  CyberPinball_N = 0',
+    '  If IsEmpty(v) Or IsNull(v) Then Exit Function',
+    '  If IsNumeric(v) Then CyberPinball_N = v',
+    'End Function',
+    '',
     `Sub ${e}_Timer()`,
     '  On Error Resume Next',
     '  CyberPinball_Ticks = CyberPinball_Ticks + 1',
     '  If bGameInPlay Then CyberPinball_Seen = True',
     ...start,
-    '  Dim s, g, v',
+    '  Dim s, g, v, p, b, sc',
     '  If bGameInPlay Then g = 1 Else g = 0',
     '  If CyberPinball_Seen Then v = 1 Else v = 0',
-    '  s = "jeu=" & g & ";vu=" & v & ";joueurs=" & PlayersPlayingGame & ";joueur=" & CurrentPlayer & ";bille=" & (BallsPerGame - BallsRemaining(CurrentPlayer) + 1) & ";billes=" & BallsPerGame & ";score=" & Score(CurrentPlayer)', // i18n-ignore : clés du relevé, lues par parseLiveState
+    // Chaque valeur à part : une lecture en erreur (indice hors du tableau) garde la sienne, pas toute la ligne.
+    '  p = CyberPinball_N(CurrentPlayer)',
+    '  b = 1 : b = BallsPerGame - CyberPinball_N(BallsRemaining(p)) + 1',
+    '  sc = 0 : sc = CyberPinball_N(Score(p))',
+    '  s = "jeu=" & g & ";vu=" & v & ";joueurs=" & CyberPinball_N(PlayersPlayingGame) & ";joueur=" & p & ";bille=" & b & ";billes=" & CyberPinball_N(BallsPerGame) & ";score=" & sc', // i18n-ignore : clés du relevé, lues par parseLiveState
     ...(goFile ? ['  If CyberPinball_Ticks >= 12 Or CyberPinball_Seen Then s = s & ";pret=1" Else s = s & ";pret=0"'] : []), // i18n-ignore : clé du relevé, lue par parseLiveState
     ...writeState(stateFile),
     'End Sub',
@@ -574,7 +587,13 @@ export function parseLiveState(text: string): LiveGameState | undefined {
     const v = fields.get(k);
     return v !== undefined && /^-?\d+(\.\d+)?(E\+?\d+)?$/i.test(v.trim()) ? Math.round(Number(v)) : undefined;
   };
-  const inGame = int('jeu'), started = int('vu'), players = int('joueurs'), player = int('joueur'), ball = int('bille'), balls = int('billes'), score = int('score');
+  const inGame = int('jeu'), started = int('vu');
+  // Avant la première partie, une table du socle commun n'a pas encore posé joueur, nombre de joueurs
+  // ni scores (The Goonies, The Matrix : au Start seulement) : vides, ils valent zéro, et « pret » se
+  // lit quand même (essai réel du 04/11/2026 : sans lui, l'attente du départ commun ne finissait pas).
+  const before = inGame === 0 && started === 0;
+  const orZero = (k: string) => int(k) ?? (before && fields.has(k) && !fields.get(k)!.trim() ? 0 : undefined);
+  const players = orZero('joueurs'), player = orZero('joueur'), ball = orZero('bille'), balls = orZero('billes'), score = orZero('score');
   if ([inGame, started, players, player, ball, balls, score].some((v) => v === undefined)) return undefined;
   if (score! < 0 || !Number.isSafeInteger(score!)) return undefined;
   // « pret » : seulement avec le départ commun (livestart.ts).

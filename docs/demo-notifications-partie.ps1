@@ -1,7 +1,8 @@
 ﻿# Banc hors écran des notifications de la partie entre amis (essai réel du 31/10/2026), sur un
 # bureau Windows caché. docs\demo-notifications-partie.cjs tire les nouvelles du vrai relevé et de
 # la vraie file (un invité accepte, deux ensemble, un refus avec sa raison, pas de réponse, des noms
-# trop longs, un joueur qui quitte, la partie finie gagnée ou perdue), puis les dessine dans les
+# trop longs, un joueur qui quitte, la partie finie gagnée ou perdue, une invitation, un ou deux amis qui
+# se connectent), puis les dessine dans les
 # vraies pages : au menu des tables et dans le menu système (frontend.html : borne, borne pivotée,
 # bureau, bureau 4:3), et pendant la partie d'une autre table (game-notice.html : chaque jeu
 # d'écrans simulés, les quatre sens du plateau, seule ou sous la carte d'une invitation). Le garde-fou

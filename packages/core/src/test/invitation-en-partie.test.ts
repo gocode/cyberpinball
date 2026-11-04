@@ -133,7 +133,9 @@ test('branchements : carillon à chaque invitation, carte pendant la partie, fer
   const main = read('app', 'src', 'frontend.ts');
   const live = main.slice(main.indexOf('const liveGames = createLiveGames({'), main.indexOf('const friendsMenu = createFriendsMenu({'));
   assert.doesNotMatch(live, /busy:/, 'plus de réponse « occupé » pendant la partie');
-  assert.match(live, /onInvite: \(invite\) => \{\s+playUiSound\('invite'\);\s+if \(playing\) gameNotices\.show\(invite\);\s+else if \(liveCanShow\(\)\) friendsMenu\.live\.openInvite/);
+  assert.match(live, /onInvite: \(invite\) => \{[\s\S]{0,400}?playUiSound\('invite'\);\s+if \(playing\) gameNotices\.show\(invite\);\s+else if \(liveCanShow\(\)\) friendsMenu\.live\.openInvite/);
+  // Notifications masquées pendant les parties : ni carillon ni carte, l'invitation attend au menu.
+  assert.match(live, /onInvite: \(invite\) => \{\s+\/\/[^\n]*\n\s+if \(playing && quietInGame\) return void/);
   const start = main.indexOf('async function play(');
   const play = main.slice(start, start + main.slice(start).search(/\r?\n\}\r?\n/));
   assert.match(play, /const result = await game\.done;\r?\n\s+if \(watchLive\) clearInterval\(watchLive\);\r?\n\s+gameNotices\.close\(\);/);

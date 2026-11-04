@@ -12,10 +12,16 @@
 //   invité, écran plein, constat bref déjà affiché) : l'évènement attend, puis expire (ttl) ou
 //   n'a plus lieu d'être (l'ami est reparti, la demande a reçu sa réponse : `still`).
 // - Le même évènement n'est pas redit avant un délai (connexions qui vont et viennent).
-// - La partie entre amis (livenotices.ts : un invité accepte ou décline, un joueur quitte, la
-//   partie est finie) est attendue par le joueur : ses notifications passent avant tout, jamais
-//   dans un résumé, et se montrent aussi hors du menu des tables (menu système, par-dessus VPX),
-//   sauf sur l'écran de la partie, qui le dit déjà (NoticeContext.liveOnly, NoticeRule.live).
+// - La partie entre amis (livenotices.ts : une invitation, un invité accepte ou décline, un
+//   joueur quitte, la partie est finie) est attendue par le joueur : ses notifications passent
+//   avant tout, jamais dans un résumé, même notifications coupées (NoticeRule.live).
+// - Certaines se montrent partout, pas seulement au menu des tables : dans le menu système et
+//   par-dessus VPX pendant une partie (NoticeRule.away : la partie entre amis, l'invitation, un
+//   ami qui se connecte ; essai réel du 04/11/2026). Ailleurs qu'au menu des tables, seules
+//   elles se montrent (NoticeContext.away), les autres attendent. Jamais sur l'écran de la partie,
+//   qui le dit déjà, sauf réglage « Masquer les notifications pendant les parties » (frontend.ts).
+// - Une notification peut avoir son son (NoticeRule.sound), joué à son entrée à l'écran : un
+//   seul pour un regroupement, jamais redit avant le délai de l'évènement.
 // Le processus principal (app/src/menu-notices.ts) fournit l'horloge et dessine `view`.
 
 import { t, tn, formatNumber } from './i18n';
@@ -23,8 +29,10 @@ import type { IconName } from './icons';
 import type { DownloadJob } from './downloadqueue';
 import type { SocialEvent, SocialState, Presence } from './social';
 import type { FriendsListSync } from './friendpresence';
+import type { UiSoundId } from './uisounds';
 
 export type NoticeKind =
+  | 'live-invite'
   | 'live-finished'
   | 'live-cancelled'
   | 'live-accepted'
@@ -79,21 +87,32 @@ export interface NoticeRule {
    * plus longtemps (NOTICE_LIVE_SHOW_MS).
    */
   live?: true;
+  /**
+   * Se montre partout, pas seulement au menu des tables : dans le menu système et par-dessus VPX
+   * pendant une partie (essai réel du 04/11/2026 : « tout le temps, y compris pendant les parties »).
+   */
+  away?: true;
+  /** Son joué à son entrée à l'écran (uisounds.ts). */
+  sound?: UiSoundId;
+  /** Attente avant de se montrer (NOTICE_GATHER_MS par défaut) : 0 pour ce qui doit paraître avec son son. */
+  gatherMs?: number;
 }
 
 const MIN = 60_000;
 
 export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
-  'live-finished': { priority: 0, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'star', tone: 'ok', act: { type: 'live-game' }, live: true },
-  'live-cancelled': { priority: 1, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'close', tone: 'warning', act: { type: 'live-game' }, live: true },
-  'live-accepted': { priority: 2, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'ok', act: { type: 'live-game' }, live: true },
-  'live-declined': { priority: 3, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'info', act: { type: 'live-game' }, live: true },
-  'live-left': { priority: 4, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'warning', act: { type: 'live-game' }, live: true },
+  // Une invitation : son carillon sonne à son arrivée (frontend.ts, onInvite), la notification paraît avec lui.
+  'live-invite': { priority: 0, ttlMs: 2 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, gatherMs: 0 },
+  'live-finished': { priority: 0, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'star', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
+  'live-cancelled': { priority: 1, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'close', tone: 'warning', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
+  'live-accepted': { priority: 2, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
+  'live-declined': { priority: 3, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'info', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
+  'live-left': { priority: 4, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'warning', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'friend-request': { priority: 10, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friend-request', tone: 'warning', act: { type: 'friend-requests' } },
   'friend-accepted': { priority: 11, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'friends', tone: 'ok', act: { type: 'friends' } },
   'download-failed': { priority: 12, ttlMs: 60 * MIN, quietMs: 60 * MIN, icon: 'alert', tone: 'error', act: { type: 'downloads' } },
   'download-done': { priority: 13, ttlMs: 30 * MIN, quietMs: 60 * MIN, icon: 'check', tone: 'ok', act: { type: 'downloads' } },
-  'friend-online': { priority: 14, ttlMs: 10 * MIN, quietMs: 15 * MIN, icon: 'friends', tone: 'info', act: { type: 'friends' } },
+  'friend-online': { priority: 14, ttlMs: 10 * MIN, quietMs: 15 * MIN, icon: 'friends', tone: 'info', act: { type: 'friends' }, away: true, sound: 'friend' },
   'friend-record': { priority: 15, ttlMs: 30 * MIN, quietMs: 24 * 60 * MIN, icon: 'star', tone: 'ok', act: { type: 'friends' } },
   'friend-badge': { priority: 16, ttlMs: 30 * MIN, quietMs: 24 * 60 * MIN, icon: 'medal', tone: 'ok', act: { type: 'friends' } },
   'friend-playing': { priority: 17, ttlMs: 5 * MIN, quietMs: 20 * MIN, icon: 'play', tone: 'info', act: { type: 'friends' } },
@@ -101,6 +120,8 @@ export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
 
 /** Notification de la partie entre amis (NoticeRule.live). */
 export const isLiveNotice = (kind: NoticeKind): boolean => NOTICE_RULES[kind].live === true;
+/** Notification qui se montre partout, menu système et partie compris (NoticeRule.away). */
+export const isAwayNotice = (kind: NoticeKind): boolean => NOTICE_RULES[kind].away === true;
 
 /** Durée à l'écran, départ (fondu de frontend.css, .notice-toast.leaving) et pause avant la suivante. */
 export const NOTICE_SHOW_MS = 6_000;
@@ -130,8 +151,12 @@ export interface NoticeView {
   title: string;
   detail?: string;
   act?: NoticeAct;
-  /** Partie entre amis : se dessine aussi dans le menu système et par-dessus VPX (NoticeRule.live). */
+  /** Partie entre amis (NoticeRule.live) : reste même notifications coupées. */
   live?: true;
+  /** Se dessine aussi dans le menu système et par-dessus VPX (NoticeRule.away). */
+  away?: true;
+  /** Son de son entrée (NoticeRule.sound). */
+  sound?: UiSoundId;
   /** En train de s'estomper. */
   leaving?: boolean;
 }
@@ -239,6 +264,8 @@ export function noticeText(kind: NoticeKind, events: readonly NoticeEvent[]): { 
   const names = () => nameList(events.map((e) => e.who ?? '?'));
   const fit = (r: { title: string; detail?: string }) => ({ title: shortened(r.title, NOTICE_TITLE_MAX), ...(r.detail ? { detail: shortened(r.detail, NOTICE_DETAIL_MAX) } : {}) });
   switch (kind) {
+    case 'live-invite':
+      return fit(one ? { title: t('{name} vous invite à rejoindre une partie', { name: who(one) }), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} invitation à une partie', '{n} invitations à une partie'), detail: names() });
     case 'live-accepted':
       return fit({ title: one ? t('{name} a accepté votre invitation', { name: who(one) }) : namesTitle((names) => t('{names} ont accepté', { names }), () => tn(n, '{n} invité a accepté', '{n} invités ont accepté'), events), detail: t('Pour lancer : {path}', { path: livePath() }) });
     case 'live-declined': {
@@ -284,6 +311,8 @@ export function noticeText(kind: NoticeKind, events: readonly NoticeEvent[]): { 
 function digestPart(kind: NoticeKind, n: number): string {
   switch (kind) {
     // La partie entre amis n'entre jamais dans un résumé (NoticeRule.live) : sa part, au cas où.
+    case 'live-invite':
+      return tn(n, '{n} invitation', '{n} invitations');
     case 'live-finished':
       return tn(n, '{n} partie entre amis finie', '{n} parties entre amis finies');
     case 'live-cancelled':
@@ -328,10 +357,10 @@ export interface NoticeContext {
   /** L'évènement a-t-il encore lieu d'être (l'ami encore en ligne, la demande encore là) ? */
   still?: (e: NoticeEvent) => boolean;
   /**
-   * Seulement la partie entre amis (NoticeRule.live) : hors du menu des tables (menu système,
-   * partie d'une autre table). Les autres attendent ; celle qui se montrait part tout de suite.
+   * Ailleurs qu'au menu des tables (menu système, par-dessus VPX) : seulement ce qui se montre
+   * partout (NoticeRule.away). Les autres attendent ; celle qui se montrait part tout de suite.
    */
-  liveOnly?: boolean;
+  away?: boolean;
 }
 
 export interface NoticeTick {
@@ -393,7 +422,7 @@ export function createNoticeCenter(): NoticeCenter {
       return { nextAt: nextExpiry() };
     }
     // Hors du menu des tables : celle qui se montrait et n'est pas de la partie entre amis est vue, elle part.
-    if (ctx.liveOnly && showing && !showing.view.live) {
+    if (ctx.away && showing && !showing.view.away) {
       freeAt = now;
       showing = undefined;
     }
@@ -405,10 +434,10 @@ export function createNoticeCenter(): NoticeCenter {
       showing = undefined;
       freeAt = goneAt;
     }
-    const ready = ctx.liveOnly ? pending.filter((e) => isLiveNotice(e.kind)) : pending;
-    if (!ready.length) return ctx.liveOnly ? { nextAt: nextExpiry() } : {};
-    // Le plus ancien attend d'avoir rassemblé ceux qui arrivent dans la foulée.
-    const readyAt = Math.max(freeAt + NOTICE_GAP_MS, Math.min(...ready.map((e) => e.at)) + NOTICE_GATHER_MS);
+    const ready = ctx.away ? pending.filter((e) => isAwayNotice(e.kind)) : pending;
+    if (!ready.length) return ctx.away ? { nextAt: nextExpiry() } : {};
+    // Le plus ancien attend d'avoir rassemblé ceux qui arrivent dans la foulée (une invitation, non : elle paraît avec son carillon).
+    const readyAt = Math.max(freeAt + NOTICE_GAP_MS, Math.min(...ready.map((e) => e.at + (NOTICE_RULES[e.kind].gatherMs ?? NOTICE_GATHER_MS))));
     if (now < readyAt) return { nextAt: readyAt };
     const groups = groupsOf(ready);
     let view: Omit<NoticeView, 'id'>;
@@ -422,7 +451,15 @@ export function createNoticeCenter(): NoticeCenter {
     } else {
       const group = groups[0]!;
       const rule = NOTICE_RULES[group.kind];
-      view = { icon: rule.icon, tone: rule.tone, ...noticeText(group.kind, group.events), act: rule.act, ...(rule.live ? { live: true as const } : {}) };
+      view = {
+        icon: rule.icon,
+        tone: rule.tone,
+        ...noticeText(group.kind, group.events),
+        act: rule.act,
+        ...(rule.live ? { live: true as const } : {}),
+        ...(rule.away ? { away: true as const } : {}),
+        ...(rule.sound ? { sound: rule.sound } : {}),
+      };
       pending = pending.filter((e) => e.kind !== group.kind);
     }
     serial++;

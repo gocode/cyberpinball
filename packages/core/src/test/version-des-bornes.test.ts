@@ -60,7 +60,8 @@ test('application : la version annoncée ; le salon, l’invitation et les résu
   const front = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(front, /appVersion: app\.getVersion\(\),/);
   const service = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'live-game.ts'), 'utf8');
-  assert.match(service, /\{ t: 'game-invite', game: \{ id: next\.id, table: next\.table, title: next\.title, players, \.\.\.version \} \}/);
+  // La version voyage avec l'invitation ; `round` : son numéro, gardé par ses renvois (parties-enchainees.test.ts).
+  assert.match(service, /\{ t: 'game-invite', game: \{ id: next\.id, table: next\.table, title: next\.title, players, \.\.\.version \}, round \}/);
   assert.match(service, /answer: 'accept', match: found\.match, \.\.\.\(found\.balls \? \{ balls: found\.balls \} : \{\}\), \.\.\.version \}/);
   const menu = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'live-game-menu.ts'), 'utf8');
   assert.match(menu, /liveBehind\(invite\.host\) \? \[\{ text: t\('Ancienne version chez \{name\}'/);

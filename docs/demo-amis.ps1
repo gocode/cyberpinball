@@ -27,15 +27,18 @@
 #   Parcours « partie-sans-releve » : la partie sur une table sans relevé de l'état de jeu (départ
 #   manuel, pas de score en direct) : marquée dans l'invitation, « Partez ! » qui part seul au bout
 #   de 4 s sans aucun événement de la partie, le score inconnu de la borne expliqué aux résultats.
+#   Parcours « parties-enchainees » : trois parties à la suite avec Bruno, la même table deux fois
+#   puis une autre (essai du 04/11/2026 : la deuxième ne finissait pas de charger). Chacune doit
+#   partir (« tous prêts »), montrer « Partez ! » 4 s, et finir à l'historique ; jamais le garde-fou.
 # Le garde-fou de mise en page (chevauchement, rognure, texte trop petit) et le guet hors écran
 # doivent rester muets.
-#   La bande de la partie entre amis, au parcours « partie » : sur la borne, les scores sur le DMD
-#   (bande-partie-entre-amis-dmd.png) et les cartes sur le topper, que la partie simulée laisse
-#   libre (bande-partie-entre-amis.png) ; au poste et sur le PinCab (-Ecrans pincab : fronton pris,
-#   FullDMD, sans topper), l'encart au bas du plateau et les scores sur le DMD ; sur un écran
-#   (-Ecrans un-ecran), l'encart. Jamais en haut du plateau, jamais rien de visible. Puis le réglage
+#   La bande de la partie entre amis, au parcours « partie » : les scores sur le DMD
+#   (bande-partie-entre-amis-dmd.png) ; sur la borne, au poste et sur le PinCab (-Ecrans pincab : fronton pris par le B2S, FullDMD,
+#   sans topper), les cartes sur le fronton, devant la table (bande-partie-entre-amis.png), et les
+#   scores sur le DMD ; sur un écran (-Ecrans un-ecran), l'encart au bas du plateau. Jamais en haut du
+#   plateau, jamais rien d'invisible. Puis le réglage
 #   « Scores des amis pendant la partie ».
-#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu, partie-coupure, partie-sans-releve] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans, pincab, un-ecran]
+#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu, partie-coupure, partie-sans-releve, parties-enchainees] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans, pincab, un-ecran]
 # Captures dans tmp\demo-amis\<parcours>\<écrans>\<langue>\captures.
 #   .\docs\demo-amis.ps1 -Accueil [-Langues en, fr]
 # Images de la rubrique Amis de la page d'accueil (README) : les deux parcours, sur l'écran
@@ -107,6 +110,17 @@ function Get-Etapes([string]$Nom, $l) {
       "action:$($l.Plus)", 'wait:800'
     )
   }
+  if ($Nom -eq 'parties-enchainees') {
+    # Trois fois : l'invitation de Bruno (attendue, il réinvite neuf secondes après chaque partie),
+    # accepter, la partie simulée, ses résultats fermés.
+    $une = @(
+      "until-action:$($l.Accepter)", 'wait:1000',
+      "action:$($l.Accepter)", 'wait:1000',
+      'until:playing', 'until:library', 'wait:2500',
+      "action:$($l.Fermer)", 'wait:800'
+    )
+    return @('wait:1500') + $une + $une + $une
+  }
   if ($Nom -in 'partie-coupure', 'partie-sans-releve') {
     # La partie de « partie », jusqu'aux résultats : accepter l'invitation, le départ commun (sa
     # coupure, ou sa table sans relevé), la partie simulée, puis les résultats fermés.
@@ -173,7 +187,7 @@ function Get-Etapes([string]$Nom, $l) {
 
 try {
   foreach ($nom in $parcoursJoues) {
-    $partie = $nom -in 'partie', 'en-jeu', 'partie-coupure', 'partie-sans-releve'
+    $partie = $nom -in 'partie', 'en-jeu', 'partie-coupure', 'partie-sans-releve', 'parties-enchainees'
     $root = New-Racine $nom -Vpx:$partie -Neuve:$Accueil
     foreach ($jeu in $ecransJoues) {
       Use-HorsEcran $jeu
@@ -200,7 +214,11 @@ try {
         $env:CYBERPINBALL_CAPTURE = "$dossier\captures"
         if (Test-Path $env:CYBERPINBALL_CAPTURE) { Remove-Item -Recurse -Force $env:CYBERPINBALL_CAPTURE }
         Push-Location $wt
-        try { $log = & $electron app 2>&1 | ForEach-Object { "$_" } } finally { Pop-Location }
+        # Son propre dossier Chromium, comme les autres démonstrations : une autre session qui fait tourner
+        # Cyber Pinball en même temps ne lui prend pas son cache ; et une ligne de Chromium sur sa sortie
+        # d'erreur reste une ligne du journal, pas une erreur du script.
+        $ErrorActionPreference = 'Continue'
+        try { $log = & $electron app "--user-data-dir=$dossier\chromium" 2>&1 | ForEach-Object { "$_" } } finally { $ErrorActionPreference = 'Stop'; Pop-Location }
         $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran|Réseau|Partie en direct|Invitation pendant la partie|Bande de la partie|Départ commun|Bibliothèque partagée|Téléchargements)' } | ForEach-Object { Write-Host "   $_" }
         $id = "$nom/$jeu/$langue"
         if ($log -match 'Autopilote : (aucun|phase|action)') { $failures += "$id : une étape rejouée n'a pas trouvé son écran ou sa phase" }
@@ -216,6 +234,20 @@ try {
           $parties = "$home_\amis\parties.json"
           if (-not (Test-Path $parties) -or @((Get-Content $parties -Raw -Encoding UTF8 | ConvertFrom-Json).games).Count -ne 3) { $failures += "$id : parties.json ne garde pas les trois parties" }
         }
+        if ($nom -eq 'parties-enchainees') {
+          # Trois parties, chacune partie « tous prêts », « Partez ! » lisible et parti, à l'historique ;
+          # aucune n'a eu besoin du garde-fou (le relevé simulé écrit la ligne vide d'avant la partie).
+          $vus = @($log | Where-Object { $_ -match "^Départ commun : carte montrée [\d.]+ s en attente, « Partez ! » ([\d.]+) s ; partie : " })
+          if ($vus.Count -ne 3) { $failures += "$id : $($vus.Count) départs montrés sur 3 parties" }
+          foreach ($v in $vus) {
+            if ($v -match '« Partez ! » ([\d.]+) s' -and ([double]$Matches[1] -lt 3.9 -or [double]$Matches[1] -gt 6)) { $failures += "$id : « Partez ! » montré $($Matches[1]) s (4 s attendues)" }
+          }
+          $tous = @($log | Where-Object { $_ -match "^Départ commun : « partez » reçu de l'hôte \(tous prêts\)" }).Count
+          if ($tous -ne 3) { $failures += "$id : « partez » « tous prêts » reçu $tous fois sur 3" }
+          if ($log -match 'prête quand même') { $failures += "$id : le garde-fou a dû dire une table prête (le relevé ne l'a pas dit)" }
+          $parties = "$home_\amis\parties.json"
+          if (-not (Test-Path $parties) -or @((Get-Content $parties -Raw -Encoding UTF8 | ConvertFrom-Json).games).Count -ne 5) { $failures += "$id : parties.json ne garde pas les cinq parties (deux d'avant, trois jouées)" }
+        }
         # La ROM attestée est arrivée avec la table ; le PuP-Pack, laissé sans attestation, jamais.
         if ($nom -eq 'amis') {
           $recus = @(Get-ChildItem -Recurse -File "$home_" -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\amis\\tables\\' })
@@ -225,10 +257,11 @@ try {
         if ($nom -eq 'partie') {
           # Où va la bande, selon les écrans : jamais sur le plateau quand le DMD ou un écran libre la porte.
           $bande = @{
-            'borne' = @{ Place = 'topper \(cards'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
-            'poste-deux-ecrans' = @{ Place = 'playfield \(insert.*scores sur le DMD'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
-            # Le PinCab de l'essai du 02/11/2026 : fronton pris (B2S), FullDMD lu ; rien ne s'affichait.
-            'pincab' = @{ Place = 'playfield \(insert.*scores sur le DMD.*pourquoi : automatique : fronton pris par la table, bas du plateau'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
+            # Le fronton, même pris par la table (B2S simulé) : la bande y passe devant (essai du 04/11/2026).
+            'borne' = @{ Place = 'backglass \(cards.*pourquoi : automatique : fronton \(pris par la table'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
+            'poste-deux-ecrans' = @{ Place = 'backglass \(cards.*scores sur le DMD'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
+            # Le PinCab : fronton pris par le B2S, FullDMD lu, pas de topper (essais des 02 et 04/11/2026).
+            'pincab' = @{ Place = 'backglass \(cards.*scores sur le DMD.*pourquoi : automatique : fronton \(pris par la table, la bande passe devant\)'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
             'un-ecran' = @{ Place = 'playfield \(insert'; Captures = @('bande-partie-entre-amis') }
           }[$jeu]
           if ($bande) {

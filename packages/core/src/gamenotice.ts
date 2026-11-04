@@ -101,21 +101,22 @@ export const GAME_NOTICE_LINE = { width: 720, height: 76, gap: 14 } as const;
 // amis (la borne répond « occupé »).
 //
 // Où (second essai du même jour : la bande en haut du plateau « cache très souvent des endroits où
-// on est censé voir la bille ») : jamais en haut du plateau.
-//   1. Toujours une bande permanente (essai du 02/11/2026 sur le PinCab : rien ne s'affichait quand
-//      le DMD était la seule place), à la première place libre : un écran que VPX laisse libre
-//      (fronton sans .directb2s, topper) porte des cartes, une par joueur, en bas du fronton comme
-//      les compteurs d'un électromécanique ; sinon un encart au bas du plateau, coin gauche pour le
-//      joueur, sur le tablier, sous la sortie des couloirs extérieurs (le couloir de lancement est à
-//      droite).
-//   2. En plus, sur le DMD, quand il montre l'écran de score de la table (dmdscore.ts, lu par
-//      l'inspector de VPX), jamais pendant une animation ni la saisie des initiales (essai du
-//      31/10/2026 : « par moment c'est gênant pendant le jeu ») : le DMD que VPX ou PinMAME dessine
-//      ne s'écrit pas de l'extérieur, alors Cyber Pinball pose ses propres points par-dessus, à sa
-//      place, quelques secondes (liveBoardDots), comme un vrai flipper montre les scores des autres.
-// Le joueur peut aussi choisir sa place (Menu système > Amis > « Scores des amis pendant la
-// partie », LiveScoresPlace) : un choix que la borne ou la table ne permet pas revient à
-// l'automatique, et le journal le dit.
+// on est censé voir la bille ») : jamais en haut du plateau, et toujours quelque part de visible.
+//   1. La bande permanente, une carte par joueur : sur le fronton, même quand la table s'en sert
+//      (B2S, PuP-Pack) — c'est le cas courant, et la bande passe devant, discrètement, en bas, comme
+//      les compteurs d'un électromécanique (essai du 04/11/2026 : en bas du plateau alors que le
+//      PinCab a un fronton, « pas ce qui avait été dit ») ; sans fronton, au centre du topper ; sans
+//      l'un ni l'autre, en dernier recours, un encart au bas du plateau, coin gauche pour le joueur,
+//      sur le tablier, sous la sortie des couloirs extérieurs.
+//   2. En plus, et réglé à part (« Scores sur le DMD », activé par défaut) : sur le DMD, quand il
+//      montre l'écran de score de la table (dmdscore.ts, lu par l'inspector de VPX), jamais pendant
+//      une animation ni la saisie des initiales (essai du 31/10/2026 : « par moment c'est gênant
+//      pendant le jeu ») : le DMD que VPX ou PinMAME dessine ne s'écrit pas de l'extérieur, alors
+//      Cyber Pinball pose ses propres points par-dessus, à sa place, quelques secondes
+//      (liveBoardDots), comme un vrai flipper montre les scores des autres.
+// Le joueur peut aussi choisir la place de la bande (Menu système > Amis > « Scores des amis pendant
+// la partie », LiveScoresSettings) : un choix que la borne ne permet pas revient à l'automatique, et
+// le journal le dit.
 
 export interface LiveBoardRow {
   name: string;
@@ -200,16 +201,24 @@ export interface LiveBoardScreens {
   dmd?: Rect;
   /** Le DMD de la table se lit (inspector de VPX) : les scores s'y posent quand il montre l'écran de score. */
   dmdReadable?: boolean;
-  /** Écrans que VPX laisse libres pendant la partie (rien d'autre que le fond de partie de Cyber Pinball), par ordre de préférence. */
+  /** Écrans que VPX laisse libres pendant la partie (rien d'autre que le fond de partie de Cyber Pinball) : pour le journal. */
   free: { role: 'backglass' | 'topper'; zone: Rect }[];
-  /** Zones du fronton et du topper de la borne, libres ou non : pour un choix du joueur. */
+  /** Zones du fronton et du topper de la borne, libres ou pris par la table : la bande y passe devant. */
   zones?: { backglass?: Rect; topper?: Rect };
 }
 
-/** Où le joueur veut voir les scores des amis (Menu système > Amis > « Scores des amis pendant la partie »). */
-export type LiveScoresPlace = 'auto' | 'dmd' | 'backglass' | 'topper' | 'playfield-bottom' | 'playfield-side';
+/** Où le joueur veut la bande des scores des amis (Menu système > Amis > « Scores des amis pendant la partie »). */
+export type LiveScoresPlace = 'auto' | 'backglass' | 'topper' | 'playfield-bottom' | 'playfield-side';
 
-export const LIVE_SCORES_PLACES: readonly LiveScoresPlace[] = ['auto', 'dmd', 'backglass', 'topper', 'playfield-bottom', 'playfield-side'];
+export const LIVE_SCORES_PLACES: readonly LiveScoresPlace[] = ['auto', 'backglass', 'topper', 'playfield-bottom', 'playfield-side'];
+
+/** Les deux réglages : la place de la bande, et les scores sur le DMD (à part, activés par défaut). */
+export interface LiveScoresSettings {
+  place: LiveScoresPlace;
+  dmd: boolean;
+}
+
+export const LIVE_SCORES_DEFAULT: LiveScoresSettings = { place: 'auto', dmd: true };
 
 export interface LiveBoardBand {
   /** Écran qui porte la bande. */
@@ -254,13 +263,20 @@ export function liveInsertSize(rows: number): { width: number; height: number } 
   return { width: LIVE_INSERT_SIZE.width, height: Math.max(1, rows) * LIVE_INSERT_SIZE.row + 2 * LIVE_INSERT_SIZE.padding };
 }
 
+/** Sur le fronton, la bande est discrète : au plus un cinquième de sa hauteur (son image, B2S ou PuP, reste à voir), sauf si elle deviendrait illisible. */
+export const LIVE_CARDS_BACKGLASS_SHARE = 0.2;
+
 /** Les cartes sur un écran : la plus grande échelle qui tient (au plus celle de sa largeur), en bas du fronton, au centre du topper. */
 function cardsOn(screen: LiveBoardScreens['free'][number], rows: number): LiveBoardBand | undefined {
   const { zone } = screen;
   const base = liveCardsSize(rows);
   const margin = Math.round(Math.min(zone.width, zone.height) * 0.04);
-  const scale = Math.min((zone.width - 2 * margin) / base.width, (zone.height - 2 * margin) / base.height, zone.width / 1920);
-  if (!(scale >= LIVE_CARDS_SIZE.min)) return undefined;
+  const fit = Math.min((zone.width - 2 * margin) / base.width, (zone.height - 2 * margin) / base.height, zone.width / 1920);
+  if (!(fit >= LIVE_CARDS_SIZE.min)) return undefined;
+  // Discrète sur le fronton, sans jamais descendre sous la taille lisible : un fronton peu haut la
+  // rejetait sinon vers le plateau (banc du 04/11/2026, fronton de 516 px).
+  const discreet = screen.role === 'backglass' ? Math.max(LIVE_CARDS_SIZE.min, (zone.height * LIVE_CARDS_BACKGLASS_SHARE) / base.height) : Infinity;
+  const scale = Math.min(fit, discreet);
   const width = Math.round(base.width * scale);
   const height = Math.round(base.height * scale);
   const x = zone.x + Math.round((zone.width - width) / 2);
@@ -278,41 +294,42 @@ function insertOn(playfield: NonNullable<LiveBoardScreens['playfield']>, rows: n
 }
 
 /**
- * Où va la bande de `rows` joueurs. Automatique : toujours une bande permanente, à la première place
- * libre dans cet ordre : le fronton que VPX laisse libre, le topper libre, sinon le bas du plateau ;
- * et en plus, quand le DMD se lit, les scores sur son écran de score. Le DMD n'est jamais la seule
- * place : ses moments d'écran de score peuvent ne jamais venir (essai du 02/11/2026 sur le PinCab,
- * fronton pris par le B2S, FullDMD lu : rien ne s'affichait). Le choix du joueur (`place`) prime
- * quand la borne et la table le permettent ; le fronton et le topper choisis portent la bande même
- * quand la table s'en sert (B2S, PuP) ; un choix impossible revient à l'automatique.
+ * Où va la bande de `rows` joueurs. Automatique : le fronton, qu'il soit libre ou pris par la table
+ * (B2S, PuP-Pack : la bande passe devant) ; sinon le topper, de même ; sinon, en dernier recours, le
+ * bas du plateau (essai du 04/11/2026). Toujours une bande visible : le DMD n'est jamais la seule
+ * place (essai du 02/11/2026 : rien ne s'affichait). Les scores sur le DMD viennent en plus, selon
+ * leur propre réglage (`dmdOn`), quand il se lit. Le choix du joueur (`place`) prime quand la borne
+ * le permet ; un choix impossible revient à l'automatique.
  */
-export function liveBoardPlacement(screens: LiveBoardScreens, rows: number, place: LiveScoresPlace = 'auto'): LiveBoardPlacement {
-  const dmd = screens.dmd && screens.dmd.width > 0 && screens.dmd.height > 0 && screens.dmdReadable ? screens.dmd : undefined;
-  const dmdWhy = dmd ? ', et sur le DMD quand il montre l’écran de score' : screens.dmd ? ', pas sur le DMD (illisible : inspector de VPX)' : ''; // i18n-ignore : journal
+export function liveBoardPlacement(screens: LiveBoardScreens, rows: number, place: LiveScoresPlace = 'auto', dmdOn = true): LiveBoardPlacement {
+  const dmd = dmdOn && screens.dmd && screens.dmd.width > 0 && screens.dmd.height > 0 && screens.dmdReadable ? screens.dmd : undefined;
+  const dmdWhy = dmd ? ', et sur le DMD quand il montre l’écran de score' : !screens.dmd ? '' : !dmdOn ? ', pas sur le DMD (désactivé)' : ', pas sur le DMD (illisible : inspector de VPX)'; // i18n-ignore : journal
+  const tail = dmd ? { dmd } : {};
+  const label = { backglass: 'fronton', topper: 'topper' } as const;
+  const state = (role: 'backglass' | 'topper') => (screens.free.some((f) => f.role === role) ? 'libre' : 'pris par la table, la bande passe devant'); // i18n-ignore : journal
+  const on = (role: 'backglass' | 'topper') => {
+    const zone = screens.zones?.[role] ?? screens.free.find((f) => f.role === role)?.zone;
+    return zone ? cardsOn({ role, zone }, rows) : undefined;
+  };
   const auto = (fallback?: string): LiveBoardPlacement => {
-    const tail = { ...(fallback ? { fallback } : {}), ...(dmd ? { dmd } : {}) };
-    const label = { backglass: 'fronton', topper: 'topper' } as const;
-    const taken = (['backglass', 'topper'] as const).filter((role) => screens.zones?.[role] && !screens.free.some((f) => f.role === role)).map((role) => `${label[role]} pris par la table`); // i18n-ignore : journal
-    for (const screen of screens.free) {
-      const band = cardsOn(screen, rows);
-      if (band) return { band, ...tail, why: `automatique : ${label[screen.role]} libre${dmdWhy}` }; // i18n-ignore : journal
+    const why = (text: string) => ({ ...tail, ...(fallback ? { fallback } : {}), why: `automatique : ${text}${dmdWhy}` }); // i18n-ignore : journal
+    for (const role of ['backglass', 'topper'] as const) {
+      const band = on(role);
+      if (band) return { band, ...why(`${label[role]} (${state(role)})`) };
     }
-    if (screens.playfield) return { band: insertOn(screens.playfield, rows, 'bottom-left'), ...tail, why: `automatique : ${taken.length ? taken.join(', ') : 'ni fronton ni topper'}, bas du plateau${dmdWhy}` }; // i18n-ignore : journal
-    return { ...tail, why: `automatique : pas d’écran du plateau${dmdWhy}` }; // i18n-ignore : journal
+    if (screens.playfield) return { band: insertOn(screens.playfield, rows, 'bottom-left'), ...why('ni fronton ni topper, bas du plateau') }; // i18n-ignore : journal
+    return why('pas d’écran du plateau'); // i18n-ignore : journal
   };
   switch (place) {
-    case 'dmd':
-      if (dmd) return { dmd, why: 'choix du joueur : DMD, sur son écran de score' }; // i18n-ignore : journal
-      return auto(!screens.dmd ? 'pas d’écran du DMD' : 'DMD de la table illisible (inspector de VPX)'); // i18n-ignore : journal
     case 'backglass':
     case 'topper': {
       const zone = screens.zones?.[place];
-      const band = zone ? cardsOn({ role: place, zone }, rows) : undefined;
-      return band ? { band, why: `choix du joueur : ${place}` } : auto(zone ? `${place} trop petit` : `pas de ${place}`); // i18n-ignore : journal
+      const band = on(place);
+      return band ? { band, ...tail, why: `choix du joueur : ${label[place]}${dmdWhy}` } : auto(zone ? `${label[place]} trop petit` : `pas de ${label[place]}`); // i18n-ignore : journal
     }
     case 'playfield-bottom':
     case 'playfield-side':
-      if (screens.playfield) return { band: insertOn(screens.playfield, rows, place === 'playfield-bottom' ? 'bottom-left' : 'middle-left'), why: `choix du joueur : ${place}` }; // i18n-ignore : journal
+      if (screens.playfield) return { band: insertOn(screens.playfield, rows, place === 'playfield-bottom' ? 'bottom-left' : 'middle-left'), ...tail, why: `choix du joueur : ${place}${dmdWhy}` }; // i18n-ignore : journal
       return auto('pas d’écran du plateau'); // i18n-ignore : journal
     default:
       return auto();
@@ -351,26 +368,39 @@ export interface LiveScoresChoice {
 }
 
 export function liveScoresChoices(cabinet: LiveScoresCabinet): LiveScoresChoice[] {
-  const dmdReason = !cabinet.dmd
-    ? t('Pas d’écran du DMD sur cette borne : un DMD matériel ne peut pas être recouvert')
-    : !cabinet.inspector
-      ? t('Le DMD se lit par l’inspector de VPX : Amis > Partage et réseau > « Autoriser dans le pare-feu de Windows »')
-      : undefined;
-  const choices: LiveScoresChoice[] = [
-    { place: 'auto', label: t('Automatique'), detail: t('Sur le fronton ou le topper quand la table les laisse libres, sinon en bas du plateau ; en plus sur le DMD quand il montre les scores') },
-    { place: 'dmd', label: t('Sur le DMD'), detail: t('Quand il montre l’écran de score de la table, jamais pendant une animation ni la saisie des initiales'), ...(dmdReason ? { unavailable: dmdReason } : {}) },
+  return [
+    { place: 'auto', label: t('Automatique'), detail: t('Sur le fronton, même quand la table s’en sert (la bande passe devant) ; sans fronton, sur le topper ; sinon en bas du plateau') },
     { place: 'backglass', label: t('Sur le fronton'), detail: t('En bas du fronton, par-dessus son image ou son PuP-Pack'), ...(cabinet.backglass ? {} : { unavailable: t('Pas d’écran de fronton sur cette borne') }) },
     { place: 'topper', label: t('Sur le topper'), detail: t('Au centre du topper, par-dessus son image ou son PuP-Pack'), ...(cabinet.topper ? {} : { unavailable: t('Pas de topper sur cette borne') }) },
     { place: 'playfield-bottom', label: t('En bas du plateau'), detail: t('Un encart sur le tablier, coin gauche, sous les couloirs extérieurs') },
     { place: 'playfield-side', label: t('Sur le côté du plateau'), detail: t('Un encart au milieu du bord gauche') },
   ];
-  return choices;
 }
 
-/** Le réglage enregistré (`<données>\amis\scores-en-partie.json`), lu sans confiance : un choix inconnu est l'automatique. */
-export function parseLiveScoresPlace(raw: unknown): LiveScoresPlace {
-  const place = raw && typeof raw === 'object' ? (raw as { place?: unknown }).place : undefined;
-  return LIVE_SCORES_PLACES.includes(place as LiveScoresPlace) ? (place as LiveScoresPlace) : 'auto';
+/** Le réglage « Scores sur le DMD » : grisé, pourquoi, quand la borne ne le permet pas (jamais caché). */
+export function liveScoresDmdUnavailable(cabinet: LiveScoresCabinet): string | undefined {
+  if (!cabinet.dmd) return t('Pas d’écran du DMD sur cette borne : un DMD matériel ne peut pas être recouvert');
+  if (!cabinet.inspector) return t('Le DMD se lit par l’inspector de VPX : Amis > Partage et réseau > « Autoriser dans le pare-feu de Windows »');
+  return undefined;
+}
+
+/**
+ * Le réglage enregistré (`<données>\amis\scores-en-partie.json`), lu sans confiance : une place
+ * inconnue est l'automatique, les scores sur le DMD sont activés sauf `dmd: false`. L'ancien choix
+ * « Sur le DMD » (avant le 04/11/2026) devient l'automatique, DMD activé. `tables` (une table par son
+ * identifiant) prépare un réglage par table, pas encore proposé : ce qu'elle précise l'emporte.
+ */
+export function parseLiveScoresSettings(raw: unknown, tableId?: string): LiveScoresSettings {
+  const read = (v: unknown, base: LiveScoresSettings): LiveScoresSettings => {
+    if (!v || typeof v !== 'object') return base;
+    const o = v as { place?: unknown; dmd?: unknown };
+    const place = LIVE_SCORES_PLACES.includes(o.place as LiveScoresPlace) ? (o.place as LiveScoresPlace) : o.place === undefined ? base.place : 'auto';
+    return { place, dmd: typeof o.dmd === 'boolean' ? o.dmd : base.dmd };
+  };
+  const all = read(raw, LIVE_SCORES_DEFAULT);
+  const tables = raw && typeof raw === 'object' ? (raw as { tables?: unknown }).tables : undefined;
+  const own = tableId && tables && typeof tables === 'object' ? (tables as Record<string, unknown>)[tableId] : undefined;
+  return own ? read(own, all) : all;
 }
 
 // --- Sur le DMD ---

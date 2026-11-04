@@ -20,7 +20,10 @@
 // Connexion qui tombe et revient (essai réel du 01/11/2026) : rien du départ ne dépend d'un message
 // unique. L'hôte renvoie la salle (« partez » compris) toutes les LIVE_RESEND_MS pendant la partie, et
 // tout de suite à un invité revenu en ligne ; l'invité renvoie son état tant que la salle ne le montre
-// pas (liveStatusBehind). Le journal dit chaque message du départ envoyé, reçu ou renvoyé.
+// pas (liveStatusBehind). Le journal dit chaque message du départ envoyé, reçu ou renvoyé. De même
+// avant le départ (essai réel du 04/11/2026, parties à la suite) : l'hôte renvoie l'invitation tant
+// que l'invité n'a pas répondu ; une invitation déjà reçue ne sonne pas deux fois, et celle à laquelle
+// on a déjà répondu fait repartir la même réponse.
 //
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
@@ -193,6 +196,8 @@ export interface LiveTableFound {
 
 /** Vérification des invitations expirées et des retardataires. */
 const TICK_MS = 1000;
+/** Une invitation sans réponse repart à ce rythme : l'invité la lit peut-être encore, elle ne sonne pas deux fois. */
+const INVITE_RESEND_MS = 10_000;
 
 export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   const now = () => opts.now?.() ?? new Date();
@@ -204,20 +209,30 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   let game: LiveGame | undefined;
   let mine: TableEntry | undefined;
   let invites: LiveInvite[] = [];
+  /** Invité : ma réponse à chaque invitation (par partie), renvoyée si l'hôte réinvite ; les plus récentes seulement. */
+  const answers = new Map<string, Extract<LiveMessage, { t: 'game-answer' }>>();
+  const answerKey = (game: string, round: number | undefined) => `${game}:${round ?? 0}`;
+  const answer = (to: string, message: Extract<LiveMessage, { t: 'game-answer' }>, round: number | undefined) => {
+    answers.set(answerKey(message.game, round), message);
+    if (answers.size > 20) answers.delete(answers.keys().next().value!);
+    net.send(to, message);
+  };
   let launch: NodeJS.Timeout | undefined;
   /** Invité : la réception des réglages de l'hôte, puis ces réglages, vérifiés. */
   let receiver: ReturnType<typeof createSettingsReceiver> | undefined;
   let hostSettings: HostSetting[] | undefined;
   /** Ma table lancée pour la partie `id` : quand elle a été prête (ms), « partez » reçu, partie démarrée. */
   let running: { id: string; readyAt?: number; released: boolean; started: boolean } | undefined;
-  /** Partie où ma table joue sans relevé (départ manuel) : chaque état envoyé le dit. */
-  let manualIn: string | undefined;
-  /** Invité : le dernier état envoyé à l'hôte (renvoyé tant que sa salle ne le montre pas), et quand. */
-  let lastStatus: { id: string; status: Omit<Extract<LiveMessage, { t: 'game-status' }>, 't' | 'game'>; at: number } | undefined;
-  /** Hôte : à qui la salle a déjà porté « partez » ; qui était en ligne au dernier tour (revenu : la salle tout de suite). */
-  const goSentTo = new Set<string>();
-  const wasOnline = new Map<string, boolean>();
-  let roomSentAt = 0;
+  /**
+   * Ce que le service retient d'une partie, rangé sous son identifiant : une autre partie en a un
+   * neuf, rien n'y passe de la précédente (essai réel du 04/11/2026 : trois parties à la suite).
+   */
+  let perGame = freshGameState('');
+  const own = (): GameState => {
+    const id = game?.id ?? '';
+    if (perGame.id !== id) perGame = freshGameState(id);
+    return perGame;
+  };
   /** La carte de l'attente avait quelque chose à montrer au dernier tour : sa fin aussi doit être portée (essai réel du 01/11/2026). */
   let waitWas = false;
   const strict = createTableVersions(opts.dataDir);
@@ -266,13 +281,13 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   function broadcastRoom(only?: string): void {
     if (!game || !isHost()) return;
     const room = roomMessage(game, now());
-    if (!only) roomSentAt = now().getTime();
+    if (!only) own().roomSentAt = now().getTime();
     for (const p of game.players) {
       if (p.host || p.state === 'declined' || p.state === 'busy' || p.state === 'expired' || (only && p.key !== only)) continue;
       const sent = net.send(p.key, room);
       // Le journal : « partez » porté à chacun, la première fois (et s'il n'a pas pu partir).
-      if (room.go && !goSentTo.has(p.key)) {
-        if (sent) goSentTo.add(p.key);
+      if (room.go && !own().goSentTo.has(p.key)) {
+        if (sent) own().goSentTo.add(p.key);
         log(`Départ commun : « partez » ${sent ? 'envoyé' : 'NON envoyé (hors ligne : renvoyé à son retour)'} à ${p.name}.`); // i18n-ignore : journal
       }
     }
@@ -288,7 +303,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   function scheduleLaunch(): void {
     if (launch) clearTimeout(launch);
     if (!game?.startAt) return;
-    launch = setTimeout(() => void run(), Math.max(0, Date.parse(game.startAt) - now().getTime()));
+    // Pour cette partie seulement : une autre, ouverte d'ici là, ne part pas à son heure.
+    const id = game.id;
+    launch = setTimeout(() => void (game?.id === id && run()), Math.max(0, Date.parse(game.startAt) - now().getTime()));
     launch.unref?.();
   }
 
@@ -302,15 +319,15 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       ...(result?.score !== undefined ? { score: result.score } : {}),
       ...(live ? { score: live.score, ball: live.ball, ...(live.balls ? { balls: live.balls } : {}) } : {}),
       ...(result?.multi || (live && live.players > 1) ? { multi: true as const } : {}),
-      ...(manualIn === game.id ? { manual: true as const } : {}),
+      ...(own().manual ? { manual: true as const } : {}),
     };
     if (isHost()) {
       setGame(gameStatus(game, me().key, status, now()));
       maybeGo();
     } else {
       // « prêt » garde son drapeau tant que ma table attend : un renvoi le redit.
-      const kept = lastStatus?.id === game.id && lastStatus.status.ready && state === 'loading' ? { ...status, ready: true as const } : status;
-      lastStatus = { id: game.id, status: kept, at: now().getTime() };
+      const kept = own().lastStatus?.status.ready && state === 'loading' ? { ...status, ready: true as const } : status;
+      own().lastStatus = { status: kept, at: now().getTime() };
       const sent = net.send(game.host, { t: 'game-status', game: game.id, ...kept });
       // Le score en partie part souvent : seuls les messages du départ et le retour vont au journal.
       if (ready || state !== 'playing' || result || !sent) log(`Départ commun : mon état « ${ready ? 'prêt' : state} » ${sent ? 'envoyé' : 'NON envoyé (hôte hors ligne : renvoyé à son retour)'} à l'hôte.`); // i18n-ignore : journal
@@ -320,7 +337,8 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
 
   /** Invité : mon état renvoyé à l'hôte, tant que sa salle ne le montre pas (message perdu pendant une coupure). */
   function resendStatus(why: 'salle' | 'tour' | 'retour'): void {
-    if (!game || isHost() || lastStatus?.id !== game.id || game.phase === 'finished' || game.phase === 'cancelled') return;
+    const lastStatus = own().lastStatus;
+    if (!game || isHost() || !lastStatus || game.phase === 'finished' || game.phase === 'cancelled') return;
     if (!liveStatusBehind(game.players.find((p) => p.key === me().key), lastStatus.status)) return;
     if (why !== 'retour' && now().getTime() - lastStatus.at < LIVE_RESEND_MS) return;
     lastStatus.at = now().getTime();
@@ -383,7 +401,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       ready: (o) => {
         if (game?.id !== id || run.readyAt !== undefined) return;
         run.readyAt = now().getTime();
-        if (o?.manual) manualIn = id;
+        if (o?.manual) own().manual = true;
         log(`Partie en direct : ma table est prête${o?.manual ? ' (sans relevé : départ manuel, pas de score en direct)' : ''}.`); // i18n-ignore : journal
         if (run.released) started();
         else report('loading', undefined, undefined, true);
@@ -490,10 +508,21 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     switch (m.t) {
       case 'game-invite': {
         const host = { key, name: net.state().friends.find((f) => f.key === key)?.name ?? m.game.players.find((p) => p.key === key)?.name ?? '?' };
+        // Renvoyée par l'hôte (ma réponse perdue, ou la sienne en route) : la même réponse repart, rien ne sonne.
+        const answered = answers.get(answerKey(m.game.id, m.round));
+        if (answered) {
+          log(`Partie en direct : invitation de ${host.name} renvoyée, déjà répondue (${answered.answer}) : réponse renvoyée.`); // i18n-ignore : journal
+          net.send(key, answered);
+          return;
+        }
+        if (invites.some((i) => i.id === m.game.id && i.host.key === key && i.round === m.round)) return;
+        // Le journal dit chaque invitation reçue, et le refus d'office : une partie qui ne part pas se comprend.
         if (ongoing()) {
+          log(`Partie en direct : invitation de ${host.name} (« ${m.game.title} ») refusée d'office : déjà dans la partie ${game!.id} (${game!.phase}).`); // i18n-ignore : journal
           net.send(key, { t: 'game-answer', game: m.game.id, answer: 'busy' });
           return;
         }
+        log(`Partie en direct : invitation reçue de ${host.name} (« ${m.game.title} », partie ${m.game.id}).`); // i18n-ignore : journal
         const invite = liveInvite(m, host, now());
         invites = [invite, ...invites.filter((i) => i.id !== invite.id && i.host.key !== key)];
         opts.onInvite?.(invite);
@@ -503,6 +532,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       case 'game-answer': {
         if (!game || !isHost() || m.game !== game.id) return;
         const before = game.players.find((p) => p.key === key)?.state;
+        if (m.answer === 'busy') log(`Partie en direct : ${game.players.find((p) => p.key === key)?.name ?? key} occupé, invitation refusée d'office.`); // i18n-ignore : journal
         setGame(answerGame(game, key, m.answer, m.match, m.balls, { ...(m.proto ? { proto: m.proto } : {}), ...(m.app ? { app: m.app } : {}) }));
         // Il vient d'accepter : mes réglages partent vers lui, à poser dans le double de sa table.
         if (before === 'invited' && game.players.find((p) => p.key === key)?.state === 'accepted' && mine) sendSettings(key, game.id, mine);
@@ -542,7 +572,8 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         }
         return;
       case 'game-start':
-        if (game && !isHost() && key === game.host && game.phase === 'gathering') {
+        // Seulement le départ de cette partie : un message de la partie d'avant n'en lance pas une autre.
+        if (game && !isHost() && key === game.host && m.game === game.id && game.phase === 'gathering') {
           game = countdownFrom(game, m.in, now());
           scheduleLaunch();
           changed();
@@ -585,24 +616,35 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     if (isHost()) {
       setGame(closeIfDone(expireInvites(game, now()), now()));
       maybeGo();
+      // Une invitation sans réponse repart (message perdu sur une liaison qui tombe), jusqu'à sa réponse ou son expiration.
+      if (game?.phase === 'gathering') {
+        for (const p of game.players) {
+          const sent = own().invites.get(p.key);
+          if (p.state !== 'invited' || !sent || now().getTime() - sent.at < INVITE_RESEND_MS || !net.online(p.key)) continue;
+          sent.at = now().getTime();
+          if (!sent.told) log(`Partie en direct : invitation renvoyée à ${p.name} (pas encore de réponse ; toutes les ${INVITE_RESEND_MS / 1000} s jusqu'à sa réponse).`); // i18n-ignore : journal
+          sent.told = true;
+          net.send(p.key, sent.message);
+        }
+      }
       // La salle renvoyée pendant la partie : un « partez » perdu arrive au tour suivant ; un invité revenu en ligne l'a tout de suite.
       if (game?.phase === 'countdown' || game?.phase === 'playing') {
         for (const p of game.players) {
           if (p.host || !livePlayers(game).includes(p)) continue;
           const online = net.online(p.key);
-          if (online && wasOnline.get(p.key) === false) {
+          if (online && own().wasOnline.get(p.key) === false) {
             log(`Départ commun : ${p.name} revenu en ligne, la salle lui est renvoyée.`); // i18n-ignore : journal
             broadcastRoom(p.key);
           }
-          wasOnline.set(p.key, online);
+          own().wasOnline.set(p.key, online);
         }
-        if (now().getTime() - roomSentAt >= LIVE_RESEND_MS) broadcastRoom();
+        if (now().getTime() - own().roomSentAt >= LIVE_RESEND_MS) broadcastRoom();
       }
     } else {
       // Invité : l'hôte revenu en ligne reçoit mon état tout de suite ; sinon, renvoyé tant que sa salle ne le montre pas.
       const online = net.online(game.host);
-      const back = online && wasOnline.get(game.host) === false;
-      wasOnline.set(game.host, online);
+      const back = online && own().wasOnline.get(game.host) === false;
+      own().wasOnline.set(game.host, online);
       if (online) resendStatus(back ? 'retour' : 'tour');
     }
     // Invité : un hôte resté muet se voit au fil du temps.
@@ -634,8 +676,6 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       if (game && ongoing() && !isHost()) net.send(game.host, { t: 'game-cancel', game: game.id });
       const live = await liveTable(table);
       mine = table;
-      goSentTo.clear();
-      wasOnline.clear();
       setGame(newLiveGame({ ...me(), ...version }, live, displayTitle(table), now()));
       log(`Partie en direct : salon ouvert sur ${table.title}.`); // i18n-ignore : journal
       return game!;
@@ -645,8 +685,12 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const next = inviteToGame(game, { key, name }, now());
       if (!next) return false;
       const players = next.players.filter((p) => p.state === 'accepted' || p.state === 'invited').map((p) => ({ key: p.key, name: p.name }));
-      if (!net.send(key, { t: 'game-invite', game: { id: next.id, table: next.table, title: next.title, players, ...version } })) return false;
+      // Une invitation voulue a son numéro : ses renvois le gardent, une nouvelle (après un refus) en prend un autre.
+      const round = (own().invites.get(key)?.round ?? 0) + 1;
+      const message: Extract<LiveMessage, { t: 'game-invite' }> = { t: 'game-invite', game: { id: next.id, table: next.table, title: next.title, players, ...version }, round };
+      if (!net.send(key, message)) return false;
       setGame(next);
+      own().invites.set(key, { message, at: now().getTime(), round });
       return true;
     },
     matchFor,
@@ -657,11 +701,11 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       invites = invites.filter((i) => i.id !== id);
       // Pas la même version : la partie ne se joue pas (décision du 30/10/2026), il récupère la sienne.
       if (found.match !== 'same') {
-        net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'decline', match: found.match, ...version });
+        answer(invite.host.key, { t: 'game-answer', game: id, answer: 'decline', match: found.match, ...version }, invite.round);
         changed();
         return found;
       }
-      net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'accept', match: found.match, ...(found.balls ? { balls: found.balls } : {}), ...version });
+      answer(invite.host.key, { t: 'game-answer', game: id, answer: 'accept', match: found.match, ...(found.balls ? { balls: found.balls } : {}), ...version }, invite.round);
       mine = found.table;
       game = guestGame(invite, { ...me(), ...version }, found.match, found.balls);
       // Les réglages de l'hôte arrivent juste après ma réponse.
@@ -673,7 +717,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     decline(id) {
       const invite = invites.find((i) => i.id === id);
       invites = invites.filter((i) => i.id !== id);
-      if (invite) net.send(invite.host.key, { t: 'game-answer', game: id, answer: 'decline' });
+      if (invite) answer(invite.host.key, { t: 'game-answer', game: id, answer: 'decline' }, invite.round);
       changed();
     },
     start() {
@@ -712,6 +756,26 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       if (launch) clearTimeout(launch);
     },
   };
+}
+
+/** Ce que le service retient d'une partie (createLiveGames, own()) : neuf pour chaque partie. */
+interface GameState {
+  id: string;
+  /** Ma table joue sans relevé (départ manuel) : chaque état envoyé le dit. */
+  manual: boolean;
+  /** Invité : le dernier état envoyé à l'hôte (renvoyé tant que sa salle ne le montre pas), et quand. */
+  lastStatus?: { status: Omit<Extract<LiveMessage, { t: 'game-status' }>, 't' | 'game'>; at: number };
+  /** Hôte : à qui la salle a déjà porté « partez ». */
+  goSentTo: Set<string>;
+  /** Qui était en ligne au dernier tour (revenu : la salle, ou mon état, tout de suite). */
+  wasOnline: Map<string, boolean>;
+  roomSentAt: number;
+  /** Hôte : l'invitation envoyée à chacun, et quand (renvoyée tant qu'il n'a pas répondu). */
+  invites: Map<string, { message: Extract<LiveMessage, { t: 'game-invite' }>; at: number; round: number; told?: boolean }>;
+}
+
+function freshGameState(id: string): GameState {
+  return { id, manual: false, goSentTo: new Set(), wasOnline: new Map(), roomSentAt: 0, invites: new Map() };
 }
 
 function fileSize(file: string): number | undefined {

@@ -62,6 +62,8 @@ export interface TableDouble {
   live: boolean;
   /** L'état de jeu que le relevé a écrit, maintenant ; undefined avant le premier ou s'il n'y en a pas. */
   liveState(): LiveGameState | undefined;
+  /** La dernière ligne écrite par le relevé, telle quelle (le journal la cite quand elle ne dit pas « prêt ») ; undefined sans ligne. */
+  liveLine(): string | undefined;
   /**
    * Départ commun (livestart.ts) : pose le fichier « partez » que le relevé surveille ; il met alors
    * le crédit et appuie sur Start. Sans relevé, rien (le joueur appuie lui-même). Une fois suffit.
@@ -215,13 +217,17 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           log(`Partie entre amis (${table.id}) : relevé de l'état de jeu non posé (${(error as Error).message}).`); // i18n-ignore : journal
         }
       }
-      const liveState = (): LiveGameState | undefined => {
+      const liveLine = (): string | undefined => {
         if (!live) return undefined;
         try {
-          return parseLiveState(fs.readFileSync(stateFile, 'utf8'));
+          return fs.readFileSync(stateFile, 'utf8');
         } catch {
           return undefined;
         }
+      };
+      const liveState = (): LiveGameState | undefined => {
+        const line = liveLine();
+        return line === undefined ? undefined : parseLiveState(line);
       };
       const records = (): TableRecords | undefined => {
         const reg = readTableRecords({ folder: plan.dir, file: plan.file, title: table.title });
@@ -247,6 +253,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           records,
           live,
           liveState,
+          liveLine,
           go() {
             if (gone || !live || finished) return;
             try {

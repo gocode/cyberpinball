@@ -17,7 +17,7 @@
 // La file (notices.ts) décide du reste : quand, où (NoticeRule.live), et le regroupement
 // (« Bruno et Léa ont accepté »).
 
-import { liveRanked, liveScore, liveStandings, type LiveGame, type LivePhase, type LivePlayerState } from './livegame';
+import { liveRanked, liveScore, liveStandings, type LiveGame, type LiveInvite, type LivePhase, type LivePlayerState } from './livegame';
 import type { LiveNoticeReason, NoticeEvent } from './notices';
 
 export interface LiveSnapshot {
@@ -73,6 +73,16 @@ export function liveNotices(prev: LiveSnapshot | undefined, next: LiveSnapshot |
     out.push({ kind: 'live-finished', key: game.id, at: now, ...subject, ...liveOutcome(game, me) });
   }
   return out;
+}
+
+/**
+ * Invitations arrivées depuis le relevé précédent (`prev` : les identifiants déjà vus ; undefined au
+ * premier relevé, qui ne dit rien) : « Bruno vous invite à rejoindre une partie » (essai réel du
+ * 04/11/2026 : la carte et le carillon ne suffisaient pas, la notification d'une ligne en plus).
+ */
+export function inviteNotices(prev: ReadonlySet<string> | undefined, invites: readonly LiveInvite[], now: number): NoticeEvent[] {
+  if (!prev) return [];
+  return invites.filter((i) => !prev.has(i.id)).map((i) => ({ kind: 'live-invite' as const, key: i.id, at: now, who: i.host.name, subject: i.title }));
 }
 
 /** Le gagnant (au classement, avec un score), ou que je gagne ; sinon ma place parmi les classés. */

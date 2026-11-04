@@ -37,6 +37,9 @@ import {
   overlayCoveredBy,
   liveBoardView,
   LIVE_GO_SHOW_MS,
+  LIVE_READY_SIGNAL_MS,
+  parseLiveState,
+  liveReadyOverdue,
   type LiveBoardScreens,
   loadCabinet,
   playfieldOrientation,
@@ -152,6 +155,7 @@ import {
   type TableRecords,
   type LegacyOrientation,
   edgeOfRotation,
+  edgeRotation,
   orientationFacts,
   recordedMediaType,
   type RecordedRole,
@@ -210,7 +214,8 @@ import { createBallCounts } from './ball-count';
 import { createTableDoubles } from './table-double';
 import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
 import { simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
-import { readLiveScoresPlace, writeLiveScoresPlace } from './live-scores-setting';
+import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
+import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { createLiveScoresMenu } from './live-scores-menu';
 import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
 import { createSocialNet } from './social-net';
@@ -915,6 +920,11 @@ library.downloads.friends({
 // Menu des tables : pastille des amis en ligne et notifications discrètes (menu-notices.ts), une
 // à la fois, seulement quand le menu des tables est là, nu : ni partie, ni attente, ni invité, ni
 // écran plein, ni aide, ni constat bref ou préavis d'arrêt déjà affichés.
+/**
+ * « Masquer les notifications pendant les parties » (Menu système > Amis, quiet-in-game-setting.ts) :
+ * désactivé par défaut ; activé, rien ne s'affiche ni ne sonne pendant une partie.
+ */
+let quietInGame = readQuietInGame(loc.dataDir);
 const menuNotices = createMenuNotices({
   social: socialNet,
   jobs: () => library.downloads.manager.jobs(),
@@ -925,18 +935,22 @@ const menuNotices = createMenuNotices({
   redraw: () => {
     if (!closing) broadcast();
   },
-  // La partie entre amis : ses nouvelles aussi dans le menu système (hors de l'écran de la partie)
-  // et par-dessus la partie d'une autre table (game-notice.ts), tant que la bande de la partie
-  // n'est pas là (elle le dit déjà) ; le tintement au menu, jamais pendant une partie.
+  // Ce qui se montre partout (la partie entre amis, une invitation, un ami qui se connecte) : aussi
+  // dans le menu système et par-dessus VPX pendant une partie (game-notice.ts), avec son son (essai
+  // réel du 04/11/2026), sauf « Masquer les notifications pendant les parties ». Jamais sur l'écran
+  // de la partie ni de l'invitation, ni ce que la bande de la partie en cours montre déjà.
   live: {
     game: () => liveGames.current(),
+    invites: () => liveGames.invites(),
     me: () => socialNet.state().key.publicKey,
     onScreen: () => friendsMenu.live.onScreen(),
+    inviteOnScreen: (id) => friendsMenu.live.inviteOnScreen(id),
+    band: () => state.phase === 'playing' && !!playing && liveBoardUp(),
     canShow: () =>
       !closing && !state.help && !state.banner && !attract.active && !guest.active && !stopNotice && !desktop.active && !friendsMenu.live.onScreen() &&
-      (state.phase === 'menu' || state.phase === 'library' || (state.phase === 'playing' && !!playing && !liveBoardUp())),
-    shown: () => playUiSound('news'),
+      (state.phase === 'menu' || state.phase === 'library' || (state.phase === 'playing' && !!playing && !quietInGame)),
   },
+  sound: (id) => playUiSound(id),
   log: (line) => console.log(line),
 });
 /** Le menu des tables est à l'écran : une invitation peut s'y afficher sans rien interrompre. */
@@ -977,6 +991,8 @@ const liveGames = createLiveGames({
   // Le carillon d'invitation sonne au menu comme pendant une partie ; en partie, la notification
   // se pose sur le plateau, par-dessus VPX : quitter sa partie ramène au menu, où l'invitation s'ouvre.
   onInvite: (invite) => {
+    // Pendant une partie, notifications masquées : ni carillon ni carte ; l'invitation attend au menu, où elle s'ouvre au retour.
+    if (playing && quietInGame) return void console.log(`Invitation pendant la partie : ${invite.host.name}, ${invite.title}, gardée pour le menu (notifications masquées pendant les parties).`); // i18n-ignore : journal
     playUiSound('invite');
     if (playing) gameNotices.show(invite);
     else if (liveCanShow()) friendsMenu.live.openInvite(invite.id, () => library.leave());
@@ -1018,7 +1034,7 @@ const gameNotices = createGameNotices({
   place: playfieldPlace,
   boardScreens: liveBoardScreens,
   dmdColor: () => mediaSettings.dmdColor,
-  scoresPlace: () => readLiveScoresPlace(loc.dataDir),
+  scoresSettings: () => readLiveScoresSettings(loc.dataDir, playing?.id),
   dmdScoreScreen: () => dmdWatch?.verdict().scoreScreen ?? false,
   // Hors écran, la pile des fenêtres est celle du vrai bureau : rien à y chercher.
   coveredBy: (win) => (OFFSCREEN ? undefined : describeCover(win)),
@@ -1057,13 +1073,27 @@ library.provideSystemItem('find-player', friendsMenu.items['find-player']);
 library.provideSystemItem('friend-requests', friendsMenu.items['friend-requests']);
 library.provideSystemItem('badges', friendsMenu.items.badges);
 library.provideSystemItem('sharing', friendsMenu.items.sharing);
+// « Masquer les notifications pendant les parties » : Start bascule, le curseur reste sur l'entrée.
+library.provideSystemItem('quiet-in-game', {
+  get detail() {
+    return quietInGame
+      ? t('Activé · connexion d’un ami, demande de rejoindre une partie, etc. : rien pendant une partie, tout reste au menu')
+      : t('Désactivé · connexion d’un ami, demande de rejoindre une partie, etc.');
+  },
+  run: () => {
+    quietInGame = !quietInGame;
+    writeQuietInGame(loc.dataDir, quietInGame);
+    console.log(`Notifications pendant les parties : ${quietInGame ? 'masquées' : 'affichées'}.`); // i18n-ignore : journal
+    library.openSystem();
+  },
+});
 // Scores des amis pendant la partie : la place de la bande, au choix du joueur (live-scores-menu.ts).
 library.provideSystemItem(
   'live-scores',
   createLiveScoresMenu({
     library,
-    get: () => readLiveScoresPlace(loc.dataDir),
-    set: (place) => writeLiveScoresPlace(loc.dataDir, place),
+    get: () => readLiveScoresSettings(loc.dataDir),
+    set: (settings) => writeLiveScoresSettings(loc.dataDir, settings),
     cabinet: () => ({
       backglass: Boolean(menuAssignments.backglass),
       topper: Boolean(menuAssignments.topper),
@@ -1840,16 +1870,20 @@ export interface PlayReport {
 /**
  * Relevé simulé d'une partie simulée (hors écran) : la table prête après une seconde ; départ une
  * seconde après « partez » (`goAt` : quand le fichier du double a été posé), le score qui monte,
- * trois billes, puis la partie finie deux secondes avant l'arrêt prévu.
+ * trois billes, puis la partie finie deux secondes avant l'arrêt prévu. La ligne passe par
+ * parseLiveState, comme celle d'une vraie table : avant la partie, joueur, nombre de joueurs et score
+ * y sont vides, comme sur The Goonies et The Matrix, qui ne les posent qu'au Start (04/11/2026).
  */
-function simulatedLiveState(startedAt: number, durationMs: number, goAt: () => number | undefined): () => LiveGameState {
+function simulatedLiveState(startedAt: number, durationMs: number, goAt: () => number | undefined): () => LiveGameState | undefined {
   return () => {
     const ready = Date.now() - startedAt >= 1000;
     const go = goAt();
     const elapsed = go === undefined ? 0 : Date.now() - go;
     const playing = Math.max(0, elapsed - 1000);
     const span = Math.max(1000, durationMs - 3000);
-    return { inGame: elapsed >= 1000 && playing < span, started: elapsed >= 1000, players: 1, player: 1, ball: Math.min(3, 1 + Math.floor((playing / span) * 3)), balls: 3, score: Math.floor(playing / 500) * 12_340, ready };
+    const started = elapsed >= 1000;
+    const values = started ? `joueurs=1;joueur=1;bille=${Math.min(3, 1 + Math.floor((playing / span) * 3))};billes=3;score=${Math.floor(playing / 500) * 12_340}` : 'joueurs=;joueur=;bille=4;billes=3;score=';
+    return parseLiveState(`jeu=${started && playing < span ? 1 : 0};vu=${started ? 1 : 0};${values};pret=${ready ? 1 : 0}`); // i18n-ignore : clés du relevé
   };
 }
 
@@ -1994,8 +2028,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // de repli sur le dossier habituel.
   // L'inspector de VPX lui est proposé si la règle du pare-feu qui ferme VPX au réseau est posée (lue pendant le chargement).
   const inspector = await inspectorReady;
-  // Il sert aussi à lire le DMD quand le joueur y veut les scores des amis (automatique, ou sur le DMD).
-  const readDmd = ['auto', 'dmd'].includes(readLiveScoresPlace(loc.dataDir));
+  // Il sert aussi à lire le DMD quand « Scores sur le DMD » est activé (pour cette table).
+  const readDmd = readLiveScoresSettings(loc.dataDir, table.id).dmd;
   const doubled = hooks.double && !displayMode ? tableDoubles.start(table, hooks.double, hooks.settings, hooks.board, inspector && { ...inspector, dmd: readDmd }) : undefined;
   if (doubled && !doubled.ok) {
     console.log(`Partie entre amis (${table.id}) : pas de double, partie non lancée (${doubled.reason}).`);
@@ -2074,11 +2108,24 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   dmdWatch = double?.inspectorPort && readDmd ? watchVpxDmd(double.inspectorPort, (line) => console.log(line)) : simulated !== undefined && double && readDmd ? simulatedDmdWatch() : undefined;
   // Départ commun (livestart.ts) : la table prête (le relevé répond « pret »), elle le dit aux
   // autres ; au « partez », le fichier du double que le relevé surveille : alors seulement, crédit et Start.
+  // Le relevé a dit « prêt » (ou la partie est partie), ou le garde-fou l'a fait à sa place.
+  let readySeen = false;
+  let readyForced = false;
   const watchLive = double
     ? setInterval(() => {
         const st = liveSource?.();
         dmdWatch?.game({ inGame: Boolean(st?.inGame), ...(st ? { score: st.score } : {}) });
         if (onScreen && (st?.ready || st?.started)) hooks.gate?.ready();
+        // Garde-fou (livestart.ts) : la table à l'écran, le relevé ne dit toujours pas « prêt » ; le journal
+        // dit pourquoi (sa dernière ligne), et la table se dit prête : personne n'attend sans fin.
+        readySeen ||= Boolean(st?.ready || st?.started);
+        if (onScreen && hooks.gate && !liveManual && !readySeen && !readyForced && liveReadyOverdue(playingSince, Date.now())) {
+          readyForced = true;
+          const line = double.liveLine()?.trim();
+          const why = line === undefined ? 'aucune ligne écrite par le relevé' : st ? `« pret=0 » : ${line.slice(0, 160)}` : `ligne illisible : ${line.slice(0, 160)}`; // i18n-ignore : journal
+          console.log(`Départ commun (${table.id}) : table à l'écran depuis ${LIVE_READY_SIGNAL_MS / 1000} s, le relevé ne dit pas « prêt » (${why}) : prête quand même.`); // i18n-ignore : journal
+          hooks.gate.ready();
+        }
         if (goneAt === undefined && (!hooks.gate || hooks.gate.go())) {
           goneAt = Date.now();
           double.go();
@@ -2231,7 +2278,21 @@ function playfieldPlace(): { zone: Rect; rotation: Rotation } | undefined {
   const cabinet = loadCabinet(loc.dataDir);
   const zone = cabinet ? cabinetZones(cabinet)?.playfield : undefined;
   const r = zone ? zoneRect(zone, display.bounds) : { x: 0, y: 0, width: display.bounds.width, height: display.bounds.height };
-  return { zone: { x: display.bounds.x + r.x, y: display.bounds.y + r.y, width: r.width, height: r.height }, rotation };
+  return { zone: { x: display.bounds.x + r.x, y: display.bounds.y + r.y, width: r.width, height: r.height }, rotation: playing && cabinet ? playedRotation(cabinet) : rotation };
+}
+
+/**
+ * Pendant la partie, le sens où VPX dessine vraiment la table (flippers du bord `played`,
+ * gameorientation.ts), celui de l'enregistrement : il peut différer du menu quand VPX tourne la
+ * table autrement. Relu une fois par partie ; un bord forcé (essais) est celui du menu.
+ */
+let played: { table: TableEntry; rotation: Rotation } | undefined;
+function playedRotation(cabinet: Cabinet): Rotation {
+  if (played && played.table === playing) return played.rotation;
+  const edge = forcedRotation() === undefined ? orientationFacts(cabinet, observedDisplays())?.played : undefined;
+  const value = edge ? edgeRotation(edge) : rotation;
+  if (playing) played = { table: playing, rotation: value };
+  return value;
 }
 
 /**
@@ -2720,15 +2781,15 @@ function viewFor(role: RoleId) {
 
 /**
  * Coin du menu des tables (fenêtre du plateau) : amis en ligne et notification, au menu des
- * tables ; dans le menu système, seulement une nouvelle de la partie entre amis ; pendant la
- * partie d'une autre table, cette nouvelle va par-dessus VPX (game-notice.ts).
+ * tables ; dans le menu système, seulement ce qui se montre partout (NoticeRule.away) ; pendant
+ * une partie, cela va par-dessus VPX (game-notice.ts).
  */
 function menuCorner(): { friendsOnline?: { count: number; title: string; searching?: boolean }; notice?: NoticeView } {
   // La file avance à chaque rendu, même hors du menu : une notification ouverte part quand un écran la recouvre.
   const corner = menuNotices.view();
-  gameNotices.line(state.phase === 'playing' && playing && corner.notice?.live ? corner.notice : undefined);
+  gameNotices.line(state.phase === 'playing' && playing && corner.notice?.away ? corner.notice : undefined);
   if (guest.active) return {};
-  if (state.phase === 'library') return corner.notice?.live ? { notice: corner.notice } : {};
+  if (state.phase === 'library') return corner.notice?.away ? { notice: corner.notice } : {};
   if (state.phase !== 'menu') return {};
   return corner;
 }

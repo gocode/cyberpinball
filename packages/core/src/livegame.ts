@@ -219,13 +219,16 @@ export interface LiveInvite {
   title: string;
   players: { key: string; name: string }[];
   receivedAt: string;
+  /** Le numéro de cette invitation chez l'hôte (game-invite `round`) : sa réponse se retrouve à un renvoi. */
+  round?: number;
 }
 
 export type LiveAnswer = 'accept' | 'decline' | 'busy';
 export type LiveStatus = 'loading' | 'playing' | 'done' | 'failed' | 'left';
 
 export type LiveMessage =
-  | { t: 'game-invite'; game: { id: string; table: LiveTable; title: string; players: { key: string; name: string }[]; proto?: number; app?: string } }
+  /** `round` : le numéro de l'invitation voulue, gardé par ses renvois (live-game.ts) ; absent chez une borne d'avant. */
+  | { t: 'game-invite'; game: { id: string; table: LiveTable; title: string; players: { key: string; name: string }[]; proto?: number; app?: string }; round?: number }
   | { t: 'game-answer'; game: string; answer: LiveAnswer; match?: LiveTableMatch; balls?: number; proto?: number; app?: string }
   /**
    * Départ commun (livestart.ts) : `readyFor`, depuis combien de millisecondes le premier joueur est
@@ -344,7 +347,8 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
       const table = parseLiveTable(g.table);
       const title = typeof g.title === 'string' && g.title.length > 0 && g.title.length <= 160 && !/[\x00-\x1f\x7f]/.test(g.title) ? g.title : undefined;
       const players = (Array.isArray(g.players) ? g.players.slice(0, LIVE_MAX_PLAYERS) : []).map(parsePeer).filter((p): p is { key: string; name: string } => !!p);
-      return table && title ? { t: 'game-invite', game: { id: g.id, table, title, players, ...parseVersion(g) } } : undefined;
+      const round = typeof m.round === 'number' && Number.isInteger(m.round) && m.round >= 1 && m.round <= 1000 ? m.round : undefined;
+      return table && title ? { t: 'game-invite', game: { id: g.id, table, title, players, ...parseVersion(g) }, ...(round ? { round } : {}) } : undefined;
     }
     case 'game-answer':
       if (!isId(m.game) || (m.answer !== 'accept' && m.answer !== 'decline' && m.answer !== 'busy')) return undefined;
@@ -408,7 +412,7 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
 /** Invitation reçue d'un pair (sa clé authentifiée par la connexion). */
 export function liveInvite(message: Extract<LiveMessage, { t: 'game-invite' }>, host: { key: string; name: string }, now = new Date()): LiveInvite {
   const version = { ...(message.game.proto ? { proto: message.game.proto } : {}), ...(message.game.app ? { app: message.game.app } : {}) };
-  return { id: message.game.id, host: { ...host, ...version }, table: message.game.table, title: message.game.title, players: message.game.players.filter((p) => p.key !== host.key), receivedAt: now.toISOString() };
+  return { id: message.game.id, host: { ...host, ...version }, table: message.game.table, title: message.game.title, players: message.game.players.filter((p) => p.key !== host.key), receivedAt: now.toISOString(), ...(message.round ? { round: message.round } : {}) };
 }
 
 export function inviteExpired(invite: Pick<LiveInvite, 'receivedAt'>, now = new Date()): boolean {

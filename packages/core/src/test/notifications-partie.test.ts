@@ -6,7 +6,7 @@
 //   message qui l'a causé, jamais de l'état trouvé ni d'une partie à une autre ;
 // - la file (notices.ts) les regroupe (« Bruno et Léa ont accepté »), ne les recouvre jamais, les
 //   montre avant tout le reste, seules, même notifications coupées, et aussi hors du menu des
-//   tables (liveOnly), où les autres attendent ;
+//   tables (away), où les autres attendent ;
 // - chaque texte tient sur sa ligne, dans les deux langues, quels que soient les noms ;
 // - le service réel (app/src/live-game.ts) et le menu (app/src/menu-notices.ts) les produisent
 //   à partir des vrais messages ; rien sur l'écran de la partie, qui le dit déjà ;
@@ -20,15 +20,17 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
 import { GAME_NOTICE_LINE, GAME_NOTICE_SIZE, gameNoticeBounds } from '../gamenotice';
+import { liveWaitBounds } from '../livestart';
 import { setLanguage } from '../i18n';
-import { answerGame, expireInvites, gameStatus, inviteToGame, newLiveGame, roomMessage, settingsReceived, startGame, applyRoom, guestGame, liveInvite, LIVE_INVITE_MS, type LiveGame, type LiveMessage } from '../livegame';
-import { liveNotices, liveOutcome, liveSnapshot } from '../livenotices';
+import { answerGame, expireInvites, gameStatus, inviteToGame, newLiveGame, roomMessage, settingsReceived, startGame, applyRoom, guestGame, liveInvite, LIVE_INVITE_MS, type LiveGame, type LiveInvite, type LiveMessage } from '../livegame';
+import { inviteNotices, liveNotices, liveOutcome, liveSnapshot } from '../livenotices';
 import {
   NOTICE_DETAIL_MAX,
   NOTICE_GATHER_MS,
   NOTICE_LIVE_SHOW_MS,
   NOTICE_RULES,
   NOTICE_SHOW_MS,
+  NOTICE_STARTUP_QUIET_MS,
   NOTICE_TITLE_MAX,
   createNoticeCenter,
   isLiveNotice,
@@ -38,6 +40,9 @@ import {
   type NoticeView,
 } from '../notices';
 import type { Rect, Rotation } from '../model';
+import { newSocialState } from '../social';
+import { SYSTEM_GROUPS, SYSTEM_ITEMS } from '../systemmenu';
+import { UI_SOUNDS, uiSoundCue } from '../uisounds';
 import type { TableEntry } from '../tables';
 
 const read = (...parts: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...parts), 'utf8');
@@ -180,7 +185,7 @@ test('textes : regroupés par genre, avec les noms ; la raison ; le gagnant, ma 
 test('textes : chaque genre de la partie tient sur sa ligne, dans les deux langues, quels que soient les noms et le nombre', () => {
   const long = 'Maximilien-Alexandre de la Tour';
   const live = (Object.keys(NOTICE_RULES) as NoticeKind[]).filter(isLiveNotice);
-  assert.deepEqual(live.sort(), ['live-accepted', 'live-cancelled', 'live-declined', 'live-finished', 'live-left']);
+  assert.deepEqual(live.sort(), ['live-accepted', 'live-cancelled', 'live-declined', 'live-finished', 'live-invite', 'live-left']);
   for (const lang of ['fr', 'en'] as const) {
     setLanguage(lang);
     try {
@@ -235,17 +240,17 @@ test('file : la partie entre amis passe avant tout, seule, plus longtemps ; regr
   assert.equal(third?.live, undefined);
 });
 
-test('file : hors du menu des tables, seule la partie entre amis se montre ; les autres attendent, celle qui se montrait part', () => {
+test('file : hors du menu des tables, seul ce qui se montre partout ; les autres attendent, celle qui se montrait part', () => {
   const c = createNoticeCenter();
-  c.push([{ kind: 'friend-online', key: 'x', at: 0, who: 'Chloé' }]);
-  assert.equal(c.tick(NOTICE_GATHER_MS, on).view?.title, 'Chloé vient de se connecter');
+  c.push([{ kind: 'download-done', key: 'x', at: 0, subject: 'Medieval Madness' }]);
+  assert.equal(c.tick(NOTICE_GATHER_MS, on).view?.title, 'Téléchargement fini');
   // Le menu système s'ouvre : elle part ; une réponse arrive, elle se montre là.
-  assert.equal(c.tick(NOTICE_GATHER_MS + 500, { canShow: true, liveOnly: true }).view, undefined);
+  assert.equal(c.tick(NOTICE_GATHER_MS + 500, { canShow: true, away: true }).view, undefined);
   c.push([ev('live-accepted', 'Bruno', { at: 10_000 })]);
-  const shown = c.tick(10_000 + NOTICE_GATHER_MS, { canShow: true, liveOnly: true }).view;
+  const shown = c.tick(10_000 + NOTICE_GATHER_MS, { canShow: true, away: true }).view;
   assert.equal(shown?.title, 'Bruno a accepté votre invitation');
   c.push([{ kind: 'friend-request', key: 'z', at: 11_000, who: 'Zoé' }]);
-  assert.equal(c.tick(30_000, { canShow: true, liveOnly: true }).view, undefined, 'la demande d’ami attend le menu des tables');
+  assert.equal(c.tick(30_000, { canShow: true, away: true }).view, undefined, 'la demande d’ami attend le menu des tables');
   assert.equal(c.tick(31_000, on).view?.title, 'Demande d’ami : Zoé');
   // Notifications coupées : la partie entre amis reste.
   c.push([ev('live-left', 'Léa', { at: 40_000 }), { kind: 'friend-online', key: 'y', at: 40_000, who: 'Émile' }]);
@@ -292,7 +297,8 @@ test('service et menu : les vraies réponses deviennent une notification regroup
     canShow: () => where === 'menu',
     redraw: () => undefined,
     now: () => clock,
-    live: { game: () => games.current(), me: () => ME, onScreen: () => where === 'screen', canShow: () => where !== 'screen', shown: (v: NoticeView) => chimes.push(v.title) },
+    live: { game: () => games.current(), me: () => ME, onScreen: () => where === 'screen', canShow: () => where !== 'screen' },
+    sound: (id: string, v: NoticeView) => chimes.push(`${id} ${v.title}`),
   });
   try {
     const game = await games.create(entry);
@@ -311,7 +317,7 @@ test('service et menu : les vraies réponses deviennent une notification regroup
     clock += NOTICE_GATHER_MS;
     const v = menu.view();
     assert.equal(v.notice?.title, 'Bruno et Léa ont accepté');
-    assert.deepEqual(chimes, ['Bruno et Léa ont accepté'], 'un tintement à son entrée');
+    assert.deepEqual(chimes, ['news Bruno et Léa ont accepté'], 'un tintement à son entrée');
     menu.view();
     assert.equal(chimes.length, 1, 'un seul, pas à chaque rendu');
     // David décline pendant que l'écran de la partie est ouvert : il le dit déjà, rien ne suit.
@@ -366,12 +372,13 @@ test('branchements : la ligne par-dessus VPX hors de la bande, le menu système,
   const main = read('app', 'src', 'frontend.ts');
   const notices = main.slice(main.indexOf('const menuNotices = createMenuNotices({'), main.indexOf('const liveCanShow'));
   assert.match(notices, /live: \{[\s\S]*onScreen: \(\) => friendsMenu\.live\.onScreen\(\)/);
-  assert.match(notices, /state\.phase === 'library' \|\| \(state\.phase === 'playing' && !!playing && !liveBoardUp\(\)\)/, 'par-dessus VPX seulement sans la bande de la partie');
+  assert.match(notices, /state\.phase === 'library' \|\| \(state\.phase === 'playing' && !!playing && !quietInGame\)/, 'par-dessus VPX pendant toute partie, sauf notifications masquées');
+  assert.match(notices, /band: \(\) => state\.phase === 'playing' && !!playing && liveBoardUp\(\)/, 'ce que la bande montre déjà ne se redit pas');
   assert.match(notices, /canShow: \(\) =>[^;]*!friendsMenu\.live\.onScreen\(\)/, 'jamais par-dessus l’écran de la partie');
-  assert.match(notices, /shown: \(\) => playUiSound\('news'\)/);
+  assert.match(notices, /sound: \(id\) => playUiSound\(id\)/);
   const corner = main.slice(main.indexOf('function menuCorner('), main.indexOf('function cinemaFor('));
-  assert.match(corner, /gameNotices\.line\(state\.phase === 'playing' && playing && corner\.notice\?\.live \? corner\.notice : undefined\)/);
-  assert.match(corner, /if \(state\.phase === 'library'\) return corner\.notice\?\.live \? \{ notice: corner\.notice \} : \{\};/);
+  assert.match(corner, /gameNotices\.line\(state\.phase === 'playing' && playing && corner\.notice\?\.away \? corner\.notice : undefined\)/);
+  assert.match(corner, /if \(state\.phase === 'library'\) return corner\.notice\?\.away \? \{ notice: corner\.notice \} : \{\};/);
   assert.match(main, /action\.type === 'live-game'[\s\S]{0,200}friendsMenu\.live\.open\(/);
   const start = main.indexOf('async function play(');
   const play = main.slice(start, start + main.slice(start).search(/\r?\n\}\r?\n/));
@@ -380,13 +387,217 @@ test('branchements : la ligne par-dessus VPX hors de la bande, le menu système,
   const notice = read('app', 'renderer', 'game-notice.js');
   assert.match(notice, /view\?\.mode === 'line'/);
   const renderer = read('app', 'renderer', 'frontend.js');
-  assert.match(renderer, /s\.phase === 'library' && s\.notice\?\.live \? cornerBox\(s\)/);
+  assert.match(renderer, /s\.phase === 'library' && s\.notice\?\.away \? cornerBox\(s\)/);
   // Textes de la ligne au plancher de 20 px (sur une fenêtre de 76 px de haut à 1 080 px).
   const css = read('app', 'renderer', 'game-notice.css');
   for (const sel of ['.line-title', '.line-detail']) {
     const size = Number(css.match(new RegExp(`\\n${sel.replace('.', '\\.')} \\{[^}]*font-size: calc\\(([\\d.]+) \\* var\\(--l\\)\\)`))?.[1]);
     assert.ok(size >= 20, `${sel} : ${size} px`);
   }
-  // Le son : au menu, jamais pendant une partie (pas un appel).
-  assert.doesNotMatch(read('packages', 'core', 'src', 'uisounds.ts').slice(read('packages', 'core', 'src', 'uisounds.ts').indexOf('  news: {')), /call: true/);
+});
+
+// ---------------------------------------------------------------------------
+// Partout, tout le temps (essai réel du 04/11/2026) : l'invitation en une ligne, la connexion d'un
+// ami avec son signal, pendant les parties aussi ; le réglage qui les masque pendant les parties.
+
+/** Un menu de notifications d'essai : amis, invitations, où l'on est, ce qui sonne. */
+function menuWith(opts: { friends: string[]; invites?: () => LiveInvite[]; where: () => 'menu' | 'library' | 'game' | 'quiet-game'; band?: () => boolean; inviteOnScreen?: (id: string) => boolean }) {
+  let clock = 2_000_000;
+  const online = new Set<string>();
+  const friends = opts.friends.map((name) => ({ key: name.toLowerCase(), name, since: new Date(0).toISOString(), events: [] }));
+  const sounds: string[] = [];
+  const state = () => ({ ...newSocialState(new Date(0)), friends });
+  const menu = createMenuNotices({
+    social: { state, online: (k: string) => online.has(k), presenceOf: () => undefined },
+    jobs: () => [],
+    mode: () => 'all',
+    canShow: () => opts.where() === 'menu',
+    redraw: () => undefined,
+    now: () => clock,
+    live: {
+      game: () => undefined,
+      invites: opts.invites ?? (() => []),
+      me: () => ME,
+      onScreen: () => false,
+      inviteOnScreen: opts.inviteOnScreen ?? (() => false),
+      band: opts.band ?? (() => false),
+      canShow: () => opts.where() !== 'quiet-game',
+    },
+    sound: (id: string, v: NoticeView) => sounds.push(`${id} ${v.title}`),
+  });
+  menu.observe();
+  return {
+    menu,
+    sounds,
+    online,
+    advance: (ms: number) => (clock += ms),
+    now: () => clock,
+  };
+}
+
+test('partout : un ami qui se connecte se voit et s’entend aussi dans le menu système et pendant une partie ; masquées, rien pendant la partie', () => {
+  let where: 'menu' | 'library' | 'game' | 'quiet-game' = 'game';
+  const m = menuWith({ friends: ['Bruno', 'Léa'], where: () => where });
+  try {
+    m.advance(NOTICE_STARTUP_QUIET_MS + 1000);
+    m.online.add('bruno');
+    m.menu.observe();
+    m.advance(NOTICE_GATHER_MS);
+    assert.equal(m.menu.view().notice?.title, 'Bruno vient de se connecter', 'pendant la partie, par-dessus VPX');
+    assert.equal(m.menu.view().notice?.away, true);
+    assert.deepEqual(m.sounds, ['friend Bruno vient de se connecter'], 'son signal, une fois');
+    // Notifications masquées pendant les parties : Léa se connecte, rien ne se montre ni ne sonne ; au menu, elle se montre.
+    m.advance(NOTICE_SHOW_MS + 5000);
+    where = 'quiet-game';
+    m.online.add('léa');
+    m.menu.observe();
+    m.advance(NOTICE_GATHER_MS + 500);
+    assert.equal(m.menu.view().notice, undefined);
+    assert.equal(m.sounds.length, 1);
+    where = 'library';
+    m.advance(100);
+    assert.equal(m.menu.view().notice?.title, 'Léa vient de se connecter', 'ce qui compte reste ensuite au menu');
+    assert.equal(m.sounds.length, 2);
+  } finally {
+    m.menu.stop();
+  }
+});
+
+test('partout : un ami qui va et vient ne sonne pas sans cesse ; une fois par ami en un quart d’heure', () => {
+  const m = menuWith({ friends: ['Bruno'], where: () => 'game' });
+  try {
+    m.advance(NOTICE_STARTUP_QUIET_MS + 1000);
+    const cycle = (offMs: number) => {
+      m.online.delete('bruno');
+      m.menu.observe();
+      m.advance(offMs);
+      m.online.add('bruno');
+      m.menu.observe();
+      m.advance(NOTICE_GATHER_MS + NOTICE_SHOW_MS + 2000);
+      m.menu.view();
+    };
+    m.online.add('bruno');
+    m.menu.observe();
+    m.advance(NOTICE_GATHER_MS);
+    m.menu.view();
+    assert.equal(m.sounds.length, 1);
+    // Il se reconnecte cinq fois en dix minutes : la tolérance de présence (social-net.ts) en couvre
+    // la plupart ; même vus hors ligne, il ne sonne plus avant son délai.
+    for (let i = 0; i < 5; i++) cycle(60_000);
+    assert.equal(m.sounds.length, 1, 'pas de son avant le délai de l’évènement');
+    m.advance(NOTICE_RULES['friend-online'].quietMs);
+    cycle(60_000);
+    assert.equal(m.sounds.length, 2, 'après un quart d’heure, de nouveau');
+  } finally {
+    m.menu.stop();
+  }
+});
+
+test('partout : l’invitation en une ligne avec son carillon (sans gros délai), pendant la partie ; rien sur l’écran de l’invitation', () => {
+  let invites: LiveInvite[] = [];
+  let onScreen = false;
+  const m = menuWith({ friends: ['Bruno'], where: () => 'game', invites: () => invites, inviteOnScreen: () => onScreen });
+  try {
+    m.advance(NOTICE_STARTUP_QUIET_MS);
+    const invite = liveInvite({ t: 'game-invite', game: { id: '0123456789abcdef', table, title: 'Glass Lagoon (Inventé 1987)', players: [] } }, { key: 'bruno', name: 'Bruno' }, new Date(m.now()));
+    invites = [invite];
+    m.menu.observe();
+    const v = m.menu.view().notice;
+    assert.equal(v?.title, 'Bruno vous invite à rejoindre une partie', 'tout de suite, avec le carillon');
+    assert.equal(v?.detail, 'Glass Lagoon (Inventé 1987)');
+    assert.equal(v?.away, true);
+    assert.deepEqual(m.sounds, [], 'le carillon sonne à l’arrivée (frontend.ts, onInvite), pas un second son');
+    // Une seconde invitation, ouverte à l'écran (au menu des tables, elle s'ouvre d'elle-même) : rien.
+    m.advance(NOTICE_LIVE_SHOW_MS + 2000);
+    m.menu.view();
+    onScreen = true;
+    invites = [{ ...invite, id: 'fedcba9876543210' }];
+    m.menu.observe();
+    m.advance(NOTICE_GATHER_MS);
+    assert.equal(m.menu.view().notice, undefined);
+  } finally {
+    m.menu.stop();
+  }
+  // Textes : seule, puis plusieurs.
+  assert.equal(noticeText('live-invite', [ev('live-invite', 'Bruno')]).title, 'Bruno vous invite à rejoindre une partie');
+  assert.equal(noticeText('live-invite', [ev('live-invite', 'Bruno'), ev('live-invite', 'Léa')]).title, '2 invitations à une partie');
+  setLanguage('en');
+  try {
+    assert.equal(noticeText('live-invite', [ev('live-invite', 'Bruno')]).title, 'Bruno invites you to join a game');
+  } finally {
+    setLanguage('fr');
+  }
+  assert.deepEqual(inviteNotices(undefined, [], 0), [], 'le premier relevé ne dit rien');
+});
+
+test('partout : pendant la partie entre amis, sa bande garde ce qu’elle montre ; un ami qui se connecte se voit quand même', () => {
+  let band = true;
+  const m = menuWith({ friends: ['Bruno', 'Léa'], where: () => 'game', band: () => band });
+  try {
+    m.advance(NOTICE_STARTUP_QUIET_MS + 1000);
+    m.online.add('léa');
+    m.menu.observe();
+    m.advance(NOTICE_GATHER_MS);
+    assert.equal(m.menu.view().notice?.title, 'Léa vient de se connecter');
+  } finally {
+    m.menu.stop();
+  }
+  // Le relevé des joueurs : « a quitté » tombe tant que la bande est là (menu-notices.ts, still).
+  const src = read('app', 'src', 'menu-notices.ts');
+  assert.match(src, /if \(isLiveNotice\(e\.kind\)\) return [^;]*!host\.live\.band\?\.\(\)/);
+  band = false;
+});
+
+test('règles : ce qui se montre partout, et son son ; les sons des notifications sonnent pendant la partie', () => {
+  const away = (Object.keys(NOTICE_RULES) as NoticeKind[]).filter((k) => NOTICE_RULES[k].away);
+  assert.deepEqual(away.sort(), ['friend-online', 'live-accepted', 'live-cancelled', 'live-declined', 'live-finished', 'live-invite', 'live-left']);
+  assert.equal(NOTICE_RULES['friend-online'].sound, 'friend');
+  assert.equal(NOTICE_RULES['live-invite'].sound, undefined, 'l’invitation a son carillon, à l’arrivée');
+  assert.equal(NOTICE_RULES['live-invite'].gatherMs, 0);
+  for (const k of away.filter((k) => k.startsWith('live-') && k !== 'live-invite')) assert.equal(NOTICE_RULES[k].sound, 'news', k);
+  for (const id of ['news', 'friend'] as const) {
+    assert.equal(UI_SOUNDS[id].notice, true, id);
+    assert.ok(uiSoundCue(id, { uiSounds: true, uiSoundsVolume: 50 }, 'game'), `${id} pendant la partie`);
+  }
+  // Trois sons distincts : l'appel, la nouvelle de la partie, le signal d'un ami.
+  const window = read('app', 'renderer', 'ui-sounds.js');
+  for (const id of ['invite', 'news', 'friend']) assert.match(window, new RegExp(`\\n    ${id}\\(ac, out, t\\) \\{`), id);
+  assert.match(window, /const CALL = new Set\(\['invite', 'news', 'friend'\]\)/);
+});
+
+test('réglage « Masquer les notifications pendant les parties » : dans la rubrique Amis, désactivé par défaut, gardé', () => {
+  assert.ok(SYSTEM_GROUPS.amis.entries.includes('quiet-in-game'));
+  assert.equal(SYSTEM_ITEMS['quiet-in-game'].label, 'Masquer les notifications pendant les parties');
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const setting = require(path.join(REPO_ROOT, 'app', 'dist', 'quiet-in-game-setting.js')) as { readQuietInGame(d: string): boolean; writeQuietInGame(d: string, v: boolean): void };
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-quiet-in-game-'));
+  assert.equal(setting.readQuietInGame(dir), false, 'désactivé par défaut');
+  setting.writeQuietInGame(dir, true);
+  assert.equal(setting.readQuietInGame(dir), true);
+  fs.writeFileSync(path.join(dir, 'amis', 'notifications-en-partie.json'), '{ illisible');
+  assert.equal(setting.readQuietInGame(dir), false, 'illisible : désactivé');
+  const main = read('app', 'src', 'frontend.ts');
+  assert.match(main, /library\.provideSystemItem\('quiet-in-game', \{/);
+  // Les places en partie suivent le sens où VPX dessine la table (gameorientation.ts, played).
+  assert.match(main, /rotation: playing && cabinet \? playedRotation\(cabinet\) : rotation/);
+});
+
+test('en partie : la ligne ne touche jamais la carte du départ commun, quels que soient l’écran, le sens et le nombre de joueurs', () => {
+  for (const zone of [
+    { x: 0, y: 0, width: 1920, height: 1080 },
+    { x: 0, y: 0, width: 1080, height: 1920 },
+    { x: -1080, y: 200, width: 1080, height: 1920 },
+    { x: 1920, y: 0, width: 3840, height: 2160 },
+    { x: 0, y: 0, width: 1280, height: 1024 },
+  ]) {
+    for (const rotation of ROTATIONS) {
+      const unit = Math.min(zone.width, zone.height) / 1080;
+      const line = gameNoticeBounds(zone, rotation, { width: Math.round(GAME_NOTICE_LINE.width * unit), height: Math.round(GAME_NOTICE_LINE.height * unit) }, Math.round(GAME_NOTICE_SIZE.margin * unit));
+      for (let rows = 1; rows <= 4; rows++) {
+        const wait = liveWaitBounds(zone, rotation, rows);
+        assert.ok(!overlap(line, wait), `${zone.width}×${zone.height}, ${rotation}°, ${rows} joueurs : la ligne ${JSON.stringify(line)} touche le départ ${JSON.stringify(wait)}`);
+      }
+    }
+  }
 });

@@ -21,8 +21,8 @@
 
   /** Sons du passage de relais (UI_SOUNDS[id].handover, uisounds.ts) : les seuls permis au début de la partie. */
   const HANDOVER = new Set(['coil']);
-  /** Sons d'un appel (UI_SOUNDS[id].call, uisounds.ts) : permis pendant la partie. */
-  const CALL = new Set(['invite']);
+  /** Sons permis pendant la partie : l'appel (UI_SOUNDS[id].call : une invitation) et ceux des notifications qui s'y montrent aussi (notice). */
+  const CALL = new Set(['invite', 'news', 'friend']);
   /** Écart minimal entre deux fois le même son, en ms : la roue qui défile vite ne mitraille pas. */
   const MIN_GAP_MS = 45;
   /** Contexte audio fermé après ce temps sans son : aucun flux ouvert sur la sortie pendant le reste du menu. */
@@ -177,6 +177,14 @@
         hiss(ac, out, t + at, { filter: 'highpass', freq: 6000, peak: 0.05, decay: 0.008 });
       }
       return 0.6;
+    },
+    // Signal d'un ami (un ami vient de se connecter, notices.ts) : une seule note douce qui glisse
+    // vers le haut, de 520 à 780 Hz en 70 ms, avec un soupçon d'octave ; ni cloche ni choc, pour se
+    // distinguer du carillon d'invitation et du tintement de la partie. 0,25 s, sans réverbération.
+    friend(ac, out, t) {
+      tone(ac, out, t, { from: 520, to: 780, glide: 0.07, peak: 0.22, attack: 0.008, decay: 0.22 });
+      tone(ac, out, t + 0.01, { from: 1040, to: 1560, glide: 0.07, peak: 0.04, attack: 0.008, decay: 0.14 });
+      return 0.25;
     },
     // Tintement de la partie entre amis (un invité accepte ou décline, la partie est finie,
     // notices.ts) : deux notes de cloche douces qui montent d'une quarte, mi puis la, à 120 ms

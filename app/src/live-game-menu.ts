@@ -92,6 +92,8 @@ export interface LiveMenu {
   attention(): boolean;
   /** L'écran de la partie (salon, départ, résultats) est ouvert : ses nouvelles s'y voient déjà (menu-notices.ts). */
   onScreen(): boolean;
+  /** L'écran de cette invitation est ouvert : elle s'y voit déjà (menu-notices.ts). */
+  inviteOnScreen(id: string): boolean;
   /** La partie est finie et ses résultats pas encore montrés : ils s'ouvrent au retour d'une partie d'une autre table. */
   unseenResults(): boolean;
 }
@@ -114,6 +116,8 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   let followed: { id: string; phase: LiveGame['phase'] } | undefined;
   /** La dernière partie dont les résultats, finis, ont été montrés. */
   let resultsSeen: string | undefined;
+  /** L'écran de l'invitation ouverte en dernier, et laquelle (inviteOnScreen). */
+  let inviteScreen: { id: string; build: () => Built } | undefined;
 
   const stateTone = (p: LivePlayer): Tone | undefined =>
     p.state === 'accepted' || p.state === 'playing' || p.state === 'done' || (p.state === 'loading' && p.ready) ? 'ok' : p.state === 'declined' || p.state === 'failed' || p.state === 'left' ? 'quiet' : p.state === 'busy' || p.state === 'expired' ? 'warning' : undefined;
@@ -625,7 +629,9 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   function openInvite(id: string, back: () => void): void {
     const invite = games.invites().find((i) => i.id === id);
     // Ouverte d'elle-même, parfois sous un bouton déjà appuyé : le curseur sur « Répondre plus tard ».
-    const show = () => host.library.openCustom(() => buildInvite(id, back), Number.MAX_SAFE_INTEGER);
+    const build = () => buildInvite(id, back);
+    inviteScreen = { id, build };
+    const show = () => host.library.openCustom(build, Number.MAX_SAFE_INTEGER);
     if (!invite || matches.has(id)) return show();
     // La table vérifiée d'abord : l'écran s'ouvre avec toutes ses actions, le curseur sur la première.
     void games.matchFor(invite).then(
@@ -740,6 +746,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     },
     attention: () => games.invites().length > 0 || games.current()?.phase === 'finished',
     onScreen: () => host.library.isShowing?.(buildGame) ?? false,
+    inviteOnScreen: (id) => inviteScreen?.id === id && (host.library.isShowing?.(inviteScreen.build) ?? false),
     unseenResults: () => {
       const game = games.current();
       return game?.phase === 'finished' && game.id !== resultsSeen;

@@ -81,9 +81,27 @@ export function liveAwaited(game: Pick<LiveGame, 'players'>): LivePlayer[] {
   return livePlayers(game).filter((p) => (p.state === 'accepted' || p.state === 'loading') && !p.ready && liveCommonStart(p));
 }
 
-/** L'heure où « partez » sera donné sans les derniers (ms), une fois un premier joueur prêt. */
-export function liveGoDeadline(game: Pick<LiveGame, 'firstReadyAt'>): number | undefined {
-  return game.firstReadyAt ? Date.parse(game.firstReadyAt) + LIVE_READY_WAIT_MS : undefined;
+/**
+ * Garde-fou : la table à l'écran depuis ce temps sans que son relevé dise « prêt » (ligne illisible,
+ * relevé muet), elle se dit prête quand même, et le journal dit pourquoi (frontend.ts). Le relevé
+ * garde son propre compte (trois secondes de table à l'écran) avant le crédit et Start. Essai réel
+ * du 04/11/2026 (The Goonies, The Matrix) : « Chargement de la table… » sans fin sur les deux bornes.
+ */
+export const LIVE_READY_SIGNAL_MS = 20_000;
+
+/** La table est à l'écran depuis `onScreenSince` (ms) et son relevé ne dit toujours pas « prêt » : le garde-fou la dit prête. */
+export function liveReadyOverdue(onScreenSince: number | undefined, now: number): boolean {
+  return onScreenSince !== undefined && now - onScreenSince >= LIVE_READY_SIGNAL_MS;
+}
+
+/**
+ * L'heure où « partez » sera donné sans les derniers (ms) : LIVE_READY_WAIT_MS après le premier prêt ;
+ * personne prêt, au plus tard ce délai et le garde-fou après le lancement (`startAt`) : une attente
+ * où nul ne se dit prêt finit quand même.
+ */
+export function liveGoDeadline(game: Pick<LiveGame, 'firstReadyAt' | 'startAt'>): number | undefined {
+  if (game.firstReadyAt) return Date.parse(game.firstReadyAt) + LIVE_READY_WAIT_MS;
+  return game.startAt ? Date.parse(game.startAt) + LIVE_READY_WAIT_MS + LIVE_READY_SIGNAL_MS : undefined;
 }
 
 /**

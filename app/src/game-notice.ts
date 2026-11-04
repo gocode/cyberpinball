@@ -34,7 +34,7 @@ import {
   type GameNoticeView,
   type LiveBoardScreens,
   type LiveBoardView,
-  type LiveScoresPlace,
+  type LiveScoresSettings,
   type LiveInvite,
   type NoticeView,
   type LiveWaitView,
@@ -51,7 +51,7 @@ export interface GameNoticesOptions {
   /** Partie entre amis : les écrans que la bande peut prendre (DMD, écrans libres, plateau). */
   boardScreens(): LiveBoardScreens | undefined;
   /** Où le joueur veut voir les scores des amis (Menu système > Amis). */
-  scoresPlace?(): LiveScoresPlace;
+  scoresSettings?(): LiveScoresSettings;
   /** Le DMD montre son écran de score, maintenant (dmd-watch.ts) : sans réponse, jamais de scores sur le DMD. */
   dmdScoreScreen?(): boolean;
   /**
@@ -93,6 +93,14 @@ export interface GameNotices {
 const TICK_MS = 1000;
 /** Relecture de la bande : les scores qui reviennent sur le DMD, et en repartent (LIVE_FLASH). */
 const BOARD_TICK_MS = 500;
+/**
+ * Une fenêtre étrangère qui repasse devant la bande (un PuP-Pack qui se remet sans cesse au premier
+ * plan) : la bande se remet devant à ce rythme, tant qu'elle insiste, et jusqu'à GUARD_MS après la
+ * dernière fois. Mesuré sur le bureau caché (docs\demo-bande-devant.ps1, 04/11/2026) : contre une
+ * fenêtre réaffirmée toutes les 100 ms, la relecture de 500 ms seule ne tenait devant que 11 % du temps.
+ */
+const GUARD_TICK_MS = 40;
+const GUARD_MS = 5000;
 
 /** Une fenêtre posée par-dessus VPX, et ce qu'elle montre. */
 export interface Overlay {
@@ -102,6 +110,9 @@ export interface Overlay {
   last: string;
   /** Place et forme : une autre place, une autre fenêtre (aucune n'est redimensionnée à la main). */
   key: string;
+  /** Remise devant rapide, tant qu'une fenêtre étrangère insiste (GUARD_TICK_MS), et jusqu'à quand. */
+  guard?: NodeJS.Timeout;
+  guardUntil?: number;
 }
 
 /** La fenêtre transparente, sans focus, que les clics traversent, hors des captures, au-dessus de VPX (et du menu). */
@@ -147,6 +158,7 @@ export const alive = (o: Overlay | undefined): o is Overlay => !!o && !o.win.isD
  * d'attente du départ commun restait vide quand la bande quittait le topper au même moment).
  */
 export function dispose(o: Overlay | undefined): void {
+  if (o?.guard) clearInterval(o.guard);
   if (alive(o)) o.win.close();
 }
 
@@ -287,10 +299,22 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     const key = `${name} ${by}`;
     const seen = (covers.get(key) ?? 0) + 1;
     covers.set(key, seen);
-    if (seen === 1) opts.log?.(`Bande de la partie entre amis${name === 'dmd' ? ' (DMD)' : ''} recouverte par ${by} : remise devant.`); // i18n-ignore : journal
-    if (seen === 10) opts.log?.(`Bande de la partie entre amis${name === 'dmd' ? ' (DMD)' : ''} : ${by} repasse sans cesse devant.`); // i18n-ignore : journal
+    const what = name === 'ligne' ? 'Notification pendant la partie' : `Bande de la partie entre amis${name === 'dmd' ? ' (DMD)' : ''}`; // i18n-ignore : journal
+    if (seen === 1) opts.log?.(`${what} recouverte par ${by} : remise devant.`); // i18n-ignore : journal
+    if (seen === 10) opts.log?.(`${what} : ${by} repasse sans cesse devant.`); // i18n-ignore : journal
     o.win.setAlwaysOnTop(true, 'screen-saver');
     o.win.moveTop();
+    // Elle insiste peut-être (un PuP qui se remet sans cesse au premier plan) : remise devant rapide, sans focus.
+    o.guardUntil = Date.now() + GUARD_MS;
+    o.guard ??= setInterval(() => {
+      if (!alive(o) || Date.now() > (o.guardUntil ?? 0)) {
+        clearInterval(o.guard);
+        o.guard = undefined;
+        return;
+      }
+      if (isShown(o.win)) o.win.moveTop();
+    }, GUARD_TICK_MS);
+    o.guard.unref?.();
   }
 
   /** La bande de la partie : sa place selon les écrans du moment et le choix du joueur, son contenu, les scores sur le DMD quand il montre l'écran de score. */
@@ -304,8 +328,9 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
       return;
     }
     const screens = opts.boardScreens();
-    const place = opts.scoresPlace?.() ?? 'auto';
-    const placement = screens ? liveBoardPlacement(screens, boardView.rows.length, place) : {};
+    const settings = opts.scoresSettings?.() ?? { place: 'auto', dmd: true };
+    const place = settings.place;
+    const placement = screens ? liveBoardPlacement(screens, boardView.rows.length, place, settings.dmd) : {};
     const where = JSON.stringify([placement.band?.role, placement.band?.bounds, placement.dmd, placement.fallback]);
     if (where !== placed) {
       placed = where;
@@ -313,7 +338,7 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
       const r = (x: Rect) => `${x.width} × ${x.height} en ${x.x}, ${x.y}`; // i18n-ignore : journal
       opts.log?.(`Bande de la partie entre amis, place : ${b ? `${b.role} (${b.layout}, ${r(b.bounds)})` : 'aucune bande permanente'}${placement.dmd ? `, scores sur le DMD quand il montre l'écran de score (${r(placement.dmd)})` : ''}${place !== 'auto' ? ` ; choix du joueur : ${place}${placement.fallback ? `, impossible ici (${placement.fallback}) : automatique` : ''}` : ''}${placement.why ? ` ; pourquoi : ${placement.why}` : ''}.`); // i18n-ignore : journal
       // Rien de visible en permanence : seulement sur le choix « Sur le DMD » (ses moments d'écran de score) ; sinon, une erreur de place.
-      if (!b && place !== 'dmd') opts.log?.(`Bande de la partie entre amis : aucune place visible (${screens ? 'écrans sans plateau' : 'écrans de la borne inconnus'}).`); // i18n-ignore : journal
+      if (!b) opts.log?.(`Bande de la partie entre amis : aucune place visible (${screens ? 'écrans sans plateau' : 'écrans de la borne inconnus'}).`); // i18n-ignore : journal
     }
     const b = placement.band;
     band = layer(band, b?.bounds, JSON.stringify([b?.bounds, b?.layout, b?.rotation]));
@@ -346,6 +371,8 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     if (!line.loaded) return;
     // Une capture de chaque nouvelle, à son entrée (son départ a le même nom : pas de seconde).
     send(line, { view: { ...lineView, mode: 'line' }, rotation }, `nouvelle-${lineView.id}`);
+    // Une fenêtre de VPX, de PuP ou du DMD passée devant : la notification repasse devant, sans prendre le focus.
+    keepInFront(line, 'ligne');
   }
 
   function closeLine(): void {
@@ -434,13 +461,8 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     if (lineView) showLine();
   }
 
-  function close(): void {
-    // Fin de partie : la bande ne revient pas après la carte de l’attente.
-    boardView = undefined;
-    closeLine();
-    closeNotice();
-    closeWait('fin de la partie'); // i18n-ignore : journal
-    waitEnded = false;
+  /** La bande seule (et ses points sur le DMD) : la nouvelle, l'invitation et l'attente du départ commun restent. */
+  function closeBoard(): void {
     if (boardTicker) clearInterval(boardTicker);
     boardTicker = undefined;
     boardView = undefined;
@@ -450,6 +472,16 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     for (const o of [band, dmd]) dispose(o);
     band = undefined;
     dmd = undefined;
+  }
+
+  function close(): void {
+    // Fin de partie : la bande ne revient pas après la carte de l’attente.
+    boardView = undefined;
+    closeLine();
+    closeNotice();
+    closeWait('fin de la partie'); // i18n-ignore : journal
+    waitEnded = false;
+    closeBoard();
   }
 
   return {
@@ -494,7 +526,9 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     },
     board(view) {
       if (!view) {
-        if (boardView) close();
+        // Plus de bande (l'attente du départ commun reprend la main, par exemple) : elle seule part.
+        // close() fermait aussi la carte d'attente qui venait de s'ouvrir (démonstration du 04/11/2026 : attente vue 0,5 s).
+        if (boardView) closeBoard();
         return;
       }
       if (!boardView) closeNotice();

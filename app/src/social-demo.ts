@@ -19,6 +19,9 @@
 // la salle de Bruno ; la borne le renvoie, et le départ se fait sans attendre le délai (essai réel du
 // 01/11/2026). =partie-sans-releve : la même partie sur une table sans relevé (départ manuel, pas
 // de score en direct) : marquée dans l'invitation, « Partez ! » qui part seul, un score inconnu.
+// =parties-enchainees : trois parties à la suite (essai réel du 04/11/2026 : la deuxième ne
+// finissait pas de charger) ; Bruno a deux tables en commun avec la borne, et réinvite après chaque
+// partie : la même table deux fois, puis l'autre.
 // CYBERPINBALL_RESEAU_DEMO=coupure (gestionnaire de téléchargements, docs\demo-gestionnaire-telechargements.ps1) :
 // la table que la borne n'a pas pèse 24 Mo, Bruno l'envoie à débit bridé et se déconnecte en
 // plein envoi ; =retour : au démarrage suivant de Cyber Pinball, Bruno (même borne, même clé)
@@ -47,7 +50,11 @@ export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
 }
 
 /** Les démonstrations de la partie en direct : Bruno invite la borne (`en-jeu` : pendant qu'elle joue). */
-const LIVE_DEMOS = ['partie', 'en-jeu', 'partie-coupure', 'partie-sans-releve'];
+const LIVE_DEMOS = ['partie', 'en-jeu', 'partie-coupure', 'partie-sans-releve', 'parties-enchainees'];
+/** Parties à la suite, démonstration « parties-enchainees » : la table de chacune (rang dans les tables communes). */
+const CHAINED_TABLES = [0, 0, 1];
+/** Après une partie finie, Bruno réinvite après ce délai : la borne a fermé ses résultats, elle est au menu des tables. */
+const CHAINED_AFTER_MS = 9000;
 /** Partie en direct, démonstration de la coupure : la liaison de Bruno tombe ce temps, dès que la borne lance sa table ; assez pour couvrir son « prêt » (table chargée quelques secondes après). */
 const LIVE_CUT_MS = 12_000;
 
@@ -120,7 +127,7 @@ export function seedSimulatedFriends(dataDir: string, now = new Date(), env: Nod
   const others = env.CYBERPINBALL_RESEAU_DEMO === 'notifications' ? ['David', 'Fanny'].map((name) => setName(newSocialState(now), name)!) : [];
   const since = state.friends[0]!.since;
   saveSocial(dataDir, { ...state, friends: [...state.friends, ...others.map((o) => ({ key: o.key.publicKey, name: o.name, since, lastSeen: threeHours.toISOString(), events: [] }))] });
-  if (['partie', 'partie-coupure', 'partie-sans-releve'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '')) seedHistory(dataDir, me.key.publicKey, emile.key.publicKey, now);
+  if (['partie', 'partie-coupure', 'partie-sans-releve', 'parties-enchainees'].includes(env.CYBERPINBALL_RESEAU_DEMO ?? '')) seedHistory(dataDir, me.key.publicKey, emile.key.publicKey, now);
   if (env.CYBERPINBALL_RESEAU_DEMO === 'notifications') {
     for (const friend of [emile, ...others]) {
       const dir = path.join(dataDir, 'reseau-simule', friend.name);
@@ -188,24 +195,27 @@ function picture(width: number, height: number, hue: [number, number, number]): 
  * une ROM et un PuP-Pack (des parties sous droits, à attester avant de les prendre) ; chacune avec
  * quelques médias.
  */
-function brunoRoot(dir: string, mine: readonly TableEntry[], cut = false, sameVersion = false): string {
+function brunoRoot(dir: string, mine: readonly TableEntry[], cut = false, sameVersion = false, common = 1): string {
   const root = path.join(dir, 'borne');
   const tables = layoutOf(root).tables;
-  const folders = [...(mine[0] ? [path.basename(mine[0].folder)] : []), DEMO_TABLES.notOnCabinet];
+  // Les tables qu'il a aussi (`common`, celles de la borne d'abord), puis celle qu'elle n'a pas.
+  const shared = mine.slice(0, common);
+  const folders = [...shared.map((t) => path.basename(t.folder)), DEMO_TABLES.notOnCabinet];
   for (const [i, folder] of folders.entries()) {
+    const other = folder === DEMO_TABLES.notOnCabinet;
     const at = path.join(tables, folder);
     fs.mkdirSync(path.join(at, 'medias'), { recursive: true });
     const vpx = path.join(at, `${folder}.vpx`);
-    if (!i && sameVersion && mine[0]) fs.copyFileSync(mine[0].file, vpx);
-    else if (!fs.existsSync(vpx)) fs.writeFileSync(vpx, i && cut ? bigTable(CUT_TABLE_BYTES) : Buffer.alloc(200_000 + i, 9));
-    const hue: [number, number, number] = i ? [200, 90, 220] : [40, 200, 170];
+    if (!other && sameVersion) fs.copyFileSync(shared[i]!.file, vpx);
+    else if (!fs.existsSync(vpx)) fs.writeFileSync(vpx, other && cut ? bigTable(CUT_TABLE_BYTES) : Buffer.alloc(200_000 + i, 9));
+    const hue: [number, number, number] = other ? [200, 90, 220] : [40, 200, 170];
     fs.writeFileSync(path.join(at, 'medias', `(Wheel) ${folder}.png`), picture(256, 256, hue));
     fs.writeFileSync(path.join(at, 'medias', `(Backglass) ${folder}.png`), picture(640, 480, hue));
     fs.writeFileSync(path.join(at, 'medias', `(GameHelp) ${folder}.png`), picture(480, 640, hue));
     fs.writeFileSync(path.join(at, 'medias', `(Topper) ${folder}.png`), picture(768, 256, hue));
     fs.writeFileSync(path.join(at, 'medias', `(FullDMD) ${folder}.png`), picture(640, 360, hue));
     fs.writeFileSync(path.join(at, 'medias', `(Loading) ${folder}.png`), picture(640, 360, hue));
-    if (i) {
+    if (other) {
       // Une archive zip vide (sa seule fin de répertoire) et un écran de PuP-Pack.
       fs.mkdirSync(path.join(at, 'pinmame', 'roms'), { recursive: true });
       fs.writeFileSync(path.join(at, 'pinmame', 'roms', 'glag_l1.zip'), Buffer.from([0x50, 0x4b, 0x05, 0x06, ...new Array(18).fill(0)]));
@@ -298,7 +308,11 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     };
   }
   let games: LiveGames | undefined;
-  let starting = false;
+  /** La partie dont Bruno a donné le départ, et celle après laquelle il a déjà réinvité. */
+  let startedFor = '';
+  let againAfter = '';
+  const chained = mode === 'parties-enchainees';
+  let round = 0;
   const liveDemo = LIVE_DEMOS.includes(mode ?? '');
   const manual = mode === 'partie-sans-releve';
   // Coupure pendant l'attente : rien ne passe, dans un sens ni dans l'autre, et la borne de Bruno ne voit plus la sienne.
@@ -325,6 +339,8 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     games = createLiveGames({
       net: liveNet,
       dataDir: brunoDir,
+      // Son journal, préfixé : ce que fait sa borne se lit avec celui de la borne.
+      log: (line) => log(`Bruno : ${line}`), // i18n-ignore : journal
       tables: brunoTables,
       // Ses réglages partent vers la borne, comme ceux d'une vraie borne (hostsettings.ts).
       settingsOf: (table) => readHostSettings({ folder: table.folder, roms: [] }),
@@ -346,26 +362,57 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
         }
         return { ok: true, seconds: 254, records: [{ score: 2_841_350_120, rank: 1, initials: 'BRU' }] };
       },
-      // La borne a accepté : Bruno donne le départ un peu après.
+      // La borne a accepté : Bruno donne le départ un peu après. Parties à la suite : la partie finie,
+      // il ferme la sienne et réinvite, jusqu'à la dernière.
       onChange: () => {
         const game = games?.current();
-        if (starting || game?.phase !== 'gathering' || !game.players.some((p) => !p.host && p.state === 'accepted')) return;
-        starting = true;
+        if (chained && game?.phase === 'finished' && againAfter !== game.id && round + 1 < CHAINED_TABLES.length) {
+          againAfter = game.id;
+          timers.push(
+            setTimeout(() => {
+              round++;
+              games?.close();
+              log(`Réseau simulé : Bruno réinvite la borne (partie ${round + 1} sur ${CHAINED_TABLES.length}).`); // i18n-ignore : journal
+              void invite();
+            }, CHAINED_AFTER_MS),
+          );
+        }
+        if (!game || startedFor === game.id || game.phase !== 'gathering' || !game.players.some((p) => !p.host && p.state === 'accepted')) return;
+        startedFor = game.id;
         timers.push(setTimeout(() => games?.start(), 3500));
       },
     });
   }
+  // La borne pas encore vue en ligne chez Bruno (liaison qui se refait) : l'invitation ne part pas ;
+  // il réessaie, comme un joueur, toutes les deux secondes, une minute au plus, et le journal le dit.
+  // Parties à la suite : la table de cette partie (CHAINED_TABLES), parmi celles qu'ils ont tous deux.
+  const invite = async (tries = 0): Promise<void> => {
+    if (!games) return;
+    bruno.setPresence({ status: 'menu', since: new Date().toISOString() });
+    const want = chained ? path.basename(mine()[CHAINED_TABLES[round]!]?.folder ?? '') : undefined;
+    const shared = (want && brunoTables().find((t) => path.basename(t.folder) === want)) || brunoTables()[0];
+    if (!shared) return;
+    try {
+      if (!games.current()) await games.create(shared);
+    } catch (error) {
+      return log(`Réseau simulé : salon de Bruno pas ouvert sur ${shared.title} (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+    if (games.invite(me.key, me.name)) return log(`Réseau simulé : Bruno invite la borne sur ${shared.title}.`); // i18n-ignore : journal
+    if (tries >= 30) return log('Réseau simulé : invitation de Bruno abandonnée après une minute.'); // i18n-ignore : journal
+    if (!tries) log('Réseau simulé : invitation de Bruno pas partie (borne pas encore en ligne chez lui), nouvel essai toutes les 2 s.'); // i18n-ignore : journal
+    timers.push(setTimeout(() => void invite(tries + 1), 2000));
+  };
   bruno.request(me);
   chloe.request(me);
   // Bruno devient ami (la démonstration accepte à la place du joueur), puis joue. Déjà ami (retour) : sa bibliothèque tout de suite.
   const accept = setInterval(() => {
     if (main.state().friends.some((f) => f.key === bruno.state().key.publicKey)) {
-      root ??= brunoRoot(brunoDir, mine(), cut, liveDemo);
+      root ??= brunoRoot(brunoDir, mine(), cut, liveDemo, chained ? 2 : 1);
       clearInterval(accept);
       return;
     }
     if (main.state().incoming.some((r) => r.key === bruno.state().key.publicKey)) {
-      root ??= brunoRoot(brunoDir, mine(), cut, liveDemo);
+      root ??= brunoRoot(brunoDir, mine(), cut, liveDemo, chained ? 2 : 1);
       main.accept(bruno.state().key.publicKey);
       clearInterval(accept);
       // Notifications : Bruno suit l'horaire de la démonstration (NOTIFICATIONS_SCRIPT).
@@ -377,17 +424,6 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       // Partie en direct : l'invitation, une fois la borne reliée et le menu affiché ; en-jeu, une
       // fois la borne en partie (sa présence le dit).
       if (games) {
-        // La borne pas encore vue en ligne chez Bruno (liaison qui se refait) : l'invitation ne part pas ;
-        // il réessaie, comme un joueur, toutes les deux secondes, une minute au plus, et le journal le dit.
-        const invite = async (tries = 0) => {
-          bruno.setPresence({ status: 'menu', since: new Date().toISOString() });
-          const shared = brunoTables()[0];
-          if (!shared) return;
-          if (!games!.current()) await games!.create(shared);
-          if (games!.invite(me.key, me.name) || tries >= 30) return;
-          if (!tries) log('Réseau simulé : invitation de Bruno pas partie (borne pas encore en ligne chez lui), nouvel essai toutes les 2 s.'); // i18n-ignore : journal
-          timers.push(setTimeout(() => void invite(tries + 1), 2000));
-        };
         if (mode !== 'en-jeu') timers.push(setTimeout(invite, 6000));
         else {
           const watch = setInterval(() => {

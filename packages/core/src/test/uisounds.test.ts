@@ -11,6 +11,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import * as vm from 'node:vm';
 import { REPO_ROOT } from './i18n-scan';
+import { NOTICE_RULES } from '../notices';
 import { UI_SOUND_IDS, UI_SOUNDS, uiSoundCue } from '../uisounds';
 import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings, type MenuMediaSettings } from '../mediaview';
 import { playVolume, type MenuMoment } from '../menumoments';
@@ -39,10 +40,12 @@ test('rien ne joue quand les sons sont coupés, à 0 %, en mode attente ou penda
       assert.equal(uiSoundCue(id, off, moment), undefined, `${id} coupé, ${moment}`);
       assert.equal(uiSoundCue(id, silent, moment), undefined, `${id} à 0 %, ${moment}`);
     }
-    const relay = { ...(UI_SOUNDS[id].handover ? { handover: true } : {}), ...(UI_SOUNDS[id].call ? { call: true } : {}) };
+    const ring = UI_SOUNDS[id].call || UI_SOUNDS[id].notice;
+    const relay = { ...(UI_SOUNDS[id].handover ? { handover: true } : {}), ...(ring ? { call: true } : {}) };
     // Pendant la partie : seuls le son du passage de relais (le coup de bobine, quand VPX prend la
-    // main) et celui d'un appel (le carillon d'une invitation, qui attend une réponse).
-    const allowed = UI_SOUNDS[id].handover || UI_SOUNDS[id].call;
+    // main), celui d'un appel (le carillon d'une invitation, qui attend une réponse) et ceux des
+    // notifications qui se montrent aussi pendant la partie (essai réel du 04/11/2026).
+    const allowed = UI_SOUNDS[id].handover || ring;
     assert.deepEqual(uiSoundCue(id, S, 'game'), allowed ? { id, volume: playVolume(50), ...relay } : undefined, `${id} pendant la partie`);
     assert.equal(uiSoundCue(id, S, 'attract'), undefined, `${id} en mode attente`);
     assert.deepEqual(uiSoundCue(id, S, 'browse'), { id, volume: playVolume(50), ...relay });
@@ -51,6 +54,9 @@ test('rien ne joue quand les sons sont coupés, à 0 %, en mode attente ou penda
   }
   assert.deepEqual(UI_SOUND_IDS.filter((id) => UI_SOUNDS[id].handover), ['coil'], 'un seul son de relais');
   assert.deepEqual(UI_SOUND_IDS.filter((id) => UI_SOUNDS[id].call), ['invite'], 'un seul son d’appel');
+  // Un son de notification est celui d'une règle de notification (notices.ts, NoticeRule.sound), et seulement lui.
+  const ruled = new Set(Object.values(NOTICE_RULES).flatMap((r) => (r.sound ? [r.sound] : [])));
+  assert.deepEqual(UI_SOUND_IDS.filter((id) => UI_SOUNDS[id].notice), [...ruled].sort((a, b) => UI_SOUND_IDS.indexOf(a) - UI_SOUND_IDS.indexOf(b)));
 });
 
 test('fenêtre : le carillon d’une invitation sonne pendant la partie, et seulement lui', () => {
@@ -239,8 +245,10 @@ test('branchements : le processus principal ne joue un son que par uiSoundCue, a
   const fn = main.slice(main.indexOf('function playUiSound('), main.indexOf('function moment('));
   assert.match(fn, /uiSoundCue\(id, mediaSettings, moment\(\)\)/);
   assert.match(fn, /windows\.get\('playfield'\)/);
-  // Chaque son du registre a son déclencheur.
-  for (const id of UI_SOUND_IDS) assert.match(main, new RegExp(`playUiSound\\('${id}'\\)`), id);
+  // Chaque son du registre a son déclencheur : un appel explicite, ou, pour le son d'une
+  // notification, la règle qui le porte (NoticeRule.sound), jouée par menu-notices.ts.
+  for (const id of UI_SOUND_IDS.filter((id) => !UI_SOUNDS[id].notice)) assert.match(main, new RegExp(`playUiSound\\('${id}'\\)`), id);
+  assert.match(main, /sound: \(id\) => playUiSound\(id\)/, 'les sons des notifications, joués à leur entrée');
   // Fenêtre : la page charge le moteur, l'état lui donne la phase, la sortie du menu lui est passée.
   assert.match(read('app', 'renderer', 'frontend.html'), /<script src="ui-sounds\.js"><\/script>/);
   assert.match(read('app', 'renderer', 'frontend.js'), /CyberUiSounds\?\.setPhase\(s\.phase\)/);

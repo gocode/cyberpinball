@@ -1,14 +1,15 @@
 // Banc hors écran des notifications de la partie entre amis (essai réel du 31/10/2026 : un invité
-// accepte pendant qu'on est sorti du salon, on finit avant les autres et on joue autre chose),
-// lancé par docs\demo-notifications-partie.ps1. Les nouvelles viennent du vrai relevé et de la vraie
+// accepte pendant qu'on est sorti du salon, on finit avant les autres et on joue autre chose) et de
+// celles qui se montrent partout (essai réel du 04/11/2026 : une invitation, un ami qui se connecte,
+// aussi pendant les parties), lancé par docs\demo-notifications-partie.ps1. Les nouvelles viennent du vrai relevé et de la vraie
 // file (livenotices.ts, notices.ts : textes, regroupement, tons), puis sont dessinées par les vraies
 // pages, dans chacun de leurs lieux :
 // - au menu des tables (frontend.html), avec les pastilles des amis et des téléchargements ;
 // - dans le menu système (frontend.html, phase « library », l'écran « Mes amis ») ;
 // - pendant la partie d'une autre table (game-notice.html, la fenêtre posée par-dessus VPX), à la
 //   place que donne gameNoticeBounds sur chaque jeu d'écrans simulés (docs\ecrans), dans les
-//   quatre sens du plateau, seule ou sous la carte d'une invitation ; une planche par jeu
-//   d'écrans les montre à l'échelle sur le plateau.
+//   quatre sens du plateau, seule ou sous la carte d'une invitation, jamais sur la carte du départ
+//   commun ; une planche par jeu d'écrans les montre à l'échelle sur le plateau.
 // Chaque rendu passe le garde-fou de mise en page (chevauchement, rognure, texte sous 20 px) ; le
 // relevé dans mise-en-page.txt doit rester muet.
 //   electron docs/demo-notifications-partie.cjs <spec.json>   { "out": dossier des captures, "langue": "fr" | "en" }
@@ -48,10 +49,14 @@ function salon(names) {
 
 /** La notification que la file montrerait après ce changement de la partie. */
 function noticeOf(before, after) {
-  const events = core.liveNotices(core.liveSnapshot(before, ME), core.liveSnapshot(after, ME), after, ME, 1000);
+  return viewOf(core.liveNotices(core.liveSnapshot(before, ME), core.liveSnapshot(after, ME), after, ME, 1000));
+}
+
+/** La notification que la file montrerait de ces évènements, hors du menu des tables (menu système, partie). */
+function viewOf(events) {
   const center = core.createNoticeCenter();
   center.push(events);
-  const view = center.tick(1000 + core.NOTICE_GATHER_MS, { canShow: true, liveOnly: true }).view;
+  const view = center.tick(1000 + core.NOTICE_GATHER_MS, { canShow: true, away: true }).view;
   if (!view) throw new Error(`aucune notification pour ${JSON.stringify(events.map((e) => e.kind))}`);
   return view;
 }
@@ -64,6 +69,15 @@ function finished(myScore) {
   g = core.gameStatus(g, ME, { state: 'done', score: myScore }, at(140));
   g = core.gameStatus(g, 'léa', { state: 'done', score: 980_120 }, at(300));
   return [g, core.gameStatus(g, 'bruno', { state: 'done', score: 2_418_300 }, at(600))];
+}
+
+/** Des amis qui se connectent, par le vrai relevé du réseau des amis. */
+function friendOnline(names) {
+  const friends = names.map((name) => ({ key: name.toLowerCase().padEnd(64, '0'), name, since: at(0).toISOString(), events: [] }));
+  const state = { ...core.newSocialState(at(0)), friends };
+  const before = core.socialSnapshot(state, () => false, () => undefined);
+  const after = core.socialSnapshot(state, () => true, () => undefined);
+  return core.socialNotices(before, after, state, 1000);
 }
 
 function news() {
@@ -85,6 +99,10 @@ function news() {
     quitte: noticeOf(playing, core.gameStatus(playing, 'bruno', { state: 'left' }, at(60))),
     terminee: noticeOf(...finished(1_240_500)),
     gagnee: noticeOf(...finished(3_000_000)),
+    // Essai réel du 04/11/2026 : l'invitation en une ligne, et un ami qui se connecte, aussi pendant les parties.
+    invitation: viewOf(core.inviteNotices(new Set(), [core.liveInvite({ t: 'game-invite', game: { id: '0123456789abcdef', table: TABLE, title: 'Neon Harbor (Inventé 1986)', players: [] } }, { key: 'bruno', name: 'Bruno' }, at(0))], 1000)),
+    'ami-connecte': viewOf(friendOnline(['Bruno'])),
+    'amis-connectes': viewOf(friendOnline(['Bruno', 'Léa'])),
   };
   return Object.fromEntries(Object.entries(views).map(([name, view]) => [name, { ...view, id: name }]));
 }
@@ -188,6 +206,7 @@ async function renderMenus(views, report) {
 
 const LAYOUTS = {
   borne: { playfield: 0 },
+  pincab: { playfield: 0 },
   'poste-deux-ecrans': { playfield: 2 },
   'un-ecran': { playfield: 0 },
 };
@@ -262,10 +281,12 @@ async function renderInGame(views, report) {
           }
           if (what === 'terminee') sheet.push({ rotation, withInvite, zone, layers: [...layers, { bounds, image: rendered.get(key) }] });
         }
-        // Dans la zone du plateau, jamais sur l'invitation.
+        // Dans la zone du plateau, jamais sur l'invitation, ni (seule) sur la carte du départ commun.
+        const touches = (a, b) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
         const inside = bounds.x >= zone.x && bounds.y >= zone.y && bounds.x + bounds.width <= zone.x + zone.width && bounds.y + bounds.height <= zone.y + zone.height;
-        const overlap = withInvite && bounds.x < cardBounds.x + cardBounds.width && cardBounds.x < bounds.x + bounds.width && bounds.y < cardBounds.y + cardBounds.height && cardBounds.y < bounds.y + bounds.height;
-        if (!inside || overlap) report.push(`${name} ${rotation}° ${withInvite ? 'sous l’invitation' : 'seule'} : ${!inside ? 'hors du plateau' : 'sur l’invitation'}`);
+        const overlap = withInvite && touches(bounds, cardBounds);
+        const onStart = !withInvite && [1, 2, 3, 4].some((rows) => touches(bounds, core.liveWaitBounds(zone, rotation, rows)));
+        if (!inside || overlap || onStart) report.push(`${name} ${rotation}° ${withInvite ? 'sous l’invitation' : 'seule'} : ${!inside ? 'hors du plateau' : overlap ? 'sur l’invitation' : 'sur la carte du départ'}`);
       }
     }
     await drawSheet(name, zone, sheet);

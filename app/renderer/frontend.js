@@ -807,9 +807,9 @@ function drawPlayfield(s) {
   // Mode invité : le cadenas prend la place de la roue dentée, le menu système est fermé.
   if (!(s.phase === 'message' && s.message?.action === 'power')) nodes.push(s.guest ? guestLock(s.guest) : gearButton(s));
   // Au menu des tables seulement : un écran plein a son propre accès (première entrée du menu
-  // système). Pastilles et notification, jamais en mode invité. Dans le menu système, une
-  // nouvelle de la partie entre amis seule (notices.ts, NoticeRule.live), au même endroit.
-  const corner = s.phase === 'menu' && !s.guest ? cornerBox(s) : s.phase === 'library' && s.notice?.live ? cornerBox(s) : undefined;
+  // système). Pastilles et notification, jamais en mode invité. Dans le menu système, ce qui se
+  // montre partout (notices.ts, NoticeRule.away : partie entre amis, invitation, ami connecté), au même endroit.
+  const corner = s.phase === 'menu' && !s.guest ? cornerBox(s) : s.phase === 'library' && s.notice?.away ? cornerBox(s) : undefined;
   if (corner) nodes.push(corner);
   else noticeShown = undefined;
 

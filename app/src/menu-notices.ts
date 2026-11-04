@@ -1,16 +1,20 @@
 // Notifications du menu des tables (packages/core/src/notices.ts) : la pastille des amis en
 // ligne et une notification discrète à la fois, à gauche de la roue dentée.
 //
-// Trois relevés, comparés à chaque changement : le réseau des amis (un ami qui se connecte, qui
+// Quatre relevés, comparés à chaque changement : le réseau des amis (un ami qui se connecte, qui
 // lance une partie, une demande reçue ou acceptée, un record ou un badge d'un ami), la file des
-// téléchargements (un téléchargement fini ou bloqué) et la partie entre amis (livenotices.ts : un
-// invité accepte ou décline, un joueur quitte, la partie est finie). La file des notifications
-// décide quand montrer quoi ; ce module lui donne l'heure, dit si l'écran s'y prête et redessine
-// le menu quand ce qu'elle montre change (une entrée, un départ, une fin), jamais plus.
+// téléchargements (un téléchargement fini ou bloqué), les invitations reçues et la partie entre
+// amis (livenotices.ts : un invité accepte ou décline, un joueur quitte, la partie est finie). La
+// file des notifications décide quand montrer quoi ; ce module lui donne l'heure, dit si l'écran
+// s'y prête et redessine le menu quand ce qu'elle montre change (une entrée, un départ, une fin),
+// jamais plus.
 //
-// La partie entre amis se montre aussi hors du menu des tables (menu système, partie d'une autre
-// table : `live.canShow`), sauf sur l'écran de la partie, qui le dit déjà, et même notifications
-// coupées : le joueur attend ces nouvelles (NoticeRule.live).
+// Ce qui se montre partout (NoticeRule.away : la partie entre amis, une invitation, un ami qui se
+// connecte) paraît aussi hors du menu des tables, dans le menu système et par-dessus VPX
+// (`live.canShow`), sauf sur l'écran de la partie ou de l'invitation, qui le disent déjà, et ce
+// que la bande de la partie en cours montre déjà (`live.band`). La partie entre amis reste même
+// notifications coupées : le joueur attend ces nouvelles (NoticeRule.live). Chaque notification
+// qui a son son (NoticeRule.sound) le fait entendre à son entrée, une fois (`sound`).
 
 import {
   NOTICE_RULES,
@@ -19,6 +23,7 @@ import {
   downloadNotices,
   downloadSnapshot,
   friendsOnlineView,
+  inviteNotices,
   isLiveNotice,
   liveNotices,
   liveSnapshot,
@@ -28,6 +33,7 @@ import {
   type DownloadSnapshot,
   type FriendsListSync,
   type LiveGame,
+  type LiveInvite,
   type LiveSnapshot,
   type NoticeEvent,
   type NoticeView,
@@ -35,6 +41,7 @@ import {
   type Presence,
   type SocialSnapshot,
   type SocialState,
+  type UiSoundId,
 } from '@cyberpinball/core';
 
 export interface MenuNoticesHost {
@@ -54,18 +61,24 @@ export interface MenuNoticesHost {
   canShow(): boolean;
   /** Ce que la notification montre a changé : redessiner le menu. */
   redraw(): void;
-  /** La partie entre amis (live-game.ts) : ses nouvelles se montrent aussi hors du menu des tables. */
+  /** La partie entre amis et les invitations (live-game.ts) ; ce qui se montre partout. */
   live?: {
     game(): LiveGame | undefined;
+    /** Invitations encore valables. */
+    invites?(): readonly LiveInvite[];
     /** Clé de cette borne. */
     me(): string;
     /** L'écran de la partie (salon, départ, résultats) est ouvert : il le dit déjà. */
     onScreen(): boolean;
-    /** Une nouvelle de la partie peut se montrer ici (menu des tables, menu système, partie d'une autre table). */
+    /** L'écran de cette invitation est ouvert : il le dit déjà. */
+    inviteOnScreen?(id: string): boolean;
+    /** La bande de la partie entre amis est sur les écrans (pendant la partie) : elle dit déjà où en sont les joueurs. */
+    band?(): boolean;
+    /** Ce qui se montre partout peut se montrer ici (menu des tables, menu système, partie). */
     canShow(): boolean;
-    /** Une nouvelle de la partie entre à l'écran : son discret. */
-    shown?(view: NoticeView): void;
   };
+  /** Une notification qui a son son entre à l'écran (NoticeRule.sound). */
+  sound?(id: UiSoundId, view: NoticeView): void;
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -92,8 +105,10 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
    * démarrage, et le service qui la tient est créé après ce module (frontend.ts).
    */
   let born = false;
-  /** Dernière nouvelle de la partie entrée à l'écran (son id), pour son seul son. */
-  let liveShown: string | undefined;
+  /** Invitations déjà vues (le premier relevé les prend telles quelles). */
+  let invites: ReadonlySet<string> | undefined;
+  /** Dernière notification entrée à l'écran (son id), pour son seul son. */
+  let sounded: string | undefined;
   let timer: NodeJS.Timeout | undefined;
   let shown = 'null';
   let stopped = false;
@@ -119,9 +134,12 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
         const j = host.jobs().find((x) => x.id === e.key);
         return Boolean(j && j.state === 'failed' && !j.seen);
       }
+      case 'live-invite':
+        // Encore valable, et son écran fermé (ouvert, il le dit déjà).
+        return !!host.live?.invites?.().some((i) => i.id === e.key) && !host.live.inviteOnScreen?.(e.key);
       default:
-        // La partie entre amis : encore la mienne, et son écran fermé (ouvert, il le dit déjà).
-        if (isLiveNotice(e.kind)) return !!host.live && host.live.game()?.id === e.key.split('|')[0] && !host.live.onScreen();
+        // La partie entre amis : encore la mienne, son écran fermé, la bande pas là (elles le disent déjà).
+        if (isLiveNotice(e.kind)) return !!host.live && host.live.game()?.id === e.key.split('|')[0] && !host.live.onScreen() && !host.live.band?.();
         return true;
     }
   }
@@ -131,8 +149,9 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     // Notifications coupées : seule la partie entre amis reste.
     if (!all) center.clear((e) => isLiveNotice(e.kind));
     const menu = all && host.canShow();
-    const liveHere = host.canShow() || (host.live?.canShow() ?? false);
-    return center.tick(now(), { canShow: menu || liveHere, liveOnly: !menu, still });
+    // Ce qui se montre partout : au menu des tables (même notifications coupées), dans le menu système, en partie.
+    const away = host.canShow() || (host.live?.canShow() ?? false);
+    return center.tick(now(), { canShow: menu || away, away: !menu, still });
   }
 
   /** Redessine si ce que la file montre a changé (le rendu reprogramme la suite), sinon repasse à l'heure qu'elle demande. */
@@ -161,9 +180,10 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     const jobs = host.jobs();
     const game = born ? host.live?.game() : undefined;
     const me = born ? (host.live?.me() ?? '') : '';
+    const received = born ? (host.live?.invites?.() ?? []) : [];
     born = true;
     const nextLive = liveSnapshot(game, me);
-    const events = [...liveNotices(live, nextLive, game, me, t), ...socialNotices(social, nextSocial, s, t, host.badgeLabel), ...downloadNotices(downloads, jobs, t, host.reason)]
+    const events = [...inviteNotices(invites, received, t), ...liveNotices(live, nextLive, game, me, t), ...socialNotices(social, nextSocial, s, t, host.badgeLabel), ...downloadNotices(downloads, jobs, t, host.reason)]
       // Au démarrage, et tant que la borne cherche ses amis, c'est elle qui arrive : pas une nouvelle.
       .filter((e) => (t >= quietUntil && host.social.listSync?.() !== 'searching') || e.kind !== 'friend-online')
       // Notifications coupées : seule la partie entre amis reste.
@@ -171,6 +191,7 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     social = nextSocial;
     downloads = downloadSnapshot(jobs);
     live = nextLive;
+    invites = new Set(received.map((i) => i.id));
     if (!events.length) return;
     center.push(events);
     for (const e of events) host.log?.(`Notifications : ${e.kind} ${e.who ?? e.subject ?? ''} (priorité ${NOTICE_RULES[e.kind].priority})`); // i18n-ignore : journal
@@ -183,9 +204,9 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     const next = JSON.stringify(r.view ?? null);
     if (r.view && next !== shown && !r.view.leaving) host.log?.(`Notifications : affichée « ${r.view.title} »${r.view.detail ? ` (${r.view.detail})` : ''}`); // i18n-ignore : journal
     else if (!r.view && shown !== 'null') host.log?.('Notifications : plus rien d’affiché'); // i18n-ignore : journal
-    if (r.view?.live && !r.view.leaving && r.view.id !== liveShown) {
-      liveShown = r.view.id;
-      host.live?.shown?.(r.view);
+    if (r.view?.sound && !r.view.leaving && r.view.id !== sounded) {
+      sounded = r.view.id;
+      host.sound?.(r.view.sound, r.view);
     }
     shown = next;
     schedule(r.nextAt);
