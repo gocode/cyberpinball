@@ -73,6 +73,7 @@ export * from './romscores';
 export * from './journal';
 export * from './livestate';
 export * from './vpxinspector';
+export * from './vpxfailure';
 export * from './highscores';
 export * from './dmdfont';
 export * from './dmdcolor';

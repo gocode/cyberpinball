@@ -2,6 +2,8 @@
 // /api/tree donne les afficheurs (DMD de PinMAME, FlexDMD…), /ws/display une image RVB à chaque
 // changement. Rien n'est capturé à l'écran : la fenêtre des scores posée par-dessus le DMD ne se lit
 // pas elle-même. La règle de l'écran de score est dans packages/core/src/dmdscore.ts.
+// Seul un DMD de PinMAME se lit ainsi : celui de FlexDMD se dessine à chaque image demandée, et la
+// demande viendrait du fil de l'inspector (dmdscore.ts, inspectorDisplayReadable).
 
 import { DmdScoreWatch, chooseDmdDisplay, type DmdGameSignals, type DmdScoreVerdict, type InspectorDisplay } from '@cyberpinball/core';
 
@@ -30,7 +32,16 @@ export function watchVpxDmd(port: number, log: (line: string) => void, now: () =
     if (stopped) return;
     try {
       const res = await fetch(`http://127.0.0.1:${port}/api/tree`, { signal: AbortSignal.timeout(1500) });
-      const chosen = chooseDmdDisplay(((await res.json()) as { tree?: unknown }).tree);
+      const refused: InspectorDisplay[] = [];
+      const chosen = chooseDmdDisplay(((await res.json()) as { tree?: unknown }).tree, refused);
+      if (!chosen && refused.length) {
+        // Un DMD dessiné à la demande (FlexDMD…) : le lire d'ici ferait rendre sa scène hors du fil
+        // du script de la table, et VPX peut s'arrêter (dmdscore.ts, inspectorDisplayReadable).
+        const d = refused[0]!;
+        log(`Bande de la partie entre amis : DMD de ${d.controller || 'la table'} (${d.name}) pas lu par l'inspector de VPX : le lire ferait dessiner sa scène hors du fil du script de la table (arrêt de VPX possible). Pas de scores sur le DMD.`); // i18n-ignore : journal
+        stopped = true;
+        return;
+      }
       if (chosen) {
         display = chosen;
         log(`Bande de la partie entre amis : DMD lu par l'inspector de VPX (${chosen.name}${chosen.controller ? `, ${chosen.controller}` : ''}).`); // i18n-ignore : journal

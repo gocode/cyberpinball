@@ -187,10 +187,27 @@ export interface InspectorDisplay {
 }
 
 /**
+ * Un afficheur que l'inspector peut lire sans risque pendant la partie : celui de PinMAME, dont
+ * l'image est déjà calculée par l'émulation (bloc d'état partagé). Jamais un afficheur dessiné à
+ * la demande : FlexDMD (et UltraDMD, qui passe par lui) rend toute sa scène à chaque image demandée
+ * (FlexDMDPlugin.cpp, GetRenderFrame → FlexDMD::Render → Stage Update et Draw), et le serveur de
+ * l'inspector la demande depuis son propre fil toutes les 10 ms (WebServer.cpp, PushDisplayWsFrames),
+ * pendant que le script de la table modifie la même scène sur le sien, sans verrou
+ * (LockRenderThread n'est qu'un compteur). Essai réel du 04/11/2026 sur The Goonies : la scène
+ * abîmée (« Actor Ball not found in children of »), l'erreur du script ligne 9781, puis VPX fermé
+ * sur une corruption du tas (0xC0000374). Commit af26b2d93 de VPX 10.8.1.
+ */
+export function inspectorDisplayReadable(controller: string): boolean {
+  return /^pinmame$/i.test(controller.trim());
+}
+
+/**
  * Le DMD parmi les afficheurs de l'inspector : le plus grand d'au moins 64 points de large (un
  * afficheur à segments n'en est pas un), comme displays.html de l'inspector les lit dans l'arbre.
+ * Seulement parmi ceux qui se lisent sans risque (inspectorDisplayReadable) ; `refused` reçoit les
+ * autres, pour le journal.
  */
-export function chooseDmdDisplay(tree: unknown): InspectorDisplay | undefined {
+export function chooseDmdDisplay(tree: unknown, refused?: InspectorDisplay[]): InspectorDisplay | undefined {
   const found: InspectorDisplay[] = [];
   const list = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.filter((x): x is Record<string, unknown> => !!x && typeof x === 'object') : []);
   for (const controller of list(tree)) {
@@ -202,7 +219,10 @@ export function chooseDmdDisplay(tree: unknown): InspectorDisplay | undefined {
         const size = /(\d+)x(\d+)/.exec(name);
         const width = size ? Number(size[1]) : 0;
         const height = size ? Number(size[2]) : 0;
-        if (width >= 64 && height >= 16) found.push({ mapping: String(item.mapping), name, width, height, controller: String(controller.name ?? '') });
+        if (width < 64 || height < 16) continue;
+        const display = { mapping: String(item.mapping), name, width, height, controller: String(controller.name ?? '') };
+        if (inspectorDisplayReadable(display.controller)) found.push(display);
+        else refused?.push(display);
       }
     }
   }

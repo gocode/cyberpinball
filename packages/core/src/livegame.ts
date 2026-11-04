@@ -611,7 +611,7 @@ export function countdownLeft(game: Pick<LiveGame, 'startAt'>, now = new Date())
 // ---------------------------------------------------------------------------
 // Textes
 
-export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'balls' | 'settings' | 'host' | 'ready'>, hostBalls?: number): string {
+export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'balls' | 'settings' | 'host' | 'ready'> & Partial<Pick<LivePlayer, 'score' | 'seconds'>>, hostBalls?: number): string {
   switch (p.state) {
     case 'invited':
       return t('Invité, en attente de sa réponse');
@@ -635,8 +635,16 @@ export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'ba
     case 'done':
       return t('Partie terminée');
     case 'failed':
-      return t('La partie n’a pas démarré de son côté');
+      return liveFailedPlaying(p) ? t('VPX s’est arrêté pendant sa partie : score compté jusqu’à l’arrêt') : t('La partie n’a pas démarré de son côté');
   }
+}
+
+/**
+ * Une partie en échec qui avait commencé : VPX s'est arrêté en cours de jeu (essai réel du
+ * 04/11/2026, The Goonies), pas au lancement. Son score du moment compte, les autres continuent.
+ */
+export function liveFailedPlaying(p: Partial<Pick<LivePlayer, 'state' | 'score' | 'seconds'>>): boolean {
+  return p.state === 'failed' && (p.score !== undefined || (p.seconds ?? 0) > 0);
 }
 
 /** Une borne en retard (liveBehind) : ce qui lui manque, et quoi faire. */

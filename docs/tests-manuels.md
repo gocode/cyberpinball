@@ -1363,6 +1363,17 @@ Retours de l'essai réel du 04/11/2026 (0.1.6-essai.6, le poste et la borne) : a
 | 711 | Le journal | Après 710, ouvrir `data\logs\journal.txt` sur A et sur B. | Pour chaque partie : « relevé de l'état de jeu et départ automatique posés », « ma table est prête » moins de 5 s après « écrans occupés par VPX », « « partez » reçu de l'hôte (tous prêts) » ou « « partez » donné (tous prêts) ». Jamais « prête quand même ». |
 | 712 | Garde-fou | Si une table reste un jour à « Chargement de la table… » alors qu'elle est à l'écran. | Au bout de 20 s, elle passe à « Prêt » et la partie part ; le journal dit « table à l'écran depuis 20 s, le relevé ne dit pas « prêt » (…) : prête quand même », avec la dernière ligne du relevé : la transmettre. |
 
+## VPX arrêté en pleine partie
+
+Retours de l'essai réel du 04/11/2026 (0.1.6-essai.8, PinCab) : en partie entre amis sur The Goonies, VPX fermé en cours de jeu (code 3221226356, 0xC0000374) après une erreur du script ligne 9781 sur le DMD de FlexDMD ; l'écran proposait « voir ce qu'il manque pour jouer ». Cause : la lecture du DMD de FlexDMD par l'inspector de VPX, depuis un autre fil que le script. Deux bornes amies, A et B, sur le vrai réseau. La preuve sans opérateur : `packages/core/src/test/arret-vpx.test.ts` (fin du journal de VPX de l'essai, règle de diagnostic, choix du DMD lisible, écran d'échec).
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 713 | Parties longues sur une table FlexDMD | A invite B sur The Goonies, trois parties entières à la suite, avec les modes (Fight the Fratellis compris). | VPX ne s'arrête plus. La bande des amis reste sur le fronton, jamais sur le DMD de la table ; le journal dit « DMD dessiné par le script (sans PinMAME), pas lu par l'inspector de VPX ». |
+| 714 | Table à ROM | Même chose sur Terminator 2. | Les scores des amis se posent toujours sur l'écran de score du DMD ; le journal dit « DMD lu par l'inspector de VPX (Display 0 128x32, PinMAME) ». |
+| 715 | Écran d'un arrêt de VPX | Si VPX s'arrête un jour en pleine partie (seul). | Titre « Le script de la table s'est arrêté » (ou « VPX s'est arrêté pendant la partie »), la ligne et le message de l'erreur, la ligne en faute, le code de sortie nommé ; « Start : rejouer la table » relance la même table. Jamais « voir ce qu'il manque pour jouer ». Le journal dit « VPX arrêté (…) : … » : le transmettre. |
+| 716 | Arrêt en partie entre amis | Si VPX s'arrête chez B pendant une partie entre amis. | Chez B, « Start : voir la partie entre amis » ouvre la partie ; chez A, la partie continue et finit, B garde le score atteint (« VPX s'est arrêté pendant sa partie » s'il avait joué moins de 20 s). |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

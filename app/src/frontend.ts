@@ -171,6 +171,8 @@ import {
   mediaUrl,
   type IntroFiles,
   volumeOutputIds,
+  diagnoseVpxFailure,
+  readVpxScript as readTableScript,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -294,8 +296,11 @@ interface Message {
   title: string;
   lines: string[];
   /** Ce que fait Start sur ce message. */
-  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'journey' | 'power' | 'orientation';
-  /** Table d'une partie échouée : Start ouvre « Ce qu'il manque pour jouer » (action 'journey'). */
+  action?: 'wizard' | 'install-vpx' | 'addTable' | 'manualEdits' | 'buttons' | 'interface' | 'otherFrontend' | 'journey' | 'replay' | 'live' | 'power' | 'orientation';
+  /**
+   * Table d'une partie échouée : Start ouvre « Ce qu'il manque pour jouer » (action 'journey'), ou la
+   * relance quand rien ne manque (action 'replay' : le script de la table ou VPX s'est arrêté).
+   */
   table?: string;
 }
 
@@ -312,6 +317,8 @@ const MESSAGE_DOORS: Record<NonNullable<Message['action']>, GuestDoor> = {
   interface: 'message.interface',
   otherFrontend: 'message.other-frontend',
   journey: 'message.journey',
+  replay: 'message.replay',
+  live: 'message.live',
   power: 'message.power',
   orientation: 'message.orientation',
 };
@@ -1775,6 +1782,23 @@ function handleKey(input: Input): boolean {
         library.openJourney(state.message.table);
         return true;
       }
+      // VPX arrêté par le script de la table (rien ne manque) : Start la relance.
+      if (state.message?.action === 'replay' && is(KEYS.confirm)) {
+        const again = tables.find((x) => x.file === state.message?.table);
+        state = { ...state, phase: 'menu', message: undefined };
+        if (again) {
+          state = { ...state, index: Math.max(0, tables.indexOf(again)) };
+          void play(again);
+          return true;
+        }
+        break;
+      }
+      // VPX arrêté pendant une partie entre amis : Start ouvre la partie (les autres continuent, les résultats y arrivent).
+      if (state.message?.action === 'live' && is(KEYS.confirm)) {
+        state = { ...state, phase: 'menu', message: undefined };
+        friendsMenu.live.open(() => library.leave());
+        return true;
+      }
       if (tables.length) state = { ...state, phase: 'menu', message: undefined };
       // « Plus tard » sur l'installation de VPX, sans table : l'invite d'ajout, sinon le Start suivant lancerait le téléchargement.
       else if (state.message?.action === 'install-vpx') state = { ...state, message: noTables() };
@@ -2204,7 +2228,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     if (recorded && !unseen) showRecording({ ...recorded, table: tables.find((t) => t.id === table.id) ?? recorded.table });
   } else {
     const repaired = result.failure === 'dialog' && result.message ? repairScriptStop(table, result.message) : undefined;
-    state = { ...state, phase: 'message', message: explain(result, table, repaired) };
+    state = { ...state, phase: 'message', message: explain(result, table, repaired, Boolean(double)) };
   }
   // Configuration de la borne changée juste avant la partie : VPX avait déjà les bons
   // écrans, le menu les reprend en redémarrant.
@@ -2479,6 +2503,31 @@ function joystickMessage(version: string): Message | undefined {
   };
 }
 
+/** Le .vbs que VPX joue à côté de la table, s'il y en a un (même nom que le .vpx). */
+function tableScriptFile(table: TableEntry): string | undefined {
+  const base = path.basename(table.file, path.extname(table.file)).toLowerCase();
+  try {
+    const name = fs.readdirSync(path.dirname(table.file)).find((f) => f.toLowerCase() === `${base}.vbs`);
+    return name ? path.join(path.dirname(table.file), name) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Le script de la table, pour citer la ligne en faute : son .vbs, sinon celui du .vpx. Les ajouts de
+ * Cyber Pinball (relevé, reconnaissance PupCapture, interrupteurs) ne déplacent aucune ligne : le
+ * numéro donné par VPX pour le double est celui de la table.
+ */
+function tableScriptText(table: TableEntry): string | undefined {
+  const vbs = tableScriptFile(table);
+  try {
+    return vbs ? fs.readFileSync(vbs, 'latin1') : readTableScript(table.file);
+  } catch {
+    return undefined;
+  }
+}
+
 /**
  * Partie échouée : ce qu'en dit VPX, puis Start mène à « Ce qu'il manque pour jouer », qui
  * relit la table, dit ce qui manque et où le trouver. Seule la ROM empêche une table de
@@ -2486,7 +2535,18 @@ function joystickMessage(version: string): Message | undefined {
  * tel, le dossier restant proposé (« Pour aller plus loin »), pas exigé. `repaired` : le script
  * vient d'être corrigé pour le core.vbs actuel (repairScriptStop), la partie suivante démarre.
  */
-function explain(result: LaunchResult, table: TableEntry, repaired?: string): Message {
+function explain(result: LaunchResult, table: TableEntry, repaired?: string, live = false): Message {
+  // Arrêt reconnu dans le journal de VPX (vpxfailure.ts) : la vraie raison, et Start relance la
+  // table, ou ouvre la partie entre amis ; jamais « ce qu'il manque pour jouer », rien ne manque.
+  const known = repaired ? undefined : diagnoseVpxFailure(result.logTail, result.exitCode, path.basename(tableScriptFile(table) ?? table.file), tableScriptText(table));
+  if (known) {
+    console.log(known.journal);
+    const lines = [...known.lines];
+    if (live) lines.push(t('Partie entre amis : les autres continuent ; votre score compte jusqu’à l’arrêt.'));
+    lines.push(...result.notices);
+    if (result.logTail.length) lines.push(t('Fin du journal de VPX :'), ...result.logTail.slice(-5));
+    return { title: known.title, lines, action: live ? 'live' : 'replay', table: table.file };
+  }
   const lines = [result.message ?? t('Erreur inconnue.')];
   if (repaired) lines.push(t('Cyber Pinball a corrigé le script de la table ({fix}) : relancez-la.', { fix: repaired }));
   if (result.message && /can't start game/i.test(result.message)) {

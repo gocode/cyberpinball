@@ -32,6 +32,7 @@ test('mode invité : les portes ouvertes sont exactement celles-ci, chacune pour
     'game.force-stop': 'arrêter une partie bloquée : la partie seulement, rien n’est enregistré',
     'message.other-frontend': 'jouer quand même, un autre menu ouvert : rien n’est modifié',
     'message.power': 'extinction déjà en cours : l’écran reste noir, aucun choix n’y est offert',
+    'message.replay': 'rejouer la table après un arrêt de VPX : la même partie que « Jouer », rien de modifié',
     'sheet.play': 'jouer',
     'sheet.read': 'lire le prospectus et les règles',
     'sheet.back': 'revenir au menu',

@@ -185,7 +185,13 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           } catch (error) {
             log(`Partie entre amis (${table.id}) : VPinballX.ini illisible (${(error as Error).message}), pas d'inspector.`); // i18n-ignore : journal
           }
-          const offered = iniText !== undefined ? inspector : undefined;
+          // Le DMD ne se lit par l'inspector que s'il est celui de PinMAME : celui de FlexDMD (table
+          // originale) se dessine à chaque image demandée, et la demande viendrait du fil de l'inspector,
+          // en même temps que le script modifie la même scène (arrêt de VPX du 04/11/2026, dmdscore.ts).
+          const pinmame = roms.length > 0 || (script ? usesPinmameCode(script) : false);
+          const offered = iniText !== undefined && inspector ? { ...inspector, dmd: Boolean(inspector.dmd && pinmame) } : undefined;
+          if (inspector?.dmd && !pinmame)
+            log(`Partie entre amis (${table.id}) : DMD dessiné par le script (sans PinMAME), pas lu par l'inspector de VPX : le lire ferait dessiner sa scène hors du fil du script (arrêt de VPX possible).`); // i18n-ignore : journal
           const hook = script ? liveStateHook(script, readVpxElements(plan.file), stateFile, rom?.memory, offered, goFile) : { ok: false as const, reason: 'script illisible ou protégé' }; // i18n-ignore : journal
           if (hook.ok && (hook.inspector.length || offered?.dmd)) {
             // La carte réduite et le VPinballX.ini de la partie, dans le double seulement ; un fichier lié à l'original est remplacé, jamais réécrit.

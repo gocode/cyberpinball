@@ -1363,6 +1363,17 @@ Feedback from the real test of 04/11/2026 (0.1.6-essai.6, the desktop and the ca
 | 711 | The log | After 710, open `data\logs\journal.txt` on A and on B. | For each game: "relevé de l'état de jeu et départ automatique posés", "ma table est prête" less than 5 s after "écrans occupés par VPX", "« partez » reçu de l'hôte (tous prêts)" or "« partez » donné (tous prêts)". Never "prête quand même". |
 | 712 | Safeguard | If a table ever stays at "Loading table…" while it is on screen. | After 20 s it turns "Ready" and the game starts; the log says "table à l'écran depuis 20 s, le relevé ne dit pas « prêt » (…) : prête quand même", with the last line of live tracking: send it. |
 
+## VPX stopped mid-game
+
+Feedback from the real test of 04/11/2026 (0.1.6-essai.8, PinCab): in a game with friends on The Goonies, VPX closed during play (code 3221226356, 0xC0000374) after a script error at line 9781 on the FlexDMD DMD; the screen offered "see what's missing to play". Cause: reading the FlexDMD DMD through the VPX inspector, from another thread than the script. Two friend cabinets, A and B, on the real network. The unattended proof: `packages/core/src/test/arret-vpx.test.ts` (end of the VPX log of the test, diagnosis rule, choice of a readable DMD, failure screen).
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 713 | Long games on a FlexDMD table | A invites B on The Goonies, three full games in a row, with the modes (Fight the Fratellis included). | VPX no longer stops. The friends' board stays on the backglass, never on the table's DMD; the log says "DMD dessiné par le script (sans PinMAME), pas lu par l'inspector de VPX". |
+| 714 | ROM table | Same on Terminator 2. | The friends' scores still go on the DMD score screen; the log says "DMD lu par l'inspector de VPX (Display 0 128x32, PinMAME)". |
+| 715 | Screen of a VPX stop | If VPX ever stops mid-game (alone). | Title "The table's script stopped" (or "VPX stopped during the game"), the error's line and message, the faulty line, the exit code named; "Start: play the table again" starts the same table again. Never "see what's missing to play". The log says "VPX arrêté (…) : …": send it. |
+| 716 | Stop in a game with friends | If VPX stops on B during a game with friends. | On B, "Start: see the game with friends" opens the game; on A, the game carries on and ends, B keeps the score reached ("VPX stopped during their game" if they had played less than 20 s). |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

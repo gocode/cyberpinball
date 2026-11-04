@@ -1,5 +1,7 @@
 # Cyber Pinball
 
+<p align="center"><img src="docs/images/fr/brand-backglass.webp?v=5147d8931c" width="900" alt="Le fronton de Cyber Pinball, tel que la borne l'affiche par défaut : les mots CYBER PINBALL à gauche, PINBALL en vert signal, à côté d'une bille noire lustrée lancée entre deux batteurs éclairés de sarcelle."></p>
+
 **Un frontend libre pour borne de flipper virtuel. Vous décrivez votre borne une fois, Cyber Pinball règle tout le reste. Tout se commande avec les boutons des flippers, et vous jouez en ligne avec les bornes de vos amis.**
 
 [English](README.md) · [Télécharger](https://github.com/gocode/cyberpinball/releases) · [Manuel technique](docs/manuel.md) · [Nouveautés](CHANGELOG.md)
@@ -14,7 +16,7 @@ Cyber Pinball transforme un PC rempli de tables Visual Pinball X en véritable b
 
 ## Points forts
 
-- **[Jouer entre amis, de borne à borne](#jouer-entre-amis-de-borne-à-borne)** : des parties en ligne jusqu'à quatre bornes, des tables et des médias qui s'échangent, et vous voyez qui joue à quoi. Sans serveur ni compte.
+- **[Jouer entre amis, de borne à borne](#jouer-entre-amis-de-borne-à-borne)** : des parties en ligne jusqu'à quatre bornes, les scores de chacun en direct, une notification quand un ami arrive ou vous invite, même en pleine partie, et des tables qui s'échangent. Sans serveur ni compte.
 - **[Tout se règle depuis la borne](#tout-se-règle-depuis-la-borne)** : un assistant qui se suit aux boutons des flippers. Les écrans sont reconnus à leur empreinte matérielle, si bien que rien ne casse quand Windows les renumérote.
 - **[Un menu digne d'une vraie borne](#un-menu-digne-dune-vraie-borne)** : une roue de médaillons, un DMD animé, un lancement façon cinéma, les bruits de la machine, et jamais le moindre bout de bureau Windows.
 - **[De la table repérée à la première partie](#de-la-table-repérée-à-la-première-partie)** : le catalogue VPS, un parcours guidé « Ce qu'il manque pour jouer », un médecin des tables, et chaque fichier téléchargé rangé au bon endroit.
@@ -28,10 +30,17 @@ Cyber Pinball transforme un PC rempli de tables Visual Pinball X en véritable b
 Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bornes, par Internet ou sur le réseau local : pas de compte à créer, pas de serveur au milieu.
 
 - **Des parties en direct, en ligne.** Invitez jusqu'à trois amis sur une table. L'invitation s'affiche sur leur borne, Cyber Pinball vérifie que tout le monde a la même version de la table, puis un compte à rebours commun lance la partie partout en même temps. À la fin, les scores de chacun s'affichent côte à côte.
-- **Savoir qui joue.** Vous voyez quels amis sont en ligne, sur quelle table ils jouent, leurs derniers records et leurs badges. De petites notifications apparaissent sur la roue, jamais pendant une partie.
+- **Savoir qui joue, en direct.** Vos amis en ligne se voient d'un coup d'œil sur le menu des tables : la table sur laquelle chacun joue, ses derniers records, ses badges. La fiche d'un ami dit aussi par où il est relié, Internet ou réseau local.
+- **Des notifications qui suivent la vie du groupe.** « Bruno vient de se connecter », « Bruno vous invite à jouer », un invité qui accepte ou décline, une partie finie avec le gagnant et votre place : une ligne discrète en haut du plateau, avec son petit son. Elles arrivent même pendant une partie, par-dessus VPX, sans lui prendre la main. Si vous préférez jouer tranquille, un réglage les garde pour le retour au menu.
+- **Les scores des autres pendant que vous jouez.** Dans une partie entre amis, une bande affiche le score et la bille de chacun en direct, sur le fronton ou le topper, et sur le DMD aux moments calmes. Elle ne cache jamais la bille.
+- **Le record du groupe à battre.** Chaque table a son tableau des records entre amis : le salon annonce le record à battre, la machine affiche les records du groupe pendant la partie, et les résultats donnent les cinq meilleurs. La partie se joue sur un double de la table : vos records et vos réglages habituels restent intacts.
 - **Compléter sa collection chez un ami.** Parcourez la bibliothèque d'un ami pour y repérer les tables que vous n'avez pas et les médias qui vous manquent. Récupérez une table complète ou seulement certaines de ses parties (table, fronton, sons, médias), en comparant sa version et la vôtre. Tout est vérifié à la réception, et vous voyez exactement ce qui va être ajouté avant la moindre installation ; la ROM et le PuP-Pack sont décochés par défaut, et ne se cochent qu'après avoir attesté que vous en avez les droits.
 - **Trouver des partenaires de jeu.** Cherchez un joueur par son nom dans un annuaire que les bornes se transmettent entre elles, ou repérez les bornes voisines sur le réseau local, même sans Internet. Envoyez-lui une demande d'ami : il n'a plus qu'à l'accepter.
 - **Chez vous, c'est vous qui décidez.** Vos sauvegardes, vos fichiers de records et vos programmes ne quittent jamais votre borne. Le partage est activé par défaut et se coupe à un seul endroit, « Partage et réseau », qui montre aussi ce que les autres bornes peuvent voir. Le tout repose sur Hyperswarm, de [Holepunch](https://holepunch.to).
+
+<p align="center"><img src="docs/images/fr/friends-notifications.webp?v=78efa94952" width="760" alt="Deux moments d'une partie. Sur Star Courier, une ligne discrète en haut du plateau : Bruno vient de se connecter. Un peu plus tard, sur Neon Abyss, la carte de son invitation : Bruno vous invite à jouer, sur Neon Harbor, avec le temps restant pour répondre."></p>
+
+<p align="center"><img src="docs/images/fr/live-scores.webp?v=1494989292" width="760" alt="Une partie entre amis en cours sur Atlas Rising. En bas du fronton, la bande Partie entre amis donne les scores de Bruno et d'Alexis en direct, avec la bille de chacun ; dessous, le DMD reprend les mêmes scores en points lumineux."></p>
 
 <p align="center"><img src="docs/images/fr/friends.webp?v=8a30474698" width="760" alt="Mes amis : Bruno est en ligne sur Star Courier et vient de battre son record, Émile est hors ligne. À côté, la page de Bruno, avec ses derniers événements et le bouton Voir sa bibliothèque."></p>
 

@@ -143,6 +143,7 @@ export const messages: Record<string, string> = {
   'Chargement de la table': 'Loading the table',
   'Partie terminée': 'Game over',
   'La partie n’a pas démarré de son côté': 'The game did not start on their side',
+  'VPX s’est arrêté pendant sa partie : score compté jusqu’à l’arrêt': 'VPX stopped during their game: score counted up to the stop',
   'Vous avez cette table': 'You have this table',
   'Vous n’avez pas cette table : récupérez-la par le catalogue, puis demandez une nouvelle invitation':
     'You do not have this table: get it through the catalogue, then ask for a new invitation',
@@ -378,6 +379,7 @@ export const messages: Record<string, string> = {
   'Cyber Pinball {app} sur sa borne : sa table part sans attendre les autres, à mettre à jour': 'Cyber Pinball {app} on their cabinet: their table starts without waiting for the others, needs updating',
   'Ancienne version de Cyber Pinball sur sa borne : sa table part sans attendre les autres, à mettre à jour': 'Old Cyber Pinball version on their cabinet: their table starts without waiting for the others, needs updating',
   'Partie pas démarrée de son côté': 'Game did not start on their side',
+  'VPX arrêté pendant sa partie': 'VPX stopped during their game',
   'Ancienne version : part sans attendre': 'Old version: starts without waiting',
   'Parti': 'Started',
   'Chargement de la table… il part dès qu’elle est prête': 'Loading the table… starts as soon as it is ready',

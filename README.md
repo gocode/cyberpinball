@@ -1,5 +1,7 @@
 # Cyber Pinball
 
+<p align="center"><img src="docs/images/en/brand-backglass.webp?v=5147d8931c" width="900" alt="The Cyber Pinball backglass, as the cabinet shows it by default: the words CYBER PINBALL on the left, PINBALL in signal green, beside a glossy black ball streaking between two teal-lit flippers."></p>
+
 **A free, open-source frontend for virtual pinball cabinets. Describe your cabinet once: Cyber Pinball sets up everything else, you drive it all from the flipper buttons, and you play online with your friends' cabinets.**
 
 [Français](README.fr.md) · [Download](https://github.com/gocode/cyberpinball/releases) · [Technical manual](docs/manual.md) · [What's new](CHANGELOG.en.md)
@@ -14,7 +16,7 @@ Cyber Pinball turns a PC full of Visual Pinball X tables into a real arcade cabi
 
 ## Highlights
 
-- **[Play with friends, cabinet to cabinet](#play-with-friends-cabinet-to-cabinet)**: live online games on up to four cabinets, shared tables and media, who is playing and on which table. No server, no account.
+- **[Play with friends, cabinet to cabinet](#play-with-friends-cabinet-to-cabinet)**: live online games on up to four cabinets, everyone's score live, a notification when a friend comes online or invites you, even mid-game, and tables you can swap. No server, no account.
 - **[Set up from the cabinet itself](#set-up-from-the-cabinet-itself)**: a wizard driven by the flipper buttons, screens recognised by their hardware fingerprint, so nothing breaks when Windows renumbers them.
 - **[A menu with real cabinet presence](#a-menu-with-real-cabinet-presence)**: wheel of medallions, live DMD, cinematic launch, interface sounds, and never a glimpse of the Windows desktop.
 - **[From "I want this table" to "Play"](#from-i-want-this-table-to-play)**: the VPS catalogue, a guided "What's missing to play" path, a table doctor, every downloaded file sent where it belongs.
@@ -28,10 +30,17 @@ Cyber Pinball turns a PC full of Visual Pinball X tables into a real arcade cabi
 Your cabinet is no longer an island. Cyber Pinball links cabinets directly to each other, over the Internet or the local network, with no account to create and no server in between.
 
 - **Live online games.** Invite up to three friends on the same table: the invitation opens on their cabinet, the table version is checked, a shared countdown starts the game on every cabinet at once, then everyone sees the results side by side.
-- **Who's playing, right now.** Your friends online, the table they are on, their latest high scores and badges, with small notifications on the wheel, never during a game.
+- **Who's playing, right now.** Your friends online at a glance on the table menu: the table each one is on, their latest high scores, their badges. A friend's page also says how you are linked, Internet or local network.
+- **Notifications that follow the group.** "Bruno just came online", "Bruno invites you to play", a guest who accepts or declines, a game that ends with the winner and your place: one discreet line at the top of the playfield, with its own little sound. They show up even during a game, over VPX, without taking control from it. If you would rather play in peace, one setting keeps them for when you are back at the menu.
+- **Everyone else's score while you play.** In a game with friends, a strip shows each player's score and ball live, on the backglass or the topper, and on the DMD during quiet moments. It never hides the ball.
+- **The group's high score to beat.** Every table has its own high-score board among friends: the lobby shows the score to beat, the machine displays the group's high scores during the game, and the results list the top five. The game runs on a copy of the table, so your usual high scores and settings stay untouched.
 - **Shared tables and media.** Browse a friend's library: the tables you don't have, the media you are missing. Fetch a whole table, or part by part (table, backglass, sounds, media), their version and yours side by side. Everything is checked on arrival and shown in the add plan before anything is installed; ROM and PuP-Pack are unticked by default, and only ticked once you attest that you hold the rights.
 - **Find players.** Search for a player by name in a directory the cabinets pass to each other, or find the cabinets around you on the local network, even without the Internet. Send a friend request; they accept on their side.
 - **Your cabinet, your rules.** Saves, high-score files and programs never leave your cabinet. Sharing is on by default and turned off in one place, "Sharing and network", which also shows what other cabinets can see. Built on [Holepunch](https://holepunch.to)'s Hyperswarm.
+
+<p align="center"><img src="docs/images/en/friends-notifications.webp?v=dc42cfa51e" width="760" alt="Two moments of a game. On Star Courier, one discreet line at the top of the playfield: Bruno just came online. A little later, on Neon Abyss, his invitation card: Bruno invites you to play, on Neon Harbor, with the time left to answer."></p>
+
+<p align="center"><img src="docs/images/en/live-scores.webp?v=216d920702" width="760" alt="A game with friends in progress on Atlas Rising. At the bottom of the backglass, the Game with friends strip shows Bruno's and Alexis's scores live, with each player's ball; below it, the DMD shows the same scores in glowing dots."></p>
 
 <p align="center"><img src="docs/images/en/friends.webp?v=f215598b45" width="760" alt="My friends: Bruno is online and playing Star Courier, with his new high score just now, and Émile is offline; next to it, Bruno's page with his latest events and See their library."></p>
 

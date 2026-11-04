@@ -23,7 +23,7 @@ import { writeFileAtomic } from './atomicwrite';
 import { isBallCount } from './ballcount';
 import { boardKey } from './groupboard';
 import { t, tn } from './i18n';
-import { liveBallsAgainst, liveBehindLabel, liveNoLiveState, liveOtherBalls, liveScore, liveStandings, type LiveGame, type LivePlayer, type LivePlayerState, type LiveTable } from './livegame';
+import { liveBallsAgainst, liveBehindLabel, liveFailedPlaying, liveNoLiveState, liveOtherBalls, liveScore, liveStandings, type LiveGame, type LivePlayer, type LivePlayerState, type LiveTable } from './livegame';
 import { normalizeName } from './social';
 import { isPlayerPublicKey, parseTableIdentity } from './sharing';
 import { readKeptJson } from './store';
@@ -236,12 +236,12 @@ export function historyOffLabel(p: Pick<HistoryPlayer, 'off' | 'balls'>, hostBal
 }
 
 /** Comment sa partie s'est terminée, quand il ne l'a pas finie ; sans score, une borne en retard le dit. */
-export function historyStateLabel(p: Pick<HistoryPlayer, 'state' | 'score' | 'host' | 'proto' | 'app'>): string | undefined {
+export function historyStateLabel(p: Pick<HistoryPlayer, 'state' | 'score' | 'host' | 'proto' | 'app'> & Partial<Pick<HistoryPlayer, 'seconds'>>): string | undefined {
   switch (p.state) {
     case 'done':
       return p.score === undefined && !p.host && liveNoLiveState(p) ? liveBehindLabel(p) : undefined;
     case 'failed':
-      return t('La partie n’a pas démarré de son côté');
+      return liveFailedPlaying(p) ? t('VPX s’est arrêté pendant sa partie : score compté jusqu’à l’arrêt') : t('La partie n’a pas démarré de son côté');
     case 'left':
       return t('A quitté la partie');
     default:

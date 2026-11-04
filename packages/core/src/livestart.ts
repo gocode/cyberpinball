@@ -24,7 +24,7 @@
 // « partez » dans app/src/table-double.ts, l'affichage sur la table dans app/src/game-notice.ts.
 
 import { t } from './i18n';
-import { LIVE_PROTOCOL, LIVE_READY_WAIT_MS, livePlayers, type LiveGame, type LiveGoReason, type LivePlayer } from './livegame';
+import { LIVE_PROTOCOL, LIVE_READY_WAIT_MS, liveFailedPlaying, livePlayers, type LiveGame, type LiveGoReason, type LivePlayer } from './livegame';
 import type { LiveManualReason } from './livestate';
 import type { Rect, Rotation } from './model';
 
@@ -165,7 +165,7 @@ export interface LiveWaitView {
 /** Le statut d'un joueur pendant l'attente. */
 function waitStatus(p: LivePlayer, game: LiveGame): { status: string; ready: boolean; out: boolean } {
   if (p.state === 'left') return { status: t('A quitté la partie'), ready: false, out: true };
-  if (p.state === 'failed') return { status: t('Partie pas démarrée de son côté'), ready: false, out: true };
+  if (p.state === 'failed') return { status: liveFailedPlaying(p) ? t('VPX arrêté pendant sa partie') : t('Partie pas démarrée de son côté'), ready: false, out: true };
   if (p.state === 'done') return { status: t('Partie terminée'), ready: true, out: true };
   if (!liveCommonStart(p)) return { status: t('Ancienne version : part sans attendre'), ready: false, out: true };
   if (p.state === 'playing') return { status: t('Parti'), ready: true, out: false };

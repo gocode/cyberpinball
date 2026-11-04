@@ -15,7 +15,8 @@
 # puis, une fois pour les deux langues :
 #   demonstrations : les démonstrations des autres fonctions, en mode accueil (-Accueil) : lancement
 #              cinématique, DMD vivant, santé de la borne, « Ce qu'il manque pour jouer », amis ;
-#   images   : assemblage et remise à l'endroit (playfield couché) dans docs\images, en WebP.
+#   images   : assemblage et remise à l'endroit (playfield couché) dans docs\images, en WebP,
+#              puis docs\demo-presentation.ps1 (fronton de la marque, dossier à partager).
 # Le garde-fou de mise en page et le guet hors écran doivent rester muets, sinon le script échoue.
 #   .\docs\demo-captures.ps1 [-Langues en, fr] [-Etapes medias, menu, fiche, bureau, assistant, reglages, demonstrations, images]
 # Ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont lus ni touchés ; VPX n'est jamais lancé.
@@ -237,18 +238,9 @@ if ($Etapes -contains 'images') {
     if (Test-Path "$c\fiche") { Write-Planche "$out\game-media.webp" 720 1280 @(@{ src = "$c\fiche\10-wait_3000.png"; x = 0; y = 0; w = 720; h = 1280; turn = -1 }) }
     if (Test-Path "$c\bureau") { Write-Planche "$out\desktop.webp" 1600 900 @(@{ src = "$c\bureau\06-wait_2500.png"; x = 0; y = 0; w = 1600; h = 900 }) }
   }
-  # Chaque image change d'adresse quand son contenu change (?v=<empreinte>) : un navigateur ou
-  # GitHub ne montre jamais l'ancienne image gardée en cache sous le même nom.
-  foreach ($pair in @(@('en', 'README.md'), @('fr', 'README.fr.md'))) {
-    $readme = "$wt\$($pair[1])"
-    $text = [IO.File]::ReadAllText($readme)
-    $text = [regex]::Replace($text, "docs/images/$($pair[0])/([\w-]+)\.webp(\?v=[0-9a-f]+)?", {
-        param($m)
-        $file = "$wt\docs\images\$($pair[0])\$($m.Groups[1].Value).webp"
-        $hash = (Get-FileHash $file -Algorithm SHA256).Hash.Substring(0, 10).ToLower()
-        "docs/images/$($pair[0])/$($m.Groups[1].Value).webp?v=$hash"
-      })
-    [IO.File]::WriteAllText($readme, $text, [Text.UTF8Encoding]::new($false))
-  }
+  # Fronton de la marque en tête de la page, dossier docs\Design\presentation à partager, et
+  # adresses des images de README.md et README.fr.md suivant leur contenu (?v=<empreinte>).
+  & "$PSScriptRoot\demo-presentation.ps1"
+  if (-not $?) { throw 'Images de présentation en échec.' }
 }
 "Captures dans $base\<langue>\captures (version annoncée : $next)."
