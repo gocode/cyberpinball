@@ -4,7 +4,16 @@
 
 **Un frontend libre pour borne de flipper virtuel. Vous décrivez votre borne une fois, Cyber Pinball règle tout le reste. Tout se commande avec les boutons des flippers, et vous jouez en ligne avec les bornes de vos amis.**
 
-[English](README.md) · [Télécharger](https://github.com/gocode/cyberpinball/releases) · [Manuel technique](docs/manuel.md) · [Nouveautés](CHANGELOG.md)
+[English](README.md) · [Télécharger](#télécharger) · [Toutes les fonctionnalités](docs/fonctionnalites.md) · [Manuel technique](docs/manuel.md) · [Nouveautés](CHANGELOG.md)
+
+## Télécharger
+
+[![Dernière version](https://img.shields.io/github/v/release/gocode/cyberpinball?label=derni%C3%A8re%20version&color=8BE23A&labelColor=0A1A18)](https://github.com/gocode/cyberpinball/releases/latest)
+
+- **[⬇ Télécharger Cyber Pinball](https://github.com/gocode/cyberpinball/releases/latest/download/CyberPinball-Setup.exe)** (`CyberPinball-Setup.exe`, environ 110 Mio) : l'installeur conseillé. Visual Pinball X est téléchargé et vérifié au premier lancement.
+- **[⬇ Installeur complet](https://github.com/gocode/cyberpinball/releases/latest/download/CyberPinball-Setup-complet.exe)** (`CyberPinball-Setup-complet.exe`, environ 280 Mio) : Visual Pinball X inclus, pour une borne sans Internet.
+
+Windows 10 ou 11, 64 bits. Ces liens téléchargent toujours la dernière version, directement. Déjà installé ? La borne se met à jour depuis son menu système. Versions précédentes et nouveautés : [toutes les versions](https://github.com/gocode/cyberpinball/releases).
 
 <p align="center"><img src="docs/images/fr/cabinet.webp?v=9f776b3256" width="900" alt="Le menu des tables sur une borne à quatre écrans. Sur le playfield, montré à la verticale : le plateau de la table sélectionnée, la roue de médaillons ronds et les commandes. À côté, le topper, le fronton et le DMD du même jeu, Neon Abyss."></p>
 
@@ -21,7 +30,9 @@ Cyber Pinball transforme un PC rempli de tables Visual Pinball X en véritable b
 - **[Un menu digne d'une vraie borne](#un-menu-digne-dune-vraie-borne)** : une roue de médaillons, un DMD animé, un lancement façon cinéma, les bruits de la machine, et jamais le moindre bout de bureau Windows.
 - **[De la table repérée à la première partie](#de-la-table-repérée-à-la-première-partie)** : le catalogue VPS, un parcours guidé « Ce qu'il manque pour jouer », un médecin des tables, et chaque fichier téléchargé rangé au bon endroit.
 - **[Les médias de votre choix, d'où qu'ils viennent](#les-médias-de-votre-choix-doù-quils-viennent)** : pour chaque média, tout ce que proposent les sites, un navigateur intégré, et vos propres parties filmées pour présenter les tables sur la roue.
-- **[Une borne qui s'entretient toute seule](#une-borne-qui-sentretient-toute-seule)** : un bilan de santé, des mises à jour signées, des horaires pour la nuit, un mode invité pour les soirées.
+- **[Une borne qui s'entretient toute seule](#une-borne-qui-sentretient-toute-seule)** : un bilan de santé, des sauvegardes, des mises à jour signées, des horaires pour la nuit, un mode invité pour les soirées.
+
+**[Toutes les fonctionnalités, en détail →](docs/fonctionnalites.md)** La liste complète, rubrique par rubrique, avec une capture de chaque écran.
 
 ## Jouer entre amis, de borne à borne
 
@@ -107,6 +118,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 
 - **La santé de la borne d'un seul coup d'œil.** Espace disque, tables qui ne démarrent pas, médias manquants, écrans, version de VPX : tout est réuni sur un seul écran, et chaque problème vient avec sa solution.
 - **Des mises à jour signées, installées depuis la borne.** Une pastille rouge apparaît sur la roue dentée dès qu'une version sort. Vous lisez les nouveautés dans votre langue, et un bouton suffit pour l'installer. Chaque version est signée, et la borne refuse tout ce qui ne porte pas la signature de l'éditeur. Vos tables, médias et réglages sont conservés.
+- **Des sauvegardes sur une clé USB.** Les réglages et les scores, les tables en plus, ou toute l'installation, copiés et vérifiés fichier par fichier ; ce qui n'a pas changé n'est jamais recopié. Une restauration montre d'abord ce qu'elle va faire, et s'annule. Les réglages et les scores peuvent aussi se sauvegarder tout seuls, chaque semaine.
 - **Des horaires d'arcade.** La nuit, la borne baisse ses écrans et coupe le son, puis se met en veille ou s'éteint à l'heure choisie si personne ne joue. Un avertissement prévient avant, et n'importe quel bouton l'annule.
 - **Un mode invité** pour les soirées ou pour les enfants : on peut choisir une table, jouer et lire sa fiche, rien de plus. Pour en sortir, on maintient les deux flippers et les deux boutons MagnaSave.
 - **Une borne dédiée.** Si vous le souhaitez, Cyber Pinball remplace l'interface de Windows, en gardant un moyen de la retrouver. Vous éteignez, redémarrez ou mettez en veille depuis le menu, avec des écrans noirs jusqu'au bout.
@@ -123,7 +135,7 @@ Une partie entre amis, chacun chez soi ? Cyber Pinball relie directement vos bor
 
 ## Installation
 
-Téléchargez un installeur sur la page des [versions publiées](https://github.com/gocode/cyberpinball/releases) :
+Téléchargez un installeur par les [liens plus haut](#télécharger), ou sur la page des [versions publiées](https://github.com/gocode/cyberpinball/releases) pour une version précédente :
 
 | Fichier | Taille | Visual Pinball X |
 | --- | --- | --- |

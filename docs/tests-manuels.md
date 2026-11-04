@@ -1397,6 +1397,25 @@ Deux bornes A et B, amies, sur le vrai réseau, la même version d'une table sur
 | 731 | Changer de table | A invite B ; A choisit « Changer de table » et une autre table, avec B. | Chez B : l'ancienne invitation dit « A a changé de table », « Voir la nouvelle invitation » mène à la nouvelle. |
 | 732 | Réinvité après un refus | B refuse ; A le réinvite depuis le même salon (« Inviter un autre ami » > B). | Chez B : carillon, la carte, et la notification d'invitation de nouveau (pas tue). |
 
+## Sauvegardes
+
+Sur la borne, une clé USB à brancher (une clé en exFAT ou NTFS, et si possible une seconde en FAT32), et une table à ROM dont on a battu un record. La preuve sans opérateur : `packages/core/src/test/sauvegardes.test.ts` (le moteur), `packages/core/src/test/sauvegardes-menu.test.ts` (les écrans, lecteurs simulés) et `.\docs\demo-sauvegardes.ps1` (rendu des vrais écrans) ; le manuel : « Sauvegardes ».
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 740 | Sans clé | Menu système > Cyber Pinball > Sauvegardes, aucune clé branchée. | « Sauvegarder maintenant » grisée avec « Choisissez d’abord une clé, un disque ou un dossier » ; « Choisir une destination » invite à brancher une clé. Rien n'est caché. |
+| 741 | Choisir la clé | Brancher la clé, « Choisir une destination », puis la clé. | La clé apparaît avec sa place libre et son système de fichiers ; choisie, l'écran principal dit « Destination : Clé « … » (E:) ». Le disque de la borne est proposé en dernier, « À vérifier ». |
+| 742 | Réglages et scores | « Sauvegarder maintenant ». | Le focus est sur « Réglages et scores », jamais sur « Lancer la sauvegarde ». Lancée : quelques secondes, puis « Sauvegarde terminée » et « ✓ … fichiers vérifiés ». Sur la clé : `CyberPinball-Sauvegardes\<borne>\<date> reglages\sauvegarde.json`. |
+| 743 | Avec les tables, deux fois | Choisir « Avec les tables », lancer ; puis relancer aussitôt. | La première copie montre une barre par partie et le temps restant. La seconde est presque immédiate : « … copiés ; le reste était déjà sur la destination ». |
+| 744 | Partie pendant la copie | Pendant une sauvegarde avec les tables, « Retour au menu », puis lancer une table. | « Partie impossible pour l’instant » : « Une sauvegarde est en cours : les parties attendent sa fin. » ; l'entrée Sauvegardes montre l'avancée. |
+| 745 | Clé retirée en route | Retirer la clé pendant la copie des tables. | « Sauvegarde interrompue » : ce qui était déjà copié et vérifié est nommé ; rebranchée, « Reprendre la sauvegarde » ne copie que ce qui manque. |
+| 746 | FAT32 | Choisir la clé en FAT32 si une table a une vidéo de plus de 4 Go. | « Avec les tables » et « Toute l’installation » : « Bloquant », « FAT32 : … dépassent 4 Go » ; « Lancer la sauvegarde » grisée avec la raison ; « Réglages et scores » reste possible. |
+| 747 | Éjecter | Après une sauvegarde, « Éjecter la clé ». | « Vous pouvez débrancher Clé « … » » ; la clé disparaît de l'Explorateur. |
+| 748 | Restaurer un réglage | Changer un réglage (Médias, son et attente), battre un record sur la table à ROM, puis « Restaurer une sauvegarde » > la sauvegarde de 742. | Le plan s'ouvre sur la première partie, chaque partie « ✓ Inclus » avec ses fichiers remplacés ; Start sur une partie la passe à « Exclu ». « Restaurer la sélection » : copie, puis Cyber Pinball redémarre ; le bandeau dit « Restauration terminée » ; le réglage et le record d'avant sont revenus ; l'état d'avant est dans la corbeille (`<date> Avant restauration`). |
+| 749 | Annuler la restauration | « Restaurer une sauvegarde » > « Annuler la dernière restauration ». | Redémarrage ; le réglage et le record du scénario 748 reviennent. |
+| 750 | Une autre borne | Restaurer, sur une seconde borne (ou après avoir supprimé `data\borne.json` et refait un modèle), une sauvegarde de la première. | Rangée sous « Une autre borne » ; dans le plan, « Écrans, boutons et son de la borne » est « Exclu » et « Garder mes amis et l’identité de cette borne » est choisi ; « Remplacer « … » sur le réseau » demande une confirmation, qui commence sur « Retour ». |
+| 751 | Automatique | « Automatique : chaque semaine », puis avancer l'horloge de Windows au dimanche après 4 h (ou attendre). | Borne libre, une sauvegarde « Automatique » apparaît sur la borne, puis, clé branchée, « Réglages et scores copiés sur Clé « … » ». Jamais pendant une partie. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

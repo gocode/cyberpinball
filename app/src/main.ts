@@ -6,6 +6,8 @@
 import './sandbox-guard';
 // Puis, avant le démarrage d'Electron : le mode hors écran des essais sans opérateur.
 import { OFFSCREEN, relaunchOnHiddenDesktop } from './offscreen';
+// Puis une restauration préparée (Sauvegardes) : ses fichiers posés avant que quoi que ce soit ne les lise.
+import './restore-on-start';
 // Puis l'orientation des écrans pendant la session : sa sortie (will-quit) passe avant celle de la
 // borne dédiée, qui sort avec son propre code.
 import { startOrientation } from './display-orientation';

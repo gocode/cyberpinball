@@ -9,7 +9,8 @@
 #   - un dossier prêt à partager, docs\Design\presentation (document de travail, jamais publié) :
 #     ce fronton en PNG 1920 × 1080, les frontons des tables fictives, et les images de la page du
 #     projet en JPEG pour une messagerie (vitrine-fr, vitrine-en ; le lancement animé reste en WebP) ;
-#   - l'adresse de chaque image de README.md et README.fr.md suit son contenu (?v=<empreinte>).
+#   - l'adresse de chaque image de README.md, README.fr.md et de la page « Toutes les
+#     fonctionnalités » suit son contenu (?v=<empreinte>, docs\adresses-images.ps1).
 # docs\demo-captures.ps1 l'appelle à la fin de son étape « images ».
 #   .\docs\demo-presentation.ps1
 $ErrorActionPreference = 'Stop'
@@ -99,19 +100,10 @@ foreach ($file in Get-ChildItem "$PSScriptRoot\demo-captures-medias\*-backglass.
   "   $($file.Name -replace '-backglass', '')"
 }
 
-# Chaque image change d'adresse quand son contenu change (?v=<empreinte>) : un navigateur ou
-# GitHub ne montre jamais l'ancienne image gardée en cache sous le même nom.
-foreach ($pair in @(@('en', 'README.md'), @('fr', 'README.fr.md'))) {
-  $readme = "$wt\$($pair[1])"
-  $text = [IO.File]::ReadAllText($readme)
-  $text = [regex]::Replace($text, "docs/images/$($pair[0])/([\w-]+)\.webp(\?v=[0-9a-f]+)?", {
-      param($m)
-      $file = "$wt\docs\images\$($pair[0])\$($m.Groups[1].Value).webp"
-      $hash = (Get-FileHash $file -Algorithm SHA256).Hash.Substring(0, 10).ToLower()
-      "docs/images/$($pair[0])/$($m.Groups[1].Value).webp?v=$hash"
-    })
-  [IO.File]::WriteAllText($readme, $text, [Text.UTF8Encoding]::new($false))
-}
+# Chaque image change d'adresse quand son contenu change (?v=<empreinte>) : README.md,
+# README.fr.md et la page « Toutes les fonctionnalités » (docs\adresses-images.ps1).
+& "$PSScriptRoot\adresses-images.ps1"
+if (-not $?) { throw 'Adresses des images en échec.' }
 # Habillage de la chaîne YouTube (bannière, photo de profil), sur la même illustration.
 & "$PSScriptRoot\demo-youtube.ps1"
 if (-not $?) { throw 'Habillage YouTube en échec.' }

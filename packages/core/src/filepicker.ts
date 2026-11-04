@@ -52,6 +52,10 @@ export interface DriveInfo {
   size?: number;
   /** Dossier qui le représente (essais : un dossier du bac à sable) ; sinon « E:\ ». */
   path?: string;
+  /** Système de fichiers : « NTFS », « exFAT », « FAT32 » (FAT32 refuse un fichier de 4 Go). */
+  fs?: string;
+  /** Numéro de série du volume : reconnaître une clé même si sa lettre change. */
+  serial?: string;
 }
 
 /**
@@ -70,7 +74,9 @@ export function parseDrives(raw: unknown): DriveInfo[] {
     const size = typeof d.Size === 'number' ? d.Size : undefined;
     if ((type === 'usb' || type === 'cd') && !size) continue;
     const name = typeof d.VolumeName === 'string' && d.VolumeName.trim() ? d.VolumeName.trim() : undefined;
-    out.push({ letter, name, type, size, free: typeof d.FreeSpace === 'number' ? d.FreeSpace : undefined });
+    const fsName = typeof d.FileSystem === 'string' && d.FileSystem.trim() ? d.FileSystem.trim() : undefined;
+    const serial = typeof d.VolumeSerialNumber === 'string' && d.VolumeSerialNumber.trim() ? d.VolumeSerialNumber.trim() : undefined;
+    out.push({ letter, name, type, size, free: typeof d.FreeSpace === 'number' ? d.FreeSpace : undefined, ...(fsName ? { fs: fsName } : {}), ...(serial ? { serial } : {}) });
   }
   // Clés USB d'abord (c'est par elles qu'arrivent les fichiers sur une borne), puis par lettre.
   const rank = { usb: 0, fixed: 1, cd: 2, network: 3 };

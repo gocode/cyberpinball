@@ -14,6 +14,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { isPrivate } from './audit-publication.mjs';
+import { readmeDownloadProblems } from './telechargement-direct.mjs';
 
 const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -21,6 +22,7 @@ const repo = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const PAIRS = [
   { fr: 'README.fr.md', en: 'README.md' },
   { fr: 'CHANGELOG.md', en: 'CHANGELOG.en.md' },
+  { fr: 'docs/fonctionnalites.md', en: 'docs/features.md' },
   { fr: 'docs/manuel.md', en: 'docs/manual.md' },
   { fr: 'docs/tests-manuels.md', en: 'docs/manual-tests.md' },
   { fr: 'docs/design-system/README.md', en: 'docs/design-system/README.en.md' },
@@ -181,6 +183,8 @@ export function checkTranslations() {
     problems.push(`${file} : document publié sans traduction (ajoutez la paire à PAIRS dans scripts/traductions.mjs)`);
   }
   for (const pair of PAIRS) problems.push(...comparePair(pair));
+  // Liens de téléchargement direct de la dernière version, en tête des deux README.
+  problems.push(...readmeDownloadProblems(repo));
   return problems;
 }
 

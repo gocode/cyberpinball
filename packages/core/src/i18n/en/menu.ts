@@ -24,7 +24,7 @@ export const messages: Record<string, string> = {
   'Boutons, écrans, son, réglages de VPX, bureau Windows, mode invité': 'Buttons, screens, sound, VPX settings, Windows desktop, guest mode',
   'Migration': 'Migration',
   'Images et vidéos des tables, musique et mode attente du menu': 'Table images and videos, menu music and attract mode',
-  'Langue, mise à jour, migration, quitter, veille et extinction': 'Language, update, migration, quit, sleep and shutdown',
+  'Langue, mise à jour, sauvegardes, migration, quitter, veille et extinction': 'Language, update, backups, migration, quit, sleep and shutdown',
   'Reprendre les médias de PinUP Popper ou PinballX, regrouper les ROM': 'Import media from PinUP Popper or PinballX, gather ROMs',
   'Menu système': 'System menu',
   'Trouver les médias manquants': 'Find missing media',

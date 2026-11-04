@@ -7,6 +7,12 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.7
+
+- Backups, in System menu > Cyber Pinball: copy your settings and scores, your tables too, or the whole installation, to a USB drive, a disk or a network drive. Only changed files are copied again, and every file written is read back. A level that does not fit on the drive is greyed out with its reason (not enough space, FAT32 drive and a file over 4 GB).
+- During a backup the menu stays free, but tables wait for the copy to end. A copy that was stopped, or whose drive was removed, keeps what was verified: "Resume the backup" only copies what is missing.
+- Restore: a plan first shows, part by part, what will be replaced, put back or kept, and Start includes or excludes each part. Cyber Pinball restarts and puts the files in place before reading them; the previous state goes to the trash, and "Undo the last restore" brings it back. A backup from another cabinet does not take its screens or its identity on the friends network by default.
+- Automatic backup (off by default): settings and scores every week or every night, while the cabinet is free, kept on the cabinet (the last 10) then copied to the drive as soon as it is plugged in.
 ## 0.1.6
 
 - Game with friends on a table whose DMD is drawn by its script (FlexDMD, like The Goonies): VPX no longer stops mid-game. Cyber Pinball read that DMD during the game in a way that could damage VPX's memory; it now only reads the DMD of ROM tables (the friends' scores still go on its score screen, on the backglass for the others). If VPX stops anyway, the screen says why (the table's script error, line and message, or exit code explained) and Start plays the table again, or opens the game with friends, instead of looking for what is missing to play.

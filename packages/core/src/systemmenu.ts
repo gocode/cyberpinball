@@ -38,6 +38,7 @@ export const SYSTEM_ITEM_IDS = [
   'guest-mode',
   'language',
   'updates',
+  'backups',
   'media-import',
   'rom-migration',
   'quit',
@@ -118,9 +119,9 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'cyberpinball',
     icon: 'pinball-app',
     label: 'Cyber Pinball', // i18n-ignore : le nom de l'application
-    get detail() { return t('Langue, mise à jour, migration, quitter, veille et extinction'); },
+    get detail() { return t('Langue, mise à jour, sauvegardes, migration, quitter, veille et extinction'); },
     // Les sorties à la fin, de la plus légère à la plus lourde : quitter, veille, redémarrage, arrêt.
-    entries: ['language', 'updates', 'migration', 'quit', 'sleep', 'restart', 'shutdown'],
+    entries: ['language', 'updates', 'backups', 'migration', 'quit', 'sleep', 'restart', 'shutdown'],
   },
   migration: {
     id: 'migration',
@@ -159,6 +160,7 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   // Nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée.
   language: { icon: 'language', label: 'Langue / Language' }, // i18n-ignore
   updates: { icon: 'upgrade', get label() { return t('Mise à jour de Cyber Pinball'); } },
+  backups: { icon: 'drive', get label() { return t('Sauvegardes'); } },
   'media-import': { icon: 'folder-download', get label() { return t('Reprendre les médias'); } },
   'rom-migration': { icon: 'link', get label() { return t('Regrouper les ROM'); } },
   // Le symbole d'alimentation est gardé pour l'arrêt du PC.

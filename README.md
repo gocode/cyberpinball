@@ -4,7 +4,16 @@
 
 **A free, open-source frontend for virtual pinball cabinets. Describe your cabinet once: Cyber Pinball sets up everything else, you drive it all from the flipper buttons, and you play online with your friends' cabinets.**
 
-[Français](README.fr.md) · [Download](https://github.com/gocode/cyberpinball/releases) · [Technical manual](docs/manual.md) · [What's new](CHANGELOG.en.md)
+[Français](README.fr.md) · [Download](#download) · [Every feature](docs/features.md) · [Technical manual](docs/manual.md) · [What's new](CHANGELOG.en.md)
+
+## Download
+
+[![Latest version](https://img.shields.io/github/v/release/gocode/cyberpinball?label=latest%20version&color=8BE23A&labelColor=0A1A18)](https://github.com/gocode/cyberpinball/releases/latest)
+
+- **[⬇ Download Cyber Pinball](https://github.com/gocode/cyberpinball/releases/latest/download/CyberPinball-Setup.exe)** (`CyberPinball-Setup.exe`, about 110 MiB): the recommended installer. Visual Pinball X is downloaded and checked on first launch.
+- **[⬇ Full installer](https://github.com/gocode/cyberpinball/releases/latest/download/CyberPinball-Setup-complet.exe)** (`CyberPinball-Setup-complet.exe`, about 280 MiB): Visual Pinball X included, for a cabinet without Internet access.
+
+Windows 10 or 11, 64-bit. These links always fetch the latest version, straight away. Already installed? The cabinet updates itself from its system menu. Earlier versions and release notes: [all releases](https://github.com/gocode/cyberpinball/releases).
 
 <p align="center"><img src="docs/images/en/cabinet.webp?v=6c63b0c2a8" width="900" alt="The table menu on a four-screen cabinet: the playfield screen, shown upright, with the selected table's playfield, the wheel of round table medallions and the button hints; next to it the topper, the backglass and the DMD showing the same game, Neon Abyss."></p>
 
@@ -21,7 +30,9 @@ Cyber Pinball turns a PC full of Visual Pinball X tables into a real arcade cabi
 - **[A menu with real cabinet presence](#a-menu-with-real-cabinet-presence)**: wheel of medallions, live DMD, cinematic launch, interface sounds, and never a glimpse of the Windows desktop.
 - **[From "I want this table" to "Play"](#from-i-want-this-table-to-play)**: the VPS catalogue, a guided "What's missing to play" path, a table doctor, every downloaded file sent where it belongs.
 - **[Media from every source, chosen by you](#media-from-every-source-chosen-by-you)**: galleries of what each site offers, a built-in browser, and your own games recorded as wheel videos.
-- **[A cabinet that looks after itself](#a-cabinet-that-looks-after-itself)**: a health check, signed updates, a night schedule, guest mode for parties.
+- **[A cabinet that looks after itself](#a-cabinet-that-looks-after-itself)**: a health check, backups, signed updates, a night schedule, guest mode for parties.
+
+**[Every feature, in detail →](docs/features.md)** The full list, section by section, with a screenshot of each screen.
 
 ## Play with friends, cabinet to cabinet
 
@@ -107,6 +118,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 
 - **Cabinet health.** Disk space, tables that don't start, missing media, screens and VPX version on one screen, each with its repair.
 - **Signed updates, from the cabinet.** A red dot on the gear when a release is out; what's new in your language; one press installs it. Every release is signed, and the cabinet refuses anything that does not carry the publisher's signature. Tables, media and settings are kept.
+- **Backups on a USB drive.** Settings and scores, the tables too, or the whole installation, copied and verified file by file; what has not changed is never copied again. Restoring shows the plan first, and can be undone. Settings and scores can also be backed up every week on their own.
 - **Arcade hours.** The cabinet dims and goes quiet at night, then sleeps or shuts down at the chosen time if nobody is playing, after a warning any button cancels.
 - **Guest mode** for a party or the kids: guests can choose a table, play and read its page, nothing else; holding both flippers and both MagnaSaves unlocks it.
 - **A dedicated cabinet.** Optionally, Cyber Pinball replaces the Windows shell, with a way to bring it back; shut down, restart and sleep from the menu, every screen black until the end.
@@ -123,7 +135,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 
 ## Installation
 
-Download an installer from the [Releases](https://github.com/gocode/cyberpinball/releases) page:
+Download an installer from the [links above](#download), or from the [Releases](https://github.com/gocode/cyberpinball/releases) page for an earlier version:
 
 | File | Size | Visual Pinball X |
 | --- | --- | --- |

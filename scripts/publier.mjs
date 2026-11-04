@@ -20,6 +20,10 @@
 // Une version avec préversion (0.2.0-essai.1) est publiée en « pre-release » : GitHub ne la
 // donne pas pour « latest », seules les bornes qui acceptent les préversions la voient.
 //
+// Version finale : elle porte toujours ses deux installeurs, que donnent les liens de
+// téléchargement direct en tête des README (releases/latest/download/…, scripts/telechargement-direct.mjs) :
+// --rapide et --leger sont refusés pour elle, et ces liens sont vérifiés une fois la version publiée.
+//
 // Publication rapide : refusée si le socle (Electron, exécutable : scripts/fabriquer.mjs) n'est
 // plus celui du dernier flux publié, puisque les bornes ne pourraient pas prendre le paquet léger.
 //
@@ -36,6 +40,7 @@ import { loadPrivateKey } from './cle-publication.mjs';
 import { describeRepository } from './decrire-github.mjs';
 import { githubToken, missingTokenMessage } from './jeton-github.mjs';
 import { snapshotAndPush } from './envoyer-github.mjs';
+import { DIRECT_DOWNLOADS, directDownloadProblems } from './telechargement-direct.mjs';
 import { bulletPoints, changelogNotes, changelogSections } from './traductions.mjs';
 
 const require = createRequire(import.meta.url);
@@ -51,6 +56,11 @@ const option = (name) => {
 const local = option('--local');
 const rapid = argv.includes('--rapide');
 const prerelease = version.includes('-');
+// Les liens directs des README donnent la dernière version finale : elle doit porter ses installeurs.
+if (!prerelease && !local && (rapid || argv.includes('--leger'))) {
+  console.error(`\nPublication arrêtée : ${version} est une version finale ; elle doit porter ses deux installeurs (${DIRECT_DOWNLOADS.join(', ')}), que donnent les liens de téléchargement direct des README. Publiez-la sans --rapide ni --leger, ou en préversion (${version}-essai.1).`);
+  process.exit(1);
+}
 
 function step(text) {
   console.log(`\n> ${text}`);
@@ -256,6 +266,10 @@ const created = await api('POST', '/releases', {
 if (created.status !== 201) fail(`création de la release refusée (HTTP ${created.status}) : ${JSON.stringify(created.json)}`);
 const uploadBase = created.json.upload_url.replace(/\{.*\}$/, '');
 const files = reference ? [appPackage, feed] : [installer, ...(fs.existsSync(complete) ? [complete] : []), appPackage, feed];
+if (!prerelease) {
+  const missing = DIRECT_DOWNLOADS.filter((name) => !files.some((file) => path.basename(file) === name));
+  if (missing.length) fail(`la version finale ${version} n'aurait pas ${missing.join(', ')} : les liens de téléchargement direct des README mèneraient à une erreur. La release reste en brouillon.`);
+}
 for (const file of files) {
   const name = path.basename(file);
   process.stdout.write(`  ${name} (${(fs.statSync(file).size / 1024 ** 2).toFixed(1)} Mio)… `);
@@ -294,6 +308,11 @@ if (argv.includes('--brouillon')) {
   if (check instanceof Error) console.log(`Attention : le flux n'est pas encore lisible par les bornes (${check.message}).`);
   else if (check.latest.version !== version) console.log(`Attention : au bout d'une minute, les bornes lisent encore la version ${check.latest.version}, pas ${version} : à vérifier sur GitHub.`);
   else console.log(`Flux lu comme une borne : version ${check.latest.version}${prerelease ? ' (préversion : seules les bornes qui acceptent les préversions la voient)' : ''}.`);
+  if (!prerelease) {
+    const problems = await directDownloadProblems(repository, version);
+    if (problems.length) console.log(`Attention : téléchargement direct des README pas encore sur ${version} :\n  ${problems.join('\n  ')}`);
+    else console.log(`Téléchargement direct des README : ${DIRECT_DOWNLOADS.join(' et ')} de la version ${version}.`);
+  }
 }
 
 // Description et sujets du dépôt, d'après package.json. Sans la permission « Administration »,

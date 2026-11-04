@@ -1397,6 +1397,25 @@ Two cabinets A and B, friends, on the real network, the same version of a table 
 | 731 | Change table | A invites B; A chooses "Changer de table" (Change table) and another table, with B. | On B: the old invitation says "A a changé de table", "Voir la nouvelle invitation" leads to the new one. |
 | 732 | Invited again after a refusal | B declines; A invites them again from the same room ("Inviter un autre ami" > B). | On B: chime, the card, and the invitation notification again (not muted). |
 
+## Backups
+
+On the cabinet, a USB drive to plug in (one in exFAT or NTFS, and if possible a second one in FAT32), and a ROM table on which a record has been beaten. The proof without an operator: `packages/core/src/test/sauvegardes.test.ts` (the engine), `packages/core/src/test/sauvegardes-menu.test.ts` (the screens, simulated drives) and `.\docs\demo-sauvegardes.ps1` (rendering of the real screens); the manual: "Backups".
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 740 | No drive | System menu > Cyber Pinball > Backups, no drive plugged in. | "Sauvegarder maintenant" (Back up now) greyed out with "Choisissez d’abord une clé, un disque ou un dossier" (First choose a USB drive, a disk or a folder); "Choisir une destination" (Choose a destination) asks to plug in a drive. Nothing is hidden. |
+| 741 | Choose the drive | Plug in the drive, "Choisir une destination", then the drive. | The drive shows up with its free space and file system; once chosen, the main screen says "Destination : Clé « … » (E:)". The cabinet disk is offered last, "À vérifier" (To check). |
+| 742 | Settings and scores | "Sauvegarder maintenant". | The focus is on "Réglages et scores" (Settings and scores), never on "Lancer la sauvegarde" (Start the backup). Started: a few seconds, then "Sauvegarde terminée" (Backup complete) and "✓ … fichiers vérifiés". On the drive: `CyberPinball-Sauvegardes\<cabinet>\<date> reglages\sauvegarde.json`. |
+| 743 | With the tables, twice | Choose "Avec les tables" (With the tables), start; then start again straight away. | The first copy shows one bar per part and the time left. The second is almost instant: "… copiés ; le reste était déjà sur la destination" (… copied; the rest was already on the destination). |
+| 744 | Game during the copy | During a backup with the tables, "Retour au menu" (Back to menu), then launch a table. | "Partie impossible pour l’instant" (Game not possible right now): "Une sauvegarde est en cours : les parties attendent sa fin."; the Backups entry shows the progress. |
+| 745 | Drive pulled out | Pull the drive out while the tables are copied. | "Sauvegarde interrompue" (Backup interrupted): what was already copied and verified is named; plugged back in, "Reprendre la sauvegarde" (Resume the backup) copies only what is missing. |
+| 746 | FAT32 | Choose the FAT32 drive if a table has a video over 4 GB. | "Avec les tables" and "Toute l’installation" (The whole installation): "Bloquant" (Blocking), "FAT32 : … dépassent 4 Go"; "Lancer la sauvegarde" greyed out with the reason; "Réglages et scores" stays possible. |
+| 747 | Eject | After a backup, "Éjecter la clé" (Eject the drive). | "Vous pouvez débrancher Clé « … »" (You can unplug …); the drive disappears from File Explorer. |
+| 748 | Restore a setting | Change a setting (Médias, son et attente), beat a record on the ROM table, then "Restaurer une sauvegarde" (Restore a backup) > the backup from 742. | The plan opens on the first part, each part "✓ Inclus" (Included) with its replaced files; Start on a part turns it to "Exclu" (Excluded). "Restaurer la sélection" (Restore the selection): copy, then Cyber Pinball restarts; the banner says "Restauration terminée" (Restore complete); the earlier setting and record are back; the earlier state is in the trash (`<date> Avant restauration`). |
+| 749 | Undo the restore | "Restaurer une sauvegarde" > "Annuler la dernière restauration" (Undo the last restore). | Restart; the setting and record from scenario 748 come back. |
+| 750 | Another cabinet | Restore, on a second cabinet (or after deleting `data\borne.json` and redoing a model), a backup of the first one. | Listed under "Une autre borne" (Another cabinet); in the plan, "Écrans, boutons et son de la borne" is "Exclu" and "Garder mes amis et l’identité de cette borne" is chosen; "Remplacer « … » sur le réseau" asks for a confirmation, which starts on "Retour" (Back). |
+| 751 | Automatic | "Automatique : chaque semaine" (Automatic: every week), then move the Windows clock to Sunday after 4 am (or wait). | With the cabinet free, an "Automatique" backup appears on the cabinet, then, drive plugged in, "Réglages et scores copiés sur Clé « … »". Never during a game. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

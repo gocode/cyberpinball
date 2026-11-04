@@ -13,6 +13,7 @@ export * from './locations';
 export * from './tables';
 export * from './tableorder';
 export * from './atomicwrite';
+export * from './backup';
 export * from './fileops';
 export * from './transfer';
 export * from './ratelimit';

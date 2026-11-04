@@ -12,18 +12,63 @@
 #   bureau   : le menu des tables sur un PC de bureau à deux écrans (plateau dans son cadre 9:16) ;
 #   assistant: l'étape « Écrans et rôles » sur les quatre écrans ;
 #   reglages : l'écran des réglages de VPX ;
+#   fonctions: un écran par fonction de la page « Toutes les fonctionnalités » (docs\features.md,
+#              docs\fonctionnalites.md), chacun dans sa propre ouverture (liste $Fonctions) ;
 # puis, une fois pour les deux langues :
 #   demonstrations : les démonstrations des autres fonctions, en mode accueil (-Accueil) : lancement
 #              cinématique, DMD vivant, santé de la borne, « Ce qu'il manque pour jouer », amis ;
 #   images   : assemblage et remise à l'endroit (playfield couché) dans docs\images, en WebP,
-#              puis docs\demo-presentation.ps1 (fronton de la marque, dossier à partager).
+#              puis docs\demo-presentation.ps1 (fronton de la marque, dossier à partager) ;
+#   images-fonctions : les écrans de l'étape fonctions, remis debout, dans docs\images\<langue>\features
+#              (compris dans images) ; une capture que le garde-fou refuse n'est pas reprise.
 # Le garde-fou de mise en page et le guet hors écran doivent rester muets, sinon le script échoue.
-#   .\docs\demo-captures.ps1 [-Langues en, fr] [-Etapes medias, menu, fiche, bureau, assistant, reglages, demonstrations, images]
+#   .\docs\demo-captures.ps1 [-Langues en, fr] [-Etapes medias, menu, fiche, bureau, assistant, reglages, fonctions, demonstrations, images, images-fonctions] [-Seulement doctor, tilt]
 # Ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont lus ni touchés ; VPX n'est jamais lancé.
 param(
   [string[]]$Langues = @('en', 'fr'),
-  [string[]]$Etapes = @('medias', 'menu', 'fiche', 'bureau', 'assistant', 'reglages', 'demonstrations', 'images'),
-  [int]$Port = 8766
+  [string[]]$Etapes = @('medias', 'menu', 'fiche', 'bureau', 'assistant', 'reglages', 'fonctions', 'demonstrations', 'images'),
+  [int]$Port = 8766,
+  # Étapes fonctions et images-fonctions : seulement ces écrans (noms de la liste des fonctions, plus bas), pour en refaire un.
+  [string[]]$Seulement = @()
+)
+# Écrans de la page « Toutes les fonctionnalités » : nom de l'image, départ, puis les étapes.
+#   S : menu système (Exit depuis la roue), F : fiche de Neon Abyss (Start quatre tables plus loin),
+#       suivis des actions nommées en français (la clé du catalogue de textes) ; un libellé à
+#       virgule s'écrit par sa fin (« son et attente »), les étapes étant séparées par des virgules,
+#       et ce bout de libellé, qui n'est pas une clé du catalogue, a sa traduction dans $Bouts.
+#   W : une étape de l'assistant ouverte seule, par son drapeau (packages/core/src/wizardsteps.ts),
+#       image prise sur l'écran 1, le playfield, tourné pour le joueur comme les menus.
+# Chacun part d'une ouverture neuve : une action introuvable ne gâte que son image. Écartés de la
+# page : les écrans vides ou que le bac à sable trahit (téléchargements, bibliothèque de ROM, partage
+# et réseau, trouver un joueur : réseau coupé ; lanceur : aucun joystick), et « Réglages de cette
+# table », qui s'ouvre dans une autre fenêtre.
+$Bouts = @{ 'son et attente' = @{ en = 'sound and attract mode' } }
+$Fonctions = @(
+  @('all-tables', 'S', @('action:Toutes les tables')),
+  @('add-table', 'S', @('action:Ajouter une table')),
+  @('menu-settings', 'S', @('action:son et attente')),
+  @('startup-show', 'S', @('action:son et attente', 'wait:800', 'action:Ouverture au démarrage')),
+  @('arcade-hours', 'S', @('action:son et attente', 'wait:800', 'action:Horaire de la borne')),
+  @('dmd-colour', 'S', @('action:son et attente', 'wait:800', 'action:Couleur du DMD')),
+  @('friends-section', 'S', @('action:Amis')),
+  @('live-scores-setting', 'S', @('action:Scores des amis pendant la partie')),
+  @('badges', 'S', @('action:Mes badges')),
+  @('cabinet-setup', 'S', @('action:Configuration de la borne')),
+  @('dmd-screen', 'S', @('action:Configuration de la borne', 'wait:800', 'action:Écran du DMD')),
+  @('configurations', 'S', @('action:Configuration de la borne', 'wait:800', 'action:Configurations de la borne')),
+  @('controls', 'S', @('action:Commandes de la borne')),
+  @('guest-mode', 'S', @('action:Mode invité')),
+  @('dedicated', 'S', @('action:Borne dédiée')),
+  @('language', 'S', @('action:Langue / Language')),
+  @('doctor', 'F', @('action:Diagnostiquer et réparer')),
+  @('game-parts', 'F', @('action:Parties du jeu')),
+  @('flyer', 'F', @('action:Prospectus')),
+  @('buttons', 'W', @('--boutons')),
+  @('interface-buttons', 'W', @('--interface')),
+  @('tilt', 'W', @('--tilt')),
+  @('playfield', 'W', @('--playfield')),
+  @('screen-layout', 'W', @('--disposition')),
+  @('sound', 'W', @('--son'))
 )
 $ErrorActionPreference = 'Stop'
 $wt = Split-Path $PSScriptRoot -Parent
@@ -32,7 +77,8 @@ $wt = Split-Path $PSScriptRoot -Parent
 if (Enter-BureauCache $PSCommandPath $PSBoundParameters) { exit $LASTEXITCODE }
 Use-HorsEcran 'borne'
 $base = "$wt\tmp\demo-captures"
-$root = "$base\root"
+# Nommée comme une vraie racine de borne : certains écrans montrent son chemin (étape fonctions).
+$root = "$base\CyberPinball"
 $electron = node -p "require('electron')"
 $failures = @()
 
@@ -95,6 +141,8 @@ function Invoke-Capture([string]$Langue, [string]$Nom, [string[]]$Touches, [stri
   if (Test-Path $env:CYBERPINBALL_CAPTURE) { Remove-Item -Recurse -Force $env:CYBERPINBALL_CAPTURE }
   Push-Location $wt
   try { $log = & $electron app @Arguments 2>&1 | ForEach-Object { "$_" } } finally { Pop-Location }
+  New-Item -ItemType Directory -Force $env:CYBERPINBALL_CAPTURE | Out-Null
+  Set-Content "$env:CYBERPINBALL_CAPTURE\journal.txt" $log -Encoding UTF8
   $log | Where-Object { $_ -match '^(Autopilote|Mise en page|Traduction manquante|Hors écran)' } | ForEach-Object { Write-Host "   $_" }
   if ($log -match 'Autopilote : aucun') { $script:failures += "$Langue/$Nom : une action rejouée n'a pas trouvé son écran" }
   if ($log -match 'Traduction manquante') { $script:failures += "$Langue/$Nom : texte sans traduction" }
@@ -160,6 +208,44 @@ try {
     if ($Etapes -contains 'assistant') {
       Invoke-Capture $langue 'assistant' @('wait:1500') @('--assistant', '--ecrans')
     }
+    if ($Etapes -contains 'fonctions') {
+      # VPX n'est pas installé : Exit (plus tard). Menu système : Exit depuis la roue. Fiche : Start
+      # sur Neon Abyss, quatre tables plus loin. Un écran que le garde-fou refuse est noté à part
+      # (fonctions-ecartees.txt) : l'assemblage ne le reprend pas, les autres continuent.
+      $ecartees = @()
+      # La racine montrée par « Ajouter une table » (dossier d'import) et d'autres écrans : un
+      # lecteur court (subst), « P:\CyberPinball », plutôt que le chemin du dépôt sur ce poste.
+      $lecteur = @('P:', 'Q:', 'R:', 'S:', 'T:', 'U:', 'V:', 'W:') | Where-Object { -not (Test-Path "$_\") } | Select-Object -First 1
+      subst $lecteur $base
+      $env:CYBERPINBALL_ROOT = "$lecteur\CyberPinball"
+      try {
+      foreach ($f in $Fonctions) {
+        if ($Seulement.Count -and $Seulement -notcontains $f[0]) { continue }
+        $avant = $script:failures.Count
+        # Une ouverture qui échoue (guet sans bilan, application arrêtée) écarte son écran seulement.
+        try {
+          if ($f[1] -eq 'W') { Invoke-Capture $langue "fonctions\$($f[0])" @('wait:2500') $f[2] }
+          else {
+            $depart = if ($f[1] -eq 'S') { @('Escape', 'wait:600', 'Escape', 'wait:800') } else { @('Escape', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'wait:2000', 'Digit1', 'wait:1200') }
+            $sequence = $f[2] | ForEach-Object { $b = $Bouts[$_ -replace '^action:', '']; if ($b -and $b[$langue]) { "action:$($b[$langue])" } else { $_ } }
+            Invoke-Capture $langue "fonctions\$($f[0])" ($depart + $sequence + @('wait:2500')) @()
+          }
+        } catch { $script:failures += "$langue/fonctions\$($f[0]) : $($_.Exception.Message) (journal.txt de l'écran)" }
+        # Toujours des listes : un seul écart ne doit pas devenir une chaîne qu'on découperait en lettres.
+        $nouveaux = @($script:failures | Select-Object -Skip $avant)
+        if ($nouveaux.Count) {
+          $ecartees = @($ecartees) + $nouveaux
+          $script:failures = @($script:failures | Select-Object -First $avant)
+        }
+      }
+      } finally {
+        subst $lecteur /D
+        $env:CYBERPINBALL_ROOT = $root
+      }
+      New-Item -ItemType Directory -Force "$base\$langue\captures\fonctions" | Out-Null
+      Set-Content "$base\$langue\captures\fonctions\fonctions-ecartees.txt" ($ecartees -join "`n") -Encoding UTF8
+      if ($ecartees.Count) { "   Écrans écartés ($($ecartees.Count)) :"; $ecartees | ForEach-Object { "     $_" } }
+    }
     if ($Etapes -contains 'reglages') {
       # L'écran affiche le chemin de VPinballX.ini : celui d'une racine de borne courte (lecteur
       # subst sur le bac à sable, lu seulement), plutôt que celui du dossier du dépôt.
@@ -194,16 +280,34 @@ if ($Etapes -contains 'demonstrations') {
 
 # Images de la page du projet : le playfield couché (joueur au bord gauche de l'image) est remis
 # d'un quart de tour à l'endroit ; la borne entière est assemblée écran par écran.
+$edge = '#24504a'
+function Write-Planche([string]$Out, [int]$Width, [int]$Height, [object[]]$Layers) {
+  $spec = "$base\planche.json"
+  @{ out = $Out; width = $Width; height = $Height; background = '#030807'; quality = 0.84; layers = $Layers } | ConvertTo-Json -Depth 6 | Set-Content $spec -Encoding UTF8
+  Push-Location $wt
+  try { & $electron docs\demo-captures.cjs --planche $spec 2>&1 | ForEach-Object { "   $_" } } finally { Pop-Location }
+  if ($LASTEXITCODE -ne 0) { throw "Image impossible : $Out" }
+}
+if ($Etapes -contains 'images' -or $Etapes -contains 'images-fonctions') {
+  '== images de la page « Toutes les fonctionnalités » (docs\images\<langue>\features)'
+  foreach ($langue in $Langues) {
+    $dir = "$base\$langue\captures\fonctions"
+    $out = "$wt\docs\images\$langue\features"
+    New-Item -ItemType Directory -Force $out | Out-Null
+    $refus = if (Test-Path "$dir\fonctions-ecartees.txt") { @(Get-Content "$dir\fonctions-ecartees.txt" -Encoding UTF8) } else { @() }
+    foreach ($f in $Fonctions) {
+      if ($Seulement.Count -and $Seulement -notcontains $f[0]) { continue }
+      if ($refus | Where-Object { $_ -like "$langue/fonctions\$($f[0]) :*" }) { "   $langue/$($f[0]) : écarté par le garde-fou"; continue }
+      # Le dernier écran de la séquence (après la dernière attente), playfield remis debout.
+      $motif = if ($f[1] -eq 'W') { '*-ecran1.png' } else { '*.png' }
+      $last = Get-ChildItem "$dir\$($f[0])\$motif" -ErrorAction SilentlyContinue | Sort-Object Name | Select-Object -Last 1
+      if (-not $last) { "   $langue/$($f[0]) : pas de capture"; continue }
+      Write-Planche "$out\$($f[0]).webp" 720 1280 @(@{ src = $last.FullName; x = 0; y = 0; w = 720; h = 1280; turn = -1 })
+    }
+  }
+}
 if ($Etapes -contains 'images') {
   '== images de docs\images'
-  $edge = '#24504a'
-  function Write-Planche([string]$Out, [int]$Width, [int]$Height, [object[]]$Layers) {
-    $spec = "$base\planche.json"
-    @{ out = $Out; width = $Width; height = $Height; background = '#030807'; quality = 0.84; layers = $Layers } | ConvertTo-Json -Depth 6 | Set-Content $spec -Encoding UTF8
-    Push-Location $wt
-    try { & $electron docs\demo-captures.cjs --planche $spec 2>&1 | ForEach-Object { "   $_" } } finally { Pop-Location }
-    if ($LASTEXITCODE -ne 0) { throw "Image impossible : $Out" }
-  }
   function Layer([string]$Src, [int]$X, [int]$Y, [int]$W, [int]$H, [int]$Turn = 0) {
     if (-not (Test-Path $Src)) { throw "Capture absente : $Src" }
     @{ src = $Src; x = $X; y = $Y; w = $W; h = $H; turn = $Turn; radius = 10; border = $edge }

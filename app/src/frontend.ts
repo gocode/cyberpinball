@@ -176,6 +176,8 @@ import {
   volumeOutputIds,
   diagnoseVpxFailure,
   readVpxScript as readTableScript,
+  diskSpace,
+  loadSocial,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -205,6 +207,10 @@ import { serveMedias } from './media-protocol';
 import { createMenuSettings } from './menu-settings';
 import { createIntroMenu } from './intro-menu';
 import { createLanguageMenu } from './language-menu';
+import { createBackupsMenu } from './backups-menu';
+import { ejectDrive } from './drive-eject';
+import { freezeWrites } from './write-freeze';
+import { listDrives } from './file-picker';
 import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
 import { createFriendsMenu } from './friends-menu';
@@ -804,6 +810,41 @@ const updates = createUpdatesMenu({
   background: !OFFSCREEN || Boolean(process.env.CYBERPINBALL_MAJ_URL),
 });
 library.provideSystemItem('updates', updates.systemItem);
+// Sauvegardes : sur une clé USB ou un disque, à la demande ou chaque semaine (réglages et scores) ;
+// la restauration prépare ses fichiers puis relance le menu, qui les pose au démarrage (restore-on-start.ts).
+const backups = createBackupsMenu({
+  library,
+  broadcast: () => broadcast(),
+  root: loc.root,
+  dataDir: loc.dataDir,
+  trashRoot: loc.root ? layoutOf(loc.root).trash : path.join(loc.dataDir, 'trash'),
+  version: app.getVersion(),
+  cabinetName: () => {
+    try {
+      return loadSocial(loc.dataDir).name || undefined;
+    } catch {
+      return undefined;
+    }
+  },
+  listDrives: () => listDrives(),
+  diskSpace: (dir) => diskSpace(dir),
+  eject: (drive) => ejectDrive(drive, OFFSCREEN),
+  // Les fichiers restaurés sont posés par le nouveau processus : celui-ci n'écrit plus rien jusqu'à sa fin.
+  relaunch: () => {
+    freezeWrites([loc.root ?? loc.dataDir, loc.dataDir], [path.join(loc.dataDir, 'logs')]);
+    relaunchMenu();
+  },
+  notify: (text) => showBanner(text),
+});
+library.provideSystemItem('backups', backups.systemItem);
+{
+  const restored = backups.restoredNotice();
+  if (restored) setTimeout(() => showBanner(restored), 4000).unref();
+  // Fichiers encore ouverts par l'ancien processus au démarrage (une vidéo en lecture) : reposés une fois qu'il est fermé.
+  for (const delay of [20_000, 60_000]) setTimeout(() => backups.retryPendingRestore(), delay).unref();
+  // Sauvegarde automatique : regardée chaque minute, faite quand la borne est libre.
+  setInterval(() => void backups.autoTick(stopIdle()).catch((error: Error) => console.error(`Sauvegarde automatique : ${error.message}`)), 60_000).unref(); // i18n-ignore : journal
+}
 // Aide-mémoire des boutons : aussi ici, puisque le pied du menu ne nomme que Flippers, Start et Exit.
 library.provideSystemItem('controls', {
   get detail() {
@@ -1951,6 +1992,13 @@ const SIMULATED_MANUAL = OFFSCREEN && !!process.env.CYBERPINBALL_PARTIE_SIMULEE_
 async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void; gate?: LiveStartGate } = {}): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
   if (!install) return undefined;
+  // Une sauvegarde ou une restauration en cours : la partie écrirait ses scores pendant la copie.
+  const copying = backups.busy();
+  if (copying) {
+    state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible pour l’instant'), lines: [copying, t('Start ou Exit : revenir au menu.')] } };
+    broadcast();
+    return undefined;
+  }
   // Hors écran, une partie simulée (CYBERPINBALL_PARTIE_SIMULEE : rôles qu'elle occupe,
   // « backglass,dmd », ou vide) montre chargement, partie et retour sans lancer VPX.
   const simulated = OFFSCREEN ? process.env.CYBERPINBALL_PARTIE_SIMULEE : undefined;

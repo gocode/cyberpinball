@@ -87,7 +87,7 @@ export function listDrives(): Promise<DriveInfo[]> {
   }
   if (drivesCache && Date.now() - drivesCache.at < 15_000) return Promise.resolve(drivesCache.drives);
   return new Promise((resolve) => {
-    const script = 'Get-CimInstance Win32_LogicalDisk | Select-Object DeviceID,DriveType,VolumeName,FreeSpace,Size | ConvertTo-Json -Compress';
+    const script = 'Get-CimInstance Win32_LogicalDisk | Select-Object DeviceID,DriveType,VolumeName,FreeSpace,Size,FileSystem,VolumeSerialNumber | ConvertTo-Json -Compress';
     execFile('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, timeout: 8000 }, (error, stdout) => {
       let drives: DriveInfo[] = [];
       try {
