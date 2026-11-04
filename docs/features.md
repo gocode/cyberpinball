@@ -495,10 +495,10 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 ### Backups
 
-- **On a USB drive, a disk or a network drive**: settings and scores (a few MB), the tables too, or the whole installation. What has not changed is never copied again, and every file is read back and checked.
+- **On a USB drive, a disk or a network drive**, at its root or in the folder of your choice: settings and scores (a few MB), the tables too, or the whole installation. What has not changed is never copied again, and every file is read back and checked.
 - **Restoring shows the plan first**: what will be replaced, put back or kept, part by part. The earlier state goes to the bin, and "Annuler la dernière restauration" (Undo the last restore) puts it back.
 - **From one cabinet to another**: another cabinet's backup does not bring over its screens or its identity on the friends network by default.
-- **Automatic** (off by default): settings and scores every week or every night, when the cabinet is free, copied to the drive as soon as it is plugged in.
+- **Automatic** (off by default): settings and scores every day or every week, as soon as possible (the first time the cabinet is free) or at the chosen time; a game started takes priority. Copied to the drive as soon as it is plugged in.
 
 ### Cabinet schedule
 

@@ -16,6 +16,8 @@ import * as path from 'node:path';
 import {
   applyPendingRestore,
   autoBackupDue,
+  autoHour,
+  autoWeekday,
   backupPartLabel,
   cabinetIdentity,
   canUndoLastRestore,
@@ -23,6 +25,8 @@ import {
   formatDateTime,
   formatRemaining,
   formatSize,
+  hourLabel,
+  isInside,
   isSameCabinet,
   levelLabel,
   listBackups,
@@ -32,6 +36,7 @@ import {
   loadPendingRestore,
   localBackupDir,
   markLastRestoreShown,
+  nextAutoSlot,
   planRestore,
   prepareRestore,
   prepareUndoLastRestore,
@@ -48,6 +53,7 @@ import {
   BACKUP_PARTS,
   LEVEL_PARTS,
   type AutoBackup,
+  type AutoMoment,
   type BackupInfo,
   type BackupLevel,
   type BackupPart,
@@ -66,6 +72,8 @@ export interface BackupsMenuHost {
     openSystem(): void;
     /** Opération courte : le message à l'écran, les touches ignorées. */
     task(message: string, work: () => Promise<void> | void): Promise<void>;
+    /** Sélecteur de fichiers de Cyber Pinball, en mode dossier : undefined à l'abandon. */
+    pick?(request: { title: string; icon?: 'usb'; purpose: string; mode: 'folder'; startDir?: string }): Promise<string[] | undefined>;
   };
   /** Redessine l'écran affiché (progression d'une copie). */
   broadcast(): void;
@@ -156,7 +164,25 @@ export function createBackupsMenu(host: BackupsMenuHost) {
   const drivePath = (d: DriveInfo) => d.path ?? `${d.letter}\\`;
   const rootDrive = () => (host.root ? path.parse(path.resolve(host.root)).root.slice(0, 2).toUpperCase() : undefined);
   const isRootDrive = (d: DriveInfo) => !d.path && d.letter.toUpperCase() === rootDrive();
-  const destOf = (d: DriveInfo) => path.join(drivePath(d), BACKUP_DIR_NAME);
+  /** Dossier des sauvegardes à la racine d'un lecteur (où l'on cherche aussi celles d'une autre borne). */
+  const rootDestOf = (d: DriveInfo) => path.join(drivePath(d), BACKUP_DIR_NAME);
+
+  /** Le dossier choisi sur ce lecteur (« Sauvegardes\Borne »), si la destination choisie est sur lui. */
+  function folderOn(d: DriveInfo): string | undefined {
+    const c = settings().destination;
+    if (!c?.folder) return undefined;
+    const same = c.serial && d.serial ? c.serial === d.serial : isInside(path.resolve(c.path), path.resolve(drivePath(d)));
+    return same ? c.folder : undefined;
+  }
+
+  /** Dossier des sauvegardes sur un lecteur : dans le dossier choisi s'il est sur lui, sinon à sa racine. */
+  const destOf = (d: DriveInfo) => path.join(drivePath(d), folderOn(d) ?? '', BACKUP_DIR_NAME);
+
+  /** « Clé « SAUVEGARDE » (E:) › Sauvegardes\Borne » : le lecteur, et le dossier choisi dessus. */
+  function placeName(d: DriveInfo): string {
+    const folder = folderOn(d);
+    return folder ? t('{where} › {folder}', { where: driveName(d), folder }) : driveName(d);
+  }
 
   function driveName(d: DriveInfo): string {
     if (isRootDrive(d)) return t('Disque de la borne ({letter})', { letter: d.letter });
@@ -228,10 +254,10 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     const here = dest ? listBackups(dest, false).filter((b) => b.manifest.cabinet.id === identity().id) : [];
     const sections: Section[] = [];
     if (restoredFlash) sections.push({ rows: restoredFlash });
-    if (job) sections.push({ rows: [{ icon: 'info', text: jobLine(), tone: 'info', progress: { value: jobValue(), tone: 'info' } }] });
+    if (job) sections.push({ rows: [{ icon: 'info', text: job.auto ? `${t('Sauvegarde automatique')} · ${jobLine()}` : jobLine(), tone: 'info', progress: { value: jobValue(), tone: 'info' } }] });
     if (drive) {
       sections.push({
-        title: t('Sur {where}', { where: driveName(drive) }),
+        title: t('Sur {where}', { where: placeName(drive) }),
         rows: here.length
           ? here.slice(0, 3).map((b) => ({
               icon: levelIcon(b.manifest.level),
@@ -254,7 +280,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     }
     const noDest = t('Choisissez d’abord une clé, un disque ou un dossier');
     const actions: Action[] = [
-      job
+      job && !job.auto
         ? { label: job.kind === 'backup' ? t('Sauvegarde en cours') : t('Restauration en cours'), detail: jobLine(), icon: 'drive', run: showJob }
         : {
             label: t('Sauvegarder maintenant'),
@@ -265,9 +291,9 @@ export function createBackupsMenu(host: BackupsMenuHost) {
           },
       { label: t('Restaurer une sauvegarde'), detail: t('Choisir parmi celles des clés, des disques et de la borne'), icon: 'restore', run: openRestoreList },
       drive
-        ? { label: t('Destination : {where}', { where: driveName(drive) }), detail: t('{free} libres · changer de clé, de disque ou de dossier', { free: formatSize(freeOf(drive) ?? 0) }), icon: 'usb', run: openDestination }
+        ? { label: t('Destination : {where}', { where: placeName(drive) }), detail: t('{free} libres · changer de clé, de disque ou de dossier', { free: formatSize(freeOf(drive) ?? 0) }), icon: 'usb', run: openDestination }
         : { label: s.destination ? t('Destination : {where}, absente', { where: s.destination.label ?? s.destination.path }) : t('Choisir une destination'), detail: t('Une clé, un disque externe, un dossier du réseau ou de la borne'), icon: 'usb', run: openDestination },
-      { label: autoLabel(s.auto), detail: autoDetail(s), icon: 'clock', run: openAuto },
+      { label: autoLabel(s), detail: autoDetail(s), icon: 'clock', run: openAuto },
       backAction(),
     ];
     return {
@@ -281,12 +307,37 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     };
   }
 
-  function autoLabel(a: AutoBackup): string {
-    return a === 'weekly' ? t('Automatique : chaque semaine') : a === 'nightly' ? t('Automatique : chaque nuit') : t('Automatique : désactivée');
+  /** « dimanche » : nom du jour (0 : dimanche), dans la langue de l'interface. */
+  function dayName(day: number): string {
+    // Le 1er novembre 2026 est un dimanche.
+    return formatDateTime(new Date(2026, 10, 1 + day, 12).toISOString(), { weekday: 'long' });
   }
+
+  /** « Le dimanche à 4 h », « Chaque jour à 4 h » : l'heure fixe choisie. */
+  function fixedLabel(s: BackupSettings): string {
+    const hour = hourLabel(autoHour(s) * 60);
+    return s.auto === 'weekly' ? t('Le {day} à {hour}', { day: dayName(autoWeekday(s)), hour }) : t('Chaque jour à {hour}', { hour });
+  }
+
+  function autoLabel(s: BackupSettings): string {
+    if (s.auto === 'off') return t('Automatique : désactivée');
+    if (s.moment === 'fixed') return s.auto === 'weekly' ? t('Automatique : le {day} à {hour}', { day: dayName(autoWeekday(s)), hour: hourLabel(autoHour(s) * 60) }) : t('Automatique : chaque jour à {hour}', { hour: hourLabel(autoHour(s) * 60) });
+    return s.auto === 'weekly' ? t('Automatique : chaque semaine, dès que possible') : t('Automatique : chaque jour, dès que possible');
+  }
+
+  /** Ce qui vient : « Prochaine : dès que la borne est libre », « Prochaine : demain, dès que possible »… */
+  function nextLine(s: BackupSettings): string {
+    const at = now();
+    if (autoBackupDue(s, at)) return t('Prochaine : dès que la borne est libre');
+    const next = nextAutoSlot(s, at);
+    if (!next) return '';
+    if (s.moment === 'fixed') return t('Prochaine : {when}', { when: when(next.toISOString()) });
+    return s.auto === 'weekly' ? t('Faite cette semaine ; prochaine dès que possible à partir de lundi') : t('Faite aujourd’hui ; prochaine demain, dès que possible');
+  }
+
   function autoDetail(s: BackupSettings): string {
-    if (s.auto === 'off') return t('Réglages et scores, chaque semaine ou chaque nuit');
-    return s.auto === 'weekly' ? t('Réglages et scores, le dimanche à 4 h') : t('Réglages et scores, chaque nuit à 4 h');
+    if (s.auto === 'off') return t('Réglages et scores, chaque jour ou chaque semaine');
+    return nextLine(s);
   }
 
   function identity() {
@@ -354,13 +405,13 @@ export function createBackupsMenu(host: BackupsMenuHost) {
             tone: 'ok',
             run: () => void startBackup(level, drive),
           },
-      { label: t('Changer de destination'), detail: t('{where} · {free} libres', { where: driveName(drive), free: formatSize(freeOf(drive) ?? 0) }), icon: 'usb', run: openDestination },
+      { label: t('Changer de destination'), detail: t('{where} · {free} libres', { where: placeName(drive), free: formatSize(freeOf(drive) ?? 0) }), icon: 'usb', run: openDestination },
       backAction(() => host.library.openCustom(buildMain, 0)),
     ];
     return {
       heading: t('Sauvegarder maintenant'),
       icon: 'drive',
-      subheading: t('Vers {where} · {free} libres', { where: driveName(drive), free: formatSize(freeOf(drive) ?? 0) }),
+      subheading: t('Vers {where} · {free} libres', { where: placeName(drive), free: formatSize(freeOf(drive) ?? 0) }),
       lead: t('Chaque niveau contient le précédent ; ce qui est déjà sur la destination n’est pas recopié.'),
       hint: t('Flippers ou Tab : choisir · Start ou Entrée : choisir ce niveau · Exit ou Échap : revenir · souris'),
       sections: [
@@ -393,24 +444,36 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     return job.kind === 'backup' ? t('Une sauvegarde est en cours : les parties attendent sa fin.') : t('Une restauration est en cours : les parties attendent sa fin.');
   }
 
-  async function startBackup(l: BackupLevel, drive: DriveInfo, auto = false): Promise<Finished | undefined> {
+  function startBackup(l: BackupLevel, drive: DriveInfo, auto = false): Promise<Finished | undefined> {
+    return backupTo(l, { dest: destOf(drive), where: placeName(drive), drive, maxFileSize: maxFileOf(drive) }, auto);
+  }
+
+  /**
+   * Une sauvegarde vers `target.dest` (une clé, un dossier, ou la borne pour l'automatique). Celle
+   * d'une sauvegarde automatique ne remplace pas l'écran de fin d'une sauvegarde à la main.
+   */
+  async function backupTo(l: BackupLevel, target: { dest: string; where: string; drive?: DriveInfo; maxFileSize?: number }, auto: boolean): Promise<Finished | undefined> {
+    // Une sauvegarde à la main passe avant une sauvegarde automatique en cours.
+    if (!auto && job?.auto) await stopAuto('une sauvegarde à la main'); // i18n-ignore : journal
     if (job || !host.root) return undefined;
-    const where = driveName(drive);
+    const { where, drive } = target;
     job = { kind: 'backup', level: l, where, auto, meter: createTransferMeter(), stop: false };
     const started = Date.now();
     let firstCopy = 0;
-    finished = undefined;
-    if (!auto) host.library.openCustom(buildJob, 0);
+    if (!auto) {
+      finished = undefined;
+      host.library.openCustom(buildJob, 0);
+    }
     const outcome = await runBackup({
       root: host.root,
       dataDir: host.dataDir,
-      dest: destOf(drive),
+      dest: target.dest,
       level: l,
       cabinet: identity(),
       version: host.version,
       auto,
       now,
-      maxFileSize: maxFileOf(drive),
+      maxFileSize: target.maxFileSize,
       shouldStop: () => Boolean(job?.stop),
       onProgress: (p) => {
         if (!job) return;
@@ -426,19 +489,38 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     });
     const at = now().toISOString();
     console.log(`Sauvegarde ${l}${auto ? ' automatique' : ''} vers ${where} : ${outcome.ok ? 'vérifiée' : outcome.reason === 'stopped' ? 'arrêtée' : `interrompue (${outcome.error})`}, ${formatSize(outcome.written)} écrits en ${Math.round((Date.now() - started) / 1000)} s${outcome.ok ? `, ${outcome.files} fichiers` : ''}.`); // i18n-ignore : journal
-    finished = { kind: 'backup', ok: outcome.ok, level: l, where, drive, info: outcome.info, written: outcome.written, ...(outcome.ok ? {} : { reason: outcome.reason, error: outcome.error }), at };
+    const done: Finished = { kind: 'backup', ok: outcome.ok, level: l, where, ...(drive ? { drive } : {}), info: outcome.info, written: outcome.written, ...(outcome.ok ? {} : { reason: outcome.reason, error: outcome.error }), at };
+    if (!auto) finished = done;
     job = undefined;
     if (outcome.ok) {
       const s = settings();
       save({ ...s, last: { at, level: l, where } });
       try {
-        pruneBackups(destOf(drive), identity().id, KEEP_AUTO);
+        pruneBackups(target.dest, identity().id, KEEP_AUTO);
       } catch {
         // rangement impossible (clé retirée) : il se fera la prochaine fois
       }
     }
     host.broadcast();
-    return finished;
+    return done;
+  }
+
+  /**
+   * Une sauvegarde automatique cède la place à une partie : elle s'arrête (ce qui est copié et
+   * vérifié reste) et se refait au prochain moment libre. true si elle était en cours.
+   */
+  function yieldToGame(): Promise<boolean> {
+    return stopAuto('une partie'); // i18n-ignore : journal
+  }
+
+  /** Arrête la sauvegarde automatique en cours (pour une partie, une sauvegarde ou une restauration à la main). */
+  async function stopAuto(why: string, timeoutMs = 15_000): Promise<boolean> {
+    if (!job?.auto) return false;
+    job.stop = true;
+    console.log(`Sauvegarde automatique arrêtée pour ${why} : elle reprendra au prochain moment libre.`); // i18n-ignore : journal
+    const until = Date.now() + timeoutMs;
+    while (job && Date.now() < until) await new Promise((resolve) => setTimeout(resolve, 100));
+    return true;
   }
 
   function showJob(): void {
@@ -567,54 +649,128 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     void host.library.task(t('Recherche des clés et des disques…'), readDrives).then(() => host.library.openCustom(buildDestination, 0));
   }
 
+  /** Dernier refus d'un dossier choisi (pas sur un lecteur, dans l'installation, en lecture seule). */
+  let destError: string | undefined;
+
+  /** Ce qui ne va pas avec ce lecteur comme destination (même disque, FAT32, place), ou undefined. */
+  function driveWarning(d: DriveInfo): string | undefined {
+    const total = entries ? entries.filter((e) => LEVEL_PARTS.tables.includes(e.part)).reduce((s, e) => s + e.size, 0) : undefined;
+    const free = freeOf(d);
+    if (isRootDrive(d)) return t('Le même disque que Cyber Pinball : cette copie ne protège pas d’une panne du disque');
+    if (maxFileOf(d)) return t('FAT32 : réglages et scores seulement si une table a un fichier de plus de 4 Go');
+    if (total !== undefined && free !== undefined && free < total) return t('Réglages et scores ; pas la place pour les tables');
+    return undefined;
+  }
+
   function buildDestination(): Built {
     const current = destinationDrive();
+    const currentFolder = current ? folderOn(current) : undefined;
     const list = [...drives].sort((a, b) => Number(isRootDrive(a)) - Number(isRootDrive(b)));
-    const total = entries ? entries.filter((e) => LEVEL_PARTS.tables.includes(e.part)).reduce((s, e) => s + e.size, 0) : undefined;
-    const rows: Row[] = list.map((d, i) => {
+    const actions: Action[] = [];
+    const rows: Row[] = [];
+    // Le dossier choisi d'abord : il n'est la racine d'aucun lecteur de la liste.
+    if (current && currentFolder) {
+      const free = freeOf(current);
+      const warn = driveWarning(current);
+      rows.push({
+        action: actions.length,
+        pick: true,
+        current: true,
+        icon: 'folder',
+        text: free !== undefined ? t('{where} · {free} libres', { where: placeName(current), free: formatSize(free) }) : placeName(current),
+        detail: warn ?? t('Dossier choisi · {dir}', { dir: destOf(current) }),
+        tone: warn ? 'warning' : 'ok',
+        badges: [warn ? t('À vérifier') : t('Choisie')],
+      });
+      actions.push({ label: placeName(current), key: 'folder', run: () => host.library.openCustom(buildMain, 0) });
+    }
+    for (const d of list) {
       const free = freeOf(d);
-      const fat = Boolean(maxFileOf(d));
-      const tight = total !== undefined && free !== undefined && free < total;
-      const warn = isRootDrive(d)
-        ? t('Le même disque que Cyber Pinball : cette copie ne protège pas d’une panne du disque')
-        : fat
-          ? t('FAT32 : réglages et scores seulement si une table a un fichier de plus de 4 Go')
-          : tight
-            ? t('Réglages et scores ; pas la place pour les tables')
-            : undefined;
+      const warn = driveWarning(d);
       const kind = d.type === 'usb' ? t('Clé USB') : d.type === 'network' ? t('Réseau') : t('Disque');
-      const isCurrent = Boolean(current && current.letter === d.letter);
-      return {
-        action: i,
+      const isCurrent = Boolean(current && !currentFolder && current.letter === d.letter);
+      rows.push({
+        action: actions.length,
         pick: true,
         current: isCurrent,
         text: free !== undefined ? t('{where} · {free} libres', { where: driveName(d), free: formatSize(free) }) : driveName(d),
         detail: warn ?? [kind, d.fs].filter(Boolean).join(' · '),
         tone: warn ? 'warning' : 'ok',
         ...(warn ? { badges: [t('À vérifier')] } : isCurrent ? { badges: [t('Choisie')] } : {}),
-      };
-    });
-    const actions: Action[] = list.map((d) => ({
-      label: driveName(d),
-      key: `drive:${d.letter}`,
-      run: () => {
-        save({ ...settings(), destination: { path: destOf(d), label: driveName(d), ...(d.serial ? { serial: d.serial } : {}) } });
-        host.library.openCustom(buildMain, 0);
-      },
-    }));
+      });
+      actions.push({
+        label: driveName(d),
+        key: `drive:${d.letter}`,
+        run: () => {
+          destError = undefined;
+          save({ ...settings(), destination: { path: rootDestOf(d), label: driveName(d), ...(d.serial ? { serial: d.serial } : {}) } });
+          host.library.openCustom(buildMain, 0);
+        },
+      });
+    }
+    const sections: Section[] = [];
+    if (destError) sections.push({ rows: [{ icon: 'alert', text: destError, tone: 'error' }] });
+    sections.push(rows.length ? { options: true, rows } : { rows: [{ icon: 'usb', text: t('Aucune clé ni aucun disque trouvé'), detail: t('Branchez-en un, puis « Chercher de nouveau »'), tone: 'info' }] });
     return {
       heading: t('Destination'),
       icon: 'usb',
       subheading: t('Une clé, un disque ou un dossier · le dossier {dir} y est créé', { dir: BACKUP_DIR_NAME }),
       hint: t('Flippers ou Tab : choisir · Start ou Entrée : choisir cette destination · Exit ou Échap : revenir · souris'),
-      sections: rows.length ? [{ options: true, rows }] : [{ rows: [{ icon: 'usb', text: t('Aucune clé ni aucun disque trouvé'), detail: t('Branchez-en un, puis « Chercher de nouveau »'), tone: 'info' }] }],
+      sections,
       actions: [
         ...actions,
+        host.library.pick
+          ? { label: t('Choisir un dossier…'), detail: t('Sur une clé, un disque ou un lecteur réseau : {dir} y est créé', { dir: BACKUP_DIR_NAME }), icon: 'folder', run: () => void chooseFolder() }
+          : { label: t('Choisir un dossier…'), detail: t('Indisponible ici : choisissez un lecteur'), icon: 'folder', tone: 'quiet', run: () => undefined },
         { label: t('Chercher de nouveau'), detail: t('Une clé ou un disque qui vient d’être branché'), icon: 'refresh', run: openDestination },
-        backAction(() => host.library.openCustom(buildMain, 0)),
+        backAction(() => ((destError = undefined), host.library.openCustom(buildMain, 0))),
       ],
-      back: () => host.library.openCustom(buildMain, 0),
+      back: () => ((destError = undefined), host.library.openCustom(buildMain, 0)),
     };
+  }
+
+  /**
+   * Un dossier précis comme destination (E:\Sauvegardes\Borne) : le dossier des sauvegardes est
+   * créé dedans, et le lecteur reconnu par son numéro de série si sa lettre change. Refusé, avec
+   * la raison, s'il n'est sur aucun lecteur, s'il est dans l'installation ou si l'on ne peut pas y
+   * écrire.
+   */
+  async function chooseFolder(): Promise<void> {
+    const pick = host.library.pick;
+    if (!pick) return;
+    const current = destinationDrive();
+    const first = current ?? [...drives].sort((a, b) => Number(isRootDrive(a)) - Number(isRootDrive(b)))[0];
+    const startDir = current ? path.join(drivePath(current), folderOn(current) ?? '') : first ? drivePath(first) : undefined;
+    const picked = await pick({ title: t('Destination : choisir un dossier'), icon: 'usb', purpose: t('Destination des sauvegardes'), mode: 'folder', ...(startDir ? { startDir } : {}) });
+    if (!picked?.[0]) return;
+    let dir = path.resolve(picked[0]);
+    if (path.basename(dir).toLowerCase() === BACKUP_DIR_NAME.toLowerCase()) dir = path.dirname(dir);
+    const drive = drives
+      .filter((d) => isInside(dir, path.resolve(drivePath(d))))
+      .sort((a, b) => path.resolve(drivePath(b)).length - path.resolve(drivePath(a)).length)[0];
+    const refuse = (text: string) => {
+      destError = text;
+      host.library.openCustom(buildDestination, 0);
+    };
+    if ((host.root && isInside(dir, path.resolve(host.root))) || isInside(dir, path.resolve(host.dataDir)))
+      return refuse(t('« {dir} » est dans l’installation de Cyber Pinball : choisissez un dossier en dehors', { dir }));
+    if (!drive) return refuse(t('« {dir} » n’est sur aucune clé ni aucun disque de ce PC', { dir }));
+    const dest = path.join(dir, BACKUP_DIR_NAME);
+    try {
+      fs.mkdirSync(dest, { recursive: true });
+      const probe = path.join(dest, '.essai-ecriture');
+      fs.writeFileSync(probe, '');
+      fs.rmSync(probe, { force: true });
+    } catch (error) {
+      return refuse(t('Impossible d’écrire dans « {dir} » : {error}', { dir, error: (error as Error).message }));
+    }
+    const folder = path.relative(path.resolve(drivePath(drive)), dir);
+    destError = undefined;
+    save({
+      ...settings(),
+      destination: { path: dest, label: folder ? t('{where} › {folder}', { where: driveName(drive), folder }) : driveName(drive), ...(drive.serial ? { serial: drive.serial } : {}), ...(folder ? { folder } : {}) },
+    });
+    host.library.openCustom(buildMain, 0);
   }
 
   // ---------- Restaurer ----------
@@ -622,7 +778,10 @@ export function createBackupsMenu(host: BackupsMenuHost) {
   /** Destinations où chercher : chaque lecteur qui a un dossier de sauvegardes, et la borne. */
   function sources(): { dest: string; where: string }[] {
     const out: { dest: string; where: string }[] = [];
-    for (const d of drives) if (fs.existsSync(destOf(d))) out.push({ dest: destOf(d), where: driveName(d) });
+    // Le dossier choisi sur un lecteur, et le dossier à sa racine (une autre borne, une ancienne destination).
+    for (const d of drives)
+      for (const [dest, where] of [[destOf(d), placeName(d)], [rootDestOf(d), driveName(d)]] as const)
+        if (!out.some((o) => samePath(o.dest, dest)) && fs.existsSync(dest)) out.push({ dest, where });
     const local = localBackupDir(host.dataDir);
     if (fs.existsSync(local)) out.push({ dest: local, where: t('cette borne') });
     return out;
@@ -825,6 +984,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
 
   async function startRestore(): Promise<void> {
     const c = choice;
+    if (job?.auto) await stopAuto('une restauration'); // i18n-ignore : journal
     if (!c?.plan || job) return;
     job = { kind: 'restore', where: whereOf(c.backup), meter: createTransferMeter(), stop: false };
     host.library.openCustom(buildRestoring, 0);
@@ -895,70 +1055,159 @@ export function createBackupsMenu(host: BackupsMenuHost) {
 
   // ---------- Sauvegarde automatique ----------
 
-  function openAuto(): void {
-    host.library.openCustom(buildAuto, 0);
+  function openAuto(key?: string): void {
+    const at = key ? Math.max(0, buildAuto().actions.findIndex((a) => a.key === key)) : 0;
+    host.library.openCustom(buildAuto, at);
   }
 
   function buildAuto(): Built {
     const s = settings();
-    const choices: AutoBackup[] = ['off', 'weekly', 'nightly'];
-    const label: Record<AutoBackup, string> = { off: t('Désactivée'), weekly: t('Chaque semaine, le dimanche à 4 h'), nightly: t('Chaque nuit, à 4 h') };
+    const choices: AutoBackup[] = ['off', 'daily', 'weekly'];
+    const label: Record<AutoBackup, string> = { off: t('Désactivée'), daily: t('Chaque jour'), weekly: t('Chaque semaine') };
     const local = localBackupDir(host.dataDir);
     const localLast = listBackups(local, false).find((b) => b.manifest.auto && b.manifest.complete);
     const drive = destinationDrive();
-    const rows: Row[] = choices.map((a, i) => ({ action: i, pick: true, current: s.auto === a, text: label[a], ...(a === 'off' ? { detail: t('Seulement à la demande') } : {}), ...(s.auto === a ? { badges: [t('Choisi')] } : {}) }));
+    const actions: Action[] = [];
+    const sections: Section[] = [];
+    // Toute programmation changée repart de maintenant (une heure fixe déjà passée n'est pas manquée).
+    const set = (patch: Partial<BackupSettings>, key: string) => {
+      const schedule = 'auto' in patch || 'moment' in patch;
+      save({ ...settings(), ...patch, ...(schedule ? { autoSince: now().toISOString() } : {}) });
+      openAuto(key);
+    };
+
+    const freq: Row[] = choices.map((a) => {
+      const row: Row = { action: actions.length, pick: true, current: s.auto === a, text: label[a], ...(a === 'off' ? { detail: t('Seulement à la demande') } : {}), ...(s.auto === a ? { badges: [t('Choisi')] } : {}) };
+      actions.push({ label: label[a], key: `auto:${a}`, run: () => set({ auto: a }, `auto:${a}`) });
+      return row;
+    });
+    sections.push({ title: t('Quand'), options: true, rows: freq });
+
+    if (s.auto !== 'off') {
+      const moments: { id: AutoMoment; text: string; detail: string }[] = [
+        { id: 'asap', text: t('Dès que possible'), detail: s.auto === 'weekly' ? t('La première fois que la borne est libre dans la semaine') : t('La première fois que la borne est libre dans la journée') },
+        { id: 'fixed', text: t('À heure fixe'), detail: t('{when} ; manquée (PC éteint), dès que possible', { when: fixedLabel(s) }) },
+      ];
+      const current: AutoMoment = s.moment ?? 'asap';
+      sections.push({
+        title: t('Moment'),
+        options: true,
+        rows: moments.map((m) => {
+          const row: Row = { action: actions.length, pick: true, current: current === m.id, text: m.text, detail: m.detail, ...(current === m.id ? { badges: [t('Choisi')] } : {}) };
+          actions.push({ label: m.text, key: `moment:${m.id}`, run: () => set({ moment: m.id }, `moment:${m.id}`) });
+          return row;
+        }),
+      });
+    }
+
+    sections.push({
+      title: t('Où'),
+      rows: [
+        ...(s.auto !== 'off' ? [{ icon: 'clock' as const, text: nextLine(s), tone: autoBackupDue(s, now()) ? ('info' as const) : ('quiet' as const) }] : []),
+        { icon: 'drive', text: t('Sur cette borne · les {n} dernières gardées', { n: KEEP_AUTO }), detail: localLast ? t('Dernière : {when} · ne protège pas d’une panne du disque', { when: when(localLast.manifest.createdAt) }) : t('Ne protège pas d’une panne du disque'), tone: localLast ? 'ok' : 'quiet', ...(localLast ? { badges: [t('Vérifiée')] } : {}) },
+        s.copyToDestination
+          ? { icon: 'usb', text: s.destination ? t('Copiée sur {where} dès qu’elle est là', { where: s.destination.label ?? s.destination.path }) : t('Copiée sur la destination choisie dès qu’elle est là'), detail: s.lastCopy ? t('Dernière copie : {when} ; reconnue même si sa lettre change', { when: when(s.lastCopy) }) : drive ? t('Prochaine copie avec la prochaine sauvegarde') : t('En attente de la destination'), tone: s.lastCopy ? 'ok' : 'quiet', ...(s.lastCopy ? { badges: [t('Copiée')] } : {}) }
+          : { icon: 'usb', text: t('Pas de copie sur une clé ou un disque'), tone: 'quiet' },
+      ],
+    });
+
+    if (s.auto !== 'off' && s.moment === 'fixed') {
+      actions.push({ label: t('Heure : {hour}', { hour: hourLabel(autoHour(s) * 60) }), detail: t('L’heure de la sauvegarde'), icon: 'clock', key: 'hour', run: openHourChoice });
+      if (s.auto === 'weekly') actions.push({ label: t('Jour : {day}', { day: dayName(autoWeekday(s)) }), detail: t('Le jour de la sauvegarde'), icon: 'list', key: 'day', run: openDayChoice });
+    }
+    actions.push(
+      { label: s.copyToDestination ? t('Copier aussi sur la destination : oui') : t('Copier aussi sur la destination : non'), detail: t('La clé, le disque ou le dossier choisi dans « Destination »'), icon: 'usb', key: 'copy', run: () => set({ copyToDestination: !settings().copyToDestination }, 'copy') },
+      backAction(() => host.library.openCustom(buildMain, 0)),
+    );
     return {
       heading: t('Sauvegarde automatique'),
       icon: 'clock',
       subheading: t('Réglages et scores'),
-      lead: t('Les réglages et les scores, quand la borne est libre ; une heure manquée (PC éteint) est rattrapée au démarrage suivant. Pour les tables, « Sauvegarder maintenant ».'),
+      lead: t('Quand la borne est libre ; une partie lancée passe avant, la sauvegarde reprend après. Pour les tables, « Sauvegarder maintenant ».'),
       hint: t('Flippers ou Tab : choisir · Start ou Entrée : choisir · Exit ou Échap : revenir · souris'),
-      sections: [
-        { title: t('Quand'), options: true, rows },
-        {
-          title: t('Où'),
-          rows: [
-            { icon: 'drive', text: t('Sur cette borne · les {n} dernières gardées', { n: KEEP_AUTO }), detail: localLast ? t('Dernière : {when} · ne protège pas d’une panne du disque', { when: when(localLast.manifest.createdAt) }) : t('Ne protège pas d’une panne du disque'), tone: localLast ? 'ok' : 'quiet', ...(localLast ? { badges: [t('Vérifiée')] } : {}) },
-            s.copyToDestination
-              ? { icon: 'usb', text: s.destination ? t('Copiée sur {where} dès qu’elle est là', { where: s.destination.label ?? s.destination.path }) : t('Copiée sur la destination choisie dès qu’elle est là'), detail: s.lastCopy ? t('Dernière copie : {when} ; reconnue même si sa lettre change', { when: when(s.lastCopy) }) : drive ? t('Prochaine copie avec la prochaine sauvegarde') : t('En attente de la destination'), tone: s.lastCopy ? 'ok' : 'quiet', ...(s.lastCopy ? { badges: [t('Copiée')] } : {}) }
-              : { icon: 'usb', text: t('Pas de copie sur une clé ou un disque'), tone: 'quiet' },
-          ],
-        },
-      ],
-      actions: [
-        ...choices.map((a) => ({ label: label[a], key: `auto:${a}`, run: () => {
-          save({ ...settings(), auto: a });
-          host.library.openCustom(buildAuto, choices.indexOf(a));
-        } })),
-        { label: s.copyToDestination ? t('Copier aussi sur la destination : oui') : t('Copier aussi sur la destination : non'), detail: t('La clé ou le disque choisi dans « Destination »'), icon: 'usb', run: () => {
-          save({ ...settings(), copyToDestination: !settings().copyToDestination });
-          host.library.openCustom(buildAuto, 3);
-        } },
-        backAction(() => host.library.openCustom(buildMain, 0)),
-      ],
+      sections,
+      actions,
       back: () => host.library.openCustom(buildMain, 0),
     };
   }
 
+  function openHourChoice(): void {
+    const hours = Array.from({ length: 24 }, (_, h) => h);
+    host.library.openCustom(
+      () => {
+        const s = settings();
+        return {
+          heading: t('Heure de la sauvegarde'),
+          icon: 'clock',
+          lead: t('Si la borne est éteinte à cette heure, la sauvegarde se fait dès qu’elle est libre.'),
+          sections: [],
+          actions: [
+            ...hours.map((h) => ({
+              label: hourLabel(h * 60),
+              ...(autoHour(s) === h ? { detail: t('choix actuel'), tone: 'ok' as const } : {}),
+              run: () => {
+                save({ ...settings(), hour: h, autoSince: now().toISOString() });
+                openAuto('hour');
+              },
+            })),
+            backAction(() => openAuto('hour')),
+          ],
+          back: () => openAuto('hour'),
+        };
+      },
+      autoHour(settings()),
+    );
+  }
+
+  function openDayChoice(): void {
+    // Du lundi au dimanche.
+    const days = [1, 2, 3, 4, 5, 6, 0];
+    host.library.openCustom(
+      () => {
+        const s = settings();
+        return {
+          heading: t('Jour de la sauvegarde'),
+          icon: 'list',
+          sections: [],
+          actions: [
+            ...days.map((d) => ({
+              label: dayName(d).charAt(0).toUpperCase() + dayName(d).slice(1),
+              ...(autoWeekday(s) === d ? { detail: t('choix actuel'), tone: 'ok' as const } : {}),
+              run: () => {
+                save({ ...settings(), weekday: d, autoSince: now().toISOString() });
+                openAuto('day');
+              },
+            })),
+            backAction(() => openAuto('day')),
+          ],
+          back: () => openAuto('day'),
+        };
+      },
+      days.indexOf(autoWeekday(settings())),
+    );
+  }
+
+  /** Après un échec d'une sauvegarde automatique (disque plein…), pas de nouvel essai avant ce moment. */
+  let autoRetryAt = 0;
+  const AUTO_RETRY_MS = 30 * 60_000;
+
   /**
    * Appelée chaque minute : une sauvegarde automatique due se fait sur la borne quand elle est
-   * libre, puis est copiée sur la destination si elle est branchée (et dès qu'elle l'est).
+   * libre, puis est copiée sur la destination si elle est branchée (et dès qu'elle l'est). Une
+   * partie lancée pendant ce temps l'arrête (yieldToGame) : elle se refait au moment libre suivant.
    */
   async function autoTick(free: boolean): Promise<void> {
-    if (job || !host.root || !free) return;
+    if (job || !host.root || !free || Date.now() < autoRetryAt) return;
     const s = settings();
     const at = now();
     if (autoBackupDue(s, at)) {
       // Sur la borne : <data>\sauvegardes, la destination des sauvegardes automatiques.
-      const outcome = await runBackup({ root: host.root, dataDir: host.dataDir, dest: localBackupDir(host.dataDir), level: 'settings', cabinet: identity(), version: host.version, auto: true, now });
-      if (outcome.ok) {
-        save({ ...settings(), lastAuto: at.toISOString(), last: { at: at.toISOString(), level: 'settings', where: t('cette borne') } });
-        try {
-          pruneBackups(localBackupDir(host.dataDir), identity().id, KEEP_AUTO);
-        } catch {
-          // rangement plus tard
-        }
+      const done = await backupTo('settings', { dest: localBackupDir(host.dataDir), where: t('cette borne') }, true);
+      if (!done?.ok) {
+        if (done?.reason === 'error') autoRetryAt = Date.now() + AUTO_RETRY_MS;
+        return;
       }
+      save({ ...settings(), lastAuto: at.toISOString() });
     }
     const after = settings();
     if (after.auto !== 'off' && after.copyToDestination && after.destination && after.lastAuto && (!after.lastCopy || after.lastCopy < after.lastAuto)) {
@@ -968,8 +1217,8 @@ export function createBackupsMenu(host: BackupsMenuHost) {
       const done = await startBackup('settings', drive, true);
       if (done?.ok) {
         save({ ...settings(), lastCopy: now().toISOString() });
-        host.notify?.(t('Réglages et scores copiés sur {where}', { where: driveName(drive) }));
-      }
+        host.notify?.(t('Réglages et scores copiés sur {where}', { where: placeName(drive) }));
+      } else if (done?.reason === 'error') autoRetryAt = Date.now() + AUTO_RETRY_MS;
     }
   }
 
@@ -1004,7 +1253,7 @@ export function createBackupsMenu(host: BackupsMenuHost) {
     if (applied.failed.length && !loadPendingRestore(host.dataDir)) host.notify?.(tn(applied.failed.length, '{n} fichier n’a pas pu être posé', '{n} fichiers n’ont pas pu être posés'));
   }
 
-  return { systemItem, open, busy, autoTick, restoredNotice, retryPendingRestore };
+  return { systemItem, open, busy, yieldToGame, autoTick, restoredNotice, retryPendingRestore };
 }
 
 /** Pour les tests : le dernier résultat d'un niveau, sans écran. */

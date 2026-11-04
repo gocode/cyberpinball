@@ -20,6 +20,7 @@ import {
   formatDate,
   formatSize,
   insideDownloads,
+  isInside,
   listFolder,
   matchesFilter,
   noteDownloadUse,
@@ -52,6 +53,8 @@ export interface PickRequest {
   mode: 'file' | 'files' | 'folder' | 'files-or-folder';
   /** Où ouvrir : les téléchargements de Cyber Pinball par défaut quand ils ont ce qu'on cherche. */
   start?: 'cp' | 'windows' | 'import' | 'desktop';
+  /** Ou ce dossier, ouvert dans l'emplacement qui le contient (un lecteur, le Bureau…) ; l'emporte sur `start`. */
+  startDir?: string;
   done(paths: string[]): void;
   cancel(): void;
 }
@@ -147,6 +150,14 @@ export function createFilePicker(ctx: FilePickerContext) {
     const cp = places.find((p) => p.kind === 'cp-downloads');
     const first = wanted ?? (cp && cpEntries({ ...s, place: cp }).shown.length ? cp : places.find((p) => p.kind === 'windows-downloads')) ?? places[0]!;
     state = s;
+    const dir = request.startDir && fs.existsSync(request.startDir) ? path.resolve(request.startDir) : undefined;
+    // L'emplacement le plus précis qui contient ce dossier : le Bureau plutôt que le disque C:.
+    const holder = dir
+      ? places
+          .filter((p) => p.path && isInside(dir, path.resolve(p.path)))
+          .sort((a, b) => path.resolve(b.path!).length - path.resolve(a.path!).length)[0]
+      : undefined;
+    if (holder && dir) return enter(s, holder, dir);
     enter(s, first);
   }
 

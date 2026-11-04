@@ -995,12 +995,34 @@ export function prepareUndoLastRestore(dataDir: string, now = new Date()): boole
 
 // ---------- Destination et sauvegarde automatique ----------
 
-export type AutoBackup = 'off' | 'weekly' | 'nightly';
+export type AutoBackup = 'off' | 'daily' | 'weekly';
+/**
+ * Moment d'une sauvegarde automatique : dès que possible (la première fois que la borne est libre
+ * dans la journée ou la semaine : une borne n'est pas allumée toute la journée), ou à heure fixe
+ * (une heure manquée, PC éteint, est rattrapée dès que possible).
+ */
+export type AutoMoment = 'asap' | 'fixed';
 
 export interface BackupSettings {
-  /** Dossier de destination choisi (E:\CyberPinball-Sauvegardes), et ce qui permet de reconnaître la clé si sa lettre change. */
-  destination?: { path: string; label?: string; serial?: string };
+  /**
+   * Dossier de destination choisi (E:\Sauvegardes\CyberPinball-Sauvegardes), et ce qui permet de
+   * reconnaître la clé si sa lettre change. `folder` : le dossier choisi sur ce lecteur, depuis sa
+   * racine (« Sauvegardes\Borne ») ; absent, la racine du lecteur. Le dossier des sauvegardes est
+   * toujours créé dedans.
+   */
+  destination?: { path: string; label?: string; serial?: string; folder?: string };
   auto: AutoBackup;
+  /** Absent : dès que possible. */
+  moment?: AutoMoment;
+  /** Heure fixe (0 à 23) ; absente : AUTO_BACKUP_HOUR. */
+  hour?: number;
+  /** Jour de l'heure fixe d'une sauvegarde hebdomadaire (0 : dimanche) ; absent : dimanche. */
+  weekday?: number;
+  /**
+   * Quand la programmation a été choisie : une heure fixe passée avant n'est pas « manquée » (le
+   * dimanche 4 h choisi un mercredi attend dimanche). Dès que possible, la première se fait aussitôt.
+   */
+  autoSince?: string;
   /** Copier aussi la dernière sauvegarde automatique sur la destination quand elle est là. */
   copyToDestination: boolean;
   /** Dernière sauvegarde automatique réussie (sur la borne), dernière copie sur la destination. */
@@ -1015,8 +1037,14 @@ export const DEFAULT_BACKUP_SETTINGS: BackupSettings = { auto: 'off', copyToDest
 export function loadBackupSettings(dataDir: string): BackupSettings {
   try {
     const raw = readJsonFile(backupSettingsFile(dataDir)) as Partial<BackupSettings>;
-    const auto: AutoBackup = raw?.auto === 'weekly' || raw?.auto === 'nightly' ? raw.auto : 'off';
-    return { ...DEFAULT_BACKUP_SETTINGS, ...raw, auto, copyToDestination: raw?.copyToDestination !== false };
+    // « nightly » : nom de la préversion 0.1.7-essai.1, une sauvegarde chaque nuit à 4 h.
+    const legacy = (raw?.auto as string | undefined) === 'nightly';
+    const auto: AutoBackup = raw?.auto === 'weekly' || raw?.auto === 'daily' ? raw.auto : legacy ? 'daily' : 'off';
+    const out: BackupSettings = { ...DEFAULT_BACKUP_SETTINGS, ...raw, auto, copyToDestination: raw?.copyToDestination !== false };
+    out.moment = raw?.moment === 'fixed' || raw?.moment === 'asap' ? raw.moment : legacy ? 'fixed' : 'asap';
+    if (!(Number.isInteger(raw?.hour) && raw!.hour! >= 0 && raw!.hour! < 24)) delete out.hour;
+    if (!(Number.isInteger(raw?.weekday) && raw!.weekday! >= 0 && raw!.weekday! < 7)) delete out.weekday;
+    return out;
   } catch {
     return { ...DEFAULT_BACKUP_SETTINGS };
   }
@@ -1026,26 +1054,49 @@ export function saveBackupSettings(dataDir: string, settings: BackupSettings): v
   writeFileAtomic(backupSettingsFile(dataDir), JSON.stringify(settings, null, 2));
 }
 
-/** Heure des sauvegardes automatiques : 4 h du matin, le dimanche pour l'hebdomadaire. */
+/** Heure fixe proposée d'abord : 4 h du matin, le dimanche pour l'hebdomadaire. */
 export const AUTO_BACKUP_HOUR = 4;
+/** Jour de l'heure fixe hebdomadaire par défaut : dimanche. */
+export const AUTO_BACKUP_WEEKDAY = 0;
+/** Une semaine « dès que possible » commence le lundi à 0 h. */
+const WEEK_START = 1;
+
+type Schedule = Pick<BackupSettings, 'auto' | 'moment' | 'hour' | 'weekday'>;
+
+export const autoHour = (s: Schedule) => s.hour ?? AUTO_BACKUP_HOUR;
+export const autoWeekday = (s: Schedule) => s.weekday ?? AUTO_BACKUP_WEEKDAY;
 
 /**
- * Dernière échéance passée de la sauvegarde automatique, à `now` : le dernier dimanche 4 h
- * (hebdomadaire) ou le dernier 4 h (chaque nuit). Une sauvegarde est due si la dernière réussie est
- * plus ancienne : manquée (PC éteint), elle se fait dès que la borne est libre.
+ * Dernière échéance passée de la sauvegarde automatique, à `now`. Dès que possible : le début du
+ * jour (0 h) ou de la semaine (lundi 0 h). À heure fixe : la dernière heure choisie passée (le jour
+ * choisi pour l'hebdomadaire). Une sauvegarde est due si la dernière réussie est plus ancienne :
+ * pas encore faite dans la période, ou heure manquée (PC éteint), elle se fait dès que la borne est
+ * libre.
  */
-export function lastAutoSlot(auto: AutoBackup, now: Date): Date | undefined {
-  if (auto === 'off') return undefined;
+export function lastAutoSlot(s: Schedule, now: Date): Date | undefined {
+  if (s.auto === 'off') return undefined;
   const slot = new Date(now);
-  slot.setHours(AUTO_BACKUP_HOUR, 0, 0, 0);
+  const fixed = s.moment === 'fixed';
+  slot.setHours(fixed ? autoHour(s) : 0, 0, 0, 0);
   if (slot > now) slot.setDate(slot.getDate() - 1);
-  if (auto === 'weekly') while (slot.getDay() !== 0) slot.setDate(slot.getDate() - 1);
+  const day = fixed ? autoWeekday(s) : WEEK_START;
+  if (s.auto === 'weekly') while (slot.getDay() !== day) slot.setDate(slot.getDate() - 1);
   return slot;
 }
 
+/** Échéance suivante, après `now` (ce que l'écran annonce une fois la sauvegarde de la période faite). */
+export function nextAutoSlot(s: Schedule, now: Date): Date | undefined {
+  const last = lastAutoSlot(s, now);
+  if (!last) return undefined;
+  const next = new Date(last);
+  next.setDate(next.getDate() + (s.auto === 'weekly' ? 7 : 1));
+  return next;
+}
+
 export function autoBackupDue(settings: BackupSettings, now: Date): boolean {
-  const slot = lastAutoSlot(settings.auto, now);
+  const slot = lastAutoSlot(settings, now);
   if (!slot) return false;
+  if (settings.moment === 'fixed' && settings.autoSince && slot < new Date(settings.autoSince)) return false;
   return !settings.lastAuto || new Date(settings.lastAuto) < slot;
 }
 

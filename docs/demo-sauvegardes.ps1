@@ -1,11 +1,11 @@
 ﻿# Démonstration sans opérateur des sauvegardes (Menu système > Cyber Pinball > Sauvegardes), hors
 # écran sur un bureau Windows caché, avec des tables inventées (docs\demo-captures.cjs) et deux clés
 # simulées (CYBERPINBALL_LECTEURS : des dossiers du bac à sable). Pour chaque jeu d'écrans et chaque
-# langue : l'écran sans destination, le choix de la clé, le choix du niveau (focus sur le niveau),
+# langue : l'écran sans destination, le choix d'un dossier précis de la clé (sélecteur de dossiers), le choix du niveau (focus sur le niveau),
 # la copie puis « Sauvegarde terminée », la liste des sauvegardes, le plan (une partie exclue),
-# la sauvegarde automatique, puis une clé FAT32 presque pleine : niveaux bloqués avec leur raison.
+# la sauvegarde automatique (chaque jour, à heure fixe, l'heure et le jour choisis), puis une clé FAT32 presque pleine : niveaux bloqués avec leur raison.
 # Le garde-fou de mise en page et le guet hors écran doivent rester muets ; la sauvegarde doit être
-# sur la clé simulée, complète. Rien n'est restauré (le redémarrage quitterait la démonstration).
+# dans le dossier choisi de la clé simulée, complète. Rien n'est restauré (le redémarrage quitterait la démonstration).
 #   .\docs\demo-sauvegardes.ps1 [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans]
 # Captures dans tmp\demo-sauvegardes\<écrans>\<langue>\captures. VPX n'est jamais lancé ; ni le
 # vrai modèle de borne, ni une vraie clé, ni le vrai VPinballX.ini ne sont lus ni touchés.
@@ -35,12 +35,15 @@ if (-not (Test-Path "$root\tables")) {
 
 # Le premier Exit ferme le message de démarrage (VPX n'est pas installé dans le bac à sable), le
 # second ouvre le menu système. Les clés se choisissent au bouton (la première est sous le
-# curseur) : leur nom change avec la langue.
+# curseur) : leur nom change avec la langue. La destination est d'abord un dossier de la clé E:
+# (« Sauvegardes ») ; plus loin, la clé G: est à deux crans sous le dossier choisi.
 $touches = @(
   'Escape', 'wait:1500', 'Escape', 'wait:800',
   'action:Sauvegardes', 'wait:1500',
   'action:Choisir une destination', 'wait:1200',
-  'Digit1', 'wait:1000',
+  'action:Choisir un dossier…', 'wait:1500',
+  'action:Sauvegardes', 'wait:1000',
+  'action:Prendre ce dossier entier', 'wait:1200',
   'action:Sauvegarder maintenant', 'wait:1500',
   'action:Avec les tables', 'wait:600',
   'action:Lancer la sauvegarde', 'wait:1500', 'wait:30000',
@@ -49,10 +52,14 @@ $touches = @(
   'Digit1', 'wait:1500',
   'Digit1', 'wait:1500',
   'Escape', 'wait:800', 'Escape', 'wait:600', 'Escape', 'wait:800',
-  'action:Automatique : désactivée', 'wait:800', 'Escape', 'wait:800',
+  'action:Automatique : désactivée', 'wait:800',
+  'action:Chaque jour', 'wait:800', 'action:À heure fixe', 'wait:800', 'action:Chaque semaine', 'wait:800',
+  'action:Heure :', 'wait:800', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'wait:400', 'Digit1', 'wait:800',
+  'action:Jour :', 'wait:800', 'ShiftRight', 'wait:400', 'Digit1', 'wait:800',
+  'action:Dès que possible', 'wait:800', 'action:Désactivée', 'wait:800', 'Escape', 'wait:800',
   'action:Sauvegarder maintenant', 'wait:1500',
   'action:Changer de destination', 'wait:1200',
-  'ShiftRight', 'wait:400', 'Digit1', 'wait:1000',
+  'ShiftRight', 'ShiftRight', 'wait:400', 'Digit1', 'wait:1000',
   'action:Sauvegarder maintenant', 'wait:1500',
   'Escape', 'wait:800'
 )
@@ -65,8 +72,11 @@ try {
       $dossier = "$base\$jeu\$langue"
       $home_ = "$dossier\home"
       foreach ($d in @($home_, "$dossier\cle-e", "$dossier\cle-g")) { if (Test-Path $d) { Remove-Item -Recurse -Force $d } }
-      New-Item -ItemType Directory -Force "$home_\sandbox", "$dossier\cle-e", "$dossier\cle-g" | Out-Null
+      New-Item -ItemType Directory -Force "$home_\sandbox", "$dossier\cle-e\Sauvegardes", "$dossier\cle-g" | Out-Null
       Set-Content "$home_\sandbox\VPinballX.ini" '' -Encoding UTF8
+      # Une sauvegarde automatique déjà faite aujourd'hui : la programmer pendant la démonstration n'en lance pas d'autre.
+      $faite = (Get-Date).ToUniversalTime().ToString('o')
+      [IO.File]::WriteAllText("$home_\sauvegardes.json", (ConvertTo-Json -Compress @{ auto = 'off'; copyToDestination = $true; lastAuto = $faite; lastCopy = $faite }))
       node "$PSScriptRoot\demo-medias.cjs" modele "$PSScriptRoot\ecrans\$jeu.json" "$home_\cabinet.json" "$home_\sandbox\VPinballX.ini" | Out-Null
       if ($LASTEXITCODE -ne 0) { throw 'Modèle de borne des écrans simulés impossible.' }
       $lecteurs = @(
@@ -92,8 +102,9 @@ try {
       $report = "$captures\mise-en-page.txt"
       if (-not (Test-Path $report)) { $failures += "$id : relevé de mise en page absent" }
       elseif ((Get-Content $report -Raw -Encoding UTF8) -notmatch '^Aucun problème') { $failures += "$id : mise en page, voir $report" }
-      $liste = @(Get-ChildItem "$dossier\cle-e\CyberPinball-Sauvegardes" -Recurse -Filter 'sauvegarde.json' -ErrorAction SilentlyContinue)
-      if ($liste.Count -ne 1) { $failures += "$id : $($liste.Count) sauvegarde(s) sur la clé simulée au lieu d'une" }
+      $liste = @(Get-ChildItem "$dossier\cle-e\Sauvegardes\CyberPinball-Sauvegardes" -Recurse -Filter 'sauvegarde.json' -ErrorAction SilentlyContinue)
+      if ($liste.Count -ne 1) { $failures += "$id : $($liste.Count) sauvegarde(s) dans le dossier choisi de la clé simulée au lieu d'une" }
+      if (Test-Path "$dossier\cle-e\CyberPinball-Sauvegardes") { $failures += "$id : sauvegarde à la racine de la clé au lieu du dossier choisi" }
       elseif (-not (Get-Content $liste[0].FullName -Raw -Encoding UTF8 | ConvertFrom-Json).complete) { $failures += "$id : la sauvegarde n'est pas complète" }
       if (@(Get-ChildItem "$dossier\cle-g" -Recurse -File -ErrorAction SilentlyContinue).Count) { $failures += "$id : la clé pleine a reçu des fichiers" }
     }

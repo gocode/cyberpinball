@@ -65,11 +65,12 @@ function fakeRoot(id = 'salon'): string {
   return root;
 }
 
-function harness(options: { root?: string; drives?: Drive[]; now?: Date } = {}) {
+function harness(options: { root?: string; drives?: Drive[]; now?: Date; pick?: (request: { startDir?: string }) => string[] | undefined } = {}) {
   const { createBackupsMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'backups-menu.js')) as {
     createBackupsMenu(host: object): {
       systemItem: { detail?: string; run(): void };
       busy(): string | undefined;
+      yieldToGame(): Promise<boolean>;
       autoTick(free: boolean): Promise<void>;
       restoredNotice(): string | undefined;
     };
@@ -83,6 +84,7 @@ function harness(options: { root?: string; drives?: Drive[]; now?: Date } = {}) 
   /** Tâches d'écran en cours (recherche des lecteurs, calcul de la place, plan) : settle les attend. */
   let inflight = 0;
   const notices: string[] = [];
+  const picks: { startDir?: string }[] = [];
   const menu = createBackupsMenu({
     library: {
       openCustom: (build: () => Built, at = 0) => (screen = { build, at }),
@@ -95,6 +97,7 @@ function harness(options: { root?: string; drives?: Drive[]; now?: Date } = {}) 
           inflight--;
         }
       },
+      ...(options.pick ? { pick: async (request: { startDir?: string }) => (picks.push(request), options.pick!(request)) } : {}),
     },
     broadcast: () => undefined,
     root,
@@ -131,7 +134,7 @@ function harness(options: { root?: string; drives?: Drive[]; now?: Date } = {}) 
     await settle();
   };
   const focused = () => shown().actions[screen!.at];
-  return { menu, root, dataDir, drives, shown, action, choose, settle, focused, relaunched: () => relaunched, notices, open: async () => { menu.systemItem.run(); await settle(); } };
+  return { menu, root, dataDir, drives, shown, action, choose, settle, focused, relaunched: () => relaunched, notices, picks, open: async () => { menu.systemItem.run(); await settle(); } };
 }
 
 function usb(name = 'SAUVEGARDE', letter = 'E:', extra: Partial<Drive> = {}): Drive {
@@ -263,7 +266,7 @@ test('sauvegarde automatique : due, borne libre, faite sur la borne puis copiée
   const key = usb();
   const sunday = new Date(2026, 10, 4, 21, 0);
   const h = harness({ drives: [key], now: sunday });
-  saveBackupSettings(h.dataDir, { auto: 'weekly', copyToDestination: true, destination: { path: path.join(key.path!, BACKUP_DIR_NAME), serial: key.serial } });
+  saveBackupSettings(h.dataDir, { auto: 'weekly', moment: 'fixed', copyToDestination: true, destination: { path: path.join(key.path!, BACKUP_DIR_NAME), serial: key.serial } });
   await h.menu.autoTick(false);
   assert.equal(listBackups(localBackupDir(h.dataDir)).length, 0, 'pendant une partie, rien');
   await h.menu.autoTick(true);
@@ -274,4 +277,92 @@ test('sauvegarde automatique : due, borne libre, faite sur la borne puis copiée
   assert.ok(h.notices.some((n) => /copiés sur/.test(n)));
   await h.menu.autoTick(true);
   assert.equal(listBackups(localBackupDir(h.dataDir)).length, 1, 'faite une fois par échéance');
+});
+
+test('un dossier précis comme destination : sauvegardes dedans, retrouvées pour restaurer ; refusé dans l’installation', async () => {
+  const key = usb();
+  const target = path.join(key.path!, 'Sauvegardes', 'Borne');
+  fs.mkdirSync(target, { recursive: true });
+  let answer: string | undefined = target;
+  const h = harness({ drives: [key], pick: () => (answer ? [answer] : undefined) });
+  await h.open();
+  await h.choose('Choisir une destination');
+  await h.choose('Choisir un dossier…');
+  assert.equal(h.picks[0]!.startDir, key.path, 'le sélecteur s’ouvre sur la clé');
+  const s = loadBackupSettings(h.dataDir);
+  assert.equal(s.destination?.folder, path.join('Sauvegardes', 'Borne'));
+  assert.equal(s.destination?.serial, key.serial);
+  assert.match(h.action(/^Destination : /).label, /Clé « SAUVEGARDE » \(E:\) › Sauvegardes.Borne/);
+  await h.choose('Sauvegarder maintenant');
+  await h.choose('Lancer la sauvegarde');
+  assert.equal(listBackups(path.join(target, BACKUP_DIR_NAME)).length, 1, 'dans le dossier choisi');
+  assert.ok(!fs.existsSync(path.join(key.path!, BACKUP_DIR_NAME)), 'rien à la racine de la clé');
+  await h.choose('Revenir aux sauvegardes');
+  await h.choose('Restaurer une sauvegarde');
+  assert.ok(h.shown().actions.some((a) => /^Borne du salon /.test(a.label)), 'retrouvée pour restaurer');
+  // La destination rouverte : le dossier choisi en tête, coché ; le sélecteur repart de lui.
+  h.shown().back();
+  await h.choose(/^Destination : /);
+  const first = h.shown().sections.find((x) => x.options)!.rows[0]!;
+  assert.ok(first.current && first.badges?.includes('Choisie'));
+  // Un dossier dans l'installation est refusé, la destination ne change pas.
+  answer = path.join(h.root, 'tables');
+  await h.choose('Choisir un dossier…');
+  assert.equal(h.picks[1]!.startDir, target);
+  assert.equal(h.shown().heading, 'Destination');
+  assert.match(h.shown().sections[0]!.rows[0]!.text, /dans l’installation/);
+  assert.equal(loadBackupSettings(h.dataDir).destination?.folder, path.join('Sauvegardes', 'Borne'));
+  // Le dossier des sauvegardes lui-même : c'est son dossier parent qui est pris.
+  answer = path.join(target, BACKUP_DIR_NAME);
+  await h.choose('Choisir un dossier…');
+  assert.equal(loadBackupSettings(h.dataDir).destination?.folder, path.join('Sauvegardes', 'Borne'));
+});
+
+test('sauvegarde automatique dès que possible : une par jour à la première occasion ; une partie passe avant', async () => {
+  const at = { now: new Date(2026, 10, 4, 21, 0) };
+  const h = harness({ now: at.now });
+  saveBackupSettings(h.dataDir, { auto: 'daily', moment: 'asap', copyToDestination: false });
+  await h.menu.autoTick(true);
+  assert.equal(listBackups(localBackupDir(h.dataDir)).length, 1, 'faite à la première occasion');
+  await h.menu.autoTick(true);
+  assert.equal(listBackups(localBackupDir(h.dataDir)).length, 1, 'une seule par jour');
+  assert.match(h.menu.systemItem.detail ?? '', /Dernière/);
+  // Une partie lancée pendant une sauvegarde automatique l'arrête : elle n'est pas comptée.
+  const g = harness();
+  saveBackupSettings(g.dataDir, { auto: 'daily', moment: 'asap', copyToDestination: false });
+  for (let i = 0; i < 40; i++) write(g.root, `tables/T${i}/T${i}.ini`, 'x'.repeat(200_000));
+  const running = g.menu.autoTick(true);
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(await g.menu.yieldToGame(), true);
+  assert.equal(g.menu.busy(), undefined, 'la partie peut partir');
+  await running;
+  assert.equal(loadBackupSettings(g.dataDir).lastAuto, undefined, 'pas comptée : elle se refera');
+  assert.equal(await g.menu.yieldToGame(), false, 'plus rien à arrêter');
+});
+
+test('écran automatique : chaque jour, à heure fixe, l’heure choisie ; le jour pour chaque semaine', async () => {
+  const h = harness({ now: new Date(2026, 10, 4, 21, 0) });
+  await h.open();
+  await h.choose('Automatique : désactivée');
+  assert.equal(h.shown().heading, 'Sauvegarde automatique');
+  assert.ok(!h.shown().sections.some((s) => s.title === 'Moment'), 'désactivée : pas de moment');
+  await h.choose('Chaque jour');
+  assert.equal(h.focused()!.label, 'Chaque jour', 'le curseur reste sur le choix');
+  assert.equal(loadBackupSettings(h.dataDir).moment, 'asap', 'dès que possible par défaut');
+  assert.ok(h.shown().sections.find((s) => s.title === 'Moment')!.rows[0]!.current);
+  assert.ok(!h.shown().actions.some((a) => /^Heure/.test(a.label)), 'pas d’heure dès que possible');
+  await h.choose('À heure fixe');
+  await h.choose('Heure : 4 h');
+  assert.equal(h.shown().heading, 'Heure de la sauvegarde');
+  assert.equal(h.focused()!.label, '4 h', 'le curseur sur l’heure actuelle');
+  await h.choose('22 h');
+  assert.equal(loadBackupSettings(h.dataDir).hour, 22);
+  assert.equal(h.focused()!.label, 'Heure : 22 h');
+  await h.choose('Chaque semaine');
+  await h.choose('Jour : dimanche');
+  await h.choose('Mardi');
+  const s = loadBackupSettings(h.dataDir);
+  assert.deepEqual([s.auto, s.moment, s.hour, s.weekday], ['weekly', 'fixed', 22, 2]);
+  h.shown().back();
+  assert.ok(h.action('Automatique : le mardi à 22 h'));
 });

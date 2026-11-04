@@ -118,7 +118,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 
 - **Cabinet health.** Disk space, tables that don't start, missing media, screens and VPX version on one screen, each with its repair.
 - **Signed updates, from the cabinet.** A red dot on the gear when a release is out; what's new in your language; one press installs it. Every release is signed, and the cabinet refuses anything that does not carry the publisher's signature. Tables, media and settings are kept.
-- **Backups on a USB drive.** Settings and scores, the tables too, or the whole installation, copied and verified file by file; what has not changed is never copied again. Restoring shows the plan first, and can be undone. Settings and scores can also be backed up every week on their own.
+- **Backups on a USB drive.** Settings and scores, the tables too, or the whole installation, copied and verified file by file; what has not changed is never copied again. Restoring shows the plan first, and can be undone. Settings and scores can also back themselves up every day or every week, as soon as the cabinet is free or at the time you choose, in the folder of your choice.
 - **Arcade hours.** The cabinet dims and goes quiet at night, then sleeps or shuts down at the chosen time if nobody is playing, after a warning any button cancels.
 - **Guest mode** for a party or the kids: guests can choose a table, play and read its page, nothing else; holding both flippers and both MagnaSaves unlocks it.
 - **A dedicated cabinet.** Optionally, Cyber Pinball replaces the Windows shell, with a way to bring it back; shut down, restart and sleep from the menu, every screen black until the end.

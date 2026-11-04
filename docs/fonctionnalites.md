@@ -495,10 +495,10 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 ### Sauvegardes
 
-- **Sur une clé USB, un disque ou un lecteur réseau** : les réglages et les scores (quelques Mo), les tables en plus, ou toute l'installation. Ce qui n'a pas changé n'est jamais recopié, et chaque fichier est relu et vérifié.
+- **Sur une clé USB, un disque ou un lecteur réseau**, à sa racine ou dans le dossier de votre choix : les réglages et les scores (quelques Mo), les tables en plus, ou toute l'installation. Ce qui n'a pas changé n'est jamais recopié, et chaque fichier est relu et vérifié.
 - **Restaurer montre d'abord le plan** : ce qui sera remplacé, remis ou gardé, partie par partie. L'état d'avant part à la corbeille, et « Annuler la dernière restauration » le remet.
 - **D'une borne à l'autre** : la sauvegarde d'une autre borne ne reprend d'office ni ses écrans ni son identité sur le réseau des amis.
-- **Automatique** (désactivée par défaut) : les réglages et les scores chaque semaine ou chaque nuit, borne libre, copiés sur la clé dès qu'elle est branchée.
+- **Automatique** (désactivée par défaut) : les réglages et les scores chaque jour ou chaque semaine, dès que possible (la première fois que la borne est libre) ou à l'heure choisie ; une partie lancée passe avant. Copiés sur la clé dès qu'elle est branchée.
 
 ### Horaire de la borne
 

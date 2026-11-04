@@ -843,7 +843,7 @@ library.provideSystemItem('backups', backups.systemItem);
   // Fichiers encore ouverts par l'ancien processus au démarrage (une vidéo en lecture) : reposés une fois qu'il est fermé.
   for (const delay of [20_000, 60_000]) setTimeout(() => backups.retryPendingRestore(), delay).unref();
   // Sauvegarde automatique : regardée chaque minute, faite quand la borne est libre.
-  setInterval(() => void backups.autoTick(stopIdle()).catch((error: Error) => console.error(`Sauvegarde automatique : ${error.message}`)), 60_000).unref(); // i18n-ignore : journal
+  setInterval(() => void backups.autoTick(backupFree()).catch((error: Error) => console.error(`Sauvegarde automatique : ${error.message}`)), 60_000).unref(); // i18n-ignore : journal
 }
 // Aide-mémoire des boutons : aussi ici, puisque le pied du menu ne nomme que Flippers, Start et Exit.
 library.provideSystemItem('controls', {
@@ -1235,6 +1235,18 @@ function stopIdle(): boolean {
   if (desktop.active || state.phase === 'loading' || state.phase === 'playing' || power.control.busy) return false;
   if (state.phase === 'message' && state.message?.action === 'power') return false;
   return attract.active || attract.idleFor() >= Math.max(STOP_IDLE_FALLBACK_MS, mediaSettings.attractDelay * 1000);
+}
+
+/** Sans bouton depuis 30 s, au menu : une sauvegarde automatique peut se faire (« dès que possible »). */
+const BACKUP_IDLE_MS = 30_000;
+/**
+ * Borne libre pour une sauvegarde automatique : au menu (ni partie, ni chargement, ni bureau, ni
+ * action d'alimentation), sans bouton depuis 30 s ; une partie lancée pendant la copie l'arrête.
+ */
+function backupFree(): boolean {
+  if (desktop.active || state.phase === 'loading' || state.phase === 'playing' || power.control.busy) return false;
+  if (state.phase === 'message' && state.message?.action === 'power') return false;
+  return attract.active || attract.idleFor() >= BACKUP_IDLE_MS;
 }
 
 /** Boutons qui peuvent réveiller la borne, relus au plus toutes les minutes (un périphérique branché entre-temps). */
@@ -1992,7 +2004,9 @@ const SIMULATED_MANUAL = OFFSCREEN && !!process.env.CYBERPINBALL_PARTIE_SIMULEE_
 async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display', hooks: { onPlaying?(): void; record?: RecordingSettings; double?: string; settings?: HostSetting[]; board?: GroupRecord[]; onProgress?(p: LiveProgress): void; gate?: LiveStartGate } = {}): Promise<PlayReport | undefined> {
   const install = vpxInstall(loc);
   if (!install) return undefined;
-  // Une sauvegarde ou une restauration en cours : la partie écrirait ses scores pendant la copie.
+  // Une sauvegarde automatique cède la place (elle reprendra au prochain moment libre) ; une sauvegarde
+  // à la main ou une restauration en cours : la partie écrirait ses scores pendant la copie.
+  await backups.yieldToGame();
   const copying = backups.busy();
   if (copying) {
     state = { ...state, phase: 'message', help: false, message: { title: t('Partie impossible pour l’instant'), lines: [copying, t('Start ou Exit : revenir au menu.')] } };

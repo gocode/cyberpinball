@@ -15,7 +15,11 @@ import {
   estimateBackup,
   isSameCabinet,
   lastAutoSlot,
+  nextAutoSlot,
+  autoHour,
+  autoWeekday,
   listBackups,
+  loadBackupSettings,
   loadHashCache,
   loadLastRestore,
   loadPendingRestore,
@@ -335,22 +339,66 @@ test('les sauvegardes automatiques au-delà des dix dernières sont rangées, ja
   assert.ok(left.every((b) => b.damaged === 0), 'les objets encore cités restent');
 });
 
-test('échéances : le dimanche 4 h, ou chaque nuit ; manquée, elle reste due', () => {
+test('échéances à heure fixe : l’heure et le jour choisis ; manquée, elle reste due', () => {
   // Mercredi 4 novembre 2026, 21 h : le dernier dimanche 4 h est le 1er novembre.
   const wed = new Date(2026, 10, 4, 21, 0);
-  const slot = lastAutoSlot('weekly', wed)!;
+  const weekly = { auto: 'weekly', moment: 'fixed' } as const;
+  const slot = lastAutoSlot(weekly, wed)!;
   assert.equal(slot.getDay(), 0);
   assert.equal(slot.getDate(), 1);
   assert.equal(slot.getHours(), 4);
-  assert.equal(lastAutoSlot('nightly', wed)!.getDate(), 4);
-  assert.equal(lastAutoSlot('nightly', new Date(2026, 10, 4, 3, 0))!.getDate(), 3);
-  assert.equal(lastAutoSlot('off', wed), undefined);
-  assert.equal(autoBackupDue({ auto: 'weekly', copyToDestination: true }, wed), true);
-  assert.equal(autoBackupDue({ auto: 'weekly', copyToDestination: true, lastAuto: new Date(2026, 10, 1, 4, 5).toISOString() }, wed), false);
-  assert.equal(autoBackupDue({ auto: 'weekly', copyToDestination: true, lastAuto: new Date(2026, 9, 31, 4, 5).toISOString() }, wed), true);
+  assert.equal(lastAutoSlot({ auto: 'daily', moment: 'fixed' }, wed)!.getDate(), 4);
+  assert.equal(lastAutoSlot({ auto: 'daily', moment: 'fixed' }, new Date(2026, 10, 4, 3, 0))!.getDate(), 3);
+  // Heure et jour choisis : le mardi à 22 h ; à 21 h ce mercredi, le dernier est hier soir.
+  const tue = lastAutoSlot({ auto: 'weekly', moment: 'fixed', hour: 22, weekday: 2 }, wed)!;
+  assert.deepEqual([tue.getDate(), tue.getHours()], [3, 22]);
+  const daily22 = lastAutoSlot({ auto: 'daily', moment: 'fixed', hour: 22 }, wed)!;
+  assert.deepEqual([daily22.getDate(), daily22.getHours()], [3, 22]);
+  assert.equal(nextAutoSlot({ auto: 'daily', moment: 'fixed', hour: 22 }, wed)!.getDate(), 4);
+  assert.equal(lastAutoSlot({ auto: 'off' }, wed), undefined);
+  assert.equal(autoBackupDue({ ...weekly, copyToDestination: true }, wed), true);
+  assert.equal(autoBackupDue({ ...weekly, copyToDestination: true, lastAuto: new Date(2026, 10, 1, 4, 5).toISOString() }, wed), false);
+  assert.equal(autoBackupDue({ ...weekly, copyToDestination: true, lastAuto: new Date(2026, 9, 31, 4, 5).toISOString() }, wed), true);
   assert.equal(autoBackupDue({ auto: 'off', copyToDestination: true }, wed), false);
+  // Choisie ce mercredi : le dimanche passé n'est pas manqué, la première attend dimanche prochain.
+  const chosen = { ...weekly, copyToDestination: true, autoSince: new Date(2026, 10, 4, 20, 0).toISOString() };
+  assert.equal(autoBackupDue(chosen, wed), false);
+  assert.equal(autoBackupDue(chosen, new Date(2026, 10, 8, 4, 1)), true, 'dimanche 4 h passé : due');
+  assert.equal(autoBackupDue(chosen, new Date(2026, 10, 9, 18, 0)), true, 'PC éteint dimanche : rattrapée lundi');
+  // Dès que possible : choisie maintenant, la première se fait aussitôt.
+  assert.equal(autoBackupDue({ auto: 'daily', moment: 'asap', copyToDestination: true, autoSince: wed.toISOString() }, wed), true);
 });
 
+test('échéances dès que possible : une par jour ou par semaine (du lundi), à la première occasion', () => {
+  const wed = new Date(2026, 10, 4, 21, 0);
+  // Chaque jour : due tant qu'aucune n'est faite depuis 0 h, quelle que soit l'heure d'allumage.
+  const daily = { auto: 'daily', moment: 'asap', copyToDestination: true } as const;
+  assert.equal(lastAutoSlot(daily, wed)!.getHours(), 0);
+  assert.equal(autoBackupDue({ ...daily, lastAuto: new Date(2026, 10, 3, 23, 30).toISOString() }, wed), true, 'faite hier soir : due aujourd’hui');
+  assert.equal(autoBackupDue({ ...daily, lastAuto: new Date(2026, 10, 4, 0, 10).toISOString() }, wed), false, 'faite cette nuit : rien avant demain');
+  assert.equal(nextAutoSlot(daily, wed)!.getDate(), 5);
+  // Chaque semaine : la semaine commence le lundi 2 novembre.
+  const weekly = { auto: 'weekly', moment: 'asap', copyToDestination: true } as const;
+  const monday = lastAutoSlot(weekly, wed)!;
+  assert.deepEqual([monday.getDay(), monday.getDate(), monday.getHours()], [1, 2, 0]);
+  assert.equal(autoBackupDue({ ...weekly, lastAuto: new Date(2026, 10, 1, 20, 0).toISOString() }, wed), true, 'faite dimanche : semaine nouvelle, due');
+  assert.equal(autoBackupDue({ ...weekly, lastAuto: new Date(2026, 10, 2, 19, 0).toISOString() }, wed), false, 'faite lundi : rien avant lundi prochain');
+  assert.equal(nextAutoSlot(weekly, wed)!.getDate(), 9);
+});
+
+test('réglages : « chaque nuit » de la préversion devient chaque jour à heure fixe, valeurs hors bornes ignorées', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-sauv-reglages-'));
+  try {
+    fs.writeFileSync(path.join(dir, 'sauvegardes.json'), JSON.stringify({ auto: 'nightly', copyToDestination: true }));
+    const legacy = loadBackupSettings(dir);
+    assert.deepEqual([legacy.auto, legacy.moment, autoHour(legacy)], ['daily', 'fixed', 4]);
+    fs.writeFileSync(path.join(dir, 'sauvegardes.json'), JSON.stringify({ auto: 'weekly', hour: 31, weekday: -1 }));
+    const odd = loadBackupSettings(dir);
+    assert.deepEqual([odd.moment, odd.hour, odd.weekday, autoHour(odd), autoWeekday(odd)], ['asap', undefined, undefined, 4, 0]);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
 test('un dossier des données hors de la racine (bac à sable) est sauvegardé et restauré à sa place', async () => {
   const root = fakeRoot();
   const home = tmp('cp-sauvegarde-home-');
