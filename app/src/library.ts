@@ -3635,6 +3635,26 @@ export function createLibrary(host: LibraryHost) {
      */
     installReceived: (dir: string, table?: TableEntry, back?: () => void) => startImport([dir], 'move', undefined, undefined, false, table?.folder, back),
     isActive: () => screen !== undefined,
+    /**
+     * Un écran qui s'ouvre de lui-même par-dessus celui-ci (une invitation à jouer) : `open` reçoit le
+     * retour qui rend l'écran d'avant tel qu'il était, curseur compris. Refusé (false) pendant une
+     * opération longue ou une saisie : l'écran du moment ne se perd pas.
+     */
+    interrupt: (open: (back: () => void) => void): boolean => {
+      if (busyCount > 0 || screen?.kind === 'prompt' || (screen?.kind === 'edit' && screen.editor)) return false;
+      const was = screen;
+      const at = cursor;
+      open(() => {
+        if (!was) return leave();
+        screen = was;
+        cursor = at;
+        host.enter();
+        host.broadcast();
+      });
+      return true;
+    },
+    /** Le navigateur intégré (fenêtre « Récupérer ») est ouvert. */
+    browserOpen: () => catalogUi.acquirer.isOpen(),
     /** L'écran fait écouter des sons : la musique du menu se tait (un seul son à la fois). */
     previewsSound: () => screen !== undefined && soundPreview,
     /** Table dont parle l'écran ouvert (fiche, médias du jeu, fichiers, parcours…) : ses médias restent sur les écrans de la borne. */

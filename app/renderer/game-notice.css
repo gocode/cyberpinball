@@ -169,7 +169,9 @@ body {
   inset: 0;
   box-sizing: border-box;
   border: 1px solid var(--line-strong);
-  background: var(--scrim-strong);
+  /* Un peu plus opaque que le verre fumé des autres cartes (0,88) : devant un PuP-Pack animé, la bande
+     se confondait avec l'arrière-plan (essai du 04/11/2026 sur le PinCab). */
+  background: var(--scrim-board);
   box-shadow: var(--halo-panel);
   color: var(--ink);
   font-family: var(--font-ui);

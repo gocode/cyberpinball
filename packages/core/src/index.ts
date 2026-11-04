@@ -129,6 +129,7 @@ export * from './livechoice';
 export * from './livestart';
 export * from './notices';
 export * from './livenotices';
+export * from './noticezone';
 export * from './gamerecording';
 export * from './gamenotice';
 export * from './dmdscore';

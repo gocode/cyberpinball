@@ -17,7 +17,7 @@
 // La file (notices.ts) décide du reste : quand, où (NoticeRule.live), et le regroupement
 // (« Bruno et Léa ont accepté »).
 
-import { liveRanked, liveScore, liveStandings, type LiveGame, type LiveInvite, type LivePhase, type LivePlayerState } from './livegame';
+import { liveRanked, liveScore, liveStandings, type LiveGame, type LiveInvite, type LiveInviteEnd, type LivePhase, type LivePlayerState } from './livegame';
 import type { LiveNoticeReason, NoticeEvent } from './notices';
 
 export interface LiveSnapshot {
@@ -58,7 +58,7 @@ export function liveNotices(prev: LiveSnapshot | undefined, next: LiveSnapshot |
     if (next.hosting && before.state === 'invited') {
       if (p.state === 'accepted') out.push({ kind: 'live-accepted', key, at: now, who: p.name, ...subject });
       else if (p.state === 'declined' || p.state === 'busy' || p.state === 'expired') {
-        const reason: LiveNoticeReason | undefined = p.state !== 'declined' ? p.state : p.match === 'missing' || p.match === 'other-version' ? p.match : undefined;
+        const reason: LiveNoticeReason | undefined = p.state === 'expired' && p.offline ? 'offline' : p.state !== 'declined' ? p.state : p.match === 'missing' || p.match === 'other-version' ? p.match : undefined;
         out.push({ kind: 'live-declined', key, at: now, who: p.name, ...subject, ...(reason ? { reason } : {}) });
       }
     } else if (IN_GAME.includes(before.state) && (p.state === 'left' || p.state === 'failed')) {
@@ -80,9 +80,31 @@ export function liveNotices(prev: LiveSnapshot | undefined, next: LiveSnapshot |
  * premier relevé, qui ne dit rien) : « Bruno vous invite à rejoindre une partie » (essai réel du
  * 04/11/2026 : la carte et le carillon ne suffisaient pas, la notification d'une ligne en plus).
  */
-export function inviteNotices(prev: ReadonlySet<string> | undefined, invites: readonly LiveInvite[], now: number): NoticeEvent[] {
+export function inviteNotices(prev: ReadonlySet<string> | undefined, invites: readonly LiveInvite[], now: number, ended: (id: string) => LiveInviteEndInfo | undefined = () => undefined): NoticeEvent[] {
   if (!prev) return [];
-  return invites.filter((i) => !prev.has(i.id)).map((i) => ({ kind: 'live-invite' as const, key: i.id, at: now, who: i.host.name, subject: i.title }));
+  // Chaque invitation voulue a son numéro (round) : réinvité après un refus, dans la même partie, c'en est une nouvelle.
+  const arrived = invites.filter((i) => !prev.has(inviteTag(i))).map((i) => ({ kind: 'live-invite' as const, key: inviteTag(i), at: now, who: i.host.name, subject: i.title }));
+  // Une invitation vue qui n'est plus là sans ma réponse : pourquoi, aux deux bornes (essai réel du
+  // 04/11/2026). Changée de table : la nouvelle invitation le dit déjà.
+  const gone = [...prev]
+    .filter((tag) => !invites.some((i) => inviteTag(i) === tag))
+    .flatMap((tag) => {
+      const end = ended(tagId(tag));
+      return end && end.why !== 'answered' && end.why !== 'replaced' ? [{ kind: 'live-invite-ended' as const, key: tag, at: now, who: end.name, subject: end.title, end: end.why }] : [];
+    });
+  return [...arrived, ...gone];
+}
+
+/** Une invitation et son numéro : « 0123456789abcdef|2 » (le relevé des invitations, la clé de leurs notifications). */
+export const inviteTag = (i: Pick<LiveInvite, 'id' | 'round'>): string => `${i.id}|${i.round ?? 0}`;
+/** La partie d'une clé d'invitation (inviteTag) ; une clé sans numéro est la partie elle-même. */
+export const tagId = (tag: string): string => tag.split('|')[0]!;
+
+/** Comment une invitation reçue a pris fin (live-game.ts, inviteEnd) : `answered`, par ma réponse. */
+export interface LiveInviteEndInfo {
+  why: LiveInviteEnd | 'answered';
+  name: string;
+  title: string;
 }
 
 /** Le gagnant (au classement, avec un score), ou que je gagne ; sinon ma place parmi les classés. */

@@ -25,6 +25,15 @@
 // que l'invité n'a pas répondu ; une invitation déjà reçue ne sonne pas deux fois, et celle à laquelle
 // on a déjà répondu fait repartir la même réponse.
 //
+// Chaque fin d'invitation arrive aux deux bornes (essai réel du 04/11/2026 : « celui qui a invité
+// peut attendre longtemps », « l'invité n'apprend pas que l'invitation est annulée ») : la réponse
+// de l'invité repart à chaque renvoi de l'invitation ; celui qui invite dit pourquoi elle prend fin
+// sans réponse (game-cancel `why` : annulée, partie lancée sans lui, changée de table, expirée, vu
+// hors ligne) et le renvoie jusqu'à l'accusé de réception (game-cancel-ok) ou la fin des deux
+// minutes ; une réponse arrivée trop tard reçoit cette fin en retour (lateAnswerEnd). Chacun
+// constate aussi seul l'expiration et le départ de l'autre hors ligne. L'invité garde la fin de
+// chaque invitation (inviteEnd) : son écran et sa notification la disent.
+//
 // Sans electron à l'exécution : les tests du cœur le chargent avec un réseau d'essai.
 
 import { createHash } from 'node:crypto';
@@ -39,6 +48,8 @@ import {
   boardFor,
   countdownFrom,
   countdownLeft,
+  dropOfflineInvites,
+  lateAnswerEnd,
   livePlayers,
   createSettingsReceiver,
   expireInvites,
@@ -56,6 +67,8 @@ import {
   loadBoards,
   loadHistory,
   LIVE_COUNTDOWN_S,
+  LIVE_ANSWER_SHOW_MS,
+  LIVE_INVITE_MS,
   LIVE_PROTOCOL,
   matchLiveTable,
   newLiveGame,
@@ -75,6 +88,8 @@ import {
   type HostSetting,
   type LiveGame,
   type LiveInvite,
+  type LiveInviteEnd,
+  type LiveInviteEndInfo,
   type LiveManualReason,
   type LiveMessage,
   type LiveRecord,
@@ -166,6 +181,8 @@ export interface LiveGames {
   waitView(opts?: { manual?: boolean }): LiveWaitView | undefined;
   /** Invitations reçues, sans les expirées. */
   invites(): LiveInvite[];
+  /** Comment cette invitation reçue a pris fin (`next` : la nouvelle invitation qui la remplace) ; undefined : en cours, ou inconnue. */
+  inviteEnd(id: string): (LiveInviteEndInfo & { next?: string }) | undefined;
   /** Crée un salon sur cette table (l'empreinte du .vpx se calcule d'abord). */
   create(table: TableEntry): Promise<LiveGame>;
   /** Invite un ami dans mon salon ; false : salon plein, ami pas relié, ou partie déjà partie. */
@@ -176,8 +193,8 @@ export interface LiveGames {
   decline(id: string): void;
   /** Départ commun (celui qui invite). */
   start(): boolean;
-  /** Celui qui invite annule ; un invité quitte la partie. */
-  leave(): void;
+  /** Celui qui invite annule (`replacedFor` : ces invités reçoivent tout de suite une autre invitation) ; un invité quitte la partie. */
+  leave(opts?: { replacedFor?: readonly string[] }): void;
   /** Partie finie ou annulée : on n'en parle plus. */
   close(): void;
   stop(): void;
@@ -192,6 +209,8 @@ export interface LiveTableFound {
   scriptDiffers?: boolean;
   /** Ma table n'aura pas de relevé de l'état de jeu : départ manuel, pas de score en direct, et pourquoi. */
   manual?: LiveManualReason;
+  /** L'invitation a pris fin pendant la vérification de la table (annulée, expirée…) : rien n'est parti (inviteEnd dit pourquoi). */
+  gone?: true;
 }
 
 /** Vérification des invitations expirées et des retardataires. */
@@ -209,6 +228,10 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   let game: LiveGame | undefined;
   let mine: TableEntry | undefined;
   let invites: LiveInvite[] = [];
+  /** Invité : comment chaque invitation reçue a pris fin, les plus récentes (inviteEnd). */
+  const ended = new Map<string, LiveInviteEndInfo & { next?: string; host: string }>();
+  /** Celui qui invite : chaque fin d'invitation dite à un invité, renvoyée jusqu'à son accusé de réception ou `until`. */
+  const ends = new Map<string, { to: string; name: string; message: Extract<LiveMessage, { t: 'game-cancel' }>; at: number; until: number }>();
   /** Invité : ma réponse à chaque invitation (par partie), renvoyée si l'hôte réinvite ; les plus récentes seulement. */
   const answers = new Map<string, Extract<LiveMessage, { t: 'game-answer' }>>();
   const answerKey = (game: string, round: number | undefined) => `${game}:${round ?? 0}`;
@@ -276,6 +299,30 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
 
   const isHost = () => !!game && game.host === me().key;
   const ongoing = () => !!game && game.phase !== 'finished' && game.phase !== 'cancelled';
+
+  /** Invité : cette invitation reçue prend fin (sans ma réponse, ou par elle) ; son écran et sa notification le diront. */
+  function endInvite(invite: LiveInvite, why: LiveInviteEnd | 'answered', next?: string): void {
+    invites = invites.filter((i) => i.id !== invite.id);
+    ended.set(invite.id, { why, name: invite.host.name, title: invite.title, host: invite.host.key, ...(next ? { next } : {}) });
+    if (ended.size > 20) ended.delete(ended.keys().next().value!);
+    if (why !== 'answered') log(`Partie en direct : invitation de ${invite.host.name} (« ${invite.title} ») terminée : ${why}.`); // i18n-ignore : journal
+  }
+
+  /** Celui qui invite : la fin de son invitation dite à cet invité, renvoyée tant qu'il ne l'a pas reçue (ticker). */
+  function tellEnd(to: string, name: string, id: string, why: LiveInviteEnd): void {
+    const message: Extract<LiveMessage, { t: 'game-cancel' }> = { t: 'game-cancel', game: id, why };
+    const sent = net.send(to, message);
+    ends.set(`${to}|${id}`, { to, name, message, at: now().getTime(), until: now().getTime() + LIVE_INVITE_MS });
+    log(`Partie en direct : fin de l'invitation dite à ${name} (${why})${sent ? '' : ', hors ligne : redite à son retour'}.`); // i18n-ignore : journal
+  }
+
+  /** Celui qui invite : les invitations de cette partie qui passent de « invité » à une fin sans réponse, dites à chacun. */
+  function tellEnds(before: LiveGame, after: LiveGame, why: (p: LiveGame['players'][number]) => LiveInviteEnd): void {
+    for (const p of after.players) {
+      const was = before.players.find((x) => x.key === p.key);
+      if (was?.state === 'invited' && p.state === 'expired') tellEnd(p.key, p.name, after.id, why(p));
+    }
+  }
 
   /** Celui qui invite : la salle à jour pour chaque invité relié. */
   function broadcastRoom(only?: string): void {
@@ -524,16 +571,28 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
         }
         log(`Partie en direct : invitation reçue de ${host.name} (« ${m.game.title} », partie ${m.game.id}).`); // i18n-ignore : journal
         const invite = liveInvite(m, host, now());
+        // Le même hôte, une autre partie (il a changé de table) : l'ancienne invitation prend fin, la nouvelle la remplace.
+        for (const old of invites.filter((i) => i.id !== invite.id && i.host.key === key)) endInvite(old, 'replaced', invite.id);
+        // « Changée de table » déjà dit par l'hôte (game-cancel avant la nouvelle) : elle mène à celle-ci.
+        for (const e of ended.values()) if (e.host === key && e.why === 'replaced' && !e.next) e.next = invite.id;
         invites = [invite, ...invites.filter((i) => i.id !== invite.id && i.host.key !== key)];
         opts.onInvite?.(invite);
         changed();
         return;
       }
       case 'game-answer': {
-        if (!game || !isHost() || m.game !== game.id) return;
+        // Trop tard (invitation annulée, partie lancée, expirée, vu hors ligne) : il l'apprend, plutôt qu'attendre un départ qui ne viendra pas.
+        const late = !game || !isHost() || m.game !== game.id ? 'cancelled' : lateAnswerEnd(game, m.game, key);
+        if (late) {
+          if (m.answer === 'accept' && !ends.has(`${key}|${m.game}`)) tellEnd(key, net.state().friends.find((f) => f.key === key)?.name ?? key, m.game, late);
+          else if (m.answer === 'accept') net.send(key, ends.get(`${key}|${m.game}`)!.message);
+          return;
+        }
+        if (!game || !isHost()) return;
         const before = game.players.find((p) => p.key === key)?.state;
         if (m.answer === 'busy') log(`Partie en direct : ${game.players.find((p) => p.key === key)?.name ?? key} occupé, invitation refusée d'office.`); // i18n-ignore : journal
-        setGame(answerGame(game, key, m.answer, m.match, m.balls, { ...(m.proto ? { proto: m.proto } : {}), ...(m.app ? { app: m.app } : {}) }));
+        if (before === 'invited') log(`Partie en direct : ${game.players.find((p) => p.key === key)?.name ?? key} a répondu « ${m.answer} ».`); // i18n-ignore : journal
+        setGame(answerGame(game, key, m.answer, m.match, m.balls, { ...(m.proto ? { proto: m.proto } : {}), ...(m.app ? { app: m.app } : {}) }, now()));
         // Il vient d'accepter : mes réglages partent vers lui, à poser dans le double de sa table.
         if (before === 'invited' && game.players.find((p) => p.key === key)?.state === 'accepted' && mine) sendSettings(key, game.id, mine);
         return;
@@ -590,15 +649,23 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
           maybeGo();
         }
         return;
-      case 'game-cancel':
+      case 'game-cancel': {
         // Celui qui invite annule ; un invité, lui, quitte la partie.
+        const fromHost = !(game && isHost() && m.game === game.id);
         if (game && m.game === game.id && key === game.host && !isHost()) {
           if (launch && game.phase === 'countdown') clearTimeout(launch);
+          if (game.phase !== 'cancelled') log(`Partie en direct : partie annulée par ${game.players.find((p) => p.host)?.name ?? key}${m.why ? ` (${m.why})` : ''}.`); // i18n-ignore : journal
           game = { ...game, phase: 'cancelled' };
-          changed();
         } else if (game && isHost() && m.game === game.id) setGame(gameStatus(game, key, { state: 'left' }, now()));
-        invites = invites.filter((i) => !(i.id === m.game && i.host.key === key));
+        const invite = invites.find((i) => i.id === m.game && i.host.key === key);
+        if (invite) endInvite(invite, m.why ?? 'cancelled');
+        // Reçue : celui qui invite cesse de la redire (même redite, déjà connue : l'accusé repart).
+        if (fromHost) net.send(key, { t: 'game-cancel-ok', game: m.game });
         changed();
+        return;
+      }
+      case 'game-cancel-ok':
+        if (ends.delete(`${key}|${m.game}`)) log(`Partie en direct : fin de l'invitation reçue par ${net.state().friends.find((f) => f.key === key)?.name ?? key}.`); // i18n-ignore : journal
         return;
       default:
         return;
@@ -606,15 +673,38 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   });
 
   const ticker = setInterval(() => {
-    if (invites.some((i) => inviteExpired(i, now()))) invites = invites.filter((i) => !inviteExpired(i, now()));
+    // Invité : une invitation expirée, ou dont l'hôte est passé hors ligne, prend fin ; son écran le dit tout de suite.
+    let gone = false;
+    for (const i of [...invites]) {
+      const why = inviteExpired(i, now()) ? 'expired' : !net.online(i.host.key) ? 'host-offline' : undefined;
+      if (why) {
+        endInvite(i, why);
+        gone = true;
+      }
+    }
     // Une invitation en attente : son temps restant à l'écran, une fois par seconde.
-    if (invites.length) changed();
+    if (invites.length || gone) changed();
+    // Celui qui invite : chaque fin d'invitation redite jusqu'à son accusé de réception, tant qu'elle vaut.
+    for (const [k, e] of ends) {
+      if (now().getTime() > e.until) ends.delete(k);
+      else if (now().getTime() - e.at >= LIVE_RESEND_MS && net.online(e.to)) {
+        e.at = now().getTime();
+        net.send(e.to, e.message);
+      }
+    }
     if (!game) {
       waitWas = false;
       return;
     }
     if (isHost()) {
-      setGame(closeIfDone(expireInvites(game, now()), now()));
+      // Sans réponse depuis deux minutes, ou passé hors ligne : l'invitation prend fin, il l'apprend.
+      const before = game;
+      const offline = dropOfflineInvites(before, (k) => net.online(k), now());
+      const expired = expireInvites(offline, now());
+      tellEnds(before, expired, (p) => (p.offline ? 'offline' : 'expired'));
+      setGame(closeIfDone(expired, now()));
+      // Une réponse en tête du salon : il se redessine jusqu'à ce qu'elle en parte.
+      if (game?.phase === 'gathering' && game.players.some((p) => p.answeredAt && now().getTime() - Date.parse(p.answeredAt) < LIVE_ANSWER_SHOW_MS + 2 * TICK_MS)) changed();
       maybeGo();
       // Une invitation sans réponse repart (message perdu sur une liaison qui tombe), jusqu'à sa réponse ou son expiration.
       if (game?.phase === 'gathering') {
@@ -657,6 +747,17 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
   }, TICK_MS);
   ticker.unref?.();
 
+  /**
+   * Celui qui invite annule son salon : chacun l'apprend, redit jusqu'à l'accusé de réception ;
+   * ceux qui reçoivent aussitôt une autre invitation (`replacedFor`, changement de table) : « changée de table ».
+   */
+  function cancelAsHost(g: LiveGame, replacedFor: readonly string[]): void {
+    for (const p of g.players) {
+      if (p.host || !['invited', 'accepted'].includes(p.state)) continue;
+      tellEnd(p.key, p.name, g.id, p.state === 'invited' && replacedFor.includes(p.key) ? 'replaced' : 'cancelled');
+    }
+  }
+
   function waitView(opts: { manual?: boolean } = {}): LiveWaitView | undefined {
     const run = running;
     return game && run?.id === game.id ? liveWaitView(game, me().key, now(), { ...opts, ...(run.readyAt !== undefined ? { readyAt: run.readyAt } : {}) }) : undefined;
@@ -672,8 +773,14 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     manualOf,
     waitView,
     invites: () => invites.filter((i) => !inviteExpired(i, now())),
+    inviteEnd: (id) => {
+      const e = ended.get(id);
+      return e ? { why: e.why, name: e.name, title: e.title, ...(e.next ? { next: e.next } : {}) } : undefined;
+    },
     async create(table) {
       if (game && ongoing() && !isHost()) net.send(game.host, { t: 'game-cancel', game: game.id });
+      // Un salon encore ouvert : ses invités apprennent sa fin (inviteAll l'a déjà fermé d'ordinaire).
+      if (game && isHost() && (game.phase === 'gathering' || game.phase === 'countdown')) cancelAsHost(game, []);
       const live = await liveTable(table);
       mine = table;
       setGame(newLiveGame({ ...me(), ...version }, live, displayTitle(table), now()));
@@ -689,6 +796,8 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const round = (own().invites.get(key)?.round ?? 0) + 1;
       const message: Extract<LiveMessage, { t: 'game-invite' }> = { t: 'game-invite', game: { id: next.id, table: next.table, title: next.title, players, ...version }, round };
       if (!net.send(key, message)) return false;
+      // Réinvité dans le même salon : la fin de l'invitation d'avant ne se redit plus (elle annulerait celle-ci).
+      ends.delete(`${key}|${next.id}`);
       setGame(next);
       own().invites.set(key, { message, at: now().getTime(), round });
       return true;
@@ -698,7 +807,9 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const invite = invites.find((i) => i.id === id);
       if (!invite) return { match: 'missing' };
       const found = await matchFor(invite);
-      invites = invites.filter((i) => i.id !== id);
+      // Annulée pendant la vérification de la table : rien ne part.
+      if (!invites.some((i) => i.id === id)) return { match: found.match, gone: true };
+      endInvite(invite, 'answered');
       // Pas la même version : la partie ne se joue pas (décision du 30/10/2026), il récupère la sienne.
       if (found.match !== 'same') {
         answer(invite.host.key, { t: 'game-answer', game: id, answer: 'decline', match: found.match, ...version }, invite.round);
@@ -716,8 +827,11 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     },
     decline(id) {
       const invite = invites.find((i) => i.id === id);
-      invites = invites.filter((i) => i.id !== id);
-      if (invite) answer(invite.host.key, { t: 'game-answer', game: id, answer: 'decline' }, invite.round);
+      if (invite) {
+        endInvite(invite, 'answered');
+        answer(invite.host.key, { t: 'game-answer', game: id, answer: 'decline' }, invite.round);
+        log(`Partie en direct : invitation de ${invite.host.name} refusée.`); // i18n-ignore : journal
+      }
       changed();
     },
     start() {
@@ -725,18 +839,20 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
       const next = startGame(game, now());
       if (next === game) return false;
       for (const p of next.players) if (!p.host && p.state === 'accepted') net.send(p.key, { t: 'game-start', game: next.id, in: LIVE_COUNTDOWN_S * 1000 });
+      // Ceux qui n'avaient pas encore répondu : la partie part sans eux, ils l'apprennent.
+      tellEnds(game, next, () => 'started');
       setGame(next);
       scheduleLaunch();
       return true;
     },
-    leave() {
+    leave(opts) {
       if (!game) return;
       if (launch) clearTimeout(launch);
       launch = undefined;
       if (isHost()) {
         // Partie déjà partie : chacun finit la sienne, les résultats arrivent quand même.
         if (game.phase === 'gathering' || game.phase === 'countdown') {
-          for (const p of game.players) if (!p.host) net.send(p.key, { t: 'game-cancel', game: game.id });
+          cancelAsHost(game, opts?.replacedFor ?? []);
           game = { ...game, phase: 'cancelled' };
         }
       } else if (ongoing()) net.send(game.host, { t: 'game-cancel', game: game.id });

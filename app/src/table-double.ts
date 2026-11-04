@@ -76,6 +76,8 @@ export interface TableDouble {
   ini?: string;
   /** Port de l'inspector de VPX quand il est activé pour cette partie (127.0.0.1) : le DMD s'y lit (dmd-watch.ts). */
   inspectorPort?: number;
+  /** Table sans PinMAME : son DMD (FlexDMD…) se dessine par le script, jamais lu par l'inspector (dmdscore.ts, inspectorDisplayReadable). */
+  dmdByScript?: boolean;
   /** Après la partie : compare le dossier habituel à son empreinte d'avant, puis supprime le double. */
   finish(): void;
 }
@@ -168,6 +170,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
       // Départ commun : le relevé attend ce fichier pour mettre le crédit et appuyer sur Start.
       const goFile = path.join(plan.dir, 'cyberpinball-partez.txt');
       let live = false;
+      let dmdByScript = false;
       let ini: { file: string; text: string; port: number } | undefined;
       if (board) {
         try {
@@ -189,6 +192,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
           // originale) se dessine à chaque image demandée, et la demande viendrait du fil de l'inspector,
           // en même temps que le script modifie la même scène (arrêt de VPX du 04/11/2026, dmdscore.ts).
           const pinmame = roms.length > 0 || (script ? usesPinmameCode(script) : false);
+          dmdByScript = !pinmame;
           const offered = iniText !== undefined && inspector ? { ...inspector, dmd: Boolean(inspector.dmd && pinmame) } : undefined;
           if (inspector?.dmd && !pinmame)
             log(`Partie entre amis (${table.id}) : DMD dessiné par le script (sans PinMAME), pas lu par l'inspector de VPX : le lire ferait dessiner sa scène hors du fil du script (arrêt de VPX possible).`); // i18n-ignore : journal
@@ -271,6 +275,7 @@ export function createTableDoubles(opts: TableDoublesOptions) {
             }
           },
           ...(ini ? { ini: ini.file, inspectorPort: ini.port } : {}),
+          ...(dmdByScript ? { dmdByScript } : {}),
           finish() {
             if (finished) return;
             finished = true;

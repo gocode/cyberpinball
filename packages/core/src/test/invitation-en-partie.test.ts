@@ -133,7 +133,9 @@ test('branchements : carillon à chaque invitation, carte pendant la partie, fer
   const main = read('app', 'src', 'frontend.ts');
   const live = main.slice(main.indexOf('const liveGames = createLiveGames({'), main.indexOf('const friendsMenu = createFriendsMenu({'));
   assert.doesNotMatch(live, /busy:/, 'plus de réponse « occupé » pendant la partie');
-  assert.match(live, /onInvite: \(invite\) => \{[\s\S]{0,400}?playUiSound\('invite'\);\s+if \(playing\) gameNotices\.show\(invite\);\s+else if \(liveCanShow\(\)\) friendsMenu\.live\.openInvite/);
+  assert.match(live, /onInvite: \(invite\) => \{[\s\S]{0,400}?playUiSound\('invite'\);\s+if \(playing\) gameNotices\.show\(invite\);\s+else if \(!openArrivedInvite\(invite\.id\)\)/);
+  // Hors partie, elle s'ouvre d'elle-même sur la roue, dans le menu système et sur l'aide (library.interrupt rend l'écran d'avant).
+  assert.match(main, /function openArrivedInvite\(id: string\): boolean \{[\s\S]{0,500}friendsMenu\.live\.openInvite\(id, \(\) => library\.leave\(\)\);[\s\S]{0,200}library\.interrupt\(\(back\) => friendsMenu\.live\.openInvite\(id, back\)\)/);
   // Notifications masquées pendant les parties : ni carillon ni carte, l'invitation attend au menu.
   assert.match(live, /onInvite: \(invite\) => \{\s+\/\/[^\n]*\n\s+if \(playing && quietInGame\) return void/);
   const start = main.indexOf('async function play(');

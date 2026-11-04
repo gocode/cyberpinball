@@ -99,6 +99,9 @@ import {
   type UiSoundId,
   type MenuMediaSettings,
   type NoticeView,
+  type NoticeZone,
+  noticeZone,
+  type ZoneScreen,
   type MenuMoment,
   type MenuPhase,
   type RoleRect,
@@ -215,7 +218,7 @@ import { startCabinetVolume, type CabinetVolume } from './cabinet-volume';
 import { createBallCounts } from './ball-count';
 import { createTableDoubles } from './table-double';
 import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
-import { simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
+import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
 import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { createLiveScoresMenu } from './live-scores-menu';
@@ -924,9 +927,9 @@ library.downloads.friends({
   has: (key) => socialNet.state().friends.some((f) => f.key === key),
   name: (key) => socialNet.state().friends.find((f) => f.key === key)?.name,
 });
-// Menu des tables : pastille des amis en ligne et notifications discrètes (menu-notices.ts), une
-// à la fois, seulement quand le menu des tables est là, nu : ni partie, ni attente, ni invité, ni
-// écran plein, ni aide, ni constat bref ou préavis d'arrêt déjà affichés.
+// Pastille des amis en ligne et notifications discrètes (menu-notices.ts), une à la fois, sur
+// chaque écran selon sa zone (noticezone.ts, currentZone) : partout dans Cyber Pinball, et en
+// partie ce qui compte, par-dessus VPX (essai réel du 04/11/2026).
 /**
  * « Masquer les notifications pendant les parties » (Menu système > Amis, quiet-in-game-setting.ts) :
  * désactivé par défaut ; activé, rien ne s'affiche ni ne sonne pendant une partie.
@@ -938,30 +941,41 @@ const menuNotices = createMenuNotices({
   reason: (j) => downloadReasonText(j),
   badgeLabel,
   mode: () => mediaSettings.notices,
-  canShow: () => !closing && state.phase === 'menu' && !state.help && !state.banner && !attract.active && !guest.active && !stopNotice && !desktop.active && tables.length > 0,
+  zone: () => currentZone(),
   redraw: () => {
     if (!closing) broadcast();
   },
-  // Ce qui se montre partout (la partie entre amis, une invitation, un ami qui se connecte) : aussi
-  // dans le menu système et par-dessus VPX pendant une partie (game-notice.ts), avec son son (essai
-  // réel du 04/11/2026), sauf « Masquer les notifications pendant les parties ». Jamais sur l'écran
-  // de la partie ni de l'invitation, ni ce que la bande de la partie en cours montre déjà.
+  // La partie entre amis et les invitations : jamais ce que l'écran de la partie ou de l'invitation
+  // dit déjà, ni ce que la bande de la partie en cours montre déjà.
   live: {
     game: () => liveGames.current(),
     invites: () => liveGames.invites(),
     me: () => socialNet.state().key.publicKey,
     onScreen: () => friendsMenu.live.onScreen(),
     inviteOnScreen: (id) => friendsMenu.live.inviteOnScreen(id),
+    inviteEnd: (id) => liveGames.inviteEnd(id),
     band: () => state.phase === 'playing' && !!playing && liveBoardUp(),
-    canShow: () =>
-      !closing && !state.help && !state.banner && !attract.active && !guest.active && !stopNotice && !desktop.active && !friendsMenu.live.onScreen() &&
-      (state.phase === 'menu' || state.phase === 'library' || (state.phase === 'playing' && !!playing && !quietInGame)),
   },
   sound: (id) => playUiSound(id),
   log: (line) => console.log(line),
 });
-/** Le menu des tables est à l'écran : une invitation peut s'y afficher sans rien interrompre. */
-const liveCanShow = () => !closing && state.phase === 'menu';
+/**
+ * Une invitation qui arrive s'ouvre d'elle-même : sur la roue, comme avant ; dans le menu système
+ * (chacun de ses sous-écrans) et sur l'aide des commandes, par-dessus, « Répondre plus tard » ou
+ * « Retour » rendant l'écran tel qu'il était (library.interrupt). Ailleurs (message, confirmation,
+ * mode attente, opération longue, saisie), la notification l'annonce et l'entrée du menu système
+ * y mène. Pendant une partie : la carte sur le plateau (game-notice.ts).
+ */
+function openArrivedInvite(id: string): boolean {
+  if (closing || guest.active || desktop.active) return false;
+  if (state.phase === 'menu' && !attract.active) {
+    if (state.help) state = { ...state, help: false };
+    friendsMenu.live.openInvite(id, () => library.leave());
+    return true;
+  }
+  if (state.phase === 'library') return library.interrupt((back) => friendsMenu.live.openInvite(id, back));
+  return false;
+}
 // Partie en direct : invitation, départ commun, puis la table lancée ici comme par Start.
 // Billes par partie (ROM, script, menu de service) : une partie en direct ne classe pas 5 billes contre 3.
 const ballCounts = createBallCounts({ dataDir: loc.dataDir, romsOf, pinmameDirs: () => (loc.root ? [path.join(loc.root, 'pinmame')] : []) });
@@ -1002,7 +1016,7 @@ const liveGames = createLiveGames({
     if (playing && quietInGame) return void console.log(`Invitation pendant la partie : ${invite.host.name}, ${invite.title}, gardée pour le menu (notifications masquées pendant les parties).`); // i18n-ignore : journal
     playUiSound('invite');
     if (playing) gameNotices.show(invite);
-    else if (liveCanShow()) friendsMenu.live.openInvite(invite.id, () => library.leave());
+    else if (!openArrivedInvite(invite.id)) console.log(`Invitation de ${invite.host.name} : annoncée par la notification (écran « ${zoneScreen()} » laissé tel quel).`); // i18n-ignore : journal
   },
   play: async (table, onPlaying, settings, board, progress, gate) => {
     // Le départ commun ferme l'écran ouvert (le compte à rebours), comme Start sur une table.
@@ -1042,7 +1056,8 @@ const gameNotices = createGameNotices({
   boardScreens: liveBoardScreens,
   dmdColor: () => mediaSettings.dmdColor,
   scoresSettings: () => readLiveScoresSettings(loc.dataDir, playing?.id),
-  dmdScoreScreen: () => dmdWatch?.verdict().scoreScreen ?? false,
+  dmdVerdict: () => dmdWatch?.verdict(),
+  dmdUnreadable: () => (dmdWatch ? dmdWatch.unreadable() : 'inspector de VPX non activé pour cette partie (pare-feu de VPX non autorisé ?)'), // i18n-ignore : journal
   // Hors écran, la pile des fenêtres est celle du vrai bureau : rien à y chercher.
   coveredBy: (win) => (OFFSCREEN ? undefined : describeCover(win)),
   invites: () => liveGames.invites(),
@@ -2129,7 +2144,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Hors écran, la partie simulée n'exécute aucun script : son relevé est simulé, pour la bande et la fin de partie.
   const liveSource = double?.live ? () => double.liveState() : simulated !== undefined && double && !liveManual ? simulatedLiveState(Date.now(), liveRunMs, () => goneAt) : undefined;
   // Le DMD de la table, lu par l'inspector de VPX : les scores des amis ne s'y posent que sur son écran de score (dmdscore.ts).
-  dmdWatch = double?.inspectorPort && readDmd ? watchVpxDmd(double.inspectorPort, (line) => console.log(line)) : simulated !== undefined && double && readDmd ? simulatedDmdWatch() : undefined;
+  // Une table sans PinMAME (FlexDMD) : jamais son image par l'inspector, le rythme de la partie d'après le relevé.
+  dmdWatch = !readDmd || !double ? undefined : simulated !== undefined ? simulatedDmdWatch() : double.dmdByScript && double.live ? scriptDmdWatch() : double.inspectorPort ? watchVpxDmd(double.inspectorPort, (line) => console.log(line)) : undefined;
   // Départ commun (livestart.ts) : la table prête (le relevé répond « pret »), elle le dit aux
   // autres ; au « partez », le fichier du double que le relevé surveille : alors seulement, crédit et Start.
   // Le relevé a dit « prêt » (ou la partie est partie), ou le garde-fou l'a fait à sa place.
@@ -2840,18 +2856,53 @@ function viewFor(role: RoleId) {
 }
 
 /**
- * Coin du menu des tables (fenêtre du plateau) : amis en ligne et notification, au menu des
- * tables ; dans le menu système, seulement ce qui se montre partout (NoticeRule.away) ; pendant
- * une partie, cela va par-dessus VPX (game-notice.ts).
+ * L'écran du moment, pour la zone des notifications (noticezone.ts) : nommé ici, une seule fois,
+ * pour la file, le coin dessiné par la fenêtre du plateau et la ligne posée par-dessus VPX ou le
+ * navigateur intégré. Le mode invité n'y change rien : une notification informe, et ce qu'elle
+ * ouvre passe par le cadenas (guest.knock).
  */
-function menuCorner(): { friendsOnline?: { count: number; title: string; searching?: boolean }; notice?: NoticeView } {
-  // La file avance à chaque rendu, même hors du menu : une notification ouverte part quand un écran la recouvre.
+function zoneScreen(): ZoneScreen {
+  if (desktop.active) return 'desktop';
+  if (state.phase === 'playing' || state.phase === 'loading') return state.phase;
+  if (state.phase === 'intro') return 'intro';
+  if (state.phase === 'message' && state.message?.action === 'power') return 'power';
+  if (library.browserOpen() && browserOnPlayfield()) return 'browser';
+  if (attract.active) return 'attract';
+  if (state.phase === 'library') return 'library';
+  if (state.phase === 'confirmQuit') return 'confirmQuit';
+  if (state.phase === 'message') return 'message';
+  if (state.help) return 'help';
+  return 'menu';
+}
+
+/** La zone des notifications de l'écran du moment. */
+function currentZone(): NoticeZone {
+  return noticeZone(zoneScreen(), { quietInGame, banner: !!state.banner, stopNotice: !!stopNotice, closing });
+}
+
+/** Le navigateur intégré couvre l'écran du plateau (sinon le menu système reste visible dessous). */
+function browserOnPlayfield(): boolean {
+  const at = browserScreenRect()?.bounds;
+  const pf = menuAssignments.playfield?.bounds;
+  if (!at || !pf) return true;
+  return at.x < pf.x + pf.width && pf.x < at.x + at.width && at.y < pf.y + pf.height && pf.y < at.y + at.height;
+}
+
+/**
+ * La zone des notifications (fenêtre du plateau) : amis en ligne et notification, dans le coin du
+ * menu des tables ou sur la ligne de la roue dentée d'un écran plein (`zone`) ; par-dessus VPX
+ * ou le navigateur intégré, une ligne posée sur eux (game-notice.ts).
+ */
+function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: number; title: string; searching?: boolean }; notice?: NoticeView } {
+  const zone = currentZone();
+  // La file avance à chaque rendu : une notification ouverte part quand l'écran ne s'y prête plus.
   const corner = menuNotices.view();
-  gameNotices.line(state.phase === 'playing' && playing && corner.notice?.away ? corner.notice : undefined);
-  if (guest.active) return {};
-  if (state.phase === 'library') return corner.notice?.away ? { notice: corner.notice } : {};
-  if (state.phase !== 'menu') return {};
-  return corner;
+  const over = zone.place === 'over' && corner.notice ? corner.notice : undefined;
+  // Le navigateur : en bas de sa page, jamais sur sa barre (adresse, téléchargements) ; VPX : le coin haut du joueur.
+  const browser = zoneScreen() === 'browser' ? browserScreenRect()?.bounds : undefined;
+  gameNotices.line(over, browser ? { zone: browser, rotation: 0, corner: 'bottom-left' } : undefined);
+  if (zone.place !== 'corner' && zone.place !== 'head') return {};
+  return { zone: zone.place, ...corner };
 }
 
 /** Part d'une fenêtre dans le lancement en cinéma : le logo part du plateau, se pose sur le fronton (sa fenêtre ou sa zone). */

@@ -30,6 +30,14 @@
 #   Parcours « parties-enchainees » : trois parties à la suite avec Bruno, la même table deux fois
 #   puis une autre (essai du 04/11/2026 : la deuxième ne finissait pas de charger). Chacune doit
 #   partir (« tous prêts »), montrer « Partez ! » 4 s, et finir à l'historique ; jamais le garde-fou.
+#   Parcours « fins-invitation » : les notifications sur chaque écran et les fins d'invitation aux deux
+#   bornes (essai du 04/11/2026). La roue (le compteur, une notification), puis Menu système > Amis >
+#   « Partage et réseau » : Bruno lance une partie (la notification et le compteur, là aussi), puis
+#   invite : l'invitation s'ouvre par-dessus ; il annule : l'écran dit « Invitation annulée par Bruno »,
+#   « Retour » rend « Partage et réseau ». Puis Médias > « Médias, son et attente » > « Ordre des tables » :
+#   il réinvite, la borne refuse, Bruno le voit ; « Retour » rend l'ordre des tables. Enfin une partie
+#   (simulée) : Bruno invite (la carte et la ligne par-dessus la table), puis annule : la carte part, la
+#   ligne dit pourquoi. Bruno est une vraie borne de Cyber Pinball sur le réseau simulé (127.0.0.1).
 # Le garde-fou de mise en page (chevauchement, rognure, texte trop petit) et le guet hors écran
 # doivent rester muets.
 #   La bande de la partie entre amis, au parcours « partie » : les scores sur le DMD
@@ -38,7 +46,7 @@
 #   scores sur le DMD ; sur un écran (-Ecrans un-ecran), l'encart au bas du plateau. Jamais en haut du
 #   plateau, jamais rien d'invisible. Puis le réglage
 #   « Scores des amis pendant la partie ».
-#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu, partie-coupure, partie-sans-releve, parties-enchainees] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans, pincab, un-ecran]
+#   .\docs\demo-amis.ps1 [-Parcours amis, partie, en-jeu, partie-coupure, partie-sans-releve, parties-enchainees, fins-invitation] [-Langues fr, en] [-Ecrans borne, poste-deux-ecrans, pincab, un-ecran]
 # Captures dans tmp\demo-amis\<parcours>\<écrans>\<langue>\captures.
 #   .\docs\demo-amis.ps1 -Accueil [-Langues en, fr]
 # Images de la rubrique Amis de la page d'accueil (README) : les deux parcours, sur l'écran
@@ -99,6 +107,23 @@ $libelles = @{
 }
 
 function Get-Etapes([string]$Nom, $l) {
+  if ($Nom -eq 'fins-invitation') {
+    # Les libellés en français : l'autopilote cherche aussi leur traduction (library.ts, labelNames).
+    # Bruno attend chaque signal (copy: … reseau-simule\signal-N, app\src\social-demo.ts) : la borne est à l'écran voulu.
+    $signal = { param($n) "copy:$home_\cabinet.json|$home_\reseau-simule\signal-$n" }
+    return @(
+      'wait:2500', $Exit, 'wait:800', 'action:Partage et réseau', 'wait:800', (& $signal 1), 'wait:5000',
+      "until-action:$($l.Plus)", 'wait:1500', (& $signal 2),
+      "until-action:$($l.Retour)", 'wait:1200',
+      "action:$($l.Retour)", 'wait:1200',
+      $Exit, 'wait:600', 'action:Médias', 'wait:400', 'action:Médias', 'wait:400', 'action:Ordre des tables', 'wait:800', (& $signal 3),
+      'until-action:Refuser', 'wait:1500',
+      'action:Refuser', 'wait:3000',
+      'leave', 'wait:1500', 'Enter', 'wait:800', 'action:Jouer',
+      'until:playing', 'wait:4000', 'wait:6000', 'wait:4000',
+      'until:menu', 'wait:2000'
+    )
+  }
   if ($Nom -eq 'en-jeu') {
     # Le menu des tables, Start (la fiche, avec « Jouer avec un ami »), « Jouer » : la partie simulée
     # dure 24 s (CYBERPINBALL_PARTIE_MS). Bruno invite 1,5 s après l'avoir vue en partie : la carte,
@@ -187,7 +212,7 @@ function Get-Etapes([string]$Nom, $l) {
 
 try {
   foreach ($nom in $parcoursJoues) {
-    $partie = $nom -in 'partie', 'en-jeu', 'partie-coupure', 'partie-sans-releve', 'parties-enchainees'
+    $partie = $nom -in 'partie', 'en-jeu', 'partie-coupure', 'partie-sans-releve', 'parties-enchainees', 'fins-invitation'
     $root = New-Racine $nom -Vpx:$partie -Neuve:$Accueil
     foreach ($jeu in $ecransJoues) {
       Use-HorsEcran $jeu
@@ -209,7 +234,7 @@ try {
         if ($partie) { $env:CYBERPINBALL_PARTIE_SIMULEE = 'backglass' } else { Remove-Item Env:CYBERPINBALL_PARTIE_SIMULEE -ErrorAction SilentlyContinue }
         # Table sans relevé : la partie simulée n'écrit aucun état de jeu (frontend.ts, SIMULATED_MANUAL).
         if ($nom -eq 'partie-sans-releve') { $env:CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE = '1' } else { Remove-Item Env:CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE -ErrorAction SilentlyContinue }
-        if ($nom -eq 'en-jeu') { $env:CYBERPINBALL_PARTIE_MS = '24000' } else { Remove-Item Env:CYBERPINBALL_PARTIE_MS -ErrorAction SilentlyContinue }
+        if ($nom -in 'en-jeu', 'fins-invitation') { $env:CYBERPINBALL_PARTIE_MS = '24000' } else { Remove-Item Env:CYBERPINBALL_PARTIE_MS -ErrorAction SilentlyContinue }
         $env:CYBERPINBALL_AUTOPILOT = (Get-Etapes $nom $l) -join ','
         $env:CYBERPINBALL_CAPTURE = "$dossier\captures"
         if (Test-Path $env:CYBERPINBALL_CAPTURE) { Remove-Item -Recurse -Force $env:CYBERPINBALL_CAPTURE }
@@ -258,15 +283,17 @@ try {
           # Où va la bande, selon les écrans : jamais sur le plateau quand le DMD ou un écran libre la porte.
           $bande = @{
             # Le fronton, même pris par la table (B2S simulé) : la bande y passe devant (essai du 04/11/2026).
-            'borne' = @{ Place = 'backglass \(cards.*pourquoi : automatique : fronton \(pris par la table'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
-            'poste-deux-ecrans' = @{ Place = 'backglass \(cards.*scores sur le DMD'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
+            # Le bilan de la partie dit les passages sur le DMD (essai du 04/11/2026 : aucun de toute la partie, et rien au journal).
+            'borne' = @{ Place = 'backglass \(cards.*pourquoi : automatique : fronton \(pris par la table'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd'); Dmd = 'Scores sur le DMD : \d+ passages? en \d+ s de partie' }
+            'poste-deux-ecrans' = @{ Place = 'backglass \(cards.*scores sur le DMD'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd'); Dmd = 'Scores sur le DMD : \d+ passages? en \d+ s de partie' }
             # Le PinCab : fronton pris par le B2S, FullDMD lu, pas de topper (essais des 02 et 04/11/2026).
-            'pincab' = @{ Place = 'backglass \(cards.*scores sur le DMD.*pourquoi : automatique : fronton \(pris par la table, la bande passe devant\)'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd') }
-            'un-ecran' = @{ Place = 'playfield \(insert'; Captures = @('bande-partie-entre-amis') }
+            'pincab' = @{ Place = 'backglass \(cards.*scores sur le DMD.*pourquoi : automatique : fronton \(pris par la table, la bande passe devant\)'; Captures = @('bande-partie-entre-amis', 'bande-partie-entre-amis-dmd'); Dmd = 'Scores sur le DMD : \d+ passages? en \d+ s de partie' }
+            'un-ecran' = @{ Place = 'playfield \(insert'; Captures = @('bande-partie-entre-amis'); Dmd = "Scores sur le DMD : aucun passage en \d+ s de partie ; pourquoi : pas d$([char]0x2019)écran du DMD sur la borne" }
           }[$jeu]
           if ($bande) {
             if (-not ($log -match "Bande de la partie entre amis, place : $($bande.Place)")) { $failures += "$id : la bande n'est pas à sa place ($($bande.Place))" }
             foreach ($c in $bande.Captures) { if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\$c.png")) { $failures += "$id : pas de capture $c" } }
+            if (-not ($log -match $bande.Dmd)) { $failures += "$id : pas de bilan des scores sur le DMD ($($bande.Dmd))" }
           }
           if ($log -match 'Bande de la partie entre amis( \(DMD\))? : (?!mise en page conforme)') { $failures += "$id : mise en page de la bande de la partie" }
         }
@@ -296,6 +323,19 @@ try {
           }
           foreach ($c in 'depart-attente-commun', 'depart-partez-commun') { if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\$c.png")) { $failures += "$id : pas de capture $c" } }
           if ($log -match 'Départ commun \((attente|partez)\) : (?!mise en page conforme)') { $failures += "$id : mise en page de l'attente du départ commun" }
+        }
+        if ($nom -eq 'fins-invitation') {
+          # Chaque fin, aux deux bornes : l'annulation reçue ici, son accusé chez Bruno ; le refus vu chez Bruno ;
+          # l'annulation pendant la partie : la carte part, la ligne le dit par-dessus la table.
+          if (-not ($log -match "^Partie en direct : invitation de Bruno .* terminée : cancelled")) { $failures += "$id : l'annulation de Bruno n'est pas arrivée" }
+          if (@($log | Select-String -Pattern "^Bruno : Partie en direct : fin de l'invitation reçue par").Count -lt 2) { $failures += "$id : Bruno n'a pas eu l'accusé de ses deux annulations" }
+          if (-not ($log -match "^Réseau simulé : Bruno voit la réponse de la borne \(declined\)")) { $failures += "$id : Bruno n'a pas vu le refus" }
+          if (-not ($log -match "^Notification pendant la partie : « ")) { $failures += "$id : aucune notification par-dessus la partie" }
+          if (-not ($log -match "^Notifications : live-invite-ended Bruno")) { $failures += "$id : la fin de l'invitation pendant la partie n'a pas été annoncée" }
+          if (-not ($log -match "^Notifications : affichée « .*Bruno.* » \(")) { $failures += "$id : aucune notification affichée dans les sous-écrans du menu système" }
+          if (-not (Test-Path "$env:CYBERPINBALL_CAPTURE\invitation-en-partie-full.png")) { $failures += "$id : pas de capture de l'invitation pendant la partie" }
+          if (-not (Get-ChildItem "$env:CYBERPINBALL_CAPTURE" -Filter 'notification-en-partie-*.png' -ErrorAction SilentlyContinue)) { $failures += "$id : pas de capture de la ligne par-dessus la partie" }
+          if ($log -match 'Scénario des fins d.invitation interrompu') { $failures += "$id : le scénario de Bruno s'est interrompu" }
         }
         if ($nom -eq 'en-jeu') {
           foreach ($etat in 'full', 'compact') {

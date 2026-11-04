@@ -135,6 +135,7 @@ async function scenario(sc, box, report, log) {
       manualOf: async () => undefined,
       waitView: () => undefined,
       invites: () => [],
+      inviteEnd: () => undefined,
       create: async () => {
         throw new Error('pas de partie dans cette démonstration');
       },

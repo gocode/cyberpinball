@@ -1,0 +1,101 @@
+<!doctype html>
+<!--
+  Habillage de la chaîne YouTube de Cyber Pinball, rendu par docs/demo-youtube.cjs (hors écran) :
+    ?vue=banniere  2560 × 1440 : la marque et la bille dans la zone visible partout (1546 × 423 au
+                   centre, téléphone) ; le reste de l'illustration pour l'ordinateur et la télévision.
+    ?vue=profil    800 × 800 : la bille et sa traînée, sans texte, lisible en rond à 98 px.
+    &guides=1      les zones d'affichage de YouTube par-dessus, pour contrôle.
+  Couleurs, polices et marque du design system (app/renderer/fallback.css, « Marque »).
+-->
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Chaîne YouTube</title>
+<style>
+  @font-face {
+    font-family: 'CP Saira';
+    src: url('../app/renderer/polices/saira/Saira-wdth-wght.ttf') format('truetype');
+    font-weight: 100 900;
+    font-stretch: 50% 125%;
+    font-display: block;
+  }
+  :root {
+    --void: #030807;
+    --ink: #e6f0ec;
+    --muted: #9bada7;
+    --signal: #8be23a;
+    --primary: #36c9b4;
+    --art: url('../app/renderer/fronton-marque.webp');
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: var(--void); }
+  body { position: relative; font-family: 'CP Saira', 'Segoe UI', sans-serif; }
+
+  /* L'illustration est un 16:9 calé à droite : la bille est à 830/1080 de hauteur du bord droit,
+     à 460/1080 du haut, d'un diamètre d'environ 300/1080. */
+  .art { position: absolute; background: var(--art) right top / auto 100% no-repeat; }
+
+  /* ---------- Bannière ---------- */
+  .banniere .art { height: 1100px; top: 252px; right: -60px; width: 2400px; }
+  /* Fondus : vers le noir à gauche (sous la marque), en haut et en bas (télévision). */
+  .banniere .fondu {
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, var(--void) 0, var(--void) 252px, rgb(3 8 7 / 0) 470px, rgb(3 8 7 / 0) 1060px, var(--void) 1352px),
+      linear-gradient(90deg, var(--void) 0, var(--void) 560px, rgb(3 8 7 / 0.93) 1060px, rgb(3 8 7 / 0.55) 1380px, rgb(3 8 7 / 0) 1620px);
+  }
+  .marque {
+    position: absolute; left: 600px; top: 528px;
+    font-size: 100px;
+  }
+  .marque span {
+    display: block; width: max-content; white-space: nowrap;
+    font-weight: 300; font-stretch: 125%; text-transform: uppercase;
+    line-height: 1.35; letter-spacing: 0.5em; margin-right: -0.5em; color: var(--ink);
+  }
+  .marque .pin { color: var(--signal); }
+  .accroche {
+    position: absolute; left: 604px; top: 824px;
+    font-size: 36px; font-weight: 400; font-stretch: 100%; letter-spacing: 0.04em; color: var(--muted);
+  }
+  .accroche b { font-weight: 500; color: var(--ink); }
+
+  /* ---------- Photo de profil ---------- */
+  .profil .art { height: 1584px; top: -246px; right: -790px; width: 3000px; }
+  .profil .fondu {
+    position: absolute; inset: 0;
+    background: radial-gradient(circle at 46% 54%, rgb(3 8 7 / 0) 0 46%, rgb(3 8 7 / 0.55) 64%, var(--void) 76%);
+  }
+
+  /* ---------- Repères ---------- */
+  .guide { position: absolute; border: 4px dashed; pointer-events: none; }
+  .guide i { position: absolute; left: 12px; top: 6px; font: 600 28px 'Segoe UI', sans-serif; font-style: normal; }
+  .g-tv { inset: 0; border-color: #ff6b6b; }
+  .g-bureau { left: 0; right: 0; top: 508px; height: 423px; border-color: #f2b33d; }
+  .g-mobile { left: 507px; width: 1546px; top: 508px; height: 423px; border-color: #8be23a; }
+  .g-rond { left: 0; top: 0; width: 800px; height: 800px; border-radius: 50%; border-color: #8be23a; }
+</style>
+</head>
+<body>
+<script>
+  const q = new URLSearchParams(location.search);
+  const vue = q.get('vue') === 'profil' ? 'profil' : 'banniere';
+  document.body.className = vue;
+  const add = (html) => document.body.insertAdjacentHTML('beforeend', html);
+  add('<div class="art"></div><div class="fondu"></div>');
+  if (vue === 'banniere') {
+    add('<div class="marque"><span>Cyber</span><span class="pin">Pinball</span></div>');
+    add('<p class="accroche">Votre borne de flipper virtuel <b>se règle toute seule.</b></p>');
+  }
+  if (q.get('guides') === '1') {
+    if (vue === 'banniere') {
+      add('<div class="guide g-tv"><i style="color:#ff6b6b">Télévision</i></div>');
+      add('<div class="guide g-bureau"><i style="color:#f2b33d">Ordinateur</i></div>');
+      add('<div class="guide g-mobile"><i style="color:#8be23a;top:auto;bottom:6px">Téléphone et tous écrans</i></div>');
+    } else {
+      add('<div class="guide g-rond"></div>');
+    }
+  }
+</script>
+</body>
+</html>

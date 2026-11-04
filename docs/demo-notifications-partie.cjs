@@ -136,7 +136,21 @@ function menuState(notice) {
     friendsOnline: { count: 3, title: core.t('{n} amis en ligne : {names}', { n: 3, names: 'Bruno, Léa et David' }) },
     downloads: { label: '1 · 45 %', value: 0.45, tone: 'info', icon: 'download', title: '1' },
     notice,
+    zone: 'corner',
   };
+}
+
+/** Le compteur des amis, sur tout écran de Cyber Pinball (noticezone.ts). */
+const COUNT = () => ({ count: 3, title: core.t('{n} amis en ligne : {names}', { n: 3, names: 'Bruno, Léa et David' }) });
+
+/** Un écran plein de Cyber Pinball (aide, message), sa zone sur la ligne de la roue dentée. */
+function overState(extra) {
+  return (notice) => ({ ...menuState(notice), downloads: undefined, friendsOnline: COUNT(), zone: 'head', ...extra });
+}
+
+/** Un sous-écran profond du menu système (noticezone.ts : le compteur et toutes les notifications). */
+function deepState(library) {
+  return (notice) => ({ ...libraryState(notice), library: { ...libraryState(notice).library, ...library } });
 }
 
 /** « Mes amis », tel que friends-menu.ts le décrit : l'entrée de la partie en tête, puis les amis. */
@@ -155,6 +169,8 @@ function libraryState(notice) {
     menuKeys: [],
     nav: {},
     notice,
+    friendsOnline: COUNT(),
+    zone: 'head',
     library: {
       screen: 'custom',
       heading: T('Mes amis'),
@@ -184,15 +200,39 @@ async function renderMenus(views, report) {
     win.setBounds({ x: 0, y: 0, width: w, height: h });
     await win.loadFile(path.join(REPO, 'app', 'renderer', 'frontend.html'), { query: { role: 'playfield', rotation, zones: '[]' } });
     await delay(400);
-    for (const [where, state] of [['menu', menuState], ['menu-systeme', libraryState]]) {
+    const T = core.t;
+    const screens = [
+      ['menu', menuState],
+      ['menu-systeme', libraryState],
+      // Deux sous-écrans profonds (essai réel du 04/11/2026 : « dans les autres écrans, rien ») : Amis > Partage et réseau, Médias > Médias, son et attente > Ordre des tables.
+      ['partage-et-reseau', deepState({ heading: T('Partage et réseau'), icon: 'friends', subheading: '', sections: [{ title: T('Partage et réseau'), rows: [{ text: T('Limiter le débit des téléchargements…'), detail: T('Sans limite'), icon: 'download' }] }], actions: [{ label: T('Limiter le débit des téléchargements…'), icon: 'download' }, { label: T('Retour'), icon: 'back' }] })],
+      // Comme menu-settings.ts (openTableOrder) : chaque ordre, sans icône, le choix actuel en vert.
+      ['ordre-des-tables', deepState({ heading: T('Ordre des tables'), icon: 'sort', subheading: '', lead: T('Comment les médaillons se suivent dans la roue, et les titres dans la liste. La table choisie reste la même quand l’ordre change.'), sections: [], actions: [...core.TABLE_ORDERS.map((o, i) => ({ label: core.TABLE_ORDER_LABELS[o].charAt(0).toLocaleUpperCase() + core.TABLE_ORDER_LABELS[o].slice(1), ...(i === 0 ? { tone: 'ok' } : {}) })), { label: T('Retour') }] })],
+      ['aide', overState({ help: true })],
+      ['message', overState({ phase: 'message', table: undefined, message: { title: T('Installation de VPX'), lines: [T('Start ou Exit : revenir au menu.')] } })],
+    ];
+    for (const [where, state] of screens) {
       for (const [name, view] of Object.entries(views)) {
         const id = `${where}-${name}-${suffix}`;
         win.webContents.send('state', structuredClone(state(view)));
         await delay(700);
         fs.writeFileSync(path.join(spec.out, `${id}.png`), (await win.webContents.capturePage()).toPNG());
         const shown = await win.webContents.executeJavaScript(`(() => { const t = document.querySelector('.notice-toast'); return t ? t.innerText.replace(/\\s+/g, ' ').trim() : null; })()`);
-        const problems = await checkLayout(win.webContents);
+        const count = await win.webContents.executeJavaScript(`!!document.querySelector('.friends-pill')`);
+        let problems = await checkLayout(win.webContents);
+        // Ce que l'écran a déjà sans la zone (le même état, sans compteur ni notification) n'est pas de la zone : dit à part.
+        if (problems.length) {
+          win.webContents.send('state', structuredClone({ ...state(view), zone: undefined, notice: undefined, friendsOnline: undefined }));
+          await delay(500);
+          const before = new Set(await checkLayout(win.webContents));
+          const own = problems.filter((p) => !before.has(p));
+          if (own.length < problems.length) report.push(`${id} sans la zone : déjà ${problems.length - own.length} problème(s) de l’écran lui-même, hors de ce banc`);
+          problems = own;
+          win.webContents.send('state', structuredClone(state(view)));
+          await delay(500);
+        }
         if (!shown) problems.push('notification absente');
+        if (!count) problems.push('compteur des amis absent');
         else if (!shown.startsWith(view.title.slice(0, 12))) problems.push(`autre notification à l’écran : « ${shown} »`);
         report.push(`${id} : ${problems.length ? problems.join(' ; ') : 'conforme'}${shown ? ` (« ${shown} »)` : ''}`);
       }
@@ -325,7 +365,7 @@ app.whenReady().then(async () => {
   await renderMenus(views, report);
   await renderInGame(views, report);
   fs.writeFileSync(path.join(spec.out, 'mise-en-page.txt'), report.join('\n') + '\n');
-  const bad = report.filter((l) => !l.startsWith('texte ') && !/: conforme( \(|$)/.test(l));
+  const bad = report.filter((l) => !l.startsWith('texte ') && !l.includes(' sans la zone : ') && !/: conforme( \(|$)/.test(l));
   console.log(`Notifications de la partie entre amis : ${report.length} relevés, ${bad.length} problème(s).`);
   for (const l of bad) console.log(`  ${l}`);
   app.exit(bad.length ? 1 : 0);

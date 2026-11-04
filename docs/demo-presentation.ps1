@@ -112,4 +112,7 @@ foreach ($pair in @(@('en', 'README.md'), @('fr', 'README.fr.md'))) {
     })
   [IO.File]::WriteAllText($readme, $text, [Text.UTF8Encoding]::new($false))
 }
+# Habillage de la chaîne YouTube (bannière, photo de profil), sur la même illustration.
+& "$PSScriptRoot\demo-youtube.ps1"
+if (-not $?) { throw 'Habillage YouTube en échec.' }
 "Images de présentation dans $kit ; fronton de la page du projet dans docs\images\<langue>\brand-backglass.webp."

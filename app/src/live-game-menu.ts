@@ -14,6 +14,7 @@ import {
   friendsListLine,
   language,
   LIVE_INVITE_MS,
+  LIVE_ANSWER_SHOW_MS,
   LIVE_MAX_PLAYERS,
   liveMatchLabel,
   livePlayerStateLabel,
@@ -126,6 +127,27 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   /** La liste des amis se fait encore (friendpresence.ts) : un ami absent n'est pas sûr. */
   const searching = () => ['searching', 'updating'].includes(host.net.listSync());
   const playingNow = (key: string) => host.net.online(key) && host.net.presenceOf(key)?.status === 'playing';
+
+  /**
+   * Celui qui invite : chaque réponse (ou fin sans réponse) des dernières secondes, en tête du salon
+   * (essai réel du 04/11/2026 : « on n'a pas l'impression d'en être informé, on peut attendre
+   * longtemps ») ; un refus dit que sa place est libérée.
+   */
+  function answerRows(game: LiveGame): Row[] {
+    const recent = game.players.filter((p) => !p.host && p.answeredAt && now().getTime() - Date.parse(p.answeredAt) < LIVE_ANSWER_SHOW_MS);
+    return recent.map((p): Row => {
+      const name = label(p.key, p.name);
+      if (p.state === 'accepted') return { text: t('{name} a accepté votre invitation', { name }), detail: t('Lancez la partie quand vous voulez'), tone: 'ok', icon: 'check' };
+      const freed = t('Sa place est libérée : invitez un autre ami, ou changez de table');
+      const text =
+        p.state === 'busy' ? t('{name} est occupé pour l’instant', { name })
+        : p.state === 'expired' ? (p.offline ? t('{name} est passé hors ligne : invitation retirée', { name }) : t('Pas de réponse de {name} en deux minutes', { name }))
+        : p.match === 'missing' ? t('{name} n’a pas cette table', { name })
+        : p.match === 'other-version' ? t('{name} n’a pas la même version', { name })
+        : t('{name} a refusé votre invitation', { name });
+      return { text, detail: freed, tone: 'warning', icon: 'alert' };
+    });
+  }
 
   function playerRows(game: LiveGame): Row[] {
     return game.players.map((p) => {
@@ -401,7 +423,8 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       // Déjà un salon sur cette table : les amis y sont ajoutés ; sinon un nouveau salon.
       if (!current || current.host !== myKey() || current.phase !== 'gathering' || games.table()?.file !== table.file) {
         if (current?.phase === 'finished' || current?.phase === 'cancelled') games.close();
-        else if (current?.host === myKey()) games.leave();
+        // Changer de table : les mêmes invités reçoivent aussitôt la nouvelle invitation (« changée de table », pas « annulée »).
+        else if (current?.host === myKey()) games.leave({ replacedFor: keys });
         await games.create(table);
       }
       const sent = keys.filter((key) => games.invite(key, nameOf(key)));
@@ -471,6 +494,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       lead: hosting ? t('Lancez quand vos amis sont prêts : un compte à rebours commun, puis la table se lance sur chaque borne.') : t('En attente du départ donné par {name}.', { name: hostPlayer?.name ?? '?' }),
       sections: [
         ...takeFlash(),
+        ...(hosting && answerRows(game).length ? [{ rows: answerRows(game) }] : []),
         { rows: [tableRow(game), ...manualRows(game.table.manual), ...(myself?.host ? [] : ballsRow(myself?.balls, game.table.balls)), boardRow()] },
         { title: t('Joueurs ({n} sur {max})', { n: seats, max: LIVE_MAX_PLAYERS }), rows: playerRows(game) },
       ],
@@ -643,11 +667,41 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     );
   }
 
+  /**
+   * L'invitation a pris fin pendant que son écran était ouvert : il le dit, avec qui et pourquoi, et
+   * un retour (essai réel du 04/11/2026 : l'invité restait sur « Accepter / Refuser » sans savoir
+   * qu'elle était annulée) ; changée de table, la nouvelle invitation est à un bouton.
+   */
+  function buildInviteEnded(id: string, back: () => void): Built {
+    const end = games.inviteEnd(id);
+    const name = end?.name ?? '?';
+    const said: Record<string, { text: string; detail?: string }> = {
+      cancelled: { text: t('Invitation annulée par {name}', { name }) },
+      started: { text: t('{name} a lancé la partie sans vous', { name }), detail: t('Votre réponse n’est pas arrivée avant le départ') },
+      replaced: { text: t('{name} a changé de table', { name }), detail: t('Une nouvelle invitation vous attend') },
+      expired: { text: t('Invitation expirée'), detail: t('Pas de réponse en deux minutes') },
+      offline: { text: t('Invitation retirée par {name}', { name }), detail: t('Votre borne semblait hors ligne de son côté') },
+      'host-offline': { text: t('{name} est passé hors ligne', { name }), detail: t('Son invitation est retirée') },
+    };
+    const r = end && end.why !== 'answered' ? said[end.why]! : { text: t('Cette invitation n’est plus valable'), detail: t('Annulée, expirée (deux minutes), ou déjà répondue') };
+    const next = end?.next && games.invites().some((i) => i.id === end.next) ? end.next : undefined;
+    const actions: Action[] = [
+      ...(next ? [{ label: t('Voir la nouvelle invitation'), icon: 'gamepad' as const, tone: 'ok' as const, run: () => openInvite(next, back) }] : []),
+      { label: t('Retour'), icon: 'back', run: back },
+    ];
+    return {
+      heading: end ? t('Invitation de {name}', { name }) : t('Invitation à une partie en direct'),
+      icon: 'gamepad',
+      ...(end?.title ? { subheading: end.title } : {}),
+      sections: [...takeFlash(), { rows: [{ text: r.text, ...(r.detail ? { detail: r.detail } : {}), tone: 'warning', icon: 'close' }] }],
+      actions,
+      back,
+    };
+  }
+
   function buildInvite(id: string, back: () => void): Built {
     const invite = games.invites().find((i) => i.id === id);
-    if (!invite) {
-      return { heading: t('Invitation à une partie en direct'), icon: 'gamepad', sections: [...takeFlash(), { rows: [{ text: t('Cette invitation n’est plus valable'), detail: t('Annulée, expirée (deux minutes), ou déjà répondue'), tone: 'info' }] }], actions: [{ label: t('Retour'), icon: 'back', run: back }], back };
-    }
+    if (!invite) return buildInviteEnded(id, back);
     const found = matches.get(id);
     const match = found?.match;
     const rows: Row[] = [
@@ -673,6 +727,8 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
         tone: 'ok',
         run: async () => {
           const r = await games.accept(id);
+          // Annulée pendant la vérification : l'écran dit déjà pourquoi (buildInviteEnded).
+          if (r.gone) return;
           gameBack = back;
           if (r.match !== 'same') {
             flash = { text: liveMatchLabel(r.match), tone: 'warning' };

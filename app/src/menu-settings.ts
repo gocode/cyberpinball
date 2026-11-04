@@ -263,7 +263,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         label: v.notices === 'all' ? t('Notifications du menu : affichées') : v.notices === 'count' ? t('Notifications du menu : compteur seul') : t('Notifications du menu : coupées'),
         detail:
           v.notices === 'all'
-            ? t('Nombre d’amis en ligne, et un message discret quand un ami se connecte, une demande arrive, un téléchargement finit ; pendant une partie, seulement les nouvelles d’une partie entre amis (Start : compteur seul)')
+            ? t('Nombre d’amis en ligne et un message discret, sur chaque écran, quand un ami se connecte, une demande arrive, un téléchargement finit ; pendant une partie, seulement une invitation, un ami qui se connecte et la partie entre amis (Start : compteur seul)')
             : v.notices === 'count'
               ? t('Le nombre d’amis en ligne ; seulement les nouvelles d’une partie entre amis (Start : rien)')
               : t('Ni compteur ni message, sauf les nouvelles d’une partie entre amis ; la pastille des téléchargements reste (Start : tout afficher)'),

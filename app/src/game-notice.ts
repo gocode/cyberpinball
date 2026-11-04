@@ -25,6 +25,7 @@ import {
   GAME_NOTICE_SIZE,
   LIVE_GO_SHOW_MS,
   LiveBoardFlash,
+  LiveDmdTally,
   gameNoticeBounds,
   gameNoticeView,
   liveBoardDots,
@@ -38,6 +39,7 @@ import {
   type LiveInvite,
   type NoticeView,
   type LiveWaitView,
+  type DmdScoreVerdict,
   type Rect,
   type Rotation,
 } from '@cyberpinball/core';
@@ -52,8 +54,10 @@ export interface GameNoticesOptions {
   boardScreens(): LiveBoardScreens | undefined;
   /** Où le joueur veut voir les scores des amis (Menu système > Amis). */
   scoresSettings?(): LiveScoresSettings;
-  /** Le DMD montre son écran de score, maintenant (dmd-watch.ts) : sans réponse, jamais de scores sur le DMD. */
-  dmdScoreScreen?(): boolean;
+  /** Ce que la règle voit du DMD, maintenant (dmd-watch.ts) : sans réponse, jamais de scores sur le DMD. */
+  dmdVerdict?(): DmdScoreVerdict | undefined;
+  /** Le DMD ne se lit pas : pourquoi, pour le journal (dmd-watch.ts). */
+  dmdUnreadable?(): string | undefined;
   /**
    * La fenêtre étrangère (VPX, PuP, B2S, FlexDMD, DMD externe…) qui passe devant cette fenêtre de la
    * bande et la recouvre en partie, décrite pour le journal ; undefined : rien devant.
@@ -73,8 +77,11 @@ export interface GameNotices {
   show(invite: LiveInvite): void;
   /** Partie entre amis : la bande de la partie, à jour (undefined : plus de bande). */
   board(view: LiveBoardView | undefined): void;
-  /** Une nouvelle de la partie entre amis, d'une ligne (undefined : plus rien). */
-  line(view: NoticeView | undefined): void;
+  /**
+   * Une notification d'une ligne par-dessus VPX (undefined : plus rien) ; `where` : ailleurs que le
+   * coin haut du plateau (le bas du navigateur intégré).
+   */
+  line(view: NoticeView | undefined, where?: LinePlace): void;
   /**
    * Partie entre amis : l'attente du départ commun, à jour (undefined : plus d'attente). « Partez ! »
    * reste à l'écran LIVE_GO_SHOW_MS à compter de son apparition réelle, même si la vue s'arrête avant.
@@ -87,6 +94,13 @@ export interface GameNotices {
   prepareWait(view: LiveWaitView | undefined): void;
   /** Fin de la partie : plus rien par-dessus VPX. */
   close(): void;
+}
+
+/** Où poser la ligne quand ce n'est pas le coin haut du plateau : une zone, son sens, son coin. */
+export interface LinePlace {
+  zone: Rect;
+  rotation: Rotation;
+  corner: 'top-left' | 'bottom-left';
 }
 
 /** Relecture de l'invitation montrée (temps restant, annulation). */
@@ -175,6 +189,8 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   let band: Overlay | undefined;
   let dmd: Overlay | undefined;
   let flash: LiveBoardFlash | undefined;
+  /** Le bilan des scores sur le DMD de cette partie : au journal à la fin, ou après LIVE_DMD_OVERDUE_MS sans passage. */
+  let tally: LiveDmdTally | undefined;
   let boardTicker: NodeJS.Timeout | undefined;
   /** Dernière place annoncée au journal. */
   let placed = '';
@@ -183,6 +199,7 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   /** La nouvelle de la partie entre amis : sa fenêtre et ce qu'elle montre. */
   let line: Overlay | undefined;
   let lineView: NoticeView | undefined;
+  let lineWhere: LinePlace | undefined;
   /** L'attente du départ commun : sa vue, sa carte sur le plateau. */
   let waitView: LiveWaitView | undefined;
   let waitCard: Overlay | undefined;
@@ -347,8 +364,15 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
       keepInFront(band, 'bande');
     }
     // Les points sur le DMD : une fenêtre le temps d'un passage, fermée dès que le DMD montre autre chose.
-    if (placement.dmd) flash ??= new LiveBoardFlash(Date.now());
-    const onDmd = placement.dmd && flash?.visible(boardView, Date.now(), opts.dmdScoreScreen?.() ?? false) ? placement.dmd : undefined;
+    const now = Date.now();
+    if (placement.dmd) flash ??= new LiveBoardFlash(now);
+    const verdict = screens?.dmdReadable ? opts.dmdVerdict?.() : undefined;
+    const onDmd = placement.dmd && flash?.visible(boardView, now, verdict?.scoreScreen ?? false) ? placement.dmd : undefined;
+    // Garde-fou : réglage activé et DMD présent, au moins un passage, ou le journal dit pourquoi.
+    tally ??= new LiveDmdTally(now);
+    const unreadable = screens?.dmdReadable ? undefined : opts.dmdUnreadable?.();
+    const overdue = tally.tick(now, { wanted: settings.dmd, screen: Boolean(screens?.dmd), readable: Boolean(screens?.dmdReadable), ...(unreadable ? { unreadable } : {}), ...(verdict ? { verdict } : {}), shown: Boolean(onDmd) });
+    if (overdue) opts.log?.(overdue);
     dmd = layer(dmd, onDmd, JSON.stringify(onDmd));
     if (alive(dmd)) {
       send(dmd, { view: { mode: 'board', layout: 'dmd', dots: Array.from(liveBoardDots(boardView)), color: opts.dmdColor() }, rotation: 0 }, 'partie-dmd');
@@ -360,7 +384,7 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   function showLine(): void {
     if (!lineView) return;
     const below = alive(notice) ? GAME_NOTICE_SIZE.full.height + GAME_NOTICE_LINE.gap : 0;
-    const at = boundsFor(GAME_NOTICE_LINE, below);
+    const at = lineWhere ? placedAt(lineWhere) : boundsFor(GAME_NOTICE_LINE, below);
     if (!at) {
       opts.log?.('Partie entre amis, notification pendant la partie : pas d’écran du plateau retrouvé, rien n’est montré.'); // i18n-ignore : journal
       return;
@@ -373,10 +397,20 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     send(line, { view: { ...lineView, mode: 'line' }, rotation }, `nouvelle-${lineView.id}`);
     // Une fenêtre de VPX, de PuP ou du DMD passée devant : la notification repasse devant, sans prendre le focus.
     keepInFront(line, 'ligne');
+    // Le navigateur intégré se remet devant les fenêtres de Cyber Pinball (acquire-window.ts, keepInFront) : la ligne repasse au-dessus.
+    if (lineWhere) raise(line);
+  }
+
+  /** La ligne à une place donnée (le navigateur intégré), à l'échelle de sa zone. */
+  function placedAt(where: LinePlace): { place: { zone: Rect; rotation: Rotation }; bounds: Rect } {
+    const unit = Math.min(where.zone.width, where.zone.height) / 1080;
+    const size = { width: Math.round(GAME_NOTICE_LINE.width * unit), height: Math.round(GAME_NOTICE_LINE.height * unit) };
+    return { place: where, bounds: gameNoticeBounds(where.zone, where.rotation, size, Math.round(GAME_NOTICE_SIZE.margin * unit), where.corner) };
   }
 
   function closeLine(): void {
     lineView = undefined;
+    lineWhere = undefined;
     dispose(line);
     line = undefined;
   }
@@ -475,7 +509,9 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
   }
 
   function close(): void {
-    // Fin de partie : la bande ne revient pas après la carte de l’attente.
+    // Fin de partie : la bande ne revient pas après la carte de l’attente ; le bilan des scores sur le DMD au journal.
+    if (tally) opts.log?.(tally.summary(Date.now()));
+    tally = undefined;
     boardView = undefined;
     closeLine();
     closeNotice();
@@ -539,11 +575,12 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
         boardTicker.unref?.();
       }
     },
-    line(view) {
+    line(view, where) {
       if (!view) return closeLine();
-      if (JSON.stringify(view) === JSON.stringify(lineView) && alive(line)) return;
-      if (!lineView || view.id !== lineView.id) opts.log?.(`Partie entre amis, notification pendant la partie : « ${view.title} »${view.detail ? ` (${view.detail})` : ''}.`); // i18n-ignore : journal
+      if (JSON.stringify(view) === JSON.stringify(lineView) && JSON.stringify(where) === JSON.stringify(lineWhere) && alive(line)) return;
+      if (!lineView || view.id !== lineView.id) opts.log?.(`Notification ${where ? 'par-dessus le navigateur intégré' : 'pendant la partie'} : « ${view.title} »${view.detail ? ` (${view.detail})` : ''}.`); // i18n-ignore : journal
       lineView = view;
+      lineWhere = where;
       showLine();
     },
     close,

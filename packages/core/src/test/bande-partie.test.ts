@@ -16,7 +16,9 @@ import {
   LIVE_CARDS_SIZE,
   LIVE_FLASH,
   LIVE_SCORES_PLACES,
+  LIVE_DMD_OVERDUE_MS,
   LiveBoardFlash,
+  LiveDmdTally,
   gameNoticeBounds,
   liveBoardDots,
   liveBoardPlacement,
@@ -246,7 +248,7 @@ test('DMD : les scores seulement sur l’écran de score, jamais au hasard', () 
   // Pas d'écran de score (lancement, animation) : rien, quel que soit le temps passé.
   assert.equal(at(0), false);
   assert.equal(at(60_000), false, 'jamais sans l’écran de score');
-  // Le premier repos de la partie, vu depuis 1,5 s : la liste des joueurs.
+  // Le premier repos de la partie, vu depuis settleMs : la liste des joueurs.
   scoreScreen = true;
   assert.equal(at(60_000), false, 'écran de score à peine vu');
   const first = 60_000 + LIVE_FLASH.settleMs;
@@ -259,13 +261,14 @@ test('DMD : les scores seulement sur l’écran de score, jamais au hasard', () 
   assert.equal(at(first + 3500), false, 'le passage est fini, rien de nouveau');
   // Ma bille change : de retour au prochain écran de score, jamais moins de 15 s après la dernière fois.
   v = { ...v, rows: v.rows.map((r) => (r.me ? { ...r, ball: 3, short: 'B3' } : r)) };
-  assert.equal(at(first + 4000), false, 'écran de score revu, pas encore 1,5 s');
-  assert.equal(at(first + 10_000), false, 'trop tôt');
+  assert.equal(at(first + 4000), false, 'écran de score revu, trop tôt');
+  assert.equal(at(first + LIVE_FLASH.gapMs - 1), false, 'trop tôt');
   assert.equal(at(first + LIVE_FLASH.gapMs), true, 'ma bille a changé');
   const shownAt = first + LIVE_FLASH.gapMs;
   assert.equal(at(shownAt + LIVE_FLASH.showMs - 1), true);
   assert.equal(at(shownAt + LIVE_FLASH.showMs), false, `${LIVE_FLASH.showMs / 1000} s au plus`);
-  // Rien ne change : au plus tard toutes les 45 s, pourvu que le DMD montre l'écran de score.
+  // Rien ne change : toutes les 12 s, pourvu que le DMD montre l'écran de score (« toutes les 10 à 15 s », essai du 04/11/2026).
+  assert.ok(LIVE_FLASH.everyMs >= 10_000 && LIVE_FLASH.everyMs <= 15_000 && LIVE_FLASH.gapMs >= 10_000 && LIVE_FLASH.showMs < LIVE_FLASH.gapMs);
   assert.equal(at(shownAt + LIVE_FLASH.everyMs - 1), false);
   assert.equal(at(shownAt + LIVE_FLASH.everyMs), true);
   // Un autre prend la tête : de retour dès que l'écart le permet.
@@ -273,6 +276,59 @@ test('DMD : les scores seulement sur l’écran de score, jamais au hasard', () 
   v = { ...v, rows: v.rows.map((r) => ({ ...r, lead: r.me })) };
   assert.equal(at(next + LIVE_FLASH.showMs + 1), false);
   assert.equal(at(next + LIVE_FLASH.gapMs), true, 'nouveau joueur en tête');
+});
+
+// Essai du 04/11/2026 sur le PinCab : « Scores sur le DMD » activé, rien de toute la partie, et rien au
+// journal pour dire pourquoi. Invariant : réglage activé et DMD présent, au moins un passage au bout de
+// LIVE_DMD_OVERDUE_MS de partie, sinon une ligne du journal qui dit pourquoi ; à la fin, toujours un bilan.
+test('garde-fou des scores sur le DMD : un passage, ou la raison au journal', () => {
+  const verdicts: Record<string, (t: number) => { scoreScreen: boolean; why: string }> = {
+    'écran de score': () => ({ scoreScreen: true, why: 'écran de score' }),
+    'jamais calme': () => ({ scoreScreen: false, why: 'animation' }),
+    'animations entre deux': (t) => (t % 18_000 < 14_000 ? { scoreScreen: true, why: 'écran de score' } : { scoreScreen: false, why: 'animation' }),
+    'écran de score par instants': (t) => (t % 5000 < 400 ? { scoreScreen: true, why: 'écran de score' } : { scoreScreen: false, why: 'autre écran (animation, texte, choix à faire)' }),
+  };
+  let cases = 0;
+  for (const wanted of [true, false])
+    for (const screen of [true, false])
+      for (const readable of [true, false])
+        for (const [name, verdict] of Object.entries(verdicts)) {
+          const start = 1_000_000;
+          const tally = new LiveDmdTally(start);
+          const flash = new LiveBoardFlash(start);
+          const lines: string[] = [];
+          let firstPass: number | undefined;
+          const placed = wanted && screen && readable;
+          for (let t = 0; t <= 90_000; t += 500) {
+            const v = readable ? verdict(t) : undefined;
+            const shown = placed && flash.visible(view(2), start + t, v?.scoreScreen ?? false);
+            if (shown) firstPass ??= t;
+            const line = tally.tick(start + t, { wanted, screen, readable, ...(readable ? {} : { unreadable: 'inspector de VPX injoignable sur le port 2113' }), ...(v ? { verdict: v } : {}), shown });
+            if (line) lines.push(line);
+          }
+          const label = `${name}, réglage ${wanted}, écran ${screen}, lisible ${readable}`;
+          const summary = tally.summary(start + 90_000);
+          assert.ok(/^Scores sur le DMD : /.test(summary) && /pourquoi : .+|le reste du temps : .+/.test(summary), `${label} : ${summary}`);
+          if (wanted && screen) {
+            // Au moins un passage avant le délai, ou la ligne du garde-fou, une seule fois, avec sa raison.
+            if (firstPass !== undefined && firstPass < LIVE_DMD_OVERDUE_MS) assert.deepEqual(lines, [], label);
+            else {
+              assert.equal(lines.length, 1, `${label} : ${lines.join(' | ')}`);
+              assert.match(lines[0]!, /aucun passage après \d+ s de partie ; pourquoi : \S/, label);
+            }
+          } else assert.deepEqual(lines, [], `${label} : pas de garde-fou sans le réglage ou sans DMD`);
+          if (!wanted) assert.match(summary, /désactivé/, label);
+          else if (!screen) assert.match(summary, /pas d’écran du DMD/, label);
+          else if (!readable) assert.match(summary, /DMD illisible \(inspector de VPX injoignable/, label);
+          cases++;
+        }
+  assert.equal(cases, 32);
+  // Un DMD qui montre son écran de score : un passage toutes les 12 s, au bilan.
+  const tally = new LiveDmdTally(0);
+  const flash = new LiveBoardFlash(0);
+  for (let t = 0; t <= 120_000; t += 500) tally.tick(t, { wanted: true, screen: true, readable: true, verdict: { scoreScreen: true, why: 'écran de score' }, shown: flash.visible(view(2), t, true) });
+  assert.ok(tally.count >= 9, `${tally.count} passages en 120 s`);
+  assert.match(tally.summary(120_000), /^Scores sur le DMD : \d+ passages en 120 s de partie \(un toutes les 1[0-3] s\)/);
 });
 
 test('choix du joueur : chaque place, et l’automatique quand la borne ou la table ne la permet pas', () => {
@@ -368,7 +424,11 @@ test('application : les fenêtres de la bande et du DMD, et ce que frontend.ts l
   assert.equal(notice.match(/createWindow\(\{/g)?.length, 1);
   assert.match(notice, /liveBoardPlacement\(screens, boardView\.rows\.length, place, settings\.dmd\)/);
   // Les points du DMD : seulement sur l'écran de score ; une fenêtre le temps d'un passage, fermée ensuite, jamais cachée (screencover.test.ts).
-  assert.match(notice, /const onDmd = placement\.dmd && flash\?\.visible\(boardView, Date\.now\(\), opts\.dmdScoreScreen\?\.\(\) \?\? false\) \? placement\.dmd : undefined;/);
+  assert.match(notice, /const onDmd = placement\.dmd && flash\?\.visible\(boardView, now, verdict\?\.scoreScreen \?\? false\) \? placement\.dmd : undefined;/);
+  // Garde-fou (essai du 04/11/2026) : chaque relecture comptée, la ligne du garde-fou et le bilan de la partie au journal.
+  assert.match(notice, /const overdue = tally\.tick\(now, \{ wanted: settings\.dmd, screen: Boolean\(screens\?\.dmd\), readable: Boolean\(screens\?\.dmdReadable\)/);
+  assert.match(notice, /if \(overdue\) opts\.log\?\.\(overdue\);/);
+  assert.match(notice, /function close\(\): void \{[\s\S]*?if \(tally\) opts\.log\?\.\(tally\.summary\(Date\.now\(\)\)\);/);
   // Au-dessus de toute fenêtre de VPX, PuP, B2S : remise devant, et le journal le dit.
   assert.match(notice, /keepInFront\(band, 'bande'\);/);
   // Ses fenêtres se ferment par close(), jamais par destroy() : détruite pendant qu'une autre charge, elle emporte leur processus de rendu.
@@ -386,8 +446,11 @@ test('application : les fenêtres de la bande et du DMD, et ce que frontend.ts l
   assert.match(front, /return zone && !occupiedThisGame\.has\(role\) \? \[\{ role, zone \}\] : \[\];/);
   assert.match(front, /for \(const role of next\) occupiedThisGame\.add\(role\);/);
   // Le DMD lu par l'inspector quand le joueur y veut les scores, et les signaux du relevé.
-  assert.match(front, /dmdWatch = double\?\.inspectorPort && readDmd \? watchVpxDmd\(/);
   assert.match(front, /dmdWatch\?\.game\(\{ inGame: Boolean\(st\?\.inGame\)/);
+  assert.match(front, /dmdVerdict: \(\) => dmdWatch\?\.verdict\(\),/);
+  // Une table sans PinMAME : jamais l'inspector sur son DMD, le rythme de la partie (arrêt de VPX du 04/11/2026).
+  assert.match(front, /double\.dmdByScript && double\.live \? scriptDmdWatch\(\) : double\.inspectorPort \? watchVpxDmd\(/);
+  assert.match(front, /dmdUnreadable: \(\) => \(dmdWatch \? dmdWatch\.unreadable\(\) : /);
   assert.match(front, /const dmd = framed && screen \?/);
   // La page : les points du DMD par l'afficheur du menu (fallback.js), à sa couleur.
   const page = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'game-notice.html'), 'utf8');

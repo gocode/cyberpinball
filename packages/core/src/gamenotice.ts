@@ -406,15 +406,14 @@ export function parseLiveScoresSettings(raw: unknown, tableId?: string): LiveSco
 // --- Sur le DMD ---
 
 /**
- * Les scores sur le DMD : seulement quand il montre l'écran de score de la table (dmdscore.ts), et
- * jamais au hasard (essai du 31/10/2026) : au premier repos de la partie (la liste des joueurs),
- * puis au repos qui suit une bille du joueur, un autre qui prend la tête ou finit sa partie, et au
- * plus tard toutes les 45 s ; jamais deux fois en moins de 15 s ; 6 s au plus, et ils partent dès
- * que le DMD montre autre chose ou que le score bouge. Un passage ne commence que sur un écran de
- * score vu depuis 1,5 s : un instant reconnu à tort (Star Trek : une seconde d'une animation presque
- * immobile, mesurée au banc) ne suffit pas.
+ * Les scores sur le DMD : seulement quand il montre l'écran de score de la table (dmdscore.ts),
+ * toutes les 12 s tant qu'il le montre (essai du 04/11/2026 sur le PinCab : « un passage très
+ * régulier, toutes les 10 à 15 s, tant que le DMD d'origine le permet ») ; plus tôt, 10 s après le
+ * précédent, quand ma bille change, qu'un autre prend la tête ou finit sa partie. 4 s chacun, et ils
+ * partent dès que le DMD montre autre chose (une animation, un texte, un choix à faire). Un passage ne
+ * commence que sur un écran de score vu depuis 0,5 s (en plus du calme que la règle demande déjà).
  */
-export const LIVE_FLASH = { showMs: 6000, everyMs: 45_000, gapMs: 15_000, settleMs: 1500 } as const;
+export const LIVE_FLASH = { showMs: 4000, everyMs: 12_000, gapMs: 10_000, settleMs: 500 } as const;
 
 /** Ce qui fait revenir les scores sur le DMD : ma bille, le joueur en tête, les parties finies. */
 export function liveFlashKey(view: LiveBoardView): string {
@@ -454,6 +453,94 @@ export class LiveBoardFlash {
     this.until = now + LIVE_FLASH.showMs;
     this.pending = false;
     return true;
+  }
+}
+
+/** Ce que la bande voit du DMD à chaque relecture (app/src/game-notice.ts), pour le bilan de la partie. */
+export interface LiveDmdTick {
+  /** Réglage « Scores sur le DMD » activé. */
+  wanted: boolean;
+  /** Un écran du DMD sur la borne (rôle dmd, ou le cadre du DMD de l'habillage FullDMD). */
+  screen: boolean;
+  /** Le DMD se lit (inspector de VPX). */
+  readable: boolean;
+  /** Sinon, pourquoi (dmd-watch.ts). */
+  unreadable?: string;
+  /** La règle de l'écran de score (dmdscore.ts), quand le DMD se lit. */
+  verdict?: { scoreScreen: boolean; why: string };
+  /** Les scores sont sur le DMD à cette relecture. */
+  shown: boolean;
+}
+
+/**
+ * Réglage activé et DMD présent : au bout de ce temps de partie sans aucun passage, le journal dit
+ * pourquoi (essai du 04/11/2026 sur le PinCab : « Scores sur le DMD » activé, rien de toute la partie,
+ * et rien au journal pour dire ce que la règle avait vu).
+ */
+export const LIVE_DMD_OVERDUE_MS = 60_000;
+
+/** Ce qui empêche un passage à cette relecture, ou « passage ». */
+export function liveDmdTickReason(s: LiveDmdTick): string {
+  if (!s.wanted) return 'réglage « Scores sur le DMD » désactivé'; // i18n-ignore : journal
+  if (!s.screen) return 'pas d’écran du DMD sur la borne'; // i18n-ignore : journal
+  if (s.shown) return 'passage'; // i18n-ignore : journal
+  if (!s.readable) return `DMD illisible (${s.unreadable ?? 'inspector de VPX'})`; // i18n-ignore : journal
+  if (!s.verdict) return 'DMD sans réponse'; // i18n-ignore : journal
+  if (s.verdict.scoreScreen) return 'écran de score, en attente du rythme'; // i18n-ignore : journal
+  return `DMD : ${s.verdict.why}`; // i18n-ignore : journal
+}
+
+/**
+ * Le bilan des scores sur le DMD pendant une partie : combien de passages, et ce qui a empêché les
+ * autres, en part du temps de partie. `tick` à chaque relecture de la bande ; il rend, une fois, la
+ * ligne du garde-fou (LIVE_DMD_OVERDUE_MS) ; `summary` à la fin de la partie.
+ */
+export class LiveDmdTally {
+  private passes = 0;
+  private wasShown = false;
+  private lastAt?: number;
+  private last?: LiveDmdTick;
+  private told = false;
+  private readonly spent = new Map<string, number>();
+
+  constructor(private readonly start: number) {}
+
+  /** Passages comptés jusqu'ici. */
+  get count(): number {
+    return this.passes;
+  }
+
+  tick(now: number, s: LiveDmdTick): string | undefined {
+    // Le temps depuis la relecture d'avant revient à ce qu'elle voyait (deux secondes au plus : une pause de la bande ne compte pas).
+    if (this.lastAt !== undefined && this.last) {
+      const reason = liveDmdTickReason(this.last);
+      this.spent.set(reason, (this.spent.get(reason) ?? 0) + Math.max(0, Math.min(2000, now - this.lastAt)));
+    }
+    this.lastAt = now;
+    this.last = s;
+    if (s.shown && !this.wasShown) this.passes++;
+    this.wasShown = s.shown;
+    if (this.told || this.passes || !s.wanted || !s.screen || now - this.start < LIVE_DMD_OVERDUE_MS) return undefined;
+    this.told = true;
+    return `Scores sur le DMD : aucun passage après ${Math.round((now - this.start) / 1000)} s de partie ; pourquoi : ${this.why()}.`; // i18n-ignore : journal
+  }
+
+  /** Ce qui a pris le temps de la partie, hors passages : les trois premières raisons, en part du temps. */
+  private why(): string {
+    const total = [...this.spent.values()].reduce((a, b) => a + b, 0);
+    const reasons = [...this.spent].filter(([k]) => k !== 'passage').sort((a, b) => b[1] - a[1]);
+    if (!total || !reasons.length) return this.last ? liveDmdTickReason(this.last) : 'partie trop courte pour en juger'; // i18n-ignore : journal
+    return reasons
+      .slice(0, 3)
+      .map(([k, ms]) => `${k} ${Math.round((100 * ms) / total)} %`)
+      .join(', ');
+  }
+
+  /** La ligne du journal à la fin de la partie. */
+  summary(now: number): string {
+    const seconds = Math.round((now - this.start) / 1000);
+    if (!this.passes) return `Scores sur le DMD : aucun passage en ${seconds} s de partie ; pourquoi : ${this.why()}.`; // i18n-ignore : journal
+    return `Scores sur le DMD : ${this.passes} passage${this.passes > 1 ? 's' : ''} en ${seconds} s de partie (un toutes les ${Math.round(seconds / this.passes)} s) ; le reste du temps : ${this.why()}.`; // i18n-ignore : journal
   }
 }
 

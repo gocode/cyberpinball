@@ -11,7 +11,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
-import { DMD_SCORE_RULE, DmdScoreWatch, chooseDmdDisplay, type DmdFrame } from '../dmdscore';
+import { DMD_SCORE_RULE, DMD_SIGNAL_RULE, DmdScoreWatch, DmdSignalWatch, chooseDmdDisplay, type DmdFrame } from '../dmdscore';
 import { LiveBoardFlash, type LiveBoardView } from '../gamenotice';
 
 const W = 128;
@@ -28,12 +28,37 @@ function frame(seed: number, lit = 400): DmdFrame {
   return { width: W, height: H, dots };
 }
 
-/** Rejoue des images toutes les 100 ms (`at` en ms) ; rend le verdict à chaque instant demandé. */
+/** Rejoue des images toutes les 100 ms (`at` en ms). */
 function play(watch: DmdScoreWatch, from: number, to: number, image: (t: number) => DmdFrame): void {
   for (let t = from; t < to; t += 100) watch.frame(image(t), t);
 }
 
-test('écran de score : l’image qui revient, score immobile, en partie', () => {
+/** Des points tirés d'une graine dans un rectangle (un score, un texte : une mise en page). */
+function region(dots: Uint8Array, seed: number, x0: number, y0: number, w: number, h: number, lit: number): void {
+  let x = seed * 2654435761;
+  for (let i = 0; i < lit; i++) {
+    x = (x * 1103515245 + 12345) >>> 0;
+    dots[(y0 + ((x >>> 8) % h)) * W + x0 + (x % w)] = 255;
+  }
+}
+
+/** L'écran de score dessiné : le score en haut (ses derniers chiffres tirés de `digits`), le crédit en bas. */
+function scoreScreen(digits: number): DmdFrame {
+  const dots = new Uint8Array(W * H);
+  region(dots, 11, 20, 0, 60, 14, 160);
+  region(dots, 1000 + digits, 80, 0, 30, 14, 90);
+  region(dots, 12, 20, 26, 90, 6, 120);
+  return { width: W, height: H, dots };
+}
+
+/** Un écran de choix à faire (ou un texte de mode) : sa propre mise en page. */
+function choiceScreen(seed: number): DmdFrame {
+  const dots = new Uint8Array(W * H);
+  region(dots, seed, 0, 12, 60, 14, 300);
+  return { width: W, height: H, dots };
+}
+
+test('écran de score au repos : l’image qui revient, score immobile, en partie', () => {
   const watch = new DmdScoreWatch();
   watch.game({ inGame: true, score: 154_140 }, 0);
   // Comme Terminator 2 : l'écran de score 1 s, son score qui glisse 0,5 s (images toutes différentes), et ainsi de suite.
@@ -42,16 +67,52 @@ test('écran de score : l’image qui revient, score immobile, en partie', () =>
   play(watch, 0, 6000, t2);
   assert.equal(watch.verdict(5950).scoreScreen, true, JSON.stringify(watch.verdict(5950)));
   // Pendant le glissement (une transition brève), il reste l'écran de score.
-  play(watch, 6000, 6150, t2);
-  assert.equal(watch.verdict(6150).scoreScreen, true, 'transition brève');
-  // Un BONUS fixe une seconde : plus l'écran de score dès qu'il dure (200 ms).
+  play(watch, 6000, 7650, t2);
+  assert.equal(watch.verdict(7650).scoreScreen, true, 'transition brève');
+  // Un BONUS fixe une seconde, en plein écran de score : plus l'écran de score dès qu'il dure (stableMs).
   const bonus = frame(77);
-  play(watch, 6200, 7200, () => bonus);
-  assert.equal(watch.verdict(6200 + DMD_SCORE_RULE.strangerMs - 50).scoreScreen, true, 'pas encore');
-  assert.equal(watch.verdict(6200 + DMD_SCORE_RULE.strangerMs + 50).why, 'autre image');
+  const at = 8000;
+  play(watch, 7700, at, t2);
+  play(watch, at, at + DMD_SCORE_RULE.stableMs - 100, () => bonus);
+  assert.equal(watch.verdict(at + DMD_SCORE_RULE.stableMs - 50).scoreScreen, true, 'pas encore');
+  play(watch, at + DMD_SCORE_RULE.stableMs - 100, at + DMD_SCORE_RULE.stableMs + 100, () => bonus);
+  assert.equal(watch.verdict(at + DMD_SCORE_RULE.stableMs + 50).why, 'autre écran (animation, texte, choix à faire)');
 });
 
-test('pas d’écran de score : animation, texte montré une fois, score qui bouge, fin de partie', () => {
+// Essai du 04/11/2026 sur le PinCab : « Scores sur le DMD » activé, aucun passage de toute la partie.
+// La règle voulait le score immobile depuis 3 s ; bille en jeu, il bouge sans cesse, et l'écran de
+// score change ses chiffres avec lui.
+test('en jeu : l’écran de score dont les chiffres changent avec le score, jamais un texte ni un choix', () => {
+  const watch = new DmdScoreWatch();
+  watch.game({ inGame: true, score: 1000 }, 0);
+  // Un coup par seconde : les chiffres changent à 100 ms, le relevé le dit 400 ms plus tard.
+  for (let t = 0; t < 6000; t += 100) {
+    watch.frame(scoreScreen(Math.max(0, Math.floor((t - 100) / 1000))), t);
+    if (t % 1000 === 500) watch.game({ inGame: true, score: 1000 + Math.floor(t / 1000) * 10 }, t);
+  }
+  assert.equal(watch.verdict(5950).scoreScreen, true, JSON.stringify(watch.verdict(5950)));
+  // Une animation après un coup : plus rien ; puis l'écran de score revient, d'autres chiffres, score immobile.
+  play(watch, 6000, 8000, (t) => frame(5000 + t));
+  assert.equal(watch.verdict(7950).why, 'animation');
+  play(watch, 8000, 8000 + DMD_SCORE_RULE.calmMs - 200, () => scoreScreen(40));
+  assert.equal(watch.verdict(8000 + DMD_SCORE_RULE.calmMs - 250).why, 'écran de score à peine revenu');
+  play(watch, 8000 + DMD_SCORE_RULE.calmMs - 200, 10_000, () => scoreScreen(40));
+  assert.equal(watch.verdict(9950).scoreScreen, true, 'l’écran de score reconnu revient');
+  // Bille retenue, un choix à faire (score figé) : jamais, même longtemps.
+  play(watch, 10_000, 20_000, () => choiceScreen(5));
+  assert.equal(watch.verdict(19_950).why, 'autre écran (animation, texte, choix à faire)');
+  // Un texte de mode qui paraît sur le coup (le score bouge à son apparition, le relevé le dit en retard,
+  // puis plus rien ne change), en début de partie : pas l'écran de score.
+  const text = new DmdScoreWatch();
+  text.game({ inGame: true, score: 10 }, 0);
+  play(text, 0, 2000, (t) => frame(7000 + t));
+  play(text, 2000, 2700, () => choiceScreen(6));
+  text.game({ inGame: true, score: 20 }, 2600);
+  play(text, 2700, 5000, () => choiceScreen(6));
+  assert.equal(text.verdict(4950).why, 'autre écran (animation, texte, choix à faire)');
+});
+
+test('pas d’écran de score : animation, texte montré une fois, fin de partie', () => {
   // Une animation : chaque image est nouvelle.
   const anim = new DmdScoreWatch();
   anim.game({ inGame: true, score: 10 }, 0);
@@ -63,15 +124,8 @@ test('pas d’écran de score : animation, texte montré une fois, score qui bou
   const text = frame(9);
   play(mode, 0, 6000, (t) => (t < 3500 ? frame(8000 + t) : text));
   assert.equal(mode.verdict(5950).scoreScreen, false, JSON.stringify(mode.verdict(5950)));
-  // L'écran de score, mais le score bouge : la bille est en jeu, rien ne se pose.
-  const busy = new DmdScoreWatch();
-  const still = frame(3);
-  for (let t = 0; t < 6000; t += 100) {
-    busy.game({ inGame: true, score: 1000 + Math.floor(t / 1000) * 10 }, t);
-    busy.frame(still, t);
-  }
-  assert.equal(busy.verdict(5950).why, 'score qui bouge');
   // La fin de partie, les initiales : le relevé dit qu'aucune partie n'est en cours.
+  const still = frame(3);
   const over = new DmdScoreWatch();
   over.game({ inGame: false, score: 535_610 }, 0);
   play(over, 0, 6000, () => still);
@@ -81,6 +135,24 @@ test('pas d’écran de score : animation, texte montré une fois, score qui bou
   fresh.game({ inGame: true, score: 1 }, 0);
   fresh.frame(still, 5000);
   assert.equal(fresh.verdict(5100).why, 'pas assez d’images du DMD');
+});
+
+// Une table sans PinMAME (FlexDMD) : l'inspector ne lit jamais son image (arrêt de VPX du 04/11/2026
+// sur The Goonies). Le rythme de la partie, d'après le relevé seul.
+test('DMD sans image (FlexDMD) : bille en jeu seulement, jamais bille retenue ni hors partie', () => {
+  const watch = new DmdSignalWatch();
+  assert.equal(watch.verdict(0).why, 'pas de partie en cours');
+  watch.game({ inGame: true, score: 0 }, 0);
+  assert.equal(watch.verdict(DMD_SIGNAL_RULE.startedMs - 1).scoreScreen, false, 'partie à peine commencée');
+  assert.equal(watch.verdict(DMD_SIGNAL_RULE.startedMs + 100).scoreScreen, false, 'score jamais bougé (au lanceur)');
+  for (let t = 1000; t <= 20_000; t += 1000) watch.game({ inGame: true, score: t }, t);
+  assert.equal(watch.verdict(20_500).scoreScreen, true, 'bille en jeu');
+  // Bille retenue, un choix à faire : le score figé.
+  assert.equal(watch.verdict(20_000 + DMD_SIGNAL_RULE.movedMs + 1).scoreScreen, false);
+  assert.match(watch.verdict(20_000 + DMD_SIGNAL_RULE.movedMs + 1).why, /bille retenue ou choix à faire/);
+  // Fin de partie, saisie des initiales (le relevé : plus de partie en cours).
+  watch.game({ inGame: false, score: 20_000 }, 21_000);
+  assert.equal(watch.verdict(21_500).why, 'pas de partie en cours');
 });
 
 test('un DMD à nuances : les ombres ne comptent pas, quelques points qui clignotent non plus', () => {
@@ -166,22 +238,28 @@ test('Terminator 2 (WPC) : l’écran de score entre deux coups, jamais le BONUS
   assert.notEqual(seen.get(36), 'écran de score', '36 s : départ de bille');
   // Partie finie (game_over avant les initiales), saisie des initiales, attente.
   for (const t of [72, 80, 90]) assert.equal(seen.get(t), 'pas de partie en cours', `${t} s`);
-  // Les scores des amis se posent à chaque repos, jamais sur le BONUS ni après la fin.
-  assert.ok(flashes.some((t) => t > 25 && t < 30.7) && flashes.some((t) => t > 42 && t < 48.4) && flashes.some((t) => t > 60 && t < 66), `aux trois repos : ${flashes[0]} … ${flashes.at(-1)} (${flashes.length})`);
-  // Le BONUS commence à 30,75 s : les scores partent dès qu'il dure (DMD_SCORE_RULE.strangerMs), au plus 0,25 s après.
-  assert.deepEqual(flashes.filter((t) => (t >= 31 && t < 33) || t >= 69.5), [], 'ni BONUS ni fin de partie');
+  // Les scores des amis se posent régulièrement (LIVE_FLASH), jamais sur le BONUS ni après la fin.
+  assert.ok(flashes.some((t) => t > 22 && t < 30.7) && flashes.some((t) => t > 38 && t < 42) && flashes.some((t) => t > 55 && t < 60), `régulièrement : ${flashes[0]} … ${flashes.at(-1)} (${flashes.length})`);
+  // Le BONUS commence à 30,75 s : les scores partent dès qu'il dure (DMD_SCORE_RULE.stableMs), au plus 0,45 s après.
+  assert.deepEqual(flashes.filter((t) => (t >= 31.2 && t < 33) || t >= 69.5), [], 'ni BONUS ni fin de partie');
 });
 
 // Star Trek : en jeu, une scène animée (l'Enterprise, les étoiles) et le score en haut à gauche ; elle
 // n'est reconnue qu'à ses moments calmes (prudent : dans le doute, rien sur le DMD).
 test('Star Trek (Stern SAM) : la scène en jeu, à ses moments calmes ; jamais une animation ni la fin', { skip: !fs.existsSync(path.join(FIXTURES, 'st_161h.json')) && 'images de travail absentes (dépôt public)' }, () => {
-  const { seen, flashes } = replay('st_161h.json', [106.9, 168, 172.5, 92, 112, 150, 186]);
+  const { seen, flashes } = replay('st_161h.json', [106.9, 168, 172.5, 92, 112, 186]);
   // L'écran en jeu : l'Enterprise, le score en haut à gauche.
-  for (const t of [106.9, 168, 172.5]) assert.equal(seen.get(t), 'écran de score', `${t} s`);
-  // Distorsion, récompense (« MEDAL BOUND »), score qui bouge.
-  for (const t of [92, 112, 150]) assert.notEqual(seen.get(t), 'écran de score', `${t} s`);
+  for (const t of [106.9, 168]) assert.equal(seen.get(t), 'écran de score', `${t} s`);
+  // Distorsion, récompense (« MEDAL BOUND »), « BALL SAVED / KEEP SHOOTING » qui clignote (169,6 à 173,6 s :
+  // la première règle le prenait pour l'écran de score).
+  for (const t of [92, 112, 172.5]) assert.notEqual(seen.get(t), 'écran de score', `${t} s`);
   assert.equal(seen.get(186), 'pas de partie en cours');
   // Une seconde d'une animation inversée (90,5 à 91,5 s) passe pour l'écran de score : le délai d'entrée l'écarte.
   assert.ok(flashes.some((t) => t > 166 && t < 170), 'la scène calme de la fin');
-  assert.deepEqual(flashes.filter((t) => t >= 88 && t < 95), [], 'jamais sur l’animation inversée');
+  assert.deepEqual(flashes.filter((t) => (t >= 88 && t < 95) || (t >= 170.5 && t < 173.6)), [], 'jamais sur l’animation inversée ni sur BALL SAVED');
+  // Régulièrement : des passages tout au long du jeu, jamais plus de 30 s sans.
+  const starts = flashes.filter((t, i) => i === 0 || t - flashes[i - 1]! > 1);
+  const gaps = starts.slice(1).map((t, i) => t - starts[i]!);
+  assert.ok(starts.length >= 6, `${starts.length} passages`);
+  assert.ok(gaps.every((g) => g < 30), `écarts : ${gaps.map((g) => g.toFixed(0)).join(', ')}`);
 });

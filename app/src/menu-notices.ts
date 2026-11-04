@@ -9,10 +9,11 @@
 // s'y prête et redessine le menu quand ce qu'elle montre change (une entrée, un départ, une fin),
 // jamais plus.
 //
-// Ce qui se montre partout (NoticeRule.away : la partie entre amis, une invitation, un ami qui se
-// connecte) paraît aussi hors du menu des tables, dans le menu système et par-dessus VPX
-// (`live.canShow`), sauf sur l'écran de la partie ou de l'invitation, qui le disent déjà, et ce
-// que la bande de la partie en cours montre déjà (`live.band`). La partie entre amis reste même
+// Où et quoi : la zone des notifications de l'écran du moment (noticezone.ts, `zone`), la même
+// règle pour tous les écrans : sur tout écran de Cyber Pinball, le compteur et toutes les
+// notifications ; pendant une partie, ce qui se montre partout (NoticeRule.away : la partie entre
+// amis, une invitation, un ami qui se connecte), par-dessus VPX. Jamais ce que l'écran de la partie
+// ou de l'invitation dit déjà, ni ce que la bande de la partie en cours montre déjà (`live.band`). La partie entre amis reste même
 // notifications coupées : le joueur attend ces nouvelles (NoticeRule.live). Chaque notification
 // qui a son son (NoticeRule.sound) le fait entendre à son entrée, une fois (`sound`).
 
@@ -24,19 +25,23 @@ import {
   downloadSnapshot,
   friendsOnlineView,
   inviteNotices,
+  inviteTag,
   isLiveNotice,
   liveNotices,
   liveSnapshot,
   socialNotices,
+  tagId,
   socialSnapshot,
   type DownloadJob,
   type DownloadSnapshot,
   type FriendsListSync,
   type LiveGame,
   type LiveInvite,
+  type LiveInviteEndInfo,
   type LiveSnapshot,
   type NoticeEvent,
   type NoticeView,
+  type NoticeZone,
   type NoticesMode,
   type Presence,
   type SocialSnapshot,
@@ -57,8 +62,8 @@ export interface MenuNoticesHost {
   reason?(job: DownloadJob): string | undefined;
   badgeLabel?(id: string): string;
   mode(): NoticesMode;
-  /** Le menu des tables est à l'écran et rien ne s'y oppose (partie, attente, invité, écran plein, constat bref). */
-  canShow(): boolean;
+  /** La zone des notifications de l'écran du moment (noticezone.ts) : où, le compteur, quelles notifications. */
+  zone(): NoticeZone;
   /** Ce que la notification montre a changé : redessiner le menu. */
   redraw(): void;
   /** La partie entre amis et les invitations (live-game.ts) ; ce qui se montre partout. */
@@ -66,6 +71,8 @@ export interface MenuNoticesHost {
     game(): LiveGame | undefined;
     /** Invitations encore valables. */
     invites?(): readonly LiveInvite[];
+    /** Comment une invitation reçue a pris fin (live-game.ts) : sa fin s'annonce, sauf par ma réponse. */
+    inviteEnd?(id: string): LiveInviteEndInfo | undefined;
     /** Clé de cette borne. */
     me(): string;
     /** L'écran de la partie (salon, départ, résultats) est ouvert : il le dit déjà. */
@@ -74,11 +81,12 @@ export interface MenuNoticesHost {
     inviteOnScreen?(id: string): boolean;
     /** La bande de la partie entre amis est sur les écrans (pendant la partie) : elle dit déjà où en sont les joueurs. */
     band?(): boolean;
-    /** Ce qui se montre partout peut se montrer ici (menu des tables, menu système, partie). */
-    canShow(): boolean;
   };
-  /** Une notification qui a son son entre à l'écran (NoticeRule.sound). */
-  sound?(id: UiSoundId, view: NoticeView): void;
+  /**
+   * Une notification qui a son son entre à l'écran (NoticeRule.sound) ; sans `view` : une nouvelle
+   * de la partie que l'écran ouvert montre déjà (le salon, l'invitation), qui sonne quand même.
+   */
+  sound?(id: UiSoundId, view?: NoticeView): void;
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -136,7 +144,10 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
       }
       case 'live-invite':
         // Encore valable, et son écran fermé (ouvert, il le dit déjà).
-        return !!host.live?.invites?.().some((i) => i.id === e.key) && !host.live.inviteOnScreen?.(e.key);
+        return !!host.live?.invites?.().some((i) => inviteTag(i) === e.key) && !host.live.inviteOnScreen?.(tagId(e.key));
+      case 'live-invite-ended':
+        // Son écran ouvert dit déjà la fin (« Invitation annulée par … »).
+        return !host.live?.inviteOnScreen?.(tagId(e.key));
       default:
         // La partie entre amis : encore la mienne, son écran fermé, la bande pas là (elles le disent déjà).
         if (isLiveNotice(e.kind)) return !!host.live && host.live.game()?.id === e.key.split('|')[0] && !host.live.onScreen() && !host.live.band?.();
@@ -148,10 +159,9 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     const all = host.mode() === 'all';
     // Notifications coupées : seule la partie entre amis reste.
     if (!all) center.clear((e) => isLiveNotice(e.kind));
-    const menu = all && host.canShow();
-    // Ce qui se montre partout : au menu des tables (même notifications coupées), dans le menu système, en partie.
-    const away = host.canShow() || (host.live?.canShow() ?? false);
-    return center.tick(now(), { canShow: menu || away, away: !menu, still });
+    const zone = host.zone();
+    // Rien maintenant : la file garde tout pour l'écran suivant. En partie, ou notifications coupées : ce qui se montre partout.
+    return center.tick(now(), { canShow: zone.notices !== 'wait', away: zone.notices === 'away' || !all, still });
   }
 
   /** Redessine si ce que la file montre a changé (le rendu reprogramme la suite), sinon repasse à l'heure qu'elle demande. */
@@ -183,7 +193,7 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     const received = born ? (host.live?.invites?.() ?? []) : [];
     born = true;
     const nextLive = liveSnapshot(game, me);
-    const events = [...inviteNotices(invites, received, t), ...liveNotices(live, nextLive, game, me, t), ...socialNotices(social, nextSocial, s, t, host.badgeLabel), ...downloadNotices(downloads, jobs, t, host.reason)]
+    const events = [...inviteNotices(invites, received, t, (id) => host.live?.inviteEnd?.(id)), ...liveNotices(live, nextLive, game, me, t), ...socialNotices(social, nextSocial, s, t, host.badgeLabel), ...downloadNotices(downloads, jobs, t, host.reason)]
       // Au démarrage, et tant que la borne cherche ses amis, c'est elle qui arrive : pas une nouvelle.
       .filter((e) => (t >= quietUntil && host.social.listSync?.() !== 'searching') || e.kind !== 'friend-online')
       // Notifications coupées : seule la partie entre amis reste.
@@ -191,8 +201,12 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     social = nextSocial;
     downloads = downloadSnapshot(jobs);
     live = nextLive;
-    invites = new Set(received.map((i) => i.id));
+    invites = new Set(received.map(inviteTag));
     if (!events.length) return;
+    // L'écran ouvert dit déjà la nouvelle (le salon : « Bruno a refusé » ; l'invitation : « annulée ») : la
+    // notification n'y paraît pas, son son si, une fois (essai réel du 04/11/2026 : « plus de dynamisme »).
+    const told = events.find((e) => isLiveNotice(e.kind) && NOTICE_RULES[e.kind].sound && (e.kind === 'live-invite-ended' ? host.live?.inviteOnScreen?.(tagId(e.key)) : e.kind !== 'live-invite' && host.live?.onScreen()));
+    if (told && host.zone().notices !== 'wait') host.sound?.(NOTICE_RULES[told.kind].sound!);
     center.push(events);
     for (const e of events) host.log?.(`Notifications : ${e.kind} ${e.who ?? e.subject ?? ''} (priorité ${NOTICE_RULES[e.kind].priority})`); // i18n-ignore : journal
     poke();
@@ -210,7 +224,7 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     }
     shown = next;
     schedule(r.nextAt);
-    const friends = mode === 'off' ? undefined : friendsOnlineView(socialSnapshot(host.social.state(), (k) => host.social.online(k), (k) => host.social.presenceOf(k)), host.social.listSync?.());
+    const friends = mode === 'off' || !host.zone().count ? undefined : friendsOnlineView(socialSnapshot(host.social.state(), (k) => host.social.online(k), (k) => host.social.presenceOf(k)), host.social.listSync?.());
     return { ...(r.view ? { notice: r.view } : {}), ...(friends ? { friendsOnline: friends } : {}) };
   }
 

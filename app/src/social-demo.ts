@@ -50,7 +50,7 @@ export function simulatedPlayersWanted(env: NodeJS.ProcessEnv): boolean {
 }
 
 /** Les démonstrations de la partie en direct : Bruno invite la borne (`en-jeu` : pendant qu'elle joue). */
-const LIVE_DEMOS = ['partie', 'en-jeu', 'partie-coupure', 'partie-sans-releve', 'parties-enchainees'];
+const LIVE_DEMOS = ['partie', 'en-jeu', 'partie-coupure', 'partie-sans-releve', 'parties-enchainees', 'fins-invitation'];
 /** Parties à la suite, démonstration « parties-enchainees » : la table de chacune (rang dans les tables communes). */
 const CHAINED_TABLES = [0, 0, 1];
 /** Après une partie finie, Bruno réinvite après ce délai : la borne a fermé ses résultats, elle est au menu des tables. */
@@ -402,6 +402,53 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     if (!tries) log('Réseau simulé : invitation de Bruno pas partie (borne pas encore en ligne chez lui), nouvel essai toutes les 2 s.'); // i18n-ignore : journal
     timers.push(setTimeout(() => void invite(tries + 1), 2000));
   };
+  /**
+   * Fins d'invitation (docs\demo-amis.ps1 -Parcours fins-invitation, essai réel du 04/11/2026) : Bruno
+   * invite la borne pendant qu'elle est dans un sous-écran du menu système, puis annule ; réinvite,
+   * et voit son refus ; puis l'invite pendant sa partie, et annule encore. Chaque étape attend ce
+   * qu'en voit une vraie borne (le refus, la borne en partie), ou le signal que l'autopilote pose
+   * quand la borne est à l'écran voulu (`<données>\reseau-simule\signal-N`, étape « copy: ») : la
+   * démonstration ne parie pas sur la durée de ses étapes.
+   */
+  async function endsScript(): Promise<void> {
+    const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    const wait = async (what: string, ok: () => boolean, ms = 90_000) => {
+      for (const end = Date.now() + ms; !ok(); await sleep(200)) if (Date.now() > end) throw new Error(what);
+    };
+    const guest = () => games?.current()?.players.find((p) => p.key === me.key);
+    const signal = (n: number) => wait(`signal ${n}`, () => fs.existsSync(path.join(dataDir, 'reseau-simule', `signal-${n}`)), 300_000);
+    try {
+      // La borne est dans un sous-écran du menu système : Bruno lance une partie (une notification, avec le compteur), puis invite.
+      await signal(1);
+      bruno.setPresence({ status: 'playing', table: DEMO_TABLES.brunoPlays, since: new Date().toISOString() });
+      await sleep(4000);
+      await invite();
+      await wait('invitation reçue', () => // i18n-ignore : journal
+        guest()?.state === 'invited');
+      // L'invitation vue par-dessus le sous-écran : il annule.
+      await signal(2);
+      log('Réseau simulé : Bruno annule son invitation.'); // i18n-ignore : journal
+      games?.leave();
+      // Le second sous-écran : il réinvite.
+      await signal(3);
+      await invite();
+      await wait('réponse de la borne', () => // i18n-ignore : journal
+        !!guest() && guest()!.state !== 'invited');
+      log(`Réseau simulé : Bruno voit la réponse de la borne (${guest()!.state}).`); // i18n-ignore : journal
+      // Dans le second sous-écran : il relance une autre table (une notification de plus là aussi).
+      await sleep(1500);
+      bruno.setPresence({ status: 'playing', table: DEMO_TABLES.brunoPlaysAgain, since: new Date().toISOString() });
+      await wait('borne en partie', () => // i18n-ignore : journal
+        bruno.presenceOf(me.key)?.status === 'playing', 180_000);
+      await sleep(1500);
+      await invite();
+      await sleep(6000);
+      log('Réseau simulé : Bruno annule son invitation pendant la partie de la borne.'); // i18n-ignore : journal
+      games?.leave();
+    } catch (error) {
+      log(`Réseau simulé : scénario des fins d'invitation interrompu (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+  }
   bruno.request(me);
   chloe.request(me);
   // Bruno devient ami (la démonstration accepte à la place du joueur), puis joue. Déjà ami (retour) : sa bibliothèque tout de suite.
@@ -423,7 +470,8 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
       }
       // Partie en direct : l'invitation, une fois la borne reliée et le menu affiché ; en-jeu, une
       // fois la borne en partie (sa présence le dit).
-      if (games) {
+      if (games && mode === 'fins-invitation') void endsScript();
+      else if (games) {
         if (mode !== 'en-jeu') timers.push(setTimeout(invite, 6000));
         else {
           const watch = setInterval(() => {

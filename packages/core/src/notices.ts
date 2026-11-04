@@ -30,9 +30,11 @@ import type { DownloadJob } from './downloadqueue';
 import type { SocialEvent, SocialState, Presence } from './social';
 import type { FriendsListSync } from './friendpresence';
 import type { UiSoundId } from './uisounds';
+import type { LiveInviteEnd } from './livegame';
 
 export type NoticeKind =
   | 'live-invite'
+  | 'live-invite-ended'
   | 'live-finished'
   | 'live-cancelled'
   | 'live-accepted'
@@ -62,13 +64,15 @@ export interface NoticeEvent {
   from?: string;
   /** Partie entre amis : pourquoi un invité ne vient pas, ou pourquoi un joueur ne joue plus (livenotices.ts). */
   reason?: LiveNoticeReason;
+  /** Invitation reçue qui prend fin sans ma réponse : pourquoi (annulée, partie lancée, expirée, hors ligne). */
+  end?: LiveInviteEnd;
   /** Partie entre amis finie : je la gagne (`who` : le gagnant, sinon), ou ma place au classement. */
   won?: true;
   place?: { rank: number; of: number };
 }
 
-/** Invitation sans la même version, sans la table, occupé, sans réponse ; partie pas démarrée. */
-export type LiveNoticeReason = 'missing' | 'other-version' | 'busy' | 'expired' | 'failed';
+/** Invitation sans la même version, sans la table, occupé, sans réponse, passé hors ligne ; partie pas démarrée. */
+export type LiveNoticeReason = 'missing' | 'other-version' | 'busy' | 'expired' | 'offline' | 'failed';
 
 export interface NoticeRule {
   /** Plus petit : plus urgent. */
@@ -103,6 +107,8 @@ const MIN = 60_000;
 export const NOTICE_RULES: Readonly<Record<NoticeKind, NoticeRule>> = {
   // Une invitation : son carillon sonne à son arrivée (frontend.ts, onInvite), la notification paraît avec lui.
   'live-invite': { priority: 0, ttlMs: 2 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, gatherMs: 0 },
+  // Une invitation reçue qui prend fin sans ma réponse : sa notification (et sa carte) partent, celle-ci dit pourquoi.
+  'live-invite-ended': { priority: 1, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'close', tone: 'warning', act: { type: 'live-game' }, live: true, away: true, sound: 'news', gatherMs: 0 },
   'live-finished': { priority: 0, ttlMs: 60 * MIN, quietMs: 24 * 60 * MIN, icon: 'star', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-cancelled': { priority: 1, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'close', tone: 'warning', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
   'live-accepted': { priority: 2, ttlMs: 10 * MIN, quietMs: 24 * 60 * MIN, icon: 'gamepad', tone: 'ok', act: { type: 'live-game' }, live: true, away: true, sound: 'news' },
@@ -229,6 +235,8 @@ function reasonText(reason: LiveNoticeReason | undefined): string | undefined {
       return t('Occupé pour l’instant');
     case 'expired':
       return t('Pas de réponse');
+    case 'offline':
+      return t('Passé hors ligne : invitation retirée');
     case 'failed':
       return t('Sa partie n’a pas démarré');
     default:
@@ -247,6 +255,8 @@ function reasonShort(reason: LiveNoticeReason | undefined): string | undefined {
       return t('occupé');
     case 'expired':
       return t('pas de réponse');
+    case 'offline':
+      return t('hors ligne');
     case 'failed':
       return t('pas démarrée');
     default:
@@ -266,12 +276,29 @@ export function noticeText(kind: NoticeKind, events: readonly NoticeEvent[]): { 
   switch (kind) {
     case 'live-invite':
       return fit(one ? { title: t('{name} vous invite à rejoindre une partie', { name: who(one) }), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} invitation à une partie', '{n} invitations à une partie'), detail: names() });
+    case 'live-invite-ended': {
+      // La dernière fin dit tout : une seule invitation par hôte à la fois.
+      const last = events[events.length - 1]!;
+      const name = who(last);
+      const said: Record<LiveInviteEnd, { title: string; detail?: string }> = {
+        cancelled: { title: t('{name} a annulé son invitation', { name }) },
+        started: { title: t('{name} a lancé la partie sans vous', { name }) },
+        replaced: { title: t('{name} a changé de table', { name }) },
+        expired: { title: t('Invitation de {name} expirée', { name }), detail: t('Pas de réponse en deux minutes') },
+        offline: { title: t('Invitation de {name} retirée', { name }), detail: t('Vous sembliez hors ligne de son côté') },
+        'host-offline': { title: t('{name} est passé hors ligne', { name }), detail: t('Son invitation est retirée') },
+      };
+      const r = said[last.end ?? 'cancelled'];
+      return fit({ title: r.title, ...(r.detail ? { detail: r.detail } : last.subject ? { detail: subject(last) } : {}) });
+    }
     case 'live-accepted':
       return fit({ title: one ? t('{name} a accepté votre invitation', { name: who(one) }) : namesTitle((names) => t('{names} ont accepté', { names }), () => tn(n, '{n} invité a accepté', '{n} invités ont accepté'), events), detail: t('Pour lancer : {path}', { path: livePath() }) });
     case 'live-declined': {
       if (one) {
         const reason = reasonText(one.reason);
-        return fit({ title: one.reason === 'expired' ? t('Pas de réponse de {name}', { name: who(one) }) : t('{name} a décliné votre invitation', { name: who(one) }), ...(reason && one.reason !== 'expired' ? { detail: reason } : {}) });
+        const title = one.reason === 'expired' ? t('Pas de réponse de {name}', { name: who(one) }) : one.reason === 'offline' ? t('{name} est passé hors ligne', { name: who(one) }) : t('{name} a décliné votre invitation', { name: who(one) });
+        const detail = one.reason === 'offline' ? t('Invitation retirée') : one.reason !== 'expired' ? reason : undefined;
+        return fit({ title, ...(detail ? { detail } : {}) });
       }
       return fit({ title: namesTitle((names) => t('{names} ont décliné', { names }), () => tn(n, '{n} invité a décliné', '{n} invités ont décliné'), events), detail: subjectList(events.map((e) => [who(e), reasonShort(e.reason)].filter(Boolean).join(' : '))) });
     }
@@ -313,6 +340,8 @@ function digestPart(kind: NoticeKind, n: number): string {
     // La partie entre amis n'entre jamais dans un résumé (NoticeRule.live) : sa part, au cas où.
     case 'live-invite':
       return tn(n, '{n} invitation', '{n} invitations');
+    case 'live-invite-ended':
+      return tn(n, '{n} invitation retirée', '{n} invitations retirées');
     case 'live-finished':
       return tn(n, '{n} partie entre amis finie', '{n} parties entre amis finies');
     case 'live-cancelled':

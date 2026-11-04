@@ -767,8 +767,9 @@ function cornerBox(s) {
   const nodes = cornerNodes(s);
   if (!nodes.length) return undefined;
   statusCorner ??= { box: el('div', 'status-corner') };
-  // Menu système : sur la ligne de la roue dentée, à droite de la marque, au-dessus de l'en-tête (frontend.css).
-  statusCorner.box.classList.toggle('over-library', s.phase === 'library');
+  // Écran plein (menu système, aide, message, mode attente) : sur la ligne de la roue dentée, à droite
+  // de la marque, au-dessus de l'en-tête (frontend.css) ; au menu des tables, le coin.
+  statusCorner.box.classList.toggle('on-head', s.zone === 'head');
   statusCorner.line = nodes.find((n) => n.classList.contains('notice-line')) ?? statusCorner.line;
   placeInto(statusCorner.box, nodes);
   return statusCorner.box;
@@ -791,7 +792,10 @@ function drawPlayfield(s) {
   // Mode attente : la table tirée au hasard, sans la liste du menu.
   if (s.attract) {
     dropLoadingFallback();
-    root.replaceChildren(attractScreen(s));
+    const corner = s.zone ? cornerBox(s) : undefined;
+    if (!corner) noticeShown = undefined;
+    root.replaceChildren(attractScreen(s), ...(corner ? [corner] : []));
+    fitNotice();
     return;
   }
   dropAttractLogo();
@@ -806,10 +810,9 @@ function drawPlayfield(s) {
   // Extinction, veille ou redémarrage en cours : plus rien à choisir, ni roue dentée ni cadenas.
   // Mode invité : le cadenas prend la place de la roue dentée, le menu système est fermé.
   if (!(s.phase === 'message' && s.message?.action === 'power')) nodes.push(s.guest ? guestLock(s.guest) : gearButton(s));
-  // Au menu des tables seulement : un écran plein a son propre accès (première entrée du menu
-  // système). Pastilles et notification, jamais en mode invité. Dans le menu système, ce qui se
-  // montre partout (notices.ts, NoticeRule.away : partie entre amis, invitation, ami connecté), au même endroit.
-  const corner = s.phase === 'menu' && !s.guest ? cornerBox(s) : s.phase === 'library' && s.notice?.away ? cornerBox(s) : undefined;
+  // La zone des notifications (noticezone.ts) : le processus principal dit où (s.zone), sur chaque
+  // écran ; le rendu ne décide de rien. Coin du menu des tables, ou ligne de la roue dentée d'un écran plein.
+  const corner = s.zone ? cornerBox(s) : undefined;
   if (corner) nodes.push(corner);
   else noticeShown = undefined;
 

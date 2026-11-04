@@ -9,8 +9,8 @@
 //   trouvé au démarrage, ni les vieux records qu'un ami renvoie en se reconnectant) ;
 // - chaque genre a sa règle, son texte et sa part du résumé, dans les deux langues, et chaque
 //   texte tient sur sa ligne quels que soient les noms ;
-// - le menu des tables ne montre rien pendant une partie, en attente, en mode invité, sous un
-//   écran plein ou un constat : la condition de app/src/frontend.ts est relevée.
+// - chaque écran a sa zone (noticezone.ts, nommée une fois dans app/src/frontend.ts) : le test
+//   « notifications-partout » la parcourt, celui-ci relève son branchement.
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -40,6 +40,7 @@ import {
   type NoticeKind,
 } from '../notices';
 import { newSocialState, type Presence, type SocialEvent, type SocialState } from '../social';
+import { noticeZone, type NoticeZone } from '../noticezone';
 import { REPO_ROOT } from './i18n-scan';
 
 const KINDS = Object.keys(NOTICE_RULES) as NoticeKind[];
@@ -267,15 +268,16 @@ test('relevé des téléchargements : fini et bloqué seulement, sans les écran
   );
 });
 
-test('menu des tables : rien pendant une partie, en attente, en mode invité, sous un écran plein ou un constat', () => {
+test('zone des notifications : une seule règle pour chaque écran, nommé une fois (noticezone.ts, frontend.ts) ; le constat bref et le préavis d’arrêt les font attendre', () => {
   const src = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
-  const line = src.split('\n').find((l) => /^\s*canShow: \(\) =>/.test(l));
-  assert.ok(line, 'createMenuNotices reçoit canShow dans frontend.ts');
-  for (const need of ["state.phase === 'menu'", '!state.help', '!state.banner', '!attract.active', '!guest.active', '!stopNotice', '!desktop.active'])
-    assert.ok(line.includes(need), `canShow doit tenir compte de ${need}`);
-  // La pastille et la notification ne sont jamais dessinées en mode invité (le rendu le redit).
+  assert.match(src, /zone: \(\) => currentZone\(\),/, 'createMenuNotices suit la zone de l’écran');
+  const screen = src.slice(src.indexOf('function zoneScreen('), src.indexOf('function currentZone('));
+  for (const need of ['desktop.active', "state.phase === 'playing'", "state.phase === 'intro'", "action === 'power'", 'library.browserOpen()', 'attract.active', "state.phase === 'library'", "state.phase === 'confirmQuit'", "state.phase === 'message'", 'state.help'])
+    assert.ok(screen.includes(need), `zoneScreen tient compte de ${need}`);
+  assert.match(src, /noticeZone\(zoneScreen\(\), \{ quietInGame, banner: !!state\.banner, stopNotice: !!stopNotice, closing \}\)/);
+  // Le rendu dessine ce que la zone dit, sans décider de rien.
   const renderer = fs.readFileSync(path.join(REPO_ROOT, 'app', 'renderer', 'frontend.js'), 'utf8');
-  assert.match(renderer, /s\.phase === 'menu' && !s\.guest \? cornerBox\(s\)/);
+  assert.match(renderer, /const corner = s\.zone \? cornerBox\(s\) : undefined;/);
   // Le réglage se lit dans les réglages du menu, et coupe aussi le compteur.
   assert.match(src, /mode: \(\) => mediaSettings\.notices/);
 });
@@ -296,7 +298,7 @@ test('menu des tables (menu-notices.ts) : silence au démarrage, réglage suivi,
     social: { state(): SocialState; online(k: string): boolean; presenceOf(k: string): Presence | undefined };
     jobs(): DownloadJob[];
     mode(): 'all' | 'count' | 'off';
-    canShow(): boolean;
+    zone(): NoticeZone;
     redraw(): void;
     now(): number;
   };
@@ -310,7 +312,7 @@ test('menu des tables (menu-notices.ts) : silence au démarrage, réglage suivi,
     social: { state: () => state, online: (k) => online.has(k), presenceOf: () => undefined },
     jobs: () => [],
     mode: () => mode,
-    canShow: () => true,
+    zone: () => noticeZone('menu'),
     redraw: () => redraws++,
     now: () => clock,
   });

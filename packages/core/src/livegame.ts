@@ -64,6 +64,8 @@ export function liveNoLiveState(p: { proto?: number }): boolean {
 export const LIVE_MAX_PLAYERS = 4;
 /** Une invitation sans réponse expire après ce délai. */
 export const LIVE_INVITE_MS = 2 * 60_000;
+/** Une réponse (ou une fin sans réponse) reste en tête du salon de celui qui invite ce temps-là. */
+export const LIVE_ANSWER_SHOW_MS = 30_000;
 /** Compte à rebours du départ commun, en secondes. */
 export const LIVE_COUNTDOWN_S = 5;
 /** Résultats attendus au plus ce délai après le premier joueur revenu ; au-delà, la partie se clôt. */
@@ -162,6 +164,13 @@ export interface LivePlayer {
   app?: string;
   /** Invité le (ISO), pour l'expiration. */
   invitedAt?: string;
+  /**
+   * Hôte : quand son invitation a pris fin (réponse, refus d'office, expiration, hors ligne), à
+   * l'horloge de l'hôte : le salon le dit en tête un moment (jamais envoyé aux autres).
+   */
+  answeredAt?: string;
+  /** « Pas de réponse » parce qu'il est passé hors ligne avant de répondre : son invitation est retirée. */
+  offline?: true;
   /** Fin de partie : durée jouée et records entrés. */
   seconds?: number;
   records?: LiveRecord[];
@@ -224,6 +233,16 @@ export interface LiveInvite {
 }
 
 export type LiveAnswer = 'accept' | 'decline' | 'busy';
+
+/**
+ * Pourquoi une invitation prend fin sans la réponse de l'invité, dit aux deux bornes (game-cancel,
+ * essai réel du 04/11/2026) : celui qui invite annule (`cancelled`), lance la partie sans lui
+ * (`started`), change de table (`replaced`), la laisse expirer (`expired`, deux minutes), ou l'a
+ * vu passer hors ligne (`offline`) ; chez l'invité seulement, celui qui invite est passé hors
+ * ligne (`host-offline`).
+ */
+export type LiveInviteEnd = 'cancelled' | 'started' | 'replaced' | 'expired' | 'offline' | 'host-offline';
+const INVITE_ENDS: readonly LiveInviteEnd[] = ['cancelled', 'started', 'replaced', 'expired', 'offline', 'host-offline'];
 export type LiveStatus = 'loading' | 'playing' | 'done' | 'failed' | 'left';
 
 export type LiveMessage =
@@ -239,7 +258,10 @@ export type LiveMessage =
   | { t: 'game-start'; game: string; in: number }
   /** `ready` (avec « loading ») : sa table est chargée, elle attend « partez » ; `manual` : sa table n'a pas de relevé. */
   | { t: 'game-status'; game: string; state: LiveStatus; seconds?: number; records?: LiveRecord[]; score?: number; ball?: number; balls?: number; multi?: true; ready?: true; manual?: true }
-  | { t: 'game-cancel'; game: string }
+  /** `why` : pour une invitation, pourquoi elle prend fin ; absent chez une borne d'avant (annulée). */
+  | { t: 'game-cancel'; game: string; why?: LiveInviteEnd }
+  /** L'invité a reçu la fin (game-cancel) : celui qui invite cesse de la renvoyer. */
+  | { t: 'game-cancel-ok'; game: string }
   /** Réglages de l'hôte : chaque fichier, son empreinte et sa taille, ou absent (pas de sha). */
   | { t: 'game-settings'; game: string; files: { rel: string; sha?: string; bytes?: number }[] }
   /** Un morceau d'un fichier de réglages, en base64. */
@@ -335,6 +357,7 @@ function parsePlayer(raw: unknown): LivePlayer | undefined {
     ...(records?.length ? { records } : {}),
     ...(r.ready === true ? { ready: true as const } : {}),
     ...(r.manual === true ? { manual: true as const } : {}),
+    ...(r.offline === true && r.state === 'expired' ? { offline: true as const } : {}),
   };
 }
 
@@ -380,7 +403,9 @@ export function parseLiveMessage(m: Record<string, unknown>): LiveMessage | unde
       return { t: 'game-status', game: m.game, state: m.state as LiveStatus, ...(s !== undefined ? { seconds: s } : {}), ...(records?.length ? { records } : {}), ...progress, ...(m.ready === true ? { ready: true as const } : {}), ...(m.manual === true ? { manual: true as const } : {}) };
     }
     case 'game-cancel':
-      return isId(m.game) ? { t: 'game-cancel', game: m.game } : undefined;
+      return isId(m.game) ? { t: 'game-cancel', game: m.game, ...(INVITE_ENDS.includes(m.why as LiveInviteEnd) && m.why !== 'host-offline' ? { why: m.why as LiveInviteEnd } : {}) } : undefined;
+    case 'game-cancel-ok':
+      return isId(m.game) ? { t: 'game-cancel-ok', game: m.game } : undefined;
     case 'game-settings': {
       if (!isId(m.game) || !Array.isArray(m.files) || m.files.length > SETTINGS_MAX_FILES) return undefined;
       const files: { rel: string; sha?: string; bytes?: number }[] = [];
@@ -462,6 +487,7 @@ export function inviteToGame(game: LiveGame, peer: { key: string; name: string }
   const there = game.players.find((p) => p.key === peer.key);
   if (there) {
     if (['accepted', 'invited'].includes(there.state)) return game;
+    // Invité de nouveau : sa fin d'avant (refus, hors ligne) ne compte plus.
     return setPlayer(game, peer.key, (p) => ({ key: p.key, name: peer.name, state: 'invited', invitedAt: now.toISOString() }));
   }
   if (game.players.filter((p) => !['declined', 'busy', 'expired', 'left'].includes(p.state)).length >= LIVE_MAX_PLAYERS) return undefined;
@@ -469,12 +495,27 @@ export function inviteToGame(game: LiveGame, peer: { key: string; name: string }
 }
 
 /** Réponse d'un invité ; ignorée s'il n'est pas invité ou si la partie est partie. */
-export function answerGame(game: LiveGame, key: string, answer: LiveAnswer, match?: LiveTableMatch, balls?: number, version: { proto?: number; app?: string } = {}): LiveGame {
+export function answerGame(game: LiveGame, key: string, answer: LiveAnswer, match?: LiveTableMatch, balls?: number, version: { proto?: number; app?: string } = {}, now = new Date()): LiveGame {
   const p = game.players.find((x) => x.key === key);
   if (!p || p.host || game.phase !== 'gathering' || p.state !== 'invited') return game;
   // Sans la même version, accepter ne mène à rien : compté comme un refus (une borne d'avant le 30/10/2026 acceptait une autre version).
   const state: LivePlayerState = answer === 'accept' && (match === undefined || match === 'same') ? 'accepted' : answer === 'busy' ? 'busy' : 'declined';
-  return setPlayer(game, key, (x) => ({ ...x, state, ...(match ? { match } : {}), ...(isBallCount(balls) ? { balls } : {}), ...(version.proto ? { proto: version.proto } : {}), ...(version.app ? { app: version.app } : {}) }));
+  return setPlayer(game, key, (x) => ({ ...x, state, answeredAt: now.toISOString(), ...(match ? { match } : {}), ...(isBallCount(balls) ? { balls } : {}), ...(version.proto ? { proto: version.proto } : {}), ...(version.app ? { app: version.app } : {}) }));
+}
+
+/**
+ * Pourquoi la réponse de cet invité arrive trop tard, dit en retour (game-cancel) : son invitation a
+ * déjà pris fin chez moi (essai réel du 04/11/2026 : l'invité accepte une invitation déjà annulée et
+ * attend un départ qui ne viendra pas). undefined : elle vaut encore, ou il a déjà répondu.
+ */
+export function lateAnswerEnd(game: LiveGame | undefined, id: string, key: string): LiveInviteEnd | undefined {
+  if (!game || game.id !== id) return 'cancelled';
+  if (game.phase === 'cancelled') return 'cancelled';
+  const p = game.players.find((x) => x.key === key);
+  if (!p) return 'cancelled';
+  if (p.state === 'expired') return p.offline ? 'offline' : game.phase === 'gathering' ? 'expired' : 'started';
+  if (p.state === 'invited' && game.phase !== 'gathering') return 'started';
+  return undefined;
 }
 
 /** L'invité dit s'il a reçu les réglages de l'hôte entiers ; ignoré s'il n'a pas accepté. */
@@ -487,7 +528,17 @@ export function settingsReceived(game: LiveGame, key: string, ok: boolean): Live
 /** Invitations restées sans réponse trop longtemps : expirées. */
 export function expireInvites(game: LiveGame, now = new Date()): LiveGame {
   const stale = game.players.filter((p) => p.state === 'invited' && p.invitedAt && now.getTime() - Date.parse(p.invitedAt) > LIVE_INVITE_MS);
-  return stale.length ? { ...game, players: game.players.map((p) => (stale.includes(p) ? { ...p, state: 'expired' } : p)) } : game;
+  return stale.length ? { ...game, players: game.players.map((p) => (stale.includes(p) ? { ...p, state: 'expired', answeredAt: now.toISOString() } : p)) } : game;
+}
+
+/**
+ * Invités passés hors ligne (après la tolérance de présence, friendpresence.ts) avant de répondre :
+ * leur invitation est retirée, leur place libérée ; ils l'apprennent à leur retour (game-cancel).
+ */
+export function dropOfflineInvites(game: LiveGame, online: (key: string) => boolean, now = new Date()): LiveGame {
+  if (game.phase !== 'gathering') return game;
+  const gone = game.players.filter((p) => p.state === 'invited' && !online(p.key));
+  return gone.length ? { ...game, players: game.players.map((p) => (gone.includes(p) ? { ...p, state: 'expired', offline: true, answeredAt: now.toISOString() } : p)) } : game;
 }
 
 /** Au moins un invité a accepté : celui qui invite peut donner le départ. */
@@ -502,7 +553,7 @@ export function startGame(game: LiveGame, now = new Date()): LiveGame {
     ...game,
     phase: 'countdown',
     startAt: new Date(now.getTime() + LIVE_COUNTDOWN_S * 1000).toISOString(),
-    players: game.players.map((p) => (p.state === 'invited' ? { ...p, state: 'expired' } : p)),
+    players: game.players.map((p) => (p.state === 'invited' ? { ...p, state: 'expired', answeredAt: now.toISOString() } : p)),
   };
 }
 
@@ -561,7 +612,7 @@ export function roomMessage(game: LiveGame, now = new Date()): Extract<LiveMessa
   const readyFor = game.firstReadyAt && !game.goAt ? { readyFor: Math.max(0, now.getTime() - Date.parse(game.firstReadyAt)) } : {};
   // Le temps avant le lancement : un invité dont « game-start » s'est perdu part avec la salle.
   const startIn = game.phase === 'countdown' && game.startAt ? { startIn: Math.max(0, Date.parse(game.startAt) - now.getTime()) } : {};
-  return { t: 'game-room', game: game.id, phase: game.phase, players: game.players.map(({ invitedAt: _invitedAt, ...p }) => p), ...readyFor, ...go, ...startIn };
+  return { t: 'game-room', game: game.id, phase: game.phase, players: game.players.map(({ invitedAt: _invitedAt, answeredAt: _answeredAt, ...p }) => p), ...readyFor, ...go, ...startIn };
 }
 
 /** Côté invité : la salle reçue de celui qui invite remplace la sienne ; « partez » s'y lit, une fois. */
@@ -611,7 +662,7 @@ export function countdownLeft(game: Pick<LiveGame, 'startAt'>, now = new Date())
 // ---------------------------------------------------------------------------
 // Textes
 
-export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'balls' | 'settings' | 'host' | 'ready'> & Partial<Pick<LivePlayer, 'score' | 'seconds'>>, hostBalls?: number): string {
+export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'balls' | 'settings' | 'host' | 'ready' | 'offline'> & Partial<Pick<LivePlayer, 'score' | 'seconds'>>, hostBalls?: number): string {
   switch (p.state) {
     case 'invited':
       return t('Invité, en attente de sa réponse');
@@ -625,7 +676,7 @@ export function livePlayerStateLabel(p: Pick<LivePlayer, 'state' | 'match' | 'ba
     case 'busy':
       return t('Occupé pour l’instant');
     case 'expired':
-      return t('Pas de réponse');
+      return p.offline ? t('Passé hors ligne : invitation retirée') : t('Pas de réponse');
     case 'left':
       return t('A quitté la partie');
     case 'loading':
