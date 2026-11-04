@@ -86,7 +86,18 @@ export function snapshotAndPush({ message, source = 'HEAD', dryRun = false, newH
   }
   // Remplacement : forcé, mais seulement si main est encore celui qu'on vient de lire.
   const push = newHistory ? ['push', `--force-with-lease=main:${parent}`, url, `${snapshot}:refs/heads/main`] : ['push', url, `${snapshot}:refs/heads/main`];
-  git(push, { stdio: ['ignore', 'inherit', 'inherit'] });
+  // Jusqu'à trois essais : GitHub répond parfois « Internal Server Error » le temps d'un
+  // incident (04/11/2026, publication d'essai.8). Le même instantané est renvoyé, rien d'autre.
+  for (let attempt = 1; ; attempt++) {
+    try {
+      git(push, { stdio: ['ignore', 'inherit', 'inherit'] });
+      break;
+    } catch (error) {
+      if (attempt === 3) throw error;
+      console.log(`Envoi refusé par GitHub, nouvel essai dans ${20 * attempt} s…`);
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 20000 * attempt);
+    }
+  }
   git(['update-ref', PUBLIC_REF, snapshot]);
   console.log(`Envoyé sur main : ${url.replace(/\.git$/, '')}/commit/${snapshot}`);
   return snapshot;

@@ -84,7 +84,10 @@ const api = async (method, url, body, headers = {}) => {
     body: body === undefined ? undefined : body instanceof Blob ? body : JSON.stringify(body),
   });
   const text = await response.text();
-  return { status: response.status, json: text ? JSON.parse(text) : undefined };
+  // Une erreur 5xx de GitHub peut répondre autre chose que du JSON.
+  let json;
+  try { json = text ? JSON.parse(text) : undefined; } catch { json = { message: text.slice(0, 200) }; }
+  return { status: response.status, json };
 };
 if (!local) {
   if (!token) fail(missingTokenMessage());
@@ -234,6 +237,14 @@ const body = [
   `SHA-256 de ${update.UPDATE_INSTALLER_NAME} : \`${manifest.installer.sha256}\``,
   `SHA-256 de ${update.UPDATE_APP_NAME} : \`${manifest.app.sha256}\``,
 ].join('\n');
+// Un brouillon de la même version, laissé par une publication interrompue (envoi refusé par
+// GitHub, 04/11/2026 : HTTP 500 sur le paquet), est retiré : sinon il resterait orphelin à côté
+// du nouveau. Un brouillon n'a pas encore d'étiquette, d'où la liste plutôt que /releases/tags.
+const drafts = await api('GET', '/releases?per_page=50');
+for (const draft of (drafts.status === 200 ? drafts.json : []).filter((r) => r.draft && r.tag_name === `v${version}`)) {
+  const removed = await api('DELETE', `/releases/${draft.id}`);
+  console.log(`Brouillon interrompu de v${version} retiré (HTTP ${removed.status}).`);
+}
 const created = await api('POST', '/releases', {
   tag_name: `v${version}`,
   target_commitish: commit,
@@ -248,8 +259,19 @@ const files = reference ? [appPackage, feed] : [installer, ...(fs.existsSync(com
 for (const file of files) {
   const name = path.basename(file);
   process.stdout.write(`  ${name} (${(fs.statSync(file).size / 1024 ** 2).toFixed(1)} Mio)… `);
-  const blob = await fs.openAsBlob(file);
-  const sent = await api('POST', `${uploadBase}?name=${encodeURIComponent(name)}`, blob, { 'content-type': name.endsWith('.json') ? 'application/json' : 'application/octet-stream' });
+  // Jusqu'à trois essais : une erreur passagère de GitHub (5xx) ne doit pas arrêter la
+  // publication. Un envoi coupé peut laisser un fichier partiel du même nom, retiré avant de
+  // renvoyer (sinon GitHub répond 422 « already_exists »).
+  let sent;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const blob = await fs.openAsBlob(file);
+    sent = await api('POST', `${uploadBase}?name=${encodeURIComponent(name)}`, blob, { 'content-type': name.endsWith('.json') ? 'application/json' : 'application/octet-stream' });
+    if (sent.status === 201 || attempt === 3 || (sent.status < 500 && sent.status !== 422)) break;
+    process.stdout.write(`refusé (HTTP ${sent.status}), nouvel essai… `);
+    const assets = await api('GET', `/releases/${created.json.id}/assets`);
+    for (const asset of (assets.status === 200 ? assets.json : []).filter((a) => a.name === name)) await api('DELETE', `/releases/assets/${asset.id}`);
+    await new Promise((resolve) => setTimeout(resolve, 5000 * attempt));
+  }
   if (sent.status !== 201) fail(`envoi de ${name} refusé (HTTP ${sent.status}) : ${JSON.stringify(sent.json)}. La release reste en brouillon.`);
   console.log('envoyé');
 }
