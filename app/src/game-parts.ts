@@ -16,6 +16,7 @@ import * as path from 'node:path';
 import {
   applyOps,
   CONTENT_LABELS,
+  expectedPackNames,
   formatDay,
   formatNumber,
   formatSize,
@@ -29,6 +30,7 @@ import {
   MEDIA_SITES,
   NEED_LABELS,
   partFits,
+  partFolderPick,
   partLabel,
   partOffers,
   partSources,
@@ -48,6 +50,7 @@ import {
   type MediaSiteId,
   type NeedKind,
   type PartOffer,
+  type PartWanted,
   type TableEntry,
   type TableGame,
   type VpsDb,
@@ -109,6 +112,9 @@ interface Proposals {
 
 /** Extension que VPX attend nommée comme la table : fronton, point de vue, réglages propres. */
 const NAMED_LIKE_TABLE: Partial<Record<GamePart, string>> = { b2s: '.directb2s', pov: '.pov', ini: '.ini' };
+
+/** Parties qui sont d'ordinaire un dossier, pas un fichier : le choix d'un dossier y est dit en premier. */
+const PART_FOLDERS = new Set<GamePart>(['pup', 'altcolor', 'altsound', 'music']);
 
 /** Propositions montrées au plus par partie (les plus sûres d'abord). */
 const MAX_PROPOSALS = 24;
@@ -377,7 +383,7 @@ export function createGameParts(ctx: GamePartsContext) {
       if (p?.sites[site.id]?.state === 'login' && ctx.sites) actions.push({ label: t('Se connecter à {site}…', { site: site.name }), detail: t('Dans la fenêtre de Cyber Pinball ; votre mot de passe reste au site'), run: () => ctx.sites!.signIn(site.id) });
     }
     if (kind) actions.push({ label: t('Tous les fichiers téléchargés…'), detail: t('Ceux qui ne conviennent pas compris'), run: () => openCandidates(table, kind, from) });
-    if (ctx.pick) actions.push({ label: t('Chercher un fichier…'), detail: t('Téléchargements de Cyber Pinball, clé USB, disques'), run: () => void pickFile(table, part, from) });
+    if (ctx.pick) actions.push({ label: t('Chercher un fichier ou un dossier…'), detail: PART_FOLDERS.has(part) ? t('Un fichier, ou tout un dossier (« Prendre ce dossier entier ») : Téléchargements, clé USB, disques, une autre installation') : t('Téléchargements de Cyber Pinball, clé USB, disques ; un dossier aussi'), run: () => void pickFile(table, part, from) });
     if (item?.state === 'received') actions.push({ label: t('Installer ce qui est reçu'), detail: t('Voir le plan'), tone: 'ok', run: () => ctx.catalog.installGame(item.gameId) });
     if (part === 'pup' && here) actions.push({ label: t('Options du PuP-Pack'), detail: t('Disposition des écrans'), run: () => ctx.pupOptions(table) });
     if (part === 'media') actions.push({ label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), run: () => ctx.medias(table) });
@@ -442,12 +448,50 @@ export function createGameParts(ctx: GamePartsContext) {
     return { kind: 'image', url: mediaUrl(local), rotation: 0 };
   }
 
+  /**
+   * Un fichier ou un dossier pour cette partie : toutes les parties s'acceptent en dossier (un
+   * PuP-Pack, des sons, des couleurs, une musique ne sont pas un fichier). Un dossier qui en
+   * contient plusieurs (PUPVideos entier, VPinMAME\altsound) est réduit à celle de la table,
+   * d'après ses noms ; sans nom qui convienne, on choisit dans la liste de ses sous-dossiers.
+   */
   async function pickFile(table: TableEntry, part: GamePart, from: number): Promise<void> {
-    const paths = await ctx.pick!({ title: t('{part} : {title}', { part: partLabel(part), title: table.title }), icon: 'inbox', purpose: t('Parties du jeu : {part}', { part: partLabel(part) }), mode: 'file', start: 'cp' });
-    if (paths?.length) {
-      ctx.catalog.setRefresh(undefined);
-      ctx.install(paths, table, () => openPart(table, part, from));
-    } else openPart(table, part, from);
+    const back = () => openPart(table, part, from);
+    const paths = await ctx.pick!({ title: t('{part} : {title}', { part: partLabel(part), title: table.title }), icon: 'inbox', purpose: t('Parties du jeu : {part}', { part: partLabel(part) }), mode: 'files-or-folder', start: 'cp' });
+    if (!paths?.length) return back();
+    const dir = paths.length === 1 && isDirectory(paths[0]!) ? paths[0]! : undefined;
+    const pick = dir ? partFolderPick(dir, part, wantedOf(table)) : { use: paths };
+    if ('choose' in pick) return chooseFolder(table, part, dir!, pick.choose, from);
+    ctx.catalog.setRefresh(undefined);
+    ctx.install(pick.use, table, back);
+  }
+
+  /** Noms sous lesquels la table cherche ses parties : PuP-Packs que chargera le plugin, ROM, titre. */
+  function wantedOf(table: TableEntry): PartWanted {
+    const script = ctx.script(table);
+    const facts = script && !('error' in script) ? script : undefined;
+    return { packs: expectedPackNames(facts), roms: facts?.roms ?? [], title: game()?.name ?? table.title };
+  }
+
+  /** Plusieurs PuP-Packs (ou dossiers) dans celui choisi, aucun au nom de la table : on choisit le sien. */
+  function chooseFolder(table: TableEntry, part: GamePart, dir: string, choices: string[], from: number): void {
+    const back = () => openPart(table, part, from);
+    ctx.catalog.setRefresh(undefined);
+    ctx.show(
+      () => ({
+        heading: t('{part} : lequel ?', { part: partLabel(part) }),
+        subheading: [table.title, dir].join(' · '),
+        lead: t('Ce dossier en contient plusieurs, et aucun ne porte un nom que la table attend. Start sur le sien : seul celui-là passe par le plan d’ajout.'),
+        sections: [],
+        actions: [
+          ...choices.map((c): Action => ({ label: path.basename(c), key: `dir:${c}`, run: () => ctx.install([c], table, back) })),
+          ctx.catalog.webAction('parts.folder', { query: partWebQuery(titleOf(table), part), target: target(table, part === 'ini' ? undefined : (part as NeedKind)) }, () => chooseFolder(table, part, dir, choices, from)),
+          { label: t('Retour : {part}', { part: partLabel(part) }), run: back },
+        ],
+        back,
+      }),
+      0,
+      table.file,
+    );
   }
 
   /** Fichiers déjà téléchargés pour cette partie : ceux qui conviennent d'abord ; Start ouvre le plan d'ajout à cette table. */
@@ -628,6 +672,14 @@ const PART_LEADS: Record<GamePart, () => string> = {
 };
 
 const samePathText = (a: string, b: string) => path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase();
+
+function isDirectory(p: string): boolean {
+  try {
+    return fs.statSync(p).isDirectory();
+  } catch {
+    return false;
+  }
+}
 
 function fileSize(file: string): number {
   try {

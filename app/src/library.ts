@@ -109,6 +109,9 @@ import {
   formatDateTime,
   formatList,
   formatNumber,
+  companionLabel,
+  installationCompanions,
+  type CompanionReport,
   language,
   playBlockers,
   romBlockers,
@@ -186,6 +189,7 @@ import { createConverter } from './media-convert';
 import { analyseDressing } from './fulldmd';
 import { createMediaSites } from './media-sites';
 import { createMediaImport } from './media-import';
+import { createInstallationImport } from './installation-import';
 import { createMedias, playsSoundPreview, type MediaView } from './library-medias';
 import { createTableFiles } from './table-files';
 import { createFilePicker, type PickRequest } from './file-picker';
@@ -527,6 +531,11 @@ type Screen =
        * `wanted` : le choix de l'utilisateur (oui d'office) ; `problem` : index indisponible.
        */
       medias?: { wanted: boolean; games: Map<string, MediaDbGameOffer>; problem?: string };
+      /**
+       * Tables choisies dans une installation existante (Popper, PinballX…) : ce qui a été
+       * retrouvé ailleurs dans l'installation et ajouté au plan, et ce qui y manque.
+       */
+      companions?: CompanionReport[];
     }
   | { kind: 'addChoice'; plan: AddPlan; key: string }
   | { kind: 'addPupChoice'; plan: AddPlan; key: string }
@@ -685,6 +694,17 @@ export function createLibrary(host: LibraryHost) {
   const layout = () => (host.root ? layoutOf(host.root) : undefined);
   const tablesDir = () => layout()?.tables ?? '';
   const find = (file: string) => host.tables().find((t) => samePath(t.file, file));
+  const installationImport = createInstallationImport({
+    root: () => host.root,
+    tables: () => host.tables(),
+    pickFolder: async () => (await pickPaths({ title: t('Dossier de l’autre installation'), icon: 'folder', purpose: t('Reprise de tables d’une autre installation'), mode: 'folder', start: 'desktop' }))?.[0],
+    openCustom: (build, at) => openCustom(build, at),
+    cursor: () => cursor,
+    task: (message, work) => task(message, work),
+    install: (paths, back) => startImport(paths, 'copy', undefined, undefined, true, undefined, back),
+    web: (after) => catalogUi.webAction('add.installation', { query: partWebQuery('table', 'table'), received: (file) => startImport([file], 'copy', undefined, undefined, true) }, after),
+    back: () => openAdd(),
+  });
   const mediaImport = createMediaImport({
     tablesDir: () => layout()?.tables,
     trashRoot: () => layout()?.trash,
@@ -2479,6 +2499,7 @@ export function createLibrary(host: LibraryHost) {
       { label: t('Reprendre un fichier téléchargé'), detail: downloadsDetail(), icon: 'download', run: () => void pick('downloads') },
       { label: t('Choisir des fichiers…'), detail: t('Clé USB, Téléchargements, Bureau, disques ; ou glissez-les ici'), icon: 'import', run: () => void pick('files') },
       { label: t('Choisir un dossier…'), detail: t('Tout le dossier d’une table, depuis une clé USB ou un disque'), icon: 'folder', run: () => void pick('folder') },
+      { label: t('Depuis une autre installation…'), detail: t('PinUP Popper, PinballX : les tables une à une, avec leur PuP-Pack, leur ROM et leurs médias'), icon: 'layers', run: () => installationImport.open() },
       { label: t('Récupérés et attendus'), detail: catalogUi.summary(), icon: 'inbox', run: () => catalogUi.openWaitList(() => openAdd()) },
       { label: t('Mises à jour des tables'), detail: t('Nouvelles versions des tables installées'), icon: 'refresh', run: () => catalogUi.openUpdates() },
       { label: t('Comptes des sites'), detail: t('vpuniverse.com, vpforums.org… : connexions gardées'), icon: 'account', run: () => catalogUi.openAccounts() },
@@ -2522,7 +2543,7 @@ export function createLibrary(host: LibraryHost) {
       kind === 'folder'
         ? { title: t('Choisir un dossier'), icon: 'folder', purpose: t('Ajout d’une table'), mode: 'folder' }
         : kind === 'rom'
-          ? { title: t('Choisir des ROM'), icon: 'chip', purpose: t('Ajout d’une ROM'), mode: 'files', filter: { label: t('ROM et archives'), extensions: ['zip', '7z', 'rar'] }, start: 'cp' }
+          ? { title: t('Choisir des ROM'), icon: 'chip', purpose: t('Ajout d’une ROM'), mode: 'files-or-folder', filter: { label: t('ROM et archives'), extensions: ['zip', '7z', 'rar'] }, start: 'cp' }
           : { title: t('Choisir des fichiers'), icon: 'import', purpose: journey ? t('Ajout de ce qu’il manque à {table}', { table: find(journey)?.title ?? path.basename(journey) }) : t('Ajout d’une table'), mode: 'files-or-folder', filter: tableFilter(), start: kind === 'downloads' ? 'cp' : undefined };
     const paths = await pickPaths(request);
     if (paths?.length) startImport(paths, 'copy', undefined, journey, !journey);
@@ -2550,6 +2571,13 @@ export function createLibrary(host: LibraryHost) {
         }
         host.windows().get('playfield')?.focus();
       }
+      // Une table choisie dans une installation existante (Popper, PinballX…) : son PuP-Pack, sa ROM,
+      // ses couleurs, ses sons, son dossier DMD et ses médias sont rangés ailleurs ; ils la suivent.
+      busy = t('Recherche de ses parties dans l’installation d’origine…');
+      host.broadcast();
+      const companions = installationCompanions(s.prepared.sources, (vpx) => s.scripts.get(vpx.toLowerCase()), host.root ? [host.root] : []);
+      s.prepared.sources.push(...companions.sources);
+      s.companions = companions.reports;
       s.existing = knownTables();
       if (s.prepared.sources.some((src) => listVpx(src.path).length)) s.vps = await vpsForImport();
       replan(s);
@@ -2831,6 +2859,21 @@ export function createLibrary(host: LibraryHost) {
     return rows;
   }
 
+  /** « Repris de l'installation d'origine » : ce qui y a été retrouvé pour chaque table, et ce qui y manque. */
+  function companionSection(reports: CompanionReport[]): Section {
+    const rows: Row[] = reports.map((r) => {
+      const medias = r.found.filter((c) => c.part === 'media').length;
+      const found = [...new Set(r.found.filter((c) => c.part !== 'media').map((c) => companionLabel(c.part)))];
+      if (medias) found.push(tn(medias, '{n} média', '{n} médias'));
+      return {
+        text: path.basename(r.vpx),
+        detail: [found.length ? t('Retrouvés : {parts}', { parts: formatList(found) }) : t('Rien d’autre retrouvé'), r.missing.length ? t('absent de l’installation : {parts}', { parts: formatList(r.missing) }) : undefined].filter(Boolean).join(' · '),
+        tone: r.missing.length ? 'warning' : 'ok',
+      };
+    });
+    return { title: t('Repris de l’installation d’origine · {root}', { root: reports[0]!.root }), rows };
+  }
+
   function buildAddPlan(s: AddPlan): Built {
     const cancel = () => {
       if (s.prepared) fs.rmSync(s.prepared.staging, { recursive: true, force: true });
@@ -2844,6 +2887,7 @@ export function createLibrary(host: LibraryHost) {
     // Après « Installer » et « Annuler » : changer le jeu VPS d'une table.
     const choiceActions: Action[] = [];
     for (const error of s.prepared?.errors ?? []) sections.push({ rows: [{ text: error, tone: 'error' }] });
+    if (s.companions?.length) sections.push(companionSection(s.companions));
     if (plan && !s.vps && plan.tables.some((t) => t.steps.some((st) => st.kind === 'table'))) {
       sections.push({ rows: [{ text: t('Base VPS indisponible : noms déduits des fichiers'), detail: vpsProblem ? t('Téléchargement impossible ({problem}). Elle sera téléchargée au prochain ajout.', { problem: vpsProblem }) : undefined, tone: 'quiet' }] });
     }

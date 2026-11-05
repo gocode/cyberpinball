@@ -1440,6 +1440,17 @@ On the cabinet: the KL25Z (Pinscape), and for addressable LEDs a controller of t
 | 767 | Pinscape Pico | A Pinscape Pico with addressable LEDs declared as outputs in its configuration. | “Contrôleurs”: “Pinscape Pico · directoutputconfig120.ini”; the editor explains that its LEDs are declared in its configuration; nothing is written. |
 | 768 | ESP32 running WLED, four strips, one per universe | An ESP32 (NodeMCU-32S) running WLED over Wi-Fi, a fast level shifter to the strips. In the editor, “Art-Net (DMX)”, first universe 0, “Côté gauche” 120 LEDs universe 0, “Côté droit” 120 LEDs universe 1, two rings on universes 2 and 3; “Enregistrer” (Save). In WLED: LED Preferences with the “Start” values shown, Sync Interfaces > Realtime on “Art-Net”, start universe 0, “Multi RGB”, “WiFi sleep” unticked. Launch a table the configtool knows. | The editor shows “Côté gauche” Start 0, “Côté droit” Start 170, then 340 and 510, and the total LED count; the save notice repeats them. In a game, each strip gets its own effects (a right-side effect is never shifted nor shown on the neighbouring strip), without stutter. |
 
+## Bringing tables in from another installation
+
+A PinUP Popper (or PinballX) installation on this PC or a plugged-in drive: `VisualPinballTables`, `VPinMAME`, `PinUPSystemPUPVideos` and `POPMedia`, with at least one table with a PuP-Pack and one table with a ROM.
+
+| # | Scenario | How | Expected result |
+|---|---|---|---|
+| 769 | A single table, with its PuP-Pack | "Ajouter une table" (Add a table) > "Depuis une autre installation…" (From another installation…) (or "Choisir un dossier…" (Choose a folder…): the installation root); tick a single table with a PuP-Pack; "Reprendre la table cochée" (Bring in the ticked table). | The screen lists all its tables, "Déjà dans la borne" (Already on the cabinet) on the ones you have. The plan holds only the ticked table, with the "Repris de l'installation d'origine" (Brought in from the original installation) section: PuP-Pack, backglass, media (and ROM, colours, sounds for a ROM table). After "Installer" (Install), the game shows the PuP-Pack; the original installation is untouched. |
+| 770 | The `.vpx` alone, chosen by hand | "Ajouter une table" > "Choisir des fichiers…" (Choose files…); in `VisualPinballTables`, choose a single `.vpx` whose PuP-Pack is in `PUPVideos`. | The plan also brings its PuP-Pack, ROM and media ("Repris de l'installation d'origine"). A pack the script expects but that is missing is stated ("absent de l'installation : PuP-Pack « … »", missing from the installation). |
+| 771 | PuP-Pack chosen as a folder, from the game parts | Page of a table without a PuP-Pack > "Parties du jeu" (Game parts) > "PuP-Pack" > "Chercher un fichier ou un dossier…" (Look for a file or a folder…); go to `PinUPSystemPUPVideos<pack>`; "Prendre ce dossier entier" (Take this whole folder). | The add plan, targeted at this table, installs the pack in its `pupvideos`. |
+| 772 | The whole PUPVideos | Same path, but "Prendre ce dossier entier" on `PUPVideos` itself. | The pack with the name the table expects is taken alone; with no matching name, "PuP-Pack : lequel ?" (PuP-Pack: which one?) lists the packs, and Start on one installs only that one. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

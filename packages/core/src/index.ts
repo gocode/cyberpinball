@@ -22,6 +22,7 @@ export * from './tablecontents';
 export * from './doctor';
 export * from './playable';
 export * from './tableimport';
+export * from './installation';
 export * from './vpx-settings';
 export * from './vpx-essentials';
 export * from './layout';

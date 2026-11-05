@@ -56,6 +56,11 @@ export interface ImportSource {
   mode: 'move' | 'copy';
   /** Dossier déballé d'une archive : c'est un paquet, même s'il ne contient qu'un fichier. */
   unpacked?: boolean;
+  /**
+   * .vpx dont cette source est une partie : retrouvée dans l'installation d'où vient la table
+   * (son PuP-Pack dans PUPVideos, sa ROM dans VPinMAME…, installation.ts). Elle lui revient.
+   */
+  owner?: string;
 }
 
 /** Table déjà installée, pour y ranger un complément (ROM, vidéos PuP…). */
@@ -283,6 +288,8 @@ interface Item {
   rom?: RomItem;
   /** Vient d'une archive déballée (dossier de travail). */
   unpacked: boolean;
+  /** .vpx auquel cet élément appartient (ImportSource.owner). */
+  owner?: string;
 }
 
 interface RomItem {
@@ -349,7 +356,8 @@ export function planImport(sources: ImportSource[], opts: PlanOptions): ImportPl
   const romItems: { item: Item; owner?: Game }[] = [];
   const ofGame = opts.vpsGame ? games.filter((g) => g.vpsId === opts.vpsGame) : [];
   for (const item of items.filter((i) => i.kind !== 'table')) {
-    const game = target ?? assign(item, games, packages, opts.vps) ?? (ofGame.length === 1 ? ofGame[0] : undefined);
+    const owned = item.owner ? games.find((g) => g.vpx.some((v) => samePath(v.path, item.owner!))) : undefined;
+    const game = target ?? owned ?? assign(item, games, packages, opts.vps) ?? (ofGame.length === 1 ? ofGame[0] : undefined);
     if (opts.romLibrary && item.kind === 'rom' && (!item.isDir || item.rom)) romItems.push({ item, owner: game });
     else if (game) game.others.push(item);
     else leftovers.push({ source: item.source, reason: t('Je ne sais pas à quelle table il appartient : il reste où il est.') });
@@ -522,15 +530,16 @@ export function applyRomImport(rom: RomImport, ctx: ImportContext): void {
 function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[], dmdFolders: string[], hints: RomHints): void {
   const label = src.label ?? path.basename(src.path);
   const unpacked = Boolean(src.unpacked);
+  const owner = src.owner ? { owner: src.owner } : {};
   const push = (p: string, dir: boolean, kind: FileKind, parents: string[], source: string, media?: RecognizedMedia) => {
     if (kind === 'ignored') ignored.push(source);
     else {
       const rom = kind === 'rom' && !dir ? describeRomZip(p, hints) : undefined;
-      items.push({ path: p, isDir: dir, kind, parents, pkg, source, mode: src.mode, unpacked, ...(media ? { media } : {}), ...(rom ? { rom } : {}) });
+      items.push({ path: p, isDir: dir, kind, parents, pkg, source, mode: src.mode, unpacked, ...owner, ...(media ? { media } : {}), ...(rom ? { rom } : {}) });
     }
   };
   const pushRom = (p: string, parents: string[], source: string, rom: RomItem) =>
-    items.push({ path: p, isDir: true, kind: 'rom', parents, pkg, source, mode: src.mode, unpacked, rom });
+    items.push({ path: p, isDir: true, kind: 'rom', parents, pkg, source, mode: src.mode, unpacked, ...owner, rom });
   // Dossiers au-dessus d'une sélection (« …\POPMedia\Visual Pinball X\Wheel ») : ils disent comment lire les médias.
   const above = src.unpacked ? [] : path.resolve(src.path).split(/[\\/]+/).filter(Boolean).slice(0, -1);
   if (!isDir(src.path)) {
@@ -541,7 +550,8 @@ function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[
   }
   const isDmdFolder = (name: string) => dmdFolders.some((d) => d.toLowerCase() === name.toLowerCase());
   const start = src.unpacked || isDmdFolder(path.basename(src.path)) ? undefined : mediaFolder(path.basename(src.path), above);
-  const own = src.unpacked || start ? undefined : classifyDir(path.basename(src.path), src.path, [], dmdFolders);
+  // Le dossier au-dessus compte : « PUPVideos\TheMatrix », « VPinMAME\altsound\t2_l8 » choisis seuls.
+  const own = src.unpacked || start ? undefined : classifyDir(path.basename(src.path), src.path, above.slice(-1), dmdFolders);
   const context = src.unpacked ? [] : [...above, path.basename(src.path)];
   if (own) {
     push(src.path, true, own, [], label);
@@ -549,7 +559,7 @@ function collect(src: ImportSource, pkg: number, items: Item[], ignored: string[
   }
   // Archive qui contient directement le pack (screens.pup à sa racine) : elle lui donne son nom.
   if (src.unpacked && isPackRoot(src.path) && !fs.readdirSync(src.path).some((f) => f.toLowerCase().endsWith('.vpx'))) {
-    items.push({ path: src.path, isDir: true, kind: 'pup', parents: [], pkg, source: label, mode: src.mode, unpacked, name: label.replace(/\.(zip|7z|rar)$/i, '') });
+    items.push({ path: src.path, isDir: true, kind: 'pup', parents: [], pkg, source: label, mode: src.mode, unpacked, ...owner, name: label.replace(/\.(zip|7z|rar)$/i, '') });
     return;
   }
   // Archive (.7z, .rar) ou dossier qui ne contient qu'une ROM : ses puces feront un zip à plat.

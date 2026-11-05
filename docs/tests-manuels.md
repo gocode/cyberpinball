@@ -1440,6 +1440,17 @@ Sur la borne : la KL25Z (Pinscape), et pour les LED adressables un contrôleur �
 | 767 | Pinscape Pico | Une Pinscape Pico avec des LED adressables déclarées comme sorties dans sa configuration. | « Contrôleurs » : « Pinscape Pico · directoutputconfig120.ini » ; l'éditeur explique que ses LED se déclarent dans sa configuration ; rien n'est écrit. |
 | 768 | ESP32 sous WLED, quatre bandes, une par univers | Un ESP32 (NodeMCU-32S) sous WLED en Wi-Fi, un adaptateur de niveau rapide vers les bandes. Dans l'éditeur, « Art-Net (DMX) », premier univers 0, « Côté gauche » 120 LED univers 0, « Côté droit » 120 LED univers 1, deux anneaux sur les univers 2 et 3 ; « Enregistrer ». Dans WLED : LED Preferences avec les « Start » affichés, Sync Interfaces > Realtime en « Art-Net », univers de départ 0, « Multi RGB », « WiFi sleep » décoché. Lancer une table connue du configtool. | L'éditeur affiche « Côté gauche » Start 0, « Côté droit » Start 170, puis 340 et 510, et le total de LED ; l'avis d'enregistrement les répète. En partie, chaque bande reçoit ses propres effets (un effet du côté droit ne s'affiche jamais décalé ni sur la bande d'à côté), sans saccades. |
 
+## Reprise depuis une autre installation
+
+Une installation de PinUP Popper (ou de PinballX) sur ce PC ou un disque branché : `VisualPinballTables`, `VPinMAME`, `PinUPSystemPUPVideos` et `POPMedia`, avec au moins une table à PuP-Pack et une table à ROM.
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 769 | Une seule table, avec son PuP-Pack | « Ajouter une table » > « Depuis une autre installation… » (ou « Choisir un dossier… » : la racine de l'installation) ; cocher une seule table à PuP-Pack ; « Reprendre la table cochée ». | L'écran liste toutes ses tables, « Déjà dans la borne » sur celles qu'on a. Le plan ne contient que la table cochée, avec la section « Repris de l'installation d'origine » : PuP-Pack, fronton, médias (et ROM, couleurs, sons pour une table à ROM). Après « Installer », la partie montre le PuP-Pack ; l'installation d'origine est intacte. |
+| 770 | Le seul .vpx, choisi à la main | « Ajouter une table » > « Choisir des fichiers… » ; dans `VisualPinballTables`, choisir un seul `.vpx` dont le PuP-Pack est dans `PUPVideos`. | Le plan reprend aussi son PuP-Pack, sa ROM et ses médias (« Repris de l'installation d'origine »). Un pack attendu par le script mais absent est dit (« absent de l'installation : PuP-Pack « … » »). |
+| 771 | PuP-Pack choisi en dossier, depuis les parties du jeu | Fiche d'une table sans PuP-Pack > « Parties du jeu » > « PuP-Pack » > « Chercher un fichier ou un dossier… » ; aller dans `PinUPSystemPUPVideos<pack>` ; « Prendre ce dossier entier ». | Le plan d'ajout, ciblé sur cette table, installe le pack dans son `pupvideos`. |
+| 772 | PUPVideos entier | Même chemin, mais « Prendre ce dossier entier » sur `PUPVideos` lui-même. | Le pack au nom que la table attend est pris seul ; sans nom qui convienne, « PuP-Pack : lequel ? » liste les packs, et Start sur l'un n'installe que lui. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

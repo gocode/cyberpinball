@@ -226,6 +226,12 @@ export function classifyDir(name: string, dir: string, parents: string[] = [], d
   if (parent === 'altsound') return 'altsound';
   if (parent === 'serum') return 'serum';
   if (parent === 'vni') return 'vni';
+  // VPinMAME\altcolor\<rom> : les couleurs d'une ROM, Serum (.cRZ) ou PIN2DMD (.pal, .vni).
+  if (parent === 'altcolor') {
+    const inside = listSafe(dir).map((f) => path.extname(f).toLowerCase());
+    if (inside.some((e) => SERUM_EXT.has(e))) return 'serum';
+    if (inside.some((e) => VNI_EXT.has(e))) return 'vni';
+  }
   if (lower === 'music') return 'music';
   if (lower === 'medias') return 'media';
   if (lower === 'scripts') return 'script';

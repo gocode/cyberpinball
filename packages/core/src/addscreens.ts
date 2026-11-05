@@ -7,6 +7,7 @@
 
 export const ADD_SCREENS = {
   'add.funnel': true, // Ajouter une table (entonnoir)
+  'add.installation': true, // Reprendre une table d’une autre installation (Popper, PinballX…)
   catalog: true, // Trouver une table (catalogue de la base VPS)
   'catalog.game': true, // Fiche d’un jeu de la base VPS : ses versions
   'catalog.needs': true, // Ce qu’il faut pour une version
@@ -16,6 +17,7 @@ export const ADD_SCREENS = {
   'waitlist.replace': true, // Remplacer un élément, choisir un fichier déjà téléchargé
   parts: true, // Parties du jeu
   'parts.part': true, // Une partie du jeu (propositions de toutes les sources)
+  'parts.folder': true, // Une partie : lequel des dossiers choisis (PUPVideos entier…)
   'parts.candidates': true, // Une partie : depuis Téléchargements
   'parts.files': true, // « … : au choix » (fichiers de VPS pour une partie, galerie des fichiers)
   downloads: true, // Téléchargements

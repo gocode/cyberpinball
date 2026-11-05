@@ -63,7 +63,6 @@ export const messages: Record<string, string> = {
   'cette table n’utilise pas de ROM': 'this table uses no ROM',
   'absent · {n} sur VPS': 'missing · {n} on VPS',
   '{file} · le {date}': '{file} · on {date}',
-  'Chercher un fichier…': 'Look for a file…',
   'Voir le plan': 'See the plan',
   'Options du PuP-Pack': 'PuP-Pack options',
   'Réaffecter à une autre table': 'Reassign to another table',

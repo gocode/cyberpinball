@@ -304,6 +304,8 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **"Add a table"** (System menu > "Tables") gathers it all: "Ready to install", the import folder (USB stick), "Find a table online", "Reuse a downloaded file", "Choose files…", drag and drop, "Received and expected", "Table updates", "Site accounts".
 - **Every table named from the VPS database** (Virtual Pinball Spreadsheet, about 2,600 games): a "Title (Manufacturer Year)" folder, details filled in (manufacturer, year, authors, IPDB number). A doubt opens "Which game is it?" with five suggestions.
 - **"Table updates"**: the tables for which a newer version exists.
+- **"From another installation…"**: the tables of another cabinet menu, listed one by one; tick the ones you want, and each arrives with what that installation kept elsewhere (PuP-Pack, ROM, DMD colours and sounds, DMD folder, backglass, media). Nothing is brought in wholesale; the original installation does not change.
+- **A game part can be chosen as a folder too** ("Game parts" > "Look for a file or a folder…"): a PuP-Pack, sounds or colours, even taken from a folder that holds many.
 
 ### The online catalogue
 

@@ -304,6 +304,8 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **« Ajouter une table »** (Menu système > « Tables ») réunit tout : « Prêt à installer », le dossier d'import (clé USB), « Trouver une table en ligne », « Reprendre un fichier téléchargé », « Choisir des fichiers… », glisser-déposer, « Récupérés et attendus », « Mises à jour des tables », « Comptes des sites ».
 - **Chaque table nommée d'après la base VPS** (Virtual Pinball Spreadsheet, environ 2 600 jeux) : dossier « Titre (Fabricant Année) », fiche remplie (fabricant, année, auteurs, identifiant IPDB). Un doute ouvre « Quel jeu est-ce ? » avec cinq propositions.
 - **« Mises à jour des tables »** : les tables dont une version plus récente existe.
+- **« Depuis une autre installation… »** : les tables d'un autre menu de borne, listées une à une ; on coche celles qu'on veut, et chacune arrive avec ce que cette installation rangeait ailleurs (PuP-Pack, ROM, couleurs et sons du DMD, dossier DMD, fronton, médias). Rien n'est repris en bloc, l'installation d'origine ne change pas.
+- **Une partie du jeu se choisit aussi en dossier** (« Parties du jeu » > « Chercher un fichier ou un dossier… ») : un PuP-Pack, des sons ou des couleurs, même pris dans un dossier qui en contient beaucoup.
 
 ### Le catalogue en ligne
 
