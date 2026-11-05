@@ -28,9 +28,11 @@ body.mouse [data-act] {
   cursor: pointer;
 }
 
-/* Dans la racine, pour pivoter avec elle (écran du playfield tourné) et rester dans sa zone. */
-body.dragging #root::after {
-  content: 'Déposez les fichiers de la table ici';
+/*
+ * Dans la racine, pour pivoter avec elle (écran du playfield tourné) et rester dans sa zone. Un vrai
+ * élément (library.js), pas un ::after : traduit, et vu du garde-fou de mise en page.
+ */
+.drop-hint {
   position: absolute;
   inset: 3cqmin;
   display: flex;
@@ -224,6 +226,16 @@ body.mouse .lib-back:hover {
 .lib-row-text {
   font-weight: 600;
   word-break: break-word;
+}
+
+/*
+ * L'icône reste devant son texte : la ligne passe à la ligne pour les badges, jamais entre
+ * l'icône et le texte qui la suit (assez long, il partait seul sous elle : « Fermé en mode
+ * invité », novembre 2026 ; layout-check.ts le signale). Icône de 1 em à 2,4 cqmin, écart de 1 cqmin.
+ */
+.lib-row-icon + .lib-row-text {
+  min-width: 0;
+  max-width: calc(100% - 3.4cqmin);
 }
 
 .lib-row-detail {
@@ -844,10 +856,6 @@ body.mouse .lib-row.pick:not(.selected):hover {
 }
 
 /* ---------- Médias d'un jeu : une carte par média, avec son aperçu ---------- */
-
-body.dragging #root:has(.lib-media)::after {
-  content: 'Déposez le fichier du média ici';
-}
 
 .lib-body.lib-media {
   grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);

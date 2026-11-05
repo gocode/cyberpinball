@@ -45,6 +45,8 @@ export interface OwnedKeysOptions {
   inputKeys?: string[];
   /** Étape « Tilt » faite : le balancier simulé de VPX ([Player] SimulatedPlumb, PlumbThresholdAngle). */
   tilt?: boolean;
+  /** [Plugin.DOF] Enable écrit lors de la dernière synchronisation (contrôleur DOF branché ou configuré). */
+  dof?: boolean;
 }
 
 /**
@@ -69,6 +71,7 @@ export function vpxOwnedKeys(profile: VpxProfile, manual: string[] = [], audio =
   for (const s of [...VPX_PLAY_SETTINGS, ...VPX_STILL_TABLE]) keys.push([s.section, s.key]);
   if (audio) for (const key of VPX_AUDIO_OWNED_KEYS) keys.push(['Player', key]);
   for (const key of options.dmdKeys ?? []) keys.push(['Plugin.DMDUtil', key]);
+  if (options.dof) keys.push(['Plugin.DOF', 'Enable']);
   for (const key of options.inputKeys ?? []) keys.push(['Input', key]);
   if (options.tilt) for (const key of VPX_TILT_OWNED_KEYS) keys.push(['Player', key]);
   // Clés changées à la main que l'utilisateur a choisi de garder (Cabinet.vpxManual, « Section.Clé ») :

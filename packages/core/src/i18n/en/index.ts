@@ -16,6 +16,7 @@ import { messages as waitlist } from './waitlist';
 import { messages as files } from './files';
 import { messages as webmedia } from './webmedia';
 import { messages as health } from './health';
+import { messages as dof } from './dof';
 import { messages as dedicated } from './dedicated';
 import { messages as power } from './power';
 import { messages as hours } from './hours';
@@ -32,6 +33,6 @@ import { messages as ingame } from './ingame';
 import { messages as backups } from './backups';
 
 /** Chaque partie du catalogue, par nom de fichier (pour le test des doublons). */
-export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups };
+export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups };
 
 export const EN_MESSAGES: Catalog = Object.assign({}, ...Object.values(EN_PARTS));

@@ -16,7 +16,7 @@ import {
   t,
   tn,
 } from '../i18n';
-import { describeReport, looksFrench, scanAll, scanCode, scanHtml } from './i18n-scan';
+import { describeReport, looksFrench, scanAll, scanCode, scanCss, scanHtml } from './i18n-scan';
 
 test('i18n : aucun texte traduit au chargement des modules du cœur', () => {
   // Un libellé traduit à l'import garderait la langue par défaut : les tables de constantes ont des accesseurs.
@@ -86,6 +86,9 @@ test('i18n : le relevé trouve les clés, les gabarits et les textes codés en d
   const html = scanHtml('x.html', '<title>Réglages</title><button data-i18n>Fermer (Échap)</button><b data-i18n="Retour (contexte)">Retour</b><span>CYBER</span><!-- Démonstration -->');
   assert.deepEqual(html.keys.map((k) => k.key), ['Fermer (Échap)', 'Retour (contexte)']);
   assert.deepEqual(html.hardcoded.map((h) => h.text), ['Réglages']);
+  // Feuille de style : un texte écrit par content: n'est jamais traduit (l'invite du glisser-déposer l'était).
+  const css = scanCss('x.css', "/* content: 'Déposez ici' */\n.a::after {\n  content: 'Déposez les fichiers ici';\n}\n.b::after { content: ' ✓'; }\n.c::before { content: attr(data-label); }");
+  assert.deepEqual(css.hardcoded.map((h) => [h.line, h.text]), [[3, 'Déposez les fichiers ici']]);
   assert.equal(looksFrench('Retour'), true);
   assert.equal(looksFrench('playfield'), false);
   assert.equal(looksFrench('Start : valider'), true);

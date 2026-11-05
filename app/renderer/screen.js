@@ -129,7 +129,12 @@ function renderZones(state) {
       box.style.top = `${part.zone.y * 100}%`;
       box.style.width = `${part.zone.width * 100}%`;
       box.style.height = `${part.zone.height * 100}%`;
-      box.dataset.label = part.label;
+      // L'étiquette est un vrai texte de la page, pas un ::before : le garde-fou de mise en page
+      // (layout-check.ts) la voit, et voit ce qui la recouvrirait.
+      const label = document.createElement('span');
+      label.className = 'zone-label';
+      label.textContent = part.label;
+      box.append(label);
       if (part.editable) {
         box.dataset.role = part.role;
         // Coins à tirer pour redimensionner ; le reste de la zone se tire pour la déplacer.
@@ -144,6 +149,46 @@ function renderZones(state) {
     }),
   );
 }
+
+// Étiquette d'une zone : dans le premier coin de sa zone que rien de l'écran ne recouvre (textes,
+// boutons, panneau de la disposition, étiquettes déjà posées). En haut à gauche d'ordinaire ;
+// sur un playfield pivoté de 270°, le panneau rangé « en haut » de l'écran tourné passe à gauche
+// et coupait l'étiquette du playfield (novembre 2026). Sans coin libre, celui qui en cache le moins.
+const LABEL_CORNERS = ['nw', 'ne', 'sw', 'se'];
+function screenObstacles() {
+  const root = $('screen');
+  const rects = [];
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  for (let n; (n = walker.nextNode()); ) {
+    if (!n.textContent.trim() || !n.parentElement.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) continue;
+    const range = document.createRange();
+    range.selectNodeContents(n);
+    rects.push(...range.getClientRects());
+  }
+  for (const el of root.querySelectorAll('button, .arrange, .panel, .quit-dialog')) if (el.checkVisibility({ checkVisibilityCSS: true })) rects.push(el.getBoundingClientRect());
+  return rects.filter((r) => r.width > 1 && r.height > 1);
+}
+const overlapArea = (a, b) => Math.max(0, Math.min(a.right, b.right) - Math.max(a.left, b.left)) * Math.max(0, Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top));
+function placeZoneLabels() {
+  const labels = [...document.querySelectorAll('#zones .zone-label')];
+  if (!labels.length) return;
+  const obstacles = screenObstacles();
+  for (const label of labels) {
+    let best = LABEL_CORNERS[0];
+    let least = Infinity;
+    for (const corner of LABEL_CORNERS) {
+      label.dataset.corner = corner;
+      const r = label.getBoundingClientRect();
+      const area = obstacles.reduce((sum, o) => sum + overlapArea(r, o), 0);
+      if (area < least) [best, least] = [corner, area];
+      if (area === 0) break;
+    }
+    label.dataset.corner = best;
+    obstacles.push(label.getBoundingClientRect());
+  }
+}
+// La fenêtre changée de taille (ou, à chaque rendu, les polices chargées), les textes ont bougé.
+window.addEventListener('resize', placeZoneLabels);
 
 // Étape « Disposition » : une zone tirée à la souris. Le rectangle part toujours de
 // celui du début du geste (pas d'erreur qui s'accumule) ; le processus principal le
@@ -210,10 +255,6 @@ function renderArrange(state) {
   const box = $('arrange');
   const a = state.arrange;
   document.body.classList.toggle('arranging', state.phase === 'arrange');
-  // Sur chaque écran, le geste à la souris dès l'ouverture de l'étape.
-  const coach = $('arrange-coach');
-  coach.hidden = state.phase !== 'arrange' || Boolean(a);
-  coach.textContent = coach.hidden ? '' : t('Tirez une zone pour la déplacer, jusque sur un autre écran · tirez un coin pour la redimensionner');
   box.hidden = !a;
   box.replaceChildren();
   box.classList.toggle('dock-top', a?.dock === 'top');
@@ -376,6 +417,8 @@ function render(state) {
     }
     fitPanel(panel);
   }
+  placeZoneLabels();
+  document.fonts.ready.then(placeZoneLabels);
 }
 
 window.cyber.onState(render);

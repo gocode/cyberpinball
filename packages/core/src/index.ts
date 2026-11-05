@@ -33,6 +33,7 @@ export * from './cabinetvolume';
 export * from './plunger';
 export * from './tilt';
 export * from './dmd';
+export * from './dof';
 export * from './vpx-plugin-settings';
 export * from './puppack';
 export * from './pupcapture';

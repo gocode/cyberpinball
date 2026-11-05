@@ -643,17 +643,45 @@ document.addEventListener('click', (event) => {
   if (target) window.cyber.act(JSON.parse(target.dataset.act));
 });
 
-// Glisser-déposer de fichiers : c'est un ajout de table.
+// Glisser-déposer de fichiers : c'est un ajout de table (ou d'un média, sur l'écran des médias).
+// L'invite est un élément de la racine, pour pivoter avec elle : traduite, et vue du garde-fou.
+// Un rendu remplace le contenu de la racine : l'invite y revient tant que le geste dure.
+function placeDropHint() {
+  const root = document.getElementById('root');
+  if (!root || !document.body.classList.contains('dragging')) return;
+  let hint = root.querySelector(':scope > .drop-hint');
+  if (!hint) {
+    hint = document.createElement('div');
+    hint.className = 'drop-hint';
+    root.append(hint);
+  }
+  const text = root.querySelector('.lib-media') ? t('Déposez le fichier du média ici') : t('Déposez les fichiers de la table ici');
+  if (hint.textContent !== text) hint.textContent = text;
+}
+// Créé au premier geste seulement : le rendu des tests (linkedom) n'a pas de MutationObserver.
+let dropHintKeeper;
+function showDropHint() {
+  document.body.classList.add('dragging');
+  placeDropHint();
+  const root = document.getElementById('root');
+  dropHintKeeper ??= new MutationObserver(placeDropHint);
+  if (root) dropHintKeeper.observe(root, { childList: true });
+}
+function hideDropHint() {
+  document.body.classList.remove('dragging');
+  dropHintKeeper?.disconnect();
+  document.getElementById('root')?.querySelector(':scope > .drop-hint')?.remove();
+}
 document.addEventListener('dragover', (event) => {
   event.preventDefault();
-  document.body.classList.add('dragging');
+  if (!document.body.classList.contains('dragging')) showDropHint();
 });
 document.addEventListener('dragleave', (event) => {
-  if (!event.relatedTarget) document.body.classList.remove('dragging');
+  if (!event.relatedTarget) hideDropHint();
 });
 document.addEventListener('drop', (event) => {
   event.preventDefault();
-  document.body.classList.remove('dragging');
+  hideDropHint();
   const paths = [...event.dataTransfer.files].map((f) => window.cyber.pathOf(f)).filter(Boolean);
   if (paths.length) window.cyber.act({ type: 'drop', paths });
 });

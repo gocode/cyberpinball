@@ -195,6 +195,9 @@ function everyCase(): HealthFacts[] {
     { at, disks: [], screens: { configurations: 1, plugged: 3, active, homonyms: [{ name: 'PL2294H', roles: ['backglass', 'dmd'] }] }, vpx: {} },
     // Le playfield et le fronton : la fenêtre du playfield n'est pas déplacée.
     { at, disks: [], screens: { configurations: 1, plugged: 3, active, homonyms: [{ name: 'PL2294H', roles: ['playfield', 'backglass'] }] }, vpx: {} },
+    // LED et retours (DOF) : prêt ; puis le cas réel du 04/11/2026, une KL25Z sans configuration ni contrôleur de LED adressables.
+    { at, disks: [], dof: { controllers: ['Pinscape (KL25Z) · 51'], ini: 2, problems: [] }, vpx: {} },
+    { at, disks: [], dof: { controllers: ['Pinscape (KL25Z) · 51', 'Teensy (TeensyStripController) (COM7) · 30'], ini: 0, problems: ['Aucun fichier directoutputconfig.ini', 'Teensy branché (COM7) mais aucun Cabinet.xml ne le déclare'] }, vpx: {} },
   ];
 }
 
@@ -209,7 +212,7 @@ test('chaque contrôle passe par ses états, et chaque ligne mène à un écran 
     assert.ok((HEALTH_TARGET_KINDS as readonly string[]).includes(l.target.kind), `${l.check} « ${l.title} » : cible inconnue`);
     assert.ok(targetReachable(l.target), `${l.check} « ${l.title} » : l'entrée ${JSON.stringify(l.target)} n'est dans aucune rubrique du menu système`);
   }
-  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], vpx: ['ok', 'check', 'blocking'] };
+  const expected: Record<string, HealthState[]> = { disk: ['ok', 'check', 'blocking'], tables: ['ok', 'check', 'blocking'], pup: ['ok', 'check'], media: ['ok', 'check'], screens: ['ok', 'check', 'blocking'], dof: ['ok', 'check'], vpx: ['ok', 'check', 'blocking'] };
   for (const check of HEALTH_CHECKS) assert.deepEqual([...(seen.get(check) ?? [])].sort(), [...expected[check]!].sort(), `états du contrôle ${check}`);
   // Chaque sorte de cible sert.
   assert.deepEqual([...new Set(lines.map((l) => l.target.kind))].sort(), [...HEALTH_TARGET_KINDS].sort());
@@ -319,4 +322,9 @@ test('rendu : chaque ligne est une action, choisie seule, jamais répétée dans
   // Un compte à zéro reste lisible, sans la couleur de l'alerte.
   assert.ok(document.querySelector('.health-count.tone-warning')!.classList.contains('none'));
   assert.equal(document.querySelector('.lib-body')!.className, 'lib-body lib-health');
+});
+
+test('LED et retours (DOF) : rien sur une borne sans contrôleur ni configuration', () => {
+  setLanguage('fr');
+  assert.deepEqual(healthLines({ at: '2026-11-05T10:00:00Z', disks: [], dof: { controllers: [], ini: 0, problems: [] }, vpx: { installed: '10.8.1' } }).filter((l) => l.check === 'dof'), []);
 });

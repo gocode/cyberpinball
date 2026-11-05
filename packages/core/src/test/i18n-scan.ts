@@ -23,7 +23,8 @@ export function interfaceSources(root = REPO_ROOT): string[] {
   };
   const ts = (name: string) => name.endsWith('.ts') && !name.endsWith('.d.ts');
   add('app/src', ts);
-  add('app/renderer', (name) => (name.endsWith('.js') || name.endsWith('.html')) && !name.startsWith('fallback-demo'));
+  // Feuilles de style comprises : un texte écrit par content: n'est jamais traduit (glisser-déposer, novembre 2026).
+  add('app/renderer', (name) => (name.endsWith('.js') || name.endsWith('.html') || name.endsWith('.css')) && !name.startsWith('fallback-demo'));
   add('packages/core/src', ts);
   add('packages/installer/src', ts);
   add('packages/win-displays/src', ts);
@@ -348,9 +349,25 @@ export function scanHtml(file: string, src: string): FileScan {
   return result;
 }
 
+/**
+ * Relevé d'une feuille de style : un texte de l'interface n'y a pas sa place. Écrit par content:
+ * (::before, ::after), il resterait en français en anglais, et le garde-fou de mise en page ne le
+ * verrait pas (layout-check.ts) ; il va dans la page, par t().
+ */
+export function scanCss(file: string, src: string): FileScan {
+  const result: FileScan = { keys: [], hardcoded: [], dynamic: [] };
+  const clean = src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '));
+  for (const match of clean.matchAll(/\bcontent\s*:\s*(['"])((?:\\.|(?!\1)[^\\])*)\1/g)) {
+    const text = match[2]!.trim();
+    if (!looksFrench(text)) continue;
+    result.hardcoded.push({ file, line: clean.slice(0, match.index).split('\n').length, text });
+  }
+  return result;
+}
+
 export function scanFile(root: string, file: string): FileScan {
   const src = fs.readFileSync(path.join(root, file), 'utf8');
-  return file.endsWith('.html') ? scanHtml(file, src) : scanCode(file, src);
+  return file.endsWith('.html') ? scanHtml(file, src) : file.endsWith('.css') ? scanCss(file, src) : scanCode(file, src);
 }
 
 export interface CatalogReport {

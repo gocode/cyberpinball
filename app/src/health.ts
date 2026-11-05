@@ -28,6 +28,7 @@ import {
   t,
   tablesFacts,
   tn,
+  type DofFacts,
   type Finding,
   type HealthFacts,
   type HealthLine,
@@ -53,6 +54,8 @@ export interface HealthContext {
   doctor(): (table: TableEntry) => Finding[] | undefined;
   /** Ce que VPinMediaDB ajouterait aux tables, hors ligne (media-download.ts, offlineSurvey). */
   media(pause: () => Promise<void>): Promise<MediaFacts | undefined>;
+  /** LED et retours (DOF) : contrôleurs et constats ; undefined sans VPX. */
+  dof?(): DofFacts | undefined;
   openCustom(build: () => Built, at?: number): void;
   openSystem(): void;
   /** Ouvre une entrée du menu système ; son « Retour » ramène à `back`. */
@@ -142,7 +145,13 @@ export function createHealth(ctx: HealthContext) {
       pup = pupFacts(seen, PUP_PLAY_REPAIRS);
     }
     const media = layout ? await ctx.media(pause) : undefined;
-    return { at: new Date().toISOString(), disks, tables, pup, media, screens, vpx };
+    let dof: DofFacts | undefined;
+    try {
+      dof = ctx.dof?.();
+    } catch (error) {
+      console.error(`Santé de la borne, DOF : ${(error as Error).message}`); // i18n-ignore : journal
+    }
+    return { at: new Date().toISOString(), disks, tables, pup, media, screens, ...(dof ? { dof } : {}), vpx };
   }
 
   /** Relève tout en arrière-plan ; un relevé en cours n'est pas doublé. */

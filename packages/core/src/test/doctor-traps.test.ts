@@ -14,6 +14,7 @@ import { mediaErrorsFile, readMediaErrors, recordMediaError } from '../mediaerro
 import { blocksPlay, playBlockers } from '../playable';
 import { readInfo, scanTables, type TableEntry } from '../tables';
 import { buildZip } from '../romzip';
+import { readDofSetup, type DofSetup } from '../dof';
 import { devPcDisplays, framedFullDmd, starTrekPack, vpxWithScript } from './fixtures';
 import { pngFrame } from '../fulldmdframe';
 import { dressScreen, tableDressing } from '../fulldmdtable';
@@ -135,6 +136,12 @@ interface Trap {
   script?: DoctorContext['script'];
   /** Contexte en plus (journal de VPX), qui peut dépendre du dossier de la table. */
   ctx?: (folder: string) => Partial<DoctorContext>;
+}
+/** Configuration DOF de la borne, à côté du dossier des tables, avec ces ROM dans directoutputconfig51.ini. */
+function dofSetupWith(folder: string, roms: string[]): DofSetup {
+  const dir = path.join(path.dirname(folder), '_dof');
+  write(path.join(dir, 'directoutputconfig51.ini'), ['[Config DOF]', ...roms.map((r) => `${r},S11 Red,0`), ''].join('\r\n'));
+  return readDofSetup(dir);
 }
 
 const TRAPS: Trap[] = [
@@ -459,6 +466,12 @@ const TRAPS: Trap[] = [
     },
     ctx: (folder) => ({ logsDir: logsOf(folder) }),
   },
+  // DOF (dof.ts) : la borne a une configuration, mais pas pour cette ROM.
+  { code: 'dofNoConfig', arm: () => {}, ctx: (folder) => ({ dof: dofSetupWith(folder, ['tz', 'mm']) }) },
+  // DOF : table électromécanique (sans PinMAME) sur une borne configurée.
+  { code: 'dofNoPinmame', arm: () => {}, script: scriptFacts(NO_PUP_SCRIPT), ctx: (folder) => ({ dof: dofSetupWith(folder, ['afm']) }) },
+  // DOF : un directoutputconfig51.ini resté dans le dossier de la table masque celui de la borne.
+  { code: 'dofLocalIni', arm: (folder) => write(path.join(folder, 'directoutputconfig51.ini'), '[Config DOF]\r\nafm,0\r\n'), ctx: (folder) => ({ dof: dofSetupWith(folder, ['afm']) }) },
 ];
 
 test('table témoin : aucune règle ne se déclenche', () => {

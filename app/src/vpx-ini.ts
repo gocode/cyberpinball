@@ -6,6 +6,7 @@
 // correspond aux écrans branchés est reconnue avant chaque synchronisation.
 
 import {
+  cabinetJoystickHids,
   configIniPath,
   findGlobalDmdFolders,
   loadCabinet,
@@ -22,6 +23,7 @@ import {
   type VpxSyncWrite,
 } from '@cyberpinball/core';
 import { probeAudioOutputs, probeUsbDevices } from '@cyberpinball/win-displays';
+import { readDof } from './dof-files';
 import { backupDir, locations } from './paths';
 
 export type VpxIniSync = VpxSyncWrite;
@@ -38,14 +40,15 @@ export function syncVpxIni(
   /** Étape de l'assistant refaite seule : seulement ces clés écrites (SyncOptions.only). */
   only?: (id: string) => boolean,
 ): VpxIniSync {
-  const root = locations().root;
+  const loc = locations();
+  const root = loc.root;
   return writeVpxSync(
     dataDir,
     iniPath,
     cabinet,
     displays,
     profile,
-    { overwriteManual, audio, usb: usbDevices(), folders: root ? findGlobalDmdFolders(root) : undefined, only },
+    { overwriteManual, audio, usb: usbDevices(), folders: root ? findGlobalDmdFolders(root) : undefined, dof: readDof(loc), hidNames: cabinetJoystickHids(cabinet), only },
     backupDir(dataDir),
   );
 }

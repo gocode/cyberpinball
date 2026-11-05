@@ -196,7 +196,8 @@ function ownedKeys(): Set<string> {
     .filter((id) => id.startsWith(input))
     .map((id) => id.slice(input.length));
   const roles = cabinet ? (Object.keys(cabinet.roles) as RoleId[]) : undefined;
-  return vpxOwnedKeys(vpxProfile(loc).profile, cabinet?.vpxManual, Boolean(cabinet?.audio), { roles, dmdKeys, inputKeys, tilt: Boolean(cabinet?.tilt) });
+  const dof = loadOwnedMemory(loc.dataDir, activeVpxIni(loc))?.['Plugin.DOF.Enable'] !== undefined;
+  return vpxOwnedKeys(vpxProfile(loc).profile, cabinet?.vpxManual, Boolean(cabinet?.audio), { roles, dmdKeys, inputKeys, tilt: Boolean(cabinet?.tilt), dof });
 }
 let ipcReady = false;
 /** États calculés depuis la dernière lecture des fichiers (un affichage en demande des milliers). */
@@ -862,6 +863,12 @@ function ownedOrigin(def: VpxSettingDef): { why: string; how: string; wizard?: W
     return {
       why: t('Elle suit le DMD réel reconnu à son identifiant USB (ZeDMD, PIN2DMD, Pixelcade).'),
       how: t('Elle change quand on branche le DMD. {keep}', { keep: keepYours() }),
+    };
+  }
+  if (def.section === 'Plugin.DOF') {
+    return {
+      why: t('Cyber Pinball allume le plugin DOF dès qu’un contrôleur de retours est branché (Pinscape, LedWiz, Teensy…) ou que la borne a une configuration DOF.'),
+      how: t('Voir Menu système > Borne > « LED et retours (DOF) ». {keep}', { keep: keepYours() }),
     };
   }
   if (def.key.startsWith('Priority.')) {

@@ -11,7 +11,15 @@
 // - un texte ou une icône plus petits que 20 px (plancher du design system) tels qu'on les
 //   voit, réduits par un transform compris (médaillons de la roue).
 // Une superposition voulue (aide, menu par-dessus le menu des tables) n'est pas un
-// chevauchement : le calque du dessus a un fond opaque qui cache celui du dessous.
+// chevauchement : le calque du dessus a un fond opaque qui cache celui du dessous, en entier.
+// Un calque opaque qui n'en cache qu'une partie (un bandeau sur le bout d'une étiquette) la coupe :
+// signalé. Un calque qui laisse passer la souris (pointer-events: none) se voit quand même : il
+// était hors du relevé, et le bandeau d'aide de la disposition des écrans coupait l'étiquette de
+// la zone du haut sans rien dire (novembre 2026).
+// Tout texte est un texte de la page : un texte écrit par la feuille de style (::before, ::after)
+// échappe à ce relevé comme à la traduction, il est signalé.
+// Une icône reste sur la ligne de son texte : poussée seule au-dessus (ou au-dessous) de lui par un
+// retour à la ligne, elle est signalée (« Fermé en mode invité », novembre 2026).
 // Une coupure voulue non plus : « … » posé par le texte ou par le conteneur qui le coupe
 // (text-overflow n'est pas hérité), ou nombre de lignes limité (-webkit-line-clamp) ;
 // seule la partie visible d'un texte compte alors (les lignes masquées ne chevauchent rien).
@@ -122,13 +130,23 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     const c = getComputedStyle(el).backgroundColor.match(/[\d.]+/g);
     return c && (c.length < 4 ? true : Number(c[3]) >= 0.8);
   };
-  // Le calque de « top » cache-t-il « bottom » par un fond opaque, entre eux deux ?
+  // Le calque de « top » cache-t-il « bottom » par un fond opaque, entre eux deux ? Rend ce calque.
   const masked = (top, bottom, x, y) => {
     for (let e = top; e && !e.contains(bottom); e = e.parentElement) {
       const r = e.getBoundingClientRect();
-      if (opaque(e) && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return true;
+      if (opaque(e) && x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return e;
     }
-    return false;
+    return undefined;
+  };
+  // Le temps d'un relevé au point, ces éléments reçoivent la souris (pointer-events), puis reprennent leur réglage.
+  const touchable = (els, run) => {
+    const saved = els.map((e) => [e.style.getPropertyValue('pointer-events'), e.style.getPropertyPriority('pointer-events')]);
+    els.forEach((e) => e.style.setProperty('pointer-events', 'auto', 'important'));
+    try {
+      return run();
+    } finally {
+      els.forEach((e, i) => e.style.setProperty('pointer-events', saved[i][0], saved[i][1]));
+    }
   };
   // Coupure voulue par ce conteneur : « … » en fin de ligne, ou lignes limitées.
   const truncates = (e) => {
@@ -158,14 +176,44 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       if (w <= T || h <= T) continue;
       const x = Math.max(va.left, vb.left) + w / 2;
       const y = Math.max(va.top, vb.top) + h / 2;
-      const hit = document.elementFromPoint(x, y);
+      // Les deux se voient au point visé, même s'ils laissent passer la souris (bandeau d'aide,
+      // étiquette d'une zone) : sinon le point tomberait dessous, comme sur un troisième élément.
+      const hit = touchable([a.el, b.el], () => document.elementFromPoint(x, y));
       if (!hit) continue;
       const onA = a.el === hit || a.el.contains(hit) || hit.contains(a.el);
       const onB = b.el === hit || b.el.contains(hit) || hit.contains(b.el);
       if (!onA && !onB) continue; // un troisième élément couvre les deux
       const [top, bottom] = onA ? [a.el, b.el] : [b.el, a.el];
-      if (masked(top, bottom, x, y)) continue;
       const at = (v) => '[' + [v.left, v.top, v.right, v.bottom].map(Math.round).join(', ') + ']';
+      const cover = masked(top, bottom, x, y);
+      if (cover) {
+        // Caché en entier : voulu (un menu par-dessus un autre). En partie : coupé.
+        const c = cover.getBoundingClientRect(), hidden = onA ? vb : va;
+        const inside = (r) => hidden.left >= r.left - T && hidden.right <= r.right + T && hidden.top >= r.top - T && hidden.bottom <= r.bottom + T;
+        if (inside(c)) continue;
+        // Un calque opaque plus large, entre les deux, le cache déjà en entier : la ligne choisie
+        // (fond vert) d'un écran plein passe sur la roue du menu, que l'écran lui-même recouvre.
+        let whole = false;
+        for (let e = cover.parentElement; e && !e.contains(bottom); e = e.parentElement) {
+          if (opaque(e) && inside(e.getBoundingClientRect())) {
+            whole = true;
+            break;
+          }
+        }
+        if (whole) continue;
+        // En-tête collant d'une liste qui défile (bilan de la santé de la borne) : ce qui passe dessous
+        // a défilé, il n'est pas coupé.
+        let sticky = false;
+        for (let e = cover; e && !e.contains(bottom); e = e.parentElement) {
+          if (getComputedStyle(e).position === 'sticky') {
+            sticky = true;
+            break;
+          }
+        }
+        if (sticky) continue;
+        problems.add('caché en partie : ' + label(bottom) + ' ' + at(hidden) + ' sous ' + label(cover).slice(0, 60) + ' ' + at(c));
+        continue;
+      }
       problems.add('chevauchement : ' + [label(a.el) + ' ' + at(va), label(b.el) + ' ' + at(vb)].sort().join(' et '));
     }
   }
@@ -201,6 +249,56 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     const v = seen[i];
     if (!scrolled && v.right - v.left > T && v.bottom - v.top > T && (v.left < -T || v.top < -T || v.right > vw + T || v.bottom > vh + T)) problems.add('hors de la fenêtre : ' + label(el));
   });
+  // Texte écrit par la feuille de style (content: 'texte' ou attr()) : hors de ce relevé (aucun nœud
+  // de texte), et hors de la traduction. L'étiquette des zones de la disposition des écrans en était un.
+  for (const el of document.querySelectorAll('*')) {
+    for (const pseudo of ['::before', '::after']) {
+      const s = getComputedStyle(el, pseudo);
+      if (!s.content || s.content === 'none' || s.content === 'normal' || s.display === 'none') continue;
+      const written = s.content.replace(/url\([^)]*\)|counters?\([^)]*\)/g, '');
+      if (!/attr\(|[\p{L}\p{N}]/u.test(written) || !shown(el)) continue;
+      problems.add('texte écrit par la feuille de style (' + pseudo + ') : ' + label(el).slice(0, 60) + ' ' + s.content.slice(0, 60));
+    }
+  }
+  // Icône séparée de son texte par un retour à la ligne : seule au-dessus de lui (icône devant) ou
+  // au-dessous (icône après). Seulement là où les deux se suivent sur une ligne : texte courant, ou
+  // flex en ligne qui passe à la ligne (une grille, une colonne, les posent l'un sous l'autre exprès).
+  // Dans une vue pivotée d'un quart de tour, le dessous est sur le côté.
+  const along = (r, q) => (q === 1 ? { top: -r.right, bottom: -r.left } : q === 2 ? { top: -r.bottom, bottom: -r.top } : q === 3 ? { top: r.left, bottom: r.right } : { top: r.top, bottom: r.bottom });
+  const rectsOf = (node) => {
+    if (node.nodeType !== 3) return [...node.getClientRects()];
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    return [...range.getClientRects()].filter((r) => r.width > 1 && r.height > 1);
+  };
+  // Voisin rendu le plus proche (texte non vide, ou élément affiché) ; seulement s'il porte du texte.
+  const neighbour = (node, side) => {
+    for (let n = node[side]; n; n = n[side]) {
+      if (n.nodeType === 3) {
+        if (n.textContent.trim()) return n;
+        continue;
+      }
+      if (n.nodeType !== 1 || !shown(n)) continue;
+      return (n.innerText || n.textContent || '').trim() ? n : undefined;
+    }
+    return undefined;
+  };
+  for (const icon of document.querySelectorAll('svg.icon')) {
+    const parent = icon.parentElement;
+    if (!parent || !shown(icon)) continue;
+    const p = getComputedStyle(parent);
+    if (/grid/.test(p.display)) continue;
+    if (/flex/.test(p.display) && (!p.flexDirection.startsWith('row') || p.flexWrap === 'nowrap')) continue;
+    const q = (((Math.round(turn(icon) / (Math.PI / 2)) % 4) + 4) % 4);
+    const own = icon.getBoundingClientRect();
+    if (own.width <= T || own.height <= T) continue;
+    const me = along(own, q);
+    const next = neighbour(icon, 'nextSibling'), prev = neighbour(icon, 'previousSibling');
+    const first = next && rectsOf(next)[0], last = prev && rectsOf(prev).at(-1);
+    const name = (n) => (n.nodeType === 3 ? label(n.parentElement) : label(n)).slice(0, 80);
+    if (first && along(first, q).top >= me.bottom - T) problems.add('icône seule sur sa ligne, au-dessus de son texte : ' + label(icon) + ' et ' + name(next));
+    if (last && me.top >= along(last, q).bottom - T) problems.add('icône seule sur sa ligne, au-dessous de son texte : ' + label(icon) + ' et ' + name(prev));
+  }
   // Lignes limitées avec un interligne trop serré : l'encre de la ligne masquée dépasse.
   for (const el of document.querySelectorAll('*')) {
     const s = getComputedStyle(el);

@@ -2609,7 +2609,10 @@ function viewFor(index: number) {
       highlight: panelHere,
       prompt: panelHere ? '' : (base.assignedLabel ?? t('Aucun rôle')),
       step: panelHere ? '' : t('Disposition des écrans en cours'),
-      hint: '',
+      // Sur les autres écrans, le geste à la souris : dans la ligne d'aide, à sa place dans le
+      // flux de la page. Posé en bandeau par-dessus l'écran, il recouvrait l'étiquette de la zone
+      // du haut (« BACKGLASS · 1920 × 1080 · PLEIN ÉC… », novembre 2026).
+      hint: panelHere ? '' : t('Tirez une zone pour la déplacer, jusque sur un autre écran · tirez un coin pour la redimensionner'),
       notice: undefined,
       arrange: panelHere ? { ...arrangePanel(host, wizard.arrange, (codes) => formatList(codes.map(keyLabel).slice(0, 2), 'or')), findings: arrangeFindings() } : undefined,
     };

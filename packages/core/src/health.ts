@@ -31,7 +31,7 @@ import { vpxDisplayName, type VpxDisplayIdFormat } from './vpx';
 export type HealthState = 'ok' | 'check' | 'blocking';
 
 /** Les contrôles, dans l'ordre de la page. */
-export const HEALTH_CHECKS = ['disk', 'tables', 'pup', 'media', 'screens', 'vpx'] as const;
+export const HEALTH_CHECKS = ['disk', 'tables', 'pup', 'media', 'screens', 'dof', 'vpx'] as const;
 export type HealthCheckId = (typeof HEALTH_CHECKS)[number];
 
 /** Où mène une ligne. */
@@ -141,6 +141,16 @@ export interface VpxFacts {
   known?: string;
 }
 
+/** LED et retours de la borne (dof.ts) : ce que DOF trouve, et ce qui l'empêchera d'allumer. */
+export interface DofFacts {
+  /** Contrôleurs branchés ou déclarés dans Cabinet.xml, en clair (« Pinscape (KL25Z) · 51 »). */
+  controllers: string[];
+  /** Fichiers directoutputconfig*.ini trouvés. */
+  ini: number;
+  /** Constats « à vérifier » (dofFindings, sévérité warning), tels quels. */
+  problems: string[];
+}
+
 export interface HealthFacts {
   /** Fin du relevé (ISO). */
   at: string;
@@ -150,6 +160,8 @@ export interface HealthFacts {
   pup?: PupFacts;
   media?: MediaFacts;
   screens?: ScreensFacts;
+  /** Absent d'un relevé plus ancien, ou sans dossier de DOF lisible. */
+  dof?: DofFacts;
   vpx: VpxFacts;
 }
 
@@ -545,6 +557,27 @@ function orientationLines(facts: OrientationFacts): HealthLine[] {
   return [{ check: 'screens', state: verdict.state, title: verdict.title, detail: verdict.detail, go: t('Ouvrir la configuration de la borne'), target: SYSTEM('cabinet') }];
 }
 
+/**
+ * LED et retours (DOF) : rien sur une borne sans contrôleur ni configuration (DOF est facultatif) ;
+ * sinon une ligne par point à vérifier, ou une ligne « prêt ». Chacune ouvre « LED et retours (DOF) ».
+ */
+export function dofLines(facts: DofFacts): HealthLine[] {
+  if (!facts.controllers.length && !facts.ini && !facts.problems.length) return [];
+  const go = t('Ouvrir LED et retours (DOF)');
+  const target = SYSTEM('dof');
+  if (facts.problems.length) return facts.problems.map((title) => ({ check: 'dof', state: 'check', title, go, target }));
+  return [
+    {
+      check: 'dof',
+      state: 'ok',
+      title: t('DOF prêt : {controllers}', { controllers: facts.controllers.join(', ') || t('aucun contrôleur branché') }),
+      detail: tn(facts.ini, '{n} fichier de configuration du configtool', '{n} fichiers de configuration du configtool'),
+      go,
+      target,
+    },
+  ];
+}
+
 export function vpxLines(facts: VpxFacts): HealthLine[] {
   const install = (version: string | undefined) => (version ? t('Installer VPX {version}', { version }) : t('Installer VPX'));
   if (!facts.installed) {
@@ -574,6 +607,7 @@ export function healthLines(facts: HealthFacts): HealthLine[] {
     ...(facts.pup ? pupLines(facts.pup) : []),
     ...(facts.media ? mediaLines(facts.media) : []),
     ...(facts.screens ? screensLines(facts.screens) : []),
+    ...(facts.dof ? dofLines(facts.dof) : []),
     ...vpxLines(facts.vpx),
   ];
 }
@@ -596,6 +630,8 @@ export function healthCheckInfo(check: HealthCheckId): { title: string; icon: Ic
       return { title: t('Médias'), icon: 'image' };
     case 'screens':
       return { title: t('Écrans'), icon: 'screens' };
+    case 'dof':
+      return { title: t('LED et retours (DOF)'), icon: 'bulb' };
     case 'vpx':
       return { title: 'Visual Pinball X', icon: 'play' }; // i18n-ignore : nom du logiciel
   }

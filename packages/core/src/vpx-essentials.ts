@@ -466,6 +466,146 @@ export const VPX_ESSENTIALS: EssentialGroup[] = [
     ],
   },
   {
+    // Réglages de [Controller] lus par les scripts qui utilisent controller.vbs (Settings_properties.inl) :
+    // le son de la table, la borne (DOF), ou les deux. Défaut de VPX : les deux.
+    icon: 'pulse',
+    get title() {
+      return t('Retours de la borne (DOF)');
+    },
+    settings: [
+      {
+        section: 'Plugin.DOF',
+        key: 'Enable',
+        get label() {
+          return t('Retours de la borne (DOF)');
+        },
+        get help() {
+          return t('Le plugin DOF de VPX pilote les contrôleurs de la borne (LED, LED adressables, solénoïdes, vibreur) d’après la configuration faite sur configtool.vpuniverse.com. Cyber Pinball l’allume dès qu’un contrôleur est branché ou configuré. Seules les tables à ROM PinMAME en profitent.');
+        },
+        get values() {
+          return [t('Éteint'), t('Allumé')];
+        },
+      },
+      {
+        section: 'Controller',
+        key: 'DOFContactors',
+        get label() {
+          return t('Contacteurs (bumpers, slingshots)');
+        },
+        get help() {
+          return t('Bruit des solénoïdes du plateau : joué par le son de la table, par les contacteurs de la borne (DOF), ou les deux.');
+        },
+        get values() {
+          return [t('Son de la table'), t('DOF'), t('Les deux')];
+        },
+      },
+      {
+        section: 'Controller',
+        key: 'DOFKnocker',
+        get label() {
+          return t('Knocker');
+        },
+        get help() {
+          return t('Le claquement d’une partie gratuite : son de la table, knocker de la borne (DOF), ou les deux.');
+        },
+        get values() {
+          return [t('Son de la table'), t('DOF'), t('Les deux')];
+        },
+      },
+      {
+        section: 'Controller',
+        key: 'DOFChimes',
+        get label() {
+          return t('Carillons');
+        },
+        get help() {
+          return t('Les carillons des tables électromécaniques : son de la table, carillons de la borne (DOF), ou les deux.');
+        },
+        get values() {
+          return [t('Son de la table'), t('DOF'), t('Les deux')];
+        },
+      },
+      {
+        section: 'Controller',
+        key: 'DOFBell',
+        get label() {
+          return t('Cloche');
+        },
+        get help() {
+          return t('La cloche des tables électromécaniques : son de la table, cloche de la borne (DOF), ou les deux.');
+        },
+        get values() {
+          return [t('Son de la table'), t('DOF'), t('Les deux')];
+        },
+      },
+      {
+        section: 'Controller',
+        key: 'DOFGear',
+        get label() {
+          return t('Moteur');
+        },
+        get help() {
+          return t('Le moteur d’engrenages (gear motor) : son de la table, moteur de la borne (DOF), ou les deux.');
+        },
+        get values() {
+          return [t('Son de la table'), t('DOF'), t('Les deux')];
+        },
+      },
+      {
+        section: 'Controller',
+        key: 'DOFShaker',
+        get label() {
+          return t('Vibreur');
+        },
+        get help() {
+          return t('Le moteur vibrant (shaker) : son de la table, vibreur de la borne (DOF), ou les deux.');
+        },
+        get values() {
+          return [t('Son de la table'), t('DOF'), t('Les deux')];
+        },
+      },
+      {
+        section: 'Controller',
+        key: 'DOFFlippers',
+        get label() {
+          return t('Flippers');
+        },
+        get help() {
+          return t('Le claquement des flippers : son de la table, solénoïdes de la borne (DOF), ou les deux.');
+        },
+        get values() {
+          return [t('Son de la table'), t('DOF'), t('Les deux')];
+        },
+      },
+      {
+        section: 'Controller',
+        key: 'DOFTargets',
+        get label() {
+          return t('Cibles');
+        },
+        get help() {
+          return t('Le choc des cibles : son de la table, contacteurs de la borne (DOF), ou les deux.');
+        },
+        get values() {
+          return [t('Son de la table'), t('DOF'), t('Les deux')];
+        },
+      },
+      {
+        section: 'Controller',
+        key: 'DOFDropTargets',
+        get label() {
+          return t('Cibles tombantes');
+        },
+        get help() {
+          return t('La remise des cibles tombantes : son de la table, contacteurs de la borne (DOF), ou les deux.');
+        },
+        get values() {
+          return [t('Son de la table'), t('DOF'), t('Les deux')];
+        },
+      },
+    ],
+  },
+  {
     icon: 'folder',
     get title() {
       return t('Dossiers communs à toutes les tables');

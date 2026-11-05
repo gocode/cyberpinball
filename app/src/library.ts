@@ -164,8 +164,15 @@ import {
   knownVpsId,
   type RecordedRole,
   type RecordingSettings,
+  cabinetJoystickHids,
+  detectDofControllers,
+  dofHealthFacts,
 } from '@cyberpinball/core';
-import { prepareImport, type PreparedImport } from './archives';
+import { prepareImport, unpackArchive, type PreparedImport } from './archives';
+import { createDofMenu } from './dof-menu';
+import { dofDir, readDof, vpxWorkDir } from './dof-files';
+import { backupDir, locations } from './paths';
+import { usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
 import { LayoutReport } from './layout-check';
 import { createCatalog } from './catalog';
@@ -1082,6 +1089,12 @@ export function createLibrary(host: LibraryHost) {
     layout,
     doctor: () => quickDoctor(),
     media: (pause) => mediaDownload.offlineSurvey(pause),
+    dof: () => {
+      const setup = readDofQuiet();
+      if (!setup) return undefined;
+      const devices = usbDevices() ?? [];
+      return dofHealthFacts(setup, detectDofControllers(devices, cabinetJoystickHids(loadCabinet(host.dataDir))), devices);
+    },
     openCustom: (build, at) => openCustom(build, at),
     openSystem: () => openSystem(),
     runSystemItem: (id, back) => runSystemItem(id, back),
@@ -1098,6 +1111,43 @@ export function createLibrary(host: LibraryHost) {
     },
     run: () => health.open(),
   });
+
+  // LED et retours (DOF) : contrôleurs reconnus, configuration du configtool, LED adressables.
+  const dofStaging = () => path.join(layout()?.downloads ?? path.join(host.dataDir, 'tmp'), 'dof');
+  const dofMenu = createDofMenu({
+    library: {
+      openCustom: (build, at) => openCustom(build, at),
+      openSystem: () => openSystem(),
+      openPrompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
+      openNotice: (heading, lines, then) => openNotice(heading, lines, then),
+      pick: (request) => pickPaths(request),
+      task: (message, work) => task(message, work),
+    },
+    dir: () => dofDirOf(),
+    workDir: () => vpxWorkDir(locations()),
+    usb: () => usbDevices(),
+    hidNames: () => cabinetJoystickHids(loadCabinet(host.dataDir)),
+    backupDir: () => backupDir(host.dataDir),
+    stagingDir: dofStaging,
+    unpack: (file, dest) => unpackArchive(file, dest),
+    browse: (url, received) =>
+      catalogUi.acquirer.show({
+        url,
+        game: t('Configuration DOF de la borne'),
+        expected: t('ZIP de « Generate Config »'),
+        host: t('configtool.vpuniverse.com · votre compte VPUniverse'),
+        status: t('Décrivez la borne, puis « Generate Config » : le ZIP téléchargé revient à « LED et retours (DOF) » et s’importe.'),
+        claim: {
+          dir: path.join(dofStaging(), 'recu'),
+          title: t('Configuration DOF'),
+          done: (r) => {
+            if (!('error' in r)) received(r.file);
+          },
+        },
+      }),
+    changed: () => void health.refresh(),
+  });
+  provideSystemItem('dof', dofMenu.item);
 
   // Écran « Médias » de la fiche : logo, fronton, vidéos, règles…
   const medias = createMedias({
@@ -1392,6 +1442,7 @@ export function createLibrary(host: LibraryHost) {
       romLibrary: layout()?.roms,
       orientation: host.playfieldOrientation?.(),
       dmdPlaced: Boolean(cabinet && dmdPlaceOf(readDmdPlaces(host.dataDir), cabinet.id, table.id)),
+      dof: readDofQuiet(),
     });
     return { script, findings };
   }
@@ -1401,10 +1452,25 @@ export function createLibrary(host: LibraryHost) {
    * lu (undefined s'il ne l'a jamais été), sans l'habillage FullDMD. Modèle de borne, journal
    * de VPX et sens du playfield sont lus une fois pour tout le relevé.
    */
+  /** Dossier de DOF de la borne (dof-files.ts) ; undefined sans VPX. */
+  function dofDirOf(): string | undefined {
+    return dofDir(locations());
+  }
+
+  /** Configuration DOF lue pour le médecin ; une erreur de lecture ne l'arrête jamais. */
+  function readDofQuiet() {
+    try {
+      return readDof(locations());
+    } catch {
+      return undefined;
+    }
+  }
+
   function quickDoctor(): (table: TableEntry) => Finding[] | undefined {
     const cabinet = pupCabinet(loadCabinet(host.dataDir));
     const vpxLog = readLog(host.vpxLogFile?.());
     const orientation = host.playfieldOrientation?.();
+    const dof = readDofQuiet();
     return (table) => {
       const script = cachedScript(table.file, host.dataDir);
       if (!script) return undefined;
@@ -1417,6 +1483,7 @@ export function createLibrary(host: LibraryHost) {
         otherPackNames: otherPackNames(table),
         romLibrary: layout()?.roms,
         orientation,
+        dof,
       });
     };
   }

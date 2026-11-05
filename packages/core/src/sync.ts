@@ -3,6 +3,7 @@ import { managedJoysticks, noAutoLayoutSettings, vpxAnalogSettings } from './plu
 import { tiltFindings, VPX_STILL_TABLE, vpxTiltSettings } from './tilt';
 import { buttonInfo, buttonProblems, DEFAULT_BUTTONS, inGameMenuSetting, isInputKey, keyLabel, codeOfScancode, vpxInputSettings, vpxVolumeSettings, type SilencedAction } from './buttons';
 import { VPX_DMD_OWNED_KEYS, vpxDmdSettings, vpxFolderDefaults, type DetectedDmd, type GlobalDmdFolders } from './dmd';
+import { detectDofControllers, VPX_DOF_OWNED_KEYS, vpxDofSettings, type DetectedDofController, type DofSetup, type HidName } from './dof';
 import { t } from './i18n';
 import { IniDocument } from './ini';
 import { loadOwnedMemory, readTextIfExists, saveOwnedMemory, writeWithBackup, type WriteReport } from './store';
@@ -67,6 +68,13 @@ export interface SyncOptions {
   /** Dossiers communs de ROM et de colorisation (findGlobalDmdFolders), proposés aux plugins. */
   folders?: GlobalDmdFolders;
   /**
+   * Dossier de configuration de DOF tel que libdof le lira (readDofSetup). Avec usb, il décide de
+   * [Plugin.DOF] Enable ; sans l'un ni l'autre, [Plugin.DOF] n'est pas touché.
+   */
+  dof?: DofSetup;
+  /** Noms HID connus (joysticks), qui départagent Pinscape et LedWiz (detectDofControllers). */
+  hidNames?: HidName[];
+  /**
    * Étape de l'assistant refaite seule : seules ces clés (« Section.Clé ») sont écrites ;
    * les autres restent telles quelles dans le fichier, et leur dernière valeur écrite en mémoire.
    */
@@ -79,6 +87,8 @@ export interface SyncPlan {
   audio: Partial<Record<AudioRole, ObservedAudioOutput>>;
   /** DMD réels reconnus (option usb seulement). */
   dmd: DetectedDmd[];
+  /** Contrôleurs DOF reconnus (option usb seulement). */
+  dof: DetectedDofController[];
   /** Actions de VPX privées de leur touche, reprise par un bouton de la borne (modèle avec l'étape « Boutons » seulement). */
   silenced: SilencedAction[];
   changes: VpxChange[];
@@ -180,7 +190,7 @@ export function planVpxSync(
   }
 
   if (!assignments.playfield) {
-    return { assignments, audio: {}, dmd: [], silenced: [], changes: [], findings, nextIni: undefined, manualEdits: [], memory: { ...options.memory } };
+    return { assignments, audio: {}, dmd: [], dof: [], silenced: [], changes: [], findings, nextIni: undefined, manualEdits: [], memory: { ...options.memory } };
   }
 
   const doc = IniDocument.parse(currentIni);
@@ -281,6 +291,20 @@ export function planVpxSync(
     if (written !== undefined && memory[id] === undefined) memory[id] = written;
   }
 
+  // DOF : le plugin allumé dès qu'un contrôleur est branché ou configuré (dof.ts) ; sinon
+  // [Plugin.DOF] reste tel quel. Le détail (ini manquant, bandes non déclarées…) est dans
+  // « LED et retours (DOF) » et la santé de la borne, pas ici.
+  let dof: DetectedDofController[] = [];
+  if (options.usb || options.dof) {
+    dof = detectDofControllers(options.usb ?? [], options.hidNames);
+    applyOwned(vpxDofSettings(options.dof, dof));
+  }
+  for (const key of VPX_DOF_OWNED_KEYS) {
+    const id = ownedId('Plugin.DOF', key);
+    const written = options.memory?.[id];
+    if (written !== undefined && memory[id] === undefined) memory[id] = written;
+  }
+
   // Boutons : touches de l'étape « Boutons » ; sans elle, [Input] reste tel quel, sauf la
   // combinaison qui ouvre le menu de VPX en partie (touches par défaut des encodeurs).
   let silenced: SilencedAction[] = [];
@@ -350,7 +374,7 @@ export function planVpxSync(
     });
   }
 
-  return { assignments, audio, dmd, silenced, changes, findings, nextIni: changes.length > 0 ? doc.toString() : undefined, manualEdits, memory };
+  return { assignments, audio, dmd, dof, silenced, changes, findings, nextIni: changes.length > 0 ? doc.toString() : undefined, manualEdits, memory };
 }
 
 export interface VpxSyncWrite {

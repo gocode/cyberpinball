@@ -69,6 +69,7 @@ import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAlias
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
 import { companion, nameKey } from './tablefiles';
+import { dofRomNumbers, tableDofIni, tableIniMasksGlobal, type DofSetup } from './dof';
 import { playBlockers, playSeverity } from './playable';
 import { parseTableName, readInfo, type TableEntry } from './tables';
 import { findTableIni } from './vpx-settings';
@@ -141,6 +142,9 @@ export const FINDING_CODES = [
   'mediaHuge',
   'mediaDuplicate',
   'mediaPlaybackError',
+  'dofNoConfig',
+  'dofNoPinmame',
+  'dofLocalIni',
 ] as const;
 
 export interface Finding {
@@ -223,6 +227,11 @@ export interface DoctorContext {
    * Ni « Écrans placés pour cette table » pour le DMD, ni « Le DMD cacherait l'habillage FullDMD ».
    */
   dmdPlaced?: boolean;
+  /**
+   * Configuration de DOF de la borne (readDofSetup, dof.ts) : la ROM de la table y a-t-elle ses
+   * effets ? Absente, ou sans aucun ini (borne sans DOF), les règles DOF se taisent.
+   */
+  dof?: DofSetup;
 }
 
 /** Mémoire de Cyber Pinball dans le .info : option et nom d'origine de chaque pack installé. */
@@ -502,6 +511,12 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
       const finding = checkDmdFolder(folder, ctx.script.dmdFolder, ctx.script.usesPinmame);
       if (finding) findings.push(finding);
     }
+  }
+
+  // 4 bis. DOF : les LED et retours de la borne réagiront-ils à cette table ? Seulement sur une
+  // borne qui a une configuration DOF, et jamais bloquant : la table se joue sans.
+  if (ownFolder && ctx.dof?.ini.length && ctx.script && !('error' in ctx.script)) {
+    findings.push(...dofFindingsFor(folder, ctx.script, ctx.dof));
   }
 
   // 5. Rapports de plantage laissés par VPX.
@@ -842,6 +857,48 @@ function coreCompatFinding(entry: TableEntry, ctx: DoctorContext, override: Over
     detail: detail.join(' '),
     fix: content ? { label: t('N’exécuter vpmInit qu’une fois (dans {file})', { file }), ops: [{ op: 'write', path: target, content, encoding: 'latin1' }] } : undefined,
   };
+}
+
+
+/** Règles DOF d'une table (dof.ts) : ini local qui masque celui de la borne, table sans PinMAME, ROM sans effets. */
+function dofFindingsFor(folder: string, script: ScriptFacts, dof: DofSetup): Finding[] {
+  if (tableIniMasksGlobal(dof, folder)) {
+    const local = tableDofIni(folder);
+    return [
+      {
+        code: 'dofLocalIni',
+        severity: 'warning',
+        title: t('Configuration DOF propre à la table'),
+        detail: t('{files} dans le dossier de la table passe avant la configuration DOF de la borne : pour cette table, DOF ne lit que ce fichier, souvent un reste d’archive.', {
+          files: formatList(local.map((f) => path.basename(f))),
+        }),
+        fix: { label: t('Mettre ce fichier à la corbeille et garder la configuration de la borne'), ops: local.map((f) => ({ op: 'trash', path: f })) },
+      },
+    ];
+  }
+  if (!script.usesPinmame) {
+    return [
+      {
+        code: 'dofNoPinmame',
+        severity: 'info',
+        title: t('Pas de LED ni de retours DOF'),
+        detail: t('La table n’utilise pas de ROM PinMAME : le plugin DOF de VPX ne démarre que pour une ROM. Les LED et contacteurs de la borne resteront éteints pendant la partie.'),
+      },
+    ];
+  }
+  if (script.roms.length && script.roms.every((rom) => dofRomNumbers(dof.ini, rom).length === 0)) {
+    return [
+      {
+        code: 'dofNoConfig',
+        severity: 'info',
+        title: t('Aucun effet DOF pour cette ROM'),
+        detail: t('La configuration DOF de la borne n’a rien pour « {rom} » : les LED et contacteurs ne réagiront pas. Une table récente manque parfois au configtool : réimportez votre configuration depuis configtool.vpuniverse.com.', {
+          rom: script.roms[0]!,
+        }),
+      },
+    ];
+  }
+  return [];
 }
 
 /**

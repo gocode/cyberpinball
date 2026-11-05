@@ -411,4 +411,7 @@ export const messages: Record<string, string> = {
   'PuP-Pack allumé par Cyber Pinball': 'PuP-Pack switched on by Cyber Pinball',
   'fronton laissé au .directb2s': 'backglass left to the .directb2s',
   'table sans .directb2s': 'table without a .directb2s',
+  // app/renderer/library.js : fichiers glissés sur la fenêtre
+  'Déposez les fichiers de la table ici': 'Drop the table files here',
+  'Déposez le fichier du média ici': 'Drop the media file here',
 };
