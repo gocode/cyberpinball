@@ -409,3 +409,56 @@ test('DOF : la borne de référence (05/11/2026), deux bandes verticales et deux
   const devices = [usb(0x1209, 0xeaea), usb(0x16c0, 0x0483, { port: 'COM5' })];
   assert.deepEqual(dofFindings(readDofSetup(dir), detectDofControllers(devices), devices), []);
 });
+
+test('DOF : LED adressables en Art-Net (WLED), un contrôleur par univers, 170 LED au plus chacun', () => {
+  const leds: CabinetLeds = {
+    controller: 'ArtNet',
+    port: '',
+    address: '192.168.1.50',
+    universe: 0,
+    strips: [
+      { name: 'Côté gauche', output: 1, width: 1, height: 110, arrangement: 'TopDownLeftRight', colorOrder: 'RGB', brightness: 100, dofOutput: 1 },
+      { name: 'Haut-parleur gauche', output: 1, width: 24, height: 1, arrangement: 'LeftRightTopDown', colorOrder: 'RGB', brightness: 100, dofOutput: 7 },
+      { name: 'Côté droit', output: 2, width: 1, height: 130, arrangement: 'TopDownLeftRight', colorOrder: 'RGB', brightness: 100, dofOutput: 4 },
+    ],
+  };
+  assert.deepEqual(ledProblems(leds), []);
+  assert.deepEqual(stripFirstLeds(leds), [1, 111, 1], 'la numérotation repart de 1 à chaque univers');
+  const dir = tmp();
+  for (const f of planLedWrite(dir, leds).files) fs.writeFileSync(f.file, f.content);
+  const setup = readDofSetup(dir);
+  assert.deepEqual(
+    setup.cabinet!.controllers.map((c) => [c.type, c.name, c.universe, c.address]),
+    [
+      ['ArtNet', 'Art-Net 0', 0, '192.168.1.50'],
+      ['ArtNet', 'Art-Net 1', 1, '192.168.1.50'],
+    ],
+  );
+  assert.deepEqual(
+    setup.cabinet!.strips.map((s) => [s.name, s.controller, s.firstLed]),
+    [
+      ['Côté gauche', 'Art-Net 0', 1],
+      ['Haut-parleur gauche', 'Art-Net 0', 111],
+      ['Côté droit', 'Art-Net 1', 1],
+    ],
+  );
+  assert.deepEqual(ledsFromCabinet(setup.cabinet!), leds, 'relu dans l’éditeur sans rien perdre');
+  // Art-Net n'a pas de port série : rien à redire, même sans périphérique USB.
+  fs.writeFileSync(path.join(dir, 'directoutputconfig30.ini'), INI);
+  assert.deepEqual(dofFindings(readDofSetup(dir), [], []), []);
+  // Un univers trop chargé, une adresse fausse.
+  const crowded = { ...leds, address: 'wled.local', strips: [{ ...leds.strips[0]!, height: 200 }] };
+  const problems = ledProblems(crowded);
+  assert.ok(problems.some((p) => p.includes('200')), problems.join(' | '));
+  assert.ok(problems.some((p) => p.includes('wled.local')), problems.join(' | '));
+});
+
+test('DOF : DudesCab et Pinscape Pico portent leurs bandes, Cyber Pinball n’écrit rien pour elles', () => {
+  for (const controller of ['DudesCab', 'PinscapePico'] as const) {
+    const problems = ledProblems({ controller, port: '', strips: [] });
+    assert.equal(problems.length, 1, controller);
+    assert.match(problems[0]!, /outil de la carte/);
+  }
+  assert.equal(DOF_CONTROLLERS.DudesCab.addressable, true);
+  assert.equal(DOF_CONTROLLERS.PinscapePico.addressable, true);
+});

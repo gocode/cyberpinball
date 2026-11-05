@@ -6,6 +6,7 @@
 #   page          : contrôleurs reconnus, « La KL25Z ne pilote pas de LED adressables », points à vérifier ;
 #   éditeur       : « LED adressables », les bandes de la borne de référence (2 verticales, 2 anneaux), enregistrées :
 #                   Cabinet.xml et GlobalConfig_B2SServer.xml écrits dans le dossier de DOF du bac à sable ;
+#   cartes        : en français, Art-Net puis DudesCab (rien à écrire), puis retour au Teensy ;
 #   page relue    : le Teensy n'est plus « non déclaré » ;
 #   santé         : le contrôle « LED et retours (DOF) ».
 # Le garde-fou de mise en page et le guet hors écran doivent rester muets, sinon le script échoue.
@@ -77,7 +78,16 @@ try {
       $env:CYBERPINBALL_ROOT = $root
       $env:CYBERPINBALL_LANGUE = $langue
       $env:CYBERPINBALL_USB_DEVICES = "$base\usb-dof.json"
-      $env:CYBERPINBALL_AUTOPILOT = $touches -join ','
+      # En français, le choix de la carte d'abord : Art-Net (adresse, univers), DudesCab (bandes décrites
+      # dans l'outil de la carte, rien à écrire), puis retour au Teensy (les libellés « Contrôleur : … »
+      # n'ont pas de clé seule à traduire pour l'autopilote).
+      $cartes = @()
+      if ($langue -eq 'fr') {
+        foreach ($carte in @('Art-Net (DMX)', 'DudesCab', 'Teensy (TeensyStripController)')) { $cartes += @('action:Contrôleur', 'wait:600', "action:$carte", 'wait:800') }
+      }
+      $avantBandes = [array]::IndexOf($touches, 'action:Bandes de LED adressables…') + 2
+      $suite = @($touches[0..($avantBandes - 1)]) + $cartes + @($touches[$avantBandes..($touches.Count - 1)])
+      $env:CYBERPINBALL_AUTOPILOT = $suite -join ','
       $env:CYBERPINBALL_CAPTURE = $captures
       if (Test-Path $captures) { Remove-Item -Recurse -Force $captures }
       $id = "$jeu/$langue"

@@ -21,6 +21,12 @@ import {
   LED_COLOR_ORDERS,
   LED_CONTROLLER_TYPES,
   LED_MAX_OUTPUTS,
+  ARTNET_LEDS_PER_UNIVERSE,
+  ARTNET_MAX_UNIVERSES,
+  artnetUniverse,
+  ledOutputCount,
+  ledsOnBoard,
+  ledsOnSerial,
   ledProblems,
   ledsFromCabinet,
   ledsPerOutput,
@@ -304,8 +310,11 @@ export function createDofMenu(host: DofMenuHost) {
     const fromFile = s?.cabinet ? ledsFromCabinet(s.cabinet) : undefined;
     if (fromFile) return fromFile;
     const { devices } = read();
-    const teensy = detectDofControllers(devices, host.hidNames()).find((d) => d.type === 'TeensyStripController');
-    return { controller: 'TeensyStripController', port: teensy?.device.port ?? serialPortCandidates(devices)[0]?.port ?? '', strips: [] };
+    const detected = detectDofControllers(devices, host.hidNames());
+    const teensy = detected.find((d) => d.type === 'TeensyStripController');
+    // Une carte qui porte elle-même ses bandes (DudesCab, Pinscape Pico), sans Teensy : on part d'elle.
+    const onBoard = !teensy ? detected.find((d) => d.type === 'DudesCab' || d.type === 'PinscapePico') : undefined;
+    return { controller: (onBoard?.type as LedControllerType | undefined) ?? 'TeensyStripController', port: teensy?.device.port ?? serialPortCandidates(devices)[0]?.port ?? '', strips: [] };
   }
 
   function openEditor(at = 0): void {
@@ -318,69 +327,203 @@ export function createDofMenu(host: DofMenuHost) {
     open(2);
   }
 
+  /** Lignes de l'éditeur avant les bandes : contrôleur, puis port (série) ou adresse et univers (Art-Net). */
+  function settingsRows(d: CabinetLeds): number {
+    return d.controller === 'ArtNet' ? 3 : ledsOnSerial(d.controller) ? 2 : 1;
+  }
+  const stripRow = (i: number) => settingsRows(draft ?? initialDraft()) + i;
+  const addRow = () => settingsRows(draft ?? initialDraft()) + (draft?.strips.length ?? 0);
+
+  /** « Sortie 2 » ou « Univers 1 » : où arrivent les données d'une bande. */
+  function outputLabel(d: CabinetLeds, output: number): string {
+    return d.controller === 'ArtNet' ? t('Univers {n}', { n: artnetUniverse(d, output) }) : t('Sortie {n}', { n: output });
+  }
+
+  /** Ce qu'il faut savoir du câblage, selon la carte. */
+  function wiringRows(d: CabinetLeds): Row[] {
+    if (d.controller === 'DudesCab') {
+      return [
+        {
+          icon: 'info',
+          text: t('Les bandes du DudesCab se décrivent dans son propre outil'),
+          detail: t('Nombre de LED, sorties et numéro DOF se règlent dans l’outil de configuration du DudesCab (micrologiciel 1.9 ou plus récent, mode MX). VPX les lit sur la carte à chaque partie : Cyber Pinball n’a pas de Cabinet.xml à écrire, il en créerait des doublons.'),
+        },
+      ];
+    }
+    if (d.controller === 'PinscapePico') {
+      return [
+        {
+          icon: 'info',
+          text: t('Les LED de la Pinscape Pico se déclarent dans sa configuration'),
+          detail: t('Dans l’outil de configuration de la Pinscape Pico, chaque LED adressable devient une sortie de la carte. DOF la pilote comme les autres sorties (directoutputconfig120.ini pour l’unité 1) : Cyber Pinball n’a pas de Cabinet.xml à écrire.'),
+        },
+      ];
+    }
+    if (d.controller === 'ArtNet') {
+      return [
+        {
+          icon: 'info',
+          text: t('Un nœud Art-Net sur le réseau (WLED sur un ESP32…)'),
+          detail: t('Le PC de la borne et le nœud sur le même réseau. Dans WLED : Sync Interfaces, réception en temps réel « Art-Net », univers de départ comme ici, mode « Multi RGB ». 512 canaux par univers : {max} LED au plus ; une bande plus longue se coupe en deux bandes sur deux univers.', { max: ARTNET_LEDS_PER_UNIVERSE }),
+        },
+      ];
+    }
+    return [
+      {
+        icon: 'info',
+        text: t('Les bandes se branchent sur le contrôleur, pas sur la KL25Z'),
+        detail: t('Données (DIN) sur une sortie du contrôleur, +5 V et masse sur une alimentation 5 V à part, masses reliées. Les LED d’une même sortie se suivent : la première bande, puis celle branchée à sa suite.'),
+      },
+      {
+        icon: 'info',
+        text: t('Câble de données long (jusqu’au fronton)'),
+        detail: t('Un câble Ethernet depuis la carte OctoWS2811 du Teensy : chaque fil de données torsadé avec une masse. Une résistance de 100 à 330 Ω au départ des données (déjà sur l’OctoWS2811), et le 5 V amené à la bande par son propre câble, pas par celui des données.'),
+      },
+    ];
+  }
+
   function buildEditor(): Built {
     // Un écran se redessine à tout moment (relevé de la santé…) : sans description en cours, on la relit.
     const d = (draft ??= initialDraft());
+    const onBoard = ledsOnBoard(d.controller);
     const problems = ledProblems(d);
     const counts = ledsPerOutput(d);
     const total = counts.reduce((a, b) => a + b, 0);
-    const sections: Built['sections'] = [
-      {
-        rows: [
-          {
-            icon: 'info',
-            text: t('Les bandes se branchent sur le contrôleur, pas sur la KL25Z'),
-            detail: t('Données (DIN) sur une sortie du contrôleur, +5 V et masse sur une alimentation 5 V à part, masses reliées. Les LED d’une même sortie se suivent : la première bande, puis celle branchée à sa suite.'),
-          },
-          {
-            icon: 'info',
-            text: t('Câble de données long (jusqu’au fronton)'),
-            detail: t('Un câble Ethernet depuis la carte OctoWS2811 du Teensy : chaque fil de données torsadé avec une masse. Une résistance de 100 à 330 Ω au départ des données (déjà sur l’OctoWS2811), et le 5 V amené à la bande par son propre câble, pas par celui des données.'),
-          },
-        ],
-      },
-    ];
-    if (counts.length) {
+    const sections: Built['sections'] = [{ rows: wiringRows(d) }];
+    if (counts.length && !onBoard) {
       sections.push({
-        title: t('Sorties du contrôleur'),
-        rows: counts.map((n, i) => ({ text: t('Sortie {n}', { n: i + 1 }), detail: tn(n, '{n} LED', '{n} LED') })).concat([{ text: t('En tout'), detail: tn(total, '{n} LED', '{n} LED') }]),
+        title: d.controller === 'ArtNet' ? t('Univers Art-Net') : t('Sorties du contrôleur'),
+        rows: counts
+          .map((n, i) => ({ text: outputLabel(d, i + 1), detail: tn(n, '{n} LED', '{n} LED'), ...(d.controller === 'ArtNet' && n > ARTNET_LEDS_PER_UNIVERSE ? { tone: 'warning' as const } : {}) }))
+          .filter((r) => r.detail !== tn(0, '{n} LED', '{n} LED'))
+          .concat([{ text: t('En tout'), detail: tn(total, '{n} LED', '{n} LED') }]),
       });
     }
-    if (problems.length) sections.push({ title: t('Avant d’enregistrer'), rows: problems.map((p) => ({ icon: 'alert' as const, text: p, tone: 'warning' as const })) });
+    if (problems.length && !onBoard) sections.push({ title: t('Avant d’enregistrer'), rows: problems.map((p) => ({ icon: 'alert' as const, text: p, tone: 'warning' as const })) });
 
+    const unavailable = (label: string, icon: Action['icon'], reason: string): Action => ({ label, detail: reason, icon, tone: 'quiet', run: () => library.openNotice(label, [reason], () => openEditor()) });
     const actions: Action[] = [
-      {
-        label: t('Contrôleur : {controller}', { controller: controllerLabel(d.controller) }),
-        detail: t('Start : changer'),
-        icon: 'chip',
-        run: () => {
-          d.controller = LED_CONTROLLER_TYPES[(LED_CONTROLLER_TYPES.indexOf(d.controller) + 1) % LED_CONTROLLER_TYPES.length]!;
-          openEditor(0);
-        },
-      },
-      { label: t('Port série : {port}', { port: d.port || t('à choisir') }), detail: t('Start : choisir parmi les ports branchés'), icon: 'link', run: () => openPorts() },
-      ...d.strips.map(
-        (s, i): Action => ({
-          key: `strip-${i}`,
-          label: s.name || t('Bande sans nom'),
-          detail: t('Sortie {output} · {w} × {h} = {n} LED · DOF {dof}', { output: s.output, w: s.width, h: s.height, n: stripLedCount(s), dof: s.dofOutput }),
-          run: () => openStrip(i),
-        }),
-      ),
-      { label: t('Ajouter une bande'), detail: t('Une bande simple ou une matrice (lignes × colonnes)'), icon: 'plus', run: () => addStrip() },
-      problems.length
-        ? { label: t('Enregistrer'), detail: problems[0]!, icon: 'check', tone: 'quiet', run: () => library.openNotice(t('Pas encore'), problems, () => openEditor()) }
-        : { label: t('Enregistrer'), detail: t('Écrit Cabinet.xml dans le dossier de DOF'), icon: 'check', tone: 'ok', run: () => save() },
-      { label: t('Retour sans enregistrer'), icon: 'back', run: () => leaveEditor() },
+      { label: t('Contrôleur : {controller}', { controller: controllerLabel(d.controller) }), detail: t('Start : choisir la carte des LED adressables'), icon: 'chip', run: () => openControllers() },
     ];
+    if (ledsOnSerial(d.controller)) {
+      actions.push({ label: t('Port série : {port}', { port: d.port || t('à choisir') }), detail: t('Start : choisir parmi les ports branchés'), icon: 'link', run: () => openPorts() });
+    } else if (d.controller === 'ArtNet') {
+      actions.push(
+        {
+          label: t('Adresse du nœud : {address}', { address: d.address?.trim() || t('tout le réseau') }),
+          detail: t('L’adresse IP du nœud Art-Net, ou rien pour diffuser'),
+          icon: 'link',
+          run: () =>
+            library.openPrompt(t('Adresse du nœud Art-Net'), t('Adresse IP (192.168.1.50), vide : tout le réseau'), d.address ?? '', (value) => {
+              if (value !== undefined) d.address = value.trim();
+              openEditor(1);
+            }),
+        },
+        {
+          label: t('Premier univers : {n}', { n: d.universe ?? 0 }),
+          detail: t('Celui que le nœud attend (0 pour WLED par défaut)'),
+          icon: 'list',
+          run: () => openUniverse(),
+        },
+      );
+    }
+    if (!onBoard) {
+      actions.push(
+        ...d.strips.map(
+          (s, i): Action => ({
+            key: `strip-${i}`,
+            label: s.name || t('Bande sans nom'),
+            detail: t('{output} · {w} × {h} = {n} LED · DOF {dof}', { output: outputLabel(d, s.output), w: s.width, h: s.height, n: stripLedCount(s), dof: s.dofOutput }),
+            run: () => openStrip(i),
+          }),
+        ),
+        { label: t('Ajouter une bande'), detail: t('Une bande simple ou une matrice (lignes × colonnes)'), icon: 'plus', run: () => addStrip() },
+        problems.length
+          ? { label: t('Enregistrer'), detail: problems[0]!, icon: 'check', tone: 'quiet', run: () => library.openNotice(t('Pas encore'), problems, () => openEditor()) }
+          : { label: t('Enregistrer'), detail: t('Écrit Cabinet.xml dans le dossier de DOF'), icon: 'check', tone: 'ok', run: () => save() },
+      );
+    } else {
+      const reason = problems[0]!;
+      actions.push(unavailable(t('Ajouter une bande'), 'plus', reason), unavailable(t('Enregistrer'), 'check', reason));
+    }
+    actions.push({ label: t('Retour sans enregistrer'), icon: 'back', run: () => leaveEditor() });
     return {
       heading: t('LED adressables'),
       icon: 'bulb',
-      lead: t('Chaque bande devient un toy de DOF ; dans le configtool, votre contrôleur de LED adressables porte le numéro {n} et chaque toy la sortie DOF indiquée ici.', { n: DOF_ADDRESSABLE_NUMBER }),
+      lead: onBoard
+        ? t('{controller} : les bandes se décrivent dans l’outil de la carte.', { controller: controllerLabel(d.controller) })
+        : t('Chaque bande devient un toy de DOF ; dans le configtool, votre contrôleur de LED adressables porte le numéro {n} et chaque toy la sortie DOF indiquée ici.', { n: DOF_ADDRESSABLE_NUMBER }),
       sections,
       actions,
       back: () => leaveEditor(),
     };
+  }
+
+  /** Choix de la carte des LED adressables : les trois familles de libdof. */
+  function openControllers(): void {
+    const d = draft ?? initialDraft();
+    const details: Record<LedControllerType, () => string> = {
+      TeensyStripController: () => t('Port série, jusqu’à 8 sorties avec la carte OctoWS2811 ; Cabinet.xml écrit par Cyber Pinball'),
+      WemosD1MPStripController: () => t('Port série (CH340 ou CP210x) ; Cabinet.xml écrit par Cyber Pinball'),
+      ArtNet: () => t('Nœud réseau (WLED sur un ESP32…), {max} LED par univers ; Cabinet.xml écrit par Cyber Pinball', { max: ARTNET_LEDS_PER_UNIVERSE }),
+      DudesCab: () => t('Bandes décrites dans l’outil du DudesCab, lues par VPX sur la carte'),
+      PinscapePico: () => t('LED déclarées dans la configuration de la Pinscape Pico, comme des sorties'),
+    };
+    library.openCustom(
+      () => ({
+        heading: t('Carte des LED adressables'),
+        icon: 'chip',
+        sections: [],
+        actions: [
+          ...LED_CONTROLLER_TYPES.map(
+            (c): Action => ({
+              key: c,
+              label: controllerLabel(c),
+              detail: c === d.controller ? t('{detail} · choix actuel', { detail: details[c]() }) : details[c](),
+              tone: c === d.controller ? 'ok' : undefined,
+              run: () => {
+                d.controller = c;
+                draft = d;
+                // Les sorties d'un univers Art-Net ne sont pas celles d'un Teensy : on garde les bandes, l'utilisateur revoit leur sortie.
+                openEditor(0);
+              },
+            }),
+          ),
+          { label: t('Retour'), icon: 'back', run: () => openEditor(0) },
+        ],
+        back: () => openEditor(0),
+      }),
+      Math.max(0, LED_CONTROLLER_TYPES.indexOf(d.controller)),
+    );
+  }
+
+  function openUniverse(): void {
+    const d = draft!;
+    const values = Array.from({ length: ARTNET_MAX_UNIVERSES }, (_, k) => k);
+    library.openCustom(
+      () => ({
+        heading: t('Premier univers Art-Net'),
+        icon: 'list',
+        sections: [],
+        actions: [
+          ...values.map(
+            (v): Action => ({
+              key: String(v),
+              label: String(v),
+              detail: v === (d.universe ?? 0) ? t('choix actuel') : undefined,
+              tone: v === (d.universe ?? 0) ? 'ok' : undefined,
+              run: () => {
+                d.universe = v;
+                openEditor(2);
+              },
+            }),
+          ),
+          { label: t('Retour'), icon: 'back', run: () => openEditor(2) },
+        ],
+        back: () => openEditor(2),
+      }),
+      d.universe ?? 0,
+    );
   }
 
   function openPorts(): void {
@@ -448,7 +591,7 @@ export function createDofMenu(host: DofMenuHost) {
               const d = (draft ??= initialDraft());
               const used = new Set(d.strips.map((x) => x.output));
               let output = 1;
-              while (used.has(output) && output < LED_MAX_OUTPUTS) output++;
+              while (used.has(output) && output < ledOutputCount(d.controller)) output++;
               d.strips.push({
                 name: preset.name(),
                 output,
@@ -463,9 +606,9 @@ export function createDofMenu(host: DofMenuHost) {
             },
           }),
         ),
-        { label: t('Retour'), icon: 'back', run: () => openEditor(2) },
+        { label: t('Retour'), icon: 'back', run: () => openEditor(addRow()) },
       ],
-      back: () => openEditor(2),
+      back: () => openEditor(addRow()),
     }));
   }
 
@@ -473,7 +616,7 @@ export function createDofMenu(host: DofMenuHost) {
     library.openCustom(() => {
       const s = (draft ??= initialDraft()).strips[i];
       if (!s) return buildEditor();
-      const back = () => openEditor(2 + i);
+      const back = () => openEditor(stripRow(i));
       const choose = <T extends string | number>(row: number, heading: string, values: readonly T[], label: (v: T) => string, current: T, set: (v: T) => void, other?: () => void) =>
         library.openCustom(
           () => ({
@@ -523,12 +666,20 @@ export function createDofMenu(host: DofMenuHost) {
                 openStrip(i, 0);
               }),
           },
-          {
-            label: t('Sortie du contrôleur : {n}', { n: s.output }),
-            detail: t('Le connecteur où arrivent ses données'),
-            icon: 'link',
-            run: () => choose(1, t('Sortie du contrôleur'), Array.from({ length: LED_MAX_OUTPUTS }, (_, k) => k + 1), (v) => t('Sortie {n}', { n: v }), s.output, (v) => (s.output = v)),
-          },
+          draft!.controller === 'ArtNet'
+            ? {
+                label: t('Univers Art-Net : {n}', { n: artnetUniverse(draft!, s.output) }),
+                detail: t('{max} LED au plus par univers', { max: ARTNET_LEDS_PER_UNIVERSE }),
+                icon: 'link',
+                run: () =>
+                  choose(1, t('Univers Art-Net'), Array.from({ length: ARTNET_MAX_UNIVERSES }, (_, k) => k + 1), (v) => t('Univers {n}', { n: artnetUniverse(draft!, v) }), s.output, (v) => (s.output = v)),
+              }
+            : {
+                label: t('Sortie du contrôleur : {n}', { n: s.output }),
+                detail: t('Le connecteur où arrivent ses données'),
+                icon: 'link',
+                run: () => choose(1, t('Sortie du contrôleur'), Array.from({ length: LED_MAX_OUTPUTS }, (_, k) => k + 1), (v) => t('Sortie {n}', { n: v }), s.output, (v) => (s.output = v)),
+              },
           {
             label: t('Colonnes : {n}', { n: s.width }),
             detail: t('1 pour une bande simple'),
@@ -571,7 +722,7 @@ export function createDofMenu(host: DofMenuHost) {
             tone: 'warning',
             run: () => {
               draft!.strips.splice(i, 1);
-              openEditor(2);
+              openEditor(addRow());
             },
           },
           { label: t('Retour'), icon: 'back', run: back },

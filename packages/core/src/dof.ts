@@ -64,7 +64,7 @@ export interface DofControllerInfo {
 /** Ce que chaque type est, et quels ini il lit (autoconfigurateurs de libdof : unitBias, ledWizNumber). */
 export const DOF_CONTROLLERS: Record<DofControllerType, DofControllerInfo> = {
   Pinscape: { label: 'Pinscape (KL25Z)', auto: true, addressable: false, numbers: '51–66' },
-  PinscapePico: { label: 'Pinscape Pico', auto: true, addressable: false, numbers: '120+' },
+  PinscapePico: { label: 'Pinscape Pico', auto: true, addressable: true, numbers: '120+' },
   LedWiz: { label: 'LedWiz', auto: true, addressable: false, numbers: '1–16' },
   DudesCab: { label: 'DudesCab', auto: true, addressable: true, numbers: '90–94' },
   UMXController: { label: 'UMX', auto: true, addressable: true, numbers: '' },
@@ -310,6 +310,9 @@ export interface DofCabinetController {
   type: string;
   name: string;
   comPort?: string;
+  /** Art-Net : univers DMX et adresse de diffusion. */
+  universe?: number;
+  address?: string;
   /** NumberOfLedsStrip1..10 des contrôleurs de LED adressables. */
   ledsPerOutput?: number[];
 }
@@ -449,10 +452,14 @@ export function readCabinetXml(file: string, text = fs.readFileSync(file, 'utf8'
       if (v !== undefined) leds[i - 1] = Number(v) || 0;
     }
     const comPort = childText(c, 'ComPortName');
+    const universe = childText(c, 'Universe');
+    const address = childText(c, 'BroadcastAddress');
     controllers.push({
       type: c.name,
       name: childText(c, 'Name') ?? c.attrs.Name ?? c.name,
       ...(comPort ? { comPort } : {}),
+      ...(universe !== undefined ? { universe: Number(universe) } : {}),
+      ...(address ? { address } : {}),
       ...(leds.length ? { ledsPerOutput: Array.from(leds, (v) => v ?? 0) } : {}),
     });
   }
@@ -763,8 +770,32 @@ export type LedArrangement = (typeof LED_ARRANGEMENTS)[number];
 export const LED_COLOR_ORDERS = ['GRB', 'RGB', 'RBG', 'GBR', 'BRG', 'BGR'] as const;
 export type LedColorOrder = (typeof LED_COLOR_ORDERS)[number];
 
-export type LedControllerType = 'TeensyStripController' | 'WemosD1MPStripController';
-export const LED_CONTROLLER_TYPES: readonly LedControllerType[] = ['TeensyStripController', 'WemosD1MPStripController'];
+/**
+ * Cartes qui pilotent des LED adressables, en trois familles (libdof eef645d) :
+ * - Teensy, Wemos D1 : port série, déclarés dans Cabinet.xml avec leurs bandes (LedStrip) ;
+ * - Art-Net (WLED ou un autre nœud ESP32 sur le réseau) : un contrôleur ArtNet par univers DMX de
+ *   512 canaux, soit 170 LED au plus par univers (ArtNet.h, DMX_CHANNELS), déclarés dans Cabinet.xml ;
+ * - DudesCab (mode MX) et Pinscape Pico : les bandes se décrivent dans l'outil de la carte, que libdof
+ *   lit sur la carte (DudesCab : UMXController::UpdateCabinetFromConfig crée lui-même ses LedStrip ;
+ *   Pinscape Pico : les LED sont des sorties de la carte). Un Cabinet.xml les doublerait.
+ */
+export type LedControllerType = 'TeensyStripController' | 'WemosD1MPStripController' | 'ArtNet' | 'DudesCab' | 'PinscapePico';
+export const LED_CONTROLLER_TYPES: readonly LedControllerType[] = ['TeensyStripController', 'WemosD1MPStripController', 'ArtNet', 'DudesCab', 'PinscapePico'];
+
+/** Cartes dont les bandes se décrivent dans leur propre outil : Cyber Pinball n'écrit rien pour elles. */
+export function ledsOnBoard(controller: LedControllerType): boolean {
+  return controller === 'DudesCab' || controller === 'PinscapePico';
+}
+
+/** Cartes reliées par un port série (COM). */
+export function ledsOnSerial(controller: LedControllerType): boolean {
+  return controller === 'TeensyStripController' || controller === 'WemosD1MPStripController';
+}
+
+/** LED d'un univers Art-Net : 512 canaux DMX, 3 par LED. */
+export const ARTNET_LEDS_PER_UNIVERSE = 170;
+/** Univers Art-Net qu'une borne peut raisonnablement employer. */
+export const ARTNET_MAX_UNIVERSES = 16;
 
 /** Sorties d'un contrôleur de LED : 8 sur l'OctoWS2811 du Teensy, 10 au plus dans libdof. */
 export const LED_MAX_OUTPUTS = 10;
@@ -788,11 +819,29 @@ export interface LedStripSpec {
 /** LED adressables de la borne, telles que décrites dans « LED et retours (DOF) ». */
 export interface CabinetLeds {
   controller: LedControllerType;
-  /** Port série du contrôleur (COM5). */
+  /** Port série du contrôleur (COM5) ; Teensy et Wemos D1 seulement. */
   port: string;
+  /**
+   * Bandes ; `output` est la sortie du contrôleur (Teensy, Wemos D1) ou l'univers Art-Net compté
+   * depuis `universe` (1 : le premier univers).
+   */
   strips: LedStripSpec[];
   /** Numéro de l'ini (30 par défaut, celui du configtool). */
   number?: number;
+  /** Art-Net : adresse du nœud (192.168.1.50) ou de diffusion ; vide : diffusion sur tout le réseau. */
+  address?: string;
+  /** Art-Net : numéro du premier univers (0 par défaut, celui de WLED). */
+  universe?: number;
+}
+
+/** Sorties qu'offre un contrôleur : sorties du Teensy ou du Wemos, univers Art-Net. */
+export function ledOutputCount(controller: LedControllerType): number {
+  return controller === 'ArtNet' ? ARTNET_MAX_UNIVERSES : LED_MAX_OUTPUTS;
+}
+
+/** Univers Art-Net d'une sortie (1 : le premier univers). */
+export function artnetUniverse(leds: Pick<CabinetLeds, 'universe'>, output: number): number {
+  return (leds.universe ?? 0) + output - 1;
 }
 
 export function stripLedCount(s: Pick<LedStripSpec, 'width' | 'height'>): number {
@@ -809,13 +858,14 @@ export function ledsPerOutput(leds: CabinetLeds): number[] {
 
 /**
  * FirstLedNumber de chaque bande : libdof numérote les LED du contrôleur d'un bout à l'autre,
- * sortie 1 d'abord (TeensyStripController : NumberOfLedsStrip1, puis 2…).
+ * sortie 1 d'abord (TeensyStripController : NumberOfLedsStrip1, puis 2…). Art-Net : chaque univers
+ * est un contrôleur à part, la numérotation repart de 1.
  */
 export function stripFirstLeds(leds: CabinetLeds): number[] {
   const perOutput = ledsPerOutput(leds);
   const used = Array.from({ length: perOutput.length }, () => 0);
   return leds.strips.map((s) => {
-    const before = perOutput.slice(0, s.output - 1).reduce((a, b) => a + b, 0);
+    const before = leds.controller === 'ArtNet' ? 0 : perOutput.slice(0, s.output - 1).reduce((a, b) => a + b, 0);
     const first = before + used[s.output - 1]! + 1;
     used[s.output - 1]! += stripLedCount(s);
     return first;
@@ -825,19 +875,34 @@ export function stripFirstLeds(leds: CabinetLeds): number[] {
 /** Ce qui empêche d'écrire Cabinet.xml (liste vide : on peut). */
 export function ledProblems(leds: CabinetLeds): string[] {
   const problems: string[] = [];
-  if (!/^COM\d+$/i.test(leds.port.trim())) problems.push(t('Port série du contrôleur à choisir (COM3, COM5…).'));
+  if (ledsOnBoard(leds.controller)) {
+    problems.push(t('{controller} : les bandes se décrivent dans l’outil de la carte, DOF les y lit ; Cyber Pinball n’a rien à écrire.', { controller: DOF_CONTROLLERS[leds.controller].label }));
+    return problems;
+  }
+  if (ledsOnSerial(leds.controller) && !/^COM\d+$/i.test(leds.port.trim())) problems.push(t('Port série du contrôleur à choisir (COM3, COM5…).'));
+  if (leds.controller === 'ArtNet' && leds.address?.trim() && !/^\d{1,3}(\.\d{1,3}){3}$/.test(leds.address.trim())) {
+    problems.push(t('Adresse Art-Net « {address} » : une adresse IP (192.168.1.50), ou rien pour diffuser sur tout le réseau.', { address: leds.address }));
+  }
   if (!leds.strips.length) problems.push(t('Aucune bande décrite.'));
   const names = new Set<string>();
   const outputs = new Set<number>();
+  const max = ledOutputCount(leds.controller);
   for (const s of leds.strips) {
     if (!s.name.trim()) problems.push(t('Une bande n’a pas de nom.'));
     else if (names.has(s.name.trim())) problems.push(t('Deux bandes s’appellent « {name} ».', { name: s.name }));
     names.add(s.name.trim());
-    if (!Number.isInteger(s.output) || s.output < 1 || s.output > LED_MAX_OUTPUTS) problems.push(t('« {name} » : sortie {n} hors de 1 à {max}.', { name: s.name, n: s.output, max: LED_MAX_OUTPUTS }));
+    if (!Number.isInteger(s.output) || s.output < 1 || s.output > max) problems.push(t('« {name} » : sortie {n} hors de 1 à {max}.', { name: s.name, n: s.output, max }));
     if (stripLedCount(s) < 1) problems.push(t('« {name} » : aucune LED.', { name: s.name }));
     if (outputs.has(s.dofOutput)) problems.push(t('Sortie DOF {n} donnée à deux bandes.', { n: s.dofOutput }));
     outputs.add(s.dofOutput);
     if (!Number.isInteger(s.dofOutput) || s.dofOutput < 1) problems.push(t('« {name} » : sortie DOF invalide.', { name: s.name }));
+  }
+  if (leds.controller === 'ArtNet') {
+    ledsPerOutput(leds).forEach((n, i) => {
+      if (n > ARTNET_LEDS_PER_UNIVERSE) {
+        problems.push(t('Univers Art-Net {u} : {n} LED, {max} au plus (512 canaux DMX). Répartissez les bandes sur plusieurs univers.', { u: artnetUniverse(leds, i + 1), n, max: ARTNET_LEDS_PER_UNIVERSE }));
+      }
+    });
   }
   return problems;
 }
@@ -857,9 +922,32 @@ function el(name: string, value: string | number, indent: string): string {
 /** Cabinet.xml des LED adressables décrites ; l'auto-configuration des autres contrôleurs reste active. */
 export function cabinetXml(leds: CabinetLeds, now = new Date()): string {
   const number = leds.number ?? DOF_ADDRESSABLE_NUMBER;
-  const controllerName = leds.controller === 'TeensyStripController' ? 'Teensy' : 'Wemos';
   const counts = ledsPerOutput(leds);
   const firsts = stripFirstLeds(leds);
+  const artnet = leds.controller === 'ArtNet';
+  /** Nom du contrôleur qui porte une bande : un par univers Art-Net. */
+  const controllerOf = (output: number) => (artnet ? `Art-Net ${artnetUniverse(leds, output)}` : leds.controller === 'TeensyStripController' ? 'Teensy' : 'Wemos');
+  const controllers: string[] = [];
+  if (artnet) {
+    const used = [...new Set(leds.strips.map((s) => s.output))].sort((a, b) => a - b);
+    for (const output of used) {
+      controllers.push(
+        '    <ArtNet>',
+        el('Name', controllerOf(output), '      '),
+        el('Universe', artnetUniverse(leds, output), '      '),
+        ...(leds.address?.trim() ? [el('BroadcastAddress', leds.address.trim(), '      ')] : []),
+        '    </ArtNet>',
+      );
+    }
+  } else {
+    controllers.push(
+      `    <${leds.controller}>`,
+      el('Name', controllerOf(1), '      '),
+      ...counts.map((n, i) => el(`NumberOfLedsStrip${i + 1}`, n, '      ')),
+      el('ComPortName', leds.port.trim().toUpperCase(), '      '),
+      `    </${leds.controller}>`,
+    );
+  }
   const lines = [
     '<?xml version="1.0" encoding="utf-8"?>',
     `<!-- Written by Cyber Pinball (LED et retours (DOF)), ${now.toISOString()}. Cyber Pinball rewrites this file; remove this line to keep your own edits. -->`, // i18n-ignore : fichier lu par DOF
@@ -867,11 +955,7 @@ export function cabinetXml(leds: CabinetLeds, now = new Date()): string {
     '  <Name>Cyber Pinball</Name>',
     '  <AutoConfigEnabled>true</AutoConfigEnabled>',
     '  <OutputControllers>',
-    `    <${leds.controller}>`,
-    el('Name', controllerName, '      '),
-    ...counts.map((n, i) => el(`NumberOfLedsStrip${i + 1}`, n, '      ')),
-    el('ComPortName', leds.port.trim().toUpperCase(), '      '),
-    `    </${leds.controller}>`,
+    ...controllers,
     '  </OutputControllers>',
     '  <Toys>',
   ];
@@ -886,7 +970,7 @@ export function cabinetXml(leds: CabinetLeds, now = new Date()): string {
       el('FirstLedNumber', firsts[i]!, '      '),
       el('FadingCurveName', 'SwissLizardsLedCurve', '      '),
       el('Brightness', Math.max(0, Math.min(100, Math.round(s.brightness))), '      '),
-      el('OutputControllerName', controllerName, '      '),
+      el('OutputControllerName', controllerOf(s.output), '      '),
       '    </LedStrip>',
     );
   });
@@ -961,31 +1045,45 @@ export function planLedWrite(dir: string, leds: CabinetLeds, now = new Date()): 
 
 /** Bandes d'un Cabinet.xml relu, pour reprendre la description dans l'éditeur. */
 export function ledsFromCabinet(cabinet: DofCabinetFile): CabinetLeds | undefined {
+  const dofOutputs = new Map(cabinet.equivalents.flatMap((e) => e.outputs.map((o) => [o.name, o.number] as const)));
+  const spec = (s: DofCabinetStrip, output: number): LedStripSpec => ({
+    name: s.name,
+    output,
+    width: s.width,
+    height: s.height,
+    arrangement: (LED_ARRANGEMENTS as readonly string[]).includes(s.arrangement ?? '') ? (s.arrangement as LedArrangement) : 'LeftRightTopDown',
+    colorOrder: (LED_COLOR_ORDERS as readonly string[]).includes(s.colorOrder ?? '') ? (s.colorOrder as LedColorOrder) : 'RGB',
+    brightness: s.brightness ?? 100,
+    dofOutput: dofOutputs.get(s.name) ?? 1,
+  });
+  const artnet = cabinet.controllers.filter((x) => x.type === 'ArtNet');
+  if (artnet.length && !cabinet.controllers.some((x) => x.type === 'TeensyStripController' || x.type === 'WemosD1MPStripController')) {
+    const first = Math.min(...artnet.map((a) => a.universe ?? 0));
+    const address = artnet.find((a) => a.address)?.address;
+    return {
+      controller: 'ArtNet',
+      port: '',
+      universe: first,
+      ...(address ? { address } : {}),
+      strips: cabinet.strips.flatMap((s) => {
+        const c = artnet.find((a) => a.name === s.controller);
+        return c ? [spec(s, (c.universe ?? 0) - first + 1)] : [];
+      }),
+    };
+  }
   const c = cabinet.controllers.find((x) => x.type === 'TeensyStripController' || x.type === 'WemosD1MPStripController');
   if (!c) return undefined;
   const counts = c.ledsPerOutput ?? [];
   const starts = counts.map((_, i) => counts.slice(0, i).reduce((a, b) => a + b, 0) + 1);
-  const outputOf = (first: number) => {
+  const outputOf = (firstLed: number) => {
     let o = 1;
-    for (let i = 0; i < starts.length; i++) if (first >= starts[i]!) o = i + 1;
+    for (let i = 0; i < starts.length; i++) if (firstLed >= starts[i]!) o = i + 1;
     return o;
   };
-  const dofOutputs = new Map(cabinet.equivalents.flatMap((e) => e.outputs.map((o) => [o.name, o.number] as const)));
   return {
     controller: c.type as LedControllerType,
     port: c.comPort ?? '',
-    strips: cabinet.strips
-      .filter((s) => !s.controller || s.controller === c.name)
-      .map((s) => ({
-        name: s.name,
-        output: outputOf(s.firstLed),
-        width: s.width,
-        height: s.height,
-        arrangement: (LED_ARRANGEMENTS as readonly string[]).includes(s.arrangement ?? '') ? (s.arrangement as LedArrangement) : 'LeftRightTopDown',
-        colorOrder: (LED_COLOR_ORDERS as readonly string[]).includes(s.colorOrder ?? '') ? (s.colorOrder as LedColorOrder) : 'RGB',
-        brightness: s.brightness ?? 100,
-        dofOutput: dofOutputs.get(s.name) ?? 1,
-      })),
+    strips: cabinet.strips.filter((s) => !s.controller || s.controller === c.name).map((s) => spec(s, outputOf(s.firstLed))),
   };
 }
 
