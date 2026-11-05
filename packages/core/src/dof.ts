@@ -872,6 +872,40 @@ export function stripFirstLeds(leds: CabinetLeds): number[] {
   });
 }
 
+/** Une bande telle que WLED la voit : sa première LED (« Start » dans LED Preferences) et sa longueur. */
+export interface WledSegment {
+  name: string;
+  /** Univers Art-Net où DOF envoie ses couleurs. */
+  universe: number;
+  /** Index de sa première LED dans WLED (0 : la première). */
+  start: number;
+  length: number;
+}
+
+/**
+ * Placement des bandes dans WLED pour la réception Art-Net en « Multi RGB » : WLED range 170 LED par
+ * univers à la suite (LED k : univers de départ + k ÷ 170, canaux 3 × (k mod 170) + 1 à 3, adresse
+ * DMX de départ 1). DOF envoie chaque bande à son univers, à partir de sa FirstLedNumber : la bande
+ * commence donc dans WLED à 170 × (univers − premier univers) + FirstLedNumber − 1. D'un univers à
+ * l'autre, la numérotation de WLED a des trous (0, 170, 340…) : une bande de DOF ne déborde jamais
+ * d'un univers sur le suivant.
+ */
+export function wledSegments(leds: CabinetLeds): WledSegment[] {
+  if (leds.controller !== 'ArtNet') return [];
+  const firsts = stripFirstLeds(leds);
+  return leds.strips.map((s, i) => ({
+    name: s.name.trim(),
+    universe: artnetUniverse(leds, s.output),
+    start: ARTNET_LEDS_PER_UNIVERSE * (s.output - 1) + firsts[i]! - 1,
+    length: stripLedCount(s),
+  }));
+}
+
+/** Nombre de LED à déclarer dans WLED : jusqu'au bout de la dernière bande, trous compris. */
+export function wledLedCount(leds: CabinetLeds): number {
+  return Math.max(0, ...wledSegments(leds).map((g) => g.start + g.length));
+}
+
 /** Ce qui empêche d'écrire Cabinet.xml (liste vide : on peut). */
 export function ledProblems(leds: CabinetLeds): string[] {
   const problems: string[] = [];

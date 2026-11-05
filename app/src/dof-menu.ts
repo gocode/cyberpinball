@@ -24,6 +24,8 @@ import {
   ARTNET_LEDS_PER_UNIVERSE,
   ARTNET_MAX_UNIVERSES,
   artnetUniverse,
+  wledLedCount,
+  wledSegments,
   ledOutputCount,
   ledsOnBoard,
   ledsOnSerial,
@@ -364,7 +366,17 @@ export function createDofMenu(host: DofMenuHost) {
         {
           icon: 'info',
           text: t('Un nœud Art-Net sur le réseau (WLED sur un ESP32…)'),
-          detail: t('Le PC de la borne et le nœud sur le même réseau. Dans WLED : Sync Interfaces, réception en temps réel « Art-Net », univers de départ comme ici, mode « Multi RGB ». 512 canaux par univers : {max} LED au plus ; une bande plus longue se coupe en deux bandes sur deux univers.', { max: ARTNET_LEDS_PER_UNIVERSE }),
+          detail: t('Dans WLED : Config > Sync Interfaces > Realtime, réception « Art-Net », univers de départ {universe}, adresse DMX de départ 1, mode « Multi RGB ». Config > WiFi Setup : décocher le sommeil du Wi-Fi (« WiFi sleep »), sinon les effets saccadent. Le PC de la borne et l’ESP32 sur le même réseau.', { universe: d.universe ?? 0 }),
+        },
+        {
+          icon: 'info',
+          text: t('{max} LED par univers : chaque bande au début du sien', { max: ARTNET_LEDS_PER_UNIVERSE }),
+          detail: t('WLED range 170 LED par univers à la suite. Une bande sur le 2e univers commence donc à la LED 170 dans WLED, pas juste après la précédente : saisissez dans LED Preferences le « Start » indiqué plus bas pour chaque bande, sinon ses couleurs arrivent décalées.'),
+        },
+        {
+          icon: 'info',
+          text: t('Données des bandes en 5 V'),
+          detail: t('L’ESP32 sort ses données en 3,3 V : un adaptateur de niveau rapide (74AHCT125, 74HCT245) entre lui et la bande. Les petits modules bidirectionnels à BSS138 sont souvent trop lents pour les WS2812. Art-Net est prévu par le plugin DOF de VPX mais pas encore éprouvé : à vérifier en partie.'),
         },
       ];
     }
@@ -389,7 +401,18 @@ export function createDofMenu(host: DofMenuHost) {
     const problems = ledProblems(d);
     const counts = ledsPerOutput(d);
     const total = counts.reduce((a, b) => a + b, 0);
-    const sections: Built['sections'] = [{ rows: wiringRows(d) }];
+    const sections: Built['sections'] = [];
+    // Art-Net : ce qu'il faut saisir dans WLED pour que chaque bande reçoive ses propres couleurs.
+    if (d.controller === 'ArtNet' && d.strips.length) {
+      sections.push({
+        title: t('Dans WLED (LED Preferences)'),
+        rows: wledSegments(d)
+          .map((g): Row => ({ text: t('« {name} » : Start {start}, {n} LED', { name: g.name, start: g.start, n: g.length }), detail: t('Univers {n}', { n: g.universe }) }))
+          .concat([{ text: t('LED en tout dans WLED : {n}', { n: wledLedCount(d) }), detail: t('Trous compris : les LED entre deux bandes n’existent pas, WLED les ignore.') }]),
+      });
+    }
+    // Les valeurs à saisir d'abord (WLED), puis le câblage et les réglages, puis les sorties.
+    sections.push({ rows: wiringRows(d) });
     if (counts.length && !onBoard) {
       sections.push({
         title: d.controller === 'ArtNet' ? t('Univers Art-Net') : t('Sorties du contrôleur'),
@@ -755,6 +778,14 @@ export function createDofMenu(host: DofMenuHost) {
     }
     for (const r of plan.refused) lines.push(t('Non écrit : {file}. {reason}', { file: r.file, reason: r.reason }));
     const leds = draft;
+    if (leds.controller === 'ArtNet') {
+      lines.push(
+        t('Dans WLED, LED Preferences, le « Start » de chaque bande : {list} ({n} LED en tout).', {
+          list: wledSegments(leds).map((g) => t('« {name} » {start}', { name: g.name, start: g.start })).join(', '),
+          n: wledLedCount(leds),
+        }),
+      );
+    }
     lines.push(
       t('Dans le configtool : contrôleur de LED adressables numéro {n}, avec {list}. Puis « Generate Config » et importez le ZIP.', {
         n: leds.number ?? DOF_ADDRESSABLE_NUMBER,

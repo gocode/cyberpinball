@@ -83,7 +83,13 @@ try {
       # n'ont pas de clé seule à traduire pour l'autopilote).
       $cartes = @()
       if ($langue -eq 'fr') {
-        foreach ($carte in @('Art-Net (DMX)', 'DudesCab', 'Teensy (TeensyStripController)')) { $cartes += @('action:Contrôleur', 'wait:600', "action:$carte", 'wait:800') }
+        foreach ($carte in @('Art-Net (DMX)', 'DudesCab', 'Teensy (TeensyStripController)')) {
+          $cartes += @('action:Contrôleur', 'wait:600', "action:$carte", 'wait:800')
+          # Art-Net : une bande, pour la section « Dans WLED (LED Preferences) » et ses « Start », puis on la retire.
+          if ($carte -eq 'Art-Net (DMX)') {
+            $cartes += @('action:Ajouter une bande', 'wait:600', 'action:Bande verticale à gauche du playfield', 'wait:600', 'Escape', 'wait:800', 'action:Côté gauche', 'wait:600', 'action:Supprimer cette bande', 'wait:600')
+          }
+        }
       }
       $avantBandes = [array]::IndexOf($touches, 'action:Bandes de LED adressables…') + 2
       $suite = @($touches[0..($avantBandes - 1)]) + $cartes + @($touches[$avantBandes..($touches.Count - 1)])

@@ -35,6 +35,8 @@ import {
   stripFirstLeds,
   tableIniMasksGlobal,
   vpxDofSettings,
+  wledLedCount,
+  wledSegments,
   type CabinetLeds,
 } from '../dof';
 import { toPhysicalScreen } from '../fingerprint';
@@ -461,4 +463,51 @@ test('DOF : DudesCab et Pinscape Pico portent leurs bandes, Cyber Pinball n’é
   }
   assert.equal(DOF_CONTROLLERS.DudesCab.addressable, true);
   assert.equal(DOF_CONTROLLERS.PinscapePico.addressable, true);
+});
+
+test('DOF : alignement avec WLED en Art-Net « Multi RGB » (170 LED par univers, « Start » de chaque bande)', () => {
+  // Cas réel du 05/11/2026 : un ESP32 sous WLED, 2 bandes de 120 LED de part et d'autre du playfield
+  // et 2 anneaux au fronton, une bande par univers à partir de l'univers 0.
+  const strip = (name: string, output: number, width: number, height: number, dofOutput: number) =>
+    ({ name, output, width, height, arrangement: 'TopDownLeftRight', colorOrder: 'GRB', brightness: 100, dofOutput }) as const;
+  const leds: CabinetLeds = {
+    controller: 'ArtNet',
+    port: '',
+    universe: 0,
+    strips: [strip('Côté gauche', 1, 1, 120, 1), strip('Côté droit', 2, 1, 120, 4), strip('Haut-parleur gauche', 3, 32, 1, 7), strip('Haut-parleur droit', 4, 32, 1, 10)],
+  };
+  assert.deepEqual(
+    wledSegments(leds).map((g) => [g.name, g.universe, g.start, g.length]),
+    [
+      ['Côté gauche', 0, 0, 120],
+      ['Côté droit', 1, 170, 120],
+      ['Haut-parleur gauche', 2, 340, 32],
+      ['Haut-parleur droit', 3, 510, 32],
+    ],
+    'chaque bande commence au début de son univers dans WLED : des trous, pas 0, 120, 240…',
+  );
+  assert.equal(wledLedCount(leds), 542);
+  // Ce que DOF envoie concorde : chaque bande au canal 1 de son univers (FirstLedNumber 1, contrôleur par univers).
+  const dir = tmp();
+  for (const f of planLedWrite(dir, leds).files) fs.writeFileSync(f.file, f.content);
+  const cab = readDofSetup(dir).cabinet!;
+  for (const g of wledSegments(leds)) {
+    const s = cab.strips.find((x) => x.name === g.name)!;
+    const c = cab.controllers.find((x) => x.name === s.controller)!;
+    assert.equal(c.universe, g.universe, g.name);
+    // LED k de WLED : univers 0 + k ÷ 170, position k mod 170 (+1 pour FirstLedNumber).
+    assert.equal(Math.floor(g.start / 170), c.universe! - 0, g.name);
+    assert.equal((g.start % 170) + 1, s.firstLed, g.name);
+  }
+  // Deux bandes sur un même univers : la seconde suit la première, puis l'univers suivant repart à 170.
+  const shared: CabinetLeds = { ...leds, universe: 1, strips: [strip('A', 1, 1, 100, 1), strip('B', 1, 1, 50, 4), strip('C', 2, 1, 60, 7)] };
+  assert.deepEqual(
+    wledSegments(shared).map((g) => [g.name, g.universe, g.start]),
+    [
+      ['A', 1, 0],
+      ['B', 1, 100],
+      ['C', 2, 170],
+    ],
+  );
+  assert.deepEqual(wledSegments({ ...leds, controller: 'TeensyStripController', port: 'COM5' }), []);
 });
