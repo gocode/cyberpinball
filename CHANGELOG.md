@@ -9,6 +9,11 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.8
+
+- Avatar, dans Menu système > Amis > « Mon avatar » : une photo ou une image à vous, choisie sur ce PC ou dans le navigateur intégré (clic droit sur une image : « Télécharger cette image »), puis recadrée aux boutons de la borne (zoom, déplacer le cadre, recentrer) ou à la souris. Une photo y perd ses métadonnées, position GPS comprise.
+- Vos amis voient votre avatar partout où votre nom s'affiche : Mes amis, votre fiche, les demandes d'amis, l'historique des parties, la partie en direct, la carte d'invitation et la bande des scores pendant la partie, les notifications. Sans avatar, vos initiales sur une teinte qui vous est propre. Seuls vos amis et les joueurs d'une demande en cours le reçoivent, jamais l'annuaire.
+
 ## 0.1.7
 
 - Sauvegardes, dans Menu système > Cyber Pinball : copiez vos réglages et vos scores, vos tables en plus, ou toute l'installation, sur une clé USB, un disque ou un lecteur réseau, à sa racine ou dans le dossier de votre choix (« Choisir un dossier… »). Seuls les fichiers changés sont recopiés, et chaque fichier écrit est relu. Un niveau qui ne tient pas sur la clé est grisé avec sa raison (place manquante, clé en FAT32 et fichier de plus de 4 Go).

@@ -14,7 +14,10 @@
 const frame = document.getElementById('frame');
 const notice = document.getElementById('notice');
 const parts = Object.fromEntries(['title', 'table', 'left', 'hint'].map((id) => [id, document.getElementById(id)]));
-document.getElementById('icon').append(cyberIcon('gamepad'));
+const noticeIcon = document.getElementById('icon');
+noticeIcon.append(cyberIcon('gamepad'));
+/** Ce que montre la place de l'icône de la carte : l'icône, ou la pastille de celui qui invite (gardée d'un rendu à l'autre). */
+let noticeFace = 'icon';
 const board = document.getElementById('board');
 const boardRows = document.getElementById('board-rows');
 document.getElementById('board-icon').append(cyberIcon('gamepad'));
@@ -57,6 +60,14 @@ function renderBoard(view) {
         const span = document.createElement('span');
         span.className = cls;
         span.textContent = text ?? '';
+        // Le nom avec la pastille du joueur devant, dans la même case.
+        if (cls === 'board-name' && row.avatar) {
+          const who = document.createElement('span');
+          who.className = 'board-who';
+          who.append(avatarNode(row.avatar, 'board-avatar'), span);
+          li.append(who);
+          continue;
+        }
         li.append(span);
       }
       return li;
@@ -117,9 +128,11 @@ function renderLine(view) {
   dmd.hidden = true;
   const tone = ['ok', 'info', 'warning', 'error'].includes(view.tone) ? view.tone : 'info';
   line.className = `line tone-${tone}${view.leaving ? ' leaving' : ''}`;
-  if (lineIconName !== view.icon) {
-    lineIconName = view.icon;
-    lineIcon.replaceChildren(cyberIcon(view.icon || 'info'));
+  // Un seul joueur en cause : sa pastille à la place de l'icône.
+  const face = view.avatar ? `avatar:${JSON.stringify(view.avatar)}` : view.icon;
+  if (lineIconName !== face) {
+    lineIconName = face;
+    lineIcon.replaceChildren(view.avatar ? avatarNode(view.avatar, 'line-avatar') : cyberIcon(view.icon || 'info'));
   }
   lineTitle.textContent = view.title ?? '';
   lineDetail.textContent = view.detail ?? '';
@@ -186,7 +199,14 @@ function render(state) {
   turnFrame(Number(state.rotation));
   const className = `notice mode-${view.mode}`;
   if (notice.className !== className) notice.className = className;
+  // Celui qui invite : sa pastille à la place de l'icône, refaite seulement quand elle change.
+  const face = view.avatar ? JSON.stringify(view.avatar) : 'icon';
+  if (face !== noticeFace) {
+    noticeFace = face;
+    noticeIcon.replaceChildren(view.avatar ? avatarNode(view.avatar, 'notice-avatar') : cyberIcon('gamepad'));
+  }
   parts.title.textContent = view.mode === 'full' ? view.title : view.short;
+
   parts.table.textContent = view.table ?? '';
   parts.left.textContent = view.left ?? '';
   parts.hint.textContent = view.hint ?? '';

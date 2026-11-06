@@ -10,6 +10,7 @@ import { formatNumber, t } from './i18n';
 import { LIVE_INVITE_MS, liveNoLiveState, livePlayers, liveRanked, liveScore, type LiveGame, type LiveInvite } from './livegame';
 import { DMD_FONT_SMALL, dmdText, textWidth } from './dmdfont';
 import { DMD_HEIGHT, DMD_LEVEL, DMD_MARGIN, DMD_WIDTH, blankDots, drawCentered, drawText, scoreText, type DmdDots } from './livedmd';
+import type { AvatarView } from './avatar';
 import type { Rect, Rotation } from './model';
 import { TASKBAR_CLASSES, type StackedWindow } from './screencover';
 
@@ -34,6 +35,10 @@ export interface GameNoticeView {
   left: string;
   /** Part du temps restant, de 1 à 0. */
   progress: number;
+  /** Celui qui invite : sa clé, pour sa pastille. */
+  host: { key: string; name: string };
+  /** Sa pastille (avatar.ts), posée par l'application : à la place de l'icône de la carte. */
+  avatar?: AvatarView;
 }
 
 /** Temps restant d'une invitation, en millisecondes (0 : expirée). */
@@ -54,6 +59,7 @@ export function gameNoticeView(invite: LiveInvite, shownAt: Date, now = new Date
     hint: t('Quittez la partie pour le rejoindre, ou continuez : elle s’efface seule'),
     left: `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`,
     progress: Math.round((left / LIVE_INVITE_MS) * 1000) / 1000,
+    host: { key: invite.host.key, name: invite.host.name },
   };
 }
 
@@ -119,7 +125,11 @@ export const GAME_NOTICE_LINE = { width: 720, height: 76, gap: 14 } as const;
 // le journal le dit.
 
 export interface LiveBoardRow {
+  /** Clé du joueur : sa pastille (absente : pas de pastille). */
+  key?: string;
   name: string;
+  /** Sa pastille (avatar.ts), posée par l'application ; le DMD n'en montre pas. */
+  avatar?: AvatarView;
   /** « 1 240 500 », ou « — » tant qu'aucun score n'est lu. */
   score: string;
   /** Le score en nombre (undefined : pas encore lu), pour le DMD. */
@@ -177,8 +187,10 @@ export function liveBoardView(game: LiveGame, me: string): LiveBoardView | undef
     rows: sorted.map((p) => {
       const score = liveScore(p);
       return {
+        key: p.key,
         name: p.name,
         score: score === undefined ? '—' : formatNumber(score),
+
         ...(score !== undefined ? { points: score } : {}),
         detail: detail(p),
         short: short(p),

@@ -32,8 +32,9 @@ import { messages as intro } from './intro';
 import { messages as ingame } from './ingame';
 import { messages as backups } from './backups';
 import { messages as installation } from './installation';
+import { messages as avatar } from './avatar';
 
 /** Chaque partie du catalogue, par nom de fichier (pour le test des doublons). */
-export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups, installation };
+export const EN_PARTS: Readonly<Record<string, Catalog>> = { common, wizard, library, catalog, media, downloads, tables, settings, menu, journey, waitlist, files, webmedia, health, dof, dedicated, power, hours, parts, sharing, social, friends, downloadmanager, notices, recording, history, intro, ingame, backups, installation, avatar };
 
 export const EN_MESSAGES: Catalog = Object.assign({}, ...Object.values(EN_PARTS));

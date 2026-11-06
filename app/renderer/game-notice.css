@@ -698,3 +698,61 @@ body {
 .volume-detail[hidden] {
   display: none;
 }
+
+/* ---------- Pastille d'un joueur (avatar.js) ---------- */
+
+/* Carte d'invitation : celui qui invite, à la place de l'icône. */
+.notice-icon .notice-avatar {
+  width: calc(56 * var(--u));
+  height: calc(56 * var(--u));
+  font-size: calc(22 * var(--u));
+  box-shadow: 0 0 0 calc(2 * var(--u)) var(--signal);
+}
+
+.mode-compact .notice-icon .notice-avatar {
+  width: calc(40 * var(--u));
+  height: calc(40 * var(--u));
+  font-size: calc(20 * var(--u));
+}
+
+/* Bande de la partie : la pastille devant le nom, dans sa case. */
+.board-who {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.layout-cards .board-who {
+  gap: calc(12 * var(--c));
+}
+
+.layout-cards .board-avatar {
+  width: calc(48 * var(--c));
+  height: calc(48 * var(--c));
+  font-size: calc(20 * var(--c));
+}
+
+.layout-insert .board-who {
+  gap: calc(8 * var(--i));
+}
+
+.layout-insert .board-avatar {
+  width: calc(26 * var(--i));
+  height: calc(26 * var(--i));
+}
+
+/* Encart d’une ligne de 34 : trop petit pour des initiales lisibles (20 px au moins) ; la teinte seule, le nom est à côté. */
+.layout-insert .board-avatar .avatar-initials {
+  display: none;
+}
+
+.board-row.me .board-avatar {
+  box-shadow: 0 0 0 1px var(--halo);
+}
+
+/* Nouvelle d'une ligne : le joueur dont elle parle. */
+.line-icon .line-avatar {
+  width: calc(40 * var(--l));
+  height: calc(40 * var(--l));
+  font-size: calc(20 * var(--l));
+}

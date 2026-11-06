@@ -13,6 +13,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import { REPO_ROOT } from './i18n-scan';
+import { readAvatarImage, type AvatarImage } from '../avatar';
 import { loadSocial, nearbyPlayers, newSocialState, searchDirectory, type Presence, type SocialEvent, type SocialNetMode, type SocialState } from '../social';
 
 const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
@@ -35,6 +36,12 @@ interface Net {
   accept(key: string): void;
   remove(key: string): void;
   block(key: string): void;
+}
+/** Ce que le test des avatars utilise en plus. */
+interface AvatarNet extends Net {
+  setAvatar(image: AvatarImage | undefined): void;
+  avatarFile(key: string): string | undefined;
+  decline(key: string): void;
 }
 interface NetModule {
   createSocialNet(o: object): Net;
@@ -436,6 +443,63 @@ test('présence : entrant bloqué d’un côté (pare-feu), la liaison sortante 
     assert.ok(p.logs[1 - r]!.some((l) => new RegExp(`liaison Internet entrante avec ${refuserName} ouverte`).test(l)));
   } finally {
     await Promise.all([p.a.stop(), p.b.stop()]);
+    await testnet.destroy();
+  }
+});
+
+test('avatar : reçu par les amis et les demandes en cours, jamais par l’annuaire ; changé, retiré, puis oublié', async () => {
+  const testnet = await createTestnet(3, { host: '127.0.0.1' });
+  const a = cabinet('Alice', { bootstrap: testnet.bootstrap, lan: false });
+  const b = cabinet('Bruno', { bootstrap: testnet.bootstrap, lan: false });
+  const c = cabinet('Chloe', { bootstrap: testnet.bootstrap, lan: false });
+  const nets = [a, b, c].map((x) => x.net as AvatarNet);
+  const [na, nb, nc] = nets as [AvatarNet, AvatarNet, AvatarNet];
+  const keyA = profileOf(na).key;
+  const keyC = profileOf(nc).key;
+  /** Image d'essai : un en-tête PNG de 256 × 256 (le contrôle ne décode pas). */
+  const image = (seed: number) => {
+    const head = Buffer.alloc(40, seed);
+    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(head, 0);
+    head.writeUInt32BE(13, 8);
+    head.write('IHDR', 12, 'latin1');
+    head.writeUInt32BE(256, 16);
+    head.writeUInt32BE(256, 20);
+    return readAvatarImage(head)!;
+  };
+  const bytesOf = (file: string | undefined) => (file && fs.existsSync(file) ? fs.readFileSync(file) : undefined);
+  try {
+    na.setAvatar(image(1));
+    nc.setAvatar(image(3));
+    await Promise.all(nets.map((n) => n.start()));
+    await until('Alice dans l’annuaire de Bruno et de Chloé', () => [nb, nc].every((n) => n.state().directory.some((d) => d.profile.key === keyA)));
+    na.request(profileOf(nb));
+    await until('demande reçue par Bruno', () => nb.state().incoming.some((r) => r.key === keyA));
+    // Une demande en cours suffit : Bruno voit déjà la photo de celle qui le demande.
+    await until('avatar d’Alice chez Bruno', () => bytesOf(nb.avatarFile(keyA))?.equals(image(1).bytes) === true);
+    nb.accept(keyA);
+    await until('amis', () => na.state().friends.length === 1 && nb.state().friends.length === 1);
+    // Chloé ne connaît Alice que par l'annuaire : ses initiales, pas sa photo.
+    assert.equal(nc.avatarFile(keyA), undefined);
+
+    // Changé : le nouveau arrive, l'ancien fichier est rangé.
+    const old = nb.avatarFile(keyA)!;
+    na.setAvatar(image(2));
+    await until('nouvel avatar d’Alice chez Bruno', () => bytesOf(nb.avatarFile(keyA))?.equals(image(2).bytes) === true);
+    await until('ancien fichier rangé', () => !fs.existsSync(old));
+
+    // Chloé demande Alice : Alice reçoit son avatar avec la demande.
+    nc.request(profileOf(na));
+    await until('avatar de Chloé chez Alice', () => bytesOf(na.avatarFile(keyC))?.equals(image(3).bytes) === true);
+    // Refusée : son avatar sort de chez Alice.
+    na.decline(keyC);
+    await until('avatar de Chloé oublié', () => na.avatarFile(keyC) === undefined);
+
+    // Retiré : Bruno voit de nouveau les initiales d'Alice.
+    na.setAvatar(undefined);
+    await until('avatar d’Alice retiré chez Bruno', () => nb.avatarFile(keyA) === undefined);
+    assert.equal(na.avatarFile(keyA), undefined);
+  } finally {
+    await Promise.all(nets.map((n) => n.stop()));
     await testnet.destroy();
   }
 });

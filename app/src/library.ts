@@ -130,6 +130,7 @@ import {
   type Finding,
   type AddScreenId,
   type IconName,
+  type AvatarView,
   type ImportPlan,
   type KnownTable,
   type NavigationKeys,
@@ -368,6 +369,8 @@ export type UiAction =
   | { type: 'zone' }
   /** Mesure du texte de l'écran par le rendu (zone de lecture, reading.ts) : `key` désigne l'écran mesuré. */
   | { type: 'reading'; key: number; overflow: boolean; top: boolean; bottom: boolean }
+  /** Recadrage d'un avatar à la souris (Built.crop) : le cadre glissé (`dx`, `dy` en parts de la largeur et de la hauteur de l'image), molette (`zoom` en crans). */
+  | { type: 'crop'; dx?: number; dy?: number; zoom?: number }
   | { type: 'wheel'; offset: number };
 
 export type Tone = 'error' | 'warning' | 'info' | 'ok' | 'quiet';
@@ -390,6 +393,10 @@ export interface Row {
   progress?: { value?: number; tone?: Tone; busy?: boolean };
   /** Schéma de l'écran du DMD à droite de la ligne (« Écran du DMD ») : FullDMD ou DMD seul en bande. */
   figure?: 'fulldmd' | 'dmd';
+  /** Pastille d'un joueur devant le texte (avatar.ts) : son image, sinon ses initiales ; à la place de l'icône. */
+  avatar?: AvatarView;
+  /** Pastilles des joueurs d'une partie, en ligne après le texte (historique des parties). */
+  avatars?: AvatarView[];
 }
 export interface Section {
   title?: string;
@@ -433,6 +440,8 @@ export interface Built {
   heading: string;
   /** Icône du titre : celle de l'entrée qui a ouvert l'écran, pour s'y retrouver. */
   icon?: IconName;
+  /** Pastille du joueur dont parle l'écran (fiche d'un ami), devant le titre à la place de l'icône. */
+  avatar?: AvatarView;
   subheading?: string;
   lead?: string;
   sections: Section[];
@@ -450,12 +459,28 @@ export interface Built {
   health?: HealthView;
   /** Bandeau d'aide propre à l'écran (sélecteur de fichiers : Exit remonte d'un dossier). */
   hint?: string;
+  /** Recadrage d'une image (avatar-menu.ts) : l'image, le carré gardé et l'aperçu, à la place des sections. */
+  crop?: CropView;
   /**
    * Ce que Start fait sur un élément de la liste de contenu (« cocher ou décocher »), dit par le
    * bandeau d'aide tant qu'on y est ; sans lui, « valider ». Une liste de cases à cocher le dit :
    * sinon rien n'indique qu'on y coche (la ROM d'un ami, 01/11/2026).
    */
   listStart?: string;
+}
+
+/** Ce que le rendu montre d'un recadrage (app/renderer/library.js, renderCrop). */
+export interface CropView {
+  /** Adresse cyber-media:// de l'image de travail. */
+  src: string;
+  width: number;
+  height: number;
+  /** Carré gardé, en parts de la largeur et de la hauteur de l'image (cropBox, avatar.ts). */
+  box: { left: number; top: number; width: number; height: number };
+  /** Légende de l'aperçu (« Ce que verront vos amis »). */
+  caption: string;
+  /** Glisser et molette sur l'image (UiAction « crop ») ; le rendu ne fait que transmettre. */
+  input(gesture: { dx?: number; dy?: number; zoom?: number }): void;
 }
 
 /** Ce que le rendu montre du parcours d'une table (app/renderer/library.js, renderJourney). */
@@ -3524,6 +3549,10 @@ export function createLibrary(host: LibraryHost) {
     if (action.type === 'editor' && (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
       pressKey(screen, action.index);
       host.broadcast();
+    } else if (action.type === 'crop') {
+      // Glisser ou molette sur l'image d'un recadrage : l'écran décrit s'en charge, puis se redessine.
+      build().crop?.input({ ...(action.dx !== undefined ? { dx: action.dx } : {}), ...(action.dy !== undefined ? { dy: action.dy } : {}), ...(action.zoom !== undefined ? { zoom: action.zoom } : {}) });
+      host.broadcast();
     } else if (action.type === 'back') {
       if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) closeEditor(screen, false);
       else build().back();
@@ -3580,8 +3609,11 @@ export function createLibrary(host: LibraryHost) {
       heading: built.heading,
       icon: built.icon ?? (TABLE_SCREENS.includes(screen.kind) ? undefined : section),
       subheading: built.subheading,
+      avatar: built.avatar,
       lead: built.lead,
       sections: built.sections,
+      crop: built.crop ? { src: built.crop.src, width: built.crop.width, height: built.crop.height, box: built.crop.box, caption: built.crop.caption } : undefined,
+
       back: backLabel(built),
       actions: built.actions.map(({ label, detail, tone, icon, web, attention, shortcut }, i) => ({ label, detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
       media: built.media,

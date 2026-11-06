@@ -36,6 +36,7 @@ import {
   type LiveBoardScreens,
   type LiveBoardView,
   type LiveScoresSettings,
+  type AvatarView,
   type LiveInvite,
   type NoticeView,
   type LiveWaitView,
@@ -67,6 +68,8 @@ export interface GameNoticesOptions {
   dmdColor(): string | undefined;
   /** Invitations encore valables (live-game.ts). */
   invites(): readonly LiveInvite[];
+  /** Pastille d'un joueur (avatar.ts) : sur la carte d'invitation et dans la bande ; absente : l'icône. */
+  avatar?(key: string, name: string): AvatarView;
   /** Essais sans opérateur : captures de la notification (CYBERPINBALL_CAPTURE). */
   captureDir?: string;
   log?(line: string): void;
@@ -246,6 +249,7 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
     if (!invite) return undefined;
     if (invite.id !== shown?.id) shown = { id: invite.id, at: new Date() };
     const view = gameNoticeView(invite, shown.at);
+    if (view && opts.avatar) view.avatar = opts.avatar(view.host.key, view.host.name);
     return view ? { invite, view } : undefined;
   }
 
@@ -568,7 +572,9 @@ export function createGameNotices(opts: GameNoticesOptions): GameNotices {
         return;
       }
       if (!boardView) closeNotice();
-      boardView = view;
+      // Chaque joueur avec sa pastille (le DMD n'en montre pas, il les ignore).
+      boardView = opts.avatar ? { ...view, rows: view.rows.map((r) => (r.key ? { ...r, avatar: opts.avatar!(r.key, r.name) } : r)) } : view;
+
       showBoard();
       if (!boardTicker) {
         boardTicker = setInterval(showBoard, BOARD_TICK_MS);

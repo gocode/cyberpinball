@@ -38,6 +38,11 @@
 #   il réinvite, la borne refuse, Bruno le voit ; « Retour » rend l'ordre des tables. Enfin une partie
 #   (simulée) : Bruno invite (la carte et la ligne par-dessus la table), puis annule : la carte part, la
 #   ligne dit pourquoi. Bruno est une vraie borne de Cyber Pinball sur le réseau simulé (127.0.0.1).
+#   Parcours « avatar » : Menu système > Amis > « Mon avatar », « Choisir une image sur ce PC… » sur
+#   le Bureau du bac à sable (CYBERPINBALL_BUREAU : une illustration inventée des tables, jamais le
+#   Bureau du poste), le recadrage aux boutons (zoom avant deux fois, à gauche, en haut, valider),
+#   puis « Mes amis » (Bruno avec son avatar, Émile hors ligne avec ses initiales), la fiche de Bruno,
+#   « Demandes d'amis » (Chloé et son avatar) et « Partage et réseau » (le vôtre).
 # Le garde-fou de mise en page (chevauchement, rognure, texte trop petit) et le guet hors écran
 # doivent rester muets.
 #   La bande de la partie entre amis, au parcours « partie » : les scores sur le DMD
@@ -107,6 +112,23 @@ $libelles = @{
 }
 
 function Get-Etapes([string]$Nom, $l) {
+  if ($Nom -eq 'avatar') {
+    # Les libellés en français : l'autopilote cherche aussi leur traduction (library.ts, labelNames).
+    return @(
+      'wait:1500', $Exit, 'wait:800', $Exit, 'wait:4000',
+      "action:$($l.Amis)", 'action:Mon avatar', 'wait:800',
+      'action:Choisir une image sur ce PC', 'wait:1500', 'action:portrait-invente.png', 'wait:5000',
+      'action:Zoom avant', 'wait:500', 'action:Zoom avant', 'wait:500',
+      'action:Déplacer vers la gauche', 'wait:500', 'action:Déplacer vers le haut', 'wait:800',
+      'action:Valider ce cadrage', 'wait:3000',
+      "action:$($l.Retour)", 'wait:800',
+      "action:$($l.MesAmis)", 'wait:1500',
+      'action:Bruno', 'wait:800', $Exit, 'wait:600',
+      'action:Demandes reçues', 'wait:1000',
+      "action:$($l.Retour)", 'wait:800',
+      "action:$($l.Partage)", 'wait:1200', $Exit
+    )
+  }
   if ($Nom -eq 'fins-invitation') {
     # Les libellés en français : l'autopilote cherche aussi leur traduction (library.ts, labelNames).
     # Bruno attend chaque signal (copy: … reseau-simule\signal-N, app\src\social-demo.ts) : la borne est à l'écran voulu.
@@ -231,6 +253,16 @@ try {
         $env:CYBERPINBALL_LANGUE = $langue
         $env:CYBERPINBALL_RESEAU = 'simule'
         $env:CYBERPINBALL_RESEAU_DEMO = if ($partie) { $nom } else { '1' }
+        # Avatar : une illustration inventée des tables, sur le Bureau du bac à sable (jamais celui du poste).
+        if ($nom -eq 'avatar') {
+          $bureau = "$home_\bureau"
+          New-Item -ItemType Directory -Force $bureau | Out-Null
+          $image = Get-ChildItem "$root\tables" -Recurse -File -Include *.png | Sort-Object Length -Descending | Select-Object -First 1
+          if (-not $image) { throw 'Aucune illustration des tables inventées pour l''avatar.' }
+          Copy-Item $image.FullName "$bureau\portrait-invente.png"
+          $env:CYBERPINBALL_BUREAU = $bureau
+        } else { Remove-Item Env:CYBERPINBALL_BUREAU -ErrorAction SilentlyContinue }
+
         if ($partie) { $env:CYBERPINBALL_PARTIE_SIMULEE = 'backglass' } else { Remove-Item Env:CYBERPINBALL_PARTIE_SIMULEE -ErrorAction SilentlyContinue }
         # Table sans relevé : la partie simulée n'écrit aucun état de jeu (frontend.ts, SIMULATED_MANUAL).
         if ($nom -eq 'partie-sans-releve') { $env:CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE = '1' } else { Remove-Item Env:CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE -ErrorAction SilentlyContinue }
@@ -351,7 +383,7 @@ try {
     }
   }
 } finally {
-  Remove-Item Env:CYBERPINBALL_LANGUE, Env:CYBERPINBALL_AUTOPILOT, Env:CYBERPINBALL_CAPTURE, Env:CYBERPINBALL_HOME, Env:CYBERPINBALL_ROOT, Env:CYBERPINBALL_RESEAU, Env:CYBERPINBALL_RESEAU_DEMO, Env:CYBERPINBALL_PARTIE_SIMULEE, Env:CYBERPINBALL_PARTIE_MS -ErrorAction SilentlyContinue
+  Remove-Item Env:CYBERPINBALL_LANGUE, Env:CYBERPINBALL_BUREAU, Env:CYBERPINBALL_AUTOPILOT, Env:CYBERPINBALL_CAPTURE, Env:CYBERPINBALL_HOME, Env:CYBERPINBALL_ROOT, Env:CYBERPINBALL_RESEAU, Env:CYBERPINBALL_RESEAU_DEMO, Env:CYBERPINBALL_PARTIE_SIMULEE, Env:CYBERPINBALL_PARTIE_MS -ErrorAction SilentlyContinue
 }
 
 if ($failures.Count) { throw "Démonstration du réseau des bornes en échec :`n  $($failures -join "`n  ")" }

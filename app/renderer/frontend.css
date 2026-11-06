@@ -2917,3 +2917,11 @@ html.in-game .zone {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* Notification d'un seul joueur (un ami qui se connecte, une invitation) : sa pastille à la place de l'icône. */
+.notice-avatar {
+  width: 4.6cqmin;
+  height: 4.6cqmin;
+  font-size: 1.9cqmin;
+  box-shadow: 0 0 0 0.2cqmin var(--tone, var(--meta));
+}

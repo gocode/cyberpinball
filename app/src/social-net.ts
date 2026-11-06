@@ -16,6 +16,18 @@ import * as net from 'node:net';
 import {
   acceptRequest,
   addEvent,
+  avatarFileOf,
+  avatarHashOf,
+  avatarPath,
+  avatarPeers,
+  decodeAvatarData,
+  keepAvatars,
+  pruneAvatarFiles,
+  readAvatarFile,
+  setOwnAvatar,
+  setPeerAvatar,
+  writeAvatarFile,
+  type AvatarImage,
   blockPlayer,
   cancelRequest,
   createPresenceBook,
@@ -134,6 +146,8 @@ const REDIAL_SOON_MAX = 6;
 const jittered = (delay: number) => Math.round(delay * (0.5 + Math.random()));
 /** Balise d'un ami reçue sans liaison locale : la borne qui n'appelle pas d'habitude appelle passé ce délai. */
 const LAN_FALLBACK_MS = 2 * BEACON_MS;
+/** Un avatar demandé sans réponse : redemandé au plus à ce rythme (liaison tombée, autre borne occupée). */
+const AVATAR_ASK_MS = 30_000;
 
 export interface NetStatus {
   mode: SocialNetMode;
@@ -204,6 +218,8 @@ interface Peer {
   lan?: { host: string; port: number };
   /** Première balise reçue sans liaison locale (ms) : passé LAN_FALLBACK_MS, cette borne appelle aussi. */
   lanWaiting?: number;
+  /** Empreinte de l'avatar qu'il annonce (bonjour, message « avatar ») ; null : aucun ; absente : pas encore dit. */
+  avatar?: string | null;
 }
 
 export interface SocialNet {
@@ -249,6 +265,13 @@ export interface SocialNet {
   send(key: string, message: FriendMessage): boolean;
   /** Morceau de fichier à un ami, en respectant le débit du flux ; false : plus relié. */
   sendChunk(key: string, frame: Buffer): Promise<boolean>;
+  /**
+   * Mon avatar (image contrôlée par readAvatarImage), ou undefined pour le retirer : enregistré,
+   * annoncé aux bornes reliées ; mes amis et les joueurs d'une demande en cours le redemandent.
+   */
+  setAvatar(image: AvatarImage | undefined): void;
+  /** Fichier de l'avatar d'un joueur (soi compris) ; undefined : pas d'avatar connu, ses initiales. */
+  avatarFile(key: string): string | undefined;
   /** Messages des services reçus d'un ami ; rend de quoi se désabonner. */
   onMessage(listener: (key: string, message: FriendMessage) => void): () => void;
   onChunk(listener: (key: string, frame: Buffer) => void): () => void;
@@ -358,6 +381,77 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     // Devenu ami : la présence et les derniers évènements, tout de suite.
     if (before !== 'friend' && after === 'friend') greetFriend(key);
     followPeers();
+    // Ami ou demande : son avatar, s'il en a un ; plus rien des deux : le sien sort.
+    if (before !== after) {
+      tidyAvatars();
+      syncAvatar(key);
+    }
+  }
+
+  // ---------- Avatars ----------
+
+  /** Empreinte de mon avatar, telle que l'annonce le bonjour. */
+  const ownAvatarHash = () => (state.avatar ? avatarHashOf(state.avatar) : undefined);
+  /** Demandes d'avatar en vol : clé -> empreinte et heure, pour ne pas redemander à chaque message. */
+  const avatarAsked = new Map<string, { hash: string; at: number }>();
+
+  /** Avatars de ceux qui ne sont plus ni amis ni en demande : hors de l'état, et leurs fichiers rangés. */
+  function tidyAvatars(): void {
+    const kept = keepAvatars(state);
+    commitQuietly(kept.state);
+    try {
+      pruneAvatarFiles(opts.dataDir, kept.files);
+    } catch (error) {
+      log(`Réseau des bornes : rangement des avatars impossible (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+  }
+
+  /**
+   * L'avatar qu'un ami (ou un joueur d'une demande en cours) annonce : demandé s'il manque ou a
+   * changé, retiré s'il n'en a plus. Les autres joueurs de l'annuaire n'échangent pas d'avatar.
+   */
+  function syncAvatar(key: string): void {
+    const peer = peers.get(key);
+    if (!peer || peer.avatar === undefined || !avatarPeers(state).has(key)) return;
+    const held = state.peerAvatars?.[key];
+    if (peer.avatar === null) {
+      if (held) tidyAfter(setPeerAvatar(state, key, undefined));
+      return;
+    }
+    if (held && avatarHashOf(held) === peer.avatar && readAvatarFile(opts.dataDir, held)) return;
+    const asked = avatarAsked.get(key);
+    if (asked && asked.hash === peer.avatar && ms() - asked.at < AVATAR_ASK_MS) return;
+    if (sendTo(key, { t: 'avatar-get', avatar: peer.avatar })) avatarAsked.set(key, { hash: peer.avatar, at: ms() });
+  }
+
+  function tidyAfter(next: SocialState): void {
+    commitQuietly(next);
+    tidyAvatars();
+  }
+
+  /** Mon avatar, à qui le demande : un ami ou un joueur d'une demande en cours, et s'il est toujours le mien. */
+  function sendAvatar(key: string, hash: string): void {
+    if (!avatarPeers(state).has(key) || ownAvatarHash() !== hash) return;
+    const image = readAvatarFile(opts.dataDir, state.avatar!);
+    if (!image) return log('Réseau des bornes : fichier de mon avatar illisible, pas envoyé.'); // i18n-ignore : journal
+    sendTo(key, { t: 'avatar-data', avatar: hash, data: image.bytes.toString('base64') });
+  }
+
+  /** Image reçue : celle que ce joueur annonce, contrôlée (parseSocialMessage l'a déjà vérifiée), puis gardée. */
+  function receiveAvatar(key: string, hash: string, data: string): void {
+    const peer = peers.get(key);
+    if (!peer || peer.avatar !== hash || !avatarPeers(state).has(key)) return;
+    avatarAsked.delete(key);
+    const image = decodeAvatarData(data, hash);
+    if (!image) return;
+    let file: string;
+    try {
+      file = writeAvatarFile(opts.dataDir, image);
+    } catch (error) {
+      return log(`Réseau des bornes : avatar de ${nameOf(key)} pas enregistré (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+    tidyAfter(setPeerAvatar(state, key, file));
+    if (traced(key)) log(`Réseau des bornes : avatar de ${nameOf(key)} reçu (${Math.round(image.bytes.length / 1024)} Ko).`); // i18n-ignore : journal
   }
 
   function greetFriend(key: string): void {
@@ -504,7 +598,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       detach();
     });
     channel.open();
-    link.send({ t: 'hello', profile: signProfile(state), dir: directorySample(state) });
+    const avatar = ownAvatarHash();
+    link.send({ t: 'hello', profile: signProfile(state), dir: directorySample(state), ...(avatar ? { avatar } : {}) });
     changed();
   }
 
@@ -520,6 +615,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         const lan = [...peer.links].some((l) => l.via === 'lan');
         learn([message.profile], lan);
         learn(message.dir, false); // relayés : vus par lui, pas forcément à proximité
+        // Une borne d'avant les avatars n'en annonce pas : comme aucun.
+        peer.avatar = message.avatar ?? null;
+        syncAvatar(key);
         if (first) {
           // Bonjour reçu sur cette liaison : elle compte pour la présence.
           const appeared = book.up(key, link, ms());
@@ -557,6 +655,16 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         return;
       case 'events':
         commit(receiveEvents(state, key, message.events));
+        return;
+      case 'avatar':
+        peer.avatar = message.avatar ?? null;
+        syncAvatar(key);
+        return;
+      case 'avatar-get':
+        sendAvatar(key, message.avatar);
+        return;
+      case 'avatar-data':
+        receiveAvatar(key, message.avatar, message.data);
         return;
     }
   }
@@ -724,6 +832,7 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         await startInternet();
         await startLan();
         status = { ...status, running: true, error: undefined };
+        tidyAvatars();
         beginSearch();
         log(`Réseau des bornes : démarré (${opts.mode}, borne ${signProfile(state).name}, ${state.friends.length} ami(s) à chercher).`); // i18n-ignore : journal
       } catch (error) {
@@ -836,6 +945,17 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     },
     unblock: (key) => commit(unblockPlayer(state, key)),
     setShareLibrary: (on) => commit({ ...state, shareLibrary: on, shareLibraryChosen: true }),
+    setAvatar(image) {
+      const file = image ? writeAvatarFile(opts.dataDir, image) : undefined;
+      tidyAfter(setOwnAvatar(state, file));
+      // Toutes les bornes reliées l'apprennent ; seuls mes amis et les demandes en cours le redemandent.
+      const notice: SocialMessage = { t: 'avatar', ...(image ? { avatar: image.hash } : {}) };
+      for (const peer of peers.values()) for (const link of peer.links) if (link.greeted) link.send(notice);
+    },
+    avatarFile(key) {
+      const file = avatarFileOf(state, key);
+      return file ? avatarPath(opts.dataDir, file) : undefined;
+    },
     setDownloadRate: (rate) => {
       const { downloadRate: _, ...rest } = state;
       commit(rate > 0 ? { ...rest, downloadRate: rate } : rest);

@@ -10,6 +10,7 @@
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un réseau d'essai.
 
 import {
+  avatarView,
   BADGES,
   DOWNLOAD_RATE_CHOICES,
   rateLabel,
@@ -44,6 +45,7 @@ import {
   type Relation,
   type SocialEvent,
 } from '@cyberpinball/core';
+import type { AvatarMenu } from './avatar-menu';
 import type { FirewallRule } from './firewall-rule';
 import type { FriendContent } from './friend-content';
 import { createFriendLibraryMenu, type FriendDownloads } from './friend-library-menu';
@@ -72,6 +74,8 @@ export interface FriendsMenuHost {
   /** Place libre du lecteur des données, en octets. */
   freeSpace?(): number | undefined;
   net: SocialNet;
+  /** « Mon avatar » (avatar-menu.ts) : ouvert depuis « Partage et réseau » ; absent : l'entrée n'y est pas. */
+  avatarMenu?: AvatarMenu;
   firewall: FirewallRule;
   content: FriendContent;
   /** Gestionnaire de téléchargements : chaque réception d'un ami y passe (friend-library-menu.ts). */
@@ -121,6 +125,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   };
 
   const name = (key: string, plain: string) => displayName(plain, key);
+  /** Pastille d'un joueur : son avatar s'il est un ami ou en demande et qu'on l'a reçu, sinon ses initiales. */
+  const avatar = (key: string, plain: string) => avatarView(key, plain, net.avatarFile(key));
   const live = createLiveMenu({
     library: host.library,
     net,
@@ -130,9 +136,10 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     identityOf: (table) => tableIdentity(table, host.romsOf?.(table) ?? []),
     openFriendTable: (key, identity, back, want) => libraryMenu.openMatching(key, identity, back, want),
     redraw: host.redraw,
+    avatar,
     ...(host.now ? { now: host.now } : {}),
   });
-  const historyMenu = createGameHistoryMenu({ library: host.library, history: () => host.games.history(), back });
+  const historyMenu = createGameHistoryMenu({ library: host.library, history: () => host.games.history(), back, avatar });
   const libraryMenu = createFriendLibraryMenu({
     library: host.library,
     net,
@@ -211,6 +218,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         const index = actions.push({ label: name(f.key, f.name), key: `friend:${f.key}`, icon: 'friend-list', run: () => openFriend(f.key) }) - 1;
         return {
           text: name(f.key, f.name),
+          avatar: avatar(f.key, f.name),
           detail: !online && blocked ? t('Sa présence ne vous parvient pas : le pare-feu de Windows bloque le réseau des bornes') : presenceText(p, online, f),
           tone: online ? 'ok' : undefined,
           badges: [online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : blocked ? t('Bloqué par le pare-feu') : t('Hors ligne')],
@@ -274,10 +282,10 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         // Indisponible : grisé, avec sa raison ; Start ne mène nulle part.
         const reason = blocked ? t('Sa borne ne vous parvient pas : le pare-feu de Windows bloque le réseau des bornes') : t('Hors ligne : sa bibliothèque se voit quand sa borne est allumée');
         const index = actions.push({ label, key: `add-friend:${f.key}`, icon: 'friend-list', tone: 'quiet', detail: t('Indisponible : {reason}', { reason }), run: () => undefined }) - 1;
-        return { text: label, detail: reason, tone: 'quiet', badges: [blocked ? t('Bloqué par le pare-feu') : t('Hors ligne')], action: index, pick: true } satisfies Row;
+        return { text: label, avatar: avatar(f.key, f.name), detail: reason, tone: 'quiet', badges: [blocked ? t('Bloqué par le pare-feu') : t('Hors ligne')], action: index, pick: true } satisfies Row;
       }
       const index = actions.push({ label, key: `add-friend:${f.key}`, icon: 'friend-list', detail: lib.detail, run: () => libraryMenu.open(f.key, here, true) }) - 1;
-      return { text: label, detail: lib.detail, tone: lib.absent ? 'ok' : undefined, badges: lib.absent ? [tn(lib.absent, '{n} à prendre', '{n} à prendre')] : [t('En ligne')], action: index, pick: true } satisfies Row;
+      return { text: label, avatar: avatar(f.key, f.name), detail: lib.detail, tone: lib.absent ? 'ok' : undefined, badges: lib.absent ? [tn(lib.absent, '{n} à prendre', '{n} à prendre')] : [t('En ligne')], action: index, pick: true } satisfies Row;
     });
     const sections: Section[] = [...(offRows().length ? [{ rows: offRows() }] : [])];
     if (rows.length) sections.push({ rows });
@@ -311,6 +319,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     return {
       heading: name(f.key, f.name),
       icon: 'friend-list',
+      avatar: avatar(f.key, f.name),
       subheading: presenceText(p, online, f),
       sections: [
         ...takeFlash(),
@@ -370,6 +379,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       const index = actions.push({ label: name(d.profile.key, d.profile.name), key: `player:${d.profile.key}`, icon: 'friend-add', run: () => openPlayer(d.profile.key, from) }) - 1;
       return {
         text: name(d.profile.key, d.profile.name),
+        avatar: avatar(d.profile.key, d.profile.name),
         detail: opts.nearby?.has(d.profile.key) ? t('Sur votre réseau local') : t('Vu {ago}', { ago: socialAgo(d.seen, now()) }),
         badges: relationBadge(rel),
         tone: rel === 'friend' ? 'ok' : undefined,
@@ -466,7 +476,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     if (rel === 'friend') actions.push({ label: t('Voir sa fiche'), icon: 'friend-list', run: () => openFriend(key) });
     if (rel !== 'self') actions.push({ label: t('Bloquer'), detail: t('Plus de demande, plus de connexion avec sa borne'), icon: 'lock', run: () => confirmBlock(key, plain, () => openPlayer(key, from), from) });
     actions.push(backAction(from));
-    return { heading: name(key, plain), icon: rel === 'incoming' ? 'friend-request' : 'friend-add', subheading: rel === 'incoming' ? t('Demande d’amitié reçue') : relationBadge(rel)[0], sections: rows.length ? [{ rows }] : [], actions, back: from };
+    return { heading: name(key, plain), icon: rel === 'incoming' ? 'friend-request' : 'friend-add', avatar: avatar(key, plain), subheading: rel === 'incoming' ? t('Demande d’amitié reçue') : relationBadge(rel)[0], sections: rows.length ? [{ rows }] : [], actions, back: from };
   }
 
   function requestActions(key: string, plain: string, after: () => void): Action[] {
@@ -489,6 +499,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       const index = actions.push({ label: name(r.key, r.name), key: `request:${r.key}`, icon: incoming ? 'friend-request' : 'friend-add', run: () => openPlayer(r.key, openRequests) }) - 1;
       return {
         text: name(r.key, r.name),
+        avatar: avatar(r.key, r.name),
         detail: incoming
           ? r.lan
             ? t('Reçue {ago} · sur votre réseau local', { ago: socialAgo(r.at, now()) })
@@ -600,6 +611,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const rows: Row[] = [
       s.enabled ? { text: t('Partage activé'), detail: status.mode === 'off' ? t('Réseau coupé pendant les essais sans opérateur') : status.running ? tn(status.peers, 'Relié à {n} borne', 'Relié à {n} bornes') : status.error ? t('Réseau indisponible : {error}', { error: status.error }) : t('Connexion au réseau…'), tone: 'ok', badges: [t('Activé')], icon: 'network' } : { text: t('Partage désactivé'), detail: t('Personne ne vous voit ; vos amis vous voient hors ligne'), tone: 'warning', badges: [t('Désactivé')], icon: 'network' },
       { text: t('Votre nom : {name}', { name: name(s.key.publicKey, s.name) }), detail: t('Visible dans l’annuaire ; l’étiquette #{tag} vient de la clé de cette borne', { tag: name(s.key.publicKey, '').split('#')[1]! }), icon: 'friend-list' },
+      { text: s.avatar ? t('Votre avatar : une image à vous') : t('Votre avatar : vos initiales'), detail: t('Vu par vos amis et les joueurs d’une demande en cours ; « Changer d’avatar… » le montre'), icon: 'avatar' },
       { text: s.lan ? t('Réseau local : activé') : t('Réseau local : désactivé'), detail: s.lan ? tn(near, '{n} borne à proximité', '{n} bornes à proximité') : t('Les bornes de votre réseau ne vous trouvent pas sans Internet'), tone: s.lan ? 'ok' : 'quiet', icon: 'monitor' },
       s.shareLibrary
         ? { text: t('Bibliothèque partagée avec vos amis'), detail: t('Ils voient vos tables et peuvent les récupérer, avec leurs médias'), tone: 'ok', badges: [t('Partagée')], icon: 'tables' }
@@ -612,6 +624,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       ...[repairRow()].filter((r): r is Row => !!r),
     ];
     const actions: Action[] = [{ label: t('Changer de nom…'), detail: t('{min} à {max} caractères', { min: NAME_MIN, max: NAME_MAX }), icon: 'edit', run: () => askName() }];
+    if (host.avatarMenu) actions.push({ label: t('Changer d’avatar…'), detail: t('Une photo ou une image, recadrée aux boutons'), icon: 'avatar', run: () => host.avatarMenu!.open(() => host.library.openCustom(buildSharing, 1)) });
     if (firewallToAllow()) actions.push(allowAction(() => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER)));
     if (s.blocked.length) actions.push({ label: tn(s.blocked.length, '{n} joueur bloqué', '{n} joueurs bloqués'), icon: 'eye', run: () => openBlocked() });
     actions.push(
@@ -640,6 +653,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
           rows: [
             { text: t('Réseau : votre nom et son étiquette') },
             { text: t('Amis : présence, table en cours, records, badges et parties') },
+            { text: t('Amis et demandes d’ami en cours : votre avatar'), detail: t('Jamais l’annuaire : les autres joueurs voient vos initiales') },
+
             ...(s.shareLibrary
               ? [
                   { text: t('Amis : vos tables, leurs parties (fronton, PuP-Pack, sons…) et leurs médias'), detail: t('Une ROM ou un PuP-Pack seulement si votre ami les coche en attestant en avoir le droit : ils sont décochés d’office') },

@@ -20,6 +20,7 @@ export const SYSTEM_ITEM_IDS = [
   'missing-media',
   'menu-media',
   'friends',
+  'avatar',
   'game-history',
   'find-player',
   'friend-requests',
@@ -106,8 +107,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'amis',
     icon: 'friends',
     get label() { return t('Amis'); },
-    get detail() { return t('Mes amis, historique des parties, trouver un joueur, demandes, badges, partage'); },
-    entries: ['friends', 'game-history', 'find-player', 'friend-requests', 'badges', 'sharing', 'live-scores', 'quiet-in-game'],
+    get detail() { return t('Mes amis, mon avatar, historique des parties, trouver un joueur, demandes, badges, partage'); },
+    entries: ['friends', 'avatar', 'game-history', 'find-player', 'friend-requests', 'badges', 'sharing', 'live-scores', 'quiet-in-game'],
   },
   borne: {
     id: 'borne',
@@ -141,6 +142,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'missing-media': { icon: 'image-download', get label() { return t('Trouver les médias manquants'); } },
   'menu-media': { icon: 'music', get label() { return t('Médias, son et attente'); } },
   friends: { icon: 'friend-list', get label() { return t('Mes amis'); } },
+  avatar: { icon: 'avatar', get label() { return t('Mon avatar'); } },
+
   'game-history': { icon: 'clock', get label() { return t('Historique des parties'); } },
   'find-player': { icon: 'friend-add', get label() { return t('Trouver un joueur'); } },
   'friend-requests': { icon: 'friend-request', get label() { return t('Demandes d’amis'); } },

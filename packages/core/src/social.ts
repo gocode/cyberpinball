@@ -14,6 +14,7 @@ import { createPrivateKey } from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { renameWithRetry, writeFileAtomic } from './atomicwrite';
+import { decodeAvatarData, isAvatarFileName, isAvatarHash } from './avatar';
 import { dmdScore } from './highscores';
 import { t } from './i18n';
 import { parseRate, type ByteRate } from './ratelimit';
@@ -157,6 +158,13 @@ export interface SocialState {
   badges: EarnedBadge[];
   /** Badges déjà évalués une fois : ceux mérités ensuite deviennent des évènements (badges.ts). */
   badgesChecked: boolean;
+  /**
+   * Avatar de ce joueur : nom du fichier dans <données>\avatars (avatar.ts) ; absent : ses
+   * initiales. Envoyé à ses amis et aux joueurs d'une demande en cours, jamais à l'annuaire.
+   */
+  avatar?: string;
+  /** Avatars reçus des amis et des demandes en cours, par clé : nom du fichier dans <données>\avatars. */
+  peerAvatars?: Record<string, string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,7 +284,17 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     events: array(s.events, (e): e is SocialEvent => !!parseEvent(e)),
     badges: array(s.badges, (b): b is EarnedBadge => !!b && typeof b === 'object' && typeof (b as EarnedBadge).id === 'string' && isIso((b as EarnedBadge).at)),
     badgesChecked: s.badgesChecked === true,
+    ...(isAvatarFileName(s.avatar) ? { avatar: s.avatar } : {}),
+    ...(peerAvatarsOf(s.peerAvatars) ? { peerAvatars: peerAvatarsOf(s.peerAvatars)! } : {}),
   };
+}
+
+/** Avatars des autres relus : clé de joueur et nom de fichier valides ; undefined s'il n'y en a aucun. */
+function peerAvatarsOf(raw: unknown): Record<string, string> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, file] of Object.entries(raw as Record<string, unknown>)) if (isPlayerPublicKey(key) && isAvatarFileName(file)) out[key] = file;
+  return Object.keys(out).length ? out : undefined;
 }
 
 export function socialFile(dataDir: string): string {
@@ -320,15 +338,24 @@ export function saveSocial(dataDir: string, state: SocialState): void {
 // Messages entre bornes
 
 export type SocialMessage =
-  /** Premier message d'une connexion : qui je suis, et une part de mon annuaire. */
-  | { t: 'hello'; profile: Profile; dir: Profile[] }
+  /**
+   * Premier message d'une connexion : qui je suis, une part de mon annuaire, et l'empreinte de mon
+   * avatar (absente : pas d'avatar ; une borne d'avant les avatars ne l'envoie pas).
+   */
+  | { t: 'hello'; profile: Profile; dir: Profile[]; avatar?: string }
   | { t: 'dir'; dir: Profile[] }
   | { t: 'request' }
   | { t: 'accept' }
   | { t: 'decline' }
   | { t: 'unfriend' }
   | { t: 'presence'; presence: Presence }
-  | { t: 'events'; events: SocialEvent[] };
+  | { t: 'events'; events: SocialEvent[] }
+  /** Mon avatar a changé (absent : retiré) ; ceux qui le suivent le redemandent. */
+  | { t: 'avatar'; avatar?: string }
+  /** L'avatar de cette empreinte, s'il est toujours le tien. */
+  | { t: 'avatar-get'; avatar: string }
+  /** L'image d'un avatar, en base64, contrôlée à la réception (decodeAvatarData). */
+  | { t: 'avatar-data'; avatar: string; data: string };
 
 const str = (v: unknown, max: number): string | undefined => (typeof v === 'string' && v.length > 0 && v.length <= max ? v : undefined);
 
@@ -389,7 +416,7 @@ export function parseSocialMessage(raw: unknown, now = new Date()): SocialMessag
   switch (m.t) {
     case 'hello': {
       const profile = verifyProfile(m.profile, now);
-      return profile ? { t: 'hello', profile, dir: dir() } : undefined;
+      return profile ? { t: 'hello', profile, dir: dir(), ...(isAvatarHash(m.avatar) ? { avatar: m.avatar } : {}) } : undefined;
     }
     case 'dir':
       return { t: 'dir', dir: dir() };
@@ -404,9 +431,57 @@ export function parseSocialMessage(raw: unknown, now = new Date()): SocialMessag
     }
     case 'events':
       return Array.isArray(m.events) ? { t: 'events', events: m.events.slice(0, EVENTS_MAX).map(parseEvent).filter((e): e is SocialEvent => !!e) } : undefined;
+    case 'avatar':
+      if (m.avatar === undefined) return { t: 'avatar' };
+      return isAvatarHash(m.avatar) ? { t: 'avatar', avatar: m.avatar } : undefined;
+    case 'avatar-get':
+      return isAvatarHash(m.avatar) ? { t: 'avatar-get', avatar: m.avatar } : undefined;
+    case 'avatar-data':
+      // L'image doit être celle de l'empreinte, et une image d'avatar acceptable : sinon rien n'entre.
+      return isAvatarHash(m.avatar) && decodeAvatarData(m.data, m.avatar) ? { t: 'avatar-data', avatar: m.avatar, data: m.data as string } : undefined;
     default:
       return undefined;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Avatars
+
+/** Joueurs dont on échange l'avatar : les amis et les demandes en cours, dans un sens ou dans l'autre. */
+export function avatarPeers(state: SocialState): Set<string> {
+  return new Set([...state.friends.map((f) => f.key), ...state.incoming.map((r) => r.key), ...state.outgoing.map((r) => r.key)]);
+}
+
+/** Nom du fichier de l'avatar d'un joueur (soi compris) ; undefined : ses initiales. */
+export function avatarFileOf(state: SocialState, key: string): string | undefined {
+  return key === state.key.publicKey ? state.avatar : state.peerAvatars?.[key];
+}
+
+/** Mon avatar change (nom du fichier, ou undefined : retiré). */
+export function setOwnAvatar(state: SocialState, file: string | undefined): SocialState {
+  if (state.avatar === file) return state;
+  const { avatar: _, ...rest } = state;
+  return file ? { ...rest, avatar: file } : rest;
+}
+
+/** L'avatar d'un autre joueur, reçu (nom du fichier) ou retiré. */
+export function setPeerAvatar(state: SocialState, key: string, file: string | undefined): SocialState {
+  if (state.peerAvatars?.[key] === file) return state;
+  const { [key]: _, ...others } = state.peerAvatars ?? {};
+  const peerAvatars = file ? { ...others, [key]: file } : others;
+  const { peerAvatars: __, ...rest } = state;
+  return Object.keys(peerAvatars).length ? { ...rest, peerAvatars } : rest;
+}
+
+/**
+ * Les avatars de ceux qui ne sont plus ni amis ni en demande sortent de l'état ; renvoie aussi les
+ * fichiers encore utilisés (le mien et ceux qui restent), pour ranger le dossier (pruneAvatarFiles).
+ */
+export function keepAvatars(state: SocialState): { state: SocialState; files: string[] } {
+  const peers = avatarPeers(state);
+  let next = state;
+  for (const key of Object.keys(state.peerAvatars ?? {})) if (!peers.has(key)) next = setPeerAvatar(next, key, undefined);
+  return { state: next, files: [...(next.avatar ? [next.avatar] : []), ...Object.values(next.peerAvatars ?? {})] };
 }
 
 // ---------------------------------------------------------------------------

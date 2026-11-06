@@ -67,6 +67,7 @@ test('vue : carte entière quelques secondes, puis pastille ; temps restant ; ri
     hint: 'Quittez la partie pour le rejoindre, ou continuez : elle s’efface seule',
     left: '2:00',
     progress: 1,
+    host: { key: 'k', name: 'Bruno' },
   });
   assert.equal(view(GAME_NOTICE_FULL_MS - 1)?.mode, 'full');
   assert.equal(view(GAME_NOTICE_FULL_MS)?.mode, 'compact');

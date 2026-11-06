@@ -18,6 +18,7 @@
 // qui a son son (NoticeRule.sound) le fait entendre à son entrée, une fois (`sound`).
 
 import {
+  avatarView,
   NOTICE_RULES,
   NOTICE_STARTUP_QUIET_MS,
   createNoticeCenter,
@@ -42,6 +43,7 @@ import {
   type NoticeEvent,
   type NoticeView,
   type NoticeZone,
+  type AvatarView,
   type NoticesMode,
   type Presence,
   type SocialSnapshot,
@@ -56,6 +58,8 @@ export interface MenuNoticesHost {
     presenceOf(key: string): Presence | undefined;
     /** La liste des amis est-elle sûre (friendpresence.ts) ? Sans lui : à jour. */
     listSync?(): FriendsListSync;
+    /** Fichier de l'avatar d'un joueur (social-net.ts) : la pastille de la notification qui parle de lui. */
+    avatarFile?(key: string): string | undefined;
   };
   jobs(): readonly DownloadJob[];
   /** Raison d'un téléchargement bloqué, courte (« plus de place »). */
@@ -97,7 +101,7 @@ export interface MenuNotices {
   /** Déjà dit ailleurs (le bandeau d'un écran plein) : la notification ne le redira pas. */
   said(kind: NoticeEvent['kind'], key: string): void;
   /** Ce que le menu des tables dessine maintenant (à chaque rendu de la fenêtre du plateau). */
-  view(): { notice?: NoticeView; friendsOnline?: { count: number; title: string; searching?: boolean } };
+  view(): { notice?: NoticeView & { avatar?: AvatarView }; friendsOnline?: { count: number; title: string; searching?: boolean } };
   stop(): void;
 }
 
@@ -225,7 +229,11 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     shown = next;
     schedule(r.nextAt);
     const friends = mode === 'off' || !host.zone().count ? undefined : friendsOnlineView(socialSnapshot(host.social.state(), (k) => host.social.online(k), (k) => host.social.presenceOf(k)), host.social.listSync?.());
-    return { ...(r.view ? { notice: r.view } : {}), ...(friends ? { friendsOnline: friends } : {}) };
+    // Un seul joueur en cause : sa pastille (son avatar, sinon ses initiales) à la place de l'icône.
+    const who = r.view?.player;
+    const notice = r.view && who ? { ...r.view, avatar: avatarView(who.key, who.name, host.social.avatarFile?.(who.key)) } : r.view;
+    return { ...(notice ? { notice } : {}), ...(friends ? { friendsOnline: friends } : {}) };
+
   }
 
   // Ce qui est là au démarrage (amis, demandes, téléchargements finis) n'est pas une nouvelle.

@@ -115,6 +115,16 @@ export const ICON_NAMES = [
   'broom',
   // Enregistrement d'une partie
   'record',
+  // Avatar des joueurs : l'avatar, son recadrage, le cadre déplacé et le zoom
+  'avatar',
+  'crop',
+  'move-left',
+  'move-right',
+  'move-up',
+  'move-down',
+  'zoom-in',
+  'zoom-out',
 ] as const;
+
 
 export type IconName = (typeof ICON_NAMES)[number];

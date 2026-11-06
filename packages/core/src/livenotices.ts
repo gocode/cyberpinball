@@ -56,13 +56,13 @@ export function liveNotices(prev: LiveSnapshot | undefined, next: LiveSnapshot |
     if (!before || before.state === p.state) continue;
     const key = `${game.id}|${p.key}|${p.invitedAt ?? ''}`;
     if (next.hosting && before.state === 'invited') {
-      if (p.state === 'accepted') out.push({ kind: 'live-accepted', key, at: now, who: p.name, ...subject });
+      if (p.state === 'accepted') out.push({ kind: 'live-accepted', key, at: now, who: p.name, player: p.key, ...subject });
       else if (p.state === 'declined' || p.state === 'busy' || p.state === 'expired') {
         const reason: LiveNoticeReason | undefined = p.state === 'expired' && p.offline ? 'offline' : p.state !== 'declined' ? p.state : p.match === 'missing' || p.match === 'other-version' ? p.match : undefined;
-        out.push({ kind: 'live-declined', key, at: now, who: p.name, ...subject, ...(reason ? { reason } : {}) });
+        out.push({ kind: 'live-declined', key, at: now, who: p.name, player: p.key, ...subject, ...(reason ? { reason } : {}) });
       }
     } else if (IN_GAME.includes(before.state) && (p.state === 'left' || p.state === 'failed')) {
-      out.push({ kind: 'live-left', key, at: now, who: p.name, ...subject, ...(p.state === 'failed' ? { reason: 'failed' as const } : {}) });
+      out.push({ kind: 'live-left', key, at: now, who: p.name, player: p.key, ...subject, ...(p.state === 'failed' ? { reason: 'failed' as const } : {}) });
     }
   }
   if (!next.hosting && prev.phase !== 'cancelled' && next.phase === 'cancelled') {
@@ -83,7 +83,7 @@ export function liveNotices(prev: LiveSnapshot | undefined, next: LiveSnapshot |
 export function inviteNotices(prev: ReadonlySet<string> | undefined, invites: readonly LiveInvite[], now: number, ended: (id: string) => LiveInviteEndInfo | undefined = () => undefined): NoticeEvent[] {
   if (!prev) return [];
   // Chaque invitation voulue a son numéro (round) : réinvité après un refus, dans la même partie, c'en est une nouvelle.
-  const arrived = invites.filter((i) => !prev.has(inviteTag(i))).map((i) => ({ kind: 'live-invite' as const, key: inviteTag(i), at: now, who: i.host.name, subject: i.title }));
+  const arrived = invites.filter((i) => !prev.has(inviteTag(i))).map((i) => ({ kind: 'live-invite' as const, key: inviteTag(i), at: now, who: i.host.name, player: i.host.key, subject: i.title }));
   // Une invitation vue qui n'est plus là sans ma réponse : pourquoi, aux deux bornes (essai réel du
   // 04/11/2026). Changée de table : la nouvelle invitation le dit déjà.
   const gone = [...prev]

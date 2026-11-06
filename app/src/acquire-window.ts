@@ -39,7 +39,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, BrowserWindow, ipcMain, screen, session, shell, WebContentsView, webFrameMain, type DownloadItem, type Rectangle, type Session } from 'electron';
+import { app, BrowserWindow, ipcMain, Menu, screen, session, shell, WebContentsView, webFrameMain, type DownloadItem, type Rectangle, type Session } from 'electron';
 import {
   audioSinkScript,
   createTransferMeter,
@@ -904,6 +904,15 @@ export function createAcquirer(events: AcquireEvents) {
       if (frame) void frame.executeJavaScript(audioSinkScript(output!)).catch(() => undefined);
     });
     contents.on('did-stop-loading', () => probeVideo(contents));
+    // Recherche libre : une image d'une page (résultats d'images, page d'un site) se prend d'un
+    // clic droit, « Télécharger cette image » ; elle part comme tout téléchargement de la page,
+    // vers ce qui l'attend (un média, l'avatar). Les moteurs d'images n'ont pas de lien de téléchargement.
+    contents.on('context-menu', (_e, params) => {
+      if (!open?.request.search || params.mediaType !== 'image' || !params.srcURL || !/^(https?|data):/i.test(params.srcURL)) return;
+      const src = params.srcURL;
+      Menu.buildFromTemplate([{ label: t('Télécharger cette image'), click: () => contents.downloadURL(src) }]).popup({ window: win });
+    });
+
     contents.on('did-navigate-in-page', (_e, _url, isMainFrame) => isMainFrame && probeVideo(contents));
     contents.on('did-fail-load', (_e, code, description, url, isMainFrame) => {
       if (isMainFrame && code !== -3)

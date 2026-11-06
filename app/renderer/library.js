@@ -31,8 +31,13 @@ function renderLibrary(v) {
     head.append(back);
   }
   const h1 = libEl('h1', '', v.heading);
+  // Pastille du joueur dont parle l'écran (fiche d'un ami) : à la place de l'icône du titre.
+  if (v.avatar) {
+    h1.classList.add('with-icon');
+    h1.prepend(avatarNode(v.avatar, 'lib-head-avatar'));
+  }
   // Icône du titre : celle de l'entrée qui a ouvert l'écran (registre icons.js).
-  if (v.icon) {
+  else if (v.icon) {
     h1.classList.add('with-icon');
     h1.prepend(cyberIcon(v.icon, 'lib-head-icon'));
   }
@@ -45,6 +50,8 @@ function renderLibrary(v) {
     'div',
     v.pages
       ? 'lib-body lib-pages'
+      : v.crop
+        ? 'lib-body lib-crop-body'
       : v.media
         ? `lib-body lib-media${v.media.large ? ' large' : ''}${v.media.gallery ? ' with-gallery' : ''}`
         : v.journey
@@ -60,6 +67,7 @@ function renderLibrary(v) {
   // Texte en lecture (reading.ts) : de même, les actions s'éteignent un peu.
   else if (v.reading?.active) body.classList.add('zone-list');
   if (v.pages) body.append(renderPages(v.pages));
+  else if (v.crop) body.append(renderCrop(v.crop));
   else if (v.journey) body.append(renderJourney(v.journey));
   else if (v.health) body.append(zoneFrame(renderHealth(v.health, v.cursor), v.zone));
   else if (v.media || v.sections.length) {
@@ -83,21 +91,34 @@ function renderLibrary(v) {
           actOn(li, { type: 'activate', index: row.action });
         }
         const line = libEl('div', 'lib-row-line');
-        if (row.icon) line.append(cyberIcon(row.icon, 'lib-row-icon'));
+        // Pastille d'un joueur (son avatar, sinon ses initiales) : à gauche de tout le bloc, à la place de l'icône.
+        if (row.icon && !row.avatar) line.append(cyberIcon(row.icon, 'lib-row-icon'));
         line.append(libEl('span', 'lib-row-text', row.text));
+        // Les joueurs d'une partie, en petites pastilles qui se chevauchent un peu.
+        if (row.avatars?.length) {
+          const stack = libEl('span', 'lib-avatars');
+          for (const a of row.avatars) stack.append(avatarNode(a, 'lib-avatar-small'));
+          line.append(stack);
+        }
         for (const badge of row.badges ?? []) line.append(libEl('span', 'badge', badge));
-        // Schéma à droite (« Écran du DMD ») : le texte passe dans une colonne à part.
-        const main = row.figure ? libEl('div', 'lib-row-main') : li;
+        // Schéma à droite (« Écran du DMD ») ou pastille à gauche : le texte passe dans une colonne à part.
+        const main = row.figure || row.avatar ? libEl('div', 'lib-row-main') : li;
         main.append(line);
         if (row.detail) main.append(libEl('div', 'lib-row-detail', row.detail));
         if (row.figure) li.append(main, dmdFigure(row.figure));
+        if (row.avatar) {
+          li.classList.add('with-avatar');
+          li.append(avatarNode(row.avatar, 'lib-row-avatar'), main);
+        }
+        // Avec une pastille, la barre et la note restent dans la colonne du texte.
+        const tail = row.avatar ? main : li;
         // Téléchargement : sa barre sous le détail ; sans valeur (taille inconnue), une barre sans fin.
-        if (row.progress) li.append(rowProgress(row.progress));
+        if (row.progress) tail.append(rowProgress(row.progress));
         // À quoi sert un fichier : signe et mot, jamais la couleur seule.
         if (row.note) {
           const note = libEl('div', `lib-row-note tone-${row.note.tone}`);
           note.append(libEl('span', 'lib-row-sign', row.note.sign), libEl('span', '', row.note.text));
-          li.append(note);
+          tail.append(note);
         }
         list.append(li);
       }
@@ -173,7 +194,103 @@ function renderLibrary(v) {
   return o;
 }
 
+// ---------- Avatar d'un joueur (packages/core/src/avatar.ts) ----------
+
+// La pastille elle-même : avatarNode (avatar.js, chargé avant ce fichier).
+
+// ---------- Recadrage (avatar-menu.ts) ----------
+
+/**
+ * L'image entière, le carré gardé par-dessus (l'extérieur assombri, le rond que verront les amis
+ * dessiné dedans), et l'aperçu à droite, en grand puis à la taille des listes. Les boutons sont
+ * les actions de l'écran ; à la souris, on glisse le cadre (un seul geste envoyé au lâcher, pour
+ * que le dessin suive le pointeur sans attendre) et la molette zoome.
+ */
+function renderCrop(c) {
+  const box = libEl('div', 'lib-crop');
+  const area = libEl('div', 'lib-crop-area');
+  const stage = libEl('div', 'lib-crop-stage');
+  // Proportion de l'image : la zone la fait tenir en largeur comme en hauteur (library.css).
+  stage.style.setProperty('--ratio', String(c.width / c.height));
+  area.append(stage);
+  const img = libEl('img', 'lib-crop-image');
+  img.alt = '';
+  img.draggable = false;
+  img.src = c.src;
+  const frame = libEl('div', 'lib-crop-frame');
+  frame.append(libEl('div', 'lib-crop-circle'));
+  stage.append(img, frame);
+
+  const preview = libEl('figure', 'lib-crop-preview');
+  const discs = libEl('div', 'lib-crop-discs');
+  // L'aperçu : l'image en fond du rond, agrandie et décalée pour que le carré gardé le remplisse
+  // (rien ne déborde de sa boîte : le garde-fou de mise en page reste muet).
+  const big = libEl('div', 'lib-crop-disc');
+  const small = libEl('div', 'lib-crop-disc small');
+  const shots = [big, small];
+  for (const disc of shots) disc.style.backgroundImage = `url("${c.src}")`;
+  discs.append(big, small);
+  preview.append(discs, libEl('figcaption', '', c.caption));
+
+  const place = (b) => {
+    frame.style.left = `${b.left * 100}%`;
+    frame.style.top = `${b.top * 100}%`;
+    frame.style.width = `${b.width * 100}%`;
+    frame.style.height = `${b.height * 100}%`;
+    // Position en pourcentage d'une image de fond : p = décalage / (boîte − image), d'où left / (1 − largeur).
+    const at = (start, part) => (part >= 1 ? 0 : (start / (1 - part)) * 100);
+    for (const shot of shots) {
+      shot.style.backgroundSize = `${100 / b.width}% ${100 / b.height}%`;
+      shot.style.backgroundPosition = `${at(b.left, b.width)}% ${at(b.top, b.height)}%`;
+    }
+
+  };
+  place(c.box);
+
+  // Glisser : le cadre suit le pointeur, borné à l'image ; le geste part au lâcher.
+  let drag;
+  stage.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    const r = stage.getBoundingClientRect();
+    drag = { x: e.clientX, y: e.clientY, w: r.width, h: r.height, dx: 0, dy: 0 };
+    stage.setPointerCapture(e.pointerId);
+    stage.classList.add('dragging');
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!drag) return;
+    const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+    drag.dx = clamp((e.clientX - drag.x) / drag.w, -c.box.left, 1 - c.box.left - c.box.width);
+    drag.dy = clamp((e.clientY - drag.y) / drag.h, -c.box.top, 1 - c.box.top - c.box.height);
+    place({ ...c.box, left: c.box.left + drag.dx, top: c.box.top + drag.dy });
+  });
+  const release = () => {
+    if (!drag) return;
+    const { dx, dy } = drag;
+    drag = undefined;
+    stage.classList.remove('dragging');
+    if (Math.abs(dx) > 0.002 || Math.abs(dy) > 0.002) window.cyber.act({ type: 'crop', dx, dy });
+  };
+  stage.addEventListener('pointerup', release);
+  stage.addEventListener('pointercancel', release);
+  // Molette : un cran à la fois, au plus tous les 120 ms (un pavé tactile en envoie des dizaines).
+  let wheelAt = 0;
+  stage.addEventListener(
+    'wheel',
+    (e) => {
+      e.preventDefault();
+      if (!e.deltaY || Date.now() - wheelAt < 120) return;
+      wheelAt = Date.now();
+      window.cyber.act({ type: 'crop', zoom: e.deltaY < 0 ? 1 : -1 });
+    },
+    { passive: false },
+  );
+  box.append(area, preview);
+  return box;
+
+}
+
 // ---------- Liste de contenu : son cadre et son repère (listzones.ts) ----------
+
 
 /**
  * Liste de contenu d'un écran à deux zones (jeux, médias, fichiers…) : dans un cadre à elle, avec

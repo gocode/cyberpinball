@@ -73,3 +73,36 @@ body {
   stroke-width: 2;
   vertical-align: -0.14em;
 }
+
+/*
+ * Pastille d'un joueur (avatar.js, packages/core/src/avatar.ts) : son image, ou ses initiales sur
+ * la teinte tirée de sa clé. La teinte reste sombre et peu saturée (fond noir sarcelle) : seul le
+ * texte clair ressort. La taille vient de chaque fenêtre (library.css, game-notice.css, frontend.css).
+ */
+.avatar {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  box-sizing: border-box;
+  border-radius: 50%;
+  overflow: hidden;
+  background: hsl(var(--avatar-hue, 170) 34% 22%);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line-strong);
+  font-weight: 600;
+  line-height: 1;
+  user-select: none;
+}
+
+.avatar-initials {
+  letter-spacing: 0.02em;
+}
+
+.avatar-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}

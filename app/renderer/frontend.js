@@ -706,7 +706,8 @@ function noticeToast(n) {
       detail.dataset.full = n.detail;
       text.append(detail);
     }
-    box.append(cyberIcon(n.icon ?? 'info', 'notice-icon'), text);
+    // Un seul joueur en cause (un ami qui se connecte, une invitation) : sa pastille à la place de l'icône.
+    box.append(n.avatar ? avatarNode(n.avatar, 'notice-icon notice-avatar') : cyberIcon(n.icon ?? 'info', 'notice-icon'), text);
     noticeShown = { id: n.id, box };
   }
   noticeShown.box.classList.toggle('leaving', Boolean(n.leaving));

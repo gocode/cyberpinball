@@ -8,6 +8,9 @@
 // - Analyse d'un son : durée, voies, et les pics qui dessinent sa forme d'onde.
 // - Images d'un média (une image, ou quelques moments d'une vidéo), en pixels : le cadre du
 //   DMD d'un FullDMD y est cherché (fulldmdframe.ts).
+// - Avatar d'un joueur (avatar-menu.ts) : l'image de travail, réduite (une photo de 12 Mpx) et
+//   redessinée en JPEG, puis le carré gardé à la taille de l'avatar. Redessinée, une photo perd
+//   ses métadonnées (EXIF, position GPS) ; createImageBitmap applique son orientation.
 //
 // La page vit dans une session à part dont toutes les adresses https sont servies ici :
 // elle lit le fichier source par /in/<n> et rend le résultat par /out/<n>. Elle n'atteint
@@ -92,6 +95,35 @@ window.toPng = async (id, out) => {
   const png = await canvas.convertToBlob({ type: 'image/png' });
   await fetch('/out/' + out, { method: 'POST', body: png });
   return { width: bitmap.width, height: bitmap.height };
+};
+window.fitJpeg = async (id, out, maxSide, quality) => {
+  const blob = await (await fetch('/in/' + id)).blob();
+  const bitmap = await createImageBitmap(blob);
+  const scale = Math.min(1, maxSide / Math.max(bitmap.width, bitmap.height));
+  const w = Math.max(1, Math.round(bitmap.width * scale));
+  const h = Math.max(1, Math.round(bitmap.height * scale));
+  const canvas = new OffscreenCanvas(w, h);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, w, h);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, 0, 0, w, h);
+  const jpeg = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+  await fetch('/out/' + out, { method: 'POST', body: jpeg });
+  return { width: w, height: h };
+};
+window.cropJpeg = async (id, out, x, y, side, size, quality) => {
+  const blob = await (await fetch('/in/' + id)).blob();
+  const bitmap = await createImageBitmap(blob);
+  const canvas = new OffscreenCanvas(size, size);
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, size, size);
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(bitmap, x, y, side, side, 0, 0, size, size);
+  const jpeg = await canvas.convertToBlob({ type: 'image/jpeg', quality });
+  await fetch('/out/' + out, { method: 'POST', body: jpeg });
+  return { width: size, height: size };
 };
 window.framesOf = async (id, video, times, maxWidth, out) => {
   const blob = await (await fetch('/in/' + id)).blob();
@@ -272,7 +304,44 @@ export function createConverter() {
     return { width: size.width, height: size.height, images };
   }
 
-  return { probeAudio, audioToWav, imageToPng, mediaFrames };
+  /**
+   * Image de travail d'un avatar : `file` (tout format que Chromium lit) réduite à `maxSide` pixels
+   * de côté au plus, en JPEG dans `out` ; ses dimensions.
+   */
+  async function fitJpeg(file: string, out: string, maxSide: number, quality = 0.92): Promise<{ width: number; height: number }> {
+    const id = inputId(file);
+    const key = `j${next++}`;
+    let size: { width: number; height: number };
+    try {
+      size = await run(`fitJpeg(${JSON.stringify(id)}, ${JSON.stringify(key)}, ${maxSide}, ${quality})`);
+    } catch (error) {
+      throw failure(error, 'image');
+    }
+    const got = outputs.get(key);
+    outputs.delete(key);
+    if (!got) throw new Error(t('conversion sans résultat'));
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, got.data);
+    return size;
+  }
+
+  /** Le carré (`x`, `y`, `side`, en pixels de `file`) redessiné en JPEG de `size` pixels de côté : ses octets. */
+  async function cropJpeg(file: string, rect: { x: number; y: number; side: number }, size: number, quality = 0.86): Promise<Buffer> {
+    const id = inputId(file);
+    const key = `c${next++}`;
+    try {
+      await run(`cropJpeg(${JSON.stringify(id)}, ${JSON.stringify(key)}, ${rect.x}, ${rect.y}, ${rect.side}, ${size}, ${quality})`);
+    } catch (error) {
+      throw failure(error, 'image');
+    }
+    const got = outputs.get(key);
+    outputs.delete(key);
+    if (!got) throw new Error(t('conversion sans résultat'));
+    return got.data;
+  }
+
+  return { probeAudio, audioToWav, imageToPng, mediaFrames, fitJpeg, cropJpeg };
+
 }
 
 export type Converter = ReturnType<typeof createConverter>;

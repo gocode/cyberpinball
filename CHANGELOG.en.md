@@ -7,6 +7,11 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.8
+
+- Avatar, in System menu > Friends > "My avatar": a photo or a picture of your own, chosen on this PC or in the built-in browser (right-click a picture: "Download this image"), then cropped with the cabinet buttons (zoom, move the frame, recenter) or the mouse. A photo loses its metadata, GPS position included.
+- Your friends see your avatar wherever your name is shown: My friends, your sheet, friend requests, the game history, the live game, the invitation card and the score band during the game, notifications. Without an avatar, your initials on a hue of your own. Only your friends and players with a pending request receive it, never the directory.
+
 ## 0.1.7
 
 - Backups, in System menu > Cyber Pinball: copy your settings and scores, your tables too, or the whole installation, to a USB drive, a disk or a network drive, at its root or in the folder of your choice ("Choose a folder…"). Only changed files are copied again, and every file written is read back. A level that does not fit on the drive is greyed out with its reason (not enough space, FAT32 drive and a file over 4 GB).

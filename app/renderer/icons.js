@@ -122,6 +122,16 @@ const CYBER_ICONS = {
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3c-3 3.5-3 14.5 0 18M12 3c3 3.5 3 14.5 0 18"/>', // Globe à méridiens : un téléchargement venu d’un site web.
   broom: '<path d="M19 3 11 11M8 10l6 6-2 5c-3 0-7-2-9-5l5-6zM6 15l2 2"/>', // Balai : retirer les finis de la liste, sans toucher aux fichiers.
   record: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="m16 10 6-3v10l-6-3"/><circle cx="9" cy="12" r="2.5"/>', // Caméra et point d’enregistrement : jouer et enregistrer la partie pour la roue.
+
+  // Avatar des joueurs (avatar-menu.ts)
+  avatar: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5c1.5-2 3.3-3 5.5-3s4 1 5.5 3"/>', // Visage dans sa pastille ronde : l’avatar d’un joueur.
+  crop: '<path d="M6 2v16h16M2 6h16v16"/>', // Deux équerres croisées : recadrer une image.
+  'move-left': '<rect x="12" y="7" width="9" height="10" rx="1"/><path d="M9 12H3M6 9l-3 3 3 3"/>', // Cadre et flèche à sa gauche : déplacer le cadre vers la gauche.
+  'move-right': '<rect x="3" y="7" width="9" height="10" rx="1"/><path d="M15 12h6M18 9l3 3-3 3"/>', // Cadre et flèche à sa droite.
+  'move-up': '<rect x="7" y="12" width="10" height="9" rx="1"/><path d="M12 9V3M9 6l3-3 3 3"/>', // Cadre et flèche au-dessus.
+  'move-down': '<rect x="7" y="3" width="10" height="9" rx="1"/><path d="M12 15v6M9 18l3 3 3-3"/>', // Cadre et flèche en dessous.
+  'zoom-in': '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M10 7v6M7 10h6"/>', // Loupe et plus : rapprocher.
+  'zoom-out': '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M7 10h6"/>', // Loupe et moins : éloigner.
 };
 
 /**

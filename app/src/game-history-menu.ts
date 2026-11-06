@@ -15,6 +15,7 @@ import {
   playDuration,
   t,
   tn,
+  type AvatarView,
   type HistoryGame,
   type HistoryPlayer,
 } from '@cyberpinball/core';
@@ -26,6 +27,8 @@ export interface GameHistoryMenuHost {
   history(): readonly HistoryGame[];
   /** Retour de la liste : la rubrique Amis. */
   back(): void;
+  /** Pastille d'un joueur (avatar.ts) : son avatar s'il est encore un ami, sinon ses initiales. */
+  avatar?(key: string, name: string): AvatarView;
 }
 
 export interface GameHistoryMenu {
@@ -65,6 +68,8 @@ export function createGameHistoryMenu(host: GameHistoryMenuHost): GameHistoryMen
         text: game.title,
         detail: game.players.map((p) => short(game, p)).join(' · '),
         icon: mine?.rank === 1 && counted > 1 ? 'star' : 'gamepad',
+        // Les joueurs de la partie, dans l'ordre du classement : qui était là, d'un coup d'œil.
+        ...(host.avatar ? { avatars: game.players.map((p) => host.avatar!(p.key, p.name)) } : {}),
         tone: mine?.rank === 1 && counted > 1 ? 'ok' : undefined,
         badges: [time(game.at)],
         action: index,
@@ -99,7 +104,8 @@ export function createGameHistoryMenu(host: GameHistoryMenuHost): GameHistoryMen
       p.seconds !== undefined ? playDuration(p.seconds) : undefined,
     ].filter(Boolean).join(' · ');
     const badges = [...(p.rank === 1 && counted > 1 ? [t('Meilleur score')] : []), ...(p.host ? [t('Hôte')] : [])];
-    return { text, ...(detail ? { detail } : {}), icon: p.rank === 1 ? 'star' : 'friend-list', tone: p.rank ? 'ok' : 'quiet', ...(badges.length ? { badges } : {}) };
+    return { text, ...(detail ? { detail } : {}), ...(host.avatar ? { avatar: host.avatar(p.key, p.name) } : {}), icon: p.rank === 1 ? 'star' : 'friend-list',
+ tone: p.rank ? 'ok' : 'quiet', ...(badges.length ? { badges } : {}) };
   }
 
   function buildGame(id: string, from: number): Built {

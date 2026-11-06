@@ -56,6 +56,8 @@ export interface NoticeEvent {
   at: number;
   /** Nom de l'ami. */
   who?: string;
+  /** Clé du joueur dont parle l'évènement : sa pastille (avatar.ts) dans la notification. */
+  player?: string;
   /** Titre de la table, nom du téléchargement. */
   subject?: string;
   /** Précision : score, place, raison d'un échec, nom d'un badge. */
@@ -165,6 +167,8 @@ export interface NoticeView {
   sound?: UiSoundId;
   /** En train de s'estomper. */
   leaving?: boolean;
+  /** Le joueur dont elle parle, quand elle n'en annonce qu'un : sa pastille à la place de l'icône. */
+  player?: { key: string; name: string };
 }
 
 /** Réglage du menu système (mediaview.ts, MenuMediaSettings.notices). */
@@ -480,10 +484,14 @@ export function createNoticeCenter(): NoticeCenter {
     } else {
       const group = groups[0]!;
       const rule = NOTICE_RULES[group.kind];
+      // Un seul joueur en cause (le dernier évènement pour une fin d'invitation) : sa pastille.
+      const players = [...new Set(group.events.map((e) => e.player))];
+      const lone = players.length === 1 && players[0] ? group.events.find((e) => e.player === players[0]) : undefined;
       view = {
         icon: rule.icon,
         tone: rule.tone,
         ...noticeText(group.kind, group.events),
+        ...(lone ? { player: { key: lone.player!, name: lone.who ?? '?' } } : {}),
         act: rule.act,
         ...(rule.live ? { live: true as const } : {}),
         ...(rule.away ? { away: true as const } : {}),
@@ -575,19 +583,20 @@ export function socialNotices(prev: SocialSnapshot | undefined, next: SocialSnap
   for (const [key, presence] of next.online) {
     // Un ami tout juste accepté est annoncé comme tel (ou pas du tout, si c'est nous qui avons accepté).
     if (!prev.friends.has(key)) continue;
-    if (!prev.online.has(key)) out.push({ kind: 'friend-online', key, at: now, who: name(key) });
+    if (!prev.online.has(key)) out.push({ kind: 'friend-online', key, at: now, who: name(key), player: key });
     // Une partie lancée par un ami déjà en ligne (sa présence passe à « playing »).
     else if (presence?.status === 'playing' && prev.online.get(key)?.status !== 'playing' && prev.online.get(key) !== undefined)
-      out.push({ kind: 'friend-playing', key: `${key}|${presence.since}`, at: now, who: name(key), ...(presence.table ? { subject: presence.table.title } : {}) });
+      out.push({ kind: 'friend-playing', key: `${key}|${presence.since}`, at: now, who: name(key), player: key, ...(presence.table ? { subject: presence.table.title } : {}) });
   }
-  for (const [key, who] of next.incoming) if (!prev.incoming.has(key)) out.push({ kind: 'friend-request', key, at: now, who });
-  for (const key of next.friends.keys()) if (prev.outgoing.has(key) && !prev.friends.has(key)) out.push({ kind: 'friend-accepted', key, at: now, who: name(key) });
+  for (const [key, who] of next.incoming) if (!prev.incoming.has(key)) out.push({ kind: 'friend-request', key, at: now, who, player: key });
+  for (const key of next.friends.keys()) if (prev.outgoing.has(key) && !prev.friends.has(key)) out.push({ kind: 'friend-accepted', key, at: now, who: name(key), player: key });
   for (const f of state.friends) {
     if (!prev.friends.has(f.key)) continue; // un nouvel ami envoie ses derniers évènements : déjà annoncé comme ami
     for (const e of f.events) {
       if (prev.events.has(e.id) || now - Date.parse(e.at) > FRIEND_EVENT_FRESH_MS) continue;
       const ev = friendEventNotice(f.name, e, now, badgeLabel);
-      if (ev) out.push(ev);
+      if (ev) out.push({ ...ev, player: f.key });
+
     }
   }
   return out;

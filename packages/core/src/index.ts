@@ -125,6 +125,7 @@ export * from './sessionorientation';
 export * from './sharing';
 export * from './mediapack';
 export * from './social';
+export * from './avatar';
 export * from './friendpresence';
 export * from './badges';
 export * from './firewall';

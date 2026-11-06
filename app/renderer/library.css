@@ -2301,3 +2301,187 @@ body.mouse .lib-health .health-line:not(.selected):hover {
   font-size: 3.2cqmin;
   color: var(--ink-muted);
 }
+
+/* ---------- Avatar d'un joueur dans les écrans (pastille : avatar.js, theme.css) ---------- */
+
+/* Dans une liste : la pastille à gauche du nom et de son détail, centrée sur le bloc. */
+.lib-row.with-avatar {
+  display: flex;
+  align-items: center;
+  gap: 1.6cqmin;
+}
+
+.lib-row.with-avatar > .lib-row-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.lib-row-avatar {
+  width: 5.4cqmin;
+  height: 5.4cqmin;
+  font-size: 2.1cqmin;
+}
+
+/* En ligne (ton « ok ») : un anneau vert signal ; grisé (hors ligne, indisponible) : la pastille s'éteint aussi. */
+.lib-row.tone-ok .lib-row-avatar {
+  box-shadow: 0 0 0 0.25cqmin var(--signal);
+}
+
+.lib-row.tone-quiet .lib-row-avatar {
+  opacity: 0.55;
+}
+
+.lib-head-avatar {
+  width: 7.4cqmin;
+  height: 7.4cqmin;
+  font-size: 2.9cqmin;
+  box-shadow: 0 0 0 0.3cqmin var(--halo), 0 0 2cqmin rgba(28, 143, 128, 0.35);
+}
+
+/* Les joueurs d'une partie (historique) : petites pastilles qui se chevauchent un peu, détourées du fond. */
+.lib-avatars {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  margin-left: 0.4cqmin;
+}
+
+.lib-avatar-small {
+  width: 4.4cqmin;
+  height: 4.4cqmin;
+  font-size: 1.9cqmin;
+  box-shadow: 0 0 0 0.25cqmin var(--surface);
+}
+
+.lib-avatar-small + .lib-avatar-small {
+  margin-left: -1.1cqmin;
+}
+
+/* ---------- Recadrage d'un avatar (library.js, renderCrop) ---------- */
+
+/* L'image et l'aperçu à gauche, les gestes à droite ; en borne (portrait), les gestes dessous. */
+.lib-body.lib-crop-body {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+@container (orientation: portrait) {
+  .lib-body.lib-crop-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+}
+
+.lib-crop {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 3cqmin;
+  align-items: center;
+}
+
+@container (orientation: portrait) {
+  .lib-crop {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+  }
+}
+
+/* La place de l'image : un conteneur à lui, pour que l'image y tienne en largeur comme en hauteur. */
+.lib-crop-area {
+  container-type: size;
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lib-crop-stage {
+  position: relative;
+  width: min(100cqw, calc(100cqh * var(--ratio, 1)));
+  aspect-ratio: var(--ratio, 1);
+  overflow: hidden;
+  border-radius: 0.6cqmin;
+  box-shadow: var(--halo-panel);
+  cursor: grab;
+  touch-action: none;
+}
+
+.lib-crop-stage.dragging {
+  cursor: grabbing;
+}
+
+.lib-crop-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* Le carré gardé : l'extérieur assombri, un filet vert signal, et le rond que verront les amis. */
+.lib-crop-frame {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid var(--signal);
+  box-shadow: 0 0 0 200vmax var(--scrim);
+  pointer-events: none;
+}
+
+.lib-crop-circle {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px dashed rgba(230, 240, 236, 0.75);
+}
+
+.lib-crop-preview {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2cqmin;
+}
+
+.lib-crop-preview figcaption {
+  font-size: 2.2cqmin;
+  color: var(--ink-muted);
+  text-align: center;
+}
+
+.lib-crop-discs {
+  display: flex;
+  align-items: flex-end;
+  gap: 2.4cqmin;
+}
+
+.lib-crop-disc {
+  position: relative;
+  width: 24cqmin;
+  height: 24cqmin;
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background-color: var(--void);
+  background-repeat: no-repeat;
+  box-shadow: 0 0 0 0.3cqmin var(--signal), 0 0 2.4cqmin var(--signal-haze);
+}
+
+/* À la taille des listes (Mes amis) : ce que les amis verront le plus souvent. */
+.lib-crop-disc.small {
+  width: 5.4cqmin;
+  height: 5.4cqmin;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+@container (orientation: portrait) {
+  .lib-crop-disc {
+    width: 16cqmin;
+    height: 16cqmin;
+  }
+}

@@ -40,7 +40,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { addEvent, addToHistory, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, type LiveGame, type SocialState, type TableEntry } from '@cyberpinball/core';
+import { addEvent, addToHistory, readAvatarImage, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, type LiveGame, type SocialState, type TableEntry } from '@cyberpinball/core';
 import { createFriendContent, type FriendContent } from './friend-content';
 import { createLiveGames, createTableVersions, type LiveGames } from './live-game';
 import { createSocialNet, type SocialNet } from './social-net';
@@ -166,15 +166,33 @@ function seedHistory(dataDir: string, me: string, emile: string, now: Date): voi
   saveHistory(path.join(dataDir, 'amis', 'parties.json'), history);
 }
 
-async function bot(dataDir: string, name: string, lan: boolean, bootstrap: { host: string; port: number }[], extra: Partial<SocialState> = {}): Promise<SocialNet> {
+async function bot(dataDir: string, name: string, lan: boolean, bootstrap: { host: string; port: number }[], extra: Partial<SocialState> = {}, avatar?: [number, number, number]): Promise<SocialNet> {
   const dir = path.join(dataDir, 'reseau-simule', name);
   fs.mkdirSync(dir, { recursive: true });
   // Une borne fictive déjà venue (démarrage suivant de la démonstration) garde sa clé et ses amis.
   if (fs.existsSync(socialFile(dir))) saveSocial(dir, { ...loadSocial(dir), lan, ...extra });
   else saveSocial(dir, { ...setName(newSocialState(), name)!, lan, ...extra });
   const net = createSocialNet({ dataDir: dir, mode: 'simulated', host: '127.0.0.1', bootstrap });
+  // Son avatar (avatar.ts) : une silhouette dessinée, jamais une vraie photo (les captures sont publiques).
+  if (avatar) net.setAvatar(readAvatarImage(avatarPicture(avatar)));
   await net.start();
   return net;
+}
+
+/** Avatar inventé d'une borne fictive : une silhouette claire (tête et épaules) sur un dégradé de sa teinte. */
+function avatarPicture(hue: [number, number, number]): Buffer {
+  const size = 128;
+  const data = Buffer.alloc(size * size * 4);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const k = 0.3 + (0.5 * (x + y)) / (2 * size);
+      const head = (x - 64) ** 2 + (y - 50) ** 2 < 22 ** 2;
+      const shoulders = ((x - 64) / 46) ** 2 + ((y - 128) / 46) ** 2 < 1;
+      const light = head || shoulders ? 1.9 : 1;
+      data.set([Math.min(255, Math.round(hue[0] * k * light)), Math.min(255, Math.round(hue[1] * k * light)), Math.min(255, Math.round(hue[2] * k * light)), 255], (y * size + x) * 4);
+    }
+  }
+  return encodePng({ width: size, height: size, data });
 }
 
 /** Image unie en dégradé, de la taille d'un média de ce format. */
@@ -238,8 +256,9 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
   // Retour de Bruno : sa borne n'est pas encore là au démarrage, elle arrive quelques secondes après.
   if (mode === 'retour') await new Promise((r) => setTimeout(r, RETURN_AFTER_MS));
   if (mode === 'retour') log('Réseau simulé : Bruno revient.'); // i18n-ignore : journal
-  const bruno = await bot(dataDir, 'Bruno', false, bootstrap, { shareLibrary: true });
-  const chloe = await bot(dataDir, 'Chloé', false, bootstrap); // i18n-ignore : nom d'un joueur fictif
+  const bruno = await bot(dataDir, 'Bruno', false, bootstrap, { shareLibrary: true }, [70, 150, 200]);
+  const chloe = await bot(dataDir, 'Chloé', false, bootstrap, {}, [200, 110, 150]); // i18n-ignore : nom d'un joueur fictif
+
   const dora = await bot(dataDir, 'Dora', true, bootstrap);
   const brunoDir = path.join(dataDir, 'reseau-simule', 'Bruno');
   // Sa bibliothèque se fait à l'amitié : les tables de la borne sont lues d'ici là.

@@ -14,6 +14,8 @@ import {
   arcadeHoursClock,
   badgeLabel,
   downloadReasonText,
+  avatarsDir,
+  avatarView,
   powerSimulated,
   powerTexts,
   powerUnavailable,
@@ -205,7 +207,8 @@ import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './
 import { hideTaskbars, isVeil, nameScreen, relaunchCovered, restoreTaskbars, setDesktopMode, settleScreens, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
 import { forcedRotation, menuRotation, openSettings } from './settings';
-import { serveMedias } from './media-protocol';
+import { allowPreview, serveMedias } from './media-protocol';
+import { createAvatarMenu } from './avatar-menu';
 import { createMenuSettings } from './menu-settings';
 import { createIntroMenu } from './intro-menu';
 import { createLanguageMenu } from './language-menu';
@@ -538,6 +541,9 @@ let downloadsShown: string | undefined;
 const library = createLibrary({
   root: loc.root,
   dataDir: loc.dataDir,
+  // Essais : le Bureau du sélecteur de fichiers est un dossier du bac à sable (CYBERPINBALL_BUREAU),
+  // jamais celui du poste, dont les noms de fichiers finiraient dans les captures.
+  ...(process.env.CYBERPINBALL_BUREAU ? { desktopDir: () => process.env.CYBERPINBALL_BUREAU! } : {}),
   vpxExe: () => vpxInstall(loc)?.exe,
   tables: () => tables,
   reload: (file) => reloadTables(file),
@@ -1105,8 +1111,44 @@ const gameNotices = createGameNotices({
   // Hors écran, la pile des fenêtres est celle du vrai bureau : rien à y chercher.
   coveredBy: (win) => (OFFSCREEN ? undefined : describeCover(win)),
   invites: () => liveGames.invites(),
+  avatar: (key, name) => avatarView(key, name, socialNet.avatarFile(key)),
   captureDir: process.env.CYBERPINBALL_CAPTURE,
   log: (line) => console.log(line),
+});
+// Mon avatar (avatar-menu.ts) : une image à soi, recadrée aux boutons, que les amis voient partout.
+const avatarMenu = createAvatarMenu({
+  library,
+  net: socialNet,
+  convert: () => (converter ??= createConverter()),
+  allowPreview,
+  dataDir: loc.dataDir,
+  browse: (url, received) => {
+    library.catalog.acquirer.show({
+      url,
+      game: t('Mon avatar'),
+      expected: t('Une image : photo, dessin, logo'),
+      host: t('Recherche libre · image que vous choisissez'),
+      status: t('Clic droit sur une image : « Télécharger cette image ». Elle revient à « Mon avatar » pour le recadrage. Fermer (Échap) garde la page.'),
+      search: { query: t('avatar flipper'), engine: 'images' },
+      claim: {
+        dir: path.join(avatarsDir(loc.dataDir), 'recadrage', 'recu'),
+        title: t('Mon avatar'),
+        done: (r) => {
+          if ('error' in r) return;
+          // L'image est là : le navigateur se ferme, le recadrage s'ouvre dans le menu.
+          library.catalog.acquirer.close();
+          received(r.file);
+        },
+      },
+    });
+    return undefined;
+  },
+});
+library.provideSystemItem('avatar', {
+  get detail() {
+    return avatarMenu.detail();
+  },
+  run: () => avatarMenu.open(() => library.openSystem()),
 });
 const friendsMenu = createFriendsMenu({
   library: {
@@ -1114,6 +1156,7 @@ const friendsMenu = createFriendsMenu({
     catalogFor: (identity) => (identity.vpsId ? library.catalog.openGame(identity.vpsId) : library.catalog.openSearch(identity.title)),
   },
   net: socialNet,
+  avatarMenu,
   firewall: socialFirewall,
   content: friendContent,
   downloads: library.downloads,
@@ -1415,7 +1458,9 @@ export function startFrontend(): void {
     log: (line) => console.log(line),
   });
   medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, onChange: () => broadcast() });
-  serveMedias(() => medias!.allowedDirs(tables));
+  // Les avatars des joueurs (avatar.ts) se lisent aussi par le protocole des médias.
+  serveMedias(() => [...medias!.allowedDirs(tables), avatarsDir(loc.dataDir)]);
+
   // Média ajouté, remplacé ou supprimé, table ajoutée, renommée ou supprimée, par
   // n'importe quel chemin (Cyber Pinball ou à la main) : relu et renvoyé aux fenêtres.
   if (loc.root) {
