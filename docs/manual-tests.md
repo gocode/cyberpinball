@@ -1590,6 +1590,19 @@ The same cabinet and phone as tests 806 to 815, Cyber Pinball on the table menu.
 | 832 | Game and browser | Start a game; then, on return, open "Récupérer" (Get) and close it. | During the game, "Partie en cours" (Game in progress), Keyboard and Send greyed out ("Après la partie", After the game); on return, the buttons; "Récupérer" open: the touchpad; closed: the buttons, without a new acceptance. |
 | 833 | End of the link | Leave the phone 20 minutes without a gesture in the menu; then reconnect and quit Cyber Pinball. | "Télécommande déconnectée" (Remote disconnected) after 20 minutes; "Cyber Pinball fermé" (Cyber Pinball closed) on closing; afterwards, nothing answers at the QR's address. |
 
+## DMD on the wheel
+
+A cabinet with a 16:9 FullDMD (DMD screen), "DMD du menu" (Menu DMD) on "vivant" (live), at the table menu. Two tables: one whose FullDMD media has a drawn DMD frame, the other whose FullDMD media has none.
+
+| # | Scenario | How | Expected result |
+|---|---|---|---|
+| 850 | Open the setting | On the framed table, Start, "Gérer la table…" (Manage the table…), then "DMD sur la roue" (DMD on the wheel). | The settings screen on the playfield; on the DMD screen, the table, its dots in the frame, a dashed green frame and its caption (size and position in pixels). "Revenir à la place automatique" (Back to the automatic position) greyed out, with its reason. |
+| 851 | Move and resize | "Taille" (Size), left flipper held; Start; "Position verticale" (Vertical position), left flipper held, then right MagnaSave twice; Start. | The dots shrink without distortion (4:1), then move up, live, faster and faster with the flipper held; the right MagnaSave moves them down one pixel; the caption follows. |
+| 852 | Save and go back to the wheel | "Enregistrer pour cette table" (Save for this table), Exit three times. | "Enregistré pour cette table" (Saved for this table); on the wheel, the dots where set, the FullDMD media around them, no more dashed frame. On another table then back: the position stays. |
+| 853 | Hide on a table without a frame | On the table without a frame (the 4:1 strip on black), Start, "Gérer la table…", "DMD sur la roue", "DMD sur la roue" (hidden), "Enregistrer pour cette table", back to the wheel. | The position lines greyed out ("DMD masqué : affichez-le d'abord", DMD hidden: show it first); on the wheel, the FullDMD media alone, no dots; the table's page says "Masqué pour cette table" (Hidden for this table). |
+| 854 | Leave without saving | Open "DMD sur la roue" again, move the dots, Exit. | The question: "Enregistrer pour cette table", "Abandonner les changements" (Discard the changes), "Continuer le réglage" (Keep adjusting); "Abandonner" brings back the saved position. |
+| 855 | The game keeps its own setting | Start the framed table; both MagnaSaves, "Position du DMD" (DMD position); back to the menu; then "Revenir à la place automatique" in "DMD sur la roue". | In game, the DMD is at the game's position, not the wheel's; the wheel's position does not move after the game; "Revenir à la place automatique" puts the dots back in the frame, without touching the game's setting. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

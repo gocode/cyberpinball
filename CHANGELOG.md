@@ -29,6 +29,7 @@ son interface).
 - Fiche d'une table resserrée : « Jouer », « Jouer avec un ami » et « Prospectus et règles » en tête, tout le reste sous « Gérer la table… », qui signale dès la fiche ce qui est à vérifier. Le prospectus et les règles forment un seul livret, tourné aux flippers.
 - Le bouton de retour en tête de chaque écran dit où il mène (« ‹ Neon Abyss », « ‹ Gérer la table », « ‹ Menu des tables ») ; dans une liste, il montre « Exit : actions ».
 - Au bureau, une table qui tarde à charger le dit : passé 8 s, l'encart du chargement donne l'étape réellement vue (VPX lancé, puis ses fenêtres ouvertes), le temps écoulé, et Exit ou Ctrl+Maj+K pour arrêter ; la roue revient, sans partie comptée. Sur la borne, le média de chargement reste seul.
+- DMD sur la roue, table par table : fiche > « Gérer la table… » > « DMD sur la roue ». Affichez ou masquez les points du DMD du menu pour cette table (masqué, l'écran du FullDMD montre son média seul), et placez-les où vous voulez sur l'écran du DMD, aux boutons de la borne, en voyant le résultat en direct. Le DMD en partie garde son propre réglage (les deux MagnaSave pendant la partie).
 
 ## 0.1.7
 

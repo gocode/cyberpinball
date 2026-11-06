@@ -2108,6 +2108,50 @@ html.annex .zone {
   position: absolute;
 }
 
+/* « DMD sur la roue » : cadre du réglage autour des points, légende au-dessus (dessous s'il touche le haut). */
+.live-dmd-edit {
+  position: absolute;
+  z-index: 3;
+  box-sizing: border-box;
+  border: 2px dashed var(--signal, #8be23a);
+  pointer-events: none;
+  /* Le grand côté de l'écran du DMD (1 920 px de référence) : lisible aussi sur une bande 4:1. */
+  --u: calc(100vmax / 1920);
+}
+
+.live-dmd-edit[hidden] {
+  display: none;
+}
+
+.live-dmd-edit.masque {
+  border-color: rgba(255, 255, 255, 0.55);
+}
+
+.live-dmd-edit-label {
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  transform: translateY(-100%);
+  padding: 2px 8px;
+  font-family: var(--font-ui, sans-serif);
+  font-size: calc(24 * var(--u));
+  font-weight: 600;
+  line-height: 1.3;
+  color: #000;
+  background: var(--signal, #8be23a);
+  white-space: nowrap;
+}
+
+.live-dmd-edit.dessous .live-dmd-edit-label {
+  top: auto;
+  bottom: -2px;
+  transform: translateY(100%);
+}
+
+.live-dmd-edit.masque .live-dmd-edit-label {
+  background: rgba(255, 255, 255, 0.85);
+}
+
 /* Le fond du playfield (et son cadre 9:16 au bureau) n'existe que sur l'écran du playfield (layout-check.ts). */
 html.annex #media-bg {
   display: none;

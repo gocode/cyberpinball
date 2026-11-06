@@ -51,6 +51,7 @@ export * from './sandbox';
 export * from './zones';
 export * from './dmdscreen';
 export * from './dmdplace';
+export * from './menudmd';
 export * from './screencover';
 export * from './taskbarguard';
 export * from './shortcuts';

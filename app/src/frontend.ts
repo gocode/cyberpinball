@@ -209,6 +209,7 @@ import { installVpx, vpxArchivePresent } from './install-vpx';
 import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
 import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
+import { createMenuDmd } from './menu-dmd';
 import { cachedScript } from './vbs';
 import { mediaFrame, prepareDressing } from './fulldmd';
 import { LiveDmd, type LiveDmdAnimationHandle } from './live-dmd';
@@ -794,6 +795,7 @@ const library = createLibrary({
   tableSettings: (table) => openVpxSettings(table),
   playWithFriend: (table, back) => friendsMenu.live.sheetAction(table, back),
   // « Ajouter aux favoris » sur la fiche : User.Favorite du .info (celui de la table, sinon celui du dossier).
+  menuDmd: { detail: (table) => menuDmd.detail(table), open: (table, back) => menuDmd.open(table, back) },
   favorite: (table, on) => {
     if (!loc.root) return;
     setFavorite(infoFileFor(table, layoutOf(loc.root).tables), on);
@@ -1455,6 +1457,25 @@ const liveGames = createLiveGames({
 });
 // Volume −, Volume + et Muet : le son de Windows, au menu comme en partie (cabinet-volume.ts).
 let cabinetVolume: CabinetVolume | undefined;
+// Fiche > « DMD sur la roue » : le DMD du menu affiché ou masqué pour chaque table, et sa place (menu-dmd.ts).
+const menuDmd = createMenuDmd({
+  dataDir: loc.dataDir,
+  configuration: () => menuConfiguration,
+  auto: (table) => autoDmdPlace(table),
+  unseen: () =>
+    mediaSettings.dmd !== 'live'
+      ? t('« DMD du menu » est réglé sur « classique » : la roue montre le média DMD de la table, sans points (Menu système > Médias > « Médias, son et attente »).')
+      : undefined,
+  keys: () => {
+    const magna = zoneSwitchKeys({ buttons, navigation });
+    const b = buttonKeys(buttons);
+    const only = (code: string | undefined) => (code && magna.includes(code) ? [code] : []);
+    return { previous: KEYS.previous, next: KEYS.next, confirm: KEYS.confirm, exit: KEYS.exit, up: only(b.leftMagna), down: only(b.rightMagna) };
+  },
+  library: { openCustom: (build, at, table) => library.openCustom(build, at, table), openSheet: (table, flash) => library.openSheet(table, flash) },
+  broadcast: () => broadcast(),
+  log: (line) => console.log(line),
+});
 // Les deux MagnaSave pendant la partie : position du DMD, puis le menu de VPX (in-game-menu.ts).
 const inGameMenu = createInGameMenu({ log: (line) => console.log(line), allowed: () => guest.allows('game.settings') });
 // Invitation reçue pendant la partie : carte discrète dans le coin du plateau (game-notice.ts).
@@ -1811,6 +1832,7 @@ export function startFrontend(): void {
   // Configuration à choisir : le menu s'ouvre droit sur l'écran principal, avec les boutons de la dernière utilisée.
   const cabinet = loadCabinet(loc.dataDir);
   menuDmdKind = cabinet && !choose ? dmdKindOf(cabinet) : undefined;
+  menuConfiguration = cabinet && !choose ? cabinet.id : undefined;
   // Rotation d'après l'écran du playfield tel que Windows le décrit maintenant : une
   // orientation changée hors de l'assistant fait aussi tourner le menu.
   rotation = menuRotation(choose ? undefined : cabinet, choose ? undefined : assignments.playfield);
@@ -3699,6 +3721,8 @@ const recordsCache = new Map<string, { stamp: string; records?: TableRecords }>(
 const dmdFrames = new Map<string, FrameRecord | undefined>();
 /** Écran du DMD de la borne : FullDMD ou DMD seul (dmdKindOf), lu au démarrage du menu. */
 let menuDmdKind: DmdKind | undefined;
+/** Configuration de la borne branchée (DMD sur la roue : réglages par configuration puis par table). */
+let menuConfiguration: string | undefined;
 
 /**
  * Joue une animation sur le DMD du menu (« chargement »…), par-dessus l'alternance ; sans
@@ -3754,22 +3778,47 @@ function knownDmdFrame(url: string): FrameRecord | undefined {
 }
 
 /**
- * Place des points dans la zone du DMD de cette fenêtre : dans le cadre du média FullDMD (le
- * média se voit autour, framed), sinon la bande 4:1 centrée sur du noir. undefined : DMD
- * classique, ou la fenêtre n'a pas le DMD.
+ * Place automatique des points pour une table (liveDmdArea) : dans le cadre du média FullDMD
+ * (framed : le média se voit autour), sinon la bande 4:1 centrée. undefined : pas d'écran du DMD.
  */
-function liveDmdView(role: RoleId): { area: ReturnType<typeof liveDmdArea>; framed: boolean } | undefined {
+function autoDmdPlace(table: TableEntry | undefined): { zone: ReturnType<typeof liveDmdArea>; size: { width: number; height: number }; framed: boolean; media: boolean } | undefined {
+  const rect = roleRects.find((r) => r.role === 'dmd')?.rect;
+  if (!rect && !dmdWindow()) return undefined;
+  const size = rect ? { width: rect.width, height: rect.height } : { width: 16, height: 9 };
+  const view = table && medias ? medias.roleMedia(table, 'dmd') : undefined;
+  const fullDmd = menuDmdKind === 'fulldmd' && (view?.found ?? view?.type) === 'FullDMD';
+  const record = fullDmd && view?.url ? knownDmdFrame(view.url) : undefined;
+  const framed = Boolean(record?.frame);
+  return { zone: liveDmdArea(framed ? record : undefined, size), size, framed, media: fullDmd && Boolean(view?.url) };
+}
+
+/**
+ * Place des points dans la zone du DMD de cette fenêtre : le réglage de la table pour la roue
+ * (menu-dmd.ts : place réglée, ou masqué), sinon la place automatique. framed : le média de la
+ * zone se voit autour des points (cadre trouvé, ou place réglée sur un média FullDMD). hidden : les
+ * points ne se dessinent pas, la zone montre son média seul. editing : réglage en cours, un cadre
+ * et sa légende autour des points. undefined : DMD classique, ou la fenêtre n'a pas le DMD.
+ */
+function liveDmdView(role: RoleId): { area: ReturnType<typeof liveDmdArea>; framed: boolean; hidden?: boolean; editing?: string } | undefined {
   if (!liveDmdOn() || !(windowRoles.get(role) ?? [role]).includes('dmd')) return undefined;
   const table = screensSubject();
   // FullDMD sans table : la marque sur toute la grille de 160 × 90 du repli (fallback.js, fullDmd),
   // pas une bande 4:1 entre deux aplats noirs (revue du directeur artistique, 27/10/2026).
   if (!table && menuDmdKind === 'fulldmd' && state.phase !== 'loading') return undefined;
-  const view = table && medias ? medias.roleMedia(table, 'dmd') : undefined;
-  const fullDmd = menuDmdKind === 'fulldmd' && (view?.found ?? view?.type) === 'FullDMD';
-  const record = fullDmd && view?.url ? knownDmdFrame(view.url) : undefined;
-  const rect = roleRects.find((r) => r.role === 'dmd')?.rect;
-  const framed = Boolean(record?.frame);
-  return { area: liveDmdArea(framed ? record : undefined, rect ?? { width: 16, height: 9 }), framed };
+  const auto = autoDmdPlace(table)!;
+  // Chargement : l'animation du lancement se montre toujours, à la place automatique.
+  if (!table || state.phase === 'loading') return { area: auto.zone, framed: auto.framed };
+  const spot = menuDmd.spot(table, auto.zone, state.phase === 'library');
+  const { aspect: _aspect, ...area } = spot.zone;
+  // Points déplacés hors de la place automatique, sur un média FullDMD : le média se voit autour
+  // (pendant le réglage aussi : l'aperçu est ce que la roue montrera une fois enregistré).
+  const moved = (['x', 'y', 'width', 'height'] as const).some((k) => Math.abs(spot.zone[k] - auto.zone[k]) > 1e-6);
+  return {
+    area,
+    framed: auto.framed || (moved && auto.media),
+    ...(spot.hidden && { hidden: true }),
+    ...(spot.editing && { editing: spot.editing }),
+  };
 }
 
 /** Programme du DMD vivant d'après l'état du menu : la table montrée, le chargement, la partie. */

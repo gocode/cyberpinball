@@ -47,4 +47,30 @@ export const messages: Record<string, string> = {
     'VPX didn’t open a window for the DMD in this game (DMD off or embedded in the playfield): the chosen position will show in the next game.',
   'Aucune touche du clavier n’ouvre le menu de VPX : un bouton de la borne a pris F12.': 'No keyboard key opens the VPX menu: a cabinet button took F12.',
   'Enregistré pour cette table dans la configuration « {name} » : elle s’ouvrira ainsi à chaque partie.': 'Saved for this table in the “{name}” configuration: it will open like this in every game.',
+
+  // packages/core/src/menudmd.ts, app/src/menu-dmd.ts (DMD sur la roue, fiche de la table)
+  'DMD sur la roue': 'DMD on the wheel',
+  'Revenir à la place automatique': 'Back to the automatic position',
+  'Cette table reprend la place automatique du DMD sur la roue.': 'This table is back to the automatic DMD position on the wheel.',
+  'Cette table suit déjà la place automatique.': 'This table already follows the automatic position.',
+  'DMD masqué : affichez-le d’abord (ligne « DMD sur la roue »).': 'DMD hidden: show it first (“DMD on the wheel” line).',
+  'DMD masqué sur la roue': 'DMD hidden on the wheel',
+  'Enregistré pour cette table : la roue le montre dès maintenant.': 'Saved for this table: the wheel shows it right away.',
+  'Rien à garder : c’est la place automatique, la table la suit.': 'Nothing to keep: this is the automatic position, the table follows it.',
+  'Cette configuration de la borne n’a pas d’écran du DMD.': 'This cabinet configuration has no DMD screen.',
+  'Réglé pour cette table': 'Set for this table',
+  'Place automatique': 'Automatic position',
+  'Ce réglage ne vaut que pour la roue ; le DMD en partie se règle pendant la partie (les deux MagnaSave).': 'This setting is for the wheel only; the in-game DMD is set during the game (both MagnaSave buttons).',
+  'Dans le cadre de DMD dessiné sur le média FullDMD de la table.': 'Inside the DMD frame drawn on the table’s FullDMD media.',
+  'Bande 4:1 centrée sur l’écran du DMD.': '4:1 strip centred on the DMD screen.',
+  'Ne se voit pas maintenant': 'Not visible right now',
+  'La place du DMD sur la roue a changé sans être enregistrée.': 'The DMD position on the wheel changed without being saved.',
+  '{previous} / {next} : changer de format · {confirm} : valider · {exit} : annuler': '{previous} / {next}: change format · {confirm}: confirm · {exit}: cancel',
+  'Ce que la roue montre sur l’écran du DMD pour cette table : les points affichés ou non, et leur place. L’écran du DMD le montre en direct.':
+    'What the wheel shows on the DMD screen for this table: dots shown or not, and where. The DMD screen shows it live.',
+  'Place automatique, affiché · le DMD en partie se règle à part': 'Automatic position, shown · the in-game DMD is set separately',
+  'Masqué pour cette table': 'Hidden for this table',
+  'Place réglée pour cette table': 'Position set for this table',
+  '« DMD du menu » est réglé sur « classique » : la roue montre le média DMD de la table, sans points (Menu système > Médias > « Médias, son et attente »).':
+    '“Menu DMD” is set to “classic”: the wheel shows the table’s DMD media, without dots (System menu > Media > “Media, sound and attract mode”).',
 };

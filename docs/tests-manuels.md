@@ -1589,6 +1589,19 @@ La même borne et le même téléphone que les tests 806 à 815, Cyber Pinball a
 | 832 | Partie et navigateur | Lancer une partie ; puis, au retour, ouvrir « Récupérer » et le fermer. | Pendant la partie, « Partie en cours », Clavier et Envoyer grisés (« Après la partie ») ; au retour, les boutons ; « Récupérer » ouvert : le pavé tactile ; fermé : les boutons, sans nouvelle acceptation. |
 | 833 | Fin de la liaison | Laisser le téléphone 20 minutes sans geste au menu ; puis reconnecter et quitter Cyber Pinball. | « Télécommande déconnectée » après 20 minutes ; « Cyber Pinball fermé » à la fermeture ; ensuite, plus rien ne répond à l'adresse du QR. |
 
+## DMD sur la roue
+
+Une borne au FullDMD 16:9 (écran du DMD), « DMD du menu » sur « vivant », au menu des tables. Deux tables : l'une dont le média FullDMD a un cadre de DMD dessiné, l'autre dont le média FullDMD n'en a pas.
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 850 | Ouvrir le réglage | Sur la table au cadre, Start, « Gérer la table… », puis « DMD sur la roue ». | L'écran de réglage sur le plateau ; sur l'écran du DMD, la table, ses points dans le cadre, un cadre pointillé vert et sa légende (taille et position en pixels). « Revenir à la place automatique » grisé, avec sa raison. |
+| 851 | Déplacer et redimensionner | « Taille », flipper gauche maintenu ; Start ; « Position verticale », flipper gauche maintenu, puis MagnaSave droit deux fois ; Start. | Les points rétrécissent sans se déformer (4:1), puis montent, en direct, de plus en plus vite flipper tenu ; MagnaSave droit les descend d'un pixel ; la légende suit. |
+| 852 | Enregistrer et revenir à la roue | « Enregistrer pour cette table », Exit trois fois. | « Enregistré pour cette table » ; sur la roue, les points à la place réglée, le média FullDMD autour, plus de cadre pointillé. Sur une autre table puis de retour : la place réglée reste. |
+| 853 | Masquer sur une table sans cadre | Sur la table sans cadre (la bande 4:1 sur du noir), Start, « Gérer la table… », « DMD sur la roue », « DMD sur la roue » (masqué), « Enregistrer pour cette table », retour à la roue. | Les lignes de place grisées (« DMD masqué : affichez-le d'abord ») ; sur la roue, le média FullDMD seul, sans points ; la fiche dit « Masqué pour cette table ». |
+| 854 | Quitter sans enregistrer | Rouvrir « DMD sur la roue », déplacer les points, Exit. | La question : « Enregistrer pour cette table », « Abandonner les changements », « Continuer le réglage » ; « Abandonner » rend la place enregistrée. |
+| 855 | La partie garde son réglage | Lancer la table au cadre ; les deux MagnaSave, « Position du DMD » ; revenir au menu ; puis « Revenir à la place automatique » dans « DMD sur la roue ». | En partie, le DMD est à la place de la partie, pas à celle de la roue ; la place de la roue ne bouge pas après la partie ; « Revenir à la place automatique » remet les points dans le cadre, sans toucher au réglage de la partie. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

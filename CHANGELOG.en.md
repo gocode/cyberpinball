@@ -27,6 +27,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Tighter game page: "Play", "Play with a friend" and "Flyer and rules" at the top, everything else under "Manage the table…", which shows from the game page what needs checking. The flyer and the rules form a single booklet, turned with the flippers.
 - The back button at the top of every screen says where it leads ("‹ Neon Abyss", "‹ Manage the table", "‹ Table menu"); in a list, it shows "Exit: actions".
 - On a desk PC, a table slow to load says so: after 8 s, the loading panel gives the step actually seen (VPX running, then its windows open), the elapsed time, and Exit or Ctrl+Shift+K to stop; the wheel comes back, with no game counted. On the cabinet, the loading media stays alone.
+- DMD on the wheel, table by table: the table's page > "Gérer la table…" (Manage the table…) > "DMD sur la roue" (DMD on the wheel). Show or hide the menu DMD's dots for this table (hidden, the FullDMD screen shows its media alone), and place them wherever you like on the DMD screen, with the cabinet buttons, watching the result live. The in-game DMD keeps its own setting (both MagnaSaves during the game).
 
 ## 0.1.7
 

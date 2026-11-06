@@ -1070,8 +1070,10 @@ const zones = parts.map((p) => {
  * DMD du menu vivant (app/src/live-dmd.ts) : le processus principal envoie chaque image
  * changée de l'afficheur (128 × 32 nuances), ou « le média » quand c'est au tour du média DMD
  * de la table. L'afficheur se pose sur la zone du DMD, à la place dite par l'état (liveDmd :
- * dans le cadre du média FullDMD, ou la bande 4:1 sur du noir). Sans liveDmd (DMD classique,
- * partie en cours), il disparaît et la zone montre son média comme avant.
+ * celle réglée pour la table sur la roue, sinon dans le cadre du média FullDMD, ou la bande 4:1
+ * sur du noir). liveDmd.hidden : DMD masqué pour cette table, la zone montre son média seul.
+ * liveDmd.editing : « DMD sur la roue » ouvert, un cadre et sa légende autour des points. Sans
+ * liveDmd (DMD classique, partie en cours), il disparaît et la zone montre son média comme avant.
  */
 const dmdZone = zones.find((z) => z.role === 'dmd');
 let liveDmd;
@@ -1081,7 +1083,13 @@ let lastDmdShot;
 function dropLiveDmd() {
   liveDmd?.matrix.destroy();
   liveDmd?.holder.remove();
+  liveDmd?.edit.remove();
   liveDmd = undefined;
+}
+
+/** Les points se cachent : DMD masqué pour la table, ou c'est au tour du média. */
+function dmdDotsHidden() {
+  return Boolean(liveDmd?.hidden || lastDmdShot?.media);
 }
 
 /** La vidéo de la zone ne joue que si elle se voit : pas sous l'afficheur posé sur du noir. */
@@ -1095,20 +1103,33 @@ function syncLiveDmd(spec) {
     const holder = el('div', 'live-dmd');
     const box = el('div', 'live-dmd-dots');
     holder.append(box);
-    dmdZone.node.append(holder);
-    liveDmd = { holder, box, matrix: CyberFallback.dotMatrix(box, {}) };
-    if (lastDmdShot) showDmdShot(lastDmdShot);
+    // Cadre du réglage « DMD sur la roue » : par-dessus le média, même quand les points sont cachés.
+    const edit = el('div', 'live-dmd-edit');
+    edit.append(el('div', 'live-dmd-edit-label'));
+    edit.hidden = true;
+    dmdZone.node.append(holder, edit);
+    liveDmd = { holder, box, edit, matrix: CyberFallback.dotMatrix(box, {}) };
   }
   liveDmd.framed = spec.framed;
+  liveDmd.hidden = Boolean(spec.hidden);
   liveDmd.holder.classList.toggle('framed', spec.framed);
   const a = spec.area;
-  Object.assign(liveDmd.box.style, { left: `${a.x * 100}%`, top: `${a.y * 100}%`, width: `${a.width * 100}%`, height: `${a.height * 100}%` });
+  const place = { left: `${a.x * 100}%`, top: `${a.y * 100}%`, width: `${a.width * 100}%`, height: `${a.height * 100}%` };
+  Object.assign(liveDmd.box.style, place);
+  Object.assign(liveDmd.edit.style, place);
+  liveDmd.edit.hidden = !spec.editing;
+  liveDmd.edit.classList.toggle('masque', Boolean(spec.hidden));
+  liveDmd.edit.classList.toggle('dessous', a.y < 0.15);
+  liveDmd.edit.firstChild.textContent = spec.editing ?? '';
+  liveDmd.holder.hidden = dmdDotsHidden();
+  if (lastDmdShot) showDmdShot(lastDmdShot);
+  else dmdZone.layer.setActive(dmdMediaActive());
 }
 
 function showDmdShot(shot) {
   lastDmdShot = shot;
   if (!liveDmd) return;
-  liveDmd.holder.hidden = Boolean(shot.media);
+  liveDmd.holder.hidden = dmdDotsHidden();
   if (!shot.media && shot.dots) liveDmd.matrix.show(shot.dots);
   dmdZone.layer.setActive(dmdMediaActive());
 }
@@ -1539,7 +1560,7 @@ window.cyberEtat = () => ({
     return img ? decodeURIComponent(img.getAttribute('src')).replace(/^.*[\\/]/, '') : `titre : ${n.querySelector('.wheel-name')?.textContent ?? n.textContent}`; // i18n-ignore : relevé des essais
   }),
   // DMD du menu vivant : affiché ou non (page du média), dans le cadre du FullDMD ou sur du noir, points allumés.
-  dmd: liveDmd && { visible: !liveDmd.holder.hidden, cadre: Boolean(liveDmd.framed), points: lastDmdShot?.dots ? lastDmdShot.dots.filter((v) => v > 0).length : 0 },
+  dmd: liveDmd && { visible: !liveDmd.holder.hidden, masque: Boolean(liveDmd.hidden), reglage: !liveDmd.edit.hidden, cadre: Boolean(liveDmd.framed), points: lastDmdShot?.dots ? lastDmdShot.dots.filter((v) => v > 0).length : 0 },
   // Ouverture : son numéro, si elle est partie, chaque animation de Cyber Pinball montée (instant, au bout) et l'invite.
   ouverture: lastState?.intro && { id: lastState.intro.id, partie: lastState.intro.startedAt !== undefined, scenes: window.CyberIntro?.scenes() ?? [], invite: Boolean(root.querySelector('.intro-hint')) },
   // Lancement en cinéma : les scènes posées (départ, arrivée), le logo ou le médaillon, et si elles s'effacent.

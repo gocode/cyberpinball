@@ -266,6 +266,8 @@ export interface LibraryHost {
   playWithFriend?(table: TableEntry, back: () => void): Action;
   /** « Ajouter aux favoris » / « Retirer des favoris » (collections.ts : User.Favorite du .info). */
   favorite?(table: TableEntry, on: boolean): void;
+  /** « DMD sur la roue » (menu-dmd.ts) : le DMD du menu affiché ou masqué pour cette table, et sa place ; `back` : l'écran d'où on l'a ouvert. */
+  menuDmd?: { detail(table: TableEntry): string; open(table: TableEntry, back: () => void): void };
   /**
    * Partie de réglage de l'affichage (« Régler l'affichage en partie ») : VPX démarre la table
    * menu ouvert sur le cadrage, sans statistiques ; undefined si elle n'a pas démarré pour une
@@ -488,6 +490,11 @@ export interface Built {
    * sinon rien n'indique qu'on y coche (la ROM d'un ami, 01/11/2026).
    */
   listStart?: string;
+  /**
+   * Touches propres à l'écran, avant la navigation (DMD sur la roue : une ligne ouverte prend les
+   * flippers pour déplacer les points) ; true : la touche est prise, l'écran se redessine.
+   */
+  keys?: (input: Input) => boolean;
 }
 
 /** Ce que le rendu montre d'un recadrage (app/renderer/library.js, renderCrop). */
@@ -1914,6 +1921,9 @@ export function createLibrary(host: LibraryHost) {
       ...(host.adjustDisplay && host.vpxExe()
         ? [{ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }]
         : []),
+      ...(host.menuDmd
+        ? [{ label: t('DMD sur la roue'), detail: host.menuDmd.detail(table), icon: 'dmd' as const, door: 'sheet.menu-dmd' as const, run: () => host.menuDmd!.open(table, () => openSheet(table)) }]
+        : []),
       ...(host.playAndRecord && host.vpxExe()
         ? [{ label: t('Jouer et enregistrer'), detail: t('Filmer la partie pour la présentation de la table sur la roue'), icon: 'record' as const, door: 'sheet.record' as const, run: () => recording.setup(table) }]
         : []),
@@ -1932,7 +1942,7 @@ export function createLibrary(host: LibraryHost) {
         icon: 'toolbox',
         subheading: table.title,
         lead: s.flash,
-        // Onze actions : sur deux colonnes, au bureau comme en borne (library.css, .lib-manage).
+        // Douze actions : sur deux colonnes, au bureau comme en borne (library.css, .lib-manage).
         variant: 'manage',
         sections: [],
         actions: [...manage, { label: t('Retour à la fiche'), icon: 'back', door: 'sheet.back', run: up }],
@@ -3426,6 +3436,10 @@ export function createLibrary(host: LibraryHost) {
     }
     if (screen.kind === 'pages') return pagesKey(screen, input);
     const built = build();
+    if (built.keys?.(input)) {
+      host.broadcast();
+      return true;
+    }
     const n = built.actions.length;
     const ids = actionIds(built.actions);
     // Start valide l'élément que la dernière vue montrait sous le curseur, même si la liste a bougé.
@@ -3957,7 +3971,8 @@ export function createLibrary(host: LibraryHost) {
    * et « remove:chemin » (fichier posé ou retiré pendant que le menu tourne, comme à la main :
    * le guet des dossiers, mediawatch.ts, doit le faire voir sans redémarrer), « hold:code » et
    * « release:code » (bouton tenu puis relâché : combinaison de déverrouillage du mode invité ;
-   * une touche simple est appuyée puis relâchée).
+   * une touche simple est appuyée puis relâchée), « repeat:code:n » (bouton maintenu : n appuis,
+   * les suivants en répétition du clavier, qui accélèrent un réglage).
    * Le garde-fou de mise en page inspecte chaque écran, pas seulement le playfield.
    */
   async function autopilot(steps: string[], captureDir: string | undefined, pressKey: (input: Input) => void, phase: () => string): Promise<void> {
@@ -4002,6 +4017,12 @@ export function createLibrary(host: LibraryHost) {
         } else if (step.startsWith('remove:')) fs.rmSync(step.slice(7), { force: true });
         else if (step.startsWith('action:')) activateByLabel(step.slice(7));
         else if (step.startsWith('hold:')) send('keyDown', step.slice(5));
+        else if (step.startsWith('repeat:')) {
+          // Bouton maintenu (« repeat:ShiftLeft:25 ») : un appui, puis les répétitions du clavier, puis le relâchement.
+          const [code, count] = step.slice(7).split(':') as [string, string];
+          for (let n = 0; n < Math.max(1, Number(count) || 1); n++) pressKey({ type: 'keyDown', code, key: '', isAutoRepeat: n > 0, shift: false, control: false, alt: false, meta: false } as Input);
+          send('keyUp', code);
+        }
         else if (step.startsWith('release:')) send('keyUp', step.slice(8));
         else if (/^((Control|Shift|Alt)\+)+\w+$/.test(step)) {
           // Combinaison (« Control+Shift+KeyD ») : le raccourci tel que le clavier l'envoie.
