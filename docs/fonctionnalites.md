@@ -307,7 +307,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 ## Tout se fait aux boutons
 
 - **Flippers, Start et Exit** suffisent partout : choisir, valider, revenir. La roue dentée ⚙ et Tab ouvrent le menu système à la souris ou au clavier.
-- **Menu système en cinq rubriques** : Amis, Tables, Médias, puis Téléchargements, Borne et Cyber Pinball. Une pastille rouge remonte jusqu'à la roue dentée quand une entrée vous attend, et le menu s'ouvre sur elle.
+- **Menu système en cinq rubriques** : Amis, Tables, Médias, puis Téléchargements, Télécommande du téléphone, Borne et Cyber Pinball. Une pastille rouge remonte jusqu'à la roue dentée quand une entrée vous attend, et le menu s'ouvre sur elle.
 - **Longues listes** : Exit ramène aux actions de l'écran, MagnaSave passe de la liste aux actions en retrouvant sa place, un flipper tenu fait défiler de lettre en lettre.
 - **Textes longs** (nouveautés, messages) lus page par page aux flippers, avec la part déjà lue.
 - **Un retour qui dit où il mène** au-dessus du titre de chaque écran, cliquable : « ‹ Neon Abyss », « ‹ Téléchargements », « ‹ Menu des tables » ; dans une liste, « Exit : actions ».
@@ -355,7 +355,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 - **Un QR code dans le bandeau du navigateur intégré** : scannez-le avec votre téléphone, sur le même Wi-Fi que la borne. Rien à installer : la page vient de la borne.
 - **Un pavé tactile** pour le pointeur (toucher : un clic ; deux doigts : défiler ; appui long : clic droit), **le clavier du téléphone** dès qu'un champ de la page a le clavier (identifiant, mot de passe masqué, « Champ suivant », Entrée), Retour, Avancer, Fermer.
-- **Tout le menu, aussi** : Menu système > Borne > Télécommande du téléphone montre le QR en grand, le clavier à l'écran en montre un petit. Le téléphone tient alors **les boutons de la borne** (Start, flippers, Exit, MagnaSave ; un flipper tenu fait défiler vite), **tape à la place du clavier à l'écran** (recherche, nom d'un joueur, d'une configuration) et **envoie un fichier dans le dossier d'import** (jusqu'à 2 Go, la progression sur les deux écrans), qu'« Ajouter une table » propose ensuite.
+- **Tout le menu, aussi** : Menu système > Télécommande du téléphone montre le QR en grand, le clavier à l'écran en montre un petit. Le téléphone tient alors **les boutons de la borne** (Start, flippers, Exit, MagnaSave ; un flipper tenu fait défiler vite), **tape à la place du clavier à l'écran** (recherche, nom d'un joueur, d'une configuration) et **envoie un fichier dans le dossier d'import** (jusqu'à 2 Go, la progression sur les deux écrans), qu'« Ajouter une table » propose ensuite.
 - **Vous acceptez le téléphone à la borne** : le même code de quatre chiffres des deux côtés, Start pour accepter, Exit pour refuser. Un seul téléphone à la fois ; le QR change toutes les trois minutes et ne sert qu'une fois ; la liaison suit la borne du navigateur au menu et se coupe après 20 minutes sans geste au menu. Le mode invité s'applique aussi au téléphone, qui ne le déverrouille jamais.
 - **Chiffré, et sur le réseau local seulement** : personne sur le Wi-Fi ne lit ce que vous tapez. Cyber Pinball n'enregistre rien de ce que vous tapez : c'est vous qui vous connectez.
 

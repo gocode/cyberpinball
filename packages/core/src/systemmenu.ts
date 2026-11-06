@@ -78,18 +78,19 @@ export const SYSTEM_ROOT: readonly SystemGroupId[] = ['amis', 'tables', 'medias'
 /**
  * Entrées montrées aussi à la racine, parmi les rubriques : Activité récente, les notifications de
  * tout Cyber Pinball (amis, téléchargements, mises à jour), et Téléchargements, comme le
- * gestionnaire de téléchargements d'une console. Elles gardent leur place dans leur rubrique
- * (Cyber Pinball > Activité récente, Tables > Téléchargements).
+ * gestionnaire de téléchargements d'une console, et Télécommande du téléphone (06/11/2026 : rangée
+ * seulement dans Borne, on ne la trouvait pas). Elles gardent leur place dans leur rubrique
+ * (Cyber Pinball > Activité récente, Tables > Téléchargements, Borne > Télécommande du téléphone).
  */
-export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'downloads'];
+export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'downloads', 'phone-remote'];
 
 /**
  * La racine du menu système telle qu'elle s'affiche : Activité récente en tête (06/11/2026, revue
- * de Codex : elle couvre plusieurs rubriques), puis Amis, Tables, Médias, Téléchargements, Borne,
- * Cyber Pinball (ordre choisi le 29/10/2026). systemmenu.test.ts vérifie qu'elle reprend
+ * de Codex : elle couvre plusieurs rubriques), puis Amis, Tables, Médias, Téléchargements,
+ * Télécommande du téléphone, Borne, Cyber Pinball (ordre choisi le 29/10/2026). systemmenu.test.ts vérifie qu'elle reprend
  * SYSTEM_ROOT dans son ordre et chaque raccourci une fois.
  */
-export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['activity', 'amis', 'tables', 'medias', 'downloads', 'borne', 'cyberpinball'];
+export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['activity', 'amis', 'tables', 'medias', 'downloads', 'phone-remote', 'borne', 'cyberpinball'];
 
 export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   tables: {

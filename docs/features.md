@@ -306,7 +306,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 ## Everything from the buttons
 
 - **Flippers, Start and Exit** are enough everywhere: choose, confirm, go back. The gear ⚙ and Tab open the system menu with the mouse or the keyboard.
-- **A system menu in five sections**: Friends, Tables, Media, then Downloads, Cabinet and Cyber Pinball. A red dot climbs up to the gear when an entry is waiting for you, and the menu opens on it.
+- **A system menu in five sections**: Friends, Tables, Media, then Downloads, Phone remote, Cabinet and Cyber Pinball. A red dot climbs up to the gear when an entry is waiting for you, and the menu opens on it.
 - **Long lists**: Exit goes back to the screen's actions, MagnaSave switches between the list and the actions and keeps your place, a held flipper scrolls letter by letter.
 - **Long texts** (release notes, messages) read page by page with the flippers, with how much you have read.
 - **A back button that says where it leads**, above every screen's title, clickable: "‹ Neon Abyss", "‹ Downloads", "‹ Table menu"; in a list, "Exit: actions".
@@ -354,7 +354,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 - **A QR code in the built-in browser's banner**: scan it with your phone, on the same Wi-Fi as the cabinet. Nothing to install: the page comes from the cabinet.
 - **A touchpad** for the pointer (tap: a click; two fingers: scroll; long press: right-click), **the phone's keyboard** as soon as a field of the page has the keyboard focus (username, hidden password, "Champ suivant" (Next field), Enter), Back, Forward, Close.
-- **The whole menu, too**: System menu > Cabinet > Phone remote shows the QR in large, the on-screen keyboard shows a small one. The phone then holds **the cabinet's buttons** (Start, flippers, Exit, MagnaSave; a held flipper scrolls fast), **types instead of the on-screen keyboard** (search, player name, configuration name) and **sends a file to the import folder** (up to 2 GB, progress on both screens), which "Add a table" then offers.
+- **The whole menu, too**: System menu > Phone remote shows the QR in large, the on-screen keyboard shows a small one. The phone then holds **the cabinet's buttons** (Start, flippers, Exit, MagnaSave; a held flipper scrolls fast), **types instead of the on-screen keyboard** (search, player name, configuration name) and **sends a file to the import folder** (up to 2 GB, progress on both screens), which "Add a table" then offers.
 - **You accept the phone at the cabinet**: the same four-digit code on both sides, Start to accept, Exit to refuse. One phone at a time; the QR changes every three minutes and serves only once; the link follows the cabinet from the browser to the menu and ends after 20 minutes without a gesture in the menu. Guest mode applies to the phone too, which never unlocks it.
 - **Encrypted, and on the local network only**: nobody on the Wi-Fi reads what you type. Cyber Pinball records nothing you type: you sign in yourself.
 

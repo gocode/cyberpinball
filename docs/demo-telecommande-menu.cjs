@@ -295,7 +295,16 @@ async function run(report) {
     await delay(350);
     const label = `borne-${String(++step).padStart(2, '0')}-${name}`;
     await report.check(win.webContents, label);
-    const image = await win.capturePage();
+    // Première image d'une fenêtre hors écran : capturePage peut échouer (« UnknownVizError ») avant le premier dessin ; on réessaie.
+    let image;
+    for (let i = 0; !image; i++) {
+      try {
+        image = await win.capturePage();
+      } catch (error) {
+        if (i >= 5) throw error;
+        await delay(400);
+      }
+    }
     if (CAPTURES) fs.writeFileSync(path.join(OUT, `${label}.png`), image.toPNG());
     return image;
   }
@@ -313,10 +322,14 @@ async function run(report) {
     return jsQR(rgba, width, height)?.data;
   }
 
-  // 1. Menu système > Borne > Télécommande du téléphone.
+  // 1. La racine du menu système (Exit au menu des tables) : « Télécommande du téléphone » y est,
+  // et aussi dans Borne (06/11/2026 : rangée seulement dans Borne, on ne la trouvait pas).
   library.openSystem();
+  check(view().actions.some((a) => a.label === T('Télécommande du téléphone')), 'la racine du menu système a l’entrée « Télécommande du téléphone »');
+  await shotBorne('menu-systeme');
   act(T('Borne'));
-  check(view().actions.some((a) => a.label === T('Télécommande du téléphone')), 'Menu système > Borne a l’entrée « Télécommande du téléphone »');
+  check(view().actions.some((a) => a.label === T('Télécommande du téléphone')), 'Menu système > Borne a aussi l’entrée « Télécommande du téléphone »');
+  library.openSystem();
   act(T('Télécommande du téléphone'));
   const offer = await until('QR code sur l’écran de la télécommande', () => (remote.bar()?.phase === 'offer' ? remote.bar() : undefined));
   if (!offer) return;
@@ -369,8 +382,9 @@ async function run(report) {
   check(held >= 6, 'un flipper tenu au téléphone se répète, comme un vrai bouton tenu', `${held} répétitions en 1,3 s`);
   await delay(400);
   check(repeats - before.repeats === held, 'relâché, il s’arrête');
-  await until('choix suivi sur le téléphone', async () => (await phoneJs(`document.getElementById('page-host').textContent`)) === view().actions[view().cursor]?.label);
-  check(true, 'le choix courant de la borne s’affiche sur le téléphone');
+  let shown;
+  await until('choix suivi sur le téléphone', async () => (shown = await phoneJs(`document.getElementById('page-host').textContent`)) === view().actions[view().cursor]?.label);
+  check(shown === view().actions[view().cursor]?.label, 'le choix courant de la borne s’affiche sur le téléphone', `téléphone « ${shown} », borne « ${view().actions[view().cursor]?.label} » (${view().heading}, ${view().cursor})`);
 
   // 4. Le clavier à l'écran : le téléphone tape à sa place, Valider l'envoie.
   let named;

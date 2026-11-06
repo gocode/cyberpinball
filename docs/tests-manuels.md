@@ -1578,7 +1578,7 @@ La même borne et le même téléphone que les tests 806 à 815, Cyber Pinball a
 
 | # | Scénario | Comment | Résultat attendu |
 |---|---|---|---|
-| 824 | Le QR du menu | Menu système > Borne > Télécommande du téléphone. | Le QR en grand à gauche, « Connecter un téléphone » à droite ; rien ne déborde, pas de « % lu ». |
+| 824 | Le QR du menu | Exit au menu des tables, puis « Télécommande du téléphone » (à la racine du menu système, aussi dans Borne). | Le QR en grand à gauche, « Connecter un téléphone » à droite ; rien ne déborde, pas de « % lu ». |
 | 825 | Accepter au menu | Scanner le QR, comparer les codes, Start à la borne. | Le téléphone passe aux boutons (Start, deux flippers, Exit, MagnaSave) ; la borne dit « Téléphone connecté » ; Start n'a rien fait d'autre sur l'écran. |
 | 826 | Naviguer | Exit au téléphone, puis tenir le flipper droit deux secondes, puis Start. | Exit ferme l'écran ; le flipper tenu fait défiler vite (« Défilement rapide ») et s'arrête au relâchement ; Start ouvre l'entrée choisie, comme les boutons de la borne. En tête du téléphone, l'écran et l'entrée choisie. |
 | 827 | Taper au téléphone | Ouvrir un clavier à l'écran (Amis > Trouver un joueur, ou Renommer une configuration) ; taper au téléphone, accents compris, puis « Valider ». | Le panneau du clavier s'ouvre avec le texte de la borne ; ce qui est tapé remplace le texte du clavier à l'écran ; « Valider » valide, « Annuler » ferme sans rien garder. |

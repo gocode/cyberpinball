@@ -1579,7 +1579,7 @@ The same cabinet and phone as tests 806 to 815, Cyber Pinball on the table menu.
 
 | # | Scenario | How | Expected result |
 |---|---|---|---|
-| 824 | The menu's QR | System menu > Cabinet > Phone remote. | The QR in large on the left, "Connecter un téléphone" (Connect a phone) on the right; nothing overflows, no "% lu" (% read). |
+| 824 | The menu's QR | Exit on the table menu, then "Télécommande du téléphone" (Phone remote, at the root of the system menu, also in Cabinet). | The QR in large on the left, "Connecter un téléphone" (Connect a phone) on the right; nothing overflows, no "% lu" (% read). |
 | 825 | Accept in the menu | Scan the QR, compare the codes, Start at the cabinet. | The phone switches to the buttons (Start, two flippers, Exit, MagnaSave); the cabinet says "Téléphone connecté" (Phone connected); Start did nothing else on the screen. |
 | 826 | Navigate | Exit on the phone, then hold the right flipper for two seconds, then Start. | Exit closes the screen; the held flipper scrolls fast ("Défilement rapide", Fast scroll) and stops on release; Start opens the selected entry, like the cabinet's buttons. At the top of the phone, the screen and the selected entry. |
 | 827 | Type on the phone | Open an on-screen keyboard (Friends > Find a player, or Rename a configuration); type on the phone, accents included, then "Valider" (Confirm). | The keyboard panel opens with the cabinet's text; what is typed replaces the on-screen keyboard's text; "Valider" confirms, "Annuler" (Cancel) closes without keeping anything. |
