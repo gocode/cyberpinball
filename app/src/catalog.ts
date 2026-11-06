@@ -498,6 +498,7 @@ export function createCatalog(ctx: CatalogContext) {
     exitKeys: () => host.keys().exit,
     navKeys: () => host.keys(),
     audioOutput: () => host.audioOutput?.(),
+    remote: host.phoneRemote,
     grabVideo: ytdlp,
     // Gestionnaire de téléchargements : le fichier d'une page y entre, avec l'écran où il ramène.
     track: ctx.downloads

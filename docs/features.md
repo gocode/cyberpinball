@@ -335,6 +335,15 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **"Block ads"**, on by default, YouTube included; table forums are never filtered.
 - **"Search the web…"** on every add or choice screen, with the search already filled in.
 
+### The phone as a remote
+
+<p align="center"><img src="images/en/features/telecommande.webp?v=2d5fc38805" width="900" alt="The built-in browser driven by a phone: the banner says Phone connected, the green pointer is on the username field; next to it, the phone page with its touchpad and keyboard"></p>
+
+- **A QR code in the built-in browser's banner**: scan it with your phone, on the same Wi-Fi as the cabinet. Nothing to install: the page comes from the cabinet.
+- **A touchpad** for the pointer (tap: a click; two fingers: scroll; long press: right-click), **the phone's keyboard** as soon as a field of the page has the keyboard focus (username, hidden password, "Champ suivant" (Next field), Enter), Back, Forward, Close.
+- **You accept the phone at the cabinet**: the same four-digit code on both sides, Start to accept, Exit to refuse. One phone at a time; the QR changes every three minutes and serves only once; everything is cut when the browser closes.
+- **Encrypted, and on the local network only**: nobody on the Wi-Fi reads what you type. Cyber Pinball records nothing you type: you sign in yourself.
+
 ### Site accounts
 
 - **"Site accounts"**: VPUniverse, VPForums, Pinball Nirvana, PinSound, each "Signed in" (with its expiry date) or not; "Sign out" only clears that site's cookies.

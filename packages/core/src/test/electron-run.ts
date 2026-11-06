@@ -17,6 +17,10 @@ export interface ElectronRun {
   stderr: string;
 }
 
+/** Après la fin d'Electron, ses processus ont jusqu'à GRACE_POLLS × GRACE_STEP_MS pour partir d'eux-mêmes. */
+export const GRACE_POLLS = 10;
+export const GRACE_STEP_MS = 500;
+
 /** Processus vivants dont la ligne de commande contient `marker` (Windows), hors celui qui cherche. */
 export function processesWith(marker: string): { pid: number; name: string }[] {
   if (process.platform !== 'win32') return [];
@@ -58,7 +62,15 @@ export function runElectron(electron: string, args: string[], opts: { dir: strin
     fs.closeSync(fdOut);
     fs.closeSync(fdErr);
   }
-  const left = processesWith(userData);
+  // Chromium arrête ses processus (GPU, rendu, utilitaires) un à un après la fin du principal :
+  // sous charge (plusieurs suites en parallèle), ils ne sont pas tous partis à l'instant où
+  // spawnSync rend (échecs du 06/11/2026, jamais reproduits seuls). Délai de grâce, comme les
+  // autres garde-fous (enfants-vivants.test.ts) ; un relais qui tient vraiment reste attrapé.
+  let left = processesWith(userData);
+  for (let i = 0; i < GRACE_POLLS && left.length; i++) {
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, GRACE_STEP_MS);
+    left = processesWith(userData);
+  }
   killAll(left);
   const result: ElectronRun = { status: run.status, signal: run.signal, stdout: fs.readFileSync(out, 'utf8'), stderr: fs.readFileSync(err, 'utf8') };
   fs.rmSync(out, { force: true });

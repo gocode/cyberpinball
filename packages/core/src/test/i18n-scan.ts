@@ -25,6 +25,8 @@ export function interfaceSources(root = REPO_ROOT): string[] {
   add('app/src', ts);
   // Feuilles de style comprises : un texte écrit par content: n'est jamais traduit (glisser-déposer, novembre 2026).
   add('app/renderer', (name) => (name.endsWith('.js') || name.endsWith('.html') || name.endsWith('.css')) && !name.startsWith('fallback-demo'));
+  // Page du téléphone (télécommande de la borne, phone-remote.ts) : traduite comme les écrans.
+  add('app/renderer/telephone', (name) => name.endsWith('.js') || name.endsWith('.html') || name.endsWith('.css'));
   add('packages/core/src', ts);
   add('packages/installer/src', ts);
   add('packages/win-displays/src', ts);

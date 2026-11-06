@@ -1522,6 +1522,23 @@ Deux bornes amies en ligne ; l'une joue une table pendant que l'autre lui envoie
 | 796 | Gardé d'un démarrage à l'autre | Quitter Cyber Pinball et le relancer ; ouvrir Activité récente. Puis « Effacer l'activité récente ». | Les mêmes lignes, lues ou non comme avant. La question s'ouvre avec Annuler choisi ; « Effacer » vide la liste (« Aucune activité récente ») ; amis, téléchargements et historique des parties restent. |
 | 797 | Résumé et mode invité | Au menu des tables, laisser arriver trois genres de nouvelles à la fois (le menu système ouvert pendant ce temps, puis revenir) : cliquer le résumé « <n> nouveautés ». Puis activer le mode invité et recliquer un résumé. | Le clic ouvre Activité récente, « Retour » ramène au menu des tables. En mode invité, rien ne s'ouvre : le cadenas, comme pour la roue dentée. |
 
+## Le téléphone comme télécommande du navigateur intégré
+
+Une borne dont la règle du pare-feu de Cyber Pinball est posée (« Partage et réseau »), un téléphone sur le même Wi-Fi, un site communautaire dont vous avez un compte. Tests sur un vrai téléphone, que les essais hors écran ne remplacent pas.
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 806 | Le QR code | Ouvrir « Récupérer » (Comptes des sites > « Se connecter », ou un téléchargement qui demande la page). | Dans le bandeau, « TÉLÉCOMMANDE », un QR code et « Scannez avec votre téléphone, sur le même Wi-Fi que la borne » ; le nom du jeu reste lisible. |
+| 807 | Lire le QR code | Scanner le QR avec l'appareil photo d'un iPhone, puis d'un Android. | La page « CYBER PINBALL » s'ouvre dans le navigateur du téléphone, sans rien à installer ; « Comparez les codes » et un code de quatre chiffres. Le bandeau montre le même code, « MÊME CODE ? » et le nom du téléphone. |
+| 808 | Accepter, refuser | Exit à la borne ; scanner le nouveau QR, puis Start. | Exit : le téléphone dit « Connexion refusée », un QR neuf s'affiche, le navigateur reste ouvert. Start : le téléphone passe au pavé, le bandeau dit « TÉLÉPHONE CONNECTÉ ». |
+| 809 | Pointeur et clic | Glisser sur le pavé, lentement puis vite ; toucher un lien. | Le pointeur vert suit le doigt sur la page, sans sortir de la page ; un toucher clique (un anneau à la pointe), le lien s'ouvre. |
+| 810 | Défiler, clic droit | Deux doigts vers le haut ; appui long sur un lien. | La page défile dans le sens des doigts ; l'appui long ouvre sur le téléphone « Clic droit » avec « Ouvrir le lien ». |
+| 811 | Se connecter au site | Toucher le champ de l'identifiant de la page de connexion, taper avec le clavier du téléphone (accents compris), « Champ suivant », taper le mot de passe, Entrée. | Le panneau du clavier s'ouvre avec le libellé du champ ; ce qui est tapé arrive dans le champ de la borne, le mot de passe masqué sur le téléphone ; Entrée envoie le formulaire, le site vous connecte. |
+| 812 | Coupure et reprise | Verrouiller le téléphone dix secondes, puis le déverrouiller ; recharger la page du téléphone. | « Reconnexion en cours… », puis le pavé revient sans nouvelle acceptation. |
+| 813 | Un seul téléphone | Pendant qu'un téléphone pilote, en scanner un autre avec une photo de l'ancien QR. | Le second téléphone dit « QR code déjà utilisé » ou « Un téléphone est déjà connecté » ; le premier pilote toujours. |
+| 814 | Fermer | Sur le téléphone, « Fermer », puis « Fermer le navigateur ». | Le navigateur intégré se ferme ; le téléphone dit « Navigateur de la borne fermé ». Recharger la page du téléphone : elle ne pilote plus rien. |
+| 815 | Pare-feu absent | Sur une borne sans la règle de Cyber Pinball (lancée depuis ses sources, ou règle retirée), ouvrir « Récupérer ». | Le bloc « TÉLÉCOMMANDE » est grisé, avec sa raison (pare-feu à autoriser, ou lancé depuis les sources) ; aucune invite du pare-feu de Windows n'apparaît. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

@@ -129,3 +129,11 @@ export function fillBelow(win: BrowserWindow, view: { setBounds(bounds: Rectangl
     place();
   };
 }
+
+/**
+ * Pose une petite vue par-dessus la page de sa fenêtre (le pointeur du téléphone, phone-remote.ts),
+ * en coordonnées du contenu de la fenêtre : une vue, jamais une fenêtre (elles passent par coverDisplay).
+ */
+export function placeOver(view: { setBounds(bounds: Rectangle): void }, bounds: Rectangle): void {
+  view.setBounds(bounds);
+}

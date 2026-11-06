@@ -50,7 +50,7 @@ interface NetModule {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const net = require(path.join(APP_DIST, 'social-net.js')) as NetModule;
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const createTestnet = require(path.join(REPO_ROOT, 'node_modules', 'hyperdht', 'testnet.js')) as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
+const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 
 
 /** `detail` : ce qu'on sait au moment de l'échec (liaisons, journal), pour qu'un délai dépassé s'explique. */

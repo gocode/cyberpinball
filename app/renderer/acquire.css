@@ -140,6 +140,189 @@ html.narrow .what {
   display: none;
 }
 
+/* ---------- Télécommande du téléphone (phone-remote.ts) : un cadre fixe de 420 × 108 entre ce
+   qu'il faut télécharger et les boutons, qui passent alors en grille 2 × 2 (600 de large) pour
+   laisser le nom du jeu lisible (revue de Codex, 06/11/2026). Le QR code, le téléphone à accepter
+   (son code), celui qui pilote, ou la raison pour laquelle la télécommande est indisponible. ---------- */
+
+html.with-remote .bar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) calc(420 * var(--u)) calc(600 * var(--u));
+  grid-template-areas: 'what remote buttons';
+  column-gap: calc(24 * var(--u));
+  align-items: center;
+}
+
+html.with-remote .what {
+  grid-area: what;
+}
+
+html.with-remote .buttons {
+  grid-area: buttons;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: calc(48 * var(--u));
+  gap: calc(8 * var(--u));
+}
+
+html.with-remote .buttons button {
+  min-width: 0;
+  padding: 0 calc(12 * var(--u));
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Écran étroit : le bloc à droite de ce qu'il faut télécharger, les quatre boutons en dessous. */
+html.narrow.with-remote .bar {
+  grid-template-columns: minmax(0, 1fr) calc(420 * var(--u));
+  grid-template-areas: 'what remote' 'buttons buttons';
+  row-gap: calc(12 * var(--u));
+  align-content: center;
+}
+
+html.narrow.with-remote .buttons {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-auto-rows: calc(52 * var(--u));
+}
+
+.remote {
+  grid-area: remote;
+  display: grid;
+  grid-template-columns: calc(136 * var(--u)) minmax(0, 1fr);
+  grid-template-rows: calc(48 * var(--u)) calc(40 * var(--u));
+  align-items: center;
+  gap: calc(6 * var(--u)) calc(12 * var(--u));
+  width: calc(420 * var(--u));
+  height: calc(108 * var(--u));
+  padding: calc(6 * var(--u));
+  border: 1px solid var(--line-soft);
+  border-radius: calc(8 * var(--u));
+  background: var(--surface-sunken);
+}
+
+.remote[hidden],
+.remote [hidden] {
+  display: none;
+}
+
+/* QR code et indisponible : une seule rangée, le carré (ou l'icône) à gauche. */
+.remote[data-phase='offer'],
+.remote[data-phase='off'] {
+  grid-template-columns: calc(94 * var(--u)) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+/* Modules noirs sur fond clair, dessinés pixel à pixel (acquire.js) : 94 de côté, marge comprise. */
+.qr {
+  grid-column: 1;
+  grid-row: 1;
+  width: calc(94 * var(--u));
+  height: calc(94 * var(--u));
+  image-rendering: pixelated;
+}
+
+.remote-text {
+  grid-column: 2;
+  grid-row: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: calc(2 * var(--u));
+}
+
+.remote-title,
+.remote-line {
+  font-size: calc(20 * var(--u));
+  line-height: calc(24 * var(--u));
+}
+
+.remote-title {
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.remote-line {
+  color: var(--muted);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.remote[data-phase='pending'] .remote-line,
+.remote[data-phase='paired'] .remote-line {
+  -webkit-line-clamp: 1;
+  color: var(--text);
+}
+
+.remote-code,
+.remote-mark {
+  grid-column: 1;
+  grid-row: 1;
+  justify-self: center;
+}
+
+.remote-code {
+  font-size: calc(40 * var(--u));
+  line-height: calc(48 * var(--u));
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  padding-left: 0.06em;
+  white-space: nowrap;
+  color: var(--accent);
+  text-shadow: 0 0 calc(18 * var(--u)) var(--signal-haze);
+}
+
+.remote-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(32 * var(--u));
+  color: var(--accent);
+}
+
+.remote-actions {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  display: flex;
+  gap: calc(10 * var(--u));
+}
+
+.remote-actions button {
+  flex: 1;
+  min-width: 0;
+  height: calc(40 * var(--u));
+  padding: 0 calc(8 * var(--u));
+}
+
+.remote-actions button.accept {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-signal);
+  font-weight: 600;
+}
+
+/* Un téléphone attend : le cadre s'allume, on ne peut pas le manquer. */
+.remote[data-phase='pending'] {
+  border-color: var(--accent);
+  box-shadow: var(--glow-signal);
+}
+
+.remote[data-phase='paired'] {
+  border-color: var(--line);
+}
+
+/* Indisponible : le titre et l'icône s'effacent, la raison reste lisible. */
+.remote[data-phase='off'] .remote-title,
+.remote[data-phase='off'] .remote-mark {
+  color: var(--ink-faint);
+}
+
 /* Repli d'un téléchargement direct, téléchargement interrompu, page morte. */
 .status.warn {
   color: var(--warn);

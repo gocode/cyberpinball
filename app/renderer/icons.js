@@ -132,6 +132,8 @@ const CYBER_ICONS = {
   'move-down': '<rect x="7" y="3" width="10" height="9" rx="1"/><path d="M12 15v6M9 18l3 3 3-3"/>', // Cadre et flèche en dessous.
   'zoom-in': '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M10 7v6M7 10h6"/>', // Loupe et plus : rapprocher.
   'zoom-out': '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M7 10h6"/>', // Loupe et moins : éloigner.
+  phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>', // Téléphone : la télécommande de la borne.
+  backspace: '<path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-7-7z"/><path d="m12 9 6 6M18 9l-6 6"/>', // Touche Effacer (retour arrière) du clavier du téléphone.
 };
 
 /**

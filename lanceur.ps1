@@ -37,7 +37,8 @@ function Invoke-Checked([scriptblock]$Command, [string]$What) {
 }
 
 function Build {
-  if (-not (Test-Path 'node_modules')) {
+  # node_modules peut ne contenir que les liens @cyberpinball\* (scripts/liens-espaces.mjs) : on teste une vraie dépendance.
+  if (-not (Test-Path 'node_modules\typescript')) {
     Step 'Installation des dépendances'
     Invoke-Checked { npm install } 'npm install'
   }

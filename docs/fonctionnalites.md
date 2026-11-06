@@ -335,6 +335,15 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **« Bloquer les publicités »**, activé par défaut, YouTube compris ; les forums des tables ne sont jamais filtrés.
 - **« Chercher sur le web… »** sur chaque écran d'ajout ou de choix, la recherche déjà remplie.
 
+### Le téléphone comme télécommande
+
+<p align="center"><img src="images/fr/features/telecommande.webp?v=6bba909c78" width="900" alt="Le navigateur intégré piloté par un téléphone : le bandeau dit « Téléphone connecté », le pointeur vert est sur le champ de l'identifiant ; à côté, la page du téléphone avec son pavé tactile et son clavier"></p>
+
+- **Un QR code dans le bandeau du navigateur intégré** : scannez-le avec votre téléphone, sur le même Wi-Fi que la borne. Rien à installer : la page vient de la borne.
+- **Un pavé tactile** pour le pointeur (toucher : un clic ; deux doigts : défiler ; appui long : clic droit), **le clavier du téléphone** dès qu'un champ de la page a le clavier (identifiant, mot de passe masqué, « Champ suivant », Entrée), Retour, Avancer, Fermer.
+- **Vous acceptez le téléphone à la borne** : le même code de quatre chiffres des deux côtés, Start pour accepter, Exit pour refuser. Un seul téléphone à la fois ; le QR change toutes les trois minutes et ne sert qu'une fois ; tout se coupe quand le navigateur se ferme.
+- **Chiffré, et sur le réseau local seulement** : personne sur le Wi-Fi ne lit ce que vous tapez. Cyber Pinball n'enregistre rien de ce que vous tapez : c'est vous qui vous connectez.
+
 ### Comptes des sites
 
 - **« Comptes des sites »** : VPUniverse, VPForums, Pinball Nirvana, PinSound, chacun « Connecté » (avec sa date d'expiration) ou non ; « Se déconnecter » n'efface que les cookies de ce site.

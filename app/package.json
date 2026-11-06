@@ -17,6 +17,7 @@
     "hyperdht": "6.34.1",
     "hyperswarm": "4.17.2",
     "protomux": "3.13.0",
+    "qrcode-generator": "2.0.4",
     "tldts-experimental": "7.4.18"
   }
 }

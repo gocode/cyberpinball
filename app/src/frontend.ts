@@ -252,6 +252,7 @@ import { createDedicatedSystem } from './dedicated-system';
 import { handOverOnQuit, shellSession } from './dedicated-session';
 import { createPowerMenu } from './power';
 import { readWakeDevices } from './arcade-hours';
+import { createPhoneRemote, phoneRemoteMode } from './phone-remote';
 
 /**
  * Touches du menu : celles des boutons de l'interface (étape « Boutons de l'interface »
@@ -559,6 +560,13 @@ let closing = false;
 // Redessin de la file des téléchargements (downloadsChanged) : déclarés avant la gestion des tables, qui la crée.
 let downloadsRedraw: NodeJS.Timeout | undefined;
 let downloadsShown: string | undefined;
+// Télécommande du téléphone pour le navigateur intégré (phone-remote.ts) : réseau local réel en
+// usage normal, si la règle du pare-feu de Cyber Pinball est posée ; 127.0.0.1 pendant un essai.
+const phoneRemote = createPhoneRemote({
+  mode: () => phoneRemoteMode(process.env),
+  firewall: async () => socialFirewall.state() ?? (await socialFirewall.check()),
+  fromSources: !app.isPackaged,
+});
 const library = createLibrary({
   root: loc.root,
   dataDir: loc.dataDir,
@@ -606,6 +614,7 @@ const library = createLibrary({
   windows: () => windows,
   browserScreen: () => browserScreenRect(),
   audioOutput: () => audioOutput,
+  phoneRemote,
   openBrowserScreen: (back) => configurations.openBrowserScreen(undefined, back),
   broadcast: () => broadcast(),
   installVpx: () => {

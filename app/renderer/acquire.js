@@ -5,6 +5,7 @@
 // restant et Annuler (le processus principal formate tout, transfer.ts).
 // Recherche libre : une ligne de recherche (moteurs, champ prérempli, Chercher) et, sur une
 // page vidéo, une ligne qui la décrit, avec « Télécharger cette vidéo » quand c'est possible.
+// Entre les deux, le bloc de la télécommande du téléphone (showRemote).
 const $ = (id) => document.getElementById(id);
 
 /** Lignes affichées, par identifiant de téléchargement : mises à jour sur place, sans tout redessiner. */
@@ -148,10 +149,66 @@ window.cyberAcquire.onState((s) => {
     else $('video').insertBefore($('grab-video'), $('grab-audio'));
   }
   showDownloads(s.downloads ?? [], s.more);
+  showRemote(s.remote);
 
   // Même hauteur que celle où le processus principal pose la page du site, en dessous.
   if (s.barHeight) document.documentElement.style.setProperty('--bar-height', `${s.barHeight}px`);
 });
+
+/**
+ * Télécommande du téléphone (app/src/phone-remote.ts) : le QR code à scanner, le téléphone qui
+ * attend d'être accepté (son code, Accepter et Refuser), celui qui pilote (Déconnecter), ou la
+ * raison pour laquelle elle est indisponible (grisée, jamais cachée).
+ */
+function showRemote(r) {
+  const box = $('remote');
+  box.hidden = !r;
+  // Le bloc présent, les quatre boutons passent en grille 2 × 2 (acquire.css, html.with-remote).
+  document.documentElement.classList.toggle('with-remote', Boolean(r));
+  if (!r) return;
+  box.dataset.phase = r.phase;
+  $('remote-title').textContent = r.title;
+  $('remote-line').textContent = r.line;
+  $('remote-line').title = r.line;
+  const qr = $('remote-qr');
+  qr.hidden = r.phase !== 'offer' || !r.qr;
+  if (!qr.hidden) drawQr(qr, r.qr);
+  $('remote-code').hidden = r.phase !== 'pending';
+  $('remote-code').textContent = r.code ?? '';
+  $('remote-mark').hidden = r.phase !== 'paired' && r.phase !== 'off';
+  if (!$('remote-mark').firstChild) $('remote-mark').replaceChildren(cyberIcon('phone'));
+  box.title = r.phase === 'offer' ? r.url : '';
+  $('remote-actions').hidden = r.phase !== 'pending' && r.phase !== 'paired';
+  $('remote-accept').hidden = r.phase !== 'pending';
+  $('remote-refuse').hidden = r.phase !== 'pending';
+  $('remote-end').hidden = r.phase !== 'paired';
+}
+
+/**
+ * QR code : modules noirs sur fond clair (les lecteurs des téléphones le lisent le mieux ainsi),
+ * marge claire de 3 modules (la norme en veut 4 ; le fond sombre autour du carré complète).
+ */
+let qrDrawn = '';
+function drawQr(canvas, rows) {
+  const key = `${rows.join('')}:${canvas.clientWidth}`;
+  if (key === qrDrawn) return;
+  qrDrawn = key;
+  const n = rows.length;
+  const quiet = 3;
+  const scale = Math.max(2, Math.ceil((canvas.clientWidth * (window.devicePixelRatio || 1)) / (n + quiet * 2)));
+  canvas.width = canvas.height = (n + quiet * 2) * scale;
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#e6f0ec';
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  g.fillStyle = '#030807';
+  rows.forEach((row, y) => {
+    for (let x = 0; x < n; x++) if (row[x] === '1') g.fillRect((x + quiet) * scale, (y + quiet) * scale, scale, scale);
+  });
+}
+
+$('remote-accept').addEventListener('click', () => window.cyberAcquire.remote('accept'));
+$('remote-refuse').addEventListener('click', () => window.cyberAcquire.remote('refuse'));
+$('remote-end').addEventListener('click', () => window.cyberAcquire.remote('end'));
 
 for (const action of ['back', 'home', 'browser', 'close']) $(action).addEventListener('click', () => window.cyberAcquire.act(action));
 window.cyberAcquire.ready();

@@ -142,3 +142,5 @@ export * from './gamerecording';
 export * from './gamenotice';
 export * from './dmdscore';
 export * from './gamereturn';
+export * from './remote';
+export * from './websocket';

@@ -53,7 +53,7 @@ interface Games {
 const netModule = require(path.join(APP_DIST, 'social-net.js')) as { createSocialNet(o: object): Net };
 const contentModule = require(path.join(APP_DIST, 'friend-content.js')) as { createFriendContent(o: object): Content };
 const gamesModule = require(path.join(APP_DIST, 'live-game.js')) as { createLiveGames(o: object): Games };
-const createTestnet = require(path.join(REPO_ROOT, 'node_modules', 'hyperdht', 'testnet.js')) as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
+const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 async function until(what: string, check: () => boolean, ms = 15_000): Promise<void> {

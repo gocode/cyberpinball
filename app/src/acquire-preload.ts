@@ -8,7 +8,8 @@ contextBridge.exposeInMainWorld('cyberI18n', ipcRenderer.sendSync('i18n') ?? {})
 // Bandeau de la fenêtre « Récupérer » (acquire-window.ts) : il affiche ce qu'il faut
 // télécharger et les téléchargements en cours, et renvoie ses quatre boutons et Annuler ;
 // en recherche libre, le texte cherché et son moteur, « Télécharger cette vidéo », et quand
-// son champ de recherche a le clavier (les touches n'y sont pas des boutons de la borne).
+// son champ de recherche a le clavier (les touches n'y sont pas des boutons de la borne) ;
+// le bloc de la télécommande du téléphone (QR code, téléphone à accepter, téléphone qui pilote).
 // La page du site, en dessous, n'a pas de préchargement : elle ne voit rien de Cyber Pinball.
 contextBridge.exposeInMainWorld('cyberAcquire', {
   onState: (callback: (state: unknown) => void) => {
@@ -21,5 +22,7 @@ contextBridge.exposeInMainWorld('cyberAcquire', {
   video: () => ipcRenderer.send('acquire:video'),
   grab: (want: 'audio' | 'video') => ipcRenderer.send('acquire:grab', want),
   typing: (typing: boolean) => ipcRenderer.send('acquire:typing', typing),
+  // Télécommande du téléphone (phone-remote.ts) : accepter, refuser ou déconnecter le téléphone.
+  remote: (action: 'accept' | 'refuse' | 'end') => ipcRenderer.send('acquire:remote', action),
 
 });

@@ -5,6 +5,7 @@
 // Pilotage aux boutons de la borne (flippers : choisir, Start : valider, Exit :
 // revenir), au clavier ou à la souris (clics envoyés par le rendu).
 
+import type { PhoneRemote } from './phone-remote';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, type BrowserWindow, type Input, type Rectangle } from 'electron';
@@ -291,6 +292,8 @@ export interface LibraryHost {
   browserScreen?(): { bounds: Rectangle; notice?: string } | undefined;
   /** Nom Windows de la sortie audio du menu (menuAudioOutput), pour le son des pages de « Récupérer ». */
   audioOutput?(): string | undefined;
+  /** Télécommande du téléphone (phone-remote.ts) pour le navigateur intégré ; absente : pas de QR code. */
+  phoneRemote?: PhoneRemote;
   /** Choix de l'écran du navigateur intégré pour la configuration active ; Retour mène à `back`. */
   openBrowserScreen?(back: () => void): void;
   broadcast(): void;

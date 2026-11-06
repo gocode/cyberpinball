@@ -16,6 +16,20 @@
           <div class="status" id="status"></div>
           <div class="screen-note" id="screen-note" hidden></div>
         </div>
+        <aside class="remote" id="remote" hidden>
+          <canvas class="qr" id="remote-qr" hidden></canvas>
+          <div class="remote-code" id="remote-code" hidden></div>
+          <span class="remote-mark" id="remote-mark" hidden></span>
+          <div class="remote-text">
+            <div class="remote-title" id="remote-title"></div>
+            <div class="remote-line" id="remote-line"></div>
+          </div>
+          <div class="remote-actions" id="remote-actions" hidden>
+            <button type="button" id="remote-accept" class="accept" data-i18n>Accepter (Start)</button>
+            <button type="button" id="remote-refuse" data-i18n>Refuser (Exit)</button>
+            <button type="button" id="remote-end" data-i18n>Déconnecter</button>
+          </div>
+        </aside>
         <nav class="buttons">
           <button type="button" id="back" data-i18n>← Précédent</button>
           <button type="button" id="home" data-i18n="Retour à la fiche (page du fichier sur le site)">Retour à la fiche</button>

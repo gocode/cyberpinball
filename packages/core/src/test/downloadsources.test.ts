@@ -30,8 +30,8 @@ const TRACKED = /\.track\(|\.add\(\{|trackInstall\(|track: |trackGrab: |friendTr
 /** Endroits relevés, avec ce qu'ils sont et par où ils passent (nombre d'occurrences de PRIMITIVES). */
 const SOURCES: Record<string, { count: number; how: string }> = {
   'app/src/acquire-window.ts': {
-    count: 5,
-    how: 'pages des sites (will-download, downloadURL ; « Télécharger cette image » du clic droit, qui part de la page comme ses liens) : chaque téléchargement entre dans la file (events.track), repris par siteTransport (createInterruptedDownload) ; fetchImage : vignettes des résultats, aperçus, pas un téléchargement',
+    count: 7,
+    how: 'pages des sites (will-download, downloadURL ; « Télécharger cette image » du clic droit, qui part de la page comme ses liens ; les mêmes, et « Télécharger cette vidéo », demandés par le téléphone qui pilote la page, phone-remote.ts) : chaque téléchargement entre dans la file (events.track), repris par siteTransport (createInterruptedDownload) ; fetchImage : vignettes des résultats, aperçus, pas un téléchargement',
   },
   'app/src/friend-content.ts': { count: 1, how: 'fichier d’un ami : fetchFile, appelé par le transport des amis de la file (download-sources.ts)' },
   'app/src/media-convert.ts': { count: 6, how: 'conversion dans le rendu (images, sons, avatar), protocole local /in et /out : rien ne vient du réseau' },

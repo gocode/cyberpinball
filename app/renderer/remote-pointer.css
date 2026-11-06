@@ -1,0 +1,56 @@
+/* Pointeur du téléphone (remote-pointer.html) : la flèche sombre cerclée de vert signal, lisible sur une page claire comme sombre. */
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+}
+
+.arrow {
+  position: absolute;
+  left: 13px;
+  top: 13px;
+  width: 34px;
+  height: 40px;
+  overflow: visible;
+  filter: drop-shadow(0 0 3px rgba(139, 226, 58, 0.55)) drop-shadow(0 1px 2px rgba(0, 0, 0, 0.7));
+}
+
+.arrow path {
+  fill: #071204;
+  stroke: #8be23a;
+  stroke-width: 2.4;
+  stroke-linejoin: round;
+}
+
+/* Clic : un anneau part de la pointe. */
+.ring {
+  position: absolute;
+  left: 16px;
+  top: 16px;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  border: 2px solid #8be23a;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+.ring.on {
+  animation: ring 0.32s ease-out;
+}
+
+@keyframes ring {
+  from {
+    width: 4px;
+    height: 4px;
+    opacity: 1;
+  }
+  to {
+    width: 30px;
+    height: 30px;
+    opacity: 0;
+  }
+}

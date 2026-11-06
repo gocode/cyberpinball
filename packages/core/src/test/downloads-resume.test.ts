@@ -350,7 +350,7 @@ interface Content {
 /* eslint-disable @typescript-eslint/no-require-imports */
 const netModule = require(path.join(APP_DIST, 'social-net.js')) as { createSocialNet(o: object): Net };
 const contentModule = require(path.join(APP_DIST, 'friend-content.js')) as { createFriendContent(o: object): Content };
-const createTestnet = require(path.join(REPO_ROOT, 'node_modules', 'hyperdht', 'testnet.js')) as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
+const createTestnet = require('hyperdht/testnet.js') as (n: number, o: { host: string }) => Promise<{ bootstrap: { host: string; port: number }[]; destroy(): Promise<void> }>;
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 const BIG = payload(6 * 1024 * 1024);

@@ -132,4 +132,5 @@ test('tests : tout Electron passe par runElectron (tué au délai, aucun process
   const helper = read('packages/core/src/test/electron-run.ts');
   assert.match(helper, /stdio: \['ignore', fdOut, fdErr\]/, 'sortie dans des fichiers : rien à attendre que la fin du processus');
   assert.match(helper, /killAll\(left\)/);
+  assert.match(helper, /for \(let i = 0; i < GRACE_POLLS && left\.length; i\+\+\)[\s\S]*?left = processesWith\(userData\);[\s\S]*?killAll\(left\)/, 'délai de grâce avant de déclarer un processus survivant (Chromium ferme les siens un à un)');
 });

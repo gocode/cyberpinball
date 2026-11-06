@@ -15,6 +15,9 @@
 // le pointeur, qui pouvait être sur un écran qui le cache. Une ligne de plus dans le bandeau
 // dit quand l'écran choisi n'est pas branché, ou que le playfield choisi est de travers.
 // Exit de la borne la ferme, comme Échap.
+// Télécommande du téléphone (phone-remote.ts) : un QR code dans le bandeau, « Télécommande » ;
+// le téléphone qui l’a lu, accepté à la borne (Start, ou « Accepter » ; Exit refuse), pilote la
+// page du site (pavé tactile, clavier, Retour, Avancer, Fermer), jamais le bandeau.
 // Recherche libre (« Chercher moi-même sur le web… », docs/recherche/sources-medias.md § 7) :
 // le bandeau gagne un champ de recherche prérempli et ses moteurs (web, images, vidéos,
 // YouTube) ; sur une page vidéo, une ligne la décrit (sonde VIDEO_PAGE_PROBE) et, quand la
@@ -80,6 +83,7 @@ import type { AdBlocker } from './ad-blocker';
 import { coverDisplay, fillBelow } from './cover-display';
 import { onJoystickInput } from './joystick-input';
 import { createWindow, OFFSCREEN, primaryRect } from './offscreen';
+import type { PhoneRemote } from './phone-remote';
 import type { GrabProgress, GrabResult } from './ytdlp-tool';
 
 export const ACQUIRE_PARTITION = 'persist:acquisition';
@@ -191,6 +195,8 @@ export interface AcquireEvents {
    */
   /** Bloqueur de publicités de la session (ad-blocker.ts) ; absent : les pages restent telles quelles. */
   adBlocker?: Pick<AdBlocker, 'attach' | 'refresh'>;
+  /** Télécommande du téléphone (phone-remote.ts) ; absente : pas de QR code dans le bandeau. */
+  remote?: PhoneRemote;
   grabVideo?: {
     installed(): boolean;
     grab(request: { url: string; want: GrabKind; out: string; signal: AbortSignal; progress(p: GrabProgress): void }): Promise<GrabResult>;
@@ -718,6 +724,8 @@ export function createAcquirer(events: AcquireEvents) {
    * en choisissent un autre, Start de nouveau l'annule. Vrai si la touche a servi.
    */
   function cabinetKey(input: Electron.Input): boolean {
+    // Un téléphone attend d'être accepté : Start l'accepte (Exit le refuse : exit, plus bas).
+    if (input.type === 'keyDown' && !input.isAutoRepeat && events.remote?.pending() && events.navKeys?.().confirm.includes(input.code)) return events.remote.accept();
     if (input.type !== 'keyDown' || (!downloads.size && !grabs.size)) return false;
     const keys = events.navKeys?.();
     if (!keys) return false;
@@ -776,8 +784,41 @@ export function createAcquirer(events: AcquireEvents) {
       more,
       barHeight: height,
       narrow: open.scale?.narrow === true,
+      remote: events.remote?.bar(),
     });
     open.setBar?.(height);
+    // Le téléphone suit la page (titre, Retour, Avancer) et ses actions (vidéo, téléchargements).
+    events.remote?.pageChanged();
+  }
+
+  /** Actions de la feuille « Plus » du téléphone : celles du bandeau, qu'il ne peut pas toucher. */
+  function remoteActions(): { id: string; label: string }[] {
+    if (!open) return [];
+    const out = [{ id: 'home', label: open.request.search ? t('Retour à la recherche') : t('Retour à la fiche') }, { id: 'reload', label: t('Recharger la page') }];
+    const video = open.request.search && open.video ? videoLine(open.video) : undefined;
+    if (video?.direct) out.push({ id: 'video', label: t('Télécharger cette vidéo') });
+    if (video?.grab) out.push({ id: 'grab-audio', label: t('Récupérer le son') }, { id: 'grab-video', label: t('Récupérer la vidéo') });
+    for (const line of downloadLines().lines) out.push({ id: `cancel:${line.id}`, label: t('Annuler : {file}', { file: line.filename }) });
+    return out;
+  }
+
+  function remoteNav(action: 'back' | 'forward' | 'home' | 'close' | 'reload'): void {
+    if (!open) return;
+    const v = open.view.webContents;
+    if (action === 'back' && v.navigationHistory.canGoBack()) v.navigationHistory.goBack();
+    else if (action === 'forward' && v.navigationHistory.canGoForward()) v.navigationHistory.goForward();
+    else if (action === 'home') void v.loadURL(open.request.url);
+    else if (action === 'reload') v.reload();
+    else if (action === 'close') close();
+  }
+
+  function remoteAct(id: string): void {
+    if (!open) return;
+    if (id === 'home' || id === 'reload') return remoteNav(id);
+    if (id === 'video' && open.video?.direct) return open.view.webContents.downloadURL(open.video.direct);
+    if (id === 'grab-audio' || id === 'grab-video') return grabVideo(id === 'grab-audio' ? 'audio' : 'video');
+    const cancel = /^cancel:(\d+)$/.exec(id);
+    if (cancel) cancelDownload(Number(cancel[1]));
   }
 
   let ipcReady = false;
@@ -815,6 +856,13 @@ export function createAcquirer(events: AcquireEvents) {
     ipcMain.on('acquire:video', (e) => {
       if (!open?.video?.direct || e.sender !== open.win.webContents) return;
       open.view.webContents.downloadURL(open.video.direct);
+    });
+    // Télécommande : Accepter, Refuser, Déconnecter (le bandeau, à la souris).
+    ipcMain.on('acquire:remote', (e, action: unknown) => {
+      if (!open || e.sender !== open.win.webContents) return;
+      if (action === 'accept') events.remote?.accept();
+      else if (action === 'refuse') events.remote?.refuse();
+      else if (action === 'end') events.remote?.end();
     });
     // Champ de recherche du bandeau : tant qu'on y tape, les touches ne sont pas des boutons de la borne.
     ipcMain.on('acquire:typing', (e, typing: unknown) => {
@@ -881,6 +929,21 @@ export function createAcquirer(events: AcquireEvents) {
     const contents = view.webContents;
     claimFor(contents.id, request.claim);
     watchSizes(contents);
+    // Le téléphone pilote cette page : QR code dans le bandeau, liaison coupée à la fermeture.
+    events.remote?.attach({
+      win,
+      view,
+      changed: () => sendBar(),
+      nav: remoteNav,
+      actions: remoteActions,
+      act: remoteAct,
+      search: () => (open?.request.search ? { query: (webSearchOf(contents.getURL()) ?? open.lastSearch ?? open.request.search).query } : undefined),
+      runSearch: (query) => {
+        if (!open?.request.search) return;
+        const engine = (webSearchOf(contents.getURL()) ?? open.lastSearch ?? open.request.search).engine;
+        void contents.loadURL(webEngineUrl(query, engine));
+      },
+    });
     // Une page qui ouvre un nouvel onglet (lien de téléchargement, MEGA) : dans la même vue.
     contents.setWindowOpenHandler(({ url }) => {
       if (/^https?:/i.test(url)) void contents.loadURL(url);
@@ -908,6 +971,14 @@ export function createAcquirer(events: AcquireEvents) {
     // clic droit, « Télécharger cette image » ; elle part comme tout téléchargement de la page,
     // vers ce qui l'attend (un média, l'avatar). Les moteurs d'images n'ont pas de lien de téléchargement.
     contents.on('context-menu', (_e, params) => {
+      // Clic droit du téléphone : le menu part au téléphone, celui de Windows n'y serait pas atteignable.
+      const image = open?.request.search && params.mediaType === 'image' && params.srcURL && /^(https?|data):/i.test(params.srcURL) ? params.srcURL : undefined;
+      const link = /^https?:/i.test(params.linkURL) ? params.linkURL : undefined;
+      const items = [
+        ...(link ? [{ id: 'menu-link', label: t('Ouvrir le lien'), run: () => void contents.loadURL(link) }] : []),
+        ...(image ? [{ id: 'menu-image', label: t('Télécharger cette image'), run: () => contents.downloadURL(image) }] : []),
+      ];
+      if (events.remote?.offerMenu(items)) return;
       if (!open?.request.search || params.mediaType !== 'image' || !params.srcURL || !/^(https?|data):/i.test(params.srcURL)) return;
       const src = params.srcURL;
       Menu.buildFromTemplate([{ label: t('Télécharger cette image'), click: () => contents.downloadURL(src) }]).popup({ window: win });
@@ -932,7 +1003,8 @@ export function createAcquirer(events: AcquireEvents) {
     const closing = (input: Electron.Input) =>
       input.type === 'keyDown' && !pageFullScreen && (input.key === 'Escape' || Boolean(events.exitKeys?.().includes(input.code)));
     // Exit pendant qu'un téléchargement est désigné pour l'annulation : on renonce, sans fermer.
-    const exit = () => disarm() || close();
+    // Exit pendant qu'un téléphone attend d'être accepté : il est refusé, la fenêtre reste.
+    const exit = () => disarm() || Boolean(events.remote?.refuse()) || close();
     const escape = (e: Electron.Event, input: Electron.Input) => {
       if (!closing(input)) return;
       e.preventDefault();
@@ -945,7 +1017,8 @@ export function createAcquirer(events: AcquireEvents) {
     // La page garde ses touches (Entrée, flèches…) et ce qu'on tape dans un champ : Start n'y
     // désigne un téléchargement que hors d'un champ de saisie, sans retirer la touche à la page.
     contents.on('before-input-event', (_e, input) => {
-      if (input.type !== 'keyDown' || (!downloads.size && !grabs.size) || PAGE_KEYS.has(input.code)) return;
+      const phone = Boolean(events.remote?.pending());
+      if (input.type !== 'keyDown' || (!downloads.size && !grabs.size && !phone) || PAGE_KEYS.has(input.code)) return;
       void contents
         .executeJavaScript('(() => { const e = document.activeElement; return Boolean(e && (e.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName))); })()', true)
         .then((typing) => typing || cabinetKey(input))

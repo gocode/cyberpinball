@@ -1522,6 +1522,23 @@ Two friend cabinets online; one plays a table while the other sends it news (sig
 | 796 | Kept from one start to the next | Quit Cyber Pinball and start it again; open Recent activity. Then "Effacer l'activité récente" (Clear recent activity). | The same lines, read or not as before. The question opens with Annuler (Cancel) chosen; "Effacer" (Delete) empties the list ("Aucune activité récente" (No recent activity)); friends, downloads and game history stay. |
 | 797 | Summary and guest mode | At the tables menu, let three kinds of news arrive at once (the system menu open meanwhile, then come back): click the "<n> nouveautés" (<n> new notifications) summary. Then turn guest mode on and click a summary again. | The click opens Recent activity, "Retour" (Back) returns to the tables menu. In guest mode, nothing opens: the padlock, as for the gear. |
 
+## The phone as a remote for the built-in browser
+
+A cabinet whose Cyber Pinball firewall rule is in place ("Partage et réseau", Sharing and network), a phone on the same Wi-Fi, a community site you have an account on. Tests on a real phone, which the off-screen tests do not replace.
+
+| # | Scenario | How | Expected result |
+|---|---|---|---|
+| 806 | The QR code | Open "Récupérer" (Get) (Site accounts > "Se connecter" (Sign in), or a download that needs the page). | In the banner, "TÉLÉCOMMANDE" (Remote), a QR code and "Scannez avec votre téléphone, sur le même Wi-Fi que la borne" (Scan with your phone, on the same Wi-Fi as the cabinet); the game name stays readable. |
+| 807 | Read the QR code | Scan the QR with an iPhone's camera, then an Android's. | The "CYBER PINBALL" page opens in the phone's browser, with nothing to install; "Comparez les codes" (Compare the codes) and a four-digit code. The banner shows the same code, "MÊME CODE ?" (Same code?) and the phone's name. |
+| 808 | Accept, refuse | Exit at the cabinet; scan the new QR, then Start. | Exit: the phone says "Connexion refusée" (Connection refused), a new QR shows, the browser stays open. Start: the phone switches to the touchpad, the banner says "TÉLÉPHONE CONNECTÉ" (Phone connected). |
+| 809 | Pointer and click | Swipe on the pad, slowly then quickly; tap a link. | The green pointer follows the finger on the page, without leaving the page; a tap clicks (a ring at the tip), the link opens. |
+| 810 | Scroll, right-click | Two fingers upwards; long press on a link. | The page scrolls in the fingers' direction; the long press opens "Clic droit" (Right-click) on the phone with "Ouvrir le lien" (Open the link). |
+| 811 | Sign in to the site | Tap the username field of the sign-in page, type with the phone's keyboard (accents included), "Champ suivant" (Next field), type the password, Enter. | The keyboard panel opens with the field's label; what is typed arrives in the cabinet's field, the password hidden on the phone; Enter sends the form, the site signs you in. |
+| 812 | Break and resume | Lock the phone for ten seconds, then unlock it; reload the phone page. | "Reconnexion en cours…" (Reconnecting…), then the pad comes back without a new acceptance. |
+| 813 | One phone only | While a phone drives, scan another one with a photo of the old QR. | The second phone says "QR code déjà utilisé" (QR code already used) or "Un téléphone est déjà connecté" (A phone is already connected); the first one still drives. |
+| 814 | Close | On the phone, "Fermer" (Close), then "Fermer le navigateur" (Close the browser). | The built-in browser closes; the phone says "Navigateur de la borne fermé" (Cabinet browser closed). Reload the phone page: it no longer drives anything. |
+| 815 | No firewall rule | On a cabinet without the Cyber Pinball rule (run from source, or rule removed), open "Récupérer". | The "TÉLÉCOMMANDE" block is greyed out, with its reason (firewall to allow, or run from source); no Windows firewall prompt appears. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

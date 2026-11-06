@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+    <meta name="theme-color" content="#030807" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="dark" />
+    <title data-i18n>Télécommande de la borne</title>
+    <link rel="stylesheet" href="theme.css" />
+    <link rel="stylesheet" href="telephone.css" />
+  </head>
+  <!-- Page du téléphone qui pilote la borne (telephone.js) ; servie par la borne sur le réseau
+       local (app/src/phone-remote.ts). États : body[data-state]. -->
+  <body data-state="connecting">
+    <header class="top">
+      <div class="brand" aria-label="Cyber Pinball">CYBER <b>PINBALL</b></div>
+      <div class="link" id="link" role="status"><span class="dot" aria-hidden="true"></span><span id="link-text" data-i18n>Connexion…</span></div>
+    </header>
+
+    <section class="page" id="page" aria-live="polite">
+      <span class="page-title" id="page-title"></span>
+      <span class="page-host" id="page-host"></span>
+    </section>
+
+    <main class="stage">
+      <div class="message" id="message">
+        <span class="message-mark" id="message-mark" aria-hidden="true"></span>
+        <div class="code" id="code" hidden></div>
+        <h1 class="message-title" id="message-title" data-i18n>Connexion à la borne…</h1>
+        <p class="message-text" id="message-text"></p>
+      </div>
+      <div class="pad" id="pad">
+        <div class="pad-hint" id="pad-hint">
+          <span data-i18n>Glissez pour déplacer le pointeur</span>
+          <span data-i18n>Touchez pour cliquer</span>
+          <span data-i18n>Deux doigts pour défiler</span>
+          <span data-i18n>Appui long pour le clic droit</span>
+        </div>
+      </div>
+    </main>
+
+    <form class="keys" id="keys" hidden autocomplete="off">
+      <div class="keys-head">
+        <label class="field-label" id="field-label" for="field"></label>
+        <button type="button" class="ghost" id="keys-hide" data-i18n>Masquer</button>
+        <span class="field-mark" id="field-mark" hidden></span>
+      </div>
+      <div class="field-row">
+        <input id="field" type="text" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="go" />
+        <button type="button" class="key" id="key-backspace"></button>
+      </div>
+      <div class="key-row">
+        <button type="button" class="key wide" id="key-tab" data-i18n>Champ suivant</button>
+        <button type="submit" class="key wide primary" id="key-enter" data-i18n>Entrée</button>
+      </div>
+    </form>
+
+    <nav class="tools" id="tools">
+      <button type="button" class="tool" id="nav-back"></button>
+      <button type="button" class="tool" id="nav-forward"></button>
+      <button type="button" class="tool" id="nav-keyboard"></button>
+      <button type="button" class="tool" id="nav-more"></button>
+      <button type="button" class="tool danger" id="nav-close"></button>
+    </nav>
+
+    <div class="sheet" id="sheet" hidden>
+      <div class="sheet-panel" role="dialog" aria-modal="true" aria-labelledby="sheet-title">
+        <div class="sheet-title" id="sheet-title"></div>
+        <div class="sheet-text" id="sheet-text" hidden></div>
+        <form class="sheet-search" id="sheet-search" hidden>
+          <input id="search-query" type="search" autocomplete="off" enterkeyhint="search" />
+          <button type="submit" class="key primary" data-i18n>Chercher</button>
+        </form>
+        <div class="sheet-actions" id="sheet-actions"></div>
+        <button type="button" class="key wide" id="sheet-cancel" data-i18n>Annuler</button>
+      </div>
+    </div>
+
+    <script src="catalogue.js"></script>
+    <script src="i18n.js"></script>
+    <script src="icons.js"></script>
+    <script src="telephone-core.js"></script>
+    <script src="telephone.js"></script>
+  </body>
+</html>

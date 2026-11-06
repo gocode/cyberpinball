@@ -124,6 +124,8 @@ export const ICON_NAMES = [
   'move-down',
   'zoom-in',
   'zoom-out',
+  'phone',
+  'backspace',
 ] as const;
 
 
