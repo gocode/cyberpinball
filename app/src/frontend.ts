@@ -194,6 +194,7 @@ import {
   readVpxScript as readTableScript,
   diskSpace,
   loadSocial,
+  type RemoteButton,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -625,8 +626,11 @@ function changeCollection(how: { step: -1 | 1 } | { id: string }): void {
 // Redessin de la file des téléchargements (downloadsChanged) : déclarés avant la gestion des tables, qui la crée.
 let downloadsRedraw: NodeJS.Timeout | undefined;
 let downloadsShown: string | undefined;
-// Télécommande du téléphone pour le navigateur intégré (phone-remote.ts) : réseau local réel en
-// usage normal, si la règle du pare-feu de Cyber Pinball est posée ; 127.0.0.1 pendant un essai.
+// Télécommande du téléphone (phone-remote.ts) : le navigateur intégré, puis tout le menu (setMenu,
+// plus bas) ; réseau local réel en usage normal, si la règle du pare-feu de Cyber Pinball est
+// posée ; 127.0.0.1 pendant un essai.
+/** Fichier qui arrive du téléphone : le bandeau du menu et l'écran de la télécommande le suivent. */
+let phoneUpload: { name: string; received: number; size: number } | undefined;
 const phoneRemote = createPhoneRemote({
   mode: () => phoneRemoteMode(process.env),
   firewall: async () => socialFirewall.state() ?? (await socialFirewall.check()),
@@ -687,6 +691,7 @@ const library = createLibrary({
   browserScreen: () => browserScreenRect(),
   audioOutput: () => audioOutput,
   phoneRemote,
+  phoneUpload: () => phoneUpload,
   openBrowserScreen: (back) => configurations.openBrowserScreen(undefined, back),
   broadcast: () => broadcast(),
   installVpx: () => {
@@ -709,6 +714,77 @@ const library = createLibrary({
 // Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes (pastille
 // rouge) ; jamais pendant une partie ni son chargement.
 library.watchHealth(() => state.phase === 'loading' || state.phase === 'playing');
+// Le téléphone pilote le menu quand « Récupérer » est fermé : ses boutons passent par handleKey
+// (portes du mode invité comprises, jamais la combinaison de déverrouillage), son texte remplace
+// celui du clavier à l'écran, un fichier envoyé arrive dans le dossier d'import (porte phone.files).
+let phoneUploadShown = 0;
+let phoneRedraw = false;
+phoneRemote.setMenu({
+  phase: () => (state.phase === 'loading' || state.phase === 'playing' ? 'game' : 'menu'),
+  screen: () => remoteScreen(),
+  field: () => (state.phase === 'library' ? library.remoteField() : undefined),
+  button: (b, down, repeat) => remoteButton(b, down, repeat),
+  setText: (value) => state.phase === 'library' && library.remoteSet(value),
+  enter: () => state.phase === 'library' && library.remoteEnter(),
+  uploadDir: () =>
+    !guest.knock('phone.files')
+      ? { refused: t('Indisponible en mode invité.') }
+      : loc.root
+        ? { dir: layoutOf(loc.root).import }
+        : { refused: t('Aucun dossier de Cyber Pinball sur cette borne.') },
+  uploading: (p) => {
+    const was = phoneUpload;
+    phoneUpload = p;
+    // Le bandeau du menu suit l'envoi (l'écran de la télécommande a sa propre barre), quatre fois par seconde au plus.
+    const text = p && !(state.phase === 'library' && library.remoteSurfaces().menu) ? phoneUploadBanner(p) : undefined;
+    if (text) state = { ...state, banner: text };
+    else if (was && state.banner === phoneUploadBanner(was)) state = { ...state, banner: undefined };
+    const now = Date.now();
+    if (p && now - phoneUploadShown < 250) return;
+    phoneUploadShown = now;
+    broadcast();
+  },
+  uploaded: (name) => showBanner(t('Reçu du téléphone : {name}, dans le dossier d’import', { name }), 'add-table'),
+  // Le bloc de la télécommande a changé : un redessin, après le geste en cours (jamais pendant broadcast).
+  changed: () => {
+    if (phoneRedraw) return;
+    phoneRedraw = true;
+    setImmediate(() => {
+      phoneRedraw = false;
+      broadcast();
+    });
+  },
+});
+
+/** En tête de la page du téléphone : l'écran du menu affiché et ce qui y est choisi. */
+function remoteScreen(): { title: string; item?: string; zone?: string } {
+  if (state.phase === 'loading' || state.phase === 'playing') return { title: playing?.title ?? tables[state.index]?.title ?? t('Partie en cours') };
+  if (state.phase === 'library') return library.remoteScreen() ?? { title: t('Menu système') };
+  if (state.phase === 'message') return { title: state.message?.title ?? '' };
+  if (state.phase === 'confirmQuit') return { title: t('Quitter Cyber Pinball ?') };
+  // La roue : la collection active, la table choisie ; MagnaSave y passe à la collection suivante.
+  return { title: collections.current().label || t('Menu des tables'), item: tables[state.index]?.title, zone: collections.locked() ? undefined : t('Collection suivante') };
+}
+
+/**
+ * Un bouton de la borne tenu au téléphone : la touche de ce bouton sur cette borne (interfaceKeys,
+ * zoneSwitchKeys), remise à handleKey comme une vraie touche. `repeat` : flipper tenu.
+ */
+function remoteButton(b: RemoteButton, down: boolean, repeat: boolean): void {
+  // MagnaSave : sur la roue, le droit (collection suivante, collections-menu.ts) ; ailleurs, la bascule entre la liste et les actions d'un écran.
+  const zone = state.phase === 'menu' ? (collectionKeys().next[0] ?? zoneSwitchKeys({ buttons, navigation })[0]) : zoneSwitchKeys({ buttons, navigation })[0];
+  const code = b === 'zone' ? zone : KEYS[b][0];
+  if (!code) return;
+  const input = { type: down ? 'keyDown' : 'keyUp', code, key: '', isAutoRepeat: repeat, isComposing: false, shift: false, control: false, alt: false, meta: false, location: 0, modifiers: [] } as unknown as Input;
+  if (down) handleKey(input, true);
+  else handleKeyUp(input, true);
+}
+
+/** Bandeau du menu pendant un envoi du téléphone. */
+function phoneUploadBanner(p: { name: string; received: number; size: number }): string {
+  const pct = p.size ? Math.floor((p.received / p.size) * 100) : 0;
+  return t('Réception depuis le téléphone · {pct} % · {name}', { pct, name: p.name });
+}
 // Configurations de la borne : la configuration active est nommée dans le sous-menu.
 const configurations = createConfigurationsMenu({
   loc,
@@ -1642,6 +1718,8 @@ export function startFrontend(): void {
   }
   app.on('before-quit', () => {
     closing = true;
+    // Le téléphone apprend que Cyber Pinball se ferme ; plus rien n'écoute.
+    phoneRemote.close();
     cabinetVolume?.stop();
     guest.dispose();
     mediaWatch?.close();
@@ -1984,10 +2062,15 @@ function unlockListening(): boolean {
   return state.phase !== 'loading' && state.phase !== 'playing' && !desktop.active;
 }
 
-/** Touche ou bouton relâché : la combinaison de déverrouillage, et la bascule des zones (MagnaSave, F6). */
-function handleKeyUp(input: Input): void {
-  cabinetVolume?.windowInput(input);
-  guest.input(input.code, false, unlockListening());
+/**
+ * Touche ou bouton relâché : la combinaison de déverrouillage, et la bascule des zones (MagnaSave, F6).
+ * `fromPhone` : relâché au téléphone (remoteButton), qui ne compte pas dans la combinaison.
+ */
+function handleKeyUp(input: Input, fromPhone = false): void {
+  if (!fromPhone) {
+    cabinetVolume?.windowInput(input);
+    guest.input(input.code, false, unlockListening());
+  }
   // Gestion des tables : MagnaSave (F6) relâché bascule entre la liste et les actions de l'écran.
   if (state.phase === 'library') library.handleKeyUp(input);
 }
@@ -1996,11 +2079,12 @@ function handleKeyUp(input: Input): void {
  * Touches et boutons du menu. En mode invité, chaque porte (GUEST_DOORS) laisse passer ou non :
  * fermée, rien ne se passe que l'indice « Verrouillé » près du cadenas.
  */
-function handleKey(input: Input): boolean {
-  cabinetVolume?.windowInput(input);
+function handleKey(input: Input, fromPhone = false): boolean {
+  if (!fromPhone) cabinetVolume?.windowInput(input);
   const is = (group: string[]) => group.includes(input.code);
-  // Un bouton de la combinaison appuyé pendant qu'un autre est tenu ne fait rien d'autre.
-  if (guest.input(input.code, true, unlockListening())) return true;
+  // Un bouton de la combinaison appuyé pendant qu'un autre est tenu ne fait rien d'autre. Le
+  // téléphone n'y entre pas : on ne déverrouille le mode invité qu'à la borne.
+  if (!fromPhone && guest.input(input.code, true, unlockListening())) return true;
   if (input.control && input.code === 'KeyQ') return guest.knock('shortcut.quit') ? quit() : true;
   // Extinction, veille ou redémarrage en cours : plus rien ne se choisit.
   if (state.phase === 'message' && state.message?.action === 'power') return true;
@@ -2012,6 +2096,21 @@ function handleKey(input: Input): boolean {
   if (attract.activity() || noticed) return leaveAttract();
   // Ouverture : n'importe quel bouton affiche la roue (pendant la lecture aussi), sans autre effet.
   if (state.phase === 'intro') return leaveIntro();
+
+  // Un téléphone a lu le QR de l'écran affiché (télécommande, clavier à l'écran) : Start et Exit
+  // sont à lui, jamais à l'écran derrière. Start l'accepte, Exit le refuse.
+  if (!fromPhone && !input.isAutoRepeat && state.phase === 'library' && (phoneRemote.pendingOn('menu') || phoneRemote.pendingOn('keyboard'))) {
+    if (is(KEYS.confirm)) {
+      phoneRemote.accept();
+      broadcast();
+      return true;
+    }
+    if (is(KEYS.exit)) {
+      phoneRemote.refuse();
+      broadcast();
+      return true;
+    }
+  }
 
   // La carte du retour d'une partie : Start rejoue, Exit rend la roue, un autre bouton la ferme (puis agit).
   if (gameReturnKey(input, is)) return true;
@@ -3549,4 +3648,9 @@ function broadcast(): void {
   for (const [role, win] of windows) {
     if (!win.isDestroyed()) win.webContents.send('state', viewFor(role));
   }
+  // Télécommande du téléphone : le QR vit tant que l'écran qui le montre est affiché ; le téléphone suit l'écran.
+  const surfaces = state.phase === 'library' && !desktop.active ? library.remoteSurfaces() : { menu: false, keyboard: false };
+  phoneRemote.show('menu', surfaces.menu);
+  phoneRemote.show('keyboard', surfaces.keyboard);
+  phoneRemote.menuChanged();
 }

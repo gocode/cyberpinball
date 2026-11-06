@@ -1536,7 +1536,7 @@ A cabinet whose Cyber Pinball firewall rule is in place ("Partage et réseau", S
 | 811 | Sign in to the site | Tap the username field of the sign-in page, type with the phone's keyboard (accents included), "Champ suivant" (Next field), type the password, Enter. | The keyboard panel opens with the field's label; what is typed arrives in the cabinet's field, the password hidden on the phone; Enter sends the form, the site signs you in. |
 | 812 | Break and resume | Lock the phone for ten seconds, then unlock it; reload the phone page. | "Reconnexion en cours…" (Reconnecting…), then the pad comes back without a new acceptance. |
 | 813 | One phone only | While a phone drives, scan another one with a photo of the old QR. | The second phone says "QR code déjà utilisé" (QR code already used) or "Un téléphone est déjà connecté" (A phone is already connected); the first one still drives. |
-| 814 | Close | On the phone, "Fermer" (Close), then "Fermer le navigateur" (Close the browser). | The built-in browser closes; the phone says "Navigateur de la borne fermé" (Cabinet browser closed). Reload the phone page: it no longer drives anything. |
+| 814 | Close | On the phone, "Fermer" (Close), then "Fermer le navigateur" (Close the browser). | The built-in browser closes; the phone switches to the menu buttons, still connected (see 824 onwards). |
 | 815 | No firewall rule | On a cabinet without the Cyber Pinball rule (run from source, or rule removed), open "Récupérer". | The "TÉLÉCOMMANDE" block is greyed out, with its reason (firewall to allow, or run from source); no Windows firewall prompt appears. |
 
 ## Collections and favourites
@@ -1553,6 +1553,24 @@ The cabinet with at least ten tables from several manufacturers and decades, som
 | 821 | Favourite from another installation | Take over a table from an installation where it is a favourite ("Ajouter une table" > "Depuis une autre installation…"). | After "Installer", it is in Favourites, its star before the title. |
 | 822 | Guest mode restricted to favourites | Menu système > Borne > Mode invité; Start on "Tables proposées" up to Favourites; "Activer le mode invité"; MagnaSave; then the unlock combination. | The menu only shows favourites, the padlock in the marker; MagnaSave only shows the "Verrouillé" hint; the help no longer mentions MagnaSave. After a restart, still restricted. Unlocked, the previous collection comes back. |
 | 823 | Attract mode within the collection | On Favourites, let the attract mode delay pass (Médias, son et attente > Mode attente). | Only Favourites tables come on screen. |
+
+
+## The phone as a remote for the menu
+
+The same cabinet and phone as tests 806 to 815, Cyber Pinball on the table menu. A table file (zip of a few tens of MB) on the phone.
+
+| # | Scenario | How | Expected result |
+|---|---|---|---|
+| 824 | The menu's QR | System menu > Cabinet > Phone remote. | The QR in large on the left, "Connecter un téléphone" (Connect a phone) on the right; nothing overflows, no "% lu" (% read). |
+| 825 | Accept in the menu | Scan the QR, compare the codes, Start at the cabinet. | The phone switches to the buttons (Start, two flippers, Exit, MagnaSave); the cabinet says "Téléphone connecté" (Phone connected); Start did nothing else on the screen. |
+| 826 | Navigate | Exit on the phone, then hold the right flipper for two seconds, then Start. | Exit closes the screen; the held flipper scrolls fast ("Défilement rapide", Fast scroll) and stops on release; Start opens the selected entry, like the cabinet's buttons. At the top of the phone, the screen and the selected entry. |
+| 827 | Type on the phone | Open an on-screen keyboard (Friends > Find a player, or Rename a configuration); type on the phone, accents included, then "Valider" (Confirm). | The keyboard panel opens with the cabinet's text; what is typed replaces the on-screen keyboard's text; "Valider" confirms, "Annuler" (Cancel) closes without keeping anything. |
+| 828 | The on-screen keyboard's QR | Disconnect the phone, open an on-screen keyboard; scan the QR of the "Taper au téléphone" (Type on your phone) strip, Start. | The strip shows the QR, then the code, then "Le téléphone connecté tape ici" (The connected phone types here); Start accepts without typing a key; the keys do not move. |
+| 829 | Send a file | "Envoyer" (Send), pick the table's zip. | The progress on the phone and in the cabinet's banner; "Reçu par la borne" (Received by the cabinet); the file is in `<root>\import`, and it shows up in System menu > Tables > Add a table. |
+| 830 | Transfer refused | Send a file over 2 GB; then, with guest mode on, a small file. | "Fichier trop volumineux. Maximum : 2 Go." (File too large); in guest mode, "Indisponible en mode invité." (Unavailable in guest mode); nothing reaches the import folder. |
+| 831 | Transfer interrupted | During a transfer, turn off the phone's Wi-Fi. | "Envoi interrompu" (Transfer interrupted) on the phone; the cabinet's banner disappears; no partial file stays in the import folder. |
+| 832 | Game and browser | Start a game; then, on return, open "Récupérer" (Get) and close it. | During the game, "Partie en cours" (Game in progress), Keyboard and Send greyed out ("Après la partie", After the game); on return, the buttons; "Récupérer" open: the touchpad; closed: the buttons, without a new acceptance. |
+| 833 | End of the link | Leave the phone 20 minutes without a gesture in the menu; then reconnect and quit Cyber Pinball. | "Télécommande déconnectée" (Remote disconnected) after 20 minutes; "Cyber Pinball fermé" (Cyber Pinball closed) on closing; afterwards, nothing answers at the QR's address. |
 
 ## What cannot be tested yet
 

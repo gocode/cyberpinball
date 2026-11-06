@@ -2,8 +2,10 @@
 // app/src/phone-remote.ts) : le chiffrement du téléphone, écrit en JavaScript pour une page servie
 // en HTTP, est comparé à celui de node:crypto ; l'appairage (QR à usage unique et périmé, code,
 // acceptation, refus, un seul téléphone, reprise) ; les adresses du réseau local ; ce que le
-// téléphone peut demander ; le pointeur ; le WebSocket minimal ; le QR code, décodé. Aucun test
-// n'ouvre de socket hors de 127.0.0.1. L'injection dans une vraie page : telecommande.test.ts.
+// téléphone peut demander ; le pointeur ; le WebSocket minimal ; le QR code, décodé. Deuxième
+// jalon (tout le menu) : boutons, texte du clavier à l'écran, envoi d'un fichier (noms nettoyés,
+// morceaux scellés, de gros morceaux aussi vite que juste). Aucun test n'ouvre de socket hors de
+// 127.0.0.1. L'injection dans une vraie page et dans le menu : telecommande.test.ts.
 
 import assert from 'node:assert/strict';
 import * as crypto from 'node:crypto';
@@ -12,8 +14,15 @@ import * as http from 'node:http';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import {
+  cleanUploadName,
   createRemotePairing,
   deviceLabel,
+  freeUploadName,
+  openRemoteBytes,
+  REMOTE_CHUNK,
+  REMOTE_UPLOAD_MAX,
+  sealRemoteBytes,
+  uploadAad,
   fromBase64Url,
   isLocalNetworkAddress,
   movePointer,
@@ -40,6 +49,7 @@ interface PhoneCore {
   toB64(bytes: Uint8Array): string;
   fromB64(text: string): Uint8Array | null;
   seal(key: Uint8Array, aad: Uint8Array, message: unknown, random?: (n: number) => Uint8Array): string;
+  sealBytes(key: Uint8Array, aad: Uint8Array, plain: Uint8Array, random?: (n: number) => Uint8Array): Uint8Array;
   open(key: Uint8Array, aad: Uint8Array, frame: string): unknown;
   textDiff(before: string, after: string): { del: number; ins: string };
   deviceName(ua: string): string;
@@ -376,4 +386,105 @@ test('page du téléphone : rien de chargé d’ailleurs, ni script dans la page
   assert.doesNotMatch(html, /<script>|\son\w+="/, 'aucun script en ligne (la politique de sécurité les refuse)');
   const served = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'phone-remote.ts'), 'utf8');
   for (const m of html.matchAll(/(?:src|href)="([^"]+)"/g)) assert.ok(m[1] === 'catalogue.js' || served.includes(`'/${m[1]}'`), `${m[1]} servi par phone-remote.ts`);
+});
+
+test('télécommande du menu : boutons de la borne, texte du clavier à l’écran, envoi ; rien d’autre', () => {
+  assert.deepEqual(parsePhoneMessage({ t: 'btn', s: 3, b: 'next', down: true }), { t: 'btn', s: 3, b: 'next', down: true });
+  assert.deepEqual(parsePhoneMessage({ t: 'btn', s: 3, b: 'zone', down: false }), { t: 'btn', s: 3, b: 'zone', down: false });
+  // Une ligne : saut de ligne et caractères de contrôle deviennent des espaces.
+  assert.deepEqual(parsePhoneMessage({ t: 'set', s: 3, value: 'Bille\nd’Été\u0007' }), { t: 'set', s: 3, value: 'Bille d’Été ' });
+  assert.deepEqual(parsePhoneMessage({ t: 'set', s: 3, value: '' }), { t: 'set', s: 3, value: '' });
+  assert.deepEqual(parsePhoneMessage({ t: 'up', s: 3, name: 'table.zip', size: 12 }), { t: 'up', s: 3, name: 'table.zip', size: 12 });
+  // Trop grand : lu quand même, la borne répond pourquoi (la liaison n'est pas coupée).
+  assert.deepEqual(parsePhoneMessage({ t: 'up', s: 3, name: 'x.7z', size: REMOTE_UPLOAD_MAX + 1 }), { t: 'up', s: 3, name: 'x.7z', size: REMOTE_UPLOAD_MAX + 1 });
+  assert.deepEqual(parsePhoneMessage({ t: 'up-cancel', s: 3 }), { t: 'up-cancel', s: 3 });
+  for (const bad of [
+    { t: 'btn', s: 3, b: 'tilt', down: true },
+    { t: 'btn', s: 3, b: 'help', down: true },
+    { t: 'btn', s: 3, b: 'next', down: 1 },
+    { t: 'btn', s: 3, b: 'next' },
+    { t: 'set', s: 3, value: 'x'.repeat(513) },
+    { t: 'set', s: 3, value: 42 },
+    { t: 'up', s: 3, name: 'x', size: -1 },
+    { t: 'up', s: 3, name: 'x', size: 1.5 },
+    { t: 'up', s: 3, name: 'x'.repeat(1025), size: 1 },
+    { t: 'up', s: 3, size: 1 },
+    { t: 'path', s: 3, dir: 'C:\\Windows' },
+  ])
+    assert.equal(parsePhoneMessage(bad), undefined, JSON.stringify(bad));
+});
+
+test('envoi : le nom du fichier, nettoyé, ne sort jamais du dossier d’import', () => {
+  const cases: [unknown, string | undefined][] = [
+    ['Neon Abyss 1.2 (VPW).zip', 'Neon Abyss 1.2 (VPW).zip'],
+    ['../../Windows/System32/evil.dll', 'evil.dll'],
+    ['..\\..\\autoexec.bat', 'autoexec.bat'],
+    ['D:\\Tables\\x\\table.vpx', 'table.vpx'],
+    ['a<b>c:d"e|f?g*.zip', 'a b c d e f g .zip'],
+    ['  .cache.zip  ', 'cache.zip'],
+    ['...', undefined],
+    ['', undefined],
+    ['nom.  ', 'nom'],
+    ['CON', '_CON'],
+    ['nul.txt', '_nul.txt'],
+    ['com1.zip', '_com1.zip'],
+    ['Bille\u0000\u001f.vpx', 'Bille .vpx'],
+    [42, undefined],
+  ];
+  const dir = path.resolve('import');
+  for (const [input, expected] of cases) {
+    const out = cleanUploadName(input);
+    assert.equal(out, expected, JSON.stringify(input));
+    if (!out) continue;
+    assert.doesNotMatch(out, /[\\/:*?"<>|\u0000-\u001f]/, out);
+    assert.ok(!out.startsWith('.') && !/[. ]$/.test(out), out);
+    assert.equal(path.dirname(path.resolve(dir, out)), dir, out);
+  }
+  // 120 caractères au plus, l'extension gardée.
+  const long = cleanUploadName(`${'é'.repeat(300)}.vpx`)!;
+  assert.ok([...long].length <= 120 && long.endsWith('.vpx'), long);
+  // Un nom pris : « (2) », « (3) »…
+  const taken = new Set(['table.zip', 'table (2).zip']);
+  assert.equal(freeUploadName('table.zip', (n) => taken.has(n)), 'table (3).zip');
+  assert.equal(freeUploadName('autre.zip', (n) => taken.has(n)), 'autre.zip');
+});
+
+test('envoi : morceaux scellés par le téléphone, ouverts par la borne ; un autre rang, envoi ou connexion n’ouvre rien', () => {
+  const key = crypto.randomBytes(32);
+  const challenge = crypto.randomBytes(16);
+  const plain = crypto.randomBytes(REMOTE_CHUNK);
+  const sealed = phone.sealBytes(key, uploadAad(challenge, 'abcdefghijk', 4), plain);
+  assert.equal(sealed.length, REMOTE_CHUNK + 28);
+  assert.deepEqual(Buffer.from(openRemoteBytes(key, uploadAad(challenge, 'abcdefghijk', 4), sealed)!), plain);
+  assert.equal(openRemoteBytes(key, uploadAad(challenge, 'abcdefghijk', 5), sealed), undefined, 'autre rang (morceau déplacé)');
+  assert.equal(openRemoteBytes(key, uploadAad(challenge, 'abcdefghijX', 4), sealed), undefined, 'autre envoi');
+  assert.equal(openRemoteBytes(key, uploadAad(crypto.randomBytes(16), 'abcdefghijk', 4), sealed), undefined, 'autre connexion');
+  assert.equal(openRemoteBytes(crypto.randomBytes(32), uploadAad(challenge, 'abcdefghijk', 4), sealed), undefined, 'autre clé');
+  const tampered = Buffer.from(sealed);
+  tampered[100] = tampered[100]! ^ 1;
+  assert.equal(openRemoteBytes(key, uploadAad(challenge, 'abcdefghijk', 4), tampered), undefined, 'morceau modifié');
+  assert.equal(openRemoteBytes(key, uploadAad(challenge, 'abcdefghijk', 4), Buffer.alloc(REMOTE_CHUNK + 29)), undefined, 'trop long');
+  // Et l'inverse : scellé par la borne, ouvert par le calcul du téléphone.
+  const back = sealRemoteBytes(key, Buffer.from('x'), plain);
+  assert.deepEqual(Buffer.from(phone.aeadOpen(key, back.subarray(0, 12), Buffer.from('x'), back.subarray(12))!), plain);
+});
+
+test('chiffrement : de gros morceaux, juste et assez vite (borne et téléphone, comparés à node:crypto)', () => {
+  for (const n of [REMOTE_CHUNK, REMOTE_CHUNK - 1, 1_000_003]) {
+    const key = crypto.randomBytes(32);
+    const nonce = crypto.randomBytes(12);
+    const aad = crypto.randomBytes(27);
+    const plain = crypto.randomBytes(n);
+    const c = crypto.createCipheriv('chacha20-poly1305', key, nonce, { authTagLength: 16 });
+    c.setAAD(aad, { plaintextLength: n });
+    const expected = Buffer.concat([c.update(plain), c.final(), c.getAuthTag()]);
+    assert.deepEqual(Buffer.from(aeadSeal(key, nonce, aad, plain)), expected, `borne, ${n} octets`);
+    assert.deepEqual(Buffer.from(phone.aeadSeal(key, nonce, aad, plain)), expected, `téléphone, ${n} octets`);
+  }
+  // 16 Mo scellés et ouverts en moins de 4 s (environ 0,4 s sur un PC de borne) : un envoi de 2 Go ne fige pas la borne.
+  const big = crypto.randomBytes(8 * 1024 * 1024);
+  const start = Date.now();
+  aeadOpen(crypto.randomBytes(32), crypto.randomBytes(12), Buffer.alloc(0), Buffer.concat([big, Buffer.alloc(16)]));
+  aeadSeal(crypto.randomBytes(32), crypto.randomBytes(12), Buffer.alloc(0), big);
+  assert.ok(Date.now() - start < 4000, `${Date.now() - start} ms pour 16 Mo`);
 });

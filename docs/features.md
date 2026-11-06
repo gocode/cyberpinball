@@ -353,7 +353,8 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 - **A QR code in the built-in browser's banner**: scan it with your phone, on the same Wi-Fi as the cabinet. Nothing to install: the page comes from the cabinet.
 - **A touchpad** for the pointer (tap: a click; two fingers: scroll; long press: right-click), **the phone's keyboard** as soon as a field of the page has the keyboard focus (username, hidden password, "Champ suivant" (Next field), Enter), Back, Forward, Close.
-- **You accept the phone at the cabinet**: the same four-digit code on both sides, Start to accept, Exit to refuse. One phone at a time; the QR changes every three minutes and serves only once; everything is cut when the browser closes.
+- **The whole menu, too**: System menu > Cabinet > Phone remote shows the QR in large, the on-screen keyboard shows a small one. The phone then holds **the cabinet's buttons** (Start, flippers, Exit, MagnaSave; a held flipper scrolls fast), **types instead of the on-screen keyboard** (search, player name, configuration name) and **sends a file to the import folder** (up to 2 GB, progress on both screens), which "Add a table" then offers.
+- **You accept the phone at the cabinet**: the same four-digit code on both sides, Start to accept, Exit to refuse. One phone at a time; the QR changes every three minutes and serves only once; the link follows the cabinet from the browser to the menu and ends after 20 minutes without a gesture in the menu. Guest mode applies to the phone too, which never unlocks it.
 - **Encrypted, and on the local network only**: nobody on the Wi-Fi reads what you type. Cyber Pinball records nothing you type: you sign in yourself.
 
 ### Site accounts

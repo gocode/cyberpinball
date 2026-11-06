@@ -45,6 +45,50 @@ test('télécommande du téléphone : appairage, injection et refus, de bout en 
   }
 });
 
+test('télécommande du téléphone dans tout le menu : boutons, clavier à l’écran, envoi d’un fichier, refus, de bout en bout', { skip: electron ? false : 'Electron sous Windows requis', timeout: 240_000 }, () => {
+  // docs/demo-telecommande-menu.cjs : la vraie gestion des tables (library.ts) hors écran, la vraie
+  // page du téléphone ; le QR lu sur la capture de l'écran, Start, les boutons tenus, la saisie,
+  // l'envoi octet pour octet ; puis les refus, une partie, le navigateur intégré, l'inactivité,
+  // Déconnecter et la fermeture. Le garde-fou de mise en page relit chaque écran de la borne.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-telecommande-menu-'));
+  try {
+    const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
+    delete env.ELECTRON_RUN_AS_NODE;
+    delete env.CYBERPINBALL_A_L_ECRAN;
+    const run = runElectron(electron!, [path.join(REPO_ROOT, 'docs', 'demo-telecommande-menu.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
+    assert.equal(run.status, 0, result);
+    assert.doesNotMatch(result, /ÉCHEC/, result);
+    assert.ok((result.match(/^OK /gm) ?? []).length >= 45, result);
+    for (const step of [
+      'le QR code de l’écran se lit sur la capture',
+      'Start accepte le téléphone : il pilote le menu',
+      'Exit au téléphone ferme l’écran',
+      'un flipper tenu au téléphone se répète',
+      'ce qui est tapé au téléphone remplace le texte du clavier à l’écran',
+      'Valider au téléphone : Entrée du clavier à l’écran',
+      'le fichier envoyé arrive dans le dossier d’import, octet pour octet',
+      'même nom déjà pris : « (2) »',
+      'plus de 2 Go : refusé',
+      'mode invité : envoi refusé',
+      'un nom qui remonte les dossiers reste dans le dossier d’import',
+      'un morceau scellé pour une autre connexion est refusé',
+      'le même morceau rejoué est refusé',
+      'les boutons du téléphone ne font rien pendant la partie',
+      '« Récupérer » fermé : le téléphone revient aux boutons du menu',
+      'le QR code sous le clavier à l’écran se lit sur la capture',
+      'Start accepte le téléphone sans taper de touche',
+      'sans geste au menu, la liaison se coupe',
+      'plus de QR affiché ni de téléphone : plus rien n’écoute',
+      'Cyber Pinball se ferme : le téléphone l’apprend',
+      'garde-fou de mise en page',
+    ])
+      assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
+});
+
 test('réseau : seuls social-net.ts et phone-remote.ts écoutent ; la télécommande, seulement sur le réseau local réel', () => {
   const src = path.join(REPO_ROOT, 'app', 'src');
   const listeners = fs

@@ -21,7 +21,6 @@ export const messages: Record<string, string> = {
   'Tables': 'Tables',
   'Toutes les tables et leur fiche, ajouter une table, téléchargements, bibliothèque de ROM': 'Every table and its page, add a table, downloads, ROM library',
   'Toutes les tables': 'All tables',
-  'Boutons, écrans, son, réglages de VPX, bureau Windows, mode invité': 'Buttons, screens, sound, VPX settings, Windows desktop, guest mode',
   'Migration': 'Migration',
   'Images et vidéos des tables, musique et mode attente du menu': 'Table images and videos, menu music and attract mode',
   'Langue, mise à jour, sauvegardes, migration, quitter, veille et extinction': 'Language, update, backups, migration, quit, sleep and shutdown',

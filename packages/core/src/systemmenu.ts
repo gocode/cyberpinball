@@ -33,6 +33,7 @@ export const SYSTEM_ITEM_IDS = [
   'cabinet',
   'vpx-settings',
   'controls',
+  'phone-remote',
   'dof',
   'desktop',
   'explorer',
@@ -117,8 +118,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'borne',
     icon: 'cabinet',
     get label() { return t('Borne'); },
-    get detail() { return t('Boutons, écrans, son, réglages de VPX, bureau Windows, mode invité'); },
-    entries: ['health', 'cabinet', 'vpx-settings', 'controls', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
+    get detail() { return t('Boutons, écrans, son, réglages de VPX, télécommande du téléphone, bureau Windows, mode invité'); },
+    entries: ['health', 'cabinet', 'vpx-settings', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -161,6 +162,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
   'vpx-settings': { icon: 'sliders', get label() { return t('Réglages de VPX'); } },
   controls: { icon: 'gamepad', get label() { return t('Commandes de la borne'); } },
+  // Le téléphone pilote la borne : boutons, clavier, envoi d'un fichier (app/src/phone-remote-menu.ts).
+  'phone-remote': { icon: 'phone', get label() { return t('Télécommande du téléphone'); } },
   dof: { icon: 'bulb', get label() { return t('LED et retours (DOF)'); } },
   desktop: { icon: 'desktop', get label() { return t('Bureau Windows'); } },
   // Seulement quand Cyber Pinball est le shell de Windows (borne dédiée) : à la place de « Bureau Windows ».

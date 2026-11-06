@@ -141,6 +141,7 @@ const CYBER_ICONS = {
   'star-filled': '<path d="M12 3l2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.4l6.1-.9z"/>', // Étoile compacte, remplie par le CSS : une table en favori.
   phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>', // Téléphone : la télécommande de la borne.
   backspace: '<path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-7-7z"/><path d="m12 9 6 6M18 9l-6 6"/>', // Touche Effacer (retour arrière) du clavier du téléphone.
+  upload: '<path d="M12 15V3M7 8l5-5 5 5M4 17v4h16v-4"/>', // Envoyer un fichier du téléphone vers la borne (le contraire de download).
 };
 
 /**

@@ -74,6 +74,8 @@ function renderLibrary(v) {
   else if (v.health) body.append(zoneFrame(renderHealth(v.health, v.cursor), v.zone));
   else if (v.media || v.sections.length) {
     const content = libEl('div', 'lib-content');
+    // Télécommande du téléphone : le QR code, le code à comparer ou le téléphone, en tête.
+    if (v.remote) content.append(renderRemote(v.remote, false));
     // Médias : le message du moment, puis les cartes, puis les sections titrées.
     const sections = v.media ? [...v.sections.filter((x) => !x.title), { cards: true }, ...v.sections.filter((x) => x.title)] : v.sections;
     for (const section of sections) {
@@ -731,6 +733,46 @@ function progressBar(value) {
   return bar;
 }
 
+// ---------- Télécommande du téléphone (app/src/phone-remote-menu.ts) ----------
+
+/**
+ * QR code : modules sombres sur fond clair (les téléphones le lisent le mieux ainsi), marge de
+ * quatre modules. Dessiné à 12 px le module puis réduit sans lissage (image-rendering) : net à
+ * toute taille, sans attendre la mise en page.
+ */
+function remoteQr(rows) {
+  const n = rows.length;
+  const quiet = 4;
+  const scale = 12;
+  const canvas = document.createElement('canvas');
+  canvas.className = 'lib-remote-qr';
+  canvas.width = canvas.height = (n + quiet * 2) * scale;
+  canvas.setAttribute('role', 'img');
+  canvas.setAttribute('aria-label', t('QR code de la télécommande'));
+  const g = canvas.getContext('2d');
+  g.fillStyle = '#e6f0ec';
+  g.fillRect(0, 0, canvas.width, canvas.height);
+  g.fillStyle = '#030807';
+  rows.forEach((row, y) => {
+    for (let x = 0; x < n; x++) if (row[x] === '1') g.fillRect((x + quiet) * scale, (y + quiet) * scale, scale, scale);
+  });
+  return canvas;
+}
+
+/** Le bloc : le QR, le code à comparer, ou le téléphone (connecté, ou grisé quand c'est indisponible). `compact` : sous le clavier à l'écran. */
+function renderRemote(r, compact) {
+  const box = libEl('div', `lib-remote phase-${r.phase}${compact ? ' lib-remote-band' : ''}`);
+  const left = libEl('div', 'lib-remote-left');
+  if (r.phase === 'offer' && r.qr) left.append(remoteQr(r.qr));
+  else if (r.phase === 'pending') left.append(libEl('div', 'lib-remote-code', r.code ?? ''));
+  else left.append(cyberIcon('phone', 'lib-remote-icon'));
+  const text = libEl('div', 'lib-remote-text');
+  text.append(libEl('div', 'lib-remote-title', r.title));
+  for (const line of r.lines) text.append(libEl('div', 'lib-remote-line', line));
+  box.append(left, text);
+  return box;
+}
+
 function renderEditor(e) {
   const box = libEl('div', `lib-editor editor-${e.kind}`);
   const panel = libEl('div', 'panel');
@@ -747,6 +789,8 @@ function renderEditor(e) {
     keys.append(button);
   });
   panel.append(keys);
+  // Taper au téléphone : une vraie rangée sous les touches, jamais par-dessus.
+  if (e.remote) panel.append(renderRemote(e.remote, true));
   box.append(panel);
   return box;
 }

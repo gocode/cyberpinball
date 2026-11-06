@@ -1,5 +1,6 @@
-// Le téléphone comme télécommande de la borne (docs/recherche/telecommande-telephone.md), premier
-// jalon : le navigateur intégré « Récupérer ». Une borne n'a souvent ni clavier ni souris, alors
+// Le téléphone comme télécommande de la borne (docs/recherche/telecommande-telephone.md). Premier
+// jalon : le navigateur intégré « Récupérer » ; deuxième (06/11/2026) : tout le menu, ses boutons,
+// son clavier à l'écran, et l'envoi d'un fichier vers le dossier d'import. Une borne n'a souvent ni clavier ni souris, alors
 // que les sites communautaires demandent de s'y connecter et d'y cliquer. Le bandeau du
 // navigateur montre un QR code ; le téléphone ouvre la page que sert la borne sur le réseau local
 // (aucun serveur externe, aucune application à installer) : un pavé tactile, son clavier, Retour,
@@ -16,9 +17,12 @@
 // - ce téléphone attend d'être accepté à la borne (Start, ou le bouton du bandeau), un code de
 //   quatre chiffres affiché des deux côtés ; sans réponse en REMOTE_ACCEPT_MS, il est refusé ;
 // - accepté, il reçoit une clé de session, qui le laisse revenir après une coupure (page rechargée,
-//   écran verrouillé, Wi-Fi perdu un instant) tant que le navigateur intégré reste ouvert ;
+//   écran verrouillé, Wi-Fi perdu un instant) tant que la liaison vit ;
 // - un seul téléphone à la fois : le QR disparaît tant qu'un téléphone attend ou pilote ;
-// - tout s'efface à la fermeture du navigateur intégré (createRemotePairing est recréé).
+// - la liaison vit tant que le menu de Cyber Pinball tourne, partie comprise ; elle se coupe quand
+//   le téléphone se déconnecte, qu'on le déconnecte à la borne, après REMOTE_IDLE_MS sans geste au
+//   menu, ou quand Cyber Pinball se ferme. Sans téléphone ni QR affiché, rien n'écoute et tout
+//   s'efface (createRemotePairing est recréé au prochain QR).
 //
 // Chiffrement : la page du téléphone est servie en HTTP (un certificat de la borne ferait afficher
 // au téléphone une alerte de sécurité), où le navigateur n'offre pas WebCrypto. Chaque message est
@@ -43,6 +47,16 @@ export const REMOTE_KEY_BYTES = 32;
 export const REMOTE_CHALLENGE_BYTES = 16;
 /** Plus long texte qu'un message de saisie apporte (une phrase, un mot de passe collé). */
 export const REMOTE_TEXT_MAX = 512;
+/** Au menu, sans geste du téléphone pendant ce délai (hors partie), la liaison se coupe. */
+export const REMOTE_IDLE_MS = 20 * 60_000;
+/** Plus gros fichier que le téléphone peut envoyer à la borne (une table avec son PuP-Pack). */
+export const REMOTE_UPLOAD_MAX = 2 * 1024 ** 3;
+/** Morceau d'un envoi, avant scellement : un message HTTP chacun, l'un après l'autre. */
+export const REMOTE_CHUNK = 256 * 1024;
+/** Place laissée libre sur le disque de la borne après un envoi. */
+export const REMOTE_UPLOAD_SPARE = 512 * 1024 ** 2;
+/** Sans morceau pendant ce délai, l'envoi est abandonné et ce qui était reçu effacé. */
+export const REMOTE_UPLOAD_IDLE_MS = 60_000;
 
 // ---------------------------------------------------------------------------
 // Encodage
@@ -76,6 +90,26 @@ export function sealRemote(key: Uint8Array, aad: Uint8Array, message: unknown, r
   const nonce = random(NONCE);
   const body = aeadSeal(key, nonce, aad, Buffer.from(JSON.stringify(message), 'utf8'));
   return toBase64Url(Buffer.concat([nonce, body]));
+}
+
+/**
+ * Données associées d'un morceau d'envoi : le défi de la borne pour cette connexion, l'envoi et
+ * le rang du morceau. Un morceau rejoué, déplacé ou d'un autre envoi ne s'ouvre pas.
+ */
+export function uploadAad(challenge: Uint8Array, id: string, index: number): Buffer {
+  return Buffer.concat([Buffer.from(challenge), Buffer.from(`envoi:${id}:${index}`, 'utf8')]);
+}
+
+/** Ouvre un morceau d'envoi (nonce 12 ‖ chiffré ‖ étiquette 16, en binaire) ; undefined s'il ne vient pas de cette clé, pour ces données associées. */
+export function openRemoteBytes(key: Uint8Array, aad: Uint8Array, raw: Uint8Array): Uint8Array | undefined {
+  if (raw.length < NONCE + TAG || raw.length > REMOTE_CHUNK + NONCE + TAG || key.length !== REMOTE_KEY_BYTES) return undefined;
+  return aeadOpen(key, raw.subarray(0, NONCE), aad, raw.subarray(NONCE));
+}
+
+/** Scelle un morceau d'envoi (pour les essais : la page du téléphone a sealBytes). */
+export function sealRemoteBytes(key: Uint8Array, aad: Uint8Array, plain: Uint8Array, random: (n: number) => Buffer = crypto.randomBytes): Buffer {
+  const nonce = random(NONCE);
+  return Buffer.concat([nonce, aeadSeal(key, nonce, aad, plain)]);
 }
 
 /** Ouvre une trame scellée par sealRemote (ou par le téléphone) ; undefined si elle ne vient pas de cette clé, pour ces données associées. */
@@ -259,6 +293,11 @@ export function createRemotePairing(opts: RemotePairingOptions = {}) {
       session.phase = 'paired';
       return true;
     },
+    /** Un téléphone attend ou pilote (sans créer de QR, contrairement à view). */
+    session(): 'pending' | 'paired' | undefined {
+      expire();
+      return session?.phase;
+    },
     /** Refusé à la borne, ou déconnecté : la clé de session ne vaut plus rien, un QR neuf s'affiche. */
     end(): boolean {
       const had = Boolean(session);
@@ -280,6 +319,9 @@ export type RemoteKey = 'Enter' | 'Tab' | 'Backspace' | 'ArrowLeft' | 'ArrowRigh
 const KEYS: readonly RemoteKey[] = ['Enter', 'Tab', 'Backspace', 'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Space'];
 export type RemoteNav = 'back' | 'forward' | 'home' | 'close' | 'reload';
 const NAVS: readonly RemoteNav[] = ['back', 'forward', 'home', 'close', 'reload'];
+/** Boutons de la borne que le téléphone tient au menu : les touches de l'interface en vigueur (interfaceKeys). */
+export type RemoteButton = 'previous' | 'next' | 'confirm' | 'exit' | 'zone';
+export const REMOTE_BUTTONS: readonly RemoteButton[] = ['previous', 'next', 'confirm', 'exit', 'zone'];
 
 /** Ce que le téléphone peut demander, une fois accepté. Rien d'autre ne passe. */
 export type PhoneMessage =
@@ -291,6 +333,13 @@ export type PhoneMessage =
   | { t: 'nav'; s: number; action: RemoteNav }
   | { t: 'act'; s: number; id: string }
   | { t: 'search'; s: number; query: string }
+  /** Au menu : un bouton de la borne appuyé ou relâché. */
+  | { t: 'btn'; s: number; b: RemoteButton; down: boolean }
+  /** Au menu : tout le texte du clavier à l'écran, tapé au téléphone. */
+  | { t: 'set'; s: number; value: string }
+  /** Envoi d'un fichier : son nom (nettoyé à la borne) et sa taille ; puis les morceaux en HTTP. */
+  | { t: 'up'; s: number; name: string; size: number }
+  | { t: 'up-cancel'; s: number }
   | { t: 'ping'; s: number }
   | { t: 'bye'; s: number };
 
@@ -325,6 +374,18 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       return typeof m.id === 'string' && /^[a-z0-9:-]{1,40}$/.test(m.id) ? { t: 'act', s, id: m.id } : undefined;
     case 'search':
       return typeof m.query === 'string' && m.query.trim() && m.query.length <= 300 ? { t: 'search', s, query: m.query.replace(/[\u0000-\u001f\u007f]/g, ' ') } : undefined;
+    case 'btn':
+      return REMOTE_BUTTONS.includes(m.b as RemoteButton) && typeof m.down === 'boolean' ? { t: 'btn', s, b: m.b as RemoteButton, down: m.down } : undefined;
+    case 'set': {
+      if (typeof m.value !== 'string' || [...m.value].length > REMOTE_TEXT_MAX) return undefined;
+      // Une ligne : ni saut de ligne ni caractère de contrôle dans un nom ou une recherche.
+      return { t: 'set', s, value: m.value.replace(/[\u0000-\u001f\u007f]/g, ' ') };
+    }
+    case 'up':
+      // La taille est lue telle quelle : trop grande, la borne répond pourquoi (plutôt que couper la liaison).
+      return typeof m.name === 'string' && m.name.length <= 1024 && typeof m.size === 'number' && Number.isSafeInteger(m.size) && m.size >= 0 ? { t: 'up', s, name: m.name, size: m.size } : undefined;
+    case 'up-cancel':
+      return { t: 'up-cancel', s };
     case 'ping':
       return { t: 'ping', s };
     case 'bye':
@@ -405,4 +466,55 @@ export function readRemoteField(raw: unknown): RemoteField | undefined {
   const kinds: readonly RemoteFieldKind[] = ['text', 'password', 'email', 'number', 'tel', 'url', 'search', 'multiline'];
   if (!kinds.includes(r.kind as RemoteFieldKind)) return undefined;
   return { kind: r.kind as RemoteFieldKind, label: typeof r.label === 'string' ? r.label.replace(/[\u0000-\u001f]/g, ' ').slice(0, 60) : '', ...(r.focused === true ? { focused: true } : {}) };
+}
+
+
+// ---------------------------------------------------------------------------
+// Envoi d'un fichier
+
+/** Noms que Windows réserve à des périphériques, quelle que soit l'extension (« con.txt »). */
+const RESERVED = /^(con|prn|aux|nul|com[0-9¹²³]|lpt[0-9¹²³])$/i;
+
+/**
+ * Nom d'un fichier envoyé par le téléphone, tel qu'il sera rangé dans le dossier d'import : le
+ * dernier élément seulement (rien d'un chemin), sans caractère interdit par Windows ni de
+ * contrôle, sans point ni espace au bout, sans point au début (le dossier d'import ignore les
+ * fichiers cachés), jamais un nom de périphérique, 120 caractères au plus en gardant
+ * l'extension. undefined : il ne reste rien de lisible.
+ */
+export function cleanUploadName(name: unknown): string | undefined {
+  if (typeof name !== 'string') return undefined;
+  let base = name.normalize('NFC').split(/[\\/]/).pop() ?? '';
+  base = base
+    .replace(/[\u0000-\u001f\u007f<>:"|?*]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^[.\s]+/, '')
+    .replace(/[.\s]+$/, '');
+  if (!base) return undefined;
+  const dot = base.lastIndexOf('.');
+  let stem = dot > 0 ? base.slice(0, dot) : base;
+  let ext = dot > 0 ? base.slice(dot) : '';
+  if (ext.length > 16) {
+    stem = base;
+    ext = '';
+  }
+  if (RESERVED.test(stem.split('.')[0]!.trim())) stem = `_${stem}`;
+  const room = 120 - ext.length;
+  if ([...stem].length > room) stem = [...stem].slice(0, room).join('').trim();
+  const out = `${stem}${ext}`.replace(/[.\s]+$/, '');
+  return out || undefined;
+}
+
+/** « table.zip », « table (2).zip », … : le premier nom que `taken` ne connaît pas. */
+export function freeUploadName(name: string, taken: (candidate: string) => boolean): string {
+  if (!taken(name)) return name;
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : '';
+  for (let n = 2; n < 1000; n++) {
+    const candidate = `${stem} (${n})${ext}`;
+    if (!taken(candidate)) return candidate;
+  }
+  return `${stem} (${Date.now()})${ext}`;
 }

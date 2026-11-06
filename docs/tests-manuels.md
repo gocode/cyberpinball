@@ -1536,7 +1536,7 @@ Une borne dont la règle du pare-feu de Cyber Pinball est posée (« Partage et 
 | 811 | Se connecter au site | Toucher le champ de l'identifiant de la page de connexion, taper avec le clavier du téléphone (accents compris), « Champ suivant », taper le mot de passe, Entrée. | Le panneau du clavier s'ouvre avec le libellé du champ ; ce qui est tapé arrive dans le champ de la borne, le mot de passe masqué sur le téléphone ; Entrée envoie le formulaire, le site vous connecte. |
 | 812 | Coupure et reprise | Verrouiller le téléphone dix secondes, puis le déverrouiller ; recharger la page du téléphone. | « Reconnexion en cours… », puis le pavé revient sans nouvelle acceptation. |
 | 813 | Un seul téléphone | Pendant qu'un téléphone pilote, en scanner un autre avec une photo de l'ancien QR. | Le second téléphone dit « QR code déjà utilisé » ou « Un téléphone est déjà connecté » ; le premier pilote toujours. |
-| 814 | Fermer | Sur le téléphone, « Fermer », puis « Fermer le navigateur ». | Le navigateur intégré se ferme ; le téléphone dit « Navigateur de la borne fermé ». Recharger la page du téléphone : elle ne pilote plus rien. |
+| 814 | Fermer | Sur le téléphone, « Fermer », puis « Fermer le navigateur ». | Le navigateur intégré se ferme ; le téléphone passe aux boutons du menu, toujours connecté (voir 824 et suivants). |
 | 815 | Pare-feu absent | Sur une borne sans la règle de Cyber Pinball (lancée depuis ses sources, ou règle retirée), ouvrir « Récupérer ». | Le bloc « TÉLÉCOMMANDE » est grisé, avec sa raison (pare-feu à autoriser, ou lancé depuis les sources) ; aucune invite du pare-feu de Windows n'apparaît. |
 
 ## Collections et favoris
@@ -1553,6 +1553,23 @@ La borne avec au moins dix tables de plusieurs fabricants et décennies, dont ce
 | 821 | Favori d'une autre installation | Reprendre une table d'une installation où elle est en favori (« Ajouter une table » > « Depuis une autre installation… »). | Après « Installer », elle est dans Favoris, son étoile devant le titre. |
 | 822 | Mode invité limité aux favoris | Menu système > Borne > Mode invité ; Start sur « Tables proposées » jusqu'à Favoris ; « Activer le mode invité » ; MagnaSave ; puis la combinaison de déverrouillage. | Le menu ne montre que les favoris, le cadenas dans le repère ; MagnaSave ne fait que l'indice « Verrouillé » ; l'aide ne parle plus des MagnaSave. Au redémarrage, toujours limité. Déverrouillé, la collection d'avant revient. |
 | 823 | Mode attente dans la collection | Sur Favoris, laisser passer le délai du mode attente (Médias, son et attente > Mode attente). | Seules des tables de Favoris passent à l'écran. |
+
+## Le téléphone comme télécommande du menu
+
+La même borne et le même téléphone que les tests 806 à 815, Cyber Pinball au menu des tables. Un fichier de table (zip de quelques dizaines de Mo) sur le téléphone.
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 824 | Le QR du menu | Menu système > Borne > Télécommande du téléphone. | Le QR en grand à gauche, « Connecter un téléphone » à droite ; rien ne déborde, pas de « % lu ». |
+| 825 | Accepter au menu | Scanner le QR, comparer les codes, Start à la borne. | Le téléphone passe aux boutons (Start, deux flippers, Exit, MagnaSave) ; la borne dit « Téléphone connecté » ; Start n'a rien fait d'autre sur l'écran. |
+| 826 | Naviguer | Exit au téléphone, puis tenir le flipper droit deux secondes, puis Start. | Exit ferme l'écran ; le flipper tenu fait défiler vite (« Défilement rapide ») et s'arrête au relâchement ; Start ouvre l'entrée choisie, comme les boutons de la borne. En tête du téléphone, l'écran et l'entrée choisie. |
+| 827 | Taper au téléphone | Ouvrir un clavier à l'écran (Amis > Trouver un joueur, ou Renommer une configuration) ; taper au téléphone, accents compris, puis « Valider ». | Le panneau du clavier s'ouvre avec le texte de la borne ; ce qui est tapé remplace le texte du clavier à l'écran ; « Valider » valide, « Annuler » ferme sans rien garder. |
+| 828 | Le QR du clavier à l'écran | Déconnecter le téléphone, ouvrir un clavier à l'écran ; scanner le QR de la bande « Taper au téléphone », Start. | La bande montre le QR, puis le code, puis « Le téléphone connecté tape ici » ; Start accepte sans taper de touche ; les touches ne bougent pas. |
+| 829 | Envoyer un fichier | « Envoyer », choisir le zip de la table. | La progression sur le téléphone et dans le bandeau de la borne ; « Reçu par la borne » ; le fichier est dans `<racine>\import`, et il paraît dans Menu système > Tables > Ajouter une table. |
+| 830 | Envoi refusé | Envoyer un fichier de plus de 2 Go ; puis, mode invité activé, un petit fichier. | « Fichier trop volumineux. Maximum : 2 Go. » ; en mode invité, « Indisponible en mode invité. » ; rien n'arrive dans le dossier d'import. |
+| 831 | Envoi interrompu | Pendant un envoi, couper le Wi-Fi du téléphone. | « Envoi interrompu » sur le téléphone ; le bandeau de la borne disparaît ; aucun fichier partiel ne reste dans le dossier d'import. |
+| 832 | Partie et navigateur | Lancer une partie ; puis, au retour, ouvrir « Récupérer » et le fermer. | Pendant la partie, « Partie en cours », Clavier et Envoyer grisés (« Après la partie ») ; au retour, les boutons ; « Récupérer » ouvert : le pavé tactile ; fermé : les boutons, sans nouvelle acceptation. |
+| 833 | Fin de la liaison | Laisser le téléphone 20 minutes sans geste au menu ; puis reconnecter et quitter Cyber Pinball. | « Télécommande déconnectée » après 20 minutes ; « Cyber Pinball fermé » à la fermeture ; ensuite, plus rien ne répond à l'adresse du QR. |
 
 ## Ce qui ne peut pas encore être testé
 

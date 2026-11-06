@@ -353,7 +353,8 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 - **Un QR code dans le bandeau du navigateur intégré** : scannez-le avec votre téléphone, sur le même Wi-Fi que la borne. Rien à installer : la page vient de la borne.
 - **Un pavé tactile** pour le pointeur (toucher : un clic ; deux doigts : défiler ; appui long : clic droit), **le clavier du téléphone** dès qu'un champ de la page a le clavier (identifiant, mot de passe masqué, « Champ suivant », Entrée), Retour, Avancer, Fermer.
-- **Vous acceptez le téléphone à la borne** : le même code de quatre chiffres des deux côtés, Start pour accepter, Exit pour refuser. Un seul téléphone à la fois ; le QR change toutes les trois minutes et ne sert qu'une fois ; tout se coupe quand le navigateur se ferme.
+- **Tout le menu, aussi** : Menu système > Borne > Télécommande du téléphone montre le QR en grand, le clavier à l'écran en montre un petit. Le téléphone tient alors **les boutons de la borne** (Start, flippers, Exit, MagnaSave ; un flipper tenu fait défiler vite), **tape à la place du clavier à l'écran** (recherche, nom d'un joueur, d'une configuration) et **envoie un fichier dans le dossier d'import** (jusqu'à 2 Go, la progression sur les deux écrans), qu'« Ajouter une table » propose ensuite.
+- **Vous acceptez le téléphone à la borne** : le même code de quatre chiffres des deux côtés, Start pour accepter, Exit pour refuser. Un seul téléphone à la fois ; le QR change toutes les trois minutes et ne sert qu'une fois ; la liaison suit la borne du navigateur au menu et se coupe après 20 minutes sans geste au menu. Le mode invité s'applique aussi au téléphone, qui ne le déverrouille jamais.
 - **Chiffré, et sur le réseau local seulement** : personne sur le Wi-Fi ne lit ce que vous tapez. Cyber Pinball n'enregistre rien de ce que vous tapez : c'est vous qui vous connectez.
 
 ### Comptes des sites

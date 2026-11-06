@@ -1,14 +1,28 @@
-// Le téléphone comme télécommande du navigateur intégré « Récupérer » (packages/core/src/remote.ts
-// pour l'appairage, le chiffrement et la lecture des messages). Tant que la fenêtre est ouverte, la
-// borne sert sur le réseau local la page du téléphone (app/renderer/telephone/*) et sa liaison
-// WebSocket ; le bandeau montre le QR code, puis le téléphone à accepter, puis celui qui pilote.
+// Le téléphone comme télécommande de la borne (packages/core/src/remote.ts pour l'appairage, le
+// chiffrement et la lecture des messages). La borne sert sur le réseau local la page du téléphone
+// (app/renderer/telephone/*) et sa liaison WebSocket tant qu'un QR code est affiché ou qu'un
+// téléphone est là. Trois endroits montrent le QR (RemoteSurface) : le bandeau du navigateur intégré
+// « Récupérer », l'écran Menu système > Borne > Télécommande du téléphone, et le clavier à l'écran ;
+// puis le téléphone à accepter, puis celui qui pilote.
 //
-// Le téléphone ne touche qu'à la page du site (la vue sous le bandeau) : ses gestes y sont injectés
+// Ce que pilote le téléphone dépend de ce que la borne montre (RemoteMode) : la page du site quand
+// « Récupérer » est ouvert (browser), le menu sinon (menu : ses boutons, son clavier à l'écran,
+// l'envoi d'un fichier vers le dossier d'import), rien pendant une partie (game). La liaison vit tant
+// que Cyber Pinball tourne ; elle se coupe quand le téléphone se déconnecte, qu'on le déconnecte à la
+// borne, après REMOTE_IDLE_MS sans geste au menu, ou à la fermeture (close).
+//
+// Au navigateur :
+// le téléphone ne touche qu'à la page du site (la vue sous le bandeau) : ses gestes y sont injectés
 // comme ceux d'une souris et d'un clavier (sendInputEvent, insertText), avec un pointeur dessiné
 // par-dessus (une petite vue transparente, app/renderer/remote-pointer.html), car le pointeur de
 // Windows ne bouge pas. Jamais le bandeau (on n'y accepte pas un téléphone depuis ce téléphone),
 // jamais une touche qui fermerait la fenêtre (Échap), jamais la valeur d'un champ : la sonde du
 // champ actif n'en lit que la nature et le libellé. C'est l'utilisateur qui tape.
+//
+// Au menu : les boutons passent par le chemin des touches de la borne (frontend.ts, remoteButton),
+// portes du mode invité comprises ; le texte remplace celui du clavier à l'écran ; un fichier arrive
+// en morceaux scellés (POST /envoi), écrit à part (.envoi-*.part) puis renommé dans le dossier
+// d'import, jamais ailleurs, 2 Go au plus, place vérifiée.
 //
 // Réseau (décidé le 06/11/2026) : en usage normal, l'écoute porte sur toutes les cartes, mais ne
 // répond qu'aux adresses du réseau local (isLocalNetworkAddress), et seulement si la règle du
@@ -17,7 +31,7 @@
 // elle, rien n'écoute (Windows afficherait son invite, que personne ne peut valider à la borne, et
 // poserait des règles bloquantes qui couperaient aussi le réseau des amis) : le bloc reste visible,
 // grisé avec la raison. Pendant un essai (réseau simulé ou coupé, docs\demo-telecommande.ps1) :
-// 127.0.0.1 seulement. Tout s'arrête à la fermeture de la fenêtre : écoute, liaison, clés.
+// 127.0.0.1 seulement. Sans QR affiché ni téléphone, tout s'arrête : écoute, liaison, clés.
 
 import * as fs from 'node:fs';
 import * as http from 'node:http';
@@ -27,7 +41,18 @@ import * as crypto from 'node:crypto';
 import { WebContentsView, type BrowserWindow, type WebContents } from 'electron';
 import {
   acceptWebSocket,
+  cleanUploadName,
   createRemotePairing,
+  formatSize,
+  freeUploadName,
+  openRemoteBytes,
+  REMOTE_CHUNK,
+  REMOTE_IDLE_MS,
+  REMOTE_UPLOAD_IDLE_MS,
+  REMOTE_UPLOAD_MAX,
+  REMOTE_UPLOAD_SPARE,
+  renameWithRetryAsync,
+  uploadAad,
   isLocalNetworkAddress,
   language,
   localeOf,
@@ -50,6 +75,7 @@ import {
   type FirewallState,
   type PhoneMessage,
   type RemoteField,
+  type RemoteButton,
   type RemoteNav,
   type RemotePairing,
   type WebSocketLink,
@@ -84,6 +110,43 @@ export type RemoteBar =
   | { phase: 'paired'; title: string; line: string }
   | { phase: 'off'; title: string; line: string };
 
+/** Ce que pilote le téléphone : la page du navigateur intégré, le menu, ou rien (une partie). */
+export type RemoteMode = 'browser' | 'menu' | 'game';
+
+/** Où le QR code est affiché : bandeau de « Récupérer », écran de la télécommande, clavier à l'écran. */
+export type RemoteSurface = 'browser' | 'menu' | 'keyboard';
+
+/** Le clavier à l'écran du menu, tel que le téléphone le remplit (son texte n'est pas secret : un nom, une recherche). */
+export interface MenuField {
+  /** Change à chaque ouverture du clavier : le téléphone repart alors du texte de la borne. */
+  id: number;
+  kind: 'text' | 'number';
+  label: string;
+  value: string;
+}
+
+/** Ce que le menu donne à la télécommande (frontend.ts) : ce qu'il montre, ses boutons, son clavier, le dossier d'import. */
+export interface MenuTarget {
+  /** Le menu, ou une partie (VPX a les boutons). */
+  phase(): 'menu' | 'game';
+  /** L'écran affiché et ce qui y est choisi, montrés en tête de la page du téléphone ; `zone` : ce que fait MagnaSave ici. */
+  screen(): { title: string; item?: string; zone?: string };
+  field(): MenuField | undefined;
+  /** Un bouton de la borne appuyé (`repeat` : tenu) ou relâché. */
+  button(b: RemoteButton, down: boolean, repeat: boolean): void;
+  setText(value: string): void;
+  /** Entrée : le clavier à l'écran valide. */
+  enter(): void;
+  /** Le dossier où ranger un fichier envoyé, ou pourquoi c'est refusé (mode invité, pas de dossier). */
+  uploadDir(): { dir: string } | { refused: string };
+  /** Envoi en cours (pour le bandeau du menu), undefined quand il est fini ou abandonné. */
+  uploading(p: { name: string; received: number; size: number } | undefined): void;
+  /** Fichier rangé dans le dossier d'import sous ce nom. */
+  uploaded(name: string): void;
+  /** Le bloc de la télécommande a changé (QR renouvelé, téléphone à accepter) : redessiner le menu. */
+  changed(): void;
+}
+
 /** Ce que la fenêtre « Récupérer » donne à la télécommande pendant qu'elle est ouverte. */
 export interface RemoteTarget {
   win: BrowserWindow;
@@ -112,6 +175,8 @@ export interface PhoneRemoteOptions {
   interfaces?(): ReturnType<typeof os.networkInterfaces>;
   /** Dossier des pages (app/renderer). */
   rendererDir?: string;
+  /** Inactivité au menu avant la coupure (essais) ; par défaut REMOTE_IDLE_MS. */
+  idleMs?: number;
 }
 
 /**
@@ -135,6 +200,11 @@ const MAX_LINKS = 4;
 const FIELD_POLL_MS = 700;
 /** Un clic droit du téléphone : le menu de la page qui suit dans ce délai lui revient. */
 const MENU_MS = 1500;
+/** Flipper tenu au téléphone : après ce délai, l'appui se répète (le menu accélère comme sous un vrai bouton). */
+const HOLD_DELAY_MS = 400;
+const HOLD_REPEAT_MS = 70;
+/** Un bouton qui reste tenu plus longtemps est relâché (doigt perdu, téléphone en veille). */
+const HOLD_MAX_MS = 20_000;
 /** Taille de la vue du pointeur ; sa pointe est à POINTER_TIP du coin. */
 const POINTER_BOX = { width: 50, height: 56 };
 const POINTER_TIP = 16;
@@ -158,12 +228,30 @@ interface Link {
   seqOut: number;
 }
 
+/** Un fichier qui arrive du téléphone : écrit dans `part` (caché), renommé à la fin dans le dossier d'import. */
+interface Upload {
+  id: string;
+  link: Link;
+  dir: string;
+  name: string;
+  part: string;
+  file: fs.promises.FileHandle;
+  size: number;
+  received: number;
+  index: number;
+  last: number;
+  busy: boolean;
+}
+
 export function createPhoneRemote(opts: PhoneRemoteOptions) {
   const log = opts.log ?? ((line: string) => console.log(line));
   const rendererDir = opts.rendererDir ?? path.join(__dirname, '..', 'renderer');
   const interfaces = opts.interfaces ?? os.networkInterfaces;
 
   let target: RemoteTarget | undefined;
+  let menu: MenuTarget | undefined;
+  /** Endroits qui montrent le QR code maintenant. */
+  const surfaces = new Set<RemoteSurface>();
   let pairing: RemotePairing | undefined;
   let server: http.Server | undefined;
   let address: { host: string; port: number } | undefined;
@@ -183,15 +271,26 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let pageSent = '';
   let menuUntil = 0;
   /** Actions du menu de la page (clic droit du téléphone), par identifiant. */
-  let menu = new Map<string, () => void>();
-  /** Gestes du téléphone en cours d'injection : un à la fois, dans l'ordre. */
+  let menuItems = new Map<string, () => void>();
+  /** Gestes du téléphone en cours d'injection : un à la fois, dans l'ordre ; oubliés quand le mode change. */
   let queue: Promise<void> = Promise.resolve();
   let generation = 0;
+  /** Ouverture de l'écoute : une écoute lancée pour une ouverture précédente se referme. */
+  let wakeRun = 0;
+  /** Dernier mode, écran et champ envoyés au téléphone. */
+  let modeSent: RemoteMode | undefined;
+  let screenSent = '';
+  /** Dernier geste du téléphone (hors ping) : au menu, sans geste pendant REMOTE_IDLE_MS, la liaison se coupe. */
+  let lastActivity = Date.now();
+  /** Boutons de la borne tenus au téléphone : la répétition, et l'arrêt de sûreté. */
+  const holds = new Map<RemoteButton, { timer: NodeJS.Timeout; until: number }>();
+  /** Envoi d'un fichier en cours, un seul, lié à la connexion qui l'a demandé. */
+  let upload: Upload | undefined;
 
   // --- Bandeau ---------------------------------------------------------------
 
   function bar(): RemoteBar | undefined {
-    if (!target) return undefined;
+    if (!pairing && !surfaces.size) return undefined;
     if (unavailable) return { phase: 'off', title: t('Télécommande'), line: unavailable };
     if (!pairing || !address) return { phase: 'off', title: t('Télécommande'), line: t('Préparation…') };
     const view = pairing.view();
@@ -216,13 +315,20 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     lastBar = b;
     lastPhase = now?.phase;
     target?.changed();
+    menu?.changed();
+  }
+
+  /** Ce que pilote le téléphone maintenant. */
+  function mode(): RemoteMode {
+    if (target) return 'browser';
+    return menu ? menu.phase() : 'browser';
   }
 
   // --- Serveur -----------------------------------------------------------------
 
   function securityHeaders(host: string): Record<string, string> {
     return {
-      'Content-Security-Policy': `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src ws://${host}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
+      'Content-Security-Policy': `default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src 'self' ws://${host}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`,
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'no-referrer',
       'X-Frame-Options': 'DENY',
@@ -248,6 +354,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   function serve(req: http.IncomingMessage, res: http.ServerResponse): void {
     const url = (req.url ?? '/').split('?')[0]!;
+    if (allowed(req) && req.method === 'POST' && url.startsWith('/envoi/')) return void receiveChunk(req, res, url);
     if (!allowed(req) || (req.method !== 'GET' && req.method !== 'HEAD')) {
       res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8', Connection: 'close' }).end();
       return;
@@ -280,8 +387,10 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     ws.onClose(() => {
       links.delete(ws);
       if (active?.ws === ws) {
+        if (upload?.link === active) void abortUpload(undefined);
         active = undefined;
         showPointer(false);
+        releaseButtons();
       }
     });
     const inbound = crypto.randomBytes(REMOTE_CHALLENGE_BYTES);
@@ -347,10 +456,14 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     link.ws.send(sealRemote(link.key, link.outbound, { ...message, s: ++link.seqOut }));
   }
 
-  function endLink(link: Link, why: 'refused' | 'ended' | 'closed'): void {
+  function endLink(link: Link, why: 'refused' | 'ended' | 'closed' | 'idle' | 'quit'): void {
+    if (upload?.link === link) void abortUpload(undefined);
     sendTo(link, { t: 'end', why });
     link.ws.close();
-    if (active === link) active = undefined;
+    if (active === link) {
+      active = undefined;
+      releaseButtons();
+    }
     showPointer(false);
   }
 
@@ -358,11 +471,54 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   function ready(link: Link): void {
     sendTo(link, { t: 'ready' });
-    pageSent = '';
-    fieldSent = 'null';
-    pushPage(true);
-    pushField(true);
-    showPointer(true);
+    lastActivity = Date.now();
+    pushState(true);
+  }
+
+  /** Mode, puis ce que le mode montre : la page et son champ, ou l'écran du menu et son clavier. */
+  function pushState(force = false): void {
+    if (!active || pairing?.session() !== 'paired') return;
+    const m = mode();
+    if (force || m !== modeSent) {
+      modeSent = m;
+      // Ce qui était en cours d'injection pour l'autre mode est oublié ; un bouton tenu, relâché.
+      generation++;
+      releaseButtons();
+      pageSent = '';
+      fieldSent = 'null';
+      screenSent = '';
+      sendTo(active, { t: 'mode', mode: m });
+      force = true;
+    }
+    showPointer(m === 'browser');
+    if (m === 'browser') {
+      pushPage(force);
+      pushField(force);
+      return;
+    }
+    pushScreen(force);
+    pushMenuField(force);
+  }
+
+  function pushScreen(force = false): void {
+    if (!active || !menu) return;
+    const sc = menu.screen();
+    const state = { title: sc.title.slice(0, 120), item: (sc.item ?? '').slice(0, 120), zone: (sc.zone ?? '').slice(0, 40) };
+    const text = JSON.stringify(state);
+    if (!force && text === screenSent) return;
+    screenSent = text;
+    sendTo(active, { t: 'screen', ...state });
+  }
+
+  /** Le clavier à l'écran : il part avec son texte (un nom, une recherche), jamais un mot de passe : le menu n'en demande pas. */
+  function pushMenuField(force = false): void {
+    if (!active || !menu) return;
+    const f = mode() === 'menu' ? menu.field() : undefined;
+    const state = f ? { id: f.id, kind: f.kind, label: f.label.slice(0, 60), value: f.value.slice(0, 512) } : null;
+    const text = JSON.stringify(state);
+    if (!force && text === fieldSent) return;
+    fieldSent = text;
+    sendTo(active, { t: 'field', field: state });
   }
 
   function pageState(): Record<string, unknown> | undefined {
@@ -383,7 +539,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   }
 
   function pushPage(force = false): void {
-    if (!active || pairing?.view().phase !== 'paired') return;
+    if (!active || pairing?.session() !== 'paired' || !target) return;
     const state = pageState();
     const text = JSON.stringify(state ?? null);
     if (!state || (!force && text === pageSent)) return;
@@ -392,7 +548,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   }
 
   function pushField(force = false): void {
-    if (!active || pairing?.view().phase !== 'paired') return;
+    if (!active || pairing?.session() !== 'paired' || !target) return;
     const text = JSON.stringify(field ?? null);
     if (!force && text === fieldSent) return;
     fieldSent = text;
@@ -401,7 +557,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   /** Le champ qui a le clavier, dans le premier cadre de la page qui en a un. */
   async function probeField(): Promise<void> {
-    if (!target || target.view.webContents.isDestroyed() || pairing?.view().phase !== 'paired') return;
+    if (!target || target.view.webContents.isDestroyed() || pairing?.session() !== 'paired') return;
     // Le cadre qui a le focus d'abord ; sans focus nulle part (fenêtre en arrière-plan), le champ resté actif.
     let found: RemoteField | undefined;
     for (const frame of target.view.webContents.mainFrame.framesInSubtree) {
@@ -442,6 +598,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   const KEY_CODES = { Enter: 'Return', Tab: 'Tab', Backspace: 'Backspace', ArrowLeft: 'Left', ArrowRight: 'Right', ArrowUp: 'Up', ArrowDown: 'Down', Space: 'Space' } as const;
 
   async function inject(message: PhoneMessage): Promise<void> {
+    if (mode() !== 'browser') return injectMenu(message);
     const contents = wc();
     if (!contents || !target) return;
     switch (message.t) {
@@ -490,9 +647,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         target.nav(message.action);
         return;
       case 'act': {
-        const fromMenu = menu.get(message.id);
+        const fromMenu = menuItems.get(message.id);
         if (fromMenu) {
-          menu = new Map();
+          menuItems = new Map();
           return fromMenu();
         }
         target.act(message.id);
@@ -506,19 +663,220 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     }
   }
 
+  /** Au menu : les boutons, le clavier à l'écran, l'envoi. Les gestes du navigateur arrivés en retard sont ignorés. */
+  function injectMenu(message: PhoneMessage): void {
+    if (!menu) return;
+    switch (message.t) {
+      case 'btn':
+        if (mode() === 'menu') button(message.b, message.down);
+        return;
+      case 'set':
+        if (mode() === 'menu') menu.setText(message.value);
+        return;
+      case 'key':
+        if (mode() === 'menu' && message.key === 'Enter') menu.enter();
+        return;
+      default:
+        return;
+    }
+  }
+
   function handle(link: Link, message: PhoneMessage): void {
     if (message.t === 'bye') {
       log('Télécommande : le téléphone s’est déconnecté.'); // i18n-ignore : journal
+      if (upload?.link === link) void abortUpload(undefined);
       pairing?.end();
       link.ws.close();
       active = undefined;
       showPointer(false);
+      releaseButtons();
       tick();
+      settle();
       return;
     }
-    if (pairing?.view().phase !== 'paired' || message.t === 'ping') return;
+    if (pairing?.session() !== 'paired' || message.t === 'ping') return;
+    lastActivity = Date.now();
+    // L'envoi ne passe pas par la file des gestes : sa réponse ne doit pas attendre une injection.
+    if (message.t === 'up') return void startUpload(link, message);
+    if (message.t === 'up-cancel') {
+      if (upload?.link === link) {
+        log('Télécommande : envoi annulé depuis le téléphone.'); // i18n-ignore : journal
+        void abortUpload(undefined);
+      }
+      return;
+    }
     const run = generation;
     queue = queue.then(() => (run === generation ? inject(message) : undefined)).catch(() => undefined);
+  }
+
+  // --- Boutons de la borne, tenus au téléphone ----------------------------------
+
+  function button(b: RemoteButton, down: boolean): void {
+    if (!menu) return;
+    const held = holds.get(b);
+    if (!down) {
+      if (!held) return;
+      clearTimeout(held.timer);
+      holds.delete(b);
+      menu.button(b, false, false);
+      return;
+    }
+    if (held) return;
+    menu.button(b, true, false);
+    // Les flippers se répètent quand ils sont tenus ; Start, Exit et MagnaSave non (Start tenu ne relance rien).
+    const repeats = b === 'previous' || b === 'next';
+    const entry = { timer: undefined as unknown as NodeJS.Timeout, until: Date.now() + HOLD_MAX_MS };
+    const again = () => {
+      if (holds.get(b) !== entry) return;
+      if (Date.now() > entry.until || mode() !== 'menu') return button(b, false);
+      if (repeats) menu?.button(b, true, true);
+      entry.timer = setTimeout(again, repeats ? HOLD_REPEAT_MS : 1000);
+    };
+    entry.timer = setTimeout(again, repeats ? HOLD_DELAY_MS : 1000);
+    holds.set(b, entry);
+  }
+
+  /** Relâche à la borne tout bouton tenu au téléphone (liaison coupée, autre mode). */
+  function releaseButtons(): void {
+    for (const b of [...holds.keys()]) button(b, false);
+  }
+
+  // --- Envoi d'un fichier vers le dossier d'import ------------------------------
+
+  async function startUpload(link: Link, m: Extract<PhoneMessage, { t: 'up' }>): Promise<void> {
+    const no = (text: string) => {
+      if (active === link) sendTo(link, { t: 'up-no', text });
+    };
+    if (!menu) return no(t('Envoi indisponible : ouvrez le menu de la borne.'));
+    if (upload) return no(t('Un envoi est déjà en cours.'));
+    const where = menu.uploadDir();
+    if ('refused' in where) return no(where.refused);
+    if (m.size < 1) return no(t('Fichier vide : rien à envoyer.'));
+    if (m.size > REMOTE_UPLOAD_MAX) return no(t('Fichier trop volumineux. Maximum : {max}.', { max: formatSize(REMOTE_UPLOAD_MAX) }));
+    const name = cleanUploadName(m.name);
+    if (!name) return no(t('Nom de fichier illisible : renommez-le sur le téléphone.'));
+    const dir = path.resolve(where.dir);
+    let file: fs.promises.FileHandle;
+    const id = toBase64Url(crypto.randomBytes(8));
+    const part = path.join(dir, `.envoi-${id}.part`);
+    try {
+      fs.mkdirSync(dir, { recursive: true });
+      const disk = fs.statfsSync(dir);
+      const free = disk.bavail * disk.bsize;
+      if (free < m.size + REMOTE_UPLOAD_SPARE) return no(t('Espace insuffisant sur la borne : {free} libres.', { free: formatSize(Math.max(0, free)) }));
+      file = await fs.promises.open(part, 'wx');
+    } catch (error) {
+      log(`Télécommande : envoi impossible dans ${dir} (${(error as Error).message}).`); // i18n-ignore : journal
+      return no(t('Le dossier d’import de la borne est inaccessible.'));
+    }
+    if (active !== link || upload) {
+      await file.close().catch(() => undefined);
+      fs.rmSync(part, { force: true });
+      return;
+    }
+    upload = { id, link, dir, name, part, file, size: m.size, received: 0, index: 0, last: Date.now(), busy: false };
+    log(`Télécommande : réception d'un fichier du téléphone (${formatSize(m.size)}).`); // i18n-ignore : journal
+    sendTo(link, { t: 'up-ready', id, chunk: REMOTE_CHUNK });
+    menu.uploading({ name, received: 0, size: m.size });
+  }
+
+  /** Abandon : le fichier partiel est effacé ; `text` part au téléphone s'il est encore là. */
+  async function abortUpload(text: string | undefined): Promise<void> {
+    const u = upload;
+    if (!u) return;
+    upload = undefined;
+    menu?.uploading(undefined);
+    if (text && active === u.link) sendTo(u.link, { t: 'up-no', text });
+    await u.file.close().catch(() => undefined);
+    fs.rmSync(u.part, { force: true });
+  }
+
+  function reply(res: http.ServerResponse, status: number): void {
+    res.writeHead(status, { ...securityHeaders(String(res.req.headers.host)), 'Content-Type': 'text/plain; charset=utf-8', ...(status >= 400 ? { Connection: 'close' } : {}) }).end();
+  }
+
+  /**
+   * Un morceau d'envoi : POST /envoi/<envoi>/<rang>, scellé sous la clé de la liaison, données
+   * associées liées à la connexion et au rang (uploadAad). Les morceaux arrivent dans l'ordre,
+   * chacun de la taille attendue ; le dernier reçu, le fichier est renommé dans le dossier d'import.
+   */
+  async function receiveChunk(req: http.IncomingMessage, res: http.ServerResponse, url: string): Promise<void> {
+    const m = /^\/envoi\/([A-Za-z0-9_-]{11})\/(\d{1,7})$/.exec(url);
+    const origin = req.headers.origin;
+    const u = upload;
+    const index = m ? Number(m[2]) : -1;
+    const length = Number(req.headers['content-length']);
+    if (!m || (origin !== undefined && origin !== `http://${String(req.headers.host).toLowerCase()}`) || !u || u.id !== m[1] || u.busy || active !== u.link) {
+      req.resume();
+      return reply(res, 409);
+    }
+    const expected = Math.min(REMOTE_CHUNK, u.size - u.received);
+    if (index !== u.index || !Number.isSafeInteger(length) || length !== expected + 28) {
+      req.resume();
+      await abortUpload(t('La borne a interrompu l’envoi.'));
+      return reply(res, 400);
+    }
+    u.busy = true;
+    const parts: Buffer[] = [];
+    let got = 0;
+    let over = false;
+    req.on('data', (chunk: Buffer) => {
+      got += chunk.length;
+      if (got > length) over = true;
+      else parts.push(chunk);
+    });
+    await new Promise<void>((resolve) => {
+      req.on('end', resolve);
+      req.on('error', resolve);
+      req.on('close', resolve);
+    });
+    if (upload !== u) return reply(res, 409);
+    u.busy = false;
+    const body = Buffer.concat(parts);
+    const plain = !over && body.length === length ? openRemoteBytes(u.link.key, uploadAad(u.link.inbound, u.id, index), body) : undefined;
+    if (!plain || plain.length !== expected) {
+      log('Télécommande : morceau d’envoi refusé (illisible, rejoué ou d’une autre connexion).'); // i18n-ignore : journal
+      await abortUpload(t('La borne a interrompu l’envoi.'));
+      return reply(res, 403);
+    }
+    try {
+      await u.file.write(plain, 0, plain.length, u.received);
+    } catch (error) {
+      log(`Télécommande : écriture impossible (${(error as Error).message}).`); // i18n-ignore : journal
+      await abortUpload(t('Le dossier d’import de la borne est inaccessible.'));
+      return reply(res, 500);
+    }
+    u.received += plain.length;
+    u.index++;
+    u.last = Date.now();
+    lastActivity = u.last;
+    if (u.received < u.size) {
+      menu?.uploading({ name: u.name, received: u.received, size: u.size });
+      return reply(res, 204);
+    }
+    await finishUpload(u);
+    reply(res, 204);
+  }
+
+  /** Tout est reçu : le fichier prend son nom dans le dossier d'import (un autre s'il est pris). */
+  async function finishUpload(u: Upload): Promise<void> {
+    upload = undefined;
+    menu?.uploading(undefined);
+    try {
+      await u.file.close();
+      const name = freeUploadName(u.name, (candidate) => fs.existsSync(path.join(u.dir, candidate)));
+      const final = path.join(u.dir, name);
+      // Le nom est nettoyé (cleanUploadName) : il reste dans le dossier d'import, sans rien d'un chemin.
+      if (path.dirname(path.resolve(final)) !== path.resolve(u.dir)) throw new Error('nom hors du dossier d’import'); // i18n-ignore : journal
+      await renameWithRetryAsync(u.part, final);
+      log(`Télécommande : fichier reçu du téléphone, rangé dans le dossier d'import (${formatSize(u.size)}).`); // i18n-ignore : journal
+      if (active === u.link) sendTo(u.link, { t: 'up-done', name });
+      menu?.uploaded(name);
+    } catch (error) {
+      log(`Télécommande : fichier reçu, mais impossible à ranger (${(error as Error).message}).`); // i18n-ignore : journal
+      fs.rmSync(u.part, { force: true });
+      if (active === u.link) sendTo(u.link, { t: 'up-no', text: t('Le dossier d’import de la borne est inaccessible.') });
+    }
   }
 
   // --- Pointeur ---------------------------------------------------------------
@@ -540,6 +898,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   function showPointer(on: boolean): void {
     if (!pointer || pointer.webContents.isDestroyed()) return;
+    on = on && Boolean(target);
     if (on) {
       // Au milieu de la page à la première liaison ; il reste où on l'a laissé après une coupure.
       if (!at.x && !at.y) at = { x: area().width / 2, y: area().height / 2 };
@@ -596,13 +955,88 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     log(`Télécommande : page du téléphone servie sur ${host}:${port} (${mode === 'lan' ? 'réseau local' : 'essai, 127.0.0.1'}).`); // i18n-ignore : journal
   }
 
-  /** Le navigateur intégré s'ouvre : la télécommande s'y attache. */
-  function attach(next: RemoteTarget): void {
-    detach();
-    target = next;
-    generation++;
+  /** Un QR va s'afficher : la télécommande se réveille (appairage neuf, écoute). Rien si elle l'est déjà. */
+  function wake(): void {
+    if (pairing) return;
+    const run = ++wakeRun;
     pairing = createRemotePairing();
     unavailable = undefined;
+    lastBar = '';
+    lastPhase = undefined;
+    void listen(opts.mode())
+      .catch((error: Error) => {
+        unavailable = t('Indisponible : {reason}', { reason: error.message });
+        log(`Télécommande : écoute impossible (${error.message}).`); // i18n-ignore : journal
+      })
+      .finally(() => {
+        if (run !== wakeRun) return closeServer();
+        clearInterval(ticker);
+        ticker = setInterval(heartbeat, FIELD_POLL_MS);
+        ticker.unref?.();
+        tick();
+      });
+  }
+
+  /** Toutes les 700 ms : QR à renouveler, champ de la page, mode et écran du menu, inactivité, envoi en panne. */
+  function heartbeat(): void {
+    tick();
+    if (target) void probeField();
+    // L'écran du menu part à chaque redessin (menuChanged) : ici, seulement un changement de mode.
+    if (mode() !== modeSent) pushState();
+    const now = Date.now();
+    if (mode() !== 'menu') lastActivity = now;
+    else if (active && pairing?.session() === 'paired' && now - lastActivity > (opts.idleMs ?? REMOTE_IDLE_MS)) {
+      log('Télécommande : téléphone déconnecté après 20 minutes sans geste.'); // i18n-ignore : journal
+      endLink(active, 'idle');
+      pairing.end();
+      tick();
+      settle();
+      return;
+    }
+    if (upload && !upload.busy && now - upload.last > REMOTE_UPLOAD_IDLE_MS) {
+      log('Télécommande : envoi abandonné, plus rien reçu du téléphone.'); // i18n-ignore : journal
+      void abortUpload(t('Envoi interrompu : plus rien reçu du téléphone.'));
+    }
+  }
+
+  /** Plus de QR affiché ni de téléphone : l'écoute s'arrête, les clés sont oubliées. Un téléphone qui attendait, sans code à comparer, est refusé. */
+  function settle(): void {
+    if (!pairing) return;
+    if (!surfaces.size && pairing.session() === 'pending') {
+      log('Télécommande : plus de code affiché, téléphone en attente refusé.'); // i18n-ignore : journal
+      if (active) endLink(active, 'refused');
+      pairing.end();
+    }
+    if (surfaces.size || pairing.session()) return;
+    sleep();
+  }
+
+  function sleep(why: 'closed' | 'quit' = 'closed'): void {
+    if (!pairing) return;
+    wakeRun++;
+    generation++;
+    if (active) endLink(active, why);
+    active = undefined;
+    void abortUpload(undefined);
+    releaseButtons();
+    clearInterval(ticker);
+    ticker = undefined;
+    closeServer();
+    pairing = undefined;
+    unavailable = undefined;
+    lastBar = '';
+    lastPhase = undefined;
+    modeSent = undefined;
+    log('Télécommande : plus de QR code ni de téléphone, écoute arrêtée.'); // i18n-ignore : journal
+    target?.changed();
+    menu?.changed();
+  }
+
+  /** Le navigateur intégré s'ouvre : son bandeau montre le QR, le téléphone connecté passe au pavé tactile. */
+  function attach(next: RemoteTarget): void {
+    if (target) detach();
+    target = next;
+    surfaces.add('browser');
     at = { x: 0, y: 0 };
     field = undefined;
     makePointer(next.win);
@@ -614,21 +1048,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       if (target === next) detach();
       if (pointer && !pointer.webContents.isDestroyed()) pointer.webContents.close();
     });
-    const run = generation;
-    void listen(opts.mode())
-      .catch((error: Error) => {
-        unavailable = t('Indisponible : {reason}', { reason: error.message });
-        log(`Télécommande : écoute impossible (${error.message}).`); // i18n-ignore : journal
-      })
-      .finally(() => {
-        if (run !== generation) return closeServer();
-        ticker = setInterval(() => {
-          tick();
-          void probeField();
-        }, FIELD_POLL_MS);
-        ticker.unref?.();
-        tick();
-      });
+    wake();
+    pushState();
+    tick();
   }
 
   function closeServer(): void {
@@ -641,28 +1063,59 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     s?.close();
   }
 
-  /** Le navigateur intégré se ferme : la liaison est coupée, les clés oubliées, l'écoute arrêtée. */
+  /**
+   * Le navigateur intégré se ferme. Avec le menu (setMenu), le téléphone connecté revient à ses
+   * boutons ; sans lui (essais du navigateur seul), la liaison est coupée, les clés oubliées.
+   */
   function detach(): void {
     if (!target) return;
-    generation++;
-    if (active) endLink(active, 'closed');
-    active = undefined;
-    clearInterval(ticker);
-    ticker = undefined;
-    closeServer();
-    pairing = undefined;
     target = undefined;
-    lastBar = '';
-    lastPhase = undefined;
-    menu = new Map();
+    surfaces.delete('browser');
+    menuItems = new Map();
     if (pointer && !pointer.webContents.isDestroyed()) pointer.webContents.close();
     pointer = undefined;
-    log('Télécommande : navigateur intégré fermé, liaison coupée.'); // i18n-ignore : journal
+    if (!menu) {
+      if (pairing) sleep('closed');
+      log('Télécommande : navigateur intégré fermé, liaison coupée.'); // i18n-ignore : journal
+      return;
+    }
+    log('Télécommande : navigateur intégré fermé, le téléphone revient au menu.'); // i18n-ignore : journal
+    pushState();
+    settle();
+    tick();
+  }
+
+  /** Un écran du menu montre le QR (écran de la télécommande, clavier à l'écran), ou plus. */
+  function show(surface: Exclude<RemoteSurface, 'browser'>, on: boolean): void {
+    if (on === surfaces.has(surface)) return;
+    if (on) {
+      surfaces.add(surface);
+      wake();
+      tick();
+      return;
+    }
+    surfaces.delete(surface);
+    settle();
+    tick();
   }
 
   return {
     attach,
     detach,
+    show,
+    /** Le menu de Cyber Pinball (frontend.ts) : le téléphone le pilote quand « Récupérer » est fermé. */
+    setMenu(next: MenuTarget): void {
+      menu = next;
+    },
+    /** Le menu a changé (écran, choix, clavier, partie) : le téléphone suit. Appelé à chaque redessin. */
+    menuChanged: () => pushState(),
+    /** Ce que pilote le téléphone connecté ; undefined sans téléphone accepté. */
+    connected: (): RemoteMode | undefined => (active && pairing?.session() === 'paired' ? mode() : undefined),
+    /** Cyber Pinball se ferme : le téléphone l'apprend, rien n'écoute plus. */
+    close(): void {
+      surfaces.clear();
+      sleep('quit');
+    },
     bar,
     /** Start à la borne, ou « Accepter » : le téléphone qui attend peut piloter. Faux s'il n'y en avait pas. */
     accept(): boolean {
@@ -672,32 +1125,36 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       tick();
       return true;
     },
+    /** Un téléphone attend, et ce QR-ci (cet endroit) montre son code : Start l'accepte, Exit le refuse. */
+    pendingOn: (surface: RemoteSurface) => pairing?.session() === 'pending' && surfaces.has(surface),
     /** Exit à la borne, ou « Refuser » : le téléphone qui attend est refusé. Faux s'il n'y en avait pas. */
     refuse(): boolean {
-      if (pairing?.view().phase !== 'pending') return false;
+      if (pairing?.session() !== 'pending') return false;
       log('Télécommande : téléphone refusé à la borne.'); // i18n-ignore : journal
       if (active) endLink(active, 'refused');
       pairing.end();
       tick();
+      settle();
       return true;
     },
     /** « Déconnecter » : le téléphone qui pilote ne pilote plus, un QR neuf s'affiche. */
     end(): void {
-      if (pairing?.view().phase !== 'paired') return;
+      if (pairing?.session() !== 'paired') return;
       log('Télécommande : téléphone déconnecté depuis la borne.'); // i18n-ignore : journal
       if (active) endLink(active, 'ended');
       pairing.end();
       tick();
+      settle();
     },
-    pending: () => pairing?.view().phase === 'pending',
+    pending: () => pairing?.session() === 'pending',
     /**
      * Le menu de la page (clic droit) : s'il suit un clic droit du téléphone, ses actions partent
      * au téléphone (vrai), le menu de Windows n'y serait pas atteignable.
      */
     offerMenu(items: { id: string; label: string; run: () => void }[]): boolean {
-      if (!active || Date.now() > menuUntil || pairing?.view().phase !== 'paired') return false;
+      if (!active || Date.now() > menuUntil || pairing?.session() !== 'paired' || !target) return false;
       menuUntil = 0;
-      menu = new Map(items.map((i) => [i.id, i.run]));
+      menuItems = new Map(items.map((i) => [i.id, i.run]));
       sendTo(active, { t: 'menu', items: items.map(({ id, label }) => ({ id, label })) });
       return true;
     },
@@ -707,6 +1164,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     address: () => address,
     pointerAt: () => ({ ...at }),
     pointerView: () => pointer,
+    /** Pour les essais : l'envoi en cours. */
+    uploadState: () => (upload ? { name: upload.name, received: upload.received, size: upload.size, part: upload.part } : undefined),
   };
 }
 

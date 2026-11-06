@@ -11,8 +11,9 @@
     <link rel="stylesheet" href="telephone.css" />
   </head>
   <!-- Page du téléphone qui pilote la borne (telephone.js) ; servie par la borne sur le réseau
-       local (app/src/phone-remote.ts). États : body[data-state]. -->
-  <body data-state="connecting">
+       local (app/src/phone-remote.ts). États : body[data-state] ; ce que la borne montre :
+       body[data-mode] (browser : le navigateur intégré, menu : le menu, game : une partie). -->
+  <body data-state="connecting" data-mode="browser">
     <header class="top">
       <div class="brand" aria-label="Cyber Pinball">CYBER <b>PINBALL</b></div>
       <div class="link" id="link" role="status"><span class="dot" aria-hidden="true"></span><span id="link-text" data-i18n>Connexion…</span></div>
@@ -29,6 +30,18 @@
         <div class="code" id="code" hidden></div>
         <h1 class="message-title" id="message-title" data-i18n>Connexion à la borne…</h1>
         <p class="message-text" id="message-text"></p>
+      </div>
+      <div class="buttons" id="buttons">
+        <button type="button" class="btn btn-start" data-b="confirm"></button>
+        <button type="button" class="btn btn-flip" data-b="previous"></button>
+        <button type="button" class="btn btn-flip" data-b="next"></button>
+        <button type="button" class="btn btn-exit" data-b="exit"></button>
+        <button type="button" class="btn btn-zone" data-b="zone"></button>
+      </div>
+      <div class="game-note" id="game-note">
+        <span class="message-mark" id="game-mark" aria-hidden="true"></span>
+        <h1 class="message-title" data-i18n>Partie en cours</h1>
+        <p class="message-text" data-i18n>Les commandes reviennent à la fin de la partie.</p>
       </div>
       <div class="pad" id="pad">
         <div class="pad-hint" id="pad-hint">
@@ -52,15 +65,29 @@
       </div>
       <div class="key-row">
         <button type="button" class="key wide" id="key-tab" data-i18n>Champ suivant</button>
+        <button type="button" class="key wide" id="key-cancel" data-i18n>Annuler</button>
         <button type="submit" class="key wide primary" id="key-enter" data-i18n>Entrée</button>
       </div>
     </form>
 
+    <section class="upload" id="upload" hidden aria-live="polite" aria-labelledby="upload-title">
+      <div class="upload-head">
+        <span class="upload-mark" id="upload-mark" aria-hidden="true"></span>
+        <span class="upload-title" id="upload-title"></span>
+      </div>
+      <div class="upload-name" id="upload-name"></div>
+      <div class="upload-track" id="upload-track" role="progressbar" aria-valuemin="0" aria-valuemax="100"><span class="upload-fill" id="upload-fill"></span></div>
+      <div class="upload-line" id="upload-line"></div>
+      <button type="button" class="key wide" id="upload-button"></button>
+    </section>
+    <input type="file" id="file-input" hidden />
+
     <nav class="tools" id="tools">
       <button type="button" class="tool" id="nav-back"></button>
       <button type="button" class="tool" id="nav-forward"></button>
-      <button type="button" class="tool" id="nav-keyboard"></button>
-      <button type="button" class="tool" id="nav-more"></button>
+      <button type="button" class="tool" id="nav-keyboard" aria-controls="keys"></button>
+      <button type="button" class="tool" id="nav-send"></button>
+      <button type="button" class="tool" id="nav-more" aria-controls="sheet" aria-haspopup="dialog"></button>
       <button type="button" class="tool danger" id="nav-close"></button>
     </nav>
 

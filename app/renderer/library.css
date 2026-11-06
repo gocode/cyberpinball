@@ -2507,3 +2507,117 @@ body.mouse .lib-health .health-line:not(.selected):hover {
     height: 16cqmin;
   }
 }
+
+/* ---------- Télécommande du téléphone (phone-remote-menu.ts) ----------
+ * Revue de Codex du 06/11/2026 (docs/Design/telecommande-menu) : un panneau, le QR (ou le code,
+ * ou le téléphone) à gauche, l'état et ses consignes à droite ; sous le clavier à l'écran, la même
+ * chose en bande de 184 px de référence, de hauteur fixe d'un état à l'autre (les touches ne bougent pas).
+ */
+.lib-remote {
+  display: grid;
+  grid-template-columns: minmax(0, 28cqmin) minmax(0, 1fr);
+  align-items: center;
+  gap: 2.2cqmin;
+  min-height: 30cqmin;
+  margin-bottom: 2.2cqmin;
+  padding: 2.2cqmin;
+  border-radius: 0.8cqmin;
+  background: var(--surface);
+  outline: 1px solid var(--line-strong);
+  outline-offset: -1px;
+}
+
+.lib-remote-left {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+}
+
+.lib-remote-qr {
+  display: block;
+  width: min(100%, 25.9cqmin);
+  height: auto;
+  aspect-ratio: 1;
+  image-rendering: pixelated;
+}
+
+.lib-remote-code {
+  font-size: 6.7cqmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.12em;
+  padding-left: 0.12em;
+  color: var(--accent);
+}
+
+.lib-remote-icon {
+  font-size: 5.9cqmin;
+  color: var(--accent);
+}
+
+.lib-remote.phase-off .lib-remote-icon {
+  color: var(--ink-faint);
+}
+
+.lib-remote-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqmin;
+  min-width: 0;
+}
+
+.lib-remote-title {
+  font-size: 3.15cqmin;
+  font-weight: 600;
+  line-height: 3.7cqmin;
+  overflow-wrap: anywhere;
+}
+
+.lib-remote-line {
+  font-size: 2.2cqmin;
+  line-height: 3cqmin;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.lib-remote.phase-off .lib-remote-title {
+  color: var(--ink-muted);
+}
+
+/* Sous le clavier à l'écran. */
+.lib-remote.lib-remote-band {
+  grid-template-columns: 13.9cqmin minmax(0, 1fr);
+  min-height: 17cqmin;
+  height: 17cqmin;
+  margin: 2cqmin 0 0;
+  padding: 1.5cqmin;
+  background: var(--surface-sunken);
+}
+
+.lib-remote.lib-remote-band .lib-remote-qr {
+  width: 13.9cqmin;
+}
+
+.lib-remote.lib-remote-band .lib-remote-code {
+  font-size: 4.4cqmin;
+}
+
+.lib-remote.lib-remote-band .lib-remote-icon {
+  font-size: 4.4cqmin;
+}
+
+.lib-remote.lib-remote-band .lib-remote-text {
+  gap: 0.4cqmin;
+}
+
+.lib-remote.lib-remote-band .lib-remote-title {
+  font-size: 2.2cqmin;
+  line-height: 3cqmin;
+}
+
+.lib-remote.lib-remote-band .lib-remote-line {
+  font-size: 1.86cqmin;
+  line-height: 2.6cqmin;
+}

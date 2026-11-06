@@ -5,7 +5,8 @@
 // Pilotage aux boutons de la borne (flippers : choisir, Start : valider, Exit :
 // revenir), au clavier ou à la souris (clics envoyés par le rendu).
 
-import type { PhoneRemote } from './phone-remote';
+import type { MenuField, PhoneRemote, RemoteBar } from './phone-remote';
+import { createPhoneRemoteMenu, remoteBlock } from './phone-remote-menu';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, type BrowserWindow, type Input, type Rectangle } from 'electron';
@@ -295,8 +296,10 @@ export interface LibraryHost {
   browserScreen?(): { bounds: Rectangle; notice?: string } | undefined;
   /** Nom Windows de la sortie audio du menu (menuAudioOutput), pour le son des pages de « Récupérer ». */
   audioOutput?(): string | undefined;
-  /** Télécommande du téléphone (phone-remote.ts) pour le navigateur intégré ; absente : pas de QR code. */
+  /** Télécommande du téléphone (phone-remote.ts) ; absente : pas de QR code, ni écran de la télécommande. */
   phoneRemote?: PhoneRemote;
+  /** Fichier qui arrive du téléphone (frontend.ts), pour la barre de l'écran de la télécommande. */
+  phoneUpload?(): { name: string; received: number; size: number } | undefined;
   /** Choix de l'écran du navigateur intégré pour la configuration active ; Retour mène à `back`. */
   openBrowserScreen?(back: () => void): void;
   broadcast(): void;
@@ -475,6 +478,8 @@ export interface Built {
   hint?: string;
   /** Recadrage d'une image (avatar-menu.ts) : l'image, le carré gardé et l'aperçu, à la place des sections. */
   crop?: CropView;
+  /** Télécommande du téléphone (phone-remote-menu.ts) : le QR code, le code à comparer ou le téléphone connecté, en tête du contenu. */
+  remote?: RemoteBar;
   /**
    * Ce que Start fait sur un élément de la liste de contenu (« cocher ou décocher »), dit par le
    * bandeau d'aide tant qu'on y est ; sans lui, « valider ». Une liste de cases à cocher le dit :
@@ -1224,6 +1229,19 @@ export function createLibrary(host: LibraryHost) {
     changed: () => void health.refresh(),
   });
   provideSystemItem('dof', dofMenu.item);
+
+  // Télécommande du téléphone (Menu système > Borne) : le QR code hors du navigateur intégré.
+  const remoteMenu = host.phoneRemote
+    ? createPhoneRemoteMenu({
+        remote: host.phoneRemote,
+        library: { openCustom: (build, at) => openCustom(build, at), openSystem: () => openSystem(), showing: (build) => screen?.kind === 'custom' && screen.build === build },
+        upload: () => host.phoneUpload?.(),
+      })
+    : undefined;
+  if (remoteMenu) provideSystemItem('phone-remote', remoteMenu.item);
+  /** Numéro de chaque clavier à l'écran ouvert : le téléphone repart du texte de la borne quand il change. */
+  const editorIds = new WeakMap<object, number>();
+  let editorCount = 0;
 
   // Écran « Médias » de la fiche : logo, fronton, vidéos, règles…
   const medias = createMedias({
@@ -3633,7 +3651,8 @@ export function createLibrary(host: LibraryHost) {
     const readingOn = Boolean(readingEdges(built, zones));
     const read = readable(built, zones) ? readingState() : undefined;
     soundPreview = playsSoundPreview(built.media);
-    const editorView = (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor ? viewEditor(screen.editor) : undefined;
+    const remoteBar = screen.kind === 'edit' || screen.kind === 'prompt' ? (screen.editor && screen.editor.kind !== 'choice' ? host.phoneRemote?.bar() : undefined) : undefined;
+    const editorView = (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor ? { ...viewEditor(screen.editor), remoteBar, remote: remoteBar ? remoteBlock(remoteBar, 'keyboard') : undefined } : undefined;
     // « Chercher sur le web… » n'a son icône que dans un menu à icônes : seule, elle décalerait tous les libellés.
     const iconMenu = built.actions.some((a) => a.icon && !a.web);
     return {
@@ -3646,6 +3665,7 @@ export function createLibrary(host: LibraryHost) {
       lead: built.lead,
       sections: built.sections,
       crop: built.crop ? { src: built.crop.src, width: built.crop.width, height: built.crop.height, box: built.crop.box, caption: built.crop.caption } : undefined,
+      remote: built.remote ? remoteBlock(built.remote, 'screen') : undefined,
 
       back: backLabel(built),
       actions: built.actions.map(({ label, detail, tone, icon, web, attention, shortcut }, i) => ({ label, detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
@@ -3675,7 +3695,11 @@ export function createLibrary(host: LibraryHost) {
         : editorView
         ? editorView.kind === 'choice'
           ? t('Flippers : choisir · Start : valider · Exit : annuler')
-          : t('Flippers : choisir une touche · Start : la taper · Exit : annuler · ou tapez au clavier, Entrée pour valider')
+          : editorView.remoteBar?.phase === 'pending'
+            ? t('Start : accepter le téléphone · Exit : le refuser')
+            : host.phoneRemote?.connected() === 'menu'
+              ? t('Tapez sur le téléphone · ou flippers : choisir une touche · Start : la taper · Exit : annuler')
+              : t('Flippers : choisir une touche · Start : la taper · Exit : annuler · ou tapez au clavier, Entrée pour valider')
         : read?.active
           ? t('Flippers : faire défiler, tenus pour aller vite · Start ou Entrée : page suivante · Exit ou Échap : revenir aux actions · MagnaSave ou F6 : actions de l’écran')
         : zone?.active === 'list'
@@ -3718,6 +3742,53 @@ export function createLibrary(host: LibraryHost) {
     const keys = KEYBOARD.map((k) => (k.length === 1 ? (upper ? k : k.toLowerCase()) : keyLabel(k)));
     // La touche Maj est repérée par son rang : son libellé suit la langue.
     return { kind: e.kind, label: e.label, keys, cursor: e.cursor, value: e.value, shift: e.shift, shiftKey: KEYBOARD.indexOf('Maj') };
+  }
+
+  // ---------- Télécommande du téléphone (phone-remote.ts) ----------
+
+  /** Le clavier à l'écran ouvert, texte ou nombre, tel que le téléphone le remplit. */
+  function remoteField(): MenuField | undefined {
+    if (!screen || (screen.kind !== 'edit' && screen.kind !== 'prompt') || !screen.editor || screen.editor.kind === 'choice') return undefined;
+    const e = screen.editor;
+    let id = editorIds.get(e);
+    if (id === undefined) editorIds.set(e, (id = ++editorCount));
+    return { id, kind: e.kind, label: e.label, value: e.kind === 'text' ? e.value : e.typed || String(e.value) };
+  }
+
+  /** Le texte tapé au téléphone remplace celui du clavier à l'écran (un nombre : ses chiffres, quatre au plus). */
+  function remoteSet(value: string): void {
+    if (!screen || (screen.kind !== 'edit' && screen.kind !== 'prompt') || !screen.editor) return;
+    const e = screen.editor;
+    if (e.kind === 'text') {
+      e.value = value;
+      e.typed = true;
+    } else if (e.kind === 'number') {
+      e.typed = value.replace(/\D/g, '').slice(-4);
+      if (e.typed) e.value = Number(e.typed);
+    } else return;
+    host.broadcast();
+  }
+
+  /** Valider au téléphone : Entrée du clavier à l'écran. */
+  function remoteEnter(): void {
+    if (!screen || (screen.kind !== 'edit' && screen.kind !== 'prompt') || !screen.editor || screen.editor.kind === 'choice') return;
+    closeEditor(screen, true);
+  }
+
+  /** En tête de la page du téléphone : l'écran affiché et ce qui y est choisi. */
+  function remoteScreen(): { title: string; item?: string } | undefined {
+    if (!screen) return undefined;
+    const built = build();
+    if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) return { title: built.heading, item: screen.editor.label };
+    const ids = actionIds(built.actions);
+    const at = followCursor(ids, cursor, screen, anchor);
+    return { title: built.heading, item: built.actions[at]?.label };
+  }
+
+  /** Où le menu montre le QR code maintenant : l'écran de la télécommande, le clavier à l'écran. */
+  function remoteSurfaces(): { menu: boolean; keyboard: boolean } {
+    const editor = (screen?.kind === 'edit' || screen?.kind === 'prompt') && screen.editor && screen.editor.kind !== 'choice';
+    return { menu: Boolean(remoteMenu?.shown()), keyboard: Boolean(editor) };
   }
 
   // ---------- Mode sans opérateur ----------
@@ -3885,6 +3956,13 @@ export function createLibrary(host: LibraryHost) {
     /** L'application fournit-elle cette entrée (une borne dédiée n'a pas « Bureau Windows ») ? */
     hasSystemItem: (id: SystemItemId) => systemItems.has(id),
     openPrompt,
+    remoteField,
+    remoteSet,
+    remoteEnter,
+    remoteScreen,
+    remoteSurfaces,
+    /** Essais : ouvrir l'écran de la télécommande. */
+    openPhoneRemote: () => remoteMenu?.item.run(),
     /** Sélecteur de fichiers de Cyber Pinball ; undefined à l'abandon, l'écran d'où l'on vient revient tel quel. */
     pick: pickPaths,
     openNotice,

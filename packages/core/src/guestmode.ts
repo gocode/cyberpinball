@@ -35,6 +35,7 @@ export const GUEST_DOORS = {
   'shortcut.quit': false, // Quitter Cyber Pinball : Ctrl+Q
   'window.close': false, // Fermer une fenêtre de Cyber Pinball : Alt+F4
   'files.drop': false, // Fichiers glissés sur la fenêtre : ajout d’une table, d’un média
+  'phone.files': false, // Fichier envoyé du téléphone vers le dossier d’import (télécommande, phone-remote.ts)
   'game.force-stop': true, // Arrêter une partie bloquée : Ctrl+Maj+K, pendant la partie
   'game.settings': false, // Réglages en partie (position du DMD, menu de VPX) : les deux MagnaSave, pendant la partie
   // Messages du menu (frontend.ts, Message.action) : Start fait leur action ; Exit les ferme toujours, sans rien faire d'autre.

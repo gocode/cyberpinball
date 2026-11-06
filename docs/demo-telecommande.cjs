@@ -415,7 +415,9 @@ async function run() {
     const x = padBox.x + padBox.w / 2;
     const y = padBox.y + padBox.h / 2;
     mouse('mouseDown', x, y);
-    await delay(800);
+    // Le doigt reste posé jusqu'à la feuille du clic droit : sous la charge (toute la suite des
+    // essais), un appui de 800 ms pouvait se lever avant le minuteur de l'appui long (550 ms).
+    await until('appui long reconnu', () => phoneJs(`!document.getElementById('sheet').hidden`), 4000);
     mouse('mouseUp', x, y);
   }
   await until('menu du clic droit sur le téléphone', () => phoneJs(`!document.getElementById('sheet').hidden && document.getElementById('sheet-actions').textContent.includes(${JSON.stringify(T('Ouvrir le lien'))})`));

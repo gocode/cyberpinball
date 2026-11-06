@@ -94,7 +94,7 @@ const INPUT_SOURCES: Record<string, { count: number; why: string }> = {
   'settings.ts': { count: 4, why: 'réglages de VPX : derrière menu.vpx-settings et sheet.table-settings, fermées' },
   'wizard.ts': { count: 7, why: 'assistant de la borne, lancé à part : derrière message.wizard, message.buttons, message.interface et le menu système, fermés ; l’autopilote guette ses propres touches rejouées (Clavier:…)' },
   'game-recording.ts': { count: 3, why: 'enregistreur d’une partie : prêt, morceaux de vidéo et événements de sa propre fenêtre cachée (event.sender vérifié) ; armé par « Jouer et enregistrer », derrière sheet.record, fermée' },
-  'acquire-window.ts': { count: 13, why: 'fenêtre « Récupérer » : derrière sheet.missing, sheet.further et le menu système, fermés ; la télécommande du téléphone (phone-remote.ts) ne vit que pendant qu’elle est ouverte' },
+  'acquire-window.ts': { count: 13, why: 'fenêtre « Récupérer » : derrière sheet.missing, sheet.further et le menu système, fermés ; le téléphone accepté qui pilote le menu passe par le même handleKey (frontend.ts, remoteButton)' },
   'ad-blocker.ts': { count: 3, why: 'bloqueur de publicités : canaux des scripts préchargés des pages du navigateur intégré, qui ne rendent que des filtres (styles, scriptlets) et ne changent rien ; aiguillés par la session de la page, celle de « Récupérer »' },
   'in-game-menu.ts': { count: 3, why: 'réglages en partie : la combinaison des MagnaSave passe par game.settings, fermée ; touches, boutons et canal de ses propres fenêtres (event.sender vérifié), qui n’existent qu’une fois le menu ouvert' },
 };
@@ -116,6 +116,20 @@ test('mode invité : toute source d’entrées de app/src est revue (une nouvell
     expected,
     'Nouvelle source d’entrées dans app/src : la faire passer par une porte du mode invité (GUEST_DOORS, guest.knock) ou vérifier qu’elle n’est atteignable que derrière une porte fermée, puis l’inscrire dans INPUT_SOURCES.',
   );
+});
+
+test('mode invité : le téléphone (télécommande) passe par les mêmes portes, ne déverrouille rien, n’envoie aucun fichier', () => {
+  const frontend = fs.readFileSync(path.join(__dirname, '..', '..', '..', '..', 'app', 'src', 'frontend.ts'), 'utf8');
+  // Les boutons tenus au téléphone : le chemin des touches de la borne, donc les portes de handleKey.
+  assert.match(frontend, /function remoteButton\([\s\S]*?if \(down\) handleKey\(input, true\);\s*else handleKeyUp\(input, true\);/);
+  // Jamais la combinaison de déverrouillage : on ne déverrouille le mode invité qu'à la borne.
+  assert.match(frontend, /if \(!fromPhone && guest\.input\(input\.code, true, unlockListening\(\)\)\) return true;/);
+  assert.match(frontend, /function handleKeyUp\(input: Input, fromPhone = false\): void \{\s*if \(!fromPhone\) \{\s*cabinetVolume\?\.windowInput\(input\);\s*guest\.input\(input\.code, false/);
+  // L'envoi d'un fichier : derrière la porte phone.files, fermée à l'invité.
+  assert.equal(GUEST_DOORS['phone.files'], false);
+  assert.match(frontend, /uploadDir: \(\) =>\s*!guest\.knock\('phone\.files'\)/);
+  // L'écran de la télécommande est une entrée du menu système, fermé à l'invité (menu.system).
+  assert.ok(SYSTEM_GROUPS.borne.entries.includes('phone-remote'));
 });
 
 test('mode invité : l’entrée est dans la rubrique Borne', () => {

@@ -132,6 +132,7 @@ export const ICON_NAMES = [
   'star-filled',
   'phone',
   'backspace',
+  'upload',
 ] as const;
 
 
