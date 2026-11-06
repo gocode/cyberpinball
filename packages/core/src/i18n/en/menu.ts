@@ -14,6 +14,19 @@ export const messages: Record<string, string> = {
   'Bureau Windows (tous les écrans du PC), puis retour au menu': 'Windows desktop (every PC screen), then back to the menu',
   'Flippers : choisir': 'Flippers: choose',
   'Start : fiche': 'Start: game page',
+  // Chargement qui tarde (packages/core/src/loadingprogress.ts, app/renderer/frontend.js)
+  'Cyber Pinball prépare la partie': 'Cyber Pinball is preparing the game',
+  'VPX est lancé : il charge la table': 'VPX is running: it is loading the table',
+  'VPX a ouvert ses fenêtres : la table finit de charger': 'VPX has opened its windows: the table is finishing loading',
+  'Arrêt demandé : VPX se ferme': 'Stop requested: VPX is closing',
+  '{keys} ou Exit : arrêter': '{keys} or Exit: stop',
+  'depuis {time}': '{time} elapsed',
+  'Start : jouer': 'Start: play',
+  'Start tenu : fiche': 'Hold Start: game page',
+  'Jouer la table choisie': 'Play the chosen table',
+  'Start maintenu, ou {keys}': 'Hold Start, or {keys}',
+  'Start maintenu': 'Hold Start',
+  'Fiche de la table': 'Game page',
   'Exit : menu': 'Exit: menu',
   'Son, vue, performances, pour toutes les tables': 'Sound, view, performance, for every table',
   'Configuration de la borne': 'Cabinet setup',
@@ -171,6 +184,14 @@ export const messages: Record<string, string> = {
   'Ordre des tables : {order}': 'Table order: {order}',
   '{detail} (Start : changer)': '{detail} (Start: change)',
   'Table au démarrage : {start}': 'Table at startup: {start}',
+  // Start sur la roue (tableorder.ts, WHEEL_STARTS ; app/src/menu-settings.ts, app/src/frontend.ts)
+  'ouvrir la fiche': 'open the game page',
+  'jouer directement': 'play right away',
+  'Start sur la roue : {start}': 'Start on the wheel: {start}',
+  'Start lance la table choisie ; sa fiche s’ouvre à Start maintenu, ou F6 d’un clavier (Start : ouvrir plutôt la fiche)':
+    'Start launches the chosen table; its game page opens on a held Start, or F6 on a keyboard (Start: open the game page instead)',
+  'Start ouvre la fiche de la table (Jouer, Prospectus…), un second Start la lance (Start : jouer directement)':
+    'Start opens the table’s game page (Play, Flyer…), a second Start launches it (Start: play right away)',
   'Ordre des tables': 'Table order',
   'Comment les médaillons se suivent dans la roue, et les titres dans la liste. La table choisie reste la même quand l’ordre change.':
     'How the medallions follow each other on the wheel, and the titles in the list. The selected table stays the same when the order changes.',

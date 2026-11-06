@@ -1509,6 +1509,24 @@ Deux bornes amies en ligne, la bibliothèque de l'une partagée, avec au moins u
 | 784 | Choisir un ami | Menu système > « Tables » > « Ajouter une table » > « Depuis un ami… ». | L'ami en tête, « <n> à prendre », « … tables, dont <n> absentes de votre borne » ; un ami hors ligne est grisé avec « Hors ligne : sa bibliothèque se voit quand sa borne est allumée ». |
 | 785 | Récupérer une table | Start sur l'ami, puis sur la première table, « Récupérer toute la table ». | Sa bibliothèque s'ouvre sur « Absentes de votre borne », le curseur sur la première ; la réception puis le plan d'ajout, comme depuis sa fiche d'ami. « Retour » ramène à la liste des amis, puis à « Ajouter une table ». |
 
+## Ergonomie du menu : Start, fiche, retours, chargement
+
+Une borne avec quelques tables, dont une avec prospectus et règles ; puis une table longue à charger (un gros PuP-Pack, ou VPX lancé depuis un disque lent).
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 835 | Start sur la roue, par défaut | Sans rien régler, Start sur une table. | La fiche s'ouvre, comme avant ; la ligne d'aide dit « Start : fiche ». |
+| 836 | Jouer directement | Menu système > « Médias » > « Médias, son et attente » > « Start sur la roue : ouvrir la fiche », Start : « jouer directement ». Revenir à la roue, appuyer brièvement sur Start. | La ligne d'aide dit « Start : jouer · Start tenu : fiche » ; l'aide-mémoire (H) « Jouer la table choisie » et « Start maintenu, ou F6 » ; le Start bref lance la table, sans fiche. |
+| 837 | La fiche reste accessible | Toujours en « jouer directement » : Start maintenu une seconde, puis relâché ; ensuite F6 d'un clavier, puis un MagnaSave sur la roue. Enfin Start enfoncé, un flipper pendant l'appui, puis Start relâché. | Start maintenu ouvre la fiche avant le relâchement, sans partie ; F6 l'ouvre aussi ; le MagnaSave change de collection ; l'appui interrompu par un flipper ne lance rien. |
+| 838 | Fiche resserrée | Ouvrir la fiche d'une table. | En tête « Jouer », « Jouer avec un ami » (grisée sans ami en ligne), « Prospectus et règles », puis « Gérer la table… » et le retour. Une table aux fichiers à vérifier : « Gérer la table… » en orange, « À vérifier : Fichiers de la table ». |
+| 839 | Gérer la table | « Gérer la table… », puis « Médias du jeu », puis Exit jusqu'à la roue. | « Gérer la table » liste médias, parties du jeu, fichiers, réglages, affichage en partie, diagnostic, modifier, supprimer ; Exit depuis « Médias du jeu » revient à « Gérer la table », puis à la fiche, puis à la roue. |
+| 840 | Livret « Prospectus et règles » | « Prospectus et règles », puis le flipper droit jusqu'au bout, puis Start. | Les pages du prospectus, puis celles des règles (« Règles · page 1 sur … ») ; Start sur la dernière page revient à la fiche. À la souris, « Règles » saute directement aux règles. |
+| 841 | Mode invité | Mode invité activé, fiche d'une table. | « Jouer », « Prospectus et règles », le retour ; ni « Gérer la table… » ni ce qu'il contient. |
+| 842 | Retour nommé | Fiche > « Gérer la table… » > « Médias du jeu » ; puis menu système > « Téléchargements » ; puis « Toutes les tables » > une table. | Le bouton en tête dit « ‹ Gérer la table », « ‹ Neon Abyss » (le nom de la table), « ‹ Menu des tables », « ‹ Toutes les tables » ; chaque clic mène bien là. Le journal ne dit aucun « Retour de … : le bouton annonçait … ». |
+| 843 | Exit : actions | Dans « Médias du jeu », MagnaSave pour entrer dans la liste. | Le bouton en tête devient « Exit : actions » (touche cerclée) ; Exit ou un clic sur lui revient aux actions, puis il redit « ‹ Gérer la table ». |
+| 844 | Chargement qui tarde | Lancer la table longue à charger, au bureau puis sur la borne. | Sur la borne, rien d'autre que le média de chargement, du début à la fin. Au bureau, passé 8 s, dans l'encart : « VPX est lancé : il charge la table », puis « VPX a ouvert ses fenêtres… » quand le fronton paraît, « depuis 12 s » qui avance chaque seconde, « Ctrl+Maj+K ou Exit : arrêter ». Aucun pourcentage. Tout disparaît quand la table est à l'écran. |
+| 845 | Arrêter un chargement | Passé 8 s, Exit (ou Ctrl+Maj+K), au bureau puis sur la borne. | Au bureau « Arrêt demandé : VPX se ferme » ; puis, partout, la roue, sans message d'échec ; le nombre de parties de la table (fiche) n'a pas bougé. |
+
 ## Activité récente
 
 Deux bornes amies en ligne ; l'une joue une table pendant que l'autre lui envoie des nouvelles (connexion, invitation, record).

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { DEFAULT_MENU_MEDIA_SETTINGS, normalizeMenuMediaSettings } from '../mediaview';
-import { ShuffleKeys, START_TABLES, TABLE_ORDERS, sortTables, startIndex } from '../tableorder';
+import { ShuffleKeys, START_TABLES, TABLE_ORDERS, WHEEL_STARTS, WHEEL_START_HOLD_MS, sortTables, startIndex } from '../tableorder';
 import type { TableEntry } from '../tables';
 
 type T = Pick<TableEntry, 'file' | 'title' | 'version' | 'manufacturer' | 'year' | 'info'>;
@@ -68,4 +68,13 @@ test('ordre et table au démarrage : lus de medias.json, valeur inconnue ignoré
   for (const start of START_TABLES) assert.equal(normalizeMenuMediaSettings({ startTable: start }).startTable, start);
   assert.equal(normalizeMenuMediaSettings({ tableOrder: 'couleur' }).tableOrder, 'title');
   assert.equal(normalizeMenuMediaSettings({ startTable: 42 }).startTable, 'first');
+});
+
+test('Start sur la roue : la fiche par défaut, « jouer directement » à choisir ; la fiche reste à Start maintenu (et F6)', () => {
+  assert.equal(DEFAULT_MENU_MEDIA_SETTINGS.wheelStart, 'sheet');
+  for (const start of WHEEL_STARTS) assert.equal(normalizeMenuMediaSettings({ wheelStart: start }).wheelStart, start);
+  assert.equal(normalizeMenuMediaSettings({ wheelStart: 'jouer' }).wheelStart, 'sheet');
+  assert.equal(normalizeMenuMediaSettings({}).wheelStart, 'sheet');
+  // Un appui maintenu se distingue d'un appui franc sans faire attendre : entre une demi-seconde et une seconde.
+  assert.ok(WHEEL_START_HOLD_MS >= 500 && WHEEL_START_HOLD_MS <= 1000);
 });

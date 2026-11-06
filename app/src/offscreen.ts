@@ -115,6 +115,59 @@ export function createWindow(options: BrowserWindowConstructorOptions): BrowserW
   return win;
 }
 
+/** Au-delà, une fenêtre dont la page n'a pas dit « prête à s'afficher » est montrée quand même. */
+export const READY_TO_SHOW_MAX_MS = 10_000;
+
+/**
+ * Appelle `ready` une fois, quand la fenêtre peut être montrée : à son événement ready-to-show,
+ * ou au plus tard READY_TO_SHOW_MAX_MS après cet appel. Jamais pour une fenêtre détruite.
+ *
+ * Electron n'émet ready-to-show qu'à la première image « non vide » d'une fenêtre encore cachée :
+ * jamais pour une fenêtre déjà visible à ce moment, ni pour une page qui n'a encore rien peint de
+ * significatif. Le 06/11/2026, au redémarrage qui suit une mise à jour (et à deux lancements
+ * ordinaires, tous sur un poste très chargé : 17 à 30 s d'initialisation au lieu de 1 à 5), le
+ * playfield ne l'a jamais reçu : Cyber Pinball tournait, les voiles noirs couvraient les écrans,
+ * aucune fenêtre du menu ne s'affichait. Une fenêtre montrée plus tard n'est jamais claire :
+ * transparente jusqu'à sa première image (createWindow), le voile noir reste dessous.
+ * Le retard est noté dans le journal, avec l'état de la page, pour en trouver la cause.
+ */
+export function whenReadyToShow(win: BrowserWindow, ready: () => void, maxMs = READY_TO_SHOW_MAX_MS): void {
+  let done = false;
+  const go = (late: boolean) => {
+    if (done) return;
+    done = true;
+    clearTimeout(timer);
+    if (win.isDestroyed()) return;
+    if (late) console.warn(lateReadyNotice(win, maxMs));
+    ready();
+  };
+  const timer = setTimeout(() => go(true), maxMs);
+  win.once('ready-to-show', () => go(false));
+  win.once('closed', () => {
+    done = true;
+    clearTimeout(timer);
+  });
+}
+
+/** whenReadyToShow, en promesse (essais sans opérateur). */
+export function readyToShow(win: BrowserWindow, maxMs = READY_TO_SHOW_MAX_MS): Promise<void> {
+  return new Promise((resolve) => whenReadyToShow(win, resolve, maxMs));
+}
+
+/** Constat pour le journal : la fenêtre, et ce que fait sa page à ce moment. */
+function lateReadyNotice(win: BrowserWindow, maxMs: number): string {
+  const contents = win.webContents;
+  const yes = (v: boolean) => (v ? 'oui' : 'non'); // i18n-ignore : journal
+  const facts = [
+    `page en chargement : ${yes(contents.isLoading())}`, // i18n-ignore : journal
+    `rendu planté : ${yes(contents.isCrashed())}`, // i18n-ignore : journal
+    `attente d’une réponse : ${yes(contents.isWaitingForResponse())}`, // i18n-ignore : journal
+    `déjà visible : ${yes(isShown(win))}`, // i18n-ignore : journal
+    `processus du rendu : ${contents.getOSProcessId() || 'aucun'}`, // i18n-ignore : journal
+  ];
+  return `Fenêtre « ${win.getTitle()} » : pas de ready-to-show après ${maxMs / 1000} s (${facts.join(', ')}) ; montrée quand même.`; // i18n-ignore : journal
+}
+
 /** Fenêtres à l'écran pas encore montrées avec leur page affichée. */
 const unpainted = new Set<BrowserWindow>();
 let somePainted = false;

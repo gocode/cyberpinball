@@ -128,6 +128,21 @@ test('la géométrie d’Electron ne se lit que par offscreen.ts : un écran sim
   assert.deepEqual(offenders(/screenToDipRect|getPrimaryDisplay|getAllDisplays/, 'offscreen.ts'), [], 'utiliser windowRect() ou primaryRect()');
 });
 
+// 06/11/2026 : au redémarrage qui suit une mise à jour, sur un poste chargé, le playfield n'a
+// jamais reçu ready-to-show (Electron ne l'émet pas pour une fenêtre déjà visible à sa première
+// image, ni pour une page qui n'a rien peint de significatif) : Cyber Pinball tournait, aucune
+// fenêtre du menu ne s'affichait. Toute fenêtre attend donc par whenReadyToShow, qui la montre
+// au plus tard après READY_TO_SHOW_MAX_MS et le note dans le journal.
+test('une fenêtre n’attend jamais ready-to-show sans fin : whenReadyToShow ou readyToShow', () => {
+  assert.deepEqual(offenders(/['"]ready-to-show['"]/, 'offscreen.ts'), [], 'utiliser whenReadyToShow(win, …) ou readyToShow(win) de app/src/offscreen.ts');
+  const helper = fs.readFileSync(path.join(SOURCES, 'offscreen.ts'), 'utf8').match(/export function whenReadyToShow[\s\S]*?\n}/)?.[0] ?? '';
+  assert.match(helper, /setTimeout\(\(\) => go\(true\), maxMs\)/, 'un délai de secours');
+  assert.match(helper, /win\.once\('ready-to-show', \(\) => go\(false\)\)/);
+  assert.match(helper, /if \(late\) console\.warn\(/, 'le retard est noté dans le journal');
+  const main = fs.readFileSync(path.join(SOURCES, 'main.ts'), 'utf8');
+  assert.match(main, /^journalProcessesGone\(\);/m, 'les processus de Chromium arrêtés sont notés dans le journal');
+});
+
 test('la visibilité d’une fenêtre se lit par isShown : hors écran, aucune n’est vraiment visible', () => {
   assert.deepEqual(offenders(/\.isVisible\(\)/, 'offscreen.ts'), [], 'utiliser isShown(win) de app/src/offscreen.ts');
 });

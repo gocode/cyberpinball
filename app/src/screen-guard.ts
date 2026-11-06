@@ -57,7 +57,7 @@ import {
   type TaskbarRestoreMoment,
 } from '@cyberpinball/core';
 import { allowAnyForeground, foregroundWindow, hideWindow, listWindows, placeWindowBelow, showWindowInactive, taskbarWindows, type WindowInfo } from '@cyberpinball/win-displays';
-import { createWindow, desktopDisplays, isShown, OFFSCREEN, paintedOnScreen } from './offscreen';
+import { createWindow, desktopDisplays, isShown, OFFSCREEN, paintedOnScreen, whenReadyToShow } from './offscreen';
 import { coverDisplay, coverProblem } from './cover-display';
 import { locations } from './paths';
 import { relaunchThroughShellLauncher, shellSession } from './dedicated-session';
@@ -191,7 +191,7 @@ function openVeil(d: Display): BrowserWindow {
   // (createWindow) : au démarrage, le bureau se voit un peu plus longtemps ; à une relance, les
   // fenêtres de l'ancien processus couvrent les écrans jusque-là.
   // En mode bureau (écran branché entre-temps), il attend caché le retour au menu.
-  win.once('ready-to-show', () => win.isDestroyed() || desktopMode || win.showInactive());
+  whenReadyToShow(win, () => desktopMode || win.showInactive());
   return win;
 }
 

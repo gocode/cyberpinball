@@ -82,15 +82,15 @@ function Invoke-Autopilot($name, $steps) {
 
 Invoke-Autopilot 'medecin' @(
   'Escape', 'click:.lib-action:last-child',                                   # menu système, retour à la souris
-  'Digit1', 'click:.lib-action[data-label="Diagnostiquer et réparer"]',     # fiche, Diagnostiquer à la souris
+  'Digit1', 'action:Gérer la table', 'click:.lib-action[data-label="Diagnostiquer et réparer"]', # fiche, Gérer la table, Diagnostiquer à la souris
   'click:.lib-row.fixable',                                                   # répare la ROM en cliquant le constat
   'action:Tout réparer',                                                      # Tout réparer
-  'action:Retour à la fiche',                                                 # retour à la fiche
+  'action:Retour à la fiche',                                                 # retour à « Gérer la table »
   'action:Modifier les informations', 'Digit1', 'type:: Judgment Day', 'Enter', # titre au clavier
   'ShiftRight', 'Digit1', 'Escape',                                           # liste des fabricants
   'ShiftRight', 'Digit1', 'click:.key:nth-child(13)', 'Enter',                # année : + à la souris
   'ShiftRight', 'Digit1',                                                     # enregistrer
-  'action:Supprimer la table', 'Escape', 'Escape',                            # suppression proposée puis annulée
+  'action:Supprimer la table', 'Escape', 'Escape', 'Escape',                  # suppression proposée puis annulée ; la fiche, la roue
   'ShiftLeft', 'Digit1', 'action:Diagnostiquer et réparer',                    # table en vrac : médecin
   'Digit1', 'Escape', 'Escape'                                                # rangée dans son dossier, ROM absente
 )

@@ -51,6 +51,26 @@ export const START_TABLE_LABELS: Record<StartTable, string> = {
   },
 };
 
+/**
+ * Ce que fait Start sur la roue des tables : ouvrir la fiche (défaut), ou jouer la table
+ * directement. En « jouer », la fiche reste à Start maintenu (WHEEL_START_HOLD_MS) et à F6 d'un clavier ;
+ * les MagnaSave de la borne changent de collection sur la roue.
+ */
+export const WHEEL_STARTS = ['sheet', 'play'] as const;
+export type WheelStart = (typeof WHEEL_STARTS)[number];
+
+/** Start tenu au moins ce temps sur la roue, en « jouer directement » : la fiche s'ouvre au lieu de la partie. */
+export const WHEEL_START_HOLD_MS = 700;
+
+export const WHEEL_START_LABELS: Record<WheelStart, string> = {
+  get sheet() {
+    return t('ouvrir la fiche');
+  },
+  get play() {
+    return t('jouer directement');
+  },
+};
+
 type Sortable = Pick<TableEntry, 'file' | 'title' | 'version' | 'manufacturer' | 'year' | 'info'>;
 
 /** Clé de tirage de chaque table pour l'ordre mélangé, gardée le temps d'une session. */

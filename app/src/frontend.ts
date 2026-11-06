@@ -28,6 +28,11 @@ import {
   keyLabel,
   interfaceKeys,
   zoneSwitchKeys,
+  WHEEL_START_HOLD_MS,
+  LOADING_SLOW_MS,
+  advanceLoadingStep,
+  loadingStepLabel,
+  type LoadingStep,
   navigationButtons,
   navigationProblems,
   type ButtonsSource,
@@ -199,7 +204,7 @@ import {
 import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
-import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, windowRect } from './offscreen';
+import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
@@ -293,7 +298,14 @@ function menuKeys(): [string, string][] {
     ...(collections.locked()
       ? []
       : [['menu.collections', t('Changer de collection (Toutes, Favoris, Récentes, un fabricant, une décennie…)'), t('MagnaSave gauche ou droit, ou clic sur le repère au-dessus de la roue')] as [GuestDoor, string, string]]),
-    ['menu.sheet', guest.active ? t('Fiche de la table (Jouer, Prospectus, Règles)') : t('Fiche de la table (Jouer, Modifier…)'), `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`],
+    // Start sur la roue (réglage « Start sur la roue ») : la fiche, ou la partie, la fiche passant alors à Start maintenu (et F6).
+    ...(wheelPlays()
+      ? ([
+          ['sheet.play', t('Jouer la table choisie'), `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`],
+          // Une ligne chacune : l'aide-mémoire tient à l'écran sans rien pousser hors de la fenêtre (bureau en 1080p).
+          ['menu.sheet', t('Fiche de la table'), sheetKeys().length ? t('Start maintenu, ou {keys}', { keys: or(sheetKeys()) }) : t('Start maintenu')],
+        ] as [GuestDoor, string, string][])
+      : ([['menu.sheet', guest.active ? t('Fiche de la table (Jouer, Prospectus, Règles)') : t('Fiche de la table (Jouer, Modifier…)'), `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`]] as [GuestDoor, string, string][])),
     ...(KEYS.help.length ? [['menu.commands', t('Afficher les commandes'), or(KEYS.help)] as [GuestDoor, string, string]] : []),
     ['menu.vpx-settings', t('Réglages de VPX'), KEYS.settings.length ? t('{keys}, ou Exit puis « Réglages de VPX »', { keys: or(KEYS.settings) }) : t('Exit puis « Réglages de VPX »')],
     ['menu.system', t('Menu et configuration (tables, réglages, boutons, écrans, Bureau Windows, quitter)'), t('Exit ({keys}), Tab, ou clic sur ⚙ en haut à droite', { keys: or(KEYS.exit) })],
@@ -315,10 +327,128 @@ function menuFooter(): [string, string?][] {
     [t('Flippers : choisir')],
     // Mode invité qui impose une collection : les MagnaSave n'y font rien, l'aide n'en parle pas.
     ...(!collections.locked() && (magna.previous.length || magna.next.length) ? [[t('MagnaSave : collections')] as [string]] : []),
-    [t('Start : fiche'), KEYS.confirm[0]],
+    // « Jouer directement » : Start joue ; tenu, la fiche (les MagnaSave restent aux collections). Deux repères courts : un seul long passait sur trois lignes en borne.
+    ...(wheelPlays()
+      ? ([
+          [t('Start : jouer'), KEYS.confirm[0]],
+          [t('Start tenu : fiche'), sheetKeys()[0]],
+        ] as [string, string?][])
+      : ([[t('Start : fiche'), KEYS.confirm[0]]] as [string, string?][])),
     // Mode invité : Exit n'ouvre pas le menu système.
     ...(guest.allows('menu.system') ? [[t('Exit : menu'), KEYS.exit[0]] as [string, string]] : []),
   ];
+}
+
+/**
+ * Lancement en cours (loadingprogress.ts) : l'étape observée, l'heure du Start, `slow` passé
+ * LOADING_SLOW_MS (le cartouche paraît), `stop` une fois VPX lancé, `stopped` quand Exit ou
+ * Ctrl+Maj+K l'a arrêté. Effacé quand la table est à l'écran.
+ */
+let launch: { step: LoadingStep; since: number; slow: boolean; timer: NodeJS.Timeout; stop?: () => void; stopped?: boolean } | undefined;
+
+function startLaunch(): void {
+  endLaunch();
+  const since = Date.now();
+  launch = {
+    step: 'prepare',
+    since,
+    slow: false,
+    timer: setTimeout(() => {
+      if (!launch || launch.since !== since || state.phase !== 'loading') return;
+      launch.slow = true;
+      console.log(`Lancement : la table n'est pas à l'écran ${LOADING_SLOW_MS / 1000} s après le Start (${launch.step}) ; le chargement le dit.`); // i18n-ignore : journal
+      broadcast();
+    }, LOADING_SLOW_MS),
+  };
+}
+
+/** Étape vue pendant le lancement : le cartouche la dit, s'il est là. */
+function launchStep(step: LoadingStep): void {
+  if (!launch) return;
+  const next = advanceLoadingStep(launch.step, step);
+  if (next === launch.step) return;
+  launch.step = next;
+  if (launch.slow) broadcast();
+}
+
+function endLaunch(): void {
+  if (launch) clearTimeout(launch.timer);
+  launch = undefined;
+}
+
+/** Exit ou Ctrl+Maj+K pendant un chargement : VPX se ferme s'il est lancé, sinon il ne le sera pas. */
+function stopLaunch(): void {
+  if (!launch || launch.stopped) return;
+  launch.stopped = true;
+  console.log(`Lancement : arrêté pendant le chargement (${launch.step}, ${Math.round((Date.now() - launch.since) / 1000)} s après le Start).`); // i18n-ignore : journal
+  launch.stop?.();
+  broadcast();
+}
+
+/**
+ * Touches qui ouvrent aussi la fiche en « jouer directement » : celles qui basculent les zones d'un
+ * écran (F6 d'un clavier), sauf les MagnaSave de la borne, qui changent de collection sur la roue.
+ */
+function sheetKeys(): string[] {
+  const magna = collectionKeys();
+  return zoneSwitchKeys({ buttons, navigation }).filter((k) => !magna.previous.includes(k) && !magna.next.includes(k));
+}
+
+/** Réglage « Start sur la roue » sur « jouer directement » (tableorder.ts, WHEEL_STARTS). */
+function wheelPlays(): boolean {
+  return mediaSettings.wheelStart === 'play';
+}
+
+/**
+ * Start appuyé sur la roue en « jouer directement » : relâché avant WHEEL_START_HOLD_MS, la
+ * partie ; tenu jusque-là, la fiche s'ouvre sans attendre le relâchement (un appui qui dure
+ * ne lance jamais une partie par surprise).
+ */
+let wheelPress: { code: string; file: string; timer: NodeJS.Timeout } | undefined;
+
+function cancelWheelPress(): void {
+  if (wheelPress) clearTimeout(wheelPress.timer);
+  wheelPress = undefined;
+}
+
+/** Start sur la roue : la fiche (réglage par défaut), ou la partie de la table choisie. */
+function wheelConfirm(table: TableEntry, sheet: boolean): void {
+  cancelWheelPress();
+  if (sheet) {
+    if (guest.knock('menu.sheet')) library.openSheet(table);
+  } else if (guest.knock('sheet.play')) {
+    state = { ...state, index: Math.max(0, tables.indexOf(table)) };
+    void play(table, process.env.CYBERPINBALL_AUTOPILOT ? Number(process.env.CYBERPINBALL_PARTIE_MS) || 10_000 : undefined);
+  }
+}
+
+/** Start enfoncé sur la roue, en « jouer directement » : la minuterie de l'appui maintenu. */
+function pressWheelStart(code: string): void {
+  const table = tables[state.index];
+  if (!table) return;
+  cancelWheelPress();
+  wheelPress = {
+    code,
+    file: table.file,
+    timer: setTimeout(() => {
+      wheelPress = undefined;
+      // Toujours sur la roue, toujours la même table : la fiche.
+      if (state.phase === 'menu' && tables[state.index]?.file === table.file) {
+        wheelConfirm(table, true);
+        broadcast();
+      }
+    }, WHEEL_START_HOLD_MS),
+  };
+}
+
+/** Start relâché avant la minuterie : la partie de la table sur laquelle il a été enfoncé. */
+function releaseWheelStart(code: string): void {
+  if (wheelPress?.code !== code) return;
+  const table = tables.find((x) => x.file === wheelPress!.file);
+  cancelWheelPress();
+  if (state.phase !== 'menu' || !table) return;
+  wheelConfirm(table, false);
+  broadcast();
 }
 
 /**
@@ -1638,7 +1768,9 @@ export function startFrontend(): void {
     if (state.phase === 'intro') return void leaveIntro();
     // La carte du retour : un clic ailleurs que sur ses choix la ferme d'abord (ses choix passent par handleKey).
     if (action.type !== 'key' && gameReturn.open) leaveGameReturn();
-    if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
+    // Clic sur « Start : jouer » de la roue : un clic n'a pas de durée, il joue tout de suite.
+    if (action.type === 'key' && state.phase === 'menu' && !state.help && !gameReturn.open && wheelPlays() && KEYS.confirm.includes(action.code) && tables[state.index]) wheelConfirm(tables[state.index]!, false), broadcast();
+    else if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
     // Roue dentée (ou cadenas, en mode invité).
     else if (action.type === 'config') guest.knock('menu.system') && openConfig();
     // Pastille des téléchargements du menu des tables.
@@ -1662,7 +1794,8 @@ export function startFrontend(): void {
       broadcast();
     }
     else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
-      if (action.offset === 0) guest.knock('menu.sheet') && library.openSheet(tables[state.index]!);
+      // Clic sur la table au centre : comme Start (la fiche, ou la partie en « jouer directement »).
+      if (action.offset === 0) wheelConfirm(tables[state.index]!, !wheelPlays());
       else if (guest.knock('menu.choose')) moveSelection(action.offset);
       broadcast();
     } else library.handleAction(action);
@@ -2003,7 +2136,8 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     // Seule la mise en page du playfield pivote : la fenêtre garde les bornes de l'écran.
     const turn = role.id === 'playfield' ? rotation : 0;
     win.loadFile(path.join(__dirname, '..', 'renderer', 'frontend.html'), { query: { role: role.id, rotation: String(turn), zones: JSON.stringify(parts), ...(playfield && { playfield: JSON.stringify(playfield) }) } });
-    win.once('ready-to-show', () => {
+    // Au plus tard après READY_TO_SHOW_MAX_MS : un démarrage lent laissait le menu invisible (06/11/2026).
+    whenReadyToShow(win, () => {
       win.show();
       if (role.id !== 'playfield') return;
       win.focus();
@@ -2071,6 +2205,8 @@ function handleKeyUp(input: Input, fromPhone = false): void {
     cabinetVolume?.windowInput(input);
     guest.input(input.code, false, unlockListening());
   }
+  // Roue en « jouer directement » : Start relâché tôt lance la partie (au téléphone aussi).
+  releaseWheelStart(input.code);
   // Gestion des tables : MagnaSave (F6) relâché bascule entre la liste et les actions de l'écran.
   if (state.phase === 'library') library.handleKeyUp(input);
 }
@@ -2120,6 +2256,11 @@ function handleKey(input: Input, fromPhone = false): boolean {
 
   switch (state.phase) {
     case 'loading':
+      // Ctrl+Maj+K arrête le lancement ; Exit aussi, une fois que le chargement tarde et le dit.
+      if (matchesShortcut(input, SHORTCUTS.forceStop) || (launch?.slow && is(KEYS.exit))) {
+        if (guest.knock('game.force-stop')) stopLaunch();
+      }
+      return true;
     case 'playing':
       // Arrêter une partie bloquée, reçu par une fenêtre du menu (partie simulée : le raccourci global n'est pas pris).
       if (state.phase === 'playing' && matchesShortcut(input, SHORTCUTS.forceStop)) forceStop?.();
@@ -2198,15 +2339,24 @@ function handleKey(input: Input, fromPhone = false): boolean {
       state = { ...state, phase: 'menu' };
       break;
     case 'menu':
+      // Un autre bouton pendant que Start est tenu (« jouer directement ») : l'appui ne lance plus rien.
+      if (wheelPress && input.code !== wheelPress.code) cancelWheelPress();
       if (is(KEYS.help)) guest.knock('menu.commands') && (state = { ...state, help: !state.help });
       else if (state.help && is(KEYS.exit)) state = { ...state, help: false };
       else if (is(KEYS.previous)) guest.knock('menu.choose') && moveSelection(-1);
       else if (is(KEYS.next)) guest.knock('menu.choose') && moveSelection(1);
-      else if (is(KEYS.confirm)) guest.knock('menu.sheet') && library.openSheet(tables[state.index]!);
-      else if (is(KEYS.settings)) guest.knock('menu.vpx-settings') && openVpxSettings();
+      else if (is(KEYS.confirm)) {
+        // « Jouer directement » : l'appui attend son relâchement (partie) ou sa durée (fiche) ; la répétition d'une touche tenue n'y change rien.
+        if (!wheelPlays()) wheelConfirm(tables[state.index]!, true);
+        else if (!input.isAutoRepeat) pressWheelStart(input.code);
+      } else if (is(KEYS.settings)) guest.knock('menu.vpx-settings') && openVpxSettings();
       else if (is(KEYS.exit)) guest.knock('menu.system') && library.openSystem();
       else if (is(collectionKeys().previous)) changeCollection({ step: -1 });
       else if (is(collectionKeys().next)) changeCollection({ step: 1 });
+      // « Jouer directement » : F6 d'un clavier ouvre aussi la fiche (les MagnaSave de la borne changent de collection).
+      else if (wheelPlays() && is(sheetKeys())) {
+        if (!input.isAutoRepeat) wheelConfirm(tables[state.index]!, true);
+      }
       else return false;
       break;
   }
@@ -2391,6 +2541,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Rejouer depuis la carte du retour précédent : elle part, son knocker aussi.
   closeGameReturn();
   state = { ...state, phase: 'loading', help: false };
+  startLaunch();
   launchCount++;
   const pressedAt = Date.now();
   // Lancement en cinéma, pour une vraie partie : la chorégraphie part au Start, dans les fenêtres
@@ -2452,6 +2603,17 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     }
   }
 
+  // Arrêté pendant la préparation (Exit, Ctrl+Maj+K) : VPX n'est pas lancé, rien n'a changé.
+  if (launch?.stopped) {
+    endLaunch();
+    dressing = undefined;
+    displayMode = false;
+    cinema.stop();
+    state = { ...state, phase: 'menu' };
+    broadcast();
+    return undefined;
+  }
+
   // Partie entre amis : VPX joue un double de la table, fait après les préparations ci-dessus ; le
   // dossier habituel n'est jamais ouvert en écriture. Sans double possible, pas de partie : jamais
   // de repli sur le dossier habituel.
@@ -2496,6 +2658,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     // Avant tout ce qui peut redessiner la bande d'une partie entre amis (hooks.onPlaying : le statut part aux autres).
     playingSince = Date.now();
     state = { ...state, phase: 'playing' };
+    // La table à l'écran : le chargement est fini, son cartouche avec lui.
+    endLaunch();
     // Journal des écrans : la pile des fenêtres, la fenêtre de jeu de VPX affichée (le gardien des barres n'y touche pas).
     settleScreens('vpx');
     // Les amis voient la table en cours, en temps réel (pas pendant un réglage de l'affichage).
@@ -2518,10 +2682,20 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   };
   // Ce qui a pris le temps du Start au lancement : rien d'autre que l'écran de chargement et la préparation (docs\demo-cinema.ps1).
   console.log(`Lancement : VPX lancé ${Date.now() - pressedAt} ms après le Start (écran de chargement ${loadingMs} ms${captureMs ? `, captures des essais ${captureMs} ms` : ''}, préparation ${Date.now() - preparing} ms ; lancement en cinéma ${cinema.running ? 'joué' : 'coupé'}).`);
+  // Les fenêtres de VPX paraissent avant celle du jeu : le cartouche du chargement le dit.
+  const onWindows = () => launchStep('windows');
+  // Hors écran, un chargement simulé qui tarde (CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) montre le cartouche.
+  const simulatedLoadMs = Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) || undefined;
   const game =
     simulated !== undefined
-      ? simulateVpx({ onPlaying, onForeground })
-      : launchVpx({ exe: install.exe, ini: double?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying, onForeground });
+      ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}) })
+      : launchVpx({ exe: install.exe, ini: double?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying, onForeground, onWindows });
+  if (launch) {
+    launch.stop = () => game.stop();
+    launchStep('launched');
+    // Arrêt demandé pendant la préparation, juste après le contrôle : VPX se ferme aussitôt lancé.
+    if (launch.stopped) game.stop();
+  }
   // Départ commun : la carte de l'attente se charge, cachée, pendant que VPX charge la table ; elle
   // paraît dès la première vue, même quand l'attente ne dure qu'un instant (borne lente à créer ses fenêtres).
   if (hooks.gate) gameNotices.prepareWait(liveGames.waitView({ manual: liveManual }));
@@ -2585,6 +2759,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (watchLive) clearInterval(watchLive);
   gameNotices.close();
   inGameMenu.disarm();
+  // Arrêté pendant le chargement : ni partie comptée, ni message d'échec, la roue.
+  const stoppedLoading = launch?.stopped === true;
+  endLaunch();
   dmdWatch?.stop();
   dmdWatch = undefined;
   // Les records de la partie, lus où VPX les a écrits (le double, pour une partie entre amis) ; puis le double s'en va.
@@ -2616,6 +2793,11 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // pour le joueur, mais le signe qu'un réglage ou une version de VPX a changé.
   for (const notice of result.notices) console.log(`VPX (${table.id}) : ${notice}`);
 
+  if (stoppedLoading) {
+    state = { ...state, phase: 'menu' };
+    broadcast();
+    return { result, focusReturned, entered: [] };
+  }
   if (mode === 'display') return { result, focusReturned, entered: [] };
   // Un score entré au tableau d'honneur pendant la partie : le knocker sonne au retour au menu.
   const entered = result.ok ? newRecords(recordsBefore, recordsAfter) : [];
@@ -3257,6 +3439,13 @@ function viewFor(role: RoleId) {
     bilan: state.phase === 'menu' && !state.help && !shown ? gameReturnFor(role) : undefined,
     // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
     loading: state.phase === 'loading' && role === 'playfield' && medias && table ? medias.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
+    // Chargement qui tarde (loadingprogress.ts) : l'étape vue, l'heure du Start (le rendu compte les secondes), comment arrêter.
+    slow:
+      state.phase === 'loading' && role === 'playfield' && launch?.slow
+        ? launch.stopped
+          ? { step: t('Arrêt demandé : VPX se ferme'), since: launch.since }
+          : { step: loadingStepLabel(launch.step), since: launch.since, stop: t('{keys} ou Exit : arrêter', { keys: shortcutLabel(SHORTCUTS.forceStop) }) }
+        : undefined,
     // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
     backglass: role === 'playfield' && medias && table && !shown ? medias.typeMedia(table, 'backglass', 'Backglass') : undefined,
     // Mode invité : un message dont l'action est fermée n'en propose pas (son pied dit « Revenir au menu »).

@@ -157,5 +157,5 @@ test('branchements : carillon à chaque invitation, carte pendant la partie, fer
   const library = read('app', 'src', 'library.ts');
   const sheet = library.slice(library.indexOf('function buildSheet('), library.indexOf('function pagesAction('));
   assert.ok(sheet.indexOf("door: 'sheet.play'") < sheet.indexOf("door: 'sheet.friends'"));
-  assert.ok(sheet.indexOf("door: 'sheet.friends'") < sheet.indexOf('...further'));
+  assert.ok(sheet.indexOf("door: 'sheet.friends'") < sheet.indexOf('pagesAction(table),'));
 });

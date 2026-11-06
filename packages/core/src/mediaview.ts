@@ -35,7 +35,7 @@ import {
 import { ROLES, type Cabinet, type FlipperEdge, type RoleId, type Rotation } from './model';
 import { companion } from './tablefiles';
 import type { TableEntry } from './tables';
-import { START_TABLES, TABLE_ORDERS, type StartTable, type TableOrder } from './tableorder';
+import { START_TABLES, TABLE_ORDERS, WHEEL_STARTS, type StartTable, type TableOrder, type WheelStart } from './tableorder';
 
 // ---------------------------------------------------------------------------
 // Adresse des fichiers
@@ -531,6 +531,11 @@ export interface MenuMediaSettings {
   tableOrder: TableOrder;
   /** Table choisie au démarrage : la première de l'ordre par défaut, ou au hasard, ou la dernière jouée. */
   startTable: StartTable;
+  /**
+   * Start sur la roue : ouvre la fiche de la table (défaut), ou la joue directement ; la fiche
+   * reste alors à Start maintenu et à F6 d'un clavier (WHEEL_STARTS).
+   */
+  wheelStart: WheelStart;
   /** Qualité téléchargée depuis VPinMediaDB : d'après l'écran du plateau (défaut), ou imposée. */
   downloadQuality: MediaDbQualitySetting;
   /** DMD du menu : vivant par défaut, classique pour revenir au média seul. */
@@ -575,6 +580,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   menuLayout: 'medaillons',
   tableOrder: 'title',
   startTable: 'first',
+  wheelStart: 'sheet',
   downloadQuality: 'auto',
   dmd: 'live',
   dmdColor: DEFAULT_DMD_COLOR,
@@ -613,6 +619,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     menuLayout: menuLayoutOf(r.menuLayout, d.menuLayout),
     tableOrder: TABLE_ORDERS.includes(r.tableOrder as TableOrder) ? (r.tableOrder as TableOrder) : d.tableOrder,
     startTable: START_TABLES.includes(r.startTable as StartTable) ? (r.startTable as StartTable) : d.startTable,
+    wheelStart: WHEEL_STARTS.includes(r.wheelStart as WheelStart) ? (r.wheelStart as WheelStart) : d.wheelStart,
     downloadQuality: MEDIADB_QUALITY_SETTINGS.includes(r.downloadQuality as MediaDbQualitySetting) ? (r.downloadQuality as MediaDbQualitySetting) : d.downloadQuality,
     dmd: MENU_DMD_MODES.includes(r.dmd as MenuDmdMode) ? (r.dmd as MenuDmdMode) : d.dmd,
     dmdColor: normalizeDmdColor(r.dmdColor),

@@ -82,6 +82,8 @@ import {
   sameFile,
   sheetPages,
   SHEET_PAGE_TYPES,
+  BackTrail,
+  type BackPlace,
   samePath,
   sortTables,
   tableGame,
@@ -542,7 +544,8 @@ type Editor =
 type Screen =
   /** Menu système : une rubrique, ou ses rubriques (racine). */
   | { kind: 'system'; group?: SystemGroupId }
-  | { kind: 'sheet'; file: string; flash?: string; pup?: TablePupPack[]; contents?: TableContents }
+  /** `manage` : « Gérer la table… », les actions de la fiche qui ne servent pas à jouer. */
+  | { kind: 'sheet'; file: string; flash?: string; pup?: TablePupPack[]; contents?: TableContents; manage?: boolean }
   /** Options des PuP-Packs de la table (fiche > « PuP-Pack »). */
   | { kind: 'pupOptions'; file: string; flash?: string; pup?: TablePupPack[] }
   /** Prospectus ou règles de la table, page par page (flippers : page précédente ou suivante). */
@@ -740,6 +743,12 @@ export function createLibrary(host: LibraryHost) {
    * garde ; oublié au retour aux tables, au lancement d'une partie et quand la roue ouvre une fiche.
    */
   let sheetReturn: (() => void) | undefined;
+  /**
+   * Table dont « Gérer la table… » est ouvert : les écrans qui s'en ouvrent (médias, parties du
+   * jeu, médecin…) reviennent par openSheet, qui y ramène au lieu de la fiche. Oublié en
+   * revenant à la fiche, au retour aux tables, au lancement d'une partie et quand la roue ouvre une fiche.
+   */
+  let sheetManage: string | undefined;
 
   /** Ajoute une entrée du menu système ; l'arbre des rubriques (systemmenu.ts, core) dit où elle va. */
   function provideSystemItem(id: SystemItemId, item: ProvidedSystemItem): void {
@@ -840,6 +849,8 @@ export function createLibrary(host: LibraryHost) {
     systemChosen = undefined;
     systemReturn = undefined;
     sheetReturn = undefined;
+    sheetManage = undefined;
+    backTrail.reset();
     host.leave();
     host.broadcast();
   }
@@ -906,6 +917,7 @@ export function createLibrary(host: LibraryHost) {
     section = undefined;
     // Revenu au menu système : une fiche ouverte ensuite d'ailleurs ne ramène plus à « Toutes les tables ».
     sheetReturn = undefined;
+    sheetManage = undefined;
     systemGroup = group;
     const entries = systemEntries(group);
     const chosen = at ? entries.indexOf(at) : -1;
@@ -946,8 +958,9 @@ export function createLibrary(host: LibraryHost) {
     go({ kind: 'notice', heading, lines, then, table: tableOf(screen) });
   }
 
+  /** La fiche de la table ; « Gérer la table… » quand c'est de là qu'on revient (sheetManage). */
   function openSheet(table: TableEntry, flash?: string): void {
-    go({ kind: 'sheet', file: table.file, flash });
+    go({ kind: 'sheet', file: table.file, flash, ...(sheetManage && samePath(sheetManage, table.file) ? { manage: true } : {}) });
   }
 
   /** Menu système > Tables > Toutes les tables : la liste, la sélection sur `focus` (une table). */
@@ -1888,6 +1901,46 @@ export function createLibrary(host: LibraryHost) {
       dmdMissing && !missing.length ? [{ label: t('Pour aller plus loin'), detail: t('Contenu du DMD absent (facultatif) : le récupérer'), icon: 'download', door: 'sheet.further', run: () => journeyUi.open(table.file) }] : [];
     // Mode invité : la fiche sert à jouer ; les fichiers de la table (noms, ROM, replis) n'y sont pas montrés.
     const guest = host.guest.active;
+    // « Gérer la table… » : tout ce qui ne sert pas à jouer, rangé à part pour que la fiche tienne en quelques choix.
+    const manage: SheetAction[] = [
+      ...further,
+      { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), icon: 'image', door: 'sheet.medias', run: () => medias.open(table) },
+      { label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) },
+      { label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) },
+      ...pupAction(table, s),
+      ...(host.tableSettings
+        ? [{ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, door: 'sheet.table-settings' as const, run: () => host.tableSettings!(table) }]
+        : []),
+      ...(host.adjustDisplay && host.vpxExe()
+        ? [{ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }]
+        : []),
+      ...(host.playAndRecord && host.vpxExe()
+        ? [{ label: t('Jouer et enregistrer'), detail: t('Filmer la partie pour la présentation de la table sur la roue'), icon: 'record' as const, door: 'sheet.record' as const, run: () => recording.setup(table) }]
+        : []),
+      { label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) },
+      { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },
+      { label: t('Supprimer la table'), detail: t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
+    ];
+    if (s.manage) {
+      // Exit et « Retour » : la fiche, sans plus y revenir depuis les écrans ouverts ensuite.
+      const up = () => {
+        sheetManage = undefined;
+        openSheet(table);
+      };
+      return {
+        heading: t('Gérer la table'),
+        icon: 'toolbox',
+        subheading: table.title,
+        lead: s.flash,
+        // Onze actions : sur deux colonnes, au bureau comme en borne (library.css, .lib-manage).
+        variant: 'manage',
+        sections: [],
+        actions: [...manage, { label: t('Retour à la fiche'), icon: 'back', door: 'sheet.back', run: up }],
+        back: up,
+      };
+    }
+    // Ce qui demande un œil (fichiers à vérifier, option du PuP-Pack) se voit dès la fiche.
+    const watch = manage.filter((a) => a.tone === 'warning').map((a) => a.label);
     const actions: SheetAction[] = [
       ...missing,
       {
@@ -1897,29 +1950,24 @@ export function createLibrary(host: LibraryHost) {
         run: () => {
           screen = undefined;
           sheetReturn = undefined;
+          sheetManage = undefined;
           host.play(table);
         },
       },
       ...(host.playWithFriend ? [{ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }] : []),
+      pagesAction(table),
       ...(host.favorite ? [favoriteAction(table)] : []),
-      ...further,
-      ...SHEET_PAGE_TYPES.map((type) => pagesAction(table, type)),
-      { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },
-      { label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), icon: 'image', door: 'sheet.medias', run: () => medias.open(table) },
-      { label: t('Parties du jeu'), detail: t('Table, PuP-Pack, fronton, ROM… : ajouter, remplacer, retirer'), icon: 'table-add', door: 'sheet.parts', run: () => gameParts.open(table) },
-      { label: t('Fichiers de la table'), detail: tableFiles.summary(contents), tone: contents.problems ? 'warning' : undefined, icon: 'folder', door: 'sheet.files', run: () => tableFiles.open(table, 0, contents) },
-      ...pupAction(table, s),
-      ...(host.playAndRecord && host.vpxExe()
-        ? [{ label: t('Jouer et enregistrer'), detail: t('Filmer la partie pour la présentation de la table sur la roue'), icon: 'record' as const, door: 'sheet.record' as const, run: () => recording.setup(table) }]
-        : []),
-      ...(host.adjustDisplay && host.vpxExe()
-        ? [{ label: t('Régler l’affichage en partie'), detail: t('Cadrage, fronton, DMD, topper : sur la table lancée, dans le menu de VPX'), icon: 'frame' as const, door: 'sheet.display' as const, run: () => adjustDisplay(table) }]
-        : []),
-      ...(host.tableSettings
-        ? [{ label: t('Réglages de cette table'), detail: t('Son, jeu… pour cette table seulement'), icon: 'sliders' as const, door: 'sheet.table-settings' as const, run: () => host.tableSettings!(table) }]
-        : []),
-      { label: t('Diagnostiquer et réparer'), icon: 'pulse', door: 'sheet.doctor', run: () => openDoctor(table.file) },
-      { label: t('Supprimer la table'), detail: t('Mise à la corbeille'), tone: 'error', icon: 'trash', door: 'sheet.remove', run: () => go({ kind: 'remove', file: table.file }) },
+      {
+        label: t('Gérer la table…'),
+        detail: watch.length ? t('À vérifier : {what}', { what: formatList(watch) }) : t('Médias, parties du jeu, fichiers, réglages, diagnostic, modifier, supprimer'),
+        tone: watch.length ? 'warning' : undefined,
+        icon: 'toolbox',
+        door: 'sheet.manage',
+        run: () => {
+          sheetManage = table.file;
+          openSheet(table);
+        },
+      },
       { label: exitLabel, icon: 'back', door: 'sheet.back', run: exit },
     ];
 
@@ -1955,25 +2003,60 @@ export function createLibrary(host: LibraryHost) {
   const pagesOf = (table: TableEntry, type: SheetPageType) => sheetPages(table, host.root, host.dataDir, type);
 
   /** « Prospectus : 2 pages » ; sans fichier, ce que montre le repli. */
-  function pagesAction(table: TableEntry, type: SheetPageType): SheetAction {
-    const n = pagesOf(table, type).length;
+  /**
+   * « Prospectus et règles » : un seul livret, le prospectus puis les règles ; chaque partie a
+   * au moins une page (son repli : fiche générée, commandes de la partie).
+   */
+  function pagesAction(table: TableEntry): SheetAction {
+    const parts = SHEET_PAGE_TYPES.map((type) => {
+      const n = pagesOf(table, type).length;
+      return t('{label} : {what}', { label: mediaTypeInfo(type).label, what: n ? tn(n, '{n} page', '{n} pages') : type === 'GameInfo' ? t('fiche générée') : t('commandes de la partie') });
+    });
     return {
-      label: mediaTypeInfo(type).label,
+      label: t('Prospectus et règles'),
       door: 'sheet.read',
-      icon: type === 'GameInfo' ? 'info' : 'rules',
-      detail: n ? tn(n, '{n} page', '{n} pages') : type === 'GameInfo' ? t('Fiche générée : titre, fabricant, année') : t('Commandes de la partie'),
-      run: () => go({ kind: 'pages', file: table.file, type, index: 0 }),
+      icon: 'rules',
+      detail: parts.join(' · '),
+      run: () => go({ kind: 'pages', file: table.file, type: SHEET_PAGE_TYPES[0], index: 0 }),
     };
   }
+
+  /** Pages du livret, partie par partie (au moins une chacune) : [prospectus, règles]. */
+  const bookletCounts = (table: TableEntry) => SHEET_PAGE_TYPES.map((type) => Math.max(1, pagesOf(table, type).length));
+
+  /** Tourne le livret de `step` pages, d'une partie à l'autre ; au bout, il repart de l'autre. */
+  function turnBooklet(s: PagesScreen, counts: number[], step: number): void {
+    const total = counts.reduce((a, b) => a + b, 0);
+    const at = SHEET_PAGE_TYPES.indexOf(s.type);
+    let flat = (counts.slice(0, at).reduce((a, b) => a + b, 0) + s.index + step + total) % total;
+    for (const [i, type] of SHEET_PAGE_TYPES.entries()) {
+      if (flat < counts[i]!) {
+        s.type = type;
+        s.index = flat;
+        return;
+      }
+      flat -= counts[i]!;
+    }
+  }
+
+  /** Dernière page du livret (celle des règles) : Start revient ensuite à la fiche. */
+  const bookletEnd = (s: PagesScreen, counts: number[]) => s.type === SHEET_PAGE_TYPES.at(-1) && s.index >= counts.at(-1)! - 1;
 
   function buildPages(s: PagesScreen): Built {
     const table = find(s.file);
     const back = () => (table ? openSheet(table) : leave());
     if (!table) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), door: 'sheet.back', run: leave }], back };
-    const count = Math.max(1, pagesOf(table, s.type).length);
+    const counts = bookletCounts(table);
+    const count = counts[SHEET_PAGE_TYPES.indexOf(s.type)]!;
     s.index = Math.min(s.index, count - 1);
     const turn = (step: number) => {
-      s.index = (s.index + step + count) % count;
+      turnBooklet(s, counts, step);
+      host.broadcast();
+    };
+    // À la souris : sauter au prospectus ou aux règles.
+    const jump = (type: SheetPageType) => {
+      s.type = type;
+      s.index = 0;
       host.broadcast();
     };
     const label = mediaTypeInfo(s.type).label;
@@ -1983,21 +2066,23 @@ export function createLibrary(host: LibraryHost) {
       sections: [],
       // Lire, page par page : ouvert à l'invité comme la fiche.
       actions: [
-        ...(count > 1 ? [{ label: t('‹ Page précédente'), door: 'sheet.read' as const, run: () => turn(-1) }, { label: t('Page suivante ›'), door: 'sheet.read' as const, run: () => turn(1) }] : []),
+        { label: t('‹ Page précédente'), door: 'sheet.read' as const, run: () => turn(-1) },
+        { label: t('Page suivante ›'), door: 'sheet.read' as const, run: () => turn(1) },
+        ...SHEET_PAGE_TYPES.filter((type) => type !== s.type).map((type) => ({ label: mediaTypeInfo(type).label, door: 'sheet.read' as const, run: () => jump(type) })),
         { label: t('Retour à la fiche'), door: 'sheet.read', run: back },
       ],
       back,
     };
   }
 
-  /** Flippers : page précédente ou suivante ; Start : page suivante, puis la fiche après la dernière ; Exit : la fiche. */
+  /** Flippers : page précédente ou suivante, du prospectus aux règles ; Start : page suivante, puis la fiche après la dernière ; Exit : la fiche. */
   function pagesKey(s: PagesScreen, input: Input): boolean {
     const KEYS = host.keys();
     const is = (group: string[]) => group.includes(input.code);
     const table = find(s.file);
-    const count = table ? Math.max(1, pagesOf(table, s.type).length) : 1;
-    if (is(KEYS.previous) || is(KEYS.next)) s.index = (s.index + (is(KEYS.previous) ? -1 : 1) + count) % count;
-    else if (is(KEYS.confirm) && s.index < count - 1) s.index++;
+    const counts = table ? bookletCounts(table) : SHEET_PAGE_TYPES.map(() => 1);
+    if (is(KEYS.previous) || is(KEYS.next)) turnBooklet(s, counts, is(KEYS.previous) ? -1 : 1);
+    else if (is(KEYS.confirm) && !bookletEnd(s, counts)) turnBooklet(s, counts, 1);
     else if (is(KEYS.confirm) || is(KEYS.exit)) build().back();
     else return false;
     host.broadcast();
@@ -2800,7 +2885,7 @@ export function createLibrary(host: LibraryHost) {
     if (!s.medias || !ids.length) return [];
     const offers = ids.flatMap((id) => (s.medias!.games.get(id) ? [s.medias!.games.get(id)!] : []));
     if (!offers.length) {
-      return [s.medias.problem ? { text: t('Médias de VPinMediaDB indisponibles'), detail: s.medias.problem, tone: 'quiet' } : { text: t('VPinMediaDB n’a pas de médias pour ce jeu'), detail: t('« Médias du jeu », sur la fiche, en propose d’autres sources.'), tone: 'quiet' }];
+      return [s.medias.problem ? { text: t('Médias de VPinMediaDB indisponibles'), detail: s.medias.problem, tone: 'quiet' } : { text: t('VPinMediaDB n’a pas de médias pour ce jeu'), detail: t('« Gérer la table… » puis « Médias du jeu », sur la fiche, en propose d’autres sources.'), tone: 'quiet' }];
     }
     const wanted = s.medias.wanted;
     const rows: Row[] = offers.map((o) => ({
@@ -3386,13 +3471,19 @@ export function createLibrary(host: LibraryHost) {
     } else if (is(KEYS.confirm)) {
       // Start dans le texte : la page suivante, puis la première action ; jamais une action sans l'avoir choisie.
       if (edges && reading.active) applyReading(readingStep(edges, n, 1));
-      else void built.actions[cursor]?.run();
+      else {
+        if (built.actions[cursor]?.run === built.back) expectBack();
+        void built.actions[cursor]?.run();
+      }
     }
     // Exit dans le texte ou dans la liste de contenu : retour aux actions de l'écran ; Exit dans les actions : l'écran se ferme.
     else if (is(KEYS.exit)) {
       if (edges && reading.active) reading.active = false;
       else if (zones && zoneOf(zones, cursor) === 'list') cursor = leaveList(zones, ids, zonesMemory(), backIndex(built));
-      else built.back();
+      else {
+        expectBack();
+        built.back();
+      }
     } else if (edges && PAGE_KEYS[input.code]) scrollReading(PAGE_KEYS[input.code]!);
     else {
       // Raccourci d'une entrée (affiché à droite de son libellé) : elle, sans s'y déplacer.
@@ -3605,7 +3696,10 @@ export function createLibrary(host: LibraryHost) {
       host.broadcast();
     } else if (action.type === 'back') {
       if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) closeEditor(screen, false);
-      else build().back();
+      else {
+        expectBack();
+        build().back();
+      }
       host.broadcast();
     } else if (action.type === 'zone') {
       if (screen.kind === 'pages' || ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor)) return;
@@ -3628,6 +3722,7 @@ export function createLibrary(host: LibraryHost) {
       cursor = index;
       reading.active = false;
       host.broadcast();
+      if (built.actions[index]!.run === built.back) expectBack();
       void built.actions[index]!.run();
     }
   }
@@ -3635,8 +3730,12 @@ export function createLibrary(host: LibraryHost) {
   // ---------- Vue envoyée au rendu ----------
 
   function view() {
-    if (!screen) return undefined;
+    if (!screen) {
+      arrived(undefined);
+      return undefined;
+    }
     const built = build();
+    arrived(placeOf(screen, built), screen);
     const ids = actionIds(built.actions);
     cursor = followCursor(ids, cursor, screen, anchor);
     const zones = screenZones(built, built.actions.length);
@@ -3668,7 +3767,9 @@ export function createLibrary(host: LibraryHost) {
       remote: built.remote ? remoteBlock(built.remote, 'screen') : undefined,
 
       back: backLabel(built),
-      actions: built.actions.map(({ label, detail, tone, icon, web, attention, shortcut }, i) => ({ label, detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
+      // Dans la liste d'un écran à deux zones, Exit n'y ramène pas : il passe aux actions, le bouton le dit (et fait de même au clic).
+      backTag: zone?.active === 'list' ? { key: 'Exit', text: t('actions') } : undefined,
+      actions: built.actions.map(({ label, detail, tone, icon, web, attention, shortcut, run }, i) => ({ label: run === built.back ? backActionLabel(label) : label, detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
       media: built.media,
       variant: built.variant,
       journey: built.journey,
@@ -3724,14 +3825,61 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /**
-   * Libellé du bouton de retour en tête d'écran : celui de l'action qui fait la même chose
-   * qu'Exit (« Retour à la fiche », « Annuler »…), sinon « Retour ». Aucun quand cette action
-   * est la seule de l'écran (un message à lire, « Continuer ») : elle est déjà sous la main.
+   * Libellé du bouton de retour en tête d'écran : le nom de l'écran où il mène (« Neon Abyss »,
+   * « Téléchargements », « Menu des tables »), d'après le parcours (backtrail.ts). Une action
+   * de retour qui dit autre chose qu'un retour (« Annuler », « Retour sans enregistrer ») garde
+   * son libellé. Aucun bouton quand cette action est la seule de l'écran (un message à lire,
+   * « Continuer ») : elle est déjà sous la main.
    */
   function backLabel(built: Built): string | undefined {
     const same = built.actions.find((a) => a.run === built.back);
     if (same && built.actions.length === 1) return undefined;
-    return same?.label ?? t('Retour');
+    if (same && !plainReturn(same.label)) return same.label;
+    return backTrail.destination().heading;
+  }
+
+  /**
+   * Libellé de l'action de retour, au bas de la liste : un « Retour » qui ne dit rien nomme sa
+   * destination, comme le bouton en tête (« Retour : Menu système ») ; « Retour à la fiche » qui
+   * mène en fait à « Gérer la table » (les écrans qui s'en ouvrent y reviennent) le dit aussi.
+   */
+  function backActionLabel(label: string): string {
+    const to = backTrail.destination();
+    if (label === t('Retour')) return t('Retour : {screen}', { screen: to.heading });
+    if (label !== t('Retour à la fiche')) return label;
+    return to.kind === 'sheet' || to.kind === 'wheel' ? label : t('Retour : {screen}', { screen: to.heading });
+  }
+
+  /** « Retour », « Retour à la fiche », « Retour aux tables »… : un retour qui ne dit rien de plus que sa destination. */
+  function plainReturn(label: string): boolean {
+    return label === t('Retour') || /^(Retour (à|au|aux) |Back to )/.test(label); // i18n-ignore : forme des libellés de retour, dans les deux langues
+  }
+
+  // ---------- Retour nommé : le parcours des écrans (backtrail.ts) ----------
+
+  /** Le parcours : le menu des tables (la roue, ou la liste des titres) quand plus rien n'est ouvert. */
+  const backTrail = new BackTrail<Screen>(() => ({ key: 'wheel', kind: 'wheel', heading: t('Menu des tables') }));
+
+  /** L'écran affiché, reconnu par sa sorte, sa table et son titre : le même écran rouvert a la même clé. */
+  function placeOf(s: Screen, built: Built): BackPlace {
+    const file = 'file' in s && typeof s.file === 'string' ? s.file : '';
+    const kind = s.kind === 'sheet' && s.manage ? 'sheet+manage' : s.kind;
+    return { key: `${kind}|${file}|${built.heading}`, kind, heading: built.heading };
+  }
+
+  /** Un retour va partir de l'écran affiché : ce qu'annonce son bouton, vérifié à l'arrivée. */
+  function expectBack(): void {
+    backTrail.expect();
+  }
+
+  /**
+   * L'écran affiché (undefined : la gestion des tables fermée) : le parcours avance ou revient. Un
+   * retour arrivé ailleurs que là où son bouton le disait est appris, et dit au journal, pour que
+   * l'écran déclare sa destination.
+   */
+  function arrived(place: BackPlace | undefined, s?: Screen): void {
+    const surprise = backTrail.arrive(place, s);
+    if (surprise) console.warn(`Retour de « ${surprise.from} » : le bouton annonçait « ${surprise.announced} », arrivé sur « ${surprise.landed} ».`); // i18n-ignore : journal
   }
 
   function viewEditor(e: Editor) {
@@ -3912,6 +4060,22 @@ export function createLibrary(host: LibraryHost) {
         return runSystemEntry(found);
       }
     }
+    // Fiche : une action rangée sous « Gérer la table… » (ou revenue en tête de la fiche) s'atteint par son nom, et
+    // « Prospectus » ou « Règles » ouvre le livret à cette partie ; les démonstrations nomment l'action, pas le chemin.
+    if (index < 0 && screen?.kind === 'sheet') {
+      const sheet = screen;
+      const table = find(sheet.file);
+      const type = SHEET_PAGE_TYPES.find((x) => names.includes(mediaTypeInfo(x).label));
+      if (table && type) return go({ kind: 'pages', file: table.file, type, index: 0 });
+      if (table) {
+        sheetManage = sheet.manage ? undefined : table.file;
+        openSheet(table);
+        if (actionIndex(build().actions, wanted) >= 0) return activateByLabel(wanted);
+        // Introuvable de l'autre côté aussi : la fiche telle qu'elle était.
+        sheetManage = sheet.manage ? table.file : undefined;
+        openSheet(table);
+      }
+    }
     if (index < 0) return console.log(`Autopilote : aucune action « ${wanted} » sur cet écran (${actions.map((a) => a.label).join(' · ') || 'aucune action'}).`);
     handleAction({ type: 'activate', index });
   }
@@ -3969,6 +4133,7 @@ export function createLibrary(host: LibraryHost) {
     /** Fiche ouverte depuis la roue : son « Retour » y ramène. */
     openSheet: (table: TableEntry, flash?: string) => {
       sheetReturn = undefined;
+      sheetManage = undefined;
       openSheet(table, flash);
     },
     openAdd,

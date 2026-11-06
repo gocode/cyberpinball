@@ -115,7 +115,7 @@ if ($Terminator2) {
         'Digit1',                                      # fiche de Terminator 2 (la première de la roue)
         'action:Diagnostiquer',                        # médecin : ROM t2_l8 en fichiers éparpillés à la racine
         'action:Refaire t2_l8.zip',                    # zip à plat dans la bibliothèque, lié, puces à la corbeille ; nouvelle analyse
-        'action:Retour à la fiche', 'Escape',          # fiche, roue
+        'action:Retour à la fiche', 'Escape', 'Escape', # « Gérer la table », fiche, roue
         'Escape', 'action:Ajouter une table',          # menu système, Ajouter une table : t2_l8.zip à sous-dossier dans le dossier d'import
         'action:Importer le contenu du dossier',       # plan : ROM reconnue dans « t2_l8 », même contenu que la bibliothèque, liée dans Terminator 2 VR
         'action:Installer',                            # vérification de Terminator 2 VR

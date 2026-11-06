@@ -25,6 +25,11 @@ son interface).
 - Mode invité : « Tables proposées » le limite à une collection (les favoris, un fabricant…) ; au déverrouillage, la collection d'avant revient. Le mode attente ne montre que les tables de la collection affichée.
 
 - Amis : une panne du réseau local (« addMembership EHOSTUNREACH », borne démarrée avant son réseau, VPN, câble débranché) ne bloque plus le réseau des amis. Internet continue, « Partage et réseau » affiche « Réseau local : indisponible » avec sa raison, et le réseau local se rétablit tout seul dès qu'une carte réseau est prête. Un démarrage raté se réessaie aussi tout seul, sans relancer Cyber Pinball.
+- Start sur la roue, dans Médias, son et attente : « ouvrir la fiche » (comme avant) ou « jouer directement ». En « jouer directement », la fiche s'ouvre à Start maintenu (ou F6 d'un clavier) ; la ligne d'aide et l'aide-mémoire le disent.
+- Fiche d'une table resserrée : « Jouer », « Jouer avec un ami » et « Prospectus et règles » en tête, tout le reste sous « Gérer la table… », qui signale dès la fiche ce qui est à vérifier. Le prospectus et les règles forment un seul livret, tourné aux flippers.
+- Le bouton de retour en tête de chaque écran dit où il mène (« ‹ Neon Abyss », « ‹ Gérer la table », « ‹ Menu des tables ») ; dans une liste, il montre « Exit : actions ».
+- Au bureau, une table qui tarde à charger le dit : passé 8 s, l'encart du chargement donne l'étape réellement vue (VPX lancé, puis ses fenêtres ouvertes), le temps écoulé, et Exit ou Ctrl+Maj+K pour arrêter ; la roue revient, sans partie comptée. Sur la borne, le média de chargement reste seul.
+
 ## 0.1.7
 
 - Sauvegardes, dans Menu système > Cyber Pinball : copiez vos réglages et vos scores, vos tables en plus, ou toute l'installation, sur une clé USB, un disque ou un lecteur réseau, à sa racine ou dans le dossier de votre choix (« Choisir un dossier… »). Seuls les fichiers changés sont recopiés, et chaque fichier écrit est relu. Un niveau qui ne tient pas sur la clé est grisé avec sa raison (place manquante, clé en FAT32 et fichier de plus de 4 Go).

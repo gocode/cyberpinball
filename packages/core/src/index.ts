@@ -12,6 +12,8 @@ export * from './configurations';
 export * from './locations';
 export * from './tables';
 export * from './tableorder';
+export * from './backtrail';
+export * from './loadingprogress';
 export * from './collections';
 export * from './atomicwrite';
 export * from './backup';

@@ -70,6 +70,7 @@ export const GUEST_DOORS = {
   'sheet.table-settings': false, // Réglages de cette table
   'sheet.doctor': false, // Diagnostiquer et réparer
   'sheet.remove': false, // Supprimer la table
+  'sheet.manage': false, // Gérer la table… (médias, parties du jeu, fichiers, réglages, diagnostic, modifier, supprimer)
 } as const satisfies Record<string, boolean>;
 
 export type GuestDoor = keyof typeof GUEST_DOORS;

@@ -283,6 +283,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 - **"Table order"**: by title, last played, most played, year, manufacturer, or shuffled at every start.
 - **"Table at startup"**: the first one, a random table, or the last one played.
+- **"Start on the wheel"**: open the game page (default), or play right away; the game page stays on a held Start (or F6).
 - **Attract mode** after 5 minutes (from 1 to 30 minutes, or never): a random table every 20 s, with its media, and the first button brings the menu back as it was.
 
 <p align="center"><img src="images/en/features/menu-settings.webp?v=59d339fbaa" width="360" alt="Media, sound and attract mode: menu wheel, table order, table at startup, game music and its volume, video sound, cinematic launch, intro, interface sounds…"></p>
@@ -308,7 +309,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **A system menu in five sections**: Friends, Tables, Media, then Downloads, Cabinet and Cyber Pinball. A red dot climbs up to the gear when an entry is waiting for you, and the menu opens on it.
 - **Long lists**: Exit goes back to the screen's actions, MagnaSave switches between the list and the actions and keeps your place, a held flipper scrolls letter by letter.
 - **Long texts** (release notes, messages) read page by page with the flippers, with how much you have read.
-- **"‹ Back"** above every screen's title, clickable.
+- **A back button that says where it leads**, above every screen's title, clickable: "‹ Neon Abyss", "‹ Downloads", "‹ Table menu"; in a list, "Exit: actions".
 - **A feature that's unavailable stays visible**, greyed out, with its reason.
 - **Keyboard shortcuts** shown next to the entries: R for VPX settings, H for the controls, Ctrl+Shift+D for the desktop, Ctrl+Shift+K to stop a game that hangs.
 - **An icon for every menu**, drawn for Cyber Pinball.
@@ -389,11 +390,11 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 ## A table's page
 
-- **Start on a table** opens its page: play statistics, a summary of its files, and the actions "Play", "Play with a friend", "Play and record", "Flyer", "Rules", "Edit info", "Game media", "Game parts", "Table files", "Settings for this table", "Adjust display in game", "Diagnose and fix", "Remove table".
+- **Start on a table** opens its page (or launches the game, if "Start on the wheel" says so): play statistics, a summary of its files, and three choices at the top, "Play", "Play with a friend", "Flyer and rules". The rest waits under "Manage the table…": "Game media", "Game parts", "Table files", "PuP-Pack", "This table's settings", "Adjust display in game", "Play and record", "Diagnose and repair", "Edit info", "Delete the table"; whatever needs a look shows from the game page.
 - **"All tables"** (System menu > "Tables"): the full list, with manufacturer, year, version and number of games; Start opens the same page.
 - **"Game parts"**: one line per part (table, backglass, ROM, PuP-Pack, DMD colours, sounds, music, point of view, topper, media), "Present", "Received, to install", "Expected" or missing; each one can be added, replaced, reassigned or removed, and a missing part starts a search on every site.
 - **"Table files"**: the whole folder grouped by kind, with what VPX will do with each file ("loaded by VPX with this table", "wrongly named: VPX won't load it").
-- **"Flyer" and "Rules"** page by page, turned for the player.
+- **"Flyer and rules"**: a single booklet, page by page, turned for the player.
 - **"Diagnose and fix"**: the table doctor (see [A cabinet that looks after itself](#a-cabinet-that-looks-after-itself)).
 
 <p align="center"><img src="images/en/game-page.webp?v=288bd5f7e2" width="360" alt="The game page of Neon Abyss: play statistics, files, and the actions Play, Flyer, Rules, Edit info, Game media, Settings for this table, Diagnose and fix, Remove table."></p>
@@ -508,6 +509,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 ## During a game
 
 - **The loading screen**: on the cabinet, the game's loading video alone, full screen; on a desk PC, the video with the game's controls beside it.
+- **A slow table says so**, on a desk PC: after 8 s, the loading panel gives the step actually seen (VPX running, its windows open), the elapsed time, and how to stop (Ctrl+Shift+K or Exit). Never a made-up percentage; on the cabinet, the loading media stays alone.
 - **The menu's windows never take control from VPX**; a notification for an invitation, a friend or a game with friends shows over it without stealing focus.
 - **Ctrl+Shift+K stops a game that hangs**: a polite close, then forced after 5 s.
 - **A game that fails says why**: an error in the table's script (line and message) or a VPX exit explained, and Start plays the table again or opens "What's missing to play".

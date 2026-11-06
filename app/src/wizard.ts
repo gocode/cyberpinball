@@ -134,7 +134,7 @@ import {
 } from '@cyberpinball/core';
 import { orientation } from './display-orientation';
 import { observedDisplays, orientationSimulated } from './displays';
-import { createWindow, isShown, OFFSCREEN, windowRect } from './offscreen';
+import { createWindow, isShown, OFFSCREEN, readyToShow, whenReadyToShow, windowRect } from './offscreen';
 import { keyboardFollows, keyboardIncident } from './foreground';
 import { onKeyInput, sendableKey } from './key-input';
 import { joystickAxes, joystickStatus, moveVirtualAxis, onJoystickInput, pressVirtualButton, pressVirtualPinscapeButton } from './joystick-input';
@@ -398,7 +398,7 @@ export function startWizard(): void {
     // dont le relâchement arrive à l'autre fenêtre : sinon, la touche n'est jamais relevée.
     win.on('blur', () => setImmediate(() => windows.some((w) => !w.isDestroyed() && w.isFocused()) || releaseKeys()));
     win.loadFile(path.join(__dirname, '..', 'renderer', 'screen.html'));
-    win.once('ready-to-show', () => {
+    whenReadyToShow(win, () => {
       win.show();
       if (windows.every((w) => w.isDestroyed() || isShown(w))) takeKeyboard();
     });
@@ -466,7 +466,7 @@ function takeKeyboard(): void {
  * chaque touche dans CYBERPINBALL_CAPTURE, puis quitte.
  */
 async function runAutopilot(codes: string[], captureDir: string | undefined): Promise<void> {
-  await Promise.all(windows.map((w) => new Promise<void>((resolve) => w.once('ready-to-show', () => resolve()))));
+  await Promise.all(windows.map((w) => readyToShow(w)));
   await delay(800);
   if (captureDir) fs.mkdirSync(captureDir, { recursive: true });
   const layout = new LayoutReport(captureDir);

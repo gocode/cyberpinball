@@ -76,8 +76,9 @@ test('VPX n’attend jamais l’animation : play() lance VPX comme sans elle', (
   // Le relais : le lanceur le donne (partie réelle comme simulée), il fait sonner la bobine.
   // Il fait aussi partir le délai de l'enregistrement d'une partie (« Jouer et enregistrer »), sans rien attendre.
   assert.match(play, /const onForeground = \(\) => \{\n\s+if \(cinema\.handover\(\)\) playUiSound\('coil'\);\n(?:\s+recording\?\.shown\(\);\n)?\s+\};/);
-  assert.match(play, /simulateVpx\(\{ onPlaying, onForeground \}\)/);
-  assert.match(play, /launchVpx\(\{[^}]*onPlaying, onForeground \}\)/);
+  // (onWindows : la première fenêtre de VPX, pour l'étape que dit un chargement qui tarde, loadingprogress.ts.)
+  assert.match(play, /simulateVpx\(\{ onPlaying, onForeground, onWindows(, \.\.\.\([^)]*\))? \}\)/);
+  assert.match(play, /launchVpx\(\{[^}]*onPlaying, onForeground, onWindows \}\)/);
   // La chorégraphie s'arrête avec le lancement : écrans à revoir, ou partie finie.
   assert.ok(play.indexOf('cinema.stop()') > start && play.lastIndexOf('cinema.stop()') > play.indexOf('await game.done'));
 });

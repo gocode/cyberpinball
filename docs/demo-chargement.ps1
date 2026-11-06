@@ -10,9 +10,12 @@
 #            (ou son repli) dans le cadre 9:16, l'encart du titre, de l'état et des commandes à
 #            sa droite ; commandes nombreuses aux noms longs (boutons de joystick).
 # Le garde-fou de mise en page (layout-check.ts) doit rester muet : chevauchement, rognure,
-# texte en borne, encart sur le cadre du média. Captures et relevé dans tmp\captures\chargement.
-#   .\docs\demo-chargement.ps1
+# texte en borne, encart sur le cadre du média. Chargement qui tarde : l'étape vue, le temps écoulé
+# et l'arrêt dans l'encart du bureau ; en borne, toujours rien sur le média. En français puis en anglais.
+# Captures et relevé dans tmp\captures\chargement\<langue>.
+#   .\docs\demo-chargement.ps1 [-Langues fr, en]
 # VPX n'est jamais lancé ; ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont lus.
+param([string[]]$Langues = @('fr', 'en'))
 $ErrorActionPreference = 'Stop'
 $wt = Split-Path $PSScriptRoot -Parent
 . "$PSScriptRoot\hors-ecran.ps1"
@@ -33,12 +36,16 @@ if (-not (Test-Path "$root\tables")) {
   if ($LASTEXITCODE -ne 0) { throw 'Génération des médias en échec.' }
 }
 if (Test-Path $captures) { Remove-Item -Recurse -Force $captures }
-New-Item -ItemType Directory -Force $captures | Out-Null
-@{ root = $root; out = $captures } | ConvertTo-Json | Set-Content -Path "$base\spec.json" -Encoding UTF8
-
-Push-Location $wt
-try { & $electron docs\demo-chargement.cjs "$base\spec.json" 2>&1 | ForEach-Object { "   $_" } } finally { Pop-Location }
-$code = $LASTEXITCODE
-Get-ChildItem $captures -Filter *.png | Measure-Object | ForEach-Object { "  $($_.Count) captures dans $captures" }
-if ($code -ne 0) { throw "Écran de chargement : voir $captures\mise-en-page.txt" }
+$failed = @()
+foreach ($langue in $Langues) {
+  "== $langue"
+  $out = "$captures\$langue"
+  New-Item -ItemType Directory -Force $out | Out-Null
+  @{ root = $root; out = $out; lang = $langue } | ConvertTo-Json | Set-Content -Path "$base\spec-$langue.json" -Encoding UTF8
+  Push-Location $wt
+  try { & $electron docs\demo-chargement.cjs "$base\spec-$langue.json" 2>&1 | ForEach-Object { "   $_" } } finally { Pop-Location }
+  if ($LASTEXITCODE -ne 0) { $failed += "$out\mise-en-page.txt" }
+  Get-ChildItem $out -Filter *.png | Measure-Object | ForEach-Object { "  $($_.Count) captures dans $out" }
+}
+if ($failed.Count) { throw "Écran de chargement : voir $($failed -join ', ')" }
 'Écran de chargement : aucun problème de mise en page.'

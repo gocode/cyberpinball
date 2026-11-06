@@ -11,7 +11,7 @@ import { frontendNames, installedFrontends, t, loadCabinet, navigationKeys, runn
 import { runningProcessNames } from '@cyberpinball/win-displays';
 import { coverDisplay } from './cover-display';
 import { LayoutReport } from './layout-check';
-import { createWindow, isShown, OFFSCREEN, primaryRect } from './offscreen';
+import { createWindow, isShown, OFFSCREEN, primaryRect, whenReadyToShow } from './offscreen';
 import { onJoystickInput } from './joystick-input';
 import { locations } from './paths';
 
@@ -114,7 +114,7 @@ export function otherFrontendsGate(): Promise<Gate> {
       } else show(still);
     }, CHECK_MS);
     void win.loadFile(path.join(__dirname, '..', 'renderer', 'screen.html'));
-    win.once('ready-to-show', () => {
+    whenReadyToShow(win, () => {
       win.show();
       win.focus();
       void capture(win);

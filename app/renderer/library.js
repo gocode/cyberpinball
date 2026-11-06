@@ -24,10 +24,12 @@ function renderLibrary(v) {
   const o = libEl('section', `lib lib-${v.screen}${v.variant ? ` lib-${v.variant}` : ''}`);
   const head = libEl('header', 'lib-head');
   // Retour en tête : à la souris, inutile de descendre au bas de la liste chercher « Retour ».
+  // Il nomme l'écran où il mène ; dans la liste d'un écran à deux zones, ce que fait Exit (passer aux actions), et un clic fait de même.
   if (v.back) {
-    const back = actOn(libEl('button', 'lib-back'), { type: 'back' });
+    const back = actOn(libEl('button', `lib-back${v.backTag ? ' exit-to-actions' : ''}`), v.backTag ? { type: 'zone' } : { type: 'back' });
     back.type = 'button';
-    back.append(libEl('span', 'lib-back-arrow', '‹'), libEl('span', '', v.back));
+    if (v.backTag) back.append(libEl('span', 'lib-keycap', v.backTag.key), libEl('span', '', v.backTag.text));
+    else back.append(libEl('span', 'lib-back-arrow', '‹'), libEl('span', '', v.back));
     head.append(back);
   }
   const h1 = libEl('h1', '', v.heading);
@@ -524,7 +526,7 @@ function renderInfoSheet(card) {
   }
   if (facts.childElementCount) sheet.append(facts);
   if (card.description) sheet.append(libEl('p', 'info-desc', card.description));
-  sheet.append(libEl('p', 'pages-note', t('Pas de prospectus pour ce jeu : « Médias du jeu », sur la fiche, permet d’en ajouter.')));
+  sheet.append(libEl('p', 'pages-note', t('Pas de prospectus pour ce jeu : « Gérer la table… » puis « Médias du jeu », sur la fiche, permet d’en ajouter.')));
   return sheet;
 }
 
@@ -538,7 +540,7 @@ function renderGameKeys(rows) {
     row.append(libEl('span', '', label), libEl('span', 'game-key-name', key));
     list.append(row);
   }
-  box.append(list, libEl('p', 'pages-note', t('Pas de carte de règles pour ce jeu : « Médias du jeu », sur la fiche, permet d’en ajouter.')));
+  box.append(list, libEl('p', 'pages-note', t('Pas de carte de règles pour ce jeu : « Gérer la table… » puis « Médias du jeu », sur la fiche, permet d’en ajouter.')));
   return box;
 }
 

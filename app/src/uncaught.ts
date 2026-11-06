@@ -5,6 +5,7 @@
 // arrête au contraire l'essai en échec.
 
 import * as path from 'node:path';
+import { app } from 'electron';
 import { appendErrorLog, errorLogEntry, errorLogFile, type ErrorLogKind } from '@cyberpinball/core';
 
 export function journalUncaught(dataDir: string): void {
@@ -20,4 +21,21 @@ export function journalUncaught(dataDir: string): void {
   };
   process.on('uncaughtException', note('exception'));
   process.on('unhandledRejection', note('rejection'));
+}
+
+/**
+ * Processus de Chromium arrêtés (rendu d'une page, GPU, service réseau…) : notés dans le journal.
+ * Jusqu'au 06/11/2026, rien ne l'était : un menu resté invisible après une mise à jour ne
+ * laissait aucune trace de ce qui était arrivé à ses pages.
+ */
+export function journalProcessesGone(): void {
+  app.on('render-process-gone', (_event, contents, details) => {
+    const title = contents.getTitle() || contents.getURL();
+    console.warn(`Rendu de « ${title} » arrêté : ${details.reason} (code ${details.exitCode}).`); // i18n-ignore : journal
+  });
+  app.on('child-process-gone', (_event, details) => {
+    // Un utilitaire qui finit normalement (clean-exit) n'est pas un incident.
+    if (details.reason === 'clean-exit') return;
+    console.warn(`Processus ${details.type}${details.name ? ` (${details.name})` : ''} de Chromium arrêté : ${details.reason} (code ${details.exitCode}).`); // i18n-ignore : journal
+  });
 }

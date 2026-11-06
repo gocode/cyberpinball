@@ -99,6 +99,23 @@ body.mouse [data-act] {
   letter-spacing: 0;
 }
 
+/* Dans la liste d'un écran à deux zones : « Exit : actions », la touche cerclée comme dans le bandeau de la liste. */
+.lib-back.exit-to-actions .lib-keycap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 3.7cqmin;
+  height: 3.4cqmin;
+  padding: 0 0.9cqmin;
+  border: 1px solid var(--halo);
+  border-radius: 0.3cqmin;
+  background: var(--surface);
+  font-size: 2cqmin;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+
 body.mouse .lib-back:hover {
   border-color: var(--signal);
   box-shadow: var(--glow-signal);
@@ -366,6 +383,18 @@ body.mouse .lib-back:hover {
   .lib-sheet .lib-action .detail {
     font-size: 1.9cqmin;
   }
+}
+
+/* « Gérer la table » : ses onze actions sur deux colonnes, au bureau aussi (revue de Codex, 06/11/2026), parcourues ligne par ligne. */
+.lib-manage .lib-body.only-actions {
+  grid-template-columns: minmax(0, 150cqmin);
+}
+
+.lib-manage .lib-body.only-actions > .lib-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 0.8cqmin 1.6cqmin;
 }
 
 /* Fichiers d'une table : le nom en entier (il passe à la ligne), la taille en pastille. */

@@ -580,9 +580,42 @@ function loadingCard(s) {
   const state = el('div', 'loading-state');
   const bar = el('div', 'loading-bar');
   bar.append(el('div', 'loading-run'));
-  state.append(el('span', '', t('Chargement de la table…')), bar);
+  // Chargement qui tarde : l'étape vue à la place de « Chargement de la table… », et sous la barre le temps écoulé et l'arrêt.
+  state.append(el('span', s.slow ? 'loading-slow-step' : '', s.slow ? s.slow.step : t('Chargement de la table…')), bar);
+  if (s.slow) state.append(slowMeta(s.slow));
   card.append(head, state, keysGrid(s.loadingKeys.title, s.loadingKeys.rows));
   return card;
+}
+
+/** « Depuis 12 s · Ctrl+Maj+K ou Exit : arrêter » : le temps compté ici, chaque seconde (tickSince). */
+function slowMeta(slow) {
+  const meta = el('span', 'loading-slow-meta');
+  const since = el('span', 'loading-slow-since', sinceText(slow.since));
+  since.dataset.since = String(slow.since);
+  tickSince();
+  meta.append(since);
+  if (slow.stop) meta.append(el('span', 'loading-slow-stop', slow.stop));
+  return meta;
+}
+
+/** Temps écoulé depuis le Start : « depuis 12 s », « depuis 1 min 05 s ». Jamais de pourcentage : rien n'est estimé. */
+function sinceText(since) {
+  const s = Math.max(0, Math.floor((Date.now() - since) / 1000));
+  const time = s < 60 ? t('{s} s', { s }) : t('{m} min {s} s', { m: Math.floor(s / 60), s: String(s % 60).padStart(2, '0') });
+  return t('depuis {time}', { time });
+}
+
+/** Le temps écoulé, compté chaque seconde tant qu'un cartouche est affiché ; plus aucun : la minuterie s'arrête. */
+let sinceTicker;
+function tickSince() {
+  sinceTicker ??= setInterval(() => {
+    const nodes = document.querySelectorAll('[data-since]');
+    for (const node of nodes) node.textContent = sinceText(Number(node.dataset.since));
+    if (!nodes.length) {
+      clearInterval(sinceTicker);
+      sinceTicker = undefined;
+    }
+  }, 1000);
 }
 
 /**
@@ -646,6 +679,8 @@ function loadingScreen(s) {
   const reminder = s.loadingKeys.display ? keysGrid(s.loadingKeys.title, s.loadingKeys.rows) : undefined;
   reminder?.classList.add('display-reminder');
   const standIn = s.loading?.url ? dropLoadingFallback() : loadingStandIn(s, 'full', reminder);
+  // En borne, rien d'autre sur le média, même quand la table tarde : ni commandes, ni cartouche
+  // (demande du mainteneur, 06/11/2026). Exit et Ctrl+Maj+K arrêtent quand même le lancement.
   if (standIn) return [standIn];
   if (!reminder) return [];
   const o = el('section', 'loading-reminder');
@@ -962,7 +997,26 @@ function drawPlayfield(s) {
   } else nodes.unshift(brand());
   placeChildren(nodes);
   fitNotice();
+  fitKeys(root.querySelector('.overlay .keys'));
 }
+
+/**
+ * Aide-mémoire (H) : des commandes de plus (« Start sur la roue : jouer directement », boutons de
+ * joystick aux noms longs) le font déborder de l'écran, marque et bandeau d'aide poussés dehors.
+ * Son corps se réduit alors par paliers, jamais sous le plancher de 20 px du design system.
+ */
+function fitKeys(keys) {
+  const screen = keys?.closest('.overlay');
+  if (!screen) return;
+  const px = parseFloat(getComputedStyle(keys.querySelector('table') ?? keys).fontSize) / Number(keys.style.getPropertyValue('--keys-scale') || 1);
+  for (const k of [1, 0.94, 0.88, 0.82, 0.76]) {
+    if (px * k < 20) break;
+    keys.style.setProperty('--keys-scale', String(k));
+    if (screen.scrollHeight <= screen.clientHeight + 1) return;
+  }
+}
+
+new ResizeObserver(() => fitKeys(root.querySelector('.overlay .keys'))).observe(root);
 
 /** Repli minimal d'un écran annexe (sans fallback.js) : le titre de la table sur fond noir. */
 function minimalCard(part, card) {

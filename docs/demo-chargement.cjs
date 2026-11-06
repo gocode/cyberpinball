@@ -6,7 +6,9 @@
 // long, commandes nombreuses aux noms longs (boutons de joystick), réglage de l'affichage,
 // à plusieurs tailles d'écran. Chaque cas est capturé, et le garde-fou de mise en page
 // (layout-check.ts) relève chevauchements, rognures et les règles du chargement.
-//   electron docs/demo-chargement.cjs <spec.json>   { "root": racine des tables (demo-moments.cjs), "out": dossier des captures }
+// Chargement qui tarde (loadingprogress.ts) : l'étape vue, le temps écoulé et l'arrêt, au bureau
+// dans l'encart ; en borne, l'état les porte aussi, et rien ne doit paraître sur le média (garde-fou).
+//   electron docs/demo-chargement.cjs <spec.json>   { "root": racine des tables (demo-moments.cjs), "out": dossier des captures, "lang": "fr" ou "en" }
 // Fenêtres jamais montrées (show: false, rendu hors écran, son coupé).
 
 'use strict';
@@ -16,10 +18,13 @@ const path = require('node:path');
 
 const REPO = path.join(__dirname, '..');
 const specFile = process.argv.find((a) => a.endsWith('.json'));
-const spec = JSON.parse(fs.readFileSync(specFile, 'utf8'));
+// Écrit par Windows PowerShell 5.1 (Set-Content -Encoding UTF8), le fichier commence par un BOM.
+const spec = JSON.parse(fs.readFileSync(specFile, 'utf8').replace(/^﻿/, ''));
 
 const { app, BrowserWindow, ipcMain } = require('electron');
 const core = require(path.join(REPO, 'packages', 'core', 'dist', 'index.js'));
+// Langue des textes envoyés par l'état (étape, commandes) et du catalogue de la page.
+core.setLanguage(spec.lang === 'en' ? 'en' : 'fr');
 // Le protocole cyber-media:// est déclaré au chargement du module, avant que l'application soit prête.
 const { serveMedias } = require(path.join(REPO, 'app', 'dist', 'media-protocol.js'));
 const { checkLayout } = require(path.join(REPO, 'app', 'dist', 'layout-check.js'));
@@ -58,7 +63,26 @@ const CASES = [
   ['borne-pivotee-sans-media', 3840, 2160, 90, LONG],
   ['borne-pivotee-reglage-sans-media', 3840, 2160, 90, LONG, { display: true, buttons: JOYSTICK }],
   ['borne-pivotee-270-video', 1920, 1080, 270, ROCKET],
+  // Chargement qui tarde : l'étape vue, le temps écoulé, l'arrêt (12 s, puis 1 min 05 s).
+  ['bureau-1080p-lent', 1920, 1080, 0, NEON, { slow: 'launched' }],
+  ['bureau-1080p-lent-sans-media-titre-long', 1920, 1080, 0, LONG, { slow: 'windows', since: 65_000 }],
+  ['bureau-1366x768-lent-joystick', 1366, 768, 0, LONG, { slow: 'prepare', buttons: JOYSTICK }],
+  ['bureau-1024x768-lent-arret', 1024, 768, 0, ROCKET, { slow: 'stopped', buttons: JOYSTICK }],
+  ['borne-debout-lent', 1080, 1920, 0, NEON, { slow: 'launched' }],
+  ['borne-debout-lent-sans-media', 1080, 1920, 0, LONG, { slow: 'windows', since: 65_000 }],
+  ['borne-debout-lent-reglage', 1080, 1920, 0, NEON, { display: true, slow: 'launched' }],
+  ['borne-pivotee-lent', 3840, 2160, 90, NEON, { slow: 'windows' }],
+  ['borne-pivotee-lent-reglage-sans-media', 3840, 2160, 90, LONG, { display: true, buttons: JOYSTICK, slow: 'launched' }],
+  ['borne-pivotee-270-lent', 1920, 1080, 270, ROCKET, { slow: 'prepare' }],
 ];
+
+/** Le cartouche tel que viewFor (frontend.ts) l'enverrait : l'étape vue, l'heure du Start, l'arrêt. */
+function slowFor(options) {
+  if (!options.slow) return undefined;
+  const since = Date.now() - (options.since ?? 12_000);
+  if (options.slow === 'stopped') return { step: core.t('Arrêt demandé : VPX se ferme'), since };
+  return { step: core.loadingStepLabel(options.slow), since, stop: core.t('{keys} ou Exit : arrêter', { keys: core.shortcutLabel(core.SHORTCUTS.forceStop) }) };
+}
 
 function stateFor(medias, table, options = {}) {
   const loading = medias.typeMedia(table, 'playfield', 'Loading');
@@ -78,7 +102,8 @@ function stateFor(medias, table, options = {}) {
     footer: [],
     menuKeys: [],
     gameKeys: rows,
-    loadingKeys: options.display ? { title: 'Réglage de l’affichage', rows, display: true } : { title: 'Commandes de la partie', rows, display: false },
+    loadingKeys: options.display ? { title: core.t('Réglage de l’affichage'), rows, display: true } : { title: core.t('Commandes de la partie'), rows, display: false },
+    slow: slowFor(options),
     nav: {},
   };
 }
@@ -93,7 +118,7 @@ process.on('unhandledRejection', (error) => {
 });
 
 app.whenReady().then(async () => {
-  ipcMain.on('i18n', (e) => (e.returnValue = {}));
+  ipcMain.on('i18n', (e) => (e.returnValue = { language: core.language(), locale: core.locale(), messages: core.messagesOf(core.language()) }));
   ipcMain.on('ready', () => {});
   ipcMain.on('media-error', (_e, error) => console.log(`Média illisible : ${JSON.stringify(error)}`));
   const tables = core.scanTables(path.join(spec.root, 'tables'));

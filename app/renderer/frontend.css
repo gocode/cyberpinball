@@ -915,6 +915,11 @@ html.menu-desktop[data-menu-band] #root {
     display: none;
   }
 
+  /* Cinq (« Start sur la roue : jouer directement ») : « Start tenu : fiche » cède aussi, l'aide-mémoire (H) le dit. */
+  html.menu-desktop[data-menu-band] #root > .footer.menu-help .hint:first-child:nth-last-child(5) ~ .hint:nth-child(4) {
+    display: none;
+  }
+
   /* L'aide prend toute la largeur du bandeau. */
   html.menu-desktop[data-menu-band] #root > .footer.menu-help {
     left: var(--band-left);
@@ -1224,6 +1229,15 @@ html[data-menu-band] #root > .footer.menu-help {
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink-muted);
+}
+
+/*
+ * Cinq commandes (« Start sur la roue : jouer directement » : Start joue, Start tenu ouvre la fiche)
+ * ne tiennent pas sur la ligne du bandeau : « Flippers : choisir », qui se devine sur une borne,
+ * cède sa place, comme pour quatre sur un écran étroit.
+ */
+html[data-menu-band] #root > .footer.menu-help .hint:first-child:nth-last-child(5) {
+  display: none;
 }
 
 html[data-menu-band] #root > .footer.menu-help .cap {
@@ -1998,20 +2012,22 @@ html.power-phase body,
 }
 
 .keys {
+  --k: var(--keys-scale, 1);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(48cqmin, 1fr));
-  gap: 4cqmin;
+  gap: calc(4cqmin * var(--k));
   width: min(100%, 140cqmin);
 }
 
+/* Corps de 2,6cqmin, réduit par paliers (--keys-scale, fitKeys) quand l'aide-mémoire déborde de l'écran. */
 .keys table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 2.6cqmin;
+  font-size: calc(2.6cqmin * var(--k));
 }
 
 .keys td {
-  padding: 0.9cqmin 0;
+  padding: calc(0.9cqmin * var(--k)) 0;
   border-bottom: 1px solid var(--line-soft);
 }
 
@@ -2352,6 +2368,27 @@ html.loading-video #media-bg::after {
   margin-left: 0;
   font-weight: 600;
   text-wrap: balance;
+}
+
+/*
+ * Chargement qui tarde (loadingprogress.ts) : l'étape vue, le temps écoulé, comment arrêter.
+ * Au bureau seulement, dans l'encart, à la place de « Chargement de la table… » ; en borne, le
+ * média de chargement reste seul.
+ */
+.loading-slow-step {
+  color: var(--ink);
+}
+
+.loading-slow-meta {
+  display: flex;
+  flex-wrap: wrap;
+  column-gap: calc(24 * var(--u));
+  row-gap: calc(4 * var(--u));
+  color: var(--ink-muted);
+}
+
+.loading-slow-since {
+  font-variant-numeric: tabular-nums;
 }
 
 /* Borne, réglage de l'affichage : les boutons du menu de VPX dans un bandeau, en bas du média. */

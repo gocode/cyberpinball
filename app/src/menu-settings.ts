@@ -23,6 +23,7 @@ import {
   MEDIADB_QUALITY_SETTINGS,
   START_TABLE_LABELS,
   START_TABLES,
+  WHEEL_START_LABELS,
   TABLE_ORDER_LABELS,
   TABLE_ORDERS,
   VOLUME_CHOICES,
@@ -146,6 +147,7 @@ export const MENU_SETTINGS_ROWS = [
   'menuLayout',
   'tableOrder',
   'startTable',
+  'wheelStart',
   'tableColor',
   'music',
   'musicVolume',
@@ -201,6 +203,15 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         detail: t('{detail} (Start : changer)', { detail: START_DETAILS[v.startTable] }),
         icon: 'pin',
         run: () => set({ startTable: START_TABLES[(START_TABLES.indexOf(v.startTable) + 1) % START_TABLES.length]! }),
+      },
+      wheelStart: {
+        label: t('Start sur la roue : {start}', { start: WHEEL_START_LABELS[v.wheelStart] }),
+        detail:
+          v.wheelStart === 'play'
+            ? t('Start lance la table choisie ; sa fiche s’ouvre à Start maintenu, ou F6 d’un clavier (Start : ouvrir plutôt la fiche)')
+            : t('Start ouvre la fiche de la table (Jouer, Prospectus…), un second Start la lance (Start : jouer directement)'),
+        icon: 'start',
+        run: () => set({ wheelStart: v.wheelStart === 'play' ? 'sheet' : 'play' }),
       },
       tableColor: {
         label: v.tableColor ? t('Couleur de chaque table au menu : affichée') : t('Couleur de chaque table au menu : coupée'),

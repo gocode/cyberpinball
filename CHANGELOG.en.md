@@ -23,6 +23,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Guest mode: "Tables proposées" (Tables offered) restricts it to a collection (favourites, a manufacturer…); on unlocking, the previous collection comes back. Attract mode only shows the tables of the collection shown.
 
 - Friends: a local network failure ("addMembership EHOSTUNREACH", a cabinet started before its network, a VPN, an unplugged cable) no longer blocks the friends network. The Internet carries on, "Sharing and network" shows "Local network: unavailable" with its reason, and the local network comes back by itself as soon as a network adapter is ready. A failed start is also retried by itself, without restarting Cyber Pinball.
+- Start on the wheel, in Media, sound and attract: "open the game page" (as before) or "play right away". With "play right away", the game page opens on a held Start (or F6 on a keyboard); the help line and the controls reminder say so.
+- Tighter game page: "Play", "Play with a friend" and "Flyer and rules" at the top, everything else under "Manage the table…", which shows from the game page what needs checking. The flyer and the rules form a single booklet, turned with the flippers.
+- The back button at the top of every screen says where it leads ("‹ Neon Abyss", "‹ Manage the table", "‹ Table menu"); in a list, it shows "Exit: actions".
+- On a desk PC, a table slow to load says so: after 8 s, the loading panel gives the step actually seen (VPX running, then its windows open), the elapsed time, and Exit or Ctrl+Shift+K to stop; the wheel comes back, with no game counted. On the cabinet, the loading media stays alone.
+
 ## 0.1.7
 
 - Backups, in System menu > Cyber Pinball: copy your settings and scores, your tables too, or the whole installation, to a USB drive, a disk or a network drive, at its root or in the folder of your choice ("Choose a folder…"). Only changed files are copied again, and every file written is read back. A level that does not fit on the drive is greyed out with its reason (not enough space, FAT32 drive and a file over 4 GB).

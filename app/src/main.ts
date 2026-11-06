@@ -27,7 +27,7 @@ import { guardScreens } from './screen-guard';
 import { startSettingsAlone } from './settings';
 import { superviseCabinet } from './supervisor';
 import { journalConsole } from './journal';
-import { journalUncaught } from './uncaught';
+import { journalProcessesGone, journalUncaught } from './uncaught';
 import { startWizard } from './wizard';
 
 const loc = locations();
@@ -36,6 +36,8 @@ journalConsole(loc.dataDir);
 // À l'écran, une erreur non rattrapée est notée dans <données>\logs\erreurs.txt et
 // l'application continue, sans boîte modale (hors écran : l'essai s'arrête, offscreen.ts).
 if (!OFFSCREEN) journalUncaught(loc.dataDir);
+// Un rendu ou le GPU de Chromium qui s'arrête : noté dans le journal (menu resté invisible, 06/11/2026).
+journalProcessesGone();
 const wantsSettings = process.argv.includes('--reglages');
 const wantsWizard = !wantsSettings && (process.argv.includes('--assistant') || wizardStepOf(process.argv) !== undefined || !loadCabinet(loc.dataDir));
 

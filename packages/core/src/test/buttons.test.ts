@@ -584,7 +584,7 @@ test('clavier et joystick : le clavier suit les boutons du joystick, et l’assi
   assert.match(foreground, /if \(OFFSCREEN/, 'hors écran, jamais de premier plan');
   const wizard = read('app', 'src', 'wizard.ts');
   // L'assistant prend le clavier une fois ses fenêtres affichées.
-  assert.match(wizard, /ready-to-show[\s\S]{0,200}takeKeyboard\(\)/);
+  assert.match(wizard, /whenReadyToShow\(win[\s\S]{0,200}takeKeyboard\(\)/);
   assert.match(wizard, /function takeKeyboard\(\)[\s\S]*?keyboardFollows\(/);
   // Touches du clavier (relâchement compris, key-input.ts) et boutons du joystick arrivent au même traitement.
   assert.match(wizard, /onKeyInput\(\s*win,[\s\S]{0,200}handleKey\(input\)[\s\S]{0,100}handleKey\(input\)/);

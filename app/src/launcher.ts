@@ -58,6 +58,11 @@ export interface LaunchOptions {
   /** Appelé quand la fenêtre de jeu est à l'écran. */
   onPlaying?: () => void;
   /**
+   * Appelé une fois, quand VPX montre une première fenêtre (fronton, DMD…) avant celle du jeu :
+   * le cartouche du chargement le dit (loadingprogress.ts).
+   */
+  onWindows?: () => void;
+  /**
    * Appelé une fois, quand la fenêtre de jeu tient le premier plan (Windows le dit :
    * foregroundWindow appartient à VPX) : VPX a pris la main. Jamais d'après un délai : si
    * Windows ne lui donne jamais le premier plan, il n'est pas appelé.
@@ -86,6 +91,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   let player: WindowInfo | undefined;
   let playingSince: number | undefined;
   let foreground = false;
+  let windowsSeen = false;
   let failure: LaunchFailure | undefined;
   let message: string | undefined;
   let killTimer: NodeJS.Timeout | undefined;
@@ -130,6 +136,10 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
         notices.push(verdict.notice);
       }
 
+      if (!player && windows.length && !windowsSeen) {
+        windowsSeen = true;
+        opts.onWindows?.();
+      }
       if (!player) {
         player = windows.find((w) => w.title === PLAYER_TITLE);
         if (player) {
@@ -189,21 +199,25 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
  * jusqu'à stop(). Le menu passe ainsi par le chargement, la partie et le retour, comme
  * avec VPX, sans rien ouvrir sur les écrans du poste.
  */
-export function simulateVpx(opts: { onPlaying?: () => void; onForeground?: () => void; loadMs?: number }): RunningGame {
+export function simulateVpx(opts: { onPlaying?: () => void; onForeground?: () => void; onWindows?: () => void; loadMs?: number }): RunningGame {
   const t0 = Date.now();
   let playingSince: number | undefined;
   let finish: (result: LaunchResult) => void = () => undefined;
   const done = new Promise<LaunchResult>((resolve) => (finish = resolve));
+  const loadMs = opts.loadMs ?? 1500;
+  // Ses « fenêtres » (fronton, DMD) paraissent avant la fenêtre de jeu, comme celles de VPX : à mi-chargement, 8 s au plus.
+  const shown = setTimeout(() => opts.onWindows?.(), Math.min(loadMs / 2, 8000));
   const timer = setTimeout(() => {
     playingSince = Date.now();
     opts.onPlaying?.();
     // Sans fenêtre de VPX, la « fenêtre de jeu » simulée a le premier plan dès qu'elle paraît.
     opts.onForeground?.();
-  }, opts.loadMs ?? 1500);
+  }, loadMs);
   let stopped = false;
   const stop = () => {
     if (stopped) return;
     stopped = true;
+    clearTimeout(shown);
     clearTimeout(timer);
     finish({
       ok: true,

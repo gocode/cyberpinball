@@ -283,6 +283,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 - **« Ordre des tables »** : par titre, dernières jouées, plus jouées, année, fabricant, ou mélangé à chaque démarrage.
 - **« Table au démarrage »** : la première, une table au hasard, ou la dernière jouée.
+- **« Start sur la roue »** : ouvrir la fiche (par défaut), ou jouer directement ; la fiche reste à Start maintenu (ou F6).
 - **Mode attente** après 5 minutes (de 1 à 30 minutes, ou jamais) : une table au hasard toutes les 20 s, avec ses médias, et le premier bouton ramène au menu tel qu'il était.
 
 <p align="center"><img src="images/fr/features/menu-settings.webp?v=4e22742bec" width="360" alt="Médias, son et attente : roue du menu, ordre des tables, table au démarrage, musique des jeux et son volume, son des vidéos, lancement en cinéma, ouverture, sons de l'interface…"></p>
@@ -308,7 +309,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Menu système en cinq rubriques** : Amis, Tables, Médias, puis Téléchargements, Borne et Cyber Pinball. Une pastille rouge remonte jusqu'à la roue dentée quand une entrée vous attend, et le menu s'ouvre sur elle.
 - **Longues listes** : Exit ramène aux actions de l'écran, MagnaSave passe de la liste aux actions en retrouvant sa place, un flipper tenu fait défiler de lettre en lettre.
 - **Textes longs** (nouveautés, messages) lus page par page aux flippers, avec la part déjà lue.
-- **« ‹ Retour »** au-dessus du titre de chaque écran, cliquable.
+- **Un retour qui dit où il mène** au-dessus du titre de chaque écran, cliquable : « ‹ Neon Abyss », « ‹ Téléchargements », « ‹ Menu des tables » ; dans une liste, « Exit : actions ».
 - **Une fonction indisponible reste visible**, grisée, avec sa raison.
 - **Raccourcis clavier** affichés à côté des entrées : R pour les réglages de VPX, H pour les commandes, Ctrl+Maj+D pour le bureau, Ctrl+Maj+K pour arrêter une partie bloquée.
 - **Une icône par menu**, dessinée pour Cyber Pinball.
@@ -389,11 +390,11 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 ## La fiche d'une table
 
-- **Start sur une table** ouvre sa fiche : statistiques de jeu, résumé des fichiers, et les actions « Jouer », « Jouer avec un ami », « Jouer et enregistrer », « Prospectus », « Règles », « Modifier les informations », « Médias du jeu », « Parties du jeu », « Fichiers de la table », « Réglages de cette table », « Régler l'affichage en partie », « Diagnostiquer et réparer », « Supprimer la table ».
+- **Start sur une table** ouvre sa fiche (ou lance la partie, si « Start sur la roue » le dit) : statistiques de jeu, résumé des fichiers, et trois choix en tête, « Jouer », « Jouer avec un ami », « Prospectus et règles ». Le reste attend sous « Gérer la table… » : « Médias du jeu », « Parties du jeu », « Fichiers de la table », « PuP-Pack », « Réglages de cette table », « Régler l'affichage en partie », « Jouer et enregistrer », « Diagnostiquer et réparer », « Modifier les informations », « Supprimer la table » ; ce qui demande un œil s'annonce dès la fiche.
 - **« Toutes les tables »** (Menu système > « Tables ») : la liste complète, avec fabricant, année, version et nombre de parties ; Start ouvre la même fiche.
 - **« Parties du jeu »** : une ligne par partie (table, fronton, ROM, PuP-Pack, couleurs du DMD, sons, musique, point de vue, topper, médias), « Présent », « Reçu, à installer », « Attendu » ou absent ; chacune s'ajoute, se remplace, se réaffecte ou se retire, et une partie absente lance la recherche sur tous les sites.
 - **« Fichiers de la table »** : tout le dossier groupé par sorte, avec ce que VPX en fera (« chargé par VPX avec cette table », « mal nommé : VPX ne le chargera pas »).
-- **« Prospectus » et « Règles »** page par page, tournés pour le joueur.
+- **« Prospectus et règles »** : un seul livret, page par page, tourné pour le joueur.
 - **« Diagnostiquer et réparer »** : le médecin de la table (voir [Une borne qui s'entretient](#une-borne-qui-sentretient)).
 
 <p align="center"><img src="images/fr/game-page.webp?v=c9bc2367a6" width="360" alt="La fiche de Neon Abyss : statistiques de jeu, fichiers, et les actions Jouer, Prospectus, Règles, Modifier les informations, Médias du jeu, Réglages de cette table, Diagnostiquer et réparer, Retirer la table."></p>
@@ -508,6 +509,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 ## Pendant une partie
 
 - **L'écran de chargement** : sur la borne, la vidéo de chargement du jeu seule, plein écran ; au bureau, la vidéo et les commandes de la partie à côté.
+- **Une table qui tarde le dit**, au bureau : passé 8 s, l'encart du chargement donne l'étape réellement vue (VPX lancé, ses fenêtres ouvertes), le temps écoulé, et comment arrêter (Ctrl+Maj+K ou Exit). Jamais de pourcentage inventé ; sur la borne, le média de chargement reste seul.
 - **Les fenêtres du menu ne prennent jamais la main à VPX** ; la notification d'une invitation, d'un ami ou d'une partie entre amis s'affiche par-dessus sans voler le focus.
 - **Ctrl+Maj+K arrête une partie bloquée** : fermeture polie, puis forcée après 5 s.
 - **Une partie qui échoue dit pourquoi** : erreur du script de la table (ligne et message) ou arrêt de VPX expliqué, et Start rejoue la table ou ouvre « Ce qu'il manque pour jouer ».

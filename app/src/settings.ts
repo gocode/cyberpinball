@@ -68,7 +68,7 @@ import { activeVpxIni } from './vpx-ini';
 import { describeReset, resetButtons } from './buttons-reset';
 import { coverDisplay } from './cover-display';
 import { onJoystickInput } from './joystick-input';
-import { createWindow, primaryRect } from './offscreen';
+import { createWindow, primaryRect, readyToShow, whenReadyToShow } from './offscreen';
 import { LayoutReport } from './layout-check';
 import { click } from './library';
 import { relaunchCovered } from './screen-guard';
@@ -262,7 +262,7 @@ export function openSettings(target: SettingsTarget, options: OpenSettingsOption
     resolveClosed();
   });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'settings.html'), { query: { rotation: String(options.rotation ?? 0) } });
-  win.once('ready-to-show', () => {
+  whenReadyToShow(win, () => {
     win.show();
     win.focus();
   });
@@ -1089,7 +1089,7 @@ export async function startSettingsAlone(tables: TableEntry[]): Promise<void> {
 async function runAutopilot(codes: string[], captureDir: string | undefined): Promise<void> {
   const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
   const s = session!;
-  await new Promise<void>((resolve) => s.win.once('ready-to-show', () => resolve()));
+  await readyToShow(s.win);
   await delay(600);
   if (captureDir) fs.mkdirSync(captureDir, { recursive: true });
   const layout = new LayoutReport(captureDir);
