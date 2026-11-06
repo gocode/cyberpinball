@@ -65,6 +65,7 @@ Your cabinet is no longer an island. Cyber Pinball links cabinets directly to ea
 - **Screens recognised, not numbered.** Each monitor is identified by its EDID fingerprint, and `VPinballX.ini` is rewritten at every start. Swap a monitor, wake the screens in a different order, let Windows renumber everything: the playfield stays the playfield.
 - **Sound where it belongs.** One step plays a sound on every output, lets you pick the backglass and playfield outputs, and tests each speaker of a 5.1 or 7.1 card. The menu, its music and every video go through the cabinet speakers.
 - **Several setups, one install.** The same installation serves a cabinet and a desk PC: the connected setup is recognised on its own, each with its screens, sound, buttons and `VPinballX.ini`.
+- **Cabinet LEDs and feedback (DOF).** Controllers (Pinscape, LedWiz, Teensy…) are recognised, the configtool configuration imports itself, and your addressable LED strips are described on screen: Cyber Pinball writes the `Cabinet.xml` and tells you what keeps an LED from lighting.
 - **VPX settings without the `.ini`.** Every VPX setting, read from VPX's own source code, is editable globally or table by table. Framing and the position of the backglass, DMD and topper are adjusted on the running table, from VPX's menu.
 
 <p align="center"><img src="docs/images/en/vpx-settings.webp?v=38fcfb008f" width="760" alt="The VPX settings screen: the Essentials tab with table view and sound settings, the values managed by Cyber Pinball, and the description of the selected setting."></p>

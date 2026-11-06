@@ -32,8 +32,9 @@ import { isJunkName } from './puppack';
 export const PUP_FOLDER = 'pupvideos';
 /**
  * Dossier frère des packs désactivés : ni le plugin PUP ni PinUP Popper ne le lisent. Nom en
- * ASCII seulement : fs.cpSync de Node 22 sous Windows écrit un chemin accentué en « Ã© » (copie
- * d'un pack à l'import, vérifié le 06/11/2026), et le pack se perdrait dans un dossier fantôme.
+ * ASCII, choisi quand fs.cpSync de Node 22 écrivait encore un chemin accentué en « Ã© » (vu le
+ * 06/11/2026) ; les copies passent désormais par copyTree (copytree.ts), saine, mais ce nom est
+ * déjà sur les bornes et reste.
  */
 export const PUP_DISABLED_FOLDER = 'pupvideos (off)'; // i18n-ignore : nom de dossier
 

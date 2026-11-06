@@ -90,6 +90,7 @@ Les bornes se relient directement entre elles, par Internet ou par le réseau lo
 - **ROM et PuP-Pack décochés d'office** : ils ne se cochent qu'après l'attestation de vos droits (« J'atteste et je m'engage »).
 - **Tout est vérifié à l'arrivée** (taille, empreinte SHA-256, contenu conforme à son type) puis passe par le plan d'ajout avant d'être installé. Un fichier refusé en route est sauté avec sa raison, le reste arrive.
 - **Une réception ne part qu'une fois** et se suit partout : « Réception en cours », sa barre et son pourcentage, sur la fiche de la table et dans « Téléchargements ». Une fois reçue : « Installer dans ma bibliothèque ».
+- **Depuis « Ajouter une table »** : « Depuis un ami… » liste vos amis, ceux qui ont des tables que vous n'avez pas en tête, et ouvre leur bibliothèque sur ces tables.
 - **Une place suffisante est vérifiée** avant de commencer (la taille plus 1 Gio).
 - **« Limiter le débit des téléchargements… »** : de 256 ko/s à 20 Mo/s, ou sans limite, pour laisser la connexion au reste de la maison.
 
@@ -216,6 +217,13 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 <p align="center"><img src="images/fr/features/sound.webp?v=6a477c47dd" width="360" alt="L'étape Son : la sortie 1 sur 2 joue un bip ; flipper gauche pour le fronton, flipper droit pour le plateau, Start pour les deux."></p>
 
+### LED et retours (DOF)
+
+- **Les contrôleurs reconnus sans rien leur envoyer** (Pinscape, LedWiz, Teensy, DudesCab, PacLed…), le plugin DOF de VPX allumé, et ce qui empêche une LED de s'allumer dit clairement (configuration absente, contrôleur sans son fichier, Teensy non déclaré).
+- **La configuration du configtool** se récupère dans « Récupérer » et s'importe d'elle-même ; l'ancienne est sauvegardée.
+- **LED adressables (WS2812)** : décrivez vos bandes (Teensy, Wemos D1, ou Art-Net vers WLED sur un ESP32) et Cyber Pinball écrit le `Cabinet.xml` de DOF, sans jamais remplacer un fichier écrit à la main.
+- **Le médecin d'une table** signale une ROM sans effets DOF ; les réglages de VPX choisissent, pour le knocker ou le vibreur, le son de la table, la borne ou les deux.
+
 ### Plusieurs configurations
 
 - **Une installation, plusieurs postes** : une borne et un PC de bureau, par exemple. Chaque configuration a ses écrans, rôles, zones, son, boutons et son propre `VPinballX.ini` ; tables, ROM, médias et statistiques restent communs.
@@ -276,7 +284,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 - **Un voile noir par écran**, du démarrage à la fin d'une partie : aucun écran ne montre le bureau Windows.
 - **Pas de flash blanc** : une fenêtre reste transparente jusqu'à sa première image.
-- **Barres des tâches masquées** pendant la partie, puis rendues ; remises derrière le menu au retour.
+- **Barres des tâches masquées** pendant la partie, puis rendues ; remises derrière le menu au retour. Sur une borne lancée au démarrage de Windows, masquées toute la session, rendues au bureau Windows et quand on quitte.
 - **« Bureau Windows »** (Ctrl+Maj+D) libère tous les écrans du PC ; le même raccourci ramène le menu.
 
 ## Tout se fait aux boutons
@@ -301,7 +309,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 ### Toutes les façons d'ajouter une table
 
-- **« Ajouter une table »** (Menu système > « Tables ») réunit tout : « Prêt à installer », le dossier d'import (clé USB), « Trouver une table en ligne », « Reprendre un fichier téléchargé », « Choisir des fichiers… », glisser-déposer, « Récupérés et attendus », « Mises à jour des tables », « Comptes des sites ».
+- **« Ajouter une table »** (Menu système > « Tables ») réunit tout : « Prêt à installer », le dossier d'import (clé USB), « Trouver une table en ligne », « Reprendre un fichier téléchargé », « Choisir des fichiers… », glisser-déposer, « Récupérés et attendus », « Mises à jour des tables », « Comptes des sites », et « Depuis un ami… » (la bibliothèque d'un ami, ses tables que vous n'avez pas en tête).
 - **Chaque table nommée d'après la base VPS** (Virtual Pinball Spreadsheet, environ 2 600 jeux) : dossier « Titre (Fabricant Année) », fiche remplie (fabricant, année, auteurs, identifiant IPDB). Un doute ouvre « Quel jeu est-ce ? » avec cinq propositions.
 - **« Mises à jour des tables »** : les tables dont une version plus récente existe.
 - **« Depuis une autre installation… »** : les tables d'un autre menu de borne, listées une à une ; on coche celles qu'on veut, et chacune arrive avec ce que cette installation rangeait ailleurs (PuP-Pack, ROM, couleurs et sons du DMD, dossier DMD, fronton, médias). Rien n'est repris en bloc, l'installation d'origine ne change pas.
@@ -393,6 +401,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Réparé avant chaque partie** : un pack que le script de la table garde éteint est allumé (par un script adapté à côté, la table n'est jamais modifiée), un pack que personne ne lance est lancé, les images livrées sous un nom de vidéo et les noms accentués sont corrigés, l'ordre des playlists remis.
 - **Vidéos déclenchées par le DMD** reconnues pendant la partie sur les tables FlexDMD sans ROM.
 - **Le DMD de la table reste devant le pack** quand le pack le cacherait.
+- **Désactivé, table par table** (« Parties du jeu » > « PuP-Pack ») : la table se joue comme si le pack n'était pas installé, sans ses vidéos ; « Réactiver le PuP-Pack » le remet à l'identique.
 
 ### Fronton, DMD et plugins de VPX
 
@@ -521,6 +530,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 - **« Borne dédiée »** (désactivée par défaut) : la session Windows s'ouvre directement sur Cyber Pinball, sans bureau ni barre des tâches, et un surveillant le relance s'il se ferme. Sous Windows Pro et Famille comme sous Entreprise et IoT.
 - **« Lancement au démarrage »** : Cyber Pinball s'ouvre avec Windows, le bureau masqué derrière.
+- **Barres des tâches masquées toute la session** sur une borne lancée au démarrage ; elles reviennent au bureau Windows (Ctrl+Maj+D) et quand on quitte, et seules après un arrêt brutal.
 - **Chaque réglage de Windows sauvegardé** avant d'écrire ; « Désactiver » le remet tel quel et le vérifie, et un script de secours fait de même hors de Cyber Pinball.
 
 <p align="center"><img src="images/fr/features/dedicated.webp?v=1dd99478a4" width="360" alt="Borne dédiée : désactivée, ce qu'il faut avant d'activer, deux façons au choix (remplacer le bureau, lancer au démarrage de Windows), et le secours pour accéder à Windows."></p>
@@ -548,7 +558,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 Cyber Pinball est un premier prototype (0.1.x). Ce qui n'est pas encore là :
 
-- **Windows seulement**, et seulement Visual Pinball X 10.8.1 en mode plugins : pas de mode classique, pas de DOF (retours de force, éclairages), pas d'autres émulateurs pour l'instant.
+- **Windows seulement**, et seulement Visual Pinball X 10.8.1 en mode plugins : pas de mode classique, pas d'autres émulateurs pour l'instant.
 - **Installeurs non signés** : Windows SmartScreen avertit à l'installation.
 - **DMD matériels** (ZeDMD, PIN2DMD, Pixelcade) : alimentés par VPX pendant les parties, pas encore par le menu.
 - **Records et knocker** : pas encore lus pour les tables PinMAME dont la ROM garde ses records.

@@ -44,6 +44,9 @@ function step(text) {
 
 step('Compilation TypeScript');
 execFileSync(process.execPath, [path.join(repo, 'node_modules', 'typescript', 'bin', 'tsc'), '-b'], { cwd: repo, stdio: 'inherit' });
+// Copie de dossiers sûre avec les chemins accentués (packages/core/src/copytree.ts) : ce script
+// tourne sous Node 22, dont fs.cpSync les abîme sous Windows.
+const { copyTree } = require(path.join(repo, 'packages', 'core', 'dist', 'copytree.js'));
 
 step('Regroupement (esbuild)');
 fs.rmSync(path.join(repo, 'build'), { recursive: true, force: true });
@@ -64,13 +67,13 @@ fs.copyFileSync(require.resolve('@ghostery/adblocker-electron-preload'), path.jo
 
 step('Fichiers de l’application');
 // Mêmes chemins relatifs qu'en développement : dist\..\renderer, dist\..\components.json.
-fs.cpSync(path.join(repo, 'app', 'renderer'), path.join(stage, 'renderer'), { recursive: true });
+copyTree(path.join(repo, 'app', 'renderer'), path.join(stage, 'renderer'));
 const installerDir = path.join(repo, 'packages', 'installer');
 for (const name of fs.readdirSync(installerDir)) {
   const from = path.join(installerDir, name);
   // Données du manifeste et schémas éventuels (par exemple vpx-settings\).
-  if (name.endsWith('.json') && name !== 'package.json' && name !== 'tsconfig.json') fs.cpSync(from, path.join(stage, name));
-  if (name === 'vpx-settings') fs.cpSync(from, path.join(stage, name), { recursive: true });
+  if (name.endsWith('.json') && name !== 'package.json' && name !== 'tsconfig.json') fs.copyFileSync(from, path.join(stage, name));
+  if (name === 'vpx-settings') copyTree(from, path.join(stage, name));
 }
 // koffi et son binaire natif, livré à part dans un paquet propre à la plateforme
 // (seul celui de win32-x64 est copié). Du paquet koffi, on ne garde que le
@@ -82,7 +85,7 @@ const koffiRuntime = (src) => {
   return /^LICENSE/i.test(name) || (/\.(c?js|json|node)$/.test(name) && name !== 'cnoke.cjs');
 };
 for (const pkg of ['koffi', koffiNative]) {
-  fs.cpSync(path.join(repo, 'node_modules', pkg), path.join(stage, 'node_modules', pkg), { recursive: true, filter: koffiRuntime });
+  copyTree(path.join(repo, 'node_modules', pkg), path.join(stage, 'node_modules', pkg), { filter: koffiRuntime });
 }
 const versionOf = (pkg) => require(path.join(repo, 'node_modules', pkg, 'package.json')).version;
 
@@ -98,8 +101,7 @@ const closure = (pkg) => {
 for (const pkg of NATIVE_NET) closure(pkg);
 for (const pkg of nativeNet) {
   const from = path.join(repo, 'node_modules', pkg);
-  fs.cpSync(from, path.join(stage, 'node_modules', pkg), {
-    recursive: true,
+  copyTree(from, path.join(stage, 'node_modules', pkg), {
     filter: (src) => {
       const rel = path.relative(from, src).split(path.sep);
       if (rel[0] === 'prebuilds' && rel[1] && rel[1] !== `${process.platform}-${process.arch}`) return false;

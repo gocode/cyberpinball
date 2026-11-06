@@ -6,6 +6,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { renameWithRetry } from './atomicwrite';
+import { copyTree } from './copytree';
 import { formatNumber, t } from './i18n';
 import { buildZip, writeZipData, type RomZipMember } from './romzip';
 
@@ -103,8 +104,7 @@ function transfer(from: string, to: string, ctx: OpContext, move: boolean): void
   }
   if (move) movePath(from, to);
   else {
-    fs.mkdirSync(path.dirname(to), { recursive: true });
-    fs.cpSync(from, to, { recursive: true, errorOnExist: true, force: false });
+    copyTree(from, to, { overwrite: false });
   }
 }
 
@@ -218,7 +218,7 @@ export function movePath(from: string, to: string): void {
     renameWithRetry(from, to);
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'EXDEV') throw error;
-    fs.cpSync(from, to, { recursive: true, errorOnExist: true, force: false });
+    copyTree(from, to, { overwrite: false });
     fs.rmSync(from, { recursive: true, force: true });
   }
 }

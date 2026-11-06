@@ -15,6 +15,7 @@ export * from './tableorder';
 export * from './atomicwrite';
 export * from './backup';
 export * from './fileops';
+export * from './copytree';
 export * from './transfer';
 export * from './ratelimit';
 export * from './tablefiles';

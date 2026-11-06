@@ -23,6 +23,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - PuP-Pack disabled, table by table: in Game parts > PuP-Pack, “Disable the PuP-Pack” makes the table play as if the pack were not installed, without its videos; “Re-enable the PuP-Pack” restores it exactly. A pack shared with another version of the table is pointed out first.
 - Cabinet started with Windows: the taskbars no longer show, neither in the menu nor during games. They come back when you go back to Windows (Windows desktop, or Ctrl+Shift+D) and when you quit Cyber Pinball, then hide again on returning to the menu. If Cyber Pinball stops abruptly, they come back by themselves a few seconds later.
 - Add a table > “From a friend…”: your friends, those who have tables you lack first; pick one, and their library opens on those tables, to get as from their friend page.
+- Table doctor: a folder whose accents a copy damaged (“Ã©” instead of “é”) is pointed out, and its content goes back under its real name in one step.
 
 ## 0.1.6
 

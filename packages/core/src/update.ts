@@ -35,6 +35,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { renameWithRetry } from './atomicwrite';
+import { copyTree } from './copytree';
 import { formatNumber, language, t, type Language } from './i18n';
 import { UPDATE_PUBLIC_KEY } from './update-key';
 import { fetchResumable, ResumableError } from './resumable';
@@ -567,7 +568,7 @@ export async function swapAppDir(appDir: string, staged: string, opts: { retryMs
       renameWithRetry(staged, appDir);
     } catch {
       // Autre disque (EXDEV) : copie, puis effacement du paquet déplié.
-      fs.cpSync(staged, appDir, { recursive: true });
+      copyTree(staged, appDir);
       fs.rmSync(staged, { recursive: true, force: true });
     }
   } catch (error) {

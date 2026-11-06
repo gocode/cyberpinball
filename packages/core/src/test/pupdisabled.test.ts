@@ -344,6 +344,6 @@ test('invariant : le dossier pupvideos d’une table n’est nommé que dans pup
   for (const dir of ['packages/core/src', 'packages/installer/src', 'packages/win-displays/src', 'app/src']) walk(path.join(REPO_ROOT, dir));
   assert.deepEqual(offenders, []);
   assert.ok(isPupFolderName('PUPVideos') && isPupFolderName(PUP_DISABLED_FOLDER.toUpperCase()) && !isPupFolderName('medias'));
-  // ASCII seulement : fs.cpSync de Node 22 sous Windows abîme un chemin accentué (le pack copié à l'import s'y perdrait).
+  // ASCII : nom choisi quand fs.cpSync de Node 22 abîmait les chemins accentués, déjà sur les bornes (copytree.ts).
   assert.match(PUP_DISABLED_FOLDER, /^[\x20-\x7e]+$/);
 });

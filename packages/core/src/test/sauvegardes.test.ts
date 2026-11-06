@@ -8,6 +8,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { copyTree } from '../copytree';
 import {
   applyPendingRestore,
   autoBackupDue,
@@ -402,7 +403,7 @@ test('réglages : « chaque nuit » de la préversion devient chaque jour à heu
 test('un dossier des données hors de la racine (bac à sable) est sauvegardé et restauré à sa place', async () => {
   const root = fakeRoot();
   const home = tmp('cp-sauvegarde-home-');
-  fs.cpSync(path.join(root, 'data'), home, { recursive: true });
+  copyTree(path.join(root, 'data'), home);
   fs.rmSync(path.join(root, 'data'), { recursive: true });
   const dest = tmp('cp-sauvegarde-cle-');
   const done = await runBackup({ root, dataDir: home, dest, level: 'settings', cabinet: CABINET, version: '0.1.6' });

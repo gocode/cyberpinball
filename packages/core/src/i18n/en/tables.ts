@@ -553,4 +553,12 @@ export const messages: Record<string, string> = {
   'copie désactivée : celui de pupvideos est chargé à sa place': 'disabled copy: the one in pupvideos is loaded instead',
   'PuP-Pack désactivé : la table se joue sans lui': 'PuP-Pack disabled: the table plays without it',
   '{file}, écrit par Cyber Pinball pour le PuP-Pack, part à la corbeille : le pack de « {table} » est désactivé.': '{file}, written by Cyber Pinball for the PuP-Pack, goes to the trash: the pack of “{table}” is disabled.',
+  'Dossier au nom abîmé par une copie': 'Folder name damaged by a copy',
+  'Dossiers aux noms abîmés par une copie': 'Folder names damaged by a copy',
+  '{list} devait s’appeler {names} : une copie faite sous Node 22 a écrit ses accents en « Ã© ». Ce qu’il contient n’est pas là où on le cherche. Un fichier déjà présent sous le vrai nom part à la corbeille, remplacé par la copie.':
+    '{list} should have been called {names}: a copy made under Node 22 wrote its accents as “Ã©”. What it holds is not where it is looked for. A file already present under the real name goes to the trash, replaced by the copy.',
+  '{list} devaient s’appeler {names} : une copie faite sous Node 22 a écrit leurs accents en « Ã© ». Ce qu’ils contiennent n’est pas là où on le cherche. Un fichier déjà présent sous le vrai nom part à la corbeille, remplacé par la copie.':
+    '{list} should have been called {names}: a copy made under Node 22 wrote their accents as “Ã©”. What they hold is not where it is looked for. A file already present under the real name goes to the trash, replaced by the copy.',
+  'Ranger son contenu sous son vrai nom': 'Move its contents under its real name',
+  'Ranger leur contenu sous leur vrai nom': 'Move their contents under their real names',
 };

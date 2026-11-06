@@ -15,6 +15,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { copyTree } from '../copytree';
 import { diagnose, repairPupForPlay, scriptFacts, type DoctorContext, type ScriptFacts } from '../doctor';
 import { PUP_HEALTH_FINDINGS } from '../health';
 import { addPupLoader, captureTriggers, expectedPackNames, pupLoaderNeeded, type PupCabinet } from '../puppack';
@@ -204,7 +205,7 @@ test('sans nom de jeu pour B2S : le seul dossier du pack sert de nom ; plusieurs
   assert.equal(loadedPack(folder), PACK);
   // Deux packs, rien pour choisir : le médecin le dit (avant : aucun constat).
   fs.rmSync(path.join(folder, VPX.replace(/\.vpx$/, '.vbs')));
-  fs.cpSync(path.join(folder, 'pupvideos', PACK), path.join(folder, 'pupvideos', 'GOT PupPack v0.9'), { recursive: true });
+  copyTree(path.join(folder, 'pupvideos', PACK), path.join(folder, 'pupvideos', 'GOT PupPack v0.9'));
   const found = diagnose(scanTables(tablesDir)[0]!, ctx).filter((f) => f.code.startsWith('pup'));
   assert.equal(found[0]?.code, 'pupMissing');
   assert.equal(found[0]?.fix, undefined);

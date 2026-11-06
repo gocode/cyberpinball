@@ -6,6 +6,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { applyOps, formatSize, isInside, safeName, sameVolume, sizeOf, type FileOp, type OpContext } from './fileops';
+import { findMangledDirs } from './copytree';
 import { formatDate, formatDateTime, formatList, t, tn } from './i18n';
 import { IniDocument } from './ini';
 import { isCurrentMediaError, mediaErrorsFile, readMediaErrors, type MediaErrorEntry, type MediaErrorKind } from './mediaerrors';
@@ -100,6 +101,7 @@ export interface Fix {
 /** Toutes les règles du médecin ; chacune a sa table piégée (doctor-traps.test.ts). */
 export const FINDING_CODES = [
   'outsideFolder',
+  'folderMangled',
   'scriptOverride',
   'scriptPatchStale',
   'scriptCoreCompat',
@@ -439,6 +441,31 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   const ownFolder = path.resolve(folder).toLowerCase() !== path.resolve(ctx.tablesDir).toLowerCase();
   const files = fs.readdirSync(folder);
   const has = (name: string) => files.find((f) => f.toLowerCase() === name.toLowerCase());
+
+  // 0. Dossier écrit par l'ancien fs.cpSync de Node 22 : « Été » devenu « Ã‰tÃ© » (copytree.ts).
+  // Le dossier de la table lui-même (copie d'une table à l'import) ou l'un de ses sous-dossiers.
+  if (ownFolder) {
+    const mangled = findMangledDirs(folder, 3);
+    if (mangled.length) {
+      const names = (dirs: string[]) => quoteList(dirs.map((d) => path.basename(d)));
+      const params = { list: names(mangled.map((m) => m.path)), names: names(mangled.map((m) => m.repaired)) };
+      findings.push({
+        code: 'folderMangled',
+        severity: 'warning',
+        title: tn(mangled.length, 'Dossier au nom abîmé par une copie', 'Dossiers aux noms abîmés par une copie'),
+        detail: tn(
+          mangled.length,
+          '{list} devait s’appeler {names} : une copie faite sous Node 22 a écrit ses accents en « Ã© ». Ce qu’il contient n’est pas là où on le cherche. Un fichier déjà présent sous le vrai nom part à la corbeille, remplacé par la copie.',
+          '{list} devaient s’appeler {names} : une copie faite sous Node 22 a écrit leurs accents en « Ã© ». Ce qu’ils contiennent n’est pas là où on le cherche. Un fichier déjà présent sous le vrai nom part à la corbeille, remplacé par la copie.',
+          params,
+        ),
+        fix: {
+          label: tn(mangled.length, 'Ranger son contenu sous son vrai nom', 'Ranger leur contenu sous leur vrai nom'),
+          ops: mangled.map((m) => ({ op: 'move', from: m.path, to: m.repaired })),
+        },
+      });
+    }
+  }
 
   // 1. Table rangée en vrac dans le dossier des tables.
   if (!ownFolder) {

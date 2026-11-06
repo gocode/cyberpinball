@@ -106,6 +106,11 @@ function healthyMedias(folder: string): void {
 const logsOf = (folder: string) => path.join(path.dirname(folder), '_journaux');
 
 /** Une table saine dans son dossier : backglass, ROM rangée, .info. */
+/** Nom tel que l'écrivait fs.cpSync de Node 22 sous Windows : l'UTF-8 relu en cp1252. */
+function mangled(name: string): string {
+  return new TextDecoder('windows-1252').decode(Buffer.from(name, 'utf8'));
+}
+
 function healthyTable(tablesDir: string): string {
   const folder = path.join(tablesDir, TABLE);
   write(path.join(folder, `${TABLE}.vpx`), 'vpx');
@@ -164,6 +169,8 @@ const TRAPS: Trap[] = [
       write(path.join(tablesDir, `${TABLE}.vpx`), 'vpx');
     },
   },
+  // Sous-dossier écrit par l'ancien fs.cpSync de Node 22 : « désactivés » devenu « dÃ©sactivÃ©s » (copytree.ts).
+  { code: 'folderMangled', arm: (folder) => write(path.join(folder, mangled('pupvideos (désactivés)'), 'afm_113b', 'screens.pup'), SCREENS) },
   { code: 'scriptOverride', arm: (folder) => write(path.join(folder, `${TABLE}.vbs`), 'script extrait') },
   // .vbs de Cyber Pinball (PuP-Pack allumé) tiré du script d'une version précédente de la table.
   {
@@ -643,6 +650,40 @@ test('table témoin avec médias : bons noms, bons formats, proportions de la bo
     assert.deepEqual(diagnose(entry, { tablesDir, script, cabinet: CABINET, otherPackNames: ['afm_113b'] }), [], entry.file);
   }
   fs.rmSync(tablesDir, { recursive: true });
+});
+
+test('dossier de table au nom abîmé par une copie : rangé sous son vrai nom, rien de perdu', () => {
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-traps-'));
+  const real = 'Attack from Mars Été (Bally 1995)';
+  // La bonne table, d'avant, et la copie plus récente perdue dans le dossier fantôme.
+  write(path.join(tablesDir, real, `${real}.vpx`), 'ancienne');
+  write(path.join(tablesDir, real, `${real}.info`), '{}');
+  const ghost = path.join(tablesDir, mangled(real));
+  write(path.join(ghost, `${real}.vpx`), 'nouvelle');
+  write(path.join(ghost, `${real}.directb2s`), 'b2s');
+  write(path.join(ghost, mangled('Sons alternatifs é'), 'a.ogg'), 'son');
+  const entries = scanTables(tablesDir);
+  const ctx = { tablesDir, script: scriptFacts('') };
+  // La table saine, au nom accentué, ne déclenche rien : c'est la copie fantôme qui est signalée.
+  assert.ok(!diagnose(entries.find((e) => path.basename(e.folder) === real)!, ctx).some((f) => f.code === 'folderMangled'));
+  const finding = diagnose(entries.find((e) => e.folder === ghost)!, ctx).find((f) => f.code === 'folderMangled')!;
+  assert.equal(finding.title, 'Dossier au nom abîmé par une copie');
+  assert.ok(finding.detail.includes(`« ${real} »`), finding.detail);
+  const trashDir = `${tablesDir}-corbeille`;
+  applyOps(finding.fix!.ops, { trashDir });
+  assert.deepEqual(fs.readdirSync(tablesDir), [real]);
+  assert.equal(fs.readFileSync(path.join(tablesDir, real, `${real}.vpx`), 'utf8'), 'nouvelle');
+  assert.ok(fs.existsSync(path.join(tablesDir, real, `${real}.directb2s`)));
+  // Le sous-dossier fantôme a suivi tel quel : il est signalé à son tour, sous la table réparée.
+  const after = diagnose(scanTables(tablesDir)[0]!, ctx).find((f) => f.code === 'folderMangled')!;
+  applyOps(after.fix!.ops, { trashDir });
+  assert.equal(fs.readFileSync(path.join(tablesDir, real, 'Sons alternatifs é', 'a.ogg'), 'utf8'), 'son');
+  assert.ok(!diagnose(scanTables(tablesDir)[0]!, ctx).some((f) => f.code === 'folderMangled'));
+  // L'ancienne table n'est pas perdue : elle est à la corbeille.
+  const trashed = fs.readdirSync(trashDir, { recursive: true }).map(String);
+  assert.ok(trashed.some((f) => f.endsWith(`${real}.vpx`)), trashed.join(', '));
+  fs.rmSync(tablesDir, { recursive: true });
+  fs.rmSync(trashDir, { recursive: true, force: true });
 });
 
 test('les pièges couvrent toutes les règles du médecin', () => {

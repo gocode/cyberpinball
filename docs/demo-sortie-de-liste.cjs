@@ -63,7 +63,7 @@ function sandbox(name) {
   const box = path.join(BASE, name);
   const root = path.join(box, 'root');
   fs.rmSync(box, { recursive: true, force: true });
-  fs.cpSync(SOURCE, root, { recursive: true });
+  core.copyTree(SOURCE, root);
   const L = core.layoutOf(root);
   for (const d of [L.tables, L.import, L.media, L.data, L.trash, L.downloads, L.roms]) fs.mkdirSync(d, { recursive: true });
   MORE.forEach((title, i) => {

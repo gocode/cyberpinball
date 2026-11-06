@@ -90,6 +90,7 @@ Cabinets link directly to each other, over the Internet or the local network, wi
 - **ROM and PuP-Pack unticked by default**: they can only be ticked once you attest that you hold the rights ("I certify and agree").
 - **Everything is checked on arrival** (size, SHA-256 fingerprint, content matching its type), then goes through the add plan before anything is installed. A file refused on the way is skipped with its reason; the rest arrives.
 - **A transfer only starts once** and can be followed everywhere: "Receiving", its bar and percentage, on the table's page and in "Downloads". Once received: "Install in my library".
+- **From "Add a table"**: "From a friend…" lists your friends, those with tables you lack first, and opens their library on those tables.
 - **Free space is checked** before starting (the size plus 1 GiB).
 - **"Limit download speed…"**: from 256 kB/s to 20 MB/s, or no limit, to leave the connection to the rest of the house.
 
@@ -216,6 +217,13 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 <p align="center"><img src="images/en/features/sound.webp?v=86235c7720" width="360" alt="The Sound step: output 1 of 2 plays one beep; left flipper for the backglass, right flipper for the playfield, Start for both."></p>
 
+### LED and feedback (DOF)
+
+- **Controllers recognised without sending them anything** (Pinscape, LedWiz, Teensy, DudesCab, PacLed…), the VPX DOF plugin turned on, and what keeps an LED from lighting stated plainly (missing configuration, controller without its file, undeclared Teensy).
+- **The configtool configuration** is fetched in "Get" and imports itself; the old one is backed up.
+- **Addressable LEDs (WS2812)**: describe your strips (Teensy, Wemos D1, or Art-Net to WLED on an ESP32) and Cyber Pinball writes the DOF `Cabinet.xml`, never replacing a hand-written file.
+- **A table's doctor** points out a ROM with no DOF effects; the VPX settings choose, for the knocker or the shaker, the table's sound, the cabinet or both.
+
 ### Several configurations
 
 - **One install, several setups**: a cabinet and a desk PC, for example. Each configuration has its screens, roles, zones, sound, buttons and its own `VPinballX.ini`; tables, ROMs, media and statistics are shared.
@@ -276,7 +284,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 - **A black veil per screen**, from start-up to the end of a game: no screen ever shows the Windows desktop.
 - **No white flash**: a window stays transparent until its first frame.
-- **Taskbars hidden** during the game, then given back; put back behind the menu on return.
+- **Taskbars hidden** during the game, then given back; put back behind the menu on return. On a cabinet started with Windows, hidden for the whole session, given back on the Windows desktop and when quitting.
 - **"Windows desktop"** (Ctrl+Shift+D) frees every screen of the PC; the same shortcut brings the menu back.
 
 ## Everything from the buttons
@@ -301,7 +309,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 ### Every way to add a table
 
-- **"Add a table"** (System menu > "Tables") gathers it all: "Ready to install", the import folder (USB stick), "Find a table online", "Reuse a downloaded file", "Choose files…", drag and drop, "Received and expected", "Table updates", "Site accounts".
+- **"Add a table"** (System menu > "Tables") gathers it all: "Ready to install", the import folder (USB stick), "Find a table online", "Reuse a downloaded file", "Choose files…", drag and drop, "Received and expected", "Table updates", "Site accounts", and "From a friend…" (a friend's library, their tables you lack first).
 - **Every table named from the VPS database** (Virtual Pinball Spreadsheet, about 2,600 games): a "Title (Manufacturer Year)" folder, details filled in (manufacturer, year, authors, IPDB number). A doubt opens "Which game is it?" with five suggestions.
 - **"Table updates"**: the tables for which a newer version exists.
 - **"From another installation…"**: the tables of another cabinet menu, listed one by one; tick the ones you want, and each arrives with what that installation kept elsewhere (PuP-Pack, ROM, DMD colours and sounds, DMD folder, backglass, media). Nothing is brought in wholesale; the original installation does not change.
@@ -393,6 +401,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **Fixed before every game**: a pack the table's script keeps switched off is switched on (by an adapted script next to it, the table is never modified), a pack nobody starts is started, images shipped under a video name and accented file names are fixed, the playlist order restored.
 - **Videos triggered by the DMD** recognised during the game on FlexDMD tables without a ROM.
 - **The table's DMD stays in front of the pack** when the pack would hide it.
+- **Disabled, table by table** ("Game parts" > "PuP-Pack"): the table plays as if the pack were not installed, without its videos; "Re-enable the PuP-Pack" puts it back exactly.
 
 ### Backglass, DMD and VPX plugins
 
@@ -521,6 +530,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 - **"Dedicated cabinet"** (off by default): the Windows session opens straight on Cyber Pinball, with no desktop or taskbar, and a watchdog restarts it if it closes. On Windows Pro and Home as on Enterprise and IoT.
 - **"Launch at startup"**: Cyber Pinball opens with Windows, the desktop hidden behind it.
+- **Taskbars hidden for the whole session** on a cabinet launched at startup; they come back on the Windows desktop (Ctrl+Shift+D) and when quitting, and by themselves after an abrupt stop.
 - **Every Windows setting backed up** before writing; turning it off puts it back as it was and checks it, and a rescue script does the same outside Cyber Pinball.
 
 <p align="center"><img src="images/en/features/dedicated.webp?v=d79d41df88" width="360" alt="Dedicated cabinet: off, what's needed before turning it on, two ways to choose from (replace the desktop, launch at Windows startup), and the rescue to reach Windows."></p>
@@ -548,7 +558,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 Cyber Pinball is an early prototype (0.1.x). What isn't there yet:
 
-- **Windows only**, and only Visual Pinball X 10.8.1 in plugin mode: no classic mode, no DOF (force feedback, lighting), no other emulators for now.
+- **Windows only**, and only Visual Pinball X 10.8.1 in plugin mode: no classic mode, no other emulators for now.
 - **Unsigned installers**: Windows SmartScreen warns when you install.
 - **Real DMDs** (ZeDMD, PIN2DMD, Pixelcade): driven by VPX during games, not by the menu yet.
 - **High scores and knocker**: not yet read for PinMAME tables whose ROM keeps its high scores.

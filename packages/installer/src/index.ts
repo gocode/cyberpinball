@@ -6,6 +6,7 @@ import {
   componentPaths,
   layoutOf,
   configIniPath,
+  copyTree,
   t,
   updateCabinetSet,
   writeRootPointer,
@@ -47,7 +48,7 @@ export function setupRoot(root: string, locations: Locations): SetupReport {
   const migrated: string[] = [];
   const copyIfMissing = (from: string, to: string) => {
     if (fs.existsSync(from) && !fs.existsSync(to)) {
-      fs.cpSync(from, to, { recursive: true });
+      copyTree(from, to);
       migrated.push(to);
     }
   };

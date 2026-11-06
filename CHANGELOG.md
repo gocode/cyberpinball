@@ -25,6 +25,7 @@ son interface).
 - PuP-Pack désactivé, table par table : dans Parties du jeu > PuP-Pack, « Désactiver le PuP-Pack » fait jouer la table comme si le pack n'était pas installé, sans ses vidéos ; « Réactiver le PuP-Pack » le remet à l'identique. Un pack partagé avec une autre version de la table est signalé avant.
 - Borne lancée au démarrage de Windows : les barres des tâches ne se voient plus, ni au menu ni pendant les parties. Elles reviennent quand vous retournez sur Windows (Bureau Windows, ou Ctrl+Maj+D) et quand vous quittez Cyber Pinball, puis se masquent de nouveau au retour au menu. Si Cyber Pinball s'arrête brutalement, elles reviennent seules quelques secondes après.
 - Ajouter une table > « Depuis un ami… » : vos amis, ceux qui ont des tables que vous n'avez pas en tête ; choisissez-en un, et sa bibliothèque s'ouvre sur ces tables, à récupérer comme depuis sa fiche.
+- Médecin des tables : un dossier dont une copie a abîmé les accents (« Ã© » au lieu de « é ») est signalé, et son contenu se range sous son vrai nom d'un geste.
 
 ## 0.1.6
 
