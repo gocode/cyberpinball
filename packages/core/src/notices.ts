@@ -46,7 +46,7 @@ export type NoticeKind =
 export type NoticeTone = 'ok' | 'info' | 'warning' | 'error';
 
 /** Ce qu'un clic sur la notification ouvre (action du menu des tables). */
-export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' };
+export type NoticeAct = { type: 'friends' } | { type: 'friend-requests' } | { type: 'downloads' } | { type: 'live-game' } | { type: 'activity' };
 
 export interface NoticeEvent {
   kind: NoticeKind;
@@ -212,8 +212,6 @@ function subjectList(subjects: readonly string[]): string {
 }
 
 const capitalized = (s: string | undefined) => (s ? s.charAt(0).toLocaleUpperCase() + s.slice(1) : '');
-const who = (e: NoticeEvent) => shortened(e.who ?? '?', NAME_MAX);
-const subject = (e: NoticeEvent) => shortened(e.subject ?? '', SUBJECT_MAX);
 
 /**
  * « Bruno et Léa ont accepté » : les noms, entiers et distincts, quand ils tiennent dans la place
@@ -271,12 +269,19 @@ function reasonShort(reason: LiveNoticeReason | undefined): string | undefined {
 /** Où retrouver la partie entre amis au clavier ou aux boutons : son entrée, en tête de « Mes amis ». */
 const livePath = () => t('Menu système > Amis > Mes amis');
 
-/** Titre et précision d'un groupe d'évènements du même genre (le premier est le plus ancien). */
-export function noticeText(kind: NoticeKind, events: readonly NoticeEvent[]): { title: string; detail?: string } {
+/**
+ * Titre et précision d'un groupe d'évènements du même genre (le premier est le plus ancien).
+ * `full` : le texte entier, rien de raccourci (Activité récente, activity.ts) ; sans lui, chacun
+ * tient sur la ligne de la notification.
+ */
+export function noticeText(kind: NoticeKind, events: readonly NoticeEvent[], opts: { full?: boolean } = {}): { title: string; detail?: string } {
   const one = events.length === 1 ? events[0] : undefined;
   const n = events.length;
-  const names = () => nameList(events.map((e) => e.who ?? '?'));
-  const fit = (r: { title: string; detail?: string }) => ({ title: shortened(r.title, NOTICE_TITLE_MAX), ...(r.detail ? { detail: shortened(r.detail, NOTICE_DETAIL_MAX) } : {}) });
+  const full = opts.full === true;
+  const names = () => nameList(events.map((e) => e.who ?? '?'), full ? Number.MAX_SAFE_INTEGER : NOTICE_DETAIL_MAX);
+  const who = (e: NoticeEvent) => (full ? (e.who ?? '?') : shortened(e.who ?? '?', NAME_MAX));
+  const subject = (e: NoticeEvent) => (full ? (e.subject ?? '') : shortened(e.subject ?? '', SUBJECT_MAX));
+  const fit = (r: { title: string; detail?: string }) => (full ? { title: r.title, ...(r.detail ? { detail: r.detail } : {}) } : { title: shortened(r.title, NOTICE_TITLE_MAX), ...(r.detail ? { detail: shortened(r.detail, NOTICE_DETAIL_MAX) } : {}) });
   switch (kind) {
     case 'live-invite':
       return fit(one ? { title: t('{name} vous invite à rejoindre une partie', { name: who(one) }), ...(one.subject ? { detail: subject(one) } : {}) } : { title: tn(n, '{n} invitation à une partie', '{n} invitations à une partie'), detail: names() });
@@ -331,7 +336,7 @@ export function noticeText(kind: NoticeKind, events: readonly NoticeEvent[]): { 
     case 'friend-badge':
       return fit(one ? { title: t('Badge de {name}', { name: who(one) }), ...(one.extra ? { detail: one.extra } : {}) } : { title: tn(n, '{n} badge pour vos amis', '{n} badges pour vos amis'), detail: names() });
     case 'download-done':
-      return fit(one ? { title: t('Téléchargement fini'), detail: [subject(one), one.from ? t('de {name}', { name: shortened(one.from, NAME_MAX) }) : ''].filter(Boolean).join(' · ') } : { title: tn(n, '{n} téléchargement fini', '{n} téléchargements finis'), detail: subjectList(events.map(subject)) });
+      return fit(one ? { title: t('Téléchargement fini'), detail: [subject(one), one.from ? t('de {name}', { name: full ? one.from : shortened(one.from, NAME_MAX) }) : ''].filter(Boolean).join(' · ') } : { title: tn(n, '{n} téléchargement fini', '{n} téléchargements finis'), detail: subjectList(events.map(subject)) });
     case 'download-failed':
       // La cause d'abord : c'est elle qui doit rester lisible quand la place manque.
       return fit(one ? { title: t('Téléchargement bloqué'), detail: [capitalized(one.extra), subject(one)].filter(Boolean).join(' · ') } : { title: tn(n, '{n} téléchargement bloqué', '{n} téléchargements bloqués'), detail: subjectList(events.map(subject)) });
@@ -400,6 +405,12 @@ export interface NoticeTick {
   view?: NoticeView;
   /** Quand rappeler tick (ms, même horloge) ; undefined : rien n'attend. */
   nextAt?: number;
+  /**
+   * La notification qui vient d'entrer à l'écran, à ce tick seulement : ses évènements, et si elle
+   * les résume (« 4 nouveautés ») sans les dire. Activité récente (activity.ts) tient pour lus ceux
+   * qui ont été dits, pas ceux d'un résumé.
+   */
+  entered?: { events: readonly NoticeEvent[]; digest: boolean };
 }
 
 interface Showing {
@@ -474,12 +485,13 @@ export function createNoticeCenter(): NoticeCenter {
     if (now < readyAt) return { nextAt: readyAt };
     const groups = groupsOf(ready);
     let view: Omit<NoticeView, 'id'>;
+    let entered: NonNullable<NoticeTick['entered']>;
     // La partie entre amis passe d'abord, seule (NoticeRule.live) ; les autres genres, en résumé s'ils sont trois ou plus.
     if (!NOTICE_RULES[groups[0]!.kind].live && groups.length >= NOTICE_DIGEST_KINDS) {
-      // Résumé : tout ce qui attend, en une fois ; un clic mène au plus urgent.
+      // Résumé : tout ce qui attend, en une fois ; un clic ouvre Activité récente, qui les dit chacun en entier.
       const text = digestText(groups);
-      const first = NOTICE_RULES[groups[0]!.kind];
-      view = { icon: 'info', tone: 'info', title: text.title, detail: text.detail, act: first.act };
+      view = { icon: 'info', tone: 'info', title: text.title, detail: text.detail, act: { type: 'activity' } };
+      entered = { events: groups.flatMap((g) => g.events), digest: true };
       pending = [];
     } else {
       const group = groups[0]!;
@@ -497,12 +509,13 @@ export function createNoticeCenter(): NoticeCenter {
         ...(rule.away ? { away: true as const } : {}),
         ...(rule.sound ? { sound: rule.sound } : {}),
       };
+      entered = { events: group.events, digest: false };
       pending = pending.filter((e) => e.kind !== group.kind);
     }
     serial++;
     const showMs = view.live ? NOTICE_LIVE_SHOW_MS : NOTICE_SHOW_MS;
     showing = { id: `n${serial}`, view: { id: `n${serial}`, ...view }, shownAt: now, showMs };
-    return { view: showing.view, nextAt: now + showMs };
+    return { view: showing.view, nextAt: now + showMs, entered };
   }
 
   function nextExpiry(): number | undefined {

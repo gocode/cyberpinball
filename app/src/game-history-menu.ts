@@ -33,6 +33,8 @@ export interface GameHistoryMenuHost {
 
 export interface GameHistoryMenu {
   open(at?: number): void;
+  /** Le détail d'une partie, ouvert d'ailleurs (Activité récente) : son « Retour » vers `back`. */
+  openGame(id: string, back: () => void): void;
   /** Ce que dit l'entrée du menu système. */
   detail(): string;
 }
@@ -108,8 +110,8 @@ export function createGameHistoryMenu(host: GameHistoryMenuHost): GameHistoryMen
  tone: p.rank ? 'ok' : 'quiet', ...(badges.length ? { badges } : {}) };
   }
 
-  function buildGame(id: string, from: number): Built {
-    const back = () => open(from);
+  function buildGame(id: string, from: number | (() => void)): Built {
+    const back = typeof from === 'function' ? from : () => open(from);
     const game = host.history().find((g) => g.id === id);
     if (!game) return { heading: t('Historique des parties'), icon: 'clock', sections: [{ rows: [{ text: t('Cette partie n’est plus dans l’historique'), tone: 'info' }] }], actions: [{ label: t('Retour'), icon: 'back', run: back }], back };
     const hostPlayer = game.players.find((p) => p.host);
@@ -137,7 +139,7 @@ export function createGameHistoryMenu(host: GameHistoryMenuHost): GameHistoryMen
     };
   }
 
-  function openGame(id: string, from: number): void {
+  function openGame(id: string, from: number | (() => void)): void {
     host.library.openCustom(() => buildGame(id, from));
   }
 
@@ -147,6 +149,7 @@ export function createGameHistoryMenu(host: GameHistoryMenuHost): GameHistoryMen
 
   return {
     open,
+    openGame: (id, back) => openGame(id, back),
     detail() {
       const last = host.history()[0];
       return last ? t('Dernière : {table}, {day}', { table: last.title, day: new Date(last.at).toLocaleDateString(locale()) }) : t('Les parties entre amis jouées sur cette borne');

@@ -92,7 +92,7 @@ test('notifications : trois genres ou plus qui attendent font un seul résumé',
   const digest = c.tick(61_000, on).view;
   assert.equal(digest?.title, '4 nouveautés');
   assert.equal(digest?.detail, '1 demande d’ami · 1 téléchargement fini · …', 'du plus urgent au moins urgent, dans sa longueur');
-  assert.equal(digest?.act?.type, 'friend-requests', 'un clic mène au plus urgent');
+  assert.equal(digest?.act?.type, 'activity', 'un clic ouvre Activité récente, qui dit chacune en entier');
   assert.equal(c.pending().length, 0);
 });
 

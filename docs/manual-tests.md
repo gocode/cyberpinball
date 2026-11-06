@@ -1494,6 +1494,19 @@ Two friend cabinets online, one with its library shared and at least one table t
 | 784 | Choose a friend | System menu > "Tables" > "Ajouter une table" (Add a table) > "Depuis un ami…" (From a friend…). | The friend at the top, "<n> à prendre" (<n> to take), "… tables, dont <n> absentes de votre borne" (… tables, <n> of them missing from your cabinet); an offline friend is greyed out with "Hors ligne : sa bibliothèque se voit quand sa borne est allumée" (Offline: their library shows when their cabinet is on). |
 | 785 | Get a table | Start on the friend, then on the first table, "Récupérer toute la table" (Get the whole table). | Their library opens on "Absentes de votre borne" (Missing from your cabinet), the cursor on the first one; the reception then the add plan, as from their friend page. "Retour" (Back) returns to the list of friends, then to "Ajouter une table". |
 
+## Recent activity
+
+Two friend cabinets online; one plays a table while the other sends it news (sign-in, invitation, record).
+
+| # | Scenario | How | Expected result |
+|---|---|---|---|
+| 792 | Missed news | On cabinet A, "Masquer les notifications pendant les parties" (Hide notifications during games) on, start a table. During the game, from cabinet B: go offline then back online, invite A, wait for the invitation to end (two minutes). Leave the game. | On return, the gear has its red dot; System menu: "Activité récente" (Recent activity) at the top, with its dot and "<n> non lues · …" (<n> unread · …). The screen groups by day, the most recent at the top; B's invitation is greyed, "✕ Invitation expirée" (Invitation expired); B's sign-in says "Start : voir sa fiche" (see their page) and "En ligne" (Online). |
+| 793 | Full text and grouping | Give cabinet B a long name (more than 16 characters); take it offline and back online three times more than a quarter of an hour apart. Open Recent activity. | A single line "<name> : 3 connexions" (<name>: 3 sign-ins), the full name, no "…", the three times below; the menu notification shortened the name. |
+| 794 | Start does the action | On an invitation line that still holds, Start; then "Retour" (Back). On a finished download line, Start. | The invitation screen opens, its "Retour" (Back) returns to Recent activity, the same line chosen; the download manager opens on that download. |
+| 795 | Unread until seen | Make a download block (full disk, or source cut off) at the tables menu: the "Téléchargement bloqué" (Download blocked) notification shows. Open Recent activity, go down to its line, leave. | After the notification, the red dot stays; the line has "Non lu" (Unread) and its dot until you leave the screen; back in the system menu, no more dot if every line was gone through. |
+| 796 | Kept from one start to the next | Quit Cyber Pinball and start it again; open Recent activity. Then "Effacer l'activité récente" (Clear recent activity). | The same lines, read or not as before. The question opens with Annuler (Cancel) chosen; "Effacer" (Delete) empties the list ("Aucune activité récente" (No recent activity)); friends, downloads and game history stay. |
+| 797 | Summary and guest mode | At the tables menu, let three kinds of news arrive at once (the system menu open meanwhile, then come back): click the "<n> nouveautés" (<n> new notifications) summary. Then turn guest mode on and click a summary again. | The click opens Recent activity, "Retour" (Back) returns to the tables menu. In guest mode, nothing opens: the padlock, as for the gear. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

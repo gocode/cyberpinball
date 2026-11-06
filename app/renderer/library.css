@@ -272,6 +272,17 @@ body.mouse .lib-back:hover {
   color: var(--ink-faint);
 }
 
+/* Ligne pas encore lue (Activité récente) : la pastille rouge des entrées du menu, juste après le texte. */
+.lib-row-line > .lib-attention {
+  flex: none;
+  align-self: center;
+  width: 1.11cqmin;
+  height: 1.11cqmin;
+  border-radius: 50%;
+  background: var(--danger);
+  box-shadow: 0 0 0 0.19cqmin var(--void);
+}
+
 /* Fiche : « Backglass … nom du fichier » sur une ligne, en compact pour tout voir. */
 .lib-sheet .lib-row {
   display: grid;

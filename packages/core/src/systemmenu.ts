@@ -27,6 +27,7 @@ export const SYSTEM_ITEM_IDS = [
   'badges',
   'sharing',
   'live-scores',
+  'activity',
   'quiet-in-game',
   'health',
   'cabinet',
@@ -74,18 +75,20 @@ export interface SystemGroup extends SystemEntry {
 export const SYSTEM_ROOT: readonly SystemGroupId[] = ['amis', 'tables', 'medias', 'borne', 'cyberpinball'];
 
 /**
- * Entrées montrées aussi à la racine, parmi les rubriques : Téléchargements, comme le gestionnaire
- * de téléchargements d'une console. Elles gardent leur place dans leur rubrique
- * (Tables > Téléchargements).
+ * Entrées montrées aussi à la racine, parmi les rubriques : Activité récente, les notifications de
+ * tout Cyber Pinball (amis, téléchargements, mises à jour), et Téléchargements, comme le
+ * gestionnaire de téléchargements d'une console. Elles gardent leur place dans leur rubrique
+ * (Amis > Activité récente, Tables > Téléchargements).
  */
-export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['downloads'];
+export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'downloads'];
 
 /**
- * La racine du menu système telle qu'elle s'affiche : Amis, Tables, Médias, Téléchargements, Borne,
+ * La racine du menu système telle qu'elle s'affiche : Activité récente en tête (06/11/2026, revue
+ * de Codex : elle couvre plusieurs rubriques), puis Amis, Tables, Médias, Téléchargements, Borne,
  * Cyber Pinball (ordre choisi le 29/10/2026). systemmenu.test.ts vérifie qu'elle reprend
  * SYSTEM_ROOT dans son ordre et chaque raccourci une fois.
  */
-export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['amis', 'tables', 'medias', 'downloads', 'borne', 'cyberpinball'];
+export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['activity', 'amis', 'tables', 'medias', 'downloads', 'borne', 'cyberpinball'];
 
 export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   tables: {
@@ -108,7 +111,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'friends',
     get label() { return t('Amis'); },
     get detail() { return t('Mes amis, mon avatar, historique des parties, trouver un joueur, demandes, badges, partage'); },
-    entries: ['friends', 'avatar', 'game-history', 'find-player', 'friend-requests', 'badges', 'sharing', 'live-scores', 'quiet-in-game'],
+    entries: ['friends', 'avatar', 'game-history', 'find-player', 'friend-requests', 'badges', 'sharing', 'live-scores', 'activity', 'quiet-in-game'],
   },
   borne: {
     id: 'borne',
@@ -150,7 +153,10 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   badges: { icon: 'medal', get label() { return t('Mes badges'); } },
   sharing: { icon: 'network', get label() { return t('Partage et réseau'); } },
   'live-scores': { icon: 'dmd', get label() { return t('Scores des amis pendant la partie'); } },
-  'quiet-in-game': { icon: 'bell', get label() { return t('Masquer les notifications pendant les parties'); } },
+  // Activité récente (activity.ts) : les notifications des derniers jours, en entier.
+  activity: { icon: 'bell', get label() { return t('Activité récente'); } },
+  // La lune du « ne pas déranger » : la cloche est à Activité récente, dans la même rubrique.
+  'quiet-in-game': { icon: 'moon', get label() { return t('Masquer les notifications pendant les parties'); } },
   health: { icon: 'health', get label() { return t('Santé de la borne'); } },
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
   'vpx-settings': { icon: 'sliders', get label() { return t('Réglages de VPX'); } },

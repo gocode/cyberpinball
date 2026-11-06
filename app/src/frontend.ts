@@ -106,6 +106,7 @@ import {
   type MenuMediaSettings,
   type NoticeView,
   type NoticeZone,
+  type SystemItemId,
   noticeZone,
   type ZoneScreen,
   type MenuMoment,
@@ -238,6 +239,7 @@ import { createLiveScoresMenu } from './live-scores-menu';
 import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
 import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
+import { createActivityMenu } from './activity-menu';
 import { seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
 import { TableTints } from './table-tint';
@@ -813,6 +815,11 @@ const updates = createUpdatesMenu({
   library,
   broadcast: () => broadcast(),
   downloads: library.downloads.manager,
+  // Activité récente : une version plus récente, une fois par version ; au démarrage, la mise à jour faite ou manquée.
+  available: (version, current) => {
+    if (!activityMenu.entries().some((e) => e.kind === 'update-available' && e.key === version)) activityMenu.note({ kind: 'update-available', facts: { key: version, version, previous: current } });
+  },
+  outcome: (o) => activityMenu.note({ kind: o.installed ? 'update-installed' : 'update-failed', facts: { key: o.to, version: o.to, previous: o.previous } }),
   // Borne dédiée : Shell Launcher ne relance rien, l'installeur relance lui-même Cyber Pinball.
   quit: () => {
     handOverOnQuit();
@@ -851,7 +858,7 @@ const backups = createBackupsMenu({
 library.provideSystemItem('backups', backups.systemItem);
 {
   const restored = backups.restoredNotice();
-  if (restored) setTimeout(() => showBanner(restored), 4000).unref();
+  if (restored) setTimeout(() => showBanner(restored, 'backups'), 4000).unref();
   // Fichiers encore ouverts par l'ancien processus au démarrage (une vidéo en lecture) : reposés une fois qu'il est fermé.
   for (const delay of [20_000, 60_000]) setTimeout(() => backups.retryPendingRestore(), delay).unref();
   // Sauvegarde automatique : regardée chaque minute, faite quand la borne est libre.
@@ -988,6 +995,48 @@ library.downloads.friends({
  * désactivé par défaut ; activé, rien ne s'affiche ni ne sonne pendant une partie.
  */
 let quietInGame = readQuietInGame(loc.dataDir);
+/**
+ * Activité récente (Menu système > Activité récente, activity-menu.ts) : chaque notification en
+ * entier, affichée ou retenue, gardée d'un démarrage à l'autre ; ce que Start y fait passe par les
+ * écrans des amis, de la partie entre amis, des téléchargements et du menu système.
+ */
+const activityMenu = createActivityMenu({
+  dataDir: loc.dataDir,
+  library: {
+    openCustom: (build, at) => library.openCustom(build, at),
+    openSystem: () => library.openSystem(),
+    cursor: () => library.cursor(),
+    isShowing: (build) => library.isShowing(build),
+    runSystemItem: (id, back) => library.runSystemItem(id, back),
+    hasSystemItem: (id) => library.hasSystemItem(id),
+    openDownloads: (focus) => library.downloads.open(focus),
+  },
+  hasDownload: (id) => library.downloads.manager.jobs().some((j) => j.id === id),
+  friends: {
+    isFriend: (key) => socialNet.state().friends.some((f) => f.key === key),
+    online: (key) => socialNet.online(key),
+    playing: (key) => socialNet.presenceOf(key)?.status === 'playing',
+    incoming: (key) => socialNet.state().incoming.some((r) => r.key === key),
+    openFriend: (key, back) => friendsMenu.openFriend(key, back),
+    openRequests: (back) => friendsMenu.openRequests(back),
+    avatar: (key, name) => avatarView(key, name, socialNet.avatarFile(key)),
+  },
+  live: {
+    hasInvite: (id) => liveGames.invites().some((i) => i.id === id),
+    inviteEnd: (id) => liveGames.inviteEnd(id),
+    openInvite: (id, back) => friendsMenu.live.openInvite(id, back),
+    current: () => liveGames.current(),
+    open: (back) => friendsMenu.live.open(back),
+    inHistory: (id) => friendsMenu.history.has(id),
+    openHistory: (id, back) => friendsMenu.history.openGame(id, back),
+  },
+  // La pastille de la roue dentée et de l'entrée suit le non lu.
+  changed: () => {
+    if (!closing && state.phase !== 'playing' && state.phase !== 'loading') broadcast();
+  },
+  log: (line) => console.log(line),
+});
+library.provideSystemItem('activity', activityMenu.item);
 const menuNotices = createMenuNotices({
   social: socialNet,
   jobs: () => library.downloads.manager.jobs(),
@@ -1010,6 +1059,7 @@ const menuNotices = createMenuNotices({
     band: () => state.phase === 'playing' && !!playing && liveBoardUp(),
   },
   sound: (id) => playUiSound(id),
+  activity: { record: (events, quiet) => activityMenu.record(events, quiet), shown: (events) => activityMenu.shown(events) },
   log: (line) => console.log(line),
 });
 /**
@@ -1427,6 +1477,10 @@ export function startFrontend(): void {
     else if (action.type === 'live-game') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) friendsMenu.live.open(() => library.leave());
     }
+    // Résumé « 4 nouveautés » : Activité récente, qui dit chacune en entier ; Retour ramène où l'on était.
+    else if (action.type === 'activity') {
+      if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) activityMenu.open(state.phase === 'menu' ? () => library.leave() : undefined);
+    }
     else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
       if (action.offset === 0) guest.knock('menu.sheet') && library.openSheet(tables[state.index]!);
       else if (guest.knock('menu.choose')) moveSelection(action.offset);
@@ -1515,10 +1569,10 @@ export function startFrontend(): void {
   // Bande DMD seule sur un écran large, jamais tranchée : l'utilisateur dit une fois ce qu'est l'écran.
   // Orientation des écrans : ce que le démarrage (ou la dernière fermeture) n'a pas pu rendre.
   const orientationProblems = takeOrientationProblems();
-  if (orientationProblems.length) showBanner(orientationProblems.join(' '));
+  if (orientationProblems.length) showBanner(orientationProblems.join(' '), 'cabinet');
   const legacy = choose ? undefined : legacyDesktopTurned();
-  if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(t('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Borne > Configuration de la borne > Écran du DMD.'));
-  if (selection?.previous && selection.configuration) showBanner(t('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }));
+  if (cabinet && !choose && dmdKindQuestion(cabinet)) showBanner(t('Écran du DMD à vérifier : FullDMD ou DMD seul ? Menu système > Borne > Configuration de la borne > Écran du DMD.'), 'cabinet');
+  if (selection?.previous && selection.configuration) showBanner(t('Configuration « {name} » reconnue (avant : « {previous} »).', { name: selection.configuration.name, previous: selection.previous.name }), 'cabinet');
   // Après une mise à jour : la nouvelle version est-elle là ?
   const updateNotice = updates.startupNotice();
   updates.startBackgroundChecks();
@@ -2859,11 +2913,16 @@ async function checkFirewallAtStart(): Promise<void> {
   const report = await guardFirewall(socialFirewall, { ...(update ? { update } : {}), log: (line) => console.log(line) });
   if (socialFirewall.simulated || !report.problems.length) return;
   if (update && state.phase === 'menu' && !guest.active && !closing) friendsMenu.openFirewall(() => library.leave());
-  else showBanner(t('Pare-feu de Windows : {reason}. Menu système > Amis > Partage et réseau.', { reason: report.problems[0]!.reason }));
+  else showBanner(t('Pare-feu de Windows : {reason}. Menu système > Amis > Partage et réseau.', { reason: report.problems[0]!.reason }), 'sharing');
 }
 
-/** Constat bref en haut du menu, qui s'efface seul : il ne demande aucun bouton. */
-function showBanner(text: string): void {
+/**
+ * Constat bref en haut du menu, qui s'efface seul : il ne demande aucun bouton. `note` : il entre
+ * aussi à Activité récente, Start y ouvrant l'entrée du menu système qu'il nomme (un constat du
+ * démarrage) ; la réponse immédiate à un geste (orientation rendue, veille simulée) n'y entre pas.
+ */
+function showBanner(text: string, note?: SystemItemId): void {
+  if (note) activityMenu.note({ kind: 'note', facts: { key: text, text, item: note } });
   // Pendant l'ouverture, il attend la roue : rien ne se pose sur les animations.
   if (state.phase === 'intro') return void pendingBanners.push(text);
   state = { ...state, banner: text };

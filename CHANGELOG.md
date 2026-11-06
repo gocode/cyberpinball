@@ -16,6 +16,7 @@ son interface).
 - Ouverture au démarrage : une fois l'animation finie, le plateau ne se fige plus. Les fils de lumière continuent de tourner lentement et la poussière lumineuse dérive sur plusieurs profondeurs, sans à-coup, tant que personne n'appuie sur un bouton. Les autres écrans, et votre image ou votre vidéo d'ouverture, restent tels quels.
 - Chaque table a sa couleur au menu : la lumière de la roue, le halo des cadres et le fond des écrans sans média prennent la teinte de son fronton (ou de son logo, de son plateau), en fondu quand la table choisie s'arrête, jamais pendant le défilement. La table choisie reste en vert. Un fronton en noir et blanc garde la sarcelle de Cyber Pinball. Pour revenir à la sarcelle partout : Menu système > Médias > « Médias, son et attente » > « Couleur de chaque table au menu ».
 - Le DMD du menu peut prendre la couleur de chaque table : « Couleur du DMD » > « Couleur de la table ». Le vert signal reste la couleur par défaut.
+- Activité récente, en tête du menu système : chaque notification en entier, par jour, pour relire celles qu'on a manquées (pendant une partie, dans un résumé « 4 nouveautés », trop vite passées). Start fait ce qu'elle annonce : la fiche de l'ami, l'invitation tant qu'elle vaut, les résultats, les téléchargements, la mise à jour ; ce qui ne vaut plus reste, grisé avec sa raison. Ce qui se répète tient sur une ligne (« Chloé : 3 connexions ») ; une pastille rouge tant qu'il reste du non lu ; les 50 dernières gardées d'un démarrage à l'autre.
 
 ## 0.1.7
 

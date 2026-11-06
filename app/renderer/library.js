@@ -94,6 +94,8 @@ function renderLibrary(v) {
         // Pastille d'un joueur (son avatar, sinon ses initiales) : à gauche de tout le bloc, à la place de l'icône.
         if (row.icon && !row.avatar) line.append(cyberIcon(row.icon, 'lib-row-icon'));
         line.append(libEl('span', 'lib-row-text', row.text));
+        // Pas encore lue (Activité récente) : la pastille rouge des entrées du menu, et son mot dans les badges.
+        if (row.unread) line.append(libEl('span', 'lib-attention'));
         // Les joueurs d'une partie, en petites pastilles qui se chevauchent un peu.
         if (row.avatars?.length) {
           const stack = libEl('span', 'lib-avatars');

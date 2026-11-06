@@ -96,6 +96,12 @@ export interface FriendsMenu {
   openFirewall(back?: () => void): void;
   /** « Ajouter une table > Depuis un ami… » : les amis, puis la bibliothèque de celui qu'on choisit, ses tables absentes d'abord. */
   addFromFriend: { detail(): string; open(back: () => void): void };
+  /** La fiche d'un ami, son « Retour » vers `back` (Activité récente) ; sans lui, Mes amis. */
+  openFriend(key: string, back?: () => void): void;
+  /** Les demandes d'amis, leur « Retour » vers `back` ; sans lui, le menu système. */
+  openRequests(back?: () => void): void;
+  /** Historique des parties : le détail d'une partie, s'il la garde (son « Retour » vers `back`). */
+  history: { has(id: string): boolean; openGame(id: string, back: () => void): void };
   items: {
     friends: ProvidedSystemItem;
     'game-history': ProvidedSystemItem;
@@ -204,8 +210,14 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   // ---------- Mes amis ----------
 
   function openFriends(at?: number): void {
+    friendBack = undefined;
     host.library.openCustom(buildFriends, at);
   }
+
+  /** Retour de la fiche d'un ami ouverte d'ailleurs (Activité récente) ; sans lui, Mes amis. */
+  let friendBack: (() => void) | undefined;
+  /** Retour des demandes d'amis ouvertes d'ailleurs ; sans lui, le menu système. */
+  let requestsBack: (() => void) | undefined;
 
   function buildFriends(): Built {
     const s = net.state();
@@ -304,13 +316,14 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
 
   // ---------- Fiche d'un ami ----------
 
-  function openFriend(key: string): void {
+  function openFriend(key: string, back?: () => void): void {
+    if (back) friendBack = back;
     host.library.openCustom(() => buildFriend(key), Number.MAX_SAFE_INTEGER);
   }
 
   function buildFriend(key: string): Built {
     const f = net.state().friends.find((x) => x.key === key);
-    const up = () => openFriends();
+    const up = friendBack ?? (() => openFriends());
     if (!f) return { heading: t('Mes amis'), icon: 'friend-list', sections: [{ rows: [{ text: t('N’est plus dans vos amis'), tone: 'info' }] }], actions: [backAction(up)], back: up };
     const online = net.online(key);
     const p = net.presenceOf(key);
@@ -488,7 +501,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
 
   // ---------- Demandes d'amis ----------
 
-  function openRequests(): void {
+  function openRequests(back?: () => void): void {
+    requestsBack = back;
     host.library.openCustom(buildRequests);
   }
 
@@ -496,7 +510,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const s = net.state();
     const actions: Action[] = [];
     const row = (r: FriendRequest, incoming: boolean): Row => {
-      const index = actions.push({ label: name(r.key, r.name), key: `request:${r.key}`, icon: incoming ? 'friend-request' : 'friend-add', run: () => openPlayer(r.key, openRequests) }) - 1;
+      const index = actions.push({ label: name(r.key, r.name), key: `request:${r.key}`, icon: incoming ? 'friend-request' : 'friend-add', run: () => openPlayer(r.key, () => openRequests(requestsBack)) }) - 1;
       return {
         text: name(r.key, r.name),
         avatar: avatar(r.key, r.name),
@@ -516,8 +530,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const sections: Section[] = [...takeFlash(), ...(offRows().length ? [{ rows: offRows() }] : [])];
     sections.push({ title: t('Reçues'), rows: s.incoming.length ? s.incoming.map((r) => row(r, true)) : [{ text: t('Aucune demande reçue'), tone: 'quiet' }] });
     if (s.outgoing.length) sections.push({ title: t('Envoyées'), rows: s.outgoing.map((r) => row(r, false)) });
-    actions.push({ label: t('Trouver un joueur'), icon: 'search', run: () => openFind() }, backAction());
-    return { heading: t('Demandes d’amis'), icon: 'friend-request', sections, actions, back };
+    const up = requestsBack ?? back;
+    actions.push({ label: t('Trouver un joueur'), icon: 'search', run: () => openFind() }, backAction(up));
+    return { heading: t('Demandes d’amis'), icon: 'friend-request', sections, actions, back: up };
   }
 
   // ---------- Mes badges ----------
@@ -757,6 +772,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     live,
     openFirewall,
     addFromFriend: { detail: addFromFriendDetail, open: (back) => openAddFromFriend(back) },
+    openFriend,
+    openRequests,
+    history: { has: (id) => host.games.history().some((g) => g.id === id), openGame: (id, back) => historyMenu.openGame(id, back) },
     items: {
       friends: {
         get detail() {

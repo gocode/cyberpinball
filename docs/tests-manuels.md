@@ -1494,6 +1494,19 @@ Deux bornes amies en ligne, la bibliothèque de l'une partagée, avec au moins u
 | 784 | Choisir un ami | Menu système > « Tables » > « Ajouter une table » > « Depuis un ami… ». | L'ami en tête, « <n> à prendre », « … tables, dont <n> absentes de votre borne » ; un ami hors ligne est grisé avec « Hors ligne : sa bibliothèque se voit quand sa borne est allumée ». |
 | 785 | Récupérer une table | Start sur l'ami, puis sur la première table, « Récupérer toute la table ». | Sa bibliothèque s'ouvre sur « Absentes de votre borne », le curseur sur la première ; la réception puis le plan d'ajout, comme depuis sa fiche d'ami. « Retour » ramène à la liste des amis, puis à « Ajouter une table ». |
 
+## Activité récente
+
+Deux bornes amies en ligne ; l'une joue une table pendant que l'autre lui envoie des nouvelles (connexion, invitation, record).
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 792 | Les nouvelles manquées | Sur la borne A, « Masquer les notifications pendant les parties » activé, lancer une table. Pendant la partie, depuis la borne B : se déconnecter puis se reconnecter, inviter A, attendre la fin de l'invitation (deux minutes). Quitter la partie. | Au retour, la roue dentée a sa pastille rouge ; Menu système : « Activité récente » en tête, avec sa pastille et « <n> non lues · … ». L'écran groupe par jour, la plus récente en haut ; l'invitation de B est grisée, « ✕ Invitation expirée » ; la connexion de B dit « Start : voir sa fiche » et « En ligne ». |
+| 793 | Texte entier et regroupement | Donner à la borne B un nom long (plus de 16 caractères) ; la déconnecter et la reconnecter trois fois à plus d'un quart d'heure d'écart. Ouvrir Activité récente. | Une seule ligne « <nom> : 3 connexions », le nom entier, sans « … », les trois heures dessous ; la notification du menu, elle, raccourcissait le nom. |
+| 794 | Start fait l'action | Sur une ligne d'invitation encore valable, Start ; puis « Retour ». Sur une ligne de téléchargement fini, Start. | L'écran de l'invitation s'ouvre, son « Retour » ramène à Activité récente, la même ligne choisie ; le gestionnaire de téléchargements s'ouvre sur ce téléchargement. |
+| 795 | Non lu jusqu'à ce qu'on le voie | Faire bloquer un téléchargement (disque plein, ou source coupée) au menu des tables : la notification « Téléchargement bloqué » se montre. Ouvrir Activité récente, descendre jusqu'à sa ligne, sortir. | Après la notification, la pastille rouge reste ; la ligne a « Non lu » et sa pastille jusqu'à la sortie de l'écran ; au retour dans le menu système, plus de pastille si toutes les lignes ont été parcourues. |
+| 796 | Gardé d'un démarrage à l'autre | Quitter Cyber Pinball et le relancer ; ouvrir Activité récente. Puis « Effacer l'activité récente ». | Les mêmes lignes, lues ou non comme avant. La question s'ouvre avec Annuler choisi ; « Effacer » vide la liste (« Aucune activité récente ») ; amis, téléchargements et historique des parties restent. |
+| 797 | Résumé et mode invité | Au menu des tables, laisser arriver trois genres de nouvelles à la fois (le menu système ouvert pendant ce temps, puis revenir) : cliquer le résumé « <n> nouveautés ». Puis activer le mode invité et recliquer un résumé. | Le clic ouvre Activité récente, « Retour » ramène au menu des tables. En mode invité, rien ne s'ouvre : le cadenas, comme pour la roue dentée. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

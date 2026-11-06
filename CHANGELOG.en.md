@@ -14,6 +14,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Startup intro: once the animation is over, the playfield no longer freezes. The threads of light keep turning slowly and the glowing dust drifts on several depths, smoothly, until someone presses a button. The other screens, and your own intro image or video, stay as they are.
 - Each table has its colour in the menu: the wheel's light, the frames' glow and the background of screens without media take the hue of its backglass (or of its logo, its playfield), with a fade once the chosen table stops, never while scrolling. The chosen table stays green. A black-and-white backglass keeps Cyber Pinball's teal. To keep the teal everywhere: System menu > Media > "Médias, son et attente" > "Couleur de chaque table au menu" (Colour of each table in the menu).
 - The menu DMD can take each table's colour: "Couleur du DMD" (DMD colour) > "Couleur de la table" (Table colour). Signal green stays the default colour.
+- Recent activity, at the top of the system menu: every notification in full, by day, to read back the ones you missed (during a game, in a "4 new notifications" summary, gone too fast). Start does what it announces: the friend's page, the invitation while it holds, the results, the downloads, the update; what no longer holds stays, greyed with its reason. Repeats fit on one line ("Chloé: 3 sign-ins"); a red dot while anything is unread; the last 50 kept from one start to the next.
 
 ## 0.1.7
 

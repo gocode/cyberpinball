@@ -365,6 +365,8 @@ export type UiAction =
   | { type: 'friend-requests' }
   /** Notification de la partie entre amis (un invité accepte, la partie est finie) : l'écran de la partie. */
   | { type: 'live-game' }
+  /** Résumé « 4 nouveautés » : Activité récente, qui dit chacune en entier. */
+  | { type: 'activity' }
   /** Repère de la liste de contenu (« Sortir de la liste », « Revenir à la liste ») : comme MagnaSave. */
   | { type: 'zone' }
   /** Mesure du texte de l'écran par le rendu (zone de lecture, reading.ts) : `key` désigne l'écran mesuré. */
@@ -397,6 +399,8 @@ export interface Row {
   avatar?: AvatarView;
   /** Pastilles des joueurs d'une partie, en ligne après le texte (historique des parties). */
   avatars?: AvatarView[];
+  /** Pas encore lue (Activité récente) : la pastille rouge des entrées du menu, après le texte. */
+  unread?: boolean;
 }
 export interface Section {
   title?: string;
@@ -3845,6 +3849,12 @@ export function createLibrary(host: LibraryHost) {
     openSystem,
     openSystemRoot,
     openCustom,
+    /** Position du curseur de l'écran ouvert (Activité récente : la ligne qu'on regarde est vue). */
+    cursor: () => cursor,
+    /** Une entrée du menu système ouverte depuis un autre écran : son « Retour » ramène à `back`. */
+    runSystemItem: (id: SystemItemId, back: () => void) => runSystemItem(id, back),
+    /** L'application fournit-elle cette entrée (une borne dédiée n'a pas « Bureau Windows ») ? */
+    hasSystemItem: (id: SystemItemId) => systemItems.has(id),
     openPrompt,
     /** Sélecteur de fichiers de Cyber Pinball ; undefined à l'abandon, l'écran d'où l'on vient revient tel quel. */
     pick: pickPaths,

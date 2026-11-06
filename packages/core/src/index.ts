@@ -135,6 +135,7 @@ export * from './livegame';
 export * from './livechoice';
 export * from './livestart';
 export * from './notices';
+export * from './activity';
 export * from './livenotices';
 export * from './noticezone';
 export * from './gamerecording';

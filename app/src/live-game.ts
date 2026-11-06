@@ -775,7 +775,7 @@ export function createLiveGames(opts: LiveGamesOptions): LiveGames {
     invites: () => invites.filter((i) => !inviteExpired(i, now())),
     inviteEnd: (id) => {
       const e = ended.get(id);
-      return e ? { why: e.why, name: e.name, title: e.title, ...(e.next ? { next: e.next } : {}) } : undefined;
+      return e ? { why: e.why, name: e.name, title: e.title, host: e.host, ...(e.next ? { next: e.next } : {}) } : undefined;
     },
     async create(table) {
       if (game && ongoing() && !isHost()) net.send(game.host, { t: 'game-cancel', game: game.id });

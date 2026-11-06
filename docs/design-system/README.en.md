@@ -62,6 +62,8 @@ A list on its own (system menu, sections) starts just below the header, with the
 
 On the tables menu, what arrives unasked (a friend coming online, a finished download) goes through a single notification at a time (`Notification`), left of the gear, next to the friends online pill: 64 px high, edge and icon in the tone's colour (meta blue for information, green for success), a 24 px title and a 20 px detail, each on one line; never over the media or the wheel.
 
+What notifications announced can be read back in full in “Recent activity” (system menu, `ListeContenu` content list): one line per notification, grouped by day, its notification’s icon or the player’s badge, the time as a badge. Unread carries the red dot of menu entries right after the title, and its word, “Unread”, as a badge; never colour alone. What Start does is said below in the neutral tone of captions (“↩ Start: see their page”): green stays with the current choice. An action that no longer holds keeps its line, greyed, with its reason instead (“✕ Invitation expired”), more legible than the greyed title. A blocked state takes the red cross and its word.
+
 A content list (games, media, files) next to the screen actions is a zone of its own (`ListeContenu`): a frame, a header bar that does not scroll with the position of the choice and the marker "Exit · Sortir de la liste" (Leave the list) ("MagnaSave · Revenir à la liste" (Back to the list) outside it). The frame of the zone holding the choice lights up in teal, the other zone goes to 0.8 opacity; green stays on the chosen item. Exit in the list brings back to the actions, MagnaSave switches.
 
 ## States and interaction to build into the prototype

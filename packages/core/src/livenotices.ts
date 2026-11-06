@@ -90,7 +90,7 @@ export function inviteNotices(prev: ReadonlySet<string> | undefined, invites: re
     .filter((tag) => !invites.some((i) => inviteTag(i) === tag))
     .flatMap((tag) => {
       const end = ended(tagId(tag));
-      return end && end.why !== 'answered' && end.why !== 'replaced' ? [{ kind: 'live-invite-ended' as const, key: tag, at: now, who: end.name, subject: end.title, end: end.why }] : [];
+      return end && end.why !== 'answered' && end.why !== 'replaced' ? [{ kind: 'live-invite-ended' as const, key: tag, at: now, who: end.name, ...(end.host ? { player: end.host } : {}), subject: end.title, end: end.why }] : [];
     });
   return [...arrived, ...gone];
 }
@@ -105,6 +105,8 @@ export interface LiveInviteEndInfo {
   why: LiveInviteEnd | 'answered';
   name: string;
   title: string;
+  /** Clé de celui qui invitait : sa fiche, depuis Activité récente. */
+  host?: string;
 }
 
 /** Le gagnant (au classement, avec un score), ou que je gagne ; sinon ma place parmi les classés. */

@@ -67,6 +67,10 @@ export interface UpdatesHost {
   background: boolean;
   /** Gestionnaire de téléchargements : le téléchargement de la mise à jour y est suivi. */
   downloads?: DownloadManager;
+  /** Une recherche en arrière-plan trouve une version plus récente : Activité récente la consigne (une fois par version). */
+  available?(version: string, current: string): void;
+  /** Au démarrage, la mise à jour lancée avant la fermeture : faite (`installed`), ou restée sans effet. */
+  outcome?(o: { installed: boolean; to: string; previous: string }): void;
 }
 
 type State =
@@ -181,6 +185,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
       if (!quietAllowed()) return true;
       state = result.status === 'available' ? { kind: 'available', latest: result.latest } : { kind: 'up-to-date', latest: result.latest };
       checkedAt = Date.now();
+      if (state.kind === 'available') host.available?.(state.latest.version, host.version);
       console.log(`Mise à jour (arrière-plan) : ${describe()}`);
       host.broadcast();
       return true;
@@ -506,6 +511,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
     const outcome = takeUpdateOutcome(host.loc.dataDir, host.version);
     if (!outcome) return undefined;
     if (outcome.kind === 'installed') installed = { from: outcome.from, to: outcome.to };
+    host.outcome?.(outcome.kind === 'installed' ? { installed: true, to: outcome.to, previous: outcome.from } : { installed: false, to: outcome.to, previous: outcome.current });
     const text =
       outcome.kind === 'installed'
         ? t('Cyber Pinball {to} est installé (avant : {from}).', { to: outcome.to, from: outcome.from })

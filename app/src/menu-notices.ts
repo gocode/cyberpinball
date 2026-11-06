@@ -9,6 +9,10 @@
 // s'y prête et redessine le menu quand ce qu'elle montre change (une entrée, un départ, une fin),
 // jamais plus.
 //
+// Chaque évènement entre aussi, dès son arrivée, au journal d'Activité récente (activity.ts,
+// `activity`), qu'il se montre ou non ; la notification qui le dit en entier le donne pour lu,
+// pas celle qui le résume (« 4 nouveautés »).
+//
 // Où et quoi : la zone des notifications de l'écran du moment (noticezone.ts, `zone`), la même
 // règle pour tous les écrans : sur tout écran de Cyber Pinball, le compteur et toutes les
 // notifications ; pendant une partie, ce qui se montre partout (NoticeRule.away : la partie entre
@@ -91,6 +95,12 @@ export interface MenuNoticesHost {
    * de la partie que l'écran ouvert montre déjà (le salon, l'invitation), qui sonne quand même.
    */
   sound?(id: UiSoundId, view?: NoticeView): void;
+  /**
+   * Activité récente (activity-menu.ts) : chaque évènement à son arrivée, affiché ou retenu, même
+   * notifications coupées (`quiet` : celles-ci ne demandent pas à être revues) ; puis ceux qu'une
+   * notification vient de dire en entier.
+   */
+  activity?: { record(events: readonly NoticeEvent[], quiet: boolean): void; shown(events: readonly NoticeEvent[]): void };
   now?: () => number;
   log?: (line: string) => void;
 }
@@ -165,7 +175,10 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     if (!all) center.clear((e) => isLiveNotice(e.kind));
     const zone = host.zone();
     // Rien maintenant : la file garde tout pour l'écran suivant. En partie, ou notifications coupées : ce qui se montre partout.
-    return center.tick(now(), { canShow: zone.notices !== 'wait', away: zone.notices === 'away' || !all, still });
+    const r = center.tick(now(), { canShow: zone.notices !== 'wait', away: zone.notices === 'away' || !all, still });
+    // Dite en entier : vue. Un résumé ne dit rien de chacune : Activité récente les garde à revoir.
+    if (r.entered && !r.entered.digest) host.activity?.shown(r.entered.events);
+    return r;
   }
 
   /** Redessine si ce que la file montre a changé (le rendu reprogramme la suite), sinon repasse à l'heure qu'elle demande. */
@@ -197,11 +210,13 @@ export function createMenuNotices(host: MenuNoticesHost): MenuNotices {
     const received = born ? (host.live?.invites?.() ?? []) : [];
     born = true;
     const nextLive = liveSnapshot(game, me);
-    const events = [...inviteNotices(invites, received, t, (id) => host.live?.inviteEnd?.(id)), ...liveNotices(live, nextLive, game, me, t), ...socialNotices(social, nextSocial, s, t, host.badgeLabel), ...downloadNotices(downloads, jobs, t, host.reason)]
+    const news = [...inviteNotices(invites, received, t, (id) => host.live?.inviteEnd?.(id)), ...liveNotices(live, nextLive, game, me, t), ...socialNotices(social, nextSocial, s, t, host.badgeLabel), ...downloadNotices(downloads, jobs, t, host.reason)]
       // Au démarrage, et tant que la borne cherche ses amis, c'est elle qui arrive : pas une nouvelle.
-      .filter((e) => (t >= quietUntil && host.social.listSync?.() !== 'searching') || e.kind !== 'friend-online')
-      // Notifications coupées : seule la partie entre amis reste.
-      .filter((e) => host.mode() === 'all' || isLiveNotice(e.kind));
+      .filter((e) => (t >= quietUntil && host.social.listSync?.() !== 'searching') || e.kind !== 'friend-online');
+    // Au journal, toutes : affichées, retenues pour la fin de la partie, ou notifications coupées.
+    if (news.length) host.activity?.record(news, host.mode() !== 'all');
+    // Notifications coupées : seule la partie entre amis reste.
+    const events = news.filter((e) => host.mode() === 'all' || isLiveNotice(e.kind));
     social = nextSocial;
     downloads = downloadSnapshot(jobs);
     live = nextLive;
