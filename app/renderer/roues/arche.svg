@@ -34,6 +34,13 @@
 <path d="M -20,300 Q 540,-40 1100,300 L 1100,420 Q 540,80 -20,420 Z" fill="url(#trame)"/>
 <path d="M -20,318 Q 540,-14 1100,318 L 1100,330 Q 540,0 -20,330 Z" fill="#bff7ea" opacity=".06"/>
 <ellipse cx="540" cy="190" rx="240" ry="140" fill="url(#lueur)"/>
+<!-- Encart de la collection (06/11/2026) : la collection affichée et la place de la table (frontend.css, .menu-shelf), accroché sous la pièce de la roue, qui passe devant son bord haut ; dans le fond. -->
+<clipPath id="sousArche"><path d="M -20,420 Q 540,80 1100,420 L 1100,540 L -20,540 Z"/></clipPath>
+<g clip-path="url(#sousArche)">
+  <path d="M 344,296 L 736,296 L 750,310 L 750,322 L 736,336 L 344,336 L 330,322 L 330,310 Z" fill="#000" opacity=".5" filter="url(#ombre)"/>
+  <path d="M 344,296 L 736,296 L 750,310 L 750,322 L 736,336 L 344,336 L 330,322 L 330,310 Z" fill="#07110f"/>
+  <path d="M 344,296 L 736,296 L 750,310 L 750,322 L 736,336 L 344,336 L 330,322 L 330,310 Z" fill="none" stroke="#3ad0b8" stroke-width="1" opacity=".35"/>
+</g>
 <path d="M -20,300 Q 540,-40 1100,300" fill="none" stroke="url(#chrome)" stroke-width="12"/>
 <path d="M -20,420 Q 540,80 1100,420" fill="none" stroke="url(#chrome)" stroke-width="10"/>
 </svg>

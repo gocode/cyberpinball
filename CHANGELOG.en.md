@@ -22,6 +22,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Favourites: "Ajouter aux favoris" (Add to favourites) on a table's page, a white star before its title. The favourite of a table taken over from another installation is kept.
 - Guest mode: "Tables proposées" (Tables offered) restricts it to a collection (favourites, a manufacturer…); on unlocking, the previous collection comes back. Attract mode only shows the tables of the collection shown.
 - Collections: the collection shown and the table's place ("☆ FAVOURITES │ 1 / 4") sit on a single line, in an inset on top of the title cartouche, in place of the pill and the counter.
+- Collections: on the Arche, Bandeau and Minimaliste wheels too, the collection and the table's place have their inset, drawn in the wheel's design (under the Arche, between the medallions and the title).
 
 - Friends: a local network failure ("addMembership EHOSTUNREACH", a cabinet started before its network, a VPN, an unplugged cable) no longer blocks the friends network. The Internet carries on, "Sharing and network" shows "Local network: unavailable" with its reason, and the local network comes back by itself as soon as a network adapter is ready. A failed start is also retried by itself, without restarting Cyber Pinball.
 - Start on the wheel, in Media, sound and attract: "open the game page" (as before) or "play right away". With "play right away", the game page opens on a held Start (or F6 on a keyboard); the help line and the controls reminder say so.

@@ -372,7 +372,7 @@ html.menu-desktop .menu-count {
  * Codex ; il remplace la pastille sur l'illustration et le compteur isolé). Roue Médaillons :
  * dans l'encart dessiné sur le dessus de la plaque du titre (roues/medaillons.svg, couche du
  * fond : l'arc inférieur de la roue passe devant son bord haut), sans fond à lui. Autres roues :
- * la même ligne sur un fond sombre, au-dessus du titre. Liste : en tête des lignes. Rien n'y
+ * l'encart que leur décor dessine sous leur pièce (arche, lame, filet). Liste : en tête des lignes. Rien n'y
  * bouge d'une table à l'autre : seuls le chiffre et, d'une collection à l'autre, le nom changent.
  */
 .menu-shelf {
@@ -442,6 +442,11 @@ body.mouse .menu-shelf:not(.locked) {
   display: none !important;
 }
 
+/* Ni la place qu'il gardait sous fabricant · année : au bureau étroit, le titre ne remonte plus jusqu'au repère. */
+.menu.menu-band.has-shelf {
+  --c-under: 0;
+}
+
 /* Bureau, liste : au-dessus des lignes, qui commencent un peu plus bas. */
 html.menu-desktop .menu.layout-list .menu-shelf {
   left: calc(790 * var(--u));
@@ -455,14 +460,32 @@ html.menu-desktop .menu.layout-list.has-shelf .menu-nav {
   height: calc(456 * var(--u));
 }
 
-/* Roues à bandeau sans encart dessiné : la ligne, sur son fond, au-dessus du titre. */
+/*
+ * Roues à bandeau : dans l'encart que chaque décor dessine sous sa pièce (roues/<roue>.svg, couche
+ * du fond : la lame ou le filet passe devant son bord haut ; sous l'Arche, une petite plaque
+ * entre les médaillons et le titre), sans fond à lui. Encart de 330 → 750, texte de 342 → 738.
+ */
 .menu.menu-band .menu-shelf {
   --s: var(--b);
   right: auto;
-  left: calc(var(--band-left) + 312 * var(--b));
-  bottom: calc(var(--band-bottom) + 200 * var(--b));
-  width: calc(456 * var(--b));
+  left: calc(var(--band-left) + 342 * var(--b));
+  width: calc(396 * var(--b));
+  background: none;
+}
+
+html[data-menu-band='arche'] .menu.menu-band .menu-shelf {
+  bottom: calc(var(--band-bottom) + 208 * var(--b));
+  height: calc(34 * var(--b));
+}
+
+html[data-menu-band='bandeau'] .menu.menu-band .menu-shelf {
+  bottom: calc(var(--band-bottom) + 224 * var(--b));
   height: calc(40 * var(--b));
+}
+
+html[data-menu-band='minimal'] .menu.menu-band .menu-shelf {
+  bottom: calc(var(--band-bottom) + 208 * var(--b));
+  height: calc(44 * var(--b));
 }
 
 /* Médaillons : dans l'encart du dessus de la plaque (312 → 768, du pied de l'arc au haut de la plaque). */
@@ -471,12 +494,6 @@ html[data-menu-band='medaillons'] .menu.menu-band .menu-shelf {
   bottom: calc(var(--band-bottom) + 190 * var(--b));
   width: calc(436 * var(--b));
   height: calc(46 * var(--b));
-  background: none;
-}
-
-/* Arche : la ligne au plus près du titre, sous les pieds de l'arche (revue de Codex). */
-html[data-menu-band='arche'] .menu.menu-band .menu-shelf {
-  bottom: calc(var(--band-bottom) + 194 * var(--b));
 }
 
 /* Étoile des favoris devant le titre : blanche, pleine ; sa place est gardée hors des favoris (le titre ne bouge pas). */
@@ -939,19 +956,11 @@ html.menu-desktop[data-menu-band] #root {
    * Repère des roues sans encart : la ligne, sur son fond, passe au-dessus du bandeau réduit, sur
    * la largeur de la colonne (cotes de Codex). Médaillons : il reste dans son encart, au corps plancher.
    */
-  /* Médaillons, bandeau réduit : dans l'encart, au corps de 22 (à 20, le texte paraissait fragile). */
-  html.menu-desktop[data-menu-band='medaillons'] .menu.menu-band .menu-shelf {
+  /* Bandeau réduit : le repère reste dans l'encart de sa roue, au corps de 22 (à 20, le texte paraissait fragile). */
+  html.menu-desktop[data-menu-band] .menu.menu-band .menu-shelf {
     font-size: max(calc(22 * var(--b)), calc(22 * var(--u)));
   }
 
-  html.menu-desktop:not([data-menu-band='medaillons']) .menu.menu-band .menu-shelf {
-    --s: var(--u);
-    left: calc(var(--band-left) + 24 * var(--u));
-    width: calc(var(--band-w) - 48 * var(--u));
-    bottom: calc(var(--band-bottom) + 560 * var(--b));
-    height: calc(48 * var(--u));
-    background: var(--surface-sunken);
-  }
 
   /*
    * Quatre commandes (avec « MagnaSave : collections ») ne tiennent pas sur la ligne, même serrées :

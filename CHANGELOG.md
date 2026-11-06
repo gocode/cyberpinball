@@ -24,6 +24,7 @@ son interface).
 - Favoris : « Ajouter aux favoris » sur la fiche d'une table, une étoile blanche devant son titre. Le favori d'une table reprise d'une autre installation est gardé.
 - Mode invité : « Tables proposées » le limite à une collection (les favoris, un fabricant…) ; au déverrouillage, la collection d'avant revient. Le mode attente ne montre que les tables de la collection affichée.
 - Collections : la collection affichée et la place de la table (« ☆ FAVORIS │ 1 / 4 ») tiennent sur une seule ligne, dans un encart sur le dessus du cartouche du titre, à la place de la pastille et du compteur.
+- Collections : sur les roues Arche, Bandeau et Minimaliste aussi, la collection et la place de la table ont leur encart, dessiné dans le décor de la roue (sous l'Arche, entre les médaillons et le titre).
 
 - Amis : une panne du réseau local (« addMembership EHOSTUNREACH », borne démarrée avant son réseau, VPN, câble débranché) ne bloque plus le réseau des amis. Internet continue, « Partage et réseau » affiche « Réseau local : indisponible » avec sa raison, et le réseau local se rétablit tout seul dès qu'une carte réseau est prête. Un démarrage raté se réessaie aussi tout seul, sans relancer Cyber Pinball.
 - Start sur la roue, dans Médias, son et attente : « ouvrir la fiche » (comme avant) ou « jouer directement ». En « jouer directement », la fiche s'ouvre à Start maintenu (ou F6 d'un clavier) ; la ligne d'aide et l'aide-mémoire le disent.

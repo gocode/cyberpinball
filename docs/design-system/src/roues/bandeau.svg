@@ -32,6 +32,13 @@
 <rect x="-10" y="78" width="1100" height="164" fill="#041310" opacity=".82"/>
 <rect x="-10" y="78" width="1100" height="164" fill="url(#trame)"/>
 <rect x="-10" y="78" width="1100" height="70" fill="#bff7ea" opacity=".04"/>
+<!-- Encart de la collection (06/11/2026) : la collection affichée et la place de la table (frontend.css, .menu-shelf), accroché sous la pièce de la roue, qui passe devant son bord haut ; dans le fond. -->
+<clipPath id="sousLame"><path d="M -10,242 H 1090 V 540 H -10 Z"/></clipPath>
+<g clip-path="url(#sousLame)">
+  <path d="M 330,236 L 750,236 L 750,306 L 732,324 L 348,324 L 330,306 Z" fill="#000" opacity=".5" filter="url(#ombre)"/>
+  <path d="M 330,236 L 750,236 L 750,306 L 732,324 L 348,324 L 330,306 Z" fill="#07110f"/>
+  <path d="M 330,242 L 330,306 L 348,324 L 732,324 L 750,306 L 750,242" fill="none" stroke="#3ad0b8" stroke-width="1" opacity=".35"/>
+</g>
 <g filter="url(#ombre)" fill="#000" opacity=".7"><ellipse cx="125" cy="250" rx="80" ry="16"/><ellipse cx="330" cy="256" rx="90" ry="18"/><ellipse cx="750" cy="256" rx="90" ry="18"/><ellipse cx="955" cy="250" rx="80" ry="16"/></g>
 <ellipse cx="540" cy="160" rx="250" ry="140" fill="url(#lueur)"/>
 <path d="M -10,78 H 1090" fill="none" stroke="#1c8f80" stroke-width="12" filter="url(#haloLarge)" opacity=".85"/>

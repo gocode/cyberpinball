@@ -31,6 +31,13 @@
 <rect y="300" width="1080" height="240" fill="url(#pied)"/>
 <path d="M 40,478 H 1040" stroke="url(#filet)" stroke-width="1.2" opacity=".7"/>
 <ellipse cx="540" cy="190" rx="620" ry="150" fill="#030807" opacity=".55" filter="url(#ombre)"/>
+<!-- Encart de la collection (06/11/2026) : la collection affichée et la place de la table (frontend.css, .menu-shelf), accroché sous la pièce de la roue, qui passe devant son bord haut ; dans le fond. -->
+<clipPath id="sousFilet"><path d="M 0,282 H 1080 V 540 H 0 Z"/></clipPath>
+<g clip-path="url(#sousFilet)">
+  <path d="M 330,276 L 750,276 L 750,318 L 732,336 L 348,336 L 330,318 Z" fill="#000" opacity=".5" filter="url(#ombre)"/>
+  <path d="M 330,276 L 750,276 L 750,318 L 732,336 L 348,336 L 330,318 Z" fill="#07110f"/>
+  <path d="M 330,282 L 330,318 L 348,336 L 732,336 L 750,318 L 750,282" fill="none" stroke="#3ad0b8" stroke-width="1" opacity=".35"/>
+</g>
 <g filter="url(#ombre)" fill="#000" opacity=".7"><ellipse cx="135" cy="258" rx="70" ry="14"/><ellipse cx="330" cy="262" rx="80" ry="16"/><ellipse cx="750" cy="262" rx="80" ry="16"/><ellipse cx="945" cy="258" rx="70" ry="14"/></g>
 <ellipse cx="540" cy="170" rx="230" ry="130" fill="url(#lueur)"/>
 </svg>
