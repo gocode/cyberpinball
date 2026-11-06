@@ -5,6 +5,9 @@
                    centre, téléphone) ; le reste de l'illustration pour l'ordinateur et la télévision.
     ?vue=profil    800 × 800 : la bille et sa traînée, sans texte, lisible en rond à 98 px.
     &guides=1      les zones d'affichage de YouTube par-dessus, pour contrôle.
+    &accroche=…    une autre accroche (propositions), la fin entre astérisques en gras ; par
+                   défaut « Moins de temps à configurer, *plus de temps à jouer.* »
+  Pose data-pret="1" sur <html> une fois polices et image prêtes (rendu de docs/demo-habillage.cjs).
   Couleurs, polices et marque du design system (app/renderer/fallback.css, « Marque »).
 -->
 <html lang="fr">
@@ -85,7 +88,15 @@
   add('<div class="art"></div><div class="fondu"></div>');
   if (vue === 'banniere') {
     add('<div class="marque"><span>Cyber</span><span class="pin">Pinball</span></div>');
-    add('<p class="accroche">Votre borne de flipper virtuel <b>se règle toute seule.</b></p>');
+    // Accroche de la chaîne, choisie par le mainteneur le 06/11/2026.
+    const accroche = q.get('accroche') ?? 'Moins de temps à configurer, *plus de temps à jouer.*';
+    const p = document.createElement('p');
+    p.className = 'accroche';
+    for (const [i, morceau] of accroche.split('*').entries()) {
+      if (!morceau) continue;
+      if (i % 2) { const b = document.createElement('b'); b.textContent = morceau; p.append(b); } else p.append(document.createTextNode(morceau));
+    }
+    document.body.append(p);
   }
   if (q.get('guides') === '1') {
     if (vue === 'banniere') {
@@ -96,6 +107,9 @@
       add('<div class="guide g-rond"></div>');
     }
   }
+  const art = new Image();
+  art.src = '../app/renderer/fronton-marque.webp';
+  Promise.all([document.fonts.ready, art.decode().catch(() => {})]).then(() => { document.documentElement.dataset.pret = '1'; });
 </script>
 </body>
 </html>

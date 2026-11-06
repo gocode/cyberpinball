@@ -77,7 +77,7 @@ export const INTRO_SLOT_LABELS: Readonly<Record<IntroSlot, string>> = {
 /** Ce que joue l'animation de Cyber Pinball sur chaque écran, en une phrase. */
 export const INTRO_DEFAULT_DETAILS: Readonly<Record<IntroScreen, string>> = {
   get playfield() {
-    return t('Une étincelle monte, s’embrase au cœur et déploie des fils de lumière, puis la marque se forme');
+    return t('Une étincelle monte, s’embrase au cœur et déploie des fils de lumière, puis la marque se forme ; les fils tournent ensuite lentement');
   },
   get backglass() {
     return t('Le fronton s’allume comme ses lampes à la mise sous tension, puis la marque, lettre par lettre');
@@ -260,7 +260,7 @@ export const INTRO_TIMELINE = {
   /** Reflet qui passe sur chaque marque, une fois. */
   sheen: 3400,
   sheenLength: 700,
-  /** Tout est posé : chaque écran garde sa dernière image. */
+  /** Tout est posé : chaque écran garde sa dernière image, le plateau continue en boucle (intro.js). */
   end: 4100,
   /** L'invite à appuyer sur un bouton paraît sur le plateau. */
   hint: 4300,

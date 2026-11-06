@@ -307,3 +307,135 @@ test('plateau : le shader dessine la même image sur toutes les cartes graphique
   const html = read('app', 'renderer', 'frontend.html');
   assert.ok(html.indexOf('intro-shaders.js') > 0 && html.indexOf('intro-shaders.js') < html.indexOf('intro.js"'), 'intro-shaders.js avant intro.js');
 });
+
+test('plateau : après l’animation, la boucle continue la dernière image sans saut ni à-coup, même après des jours', async () => {
+  // Les fils tournent encore, lentement, et la poussière dérive sur trois profondeurs : l'hôte
+  // calcule ces mouvements (playfieldFrame) en double précision et les ramène à leur période, le
+  // shader ne reçoit que de petits nombres. Un nombre qui grandit sans fin perdrait sa précision
+  // en simple précision (le GPU) : après quelques jours, les fils avanceraient par sauts.
+  const vm = await import('node:vm');
+  type Frame = { u_thread: Float32Array; u_rise: number[]; u_sway: number[] };
+  const box: { window: { CyberIntroShaders?: { playfield: string; playfieldUniforms: Record<string, number[]>; playfieldLoop: { spin: number; drift: number; sway: number }; playfieldFrame(ms: number, loop?: object): Frame } } } = { window: {} };
+  vm.runInNewContext(read('app', 'renderer', 'intro-shaders.js'), box);
+  const shaders = box.window.CyberIntroShaders!;
+  const frame = (ms: number, loop?: object) => shaders.playfieldFrame(ms, loop);
+  const values = (f: Frame) => [...f.u_thread, ...f.u_rise, ...f.u_sway];
+  const end = INTRO_TIMELINE.end;
+  assert.equal(end, 4100, 'la fin du rythme est celle du shader (clamp de u_time)');
+  // Ce qui ne bouge pas (fréquence, vitesse, profondeur des fils) reste la valeur relevée.
+  const base = shaders.playfieldUniforms.u_thread!;
+  const f0 = frame(0);
+  for (let i = 0; i < base.length; i++) if (i % 4 !== 1) assert.equal(f0.u_thread[i], Math.fround(base[i]!));
+  // Toujours en mouvement : entre deux images de la boucle, les fils et la poussière avancent.
+  const a = frame(end + 60_000);
+  const b = frame(end + 60_000 + 1000);
+  assert.ok(values(a).some((v, i) => Math.abs(v - values(b)[i]!) > 1e-3), 'la boucle bouge');
+  // Sans saut : à la fin de l'animation, la vitesse de chaque valeur ne change pas d'un coup
+  // (différences finies de part et d'autre de la fin, à l'écart près des périodes).
+  const TAU = 2 * Math.PI;
+  const near = (x: number, y: number, period: number) => {
+    const d = Math.abs(x - y) % period;
+    return Math.min(d, period - d);
+  };
+  const periodOf = (i: number, n: number) => (i < n && i % 4 === 1 ? TAU : i >= n && i < n + 3 ? 64 : Infinity);
+  for (const at of [end, end + 4000]) {
+    const [p, c, q] = [frame(at - 16), frame(at), frame(at + 16)].map(values) as [number[], number[], number[]];
+    const n = base.length;
+    for (let i = 0; i < c.length; i++) {
+      const period = periodOf(i, n);
+      const before = near(c[i]!, p[i]!, period);
+      const after = near(q[i]!, c[i]!, period);
+      assert.ok(Math.abs(after - before) < 2e-3, `valeur ${i} à ${at} ms : ${before} puis ${after} en 16 ms`);
+    }
+  }
+  // Les mouvements lents de la boucle : au plus le dixième de la vitesse de l'animation, jamais l'arrêt.
+  const L = shaders.playfieldLoop;
+  for (const k of ['spin', 'drift'] as const) assert.ok(L[k] > 0 && L[k] <= 0.1, `${k} : lent et jamais nul`);
+  assert.ok(L.sway > 0 && L.sway < 0.37, 'le balancement reste sous la taille d’un disque');
+  // Après une semaine : de petits nombres, toujours dans leur période.
+  const week = frame(end + 7 * 24 * 3600 * 1000);
+  for (let i = 1; i < week.u_thread.length; i += 4) assert.ok(week.u_thread[i]! >= 0 && week.u_thread[i]! < TAU + 1e-6);
+  for (const r of week.u_rise) assert.ok(r >= 0 && r < 64);
+  for (const s of week.u_sway) assert.ok(Math.abs(s) < 0.5);
+  // Le shader répète sa poussière sur la même période que celle où l'hôte ramène la montée.
+  assert.match(shaders.playfield, /const float DUST_PERIOD = 64\.0;/);
+  assert.match(shaders.playfield, /mod\(id\.y, DUST_PERIOD\)/);
+  assert.match(shaders.playfield, /uniform vec3 u_rise;/);
+  assert.match(shaders.playfield, /uniform vec3 u_sway;/);
+  // L'hôte envoie ces valeurs à chaque image ; seul le plateau tourne en boucle, et il s'arrête
+  // quand sa couche ne se voit plus (voile de nuit, fenêtre cachée), comme une vidéo.
+  const host = read('app', 'renderer', 'intro.js');
+  assert.match(host, /playfieldFrame\?\.\(/);
+  assert.equal((host.match(/\bloop: \(\) =>/g) ?? []).length, 1, 'une seule scène a une boucle : le plateau');
+  assert.match(read('app', 'renderer', 'media.js'), /slot\.handle\?\.setActive\?\.\(active && !document\.hidden\)/);
+});
+
+test('plateau : même taille de canevas avant et après la fin, lettres nettes posées sur un canevas réduit', async () => {
+  // Le vrai intro.js, dans un document linkedom, avec un faux WebGL qui note ce qu'on lui envoie.
+  // La dernière image était repeinte à pleine résolution : la boucle aurait changé de netteté à
+  // 4,1 s (et coûté le quadruple sur un écran 4K). Sur un écran plus grand que 1920 points, le
+  // canevas reste réduit, et les lettres de la marque sont posées nettes par-dessus.
+  const vm = await import('node:vm');
+  const { window, document } = parseHTML('<html><body><div id="box"></div></body></html>');
+  const sent: Record<string, unknown> = {};
+  const gl = new Proxy({} as Record<string, unknown>, {
+    get(target, key: string) {
+      if (key in target) return target[key];
+      if (/^[A-Z_0-9]+$/.test(key)) return key;
+      if (key === 'getShaderParameter' || key === 'getProgramParameter') return () => true;
+      if (key === 'getUniformLocation') return (_p: unknown, name: string) => name;
+      if (key === 'getExtension') return () => undefined;
+      if (key.startsWith('uniform')) return (name: string, ...v: unknown[]) => (sent[name] = v.length === 1 ? v[0] : v);
+      return () => ({});
+    },
+  });
+  const ctx2d = new Proxy({} as Record<string, unknown>, { get: (t, k: string) => (k === 'measureText' ? () => ({ width: 500 }) : k in t ? t[k] : () => undefined), set: (t, k: string, v) => ((t[k] = v), true) });
+  const Canvas = Object.getPrototypeOf(document.createElement('canvas'));
+  const ownGetContext = Object.getOwnPropertyDescriptor(Canvas, 'getContext');
+  Canvas.getContext = (kind: string) => (kind === 'webgl2' ? gl : ctx2d);
+  const Html = Object.getPrototypeOf(Object.getPrototypeOf(document.createElement('div')));
+  Object.defineProperty(Html, 'clientWidth', { configurable: true, get: () => 2160 });
+  Object.defineProperty(Html, 'clientHeight', { configurable: true, get: () => 3840 });
+  const box = Object.assign(window as unknown as Record<string, unknown>, {
+    window,
+    document,
+    devicePixelRatio: 1,
+    performance: { now: () => 0 },
+    requestAnimationFrame: () => 0,
+    cancelAnimationFrame: () => undefined,
+    ResizeObserver: class {
+      observe() {}
+      disconnect() {}
+    },
+  });
+  vm.runInNewContext(read('app', 'renderer', 'intro-shaders.js'), box);
+  vm.runInNewContext(read('app', 'renderer', 'intro.js'), box);
+  const intro = (box as { CyberIntro?: { playfield(c: unknown, g: unknown, o: unknown): { element: { querySelector(s: string): { width: number; height: number; className: string } | null }; destroy(): void } } }).CyberIntro!;
+  const at = (ms: number) => {
+    const host = document.getElementById('box')!;
+    const s = intro.playfield(host, {}, { intro: { at: ms, timeline: INTRO_TIMELINE } });
+    const gl = s.element.querySelector('canvas.cp-in-gl')!;
+    const letters = s.element.querySelector('canvas.cp-in-letters');
+    const out = { size: `${gl.width}x${gl.height}`, letters: letters ? `${letters.width}x${letters.height} ${letters.className}` : 'aucune', overlay: sent.u_overlay };
+    s.destroy();
+    return out;
+  };
+  // Les prototypes de linkedom sont partagés : rendus tels quels après la mesure.
+  let before: ReturnType<typeof at>;
+  let after: ReturnType<typeof at>;
+  try {
+    before = at(INTRO_TIMELINE.end - 50);
+    after = at(INTRO_TIMELINE.end + 60_000);
+  } finally {
+    if (ownGetContext) Object.defineProperty(Canvas, 'getContext', ownGetContext);
+    else delete Canvas.getContext;
+    delete Html.clientWidth;
+    delete Html.clientHeight;
+  }
+  assert.equal(before.size, '1080x1920', 'au plus 1920 points pendant l’animation');
+  assert.equal(after.size, before.size, 'la boucle garde la taille de l’animation : aucun saut de netteté');
+  assert.equal(before.letters, 'aucune');
+  assert.equal(before.overlay, 0, 'pendant l’animation, le shader peint les lettres');
+  assert.match(after.letters, /^2160x3840 cp-in-letters .*cp-in-shown/, 'lettres nettes à la taille de l’écran');
+  assert.equal(after.overlay, 1, 'le shader ne peint plus que leur lueur');
+});

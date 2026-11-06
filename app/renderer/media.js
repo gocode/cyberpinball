@@ -264,6 +264,8 @@
       if (intro && typeof window.CyberIntro?.[intro] === 'function') {
         const box = el('div', 'media-fallback intro-fallback');
         slot.handle = window.CyberIntro[intro](box, card, { intro: view.intro });
+        // Couche déjà coupée (voile de nuit, fenêtre cachée) : la scène ne tourne pas avant d'être vue.
+        slot.handle?.setActive?.(active && !document.hidden);
         opts.onEnd && setTimeout(opts.onEnd, Math.max(0, (view.intro?.timeline?.end ?? 0) - (Date.now() - (view.intro?.startedAt ?? Date.now()))));
         return box;
       }
@@ -301,6 +303,8 @@
     }
 
     function play(slot) {
+      // Une animation de Cyber Pinball qui tourne encore (la boucle du plateau) s'arrête de même.
+      slot.handle?.setActive?.(active && !document.hidden);
       const video = slot.media;
       if (video?.tagName !== 'VIDEO') return;
       // Ouverture finie : la vidéo garde sa dernière image, un nouvel état ne la relance pas.

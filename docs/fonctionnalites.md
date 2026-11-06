@@ -253,7 +253,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 ### Ouverture, lancement en cinéma et sons
 
-- **Ouverture au démarrage** : le plateau, le fronton, le topper, le DMD et le FullDMD jouent ensemble l'animation de Cyber Pinball, puis « Appuyez sur un bouton pour choisir une table ». Mettez votre image ou votre vidéo sur chaque écran et votre musique de fond, ou coupez-la ; « Voir l'ouverture » la rejoue.
+- **Ouverture au démarrage** : le plateau, le fronton, le topper, le DMD et le FullDMD jouent ensemble l'animation de Cyber Pinball, puis « Appuyez sur un bouton pour choisir une table » ; sur le plateau, les fils de lumière continuent ensuite de tourner lentement dans une poussière qui dérive, sans jamais figer l'écran. Mettez votre image ou votre vidéo sur chaque écran et votre musique de fond, ou coupez-la ; « Voir l'ouverture » la rejoue.
 - **Lancement en cinéma** : au Start, le logo du jeu recule comme une bille au lanceur, s'envole vers le fronton, un disque lumineux traverse le DMD, et un coup de bobine sonne quand VPX prend la main. VPX n'attend jamais l'animation.
 - **Sons de la machine**, tous de synthèse : clic de solénoïde au changement de table, pièce au Start, knocker quand un record tombe, carillon d'une invitation, signal d'un ami.
 - **La musique de chaque jeu** sur la roue (60 % par défaut) ; une table sans musique fait entendre sa vidéo du plateau (40 %). La musique ne démarre que si la table reste choisie 350 ms : faire défiler ne joue rien.

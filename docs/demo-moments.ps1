@@ -395,7 +395,7 @@ $scenes = @{
     )
     Attendu = @{
       '01-wait_1200' = @{ phase = 'intro'; musique = $null }
-      '02-wait_6000' = @{ phase = 'intro'; musique = $null; ouverture = @{ playfield = '^(playfield|backglass) fin \+invite$'; backglass = '^backglass fin$'; topper = '^topper fin$'; dmd = '^(dmd|fullDmd) fin$' } }
+      '02-wait_6000' = @{ phase = 'intro'; musique = $null; ouverture = @{ playfield = '^(playfield fin boucle|backglass fin) \+invite$'; backglass = '^backglass fin$'; topper = '^topper fin$'; dmd = '^(dmd|fullDmd) fin$' } }
       '04-wait_1000' = @{ etat = @{ attente = $false; phase = 'menu'; position = 1 }; ouverture = @{ playfield = '^aucune$' } }
       # Au bureau (pc-dev : plateau en largeur), le plateau joue l'ouverture du fronton ; en borne, la sienne.
     }
@@ -407,7 +407,8 @@ $scenes = @{
     Flippers = 'left'
     Etapes = @('wait:1200', 'wait:6000', $Down, 'wait:1000')
     Attendu = @{
-      '02-wait_6000' = @{ phase = 'intro'; ouverture = @{ playfield = '^playfield fin \+invite$' } }
+      # Le plateau tourne en boucle (fils, poussière) après son animation ; les autres écrans sont figés.
+      '02-wait_6000' = @{ phase = 'intro'; ouverture = @{ playfield = '^playfield fin boucle \+invite$'; backglass = '^backglass fin$' } }
       '04-wait_1000' = @{ etat = @{ attente = $false; phase = 'menu'; position = 1 } }
     }
   }
@@ -574,12 +575,12 @@ foreach ($name in $Scenarios) {
       }
       $state += " · cinéma : $($cinemaParts -join ', ')"
     }
-    # Ouverture : la scène montée dans chaque fenêtre (« au bout » ou non), l'invite du plateau.
+    # Ouverture : la scène montée dans chaque fenêtre (« au bout » ou non, en boucle), l'invite du plateau.
     if ($want.ouverture) {
       $introParts = @()
       foreach ($win in ($want.ouverture.Keys | Sort-Object)) {
         $o = $got.ecrans.$win.ouverture
-        $shown = if ($o) { ((@($o.scenes | ForEach-Object { "$($_.scene)$(if ($_.fin) { ' fin' })" }) -join ',') + $(if ($o.invite) { ' +invite' } else { '' })).Trim() } else { 'aucune' }
+        $shown = if ($o) { ((@($o.scenes | ForEach-Object { "$($_.scene)$(if ($_.fin) { ' fin' })$(if ($_.boucle) { ' boucle' })" }) -join ',') + $(if ($o.invite) { ' +invite' } else { '' })).Trim() } else { 'aucune' }
         if (-not $shown) { $shown = 'fichier' }
         $introParts += "$win $shown"
         if ($shown -notmatch $want.ouverture[$win]) { $ok = $false; $introParts[-1] += " (attendu : $($want.ouverture[$win]))" }

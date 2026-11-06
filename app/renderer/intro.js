@@ -12,8 +12,10 @@
 // instant (paint(ms écoulées depuis le départ)), calculée d'après le rythme reçu avec l'état
 // (INTRO_TIMELINE) : une fenêtre qui la monte en retard la reprend au bon moment, et les écrans
 // restent d'accord. options.intro.at fige la scène à un instant (planche des essais). Au bout,
-// plus rien ne tourne. Les styles sont dans intro.css ; couleurs, marque et matière, celles du
-// design system (fallback.css).
+// le plateau continue en boucle, discret (ses fils tournent lentement, sa poussière dérive), à
+// cadence réduite ; les autres écrans gardent leur dernière image, sans plus rien calculer.
+// options.intro.loop règle la boucle (essais : vitesses et amplitudes comparées). Les styles sont
+// dans intro.css ; couleurs, marque et matière, celles du design system (fallback.css).
 
 (() => {
   'use strict';
@@ -74,9 +76,10 @@
   const scenes = new Set();
 
   /**
-   * Monte une scène : setup(root, timeline) rend { paint(e), resize?() } ; paint dessine
+   * Monte une scène : setup(root, timeline) rend { paint(e), resize?(), loop?() } ; paint dessine
    * l'instant e (ms depuis le départ ; négatif : avant le départ, l'écran reste noir). Une
-   * minuterie d'images la fait avancer jusqu'à timeline.end, puis s'arrête sur la dernière image.
+   * minuterie d'images la fait avancer jusqu'à timeline.end, puis s'arrête sur la dernière image ;
+   * une scène qui a loop() continue au-delà, une image toutes les loop() ms (0 : elle s'arrête).
    */
   function scene(container, kind, options, setup) {
     const intro = options?.intro ?? {};
@@ -88,16 +91,28 @@
     const drawn = setup(root, timeline);
     const elapsed = () => (typeof intro.at === 'number' ? intro.at : typeof intro.startedAt === 'number' ? Date.now() - intro.startedAt : -1);
     let frame = 0;
+    let timer = 0;
     let last = NaN;
+    /** Écran visible : la couche de média coupe la scène sous le voile de nuit ou fenêtre cachée. */
+    let running = true;
+    let paintedAt = 0;
     const paint = () => {
-      const e = Math.min(elapsed(), end);
+      paintedAt = performance.now();
+      const e = drawn.loop ? elapsed() : Math.min(elapsed(), end);
       last = e;
       drawn.paint(e);
     };
     const tick = () => {
       frame = 0;
+      timer = 0;
       paint();
-      if (typeof intro.at !== 'number' && last < end && intro.startedAt !== undefined) frame = requestAnimationFrame(tick);
+      if (!running || typeof intro.at === 'number' || intro.startedAt === undefined) return;
+      if (last < end) frame = requestAnimationFrame(tick);
+      else {
+        // La boucle : l'image suivante à l'échéance qu'elle demande depuis celle-ci, calée sur l'affichage.
+        const every = drawn.loop?.() ?? 0;
+        if (every > 0) timer = setTimeout(() => (frame = requestAnimationFrame(tick)), Math.max(0, every - (performance.now() - paintedAt) - 4));
+      }
     };
     const observer = new ResizeObserver(() => {
       drawn.resize?.();
@@ -109,9 +124,19 @@
     const handle = {
       element: root,
       update() {},
-      /** Instant peint, et si la scène est au bout (pour les essais). */
-      state: () => ({ scene: kind, at: Math.round(last), fin: last >= end }),
+      /** Instant peint, si la scène est au bout, et si elle tourne en boucle (pour les essais). */
+      state: () => ({ scene: kind, at: Math.round(last), fin: last >= end, boucle: last >= end && Boolean(drawn.loop?.()) }),
       problems: () => [],
+      /** Couche active ou non (media.js) : rien ne se calcule sous le voile ni fenêtre cachée ; à la reprise, l'instant du moment. */
+      setActive(on) {
+        if (on === running) return;
+        running = on;
+        cancelAnimationFrame(frame);
+        clearTimeout(timer);
+        frame = 0;
+        timer = 0;
+        if (on) tick();
+      },
       /** Redessine l'instant peint (un canevas posé avant la première peinture de la fenêtre peut ne pas être composé). */
       repaint() {
         drawn.reset?.();
@@ -119,6 +144,7 @@
       },
       destroy() {
         cancelAnimationFrame(frame);
+        clearTimeout(timer);
         observer.disconnect();
         drawn.destroy?.();
         scenes.delete(handle);
@@ -164,14 +190,22 @@
   // « PINBALL » (nets), B les deux floutés (lueurs) ; les fils, en tableaux uniformes
   // (CyberIntroShaders.playfieldUniforms). Pendant l'animation, le canevas compte au plus 1920
   // points sur son grand côté (la moitié d'un écran 4K), moins si la carte graphique ne suit pas
-  // (images espacées de plus de 26 ms) ; la dernière image est repeinte une fois à pleine
-  // résolution. Sans WebGL2 (ou shader refusé), la marque en HTML.
+  // (images espacées de plus de 26 ms). Puis la boucle (CyberIntroShaders.playfieldFrame), à la même
+  // taille, donc sans saut de netteté, à 20 images par seconde au plus, 15 puis 10 si la carte
+  // graphique ne suit pas : le mouvement est assez lent pour rester fluide. Canevas réduit (écran
+  // plus grand que 1920 points) : à la fin, les lettres de la marque paraissent nettes en fondu, dans
+  // un canevas 2D à pleine résolution posé dessus, et le shader ne garde que leur lueur. Sans WebGL2
+  // (ou shader refusé), la marque en HTML, immobile.
 
   /** Où se pose la marque dans la texture : centre, largeur de PINBALL, hauteur du bloc au plus. */
   const PLAYFIELD_BRAND = { y: 0.79, width: 0.72, maxHeight: 0.12 };
   /** Grand côté du canevas pendant l'animation, et le plus petit auquel on descend si la carte peine. */
   const PLAYFIELD_LIVE_MAX = 1920;
   const PLAYFIELD_LIVE_MIN = 960;
+  /** Écart entre deux images de la boucle (ms), du plus fluide au plus économe. */
+  const PLAYFIELD_LOOP_STEPS = [1000 / 20, 1000 / 15, 1000 / 10];
+  /** Fondu des lettres nettes posées sur un canevas réduit, à la fin (intro.css, .cp-in-letters). */
+  const PLAYFIELD_LETTERS_FADE = 450;
   const BRAND_FONT = "'CP Saira', 'Segoe UI', sans-serif"; // i18n-ignore : pile de polices
 
   /** Programme du shader sur un triangle plein écran ; undefined si WebGL2 refuse. */
@@ -207,15 +241,19 @@
 
   /**
    * Masque de la marque à la taille du canevas (W × H) : la marque du design system
-   * (.cp-wordmark-stack : Saira 300, chasse 125 %, espacement 0,28 em, interligne 1,35).
+   * (.cp-wordmark-stack : Saira 300, chasse 125 %, espacement 0,28 em, interligne 1,35). Avec
+   * `into`, les lettres seules dans ce canevas, aux couleurs que le shader leur donne (INK, LIME),
+   * sur fond transparent : la marque nette posée sur un canevas réduit.
    */
-  function brandMask(W, H) {
-    const c = document.createElement('canvas');
+  function brandMask(W, H, into) {
+    const c = into ?? document.createElement('canvas');
     c.width = W;
     c.height = H;
     const ctx = c.getContext('2d');
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, W, H);
+    if (!into) {
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, W, H);
+    }
     const font = (size) => `300 expanded ${size}px ${BRAND_FONT}`;
     const spaced = (size) => {
       ctx.font = font(size);
@@ -239,6 +277,10 @@
       ctx.fillStyle = pinball;
       ctx.fillText('PINBALL', x, yP);
     };
+    if (into) {
+      words('#e6f0ec', '#8be23a');
+      return c;
+    }
     ctx.globalCompositeOperation = 'lighter';
     words('#f00', '#0f0');
     ctx.filter = `blur(${Math.max(1, size * 0.35)}px)`;
@@ -254,6 +296,9 @@
   function playfield(container, game, options) {
     return scene(container, 'playfield', options, (root, tl) => {
       const canvas = root.appendChild(el('canvas', 'cp-in-gl'));
+      // Les lettres nettes, sur un canevas réduit, une fois la marque formée (créées au besoin).
+      let crisp;
+      let crispSize = '';
       const { mark } = stackedLetters('cp-in-mark');
       const fallback = root.appendChild(el('div', 'cp-in-brand'));
       fallback.append(mark);
@@ -265,7 +310,8 @@
       let size = '';
       let fontsAsked = false;
       const uniform = (name) => (program ? gl.getUniformLocation(program, name) : null);
-      const u = { res: uniform('u_res'), time: uniform('u_time'), brand: uniform('u_brand') };
+      const u = { res: uniform('u_res'), time: uniform('u_time'), brand: uniform('u_brand'), thread: uniform('u_thread'), rise: uniform('u_rise'), sway: uniform('u_sway'), overlay: uniform('u_overlay') };
+      const loopTune = options?.intro?.loop;
       if (working) {
         gl.useProgram(program);
         for (const [name, values] of Object.entries(window.CyberIntroShaders.playfieldUniforms ?? {})) {
@@ -298,12 +344,12 @@
         liveMax = Math.max(PLAYFIELD_LIVE_MIN, Math.round(liveMax * 0.75));
         slow = 0;
       };
-      /** Taille du canevas : réduite pendant l'animation, pleine pour la dernière image. */
-      const fit = (full) => {
+      /** Taille du canevas : la même pendant l'animation et la boucle (au plus PLAYFIELD_LIVE_MAX). */
+      const fit = () => {
         const W = root.clientWidth || 1;
         const H = root.clientHeight || 1;
         const dpr = window.devicePixelRatio || 1;
-        const k = (full ? 1 : Math.min(1, liveMax / Math.max(W, H))) * dpr;
+        const k = Math.min(1, liveMax / Math.max(W, H)) * dpr;
         const w = Math.max(1, Math.round(W * k));
         const h = Math.max(1, Math.round(H * k));
         const key = `${w}x${h}`;
@@ -323,20 +369,71 @@
           fontsAsked = true;
           document.fonts.load(`300 expanded 100px ${BRAND_FONT}`).then(() => {
             size = '';
+            crispSize = '';
             handle.repaint();
           }, () => undefined);
         }
+      };
+      /**
+       * Cadence de la boucle : une image toutes les PLAYFIELD_LOOP_STEPS[step] ms. Huit images de
+       * suite en retard de moitié (la carte graphique ou la fenêtre ne suit pas) : un cran plus lent.
+       */
+      let step = 0;
+      let late = 0;
+      let loopAt = 0;
+      const loopPace = () => {
+        const now = performance.now();
+        const dt = now - loopAt;
+        loopAt = now;
+        // Fenêtre cachée ou reprise après une pause : rien à juger.
+        if (dt > 1000) return;
+        late = dt > PLAYFIELD_LOOP_STEPS[step] * 1.5 ? late + 1 : Math.max(0, late - 1);
+        if (late < 8 || step >= PLAYFIELD_LOOP_STEPS.length - 1) return;
+        step += 1;
+        late = 0;
+      };
+      /**
+       * Lettres nettes : sur un canevas réduit, à partir de la fin, un canevas 2D à la taille de
+       * l'écran, en fondu ; rend 1 quand le fondu est fini (le shader ne peint plus les lettres).
+       */
+      const letters = (e) => {
+        const dpr = window.devicePixelRatio || 1;
+        const W = Math.round((root.clientWidth || 1) * dpr);
+        const H = Math.round((root.clientHeight || 1) * dpr);
+        const still = typeof options?.intro?.at === 'number';
+        if (!(canvas.width < W - 1 && e >= tl.end)) {
+          crisp?.classList.remove('cp-in-shown');
+          return 0;
+        }
+        if (!crisp) crisp = root.insertBefore(el('canvas', 'cp-in-letters'), canvas.nextSibling);
+        const key = `${W}x${H}`;
+        if (key !== crispSize) {
+          crispSize = key;
+          brandMask(W, H, crisp);
+        }
+        // Instant figé (planche) : posées d'emblée ; sinon en fondu (intro.css).
+        crisp.classList.toggle('cp-in-still', still);
+        crisp.classList.add('cp-in-shown');
+        return still || e >= tl.end + PLAYFIELD_LETTERS_FADE ? 1 : 0;
       };
       let lastE = -1;
       const draw = (e) => {
         lastE = e;
         if (!working) return;
         if (e >= 0 && e < tl.end) pace();
-        fit(e >= tl.end);
+        else if (e >= tl.end) loopPace();
+        fit();
         gl.viewport(0, 0, canvas.width, canvas.height);
         gl.useProgram(program);
         gl.uniform2f(u.res, canvas.width, canvas.height);
         gl.uniform1f(u.time, clamp(e, 0, tl.end));
+        gl.uniform1f(u.overlay, letters(e));
+        const moving = window.CyberIntroShaders.playfieldFrame?.(Math.max(0, e), loopTune);
+        if (moving) {
+          gl.uniform4fv(u.thread, moving.u_thread);
+          gl.uniform3fv(u.rise, moving.u_rise);
+          gl.uniform3fv(u.sway, moving.u_sway);
+        }
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, texture);
         gl.uniform1i(u.brand, 0);
@@ -350,8 +447,11 @@
           size = '';
         },
         paint: draw,
+        /** La boucle tant que le shader dessine ; options.intro.loop.off la coupe (essais). */
+        loop: () => (working && !loopTune?.off ? PLAYFIELD_LOOP_STEPS[step] : 0),
         reset() {
           size = '';
+          crispSize = '';
         },
         repaint() {
           draw(lastE);
