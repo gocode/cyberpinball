@@ -23,6 +23,15 @@ import {
   type SystemItemId,
   variantTraitsLabel,
   tablePupPacks,
+  tablePupSwitch,
+  tableDisabledPacks,
+  disablePupPacks,
+  enablePupPacks,
+  globalPackCopies,
+  readScriptPatchFile,
+  type FolderTable,
+  PUP_DISABLED_FOLDER,
+  PUP_FOLDER,
   pupOptionOps,
   checkAppliedOption,
   missingSources,
@@ -179,7 +188,7 @@ import { usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
 import { LayoutReport } from './layout-check';
 import { createCatalog } from './catalog';
-import { createGameParts } from './game-parts';
+import { createGameParts, type PupSwitchView } from './game-parts';
 import type { RecordingOutcome } from './game-recording';
 import { createRecordingMenu } from './recording-menu';
 import { createJourney } from './journey';
@@ -264,6 +273,8 @@ export interface LibraryHost {
   recordableRoles?(): RecordedRole[];
   /** Journal de VPX (vpinball.log), lu par le médecin pour les PuP-Packs. */
   vpxLogFile?(): string | undefined;
+  /** « Dossier PinUP Player » de VPX ([Plugin.PUP] PUPFolder, VPinballX.ini de la configuration active) : le plugin y cherche aussi les packs. */
+  pupFolder?(): string | undefined;
   /** Playfield de la borne et VPinballX.ini actif : le médecin y juge le sens d'une table. */
   playfieldOrientation?(): PlayfieldOrientation | undefined;
   quit(): void;
@@ -689,6 +700,12 @@ export function createLibrary(host: LibraryHost) {
   /** Ajoute une entrée du menu système ; l'arbre des rubriques (systemmenu.ts, core) dit où elle va. */
   function provideSystemItem(id: SystemItemId, item: ProvidedSystemItem): void {
     systemItems.set(id, item);
+  }
+
+  /** « Depuis un ami… » de l'entonnoir d'ajout : fourni par le menu des amis (friends-menu.ts), créé après. */
+  let addFromFriend: { detail(): string; open(back: () => void): void } | undefined;
+  function provideAddFromFriend(source: { detail(): string; open(back: () => void): void }): void {
+    addFromFriend = source;
   }
 
   const layout = () => (host.root ? layoutOf(host.root) : undefined);
@@ -1258,6 +1275,8 @@ export function createLibrary(host: LibraryHost) {
     install: (paths, table, back) => installTo(paths, table, back),
     pick: (request) => pickPaths(request),
     pupOptions: (table) => go({ kind: 'pupOptions', file: table.file }),
+    pupSwitch: (table) => pupSwitchView(table),
+    setPup: (table, enable) => setPupEnabled(table, enable),
     medias: (table) => medias.open(table),
     reload: (file) => host.reload(file),
   });
@@ -1590,6 +1609,69 @@ export function createLibrary(host: LibraryHost) {
     return names;
   }
 
+  // ---------- PuP-Pack désactivé, table par table (pupdisabled.ts) ----------
+
+  /** Autres tables du dossier de la table, et les packs que chargent leurs scripts (undefined : pas encore lu). */
+  function folderTables(table: TableEntry): FolderTable[] {
+    return host
+      .tables()
+      .filter((o) => samePath(o.folder, table.folder) && !samePath(o.file, table.file))
+      .map((o) => {
+        const facts = cachedScript(o.file, host.dataDir);
+        return { file: o.file, title: o.title, expected: facts ? expectedPackNames(facts) : undefined };
+      });
+  }
+
+  /** Le PuP-Pack de la table pour « Parties du jeu » : actif ou désactivé, ce que le changement touche. */
+  function pupSwitchView(table: TableEntry): PupSwitchView {
+    const own = !samePath(table.folder, tablesDir());
+    if (!own) return { sw: { active: [], disabled: [], shared: [] }, off: false, blocked: t('La table n’a pas de dossier à elle : son PuP-Pack ne se range pas à part'), global: [] };
+    const facts = cachedScript(table.file, host.dataDir);
+    const sw = tablePupSwitch(table.folder, facts ? expectedPackNames(facts) : undefined, folderTables(table));
+    const pupFolder = host.pupFolder?.();
+    const patchFile = table.file.replace(/\.vpx$/i, '.vbs');
+    const patch = readScriptPatchFile(patchFile);
+    return {
+      sw,
+      off: tableDisabledPacks(table, facts).length > 0,
+      global: globalPackCopies(pupFolder, [...sw.active, ...sw.disabled]),
+      script: patch && (patch.switches.length || patch.loader || patch.capture) ? path.basename(patchFile) : undefined,
+    };
+  }
+
+  /**
+   * Désactive ou réactive le PuP-Pack de la table : ses dossiers changent de place (un renommage
+   * chacun, défait au premier échec), puis le .vbs de chaque table du dossier suit tout de suite
+   * (sans PuP, ou refait pour le pack revenu) ; le médecin le refait de toute façon avant chaque partie.
+   */
+  function setPupEnabled(table: TableEntry, enable: boolean): { ok: boolean; text: string } {
+    const view = pupSwitchView(table);
+    const packs = enable ? view.sw.disabled : view.sw.active;
+    if (view.blocked || !packs.length) return { ok: false, text: view.blocked ?? t('Rien à changer : aucun pack de cette table à cet endroit.') };
+    const trashDir = trashDirFor(layout()!.trash, `PuP-Pack ${path.basename(table.folder)}`); // i18n-ignore : nom de dossier
+    let moved: string[];
+    let skipped: { pack: string; reason: string }[];
+    try {
+      ({ moved, skipped } = enable ? enablePupPacks(table.folder, packs) : disablePupPacks(table.folder, packs, { trashDir }));
+    } catch (error) {
+      return { ok: false, text: (error as Error).message };
+    }
+    const borne = pupCabinet(loadCabinet(host.dataDir));
+    for (const one of [table, ...host.tables().filter((o) => samePath(o.folder, table.folder) && !samePath(o.file, table.file))]) {
+      try {
+        repairPupForPlay(one, { tablesDir: tablesDir(), script: cachedScript(one.file, host.dataDir), cabinet: borne, otherPackNames: otherPackNames(one) }, { trashDir });
+      } catch (error) {
+        console.log(`PuP-Pack (${one.id}) : script non remis d'accord (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+    }
+    host.reload(table.file);
+    const list = moved.join(', ');
+    const rest = skipped.map((s) => t('{pack} : {reason}', s)).join(' ; ');
+    if (!moved.length) return { ok: false, text: t('Rien n’a changé : {reasons}.', { reasons: rest }) };
+    const done = enable ? t('PuP-Pack réactivé ({packs}) : ses vidéos reviennent dès la prochaine partie.', { packs: list }) : t('PuP-Pack désactivé ({packs}) : la table se joue sans lui. « Réactiver le PuP-Pack » le remet tel quel.', { packs: list });
+    return { ok: true, text: rest ? `${done} ${t('Laissés en place : {reasons}.', { reasons: rest })}` : done };
+  }
+
   // ---------- Écrans ----------
 
   /** Menu système : les rubriques (racine), ou les entrées d'une rubrique. */
@@ -1896,6 +1978,19 @@ export function createLibrary(host: LibraryHost) {
   }
 
   function pupAction(table: TableEntry, s: { pup?: TablePupPack[] }): SheetAction[] {
+    // PuP-Pack désactivé : la fiche le dit, Start ouvre sa partie pour le réactiver.
+    if (!samePath(table.folder, tablesDir()) && pupSwitchView(table).off) {
+      return [
+        {
+          label: 'PuP-Pack', // i18n-ignore : nom propre
+          icon: 'pup',
+          detail: t('désactivé : la table se joue sans ses vidéos · Start pour le réactiver'),
+          tone: 'quiet',
+          door: 'sheet.pup',
+          run: () => gameParts.openPart(table, 'pup'),
+        },
+      ];
+    }
     const packs = pupPacksOf(table, s);
     if (!packs.length) return [];
     const unsuited = packs.some((p) => p.recommended && p.applied !== p.recommended && p.memory?.chosen !== 'user');
@@ -1970,6 +2065,7 @@ export function createLibrary(host: LibraryHost) {
           host.play(table);
         },
       },
+      { label: t('Désactiver le PuP-Pack'), detail: t('Dans « Parties du jeu » : la table se joue sans ses vidéos, réactivable à tout moment'), run: () => gameParts.openPart(table, 'pup') },
       { label: t('Retour à la fiche'), run: back },
     );
     return {
@@ -2500,6 +2596,7 @@ export function createLibrary(host: LibraryHost) {
       { label: t('Choisir des fichiers…'), detail: t('Clé USB, Téléchargements, Bureau, disques ; ou glissez-les ici'), icon: 'import', run: () => void pick('files') },
       { label: t('Choisir un dossier…'), detail: t('Tout le dossier d’une table, depuis une clé USB ou un disque'), icon: 'folder', run: () => void pick('folder') },
       { label: t('Depuis une autre installation…'), detail: t('PinUP Popper, PinballX : les tables une à une, avec leur PuP-Pack, leur ROM et leurs médias'), icon: 'layers', run: () => installationImport.open() },
+      ...(addFromFriend ? [{ label: t('Depuis un ami…'), detail: addFromFriend.detail(), icon: 'friend-list' as const, run: () => addFromFriend!.open(() => openAdd()) }] : []),
       { label: t('Récupérés et attendus'), detail: catalogUi.summary(), icon: 'inbox', run: () => catalogUi.openWaitList(() => openAdd()) },
       { label: t('Mises à jour des tables'), detail: t('Nouvelles versions des tables installées'), icon: 'refresh', run: () => catalogUi.openUpdates() },
       { label: t('Comptes des sites'), detail: t('vpuniverse.com, vpforums.org… : connexions gardées'), icon: 'account', run: () => catalogUi.openAccounts() },
@@ -2815,7 +2912,7 @@ export function createLibrary(host: LibraryHost) {
     });
     return {
       heading: t('Quelle option du PuP-Pack ?'),
-      subheading: `pupvideos\\${pack.name} · ${path.relative(tablesDir(), table.folder)}`,
+      subheading: `${pack.disabled ? PUP_DISABLED_FOLDER : PUP_FOLDER}\\${pack.name} · ${path.relative(tablesDir(), table.folder)}`,
       lead: t('Le pack propose plusieurs dispositions des écrans. Cyber Pinball recopie les fichiers de l’option choisie, comme le ferait son .bat, sans jamais l’exécuter ; l’option est retenue pour les mises à jour du pack. Rien n’est installé avant « Installer ».'),
       sections: [{ title: t('Pack'), rows }],
       actions,
@@ -2833,6 +2930,8 @@ export function createLibrary(host: LibraryHost) {
     }
     if (pack.flattened) rows.push({ text: t('Dossier en trop retiré'), detail: t('Le plugin PUP lit screens.pup à la racine du pack.'), tone: 'quiet' });
     if (pack.replaces) rows.push({ text: t('Remplace le pack installé'), detail: t('L’ancien dossier part entier à la corbeille : aucun mélange d’anciens et de nouveaux fichiers.'), tone: 'warning' });
+    // Pack désactivé dans la table (pupdisabled.ts) : sa mise à jour le reste.
+    if (pack.disabled) rows.push({ text: t('PuP-Pack désactivé dans cette table'), detail: t('Il se range avec l’ancien, dans « {folder} » : la table se joue toujours sans lui. « Parties du jeu » > PuP-Pack pour le réactiver.', { folder: PUP_DISABLED_FOLDER }), tone: 'info' });
     if (pack.variants.length) {
       const v = pack.choice.chosen!;
       const why = pack.decided
@@ -3706,6 +3805,7 @@ export function createLibrary(host: LibraryHost) {
 
   return {
     provideSystemItem,
+    provideAddFromFriend,
     /** Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes, sauf pendant `quiet` (une partie). */
     watchHealth: (quiet?: () => boolean) => health.watch(quiet),
     /** Santé de la borne : relevé, page (essais). */

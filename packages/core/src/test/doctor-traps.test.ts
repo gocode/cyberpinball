@@ -21,6 +21,7 @@ import { dressScreen, tableDressing } from '../fulldmdtable';
 import type { Cabinet, PhysicalScreen } from '../model';
 import { encodePng } from '../png';
 import { buildScriptPatch } from '../scriptpatch';
+import { PUP_DISABLED_FOLDER } from '../pupdisabled';
 
 const SCRIPT = 'Const cGameName="afm_113b"\r\nLoadVPM "01560000", "WPC.VBS", 3.26\r\nController.GameName = cGameName\r\n';
 const TABLE = 'Attack from Mars (Bally 1995)';
@@ -388,6 +389,28 @@ const TRAPS: Trap[] = [
     arm: (folder) => {
       healthyPack(folder);
       write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(PUP_OFF_SCRIPT));
+    },
+    script: scriptFacts(PUP_OFF_SCRIPT),
+  },
+  // PuP-Pack désactivé dans « Parties du jeu » (pupdisabled.ts) : l'état, sans rien réclamer.
+  {
+    code: 'pupPackDisabled',
+    arm: (folder) => {
+      healthyPack(folder);
+      fs.mkdirSync(path.join(folder, PUP_DISABLED_FOLDER));
+      fs.renameSync(path.join(folder, 'pupvideos', 'afm_113b'), path.join(folder, PUP_DISABLED_FOLDER, 'afm_113b'));
+    },
+    script: scriptFacts(PUP_SCRIPT),
+  },
+  // Pack désactivé, mais le .vbs de Cyber Pinball l'allume encore (application arrêtée entre les deux).
+  {
+    code: 'pupPackDisabledScript',
+    arm: (folder) => {
+      healthyPack(folder);
+      write(path.join(folder, `${TABLE}.vpx`), vpxWithScript(PUP_OFF_SCRIPT));
+      write(path.join(folder, `${TABLE}.vbs`), Buffer.from(buildScriptPatch(PUP_OFF_SCRIPT, [scriptFacts(PUP_OFF_SCRIPT).pup!.disabledBy!])!, 'latin1'));
+      fs.mkdirSync(path.join(folder, PUP_DISABLED_FOLDER));
+      fs.renameSync(path.join(folder, 'pupvideos', 'afm_113b'), path.join(folder, PUP_DISABLED_FOLDER, 'afm_113b'));
     },
     script: scriptFacts(PUP_OFF_SCRIPT),
   },

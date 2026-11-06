@@ -537,4 +537,20 @@ export const messages: Record<string, string> = {
   'DMD sur l’habillage ({share} % recouvert) : place réglée dans {file} ; fiche > Diagnostic pour le poser dans le cadre ({w} × {h} en {x}, {y})':
     'DMD over the artwork ({share} % covered): placement set in {file}; table sheet > Diagnosis to put it in the frame ({w} × {h} at {x}, {y})',
   'habillé (cadre {w} × {h} en {x}, {y}), place du DMD réglée en partie et gardée': 'dressed (frame {w} × {h} at {x}, {y}), DMD placement set in game and kept',
+  // packages/core/src/doctor.ts, tablecontents.ts, pupdisabled.ts, tableimport.ts : PuP-Pack désactivé
+  'PuP-Pack désactivé': 'PuP-Pack disabled',
+  '{list} : désactivé dans « Parties du jeu ». La table se joue sans ses vidéos, comme si le pack n’était pas installé ; « Réactiver le PuP-Pack » le remet tel quel.': '{list}: disabled in “Game parts”. The table plays without its videos, as if the pack were not installed; “Re-enable the PuP-Pack” puts it back as it was.',
+  'Script encore adapté pour le PuP-Pack désactivé': 'Script still adapted for the disabled PuP-Pack',
+  'Cyber Pinball avait adapté {file} pour le PuP-Pack (interrupteur allumé, lancement du pack ou reconnaissance des images du DMD). Le pack désactivé, VPX doit jouer le script de la table tel quel, comme si le pack n’avait jamais été installé.': 'Cyber Pinball had adapted {file} for the PuP-Pack (switch turned on, pack start or DMD frame recognition). With the pack disabled, VPX must play the table’s script as it is, as if the pack had never been installed.',
+  'Seuls les correctifs pour le core.vbs y restent.': 'Only the fixes for core.vbs remain in it.',
+  'Il n’a plus lieu d’être.': 'It is no longer needed.',
+  'Réparé de lui-même avant la prochaine partie.': 'Repaired by itself before the next game.',
+  'Refaire {file} sans le PuP-Pack': 'Redo {file} without the PuP-Pack',
+  '{pack} n’a pas pu être déplacé ({message}) : rien n’a changé. Un fichier du pack est peut-être ouvert (VPX, l’Explorateur).': '{pack} could not be moved ({message}): nothing changed. A file of the pack may be open (VPX, Explorer).',
+  'absent de pupvideos': 'not in pupvideos',
+  'absent de {folder}': 'not in {folder}',
+  'un autre {pack} est déjà dans pupvideos : c’est lui que charge le plugin': 'another {pack} is already in pupvideos: that is the one the plugin loads',
+  'copie désactivée : celui de pupvideos est chargé à sa place': 'disabled copy: the one in pupvideos is loaded instead',
+  'PuP-Pack désactivé : la table se joue sans lui': 'PuP-Pack disabled: the table plays without it',
+  '{file}, écrit par Cyber Pinball pour le PuP-Pack, part à la corbeille : le pack de « {table} » est désactivé.': '{file}, written by Cyber Pinball for the PuP-Pack, goes to the trash: the pack of “{table}” is disabled.',
 };

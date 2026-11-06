@@ -45,6 +45,7 @@ import {
   playfieldOrientation,
   readInfo,
   readTextIfExists,
+  IniDocument,
   recordPlay,
   ROLES,
   saveCabinet,
@@ -567,6 +568,7 @@ const library = createLibrary({
     const install = vpxInstall(loc);
     return install ? path.join(vpxPrefDir(install.version), 'vpinball.log') : undefined;
   },
+  pupFolder: () => IniDocument.parse(readTextIfExists(activeVpxIni(loc)) ?? '').get('Plugin.PUP', 'PUPFolder'),
   playfieldOrientation: () => {
     const cabinet = loadCabinet(loc.dataDir);
     return cabinet ? playfieldOrientation(cabinet, observedDisplays(), readTextIfExists(activeVpxIni(loc))) : undefined;
@@ -1137,6 +1139,8 @@ library.provideSystemItem('find-player', friendsMenu.items['find-player']);
 library.provideSystemItem('friend-requests', friendsMenu.items['friend-requests']);
 library.provideSystemItem('badges', friendsMenu.items.badges);
 library.provideSystemItem('sharing', friendsMenu.items.sharing);
+// « Ajouter une table > Depuis un ami… » : la bibliothèque d'un ami, ses tables absentes d'abord.
+library.provideAddFromFriend(friendsMenu.addFromFriend);
 // « Masquer les notifications pendant les parties » : Start bascule, le curseur reste sur l'entrée.
 library.provideSystemItem('quiet-in-game', {
   get detail() {
@@ -1180,7 +1184,7 @@ const power = createPowerMenu({
     state = { ...state, phase: 'message', help: false, message: { title, lines: [line], action: 'power' } };
     broadcast();
     saveSettings();
-    restoreTaskbars();
+    restoreTaskbars('power');
     // Le temps que chaque écran peigne l'écran noir avant que Windows n'agisse.
     await delay(600);
   },
@@ -2268,7 +2272,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // playfield reprend le premier plan. L'Explorateur ne range derrière une fenêtre plein écran que
   // la barre de l'écran qui a le premier plan : celles du DMD et du fronton, jamais au premier
   // plan, restaient devant. Le gardien des barres repasse une fois le menu revenu (taskbarguard.ts).
-  restoreTaskbars();
+  // Borne lancée au démarrage de Windows : elles restent masquées (restoresTaskbarsAt).
+  restoreTaskbars('game-end');
   const focusReturned = await showMenuAgain();
   settleScreens('return');
   // Son coupé pendant la partie (ou avant) : la pastille le rappelle au retour.

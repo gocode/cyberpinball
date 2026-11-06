@@ -36,6 +36,8 @@ import {
   partSources,
   partWebFiles,
   partWebQuery,
+  PUP_DISABLED_FOLDER,
+  PUP_FOLDER,
   searchVps,
   t,
   tableContents,
@@ -52,6 +54,7 @@ import {
   type PartOffer,
   type PartWanted,
   type TableEntry,
+  type TablePupSwitch,
   type TableGame,
   type VpsDb,
   type VpsGame,
@@ -93,8 +96,25 @@ export interface GamePartsContext {
   install(paths: string[], table: TableEntry, back?: () => void): void;
   pick?(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
   pupOptions(table: TableEntry): void;
+  /** PuP-Pack de la table : actif, désactivé, ce que le changement touche (pupdisabled.ts). */
+  pupSwitch(table: TableEntry): PupSwitchView;
+  /** Désactive ou réactive le PuP-Pack de la table ; ce qui a été fait, en une phrase. */
+  setPup(table: TableEntry, enable: boolean): { ok: boolean; text: string };
   medias(table: TableEntry): void;
   reload(file?: string): void;
+}
+
+/** Le PuP-Pack d'une table vu de « Parties du jeu » : le désactiver, le réactiver, et ce que ça touche. */
+export interface PupSwitchView {
+  sw: TablePupSwitch;
+  /** La table ne charge plus aucun pack : elle se joue comme sans pack (tableDisabledPacks). */
+  off: boolean;
+  /** Pourquoi rien ne peut changer (table sans dossier à elle) ; absent : possible. */
+  blocked?: string;
+  /** Copies du pack dans le dossier PinUP Player réglé dans VPX ([Plugin.PUP] PUPFolder), que le plugin chargerait encore. */
+  global: string[];
+  /** .vbs que Cyber Pinball avait adapté pour le pack (interrupteur, lancement, reconnaissance) : remis comme le script de la table. */
+  script?: string;
 }
 
 type Flash = { text: string; tone: Tone };
@@ -179,10 +199,11 @@ export function createGameParts(ctx: GamePartsContext) {
     const items = itemsOf(table);
     const script = ctx.script(table);
     const usesRom = script && !('error' in script) ? script.usesPinmame : undefined;
+    const pupOff = ctx.pupSwitch(table).off;
     const actions: Action[] = [];
     const rows: Row[] = GAME_PARTS.map((part, index) => {
       actions.push({ label: partLabel(part), run: () => openPart(table, part, index) });
-      return { ...partRow(part, parts.get(part), items.find((i) => i.kind === part), usesRom), action: index, pick: true };
+      return { ...partRow(part, parts.get(part), items.find((i) => i.kind === part), usesRom, part === 'pup' && pupOff), action: index, pick: true };
     });
     const received = items.filter((i) => i.state === 'received');
     if (received.length) {
@@ -214,9 +235,13 @@ export function createGameParts(ctx: GamePartsContext) {
     };
   }
 
-  /** Ligne d'une partie : présente, reçue, attendue, inutile ou absente. */
-  function partRow(part: GamePart, here: InstalledPart | undefined, item: WaitItem | undefined, usesRom: boolean | undefined): Row {
+  /** Ligne d'une partie : présente, désactivée (PuP-Pack), reçue, attendue, inutile ou absente. */
+  function partRow(part: GamePart, here: InstalledPart | undefined, item: WaitItem | undefined, usesRom: boolean | undefined, off = false): Row {
     const text = partLabel(part);
+    if (here && off) {
+      const names = here.entries.filter((e) => e.disabled).map((e) => path.basename(e.rel));
+      return { text, detail: [names.join(', '), formatSize(here.size), t('la table se joue sans lui')].filter(Boolean).join(' · '), badges: [t('Désactivé')], tone: 'quiet' };
+    }
     if (here) {
       const names = here.entries.map((e) => e.rel);
       const shown = names.length > 2 ? t('{names} et {n} autres', { names: names.slice(0, 2).join(', '), n: names.length - 2 }) : names.join(', ');
@@ -275,9 +300,11 @@ export function createGameParts(ctx: GamePartsContext) {
 
   function openPart(table: TableEntry, part: GamePart, from: number, at = 0): void {
     const key = `${table.file}|${part}`;
-    if (proposals?.key !== key) {
-      proposals = { key, sites: {} };
-      void presearch(table, part, proposals);
+    // PuP-Pack désactivé : rien à chercher ni à retélécharger tant qu'il l'est.
+    const off = part === 'pup' && ctx.pupSwitch(table).off;
+    if (proposals?.key !== key || off) {
+      proposals = off ? { key, sites: {}, downloads: [] } : { key, sites: {} };
+      if (!off) void presearch(table, part, proposals);
     }
     ctx.catalog.setRefresh(() => redraw(table, part, from));
     const build = () => buildPart(table.file, part, from);
@@ -338,6 +365,7 @@ export function createGameParts(ctx: GamePartsContext) {
     const item = itemsOf(table).find((i) => i.kind === part);
     const p = proposals?.key === `${table.file}|${part}` ? proposals : undefined;
     const after = () => openPart(table, part, from, ctx.cursor());
+    if (part === 'pup' && here && ctx.pupSwitch(table).off) return buildPupOff(table, here, from);
     const actions: Action[] = [];
     const cards: MediaCard[] = [];
 
@@ -386,6 +414,7 @@ export function createGameParts(ctx: GamePartsContext) {
     if (ctx.pick) actions.push({ label: t('Chercher un fichier ou un dossier…'), detail: PART_FOLDERS.has(part) ? t('Un fichier, ou tout un dossier (« Prendre ce dossier entier ») : Téléchargements, clé USB, disques, une autre installation') : t('Téléchargements de Cyber Pinball, clé USB, disques ; un dossier aussi'), run: () => void pickFile(table, part, from) });
     if (item?.state === 'received') actions.push({ label: t('Installer ce qui est reçu'), detail: t('Voir le plan'), tone: 'ok', run: () => ctx.catalog.installGame(item.gameId) });
     if (part === 'pup' && here) actions.push({ label: t('Options du PuP-Pack'), detail: t('Disposition des écrans'), run: () => ctx.pupOptions(table) });
+    if (part === 'pup' && here) actions.push(pupSwitchAction(table, from));
     if (part === 'media') actions.push({ label: t('Médias du jeu'), detail: t('Logo, fronton, vidéos, règles : ce que le menu montre'), run: () => ctx.medias(table) });
     if (here && part !== 'table' && part !== 'media') actions.push({ label: t('Réaffecter à une autre table'), detail: t('Elle quitte cette table pour une autre'), run: () => openMove(table, part, from) });
     if (here && part !== 'table') actions.push({ label: t('Retirer de la table'), detail: t('Corbeille de Cyber Pinball'), tone: 'error', run: () => confirmRemove(table, part, from) });
@@ -561,6 +590,105 @@ export function createGameParts(ctx: GamePartsContext) {
     );
   }
 
+  // ---------- PuP-Pack : le désactiver, le réactiver (pupdisabled.ts) ----------
+
+  /** « Désactiver le PuP-Pack », ou grisée avec sa raison. */
+  function pupSwitchAction(table: TableEntry, from: number): Action {
+    const view = ctx.pupSwitch(table);
+    const label = t('Désactiver le PuP-Pack');
+    if (view.blocked || !view.sw.active.length) return { label, detail: view.blocked ?? t('Aucun pack de cette table dans pupvideos'), tone: 'quiet', run: () => undefined };
+    return { label, detail: t('La table se joue sans ses vidéos ; réactivable à tout moment'), run: () => confirmPup(table, false, from) };
+  }
+
+  /** La partie PuP-Pack d'une table au pack désactivé : l'état et « Réactiver » ; rien n'est cherché. */
+  function buildPupOff(table: TableEntry, here: InstalledPart, from: number): Built {
+    const view = ctx.pupSwitch(table);
+    const back = () => open(table, from);
+    const actions: Action[] = [
+      view.blocked || !view.sw.disabled.length
+        ? { label: t('Réactiver le PuP-Pack'), detail: view.blocked ?? t('Aucun pack désactivé à ce nom'), tone: 'quiet', run: () => undefined }
+        : { label: t('Réactiver le PuP-Pack'), detail: t('Ses vidéos reviennent dès la prochaine partie, telles qu’avant'), tone: 'ok', run: () => confirmPup(table, true, from) },
+      { label: t('Options du PuP-Pack'), detail: t('PuP-Pack désactivé : réactivez-le d’abord'), tone: 'quiet', run: () => undefined },
+      { label: t('Retirer de la table'), detail: t('Corbeille de Cyber Pinball'), tone: 'error', run: () => confirmRemove(table, 'pup', from) },
+      { label: t('Retour : parties du jeu'), run: back },
+    ];
+    const rows: Row[] = [
+      { text: t('Désactivé'), detail: t('La table se joue sans ses vidéos, comme si le pack n’était pas installé. Rien n’est effacé : « Réactiver le PuP-Pack » le remet tel quel, avec son option.'), tone: 'info' },
+      { text: t('Dans la table'), detail: [here.entries.map((e) => `${e.rel}${path.sep}`).join(' · '), formatSize(here.size)].join(' · '), tone: 'quiet' },
+      ...view.sw.shared.map((o): Row => ({ text: o.title, detail: t('même dossier : se joue aussi sans ce pack'), tone: 'quiet' })),
+    ];
+    return {
+      heading: partLabel('pup'),
+      subheading: [table.title, t('désactivé')].join(' · '),
+      lead: t('Le pack est rangé à part, dans « {folder} » : VPX ne le trouve plus, et rien ne le réclame ni ne le retélécharge.', { folder: PUP_DISABLED_FOLDER }),
+      sections: [...takeFlash(), { rows }],
+      actions,
+      back,
+    };
+  }
+
+  /** Avant de désactiver ou de réactiver : les packs, les autres tables du dossier, ce qui resterait chargé. */
+  function confirmPup(table: TableEntry, enable: boolean, from: number): void {
+    const back = () => openPart(table, 'pup', from);
+    ctx.catalog.setRefresh(undefined);
+    ctx.show(
+      () => {
+        const view = ctx.pupSwitch(table);
+        const packs = enable ? view.sw.disabled : view.sw.active;
+        const here = partsOf(table).get('pup');
+        const sizeOf = (pack: string) => here?.entries.find((e) => path.basename(e.rel).toLowerCase() === pack.toLowerCase())?.size;
+        const folder = enable ? PUP_DISABLED_FOLDER : PUP_FOLDER;
+        const rows: Row[] = packs.map((p) => {
+          const size = sizeOf(p);
+          return { text: p, detail: [`${folder}${path.sep}${p}`, size !== undefined ? formatSize(size) : undefined].filter(Boolean).join(' · ') };
+        });
+        if (view.sw.shared.length) {
+          const tables = view.sw.shared.map((o) => `« ${o.title} »`).join(', ');
+          rows.push({
+            text: tn(view.sw.shared.length, 'Une autre table touchée', '{n} autres tables touchées'),
+            detail: enable ? t('{tables} : même dossier, même pack ; elles retrouveront aussi ses vidéos.', { tables }) : t('{tables} : même dossier, même pack ; elles se joueront aussi sans lui.', { tables }),
+            tone: 'warning',
+          });
+        }
+        if (!enable && view.global.length) {
+          rows.push({
+            text: t('Copie dans PinUP Player'),
+            detail: t('VPX chargera encore {list} (réglage « Dossier PinUP Player » de VPX) : ce pack-là continuera de s’afficher.', { list: view.global.join(', ') }),
+            tone: 'warning',
+          });
+        }
+        if (!enable && view.script) rows.push({ text: view.script, detail: t('adapté par Cyber Pinball pour le pack : remis comme le script de la table, sans interrupteur allumé ni lancement du pack'), tone: 'info' });
+        const go = enable ? t('Réactiver le PuP-Pack') : t('Désactiver le PuP-Pack');
+        return {
+          heading: enable ? t('Réactiver le PuP-Pack ?') : t('Désactiver le PuP-Pack ?'),
+          subheading: table.title,
+          lead: enable
+            ? t('Le pack revient dans pupvideos tel qu’il était : mêmes fichiers, même option. Ce que Cyber Pinball avait adapté dans le script pour le lancer est refait, et ses vidéos reviennent dès la prochaine partie.')
+            : t('Le pack passe dans « {folder} », à côté, sans rien effacer ni modifier : VPX ne le trouve plus et la table se joue comme s’il n’était pas installé. Rien ne le réclame ni ne le retélécharge ; « Réactiver le PuP-Pack » le remet tel quel.', { folder: PUP_DISABLED_FOLDER }),
+          sections: [{ rows }],
+          actions: [
+            { label: t('Annuler'), tone: 'ok', run: back },
+            packs.length && !view.blocked
+              ? { label: go, detail: packs.join(', '), tone: enable ? 'ok' : 'warning', run: () => switchPup(table, enable, from) }
+              : { label: go, detail: view.blocked ?? t('Plus rien à changer'), tone: 'quiet', run: () => undefined },
+          ],
+          back,
+          variant: 'facts',
+        };
+      },
+      0,
+      table.file,
+    );
+  }
+
+  function switchPup(table: TableEntry, enable: boolean, from: number): void {
+    const result = ctx.setPup(table, enable);
+    ctx.reload(table.file);
+    flash = { text: result.text, tone: result.ok ? 'ok' : 'error' };
+    proposals = undefined;
+    openPart(ctx.find(table.file) ?? table, 'pup', from);
+  }
+
   // ---------- Réaffecter, retirer ----------
 
   /** Où ira chaque fichier de la partie dans le dossier d'une autre table (nommé comme elle, s'il le faut). */
@@ -653,7 +781,11 @@ export function createGameParts(ctx: GamePartsContext) {
     open(table, from, { text: t('{part} retiré : dans la corbeille de Cyber Pinball.', { part: partLabel(part) }), tone: 'ok' });
   }
 
-  return { open };
+  return {
+    open,
+    /** Une partie de la table, ouverte directement (la fiche, pour le PuP-Pack). */
+    openPart: (table: TableEntry, part: GamePart) => openPart(table, part, GAME_PARTS.indexOf(part)),
+  };
 }
 
 /** Ce qu'est chaque partie, en une phrase (tête de son écran). */

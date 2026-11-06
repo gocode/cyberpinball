@@ -5,6 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { t } from './i18n';
+import { isPupFolderName, PUP_FOLDER } from './pupdisabled';
 import { findPackRoot, isJunkName } from './puppack';
 import { romContent } from './romzip';
 import { readScriptPatchFile } from './scriptpatch';
@@ -162,7 +163,7 @@ export function inventory(tableFile: string, ownFolder: boolean): TableInventory
     backglass: backglass ? path.basename(backglass) : undefined,
     strayBackglasses: ownFolder ? b2s.filter((f) => !backglass || lower(f) !== lower(path.basename(backglass))) : [],
     roms: ownFolder ? listSafe(path.join(folder, 'pinmame', 'roms')).filter((f) => lower(f).endsWith('.zip')) : [],
-    pup: ownFolder ? listDirs(path.join(folder, 'pupvideos')) : [],
+    pup: ownFolder ? listDirs(path.join(folder, PUP_FOLDER)) : [],
     serum: ownFolder ? listDirs(path.join(folder, 'serum')) : [],
     vni: ownFolder ? listDirs(path.join(folder, 'vni')) : [],
     altsound: ownFolder ? listDirs(path.join(folder, 'altsound')) : [],
@@ -222,7 +223,7 @@ export function classifyDir(name: string, dir: string, parents: string[] = [], d
   const lower = name.toLowerCase();
   const parent = (parents.at(-1) ?? '').toLowerCase();
   if (IGNORED_DIRS.has(lower)) return 'ignored';
-  if (parent === 'pupvideos') return 'pup';
+  if (isPupFolderName(parent)) return 'pup';
   if (parent === 'altsound') return 'altsound';
   if (parent === 'serum') return 'serum';
   if (parent === 'vni') return 'vni';

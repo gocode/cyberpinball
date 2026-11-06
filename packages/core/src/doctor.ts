@@ -56,6 +56,7 @@ import {
   relocateScreen,
   screenCustomPos,
   type PupPackInfo,
+  type PupLoadFacts,
   type PupLoader,
   playlistRenames,
   screenRole,
@@ -70,7 +71,7 @@ import {
 } from './puppack';
 import { addCaptureWatch, backgroundTriggers, captureBlock, captureSettings, captureWatchLines, readCaptures, sameCapture, type CaptureBlocker } from './pupcapture';
 import { buildScriptPatch, ownCapture, readScriptPatch, scriptPatchState, type ScriptPatchState } from './scriptpatch';
-import { applyCompatFixes, compatFixesApplied, compatFixesForStop, compatFixesFound, vpmInitCallCount, type CompatFix } from './scriptcompat';
+import { applyCompatFixes, compatFixesApplicable, compatFixesApplied, compatFixesForStop, compatFixesFound, vpmInitCallCount, type CompatFix } from './scriptcompat';
 import { aliasFor, historicAlias, neighbourRom, neighbourWarning, readTableAliases, romFamilyOf, tableAliasFile, withAlias, withoutAlias } from './romalias';
 import { listRoms, romFile, sameRomContent, sameRomFile, storedRom } from './romlibrary';
 import { isChipName, listRelative, readZipEntries, romContent, type RomZipMember } from './romzip';
@@ -85,6 +86,7 @@ import { vpxPlayedFlipperEdge } from './vpx';
 import { scriptCode } from './vbscript';
 import { readVpxScript, readVpxTableName } from './vpxinfo';
 import { describeRenames, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
+import { activePacks, disabledPacks, isPupFolderName, packsOfTable, PUP_DISABLED_FOLDER, PUP_FOLDER, pupVideosDir } from './pupdisabled';
 import { ratioLabel } from './zones';
 
 export type FindingSeverity = 'error' | 'warning' | 'info';
@@ -138,6 +140,8 @@ export const FINDING_CODES = [
   'pupCaptureRom',
   'pupCaptureUnseen',
   'pupLog',
+  'pupPackDisabled',
+  'pupPackDisabledScript',
   'manualView',
   'tableOrientation',
   'tableWindows',
@@ -327,9 +331,8 @@ export interface TablePupPack {
  */
 export function tablePupPacks(entry: TableEntry, borne?: PupCabinet): TablePupPack[] {
   const cabinet = withTableBackglass(entry, borne);
-  const pupName = listSafe(entry.folder).find((f) => f.toLowerCase() === 'pupvideos');
-  if (!pupName) return [];
-  const pupvideos = path.join(entry.folder, pupName);
+  const pupvideos = pupVideosDir(entry.folder);
+  if (!pupvideos) return [];
   return listDirs(pupvideos).flatMap((pack) => {
     const dir = path.join(pupvideos, pack);
     const info = analysePack(findPackRoot(dir) ?? dir);
@@ -461,8 +464,10 @@ export function diagnose(entry: TableEntry, ctx: DoctorContext): Finding[] {
   // tiré du script actuel de la table.
   const vbs = has(`${base}.vbs`);
   const override = vbs ? readOverride(entry, path.join(folder, vbs)) : undefined;
+  // Pack désactivé : le .vbs périmé est refait sans PuP (pupPackDisabledScript, dans checkPup).
+  const pupOff = ownFolder && tableDisabledPacks(entry, ctx.script && !('error' in ctx.script) ? ctx.script : undefined).length > 0;
   if (override?.state.kind === 'stale') {
-    findings.push(staleFinding(override));
+    if (!pupOff) findings.push(staleFinding(override));
   } else if (vbs && override?.state.kind !== 'ours') {
     findings.push({
       code: 'scriptOverride',
@@ -1025,7 +1030,7 @@ export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops
  * 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack), et une table que le core.vbs
  * arrête ne démarre pas (Back to the Future, 30 octobre 2026 : vpmInit appelé deux fois).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['scriptCoreCompat', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['scriptCoreCompat', 'pupPackDisabledScript', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -1042,7 +1047,8 @@ export function pupPlayRepairs(entry: TableEntry, ctx: DoctorContext): Finding[]
   const vbs = listSafe(entry.folder).find((f) => f.toLowerCase() === `${base.toLowerCase()}.vbs`);
   const override = vbs ? readOverride(entry, path.join(entry.folder, vbs)) : undefined;
   const found: Finding[] = [];
-  if (override?.state.kind === 'stale') found.push(staleFinding(override));
+  const pupOff = tableDisabledPacks(entry, script && !('error' in script) ? script : undefined).length > 0;
+  if (override?.state.kind === 'stale' && !pupOff) found.push(staleFinding(override));
   const compat = coreCompatFinding(entry, { ...ctx, script }, override);
   if (compat) found.push(compat);
   found.push(...checkPup(entry, { ...ctx, script, vpxLog: undefined }, override));
@@ -1309,13 +1315,86 @@ function pupCaptureFinding(entry: TableEntry, pack: string, root: string, overri
   };
 }
 
+/**
+ * PuP-Packs de la table désactivés (pupdisabled.ts), quand elle n'en charge plus aucun d'actif :
+ * pour la partie, c'est une table sans pack. [] sinon (aucun pack désactivé, ou un pack actif
+ * qu'elle charge l'emporte). Le médecin, la santé, le parcours et la préparation de chaque partie
+ * passent par là : un pack désactivé n'est ni réclamé, ni rallumé, ni relancé.
+ */
+export function tableDisabledPacks(entry: TableEntry, facts: PupLoadFacts | undefined): string[] {
+  const off = disabledPacks(entry.folder);
+  if (!off.length) return [];
+  const expected = facts ? expectedPackNames(facts) : undefined;
+  const alone = listSafe(entry.folder).filter((f) => f.toLowerCase().endsWith('.vpx')).length <= 1;
+  const mine = packsOfTable(off, expected, alone);
+  if (!mine.length) return [];
+  const active = activePacks(entry.folder);
+  const loadsActive = expected?.length ? active.some((a) => expected.some((e) => e.toLowerCase() === a.toLowerCase())) : active.length > 0;
+  return loadsActive ? [] : mine;
+}
+
+/** Constats d'une table au pack désactivé : l'état, et le .vbs de Cyber Pinball à remettre sans PuP. */
+function pupOffFindings(entry: TableEntry, packs: string[], override: Override | undefined): Finding[] {
+  const findings: Finding[] = [
+    {
+      code: 'pupPackDisabled',
+      severity: 'info',
+      title: t('PuP-Pack désactivé'),
+      detail: t('{list} : désactivé dans « Parties du jeu ». La table se joue sans ses vidéos, comme si le pack n’était pas installé ; « Réactiver le PuP-Pack » le remet tel quel.', {
+        list: formatList(packs.map((p) => `${PUP_DISABLED_FOLDER}\\${p}`)),
+      }),
+    },
+  ];
+  const script = pupOffScriptFinding(entry, override);
+  if (script) findings.push(script);
+  return findings;
+}
+
+/**
+ * Le .vbs de Cyber Pinball encore adapté pour le pack désactivé (interrupteurs allumés, lancement
+ * ajouté, reconnaissance des images du DMD), ou tiré d'une ancienne version de la table : refait
+ * d'après le script de la table sans rien de PuP (seuls les correctifs du core.vbs restent), ou mis
+ * à la corbeille s'il n'avait que ça. Sans pack, une PuP-DMD allumée laisserait le DMD sans score, et
+ * un script qui ne joue sa musique que sans PuP (2001 : « if usepup = false then PlaySound ») se
+ * tairait. Un .vbs venu d'ailleurs n'est pas touché. Réparé avant chaque partie (PUP_PLAY_REPAIRS).
+ */
+function pupOffScriptFinding(entry: TableEntry, override: Override | undefined): Finding | undefined {
+  if (!override || override.state.kind === 'foreign') return undefined;
+  const { patch } = override.state;
+  const pupParts = patch.switches.length > 0 || Boolean(patch.loader) || Boolean(patch.capture);
+  if (!pupParts && override.state.kind === 'ours') return undefined;
+  const embedded = readVpxScript(entry.file);
+  const compat = embedded !== undefined ? compatFixesApplicable(patch.compat ?? [], scriptCode(embedded)) : [];
+  const content = embedded !== undefined && compat.length ? buildScriptPatch(embedded, [], undefined, undefined, compat) : undefined;
+  if (content !== undefined && content === override.text) return undefined;
+  const file = path.basename(override.file);
+  return {
+    code: 'pupPackDisabledScript',
+    severity: 'warning',
+    // Sans rien de PuP, seulement périmé (table mise à jour) : refait, mais sans rallumer le pack.
+    title: pupParts ? t('Script encore adapté pour le PuP-Pack désactivé') : t('Script adapté pour une ancienne version de la table'),
+    detail: [
+      pupParts
+        ? t('Cyber Pinball avait adapté {file} pour le PuP-Pack (interrupteur allumé, lancement du pack ou reconnaissance des images du DMD). Le pack désactivé, VPX doit jouer le script de la table tel quel, comme si le pack n’avait jamais été installé.', { file })
+        : t('Cyber Pinball a écrit {file} d’après le script d’une version précédente de la table : VPX joue cet ancien script avec la nouvelle table.', { file }),
+      content ? t('Seuls les correctifs pour le core.vbs y restent.') : t('Il n’a plus lieu d’être.'),
+      t('Réparé de lui-même avant la prochaine partie.'),
+    ].join(' '),
+    fix: content
+      ? { label: t('Refaire {file} sans le PuP-Pack', { file }), ops: [{ op: 'write', path: override.file, content, encoding: 'latin1' }] }
+      : { label: t('Mettre {file} à la corbeille', { file }), ops: [{ op: 'trash', path: override.file }] },
+  };
+}
+
 /** Règles du § 4.4 de la recherche sur les PuP-Packs, sans lancer VPX. */
 function checkPup(entry: TableEntry, context: DoctorContext, override?: Override): Finding[] {
   const ctx = { ...context, cabinet: withTableBackglass(entry, context.cabinet) };
   const folder = entry.folder;
   const facts = ctx.script && !('error' in ctx.script) ? ctx.script : undefined;
-  const pupName = listSafe(folder).find((f) => f.toLowerCase() === 'pupvideos');
-  const pupDir = pupName ? path.join(folder, pupName) : undefined;
+  // Pack désactivé (pupdisabled.ts) : la table se joue comme sans pack ; rien n'est réclamé.
+  const disabled = tableDisabledPacks(entry, facts);
+  if (disabled.length) return pupOffFindings(entry, disabled, override);
+  const pupDir = pupVideosDir(folder);
   const packs = pupDir ? listDirs(pupDir) : [];
   if (!facts?.pup && !packs.length) return [];
   const findings: Finding[] = [];
@@ -1329,7 +1408,7 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
   const matching = packs.filter((p) => expected.some((e) => same(e, p)));
   // Un pack attendu par une autre version du dossier n'est ni orphelin ni à renommer.
   const others = packs.filter((p) => !matching.includes(p) && !(ctx.otherPackNames ?? []).some((n) => same(n, p)));
-  const pupvideos = pupDir ?? path.join(folder, 'pupvideos');
+  const pupvideos = pupDir ?? path.join(folder, PUP_FOLDER);
 
   // Dossier en double : pupvideos\X\X\screens.pup, ou dossier d'archive en trop.
   const nested = new Set<string>();
@@ -1821,7 +1900,7 @@ const FILE_ERRORS: readonly MediaErrorKind[] = ['decode', 'unsupported', 'image'
 /** Dossiers d'un PuP-Pack, d'une ROM ou d'un DMD dessiné par le script : jamais des médias du menu. */
 function notMediaFolder(name: string, dmdFolder: string | undefined): boolean {
   const n = name.toLowerCase();
-  return ['medias', 'pupvideos', 'pinmame', 'cache'].includes(n) || n === dmdFolder?.toLowerCase() || /\.ultradmd$|flexdmd/i.test(n);
+  return ['medias', 'pinmame', 'cache'].includes(n) || isPupFolderName(n) || n === dmdFolder?.toLowerCase() || /\.ultradmd$|flexdmd/i.test(n);
 }
 
 /** Fichiers d'un dossier, sous-dossiers compris. */
@@ -2788,7 +2867,7 @@ function findFile(dir: string, names: string[], exclude: string, depth = 3): str
   if (depth === 0) return undefined;
   for (const dirent of readDirents(dir)) {
     const p = path.join(dir, dirent.name);
-    if (!dirent.isDirectory() || isInside(p, exclude) || ['cache', 'pupvideos', 'medias'].includes(dirent.name.toLowerCase())) continue;
+    if (!dirent.isDirectory() || isInside(p, exclude) || ['cache', 'medias'].includes(dirent.name.toLowerCase()) || isPupFolderName(dirent.name)) continue;
     const found = findFile(p, names, exclude, depth - 1);
     if (found) return found;
   }

@@ -27,6 +27,7 @@ import {
   UNREADABLE_FORMATS,
   type MediaType,
 } from './medias';
+import { isPupFolderName } from './pupdisabled';
 import { nameKey } from './tablefiles';
 import { parseTableName, type TableEntry } from './tables';
 import { matchVps, type VpsDb } from './vps';
@@ -82,7 +83,7 @@ const DISTINCTIVE_POPPER = new Set(['wheel', 'playfield', 'audiolaunch', 'gamein
 const PINBALLX_FLYER_PAGES = /^(front|back|inside\s*(\d+))$/i;
 
 /** Dossiers jamais parcourus dans une installation : les PuP-Packs ont aussi des dossiers « Backglass », « Topper »… */
-const SKIPPED_DIRS = new Set(['pupvideos', 'recordings', '__macosx', '.git']);
+const SKIPPED_DIRS = new Set(['recordings', '__macosx', '.git']);
 
 /**
  * Dossier de médias d'un frontend, ou undefined. parents : dossiers au-dessus
@@ -435,7 +436,7 @@ export function scanInstallation(root: string, maxDepth = 6): InstallationScan {
     for (const d of dirents) {
       const p = path.join(dir, d.name);
       if (d.isDirectory()) {
-        if (SKIPPED_DIRS.has(d.name.toLowerCase())) continue;
+        if (SKIPPED_DIRS.has(d.name.toLowerCase()) || isPupFolderName(d.name)) continue;
         const inner = folder ? mediaSubFolder(folder, d.name) : mediaFolder(d.name, parents, siblings);
         if (inner) walk(p, [...parents, d.name], inner, depth + 1);
         else if (!folder && depth < maxDepth) walk(p, [...parents, d.name], undefined, depth + 1);

@@ -12,6 +12,7 @@ import { t } from './i18n';
 import { IniDocument } from './ini';
 import { resolveRoleMedia, type ResolvedMedia } from './medias';
 import type { Cabinet, DmdKind, Rect } from './model';
+import { pupVideosDir } from './pupdisabled';
 import { analysePack, findPackRoot, pupWindows } from './puppack';
 import { readInfo, type TableEntry } from './tables';
 import { findTableIni } from './vpx-settings';
@@ -63,9 +64,8 @@ export function pupInDmdWindow(entry: TableEntry, facts: ScriptFacts | undefined
   if (facts && (!facts.pup || facts.pup.disabledBy)) return false;
   const ini = findTableIni(entry.file);
   if (ini.exists && IniDocument.parse(fs.readFileSync(ini.path, 'utf8')).get('ScoreView', 'Priority.PUP')?.trim() === '0') return false;
-  const pupName = listSafe(entry.folder).find((f) => f.toLowerCase() === 'pupvideos');
-  if (!pupName) return false;
-  const pupvideos = path.join(entry.folder, pupName);
+  const pupvideos = pupVideosDir(entry.folder);
+  if (!pupvideos) return false;
   return listSafe(pupvideos).some((pack) => {
     const dir = path.join(pupvideos, pack);
     try {

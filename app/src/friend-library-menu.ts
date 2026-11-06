@@ -121,9 +121,15 @@ export interface FriendLibraryMenuHost {
 }
 
 export interface FriendLibraryMenu {
-  open(key: string, back: () => void): void;
+  /** `forAdd` : ouverte depuis « Ajouter une table » ; ses tables absentes de la borne d'abord. */
+  open(key: string, back: () => void, forAdd?: boolean): void;
   /** Ce que la fiche de l'ami dit de sa bibliothèque. */
   detail(key: string): string;
+  /**
+   * Pour « Ajouter une table > Depuis un ami » : combien de ses tables sont absentes de la borne
+   * (undefined tant que sa bibliothèque n'est pas là), et ce que sa ligne en dit.
+   */
+  addView(key: string): { absent?: number; detail: string };
   /**
    * Ses tables pour choisir celle d'une partie en direct (livechoice.ts) : le jeu, la taille du
    * .vpx, et la version stricte de celles qui peuvent être les miennes, demandée à sa borne.
@@ -260,15 +266,30 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     setImmediate(reopen);
   }
 
-  function open(key: string, back: () => void): void {
+  function open(key: string, back: () => void, forAdd = false): void {
     awaiting = content.library(key).state === 'loading' ? `library:${key}` : undefined;
-    host.library.openCustom(() => buildLibrary(key, back));
+    host.library.openCustom(() => buildLibrary(key, back, forAdd));
   }
 
-  function buildLibrary(key: string, back: () => void): Built {
+  function addView(key: string): { absent?: number; detail: string } {
+    const s = content.library(key);
+    if (s.state !== 'ready') return { detail: detail(key) };
+    const absent = matchLibrary(s.library, mine()).filter((m) => !m.mine).length;
+    const n = s.library.tables.length;
+    return {
+      absent,
+      detail: absent
+        ? t('{tables}, {absent}', { tables: tn(n, '{n} table', '{n} tables'), absent: tn(absent, 'dont {n} absente de votre borne', 'dont {n} absentes de votre borne') })
+        : n
+          ? t('{tables}, toutes déjà sur votre borne : leurs parties et médias à prendre', { tables: tn(n, '{n} table', '{n} tables') })
+          : t('Aucune table dans sa bibliothèque'),
+    };
+  }
+
+  function buildLibrary(key: string, back: () => void, forAdd = false): Built {
     const plain = friendName(key);
     const s = content.library(key);
-    reopenWhenReady(`library:${key}`, s.state !== 'loading', () => open(key, back));
+    reopenWhenReady(`library:${key}`, s.state !== 'loading', () => open(key, back, forAdd));
     const actions: Action[] = [];
     const sections: Section[] = [...takeFlash()];
     if (s.state !== 'ready') {
@@ -284,7 +305,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       const row = (m: LibraryMatch): Row => {
         // Une réception de cette table déjà demandée : Start montre où elle en est, jamais une seconde.
         const job = receptionOf(key, m.entry.id, m.mine);
-        const home = () => open(key, back);
+        const home = () => open(key, back, forAdd);
         const index = actions.push({ label: titleOf(m.entry.table), key: `table:${m.entry.id}`, icon: 'tables', run: () => (job ? showTransfer(job.id, home) : openTable(key, m.entry.id, home)) }) - 1;
         const missing = m.mine ? missingMedias(m.entry, have(m.mine)).length : 0;
         if (job)
@@ -310,16 +331,25 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
       const both = matches.filter((m) => m.mine);
       const other = matches.filter((m) => !m.mine);
       if (!matches.length) sections.push({ rows: [{ text: t('Aucune table dans sa bibliothèque'), tone: 'info' }] });
-      if (both.length) sections.push({ title: t('Sur votre borne ({n})', { n: both.length }), rows: both.slice(0, SHOWN).map(row), ...(both.length > SHOWN ? { more: both.length - SHOWN } : {}) });
-      if (other.length) sections.push({ title: t('Absentes de votre borne ({n})', { n: other.length }), rows: other.slice(0, SHOWN).map(row), ...(other.length > SHOWN ? { more: other.length - SHOWN } : {}) });
+      // Depuis « Ajouter une table » : ses tables qu'on n'a pas d'abord. Les lignes (et leurs actions)
+      // naissent dans l'ordre de l'écran : le curseur arrive sur la première montrée.
+      const groups: [LibraryMatch[], string][] = [
+        [both, t('Sur votre borne ({n})', { n: both.length })],
+        [other, t('Absentes de votre borne ({n})', { n: other.length })],
+      ];
+      for (const [list, title] of forAdd ? groups.reverse() : groups) {
+        if (list.length) sections.push({ title, rows: list.slice(0, SHOWN).map(row), ...(list.length > SHOWN ? { more: list.length - SHOWN } : {}) });
+      }
     }
-    actions.push({ label: t('Actualiser'), icon: 'refresh', run: () => { content.refresh(key); open(key, back); } });
+    actions.push({ label: t('Actualiser'), icon: 'refresh', run: () => { content.refresh(key); open(key, back, forAdd); } });
     actions.push({ label: t('Retour'), icon: 'back', run: back });
     return {
       heading: t('Bibliothèque de {name}', { name: plain }),
       icon: 'tables',
       subheading: displayName(plain, key),
-      lead: t('Récupérez les médias de {name}. Retrouvez ses autres tables dans le catalogue.', { name: plain }),
+      lead: forAdd
+        ? t('Ses tables absentes de votre borne d’abord : choisissez-en une pour la récupérer. Chaque fichier est vérifié à l’arrivée, puis le plan d’ajout montre tout avant d’installer.')
+        : t('Récupérez les médias de {name}. Retrouvez ses autres tables dans le catalogue.', { name: plain }),
       sections,
       actions,
       back,
@@ -811,6 +841,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
   return {
     open,
     detail,
+    addView,
     openMatching(key, identity, back, want) {
       const entry = ready(key)?.tables.find((x) => sameTable(x.table, identity));
       if (!entry) return open(key, back);

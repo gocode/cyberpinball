@@ -46,6 +46,7 @@ import { buildScriptPatch, readScriptPatch } from './scriptpatch';
 import { compatFixesApplicable, compatFixesFound } from './scriptcompat';
 import { scriptCode } from './vbscript';
 import { readVpxScript } from './vpxinfo';
+import { disabledPacks, PUP_DISABLED_FOLDER, PUP_FOLDER } from './pupdisabled';
 
 export interface ImportSource {
   /** Fichier ou dossier sur le disque (une archive déjà déballée est un dossier). */
@@ -180,6 +181,11 @@ export interface PackPlan {
   flattened: boolean;
   /** Pack déjà installé, remplacé en entier (l'ancien part à la corbeille). */
   replaces?: string;
+  /**
+   * Le pack de ce nom est désactivé dans la table (pupdisabled.ts) : le nouveau prend sa place
+   * dans pupvideos (off), et la table se joue toujours sans lui jusqu'à « Réactiver ».
+   */
+  disabled?: boolean;
   variants: PupVariant[];
   /** .bat d'options lus sans succès : jamais exécutés. */
   failedBats: BatReport[];
@@ -1006,8 +1012,10 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
  * ou retiré s'il ne sert plus. Un .vbs venu d'ailleurs n'est jamais remplacé.
  */
 function planScriptPatches(game: Game, steps: ImportStep[], opts: PlanOptions, warnings: string[]): ScriptPatchPlan[] {
-  const packs = [...steps.flatMap((s) => (s.pack ? [s.pack.name] : [])), ...listSafe(path.join(game.folder, 'pupvideos'))].map((n) => n.toLowerCase());
-  const incoming = steps.flatMap((s) => (s.pack ? [s.pack.name.toLowerCase()] : []));
+  // Un pack désactivé (pupdisabled.ts) ne compte pas : rien n'est allumé pour lui.
+  const packs = [...steps.flatMap((s) => (s.pack && !s.pack.disabled ? [s.pack.name] : [])), ...listSafe(path.join(game.folder, PUP_FOLDER))].map((n) => n.toLowerCase());
+  const incoming = steps.flatMap((s) => (s.pack && !s.pack.disabled ? [s.pack.name.toLowerCase()] : []));
+  const disabledNames = disabledPacks(game.folder).map((n) => n.toLowerCase());
   const out: ScriptPatchPlan[] = [];
   /**
    * Le pack que la table chargera occupe-t-il la fenêtre du DMD ? D'après l'option retenue pour
@@ -1018,8 +1026,8 @@ function planScriptPatches(game: Game, steps: ImportStep[], opts: PlanOptions, w
     const same = (n: string) => names.some((m) => m.toLowerCase() === n.toLowerCase());
     const step = steps.find((s) => s.pack && same(s.pack.name));
     if (step?.pack) return step.pack.choice.chosen?.traits.windows?.dmd ?? packDrawsDmd(step.from);
-    const there = listSafe(path.join(game.folder, 'pupvideos')).find(same);
-    return there !== undefined && packDrawsDmd(path.join(game.folder, 'pupvideos', there));
+    const there = listSafe(path.join(game.folder, PUP_FOLDER)).find(same);
+    return there !== undefined && packDrawsDmd(path.join(game.folder, PUP_FOLDER, there));
   };
   const consider = (source: string, vpx: string, names: string[], off: boolean, packsThere: string[]) => {
     const to = vpx.replace(/.vpx$/i, '.vbs');
@@ -1033,7 +1041,9 @@ function planScriptPatches(game: Game, steps: ImportStep[], opts: PlanOptions, w
     const packThere = names.some((n) => packsThere.includes(n.toLowerCase()));
     if (!packThere && !ours) return;
     const script = readVpxScript(source);
-    const switches = script !== undefined ? pupSwitchesToEnable(scriptCode(script), drawsDmd(names)) : [];
+    // Pack désactivé : la table se joue avec son script tel quel, sans interrupteur allumé.
+    const disabledHere = !packThere && names.some((n) => disabledNames.includes(n.toLowerCase()));
+    const switches = script !== undefined && !disabledHere ? pupSwitchesToEnable(scriptCode(script), drawsDmd(names)) : [];
     const wanted = packThere && (off || switches.length > 0);
     if (!wanted && !ours) return;
     const sw = switches[0];
@@ -1052,7 +1062,11 @@ function planScriptPatches(game: Game, steps: ImportStep[], opts: PlanOptions, w
       warnings.push(t('Le script de « {table} » coupe le PuP-Pack ({values}) : Cyber Pinball l’allume dans {file}, sans modifier la table.', params));
     } else if (ours) {
       out.push({ to });
-      warnings.push(t('{file}, écrit par Cyber Pinball pour l’ancienne version de la table, part à la corbeille : le nouveau script ne coupe plus le PuP-Pack.', params));
+      warnings.push(
+        disabledHere
+          ? t('{file}, écrit par Cyber Pinball pour le PuP-Pack, part à la corbeille : le pack de « {table} » est désactivé.', params)
+          : t('{file}, écrit par Cyber Pinball pour l’ancienne version de la table, part à la corbeille : le nouveau script ne coupe plus le PuP-Pack.', params),
+      );
     } else if (sw) {
       warnings.push(t('Le script de « {table} » coupe le PuP-Pack ({values}) : mettez {enables} dans son script.', params));
     } else if (wanted) {
@@ -1146,9 +1160,12 @@ function planPack(item: Item, game: Game, opts: PlanOptions, info: TableInfoFile
   const same = (a: string, b: string) => a.toLowerCase() === b.toLowerCase();
   const expected = game.pupNames;
   const name = expected.find((n) => same(n, origin)) ?? expected[0] ?? origin;
-  const pupvideos = path.join(game.folder, 'pupvideos');
+  // Un pack désactivé le reste : sa mise à jour se range avec lui, jamais dans pupvideos.
+  const disabled = disabledPacks(game.folder).some((f) => same(f, name));
+  const home = disabled ? PUP_DISABLED_FOLDER : PUP_FOLDER;
+  const pupvideos = path.join(game.folder, home);
   const existing = listSafe(pupvideos).find((f) => same(f, name));
-  const step = add(item, path.join('pupvideos', name), root);
+  const step = add(item, path.join(home, name), root);
   if (!step) return;
   const analysis = analysePack(root);
   const key = step.to.toLowerCase();
@@ -1170,6 +1187,7 @@ function planPack(item: Item, game: Game, opts: PlanOptions, info: TableInfoFile
     expected,
     flattened: !samePath(root, item.path),
     replaces: existing ? path.join(pupvideos, existing) : undefined,
+    ...(disabled ? { disabled } : {}),
     variants: analysis.variants,
     failedBats: analysis.bats.filter((b) => !b.ok),
     choice,

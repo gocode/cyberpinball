@@ -1462,6 +1462,36 @@ A table whose PuP-Pack is made for a single large 16:9 screen: the score at the 
 | 775 | 16:9 FullDMD | Setup whose DMD screen is a 16:9 FullDMD (3-screen PC), same table. | The score keeps the proportions of the backglass: “Credits”, “Players” and “Balls” side by side without overlapping, digits at normal size, band centred on the screen. Switching from one setup to the other reframes the score before the next game. |
 | 776 | Backglass and DMD of the same model | PC whose backglass and DMD are two screens with the same name (two PL2294H), same table. | The backglass shows the pack's six videos for the whole game; the menu log never says “est réduite par Windows”. |
 
+## PuP-Pack disabled
+
+A table with a PuP-Pack that shows during the game (preferably *2001: A Space Odyssey*, whose script switches the pack off, or a ROM table), and if possible a second version of the same table in its folder.
+
+| # | Scenario | How | Expected result |
+|---|---|---|---|
+| 777 | Disable, then re-enable | Details > "Game parts" > "PuP-Pack" > "Disable the PuP-Pack"; read the confirmation screen, then "Disable the PuP-Pack". Play. Come back, "Re-enable the PuP-Pack", play. | The confirmation names the pack, its size and, if there is one, the `.vbs` put back like the table's script. Afterwards: the "PuP-Pack" row says "Disabled", the details screen "PuP-Pack · disabled", the table folder has `pupvideos (off)\<pack>` and no `pupvideos` any more. The game plays without any of the pack's videos, with the usual backglass and DMD (2001: its music plays). The doctor only says "PuP-Pack disabled"; "What's missing to play" offers nothing for the pack. Re-enabled: the pack and its videos come back from the next game, with the same option. |
+| 778 | Shared pack, and nothing switches it back on | Same thing on a table whose folder holds another version using the same pack; disable from the first one, play both, open cabinet health, then re-enable from the second one. | The confirmation says "One other table affected" and names it. Both versions play without the pack, no repair before the game puts it back; cabinet health does not report it. Re-enabling from the second version gives the pack back to both. |
+
+## Taskbars when the cabinet starts with Windows
+
+On the PinCab, "Lancer au démarrage de Windows" (Start with Windows) turned on (System menu > "Borne" (Cabinet) > "Lancement au démarrage" (Start with Windows)), at least two screens.
+
+| # | Scenario | How | Expected result |
+|---|---|---|---|
+| 779 | Windows starts | Restart the PC, wait for the table menu. | No taskbar on any screen, neither in the menu nor during or after a game. `journal.txt`: "Borne lancée au démarrage de Windows : barres des tâches masquées tant que le menu est là." |
+| 780 | Windows desktop, then back | System menu > "Borne" > "Bureau Windows" (Windows desktop); then Ctrl+Shift+D. Do it again with Ctrl+Shift+D from the menu. | On the desktop, the taskbars are there on every screen; back in the menu, they disappear again. |
+| 781 | Quit | System menu > "Cyber Pinball" > "Quitter Cyber Pinball" (Quit Cyber Pinball). | The taskbars come back on every screen. |
+| 782 | Abrupt stop | Task Manager (Ctrl+Alt+Del) > "End task" on Cyber Pinball. | About ten seconds later, the taskbars come back by themselves. |
+| 783 | Started by hand, without the setting | "Ne plus lancer au démarrage" (Stop starting with Windows), then start Cyber Pinball from its shortcut. | As before: the taskbars are hidden only during a game. |
+
+## Adding a table from a friend
+
+Two friend cabinets online, one with its library shared and at least one table the other does not have.
+
+| # | Scenario | How | Expected result |
+|---|---|---|---|
+| 784 | Choose a friend | System menu > "Tables" > "Ajouter une table" (Add a table) > "Depuis un ami…" (From a friend…). | The friend at the top, "<n> à prendre" (<n> to take), "… tables, dont <n> absentes de votre borne" (… tables, <n> of them missing from your cabinet); an offline friend is greyed out with "Hors ligne : sa bibliothèque se voit quand sa borne est allumée" (Offline: their library shows when their cabinet is on). |
+| 785 | Get a table | Start on the friend, then on the first table, "Récupérer toute la table" (Get the whole table). | Their library opens on "Absentes de votre borne" (Missing from your cabinet), the cursor on the first one; the reception then the add plan, as from their friend page. "Retour" (Back) returns to the list of friends, then to "Ajouter une table". |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

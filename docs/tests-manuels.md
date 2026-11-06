@@ -1462,6 +1462,36 @@ Une table dont le PuP-Pack est fait pour un seul grand écran 16:9 : le score da
 | 775 | FullDMD 16:9 | Configuration dont l'écran DMD est un FullDMD 16:9 (poste à 3 écrans), même table. | Le score garde les proportions du fronton : « Credits », « Players » et « Balls » côte à côte sans se chevaucher, chiffres de taille normale, bande centrée sur l'écran. Passer d'une configuration à l'autre recadre le score avant la partie suivante. |
 | 776 | Fronton et DMD de même modèle | Poste dont le fronton et le DMD sont deux écrans du même nom (deux PL2294H), même table. | Le fronton montre les six vidéos du pack pendant toute la partie ; le journal du menu ne dit jamais « est réduite par Windows ». |
 
+## PuP-Pack désactivé
+
+Une table à PuP-Pack qui se voit en partie (de préférence *2001 : A Space Odyssey*, dont le script coupe le pack, ou une table à ROM), et si possible une seconde version de la même table dans son dossier.
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 777 | Désactiver puis réactiver | Fiche > « Parties du jeu » > « PuP-Pack » > « Désactiver le PuP-Pack » ; lire l'écran de confirmation, puis « Désactiver le PuP-Pack ». Jouer. Revenir, « Réactiver le PuP-Pack », jouer. | La confirmation nomme le pack, sa taille et, s'il y en a un, le `.vbs` remis comme le script de la table. Après : la ligne « PuP-Pack » dit « Désactivé », la fiche « PuP-Pack · désactivé », le dossier de la table a `pupvideos (off)\<pack>` et plus de `pupvideos`. La partie se joue sans aucune vidéo du pack, avec le fronton et le DMD habituels (2001 : sa musique joue). Le médecin ne dit que « PuP-Pack désactivé » ; « Ce qu'il manque pour jouer » ne propose rien pour le pack. Réactivé : le pack et ses vidéos reviennent dès la partie suivante, avec la même option. |
+| 778 | Pack partagé, et rien ne le rallume | Même chose sur une table dont le dossier contient une autre version au même pack ; désactiver depuis la première, jouer les deux, ouvrir la santé de la borne, puis réactiver depuis la seconde. | La confirmation dit « Une autre table touchée » et la nomme. Les deux versions se jouent sans pack, aucune réparation avant la partie ne le remet ; la santé de la borne ne le signale pas. La réactivation depuis la seconde version rend le pack aux deux. |
+
+## Barres des tâches en borne lancée au démarrage
+
+Sur le PinCab, « Lancer au démarrage de Windows » activé (Menu système > « Borne » > « Lancement au démarrage »), au moins deux écrans.
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 779 | Démarrage de Windows | Redémarrer le PC, attendre le menu des tables. | Aucune barre des tâches sur aucun écran, ni au menu, ni pendant ni après une partie. `journal.txt` : « Borne lancée au démarrage de Windows : barres des tâches masquées tant que le menu est là. » |
+| 780 | Bureau Windows, puis retour | Menu système > « Borne » > « Bureau Windows » ; puis Ctrl+Maj+D. Recommencer avec Ctrl+Maj+D depuis le menu. | Au bureau, les barres des tâches sont là sur chaque écran ; de retour au menu, elles disparaissent de nouveau. |
+| 781 | Quitter | Menu système > « Cyber Pinball » > « Quitter Cyber Pinball ». | Les barres des tâches reviennent sur chaque écran. |
+| 782 | Arrêt brutal | Gestionnaire des tâches (Ctrl+Alt+Suppr) > « Fin de tâche » sur Cyber Pinball. | Une dizaine de secondes plus tard, les barres des tâches reviennent d'elles-mêmes. |
+| 783 | Lancé à la main, sans le réglage | « Ne plus lancer au démarrage », puis lancer Cyber Pinball depuis son raccourci. | Comme avant : les barres ne sont masquées que pendant une partie. |
+
+## Ajouter une table depuis un ami
+
+Deux bornes amies en ligne, la bibliothèque de l'une partagée, avec au moins une table que l'autre n'a pas.
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 784 | Choisir un ami | Menu système > « Tables » > « Ajouter une table » > « Depuis un ami… ». | L'ami en tête, « <n> à prendre », « … tables, dont <n> absentes de votre borne » ; un ami hors ligne est grisé avec « Hors ligne : sa bibliothèque se voit quand sa borne est allumée ». |
+| 785 | Récupérer une table | Start sur l'ami, puis sur la première table, « Récupérer toute la table ». | Sa bibliothèque s'ouvre sur « Absentes de votre borne », le curseur sur la première ; la réception puis le plan d'ajout, comme depuis sa fiche d'ami. « Retour » ramène à la liste des amis, puis à « Ajouter une table ». |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

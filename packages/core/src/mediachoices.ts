@@ -25,6 +25,7 @@ import type { B2sElement, B2sImages, B2sLitImages } from './b2simage';
 import { t, tn } from './i18n';
 import { mediaDbOfferLabel, mediaDbOffers, type MediaDbCandidate, type MediaDbOffer, type MediaDbQuality } from './mediadb';
 import { isAcceptedFormat, mediaKind, MEDIA_TYPES, type MediaKind, type MediaType } from './medias';
+import { PUP_FOLDER } from './pupdisabled';
 import { isJunkName, parseCsvLine, parseScreens, screenRole } from './puppack';
 import type { SiteHit } from './mediasites';
 import { recordingLabel, type SavedRecording } from './gamerecording';
@@ -454,7 +455,7 @@ export function localMediaChoices(table: TableEntry, opts: LocalChoiceOptions = 
   }
 
   // PuP-Packs à côté de la table : un dossier par playlist.
-  const pupRoot = path.join(table.folder, 'pupvideos');
+  const pupRoot = path.join(table.folder, PUP_FOLDER);
   let packs: string[] = [];
   try {
     packs = fs.readdirSync(pupRoot, { withFileTypes: true }).filter((d) => d.isDirectory() && !isJunkName(d.name)).map((d) => d.name);

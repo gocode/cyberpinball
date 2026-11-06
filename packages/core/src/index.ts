@@ -37,6 +37,7 @@ export * from './dmd';
 export * from './dof';
 export * from './vpx-plugin-settings';
 export * from './puppack';
+export * from './pupdisabled';
 export * from './pupcapture';
 export * from './romlibrary';
 export * from './romzip';

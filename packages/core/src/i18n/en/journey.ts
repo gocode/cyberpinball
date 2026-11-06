@@ -116,4 +116,6 @@ export const messages: Record<string, string> = {
   'Le plus adapté à la borne d’abord. Start ouvre sa page dans la fenêtre « Récupérer » : le fichier téléchargé est rangé pour cette table, puis le parcours reprend.':
     'The best fit for the cabinet first. Start opens its page in the “Get” window: the downloaded file is stored for this table, then the checklist resumes.',
   'adapté à la borne': 'cabinet fit',
+  // packages/core/src/journey.ts : PuP-Pack désactivé
+  'Désactivé : la table se joue sans ses vidéos. « Parties du jeu » > PuP-Pack pour le réactiver.': 'Disabled: the table plays without its videos. “Game parts” > PuP-Pack to re-enable it.',
 };

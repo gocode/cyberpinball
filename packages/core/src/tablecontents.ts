@@ -9,6 +9,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { romBlockers } from './doctor';
 import { t } from './i18n';
+import { isPupFolderName, PUP_FOLDER, isDisabledPupFolderName } from './pupdisabled';
 import { isJunkName } from './puppack';
 import { romFile, sameRomFile, storedRom } from './romlibrary';
 import { readScriptPatchFile } from './scriptpatch';
@@ -36,6 +37,8 @@ export interface TableFileEntry {
   library?: string;
   /** Attendu (par le script) mais absent du dossier. */
   missing?: boolean;
+  /** PuP-Pack désactivé (pupvideos (off), pupdisabled.ts) : le plugin ne le charge pas. */
+  disabled?: boolean;
 }
 
 export interface TableContents {
@@ -75,9 +78,9 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
     const st = statSafe(path.join(folder, rel));
     add({ kind, rel, dir: false, size: st?.size ?? 0, mtimeMs: st?.mtimeMs, state, note, ...extra });
   };
-  const dirEntry = (rel: string, kind: FileKind, state: TableFileState, note: string) => {
+  const dirEntry = (rel: string, kind: FileKind, state: TableFileState, note: string, extra: Partial<TableFileEntry> = {}) => {
     const { files, size, mtimeMs } = dirStats(path.join(folder, rel));
-    add({ kind, rel, dir: true, size, files, mtimeMs, state, note });
+    add({ kind, rel, dir: true, size, files, mtimeMs, state, note, ...extra });
   };
   const sameBase = (name: string) => lower(name.replace(/\.[^.]+$/, '')) === lower(base);
 
@@ -154,9 +157,18 @@ export function tableContents(tableFile: string, opts: TableContentsOptions): Ta
         pinmame(full, name);
         continue;
       }
-      if (['pupvideos', 'altsound', 'serum', 'vni'].includes(ln)) {
-        const kind: FileKind = ln === 'pupvideos' ? 'pup' : (ln as FileKind);
-        const note = ln === 'pupvideos' ? t('PuP-Pack') : ln === 'altsound' ? t('sons alternatifs') : t('couleurs du DMD');
+      // PuP-Packs désactivés : à la table, mais ni chargés ni à ranger (pupdisabled.ts).
+      if (isDisabledPupFolderName(name)) {
+        const active = listDirents(path.join(folder, PUP_FOLDER)).map((s) => lower(s.name));
+        for (const sub of listDirents(full).filter((s) => s.isDirectory() && !isJunkName(s.name))) {
+          const replaced = active.includes(lower(sub.name));
+          dirEntry(path.join(name, sub.name), 'pup', 'quiet', replaced ? t('copie désactivée : celui de pupvideos est chargé à sa place') : t('PuP-Pack désactivé : la table se joue sans lui'), { disabled: true });
+        }
+        continue;
+      }
+      if (isPupFolderName(ln) || ['altsound', 'serum', 'vni'].includes(ln)) {
+        const kind: FileKind = isPupFolderName(ln) ? 'pup' : (ln as FileKind);
+        const note = kind === 'pup' ? t('PuP-Pack') : ln === 'altsound' ? t('sons alternatifs') : t('couleurs du DMD');
         for (const sub of listDirents(full).filter((s) => s.isDirectory() && !isJunkName(s.name))) dirEntry(path.join(name, sub.name), kind, 'ok', note);
         continue;
       }

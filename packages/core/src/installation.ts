@@ -12,6 +12,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { expectedPackNames, findPackRoot, isJunkName, isPackRoot, type PupLoadFacts } from './puppack';
 import { isInside, samePath } from './fileops';
+import { PUP_FOLDER } from './pupdisabled';
 import { t } from './i18n';
 import { mediaGameNames, scanInstallation, type IncomingMedia } from './mediaimport';
 import { nameKey } from './tablefiles';
@@ -69,7 +70,7 @@ export function findInstallation(dir: string, exclude: string[] = []): Installat
   for (let up = 0; up <= 4; up++) {
     const inPinup = path.basename(at).toLowerCase() === 'pinupsystem';
     pinmame ??= own(child(at, 'VPinMAME') ?? child(at, 'VisualPinball', 'VPinMAME') ?? child(at, 'Visual Pinball', 'VPinMAME'));
-    pupVideos ??= own(child(at, 'PinUPSystem', 'PUPVideos') ?? (inPinup ? child(at, 'PUPVideos') : undefined));
+    pupVideos ??= own(child(at, 'PinUPSystem', PUP_FOLDER) ?? (inPinup ? child(at, PUP_FOLDER) : undefined));
     if (!mediaRoots.length) mediaRoots = [child(at, 'PinUPSystem', 'POPMedia') ?? (inPinup ? child(at, 'POPMedia') : undefined), child(at, 'PinballX', 'Media')].map(own).filter((d): d is string => Boolean(d));
     const parent = path.dirname(at);
     if (parent === at) break;

@@ -40,7 +40,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { addEvent, addToHistory, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, readHostSettings, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, type LiveGame, type SocialState, type TableEntry } from '@cyberpinball/core';
+import { addEvent, addToHistory, emptyHistory, encodePng, layoutOf, loadSocial, newSocialState, PUP_FOLDER, readHostSettings, saveHistory, saveSocial, scanTables, setName, socialFile, tableContents, type LiveGame, type SocialState, type TableEntry } from '@cyberpinball/core';
 import { createFriendContent, type FriendContent } from './friend-content';
 import { createLiveGames, createTableVersions, type LiveGames } from './live-game';
 import { createSocialNet, type SocialNet } from './social-net';
@@ -219,8 +219,8 @@ function brunoRoot(dir: string, mine: readonly TableEntry[], cut = false, sameVe
       // Une archive zip vide (sa seule fin de répertoire) et un écran de PuP-Pack.
       fs.mkdirSync(path.join(at, 'pinmame', 'roms'), { recursive: true });
       fs.writeFileSync(path.join(at, 'pinmame', 'roms', 'glag_l1.zip'), Buffer.from([0x50, 0x4b, 0x05, 0x06, ...new Array(18).fill(0)]));
-      fs.mkdirSync(path.join(at, 'pupvideos', 'glag_l1'), { recursive: true });
-      fs.writeFileSync(path.join(at, 'pupvideos', 'glag_l1', 'screens.pup'), 'ScreenNum,ScreenDes\r\n2,Backglass\r\n');
+      fs.mkdirSync(path.join(at, PUP_FOLDER, 'glag_l1'), { recursive: true });
+      fs.writeFileSync(path.join(at, PUP_FOLDER, 'glag_l1', 'screens.pup'), 'ScreenNum,ScreenDes\r\n2,Backglass\r\n');
     }
   }
   return root;

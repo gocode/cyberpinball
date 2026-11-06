@@ -47,6 +47,11 @@ export interface InstalledPart {
   /** Fichiers et dossiers de la table qui la font (un PuP-Pack est un dossier). */
   entries: TableFileEntry[];
   size: number;
+  /**
+   * PuP-Pack désactivé (pupdisabled.ts) : ses dossiers sont tous dans pupvideos (off). La
+   * partie reste à la table (rien à récupérer ni à réclamer), mais VPX ne la charge pas.
+   */
+  disabled?: boolean;
 }
 
 /** Parties présentes dans le dossier d'une table ; les fichiers attendus mais absents n'en font pas. */
@@ -60,6 +65,7 @@ export function installedParts(contents: TableContents): Map<GamePart, Installed
     known.size += entry.size;
     parts.set(part, known);
   }
+  for (const known of parts.values()) if (known.entries.every((e) => e.disabled)) known.disabled = true;
   return parts;
 }
 

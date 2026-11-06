@@ -124,6 +124,75 @@ export function taskbarsToRestore(hidden: HiddenTaskbar[], current: TaskbarState
   );
 }
 
+// Barres des tâches masquées pour toute la session : la borne lancée au démarrage de Windows
+
+/**
+ * Moment où Cyber Pinball rendrait les barres qu'il a masquées : fin d'une partie, écran noir
+ * d'une action d'alimentation, démarrage après un arrêt brutal (témoin trouvé), relève par un
+ * nouveau processus (menu ↔ assistant, langue), passage au bureau Windows, fermeture.
+ */
+export type TaskbarRestoreMoment = 'game-end' | 'power' | 'start' | 'relay' | 'desktop' | 'quit';
+
+/**
+ * Borne lancée au démarrage de Windows (« Lancer au démarrage », réglage enregistré ou raccourci
+ * du dossier Démarrage posé par l'installeur), ou à la place du bureau : les barres des tâches
+ * n'ont rien à faire à l'écran tant que le menu est là. Signalement du 06/11/2026 : au démarrage
+ * en mode borne, les barres restaient visibles par-dessus le menu.
+ */
+export function cabinetHidesTaskbars(facts: { settingsMode?: 'shell' | 'startup'; dedicated: boolean; startupShortcut: boolean }): boolean {
+  return facts.settingsMode !== undefined || facts.dedicated || facts.startupShortcut;
+}
+
+/**
+ * Les barres masquées reviennent-elles à ce moment ? Hors borne, toujours (elles ne sont
+ * masquées que le temps d'une partie). En borne, seulement quand l'utilisateur retourne sur
+ * Windows : bureau (menu ou raccourci) ou fermeture de Cyber Pinball. À une relève ou au
+ * démarrage après un arrêt brutal, le nouveau processus les reprend telles quelles, sans
+ * qu'elles se montrent entre les deux.
+ */
+export function restoresTaskbarsAt(moment: TaskbarRestoreMoment, cabinet: boolean): boolean {
+  if (!cabinet) return true;
+  return moment === 'desktop' || moment === 'quit';
+}
+
+/** Ce que le secours des barres surveille : le processus, son exécutable, le témoin des barres masquées. */
+export interface TaskbarRescue {
+  pid: number;
+  exe: string;
+  marker: string;
+}
+
+/** Délai entre la fin de Cyber Pinball et le secours : le temps qu'une relève ou une mise à jour relance l'application. */
+export const TASKBAR_RESCUE_DELAY_S = 8;
+
+function psQuote(text: string): string {
+  return `'${text.replace(/'/g, "''")}'`;
+}
+
+/**
+ * Secours des barres des tâches (PowerShell caché, lancé au premier masquage) : quand Cyber
+ * Pinball s'arrête sans les avoir rendues (plantage, arrêt forcé), et qu'aucun Cyber Pinball ne
+ * l'a relayé, il réaffiche celles que désigne le témoin, puis le retire. Sans lui, une borne
+ * lancée au démarrage (fond noir, icônes masquées) resterait sans barre des tâches jusqu'au
+ * prochain lancement. Une fermeture normale retire le témoin : le secours n'a rien à faire.
+ */
+export function taskbarRescueScript(r: TaskbarRescue): string {
+  return [
+    "$ErrorActionPreference = 'SilentlyContinue'",
+    `$p = Get-Process -Id ${Math.trunc(r.pid)}`,
+    'if ($p) { $p.WaitForExit() }',
+    `Start-Sleep -Seconds ${TASKBAR_RESCUE_DELAY_S}`,
+    `$marker = ${psQuote(r.marker)}`,
+    'if (-not (Test-Path -LiteralPath $marker)) { exit }',
+    `$exe = ${psQuote(r.exe)}`,
+    'if (Get-Process | Where-Object { $_.Path -eq $exe }) { exit }',
+    "Add-Type -Namespace CyberPinball -Name Barres -MemberDefinition '[DllImport(\"user32.dll\")] public static extern bool ShowWindow(IntPtr h, int c); [DllImport(\"user32.dll\")] public static extern bool IsWindow(IntPtr h);'",
+    // SW_SHOWNA (8) : réaffichée sans être activée.
+    'foreach ($line in Get-Content -LiteralPath $marker) { if ($line -match \'^\\s*(\\d+)\\s\') { $h = [IntPtr][Int64]$Matches[1]; if ([CyberPinball.Barres]::IsWindow($h)) { [void][CyberPinball.Barres]::ShowWindow($h, 8) } } }',
+    'Remove-Item -LiteralPath $marker -Force',
+  ].join('\n');
+}
+
 // Réglages de Windows que Cyber Pinball modifie
 
 export interface WindowsChange {
@@ -148,6 +217,8 @@ export const WINDOWS_CHANGES: WindowsChange[] = [
   { call: 'hideWindow', files: ['app/src/screen-guard.ts', 'app/src/launcher.ts', 'app/src/in-game-menu.ts'] },
   // Réaffiche les barres des tâches que Cyber Pinball a masquées (taskbarsToRestore), et la fenêtre du DMD de VPX qu’il a masquée dans la même partie.
   { call: 'showWindowInactive', files: ['app/src/screen-guard.ts', 'app/src/in-game-menu.ts'] },
+  // Borne lancée au démarrage de Windows (06/11/2026) : les barres des tâches restent masquées toute la session, rendues au bureau Windows (menu ou Ctrl+Maj+D) et à la fermeture (restoresTaskbarsAt). Si Cyber Pinball s’arrête sans les rendre, un PowerShell caché les réaffiche d’après le témoin (taskbarRescueScript) ; rien d’enregistré.
+  { call: 'taskbarRescueScript', files: ['app/src/screen-guard.ts'] },
   // Barre des tâches passée devant une fenêtre du menu : rangée juste sous elle, comme l’Explorateur le fait devant une fenêtre plein écran active (taskbarguard.ts). Seulement l’ordre des fenêtres, jamais quand un autre programme a le premier plan ; l’Explorateur la remet devant à la bascule suivante, rien n’est enregistré.
   { call: 'placeWindowBelow', files: ['app/src/screen-guard.ts'] },
   // Raccourcis globaux (SHORTCUTS) : Ctrl+Maj+K pendant une partie, Ctrl+Maj+D en mode bureau ; chacun rendu à la fin.

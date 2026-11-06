@@ -16,6 +16,11 @@
 //    bascule (retour de partie, retour du bureau, changement d'écrans ou de zone de travail,
 //    premier plan rendu au menu) ; chaque bascule est notée dans <données>\logs\ecrans.txt :
 //    premier plan, ce qui est au-dessus de chaque écran, rectangle de chaque barre.
+// 3 bis. Borne lancée au démarrage de Windows (ou à la place du bureau) : les barres des tâches
+//    restent masquées toute la session, pas seulement pendant les parties ; elles reviennent au
+//    bureau Windows (menu ou Ctrl+Maj+D) et à la fermeture, et se masquent de nouveau au retour
+//    du bureau. Si l'application s'arrête sans les rendre, un secours les réaffiche
+//    (taskbarRescueScript, coexistence.ts).
 // 5. En mode bureau (desktop-mode.ts), l'inverse : les voiles sont cachés, ceux d'un écran
 //    branché entre-temps naissent cachés, et un écran qu'une fenêtre de Cyber Pinball
 //    recouvre encore est signalé (desktopBlockers). Au retour, chaque écran retrouve son voile.
@@ -27,28 +32,36 @@ import * as path from 'node:path';
 import { app, BrowserWindow, screen, type Display, type Rectangle } from 'electron';
 import {
   appendErrorLog,
+  cabinetHidesTaskbars,
   coverNotice,
   coveringWindow,
   desktopBlockers,
   displayOf,
   parseTaskbarMarker,
+  loadDedicatedRecord,
+  loadSettingsRecord,
   repairNotice,
+  restoresTaskbarsAt,
   screenCover,
   SCREENS_LOG_FILE,
   stackingReport,
+  STARTUP_SHORTCUT,
   TaskbarGuard,
   taskbarMarkerText,
+  taskbarRescueScript,
   taskbarsToRestore,
   type GuardScreen,
   type HiddenTaskbar,
   type TaskbarFacts,
   type TaskbarMoment,
+  type TaskbarRestoreMoment,
 } from '@cyberpinball/core';
 import { allowAnyForeground, foregroundWindow, hideWindow, listWindows, placeWindowBelow, showWindowInactive, taskbarWindows, type WindowInfo } from '@cyberpinball/win-displays';
 import { createWindow, desktopDisplays, isShown, OFFSCREEN, paintedOnScreen } from './offscreen';
 import { coverDisplay, coverProblem } from './cover-display';
 import { locations } from './paths';
-import { relaunchThroughShellLauncher } from './dedicated-session';
+import { relaunchThroughShellLauncher, shellSession } from './dedicated-session';
+import { windowsStartupDir } from './dedicated-system';
 import { handOverOrientation } from './display-orientation';
 
 export const VEIL_TITLE = 'Cyber Pinball — Fond';
@@ -89,10 +102,17 @@ export function guardScreens(): void {
   // Hors écran (essai sans opérateur) : les écrans sont simulés ; on ne touche ni aux vrais
   // écrans ni aux barres des tâches du poste.
   if (OFFSCREEN) return;
-  // Barres des tâches restées masquées par une partie interrompue (plantage, arrêt forcé).
-  if (fs.existsSync(taskbarMarker())) restoreTaskbars(parseTaskbarMarker(fs.readFileSync(taskbarMarker(), 'utf8')));
-  process.on('exit', () => hiddenTaskbars.length > 0 && restoreTaskbars());
+  cabinetTaskbars = cabinetSession();
+  // Barres des tâches restées masquées par une partie interrompue (plantage, arrêt forcé) ou
+  // par le processus qui nous passe le relais ; en borne, elles restent masquées et sont reprises.
+  if (fs.existsSync(taskbarMarker())) restoreTaskbars('start', parseTaskbarMarker(fs.readFileSync(taskbarMarker(), 'utf8')));
+  // Une relève (app.exit, sans before-quit) laisse les barres au nouveau processus ; une fermeture les rend.
+  process.on('exit', () => (hiddenTaskbars.length > 0 || taskbarWatch) && restoreTaskbars(desktopAllowed === 'fermeture' && !relaunching ? 'quit' : 'relay'));
   placeVeils();
+  if (cabinetTaskbars) {
+    console.log('Borne lancée au démarrage de Windows : barres des tâches masquées tant que le menu est là.');
+    hideTaskbars();
+  }
   // Relancé par relaunchCovered : l'ancien processus attend que nos fenêtres soient peintes.
   const relay = process.env[RELAY_ENV];
   delete process.env[RELAY_ENV];
@@ -190,6 +210,40 @@ function sameRect(a: Rectangle, b: Rectangle): boolean {
  * PinUP Popper, ou par un outil) le reste.
  */
 let hiddenTaskbars: HiddenTaskbar[] = [];
+/** Borne lancée au démarrage de Windows : barres masquées toute la session (cabinetHidesTaskbars). */
+let cabinetTaskbars = false;
+/** Secours des barres déjà lancé par ce processus. */
+let rescueStarted = false;
+
+/**
+ * Borne lancée au démarrage de Windows : « Lancer au démarrage » ou « Borne dédiée » activés
+ * (réglages enregistrés), raccourci du dossier Démarrage (case de l'installeur), ou Cyber
+ * Pinball shell de la session.
+ */
+function cabinetSession(): boolean {
+  const dataDir = locations().dataDir;
+  let startupShortcut = false;
+  try {
+    startupShortcut = fs.existsSync(path.join(windowsStartupDir(), STARTUP_SHORTCUT));
+  } catch {
+    // Dossier Démarrage illisible : pas de raccourci.
+  }
+  return cabinetHidesTaskbars({ settingsMode: loadSettingsRecord(dataDir)?.mode, dedicated: Boolean(loadDedicatedRecord(dataDir)) || shellSession(), startupShortcut });
+}
+
+/** Lance le secours des barres (taskbarRescueScript) : une fois par processus, au premier témoin écrit. */
+function startTaskbarRescue(): void {
+  if (rescueStarted || OFFSCREEN) return;
+  rescueStarted = true;
+  try {
+    const script = taskbarRescueScript({ pid: process.pid, exe: process.execPath, marker: taskbarMarker() });
+    const encoded = Buffer.from(script, 'utf16le').toString('base64');
+    const powershell = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+    spawn(powershell, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-WindowStyle', 'Hidden', '-EncodedCommand', encoded], { detached: true, stdio: 'ignore', windowsHide: true }).unref();
+  } catch (error) {
+    console.warn(`Secours des barres des tâches non lancé : ${(error as Error).message}`); // i18n-ignore : console
+  }
+}
 /** Barres déjà masquées au début de la partie : pas les nôtres, même réaffichées par Windows entre-temps. */
 let notOurs = new Set<bigint>();
 
@@ -202,6 +256,7 @@ function writeTaskbarMarker(): boolean {
   try {
     fs.mkdirSync(path.dirname(taskbarMarker()), { recursive: true });
     fs.writeFileSync(taskbarMarker(), taskbarMarkerText(hiddenTaskbars));
+    startTaskbarRescue();
     return true;
   } catch {
     return false;
@@ -229,7 +284,10 @@ export function hideTaskbars(): void {
       return;
     }
   }
-  if (!hiddenTaskbars.length) return;
+  // En borne, la surveillance tourne même sans barre : l'Explorateur crée les siennes après nous au démarrage de Windows.
+  if (!hiddenTaskbars.length && !cabinetTaskbars) return;
+  // Barres reprises d'un témoin (relève, démarrage) : ce processus les rendra, son secours aussi.
+  if (hiddenTaskbars.length) startTaskbarRescue();
   for (const w of shown) hideWindow(w);
   // Windows réaffiche parfois lui-même une barre masquée quand VPX prend le premier plan
   // (une fois sur onze parties, sur l'écran du DMD) : elle est aussitôt masquée de nouveau.
@@ -242,17 +300,23 @@ export function hideTaskbars(): void {
         hiddenTaskbars.push({ handle: w.handle, className: w.className });
         writeTaskbarMarker();
       }
-      console.log(`Barre des tâches (${w.className}) réaffichée par Windows pendant la partie : masquée de nouveau.`);
+      console.log(`Barre des tâches (${w.className}) réaffichée par Windows ${cabinetTaskbars ? 'en borne' : 'pendant la partie'} : masquée de nouveau.`);
     }
   }, TASKBAR_WATCH_MS);
 }
 
 /**
  * Fin d'une partie (ou démarrage après une partie interrompue, d'après le témoin) : les
- * barres des tâches que Cyber Pinball a masquées reviennent, et seulement elles.
+ * barres des tâches que Cyber Pinball a masquées reviennent, et seulement elles. En borne
+ * lancée au démarrage, seulement au bureau et à la fermeture (restoresTaskbarsAt) : au
+ * démarrage, celles du témoin restent masquées et deviennent les nôtres.
  */
-export function restoreTaskbars(hidden: HiddenTaskbar[] = hiddenTaskbars): void {
+export function restoreTaskbars(moment: TaskbarRestoreMoment, hidden: HiddenTaskbar[] = hiddenTaskbars): void {
   if (OFFSCREEN) return;
+  if (!restoresTaskbarsAt(moment, cabinetTaskbars)) {
+    if (moment === 'start') hiddenTaskbars = taskbarsToRestore(hidden, taskbarWindows()).map((w) => ({ handle: w.handle, className: w.className }));
+    return;
+  }
   if (taskbarWatch) clearInterval(taskbarWatch);
   taskbarWatch = undefined;
   // Réaffichée telle quelle, une barre revient devant tout : l'Explorateur l'a remise au premier
@@ -384,11 +448,13 @@ export function setDesktopMode(on: boolean): void {
   if (on) {
     journalScreens('desktop');
     taskbarGuard.forget();
-    if (hiddenTaskbars.length) restoreTaskbars();
+    if (hiddenTaskbars.length || taskbarWatch) restoreTaskbars('desktop');
     return;
   }
   placeVeils(true);
   for (const veil of veils.values()) if (!veil.isDestroyed() && !isShown(veil)) veil.showInactive();
+  // Borne lancée au démarrage : de retour du bureau, les barres se masquent de nouveau.
+  if (cabinetTaskbars) hideTaskbars();
 }
 
 /** Constats depuis le dernier appel (écrans restés découverts), pour le bilan d'endurance. */

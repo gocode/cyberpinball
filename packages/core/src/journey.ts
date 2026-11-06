@@ -470,8 +470,13 @@ const PUP_FIXES: readonly Finding['code'][] = ['pupMissing', 'pupNotLoaded', 'pu
 function pupStep(input: JourneyInput): JourneyStep | undefined {
   const script = input.script && !('error' in input.script) ? input.script : undefined;
   const found = input.findings.filter((f) => PUP_FIXES.includes(f.code) && f.severity !== 'info');
-  if (!script?.pup && !found.length && !input.seen?.includes('pup')) return undefined;
+  const switchedOff = input.findings.some((f) => f.code === 'pupPackDisabled');
+  if (!script?.pup && !found.length && !switchedOff && !input.seen?.includes('pup')) return undefined;
   const title = 'PuP-Pack';
+  // Désactivé dans « Parties du jeu » : rien à faire ni à récupérer (pupdisabled.ts).
+  if (switchedOff) {
+    return { id: 'pup', title, state: 'done', required: false, detail: t('Désactivé : la table se joue sans ses vidéos. « Parties du jeu » > PuP-Pack pour le réactiver.'), choices: [] };
+  }
   const fixable = found.find((f) => f.fix);
   if (fixable) return { id: 'pup', title, state: 'todo', required: false, detail: `${fixable.title}. ${fixable.detail}`, choices: [repairChoice(fixable, true)] };
   // Coupé par un script qu'on ne sait pas réécrire (table protégée) : à changer à la main.

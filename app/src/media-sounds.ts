@@ -11,7 +11,7 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { durationLabel, extractMp4Sound, formatSize, mediaTypeInfo, mediaUrl, t, tableSounds, tn, type MediaType, type TableEntry, type TableSound, type TableSoundFolder } from '@cyberpinball/core';
+import { durationLabel, extractMp4Sound, formatSize, isDisabledPupFolderName, isPupFolderName, mediaTypeInfo, mediaUrl, t, tableSounds, tn, type MediaType, type TableEntry, type TableSound, type TableSoundFolder } from '@cyberpinball/core';
 import type { Action, Built, Row, Tone } from './library';
 import type { MediaCard } from './library-medias';
 import { allowPreview } from './media-protocol';
@@ -64,8 +64,11 @@ function folderLabel(f: TableSoundFolder): string {
   if (f.medias) return t('Médias du menu (medias)');
   if (!f.rel) return t('Dossier de la table');
   const parts = f.rel.split(path.sep);
-  // Un dossier de PuP-Pack se nomme d'après son pack : « PuP-Pack gotg_2020 › Topper ».
-  if (parts[0]?.toLowerCase() === 'pupvideos' && parts[1]) return [t('PuP-Pack {pack}', { pack: parts[1] }), ...parts.slice(2)].join(' › ');
+  // Un dossier de PuP-Pack se nomme d'après son pack : « PuP-Pack gotg_2020 › Topper » ; désactivé, il le dit.
+  if (parts[0] && isPupFolderName(parts[0]) && parts[1]) {
+    const pack = isDisabledPupFolderName(parts[0]) ? t('PuP-Pack {pack} (désactivé)', { pack: parts[1] }) : t('PuP-Pack {pack}', { pack: parts[1] });
+    return [pack, ...parts.slice(2)].join(' › ');
+  }
   return parts.join(' › ');
 }
 

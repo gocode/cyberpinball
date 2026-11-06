@@ -67,6 +67,11 @@ export interface DedicatedSystem {
 }
 
 /** Simulé hors écran, dans un bac à sable ou à la demande ; le vrai seulement sur une borne réelle. */
+/** Dossier Démarrage du compte de la session (celui où l'installeur et « Lancer au démarrage » posent le raccourci). */
+export function windowsStartupDir(): string {
+  return path.join(process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup');
+}
+
 export function createDedicatedSystem(dataDir: string): DedicatedSystem {
   const simulation = process.env.CYBERPINBALL_BORNE_SIMULEE;
   if (simulation || OFFSCREEN || process.env.CYBERPINBALL_HOME) return simulatedSystem(simulation || path.join(dedicatedDir(dataDir), 'windows-simule.json'));
@@ -153,7 +158,7 @@ function realSystem(dataDir: string): DedicatedSystem {
       if (r.status === CANCELLED) return { cancelled: true };
       return { error: r.stderr.trim() || `PowerShell : code ${r.status}` };
     },
-    startupDir: () => path.join(process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'), 'Microsoft', 'Windows', 'Start Menu', 'Programs', 'Startup'),
+    startupDir: windowsStartupDir,
     bootTime: () => Date.now() - os.uptime() * 1000,
     openExplorer() {
       // Fenêtre voulue : celle de l'Explorateur (windowsHide la cacherait).

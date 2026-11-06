@@ -3,14 +3,17 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import {
+  cabinetHidesTaskbars,
   FORBIDDEN_WINDOWS_CALLS,
   frontendNames,
   installedFrontends,
   parseTaskbarMarker,
+  restoresTaskbarsAt,
   runningFrontends,
   simulatedInstalledFrontends,
   simulatedProcessNames,
   taskbarMarkerText,
+  taskbarRescueScript,
   taskbarsToRestore,
   WINDOWS_CHANGES,
   type TaskbarState,
@@ -106,7 +109,52 @@ test('le gardien des écrans ne réaffiche une barre des tâches que par taskbar
   assert.equal(guard.match(/showWindowInactive\(/g)?.length, 1, 'un seul appel à showWindowInactive');
   assert.ok(restore.indexOf('taskbarsToRestore(') >= 0 && restore.indexOf('taskbarsToRestore(') < restore.indexOf('showWindowInactive('));
   assert.doesNotMatch(guard, /restoreTaskbars\(\)\s*;?\s*\n[^\n]*existsSync\(taskbarMarker/, 'au démarrage, le témoin dit quelles barres remettre');
-  assert.match(guard, /restoreTaskbars\(parseTaskbarMarker\(/);
+  assert.match(guard, /restoreTaskbars\('start', parseTaskbarMarker\(/);
+});
+
+test('borne lancée au démarrage : barres des tâches masquées toute la session, rendues au bureau et à la fermeture seulement', () => {
+  // Signalement du 06/11/2026 : au démarrage en mode borne, les barres restaient visibles.
+  assert.equal(cabinetHidesTaskbars({ settingsMode: 'startup', dedicated: false, startupShortcut: true }), true);
+  assert.equal(cabinetHidesTaskbars({ dedicated: false, startupShortcut: true }), true, 'raccourci de l’installeur');
+  assert.equal(cabinetHidesTaskbars({ settingsMode: 'shell', dedicated: false, startupShortcut: false }), true, 'Windows Pro qui ignore la stratégie Shell : l’Explorateur tourne quand même');
+  assert.equal(cabinetHidesTaskbars({ dedicated: true, startupShortcut: false }), true);
+  assert.equal(cabinetHidesTaskbars({ dedicated: false, startupShortcut: false }), false, 'lancé à la main : barres masquées le temps des parties seulement');
+  for (const moment of ['game-end', 'power', 'start', 'relay', 'desktop', 'quit'] as const) assert.equal(restoresTaskbarsAt(moment, false), true, `hors borne : ${moment}`);
+  assert.deepEqual(
+    (['game-end', 'power', 'start', 'relay', 'desktop', 'quit'] as const).filter((m) => restoresTaskbarsAt(m, true)),
+    ['desktop', 'quit'],
+    'en borne : seulement le retour sur Windows (bureau, Ctrl+Maj+D) et la fermeture',
+  );
+});
+
+test('le gardien des écrans rend les barres au bureau et à la fermeture, et les remasque au retour du bureau en borne', () => {
+  const guard = fs.readFileSync(path.join(REPO, 'app', 'src', 'screen-guard.ts'), 'utf8');
+  const desktop = guard.slice(guard.indexOf('export function setDesktopMode'), guard.indexOf('export function takeCoverIncidents'));
+  assert.match(desktop, /restoreTaskbars\('desktop'\)/);
+  assert.ok(desktop.indexOf('if (cabinetTaskbars) hideTaskbars()') > desktop.indexOf("restoreTaskbars('desktop')"), 'retour du bureau : barres masquées de nouveau');
+  assert.match(guard, /process\.on\('exit'[^\n]*'quit'[^\n]*'relay'/, 'fermeture : quit ; app.exit d’une relève : relay');
+  // Chaque appel dit son moment : aucun restoreTaskbars() sans argument dans l'application.
+  for (const file of ['screen-guard.ts', 'frontend.ts']) {
+    const code = fs.readFileSync(path.join(REPO, 'app', 'src', file), 'utf8');
+    assert.doesNotMatch(code, /restoreTaskbars\(\)/, `${file} : restoreTaskbars sans moment`);
+  }
+});
+
+test('secours des barres : attend la fin du processus, ne fait rien après une fermeture normale ou une relève', () => {
+  const script = taskbarRescueScript({ pid: 4242, exe: 'C:\\Jeux\\Cyber Pinball\\CyberPinball.exe', marker: "C:\\Données d'essai\\barres-des-taches-masquees" });
+  assert.match(script, /Get-Process -Id 4242/);
+  assert.match(script, /WaitForExit\(\)/);
+  // Apostrophe doublée dans une chaîne PowerShell entre apostrophes.
+  assert.ok(script.includes("'C:\\Données d''essai\\barres-des-taches-masquees'"));
+  const lines = script.split('\n');
+  const at = (re: RegExp) => lines.findIndex((l) => re.test(l));
+  // Témoin retiré (fermeture normale) puis autre Cyber Pinball (relève, mise à jour) : sortie avant tout ShowWindow.
+  assert.ok(at(/Test-Path -LiteralPath \$marker/) < at(/foreach/));
+  assert.ok(at(/\$_.Path -eq \$exe/) < at(/foreach/));
+  assert.ok(at(/Remove-Item -LiteralPath \$marker/) > at(/foreach/));
+  // Lit le même témoin que celui qu'écrit l'application : « HWND classe ».
+  const hwnd = /-match '([^']+)'/.exec(script)![1]!;
+  assert.deepEqual(taskbarMarkerText([{ handle: 65552n, className: 'Shell_TrayWnd' }]).split('\n').map((l) => new RegExp(hwnd).exec(l)?.[1]), ['65552']);
 });
 
 test('réglages de Windows : chaque modification est déclarée dans WINDOWS_CHANGES, et faite là seulement', () => {

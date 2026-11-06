@@ -21,6 +21,7 @@ import {
   loadCabinetSet,
   loadHealthFacts,
   PUP_PLAY_REPAIRS,
+  pupVideosDir,
   pupFacts,
   saveHealthFacts,
   screensFacts,
@@ -87,7 +88,7 @@ interface HealthLineView {
 /** Un dossier pupvideos à côté de la table (dossier illisible : non). */
 function hasPupFolder(folder: string): boolean {
   try {
-    return fs.readdirSync(folder, { withFileTypes: true }).some((d) => d.isDirectory() && d.name.toLowerCase() === 'pupvideos');
+    return pupVideosDir(folder) !== undefined;
   } catch {
     return false;
   }

@@ -500,4 +500,6 @@ export const messages: Record<string, string> = {
   'Le son de la carte choisie se joue. Start le prend : copié dans medias\\ à l’enregistrement, l’original reste à sa place. D’une vidéo, seul le son est gardé.':
     'The selected card’s sound plays. Start takes it: copied into medias\\ when saving, the original stays where it is. From a video, only the sound is kept.',
   'Le son de « {file} » n’a pas pu être extrait : {reason}.': 'The sound of “{file}” could not be extracted: {reason}.',
+  // app/src/media-sounds.ts : sons d’un PuP-Pack désactivé
+  'PuP-Pack {pack} (désactivé)': 'PuP-Pack {pack} (disabled)',
 };

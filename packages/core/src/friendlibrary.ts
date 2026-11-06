@@ -494,7 +494,7 @@ export interface ShareableTableFile {
  * partie du jeu (table, fronton, ROM, PuP-Pack, couleurs, sons, musique, point de vue, réglages,
  * médias) et ce qui joue avec la table (contenu du DMD, scripts complémentaires). Jamais les
  * sauvegardes, records, réglages de PinMAME ni statistiques ; jamais un programme. Les dossiers
- * rangés d'un bloc sont dépliés fichier par fichier. Une ROM rangée dans la bibliothèque commune
+ * rangés d'un bloc sont dépliés fichier par fichier ; un PuP-Pack désactivé (pupdisabled.ts) ne part pas. Une ROM rangée dans la bibliothèque commune
  * (pas dans le dossier) part de là, sous son chemin dans le dossier de la table.
  */
 export function shareableTableFiles(contents: TableContents, folder: string): ShareableTableFile[] {
@@ -530,6 +530,8 @@ export function shareableTableFiles(contents: TableContents, folder: string): Sh
   for (const entry of contents.entries) {
     const part = partOfFileKind(entry.kind) ?? (WITH_TABLE.includes(entry.kind) ? 'table' : undefined);
     if (!part || !SHARED_PARTS.includes(part)) continue;
+    // Un PuP-Pack désactivé ne se joue pas ici : il ne part pas non plus chez l'ami.
+    if (entry.disabled) continue;
     if (entry.dir) {
       if (!entry.missing) walk(entry.path, entry.rel, part);
       continue;

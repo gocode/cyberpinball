@@ -90,6 +90,8 @@ export interface FriendsMenu {
   live: LiveMenu;
   /** L'écran « Pare-feu de Windows » : ce qui manque, pourquoi, et l'autorisation (ouvert après une mise à jour). */
   openFirewall(back?: () => void): void;
+  /** « Ajouter une table > Depuis un ami… » : les amis, puis la bibliothèque de celui qu'on choisit, ses tables absentes d'abord. */
+  addFromFriend: { detail(): string; open(back: () => void): void };
   items: {
     friends: ProvidedSystemItem;
     'game-history': ProvidedSystemItem;
@@ -239,6 +241,57 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   function sharingSubheading(): string {
     const s = net.state();
     return t('{name} · {count}', { name: name(s.key.publicKey, s.name), count: tn(s.friends.length, '{n} ami', '{n} amis') });
+  }
+
+  // ---------- Ajouter une table : depuis un ami ----------
+
+  /** Amis qui partagent leur bibliothèque et qui ont des tables absentes de la borne : combien. */
+  function addFromFriendDetail(): string {
+    const friends = net.state().friends;
+    if (!friends.length) return t('Pas encore d’ami : Menu système > Amis > « Trouver un joueur »');
+    const online = friends.filter((f) => net.online(f.key)).length;
+    return online
+      ? tn(online, 'Les tables d’un ami, récupérées de sa borne · {n} ami en ligne', 'Les tables d’un ami, récupérées de sa borne · {n} amis en ligne')
+      : t('Les tables d’un ami, récupérées de sa borne · aucun ami en ligne');
+  }
+
+  function openAddFromFriend(back: () => void, at?: number): void {
+    host.library.openCustom(() => buildAddFromFriend(back), at);
+  }
+
+  function buildAddFromFriend(back: () => void): Built {
+    const blocked = firewallBlocked();
+    const actions: Action[] = [];
+    const here = () => openAddFromFriend(back, Number.MAX_SAFE_INTEGER);
+    // Ceux dont on peut prendre des tables d'abord (en ligne, bibliothèque partagée, des tables absentes),
+    // puis les autres en ligne, puis ceux hors ligne : grisés, avec leur raison.
+    const view = net.state().friends.map((f) => ({ f, online: net.online(f.key), lib: libraryMenu.addView(f.key) }));
+    const rank = (v: (typeof view)[number]) => (!v.online ? 3 : v.lib.absent ? 0 : v.lib.absent === undefined ? 1 : 2);
+    view.sort((a, b) => rank(a) - rank(b) || (b.lib.absent ?? 0) - (a.lib.absent ?? 0) || a.f.name.localeCompare(b.f.name));
+    const rows: Row[] = view.map(({ f, online, lib }) => {
+      const label = name(f.key, f.name);
+      if (!online) {
+        // Indisponible : grisé, avec sa raison ; Start ne mène nulle part.
+        const reason = blocked ? t('Sa borne ne vous parvient pas : le pare-feu de Windows bloque le réseau des bornes') : t('Hors ligne : sa bibliothèque se voit quand sa borne est allumée');
+        const index = actions.push({ label, key: `add-friend:${f.key}`, icon: 'friend-list', tone: 'quiet', detail: t('Indisponible : {reason}', { reason }), run: () => undefined }) - 1;
+        return { text: label, detail: reason, tone: 'quiet', badges: [blocked ? t('Bloqué par le pare-feu') : t('Hors ligne')], action: index, pick: true } satisfies Row;
+      }
+      const index = actions.push({ label, key: `add-friend:${f.key}`, icon: 'friend-list', detail: lib.detail, run: () => libraryMenu.open(f.key, here, true) }) - 1;
+      return { text: label, detail: lib.detail, tone: lib.absent ? 'ok' : undefined, badges: lib.absent ? [tn(lib.absent, '{n} à prendre', '{n} à prendre')] : [t('En ligne')], action: index, pick: true } satisfies Row;
+    });
+    const sections: Section[] = [...(offRows().length ? [{ rows: offRows() }] : [])];
+    if (rows.length) sections.push({ rows });
+    else sections.push({ rows: [{ text: t('Pas encore d’ami'), detail: t('« Trouver un joueur » : cherchez un nom dans l’annuaire, ou une borne de votre réseau local'), tone: 'info' }] });
+    if (!rows.length) actions.push({ label: t('Trouver un joueur'), detail: t('Chercher un nom, voir les bornes à proximité'), icon: 'friend-add', run: () => openFind() });
+    actions.push(backAction(back));
+    return {
+      heading: t('Depuis un ami'),
+      icon: 'friend-list',
+      lead: t('Les tables de vos amis qui partagent leur bibliothèque : choisissez un ami, puis une de ses tables absentes de votre borne. Rien n’est installé avant que vous ayez validé le plan.'),
+      sections,
+      actions,
+      back,
+    };
   }
 
   // ---------- Fiche d'un ami ----------
@@ -688,6 +741,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   return {
     live,
     openFirewall,
+    addFromFriend: { detail: addFromFriendDetail, open: (back) => openAddFromFriend(back) },
     items: {
       friends: {
         get detail() {

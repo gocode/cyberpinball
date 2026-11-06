@@ -499,3 +499,67 @@ test('choix de la table avec deux amis : la même version chez tous en tête, le
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(invited, [FRIEND, EMILE]);
 });
+
+test('« Ajouter une table > Depuis un ami » : les amis qui ont des tables à prendre d’abord, puis sa bibliothèque, ses tables absentes en tête', async () => {
+  // Demande du 06/11/2026 : choisir une table chez un ami depuis « Ajouter une table ».
+  const EMILE = newSocialState().key.publicKey;
+  const table = (title: string) => ({ file: `C:\t\${title}.vpx`, folder: 'C:\t', title, manufacturer: 'Williams', year: 1991, info: {} });
+  const theirs = (id: number, title: string) => ({ id: id.toString(16).padStart(16, '0'), table: { title, manufacturer: 'Williams', year: 1991 }, medias: [] });
+  // Bruno n'a que des tables déjà sur la borne ; Émile en a deux qu'elle n'a pas.
+  const libraries: Record<string, ReturnType<typeof theirs>[]> = {
+    [FRIEND]: [theirs(1, 'Terminator 2')],
+    [EMILE]: [theirs(2, 'Terminator 2'), theirs(3, 'Fish Tales'), theirs(4, 'Medieval Madness')],
+  };
+  const content = {
+    library: (key: string) => ({ state: 'ready', library: { at: new Date().toISOString(), tables: libraries[key]! } }),
+    refresh: () => undefined,
+    receivedDir: () => '',
+    tableDir: () => '',
+    stop: () => undefined,
+  };
+  const { menu, last } = setup(content, 'menu', undefined, { friends: [{ key: EMILE, name: 'Émile' }], tables: [table('Terminator 2')] });
+  const add = (menu as unknown as { addFromFriend: { detail(): string; open(back: () => void): void } }).addFromFriend;
+  assert.match(add.detail(), /2 amis en ligne/);
+  let back = 0;
+  add.open(() => back++);
+  type Shown = { heading: string; lead?: string; actions: Action[]; sections: { title?: string; rows: { text: string; detail?: string; tone?: string; action?: number; badges?: string[] }[] }[] };
+  const friends = last().build() as unknown as Shown;
+  assert.equal(friends.heading, 'Depuis un ami');
+  const rows = friends.sections.flatMap((s) => s.rows).filter((r) => r.action !== undefined);
+  assert.deepEqual(rows.map((r) => r.text.replace(/ #.*/, '')), ['Émile', 'Bruno'], 'celle qui a des tables à prendre d’abord');
+  assert.deepEqual(rows[0]!.badges, ['2 à prendre']);
+  assert.match(rows[0]!.detail!, /^3 tables, dont 2 absentes de votre borne$/);
+  assert.match(rows[1]!.detail!, /toutes déjà sur votre borne/);
+  for (const row of rows) assert.equal(friends.actions[row.action!]!.label, row.text, `la ligne « ${row.text} » mène à sa propre action`);
+  assert.equal(friends.actions.at(-1)!.label, 'Retour');
+  await friends.actions.at(-1)!.run();
+  assert.equal(back, 1, 'Retour revient à « Ajouter une table »');
+  // Sa bibliothèque : ses tables absentes d'abord, le curseur sur la première.
+  add.open(() => back++);
+  await (last().build() as unknown as Shown).actions[rows[0]!.action!]!.run();
+  const library = last().build() as unknown as Shown;
+  assert.equal(library.heading, 'Bibliothèque de Émile');
+  assert.deepEqual(library.sections.map((s) => s.title), ['Absentes de votre borne (2)', 'Sur votre borne (1)']);
+  assert.match(library.actions[0]!.label, /^(Fish Tales|Medieval Madness)/, 'la première action est la première table absente');
+  for (const row of library.sections.flatMap((s) => s.rows).filter((r) => r.action !== undefined)) assert.equal(library.actions[row.action!]!.label, row.text);
+  // Son « Retour » ramène à la liste des amis de l'ajout.
+  await library.actions.at(-1)!.run();
+  assert.equal(last().build().heading, 'Depuis un ami');
+});
+
+test('« Depuis un ami » : un ami hors ligne est grisé avec sa raison, et Start n’y mène nulle part', () => {
+  const { menu, last } = setup();
+  const add = (menu as unknown as { addFromFriend: { detail(): string; open(back: () => void): void } }).addFromFriend;
+  assert.match(add.detail(), /aucun ami en ligne/);
+  add.open(() => undefined);
+  const built = last().build();
+  const row = built.sections.flatMap((s) => s.rows).find((r) => r.action !== undefined)!;
+  assert.equal(row.tone, 'quiet');
+  assert.match(row.detail!, /^Hors ligne/);
+  const action = built.actions[row.action!]!;
+  assert.equal(action.tone, 'quiet');
+  assert.match(action.detail!, /^Indisponible : /);
+  const before = last();
+  void action.run();
+  assert.equal(last(), before, 'rien ne s’ouvre');
+});
