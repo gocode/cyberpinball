@@ -40,7 +40,7 @@ interface Item {
 const { createFriendsMenu } = require(path.join(APP_DIST, 'friends-menu.js')) as {
   createFriendsMenu(host: object): { items: Record<string, Item>; live: { open(back: () => void): void; sheetAction(table: object, back: () => void): Action; inviteFriends(keys: string[], back: () => void): void } };
 };
-const { createSocialNet } = require(path.join(APP_DIST, 'social-net.js')) as { createSocialNet(o: object): { state(): { shareLibrary: boolean; key: { publicKey: string } } } };
+const { createSocialNet } = require(path.join(APP_DIST, 'social-net.js')) as { createSocialNet(o: object): { state(): { shareLibrary: boolean; key: { publicKey: string } }; status(): object } };
 const { createFirewallRule } = require(path.join(APP_DIST, 'firewall-rule.js')) as { createFirewallRule(o: object): { check(): Promise<string>; checkVpx(): Promise<string | undefined> } };
 const { createFriendContent } = require(path.join(APP_DIST, 'friend-content.js')) as { createFriendContent(o: object): object };
 /* eslint-enable @typescript-eslint/no-require-imports */
@@ -80,14 +80,15 @@ function fakeGames() {
  * `presence` : Bruno vu en ligne, dans le menu ou en partie (le réseau reste coupé) ; `vpx` : les
  * programmes de VPX à fermer au réseau ; `extra` : d'autres amis, et les tables de la borne.
  */
-function setup(content?: object, presence?: 'menu' | 'playing', vpx?: () => string[] | undefined, extra: { friends?: { key: string; name: string }[]; tables?: object[] } = {}) {
+function setup(content?: object, presence?: 'menu' | 'playing', vpx?: () => string[] | undefined, extra: { friends?: { key: string; name: string }[]; tables?: object[]; status?: object } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-friends-menu-'));
   // Un ami déjà là (hors ligne : réseau coupé).
   const friends = [{ key: FRIEND, name: 'Bruno' }, ...(extra.friends ?? [])].map((f) => ({ ...f, since: new Date().toISOString(), events: [] }));
   fs.writeFileSync(path.join(dir, 'social.json'), JSON.stringify({ ...newSocialState(), friends }));
   const opened: { build: Build; at?: number }[] = [];
   const off = createSocialNet({ dataDir: dir, mode: 'off' });
-  const net = presence ? { ...off, online: () => true, presenceOf: () => ({ status: presence, since: new Date().toISOString(), ...(presence === 'playing' ? { table: { title: 'Glass Lagoon' } } : {}) }) } : off;
+  const shown = presence ? { ...off, online: () => true, presenceOf: () => ({ status: presence, since: new Date().toISOString(), ...(presence === 'playing' ? { table: { title: 'Glass Lagoon' } } : {}) }) } : off;
+  const net = extra.status ? { ...shown, status: () => ({ ...off.status(), ...extra.status }) } : shown;
   const firewall = createFirewallRule({ exe: 'C:\\x\\CyberPinball.exe', simulated: true, vpx });
   const games = fakeGames();
   const manager = createDownloadManager({ dataDir: dir, transports: {} });
@@ -562,4 +563,19 @@ test('« Depuis un ami » : un ami hors ligne est grisé avec sa raison, et Star
   const before = last();
   void action.run();
   assert.equal(last(), before, 'rien ne s’ouvre');
+});
+
+test('réseau local en panne (multidiffusion refusée, aucune carte) : averti dans « Partage et réseau » et « À proximité », jamais « Bloquant »', () => {
+  for (const [lanError, reason] of [['addMembership EHOSTUNREACH', 'addMembership EHOSTUNREACH'], ['no-interface', 'aucune carte réseau connectée']] as const) {
+    const { menu, last } = setup(undefined, undefined, undefined, { status: { running: true, internet: true, lan: false, lanError } });
+    const rows = () => last().build().sections.flatMap((s) => s.rows) as { text: string; detail?: string; tone?: string; badges?: string[] }[];
+    menu.items.sharing!.run();
+    const lan = rows().find((r) => r.text.startsWith('Réseau local'))!;
+    assert.deepEqual([lan.text, lan.tone, lan.badges], ['Réseau local : indisponible', 'warning', ['Indisponible']]);
+    assert.equal(lan.detail, `${reason} · Internet continue sans lui ; nouvel essai tout seul`);
+    menu.items['find-player']!.run();
+    assert.ok(rows().some((r) => r.text === `Réseau local indisponible : ${reason}` && r.tone === 'quiet'), 'À proximité : la raison, grisée');
+    menu.items.friends!.run();
+    assert.ok(!rows().some((r) => r.badges?.includes('Bloquant')), 'Mes amis : rien de bloquant, Internet tourne');
+  }
 });

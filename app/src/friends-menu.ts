@@ -160,6 +160,16 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     ...(host.freeSpace ? { freeSpace: host.freeSpace } : {}),
   });
 
+  /**
+   * Réseau local en panne (multidiffusion refusée, aucune carte réseau) : sa raison. Jamais
+   * bloquant, Internet continue ; « no-interface » est NO_INTERFACE de social-net.ts.
+   */
+  function lanProblem(): string | undefined {
+    const error = net.status().lanError;
+    if (!error) return undefined;
+    return error === 'no-interface' ? t('aucune carte réseau connectée') : error;
+  }
+
   /** Rien ne passe : partage désactivé, ou réseau coupé pour les essais. */
   function offRows(): Row[] {
     const status = net.status();
@@ -423,7 +433,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         ],
       },
     ];
-    if (s.lan) sections.push({ title: t('À proximité (réseau local)'), rows: near.length ? playerRows(near, actions, openFind, { nearby: nearKeys }) : [{ text: t('Aucune autre borne sur ce réseau pour l’instant'), tone: 'quiet' }] });
+    const lanDown = lanProblem();
+    if (s.lan) sections.push({ title: t('À proximité (réseau local)'), rows: near.length ? playerRows(near, actions, openFind, { nearby: nearKeys }) : lanDown ? [{ text: t('Réseau local indisponible : {reason}', { reason: lanDown }), detail: t('Internet continue sans lui ; nouvel essai tout seul'), tone: 'quiet' }] : [{ text: t('Aucune autre borne sur ce réseau pour l’instant'), tone: 'quiet' }] });
     if (recent.length) sections.push({ title: t('Vus récemment'), rows: playerRows(recent, actions, openFind) });
     actions.push(backAction());
     return {
@@ -623,11 +634,14 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const s = net.state();
     const status = net.status();
     const near = nearbyPlayers(s, now()).length;
+    const lanDown = lanProblem();
     const rows: Row[] = [
       s.enabled ? { text: t('Partage activé'), detail: status.mode === 'off' ? t('Réseau coupé pendant les essais sans opérateur') : status.running ? tn(status.peers, 'Relié à {n} borne', 'Relié à {n} bornes') : status.error ? t('Réseau indisponible : {error}', { error: status.error }) : t('Connexion au réseau…'), tone: 'ok', badges: [t('Activé')], icon: 'network' } : { text: t('Partage désactivé'), detail: t('Personne ne vous voit ; vos amis vous voient hors ligne'), tone: 'warning', badges: [t('Désactivé')], icon: 'network' },
       { text: t('Votre nom : {name}', { name: name(s.key.publicKey, s.name) }), detail: t('Visible dans l’annuaire ; l’étiquette #{tag} vient de la clé de cette borne', { tag: name(s.key.publicKey, '').split('#')[1]! }), icon: 'friend-list' },
       { text: s.avatar ? t('Votre avatar : une image à vous') : t('Votre avatar : vos initiales'), detail: t('Vu par vos amis et les joueurs d’une demande en cours ; « Changer d’avatar… » le montre'), icon: 'avatar' },
-      { text: s.lan ? t('Réseau local : activé') : t('Réseau local : désactivé'), detail: s.lan ? tn(near, '{n} borne à proximité', '{n} bornes à proximité') : t('Les bornes de votre réseau ne vous trouvent pas sans Internet'), tone: s.lan ? 'ok' : 'quiet', icon: 'monitor' },
+      s.lan && lanDown
+        ? { text: t('Réseau local : indisponible'), detail: t('{reason} · Internet continue sans lui ; nouvel essai tout seul', { reason: lanDown }), tone: 'warning', badges: [t('Indisponible')], icon: 'monitor' }
+        : { text: s.lan ? t('Réseau local : activé') : t('Réseau local : désactivé'), detail: s.lan ? tn(near, '{n} borne à proximité', '{n} bornes à proximité') : t('Les bornes de votre réseau ne vous trouvent pas sans Internet'), tone: s.lan ? 'ok' : 'quiet', icon: 'monitor' },
       s.shareLibrary
         ? { text: t('Bibliothèque partagée avec vos amis'), detail: t('Ils voient vos tables et peuvent les récupérer, avec leurs médias'), tone: 'ok', badges: [t('Partagée')], icon: 'tables' }
         : { text: t('Bibliothèque pas partagée'), detail: t('Vos amis ne voient pas vos tables'), tone: 'quiet', icon: 'tables' },

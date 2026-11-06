@@ -13,6 +13,7 @@
 import * as dgram from 'node:dgram';
 import { createHash } from 'node:crypto';
 import * as net from 'node:net';
+import * as os from 'node:os';
 import {
   acceptRequest,
   addEvent,
@@ -108,6 +109,15 @@ export const LAN_GROUP = '239.255.42.99';
 export const LAN_PORT = 47_999;
 const BEACON_MS = 5_000;
 /**
+ * Démarrage raté (Internet), ou réseau local qui n'a pas pu s'ouvrir : nouvel essai après ce délai,
+ * doublé à chaque échec jusqu'au plafond. Sans lui, une borne démarrée avant son réseau restait
+ * « Réseau indisponible » jusqu'au prochain lancement.
+ */
+const RETRY_MS = 30_000;
+const RETRY_MAX_MS = 5 * 60_000;
+/** Balise sans aucune carte réseau à laquelle s'abonner (machine hors réseau, câble débranché). */
+export const NO_INTERFACE = 'no-interface';
+/**
  * Nouvelle recherche dans l'annuaire : Hyperswarm ne relance la sienne que toutes les dix
  * minutes, et deux bornes démarrées ensemble se manqueraient jusque-là.
  */
@@ -158,7 +168,13 @@ export interface NetStatus {
   lan: boolean;
   /** Bornes reliées en ce moment. */
   peers: number;
+  /** Le réseau des bornes ne tourne pas (Internet) : bloquant, réessayé tout seul. */
   error?: string;
+  /**
+   * Le réseau local ne passe pas (abonnement à la multidiffusion refusé, aucune carte réseau :
+   * NO_INTERFACE, port pris) : Internet continue sans lui, réessayé tout seul. Jamais bloquant.
+   */
+  lanError?: string;
 }
 
 export interface Beacon {
@@ -171,6 +187,8 @@ export interface LanBeacons {
   start(onBeacon: (beacon: Beacon, host: string) => void): Promise<void>;
   announce(beacon: Beacon): void;
   stop(): Promise<void>;
+  /** Ce qui empêche la balise de recevoir en ce moment (aucune carte abonnée) ; undefined : elle reçoit. */
+  problem?(): string | undefined;
 }
 
 export interface SocialNetOptions {
@@ -191,6 +209,8 @@ export interface SocialNetOptions {
   searchMs?: number;
   /** Essais : l'entrant refusé, comme derrière un pare-feu qui le bloque (seules les liaisons sortantes passent). */
   refuseIncoming?: boolean;
+  /** Essais : premier délai avant un nouvel essai après un échec (RETRY_MS). */
+  retryMs?: number;
 }
 
 /** Messages des services posés sur le réseau des amis : bibliothèque partagée, partie en direct. */
@@ -298,6 +318,12 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   let graceTimer: NodeJS.Timeout | undefined;
   let searchTimer: NodeJS.Timeout | undefined;
   let redialTimer: NodeJS.Timeout | undefined;
+  /** Nouvel essai du démarrage (Internet) ou du réseau local, et le nombre d'échecs de suite. */
+  let retryTimer: NodeJS.Timeout | undefined;
+  let retries = 0;
+  let lanRetryTimer: NodeJS.Timeout | undefined;
+  let lanRetries = 0;
+  const retryDelay = (n: number) => Math.min(RETRY_MAX_MS, (opts.retryMs ?? RETRY_MS) * 2 ** n);
   let redialAt = 0;
   const redialsSoon = new Map<string, number[]>();
   /** Démarrage du réseau, ou dernier changement de réseau (ms) : la recherche des amis part de là. */
@@ -755,8 +781,44 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     if (caller || ms() - peer.lanWaiting >= LAN_FALLBACK_MS) connectLan(profile.key, host, beacon.port);
   }
 
+  /**
+   * Réseau local : une panne ici (multidiffusion refusée, carte sans réseau, port pris) ne touche
+   * jamais Internet. Tout ce qui s'était ouvert se referme, l'erreur se montre dans « Partage et
+   * réseau », et un nouvel essai part tout seul. Ne lève jamais.
+   */
   async function startLan(): Promise<void> {
     if (!state.lan || opts.mode === 'off') return;
+    if (lanRetryTimer) clearTimeout(lanRetryTimer);
+    lanRetryTimer = undefined;
+    try {
+      await openLan();
+      lanRetries = 0;
+    } catch (error) {
+      const message = (error as Error).message;
+      await stopLan();
+      const delay = retryDelay(lanRetries++);
+      status = { ...status, lanError: message };
+      log(`Réseau des bornes : réseau local indisponible (${message}), Internet seul ; nouvel essai dans ${Math.round(delay / 1000)} s.`); // i18n-ignore : journal
+      lanRetryTimer = setTimeout(() => {
+        lanRetryTimer = undefined;
+        if (status.running && state.lan) void startLan().then(changed);
+      }, delay);
+      lanRetryTimer.unref?.();
+    }
+  }
+
+  /** La balise reçoit-elle ? Suivi à chaque annonce : une carte qui arrive ou repart change l'état. */
+  function followBeacons(): void {
+    const problem = beacons?.problem?.();
+    if (problem === status.lanError) return;
+    if (problem) log(`Réseau des bornes : balise locale sans réseau (${problem}), nouvel essai à chaque annonce.`); // i18n-ignore : journal
+    else log('Réseau des bornes : balise locale de nouveau à l’écoute.'); // i18n-ignore : journal
+    const { lanError: _, ...rest } = status;
+    status = problem ? { ...rest, lanError: problem } : rest;
+    changed();
+  }
+
+  async function openLan(): Promise<void> {
     const host = opts.host ?? '0.0.0.0';
     tcp = net.createServer((socket) => {
       if (opts.refuseIncoming) return socket.destroy();
@@ -774,15 +836,21 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     beacons = opts.beacons ?? (opts.mode === 'public' ? multicastBeacons() : memoryBeacons(SIMULATED_LAN));
     if (!beacons) return;
     await beacons.start(onBeacon);
-    const announce = () => beacons?.announce({ profile: signProfile(state), port: tcpPort });
+    const announce = () => {
+      beacons?.announce({ profile: signProfile(state), port: tcpPort });
+      followBeacons();
+    };
+    const { lanError: _, ...rest } = status;
+    status = { ...rest, lan: true };
     announce();
     beaconTimer = setInterval(announce, BEACON_MS);
     beaconTimer.unref?.();
-    status = { ...status, lan: true };
   }
 
   async function stopLan(): Promise<void> {
     lanActive = false;
+    if (lanRetryTimer) clearTimeout(lanRetryTimer);
+    lanRetryTimer = undefined;
     if (beaconTimer) clearInterval(beaconTimer);
     beaconTimer = undefined;
     await beacons?.stop();
@@ -790,7 +858,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     for (const peer of peers.values()) for (const link of peer.links) if (link.via === 'lan') link.stream.destroy();
     await new Promise<void>((resolve) => (tcp ? tcp.close(() => resolve()) : resolve()));
     tcp = undefined;
-    status = { ...status, lan: false };
+    const { lanError: _, ...rest } = status;
+    status = { ...rest, lan: false };
   }
 
   // ---------- Internet ----------
@@ -827,17 +896,30 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   async function start(): Promise<void> {
     if (!state.enabled || opts.mode === 'off' || status.running) return;
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = undefined;
     starting ??= (async () => {
       try {
         await startInternet();
+        // Le réseau local ne lève jamais : sa panne laisse Internet tourner (lanError).
         await startLan();
         status = { ...status, running: true, error: undefined };
+        retries = 0;
         tidyAvatars();
         beginSearch();
         log(`Réseau des bornes : démarré (${opts.mode}, borne ${signProfile(state).name}, ${state.friends.length} ami(s) à chercher).`); // i18n-ignore : journal
       } catch (error) {
-        status = { ...status, error: (error as Error).message };
-        log(`Réseau des bornes : démarrage impossible (${(error as Error).message}).`); // i18n-ignore : journal
+        const message = (error as Error).message;
+        // Ce qui s'était ouvert se referme : le nouvel essai repart de rien, sans DHT en double.
+        await teardown();
+        const delay = retryDelay(retries++);
+        status = { ...status, error: message };
+        log(`Réseau des bornes : démarrage impossible (${message}) ; nouvel essai dans ${Math.round(delay / 1000)} s.`); // i18n-ignore : journal
+        retryTimer = setTimeout(() => {
+          retryTimer = undefined;
+          void start();
+        }, delay);
+        retryTimer.unref?.();
       } finally {
         starting = undefined;
         changed();
@@ -848,6 +930,17 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   async function stop(): Promise<void> {
     await starting;
+    // Après le démarrage en cours : son échec a pu programmer un nouvel essai.
+    if (retryTimer) clearTimeout(retryTimer);
+    retryTimer = undefined;
+    retries = 0;
+    lanRetries = 0;
+    await teardown();
+    changed();
+  }
+
+  /** Tout ce que start a pu ouvrir, refermé (arrêt, ou démarrage raté à mi-chemin). */
+  async function teardown(): Promise<void> {
     await stopLan();
     if (refreshTimer) clearInterval(refreshTimer);
     refreshTimer = undefined;
@@ -866,7 +959,6 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     await testnet?.destroy();
     testnet = undefined;
     status = { ...status, running: false, internet: false, lan: false };
-    changed();
   }
 
   const messageListeners = new Set<(key: string, message: FriendMessage) => void>();
@@ -994,13 +1086,60 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   };
 }
 
-/** Vraie balise : multidiffusion UDP sur le réseau local, TTL 1 (ne sort pas du réseau). */
-export function multicastBeacons(): LanBeacons {
+/** Adresses IPv4 des cartes réseau de la machine (hors bouclage) : celles où la balise s'abonne. */
+function lanInterfaces(): string[] {
+  return Object.values(os.networkInterfaces())
+    .flat()
+    .filter((i): i is os.NetworkInterfaceInfoIPv4 => !!i && i.family === 'IPv4' && !i.internal)
+    .map((i) => i.address);
+}
+
+/**
+ * Vraie balise : multidiffusion UDP sur le réseau local, TTL 1 (ne sort pas du réseau).
+ *
+ * Le groupe se rejoint carte par carte, et de nouveau à chaque annonce. `addMembership` sans carte
+ * prend celle de la route par défaut, et lève (EHOSTUNREACH, ENODEV) quand il n'y en a pas : borne
+ * démarrée avant son réseau, câble débranché, VPN qui prend la route. Ici une carte refusée n'empêche
+ * pas les autres, aucune n'empêche le démarrage, et une carte qui arrive plus tard est prise à
+ * l'annonce suivante. `problem()` dit ce qui empêche de recevoir tant qu'aucune n'est abonnée.
+ * `options` : les essais donnent leurs cartes, leur adresse d'écoute (127.0.0.1, sans pare-feu) et leur port.
+ */
+export function multicastBeacons(options: { interfaces?: () => string[]; host?: string; port?: number } = {}): LanBeacons {
+  const interfaces = options.interfaces ?? lanInterfaces;
+  const port = options.port ?? LAN_PORT;
   let socket: dgram.Socket | undefined;
+  const joined = new Set<string>();
+  let problem: string | undefined;
+
+  function join(): void {
+    if (!socket) return;
+    const present = new Set(interfaces());
+    for (const address of joined) {
+      if (present.has(address)) continue;
+      joined.delete(address);
+      try {
+        socket.dropMembership(LAN_GROUP, address);
+      } catch {
+        // carte déjà partie : rien à quitter
+      }
+    }
+    let failure: string | undefined;
+    for (const address of present) {
+      if (joined.has(address)) continue;
+      try {
+        socket.addMembership(LAN_GROUP, address);
+        joined.add(address);
+      } catch (error) {
+        failure ??= `${(error as Error).message} (${address})`;
+      }
+    }
+    problem = joined.size ? undefined : (failure ?? NO_INTERFACE);
+  }
+
   return {
     async start(onBeacon) {
-      socket = dgram.createSocket({ type: 'udp4', reuseAddr: true });
-      socket.on('message', (data, rinfo) => {
+      const s = dgram.createSocket({ type: 'udp4', reuseAddr: true });
+      s.on('message', (data, rinfo) => {
         if (data.length > 4096) return;
         try {
           const raw = JSON.parse(data.toString('utf8')) as { app?: string; v?: number; profile?: Profile; port?: number };
@@ -1010,18 +1149,37 @@ export function multicastBeacons(): LanBeacons {
           // balise illisible : ignorée
         }
       });
-      socket.on('error', () => undefined);
-      await new Promise<void>((resolve) => socket!.bind(LAN_PORT, () => resolve()));
-      socket.addMembership(LAN_GROUP);
-      socket.setMulticastTTL(1);
+      // Port pris, adresse refusée : levé ici, jamais une attente sans fin.
+      await new Promise<void>((resolve, reject) => {
+        s.once('error', reject);
+        s.bind(port, options.host, () => {
+          s.removeListener('error', reject);
+          resolve();
+        });
+      }).catch((error: unknown) => {
+        s.close();
+        throw error;
+      });
+      s.on('error', () => undefined);
+      s.setMulticastTTL(1);
+      socket = s;
+      joined.clear();
+      join();
     },
     announce(beacon) {
-      socket?.send(JSON.stringify({ app: 'cyberpinball', v: 1, ...beacon }), LAN_PORT, LAN_GROUP);
+      join();
+      // Sans carte abonnée, l'envoi échouerait de même : rien ne part, l'annonce suivante réessaie.
+      if (!joined.size) return;
+      socket?.send(JSON.stringify({ app: 'cyberpinball', v: 1, ...beacon }), port, LAN_GROUP);
     },
     async stop() {
-      await new Promise<void>((resolve) => (socket ? socket.close(() => resolve()) : resolve()));
+      const s = socket;
       socket = undefined;
+      joined.clear();
+      problem = undefined;
+      await new Promise<void>((resolve) => (s ? s.close(() => resolve()) : resolve()));
     },
+    problem: () => problem,
   };
 }
 

@@ -20,7 +20,7 @@ const APP_DIST = path.join(REPO_ROOT, 'app', 'dist');
 /** Ce que le test utilise du service (app/src/social-net.ts). */
 interface Net {
   state(): SocialState;
-  status(): { running: boolean };
+  status(): { running: boolean; internet: boolean; lan: boolean; error?: string; lanError?: string };
   online(key: string): boolean;
   presenceOf(key: string): Presence | undefined;
   listSync(): 'off' | 'searching' | 'updating' | 'settled';
@@ -46,6 +46,14 @@ interface AvatarNet extends Net {
 interface NetModule {
   createSocialNet(o: object): Net;
   memoryBeacons(bus: Set<unknown>): unknown;
+  multicastBeacons(o: { interfaces?: () => string[]; host?: string; port?: number }): Beacons;
+  NO_INTERFACE: string;
+}
+interface Beacons {
+  start(onBeacon: () => void): Promise<void>;
+  announce(beacon: object): void;
+  stop(): Promise<void>;
+  problem?(): string | undefined;
 }
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const net = require(path.join(APP_DIST, 'social-net.js')) as NetModule;
@@ -502,4 +510,55 @@ test('avatar : reçu par les amis et les demandes en cours, jamais par l’annua
     await Promise.all(nets.map((n) => n.stop()));
     await testnet.destroy();
   }
+});
+
+test('réseau local en panne au démarrage (addMembership EHOSTUNREACH) : Internet tourne quand même, le local est réessayé et revient', async () => {
+  const testnet = await createTestnet(3, { host: '127.0.0.1' });
+  const bus = new Set<unknown>();
+  const memory = net.memoryBeacons(bus) as Beacons;
+  let failures = 2;
+  const beacons: Beacons = {
+    async start(onBeacon) {
+      if (failures-- > 0) throw new Error('addMembership EHOSTUNREACH');
+      await memory.start(onBeacon);
+    },
+    announce: (b) => memory.announce(b),
+    stop: () => memory.stop(),
+  };
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-social-panne-'));
+  const lines: string[] = [];
+  const a = net.createSocialNet({ dataDir: dir, mode: 'simulated', host: '127.0.0.1', bootstrap: testnet.bootstrap, beacons, retryMs: 100, log: (l: string) => lines.push(l) });
+  try {
+    await a.start();
+    const st = a.status();
+    assert.deepEqual([st.running, st.internet, st.lan, st.error, st.lanError], [true, true, false, undefined, 'addMembership EHOSTUNREACH'], 'la panne locale ne bloque pas Internet');
+    assert.ok(lines.some((l) => /réseau local indisponible \(addMembership EHOSTUNREACH\), Internet seul ; nouvel essai/.test(l)), lines.join(' | '));
+    await until('réseau local revenu après deux échecs', () => a.status().lan && !a.status().lanError, 5_000, () => JSON.stringify(a.status()));
+    assert.equal(failures, -1);
+    // Coupé par l'utilisateur, puis arrêté : plus de nouvel essai en attente.
+    await a.setLan(false);
+    assert.equal(a.status().lanError, undefined);
+  } finally {
+    await a.stop();
+    await testnet.destroy();
+  }
+});
+
+test('balise multidiffusion : une carte refusée ou absente ne lève pas, la raison est dite ; un port refusé lève au lieu d’attendre', async () => {
+  let cards = ['203.0.113.7'];
+  const b = net.multicastBeacons({ interfaces: () => cards, host: '127.0.0.1', port: 0 });
+  try {
+    await b.start(() => undefined);
+    assert.match(b.problem!() ?? '', /203\.0\.113\.7/, 'carte absente de la machine : refusée, dite');
+    b.announce({ profile: {}, port: 1 });
+    cards = [];
+    b.announce({ profile: {}, port: 1 });
+    assert.equal(b.problem!(), net.NO_INTERFACE, 'aucune carte : dite, sans lever');
+  } finally {
+    await b.stop();
+  }
+  // Adresse d'écoute qui n'est pas à la machine : l'ouverture échoue franchement (jamais une promesse sans fin).
+  const bad = net.multicastBeacons({ interfaces: () => [], host: '203.0.113.7', port: 0 });
+  await assert.rejects(bad.start(() => undefined), /EADDRNOTAVAIL|EINVAL/);
+  await bad.stop();
 });
