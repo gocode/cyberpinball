@@ -79,7 +79,7 @@ export const SYSTEM_ROOT: readonly SystemGroupId[] = ['amis', 'tables', 'medias'
  * Entrées montrées aussi à la racine, parmi les rubriques : Activité récente, les notifications de
  * tout Cyber Pinball (amis, téléchargements, mises à jour), et Téléchargements, comme le
  * gestionnaire de téléchargements d'une console. Elles gardent leur place dans leur rubrique
- * (Amis > Activité récente, Tables > Téléchargements).
+ * (Cyber Pinball > Activité récente, Tables > Téléchargements).
  */
 export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'downloads'];
 
@@ -112,7 +112,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'friends',
     get label() { return t('Amis'); },
     get detail() { return t('Mes amis, mon avatar, historique des parties, trouver un joueur, demandes, badges, partage'); },
-    entries: ['friends', 'avatar', 'game-history', 'find-player', 'friend-requests', 'badges', 'sharing', 'live-scores', 'activity', 'quiet-in-game'],
+    entries: ['friends', 'avatar', 'game-history', 'find-player', 'friend-requests', 'badges', 'sharing', 'live-scores', 'quiet-in-game'],
   },
   borne: {
     id: 'borne',
@@ -125,9 +125,9 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'cyberpinball',
     icon: 'pinball-app',
     label: 'Cyber Pinball', // i18n-ignore : le nom de l'application
-    get detail() { return t('Langue, mise à jour, sauvegardes, migration, quitter, veille et extinction'); },
+    get detail() { return t('Langue, mise à jour, activité récente, sauvegardes, migration, quitter, veille et extinction'); },
     // Les sorties à la fin, de la plus légère à la plus lourde : quitter, veille, redémarrage, arrêt.
-    entries: ['language', 'updates', 'backups', 'migration', 'quit', 'sleep', 'restart', 'shutdown'],
+    entries: ['language', 'updates', 'activity', 'backups', 'migration', 'quit', 'sleep', 'restart', 'shutdown'],
   },
   migration: {
     id: 'migration',

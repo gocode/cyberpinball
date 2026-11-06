@@ -15,11 +15,16 @@
 // - Au plus ACTIVITY_MAX lignes : les plus anciennes déjà lues partent d'abord, puis les plus
 //   anciennes. Le fichier (<données>\activite.json) garde tout d'un démarrage à l'autre ; illisible,
 //   il est mis de côté, jamais écrasé (readKeptJson).
-// - Non lu : ce que la notification n'a pas dit en entier (retenu puis expiré, fondu dans un
-//   résumé, notifications coupées). Les erreurs et les fins de téléchargement restent non lues
-//   jusqu'à ce qu'on les voie à l'écran, même dites (ACTIVITY_KEEP_UNREAD) : une ligne est vue
-//   quand le curseur s'y pose (revue de Codex : pas tout d'un coup à l'ouverture). La pastille
-//   rouge remonte à la roue dentée comme les autres entrées du menu système.
+// - Non lu : ce que la notification ou le constat n'a pas dit en entier (retenu puis expiré, fondu
+//   dans un résumé, notifications coupées). Les erreurs restent non lues jusqu'à ce qu'on les voie
+//   à l'écran, même dites (ACTIVITY_KEEP_UNREAD) : une ligne est vue quand le curseur s'y pose
+//   (revue de Codex : pas tout d'un coup à l'ouverture). Le non-lu se marque dans l'écran seulement.
+// - Jamais de pastille rouge (retour du 06/11/2026 : « une mise à jour installée » au redémarrage,
+//   une connexion d'ami, et la pastille qui remontait par la rubrique Amis pour une mise à jour,
+//   c'était trop) : ce qui attend une réponse a déjà la sienne là où on y répond (demandes d'ami et
+//   invitation dans Amis, téléchargement fini ou bloqué dans Téléchargements, version disponible ou
+//   mise à jour qui n'a pas abouti dans Mises à jour) ; la redoubler ici, c'est deux pastilles pour
+//   une chose, ou une pastille au mauvais endroit. Le non-lu se marque dans l'écran seulement.
 // - L'action de chaque ligne (activityAct) : la fiche de l'ami, l'invitation, l'écran de la partie
 //   ou son détail à l'historique, le gestionnaire de téléchargements, une entrée du menu système.
 //   L'application dit si elle vaut encore ; sinon la ligne reste, grisée avec sa raison.
@@ -120,8 +125,8 @@ function repeatKey(kind: ActivityKind, f: ActivityFacts): string | undefined {
   }
 }
 
-/** Erreurs et fins de téléchargement : non lues jusqu'à ce qu'on ouvre l'écran, même dites par la notification. */
-export const ACTIVITY_KEEP_UNREAD: ReadonlySet<ActivityKind> = new Set<ActivityKind>(['download-failed', 'download-done', 'update-failed']);
+/** Les erreurs : non lues jusqu'à ce qu'on les voie dans l'écran, même dites par la notification ou le constat. */
+export const ACTIVITY_KEEP_UNREAD: ReadonlySet<ActivityKind> = new Set<ActivityKind>(['download-failed', 'update-failed']);
 
 /** Le jour local d'un instant : « 2026-11-06 ». */
 export function activityDay(at: number): string {

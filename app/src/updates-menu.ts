@@ -101,6 +101,8 @@ export function createUpdatesMenu(host: UpdatesHost) {
   let state: State = { kind: 'idle' };
   /** Heure du dernier résultat (à jour ou disponible). */
   let checkedAt = 0;
+  /** La mise à jour lancée avant la fermeture n'a pas abouti (startupNotice) : pastille rouge ici, jusqu'à ce qu'on ouvre l'entrée. */
+  let failed: { to: string } | undefined;
   const date = (iso: string) => formatDate(iso);
 
   /**
@@ -141,13 +143,14 @@ export function createUpdatesMenu(host: UpdatesHost) {
       : { label: t('Préversions : non reçues'), detail: t('Choisir pour recevoir aussi les versions d’essai (0.2.0-essai.1…)'), icon: 'flask', run: togglePrereleases };
 
   const systemItem: ProvidedSystemItem = {
-    /** Pastille rouge : une version plus récente attend l'utilisateur. */
+    /** Pastille rouge : une version plus récente attend l'utilisateur, ou la dernière mise à jour n'a pas abouti. */
     get attention() {
-      return state.kind === 'available';
+      return state.kind === 'available' || failed !== undefined;
     },
     get detail() {
       const installed = prereleases() ? t('Version {version} installée, préversions reçues', { version: host.version }) : t('Version {version} installée', { version: host.version });
       if (state.kind === 'available' || state.kind === 'downloading') return t('{installed} · {version} disponible', { installed, version: state.latest.version });
+      if (failed) return t('{installed} · la mise à jour vers {to} n’a pas abouti', { installed, to: failed.to });
       if (state.kind === 'up-to-date') return t('{installed}, la dernière', { installed });
       return t('{installed} · chercher une version plus récente', { installed });
     },
@@ -164,6 +167,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
    * Sinon, une recherche part.
    */
   function open(search: boolean): void {
+    failed = undefined;
     const fresh = (state.kind === 'available' || state.kind === 'up-to-date') && Date.now() - checkedAt < FRESH_MS;
     if (search && !fresh && state.kind !== 'downloading' && state.kind !== 'installing' && state.kind !== 'checking') void check();
     else show();
@@ -511,6 +515,7 @@ export function createUpdatesMenu(host: UpdatesHost) {
     const outcome = takeUpdateOutcome(host.loc.dataDir, host.version);
     if (!outcome) return undefined;
     if (outcome.kind === 'installed') installed = { from: outcome.from, to: outcome.to };
+    else failed = { to: outcome.to };
     host.outcome?.(outcome.kind === 'installed' ? { installed: true, to: outcome.to, previous: outcome.from } : { installed: false, to: outcome.to, previous: outcome.current });
     const text =
       outcome.kind === 'installed'

@@ -15,6 +15,7 @@ export const messages: Record<string, string> = {
   'Cyber Pinball {version} est installé': 'Cyber Pinball {version} is installed',
   'Avant : {version}': 'Before: {version}',
   'La mise à jour vers {version} n’a pas abouti': 'The update to {version} did not complete',
+  '{installed} · la mise à jour vers {to} n’a pas abouti': '{installed} · the update to {to} did not complete',
   'La version {version} est restée en place': 'Version {version} stayed in place',
 
   // app/src/activity-menu.ts : l'écran

@@ -6,8 +6,10 @@
 // - au plus ACTIVITY_MAX lignes, les plus anciennes déjà lues partent d'abord ;
 // - le fichier garde tout d'un démarrage à l'autre ; illisible, il est mis de côté ; une ligne
 //   abîmée est laissée de côté, les autres restent ;
-// - non lu : ce que la notification n'a pas dit en entier (résumé, retenu) ; les erreurs et les
-//   fins de téléchargement le restent jusqu'à l'écran ; l'écran ouvert lit tout ;
+// - non lu : ce que la notification n'a pas dit en entier (résumé, retenu) ; les erreurs le restent
+//   jusqu'à l'écran ; l'écran ouvert lit tout ;
+// - jamais de pastille rouge : ce qui attend a la sienne là où on y répond ; l'entrée en tête du
+//   menu système et sous Cyber Pinball, plus dans Amis (retour du 06/11/2026) ;
 // - chaque genre de notification a son icône, son texte et son action dans les deux langues.
 
 import assert from 'node:assert/strict';
@@ -35,6 +37,7 @@ import {
 } from '../activity';
 import { NOTICE_GATHER_MS, NOTICE_RULES, NOTICE_STARTUP_QUIET_MS, createNoticeCenter, noticeText, type NoticeEvent, type NoticeKind } from '../notices';
 import { ZONE_SCREENS, noticeZone, type NoticeZone } from '../noticezone';
+import { SYSTEM_GROUPS, SYSTEM_ROOT_SHORTCUTS } from '../systemmenu';
 import { newSocialState } from '../social';
 import { REPO_ROOT } from './i18n-scan';
 
@@ -150,20 +153,21 @@ test('activité : le journal est gardé d’un démarrage à l’autre ; illisib
   assert.ok(loaded.setAside && fs.readFileSync(loaded.setAside, 'utf8').startsWith('{"v":1'));
 });
 
-test('activité : non lu, ce que la notification n’a pas dit en entier ; les erreurs et fins de téléchargement jusqu’à l’écran', () => {
+test('activité : non lu, ce que la notification n’a pas dit en entier ; les erreurs jusqu’à l’écran', () => {
   setLanguage('fr');
   const log = emptyActivity();
   const center = createNoticeCenter();
   const online = ev('friend-online', BRUNO, T0);
   const done = ev('download-done', 'j1', T0, { who: undefined, player: undefined, subject: 'Medieval Madness' });
-  for (const e of [online, done]) add(log, e);
-  // Dites une à une, en entier : la connexion est lue, la fin de téléchargement reste à voir.
+  const failed = ev('download-failed', 'j0', T0, { who: undefined, player: undefined, subject: 'Junk Yard' });
+  for (const e of [online, done, failed]) add(log, e);
+  // Dites une à une, en entier : la connexion et la fin de téléchargement sont lues, l'erreur reste à voir.
   center.push([online]);
   const said = center.tick(T0 + 5000, { canShow: true });
   assert.deepEqual(said.entered, { events: [online], digest: false });
   markActivityShown(log, said.entered!.events);
-  markActivityShown(log, [done]);
-  assert.deepEqual(log.entries.map((e) => [e.kind, e.read]), [['download-done', false], ['friend-online', true]]);
+  markActivityShown(log, [done, failed]);
+  assert.deepEqual(log.entries.map((e) => [e.kind, e.read]).sort(), [['download-done', true], ['download-failed', false], ['friend-online', true]]);
   assert.equal(activityUnread(log), 1);
   // Une nouvelle connexion du même ami : la ligne remonte, à revoir.
   add(log, ev('friend-online', BRUNO, T0 + 3600_000));
@@ -181,7 +185,8 @@ test('activité : non lu, ce que la notification n’a pas dit en entier ; les e
   assert.equal(markActivityRead(log), true);
   assert.equal(activityUnread(log), 0);
   assert.equal(markActivityRead(log), false, 'rien de changé : rien à écrire');
-  for (const kind of ACTIVITY_KEEP_UNREAD) assert.ok(kind === 'update-failed' || NOTICE_RULES[kind as NoticeKind].tone === 'error' || kind === 'download-done', kind);
+  // Ne restent non lues, dites, que les erreurs.
+  for (const kind of ACTIVITY_KEEP_UNREAD) assert.ok(kind === 'update-failed' || NOTICE_RULES[kind as NoticeKind].tone === 'error', kind);
 });
 
 test('activité : chaque genre a son icône, son texte entier et son action, en français et en anglais', () => {
@@ -227,6 +232,7 @@ const { createActivityMenu } = require(path.join(REPO_ROOT, 'app', 'dist', 'acti
   createActivityMenu(host: object): {
     record(events: readonly NoticeEvent[], quiet?: boolean): void;
     shown(events: readonly NoticeEvent[]): void;
+    note(add: { kind: ActivityKind; facts: Record<string, unknown> & { key: string } }): void;
     open(back?: () => void): void;
     unread(): number;
     entries(): readonly ActivityEntry[];
@@ -328,7 +334,8 @@ test('activité : l’écran, par jour, chaque action dite ou grisée avec sa ra
     ev('download-done', 'j9', T0 + 20, { who: undefined, player: undefined, subject: 'Safe Cracker' }),
   ]);
   assert.equal(menu.unread(), 5);
-  assert.equal(menu.item.attention, true, 'la pastille rouge, jusqu’à la roue dentée');
+  // Invitation, téléchargements : leur pastille est dans Amis et Téléchargements, pas redoublée ici.
+  assert.ok(!menu.item.attention, 'pas de pastille pour ce qui en a une ailleurs');
   assert.match(menu.item.detail!, /^5 non lues · /);
   menu.open();
   const screen = last();
@@ -352,13 +359,42 @@ test('activité : l’écran, par jour, chaque action dite ou grisée avec sa ra
   assert.deepEqual(screen.actions.slice(5).map((a) => a.label), ['Effacer l’activité récente', 'Retour']);
 });
 
+test('activité : jamais de pastille rouge, ni une mise à jour installée ni rien ; l’entrée en tête du menu système, plus dans Amis', () => {
+  setLanguage('fr');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-activite-pastille-'));
+  const { menu } = activityScreen(dir, { friends: [BRUNO], online: [BRUNO], invites: ['aaaaaaaaaaaaaaaa'], jobs: ['j1'] });
+  // Le redémarrage après une mise à jour : son bandeau l'a dite, elle entre lue.
+  menu.note({ kind: 'update-installed', facts: { key: '0.1.9', version: '0.1.9', previous: '0.1.8' } });
+  menu.note({ kind: 'update-available', facts: { key: '0.2.0', version: '0.2.0', previous: '0.1.9' } });
+  menu.note({ kind: 'note', facts: { key: 'sauvegarde', text: 'Sauvegarde faite.', item: 'downloads' } });
+  assert.equal(menu.unread(), 0, 'les constats dits au démarrage sont lus');
+  // Retenues pendant une partie puis expirées : à relire dans l'écran, sans pastille (Amis et Téléchargements ont la leur).
+  menu.record([
+    ev('friend-online', BRUNO, T0),
+    ev('friend-request', 'k1', T0 + 1),
+    ev('live-invite', 'aaaaaaaaaaaaaaaa|0', T0 + 2, { subject: 'Medieval Madness' }),
+    ev('download-done', 'j1', T0 + 3, { who: undefined, player: undefined, subject: 'Safe Cracker' }),
+    ev('download-failed', 'j1', T0 + 4, { who: undefined, player: undefined, subject: 'Junk Yard', extra: 'plus de place' }),
+  ]);
+  // Une mise à jour qui n'a pas abouti : sa pastille est sur Mises à jour (updates-menu.ts), pas ici.
+  menu.note({ kind: 'update-failed', facts: { key: '0.2.0', version: '0.2.0', previous: '0.1.9' } });
+  assert.equal(menu.unread(), 6, 'à relire dans l’écran');
+  assert.ok(!menu.item.attention, 'jamais de pastille : chaque chose a la sienne là où on y répond');
+  assert.match(menu.item.detail!, /^6 non lues · /);
+  // En tête du menu système, rangée sous Cyber Pinball (elle parle de tout, pas que des amis) : plus dans Amis,
+  // où elle faisait remonter par la rubrique une pastille de mise à jour.
+  assert.ok(SYSTEM_ROOT_SHORTCUTS.includes('activity'));
+  assert.ok(SYSTEM_GROUPS.cyberpinball.entries.includes('activity'));
+  assert.ok(!SYSTEM_GROUPS.amis.entries.includes('activity'));
+});
+
 test('activité : une ligne est vue quand le curseur s’y pose ; son repère reste jusqu’à la sortie de l’écran', () => {
   setLanguage('fr');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-activite-curseur-'));
   const { menu, last, move } = activityScreen(dir, { jobs: ['j1', 'j2'] });
   menu.record([ev('download-failed', 'j1', T0, { who: undefined, player: undefined, subject: 'Junk Yard' }), ev('download-done', 'j2', T0 + 1, { who: undefined, player: undefined, subject: 'Safe Cracker' })]);
-  // Dites par la notification : les erreurs et les fins de téléchargement restent à voir.
-  menu.shown([ev('download-done', 'j2', T0 + 1)]);
+  // Dite par la notification, une erreur reste à voir (la fin de téléchargement, retenue, aussi).
+  menu.shown([ev('download-failed', 'j1', T0)]);
   assert.equal(menu.unread(), 2);
   menu.open();
   last();

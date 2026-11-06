@@ -153,7 +153,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
 
   function record(events: readonly NoticeEvent[], quiet = false): void {
     for (const e of events) {
-      // Notifications coupées : ce qui ne se montre plus n'a pas à être revu ; la partie entre amis, les erreurs et les fins de téléchargement, si.
+      // Notifications coupées : ce qui ne se montre plus n'a pas à être revu ; la partie entre amis et les erreurs, si.
       const read = quiet && !isLiveNotice(e.kind) && !ACTIVITY_KEEP_UNREAD.has(e.kind);
       const entry = addActivity(log, { kind: e.kind, facts: activityFacts(e), at: e.at, ...(read ? { read } : {}) });
       host.log?.(`Activité récente : ${e.kind} consigné (${entry.count} fois ce jour-là${entry.read ? ', lu' : ''}).`); // i18n-ignore : journal
@@ -161,8 +161,9 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
     if (events.length) save();
   }
 
+  /** Un constat déjà dit en entier (bandeau, mise à jour) : lu, sauf une erreur (ACTIVITY_KEEP_UNREAD). */
   function note(add: Omit<ActivityAdd, 'at'> & { at?: number }): void {
-    addActivity(log, { ...add, at: add.at ?? now() });
+    addActivity(log, { read: !ACTIVITY_KEEP_UNREAD.has(add.kind), ...add, at: add.at ?? now() });
     save();
   }
 
@@ -335,9 +336,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
     unread: () => activityUnread(log),
     entries: () => log.entries,
     item: {
-      get attention() {
-        return activityUnread(log) > 0;
-      },
+      // Jamais de pastille rouge : ce qui attend a la sienne là où on y répond (activity.ts, en-tête).
       get detail() {
         const n = activityUnread(log);
         const latest = log.entries.find((e) => !e.read) ?? log.entries[0];
