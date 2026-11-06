@@ -36,6 +36,7 @@ import {
   t,
   tn,
   type AvatarView,
+  type FriendsShelf,
   type LiveFriendFit,
   type LiveFriendTables,
   type LiveGame,
@@ -100,6 +101,11 @@ export interface LiveMenu {
   inviteOnScreen(id: string): boolean;
   /** La partie est finie et ses résultats pas encore montrés : ils s'ouvrent au retour d'une partie d'une autre table. */
   unseenResults(): boolean;
+  /**
+   * Collection « Avec mes amis en ligne » (collections.ts) : mes tables qu'au moins un ami en
+   * ligne a dans la même version, et si la liste est sûre.
+   */
+  playableWithFriends(tables: readonly TableEntry[]): FriendsShelf;
 }
 
 export function createLiveMenu(host: LiveMenuHost): LiveMenu {
@@ -774,7 +780,26 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
     };
   }
 
+  function playableWithFriends(tables: readonly TableEntry[]): FriendsShelf {
+    const files = new Set<string>();
+    const friends = host.net.state().friends;
+    if (!friends.length) return { state: 'none', files };
+    const online = friends.filter((f) => host.net.online(f.key));
+    if (!online.length) return { state: searching() ? 'searching' : 'offline', files };
+    let unsure = false;
+    for (const f of online) {
+      for (const c of choicesFor(tables, [f.key])) {
+        const fit = c.friends[0]?.fit;
+        if (fit === 'same') files.add(c.entry.file.toLowerCase());
+        else if (fit === 'unknown') unsure = true;
+      }
+    }
+    // Rien de sûr encore, et une bibliothèque attendue ou une empreinte en calcul : on cherche.
+    return { state: !files.size && unsure ? 'searching' : 'ready', files };
+  }
+
   return {
+    playableWithFriends,
     inviteFriend,
     inviteFriends,
     inviteOn,

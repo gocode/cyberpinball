@@ -364,6 +364,297 @@ html.menu-desktop .menu-count {
   color: var(--ink);
 }
 
+/* ---------- Collections (collections.ts) : repère, étoile des favoris, liste des collections ---------- */
+
+/*
+ * Repère de la collection active, zone fixe : « ☆ FAVORIS · 4 tables ». Cotes de Codex
+ * (06/11/2026), en pixels de référence d'un petit côté de 1080, indépendantes du titre, du nombre
+ * de tables et de la taille de la roue : 48 de haut, icône 24, texte 24. Liste en borne :
+ * au-dessus des lignes ; liste au bureau : à la place de « Table sélectionnée » ; roues à
+ * bandeau : au coin haut-gauche du bandeau. Verre fumé, texte blanc : le vert reste au choix de la table.
+ */
+.menu-shelf {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--u));
+  left: calc(50 * var(--u));
+  bottom: calc(776 * var(--u));
+  width: calc(600 * var(--u));
+  height: calc(48 * var(--u));
+  padding: 0 calc(16 * var(--u));
+  border: calc(1.5 * var(--u)) solid var(--line-strong);
+  border-radius: calc(24 * var(--u));
+  background: var(--surface-sunken);
+  box-shadow: var(--halo-panel);
+  font-size: calc(24 * var(--u));
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.menu-shelf[hidden] {
+  display: none;
+}
+
+body.mouse .menu-shelf {
+  cursor: pointer;
+}
+
+.menu-shelf-icon {
+  flex: none;
+  width: calc(24 * var(--u));
+  height: calc(24 * var(--u));
+  color: var(--ink);
+}
+
+/* Seul un vrai libellé long (un fabricant) perd sa fin ; « Toutes », « Favoris », « Récentes » tiennent toujours. */
+.menu-shelf-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.menu-shelf-sep,
+.menu-shelf-count {
+  flex: none;
+  color: var(--ink-muted);
+}
+
+/* Bureau, liste : à la place de « Table sélectionnée », au-dessus du titre, sur la colonne des lignes. */
+html.menu-desktop .menu.layout-list .menu-shelf {
+  left: calc(790 * var(--u));
+  bottom: auto;
+  top: calc(652 * var(--u));
+}
+
+html.menu-desktop .menu.layout-list.has-shelf .menu-label {
+  display: none;
+}
+
+/* Roues à bandeau : au coin haut-gauche du bandeau, au-dessus du bout de la roue. */
+.menu.menu-band .menu-shelf {
+  left: calc(var(--band-left) + 48 * var(--u));
+  bottom: calc(var(--band-bottom) + 484 * var(--b));
+  /* 380 : à 400 (cote de Codex), le bout du repère touchait la zone cliquable du médaillon central. */
+  width: calc(380 * var(--u));
+}
+
+/* Étoile des favoris devant le titre : blanche, pleine ; sa place est gardée hors des favoris (le titre ne bouge pas). */
+.menu-title-line {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(14 * var(--u));
+  min-width: 0;
+  max-width: 100%;
+}
+
+.menu-star {
+  flex: none;
+  width: calc(36 * var(--u));
+  height: calc(36 * var(--u));
+  visibility: hidden;
+  fill: currentColor;
+  stroke: none;
+  color: var(--ink);
+}
+
+.menu-star[data-on] {
+  visibility: visible;
+}
+
+html.menu-desktop .menu-title-line {
+  gap: calc(16 * var(--u));
+}
+
+html.menu-desktop .menu-star {
+  width: calc(44 * var(--u));
+  height: calc(44 * var(--u));
+}
+
+.menu.menu-band .menu-title-line,
+html.menu-desktop .menu.menu-band .menu-title-line {
+  gap: calc(12 * var(--u));
+}
+
+.menu.menu-band .menu-star,
+html.menu-desktop .menu.menu-band .menu-star {
+  width: max(calc(28 * var(--b)), calc(22 * var(--u)));
+  height: max(calc(28 * var(--b)), calc(22 * var(--u)));
+}
+
+/*
+ * Liste des collections, 4 s après le dernier MagnaSave. Liste : à la place des lignes des
+ * tables, qu'elle couvre en entier. Roues à bandeau : en borne, au-dessus du repère (16 d'écart) ;
+ * au bureau, dans le cadre du plateau (la colonne de droite n'a pas la hauteur). Opaque. La
+ * collection affichée est un état, pas le focus : filet sarcelle, jamais de vert (le choix de la
+ * table reste le seul focus). Ses lignes se découpent sur la hauteur (collectionsPanel, PANEL_LINE).
+ */
+.collections-panel {
+  /* Gris des raisons : celui du design system (7,4:1 sur ce fond), plus clair que celui du thème. */
+  --ink-faint: #8ea29d;
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: calc(10 * var(--u));
+  left: calc(50 * var(--u));
+  right: calc(50 * var(--u));
+  bottom: calc(200 * var(--u));
+  height: calc(560 * var(--u));
+  padding: calc(24 * var(--u));
+  border: calc(1.5 * var(--u)) solid var(--line-strong);
+  border-radius: calc(12 * var(--u));
+  background: var(--surface-sunken);
+  box-shadow: var(--halo-panel);
+  font-size: calc(26 * var(--u));
+  color: var(--ink);
+  transition: opacity 160ms linear;
+}
+
+.collections-panel.leaving {
+  opacity: 0;
+}
+
+html.menu-desktop .menu.layout-list .collections-panel {
+  left: calc(790 * var(--u));
+  right: calc(112 * var(--u));
+  top: calc(110 * var(--u));
+  bottom: auto;
+  height: calc(520 * var(--u));
+}
+
+.menu.menu-band .collections-panel {
+  right: auto;
+  left: calc(var(--band-left) + 48 * var(--u));
+  bottom: calc(var(--band-bottom) + 484 * var(--b) + 64 * var(--u));
+  width: calc(600 * var(--u));
+  height: calc(860 * var(--u));
+}
+
+html.menu-desktop .menu.menu-band .collections-panel {
+  left: calc(80 * var(--u));
+  top: calc(92 * var(--u));
+  bottom: auto;
+  width: calc(531 * var(--u));
+  height: calc(944 * var(--u));
+  border-radius: calc(5 * var(--u));
+}
+
+.collections-head {
+  flex: none;
+  font-size: calc(22 * var(--u));
+  font-weight: 600;
+  line-height: calc(28 * var(--u));
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.collections-list {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: calc(6 * var(--u));
+  min-height: 0;
+  overflow: hidden;
+}
+
+.collections-heading {
+  flex: none;
+  margin-top: calc(8 * var(--u));
+  font-size: calc(20 * var(--u));
+  font-weight: 600;
+  line-height: calc(28 * var(--u));
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.collections-row {
+  flex: none;
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: calc(28 * var(--u)) minmax(0, 1fr) calc(48 * var(--u));
+  align-items: center;
+  gap: calc(16 * var(--u));
+  min-height: calc(68 * var(--u));
+  padding: calc(6 * var(--u)) calc(16 * var(--u));
+  border: calc(2 * var(--u)) solid transparent;
+  border-radius: calc(10 * var(--u));
+}
+
+.collections-row:has(.collections-reason) {
+  min-height: calc(88 * var(--u));
+}
+
+body.mouse .collections-row:not(.disabled) {
+  cursor: pointer;
+}
+
+.collections-row.focus {
+  border-color: var(--halo);
+  background: var(--surface-raised);
+}
+
+.collections-icon {
+  width: calc(28 * var(--u));
+  height: calc(28 * var(--u));
+}
+
+.collections-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.collections-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  line-height: calc(32 * var(--u));
+}
+
+.collections-reason {
+  font-size: calc(22 * var(--u));
+  line-height: calc(28 * var(--u));
+  color: var(--ink-faint);
+}
+
+.collections-count {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+}
+
+.collections-row.disabled,
+.collections-row.disabled .collections-count {
+  color: var(--ink-faint);
+}
+
+/* « ▲ 3 autres au-dessus », « ▼ … en dessous » : deux places toujours réservées, vides ou non. */
+.collections-more {
+  flex: none;
+  height: calc(28 * var(--u));
+  padding-left: calc(18 * var(--u));
+  font-size: calc(22 * var(--u));
+  line-height: calc(28 * var(--u));
+  color: var(--ink-muted);
+}
+
+.collections-hint {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  font-size: calc(22 * var(--u));
+  line-height: calc(28 * var(--u));
+  color: var(--ink-muted);
+}
+
 /* ---------- Roues : logos qui glissent d'une place à l'autre (frontend.js, wheelStage) ---------- */
 
 /*
@@ -609,6 +900,21 @@ html.menu-desktop[data-menu-band] #root {
     width: calc(170 * var(--b) + 24 * var(--u));
   }
 
+  /* Repère : sur la largeur de la colonne, au-dessus du bandeau réduit (cotes de Codex). */
+  html.menu-desktop .menu.menu-band .menu-shelf {
+    left: calc(var(--band-left) + 24 * var(--u));
+    width: calc(var(--band-w) - 48 * var(--u));
+    bottom: calc(var(--band-bottom) + 560 * var(--b));
+  }
+
+  /*
+   * Quatre commandes (avec « MagnaSave : collections ») ne tiennent pas sur la ligne, même serrées :
+   * « Flippers : choisir », qui se devine sur une borne, cède sa place. Sur ce format seulement.
+   */
+  html.menu-desktop[data-menu-band] #root > .footer.menu-help .hint:first-child:nth-last-child(4) {
+    display: none;
+  }
+
   /* L'aide prend toute la largeur du bandeau. */
   html.menu-desktop[data-menu-band] #root > .footer.menu-help {
     left: var(--band-left);
@@ -825,11 +1131,18 @@ html.menu-desktop .menu.menu-band .menu-title {
   height: calc(var(--t-h) * var(--b));
   justify-content: center;
   text-align: center;
-  /*
-   * Lueur du nom : un filtre sur la zone, pas un text-shadow sur le texte. Le texte et sa zone
-   * coupent ce qui déborde (titre limité à une ou deux lignes) : un text-shadow y était tranché
-   * en rectangle (borne, 25 octobre 2026). Le filtre se dessine après la découpe, il déborde.
-   */
+  /* La lueur du nom déborde de la zone (plus bas) : la zone ne coupe rien, le titre se limite lui-même en lignes. */
+  overflow: visible;
+}
+
+/*
+ * Lueur du nom : un filtre sur le texte, pas un text-shadow. Le texte coupe ce qui déborde (titre
+ * limité à une ou deux lignes) : un text-shadow y était tranché en rectangle (borne, 25 octobre
+ * 2026). Le filtre se dessine après la découpe, il déborde. Sur le texte seul : l'étoile des
+ * favoris, à côté, reste blanche (revue de Codex, 06/11/2026).
+ */
+.menu.menu-band .menu-title .title,
+html.menu-desktop .menu.menu-band .menu-title .title {
   filter: drop-shadow(0 0 calc(5 * var(--b)) var(--t-glow)) drop-shadow(0 0 calc(13 * var(--b)) var(--t-glow));
 }
 

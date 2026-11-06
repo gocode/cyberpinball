@@ -250,6 +250,22 @@ function wheelStage(s, style) {
   const v = wheelView;
   v.style = style;
   v.stage.className = `wheel-stage roue-${style}`;
+  // Autre collection (MagnaSave, déverrouillage du mode invité) : les tables qu'elles partagent
+  // glisseraient de leur ancienne place à la nouvelle en se croisant. La roue se repose d'un coup :
+  // celles qui restent sautent à leur place (logo déjà mesuré), celles qui partent s'en vont
+  // aussitôt, les nouvelles paraissent à leur place, en fondu, sans glisser.
+  const shelf = s.shelf?.id;
+  const swap = v.shelf !== undefined && shelf !== v.shelf;
+  v.shelf = shelf;
+  if (swap) {
+    const keep = new Set(s.neighbors.map((n) => n.key));
+    for (const [key, item] of v.items) {
+      if (keep.has(key)) continue;
+      clearTimeout(item.leaving);
+      item.node.remove();
+      v.items.delete(key);
+    }
+  }
   const live = new Set();
   for (const n of s.neighbors) {
     live.add(n.key);
@@ -258,7 +274,13 @@ function wheelStage(s, style) {
       clearTimeout(item.leaving);
       item.leaving = undefined;
     }
-    if (item && Math.abs(n.offset - item.offset) > 2) {
+    if (item && swap) {
+      item.offset = n.offset;
+      item.node.classList.add('jump');
+      placeWheelItem(item, style);
+      void item.node.offsetWidth;
+      item.node.classList.remove('jump');
+    } else if (item && Math.abs(n.offset - item.offset) > 2) {
       // Moins de neuf tables, en boucle : la table passe d'un bord à l'autre. Elle n'y glisse
       // pas en travers de la roue : elle repart, sans transition, de l'extérieur du bord d'arrivée.
       const last = (WHEELS[style].x.length - 1) / 2;
@@ -345,15 +367,23 @@ function menuPanel(s) {
     const nav = el('div', 'menu-nav');
     const title = el('div', 'menu-title');
     const text = el('div', 'title');
-    title.append(text);
+    // L'étoile des favoris, blanche, devant le titre ; sa place est gardée hors des favoris.
+    const star = cyberIcon('star-filled', 'menu-star');
+    const line = el('div', 'menu-title-line');
+    line.append(star, text);
+    title.append(line);
     title.dataset.act = JSON.stringify({ type: 'wheel', offset: 0 });
     const meta = el('div', 'menu-meta');
     const counter = el('div', 'menu-count');
+    // Repère de la collection (collections.ts) : sa place ne bouge jamais, seul son texte change.
+    const shelf = el('div', 'menu-shelf');
+    shelf.dataset.act = JSON.stringify({ type: 'collections', step: 1 });
     // Zones dont la position ne doit pas changer d'une table à l'autre (layout-check.ts, essais sans opérateur).
     nav.dataset.stable = 'navigation';
     title.dataset.stable = 'titre';
     meta.dataset.stable = 'fabricant';
     counter.dataset.stable = 'compteur';
+    shelf.dataset.stable = 'collection';
     // Bureau, roues à bandeau : le fronton du jeu en fond, et les cadres chromés (frontend.css).
     const backglass = el('div', 'menu-backglass');
     // Classes des cadres : noms de la feuille de style (frontend.css), pas du texte affiché.
@@ -361,9 +391,9 @@ function menuPanel(s) {
     // Zones du menu : le cadre du plateau d'un côté, tout le reste de l'autre ; layout-check.ts vérifie qu'elles ne se recouvrent jamais.
     const label = el('div', 'menu-label', t('Table sélectionnée'));
     frames[0].dataset.frame = 'plateau';
-    for (const zone of [frames[1], backglass, nav, label, title, meta, counter]) zone.dataset.frame = 'menu';
-    node.append(scrim, ...frames, backglass, nav, label, title, meta, counter);
-    menuView = { node, nav, text, meta, counter, backglass };
+    for (const zone of [frames[1], backglass, nav, label, title, meta, counter, shelf]) zone.dataset.frame = 'menu';
+    node.append(scrim, ...frames, backglass, nav, label, title, meta, counter, shelf);
+    menuView = { node, nav, text, meta, counter, backglass, shelf, star };
     menuBackglass = CyberMedia.layer(backglass, { className: 'background' });
   }
   const v = menuView;
@@ -383,12 +413,74 @@ function menuPanel(s) {
   }
   v.text.textContent = s.table.title;
   v.text.dataset.size = titleSize(s.table.title);
+  v.star.toggleAttribute('data-on', Boolean(s.table.favorite));
+  fillShelf(v.shelf, s.shelf);
+  v.node.classList.toggle('has-shelf', Boolean(s.shelf));
+  placeCollections(v.node, s.collections);
   v.meta.textContent = s.table.subtitle ?? '';
   // Dans une boîte flexible, l'espace en tête d'un texte nu disparaîtrait : un seul élément de texte.
   const count = el('span');
   count.append(el('b', '', String(s.position).padStart(String(s.count).length, '0')), ` / ${s.count}`);
   v.counter.replaceChildren(count);
   return v.node;
+}
+
+/**
+ * Repère de la collection active (« ★ Favoris · 4 tables ») : une zone fixe du menu, au coin
+ * haut-gauche du bandeau de la roue (en haut de la liste) ; changer de table n'y change rien,
+ * changer de collection n'en change que le texte. Mode invité restreint à une collection : le
+ * cadenas à la place de l'icône, les MagnaSave n'en changent pas.
+ */
+function fillShelf(box, shelf) {
+  box.hidden = !shelf;
+  if (!shelf) return;
+  box.classList.toggle('locked', Boolean(shelf.locked));
+  box.title = shelf.title ?? shelf.label;
+  box.replaceChildren(cyberIcon(shelf.locked ? 'lock' : shelf.icon, 'menu-shelf-icon'), el('span', 'menu-shelf-label', shelf.label), el('span', 'menu-shelf-sep', '·'), el('span', 'menu-shelf-count', shelf.countLabel));
+}
+
+/**
+ * Liste des collections, montrée quelques secondes à chaque MagnaSave (la collection change
+ * aussitôt, la liste dit où l'on est) : posée au-dessus du repère, la collection active
+ * cerclée de vert ; une collection vide grisée, sa raison dessous, jamais cachée. Fabricants
+ * et décennies sous leur intertitre. Une liste longue ne vient que par ses lignes autour de
+ * l'active (le processus principal les choisit) : rien n'y défile.
+ */
+let collectionsBox;
+
+function placeCollections(menu, c) {
+  if (!c) {
+    collectionsBox?.remove();
+    collectionsBox = undefined;
+    return;
+  }
+  collectionsBox ??= el('div', 'collections-panel');
+  collectionsBox.classList.toggle('leaving', Boolean(c.leaving));
+  const list = el('div', 'collections-list');
+  // Les deux places des « autres au-dessus / en dessous » sont toujours là : les lignes ne sautent pas.
+  const more = (text, arrow) => el('div', 'collections-more', text ? `${arrow} ${text}` : '');
+  list.append(more(c.more?.before, '▲'));
+  for (const section of c.sections) {
+    if (section.title) list.append(el('div', 'collections-heading', section.title));
+    for (const r of section.rows) {
+      const row = el('div', `collections-row${r.focus ? ' focus' : ''}${r.disabled ? ' disabled' : ''}`);
+      row.dataset.act = JSON.stringify({ type: 'collections', id: r.id });
+      const text = el('span', 'collections-text');
+      text.append(el('span', 'collections-label', r.label));
+      if (r.disabled && r.reason) text.append(el('span', 'collections-reason', r.reason));
+      row.append(cyberIcon(r.icon ?? 'list', 'collections-icon'), text, el('span', 'collections-count', r.countLabel ?? '0'));
+      list.append(row);
+    }
+  }
+  list.append(more(c.more?.after, '▼'));
+  const head = el('div', 'collections-head', c.title);
+  collectionsBox.replaceChildren(head, list);
+  if (c.hint) {
+    const hint = el('div', 'collections-hint');
+    for (const part of c.hint) hint.append(el('span', '', part));
+    collectionsBox.append(hint);
+  }
+  if (collectionsBox.parentNode !== menu) menu.append(collectionsBox);
 }
 
 /**

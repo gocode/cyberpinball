@@ -29,6 +29,7 @@ test('mode invité : les portes ouvertes sont exactement celles-ci, chacune pour
     'menu.choose': 'choisir une table',
     'menu.sheet': 'ouvrir sa fiche',
     'menu.commands': 'lire les commandes',
+    'menu.collections': 'changer de collection (Toutes, Favoris, un fabricant…) : la roue montre d’autres tables, rien n’est modifié ; fermée quand le mode invité impose une collection (menu.collection-locked)',
     'game.force-stop': 'arrêter une partie bloquée : la partie seulement, rien n’est enregistré',
     'message.other-frontend': 'jouer quand même, un autre menu ouvert : rien n’est modifié',
     'message.power': 'extinction déjà en cours : l’écran reste noir, aucun choix n’y est offert',

@@ -40,6 +40,7 @@ import { listRoms, romFile, romHash, romKey, sameRomFile, tableRomsDir } from '.
 import { buildZip, listRelative, readZipEntries, recognizeRomName, romContent, zipContentHash, type RomHints, type RomZipMember } from './romzip';
 import { classifyDir, classifyFile, nameKey, type FileKind } from './tablefiles';
 import { parseTableName, readInfo, type TableInfoFile } from './tables';
+import { mergeFavorite } from './collections';
 import { HISTORIC_ROM_ALIASES } from './vpmalias';
 import { ipdbIdOf, matchVps, type VpsCandidate, type VpsDb } from './vps';
 import { buildScriptPatch, readScriptPatch } from './scriptpatch';
@@ -961,6 +962,8 @@ function buildTablePlan(game: Game, opts: PlanOptions, linkedRoms: string[] = []
     const extra = readInfo(src.from);
     info.Info = { ...extra.Info, ...info.Info };
     if (extra.User && !info.User) info.User = extra.User;
+    // Le favori d'une installation reprise vaut ici, même quand la table a déjà ses statistiques.
+    else info.User = mergeFavorite(info, extra).User;
   }
   info.Info = { ...info.Info };
   info.Info.Title ??= game.title;

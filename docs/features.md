@@ -267,6 +267,18 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
   <img src="images/en/features/dmd-colour.webp?v=13e0818e3f" width="300" alt="DMD colour: signal green, teal, light ink, glacier blue, soft amber, plasma orange, or a colour of your own.">
 </p>
 
+### Collections and favourites
+
+- **Collections** on the wheel: All, Favourites, Recent, Never played, With my online friends, each manufacturer, each decade. **Left or right MagnaSave** goes to the previous or next one, at once; the list of collections shows for a few seconds, an empty collection greyed out with its reason.
+- **A fixed marker** on the wheel ("Favourites · 12 tables"): it never moves when you change table. Each collection keeps its table.
+- **Favourites**: "Add to favourites" on the table page, a white star before the title; a favourite from another installation is taken as it is.
+- **Guest mode restricted to a collection** (favourites, a manufacturer…), and **attract mode** within the collection shown.
+
+<p align="center">
+  <img src="images/en/features/collections.webp?v=487a2070ff" width="300" alt="The wheel on the Recent collection, the list of collections open: All and Recent, then Favourites, Never played and With my online friends greyed out with their reason, then the manufacturers.">
+  <img src="images/en/features/favorites.webp?v=c12c904b57" width="300" alt="The page of a table added to favourites: the white star after its title, “Remove from favourites”.">
+</p>
+
 ### Table order and attract mode
 
 - **"Table order"**: by title, last played, most played, year, manufacturer, or shuffled at every start.

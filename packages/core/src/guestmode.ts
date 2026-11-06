@@ -29,6 +29,8 @@ export const GUEST_DOORS = {
   'menu.commands': true, // Aide-mémoire des commandes : bouton Aide, H, F1
   'menu.system': false, // Menu système : Exit, Tab, roue dentée
   'menu.vpx-settings': false, // Réglages de VPX : bouton Réglages, R
+  'menu.collections': true, // Changer de collection (Toutes, Favoris, un fabricant…) : MagnaSave, clic sur le repère
+  'menu.collection-locked': false, // Changer de collection quand le mode invité en impose une (collections.ts)
   'shortcut.desktop': false, // Bureau Windows : Ctrl+Maj+D
   'shortcut.quit': false, // Quitter Cyber Pinball : Ctrl+Q
   'window.close': false, // Fermer une fenêtre de Cyber Pinball : Alt+F4
@@ -52,6 +54,7 @@ export const GUEST_DOORS = {
   // Fiche d'une table (app/src/library.ts, buildSheet)
   'sheet.play': true, // Jouer
   'sheet.friends': false, // Jouer avec un ami (les amis du propriétaire de la borne)
+  'sheet.favorite': false, // Ajouter aux favoris, retirer des favoris
   'sheet.read': true, // Prospectus et règles, page par page
   'sheet.back': true, // Retour au menu
   'sheet.missing': false, // Ce qu’il manque pour jouer (téléchargements)
@@ -122,17 +125,30 @@ const settingsFile = (dataDir: string) => path.join(dataDir, 'mode-invite.json')
 
 /** Mode invité enregistré ; un fichier absent ou illisible : désactivé. */
 export function loadGuestMode(dataDir: string): boolean {
+  return readGuestSettings(dataDir).active;
+}
+
+/**
+ * Collection imposée à l'invité (collections.ts : « favorites », « maker:… ») ; absente : les
+ * MagnaSave passent d'une collection à l'autre comme d'habitude.
+ */
+export function loadGuestCollection(dataDir: string): string | undefined {
+  return readGuestSettings(dataDir).collection;
+}
+
+function readGuestSettings(dataDir: string): { active: boolean; collection?: string } {
   try {
-    return JSON.parse(fs.readFileSync(settingsFile(dataDir), 'utf8').replace(/^﻿/, '')).active === true;
+    const raw = JSON.parse(fs.readFileSync(settingsFile(dataDir), 'utf8').replace(/^\uFEFF/, '')) as { active?: unknown; collection?: unknown };
+    return { active: raw.active === true, ...(typeof raw.collection === 'string' && raw.collection ? { collection: raw.collection } : {}) };
   } catch {
-    return false;
+    return { active: false };
   }
 }
 
-export function saveGuestMode(dataDir: string, active: boolean): void {
+export function saveGuestMode(dataDir: string, active: boolean, collection?: string): void {
   const file = settingsFile(dataDir);
   fs.mkdirSync(dataDir, { recursive: true });
-  writeFileAtomic(file, JSON.stringify({ active }, null, 2) + '\n');
+  writeFileAtomic(file, JSON.stringify({ active, ...(collection ? { collection } : {}) }, null, 2) + '\n');
 }
 
 /**
@@ -162,6 +178,7 @@ export interface GuestModeOptions {
  */
 export class GuestMode {
   private on: boolean;
+  private only: string | undefined;
   private hintUntil = 0;
   private hintTimer: NodeJS.Timeout | undefined;
   private unlockedUntil = 0;
@@ -172,24 +189,34 @@ export class GuestMode {
 
   constructor(private readonly options: GuestModeOptions) {
     this.on = loadGuestMode(options.dataDir);
+    this.only = this.on ? loadGuestCollection(options.dataDir) : undefined;
   }
 
   get active(): boolean {
     return this.on;
   }
 
+  /** Collection imposée à l'invité, tant que le mode invité est actif. */
+  get collection(): string | undefined {
+    return this.on ? this.only : undefined;
+  }
+
   private now(): number {
     return this.options.now?.() ?? Date.now();
   }
 
-  /** Active ou arrête le mode invité, et le garde pour le démarrage suivant. */
-  set(active: boolean): void {
+  /**
+   * Active ou arrête le mode invité, et le garde pour le démarrage suivant ; `collection` : celle
+   * qu'il impose (les MagnaSave n'en changent plus). Arrêté, la collection d'avant revient.
+   */
+  set(active: boolean, collection?: string): void {
     this.on = active;
+    this.only = active ? collection : undefined;
     if (active) this.unlockedUntil = 0;
     this.releaseAll();
     this.hintUntil = 0;
     try {
-      saveGuestMode(this.options.dataDir, active);
+      saveGuestMode(this.options.dataDir, active, this.only);
     } catch (error) {
       console.log(`Mode invité : réglage non enregistré (${(error as Error).message}).`);
     }

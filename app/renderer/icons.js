@@ -132,6 +132,13 @@ const CYBER_ICONS = {
   'move-down': '<rect x="7" y="3" width="10" height="9" rx="1"/><path d="M12 15v6M9 18l3 3 3-3"/>', // Cadre et flèche en dessous.
   'zoom-in': '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M10 7v6M7 10h6"/>', // Loupe et plus : rapprocher.
   'zoom-out': '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M7 10h6"/>', // Loupe et moins : éloigner.
+
+  // Collections du menu des tables (collections.ts), dessinées par Codex (06/11/2026)
+  history: '<path d="M4.5 9A8 8 0 1 1 4 13M4 4v5h5M12 7v5l4 2"/>', // Retour circulaire et aiguilles : les dernières tables jouées.
+  sparkle: '<path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/>', // Éclat à quatre branches : une table encore jamais jouée.
+  factory: '<path d="M3 21V11l6-4v4l6-4v7h6v7zM17 14V3h4v11M6 17h2M11 17h2M17 17h1"/>', // Toits en dents de scie et cheminée : le fabricant.
+  calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4M17 3v4M3 10h18M7 14h3M14 14h3M7 18h3M14 18h3"/>', // Calendrier à deux attaches : une période, une décennie.
+  'star-filled': '<path d="M12 3l2.7 5.5 6.1.9-4.4 4.3 1 6.1-5.4-2.9-5.4 2.9 1-6.1L3.2 9.4l6.1-.9z"/>', // Étoile compacte, remplie par le CSS : une table en favori.
   phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>', // Téléphone : la télécommande de la borne.
   backspace: '<path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-7-7z"/><path d="m12 9 6 6M18 9l-6 6"/>', // Touche Effacer (retour arrière) du clavier du téléphone.
 };

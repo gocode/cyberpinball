@@ -4,6 +4,8 @@
 
 // En premier : refuse toute écriture hors du bac à sable pendant un essai sans opérateur.
 import './sandbox-guard';
+// Puis, en bac à sable, un profil de Chromium à lui : deux essais en même temps ne se gênent plus.
+import './sandbox-profile';
 // Puis, avant le démarrage d'Electron : le mode hors écran des essais sans opérateur.
 import { OFFSCREEN, relaunchOnHiddenDesktop } from './offscreen';
 // Puis une restauration préparée (Sauvegardes) : ses fichiers posés avant que quoi que ce soit ne les lise.

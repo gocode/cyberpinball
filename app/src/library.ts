@@ -10,6 +10,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, type BrowserWindow, type Input, type Rectangle } from 'electron';
 import {
+  isFavorite,
   CONFIG_KEY,
   isSystemGroup,
   SYSTEM_GROUP_IDS,
@@ -260,6 +261,8 @@ export interface LibraryHost {
    * ligne, grisée avec sa raison sinon ; `back` rouvre la fiche.
    */
   playWithFriend?(table: TableEntry, back: () => void): Action;
+  /** « Ajouter aux favoris » / « Retirer des favoris » (collections.ts : User.Favorite du .info). */
+  favorite?(table: TableEntry, on: boolean): void;
   /**
    * Partie de réglage de l'affichage (« Régler l'affichage en partie ») : VPX démarre la table
    * menu ouvert sur le cadrage, sans statistiques ; undefined si elle n'a pas démarré pour une
@@ -376,6 +379,8 @@ export type UiAction =
   | { type: 'reading'; key: number; overflow: boolean; top: boolean; bottom: boolean }
   /** Recadrage d'un avatar à la souris (Built.crop) : le cadre glissé (`dx`, `dy` en parts de la largeur et de la hauteur de l'image), molette (`zoom` en crans). */
   | { type: 'crop'; dx?: number; dy?: number; zoom?: number }
+  /** Repère de la collection (collection suivante) ou ligne de la liste des collections (celle-ci). */
+  | { type: 'collections'; step?: number; id?: string }
   | { type: 'wheel'; offset: number };
 
 export type Tone = 'error' | 'warning' | 'info' | 'ok' | 'quiet';
@@ -449,6 +454,8 @@ export interface Built {
   icon?: IconName;
   /** Pastille du joueur dont parle l'écran (fiche d'un ami), devant le titre à la place de l'icône. */
   avatar?: AvatarView;
+  /** Fiche d'une table en favori : l'étoile blanche près du titre. */
+  favorite?: boolean;
   subheading?: string;
   lead?: string;
   sections: Section[];
@@ -1876,6 +1883,7 @@ export function createLibrary(host: LibraryHost) {
         },
       },
       ...(host.playWithFriend ? [{ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }] : []),
+      ...(host.favorite ? [favoriteAction(table)] : []),
       ...further,
       ...SHEET_PAGE_TYPES.map((type) => pagesAction(table, type)),
       { label: t('Modifier les informations'), detail: t('Titre, fabricant, année'), icon: 'edit', door: 'sheet.edit', run: () => openEdit(table) },
@@ -1899,11 +1907,28 @@ export function createLibrary(host: LibraryHost) {
 
     return {
       heading: table.title,
+      favorite: isFavorite(table.info),
       subheading: [table.manufacturer, table.year].filter(Boolean).join(' · ') || undefined,
       lead: s.flash ?? table.version,
       sections: [{ title: t('Statistiques'), rows: stats }, ...(guest ? [] : [{ title: t('Fichiers'), rows: files }])],
       actions,
       back: exit,
+    };
+  }
+
+  /** « Ajouter aux favoris » : la table entre dans la collection Favoris (MagnaSave, sur la roue) ; le choix reste sur l'entrée. */
+  function favoriteAction(table: TableEntry): SheetAction {
+    const on = isFavorite(table.info);
+    return {
+      label: on ? t('Retirer des favoris') : t('Ajouter aux favoris'),
+      detail: on ? t('Elle quitte la collection Favoris') : t('Elle rejoint la collection Favoris : MagnaSave sur la roue'),
+      icon: 'star',
+      key: 'favorite',
+      door: 'sheet.favorite',
+      run: () => {
+        host.favorite!(table, !on);
+        host.broadcast();
+      },
     };
   }
 
@@ -3614,6 +3639,7 @@ export function createLibrary(host: LibraryHost) {
     return {
       screen: screen.kind,
       heading: built.heading,
+      favorite: built.favorite || undefined,
       icon: built.icon ?? (TABLE_SCREENS.includes(screen.kind) ? undefined : section),
       subheading: built.subheading,
       avatar: built.avatar,

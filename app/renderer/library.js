@@ -41,6 +41,8 @@ function renderLibrary(v) {
     h1.classList.add('with-icon');
     h1.prepend(cyberIcon(v.icon, 'lib-head-icon'));
   }
+  // Fiche d'une table en favori : l'étoile blanche, pleine, après le titre (jamais en vert).
+  if (v.favorite) h1.append(cyberIcon('star-filled', 'lib-head-star'));
   head.append(h1);
   if (v.subheading) head.append(libEl('div', 'lib-sub', v.subheading));
   if (v.lead) head.append(libEl('p', 'lib-lead', v.lead));

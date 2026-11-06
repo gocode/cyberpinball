@@ -46,6 +46,10 @@ import {
   loadCabinet,
   playfieldOrientation,
   readInfo,
+  isFavorite,
+  setFavorite,
+  infoFileFor,
+  buttonKeys,
   readTextIfExists,
   IniDocument,
   recordPlay,
@@ -226,6 +230,7 @@ import { freezeWrites } from './write-freeze';
 import { listDrives } from './file-picker';
 import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
+import { createCollectionsMenu } from './collections-menu';
 import { createFriendsMenu } from './friends-menu';
 import { createFirewallRule } from './firewall-rule';
 import { guardFirewall } from './firewall-guard';
@@ -284,6 +289,9 @@ function menuKeys(): [string, string][] {
   // En mode invité, seulement ce qui marche : chaque ligne passe par sa porte.
   const rows: [GuestDoor, string, string][] = [
     ['menu.choose', t('Choisir une table'), t('Précédent / Suivant ({left} / {right}) ou flèches', { left: keyLabel(keys.previous), right: keyLabel(keys.next) })],
+    ...(collections.locked()
+      ? []
+      : [['menu.collections', t('Changer de collection (Toutes, Favoris, Récentes, un fabricant, une décennie…)'), t('MagnaSave gauche ou droit, ou clic sur le repère au-dessus de la roue')] as [GuestDoor, string, string]]),
     ['menu.sheet', guest.active ? t('Fiche de la table (Jouer, Prospectus, Règles)') : t('Fiche de la table (Jouer, Modifier…)'), `Start (${or(KEYS.confirm.filter((k) => k !== 'NumpadEnter'))})`],
     ...(KEYS.help.length ? [['menu.commands', t('Afficher les commandes'), or(KEYS.help)] as [GuestDoor, string, string]] : []),
     ['menu.vpx-settings', t('Réglages de VPX'), KEYS.settings.length ? t('{keys}, ou Exit puis « Réglages de VPX »', { keys: or(KEYS.settings) }) : t('Exit puis « Réglages de VPX »')],
@@ -301,8 +309,11 @@ function menuKeys(): [string, string][] {
  * de VPX s'ouvrent aussi depuis le menu système (Exit).
  */
 function menuFooter(): [string, string?][] {
+  const magna = collectionKeys();
   return [
     [t('Flippers : choisir')],
+    // Mode invité qui impose une collection : les MagnaSave n'y font rien, l'aide n'en parle pas.
+    ...(!collections.locked() && (magna.previous.length || magna.next.length) ? [[t('MagnaSave : collections')] as [string]] : []),
     [t('Start : fiche'), KEYS.confirm[0]],
     // Mode invité : Exit n'ouvre pas le menu système.
     ...(guest.allows('menu.system') ? [[t('Exit : menu'), KEYS.exit[0]] as [string, string]] : []),
@@ -504,9 +515,13 @@ let attractIndex: number | undefined;
 let attractRecent: number[] = [];
 
 function showAttractTable(): void {
-  if (!tables.length) return;
-  attractIndex = pickAttractTable(tables.length, [state.index, ...attractRecent]);
-  attractRecent = [...attractRecent, attractIndex].slice(-attractMemory(tables.length));
+  // La table tirée vient de la collection active (Favoris, un fabricant…), comme la roue.
+  const shelf = collections.shelf().tables;
+  if (!shelf.length) return;
+  const avoid = [tables[state.index], ...attractRecent.map((i) => tables[i])].map((x) => (x ? shelf.indexOf(x) : -1)).filter((i) => i >= 0);
+  attractIndex = tables.indexOf(shelf[pickAttractTable(shelf.length, avoid)]!);
+  attractRecent = [...attractRecent, attractIndex].slice(-attractMemory(shelf.length));
+  console.log(`Mode attente : ${tables[attractIndex]!.id} (collection ${collections.current().id}).`); // i18n-ignore : journal
   broadcast();
 }
 
@@ -556,6 +571,56 @@ const guest = new GuestMode({
 /** Cyber Pinball se ferme lui-même (quitter, relance, arrêt de Windows) : le mode invité laisse fermer ses fenêtres. */
 let closing = false;
 
+/**
+ * Collections du menu des tables (collections-menu.ts) : la roue ne montre que celles de la
+ * collection active ; les MagnaSave en changent ; le mode invité peut en imposer une.
+ */
+const collections = createCollectionsMenu({
+  dataDir: loc.dataDir,
+  tables: () => tables,
+  selected: () => tables[state.index],
+  select: (table) => {
+    const index = tables.indexOf(table);
+    if (index >= 0) state = { ...state, index };
+  },
+  // Réseau coupé (essais) : « Avec mes amis en ligne » le dit, grisée.
+  ...(socialNetMode(process.env) === 'off' ? {} : { friends: (list: readonly TableEntry[]) => friendsMenu.live.playableWithFriends(list) }),
+  guestCollection: () => guest.collection,
+  startIndex: (list) => startIndex(list, mediaSettings.startTable),
+  redraw: () => broadcast(),
+});
+
+/**
+ * Disposition du menu sur le playfield : au bureau (zone en largeur, vue du joueur) ou en borne
+ * (en hauteur), comme le rendu la choisit (frontend.js, syncMenuShape).
+ */
+function playfieldLandscape(): boolean {
+  const win = windows.get('playfield');
+  if (!win || win.isDestroyed()) return false;
+  const { width, height } = win.getContentBounds();
+  const turned = rotation === 90 || rotation === 270;
+  return turned ? height > width : width > height;
+}
+
+/** Touches des MagnaSave au menu des tables : collection précédente (gauche), suivante (droite) ; jamais un bouton de l'interface. */
+function collectionKeys(): { previous: string[]; next: string[] } {
+  const keys = buttonKeys(buttons);
+  const taken = new Set([...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit, ...KEYS.help, ...KEYS.settings]);
+  const own = (code: string | undefined) => (code && !taken.has(code) ? [code] : []);
+  return { previous: own(keys.leftMagna), next: own(keys.rightMagna) };
+}
+
+/** MagnaSave ou clic sur le repère : la collection voisine (ou celle cliquée dans la liste). Mode invité restreint : le cadenas. */
+function changeCollection(how: { step: -1 | 1 } | { id: string }): void {
+  if (collections.locked()) {
+    guest.knock('menu.collection-locked');
+    return;
+  }
+  if (!guest.knock('menu.collections')) return;
+  const changed = 'id' in how ? collections.choose(how.id) : collections.step(how.step);
+  if (changed) playUiSound('solenoid');
+}
+
 // Fiche, ajout, médecin et suppression des tables (library.ts).
 // Redessin de la file des téléchargements (downloadsChanged) : déclarés avant la gestion des tables, qui la crée.
 let downloadsRedraw: NodeJS.Timeout | undefined;
@@ -594,6 +659,13 @@ const library = createLibrary({
   recordableRoles: () => (['backglass', 'dmd'] as RecordedRole[]).filter((role) => menuAssignments[role]),
   tableSettings: (table) => openVpxSettings(table),
   playWithFriend: (table, back) => friendsMenu.live.sheetAction(table, back),
+  // « Ajouter aux favoris » sur la fiche : User.Favorite du .info (celui de la table, sinon celui du dossier).
+  favorite: (table, on) => {
+    if (!loc.root) return;
+    setFavorite(infoFileFor(table, layoutOf(loc.root).tables), on);
+    console.log(`Favoris : ${table.id} ${on ? 'ajoutée' : 'retirée'}.`); // i18n-ignore : journal
+    reloadTables(table.file);
+  },
   adjustDisplay: async (table) => {
     state = { ...state, index: Math.max(0, tables.indexOf(table)) };
     const report = await play(table, process.env.CYBERPINBALL_AUTOPILOT ? 10_000 : undefined, 'display');
@@ -943,7 +1015,8 @@ if (shellSession()) {
   run: () => showDesktop(),
 });
 // Mode invité : on joue, rien d'autre ; l'écran de l'entrée dit la combinaison qui déverrouille.
-library.provideSystemItem('guest-mode', createGuestMenu({ library, guest, buttons: () => buttons }));
+library.provideSystemItem('guest-mode', createGuestMenu({
+  collections: () => ({ choices: collections.list().filter((c) => c.tables.length).map((c) => ({ id: c.id, label: c.label, count: c.tables.length })), active: collections.current().id }), library, guest, buttons: () => buttons }));
 
 // Réseau des bornes (Menu système > Amis) : partage activé par défaut, démarré avec le menu ;
 // jamais le vrai réseau pendant un essai sans opérateur (socialNetMode), ni le vrai pare-feu.
@@ -1508,6 +1581,10 @@ export function startFrontend(): void {
     else if (action.type === 'activity') {
       if ((state.phase === 'menu' || state.phase === 'library') && guest.knock('menu.system')) activityMenu.open(state.phase === 'menu' ? () => library.leave() : undefined);
     }
+    else if (action.type === 'collections' && state.phase === 'menu' && tables.length) {
+      changeCollection(typeof action.id === 'string' ? { id: action.id } : { step: action.step === -1 ? -1 : 1 });
+      broadcast();
+    }
     else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
       if (action.offset === 0) guest.knock('menu.sheet') && library.openSheet(tables[state.index]!);
       else if (guest.knock('menu.choose')) moveSelection(action.offset);
@@ -1520,6 +1597,8 @@ export function startFrontend(): void {
   tables = scanOrdered();
   // Table au démarrage : la première de l'ordre choisi, une au hasard, ou la dernière jouée.
   state = { ...state, index: startIndex(tables, mediaSettings.startTable) };
+  // Collection gardée du dernier démarrage (ou imposée par le mode invité) : la table de départ y est prise.
+  collections.start();
   // Configuration à choisir : le menu s'ouvre droit sur l'écran principal, avec les boutons de la dernière utilisée.
   const cabinet = loadCabinet(loc.dataDir);
   menuDmdKind = cabinet && !choose ? dmdKindOf(cabinet) : undefined;
@@ -2027,6 +2106,8 @@ function handleKey(input: Input): boolean {
       else if (is(KEYS.confirm)) guest.knock('menu.sheet') && library.openSheet(tables[state.index]!);
       else if (is(KEYS.settings)) guest.knock('menu.vpx-settings') && openVpxSettings();
       else if (is(KEYS.exit)) guest.knock('menu.system') && library.openSystem();
+      else if (is(collectionKeys().previous)) changeCollection({ step: -1 });
+      else if (is(collectionKeys().next)) changeCollection({ step: 1 });
       else return false;
       break;
   }
@@ -3009,6 +3090,10 @@ function delay(ms: number): Promise<void> {
 function viewFor(role: RoleId) {
   // En mode attente, chaque écran montre la table tirée au hasard ; la sélection ne bouge pas.
   const shown = attractTable();
+  // La roue, la liste et le compteur : les tables de la collection active (sa place ramène la sélection dedans).
+  const shelf = collections.shelf(state.phase === 'menu');
+  const list = shelf.tables;
+  const at = shelf.index;
   const table = shown ?? tables[state.index];
   // Le logo n'est cherché que pour la liste, dessinée par le playfield.
   const wheel = (t: TableEntry) => (role === 'playfield' ? medias?.wheel(t) : undefined);
@@ -3020,6 +3105,7 @@ function viewFor(role: RoleId) {
     version: t.version,
     plays: t.info.User?.StartCount ?? 0,
     lastRun: t.info.User?.LastRun,
+    favorite: isFavorite(t.info),
     wheel: wheel(t),
   });
   // Voisines de la table choisie, pour la liste et la roue : identité stable (le fichier),
@@ -3027,8 +3113,8 @@ function viewFor(role: RoleId) {
   const neighbor = (t: TableEntry, offset: number) => ({ offset, key: t.file, title: t.title, manufacturer: t.manufacturer, year: t.year, version: t.version, wheel: wheel(t) });
   // Neuf places : sept visibles (roue Médaillons), et une de chaque côté d'où les logos entrent.
   const neighbors = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
-    .filter(() => tables.length > 0)
-    .map((offset) => neighbor(tables[(state.index + offset + tables.length * 10) % tables.length]!, offset));
+    .filter(() => list.length > 0)
+    .map((offset) => neighbor(list[(at + offset + list.length * 10) % list.length]!, offset));
   // Média de chaque rôle de cette fenêtre (le sien et ceux de ses zones), et ceux des voisines à précharger.
   const roles = windowRoles.get(role) ?? [role];
   const mediasOf = (t: TableEntry) => (medias ? Object.fromEntries(roles.map((r) => [r, medias!.roleMedia(t, r)])) : {});
@@ -3036,8 +3122,8 @@ function viewFor(role: RoleId) {
   const subject = screensSubject();
   const defaults = Object.fromEntries(roles.map((r) => [r, medias ? medias.defaultMedia(r) : defaultMediaView(r)]));
   const preload =
-    !shown && table && subject === table && medias && tables.length > 1
-      ? [...new Set(PRELOAD_OFFSETS.map((o) => tables[(state.index + o + tables.length * 10) % tables.length]!))]
+    !shown && table && subject === table && medias && list.length > 1
+      ? [...new Set(PRELOAD_OFFSETS.map((o) => list[(at + o + list.length * 10) % list.length]!))]
           .filter((t) => t !== table)
           .flatMap((t) => roles.map((r) => medias!.roleMedia(t, r)))
           .filter((v) => v.url)
@@ -3046,12 +3132,15 @@ function viewFor(role: RoleId) {
     role,
     phase: state.phase,
     help: state.help,
-    count: tables.length,
-    position: state.index + 1,
+    count: list.length,
+    position: at + 1,
     table: table ? describe(table) : undefined,
     // Moins de neuf tables : chacune une seule fois (aucune répétée pour remplir), réparties de
     // part et d'autre de la table choisie, en boucle comme la liste : la roue reste centrée.
-    neighbors: tables.length >= 9 ? neighbors : tables.map((t, i) => neighbor(t, ((i - state.index + tables.length * 2 + Math.floor((tables.length - 1) / 2)) % tables.length) - Math.floor((tables.length - 1) / 2))),
+    neighbors: list.length >= 9 ? neighbors : list.map((t, i) => neighbor(t, ((i - at + list.length * 2 + Math.floor((list.length - 1) / 2)) % list.length) - Math.floor((list.length - 1) / 2))),
+    // Repère de la collection active, partout où le menu des tables est dessiné (sous une fiche aussi :
+    // sa zone ne bouge jamais), et la liste des collections quelques secondes après un MagnaSave, au menu seulement.
+    ...(role === 'playfield' && tables.length ? collections.view(mediaSettings.menuLayout === 'list' ? 'list' : playfieldLandscape() ? 'desk' : 'band', state.phase === 'menu') : {}),
     menuLayout: mediaSettings.menuLayout,
     // Couleur des points des afficheurs dessinés par Cyber Pinball (DMD du menu, replis dmd et fullDmd).
     dmdColor: menuDmdColor(),
@@ -3256,8 +3345,11 @@ function gameReturnKey(input: Input, is: (group: string[]) => boolean): boolean 
 
 /** Table voisine dans le menu des tables (boutons, roue cliquée) : le solénoïde claque à chaque table. */
 function moveSelection(offset: number): void {
-  const index = (state.index + offset + tables.length * 10) % tables.length;
-  if (index === state.index) return;
+  // Un flipper ferme la liste des collections, et change de table quand même.
+  collections.hidePanel();
+  const next = collections.move(offset);
+  const index = next ? tables.indexOf(next) : -1;
+  if (index < 0 || index === state.index) return;
   state = { ...state, index };
   playUiSound('solenoid');
 }

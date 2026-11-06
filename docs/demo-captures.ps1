@@ -44,6 +44,10 @@ param(
 # table », qui s'ouvre dans une autre fenêtre.
 $Bouts = @{ 'son et attente' = @{ en = 'sound and attract mode' } }
 $Fonctions = @(
+  # M : depuis la roue ; MagnaSave droit (Ctrl droit) passe à la collection suivante, sa liste paraît 4 s :
+  # l'appui juste avant la capture. Neon Abyss d'abord (quatre tables plus loin), la plus récente :
+  # de Toutes à Récentes (Favoris, vide, est sauté), la même table et les mêmes sept tables, rien ne fond.
+  @('collections', 'M', @('ShiftRight', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'wait:2500', 'ControlRight')),
   @('all-tables', 'S', @('action:Toutes les tables')),
   @('add-table', 'S', @('action:Ajouter une table')),
   @('menu-settings', 'S', @('action:son et attente')),
@@ -63,6 +67,7 @@ $Fonctions = @(
   @('doctor', 'F', @('action:Diagnostiquer et réparer')),
   @('game-parts', 'F', @('action:Parties du jeu')),
   @('flyer', 'F', @('action:Prospectus')),
+  @('favorites', 'F', @('action:Ajouter aux favoris')),
   @('buttons', 'W', @('--boutons')),
   @('interface-buttons', 'W', @('--interface')),
   @('tilt', 'W', @('--tilt')),
@@ -155,6 +160,15 @@ function Invoke-Capture([string]$Langue, [string]$Nom, [string[]]$Touches, [stri
 try {
   foreach ($langue in $Langues) {
     "== $langue"
+    # « Ajouter aux favoris » (étape fonctions) écrit dans le .info d'une table de la racine partagée :
+    # chaque langue repart sans favori, et aucune autre capture ne montre l'étoile par hasard.
+    foreach ($info in Get-ChildItem "$root\tables" -Recurse -Filter *.info -ErrorAction SilentlyContinue) {
+      $json = Get-Content $info.FullName -Raw -Encoding UTF8 | ConvertFrom-Json
+      if ($json.User -and $json.User.PSObject.Properties['Favorite']) {
+        $json.User.PSObject.Properties.Remove('Favorite')
+        [IO.File]::WriteAllText($info.FullName, ($json | ConvertTo-Json -Depth 8), [Text.UTF8Encoding]::new($false))
+      }
+    }
     $home_ = "$base\$langue\home"
     # Bac à sable neuf ; les captures des étapes non rejouées restent pour l'assemblage.
     if (Test-Path $home_) { Remove-Item -Recurse -Force $home_ }
@@ -226,9 +240,11 @@ try {
         try {
           if ($f[1] -eq 'W') { Invoke-Capture $langue "fonctions\$($f[0])" @('wait:2500') $f[2] }
           else {
-            $depart = if ($f[1] -eq 'S') { @('Escape', 'wait:600', 'Escape', 'wait:800') } else { @('Escape', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'wait:2000', 'Digit1', 'wait:1200') }
+            $depart = if ($f[1] -eq 'S') { @('Escape', 'wait:600', 'Escape', 'wait:800') } elseif ($f[1] -eq 'M') { @('Escape', 'wait:1500') } else { @('Escape', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'ShiftRight', 'wait:2000', 'Digit1', 'wait:1200') }
             $sequence = $f[2] | ForEach-Object { $b = $Bouts[$_ -replace '^action:', '']; if ($b -and $b[$langue]) { "action:$($b[$langue])" } else { $_ } }
-            Invoke-Capture $langue "fonctions\$($f[0])" ($depart + $sequence + @('wait:2500')) @()
+            # La liste des collections (M) s'efface 4 s après le dernier MagnaSave : capturée aussitôt.
+            $fin = if ($f[1] -eq 'M') { @() } else { @('wait:2500') }
+            Invoke-Capture $langue "fonctions\$($f[0])" ($depart + $sequence + $fin) @()
           }
         } catch { $script:failures += "$langue/fonctions\$($f[0]) : $($_.Exception.Message) (journal.txt de l'écran)" }
         # Toujours des listes : un seul écart ne doit pas devenir une chaîne qu'on découperait en lettres.

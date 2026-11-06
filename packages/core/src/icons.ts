@@ -124,6 +124,12 @@ export const ICON_NAMES = [
   'move-down',
   'zoom-in',
   'zoom-out',
+  // Collections du menu des tables
+  'history',
+  'sparkle',
+  'factory',
+  'calendar',
+  'star-filled',
   'phone',
   'backspace',
 ] as const;

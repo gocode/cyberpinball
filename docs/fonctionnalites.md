@@ -267,6 +267,18 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
   <img src="images/fr/features/dmd-colour.webp?v=c33338bfa3" width="300" alt="Couleur du DMD : vert signal, sarcelle, encre claire, bleu glacier, ambre doux, orange plasma, ou une couleur libre.">
 </p>
 
+### Collections et favoris
+
+- **Collections** sur la roue : Toutes, Favoris, Récentes, Jamais jouées, Avec mes amis en ligne, chaque fabricant, chaque décennie. **MagnaSave gauche ou droit** passe à la précédente ou à la suivante, aussitôt ; la liste des collections paraît quelques secondes, une collection vide grisée avec sa raison.
+- **Un repère fixe** sur la roue (« Favoris · 12 tables ») : il ne bouge jamais quand on change de table. Chaque collection garde sa table.
+- **Favoris** : « Ajouter aux favoris » sur la fiche, une étoile blanche devant le titre ; le favori d'une autre installation est repris tel quel.
+- **Mode invité limité à une collection** (les favoris, un fabricant…), et **mode attente** dans la collection affichée.
+
+<p align="center">
+  <img src="images/fr/features/collections.webp?v=3fee473dd4" width="300" alt="La roue sur la collection Récentes, la liste des collections ouverte : Toutes et Récentes, puis Favoris, Jamais jouées et Avec mes amis en ligne grisées avec leur raison, puis les fabricants.">
+  <img src="images/fr/features/favorites.webp?v=fc0c81858c" width="300" alt="La fiche d'une table ajoutée aux favoris : l'étoile blanche après son titre, « Retirer des favoris ».">
+</p>
+
 ### Ordre des tables et mode attente
 
 - **« Ordre des tables »** : par titre, dernières jouées, plus jouées, année, fabricant, ou mélangé à chaque démarrage.

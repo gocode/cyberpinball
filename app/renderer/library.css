@@ -119,6 +119,17 @@ body.mouse .lib-back:hover {
   gap: 2.4cqmin;
 }
 
+/* Étoile des favoris après le titre d'une fiche : blanche, pleine, sur la ligne du titre. */
+.lib-head-star {
+  width: 0.62em;
+  height: 0.62em;
+  margin-left: 0.32em;
+  vertical-align: -0.04em;
+  fill: currentColor;
+  stroke: none;
+  color: var(--ink);
+}
+
 .lib-head-icon {
   font-size: 5.56cqmin;
 }

@@ -1539,6 +1539,21 @@ Une borne dont la règle du pare-feu de Cyber Pinball est posée (« Partage et 
 | 814 | Fermer | Sur le téléphone, « Fermer », puis « Fermer le navigateur ». | Le navigateur intégré se ferme ; le téléphone dit « Navigateur de la borne fermé ». Recharger la page du téléphone : elle ne pilote plus rien. |
 | 815 | Pare-feu absent | Sur une borne sans la règle de Cyber Pinball (lancée depuis ses sources, ou règle retirée), ouvrir « Récupérer ». | Le bloc « TÉLÉCOMMANDE » est grisé, avec sa raison (pare-feu à autoriser, ou lancé depuis les sources) ; aucune invite du pare-feu de Windows n'apparaît. |
 
+## Collections et favoris
+
+La borne avec au moins dix tables de plusieurs fabricants et décennies, dont certaines jamais jouées ; une table en favori dans son `.info` (`"User": { "Favorite": 1 }`), comme le laisse un autre frontend.
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 816 | Le repère ne bouge pas | Au menu des tables, flippers gauche et droit plusieurs fois, en roue puis en liste (Médias, son et attente > Roue du menu). | « TOUTES · <n> tables » reste à la même place et à la même taille, au coin haut-gauche de la roue (en liste : au-dessus des lignes en borne, à la place de « Table sélectionnée » au bureau) ; seul le contenu de la roue change. |
+| 817 | Passer d'une collection à l'autre | MagnaSave droit, plusieurs fois, puis MagnaSave gauche. | À chaque appui, la roue passe aussitôt à la collection suivante (Favoris, Récentes, Jamais jouées, un fabricant, une décennie…), en boucle ; la liste des collections paraît 4 s, l'active cerclée de sarcelle ; une collection vide y est grisée avec sa raison et n'est jamais ouverte. |
+| 818 | Un flipper ferme la liste | MagnaSave droit, puis aussitôt un flipper. | La liste se ferme et la table change dans la collection affichée. |
+| 819 | Chaque collection garde sa table | Dans Toutes, aller à la cinquième table ; MagnaSave droit (Favoris), choisir une autre table ; MagnaSave gauche. | Retour à Toutes sur la cinquième table ; MagnaSave droit retrouve la table choisie dans Favoris. |
+| 820 | Ajouter et retirer un favori | Start sur une table hors favoris, « Ajouter aux favoris », Exit ; MagnaSave jusqu'à Favoris ; Start, « Retirer des favoris », Exit. | Une étoile blanche pleine paraît devant le titre, sur la fiche et sur la roue ; Favoris compte une table de plus. Retirée, elle quitte Favoris (sa voisine prend la place) ; la dernière retirée, la roue revient sur Toutes. |
+| 821 | Favori d'une autre installation | Reprendre une table d'une installation où elle est en favori (« Ajouter une table » > « Depuis une autre installation… »). | Après « Installer », elle est dans Favoris, son étoile devant le titre. |
+| 822 | Mode invité limité aux favoris | Menu système > Borne > Mode invité ; Start sur « Tables proposées » jusqu'à Favoris ; « Activer le mode invité » ; MagnaSave ; puis la combinaison de déverrouillage. | Le menu ne montre que les favoris, le cadenas dans le repère ; MagnaSave ne fait que l'indice « Verrouillé » ; l'aide ne parle plus des MagnaSave. Au redémarrage, toujours limité. Déverrouillé, la collection d'avant revient. |
+| 823 | Mode attente dans la collection | Sur Favoris, laisser passer le délai du mode attente (Médias, son et attente > Mode attente). | Seules des tables de Favoris passent à l'écran. |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

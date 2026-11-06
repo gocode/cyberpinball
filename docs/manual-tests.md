@@ -1539,6 +1539,21 @@ A cabinet whose Cyber Pinball firewall rule is in place ("Partage et réseau", S
 | 814 | Close | On the phone, "Fermer" (Close), then "Fermer le navigateur" (Close the browser). | The built-in browser closes; the phone says "Navigateur de la borne fermé" (Cabinet browser closed). Reload the phone page: it no longer drives anything. |
 | 815 | No firewall rule | On a cabinet without the Cyber Pinball rule (run from source, or rule removed), open "Récupérer". | The "TÉLÉCOMMANDE" block is greyed out, with its reason (firewall to allow, or run from source); no Windows firewall prompt appears. |
 
+## Collections and favourites
+
+The cabinet with at least ten tables from several manufacturers and decades, some never played; one table favourited in its `.info` (`"User": { "Favorite": 1 }`), as another frontend leaves it.
+
+| # | Scenario | How | Expected result |
+|---|---|---|---|
+| 816 | The marker doesn't move | On the table menu, left and right flippers several times, on the wheel then in the list (Médias, son et attente > Roue du menu). | "TOUTES · <n> tables" stays in the same place and at the same size, at the top-left corner of the wheel (in the list: above the rows on a cabinet, in place of "Table sélectionnée" on a desktop); only the wheel's content changes. |
+| 817 | Moving from one collection to another | Right MagnaSave, several times, then left MagnaSave. | At each press, the wheel switches at once to the next collection (Favourites, Recent, Never played, a manufacturer, a decade…), looping; the list of collections shows for 4 s, the active one ringed in teal; an empty collection is greyed out there with its reason and never opened. |
+| 818 | A flipper closes the list | Right MagnaSave, then a flipper right away. | The list closes and the table changes within the collection shown. |
+| 819 | Each collection keeps its table | In All, go to the fifth table; right MagnaSave (Favourites), pick another table; left MagnaSave. | Back to All on the fifth table; right MagnaSave finds the table picked in Favourites again. |
+| 820 | Adding and removing a favourite | Start on a table outside favourites, "Ajouter aux favoris", Exit; MagnaSave up to Favourites; Start, "Retirer des favoris", Exit. | A filled white star appears before the title, on the page and on the wheel; Favourites counts one more table. Removed, it leaves Favourites (its neighbour takes the place); the last one removed, the wheel goes back to All. |
+| 821 | Favourite from another installation | Take over a table from an installation where it is a favourite ("Ajouter une table" > "Depuis une autre installation…"). | After "Installer", it is in Favourites, its star before the title. |
+| 822 | Guest mode restricted to favourites | Menu système > Borne > Mode invité; Start on "Tables proposées" up to Favourites; "Activer le mode invité"; MagnaSave; then the unlock combination. | The menu only shows favourites, the padlock in the marker; MagnaSave only shows the "Verrouillé" hint; the help no longer mentions MagnaSave. After a restart, still restricted. Unlocked, the previous collection comes back. |
+| 823 | Attract mode within the collection | On Favourites, let the attract mode delay pass (Médias, son et attente > Mode attente). | Only Favourites tables come on screen. |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).
