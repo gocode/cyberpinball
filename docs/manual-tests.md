@@ -1563,7 +1563,7 @@ The cabinet with at least ten tables from several manufacturers and decades, som
 
 | # | Scenario | How | Expected result |
 |---|---|---|---|
-| 816 | The marker doesn't move | On the table menu, left and right flippers several times, on the wheel then in the list (Médias, son et attente > Roue du menu). | "TOUTES · <n> tables" stays in the same place and at the same size, at the top-left corner of the wheel (in the list: above the rows on a cabinet, in place of "Table sélectionnée" on a desktop); only the wheel's content changes. |
+| 816 | The marker doesn't move | On the table menu, left and right flippers several times, on the wheel then in the list (Médias, son et attente > Roue du menu). | "TOUTES │ <i> / <n>" stays in the same place and at the same size, in the inset on top of the title cartouche (in the list: at the head of the rows); only the number and the wheel's content change, the wheel's arc passes in front of the inset's top edge. |
 | 817 | Moving from one collection to another | Right MagnaSave, several times, then left MagnaSave. | At each press, the wheel switches at once to the next collection (Favourites, Recent, Never played, a manufacturer, a decade…), looping; the list of collections shows for 4 s, the active one ringed in teal; an empty collection is greyed out there with its reason and never opened. |
 | 818 | A flipper closes the list | Right MagnaSave, then a flipper right away. | The list closes and the table changes within the collection shown. |
 | 819 | Each collection keeps its table | In All, go to the fifth table; right MagnaSave (Favourites), pick another table; left MagnaSave. | Back to All on the fifth table; right MagnaSave finds the table picked in Favourites again. |

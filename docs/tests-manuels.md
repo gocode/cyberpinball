@@ -1563,7 +1563,7 @@ La borne avec au moins dix tables de plusieurs fabricants et décennies, dont ce
 
 | # | Scénario | Comment | Résultat attendu |
 |---|---|---|---|
-| 816 | Le repère ne bouge pas | Au menu des tables, flippers gauche et droit plusieurs fois, en roue puis en liste (Médias, son et attente > Roue du menu). | « TOUTES · <n> tables » reste à la même place et à la même taille, au coin haut-gauche de la roue (en liste : au-dessus des lignes en borne, à la place de « Table sélectionnée » au bureau) ; seul le contenu de la roue change. |
+| 816 | Le repère ne bouge pas | Au menu des tables, flippers gauche et droit plusieurs fois, en roue puis en liste (Médias, son et attente > Roue du menu). | « TOUTES │ <i> / <n> » reste à la même place et à la même taille, dans l'encart du dessus du cartouche du titre (en liste : en tête des lignes) ; seuls le chiffre et le contenu de la roue changent, l'arc de la roue passe devant le bord haut de l'encart. |
 | 817 | Passer d'une collection à l'autre | MagnaSave droit, plusieurs fois, puis MagnaSave gauche. | À chaque appui, la roue passe aussitôt à la collection suivante (Favoris, Récentes, Jamais jouées, un fabricant, une décennie…), en boucle ; la liste des collections paraît 4 s, l'active cerclée de sarcelle ; une collection vide y est grisée avec sa raison et n'est jamais ouverte. |
 | 818 | Un flipper ferme la liste | MagnaSave droit, puis aussitôt un flipper. | La liste se ferme et la table change dans la collection affichée. |
 | 819 | Chaque collection garde sa table | Dans Toutes, aller à la cinquième table ; MagnaSave droit (Favoris), choisir une autre table ; MagnaSave gauche. | Retour à Toutes sur la cinquième table ; MagnaSave droit retrouve la table choisie dans Favoris. |

@@ -367,28 +367,30 @@ html.menu-desktop .menu-count {
 /* ---------- Collections (collections.ts) : repère, étoile des favoris, liste des collections ---------- */
 
 /*
- * Repère de la collection active, zone fixe : « ☆ FAVORIS · 4 tables ». Cotes de Codex
- * (06/11/2026), en pixels de référence d'un petit côté de 1080, indépendantes du titre, du nombre
- * de tables et de la taille de la roue : 48 de haut, icône 24, texte 24. Liste en borne :
- * au-dessus des lignes ; liste au bureau : à la place de « Table sélectionnée » ; roues à
- * bandeau : au coin haut-gauche du bandeau. Verre fumé, texte blanc : le vert reste au choix de la table.
+ * Repère de la collection active, zone fixe : « ☆ FAVORIS │ 1 / 4 », la collection et la place de
+ * la table choisie dans celle-ci (choisi le 06/11/2026 parmi cinq propositions, d'après celle de
+ * Codex ; il remplace la pastille sur l'illustration et le compteur isolé). Roue Médaillons :
+ * dans l'encart dessiné sur le dessus de la plaque du titre (roues/medaillons.svg, couche du
+ * fond : l'arc inférieur de la roue passe devant son bord haut), sans fond à lui. Autres roues :
+ * la même ligne sur un fond sombre, au-dessus du titre. Liste : en tête des lignes. Rien n'y
+ * bouge d'une table à l'autre : seuls le chiffre et, d'une collection à l'autre, le nom changent.
  */
 .menu-shelf {
+  --s: var(--u);
   position: absolute;
   box-sizing: border-box;
-  display: flex;
+  display: grid;
+  grid-template-columns: max(calc(24 * var(--s)), calc(20 * var(--u))) minmax(0, 1fr) calc(1 * var(--s)) auto;
   align-items: center;
-  gap: calc(10 * var(--u));
+  gap: calc(10 * var(--s));
   left: calc(50 * var(--u));
+  right: calc(50 * var(--u));
   bottom: calc(776 * var(--u));
-  width: calc(600 * var(--u));
   height: calc(48 * var(--u));
-  padding: 0 calc(16 * var(--u));
-  border: calc(1.5 * var(--u)) solid var(--line-strong);
-  border-radius: calc(24 * var(--u));
+  padding: 0 calc(14 * var(--s));
+  border-radius: calc(5 * var(--s));
   background: var(--surface-sunken);
-  box-shadow: var(--halo-panel);
-  font-size: calc(24 * var(--u));
+  font-size: max(calc(22 * var(--s)), calc(20 * var(--u)));
   font-weight: 500;
   line-height: 1.2;
   white-space: nowrap;
@@ -399,18 +401,17 @@ html.menu-desktop .menu-count {
   display: none;
 }
 
-body.mouse .menu-shelf {
+body.mouse .menu-shelf:not(.locked) {
   cursor: pointer;
 }
 
 .menu-shelf-icon {
-  flex: none;
-  width: calc(24 * var(--u));
-  height: calc(24 * var(--u));
+  width: max(calc(24 * var(--s)), calc(20 * var(--u)));
+  height: max(calc(24 * var(--s)), calc(20 * var(--u)));
   color: var(--ink);
 }
 
-/* Seul un vrai libellé long (un fabricant) perd sa fin ; « Toutes », « Favoris », « Récentes » tiennent toujours. */
+/* Seul un vrai libellé long (un fabricant) perd sa fin ; jamais les chiffres. */
 .menu-shelf-label {
   min-width: 0;
   overflow: hidden;
@@ -419,29 +420,63 @@ body.mouse .menu-shelf {
   text-transform: uppercase;
 }
 
-.menu-shelf-sep,
-.menu-shelf-count {
-  flex: none;
+.menu-shelf-rule {
+  width: calc(1 * var(--s));
+  height: calc(24 * var(--s));
+  background: var(--line-strong);
+}
+
+.menu-shelf-position {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
   color: var(--ink-muted);
 }
 
-/* Bureau, liste : à la place de « Table sélectionnée », au-dessus du titre, sur la colonne des lignes. */
+.menu-shelf-position b {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+/* La place de la table est dans le repère : le compteur isolé n'est plus dessiné. */
+.menu.has-shelf .menu-count {
+  display: none !important;
+}
+
+/* Bureau, liste : au-dessus des lignes, qui commencent un peu plus bas. */
 html.menu-desktop .menu.layout-list .menu-shelf {
   left: calc(790 * var(--u));
+  right: calc(112 * var(--u));
+  top: calc(110 * var(--u));
   bottom: auto;
-  top: calc(652 * var(--u));
 }
 
-html.menu-desktop .menu.layout-list.has-shelf .menu-label {
-  display: none;
+html.menu-desktop .menu.layout-list.has-shelf .menu-nav {
+  top: calc(174 * var(--u));
+  height: calc(456 * var(--u));
 }
 
-/* Roues à bandeau : au coin haut-gauche du bandeau, au-dessus du bout de la roue. */
+/* Roues à bandeau sans encart dessiné : la ligne, sur son fond, au-dessus du titre. */
 .menu.menu-band .menu-shelf {
-  left: calc(var(--band-left) + 48 * var(--u));
-  bottom: calc(var(--band-bottom) + 484 * var(--b));
-  /* 380 : à 400 (cote de Codex), le bout du repère touchait la zone cliquable du médaillon central. */
-  width: calc(380 * var(--u));
+  --s: var(--b);
+  right: auto;
+  left: calc(var(--band-left) + 312 * var(--b));
+  bottom: calc(var(--band-bottom) + 200 * var(--b));
+  width: calc(456 * var(--b));
+  height: calc(40 * var(--b));
+}
+
+/* Médaillons : dans l'encart du dessus de la plaque (312 → 768, du pied de l'arc au haut de la plaque). */
+html[data-menu-band='medaillons'] .menu.menu-band .menu-shelf {
+  left: calc(var(--band-left) + 322 * var(--b));
+  bottom: calc(var(--band-bottom) + 190 * var(--b));
+  width: calc(436 * var(--b));
+  height: calc(46 * var(--b));
+  background: none;
+}
+
+/* Arche : la ligne au plus près du titre, sous les pieds de l'arche (revue de Codex). */
+html[data-menu-band='arche'] .menu.menu-band .menu-shelf {
+  bottom: calc(var(--band-bottom) + 194 * var(--b));
 }
 
 /* Étoile des favoris devant le titre : blanche, pleine ; sa place est gardée hors des favoris (le titre ne bouge pas). */
@@ -531,7 +566,7 @@ html.menu-desktop .menu.layout-list .collections-panel {
 .menu.menu-band .collections-panel {
   right: auto;
   left: calc(var(--band-left) + 48 * var(--u));
-  bottom: calc(var(--band-bottom) + 484 * var(--b) + 64 * var(--u));
+  bottom: calc(var(--band-bottom) + 540 * var(--b) + 8 * var(--u));
   width: calc(600 * var(--u));
   height: calc(860 * var(--u));
 }
@@ -900,11 +935,22 @@ html.menu-desktop[data-menu-band] #root {
     width: calc(170 * var(--b) + 24 * var(--u));
   }
 
-  /* Repère : sur la largeur de la colonne, au-dessus du bandeau réduit (cotes de Codex). */
-  html.menu-desktop .menu.menu-band .menu-shelf {
+  /*
+   * Repère des roues sans encart : la ligne, sur son fond, passe au-dessus du bandeau réduit, sur
+   * la largeur de la colonne (cotes de Codex). Médaillons : il reste dans son encart, au corps plancher.
+   */
+  /* Médaillons, bandeau réduit : dans l'encart, au corps de 22 (à 20, le texte paraissait fragile). */
+  html.menu-desktop[data-menu-band='medaillons'] .menu.menu-band .menu-shelf {
+    font-size: max(calc(22 * var(--b)), calc(22 * var(--u)));
+  }
+
+  html.menu-desktop:not([data-menu-band='medaillons']) .menu.menu-band .menu-shelf {
+    --s: var(--u);
     left: calc(var(--band-left) + 24 * var(--u));
     width: calc(var(--band-w) - 48 * var(--u));
     bottom: calc(var(--band-bottom) + 560 * var(--b));
+    height: calc(48 * var(--u));
+    background: var(--surface-sunken);
   }
 
   /*

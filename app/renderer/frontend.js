@@ -414,7 +414,7 @@ function menuPanel(s) {
   v.text.textContent = s.table.title;
   v.text.dataset.size = titleSize(s.table.title);
   v.star.toggleAttribute('data-on', Boolean(s.table.favorite));
-  fillShelf(v.shelf, s.shelf);
+  fillShelf(v.shelf, s.shelf, s);
   v.node.classList.toggle('has-shelf', Boolean(s.shelf));
   placeCollections(v.node, s.collections);
   v.meta.textContent = s.table.subtitle ?? '';
@@ -426,17 +426,19 @@ function menuPanel(s) {
 }
 
 /**
- * Repère de la collection active (« ★ Favoris · 4 tables ») : une zone fixe du menu, au coin
- * haut-gauche du bandeau de la roue (en haut de la liste) ; changer de table n'y change rien,
- * changer de collection n'en change que le texte. Mode invité restreint à une collection : le
- * cadenas à la place de l'icône, les MagnaSave n'en changent pas.
+ * Repère de la collection active, « ☆ FAVORIS │ 1 / 4 » : la collection et la place de la table
+ * choisie dedans, dans l'encart du dessus de la plaque du titre (frontend.css) ; il remplace le
+ * compteur. Changer de table n'en change que le chiffre, changer de collection le nom. Mode
+ * invité restreint à une collection : le cadenas à la place de l'icône, les MagnaSave n'en changent pas.
  */
-function fillShelf(box, shelf) {
+function fillShelf(box, shelf, s) {
   box.hidden = !shelf;
   if (!shelf) return;
   box.classList.toggle('locked', Boolean(shelf.locked));
   box.title = shelf.title ?? shelf.label;
-  box.replaceChildren(cyberIcon(shelf.locked ? 'lock' : shelf.icon, 'menu-shelf-icon'), el('span', 'menu-shelf-label', shelf.label), el('span', 'menu-shelf-sep', '·'), el('span', 'menu-shelf-count', shelf.countLabel));
+  const position = el('span', 'menu-shelf-position');
+  position.append(el('b', '', String(s.position)), ` / ${s.count}`);
+  box.replaceChildren(cyberIcon(shelf.locked ? 'lock' : shelf.icon, 'menu-shelf-icon'), el('span', 'menu-shelf-label', shelf.label), el('span', 'menu-shelf-rule'), position);
 }
 
 /**

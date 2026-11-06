@@ -74,5 +74,15 @@
 </g>
 <ellipse cx="540" cy="168" rx="250" ry="150" fill="url(#lueur)"/>
 
+<!-- Encart du dessus de la plaque (06/11/2026) : la collection affichée et la place de la table
+     (frontend.css, .menu-shelf). Dans le fond, découpé par l'arc inférieur : il passe derrière la
+     roue (la lumière et le néon de l'arc, puis son filet, sont devant), la plaque en recouvre le pied. -->
+<clipPath id="sousArc"><path d="M -20,330 Q 540,222 1100,330 L 1100,540 L -20,540 Z"/></clipPath>
+<g clip-path="url(#sousArc)">
+  <path d="M 330,274 L 750,274 L 768,292 L 768,358 L 312,358 L 312,292 Z" fill="#000" opacity=".5" filter="url(#ombre)"/>
+  <path d="M 330,274 L 750,274 L 768,292 L 768,358 L 312,358 L 312,292 Z" fill="#07110f"/>
+  <path d="M 312,358 L 312,292 L 330,274 L 750,274 L 768,292 L 768,358" fill="none" stroke="#3ad0b8" stroke-width="1" opacity=".35"/>
+</g>
+
 <!-- Arc supérieur : halo large, halo serré, cœur clair. -->
 </svg>
