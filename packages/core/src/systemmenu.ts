@@ -14,6 +14,7 @@ import type { IconName } from './icons';
 /** Entrées fournies par l'application. */
 export const SYSTEM_ITEM_IDS = [
   'all-tables',
+  'collections',
   'add-table',
   'downloads',
   'roms',
@@ -97,8 +98,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'tables',
     icon: 'tables',
     get label() { return t('Tables'); },
-    get detail() { return t('Toutes les tables et leur fiche, ajouter une table, téléchargements, bibliothèque de ROM'); },
-    entries: ['all-tables', 'add-table', 'downloads', 'roms'],
+    get detail() { return t('Toutes les tables et leur fiche, collections de la roue, ajouter une table, téléchargements, bibliothèque de ROM'); },
+    entries: ['all-tables', 'collections', 'add-table', 'downloads', 'roms'],
   },
   medias: {
     id: 'medias',
@@ -172,6 +173,7 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   dedicated: { icon: 'lock', get label() { return t('Borne dédiée'); } },
   startup: { icon: 'power', get label() { return t('Lancement au démarrage'); } },
   'guest-mode': { icon: 'guest', get label() { return t('Mode invité'); } },
+  collections: { icon: 'star', get label() { return t('Collections'); } },
   // Nommée dans les deux langues, pour qu'on la retrouve quelle que soit la langue affichée.
   language: { icon: 'language', label: 'Langue / Language' }, // i18n-ignore
   updates: { icon: 'upgrade', get label() { return t('Mise à jour de Cyber Pinball'); } },

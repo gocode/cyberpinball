@@ -16,11 +16,70 @@ import {
   stepCollection,
   type Collection,
   type CollectionsPanel,
+  t,
+  tn,
   PANEL_BUDGET,
   type FriendsShelf,
   type ShelfView,
   type TableEntry,
 } from '@cyberpinball/core';
+import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
+
+/**
+ * Menu système > Tables > Collections : la même liste que les MagnaSave, à choisir aux flippers
+ * et à Start. Une borne dont les MagnaSave ne sont pas relevés (boutons facultatifs de l'étape
+ * « Boutons ») y change quand même de collection (PinCab, 06/11/2026). Une collection vide reste
+ * dans la liste, grisée avec sa raison ; Start n'y fait rien.
+ */
+export function createCollectionsItem(host: {
+  collections: CollectionsMenu;
+  library: { openCustom(build: () => Built, at?: number): void; openSystem(): void; leave(): void };
+}): ProvidedSystemItem {
+  const open = () =>
+    host.library.openCustom(() => {
+      const back = () => host.library.openSystem();
+      const current = host.collections.current().id;
+      // Une ligne par collection, sous son intertitre (Fabricants, Décennies), reliée à son action :
+      // la liste se parcourt aux flippers, Start l'ouvre (comme « Jouer avec un ami »).
+      const actions: Action[] = [];
+      const sections: Section[] = [];
+      let group: string | undefined;
+      for (const c of host.collections.list()) {
+        if (c.group !== group || !sections.length) {
+          group = c.group;
+          sections.push({ ...(c.group === 'maker' ? { title: t('Fabricants') } : c.group === 'decade' ? { title: t('Décennies') } : {}), rows: [] });
+        }
+        const count = c.tables.length;
+        const index =
+          actions.push({
+            label: c.label,
+            key: `collection:${c.id}`,
+            run: () => {
+              if (!count) return;
+              host.collections.choose(c.id);
+              host.library.leave();
+            },
+          }) - 1;
+        const detail = count ? [tn(count, '{n} table', '{n} tables'), c.id === current ? t('affichée sur la roue') : undefined, c.detail].filter(Boolean).join(' · ') : (c.reason ?? '');
+        sections[sections.length - 1]!.rows.push({ text: c.label, detail, icon: c.icon as Row['icon'], tone: !count ? 'quiet' : c.id === current ? 'ok' : undefined, action: index, pick: true });
+      }
+      actions.push({ label: t('Retour'), icon: 'back', run: back });
+      return {
+        heading: t('Collections'),
+        icon: 'star',
+        lead: t('La roue ne montre que les tables de la collection choisie. Sur la roue, les MagnaSave passent aussi d’une collection à l’autre.'),
+        sections,
+        actions,
+        back,
+      };
+    }, Math.max(0, host.collections.list().findIndex((c) => c.id === host.collections.current().id)));
+  return {
+    get detail() {
+      return t('Affichée : {collection}', { collection: host.collections.current().label });
+    },
+    run: open,
+  };
+}
 
 /** Durée de la liste des collections après le dernier MagnaSave, puis son fondu. */
 export const COLLECTIONS_PANEL_MS = 4000;

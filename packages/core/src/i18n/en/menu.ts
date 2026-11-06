@@ -32,7 +32,7 @@ export const messages: Record<string, string> = {
   'Configuration de la borne': 'Cabinet setup',
   // packages/core/src/systemmenu.ts : rubriques du menu système
   'Tables': 'Tables',
-  'Toutes les tables et leur fiche, ajouter une table, téléchargements, bibliothèque de ROM': 'Every table and its page, add a table, downloads, ROM library',
+  'Toutes les tables et leur fiche, collections de la roue, ajouter une table, téléchargements, bibliothèque de ROM': 'Every table and its page, wheel collections, add a table, downloads, ROM library',
   'Toutes les tables': 'All tables',
   'Migration': 'Migration',
   'Images et vidéos des tables, musique et mode attente du menu': 'Table images and videos, menu music and attract mode',

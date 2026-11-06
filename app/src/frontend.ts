@@ -237,7 +237,7 @@ import { freezeWrites } from './write-freeze';
 import { listDrives } from './file-picker';
 import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
-import { createCollectionsMenu } from './collections-menu';
+import { createCollectionsItem, createCollectionsMenu } from './collections-menu';
 import { createFriendsMenu } from './friends-menu';
 import { createFirewallRule } from './firewall-rule';
 import { guardFirewall } from './firewall-guard';
@@ -737,9 +737,18 @@ function playfieldLandscape(): boolean {
 /** Touches des MagnaSave au menu des tables : collection précédente (gauche), suivante (droite) ; jamais un bouton de l'interface. */
 function collectionKeys(): { previous: string[]; next: string[] } {
   const keys = buttonKeys(buttons);
-  const taken = new Set([...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit, ...KEYS.help, ...KEYS.settings]);
-  const own = (code: string | undefined) => (code && !taken.has(code) ? [code] : []);
-  return { previous: own(keys.leftMagna), next: own(keys.rightMagna) };
+  const taken = new Set([...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit, ...KEYS.help, ...KEYS.settings, ...Object.values(keys).filter(Boolean)]);
+  // MagnaSave relevé ; sinon (bouton facultatif passé à l'étape « Boutons ») sa touche par défaut
+  // d'un clavier (Ctrl gauche, Ctrl droit), si aucun autre bouton ne l'a prise, comme le mode invité.
+  const own = (recorded: string | undefined, fallback: string) => (recorded && ![...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit, ...KEYS.help, ...KEYS.settings].includes(recorded) ? [recorded] : !recorded && !taken.has(fallback) ? [fallback] : []);
+  return { previous: own(keys.leftMagna, 'ControlLeft'), next: own(keys.rightMagna, 'ControlRight') };
+}
+
+/** Au démarrage, dans le journal : les touches qui changent de collection (une borne où rien ne répond s'explique). */
+function logCollectionKeys(): void {
+  const keys = collectionKeys();
+  const name = (codes: string[]) => (codes.length ? codes.map(keyLabel).join(', ') : 'aucune'); // i18n-ignore : journal
+  console.log(`Touches des collections : MagnaSave gauche → ${name(keys.previous)}, droit → ${name(keys.next)} ; aussi Menu système > Tables > Collections.`); // i18n-ignore : journal
 }
 
 /** MagnaSave ou clic sur le repère : la collection voisine (ou celle cliquée dans la liste). Mode invité restreint : le cadenas. */
@@ -1222,6 +1231,8 @@ if (shellSession()) {
   },
   run: () => showDesktop(),
 });
+// Collections de la roue : aussi au menu système, pour une borne dont les MagnaSave ne répondent pas.
+library.provideSystemItem('collections', createCollectionsItem({ collections, library }));
 // Mode invité : on joue, rien d'autre ; l'écran de l'entrée dit la combinaison qui déverrouille.
 library.provideSystemItem('guest-mode', createGuestMenu({
   collections: () => ({ choices: collections.list().filter((c) => c.tables.length).map((c) => ({ id: c.id, label: c.label, count: c.tables.length })), active: collections.current().id }), library, guest, buttons: () => buttons }));
@@ -1829,6 +1840,7 @@ export function startFrontend(): void {
   state = { ...state, index: startIndex(tables, mediaSettings.startTable) };
   // Collection gardée du dernier démarrage (ou imposée par le mode invité) : la table de départ y est prise.
   collections.start();
+  logCollectionKeys();
   // Configuration à choisir : le menu s'ouvre droit sur l'écran principal, avec les boutons de la dernière utilisée.
   const cabinet = loadCabinet(loc.dataDir);
   menuDmdKind = cabinet && !choose ? dmdKindOf(cabinet) : undefined;
