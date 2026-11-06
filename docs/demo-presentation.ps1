@@ -104,7 +104,4 @@ foreach ($file in Get-ChildItem "$PSScriptRoot\demo-captures-medias\*-backglass.
 # README.fr.md et la page « Toutes les fonctionnalités » (docs\adresses-images.ps1).
 & "$PSScriptRoot\adresses-images.ps1"
 if (-not $?) { throw 'Adresses des images en échec.' }
-# Habillage de la chaîne YouTube (bannière, photo de profil), sur la même illustration.
-& "$PSScriptRoot\demo-youtube.ps1"
-if (-not $?) { throw 'Habillage YouTube en échec.' }
 "Images de présentation dans $kit ; fronton de la page du projet dans docs\images\<langue>\brand-backglass.webp."

@@ -31,7 +31,7 @@ const BINARY = /\.(png|jpe?g|webp|gif|bmp|ico|ttf|otf|woff2?|mp4|webm|mp3|wav|og
  * Documents de travail : notes de recherche (docs/recherche), maquettes et relevés de design
  * (docs/Design : logos de tables sous licence, impressions de pages de travail), critiques,
  * consignes et réponses échangées avec les outils d'aide (critique-*.md, BRIEF*.md, reponse*.md…),
- * et la préparation des vidéos de la chaîne (video/ : aide-mémoire, fiches de mise en ligne).
+ * et les travaux internes rangés dans video/.
  * Ils servent au développement, pas aux lecteurs du projet.
  */
 const PRIVATE = [/^docs\/recherche\//, /^docs\/design\//i, /^video\//, /(^|\/)(critique|brief|r[eé]ponse|consigne)[^/]*\.md$/i];
@@ -62,6 +62,58 @@ const RULES = [
   { what: 'chemin d’un profil Windows', re: /\b[A-Za-z]:[\\/]{1,2}Users[\\/]{1,2}(?!(Public|Default|All Users)\b)[A-Za-z0-9][\w.-]*/i },
 ];
 
+/**
+ * Motifs internes (video/motifs-internes.txt, jamais publié) : ce qui ne doit apparaître dans
+ * aucun fichier publié, ni dans son contenu (« texte: <expression> ») ni dans son chemin
+ * (« fichier: <expression> »). Ils restent sur ce poste : les écrire ici les publierait.
+ * Le fichier se vérifie lui-même par ses exemples : « refuse-texte: », « accepte-texte: »,
+ * « refuse-fichier: », « accepte-fichier: ».
+ */
+export function internalPatterns(file = path.join(repo, 'video', 'motifs-internes.txt')) {
+  const patterns = { text: [], file: [], examples: [] };
+  if (!fs.existsSync(file)) return patterns;
+  for (const raw of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const m = /^([a-z-]+):\s?(.*)$/.exec(line);
+    if (!m) throw new Error(`video/motifs-internes.txt : ligne illisible (${line})`);
+    const [, kind, value] = m;
+    if (kind === 'texte') patterns.text.push(new RegExp(value, 'i'));
+    else if (kind === 'fichier') patterns.file.push(new RegExp(value, 'i'));
+    else if (/^(refuse|accepte)-(texte|fichier)$/.test(kind)) patterns.examples.push({ kind, value });
+    else throw new Error(`video/motifs-internes.txt : sorte de ligne inconnue (${kind})`);
+  }
+  return patterns;
+}
+
+/** Fichier publié dont le chemin répond à un motif interne. */
+export function internalFile(file, patterns) {
+  const f = file.replace(/\\/g, '/');
+  return !isPrivate(f) && patterns.file.some((re) => re.test(f));
+}
+
+/** Lignes d'un texte publié qui répondent à un motif interne. */
+export function internalMentions(text, patterns) {
+  const found = [];
+  text.split(/\r?\n/).forEach((line, i) => {
+    for (const re of patterns.text) {
+      const m = re.exec(line);
+      if (m) { found.push({ line: i + 1, what: 'travail interne (motif de video/motifs-internes.txt)', excerpt: m[0] }); break; }
+    }
+  });
+  return found;
+}
+
+/** Les exemples du fichier des motifs : chaque motif refuse et laisse passer ce qu'il doit. */
+export function checkExamples(patterns) {
+  const problems = [];
+  for (const { kind, value } of patterns.examples) {
+    const hit = kind.endsWith('texte') ? internalMentions(value, patterns).length > 0 : internalFile(value, patterns);
+    if (hit !== kind.startsWith('refuse')) problems.push(`video/motifs-internes.txt : l'exemple « ${kind}: ${value} » n'est pas ${kind.startsWith('refuse') ? 'refusé' : 'accepté'}`);
+  }
+  return problems;
+}
+
 function privateNames() {
   if (process.env.CYBERPINBALL_AUDIT_NOMS !== undefined) return process.env.CYBERPINBALL_AUDIT_NOMS.split(',').map((n) => n.trim()).filter(Boolean);
   const file = path.join(os.homedir(), '.cyberpinball', 'audit-noms.txt');
@@ -87,11 +139,13 @@ export function auditText(text, names = [], { emails = true } = {}) {
 
 export function auditRepository({ commits } = {}) {
   const names = privateNames();
-  const problems = [];
+  const patterns = internalPatterns();
+  const problems = [...checkExamples(patterns)];
   const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: repo, encoding: 'utf8' }).split('\0').filter(Boolean);
   // Seuls les fichiers publiés comptent : les documents internes ne partent pas.
   for (const f of tracked.filter((x) => SECRET_FILES.test(x))) problems.push(`${f} : fichier de secret suivi par git (à retirer : git rm --cached)`);
   const files = tracked.filter((f) => !isPrivate(f));
+  for (const file of files.filter((f) => internalFile(f, patterns))) problems.push(`${file} : chemin d'un travail interne (motif de video/motifs-internes.txt), à ranger dans video/`);
   for (const file of files) {
     if (BINARY.test(file)) continue;
     const full = path.join(repo, file);
@@ -99,7 +153,7 @@ export function auditRepository({ commits } = {}) {
     const buffer = fs.readFileSync(full);
     if (buffer.includes(0)) continue;
     const text = buffer.toString('utf8');
-    for (const f of [...auditText(text, names, { emails: !THIRD_PARTY.test(file) }), ...privateLinks(file, text)]) problems.push(`${file}:${f.line} : ${f.what} (${f.excerpt})`);
+    for (const f of [...auditText(text, names, { emails: !THIRD_PARTY.test(file) }), ...privateLinks(file, text), ...internalMentions(text, patterns)]) problems.push(`${file}:${f.line} : ${f.what} (${f.excerpt})`);
   }
   if (commits) {
     const log = execFileSync('git', ['log', '--format=%H%x00%an <%ae>%x00%cn <%ce>%x00%B%x01', commits], { cwd: repo, encoding: 'utf8' });
@@ -108,16 +162,16 @@ export function auditRepository({ commits } = {}) {
       for (const f of auditText(`${author}\n${committer}\n${message}`, names)) problems.push(`commit ${sha.slice(0, 7)} : ${f.what} (${f.excerpt})`);
     }
   }
-  return { problems, files: files.length, internal: tracked.length - files.length, names: names.length };
+  return { problems, files: files.length, internal: tracked.length - files.length, names: names.length, patterns: patterns.text.length + patterns.file.length };
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const at = process.argv.indexOf('--commits');
-  const { problems, files, internal, names } = auditRepository({ commits: at > 0 ? process.argv[at + 1] : undefined });
+  const { problems, files, internal, names, patterns } = auditRepository({ commits: at > 0 ? process.argv[at + 1] : undefined });
   if (problems.length) {
     console.error(`Contrôle de publication : ${problems.length} problème${problems.length > 1 ? 's' : ''} (le dépôt est public) :`);
     for (const p of problems) console.error(`  ${p}`);
     process.exit(1);
   }
-  console.log(`Contrôle de publication : ${files} fichiers publiés (${internal} documents internes gardés ici), rien de personnel ni de secret${names ? ` (${names} nom${names > 1 ? 's' : ''} de la liste privée)` : ', liste privée de noms absente'}.`);
+  console.log(`Contrôle de publication : ${files} fichiers publiés (${internal} documents internes gardés ici), rien de personnel ni de secret${names ? ` (${names} nom${names > 1 ? 's' : ''} de la liste privée)` : ', liste privée de noms absente'}${patterns ? `, ${patterns} motif${patterns > 1 ? 's' : ''} interne${patterns > 1 ? 's' : ''}` : ''}.`);
 }
