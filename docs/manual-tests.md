@@ -1451,6 +1451,15 @@ A PinUP Popper (or PinballX) installation on this PC or a plugged-in drive: `Vis
 | 771 | PuP-Pack chosen as a folder, from the game parts | Page of a table without a PuP-Pack > "Parties du jeu" (Game parts) > "PuP-Pack" > "Chercher un fichier ou un dossier…" (Look for a file or a folder…); go to `PinUPSystemPUPVideos<pack>`; "Prendre ce dossier entier" (Take this whole folder). | The add plan, targeted at this table, installs the pack in its `pupvideos`. |
 | 772 | The whole PUPVideos | Same path, but "Prendre ce dossier entier" on `PUPVideos` itself. | The pack with the name the table expects is taken alone; with no matching name, "PuP-Pack : lequel ?" (PuP-Pack: which one?) lists the packs, and Start on one installs only that one. |
 
+## Score of a PuP-Pack placed on the backglass
+
+A table whose PuP-Pack is made for a single large 16:9 screen: the score at the bottom of the backglass, below the videos (City Hunter, Original 2025).
+
+| # | Scenario | How | Expected result |
+|---|---|---|---|
+| 773 | Cabinet with a DMD screen | Install City Hunter (or keep the one already installed), start a game, press Start. | The score, credits and current ball show on the DMD screen, scaled to the window; the backglass keeps its six videos and its artwork, with no score at the bottom. Table doctor: nothing to report about the PuP-Pack. |
+| 774 | Cabinet without a DMD screen | On a configuration without a DMD screen, start the same table. | The score goes back to the bottom of the backglass, as the author intended (`screens.pup` restored as shipped). |
+
 ## What cannot be tested yet
 
 - VPX's real behavior with the generated file: it requires VPX 10.8.1 to be installed (milestone 2).

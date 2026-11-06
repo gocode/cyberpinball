@@ -13,7 +13,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { diagnose, pupMemory, repairPupForPlay, scriptFacts, tablePupPacks } from '../doctor';
 import { applyOps } from '../fileops';
-import { analysePack, chooseVariant, parseScreens, playlistRenames, pupWindows, type PupCabinet } from '../puppack';
+import { analysePack, chooseVariant, dmdInBackglass, parseScreens, playlistRenames, pupWindows, relocateScreen, sameScreensIgnoringBand, type PupCabinet } from '../puppack';
 import { readInfo, scanTables } from '../tables';
 import { vpxWithScript } from './fixtures';
 
@@ -213,4 +213,103 @@ test('playlists : le fichier que PinUP Player joue en premier passe aussi en pre
   assert.equal(fs.readFileSync(path.join(root, 'PupAlphas', 'AACLEAR.png'), 'utf8'), 'aaclear.png');
   assert.ok(!fs.existsSync(`${dir}-corbeille`), 'rien à la corbeille');
   fs.rmSync(dir, { recursive: true });
+});
+
+// DMD absent de l'écran DMD avec City Hunter (Original 2025, Tombg), le 6 novembre 2026, sur le
+// PinCab et sur ce PC. Le pack est fait pour un seul grand écran 16:9 : six vidéos en haut du
+// fronton, le score (étiquettes que le script écrit sur l'écran 1, pDMD) dans la bande du bas.
+// screens.pup pose l'écran 1 dans le fronton (« 2,0,0,100,100 ») : le plugin PUP ne dessine rien
+// dans la fenêtre du DMD, VPX ne l'ouvre que pour l'habillage. Invariant : tout PuP-DMD posé dans
+// le fronton passe sur l'écran DMD d'une borne qui en a un (bande libre du fronton), avant chaque
+// partie, et revient dans le fronton si la borne n'a plus d'écran DMD.
+
+/** screens.pup de City Hunter, tel que livré. */
+const CITY_HUNTER_SCREENS = [
+  HEADER,
+  '2,"Backglass","PuPOverlays","Overlay.png",1,ForceOn,,""',
+  '1,"DMD - 16:9 FullDMD","PuPOverlays","Overlay3.png",1,ForcePopBack,,"2,0,0,100,100"',
+  '10,"VideoLBG","Videoscenes","MainBack.mp4",,ForceBack,,"2,0,0,100,100"',
+  '11,"VideoBG","","",,ForcePop,,"2,19.8,3.91,78.2,53.38"',
+  '12,"Video1","","",,ForcePopBack,,"2,20,3.91,25.2,25.7"',
+  '13,"Video2","","",,ForcePopBack,,"2,46.4,4.27,25.4,25.7"',
+  '14,"Video3","","",,ForcePopBack,,"2,73,4.27,23.4,25.7"',
+  '15,"Video4","","",,ForcePopBack,,"2,20,30.96,25.2,25.98"',
+  '16,"Video5","","",,ForcePopBack,,"2,46.4,31.32,25.2,25.62"',
+  '17,"Video6","","",,ForcePopBack,,"2,72.8,31.32,23.8,25.98"',
+  '18,"ScoreBonus","","",1,ForcePopBack,,"2,19.8,3.91,78.2,53.38"',
+  '',
+].join('\r\n');
+
+/** Script de City Hunter réduit : PuP-DMD (étiquettes sur l'écran 1), UltraDMD présent mais éteint. */
+const CITY_HUNTER_SCRIPT = [
+  'Const UseUltraDMD = 0',
+  'Sub LoadUltraDMD',
+  '    Set UltraDMD = CreateObject("UltraDMD.DMDObject")',
+  'End Sub',
+  'Dim pGameName : pGameName="City_Hunter"',
+  'Const pDMD=1',
+  'Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")',
+  'PuPlayer.B2SInit "", pGameName',
+  'PuPlayer.LabelInit pDMD',
+  'PuPlayer.LabelNew pDMD,"CurScore","Impact",16,32896,0,1,1,52,80,1,0',
+  '',
+].join('\r\n');
+
+test('PuP-DMD posé dans le fronton : le score passe sur l’écran DMD de la borne, et revient si elle n’en a plus', () => {
+  const screens = parseScreens(CITY_HUNTER_SCREENS);
+  assert.deepEqual(pupWindows(screens), { topper: false, backglass: true, dmd: false });
+  // Bande libre du fronton : sous les vidéos (jusqu’à 57,3 %), là où l'auteur a mis le score.
+  const found = dmdInBackglass(screens)!;
+  assert.equal(found.screen, 1);
+  assert.equal(found.parent, 2);
+  assert.deepEqual([Math.round(found.band.top * 100) / 100, found.band.bottom], [57.3, 100]);
+  assert.equal(found.customPos, '1,0,-134.19,100,234.19');
+  // Retouché, l'écran 1 est une racine : le plugin le dessine dans la fenêtre du DMD.
+  const relocated = relocateScreen(CITY_HUNTER_SCREENS, 1, found.customPos);
+  assert.equal(relocated.split('\r\n')[2], '1,"DMD - 16:9 FullDMD","PuPOverlays","Overlay3.png",1,ForcePopBack,,"1,0,-134.19,100,234.19"');
+  assert.equal(relocated.replace(/^1,.*$/m, ''), CITY_HUNTER_SCREENS.replace(/^1,.*$/m, ''));
+  assert.deepEqual(pupWindows(parseScreens(relocated)), { topper: false, backglass: true, dmd: true });
+  assert.equal(dmdInBackglass(parseScreens(relocated)), undefined);
+  // L'option du pack reste reconnue malgré la retouche.
+  assert.ok(sameScreensIgnoringBand(relocated, CITY_HUNTER_SCREENS));
+  assert.ok(!sameScreensIgnoringBand(relocated.replace('ForceOn', 'Off'), CITY_HUNTER_SCREENS));
+  // Sans autre écran dans le fronton : tout l'écran du DMD.
+  assert.equal(dmdInBackglass(parseScreens(`${HEADER}\n2,BG,,,,ForceOn,,\n1,DMD,,,,ForceBack,,"2,0,0,100,100"\n`))?.customPos, '1,0,0,100,100');
+  // DMD déjà dans sa fenêtre, ou éteint : rien.
+  assert.equal(dmdInBackglass(parseScreens(`${HEADER}\n2,BG,,,,ForceOn,,\n1,DMD,,,,ForceBack,,\n`)), undefined);
+  assert.equal(dmdInBackglass(parseScreens(`${HEADER}\n2,BG,,,,ForceOn,,\n1,DMD,,,,Off,,"2,0,0,100,100"\n`)), undefined);
+
+  // Avant la partie, sur la borne : réparé seul, une fois.
+  const tablesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cyberpinball-pupdmdbg-'));
+  const folder = path.join(tablesDir, 'City Hunter (Original 2025)');
+  const root = path.join(folder, 'pupvideos', 'City_Hunter');
+  fs.mkdirSync(root, { recursive: true });
+  fs.writeFileSync(path.join(root, 'screens.pup'), CITY_HUNTER_SCREENS, 'latin1');
+  fs.writeFileSync(path.join(root, 'triggers.pup'), 'ID,Active\r\n');
+  fs.writeFileSync(path.join(folder, 'CityHunter (Original 2025 Tombg).vpx'), vpxWithScript(CITY_HUNTER_SCRIPT));
+  const infoFile = path.join(folder, 'City Hunter (Original 2025).info');
+  fs.writeFileSync(infoFile, JSON.stringify({ CyberPinball: { pup: { City_Hunter: { origin: 'City_Hunter' } } } }));
+  const entry = () => scanTables(tablesDir)[0]!;
+  const trashDir = `${tablesDir}-corbeille`;
+  const facts = scriptFacts(CITY_HUNTER_SCRIPT);
+  // UltraDMD nommé dans le script, mais le score est écrit sur le pack : c'est lui le DMD.
+  assert.equal(facts.drawsDmd, true);
+  assert.equal(facts.pup?.labels, true);
+  const ctx = { tablesDir, cabinet: PC, script: facts };
+  assert.deepEqual(repairPupForPlay(entry(), ctx, { trashDir }).map((f) => f.code), ['pupDmdInBackglass']);
+  assert.equal(fs.readFileSync(path.join(root, 'screens.pup'), 'latin1'), relocated);
+  assert.deepEqual(pupMemory(readInfo(infoFile), 'City_Hunter'), { origin: 'City_Hunter', dmd: { screen: 1, customPos: '2,0,0,100,100' } });
+  assert.deepEqual(repairPupForPlay(entry(), ctx, { trashDir }), []);
+  assert.ok(!diagnose(entry(), ctx).some((f) => f.code.startsWith('pupDmd')));
+  // Borne sans DMD : le score retourne dans le fronton, comme livré.
+  const noDmd = { ...ctx, cabinet: { ...PC, dmd: false } };
+  assert.deepEqual(repairPupForPlay(entry(), noDmd, { trashDir }).map((f) => f.code), ['pupDmdBackToBackglass']);
+  assert.equal(fs.readFileSync(path.join(root, 'screens.pup'), 'latin1'), CITY_HUNTER_SCREENS);
+  assert.deepEqual(pupMemory(readInfo(infoFile), 'City_Hunter'), { origin: 'City_Hunter' });
+  assert.deepEqual(repairPupForPlay(entry(), noDmd, { trashDir }), []);
+  // Script qui n'écrit pas le score sur le pack : le pack n'est pas son DMD, rien ne bouge.
+  const noLabels = { ...ctx, script: scriptFacts(CITY_HUNTER_SCRIPT.replace(/^PuPlayer\.Label.*$/gm, '')) };
+  assert.ok(!diagnose(entry(), noLabels).some((f) => f.code === 'pupDmdInBackglass'));
+  fs.rmSync(tablesDir, { recursive: true });
+  fs.rmSync(trashDir, { recursive: true, force: true });
 });

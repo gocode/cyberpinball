@@ -250,6 +250,8 @@ export const PUP_HEALTH_FINDINGS = [
   'pupOptionMismatch',
   'pupOptionUnsuited',
   'pupHidesDmd',
+  'pupDmdInBackglass',
+  'pupDmdBackToBackglass',
   'pupFileNames',
   'pupCaptureUnseen',
   'pupLog',

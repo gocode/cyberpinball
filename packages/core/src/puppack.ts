@@ -527,6 +527,8 @@ export interface PupScreen {
   mode: string;
   /** Écran parent d'un CustomPos (« 2,0,0,100,100 ») : l'écran s'affiche dedans. */
   parent?: number;
+  /** Place du CustomPos, en % de la fenêtre du parent (PUPCustomPos::ScaledRect). */
+  rect?: { x: number; y: number; w: number; h: number };
   /** Image ou vidéo montrée par défaut sur cet écran : dossier (playlist) et fichier, s'ils sont donnés. */
   playlist?: string;
   playFile?: string;
@@ -543,11 +545,13 @@ export function parseScreens(text: string): PupScreen[] {
     if (!Number.isFinite(num)) continue;
     const custom = parts[7] ? parseCsvLine(parts[7]) : [];
     const parent = custom.length >= 5 ? Number.parseInt(custom[0]!, 10) : undefined;
+    const [x, y, w, h] = custom.slice(1, 5).map((v) => Number.parseFloat(v) || 0);
     screens.push({
       num,
       description: parts[1]!,
       mode: parts[5]!,
       parent: Number.isFinite(parent) ? parent : undefined,
+      rect: custom.length >= 5 ? { x: x!, y: y!, w: w!, h: h! } : undefined,
       playlist: parts[2] || undefined,
       playFile: parts[3] || undefined,
     });
@@ -622,6 +626,141 @@ function pupRoots(screens: PupScreen[]): (root: number) => boolean {
 export function packDrawsDmd(dir: string): boolean {
   const screens = analysePack(findPackRoot(dir) ?? dir).screens;
   return screens.length > 0 && pupWindows(screens).dmd;
+}
+
+/**
+ * PuP-DMD posé dans le fronton : l'écran du DMD (5, sinon 1) est placé dans le fronton (CustomPos
+ * « 2,0,0,100,100 ») et rien n'occupe la fenêtre du DMD. L'auteur a composé un grand écran 16:9
+ * unique, score en bas du fronton ; sur une borne qui a un écran DMD, celui-ci reste vide.
+ * Exemple : City Hunter (Original 2025, Tombg), le 6 novembre 2026 : six vidéos en haut du
+ * fronton, le score (étiquettes de l'écran 1) dans la bande du bas.
+ *
+ * `band` : la bande du fronton, en % de sa hauteur, que les autres écrans posés dans le fronton
+ * laissent libre (la plus haute des deux, en haut ou en bas) : c'est là que l'auteur a mis le
+ * score. Sans bande nette (moins de 15 %), tout l'écran du DMD.
+ */
+export interface DmdInBackglass {
+  /** Écran du DMD (1 ou 5). */
+  screen: number;
+  /** Écran du fronton où il est posé (2 ou 6). */
+  parent: number;
+  /** Bande de l'écran du DMD à montrer dans la fenêtre du DMD, en % de sa hauteur. */
+  band: { top: number; bottom: number };
+  /** CustomPos qui pose cette bande dans la fenêtre du DMD (relocateScreen). */
+  customPos: string;
+}
+
+const BACKGLASS_SCREENS = [2, 6];
+
+export function dmdInBackglass(screens: PupScreen[]): DmdInBackglass | undefined {
+  if (!screens.length || pupWindows(screens).dmd) return undefined;
+  // Dernière définition de chaque écran : celle que le plugin garde (PUPManager::AddScreen).
+  const byNum = new Map(screens.map((s) => [s.num, s]));
+  const dmd = [5, 1].map((n) => byNum.get(n)).find((s) => s && isVisible(s) && s.parent !== undefined && BACKGLASS_SCREENS.includes(s.parent));
+  if (!dmd?.rect || !dmd.parent) return undefined;
+  const parent = dmd.parent;
+  // Autres écrans visibles posés dans le même fronton, hors fonds pleine taille.
+  const others = [...byNum.values()].filter(
+    (s) => s !== dmd && isVisible(s) && s.parent === parent && s.rect && !(s.rect.w >= 90 && s.rect.h >= 90) && s.rect.h > 0,
+  );
+  let band = { top: 0, bottom: 100 };
+  if (others.length) {
+    const top = Math.max(0, Math.min(...others.map((s) => s.rect!.y)));
+    const bottom = Math.min(100, Math.max(...others.map((s) => s.rect!.y + s.rect!.h)));
+    const below = 100 - bottom;
+    if (Math.max(top, below) >= 15) band = below >= top ? { top: bottom, bottom: 100 } : { top: 0, bottom: top };
+  }
+  // Bande du fronton, ramenée dans l'écran du DMD (sa place dans le fronton : dmd.rect).
+  const r = dmd.rect;
+  const from = r.h > 0 ? Math.max(0, (band.top - r.y) / r.h) : 0;
+  const to = r.h > 0 ? Math.min(1, (band.bottom - r.y) / r.h) : 1;
+  const inside = to - from >= 0.15 ? { top: from * 100, bottom: to * 100 } : { top: 0, bottom: 100 };
+  return { screen: dmd.num, parent, band: inside, customPos: bandCustomPos(dmd.num, inside) };
+}
+
+/**
+ * CustomPos qui pose la bande `band` (en % de la hauteur de l'écran) dans toute la fenêtre :
+ * l'écran se désigne lui-même, il reste une racine (PUPManager::AddScreen : pas de parent quand
+ * la source est l'écran lui-même), et sa place déborde de la fenêtre en haut et en bas
+ * (PUPScreen::SetBounds ne limite pas la place à la fenêtre ; ce qui en sort ne se voit pas).
+ */
+export function bandCustomPos(screen: number, band: { top: number; bottom: number }): string {
+  const height = (band.bottom - band.top) / 100;
+  const h = 100 / height;
+  const y = -(band.top / 100) * h;
+  const fmt = (v: number) => String(Math.round(v * 100) / 100);
+  return `${screen},0,${fmt(y)},100,${fmt(h)}`;
+}
+
+/**
+ * CustomPos posé par Cyber Pinball pour montrer une bande d'un écran dans sa fenêtre
+ * (bandCustomPos) : l'écran se désigne lui-même, toute la largeur, et déborde en hauteur.
+ * Un auteur n'écrit jamais cela ; c'est ce qui distingue le pack retouché du pack livré.
+ */
+export function isBandCustomPos(screen: PupScreen): boolean {
+  const r = screen.rect;
+  return Boolean(r && screen.parent === screen.num && r.x === 0 && r.w === 100 && (r.y < 0 || r.h > 100));
+}
+
+/**
+ * screens.pup où la dernière ligne de l'écran `num` reçoit le CustomPos `customPos` ; les autres
+ * lignes et colonnes, les fins de ligne et les octets (lus en latin1) restent tels quels.
+ */
+export function relocateScreen(text: string, num: number, customPos: string): string {
+  const lines = text.split(/(?<=\n)/);
+  let index = -1;
+  lines.forEach((line, i) => {
+    if (i === 0) return;
+    const parts = parseCsvLine(line.replace(/\r?\n$/, ''));
+    if (parts.length === 8 && Number.parseInt(parts[0]!, 10) === num) index = i;
+  });
+  if (index < 0) return text;
+  const line = lines[index]!;
+  const eol = /\r?\n$/.exec(line)?.[0] ?? '';
+  const body = line.slice(0, line.length - eol.length);
+  // Début de la 8e colonne : après la 7e virgule hors guillemets.
+  let commas = 0;
+  let quoted = false;
+  let start = -1;
+  for (let i = 0; i < body.length; i++) {
+    const c = body[i]!;
+    if (c === '"') quoted = !quoted;
+    else if (c === ',' && !quoted && ++commas === 7) {
+      start = i + 1;
+      break;
+    }
+  }
+  if (start < 0) return text;
+  lines[index] = `${body.slice(0, start)}"${customPos}"${eol}`;
+  return lines.join('');
+}
+
+/** CustomPos (8e colonne) de la dernière ligne de l'écran `num`, tel qu'écrit ; undefined sans ligne. */
+export function screenCustomPos(text: string, num: number): string | undefined {
+  let found: string | undefined;
+  for (const line of text.split(/\r?\n/).slice(1)) {
+    const parts = parseCsvLine(line);
+    if (parts.length === 8 && Number.parseInt(parts[0]!, 10) === num) found = parts[7]!;
+  }
+  return found;
+}
+
+/**
+ * Deux screens.pup identiques, à un écran près dont Cyber Pinball a changé la place
+ * (isBandCustomPos dans `actual`) : l'option du pack reste reconnue après la retouche.
+ */
+export function sameScreensIgnoringBand(actual: string, expected: string): boolean {
+  const a = actual.split(/\r?\n/).filter((l) => l.trim());
+  const b = expected.split(/\r?\n/).filter((l) => l.trim());
+  if (a.length !== b.length) return false;
+  return a.every((line, i) => {
+    if (line === b[i]) return true;
+    const pa = parseCsvLine(line);
+    const pb = parseCsvLine(b[i]!);
+    if (pa.length !== 8 || pb.length !== 8 || pa.slice(0, 7).join('\u0000') !== pb.slice(0, 7).join('\u0000')) return false;
+    const [screen] = parseScreens(`h\n${line}`);
+    return Boolean(screen && isBandCustomPos(screen));
+  });
 }
 
 /** Rôle de la borne où le plugin dessine un écran PuP ; null : jamais affiché (Playfield). */
@@ -1252,7 +1391,7 @@ export function variantDifferences(root: string, variant: Pick<PupVariant, 'copi
     if (isPreviewImage(c.to)) continue;
     const pup = c.to.toLowerCase().endsWith('.pup');
     const dest = resolveInside(root, c.to);
-    const same = dest !== undefined && sameFile(path.join(root, c.from), path.join(root, dest));
+    const same = dest !== undefined && (sameFile(path.join(root, c.from), path.join(root, dest)) || sameScreensFile(path.join(root, dest), path.join(root, c.from)));
     if (!same) found.push({ text: dest === undefined ? t('{file} absent', { file: c.to }) : t('{file} différent de celui de l’option', { file: c.to }), pup });
     if (found.length >= limit) return found;
   }
@@ -1262,6 +1401,16 @@ export function variantDifferences(root: string, variant: Pick<PupVariant, 'copi
     if (found.length >= limit) return found;
   }
   return found;
+}
+
+/** screens.pup en place identique à celui de l'option, à la place du PuP-DMD près (sameScreensIgnoringBand). */
+function sameScreensFile(actual: string, expected: string): boolean {
+  if (path.basename(actual).toLowerCase() !== 'screens.pup') return false;
+  try {
+    return sameScreensIgnoringBand(fs.readFileSync(actual, 'latin1'), fs.readFileSync(expected, 'latin1'));
+  } catch {
+    return false;
+  }
 }
 
 function sameFile(a: string, b: string): boolean {

@@ -1451,6 +1451,15 @@ Une installation de PinUP Popper (ou de PinballX) sur ce PC ou un disque branch�
 | 771 | PuP-Pack choisi en dossier, depuis les parties du jeu | Fiche d'une table sans PuP-Pack > « Parties du jeu » > « PuP-Pack » > « Chercher un fichier ou un dossier… » ; aller dans `PinUPSystemPUPVideos<pack>` ; « Prendre ce dossier entier ». | Le plan d'ajout, ciblé sur cette table, installe le pack dans son `pupvideos`. |
 | 772 | PUPVideos entier | Même chemin, mais « Prendre ce dossier entier » sur `PUPVideos` lui-même. | Le pack au nom que la table attend est pris seul ; sans nom qui convienne, « PuP-Pack : lequel ? » liste les packs, et Start sur l'un n'installe que lui. |
 
+## Score d'un PuP-Pack posé dans le fronton
+
+Une table dont le PuP-Pack est fait pour un seul grand écran 16:9 : le score dans le bas du fronton, sous les vidéos (City Hunter, Original 2025).
+
+| # | Scénario | Comment | Résultat attendu |
+|---|---|---|---|
+| 773 | Borne avec un écran DMD | Installer City Hunter (ou garder celle déjà installée), lancer une partie, appuyer sur Start. | Le score, les crédits et la bille en cours s'affichent sur l'écran DMD, à l'échelle de la fenêtre ; le fronton garde ses six vidéos et son décor, sans score en bas. Médecin de la table : rien à signaler sur le PuP-Pack. |
+| 774 | Borne sans écran DMD | Sur une configuration sans écran DMD, lancer la même table. | Le score revient en bas du fronton, comme l'auteur l'a prévu (`screens.pup` remis tel que livré). |
+
 ## Ce qui ne peut pas encore être testé
 
 - Le comportement réel de VPX avec le fichier généré : il faut VPX 10.8.1 installé (jalon 2).

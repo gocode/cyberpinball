@@ -50,6 +50,12 @@ import {
   pupSwitchesToEnable,
   pupWindows,
   usesPinmameCode,
+  dmdInBackglass,
+  isBandCustomPos,
+  parseScreens,
+  relocateScreen,
+  screenCustomPos,
+  type PupPackInfo,
   type PupLoader,
   playlistRenames,
   screenRole,
@@ -121,6 +127,8 @@ export const FINDING_CODES = [
   'pupOptionMismatch',
   'pupDisabledByScript',
   'pupHidesDmd',
+  'pupDmdInBackglass',
+  'pupDmdBackToBackglass',
   'pupPlaylistOrder',
   'pupFileNames',
   'pupFilesMissing',
@@ -240,6 +248,11 @@ export interface PupMemory {
   origin?: string;
   /** L'option a été choisie dans la fiche (« PuP-Pack ») : le médecin ne propose plus d'en changer. */
   chosen?: 'user';
+  /**
+   * PuP-DMD ramené du fronton dans la fenêtre du DMD (pupDmdInBackglass) : l'écran et son
+   * CustomPos d'origine, remis si la borne n'a plus d'écran DMD (pupDmdBackToBackglass).
+   */
+  dmd?: { screen: number; customPos: string };
 }
 
 export function pupMemory(info: { [key: string]: unknown }, pack: string): PupMemory | undefined {
@@ -747,6 +760,74 @@ function pupHidesDmdFinding(tableFile: string, pack: string): Finding | undefine
   };
 }
 
+/**
+ * Le score d'un PuP-DMD posé dans le fronton (dmdInBackglass) passe dans la fenêtre du DMD de la
+ * borne : son écran reçoit un CustomPos qui y pose la bande du fronton où l'auteur l'a mis. Il
+ * faut que le script écrive le score sur le pack (LabelNew), qu'aucune option du pack ne le mette
+ * déjà sur le DMD (le choix d'option s'en charge), et que la borne ait un écran DMD. L'inverse
+ * quand la borne n'en a plus : le CustomPos d'origine, retenu dans le .info, est remis.
+ */
+function pupDmdPlaceFinding(
+  entry: TableEntry,
+  pack: string,
+  info: PupPackInfo,
+  memory: PupMemory | undefined,
+  cabinet: PupCabinet | undefined,
+  facts: ScriptFacts | undefined,
+): Finding | undefined {
+  const file = info.pupFiles.find((f) => f.toLowerCase() === 'screens.pup');
+  if (!cabinet || !file) return undefined;
+  const screensPath = path.join(info.root, file);
+  let text: string;
+  try {
+    text = fs.readFileSync(screensPath, 'latin1');
+  } catch {
+    return undefined;
+  }
+  const hasInfo = fs.existsSync(entry.infoFile);
+  if (cabinet.dmd === false) {
+    const kept = memory?.dmd;
+    const screen = kept && parseScreens(text).filter((s) => s.num === kept.screen).pop();
+    if (!kept || !screen || !isBandCustomPos(screen)) return undefined;
+    const { dmd: _dmd, ...rest } = memory!;
+    return {
+      code: 'pupDmdBackToBackglass',
+      severity: 'warning',
+      title: t('Score du PuP-Pack à remettre dans le fronton'),
+      detail: t('Le score de pupvideos\\{pack} avait été placé sur l’écran DMD ; la borne n’en a plus : il retourne en bas du fronton, comme l’auteur l’a prévu.', { pack }),
+      fix: {
+        label: t('Remettre le score dans le fronton'),
+        ops: [
+          { op: 'write', path: screensPath, content: relocateScreen(text, kept.screen, kept.customPos), encoding: 'latin1' },
+          ...(hasInfo ? [{ op: 'write' as const, path: entry.infoFile, content: withPupMemory(entry.info, pack, rest) }] : []),
+        ],
+      },
+    };
+  }
+  if (!cabinet.dmd || !facts?.pup?.labels) return undefined;
+  if (info.variants.some((v) => v.traits.windows?.dmd)) return undefined;
+  const found = dmdInBackglass(parseScreens(text));
+  const original = found && screenCustomPos(text, found.screen);
+  if (!found || original === undefined) return undefined;
+  const params = { pack, screen: found.screen, top: Math.round(found.band.top), bottom: Math.round(found.band.bottom) };
+  return {
+    code: 'pupDmdInBackglass',
+    severity: 'warning',
+    title: t('Score du PuP-Pack dans le fronton, écran DMD vide'),
+    detail: t(
+      'pupvideos\\{pack} pose son écran DMD ({screen}), où le script écrit le score, dans le fronton : il est fait pour un seul grand écran. La fenêtre du DMD de la borne resterait vide. Le score y passe (bande de {top} à {bottom} % de l’écran {screen}) ; le reste du pack garde le fronton.',
+      params,
+    ),
+    fix: {
+      label: t('Afficher le score sur l’écran DMD'),
+      ops: [
+        { op: 'write', path: screensPath, content: relocateScreen(text, found.screen, found.customPos), encoding: 'latin1' },
+        ...(hasInfo ? [{ op: 'write' as const, path: entry.infoFile, content: withPupMemory(entry.info, pack, { ...(memory ?? {}), dmd: { screen: found.screen, customPos: original } }) }] : []),
+      ],
+    },
+  };
+}
+
 /** Fichiers d'un pack renommés pour que le plugin PUP commence ses playlists comme PinUP Player (playlistRenames). */
 function playlistOrderFinding(pack: string, root: string, renames: PlaylistRename[]): Finding {
   const first = renames[0]!;
@@ -931,7 +1012,7 @@ export function repairScriptAfterStop(entry: TableEntry, ctx: DoctorContext, ops
  * 25 octobre 2026 : partie jouée sans le .vbs qui allume le pack), et une table que le core.vbs
  * arrête ne démarre pas (Back to the Future, 30 octobre 2026 : vpmInit appelé deux fois).
  */
-export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['scriptCoreCompat', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupPlaylistOrder', 'pupFileNames'];
+export const PUP_PLAY_REPAIRS: readonly Finding['code'][] = ['scriptCoreCompat', 'pupNested', 'pupMissing', 'scriptPatchStale', 'pupDisabledByScript', 'pupNotLoaded', 'pupCaptureUnseen', 'pupOptionNotApplied', 'pupOptionUnsuited', 'pupOptionMismatch', 'pupHidesDmd', 'pupDmdInBackglass', 'pupDmdBackToBackglass', 'pupPlaylistOrder', 'pupFileNames'];
 
 /**
  * Constats réparables de PUP_PLAY_REPAIRS pour cette table. Sans script connu (cache
@@ -1366,6 +1447,13 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
     // Pack dans la fenêtre du DMD d'une table qui dessine son propre DMD : le score disparaîtrait.
     if (!nested.has(pack) && !off && facts?.drawsDmd && !facts.pup?.labels && ctx.cabinet?.dmd && info.screens.length && pupWindows(info.screens).dmd) {
       const finding = pupHidesDmdFinding(entry.file, pack);
+      if (finding) findings.push(finding);
+    }
+
+    // PuP-DMD posé dans le fronton (pack fait pour un seul écran 16:9) : sur une borne qui a un
+    // écran DMD, le score passe dans la fenêtre du DMD ; remis dans le fronton si elle n'en a plus.
+    if (!nested.has(pack) && !off) {
+      const finding = pupDmdPlaceFinding(entry, pack, info, memory, ctx.cabinet, facts);
       if (finding) findings.push(finding);
     }
 
