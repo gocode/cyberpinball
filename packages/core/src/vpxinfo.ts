@@ -310,8 +310,7 @@ const MAX_IMAGE_BYTES = 60 * 1024 * 1024;
 const MAX_PER_KIND = 3;
 
 /**
- * Images utiles au menu, rangées dans la table par son auteur
- * (docs/recherche/sources-medias.md § 2.4) :
+ * Images utiles au menu, rangées dans la table par son auteur :
  * - l'image du plateau désignée par IMAG, vue de dessus à plat, sauf les atlas du
  *   Visual Light Mapper (« VLM. », « Nestmap », image carrée) ;
  * - la carte de règles désignée par `![…](nom)` dans TableRules, sinon une image au nom

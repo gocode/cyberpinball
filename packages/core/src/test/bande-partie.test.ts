@@ -3,7 +3,7 @@
 // qu'un autre écran la porte : sur le DMD de temps à autre (points posés à sa place, le DMD de VPX
 // ne s'écrivant pas de l'extérieur), en cartes sur un écran que VPX laisse libre (fronton sans
 // .directb2s, topper), et seulement sans l'un ni l'autre en encart au bas du plateau, coin gauche
-// pour le joueur. Vérifié sur les écrans simulés de docs\ecrans (borne, poste à deux écrans, un
+// pour le joueur. Vérifié sur les écrans simulés de packages\core\ecrans-simules (borne, poste à deux écrans, un
 // écran), dans les quatre sens du plateau, de un à quatre joueurs : rien hors de son écran, rien
 // sur le DMD, jamais sur le plateau quand un autre écran peut la porter.
 
@@ -43,7 +43,7 @@ const ROTATIONS: Rotation[] = [0, 90, 180, 270];
 const inside = (r: Rect, z: Rect) => r.x >= z.x && r.y >= z.y && r.x + r.width <= z.x + z.width && r.y + r.height <= z.y + z.height;
 const overlap = (a: Rect, b: Rect) => a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
 
-/** Les rôles des écrans simulés, comme docs\demo-medias.cjs (modele) les pose : indices dans le fichier, DMD en bande sous le fronton au poste. */
+/** Les rôles des écrans simulés, comme interne\demos\demo-medias.cjs (modele) les pose : indices dans le fichier, DMD en bande sous le fronton au poste. */
 const LAYOUTS: Record<string, { roles: Partial<Record<RoleId, number>>; dmdUnderBackglass?: boolean }> = {
   borne: { roles: { playfield: 0, backglass: 1, dmd: 2, topper: 3 } },
   'poste-deux-ecrans': { roles: { playfield: 2, backglass: 0, dmd: 0 }, dmdUnderBackglass: true },
@@ -53,7 +53,7 @@ const LAYOUTS: Record<string, { roles: Partial<Record<RoleId, number>>; dmdUnder
 };
 
 function roleRects(name: string): Partial<Record<RoleId, Rect>> {
-  const raw = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'docs', 'ecrans', `${name}.json`), 'utf8').replace(/^﻿/, ''));
+  const raw = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'packages', 'core', 'ecrans-simules', `${name}.json`), 'utf8').replace(/^﻿/, ''));
   const displays = parseSimulatedDisplays(raw, name);
   const layout = LAYOUTS[name]!;
   const rects: Partial<Record<RoleId, Rect>> = {};

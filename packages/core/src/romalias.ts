@@ -1,4 +1,4 @@
-// Alias de ROM propres à une table (docs/recherche/acquisition.md § 7.4 et § 8.2) :
+// Alias de ROM propres à une table :
 // le plugin PinMAME de VPX 10.8.1 lit alias.txt dans le dossier PinMAME de la table
 // (<table>\pinmame, dès que <table>\pinmame\roms existe), une ligne « alias,jeu réel »,
 // sans casse, avant même la liste des jeux. Deux usages :

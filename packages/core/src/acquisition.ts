@@ -1,5 +1,4 @@
-// Acquisition de nouvelles tables et de ce qu'elles demandent (docs/recherche/acquisition.md,
-// étapes A3 à A7) : catalogue de la base VPS, version conseillée, liste de ce qu'il faut
+// Acquisition de nouvelles tables et de ce qu'elles demandent : catalogue de la base VPS, version conseillée, liste de ce qu'il faut
 // pour une borne (table, fronton, ROM, PuP-Pack…), liste d'attente de ce que
 // l'utilisateur récupère, rattachement d'un fichier téléchargé à ce qu'il attendait,
 // provenance notée dans le .info et mises à jour disponibles.

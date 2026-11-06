@@ -10,7 +10,6 @@
 // Variant (DynamicScript.cpp l. 631-690). Cyber Pinball ajoute au .vbs une Sub qui refait la
 // reconnaissance de libpupdmd (DMD::Load, DMD::MatchIndexed) sur cette image, à chaque tour du
 // minuteur d'images de la table, et envoie B2SData "D<n>", 1 puis 0 comme le plugin.
-// Recherche : docs/recherche/pupcapture-flexdmd.md.
 
 import { createHash } from 'node:crypto';
 import * as fs from 'node:fs';

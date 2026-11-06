@@ -1,5 +1,5 @@
-// Le téléphone comme télécommande de la borne (docs/recherche/telecommande-telephone.md). Premier
-// jalon : le navigateur intégré « Récupérer » ; deuxième (06/11/2026) : tout le menu, ses boutons,
+// Le téléphone comme télécommande de la borne. Premier
+// jalon : le navigateur intégré « Récupérer » ; deuxième : tout le menu, ses boutons,
 // son clavier à l'écran, et l'envoi d'un fichier vers le dossier d'import. Une borne n'a souvent ni clavier ni souris, alors
 // que les sites communautaires demandent de s'y connecter et d'y cliquer. Le bandeau du
 // navigateur montre un QR code ; le téléphone ouvre la page que sert la borne sur le réseau local
@@ -329,14 +329,17 @@ export type PhoneMessage =
   | { t: 'click'; s: number; button: 'left' | 'right'; count: 1 | 2 }
   | { t: 'scroll'; s: number; dx: number; dy: number }
   | { t: 'text'; s: number; del: number; ins: string }
+  /**
+   * Tout le texte d'un champ, tapé au téléphone : au menu, celui du clavier à l'écran (une ligne) ;
+   * dans le navigateur, celui d'un champ de la page repris au téléphone (saut de ligne permis d'une zone de texte).
+   */
+  | { t: 'set'; s: number; value: string }
   | { t: 'key'; s: number; key: RemoteKey; shift?: boolean }
   | { t: 'nav'; s: number; action: RemoteNav }
   | { t: 'act'; s: number; id: string }
-  | { t: 'search'; s: number; query: string }
+  | { t: 'search'; s: number; query: string; engine?: string }
   /** Au menu : un bouton de la borne appuyé ou relâché. */
   | { t: 'btn'; s: number; b: RemoteButton; down: boolean }
-  /** Au menu : tout le texte du clavier à l'écran, tapé au téléphone. */
-  | { t: 'set'; s: number; value: string }
   /** Envoi d'un fichier : son nom (nettoyé à la borne) et sa taille ; puis les morceaux en HTTP. */
   | { t: 'up'; s: number; name: string; size: number }
   | { t: 'up-cancel'; s: number }
@@ -366,6 +369,11 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
       const clean = ins.replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, '');
       return del || clean ? { t: 'text', s, del, ins: clean } : undefined;
     }
+    case 'set': {
+      if (typeof m.value !== 'string' || [...m.value].length > REMOTE_TEXT_MAX) return undefined;
+      // Caractères de contrôle en espaces, sauf le saut de ligne (zone de texte d'une page) : le menu, lui, n'en garde aucun (phone-remote.ts).
+      return { t: 'set', s, value: m.value.replace(/[\u0000-\u0009\u000b-\u001f\u007f]/g, ' ') };
+    }
     case 'key':
       return KEYS.includes(m.key as RemoteKey) ? { t: 'key', s, key: m.key as RemoteKey, ...(m.shift === true ? { shift: true } : {}) } : undefined;
     case 'nav':
@@ -373,14 +381,11 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
     case 'act':
       return typeof m.id === 'string' && /^[a-z0-9:-]{1,40}$/.test(m.id) ? { t: 'act', s, id: m.id } : undefined;
     case 'search':
-      return typeof m.query === 'string' && m.query.trim() && m.query.length <= 300 ? { t: 'search', s, query: m.query.replace(/[\u0000-\u001f\u007f]/g, ' ') } : undefined;
+      if (typeof m.query !== 'string' || !m.query.trim() || m.query.length > 300) return undefined;
+      // Le moteur (Web, Images, YouTube, Vidéo) : un identifiant court, vérifié ensuite par la fenêtre « Récupérer ».
+      return { t: 'search', s, query: m.query.replace(/[\u0000-\u001f\u007f]/g, ' '), ...(typeof m.engine === 'string' && /^[a-z]{1,16}$/.test(m.engine) ? { engine: m.engine } : {}) };
     case 'btn':
       return REMOTE_BUTTONS.includes(m.b as RemoteButton) && typeof m.down === 'boolean' ? { t: 'btn', s, b: m.b as RemoteButton, down: m.down } : undefined;
-    case 'set': {
-      if (typeof m.value !== 'string' || [...m.value].length > REMOTE_TEXT_MAX) return undefined;
-      // Une ligne : ni saut de ligne ni caractère de contrôle dans un nom ou une recherche.
-      return { t: 'set', s, value: m.value.replace(/[\u0000-\u001f\u007f]/g, ' ') };
-    }
     case 'up':
       // La taille est lue telle quelle : trop grande, la borne répond pourquoi (plutôt que couper la liaison).
       return typeof m.name === 'string' && m.name.length <= 1024 && typeof m.size === 'number' && Number.isSafeInteger(m.size) && m.size >= 0 ? { t: 'up', s, name: m.name, size: m.size } : undefined;
@@ -404,12 +409,28 @@ export function parsePhoneMessage(raw: unknown): PhoneMessage | undefined {
  * environ 350 px de large : lentement, un glissé d'un bord à l'autre traverse un tiers de l'écran
  * (on vise un lien) ; vite, il le traverse en entier (on va à l'autre bout). Rien ne sort de la page.
  */
-export function movePointer(at: { x: number; y: number }, gesture: { dx: number; dy: number; ms: number }, area: { width: number; height: number }): { x: number; y: number } {
+export function movePointer(at: { x: number; y: number }, gesture: { dx: number; dy: number; ms: number; speed?: number }, area: { width: number; height: number }): { x: number; y: number } {
   const base = Math.max(area.width, area.height) / 1100;
-  const speed = Math.hypot(gesture.dx, gesture.dy) / Math.max(gesture.ms, 8);
+  const speed = gesture.speed ?? gestureSpeed(gesture);
   const gain = base * (0.9 + Math.min(2.6, Math.max(0, speed - 0.15) * 1.6));
   const clamp = (v: number, max: number) => Math.min(Math.max(0, max - 1), Math.max(0, v));
   return { x: clamp(at.x + gesture.dx * gain, area.width), y: clamp(at.y + gesture.dy * gain, area.height) };
+}
+
+/** Vitesse d'un geste du pavé, en pixels du téléphone par milliseconde. */
+export function gestureSpeed(gesture: { dx: number; dy: number; ms: number }): number {
+  return Math.hypot(gesture.dx, gesture.dy) / Math.max(gesture.ms, 8);
+}
+
+/**
+ * Vitesse lissée sur les derniers gestes : celle d'un seul geste varie d'une image à l'autre
+ * (le Wi-Fi livre les gestes par paquets, le temps mesuré entre deux est irrégulier), et
+ * l'accélération faisait avancer le pointeur par à-coups (essai réel du 06/11/2026). Après une
+ * pause (`gapMs` sans geste, plus de 120 ms), on repart de la vitesse du geste.
+ */
+export function smoothSpeed(previous: number | undefined, gesture: { dx: number; dy: number; ms: number }, gapMs: number): number {
+  const now = gestureSpeed(gesture);
+  return previous === undefined || gapMs > 120 ? now : previous * 0.6 + now * 0.4;
 }
 
 /**
@@ -433,12 +454,20 @@ export interface RemoteField {
   label: string;
   /** Son cadre a le focus de la fenêtre (document.hasFocus) : il l'emporte sur un champ resté actif ailleurs. */
   focused?: boolean;
+  /**
+   * Le texte du champ, repris au téléphone pour y être modifié ; absent pour un mot de passe, un
+   * champ de carte ou de code à usage unique, une zone riche (contentEditable) ou un texte de plus
+   * de REMOTE_TEXT_MAX caractères : le téléphone part alors d'un champ vide et tape à la suite.
+   */
+  value?: string;
 }
 
 /**
  * Sonde lancée dans chaque cadre de la page (executeJavaScript) : le champ de saisie qui a le
- * clavier, s'il y en a un, dans ce cadre. Elle ne lit jamais la valeur du champ (un mot de passe) :
- * seulement sa nature et son libellé.
+ * clavier, s'il y en a un, dans ce cadre : sa nature, son libellé, et son texte pour qu'on le
+ * modifie au téléphone (essai réel du 06/11/2026 : un champ rempli y arrivait vide). Jamais le
+ * texte d'un mot de passe, ni d'un champ que le site marque comme secret (carte, code à usage
+ * unique, mot de passe affiché en clair), ni d'une zone riche (contentEditable).
  */
 export const REMOTE_FOCUS_PROBE = `(() => {
   let e = document.activeElement;
@@ -456,7 +485,10 @@ export const REMOTE_FOCUS_PROBE = `(() => {
   const byFor = e.id ? document.querySelector('label[for="' + CSS.escape(e.id) + '"]') : null;
   const near = byFor || e.closest('label');
   const label = (e.getAttribute('aria-label') || (near && near.textContent) || e.getAttribute('placeholder') || e.getAttribute('title') || e.getAttribute('name') || '').replace(/\\s+/g, ' ').trim().slice(0, 60);
-  return { kind, label, focused: document.hasFocus() };
+  const auto = (e.getAttribute('autocomplete') || '').toLowerCase();
+  const secret = kind === 'password' || /(^|\\s)(cc-|one-time-code|current-password|new-password)/.test(auto);
+  const text = !secret && !e.isContentEditable && typeof e.value === 'string' && Array.from(e.value).length <= ${REMOTE_TEXT_MAX} ? e.value : null;
+  return { kind, label, focused: document.hasFocus(), value: text };
 })()`;
 
 /** Lit le résultat de la sonde : undefined s'il n'y a pas de champ, ou si la page a répondu autre chose. */
@@ -465,7 +497,10 @@ export function readRemoteField(raw: unknown): RemoteField | undefined {
   const r = raw as Record<string, unknown>;
   const kinds: readonly RemoteFieldKind[] = ['text', 'password', 'email', 'number', 'tel', 'url', 'search', 'multiline'];
   if (!kinds.includes(r.kind as RemoteFieldKind)) return undefined;
-  return { kind: r.kind as RemoteFieldKind, label: typeof r.label === 'string' ? r.label.replace(/[\u0000-\u001f]/g, ' ').slice(0, 60) : '', ...(r.focused === true ? { focused: true } : {}) };
+  const kind = r.kind as RemoteFieldKind;
+  // Jamais le texte d'un mot de passe, même si la page répondait autre chose.
+  const value = kind !== 'password' && typeof r.value === 'string' && [...r.value].length <= REMOTE_TEXT_MAX ? r.value : undefined;
+  return { kind, label: typeof r.label === 'string' ? r.label.replace(/[\u0000-\u001f]/g, ' ').slice(0, 60) : '', ...(r.focused === true ? { focused: true } : {}), ...(value !== undefined ? { value } : {}) };
 }
 
 

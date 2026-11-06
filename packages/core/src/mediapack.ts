@@ -1,7 +1,7 @@
 // Paquet de médias : les médias choisis d'une ou de plusieurs tables, dans un .zip ordinaire
 // que l'Explorateur ouvre, avec un manifeste signé par la clé du joueur. Il s'échange sans
 // réseau (clé USB, forum, Discord) et sera l'unité d'échange entre bornes si un réseau pair à
-// pair est retenu. Conception : docs/recherche/partage-medias.md, § 5 et § 10.
+// pair est retenu.
 //
 // Rangement dans le zip : « <Titre (Fabricant Année)>/(Type) <Titre (Fabricant Année)>.ext »,
 // le nommage des médias de VPX, et à la racine cyberpinball-medias.json : une enveloppe

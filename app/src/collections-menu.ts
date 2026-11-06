@@ -22,7 +22,7 @@ import {
   type TableEntry,
 } from '@cyberpinball/core';
 
-/** Durée de la liste des collections après le dernier MagnaSave, puis son fondu (revue de Codex, 06/11/2026). */
+/** Durée de la liste des collections après le dernier MagnaSave, puis son fondu. */
 export const COLLECTIONS_PANEL_MS = 4000;
 const PANEL_FADE_MS = 160;
 /** Les amis en ligne et leurs tables ne se recalculent pas à chaque rendu. */

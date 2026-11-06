@@ -1,7 +1,6 @@
 // Menu système > Cyber Pinball > « Sauvegardes » : une copie de la borne sur une clé USB ou un
 // disque, à trois niveaux (réglages et scores, avec les tables, toute l'installation), et sa
 // restauration, sur cette borne ou sur une autre, avec le plan avant d'écrire (backup.ts du cœur).
-// Maquette revue par Codex : docs/recherche/maquettes/sauvegardes.cjs.
 //
 // Règles de l'écran : le focus de départ n'est jamais sur une action qui écrit (niveau, plan,
 // identité d'une autre borne) ; une action indisponible reste visible, grisée avec sa raison ; une

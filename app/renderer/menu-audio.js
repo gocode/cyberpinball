@@ -1,4 +1,4 @@
-// Son du menu (tâche T5, docs/recherche/medias.md § 5.2) : musique du jeu choisi (Audio)
+// Son du menu : musique du jeu choisi (Audio)
 // en boucle, son de lancement (AudioLaunch) joué une fois, et volume du son de la vidéo
 // du playfield, sur la sortie audio du fronton (setSinkId). Seule la fenêtre du playfield
 // joue. Le processus principal décide quoi jouer et à quel volume (menuSound,

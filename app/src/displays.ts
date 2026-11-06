@@ -16,7 +16,7 @@ import { locations } from './paths';
 
 /**
  * Écrans de la borne. CYBERPINBALL_DISPLAYS (fichier JSON, même forme que probeDisplays,
- * EDID compris ; jeux versionnés dans docs\ecrans) les remplace : un essai rejoue ainsi
+ * EDID compris ; jeux versionnés dans packages\core\ecrans-simules) les remplace : un essai rejoue ainsi
  * une borne qui n'est pas celle du poste, quels que soient ses écrans du moment. Quand
  * l'orientation est simulée, chaque écran prend celle que la session lui a donnée.
  */

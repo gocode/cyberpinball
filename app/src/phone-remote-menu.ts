@@ -21,7 +21,7 @@ export interface RemoteBlock {
 
 /**
  * Textes du bloc, sur l'écran de la télécommande (`screen`) ou sous le clavier à l'écran
- * (`keyboard`) : textes revus par Codex le 06/11/2026 (docs/Design/telecommande-menu).
+ * (`keyboard`).
  */
 export function remoteBlock(bar: RemoteBar, place: 'screen' | 'keyboard'): RemoteBlock {
   const big = place === 'screen';

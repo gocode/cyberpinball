@@ -70,18 +70,18 @@ export function display(
   };
 }
 
-const SAM: EdidInfo = { manufacturer: 'SAM', productCode: 0x0c8d, serialNumber: 0, serialText: 'H4LN301501', monitorName: 'S22E450', widthCm: 48, heightCm: 27 };
-const IVM: EdidInfo = { manufacturer: 'IVM', productCode: 0x564c, serialNumber: 0, serialText: '1206923502001', monitorName: 'PLX2283HSU', widthCm: 48, heightCm: 26 };
-const PHL: EdidInfo = { manufacturer: 'PHL', productCode: 0xc032, serialNumber: 0, serialText: 'AU40939005076', monitorName: 'Philips 192E', widthCm: 41, heightCm: 23 };
+const SAM: EdidInfo = { manufacturer: 'SAM', productCode: 0x0c8d, serialNumber: 0, serialText: 'H0XX000001', monitorName: 'S22E450', widthCm: 48, heightCm: 27 };
+const IVM: EdidInfo = { manufacturer: 'IVM', productCode: 0x564c, serialNumber: 0, serialText: '1200000000001', monitorName: 'PLX2283HSU', widthCm: 48, heightCm: 26 };
+const PHL: EdidInfo = { manufacturer: 'PHL', productCode: 0xc032, serialNumber: 0, serialText: 'AU00000000001', monitorName: 'Philips 192E', widthCm: 41, heightCm: 23 };
 const AUO: EdidInfo = { manufacturer: 'AUO', productCode: 0x139d, serialNumber: 0, widthCm: 38, heightCm: 21 };
 
 /** Les quatre écrans du PC de développement, tels que relevés le 19 octobre 2026. */
 export function devPcDisplays(): ObservedDisplay[] {
   return [
-    display('\\\\.\\DISPLAY14', 'S22E450', { x: -1920, y: 0, width: 1920, height: 1080 }, SAM, '8&20834467&0&UID257'),
-    display('\\\\.\\DISPLAY1', '', { x: 0, y: 0, width: 1920, height: 1080 }, AUO, '5&253a7f23&0&UID4357'),
-    display('\\\\.\\DISPLAY12', 'Philips 192E', { x: 288, y: -768, width: 1366, height: 768 }, PHL, '7&4b6b2ff&0&UID256'),
-    display('\\\\.\\DISPLAY13', 'PLX2283HSU', { x: 1920, y: 0, width: 1920, height: 1080 }, IVM, '8&20834467&0&UID256'),
+    display('\\\\.\\DISPLAY14', 'S22E450', { x: -1920, y: 0, width: 1920, height: 1080 }, SAM, '8&1f2e3d4c&0&UID257'),
+    display('\\\\.\\DISPLAY1', '', { x: 0, y: 0, width: 1920, height: 1080 }, AUO, '5&5e6f7a8b&0&UID4357'),
+    display('\\\\.\\DISPLAY12', 'Philips 192E', { x: 288, y: -768, width: 1366, height: 768 }, PHL, '7&3c4d5e6&0&UID256'),
+    display('\\\\.\\DISPLAY13', 'PLX2283HSU', { x: 1920, y: 0, width: 1920, height: 1080 }, IVM, '8&1f2e3d4c&0&UID256'),
   ];
 }
 
@@ -98,7 +98,7 @@ const BNQ: EdidInfo = { manufacturer: 'BNQ', productCode: 0x7f53, serialNumber: 
  */
 export function secondDeskDisplays(): ObservedDisplay[] {
   return [
-    display('\\.\DISPLAY1', '', { x: 0, y: 0, width: 1920, height: 1080 }, AUO, '5&253a7f23&0&UID4357'),
+    display('\\.\DISPLAY1', '', { x: 0, y: 0, width: 1920, height: 1080 }, AUO, '5&5e6f7a8b&0&UID4357'),
     display('\\.\DISPLAY5', 'DELL P2422H', { x: 1920, y: 0, width: 1920, height: 1080 }, DEL, '8&1a2b3c4d&0&UID260'),
     display('\\.\DISPLAY6', 'BenQ GW2480', { x: 3840, y: 0, width: 1920, height: 1080 }, BNQ, '8&1a2b3c4d&0&UID261'),
   ];

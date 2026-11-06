@@ -1,5 +1,4 @@
-// Gestionnaire des médias d'un jeu (écran « Médias » de la fiche, tâche T8 de
-// docs/recherche/medias.md) : où chaque média s'affiche, ce qui est montré
+// Gestionnaire des médias d'un jeu (écran « Médias » de la fiche) : où chaque média s'affiche, ce qui est montré
 // aujourd'hui, et le plan des changements demandés. Rien n'est écrit avant que
 // l'utilisateur ait validé le plan ; ce qui est remplacé ou retiré part à la
 // corbeille (applyOps).

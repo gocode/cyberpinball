@@ -7,12 +7,13 @@ import { test } from 'node:test';
 import { fingerprintOf } from '../fingerprint';
 import { offscreenMode, parseSimulatedDisplays, realScreensRefusal } from '../offscreen';
 import { devPcDisplays } from './fixtures';
+import { DEMOS, internalFiles } from './interne';
 
 // Mode hors écran des essais sans opérateur : les fenêtres ne doivent jamais apparaître
-// sur les écrans du poste, et les écrans de la borne peuvent être simulés (docs\ecrans).
+// sur les écrans du poste, et les écrans de la borne peuvent être simulés (packages\core\ecrans-simules).
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 const SOURCES = path.join(REPO, 'app', 'src');
-const SCREENS = path.join(REPO, 'docs', 'ecrans');
+const SCREENS = path.join(REPO, 'packages', 'core', 'ecrans-simules');
 
 const screens = (name: string) => parseSimulatedDisplays(JSON.parse(fs.readFileSync(path.join(SCREENS, `${name}.json`), 'utf8')), name);
 
@@ -27,7 +28,7 @@ test('hors écran : imposé, automatique sans opérateur, sauf CYBERPINBALL_A_L_
   assert.match(realScreensRefusal('Le test d’endurance'), /^Le test d’endurance nécessite les écrans du poste.*CYBERPINBALL_A_L_ECRAN=1/);
 });
 
-test('les jeux d’écrans de docs\\ecrans sont valides', () => {
+test('les jeux d’écrans de packages\\core\\ecrans-simules sont valides', () => {
   const files = fs.readdirSync(SCREENS).filter((f) => f.endsWith('.json'));
   assert.deepEqual(files.sort(), ['borne.json', 'pc-dev.json', 'pincab.json', 'poste-deux-ecrans.json', 'un-ecran.json']);
   for (const f of files) assert.ok(screens(f.replace('.json', '')).length >= 1, f);
@@ -84,17 +85,14 @@ function offenders(pattern: RegExp, allowed: string): string[] {
 }
 
 /**
- * Les démonstrations hors écran (docs\demo-*.cjs) créent la bibliothèque avec un hôte factice :
+ * Les démonstrations hors écran (interne\demos\demo-*.cjs) créent la bibliothèque avec un hôte factice :
  * sans mode invité (host.guest, obligatoire depuis guestmode.ts), elles s'arrêtaient au premier
  * écran (« Cannot read properties of undefined (reading 'knock') », 27/10/2026, treize d'entre elles).
  */
 test('toute démonstration qui crée la bibliothèque lui donne un mode invité', () => {
-  const docs = path.join(REPO, 'docs');
-  const missing = fs
-    .readdirSync(docs)
-    .filter((f) => /^demo-.*\.cjs$/.test(f))
+  const missing = internalFiles(DEMOS, /^demo-.*\.cjs$/)
     .flatMap((f) => {
-      const text = fs.readFileSync(path.join(docs, f), 'utf8');
+      const text = fs.readFileSync(path.join(DEMOS, f), 'utf8');
       return [...text.matchAll(/createLibrary\(\{([\s\S]*?)\n\s*\}\);/g)].filter((m) => !/\bguest:/.test(m[1]!)).map(() => f);
     });
   assert.deepEqual(missing, [], 'ajouter guest: { active: false, allows: () => true, knock: () => true } à createLibrary');
@@ -183,7 +181,7 @@ test('à l’écran, une exception non rattrapée est journalisée et l’applic
 // même depuis le bureau caché. Les scripts lancent les outils en ligne de commande dans leur
 // propre console, et l'application avec windowsHide.
 test('scripts : aucune nouvelle console (Start-Process -NoNewWindow, sauf programme à fenêtres)', () => {
-  const scripts = [path.join(REPO, 'lanceur.ps1'), ...fs.readdirSync(path.join(REPO, 'docs')).filter((f) => f.endsWith('.ps1')).map((f) => path.join(REPO, 'docs', f))];
+  const scripts = [path.join(REPO, 'lanceur.ps1'), ...['scripts', 'interne/demos'].flatMap((dir) => internalFiles(path.join(REPO, dir), /\.ps1$/).map((f) => path.join(REPO, dir, f)))];
   const found = scripts.flatMap((file) =>
     fs
       .readFileSync(file, 'utf8')
@@ -217,7 +215,7 @@ test('application : tout outil en ligne de commande est lancé avec windowsHide'
 // Dans un worktree neuf, packages\*\dist n'existe pas encore : demo-mise-a-jour.ps1 s'arrêtait
 // sur un module introuvable avant d'avoir compilé quoi que ce soit.
 test('scripts : une démonstration qui lit le code compilé le compile d’abord', () => {
-  const scripts = [path.join(REPO, 'lanceur.ps1'), ...fs.readdirSync(path.join(REPO, 'docs')).filter((f) => f.endsWith('.ps1')).map((f) => path.join(REPO, 'docs', f))];
+  const scripts = [path.join(REPO, 'lanceur.ps1'), ...['scripts', 'interne/demos'].flatMap((dir) => internalFiles(path.join(REPO, dir), /\.ps1$/).map((f) => path.join(REPO, dir, f)))];
   const found = scripts.filter((file) => {
     const text = fs.readFileSync(file, 'utf8');
     return /[\\/]dist[\\/]/.test(text) && !/npm run build|Assert-Compile|tsc -b/.test(text);
@@ -228,7 +226,7 @@ test('scripts : une démonstration qui lit le code compilé le compile d’abord
 // Windows PowerShell 5.1 lit en ANSI un fichier UTF-8 sans BOM (ceux qu'écrit l'application) :
 // « Aucun problème » n'y correspondait plus à son motif, et demo-captures.ps1 échouait à tort.
 test('scripts : un fichier lu pour y chercher un texte accentué l’est en UTF-8', () => {
-  const scripts = [path.join(REPO, 'lanceur.ps1'), ...fs.readdirSync(path.join(REPO, 'docs')).filter((f) => f.endsWith('.ps1')).map((f) => path.join(REPO, 'docs', f))];
+  const scripts = [path.join(REPO, 'lanceur.ps1'), ...['scripts', 'interne/demos'].flatMap((dir) => internalFiles(path.join(REPO, dir), /\.ps1$/).map((f) => path.join(REPO, dir, f)))];
   const found = scripts.flatMap((file) =>
     fs
       .readFileSync(file, 'utf8')
@@ -243,7 +241,7 @@ test('scripts : un fichier lu pour y chercher un texte accentué l’est en UTF-
 // in $Ecrans) aussi : la variable de boucle est le paramètre, qui ne vaut plus ensuite que son
 // dernier élément (vu dans demo-alimentation.ps1 : le second scénario ne tournait que sur un jeu d'écrans).
 test('scripts : aucun paramètre réaffecté dans le corps du script, ni pris comme variable de boucle', () => {
-  const scripts = [path.join(REPO, 'lanceur.ps1'), ...fs.readdirSync(path.join(REPO, 'docs')).filter((f) => f.endsWith('.ps1')).map((f) => path.join(REPO, 'docs', f))];
+  const scripts = [path.join(REPO, 'lanceur.ps1'), ...['scripts', 'interne/demos'].flatMap((dir) => internalFiles(path.join(REPO, dir), /\.ps1$/).map((f) => path.join(REPO, dir, f)))];
   const found = scripts.flatMap((file) => {
     const text = fs.readFileSync(file, 'utf8');
     const block = /^param\(([\s\S]*?)^\)/m.exec(text) ?? /^param\((.*)\)$/m.exec(text);
@@ -259,9 +257,9 @@ test('scripts : aucun paramètre réaffecté dans le corps du script, ni pris co
 });
 
 test('chaque démonstration tourne sur le bureau caché, ou exige les écrans du poste', () => {
-  const demos = fs.readdirSync(path.join(REPO, 'docs')).filter((f) => /^demos?-.*\.ps1$/.test(f));
+  const demos = internalFiles(DEMOS, /^demos?-.*\.ps1$/);
   for (const f of demos) {
-    const text = fs.readFileSync(path.join(REPO, 'docs', f), 'utf8');
+    const text = fs.readFileSync(path.join(DEMOS, f), 'utf8');
     assert.ok(/Enter-BureauCache \$PSCommandPath \$PSBoundParameters/.test(text) || /Assert-EcransDuPoste/.test(text), `${f} : ni bureau caché ni Assert-EcransDuPoste`);
   }
 });

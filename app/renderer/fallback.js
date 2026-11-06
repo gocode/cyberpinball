@@ -1,5 +1,4 @@
-// Replis intégrés : l'habillage des écrans quand un jeu n'a pas ses médias
-// (docs/recherche/medias.md, § 5.1, colonne « Repli »). Chaque composant se dessine
+// Replis intégrés : l'habillage des écrans quand un jeu n'a pas ses médias. Chaque composant se dessine
 // dans un conteneur à partir du seul { title, manufacturer, year } : CSS, SVG et canvas,
 // avec les polices OFL de polices/ ; les afficheurs à points écrivent avec la police à
 // points de la marque (police-points.js, chargé avant ce script). Couleurs et matière

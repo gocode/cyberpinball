@@ -3,7 +3,7 @@
 // ni état, ni commandes. Au bureau, le média dans le cadre 9:16 du menu, à gauche, et un
 // encart unique à sa droite (titre, état, commandes), aux mêmes cotes que le cadre, qui ne le
 // recouvre jamais. Le rendu réel est aussi contrôlé par le garde-fou de mise en page
-// (layout-check.ts, html.loading-phase) dans les démonstrations (docs\demo-chargement.ps1).
+// (layout-check.ts, html.loading-phase) dans les démonstrations (interne\demos\demo-chargement.ps1).
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';

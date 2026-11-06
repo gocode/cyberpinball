@@ -85,9 +85,9 @@ export const SYSTEM_ROOT: readonly SystemGroupId[] = ['amis', 'tables', 'medias'
 export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'downloads', 'phone-remote'];
 
 /**
- * La racine du menu système telle qu'elle s'affiche : Activité récente en tête (06/11/2026, revue
- * de Codex : elle couvre plusieurs rubriques), puis Amis, Tables, Médias, Téléchargements,
- * Télécommande du téléphone, Borne, Cyber Pinball (ordre choisi le 29/10/2026). systemmenu.test.ts vérifie qu'elle reprend
+ * La racine du menu système telle qu'elle s'affiche : Activité récente en tête (elle couvre
+ * plusieurs rubriques), puis Amis, Tables, Médias, Téléchargements, Télécommande du téléphone,
+ * Borne, Cyber Pinball (ordre choisi le 29/10/2026). systemmenu.test.ts vérifie qu'elle reprend
  * SYSTEM_ROOT dans son ordre et chaque raccourci une fois.
  */
 export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['activity', 'amis', 'tables', 'medias', 'downloads', 'phone-remote', 'borne', 'cyberpinball'];

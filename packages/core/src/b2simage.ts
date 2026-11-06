@@ -1,5 +1,4 @@
-// Image d'un .directb2s, repli du fronton quand le jeu n'a pas de média
-// (docs/recherche/medias.md, § 5.1 et § 5.3, tâche T4).
+// Image d'un .directb2s, repli du fronton quand le jeu n'a pas de média.
 //
 // Un .directb2s est un XML de plusieurs dizaines de Mo : les ampoules
 // (<Illumination>) viennent d'abord, puis <Images> avec les grandes images en

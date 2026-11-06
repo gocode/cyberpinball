@@ -96,6 +96,8 @@ export function acceptWebSocket(req: IncomingMessage, socket: Duplex, opts: { ma
     socket.end('HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n');
     return undefined;
   }
+  // Petites trames, tout de suite : sans l'attente de Nagle qui les regroupe (gestes, état de la page).
+  (socket as Duplex & { setNoDelay?(on: boolean): void }).setNoDelay?.(true);
   socket.write(['HTTP/1.1 101 Switching Protocols', 'Upgrade: websocket', 'Connection: Upgrade', `Sec-WebSocket-Accept: ${websocketAccept(key)}`, '', ''].join('\r\n'));
   const reader = createFrameReader(opts.maxPayload);
   const texts: ((text: string) => void)[] = [];

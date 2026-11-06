@@ -1,10 +1,10 @@
-// Les démonstrations sans opérateur (docs\*.cjs, *.js, *.mjs) suivent le code qu'elles montrent.
+// Les démonstrations sans opérateur (interne\demos\*.cjs, *.js, *.mjs) suivent le code qu'elles montrent.
 //
 // Incident du 29/10/2026 : deux démonstrations cassaient en silence depuis des fusions faites
 // ailleurs. La bibliothèque d'un ami (demo-sortie-de-liste.cjs) plantait (« Cannot read
 // properties of undefined (reading 'finisher') ») : createFriendLibraryMenu attendait désormais
 // `downloads` et `library.isShowing`, que l'hôte simulé de la démonstration ne donnait pas. Les
-// scripts de docs\ sont du JavaScript que tsc ne lit pas : rien ne le voyait avant de les rejouer.
+// scripts des démonstrations sont du JavaScript que tsc ne lit pas : rien ne le voyait avant de les rejouer.
 //
 // Ce test lit chaque script avec le compilateur TypeScript et, pour tout module de l'application
 // qu'il charge (require d'un …\dist\x.js) :
@@ -22,10 +22,11 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import ts from 'typescript';
+import { DEMOS, internalFiles } from './interne';
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
-const DOCS = path.join(REPO, 'docs');
-const SCRIPTS = fs.readdirSync(DOCS).filter((f) => /\.(cjs|js|mjs)$/.test(f)).sort();
+const DOCS = DEMOS;
+const SCRIPTS = internalFiles(DOCS, /\.(cjs|js|mjs)$/);
 
 /** Module source (…\src\x.ts) d'un require d'un …\dist\x.js ; undefined pour tout autre require. */
 function moduleOf(call: ts.CallExpression): { file: string; spec: string } | undefined {

@@ -131,9 +131,18 @@ export function fillBelow(win: BrowserWindow, view: { setBounds(bounds: Rectangl
 }
 
 /**
- * Pose une petite vue par-dessus la page de sa fenêtre (le pointeur du téléphone, phone-remote.ts),
- * en coordonnées du contenu de la fenêtre : une vue, jamais une fenêtre (elles passent par coverDisplay).
+ * Pose une fenêtre transparente sur tout le contenu d'une autre, et l'y garde quand celle-ci
+ * bouge, change de taille ou passe en plein écran : le pointeur du téléphone sur la fenêtre
+ * « Récupérer » (phone-remote.ts), qui couvre déjà son écran par coverDisplay.
  */
-export function placeOver(view: { setBounds(bounds: Rectangle): void }, bounds: Rectangle): void {
-  view.setBounds(bounds);
+export function overlayContent(child: BrowserWindow, parent: BrowserWindow): void {
+  const place = () => {
+    if (!child.isDestroyed() && !parent.isDestroyed()) child.setBounds(parent.getContentBounds());
+  };
+  const events = ['move', 'resize', 'enter-full-screen', 'leave-full-screen', 'restore', 'show'] as const;
+  for (const event of events) parent.on(event as 'move', place);
+  child.once('closed', () => {
+    if (!parent.isDestroyed()) for (const event of events) parent.off(event as 'move', place);
+  });
+  place();
 }

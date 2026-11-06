@@ -1,5 +1,4 @@
-// Téléchargement des médias depuis VPinMediaDB (tâche T10, docs/recherche/medias.md
-// § 3.1, § 3.4 et § 5.5), à la demande de l'utilisateur seulement : jeu par jeu
+// Téléchargement des médias depuis VPinMediaDB, à la demande de l'utilisateur seulement : jeu par jeu
 // depuis le gestionnaire des médias, ou pour les tables à qui il en manque depuis le
 // menu système.
 //

@@ -193,9 +193,9 @@ npm run installeur  # fabrique release\CyberPinball-Setup.exe et CyberPinball-Se
 | `packages/win-displays` | Appels à Windows par FFI (koffi) : écrans, sorties audio, périphériques USB, fenêtres, orientation. |
 | `packages/installer` | Manifeste des composants tiers, dossier racine, téléchargements vérifiés, jonctions de version. |
 | `app` | L'application Electron : assistant, menu des tables, réglages de VPX, gestion des tables, lancement des parties. |
-| `docs` | Manuel technique, scénarios de tests manuels, notes de recherche, design system. |
+| `docs` | Manuel technique, liste des fonctionnalités et ses captures, design system. |
 
-Le [manuel technique](docs/manuel.md) détaille chaque partie : fichiers écrits, commandes, essais hors écran et limites connues. Les [scénarios de tests manuels](docs/tests-manuels.md) couvrent ce qui demande une vraie borne. Les deux documents existent aussi en anglais.
+Le [manuel technique](docs/manuel.md) détaille chaque partie : fichiers écrits, commandes, essais hors écran et limites connues. Il existe aussi en anglais.
 
 ### Publier une version (mainteneurs)
 

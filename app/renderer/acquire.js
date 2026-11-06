@@ -166,6 +166,7 @@ function showRemote(r) {
   // Le bloc présent, les quatre boutons passent en grille 2 × 2 (acquire.css, html.with-remote).
   document.documentElement.classList.toggle('with-remote', Boolean(r));
   if (!r) return;
+  const was = box.dataset.phase;
   box.dataset.phase = r.phase;
   $('remote-title').textContent = r.title;
   $('remote-line').textContent = r.line;
@@ -182,7 +183,19 @@ function showRemote(r) {
   $('remote-accept').hidden = r.phase !== 'pending';
   $('remote-refuse').hidden = r.phase !== 'pending';
   $('remote-end').hidden = r.phase !== 'paired';
+  // Un téléphone attend : « Accepter » a la main (le processus principal a donné le clavier au
+  // bandeau) ; Entrée valide le bouton choisi, les flèches passent à l'autre.
+  if (r.phase === 'pending' && was !== 'pending') $('remote-accept').focus();
 }
+
+$('remote-actions').addEventListener('keydown', (e) => {
+  const step = { ArrowLeft: -1, ArrowUp: -1, ArrowRight: 1, ArrowDown: 1 }[e.key];
+  const shown = [...$('remote-actions').querySelectorAll('button')].filter((b) => !b.hidden);
+  const at = shown.indexOf(document.activeElement);
+  if (!step || at < 0) return;
+  e.preventDefault();
+  shown[(at + step + shown.length) % shown.length].focus();
+});
 
 /**
  * QR code : modules noirs sur fond clair (les lecteurs des téléphones le lisent le mieux ainsi),

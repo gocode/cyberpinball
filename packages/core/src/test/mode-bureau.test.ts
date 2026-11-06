@@ -2,7 +2,7 @@
 // en mode bureau, souvent un seul écran du PC revenait. Seules les fenêtres du menu étaient
 // réduites ; les voiles noirs du gardien des écrans (un par écran, app/src/screen-guard.ts)
 // restaient en plein écran et cachaient le bureau des autres. Ces tests fixent l'invariant
-// avec les écrans simulés de docs\ecrans (ceux de CYBERPINBALL_DISPLAYS), de 1 à 4 écrans :
+// avec les écrans simulés de packages\core\ecrans-simules (ceux de CYBERPINBALL_DISPLAYS), de 1 à 4 écrans :
 // au bureau, aucune fenêtre de Cyber Pinball ne recouvre plus rien ; au retour, chaque écran
 // est de nouveau couvert, son voile remis avant sa fenêtre.
 
@@ -86,7 +86,7 @@ function cabinet(screens: CoverRect[], menuScreens: CoverRect[]) {
 
 /** Jeux d'écrans simulés versionnés (CYBERPINBALL_DISPLAYS), de 1 à 4 écrans ; 2 écrans : les deux premiers du poste à trois. */
 function screenSets(): { name: string; screens: CoverRect[] }[] {
-  const load = (file: string) => parseSimulatedDisplays(JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'docs', 'ecrans', file), 'utf8')), file).map((d) => d.bounds);
+  const load = (file: string) => parseSimulatedDisplays(JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'packages', 'core', 'ecrans-simules', file), 'utf8')), file).map((d) => d.bounds);
   const three = load('poste-deux-ecrans.json');
   const sets = [
     { name: 'un écran', screens: load('un-ecran.json') },

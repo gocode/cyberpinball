@@ -311,7 +311,7 @@ C.Question = {
   html: page('<!-- @dsCard group="Saisie" height=680 width=1300 -->', `<div style="position:relative;height:580px;border-radius:8px;overflow:hidden" class="cp-art" data-label="">${question}</div>`),
 };
 
-// Préavis d'arrêt de l'horaire et voile de nuit (app/renderer/frontend.css, « Horaire de la borne » ; maquette revue par Codex).
+// Préavis d'arrêt de l'horaire et voile de nuit (app/renderer/frontend.css, « Horaire de la borne »).
 const preavisCss = `.pv-scene{position:relative;width:1080px;height:760px;overflow:hidden;border-radius:8px;background:linear-gradient(160deg,#16303a,#0a1416 60%,#2a1830)}
 .pv-scene .pv-veil{position:absolute;inset:0;background:#000;opacity:.7}
 .pv-scene .pv-attract{position:absolute;left:0;right:0;top:220px;text-align:center;font:600 64px var(--font-ui);color:var(--ink);letter-spacing:.06em}

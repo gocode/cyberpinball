@@ -139,7 +139,7 @@ interface Bounds {
 }
 type Zone = Bounds & { aspect?: number };
 interface Setup {
-  /** Jeu d'écrans de docs\ecrans, ou écrans décrits ici. */
+  /** Jeu d'écrans de packages\core\ecrans-simules, ou écrans décrits ici. */
   ecrans: string | Bounds[];
   assignments: Record<string, number>;
   zones?: Record<string, Zone>;
@@ -182,7 +182,7 @@ ipcMain.on('i18n', (event) => {
   event.returnValue = { language: core.language(), locale: core.locale(), messages: core.messagesOf(core.language()) };
 });
 const KEYS = { previous: ['ShiftLeft'], next: ['ShiftRight'], confirm: ['Digit1'], exit: ['Escape'], back: ['Escape'] };
-// Les écrans d'un jeu de docs\ecrans tels que les lit l'application (CYBERPINBALL_DISPLAYS).
+// Les écrans d'un jeu de packages\core\ecrans-simules tels que les lit l'application (CYBERPINBALL_DISPLAYS).
 const displaysOf = (ecrans) =>
   typeof ecrans === 'string'
     ? JSON.parse(fs.readFileSync(path.join(process.env.CP_ECRANS, ecrans + '.json'), 'utf8').replace(/^﻿/, ''))
@@ -285,7 +285,7 @@ test('disposition des écrans : sur chaque fenêtre de l’éditeur, de la borne
       CP_ARRANGE: path.join(APP, 'dist', 'arrange.js'),
       CP_LAYOUT_CHECK: path.join(APP, 'dist', 'layout-check.js'),
       CP_SCREEN: path.join(APP, 'renderer', 'screen.html'),
-      CP_ECRANS: path.join(REPO, 'docs', 'ecrans'),
+      CP_ECRANS: path.join(REPO, 'packages', 'core', 'ecrans-simules'),
       CP_PRELOAD: path.join(dir, 'preload.cjs'),
       CP_SETUPS: path.join(dir, 'setups.json'),
       CP_OUT: path.join(dir, 'out.json'),

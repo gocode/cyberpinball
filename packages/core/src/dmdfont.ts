@@ -6,7 +6,7 @@
 // (5 × 7, traits d'un point), grand (9 × 14, traits de deux points), et la marque (11 × 11,
 // trait d'un point, large et très espacée, comme Saira légère élargie). L'horloge est le grand
 // agrandi ×2 au plus proche voisin : ses chiffres rectangulaires restent nets. Glyphes dessinés
-// par le directeur artistique (Codex, 27/10/2026) ; aucune police de tiers : rien à créditer.
+// pour Cyber Pinball ; aucune police de tiers : rien à créditer.
 //
 // Chaque signe est une liste de lignes, « # » pour un point allumé ; sa largeur est celle
 // de ses lignes. Les lettres accentuées perdent leur accent (comme sur les vrais DMD), les

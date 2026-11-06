@@ -1,6 +1,5 @@
 // Médias de présentation des jeux : catalogue des types, recherche du fichier à
 // montrer pour une table, dimensions lues dans l'en-tête des fichiers.
-// Conception : docs/recherche/medias.md, § 5.
 //
 // Rangement (proposition de VPX 10.8.1, docs/FileLayout.md l. 117-126) : les
 // médias d'un jeu vont dans <dossier de la table>\medias\, sous le nom
@@ -572,7 +571,7 @@ export function scanTableMedias(table: TableEntry): TableMediaFile[] {
 export type B2sImageKind = 'backglass' | 'dmd';
 
 /**
- * Point d'accroche de la tâche T4 (packages/core/src/b2simage.ts) : chemin de
+ * Point d'accroche de l'image du .directb2s (packages/core/src/b2simage.ts) : chemin de
  * l'image du .directb2s de la table, déjà extraite dans <racine>\data\cache\medias,
  * ou undefined. Synchrone : la lecture du .directb2s (des dizaines de Mo) se fait
  * ailleurs, en tâche de fond ; tant qu'elle n'est pas faite, la recherche passe à
@@ -609,7 +608,7 @@ export interface ResolvedMedia {
 }
 
 export interface ResolveOptions {
-  /** Image du .directb2s (tâche T4). Sans elle, l'étape 4 est sautée. */
+  /** Image du .directb2s. Sans elle, l'étape 4 est sautée. */
   b2sImage?: B2sImageProvider;
   /**
    * Bord des flippers dans l'image Windows du playfield (currentFlipperEdge, ou

@@ -13,7 +13,6 @@
 //   retour d'où l'on vient (01/11/2026 : « Revenir à bibliothèque de … » ne disait pas que la table
 //   n'était pas encore installée) ; un fichier sauté est dit, avec sa raison ;
 // - « Fichiers téléchargés » : l'inventaire de ce qui est gardé (downloads-screen.ts).
-// Maquette et revue de Codex : docs/recherche/maquettes/gestionnaire-telechargements.cjs.
 
 import * as path from 'node:path';
 import {
@@ -149,7 +148,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
       detail: facts(j),
       badges: [downloadStateLabel(j)],
       icon: sourceIcon(j),
-      // En pause : la ligne reste lisible (revue de Codex) ; seule la barre s'éteint.
+      // En pause : la ligne reste lisible ; seule la barre s'éteint.
       tone: j.state === 'paused' || j.state === 'cancelled' ? undefined : tone,
       progress: { ...(fraction !== undefined ? { value: fraction } : {}), tone },
       note: next(j),
@@ -290,7 +289,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
         if (!j.attached) actions.push(cancel);
         break;
       case 'waiting':
-        // Un ami absent : rien à relancer, la reprise est automatique (revue de Codex) ; un site : réessayer tout de suite.
+        // Un ami absent : rien à relancer, la reprise est automatique ; un site : réessayer tout de suite.
         if (j.source.kind === 'friend' || j.attached) actions.push(returnAction(true));
         else actions.push({ label: t('Réessayer maintenant'), detail: t('Sans attendre l’essai prévu'), icon: 'restart', tone: 'ok', key: 'retry', run: () => (m.resume(id), openJob(id)) }, returnAction(false));
         if (!j.attached) actions.push(pause, cancel);

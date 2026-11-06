@@ -8,7 +8,7 @@
 // bureau caché meurt avec lui. Il n'hérite pas non plus de la console du lanceur : seul le
 // journal lui est confié. Sans cela, un essai tué au délai laissait son relais vivant, qui tenait
 // les tuyaux de sortie du test (spawnSync attendait leur fermeture : 41 min, 01/11/2026).
-// Même bureau que docs\hors-ecran.ps1 (Enter-BureauCache).
+// Même bureau que scripts\bureau-cache.ps1 (Enter-BureauCache).
 
 import * as koffi from 'koffi';
 

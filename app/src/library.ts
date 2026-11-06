@@ -3783,7 +3783,7 @@ export function createLibrary(host: LibraryHost) {
       back: backLabel(built),
       // Dans la liste d'un écran à deux zones, Exit n'y ramène pas : il passe aux actions, le bouton le dit (et fait de même au clic).
       backTag: zone?.active === 'list' ? { key: 'Exit', text: t('actions') } : undefined,
-      actions: built.actions.map(({ label, detail, tone, icon, web, attention, shortcut, run }, i) => ({ label: run === built.back ? backActionLabel(label) : label, detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
+      actions: built.actions.map(({ label, detail, tone, icon, web, attention, shortcut, run }, i) => ({ label: shownLabel({ label, run }, built.back), detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
       media: built.media,
       variant: built.variant,
       journey: built.journey,
@@ -3857,6 +3857,14 @@ export function createLibrary(host: LibraryHost) {
    * destination, comme le bouton en tête (« Retour : Menu système ») ; « Retour à la fiche » qui
    * mène en fait à « Gérer la table » (les écrans qui s'en ouvrent y reviennent) le dit aussi.
    */
+  /**
+   * Le libellé d'une action tel que la borne l'affiche, le même pour l'écran et pour le téléphone
+   * (remoteScreen) : le téléphone montrait « Retour » quand la borne disait « Retour : Menu système ».
+   */
+  function shownLabel(action: { label: string; run: unknown }, back: unknown): string {
+    return action.run === back ? backActionLabel(action.label) : action.label;
+  }
+
   function backActionLabel(label: string): string {
     const to = backTrail.destination();
     if (label === t('Retour')) return t('Retour : {screen}', { screen: to.heading });
@@ -3944,7 +3952,8 @@ export function createLibrary(host: LibraryHost) {
     if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) return { title: built.heading, item: screen.editor.label };
     const ids = actionIds(built.actions);
     const at = followCursor(ids, cursor, screen, anchor);
-    return { title: built.heading, item: built.actions[at]?.label };
+    const action = built.actions[at];
+    return { title: built.heading, item: action && shownLabel(action, built.back) };
   }
 
   /** Où le menu montre le QR code maintenant : l'écran de la télécommande, le clavier à l'écran. */

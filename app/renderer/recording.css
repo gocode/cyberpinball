@@ -3,8 +3,7 @@
    capture : la vidéo ne la contient jamais. Discrète : fond de verre fumé, un seul signe coloré
    (point rouge qui bat pendant l'enregistrement, anneau du compte à rebours, coche verte). La
    taille suit la fenêtre (--u : un 72e de sa hauteur vue du joueur), qui suit l'écran.
-   Seul le signe porte la couleur d’état ; texte et avancement restent neutres (revu par Codex,
-   29/10/2026 : un seul accent rouge, battement de faible amplitude, immobile si le mouvement est réduit). */
+   Seul le signe porte la couleur d’état ; texte et avancement restent neutres (un seul accent rouge, battement de faible amplitude, immobile si le mouvement est réduit). */
 
 html,
 body {

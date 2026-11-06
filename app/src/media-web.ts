@@ -1,4 +1,4 @@
-// Recherche libre d'un média (docs/recherche/sources-medias.md § 7) : quand les sources
+// Recherche libre d'un média : quand les sources
 // branchées n'ont pas ce qu'il faut (une musique de présentation, un topper précis),
 // l'utilisateur cherche lui-même dans le navigateur intégré, et Cyber Pinball voit
 // arriver ce qu'il télécharge.

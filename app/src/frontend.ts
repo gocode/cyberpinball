@@ -532,7 +532,7 @@ let realign: { confused: RoleId[]; screens: Partial<Record<RoleId, Rect>>; displ
 /** Une fenêtre que VPX remet sans cesse sur le mauvais écran n'est plus déplacée après ce nombre d'essais. */
 const REALIGN_TRIES = 3;
 
-// Médias des jeux (docs/recherche/medias.md, § 5) : résolus au démarrage du menu, quand
+// Médias des jeux : résolus au démarrage du menu, quand
 // le modèle de la borne et la rotation du playfield sont connus.
 let medias: MenuMedias | undefined;
 /** Guet des dossiers des tables et des médias : tout changement se voit aussitôt sur chaque écran. */
@@ -1229,7 +1229,7 @@ library.provideSystemItem('guest-mode', createGuestMenu({
 // Réseau des bornes (Menu système > Amis) : partage activé par défaut, démarré avec le menu ;
 // jamais le vrai réseau pendant un essai sans opérateur (socialNetMode), ni le vrai pare-feu.
 const socialMode = socialNetMode(process.env);
-// Démonstration (docs\demo-amis.ps1) : un ami hors ligne écrit avant le démarrage, des bornes fictives après.
+// Démonstration : un ami hors ligne écrit avant le démarrage, des bornes fictives après.
 const socialDemo = socialMode === 'simulated' && simulatedPlayersWanted(process.env);
 if (socialDemo) seedSimulatedFriends(loc.dataDir);
 let stopSimulatedPlayers: (() => Promise<void>) | undefined;
@@ -2702,7 +2702,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     if (cinema.handover()) playUiSound('coil');
     recording?.shown();
   };
-  // Ce qui a pris le temps du Start au lancement : rien d'autre que l'écran de chargement et la préparation (docs\demo-cinema.ps1).
+  // Ce qui a pris le temps du Start au lancement : rien d'autre que l'écran de chargement et la préparation.
   console.log(`Lancement : VPX lancé ${Date.now() - pressedAt} ms après le Start (écran de chargement ${loadingMs} ms${captureMs ? `, captures des essais ${captureMs} ms` : ''}, préparation ${Date.now() - preparing} ms ; lancement en cinéma ${cinema.running ? 'joué' : 'coupé'}).`);
   // Les fenêtres de VPX paraissent avant celle du jeu : le cartouche du chargement le dit.
   const onWindows = () => launchStep('windows');

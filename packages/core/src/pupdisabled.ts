@@ -11,7 +11,7 @@
 // ignorée) ; il ne liste jamais le dossier de la table. PinUP Popper ne lit que
 // PinUPSystem\PUPVideos. Un pack rangé ailleurs n'est donc vu par personne : pour la partie,
 // c'est un pack absent, cas que le plugin traite déjà (B2SInit ne trouve rien, le script
-// continue, docs/recherche/pup-packs.md § 3.1).
+// continue).
 //
 // L'état n'est écrit nulle part ailleurs que sur le disque : un pack est désactivé quand son
 // dossier est dans pupvideos (off) et pas dans pupvideos. Une application arrêtée entre

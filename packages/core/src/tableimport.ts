@@ -166,7 +166,7 @@ export interface RomImport {
   ops: FileOp[];
 }
 
-/** Ce que l'import fait d'un PuP-Pack (docs/recherche/pup-packs.md, § 4.2). */
+/** Ce que l'import fait d'un PuP-Pack. */
 export interface PackPlan {
   /** Clé du pack dans le plan (destination en minuscules), pour retenir le choix. */
   key: string;

@@ -55,7 +55,7 @@ const CYBER_ICONS = {
   pup: '<path d="M6 3h15v13M3 7h14v14H3zM8 11l5 3-5 3z"/>', // Paquet de vidéos, deux plans superposés.
   frame: '<path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/>', // Cadrer l’affichage pendant la partie.
   pulse: '<path d="M2 12h5l3-8 4 16 3-8h5"/>', // Diagnostiquer et réparer.
-  health: '<path d="M12 5.5C9 1.5 3 2 3 7.5c0 4.5 4.5 9 9 13.5 4.5-4.5 9-9 9-13.5 0-5.5-6-6-9-2z"/><path d="M5.5 10.5h3L10 7.5l2 6.5 2-3.5h4.5"/>', // Santé de la borne : un cœur et son pouls (Codex).
+  health: '<path d="M12 5.5C9 1.5 3 2 3 7.5c0 4.5 4.5 9 9 13.5 4.5-4.5 9-9 9-13.5 0-5.5-6-6-9-2z"/><path d="M5.5 10.5h3L10 7.5l2 6.5 2-3.5h4.5"/>', // Santé de la borne : un cœur et son pouls.
   trash: '<path d="M3 7h18M6 7l1 14h10l1-14M8 7V3h8v4M10 11v6M14 11v6"/>', // Supprimer, envoyer à la corbeille.
 
   // Médias, son et attente
@@ -133,7 +133,7 @@ const CYBER_ICONS = {
   'zoom-in': '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M10 7v6M7 10h6"/>', // Loupe et plus : rapprocher.
   'zoom-out': '<circle cx="10" cy="10" r="7"/><path d="m15 15 6 6M7 10h6"/>', // Loupe et moins : éloigner.
 
-  // Collections du menu des tables (collections.ts), dessinées par Codex (06/11/2026)
+  // Collections du menu des tables (collections.ts)
   history: '<path d="M4.5 9A8 8 0 1 1 4 13M4 4v5h5M12 7v5l4 2"/>', // Retour circulaire et aiguilles : les dernières tables jouées.
   sparkle: '<path d="M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z"/>', // Éclat à quatre branches : une table encore jamais jouée.
   factory: '<path d="M3 21V11l6-4v4l6-4v7h6v7zM17 14V3h4v11M6 17h2M11 17h2M17 17h1"/>', // Toits en dents de scie et cheminée : le fabricant.

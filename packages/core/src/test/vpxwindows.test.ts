@@ -8,7 +8,7 @@ import { isOwned, vpxOwnedKeys } from '../vpx-settings';
 import { classifyVpxWindow, VPX_GAME_TITLES } from '../vpxwindows';
 import { devPcDisplays, emptyCabinet } from './fixtures';
 
-// Fenêtres relevées sur le PC de développement, VPX 10.8.1-5436 en -Play (docs/tests-manuels.md).
+// Fenêtres relevées sur le PC de développement, VPX 10.8.1-5436 en -Play (interne/tests-manuels/tests-manuels.md).
 
 test('les fenêtres de jeu de VPX sont laissées telles quelles', () => {
   for (const title of VPX_GAME_TITLES) assert.deepEqual(classifyVpxWindow({ title, className: 'SDL_app' }), { kind: 'game' });

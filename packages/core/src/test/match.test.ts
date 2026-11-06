@@ -7,12 +7,12 @@ import { devPcDisplays } from './fixtures';
 test('empreinte forte avec série EDID, faible sans', () => {
   const [sam, auo] = devPcDisplays();
   assert.deepEqual(fingerprintOf(sam!), {
-    key: 'SAM-0C8D-H4LN301501-48x27cm',
+    key: 'SAM-0C8D-H0XX000001-48x27cm',
     strength: 'strong',
     modelKey: 'SAM-0C8D-48x27cm',
   });
   assert.equal(fingerprintOf(auo!).strength, 'weak');
-  assert.equal(fingerprintOf(auo!).key, 'AUO-139D-38x21cm@5&253a7f23&0&UID4357');
+  assert.equal(fingerprintOf(auo!).key, 'AUO-139D-38x21cm@5&5e6f7a8b&0&UID4357');
 });
 
 test('retrouve les écrans quand Windows les renumérote et les déplace', () => {
@@ -29,7 +29,7 @@ test('retrouve les écrans quand Windows les renumérote et les déplace', () =>
   const result = matchScreens(saved, after.reverse());
   assert.equal(result.matched.size, 4);
   assert.deepEqual(result.missing, []);
-  assert.equal(result.matched.get('SAM-0C8D-H4LN301501-48x27cm')?.gdiName, '\\\\.\\DISPLAY2');
+  assert.equal(result.matched.get('SAM-0C8D-H0XX000001-48x27cm')?.gdiName, '\\\\.\\DISPLAY2');
 });
 
 test('empreinte faible retrouvée par le modèle si le câble change de port', () => {
@@ -39,7 +39,7 @@ test('empreinte faible retrouvée par le modèle si le câble change de port', (
 
   const result = matchScreens(saved, after);
   assert.equal(result.matched.size, 4);
-  assert.deepEqual(result.approximate, ['AUO-139D-38x21cm@5&253a7f23&0&UID4357']);
+  assert.deepEqual(result.approximate, ['AUO-139D-38x21cm@5&5e6f7a8b&0&UID4357']);
 });
 
 test('signale les écrans débranchés et les nouveaux écrans', () => {
@@ -47,6 +47,6 @@ test('signale les écrans débranchés et les nouveaux écrans', () => {
   const after = devPcDisplays().slice(1);
 
   const result = matchScreens(saved, after);
-  assert.deepEqual(result.missing, ['SAM-0C8D-H4LN301501-48x27cm']);
+  assert.deepEqual(result.missing, ['SAM-0C8D-H0XX000001-48x27cm']);
   assert.equal(result.unknown.length, 2);
 });

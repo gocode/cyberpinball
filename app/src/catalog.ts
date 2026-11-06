@@ -1,4 +1,4 @@
-// Trouver et récupérer une table (docs/recherche/acquisition.md, étapes A3 à A7) :
+// Trouver et récupérer une table :
 // catalogue de la base VPS aux boutons, fiche d'un jeu et ses versions, « ce qu'il
 // faut » pour cette borne, fenêtre « Récupérer » (acquire-window.ts), liste d'attente,
 // surveillance du dossier Téléchargements (downloads-watch.ts), installation par le

@@ -1,4 +1,4 @@
-// Moments du menu (docs/recherche/medias.md, § 5.2) : ce que montre chaque écran et ce
+// Moments du menu : ce que montre chaque écran et ce
 // qu'on entend à la navigation, au chargement, pendant la partie et en mode attente
 // (tâches T5, T6 et T7). Tout se décide ici, sans Electron : app/src/frontend.ts
 // construit l'état de chaque fenêtre avec ces fonctions, app/renderer/menu-audio.js

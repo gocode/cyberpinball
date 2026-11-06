@@ -79,8 +79,8 @@ export function siteState(site: SourceSite, cookies: SiteCookie[], now = new Dat
 // le lien de téléchargement que le site propose à ce membre, ou s'arrêter et montrer la
 // page. On ne fabrique jamais d'adresse (pas de « confirm=1 » ni de « t=1 » ajoutés), on
 // n'accepte aucune condition, on n'attend aucun délai, on ne résout aucune vérification :
-// tout cela revient à l'utilisateur, dans la fenêtre visible. Parcours relevés le
-// 22 octobre 2026 (docs/recherche/acquisition.md, § 14).
+// tout cela revient à l'utilisateur, dans la fenêtre visible. Parcours relevés en
+// octobre 2026.
 
 /**
  * Pourquoi montrer la page : un code, que probeReasonText dit dans la langue de

@@ -1,6 +1,5 @@
-// Erreurs de lecture des médias : l'affichage (tâche T2 du jalon « Habillage des
-// écrans ») les enregistre quand Chromium refuse un fichier, le médecin les lit et
-// les signale table par table. Conception : docs/recherche/medias.md, § 5.5.
+// Erreurs de lecture des médias : l'affichage les enregistre quand Chromium refuse un fichier, le médecin les lit et
+// les signale table par table.
 //
 // Fichier : <données>\logs\medias-erreurs.json, écrit par le seul processus
 // principal (le rendu lui envoie l'erreur). Format, version 1 :

@@ -454,7 +454,7 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   // Le corps qui compte est celui qu'on voit : la police multipliée par l'échelle de chaque
   // transform au-dessus du texte. Les noms des petits médaillons de la roue, réduits par
   // scale(--s), passaient à 14 px sans que rien ne le dise : ce garde-fou ne mesurait que les
-  // icônes, et le test des feuilles ne lit que les corps en cqmin (revue de Codex, 29/10/2026).
+  // icônes, et le test des feuilles ne lit que les corps en cqmin.
   // Une animation qui tourne en boucle (pulsation) compte à son pas le plus petit : relevée à un
   // autre instant, elle passerait. Un glissement ou une animation qui s'arrête comptent tels
   // qu'à l'instant du relevé (les démonstrations en relèvent aussi en plein mouvement). Sont mis

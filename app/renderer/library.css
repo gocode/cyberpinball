@@ -182,7 +182,7 @@ body.mouse .lib-back:hover {
 /*
  * Liste seule : centrée en largeur, mais partie juste sous l'en-tête (l'écart de .lib), à la
  * même hauteur d'un écran à l'autre. Centrée en hauteur, une liste courte commençait au milieu
- * de l'écran, une longue en haut (revue de Codex, octobre 2026). La rangée prend toute la
+ * de l'écran, une longue en haut. La rangée prend toute la
  * hauteur ; la liste s'y pose en haut, et ne défile qu'au-delà.
  */
 .lib-body.only-actions {
@@ -385,7 +385,7 @@ body.mouse .lib-back:hover {
   }
 }
 
-/* « Gérer la table » : ses onze actions sur deux colonnes, au bureau aussi (revue de Codex, 06/11/2026), parcourues ligne par ligne. */
+/* « Gérer la table » : ses onze actions sur deux colonnes, au bureau aussi, parcourues ligne par ligne. */
 .lib-manage .lib-body.only-actions {
   grid-template-columns: minmax(0, 150cqmin);
 }
@@ -436,7 +436,7 @@ body.mouse .lib-back:hover {
  * Liste qui défile (library.js, markOverflow) : un filet sur le bord derrière lequel il reste
  * des entrées. Le filet est le bord du conteneur, hors du contenu : la ligne qui le touche reste
  * entière et pleinement lisible. Jamais de fondu (mask-image) : il faisait passer la dernière
- * ligne visible pour désactivée (revue de Codex, octobre 2026 ; contours.test.ts et le garde-fou
+ * ligne visible pour désactivée (contours.test.ts et le garde-fou
  * de mise en page le refusent). Les bords sont toujours là, transparents tant qu'il n'y a rien
  * derrière : rien ne bouge quand ils s'allument. La marge de défilement garde l'entrée choisie
  * entière, à distance du filet (scrollIntoView en tient compte).
@@ -568,7 +568,7 @@ body.mouse .lib-zone-tag:hover {
   color: var(--ink);
 }
 
-/* La zone qui n'a pas le choix s'éteint un peu : assez pour se distinguer, jamais au point de paraître indisponible (revue de Codex, 29/10/2026). */
+/* La zone qui n'a pas le choix s'éteint un peu : assez pour se distinguer, jamais au point de paraître indisponible. */
 .lib-zone.idle > .lib-content,
 .lib-body.zone-list .lib-actions {
   opacity: 0.8;
@@ -1771,7 +1771,7 @@ body.mouse .journey-step.fixable:hover {
 /* ---------- Santé de la borne (health.ts) ---------- */
 
 /*
- * Maquette revue par Codex (octobre 2026) : en paysage, la liste prend la place et les deux
+ * en paysage, la liste prend la place et les deux
  * actions générales une colonne étroite ; le bilan reste accroché en haut de la liste qui
  * défile (aucun filet au-dessus de lui) ; constat 28 px, détail 24 px, état et destination
  * 22 px à la référence 1 080 ; la destination en casse naturelle, secondaire, verte seulement
@@ -2073,7 +2073,7 @@ body.mouse .lib-health .health-line:not(.selected):hover {
 
 /*
  * Texte à gauche, schéma de 256 × 144 (référence 1 080) à droite, centré sur la ligne
- * (maquettes revues par Codex, octobre 2026). Aucun orange : c'est une interface, pas un DMD.
+ *. Aucun orange : c'est une interface, pas un DMD.
  */
 .lib-row:has(.dmd-figure) {
   display: grid;
@@ -2538,7 +2538,7 @@ body.mouse .lib-health .health-line:not(.selected):hover {
 }
 
 /* ---------- Télécommande du téléphone (phone-remote-menu.ts) ----------
- * Revue de Codex du 06/11/2026 (docs/Design/telecommande-menu) : un panneau, le QR (ou le code,
+ * Un panneau, le QR (ou le code,
  * ou le téléphone) à gauche, l'état et ses consignes à droite ; sous le clavier à l'écran, la même
  * chose en bande de 184 px de référence, de hauteur fixe d'un état à l'autre (les touches ne bougent pas).
  */

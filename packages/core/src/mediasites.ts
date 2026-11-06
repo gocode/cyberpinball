@@ -1,5 +1,5 @@
-// Médias des sites communautaires, avec le compte de l'utilisateur (docs/recherche/
-// sources-medias.md § 6) : VPForums, puis VPUniverse en dernier recours. PinUP Popper
+// Médias des sites communautaires, avec le compte de l'utilisateur :
+// VPForums, puis VPUniverse en dernier recours. PinUP Popper
 // n'est pas sur la machine : ces deux sites portent la bibliothèque que son serveur
 // réserve à Popper Setup (wheels, vidéos du plateau, du fronton, du DMD et du topper,
 // cartes, sons de lancement, packs complets).

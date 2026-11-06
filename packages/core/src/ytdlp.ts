@@ -1,5 +1,4 @@
-// yt-dlp, l'outil qui récupère la vidéo ou le son d'une page YouTube, Vimeo, Dailymotion…
-// (docs/recherche/sources-medias.md § 7.4, choix de l'utilisateur du 26/10/2026) : yt-dlp
+// yt-dlp, l'outil qui récupère la vidéo ou le son d'une page YouTube, Vimeo, Dailymotion… : yt-dlp
 // seul, sans ffmpeg, téléchargé depuis ses versions GitHub à la première utilisation, vérifié
 // par deux empreintes SHA-256 publiées par GitHub (celle de l'API pour le fichier, et la
 // ligne de SHA2-256SUMS de la même version), rangé dans <racine>\tools\yt-dlp, et remplacé par

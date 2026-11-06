@@ -96,7 +96,7 @@ export function createRecordingMenu(ctx: RecordingMenuContext) {
       heading: t('Jouer et enregistrer'),
       icon: 'record',
       subheading: table.title,
-      // Revu par Codex (29/10/2026) : une aide courte, les valeurs restent dans les réglages.
+      // Une aide courte, les valeurs restent dans les réglages.
       lead: t('Filmée pendant que vous jouez, la partie devient la vidéo de la table sur la roue. Aucun bouton à presser : l’enregistrement s’arrête seul, ou quand vous quittez la table. Au retour, vous décidez quoi garder.'),
       sections: [],
       actions: [
@@ -223,7 +223,7 @@ export function createRecordingMenu(ctx: RecordingMenuContext) {
       return {
         title: ROLE_LABELS[f.role](),
         code: `(${f.type})`,
-        // Une conséquence directe d'abord (revu par Codex) ; les noms exacts sont au plan.
+        // Une conséquence directe d'abord ; les noms exacts sont au plan.
         state: { label: t('Nouvelle prise'), tone: 'info' },
         where: now ? t('Remplace la vidéo actuelle ; l’ancienne restera récupérable dans la corbeille') : t('Ajoute une vidéo ; aujourd’hui : visuel par défaut'),
         facts: `${f.width} × ${f.height} · ${clockLabel(keptSeconds(outcome.clock))} · ${formatSize(f.bytes)}`,
@@ -265,7 +265,7 @@ export function createRecordingMenu(ctx: RecordingMenuContext) {
     const table = ctx.find(outcome.table.file) ?? outcome.table;
     const plan = planOf(outcome, table);
     const back = () => result(outcome);
-    // Un groupe par écran, sa conséquence d'abord (revu par Codex) ; les noms exacts en détail.
+    // Un groupe par écran, sa conséquence d'abord ; les noms exacts en détail.
     const rows: Row[] = outcome.files.map((f) => {
       const steps = plan.steps.filter((st) => st.type === f.type);
       const leaving = steps.filter((st) => st.kind === 'trash');

@@ -24,7 +24,8 @@ export const PAIRS = [
   { fr: 'CHANGELOG.md', en: 'CHANGELOG.en.md' },
   { fr: 'docs/fonctionnalites.md', en: 'docs/features.md' },
   { fr: 'docs/manuel.md', en: 'docs/manual.md' },
-  { fr: 'docs/tests-manuels.md', en: 'docs/manual-tests.md' },
+  // Document interne (non publié) : vérifié quand il est là.
+  { fr: 'interne/tests-manuels/tests-manuels.md', en: 'interne/tests-manuels/manual-tests.md' },
   { fr: 'docs/design-system/README.md', en: 'docs/design-system/README.en.md' },
 ];
 
@@ -182,7 +183,7 @@ export function checkTranslations() {
     if (isPrivate(file) || paired.has(file) || UNTRANSLATED.some((re) => re.test(file))) continue;
     problems.push(`${file} : document publié sans traduction (ajoutez la paire à PAIRS dans scripts/traductions.mjs)`);
   }
-  for (const pair of PAIRS) problems.push(...comparePair(pair));
+  for (const pair of PAIRS.filter((p) => !isPrivate(p.fr) || fs.existsSync(path.join(repo, p.fr)))) problems.push(...comparePair(pair));
   // Liens de téléchargement direct de la dernière version, en tête des deux README.
   problems.push(...readmeDownloadProblems(repo));
   return problems;

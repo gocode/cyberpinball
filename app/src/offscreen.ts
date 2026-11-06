@@ -94,7 +94,7 @@ export function createWindow(options: BrowserWindowConstructorOptions): BrowserW
   // ready-to-show. Au démarrage, les quatre écrans de la borne restaient ainsi gris d'une à trois
   // secondes. Sans fond système, l'écran garde ce qu'il y a dessous (le voile noir) jusqu'à la
   // première image (mesures sur les vrais écrans, 24 octobre 2026). L'autre éclair, bleu pâle,
-  // vient du plein écran : voir coverDisplay. Détection : docs\demo-ecrans-couverts.ps1.
+  // vient du plein écran : voir coverDisplay.
   // Une fenêtre montrée reste donc transparente jusqu'à sa première image : paintedOnScreen.
   if (!OFFSCREEN) {
     const win = new BrowserWindow({ ...options, backgroundMaterial: 'none' });

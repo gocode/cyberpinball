@@ -7,7 +7,7 @@ import { parseHTML } from 'linkedom';
 import { menuRenderer } from './menu-renderer';
 
 // Listes qui défilent des écrans de gestion (.lib-actions, .lib-content, app/renderer/library.css).
-// Octobre 2026, revue de Codex du menu système : le fondu (mask-image) posé au bord d'une liste
+// Octobre 2026, revue du menu système : le fondu (mask-image) posé au bord d'une liste
 // qui défile faisait passer la dernière ligne visible pour désactivée (« Écrans et rôles »,
 // « Touches par défaut des encodeurs ») ; et une liste courte, centrée en hauteur au bureau,
 // commençait à une hauteur différente d'un écran à l'autre. Le garde-fou de mise en page

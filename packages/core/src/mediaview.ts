@@ -1,4 +1,4 @@
-// Médias dans les fenêtres du menu (tâche T2 de docs/recherche/medias.md, § 5.5) :
+// Médias dans les fenêtres du menu :
 // ce que chaque rôle affiche pour une table, l'adresse par laquelle le rendu lit
 // le fichier, les dossiers que cette adresse peut atteindre, le réglage « médias
 // pendant la partie » et les erreurs de lecture remontées par le rendu.
@@ -142,7 +142,7 @@ export function allowedMediaDirs(opts: { root?: string; dataDir: string; tables:
 // ---------------------------------------------------------------------------
 // Ce que montre chaque rôle
 
-/** Textes des replis intégrés (app/renderer/fallback.js, tâche T3). */
+/** Textes des replis intégrés (app/renderer/fallback.js). */
 export interface MediaCard {
   title: string;
   manufacturer?: string;

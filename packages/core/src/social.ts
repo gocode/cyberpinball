@@ -1,5 +1,5 @@
 // Réseau des bornes, partie sans réseau : le profil du joueur, l'annuaire, les amis, la présence
-// et les évènements partagés (docs/recherche/partage-medias.md, § 4 et § 12). Le transport
+// et les évènements partagés. Le transport
 // (Hyperswarm sur Internet, multidiffusion et TCP sur le réseau local) est dans
 // app/src/social-net.ts ; ici, seulement ce qui se décide sur des données : chaque message reçu
 // passe par parseSocialMessage, chaque changement d'état par une fonction pure de ce module.

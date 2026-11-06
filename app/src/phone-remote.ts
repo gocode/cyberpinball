@@ -12,25 +12,30 @@
 // borne, après REMOTE_IDLE_MS sans geste au menu, ou à la fermeture (close).
 //
 // Au navigateur :
-// le téléphone ne touche qu'à la page du site (la vue sous le bandeau) : ses gestes y sont injectés
-// comme ceux d'une souris et d'un clavier (sendInputEvent, insertText), avec un pointeur dessiné
-// par-dessus (une petite vue transparente, app/renderer/remote-pointer.html), car le pointeur de
-// Windows ne bouge pas. Jamais le bandeau (on n'y accepte pas un téléphone depuis ce téléphone),
-// jamais une touche qui fermerait la fenêtre (Échap), jamais la valeur d'un champ : la sonde du
-// champ actif n'en lit que la nature et le libellé. C'est l'utilisateur qui tape.
+// le téléphone pilote la fenêtre entière : la page du site (la vue sous le bandeau) et le bandeau
+// lui-même (moteurs de recherche, champ de recherche, boutons : essai réel du 06/11/2026, on ne
+// pouvait pas passer de Web à Images). Ses gestes y sont injectés comme ceux d'une souris et d'un
+// clavier (sendInputEvent, insertText), là où est le pointeur. Le pointeur est dessiné dans une
+// fenêtre transparente posée sur toute la fenêtre, que les clics traversent (remote-pointer.ts) :
+// il y glisse en douceur d'une position à la suivante, même quand le Wi-Fi livre les gestes par
+// paquets. Le pointeur de Windows, lui, ne bouge pas. Un téléphone accepté n'accepte personne :
+// tant qu'il pilote, un autre téléphone est refusé d'office (« un autre téléphone pilote »), le
+// bandeau n'a alors ni Accepter ni Refuser. Jamais une touche qui fermerait la fenêtre (Échap). Le
+// texte d'un champ est repris au téléphone pour y être modifié, jamais celui d'un mot de passe ni
+// d'un champ secret (REMOTE_FOCUS_PROBE). C'est l'utilisateur qui tape.
 //
 // Au menu : les boutons passent par le chemin des touches de la borne (frontend.ts, remoteButton),
 // portes du mode invité comprises ; le texte remplace celui du clavier à l'écran ; un fichier arrive
 // en morceaux scellés (POST /envoi), écrit à part (.envoi-*.part) puis renommé dans le dossier
 // d'import, jamais ailleurs, 2 Go au plus, place vérifiée.
 //
-// Réseau (décidé le 06/11/2026) : en usage normal, l'écoute porte sur toutes les cartes, mais ne
+// Réseau : en usage normal, l'écoute porte sur toutes les cartes, mais ne
 // répond qu'aux adresses du réseau local (isLocalNetworkAddress), et seulement si la règle du
 // pare-feu de Windows de Cyber Pinball est posée : elle vise CyberPinball.exe pour tous les ports
 // (firewall.ts), le serveur, dans le même processus, en profite sans règle de plus ni invite. Sans
 // elle, rien n'écoute (Windows afficherait son invite, que personne ne peut valider à la borne, et
 // poserait des règles bloquantes qui couperaient aussi le réseau des amis) : le bloc reste visible,
-// grisé avec la raison. Pendant un essai (réseau simulé ou coupé, docs\demo-telecommande.ps1) :
+// grisé avec la raison. Pendant un essai (réseau simulé ou coupé) :
 // 127.0.0.1 seulement. Sans QR affiché ni téléphone, tout s'arrête : écoute, liaison, clés.
 
 import * as fs from 'node:fs';
@@ -38,7 +43,7 @@ import * as http from 'node:http';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { WebContentsView, type BrowserWindow, type WebContents } from 'electron';
+import type { BrowserWindow, WebContents, WebContentsView } from 'electron';
 import {
   acceptWebSocket,
   cleanUploadName,
@@ -67,6 +72,7 @@ import {
   REMOTE_MAX_FRAME,
   remoteUrl,
   sealRemote,
+  smoothSpeed,
   socialNetMode,
   t,
   toBase64Url,
@@ -80,8 +86,7 @@ import {
   type RemotePairing,
   type WebSocketLink,
 } from '@cyberpinball/core';
-import { placeOver } from './cover-display';
-import { OFFSCREEN } from './offscreen';
+import { pointerWindow } from './remote-pointer';
 import { qrRows } from './remote-qr';
 
 /** Où écouter : le réseau local réel, 127.0.0.1 seulement (essais), ou nulle part (réseau coupé). */
@@ -159,9 +164,10 @@ export interface RemoteTarget {
   /** Actions de la feuille « Plus » du téléphone (Retour à la fiche, Télécharger cette vidéo…). */
   actions(): { id: string; label: string }[];
   act(id: string): void;
-  /** Recherche libre : le texte et le moteur de la page de résultats affichée, s'il y en a une. */
-  search?(): { query: string } | undefined;
-  runSearch?(query: string): void;
+  /** Recherche libre : le texte et le moteur de la page de résultats affichée, et les moteurs proposés. */
+  search?(): { query: string; engine: string; engines: { id: string; label: string }[] } | undefined;
+  /** Recherche libre : `engine` absent ou inconnu, celui de la page affichée. */
+  runSearch?(query: string, engine?: string): void;
 }
 
 export interface PhoneRemoteOptions {
@@ -200,14 +206,13 @@ const MAX_LINKS = 4;
 const FIELD_POLL_MS = 700;
 /** Un clic droit du téléphone : le menu de la page qui suit dans ce délai lui revient. */
 const MENU_MS = 1500;
+/** Où vont les gestes : la page du site, ou le bandeau au-dessus d'elle. */
+type Zone = 'page' | 'bar';
 /** Flipper tenu au téléphone : après ce délai, l'appui se répète (le menu accélère comme sous un vrai bouton). */
 const HOLD_DELAY_MS = 400;
 const HOLD_REPEAT_MS = 70;
 /** Un bouton qui reste tenu plus longtemps est relâché (doigt perdu, téléphone en veille). */
 const HOLD_MAX_MS = 20_000;
-/** Taille de la vue du pointeur ; sa pointe est à POINTER_TIP du coin. */
-const POINTER_BOX = { width: 50, height: 56 };
-const POINTER_TIP = 16;
 
 
 /** Les adresses de cette machine : le téléphone l'a jointe par l'une d'elles (en-tête Host). */
@@ -264,10 +269,22 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   let lastBar = '';
   let lastPhase: string | undefined;
   let qr: { url: string; rows: string[] } | undefined;
-  let pointer: WebContentsView | undefined;
+  /** Fenêtre transparente du pointeur, sur toute la fenêtre « Récupérer ». */
+  let pointer: BrowserWindow | undefined;
+  let pointerShown = false;
+  /** Pointeur, en pixels du contenu de la fenêtre (bandeau compris). */
   let at = { x: 0, y: 0 };
+  /** Vitesse lissée des derniers gestes (smoothSpeed), et l'heure du dernier. */
+  let speed: number | undefined;
+  let lastMoveAt = 0;
+  /** Où vont le texte et les touches : là où le téléphone a cliqué en dernier. */
+  let typingIn: Zone = 'page';
+  /** Sous le pointeur au dernier geste : quitter une zone la fait sortir du survol. */
+  let hoverIn: Zone | undefined;
   let field: RemoteField | undefined;
   let fieldSent = 'null';
+  /** Un clic, Tab ou Entrée a pu changer de champ : le prochain relevé renvoie le champ et son texte. */
+  let fieldFresh = false;
   let pageSent = '';
   let menuUntil = 0;
   /** Actions du menu de la page (clic droit du téléphone), par identifiant. */
@@ -547,20 +564,28 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     sendTo(active, { t: 'page', ...state });
   }
 
+  /**
+   * Le champ qui a le clavier part au téléphone quand il change (autre champ, autre libellé), ou
+   * après un clic, Tab ou Entrée, avec son texte, que le téléphone reprend. Pas à chaque relevé :
+   * le texte change pendant qu'on tape au téléphone, et le renvoyer effacerait ce qui est en route.
+   */
   function pushField(force = false): void {
     if (!active || pairing?.session() !== 'paired' || !target) return;
-    const text = JSON.stringify(field ?? null);
-    if (!force && text === fieldSent) return;
-    fieldSent = text;
+    const key = JSON.stringify(field ? { where: typingIn, kind: field.kind, label: field.label } : null);
+    if (!force && !fieldFresh && key === fieldSent) return;
+    fieldSent = key;
+    fieldFresh = false;
     sendTo(active, { t: 'field', field: field ?? null });
   }
 
-  /** Le champ qui a le clavier, dans le premier cadre de la page qui en a un. */
-  async function probeField(): Promise<void> {
-    if (!target || target.view.webContents.isDestroyed() || pairing?.session() !== 'paired') return;
+  /** Le champ qui a le clavier, là où le téléphone tape (page ou bandeau), dans le premier cadre qui en a un. */
+  async function probeField(fresh = false): Promise<void> {
+    if (fresh) fieldFresh = true;
+    const contents = typingContents();
+    if (!target || !contents || pairing?.session() !== 'paired') return;
     // Le cadre qui a le focus d'abord ; sans focus nulle part (fenêtre en arrière-plan), le champ resté actif.
     let found: RemoteField | undefined;
-    for (const frame of target.view.webContents.mainFrame.framesInSubtree) {
+    for (const frame of contents.mainFrame.framesInSubtree) {
       let one: RemoteField | undefined;
       try {
         one = readRemoteField(await frame.executeJavaScript(REMOTE_FOCUS_PROBE));
@@ -570,7 +595,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       if (one && (one.focused || !found)) found = one;
       if (found?.focused) break;
     }
-    field = found && { kind: found.kind, label: found.label };
+    field = found && { kind: found.kind, label: found.label, ...(found.value !== undefined ? { value: found.value } : {}) };
     pushField();
     pushPage();
   }
@@ -582,9 +607,40 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     return contents && !contents.isDestroyed() ? contents : undefined;
   }
 
+  /** Toute la fenêtre « Récupérer » : le pointeur va du bandeau au bas de la page. */
   function area(): { width: number; height: number } {
-    const b = target?.view.getBounds();
-    return { width: Math.max(1, b?.width ?? 1), height: Math.max(1, b?.height ?? 1) };
+    const [width, height] = target && !target.win.isDestroyed() ? target.win.getContentSize() : [1, 1];
+    return { width: Math.max(1, width ?? 1), height: Math.max(1, height ?? 1) };
+  }
+
+  function zoneContents(zone: Zone): WebContents | undefined {
+    const contents = zone === 'bar' ? target?.win.webContents : target?.view.webContents;
+    return contents && !contents.isDestroyed() ? contents : undefined;
+  }
+
+  /** Là où vont le texte et les touches du téléphone. */
+  function typingContents(): WebContents | undefined {
+    return zoneContents(typingIn);
+  }
+
+  /** Ce qui est sous le pointeur : la page (coordonnées de la page) ou le bandeau (celles de la fenêtre). */
+  function under(): { zone: Zone; contents: WebContents; x: number; y: number } | undefined {
+    if (!target) return undefined;
+    const page = target.view.getBounds();
+    const zone: Zone = at.x >= page.x && at.x < page.x + page.width && at.y >= page.y && at.y < page.y + page.height ? 'page' : 'bar';
+    const contents = zoneContents(zone);
+    if (!contents) return undefined;
+    return zone === 'page' ? { zone, contents, x: Math.round(at.x - page.x), y: Math.round(at.y - page.y) } : { zone, contents, x: Math.round(at.x), y: Math.round(at.y) };
+  }
+
+  /** La souris sur place, là où est le pointeur ; la zone quittée sort du survol. */
+  function hover(): ReturnType<typeof under> {
+    const here = under();
+    if (!here) return undefined;
+    if (hoverIn && hoverIn !== here.zone) zoneContents(hoverIn)?.sendInputEvent({ type: 'mouseLeave', x: -1, y: -1 });
+    hoverIn = here.zone;
+    here.contents.sendInputEvent({ type: 'mouseMove', x: here.x, y: here.y });
+    return here;
   }
 
   function key(contents: WebContents, keyCode: string, modifiers: ('shift')[] = []): void {
@@ -597,50 +653,80 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   const KEY_CODES = { Enter: 'Return', Tab: 'Tab', Backspace: 'Backspace', ArrowLeft: 'Left', ArrowRight: 'Right', ArrowUp: 'Up', ArrowDown: 'Down', Space: 'Space' } as const;
 
+  /** Du texte là où est le curseur : un saut de ligne (zone de texte) par la touche Entrée, le reste tel quel (accents, émojis). */
+  async function typeText(contents: WebContents, text: string): Promise<void> {
+    for (const [i, part] of text.split('\n').entries()) {
+      if (i) key(contents, 'Return');
+      if (part) await contents.insertText(part);
+    }
+  }
+
   async function inject(message: PhoneMessage): Promise<void> {
     if (mode() !== 'browser') return injectMenu(message);
-    const contents = wc();
-    if (!contents || !target) return;
+    if (!target || !wc()) return;
     switch (message.t) {
       case 'move': {
-        at = movePointer(at, message, area());
-        contents.sendInputEvent({ type: 'mouseMove', x: Math.round(at.x), y: Math.round(at.y) });
+        const now = Date.now();
+        speed = smoothSpeed(speed, message, now - lastMoveAt);
+        lastMoveAt = now;
+        at = movePointer(at, { ...message, speed }, area());
+        hover();
         placePointer();
         return;
       }
       case 'click': {
-        const x = Math.round(at.x);
-        const y = Math.round(at.y);
         if (message.button === 'right') menuUntil = Date.now() + MENU_MS;
-        contents.focus();
-        contents.sendInputEvent({ type: 'mouseDown', x, y, button: message.button, clickCount: message.count });
-        contents.sendInputEvent({ type: 'mouseUp', x, y, button: message.button, clickCount: message.count });
+        const here = hover();
+        if (!here) return;
+        // Le texte et les touches suivront là où l'on a cliqué : la page, ou le bandeau (son champ de recherche).
+        typingIn = here.zone;
+        here.contents.focus();
+        here.contents.sendInputEvent({ type: 'mouseDown', x: here.x, y: here.y, button: message.button, clickCount: message.count });
+        here.contents.sendInputEvent({ type: 'mouseUp', x: here.x, y: here.y, button: message.button, clickCount: message.count });
         flashPointer();
-        setTimeout(() => void probeField(), 180);
+        setTimeout(() => void probeField(true), 180);
         return;
       }
       case 'scroll': {
         const { deltaX, deltaY } = wheelFor(message);
+        // Toujours la page (le bandeau ne défile pas), au plus près du pointeur s'il est dans le bandeau.
+        const contents = zoneContents('page');
+        if (!contents) return;
+        const page = target.view.getBounds();
+        const x = Math.round(Math.min(Math.max(at.x - page.x, 0), page.width - 1));
+        const y = Math.round(Math.min(Math.max(at.y - page.y, 0), page.height - 1));
         // La souris d'abord sur place : après un chargement, Chromium perd une molette qu'aucun mouvement n'a précédée (banc du 06/11/2026).
-        contents.sendInputEvent({ type: 'mouseMove', x: Math.round(at.x), y: Math.round(at.y) });
-        contents.sendInputEvent({ type: 'mouseWheel', x: Math.round(at.x), y: Math.round(at.y), deltaX, deltaY, hasPreciseScrollingDeltas: true, canScroll: true });
+        contents.sendInputEvent({ type: 'mouseMove', x, y });
+        contents.sendInputEvent({ type: 'mouseWheel', x, y, deltaX, deltaY, hasPreciseScrollingDeltas: true, canScroll: true });
         return;
       }
       case 'text': {
+        const contents = typingContents();
+        if (!contents) return;
         contents.focus();
         for (let i = 0; i < message.del; i++) key(contents, 'Backspace');
-        // Un saut de ligne (zone de texte) passe par la touche Entrée, le reste tel quel (accents, émojis).
-        const parts = message.ins.split('\n');
-        for (const [i, part] of parts.entries()) {
-          if (i) key(contents, 'Return');
-          if (part) await contents.insertText(part);
-        }
+        await typeText(contents, message.ins);
+        return;
+      }
+      case 'set': {
+        // Champ repris au téléphone : tout son texte, remplacé par celui du téléphone, comme un
+        // collage (Ctrl+A puis le texte, ou Effacer s'il est vide). Juste où que le curseur soit
+        // dans le champ de la borne et où que l'on ait corrigé sur le téléphone.
+        const contents = typingContents();
+        if (!contents) return;
+        contents.focus();
+        contents.sendInputEvent({ type: 'keyDown', keyCode: 'A', modifiers: ['control'] });
+        contents.sendInputEvent({ type: 'keyUp', keyCode: 'A', modifiers: ['control'] });
+        if (message.value) await typeText(contents, message.value);
+        else key(contents, 'Backspace');
         return;
       }
       case 'key': {
+        const contents = typingContents();
+        if (!contents) return;
         contents.focus();
         key(contents, KEY_CODES[message.key], message.shift ? ['shift'] : []);
-        if (message.key === 'Tab' || message.key === 'Enter') setTimeout(() => void probeField(), 180);
+        if (message.key === 'Tab' || message.key === 'Enter') setTimeout(() => void probeField(true), 180);
         return;
       }
       case 'nav':
@@ -656,7 +742,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         return;
       }
       case 'search':
-        target.runSearch?.(message.query);
+        target.runSearch?.(message.query, message.engine);
         return;
       default:
         return;
@@ -671,7 +757,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         if (mode() === 'menu') button(message.b, message.down);
         return;
       case 'set':
-        if (mode() === 'menu') menu.setText(message.value);
+        // Le clavier à l'écran n'a qu'une ligne : un saut de ligne (permis pour une zone de texte d'une page) y devient une espace.
+        if (mode() === 'menu') menu.setText(message.value.replace(/\n/g, ' '));
         return;
       case 'key':
         if (mode() === 'menu' && message.key === 'Enter') menu.enter();
@@ -881,36 +968,41 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   // --- Pointeur ---------------------------------------------------------------
 
+  /** Fenêtre du pointeur, transparente, sur toute la fenêtre « Récupérer » (remote-pointer.ts). */
   function makePointer(win: BrowserWindow): void {
-    pointer = new WebContentsView({ webPreferences: { contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: OFFSCREEN, javascript: true } });
-    win.contentView.addChildView(pointer);
-    pointer.webContents.setAudioMuted(true);
-    pointer.setBackgroundColor('#00000000');
-    pointer.setVisible(false);
-    void pointer.webContents.loadFile(path.join(rendererDir, 'remote-pointer.html')).catch(() => undefined);
+    pointer = pointerWindow(win, rendererDir, (p) => pointer === p && placePointer(true));
   }
 
-  function placePointer(): void {
-    if (!pointer || !target) return;
-    const page = target.view.getBounds();
-    placeOver(pointer, { x: page.x + Math.round(at.x) - POINTER_TIP, y: page.y + Math.round(at.y) - POINTER_TIP, ...POINTER_BOX });
+  function pointerSend(message: Record<string, unknown>): void {
+    if (pointer && !pointer.isDestroyed()) pointer.webContents.send('pointer', message);
+  }
+
+  /** Où est la pointe ; `jump` : sans glisser jusque-là (première liaison, retour après une coupure). */
+  function placePointer(jump = false): void {
+    pointerSend({ x: at.x, y: at.y, show: pointerShown, jump });
   }
 
   function showPointer(on: boolean): void {
-    if (!pointer || pointer.webContents.isDestroyed()) return;
-    on = on && Boolean(target);
-    if (on) {
-      // Au milieu de la page à la première liaison ; il reste où on l'a laissé après une coupure.
-      if (!at.x && !at.y) at = { x: area().width / 2, y: area().height / 2 };
-      placePointer();
-      // Au-dessus de tout : la page a pu être reposée sous le bandeau depuis.
-      target?.win.contentView.addChildView(pointer);
+    // Seulement au navigateur (pushState : showPointer(mode === 'browser')).
+    pointerShown = on && Boolean(target);
+    // Au milieu de la page à la première liaison ; il reste où on l'a laissé après une coupure.
+    if (pointerShown && !at.x && !at.y && target) {
+      const page = target.view.getBounds();
+      at = { x: page.x + page.width / 2, y: page.y + page.height / 2 };
     }
-    pointer.setVisible(on);
+    placePointer(true);
   }
 
   function flashPointer(): void {
-    if (pointer && !pointer.webContents.isDestroyed()) void pointer.webContents.executeJavaScript('window.flash && window.flash()').catch(() => undefined);
+    pointerSend({ flash: true });
+  }
+
+  function closePointer(): void {
+    const p = pointer;
+    pointer = undefined;
+    pointerShown = false;
+    // close(), jamais destroy() : voir game-notice.ts (dispose).
+    if (p && !p.isDestroyed()) p.close();
   }
 
   // --- Ouverture et fermeture du navigateur intégré ------------------------------
@@ -1038,6 +1130,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     target = next;
     surfaces.add('browser');
     at = { x: 0, y: 0 };
+    speed = undefined;
+    typingIn = 'page';
+    hoverIn = undefined;
     field = undefined;
     makePointer(next.win);
     const contents = next.view.webContents;
@@ -1046,7 +1141,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     contents.on('did-stop-loading', () => void probeField());
     next.win.on('closed', () => {
       if (target === next) detach();
-      if (pointer && !pointer.webContents.isDestroyed()) pointer.webContents.close();
+      closePointer();
     });
     wake();
     pushState();
@@ -1072,8 +1167,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     target = undefined;
     surfaces.delete('browser');
     menuItems = new Map();
-    if (pointer && !pointer.webContents.isDestroyed()) pointer.webContents.close();
-    pointer = undefined;
+    closePointer();
+    typingIn = 'page';
+    hoverIn = undefined;
     if (!menu) {
       if (pairing) sleep('closed');
       log('Télécommande : navigateur intégré fermé, liaison coupée.'); // i18n-ignore : journal
@@ -1160,10 +1256,10 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     },
     /** La page ou ses actions ont changé (téléchargement, page vidéo) : le téléphone suit. */
     pageChanged: () => pushPage(),
-    /** Pour les essais : adresse servie, et position du pointeur dans la page. */
+    /** Pour les essais : adresse servie, position du pointeur (contenu de la fenêtre, bandeau compris), sa fenêtre. */
     address: () => address,
     pointerAt: () => ({ ...at }),
-    pointerView: () => pointer,
+    pointerWindow: () => pointer,
     /** Pour les essais : l'envoi en cours. */
     uploadState: () => (upload ? { name: upload.name, received: upload.received, size: upload.size, part: upload.part } : undefined),
   };

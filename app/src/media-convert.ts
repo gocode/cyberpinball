@@ -1,5 +1,4 @@
-// Conversions des fichiers reçus de la recherche libre (docs/recherche/sources-medias.md
-// § 7), sans outil externe : le moteur de Chromium d'Electron décode, dans une page
+// Conversions des fichiers reçus de la recherche libre, sans outil externe : le moteur de Chromium d'Electron décode, dans une page
 // cachée (une vue sans fenêtre, jamais affichée), ce que le menu ne lit pas.
 //
 // - Image (jpg pour le logo, bmp, avif, ico…) : redessinée en PNG.

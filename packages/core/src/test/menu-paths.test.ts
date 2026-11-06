@@ -13,7 +13,7 @@ import { REPO_ROOT, interfaceSources } from './i18n-scan';
 
 /** Entrées regroupées dans « Ajouter une table » : en français et en anglais. */
 const MOVED = ['Trouver une table', 'Find a table', 'Liste d’attente', 'Download queue', 'Récupérés et attendus', 'Mises à jour des tables', 'Table updates', 'Comptes des sites', 'Site accounts'];
-const DOCS = ['docs/manuel.md', 'docs/manual.md', 'docs/tests-manuels.md', 'docs/manual-tests.md', 'README.md', 'README.fr.md'];
+const DOCS = ['docs/manuel.md', 'docs/manual.md', 'interne/tests-manuels/tests-manuels.md', 'interne/tests-manuels/manual-tests.md', 'README.md', 'README.fr.md'];
 
 test('menu système : les entrées regroupées dans « Ajouter une table » n’y sont plus citées au premier niveau', () => {
   // Apostrophe droite ou typographique : « Liste d'attente » comme « Liste d’attente ».

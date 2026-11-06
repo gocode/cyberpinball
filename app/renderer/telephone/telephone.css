@@ -123,8 +123,8 @@ body[data-state='connecting'] .dot {
 }
 
 /*
- * Au menu : l'écran affiché, puis ce qui y est choisi, sur deux lignes au plus (revue de Codex du
- * 06/11/2026) ; hauteur fixe, pour que les boutons ne bougent pas d'une table à l'autre.
+ * Au menu : l'écran affiché, puis ce qui y est choisi, sur deux lignes au plus ;
+ * hauteur fixe, pour que les boutons ne bougent pas d'une table à l'autre.
  */
 body:not([data-mode='browser']) .page {
   min-height: 66px;
@@ -894,6 +894,38 @@ body[data-layout='editing'][data-short='true'] .tool .icon {
 
 .sheet-search[hidden] {
   display: none;
+}
+
+/* Moteurs de la recherche libre (Web, Images, YouTube, Vidéo), comme dans le bandeau de la borne. */
+.engines {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.engines[hidden] {
+  display: none;
+}
+
+.engine {
+  min-width: 0;
+  min-height: 44px;
+  padding: 0 6px;
+  overflow: hidden;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 15px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.engine[aria-checked='true'] {
+  border-color: var(--signal);
+  box-shadow: inset 0 0 0 1px var(--signal);
+  color: var(--signal);
+  font-weight: 600;
 }
 
 .sheet-actions {

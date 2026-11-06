@@ -130,7 +130,7 @@ function checkPath(parts: string[]): string | undefined {
 }
 
 function textFiles(): string[] {
-  const docs = ['manuel.md', 'manual.md', 'tests-manuels.md', 'manual-tests.md'].map((f) => path.join(REPO, 'docs', f));
+  const docs = [...['manuel.md', 'manual.md'].map((f) => path.join(REPO, 'docs', f)), ...['tests-manuels.md', 'manual-tests.md'].map((f) => path.join(REPO, 'interne', 'tests-manuels', f))];
   const readmes = ['README.md', 'README.fr.md'].map((f) => path.join(REPO, f));
   const code = [APP, path.join(REPO, 'packages', 'core', 'src'), path.join(REPO, 'packages', 'core', 'src', 'i18n', 'en')].flatMap((dir) =>
     fs

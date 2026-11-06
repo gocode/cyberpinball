@@ -1,4 +1,4 @@
-// Écran « Médias » de la fiche d'une table (T8, docs/recherche/medias.md § 5.5) :
+// Écran « Médias » de la fiche d'une table :
 // chaque type de média avec sa fonction, l'écran et le moment où il s'affiche, ce
 // qui est montré aujourd'hui (fichier du jeu ou repli, et lequel), un aperçu, et
 // les actions : prendre un fichier dans le dossier d'import, sur ce PC ou glissé

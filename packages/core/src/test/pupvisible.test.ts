@@ -302,8 +302,8 @@ function display(gdi: string, name: string, x: number, serial: string): Observed
 
 test('écrans que VPX confond : deux « PL2294H » pour le fronton et le DMD, signalés pour VPX 10.8.1 seulement', () => {
   const pf = display('\\\\.\\DISPLAY1', 'Laptop', 0, '1');
-  const bg = display('\\\\.\\DISPLAY2', 'PL2294H', 1920, '1172903211084');
-  const dmd = display('\\\\.\\DISPLAY3', 'PL2294H', 3840, '1172903211937');
+  const bg = display('\\\\.\\DISPLAY2', 'PL2294H', 1920, '1100000001084');
+  const dmd = display('\\\\.\\DISPLAY3', 'PL2294H', 3840, '1100000001937');
   const observed = [pf, bg, dmd];
   const [fp0, fp1, fp2] = observed.map((d) => fingerprintOf(d).key);
   const saved = observed.map((d) => ({ fingerprint: fingerprintOf(d).key, strength: 'strong', label: d.friendlyName, widthPx: 1920, heightPx: 1080, widthCm: 48, heightCm: 27, lastSeen: d }) as PhysicalScreen);
@@ -324,7 +324,9 @@ test('pendant la partie, aucune fenêtre de Cyber Pinball ne reste au-dessus des
     .readdirSync(SOURCES)
     .filter((f) => f.endsWith('.ts'))
     .filter((f) => /setAlwaysOnTop\(\s*true|alwaysOnTop:\s*true/.test(fs.readFileSync(path.join(SOURCES, f), 'utf8')));
-  assert.deepEqual(topmost, ['acquire-window.ts', 'game-notice.ts', 'game-recording.ts', 'in-game-menu.ts'], 'toute fenêtre au premier plan doit être fermée par closeTopmostWindows avant la partie');
+  // remote-pointer.ts : le pointeur du téléphone, rattaché à la fenêtre « Récupérer » (fermé avec
+  // elle) et, comme toute fenêtre au premier plan, fermé par closeTopmostWindows.
+  assert.deepEqual(topmost, ['acquire-window.ts', 'game-notice.ts', 'game-recording.ts', 'in-game-menu.ts', 'remote-pointer.ts'], 'toute fenêtre au premier plan doit être fermée par closeTopmostWindows avant la partie');
   // Seule exception : le témoin de l'enregistrement d'une partie, voulu au-dessus de VPX. Il ne couvre
   // qu'un coin du plateau (420 × 72 pour 1080 px), naît après closeTopmostWindows, ignore la souris,
   // n'apparaît pas dans la capture, et disparaît à la fin de l'enregistrement.

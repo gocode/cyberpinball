@@ -49,7 +49,6 @@ export const messages: Record<string, string> = {
   Confirmer: 'Confirm',
   'La roue montre la nouvelle vidéo dès le retour aux tables': 'The wheel shows the new video as soon as you are back to the tables',
   'Écriture interrompue : {error}. Ce qui a déjà été fait est resté ; les fichiers retirés sont dans la corbeille.': 'Writing interrupted: {error}. What was already done stays; the removed files are in the recycle bin.',
-  // Revus par Codex (29/10/2026)
   'Filmée pendant que vous jouez, la partie devient la vidéo de la table sur la roue. Aucun bouton à presser : l’enregistrement s’arrête seul, ou quand vous quittez la table. Au retour, vous décidez quoi garder.':
     'Filmed while you play, the game becomes the table’s video on the wheel. No button to press: recording stops by itself, or when you leave the table. When you come back, you decide what to keep.',
   '{duration} s de vidéo ; la partie continue': '{duration} s of video; the game goes on',

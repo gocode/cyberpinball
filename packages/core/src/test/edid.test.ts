@@ -5,13 +5,13 @@ import { makeEdid } from './fixtures';
 
 test('lit fabricant, produit, série texte, nom et taille', () => {
   const info = parseEdid(
-    makeEdid({ manufacturer: 'SAM', productCode: 0x0c8d, serialText: 'H4LN301501', monitorName: 'S22E450', widthCm: 48, heightCm: 27 }),
+    makeEdid({ manufacturer: 'SAM', productCode: 0x0c8d, serialText: 'H0XX000001', monitorName: 'S22E450', widthCm: 48, heightCm: 27 }),
   );
   assert.deepEqual(info, {
     manufacturer: 'SAM',
     productCode: 0x0c8d,
     serialNumber: 0,
-    serialText: 'H4LN301501',
+    serialText: 'H0XX000001',
     monitorName: 'S22E450',
     widthCm: 48,
     heightCm: 27,

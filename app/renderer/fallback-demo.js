@@ -136,7 +136,7 @@ const kind = params.get('composant');
 if (kind && MOUNT[kind]) single(kind);
 else gallery();
 
-// Pour les captures sans opérateur (docs/demo-replis.mjs) : prêt une fois les polices
+// Pour les captures sans opérateur : prêt une fois les polices
 // chargées et deux images dessinées ; défauts relevés par les composants eux-mêmes.
 window.demoProblems = () => handles.flatMap((h) => h.problems());
 document.fonts.ready.then(() =>

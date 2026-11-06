@@ -1,5 +1,5 @@
 // Bornes fictives du réseau simulé (CYBERPINBALL_RESEAU=simule et CYBERPINBALL_RESEAU_DEMO) :
-// la démonstration docs\demo-amis.ps1 montre les écrans « Amis » peuplés, sans aucune borne
+// la démonstration des amis montre les écrans « Amis » peuplés, sans aucune borne
 // réelle. Elles tournent dans le processus, sur le réseau d'essai de 127.0.0.1 de la borne :
 //   Bruno  : ami, en partie sur une table, vient de battre son record et de gagner un badge ;
 //            partage sa bibliothèque (une table que la borne a aussi, dans une autre version,
@@ -22,11 +22,11 @@
 // =parties-enchainees : trois parties à la suite (essai réel du 04/11/2026 : la deuxième ne
 // finissait pas de charger) ; Bruno a deux tables en commun avec la borne, et réinvite après chaque
 // partie : la même table deux fois, puis l'autre.
-// CYBERPINBALL_RESEAU_DEMO=coupure (gestionnaire de téléchargements, docs\demo-gestionnaire-telechargements.ps1) :
+// CYBERPINBALL_RESEAU_DEMO=coupure (gestionnaire de téléchargements) :
 // la table que la borne n'a pas pèse 24 Mo, Bruno l'envoie à débit bridé et se déconnecte en
 // plein envoi ; =retour : au démarrage suivant de Cyber Pinball, Bruno (même borne, même clé)
 // revient après quelques secondes, et l'envoi reprend là où il s'était arrêté.
-// CYBERPINBALL_RESEAU_DEMO=notifications (menu des tables, docs\demo-notifications-roue.ps1) :
+// CYBERPINBALL_RESEAU_DEMO=notifications (menu des tables) :
 // David, Fanny et Émile sont des amis déjà connus, hors ligne au départ (écrits avant le
 // démarrage, leurs bornes aussi), Chloé envoie une demande qui attend ; puis, à heures fixes
 // (NOTIFICATIONS_SCRIPT), David et Fanny se connectent ensemble, Bruno lance une partie, bat son record ; sa grosse table part à débit bridé quand on
@@ -34,7 +34,7 @@
 // réception), Émile (l'ami hors ligne) se connecte, Bruno gagne un badge et lance une autre
 // partie : trois nouveautés, un seul résumé au retour ; la table finit ensuite au menu des tables.
 // Leurs dossiers sont dans <données>\reseau-simule\ (le bac à sable de l'essai).
-// Leurs tables sont inventées, comme celles de docs\demo-captures.cjs (DEMO_TABLES) : les captures
+// Leurs tables sont inventées, comme celles des captures de la page du projet : les captures
 // de ces démonstrations vont sur la page publique du projet, aucun vrai jeu ne doit y paraître
 // (packages\core\src\test\demo-tables-inventees.test.ts).
 
@@ -60,7 +60,7 @@ const LIVE_CUT_MS = 12_000;
 
 /**
  * Tables des bornes fictives, toutes inventées : Bruno joue à une table que la borne a aussi
- * (celles de docs\demo-captures.cjs), Émile a battu son record sur une autre ; Bruno partage une
+ * (celles des captures de la page du projet), Émile a battu son record sur une autre ; Bruno partage une
  * table que la borne n'a pas (`notOnCabinet`, dossier de sa bibliothèque).
  */
 export const DEMO_TABLES = {
@@ -90,7 +90,7 @@ const RETURN_AFTER_MS = 7000;
 
 /**
  * Démonstration des notifications du menu des tables : ce que font les bornes fictives, en
- * millisecondes après leur démarrage (l'autopilote de docs\demo-notifications-roue.ps1 regarde le
+ * millisecondes après leur démarrage (l'autopilote de la démonstration regarde le
  * menu des tables pendant ce temps ; les connexions des dix premières secondes ne sont pas
  * annoncées), puis après le premier morceau de la table de Bruno (l'écran de réception est
  * ouvert : rien ne doit s'y montrer).
@@ -422,7 +422,7 @@ export async function startSimulatedPlayers(main: SocialNet, dataDir: string, mi
     timers.push(setTimeout(() => void invite(tries + 1), 2000));
   };
   /**
-   * Fins d'invitation (docs\demo-amis.ps1 -Parcours fins-invitation, essai réel du 04/11/2026) : Bruno
+   * Fins d'invitation (parcours « fins-invitation » de la démonstration) : Bruno
    * invite la borne pendant qu'elle est dans un sous-écran du menu système, puis annule ; réinvite,
    * et voit son refus ; puis l'invite pendant sa partie, et annule encore. Chaque étape attend ce
    * qu'en voit une vraie borne (le refus, la borne en partie), ou le signal que l'autopilote pose

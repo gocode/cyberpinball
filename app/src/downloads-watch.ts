@@ -1,5 +1,4 @@
-// Surveillance du dossier Téléchargements de Windows (docs/recherche/acquisition.md
-// § 8.3, étape A6), pour ce que l'utilisateur récupère dans son propre navigateur :
+// Surveillance du dossier Téléchargements de Windows, pour ce que l'utilisateur récupère dans son propre navigateur :
 // seulement si l'utilisateur l'a activée, et seulement tant que la liste d'attente
 // attend quelque chose. Un fichier en cours d'écriture (.crdownload, .part…) est
 // ignoré ; un fichier fini est remis quand sa taille ne bouge plus. Rien n'est déplacé

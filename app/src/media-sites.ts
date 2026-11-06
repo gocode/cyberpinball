@@ -1,5 +1,5 @@
-// Médias des sites communautaires, pour les propositions de chaque média (docs/recherche/
-// sources-medias.md § 6) : VPForums, puis VPUniverse en dernier recours. Cœur :
+// Médias des sites communautaires, pour les propositions de chaque média :
+// VPForums, puis VPUniverse en dernier recours. Cœur :
 // packages/core/src/mediasites.ts.
 //
 // - Recherche : les pages de résultats d'un site pour un titre (trois au plus), lues

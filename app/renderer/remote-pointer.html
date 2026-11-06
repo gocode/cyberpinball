@@ -5,13 +5,16 @@
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'self'; script-src 'self'" />
     <link rel="stylesheet" href="remote-pointer.css" />
   </head>
-  <!-- Pointeur du téléphone (app/src/phone-remote.ts) : une petite vue transparente posée sur la
-       page du navigateur intégré, sa pointe à 16 px du coin, de quoi y loger l'anneau ; un anneau au clic. -->
+  <!-- Pointeur du téléphone (app/src/phone-remote.ts) : une fenêtre transparente sur toute la
+       fenêtre « Récupérer », que les clics traversent ; la flèche y glisse d'une position à la
+       suivante (remote-pointer.js), sa pointe à 16 px du coin de sa boîte ; un anneau au clic. -->
   <body>
-    <span class="ring" id="ring"></span>
-    <svg class="arrow" viewBox="0 0 34 40" aria-hidden="true">
-      <path d="M3 3 L3 31 L10.5 24 L15.5 36 L20.5 34 L15.5 22.5 L25.5 22.5 Z" />
-    </svg>
+    <div class="pointer" id="pointer" hidden>
+      <span class="ring" id="ring"></span>
+      <svg class="arrow" viewBox="0 0 34 40" aria-hidden="true">
+        <path d="M3 3 L3 31 L10.5 24 L15.5 36 L20.5 34 L15.5 22.5 L25.5 22.5 Z" />
+      </svg>
+    </div>
     <script src="remote-pointer.js"></script>
   </body>
 </html>

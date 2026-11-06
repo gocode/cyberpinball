@@ -94,7 +94,7 @@ export interface ObservedDisplay {
    * PnP générique ». SDL s'en sert quand le nom convivial est vide.
    */
   monitorDescription?: string;
-  /** Chemin d'interface du moniteur, par exemple « \\?\DISPLAY#SAM0C8D#8&20834467&0&UID257#{...} ». */
+  /** Chemin d'interface du moniteur, par exemple « \\?\DISPLAY#SAM0C8D#8&1f2e3d4c&0&UID257#{...} ». */
   devicePath: string;
   /** Position et taille sur le bureau, en pixels physiques. */
   bounds: Rect;

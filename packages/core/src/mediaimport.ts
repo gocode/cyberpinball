@@ -1,4 +1,4 @@
-// Import des médias de présentation (tâche T9 de docs/recherche/medias.md, § 5.5).
+// Import des médias de présentation.
 //
 // Dans une archive, une sélection ou l'installation d'un autre frontend, on
 // reconnaît les médias rangés à la manière de PinUP Popper

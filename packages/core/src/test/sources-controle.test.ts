@@ -25,7 +25,7 @@ function* textFiles(dir: string): Generator<string> {
 
 test('aucun caractère de contrôle dans les sources texte', () => {
   const found: string[] = [];
-  for (const top of ['app', 'packages', 'docs', 'scripts']) {
+  for (const top of ['app', 'packages', 'docs', 'scripts', 'interne'].filter((dir) => fs.existsSync(path.join(REPO_ROOT, dir)))) {
     for (const file of textFiles(path.join(REPO_ROOT, top))) {
       const lines = fs.readFileSync(file, 'utf8').split('\n');
       lines.forEach((line, i) => {

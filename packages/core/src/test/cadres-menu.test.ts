@@ -1,11 +1,11 @@
-// Zones du menu des tables qui se recouvrent (revue de Codex du 29/10/2026) : au bureau, sur un écran
+// Zones du menu des tables qui se recouvrent : au bureau, sur un écran
 // 4:3 ou 5:4, le fronton et le bandeau de la roue couvraient presque tout le cadre 9:16 du plateau.
 // Le garde-fou de mise en page n'en disait rien : aucun texte ne s'y chevauchait. Deux maillons :
 // - le menu (frontend.html, frontend.js) range chacun de ses cadres dans une zone (data-frame) ;
 // - le garde-fou (layout-check.ts), dans un vrai Chromium hors écran : deux zones différentes qui se
 //   recouvrent, ou un cadre qui sort de la zone du playfield, sont signalés ; pas deux cadres d'une
 //   même zone (la roue mord sur le fronton), ni un fond qui couvre toute la zone (le média en borne).
-// La disposition elle-même se vérifie sur la vraie page, de 5:4 à 4K : docs\demo-noms-roue.ps1.
+// La disposition elle-même se vérifie sur la vraie page, de 5:4 à 4K : interne\demos\demo-noms-roue.ps1.
 
 import assert from 'node:assert/strict';
 import { runElectron } from './electron-run';

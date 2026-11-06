@@ -1265,7 +1265,7 @@ function bilanCard(view, nav) {
   flight.append(el('div', 'gr-trail'), logo, el('div', 'gr-ring'));
   slot.append(flight);
   // Logo large et bas (la plupart des roues détourées) : une réserve basse, posée sur le bord du panneau,
-  // l'image calée en bas ; le médaillon et les logos hauts gardent la grande (revue de Codex).
+  // l'image calée en bas ; le médaillon et les logos hauts gardent la grande.
   const shape = () => card.classList.toggle('gr-wide', face.tagName === 'IMG' && face.naturalHeight > 0 && face.naturalWidth / face.naturalHeight >= 1.6);
   if (face.tagName === 'IMG') {
     if (face.complete) shape();

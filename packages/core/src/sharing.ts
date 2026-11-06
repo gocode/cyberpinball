@@ -1,6 +1,5 @@
 // Partage entre bornes : les identités communes à toutes les bornes, quel que soit le moyen
 // d'échange (paquet sur une clé USB aujourd'hui, réseau pair à pair plus tard).
-// Conception : docs/recherche/partage-medias.md, § 2.
 //
 // - Une table : identifiant du jeu dans la base VPS, sinon ROM PinMAME, sinon titre normalisé
 //   et année. Les médias valent pour le jeu, pas pour une version de la table.
@@ -120,7 +119,7 @@ export function shareableType(raw: unknown): MediaType | undefined {
   return type && isShareableType(type) ? type : undefined;
 }
 
-/** Plus gros fichier accepté, par nature (docs/recherche/partage-medias.md, § 5.2). */
+/** Plus gros fichier accepté, par nature. */
 export const SHARE_MAX_BYTES: Readonly<Record<MediaKind, number>> = {
   image: 64 * 2 ** 20,
   audio: 128 * 2 ** 20,

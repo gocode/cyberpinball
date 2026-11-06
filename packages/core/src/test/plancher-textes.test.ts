@@ -1,4 +1,4 @@
-// Plancher de 20 px pour tout texte, tel qu'on le voit (revue de Codex du 29/10/2026) : sur la roue
+// Plancher de 20 px pour tout texte, tel qu'on le voit : sur la roue
 // du menu des tables, les noms des petits médaillons, réduits par scale(--s), passaient à 13,6 px
 // sans que rien ne le dise. Le garde-fou de mise en page ne mesurait que les icônes, et le test des
 // feuilles (sortie-de-liste.test.ts) ne lit que les corps en cqmin. Trois maillons :
@@ -236,7 +236,10 @@ test('garde-fou : la règle du plancher des textes est branchée sur le rendu r�
   assert.match(guard, /glyphScale\(el\)/, 'corps multiplié par l’échelle des transform');
   assert.match(guard, /iterations !== Infinity/, 'animation en boucle : son pas le plus petit');
   // Le banc des noms de la roue relève aussi en plein glissement, et échoue si la mesure voit ce que le garde-fou tait.
-  const bench = fs.readFileSync(path.join(REPO, 'docs', 'demo-noms-roue.cjs'), 'utf8');
+  // Banc des démonstrations : absent de la copie publique du dépôt.
+  const benchFile = path.join(REPO, 'interne', 'demos', 'demo-noms-roue.cjs');
+  if (!fs.existsSync(benchFile)) return;
+  const bench = fs.readFileSync(benchFile, 'utf8');
   assert.match(bench, /'glissement', 1, 90/);
   assert.match(bench, /que le garde-fou ne signale pas/);
 });

@@ -10,10 +10,6 @@ Set-Location $PSScriptRoot
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 
 $PointerFile = Join-Path $env:APPDATA 'CyberPinball\root.json'
-$DemoDir = Join-Path $PSScriptRoot 'tmp\demo'
-# Use-HorsEcran, Assert-EcransDuPoste : les démonstrations tournent hors écran (docs\hors-ecran.ps1).
-. (Join-Path $PSScriptRoot 'docs\hors-ecran.ps1')
-$HorsEcran = 'Env:CYBERPINBALL_HORS_ECRAN', 'Env:CYBERPINBALL_DISPLAYS'
 
 # Racine choisie à l'installation (mémorisée dans root.json), ou rien si pas encore installé.
 function Get-Root {
@@ -130,38 +126,6 @@ $Actions = [ordered]@{
     Label = 'Réglages de VPX (écran seul ; Exit pour fermer)'
     Run   = { Build; Step 'Réglages de VPX'; npx electron app --reglages }
   }
-  'demo-reglages' = @{
-    Label = 'Démo sans opérateur des réglages, hors écran (bac à sable, captures dans tmp\demo-reglages)'
-    Run   = {
-      Build
-      $dir = Join-Path $PSScriptRoot 'tmp\demo-reglages'
-      # Sur un bureau Windows caché : rien n'apparaît sur les écrans du poste.
-      if (Enter-BureauCache (Join-Path $PSScriptRoot 'lanceur.ps1') @{ Action = 'demo-reglages' }) { explorer.exe $dir; return }
-      Use-HorsEcran 'pc-dev'
-      if (Test-Path $dir) { Remove-Item $dir -Recurse -Force }
-      $env:CYBERPINBALL_HOME = Join-Path $dir 'home'
-      $sandboxIni = Join-Path $env:CYBERPINBALL_HOME 'sandbox\VPinballX.ini'
-      New-Item -ItemType Directory -Force (Split-Path $sandboxIni) | Out-Null
-      # La démo ne modifie qu'une copie du vrai VPinballX.ini, rangée dans le bac à sable.
-      $root = Get-Root
-      if ($root -and (Test-Path (Join-Path $root 'config\VPinballX.ini'))) { Copy-Item (Join-Path $root 'config\VPinballX.ini') $sandboxIni }
-      try {
-        Step 'Réglages généraux : volume du backglass à 80 %, puis onglet Avancé'
-        $env:CYBERPINBALL_CAPTURE = Join-Path $dir 'general'
-        $env:CYBERPINBALL_AUTOPILOT = ('ArrowDown,' * 8) + 'Enter,' + ('PageDown,' * 8) + 'ArrowDown,Enter,Tab,ArrowDown,ArrowDown,ArrowDown,Enter,' + ('ArrowDown,' * 5) + 'Enter,Escape,Escape'
-        npx electron app --reglages
-        Step 'Réglages de la première table : flippers à 0 % du bas de l''écran, difficulté à 80 %, liste des surcharges'
-        $env:CYBERPINBALL_CAPTURE = Join-Path $dir 'table'
-        $env:CYBERPINBALL_AUTOPILOT = 'ArrowDown,ArrowDown,Enter,ArrowDown,Enter,' + ('ArrowDown,' * 24) + 'Enter,' + ('PageDown,' * 8) + 'ArrowDown,Enter,Tab,ArrowDown,Enter,ArrowDown,Escape,Escape'
-        npx electron app --reglages --table=.vpx
-        Step "Fichiers écrits dans le bac à sable ($env:CYBERPINBALL_HOME)"
-        Get-ChildItem (Join-Path $env:CYBERPINBALL_HOME 'sandbox') -Recurse -File | ForEach-Object { $_.FullName }
-      } finally {
-        Remove-Item (@('Env:CYBERPINBALL_HOME', 'Env:CYBERPINBALL_CAPTURE', 'Env:CYBERPINBALL_AUTOPILOT') + $HorsEcran) -ErrorAction SilentlyContinue
-      }
-      if (-not (Test-BureauCache)) { explorer.exe $dir }
-    }
-  }
   'sync' = @{
     Label = 'Synchroniser VPinballX.ini avec les écrans branchés'
     Run   = { Build; Step 'Synchronisation'; node app/dist/sync-cli.js }
@@ -169,26 +133,6 @@ $Actions = [ordered]@{
   'ini' = @{
     Label = 'Afficher le VPinballX.ini géré par Cyber Pinball'
     Run   = { Show-Ini }
-  }
-  'endurance' = @{
-    Section = 'Essai à l''écran'
-    Label = "Test d'endurance (nécessite les écrans du poste) : lancements répétés d'une table, avec retour du focus"
-    Run   = {
-      Build
-      # De vraies parties de VPX : jamais hors écran, les écrans du poste sont pris pendant le test.
-      $env:CYBERPINBALL_A_L_ECRAN = '1'
-      $count = Read-Host 'Nombre de lancements [50]'
-      $seconds = Read-Host 'Secondes de jeu par lancement [10]'
-      $filter = Read-Host 'Morceau du nom de la table [première table]'
-      $env:CYBERPINBALL_STRESS = "$(if ($count) { $count } else { 50 }),$(if ($seconds) { $seconds } else { 10 })"
-      if ($filter) { $env:CYBERPINBALL_TABLE = $filter }
-      try {
-        Step "Endurance ($env:CYBERPINBALL_STRESS) : ne touchez à rien pendant le test"
-        npx electron app
-      } finally {
-        Remove-Item Env:CYBERPINBALL_STRESS, Env:CYBERPINBALL_TABLE, Env:CYBERPINBALL_A_L_ECRAN -ErrorAction SilentlyContinue
-      }
-    }
   }
   'deployer' = @{
     Section = 'Fabrication et publication sur GitHub'
@@ -272,51 +216,10 @@ $Actions = [ordered]@{
     Label = 'Appliquer la description et les sujets du dépôt GitHub (depuis package.json)'
     Run   = { Invoke-Checked { node scripts/decrire-github.mjs } 'La description du dépôt' }
   }
-  'essai-maj' = @{
-    Label = 'Essai complet de la mise à jour, hors écran (deux versions fabriquées ; 15 min environ)'
-    Run   = { Build; & (Join-Path $PSScriptRoot 'docs\demo-mise-a-jour.ps1') }
-  }
-  'essai-maj-legere' = @{
-    Label = 'Essai complet de la mise à jour légère, hors écran (publication rapide sur un site local ; 10 min environ)'
-    Run   = { Build; & (Join-Path $PSScriptRoot 'docs\demo-mise-a-jour.ps1') -Legere }
-  }
   'tests' = @{
-    Section = 'Essais sans opérateur'
+    Section = 'Tests'
     Label = 'Tests automatiques du cœur'
     Run   = { Invoke-Checked { npm test } 'Les tests' }
-  }
-  'demo' = @{
-    Label = 'Démo sans opérateur de l''assistant, hors écran (captures dans tmp\demo)'
-    Run   = {
-      # Sur un bureau Windows caché, hors écran sur les quatre écrans simulés du PC de développement.
-      if (Enter-BureauCache (Join-Path $PSScriptRoot 'lanceur.ps1') @{ Action = 'demo' }) { explorer.exe (Join-Path $DemoDir 'captures'); return }
-      Build
-      Use-HorsEcran 'pc-dev'
-      if (Test-Path $DemoDir) { Remove-Item $DemoDir -Recurse -Force }
-      $env:CYBERPINBALL_HOME = Join-Path $DemoDir 'home'
-      $env:CYBERPINBALL_CAPTURE = Join-Path $DemoDir 'captures'
-      # Playfield sur l'écran le plus à droite (flippers en bas, diagonale proposée), backglass sur le premier,
-      # DMD sur le suivant libre, pas de topper. Boutons : touches par défaut gardées (SansBoutons).
-      $env:CYBERPINBALL_AUTOPILOT = 'SansBoutons,ShiftLeft,Digit1,Digit1,Digit1,Digit1,ShiftRight,Digit1,Escape,Digit1'
-      # Aucune sortie audio simulée : l'étape « Son » est sautée, la séquence vaut sur tout PC.
-      New-Item -ItemType Directory -Force $DemoDir | Out-Null
-      $env:CYBERPINBALL_AUDIO_OUTPUTS = Join-Path $DemoDir 'sans-sortie-audio.json'
-      Set-Content -Path $env:CYBERPINBALL_AUDIO_OUTPUTS -Value '[]' -Encoding ASCII
-      try {
-        Step 'Assistant en pilote automatique'
-        npx electron app --assistant
-        Step 'Synchronisation dans le bac à sable de la démo'
-        node app/dist/sync-cli.js
-        Show-Ini
-      } finally {
-        Remove-Item (@('Env:CYBERPINBALL_HOME', 'Env:CYBERPINBALL_CAPTURE', 'Env:CYBERPINBALL_AUTOPILOT', 'Env:CYBERPINBALL_AUDIO_OUTPUTS') + $HorsEcran) -ErrorAction SilentlyContinue
-      }
-      Assert-HorsEcran (Join-Path $DemoDir 'captures')
-    }
-  }
-  'demos' = @{
-    Label = 'Toutes les démonstrations sans opérateur, hors écran (en arrière-plan, bilan dans tmp\demos)'
-    Run   = { Build; Step 'Démonstrations hors écran'; & (Join-Path $PSScriptRoot 'docs\demos-hors-ecran.ps1') }
   }
   'donnees' = @{
     Section = 'Dossiers'
@@ -327,6 +230,11 @@ $Actions = [ordered]@{
     }
   }
 }
+
+# Actions d'essai du développement (démonstrations hors écran, endurance, essais de mise à jour) :
+# un complément du dépôt de travail, absent de la copie publique.
+$Essais = Join-Path $PSScriptRoot 'interne\lanceur-essais.ps1'
+if (Test-Path $Essais) { . $Essais }
 
 function Invoke-Action([string]$Name) {
   if (-not $Actions.Contains($Name)) {

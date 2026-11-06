@@ -495,7 +495,7 @@ const TRAPS: Trap[] = [
       return { dressing: tableDressing(entry, { screen: dressScreen(cabinet), root: path.dirname(folder), cabinet, facts: scriptFacts(SCRIPT), b2sFullDmd: false, frameOf: pngFrame }) };
     },
   },
-  // Médias (docs/recherche/medias.md, § 5.5, tâche T11).
+  // Médias.
   { code: 'mediaUnreadable', arm: (folder) => write(media(folder, `(Backglass) ${TABLE}.flv`), 'flv') },
   { code: 'mediaMisnamed', arm: (folder) => write(media(folder, '(Wheel) Attack From Mars.png'), png(512, 512)) },
   { code: 'mediaStray', arm: (folder) => write(path.join(folder, 'POPMedia', 'Visual Pinball X', 'Wheel', `${TABLE}.png`), png(512, 512)) },

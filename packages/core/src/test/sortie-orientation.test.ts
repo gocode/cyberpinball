@@ -2,7 +2,7 @@
 // bureau et le menu Démarrer de l'écran du playfield restaient à l'envers. L'assistant tournait
 // l'écran dans Windows pour VPX (CDS_UPDATEREGISTRY) et l'y laissait.
 //
-// L'invariant, sur les écrans simulés de docs\ecrans (ceux de CYBERPINBALL_DISPLAYS) et un
+// L'invariant, sur les écrans simulés de packages\core\ecrans-simules (ceux de CYBERPINBALL_DISPLAYS) et un
 // Windows simulé qui distingue son réglage (gardé au redémarrage) du changement dynamique :
 // quel que soit le chemin de sortie, chaque écran retrouve l'orientation qu'il avait avant
 // Cyber Pinball, et le réglage de Windows n'est jamais changé, sauf pour lui rendre ce qu'une
@@ -34,7 +34,7 @@ import { REPO_ROOT } from './i18n-scan';
 
 const FIXTURES = ['borne.json', 'pc-dev.json', 'poste-deux-ecrans.json', 'un-ecran.json'];
 const fixture = (name: string): ObservedDisplay[] => {
-  const file = path.join(REPO_ROOT, 'docs', 'ecrans', name);
+  const file = path.join(REPO_ROOT, 'packages', 'core', 'ecrans-simules', name);
   return parseSimulatedDisplays(JSON.parse(fs.readFileSync(file, 'utf8')), file);
 };
 

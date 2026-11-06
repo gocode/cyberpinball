@@ -752,8 +752,9 @@ test('fenêtre au-dessus du menu (« Récupérer ») : aucune fenêtre de la bor
   assert.ok(onTop.includes('acquire-window.ts'));
   // Témoin de l'enregistrement d'une partie et invitation d'un ami pendant la partie : au-dessus de
   // VPX, jamais focalisés ni cliquables ; reprendre le focus le volerait à VPX. Ils le disent par
-  // leurs options, vérifiées ici.
-  const neverFocused = ['game-recording.ts', 'game-notice.ts'];
+  // leurs options, vérifiées ici. De même le pointeur du téléphone, sur la fenêtre « Récupérer » :
+  // focalisé, il prendrait le clavier à la page qu'on pilote.
+  const neverFocused = ['game-recording.ts', 'game-notice.ts', 'remote-pointer.ts'];
   for (const f of neverFocused) {
     const source = fs.readFileSync(path.join(dir, f), 'utf8');
     assert.match(source, /focusable: false,[\s\S]*?alwaysOnTop: true/, `${f} : fenêtre au-dessus non focalisable`);

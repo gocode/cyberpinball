@@ -18,7 +18,7 @@ import { test } from 'node:test';
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 
 /** Fichiers qui fabriquent les captures publiées : tables, bornes fictives, parcours rejoués. */
-const SOURCES = ['app/src/social-demo.ts', 'docs/demo-captures.cjs', 'docs/demo-captures.ps1', 'docs/demo-amis.ps1'];
+const SOURCES = ['app/src/social-demo.ts', 'interne/demos/demo-captures.cjs', 'interne/demos/demo-captures.ps1', 'interne/demos/demo-amis.ps1'];
 
 /** Fabricants réels, tels que les propose l'application (« Original » n'en est pas un). */
 function realManufacturers(): string[] {
@@ -45,7 +45,7 @@ function realTables(text: string, makers: readonly string[]): string[] {
 test('les démonstrations des images publiques ne nomment aucune table d’un vrai fabricant', () => {
   const makers = realManufacturers();
   assert.ok(makers.length > 10, `fabricants lus : ${makers.length}`);
-  const problems = SOURCES.flatMap((file) => realTables(fs.readFileSync(path.join(REPO, file), 'utf8'), makers).map((p) => `${file}:${p}`));
+  const problems = SOURCES.filter((file) => fs.existsSync(path.join(REPO, file))).flatMap((file) => realTables(fs.readFileSync(path.join(REPO, file), 'utf8'), makers).map((p) => `${file}:${p}`));
   assert.deepEqual(problems, []);
 });
 

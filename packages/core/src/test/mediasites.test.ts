@@ -251,7 +251,7 @@ test('page de résultats de VPUniverse : titres, catégories, nombre de pages, e
         ['14667', 'Game of Thrones 1.0.3 - Vídeo Topper', '160'],
         ['29635', 'Game Of Thrones Topper Video', '160'],
         ['32486', 'Game of Thrones Limited Edition (Stern 2015) - Diagonale Style Wheel', '127'],
-        ['25038', 'Game of Thrones Stark (Hursty Toppers)', '160'],
+        ['25038', 'Game of Thrones Stark (Topperfix Toppers)', '160'],
         ['31825', 'Game of Thrones Instruction Card / Rules', '91'],
       ],
       who,

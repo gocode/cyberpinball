@@ -142,7 +142,7 @@ html.narrow .what {
 
 /* ---------- Télécommande du téléphone (phone-remote.ts) : un cadre fixe de 420 × 108 entre ce
    qu'il faut télécharger et les boutons, qui passent alors en grille 2 × 2 (600 de large) pour
-   laisser le nom du jeu lisible (revue de Codex, 06/11/2026). Le QR code, le téléphone à accepter
+   laisser le nom du jeu lisible. Le QR code, le téléphone à accepter
    (son code), celui qui pilote, ou la raison pour laquelle la télécommande est indisponible. ---------- */
 
 html.with-remote .bar {
@@ -361,6 +361,14 @@ button:disabled {
   cursor: default;
 }
 
+/* Au clavier, le bouton qui a la main se voit (Tab, flèches) ; « Accepter » la prend d'office
+   quand un téléphone attend (acquire.js), d'où :focus en plus de :focus-visible. */
+button:focus-visible,
+.remote-actions button:focus {
+  outline: calc(3 * var(--u)) solid var(--accent);
+  outline-offset: calc(2 * var(--u));
+}
+
 button.close {
   border-color: var(--accent);
   color: var(--accent);
@@ -394,7 +402,7 @@ button.close {
   font-size: calc(20 * var(--u));
 }
 
-/* Écran étroit : le texte (volume, débit, temps restant) d'abord, la barre se contente de moins (revue de Codex). */
+/* Écran étroit : le texte (volume, débit, temps restant) d'abord, la barre se contente de moins. */
 html.narrow .download {
   grid-template-columns: minmax(0, 26fr) minmax(calc(48 * var(--u)), 10fr) 3.2em minmax(0, 54fr) auto;
   gap: calc(12 * var(--u));

@@ -1,4 +1,4 @@
-// Bibliothèque partagée entre amis (docs/recherche/partage-medias.md, § 14 et § 15), activée
+// Bibliothèque partagée entre amis, activée
 // par défaut : la liste de mes tables, les médias que le menu montre pour chacune, et chaque
 // table entière, partie par partie (table, fronton, ROM, PuP-Pack, sons…). Mes amis y prennent
 // les médias qui leur manquent, une table qu'ils n'ont pas, ou les parties qu'ils veulent d'une

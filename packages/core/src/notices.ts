@@ -42,7 +42,7 @@ export type NoticeKind =
   | 'live-left'
   | 'friend-request' | 'friend-accepted' | 'download-failed' | 'download-done' | 'friend-online' | 'friend-playing' | 'friend-record' | 'friend-badge';
 
-/** Bleu méta : une information ; vert : une réussite ; ambre : à voir ; rouge : bloqué (revue de Codex, 29/10/2026). */
+/** Bleu méta : une information ; vert : une réussite ; ambre : à voir ; rouge : bloqué. */
 export type NoticeTone = 'ok' | 'info' | 'warning' | 'error';
 
 /** Ce qu'un clic sur la notification ouvre (action du menu des tables). */

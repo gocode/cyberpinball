@@ -28,7 +28,7 @@ function sources(dir: string, found: string[] = []): string[] {
 }
 
 test('aucune copie de dossier ne passe par fs.cpSync : tout passe par copyTree', () => {
-  const dirs = ['packages/core/src', 'packages/installer/src', 'packages/win-displays/src', 'app/src', 'app/renderer', 'scripts', 'docs'];
+  const dirs = ['packages/core/src', 'packages/installer/src', 'packages/win-displays/src', 'app/src', 'app/renderer', 'scripts', 'docs', 'interne'].filter((dir) => fs.existsSync(path.join(REPO, dir)));
   const offenders: string[] = [];
   for (const dir of dirs) {
     for (const file of sources(path.join(REPO, dir))) {

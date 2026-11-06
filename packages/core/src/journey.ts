@@ -7,7 +7,7 @@
 // Pour une ROM absente : où la trouver (fichiers ROM de la base VPS, le nom exact d'abord
 // et le jeu de la table d'abord, puis les révisions voisines), ce qui est déjà attendu ou
 // reçu pour elle, la révision voisine déjà sur la borne. Cyber Pinball ne télécharge jamais
-// à la place de l'utilisateur sur les forums à compte (docs/recherche/acquisition.md) : il
+// à la place de l'utilisateur sur les forums à compte : il
 // ouvre la bonne page dans la fenêtre « Récupérer » et range le fichier que l'utilisateur y
 // télécharge, rattaché à la table.
 //

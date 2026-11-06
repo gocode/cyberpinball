@@ -24,6 +24,7 @@ import {
   sealRemoteBytes,
   uploadAad,
   fromBase64Url,
+  gestureSpeed,
   isLocalNetworkAddress,
   movePointer,
   openRemote,
@@ -31,9 +32,12 @@ import {
   pickLanAddress,
   readRemoteField,
   REMOTE_ACCEPT_MS,
+  REMOTE_FOCUS_PROBE,
   REMOTE_PAIRING_MS,
+  REMOTE_TEXT_MAX,
   remoteUrl,
   sealRemote,
+  smoothSpeed,
   toBase64Url,
   wheelFor,
 } from '../remote';
@@ -282,12 +286,58 @@ test('saisie : ce qui change dans le champ du téléphone, en effacements puis a
   assert.deepEqual(phone.textDiff('abc', 'abc'), { del: 0, ins: '' });
 });
 
-test('champ de la page : nature et libellé seulement, jamais la valeur', () => {
+/** La sonde du champ actif, lancée sur un faux document dont l'élément actif est `el`. */
+function runProbe(el: Record<string, unknown>): unknown {
+  const attrs = (el.attrs ?? {}) as Record<string, string>;
+  const element = { tagName: 'INPUT', isContentEditable: false, disabled: false, readOnly: false, id: '', closest: () => null, getAttribute: (name: string) => attrs[name] ?? null, ...el };
+  const document = { activeElement: element, querySelector: () => null, hasFocus: () => true };
+  return new Function('document', 'CSS', `return ${REMOTE_FOCUS_PROBE}`)(document, { escape: (s: string) => s });
+}
+
+test('champ de la page : son texte repris au téléphone, jamais celui d’un mot de passe ni d’un champ secret', () => {
   assert.deepEqual(readRemoteField({ kind: 'password', label: 'Mot de passe', value: 'secret', focused: true }), { kind: 'password', label: 'Mot de passe', focused: true });
+  assert.deepEqual(readRemoteField({ kind: 'text', label: 'Pseudo', value: 'Bille d’Été' }), { kind: 'text', label: 'Pseudo', value: 'Bille d’Été' });
+  assert.deepEqual(readRemoteField({ kind: 'text', label: 'Pseudo', value: 'x'.repeat(REMOTE_TEXT_MAX + 1) }), { kind: 'text', label: 'Pseudo' }, 'trop long : pas repris');
   assert.equal(readRemoteField({ kind: 'button' }), undefined);
   assert.equal(readRemoteField(null), undefined);
-  const probe = fs.readFileSync(path.join(REPO_ROOT, 'packages', 'core', 'src', 'remote.ts'), 'utf8').split('export const REMOTE_FOCUS_PROBE')[1]!.split('})()`;')[0]!;
-  assert.doesNotMatch(probe, /\.value\b/, 'la sonde ne lit pas la valeur du champ');
+  // La sonde elle-même, sur de faux champs.
+  assert.deepEqual(runProbe({ value: 'Bille d’Été', attrs: { 'aria-label': 'Pseudo' } }), { kind: 'text', label: 'Pseudo', focused: true, value: 'Bille d’Été' });
+  assert.equal((runProbe({ value: 'sécret-42', attrs: { type: 'password' } }) as { value: unknown }).value, null, 'mot de passe');
+  for (const auto of ['cc-number', 'one-time-code', 'current-password', 'section-x new-password'])
+    assert.equal((runProbe({ value: '4242', attrs: { autocomplete: auto } }) as { value: unknown }).value, null, `autocomplete=${auto}`);
+  assert.equal((runProbe({ tagName: 'DIV', isContentEditable: true, value: undefined }) as { value: unknown }).value, null, 'zone riche');
+  assert.equal((runProbe({ value: 'x'.repeat(REMOTE_TEXT_MAX + 1) }) as { value: unknown }).value, null, 'trop long');
+  assert.equal(runProbe({ value: 'x', attrs: { type: 'checkbox' } }), null, 'pas un champ de saisie');
+});
+
+test('champ repris : le texte entier part (« set »), borné, sans caractère de contrôle', () => {
+  assert.deepEqual(parsePhoneMessage({ t: 'set', s: 3, value: 'Bille d’Hiver\u0007\n✓' }), { t: 'set', s: 3, value: 'Bille d’Hiver \n✓' });
+  assert.deepEqual(parsePhoneMessage({ t: 'set', s: 3, value: '' }), { t: 'set', s: 3, value: '' }, 'champ vidé');
+  assert.equal(parsePhoneMessage({ t: 'set', s: 3, value: 'x'.repeat(REMOTE_TEXT_MAX + 1) }), undefined);
+  assert.equal(parsePhoneMessage({ t: 'set', s: 3, value: 42 }), undefined);
+  assert.deepEqual(parsePhoneMessage({ t: 'search', s: 4, query: 'neon abyss', engine: 'images' }), { t: 'search', s: 4, query: 'neon abyss', engine: 'images' });
+  assert.deepEqual(parsePhoneMessage({ t: 'search', s: 4, query: 'neon abyss', engine: '../x' }), { t: 'search', s: 4, query: 'neon abyss' }, 'moteur inconnu : celui de la page');
+});
+
+test('pointeur : la vitesse lissée efface les à-coups des gestes livrés par paquets', () => {
+  // Un même glissé régulier, mesuré par paquets irréguliers (8 ms, puis 40 ms) : la vitesse lissée varie bien moins.
+  const gestures = [
+    { dx: 4, dy: 0, ms: 8 },
+    { dx: 4, dy: 0, ms: 40 },
+    { dx: 4, dy: 0, ms: 8 },
+    { dx: 4, dy: 0, ms: 40 },
+  ];
+  let smooth: number | undefined;
+  const raw: number[] = [];
+  const smoothed: number[] = [];
+  for (const g of gestures) {
+    raw.push(gestureSpeed(g));
+    smooth = smoothSpeed(smooth, g, 16);
+    smoothed.push(smooth);
+  }
+  const spread = (list: number[]) => Math.max(...list.slice(1)) - Math.min(...list.slice(1));
+  assert.ok(spread(smoothed) < spread(raw) / 2, `${smoothed} / ${raw}`);
+  assert.equal(smoothSpeed(5, { dx: 1, dy: 0, ms: 10 }, 500), 0.1, 'après une pause : la vitesse du geste');
 });
 
 test('WebSocket : poignée de main, trames du client masquées et entières, le reste refusé', () => {
@@ -391,8 +441,10 @@ test('page du téléphone : rien de chargé d’ailleurs, ni script dans la page
 test('télécommande du menu : boutons de la borne, texte du clavier à l’écran, envoi ; rien d’autre', () => {
   assert.deepEqual(parsePhoneMessage({ t: 'btn', s: 3, b: 'next', down: true }), { t: 'btn', s: 3, b: 'next', down: true });
   assert.deepEqual(parsePhoneMessage({ t: 'btn', s: 3, b: 'zone', down: false }), { t: 'btn', s: 3, b: 'zone', down: false });
-  // Une ligne : saut de ligne et caractères de contrôle deviennent des espaces.
-  assert.deepEqual(parsePhoneMessage({ t: 'set', s: 3, value: 'Bille\nd’Été\u0007' }), { t: 'set', s: 3, value: 'Bille d’Été ' });
+  // Caractères de contrôle en espaces ; le saut de ligne reste (zone de texte d'une page) : le menu
+  // le change en espace lui-même, son clavier à l'écran n'a qu'une ligne (phone-remote.ts, injectMenu).
+  assert.deepEqual(parsePhoneMessage({ t: 'set', s: 3, value: 'Bille\nd’Été\u0007' }), { t: 'set', s: 3, value: 'Bille\nd’Été ' });
+  assert.match(fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'phone-remote.ts'), 'utf8'), /menu\.setText\(message\.value\.replace\(\/\\n\/g, ' '\)\)/, 'au menu, une ligne');
   assert.deepEqual(parsePhoneMessage({ t: 'set', s: 3, value: '' }), { t: 'set', s: 3, value: '' });
   assert.deepEqual(parsePhoneMessage({ t: 'up', s: 3, name: 'table.zip', size: 12 }), { t: 'up', s: 3, name: 'table.zip', size: 12 });
   // Trop grand : lu quand même, la borne répond pourquoi (la liaison n'est pas coupée).

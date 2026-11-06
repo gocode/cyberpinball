@@ -1,6 +1,6 @@
 {
   "name": "cyberpinball",
-  "version": "0.1.8-essai.15",
+  "version": "0.1.8-essai.16",
   "private": true,
   "description": "Open-source frontend for virtual pinball cabinets on Windows. Describe your cabinet once (screens, buttons, sound) and Cyber Pinball configures and maintains Visual Pinball X for you: screens recognised by EDID, a wizard driven by the cabinet buttons, table and media management, signed in-app updates.",
   "license": "GPL-3.0-or-later",
@@ -31,11 +31,11 @@
   "scripts": {
     "build": "node scripts/liens-espaces.mjs && tsc -b",
     "clean": "tsc -b --clean",
-    "test": "npm run build && node scripts/audit-publication.mjs && node scripts/traductions.mjs && node --test \"packages/core/dist/test/*.test.js\"",
+    "test": "npm run build && node scripts/audit-publication.mjs && node scripts/traductions.mjs && node --test \"packages/core/dist/test/*.test.js\" \"scripts/*.test.mjs\"",
     "vpx-schema": "npm run build && node packages/installer/dist/vpx-schema-cli.js",
     "probe": "npm run build && node packages/win-displays/dist/cli.js",
     "sync": "npm run build && node app/dist/sync-cli.js",
-    "habillage": "npm run build && powershell -NoProfile -ExecutionPolicy Bypass -File docs/diagnostic-habillage.ps1",
+    "habillage": "npm run build && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/diagnostic-habillage.ps1",
     "start": "npm run build && electron app",
     "assistant": "npm run build && electron app --assistant",
     "fabriquer": "node scripts/fabriquer.mjs",

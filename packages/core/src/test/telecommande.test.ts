@@ -4,7 +4,7 @@
 // pointeur, clique, tape (accents, émoji, effacement, mot de passe, Entrée), ouvre un lien par un
 // appui long, revient, avance, se déconnecte ; puis ce qui doit être refusé (autre hôte, autre
 // origine, QR déjà servi, Exit, touche interdite, trame rejouée, clé inconnue) et Fermer, qui
-// coupe l'écoute. Le scénario est docs/demo-telecommande.cjs, ici sans captures. Tout sur
+// coupe l'écoute. Le scénario est interne/demos/demo-telecommande.cjs, ici sans captures. Tout sur
 // 127.0.0.1 ; aucune fenêtre n'apparaît (rendu hors écran).
 // Et l'invariant du réseau : seuls social-net.ts et phone-remote.ts écoutent, la télécommande sur
 // 127.0.0.1 hors du réseau local réel, jamais pendant un essai.
@@ -16,6 +16,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { runElectron } from './electron-run';
 import { REPO_ROOT } from './i18n-scan';
+import { DEMOS, withoutInternal } from './interne';
 
 function electronPath(): string | undefined {
   try {
@@ -27,13 +28,13 @@ function electronPath(): string | undefined {
 }
 const electron = process.platform === 'win32' ? electronPath() : undefined;
 
-test('télécommande du téléphone : appairage, injection et refus, de bout en bout', { skip: electron ? false : 'Electron sous Windows requis', timeout: 240_000 }, () => {
+test('télécommande du téléphone : appairage, injection et refus, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-telecommande-'));
   try {
     const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CYBERPINBALL_A_L_ECRAN;
-    const run = runElectron(electron!, [path.join(REPO_ROOT, 'docs', 'demo-telecommande.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telecommande.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
     const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
     assert.equal(run.status, 0, result);
     assert.doesNotMatch(result, /ÉCHEC/, result);
@@ -45,8 +46,8 @@ test('télécommande du téléphone : appairage, injection et refus, de bout en 
   }
 });
 
-test('télécommande du téléphone dans tout le menu : boutons, clavier à l’écran, envoi d’un fichier, refus, de bout en bout', { skip: electron ? false : 'Electron sous Windows requis', timeout: 240_000 }, () => {
-  // docs/demo-telecommande-menu.cjs : la vraie gestion des tables (library.ts) hors écran, la vraie
+test('télécommande du téléphone dans tout le menu : boutons, clavier à l’écran, envoi d’un fichier, refus, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+  // interne/demos/demo-telecommande-menu.cjs : la vraie gestion des tables (library.ts) hors écran, la vraie
   // page du téléphone ; le QR lu sur la capture de l'écran, Start, les boutons tenus, la saisie,
   // l'envoi octet pour octet ; puis les refus, une partie, le navigateur intégré, l'inactivité,
   // Déconnecter et la fermeture. Le garde-fou de mise en page relit chaque écran de la borne.
@@ -55,7 +56,7 @@ test('télécommande du téléphone dans tout le menu : boutons, clavier à l’
     const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
     delete env.ELECTRON_RUN_AS_NODE;
     delete env.CYBERPINBALL_A_L_ECRAN;
-    const run = runElectron(electron!, [path.join(REPO_ROOT, 'docs', 'demo-telecommande-menu.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telecommande-menu.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
     const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}\n${run.stderr}`;
     assert.equal(run.status, 0, result);
     assert.doesNotMatch(result, /ÉCHEC/, result);

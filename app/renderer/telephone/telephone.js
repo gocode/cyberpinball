@@ -9,7 +9,7 @@
 // la laisse revenir après une coupure (page rechargée, écran verrouillé) tant que le navigateur
 // intégré reste ouvert. Chaque message est scellé (telephone-core.js) et numéroté.
 //
-// Démonstration hors écran (docs/demo-telecommande.cjs) : window.cyberRemoteDemo fixe un état sans borne.
+// Démonstration hors écran : window.cyberRemoteDemo fixe un état sans borne.
 'use strict';
 
 const core = window.cyberRemoteCore;
@@ -78,7 +78,7 @@ const INPUT_MODES = { email: 'email', number: 'decimal', tel: 'tel', url: 'url',
 // --- États de la page --------------------------------------------------------
 
 /**
- * Messages plein écran, par état (textes revus par Codex) ; `again` : l'état est final, rien ne
+ * Messages plein écran, par état ; `again` : l'état est final, rien ne
  * se reconnecte ; `icon` : le signe du registre au-dessus du titre.
  */
 const MESSAGES = {
@@ -402,8 +402,22 @@ pad.addEventListener('pointercancel', release);
 const field = $('field');
 let typed = '';
 let fieldShown;
+/**
+ * Le texte du champ de la borne est repris dans celui du téléphone (essai réel du 06/11/2026 :
+ * un champ rempli arrivait vide) : chaque changement envoie alors le texte entier (« set »).
+ * Sinon (mot de passe, champ secret, zone riche, texte trop long) : le téléphone part d'un champ
+ * vide et envoie ce qui change, à la suite de ce qu'il y a déjà (« text »).
+ */
+let prefilled = false;
+/** Dernière saisie au téléphone : un champ renvoyé juste après ne remplace pas ce qui est en route. */
+let typedAt = 0;
+/** Le champ de la borne dont le texte est dans celui du téléphone. */
+let openedField;
+const TEXT_MAX = 512;
+const sameField = (a, b) => Boolean(a && b && a.kind === b.kind && a.label === b.label);
 
 function showField(f) {
+  const before = fieldShown;
   // Au menu, le champ de la borne arrive avec son texte (un nom à corriger) et un numéro : le
   // même champ qui change de texte (tapé à la borne) ne remet pas à zéro ce qu'on tape ici.
   if (f && mode !== 'browser' && fieldShown && f.id === fieldShown.id && !$('keys').hidden) {
@@ -421,10 +435,11 @@ function showField(f) {
     syncLayout();
     return;
   }
-  openKeys(f, false);
+  // Le même champ, renvoyé pendant qu'on y tape : on garde ce qui est tapé, encore en route vers la borne.
+  openKeys(f, false, sameField(before, f) && !$('keys').hidden && Date.now() - typedAt < 800);
 }
 
-function openKeys(f, manual) {
+function openKeys(f, manual, keepText = false) {
   const kind = f?.kind ?? 'text';
   const keys = $('keys');
   keys.hidden = false;
@@ -443,11 +458,26 @@ function openKeys(f, manual) {
   // Au menu, un nombre est entier (nombre de LED, port) : le pavé numérique sans virgule.
   field.inputMode = mode !== 'browser' && kind === 'number' ? 'numeric' : (INPUT_MODES[kind] ?? 'text');
   field.enterKeyHint = kind === 'multiline' ? 'enter' : kind === 'search' ? 'search' : 'go';
-  field.value = mode !== 'browser' && typeof f?.value === 'string' ? f.value : '';
-  typed = field.value;
+  // Le texte du champ de la borne, quand elle le donne : toujours au menu (le clavier à l'écran),
+  // dans le navigateur sauf pour un mot de passe ou un champ secret (REMOTE_FOCUS_PROBE).
+  if (!keepText) {
+    prefilled = typeof f?.value === 'string';
+    field.value = prefilled ? f.value : '';
+    typed = field.value;
+  }
+  openedField = f;
+  // Repris, le texte entier part à chaque changement : borné comme à la borne (REMOTE_TEXT_MAX).
+  if (prefilled) field.maxLength = TEXT_MAX;
+  else field.removeAttribute('maxlength');
   $('key-enter').textContent = mode !== 'browser' ? t('Valider') : t('Entrée');
   // Le clavier du téléphone ne s'ouvre souvent qu'au toucher : le champ est là, un toucher suffit.
   field.focus({ preventScroll: true });
+  // Le curseur à la fin du texte repris (un champ e-mail ou numérique ne le permet pas : il y reste).
+  try {
+    field.setSelectionRange(field.value.length, field.value.length);
+  } catch {
+    // Type de champ sans sélection.
+  }
   releaseButtons();
   syncLayout();
 }
@@ -462,7 +492,7 @@ function hideKeys() {
 }
 
 /**
- * Présentation de la page, en un seul endroit (revue de Codex du 06/11/2026) : le panneau détaillé
+ * Présentation de la page, en un seul endroit : le panneau détaillé
  * montré (saisie ou envoi, jamais les deux), la vue de saisie quand la hauteur visible manque,
  * Start sombre quand un autre vert est à l'écran, et les outils indisponibles avec leur raison.
  */
@@ -507,6 +537,13 @@ field.addEventListener('input', () => {
     return;
   }
   const now = field.value;
+  if (now === typed) return;
+  typedAt = Date.now();
+  if (prefilled) {
+    typed = now;
+    send({ t: 'set', value: now });
+    return;
+  }
   const diff = core.textDiff(typed, now);
   typed = now;
   if (diff.del || diff.ins) send({ t: 'text', del: diff.del, ins: diff.ins });
@@ -536,7 +573,8 @@ $('keys').addEventListener('submit', (e) => {
   e.preventDefault();
   send({ t: 'key', key: 'Enter' });
   if (mode !== 'browser') return;
-  if (fieldShown?.kind !== 'multiline') {
+  // Un champ repris garde son texte (il est encore dans celui de la borne) ; sinon on repart à vide.
+  if (fieldShown?.kind !== 'multiline' && !prefilled) {
     field.value = '';
     typed = '';
   }
@@ -546,7 +584,8 @@ $('key-backspace').addEventListener('click', () => {
     // La sélection, sinon le caractère avant le curseur (un émoji entier).
     const start = field.selectionStart ?? field.value.length;
     const end = field.selectionEnd ?? start;
-    if (mode !== 'browser' && (start !== end || start < field.value.length)) {
+    // Au menu, ou un champ repris (son texte entier part) : là où est le curseur ; sinon à la fin, comme à la borne.
+    if ((mode !== 'browser' || prefilled) && (start !== end || start < field.value.length)) {
       const before = start === end ? Array.from(field.value.slice(0, start)).slice(0, -1).join('') : field.value.slice(0, start);
       field.value = before + field.value.slice(end);
       field.setSelectionRange(before.length, before.length);
@@ -761,7 +800,8 @@ $('file-input').addEventListener('change', () => {
 
 $('nav-back').addEventListener('click', () => send({ t: 'nav', action: 'back' }));
 $('nav-forward').addEventListener('click', () => send({ t: 'nav', action: 'forward' }));
-$('nav-keyboard').addEventListener('click', () => ($('keys').hidden ? openKeys(fieldShown, !fieldShown) : hideKeys()));
+// Rouvert sur le même champ : on garde ce qui y a été tapé depuis (le texte reçu à son ouverture est dépassé).
+$('nav-keyboard').addEventListener('click', () => ($('keys').hidden ? openKeys(fieldShown, !fieldShown, sameField(openedField, fieldShown)) : hideKeys()));
 $('nav-more').addEventListener('click', () =>
   mode === 'browser'
     ? openSheet(t('Actions de la page'), actions, { search: true, text: page.title || page.host, opener: $('nav-more') })
@@ -810,6 +850,7 @@ function openSheet(title, items, opts = {}) {
   );
   $('sheet-search').hidden = !(opts.search && search && mode === 'browser');
   if (opts.search && search) $('search-query').value = search.query ?? '';
+  showEngines(opts.search && search && mode === 'browser');
   sheetOpener = opts.opener;
   sheetOpener?.setAttribute('aria-expanded', 'true');
   releaseButtons();
@@ -832,10 +873,43 @@ $('sheet').addEventListener('click', (e) => e.target === $('sheet') && closeShee
 $('sheet-search').addEventListener('submit', (e) => {
   e.preventDefault();
   const query = $('search-query').value.trim();
-  if (query) send({ t: 'search', query });
+  if (query) send({ t: 'search', query, ...(engine ? { engine } : {}) });
   $('search-query').blur();
   closeSheet();
 });
+
+/** Moteur choisi dans la feuille : celui de la page de résultats affichée à son ouverture. */
+let engine;
+function showEngines(on) {
+  const box = $('sheet-engines');
+  const list = on && Array.isArray(search?.engines) ? search.engines : [];
+  box.hidden = !list.length;
+  engine = on ? search?.engine : undefined;
+  box.replaceChildren(
+    ...list.map((e) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'engine';
+      b.dataset.engine = e.id;
+      b.textContent = e.label;
+      b.setAttribute('role', 'radio');
+      // Comme dans le bandeau : un autre moteur relance aussitôt le même texte.
+      b.addEventListener('click', () => {
+        engine = e.id;
+        markEngines();
+        const query = $('search-query').value.trim();
+        if (!query) return;
+        send({ t: 'search', query, engine });
+        closeSheet();
+      });
+      return b;
+    }),
+  );
+  markEngines();
+}
+function markEngines() {
+  for (const b of $('sheet-engines').children) b.setAttribute('aria-checked', String(b.dataset.engine === engine));
+}
 
 // Clavier du téléphone ouvert : la page suit la zone visible (iOS et Chrome récent ne
 // raccourcissent que celle-là), le panneau du clavier et la barre restent au-dessus de lui.

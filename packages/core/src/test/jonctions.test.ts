@@ -14,6 +14,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { DEMOS, withoutInternal } from './interne';
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 
@@ -53,7 +54,7 @@ test('aucune jonction du dépôt ne pointe hors de son dossier (un rangement qui
   // node_modules et ses portées (@cyberpinball…), puis le reste du dépôt sur trois niveaux.
   const candidates = [
     ...links(path.join(REPO, 'node_modules'), 1),
-    ...['app', 'packages', 'docs', 'scripts'].flatMap((dir) => links(path.join(REPO, dir), 3)),
+    ...['app', 'packages', 'docs', 'scripts', 'interne'].filter((dir) => fs.existsSync(path.join(REPO, dir))).flatMap((dir) => links(path.join(REPO, dir), 3)),
   ];
   const outside = candidates.filter(({ target }) => !inside(target, root));
   assert.deepEqual(
@@ -63,9 +64,9 @@ test('aucune jonction du dépôt ne pointe hors de son dossier (un rangement qui
   );
 });
 
-test('les démonstrations qui posent une jonction la retirent en fin de partie (tmp\\demo-*\\root\\emulators)', () => {
-  const docs = path.join(REPO, 'docs');
-  const helper = fs.readFileSync(path.join(docs, 'hors-ecran.ps1'), 'utf8');
+test('les démonstrations qui posent une jonction la retirent en fin de partie (tmp\\demo-*\\root\\emulators)', { skip: withoutInternal() }, () => {
+  const docs = DEMOS;
+  const helper = fs.readFileSync(path.join(REPO, 'scripts', 'bureau-cache.ps1'), 'utf8');
   assert.match(helper, /Invoke-BureauCache[^\n]*\n\s*Remove-JonctionsSortantes/, 'Enter-BureauCache doit retirer les jonctions sortantes après la démonstration');
   const unguarded = fs.readdirSync(docs)
     .filter((name) => /^demo-.*\.ps1$/.test(name))
@@ -77,9 +78,9 @@ test('les démonstrations qui posent une jonction la retirent en fin de partie (
 });
 
 /**
- * Scripts de docs\ qui posent encore une jonction vers les vrais émulateurs (D:\CyberPinball\emulators),
+ * Scripts des démonstrations (interne\demos) qui posent encore une jonction vers les vrais émulateurs (D:\CyberPinball\emulators),
  * avec leur nombre de jonctions : ceux qui lancent réellement VPX, sur les écrans du poste. Tous
- * les autres ont une fausse installation de VPX (New-FauxVpx, docs\hors-ecran.ps1).
+ * les autres ont une fausse installation de VPX (New-FauxVpx, interne\demos\hors-ecran.ps1).
  */
 const JONCTIONS_PERMISES: Record<string, { jonctions: number; raison: string }> = {
   'demo-fenetres.ps1': { jonctions: 1, raison: 'trois vraies parties de VPX à l’écran (fenêtres d’éditeur et d’audit de VPX)' },
@@ -88,8 +89,8 @@ const JONCTIONS_PERMISES: Record<string, { jonctions: number; raison: string }> 
   'demo-tables.ps1': { jonctions: 1, raison: 'à l’écran seulement (CYBERPINBALL_A_L_ECRAN), le temps de la vraie partie de l’ajout' },
 };
 
-test('aucun script de docs\\ ne pose de jonction vers D:\\CyberPinball hors des exceptions justifiées (New-FauxVpx à la place)', () => {
-  const docs = path.join(REPO, 'docs');
+test('aucune démonstration ne pose de jonction vers D:\\CyberPinball hors des exceptions justifiées (New-FauxVpx à la place)', { skip: withoutInternal() }, () => {
+  const docs = DEMOS;
   const junction = /-ItemType\s+['"]?(?:Junction|SymbolicLink)\b|\bmklink\s+\/[JD]\b|CreateSymbolicLink/gi;
   const found = new Map<string, number>();
   for (const name of fs.readdirSync(docs).filter((n) => /\.ps1$/i.test(n))) {
@@ -102,7 +103,7 @@ test('aucun script de docs\\ ne pose de jonction vers D:\\CyberPinball hors des 
   assert.deepEqual(
     refused,
     [],
-    'Une démonstration qui ne lance pas réellement VPX prend une fausse installation (New-FauxVpx <racine>, docs\\hors-ecran.ps1) ; '
+    'Une démonstration qui ne lance pas réellement VPX prend une fausse installation (New-FauxVpx <racine>, interne\\demos\\hors-ecran.ps1) ; '
       + 'une jonction vers les vrais émulateurs, qu’un rangement du disque suivrait jusqu’à les vider, ne s’ajoute à JONCTIONS_PERMISES qu’avec sa raison.',
   );
   // Liste tenue à jour : une exception sans jonction s'en va ; chacune retire la sienne en fin de partie.

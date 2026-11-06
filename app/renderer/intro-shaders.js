@@ -1,5 +1,5 @@
 // Shaders des animations d'ouverture (intro.js), en GLSL ES 3.00. Le plateau, « Soie » : un shader
-// plein écran conçu avec Codex, directeur artistique (outils : docs/recherche/maquettes/ouverture). Contrat : u_res
+// plein écran. Contrat : u_res
 // (pixels), u_time (ms depuis le départ ; le shader le borne à la fin du rythme), u_brand (masque de
 // la marque au cadrage de l'écran : R « CYBER », G « PINBALL », B les deux floutés), les tableaux
 // uniformes de `playfieldUniforms` (u_thread, u_pulse : les fils, voir le shader) et ce qui bouge
@@ -275,7 +275,7 @@ void main() {
    * La boucle, après l'animation : vitesses et amplitudes. spin : vitesse des fils qui reste quand
    * l'animation ralentit (fraction de sa vitesse au départ) ; drift : celle de la poussière ;
    * sway : balancement de la poussière moyenne (fraction d'une cellule). « Souffle », le plus
-   * discret des trois réglages comparés (boucle.cjs), retenu avec Codex : les fils avancent d'au
+   * discret des trois réglages comparés : les fils avancent d'au
    * plus 22 points par seconde sur un plateau de 1080 de large, la poussière de 2.
    */
   playfieldLoop: { spin: 0.035, drift: 0.05, sway: 0.08 },

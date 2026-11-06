@@ -278,7 +278,7 @@ test('le processus principal passe par les zones : Exit, bascule au relâchement
 
 test('le bandeau de la liste, ses touches et les pastilles ne passent jamais sous 20 px (feuilles du menu)', () => {
   // 20 px à la référence 1080 : 1,852cqmin (ou vmin). Le repère d'une liste, ses touches cerclées et les
-  // pastilles étaient à 1,85 (19,98 px), sous le plancher du design system (revue de Codex, 29/10/2026).
+  // pastilles étaient à 1,85 (19,98 px), sous le plancher du design system.
   const floor = 20 / 10.8;
   const offenders: string[] = [];
   for (const file of ['library.css', 'frontend.css']) {

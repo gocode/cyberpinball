@@ -1,7 +1,7 @@
 // Alias historiques de VPinMAME : anciens noms de jeux qu'un script de table peut encore
 // demander (« goldfinger » pour « bond »). VPinMAME les connaissait d'office ; le plugin
 // PinMAME de VPX 10.8.1 (libpinmame) n'en connaît aucun et ne lit que l'alias.txt de
-// son dossier (docs/recherche/acquisition.md § 7.4). Le médecin propose d'écrire la ligne
+// son dossier. Le médecin propose d'écrire la ligne
 // utile dans <table>\pinmame\alias.txt (romalias.ts).
 //
 // Source : release/VPMAlias.txt de PinMAME, https://github.com/vpinball/pinmame (branche

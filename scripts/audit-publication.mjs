@@ -9,9 +9,11 @@
 // (un par ligne ; hors du dépôt, sinon elle les publierait elle-même ; CYBERPINBALL_AUDIT_NOMS
 // la remplace). Lancé par npm test et par scripts/publier.mjs.
 //
-// Documents de travail internes (isPrivate) : suivis par git sur ce poste, jamais publiés.
-// L'instantané envoyé sur GitHub les retire (scripts/envoyer-github.mjs) ; un fichier publié
-// ne doit pas leur faire de lien, qui serait cassé sur GitHub (refusé ici).
+// Documents de travail internes (isPrivate : interne/, video/, docs/recherche/, docs/Design/) :
+// suivis par git sur ce poste, jamais publiés. L'instantané envoyé sur GitHub les retire
+// (scripts/envoyer-github.mjs). Refusés aussi : un fichier suivi hors des emplacements publics
+// (PUBLIC) et des dossiers internes, et un fichier publié qui renvoie à un document interne
+// (lien ou chemin cité, cassé sur GitHub).
 
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -28,26 +30,93 @@ const THIRD_PARTY = /(^|\/)(OFL|LICENSE)[^/]*$|(^|\/)package-lock\.json$/i;
 const BINARY = /\.(png|jpe?g|webp|gif|bmp|ico|ttf|otf|woff2?|mp4|webm|mp3|wav|ogg|zip|7z|exe|dll|node|pdf)$/i;
 
 /**
- * Documents de travail : notes de recherche (docs/recherche), maquettes et relevés de design
- * (docs/Design : logos de tables sous licence, impressions de pages de travail), critiques,
- * consignes et réponses échangées avec les outils d'aide (critique-*.md, BRIEF*.md, reponse*.md…),
- * et les travaux internes rangés dans video/.
- * Ils servent au développement, pas aux lecteurs du projet.
+ * Ce qui est publié : ce qui sert à quelqu'un qui installe, exploite ou recompile sa borne.
+ * Le code de l'application et de ses paquets, ce qu'il faut pour le compiler et le publier
+ * (licence GPL), la documentation de l'utilisateur et du contributeur, les images de la page
+ * du projet, le design system (source des roues livrées) et les tests automatiques.
+ * Un fichier suivi hors de ces emplacements et hors des dossiers internes est refusé : un
+ * nouveau dossier se range dans l'un ou l'autre, explicitement, ici.
  */
-const PRIVATE = [/^docs\/recherche\//, /^docs\/design\//i, /^video\//, /(^|\/)(critique|brief|r[eé]ponse|consigne)[^/]*\.md$/i];
+export const PUBLIC = [
+  /^(README(\.fr)?|CHANGELOG(\.en)?)\.md$/, /^LICENSE$/, /^\.gitignore$/, /^package(-lock)?\.json$/, /^tsconfig(\.base)?\.json$/, /^lanceur\.(cmd|ps1)$/,
+  /^app\//, /^packages\//, /^scripts\//,
+  /^docs\/(manuel|manual|fonctionnalites|features)\.md$/, /^docs\/images\//, /^docs\/design-system\//,
+];
+
+/**
+ * Dossiers internes : suivis par git sur ce poste, jamais publiés. Le développement de
+ * l'application (interne/ : démonstrations et bancs hors écran, tests manuels ; docs/recherche :
+ * notes de recherche ; docs/Design : maquettes et relevés, logos de tables sous licence) et sa
+ * promotion (video/). Rien d'autre : pas d'exception par nom de fichier.
+ */
+const PRIVATE = [/^interne\//, /^video\//, /^docs\/recherche\//, /^docs\/design\//i];
 export function isPrivate(file) {
   return PRIVATE.some((re) => re.test(file.replace(/\\/g, '/')));
 }
 
-/** Liens Markdown d'un fichier publié vers un document interne : cassés sur GitHub. */
-function privateLinks(file, text) {
-  if (!/\.md$/i.test(file)) return [];
+export function isPublic(file) {
+  return PUBLIC.some((re) => re.test(file.replace(/\\/g, '/')));
+}
+
+/** Notes de travail échangées avec les outils d'aide : leur place est dans interne/. */
+const WORK_NOTE = /(^|\/)(critique|brief|r[eé]ponse|consigne)[^/]*\.md$/i;
+
+/** Fichiers suivis qui ne sont ni dans un emplacement public ni dans un dossier interne. */
+export function unplacedFiles(tracked) {
+  return tracked.filter((f) => !isPrivate(f) && (!isPublic(f) || WORK_NOTE.test(f)));
+}
+
+/**
+ * Emplacements internes qu'un fichier publié pourrait citer : chaque dossier interne et ce qu'il
+ * contient au premier niveau (« interne/demos », « docs/recherche »), quel que soit le
+ * séparateur. Un renvoi vers eux pointe dans le vide sur GitHub.
+ */
+export function internalPlaces(tracked) {
+  return [...new Set(tracked.filter(isPrivate).map((f) => f.split('/').slice(0, 2).join('/')))];
+}
+
+/**
+ * Fichiers publiés autorisés à citer un emplacement interne : les tests qui relisent les
+ * démonstrations et se mettent en attente sans elles, le lanceur qui charge leur complément
+ * s'il est présent, et les contrôles du dépôt qui couvrent aussi les documents internes.
+ */
+const MAY_CITE_INTERNAL = /^packages\/core\/src\/test\/|^lanceur\.ps1$|^scripts\/(audit-publication|traductions)(\.test)?\.mjs$/;
+
+/** Renvois d'un fichier publié vers un emplacement interne (lien Markdown ou chemin cité). */
+export function internalReferences(file, text, places) {
+  if (MAY_CITE_INTERNAL.test(file) || !places.length) return [];
+  const alt = places.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\//g, '[\\\\/]+')).join('|');
+  const re = new RegExp(`(?<![\\w.-])(?:\\.\\.?[\\\\/]+)*(?:${alt})(?![\\w.-])`, 'i');
   const found = [];
-  for (const m of text.matchAll(/\]\(([^)\s#]+)[^)]*\)/g)) {
-    if (/^[a-z]+:/i.test(m[1])) continue;
-    const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), decodeURI(m[1])));
-    if (isPrivate(target)) found.push({ line: text.slice(0, m.index).split('\n').length, what: 'lien vers un document interne non publié', excerpt: m[1] });
+  text.split(/\r?\n/).forEach((line, i) => {
+    const m = re.exec(line);
+    if (m) found.push({ line: i + 1, what: 'renvoi vers un document interne non publié', excerpt: m[0] });
+  });
+  // Liens Markdown relatifs vers un document interne, écrits depuis le dossier du fichier.
+  if (/\.md$/i.test(file)) {
+    for (const m of text.matchAll(/\]\(([^)\s#]+)[^)]*\)/g)) {
+      if (/^[a-z]+:/i.test(m[1])) continue;
+      const target = path.posix.normalize(path.posix.join(path.posix.dirname(file), decodeURI(m[1])));
+      if (isPrivate(target)) found.push({ line: text.slice(0, m.index).split('\n').length, what: 'lien vers un document interne non publié', excerpt: m[1] });
+    }
   }
+  return found;
+}
+
+/**
+ * Traces du travail de conception dans un fichier publié : les revues et maquettes de l'outil
+ * d'aide à la direction artistique (« revue de Codex du … »). Le fait technique se garde, sans sa
+ * provenance. Seuls ce contrôle et son test nomment l'outil.
+ */
+const WORK_TRACE = /\bCodex\b/;
+const MAY_NAME_TOOLS = /^scripts\/audit-publication(\.test)?\.mjs$/;
+export function workTraces(file, text) {
+  if (MAY_NAME_TOOLS.test(file)) return [];
+  const found = [];
+  text.split(/\r?\n/).forEach((line, i) => {
+    const m = WORK_TRACE.exec(line);
+    if (m) found.push({ line: i + 1, what: 'trace du travail de conception, à retirer (garder le fait, pas sa provenance)', excerpt: line.trim().slice(0, 80) });
+  });
   return found;
 }
 
@@ -144,7 +213,9 @@ export function auditRepository({ commits } = {}) {
   const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: repo, encoding: 'utf8' }).split('\0').filter(Boolean);
   // Seuls les fichiers publiés comptent : les documents internes ne partent pas.
   for (const f of tracked.filter((x) => SECRET_FILES.test(x))) problems.push(`${f} : fichier de secret suivi par git (à retirer : git rm --cached)`);
+  for (const f of unplacedFiles(tracked)) problems.push(`${f} : hors des emplacements publics (PUBLIC) et des dossiers internes : à ranger dans interne/, ou à déclarer public dans scripts/audit-publication.mjs`);
   const files = tracked.filter((f) => !isPrivate(f));
+  const places = internalPlaces(tracked);
   for (const file of files.filter((f) => internalFile(f, patterns))) problems.push(`${file} : chemin d'un travail interne (motif de video/motifs-internes.txt), à ranger dans video/`);
   for (const file of files) {
     if (BINARY.test(file)) continue;
@@ -153,7 +224,7 @@ export function auditRepository({ commits } = {}) {
     const buffer = fs.readFileSync(full);
     if (buffer.includes(0)) continue;
     const text = buffer.toString('utf8');
-    for (const f of [...auditText(text, names, { emails: !THIRD_PARTY.test(file) }), ...privateLinks(file, text), ...internalMentions(text, patterns)]) problems.push(`${file}:${f.line} : ${f.what} (${f.excerpt})`);
+    for (const f of [...auditText(text, names, { emails: !THIRD_PARTY.test(file) }), ...internalReferences(file, text, places), ...workTraces(file, text), ...internalMentions(text, patterns)]) problems.push(`${file}:${f.line} : ${f.what} (${f.excerpt})`);
   }
   if (commits) {
     const log = execFileSync('git', ['log', '--format=%H%x00%an <%ae>%x00%cn <%ce>%x00%B%x01', commits], { cwd: repo, encoding: 'utf8' });

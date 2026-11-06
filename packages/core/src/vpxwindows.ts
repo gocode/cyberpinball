@@ -1,7 +1,7 @@
 // Fenêtres que VPX peut ouvrir pendant une partie lancée en -Play, et ce que le
 // lanceur en fait. Titres et classes relevés dans le code source de VPX 10.8.1
 // (src/renderer/Window.cpp, src/ui/win/vpinball_eng.rc, WinEditor.cpp, codeview.cpp)
-// et vérifiés sur le PC de développement (docs/tests-manuels.md).
+// et vérifiés sur un PC de développement.
 //
 // En -Play, VPX 10.8.1 n'ouvre que ses fenêtres de jeu (classe SDL_app) : il ne
 // crée pas son éditeur, donc ni audit de la table, ni éditeur de script, ni

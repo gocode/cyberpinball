@@ -1,4 +1,4 @@
-// Réglages des médias, du son et du mode attente du menu (docs/recherche/medias.md, § 5.4),
+// Réglages des médias, du son et du mode attente du menu,
 // dans le menu système : musique des jeux, volumes, lancement en cinéma, mode attente et
 // horaire de la borne (nuit voilée, arrêt à heure fixe : packages/core/src/arcadehours.ts),
 // médias pendant la partie, DMD du menu (vivant ou classique) et sa couleur, qualité téléchargée depuis VPinMediaDB.

@@ -1,4 +1,4 @@
-// PuP-Packs en mode plugins de VPX 10.8.1 (docs/recherche/pup-packs.md, § 4) :
+// PuP-Packs en mode plugins de VPX 10.8.1 :
 // nom de dossier attendu d'après le script, vraie racine d'un pack (imbrications),
 // fichiers inutiles, options des .bat lues sans jamais être exécutées, et choix
 // de l'option d'après le modèle de borne.

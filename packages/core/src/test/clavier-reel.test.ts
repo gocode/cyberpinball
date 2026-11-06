@@ -21,7 +21,7 @@ import { devPcDisplays, emptyCabinet } from './fixtures';
 // virtuel de la bibliothèque SDL de VPX (autopilote « Joy<n> »), comme un Pinscape.
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
-const SCREENS = path.join(REPO, 'docs', 'ecrans', 'pc-dev.json');
+const SCREENS = path.join(REPO, 'packages', 'core', 'ecrans-simules', 'pc-dev.json');
 
 /** Bibliothèque SDL de VPX : CYBERPINBALL_SDL, sinon celle du VPX installé à la racine de Cyber Pinball. */
 function sdlLibrary(): string | undefined {

@@ -156,7 +156,7 @@ html[data-rotation='270'] #stop {
 /* ---------- Playfield : menu des tables ---------- */
 
 /*
- * Mise en page des maquettes de Codex, en pixels de référence d'un petit côté de 1080
+ * Mise en page des maquettes, en pixels de référence d'un petit côté de 1080
  * (--u). Zones de taille fixe : en changeant de table, seul leur contenu change, rien ne
  * bouge. Borne (zone en hauteur, html.menu-cab) : le média du plateau prend tout l'écran ;
  * la roue, le nom et fabricant · année sont posés en bas, sur un voile. Bureau (zone en
@@ -368,8 +368,8 @@ html.menu-desktop .menu-count {
 
 /*
  * Repère de la collection active, zone fixe : « ☆ FAVORIS │ 1 / 4 », la collection et la place de
- * la table choisie dans celle-ci (choisi le 06/11/2026 parmi cinq propositions, d'après celle de
- * Codex ; il remplace la pastille sur l'illustration et le compteur isolé). Roue Médaillons :
+ * la table choisie dans celle-ci (il remplace la pastille sur l'illustration et le compteur
+ * isolé). Roue Médaillons :
  * dans l'encart dessiné sur le dessus de la plaque du titre (roues/medaillons.svg, couche du
  * fond : l'arc inférieur de la roue passe devant son bord haut), sans fond à lui. Autres roues :
  * l'encart que leur décor dessine sous leur pièce (arche, lame, filet). Liste : en tête des lignes. Rien n'y
@@ -901,8 +901,7 @@ html.menu-desktop[data-menu-band] #root {
 }
 
 /*
- * Bureau plus étroit que 16:10 (3:2, 4:3, 5:4) : disposition compacte, deux zones (revue de
- * Codex, 29/10/2026). À droite du plateau, une colonne de 675 à 64 du bord : le fronton 16:9 en
+ * Bureau plus étroit que 16:10 (3:2, 4:3, 5:4) : disposition compacte, deux zones. À droite du plateau, une colonne de 675 à 64 du bord : le fronton 16:9 en
  * haut, aligné sur le haut du plateau, le bandeau entier en bas, sa barre d'aide alignée sur le
  * bas du plateau, tous deux de la largeur de la colonne ; entre eux, le vide reste sombre (de
  * 26 en 3:2 à 313 en 5:4). Le bandeau y descend à --b = 0,57 --u : textes à 20 px au moins,
@@ -954,7 +953,7 @@ html.menu-desktop[data-menu-band] #root {
 
   /*
    * Repère des roues sans encart : la ligne, sur son fond, passe au-dessus du bandeau réduit, sur
-   * la largeur de la colonne (cotes de Codex). Médaillons : il reste dans son encart, au corps plancher.
+   * la largeur de la colonne. Médaillons : il reste dans son encart, au corps plancher.
    */
   /* Bandeau réduit : le repère reste dans l'encart de sa roue, au corps de 22 (à 20, le texte paraissait fragile). */
   html.menu-desktop[data-menu-band] .menu.menu-band .menu-shelf {
@@ -1199,7 +1198,7 @@ html.menu-desktop .menu.menu-band .menu-title {
  * Lueur du nom : un filtre sur le texte, pas un text-shadow. Le texte coupe ce qui déborde (titre
  * limité à une ou deux lignes) : un text-shadow y était tranché en rectangle (borne, 25 octobre
  * 2026). Le filtre se dessine après la découpe, il déborde. Sur le texte seul : l'étoile des
- * favoris, à côté, reste blanche (revue de Codex, 06/11/2026).
+ * favoris, à côté, reste blanche.
  */
 .menu.menu-band .menu-title .title,
 html.menu-desktop .menu.menu-band .menu-title .title {
@@ -1592,7 +1591,7 @@ body.mouse .gear {
  * Téléchargements en cours (menu des tables) : pastille opaque à gauche de la roue dentée,
  * lisible sur n'importe quel média. Toujours 64 px de haut (petit côté de 1 080 px), haut à
  * 8 px, texte et icône de 24 px, barre de 4 px sous le texte quand la part reçue est connue
- * (revue de Codex, 29/10/2026). Bleu méta en cours, ambre en attente de la source, rouge
+ *. Bleu méta en cours, ambre en attente de la source, rouge
  * bloqué, vert quand un téléchargement fini attend qu'on y revienne ; le mot le dit toujours.
  */
 /*
@@ -1613,7 +1612,7 @@ body.mouse .gear {
   flex-direction: row-reverse;
   flex-wrap: wrap;
   align-items: flex-start;
-  /* 12 px entre deux pastilles, entre les pastilles et la notification (revue de Codex, 29/10/2026). */
+  /* 12 px entre deux pastilles, entre les pastilles et la notification. */
   gap: 1.11cqmin;
   pointer-events: none;
 }
@@ -1812,7 +1811,7 @@ body.mouse .friends-pill:hover {
 }
 
 /*
- * Notification (revue de Codex, 29/10/2026) : une seule à la fois, opaque (surface pleine, lisible
+ * Notification : une seule à la fois, opaque (surface pleine, lisible
  * sur n'importe quel média), 620 px de large au plus, filet de 4 px, rayon de 8 px, 16 px de
  * chaque côté, 12 px entre l'icône et le texte ; 64 px de haut au
  * plus, comme les pastilles : au bureau, la ligne de la marque s'arrête là où commencent les cadres
@@ -2313,7 +2312,7 @@ html.loading-video #media-bg::after {
  * Encart du bureau, à droite du cadre : mêmes cotes que lui (haut 92, hauteur 944, bord de
  * l'écran à 80, pour un petit côté de 1080), le même chant (ombres de #media-bg) ; entre les
  * deux, l'écart qui sépare le cadre du bord de l'écran (60 de chant à chant). Dans le flux,
- * au rythme fixé par Codex (octobre 2026) : titre, méta, état et sa barre, puis les
+ * au rythme fixé par la direction artistique : titre, méta, état et sa barre, puis les
  * commandes ; le vide qui reste passe sous elles. Commandes à 24 (--keys-scale les mène à 20
  * au plus bas, fitLoadingCard) ; variante compacte (.compact) quand rien d'autre ne tient.
  */
@@ -2557,8 +2556,8 @@ html.loading-video #media-bg::after {
 
 /*
  * Au Start, le logo du jeu s'allume sur le plateau et s'envole vers le fronton ; il y entre par
- * le bas et s'y pose ; quand VPX prend la main, tout s'efface. Rythme revu par Codex
- * (26/10/2026), CINEMA_TIMELINE dans cinema.ts (cinema.test.ts vérifie que les deux s'accordent),
+ * le bas et s'y pose ; quand VPX prend la main, tout s'efface. Rythme :
+ * CINEMA_TIMELINE dans cinema.ts (cinema.test.ts vérifie que les deux s'accordent),
  * en millisecondes depuis le Start :
  *   0–240      allumage   le logo paraît au centre, une onde brève part de lui
  *   240–340    armement   il recule d'un cran, comme une bille tirée par le lanceur
@@ -2964,7 +2963,7 @@ html.menu-desktop #cinema .cinema-depart {
 /*
  * Le logo, posé sur le bord haut du panneau : le médaillon (ou un logo haut) à moitié dehors ; un
  * logo large et bas (.gr-wide) dans une réserve basse, calé en bas, presque tout au-dessus du
- * panneau (revue de Codex : sans quoi une grande bande vide le séparait de l'intertitre).
+ * panneau (sans quoi une grande bande vide le séparait de l'intertitre).
  */
 .gr-slot {
   position: relative;
@@ -3535,7 +3534,7 @@ html.menu-desktop .intro-hint-box {
   max-width: 80%;
   text-align: center;
   background: rgb(3 8 7 / 0.9);
-  /* Deux battements puis l'invite reste allumée : la dernière image ne bouge plus (revue de Codex). */
+  /* Deux battements puis l'invite reste allumée : la dernière image ne bouge plus. */
   animation: intro-pulse 1200ms ease-in-out 2;
 }
 
@@ -3553,7 +3552,7 @@ html.menu-desktop .intro-hint-box {
 }
 
 /* ---------- Horaire de la borne : voile de nuit, préavis d'arrêt ----------
- * Maquette revue par Codex (tmp/maquette-attente) : la nuit, en attente, un voile noir sur toute
+ * la nuit, en attente, un voile noir sur toute
  * la fenêtre (médias, zones, menu), invite comprise ; il descend en 4 s et se lève d'un coup au
  * premier bouton. Seul le préavis d'arrêt passe au-dessus, sobre : compte blanc sans halo,
  * invite fixe, jauge qui se vide. Ni le DMD ni un son ne le répètent.

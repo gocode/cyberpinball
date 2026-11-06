@@ -1,4 +1,4 @@
-// « Chercher les médias » (T10, docs/recherche/medias.md § 5.5) : téléchargement depuis
+// « Chercher les médias » : téléchargement depuis
 // VPinMediaDB, à la demande seulement. Deux entrées :
 // - le gestionnaire des médias d'un jeu (fiche > Médias du jeu) : tout ce que
 //   VPinMediaDB a pour ce jeu, chaque média avec son aperçu, son poids et ce qu'il

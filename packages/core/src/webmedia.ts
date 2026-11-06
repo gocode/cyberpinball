@@ -1,4 +1,4 @@
-// Recherche libre d'un média sur le web (docs/recherche/sources-medias.md § 7) : depuis
+// Recherche libre d'un média sur le web : depuis
 // l'écran d'un média, « Chercher moi-même sur le web… » ouvre la fenêtre « Récupérer »
 // sur une recherche que l'utilisateur change à sa guise (web, images, vidéos, YouTube).
 // Tout fichier qu'il y télécharge revient au média. Ce module dit ce qu'est ce fichier

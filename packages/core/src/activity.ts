@@ -18,10 +18,8 @@
 // - Non lu : ce que la notification ou le constat n'a pas dit en entier (retenu puis expiré, fondu
 //   dans un résumé, notifications coupées). Les erreurs restent non lues jusqu'à ce qu'on les voie
 //   à l'écran, même dites (ACTIVITY_KEEP_UNREAD) : une ligne est vue quand le curseur s'y pose
-//   (revue de Codex : pas tout d'un coup à l'ouverture). Le non-lu se marque dans l'écran seulement.
-// - Jamais de pastille rouge (retour du 06/11/2026 : « une mise à jour installée » au redémarrage,
-//   une connexion d'ami, et la pastille qui remontait par la rubrique Amis pour une mise à jour,
-//   c'était trop) : ce qui attend une réponse a déjà la sienne là où on y répond (demandes d'ami et
+//   (pas tout d'un coup à l'ouverture). Le non-lu se marque dans l'écran seulement.
+// - Jamais de pastille rouge : ce qui attend une réponse a déjà la sienne là où on y répond (demandes d'ami et
 //   invitation dans Amis, téléchargement fini ou bloqué dans Téléchargements, version disponible ou
 //   mise à jour qui n'a pas abouti dans Mises à jour) ; la redoubler ici, c'est deux pastilles pour
 //   une chose, ou une pastille au mauvais endroit. Le non-lu se marque dans l'écran seulement.
@@ -251,7 +249,7 @@ export const activityUnread = (log: ActivityLog): number => log.entries.filter((
 
 /** Icône et ton d'une ligne : ceux de sa notification. */
 export function activityLook(e: Pick<ActivityEntry, 'kind'>): { icon: IconName; tone: NoticeTone } {
-  // Bloqué : la croix rouge et son mot (« Téléchargement bloqué »), comme tout état bloquant du design system (revue de Codex).
+  // Bloqué : la croix rouge et son mot (« Téléchargement bloqué »), comme tout état bloquant du design system.
   if (e.kind === 'download-failed') return { icon: 'close', tone: 'error' };
   if (e.kind in NOTICE_RULES) {
     const rule = NOTICE_RULES[e.kind as NoticeKind];
@@ -282,7 +280,7 @@ export function activityText(e: ActivityEntry): { title: string; detail?: string
     const text = { title: said.title, ...(rest ? { detail: rest.charAt(0).toLocaleUpperCase() + rest.slice(1) } : {}) };
     if (e.count > 1) {
       const name = e.who ?? '?';
-      // « Chloé : 3 connexions » (revue de Codex) : le jour est celui de la section, et rien ne s'accorde au nom.
+      // « Chloé : 3 connexions » : le jour est celui de la section, et rien ne s'accorde au nom.
       if (kind === 'friend-online') return { title: tn(e.count, '{name} : {n} connexion', '{name} : {n} connexions', { name }) };
       if (kind === 'friend-playing') return { title: tn(e.count, '{name} : {n} partie lancée', '{name} : {n} parties lancées', { name }), ...(e.subject ? { detail: e.subject } : {}) };
       if (kind === 'download-failed') return { title: t('Téléchargement bloqué {n} fois', { n: e.count }), ...(text.detail ? { detail: text.detail } : {}) };

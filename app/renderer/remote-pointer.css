@@ -8,6 +8,20 @@ body {
   background: transparent;
 }
 
+/* La boîte de la flèche, déplacée à chaque image (remote-pointer.js) ; sa pointe à 16 px du coin. */
+.pointer {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 50px;
+  height: 56px;
+  will-change: transform;
+}
+
+.pointer[hidden] {
+  display: none;
+}
+
 .arrow {
   position: absolute;
   left: 13px;

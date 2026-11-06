@@ -1,8 +1,8 @@
 // Sorties audio actives, lues en lecture seule dans le registre MMDevices :
 // HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\MMDevices\Audio\Render\{guid}.
 // Ce sont les mêmes propriétés que SDL (donc VPX) et Chromium lisent par WASAPI ;
-// la disposition du registre n'est pas documentée, elle a été relevée sur le PC
-// de développement (docs/recherche/audio.md). Rien n'est jamais modifié.
+// la disposition du registre n'est pas documentée, elle a été relevée sur un PC
+// de développement. Rien n'est jamais modifié.
 
 import {
   AUDIO_DEVICE_ACTIVE,

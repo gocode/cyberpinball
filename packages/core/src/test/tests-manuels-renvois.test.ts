@@ -10,6 +10,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { MANUAL_TESTS, withoutInternal } from './interne';
 
 const REPO = path.join(__dirname, '..', '..', '..', '..');
 
@@ -23,7 +24,7 @@ type Section = { rows: { n: string; line: number; text: string }[] };
 
 /** Sections des tests manuels : chaque titre ouvre la sienne ; ses tests sont ses lignes « | N | ». */
 function sectionsOf(file: string): Section[] {
-  const lines = fs.readFileSync(path.join(REPO, 'docs', file), 'utf8').split('\n');
+  const lines = fs.readFileSync(path.join(MANUAL_TESTS, file), 'utf8').split('\n');
   const sections: Section[] = [{ rows: [] }];
   lines.forEach((text, i) => {
     if (/^#{1,6}\s/.test(text)) sections.push({ rows: [] });
@@ -47,13 +48,13 @@ function problems(file: string): string[] {
   return found;
 }
 
-test('tests manuels : « Pendant N », « Après N », « Comme N » renvoient à un test de la même section', () => {
+test('tests manuels : « Pendant N », « Après N », « Comme N » renvoient à un test de la même section', { skip: withoutInternal(MANUAL_TESTS) }, () => {
   assert.deepEqual([...problems('tests-manuels.md'), ...problems('manual-tests.md')], []);
 });
 
 // Le manuel citait encore « Tests manuels 557 à 562 » pour l'enregistrement d'une partie, renuméroté
 // 567-572 à la fusion (29/10/2026) : 557-562 existaient, mais à cheval sur deux autres sections.
-test('manuel : une plage « tests manuels N à M » tient dans une seule section des tests manuels', () => {
+test('manuel : une plage « tests manuels N à M » tient dans une seule section des tests manuels', { skip: withoutInternal(MANUAL_TESTS) }, () => {
   const found: string[] = [];
   for (const [manual, tests, range] of [
     ['manuel.md', 'tests-manuels.md', /tests manuels (\d+) (?:à|-|–) (\d+)/gi],

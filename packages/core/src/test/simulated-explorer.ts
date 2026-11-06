@@ -1,5 +1,5 @@
 // Couche Windows simulée pour le gardien des barres des tâches (taskbarguard.test.ts,
-// docs\demo-barre-dessus.cjs) : la pile des fenêtres et la règle de l'Explorateur pour ses barres.
+// interne\demos\demo-barre-dessus.cjs) : la pile des fenêtres et la règle de l'Explorateur pour ses barres.
 //
 // La règle, telle qu'on la voit sur les bornes et le PC de développement :
 // - une fenêtre qui prend le premier plan et couvre tout son écran (plein écran) fait passer la

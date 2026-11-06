@@ -2,8 +2,7 @@
 // jours, en entier, pour relire celles qu'on a manquées. Groupées par jour, les plus récentes en
 // haut ; chaque ligne dit le texte entier, l'heure, ce qui s'est répété, si elle n'est pas lue, et
 // dessous ce que fait Start (« ↩ Start : voir sa fiche »), ou pourquoi il ne fait plus rien
-// (« ✕ Invitation expirée », la ligne grisée). Maquette revue par Codex le 06/11/2026
-// (docs/recherche/maquettes/activite-recente.cjs).
+// (« ✕ Invitation expirée », la ligne grisée).
 //
 // Le journal se tient ici : chaque évènement des notifications (menu-notices.ts), une version
 // disponible ou installée (updates-menu.ts), les constats du démarrage (frontend.ts, `note`). Il
@@ -288,7 +287,7 @@ export function createActivityMenu(host: ActivityMenuHost): ActivityMenu {
     back();
   }
 
-  /** Effacer : une question, Annuler choisi d'abord (revue de Codex). */
+  /** Effacer : une question, Annuler choisi d'abord. */
   function confirmClear(at: number): void {
     const cancel = () => show(at);
     host.library.openCustom(

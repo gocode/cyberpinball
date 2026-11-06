@@ -185,7 +185,7 @@
   // ---------- Plateau ----------
 
   // Dessinée par un shader WebGL2 plein écran (window.CyberIntroShaders.playfield, intro-shaders.js,
-  // conçu avec Codex) : lumière, profondeur et grain calculés au pixel, image fonction du seul
+  // conçu pour Cyber Pinball) : lumière, profondeur et grain calculés au pixel, image fonction du seul
   // instant. La marque lui est donnée en texture, au cadrage de l'écran : R « CYBER », G
   // « PINBALL » (nets), B les deux floutés (lueurs) ; les fils, en tableaux uniformes
   // (CyberIntroShaders.playfieldUniforms). Pendant l'animation, le canevas compte au plus 1920
@@ -482,7 +482,7 @@
         paint(e) {
           art.style.opacity = String(flicker(span(e, tl.backglassPower, 650)));
           art.style.transform = `scale(${1.035 - 0.035 * easeOut(span(e, tl.backglassPower, 1800))})`;
-          // La première lettre de chaque mot vacille comme un tube qui s'allume ; les suivantes montent (revue de Codex).
+          // La première lettre de chaque mot vacille comme un tube qui s'allume ; les suivantes montent.
           letters.forEach((letter, i) => {
             const from = tl.backglassBrand + i * 85 + (i >= 5 ? 120 : 0);
             letter.style.opacity = String(i === 0 || i === 5 ? flicker(span(e, from, 260)) : easeOut(span(e, from, 180)));
@@ -572,7 +572,7 @@
   function drawPower(dots, e, from, length) {
     const k = span(e, from, length);
     if (k <= 0 || k >= 1) return;
-    // Discrète (15 % des points au plus, nuances 1 à 4) : la bille qui suit doit dominer (revue de Codex).
+    // Discrète (15 % des points au plus, nuances 1 à 4) : la bille qui suit doit dominer.
     const density = k < 0.7 ? (k / 0.7) * 0.15 : 0.15 * (1 - (k - 0.7) / 0.3);
     const bucket = Math.floor(e / 45);
     for (let i = 0; i < dots.length; i++) {

@@ -129,7 +129,7 @@ const builderConfig = {
 };
 const sha256 = (data) => createHash('sha256').update(data).digest('hex');
 // CYBERPINBALL_SOCLE_ESSAI : un autre socle, pour les essais de la mise à jour par installeur
-// (comme après un changement d'Electron : docs\demo-mise-a-jour.ps1).
+// (comme après un changement d'Electron).
 const socle = process.env.CYBERPINBALL_SOCLE_ESSAI || `electron-${builderConfig.electronVersion}-${sha256(
   JSON.stringify({ builderConfig, electronBuilder: versionOf('electron-builder'), icon: sha256(fs.readFileSync(icon)), platform: `${process.platform}-${process.arch}` }),
 ).slice(0, 12)}`;

@@ -1799,7 +1799,7 @@ function checkPupLog(entry: TableEntry, log: string, expected: string[], found: 
   return findings;
 }
 
-// ---------- Médias de présentation (docs/recherche/medias.md, § 5.5, tâche T11) ----------
+// ---------- Médias de présentation ----------
 
 /**
  * Écart de proportions toléré entre un média et l'écran de son rôle, mesuré en

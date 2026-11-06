@@ -1,4 +1,4 @@
-// Partie en direct entre amis (docs/recherche/partage-medias.md, § 13 et § 14) : un joueur en
+// Partie en direct entre amis : un joueur en
 // invite jusqu'à trois autres sur une table ; chacun joue sa propre partie sur sa borne, au même
 // moment, après un compte à rebours commun ; les résultats de chacun arrivent à la fin.
 //

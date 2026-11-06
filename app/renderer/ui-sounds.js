@@ -144,7 +144,7 @@
       return 0.4;
     },
     // Coup de bobine (lancement en cinéma, quand VPX prend la main) : un « tchoum » sec et mat,
-    // le noyau d'une grosse bobine qui frappe sa butée (prescription de Codex, 26/10/2026). Un
+    // le noyau d'une grosse bobine qui frappe sa butée. Un
     // seul contact de bruit filtré, un corps sourd qui descend de 145 à 95 Hz (et son octave,
     // pour les petits haut-parleurs), une pointe de métal vers 650 Hz bien en dessous ; 125 ms,
     // sans réverbération. Plus sourd que le clic, sans le tintement de la pièce, moins dur que le knocker.

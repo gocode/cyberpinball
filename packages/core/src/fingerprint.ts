@@ -34,7 +34,7 @@ export function fingerprintOf(display: ObservedDisplay): Fingerprint {
   return { key: `${modelKey}@${connectionInstance(display.devicePath)}`, strength: 'weak', modelKey };
 }
 
-/** Extrait l'identifiant d'instance du chemin de périphérique (« 8&20834467&0&UID257 »). */
+/** Extrait l'identifiant d'instance du chemin de périphérique (« 8&1f2e3d4c&0&UID257 »). */
 export function connectionInstance(devicePath: string): string {
   const parts = devicePath.split('#');
   return parts.length >= 3 ? parts[2]! : devicePath;

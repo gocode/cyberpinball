@@ -113,7 +113,7 @@ const BOARD_TICK_MS = 500;
 /**
  * Une fenêtre étrangère qui repasse devant la bande (un PuP-Pack qui se remet sans cesse au premier
  * plan) : la bande se remet devant à ce rythme, tant qu'elle insiste, et jusqu'à GUARD_MS après la
- * dernière fois. Mesuré sur le bureau caché (docs\demo-bande-devant.ps1, 04/11/2026) : contre une
+ * dernière fois. Mesuré sur un bureau caché : contre une
  * fenêtre réaffirmée toutes les 100 ms, la relecture de 500 ms seule ne tenait devant que 11 % du temps.
  */
 const GUARD_TICK_MS = 40;

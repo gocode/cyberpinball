@@ -1,4 +1,4 @@
-// Fenêtre « Récupérer » (docs/recherche/acquisition.md § 8.4, étape A4) : la page d'un
+// Fenêtre « Récupérer » : la page d'un
 // fichier de VPS (forum, presque toujours avec un compte), où l'utilisateur se connecte
 // et télécharge lui-même. Cyber Pinball ne clique rien, ne remplit rien et ne garde
 // aucun mot de passe : les cookies vivent dans une session à part
@@ -18,7 +18,7 @@
 // Télécommande du téléphone (phone-remote.ts) : un QR code dans le bandeau, « Télécommande » ;
 // le téléphone qui l’a lu, accepté à la borne (Start, ou « Accepter » ; Exit refuse), pilote la
 // page du site (pavé tactile, clavier, Retour, Avancer, Fermer), jamais le bandeau.
-// Recherche libre (« Chercher moi-même sur le web… », docs/recherche/sources-medias.md § 7) :
+// Recherche libre (« Chercher moi-même sur le web… ») :
 // le bandeau gagne un champ de recherche prérempli et ses moteurs (web, images, vidéos,
 // YouTube) ; sur une page vidéo, une ligne la décrit (sonde VIDEO_PAGE_PROBE) et, quand la
 // page lit un fichier vidéo ordinaire, « Télécharger cette vidéo » le rend au média.
@@ -234,6 +234,8 @@ export interface AcquireOpen {
   video?: VideoPage;
   /** Recherche libre : la dernière page de résultats vue, dont le champ garde le texte sur les pages suivantes. */
   lastSearch?: { query: string; engine: WebEngine };
+  /** Un téléphone attend d'être accepté : le bandeau a pris le clavier (Accepter, Refuser). */
+  phonePending?: boolean;
 }
 
 /** Hôte d'une adresse, sans « www. » : la source d'un téléchargement dans le gestionnaire. */
@@ -789,6 +791,22 @@ export function createAcquirer(events: AcquireEvents) {
     open.setBar?.(height);
     // Le téléphone suit la page (titre, Retour, Avancer) et ses actions (vidéo, téléchargements).
     events.remote?.pageChanged();
+    givePhoneKeys();
+  }
+
+  /**
+   * Un téléphone attend d'être accepté : le clavier passe au bandeau, « Accepter » choisi
+   * (acquire.js) ; Entrée valide le bouton choisi, les flèches passent à « Refuser ». Essai
+   * réel du 06/11/2026 : la page gardait le clavier et y prenait Entrée, il fallait la souris.
+   * Décidé (accepté, refusé, abandonné), le clavier revient à la page.
+   */
+  function givePhoneKeys(): void {
+    if (!open) return;
+    const phone = Boolean(events.remote?.pending());
+    if (phone === Boolean(open.phonePending)) return;
+    open.phonePending = phone;
+    if (phone) open.win.webContents.focus();
+    else if (!barTyping && !open.view.webContents.isDestroyed()) open.view.webContents.focus();
   }
 
   /** Actions de la feuille « Plus » du téléphone : celles du bandeau, qu'il ne peut pas toucher. */
@@ -937,11 +955,16 @@ export function createAcquirer(events: AcquireEvents) {
       nav: remoteNav,
       actions: remoteActions,
       act: remoteAct,
-      search: () => (open?.request.search ? { query: (webSearchOf(contents.getURL()) ?? open.lastSearch ?? open.request.search).query } : undefined),
-      runSearch: (query) => {
+      // Recherche libre : le texte, le moteur affiché et les moteurs proposés (Web, Images, YouTube, Vidéo).
+      search: () => {
+        if (!open?.request.search) return undefined;
+        const shown = webSearchOf(contents.getURL()) ?? open.lastSearch ?? open.request.search;
+        return { query: shown.query, engine: shown.engine, engines: WEB_ENGINES.map((id) => ({ id, label: webEngineLabel(id) })) };
+      },
+      runSearch: (query, engine) => {
         if (!open?.request.search) return;
-        const engine = (webSearchOf(contents.getURL()) ?? open.lastSearch ?? open.request.search).engine;
-        void contents.loadURL(webEngineUrl(query, engine));
+        const chosen = WEB_ENGINES.includes(engine as WebEngine) ? (engine as WebEngine) : (webSearchOf(contents.getURL()) ?? open.lastSearch ?? open.request.search).engine;
+        void contents.loadURL(webEngineUrl(query, chosen));
       },
     });
     // Une page qui ouvre un nouvel onglet (lien de téléchargement, MEGA) : dans la même vue.
@@ -1013,7 +1036,9 @@ export function createAcquirer(events: AcquireEvents) {
     contents.on('before-input-event', escape);
     win.webContents.on('before-input-event', escape);
     // Les boutons de la borne servent dans le bandeau, sauf pendant qu'on tape dans son champ de recherche.
-    win.webContents.on('before-input-event', (e, input) => !barTyping && cabinetKey(input) && e.preventDefault());
+    // Un téléphone attend : Entrée, Espace, Tab et les flèches vont au bouton choisi (Accepter ou
+    // Refuser) ; Start accepte, quel que soit le bouton choisi.
+    win.webContents.on('before-input-event', (e, input) => !barTyping && !(events.remote?.pending() && PAGE_KEYS.has(input.code)) && cabinetKey(input) && e.preventDefault());
     // La page garde ses touches (Entrée, flèches…) et ce qu'on tape dans un champ : Start n'y
     // désigne un téléchargement que hors d'un champ de saisie, sans retirer la touche à la page.
     contents.on('before-input-event', (_e, input) => {

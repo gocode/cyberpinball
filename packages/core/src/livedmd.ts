@@ -428,7 +428,7 @@ function loadingAnimation(options: DmdAnimationOptions = {}): DmdAnimation {
   };
 }
 
-/** Rayon du disque lumineux du passage, en points (9 de diamètre, revue de Codex du 26/10/2026). */
+/** Rayon du disque lumineux du passage, en points (9 de diamètre). */
 const PASS_RADIUS = 4.5;
 /** Traînée sous le disque, point par point en s'éloignant de lui : 7, 4, 2, puis rien. */
 const PASS_TRAIL = [7, 7, 6, 5, 4, 4, 3, 2, 2, 1];

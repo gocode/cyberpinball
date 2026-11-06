@@ -19,7 +19,7 @@ setLanguage('fr');
 
 const MATRIX_B2S: VpsTableFile = {
   id: 'b2s-burt',
-  authors: ['BurtMacklin'],
+  authors: ['TableMaker'],
   version: '1.0.0',
   updatedAt: Date.UTC(2023, 4, 7),
   imgUrl: 'https://virtualpinballspreadsheet.github.io/vps-db/img/b2s-burt.webp',
@@ -40,7 +40,7 @@ test('fiche de VPUniverse en visiteur : téléchargements, vues, note, auteur, v
   const info = parseSiteFile(ref, page('vpuniverse-fiche.html'))!;
   assert.ok(info, 'la page dit le fichier');
   assert.equal(info.title, 'Matrix 2screen b2s');
-  assert.deepEqual(info.authors, ['BurtMacklin']);
+  assert.deepEqual(info.authors, ['TableMaker']);
   assert.equal(info.version, '1.0.0');
   assert.equal(info.category, 'B2S Alternate / Original');
   assert.equal(info.downloads, 298);
@@ -59,7 +59,7 @@ test('fiche de VPForums en visiteur : téléchargements, vues, note des votes, a
   const info = parseSiteFile(ref, page('vpforums-fiche.html'))!;
   assert.ok(info, 'la page dit le fichier');
   assert.equal(info.title, 'WMS Medieval Madness FX3 1.0');
-  assert.deepEqual(info.authors, ['DDH69', 'Dozer316']);
+  assert.deepEqual(info.authors, ['AUTEUR69', 'Auteur316']);
   assert.equal(info.downloads, 1435);
   assert.equal(info.views, 5504);
   assert.deepEqual(info.rating, { value: 5, count: 8 });
@@ -82,7 +82,7 @@ test('tuile d’un fichier : aperçu, popularité, auteur, date et version dès 
   const ref = siteFileRef(MATRIX_B2S.urls![0]!.url)!;
   const info = parseSiteFile(ref, page('vpuniverse-fiche.html'))!;
   const tile = webFileTile('b2s', MATRIX_B2S, info);
-  assert.equal(tile.title, 'BurtMacklin 1.0.0');
+  assert.equal(tile.title, 'TableMaker 1.0.0');
   assert.equal(tile.popularity, '298 téléchargements · 5/5');
   assert.equal(tile.downloads, 298);
   // La vignette de la base VPS d'abord, puis la capture de l'auteur.
@@ -91,7 +91,7 @@ test('tuile d’un fichier : aperçu, popularité, auteur, date et version dès 
   assert.equal(tile.facts, 'le 07/05/2023 · vpuniverse.com');
   assert.equal(webFileTile('b2s', { ...MATRIX_B2S, updatedAt: undefined }, info).facts, 'le 21/03/2023 · vpuniverse.com');
   const detail = tile.detail.join('\n').replace(/ | /g, ' ');
-  for (const said of ['par BurtMacklin', 'version 1.0.0', 'note 5/5 sur 1 avis', '1 862 vues', '4.67 MB', 'B2S Alternate / Original']) assert.ok(detail.includes(said), `détail : ${said}\n${detail}`);
+  for (const said of ['par TableMaker', 'version 1.0.0', 'note 5/5 sur 1 avis', '1 862 vues', '4.67 MB', 'B2S Alternate / Original']) assert.ok(detail.includes(said), `détail : ${said}\n${detail}`);
   assert.ok(!detail.includes('téléchargements'), detail);
   // Sans vignette VPS (ROM, PuP-Pack, couleurs, sons) : la capture de l'auteur.
   const pup = webFileTile('pup', { ...MATRIX_B2S, imgUrl: undefined }, info);

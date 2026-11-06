@@ -457,9 +457,9 @@ test('aimantation : bords et milieu de l’écran, bords des autres zones, seule
 // ---------------------------------------------------------------------------
 // Geste à la souris : l'écran de départ est celui de la fenêtre du geste
 
-const SCREEN_SETS = path.join(__dirname, '..', '..', '..', '..', 'docs', 'ecrans');
+const SCREEN_SETS = path.join(__dirname, '..', '..', '..', '..', 'packages', 'core', 'ecrans-simules');
 
-/** Écrans d'un jeu de docs\ecrans, à l'échelle demandée (bornes en pixels physiques, inchangées). */
+/** Écrans d'un jeu de packages\core\ecrans-simules, à l'échelle demandée (bornes en pixels physiques, inchangées). */
 function screenSet(file: string, scale: number): ObservedDisplay[] {
   const raw = JSON.parse(fs.readFileSync(path.join(SCREEN_SETS, file), 'utf8').replace(/^﻿/, '')) as ObservedDisplay[] | { displays: ObservedDisplay[] };
   return (Array.isArray(raw) ? raw : raw.displays).map((d) => ({ ...d, scale }));

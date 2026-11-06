@@ -165,7 +165,7 @@ test('rythme : la feuille de style suit CINEMA_TIMELINE, que suit aussi le DMD',
 test('rythme : aucune animation ne se montre avant son départ', () => {
   // Une animation remplie vers l'arrière (both, backwards) montre sa première image pendant tout son
   // délai : l'onde de la pose se voyait à demi dès l'arrivée du logo, 360 ms trop tôt (planche à
-  // 1 000 ms de docs\demo-cinema.ps1). Sa première image doit donc être invisible, ou l'animation ne
+  // 1 000 ms de interne\demos\demo-cinema.ps1). Sa première image doit donc être invisible, ou l'animation ne
   // garder que sa fin (forwards).
   const css = read('app', 'renderer', 'frontend.css');
   const section = css.slice(css.indexOf('/* ---------- Lancement en cinéma'), css.indexOf('/* ---------- Mode attente'));

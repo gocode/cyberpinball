@@ -81,7 +81,7 @@ export interface GameReturnRecord {
   place?: string;
   /**
    * En-tête du DMD, dans les mots des flippers : NEW HIGH SCORE pour un record battu, HIGH SCORE #3
-   * pour une autre place, HIGH SCORE #1 pour le premier score d'un tableau vide (revue de Codex).
+   * pour une autre place, HIGH SCORE #1 pour le premier score d'un tableau vide.
    */
   dmd: string;
   /** Le score, groupé à la façon de la langue. */
