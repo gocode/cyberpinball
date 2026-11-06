@@ -257,6 +257,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 - **Startup intro**: the playfield, backglass, topper, DMD and FullDMD play Cyber Pinball's animation together, then "Press a button to choose a table"; on the playfield, the threads of light then keep turning slowly in drifting dust, so the screen never freezes. Put your own image or video on each screen and your own background music, or turn it off; "Watch the intro" plays it again.
 - **Cinematic launch**: on Start, the game's logo pulls back like a ball on the plunger, flies up to the backglass, a glowing disc crosses the DMD, and a coil thumps when VPX takes over. VPX never waits for the show.
+- **Back from a game**: a summary card on the playfield, the logo, the length, and only what is known (the score and its place if it entered the high score table, the gap to the record, a badge earned); Start to play again, Exit for the wheel. A high score: the logo drops back from the backglass, NEW HIGH SCORE on the DMD, a ring, the knocker.
 - **Sounds of the machine**, all synthesised: a solenoid click when changing table, a coin on Start, the knocker when a high score falls, a chime for an invitation, a signal for a friend.
 - **Each game's music** on the wheel (60% by default); a table without music plays its playfield video's sound (40%). The music only starts if the table stays selected for 350 ms: scrolling plays nothing.
 - **"This game's volume"** from 0 to 200% for a table that is too loud or too quiet.

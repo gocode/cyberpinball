@@ -29,6 +29,13 @@
 #                coup de bobine sonne au passage de relais ; le journal dit quand VPX est parti ;
 #   sans-cinema: la même partie, le réglage coupé : aucune scène, pas de coup de bobine, et VPX
 #                part au même moment qu'avec le cinéma (docs\demo-cinema.ps1 lance les deux) ;
+#   retour     : retour d'une partie solo (gamereturn.ts) de Neon Galaxy, qui ne garde pas de
+#                records : la carte du bilan sur le plateau, la durée seule ; Start la relance
+#                aussitôt, Exit rend la roue (pas le menu système), la carte s'efface seule ;
+#   retour-record : la même partie, un record entré au tableau pendant la partie (VPReg.stg
+#                remplacé) : la carte du record, la chute du logo sur le fronton, le knocker à la
+#                pose du logo, une fois ;
+#   retour-arret : la partie arrêtée par « Arrêter une partie bloquée » (Ctrl+Maj+K) : pas de carte ;
 #   ouverture  : ouverture au démarrage (intro.ts) : chaque écran joue l'animation de Cyber Pinball
 #                et garde sa dernière image, l'invite paraît sur le plateau ; un flipper affiche
 #                la roue sans rien faire d'autre (la sélection ne bouge pas) ;
@@ -51,7 +58,7 @@
 #   .\docs\demo-moments.ps1 [-Scenarios navigation, silence, partie] [-Ecrans pc-dev]
 # VPX n'est jamais lancé ; ni le vrai modèle de borne ni le vrai VPinballX.ini ne sont touchés.
 param(
-  [string[]]$Scenarios = @('navigation', 'silence', 'menus', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'habillage', 'interface', 'cinema', 'sans-cinema', 'ouverture', 'ouverture-pivotee', 'ouverture-fichiers', 'attente'),
+  [string[]]$Scenarios = @('navigation', 'silence', 'menus', 'liste', 'bandeau', 'minimal', 'arche', 'partie', 'reglage', 'pivotee', 'habillage', 'interface', 'cinema', 'sans-cinema', 'retour', 'retour-record', 'retour-arret', 'ouverture', 'ouverture-pivotee', 'ouverture-fichiers', 'attente'),
   [string]$Source = 'D:\CyberPinball',
   [string]$Ecrans = 'pc-dev'
 )
@@ -317,6 +324,93 @@ $scenes = @{
       '09-until_menu' = @{ phase = 'menu'; interface = 'solenoid,solenoid,solenoid,coin' }
     }
   }
+  # Retour d'une partie solo (gamereturn.ts) : la part de chaque fenêtre (cyberEtat : scènes posées,
+  # sans celles qui s'effacent), l'intertitre et le chiffre de la carte.
+  retour = @{
+    Reglages = @{ music = $false; game = 'still' }
+    Simulee = 'backglass'
+    Etapes = @(
+      $Down, $Down, $Down, 'wait:1000', # 04 Neon Galaxy, qui ne garde pas de records
+      $Start, $Start,             # 06 fiche, puis « Jouer »
+      'until:playing',            # 07 partie simulée
+      'until:menu',               # 08 retour : la carte, la durée seule (aucun score connu)
+      $Start,                     # 09 Start : la table est relancée aussitôt
+      'until:playing',            # 10 partie
+      'until:menu',               # 11 retour : la carte
+      $Exit,                      # 12 Exit : la carte s'efface, la roue (pas le menu système)
+      'wait:500',                 # 13 plus de carte
+      $Start, $Start,             # 15 fiche, « Jouer »
+      'until:playing',            # 16 partie
+      'until:menu',               # 17 retour : la carte
+      'wait:8500'                 # 18 elle s'est effacée seule (8 s)
+    )
+    Apres = {
+      param($root, $captures)
+      $log = Get-Content "$captures\sortie.txt" -Raw -Encoding UTF8
+      if (([regex]::Matches($log, 'Retour \(.*\) : bilan, .*, sans score connu\.')).Count -ne 3) { 'journal : trois bilans sans score attendus' }
+      if ($log -notmatch 'Retour \(.*\) : Start, la table est relancée\.') { 'journal : relance par Start non relevée' }
+    }
+    Attendu = @{
+      '08-until_menu' = @{ phase = 'menu'; bilan = @{ playfield = 'plateau'; backglass = '' }; bilanTitre = 'Partie terminée'; bilanChiffre = '^\d+ s$' }
+      '09-Digit1' = @{ phase = 'loading'; bilan = @{ playfield = ''; backglass = '' } }
+      '11-until_menu' = @{ phase = 'menu'; bilan = @{ playfield = 'plateau'; backglass = '' } }
+      '12-Escape' = @{ phase = 'menu'; bilan = @{ playfield = ''; backglass = '' } }
+      '13-wait_500' = @{ phase = 'menu'; bilan = @{ playfield = ''; backglass = '' }; bilanVide = $true }
+      '17-until_menu' = @{ phase = 'menu'; bilan = @{ playfield = 'plateau'; backglass = '' } }
+      '18-wait_8500' = @{ phase = 'menu'; bilan = @{ playfield = ''; backglass = '' }; bilanVide = $true }
+    }
+  }
+  # Un record entré au tableau de Neon Galaxy pendant la partie (VPReg.stg d'avant la partie,
+  # remplacé par un tableau où JUL est premier) : la carte du record sur le plateau, la chute du
+  # logo sur le fronton, le knocker à la pose du logo (1,2 s après le retour), une seule fois.
+  'retour-record' = @{
+    Reglages = @{ music = $false; game = 'still' }
+    Simulee = 'backglass'
+    Avant = {
+      param($root)
+      $folder = (Get-ChildItem -LiteralPath "$root\tables" -Directory | Where-Object Name -like 'Neon Galaxy*').FullName
+      node -e "const f = require('./packages/core/dist/test/fixtures.js'); const fs = require('fs'); const [user, after] = process.argv.slice(1); fs.mkdirSync(user, { recursive: true }); fs.writeFileSync(user + '/VPReg.stg', f.cfb({ HighScore1: '5000000', HighScore1Name: 'AAA', HighScore2: '3000000', HighScore2Name: 'BBB' }, {}, { info: 'Imaginaire' })); fs.writeFileSync(after, f.cfb({ HighScore1: '7500000', HighScore1Name: 'JUL', HighScore2: '5000000', HighScore2Name: 'AAA' }, {}, { info: 'Imaginaire' }))" "$folder\user" "$root\VPReg-neon-apres.stg"
+    }
+    Apres = {
+      param($root, $captures)
+      $folder = (Get-ChildItem -LiteralPath "$root\tables" -Directory | Where-Object Name -like 'Neon Galaxy*').FullName
+      Remove-Item -LiteralPath "$folder\user" -Recurse -Force -ErrorAction SilentlyContinue
+      Remove-Item -LiteralPath "$root\VPReg-neon-apres.stg" -Force -ErrorAction SilentlyContinue
+      if (-not (Select-String -Path "$captures\sortie.txt" -Pattern 'Retour \(.*\) : bilan, .*Nouveau record 7500000 \(place 1\), \+2.500.000 sur l.ancien record' -Quiet)) { 'journal : bilan du record de JUL non relevé' }
+    }
+    Etapes = @(
+      $Down, $Down, $Down, 'wait:1000', # 04 Neon Galaxy
+      $Start, $Start,             # 06 fiche, puis « Jouer »
+      'until:playing',            # 07 partie simulée
+      "copy:$root\VPReg-neon-apres.stg|$root\tables\Neon Galaxy (Williams 1992)\user\VPReg.stg", # 08 la table enregistre un record
+      'until:menu',               # 09 retour : la carte du record, la chute du logo sur le fronton
+      'wait:1500',                # 10 le logo posé : le knocker a sonné, une fois
+      $Exit,                      # 11 Exit : la carte s'efface, la roue
+      'wait:500'                  # 12 plus rien ; pas d'autre knocker
+    )
+    Attendu = @{
+      '09-until_menu' = @{ phase = 'menu'; bilan = @{ playfield = 'plateau'; backglass = 'fronton' }; bilanTitre = 'Nouveau record'; bilanChiffre = '^7.500.000' }
+      '10-wait_1500' = @{ phase = 'menu'; interface = 'solenoid,solenoid,solenoid,coin,coil,knocker'; bilan = @{ playfield = 'plateau'; backglass = 'fronton' } }
+      '11-Escape' = @{ phase = 'menu'; bilan = @{ playfield = ''; backglass = '' } }
+      '12-wait_500' = @{ phase = 'menu'; interface = 'solenoid,solenoid,solenoid,coin,coil,knocker'; bilanVide = $true }
+    }
+  }
+  # « Arrêter une partie bloquée » (Ctrl+Maj+K) : la partie n'est pas finie, le retour n'en fait pas de bilan.
+  'retour-arret' = @{
+    Reglages = @{ music = $false; game = 'still' }
+    Simulee = 'backglass'
+    Etapes = @($Down, $Down, $Down, 'wait:1000', $Start, $Start, 'until:playing', 'Control+Shift+KeyK', 'until:menu', 'wait:1000')
+    Apres = {
+      param($root, $captures)
+      $log = Get-Content "$captures\sortie.txt" -Raw -Encoding UTF8
+      if ($log -notmatch 'arrêtée par le raccourci « Arrêter une partie bloquée »') { 'journal : arrêt forcé non relevé' }
+      if ($log -notmatch 'Retour \(.*\) : pas de bilan \(arrêt forcé\)\.') { 'journal : « pas de bilan (arrêt forcé) » absent' }
+    }
+    Attendu = @{
+      '09-until_menu' = @{ phase = 'menu'; bilanVide = $true }
+      '10-wait_1000' = @{ phase = 'menu'; bilanVide = $true }
+    }
+  }
   pivotee = @{
     Reglages = @{ music = $true; musicVolume = 60; videoVolume = 0; launchVolume = 80; game = 'still'; attractDelay = 6; attractInterval = 30 }
     Simulee = 'backglass'
@@ -565,6 +659,25 @@ foreach ($name in $Scenarios) {
       $state += " · sons de l'interface : $(if ($played) { $played } else { 'aucun' })$(if ($got.interface.muet) { ' (muets)' })"
     }
     if ($want.commandes) { $ok = $ok -and $menu.commandes -eq $want.commandes; $state += " · aide-mémoire : $($menu.commandes)" }
+    # Retour d'une partie : scènes posées dans chaque fenêtre (sans celles qui s'effacent), intertitre
+    # et chiffre de la carte ; « bilanVide » : aucune couche du retour, même sur le départ.
+    if ($want.bilan) {
+      $bilanParts = @()
+      foreach ($win in ($want.bilan.Keys | Sort-Object)) {
+        $shown = @($got.ecrans.$win.bilan | Where-Object { $_ -and -not $_.fin } | ForEach-Object { $_.scene }) -join ','
+        $bilanParts += "$win $(if ($shown) { $shown } else { 'aucune' })"
+        if ($shown -ne $want.bilan[$win]) { $ok = $false; $bilanParts[-1] += " (attendu : $(if ($want.bilan[$win]) { $want.bilan[$win] } else { 'aucune' }))" }
+      }
+      $state += " · retour : $($bilanParts -join ', ')"
+    }
+    $card = @($got.ecrans.playfield.bilan | Where-Object { $_ -and $_.scene -eq 'plateau' }) | Select-Object -First 1
+    if ($card) { $state += " · carte : $($card.titre) · $($card.chiffre)$(if ($card.ecart) { " · $($card.ecart)" })" }
+    if ($want.bilanTitre) { if (-not $card -or $card.titre -ne $want.bilanTitre) { $ok = $false; $state += " (intertitre attendu : $($want.bilanTitre))" } }
+    if ($want.bilanChiffre) { if (-not $card -or $card.chiffre -notmatch $want.bilanChiffre) { $ok = $false; $state += " (chiffre attendu : $($want.bilanChiffre))" } }
+    if ($want.bilanVide) {
+      $any = @(foreach ($w in @($got.ecrans.PSObject.Properties.Name)) { @($got.ecrans.$w.bilan) | Where-Object { $_ } }).Count
+      if ($any) { $ok = $false; $state += ' (une couche du retour reste)' }
+    }
     # Lancement en cinéma : scènes posées dans chaque fenêtre (sans celles qui s'effacent au relais).
     if ($want.cinema) {
       $cinemaParts = @()

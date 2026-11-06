@@ -17,6 +17,7 @@ import { centeredDmdBand } from './dmdscreen';
 import { frameWindow, type FrameRecord, type FrameRect } from './fulldmdframe';
 import { dmdScore, type TableRecords } from './highscores';
 import { CINEMA_TIMELINE } from './cinema';
+import { GAME_RETURN_TIMELINE } from './gamereturn';
 
 export const DMD_WIDTH = 128;
 export const DMD_HEIGHT = 32;
@@ -376,6 +377,8 @@ export interface DmdAnimation {
 export interface DmdAnimationOptions {
   /** Texte de l'animation, à la place du sien (passé par dmdText). */
   label?: string;
+  /** Record (animation « record ») : l'en-tête, NEW HIGH SCORE ou HIGH SCORE #3 (gamereturn.ts). */
+  head?: string;
 }
 
 /** Rail du chargement : ligne, bouts, et largeur de la bille (4 × 2 points, posée dessus). */
@@ -435,9 +438,10 @@ const PASS_TRAIL = [7, 7, 6, 5, 4, 4, 3, 2, 2, 1];
  * y = −5, en x = 64), sa traînée dessous : le logo du jeu passe du plateau au fronton, à travers
  * le DMD. Cœur 14, couronne 9 puis 4 ; posé par-dessus le titre (le plus clair l'emporte).
  */
-function drawPass(dots: DmdDots, k: number): void {
+function drawPass(dots: DmdDots, k: number, down = false): void {
   const cx = DMD_WIDTH / 2;
-  const cy = 36 - k * 41;
+  // Vers le bas (retour d'une partie, gamereturn.ts) : le même disque, de y = −5 à y = 36, sa traînée dessus.
+  const cy = down ? -5 + k * 41 : 36 - k * 41;
   for (let y = 0; y < DMD_HEIGHT; y++) {
     for (let x = 0; x < DMD_WIDTH; x++) {
       const dx = x + 0.5 - cx;
@@ -445,18 +449,19 @@ function drawPass(dots: DmdDots, k: number): void {
       const d = Math.hypot(dx, dy) / PASS_RADIUS;
       let level = d <= 0.45 ? 14 : d <= 0.75 ? 9 : d <= 1 ? 4 : 0;
       // Traînée : dans l'axe, sur la largeur du cœur, qui s'éteint en dix points sous le disque.
-      const behind = Math.floor(dy - PASS_RADIUS);
+      const behind = Math.floor((down ? -dy : dy) - PASS_RADIUS);
       if (behind >= 0 && behind < PASS_TRAIL.length && Math.abs(dx) <= 1.5) level = Math.max(level, PASS_TRAIL[behind]!);
       if (level > 0) dots[y * DMD_WIDTH + x] = Math.max(dots[y * DMD_WIDTH + x]!, level);
     }
   }
 }
 
-/** Éclat local à la sortie du disque, en haut de l'afficheur : quelques points, cœur 15 puis 8. */
-function drawFlash(dots: DmdDots): void {
-  for (let y = 0; y < 3; y++) {
+/** Éclat local à la sortie du disque, en haut de l'afficheur (en bas : `bottom`) : quelques points, cœur 15 puis 8. */
+function drawFlash(dots: DmdDots, bottom = false): void {
+  for (let row = 0; row < 3; row++) {
+    const y = bottom ? DMD_HEIGHT - 1 - row : row;
     for (let x = 61; x < 67; x++) {
-      const d = Math.hypot(x + 0.5 - DMD_WIDTH / 2, y + 0.5);
+      const d = Math.hypot(x + 0.5 - DMD_WIDTH / 2, row + 0.5);
       const level = d <= 1.5 ? DMD_LEVEL.accent : d <= 2.6 ? 8 : 0;
       if (level) dots[y * DMD_WIDTH + x] = Math.max(dots[y * DMD_WIDTH + x]!, level);
     }
@@ -494,10 +499,54 @@ function launchAnimation(options: DmdAnimationOptions = {}): DmdAnimation {
   };
 }
 
+/** NEW HIGH SCORE : trois clignotements (allumé, éteint), puis fixe. */
+const RECORD_BLINK = { on: 260, off: 140, times: 3 };
+
+/**
+ * Retour d'une partie, un score entré au tableau (gamereturn.ts, GAME_RETURN_TIMELINE) : le
+ * miroir du lancement. L'afficheur s'éteint pendant que le logo se soulève sur le fronton ; quand
+ * il en est tombé, le disque lumineux traverse l'afficheur de haut en bas, un éclat en bas à sa
+ * sortie ; puis l'en-tête (NEW HIGH SCORE, HIGH SCORE #3 pour une autre place) clignote trois fois et reste,
+ * le score en grand dessous (`label`, déjà groupé ; en petit s'il ne tient pas). Tourne jusqu'à
+ * ce qu'on l'arrête : la carte du bilan partie, l'alternance reprend, ses records à jour.
+ */
+function recordAnimation(options: DmdAnimationOptions = {}): DmdAnimation {
+  const { dmdPass, dmdPassLength, dmdFlash } = GAME_RETURN_TIMELINE;
+  const flash = dmdPass + dmdPassLength;
+  const reveal = flash + dmdFlash;
+  const head = dmdText(options.head ?? 'NEW HIGH SCORE');
+  const score = dmdText(options.label ?? '');
+  const large = textWidth(DMD_FONT_LARGE, score) <= DMD_USABLE;
+  const scoreDots = blankDots();
+  if (score) drawCentered(scoreDots, large ? DMD_FONT_LARGE : DMD_FONT_SMALL, large ? score : score.slice(0, 20), large ? 14 : 18);
+  const blinkLength = RECORD_BLINK.times * (RECORD_BLINK.on + RECORD_BLINK.off);
+  return {
+    dots(elapsed) {
+      if (elapsed < dmdPass) return blankDots();
+      if (elapsed < flash) {
+        const dots = blankDots();
+        drawPass(dots, (elapsed - dmdPass) / dmdPassLength, true);
+        return dots;
+      }
+      if (elapsed < reveal) {
+        const dots = blankDots();
+        drawFlash(dots, true);
+        return dots;
+      }
+      const dots = scoreDots.slice();
+      const t = elapsed - reveal;
+      const lit = t >= blinkLength || t % (RECORD_BLINK.on + RECORD_BLINK.off) < RECORD_BLINK.on;
+      if (lit) drawCentered(dots, DMD_FONT_SMALL, head, score ? 3 : 12, DMD_LEVEL.accent);
+      return dots;
+    },
+  };
+}
+
 /** Animations qu'on peut jouer sur le DMD du menu, par leur nom. */
 export const DMD_ANIMATIONS = {
   chargement: loadingAnimation,
   lancement: launchAnimation,
+  record: recordAnimation,
 } satisfies Record<string, (options?: DmdAnimationOptions) => DmdAnimation>;
 
 export type DmdAnimationName = keyof typeof DMD_ANIMATIONS;

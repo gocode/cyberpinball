@@ -141,3 +141,4 @@ export * from './noticezone';
 export * from './gamerecording';
 export * from './gamenotice';
 export * from './dmdscore';
+export * from './gamereturn';

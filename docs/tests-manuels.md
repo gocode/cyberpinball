@@ -846,6 +846,21 @@ Sur la borne, son allumé, puis sur un PC. La preuve sans opérateur : `packages
 | 448 | Au bureau | Sur un PC (menu au bureau), lancer une table. | Le logo part du cadre 9:16 et en sort par le haut ; l'encart du titre et des commandes ne bouge pas. Fronton sur un autre écran : le logo s'y pose ; sans fronton, rien ne l'attend et le chargement reste le même. |
 | 449 | Plateau tourné | Borne au playfield couché et tourné (Windows en paysage). | Le logo file vers le fronton vu du joueur, pas vers le haut de l'écran pour Windows. |
 
+## Retour d'une partie
+
+Sur la borne, son allumé, puis sur un PC. La preuve sans opérateur : `packages/core/src/test/gamereturn.test.ts` (jamais de score inventé, pas de bilan pour un arrêt forcé ni un échec, libellés, rythme, DMD, rendu des fenêtres) et `.\docs\demo-retour-partie.ps1` (images clés hors écran en borne, plateau tourné et au bureau, puis parties simulées dans le vrai menu ; captures dans `tmp\captures\retour-partie` et `tmp\captures\moments\retour…`). Ce qu'ils ne montrent pas : le mouvement réel d'un écran à l'autre, le son, le vrai VPX qui se ferme, la lisibilité à un mètre.
+
+| # | Scénario | Comment | Résultat attendu |
+| --- | --- | --- | --- |
+| 798 | Partie sans relevé | Jouer une table qui ne garde pas ses records (ROM PinMAME, ou table sans `user\VPReg.stg`), quitter par Exit. | La roue revient, assombrie, sous une carte : le logo, « Partie terminée », la durée (« 4 min 12 s »), START Rejouer et EXIT Roue. Aucun score. Jamais d'éclair clair ni de bureau Windows. L'aide du menu et l'anneau vert se retirent derrière la carte. |
+| 799 | Rejouer | Sur la carte, Start. | La même table se relance aussitôt (pièce, chargement), sans passer par sa fiche. |
+| 800 | Roue, effacement | Sur la carte, Exit ; puis une autre partie, sans rien toucher. | Exit : la carte s'efface, la roue revient sur la même table (pas le menu système). Sans rien toucher : la carte s'efface seule au bout de 8 s, le filet du bas s'est vidé. Un flipper ferme la carte et change de table. |
+| 801 | Bouton tenu | Quitter une partie en gardant Exit appuyé une seconde ; puis frapper les flippers à la fin de la dernière bille. | La carte reste : ni fermée, ni relancée par ces appuis. |
+| 802 | Record | Battre le record d'une table qui le garde (VPW, table originale). | Le logo s'allume sur le fronton assombri, se soulève, tombe ; une tache de lumière traverse le DMD de haut en bas, NEW HIGH SCORE clignote trois fois au-dessus du score ; le logo entre par le haut du plateau et se pose dans la carte ; une seule onde et le knocker, une fois. La carte : « Nouveau record », le score, les initiales, « +… sur l'ancien record », la durée ; elle reste 12 s. |
+| 803 | Autre place | Entrer au tableau sans battre le record (3e place). | « Tableau d'honneur · 3e place », « À … du record » ; HIGH SCORE #3 sur le DMD. À plusieurs joueurs, « Un autre score au tableau ». |
+| 804 | Arrêt forcé | Pendant une partie, Ctrl+Maj+K. | VPX se ferme, la roue revient sans carte (une partie arrêtée n'est pas une partie finie). Une table qui a échoué garde son message, sans carte. |
+| 805 | Au bureau, plateau tourné | Sur un PC (menu au bureau), puis sur une borne au playfield couché et tourné, jouer une partie. | Au bureau, la carte au centre de la fenêtre, lisible, sans rien couper. Plateau tourné : la carte est droite pour le joueur ; le logo d'un record tombe vers lui. |
+
 ## Horaire de la borne
 
 Sur la borne, puis sur un PC. La preuve sans opérateur : `packages/core/src/test/arcadehours.test.ts` (nuit à cheval sur minuit, fenêtre d'arrêt, préavis, bouton, partie jusqu'au matin, veille pendant la fenêtre, aucun arrêt réel en essai) et `.\docs\demo-attente.ps1` (horloge simulée ; captures dans `tmp\demo-attente`). Ce qu'ils ne montrent pas : la vraie veille, le vrai réveil par un bouton, la lisibilité à un mètre.

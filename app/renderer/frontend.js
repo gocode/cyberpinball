@@ -1051,6 +1051,135 @@ function syncCinema(s) {
   }
 }
 
+// ---------- Retour de partie (gamereturn.ts, frontend.css) ----------
+
+/**
+ * Au retour d'une partie solo, l'état apporte la part de cette fenêtre (s.bilan) : sur le
+ * plateau, la carte de bilan (#bilan, tournée comme la racine) ; pour un record, sur le fronton
+ * (sa zone), le logo qui s'allume et tombe. Posée une fois par retour, à l'heure du retour
+ * (--gr-elapsed) : la feuille de style fait le reste. Sur le départ (s.bilan.leaving), elle
+ * s'efface en BILAN_FADE_MS ; un état sans bilan (partie relancée, autre écran) la retire aussitôt.
+ */
+const BILAN_FADE_MS = 240;
+const bilanLayer = document.getElementById('bilan');
+/** Couches posées pour le retour en cours : { id, stages, leaving }. */
+let bilanShown;
+/** Dernier retour effacé : ses états tardifs ne reposent pas la carte. */
+let bilanEnded;
+
+/** Un choix de la carte : la touche (comme le bandeau d'aide), ce qu'elle fait ; un clic l'envoie comme la touche. */
+function bilanHint(cap, what, code, start) {
+  const hint = el('span', 'hint');
+  hint.append(el('span', start ? 'cap start' : 'cap', cap), el('span', 'what', what));
+  if (code) hint.dataset.act = JSON.stringify({ type: 'key', code });
+  return hint;
+}
+
+function bilanFact(icon, text, extra = '') {
+  const fact = el('span', `gr-fact${extra}`);
+  fact.append(cyberIcon(icon), el('span', '', text));
+  return fact;
+}
+
+/** La carte du plateau : le logo sur son bord haut, ce qui est connu de la partie, Start et Exit. */
+function bilanCard(view, nav) {
+  const stage = el('div', `bilan${view.celebrate ? ' bilan-record' : ''}`);
+  stage.dataset.bilan = 'plateau';
+  stage.style.setProperty('--gr-elapsed', String(Math.max(0, Date.now() - view.startedAt)));
+  stage.style.setProperty('--gr-ms', String(view.ms));
+  const card = el('section', 'gr-card');
+  const slot = el('div', 'gr-slot');
+  const flight = el('div', 'gr-flight');
+  const logo = el('div', 'gr-logo');
+  const face = cinemaFace(view);
+  logo.append(face);
+  flight.append(el('div', 'gr-trail'), logo, el('div', 'gr-ring'));
+  slot.append(flight);
+  // Logo large et bas (la plupart des roues détourées) : une réserve basse, posée sur le bord du panneau,
+  // l'image calée en bas ; le médaillon et les logos hauts gardent la grande (revue de Codex).
+  const shape = () => card.classList.toggle('gr-wide', face.tagName === 'IMG' && face.naturalHeight > 0 && face.naturalWidth / face.naturalHeight >= 1.6);
+  if (face.tagName === 'IMG') {
+    if (face.complete) shape();
+    else face.addEventListener('load', shape, { once: true });
+  }
+  const panel = el('div', 'gr-panel');
+  const record = view.record;
+  if (record) {
+    panel.append(el('div', 'gr-kicker', record.place ? `${record.heading} · ${record.place}` : record.heading));
+    const figure = el('div', 'gr-figure');
+    figure.append(el('span', 'gr-score', record.score));
+    if (record.initials) figure.append(el('span', 'gr-initials', record.initials));
+    panel.append(figure);
+    if (record.gap) panel.append(el('div', 'gr-gap', record.gap));
+    if (record.others) panel.append(el('div', 'gr-others', record.others));
+  } else {
+    panel.append(el('div', 'gr-kicker', t('Partie terminée')));
+    panel.append(el('div', 'gr-figure', view.duration));
+  }
+  const facts = [...(record ? [bilanFact('clock', view.duration)] : []), ...(view.badges ?? []).map((b) => bilanFact(b.icon, t('Badge : {badge}', { badge: b.label }), ' gr-badge'))];
+  if (facts.length) {
+    const row = el('div', 'gr-facts');
+    row.append(...facts);
+    panel.append(row);
+  }
+  const actions = el('div', 'gr-actions');
+  // Les noms des boutons restent ceux de la borne (Start, Exit), comme dans le bandeau d'aide.
+  actions.append(bilanHint('Start', t('Rejouer'), nav?.confirm, true), bilanHint('Exit', t('Roue'), nav?.exit, false));
+  panel.append(actions, el('div', 'gr-timer'));
+  card.append(slot, panel);
+  stage.append(el('div', 'gr-scrim'), card);
+  return stage;
+}
+
+/** Le fronton d'un record : le logo s'y allume sur un voile, se soulève d'un cran, tombe. */
+function bilanFronton(view) {
+  const stage = el('div', 'bilan-fronton');
+  stage.dataset.bilan = 'fronton';
+  stage.style.setProperty('--gr-elapsed', String(Math.max(0, Date.now() - view.startedAt)));
+  const flight = el('div', 'gr-flight');
+  const lift = el('div', 'gr-lift');
+  const logo = el('div', 'gr-logo');
+  logo.append(cinemaFace(view));
+  lift.append(logo);
+  flight.append(el('div', 'gr-trail'), lift);
+  stage.append(el('div', 'gr-scrim'), flight);
+  return stage;
+}
+
+function dropBilan() {
+  for (const stage of bilanShown?.stages ?? []) {
+    clearTimeout(stage.fade);
+    stage.node.remove();
+  }
+  bilanShown = undefined;
+  document.documentElement.classList.remove('bilan-open');
+}
+
+function syncBilan(s) {
+  const view = !s.game && s.bilan;
+  if (!view || view.id === bilanEnded) return dropBilan();
+  if (bilanShown?.id !== view.id) {
+    dropBilan();
+    const stages = [];
+    if (view.plateau && bilanLayer) stages.push({ node: bilanLayer.appendChild(bilanCard(view, s.nav)) });
+    if (view.fronton && backglassZone) stages.push({ node: backglassZone.node.appendChild(bilanFronton(view)) });
+    bilanShown = { id: view.id, stages };
+  }
+  // Derrière la carte, l'aide du menu et l'anneau de la sélection se retirent : Start y rejoue, il n'ouvre pas la fiche.
+  document.documentElement.classList.toggle('bilan-open', Boolean(view.plateau && !view.leaving));
+  if (!view.leaving || bilanShown.leaving) return;
+  // Sur le départ : fondu, puis la couche part ; ce retour ne se rejoue plus.
+  bilanShown.leaving = true;
+  const id = view.id;
+  for (const stage of bilanShown.stages) {
+    stage.node.classList.add('gr-fin');
+    stage.fade = setTimeout(() => {
+      stage.node.remove();
+      bilanEnded = id;
+    }, BILAN_FADE_MS);
+  }
+}
+
 /** Média du rôle pour la table choisie ; sans table, seul le topper garde son repli. */
 function viewOf(s, part) {
   const view = s.medias?.[part];
@@ -1268,6 +1397,8 @@ window.cyberEtat = () => ({
   // Ouverture : son numéro, si elle est partie, chaque animation de Cyber Pinball montée (instant, au bout) et l'invite.
   ouverture: lastState?.intro && { id: lastState.intro.id, partie: lastState.intro.startedAt !== undefined, scenes: window.CyberIntro?.scenes() ?? [], invite: Boolean(root.querySelector('.intro-hint')) },
   // Lancement en cinéma : les scènes posées (départ, arrivée), le logo ou le médaillon, et si elles s'effacent.
+  // Retour de partie : les scènes posées (plateau, fronton), le record, les faits montrés, sur le départ ou non.
+  bilan: [...document.querySelectorAll('[data-bilan]')].map((n) => ({ scene: n.dataset.bilan, record: n.classList.contains('bilan-record') || n.dataset.bilan === 'fronton', titre: n.querySelector('.gr-kicker')?.textContent, chiffre: n.querySelector('.gr-figure')?.textContent, ecart: n.querySelector('.gr-gap')?.textContent, faits: [...n.querySelectorAll('.gr-fact')].map((f) => f.textContent), fin: n.classList.contains('gr-fin') })), // i18n-ignore : relevé des essais
   cinema: [...document.querySelectorAll('.cinema')].map((n) => ({ scene: n.dataset.cinema, visage: n.querySelector('.cine-disc') ? 'médaillon' : 'logo', fin: n.classList.contains('cine-fin') })), // i18n-ignore : relevé des essais
   // « fronton-menu » : le fronton en fond du menu au bureau, à part de l'écran du fronton (backglass).
   couches: [...(background ? [['playfield', background]] : []), ...(menuBackglass ? [['fronton-menu', menuBackglass]] : []), ...zones.map((z) => [z.role, z.layer])].map(([part, layer]) => ({ role: part, ...layer.state() })),
@@ -1298,6 +1429,8 @@ window.cyber.onState((s) => {
   syncLiveDmd(s.game ? undefined : s.liveDmd);
   // Lancement en cinéma : posé au Start, effacé quand VPX paraît (avant le fond de partie).
   syncCinema(s);
+  // Retour d'une partie : la carte de bilan sur le plateau, la chute du logo sur le fronton (record).
+  syncBilan(s);
   // Horaire : voile de nuit et préavis d'arrêt, levés pendant la partie et pour l'écran noir de l'arrêt.
   const powering = s.phase === 'message' && s.message?.action === 'power';
   syncNight(powering ? { ...s, night: 0 } : s);

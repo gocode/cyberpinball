@@ -46,6 +46,7 @@ export const GUEST_DOORS = {
   'message.interface': false, // Refaire l’étape « Boutons de l’interface »
   'message.journey': false, // Ce qu’il manque pour jouer, après une partie échouée
   'message.replay': true, // Rejouer la table, après un arrêt de VPX dû au script de la table (rien ne manque)
+  'return.replay': true, // Rejouer la table depuis la carte du retour d’une partie (Start)
   'message.live': false, // Ouvrir la partie entre amis, après un arrêt de VPX pendant celle-ci
   'message.orientation': false, // Rendre à Windows l’orientation du bureau qu’une version précédente avait changée
   // Fiche d'une table (app/src/library.ts, buildSheet)

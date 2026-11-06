@@ -482,4 +482,20 @@ export const messages: Record<string, string> = {
   '{hex} est trop sombre : les points ne se verraient pas sur le noir de l’afficheur.': '{hex} is too dark: the dots would not show on the display’s black.',
   'Six chiffres hexadécimaux, rouge puis vert puis bleu : #8BE23A est le vert signal, #FF8A1F l’orange plasma.':
     'Six hexadecimal digits, red then green then blue: #8BE23A is signal green, #FF8A1F plasma orange.',
+  // packages/core/src/gamereturn.ts, app/renderer/frontend.js : carte de bilan au retour d'une partie
+  '{s} s': '{s} s',
+  '{m} min {s} s': '{m} min {s} s',
+  '{h} h {m} min': '{h} h {m} min',
+  '+{n} sur l’ancien record': '+{n} over the old record',
+  'À {n} du record': '{n} short of the record',
+  'Nouveau record': 'New record',
+  'Tableau d’honneur': 'High score table',
+  'Premier score enregistré': 'First score on the table',
+  '{rank}e place': '#{rank}',
+  'Un autre score au tableau': 'One more score on the table',
+  '{n} autres scores au tableau': '{n} more scores on the table',
+  'Partie terminée': 'Game over',
+  'Badge : {badge}': 'Badge: {badge}',
+  'Rejouer': 'Play again',
+  'Roue': 'Wheel',
 };

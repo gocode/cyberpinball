@@ -846,6 +846,21 @@ On the cabinet with the sound on, then on a PC. The unattended proof: `packages/
 | 448 | On a desktop | On a PC (desktop menu), launch a table. | The logo starts from the 9:16 frame and leaves it through the top; the title and controls panel does not move. Backglass on another screen: the logo lands there; without a backglass, nothing waits for it and loading stays the same. |
 | 449 | Turned playfield | Cabinet with the playfield lying flat and turned (Windows in landscape). | The logo shoots towards the backglass as the player sees it, not towards the top of the screen as Windows sees it. |
 
+## Back from a game
+
+On the cabinet with the sound on, then on a PC. The unattended proof: `packages/core/src/test/gamereturn.test.ts` (never a made-up score, no summary for a forced stop or a failure, labels, timing, DMD, window rendering) and `.\docs\demo-retour-partie.ps1` (key frames off screen on a cabinet, a turned playfield and a desktop, then simulated games in the real menu; captures in `tmp\captures\retour-partie` and `tmp\captures\moments\retour…`). What they do not show: the real motion from one screen to the next, the sound, the real VPX closing, legibility at one metre.
+
+| # | Scenario | How | Expected result |
+| --- | --- | --- | --- |
+| 798 | Game without high scores | Play a table that does not keep its high scores (PinMAME ROM, or a table without `user\VPReg.stg`), quit with Exit. | The wheel comes back, dimmed, under a card: the logo, "Partie terminée" (Game over), the length ("4 min 12 s"), START Rejouer (Play again) and EXIT Roue (Wheel). No score. Never a bright flash nor the Windows desktop. The menu help and the green ring step back behind the card. |
+| 799 | Play again | On the card, Start. | The same table relaunches straight away (coin, loading), without going through its game page. |
+| 800 | Wheel, fading | On the card, Exit; then another game, touching nothing. | Exit: the card fades, the wheel is back on the same table (not the system menu). Touching nothing: the card fades by itself after 8 s, the bottom line has run out. A flipper closes the card and changes table. |
+| 801 | Held button | Quit a game keeping Exit pressed for a second; then hit the flippers at the end of the last ball. | The card stays: neither closed nor relaunched by those presses. |
+| 802 | High score | Beat the record of a table that keeps it (VPW, original table). | The logo lights up on the dimmed backglass, lifts, drops; a spot of light crosses the DMD from top to bottom, NEW HIGH SCORE blinks three times above the score; the logo comes in from the top of the playfield and lands in the card; a single ring and the knocker, once. The card: "Nouveau record" (New record), the score, the initials, "+… sur l'ancien record" (+… over the old record), the length; it stays 12 s. |
+| 803 | Another place | Enter the table without beating the record (3rd place). | "Tableau d'honneur · 3e place" (High score table · #3), "À … du record" (… short of the record); HIGH SCORE #3 on the DMD. With several players, "Un autre score au tableau" (One more score on the table). |
+| 804 | Forced stop | During a game, Ctrl+Shift+K. | VPX closes, the wheel comes back without a card (a stopped game is not a finished game). A table that failed keeps its message, without a card. |
+| 805 | Desktop, turned playfield | On a PC (desktop menu), then on a cabinet with a lying, turned playfield, play a game. | On a desktop, the card in the middle of the window, legible, nothing cut. Turned playfield: the card is upright for the player; a high score's logo drops towards them. |
+
 ## Cabinet schedule
 
 On the cabinet, then on a PC. The unattended proof: `packages/core/src/test/arcadehours.test.ts` (night spanning midnight, stop window, warning, button, game until morning, sleep during the window, no real stop in a test) and `.\docs\demo-attente.ps1` (simulated clock; captures in `tmp\demo-attente`). What they do not show: the real sleep, the real wake-up by a button, readability from a metre away.
