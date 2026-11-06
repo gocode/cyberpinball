@@ -107,10 +107,11 @@ test('script : nom du pack passé à B2SInit (variable, constante, littéral), p
 test('screens.pup : 8 colonnes, CustomPos entre guillemets, en-tête sauté', () => {
   const s = parseScreens(`${HEADER}\r\n0,Topper,,,0,ForceON,0,\r\n5,FullDMD,,,0,ForcePoP,0,"2,0,60,100,40"\r\n2,Backglass,PuPFrames,Fond.png,0,ForceBack,,\r\nligne invalide\r\n\r\n`);
   assert.deepEqual(s, [
-    { num: 0, description: 'Topper', mode: 'ForceON', parent: undefined, playlist: undefined, playFile: undefined },
-    { num: 5, description: 'FullDMD', mode: 'ForcePoP', parent: 2, playlist: undefined, playFile: undefined },
+    { num: 0, description: 'Topper', mode: 'ForceON', parent: undefined, rect: undefined, playlist: undefined, playFile: undefined },
+    // Place dans le parent, en % (PUPCustomPos::ScaledRect).
+    { num: 5, description: 'FullDMD', mode: 'ForcePoP', parent: 2, rect: { x: 0, y: 60, w: 100, h: 40 }, playlist: undefined, playFile: undefined },
     // Fichier montré par défaut sur l'écran : le fronton du pack.
-    { num: 2, description: 'Backglass', mode: 'ForceBack', parent: undefined, playlist: 'PuPFrames', playFile: 'Fond.png' },
+    { num: 2, description: 'Backglass', mode: 'ForceBack', parent: undefined, rect: undefined, playlist: 'PuPFrames', playFile: 'Fond.png' },
   ]);
 });
 

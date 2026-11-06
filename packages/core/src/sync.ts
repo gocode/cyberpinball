@@ -31,6 +31,7 @@ import {
 } from './vpx';
 import { cabinetZones, isFullZone, isValidZone, roleZone, zoneDisplay, zoneFindings, zoneRect, zoneSizeCm } from './zones';
 import { dmdKindFindings, dmdKindOf } from './dmdscreen';
+import { confusableRoles } from './vpxwindows';
 
 export type Severity = 'blocking' | 'warning' | 'info';
 
@@ -227,7 +228,7 @@ export function planVpxSync(
   };
 
   const dmdKind = dmdKindOf(cabinet);
-  applyOwned(vpxSettingsFor(assignments, profile, cabinetZones(cabinet), dmdKind));
+  applyOwned(vpxSettingsFor(assignments, profile, cabinetZones(cabinet), dmdKind, confusableRoles(assignments, observed, profile.displayIdFormat)));
   findings.push(...zoneFindings(cabinet, assignments), ...dmdKindFindings(cabinet));
   applyOwned([...VPX_PLAY_SETTINGS]);
   changes.push(...applyVpxDefaults(doc, [...vpxPluginDefaults(assignments, profile, dmdKind), ...vpxFolderDefaults(options.folders ?? {})].filter((s) => !outside(s))));

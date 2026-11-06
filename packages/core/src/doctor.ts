@@ -252,7 +252,12 @@ export interface PupMemory {
    * PuP-DMD ramené du fronton dans la fenêtre du DMD (pupDmdInBackglass) : l'écran et son
    * CustomPos d'origine, remis si la borne n'a plus d'écran DMD (pupDmdBackToBackglass).
    */
-  dmd?: { screen: number; customPos: string };
+  dmd?: {
+    screen: number;
+    customPos: string;
+    /** CustomPos que Cyber Pinball a posé : tant qu'il est en place, la retouche est la sienne. */
+    applied?: string;
+  };
 }
 
 export function pupMemory(info: { [key: string]: unknown }, pack: string): PupMemory | undefined {
@@ -762,10 +767,12 @@ function pupHidesDmdFinding(tableFile: string, pack: string): Finding | undefine
 
 /**
  * Le score d'un PuP-DMD posé dans le fronton (dmdInBackglass) passe dans la fenêtre du DMD de la
- * borne : son écran reçoit un CustomPos qui y pose la bande du fronton où l'auteur l'a mis. Il
- * faut que le script écrive le score sur le pack (LabelNew), qu'aucune option du pack ne le mette
- * déjà sur le DMD (le choix d'option s'en charge), et que la borne ait un écran DMD. L'inverse
- * quand la borne n'en a plus : le CustomPos d'origine, retenu dans le .info, est remis.
+ * borne : son écran reçoit un CustomPos qui y pose la bande du fronton où l'auteur l'a mis, aux
+ * proportions de cette fenêtre (aspects.dmd : 4:1 sur une borne, 16:9 sur un FullDMD). Il faut
+ * que le script écrive le score sur le pack (LabelNew), qu'aucune option du pack ne le mette déjà
+ * sur le DMD (le choix d'option s'en charge), et que la borne ait un écran DMD. La place est
+ * recalculée quand la fenêtre du DMD change de forme (autre configuration de la borne), et le
+ * CustomPos d'origine, retenu dans le .info, est remis quand la borne n'a plus d'écran DMD.
  */
 function pupDmdPlaceFinding(
   entry: TableEntry,
@@ -776,7 +783,7 @@ function pupDmdPlaceFinding(
   facts: ScriptFacts | undefined,
 ): Finding | undefined {
   const file = info.pupFiles.find((f) => f.toLowerCase() === 'screens.pup');
-  if (!cabinet || !file) return undefined;
+  if (!cabinet || !file || !fs.existsSync(entry.infoFile)) return undefined;
   const screensPath = path.join(info.root, file);
   let text: string;
   try {
@@ -784,46 +791,52 @@ function pupDmdPlaceFinding(
   } catch {
     return undefined;
   }
-  const hasInfo = fs.existsSync(entry.infoFile);
+  // Retouche de Cyber Pinball en place : le CustomPos qu'il a posé (une retouche plus ancienne
+  // ne le retenait pas : un écran qui se désigne lui-même).
+  const kept = memory?.dmd;
+  const current = kept ? screenCustomPos(text, kept.screen) : undefined;
+  const keptScreen = kept && parseScreens(text).filter((s) => s.num === kept.screen).pop();
+  const ours = Boolean(kept && current !== undefined && (kept.applied !== undefined ? current === kept.applied : keptScreen && isBandCustomPos(keptScreen)));
+  const writeOps = (content: string, dmd: PupMemory['dmd']): FileOp[] => {
+    const { dmd: _old, ...rest } = memory ?? {};
+    return [
+      { op: 'write', path: screensPath, content, encoding: 'latin1' },
+      { op: 'write', path: entry.infoFile, content: withPupMemory(entry.info, pack, dmd ? { ...rest, dmd } : rest) },
+    ];
+  };
   if (cabinet.dmd === false) {
-    const kept = memory?.dmd;
-    const screen = kept && parseScreens(text).filter((s) => s.num === kept.screen).pop();
-    if (!kept || !screen || !isBandCustomPos(screen)) return undefined;
-    const { dmd: _dmd, ...rest } = memory!;
+    if (!ours) return undefined;
     return {
       code: 'pupDmdBackToBackglass',
       severity: 'warning',
       title: t('Score du PuP-Pack à remettre dans le fronton'),
       detail: t('Le score de pupvideos\\{pack} avait été placé sur l’écran DMD ; la borne n’en a plus : il retourne en bas du fronton, comme l’auteur l’a prévu.', { pack }),
-      fix: {
-        label: t('Remettre le score dans le fronton'),
-        ops: [
-          { op: 'write', path: screensPath, content: relocateScreen(text, kept.screen, kept.customPos), encoding: 'latin1' },
-          ...(hasInfo ? [{ op: 'write' as const, path: entry.infoFile, content: withPupMemory(entry.info, pack, rest) }] : []),
-        ],
-      },
+      fix: { label: t('Remettre le score dans le fronton'), ops: writeOps(relocateScreen(text, kept!.screen, kept!.customPos), undefined) },
     };
   }
   if (!cabinet.dmd || !facts?.pup?.labels) return undefined;
   if (info.variants.some((v) => v.traits.windows?.dmd)) return undefined;
-  const found = dmdInBackglass(parseScreens(text));
-  const original = found && screenCustomPos(text, found.screen);
+  const aspect = cabinet.aspects?.dmd ?? cabinet.dmdRatio;
+  // Le pack tel que livré : celui en place, ou celui d'avant la retouche.
+  const shipped = ours ? relocateScreen(text, kept!.screen, kept!.customPos) : text;
+  const found = dmdInBackglass(parseScreens(shipped), aspect);
+  const original = found && screenCustomPos(shipped, found.screen);
   if (!found || original === undefined) return undefined;
+  if (ours && current === found.customPos) return undefined;
   const params = { pack, screen: found.screen, top: Math.round(found.band.top), bottom: Math.round(found.band.bottom) };
   return {
     code: 'pupDmdInBackglass',
     severity: 'warning',
-    title: t('Score du PuP-Pack dans le fronton, écran DMD vide'),
-    detail: t(
-      'pupvideos\\{pack} pose son écran DMD ({screen}), où le script écrit le score, dans le fronton : il est fait pour un seul grand écran. La fenêtre du DMD de la borne resterait vide. Le score y passe (bande de {top} à {bottom} % de l’écran {screen}) ; le reste du pack garde le fronton.',
-      params,
-    ),
+    title: ours ? t('Score du PuP-Pack à recadrer sur l’écran DMD') : t('Score du PuP-Pack dans le fronton, écran DMD vide'),
+    detail: ours
+      ? t('La fenêtre du DMD de la borne a changé de forme : le score de pupvideos\\{pack} (bande de {top} à {bottom} % de l’écran {screen}) y est replacé à ses proportions.', params)
+      : t(
+          'pupvideos\\{pack} pose son écran DMD ({screen}), où le script écrit le score, dans le fronton : il est fait pour un seul grand écran. La fenêtre du DMD de la borne resterait vide. Le score y passe (bande de {top} à {bottom} % de l’écran {screen}) ; le reste du pack garde le fronton.',
+          params,
+        ),
     fix: {
       label: t('Afficher le score sur l’écran DMD'),
-      ops: [
-        { op: 'write', path: screensPath, content: relocateScreen(text, found.screen, found.customPos), encoding: 'latin1' },
-        ...(hasInfo ? [{ op: 'write' as const, path: entry.infoFile, content: withPupMemory(entry.info, pack, { ...(memory ?? {}), dmd: { screen: found.screen, customPos: original } }) }] : []),
-      ],
+      ops: writeOps(relocateScreen(shipped, found.screen, found.customPos), { screen: found.screen, customPos: original, applied: found.customPos }),
     },
   };
 }

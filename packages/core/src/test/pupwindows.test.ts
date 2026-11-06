@@ -13,7 +13,7 @@ import * as path from 'node:path';
 import { test } from 'node:test';
 import { diagnose, pupMemory, repairPupForPlay, scriptFacts, tablePupPacks } from '../doctor';
 import { applyOps } from '../fileops';
-import { analysePack, chooseVariant, dmdInBackglass, parseScreens, playlistRenames, pupWindows, relocateScreen, sameScreensIgnoringBand, type PupCabinet } from '../puppack';
+import { analysePack, chooseVariant, dmdInBackglass, parseScreens, playlistRenames, pupWindows, relocateScreen, sameScreensIgnoringBand, screenCustomPos, type PupCabinet } from '../puppack';
 import { readInfo, scanTables } from '../tables';
 import { vpxWithScript } from './fixtures';
 
@@ -255,26 +255,36 @@ const CITY_HUNTER_SCRIPT = [
   '',
 ].join('\r\n');
 
-test('PuP-DMD posé dans le fronton : le score passe sur l’écran DMD de la borne, et revient si elle n’en a plus', () => {
+test('PuP-DMD posé dans le fronton : le score passe sur l’écran DMD aux proportions du pack, suit la forme de la fenêtre, et revient si la borne n’a plus de DMD', () => {
   const screens = parseScreens(CITY_HUNTER_SCREENS);
   assert.deepEqual(pupWindows(screens), { topper: false, backglass: true, dmd: false });
   // Bande libre du fronton : sous les vidéos (jusqu’à 57,3 %), là où l'auteur a mis le score.
-  const found = dmdInBackglass(screens)!;
+  const found = dmdInBackglass(screens, 1724 / 416)!;
   assert.equal(found.screen, 1);
   assert.equal(found.parent, 2);
   assert.deepEqual([Math.round(found.band.top * 100) / 100, found.band.bottom], [57.3, 100]);
-  assert.equal(found.customPos, '1,0,-134.19,100,234.19');
+  // DMD 4:1 (borne) : toute la largeur, la bande (16:9 × 42,7 % ≈ 4,16:1) remplit la hauteur.
+  assert.equal(found.customPos, '1,0,-133.34,100,233.11');
+  // FullDMD 16:9 (poste, 6 novembre 2026) : l'écran garde sa taille, la bande est centrée. Une
+  // place étirée en hauteur grossissait le texte sans écarter les étiquettes : « Credits »,
+  // « Players » et « Balls » l'un sur l'autre.
+  assert.equal(dmdInBackglass(screens, 16 / 9)!.customPos, '1,0,-28.65,100,100');
+  // Invariant : dans toute fenêtre, l'écran garde les proportions du fronton 16:9 du pack.
+  for (const aspect of [4, 1724 / 416, 3, 16 / 9, 4 / 3, 1]) {
+    const [, , , w, h] = dmdInBackglass(screens, aspect)!.customPos.split(',').map(Number);
+    assert.ok(Math.abs((w! * aspect) / h! / (16 / 9) - 1) < 0.01, `fenêtre ${aspect.toFixed(2)} : ${w} × ${h}`);
+  }
   // Retouché, l'écran 1 est une racine : le plugin le dessine dans la fenêtre du DMD.
   const relocated = relocateScreen(CITY_HUNTER_SCREENS, 1, found.customPos);
-  assert.equal(relocated.split('\r\n')[2], '1,"DMD - 16:9 FullDMD","PuPOverlays","Overlay3.png",1,ForcePopBack,,"1,0,-134.19,100,234.19"');
+  assert.equal(relocated.split('\r\n')[2], '1,"DMD - 16:9 FullDMD","PuPOverlays","Overlay3.png",1,ForcePopBack,,"1,0,-133.34,100,233.11"');
   assert.equal(relocated.replace(/^1,.*$/m, ''), CITY_HUNTER_SCREENS.replace(/^1,.*$/m, ''));
   assert.deepEqual(pupWindows(parseScreens(relocated)), { topper: false, backglass: true, dmd: true });
   assert.equal(dmdInBackglass(parseScreens(relocated)), undefined);
   // L'option du pack reste reconnue malgré la retouche.
   assert.ok(sameScreensIgnoringBand(relocated, CITY_HUNTER_SCREENS));
   assert.ok(!sameScreensIgnoringBand(relocated.replace('ForceOn', 'Off'), CITY_HUNTER_SCREENS));
-  // Sans autre écran dans le fronton : tout l'écran du DMD.
-  assert.equal(dmdInBackglass(parseScreens(`${HEADER}\n2,BG,,,,ForceOn,,\n1,DMD,,,,ForceBack,,"2,0,0,100,100"\n`))?.customPos, '1,0,0,100,100');
+  // Sans autre écran dans le fronton : tout l'écran du DMD, au centre d'un DMD 4:1.
+  assert.equal(dmdInBackglass(parseScreens(`${HEADER}\n2,BG,,,,ForceOn,,\n1,DMD,,,,ForceBack,,"2,0,0,100,100"\n`), 4)?.customPos, '1,27.78,0,44.44,100');
   // DMD déjà dans sa fenêtre, ou éteint : rien.
   assert.equal(dmdInBackglass(parseScreens(`${HEADER}\n2,BG,,,,ForceOn,,\n1,DMD,,,,ForceBack,,\n`)), undefined);
   assert.equal(dmdInBackglass(parseScreens(`${HEADER}\n2,BG,,,,ForceOn,,\n1,DMD,,,,Off,,"2,0,0,100,100"\n`)), undefined);
@@ -295,20 +305,40 @@ test('PuP-DMD posé dans le fronton : le score passe sur l’écran DMD de la bo
   // UltraDMD nommé dans le script, mais le score est écrit sur le pack : c'est lui le DMD.
   assert.equal(facts.drawsDmd, true);
   assert.equal(facts.pup?.labels, true);
-  const ctx = { tablesDir, cabinet: PC, script: facts };
-  assert.deepEqual(repairPupForPlay(entry(), ctx, { trashDir }).map((f) => f.code), ['pupDmdInBackglass']);
-  assert.equal(fs.readFileSync(path.join(root, 'screens.pup'), 'latin1'), relocated);
-  assert.deepEqual(pupMemory(readInfo(infoFile), 'City_Hunter'), { origin: 'City_Hunter', dmd: { screen: 1, customPos: '2,0,0,100,100' } });
-  assert.deepEqual(repairPupForPlay(entry(), ctx, { trashDir }), []);
-  assert.ok(!diagnose(entry(), ctx).some((f) => f.code.startsWith('pupDmd')));
+  const screensNow = () => fs.readFileSync(path.join(root, 'screens.pup'), 'latin1');
+  const memoryNow = () => pupMemory(readInfo(infoFile), 'City_Hunter');
+  // Poste : FullDMD 16:9 (aspects.dmd, la fenêtre du DMD).
+  const poste = { tablesDir, cabinet: { ...PC, aspects: { dmd: 16 / 9 } }, script: facts };
+  assert.deepEqual(repairPupForPlay(entry(), poste, { trashDir }).map((f) => f.code), ['pupDmdInBackglass']);
+  assert.equal(screenCustomPos(screensNow(), 1), '1,0,-28.65,100,100');
+  assert.deepEqual(memoryNow(), { origin: 'City_Hunter', dmd: { screen: 1, customPos: '2,0,0,100,100', applied: '1,0,-28.65,100,100' } });
+  assert.deepEqual(repairPupForPlay(entry(), poste, { trashDir }), []);
+  assert.ok(!diagnose(entry(), poste).some((f) => f.code.startsWith('pupDmd')));
+  // Autre configuration de la borne, DMD 4:1 : la place est recalculée depuis le pack livré.
+  const borne = { ...poste, cabinet: { ...PC, aspects: { dmd: 1724 / 416 } } };
+  const reframed = repairPupForPlay(entry(), borne, { trashDir });
+  assert.deepEqual(reframed.map((f) => f.code), ['pupDmdInBackglass']);
+  assert.equal(reframed[0]!.title, 'Score du PuP-Pack à recadrer sur l’écran DMD');
+  assert.equal(screensNow(), relocated);
+  assert.deepEqual(memoryNow()?.dmd, { screen: 1, customPos: '2,0,0,100,100', applied: '1,0,-133.34,100,233.11' });
+  assert.deepEqual(repairPupForPlay(entry(), borne, { trashDir }), []);
+  // Retouche de la version précédente (place pour un DMD 4:1 étirée, sans « applied ») : reprise.
+  fs.writeFileSync(path.join(root, 'screens.pup'), relocateScreen(CITY_HUNTER_SCREENS, 1, '1,0,-134.19,100,234.19'), 'latin1');
+  fs.writeFileSync(infoFile, JSON.stringify({ CyberPinball: { pup: { City_Hunter: { origin: 'City_Hunter', dmd: { screen: 1, customPos: '2,0,0,100,100' } } } } }));
+  assert.deepEqual(repairPupForPlay(entry(), poste, { trashDir }).map((f) => f.code), ['pupDmdInBackglass']);
+  assert.equal(screenCustomPos(screensNow(), 1), '1,0,-28.65,100,100');
+  // Place changée à la main depuis (ce n'est plus celle que Cyber Pinball a posée) : laissée.
+  fs.writeFileSync(path.join(root, 'screens.pup'), relocateScreen(CITY_HUNTER_SCREENS, 1, '1,0,-10,100,120'), 'latin1');
+  assert.ok(!diagnose(entry(), borne).some((f) => f.code.startsWith('pupDmd')));
+  fs.writeFileSync(path.join(root, 'screens.pup'), relocateScreen(CITY_HUNTER_SCREENS, 1, '1,0,-28.65,100,100'), 'latin1');
   // Borne sans DMD : le score retourne dans le fronton, comme livré.
-  const noDmd = { ...ctx, cabinet: { ...PC, dmd: false } };
+  const noDmd = { ...poste, cabinet: { ...PC, dmd: false } };
   assert.deepEqual(repairPupForPlay(entry(), noDmd, { trashDir }).map((f) => f.code), ['pupDmdBackToBackglass']);
-  assert.equal(fs.readFileSync(path.join(root, 'screens.pup'), 'latin1'), CITY_HUNTER_SCREENS);
-  assert.deepEqual(pupMemory(readInfo(infoFile), 'City_Hunter'), { origin: 'City_Hunter' });
+  assert.equal(screensNow(), CITY_HUNTER_SCREENS);
+  assert.deepEqual(memoryNow(), { origin: 'City_Hunter' });
   assert.deepEqual(repairPupForPlay(entry(), noDmd, { trashDir }), []);
   // Script qui n'écrit pas le score sur le pack : le pack n'est pas son DMD, rien ne bouge.
-  const noLabels = { ...ctx, script: scriptFacts(CITY_HUNTER_SCRIPT.replace(/^PuPlayer\.Label.*$/gm, '')) };
+  const noLabels = { ...poste, script: scriptFacts(CITY_HUNTER_SCRIPT.replace(/^PuPlayer\.Label.*$/gm, '')) };
   assert.ok(!diagnose(entry(), noLabels).some((f) => f.code === 'pupDmdInBackglass'));
   fs.rmSync(tablesDir, { recursive: true });
   fs.rmSync(trashDir, { recursive: true, force: true });

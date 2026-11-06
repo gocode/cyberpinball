@@ -638,6 +638,13 @@ export function packDrawsDmd(dir: string): boolean {
  * `band` : la bande du fronton, en % de sa hauteur, que les autres écrans posés dans le fronton
  * laissent libre (la plus haute des deux, en haut ou en bas) : c'est là que l'auteur a mis le
  * score. Sans bande nette (moins de 15 %), tout l'écran du DMD.
+ *
+ * La bande garde les proportions que l'auteur a composées : le plugin PUP place et dimensionne
+ * les étiquettes en % de la largeur et de la hauteur de leur écran (PUPLabel::Render), une
+ * place étirée en hauteur grossit le texte sans écarter les étiquettes, qui se chevauchent
+ * (City Hunter sur le FullDMD 16:9 d'un poste, 6 novembre 2026, avec une bande calculée pour
+ * un DMD 4:1). Elle est donc posée dans la fenêtre du DMD (`windowAspect`, largeur sur
+ * hauteur) au plus grand sans déformation, centrée (dmdBandPlacement).
  */
 export interface DmdInBackglass {
   /** Écran du DMD (1 ou 5). */
@@ -652,7 +659,13 @@ export interface DmdInBackglass {
 
 const BACKGLASS_SCREENS = [2, 6];
 
-export function dmdInBackglass(screens: PupScreen[]): DmdInBackglass | undefined {
+/** Proportions (largeur sur hauteur) de l'écran du fronton pour lequel le pack est composé : 2 « Backglass 16x9 », 6 « Backglass 4x3-5x4 » (PUPManager::AddScreen). */
+const BACKGLASS_ASPECT: Record<number, number> = { 2: 16 / 9, 6: 4 / 3 };
+
+/** DMD réel, quand la borne ne dit pas la forme de la fenêtre du DMD. */
+const DEFAULT_DMD_ASPECT = 4;
+
+export function dmdInBackglass(screens: PupScreen[], windowAspect = DEFAULT_DMD_ASPECT): DmdInBackglass | undefined {
   if (!screens.length || pupWindows(screens).dmd) return undefined;
   // Dernière définition de chaque écran : celle que le plugin garde (PUPManager::AddScreen).
   const byNum = new Map(screens.map((s) => [s.num, s]));
@@ -675,31 +688,45 @@ export function dmdInBackglass(screens: PupScreen[]): DmdInBackglass | undefined
   const from = r.h > 0 ? Math.max(0, (band.top - r.y) / r.h) : 0;
   const to = r.h > 0 ? Math.min(1, (band.bottom - r.y) / r.h) : 1;
   const inside = to - from >= 0.15 ? { top: from * 100, bottom: to * 100 } : { top: 0, bottom: 100 };
-  return { screen: dmd.num, parent, band: inside, customPos: bandCustomPos(dmd.num, inside) };
+  // Proportions de l'écran du DMD tel que l'auteur l'a composé : sa place dans le fronton.
+  const canvasAspect = (BACKGLASS_ASPECT[parent] ?? 16 / 9) * (r.w > 0 && r.h > 0 ? r.w / r.h : 1);
+  const place = dmdBandPlacement(inside, canvasAspect, windowAspect > 0 ? windowAspect : DEFAULT_DMD_ASPECT);
+  return { screen: dmd.num, parent, band: inside, customPos: customPosOf(dmd.num, place) };
 }
 
 /**
- * CustomPos qui pose la bande `band` (en % de la hauteur de l'écran) dans toute la fenêtre :
- * l'écran se désigne lui-même, il reste une racine (PUPManager::AddScreen : pas de parent quand
- * la source est l'écran lui-même), et sa place déborde de la fenêtre en haut et en bas
- * (PUPScreen::SetBounds ne limite pas la place à la fenêtre ; ce qui en sort ne se voit pas).
+ * Place de l'écran (en % de la fenêtre, comme un CustomPos) qui montre la bande `band` (en % de
+ * sa hauteur) au plus grand dans une fenêtre de proportions `windowAspect`, sans la déformer
+ * (`canvasAspect` : largeur sur hauteur de l'écran composé par l'auteur), centrée. L'écran
+ * déborde de la fenêtre là où la bande ne le couvre pas : ce qui en sort ne se voit pas
+ * (PUPScreen::SetBounds ne limite pas la place à la fenêtre).
  */
-export function bandCustomPos(screen: number, band: { top: number; bottom: number }): string {
-  const height = (band.bottom - band.top) / 100;
-  const h = 100 / height;
-  const y = -(band.top / 100) * h;
+export function dmdBandPlacement(band: { top: number; bottom: number }, canvasAspect: number, windowAspect: number): { x: number; y: number; w: number; h: number } {
+  const share = (band.bottom - band.top) / 100;
+  // Toute la largeur de la fenêtre ; si la bande dépasse alors en hauteur, toute la hauteur.
+  let w = 100;
+  let h = (100 * windowAspect) / canvasAspect;
+  if (h * share > 100) {
+    h = 100 / share;
+    w = (h * canvasAspect) / windowAspect;
+  }
+  const x = (100 - w) / 2;
+  const y = (100 - h * share) / 2 - (h * band.top) / 100;
+  return { x, y, w, h };
+}
+
+function customPosOf(screen: number, place: { x: number; y: number; w: number; h: number }): string {
   const fmt = (v: number) => String(Math.round(v * 100) / 100);
-  return `${screen},0,${fmt(y)},100,${fmt(h)}`;
+  return [screen, place.x, place.y, place.w, place.h].map((v, i) => (i === 0 ? String(v) : fmt(v))).join(',');
 }
 
 /**
- * CustomPos posé par Cyber Pinball pour montrer une bande d'un écran dans sa fenêtre
- * (bandCustomPos) : l'écran se désigne lui-même, toute la largeur, et déborde en hauteur.
- * Un auteur n'écrit jamais cela ; c'est ce qui distingue le pack retouché du pack livré.
+ * CustomPos où l'écran se désigne lui-même : il reste une racine (PUPManager::AddScreen : pas
+ * de parent quand la source est l'écran lui-même). C'est la forme que Cyber Pinball pose
+ * (dmdBandPlacement) ; le .info retient laquelle (PupMemory.dmd).
  */
 export function isBandCustomPos(screen: PupScreen): boolean {
-  const r = screen.rect;
-  return Boolean(r && screen.parent === screen.num && r.x === 0 && r.w === 100 && (r.y < 0 || r.h > 100));
+  return Boolean(screen.rect && screen.parent === screen.num);
 }
 
 /**

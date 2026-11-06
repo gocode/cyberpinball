@@ -1459,6 +1459,8 @@ Une table dont le PuP-Pack est fait pour un seul grand écran 16:9 : le score da
 |---|---|---|---|
 | 773 | Borne avec un écran DMD | Installer City Hunter (ou garder celle déjà installée), lancer une partie, appuyer sur Start. | Le score, les crédits et la bille en cours s'affichent sur l'écran DMD, à l'échelle de la fenêtre ; le fronton garde ses six vidéos et son décor, sans score en bas. Médecin de la table : rien à signaler sur le PuP-Pack. |
 | 774 | Borne sans écran DMD | Sur une configuration sans écran DMD, lancer la même table. | Le score revient en bas du fronton, comme l'auteur l'a prévu (`screens.pup` remis tel que livré). |
+| 775 | FullDMD 16:9 | Configuration dont l'écran DMD est un FullDMD 16:9 (poste à 3 écrans), même table. | Le score garde les proportions du fronton : « Credits », « Players » et « Balls » côte à côte sans se chevaucher, chiffres de taille normale, bande centrée sur l'écran. Passer d'une configuration à l'autre recadre le score avant la partie suivante. |
+| 776 | Fronton et DMD de même modèle | Poste dont le fronton et le DMD sont deux écrans du même nom (deux PL2294H), même table. | Le fronton montre les six vidéos du pack pendant toute la partie ; le journal du menu ne dit jamais « est réduite par Windows ». |
 
 ## Ce qui ne peut pas encore être testé
 

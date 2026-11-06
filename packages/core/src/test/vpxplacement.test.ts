@@ -5,6 +5,7 @@ import { test } from 'node:test';
 import { healthLines } from '../health';
 import { setLanguage } from '../i18n';
 import type { ObservedDisplay, Rect, RoleId } from '../model';
+import { vpxSettingsFor } from '../vpx';
 import { confusableRoles, VPX_ANCILLARY_WINDOWS, VPX_GAME_TITLES, vpxWindowMoves } from '../vpxwindows';
 
 // Poste à 3 écrans (27 octobre 2026) : le fronton et le DMD sont deux PL2294H. VPX 10.8.1 ouvre
@@ -111,4 +112,20 @@ test('pendant la partie, le menu recale les fenêtres de VPX sans leur prendre l
   const windows = fs.readFileSync(WIN, 'utf8');
   const move = windows.slice(windows.indexOf('export function moveWindow('));
   assert.match(move.slice(0, move.indexOf('\n}\n')), /SWP_NOACTIVATE \| SWP_NOZORDER \| SWP_NOSIZE \| SWP_NOOWNERZORDER \| SWP_ASYNCWINDOWPOS/);
+});
+
+// Poste à 3 écrans, The Matrix (30 octobre 2026) et City Hunter (6 novembre) : PuP-Pack sur le
+// fronton et sur le DMD, les deux fenêtres annexes en plein écran sur le premier PL2294H. SDL ne
+// garde qu'une fenêtre plein écran par écran et réduit l'autre (SDL_video.c,
+// SDL_UpdateFullscreenMode) : le fronton restait réduit, jamais ramené, le pack invisible.
+test('écrans du même nom : les fenêtres annexes ne sont jamais en plein écran, le playfield si', () => {
+  const confused = confusableRoles(assignments, observed, 'name');
+  const fullScreen = (settings: ReturnType<typeof vpxSettingsFor>) =>
+    Object.fromEntries(settings.filter((s) => s.key.endsWith('FullScreen')).map((s) => [s.key, s.value]));
+  // Fenêtrées à la taille de leur écran : Cyber Pinball peut les ramener sur le leur.
+  const written = vpxSettingsFor(assignments, { displayIdFormat: 'name', enabledPlugins: [] }, {}, undefined, confused);
+  assert.deepEqual(fullScreen(written), { PlayfieldFullScreen: '1', BackglassFullScreen: '0', ScoreViewFullScreen: '0' });
+  for (const key of ['BackglassWidth', 'ScoreViewWidth']) assert.equal(written.find((s) => s.key === key)?.value, '1920');
+  // Écrans distincts : plein écran, comme avant.
+  assert.deepEqual(fullScreen(vpxSettingsFor(assignments, { displayIdFormat: 'name', enabledPlugins: [] })), { PlayfieldFullScreen: '1', BackglassFullScreen: '1', ScoreViewFullScreen: '1' });
 });

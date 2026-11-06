@@ -26,6 +26,8 @@ const SCRIPT = 'Const cGameName="afm_113b"\r\nLoadVPM "01560000", "WPC.VBS", 3.2
 const TABLE = 'Attack from Mars (Bally 1995)';
 /** Même table, avec un PuP-Pack chargé par le script. */
 const PUP_SCRIPT = `${SCRIPT}Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\nPuPlayer.B2SInit "", cGameName\r\n`;
+/** Même table, dont le script écrit le score sur l'écran 5 du pack (PuP-DMD). */
+const PUP_LABELS_SCRIPT = `${PUP_SCRIPT}PuPlayer.LabelInit 5\r\nPuPlayer.LabelNew 5,"CurScore","Impact",16,32896,0,1,1,52,80,1,0\r\n`;
 /** Même table, dont le script coupe le pack (« usePUP = False », comme 2001 : A Space Odyssey). */
 const PUP_OFF_SCRIPT = `${SCRIPT}usePUP = False\r\nIf usePUP = True Then\r\n  Set PuPlayer = CreateObject("PinUpPlayer.PinDisplay")\r\n  PuPlayer.B2SInit "", cGameName\r\nEnd If\r\n`;
 /** Même table, dont le script appelle vpmInit deux fois : le core.vbs de VPX 10.8 arrête la partie. */
@@ -124,6 +126,14 @@ function healthyPack(folder: string): string {
   // Le pack occupe la fenêtre du DMD (écran 5) d'une table à ROM : le DMD de la ROM reste devant.
   write(path.join(folder, `${TABLE}.ini`), '[ScoreView]\r\nPriority.PUP = 0\r\n');
   return pack;
+}
+
+/** Pack sans option dont l'écran 5 (où le script écrit le score) a ce CustomPos dans le fronton (City Hunter). */
+function dmdInBackglassPack(folder: string, customPos: string): void {
+  const pack = healthyPack(folder);
+  fs.rmSync(path.join(pack, 'PuP-Pack_Options'), { recursive: true });
+  fs.rmSync(path.join(pack, 'Option 1 - Backglass DMD Separate.bat'));
+  write(path.join(pack, 'screens.pup'), `${HEADER}\r\n2,Backglass,,,0,ForceON,0,\r\n5,FullDMD,,,0,ForceON,0,${customPos}\r\n`);
 }
 
 /** Bibliothèque de ROM du dossier des tables piégé (à côté des tables, sans .vpx). */
@@ -356,6 +366,22 @@ const TRAPS: Trap[] = [
       fs.rmSync(path.join(folder, `${TABLE}.ini`));
     },
     script: scriptFacts(PUP_SCRIPT),
+  },
+  // PuP-DMD posé dans le fronton (City Hunter) : la fenêtre du DMD de la borne resterait vide.
+  {
+    code: 'pupDmdInBackglass',
+    arm: (folder) => dmdInBackglassPack(folder, '"2,0,0,100,100"'),
+    script: scriptFacts(PUP_LABELS_SCRIPT),
+  },
+  // Le même, déjà placé sur le DMD, sur une borne qui n'a plus d'écran DMD.
+  {
+    code: 'pupDmdBackToBackglass',
+    arm: (folder) => {
+      dmdInBackglassPack(folder, '"5,0,-10,100,200"');
+      write(path.join(folder, `${TABLE}.info`), JSON.stringify({ CyberPinball: { pup: { afm_113b: { dmd: { screen: 5, customPos: '2,0,0,100,100', applied: '5,0,-10,100,200' } } } } }));
+    },
+    script: scriptFacts(PUP_LABELS_SCRIPT),
+    ctx: () => ({ cabinet: { ...CABINET, dmd: false } }),
   },
   {
     code: 'pupDisabledByScript',

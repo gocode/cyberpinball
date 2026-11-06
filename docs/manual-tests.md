@@ -1459,6 +1459,8 @@ A table whose PuP-Pack is made for a single large 16:9 screen: the score at the 
 |---|---|---|---|
 | 773 | Cabinet with a DMD screen | Install City Hunter (or keep the one already installed), start a game, press Start. | The score, credits and current ball show on the DMD screen, scaled to the window; the backglass keeps its six videos and its artwork, with no score at the bottom. Table doctor: nothing to report about the PuP-Pack. |
 | 774 | Cabinet without a DMD screen | On a configuration without a DMD screen, start the same table. | The score goes back to the bottom of the backglass, as the author intended (`screens.pup` restored as shipped). |
+| 775 | 16:9 FullDMD | Setup whose DMD screen is a 16:9 FullDMD (3-screen PC), same table. | The score keeps the proportions of the backglass: “Credits”, “Players” and “Balls” side by side without overlapping, digits at normal size, band centred on the screen. Switching from one setup to the other reframes the score before the next game. |
+| 776 | Backglass and DMD of the same model | PC whose backglass and DMD are two screens with the same name (two PL2294H), same table. | The backglass shows the pack's six videos for the whole game; the menu log never says “est réduite par Windows”. |
 
 ## What cannot be tested yet
 

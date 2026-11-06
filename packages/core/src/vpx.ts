@@ -113,12 +113,21 @@ export function vpxDisplayName(display: ObservedDisplay): string {
  * écran, une fenêtre « Windowed » posée sur la zone (WndX et WndY relatifs à
  * l'écran) ; dans la zone du playfield, une incrustation dans son image (WndX et
  * WndY relatifs à cette image).
+ *
+ * `confused` : rôles que VPX peut ouvrir sur l'écran d'un autre (confusableRoles : écrans du
+ * même nom). Leur fenêtre annexe n'est jamais en plein écran mais fenêtrée à la taille de
+ * l'écran : SDL ne garde qu'une fenêtre plein écran par écran et réduit la précédente quand une
+ * autre y passe (SDL_video.c, SDL_UpdateFullscreenMode : SDL_MinimizeWindow). Deux fenêtres
+ * plein écran ouvertes sur le même PL2294H, le fronton était réduit pour toute la partie, et
+ * Cyber Pinball ne pouvait pas le ramener sur son écran (Poste à 3 écrans, The Matrix le
+ * 30 octobre 2026, City Hunter le 6 novembre : PuP-Pack invisible sur le fronton).
  */
 export function vpxSettingsFor(
   assignments: Partial<Record<RoleId, ObservedDisplay>>,
   profile: VpxProfile = DEFAULT_VPX_PROFILE,
   zones: Partial<Record<RoleId, ScreenZone>> = {},
   dmdKind?: DmdKind,
+  confused: readonly RoleId[] = [],
 ): VpxSetting[] {
   const settings: VpxSetting[] = [];
   for (const plugin of profile.enabledPlugins) {
@@ -144,7 +153,7 @@ export function vpxSettingsFor(
     } else {
       if (win.hasOutput) put('Output', OUTPUT_FLOATING);
       put('Display', vpxDisplayId(display, profile.displayIdFormat));
-      put('FullScreen', placement === 'screen' ? FULLSCREEN_BORDERLESS : WINDOWED);
+      put('FullScreen', placement === 'screen' && (role === 'playfield' || !confused.includes(role)) ? FULLSCREEN_BORDERLESS : WINDOWED);
     }
     put('WndX', rect.x);
     put('WndY', rect.y);

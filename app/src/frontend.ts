@@ -87,6 +87,7 @@ import {
   occupiedRoles,
   confusableRoles,
   vpxWindowMoves,
+  VPX_ANCILLARY_WINDOWS,
   saveMenuMediaSettings,
   tableMediaVolume,
   newRecords,
@@ -2439,6 +2440,8 @@ function showRecording(outcome: RecordingOutcome): void {
 let playing: TableEntry | undefined;
 /** Habillage FullDMD de la partie en cours (fulldmd.ts) : l'écran du DMD le garde autour du DMD de VPX. */
 let dressing: TableDressing | undefined;
+/** Fenêtres annexes de VPX vues réduites pendant cette partie (signalées une fois chacune, minimizedVpxWindows). */
+let minimizedSeen = new Set<string>();
 /** Le DMD de VPX a déjà été vu sur l'habillage pendant cette partie (signalé une fois). */
 let dressCoveredSeen = false;
 /** Convertisseur hors écran : images des vidéos FullDMD, pour y chercher le cadre du DMD. */
@@ -2467,12 +2470,14 @@ function watchOccupied(simulated: RoleId[] | undefined): void {
     showLiveBoard();
   };
   occupiedThisGame = new Set();
+  minimizedSeen = new Set();
   if (simulated) return update(simulated);
   dressCoveredSeen = false;
   const check = () => {
     try {
       let stack = listWindows((w) => w.visible);
       if (realignVpxWindows(stack)) stack = listWindows((w) => w.visible);
+      minimizedVpxWindows(stack);
       update(occupiedRoles(roleRects, stack, process.pid));
       watchDressing(stack);
     } catch {
@@ -2495,6 +2500,21 @@ function watchDressing(stack: ReturnType<typeof listWindows>): void {
   if (share < DRESS_COVERED) return;
   dressCoveredSeen = true;
   console.log(`Partie : le DMD de VPX recouvre ${Math.round(share * 100)} % de l’habillage FullDMD (${playing?.id ?? '?'}) ; fiche de la table > Diagnostic pour le remettre dans le cadre.`);
+}
+
+/**
+ * Fenêtre annexe de VPX (fronton, DMD, topper) réduite pendant la partie : son écran ne montre
+ * que le fond de Cyber Pinball, et elle n'est jamais ramenée (vpxWindowMoves laisse les fenêtres
+ * réduites). Cause connue : deux fenêtres plein écran de VPX sur un même écran, SDL réduisant la
+ * première (vpxSettingsFor, `confused`). Signalé une fois par fenêtre et par partie.
+ */
+function minimizedVpxWindows(stack: ReturnType<typeof listWindows>): void {
+  for (const w of stack) {
+    if (w.pid === process.pid || !w.minimized || !Object.hasOwn(VPX_ANCILLARY_WINDOWS, w.title) || minimizedSeen.has(w.title)) continue;
+    minimizedSeen.add(w.title);
+    const role = VPX_ANCILLARY_WINDOWS[w.title as keyof typeof VPX_ANCILLARY_WINDOWS];
+    console.log(`[avertissement] Partie : « ${w.title} » est réduite par Windows : l'écran du rôle ${role} ne montre pas ce que VPX y dessine (fronton, DMD ou PuP-Pack). Deux fenêtres plein écran de VPX sur un même écran ?`);
+  }
 }
 
 function stopWatchOccupied(): void {

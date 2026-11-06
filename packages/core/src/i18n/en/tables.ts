@@ -506,6 +506,8 @@ export const messages: Record<string, string> = {
   'Score du PuP-Pack dans le fronton, écran DMD vide': 'PuP-Pack score on the backglass, DMD screen empty',
   'pupvideos\\{pack} pose son écran DMD ({screen}), où le script écrit le score, dans le fronton : il est fait pour un seul grand écran. La fenêtre du DMD de la borne resterait vide. Le score y passe (bande de {top} à {bottom} % de l’écran {screen}) ; le reste du pack garde le fronton.': 'pupvideos\\{pack} places its DMD screen ({screen}), where the script writes the score, inside the backglass: it is made for a single large screen. The cabinet’s DMD window would stay empty. The score moves there (band from {top} to {bottom}% of screen {screen}); the rest of the pack keeps the backglass.',
   'Afficher le score sur l’écran DMD': 'Show the score on the DMD screen',
+  'Score du PuP-Pack à recadrer sur l’écran DMD': 'PuP-Pack score to reframe on the DMD screen',
+  'La fenêtre du DMD de la borne a changé de forme : le score de pupvideos\\{pack} (bande de {top} à {bottom} % de l’écran {screen}) y est replacé à ses proportions.': 'The cabinet’s DMD window changed shape: the score of pupvideos\\{pack} (band from {top} to {bottom}% of screen {screen}) is placed there again with its proportions.',
   'Score du PuP-Pack à remettre dans le fronton': 'PuP-Pack score to put back on the backglass',
   'Le score de pupvideos\\{pack} avait été placé sur l’écran DMD ; la borne n’en a plus : il retourne en bas du fronton, comme l’auteur l’a prévu.': 'The score of pupvideos\\{pack} had been placed on the DMD screen; the cabinet no longer has one: it goes back to the bottom of the backglass, as the author intended.',
   'Remettre le score dans le fronton': 'Put the score back on the backglass',
