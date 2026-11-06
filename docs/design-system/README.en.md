@@ -36,6 +36,8 @@ States always keep a word and a sign: check mark + "OK", triangle + "À vérifie
 
 `dmd` is the default colour of the dots of the displays Cyber Pinball draws (menu DMD, fallbacks): the brand’s signal green, adjustable in the menu (“Couleur du DMD” (DMD colour): signal green, teal, light ink, glacier blue, soft amber, plasma orange `#ff8a1f`, or a custom colour). It is not a second interface accent. These displays write with “Saira Points”, a dot font drawn after Saira (`packages/core/src/dmdfont.ts`): the brand is stacked there, CYBER one shade lower and PINBALL at full brightness, since a display has only one colour.
 
+**Colour of each table** (`--table-tint`, `packages/core/src/tabletint.ts`): in the tables menu, the hue taken from the chosen table's backglass replaces the teal in the ambience only — the light of the wheel band (glows and neon of the arcs), the glow behind the wheel, the glow of frames and panels, the smoked glass of the fallbacks. Imposed lightness (OKLCH 0.75, that of the teal `#36c9b4`), chroma from 0.09 to 0.15, at least 35° from signal green; at most 25 % of the hue under a text. Green stays alone on the current choice: ring, glow under the chosen table, title, arrows. Without a hue, the teal. Codex review of 06/11/2026: keep this intensity, tint nothing more (neither the foot of the scrim nor the mesh).
+
 ## Typography and legibility
 
 Family: Saira. The wordmark stays in light, widely spaced capitals; screen titles are in capitals, game titles keep their natural case. Body text at 24 px; titles of diagnostic findings at 28 px; **no text below 20 px** at the reference scale, as it is seen: a text shrunk by a transform (a wheel medallion, a pulse) counts at its rendered size, and the layout guard measures it that way.

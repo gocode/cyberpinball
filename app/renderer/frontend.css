@@ -197,6 +197,24 @@ html[data-rotation='270'] #stop {
   height: calc(560 * var(--u));
 }
 
+/*
+ * Lueur de la table derrière la roue (theme.css, --table-tint) : l'ambiance prend la couleur du
+ * jeu choisi, jamais la sélection (l'anneau, le titre restent au vert signal). Décor sans place
+ * dans la mise en page ; au plus 25 % de la teinte sous un texte (TINT_MAX_ALPHA_UNDER_TEXT,
+ * packages/core/src/tabletint.ts, vérifié par le test des teintes).
+ */
+.menu-nav::before {
+  content: '';
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  top: -45%;
+  bottom: -15%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(ellipse 48% 52% at 50% 46%, color-mix(in oklab, var(--table-tint) 25%, transparent), color-mix(in oklab, var(--table-tint) 9%, transparent) 55%, transparent 78%);
+}
+
 /* Libellé et compteur : au bureau seulement. */
 .menu-label,
 .menu-count {
@@ -651,24 +669,63 @@ html[data-menu-band='arche'] #root {
 
 .wheel-stage.roue-medaillons {
   background-image: url('roues/medaillons.svg');
+  --roue-lumiere: url('roues/medaillons-lumiere.svg');
+  --roue-dessus: url('roues/medaillons-dessus.svg');
 }
 
 .wheel-stage.roue-bandeau {
   background-image: url('roues/bandeau.svg');
+  --roue-lumiere: url('roues/bandeau-lumiere.svg');
+  --roue-dessus: url('roues/bandeau-dessus.svg');
   --ring-y: 160;
   --ring-d: 256;
 }
 
 .wheel-stage.roue-minimal {
   background-image: url('roues/minimal.svg');
+  --roue-lumiere: url('roues/minimal-lumiere.svg');
+  --roue-dessus: url('roues/minimal-dessus.svg');
   --ring-y: 170;
   --ring-d: 230;
 }
 
 .wheel-stage.roue-arche {
   background-image: url('roues/arche.svg');
+  --roue-lumiere: url('roues/arche-lumiere.svg');
+  --roue-dessus: url('roues/arche-dessus.svg');
   --ring-y: 190;
   --ring-d: 232;
+}
+
+/*
+ * Lumière du bandeau à la couleur de la table (theme.css, --table-tint ; sarcelle de la marque
+ * sans teinte) : halos et néon des arcs, découpés du dessin (docs/design-system/src/roues.mjs),
+ * peints dans la teinte entre le verre (fond) et le dessus (cœurs clairs, flèches, plaque, au
+ * vert signal). Le vert de la table choisie (anneau, lueur sous elle, titre) ne change jamais.
+ * Couches fixes : seule la couleur passe d'une table à l'autre, en fondu.
+ */
+.menu-band .wheel-stage::before,
+.menu-band .wheel-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.menu-band .wheel-stage::before {
+  background: var(--table-tint);
+  -webkit-mask: var(--roue-lumiere) center / 100% 100% no-repeat;
+  mask: var(--roue-lumiere) center / 100% 100% no-repeat;
+}
+
+.menu-band .wheel-stage::after {
+  background: var(--roue-dessus) center / 100% 100% no-repeat;
+}
+
+/* Les logos et l'anneau au-dessus des trois couches du bandeau. */
+.menu-band .wheel-items {
+  z-index: 1;
 }
 
 /* Au bureau, les bords du bandeau, qui débordent du fronton, se fondent en dégradé. */
@@ -902,7 +959,7 @@ html.menu-desktop .menu-band .menu-frame {
   box-sizing: border-box;
   border: calc(32 * var(--u)) solid transparent;
   border-image: url('roues/cadre.svg') 32 / calc(32 * var(--u)) stretch;
-  filter: drop-shadow(0 0 calc(3 * var(--u)) rgba(139, 226, 58, 0.45)) drop-shadow(0 0 calc(14 * var(--u)) rgba(42, 209, 182, 0.4));
+  filter: drop-shadow(0 0 calc(3 * var(--u)) rgba(139, 226, 58, 0.45)) drop-shadow(0 0 calc(14 * var(--u)) color-mix(in oklab, var(--table-tint) 40%, transparent));
   pointer-events: none;
 }
 

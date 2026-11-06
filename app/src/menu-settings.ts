@@ -10,6 +10,7 @@ import {
   ATTRACT_DELAY_CHOICES,
   ATTRACT_INTERVAL_CHOICES,
   DMD_COLOR_PRESETS,
+  DMD_TABLE_COLOR,
   HOUR_CHOICES,
   NIGHT_DIM_CHOICES,
   NOTICES_MODES,
@@ -145,6 +146,7 @@ export const MENU_SETTINGS_ROWS = [
   'menuLayout',
   'tableOrder',
   'startTable',
+  'tableColor',
   'music',
   'musicVolume',
   'videoVolume',
@@ -199,6 +201,14 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         detail: t('{detail} (Start : changer)', { detail: START_DETAILS[v.startTable] }),
         icon: 'pin',
         run: () => set({ startTable: START_TABLES[(START_TABLES.indexOf(v.startTable) + 1) % START_TABLES.length]! }),
+      },
+      tableColor: {
+        label: v.tableColor ? t('Couleur de chaque table au menu : affichée') : t('Couleur de chaque table au menu : coupée'),
+        detail: v.tableColor
+          ? t('La lumière du bandeau de la roue, le halo des cadres et le fond des replis prennent la couleur du fronton de la table ; la table choisie reste en vert (Start : couper)')
+          : t('Le menu garde la sarcelle de Cyber Pinball pour toutes les tables (Start : la couleur de chaque table)'),
+        icon: 'bulb',
+        run: () => set({ tableColor: !v.tableColor }),
       },
       music: {
         label: v.music ? t('Musique des jeux : jouée') : t('Musique des jeux : coupée'),
@@ -475,7 +485,8 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
   function openDmdColor(at?: number): void {
     const back = row('dmdColor');
     const current = () => s().dmdColor;
-    const free = () => !dmdColorPreset(current());
+    const table = () => current() === DMD_TABLE_COLOR;
+    const free = () => !table() && !dmdColorPreset(current());
     host.library.openCustom(
       () => ({
         heading: t('Couleur du DMD'),
@@ -493,6 +504,17 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
             },
           })),
           {
+            label: t('Couleur de la table'),
+            detail: table()
+              ? t('Les points prennent la couleur du fronton de chaque table, plus vive que celle du menu ; vert signal pour une table sans couleur · choix actuel')
+              : t('Les points prennent la couleur du fronton de chaque table, plus vive que celle du menu ; vert signal pour une table sans couleur'),
+            tone: table() ? ('ok' as const) : undefined,
+            run: () => {
+              set({ dmdColor: DMD_TABLE_COLOR });
+              open(back);
+            },
+          },
+          {
             label: free() ? t('Couleur libre : {hex}', { hex: current().toUpperCase() }) : t('Couleur libre…'),
             detail: free() ? t('Choix actuel · Start : en écrire une autre') : t('Une couleur écrite en hexadécimal, comme #8BE23A'),
             tone: free() ? ('ok' as const) : undefined,
@@ -503,17 +525,18 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         ],
         back: () => open(back),
       }),
-      at ?? (free() ? DMD_COLOR_PRESETS.length : Math.max(0, DMD_COLOR_PRESETS.findIndex((p) => p.hex === current()))),
+      at ?? (table() ? DMD_COLOR_PRESETS.length : free() ? DMD_COLOR_PRESETS.length + 1 : Math.max(0, DMD_COLOR_PRESETS.findIndex((p) => p.hex === current()))),
     );
   }
 
   /** Couleur libre, au clavier à l'écran ; une couleur trop sombre pour l'afficheur est refusée. */
   function openFreeDmdColor(error?: string): void {
-    const at = DMD_COLOR_PRESETS.length;
+    // Après les préréglages et « Couleur de la table ».
+    const at = DMD_COLOR_PRESETS.length + 1;
     host.library.openPrompt(
       t('Couleur libre du DMD'),
       t('Couleur (hexadécimal)'),
-      s().dmdColor.toUpperCase(),
+      (s().dmdColor === DMD_TABLE_COLOR ? DMD_COLOR_PRESETS[0]!.hex : s().dmdColor).toUpperCase(),
       (value) => {
         if (value === undefined) return openDmdColor(at);
         const color = parseDmdColor(value);

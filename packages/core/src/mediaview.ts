@@ -535,8 +535,17 @@ export interface MenuMediaSettings {
   downloadQuality: MediaDbQualitySetting;
   /** DMD du menu : vivant par défaut, classique pour revenir au média seul. */
   dmd: MenuDmdMode;
-  /** Couleur des points des afficheurs que Cyber Pinball dessine (dmdcolor.ts) : vert signal par défaut. */
+  /**
+   * Couleur des points des afficheurs que Cyber Pinball dessine (dmdcolor.ts) : vert signal par
+   * défaut ; DMD_TABLE_COLOR (« table ») pour la couleur de chaque table.
+   */
   dmdColor: string;
+  /**
+   * Couleur de chaque table au menu (tabletint.ts) : la lueur du bandeau de la roue, le halo des
+   * cadres et le fond des replis prennent la teinte de ses médias (oui par défaut) ; la sélection
+   * reste au vert signal.
+   */
+  tableColor: boolean;
   /** Horaire de la borne (arcadehours.ts) : nuit voilée, arrêt à heure fixe ; non suivi par défaut. */
   hours: ArcadeHoursSettings;
   /**
@@ -569,6 +578,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   downloadQuality: 'auto',
   dmd: 'live',
   dmdColor: DEFAULT_DMD_COLOR,
+  tableColor: true,
   hours: DEFAULT_ARCADE_HOURS,
   notices: 'all',
   intro: DEFAULT_INTRO_SETTINGS,
@@ -606,6 +616,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     downloadQuality: MEDIADB_QUALITY_SETTINGS.includes(r.downloadQuality as MediaDbQualitySetting) ? (r.downloadQuality as MediaDbQualitySetting) : d.downloadQuality,
     dmd: MENU_DMD_MODES.includes(r.dmd as MenuDmdMode) ? (r.dmd as MenuDmdMode) : d.dmd,
     dmdColor: normalizeDmdColor(r.dmdColor),
+    tableColor: typeof r.tableColor === 'boolean' ? r.tableColor : d.tableColor,
     hours: normalizeArcadeHours(r.hours),
     notices: NOTICES_MODES.includes(r.notices as NoticesMode) ? (r.notices as NoticesMode) : d.notices,
     intro: normalizeIntroSettings(r.intro),

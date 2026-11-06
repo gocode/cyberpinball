@@ -148,9 +148,22 @@ test('réglage « Couleur du DMD » : préréglage, couleur libre, couleur refus
   assert.equal(settings.dmdColor, '#ff8a1f');
   assert.equal(opened.at(-1)!.at, row);
   assert.equal(main().actions[row]!.label, 'Couleur du DMD : Orange plasma');
+  // Couleur de la table (06/11/2026) : juste après les préréglages ; gardée telle quelle, sans couleur fixe.
+  main().actions[row]!.run();
+  const tableChoice = opened.at(-1)!.build().actions[DMD_COLOR_PRESETS.length]!;
+  assert.equal(tableChoice.label, 'Couleur de la table');
+  tableChoice.run();
+  assert.equal(settings.dmdColor, 'table');
+  assert.equal(opened.at(-1)!.at, row);
+  assert.equal(main().actions[row]!.label, 'Couleur du DMD : couleur de la table');
+  main().actions[row]!.run();
+  assert.equal(opened.at(-1)!.at, DMD_COLOR_PRESETS.length, 'la liste rouvre sur « Couleur de la table »');
+  assert.equal(opened.at(-1)!.build().actions[DMD_COLOR_PRESETS.length]!.tone, 'ok');
+  assert.notEqual(opened.at(-1)!.build().actions[DMD_COLOR_PRESETS.length + 1]!.tone, 'ok', 'ce n’est pas une couleur libre');
+  colors.actions[DMD_COLOR_PRESETS.findIndex((p) => p.id === 'plasma')]!.run();
   // Couleur libre : clavier à l'écran, valeur actuelle proposée.
   main().actions[row]!.run();
-  opened.at(-1)!.build().actions[DMD_COLOR_PRESETS.length]!.run();
+  opened.at(-1)!.build().actions[DMD_COLOR_PRESETS.length + 1]!.run();
   assert.equal(prompts.at(-1)!.value, '#FF8A1F');
   prompts.at(-1)!.done('#123');
   assert.match(prompts.at(-1)!.lead ?? '', /trop sombre/);
@@ -162,16 +175,18 @@ test('réglage « Couleur du DMD » : préréglage, couleur libre, couleur refus
   assert.equal(opened.at(-1)!.at, row);
   assert.equal(main().actions[row]!.label, 'Couleur du DMD : couleur libre #A1B2C3');
   const again = (main().actions[row]!.run(), opened.at(-1)!);
-  assert.equal(again.at, DMD_COLOR_PRESETS.length, 'une couleur libre rouvre la liste sur « Couleur libre »');
-  assert.equal(again.build().actions[DMD_COLOR_PRESETS.length]!.tone, 'ok');
+  assert.equal(again.at, DMD_COLOR_PRESETS.length + 1, 'une couleur libre rouvre la liste sur « Couleur libre »');
+  assert.equal(again.build().actions[DMD_COLOR_PRESETS.length + 1]!.tone, 'ok');
   // Abandon de la saisie : retour à la liste, rien de changé.
-  again.build().actions[DMD_COLOR_PRESETS.length]!.run();
+  again.build().actions[DMD_COLOR_PRESETS.length + 1]!.run();
   prompts.at(-1)!.done(undefined);
   assert.equal(settings.dmdColor, '#a1b2c3');
 
   // La couleur part dans l'état de chaque fenêtre, et la fenêtre l'applique avant de poser l'afficheur.
   const main_ts = read('app', 'src', 'frontend.ts');
-  assert.match(main_ts, /dmdColor: mediaSettings\.dmdColor/);
+  assert.match(main_ts, /dmdColor: menuDmdColor\(\)/);
+  // « Couleur de la table » : la teinte de la table montrée, sinon le vert signal (dmdcolor.ts, effectiveDmdColor).
+  assert.match(main_ts, /effectiveDmdColor\(mediaSettings\.dmdColor, tints\?\.current\(\)\?\.dmd\)/);
   // FullDMD sans table : pas de bande du DMD vivant, la marque du repli sur toute la grille de 160 × 90.
   assert.match(main_ts, /if \(!table && menuDmdKind === 'fulldmd' && state\.phase !== 'loading'\) return undefined;/);
   const front = read('app', 'renderer', 'frontend.js');

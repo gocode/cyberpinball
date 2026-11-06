@@ -1291,6 +1291,10 @@ window.cyber.onState((s) => {
   // le jeton --dmd sert au repli minimal, sans fallback.js.
   window.CyberFallback?.setDmdColor?.(s.dmdColor);
   if (s.dmdColor) document.documentElement.style.setProperty('--dmd', s.dmdColor);
+  // Couleur de la table (packages/core/src/tabletint.ts) : l'ambiance du menu, en fondu (theme.css) ;
+  // sans teinte, la sarcelle de la marque revient.
+  if (s.tint) document.documentElement.style.setProperty('--table-tint', s.tint);
+  else document.documentElement.style.removeProperty('--table-tint');
   syncLiveDmd(s.game ? undefined : s.liveDmd);
   // Lancement en cinéma : posé au Start, effacé quand VPX paraît (avant le fond de partie).
   syncCinema(s);

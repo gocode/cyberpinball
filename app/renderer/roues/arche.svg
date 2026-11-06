@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="540" viewBox="0 0 1080 540">
+<!-- Fond : couche tirée de docs/design-system/src/roues/arche.svg par docs/design-system/src/roues.mjs (ne pas modifier ici). -->
 <!-- Roue Arche : arche de métal et de verre. Repère 1080 × 540 du bandeau ; image fixe, rien ne s'anime ici. -->
 <defs>
   <filter id="halo" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="5"/></filter>
@@ -35,16 +36,4 @@
 <ellipse cx="540" cy="190" rx="240" ry="140" fill="url(#lueur)"/>
 <path d="M -20,300 Q 540,-40 1100,300" fill="none" stroke="url(#chrome)" stroke-width="12"/>
 <path d="M -20,420 Q 540,80 1100,420" fill="none" stroke="url(#chrome)" stroke-width="10"/>
-<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="#1c8f80" stroke-width="12" filter="url(#haloLarge)" opacity=".85"/>
-<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="url(#neon)" stroke-width="4" filter="url(#halo)"/>
-<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="url(#neon)" stroke-width="2.2"/>
-<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="#e6fff9" stroke-width=".9" opacity=".8"/>
-<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="#f2fffb" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="0 180 50 330 30 2000" filter="url(#halo)"/>
-<path d="M -20,312 Q 540,-24 1100,312" fill="none" stroke="#f2fffb" stroke-width="2" stroke-linecap="round" stroke-dasharray="0 180 50 330 30 2000"/>
-<path d="M -20,408 Q 540,64 1100,408" fill="none" stroke="#1c8f80" stroke-width="12" filter="url(#haloLarge)" opacity=".85"/>
-<path d="M -20,408 Q 540,64 1100,408" fill="none" stroke="url(#neon)" stroke-width="4" filter="url(#halo)"/>
-<path d="M -20,408 Q 540,64 1100,408" fill="none" stroke="url(#neon)" stroke-width="2.2"/>
-<path d="M -20,408 Q 540,64 1100,408" fill="none" stroke="#e6fff9" stroke-width=".9" opacity=".8"/>
-
-
 </svg>

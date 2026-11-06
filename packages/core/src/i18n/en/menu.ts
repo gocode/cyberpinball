@@ -453,6 +453,19 @@ export const messages: Record<string, string> = {
   'Orange plasma': 'Plasma orange',
   'Les afficheurs à plasma des flippers des années 1990': 'The plasma displays of 1990s pinball machines',
   'couleur libre {hex}': 'custom colour {hex}',
+  // packages/core/src/dmdcolor.ts, packages/core/src/tabletint.ts et app/src/menu-settings.ts : couleur de chaque table
+  'couleur de la table': 'table colour',
+  'Couleur de la table': 'Table colour',
+  'Les points prennent la couleur du fronton de chaque table, plus vive que celle du menu ; vert signal pour une table sans couleur':
+    'The dots take the colour of each table’s backglass, brighter than the menu’s; signal green for a table without a colour',
+  'Les points prennent la couleur du fronton de chaque table, plus vive que celle du menu ; vert signal pour une table sans couleur · choix actuel':
+    'The dots take the colour of each table’s backglass, brighter than the menu’s; signal green for a table without a colour · current choice',
+  'Couleur de chaque table au menu : affichée': 'Colour of each table in the menu: shown',
+  'Couleur de chaque table au menu : coupée': 'Colour of each table in the menu: off',
+  'La lumière du bandeau de la roue, le halo des cadres et le fond des replis prennent la couleur du fronton de la table ; la table choisie reste en vert (Start : couper)':
+    'The light of the wheel band, the glow of the frames and the background of stand-in screens take the colour of the table’s backglass; the chosen table stays green (Start: turn off)',
+  'Le menu garde la sarcelle de Cyber Pinball pour toutes les tables (Start : la couleur de chaque table)':
+    'The menu keeps Cyber Pinball’s teal for every table (Start: each table’s colour)',
   'Couleur du DMD : {color}': 'DMD colour: {color}',
   'Les points de l’afficheur que Cyber Pinball dessine : DMD du menu, DMD d’un jeu sans média ; pas celui de VPX en partie (Start : choisir)':
     'The dots of the display Cyber Pinball draws: menu DMD, DMD of a game without media; not VPX’s during play (Start: choose)',

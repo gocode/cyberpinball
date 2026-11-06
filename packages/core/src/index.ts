@@ -114,6 +114,7 @@ export * from './scriptcompat';
 export * from './vbscript';
 export * from './fulldmdframe';
 export * from './fulldmdtable';
+export * from './tabletint';
 export * from './dedicated';
 export * from './windowssettings';
 export * from './uisounds';

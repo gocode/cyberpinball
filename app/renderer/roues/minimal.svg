@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="540" viewBox="0 0 1080 540">
+<!-- Fond : couche tirée de docs/design-system/src/roues/minimal.svg par docs/design-system/src/roues.mjs (ne pas modifier ici). -->
 <!-- Roue Minimaliste : un filet lumineux sous les médaillons, la table reste dégagée. Repère 1080 × 540 du bandeau ; image fixe, rien ne s'anime ici. -->
 <defs>
   <filter id="halo" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="5"/></filter>
@@ -32,19 +33,4 @@
 <ellipse cx="540" cy="190" rx="620" ry="150" fill="#030807" opacity=".55" filter="url(#ombre)"/>
 <g filter="url(#ombre)" fill="#000" opacity=".7"><ellipse cx="135" cy="258" rx="70" ry="14"/><ellipse cx="330" cy="262" rx="80" ry="16"/><ellipse cx="750" cy="262" rx="80" ry="16"/><ellipse cx="945" cy="258" rx="70" ry="14"/></g>
 <ellipse cx="540" cy="170" rx="230" ry="130" fill="url(#lueur)"/>
-<path d="M 60,282 H 1020" fill="none" stroke="#1c8f80" stroke-width="12" filter="url(#haloLarge)" opacity=".85"/>
-<path d="M 60,282 H 1020" fill="none" stroke="url(#neon)" stroke-width="4" filter="url(#halo)"/>
-<path d="M 60,282 H 1020" fill="none" stroke="url(#neon)" stroke-width="2.2"/>
-<path d="M 60,282 H 1020" fill="none" stroke="#e6fff9" stroke-width=".9" opacity=".8"/>
-<path d="M 60,282 H 1020" fill="none" stroke="#f2fffb" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="0 160 50 500 50 2000" filter="url(#halo)"/>
-<path d="M 60,282 H 1020" fill="none" stroke="#f2fffb" stroke-width="2" stroke-linecap="round" stroke-dasharray="0 160 50 500 50 2000"/>
-<path d="M 380,282 H 700" stroke="#8be23a" stroke-width="3" filter="url(#halo)"/><path d="M 420,282 H 660" stroke="#c9ff8a" stroke-width="1.5"/>
-<g fill="none" stroke="#8be23a" stroke-width="6" stroke-linecap="round" stroke-linejoin="round">
-  <path d="M 30,144 L 12,170 L 30,196" filter="url(#halo)" opacity=".9"/><path d="M 30,144 L 12,170 L 30,196"/>
-  <path d="M 1050,144 L 1068,170 L 1050,196" filter="url(#halo)" opacity=".9"/><path d="M 1050,144 L 1068,170 L 1050,196"/>
-</g>
-<g fill="none" stroke="#2ad1b6" stroke-width="2.5" stroke-linecap="round" opacity=".8">
-  <path d="M 60,392 H 190 L 220,362" filter="url(#halo)"/><path d="M 60,392 H 190 L 220,362"/>
-  <path d="M 1020,392 H 890 L 860,362" filter="url(#halo)"/><path d="M 1020,392 H 890 L 860,362"/>
-</g>
 </svg>

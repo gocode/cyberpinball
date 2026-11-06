@@ -14,6 +14,8 @@ son interface).
 - Avatar, dans Menu système > Amis > « Mon avatar » : une photo ou une image à vous, choisie sur ce PC ou dans le navigateur intégré (clic droit sur une image : « Télécharger cette image »), puis recadrée aux boutons de la borne (zoom, déplacer le cadre, recentrer) ou à la souris. Une photo y perd ses métadonnées, position GPS comprise.
 - Vos amis voient votre avatar partout où votre nom s'affiche : Mes amis, votre fiche, les demandes d'amis, l'historique des parties, la partie en direct, la carte d'invitation et la bande des scores pendant la partie, les notifications. Sans avatar, vos initiales sur une teinte qui vous est propre. Seuls vos amis et les joueurs d'une demande en cours le reçoivent, jamais l'annuaire.
 - Ouverture au démarrage : une fois l'animation finie, le plateau ne se fige plus. Les fils de lumière continuent de tourner lentement et la poussière lumineuse dérive sur plusieurs profondeurs, sans à-coup, tant que personne n'appuie sur un bouton. Les autres écrans, et votre image ou votre vidéo d'ouverture, restent tels quels.
+- Chaque table a sa couleur au menu : la lumière de la roue, le halo des cadres et le fond des écrans sans média prennent la teinte de son fronton (ou de son logo, de son plateau), en fondu quand la table choisie s'arrête, jamais pendant le défilement. La table choisie reste en vert. Un fronton en noir et blanc garde la sarcelle de Cyber Pinball. Pour revenir à la sarcelle partout : Menu système > Médias > « Médias, son et attente » > « Couleur de chaque table au menu ».
+- Le DMD du menu peut prendre la couleur de chaque table : « Couleur du DMD » > « Couleur de la table ». Le vert signal reste la couleur par défaut.
 
 ## 0.1.7
 

@@ -247,6 +247,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **The menu's DMD drawn by Cyber Pinball**, on a 128 × 32 dot grid: the title, PRESS START, the high scores ("HIGH SCORE #1" to #4), the DMD media, the clock, the credits.
 - **High scores read from the table**, never made up.
 - **"DMD colour"**: signal green by default, presets (teal, light ink, glacier blue, soft amber, plasma orange) or any colour you like.
+- **Each table has its colour** in the menu: the wheel's light, the frames' glow and the background of screens without media take the hue of its backglass, with a fade; the chosen table stays green. The DMD can take it too ("Couleur de la table", Table colour). Setting: "Couleur de chaque table au menu" (Colour of each table in the menu).
 - **A dot font** drawn for Cyber Pinball.
 
 <p align="center"><img src="images/en/live-dmd.webp?v=7a6e43e169" width="760" alt="The menu's live DMD: the game title, PRESS START, the top high score and the clock, in turn."></p>

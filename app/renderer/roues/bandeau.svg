@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1080" height="540" viewBox="0 0 1080 540">
+<!-- Fond : couche tirée de docs/design-system/src/roues/bandeau.svg par docs/design-system/src/roues.mjs (ne pas modifier ici). -->
 <!-- Roue Bandeau : lame de verre droite bordée de néon, les médaillons la débordent. Repère 1080 × 540 du bandeau ; image fixe, rien ne s'anime ici. -->
 <defs>
   <filter id="halo" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="5"/></filter>
@@ -34,19 +35,4 @@
 <rect x="-10" y="78" width="1100" height="70" fill="#bff7ea" opacity=".04"/>
 <g filter="url(#ombre)" fill="#000" opacity=".7"><ellipse cx="125" cy="250" rx="80" ry="16"/><ellipse cx="330" cy="256" rx="90" ry="18"/><ellipse cx="750" cy="256" rx="90" ry="18"/><ellipse cx="955" cy="250" rx="80" ry="16"/></g>
 <ellipse cx="540" cy="160" rx="250" ry="140" fill="url(#lueur)"/>
-<path d="M -10,78 H 1090" fill="none" stroke="#1c8f80" stroke-width="12" filter="url(#haloLarge)" opacity=".85"/>
-<path d="M -10,78 H 1090" fill="none" stroke="url(#neon)" stroke-width="4" filter="url(#halo)"/>
-<path d="M -10,78 H 1090" fill="none" stroke="url(#neon)" stroke-width="2.2"/>
-<path d="M -10,78 H 1090" fill="none" stroke="#e6fff9" stroke-width=".9" opacity=".8"/>
-<path d="M -10,78 H 1090" fill="none" stroke="#f2fffb" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="0 120 60 260 30 300 60 260 30 2000" filter="url(#halo)"/>
-<path d="M -10,78 H 1090" fill="none" stroke="#f2fffb" stroke-width="2" stroke-linecap="round" stroke-dasharray="0 120 60 260 30 300 60 260 30 2000"/>
-<path d="M -10,242 H 1090" fill="none" stroke="#1c8f80" stroke-width="12" filter="url(#haloLarge)" opacity=".85"/>
-<path d="M -10,242 H 1090" fill="none" stroke="url(#neon)" stroke-width="4" filter="url(#halo)"/>
-<path d="M -10,242 H 1090" fill="none" stroke="url(#neon)" stroke-width="2.2"/>
-<path d="M -10,242 H 1090" fill="none" stroke="#e6fff9" stroke-width=".9" opacity=".8"/>
-<path d="M -10,242 H 1090" fill="none" stroke="#f2fffb" stroke-width="3.5" stroke-linecap="round" stroke-dasharray="0 200 40 600 40 2000" filter="url(#halo)"/>
-<path d="M -10,242 H 1090" fill="none" stroke="#f2fffb" stroke-width="2" stroke-linecap="round" stroke-dasharray="0 200 40 600 40 2000"/>
-<path d="M -10,90 H 1090 M -10,230 H 1090" stroke="url(#filet)" stroke-width="1" opacity=".5"/>
-<g stroke="#5ff2d6" stroke-width="3" fill="none" filter="url(#halo)"><path d="M 14,96 V 224 M 1066,96 V 224"/></g>
-<path d="M 340,262 H 740" stroke="url(#vert)" stroke-width="2" filter="url(#halo)"/>
 </svg>

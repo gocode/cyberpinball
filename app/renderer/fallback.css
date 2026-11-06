@@ -45,13 +45,14 @@
   --cp-raised: #0c1a17;
   --cp-line: #17302b;
   --cp-line-strong: #24504a;
-  --cp-halo: #1c8f80;
+  /* Teinte de la table (theme.css, --table-tint) ; la sarcelle de la marque hors du menu. */
+  --cp-halo: var(--table-halo, #1c8f80);
   --cp-ink: #e6f0ec;
   --cp-muted: #9bada7;
   --cp-meta: #5fb4cf;
   --cp-signal: #8be23a;
   /* Sarcelle lumineuse des filets et des reflets (celle de l'image de la bannière). */
-  --cp-primary: #36c9b4;
+  --cp-primary: var(--table-tint, #36c9b4);
   --cp-secondary: #5fb4cf;
   --cp-bg: var(--cp-void);
   --cp-font: 'CP Saira', 'Segoe UI', system-ui, sans-serif;
@@ -128,9 +129,9 @@ html.cp-fb-hidden .cp-fb *::after {
   inset: 0;
   background-color: var(--cp-void);
   background-image:
-    linear-gradient(115deg, transparent 48%, rgba(16, 43, 38, 0.23) 48.15%, transparent 66%),
-    radial-gradient(ellipse at 92% 12%, #143d35 0%, transparent 58%),
-    radial-gradient(ellipse 80% 55% at 10% 108%, rgba(28, 143, 128, 0.16) 0%, transparent 70%),
+    linear-gradient(115deg, transparent 48%, color-mix(in oklab, var(--table-deep, #143d35) 23%, transparent) 48.15%, transparent 66%),
+    radial-gradient(ellipse at 92% 12%, var(--table-deep, #143d35) 0%, transparent 58%),
+    radial-gradient(ellipse 80% 55% at 10% 108%, color-mix(in oklab, var(--cp-halo) 16%, transparent) 0%, transparent 70%),
     linear-gradient(150deg, var(--cp-raised), var(--cp-void) 65%);
 }
 
@@ -194,8 +195,8 @@ html.cp-fb-hidden .cp-fb *::after {
   border: max(1px, 0.16cqmin) solid var(--cp-line-strong);
   border-radius: 1.2cqmin;
   box-shadow:
-    0 0 2.4cqmin rgba(28, 143, 128, 0.16),
-    inset 0 0 2.4cqmin rgba(28, 143, 128, 0.12);
+    0 0 2.4cqmin color-mix(in oklab, var(--cp-halo) 16%, transparent),
+    inset 0 0 2.4cqmin color-mix(in oklab, var(--cp-halo) 12%, transparent);
 }
 
 .cp-corners {
@@ -435,7 +436,7 @@ html.cp-fb-hidden .cp-fb *::after {
   aspect-ratio: 1;
   flex: 0 0 auto;
   object-fit: contain;
-  filter: drop-shadow(0 0 1.2cqmin rgba(28, 143, 128, 0.35));
+  filter: drop-shadow(0 0 1.2cqmin color-mix(in oklab, var(--cp-halo) 35%, transparent));
 }
 
 /* ---------- Topper ---------- */
@@ -589,7 +590,7 @@ html.cp-fb-hidden .cp-fb *::after {
   width: 100cqmax;
   height: 100cqmax;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(28, 143, 128, 0.22) 0%, transparent 62%);
+  background: radial-gradient(circle, color-mix(in oklab, var(--cp-halo) 22%, transparent) 0%, transparent 62%);
 }
 
 .cp-pf-vignette {

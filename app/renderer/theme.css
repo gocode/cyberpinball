@@ -12,7 +12,25 @@
   font-display: block;
 }
 
+/*
+ * Couleur de la table choisie (packages/core/src/tabletint.ts, réglage « Couleur de chaque table
+ * au menu ») : posée sur html par frontend.js, sarcelle de la marque sans table ou sans teinte.
+ * Elle n'habille que l'ambiance (lueur derrière la roue, halo des cadres et des panneaux, verre
+ * fumé des replis) ; le vert signal reste seul sur le choix courant. Déclarée comme couleur, elle
+ * passe d'une table à l'autre en fondu, au pas du fondu des médias (280 ms, media.js).
+ */
+@property --table-tint {
+  syntax: '<color>';
+  inherits: true;
+  initial-value: #36c9b4;
+}
+
 :root {
+  --table-tint: #36c9b4;
+  /* Ses tons sombres : #1c8f80 et #143d35 de la marque quand elle vaut la sarcelle. */
+  --table-halo: color-mix(in oklab, var(--table-tint) 76%, #000);
+  --table-deep: color-mix(in oklab, var(--table-tint) 44%, #000);
+  transition: --table-tint 280ms ease-out;
   --void: #030807;
   --surface: #07110f;
   --surface-raised: #0c1a17;
@@ -37,13 +55,13 @@
   --scrim-strong: rgba(3, 8, 7, 0.88);
   /* La bande des scores pendant la partie, devant un PuP-Pack ou un B2S animé (game-notice.css). */
   --scrim-board: rgba(3, 8, 7, 0.94);
-  --halo-panel: 0 0 0 1px rgba(28, 143, 128, 0.1), 0 0 32px rgba(28, 143, 128, 0.16);
+  --halo-panel: 0 0 0 1px color-mix(in oklab, var(--table-halo) 10%, transparent), 0 0 32px color-mix(in oklab, var(--table-halo) 16%, transparent);
   --glow-signal: 0 0 0 1px var(--signal), 0 0 18px rgba(139, 226, 58, 0.22);
   --font-ui: 'Saira', 'Segoe UI', system-ui, sans-serif;
   /* Fond « verre fumé » : un reflet oblique sarcelle sur le noir, quand aucun média ne remplit l'écran. */
   --fond-ambiance:
-    linear-gradient(115deg, transparent 48%, rgba(16, 43, 38, 0.23) 48.15%, transparent 66%),
-    radial-gradient(ellipse at 92% 15%, #143d35 0%, transparent 58%),
+    linear-gradient(115deg, transparent 48%, color-mix(in oklab, var(--table-deep) 23%, transparent) 48.15%, transparent 66%),
+    radial-gradient(ellipse at 92% 15%, var(--table-deep) 0%, transparent 58%),
     linear-gradient(150deg, var(--surface-raised), var(--void) 65%);
 }
 

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="540" viewBox="0 0 1080 540">
+<!-- Lumière (masque) : couche tirée de docs/design-system/src/roues/minimal.svg par docs/design-system/src/roues.mjs (ne pas modifier ici). -->
+<defs>
+  <filter id="halo" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="5"/></filter>
+  <filter id="haloLarge" filterUnits="userSpaceOnUse" x="-100" y="-100" width="1280" height="740"><feGaussianBlur stdDeviation="16"/></filter>
+  <linearGradient id="neonMasque" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="1080" y2="0">
+    <stop offset="0" stop-color="#fff" stop-opacity=".25"/><stop offset=".22" stop-color="#fff"/><stop offset=".78" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity=".25"/>
+  </linearGradient>
+</defs>
+<path d="M 60,282 H 1020" fill="none" stroke="#fff" stroke-width="12" filter="url(#haloLarge)" opacity="0.53"/>
+<path d="M 60,282 H 1020" fill="none" stroke="url(#neonMasque)" stroke-width="4" filter="url(#halo)"/>
+<path d="M 60,282 H 1020" fill="none" stroke="url(#neonMasque)" stroke-width="2.2"/>
+</svg>

@@ -87,6 +87,13 @@ export const DMD_COLOR_PRESETS: readonly DmdColorPreset[] = [
 /** Couleur par défaut : le vert signal de la DA. */
 export const DEFAULT_DMD_COLOR = DMD_COLOR_PRESETS[0]!.hex;
 
+/**
+ * Choix « Couleur de la table » (06/11/2026) : les points prennent la teinte tirée des médias de
+ * la table montrée (tabletint.ts, TableTint.dmd) ; une table sans teinte garde le vert signal.
+ * Gardé tel quel dans medias.json, à la place d'une couleur.
+ */
+export const DMD_TABLE_COLOR = 'table';
+
 /** « #8BE23A », « 8be23a », « #8be » → « #8be23a » ; undefined si ce n'est pas une couleur hexadécimale. */
 export function parseDmdColor(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
@@ -109,8 +116,9 @@ export function dmdColorReadable(hex: string): boolean {
   return Math.max(...[1, 3, 5].map((i) => parseInt(c.slice(i, i + 2), 16))) >= DMD_COLOR_MIN_PEAK;
 }
 
-/** Couleur lue de medias.json : une couleur lisible, sinon celle par défaut. */
+/** Couleur lue de medias.json : « couleur de la table », une couleur lisible, sinon celle par défaut. */
 export function normalizeDmdColor(value: unknown): string {
+  if (value === DMD_TABLE_COLOR) return DMD_TABLE_COLOR;
   const c = parseDmdColor(value);
   return c && dmdColorReadable(c) ? c : DEFAULT_DMD_COLOR;
 }
@@ -121,8 +129,17 @@ export function dmdColorPreset(hex: string): DmdColorPreset | undefined {
   return DMD_COLOR_PRESETS.find((p) => p.hex === c);
 }
 
-/** Nom montré : celui du préréglage, sinon « couleur libre #A1B2C3 ». */
+/**
+ * Couleur des points pour la table montrée : celle réglée, ou, pour « couleur de la table », la
+ * teinte de ses médias (undefined : pas de teinte, ou pas de table), sinon le vert signal.
+ */
+export function effectiveDmdColor(setting: string, tableDmd: string | undefined): string {
+  return setting === DMD_TABLE_COLOR ? (tableDmd ?? DEFAULT_DMD_COLOR) : setting;
+}
+
+/** Nom montré : celui du préréglage, « couleur de la table », sinon « couleur libre #A1B2C3 ». */
 export function dmdColorLabel(hex: string): string {
+  if (hex === DMD_TABLE_COLOR) return t('couleur de la table');
   const preset = dmdColorPreset(hex);
   return preset ? preset.label : t('couleur libre {hex}', { hex: (parseDmdColor(hex) ?? hex).toUpperCase() });
 }

@@ -78,6 +78,8 @@ import {
   isServedMedia,
   loadMenuMediaSettings,
   mediaPathFromUrl,
+  DMD_TABLE_COLOR,
+  effectiveDmdColor,
   menuAudioOutput,
   menuSound,
   AttractMode,
@@ -238,6 +240,7 @@ import { createSocialNet } from './social-net';
 import { createMenuNotices } from './menu-notices';
 import { seedSimulatedFriends, simulatedPlayersWanted, startSimulatedPlayers } from './social-demo';
 import { createDedicatedMenu } from './dedicated-menu';
+import { TableTints } from './table-tint';
 import { createDedicatedSystem } from './dedicated-system';
 import { handOverOnQuit, shellSession } from './dedicated-session';
 import { createPowerMenu } from './power';
@@ -1104,7 +1107,7 @@ const inGameMenu = createInGameMenu({ log: (line) => console.log(line), allowed:
 const gameNotices = createGameNotices({
   place: playfieldPlace,
   boardScreens: liveBoardScreens,
-  dmdColor: () => mediaSettings.dmdColor,
+  dmdColor: () => menuDmdColor(),
   scoresSettings: () => readLiveScoresSettings(loc.dataDir, playing?.id),
   dmdVerdict: () => dmdWatch?.verdict(),
   dmdUnreadable: () => (dmdWatch ? dmdWatch.unreadable() : 'inspector de VPX non activé pour cette partie (pare-feu de VPX non autorisé ?)'), // i18n-ignore : journal
@@ -1458,6 +1461,8 @@ export function startFrontend(): void {
     log: (line) => console.log(line),
   });
   medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, onChange: () => broadcast() });
+  // Couleur de chaque table (table-tint.ts) : mesurée par le convertisseur hors écran, une fois par média.
+  tints = new TableTints({ dataDir: loc.dataDir, converter: () => (converter ??= createConverter()), onChange: () => broadcast() });
   // Les avatars des joueurs (avatar.ts) se lisent aussi par le protocole des médias.
   serveMedias(() => [...medias!.allowedDirs(tables), avatarsDir(loc.dataDir)]);
 
@@ -2496,6 +2501,8 @@ let minimizedSeen = new Set<string>();
 let dressCoveredSeen = false;
 /** Convertisseur hors écran : images des vidéos FullDMD, pour y chercher le cadre du DMD. */
 let converter: ReturnType<typeof createConverter> | undefined;
+/** Couleur de chaque table au menu (table-tint.ts), créée avec les médias du menu. */
+let tints: TableTints | undefined;
 /** Partie lancée pour régler l'affichage : le chargement rappelle les boutons du menu de VPX. */
 let displayMode = false;
 
@@ -2930,7 +2937,9 @@ function viewFor(role: RoleId) {
     neighbors: tables.length >= 9 ? neighbors : tables.map((t, i) => neighbor(t, ((i - state.index + tables.length * 2 + Math.floor((tables.length - 1) / 2)) % tables.length) - Math.floor((tables.length - 1) / 2))),
     menuLayout: mediaSettings.menuLayout,
     // Couleur des points des afficheurs dessinés par Cyber Pinball (DMD du menu, replis dmd et fullDmd).
-    dmdColor: mediaSettings.dmdColor,
+    dmdColor: menuDmdColor(),
+    // Couleur de la table montrée (table-tint.ts) : l'ambiance du menu ; absente, la sarcelle de la marque.
+    tint: mediaSettings.tableColor ? tints?.current()?.color : undefined,
     // DMD du menu vivant : où poser les points dans la zone du DMD de cette fenêtre (absent : DMD classique).
     liveDmd: liveDmdView(role),
     medias: subject ? mediasOf(subject) : defaults,
@@ -3207,7 +3216,28 @@ function syncLiveDmd(): void {
   liveDmd.resume();
 }
 
+/** Points des afficheurs dessinés : la couleur réglée, ou celle de la table montrée (« couleur de la table »). */
+function menuDmdColor(): string {
+  return effectiveDmdColor(mediaSettings.dmdColor, tints?.current()?.dmd);
+}
+
+/**
+ * Teinte de la table que montrent les écrans (table-tint.ts) : ses médias, dans l'ordre fronton
+ * (l'image allumée du .directb2s comprise), logo, plateau. Mesurée seulement si l'ambiance ou le
+ * DMD s'en servent ; la clé change avec la table et avec ses médias (adresse datée, mediaUrl).
+ */
+function followTint(): void {
+  if (!tints) return;
+  const used = mediaSettings.tableColor || mediaSettings.dmdColor === DMD_TABLE_COLOR;
+  const table = used && medias ? screensSubject() : undefined;
+  if (!table || !medias) return tints.follow(undefined);
+  const urls = [medias.roleMedia(table, 'backglass').url, medias.wheel(table), medias.roleMedia(table, 'playfield').url];
+  const files = urls.map((u) => (u ? mediaPathFromUrl(u) : undefined)).filter((f): f is string => Boolean(f));
+  tints.follow({ key: JSON.stringify([table.file, ...urls]), files });
+}
+
 function broadcast(): void {
+  followTint();
   syncLiveDmd();
   // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).
   attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !desktop.active);

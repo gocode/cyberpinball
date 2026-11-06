@@ -247,6 +247,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Le DMD du menu dessiné par Cyber Pinball**, sur une grille de 128 × 32 points : le titre, PRESS START, les records (« HIGH SCORE #1 » à #4), le média DMD, l'horloge, les crédits.
 - **Records lus dans la table**, jamais inventés.
 - **« Couleur du DMD »** : vert signal par défaut, préréglages (sarcelle, encre claire, bleu glacier, ambre doux, orange plasma) ou couleur libre.
+- **Chaque table a sa couleur** au menu : la lumière de la roue, le halo des cadres et le fond des écrans sans média prennent la teinte de son fronton, en fondu ; la table choisie reste en vert. Le DMD peut la prendre aussi (« Couleur de la table »). Réglage : « Couleur de chaque table au menu ».
 - **Une police à points** dessinée pour Cyber Pinball.
 
 <p align="center"><img src="images/fr/live-dmd.webp?v=7a6e43e169" width="760" alt="Le DMD vivant du menu : le titre du jeu, PRESS START, le premier record et l'horloge, à tour de rôle."></p>
