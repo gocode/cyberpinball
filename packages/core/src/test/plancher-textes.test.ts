@@ -121,12 +121,19 @@ test('roue sans logo : le médaillon porte le nom et l’initiale, la place du c
 /** Planche du développeur (fallback-demo.html), jamais montrée sur un écran de la borne. */
 const DEVELOPER_SHEETS = new Set(['fallback-demo.css']);
 
+/**
+ * Écrans dessinés à taille fixe puis mis à l'échelle de la page (transform) : leurs px suivent
+ * l'écran. Leur plancher se vérifie sur le rendu réel (garde-fou de mise en page des démonstrations,
+ * interne/demos/demo-regles.ps1 et guides-tous.cjs).
+ */
+const SCALED_SHEETS = new Set(['guide.css']);
+
 // Un corps en px fixes ne suit pas l'écran : 16 px restent 16 px en 4K (8 px de référence). Le
 // bandeau de « Récupérer » (acquire.css), plus ancien que le design system, gardait ainsi des
 // textes de 12 à 16 px dans un bandeau de 96 px, à toutes les tailles d'écran (29/10/2026).
 test('feuilles : aucun corps de texte en px fixes (ils ne suivent pas la taille de l’écran)', () => {
   const offenders: string[] = [];
-  for (const file of fs.readdirSync(RENDERER).filter((f) => f.endsWith('.css') && !DEVELOPER_SHEETS.has(f))) {
+  for (const file of fs.readdirSync(RENDERER).filter((f) => f.endsWith('.css') && !DEVELOPER_SHEETS.has(f) && !SCALED_SHEETS.has(f))) {
     for (const [, selector, body] of css(file).matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
       for (const [, value] of body!.matchAll(/(?:^|;)\s*font(?:-size)?:\s*([^;]+?)\s*(?:;|$)/gm)) {
         if (/(?:^|[\s(])[0-9.]+px\b/.test(value!)) offenders.push(`${file} ${selector!.trim().replace(/\s+/g, ' ')} : ${value}`);

@@ -1,0 +1,80 @@
+// Guide du jeu : The Goonies Never Say Die (table d'origine VPW 2021).
+import type { TableGuide } from '../tableguide';
+
+export const guideGoonies: TableGuide = {
+  id: 'goonies',
+  vps: ['34pZqivK'],
+  title: 'The Goonies',
+  sub: 'Original · 2021',
+  source: 'D’après la carte d’instructions et le script de la table.',
+  shots: {
+    1: { name: 'Cibles DATA', el: ['Target6', 'Target7', 'Target8', 'Target9'] },
+    2: { name: 'Data scope', el: 'Kicker1' },
+    3: { name: 'Boucle gauche', at: [250, 860] },
+    4: { name: 'Bille captive', el: 'stonetarget' },
+    5: { name: 'Orgue aux os', el: 'Kicker7' },
+    6: { name: 'Rampe du crâne', el: 'Trigger001' },
+    7: { name: 'Boucle droite', el: 'Spinner2' },
+    8: { name: 'Cibles SLOTH', el: ['Target1', 'Target2', 'Target3', 'Target4', 'Target5'] },
+  },
+  pages: [
+    {
+      title: 'Le but',
+      all: true,
+      shots: { 1: 'Allument le Data scope', 2: 'Mystère', 3: 'Truffle Shuffle', 4: 'Ouvre le piège', 5: 'Modes de la carte', 6: 'Lettres, extra ball', 7: 'Puits, extra ball', 8: 'Score doublé' },
+      intro: 'Allumer les onze lettres de *NEVER SAY DIE* : chaque mode en donne une. La dernière lance le *wizard mode*.',
+      note: ['Coup à travailler : la rampe du crâne [6], qui donne lettres, jackpots et extra ball.', 'À suivre : Orgue aux os → Multiball → Autres lettres → Bonus et astuces.'],
+    },
+    {
+      title: 'L’orgue aux os',
+      shots: { 5: 'Cibles, puis l’orgue' },
+      paths: [['r', 5], ['l', 5, 2]],
+      phases: ['Ouvrir', 'Entrer'],
+      steps: ['Abattre les sept cibles tombantes de part et d’autre de l’orgue [5] : sa porte s’ouvre.', 'Entrer dans l’orgue [5] : le mode suivant de la carte démarre.', 'Cinq modes à la suite : clés, rochers, orgue, toboggan, Fratelli. Suivre l’écran.'],
+      final: 'Chaque mode lancé allume une lettre de *NEVER SAY DIE*.',
+      warn: 'Pendant un mode, l’orgue [5] ne lance rien : finir le mode en cours d’abord.',
+    },
+    {
+      title: 'Multiball',
+      shots: { 4: 'Ouvre le piège, verrou', 6: 'Jackpot' },
+      paths: [['r', 4], ['r', 4, 2], ['l', 6, 2]],
+      phases: ['Verrouiller', 'Jackpots'],
+      steps: ['Toucher trois fois la bille captive [4] : le piège s’ouvre.', 'Il reste ouvert 15 secondes : y envoyer la bille [4] pour la verrouiller.', 'Trois billes verrouillées : le *Multiball* démarre.'],
+      final: 'Chaque rampe du crâne [6] paie un *jackpot* pendant le Multiball.',
+      warn: 'Après chaque Multiball, il faut un coup de plus sur la bille captive [4].',
+    },
+    {
+      title: 'Autres lettres',
+      shots: { 1: 'D-A-T-A', 2: 'Puis le Data scope', 8: 'S-L-O-T-H : score ×2', 3: '5 fois : Truffle Shuffle', 6: '5, 15, 30 : une lettre' },
+      paths: [['r', 1], ['r', 2], ['l', 8], ['r', 3, 2], ['l', 6, 2]],
+      phases: ['Cibles', 'Coups'],
+      steps: ['D-A-T-A [1] allume le Data scope [2] : y entrer lance un mystère.', 'S-L-O-T-H [8] double tous les points pendant un temps.', 'Cinq boucles gauches [3] lancent le *Truffle Shuffle*.', 'Rampe du crâne [6] : une lettre aux 5e, 15e et 30e passages.'],
+      final: 'La onzième lettre lance d’office le wizard mode *Never Say Die*.',
+    },
+    {
+      title: 'Bonus et astuces',
+      shots: { 6: '20 fois : extra ball', 7: 'Extra ball, puits', 8: 'Score doublé' },
+      paths: [['l', 6], ['l', 7, 2]],
+      phases: ['Allumer', 'Encaisser'],
+      tips: [
+        ['Extra ball', 'Vingt rampes du crâne [6] l’allument ; la prendre à la boucle droite [7].'],
+        ['Wishing Well', 'Trois boucles droites [7] : la suivante mène au bonus du puits.'],
+        ['R-I-C-H', 'Les couloirs du bas écrivent R-I-C-H : bonus de fin de bille ×2, ×4, ×6.'],
+        ['Score doublé', 'Lancer SLOTH [8] juste avant un Multiball : jackpots doublés.'],
+      ],
+    },
+  ],
+  sources: [
+    'Carte d’instructions rangée dans la table : modes qui mènent au wizard (Bones, Multiball, Sloth, Data, Truffle Shuffle), DATA et Data scope, piège ouvert 15 s, SLOTH double score, boucle gauche ×5, cibles et orgue aux os, rampe du crâne (20 pour l’extra ball, lettres à 5/15/30), R-I-C-H, Wishing Well après 3 boucles droites, NEVER SAY DIE.',
+    'Script de la table (table d’origine, sans ROM) : 7 cibles de l’orgue (organhitsleft, startmap), modes de la carte lancés par Kicker7 (starttransmap : key, bone, boulder, water, fight, chacun addNever), piège (stonetarget, opencaptive, TrapClosingTime = 15, Kicker6, 3 billes, coups requis +1 à chaque Multiball), jackpots du Multiball sur la rampe du crâne (trigger7, trapjp), lettres sur la rampe à 5/15/30 et extra ball après 20 (rampshots > 19), Data scope (Kicker1, startmystery), SLOTH (startsloth, slothmulti = 2 sur AddScore), Truffle Shuffle (addchunk, starttruffle), boucles (trigger2/trigger4, mikeyloop = 3, wwBonus), wizard à 11 lettres (neverPhraseSize, checknever).',
+    'Positions : éléments du .vpx (Target6-9 DATA, Kicker1 Data scope, stonetarget bille captive, Kicker7 orgue, Trigger001 début de la rampe du crâne, Spinner2 boucle droite, Target1-5 SLOTH).',
+  ],
+  doutes: [
+    'Boucle gauche placée à la main (at) sur le couloir aux flèches « Truffle Shuffle », qui mène au spinner Spinner1 : à confirmer en jeu.',
+    'Ordre des cinq modes de la carte repris des messages affichés par le script (FIND THE KEYS, AVOID BOULDERS, PLAY BONE ORGAN, WATER SLIDE, FIGHT FRATELLIS). Le script croise deux noms internes (le mode « bone » affiche AVOID BOULDERS, le mode « boulder » PLAY BONE ORGAN) : à vérifier en jeu. Leur règle propre n’est pas décrite.',
+    'Coups pour ouvrir le piège : 3 (StartTrapHitsToOpen), +1 à chaque Multiball ; en tout début de partie le compteur part de 2, la toute première ouverture peut donc n’en demander que deux.',
+    'Durée de SLOTH : 60 s dans le réglage du minuteur, 30 s dans le commentaire voisin du script.',
+    'D’autres lettres existent (Fratelli cachés, mystères…) : non détaillées faute de certitude.',
+    'Les cibles tombantes de l’orgue n’ont pas de pastille propre (deux banques, de part et d’autre de l’orgue [5]).',
+  ],
+};

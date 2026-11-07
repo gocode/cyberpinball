@@ -1526,6 +1526,27 @@ body.mouse .media-card[data-act]:hover {
   margin-top: 2cqmin;
 }
 
+/* Page du guide : elle prend tout l'écran du livret, sans l'en-tête de la gestion des tables. */
+.lib.lib-guide .lib-head {
+  display: none;
+}
+
+.lib-body.lib-pages.lib-guide-body {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+}
+
+.lib-guide-body .pages-stage {
+  background: none;
+  outline: none;
+}
+
+.lib-guide-body .lib-actions.pages-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 /* Ce que chaque source de règles a donné : trouvée en clair, cherchée en attente, absente grisée avec sa raison. */
 .rule-sources {
   display: grid;

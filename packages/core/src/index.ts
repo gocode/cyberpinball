@@ -94,6 +94,7 @@ export * from './tablesounds';
 export * from './acquisition';
 export * from './gameparts';
 export * from './tablerules';
+export * from './tableguide';
 export * from './addscreens';
 export * from './downloads';
 export * from './downloadqueue';

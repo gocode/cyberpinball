@@ -502,6 +502,85 @@ export function readVpxScript(file: string): string | undefined {
   }
 }
 
+/** Sortes d'éléments placés que lit readVpxPlayfield (ItemTypeEnum de VPX). */
+const LAYOUT_TYPES: Record<number, VpxPlacedType> = { 0: 'wall', 1: 'flipper', 3: 'plunger', 5: 'bumper', 6: 'trigger', 8: 'kicker', 10: 'gate', 11: 'spinner', 12: 'ramp', 22: 'target' };
+export type VpxPlacedType = 'wall' | 'flipper' | 'plunger' | 'bumper' | 'trigger' | 'kicker' | 'gate' | 'spinner' | 'ramp' | 'target';
+
+/** Plateau d'une table vu de dessus : ses bords (unités de VPX, y vers les flippers) et ses éléments placés. */
+export interface VpxPlayfield {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+  /** Chaque élément : son centre (VCEN), ou les points de son tracé (murs, rampes). */
+  items: { type: VpxPlacedType; name: string; pts: [number, number][] }[];
+}
+
+/** Comme biffRecords, mais CODE (le script, dans GameData) se saute par sa propre longueur au lieu d'arrêter la lecture. */
+function layoutRecords(buf: Buffer): { tag: string; body: Buffer }[] {
+  const out: { tag: string; body: Buffer }[] = [];
+  for (let pos = 0; pos + 8 <= buf.length; ) {
+    const size = buf.readUInt32LE(pos);
+    const tag = buf.toString('latin1', pos + 4, pos + 8);
+    if (tag === 'CODE' && pos + 12 <= buf.length) {
+      pos += 12 + buf.readUInt32LE(pos + 8);
+      continue;
+    }
+    if (size < 4 || pos + 4 + size > buf.length) break;
+    out.push({ tag, body: buf.subarray(pos + 8, pos + 4 + size) });
+    pos += 4 + size;
+  }
+  return out;
+}
+
+/**
+ * Plateau de la table pour le guide du jeu (tableguide.ts) : bords (LEFT, TOPX, RGHT, BOTM de
+ * GameData) et éléments placés, avec leur nom et leurs points (VCEN, VPOS des points de tracé).
+ * Ni lampes ni primitives : seulement ce qu'un coup peut désigner. undefined si illisible.
+ */
+export function readVpxPlayfield(file: string): VpxPlayfield | undefined {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const cfb = new CompoundFile(fd);
+    const game = cfb.children(cfb.entries[0]!).find((e) => e.type === 1 && e.name === 'GameStg');
+    if (!game) return undefined;
+    const kids = cfb.children(game);
+    const data = kids.find((e) => e.name === 'GameData');
+    if (!data) return undefined;
+    const dims: Record<string, number> = {};
+    for (const r of layoutRecords(cfb.stream(data, 256 * 1024))) {
+      if (['LEFT', 'TOPX', 'RGHT', 'BOTM'].includes(r.tag) && dims[r.tag] === undefined && r.body.length >= 4) dims[r.tag] = r.body.readFloatLE(0);
+    }
+    if (![dims.LEFT, dims.TOPX, dims.RGHT, dims.BOTM].every((v) => Number.isFinite(v)) || dims.RGHT! <= dims.LEFT! || dims.BOTM! <= dims.TOPX!) return undefined;
+    const items: VpxPlayfield['items'] = [];
+    for (const item of kids) {
+      if (item.type !== 2 || !/^GameItem\d+$/.test(item.name)) continue;
+      const head = cfb.stream(item, 4);
+      const type = head.length >= 4 ? LAYOUT_TYPES[head.readUInt32LE(0)] : undefined;
+      if (!type) continue;
+      // Murs et rampes : tout leur tracé ; les autres tiennent dans le début du flux.
+      const buf = cfb.stream(item, type === 'wall' || type === 'ramp' ? 512 * 1024 : 16 * 1024);
+      let name = '';
+      const pts: [number, number][] = [];
+      for (const r of layoutRecords(buf.subarray(4))) {
+        if (r.tag === 'NAME' && r.body.length >= 4) name = r.body.toString('utf16le', 4, Math.min(r.body.length, 4 + r.body.readUInt32LE(0))).replace(/\0+$/, '').trim();
+        else if ((r.tag === 'VCEN' || r.tag === 'VPOS') && r.body.length >= 8) {
+          const x = r.body.readFloatLE(0);
+          const y = r.body.readFloatLE(4);
+          if (Number.isFinite(x) && Number.isFinite(y)) pts.push([Math.round(x), Math.round(y)]);
+        }
+      }
+      if (name && pts.length) items.push({ type, name, pts });
+    }
+    return { left: dims.LEFT!, top: dims.TOPX!, right: dims.RGHT!, bottom: dims.BOTM!, items };
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
 /** Un élément de la table : son type (ItemTypeEnum de VPX : 0 mur, 2 minuteur, 7 lampe…) et son nom. */
 export interface VpxElement {
   type: number;

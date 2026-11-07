@@ -81,6 +81,7 @@ import {
   romsToTidy,
   sameFile,
   sheetPages,
+  readVpxPlayfield,
   SHEET_PAGE_TYPES,
   BackTrail,
   type BackPlace,
@@ -1040,6 +1041,8 @@ export function createLibrary(host: LibraryHost) {
     },
     vpxCard: (table) => mediaSearch.vpxImages(table).find((i) => i.type === 'GameHelp')?.file,
     vpxRules: (table) => mediaSearch.vpxInfo(table.file)?.rules,
+    playfield: (table) => readVpxPlayfield(table.file),
+    playfieldImage: (table) => mediaSearch.vpxImages(table).find((i) => i.type === 'Playfield')?.file,
     broadcast: () => host.broadcast(),
   });
 

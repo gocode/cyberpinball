@@ -1,0 +1,80 @@
+// Guide du jeu : Game of Thrones (Stern 2015, Limited Edition).
+import type { TableGuide } from '../tableguide';
+
+export const guideGot: TableGuide = {
+  id: 'got',
+  vps: ['0jCbA0Ttem'],
+  title: 'Game of Thrones',
+  sub: 'Stern · 2015',
+  source: 'D’après la carte de la table, son script et la feuille de règles du wiki Tilt Forums.',
+  shots: {
+    1: { name: 'Cibles Lord of Light', el: ['target7', 'target8', 'target9'] },
+    2: { name: 'Boucle gauche', el: 'Spinner001' },
+    3: { name: 'Castle Black', el: 'Kicker37' },
+    4: { name: 'Rampe gauche', el: 'trigRamp7' },
+    5: { name: 'Bélier', el: 'BatteringRam' },
+    6: { name: 'Rampe droite', el: 'trigRamp1' },
+    7: { name: 'Boucle droite', at: [880, 790] },
+    8: { name: 'Cibles Blackwater', el: ['Target43', 'Target44'] },
+  },
+  pages: [
+    {
+      title: 'Le but',
+      all: true,
+      shots: { 1: 'Maison Baratheon', 2: 'Spinner, maison Greyjoy', 3: 'Wall, maison Targaryen', 4: 'Modes, verrou, Lannister', 5: 'Multiplicateur, super JP', 6: 'Maison Stark', 7: 'Trône de fer, Martell', 8: 'Verrou, maison Tyrell' },
+      intro: 'Choisir une maison, puis allumer et gagner les *modes de maison*. Deux Multiballs font le score : *Blackwater* et *Wall*.',
+      note: ['Coup clé : la rampe gauche [4], qui lance les modes et verrouille les billes.', 'À suivre : Modes de maison → Blackwater → Wall → Bonus et astuces.'],
+    },
+    {
+      title: 'Modes de maison',
+      shots: { 2: '3 fois : Greyjoy', 3: '3 fois : Targaryen', 6: '3 fois : Stark', 7: '3 fois : Martell', 8: '3 fois : Tyrell', 4: 'Lance le mode' },
+      paths: [['r', 2], ['r', 3], ['l', 6], ['l', 7], ['r', 4, 2]],
+      phases: ['Allumer', 'Lancer'],
+      steps: ['Trois fois le coup d’une maison : elle s’allume. Ta maison l’est d’office.', 'Rampe gauche [4] : choisir le mode avec les flippers. Deux modes peuvent se cumuler.', 'Chaque mode a sa règle, souvent chronométrée : suivre l’écran.'],
+      final: 'Trois modes : *extra ball*. Quatre : *Hand of the King*. Les sept : *Iron Throne*.',
+      warn: 'Un mode perdu au chrono se relance depuis la rampe gauche [4].',
+    },
+    {
+      title: 'Blackwater Multiball',
+      shots: { 8: 'Allument le verrou', 4: 'Verrou, puis jackpot', 2: 'Jackpot', 3: 'Jackpot', 6: 'Jackpot', 7: 'Jackpot', 5: 'Super jackpot' },
+      paths: [['l', 8], ['r', 4], ['r', 2, 2], ['l', 6, 2], ['l', 5, 2]],
+      phases: ['Verrouiller', 'Jackpots'],
+      steps: ['Toucher les cibles [8] : le verrou s’allume sur la rampe gauche [4].', 'Verrouiller une bille, rallumer, recommencer. La troisième lance le Multiball.', 'Jackpots sur les cinq grands coups éclairés : [2] [3] [4] [6] [7].'],
+      final: 'Tous faits : *super jackpot* au bélier [5], 20 secondes durant, autant de fois que possible.',
+      warn: 'Le verrou se mérite de plus en plus : une cible [8] au début, puis les deux, puis les deux en temps limité.',
+    },
+    {
+      title: 'Wall Multiball',
+      shots: { 3: '6 fois, puis super JP', 7: 'Lance le Multiball', 4: 'Jackpots', 6: 'Jackpots', 2: 'Jackpots' },
+      paths: [['r', 3], ['l', 7], ['r', 4, 2], ['l', 6, 2], ['r', 3, 2]],
+      phases: ['Préparer', 'Jackpots'],
+      steps: ['Entrer six fois dans Castle Black [3] (onze fois pour les Wall suivants).', 'Boucle droite [7] : la bille monte au trône de fer et le Multiball part.', 'Trois jackpots aux rampes [4] [6], puis Castle Black [3] ; ensuite trois aux boucles [2] [7].'],
+      final: 'Castle Black [3] paie le *super jackpot* entre deux séries ; chaque jackpot vaut plus que le précédent.',
+    },
+    {
+      title: 'Bonus et astuces',
+      shots: { 5: 'Jusqu’à ×5', 1: 'Sauve-bille', 7: 'Extra ball' },
+      tips: [
+        ['Bouton d’action', 'MagnaSave droit : pouvoir de ta maison, en général une fois par bille.'],
+        ['Multiplicateur', 'Le bélier [5] allume puis monte le multiplicateur de jeu, jusqu’à ×5.'],
+        ['Lord of Light', 'Les cibles [1] sauvent la bille aux couloirs extérieurs, une fois par partie.'],
+        ['Extra ball', 'Allumée après trois modes, à prendre à la boucle droite [7].'],
+      ],
+      warn: 'Encaisser les multiplicateurs (bouton d’action) les remet à ×1 : plutôt en fin de bille.',
+    },
+  ],
+  sources: [
+    'Carte d’instructions rangée dans la table : choix de la maison et pouvoirs, multiplicateurs (combo et bélier, ×25 au plus), Blackwater (deux cibles de droite, trois verrous), Wildfire au bélier, extra ball par les modes, encaissement par le bouton d’action.',
+    'Script de la table (règles réécrites par VPW, pas d’émulation de ROM) : trois coups par maison pour l’allumer (QualifyCount), lancement des modes sur la rampe gauche (sw39), verrou sw48 allumé par Target43/44 (LightLock), jackpots Blackwater sur cinq coups puis super jackpot au bélier pendant 20 s, Wall prêt après 6 puis 11 Castle Black (AdvanceWallMultiball) et lancé au trône de fer (KickerIT), jackpots Wall rampes / Castle Black / boucles (SetJackpots, ScoreWallJP), extra ball après 3 modes, Hand of the King à 4 et Iron Throne à 7 (CheckForHotkOrITReady), Lord of Light une fois (bLoLUsed), bouton d’action = MagnaSave droit.',
+    'Feuille de règles du wiki Tilt Forums (hébergée sur pinballrulesheets.com) : correspondance coups / maisons, différences Pro et Premium/LE (Castle Black, boucle droite vers le trône), pas de skill shot sur LE.',
+    'Positions : éléments du .vpx (target7-9 banque Lord of Light, Spinner001 boucle gauche, Kicker37 Castle Black, trigRamp7 et trigRamp1 entrées des rampes, BatteringRam, Target43/44).',
+  ],
+  doutes: [
+    'Boucle droite placée à la main (at) : aucun élément ne marque son entrée ; à vérifier sur la table.',
+    'Castle Black marqué par le kicker du fond du couloir (Kicker37), sous le plateau supérieur : l’entrée réelle est plus bas.',
+    'Entrées de rampes placées sur les déclencheurs du début des fils (trigRamp7, trigRamp1), sous le plateau supérieur pour la rampe gauche.',
+    'Difficulté du verrou : la feuille de règles la fait monter d’un verrou à l’autre, le script d’un Blackwater à l’autre (une cible suffit pour les deux premiers, puis les deux, avec 30 s de délai après le troisième). À observer en jeu.',
+    'Le plateau supérieur de la LE (Castle Multiball) n’est pas traité : la feuille de règles le dit peu joué.',
+    'Le pouvoir du bouton d’action dépend de la maison (Martell : ajout de bille, Tyrell : Iron Bank…) ; détail laissé hors du guide.',
+  ],
+};

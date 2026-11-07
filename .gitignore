@@ -6,6 +6,27 @@ build/
 release/
 cache/
 
+# Tournage des vidéos : rushes (téléphones, OBS), sons et exports du montage restent sur ce poste.
+# Lourds, et internes comme tout video/ : jamais suivis par git, donc jamais sur GitHub.
+video/**/rushes/
+video/**/exports/
+video/**/*.mp4
+video/**/*.mkv
+video/**/*.mov
+video/**/*.m4v
+video/**/*.avi
+video/**/*.webm
+video/**/*.mts
+video/**/*.mxf
+video/**/*.wav
+video/**/*.mp3
+video/**/*.m4a
+video/**/*.aac
+video/**/*.flac
+video/**/*.ogg
+video/**/*.opus
+video/**/*.heic
+
 # Secrets : jamais suivis par git (le dépôt est public ; scripts/audit-publication.mjs les refuse aussi).
 jeton-github.txt
 .env

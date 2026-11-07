@@ -14,18 +14,24 @@ import {
   authorRuleBlocks,
   b2sCacheDir,
   findRuleSheet,
+  guideFor,
+  guideViews,
   looksEnglish,
   mediaUrl,
   paginateRules,
+  placeGuide,
   RULE_SITES,
   ruleVideo,
   t,
+  type GuideView,
+  type PlacedGuide,
   type RuleBlock,
   type RuleSheet,
   type RuleVideo,
   type SheetPage,
   type TableEntry,
   type VpsGame,
+  type VpxPlayfield,
 } from '@cyberpinball/core';
 import { qrRows } from './remote-qr';
 
@@ -40,6 +46,7 @@ export interface RuleSourceLine {
 
 export type HelpPage =
   | { kind: 'media'; page: SheetPage; source: string }
+  | GuideView
   | {
       kind: 'text';
       /** D'où vient le texte, affiché sous la page. */
@@ -68,6 +75,9 @@ interface Found {
   game: { state: 'searching' | 'found' | 'no-game' | 'no-catalog'; game?: VpsGame };
   sheet: { state: RuleSourceState; sheet?: RuleSheet };
   video: { state: RuleSourceState; video?: RuleVideo; thumb?: string };
+  /** Guide du jeu rédigé, placé sur le plateau de cette table, et l'image du plateau. */
+  guide?: PlacedGuide;
+  guideImage?: string;
 }
 
 export interface TableRulesContext {
@@ -80,6 +90,10 @@ export interface TableRulesContext {
   vpxCard(table: TableEntry): string | undefined;
   /** Texte TableRules du .vpx. */
   vpxRules(table: TableEntry): string | undefined;
+  /** Plateau de la table : bords et éléments placés (guide du jeu). */
+  playfield(table: TableEntry): VpxPlayfield | undefined;
+  /** Image du plateau à plat rangée dans le .vpx (fichier du cache des médias). */
+  playfieldImage(table: TableEntry): string | undefined;
   broadcast(): void;
   fetch?: typeof fetch;
 }
@@ -153,6 +167,16 @@ export function createTableRules(ctx: TableRulesContext) {
         return;
       }
       f.game = { state: 'found', game };
+      const guide = guideFor(game.id);
+      if (guide) {
+        try {
+          const pf = ctx.playfield(table);
+          f.guide = pf ? placeGuide(guide, pf) : undefined;
+          if (f.guide) f.guideImage = ctx.playfieldImage(table);
+        } catch {
+          f.guide = undefined;
+        }
+      }
       const video = ruleVideo(game);
       f.video = video ? { state: 'found', video } : { state: 'none' };
       ctx.broadcast();
@@ -218,13 +242,17 @@ export function createTableRules(ctx: TableRulesContext) {
     const video: RuleSourceLine = f?.video.video
       ? { label: t('Vidéo d’explication'), detail: 'YouTube', state: 'found' } // i18n-ignore : nom propre
       : { label: t('Vidéo d’explication'), detail: reason(videoState), state: wait(videoState) ? 'searching' : videoState };
-    return [card, author, sheet, video];
+    // Le guide rédigé n'existe que pour quelques jeux : dit quand il est là, jamais grisé.
+    const guide: RuleSourceLine[] = f?.guide ? [{ label: t('Guide du jeu'), detail: t('rédigé pour Cyber Pinball'), state: 'found' }] : [];
+    return [...guide, card, author, sheet, video];
   }
 
   /** Pages de la rubrique Règles, la dernière toujours celle des commandes. */
   function pages(table: TableEntry, own: readonly SheetPage[], keys: [string, string][]): HelpPage[] {
     const f = stateOf(table);
-    const out: HelpPage[] = own.map((page) => ({ kind: 'media' as const, page, source: t('Carte de règles du jeu') }));
+    const image = f?.guideImage && fs.existsSync(f.guideImage) ? mediaUrl(f.guideImage) : undefined;
+    const out: HelpPage[] = f?.guide ? guideViews(f.guide, { image, french: ctx.english() }) : [];
+    out.push(...own.map((page) => ({ kind: 'media' as const, page, source: t('Carte de règles du jeu') })));
     if (!own.length && f?.vpxCard && fs.existsSync(f.vpxCard)) {
       out.push({ kind: 'media', page: { url: mediaUrl(f.vpxCard), kind: 'image' }, source: t('Carte de règles rangée dans la table par son auteur') });
     }
@@ -255,6 +283,7 @@ export function createTableRules(ctx: TableRulesContext) {
   function summary(table: TableEntry, ownCards: number): string {
     const f = stateOf(table);
     const parts: string[] = [];
+    if (f?.guide) parts.push(t('guide du jeu'));
     if (ownCards || f?.vpxCard) parts.push(t('carte'));
     if (f?.author.length) parts.push(t('texte de l’auteur'));
     if (f?.sheet.sheet) parts.push(siteLabel(f.sheet.sheet));

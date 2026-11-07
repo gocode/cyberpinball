@@ -454,4 +454,14 @@ export const messages: Record<string, string> = {
   'QR code de la vidéo': 'QR code of the video',
   'Visez ce code avec votre téléphone pour regarder la vidéo.': 'Point your phone at this code to watch the video.',
   'Règles de ce jeu': 'Rules for this game',
+  // app/src/table-rules.ts, app/renderer/guide.js : guide du jeu rédigé
+  'guide du jeu': 'game guide',
+  'Guide du jeu': 'Game guide',
+  'rédigé pour Cyber Pinball': 'written for Cyber Pinball',
+  '{sub} · {title} · page {page} sur {count}': '{sub} · {title} · page {page} of {count}',
+  'Plateau dessiné d’après la table': 'Playfield drawn from the table',
+  'Tirs indicatifs': 'Suggested shots',
+  'Viser': 'Aim',
+  'Ensuite': 'Then',
+  'en français': 'in French',
 };

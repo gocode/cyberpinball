@@ -1,6 +1,6 @@
 {
   "name": "cyberpinball",
-  "version": "0.1.8-essai.18",
+  "version": "0.1.8",
   "private": true,
   "description": "Open-source frontend for virtual pinball cabinets on Windows. Describe your cabinet once (screens, buttons, sound) and Cyber Pinball configures and maintains Visual Pinball X for you: screens recognised by EDID, a wizard driven by the cabinet buttons, table and media management, signed in-app updates.",
   "license": "GPL-3.0-or-later",
@@ -29,7 +29,7 @@
     "app"
   ],
   "scripts": {
-    "build": "node scripts/liens-espaces.mjs && tsc -b",
+    "build": "node scripts/liens-espaces.mjs && node scripts/sorties-orphelines.mjs && tsc -b",
     "clean": "tsc -b --clean",
     "test": "npm run build && node scripts/audit-publication.mjs && node scripts/traductions.mjs && node --test \"packages/core/dist/test/*.test.js\" \"scripts/*.test.mjs\"",
     "vpx-schema": "npm run build && node packages/installer/dist/vpx-schema-cli.js",

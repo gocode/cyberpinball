@@ -32,6 +32,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - On a desk PC, a table slow to load says so: after 8 s, the loading panel gives the step actually seen (VPX running, then its windows open), the elapsed time, and Exit or Ctrl+Shift+K to stop; the wheel comes back, with no game counted. On the cabinet, the loading media stays alone.
 - DMD on the wheel, table by table: the table's page > "Gérer la table…" (Manage the table…) > "DMD sur la roue" (DMD on the wheel). Show or hide the menu DMD's dots for this table (hidden, the FullDMD screen shows its media alone), and place them wherever you like on the DMD screen, with the cabinet buttons, watching the result live. The in-game DMD keeps its own setting (both MagnaSaves during the game).
 - A table's rules found automatically: the card and text the author stored in the table, a public rulesheet (The Pinball Primer, Pinball Rule Sheets) for over 800 machines, a tutorial video to watch on the phone through a QR code. Each page states its source; the game controls come last, with what each source gave.
+- Game guide for ten tables (Back to the Future, Terminator 2, Game of Thrones, Guardians of the Galaxy, Star Trek, The Walking Dead, The Goonies, The Matrix, City Hunter, 2001): at the top of the rules, the goal, then one objective per page, with the shots numbered on the playfield and drawn from the flippers.
 
 ## 0.1.7
 

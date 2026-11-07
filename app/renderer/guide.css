@@ -1,0 +1,525 @@
+/*
+ * Guide du jeu (guide.js) : un écran dessiné à taille fixe puis mis à l'échelle de la page. Aucun texte sous 27 px du dessin : mis à l'échelle
+ * de la page (0,77 au bureau en 1080, actions comprises), il reste au-dessus du plancher de 20 px.
+ */
+
+.gd-fit {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.gd-screen {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: hidden;
+  transform-origin: 0 0;
+  border-radius: 24px;
+  background: var(--fond-ambiance);
+  background-color: var(--void);
+  outline: 2px solid var(--line-soft);
+  outline-offset: -2px;
+  color: var(--ink);
+  font-family: var(--font-ui);
+}
+
+.gd-screen.borne {
+  width: 1080px;
+  height: 1860px;
+}
+
+.gd-screen.bureau {
+  width: 1760px;
+  height: 960px;
+}
+
+/* En-tête : surtitre vert, titre, « fabricant · année · page » ; points de page à droite. */
+.gd-head {
+  position: absolute;
+  z-index: 4;
+}
+
+.borne .gd-head {
+  left: 56px;
+  right: 56px;
+  top: 48px;
+}
+
+.bureau .gd-head {
+  left: 1010px;
+  right: 40px;
+  top: 40px;
+}
+
+.gd-kicker {
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.gd-title {
+  margin: 6px 0 0;
+  font-size: 56px;
+  font-weight: 600;
+  line-height: 1.15;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.gd-head-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  margin-top: 12px;
+}
+
+.gd-sub {
+  font-size: 27px;
+  color: var(--meta);
+}
+
+.gd-dots {
+  display: flex;
+  flex: none;
+  gap: 10px;
+}
+
+.gd-dots i {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid var(--line-strong);
+}
+
+.gd-dots i.gd-on {
+  background: var(--signal);
+  border-color: var(--signal);
+  box-shadow: 0 0 14px var(--signal-haze);
+}
+
+.gd-dots i.gd-seen {
+  background: var(--line-strong);
+}
+
+/* Plateau : l'image du .vpx, les coups à leur place, les tirs. */
+.gd-pf {
+  position: absolute;
+}
+
+.gd-img {
+  position: absolute;
+  inset: 0;
+  background-size: 100% 100%;
+  border-radius: 10px;
+  outline: 2px solid var(--line-strong);
+  outline-offset: -2px;
+  filter: brightness(0.6) saturate(0.7);
+}
+
+.gd-pf.vue .gd-img {
+  filter: brightness(0.8) saturate(0.85);
+}
+
+.gd-img.schema {
+  background: linear-gradient(170deg, #0c1d1a, #050c0b);
+  filter: none;
+}
+
+.gd-pf svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.gd-draw {
+  z-index: 1;
+}
+
+.gd-shot,
+.gd-shot-under {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.gd-shot-under {
+  stroke: var(--void);
+  stroke-width: 14;
+  opacity: 0.85;
+}
+
+.gd-shot {
+  stroke: var(--signal);
+  stroke-width: 6;
+}
+
+.gd-shot.second {
+  stroke: var(--meta);
+  stroke-dasharray: 16 14;
+}
+
+.gd-arrow {
+  fill: var(--signal);
+  stroke: var(--void);
+  stroke-width: 2;
+}
+
+.gd-arrow.second {
+  fill: var(--meta);
+}
+
+.gd-bat {
+  stroke: var(--ink);
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+.gd-mark {
+  position: absolute;
+  z-index: 3;
+  width: 52px;
+  height: 52px;
+  margin: -26px 0 0 -26px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  font-size: 27px;
+  font-weight: 700;
+  background: rgba(3, 8, 7, 0.94);
+  border: 2px solid var(--ink-faint);
+  color: var(--ink-muted);
+}
+
+.gd-mark.gd-on {
+  border-color: var(--signal);
+  color: var(--signal);
+  box-shadow:
+    0 0 0 4px rgba(3, 8, 7, 0.6),
+    0 0 18px var(--signal-haze);
+}
+
+.gd-mark.gd-dim {
+  border-color: var(--line-strong);
+  background: var(--scrim-strong);
+}
+
+/* Plateau dessiné depuis les éléments du .vpx, quand la table n'a pas d'image à plat. */
+.gd-schema {
+  z-index: 0;
+}
+
+.gd-schema .w {
+  fill: rgba(54, 201, 180, 0.07);
+  stroke: var(--line-strong);
+  stroke-width: 4;
+}
+
+.gd-schema .r {
+  fill: none;
+  stroke: var(--meta);
+  stroke-opacity: 0.45;
+  stroke-width: 14;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.gd-schema .b {
+  fill: rgba(95, 180, 207, 0.12);
+  stroke: var(--meta);
+  stroke-opacity: 0.6;
+  stroke-width: 4;
+}
+
+.gd-schema .t {
+  fill: var(--line-strong);
+}
+
+/* Sur un fond, pour ne pas se mêler aux traits du dessin. */
+.gd-schema-note {
+  position: absolute;
+  z-index: 2;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  width: fit-content;
+  margin: 0 auto;
+  padding: 4px 14px;
+  border-radius: 10px;
+  background: var(--scrim-strong);
+  text-align: center;
+  font-size: 27px;
+  color: var(--ink-muted);
+}
+
+/* Étiquettes des coups, dans les marges du plateau, reliées par un filet. */
+.gd-leaders {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.gd-leaders path {
+  fill: none;
+  stroke: var(--ink-muted);
+  stroke-opacity: 0.65;
+  stroke-width: 1.5;
+}
+
+.gd-tag {
+  position: absolute;
+  z-index: 3;
+  width: 236px;
+  display: grid;
+  gap: 6px;
+}
+
+.gd-tag.l {
+  text-align: right;
+}
+
+.gd-tag b {
+  display: flex;
+  align-items: baseline;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.gd-tag.l b {
+  justify-content: flex-end;
+}
+
+.gd-tag > span {
+  font-size: 27px;
+  line-height: 1.25;
+  color: var(--ink-muted);
+}
+
+.gd-tag .n {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--signal);
+  border-radius: 50%;
+  color: var(--signal);
+  font-size: 27px;
+  margin-right: 6px;
+  vertical-align: 1px;
+}
+
+.gd-tag.l .n {
+  margin: 0 0 0 6px;
+}
+
+/* Texte de la page. */
+.gd-panel {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 30px 36px;
+  border: 1px solid var(--line-strong);
+  border-radius: 20px;
+  background: var(--scrim-strong);
+  box-shadow: var(--halo-panel);
+}
+
+.borne .gd-panel {
+  left: 40px;
+  right: 40px;
+  top: 1260px;
+  height: 568px;
+}
+
+.bureau .gd-panel {
+  left: 1010px;
+  right: 40px;
+  top: 214px;
+  bottom: 32px;
+  padding: 26px 32px;
+}
+
+.gd-panel h2 {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.gd-panel p {
+  margin: 0;
+  font-size: 29px;
+  line-height: 1.38;
+}
+
+.gd-panel p.quiet {
+  font-size: 27px;
+  color: var(--ink-muted);
+}
+
+.gd-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 24px;
+}
+
+.gd-legend {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 8px 24px;
+  font-size: 27px;
+  color: var(--ink-muted);
+}
+
+.gd-legend > span {
+  white-space: nowrap;
+}
+
+.gd-legend i {
+  display: inline-block;
+  width: 38px;
+  height: 0;
+  border-top: 3px solid var(--signal);
+  vertical-align: 6px;
+  margin-right: 10px;
+}
+
+.gd-legend i.b {
+  border-top-color: var(--meta);
+  border-top-style: dashed;
+}
+
+.gd-steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 14px;
+}
+
+.gd-steps li {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  font-size: 28px;
+  line-height: 1.32;
+}
+
+/* Numéro d'étape, écrit dans la page (jamais par la feuille de style : il échapperait au relevé). */
+.gd-steps .gd-n {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  background: var(--signal-wash);
+  border: 2px solid var(--line-strong);
+  color: var(--signal);
+  font-weight: 700;
+  font-size: 27px;
+}
+
+.gd-steps li.final .gd-n {
+  background: var(--signal);
+  color: var(--on-signal);
+  border-color: var(--signal);
+}
+
+.gd-chip {
+  display: inline-grid;
+  place-items: center;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  width: 38px;
+  height: 38px;
+  margin: 0 2px;
+  border-radius: 50%;
+  border: 2px solid var(--signal);
+  color: var(--signal);
+  font-size: 27px;
+  font-weight: 700;
+  vertical-align: 2px;
+  line-height: 1;
+}
+
+.gd-em {
+  color: var(--signal);
+  font-weight: 600;
+}
+
+.gd-tip {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  padding: 14px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--line-soft);
+  font-size: 27px;
+  line-height: 1.35;
+  color: var(--ink-muted);
+}
+
+.gd-tip-icon {
+  width: 30px;
+  height: 30px;
+  margin-top: 2px;
+  color: var(--warning);
+}
+
+.gd-tips {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 22px;
+}
+
+.gd-tips div {
+  font-size: 27px;
+  line-height: 1.32;
+  color: var(--ink-muted);
+}
+
+.gd-tips b {
+  display: block;
+  font-size: 27px;
+  color: var(--ink);
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.gd-src {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 18px;
+  margin-top: auto;
+  font-size: 27px;
+  color: var(--ink-muted);
+  line-height: 1.3;
+}
+
+.gd-lang {
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+}

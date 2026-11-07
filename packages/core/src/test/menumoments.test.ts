@@ -472,8 +472,9 @@ test('feuilles du menu : une classe n’est définie que dans une feuille (sauf 
   const html = fs.readFileSync(path.join(APP, 'renderer', 'frontend.html'), 'utf8');
   const sheets = [...html.matchAll(/href="([\w-]+\.css)"/g)].map((m) => m[1]!);
   // theme.css (jetons du design system, police) est chargée avant les autres par chaque page ;
-  // intro.css habille les animations d'ouverture (intro.js), des composants cp-* comme fallback.css.
-  assert.deepEqual(sheets.sort(), ['fallback.css', 'frontend.css', 'intro.css', 'library.css', 'theme.css']);
+  // intro.css habille les animations d'ouverture (intro.js), des composants cp-* comme fallback.css ;
+  // guide.css, l'écran du guide du jeu (guide.js), ses classes gd-*.
+  assert.deepEqual(sheets.sort(), ['fallback.css', 'frontend.css', 'guide.css', 'intro.css', 'library.css', 'theme.css']);
   const shared = new Set(['current', 'selected', 'mouse']);
   const seen = new Map<string, string>();
   const clashes: string[] = [];

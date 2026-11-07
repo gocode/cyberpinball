@@ -21,7 +21,9 @@ function actOn(node, action) {
 
 function renderLibrary(v) {
   drawn = v;
-  const o = libEl('section', `lib lib-${v.screen}${v.variant ? ` lib-${v.variant}` : ''}`);
+  // Page d'un guide du jeu : elle prend la place de l'en-tête (guide.css).
+  const guide = v.pages?.help?.kind === 'guide';
+  const o = libEl('section', `lib lib-${v.screen}${v.variant ? ` lib-${v.variant}` : ''}${guide ? ' lib-guide' : ''}`);
   const head = libEl('header', 'lib-head');
   // Retour en tête : à la souris, inutile de descendre au bas de la liste chercher « Retour ».
   // Il nomme l'écran où il mène ; dans la liste d'un écran à deux zones, ce que fait Exit (passer aux actions), et un clic fait de même.
@@ -53,7 +55,7 @@ function renderLibrary(v) {
   const body = libEl(
     'div',
     v.pages
-      ? 'lib-body lib-pages'
+      ? `lib-body lib-pages${guide ? ' lib-guide-body' : ''}`
       : v.crop
         ? 'lib-body lib-crop-body'
       : v.media
@@ -507,6 +509,7 @@ function pageMedia(page) {
 /** Une page des règles (table-rules.ts) : carte, texte, vidéo, ou les commandes en dernier. */
 function renderHelp(h) {
   if (h.kind === 'media') return [pageMedia(h.page), libEl('p', 'help-caption', h.source)];
+  if (h.kind === 'guide') return [renderGuidePage(h)];
   if (h.kind === 'text') return [renderRuleText(h)];
   if (h.kind === 'video') return [renderRuleVideo(h)];
   return [renderGameKeys(h.keys ?? [], h.sources ?? [])];

@@ -52,6 +52,6 @@ test('chaque espace de travail (@cyberpinball/*) se résout dans ce dépôt, dep
 
 test('npm run build pose les liens des espaces de travail avant de compiler', () => {
   const { scripts } = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8')) as { scripts: Record<string, string> };
-  assert.match(scripts.build ?? '', /^node scripts\/liens-espaces\.mjs && tsc -b/);
+  assert.match(scripts.build ?? '', /^node scripts\/liens-espaces\.mjs && .*\btsc -b\b/);
   assert.match(scripts.test ?? '', /^npm run build && /);
 });

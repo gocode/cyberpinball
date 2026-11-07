@@ -34,6 +34,7 @@ son interface).
 - Au bureau, une table qui tarde à charger le dit : passé 8 s, l'encart du chargement donne l'étape réellement vue (VPX lancé, puis ses fenêtres ouvertes), le temps écoulé, et Exit ou Ctrl+Maj+K pour arrêter ; la roue revient, sans partie comptée. Sur la borne, le média de chargement reste seul.
 - DMD sur la roue, table par table : fiche > « Gérer la table… » > « DMD sur la roue ». Affichez ou masquez les points du DMD du menu pour cette table (masqué, l'écran du FullDMD montre son média seul), et placez-les où vous voulez sur l'écran du DMD, aux boutons de la borne, en voyant le résultat en direct. Le DMD en partie garde son propre réglage (les deux MagnaSave pendant la partie).
 - Règles d'une table trouvées seules : la carte et le texte que l'auteur a rangés dans la table, une feuille de règles publique (The Pinball Primer, Pinball Rule Sheets) pour plus de 800 machines, une vidéo d'explication à regarder sur le téléphone par QR code. Chaque page dit sa source ; les commandes de la partie passent en dernier, avec ce que chaque source a donné.
+- Guide du jeu pour dix tables (Back to the Future, Terminator 2, Game of Thrones, Guardians of the Galaxy, Star Trek, The Walking Dead, The Goonies, The Matrix, City Hunter, 2001) : en tête des règles, le but, puis un objectif par page, avec les coups numérotés sur le plateau et les tirs depuis les flippers.
 
 ## 0.1.7
 
