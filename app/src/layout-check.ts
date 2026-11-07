@@ -184,9 +184,9 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       const onB = b.el === hit || b.el.contains(hit) || hit.contains(b.el);
       if (!onA && !onB) continue; // un troisième élément couvre les deux
       const [top, bottom] = onA ? [a.el, b.el] : [b.el, a.el];
-      // Un logo en vol (lancement en cinéma, chute d'un record au retour d'une partie) ne fait que passer
-      // sur l'écran : sur le titre du repli du chargement, ce n'est ni un chevauchement ni une coupure.
-      if (top.closest('.cinema, .bilan-fronton, .gr-flight')) continue;
+      // Le logo du lancement en cinéma ne fait que passer sur l'écran : sur le titre du repli du
+      // chargement, ce n'est ni un chevauchement ni une coupure.
+      if (top.closest('.cinema')) continue;
       const at = (v) => '[' + [v.left, v.top, v.right, v.bottom].map(Math.round).join(', ') + ']';
       const cover = masked(top, bottom, x, y);
       if (cover) {
@@ -222,9 +222,8 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   }
   boxes.forEach(({ el, r }, i) => {
     // Lancement en cinéma : le logo (ou le titre de son médaillon) sort de son écran par le haut
-    // et entre dans le fronton par le bas ; rogné par l'écran qu'il traverse, c'est voulu. De même au
-    // retour d'une partie (record) : il tombe du fronton et entre par le haut du plateau.
-    if (el.closest('.cinema, .bilan-fronton, .gr-flight')) return;
+    // et entre dans le fronton par le bas ; rogné par l'écran qu'il traverse, c'est voulu.
+    if (el.closest('.cinema')) return;
     let scrolled = false;
     // Coupure voulue : « … » ou lignes limitées, par le texte lui-même ou par le premier
     // conteneur qui le coupe. Elle n'excuse que ce conteneur : ce qui en reste visible (les
@@ -495,7 +494,7 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   };
   const measured = new Set();
   for (const { el, text } of boxes) {
-    if (!text || measured.has(el) || el.closest('.cinema, .bilan-fronton, .gr-flight, .cp-fb, [data-below-floor]')) continue;
+    if (!text || measured.has(el) || el.closest('.cinema, .cp-fb, [data-below-floor]')) continue;
     measured.add(el);
     const size = parseFloat(getComputedStyle(el).fontSize) * glyphScale(el) * px;
     if (size > 0 && size < 19.5) problems.add('texte plus petit que 20 px (' + size.toFixed(1) + ' px) : ' + label(el));

@@ -200,6 +200,7 @@ import { createRecordingMenu } from './recording-menu';
 import { createJourney } from './journey';
 import { createMediaDownload, mediaOffersLabel, type MediaDbGameOffer } from './media-download';
 import { createMediaSearch } from './media-search';
+import { createTableRules, type HelpPage } from './table-rules';
 import { createConverter } from './media-convert';
 import { analyseDressing } from './fulldmd';
 import { createMediaSites } from './media-sites';
@@ -1021,6 +1022,26 @@ export function createLibrary(host: LibraryHost) {
   // Index de VPinMediaDB, recherche approfondie du jeu et aperçus, partagés par le plan
   // automatique et les propositions de chaque média.
   const mediaSearch = createMediaSearch({ host, layout, tablesDir, progress, vps: () => vpsForImport(), downloads: () => downloads });
+
+  // Règles trouvées seules (table-rules.ts) : carte et texte du .vpx, feuille de règles, vidéo.
+  // La base VPS déjà téléchargée seulement : ouvrir les règles ne lance aucun gros téléchargement.
+  const tableRules = createTableRules({
+    dataDir: host.dataDir,
+    english: () => language() === 'en',
+    game: async (table) => {
+      const dir = layout()?.downloads;
+      if (dir && !vpsLoaded) {
+        vpsDb = loadVpsDb(dir);
+        vpsLoaded = true;
+      }
+      if (!vpsDb) return 'no-catalog';
+      const found = tableGame(vpsDb, table, await mediaSearch.evidence(table, false));
+      return found.game ?? 'no-game';
+    },
+    vpxCard: (table) => mediaSearch.vpxImages(table).find((i) => i.type === 'GameHelp')?.file,
+    vpxRules: (table) => mediaSearch.vpxInfo(table.file)?.rules,
+    broadcast: () => host.broadcast(),
+  });
 
   // ---------- Gestionnaire de téléchargements ----------
   // Tout ce qui arrive, d'un site ou d'un ami (packages/core/src/downloadmanager.ts) : la file
@@ -2012,15 +2033,26 @@ export function createLibrary(host: LibraryHost) {
 
   const pagesOf = (table: TableEntry, type: SheetPageType) => sheetPages(table, host.root, host.dataDir, type);
 
-  /** « Prospectus : 2 pages » ; sans fichier, ce que montre le repli. */
+  /** Pages des règles : cartes, textes et vidéo trouvés, puis les commandes de la partie. */
+  function helpPages(table: TableEntry): HelpPage[] {
+    const own = pagesOf(table, 'GameHelp');
+    tableRules.ensure(table, own.length > 0);
+    const cabinet = loadCabinet(host.dataDir);
+    return tableRules.pages(table, own, gameKeys(cabinet?.buttons, cabinet?.tilt));
+  }
+
   /**
-   * « Prospectus et règles » : un seul livret, le prospectus puis les règles ; chaque partie a
-   * au moins une page (son repli : fiche générée, commandes de la partie).
+   * « Prospectus et règles » : un seul livret, le prospectus puis les règles. Le prospectus a au
+   * moins une page (son repli : la fiche générée) ; les règles finissent toujours par les commandes.
+   * Ouvrir la fiche lance la recherche des règles (table-rules.ts).
    */
   function pagesAction(table: TableEntry): SheetAction {
+    const own = pagesOf(table, 'GameHelp').length;
+    tableRules.ensure(table, own > 0);
     const parts = SHEET_PAGE_TYPES.map((type) => {
       const n = pagesOf(table, type).length;
-      return t('{label} : {what}', { label: mediaTypeInfo(type).label, what: n ? tn(n, '{n} page', '{n} pages') : type === 'GameInfo' ? t('fiche générée') : t('commandes de la partie') });
+      const what = type === 'GameHelp' ? tableRules.summary(table, own) : n ? tn(n, '{n} page', '{n} pages') : t('fiche générée');
+      return t('{label} : {what}', { label: mediaTypeInfo(type).label, what });
     });
     return {
       label: t('Prospectus et règles'),
@@ -2032,7 +2064,7 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /** Pages du livret, partie par partie (au moins une chacune) : [prospectus, règles]. */
-  const bookletCounts = (table: TableEntry) => SHEET_PAGE_TYPES.map((type) => Math.max(1, pagesOf(table, type).length));
+  const bookletCounts = (table: TableEntry) => SHEET_PAGE_TYPES.map((type) => (type === 'GameHelp' ? helpPages(table).length : Math.max(1, pagesOf(table, type).length)));
 
   /** Tourne le livret de `step` pages, d'une partie à l'autre ; au bout, il repart de l'autre. */
   function turnBooklet(s: PagesScreen, counts: number[], step: number): void {
@@ -2049,7 +2081,7 @@ export function createLibrary(host: LibraryHost) {
     }
   }
 
-  /** Dernière page du livret (celle des règles) : Start revient ensuite à la fiche. */
+  /** Dernière page du livret (celle des commandes) : Start revient ensuite à la fiche. */
   const bookletEnd = (s: PagesScreen, counts: number[]) => s.type === SHEET_PAGE_TYPES.at(-1) && s.index >= counts.at(-1)! - 1;
 
   function buildPages(s: PagesScreen): Built {
@@ -2079,6 +2111,10 @@ export function createLibrary(host: LibraryHost) {
         { label: t('‹ Page précédente'), door: 'sheet.read' as const, run: () => turn(-1) },
         { label: t('Page suivante ›'), door: 'sheet.read' as const, run: () => turn(1) },
         ...SHEET_PAGE_TYPES.filter((type) => type !== s.type).map((type) => ({ label: mediaTypeInfo(type).label, door: 'sheet.read' as const, run: () => jump(type) })),
+        // Les commandes, dernière page des règles, sans tourner toutes les pages d'une feuille.
+        ...(bookletEnd(s, counts)
+          ? []
+          : [{ label: t('Commandes de la partie'), door: 'sheet.read' as const, run: () => ((s.type = 'GameHelp'), (s.index = counts.at(-1)! - 1), host.broadcast()) }]),
         { label: t('Retour à la fiche'), door: 'sheet.read', run: back },
       ],
       back,
@@ -2099,20 +2135,20 @@ export function createLibrary(host: LibraryHost) {
     return true;
   }
 
-  /** Ce que dessine le rendu : la page, ou le repli (fiche générée, commandes de la partie). */
+  /** Ce que dessine le rendu : la page du prospectus (ou la fiche générée), ou celle des règles. */
   function pagesView(s: PagesScreen) {
     const table = find(s.file);
     if (!table) return undefined;
-    const pages = pagesOf(table, s.type);
     const authors = table.info.Info?.Authors?.filter((a) => typeof a === 'string' && a.trim());
-    // Commandes de la partie : celles de la borne (boutons, tilt) ; une borne sans modèle a les touches par défaut.
-    const cabinet = s.type === 'GameHelp' ? loadCabinet(host.dataDir) : undefined;
+    const help = s.type === 'GameHelp' ? helpPages(table) : undefined;
+    const pages = help ? [] : pagesOf(table, s.type);
     return {
       type: s.type,
       index: s.index,
-      count: Math.max(1, pages.length),
+      count: help ? help.length : Math.max(1, pages.length),
       page: pages[s.index],
-      fallback: pages.length ? undefined : s.type === 'GameInfo' ? ('info-sheet' as const) : ('game-controls' as const),
+      help: help?.[Math.min(s.index, help.length - 1)],
+      fallback: help || pages.length ? undefined : ('info-sheet' as const),
       card: {
         title: table.title,
         manufacturer: table.manufacturer,
@@ -2121,7 +2157,6 @@ export function createLibrary(host: LibraryHost) {
         description: typeof table.info.Info?.Description === 'string' ? table.info.Info.Description : undefined,
         version: table.version,
       },
-      keys: s.type === 'GameHelp' ? gameKeys(cabinet?.buttons, cabinet?.tilt) : undefined,
     };
   }
 

@@ -257,7 +257,6 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 - **Startup intro**: the playfield, backglass, topper, DMD and FullDMD play Cyber Pinball's animation together, then "Press a button to choose a table"; on the playfield, the threads of light then keep turning slowly in drifting dust, so the screen never freezes. Put your own image or video on each screen and your own background music, or turn it off; "Watch the intro" plays it again.
 - **Cinematic launch**: on Start, the game's logo pulls back like a ball on the plunger, flies up to the backglass, a glowing disc crosses the DMD, and a coil thumps when VPX takes over. VPX never waits for the show.
-- **Back from a game**: a summary card on the playfield, the logo, the length, and only what is known (the score and its place if it entered the high score table, the gap to the record, a badge earned); Start to play again, Exit for the wheel. A high score: the logo drops back from the backglass, NEW HIGH SCORE on the DMD, a ring, the knocker.
 - **Sounds of the machine**, all synthesised: a solenoid click when changing table, a coin on Start, the knocker when a high score falls, a chime for an invitation, a signal for a friend.
 - **Each game's music** on the wheel (60% by default); a table without music plays its playfield video's sound (40%). The music only starts if the table stays selected for 350 ms: scrolling plays nothing.
 - **"This game's volume"** from 0 to 200% for a table that is too loud or too quiet.
@@ -394,7 +393,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **"All tables"** (System menu > "Tables"): the full list, with manufacturer, year, version and number of games; Start opens the same page.
 - **"Game parts"**: one line per part (table, backglass, ROM, PuP-Pack, DMD colours, sounds, music, point of view, topper, media), "Present", "Received, to install", "Expected" or missing; each one can be added, replaced, reassigned or removed, and a missing part starts a search on every site.
 - **"Table files"**: the whole folder grouped by kind, with what VPX will do with each file ("loaded by VPX with this table", "wrongly named: VPX won't load it").
-- **"Flyer and rules"**: a single booklet, page by page, turned for the player.
+- **"Flyer and rules"**: a single booklet, page by page, turned for the player. The rules are found automatically: the card and text stored in the table, a public rulesheet (The Pinball Primer, Pinball Rule Sheets), a tutorial video to watch on the phone; the game controls always come last.
 - **"Diagnose and fix"**: the table doctor (see [A cabinet that looks after itself](#a-cabinet-that-looks-after-itself)).
 
 <p align="center"><img src="images/en/game-page.webp?v=288bd5f7e2" width="360" alt="The game page of Neon Abyss: play statistics, files, and the actions Play, Flyer, Rules, Edit info, Game media, Settings for this table, Diagnose and fix, Remove table."></p>
@@ -467,7 +466,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 | Game music | backglass speakers | the cabinet's music, otherwise silence |
 | Launch sound | once, on Start | the loading video's sound |
 | Flyer | on request, page by page | a page drawn from the game's details |
-| Rules | on request, page by page | the game's controls |
+| Rules | on request, page by page | the rules found automatically, then the game's controls |
 
 - **Never an empty screen**: a missing media item is replaced by a fallback drawn in the table's colours.
 - **"Game media"**: one card per item with its preview, its state ("Present", "Fallback: …"), its dimensions and weight. Take from the import folder, pick on the PC, drag in, replace, move to the bin; nothing is written before "Save", which shows the plan first.

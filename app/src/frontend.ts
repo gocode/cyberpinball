@@ -105,11 +105,6 @@ import {
   saveMenuMediaSettings,
   tableMediaVolume,
   newRecords,
-  dmdScore,
-  GameReturn,
-  gameReturnCard,
-  type GameReturnCard,
-  type GameReturnView,
   uiSoundCue,
   LaunchCinema,
   type CinemaView,
@@ -550,17 +545,6 @@ let launchCount = 0;
  * (viewFor, cinemaFor). Rien ici ne l'attend : VPX part quand il partait, le relais vient du lanceur.
  */
 const cinema = new LaunchCinema();
-/**
- * Retour d'une partie solo (gamereturn.ts) : la carte de bilan sur le plateau, Start pour rejouer,
- * Exit pour la roue ; pour un record, la chute du logo depuis le fronton et NEW HIGH SCORE sur le DMD.
- */
-const gameReturn = new GameReturn();
-/** Prochaine échéance du retour (knocker à l'impact, carte qui s'efface seule, fin du fondu). */
-let gameReturnTimer: NodeJS.Timeout | undefined;
-/** Heure du knocker d'un record : à l'impact du logo dans la carte, pas avant. */
-let knockerAt: number | undefined;
-/** Animation « record » du DMD pendant la carte d'un record. */
-let recordDmd: LiveDmdAnimationHandle | undefined;
 
 /**
  * Ouverture au démarrage (intro.ts) : chaque écran joue son animation, puis garde sa dernière
@@ -1798,10 +1782,8 @@ export function startFrontend(): void {
     if (attract.activity() || noticed) return void leaveAttract();
     // Un clic pendant l'ouverture affiche la roue, comme un bouton.
     if (state.phase === 'intro') return void leaveIntro();
-    // La carte du retour : un clic ailleurs que sur ses choix la ferme d'abord (ses choix passent par handleKey).
-    if (action.type !== 'key' && gameReturn.open) leaveGameReturn();
     // Clic sur « Start : jouer » de la roue : un clic n'a pas de durée, il joue tout de suite.
-    if (action.type === 'key' && state.phase === 'menu' && !state.help && !gameReturn.open && wheelPlays() && KEYS.confirm.includes(action.code) && tables[state.index]) wheelConfirm(tables[state.index]!, false), broadcast();
+    if (action.type === 'key' && state.phase === 'menu' && !state.help && wheelPlays() && KEYS.confirm.includes(action.code) && tables[state.index]) wheelConfirm(tables[state.index]!, false), broadcast();
     else if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
     // Roue dentée (ou cadenas, en mode invité).
     else if (action.type === 'config') guest.knock('menu.system') && openConfig();
@@ -2007,10 +1989,7 @@ export function startFrontend(): void {
   }
   if (stress && install) void runStress(stress, process.env.CYBERPINBALL_TABLE);
   const autopilot = process.env.CYBERPINBALL_AUTOPILOT;
-  // Phase vue de l'autopilote : la carte du retour d'une partie ignore les boutons pendant sa garde
-  // (GAME_RETURN_GUARD_MS) ; « until:menu » attend qu'ils comptent, pour qu'aucune étape ne s'y perde.
-  const autopilotPhase = () => (state.phase === 'menu' && gameReturn.open && !gameReturn.listening() ? 'menu-guard' : state.phase);
-  if (autopilot && !stress) void library.autopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE, (input) => (input.type === 'keyUp' ? handleKeyUp(input) : handleKey(input)), autopilotPhase);
+  if (autopilot && !stress) void library.autopilot(autopilot.split(','), process.env.CYBERPINBALL_CAPTURE, (input) => (input.type === 'keyUp' ? handleKeyUp(input) : handleKey(input)), () => state.phase);
 }
 
 /** Les tables du disque, dans l'ordre choisi pour le menu. */
@@ -2282,9 +2261,6 @@ function handleKey(input: Input, fromPhone = false): boolean {
     }
   }
 
-  // La carte du retour d'une partie : Start rejoue, Exit rend la roue, un autre bouton la ferme (puis agit).
-  if (gameReturnKey(input, is)) return true;
-
   // Tab : menu et configuration, quels que soient les boutons relevés (dans le menu, Tab s'y déplace).
   if (input.code === CONFIG_KEY && ['menu', 'message', 'confirmQuit'].includes(state.phase)) return guest.knock('menu.system') ? openConfig() : true;
 
@@ -2296,8 +2272,6 @@ function handleKey(input: Input, fromPhone = false): boolean {
       }
       return true;
     case 'playing':
-      // Arrêter une partie bloquée, reçu par une fenêtre du menu (partie simulée : le raccourci global n'est pas pris).
-      if (state.phase === 'playing' && matchesShortcut(input, SHORTCUTS.forceStop)) forceStop?.();
       return true;
     case 'library':
       return library.handleKey(input);
@@ -2499,8 +2473,6 @@ const LIVE_CLOSE_AFTER_MS = 4000;
 const LIVE_BOARD_SETTLE_MS = 3000;
 /** Heure où la table de la partie en cours est arrivée à l'écran (Date.now()). */
 let playingSince = 0;
-/** Arrêter la partie en cours comme le raccourci « Arrêter une partie bloquée » (posé par play()). */
-let forceStop: (() => void) | undefined;
 /** Partie entre amis sur une table sans relevé : Start n'y est pas bloqué, le joueur l'appuie au « Partez ! ». */
 let liveManual = false;
 /** Hors écran : la partie simulée joue une table sans relevé (CYBERPINBALL_PARTIE_SIMULEE_SANS_RELEVE, démonstration « sans-releve »). */
@@ -2572,8 +2544,6 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Partie entre amis : la règle du pare-feu de VPX relue pendant le chargement, pour l'inspector de VPX (vpx-inspector.ts).
   const inspectorReady = hooks.double && !displayMode && simulated === undefined ? inspectorFor(socialFirewall, (line) => console.log(line)) : Promise.resolve(undefined);
   guest.releaseAll();
-  // Rejouer depuis la carte du retour précédent : elle part, son knocker aussi.
-  closeGameReturn();
   state = { ...state, phase: 'loading', help: false };
   startLaunch();
   launchCount++;
@@ -2733,16 +2703,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Départ commun : la carte de l'attente se charge, cachée, pendant que VPX charge la table ; elle
   // paraît dès la première vue, même quand l'attente ne dure qu'un instant (borne lente à créer ses fenêtres).
   if (hooks.gate) gameNotices.prepareWait(liveGames.waitView({ manual: liveManual }));
-  // Arrêter une partie bloquée (Ctrl+Maj+K) : pas une partie finie, le retour n'en fait pas le bilan.
-  let forced = false;
-  forceStop = () => {
-    if (!guest.knock('game.force-stop')) return;
-    forced = true;
-    console.log(`Partie (${table.id}) : arrêtée par le raccourci « Arrêter une partie bloquée ».`); // i18n-ignore : journal
-    game.stop();
-  };
-  // Une partie simulée ne prend aucun raccourci global au poste (les fenêtres du menu le reçoivent : handleKey).
-  if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => forceStop?.());
+  // Une partie simulée ne prend aucun raccourci global au poste.
+  if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
   // Partie entre amis : l'état de jeu que le relevé du double écrit (livestate.ts), deux fois par seconde ;
   // score et bille partent aux autres ; la partie finie (initiales saisies), VPX se ferme seul.
   let live: { score?: number; multi?: boolean } | undefined;
@@ -2803,7 +2765,6 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   double?.finish();
   recording?.gameEnded();
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
-  forceStop = undefined;
   cinema.stop();
   stopWatchOccupied();
   socialNet.setPresence({ status: 'menu', since: new Date().toISOString() });
@@ -2835,8 +2796,6 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (mode === 'display') return { result, focusReturned, entered: [] };
   // Un score entré au tableau d'honneur pendant la partie : le knocker sonne au retour au menu.
   const entered = result.ok ? newRecords(recordsBefore, recordsAfter) : [];
-  /** Badges que cette partie a valus (pour la carte du retour). */
-  const earned: string[] = [];
   for (const s of entered) console.log(`Record (${table.id}) : ${s.score}${s.initials ? ` (${s.initials})` : ''}, place ${s.rank}.`);
   if (result.ok) {
     // Les parties du test automatique ne comptent pas dans les statistiques.
@@ -2851,7 +2810,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
         // Pas pour une partie entre amis : son tableau est celui du groupe, posé dans le double, pas celui de la table.
         if (!double) for (const s of [...entered].sort((a, b) => a.rank - b.rank)) socialNet.publish({ kind: 'record', table: seen, score: s.score, rank: s.rank, ...(s.initials ? { initials: s.initials } : {}) });
         if (result.seconds >= 60) socialNet.publish({ kind: 'played', table: seen, seconds: Math.round(result.seconds) });
-        for (const e of socialNet.checkBadges(playStats(tables))) if (e.kind === 'badge' && e.badge) earned.push(e.badge);
+        socialNet.checkBadges(playStats(tables));
       } catch (error) {
         console.log(`Partie (${table.id}) : nouvelles pour les amis et badges pas mis à jour (${(error as Error).message}) ; la partie compte quand même.`); // i18n-ignore : journal
       }
@@ -2866,24 +2825,16 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   }
   // Configuration de la borne changée juste avant la partie : VPX avait déjà les bons
   // écrans, le menu les reprend en redémarrant.
-  const relaunching = Boolean(selection?.previous && result.ok);
-  if (relaunching) relaunchMenu();
+  if (selection?.previous && result.ok) relaunchMenu();
+  broadcast();
+  // Le knocker : un score entré au tableau ; entre amis, seulement le record du groupe battu (la première place).
+  if (double ? entered.some((s) => s.rank === 1 && (hooks.board?.length ?? 0) > 0) : entered.length) playUiSound('knocker');
   // Une invitation reçue pendant la partie, encore valable : elle s'ouvre au retour au menu.
   const invite = state.phase === 'menu' && !liveGames.current() ? liveGames.invites()[0] : undefined;
+  if (invite) friendsMenu.live.openInvite(invite.id, () => library.leave());
   // La partie entre amis s'est finie pendant celle d'une autre table (on avait fini avant les
   // autres) : ses résultats, pas encore vus, s'ouvrent au retour ; la notification l'a annoncé.
-  const results = !invite && !hooks.double && state.phase === 'menu' && friendsMenu.live.unseenResults();
-  // Le bilan d'une partie solo finie (gamereturn.ts) : sur la roue seulement, quand rien d'autre ne
-  // s'ouvre au retour (message, enregistrement, invitation, résultats) ; jamais pour un arrêt forcé ou un échec.
-  const card = !double && !relaunching && !recorded && !invite && !results && state.phase === 'menu' ? gameReturnCard({ ok: result.ok, forced, seconds: result.seconds, entered, before: recordsBefore, after: recordsAfter, badges: earned }) : undefined;
-  if (card) showGameReturn(table, card);
-  else if (result.ok && !double) console.log(`Retour (${table.id}) : pas de bilan (${forced ? 'arrêt forcé' : relaunching ? 'menu relancé' : recorded ? 'enregistrement à voir' : invite ? 'invitation' : results ? 'résultats entre amis' : state.phase !== 'menu' ? 'message' : 'partie trop courte'}).`); // i18n-ignore : journal
-  broadcast();
-  // Le knocker : un score entré au tableau ; entre amis, seulement le record du groupe battu (la
-  // première place). Avec la carte d'un record, il sonne à l'impact du logo (pumpGameReturn).
-  if (!card?.celebrate && (double ? entered.some((s) => s.rank === 1 && (hooks.board?.length ?? 0) > 0) : entered.length)) playUiSound('knocker');
-  if (invite) friendsMenu.live.openInvite(invite.id, () => library.leave());
-  else if (results) friendsMenu.live.open(() => library.leave());
+  else if (!hooks.double && state.phase === 'menu' && friendsMenu.live.unseenResults()) friendsMenu.live.open(() => library.leave());
   return { result, focusReturned, entered, ...(live ? { live } : {}) };
 }
 
@@ -3469,8 +3420,6 @@ function viewFor(role: RoleId) {
     intro: state.phase === 'intro' ? introFor(role) : undefined,
     // Lancement en cinéma : la part de cette fenêtre (le plateau d'où part le logo, le fronton où il se pose).
     cinema: state.phase === 'loading' ? cinemaFor(role) : undefined,
-    // Retour d'une partie solo : la carte du bilan sur le plateau, la chute du logo sur le fronton (record).
-    bilan: state.phase === 'menu' && !state.help && !shown ? gameReturnFor(role) : undefined,
     // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
     loading: state.phase === 'loading' && role === 'playfield' && medias && table ? medias.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
     // Chargement qui tarde (loadingprogress.ts) : l'étape vue, l'heure du Start (le rendu compte les secondes), comment arrêter.
@@ -3580,89 +3529,6 @@ function menuCorner(): { zone?: 'corner' | 'head'; friendsOnline?: { count: numb
 function cinemaFor(role: RoleId): CinemaView | undefined {
   const roles = windowRoles.get(role) ?? [role];
   return cinema.view({ depart: role === 'playfield', arrivee: roles.includes('backglass') });
-}
-
-/** Part d'une fenêtre dans le retour d'une partie : la carte sur le plateau ; pour un record, la chute du logo sur le fronton. */
-function gameReturnFor(role: RoleId): GameReturnView | undefined {
-  const roles = windowRoles.get(role) ?? [role];
-  return gameReturn.view({ plateau: role === 'playfield', fronton: roles.includes('backglass') });
-}
-
-/** Retour d'une partie solo finie : la carte de bilan paraît, son knocker attend l'impact du logo. */
-function showGameReturn(table: TableEntry, card: GameReturnCard): void {
-  gameReturn.show(table.file, { title: table.title, manufacturer: table.manufacturer, year: table.year, logo: medias?.wheel(table) }, card);
-  knockerAt = gameReturn.impactAt;
-  const record = card.record;
-  console.log(`Retour (${table.id}) : bilan, ${card.duration}${record ? `, ${record.heading} ${record.value} (place ${record.rank})${record.gap ? `, ${record.gap}` : ''}` : ', sans score connu'}${card.badges.length ? `, ${card.badges.map((b) => b.label).join(', ')}` : ''}.`); // i18n-ignore : journal
-  pumpGameReturn();
-}
-
-/**
- * Échéances du retour, relues à chacune : le knocker à l'impact, la carte qui s'efface seule
- * (GAME_RETURN_MS), son fondu fini. Un seul minuteur à la fois ; rien ici n'est attendu.
- */
-function pumpGameReturn(): void {
-  clearTimeout(gameReturnTimer);
-  gameReturnTimer = undefined;
-  const now = Date.now();
-  if (knockerAt !== undefined && now >= knockerAt) {
-    knockerAt = undefined;
-    playUiSound('knocker');
-  }
-  if (gameReturn.expired()) leaveGameReturn();
-  if (gameReturn.faded()) {
-    gameReturn.clear();
-    broadcast();
-  }
-  const next = [knockerAt, gameReturn.endsAt, gameReturn.fadedAt].filter((t): t is number => t !== undefined);
-  if (next.length) gameReturnTimer = setTimeout(pumpGameReturn, Math.max(0, Math.min(...next) - now));
-}
-
-/** La carte s'en va, en fondu (Exit, un autre bouton, son temps écoulé) ; le knocker d'un record pas encore sonné sonne maintenant. */
-function leaveGameReturn(): boolean {
-  if (!gameReturn.dismiss()) return false;
-  if (knockerAt !== undefined) {
-    knockerAt = undefined;
-    playUiSound('knocker');
-  }
-  broadcast();
-  pumpGameReturn();
-  return true;
-}
-
-/** Plus de carte du tout, sans fondu ni knocker (partie relancée, autre écran). */
-function closeGameReturn(): void {
-  knockerAt = undefined;
-  clearTimeout(gameReturnTimer);
-  gameReturnTimer = undefined;
-  gameReturn.clear();
-}
-
-/** Start sur la carte : la même table, aussitôt (comme « Jouer » de sa fiche). */
-function replayFromReturn(): boolean {
-  const again = tables.find((x) => x.file === gameReturn.table);
-  if (!again) return leaveGameReturn();
-  if (!guest.knock('return.replay')) return true;
-  closeGameReturn();
-  console.log(`Retour (${again.id}) : Start, la table est relancée.`); // i18n-ignore : journal
-  state = { ...state, index: Math.max(0, tables.indexOf(again)) };
-  // Sans opérateur, la partie s'arrête seule après 10 s, ou CYBERPINBALL_PARTIE_MS, comme depuis la fiche.
-  void play(again, process.env.CYBERPINBALL_AUTOPILOT ? Number(process.env.CYBERPINBALL_PARTIE_MS) || 10_000 : undefined);
-  return true;
-}
-
-/**
- * Un bouton pendant la carte du retour : rien pendant la garde (le bouton qui a fermé VPX, encore
- * tenu, un flipper de la dernière bille), ni pour une répétition ; Start rejoue, Exit rend la roue ;
- * tout autre bouton la ferme et fait ce qu'il fait d'habitude. Vrai : le bouton est pris.
- */
-function gameReturnKey(input: Input, is: (group: string[]) => boolean): boolean {
-  if (!gameReturn.open || state.phase !== 'menu' || state.help) return false;
-  if (input.isAutoRepeat || !gameReturn.listening()) return true;
-  if (is(KEYS.confirm)) return replayFromReturn();
-  if (is(KEYS.exit)) return leaveGameReturn(), true;
-  leaveGameReturn();
-  return false;
 }
 
 /** Table voisine dans le menu des tables (boutons, roue cliquée) : le solénoïde claque à chaque table. */
@@ -3847,13 +3713,6 @@ function syncLiveDmd(): void {
     loadingDmd?.stop();
     loadingDmd = undefined;
   }
-  // Retour d'une partie, un score entré au tableau : NEW HIGH SCORE tant que la carte est là ; puis l'alternance, ses records à jour.
-  const record = state.phase === 'menu' && gameReturn.celebrating ? gameReturn.record : undefined;
-  if (record) recordDmd ??= liveDmd.play('record', { label: dmdScore(record.value), head: record.dmd });
-  else {
-    recordDmd?.stop();
-    recordDmd = undefined;
-  }
   const table = screensSubject();
   if (!table) liveDmd.show('', undefined);
   else {
@@ -3887,9 +3746,6 @@ function followTint(): void {
 }
 
 function broadcast(): void {
-  // La carte du retour ne vit que sur la roue : un autre écran (fiche, message, menu système), le
-  // mode attente ou le bureau Windows la retirent.
-  if (gameReturn.table !== undefined && (state.phase !== 'menu' || desktop.active || attract.active)) closeGameReturn();
   followTint();
   syncLiveDmd();
   // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).

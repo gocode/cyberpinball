@@ -488,17 +488,93 @@ function renderHealth(h, cursor) {
 
 function renderPages(p) {
   const stage = libEl('div', 'pages-stage');
-  if (p.page) {
-    const node = mediaNode(p.page.kind, p.page.url);
-    if (p.page.kind === 'video') {
-      node.loop = true;
-      node.autoplay = true;
-      if (node.paused) node.play().catch(() => {});
-    }
-    stage.append(node);
-  } else if (p.fallback === 'game-controls') stage.append(renderGameKeys(p.keys ?? []));
+  if (p.help) stage.append(...renderHelp(p.help));
+  else if (p.page) stage.append(pageMedia(p.page));
   else stage.append(renderInfoSheet(p.card));
   return stage;
+}
+
+function pageMedia(page) {
+  const node = mediaNode(page.kind, page.url);
+  if (page.kind === 'video') {
+    node.loop = true;
+    node.autoplay = true;
+    if (node.paused) node.play().catch(() => {});
+  }
+  return node;
+}
+
+/** Une page des règles (table-rules.ts) : carte, texte, vidéo, ou les commandes en dernier. */
+function renderHelp(h) {
+  if (h.kind === 'media') return [pageMedia(h.page), libEl('p', 'help-caption', h.source)];
+  if (h.kind === 'text') return [renderRuleText(h)];
+  if (h.kind === 'video') return [renderRuleVideo(h)];
+  return [renderGameKeys(h.keys ?? [], h.sources ?? [])];
+}
+
+/** Source d'une page : le site ou la table, l'adresse, la langue du texte. */
+function helpSource(h) {
+  const foot = libEl('p', 'help-source');
+  foot.append(libEl('span', 'help-source-name', h.source));
+  if (h.english) foot.append(libEl('span', 'help-source-lang', t('en anglais')));
+  if (h.url) foot.append(libEl('span', 'help-source-url', h.url.replace(/^https?:\/\//, '')));
+  return foot;
+}
+
+/** Page d'une feuille de règles : ses parties, la taille du texte réduite jusqu'à ce qu'elles tiennent. */
+function renderRuleText(h) {
+  const box = libEl('article', 'rule-text');
+  const head = libEl('header', 'rule-head');
+  head.append(libEl('h2', '', h.title));
+  if (h.parts > 1) head.append(libEl('span', 'rule-part', t('{part} sur {parts}', { part: h.part, parts: h.parts })));
+  const body = libEl('div', 'rule-body');
+  for (const block of h.blocks) {
+    if (block.heading) body.append(libEl(block.level > 2 ? 'h4' : 'h3', '', block.more ? t('{heading} (suite)', { heading: block.heading }) : block.heading));
+    for (const line of block.lines) {
+      const bullet = line.startsWith('• ');
+      body.append(libEl('p', bullet ? 'rule-bullet' : '', bullet ? line.slice(2) : line));
+    }
+  }
+  box.append(head, body, helpSource(h));
+  requestAnimationFrame(() => fitRuleText(body));
+  return box;
+}
+
+/** Réduit le texte tant qu'il déborde, sans passer sous 20 px à 1080 (1,86vmin). */
+function fitRuleText(body) {
+  if (!body.isConnected) return;
+  const floor = (Math.min(innerWidth, innerHeight) * 1.86) / 100;
+  // En colonnes (écran en largeur), le surplus part à droite ; sinon, en bas.
+  const over = () => body.scrollHeight > body.clientHeight + 1 || body.scrollWidth > body.clientWidth + 1;
+  let size = parseFloat(getComputedStyle(body).fontSize);
+  while (over() && size > floor) {
+    size = Math.max(floor, size * 0.94);
+    body.style.fontSize = `${size}px`;
+  }
+  body.classList.toggle('overflows', over());
+}
+
+/** Vidéo d'explication : sa vignette, son titre, et le QR code pour la regarder sur le téléphone. */
+function renderRuleVideo(h) {
+  const box = libEl('div', 'rule-video');
+  const shot = libEl('div', 'rule-video-shot');
+  if (h.thumb) {
+    const img = libEl('img', '');
+    img.src = h.thumb;
+    img.alt = '';
+    shot.append(img);
+  }
+  shot.append(cyberIcon('play', 'rule-video-play'));
+  const side = libEl('div', 'rule-video-side');
+  side.append(libEl('h2', '', t('Vidéo d’explication')));
+  if (h.title) side.append(libEl('p', 'rule-video-title', h.title));
+  if (h.authors) side.append(libEl('p', 'rule-video-by', t('par {authors}', { authors: h.authors })));
+  const qr = remoteQr(h.qr);
+  qr.className = 'rule-video-qr';
+  qr.setAttribute('aria-label', t('QR code de la vidéo'));
+  side.append(qr, libEl('p', 'rule-video-hint', t('Visez ce code avec votre téléphone pour regarder la vidéo.')));
+  box.append(shot, side, helpSource(h));
+  return box;
 }
 
 // Carte de fronton du prospectus généré (fallback.js), gardée d'un affichage à l'autre.
@@ -530,8 +606,8 @@ function renderInfoSheet(card) {
   return sheet;
 }
 
-/** Règles absentes : les commandes de la partie, comme au chargement. */
-function renderGameKeys(rows) {
+/** Dernière page des règles : les commandes de la partie, puis ce que chaque source de règles a donné. */
+function renderGameKeys(rows, sources) {
   const box = libEl('div', 'game-keys pages-keys');
   box.append(libEl('h2', '', t('Commandes de la partie')));
   const list = libEl('div', 'game-keys-list');
@@ -540,7 +616,20 @@ function renderGameKeys(rows) {
     row.append(libEl('span', '', label), libEl('span', 'game-key-name', key));
     list.append(row);
   }
-  box.append(list, libEl('p', 'pages-note', t('Pas de carte de règles pour ce jeu : « Gérer la table… » puis « Médias du jeu », sur la fiche, permet d’en ajouter.')));
+  box.append(list);
+  if (sources.length) {
+    const found = libEl('div', 'rule-sources');
+    found.append(libEl('h3', '', t('Règles de ce jeu')));
+    for (const src of sources) {
+      const row = libEl('div', `rule-source state-${src.state}`);
+      row.append(libEl('span', 'rule-source-label', src.label), libEl('span', 'rule-source-detail', src.detail));
+      found.append(row);
+    }
+    box.append(found);
+  }
+  if (!sources.some((src) => src.state === 'found' || src.state === 'searching')) {
+    box.append(libEl('p', 'pages-note', t('Pas de carte de règles pour ce jeu : « Gérer la table… » puis « Médias du jeu », sur la fiche, permet d’en ajouter.')));
+  }
   return box;
 }
 

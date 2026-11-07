@@ -103,6 +103,20 @@ test('le jeu d’une table : son .info, sinon ses médias, sinon ce qu’elle di
   assert.equal(tableGame(vps, table('X', 'X.vpx', { Info: { Title: 'X', VPSId: ADVENTURE.id } })).game?.id, ADVENTURE.id);
 });
 
+test('pistes à égalité : celle du fabricant et de l’année que la table donne', () => {
+  const T2: VpsGame = { id: 't2', name: 'Terminator 2 - Judgment Day', manufacturer: 'Williams', year: 1991, romFiles: [{ version: 't2_l8' }] };
+  const JP: VpsGame = { id: 'jpt2', name: "JP's Terminator 2", manufacturer: 'Original', year: 2020, romFiles: [{ version: 't2_l8' }] };
+  const db = createVpsDb([T2, JP]);
+  const t2 = (manufacturer?: string, year?: number) =>
+    ({ ...table('Terminator 2', 'Terminator 2.vpx'), manufacturer, year }) as unknown as TableEntry;
+  // Comme sur la borne : la recherche donne les deux à égalité.
+  const evidence = { vpxInfo: { name: "JP's Terminator 2" } };
+  assert.equal(tableGame(db, t2(), evidence).game, undefined, 'sans fabricant : à choisir');
+  assert.equal(tableGame(db, t2('Williams', 1991), evidence).game?.id, T2.id);
+  assert.equal(tableGame(db, t2('Williams', 1999), evidence).game, undefined, 'année contraire : à choisir');
+  assert.equal(tableGame(db, t2('VPW', 2021), evidence).game, undefined, 'fabricant inconnu des pistes : à choisir');
+});
+
 test('résultats des sites : la partie d’après la catégorie ou le titre, le jeu d’après le titre', () => {
   const hit = (title: string, extra: Partial<SiteHit> = {}): SiteHit => ({ site: 'vpuniverse', id: title, url: `https://vpuniverse.com/files/file/${title.length}-x/`, title, ...extra });
   assert.equal(hitPart(hit('Goonies', { category: { id: '120', label: 'PuP-Packs' } })), 'pup');

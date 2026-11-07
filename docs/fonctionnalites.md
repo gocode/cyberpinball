@@ -258,7 +258,6 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 - **Ouverture au démarrage** : le plateau, le fronton, le topper, le DMD et le FullDMD jouent ensemble l'animation de Cyber Pinball, puis « Appuyez sur un bouton pour choisir une table » ; sur le plateau, les fils de lumière continuent ensuite de tourner lentement dans une poussière qui dérive, sans jamais figer l'écran. Mettez votre image ou votre vidéo sur chaque écran et votre musique de fond, ou coupez-la ; « Voir l'ouverture » la rejoue.
 - **Lancement en cinéma** : au Start, le logo du jeu recule comme une bille au lanceur, s'envole vers le fronton, un disque lumineux traverse le DMD, et un coup de bobine sonne quand VPX prend la main. VPX n'attend jamais l'animation.
-- **Retour d'une partie** : une carte de bilan sur le plateau, le logo, la durée, et seulement ce qui est connu (le score et sa place s'il est entré au tableau d'honneur, l'écart au record, un badge gagné) ; Start pour rejouer, Exit pour la roue. Un record : le logo redescend du fronton, NEW HIGH SCORE sur le DMD, une onde, le knocker.
 - **Sons de la machine**, tous de synthèse : clic de solénoïde au changement de table, pièce au Start, knocker quand un record tombe, carillon d'une invitation, signal d'un ami.
 - **La musique de chaque jeu** sur la roue (60 % par défaut) ; une table sans musique fait entendre sa vidéo du plateau (40 %). La musique ne démarre que si la table reste choisie 350 ms : faire défiler ne joue rien.
 - **« Volume de ce jeu »** de 0 à 200 % pour une table trop forte ou trop faible.
@@ -395,7 +394,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **« Toutes les tables »** (Menu système > « Tables ») : la liste complète, avec fabricant, année, version et nombre de parties ; Start ouvre la même fiche.
 - **« Parties du jeu »** : une ligne par partie (table, fronton, ROM, PuP-Pack, couleurs du DMD, sons, musique, point de vue, topper, médias), « Présent », « Reçu, à installer », « Attendu » ou absent ; chacune s'ajoute, se remplace, se réaffecte ou se retire, et une partie absente lance la recherche sur tous les sites.
 - **« Fichiers de la table »** : tout le dossier groupé par sorte, avec ce que VPX en fera (« chargé par VPX avec cette table », « mal nommé : VPX ne le chargera pas »).
-- **« Prospectus et règles »** : un seul livret, page par page, tourné pour le joueur.
+- **« Prospectus et règles »** : un seul livret, page par page, tourné pour le joueur. Les règles se trouvent seules : la carte et le texte rangés dans la table, une feuille de règles publique (The Pinball Primer, Pinball Rule Sheets), une vidéo d'explication à regarder sur le téléphone ; les commandes de la partie viennent toujours en dernier.
 - **« Diagnostiquer et réparer »** : le médecin de la table (voir [Une borne qui s'entretient](#une-borne-qui-sentretient)).
 
 <p align="center"><img src="images/fr/game-page.webp?v=c9bc2367a6" width="360" alt="La fiche de Neon Abyss : statistiques de jeu, fichiers, et les actions Jouer, Prospectus, Règles, Modifier les informations, Médias du jeu, Réglages de cette table, Diagnostiquer et réparer, Retirer la table."></p>
@@ -468,7 +467,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 | Musique du jeu | haut-parleurs du fronton | la musique de la borne, sinon le silence |
 | Son de lancement | une fois au Start | le son de la vidéo de chargement |
 | Prospectus | sur demande, page par page | une fiche tirée des informations du jeu |
-| Règles | sur demande, page par page | les commandes de la partie |
+| Règles | sur demande, page par page | les règles trouvées seules, puis les commandes de la partie |
 
 - **Jamais un écran vide** : un média manquant est remplacé par un repli dessiné aux couleurs de la table.
 - **« Médias du jeu »** : une carte par média avec son aperçu, son état (« Présent », « Repli : … »), ses dimensions et son poids. Prendre dans le dossier d'import, choisir sur le PC, glisser, remplacer, mettre à la corbeille ; rien n'est écrit avant « Enregistrer », qui montre le plan.

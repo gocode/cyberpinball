@@ -35,6 +35,7 @@ const SOURCES: Record<string, { count: number; how: string }> = {
   },
   'app/src/friend-content.ts': { count: 1, how: 'fichier d’un ami : fetchFile, appelé par le transport des amis de la file (download-sources.ts)' },
   'app/src/media-convert.ts': { count: 6, how: 'conversion dans le rendu (images, sons, avatar), protocole local /in et /out : rien ne vient du réseau' },
+  'app/src/table-rules.ts': { count: 1, how: 'vignette de la vidéo d’explication des règles (i.ytimg.com, quelques ko, gardée dans le cache des médias) : un aperçu, pas un téléchargement demandé' },
   'packages/core/src/backup.ts': { count: 1, how: 'copie de fichiers locaux vers une clé ou un disque (Sauvegardes), et retour : rien ne vient du réseau' },
   'packages/core/src/friendlibrary.ts': { count: 2, how: 'définition et lecture du message file-get' },
   'packages/core/src/mediapack.ts': { count: 1, how: 'extraction d’un paquet de médias local' },

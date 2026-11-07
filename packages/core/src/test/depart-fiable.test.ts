@@ -93,8 +93,7 @@ test('la carte part toujours : le service porte la fin de la vue, la carte se fe
   // Une fin de partie en erreur (EPERM sur social.json après la partie) ne perd plus le résultat.
   assert.match(live, /fin de partie en erreur .* mon retour part quand même/);
   const front = read('app', 'src', 'frontend.ts');
-  // Les badges gagnés sont relevés pour la carte du retour (gamereturn.ts), dans le même try.
-  assert.match(front, /for \(const e of socialNet\.checkBadges\(playStats\(tables\)\)\) if \(e\.kind === 'badge' && e\.badge\) earned\.push\(e\.badge\);\r?\n\s+\} catch \(error\) \{/);
+  assert.match(front, /socialNet\.checkBadges\(playStats\(tables\)\);\r?\n\s+\} catch \(error\) \{/);
 });
 
 // ---------------------------------------------------------------------------

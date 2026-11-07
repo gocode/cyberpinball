@@ -113,6 +113,12 @@ export function tableGame(vps: VpsDb, table: TableEntry, evidence: TableEvidence
   if (!top || top.score < 0.8) return { leads };
   if (mediaVpsIds(table.info).includes(top.game.id)) return { game: top.game, how: 'medias', leads };
   if (!second || second.siblingOf === top.game.id || top.score - second.score >= 0.1) return { game: top.game, how: 'search', leads };
+  // Pistes à égalité (« Terminator 2 » de Williams et « JP's Terminator 2 », même ROM) : la seule
+  // du fabricant et de l'année que la table donne d'elle-même (.info, nom du fichier).
+  const maker = vpsKey(table.manufacturer ?? '');
+  const close = leads.filter((l) => l.score >= 0.8 && top.score - l.score < 0.1);
+  const same = maker ? close.filter((l) => vpsKey(l.game.manufacturer ?? '') === maker && (!table.year || !l.game.year || Number(table.year) === l.game.year)) : [];
+  if (same.length === 1) return { game: same[0]!.game, how: 'search', leads };
   return { leads };
 }
 

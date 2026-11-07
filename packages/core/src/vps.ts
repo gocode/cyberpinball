@@ -57,6 +57,16 @@ export interface VpsLink {
   broken?: boolean;
 }
 
+/** Une explication du jeu : une adresse (`url`, ou `urls`), et l'identifiant de la vidéo quand elle est sur YouTube. */
+export interface VpsTutorial {
+  id?: string;
+  title?: string;
+  authors?: string[];
+  url?: string;
+  urls?: VpsLink[];
+  youtubeId?: string;
+}
+
 export interface VpsGame {
   id: string;
   name: string;
@@ -77,6 +87,10 @@ export interface VpsGame {
   soundFiles?: VpsTableFile[];
   topperFiles?: VpsTableFile[];
   povFiles?: VpsTableFile[];
+  /** Cartes et feuilles de règles (presque toujours des pages de VPUniverse). */
+  ruleFiles?: VpsTableFile[];
+  /** Explications du jeu : vidéos YouTube (youtubeId), pages de The Pinball Primer, vidéos de VPUniverse. */
+  tutorialFiles?: VpsTutorial[];
   /** Vignette du jeu. */
   imgUrl?: string;
   theme?: string[];

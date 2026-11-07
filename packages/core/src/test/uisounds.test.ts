@@ -284,8 +284,7 @@ test('knocker : records lus avant la partie et au retour, sonné seulement si un
   assert.match(play, /const recordsAfter = double \? double\.records\(\) : readTableRecords\(played\);\s+double\?\.finish\(\);/);
   assert.match(play, /const entered = result\.ok \? newRecords\(recordsBefore, recordsAfter\) : \[\];/);
   // Entre amis, seulement le record du groupe battu (la première place d'un tableau qui en avait une).
-  // Avec la carte d'un record (gamereturn.ts), le knocker attend la pose du logo (pumpGameReturn, gamereturn.test.ts).
-  assert.match(play, /if \(!card\?\.celebrate && \(double \? entered\.some\(\(s\) => s\.rank === 1 && \(hooks\.board\?\.length \?\? 0\) > 0\) : entered\.length\)\) playUiSound\('knocker'\);/);
+  assert.match(play, /if \(double \? entered\.some\(\(s\) => s\.rank === 1 && \(hooks\.board\?\.length \?\? 0\) > 0\) : entered\.length\) playUiSound\('knocker'\);/);
   // Lecture d'avant au lancement, avant la partie ; le knocker après le retour au menu (broadcast).
   assert.ok(play.indexOf('recordsBefore = readTableRecords') < play.indexOf('launchVpx('));
   assert.ok(play.lastIndexOf('broadcast();') < play.indexOf("playUiSound('knocker')"));

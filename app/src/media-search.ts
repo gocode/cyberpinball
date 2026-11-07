@@ -270,7 +270,7 @@ export function createMediaSearch(ctx: MediaSearchContext) {
     }
   }
 
-  return { index, vps: () => ctx.vps(), evidence, deep, screenshot, vpxImages, quality, stagePreviews, sizes, stage, staging, downloads };
+  return { index, vps: () => ctx.vps(), evidence, deep, screenshot, vpxImages, vpxInfo, quality, stagePreviews, sizes, stage, staging, downloads };
 }
 
 export type MediaSearch = ReturnType<typeof createMediaSearch>;

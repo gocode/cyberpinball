@@ -142,8 +142,7 @@ test('branchements : carillon à chaque invitation, carte pendant la partie, fer
   const start = main.indexOf('async function play(');
   const play = main.slice(start, start + main.slice(start).search(/\r?\n\}\r?\n/));
   assert.match(play, /const result = await game\.done;\r?\n\s+if \(watchLive\) clearInterval\(watchLive\);\r?\n\s+gameNotices\.close\(\);/);
-  // L'invitation est lue avant le bilan du retour (pas de carte quand elle s'ouvre), ouverte après le broadcast.
-  assert.match(play, /const invite = state\.phase === 'menu' && !liveGames\.current\(\) \? liveGames\.invites\(\)\[0\] : undefined;[\s\S]{0,2500}\n\s+if \(invite\) friendsMenu\.live\.openInvite\(invite\.id/);
+  assert.match(play, /const invite = state\.phase === 'menu' && !liveGames\.current\(\) \? liveGames\.invites\(\)\[0\] : undefined;\r?\n\s+if \(invite\) friendsMenu\.live\.openInvite\(invite\.id/);
   // La fenêtre : naît par createWindow, sans focus, traversée par les clics, hors des captures, au-dessus de VPX, montrée sans activation.
   const notice = read('app', 'src', 'game-notice.ts');
   assert.match(notice, /createWindow\(\{/);

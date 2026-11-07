@@ -1526,6 +1526,269 @@ body.mouse .media-card[data-act]:hover {
   margin-top: 2cqmin;
 }
 
+/* Ce que chaque source de règles a donné : trouvée en clair, cherchée en attente, absente grisée avec sa raison. */
+.rule-sources {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 0.6cqmin 3cqmin;
+  margin-top: 1.5cqmin;
+  padding-top: 2cqmin;
+  border-top: 0.2cqmin solid var(--line);
+  font-size: max(2.8cqmin, 1.86vmin);
+}
+
+.rule-sources h3 {
+  grid-column: 1 / -1;
+  margin: 0 0 0.6cqmin;
+  font-size: max(3cqmin, 1.86vmin);
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--meta);
+}
+
+.rule-source {
+  display: contents;
+}
+
+.rule-source-label {
+  font-weight: 600;
+}
+
+.rule-source-detail {
+  color: var(--ink);
+}
+
+.rule-source.state-found .rule-source-detail {
+  color: var(--accent);
+}
+
+.rule-source.state-searching span {
+  color: var(--quiet);
+}
+
+.rule-source:is(.state-none, .state-offline, .state-no-game, .state-no-catalog) span {
+  color: var(--quiet);
+  opacity: 0.75;
+}
+
+/* Source sous une carte de règles : un bandeau discret en bas de l'image. */
+.help-caption {
+  position: absolute;
+  inset: auto 0 0;
+  margin: 0;
+  padding: 1cqmin 3cqmin;
+  background: var(--scrim-strong);
+  text-align: center;
+  font-size: max(2.4cqmin, 1.86vmin);
+  color: var(--quiet);
+}
+
+/* Source sous une page de texte ou la vidéo : le site, la langue, l'adresse. */
+.help-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4cqmin 2.5cqmin;
+  margin: 0;
+  padding-top: 1.4cqmin;
+  border-top: 0.2cqmin solid var(--line);
+  font-size: max(2.3cqmin, 1.86vmin);
+  color: var(--quiet);
+}
+
+.help-source-name {
+  font-weight: 600;
+  color: var(--meta);
+}
+
+.help-source-lang {
+  padding: 0 1cqmin;
+  border: 0.2cqmin solid var(--line);
+  border-radius: 0.5cqmin;
+}
+
+.help-source-url {
+  overflow-wrap: anywhere;
+}
+
+/* Feuille de règles : titre, parties, source ; le texte se réduit pour tenir (fitRuleText). */
+.rule-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 2cqmin;
+  padding: 4cqmin 5cqmin 3cqmin;
+  background: var(--fond-ambiance);
+  background-color: var(--bg);
+}
+
+.rule-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 3cqmin;
+}
+
+.rule-head h2 {
+  margin: 0;
+  font-size: 4.4cqmin;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.rule-part {
+  flex: none;
+  font-size: max(2.6cqmin, 1.86vmin);
+  color: var(--quiet);
+}
+
+.rule-body {
+  min-height: 0;
+  overflow: hidden;
+  font-size: max(3.2cqmin, 1.86vmin);
+  line-height: 1.42;
+  column-width: 26em;
+  column-gap: 4cqmin;
+  column-fill: auto;
+  height: 100%;
+}
+
+.rule-body h3,
+.rule-body h4 {
+  margin: 0.9em 0 0.35em;
+  break-after: avoid;
+  font-size: 1.12em;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.rule-body h4 {
+  font-size: 1em;
+  color: var(--meta);
+}
+
+.rule-body > :first-child {
+  margin-top: 0;
+}
+
+.rule-body p {
+  margin: 0 0 0.55em;
+  color: var(--ink);
+}
+
+.rule-body p.rule-bullet {
+  position: relative;
+  padding-left: 1.1em;
+}
+
+.rule-body p.rule-bullet::before {
+  content: '';
+  position: absolute;
+  left: 0.2em;
+  top: 0.62em;
+  width: 0.36em;
+  height: 0.36em;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
+/* Toujours trop long au plus petit texte permis : le bas s'estompe plutôt que d'être coupé net. */
+.rule-body.overflows {
+  mask-image: linear-gradient(to bottom, #000 88%, transparent);
+}
+
+/* Vidéo d'explication : la vignette, et à côté (en dessous en portrait) le titre et le QR code. */
+.rule-video {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 3cqmin 4cqmin;
+  padding: 5cqmin;
+  background: var(--fond-ambiance);
+  background-color: var(--bg);
+}
+
+@container (orientation: portrait) {
+  .rule-video {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+}
+
+.rule-video-shot {
+  position: relative;
+  align-self: center;
+  aspect-ratio: 16 / 9;
+  border-radius: 0.6cqmin;
+  background: var(--surface-sunken, #000);
+  outline: 0.2cqmin solid var(--line);
+  outline-offset: -0.2cqmin;
+  overflow: hidden;
+}
+
+.rule-video-shot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.rule-video-play {
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 12cqmin;
+  height: 12cqmin;
+  translate: -50% -50%;
+  padding: 2.5cqmin;
+  border-radius: 50%;
+  background: var(--scrim-strong);
+  color: var(--accent);
+}
+
+.rule-video-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 1.4cqmin;
+  min-height: 0;
+}
+
+.rule-video-side h2 {
+  margin: 0;
+  font-size: 4cqmin;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.rule-video-title {
+  margin: 0;
+  font-size: max(3cqmin, 1.86vmin);
+  color: var(--ink);
+}
+
+.rule-video-by,
+.rule-video-hint {
+  margin: 0;
+  font-size: max(2.5cqmin, 1.86vmin);
+  color: var(--quiet);
+}
+
+.rule-video-qr {
+  width: min(30cqmin, 100%);
+  height: auto;
+  margin-top: 1cqmin;
+  border-radius: 0.6cqmin;
+  image-rendering: pixelated;
+}
+
+.rule-video .help-source {
+  grid-column: 1 / -1;
+}
+
 /* ---------- Ce qu'il manque pour jouer : progression et étapes (docs/design-system, EcranParcours) ---------- */
 
 /* Au bureau, les étapes prennent la place ; en borne (portrait), les gestes suivent la liste. */

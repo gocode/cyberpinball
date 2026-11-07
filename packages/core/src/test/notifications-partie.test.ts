@@ -389,7 +389,7 @@ test('branchements : la ligne par-dessus VPX hors de la bande, le menu système,
   assert.match(main, /action\.type === 'live-game'[\s\S]{0,200}friendsMenu\.live\.open\(/);
   const start = main.indexOf('async function play(');
   const play = main.slice(start, start + main.slice(start).search(/\r?\n\}\r?\n/));
-  assert.match(play, /const results = !invite && !hooks\.double && state\.phase === 'menu' && friendsMenu\.live\.unseenResults\(\);[\s\S]{0,2500}else if \(results\) friendsMenu\.live\.open\(/, 'résultats pas encore vus : ouverts au retour d’une autre table');
+  assert.match(play, /!hooks\.double && state\.phase === 'menu' && friendsMenu\.live\.unseenResults\(\)\) friendsMenu\.live\.open\(/, 'résultats pas encore vus : ouverts au retour d’une autre table');
   // Le rendu : la ligne dans la fenêtre de la partie, le coin dans le menu système.
   const notice = read('app', 'renderer', 'game-notice.js');
   assert.match(notice, /view\?\.mode === 'line'/);
