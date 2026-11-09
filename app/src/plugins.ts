@@ -5,7 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { discoverPlugins, language, PLUGIN_API, PLUGINS_DIR, type PluginManifest } from '@cyberpinball/core';
+import { discoverPlugins, ensurePluginsDir, language, PLUGIN_API, PLUGINS_DIR, type PluginManifest } from '@cyberpinball/core';
 
 export type PluginTone = 'ok' | 'warning' | 'info' | 'quiet';
 
@@ -77,8 +77,9 @@ function settingsFile(dataDir: string, id: string): string {
   return path.join(dataDir, `${PLUGINS_DIR}-reglages`, `${id}.json`);
 }
 
-/** Charge les extensions signées de <données>\plugins ; journal : une ligne par extension. */
+/** Crée <données>\plugins s'il manque, puis charge ses extensions signées ; journal : une ligne par extension. */
 export function loadPlugins(dataDir: string, log: (line: string) => void = (line) => console.log(line)): readonly LoadedPlugin[] {
+  ensurePluginsDir(dataDir);
   for (const check of discoverPlugins(dataDir)) {
     const folder = path.basename(check.dir);
     if (!check.ok) {

@@ -4,7 +4,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { checkPlugin, discoverPlugins, PLUGIN_FILE, pluginsDir, signPlugin } from '../plugins';
+import { checkPlugin, discoverPlugins, ensurePluginsDir, PLUGIN_FILE, pluginsDir, signPlugin } from '../plugins';
 
 function keys() {
   const { privateKey, publicKey } = generateKeyPairSync('ed25519');
@@ -86,4 +86,13 @@ test('extensions : identifiant ou fichier principal invalides refusés à la sig
   const { dir } = plugin();
   assert.throws(() => signPlugin(dir, { ...info(), id: '../x' }, k.priv));
   assert.throws(() => signPlugin(dir, { ...info(), main: 'absent.js' }, k.priv));
+});
+
+test('extensions : le dossier plugins est créé vide s’il manque, et un dossier existant est laissé tel quel', () => {
+  const data = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-ext-'));
+  ensurePluginsDir(data);
+  assert.deepEqual(fs.readdirSync(pluginsDir(data)), []);
+  fs.mkdirSync(path.join(pluginsDir(data), 'essai'));
+  ensurePluginsDir(data);
+  assert.deepEqual(fs.readdirSync(pluginsDir(data)), ['essai']);
 });

@@ -37,6 +37,15 @@ export function pluginsDir(dataDir: string): string {
   return path.join(dataDir, PLUGINS_DIR);
 }
 
+/** Crée <données>\plugins s'il manque (vide) : chaque installation a l'endroit où déposer une extension. */
+export function ensurePluginsDir(dataDir: string): void {
+  try {
+    fs.mkdirSync(pluginsDir(dataDir), { recursive: true });
+  } catch {
+    // dossier de données en lecture seule : rien à charger de toute façon
+  }
+}
+
 function sha256(file: string): string {
   return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 }

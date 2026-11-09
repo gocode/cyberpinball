@@ -511,8 +511,6 @@ interface State {
 }
 
 const loc = locations();
-// Extensions signées du dossier plugins des données (plugins.ts) : chargées une fois, avant les écrans qui les appellent.
-loadPlugins(loc.dataDir);
 const { profile } = vpxProfile(loc);
 let tables: TableEntry[] = [];
 // Ordre mélangé : tiré au démarrage, gardé jusqu'au prochain (tableorder.ts).
@@ -1873,6 +1871,8 @@ function resetButtonsFromMenu(): void {
 }
 
 export function startFrontend(): void {
+  // Extensions signées du dossier plugins des données (plugins.ts) : chargées une fois, journal déjà ouvert, avant les écrans qui les appellent.
+  loadPlugins(loc.dataDir);
   // Cyber Pinball relancé alors que le menu est ouvert : le menu revient (mode bureau quitté,
   // premier plan) ; pendant une partie, VPX garde l'écran.
   handleSecondLaunch(() => {
