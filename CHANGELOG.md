@@ -26,12 +26,14 @@ son interface).
 - Menu système > Cyber Pinball > « Redémarrer Cyber Pinball » relance le logiciel seul, sans redémarrer le PC.
 - « Réalité virtuelle » porte un badge « BÊTA » dans le menu : la fonction est en plein essai.
 - Dans le casque : le plateau s'affiche en portrait, comme sur la borne ; les fenêtres du fronton, du DMD et du topper s'éteignent pendant une partie en VR ; un VPX qui se fige en quittant est fermé proprement.
-- Dans le casque, les écrans du menu restent à leur place dans la pièce d'une fois sur l'autre ; la touche 5 du pavé numérique la remet devant vous.
+- Dans le casque, les écrans du menu restent à leur place dans la pièce d'une fois sur l'autre ; la touche 5 du pavé numérique les remet devant vous.
 - Le menu est dessiné exprès pour le casque : le plateau y est en portrait, pendant que le PC garde son menu en paysage. Casque porté, les écrans du PC se mettent au repos et affichent « Dans le casque » ; casque retiré, ou menu de Meta ouvert, le PC reprend la main.
 - Dans le casque, l'image de fond du plateau suit le sens du plateau (portrait) : la table se voit en entier pendant la navigation.
 - Un écran que Windows débranche puis rebranche, pendant une partie ou au menu, retrouve son rôle et son image au lieu de rester noir ; au retour d'une partie, chaque fenêtre reprend son écran.
 - Dans le casque, le menu se pilote aux manettes du Quest : gâchettes pour les flippers, A pour Start, B pour Exit, poignées pour les MagnaSave.
 - « Caler la borne », dans Menu système > Borne (ou les deux poignées tenues 3 s dans le casque) : posez le bout d'une manette sur le coin gauche de la vraie barre avant, puis sur le coin droit, et la borne du casque se pose dessus. Le calage sert au menu comme aux parties, et se garde ; à refaire seulement après un nouveau réglage du sol ou de la limite du Quest.
+- Vision 3D, dans Menu système > Borne (BÊTA) : la perspective de la table suit votre tête, comme une fenêtre ouverte sur le plateau. Une simple webcam suffit ; une Kinect pour Xbox 360 fait encore mieux et vise seule votre tête. Les images de la caméra ne quittent jamais le PC.
+- Kinect branchée sans son pilote : choisir « Vision 3D » le télécharge chez Microsoft et l'installe, sans rien d'autre à faire que d'accepter la demande de Windows. En partie, les deux MagnaSave proposent « Recentrer la vue 3D ».
 
 ## 0.1.8
 

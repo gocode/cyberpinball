@@ -205,9 +205,11 @@ test('schéma de VPX 10.8.1-5436 : nombre de réglages et cas particuliers', () 
   const schema = JSON.parse(fs.readFileSync(SCHEMA_FILE, 'utf8')) as VpxSettingsSchema;
   // 1148 macros de réglage moins les 9 de la branche #else (non BGFX), puis 101 réglages
   // déclarés par les plugins ; vérifié par `npm run vpx-schema -- --ini` contre un
-  // VPinballX.ini écrit par cette version.
-  assert.equal(schema.count, 1240);
-  assert.equal(schema.settings.length, 1240);
+  // VPinballX.ini écrit par cette version. Plus les 3 du plugin Vision3D de Cyber Pinball
+  // (Enable, Port, Gain : vpx-own-plugins.ts).
+  assert.equal(schema.count, 1243);
+  assert.equal(schema.settings.length, 1243);
+  assert.deepEqual(schema.settings.filter((s) => s.plugin === 'Vision3D').map((s) => s.key), ['Enable', 'Port', 'Gain']);
   assert.equal(schema.settings.filter((s) => !s.plugin).length, 1139);
   assert.equal(schema.sourceCommit, 'af26b2d93');
   const get = (section: string, key: string) => schema.settings.find((s) => s.section === section && s.key === key);

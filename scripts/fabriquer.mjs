@@ -87,6 +87,28 @@ for (const name of fs.readdirSync(installerDir)) {
     console.log('Compagnon du casque : natif\\' + path.basename(exe));
   }
 }
+// Vision 3D (app/src/vision3d.ts) : le plugin VPX « Vision3D » (packages/vpx-vision3d, construit ici
+// avec les mêmes outils que le compagnon du casque ; sans eux, l'entrée « Vision 3D » dit qu'il
+// manque), MediaPipe pour la webcam (le seul script classique et son WebAssembly) et le modèle du visage.
+{
+  const { buildVision3d, VISION3D_SOURCE } = await import('./vision3d.mjs');
+  const dll = buildVision3d({ quiet: true });
+  if (dll) {
+    const dir = path.join(stage, 'natif', 'vision3d');
+    fs.mkdirSync(dir, { recursive: true });
+    fs.copyFileSync(dll, path.join(dir, path.basename(dll)));
+    fs.copyFileSync(path.join(VISION3D_SOURCE, 'plugin.cfg'), path.join(dir, 'plugin.cfg'));
+    console.log(`Plugin Vision 3D : ${path.join('natif', 'vision3d', path.basename(dll))}`);
+  }
+  const mediapipe = path.dirname(require.resolve('@mediapipe/tasks-vision', { paths: [path.join(repo, 'app')] }));
+  const vendor = path.join(stage, 'vendor', 'mediapipe');
+  fs.mkdirSync(vendor, { recursive: true });
+  for (const [from, name] of [['vision_bundle.js', 'vision_bundle.js'], [path.join('wasm', 'vision_wasm_internal.js'), 'vision_wasm_internal.js'], [path.join('wasm', 'vision_wasm_internal.wasm'), 'vision_wasm_internal.wasm'], ['package.json', 'package.json']]) {
+    // package.json : nom, version et licence (Apache-2.0) de MediaPipe, avec ses fichiers.
+    if (fs.existsSync(path.join(mediapipe, from))) fs.copyFileSync(path.join(mediapipe, from), path.join(vendor, name));
+  }
+  copyTree(path.join(repo, 'app', 'ressources', 'vision3d'), path.join(stage, 'ressources', 'vision3d'));
+}
 // koffi et son binaire natif, livré à part dans un paquet propre à la plateforme
 // (seul celui de win32-x64 est copié). Du paquet koffi, on ne garde que le
 // JavaScript chargé à l'exécution : ni sources C++, ni en-têtes, ni documentation.

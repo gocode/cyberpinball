@@ -244,6 +244,11 @@ test('seul social-net.ts ouvre des sockets réseau, et Hyperswarm n’est charg�
         const uses = [...text.matchAll(/\bnet\.(\w+)\(([^)]{0,40})/g)].map((m) => `${m[1]}(${m[2]}`);
         if (uses.length === 1 && uses[0] === "connect({ host: '127.0.0.1', port }" && !/\.listen\(|createServer|node:dgram/.test(text)) continue;
       }
+      // vision3d.ts : envoi UDP au plugin VPX sur 127.0.0.1 seulement (format opentrack), jamais d'écoute ni de port ouvert.
+      if (name === 'vision3d.ts' && dir.endsWith(path.join('app', 'src'))) {
+        const sends = [...text.matchAll(/\.send\(([^;]*)\);/g)].map((m) => m[1]!);
+        if (/dgram\.createSocket\('udp4'\)/.test(text) && sends.length === 1 && sends[0]!.endsWith("'127.0.0.1'") && !/\.bind\(|\.listen\(|createServer|node:net/.test(text)) continue;
+      }
       if (/node:(dgram|net)['"]|require\(['"](hyperswarm|hyperdht|protomux|@hyperswarm\/secret-stream)/.test(text) || /from ['"](hyperswarm|hyperdht|protomux|@hyperswarm\/secret-stream)['"]/.test(text)) offenders.push(path.relative(REPO_ROOT, path.join(dir, name)));
     }
   }

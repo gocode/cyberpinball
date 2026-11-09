@@ -1,0 +1,510 @@
+// Vision 3D (packages/core/src/vision3d.ts) : la perspective de la table suit la tête du joueur.
+//
+// - Réglage : <données>\vision3d\reglage.json (activée ou non, capteur, position de jeu par
+//   configuration de borne).
+// - Plugin VPX « Vision3D » (packages/vpx-vision3d) : copié dans le dossier plugins\ de la version
+//   active de VPX, activé dans VPinballX.ini comme les autres plugins (components.json). Inerte tant
+//   qu'il ne reçoit rien : une partie sans Vision 3D n'en paie rien.
+// - Pendant une partie, HeadTracker lit le capteur (webcam : fenêtre cachée et MediaPipe ; Kinect
+//   pour Xbox 360 : Kinect10.dll de Microsoft par koffi), lisse la position de la tête, la compare à
+//   la position de jeu et envoie le déplacement au plugin par UDP local (127.0.0.1, format opentrack).
+//   La caméra s'allume au début de la partie et s'éteint à la fin ; aucune image ne quitte le PC
+//   (la fenêtre de la webcam n'a accès à aucun réseau).
+// - Pilote de la Kinect : téléchargé chez Microsoft à la demande (components.json,
+//   « kinect-runtime-1.8 »), empreinte et signature vérifiées, installé en silence avec l'accord de
+//   Windows (élévation).
+
+import { spawn } from 'node:child_process';
+import * as dgram from 'node:dgram';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { ipcMain, session, type BrowserWindow, type IpcMainEvent } from 'electron';
+import * as koffi from 'koffi';
+import {
+  clampShift,
+  HeadFilter,
+  kinectAim,
+  kinectHead,
+  medianHead,
+  opentrackPacket,
+  parseVision3dSetting,
+  subtract,
+  VISION3D_PORT,
+  vision3dHardware,
+  webcamHead,
+  t,
+  writeFileAtomic,
+  type DownloadManager,
+  type Vec3,
+  type Vision3dHardware,
+  type Vision3dSetting,
+  type Vision3dSourceKind,
+  type WebcamEyes,
+} from '@cyberpinball/core';
+import { downloadComponent, findComponent } from '@cyberpinball/installer';
+import { createWindow } from './offscreen';
+import { usbDevices } from './vpx-ini';
+
+const folder = (dataDir: string) => path.join(dataDir, 'vision3d');
+const settingFile = (dataDir: string) => path.join(folder(dataDir), 'reglage.json');
+
+export function readVision3d(dataDir: string): Vision3dSetting {
+  try {
+    return parseVision3dSetting(JSON.parse(fs.readFileSync(settingFile(dataDir), 'utf8')));
+  } catch {
+    return parseVision3dSetting(undefined);
+  }
+}
+
+export function writeVision3d(dataDir: string, setting: Vision3dSetting): void {
+  fs.mkdirSync(folder(dataDir), { recursive: true });
+  writeFileAtomic(settingFile(dataDir), JSON.stringify(setting, null, 2) + '\n');
+}
+
+// --- Matériel ---------------------------------------------------------------------------------
+
+const SYSTEM32 = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
+
+/** Le pilote de la Kinect v1 (Kinect for Windows Runtime 1.8) pose Kinect10.dll dans System32. */
+export function kinect1DriverInstalled(): boolean {
+  const simulated = process.env.CYBERPINBALL_KINECT_PILOTE;
+  if (simulated !== undefined) return simulated === '1';
+  return fs.existsSync(path.join(SYSTEM32, 'Kinect10.dll'));
+}
+
+/** Capteurs branchés maintenant (lecture passive du Gestionnaire de périphériques). */
+export function probeVision3d(): Vision3dHardware {
+  return vision3dHardware(usbDevices() ?? [], kinect1DriverInstalled());
+}
+
+// --- Plugin VPX ---------------------------------------------------------------------------------
+
+const PLUGIN_DLL = 'plugin-vision3d64.dll';
+const PLUGIN_FOLDER = 'vision3d';
+
+/** plugin.cfg et la DLL : fabriqués avec l'application (natif\vision3d), ou construits en développement. */
+export function vision3dPluginFiles(appDir: string): { dll: string; cfg: string } | undefined {
+  const shipped = path.join(appDir, 'natif', PLUGIN_FOLDER);
+  if (fs.existsSync(path.join(shipped, PLUGIN_DLL))) return { dll: path.join(shipped, PLUGIN_DLL), cfg: path.join(shipped, 'plugin.cfg') };
+  for (const repo of [path.join(appDir, '..'), path.join(appDir, '..', '..')]) {
+    const dll = path.join(repo, 'build', 'vision3d', 'Release', PLUGIN_DLL);
+    const cfg = path.join(repo, 'packages', 'vpx-vision3d', 'plugin.cfg');
+    if (fs.existsSync(dll) && fs.existsSync(cfg)) return { dll, cfg };
+  }
+  return undefined;
+}
+
+const sameFile = (a: string, b: string) => {
+  try {
+    return fs.readFileSync(a).equals(fs.readFileSync(b));
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Met le plugin dans <VPX>\plugins\vision3d, s'il n'y est pas déjà à l'identique. VPX le trouve à
+ * son lancement suivant. VPX ouvert garde la DLL : la copie attend alors la partie d'après.
+ */
+export function installVision3dPlugin(vpxDir: string, appDir: string): 'installed' | 'up-to-date' | 'missing' | 'busy' {
+  const files = vision3dPluginFiles(appDir);
+  if (!files) return 'missing';
+  const target = path.join(vpxDir, 'plugins', PLUGIN_FOLDER);
+  const dll = path.join(target, PLUGIN_DLL);
+  const cfg = path.join(target, 'plugin.cfg');
+  if (sameFile(files.dll, dll) && sameFile(files.cfg, cfg)) return 'up-to-date';
+  try {
+    fs.mkdirSync(target, { recursive: true });
+    fs.copyFileSync(files.cfg, cfg);
+    fs.copyFileSync(files.dll, dll);
+    return 'installed';
+  } catch {
+    return 'busy';
+  }
+}
+
+// --- Suivi de la tête -------------------------------------------------------------------------
+
+/** Échantillons pour mesurer la position de jeu (environ une seconde). */
+const NEUTRAL_SAMPLES = 24;
+
+export type TrackerState = 'off' | 'starting' | 'searching' | 'tracking' | 'failed';
+
+interface Source {
+  stop(): void;
+}
+
+export interface HeadTrackerOptions {
+  dataDir: string;
+  appDir: string;
+  log: (line: string) => void;
+}
+
+export class HeadTracker {
+  private source?: Source;
+  private socket?: dgram.Socket;
+  private readonly filter = new HeadFilter();
+  private kind?: Vision3dSourceKind;
+  private configurationId?: string;
+  private neutral?: Vec3;
+  private samples: Vec3[] = [];
+  private lastSeen = 0;
+  private failure?: string;
+  /** Déplacements envoyés (essais et journal). */
+  sent = 0;
+
+  constructor(private readonly opts: HeadTrackerOptions) {}
+
+  get state(): TrackerState {
+    if (!this.source) return this.failure ? 'failed' : 'off';
+    if (!this.lastSeen) return 'starting';
+    return Date.now() - this.lastSeen < 1000 ? 'tracking' : 'searching';
+  }
+
+  get failureReason(): string | undefined {
+    return this.failure;
+  }
+
+  /** Allume le capteur pour une partie. Sans erreur : la partie se joue sans Vision 3D si le capteur fait défaut. */
+  start(kind: Vision3dSourceKind, configurationId: string, setting: Vision3dSetting): void {
+    this.stop();
+    this.failure = undefined;
+    this.kind = kind;
+    this.configurationId = configurationId;
+    const saved = setting.neutral[configurationId];
+    this.neutral = saved && saved.source === kind ? { x: saved.x, y: saved.y, z: saved.z } : undefined;
+    this.samples = [];
+    this.filter.reset();
+    this.lastSeen = 0;
+    this.sent = 0;
+    this.socket = dgram.createSocket('udp4');
+    this.socket.on('error', () => undefined);
+    const onHead = (p: Vec3) => this.push(p);
+    const onFailure = (reason: string) => {
+      this.failure = reason;
+      this.opts.log(`Vision 3D : ${reason}`); // i18n-ignore : journal
+    };
+    try {
+      this.source = kind === 'kinect1' ? startKinect1(onHead, onFailure, this.opts.log) : startWebcam(setting.webcamFovDeg, onHead, onFailure, this.opts.log);
+      this.opts.log(`Vision 3D : ${kind === 'kinect1' ? 'Kinect' : 'webcam'} allumée${this.neutral ? '' : ', position de jeu mesurée à la première seconde'}.`); // i18n-ignore : journal
+    } catch (error) {
+      onFailure((error as Error).message);
+      this.stop();
+    }
+  }
+
+  /** Nouvelle position de jeu : celle de la tête dans la seconde qui suit. */
+  recenter(): void {
+    this.neutral = undefined;
+    this.samples = [];
+  }
+
+  stop(): void {
+    this.source?.stop();
+    this.source = undefined;
+    this.socket?.close();
+    this.socket = undefined;
+    if (this.sent) this.opts.log(`Vision 3D : capteur éteint (${this.sent} positions envoyées).`); // i18n-ignore : journal
+    this.sent = 0;
+  }
+
+  private push(raw: Vec3): void {
+    const now = Date.now();
+    this.lastSeen = now;
+    const p = this.filter.filter(raw, now / 1000);
+    if (!this.neutral) {
+      this.samples.push(p);
+      if (this.samples.length < NEUTRAL_SAMPLES) return;
+      this.neutral = medianHead(this.samples);
+      this.samples = [];
+      this.saveNeutral();
+      return;
+    }
+    const d = clampShift(subtract(p, this.neutral));
+    this.socket?.send(opentrackPacket(d), Number(process.env.CYBERPINBALL_VISION3D_PORT) || VISION3D_PORT, '127.0.0.1');
+    this.sent++;
+  }
+
+  private saveNeutral(): void {
+    if (!this.neutral || !this.kind || !this.configurationId) return;
+    const setting = readVision3d(this.opts.dataDir);
+    setting.neutral[this.configurationId] = { ...this.neutral, source: this.kind };
+    try {
+      writeVision3d(this.opts.dataDir, setting);
+      const n = this.neutral;
+      this.opts.log(`Vision 3D : position de jeu enregistrée (${n.x.toFixed(1)}, ${n.y.toFixed(1)}, ${n.z.toFixed(1)} cm).`); // i18n-ignore : journal
+    } catch {
+      // Réglage pas écrit : la position sera remesurée à la partie suivante.
+    }
+  }
+}
+
+// --- Webcam -----------------------------------------------------------------------------------
+
+const MEDIAPIPE_FILES = ['vision_bundle.js', 'vision_wasm_internal.js', 'vision_wasm_internal.wasm'];
+
+/** MediaPipe Tasks Vision : fabriqué avec l'application (vendor\mediapipe), ou dans node_modules en développement. */
+export function mediapipeDir(appDir: string): string | undefined {
+  const shipped = path.join(appDir, 'vendor', 'mediapipe');
+  if (MEDIAPIPE_FILES.every((f) => fs.existsSync(path.join(shipped, f)))) return shipped;
+  try {
+    // Le paquet n'exporte pas son package.json : son point d'entrée CommonJS est à sa racine.
+    const pkg = path.dirname(require.resolve('@mediapipe/tasks-vision'));
+    return fs.existsSync(path.join(pkg, 'vision_bundle.js')) ? pkg : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function mediapipeFile(dir: string, name: string): string {
+  const flat = path.join(dir, name);
+  return fs.existsSync(flat) ? flat : path.join(dir, 'wasm', name);
+}
+
+export const WEBCAM_PARTITION = 'vision3d';
+
+/** Messages de la page de la webcam (renderer/vision3d-webcam.js). */
+type WebcamMessage = { type: 'eyes'; eyes: WebcamEyes; width: number; height: number } | { type: 'status'; text: string } | { type: 'failed'; reason: string };
+
+function startWebcam(fovDeg: number, onHead: (p: Vec3) => void, onFailure: (reason: string) => void, log: (line: string) => void): Source {
+  const appDir = path.join(__dirname, '..');
+  const vendor = mediapipeDir(appDir);
+  if (!vendor) throw new Error('MediaPipe absent de cette version'); // i18n-ignore : journal
+  const model = path.join(appDir, 'ressources', 'vision3d', 'blaze_face_full_range.tflite');
+  const ses = session.fromPartition(WEBCAM_PARTITION);
+  // La caméra, rien d'autre : ni micro, ni réseau. Les images ne quittent jamais le PC.
+  ses.setPermissionRequestHandler((_wc, permission, callback, details) => {
+    const media = details as { mediaTypes?: string[] };
+    callback(permission === 'media' && !(media.mediaTypes ?? []).includes('audio'));
+  });
+  ses.setPermissionCheckHandler((_wc, permission) => permission === 'media');
+  ses.webRequest.onBeforeRequest((details, callback) => callback({ cancel: !/^(file|blob|data|devtools):/i.test(details.url) }));
+
+  const win: BrowserWindow = createWindow({
+    show: false,
+    width: 320,
+    height: 240,
+    frame: false,
+    skipTaskbar: true,
+    focusable: false,
+    webPreferences: {
+      preload: path.join(__dirname, 'vision3d-preload.js'),
+      partition: WEBCAM_PARTITION,
+      contextIsolation: true,
+      sandbox: true,
+      backgroundThrottling: false,
+    },
+  });
+  // Les fichiers de MediaPipe et le modèle passent en octets : la page en fait des blobs (aucun accès
+  // au disque depuis le rendu).
+  const assets = {
+    bundle: fs.readFileSync(mediapipeFile(vendor, 'vision_bundle.js'), 'utf8'),
+    loader: fs.readFileSync(mediapipeFile(vendor, 'vision_wasm_internal.js'), 'utf8'),
+    wasm: fs.readFileSync(mediapipeFile(vendor, 'vision_wasm_internal.wasm')),
+    model: fs.readFileSync(model),
+  };
+  const onAssets = (event: Electron.IpcMainInvokeEvent) => (event.sender === win.webContents ? assets : undefined);
+  ipcMain.removeHandler('vision3d:assets');
+  ipcMain.handle('vision3d:assets', onAssets);
+  let lastStatus = '';
+  const onMessage = (event: IpcMainEvent, message: WebcamMessage) => {
+    if (event.sender !== win.webContents) return;
+    if (message.type === 'eyes') {
+      const head = webcamHead(message.eyes, { width: message.width, height: message.height }, fovDeg);
+      if (head) onHead(head);
+    } else if (message.type === 'failed') onFailure(message.reason);
+    else if (message.text !== lastStatus) {
+      lastStatus = message.text;
+      log(`Vision 3D (webcam) : ${message.text}`); // i18n-ignore : journal
+    }
+  };
+  ipcMain.on('vision3d:webcam', onMessage);
+  void win.loadFile(path.join(appDir, 'renderer', 'vision3d-webcam.html'));
+  return {
+    stop() {
+      ipcMain.removeListener('vision3d:webcam', onMessage);
+      ipcMain.removeHandler('vision3d:assets');
+      // Fermer la page éteint la caméra (et son témoin lumineux).
+      if (!win.isDestroyed()) win.destroy();
+    },
+  };
+}
+
+// --- Kinect pour Xbox 360 (Kinect10.dll) -------------------------------------------------------
+
+// NuiApi.h, NuiSensor.h (Kinect for Windows SDK 1.8).
+const NUI_INITIALIZE_FLAG_USES_SKELETON = 0x00000008;
+const NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT = 0x00000004;
+const NUI_SKELETON_COUNT = 6;
+const NUI_SKELETON_TRACKED = 2;
+const NUI_SKELETON_POSITION_HEAD = 3;
+const NUI_SKELETON_POSITION_NOT_TRACKED = 0;
+/** NUI_SKELETON_FRAME : 8 + 4 + 4 + 16 (sol) + 16 (gravité) + 6 × NUI_SKELETON_DATA (436). */
+export const NUI_SKELETON_FRAME_SIZE = 48 + NUI_SKELETON_COUNT * 436;
+const SKELETON_DATA = 48;
+const SKELETON_SIZE = 436;
+
+/** La tête du premier squelette suivi, et le sol vu par le capteur ; undefined : personne devant le capteur. */
+export function readSkeletonFrame(frame: Buffer): { head: Vec3; floor: Vec3 } | undefined {
+  const floor = { x: frame.readFloatLE(16), y: frame.readFloatLE(20), z: frame.readFloatLE(24) };
+  for (let i = 0; i < NUI_SKELETON_COUNT; i++) {
+    const base = SKELETON_DATA + i * SKELETON_SIZE;
+    if (frame.readInt32LE(base) !== NUI_SKELETON_TRACKED) continue;
+    const joint = base + 32 + NUI_SKELETON_POSITION_HEAD * 16;
+    const jointState = frame.readInt32LE(base + 32 + 20 * 16 + NUI_SKELETON_POSITION_HEAD * 4);
+    if (jointState === NUI_SKELETON_POSITION_NOT_TRACKED) continue;
+    return { head: { x: frame.readFloatLE(joint), y: frame.readFloatLE(joint + 4), z: frame.readFloatLE(joint + 8) }, floor };
+  }
+  return undefined;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type NativeFn = (...args: any[]) => any;
+interface NuiApi {
+  initialize: NativeFn;
+  shutdown: NativeFn;
+  trackingEnable: NativeFn;
+  nextFrame: NativeFn;
+  getElevation: NativeFn;
+  setElevation: NativeFn;
+}
+let nui: NuiApi | undefined;
+
+function loadNui(): NuiApi {
+  if (nui) return nui;
+  // CYBERPINBALL_KINECT_DLL : une DLL de remplacement pour les essais sans capteur.
+  const lib = koffi.load(process.env.CYBERPINBALL_KINECT_DLL || 'Kinect10.dll');
+  nui = {
+    initialize: lib.func('int32_t __stdcall NuiInitialize(uint32_t flags)'),
+    shutdown: lib.func('void __stdcall NuiShutdown()'),
+    trackingEnable: lib.func('int32_t __stdcall NuiSkeletonTrackingEnable(void *event, uint32_t flags)'),
+    nextFrame: lib.func('int32_t __stdcall NuiSkeletonGetNextFrame(uint32_t milliseconds, _Inout_ uint8_t *frame)'),
+    getElevation: lib.func('int32_t __stdcall NuiCameraElevationGetAngle(_Out_ int32_t *degrees)'),
+    setElevation: lib.func('int32_t __stdcall NuiCameraElevationSetAngle(int32_t degrees)'),
+  };
+  return nui;
+}
+
+function startKinect1(onHead: (p: Vec3) => void, onFailure: (reason: string) => void, log: (line: string) => void): Source {
+  const api = loadNui();
+  const hr = api.initialize(NUI_INITIALIZE_FLAG_USES_SKELETON) as number;
+  if (hr < 0) throw new Error(`Kinect indisponible (NuiInitialize 0x${(hr >>> 0).toString(16)}) : est-elle branchée sur le secteur ?`); // i18n-ignore : journal
+  const tr = api.trackingEnable(null, NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT) as number;
+  if (tr < 0) {
+    api.shutdown();
+    throw new Error(`suivi du squelette impossible (0x${(tr >>> 0).toString(16)})`); // i18n-ignore : journal
+  }
+  const frame = Buffer.alloc(NUI_SKELETON_FRAME_SIZE);
+  let aimed = false;
+  /** Le moteur tourne : la tête « bouge » sans que le joueur bouge ; ces images sont ignorées. */
+  let settleUntil = 0;
+  let errors = 0;
+  const timer = setInterval(() => {
+    const rc = api.nextFrame(0, frame) as number;
+    if (rc < 0) {
+      // E_NUI_FRAME_NO_DATA : pas de nouvelle image ; une erreur qui dure : capteur débranché.
+      if ((rc >>> 0) !== 0x83010001 && ++errors > 300) {
+        clearInterval(timer);
+        onFailure('la Kinect ne répond plus'); // i18n-ignore : journal
+      }
+      return;
+    }
+    errors = 0;
+    const seen = readSkeletonFrame(frame);
+    if (!seen || Date.now() < settleUntil) return;
+    if (!aimed) {
+      // Une fois par partie : le moteur s'use et bloque la lecture une seconde.
+      aimed = true;
+      const elevation = [0];
+      if ((api.getElevation(elevation) as number) >= 0) {
+        const target = kinectAim(seen.head, elevation[0]!);
+        if (target !== undefined && (api.setElevation(target) as number) >= 0) {
+          log(`Vision 3D (Kinect) : inclinaison ${elevation[0]}° -> ${target}° pour viser la tête.`); // i18n-ignore : journal
+          settleUntil = Date.now() + 1500;
+          return;
+        }
+      }
+    }
+    onHead(kinectHead(seen.head, seen.floor));
+  }, 10);
+  return {
+    stop() {
+      clearInterval(timer);
+      try {
+        api.shutdown();
+      } catch {
+        // Capteur débranché pendant la partie.
+      }
+    },
+  };
+}
+
+// --- Pilote de la Kinect ----------------------------------------------------------------------
+
+const POWERSHELL = path.join(SYSTEM32, 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+/** Code de Start-Process quand l'utilisateur refuse l'élévation (ERROR_CANCELLED). */
+const CANCELLED = 1223;
+
+function powershell(command: string): Promise<{ status: number | null; stdout: string; stderr: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], { windowsHide: true });
+    let stdout = '';
+    let stderr = '';
+    child.stdout.on('data', (d) => (stdout += d));
+    child.stderr.on('data', (d) => (stderr += d));
+    child.on('error', (error) => resolve({ status: -1, stdout, stderr: error.message }));
+    child.on('close', (status) => resolve({ status, stdout, stderr }));
+  });
+}
+
+const quote = (s: string) => `'${s.replace(/'/g, "''")}'`;
+
+export type DriverInstall = { ok: true } | { ok: false; cancelled?: true; reason: string };
+
+/**
+ * Le pilote, téléchargé chez Microsoft (empreinte du manifeste), ou réutilisé s'il est déjà là. Suivi
+ * dans le gestionnaire de téléchargements, comme l'archive de VPX : une coupure garde son partiel.
+ */
+export async function downloadKinectDriver(downloadsDir: string, downloads?: DownloadManager): Promise<string> {
+  const component = findComponent('kinect-runtime-1.8');
+  const file = path.join(downloadsDir, path.basename(new URL(component.url).pathname));
+  const job = downloads?.track({
+    id: component.id,
+    kind: 'component',
+    title: t('Pilote de la Kinect (Microsoft)'),
+    source: { kind: 'http', label: 'download.microsoft.com' },
+    files: [{ ref: component.url, name: path.basename(file), bytes: component.size, dest: file, part: `${file}.part` }],
+    back: { screen: 'downloads' },
+    resumable: true,
+  });
+  try {
+    await downloadComponent(component, downloadsDir, (received, total) => job?.progress(received, total));
+  } catch (error) {
+    job?.fail(fs.existsSync(`${file}.part`) ? 'network' : 'http', (error as Error).message);
+    throw error;
+  }
+  job?.done([{ index: 0, file }]);
+  return file;
+}
+
+/**
+ * Vérifie que Microsoft a signé l'installateur, puis l'installe en silence ; Windows demande son
+ * accord (élévation). Le pilote posé, Kinect10.dll est dans System32.
+ */
+export async function installKinectDriver(file: string): Promise<DriverInstall> {
+  const component = findComponent('kinect-runtime-1.8');
+  const signature = await powershell(`$s = Get-AuthenticodeSignature -LiteralPath ${quote(file)}; "$($s.Status)|$($s.SignerCertificate.Subject)"`);
+  const [status, subject] = signature.stdout.trim().split('|');
+  if (status !== 'Valid' || subject !== component.signer) {
+    fs.rmSync(file, { force: true });
+    return { ok: false, reason: `signature inattendue (${status || '?'} ; ${subject || '?'}), fichier supprimé` }; // i18n-ignore : raison technique, journal et détail
+  }
+  const args = (component.silentArguments ?? []).map(quote).join(', ');
+  const run = await powershell(
+    `try { $p = Start-Process -FilePath ${quote(file)} -ArgumentList @(${args}) -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode } catch { if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { [Console]::Error.WriteLine($_.Exception.Message); exit 1 } }`,
+  );
+  if (run.status === CANCELLED) return { ok: false, cancelled: true, reason: 'installation refusée' }; // i18n-ignore : journal
+  // 3010 : installé, redémarrage conseillé (le pilote sert déjà au prochain branchement).
+  if (run.status !== 0 && run.status !== 3010) return { ok: false, reason: `installateur de Microsoft : code ${run.status}${run.stderr.trim() ? ` (${run.stderr.trim()})` : ''}` }; // i18n-ignore : journal
+  return kinect1DriverInstalled() ? { ok: true } : { ok: false, reason: 'Kinect10.dll absente après l’installation' }; // i18n-ignore : journal
+}

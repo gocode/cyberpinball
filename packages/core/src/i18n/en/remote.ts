@@ -71,7 +71,7 @@ export const messages: Record<string, string> = {
   'Déconnecter ce téléphone': 'Disconnect this phone',
   // Deuxième jalon : tout le menu (phone-remote-menu.ts, frontend.ts, library.ts, la page du téléphone en mode menu)
   'Télécommande du téléphone': 'Phone remote',
-  'Boutons, écrans, son, réglages de VPX, réalité virtuelle, télécommande du téléphone, bureau Windows, mode invité': 'Buttons, screens, sound, VPX settings, virtual reality, phone remote, Windows desktop, guest mode',
+  'Boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, bureau Windows, mode invité': 'Buttons, screens, sound, VPX settings, virtual reality, 3D vision, phone remote, Windows desktop, guest mode',
   'Indisponible en mode invité.': 'Unavailable in guest mode.',
   'Aucun dossier de Cyber Pinball sur cette borne.': 'No Cyber Pinball folder on this cabinet.',
   'Reçu du téléphone : {name}, dans le dossier d’import': 'Received from the phone: {name}, in the import folder',

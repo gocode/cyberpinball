@@ -14,6 +14,7 @@
 //            toutes les clés qu'il connaît, chacune doit être dans le schéma.
 
 import * as fs from 'node:fs';
+import * as path from 'node:path';
 import {
   extractConstants,
   IniDocument,
@@ -34,6 +35,7 @@ import {
 } from '@cyberpinball/core';
 import { loadManifest, MANIFEST_FILE, type Component } from './manifest';
 import { serializeVpxSettingsSchema, vpxSettingsSchemaFile } from './vpx-settings-schema';
+import { ownPluginSettings } from './vpx-own-plugins';
 
 const REPOSITORY = 'vpinball/vpinball';
 const SETTINGS_FILE = 'src/core/Settings_properties.inl';
@@ -188,6 +190,8 @@ async function pluginSettings(commit: string, known: Set<string>): Promise<VpxSe
       for (const w of windows) byWindow.set(w, [...(byWindow.get(w) ?? []), renderer]);
     }
   }
+  // Les plugins livrés par Cyber Pinball lui-même (vpx-own-plugins.ts), après ceux de VPX.
+  for (const def of ownPluginSettings(path.join(__dirname, '..', '..'))) add(def);
   const found = new Set([...byWindow.values()].flat().map((r) => r.id));
   const stale = Object.keys(RENDERER_WINDOWS).filter((id) => !found.has(id));
   if (stale.length) throw new Error(`Moteurs de rendu de RENDERER_WINDOWS absents du code : ${stale.join(', ')}`);

@@ -24,12 +24,14 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - System menu > Cyber Pinball > "Restart Cyber Pinball" restarts the software alone, without restarting the PC.
 - "Virtual reality" carries a "BETA" badge in the menu: the feature is still being tested.
 - In the headset: the playfield shows in portrait, as on the cabinet; the backglass, DMD and topper windows turn off during a game in VR; a VPX that freezes while quitting is closed cleanly.
-- In the headset, the menu's screens stay in their place in the room from one time to the next; the 5 key of the numeric keypad brings it back in front of you.
+- In the headset, the menu's screens stay in their place in the room from one time to the next; the 5 key of the numeric keypad brings them back in front of you.
 - The menu is drawn specially for the headset: the playfield is in portrait there, while the PC keeps its menu in landscape. With the headset on, the PC screens go to rest and show "Dans le casque" (In the headset); with the headset off, or the Meta menu open, the PC takes over again.
 - In the headset, the playfield's background image follows the playfield's orientation (portrait): the table is seen in full while browsing.
 - A screen that Windows disconnects and reconnects, during a game or in the menu, gets its role and its picture back instead of staying black; when a game ends, each window takes back its screen.
 - In the headset, the menu is driven with the Quest controllers: triggers for the flippers, A for Start, B for Exit, grips for the MagnaSave buttons.
 - "Caler la borne" (Align the cabinet), in System menu > Cabinet (or both grips held for 3 s in the headset): touch the left corner of the real front bar with the tip of a controller, then the right corner, and the headset's cabinet settles on it. The alignment serves the menu and the games alike, and is kept; redo it only after resetting the Quest's floor or boundary.
+- 3D vision, in System menu > Cabinet (BETA): the table perspective follows your head, like a window opened onto the playfield. A plain webcam is enough; a Kinect for Xbox 360 does even better and aims at your head by itself. Camera pictures never leave the PC.
+- Kinect plugged in without its driver: choosing "Vision 3D" (3D vision) downloads it from Microsoft and installs it, with nothing else to do than accept the Windows prompt. In game, both MagnaSave buttons offer "Recentrer la vue 3D" (Recenter the 3D view).
 
 ## 0.1.8
 

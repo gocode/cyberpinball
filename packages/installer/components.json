@@ -18,11 +18,30 @@
       "executable": "VPinballX_BGFX64.exe",
       "adapterSettings": {
         "displayIdFormat": "name",
-        "enabledPlugins": ["PinMAME", "AlphaDMD", "B2S", "ScoreView", "PUP", "AltSound", "Serum", "VNI", "FlexDMD", "WMP"]
+        "enabledPlugins": ["PinMAME", "AlphaDMD", "B2S", "ScoreView", "PUP", "AltSound", "Serum", "VNI", "FlexDMD", "WMP", "Vision3D"]
       },
       "license": "GPLv3+ pour la majorité des fichiers, licence dérivée de MAME pour le reste : redistribution gratuite, sans usage commercial, avec la licence jointe.",
       "source": "https://github.com/vpinball/vpinball/tree/af26b2d93",
       "sourceCommit": "af26b2d93"
+    },
+    {
+      "id": "kinect-runtime-1.8",
+      "kind": "driver",
+      "distribution": "on-demand",
+      "name": "Kinect for Windows Runtime 1.8",
+      "homepage": "https://www.microsoft.com/en-us/download/details.aspx?id=40277",
+      "version": "1.8",
+      "channel": "stable",
+      "platform": "windows-x64",
+      "installDir": "downloads",
+      "url": "https://download.microsoft.com/download/e/c/5/ec50686b-82f4-4dbf-a922-980183b214e6/KinectRuntime-v1.8-Setup.exe",
+      "sha256": "f4d4143fb0f0a8d276889c077bfc8af42bfe99c128cadab5e316bf015a9858e9",
+      "size": 116273144,
+      "executablePattern": "^KinectRuntime-v1\\.8-Setup\\.exe$",
+      "license": "Microsoft Kinect for Windows Runtime : téléchargé chez Microsoft à la demande de l'utilisateur, jamais redistribué par Cyber Pinball.",
+      "source": "https://www.microsoft.com/en-us/download/details.aspx?id=40277",
+      "silentArguments": ["/quiet", "/norestart"],
+      "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
     }
   ]
 }

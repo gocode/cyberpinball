@@ -5,14 +5,18 @@ import { t } from '@cyberpinball/core';
 /**
  * emulator : un moteur de tables (VPX, plus tard Future Pinball…), branché à un adaptateur du même id.
  * tool : un outil annexe (configuration DOF, DMD…).
+ * driver : le pilote d'un matériel (Kinect pour la Vision 3D), installé par son propre installateur
+ * signé, en silence et avec l'accord de Windows (élévation), jamais extrait.
  */
-export type ComponentKind = 'emulator' | 'tool';
+export type ComponentKind = 'emulator' | 'tool' | 'driver';
 
 /**
  * automatic : licence compatible, Cyber Pinball le livre ou le télécharge lui-même.
  * manual : non redistribuable ; l'utilisateur le télécharge depuis `homepage`, Cyber Pinball le détecte.
+ * on-demand : téléchargé chez son éditeur quand l'utilisateur le demande (matériel branché),
+ * jamais livré ni installé d'office.
  */
-export type Distribution = 'automatic' | 'manual';
+export type Distribution = 'automatic' | 'manual' | 'on-demand';
 
 export interface Component {
   id: string;
@@ -48,6 +52,10 @@ export interface Component {
    * de ses réglages (vpx-settings/<version>.json, `npm run vpx-schema`).
    */
   sourceCommit?: string;
+  /** Composant « driver » : arguments de son installateur pour une installation silencieuse. */
+  silentArguments?: string[];
+  /** Composant « driver » : sujet exact du certificat qui doit avoir signé l'installateur (Authenticode). */
+  signer?: string;
 }
 
 /** Le manifeste est livré avec le paquet, à côté de dist/. */

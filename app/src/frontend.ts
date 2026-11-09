@@ -211,6 +211,11 @@ import {
   loadSocial,
   type RemoteButton,
   vrMenuText,
+  megabytes,
+  vision3dMenuText,
+  vision3dReadiness,
+  type Vision3dHardware,
+  type Vision3dSourceKind,
   boardKey,
   countryOfLocale,
   type PlayedScore,
@@ -280,6 +285,8 @@ import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-s
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { centerWhenStarted, prepareVrGame, probeVr, readVrMode, rememberVrSettings, writeVrCalibration, writeVrMode, type VrGame } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu } from './casque';
+import { downloadKinectDriver, HeadTracker, installKinectDriver, installVision3dPlugin, probeVision3d, readVision3d, vision3dPluginFiles, writeVision3d } from './vision3d';
+import { findComponent } from '@cyberpinball/installer';
 import { closeHeadsetViews, isHeadsetView, openHeadsetViews, sendToHeadsetViews, setHeadsetPainting, type HeadsetPage } from './casque-vues';
 import { createLiveScoresMenu } from './live-scores-menu';
 import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
@@ -1819,6 +1826,86 @@ library.provideSystemItem('vr', {
   },
 });
 
+// « Vision 3D » (Menu système > Borne, vision3d.ts) : la perspective des tables suit la tête du joueur,
+// par une webcam ou une Kinect pour Xbox 360. Sans capteur, l'entrée reste visible, grisée avec sa
+// raison ; une Kinect sans pilote propose de l'installer (chez Microsoft, avec l'accord de Windows).
+let vision3d = readVision3d(loc.dataDir);
+const headTracker = new HeadTracker({ dataDir: loc.dataDir, appDir: path.join(__dirname, '..'), log: (line) => console.log(line) });
+/** Capteurs branchés, relus au plus toutes les deux secondes (le menu relit ses entrées à chaque image). */
+let vision3dProbe: { at: number; hardware: Vision3dHardware } | undefined;
+function vision3dHardware(fresh = false): Vision3dHardware {
+  if (fresh || !vision3dProbe || Date.now() - vision3dProbe.at > 2000) vision3dProbe = { at: Date.now(), hardware: probeVision3d() };
+  return vision3dProbe.hardware;
+}
+const vision3dPluginMissing = () => !vision3dPluginFiles(path.join(__dirname, '..'));
+const kinectDriverMb = () => megabytes(findComponent('kinect-runtime-1.8').size);
+const vision3dText = () => vision3dMenuText(vision3d, vision3dReadiness(vision3dHardware(), vision3d.source), { driverMb: kinectDriverMb(), pluginMissing: vision3dPluginMissing() });
+library.provideSystemItem('vision3d', {
+  badge: 'beta',
+  get label() {
+    return vision3dText().label;
+  },
+  get detail() {
+    return vision3dText().detail;
+  },
+  get tone() {
+    return vision3dText().unavailable ? ('quiet' as const) : undefined;
+  },
+  run: async () => {
+    const readiness = vision3dReadiness(vision3dHardware(true), vision3d.source);
+    if (vision3dPluginMissing()) return void library.openSystem();
+    if (!readiness.ready && readiness.installKinectDriver) return void (await installKinect());
+    if (!readiness.ready) return void library.openSystem();
+    vision3d = { ...readVision3d(loc.dataDir), mode: vision3d.mode === 'on' ? 'off' : 'on' };
+    writeVision3d(loc.dataDir, vision3d);
+    console.log(`Vision 3D : ${vision3d.mode === 'on' ? `activée (${readiness.label})` : 'désactivée'}.`); // i18n-ignore : journal
+    library.openSystem();
+  },
+});
+
+/** Le pilote de la Kinect : téléchargé chez Microsoft, signature vérifiée, installé avec l'accord de Windows ; puis la Vision 3D s'active. */
+async function installKinect(): Promise<void> {
+  if (!loc.root) return;
+  const downloads = layoutOf(loc.root).downloads;
+  let file: string | undefined;
+  await library.task(t('Téléchargement du pilote de la Kinect chez Microsoft ({mb} Mo)…', { mb: kinectDriverMb() }), async () => {
+    file = await downloadKinectDriver(downloads, library.downloads.manager);
+  });
+  if (!file) return;
+  let installed = false;
+  await library.task(t('Autorisation demandée à Windows : répondez dans la fenêtre « Contrôle de compte d’utilisateur »…'), async () => {
+    const result = await installKinectDriver(file!);
+    console.log(`Vision 3D : pilote de la Kinect ${result.ok ? 'installé' : `pas installé (${result.reason})`}.`); // i18n-ignore : journal
+    if (!result.ok) throw new Error(result.cancelled ? t('Autorisation refusée dans la fenêtre de Windows : rien n’a changé') : t('Pilote de la Kinect pas installé : {reason}', { reason: result.reason }));
+    installed = true;
+  });
+  if (!installed) return;
+  vision3d = { ...readVision3d(loc.dataDir), mode: 'on' };
+  writeVision3d(loc.dataDir, vision3d);
+  vision3dHardware(true);
+  library.openSystem();
+}
+
+/**
+ * Partie avec Vision 3D : le capteur à allumer, ou undefined (désactivée, aucun capteur prêt, partie
+ * en VR, réglage de l'affichage). Le plugin est remis dans VPX avant chaque partie s'il a changé.
+ */
+function prepareVision3d(vpxExe: string, inVr: boolean): Vision3dSourceKind | undefined {
+  const plugin = installVision3dPlugin(path.dirname(vpxExe), path.join(__dirname, '..'));
+  if (plugin === 'installed') console.log('Vision 3D : plugin copié dans VPX.'); // i18n-ignore : journal
+  if (vision3d.mode !== 'on' || inVr) return undefined;
+  if (plugin === 'missing') {
+    console.log('Vision 3D : activée, mais plugin absent de cette version ; partie sans suivi de la tête.'); // i18n-ignore : journal
+    return undefined;
+  }
+  const readiness = vision3dReadiness(vision3dHardware(true), vision3d.source);
+  if (!readiness.ready) {
+    console.log(`Vision 3D : activée mais indisponible (${readiness.reason}) ; partie sans suivi de la tête.`); // i18n-ignore : journal
+    return undefined;
+  }
+  return readiness.source;
+}
+
 // « Caler la borne » (Menu système > Borne, après « Réalité virtuelle ») : la borne du casque et les
 // tables de VPX posées sur la vraie barre avant, touchée aux manettes (calage.ts). Grisée, avec sa
 // raison, tant que le menu n'est pas dans le casque. Aussi : les deux poignées tenues 3 s.
@@ -3186,8 +3273,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     onScreen = true;
     if (liveManual) hooks.gate?.ready({ manual: true });
     if (vrGame) console.log(playedVr ? `Réalité virtuelle (${table.id}) : partie dans le casque.` : `Réalité virtuelle (${table.id}) : casque pas prêt, partie sur les écrans.`); // i18n-ignore : journal
+    if (vision3dSource && configuration) headTracker.start(vision3dSource, configuration.id, vision3d);
     // Les deux MagnaSave ouvrent désormais les réglages en partie (position du DMD, puis menu de VPX ; en VR, celui de VPX dans le casque).
-    if (configuration) inGameMenu.arm({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), place: playfieldPlace(), configurationIni: vrGame?.ini ?? activeVpxIni(loc), dataDir: loc.dataDir, vr: playedVr });
+    if (configuration) inGameMenu.arm({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), place: playfieldPlace(), configurationIni: vrGame?.ini ?? activeVpxIni(loc), dataDir: loc.dataDir, vr: playedVr, ...(vision3dSource && { vision3d: { state: () => headTracker.state, recenter: () => headTracker.recenter() } }) });
     // Partie entre amis : l'arrêt automatique (essais) se compte depuis « partez ».
     if (autoStopAfterMs && !hooks.gate) setTimeout(() => game.stop(), autoStopAfterMs);
   };
@@ -3203,6 +3291,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Réalité virtuelle (vr.ts) : activée et un runtime OpenXR présent, VPX reçoit un INI à part, la VR
   // en « Autodetect » (dans le casque s'il est prêt, sinon sur les écrans). Jamais pour régler l'affichage.
   const vrGame = simulated === undefined && !displayMode ? prepareVr(played.file, double?.ini) : undefined;
+  // Vision 3D (vision3d.ts) : le capteur s'allume quand la table est à l'écran, s'éteint à la fin.
+  const vision3dSource = simulated === undefined && !displayMode ? prepareVision3d(install.exe, Boolean(vrGame)) : undefined;
   // Le menu dans le casque passe la main sans écran intermédiaire : le compagnon garde le casque
   // (chargement compris) jusqu'à ce que VPX le prenne, puis fond au noir et s'arrête (casque.ts).
   if (simulated === undefined && headset?.running) {
@@ -3292,6 +3382,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   inGameMenu.disarm();
   const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
   if (load) console.log(load);
+  headTracker.stop();
   stopCentering?.();
   headsetPaused = false;
   // Arrêté pendant le chargement : ni partie comptée, ni message d'échec, la roue.

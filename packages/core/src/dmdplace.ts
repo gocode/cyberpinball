@@ -201,10 +201,15 @@ export interface DmdMenuHost {
   live: true | string;
   /** « Tous les réglages de VPX » impossible : pourquoi (aucune touche n'ouvre son menu). */
   vpxMenuBlocked?: string;
+  /**
+   * Vision 3D activée (vision3d.ts) : true, la tête est suivie et « Recentrer la vue 3D » est
+   * possible ; un texte, pourquoi elle ne l'est pas. Absente : Vision 3D désactivée, ligne cachée.
+   */
+  vision3d?: true | string;
 }
 
 /** Lignes du menu, dans l'ordre. */
-export type DmdItemId = 'screen' | 'moveX' | 'moveY' | 'size' | 'format' | 'shown' | 'save' | 'general' | 'vpx' | 'resume';
+export type DmdItemId = 'screen' | 'moveX' | 'moveY' | 'size' | 'format' | 'shown' | 'save' | 'general' | 'recenter3d' | 'vpx' | 'resume';
 
 const ITEMS: readonly { id: DmdItemId; label: () => string }[] = [
   { id: 'screen', label: () => t('Écran') },
@@ -215,9 +220,13 @@ const ITEMS: readonly { id: DmdItemId; label: () => string }[] = [
   { id: 'shown', label: () => t('DMD') },
   { id: 'save', label: () => t('Enregistrer pour cette table') },
   { id: 'general', label: () => t('Revenir à la position générale') },
+  { id: 'recenter3d', label: () => t('Recentrer la vue 3D') },
   { id: 'vpx', label: () => t('Tous les réglages de VPX') },
   { id: 'resume', label: () => t('Reprendre la partie') },
 ];
+
+/** Ligne montrée dans cette partie : « Recentrer la vue 3D » seulement quand la Vision 3D est activée. */
+const shown = (host: DmdMenuHost, id: DmdItemId) => id !== 'recenter3d' || host.vision3d !== undefined;
 
 /** Lignes qui règlent la place du DMD (le reste : enregistrer, quitter). */
 const PLACE_ITEMS: readonly DmdItemId[] = ['screen', 'moveX', 'moveY', 'size', 'format', 'shown'];
@@ -248,7 +257,9 @@ export type DmdMenuOutcome =
   /** Fermer le menu et ouvrir celui de VPX ; `discard` : les changements sont abandonnés. */
   | { vpx: true; discard: boolean }
   /** Fermer le menu, la partie reprend ; `discard` : les changements sont abandonnés. */
-  | { resume: true; discard: boolean };
+  | { resume: true; discard: boolean }
+  /** Vision 3D : remesurer la position de jeu sur la tête du joueur ; le menu reste ouvert. */
+  | { recenter3d: true };
 
 export interface DmdMenuState {
   item: number;
@@ -300,6 +311,7 @@ const boundsOf = (host: DmdMenuHost, s: DmdMenuState) => host.screens[s.spot.scr
 function itemBlocked(host: DmdMenuHost, s: DmdMenuState, id: DmdItemId): string | undefined {
   if (id === 'general' && !host.ownPlace) return t('Cette table n’a pas de position à elle : elle suit déjà la position générale.');
   if (id === 'vpx') return host.vpxMenuBlocked;
+  if (id === 'recenter3d' && typeof host.vision3d === 'string') return host.vision3d;
   if (id === 'screen' && host.screens.length < 2) return t('Un seul écran branché.');
   if (['moveX', 'moveY', 'size', 'format'].includes(id) && s.spot.hidden) return t('DMD masqué : affichez-le d’abord (ligne « DMD »).');
   return undefined;
@@ -373,6 +385,8 @@ function open(host: DmdMenuHost, s: DmdMenuState): DmdMenuOutcome {
       return { save: true, then: 'stay' };
     case 'general':
       return 'general';
+    case 'recenter3d':
+      return { recenter3d: true };
     case 'vpx':
       return leave(s, 'vpx');
     case 'resume':
@@ -478,8 +492,11 @@ export function dmdMenuKey(host: DmdMenuHost, s: DmdMenuState, input: { code: st
     return 'handled';
   }
   s.notice = undefined;
-  if (is(k.previous) || is(k.up)) s.item = (s.item - 1 + ITEMS.length) % ITEMS.length;
-  else if (is(k.next) || is(k.down)) s.item = (s.item + 1) % ITEMS.length;
+  if (is(k.previous) || is(k.up) || is(k.next) || is(k.down)) {
+    const step = is(k.previous) || is(k.up) ? -1 : 1;
+    do s.item = (s.item + step + ITEMS.length) % ITEMS.length;
+    while (!shown(host, ITEMS[s.item]!.id));
+  }
   else if (is(k.confirm) || input.code === 'Enter') return open(host, s);
   else if (is(k.exit) || input.code === 'Escape') return leave(s, 'resume');
   else return 'unhandled';
@@ -507,7 +524,7 @@ export type DmdMenuAction =
 export function dmdMenuAction(host: DmdMenuHost, s: DmdMenuState, action: DmdMenuAction): DmdMenuOutcome {
   switch (action.op) {
     case 'item':
-      if (!ITEMS[action.index] || s.leaving) return 'handled';
+      if (!ITEMS[action.index] || !shown(host, ITEMS[action.index]!.id) || s.leaving) return 'handled';
       if (s.mode) close(s);
       s.item = action.index;
       return open(host, s);
@@ -619,7 +636,7 @@ export function dmdMenuPanel(host: DmdMenuHost, s: DmdMenuState, keyLabel: (code
         items: indices(PLACE_ITEMS).map(line),
       },
       { title: '', items: indices(['save', 'general']).map(line) },
-      { title: t('Partie'), items: indices(['vpx', 'resume']).map(line) },
+      { title: t('Partie'), items: indices(shown(host, 'recenter3d') ? ['recenter3d', 'vpx', 'resume'] : ['vpx', 'resume']).map(line) },
     ],
     ...(s.mode === 'choice' && { choices: choices.map((c, i) => ({ label: c.label, selected: i === s.choice })) }),
     ...(s.leaving && {

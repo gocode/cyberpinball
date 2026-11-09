@@ -380,4 +380,6 @@ export interface ObservedUsbDevice {
   name?: string;
   /** Port série attribué par Windows (COM3), quand il y en a un. */
   port?: string;
+  /** Classe de pilote de Windows (« Camera », « Image », « HIDClass »…) ; absente sans pilote installé. */
+  deviceClass?: string;
 }

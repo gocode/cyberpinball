@@ -75,12 +75,15 @@ export function probeUsbDevices(): ObservedUsbDevice[] {
     };
     const name = text(key, 'FriendlyName') ?? deviceDescription(text(key, 'DeviceDesc'));
     const port = text(`${key}\\Device Parameters`, 'PortName');
+    // Classe du pilote : « Camera » ou « Image » pour une webcam (Vision 3D, vision3d.ts du cœur).
+    const deviceClass = text(key, 'Class');
     devices.push({
       instanceId,
       vid: parseInt(ids[1]!, 16),
       pid: parseInt(ids[2]!, 16),
       ...(name ? { name } : {}),
       ...(port ? { port } : {}),
+      ...(deviceClass ? { deviceClass } : {}),
     });
   }
   return devices;

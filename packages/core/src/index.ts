@@ -6,6 +6,7 @@ export * from './ini';
 export * from './vpx';
 export * from './vpxwindows';
 export * from './vr';
+export * from './vision3d';
 export * from './casque';
 export * from './casque-scene';
 export * from './sync';

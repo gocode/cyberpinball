@@ -73,4 +73,10 @@ export const messages: Record<string, string> = {
   'Place réglée pour cette table': 'Position set for this table',
   '« DMD du menu » est réglé sur « classique » : la roue montre le média DMD de la table, sans points (Menu système > Médias > « Médias, son et attente »).':
     '“Menu DMD” is set to “classic”: the wheel shows the table’s DMD media, without dots (System menu > Media > “Media, sound and attract mode”).',
+  // packages/core/src/dmdplace.ts, app/src/in-game-menu.ts : Vision 3D en partie
+  'Recentrer la vue 3D': 'Recenter the 3D view',
+  'Vue 3D recentrée : votre position de jeu est remesurée pendant une seconde, restez en place.': '3D view recentered: your playing position is measured again for one second, stay in place.',
+  'Le capteur de la Vision 3D ne répond pas : voyez le journal de Cyber Pinball.': 'The 3D vision sensor is not responding: see the Cyber Pinball log.',
+  'Vision 3D : aucune tête devant le capteur pour l’instant.': '3D vision: no head in front of the sensor yet.',
+  'Vision 3D : le capteur démarre, réessayez dans un instant.': '3D vision: the sensor is starting, try again in a moment.',
 };

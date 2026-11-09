@@ -33,6 +33,7 @@ export const SYSTEM_ITEM_IDS = [
   'health',
   'cabinet',
   'vpx-settings',
+  'vision3d',
   'vr',
   'vr-calibrate',
   'controls',
@@ -123,8 +124,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'borne',
     icon: 'cabinet',
     get label() { return t('Borne'); },
-    get detail() { return t('Boutons, écrans, son, réglages de VPX, réalité virtuelle, télécommande du téléphone, bureau Windows, mode invité'); },
-    entries: ['health', 'cabinet', 'vpx-settings', 'vr', 'vr-calibrate', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
+    get detail() { return t('Boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, bureau Windows, mode invité'); },
+    entries: ['health', 'cabinet', 'vpx-settings', 'vision3d', 'vr', 'vr-calibrate', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -170,6 +171,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   vr: { icon: 'vr', get label() { return t('Réalité virtuelle'); } },
   // Caler la borne du casque et les tables de VPX sur la vraie barre avant, aux manettes (calage.ts).
   'vr-calibrate': { icon: 'layout', get label() { return t('Caler la borne'); } },
+  // La perspective des tables suit la tête du joueur (vision3d.ts) : webcam ou Kinect.
+  vision3d: { icon: 'eye', get label() { return t('Vision 3D'); } },
   controls: { icon: 'gamepad', get label() { return t('Commandes de la borne'); } },
   // Le téléphone pilote la borne : boutons, clavier, envoi d'un fichier (app/src/phone-remote-menu.ts).
   'phone-remote': { icon: 'phone', get label() { return t('Télécommande du téléphone'); } },

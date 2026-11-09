@@ -49,6 +49,7 @@ const CALLERS: Record<string, { count: number; how: string }> = {
   'app/src/install-vpx.ts': { count: 1, how: 'archive de VPX : manager.track' },
   'app/src/media-download.ts': { count: 3, how: 'plans de VPinMediaDB (une table, toutes les tables, après l’ajout) : trackInstall' },
   'app/src/media-search.ts': { count: 2, how: 'stage : un média demandé, suivi (track) ; stagePreviews : aperçus du plan, pas un téléchargement demandé' },
+  'app/src/vision3d.ts': { count: 1, how: 'pilote de la Kinect, chez Microsoft : manager.track' },
   'app/src/updates-menu.ts': { count: 2, how: 'mise à jour (installeur ou paquet léger) : manager.track' },
   'app/src/ytdlp-tool.ts': { count: 1, how: 'yt-dlp lui-même, dans la récupération suivie (trackGrab)' },
 };

@@ -97,6 +97,8 @@ export interface InGameContext {
    */
   vr?: boolean;
   dataDir: string;
+  /** Vision 3D activée pour cette partie (vision3d.ts) : l'état du suivi, et le recentrage. */
+  vision3d?: { state: () => string; recenter: () => void };
 }
 
 export interface InGameMenu {
@@ -254,6 +256,7 @@ export function createInGameMenu(opts: { log: (line: string) => void; /** La por
       ...(general && { general }),
       live: vpx ? true : t('VPX n’a pas ouvert de fenêtre pour le DMD dans cette partie (DMD éteint ou incrusté dans le plateau) : la place choisie se verra à la prochaine partie.'),
       ...(!vpxKey && { vpxMenuBlocked: t('Aucune touche du clavier n’ouvre le menu de VPX : un bouton de la borne a pris F12.') }),
+      ...(g.vision3d && { vision3d: vision3dLine(g.vision3d.state()) }),
     };
     const playfield = screens.findIndex((s) => s.fingerprint === g.cabinet.roles.playfield);
     const panel = Math.max(0, playfield);
@@ -350,6 +353,10 @@ export function createInGameMenu(opts: { log: (line: string) => void; /** La por
     } else if (typeof out === 'object' && 'vpx' in out) {
       if (out.discard) applyLive(menu.state.saved);
       return close(true);
+    } else if (typeof out === 'object' && 'recenter3d' in out) {
+      game.vision3d?.recenter();
+      menu.state.notice = t('Vue 3D recentrée : votre position de jeu est remesurée pendant une seconde, restez en place.');
+      opts.log(`Réglages en partie (${game.table.id}) : vue 3D recentrée.`); // i18n-ignore : journal
     }
     applyLive(menu.state.spot);
     render();
@@ -448,4 +455,12 @@ export function createInGameMenu(opts: { log: (line: string) => void; /** La por
     open,
     isOpen: () => Boolean(menu),
   };
+}
+
+/** « Recentrer la vue 3D » : possible quand la tête est suivie, sinon pourquoi (HeadTracker.state). */
+function vision3dLine(state: string): true | string {
+  if (state === 'tracking') return true;
+  if (state === 'failed') return t('Le capteur de la Vision 3D ne répond pas : voyez le journal de Cyber Pinball.');
+  if (state === 'searching') return t('Vision 3D : aucune tête devant le capteur pour l’instant.');
+  return t('Vision 3D : le capteur démarre, réessayez dans un instant.');
 }

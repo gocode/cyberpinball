@@ -19,6 +19,7 @@ import { loadManifest, type Component } from './manifest';
 export * from './manifest';
 export { downloadComponent } from './download';
 export * from './vpx-settings-schema';
+export * from './vpx-own-plugins';
 
 const MARKER = '.cyberpinball-component.json';
 const MIN_FREE_BYTES = 2 * 1024 ** 3;

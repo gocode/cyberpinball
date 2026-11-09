@@ -96,6 +96,7 @@ const INPUT_SOURCES: Record<string, { count: number; why: string }> = {
   'game-recording.ts': { count: 3, why: 'enregistreur d’une partie : prêt, morceaux de vidéo et événements de sa propre fenêtre cachée (event.sender vérifié) ; armé par « Jouer et enregistrer », derrière sheet.record, fermée' },
   'acquire-window.ts': { count: 13, why: 'fenêtre « Récupérer » : derrière sheet.missing, sheet.further et le menu système, fermés ; le téléphone accepté qui pilote le menu passe par le même handleKey (frontend.ts, remoteButton)' },
   'ad-blocker.ts': { count: 3, why: 'bloqueur de publicités : canaux des scripts préchargés des pages du navigateur intégré, qui ne rendent que des filtres (styles, scriptlets) et ne changent rien ; aiguillés par la session de la page, celle de « Récupérer »' },
+  'vision3d.ts': { count: 2, why: 'Vision 3D : fichiers de MediaPipe demandés et position des yeux renvoyée par sa propre fenêtre cachée (event.sender vérifié), jamais une commande ; allumée seulement pendant une partie' },
   'in-game-menu.ts': { count: 3, why: 'réglages en partie : la combinaison des MagnaSave passe par game.settings, fermée ; touches, boutons et canal de ses propres fenêtres (event.sender vérifié), qui n’existent qu’une fois le menu ouvert' },
 };
 const INPUT_PATTERN = /ipcMain\.(?:on|once|handle|handleOnce)\(|globalShortcut\.register\(|'before-input-event'|(?<!function )onJoystickInput\(|(?<!function )onKeyInput\(/g;

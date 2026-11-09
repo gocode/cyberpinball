@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <!-- Vision 3D : jamais montrée. MediaPipe (reçu du processus principal, WebAssembly) et la caméra ; aucun réseau. -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'wasm-unsafe-eval' blob:; connect-src blob: data:; media-src mediastream: blob:; worker-src blob:; img-src blob: data:"
+    />
+    <title>Cyber Pinball — Vision 3D</title>
+  </head>
+  <body>
+    <script src="vision3d-webcam.js"></script>
+  </body>
+</html>

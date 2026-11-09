@@ -15,7 +15,7 @@ const build = path.join(repo, 'build', 'casque-vr');
 export const HEADSET_EXE = path.join(build, 'Release', 'cyberpinball-casque.exe');
 
 /** CMake : dans le PATH, sinon à sa place d'installation. */
-function cmakePath() {
+export function cmakePath() {
   const found = spawnSync('cmake', ['--version'], { encoding: 'utf8', shell: false });
   if (found.status === 0) return 'cmake';
   const installed = path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'CMake', 'bin', 'cmake.exe');
