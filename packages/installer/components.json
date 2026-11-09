@@ -25,26 +25,28 @@
       "sourceCommit": "af26b2d93"
     },
     {
-      "id": "kinect-runtime-1.8",
+      "id": "kinect-sdk-1.8",
       "kind": "driver",
       "distribution": "on-demand",
-      "name": "Kinect for Windows Runtime 1.8",
-      "homepage": "https://www.microsoft.com/en-us/download/details.aspx?id=40277",
+      "name": "Kinect for Windows SDK 1.8",
+      "homepage": "https://www.microsoft.com/en-us/download/details.aspx?id=40278",
       "version": "1.8",
       "channel": "stable",
       "platform": "windows-x64",
       "installDir": "downloads",
-      "url": "https://download.microsoft.com/download/e/c/5/ec50686b-82f4-4dbf-a922-980183b214e6/KinectRuntime-v1.8-Setup.exe",
-      "sha256": "f4d4143fb0f0a8d276889c077bfc8af42bfe99c128cadab5e316bf015a9858e9",
-      "size": 116273144,
-      "executablePattern": "^KinectRuntime-v1\\.8-Setup\\.exe$",
-      "license": "Microsoft Kinect for Windows Runtime : téléchargé chez Microsoft à la demande de l'utilisateur, jamais redistribué par Cyber Pinball.",
-      "source": "https://www.microsoft.com/en-us/download/details.aspx?id=40277",
+      "url": "https://download.microsoft.com/download/e/1/d/e1dec243-0389-4a23-87bf-f47de869fc1a/KinectSDK-v1.8-Setup.exe",
+      "sha256": "0574651d5576ebd332307df57c44922f85c569416cd0d75b59d1f99bbe8d1b53",
+      "size": 233219096,
+      "executablePattern": "^KinectSDK-v1\\.8-Setup\\.exe$",
+      "license": "Microsoft Kinect for Windows SDK 1.8 : téléchargé chez Microsoft à la demande de l'utilisateur, jamais redistribué par Cyber Pinball. Le SDK est ce qui fait accepter une Kinect pour Xbox 360 par le pilote.",
+      "source": "https://www.microsoft.com/en-us/download/details.aspx?id=40278",
       "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
       "bundlePackages": [
-        { "source": "a6", "file": "vcredist_x64.exe", "arguments": ["/q", "/norestart"] },
+        { "source": "a8", "file": "vcredist_x64.exe", "arguments": ["/q", "/norestart"] },
         { "source": "a0", "file": "KinectDrivers-v1.8-x64.WHQL.msi" },
-        { "source": "a1", "file": "KinectRuntime-v1.8-x64.msi" }
+        { "source": "a1", "file": "KinectRuntime-v1.8-x64.msi" },
+        { "source": "a12", "file": "redist.cab", "companion": true },
+        { "source": "a2", "file": "KinectSDK-v1.8-x64.msi" }
       ]
     }
   ]

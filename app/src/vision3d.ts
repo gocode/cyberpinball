@@ -11,7 +11,7 @@
 //   La caméra s'allume au début de la partie et s'éteint à la fin ; aucune image ne quitte le PC
 //   (la fenêtre de la webcam n'a accès à aucun réseau).
 // - Pilote de la Kinect : téléchargé chez Microsoft à la demande (components.json,
-//   « kinect-runtime-1.8 »), empreinte et signature vérifiées, installé en silence avec l'accord de
+//   « kinect-sdk-1.8 » : le SDK, sans lequel le pilote refuse une Kinect pour Xbox 360), empreinte et signature vérifiées, installé en silence avec l'accord de
 //   Windows (élévation).
 
 import { spawn } from 'node:child_process';
@@ -23,6 +23,7 @@ import * as koffi from 'koffi';
 import {
   clampShift,
   HeadFilter,
+  nuiErrorReason,
   kinectAim,
   kinectCameraOf,
   type KinectCameraStatus,
@@ -45,7 +46,7 @@ import {
   type WebcamEyes,
 } from '@cyberpinball/core';
 import { downloadComponent, findComponent } from '@cyberpinball/installer';
-import { deviceStatus, memoryIntegrityEnabled } from '@cyberpinball/win-displays';
+import { deviceStatus, hklmValue, memoryIntegrityEnabled } from '@cyberpinball/win-displays';
 import { createWindow } from './offscreen';
 import { usbDevices } from './vpx-ini';
 
@@ -69,6 +70,21 @@ export function writeVision3d(dataDir: string, setting: Vision3dSetting): void {
 
 const SYSTEM32 = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
 
+/**
+ * Le SDK 1.8 de Microsoft est-il inscrit ? Sans lui, le pilote refuse une Kinect pour Xbox 360
+ * (DeviceNotSupported, E_NUI_NOTSUPPORTED) : seule la Kinect pour Windows marche avec le runtime seul.
+ */
+export function kinectSdkInstalled(): boolean {
+  const simulated = process.env.CYBERPINBALL_KINECT_SDK;
+  if (simulated !== undefined) return simulated === '1';
+  if (process.env.KINECTSDK10_DIR) return true;
+  try {
+    return typeof hklmValue('SOFTWARE\\Microsoft\\Kinect', 'SDKInstallPath') === 'string';
+  } catch {
+    return false;
+  }
+}
+
 /** Le pilote de la Kinect v1 (Kinect for Windows Runtime 1.8) pose Kinect10.dll dans System32. */
 export function kinect1DriverInstalled(): boolean {
   const simulated = process.env.CYBERPINBALL_KINECT_PILOTE;
@@ -89,7 +105,7 @@ export function probeVision3d(): Vision3dHardware {
   } catch {
     status = undefined;
   }
-  return vision3dHardware(usb, kinect1DriverInstalled(), hvci, status);
+  return vision3dHardware(usb, kinect1DriverInstalled(), hvci, status, kinectSdkInstalled());
 }
 
 // --- Plugin VPX ---------------------------------------------------------------------------------
@@ -435,11 +451,11 @@ function loadNui(): NuiApi {
 function startKinect1(onHead: (p: Vec3) => void, onFailure: (reason: string) => void, log: (line: string) => void): Source {
   const api = loadNui();
   const hr = api.initialize(NUI_INITIALIZE_FLAG_USES_SKELETON) as number;
-  if (hr < 0) throw new Error(`Kinect indisponible (NuiInitialize 0x${(hr >>> 0).toString(16)}) : est-elle branchée sur le secteur ?`); // i18n-ignore : journal
+  if (hr < 0) throw new Error(nuiErrorReason(hr)); // raison en clair, d'après NuiApi.h du SDK 1.8
   const tr = api.trackingEnable(null, NUI_SKELETON_TRACKING_FLAG_ENABLE_SEATED_SUPPORT) as number;
   if (tr < 0) {
     api.shutdown();
-    throw new Error(`suivi du squelette impossible (0x${(tr >>> 0).toString(16)})`); // i18n-ignore : journal
+    throw new Error(nuiErrorReason(tr));
   }
   const frame = Buffer.alloc(NUI_SKELETON_FRAME_SIZE);
   let aimed = false;
@@ -513,7 +529,7 @@ export type DriverInstall = { ok: true } | { ok: false; cancelled?: true; reason
  * dans le gestionnaire de téléchargements, comme l'archive de VPX : une coupure garde son partiel.
  */
 export async function downloadKinectDriver(downloadsDir: string, downloads?: DownloadManager): Promise<string> {
-  const component = findComponent('kinect-runtime-1.8');
+  const component = findComponent('kinect-sdk-1.8');
   const file = path.join(downloadsDir, path.basename(new URL(component.url).pathname));
   const job = downloads?.track({
     id: component.id,
@@ -571,7 +587,7 @@ async function signerOf(file: string): Promise<{ status: string; subject: string
  * élevé : Windows demande son accord une fois.
  */
 export async function installKinectDriver(file: string): Promise<DriverInstall> {
-  const component = findComponent('kinect-runtime-1.8');
+  const component = findComponent('kinect-sdk-1.8');
   const outer = await signerOf(file);
   if (outer.status !== 'Valid' || outer.subject !== component.signer) {
     fs.rmSync(file, { force: true });
@@ -592,6 +608,8 @@ export async function installKinectDriver(file: string): Promise<DriverInstall> 
     if (x.status !== 0 || !fs.existsSync(extracted)) return { ok: false, reason: `paquet ${pkg.file} introuvable dans l’installateur` }; // i18n-ignore : journal
     const dest = path.join(work, pkg.file);
     renameWithRetry(extracted, dest);
+    // Un compagnon (archive externe d'un .msi) n'est pas signé lui-même : il vient de l'enveloppe vérifiée.
+    if (pkg.companion) continue;
     const sig = await signerOf(dest);
     if (sig.status !== 'Valid' || !/(^|, )O=Microsoft Corporation(,|$)/.test(sig.subject)) return { ok: false, reason: `${pkg.file} : signature inattendue (${sig.status || '?'} ; ${sig.subject || '?'})` }; // i18n-ignore : journal
     packages.push({ path: dest, ...(pkg.arguments && { arguments: pkg.arguments }) });

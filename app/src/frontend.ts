@@ -1849,7 +1849,7 @@ function vision3dHardware(fresh = false): Vision3dHardware {
   return vision3dProbe.hardware;
 }
 const vision3dPluginMissing = () => !vision3dPluginFiles(path.join(__dirname, '..'));
-const kinectDriverMb = () => megabytes(findComponent('kinect-runtime-1.8').size);
+const kinectDriverMb = () => megabytes(findComponent('kinect-sdk-1.8').size);
 const vision3dText = () => vision3dMenuText(vision3d, vision3dReadiness(vision3dHardware(), vision3d.source), { driverMb: kinectDriverMb(), pluginMissing: vision3dPluginMissing() });
 library.provideSystemItem('vision3d', {
   badge: 'beta',

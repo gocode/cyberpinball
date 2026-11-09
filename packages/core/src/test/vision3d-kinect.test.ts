@@ -64,8 +64,12 @@ test('pilote de la Kinect : l’archive des paquets se trouve dans l’enveloppe
   assert.equal(attachedCabinet(broken), undefined);
   // Le manifeste : trois paquets de l'enveloppe, jamais d'arguments /quiet donnés à son interface.
   const manifest = JSON.parse(fs.readFileSync(path.join(REPO, 'packages', 'installer', 'components.json'), 'utf8')) as { components: { id: string; bundlePackages?: { file: string }[]; silentArguments?: unknown }[] };
-  const kinect = manifest.components.find((c) => c.id === 'kinect-runtime-1.8')!;
-  assert.deepEqual(kinect.bundlePackages!.map((p) => p.file), ['vcredist_x64.exe', 'KinectDrivers-v1.8-x64.WHQL.msi', 'KinectRuntime-v1.8-x64.msi']);
+  const kinect = manifest.components.find((c) => c.id === 'kinect-sdk-1.8')!;
+  // Le SDK 1.8 (pas le runtime seul) : sans lui, le pilote refuse une Kinect pour Xbox 360 (E_NUI_NOTSUPPORTED).
+  assert.deepEqual(kinect.bundlePackages!.map((p) => p.file), ['vcredist_x64.exe', 'KinectDrivers-v1.8-x64.WHQL.msi', 'KinectRuntime-v1.8-x64.msi', 'redist.cab', 'KinectSDK-v1.8-x64.msi']);
+  // L'archive externe du SDK est posée à côté de lui, avant lui, sans être lancée.
+  const pkgs = kinect.bundlePackages as { file: string; companion?: boolean }[];
+  assert.equal(pkgs.find((p) => p.file === 'redist.cab')!.companion, true);
   assert.equal(kinect.silentArguments, undefined);
 });
 

@@ -58,9 +58,10 @@ export interface Component {
    * Composant « driver » livré en enveloppe WiX (Burn) dont l'interface ignore /quiet (Kinect :
    * « RedistUX », licence à cocher, fenêtre qu'un menu plein écran recouvre) : les paquets à prendre
    * dans son archive attachée (`source` : nom dans l'archive, a0, a1…), installés un à un sans
-   * fenêtre (.msi par msiexec /qn, sinon avec `arguments`), chacun signé par Microsoft.
+   * fenêtre (.msi par msiexec /qn, sinon avec `arguments`), chacun signé par Microsoft. `companion` :
+   * un fichier que le paquet suivant lit à côté de lui (l'archive externe d'un .msi), pas installé.
    */
-  bundlePackages?: { source: string; file: string; arguments?: string[] }[];
+  bundlePackages?: { source: string; file: string; arguments?: string[]; companion?: boolean }[];
 }
 
 /** Le manifeste est livré avec le paquet, à côté de dist/. */

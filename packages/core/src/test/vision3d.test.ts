@@ -11,6 +11,7 @@ import {
   kinectAim,
   kinectHead,
   medianHead,
+  nuiErrorReason,
   OneEuroFilter,
   opentrackPacket,
   parseVision3dSetting,
@@ -46,7 +47,7 @@ test('matériel : Kinect v1 reconnue avec ou sans pilote, webcams par leur class
     ],
     false,
   );
-  assert.deepEqual(hw, { kinect1: true, kinect1Driver: false, kinect2: false, webcams: ['C922 Pro Stream Webcam'], kinectCamera: { started: true, problem: 0 } });
+  assert.deepEqual(hw, { kinect1: true, kinect1Driver: false, kinect2: false, webcams: ['C922 Pro Stream Webcam'], kinectCamera: { started: true, problem: 0 }, kinectXbox360: true });
 });
 
 test('choix du capteur : Kinect prête d’abord, pilote à installer proposé, sinon webcam, sinon raison', () => {
@@ -183,15 +184,15 @@ test('Kinect : chaque raison de ne pas servir est dite (sans courant, sans pilot
   const noPower = vision3dReadiness(vision3dHardware([motor], true));
   assert.ok(!noPower.ready && /adaptateur secteur/.test(noPower.reason));
   // Pilote posé, mais Windows ne l'a pas chargé (intégrité de la mémoire désactivée sans redémarrer) : redémarrer.
-  const notLoaded = vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: false, problem: 52 }));
+  const notLoaded = vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: false, problem: 52 }, true));
   assert.ok(!notLoaded.ready && notLoaded.restart && /code 52/.test(notLoaded.reason) && /redémarrez/.test(notLoaded.reason));
   // Le périphérique n'a aucun pilote (code 28), même si Kinect10.dll est là : réinstaller.
-  const missing = vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: false, problem: 28 }));
+  const missing = vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: false, problem: 28 }, true));
   assert.ok(!missing.ready && missing.installKinectDriver);
   // Pilote chargé : la Kinect sert.
-  assert.equal(vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: true, problem: 0 })).ready, true);
+  assert.equal(vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: true, problem: 0 }, true)).ready, true);
   // Pas prête mais une webcam branchée : la webcam sert, avec la raison.
-  const fallback = vision3dReadiness(vision3dHardware([motor, camera, cam], true, false, { started: false, problem: 52 }));
+  const fallback = vision3dReadiness(vision3dHardware([motor, camera, cam], true, false, { started: false, problem: 52 }, true));
   assert.ok(fallback.ready && fallback.source === 'webcam' && /Kinect pas prête/.test(fallback.note ?? ''));
   // Pilote à installer : proposé même avec une webcam branchée (la Kinect a été branchée pour servir).
   const install = vision3dReadiness(vision3dHardware([motor, camera, cam], false));
@@ -210,4 +211,23 @@ test('bilan d’une partie : le journal de VPX dit si le module est chargé, ét
   assert.match(vision3dGameReport('disabled', 300).text, /éteint/);
   assert.match(vision3dGameReport('absent', 300).text, /pas trouvé/);
   assert.match(vision3dGameReport('loaded', 0, 'la Kinect ne répond plus').text, /ne répondait pas/);
+});
+
+test('Kinect pour Xbox 360 : sans le SDK de Microsoft, le pilote la refuse ; l’installation (SDK compris) est proposée', () => {
+  const motor = usb(0x045e, 0x02b0);
+  const xbox = usb(0x045e, 0x02ae, { deviceClass: 'KinectSensor' });
+  const windows = usb(0x045e, 0x02bf, { deviceClass: 'KinectSensor' });
+  const noSdk = vision3dReadiness(vision3dHardware([motor, xbox], true, false, { started: true, problem: 0 }, false));
+  assert.ok(!noSdk.ready && noSdk.installKinectDriver && /SDK 1\.8/.test(noSdk.reason));
+  assert.equal(vision3dReadiness(vision3dHardware([motor, xbox], true, false, { started: true, problem: 0 }, true)).ready, true);
+  // La Kinect pour Windows marche avec le pilote seul.
+  assert.equal(vision3dReadiness(vision3dHardware([motor, windows], true, false, { started: true, problem: 0 }, false)).ready, true);
+});
+
+test('codes d’erreur du pilote de la Kinect : la vraie raison, pas une supposition', () => {
+  assert.match(nuiErrorReason(0x83010008 | 0), /SDK 1\.8/);
+  assert.match(nuiErrorReason(0x83010008 | 0), /0x83010008/);
+  assert.match(nuiErrorReason(0x8301027f | 0), /courant/);
+  assert.match(nuiErrorReason(0x83010009 | 0), /autre logiciel/);
+  assert.match(nuiErrorReason(0x80004005 | 0), /erreur du pilote de la Kinect \(0x80004005\)/);
 });

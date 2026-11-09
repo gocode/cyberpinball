@@ -36,6 +36,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - One alignment per configuration: the desk one never serves the cabinet, nor the other way round. At a desk, with no real cabinet, the headset's cabinet is placed once in front of you (or on the edge of the desk, touched with the controllers), then no longer moves.
 - 3D vision: a dedicated screen tells where the sensor stands (ready, no power, driver to install, restart needed, blocked by Windows), lets you test it without starting a table and reinstall the Kinect driver; after each game, a report tells whether VPX really followed your head.
 - Kinect driver installed without any window (no more licence checkbox hidden behind the menu). If Windows memory integrity refuses this driver, Cyber Pinball says so, takes a webcam instead if one is plugged in, and opens the right Windows Security page.
+- 3D vision with a Kinect for Xbox 360: Microsoft's driver alone refuses it; "Installer le pilote de la Kinect" (Install the Kinect driver) now also installs Microsoft's kit (SDK 1.8) that allows it, still without any window. When the Kinect refuses to start, the 3D vision screen gives the real reason (not supported, no power, already in use, USB port overloaded…).
 
 ## 0.1.8
 
