@@ -548,6 +548,11 @@ const REALIGN_TRIES = 3;
 // Médias des jeux : résolus au démarrage du menu, quand
 // le modèle de la borne et la rotation du playfield sont connus.
 let medias: MenuMedias | undefined;
+/**
+ * Médias du menu dessiné pour le casque (casque-vues.ts) : le playfield y est en portrait
+ * (headsetTurn), son fond s'oriente donc d'après ce bord des flippers, pas celui de l'écran du PC.
+ */
+let headsetMedias: MenuMedias | undefined;
 /** Guet des dossiers des tables et des médias : tout changement se voit aussitôt sur chaque écran. */
 let mediaWatch: MediaWatch | undefined;
 let mediaSettings: MenuMediaSettings = loadMenuMediaSettings(loc.dataDir);
@@ -1102,6 +1107,7 @@ const introMenu = createIntroMenu({
   filesChanged: () => {
     introFileCache = undefined;
     medias?.invalidate();
+    headsetMedias?.invalidate();
   },
   screens: () => {
     const dmdType = medias?.defaultMedia('dmd').type === 'FullDMD' ? 'FullDMD' : 'DMD';
@@ -2003,6 +2009,7 @@ export function startFrontend(): void {
         introFileCache = undefined;
         if (changes.has('tables')) reloadTables();
         else medias?.invalidate();
+        headsetMedias?.invalidate();
         broadcast();
       },
     });
@@ -2049,6 +2056,7 @@ export function startFrontend(): void {
       broadcast();
     },
     openViews: () => {
+      headsetMedias ??= loc.root ? new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: loadCabinet(loc.dataDir), rotation: headsetTurn(), onChange: () => broadcast() }) : undefined;
       openHeadsetViews(headsetPages, {
         appDir: path.join(__dirname, '..'),
         playfieldRotation: headsetTurn(),
@@ -2187,6 +2195,7 @@ function reloadTables(selectFile?: string): void {
   tables = scanOrdered();
   // Médias ajoutés, remplacés ou supprimés avec les tables : tout est recherché à nouveau.
   medias?.invalidate();
+  headsetMedias?.invalidate();
   // Dossier des tables ou des médias créé depuis le démarrage (première table) : guetté aussi.
   mediaWatch?.rearm();
   const wanted = selectFile ?? current;
@@ -3608,7 +3617,7 @@ function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function viewFor(role: RoleId) {
+function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
   // En mode attente, chaque écran montre la table tirée au hasard ; la sélection ne bouge pas.
   const shown = attractTable();
   // La roue, la liste et le compteur : les tables de la collection active (sa place ramène la sélection dedans).
@@ -3617,7 +3626,7 @@ function viewFor(role: RoleId) {
   const at = shelf.index;
   const table = shown ?? tables[state.index];
   // Le logo n'est cherché que pour la liste, dessinée par le playfield.
-  const wheel = (t: TableEntry) => (role === 'playfield' ? medias?.wheel(t) : undefined);
+  const wheel = (t: TableEntry) => (role === 'playfield' ? m?.wheel(t) : undefined);
   const describe = (t: TableEntry) => ({
     title: t.title,
     manufacturer: t.manufacturer,
@@ -3638,15 +3647,15 @@ function viewFor(role: RoleId) {
     .map((offset) => neighbor(list[(at + offset + list.length * 10) % list.length]!, offset));
   // Média de chaque rôle de cette fenêtre (le sien et ceux de ses zones), et ceux des voisines à précharger.
   const roles = windowRoles.get(role) ?? [role];
-  const mediasOf = (t: TableEntry) => (medias ? Object.fromEntries(roles.map((r) => [r, medias!.roleMedia(t, r)])) : {});
+  const mediasOf = (t: TableEntry) => (m ? Object.fromEntries(roles.map((r) => [r, m!.roleMedia(t, r)])) : {});
   // Écran qui ne parle d'aucune table (menu système, réglages, aide, messages) : l'affichage par défaut de Cyber Pinball.
   const subject = screensSubject();
-  const defaults = Object.fromEntries(roles.map((r) => [r, medias ? medias.defaultMedia(r) : defaultMediaView(r)]));
+  const defaults = Object.fromEntries(roles.map((r) => [r, m ? m.defaultMedia(r) : defaultMediaView(r)]));
   const preload =
-    !shown && table && subject === table && medias && list.length > 1
+    !shown && table && subject === table && m && list.length > 1
       ? [...new Set(PRELOAD_OFFSETS.map((o) => list[(at + o + list.length * 10) % list.length]!))]
           .filter((t) => t !== table)
-          .flatMap((t) => roles.map((r) => medias!.roleMedia(t, r)))
+          .flatMap((t) => roles.map((r) => m!.roleMedia(t, r)))
           .filter((v) => v.url)
       : [];
   return {
@@ -3676,7 +3685,7 @@ function viewFor(role: RoleId) {
     // Lancement en cinéma : la part de cette fenêtre (le plateau d'où part le logo, le fronton où il se pose).
     cinema: state.phase === 'loading' ? cinemaFor(role) : undefined,
     // Chargement : la vidéo Loading du jeu (ou son repli), plein écran en borne, dans le cadre du plateau au bureau.
-    loading: state.phase === 'loading' && role === 'playfield' && medias && table ? medias.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
+    loading: state.phase === 'loading' && role === 'playfield' && m && table ? m.typeMedia(playing ?? table, 'playfield', 'Loading') : undefined,
     // Chargement qui tarde (loadingprogress.ts) : l'étape vue, l'heure du Start (le rendu compte les secondes), comment arrêter.
     slow:
       state.phase === 'loading' && role === 'playfield' && launch?.slow
@@ -3685,7 +3694,7 @@ function viewFor(role: RoleId) {
           : { step: loadingStepLabel(launch.step), since: launch.since, stop: t('{keys} ou Exit : arrêter', { keys: shortcutLabel(SHORTCUTS.forceStop) }) }
         : undefined,
     // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
-    backglass: role === 'playfield' && medias && table && !shown ? medias.typeMedia(table, 'backglass', 'Backglass') : undefined,
+    backglass: role === 'playfield' && m && table && !shown ? m.typeMedia(table, 'backglass', 'Backglass') : undefined,
     // Mode invité : un message dont l'action est fermée n'en propose pas (son pied dit « Revenir au menu »).
     message: state.message?.action && !guest.allows(MESSAGE_DOORS[state.message.action]) ? { ...state.message, action: undefined } : state.message,
     banner: state.banner,
@@ -3700,7 +3709,7 @@ function viewFor(role: RoleId) {
     ...(role === 'playfield' ? menuCorner() : {}),
     library: state.phase === 'library' ? library.view() : undefined,
     // Mode attente : la table montrée, son logo, et l'invite du playfield.
-    attract: shown ? { ...describe(shown), wheel: medias?.wheel(shown) } : undefined,
+    attract: shown ? { ...describe(shown), wheel: m?.wheel(shown) } : undefined,
     // Horaire : voile noir de la nuit (0 à 1) sur chaque écran, en attente seulement.
     night: shown && hours.night() ? mediaSettings.hours.nightDim / 100 : 0,
     // Préavis d'arrêt (dessiné par le playfield) : son heure dans l'horloge de la fenêtre.
@@ -4025,7 +4034,7 @@ function broadcast(): void {
   for (const [role, win] of windows) {
     if (!win.isDestroyed()) win.webContents.send('state', inHeadset ? { ...viewFor(role), inHeadset: true } : viewFor(role));
   }
-  sendToHeadsetViews((role) => viewFor(role));
+  sendToHeadsetViews((role) => viewFor(role, headsetMedias ?? medias));
   // Télécommande du téléphone : le QR vit tant que l'écran qui le montre est affiché ; le téléphone suit l'écran.
   const surfaces = state.phase === 'library' && !desktop.active ? library.remoteSurfaces() : { menu: false, keyboard: false };
   phoneRemote.show('menu', surfaces.menu);
