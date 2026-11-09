@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { anchorHeight, calibrateMenuText, calibrationGap, calibrationProblem, lockbarMarks, lockbarPlace, lockbarVpxSettings, STANDARD_TABLE_WIDTH_CM } from '../calage';
+import { anchorHeight, calibrateMenuText, calibrationGap, calibrationProblem, eyeHeightProblem, isCalibrated, lockbarMarks, lockbarPlace, lockbarVpxSettings, placeLockbar, placeVpxSettings, roomMoved, STANDARD_TABLE_WIDTH_CM } from '../calage';
 import { LOCKBAR_DISTANCE_M, LOCKBAR_HEIGHT_M } from '../casque';
 import { vrCarriedSettings } from '../vr';
 
@@ -95,4 +95,44 @@ test('calage : branchements du compagnon, du casque et du menu', () => {
   assert.match(frontend, /onGesture: \(\) => \(calibrateUnavailable\(\) \? undefined : openCalibration\(\)\),/);
   // L'entrée vient juste après « Réalité virtuelle ».
   assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /'vr', 'vr-calibrate', 'controls'/);
+});
+
+test('une seule pose : la table de VPX exactement où est la borne du casque, calée ou non', () => {
+  // Aller et retour : les coins touchés redonnent la place, qui redonne les coins.
+  const left = { x: 0.2, y: 0.9, z: -0.8 };
+  const right = { x: 0.8, y: 0.9, z: -0.4 };
+  const place = lockbarPlace(left, right);
+  const back = placeLockbar(place);
+  for (const [a, b] of [[back.left, left], [back.right, right]] as const) for (const k of ['x', 'y', 'z'] as const) close(a[k], b[k]);
+  assert.deepEqual(placeVpxSettings(place), lockbarVpxSettings(left, right));
+  // Pas calée (recentrage sur le regard) : la place seulement, la barre avant de l'INI reste.
+  const loose = { x: place.x, z: place.z, yaw: place.yaw };
+  assert.ok(!isCalibrated(loose) && isCalibrated(place));
+  assert.deepEqual(placeVpxSettings(loose).map((s) => s.key), ['Orientation', 'TableX', 'TableY', 'TableZ']);
+  close(Number(placeVpxSettings(loose)[0]!.value), Number(lockbarVpxSettings(left, right)[0]!.value), 1e-3);
+});
+
+test('limite du Quest changée depuis le calage, sol mal réglé : repérés', () => {
+  assert.equal(roomMoved({ width: 2, depth: 2 }, { width: 2.02, depth: 1.99 }), false);
+  assert.equal(roomMoved({ width: 2, depth: 2 }, { width: 3.1, depth: 2.4 }), true);
+  assert.equal(roomMoved(undefined, { width: 2, depth: 2 }), false);
+  assert.equal(eyeHeightProblem(1.68), undefined);
+  assert.equal(eyeHeightProblem(undefined), undefined);
+  // L'essai du 9 novembre : yeux mesurés à 2,29 m, la borne aux pieds du joueur.
+  assert.match(eyeHeightProblem(2.29) ?? '', /2,29 m du sol.*Paramètres rapides > Paramètres > Configuration de l’environnement > Limite > « Définir le niveau du sol »/);
+  assert.ok(eyeHeightProblem(0.6));
+});
+
+test('borne fixe : aucun recentrage automatique, la place imposée à VPX, le calage proposé d’office', () => {
+  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
+  const frontend = read('app', 'src', 'frontend.ts');
+  assert.match(frontend, /const settings = placeVpxSettings\(place\);\s*writeIniSettings\(vr\.ini, settings\);/);
+  assert.match(frontend, /const vrCenter = vrGame && !readCabinetPlace\(headsetPlaceFile\(\)\) && !vrHasSavedPlace\(vrText\)/);
+  assert.match(frontend, /if \(headset\?\.worn && !isCalibrated\(headset\.place\(\)\)\) offerCalibration\(\);/);
+  const cpp = read('packages', 'casque-vr', 'src', 'casque.cpp');
+  // Dans la pièce, un changement d'espace du Quest ne déplace pas la borne : il est seulement dit.
+  assert.match(cpp, /if \(!stage\)\s*wantRecenter = true;\s*else if \(change->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE\)\s*say\("piece-changee"\);/);
+  assert.match(cpp, /say\("piece " \+ std::to_string\(bounds\.width\)/);
+  assert.match(cpp, /say\("yeux " \+ std::to_string\(loc\.pose\.position\.y\)\);/);
 });

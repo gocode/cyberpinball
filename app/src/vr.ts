@@ -107,7 +107,11 @@ export function rememberVrSettings(dataDir: string, usedIni: string): void {
  * la VR, d'où chaque partie dans le casque les reprend (vrCarriedSettings).
  */
 export function writeVrCalibration(dataDir: string, settings: VpxSetting[]): void {
-  const file = vrIniFile(dataDir);
+  writeIniSettings(vrIniFile(dataDir), settings);
+}
+
+/** Réglages écrits dans un INI de VPX (la place de la borne du casque dans l'INI d'une partie). */
+export function writeIniSettings(file: string, settings: VpxSetting[]): void {
   const doc = IniDocument.parse(readTextIfExists(file));
   applyVpxSettings(doc, settings);
   fs.mkdirSync(path.dirname(file), { recursive: true });

@@ -34,6 +34,7 @@ son interface).
 - « Caler la borne », dans Menu système > Borne (ou les deux poignées tenues 3 s dans le casque) : posez le bout d'une manette sur le coin gauche de la vraie barre avant, puis sur le coin droit, et la borne du casque se pose dessus. Le calage sert au menu comme aux parties, et se garde ; à refaire seulement après un nouveau réglage du sol ou de la limite du Quest.
 - Vision 3D, dans Menu système > Borne (BÊTA) : la perspective de la table suit votre tête, comme une fenêtre ouverte sur le plateau. Une simple webcam suffit ; une Kinect pour Xbox 360 fait encore mieux et vise seule votre tête. Les images de la caméra ne quittent jamais le PC.
 - Kinect branchée sans son pilote : choisir « Vision 3D » le télécharge chez Microsoft et l'installe, sans rien d'autre à faire que d'accepter la demande de Windows. En partie, les deux MagnaSave proposent « Recentrer la vue 3D ».
+- Dans le casque, la borne ne bouge plus : le menu et la partie sont au même endroit, celui du calage, sans recentrage automatique. Tant que la borne n'est pas calée, « Caler la borne » s'ouvre seul dans le casque avant le menu ; si le sol du Quest est mal réglé, le casque dit où le régler.
 
 ## 0.1.8
 

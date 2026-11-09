@@ -12,7 +12,7 @@
 // sol recalé ou une nouvelle limite déplacent l'origine, et le calage est à refaire.
 
 import { LOCKBAR_DISTANCE_M, LOCKBAR_HEIGHT_M } from './casque';
-import { t } from './i18n';
+import { language, t } from './i18n';
 import type { VpxSetting } from './vpx';
 import type { HeadsetMenuState } from './vr';
 
@@ -31,6 +31,8 @@ export interface CabinetPlace {
   lockbarHeight?: number;
   /** Largeur de la barre avant, d'un coin à l'autre (mètres). */
   lockbarWidth?: number;
+  /** Limite du Quest au moment du calage (roomMoved). */
+  room?: RoomBounds;
 }
 
 /** Largeur d'un plateau standard (20 1/4") plus les 2 1/4" que VPX ajoute pour la barre avant, en cm. */
@@ -148,4 +150,65 @@ export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMen
     ].join(' · '),
     unavailable: false,
   };
+}
+
+/** Largeur de la barre avant de VPX par défaut ([Player] LockbarWidth, 70 cm) : celle d'une borne pas calée. */
+export const DEFAULT_LOCKBAR_WIDTH_M = 0.7;
+
+/** Borne calée aux manettes : la hauteur et la largeur de sa vraie barre avant sont connues. */
+export function isCalibrated(place: CabinetPlace | undefined): boolean {
+  return place?.lockbarWidth !== undefined && place.lockbarHeight !== undefined;
+}
+
+/**
+ * Coins de la barre avant de la borne du casque, dans la pièce : à LOCKBAR_DISTANCE_M devant la place
+ * du joueur, dans son cap, à la hauteur calée (sinon LOCKBAR_HEIGHT_M). L'inverse de lockbarPlace.
+ */
+export function placeLockbar(place: CabinetPlace): { left: Point3; right: Point3 } {
+  const forward = { x: -Math.sin(place.yaw), z: -Math.cos(place.yaw) };
+  const along = { x: -forward.z, z: forward.x };
+  const half = (place.lockbarWidth ?? DEFAULT_LOCKBAR_WIDTH_M) / 2;
+  const center = { x: place.x + forward.x * LOCKBAR_DISTANCE_M, y: place.lockbarHeight ?? LOCKBAR_HEIGHT_M, z: place.z + forward.z * LOCKBAR_DISTANCE_M };
+  return {
+    left: { x: center.x - along.x * half, y: center.y, z: center.z - along.z * half },
+    right: { x: center.x + along.x * half, y: center.y, z: center.z + along.z * half },
+  };
+}
+
+/**
+ * Place de la table de VPX pour une partie dans le casque : celle de la borne du casque, toujours,
+ * pour que le menu et le jeu soient au même endroit. Borne calée : la barre avant aussi (largeur et
+ * hauteur) ; sinon, celles de l'INI restent.
+ */
+export function placeVpxSettings(place: CabinetPlace): VpxSetting[] {
+  const { left, right } = placeLockbar(place);
+  const settings = lockbarVpxSettings(left, right);
+  return isCalibrated(place) ? settings : settings.filter((s) => s.section !== 'Player');
+}
+
+/** Limite du Quest (rectangle de la pièce, mètres) gardée avec le calage, pour voir si elle a changé depuis. */
+export interface RoomBounds {
+  width: number;
+  depth: number;
+}
+
+/**
+ * La pièce du Quest a changé depuis le calage (limite refaite, autre limite fixe) : son origine a
+ * sans doute bougé, et la borne n'est plus sur la vraie. Écart de plus de 5 cm sur un côté.
+ */
+export function roomMoved(saved: RoomBounds | undefined, now: RoomBounds | undefined): boolean {
+  if (!saved || !now) return false;
+  return Math.abs(saved.width - now.width) > 0.05 || Math.abs(saved.depth - now.depth) > 0.05;
+}
+
+/** Hauteur des yeux plausible pour un joueur debout ou assis (mètres) ; au-delà, le sol du Quest est mal réglé. */
+export const EYES_MIN_M = 1.0;
+export const EYES_MAX_M = 2.1;
+
+/** Yeux mesurés trop bas ou trop haut : le sol du Quest est à refaire, et le chemin du réglage. Sinon rien. */
+export function eyeHeightProblem(eyes: number | undefined): string | undefined {
+  if (eyes === undefined || (eyes >= EYES_MIN_M && eyes <= EYES_MAX_M)) return undefined;
+  return t('Vos yeux sont mesurés à {h} m du sol : le sol du Quest est mal réglé, et la borne serait à vos pieds. Avant de caler, dans le Quest : Paramètres rapides > Paramètres > Configuration de l’environnement > Limite > « Définir le niveau du sol », puis touchez le sol avec la manette.', {
+    h: (Math.round(eyes * 100) / 100).toLocaleString(language() === 'en' ? 'en-US' : 'fr-FR'),
+  });
 }

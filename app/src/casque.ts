@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anchorHeight, headsetPanels, headsetProtocol, headsetScene, isHeadsetButton, sceneProtocol, type CabinetPlace, type HeadsetButton, type Point3, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, headsetPanels, headsetProtocol, headsetScene, isHeadsetButton, sceneProtocol, type CabinetPlace, type HeadsetButton, type Point3, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -75,6 +75,10 @@ export interface HeadsetMenuOptions {
   onPoint?(hand: 'gauche' | 'droite', point: Point3, room: boolean): void;
   /** Les deux poignées tenues 3 s : ouvrir le calage de la borne. */
   onGesture?(): void;
+  /** Hauteur des yeux au-dessus du sol de la pièce (mètres), à chaque port du casque. */
+  onEyes?(eyes: number): void;
+  /** Limite du Quest au lancement du compagnon ; `changed` : le Quest a déplacé la pièce pendant la session. */
+  onRoom?(room: RoomBounds | undefined, changed: boolean): void;
   log(line: string): void;
 }
 
@@ -90,6 +94,8 @@ export class HeadsetMenu {
   private snapshotTaken = false;
   /** Repères du calage montrés dans la scène (coins de la barre avant). */
   private marks: Point3[] = [];
+  /** Limite du Quest donnée par le compagnon à son lancement (pièce), gardée avec le calage. */
+  room: RoomBounds | undefined;
   private shown: HeadsetMenuState = 'waiting';
   /** Textures d'Electron confiées au compagnon : rendues (release) quand il les a copiées. */
   private target: HandleTarget | undefined;
@@ -273,6 +279,25 @@ export class HeadsetMenu {
           this.opts.onPoint?.(point[1] as 'gauche' | 'droite', { x: Number(point[2]), y: Number(point[3]), z: Number(point[4]) }, !point[5]);
           continue;
         }
+        // Hauteur des yeux, limite de la pièce, pièce déplacée par le Quest : au journal, puis au menu.
+        const eyes = /^yeux (-?[\d.]+)$/.exec(line);
+        if (eyes) {
+          this.opts.log(`Casque : ${line}`); // i18n-ignore : journal
+          this.opts.onEyes?.(Number(eyes[1]));
+          continue;
+        }
+        const room = /^piece ([\d.]+) ([\d.]+)$/.exec(line);
+        if (room) {
+          this.room = { width: Number(room[1]), depth: Number(room[2]) };
+          this.opts.log(`Casque : limite du Quest ${this.room.width.toFixed(2)} × ${this.room.depth.toFixed(2)} m.`); // i18n-ignore : journal
+          this.opts.onRoom?.(this.room, false);
+          continue;
+        }
+        if (line === 'piece-changee') {
+          this.opts.log('Casque : le Quest a déplacé sa pièce (limite refaite ou sol recalé) ; la borne ne bouge pas.'); // i18n-ignore : journal
+          this.opts.onRoom?.(this.room, true);
+          continue;
+        }
         if (line === 'geste caler') {
           this.opts.log('Casque : les deux poignées tenues 3 s, calage de la borne.'); // i18n-ignore : journal
           this.opts.onGesture?.();
@@ -338,18 +363,7 @@ export class HeadsetMenu {
   }
 
   private readPlace(): CabinetPlace | undefined {
-    if (!this.opts.placeFile) return undefined;
-    try {
-      const p = JSON.parse(fs.readFileSync(this.opts.placeFile, 'utf8')) as Record<string, unknown>;
-      const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
-      const [x, z, yaw] = [num(p.x), num(p.z), num(p.yaw)];
-      if (x === undefined || z === undefined || yaw === undefined) return undefined;
-      const lockbarHeight = num(p.lockbarHeight);
-      const lockbarWidth = num(p.lockbarWidth);
-      return { x, z, yaw, ...(lockbarHeight !== undefined && { lockbarHeight }), ...(lockbarWidth !== undefined && { lockbarWidth }) };
-    } catch {
-      return undefined;
-    }
+    return this.opts.placeFile ? readCabinetPlace(this.opts.placeFile) : undefined;
   }
 
   /**
@@ -401,4 +415,24 @@ export class HeadsetMenu {
 /** Commande « ancre » du compagnon : la place de la borne dans la pièce, à la hauteur de la barre avant calée. */
 function anchorLine(place: CabinetPlace): string {
   return `ancre ${place.x} ${place.z} ${place.yaw} ${anchorHeight(place)}\n`;
+}
+
+/**
+ * Place de la borne du casque gardée (casque.json) : la seule pose de la borne, pour le menu dans le
+ * casque comme pour les parties de VPX (placeVpxSettings). Calée : la barre avant et la limite du Quest aussi.
+ */
+export function readCabinetPlace(file: string): CabinetPlace | undefined {
+  try {
+    const p = JSON.parse(fs.readFileSync(file, 'utf8')) as Record<string, unknown>;
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+    const [x, z, yaw] = [num(p.x), num(p.z), num(p.yaw)];
+    if (x === undefined || z === undefined || yaw === undefined) return undefined;
+    const lockbarHeight = num(p.lockbarHeight);
+    const lockbarWidth = num(p.lockbarWidth);
+    const r = p.room as Record<string, unknown> | undefined;
+    const room = r && num(r.width) !== undefined && num(r.depth) !== undefined ? { width: num(r.width)!, depth: num(r.depth)! } : undefined;
+    return { x, z, yaw, ...(lockbarHeight !== undefined && { lockbarHeight }), ...(lockbarWidth !== undefined && { lockbarWidth }), ...(room && { room }) };
+  } catch {
+    return undefined;
+  }
 }

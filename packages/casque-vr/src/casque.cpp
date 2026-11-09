@@ -97,7 +97,7 @@ PFN_xrGetInstanceProcAddr xrGetInstanceProcAddr_ = nullptr;
    X(xrAcquireSwapchainImage) X(xrWaitSwapchainImage) X(xrReleaseSwapchainImage) X(xrResultToString) \
    X(xrEnumerateViewConfigurationViews) X(xrLocateViews) X(xrStringToPath) X(xrCreateActionSet) X(xrCreateAction) \
    X(xrSuggestInteractionProfileBindings) X(xrAttachSessionActionSets) X(xrSyncActions) X(xrGetActionStateBoolean) \
-   X(xrCreateActionSpace)
+   X(xrCreateActionSpace) X(xrGetReferenceSpaceBoundsRect)
 #define DECLARE(name) PFN_##name name##_ = nullptr;
 XR_FUNCS(DECLARE)
 PFN_xrGetD3D11GraphicsRequirementsKHR xrGetD3D11GraphicsRequirementsKHR_ = nullptr;
@@ -1152,6 +1152,14 @@ int main(int argc, char** argv)
    }
 
    say(std::string("pret ") + props.runtimeName + (stage ? " (pièce)" : " (local)") + (colorScale ? "" : " (sans fondu des panneaux)"));
+   // Limite du Quest (rectangle de la pièce) : Cyber Pinball la compare à celle du calage. Une limite
+   // refaite déplace l'origine de la pièce, et la borne ne serait plus sur la vraie.
+   if (stage)
+   {
+      XrExtent2Df bounds {};
+      if (XR_SUCCEEDED(xrGetReferenceSpaceBoundsRect_(session, XR_REFERENCE_SPACE_TYPE_STAGE, &bounds)) && bounds.width > 0 && bounds.height > 0)
+         say("piece " + std::to_string(bounds.width) + " " + std::to_string(bounds.height));
+   }
 
    // Surfaces rendues hors écran par Cyber Pinball : les textures d'Electron ouvertes (par ressource),
    // et la copie de la dernière image, d'où les panneaux prennent la leur.
@@ -1164,6 +1172,8 @@ int main(int argc, char** argv)
    };
    std::map<std::string, Surface> surfaces;
    bool worn = false;
+   /** Hauteur des yeux déjà dite pour ce port du casque (« yeux h ») : un sol mal réglé se voit là. */
+   bool eyesSaid = false;
 
    XrPosef anchor { { 0, 0, 0, 1 }, { 0, 0, -0.f } };
    bool running = false, exitRequested = false, done = false;
@@ -1187,6 +1197,7 @@ int main(int argc, char** argv)
             if ((state == XR_SESSION_STATE_FOCUSED) != worn)
             {
                worn = state == XR_SESSION_STATE_FOCUSED;
+               eyesSaid = false;
                say(std::string("porte ") + (worn ? "1" : "0"));
             }
             // La borne reste à sa place dans la pièce, comme un objet : ni la session qui reprend le
@@ -1216,7 +1227,16 @@ int main(int argc, char** argv)
          else if (ev.type == XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING)
             done = true;
          else if (ev.type == XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING)
-            wantRecenter = true; // recentrage demandé au casque (bouton Meta maintenu)
+         {
+            // Dans la pièce, la borne ne bouge jamais d'elle-même : seulement sur demande (« recentrer »,
+            // 5 du pavé, ou le calage). La pièce déplacée par le Quest (limite refaite) : Cyber Pinball le dit.
+            // Sans la pièce, le bouton Meta maintenu recentre la vue : la borne revient devant le joueur.
+            const auto* change = reinterpret_cast<XrEventDataReferenceSpaceChangePending*>(&ev);
+            if (!stage)
+               wantRecenter = true;
+            else if (change->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE)
+               say("piece-changee");
+         }
          ev = { XR_TYPE_EVENT_DATA_BUFFER };
       }
       // Relève sans suite (VPX n'a jamais pris le casque) : deux minutes au plus.
@@ -1420,6 +1440,18 @@ int main(int argc, char** argv)
             wantRecenter = false;
             say("centre " + std::to_string(anchor.position.x) + " " + std::to_string(anchor.position.z) + " " + std::to_string(yaw) + " yeux=" + std::to_string(loc.pose.position.y - anchor.position.y)
                + (stage ? "" : " sans-piece"));
+         }
+      }
+
+      // Hauteur des yeux au-dessus du sol de la pièce, une fois par port du casque, sur une pose suivie.
+      if (stage && worn && !eyesSaid && state == XR_SESSION_STATE_FOCUSED)
+      {
+         XrSpaceLocation loc { XR_TYPE_SPACE_LOCATION };
+         constexpr XrSpaceLocationFlags tracked = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_POSITION_TRACKED_BIT;
+         if (XR_SUCCEEDED(xrLocateSpace_(view, base, fs.predictedDisplayTime, &loc)) && (loc.locationFlags & tracked) == tracked)
+         {
+            eyesSaid = true;
+            say("yeux " + std::to_string(loc.pose.position.y));
          }
       }
 
