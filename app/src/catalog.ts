@@ -182,6 +182,8 @@ export interface CatalogContext {
   pick?(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
   /** Gestionnaire de téléchargements : chaque fichier d'une page de site y est suivi, et repris après une coupure. */
   downloads?: DownloadManager;
+  /** Juke-box : « Ajouter au Juke-box » dans « Récupérer », sur une playlist ou une vidéo YouTube. */
+  jukebox?(): { accepts(url: string): 'playlist' | 'video' | undefined; add(url: string): void } | undefined;
 }
 
 /** Jeux par page du catalogue : une page tient sur l'écran, cartes et vignettes comprises. */
@@ -501,6 +503,7 @@ export function createCatalog(ctx: CatalogContext) {
     audioOutput: () => host.audioOutput?.(),
     remote: host.phoneRemote,
     grabVideo: ytdlp,
+    jukebox: { accepts: (url) => ctx.jukebox?.()?.accepts(url), add: (url) => ctx.jukebox?.()?.add(url) },
     // Gestionnaire de téléchargements : le fichier d'une page y entre, avec l'écran où il ramène.
     track: ctx.downloads
       ? (d) => {

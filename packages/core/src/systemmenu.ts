@@ -20,6 +20,7 @@ export const SYSTEM_ITEM_IDS = [
   'roms',
   'missing-media',
   'menu-media',
+  'jukebox',
   'friends',
   'avatar',
   'game-history',
@@ -84,18 +85,20 @@ export const SYSTEM_ROOT: readonly SystemGroupId[] = ['amis', 'tables', 'medias'
  * Entrées montrées aussi à la racine, parmi les rubriques : Activité récente, les notifications de
  * tout Cyber Pinball (amis, téléchargements, mises à jour), et Téléchargements, comme le
  * gestionnaire de téléchargements d'une console, et Télécommande du téléphone (06/11/2026 : rangée
- * seulement dans Borne, on ne la trouvait pas). Elles gardent leur place dans leur rubrique
- * (Cyber Pinball > Activité récente, Tables > Téléchargements, Borne > Télécommande du téléphone).
+ * seulement dans Borne, on ne la trouvait pas), et le Juke-box (09/11/2026 : ses playlists se gèrent
+ * depuis « Menu système > Juke-box », chemin donné par le médaillon de la roue). Elles gardent leur
+ * place dans leur rubrique (Cyber Pinball > Activité récente, Médias > Juke-box, Tables >
+ * Téléchargements, Borne > Télécommande du téléphone).
  */
-export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'downloads', 'phone-remote'];
+export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'jukebox', 'downloads', 'phone-remote'];
 
 /**
  * La racine du menu système telle qu'elle s'affiche : Activité récente en tête (elle couvre
- * plusieurs rubriques), puis Amis, Tables, Médias, Téléchargements, Télécommande du téléphone,
- * Borne, Cyber Pinball (ordre choisi le 29/10/2026). systemmenu.test.ts vérifie qu'elle reprend
+ * plusieurs rubriques), puis Amis, Tables, Médias, Juke-box, Téléchargements, Télécommande du
+ * téléphone, Borne, Cyber Pinball (ordre choisi le 29/10/2026, Juke-box ajouté le 09/11/2026). systemmenu.test.ts vérifie qu'elle reprend
  * SYSTEM_ROOT dans son ordre et chaque raccourci une fois.
  */
-export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['activity', 'amis', 'tables', 'medias', 'downloads', 'phone-remote', 'borne', 'cyberpinball'];
+export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['activity', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball'];
 
 export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   tables: {
@@ -109,8 +112,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'medias',
     icon: 'image',
     get label() { return t('Médias'); },
-    get detail() { return t('Images et vidéos des tables, musique et mode attente du menu'); },
-    entries: ['missing-media', 'menu-media'],
+    get detail() { return t('Images et vidéos des tables, musique et mode attente du menu, Juke-box'); },
+    entries: ['missing-media', 'menu-media', 'jukebox'],
   },
   // Réseau des bornes (social.ts) : les amis, l'annuaire des joueurs, les badges, le partage.
   amis: {
@@ -151,6 +154,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   roms: { icon: 'chip', get label() { return t('Bibliothèque de ROM'); } },
   'missing-media': { icon: 'image-download', get label() { return t('Trouver les médias manquants'); } },
   'menu-media': { icon: 'music', get label() { return t('Médias, son et attente'); } },
+  // Playlists du Juke-box : import de YouTube, fichiers locaux, qualité, place (app/src/jukebox-menu.ts).
+  jukebox: { icon: 'jukebox', label: 'Juke-box' }, // i18n-ignore : le nom du Juke-box, le même en anglais
   friends: { icon: 'friend-list', get label() { return t('Mes amis'); } },
   avatar: { icon: 'avatar', get label() { return t('Mon avatar'); } },
 

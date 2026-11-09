@@ -25,9 +25,15 @@ function renderLibrary(v) {
   const guide = v.pages?.help?.kind === 'guide';
   const o = libEl('section', `lib lib-${v.screen}${v.variant ? ` lib-${v.variant}` : ''}${guide ? ' lib-guide' : ''}`);
   const head = libEl('header', 'lib-head');
+  // Interface propre (gestion du Juke-box) : son nom en haut à droite, sur la ligne de la marque ; ni
+  // « Retour » en tête ni bandeau de liste : ses commandes, au pied, disent et font le retour.
+  if (v.app) {
+    o.classList.add('lib-app');
+    o.append(libEl('div', 'lib-app-name', v.app.name));
+  }
   // Retour en tête : à la souris, inutile de descendre au bas de la liste chercher « Retour ».
   // Il nomme l'écran où il mène ; dans la liste d'un écran à deux zones, ce que fait Exit (passer aux actions), et un clic fait de même.
-  if (v.back) {
+  if (v.back && !v.app) {
     const back = actOn(libEl('button', `lib-back${v.backTag ? ' exit-to-actions' : ''}`), v.backTag ? { type: 'zone' } : { type: 'back' });
     back.type = 'button';
     if (v.backTag) back.append(libEl('span', 'lib-keycap', v.backTag.key), libEl('span', '', v.backTag.text));
@@ -85,6 +91,13 @@ function renderLibrary(v) {
     if (v.remote) content.append(renderRemote(v.remote, false));
     // Médias : le message du moment, puis les cartes, puis les sections titrées.
     const sections = v.media ? [...v.sections.filter((x) => !x.title), { cards: true }, ...v.sections.filter((x) => x.title)] : v.sections;
+    // Colonne latérale (Section.side : les choix d'un import) : à droite au bureau, dessous en borne.
+    const side = sections.some((x) => x.side) ? libEl('div', 'lib-content-side') : undefined;
+    const main = side ? libEl('div', 'lib-content-main') : content;
+    if (side) {
+      content.classList.add('with-side');
+      content.append(main, side);
+    }
     for (const section of sections) {
       if (section.cards) {
         content.append(renderMediaCards(v.media, v.cursor));
@@ -114,17 +127,27 @@ function renderLibrary(v) {
           line.append(stack);
         }
         for (const badge of row.badges ?? []) line.append(libEl('span', 'badge', badge));
+        // Case, vignette et valeur à droite (Juke-box) : la ligne en colonnes, le texte dans la sienne.
+        const parts = Boolean(row.check || row.thumb || row.aside);
         // Schéma à droite (« Écran du DMD ») ou pastille à gauche : le texte passe dans une colonne à part.
-        const main = row.figure || row.avatar ? libEl('div', 'lib-row-main') : li;
+        const main = row.figure || row.avatar || parts ? libEl('div', 'lib-row-main') : li;
         main.append(line);
         if (row.detail) main.append(libEl('div', 'lib-row-detail', row.detail));
+        if (row.sub) main.append(libEl('div', 'lib-row-sub', row.sub));
         if (row.figure) li.append(main, dmdFigure(row.figure));
         if (row.avatar) {
           li.classList.add('with-avatar');
           li.append(avatarNode(row.avatar, 'lib-row-avatar'), main);
         }
-        // Avec une pastille, la barre et la note restent dans la colonne du texte.
-        const tail = row.avatar ? main : li;
+        if (parts && !row.figure && !row.avatar) {
+          li.classList.add('with-parts');
+          if (row.check) li.append(rowCheck(row.check));
+          if (row.thumb) li.append(rowThumb(row.thumb));
+          li.append(main);
+          if (row.aside) li.append(libEl('span', 'lib-row-aside', row.aside));
+        }
+        // Avec une pastille ou des colonnes, la barre et la note restent dans la colonne du texte.
+        const tail = row.avatar || parts ? main : li;
         // Téléchargement : sa barre sous le détail ; sans valeur (taille inconnue), une barre sans fin.
         if (row.progress) tail.append(rowProgress(row.progress));
         // À quoi sert un fichier : signe et mot, jamais la couleur seule.
@@ -137,7 +160,7 @@ function renderLibrary(v) {
       }
       if (section.more > 0) list.append(libEl('li', 'lib-row more', tn(section.more, '… et {n} autre', '… et {n} autres')));
       box.append(list);
-      content.append(box);
+      (section.side ? side : main).append(box);
     }
     // Galerie : le détail de la tuile choisie sous la liste qui défile, jamais par-dessus. Sur les
     // actions de l'écran, celui de la tuile où l'on reviendra : la galerie ne change pas de taille.
@@ -152,6 +175,11 @@ function renderLibrary(v) {
 
   // Prospectus et règles : les flippers tournent les pages ; les actions restent là pour la souris.
   const actions = libEl('ol', v.pages ? 'lib-actions pages-actions' : 'lib-actions');
+  // Intitulé des actions qui portent sur l'élément choisi (Juke-box : la playlist), en tête de leur liste.
+  if (v.actionsTitle) {
+    actions.classList.add('with-title');
+    actions.append(libEl('li', 'lib-actions-title', v.actionsTitle));
+  }
   // Une colonne d'icônes dès qu'une action en a une : les libellés restent alignés.
   if (v.actions.some((a) => a.icon)) {
     actions.classList.add('with-icons');
@@ -205,7 +233,7 @@ function renderLibrary(v) {
     actions.append(li);
   });
   body.append(actions);
-  o.append(body, libEl('footer', 'lib-hint', v.hint));
+  o.append(body, v.commands ? appCommands(v.commands) : libEl('footer', 'lib-hint', v.hint));
 
   if (v.editor) o.append(renderEditor(v.editor));
   if (v.busy) {
@@ -880,6 +908,48 @@ function galleryDetail(m, cursor) {
 }
 
 /**
+ * Commandes d'une interface propre (gestion du Juke-box), comme le bandeau des maquettes : une
+ * pastille par bouton ou touche (vert signal), puis ce qu'elle fait ; un clic fait le geste quand il
+ * en a un (Exit : retour, MagnaSave : la liste ou les actions).
+ */
+function appCommands(commands) {
+  const bar = libEl('footer', 'lib-hint lib-commands');
+  for (const c of commands) {
+    const item = c.act ? actOn(libEl('button', 'lib-command'), c.act) : libEl('span', 'lib-command');
+    if (c.act) item.type = 'button';
+    item.append(libEl('span', 'lib-command-key', c.key), libEl('span', 'lib-command-text', c.text));
+    bar.append(item);
+  }
+  return bar;
+}
+
+/** Case d'une ligne (Juke-box) : cochée (coche), vide, ou barrée (croix : sautée, refusée). */
+function rowCheck(state) {
+  const box = libEl('span', `lib-check state-${state}`);
+  if (state === 'on') box.append(cyberIcon('check', 'lib-check-icon'));
+  if (state === 'skip') box.append(cyberIcon('close', 'lib-check-icon'));
+  return box;
+}
+
+/** Vignette carrée d'une ligne : l'image (protocole des médias), sinon l'icône nommée, sur un fond sombre. */
+function rowThumb(thumb) {
+  const box = libEl('span', 'lib-thumb');
+  if (/^cyber-media:/.test(thumb)) {
+    const img = document.createElement('img');
+    img.src = thumb;
+    img.alt = '';
+    img.decoding = 'async';
+    // Image illisible : l'icône à sa place, jamais un carré blanc ni cassé.
+    img.addEventListener('error', () => img.replaceWith(cyberIcon('music', 'lib-thumb-icon')));
+    box.append(img);
+  } else {
+    box.classList.add('placeholder');
+    box.append(cyberIcon(thumb, 'lib-thumb-icon'));
+  }
+  return box;
+}
+
+/**
  * Barre d'un téléchargement dans une ligne (Téléchargements) : remplie à `value` (0 à 1), sans
  * valeur une bande qui n'avance pas, hachurée ; `tone` : la couleur de l'état (en cours, en
  * attente, en pause, fini). Le mot de l'état est dans la ligne : la couleur ne le dit jamais seule.
@@ -1031,7 +1101,8 @@ function revealSelection(root, screen) {
   measureReading();
   menuScroll.settle(root, screen);
   settleReading(drawn);
-  for (const list of document.querySelectorAll('.lib-actions, .lib-content')) {
+  // Une liste qui défile seule dans son écran (morceaux d'un import en borne) a aussi ses filets.
+  for (const list of document.querySelectorAll('.lib-actions, .lib-content, .kind-jb-entries > .lib-rows')) {
     markOverflow(list);
     if (list.dataset.overflowWatch) continue;
     list.dataset.overflowWatch = '';

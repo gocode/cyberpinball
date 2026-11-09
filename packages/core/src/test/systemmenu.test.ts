@@ -42,8 +42,9 @@ test('menu système : la racine reprend les rubriques dans leur ordre, et chaque
   assert.deepEqual(SYSTEM_ROOT_ENTRIES.filter((id) => isSystemGroup(id)), [...SYSTEM_ROOT]);
   assert.deepEqual(SYSTEM_ROOT_ENTRIES.filter((id) => !isSystemGroup(id)), [...SYSTEM_ROOT_SHORTCUTS]);
   // Ordre choisi le 29/10/2026 : Amis en premier, Téléchargements après Médias ; Activité récente en tête depuis le 06/11/2026,
-  // Télécommande du téléphone avant Borne (06/11/2026 : rangée seulement dans Borne, on ne la trouvait pas).
-  assert.deepEqual(SYSTEM_ROOT_ENTRIES, ['activity', 'amis', 'tables', 'medias', 'downloads', 'phone-remote', 'borne', 'cyberpinball']);
+  // Télécommande du téléphone avant Borne (06/11/2026 : rangée seulement dans Borne, on ne la trouvait pas),
+  // Juke-box après Médias (09/11/2026 : « Menu système > Juke-box », chemin donné par le médaillon de la roue).
+  assert.deepEqual(SYSTEM_ROOT_ENTRIES, ['activity', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball']);
 });
 
 test('menu système : dans une rubrique, chaque entrée a son icône, et la rubrique la sienne', () => {
@@ -162,7 +163,7 @@ test('lecture des chemins : guillemets, traduction entre parenthèses, texte nu'
   assert.deepEqual(segments('Borne > Configuration de la borne > Écran du DMD.'), ['Borne', 'Configuration de la borne', 'Écran du DMD']);
   assert.deepEqual(segments("Amis > Demandes d’amis'),"), ['Amis', 'Demandes d’amis'], 'chemin dans une chaîne de code');
   assert.deepEqual(segments('Amis · vous : place 2 sur 3 »'), ['Amis'], 'la suite d’une notification, après « · »');
-  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Activité récente, Amis, Tables, Médias, Téléchargements, Télécommande du téléphone, Borne, Cyber Pinball)');
+  assert.equal(checkPath(['Configuration de la borne']), '« Configuration de la borne » n\'est pas dans les rubriques (Activité récente, Amis, Tables, Médias, Juke-box, Téléchargements, Télécommande du téléphone, Borne, Cyber Pinball)');
   assert.equal(checkPath(['Téléchargements']), undefined, 'Téléchargements, à la racine');
   assert.equal(checkPath(['Tables', 'Téléchargements']), undefined, 'et toujours dans Tables');
   assert.equal(checkPath(['Cyber Pinball', 'Language / Langue']), undefined);

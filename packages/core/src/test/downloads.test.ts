@@ -298,13 +298,18 @@ test('sélecteur : lecteurs, emplacements, sélection, chemin raccourci', () => 
 test('aucune boîte de dialogue de fichiers de Windows dans l’application : le sélecteur de Cyber Pinball partout', () => {
   // Une boîte native s'ouvre sur l'écran principal, ne se pilote pas aux boutons de la borne
   // et ne propose pas les téléchargements déjà reçus : app/src/file-picker.ts la remplace.
+  // Seule exception : la musique du Juke-box au bureau (playfield en largeur, souris et clavier),
+  // décidée avec les maquettes du 09/11/2026 ; en borne, c'est le sélecteur de Cyber Pinball.
+  const allowed = new Set(['library.ts:pickNative']);
   const dir = path.join(__dirname, '..', '..', '..', '..', 'app', 'src');
   const found: string[] = [];
   for (const name of fs.readdirSync(dir).filter((n) => n.endsWith('.ts'))) {
+    let fn = '';
     fs.readFileSync(path.join(dir, name), 'utf8')
       .split(/\r?\n/)
       .forEach((line, i) => {
-        if (/\b(showOpenDialog|showSaveDialog)(Sync)?\b/.test(line)) found.push(`${name}:${i + 1}`);
+        fn = /^\s*(?:async\s+)?function\s+(\w+)/.exec(line)?.[1] ?? fn;
+        if (/\b(showOpenDialog|showSaveDialog)(Sync)?\b/.test(line) && !allowed.has(`${name}:${fn}`)) found.push(`${name}:${i + 1}`);
       });
   }
   assert.deepEqual(found, []);

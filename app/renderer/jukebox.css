@@ -1257,3 +1257,119 @@
   width: calc(28 * var(--cp));
   height: calc(28 * var(--cp));
 }
+
+/* ---------- Ligne « Gestion du Juke-box », en tête de la liste ---------- */
+
+/* Même hauteur et mêmes colonnes qu'un morceau ; l'icône du Juke-box sur une pastille sarcelle. */
+.jb-manage .jb-manage-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklab, var(--halo) 22%, var(--surface));
+  border: 1px solid var(--halo);
+  color: var(--ink);
+}
+
+.jb-manage .jb-manage-icon > svg {
+  width: 46%;
+  height: 46%;
+}
+
+.jb-manage .jb-title {
+  color: var(--ink);
+}
+
+.jb-manage .jb-artist {
+  color: var(--meta);
+}
+
+.jb-manage .jb-manage-go {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--ink-muted);
+}
+
+.jb-manage .jb-manage-go > svg {
+  width: calc(30 * var(--jp));
+  height: calc(30 * var(--jp));
+}
+
+.jb-manage.is-focus .jb-manage-go {
+  color: var(--signal);
+}
+
+/* ---------- Start maintenu : gestion des playlists ---------- */
+
+/*
+ * Le rappel, toujours là : en borne une troisième rangée, sur toute la largeur ; au bureau, trois
+ * colonnes. Les zones fixes ne bougent pas d'un état à l'autre.
+ */
+.jb-cab .jb-help {
+  top: calc(1758 * var(--jp));
+  height: calc(140 * var(--jp));
+  grid-template-rows: repeat(3, auto);
+}
+
+.jb-cab .jb-command-manage {
+  grid-column: 1 / -1;
+}
+
+.jb-desk .jb-help {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+/* L'anneau qui se remplit pendant l'appui, sur la pastille et sur la ligne « Gestion du Juke-box ». */
+.jb-holding {
+  position: relative;
+}
+
+.jb-hold-ring {
+  position: absolute;
+  inset: calc(-5 * var(--jp));
+  border-radius: inherit;
+  pointer-events: none;
+  --hold: 0%;
+  background: conic-gradient(var(--signal) var(--hold), transparent 0);
+  -webkit-mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  padding: calc(4 * var(--jp));
+  animation: jb-hold-fill var(--hold-ms, 1000ms) linear forwards;
+}
+
+@property --hold {
+  syntax: '<percentage>';
+  inherits: false;
+  initial-value: 0%;
+}
+
+@keyframes jb-hold-fill {
+  from {
+    --hold: 0%;
+  }
+  to {
+    --hold: 100%;
+  }
+}
+
+.jb-manage.jb-holding {
+  border-color: var(--signal);
+}
+
+/* Playlist vide : la ligne « Gestion du Juke-box » en tête (une ligne), l'invitation dans la place qui reste. */
+.jb-cab .jb-rows:has(+ .jb-empty-under) {
+  height: calc(132 * var(--jp));
+}
+
+.jb-cab .jb-empty-under {
+  height: calc(924 * var(--jp));
+}
+
+.jb-desk .jb-rows:has(+ .jb-empty-under) {
+  height: calc(110 * var(--jp));
+}
+
+.jb-desk .jb-empty-under {
+  height: calc(660 * var(--jp));
+  gap: calc(14 * var(--jp));
+  padding: calc(20 * var(--jp));
+}

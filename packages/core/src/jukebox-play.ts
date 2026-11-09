@@ -7,15 +7,45 @@
 // - MagnaSave : playlist précédente ou suivante (en boucle). Rien ne démarre seul : la lecture en
 //   cours continue jusqu'au prochain Start.
 // - Exit : retour à la roue, la musique s'arrête.
+// - Ligne « Gestion du Juke-box » : fixe, en tête de la liste de chaque playlist (au-dessus du morceau 1,
+//   un appui de flipper), Start ouvre la gestion. Ce n'est pas un morceau : l'enchaînement l'ignore et
+//   le compteur « 37 / 60 » ne la compte pas (demande du 09/11/2026).
 // - Fin d'un morceau : le suivant disponible de la playlist qui joue (pas forcément celle montrée),
 //   en bouclant à la fin ; aucun disponible : arrêt. Pas de lecture aléatoire dans cette version.
 // - Le volume est celui de la borne (boutons Volume, cabinetvolume.ts) : le Juke-box n'a pas de
 //   réglage à lui, ses éléments audio et vidéo jouent à plein (JUKEBOX_ELEMENT_VOLUME).
 
+import { MUTE_HOLD_MS } from './cabinetvolume';
 import { formatNumber, t } from './i18n';
 
 /** Volume des éléments audio et vidéo du Juke-box : plein, le son de la borne fait le reste. */
 export const JUKEBOX_ELEMENT_VOLUME = 1;
+/** Clé de la ligne « Gestion du Juke-box » en tête de la liste : jamais celle d'un morceau (« t12 »). */
+export const JUKEBOX_MANAGE_KEY = '@gestion';
+
+/**
+ * Start maintenu ouvre la gestion du Juke-box, depuis n'importe quel morceau : le même seuil que
+ * Volume − maintenu (couper le son), une seconde (demande du 09/11/2026).
+ */
+export const JUKEBOX_MANAGE_HOLD_MS = MUTE_HOLD_MS;
+
+/** Appui de Start en cours : depuis quand, et si la gestion est déjà partie (le relâchement n'y fait plus rien). */
+export type StartPress = { since: number; done: boolean } | undefined;
+
+/**
+ * Start dans le lecteur : un appui court joue (ou met en pause) au relâchement, un appui maintenu
+ * JUKEBOX_MANAGE_HOLD_MS ouvre la gestion, sans jamais jouer. `tick` : l'échéance du seuil (minuterie
+ * ou répétition du clavier) ; `repeat` : répétition automatique d'une touche tenue.
+ */
+export function startPressStep(press: StartPress, event: 'down' | 'repeat' | 'tick' | 'up', now: number): { press: StartPress; action?: 'start' | 'manage' } {
+  if (event === 'down') return { press: press ?? { since: now, done: false } };
+  if (!press) return { press: undefined };
+  const held = now - press.since >= JUKEBOX_MANAGE_HOLD_MS;
+  if (event === 'up') return press.done ? { press: undefined } : { press: undefined, action: held ? 'manage' : 'start' };
+  if (!press.done && held) return { press: { ...press, done: true }, action: 'manage' };
+  return { press };
+}
+
 /** Pas de lecture aléatoire dans cette version (question 2 des maquettes). */
 export const JUKEBOX_SHUFFLE = false;
 
@@ -55,7 +85,9 @@ export type PlayerEffect =
   /** Exit : retour à la roue, la musique s'arrête. */
   | { kind: 'exit' }
   /** Start refusé, avec sa raison. */
-  | { kind: 'refused'; reason: string; percent?: number };
+  | { kind: 'refused'; reason: string; percent?: number }
+  /** Start sur la ligne « Gestion du Juke-box » : la gestion s'ouvre. */
+  | { kind: 'manage' };
 
 export interface PlayerStep {
   state: PlayerState;
@@ -75,11 +107,15 @@ export function initialPlayer(lists: readonly PlayerList[], last?: { playlist: s
 
 const listOf = (lists: readonly PlayerList[], id: string) => lists.find((l) => l.id === id);
 
-/** Morceau choisi dans la playlist montrée : celui retenu, sinon celui qui joue, sinon le premier. */
+/**
+ * Ligne choisie dans la playlist montrée : celle retenue (la ligne de gestion comprise), sinon le
+ * morceau qui joue, sinon le premier ; la ligne de gestion pour une playlist vide.
+ */
 export function selectedKey(state: PlayerState, lists: readonly PlayerList[]): string | undefined {
   const list = listOf(lists, state.shown);
-  if (!list?.tracks.length) return undefined;
+  if (!list) return undefined;
   const k = state.selected[list.id];
+  if (k === JUKEBOX_MANAGE_KEY || !list.tracks.length) return JUKEBOX_MANAGE_KEY;
   if (k && list.tracks.some((tr) => tr.key === k)) return k;
   if (state.playing?.playlist === list.id && list.tracks.some((tr) => tr.key === state.playing!.key)) return state.playing.key;
   return list.tracks[0]!.key;
@@ -101,11 +137,12 @@ export function playerStep(state: PlayerState, input: PlayerInput, lists: readon
   switch (input) {
     case 'previous':
     case 'next': {
-      if (!list?.tracks.length) return { state };
+      if (!list) return { state };
+      // La ligne de gestion d'abord (rang -1), puis les morceaux ; sans boucler.
       const k = selectedKey(state, lists)!;
-      const i = list.tracks.findIndex((tr) => tr.key === k);
-      const j = Math.min(list.tracks.length - 1, Math.max(0, i + (input === 'next' ? 1 : -1)));
-      return { state: { ...state, selected: { ...state.selected, [list.id]: list.tracks[j]!.key } } };
+      const i = k === JUKEBOX_MANAGE_KEY ? -1 : list.tracks.findIndex((tr) => tr.key === k);
+      const j = Math.min(list.tracks.length - 1, Math.max(-1, i + (input === 'next' ? 1 : -1)));
+      return { state: { ...state, selected: { ...state.selected, [list.id]: j < 0 ? JUKEBOX_MANAGE_KEY : list.tracks[j]!.key } } };
     }
     case 'playlist-previous':
     case 'playlist-next': {
@@ -118,6 +155,7 @@ export function playerStep(state: PlayerState, input: PlayerInput, lists: readon
     case 'start': {
       const k = selectedKey(state, lists);
       if (!list || !k) return { state, effect: { kind: 'refused', reason: t('Playlist vide') } };
+      if (k === JUKEBOX_MANAGE_KEY) return { state, effect: { kind: 'manage' } };
       if (state.playing?.playlist === list.id && state.playing.key === k) {
         return state.paused ? { state: { ...state, paused: false }, effect: { kind: 'resume' } } : { state: { ...state, paused: true }, effect: { kind: 'pause' } };
       }
@@ -154,6 +192,7 @@ export function startHint(state: PlayerState, lists: readonly PlayerList[]): Sta
   const list = listOf(lists, state.shown);
   const k = selectedKey(state, lists);
   if (!list || !k) return { enabled: false, label: t('Indisponible'), reason: t('Playlist vide') };
+  if (k === JUKEBOX_MANAGE_KEY) return { enabled: true, label: t('Ouvrir la gestion') };
   if (state.playing?.playlist === list.id && state.playing.key === k) return { enabled: true, label: state.paused ? t('Reprendre') : t('Pause') };
   const tr = list.tracks.find((x) => x.key === k)!;
   if (tr.playable) return { enabled: true, label: t('Jouer') };

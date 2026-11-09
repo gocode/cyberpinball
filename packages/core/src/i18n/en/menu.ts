@@ -35,7 +35,7 @@ export const messages: Record<string, string> = {
   'Toutes les tables et leur fiche, collections de la roue, ajouter une table, téléchargements, bibliothèque de ROM': 'Every table and its page, wheel collections, add a table, downloads, ROM library',
   'Toutes les tables': 'All tables',
   'Migration': 'Migration',
-  'Images et vidéos des tables, musique et mode attente du menu': 'Table images and videos, menu music and attract mode',
+  'Images et vidéos des tables, musique et mode attente du menu, Juke-box': 'Table images and videos, menu music and attract mode, Juke-box',
   'Langue, mise à jour, activité récente, sauvegardes, migration, quitter ou redémarrer, veille et extinction': 'Language, update, recent activity, backups, migration, quit or restart, sleep and shutdown',
   'Reprendre les médias de PinUP Popper ou PinballX, regrouper les ROM': 'Import media from PinUP Popper or PinballX, gather ROMs',
   'Menu système': 'System menu',

@@ -193,6 +193,11 @@ export interface AcquireEvents {
    * Recherche libre : la vidéo ou le son d'une page vidéo qui ne lit pas de fichier ordinaire
    * (YouTube, Vimeo…), par yt-dlp (ytdlp-tool.ts) ; absent : pas proposé.
    */
+  /**
+   * Juke-box (jukebox-menu.ts) : sur une page de playlist ou de vidéo YouTube, « Ajouter au
+   * Juke-box » ferme la fenêtre et ouvre l'import sur ce lien. `accepts` : ce que désigne l'adresse.
+   */
+  jukebox?: { accepts(url: string): 'playlist' | 'video' | undefined; add(url: string): void };
   /** Bloqueur de publicités de la session (ad-blocker.ts) ; absent : les pages restent telles quelles. */
   adBlocker?: Pick<AdBlocker, 'attach' | 'refresh'>;
   /** Télécommande du téléphone (phone-remote.ts) ; absente : pas de QR code dans le bandeau. */
@@ -593,8 +598,24 @@ export function createAcquirer(events: AcquireEvents) {
   function barHeight(rows: number): number {
     const narrow = open?.scale?.narrow === true;
     const base = open?.screenNote ? (narrow ? BAR_NARROW_WITH_NOTE : BAR_WITH_NOTE) : narrow ? BAR_NARROW : BAR;
-    const reference = base + (open?.request.search ? SEARCH_ROW : 0) + (open?.request.search && open.video ? VIDEO_ROW : 0) + (rows ? rows * DOWNLOAD_ROW + DOWNLOAD_PAD : 0);
+    const reference = base + (open?.request.search ? SEARCH_ROW : 0) + (open?.request.search && open.video ? VIDEO_ROW : 0) + (jukeboxLine() ? VIDEO_ROW : 0) + (rows ? rows * DOWNLOAD_ROW + DOWNLOAD_PAD : 0);
     return Math.ceil(reference * (open?.scale?.unit ?? 1));
+  }
+
+  /** Ligne du Juke-box : la page est une playlist ou une vidéo YouTube qu'on peut y ajouter. */
+  function jukeboxLine(): { kind: 'playlist' | 'video'; text: string } | undefined {
+    if (!open || !events.jukebox || open.view.webContents.isDestroyed()) return undefined;
+    const kind = events.jukebox.accepts(open.view.webContents.getURL());
+    if (!kind) return undefined;
+    return { kind, text: kind === 'playlist' ? t('Playlist YouTube : l’importer dans le Juke-box, en ligne ou téléchargée, au choix') : t('Vidéo YouTube : l’ajouter à une playlist du Juke-box') };
+  }
+
+  /** Lien à ouvrir dans l'import du Juke-box une fois la fenêtre fermée (son retour au menu fait d'abord). */
+  let jukeboxPending: string | undefined;
+  function addToJukebox(): void {
+    if (!open || !jukeboxLine()) return;
+    jukeboxPending = open.view.webContents.getURL();
+    close();
   }
 
   /** Ligne d'une page vidéo : ce qu'elle est, et ce que Cyber Pinball peut en faire. */
@@ -777,6 +798,7 @@ export function createAcquirer(events: AcquireEvents) {
       ...request,
       search: search ? { ...search, engines: WEB_ENGINES.map((id) => ({ id, label: webEngineLabel(id) })) } : undefined,
       video: open.request.search && open.video ? videoLine(open.video) : undefined,
+      jukebox: jukeboxLine(),
       status: open.status,
       warn: open.warn === true,
       screenNote: open.screenNote,
@@ -816,6 +838,7 @@ export function createAcquirer(events: AcquireEvents) {
     const video = open.request.search && open.video ? videoLine(open.video) : undefined;
     if (video?.direct) out.push({ id: 'video', label: t('Télécharger cette vidéo') });
     if (video?.grab) out.push({ id: 'grab-audio', label: t('Récupérer le son') }, { id: 'grab-video', label: t('Récupérer la vidéo') });
+    if (jukeboxLine()) out.push({ id: 'jukebox', label: t('Ajouter au Juke-box') });
     for (const line of downloadLines().lines) out.push({ id: `cancel:${line.id}`, label: t('Annuler : {file}', { file: line.filename }) });
     return out;
   }
@@ -835,6 +858,7 @@ export function createAcquirer(events: AcquireEvents) {
     if (id === 'home' || id === 'reload') return remoteNav(id);
     if (id === 'video' && open.video?.direct) return open.view.webContents.downloadURL(open.video.direct);
     if (id === 'grab-audio' || id === 'grab-video') return grabVideo(id === 'grab-audio' ? 'audio' : 'video');
+    if (id === 'jukebox') return addToJukebox();
     const cancel = /^cancel:(\d+)$/.exec(id);
     if (cancel) cancelDownload(Number(cancel[1]));
   }
@@ -870,6 +894,9 @@ export function createAcquirer(events: AcquireEvents) {
     ipcMain.on('acquire:grab', (e, want: unknown) => {
       if (!open || e.sender !== open.win.webContents || (want !== 'audio' && want !== 'video')) return;
       grabVideo(want);
+    });
+    ipcMain.on('acquire:jukebox', (e) => {
+      if (open && e.sender === open.win.webContents) addToJukebox();
     });
     ipcMain.on('acquire:video', (e) => {
       if (!open?.video?.direct || e.sender !== open.win.webContents) return;
@@ -1069,6 +1096,10 @@ export function createAcquirer(events: AcquireEvents) {
 
       armed = undefined;
       events.closed();
+      // « Ajouter au Juke-box » : l'import s'ouvre après le retour au menu, sur le lien de la page.
+      const link = jukeboxPending;
+      jukeboxPending = undefined;
+      if (link) events.jukebox?.add(link);
     });
     // Tout un écran, au-dessus du menu, jamais le bureau : celui que donne le menu (choisi ou
     // automatique), sinon l'écran principal de Windows.

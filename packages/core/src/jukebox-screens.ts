@@ -12,7 +12,7 @@
 
 import { formatNumber, t, tn } from './i18n';
 import { formatTrackTime, type JukeboxQuality, type TrackSource, type TrackStatus } from './jukebox';
-import { selectedKey, startHint, type PlayerList, type PlayerState } from './jukebox-play';
+import { JUKEBOX_MANAGE_HOLD_MS, JUKEBOX_MANAGE_KEY, selectedKey, startHint, type PlayerList, type PlayerState } from './jukebox-play';
 import { DMD_FONT_LARGE, DMD_FONT_SMALL, dmdText, textWidth } from './dmdfont';
 import { DMD_HEIGHT, DMD_LEVEL, DMD_MARGIN, DMD_USABLE, DMD_WIDTH, blankDots, drawCentered, drawText, type DmdDots } from './livedmd';
 
@@ -142,10 +142,19 @@ export interface JukeboxRowView {
   playing?: 'play' | 'pause';
   focus?: boolean;
   disabled?: boolean;
+  /** Ligne fixe « Gestion du Juke-box », en tête de la liste : pas un morceau. */
+  manage?: boolean;
+}
+
+/** Rang d'affichage d'une ligne : la ligne de gestion en 0, le morceau n en n (numéroté « 0n »). */
+export function displayIndex(key: string | undefined, rows: readonly { key: string }[]): number {
+  if (key === undefined || key === JUKEBOX_MANAGE_KEY) return 0;
+  const i = rows.findIndex((r) => r.key === key);
+  return i < 0 ? 0 : i + 1;
 }
 
 export interface JukeboxCommandView {
-  id: 'flippers' | 'start' | 'magnasave' | 'exit';
+  id: 'flippers' | 'start' | 'magnasave' | 'exit' | 'manage';
   /** Bouton de la borne, et touche du clavier au bureau. */
   cab: string;
   desk: string;
@@ -202,6 +211,8 @@ export interface JukeboxPlayerView {
   commands: JukeboxCommandView[];
   /** Aucune playlist, ou playlist vide : l'invitation, sans focus. */
   empty?: 'library' | 'playlist';
+  /** Start tenu : depuis quand, et le seuil ; l'anneau de la ligne « Gestion » et de son rappel se remplit. */
+  manageHold?: { since: number; ms: number };
 }
 
 export interface JukeboxViewInput {
@@ -214,6 +225,8 @@ export interface JukeboxViewInput {
   ad?: boolean;
   /** Le morceau en cours se lit sans vidéo (son seul, fichier son, vidéo absente). */
   audioOnly?: boolean;
+  /** Start tenu depuis cet instant (horloge du processus principal). */
+  holdSince?: number;
 }
 
 const two = (n: number) => String(n).padStart(2, '0');
@@ -248,6 +261,7 @@ function originOf(source: TrackSource, audioOnly: boolean): string {
 /** Ce que Start dira sur le morceau choisi : l'action, ou pourquoi il ne joue pas. */
 function startAction(view: JukeboxViewInput, lists: readonly PlayerList[], row: JukeboxRowInput | undefined): { action: string; disabled: boolean } {
   const hint = startHint(view.state, lists);
+  if (selectedKey(view.state, lists) === JUKEBOX_MANAGE_KEY) return { action: hint.label, disabled: false };
   if (!row) return { action: t('Liste vide'), disabled: true };
   if (hint.enabled) return { action: hint.label === t('Jouer') ? t('Jouer la sélection') : hint.label, disabled: false };
   switch (row.status.kind) {
@@ -283,14 +297,28 @@ export function jukeboxPlayerView(view: JukeboxViewInput): JukeboxPlayerView {
   const playing = view.state.playing;
   const rows = shown?.rows ?? [];
   const at = rows.findIndex((r) => r.key === selected);
-  const top = Math.min(Math.max(0, view.top), Math.max(0, rows.length - view.rows));
-  const windowRows = rows.slice(top, top + view.rows).map((r, i): JukeboxRowView => {
+  // La liste montrée : la ligne « Gestion du Juke-box » en tête, puis les morceaux (rang d'affichage = numéro).
+  const shownRows: (JukeboxRowInput | undefined)[] = shown ? [undefined, ...rows] : [];
+  const top = Math.min(Math.max(0, view.top), Math.max(0, shownRows.length - view.rows));
+  const windowRows = shownRows.slice(top, top + view.rows).map((r, i): JukeboxRowView => {
+    if (!r) {
+      return {
+        key: JUKEBOX_MANAGE_KEY,
+        num: '',
+        title: t('Gestion du Juke-box'),
+        line: t('Playlists, morceaux, ajouts de YouTube ou de fichiers'),
+        duration: '',
+        source: 'download',
+        manage: true,
+        ...(selected === JUKEBOX_MANAGE_KEY ? { focus: true } : {}),
+      };
+    }
     const mark = markOf(r.status);
     const isPlaying = playing?.playlist === shown?.id && playing?.key === r.key;
     const ad = isPlaying && view.ad;
     return {
       key: r.key,
-      num: two(top + i + 1),
+      num: two(top + i),
       title: r.title,
       line: ad ? t('Publicité · le morceau suit') : mark ? reasonOf(r.status) : (r.artist ?? ''),
       ...(ad ? { mark: 'ad' as const } : mark ? { mark } : {}),
@@ -303,8 +331,9 @@ export function jukeboxPlayerView(view: JukeboxViewInput): JukeboxPlayerView {
       ...(mark ? { disabled: true } : {}),
     };
   });
+  // Lignes cachées avant la fenêtre (le filet du haut) ; le décompte ne dit que les morceaux.
   const before = top;
-  const after = Math.max(0, rows.length - top - windowRows.length);
+  const after = Math.max(0, shownRows.length - top - windowRows.length);
 
   let now: JukeboxNowView | undefined;
   if (playing) {
@@ -335,10 +364,12 @@ export function jukeboxPlayerView(view: JukeboxViewInput): JukeboxPlayerView {
 
   const start = startAction(view, lists, at >= 0 ? rows[at] : undefined);
   const commands: JukeboxCommandView[] = [
-    { id: 'flippers', cab: t('Flippers'), desk: '↑↓', action: t('Choisir'), ...(rows.length ? {} : { disabled: true }) },
+    { id: 'flippers', cab: t('Flippers'), desk: '↑↓', action: t('Choisir'), ...(shown ? {} : { disabled: true }) },
     { id: 'start', cab: t('Start'), desk: t('Entrée'), action: start.action, ...(start.disabled ? { disabled: true } : {}) },
     { id: 'magnasave', cab: t('MagnaSave'), desk: '←→', action: t('Playlists'), ...(n > 1 ? {} : { disabled: true }) },
     { id: 'exit', cab: t('Exit'), desk: t('Échap'), action: t('Roue · arrêt musique') },
+    // Toujours rappelé : Start maintenu une seconde ouvre la gestion, depuis n'importe quel morceau.
+    { id: 'manage', cab: t('Start maintenu'), desk: t('Entrée maintenue'), action: t('Gestion des playlists') },
   ];
 
   return {
@@ -356,9 +387,9 @@ export function jukeboxPlayerView(view: JukeboxViewInput): JukeboxPlayerView {
         }
       : {}),
     list: {
-      head: rows.length ? t('Sélection · {at} / {count}', { at: at + 1, count: rows.length }) : t('Aucun morceau'),
+      head: !rows.length ? t('Aucun morceau') : at >= 0 ? t('Sélection · {at} / {count}', { at: at + 1, count: rows.length }) : tn(rows.length, 'Gestion du Juke-box · {n} morceau', 'Gestion du Juke-box · {n} morceaux', { n: formatNumber(rows.length) }),
       // Liste déjà défilée : ce qu'il y a avant et après (sinon, la légende des sources).
-      ...(before ? { around: t('↑ {before} avant · {after} après ↓', { before, after }) } : {}),
+      ...(before ? { around: t('↑ {before} avant · {after} après ↓', { before: Math.max(0, before - 1), after }) } : {}),
       top,
       total: rows.length,
       rows: windowRows,
@@ -368,6 +399,7 @@ export function jukeboxPlayerView(view: JukeboxViewInput): JukeboxPlayerView {
     ...(now ? { now } : {}),
     commands,
     ...(!shown ? { empty: 'library' as const } : !rows.length ? { empty: 'playlist' as const } : {}),
+    ...(view.holdSince !== undefined ? { manageHold: { since: view.holdSince, ms: JUKEBOX_MANAGE_HOLD_MS } } : {}),
   };
 }
 

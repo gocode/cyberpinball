@@ -104,10 +104,29 @@
 
   // ---------- Commandes ----------
 
+  /**
+   * Start tenu : l'anneau qui se remplit en JUKEBOX_MANAGE_HOLD_MS (une seconde), parti de l'instant de
+   * l'appui (horloge du processus principal) : redessiné en cours d'appui, il ne repart pas de zéro.
+   */
+  function holdRing(hold) {
+    const ring = el('span', 'jb-hold-ring');
+    ring.style.setProperty('--hold-ms', `${hold.ms}ms`);
+    ring.style.animationDelay = `${-Math.max(0, Math.min(hold.ms, Date.now() - hold.since))}ms`;
+    return ring;
+  }
+
+  let holdShown;
+
   function command(c, desk) {
-    const node = el('span', `jb-command${c.disabled ? ' jb-disabled' : ''}`);
-    node.append(el('span', 'jb-key', desk ? c.desk : c.cab), el('span', 'jb-command-action', c.action));
-    if (c.id === 'start') act(node, { op: 'start' });
+    const node = el('span', `jb-command${c.disabled ? ' jb-disabled' : ''}${c.id === 'manage' ? ' jb-command-manage' : ''}`);
+    const key = el('span', 'jb-key', desk ? c.desk : c.cab);
+    if (c.id === 'manage' && holdShown) {
+      key.classList.add('jb-holding');
+      key.append(holdRing(holdShown));
+    }
+    node.append(key, el('span', 'jb-command-action', c.action));
+    if (c.id === 'manage') act(node, { op: 'manage' });
+    else if (c.id === 'start') act(node, { op: 'start' });
     else if (c.id === 'magnasave') act(node, { op: 'playlist', dir: 1 });
     else if (c.id === 'exit') act(node, { op: 'exit' });
     return node;
@@ -137,7 +156,33 @@
     return box;
   }
 
+  /**
+   * Ligne fixe « Gestion du Juke-box », en tête de la liste : même hauteur et mêmes colonnes qu'un
+   * morceau, l'icône du Juke-box à la place de la miniature, un chevron à la place de la durée.
+   */
+  function manageRow(r) {
+    const row = el('div', `jb-row jb-manage${r.focus ? ' is-focus' : ''}`);
+    act(row, { op: 'row', key: r.key });
+    const badge = el('div', 'jb-art jb-manage-icon');
+    badge.append(icon('jukebox'));
+    if (holdShown) {
+      row.classList.add('jb-holding');
+      badge.append(holdRing(holdShown));
+    }
+    const text = el('div', 'jb-row-text');
+    const title = el('span', 'jb-title jb-ellipsis', r.title);
+    title.title = r.title;
+    const line = el('span', 'jb-artist jb-ellipsis', r.line);
+    line.title = r.line;
+    text.append(title, line);
+    const go = el('span', 'jb-manage-go');
+    go.append(icon('chevron-right'));
+    row.append(el('span', 'jb-num'), badge, text, el('span', 'jb-manage-none'), go);
+    return row;
+  }
+
   function trackRow(r) {
+    if (r.manage) return manageRow(r);
     const row = el('div', `jb-row${r.focus ? ' is-focus' : ''}${r.playing ? ' jb-playing' : ''}${r.disabled ? ' jb-disabled' : ''}`);
     if (r.disabled) row.setAttribute('aria-disabled', 'true');
     act(row, { op: 'row', key: r.key });
@@ -294,7 +339,15 @@
       head.append(el('span', '', view.list.head), view.empty ? el('span', '', '') : view.list.around ? el('span', 'jb-around', view.list.around) : legend());
       nodes.push(head);
     }
-    if (view.empty) nodes.push(emptyList(view, desk));
+    // Playlist vide : la ligne de gestion reste en tête (on y ajoute des morceaux), l'invitation dessous.
+    if (view.empty === 'playlist' && view.list.rows.length) {
+      const rows = el('div', 'jb-rows');
+      rows.dataset.defile = '';
+      rows.append(...view.list.rows.map(trackRow));
+      const invite = emptyList(view, desk);
+      invite.classList.add('jb-empty-under');
+      nodes.push(rows, invite);
+    } else if (view.empty) nodes.push(emptyList(view, desk));
     else {
       const rows = el('div', `jb-rows${view.list.after ? ' continues' : ''}${view.list.before ? ' scrolled' : ''}`);
       rows.dataset.defile = '';
@@ -735,6 +788,8 @@
     document.documentElement.classList.toggle('jukebox-desk', isDesk);
     if (isDesk) cab = undefined;
     else desk = undefined;
+    // Start tenu : l'anneau de la ligne « Gestion » et de son rappel (manageHold de la vue).
+    holdShown = s.jukebox?.player?.manageHold;
     const node = isDesk ? deskView(s) : cabView(s);
     if (lastTime) showTime(lastTime);
     return [node];

@@ -38,6 +38,7 @@ export const ICON_NAMES = [
   'import',
   'image-download',
   'music',
+  'jukebox',
   'language',
   'upgrade',
   'desktop',

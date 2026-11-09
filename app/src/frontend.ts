@@ -888,6 +888,9 @@ const library = createLibrary({
   keys: () => KEYS,
   zoneKeys: () => zoneSwitchKeys({ buttons, navigation }),
   windows: () => windows,
+  landscape: () => playfieldLandscape(),
+  // Exit de la gestion du Juke-box : le lecteur, sur la playlist choisie.
+  jukeboxPlayer: (playlist) => openJukebox(playlist),
   browserScreen: () => browserScreenRect(),
   audioOutput: () => audioOutput,
   phoneRemote,
@@ -950,6 +953,12 @@ const jukeboxPlayer = createJukeboxPlayer({
   },
 });
 
+/** La gestion du Juke-box est à l'écran : le fronton garde l'affiche du Juke-box, le DMD ses points (jamais vides). */
+function jukeboxManaging(): boolean {
+  const menu = (library as { jukeboxMenu?: { active?: () => boolean } }).jukeboxMenu;
+  return state.phase === 'library' && Boolean(menu?.active?.());
+}
+
 /** La gestion des playlists (étape 4), quand elle est là : ouverte sur une playlist, ou sur l'import. */
 function jukeboxMenu(): { open(playlist?: string): void } | undefined {
   const menu = (library as { jukeboxMenu?: { open?: unknown } }).jukeboxMenu;
@@ -986,13 +995,24 @@ function openJukebox(playlist?: string): void {
     broadcast();
     return;
   }
-  if (state.phase === 'library') library.leave();
+  // Retour de la gestion : le lecteur gardé en fond ne se ferme pas au passage (la lecture reprend).
+  if (state.phase === 'library') {
+    reopeningJukebox = true;
+    try {
+      library.leave();
+    } finally {
+      reopeningJukebox = false;
+    }
+  }
   cancelWheelPress();
   collections.hidePanel();
   state = { ...state, phase: 'jukebox', help: false, message: undefined, jukebox: true };
   jukeboxPlayer.open(playlist);
   broadcast();
 }
+
+/** Le Juke-box se rouvre depuis sa gestion : broadcast ne ferme pas le lecteur gardé en fond. */
+let reopeningJukebox = false;
 
 // Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes (pastille
 // rouge) ; jamais pendant une partie ni son chargement.
@@ -3016,6 +3036,8 @@ function handleKeyUp(input: Input, fromPhone = false): void {
   releaseWheelStart(input.code);
   // Gestion des tables : MagnaSave (F6) relâché bascule entre la liste et les actions de l'écran.
   if (state.phase === 'library') library.handleKeyUp(input);
+  // Juke-box : Start relâché tôt joue ou met en pause ; maintenu, il a déjà ouvert la gestion.
+  if (state.phase === 'jukebox') jukeboxPlayer.handleKey(input);
 }
 
 /**
@@ -4359,7 +4381,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     // Le son du menu ne sort que d'une fenêtre : celle du playfield.
     sound: role === 'playfield' ? soundView() : undefined,
     // Juke-box : l'affiche du médaillon choisi, ou le lecteur (liste, clip, cartel).
-    jukebox: jukeboxPlayer.view(role, state.phase === 'menu' && !state.help && onJukebox()),
+    jukebox: jukeboxPlayer.view(role, (state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging()),
     gameKeys: gameKeys(buttons, tilt),
     // Aide-mémoire du chargement : au bureau toujours ; en borne, celui du réglage de l'affichage seulement (display).
     loadingKeys: displayMode ? { title: t('Réglage de l’affichage'), rows: displayKeys(buttons), display: true } : { title: t('Commandes de la partie'), rows: gameKeys(buttons, tilt), display: false },
@@ -4539,7 +4561,7 @@ function liveDmdOn(): boolean {
 
 /** Le DMD est au Juke-box : son médaillon choisi dans la roue, ou le lecteur ouvert (points même en DMD classique). */
 function jukeboxDmd(): boolean {
-  return state.phase === 'jukebox' || (state.phase === 'menu' && !state.help && onJukebox());
+  return state.phase === 'jukebox' || (state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging();
 }
 
 function tableRecords(table: TableEntry): TableRecords | undefined {
@@ -4682,17 +4704,17 @@ function followTint(): void {
 
 function broadcast(): void {
   // Le Juke-box se ferme, musique arrêtée, dès qu'on quitte son écran, par quelque chemin que ce soit
-  // (Exit, partie lancée du téléphone, extinction…) ; sauf au bureau, vers la gestion (menu système) :
-  // la musique y continue, en fond, jusqu'au retour à la roue ou au lecteur.
-  if (state.phase !== 'jukebox' && jukeboxPlayer.active()) {
-    if (state.phase === 'library' && playfieldLandscape()) jukeboxPlayer.toBackground();
+  // (Exit, partie lancée du téléphone, extinction…) ; sauf vers sa gestion : au bureau la musique y
+  // continue, en fond ; en borne elle s'y met en pause et reprend au retour au lecteur.
+  if (state.phase !== 'jukebox' && jukeboxPlayer.active() && !reopeningJukebox) {
+    if (state.phase === 'library' && (playfieldLandscape() || jukeboxManaging())) jukeboxPlayer.toBackground(!playfieldLandscape());
     else jukeboxPlayer.close();
   }
   // Casque porté et ses écrans rendus pour lui : ceux du PC n'affichent plus que « Dans le casque ».
   const inHeadset = Boolean(headset?.worn && headset.viewsFlowing);
   followTint();
   syncLiveDmd();
-  jukeboxPlayer.syncDmd(state.phase === 'menu' && !state.help && onJukebox());
+  jukeboxPlayer.syncDmd((state.phase === 'menu' && !state.help && onJukebox()) || jukeboxManaging());
   // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).
   attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !desktop.active);
   if (!attract.active) attractIndex = undefined;

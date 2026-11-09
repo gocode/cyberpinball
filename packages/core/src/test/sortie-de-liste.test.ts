@@ -227,7 +227,8 @@ test('rendu : chaque conteneur de liste de contenu de library.js passe par le ca
   // Les conteneurs .lib-content créés par le rendu, et ce qu'il en fait.
   const made = [...src.matchAll(/libEl\('div', '(lib-content[^']*)'\)/g)].map((m) => m[1]);
   // Le tableau des scores n'a pas de liste de contenu : ses onglets se changent aux flippers, ses lignes ne se choisissent pas.
-  assert.deepEqual(made, ['lib-content', 'lib-content journey', 'lib-content health', 'lib-content scoreboard'], 'nouveau conteneur de liste : le passer par zoneFrame, ou le ranger ici avec sa raison');
+  // Colonnes d'un contenu (Section.side) : à l'intérieur de .lib-content, qui passe par le cadre.
+  assert.deepEqual(made, ['lib-content', 'lib-content-side', 'lib-content-main', 'lib-content journey', 'lib-content health', 'lib-content scoreboard'], 'nouveau conteneur de liste : le passer par zoneFrame, ou le ranger ici avec sa raison');
   assert.equal([...src.matchAll(/zoneFrame\(content, v\.zone\)/g)].length, 2, 'liste et galerie : dans le cadre');
   assert.match(src, /zoneFrame\(renderHealth\([^)]*\), v\.zone\)/, 'Santé de la borne : dans le cadre');
   // Le parcours d'une table n'a pas de liste de contenu : ses étapes répètent les actions de l'écran.
@@ -244,6 +245,7 @@ const SCROLLING: Record<string, string> = {
   'library.css | .lib-body.lib-health > .health, .lib-body.lib-health > .lib-zone > .health': 'liste de contenu (Santé de la borne) : dans le cadre de sa zone',
   'library.css | .lib-picker .kind-places': 'liste de contenu (emplacements du sélecteur de fichiers) : dans le cadre de la zone, avec les fichiers',
   'library.css | .lib-picker .kind-entries': 'liste de contenu (fichiers du sélecteur) : dans le cadre de la zone',
+  'library.css | .lib-jukebox.jukebox-import .kind-jb-entries > .lib-rows': 'liste de contenu (morceaux d’un import YouTube, en borne) : dans le cadre de la zone, avec ses filets ; les choix de l’import restent visibles dessous',
   'settings.css | .list ul': 'réglages de VPX (settings.ts) : une liste de réglages, pas de contenu ; Exit y remonte d’un niveau, Page préc./suiv. y sautent de dix',
   'settings.css | .detail': 'réglages de VPX : le détail du réglage choisi, rien à choisir ; MagnaSave le fait défiler (data-reading, lecture.test.ts)',
   'settings.css | .choices': 'réglages de VPX : les valeurs d’un réglage, panneau qu’Exit referme',

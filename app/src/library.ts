@@ -12,7 +12,7 @@ import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, net, type BrowserWindow, type Input, type Rectangle } from 'electron';
+import { app, clipboard, dialog, net, type BrowserWindow, type Input, type Rectangle } from 'electron';
 import {
   isFavorite,
   CONFIG_KEY,
@@ -190,6 +190,8 @@ import {
   detectDofControllers,
   dofHealthFacts,
   SCORE_PERIODS,
+  JUKEBOX_AUDIO_EXTENSIONS,
+  JUKEBOX_VIDEO_EXTENSIONS,
   RANKING_SCOPES,
   type RankingLine,
   type RankingScope,
@@ -203,6 +205,7 @@ import { usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
 import { LayoutReport } from './layout-check';
 import { createJukeboxLibrary } from './jukebox-library';
+import { createJukeboxMenu } from './jukebox-menu';
 import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
 import type { RecordingOutcome } from './game-recording';
@@ -311,6 +314,8 @@ export interface LibraryHost {
   /** Touches qui basculent entre la liste de contenu d'un écran et ses actions : les MagnaSave, F6 (zoneSwitchKeys). */
   zoneKeys?(): string[];
   windows(): Map<RoleId, BrowserWindow>;
+  /** Le menu est au bureau (playfield en largeur) plutôt qu'en borne (frontend.ts, playfieldLandscape). */
+  landscape?(): boolean;
   /**
    * Écran du navigateur intégré (fenêtre « Récupérer »), en coordonnées Electron, et ce que
    * son bandeau en dit (écran choisi pas branché, playfield tourné).
@@ -348,6 +353,8 @@ export interface LibraryHost {
   notify?(text: string, job?: DownloadJob): void;
   /** La file des téléchargements a changé (progression, état) : la pastille ou l'écran se redessinent. */
   downloadsChanged?(): void;
+  /** Juke-box : le lecteur, ouvert sur cette playlist (« Exit » de la gestion du Juke-box y revient). */
+  jukeboxPlayer?(playlist?: string): void;
   /** Juke-box : playlists ou bibliothèque changées (jukebox-library.ts). */
   jukeboxChanged?(): void;
   /** Essais sans opérateur : ce qu'une capture de fenêtre ne voit pas (la vue du lecteur YouTube posée sur le fronton). */
@@ -456,6 +463,17 @@ export interface Row {
   avatars?: AvatarView[];
   /** Pas encore lue (Activité récente) : la pastille rouge des entrées du menu, après le texte. */
   unread?: boolean;
+  /**
+   * Vignette carrée à gauche (Juke-box : pochette, miniature) : une adresse cyber-media:, ou le nom
+   * d'une icône dessinée à sa place quand il n'y a pas d'image.
+   */
+  thumb?: string;
+  /** Valeur courte à droite de la ligne (« 1080p », « 4:12 », « 21 / 24 retenus »), jamais coupée. */
+  aside?: string;
+  /** Seconde ligne de détail, plus discrète (dernière synchro, raison d'une indisponibilité). */
+  sub?: string;
+  /** Case devant la ligne : cochée, vide, ou barrée (sautée, refusée : on ne peut pas la cocher). */
+  check?: 'on' | 'off' | 'skip';
 }
 export interface Section {
   title?: string;
@@ -468,6 +486,8 @@ export interface Section {
   kind?: string;
   rows: Row[];
   more?: number;
+  /** Section de la colonne latérale (les choix d'un import) : à droite au bureau, sous le reste en borne. */
+  side?: boolean;
 }
 export interface Action {
   label: string;
@@ -524,6 +544,15 @@ export interface Built {
   scoreboard?: ScoreboardView;
   /** Bandeau d'aide propre à l'écran (sélecteur de fichiers : Exit remonte d'un dossier). */
   hint?: string;
+  /** Intitulé des actions de l'écran, quand elles portent sur un élément choisi (« Néon nocturne · playlist mixte »). */
+  actionsTitle?: string;
+  /**
+   * Interface propre (gestion du Juke-box) : son nom en tête à droite, à la place de la roue dentée,
+   * et la barre de ses commandes (boutons de la borne ou touches du clavier) à la place du bandeau
+   * d'aide ; ni bouton « Retour » en tête ni bandeau de la liste. Le chemin d'où l'on vient (« Juke-box ›
+   * Néon nocturne ») sous le titre.
+   */
+  app?: { name: string; trail?: string };
   /** Recadrage d'une image (avatar-menu.ts) : l'image, le carré gardé et l'aperçu, à la place des sections. */
   crop?: CropView;
   /** Télécommande du téléphone (phone-remote-menu.ts) : le QR code, le code à comparer ou le téléphone connecté, en tête du contenu. */
@@ -1208,6 +1237,8 @@ export function createLibrary(host: LibraryHost) {
     openJourney: (file) => journeyUi.open(file),
     pick: (request) => pickPaths(request),
     downloads,
+    // Créé plus bas : lu au moment du clic.
+    jukebox: () => ({ accepts: (url) => jukebox.linkKind(url), add: (url) => jukeboxMenu.importLink(url) }),
   });
   if (layout()) catalogUi.start();
   // Les pages des sites reprennent par le navigateur intégré, dans la même session de cookies.
@@ -1220,11 +1251,39 @@ export function createLibrary(host: LibraryHost) {
     downloads,
     node: process.execPath,
     // Réseau absent : les morceaux en ligne sont grisés « Hors ligne » (essais : CYBERPINBALL_HORS_LIGNE).
-    online: () => !process.env.CYBERPINBALL_HORS_LIGNE && net.isOnline(),
-    // Playlists ou bibliothèque changées (téléchargement fini, import) : les écrans du lecteur se redessinent.
-    changed: () => host.jukeboxChanged?.(),
+    online: () => jukeboxOnline(),
+    // Playlists ou bibliothèque changées (téléchargement fini, import) : les écrans du lecteur et le menu se redessinent.
+    changed: () => {
+      host.jukeboxChanged?.();
+      host.broadcast();
+    },
     log: (line) => console.log(line),
   });
+  // Menu système > Juke-box : la gestion des playlists et leur import (jukebox-menu.ts).
+  const jukeboxMenu = createJukeboxMenu({
+    jukebox,
+    show: (build, at) => openCustom(build, at),
+    showing: (build) => screen?.kind === 'custom' && screen.build === build,
+    openSystem: () => openSystem(),
+    openPlayer: (playlist) => (host.jukeboxPlayer ? host.jukeboxPlayer(playlist) : leave()),
+    leave: () => leave(),
+    prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
+    pick: (request) => pickPaths(request),
+    pickNative: (mode, title) => pickNative(mode, title),
+    landscape: () => host.landscape?.() ?? false,
+    cursor: () => cursor,
+    redraw: () => host.broadcast(),
+    keys: () => host.keys(),
+    ability: () => {
+      // Essais : CYBERPINBALL_DISQUE_LIBRE (octets) simule un disque presque plein.
+      const simulated = Number(process.env.CYBERPINBALL_DISQUE_LIBRE);
+      const free = Number.isFinite(simulated) && process.env.CYBERPINBALL_DISQUE_LIBRE ? simulated : jukebox.usage().free;
+      return { installed: Boolean(host.root), online: jukeboxOnline(), ytdlp: catalogUi.ytdlp.installed(), ...(free !== undefined ? { free } : {}) };
+    },
+    task: (message, work) => task(message, work),
+    phone: () => host.phoneRemote?.connected() === 'menu',
+  });
+  provideSystemItem('jukebox', jukeboxMenu.item);
   downloads.setTransport('youtube', jukebox.transport);
   downloadFinishers.set('jukebox', (job) => {
     jukebox.finished(job);
@@ -1510,6 +1569,40 @@ export function createLibrary(host: LibraryHost) {
    * Choisir des fichiers ou un dossier dans le sélecteur de Cyber Pinball ; undefined à
    * l'abandon, et l'écran d'où l'on vient revient tel quel (curseur compris).
    */
+  /**
+   * Explorateur de Windows (Juke-box au bureau : fichiers ou dossier de musique). Essais :
+   * CYBERPINBALL_EXPLORATEUR, liste JSON des chemins « choisis », sans fenêtre.
+   */
+  async function pickNative(mode: 'files' | 'folder', title: string): Promise<string[] | undefined> {
+    const simulated = process.env.CYBERPINBALL_EXPLORATEUR;
+    if (simulated !== undefined) {
+      try {
+        const paths = JSON.parse(simulated) as unknown;
+        return Array.isArray(paths) && paths.length ? paths.filter((p): p is string => typeof p === 'string') : undefined;
+      } catch {
+        return undefined;
+      }
+    }
+    const options: Electron.OpenDialogOptions = {
+      title,
+      properties: mode === 'folder' ? ['openDirectory'] : ['openFile', 'multiSelections'],
+      ...(mode === 'files' ? { filters: [{ name: t('Musique et vidéos'), extensions: [...JUKEBOX_VIDEO_EXTENSIONS, ...JUKEBOX_AUDIO_EXTENSIONS] }, { name: t('Tous les fichiers'), extensions: ['*'] }] } : {}),
+    };
+    const win = host.windows().get('playfield');
+    const r = win && !win.isDestroyed() ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options);
+    return r.canceled || !r.filePaths.length ? undefined : r.filePaths;
+  }
+
+  /** Le réseau répond (Juke-box : YouTube). Essais : CYBERPINBALL_HORS_LIGNE=1 coupe le réseau. */
+  function jukeboxOnline(): boolean {
+    if (process.env.CYBERPINBALL_HORS_LIGNE) return false;
+    try {
+      return net.isOnline();
+    } catch {
+      return true;
+    }
+  }
+
   function pickPaths(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined> {
     const from = screen;
     const at = cursor;
@@ -3806,6 +3899,24 @@ export function createLibrary(host: LibraryHost) {
     return zoneMemory.memory;
   }
 
+  /**
+   * Commandes d'une interface propre (gestion du Juke-box), comme le bandeau des maquettes : en borne
+   * les boutons (FLIPPERS, START, MAGNASAVE, EXIT), au bureau les touches (↑↓, ENTRÉE, F6, ÉCHAP).
+   * Ce que fait chacun suit la zone où l'on est : dans la liste, Start fait ce que dit l'écran
+   * (« ouvrir ses morceaux », « cocher ou décocher »), Exit en sort ; MagnaSave seulement s'il y a une liste.
+   */
+  function appCommands(built: Built, zone: ReturnType<typeof zoneView>): { key: string; text: string; act?: UiAction }[] {
+    const desk = host.landscape?.() ?? false;
+    const inList = zone?.active === 'list';
+    const out: { key: string; text: string; act?: UiAction }[] = [
+      { key: desk ? '↑↓' : t('Flippers'), text: t('choisir') },
+      { key: desk ? t('Entrée') : 'Start', text: inList && built.listStart ? built.listStart : t('valider') },
+    ];
+    if (zone) out.push({ key: desk ? 'F6' : 'MagnaSave', text: inList ? t('actions') : t('la liste'), act: { type: 'zone' } });
+    out.push({ key: desk ? t('Échap') : 'Exit', text: inList ? t('sortir de la liste') : t('retour'), act: inList ? { type: 'zone' } : { type: 'back' } });
+    return out;
+  }
+
   /** Rang de l'action qui fait la même chose qu'Exit (« Retour », « Annuler »…), s'il y en a une. */
   function backIndex(built: Built): number | undefined {
     const at = built.actions.findIndex((a) => a.run === built.back);
@@ -3841,6 +3952,17 @@ export function createLibrary(host: LibraryHost) {
     const button = [KEYS.previous[0], KEYS.next[0], KEYS.confirm[0]].includes(input.code);
     const typing = e.kind !== 'choice' && char !== undefined && (!button || ('typed' in e && Boolean(e.typed)) || Boolean(input.shift));
     if (is(KEYS.exit)) return closeEditor(s, false);
+    // Ctrl+V : le texte du presse-papiers (un lien de playlist YouTube…), sur une seule ligne.
+    if (e.kind === 'text' && input.control && input.code === 'KeyV') {
+      void Promise.resolve(clipboard.readText()).then((text) => {
+        const pasted = text.replace(/\s+/g, ' ').trim();
+        if (!pasted || screen !== s || s.editor !== e) return;
+        e.value += pasted;
+        e.typed = true;
+        host.broadcast();
+      });
+      return;
+    }
     if (e.kind === 'text') {
       if (typing) {
         e.value += char;
@@ -4021,6 +4143,10 @@ export function createLibrary(host: LibraryHost) {
       actions: built.actions.map(({ label, detail, tone, icon, web, attention, badge, shortcut, run }, i) => ({ label: shownLabel({ label, run }, built.back), detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, badge: badge ? menuBadgeLabel(badge) : undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
       media: built.media,
       variant: built.variant,
+      actionsTitle: built.actionsTitle,
+      app: built.app,
+      // Interface propre : ses commandes, une pastille par bouton (ou touche), cliquables quand elles ont un geste.
+      commands: built.app ? appCommands(built, zone) : undefined,
       journey: built.journey,
       health: built.health,
       scoreboard: built.scoreboard,
@@ -4261,6 +4387,8 @@ export function createLibrary(host: LibraryHost) {
           fs.copyFileSync(from, to);
         } else if (step.startsWith('remove:')) fs.rmSync(step.slice(7), { force: true });
         else if (step.startsWith('action:')) activateByLabel(step.slice(7));
+        // Le téléphone remplit le clavier à l'écran (lien d'une playlist…), comme la télécommande.
+        else if (step.startsWith('phone:')) remoteSet(step.slice(6));
         else if (step.startsWith('hold:')) send('keyDown', step.slice(5));
         else if (step.startsWith('repeat:')) {
           // Bouton maintenu (« repeat:ShiftLeft:25 ») : un appui, puis les répétitions du clavier, puis le relâchement.
@@ -4461,6 +4589,8 @@ export function createLibrary(host: LibraryHost) {
     isShowing: (build: () => Built) => screen?.kind === 'custom' && screen.build === build,
     /** Juke-box : playlists, bibliothèque, YouTube, fichiers locaux (jukebox-library.ts). */
     jukebox,
+    /** Gestion et import du Juke-box (jukebox-menu.ts) : « Récupérer » y envoie un lien. */
+    jukeboxMenu,
     /** Gestionnaire de téléchargements : la file, son écran, et ce que les autres écrans y posent. */
     downloads: {
       manager: downloads,

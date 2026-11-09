@@ -167,3 +167,4 @@ export * from './jukebox-files';
 export * from './jukebox-play';
 export * from './jukebox-screens';
 export * from './jukebox-youtube';
+export * from './jukebox-manage';

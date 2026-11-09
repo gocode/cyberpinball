@@ -20,6 +20,7 @@ const CYBER_ICONS = {
   import: '<path d="M12 4h9v16H3v-5M2 9h12M10 5l4 4-4 4"/>', // Import de médias depuis un autre frontend.
   'image-download': '<path d="M11 4H3v16h18v-5M3 16l5-5 4 4M18 2v9M14 7l4 4 4-4"/>', // Image à récupérer.
   music: '<path d="M9 17V5l11-2v12M9 9l11-2"/><ellipse cx="6" cy="18" rx="3" ry="3"/><ellipse cx="17" cy="16" rx="3" ry="3"/>', // Musique et menu des médias.
+  jukebox: '<path d="M5 21V10a7 7 0 0 1 14 0v11zM5 17h14"/><circle cx="12" cy="10.5" r="3"/><path d="M12 10.5h.01M9 19.5h.01M15 19.5h.01"/>', // Juke-box : la borne à musique, son disque et sa grille.
   language: '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>', // Langues, sans lettre ni drapeau.
   upgrade: '<path d="M12 21V6M6 12l6-6 6 6M5 2h14"/>', // Nouvelle version de Cyber Pinball.
   desktop: '<rect x="3" y="3" width="14" height="13" rx="1"/><path d="M10 7h3M21 8v13H8"/>', // Fenêtres en cascade et tiret de réduction, sans flèche.

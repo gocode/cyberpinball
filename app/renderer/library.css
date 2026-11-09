@@ -878,8 +878,9 @@ body.mouse .lib-row.pick:not(.selected):hover {
   background: var(--surface-sunken);
   font-size: 4.4cqmin;
   font-weight: 600;
-  white-space: pre;
-  overflow: hidden;
+  /* Un texte long (lien de playlist collé du téléphone ou au Ctrl+V) passe à la ligne : jamais coupé. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
 .lib-editor .caret {
@@ -3242,4 +3243,579 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 .lib-remote.lib-remote-band .lib-remote-line {
   font-size: 1.86cqmin;
   line-height: 2.6cqmin;
+}
+
+/* ---------- Lignes en colonnes : case, vignette, texte, valeur à droite (Row.check, thumb, aside) ---------- */
+
+.lib-row.with-parts {
+  display: flex;
+  align-items: center;
+  gap: 1.6cqmin;
+}
+
+.lib-row.with-parts > .lib-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.lib-row-sub {
+  margin-top: 0.2cqmin;
+  font-size: 1.95cqmin;
+  line-height: 1.35;
+  color: var(--ink-muted);
+  word-break: break-word;
+}
+
+.lib-row-aside {
+  flex: none;
+  font-size: 2.1cqmin;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+/* Case : vide, cochée (coche verte), barrée (croix neutre : sautée, refusée, on ne peut pas la cocher). */
+.lib-check {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 3.4cqmin;
+  height: 3.4cqmin;
+  box-sizing: border-box;
+  border: 0.2cqmin solid var(--line-strong);
+  border-radius: 0.4cqmin;
+  background: var(--surface-sunken);
+  color: var(--ink-muted);
+}
+
+.lib-check.state-on {
+  border-color: var(--signal);
+  color: var(--signal);
+}
+
+.lib-check-icon {
+  width: 2.2cqmin;
+  height: 2.2cqmin;
+  stroke-width: 2.4;
+}
+
+/* Vignette : l'image, ou l'icône sur un fond sombre ; jamais un aplat clair. */
+.lib-thumb {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 7cqmin;
+  height: 7cqmin;
+  overflow: hidden;
+  border: 1px solid var(--line-soft);
+  border-radius: 0.5cqmin;
+  background: linear-gradient(150deg, #142238, #0a1716 70%);
+}
+
+.lib-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.lib-thumb-icon {
+  width: 3.4cqmin;
+  height: 3.4cqmin;
+  color: var(--meta);
+}
+
+.lib-row.tone-quiet .lib-thumb {
+  filter: grayscale(1) brightness(0.55);
+}
+
+/* Intitulé des actions d'un élément choisi (« Néon nocturne · playlist mixte ») : un intertitre vert. */
+.lib-actions-title {
+  grid-column: 1 / -1;
+  margin: 0 0 0.2cqmin;
+  font-size: 2.2cqmin;
+  font-weight: 600;
+  font-stretch: 112%;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Colonne latérale du contenu (Section.side) : à droite au bureau, sous le reste en borne. */
+.lib-content.with-side {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  align-items: start;
+  column-gap: 3.5cqmin;
+}
+
+.lib-content-main,
+.lib-content-side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2.4cqmin;
+}
+
+@container (orientation: portrait) {
+  .lib-content.with-side {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 2.4cqmin;
+  }
+}
+
+/* ---------- Juke-box : gestion des playlists et import (jukebox-menu.ts) ---------- */
+
+/* Au bureau : la liste à gauche, les actions de la playlist choisie à droite, sur deux colonnes. */
+.lib-jukebox .lib-body {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.lib-jukebox.jukebox-import .lib-body {
+  grid-template-columns: minmax(0, 1fr) 40cqmin;
+}
+
+.lib-jukebox.jukebox-manage .lib-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-content: start;
+  gap: 0.9cqmin 1.2cqmin;
+}
+
+.lib-jukebox .lib-action {
+  padding: 1.3cqmin 1.8cqmin;
+  font-size: 2.3cqmin;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  border: 0.15cqmin solid var(--line-soft);
+}
+
+/* Le fond des autres actions ; l'action choisie garde l'aplat vert du menu. */
+.lib-jukebox .lib-action:not(.current) {
+  background: var(--surface-raised);
+}
+
+.lib-jukebox .lib-action .detail {
+  font-size: 1.95cqmin;
+}
+
+/* Une action indisponible reste visible, grisée, sa raison dessous. */
+.lib-jukebox .lib-action.tone-quiet:not(.current) {
+  background: var(--surface);
+}
+
+@container (orientation: portrait) {
+  .lib-jukebox .lib-body,
+  .lib-jukebox.jukebox-import .lib-body {
+    grid-template-columns: 1fr;
+  }
+
+  .lib-jukebox .lib-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
+    gap: 0.9cqmin 1.2cqmin;
+  }
+}
+
+/* Créer, importer : deux boutons de front, en tête. */
+.lib-jukebox .kind-jb-global .lib-rows {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.2cqmin;
+}
+
+.lib-jukebox .kind-jb-global .lib-row {
+  border: 0.15cqmin solid var(--line-strong);
+  border-radius: 0.5cqmin;
+  background: var(--surface-raised);
+  padding: 1.2cqmin 1.8cqmin;
+}
+
+.lib-jukebox .kind-jb-global .lib-row-text {
+  font-weight: 500;
+}
+
+/* Playlists en cartes : vignette, nom, faits, seconde ligne, qualité en cartouche. */
+.lib-jukebox .kind-jb-playlists .lib-rows,
+.lib-jukebox .kind-jb-tracks .lib-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqmin;
+}
+
+.lib-jukebox .kind-jb-playlists .lib-row {
+  align-items: flex-start;
+  padding: 1.4cqmin 1.8cqmin;
+  border: 0.15cqmin solid var(--line-soft);
+  border-radius: 0.6cqmin;
+  background: var(--surface);
+}
+
+.lib-jukebox .kind-jb-playlists .lib-row-text {
+  font-size: 2.7cqmin;
+  font-weight: 700;
+}
+
+.lib-jukebox .kind-jb-playlists .lib-thumb {
+  width: 8.4cqmin;
+  height: 8.4cqmin;
+}
+
+.lib-jukebox .kind-jb-playlists .lib-row-aside {
+  padding: 0.4cqmin 1.1cqmin;
+  border: 0.15cqmin solid var(--line-strong);
+  border-radius: 0.4cqmin;
+  color: var(--ink);
+}
+
+/* La playlist choisie : filet et surface sarcelle, même quand le focus (vert) est ailleurs. */
+.lib-jukebox .kind-jb-playlists .lib-row.current {
+  border-color: var(--halo);
+  background: color-mix(in oklab, var(--halo) 12%, var(--surface));
+  box-shadow: inset 0.4cqmin 0 var(--halo);
+}
+
+.lib-jukebox .lib-row.current .badge {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 2cqmin;
+  color: var(--meta);
+}
+
+.lib-jukebox .kind-jb-playlists .lib-row.selected {
+  background: var(--signal-wash);
+}
+
+/* Morceaux : vignette, titre, artiste, état, durée. */
+.lib-jukebox .kind-jb-tracks .lib-row,
+.lib-jukebox .kind-jb-entries .lib-row,
+.lib-jukebox .kind-jb-found .lib-row,
+.lib-jukebox .kind-jb-refused .lib-row {
+  padding: 1cqmin 1.6cqmin;
+}
+
+.lib-jukebox .kind-jb-tracks .lib-thumb,
+.lib-jukebox .kind-jb-entries .lib-thumb {
+  width: 6cqmin;
+  height: 6cqmin;
+}
+
+/* La place sur le disque, les remarques de l'import : des encarts neutres (l'ambre pour « À vérifier »). */
+.lib-jukebox .kind-jb-disk .lib-row,
+.lib-jukebox .kind-jb-notes .lib-row {
+  border: 0.15cqmin solid var(--line-strong);
+  border-radius: 0.5cqmin;
+  background: var(--surface-raised);
+  padding: 1.3cqmin 1.8cqmin;
+}
+
+.lib-jukebox .kind-jb-notes .lib-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqmin;
+}
+
+.lib-jukebox .kind-jb-notes .lib-row.tone-warning {
+  border-color: color-mix(in oklab, var(--warning) 60%, var(--line-strong));
+}
+
+.lib-jukebox .kind-jb-notes .lib-row.tone-warning .lib-row-text,
+.lib-jukebox .kind-jb-notes .lib-row.tone-warning .lib-row-icon {
+  color: var(--warning);
+}
+
+/* Ce qui vient de se passer (import, ajout, synchro). */
+.lib-jukebox .kind-jb-flash .lib-row {
+  border: 0.15cqmin solid var(--line-strong);
+  border-left-width: 0.5cqmin;
+  border-radius: 0.5cqmin;
+  background: var(--surface-raised);
+}
+
+.lib-jukebox .kind-jb-flash .lib-row.tone-ok .lib-row-icon {
+  color: var(--signal);
+}
+
+.lib-jukebox .kind-jb-flash .lib-row.tone-warning .lib-row-icon,
+.lib-jukebox .kind-jb-flash .lib-row.tone-warning .lib-row-text {
+  color: var(--warning);
+}
+
+/* Le lien reçu : comme un champ. */
+.lib-jukebox .kind-jb-link .lib-row {
+  border: 0.15cqmin solid var(--line-strong);
+  border-radius: 0.5cqmin;
+  background: var(--surface-sunken);
+  padding: 1.1cqmin 1.8cqmin;
+}
+
+.lib-jukebox .kind-jb-link .lib-row-text {
+  font-weight: 400;
+  word-break: break-all;
+}
+
+/* L'en-tête de l'import : la playlist lue, combien retenus. */
+.lib-jukebox .kind-jb-summary .lib-row {
+  border-bottom: 0.2cqmin solid var(--halo);
+  padding: 0.8cqmin 0.6cqmin 1.2cqmin;
+}
+
+.lib-jukebox .kind-jb-summary .lib-row-text {
+  font-size: 3cqmin;
+  font-weight: 700;
+}
+
+.lib-jukebox .kind-jb-summary .lib-row-aside {
+  padding: 0.5cqmin 1.2cqmin;
+  border: 0.15cqmin solid var(--line-strong);
+  border-radius: 0.4cqmin;
+  color: var(--ink);
+}
+
+/* Analyse en cours : au milieu, rien ne bouge autour. */
+.lib-jukebox .kind-jb-wait .lib-row {
+  padding: 6cqmin 3cqmin;
+  border: 0.15cqmin solid var(--line-soft);
+  border-radius: 0.6cqmin;
+  text-align: center;
+}
+
+.lib-jukebox .kind-jb-wait .lib-row-line {
+  flex-direction: column;
+  align-items: center;
+}
+
+.lib-jukebox .kind-jb-wait .lib-row-icon {
+  width: 5cqmin;
+  height: 5cqmin;
+  color: var(--signal);
+}
+
+.lib-jukebox .kind-jb-wait .lib-row-text {
+  max-width: none;
+  font-size: 3.2cqmin;
+  font-weight: 700;
+}
+
+.lib-jukebox .kind-jb-wait .lib-row-detail {
+  max-width: 70cqmin;
+  margin: 1cqmin auto 0;
+}
+
+/* Choix exclusifs (un seul par groupe) : des segments de front, le choisi coché et cerclé de clair. */
+.lib-jukebox .kind-jb-segments .lib-rows {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 0.8cqmin;
+}
+
+.lib-jukebox .kind-jb-segments .lib-row {
+  padding: 1cqmin 1.2cqmin;
+  border: 0.15cqmin solid var(--line-soft);
+  border-radius: 0.5cqmin;
+  background: var(--surface);
+}
+
+.lib-jukebox .kind-jb-segments .lib-row.with-parts {
+  align-items: flex-start;
+  gap: 0.8cqmin;
+}
+
+.lib-jukebox .kind-jb-segments .lib-row.current {
+  border-color: var(--ink-muted);
+  background: var(--surface-raised);
+  box-shadow: none;
+}
+
+.lib-jukebox .kind-jb-segments .lib-row-text {
+  font-weight: 600;
+}
+
+.lib-jukebox .kind-jb-segments .lib-check {
+  width: 2.4cqmin;
+  height: 2.4cqmin;
+  border: none;
+  background: none;
+}
+
+.lib-jukebox .kind-jb-segments .lib-row.tone-quiet .lib-row-text {
+  color: var(--ink-faint);
+}
+
+/* Champs d'un morceau (titre, artiste, album) : un par ligne, l'origine dessous. */
+.lib-jukebox .kind-jb-fields .lib-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 1cqmin;
+}
+
+.lib-jukebox .kind-jb-fields .lib-row {
+  border: 0.15cqmin solid var(--line-soft);
+  border-radius: 0.5cqmin;
+  background: var(--surface-raised);
+  padding: 1.2cqmin 1.8cqmin;
+}
+
+.lib-jukebox .kind-jb-fields .lib-row-detail {
+  font-size: 2.4cqmin;
+  color: var(--ink);
+}
+
+/* Import au bureau : le contenu (morceaux et choix) sur toute la largeur, « Importer » et « Annuler » dessous, à droite. */
+.lib-jukebox.jukebox-import .lib-body {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 2cqmin;
+}
+
+.lib-jukebox.jukebox-import .lib-actions {
+  flex-direction: row;
+  justify-content: flex-end;
+}
+
+.lib-jukebox.jukebox-import .lib-action {
+  min-width: 34cqmin;
+}
+
+@container (orientation: portrait) {
+  .lib-jukebox.jukebox-import .lib-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Confirmations (supprimer, libérer, tout télécharger) : les gestes l'un sous l'autre, « Conserver » ou « Annuler » compris. */
+.lib-jukebox.jukebox-confirm .lib-actions {
+  display: flex;
+  flex-direction: column;
+}
+
+/* ---------- Interface propre (Built.app : gestion du Juke-box) ---------- */
+
+/*
+ * Son nom en haut à droite, sur la ligne de la marque, à la place de la roue dentée : on est dans le
+ * Juke-box, pas dans le menu système. Le titre en capitales, comme les maquettes (« VOS PLAYLISTS »).
+ */
+.lib-app-name {
+  position: absolute;
+  top: 3cqmin;
+  right: 4cqmin;
+  font-size: 2.1cqmin;
+  font-weight: 400;
+  font-stretch: 125%;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.lib-app .lib-head h1 {
+  font-size: 5.6cqmin;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.01em;
+}
+
+.lib-app .lib-head-icon {
+  display: none;
+}
+
+.lib-app .lib-head h1.with-icon {
+  gap: 0;
+}
+
+.lib-app .lib-sub {
+  font-size: 2.6cqmin;
+  color: var(--ink-muted);
+}
+
+/* La liste garde son cadre ; ses commandes sont au pied de l'écran, pas dans un bandeau. */
+.lib-app .lib-zone-bar {
+  display: none;
+}
+
+/* Les commandes : une pastille vert signal par bouton (ou touche), ce qu'elle fait en capitales. */
+.lib-commands {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1.6cqmin 3cqmin;
+  padding-top: 2cqmin;
+  border-top: 1px solid var(--line-strong);
+}
+
+.lib-command {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.2cqmin;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  color: var(--ink-muted);
+}
+
+.lib-command-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.4cqmin;
+  height: 3.8cqmin;
+  padding: 0 1.2cqmin;
+  border: 0.2cqmin solid var(--signal);
+  border-radius: 1.9cqmin;
+  font-size: 2.1cqmin;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--signal);
+}
+
+.lib-command-text {
+  font-size: 2cqmin;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+body.mouse button.lib-command:hover .lib-command-text {
+  color: var(--ink);
+}
+
+/* En borne : deux rangées de deux, à gauche et au milieu, comme le bandeau des maquettes. */
+@container (orientation: portrait) {
+  .lib-commands {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    justify-content: stretch;
+  }
+}
+
+/*
+ * Import en borne : la liste des morceaux défile dans sa propre fenêtre, pour que les choix
+ * (lecture, qualité, destination, morceaux) restent visibles avant « Importer ».
+ */
+@container (orientation: portrait) {
+  .lib-jukebox.jukebox-import .kind-jb-entries > .lib-rows {
+    max-height: 40cqmin;
+    overflow-y: auto;
+    border-block: 0.3cqmin solid transparent;
+    scroll-padding-block: 1.2cqmin;
+  }
+
+  .lib-jukebox.jukebox-import .kind-jb-entries > .lib-rows.more-above {
+    border-top-color: var(--line-strong);
+  }
+
+  .lib-jukebox.jukebox-import .kind-jb-entries > .lib-rows.more-below {
+    border-bottom-color: var(--line-strong);
+  }
 }

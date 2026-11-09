@@ -21,6 +21,8 @@ contextBridge.exposeInMainWorld('cyberAcquire', {
   search: (query: string, engine: string) => ipcRenderer.send('acquire:search', query, engine),
   video: () => ipcRenderer.send('acquire:video'),
   grab: (want: 'audio' | 'video') => ipcRenderer.send('acquire:grab', want),
+  // « Ajouter au Juke-box » : la playlist ou la vidéo YouTube affichée (jukebox-menu.ts).
+  jukebox: () => ipcRenderer.send('acquire:jukebox'),
   typing: (typing: boolean) => ipcRenderer.send('acquire:typing', typing),
   // Télécommande du téléphone (phone-remote.ts) : accepter, refuser ou déconnecter le téléphone.
   remote: (action: 'accept' | 'refuse' | 'end') => ipcRenderer.send('acquire:remote', action),

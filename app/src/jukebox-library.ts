@@ -15,12 +15,12 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
-  applyPlaylistImport,
   detailArgs,
   downloadAll,
   emptyJukebox,
   findPlaylist,
   freePlaylist,
+  importAnalysis,
   isYoutubeId,
   jukeboxDownloadSpec,
   jukeboxUsage,
@@ -30,6 +30,7 @@ import {
   mergeDetails,
   normalizeSkins,
   parseDetailLines,
+  parseJukeboxLink,
   parsePlaylistJson,
   parsePlaylistLink,
   playlistArgs,
@@ -50,6 +51,7 @@ import {
   trackStatus,
   unavailableFromMessage,
   unavailableText,
+  videoAnalysis,
   wantedHeight,
   writeFileAtomic,
   writeSongInfos,
@@ -301,8 +303,29 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
     return out;
   }
 
+  /**
+   * Lit le lien collé (téléphone, Ctrl+V, « Récupérer ») : une playlist (analyze), ou une vidéo
+   * seule, lue par la seconde lecture de yt-dlp et présentée comme une playlist d'un morceau.
+   */
+  async function analyzeLink(link: string, signal?: AbortSignal): Promise<AnalyzeResult> {
+    const parsed = parseJukeboxLink(link);
+    if ('refused' in parsed) return { ok: false, reason: parsed.refused };
+    if (parsed.kind === 'playlist') return analyze(parsed.link.url, signal);
+    const r = await opts.ytdlp.run(detailArgs([parsed.id], opts.node), signal);
+    if (!r.ok) return r;
+    const detail = parseDetailLines(r.lines).get(parsed.id);
+    if (!detail) {
+      const error = r.lines.find((l) => /^ERROR:/.test(l));
+      return { ok: false, reason: error ? playlistError(error) : t('Vidéo illisible sur YouTube') };
+    }
+    return { ok: true, analysis: videoAnalysis(parsed.id, detail) };
+  }
+
+  /** Écrans de gestion ouverts (la borne y coupe la musique, le bureau la garde) : le lecteur écoute. */
+  const manageListeners = new Set<(cabinet: boolean) => void>();
+
   function importPlaylist(req: Omit<ImportRequest, 'library' | 'now'>) {
-    const change = apply(applyPlaylistImport(current(), { ...req, library: songs(), now: now() }));
+    const change = apply(importAnalysis(current(), { ...req, library: songs(), now: now() }));
     if (change.ok && change.enqueue.length) enqueue(change.playlist, change.enqueue);
     return change;
   }
@@ -474,8 +497,25 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
     /** Le lecteur intégré de YouTube refuse la vidéo pour de bon (erreurs 100, 101, 150 : embedErrorReason) : indisponible partout. */
     markEmbedError: markReason,
     analyze,
+    analyzeLink,
+    /** Ce que désigne un lien collé : une playlist, une vidéo, ou rien d'importable. */
+    linkKind(link: string): 'playlist' | 'video' | undefined {
+      const parsed = parseJukeboxLink(link);
+      return 'refused' in parsed ? undefined : parsed.kind;
+    },
     details,
     importPlaylist,
+    /**
+     * La gestion ou l'import s'ouvre. `cabinet` : en borne, où la musique s'arrête ; au bureau, elle
+     * continue (décision du 09/11/2026). Le lecteur (étape 3) s'abonne par onManage.
+     */
+    manageOpened(cabinet: boolean): void {
+      for (const listener of manageListeners) listener(cabinet);
+    },
+    onManage(listener: (cabinet: boolean) => void): () => void {
+      manageListeners.add(listener);
+      return () => manageListeners.delete(listener);
+    },
     resync,
     downloadAll(id: string) {
       const change = apply(downloadAll(current(), id, songs(), now()));

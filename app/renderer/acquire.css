@@ -633,6 +633,22 @@ button.grab {
   color: var(--text);
 }
 
+/* Juke-box : la playlist ou la vidéo YouTube affichée, à importer ; le bouton allumé. */
+.video.jukebox .video-text {
+  flex: 1 1 auto;
+  max-width: none;
+  font-weight: 500;
+}
+
+#jukebox-add {
+  flex: none;
+  padding: calc(6 * var(--u)) calc(16 * var(--u));
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-signal);
+  font-weight: 600;
+}
+
 button.grab.primary {
   border-color: var(--accent);
   background: var(--accent);

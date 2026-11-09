@@ -956,7 +956,9 @@ function drawPlayfield(s) {
   if (s.phase === 'menu' && s.jukebox?.wheel && window.CyberJukebox) nodes.push(CyberJukebox.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
   // Extinction, veille ou redémarrage en cours : plus rien à choisir, ni roue dentée ni cadenas.
   // Mode invité : le cadenas prend la place de la roue dentée, le menu système est fermé.
-  if (!(s.phase === 'message' && s.message?.action === 'power') && !jukebox) nodes.push(s.guest ? guestLock(s.guest) : gearButton(s));
+  // Interface propre (gestion du Juke-box) : son nom à la place de la roue dentée, ni rubriques ni cadre du menu système.
+  const ownApp = s.phase === 'library' && s.library?.app;
+  if (!(s.phase === 'message' && s.message?.action === 'power') && !jukebox && !ownApp) nodes.push(s.guest ? guestLock(s.guest) : gearButton(s));
   // La zone des notifications (noticezone.ts) : le processus principal dit où (s.zone), sur chaque
   // écran ; le rendu ne décide de rien. Coin du menu des tables, ou ligne de la roue dentée d'un écran plein.
   const corner = s.zone ? cornerBox(s) : undefined;

@@ -115,6 +115,8 @@ $('video-get').addEventListener('click', () => window.cyberAcquire.video());
 // yt-dlp : le son seul ou la vidéo seule d'une page qui ne lit pas de fichier ordinaire.
 $('grab-audio').addEventListener('click', () => window.cyberAcquire.grab('audio'));
 $('grab-video').addEventListener('click', () => window.cyberAcquire.grab('video'));
+// Juke-box : la playlist ou la vidéo YouTube affichée part dans l'import (la fenêtre se ferme).
+$('jukebox-add').addEventListener('click', () => window.cyberAcquire.jukebox());
 
 window.cyberAcquire.onState((s) => {
   $('game').textContent = s.game;
@@ -147,6 +149,11 @@ window.cyberAcquire.onState((s) => {
     }
     if (grab && grab.preferred === 'audio') $('video').insertBefore($('grab-audio'), $('grab-video'));
     else $('video').insertBefore($('grab-video'), $('grab-audio'));
+  }
+  $('jukebox').hidden = !s.jukebox;
+  if (s.jukebox) {
+    $('jukebox-text').textContent = s.jukebox.text;
+    $('jukebox-text').title = s.jukebox.text;
   }
   showDownloads(s.downloads ?? [], s.more);
   showRemote(s.remote);

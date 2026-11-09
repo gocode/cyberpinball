@@ -25,7 +25,13 @@ import {
   embedErrorText,
   formatNumber,
   idleSpectrum,
+  displayIndex,
   initialPlayer,
+  startPressStep,
+  type StartPress,
+  JUKEBOX_MANAGE_HOLD_MS,
+  JUKEBOX_MANAGE_KEY,
+  selectedKey,
   jukeboxPlayerView,
   jukeboxPoster,
   jukeboxSelectionDots,
@@ -164,6 +170,11 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
    * jouer (décision du 09/11/2026) ; le clip n'est plus montré, le son continue, les morceaux s'enchaînent.
    */
   let background = false;
+  /** En borne, la gestion met la lecture en pause : elle reprend au retour, là où elle s'était arrêtée. */
+  let resumeOnReturn = false;
+  /** Start tenu : appui court, jouer ou pause ; maintenu une seconde, la gestion (startPressStep). */
+  let press: StartPress;
+  let pressTimer: NodeJS.Timeout | undefined;
   /** Titre et artiste du morceau en cours, pour le DMD (25 images par seconde). */
   let playingInfo: { title: string; artist?: string } | undefined;
   /** Le cadre du clip dans sa fenêtre (pixels de la page), dit par la fenêtre du clip. */
@@ -256,10 +267,28 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     if (!l) return;
     const input = playlistsInput();
     if (player) {
-      // Retour de la gestion au bureau : la musique jouait en fond, rien ne repart.
+      // Retour de la gestion : au bureau, la musique jouait en fond ; en borne, elle reprend où elle s'était arrêtée.
       background = false;
+      if (resumeOnReturn) {
+        resumeOnReturn = false;
+        if (player.playing && player.paused) {
+          player = { ...player, paused: false };
+          apply({ kind: 'resume' });
+        }
+      }
       if (playlist && input.some((p) => p.id === playlist)) player = { ...player, shown: playlist };
+      player = leaveManageRow(player);
       host.log('Juke-box : de nouveau à l’écran.'); // i18n-ignore : journal
+      syncDmd();
+      return;
+    }
+    // Retour de la gestion en borne (la musique s'y est arrêtée) : la playlist et le morceau d'avant.
+    if (parked) {
+      player = leaveManageRow({ ...parked, playing: undefined, paused: false });
+      parked = undefined;
+      if (playlist && input.some((p) => p.id === playlist)) player = leaveManageRow({ ...player, shown: playlist });
+      tops.clear();
+      host.log('Juke-box : de retour de la gestion.'); // i18n-ignore : journal
       syncDmd();
       return;
     }
@@ -269,6 +298,25 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     failures = 0;
     host.log(`Juke-box : ouvert (${input.length} playlist(s)).`); // i18n-ignore : journal
     syncDmd();
+  }
+
+  /**
+   * La gestion du Juke-box s'ouvre (ligne « Gestion du Juke-box », ou son bouton au bureau) : l'état du
+   * lecteur est gardé pour y revenir, sur la même playlist et le même morceau.
+   */
+  let parked: PlayerState | undefined;
+  function manage(): void {
+    if (!player) return;
+    parked = player;
+    host.manage?.(player.shown || undefined);
+  }
+
+  /** De retour de la gestion : le choix revient au premier morceau s'il était sur la ligne de gestion. */
+  function leaveManageRow(state: PlayerState): PlayerState {
+    if (state.selected[state.shown] !== JUKEBOX_MANAGE_KEY) return state;
+    const first = playlistsInput().find((p) => p.id === state.shown)?.rows[0]?.key;
+    if (!first) return state;
+    return { ...state, selected: { ...state.selected, [state.shown]: first } };
   }
 
   function stopPlayback(): void {
@@ -307,14 +355,33 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     const p = input.find((x) => x.id === player!.shown);
     if (!p) return;
     const ls = lists(input);
-    const shownList = ls.find((x) => x.id === p.id)!;
-    const sel = player.selected[p.id] ?? (player.playing?.playlist === p.id ? player.playing.key : shownList.tracks[0]?.key);
-    const index = p.rows.findIndex((r) => r.key === sel);
-    tops.set(p.id, listTop(tops.get(p.id), index, rows(), p.rows.length));
+    // Rang d'affichage : la ligne « Gestion du Juke-box » en tête, puis les morceaux.
+    const index = displayIndex(selectedKey(player, ls), p.rows);
+    tops.set(p.id, listTop(tops.get(p.id), index, rows(), p.rows.length + 1));
+  }
+
+  /** Un geste de Start : appui, répétition, échéance du seuil, relâchement. */
+  function startPress(event: 'down' | 'repeat' | 'tick' | 'up'): void {
+    const r = startPressStep(press, event, Date.now());
+    press = r.press;
+    clearTimeout(pressTimer);
+    pressTimer = undefined;
+    if (press && !press.done) pressTimer = setTimeout(() => startPress('tick'), Math.max(0, press.since + JUKEBOX_MANAGE_HOLD_MS - Date.now()) + 5);
+    if (r.action === 'start') step('start');
+    else if (r.action === 'manage') {
+      // La gestion prend la main : le relâchement n'arrivera pas ici.
+      press = undefined;
+      manage();
+    }
+    host.redraw();
   }
 
   function handleKey(input: Input): boolean {
     if (!player) return false;
+    if (input.type === 'keyUp' && host.keys().confirm.includes(input.code)) {
+      startPress('up');
+      return true;
+    }
     if (input.type !== 'keyDown') return true;
     const k = host.keys();
     const is = (codes: string[]) => codes.includes(input.code);
@@ -325,8 +392,8 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     else if (input.code === 'ArrowUp') step('previous');
     else if (input.code === 'ArrowDown') step('next');
     else if (is(k.exit)) step('exit');
-    else if (input.isAutoRepeat && is(k.confirm)) return true;
-    else if (is(k.confirm)) step('start');
+    // Start : au relâchement s'il est court (jouer, pause) ; maintenu, la gestion (startPress).
+    else if (is(k.confirm)) return (startPress(input.isAutoRepeat ? 'repeat' : 'down'), true);
     else if (is(k.previous)) step('previous');
     else if (is(k.next)) step('next');
     else if (is(k.playlistPrevious)) {
@@ -349,7 +416,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
         keepSelectionVisible();
       }
     } else if (action.op === 'start') step('start');
-    else if (action.op === 'manage') return host.manage?.(player.shown || undefined);
+    else if (action.op === 'manage') return manage();
     else if (action.op === 'playlist') step(action.dir === -1 ? 'playlist-previous' : 'playlist-next');
     else if (action.op === 'exit') step('exit');
     host.redraw();
@@ -380,6 +447,8 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       case 'refused':
         // L'aide dit déjà pourquoi (Start grisé avec sa raison) : rien de plus.
         return;
+      case 'manage':
+        return manage();
     }
   }
 
@@ -500,7 +569,8 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     // La fenêtre fermée (relance, sortie) ne détruit pas sa vue (Electron) : la page et son son s'arrêtent avec elle.
     win.on('closed', () => {
       if (online?.view === view) closeOnline();
-      else if (!view.webContents.isDestroyed()) view.webContents.close();
+      // Vue déjà fermée (lecture arrêtée avant la fenêtre) : son webContents n'existe plus.
+      else if (view.webContents && !view.webContents.isDestroyed()) view.webContents.close();
     });
     const contents = view.webContents;
     contents.setWindowOpenHandler(() => ({ action: 'deny' }));
@@ -656,7 +726,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     const shown = player?.shown ?? '';
     const p = input.find((x) => x.id === shown);
     if (p && !tops.has(p.id)) keepSelectionVisible(input);
-    return jukeboxPlayerView({ playlists: input, state: player ?? { shown: '', selected: {}, paused: false }, top: tops.get(shown) ?? 0, rows: rows(), ad, audioOnly: order?.audioOnly ?? false });
+    return jukeboxPlayerView({ playlists: input, state: player ?? { shown: '', selected: {}, paused: false }, top: tops.get(shown) ?? 0, rows: rows(), ad, audioOnly: order?.audioOnly ?? false, ...(press && !press.done ? { holdSince: press.since } : {}) });
   }
 
   /** La part du Juke-box dans l'état d'une fenêtre ; onWheel : le médaillon est choisi dans la roue. */
@@ -678,6 +748,8 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
         ...(card && now && order?.kind !== 'online' ? { card: { id: card.id, eyebrow: cardEyebrow(now), until: card.until } } : {}),
         poster: poster(),
       };
+      // En borne, pendant la gestion : le morceau en pause et l'affiche sur le fronton, jamais vide.
+      if (background && !host.desk()) out.cover = { ...(pv.now ? { now: pv.now } : {}), poster: poster() };
     } else if (roles.includes('backglass')) out.cover = { ...(pv.now ? { now: pv.now } : {}), poster: poster() };
     return out;
   }
@@ -687,11 +759,20 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     open,
     close,
     /** Au bureau, la gestion ouverte depuis le lecteur : la musique continue, sans écran. */
-    toBackground(): void {
+    /**
+     * La gestion ouverte depuis le lecteur : le clip quitte l'écran. Au bureau la musique continue ;
+     * en borne (`pause`), elle se met en pause et reprend au retour, là où elle s'était arrêtée.
+     */
+    toBackground(pause = false): void {
       if (!player || background) return;
       background = true;
       if (online && !online.win.isDestroyed()) placeView(online.view, undefined);
-      host.log('Juke-box : la musique continue pendant la gestion.'); // i18n-ignore : journal
+      if (pause && player.playing && !player.paused) {
+        player = { ...player, paused: true };
+        apply({ kind: 'pause' });
+        resumeOnReturn = true;
+      }
+      host.log(pause ? 'Juke-box : lecture en pause pendant la gestion.' : 'Juke-box : la musique continue pendant la gestion.'); // i18n-ignore : journal
     },
     inBackground: () => background,
     handleKey,

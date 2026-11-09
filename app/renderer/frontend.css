@@ -3501,8 +3501,9 @@ html.jukebox-phase #root > .banner {
 html.jukebox-phase.jukebox-desk #root > .banner {
   top: calc(var(--jp-root) * 34);
   left: calc(var(--jp-root) * 1010);
-  right: calc(var(--jp-root) * 330);
-  max-width: calc(var(--jp-root) * 560);
+  /* Avant le bouton « Gestion du Juke-box » (à partir de x = 1564), sans le toucher. */
+  right: calc(var(--jp-root) * 400);
+  max-width: calc(var(--jp-root) * 500);
 }
 
 /* Médaillon choisi : son nom en vert signal, en capitales, comme le titre de l'affiche. */
