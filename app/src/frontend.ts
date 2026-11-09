@@ -200,6 +200,8 @@ import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindows
 import { observedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
+import { quitWithWindow } from './app-lifetime';
+import { handleSecondLaunch } from './single-instance';
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
@@ -208,6 +210,7 @@ import { createMenuDmd } from './menu-dmd';
 import { cachedScript } from './vbs';
 import { mediaFrame, prepareDressing } from './fulldmd';
 import { LiveDmd, type LiveDmdAnimationHandle } from './live-dmd';
+import { DmdWheels } from './dmd-wheel';
 import { createConverter } from './media-convert';
 import { onKeyInput } from './key-input';
 import { onJoystickInput } from './joystick-input';
@@ -1764,6 +1767,13 @@ function resetButtonsFromMenu(): void {
 }
 
 export function startFrontend(): void {
+  // Cyber Pinball relancé alors que le menu est ouvert : le menu revient (mode bureau quitté,
+  // premier plan) ; pendant une partie, VPX garde l'écran.
+  handleSecondLaunch(() => {
+    if (desktop.active) return restoreFromDesktop();
+    if (state.phase === 'playing' || state.phase === 'loading') return;
+    void showMenuAgain();
+  });
   // Chromium ne donne le nom des sorties audio, et n'autorise setSinkId (sortie du fronton
   // pour la musique du menu), qu'avec ces permissions ; les pages du menu sont locales.
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media' || permission === 'speaker-selection');
@@ -1876,6 +1886,7 @@ export function startFrontend(): void {
     attract.dispose();
     hours.dispose();
     liveDmd.dispose();
+    dmdWheels.dispose();
     void stopSimulatedPlayers?.();
     // La file est écrite ; ce qui tournait reprendra au prochain démarrage, là où il en était.
     library.downloads.manager.stop();
@@ -2146,6 +2157,9 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
       if (!closing && !guest.knock('window.close')) event.preventDefault();
     });
     win.on('query-session-end', () => (closing = true));
+    // Fermée depuis Windows (bouton de la barre des tâches, Alt+F4) : tout Cyber Pinball se ferme
+    // avec elle, ses autres fenêtres et ses voiles compris ; rien ne reste dans le gestionnaire des tâches.
+    quitWithWindow(win, title);
     // Seule la mise en page du playfield pivote : la fenêtre garde les bornes de l'écran.
     const turn = role.id === 'playfield' ? rotation : 0;
     win.loadFile(path.join(__dirname, '..', 'renderer', 'frontend.html'), { query: { role: role.id, rotation: String(turn), zones: JSON.stringify(parts), ...(playfield && { playfield: JSON.stringify(playfield) }) } });
@@ -3580,10 +3594,11 @@ function soundView() {
 }
 
 // ---------------------------------------------------------------------------
-// DMD du menu vivant (live-dmd.ts, packages/core/src/livedmd.ts) : pendant la navigation,
-// l'écran du DMD montre l'afficheur à points dessiné par Cyber Pinball (titre, PRESS START,
-// records, média DMD, horloge, crédits) ; « classique » dans Médias, son et attente revient au
-// média seul. Rien pendant la partie : VPX a l'afficheur.
+// DMD du menu vivant (live-dmd.ts, packages/core/src/livedmd.ts, dmdscenes.ts) : pendant la
+// navigation, l'écran du DMD montre l'afficheur à points dessiné par Cyber Pinball (le détail de
+// la wheel à l'arrivée, titre, PRESS START, records, un intermède de jeu un cycle sur deux,
+// horloge, crédits) ; « classique » dans Médias, son et attente revient au média seul. Rien
+// pendant la partie : VPX a l'afficheur.
 
 const liveDmd = new LiveDmd({
   send: (shot) => {
@@ -3591,6 +3606,10 @@ const liveDmd = new LiveDmd({
     if (win && !win.isDestroyed()) win.webContents.send('dmd', shot);
   },
 });
+/** Wheels des tables en points, lues en arrière-plan (dmd-wheel.ts) ; l'état est renvoyé quand une arrive. */
+const dmdWheels = new DmdWheels({ converter: () => (converter ??= createConverter()), onReady: () => broadcast() });
+/** Table montrée sur le DMD vivant, et sa place dans la roue : le glissement suit le sens de la roue. */
+let dmdShown: { file: string; index: number } | undefined;
 /** Animation jouée sur le DMD pendant le lancement d'une table : « lancement » (cinéma) ou « chargement ». */
 let loadingDmd: LiveDmdAnimationHandle | undefined;
 /** Records lus de chaque table, relus quand son VPReg.stg change (après une partie). */
@@ -3714,13 +3733,22 @@ function syncLiveDmd(): void {
     loadingDmd = undefined;
   }
   const table = screensSubject();
-  if (!table) liveDmd.show('', undefined);
-  else {
+  if (!table) {
+    dmdShown = undefined;
+    liveDmd.show('', undefined);
+  } else {
     const records = tableRecords(table);
-    const media = medias?.roleMedia(table, 'dmd').url;
-    // Une autre table, ou la même dont les records ou le média ont changé : l'alternance repart du titre.
-    const key = JSON.stringify([table.file, records?.scores, records?.credits, media]);
-    liveDmd.show(key, { title: table.title, manufacturer: table.manufacturer, year: table.year, records, hasMedia: Boolean(media) });
+    const wheelUrl = medias?.wheel(table);
+    const wheel = dmdWheels.get(wheelUrl, wheelUrl ? mediaPathFromUrl(wheelUrl) : undefined);
+    // Sens de la roue : vers la table suivante (1) ou la précédente (−1), par le plus court chemin.
+    const index = tables.indexOf(table);
+    const n = tables.length;
+    const step = dmdShown && index >= 0 && dmdShown.index >= 0 && n ? (((index - dmdShown.index) % n) + n) % n : 0;
+    const dir = step > n / 2 ? -1 : 1;
+    dmdShown = { file: table.file, index };
+    // Une autre table, ou la même dont les records ont changé : l'alternance repart du titre.
+    const key = JSON.stringify([table.file, records?.scores, records?.credits]);
+    liveDmd.show(key, { title: table.title, manufacturer: table.manufacturer, year: table.year, records, wheel }, dir);
   }
   liveDmd.resume();
 }

@@ -322,7 +322,7 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
         label: t('DMD du menu : {mode}', { mode: MENU_DMD_LABELS[v.dmd] }),
         detail:
           v.dmd === 'live'
-            ? t('Cyber Pinball dessine l’afficheur : titre, records, PRESS START, horloge, crédits, puis le média DMD du jeu (Start : média seul)')
+            ? t('Cyber Pinball dessine l’afficheur en continu : titre, records, PRESS START, horloge, crédits (Start : média seul)')
             : t('Le média DMD du jeu, sinon son titre qui défile (Start : DMD vivant)'),
         icon: 'dmd',
         run: () => set({ dmd: v.dmd === 'live' ? 'classic' : 'live' }),

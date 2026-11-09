@@ -245,7 +245,8 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 
 ### Live DMD and brand colours
 
-- **The menu's DMD drawn by Cyber Pinball**, on a 128 × 32 dot grid: the title, PRESS START, the high scores ("HIGH SCORE #1" to #4), the DMD media, the clock, the credits.
+- **The menu's DMD drawn by Cyber Pinball**, on a 128 × 32 dot grid: the title, PRESS START, the high scores ("HIGH SCORE #1" to #4), the clock, the credits, never fading out: the table's DMD media shows around the dots on a FullDMD, or alone with the "classic" DMD.
+- **A DMD that comes alive**: on arriving at a table, a close-up of its wheel in dots (often its logotype) lights up, slides and makes way for the title; each page arrives with its own transition (a light wipe towards the high scores, a dissolve towards the clock); every other cycle, a short gameplay scene: bumpers, plunger, flippers, "BANK COMPLETE", "BALL LOCKED", multiball.
 - **"DMD sur la roue" (DMD on the wheel), table by table** (the table's page > "Gérer la table…", Manage the table…): dots shown or hidden (the FullDMD screen then shows its media alone), and their position on the DMD screen, set with the buttons while watching the DMD screen live. Separate from the in-game DMD, which keeps its own setting.
 - **"DMD colour"**: signal green by default, presets (teal, light ink, glacier blue, soft amber, plasma orange) or any colour you like.
 - **Each table has its colour** in the menu: the wheel's light, the frames' glow and the background of screens without media take the hue of its backglass, with a fade; the chosen table stays green. The DMD can take it too ("Couleur de la table", Table colour). Setting: "Couleur de chaque table au menu" (Colour of each table in the menu).

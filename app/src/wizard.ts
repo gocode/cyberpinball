@@ -146,6 +146,7 @@ import { coverDisplay } from './cover-display';
 import { LayoutReport } from './layout-check';
 import { arrangeAction, arrangeKey, arrangePanel, arrangeZones, startArrange, type ArrangeAction, type ArrangeHost, type ArrangeOutcome, type ArrangeState } from './arrange';
 import { relaunchCovered } from './screen-guard';
+import { quitWithWindow } from './app-lifetime';
 import { otherFrontendsOnThisPc } from './frontend-gate';
 
 const COLORS = ['#ff3d7f', '#22d3ee', '#facc15', '#a3e635', '#c084fc', '#fb923c'];
@@ -397,6 +398,8 @@ export function startWizard(): void {
     // maintenue. Le focus qui passe d'un de ses écrans à l'autre garde les touches enfoncées,
     // dont le relâchement arrive à l'autre fenêtre : sinon, la touche n'est jamais relevée.
     win.on('blur', () => setImmediate(() => windows.some((w) => !w.isDestroyed() && w.isFocused()) || releaseKeys()));
+    // Fermée depuis Windows (Alt+F4) : tout l'assistant se ferme, ses autres écrans compris.
+    quitWithWindow(win, 'Assistant'); // i18n-ignore : journal
     win.loadFile(path.join(__dirname, '..', 'renderer', 'screen.html'));
     whenReadyToShow(win, () => {
       win.show();

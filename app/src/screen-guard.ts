@@ -200,6 +200,16 @@ export function isVeil(win: BrowserWindow): boolean {
   return veilSet.has(win);
 }
 
+/** Une relève est en cours (relaunchCovered) : ce processus sort par app.exit dès que le suivant a peint. */
+export function isRelaunching(): boolean {
+  return relaunching;
+}
+
+/** Ce processus est le nouveau d'une relève (à lire avant guardScreens, qui efface la variable). */
+export function isRelay(): boolean {
+  return Boolean(process.env[RELAY_ENV]);
+}
+
 function sameRect(a: Rectangle, b: Rectangle): boolean {
   return a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 }

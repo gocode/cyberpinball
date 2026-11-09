@@ -9,6 +9,13 @@ traduction, point par point, dans [CHANGELOG.en.md](CHANGELOG.en.md) (vérifié 
 le flux de mise à jour et la release GitHub reprennent les deux langues (la borne affiche celle de
 son interface).
 
+## 0.1.9
+
+- DMD du menu : les points restent affichés en permanence sur la roue ; ils ne disparaissent plus quelques secondes à chaque tour pour laisser la place au média de la table, qui se voit autour d'eux sur un FullDMD.
+- DMD du menu plus vivant : à l'arrivée sur une table, un détail de sa wheel en points (souvent son logotype) s'allume, glisse, puis laisse la place au titre.
+- Chaque page du DMD arrive par sa transition : volet lumineux vers les records, dissolution vers l'horloge et les crédits ; d'une table à l'autre, la nouvelle glisse dans le sens de la roue.
+- Un tour sur deux, une courte scène de jeu en points après les records : bumpers, lanceur, flippers, « BANK COMPLETE », « BALL LOCKED », multibille, jamais deux fois la même de suite.
+
 ## 0.1.8
 
 - Avatar, dans Menu système > Amis > « Mon avatar » : une photo ou une image à vous, choisie sur ce PC ou dans le navigateur intégré (clic droit sur une image : « Télécharger cette image »), puis recadrée aux boutons de la borne (zoom, déplacer le cadre, recentrer) ou à la souris. Une photo y perd ses métadonnées, position GPS comprise.

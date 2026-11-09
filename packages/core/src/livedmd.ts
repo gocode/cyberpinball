@@ -1,7 +1,10 @@
 // DMD du menu vivant : pendant la navigation, Cyber Pinball dessine lui-même l'afficheur à
 // points, en 128 × 32 comme les vrais DMD, et y fait tourner ce qu'une machine montre en
 // attente : le titre de la table choisie, ses records (highscores.ts, rien d'inventé),
-// « PRESS START », l'horloge, « CREDITS », puis le média DMD de la table s'il en a un.
+// « PRESS START », l'horloge, « CREDITS ». Les points ne laissent jamais la place au média DMD
+// de la table : il se voit autour d'eux (cadre du FullDMD), ou seul en DMD « classique ».
+// Depuis le 09/11/2026 (dmdscenes.ts) : le détail de la wheel à l'arrivée sur une table, une
+// transition propre à chaque page d'arrivée, et une scène de jeu un cycle sur deux.
 //
 // Tout se calcule ici, sans navigateur : une image est une grille de 128 × 32 nuances de 0
 // (point éteint) à 15 (plein éclat). Le processus principal (app/src/live-dmd.ts) fait tourner
@@ -17,6 +20,7 @@ import { centeredDmdBand } from './dmdscreen';
 import { frameWindow, type FrameRecord, type FrameRect } from './fulldmdframe';
 import { dmdScore, type TableRecords } from './highscores';
 import { CINEMA_TIMELINE } from './cinema';
+import type { WheelDetail } from './dmdscenes';
 
 export const DMD_WIDTH = 128;
 export const DMD_HEIGHT = 32;
@@ -85,15 +89,14 @@ export const DMD_USABLE = DMD_WIDTH - 2 * DMD_MARGIN;
 // ---------------------------------------------------------------------------
 // Pages
 
-export type DmdPageId = 'title' | 'records' | 'press-start' | 'clock' | 'credits' | 'media' | 'brand';
+/** Pages de l'alternance ; « wheel » : le détail de la wheel à l'arrivée sur une table, « interlude » : une scène de jeu (dmdscenes.ts). */
+export type DmdPageId = 'title' | 'records' | 'press-start' | 'clock' | 'credits' | 'brand' | 'wheel' | 'interlude';
 
 export interface DmdPage {
   id: DmdPageId;
   /** Durée de la page, en ms. */
   hold: number;
-  /** Page du média DMD de la table : la fenêtre montre le média, pas les points. */
-  media?: boolean;
-  /** Image à `elapsed` ms du début de la page (non appelée pour la page du média). */
+  /** Image à `elapsed` ms du début de la page. */
   dots(elapsed: number): DmdDots;
   /** La page bouge (défilement, clignotement, horloge) : l'image est à recalculer en continu. */
   animated?: boolean;
@@ -106,27 +109,33 @@ export interface LiveDmdInput {
   year?: number;
   /** Records de la table (readTableRecords) ; absents : pas de page des records. */
   records?: TableRecords;
-  /** La table a un média DMD (image ou vidéo) : il passe dans l'alternance. */
-  hasMedia?: boolean;
   /** Heure de l'horloge ; maintenant par défaut (les essais la fixent). */
   now?: () => Date;
+  /** Wheel de la table en points (dmdscenes.ts, wheelDetail) : son détail joue une fois à l'arrivée. */
+  wheel?: WheelDetail;
 }
 
 /**
- * Durées de l'alternance, en ms : environ 28 s pour une table à 4 records et un média DMD.
- * Valeurs du directeur artistique (26/10/2026) : l'invitation à jouer suit le titre, le cycle
- * reste court pour un menu qu'on parcourt.
+ * Durées de l'alternance, en ms : environ 22 s pour une table à 4 records. Valeurs du directeur
+ * artistique (26/10/2026) : l'invitation à jouer suit le titre, le cycle reste court pour un menu
+ * qu'on parcourt. Plus de page du média depuis le 09/11/2026 : les points ne disparaissent plus.
  */
 export const LIVE_DMD_TIMING = {
   title: 4800,
   pressStart: 2400,
   record: 2400,
-  media: 5000,
   clock: 3000,
   credits: 1800,
   brand: 4000,
   /** Poussée vers le haut entre deux pages de points (32 lignes, à vitesse constante). */
   transition: 160,
+  /** Glissement latéral d'une table à l'autre, sur la roue. */
+  slide: 240,
+  /** Volet lumineux, vers les records ; dissolution, vers l'horloge et les crédits. */
+  wipe: 320,
+  dissolve: 320,
+  /** Allumage du détail de la wheel, point par point, par-dessus le titre. */
+  light: 400,
   /** Vitesse d'un titre trop long qui défile, en points par seconde. */
   scroll: 24,
   /** Arrêt d'un titre qui défile, au début et à la fin. */
@@ -246,15 +255,10 @@ export function brandPage(): DmdPage {
   });
 }
 
-export function mediaPage(): DmdPage {
-  const dots = blankDots();
-  return { id: 'media', hold: LIVE_DMD_TIMING.media, media: true, dots: () => dots };
-}
-
 /**
- * L'alternance d'une table : titre, PRESS START, records, média DMD, horloge, crédits ; une
- * page absente (pas de records, pas de média) est sautée. Sans table : la marque, PRESS START,
- * l'horloge.
+ * L'alternance d'une table : titre, PRESS START, records, horloge, crédits ; sans records, leur
+ * page est sautée. Sans table : la marque, PRESS START, l'horloge. Jamais de page du média DMD :
+ * les points restent affichés (le média se voit autour, ou seul en DMD « classique »).
  */
 export function liveDmdPages(input: LiveDmdInput | undefined): DmdPage[] {
   if (!input?.title) return [brandPage(), pressStartPage(), clockPage(input?.now)];
@@ -262,7 +266,6 @@ export function liveDmdPages(input: LiveDmdInput | undefined): DmdPage[] {
     titlePage(input),
     pressStartPage(),
     ...recordPages(input.records),
-    ...(input.hasMedia ? [mediaPage()] : []),
     clockPage(input.now),
     creditsPage(input.records?.credits),
   ];
@@ -271,16 +274,27 @@ export function liveDmdPages(input: LiveDmdInput | undefined): DmdPage[] {
 // ---------------------------------------------------------------------------
 // Programme : les pages à la suite, en boucle, avec leurs transitions
 
-/** Ce que montre le DMD à un instant : des points, ou le média de la table. */
+/** Ce que montre le DMD à un instant. */
 export interface LiveDmdShot {
   page: DmdPageId;
   /** Index de la page dans le programme. */
   index: number;
-  media: boolean;
-  /** Points à montrer (absents pour le média). */
-  dots?: DmdDots;
+  dots: DmdDots;
   /** L'image change d'elle-même (défilement, transition, clignotement) : la recalculer à la trame suivante. */
   moving: boolean;
+}
+
+/** Hachage entier figé d'un point (jamais de fract(sin), qui varie selon la machine) : [0, 1). */
+export function dotHash(x: number, y: number, seed = 0): number {
+  let h = Math.imul(x + 374761393, 668265263) ^ Math.imul(y + 2246822519, 3266489917) ^ Math.imul(seed + 1, 2654435761);
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Courbe douce, de 0 à 1. */
+export function easeDots(k: number): number {
+  const c = Math.min(1, Math.max(0, k));
+  return c * c * (3 - 2 * c);
 }
 
 /** Transition entre deux images : l'ancienne monte et la nouvelle la pousse, ligne à ligne (k de 0 à 1). */
@@ -295,49 +309,157 @@ export function transitionDots(from: DmdDots, to: DmdDots, k: number): DmdDots {
 }
 
 /**
- * Programme en boucle : chaque page pendant sa durée, puis une poussée vers la suivante (sauf
- * entre deux records, qui se remplacent directement, et vers ou depuis le média : la fenêtre
- * passe de l'un à l'autre d'un coup, sans bouger l'habillage FullDMD).
+ * Les transitions du DMD (revue du directeur artistique du 09/11/2026), chacune liée à ce
+ * qu'elle annonce, jamais tirée au hasard : la poussée pour l'alternance courante, le glissement
+ * d'une table à l'autre, le volet vers les records, la dissolution vers l'horloge et les crédits,
+ * l'allumage vers le détail de la wheel. k va de 0 (l'ancienne image) à 1 (la nouvelle).
+ */
+export const DMD_TRANSITIONS = {
+  push: transitionDots,
+  /** L'ancienne part à gauche (dir 1) ou à droite (dir −1), la nouvelle la suit, en douceur. */
+  slide(from: DmdDots, to: DmdDots, k: number, dir: 1 | -1 = 1): DmdDots {
+    const out = blankDots();
+    const shift = Math.round(easeDots(k) * DMD_WIDTH);
+    for (let y = 0; y < DMD_HEIGHT; y++) {
+      for (let x = 0; x < DMD_WIDTH; x++) {
+        const sx = dir === 1 ? x + shift : x - shift;
+        out[y * DMD_WIDTH + x] = sx >= 0 && sx < DMD_WIDTH ? from[y * DMD_WIDTH + sx]! : to[y * DMD_WIDTH + (dir === 1 ? sx - DMD_WIDTH : sx + DMD_WIDTH)]!;
+      }
+    }
+    return out;
+  },
+  /** Un front lumineux de gauche à droite : 2 colonnes au plein éclat, 2 à 7 derrière ; la nouvelle image derrière lui. */
+  wipe(from: DmdDots, to: DmdDots, k: number): DmdDots {
+    const out = blankDots();
+    const edge = k * (DMD_WIDTH + 6);
+    for (let y = 0; y < DMD_HEIGHT; y++) {
+      for (let x = 0; x < DMD_WIDTH; x++) {
+        const i = y * DMD_WIDTH + x;
+        const gap = edge - x;
+        out[i] = gap > 0 ? to[i]! : from[i]!;
+        if (gap > -1 && gap < 3) out[i] = Math.max(out[i]!, gap < 1 ? 15 : 7);
+      }
+    }
+    return out;
+  },
+  /** Chaque point passe à la nouvelle image à son heure, tirée d'un hachage figé. */
+  dissolve(from: DmdDots, to: DmdDots, k: number): DmdDots {
+    const out = blankDots();
+    for (let i = 0; i < out.length; i++) out[i] = dotHash(i % DMD_WIDTH, Math.floor(i / DMD_WIDTH), 3) < k ? to[i]! : from[i]!;
+    return out;
+  },
+  /** Allumage : chaque point passe à la nouvelle image à son heure, allumé d'abord au plein éclat (120 ms sur 400). */
+  light(from: DmdDots, to: DmdDots, k: number): DmdDots {
+    const out = blankDots();
+    for (let i = 0; i < out.length; i++) {
+      const on = dotHash(i % DMD_WIDTH, Math.floor(i / DMD_WIDTH), 7) * 0.7;
+      out[i] = k < on ? from[i]! : to[i] && k < on + 0.3 ? 15 : to[i]!;
+    }
+    return out;
+  },
+} satisfies Record<string, (from: DmdDots, to: DmdDots, k: number) => DmdDots>;
+
+export type DmdTransitionName = keyof typeof DMD_TRANSITIONS;
+
+/** Durée de chaque transition, en ms (des multiples de 40 : une image du DMD). */
+export const DMD_TRANSITION_MS: Record<DmdTransitionName, number> = {
+  push: LIVE_DMD_TIMING.transition,
+  slide: LIVE_DMD_TIMING.slide,
+  wipe: LIVE_DMD_TIMING.wipe,
+  dissolve: LIVE_DMD_TIMING.dissolve,
+  light: LIVE_DMD_TIMING.light,
+};
+
+/**
+ * Transition d'une page à la suivante, selon la page d'arrivée : le volet vers les records, la
+ * dissolution vers l'horloge et les crédits, l'allumage vers la wheel, la poussée ailleurs.
+ * Aucune entre deux records, qui se remplacent directement.
+ */
+export function transitionTo(from: DmdPageId, to: DmdPageId): DmdTransitionName | undefined {
+  if (from === 'records' && to === 'records') return undefined;
+  if (to === 'records') return 'wipe';
+  if (to === 'clock' || to === 'credits') return 'dissolve';
+  if (to === 'wheel') return 'light';
+  return 'push';
+}
+
+/** Une page du programme, à sa place. */
+interface Slot {
+  page: DmdPage;
+  start: number;
+  /** Index dans `pages`, −1 pour l'ouverture. */
+  index: number;
+  /** Durée montrée (la première page de l'ouverture est coupée à `after`). */
+  hold: number;
+  /** Transition vers la page suivante (aucune : elle la remplace directement). */
+  transition?: DmdTransitionName;
+  next: DmdPage;
+}
+
+/** Ouverture d'un programme : une page jouée une fois, au bout de `after` ms sur la première. */
+export interface LiveDmdIntro {
+  page: DmdPage;
+  after: number;
+}
+
+/**
+ * Programme en boucle : chaque page pendant sa durée, puis la transition qu'appelle la suivante
+ * (transitionTo). Avec une ouverture (le détail de la wheel), la première page est montrée
+ * `after` ms, l'ouverture s'allume par-dessus, puis la boucle part du début.
  */
 export class LiveDmdProgram {
-  private readonly starts: number[] = [];
+  private readonly loop: Slot[] = [];
+  private readonly opening: Slot[] = [];
+  /** Durée de l'ouverture, en ms (0 : aucune). */
+  readonly openingLength: number;
+  /** Durée de la boucle, en ms. */
   readonly cycle: number;
 
-  constructor(readonly pages: DmdPage[]) {
+  constructor(
+    readonly pages: DmdPage[],
+    intro?: LiveDmdIntro,
+  ) {
     let t = 0;
     for (const [i, page] of pages.entries()) {
-      this.starts.push(t);
-      t += page.hold + (this.blends(i) ? LIVE_DMD_TIMING.transition : 0);
+      const next = pages[(i + 1) % pages.length]!;
+      const transition = pages.length > 1 ? transitionTo(page.id, next.id) : undefined;
+      this.loop.push({ page, start: t, index: i, hold: page.hold, transition, next });
+      t += page.hold + (transition ? DMD_TRANSITION_MS[transition] : 0);
     }
     this.cycle = t;
-  }
-
-  /** Une poussée suit la page i : deux pages de points (pas deux records, pas le média), et plus d'une page. */
-  private blends(i: number): boolean {
-    const page = this.pages[i]!;
-    const next = this.pages[(i + 1) % this.pages.length]!;
-    return this.pages.length > 1 && !page.media && !next.media && !(page.id === 'records' && next.id === 'records');
+    let o = 0;
+    if (intro && pages.length) {
+      const first = pages[0]!;
+      const into = transitionTo(first.id, intro.page.id)!;
+      this.opening.push({ page: first, start: 0, index: 0, hold: intro.after, transition: into, next: intro.page });
+      o = intro.after + DMD_TRANSITION_MS[into];
+      const back = transitionTo(intro.page.id, first.id)!;
+      this.opening.push({ page: intro.page, start: o, index: -1, hold: intro.page.hold, transition: back, next: first });
+      o += intro.page.hold + DMD_TRANSITION_MS[back];
+    }
+    this.openingLength = o;
   }
 
   at(elapsed: number): LiveDmdShot {
-    if (!this.pages.length) return { page: 'brand', index: 0, media: false, dots: blankDots(), moving: false };
-    const t = ((elapsed % this.cycle) + this.cycle) % this.cycle;
-    let i = this.starts.length - 1;
-    while (i > 0 && this.starts[i]! > t) i--;
-    const page = this.pages[i]!;
-    const local = t - this.starts[i]!;
-    if (local < page.hold) {
-      if (page.media) return { page: page.id, index: i, media: true, moving: false };
-      return { page: page.id, index: i, media: false, dots: page.dots(local), moving: Boolean(page.animated) };
+    if (!this.pages.length) return { page: 'brand', index: 0, dots: blankDots(), moving: false };
+    let slots = this.opening;
+    let t = Math.max(0, elapsed);
+    if (t >= this.openingLength) {
+      slots = this.loop;
+      t = (t - this.openingLength) % this.cycle;
     }
-    const next = this.pages[(i + 1) % this.pages.length]!;
-    const k = (local - page.hold) / LIVE_DMD_TIMING.transition;
-    return { page: page.id, index: i, media: false, dots: transitionDots(page.dots(page.hold), next.dots(0), k), moving: true };
+    let i = slots.length - 1;
+    while (i > 0 && slots[i]!.start > t) i--;
+    const slot = slots[i]!;
+    const local = t - slot.start;
+    if (local < slot.hold || !slot.transition) return { page: slot.page.id, index: slot.index, dots: slot.page.dots(local), moving: Boolean(slot.page.animated) };
+    const k = (local - slot.hold) / DMD_TRANSITION_MS[slot.transition];
+    return { page: slot.page.id, index: slot.index, dots: DMD_TRANSITIONS[slot.transition](slot.page.dots(slot.hold), slot.next.dots(0), k), moving: true };
   }
 
-  /** Début de la page `index` dans le cycle, en ms. */
+  /** Début de la page `index` dans la boucle (après l'ouverture), en ms. */
   startOf(index: number): number {
-    return this.starts[index] ?? 0;
+    return this.loop[index]?.start ?? 0;
   }
 }
 

@@ -1070,8 +1070,7 @@ const zones = parts.map((p) => {
 
 /**
  * DMD du menu vivant (app/src/live-dmd.ts) : le processus principal envoie chaque image
- * changée de l'afficheur (128 × 32 nuances), ou « le média » quand c'est au tour du média DMD
- * de la table. L'afficheur se pose sur la zone du DMD, à la place dite par l'état (liveDmd :
+ * changée de l'afficheur (128 × 32 nuances), toujours des points. L'afficheur se pose sur la zone du DMD, à la place dite par l'état (liveDmd :
  * celle réglée pour la table sur la roue, sinon dans le cadre du média FullDMD, ou la bande 4:1
  * sur du noir). liveDmd.hidden : DMD masqué pour cette table, la zone montre son média seul.
  * liveDmd.editing : « DMD sur la roue » ouvert, un cadre et sa légende autour des points. Sans
@@ -1089,9 +1088,9 @@ function dropLiveDmd() {
   liveDmd = undefined;
 }
 
-/** Les points se cachent : DMD masqué pour la table, ou c'est au tour du média. */
+/** Les points ne se cachent que si le DMD est masqué pour la table : l'alternance n'a pas de page du média. */
 function dmdDotsHidden() {
-  return Boolean(liveDmd?.hidden || lastDmdShot?.media);
+  return Boolean(liveDmd?.hidden);
 }
 
 /** La vidéo de la zone ne joue que si elle se voit : pas sous l'afficheur posé sur du noir. */
@@ -1132,7 +1131,7 @@ function showDmdShot(shot) {
   lastDmdShot = shot;
   if (!liveDmd) return;
   liveDmd.holder.hidden = dmdDotsHidden();
-  if (!shot.media && shot.dots) liveDmd.matrix.show(shot.dots);
+  if (shot.dots) liveDmd.matrix.show(shot.dots);
   dmdZone.layer.setActive(dmdMediaActive());
 }
 

@@ -14,6 +14,7 @@ import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions, type 
 import { offscreenMode, realScreensRefusal, type Rect } from '@cyberpinball/core';
 import { currentDesktop, HIDDEN_DESKTOP, startOnHiddenDesktop, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
+import { noteTaskbarButton } from './app-lifetime';
 
 export const OFFSCREEN = offscreenMode(process.env);
 
@@ -99,6 +100,8 @@ export function createWindow(options: BrowserWindowConstructorOptions): BrowserW
   if (!OFFSCREEN) {
     const win = new BrowserWindow({ ...options, backgroundMaterial: 'none' });
     trackPainting(win);
+    // Toute l'application se ferme avec sa dernière fenêtre qui a un bouton dans la barre des tâches (app-lifetime.ts).
+    noteTaskbarButton(win, options.skipTaskbar);
     return win;
   }
   const win = new BrowserWindow({
@@ -110,6 +113,8 @@ export function createWindow(options: BrowserWindowConstructorOptions): BrowserW
   });
   // Les sons de l'assistant sont joués (leur compte rendu fait foi), mais ne s'entendent pas.
   win.webContents.setAudioMuted(true);
+  // Hors écran, aucune n'a de bouton : la règle suit celui qu'elle aurait à l'écran.
+  noteTaskbarButton(win, options.skipTaskbar);
   keepOffscreen(win);
   startWatch();
   return win;

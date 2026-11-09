@@ -32,7 +32,7 @@ const RECORDS: TableRecords = {
   credits: 14,
   scores: [1, 2, 3, 4, 5].map((rank) => ({ rank, score: 80_000_000 - rank * 10_000_000, initials: 'ABC' })),
 };
-const GALAXY = { title: 'Guardians of the Galaxy', manufacturer: 'Stern', year: 2017, records: RECORDS, hasMedia: true, now: NOW };
+const GALAXY = { title: 'Guardians of the Galaxy', manufacturer: 'Stern', year: 2017, records: RECORDS, now: NOW };
 
 /** Colonnes allumées d'une image. */
 function litColumns(dots: DmdDots): number[] {
@@ -96,7 +96,6 @@ test('texte du DMD : capitales sans accent, signes inconnus en « ? »', () => {
 test('chaque page tient dans la grille, ses textes fixes dans les marges', () => {
   for (const input of [GALAXY, { title: 'Terminator 2', manufacturer: 'Williams', year: 1991, now: NOW }, undefined]) {
     for (const page of liveDmdPages(input)) {
-      if (page.media) continue;
       const dots = page.dots(0);
       assert.equal(dots.length, DMD_WIDTH * DMD_HEIGHT);
       assert.ok(dots.some((v) => v > 0), `page ${page.id} vide`);
@@ -123,9 +122,9 @@ test('titre : en grand s’il tient avec ses marges (Terminator 2), sinon il dé
   }
 });
 
-test('alternance : titre, PRESS START, records (4 au plus), média, horloge, crédits ; les absents sautés', () => {
+test('alternance : titre, PRESS START, records (4 au plus), horloge, crédits ; les absents sautés', () => {
   const ids = liveDmdPages(GALAXY).map((p) => p.id);
-  assert.deepEqual(ids, ['title', 'press-start', ...Array(LIVE_DMD_RECORDS).fill('records'), 'media', 'clock', 'credits']);
+  assert.deepEqual(ids, ['title', 'press-start', ...Array(LIVE_DMD_RECORDS).fill('records'), 'clock', 'credits']);
   assert.deepEqual(
     liveDmdPages({ title: 'Terminator 2' }).map((p) => p.id),
     ['title', 'press-start', 'clock', 'credits'],
@@ -134,9 +133,22 @@ test('alternance : titre, PRESS START, records (4 au plus), média, horloge, cr�
     liveDmdPages(undefined).map((p) => p.id),
     ['brand', 'press-start', 'clock'],
   );
-  // Un cycle d'environ 28 s pour une table à 4 records et un média (revue du directeur artistique).
+  // Un cycle d'environ 22 s pour une table à 4 records (durées du directeur artistique, sans page du média).
   const cycle = new LiveDmdProgram(liveDmdPages({ ...GALAXY, title: 'Terminator 2' })).cycle;
-  assert.ok(cycle > 26_000 && cycle < 30_000, `cycle de ${cycle} ms`);
+  assert.ok(cycle > 21_000 && cycle < 24_000, `cycle de ${cycle} ms`);
+});
+
+test('les points ne disparaissent jamais : à chaque instant du cycle, une image allumée (09/11/2026)', () => {
+  // Plus de page du média : le média DMD se voit autour des points (cadre FullDMD) ou seul en DMD « classique ».
+  for (const input of [GALAXY, { title: 'Terminator 2', now: NOW }, undefined]) {
+    const program = new LiveDmdProgram(liveDmdPages(input));
+    for (let t = 0; t < program.cycle; t += 50) {
+      const shot = program.at(t);
+      // PRESS START clignote : sa demi-période éteinte est voulue, pas une disparition de l'afficheur.
+      if (shot.page === 'press-start') continue;
+      assert.ok(shot.dots.some((v) => v > 0), `${input?.title ?? 'sans table'} : afficheur vide à ${t} ms (${shot.page})`);
+    }
+  }
 });
 
 test('records : le score et les initiales tels qu’enregistrés, crédits de la table sinon 0', () => {
@@ -152,18 +164,13 @@ test('records : le score et les initiales tels qu’enregistrés, crédits de la
   assert.equal(Math.max(...pages.find((p) => p.id === 'clock')!.dots(0)), DMD_LEVEL.quiet);
 });
 
-test('programme : poussée entre deux pages de points, pas entre deux records, coupe franche vers le média', () => {
+test('programme : poussée entre deux pages, pas entre deux records', () => {
   const program = new LiveDmdProgram(liveDmdPages(GALAXY));
   const pages = program.pages;
   const title = program.at(pages[0]!.hold + LIVE_DMD_TIMING.transition / 2);
-  assert.ok(title.moving && !title.media, 'transition après le titre');
+  assert.ok(title.moving, 'transition après le titre');
   const r1 = pages.findIndex((p) => p.id === 'records');
   assert.equal(program.startOf(r1 + 1), program.startOf(r1) + LIVE_DMD_TIMING.record, 'records remplacés sans mouvement');
-  const media = pages.findIndex((p) => p.media);
-  assert.equal(program.startOf(media), program.startOf(media - 1) + pages[media - 1]!.hold, 'pas de transition vers le média');
-  const shot = program.at(program.startOf(media) + 100);
-  assert.equal(shot.media, true);
-  assert.equal(shot.dots, undefined);
   // Le cycle boucle.
   assert.equal(program.at(program.cycle + 10).page, 'title');
   // Poussée vers le haut : à mi-course, la moitié basse est le haut de la nouvelle image.
@@ -204,12 +211,12 @@ test('animation « chargement » : le mot, une bille de 4 × 2 points qui roule 
 });
 
 interface Shot {
-  media: boolean;
-  dots?: DmdDots;
+  dots: DmdDots;
 }
 const { LiveDmd } = require(path.join(REPO_ROOT, 'app', 'dist', 'live-dmd.js')) as {
   LiveDmd: new (o: { send(s: Shot): void; now?: () => number }) => {
-    show(key: string, input: unknown): void;
+    show(key: string, input: unknown, dir?: 1 | -1): void;
+    current(): { openingLength: number } | undefined;
     play(name: 'chargement', options?: { label?: string }): { stop(): void; done: Promise<void> };
     playing(): string | undefined;
     pause(): void;
@@ -237,7 +244,15 @@ test('LiveDmd : une image fixe part une fois, rien en pause, l’animation passe
   dmd.resend();
   const pressStart = sent.at(-1)!.dots!;
   dmd.show('autre', { title: 'Medieval Madness', now: NOW });
-  assert.ok(!sameDots(sent.at(-1)!.dots, pressStart), 'nouvelle table : retour au titre');
+  assert.ok(sameDots(sent.at(-1)!.dots, pressStart), 'nouvelle table : le glissement part de l’image d’avant');
+  now += LIVE_DMD_TIMING.slide / 2;
+  dmd.resend();
+  const sliding = sent.at(-1)!.dots;
+  assert.ok(!sameDots(sliding, pressStart), 'à mi-glissement, les deux tables se partagent l’afficheur');
+  now += LIVE_DMD_TIMING.slide;
+  dmd.resend();
+  const title = titlePage({ title: 'Medieval Madness', now: NOW }).dots(LIVE_DMD_TIMING.slide * 1.5);
+  assert.ok(sameDots(sent.at(-1)!.dots, title), 'nouvelle table : retour au titre');
   const anim = dmd.play('chargement');
   assert.equal(dmd.playing(), 'chargement');
   const loading = sent.at(-1)!.dots!;
@@ -249,5 +264,23 @@ test('LiveDmd : une image fixe part une fois, rien en pause, l’animation passe
   const count = sent.length;
   dmd.play('chargement');
   assert.equal(sent.length, count, 'rien n’est envoyé pendant la partie');
+  dmd.dispose();
+});
+
+test('LiveDmd : la wheel lue en retard s’ajoute tant que son détail n’a pas dû jouer', () => {
+  let now = 0;
+  const dmd = new LiveDmd({ now: () => now, send: () => undefined });
+  dmd.resume();
+  const wheel = { width: 112, height: 112, dots: new Uint8Array(112 * 112).fill(9), from: 30, to: 46 };
+  dmd.show('bttf', { title: 'Back to the Future', now: NOW });
+  assert.equal(dmd.current()!.openingLength, 0);
+  now = 300;
+  dmd.show('bttf', { title: 'Back to the Future', now: NOW, wheel });
+  assert.ok(dmd.current()!.openingLength > 0, 'à temps : le détail jouera à 800 ms');
+  // Trop tard pour une autre table : le titre est déjà passé, rien ne repart en arrière.
+  dmd.show('t2', { title: 'Terminator 2', now: NOW });
+  now += 900;
+  dmd.show('t2', { title: 'Terminator 2', now: NOW, wheel });
+  assert.equal(dmd.current()!.openingLength, 0);
   dmd.dispose();
 });

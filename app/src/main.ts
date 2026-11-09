@@ -23,7 +23,10 @@ import { layoutOf, loadCabinet, scanTables, wizardStepOf } from '@cyberpinball/c
 import { startFrontend } from './frontend';
 import { locations } from './paths';
 import { otherFrontendsGate } from './frontend-gate';
-import { guardScreens } from './screen-guard';
+import { guardScreens, isRelaunching, isRelay } from './screen-guard';
+import { configureLifetime, isQuitting } from './app-lifetime';
+import { holdSingleInstance } from './single-instance';
+import { startIdleCursor } from './idle-cursor';
 import { startSettingsAlone } from './settings';
 import { superviseCabinet } from './supervisor';
 import { journalConsole } from './journal';
@@ -45,7 +48,12 @@ const wantsWizard = !wantsSettings && (process.argv.includes('--assistant') || w
 // qui lance et relance Cyber Pinball. Sinon, un essai sans opérateur lancé sur le bureau de
 // l'utilisateur se refait sur le bureau caché.
 if (!superviseCabinet(loc.dataDir) && !relaunchOnHiddenDesktop()) {
+  // Fermer le menu ou l'assistant depuis Windows ferme toute l'application ; une relève n'en est pas une fermeture.
+  configureLifetime({ relaunching: isRelaunching });
+  // Une seule instance : un second lancement ramène celle qui est ouverte (single-instance.ts).
+  const single = holdSingleInstance({ relaying: isRelay(), ignore: () => isRelaunching() || isQuitting() });
   app.whenReady().then(async () => {
+    if (!(await single)) return app.exit(0);
     // Un autre menu de borne ouvert (PinUP Popper…) : aucun écran n'est pris avant qu'il soit
     // fermé, ou que l'utilisateur choisisse de continuer quand même.
     const gate = await otherFrontendsGate();
@@ -55,6 +63,8 @@ if (!superviseCabinet(loc.dataDir) && !relaunchOnHiddenDesktop()) {
     // Puis l'écran du playfield dans son orientation de jeu, pour la session seulement, avant que
     // le menu ou l'assistant ne lisent les écrans.
     await startOrientation();
+    // Le pointeur de la souris se masque quand on ne s'en sert plus, sur toutes les pages.
+    startIdleCursor();
     if (wantsSettings) void startSettingsAlone(loc.root ? scanTables(layoutOf(loc.root).tables) : []);
     else if (wantsWizard) startWizard();
     else startFrontend();

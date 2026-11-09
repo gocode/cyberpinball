@@ -245,7 +245,8 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 
 ### DMD vivant et couleurs de la marque
 
-- **Le DMD du menu dessiné par Cyber Pinball**, sur une grille de 128 × 32 points : le titre, PRESS START, les records (« HIGH SCORE #1 » à #4), le média DMD, l'horloge, les crédits.
+- **Le DMD du menu dessiné par Cyber Pinball**, sur une grille de 128 × 32 points : le titre, PRESS START, les records (« HIGH SCORE #1 » à #4), l'horloge, les crédits, sans jamais s'effacer : le média DMD de la table se voit autour des points sur un FullDMD, ou seul en DMD « classique ».
+- **Le DMD prend vie** : à l'arrivée sur une table, un détail de sa wheel en points (souvent son logotype) s'allume, glisse et laisse place au titre ; chaque page arrive par sa transition (volet lumineux vers les records, dissolution vers l'horloge) ; un cycle sur deux, une courte scène de jeu : bumpers, lanceur, flippers, « BANK COMPLETE », « BALL LOCKED », multibille.
 - **Records lus dans la table**, jamais inventés.
 - **« DMD sur la roue », table par table** (fiche de la table > « Gérer la table… ») : les points affichés ou masqués (l'écran du FullDMD montre alors son média seul), et leur place sur l'écran du DMD, réglée aux boutons en voyant l'écran du DMD en direct. À part du DMD en partie, qui garde son propre réglage.
 - **« Couleur du DMD »** : vert signal par défaut, préréglages (sarcelle, encre claire, bleu glacier, ambre doux, orange plasma) ou couleur libre.

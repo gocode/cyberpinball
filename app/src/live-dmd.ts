@@ -8,13 +8,28 @@
 //   await anim.done;   // fin de l'animation (une animation sans durée tourne jusqu'à anim.stop())
 //   anim.stop();       // l'alternance reprend
 // Rien n'est envoyé pendant une partie : VPX a l'afficheur (pause / resume).
+//
+// D'une table à l'autre, la nouvelle alternance glisse sur l'ancienne image dans le sens de la
+// roue (240 ms) ; la wheel décodée en retard (dmd-wheel.ts) s'ajoute tant que son détail n'a pas
+// encore dû jouer.
 
-import { LiveDmdProgram, dmdAnimation, liveDmdPages, sameDots, type DmdAnimationName, type DmdAnimationOptions, type DmdDots, type LiveDmdInput } from '@cyberpinball/core';
+import {
+  DMD_TRANSITIONS,
+  LIVE_DMD_SCENES,
+  LIVE_DMD_TIMING,
+  dmdAnimation,
+  liveDmdProgram,
+  sameDots,
+  type DmdAnimationName,
+  type DmdAnimationOptions,
+  type DmdDots,
+  type LiveDmdInput,
+  type LiveDmdProgram,
+} from '@cyberpinball/core';
 
-/** Ce que reçoit la fenêtre : des points, ou « montrer le média de la table ». */
+/** Ce que reçoit la fenêtre : les points à dessiner. */
 export interface LiveDmdShotMessage {
-  media: boolean;
-  dots?: DmdDots;
+  dots: DmdDots;
 }
 
 export interface LiveDmdOptions {
@@ -50,6 +65,10 @@ export class LiveDmd {
   private paused = true;
   private animation?: Running;
   private last?: LiveDmdShotMessage;
+  /** La wheel de la table montrée est dans le programme. */
+  private hasWheel = false;
+  /** Glissement en cours depuis l'image de la table d'avant. */
+  private handoff?: { from: DmdDots; start: number; dir: 1 | -1 };
   private readonly now: () => number;
 
   constructor(private readonly options: LiveDmdOptions) {
@@ -57,15 +76,31 @@ export class LiveDmd {
   }
 
   /**
-   * Table montrée (ou aucune) : `key` dit quand c'est une autre table, ou la même dont
-   * les records ou les médias ont changé. Une autre table repart du titre.
+   * Table montrée (ou aucune) : `key` dit quand c'est une autre table, ou la même dont les
+   * records ont changé ; elle ne compte pas la wheel. Une autre table repart du titre, glissée
+   * sur l'image d'avant dans le sens `dir` de la roue (1 : vers la suivante). La même table dont
+   * la wheel arrive : elle s'ajoute sans rien relancer, si son détail n'a pas encore dû jouer.
    */
-  show(key: string, input: LiveDmdInput | undefined): void {
-    if (key === this.subjectKey && this.program) return;
+  show(key: string, input: LiveDmdInput | undefined, dir: 1 | -1 = 1): void {
+    if (key === this.subjectKey && this.program) {
+      if (input?.wheel && !this.hasWheel && this.now() - this.start < LIVE_DMD_SCENES.wheelAfter) {
+        this.program = liveDmdProgram(input);
+        this.hasWheel = true;
+      }
+      return;
+    }
+    const before = this.last?.dots;
     this.subjectKey = key;
-    this.program = new LiveDmdProgram(liveDmdPages(input));
+    this.program = liveDmdProgram(input);
+    this.hasWheel = Boolean(input?.wheel);
     this.start = this.now();
+    this.handoff = before && !this.paused && !this.animation ? { from: before, start: this.start, dir } : undefined;
     this.tick();
+  }
+
+  /** Le programme courant, pour les essais. */
+  current(): LiveDmdProgram | undefined {
+    return this.program;
   }
 
   /** Joue une animation par-dessus l'alternance ; celle qui jouait s'arrête. */
@@ -114,6 +149,7 @@ export class LiveDmd {
     if (!this.paused) return;
     this.paused = false;
     this.start = this.now();
+    this.handoff = undefined;
     this.tick();
   }
 
@@ -138,14 +174,19 @@ export class LiveDmd {
     const anim = this.animation;
     if (anim && anim.duration !== undefined && now - anim.start >= anim.duration) anim.finish();
     if (this.animation) {
-      shot = { media: false, dots: this.animation.dots(now - this.animation.start) };
+      shot = { dots: this.animation.dots(now - this.animation.start) };
       moving = true;
     } else if (this.program) {
       const at = this.program.at(now - this.start);
-      shot = { media: at.media, dots: at.dots };
+      shot = { dots: at.dots };
       moving = at.moving;
+      const slide = this.handoff;
+      if (slide && now - slide.start < LIVE_DMD_TIMING.slide) {
+        shot = { dots: DMD_TRANSITIONS.slide(slide.from, at.dots, (now - slide.start) / LIVE_DMD_TIMING.slide, slide.dir) };
+        moving = true;
+      } else this.handoff = undefined;
     } else return;
-    if (!this.last || shot.media !== this.last.media || !sameDots(shot.dots, this.last.dots)) {
+    if (!this.last || !sameDots(shot.dots, this.last.dots)) {
       this.last = shot;
       this.options.send(shot);
     }

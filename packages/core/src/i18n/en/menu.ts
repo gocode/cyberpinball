@@ -249,8 +249,8 @@ export const messages: Record<string, string> = {
   'DMD du menu : {mode}': 'Menu DMD: {mode}',
   vivant: 'live',
   classique: 'classic',
-  'Cyber Pinball dessine l’afficheur : titre, records, PRESS START, horloge, crédits, puis le média DMD du jeu (Start : média seul)':
-    'Cyber Pinball draws the display: title, high scores, PRESS START, clock, credits, then the game’s DMD media (Start: media only)',
+  'Cyber Pinball dessine l’afficheur en continu : titre, records, PRESS START, horloge, crédits (Start : média seul)':
+    'Cyber Pinball draws the display at all times: title, high scores, PRESS START, clock, credits (Start: media only)',
   'Le média DMD du jeu, sinon son titre qui défile (Start : DMD vivant)': 'The game’s DMD media, else its scrolling title (Start: live DMD)',
   'Qualité téléchargée (VPinMediaDB) : {quality}': 'Download quality (VPinMediaDB): {quality}',
   '4k si l’écran du plateau dépasse {pixels} points, 1k sinon ; seule l’image du plateau existe en 4k (Start : changer)':

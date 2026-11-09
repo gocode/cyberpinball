@@ -9,11 +9,15 @@
 // (un par ligne ; hors du dépôt, sinon elle les publierait elle-même ; CYBERPINBALL_AUDIT_NOMS
 // la remplace). Lancé par npm test et par scripts/publier.mjs.
 //
-// Documents de travail internes (isPrivate : interne/, video/, docs/recherche/, docs/Design/) :
+// Documents de travail internes (isPrivate : interne/, docs/recherche/, docs/Design/) :
 // suivis par git sur ce poste, jamais publiés. L'instantané envoyé sur GitHub les retire
 // (scripts/envoyer-github.mjs). Refusés aussi : un fichier suivi hors des emplacements publics
 // (PUBLIC) et des dossiers internes, et un fichier publié qui renvoie à un document interne
 // (lien ou chemin cité, cassé sur GitHub).
+//
+// La communication et la promotion ne sont pas suivies du tout : elles
+// vivent dans hors-depot/, exclu de git sur ce poste. Un fichier de hors-depot/ ou de l'ancien
+// video/ qui se retrouverait suivi est refusé comme tout fichier mal rangé.
 
 import { execFileSync } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -46,10 +50,10 @@ export const PUBLIC = [
 /**
  * Dossiers internes : suivis par git sur ce poste, jamais publiés. Le développement de
  * l'application (interne/ : démonstrations et bancs hors écran, tests manuels ; docs/recherche :
- * notes de recherche ; docs/Design : maquettes et relevés, logos de tables sous licence) et sa
- * promotion (video/). Rien d'autre : pas d'exception par nom de fichier.
+ * notes de recherche ; docs/Design : maquettes et relevés, logos de tables sous licence). Rien
+ * d'autre : pas d'exception par nom de fichier. La promotion n'est pas suivie (hors-depot/).
  */
-const PRIVATE = [/^interne\//, /^video\//, /^docs\/recherche\//, /^docs\/design\//i];
+const PRIVATE = [/^interne\//, /^docs\/recherche\//, /^docs\/design\//i];
 export function isPrivate(file) {
   return PRIVATE.some((re) => re.test(file.replace(/\\/g, '/')));
 }
@@ -132,25 +136,25 @@ const RULES = [
 ];
 
 /**
- * Motifs internes (video/motifs-internes.txt, jamais publié) : ce qui ne doit apparaître dans
+ * Motifs internes (interne/motifs-internes.txt, jamais publié) : ce qui ne doit apparaître dans
  * aucun fichier publié, ni dans son contenu (« texte: <expression> ») ni dans son chemin
  * (« fichier: <expression> »). Ils restent sur ce poste : les écrire ici les publierait.
  * Le fichier se vérifie lui-même par ses exemples : « refuse-texte: », « accepte-texte: »,
  * « refuse-fichier: », « accepte-fichier: ».
  */
-export function internalPatterns(file = path.join(repo, 'video', 'motifs-internes.txt')) {
+export function internalPatterns(file = path.join(repo, 'interne', 'motifs-internes.txt')) {
   const patterns = { text: [], file: [], examples: [] };
   if (!fs.existsSync(file)) return patterns;
   for (const raw of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
     const line = raw.trim();
     if (!line || line.startsWith('#')) continue;
     const m = /^([a-z-]+):\s?(.*)$/.exec(line);
-    if (!m) throw new Error(`video/motifs-internes.txt : ligne illisible (${line})`);
+    if (!m) throw new Error(`interne/motifs-internes.txt : ligne illisible (${line})`);
     const [, kind, value] = m;
     if (kind === 'texte') patterns.text.push(new RegExp(value, 'i'));
     else if (kind === 'fichier') patterns.file.push(new RegExp(value, 'i'));
     else if (/^(refuse|accepte)-(texte|fichier)$/.test(kind)) patterns.examples.push({ kind, value });
-    else throw new Error(`video/motifs-internes.txt : sorte de ligne inconnue (${kind})`);
+    else throw new Error(`interne/motifs-internes.txt : sorte de ligne inconnue (${kind})`);
   }
   return patterns;
 }
@@ -167,7 +171,7 @@ export function internalMentions(text, patterns) {
   text.split(/\r?\n/).forEach((line, i) => {
     for (const re of patterns.text) {
       const m = re.exec(line);
-      if (m) { found.push({ line: i + 1, what: 'travail interne (motif de video/motifs-internes.txt)', excerpt: m[0] }); break; }
+      if (m) { found.push({ line: i + 1, what: 'travail interne (motif de interne/motifs-internes.txt)', excerpt: m[0] }); break; }
     }
   });
   return found;
@@ -178,7 +182,7 @@ export function checkExamples(patterns) {
   const problems = [];
   for (const { kind, value } of patterns.examples) {
     const hit = kind.endsWith('texte') ? internalMentions(value, patterns).length > 0 : internalFile(value, patterns);
-    if (hit !== kind.startsWith('refuse')) problems.push(`video/motifs-internes.txt : l'exemple « ${kind}: ${value} » n'est pas ${kind.startsWith('refuse') ? 'refusé' : 'accepté'}`);
+    if (hit !== kind.startsWith('refuse')) problems.push(`interne/motifs-internes.txt : l'exemple « ${kind}: ${value} » n'est pas ${kind.startsWith('refuse') ? 'refusé' : 'accepté'}`);
   }
   return problems;
 }
@@ -216,7 +220,7 @@ export function auditRepository({ commits } = {}) {
   for (const f of unplacedFiles(tracked)) problems.push(`${f} : hors des emplacements publics (PUBLIC) et des dossiers internes : à ranger dans interne/, ou à déclarer public dans scripts/audit-publication.mjs`);
   const files = tracked.filter((f) => !isPrivate(f));
   const places = internalPlaces(tracked);
-  for (const file of files.filter((f) => internalFile(f, patterns))) problems.push(`${file} : chemin d'un travail interne (motif de video/motifs-internes.txt), à ranger dans video/`);
+  for (const file of files.filter((f) => internalFile(f, patterns))) problems.push(`${file} : chemin d'un travail interne (motif de interne/motifs-internes.txt), à ranger dans video/`);
   for (const file of files) {
     if (BINARY.test(file)) continue;
     const full = path.join(repo, file);

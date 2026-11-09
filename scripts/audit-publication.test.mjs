@@ -7,22 +7,24 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { internalPlaces, internalReferences, isPrivate, isPublic, unplacedFiles, workTraces } from './audit-publication.mjs';
 
-test('quatre dossiers internes, sans exception par nom de fichier', () => {
-  for (const f of ['interne/demos/demo-x.ps1', 'interne/tests-manuels/tests-manuels.md', 'video/clips/rendu.ps1', 'docs/recherche/medias.md', 'docs/Design/maquette.html']) assert.equal(isPrivate(f), true, f);
+test('trois dossiers internes, sans exception par nom de fichier ; la communication n\'est pas suivie', () => {
+  for (const f of ['interne/demos/demo-x.ps1', 'interne/tests-manuels/tests-manuels.md', 'docs/recherche/medias.md', 'docs/Design/maquette.html']) assert.equal(isPrivate(f), true, f);
   for (const f of ['docs/manuel.md', 'docs/images/fr/launch.webp', 'app/src/frontend.ts', 'README.md', 'docs/design-system/README.md']) assert.equal(isPrivate(f), false, f);
+  // hors-depot/ (et l'ancien video/) ne sont jamais suivis : ni internes, ni publics.
+  for (const f of ['hors-depot/forum/message.md', 'video/clips/rendu.ps1']) assert.equal(isPrivate(f) || isPublic(f), false, f);
 });
 
 test('un fichier hors des emplacements publics et des dossiers internes est refusé', () => {
-  const tracked = ['app/src/a.ts', 'packages/core/src/b.ts', 'scripts/c.mjs', 'docs/manual.md', 'docs/images/en/x.webp', 'lanceur.cmd', 'interne/demos/demo-a.ps1', 'video/x.txt',
+  const tracked = ['app/src/a.ts', 'packages/core/src/b.ts', 'scripts/c.mjs', 'docs/manual.md', 'docs/images/en/x.webp', 'lanceur.cmd', 'interne/demos/demo-a.ps1', 'video/x.txt', 'hors-depot/forum/a.md',
     'docs/demo-oubli.ps1', 'outils/rendu.mjs', 'docs/notes.md', 'notes.txt', 'app/brief-ecran.md', 'docs/design-system/critique-codex.md'];
-  assert.deepEqual(unplacedFiles(tracked), ['docs/demo-oubli.ps1', 'outils/rendu.mjs', 'docs/notes.md', 'notes.txt', 'app/brief-ecran.md', 'docs/design-system/critique-codex.md']);
+  assert.deepEqual(unplacedFiles(tracked), ['video/x.txt', 'hors-depot/forum/a.md', 'docs/demo-oubli.ps1', 'outils/rendu.mjs', 'docs/notes.md', 'notes.txt', 'app/brief-ecran.md', 'docs/design-system/critique-codex.md']);
   assert.equal(isPublic('docs/fonctionnalites.md'), true);
   assert.equal(isPublic('docs/ecrans/pc-dev.json'), false);
 });
 
 test('un fichier publié ne cite aucun document interne, quel que soit le séparateur', () => {
-  const places = internalPlaces(['interne/demos/demo-x.ps1', 'docs/recherche/medias.md', 'docs/recherche/maquettes/a.cjs', 'video/clips/a.ps1', 'video/motifs-internes.txt']);
-  assert.deepEqual(places.sort(), ['docs/recherche', 'interne/demos', 'video/clips', 'video/motifs-internes.txt']);
+  const places = internalPlaces(['interne/demos/demo-x.ps1', 'docs/recherche/medias.md', 'docs/recherche/maquettes/a.cjs', 'interne/motifs-internes.txt']);
+  assert.deepEqual(places.sort(), ['docs/recherche', 'interne/demos', 'interne/motifs-internes.txt']);
   const cited = (file, text) => internalReferences(file, text, places).map((f) => f.excerpt);
   assert.deepEqual(cited('app/src/a.ts', '// Démonstration : interne\\demos\\demo-x.ps1'), ['interne\\demos']);
   assert.deepEqual(cited('packages/core/src/b.ts', '// Conception : docs/recherche/medias.md, § 5.'), ['docs/recherche']);

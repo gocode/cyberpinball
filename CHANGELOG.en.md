@@ -7,6 +7,13 @@ section of [CHANGELOG.md](CHANGELOG.md) point by point (same versions, same numb
 `npm run publier` puts both languages in the update feed, where the cabinet shows the notes in
 its own language before installing, and in the GitHub release. Short sentences, written for the cabinet's user.
 
+## 0.1.9
+
+- Menu DMD: the dots now stay on screen at all times on the wheel; they no longer disappear for a few seconds each cycle to make way for the table's media, which shows around them on a FullDMD.
+- A livelier menu DMD: on arriving at a table, a close-up of its wheel in dots (often its logotype) lights up, slides, then makes way for the title.
+- Each DMD page arrives with its own transition: a light wipe towards the high scores, a dissolve towards the clock and the credits; from one table to the next, the new one slides in the wheel's direction.
+- Every other cycle, a short gameplay scene in dots after the high scores: bumpers, plunger, flippers, "BANK COMPLETE", "BALL LOCKED", multiball, never the same twice in a row.
+
 ## 0.1.8
 
 - Avatar, in System menu > Friends > "My avatar": a photo or a picture of your own, chosen on this PC or in the built-in browser (right-click a picture: "Download this image"), then cropped with the cabinet buttons (zoom, move the frame, recenter) or the mouse. A photo loses its metadata, GPS position included.
