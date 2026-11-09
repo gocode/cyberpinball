@@ -36,6 +36,8 @@ son interface).
 - Kinect branchée sans son pilote : choisir « Vision 3D » le télécharge chez Microsoft et l'installe, sans rien d'autre à faire que d'accepter la demande de Windows. En partie, les deux MagnaSave proposent « Recentrer la vue 3D ».
 - Dans le casque, la borne ne bouge plus : le menu et la partie sont au même endroit, celui du calage, sans recentrage automatique. Tant que la borne n'est pas calée, « Caler la borne » s'ouvre seul dans le casque avant le menu ; si le sol du Quest est mal réglé, le casque dit où le régler.
 - Un calage par configuration : celui du bureau ne sert jamais à la borne, ni l'inverse. Au bureau, sans vraie borne, la borne du casque se pose une fois devant vous (ou sur le bord du bureau, touché aux manettes), puis ne bouge plus.
+- Vision 3D : un écran dédié dit où en est le capteur (prêt, sans courant, pilote à installer, à redémarrer, bloqué par Windows), permet de l'essayer sans lancer de table et de réinstaller le pilote de la Kinect ; après chaque partie, un bilan dit si VPX a bien suivi votre tête.
+- Pilote de la Kinect installé sans aucune fenêtre (plus de licence à cocher cachée derrière le menu). Si l'intégrité de la mémoire de Windows refuse ce pilote, Cyber Pinball le dit, prend une webcam à sa place si elle est branchée, et ouvre la bonne page de Sécurité Windows.
 
 ## 0.1.8
 

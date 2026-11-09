@@ -23,6 +23,8 @@ const ENUM = 'SYSTEM\\CurrentControlSet\\Enum';
 interface Api {
   sizeOf: NativeFn;
   list: NativeFn;
+  locate: NativeFn;
+  status: NativeFn;
 }
 
 let api: Api | undefined;
@@ -33,6 +35,8 @@ function loadApi(): Api {
   api = {
     sizeOf: cfgmgr32.func('uint32_t __stdcall CM_Get_Device_ID_List_SizeW(_Out_ uint32_t *length, const char16_t *filter, uint32_t flags)'),
     list: cfgmgr32.func('uint32_t __stdcall CM_Get_Device_ID_ListW(const char16_t *filter, void *buffer, uint32_t length, uint32_t flags)'),
+    locate: cfgmgr32.func('uint32_t __stdcall CM_Locate_DevNodeW(_Out_ uint32_t *devInst, const char16_t *deviceId, uint32_t flags)'),
+    status: cfgmgr32.func('uint32_t __stdcall CM_Get_DevNode_Status(_Out_ uint32_t *status, _Out_ uint32_t *problem, uint32_t devInst, uint32_t flags)'),
   };
   return api;
 }
@@ -93,4 +97,25 @@ export function probeUsbDevices(): ObservedUsbDevice[] {
 function deviceDescription(raw: string | undefined): string | undefined {
   if (!raw) return undefined;
   return raw.startsWith('@') ? raw.slice(raw.lastIndexOf(';') + 1) || undefined : raw;
+}
+
+// cfgmgr32.h : état d'un nœud de périphérique.
+const DN_STARTED = 0x00000008;
+const DN_HAS_PROBLEM = 0x00000400;
+
+/**
+ * Le pilote d'un périphérique présent tourne-t-il ? `started` : pilote chargé ; sinon `problem`, le
+ * code du Gestionnaire de périphériques (28 : aucun pilote installé ; 39, 52 : pilote refusé ou
+ * illisible, par exemple par l'intégrité de la mémoire). undefined : périphérique introuvable.
+ */
+export function deviceStatus(instanceId: string): { started: boolean; problem: number } | undefined {
+  if (process.platform !== 'win32') return undefined;
+  const w = loadApi();
+  const node = [0];
+  if (w.locate(node, instanceId, 0) !== CR_SUCCESS) return undefined;
+  const status = [0];
+  const problem = [0];
+  if (w.status(status, problem, node[0]!, 0) !== CR_SUCCESS) return undefined;
+  const has = (status[0]! & DN_HAS_PROBLEM) !== 0;
+  return { started: (status[0]! & DN_STARTED) !== 0 && !has, problem: has ? problem[0]! : 0 };
 }

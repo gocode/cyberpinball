@@ -40,8 +40,12 @@
       "executablePattern": "^KinectRuntime-v1\\.8-Setup\\.exe$",
       "license": "Microsoft Kinect for Windows Runtime : téléchargé chez Microsoft à la demande de l'utilisateur, jamais redistribué par Cyber Pinball.",
       "source": "https://www.microsoft.com/en-us/download/details.aspx?id=40277",
-      "silentArguments": ["/quiet", "/norestart"],
-      "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US"
+      "signer": "CN=Microsoft Corporation, O=Microsoft Corporation, L=Redmond, S=Washington, C=US",
+      "bundlePackages": [
+        { "source": "a6", "file": "vcredist_x64.exe", "arguments": ["/q", "/norestart"] },
+        { "source": "a0", "file": "KinectDrivers-v1.8-x64.WHQL.msi" },
+        { "source": "a1", "file": "KinectRuntime-v1.8-x64.msi" }
+      ]
     }
   ]
 }

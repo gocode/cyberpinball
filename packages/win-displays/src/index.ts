@@ -219,3 +219,4 @@ export * from './power';
 export * from './system-volume';
 export * from './openxr';
 export * from './handles';
+export * from './device-guard';

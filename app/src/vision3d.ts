@@ -24,6 +24,8 @@ import {
   clampShift,
   HeadFilter,
   kinectAim,
+  kinectCameraOf,
+  type KinectCameraStatus,
   kinectHead,
   medianHead,
   opentrackPacket,
@@ -32,6 +34,7 @@ import {
   VISION3D_PORT,
   vision3dHardware,
   webcamHead,
+  renameWithRetry,
   t,
   writeFileAtomic,
   type DownloadManager,
@@ -42,6 +45,7 @@ import {
   type WebcamEyes,
 } from '@cyberpinball/core';
 import { downloadComponent, findComponent } from '@cyberpinball/installer';
+import { deviceStatus, memoryIntegrityEnabled } from '@cyberpinball/win-displays';
 import { createWindow } from './offscreen';
 import { usbDevices } from './vpx-ini';
 
@@ -74,7 +78,18 @@ export function kinect1DriverInstalled(): boolean {
 
 /** Capteurs branchés maintenant (lecture passive du Gestionnaire de périphériques). */
 export function probeVision3d(): Vision3dHardware {
-  return vision3dHardware(usbDevices() ?? [], kinect1DriverInstalled());
+  // CYBERPINBALL_INTEGRITE_MEMOIRE (essais) : 1 ou 0 à la place du registre.
+  const simulated = process.env.CYBERPINBALL_INTEGRITE_MEMOIRE;
+  const hvci = simulated !== undefined ? simulated === '1' : memoryIntegrityEnabled();
+  const usb = usbDevices() ?? [];
+  const camera = kinectCameraOf(usb);
+  let status: KinectCameraStatus | undefined;
+  try {
+    status = camera ? deviceStatus(camera.instanceId) : undefined;
+  } catch {
+    status = undefined;
+  }
+  return vision3dHardware(usb, kinect1DriverInstalled(), hvci, status);
 }
 
 // --- Plugin VPX ---------------------------------------------------------------------------------
@@ -150,6 +165,8 @@ export class HeadTracker {
   private samples: Vec3[] = [];
   private lastSeen = 0;
   private failure?: string;
+  /** Essai hors partie en cours : où rendre les positions (test). */
+  private testing?: (p: Vec3) => void;
   /** Déplacements envoyés (essais et journal). */
   sent = 0;
 
@@ -193,13 +210,42 @@ export class HeadTracker {
     }
   }
 
+  /**
+   * Essai hors partie (« Tester le capteur ») : le capteur allumé, chaque position lissée rendue à
+   * `onHead` ; rien n'est envoyé à VPX ni enregistré. stop() l'éteint.
+   */
+  test(kind: Vision3dSourceKind, setting: Vision3dSetting, onHead: (p: Vec3) => void): void {
+    this.stop();
+    this.failure = undefined;
+    this.filter.reset();
+    this.lastSeen = 0;
+    this.testing = onHead;
+    const onFailure = (reason: string) => {
+      this.failure = reason;
+      this.opts.log(`Vision 3D (essai) : ${reason}`); // i18n-ignore : journal
+    };
+    try {
+      this.source = kind === 'kinect1' ? startKinect1((p) => this.push(p), onFailure, this.opts.log) : startWebcam(setting.webcamFovDeg, (p) => this.push(p), onFailure, this.opts.log);
+      this.opts.log(`Vision 3D : essai du capteur (${kind === 'kinect1' ? 'Kinect' : 'webcam'}).`); // i18n-ignore : journal
+    } catch (error) {
+      onFailure((error as Error).message);
+      this.stop();
+    }
+  }
+
   /** Nouvelle position de jeu : celle de la tête dans la seconde qui suit. */
   recenter(): void {
     this.neutral = undefined;
     this.samples = [];
   }
 
+  /** Bilan de la partie qui s'achève : positions envoyées et panne du capteur, lus avant stop(). */
+  summary(): { sent: number; failure?: string } {
+    return { sent: this.sent, ...(this.failure && { failure: this.failure }) };
+  }
+
   stop(): void {
+    this.testing = undefined;
     this.source?.stop();
     this.source = undefined;
     this.socket?.close();
@@ -212,6 +258,7 @@ export class HeadTracker {
     const now = Date.now();
     this.lastSeen = now;
     const p = this.filter.filter(raw, now / 1000);
+    if (this.testing) return this.testing(p);
     if (!this.neutral) {
       this.samples.push(p);
       if (this.samples.length < NEUTRAL_SAMPLES) return;
@@ -487,24 +534,82 @@ export async function downloadKinectDriver(downloadsDir: string, downloads?: Dow
   return file;
 }
 
+/** Archive CAB attachée à une enveloppe WiX (Burn) : la plus grande des archives (« MSCF ») du fichier. */
+export function attachedCabinet(exe: Buffer): { offset: number; size: number } | undefined {
+  let best: { offset: number; size: number } | undefined;
+  for (let i = exe.indexOf('MSCF\0\0\0\0', 0, 'latin1'); i >= 0; i = exe.indexOf('MSCF\0\0\0\0', i + 4, 'latin1')) {
+    const size = exe.readUInt32LE(i + 8);
+    if (i + size <= exe.length && (!best || size > best.size)) best = { offset: i, size };
+  }
+  return best;
+}
+
+const EXPAND = path.join(SYSTEM32, 'expand.exe');
+
+function run(file: string, args: string[]): Promise<{ status: number | null; stderr: string }> {
+  return new Promise((resolve) => {
+    const child = spawn(file, args, { windowsHide: true });
+    let stderr = '';
+    child.stderr.on('data', (d) => (stderr += d));
+    child.on('error', (error) => resolve({ status: -1, stderr: error.message }));
+    child.on('close', (status) => resolve({ status, stderr }));
+  });
+}
+
+/** Sujet du certificat d'un fichier signé, ou la raison du refus. */
+async function signerOf(file: string): Promise<{ status: string; subject: string }> {
+  const r = await powershell(`$s = Get-AuthenticodeSignature -LiteralPath ${quote(file)}; "$($s.Status)|$($s.SignerCertificate.Subject)"`);
+  const [status, subject] = r.stdout.trim().split('|');
+  return { status: status ?? '', subject: subject ?? '' };
+}
+
 /**
- * Vérifie que Microsoft a signé l'installateur, puis l'installe en silence ; Windows demande son
- * accord (élévation). Le pilote posé, Kinect10.dll est dans System32.
+ * Installe le pilote sans aucune fenêtre. L'enveloppe de Microsoft (empreinte et signature vérifiées)
+ * n'est jamais lancée : son interface montre sa licence à cocher malgré /quiet, et la fenêtre se
+ * perd derrière le menu plein écran. Ses paquets (bundlePackages) sont pris dans son archive par
+ * expand.exe de Windows, chacun vérifié signé par Microsoft, puis installés d'un trait par un script
+ * élevé : Windows demande son accord une fois.
  */
 export async function installKinectDriver(file: string): Promise<DriverInstall> {
   const component = findComponent('kinect-runtime-1.8');
-  const signature = await powershell(`$s = Get-AuthenticodeSignature -LiteralPath ${quote(file)}; "$($s.Status)|$($s.SignerCertificate.Subject)"`);
-  const [status, subject] = signature.stdout.trim().split('|');
-  if (status !== 'Valid' || subject !== component.signer) {
+  const outer = await signerOf(file);
+  if (outer.status !== 'Valid' || outer.subject !== component.signer) {
     fs.rmSync(file, { force: true });
-    return { ok: false, reason: `signature inattendue (${status || '?'} ; ${subject || '?'}), fichier supprimé` }; // i18n-ignore : raison technique, journal et détail
+    return { ok: false, reason: `signature inattendue (${outer.status || '?'} ; ${outer.subject || '?'}), fichier supprimé` }; // i18n-ignore : raison technique, journal et détail
   }
-  const args = (component.silentArguments ?? []).map(quote).join(', ');
-  const run = await powershell(
-    `try { $p = Start-Process -FilePath ${quote(file)} -ArgumentList @(${args}) -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode } catch { if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { [Console]::Error.WriteLine($_.Exception.Message); exit 1 } }`,
+  const work = path.join(path.dirname(file), component.id);
+  fs.rmSync(work, { recursive: true, force: true });
+  fs.mkdirSync(work, { recursive: true });
+  const exe = fs.readFileSync(file);
+  const cab = attachedCabinet(exe);
+  if (!cab) return { ok: false, reason: 'archive des paquets introuvable dans l’installateur' }; // i18n-ignore : journal
+  const cabFile = path.join(work, 'paquets.cab');
+  fs.writeFileSync(cabFile, exe.subarray(cab.offset, cab.offset + cab.size));
+  const packages: { path: string; arguments?: string[] }[] = [];
+  for (const pkg of component.bundlePackages ?? []) {
+    const x = await run(EXPAND, [`-F:${pkg.source}`, cabFile, work]);
+    const extracted = path.join(work, pkg.source);
+    if (x.status !== 0 || !fs.existsSync(extracted)) return { ok: false, reason: `paquet ${pkg.file} introuvable dans l’installateur` }; // i18n-ignore : journal
+    const dest = path.join(work, pkg.file);
+    renameWithRetry(extracted, dest);
+    const sig = await signerOf(dest);
+    if (sig.status !== 'Valid' || !/(^|, )O=Microsoft Corporation(,|$)/.test(sig.subject)) return { ok: false, reason: `${pkg.file} : signature inattendue (${sig.status || '?'} ; ${sig.subject || '?'})` }; // i18n-ignore : journal
+    packages.push({ path: dest, ...(pkg.arguments && { arguments: pkg.arguments }) });
+  }
+  fs.rmSync(cabFile, { force: true });
+  // Un script, élevé une fois : chaque paquet sans fenêtre. Codes admis : 0, 3010 et 1641
+  // (redémarrage conseillé), 1638 (version plus récente déjà là, Visual C++).
+  const steps = packages.map((p) =>
+    p.path.toLowerCase().endsWith('.msi')
+      ? `$p = Start-Process -FilePath (Join-Path $env:SystemRoot 'System32\\msiexec.exe') -ArgumentList @('/i', '"${p.path.replace(/'/g, "''")}"', '/qn', '/norestart') -Wait -PassThru -WindowStyle Hidden; if ($ok -notcontains $p.ExitCode) { exit $p.ExitCode }`
+      : `$p = Start-Process -FilePath ${quote(p.path)} -ArgumentList @(${(p.arguments ?? []).map(quote).join(', ')}) -Wait -PassThru -WindowStyle Hidden; if ($ok -notcontains $p.ExitCode) { exit $p.ExitCode }`,
   );
-  if (run.status === CANCELLED) return { ok: false, cancelled: true, reason: 'installation refusée' }; // i18n-ignore : journal
-  // 3010 : installé, redémarrage conseillé (le pilote sert déjà au prochain branchement).
-  if (run.status !== 0 && run.status !== 3010) return { ok: false, reason: `installateur de Microsoft : code ${run.status}${run.stderr.trim() ? ` (${run.stderr.trim()})` : ''}` }; // i18n-ignore : journal
+  const script = path.join(work, 'installer.ps1');
+  fs.writeFileSync(script, ['$ok = @(0, 3010, 1641, 1638)', ...steps, 'exit 0', ''].join('\r\n'), 'utf8');
+  const elevated = await powershell(
+    `try { $p = Start-Process -FilePath ${quote(POWERSHELL)} -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '"${script.replace(/'/g, "''")}"'); exit $p.ExitCode } catch { if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { [Console]::Error.WriteLine($_.Exception.Message); exit 1 } }`,
+  );
+  if (elevated.status === CANCELLED) return { ok: false, cancelled: true, reason: 'installation refusée' }; // i18n-ignore : journal
+  if (elevated.status !== 0) return { ok: false, reason: `paquet de Microsoft : code ${elevated.status}${elevated.stderr.trim() ? ` (${elevated.stderr.trim()})` : ''}` }; // i18n-ignore : journal
   return kinect1DriverInstalled() ? { ok: true } : { ok: false, reason: 'Kinect10.dll absente après l’installation' }; // i18n-ignore : journal
 }

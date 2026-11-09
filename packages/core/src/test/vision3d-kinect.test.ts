@@ -46,6 +46,29 @@ test('Kinect : la structure du squelette se lit comme le SDK 1.8 la remplit (pre
   assert.deepEqual(readSkeletonFrame(frame), { head: { x: -0.25, y: 0.5, z: 1.5 }, floor: { x: 0, y: 1, z: 0 } });
 });
 
+test('pilote de la Kinect : l’archive des paquets se trouve dans l’enveloppe (la plus grande archive CAB), paquets pris sans lancer son interface', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const { attachedCabinet } = require(path.join(REPO, 'app', 'dist', 'vision3d.js')) as { attachedCabinet: (b: Buffer) => { offset: number; size: number } | undefined };
+  const cab = (size: number) => {
+    const b = Buffer.alloc(size);
+    b.write('MSCF\0\0\0\0', 0, 'latin1');
+    b.writeUInt32LE(size, 8);
+    return b;
+  };
+  const exe = Buffer.concat([Buffer.alloc(100), cab(300), Buffer.alloc(20), cab(5000), Buffer.alloc(10)]);
+  assert.deepEqual(attachedCabinet(exe), { offset: 420, size: 5000 });
+  assert.equal(attachedCabinet(Buffer.alloc(64)), undefined);
+  // Une taille annoncée au-delà du fichier : pas une archive.
+  const broken = cab(300);
+  broken.writeUInt32LE(9999, 8);
+  assert.equal(attachedCabinet(broken), undefined);
+  // Le manifeste : trois paquets de l'enveloppe, jamais d'arguments /quiet donnés à son interface.
+  const manifest = JSON.parse(fs.readFileSync(path.join(REPO, 'packages', 'installer', 'components.json'), 'utf8')) as { components: { id: string; bundlePackages?: { file: string }[]; silentArguments?: unknown }[] };
+  const kinect = manifest.components.find((c) => c.id === 'kinect-runtime-1.8')!;
+  assert.deepEqual(kinect.bundlePackages!.map((p) => p.file), ['vcredist_x64.exe', 'KinectDrivers-v1.8-x64.WHQL.msi', 'KinectRuntime-v1.8-x64.msi']);
+  assert.equal(kinect.silentArguments, undefined);
+});
+
 const electron = electronPath();
 const skip = process.platform !== 'win32' ? 'Windows seulement' : !electron ? 'Electron absent' : !fs.existsSync(FAKE_DLL) ? 'fausse Kinect10.dll pas construite (node scripts/vision3d.mjs)' : false;
 

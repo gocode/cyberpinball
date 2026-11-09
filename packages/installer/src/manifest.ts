@@ -52,10 +52,15 @@ export interface Component {
    * de ses réglages (vpx-settings/<version>.json, `npm run vpx-schema`).
    */
   sourceCommit?: string;
-  /** Composant « driver » : arguments de son installateur pour une installation silencieuse. */
-  silentArguments?: string[];
   /** Composant « driver » : sujet exact du certificat qui doit avoir signé l'installateur (Authenticode). */
   signer?: string;
+  /**
+   * Composant « driver » livré en enveloppe WiX (Burn) dont l'interface ignore /quiet (Kinect :
+   * « RedistUX », licence à cocher, fenêtre qu'un menu plein écran recouvre) : les paquets à prendre
+   * dans son archive attachée (`source` : nom dans l'archive, a0, a1…), installés un à un sans
+   * fenêtre (.msi par msiexec /qn, sinon avec `arguments`), chacun signé par Microsoft.
+   */
+  bundlePackages?: { source: string; file: string; arguments?: string[] }[];
 }
 
 /** Le manifeste est livré avec le paquet, à côté de dist/. */

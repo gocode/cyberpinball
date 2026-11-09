@@ -68,6 +68,20 @@ export function parseVision3dSetting(raw: unknown): Vision3dSetting {
 const MICROSOFT = 0x045e;
 /** Kinect pour Xbox 360 et Kinect pour Windows (v1) : caméra, moteur, micros (VID 045E). */
 const KINECT1_PIDS = [0x02ae, 0x02ad, 0x02b0, 0x02bf, 0x02be, 0x02c2];
+/** La caméra de la Kinect v1 (celle qui voit le squelette) : seulement quand l'adaptateur secteur l'alimente. */
+const KINECT1_CAMERA_PIDS = [0x02ae, 0x02bf];
+
+/** La caméra de la Kinect v1 parmi les périphériques USB : son identifiant d'instance, pour lire l'état de son pilote. */
+export function kinectCameraOf(usb: readonly ObservedUsbDevice[]): ObservedUsbDevice | undefined {
+  return usb.find((d) => d.vid === MICROSOFT && KINECT1_CAMERA_PIDS.includes(d.pid) && !/&MI_/i.test(d.instanceId));
+}
+
+/** État du pilote de la caméra de la Kinect, lu dans Windows (deviceStatus de win-displays). */
+export interface KinectCameraStatus {
+  started: boolean;
+  /** Code du Gestionnaire de périphériques : 28 = aucun pilote ; 39, 52 = pilote refusé ou illisible. */
+  problem: number;
+}
 /** Kinect pour Xbox One et Kinect pour Windows v2. */
 const KINECT2_PIDS = [0x02c4, 0x02d8, 0x02d9];
 /** Classes de pilote d'une caméra pour Windows (Gestionnaire de périphériques : « Caméras », « Périphériques d'images »). */
@@ -81,10 +95,20 @@ export interface Vision3dHardware {
   kinect2: boolean;
   /** Webcams présentes (nom du Gestionnaire de périphériques), sans les caméras des Kinect. */
   webcams: string[];
+  /**
+   * Intégrité de la mémoire de Windows activée : elle refuse le pilote de la Kinect v1 (2013,
+   * kinectcamera.sys). Cyber Pinball ne la désactive jamais ; il le dit, et prend une webcam.
+   */
+  memoryIntegrity?: boolean;
+  /**
+   * La caméra de la Kinect : absente (adaptateur secteur débranché : seuls le moteur et les micros
+   * paraissent), ou l'état de son pilote. Non relevé : undefined.
+   */
+  kinectCamera?: KinectCameraStatus | 'absent';
 }
 
 /** Ce que la Vision 3D peut utiliser, d'après les périphériques USB présents. */
-export function vision3dHardware(usb: readonly ObservedUsbDevice[], kinect1Driver: boolean): Vision3dHardware {
+export function vision3dHardware(usb: readonly ObservedUsbDevice[], kinect1Driver: boolean, memoryIntegrity = false, cameraStatus?: KinectCameraStatus): Vision3dHardware {
   const isMs = (d: ObservedUsbDevice, pids: number[]) => d.vid === MICROSOFT && pids.includes(d.pid);
   const webcams = usb
     .filter((d) => !isMs(d, KINECT1_PIDS) && !isMs(d, KINECT2_PIDS) && CAMERA_CLASSES.includes((d.deviceClass ?? '').toLowerCase()))
@@ -94,25 +118,70 @@ export function vision3dHardware(usb: readonly ObservedUsbDevice[], kinect1Drive
     kinect1Driver,
     kinect2: usb.some((d) => isMs(d, KINECT2_PIDS)),
     webcams: [...new Set(webcams)],
+    ...(memoryIntegrity && { memoryIntegrity: true }),
+    ...(usb.some((d) => isMs(d, KINECT1_PIDS)) && { kinectCamera: kinectCameraOf(usb) ? (cameraStatus ?? { started: true, problem: 0 }) : ('absent' as const) }),
   };
 }
 
 export type Vision3dReadiness =
-  | { ready: true; source: Vision3dSourceKind; label: string }
-  | { ready: false; reason: string; installKinectDriver?: true };
+  | { ready: true; source: Vision3dSourceKind; label: string; note?: string }
+  | { ready: false; reason: string; installKinectDriver?: true; memoryIntegrity?: true; restart?: true };
 
 /** Le capteur que prendra la prochaine partie, ou pourquoi aucun ne peut servir. */
 export function vision3dReadiness(hw: Vision3dHardware, choice: Vision3dSourceChoice = 'auto'): Vision3dReadiness {
   const webcam = hw.webcams[0];
   const kinectReady = hw.kinect1 && hw.kinect1Driver;
+  // Kinect branchée, mais son pilote refusé par l'intégrité de la mémoire : une webcam la remplace.
+  const blocked = hw.kinect1 && hw.memoryIntegrity;
+  const camera = hw.kinectCamera;
+  // La Kinect ne peut pas servir maintenant, et pourquoi : sans courant, sans pilote, pilote pas chargé.
+  const unusable: Vision3dReadiness | undefined = !hw.kinect1
+    ? undefined
+    : blocked
+      ? { ready: false, reason: kinectBlockedReason(), memoryIntegrity: true }
+      : camera === 'absent'
+        ? { ready: false, reason: t('Kinect sans courant : branchez son adaptateur secteur (seuls son moteur et ses micros sont vus)') }
+        : !hw.kinect1Driver || camera?.problem === 28
+          ? { ready: false, reason: t('Kinect détectée, pilote de Microsoft manquant'), installKinectDriver: true }
+          : camera && !camera.started
+            ? { ready: false, reason: t('Windows n’a pas chargé le pilote de la Kinect (code {code}) : redémarrez le PC, puis débranchez et rebranchez la Kinect', { code: camera.problem }), restart: true }
+            : undefined;
   if (choice !== 'webcam') {
-    if (kinectReady) return { ready: true, source: 'kinect1', label: t('Kinect pour Xbox 360') };
-    if (hw.kinect1) return { ready: false, reason: t('Kinect détectée, pilote de Microsoft manquant'), installKinectDriver: true };
-    if (choice === 'kinect1') return { ready: false, reason: t('Kinect pour Xbox 360 introuvable : branchez-la avec son adaptateur secteur') };
+    if (hw.kinect1 && !unusable) return { ready: true, source: 'kinect1', label: t('Kinect pour Xbox 360') };
+    // Le pilote à installer passe avant la webcam : le joueur a branché sa Kinect pour s'en servir.
+    if (unusable && (unusable as { installKinectDriver?: true }).installKinectDriver) return unusable;
+    if (unusable && !webcam) return unusable;
+    if (choice === 'kinect1' && !hw.kinect1) return { ready: false, reason: t('Kinect pour Xbox 360 introuvable : branchez-la avec son adaptateur secteur') };
   }
-  if (webcam) return { ready: true, source: 'webcam', label: webcam };
+  if (webcam) return { ready: true, source: 'webcam', label: webcam, ...(unusable && !unusable.ready && choice !== 'webcam' && { note: blocked ? t('Kinect refusée par l’intégrité de la mémoire de Windows : webcam utilisée') : t('Kinect pas prête ({reason}) : webcam utilisée', { reason: unusable.reason }) }) };
   if (hw.kinect2) return { ready: false, reason: t('La Kinect pour Xbox One n’est pas encore prise en charge : branchez une webcam ou une Kinect pour Xbox 360') };
   return { ready: false, reason: t('Aucune caméra : branchez une webcam ou une Kinect pour Xbox 360') };
+}
+
+/** La Kinect v1 et l'intégrité de la mémoire de Windows : pourquoi, et les deux issues. */
+export function kinectBlockedReason(): string {
+  return t('Windows refuse le pilote de la Kinect pour Xbox 360 (intégrité de la mémoire activée) : désactivez-la puis redémarrez, ou branchez une webcam');
+}
+
+/** Ce que dit le journal de VPX (vpinball.log, depuis le lancement) du plugin Vision3D. */
+export type Vision3dPluginLog = 'loaded' | 'disabled' | 'failed' | 'absent';
+
+/** Lignes de MsgPluginManager et de Player::Player (VPX 10.8.1) sur le plugin. */
+export function vision3dPluginLog(log: string): Vision3dPluginLog {
+  if (new RegExp(`Plugin ${VISION3D_PLUGIN} loaded\\b`).test(log)) return 'loaded';
+  if (new RegExp(`Plugin ${VISION3D_PLUGIN} was found but is disabled`).test(log)) return 'disabled';
+  if (new RegExp(`Plugin ${VISION3D_PLUGIN} (failed to load|invalid library|has an invalid library)`).test(log)) return 'failed';
+  return 'absent';
+}
+
+/** Bilan d'une partie avec Vision 3D : ce qui a marché, ou où ça a coincé, en clair. */
+export function vision3dGameReport(plugin: Vision3dPluginLog, sent: number, failure?: string): { ok: boolean; text: string } {
+  if (failure) return { ok: false, text: t('Dernière partie : le capteur ne répondait pas ({reason})', { reason: failure }) };
+  if (plugin === 'disabled') return { ok: false, text: t('Dernière partie : VPX avait le module Vision 3D éteint ([Plugin.Vision3D] Enable)') };
+  if (plugin === 'failed') return { ok: false, text: t('Dernière partie : VPX n’a pas pu charger le module Vision 3D (voir vpinball.log)') };
+  if (plugin === 'absent') return { ok: false, text: t('Dernière partie : VPX n’a pas trouvé le module Vision 3D dans son dossier plugins') };
+  if (!sent) return { ok: false, text: t('Dernière partie : module chargé par VPX, mais aucune tête vue par le capteur') };
+  return { ok: true, text: t('Dernière partie : module chargé par VPX, {n} positions de la tête envoyées', { n: sent }) };
 }
 
 /** Taille annoncée du pilote de Microsoft (manifeste des composants), pour le dire avant de télécharger. */
@@ -134,22 +203,30 @@ export function vision3dMenuText(
       return {
         label: t('Vision 3D : pilote Kinect à installer'),
         detail: options.driverMb
-          ? t('{reason} · choisir pour l’installer ({mb} Mo, téléchargé chez Microsoft)', { reason: readiness.reason, mb: options.driverMb })
-          : t('{reason} · choisir pour l’installer (téléchargé chez Microsoft)', { reason: readiness.reason }),
+          ? t('{reason} · choisir pour l’installer ({mb} Mo, téléchargé chez Microsoft ; l’installer vaut acceptation de sa licence)', { reason: readiness.reason, mb: options.driverMb })
+          : t('{reason} · choisir pour l’installer (téléchargé chez Microsoft ; l’installer vaut acceptation de sa licence)', { reason: readiness.reason }),
         unavailable: false,
       };
+    }
+    if (readiness.memoryIntegrity) {
+      // Choisissable : ouvre la page de Sécurité Windows, où le joueur décide lui-même.
+      return { label: t('Vision 3D : Kinect bloquée par Windows'), detail: t('{reason} · choisir pour ouvrir « Isolation du noyau » dans Sécurité Windows', { reason: readiness.reason }), unavailable: false };
+    }
+    if (readiness.restart) {
+      // Choisissable : l'écran dit quoi faire et permet de réinstaller le pilote.
+      return { label: t('Vision 3D : Kinect pas prête'), detail: readiness.reason, unavailable: false };
     }
     return { label: t('Vision 3D : indisponible'), detail: readiness.reason, unavailable: true };
   }
   return setting.mode === 'on'
     ? {
         label: t('Vision 3D : activée'),
-        detail: t('{sensor} · la perspective des tables suit votre tête ; recentrer : réglages en partie · choisir pour désactiver', { sensor: readiness.label }),
+        detail: [t('{sensor} · la perspective des tables suit votre tête ; recentrer : réglages en partie · choisir pour désactiver', { sensor: readiness.label }), ...(readiness.note ? [readiness.note] : [])].join(' · '),
         unavailable: false,
       }
     : {
         label: t('Vision 3D : désactivée'),
-        detail: t('{sensor} prête · choisir pour que la perspective des tables suive votre tête', { sensor: readiness.label }),
+        detail: [t('{sensor} prête · choisir pour que la perspective des tables suive votre tête', { sensor: readiness.label }), ...(readiness.note ? [readiness.note] : [])].join(' · '),
         unavailable: false,
       };
 }

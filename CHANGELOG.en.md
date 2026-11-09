@@ -34,6 +34,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Kinect plugged in without its driver: choosing "Vision 3D" (3D vision) downloads it from Microsoft and installs it, with nothing else to do than accept the Windows prompt. In game, both MagnaSave buttons offer "Recentrer la vue 3D" (Recenter the 3D view).
 - In the headset, the cabinet no longer moves: the menu and the game are in the same place, the aligned one, with no automatic recentring. As long as the cabinet is not aligned, "Caler la borne" (Align the cabinet) opens by itself in the headset before the menu; if the Quest's floor is wrongly set, the headset says where to set it.
 - One alignment per configuration: the desk one never serves the cabinet, nor the other way round. At a desk, with no real cabinet, the headset's cabinet is placed once in front of you (or on the edge of the desk, touched with the controllers), then no longer moves.
+- 3D vision: a dedicated screen tells where the sensor stands (ready, no power, driver to install, restart needed, blocked by Windows), lets you test it without starting a table and reinstall the Kinect driver; after each game, a report tells whether VPX really followed your head.
+- Kinect driver installed without any window (no more licence checkbox hidden behind the menu). If Windows memory integrity refuses this driver, Cyber Pinball says so, takes a webcam instead if one is plugged in, and opens the right Windows Security page.
 
 ## 0.1.8
 

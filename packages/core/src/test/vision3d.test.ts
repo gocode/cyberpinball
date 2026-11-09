@@ -14,7 +14,9 @@ import {
   OneEuroFilter,
   opentrackPacket,
   parseVision3dSetting,
+  vision3dGameReport,
   vision3dHardware,
+  vision3dPluginLog,
   vision3dMenuText,
   vision3dReadiness,
   webcamHead,
@@ -44,7 +46,7 @@ test('matériel : Kinect v1 reconnue avec ou sans pilote, webcams par leur class
     ],
     false,
   );
-  assert.deepEqual(hw, { kinect1: true, kinect1Driver: false, kinect2: false, webcams: ['C922 Pro Stream Webcam'] });
+  assert.deepEqual(hw, { kinect1: true, kinect1Driver: false, kinect2: false, webcams: ['C922 Pro Stream Webcam'], kinectCamera: { started: true, problem: 0 } });
 });
 
 test('choix du capteur : Kinect prête d’abord, pilote à installer proposé, sinon webcam, sinon raison', () => {
@@ -146,4 +148,66 @@ test('paquet opentrack : 48 octets, trois doubles petit-boutistes puis trois zé
   assert.equal(b.readDoubleLE(8), -2.5);
   assert.equal(b.readDoubleLE(16), 3.5);
   assert.equal(b.readDoubleLE(24) + b.readDoubleLE(32) + b.readDoubleLE(40), 0);
+});
+
+test('intégrité de la mémoire : la Kinect refusée par Windows cède la place à la webcam, sinon la raison et la page de Sécurité Windows', () => {
+  const blocked = { kinect1: true, kinect1Driver: true, kinect2: false, webcams: [] as string[], memoryIntegrity: true };
+  const alone = vision3dReadiness(blocked);
+  assert.ok(!alone.ready && alone.memoryIntegrity && !alone.installKinectDriver && /intégrité de la mémoire/.test(alone.reason));
+  const text = vision3dMenuText({ mode: 'on' }, alone);
+  assert.equal(text.unavailable, false, 'choisissable : elle ouvre « Isolation du noyau »');
+  assert.match(text.detail, /Isolation du noyau/);
+  // Pilote pas encore installé : jamais proposé, il serait refusé de même.
+  const noDriver = vision3dReadiness({ ...blocked, kinect1Driver: false });
+  assert.ok(!noDriver.ready && !noDriver.installKinectDriver && noDriver.memoryIntegrity);
+  // Une webcam branchée : elle sert, et le menu dit pourquoi pas la Kinect.
+  const webcam = vision3dReadiness({ ...blocked, webcams: ['Cam'] });
+  assert.ok(webcam.ready && webcam.source === 'webcam' && /intégrité de la mémoire/.test(webcam.note ?? ''));
+  assert.match(vision3dMenuText({ mode: 'on' }, webcam).detail, /webcam utilisée/);
+  // Intégrité de la mémoire sans Kinect : rien ne change pour la webcam.
+  assert.deepEqual(vision3dReadiness({ kinect1: false, kinect1Driver: false, kinect2: false, webcams: ['Cam'], memoryIntegrity: true }), { ready: true, source: 'webcam', label: 'Cam' });
+  assert.equal(vision3dHardware([], false, true).memoryIntegrity, true);
+  assert.equal(vision3dHardware([], false).memoryIntegrity, undefined);
+});
+
+test('pilote de la Kinect : licence de Microsoft dite avant l’installation', () => {
+  const driver = vision3dMenuText({ mode: 'off' }, { ready: false, reason: 'Kinect détectée', installKinectDriver: true }, { driverMb: 116 });
+  assert.match(driver.detail, /acceptation de sa licence/);
+});
+
+test('Kinect : chaque raison de ne pas servir est dite (sans courant, sans pilote, pilote pas chargé), la webcam prend le relais', () => {
+  const motor = usb(0x045e, 0x02b0);
+  const camera = usb(0x045e, 0x02ae, { deviceClass: 'KinectSensor' });
+  const cam = usb(0x046d, 0x085c, { deviceClass: 'Camera', name: 'Cam' });
+  // Adaptateur secteur débranché : moteur et micros seulement.
+  const noPower = vision3dReadiness(vision3dHardware([motor], true));
+  assert.ok(!noPower.ready && /adaptateur secteur/.test(noPower.reason));
+  // Pilote posé, mais Windows ne l'a pas chargé (intégrité de la mémoire désactivée sans redémarrer) : redémarrer.
+  const notLoaded = vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: false, problem: 52 }));
+  assert.ok(!notLoaded.ready && notLoaded.restart && /code 52/.test(notLoaded.reason) && /redémarrez/.test(notLoaded.reason));
+  // Le périphérique n'a aucun pilote (code 28), même si Kinect10.dll est là : réinstaller.
+  const missing = vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: false, problem: 28 }));
+  assert.ok(!missing.ready && missing.installKinectDriver);
+  // Pilote chargé : la Kinect sert.
+  assert.equal(vision3dReadiness(vision3dHardware([motor, camera], true, false, { started: true, problem: 0 })).ready, true);
+  // Pas prête mais une webcam branchée : la webcam sert, avec la raison.
+  const fallback = vision3dReadiness(vision3dHardware([motor, camera, cam], true, false, { started: false, problem: 52 }));
+  assert.ok(fallback.ready && fallback.source === 'webcam' && /Kinect pas prête/.test(fallback.note ?? ''));
+  // Pilote à installer : proposé même avec une webcam branchée (la Kinect a été branchée pour servir).
+  const install = vision3dReadiness(vision3dHardware([motor, camera, cam], false));
+  assert.ok(!install.ready && install.installKinectDriver);
+});
+
+test('bilan d’une partie : le journal de VPX dit si le module est chargé, éteint ou introuvable', () => {
+  const line = (s: string) => `2026-11-09 22:39:29.487 INFO  [Main] ${s}\n`;
+  assert.equal(vision3dPluginLog(line('[MsgPI::MsgPlugin::Load@520] Plugin Vision3D loaded (library: D:\\CyberPinball\\emulators\\vpx\\current\\plugins\\vision3d\\plugin-vision3d64.dll) [id=20]')), 'loaded');
+  assert.equal(vision3dPluginLog(line('[Player::Player@173] Plugin Vision3D was found but is disabled (D:\\x\\plugin-vision3d64.dll)')), 'disabled');
+  assert.equal(vision3dPluginLog(line('[MsgPI::MsgPlugin::Load@500] Plugin Vision3D failed to load library plugin-vision3d64.dll')), 'failed');
+  assert.equal(vision3dPluginLog(line('Plugin Vision3DX loaded (library: x)') + line('Plugin PUP loaded (library: y)')), 'absent');
+  assert.equal(vision3dGameReport('loaded', 812).ok, true);
+  assert.match(vision3dGameReport('loaded', 812).text, /812 positions/);
+  assert.match(vision3dGameReport('loaded', 0).text, /aucune tête vue/);
+  assert.match(vision3dGameReport('disabled', 300).text, /éteint/);
+  assert.match(vision3dGameReport('absent', 300).text, /pas trouvé/);
+  assert.match(vision3dGameReport('loaded', 0, 'la Kinect ne répond plus').text, /ne répondait pas/);
 });

@@ -5,7 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, BrowserWindow, globalShortcut, ipcMain, session, type Input, type Rectangle } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, session, shell, type Input, type Rectangle } from 'electron';
 import {
   ArcadeHours,
   CONFIG_KEY,
@@ -220,10 +220,13 @@ import {
   type RemoteButton,
   vrMenuText,
   megabytes,
+  vision3dGameReport,
+  vision3dPluginLog,
   vision3dMenuText,
   vision3dReadiness,
   type Vision3dHardware,
   type Vision3dSourceKind,
+  type IconName,
   boardKey,
   countryOfLocale,
   type PlayedScore,
@@ -242,7 +245,7 @@ import { installVpx, vpxArchivePresent } from './install-vpx';
 import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
 import { watchGameLoad, type GameLoadWatch } from './game-load';
-import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
+import { createLibrary, type ActionShortcut, type Row, type SystemItem, type UiAction } from './library';
 import { createMenuDmd } from './menu-dmd';
 import { cachedScript } from './vbs';
 import { mediaFrame, prepareDressing } from './fulldmd';
@@ -1859,17 +1862,142 @@ library.provideSystemItem('vision3d', {
   get tone() {
     return vision3dText().unavailable ? ('quiet' as const) : undefined;
   },
-  run: async () => {
-    const readiness = vision3dReadiness(vision3dHardware(true), vision3d.source);
+  run: () => {
     if (vision3dPluginMissing()) return void library.openSystem();
-    if (!readiness.ready && readiness.installKinectDriver) return void (await installKinect());
-    if (!readiness.ready) return void library.openSystem();
-    vision3d = { ...readVision3d(loc.dataDir), mode: vision3d.mode === 'on' ? 'off' : 'on' };
-    writeVision3d(loc.dataDir, vision3d);
-    console.log(`Vision 3D : ${vision3d.mode === 'on' ? `activée (${readiness.label})` : 'désactivée'}.`); // i18n-ignore : journal
-    library.openSystem();
+    vision3dHardware(true);
+    openVision3dScreen();
   },
 });
+
+/** Essai du capteur hors partie : positions vues, et quand il s'arrête de lui-même (la caméra ne reste pas allumée). */
+let vision3dTest: { until: number; seen: number; last?: { x: number; y: number; z: number }; timer: NodeJS.Timeout } | undefined;
+const VISION3D_TEST_MS = 20_000;
+
+function stopVision3dTest(): void {
+  if (!vision3dTest) return;
+  clearInterval(vision3dTest.timer);
+  vision3dTest = undefined;
+  headTracker.stop();
+}
+
+/**
+ * Écran « Vision 3D » : où en est le capteur (prêt, ou pourquoi pas, en clair), l'activer, l'essayer
+ * sans lancer de table, installer ou réinstaller le pilote de la Kinect, ouvrir « Isolation du noyau ».
+ */
+function openVision3dScreen(at = 0): void {
+  const back = () => {
+    stopVision3dTest();
+    library.openSystem();
+  };
+  library.openCustom(() => {
+    const hw = vision3dHardware();
+    const readiness = vision3dReadiness(hw, vision3d.source);
+    const rows: Row[] = [
+      readiness.ready
+        ? { icon: 'check', text: t('{sensor} prête', { sensor: readiness.label }), ...(readiness.note && { detail: readiness.note }), tone: 'ok' as const }
+        : { icon: 'alert', text: readiness.reason, tone: 'warning' as const },
+      { icon: 'eye', text: vision3d.mode === 'on' ? t('Vision 3D activée : la perspective des tables suit votre tête') : t('Vision 3D désactivée'), tone: vision3d.mode === 'on' ? ('ok' as const) : ('quiet' as const) },
+    ];
+    if (vision3dLastGame && !vision3dTest) rows.push({ icon: vision3dLastGame.ok ? 'check' : 'alert', text: vision3dLastGame.text, tone: vision3dLastGame.ok ? ('ok' as const) : ('warning' as const) });
+    if (vision3dTest) {
+      const failure = headTracker.failureReason;
+      const last = vision3dTest.last;
+      rows.push(
+        failure
+          ? { icon: 'alert', text: t('Essai : le capteur ne répond pas ({reason})', { reason: failure }), tone: 'warning' as const }
+          : last && headTracker.state === 'tracking'
+            ? {
+                icon: 'pulse',
+                text: t('Essai : tête vue à {d} m', { d: (last.z / 100).toLocaleString(language() === 'en' ? 'en-US' : 'fr-FR', { maximumFractionDigits: 2 }) }),
+                detail: t('{x} cm à droite, {y} cm en hauteur (depuis le capteur) · penchez-vous : les valeurs suivent', { x: Math.round(last.x), y: Math.round(last.y) }),
+                tone: 'ok' as const,
+              }
+            : { icon: 'pulse', text: vision3dTest.seen ? t('Essai : tête perdue, revenez devant le capteur') : t('Essai : capteur allumé, mettez-vous devant lui…'), tone: 'info' as const },
+      );
+    }
+    const actions: { label: string; detail?: string; icon: IconName; run: () => void }[] = [];
+    if (readiness.ready) {
+      actions.push({
+        label: vision3d.mode === 'on' ? t('Désactiver la Vision 3D') : t('Activer la Vision 3D'),
+        icon: 'eye',
+        run: () => {
+          vision3d = { ...readVision3d(loc.dataDir), mode: vision3d.mode === 'on' ? 'off' : 'on' };
+          writeVision3d(loc.dataDir, vision3d);
+          console.log(`Vision 3D : ${vision3d.mode === 'on' ? `activée (${readiness.label})` : 'désactivée'}.`); // i18n-ignore : journal
+          openVision3dScreen(library.cursor());
+        },
+      });
+      actions.push({
+        label: vision3dTest ? t('Arrêter l’essai') : t('Tester le capteur'),
+        detail: vision3dTest ? undefined : t('Sans lancer de table : la position de votre tête, en direct, pendant {s} s', { s: VISION3D_TEST_MS / 1000 }),
+        icon: 'pulse',
+        run: () => (vision3dTest ? (stopVision3dTest(), openVision3dScreen(library.cursor())) : startVision3dTest(readiness.source)),
+      });
+    }
+    if (!readiness.ready && readiness.installKinectDriver) {
+      actions.push({ label: t('Installer le pilote de la Kinect'), detail: t('{mb} Mo, téléchargé chez Microsoft ; l’installer vaut acceptation de sa licence', { mb: kinectDriverMb() }), icon: 'download', run: () => void installKinect() });
+    } else if (hw.kinect1 && hw.kinect1Driver && !hw.memoryIntegrity) {
+      actions.push({ label: t('Réinstaller le pilote de la Kinect'), detail: t('Si la Kinect ne répond pas malgré son pilote ; Windows demande son accord'), icon: 'refresh', run: () => void installKinect() });
+    }
+    if (!readiness.ready && readiness.memoryIntegrity) {
+      actions.push({
+        label: t('Ouvrir « Isolation du noyau »'),
+        detail: t('Dans Sécurité Windows : vous décidez ; puis redémarrez le PC'),
+        icon: 'lock',
+        run: () => {
+          console.log('Vision 3D : ouverture de « Isolation du noyau » (Sécurité Windows).'); // i18n-ignore : journal
+          stopVision3dTest();
+          // Les écrans libérés d'abord (Bureau Windows) : la page ne s'ouvre pas derrière le menu.
+          showDesktop();
+          void shell.openExternal('windowsdefender://coreisolation');
+        },
+      });
+    }
+    actions.push({ label: t('Retour'), icon: 'back', run: back });
+    return {
+      heading: SYSTEM_ITEMS.vision3d.label,
+      icon: SYSTEM_ITEMS.vision3d.icon,
+      lead: t('La perspective des tables suit votre tête, comme une fenêtre ouverte sur le plateau. Une webcam suffit ; une Kinect pour Xbox 360 vise seule votre tête. Les images restent sur ce PC.'),
+      sections: [{ rows }],
+      actions,
+      back,
+    };
+  }, at);
+}
+
+/** Bilan de la dernière partie avec Vision 3D, montré dans l'écran « Vision 3D » et noté au journal. */
+let vision3dLastGame: { ok: boolean; text: string } | undefined;
+
+function noteVision3dGame(logFile: string, from: number): void {
+  let text = '';
+  try {
+    const all = fs.readFileSync(logFile);
+    // VPX recommence son journal à chaque lancement : plus court qu'avant, il est tout neuf.
+    text = all.subarray(all.length >= from ? from : 0).toString('utf8');
+  } catch {
+    text = '';
+  }
+  const { sent, failure } = headTracker.summary();
+  vision3dLastGame = vision3dGameReport(vision3dPluginLog(text), sent, failure);
+  console.log(`Vision 3D : ${vision3dLastGame.text}`); // i18n-ignore : journal (texte déjà traduit)
+}
+
+/** « Tester le capteur » : allumé hors partie, l'écran suit la tête en direct, puis s'éteint seul. */
+function startVision3dTest(source: Vision3dSourceKind): void {
+  stopVision3dTest();
+  const timer = setInterval(() => {
+    if (!vision3dTest) return;
+    if (Date.now() > vision3dTest.until || playing || launch) stopVision3dTest();
+    openVision3dScreen(library.cursor());
+  }, 300);
+  vision3dTest = { until: Date.now() + VISION3D_TEST_MS, seen: 0, timer };
+  headTracker.test(source, vision3d, (p) => {
+    if (!vision3dTest) return;
+    vision3dTest.seen++;
+    vision3dTest.last = p;
+  });
+  openVision3dScreen(library.cursor());
+}
 
 /** Le pilote de la Kinect : téléchargé chez Microsoft, signature vérifiée, installé avec l'accord de Windows ; puis la Vision 3D s'active. */
 async function installKinect(): Promise<void> {
@@ -1891,7 +2019,7 @@ async function installKinect(): Promise<void> {
   vision3d = { ...readVision3d(loc.dataDir), mode: 'on' };
   writeVision3d(loc.dataDir, vision3d);
   vision3dHardware(true);
-  library.openSystem();
+  openVision3dScreen();
 }
 
 /**
@@ -3381,6 +3509,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const vrGame = simulated === undefined && !displayMode ? prepareVr(played.file, double?.ini) : undefined;
   // Vision 3D (vision3d.ts) : le capteur s'allume quand la table est à l'écran, s'éteint à la fin.
   const vision3dSource = simulated === undefined && !displayMode ? prepareVision3d(install.exe, Boolean(vrGame)) : undefined;
+  // Bilan de la Vision 3D : ce que VPX écrira de son module dans vpinball.log, à partir d'ici.
+  const vision3dLog = path.join(vpxPrefDir(install.version), 'vpinball.log');
+  const vision3dLogFrom = vision3dSource && fs.existsSync(vision3dLog) ? fs.statSync(vision3dLog).size : 0;
   // Le menu dans le casque passe la main sans écran intermédiaire : le compagnon garde le casque
   // (chargement compris) jusqu'à ce que VPX le prenne, puis fond au noir et s'arrête (casque.ts).
   if (simulated === undefined && headset?.running) {
@@ -3471,6 +3602,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   inGameMenu.disarm();
   const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
   if (load) console.log(load);
+  if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
   headTracker.stop();
   stopCentering?.();
   headsetPaused = false;
