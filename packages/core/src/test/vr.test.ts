@@ -46,28 +46,29 @@ test('les réglages de la VR de la partie précédente reviennent, sauf ceux que
   assert.equal(doc.get('PlayerVR', 'AddBackglass'), '0');
 });
 
-test('l’aperçu du casque va en plein écran sur l’écran du fronton, face aux spectateurs', () => {
-  const cab = ['[Player]', 'PlayfieldDisplay = iiyama 43 [0, 0]', '', '[Backglass]', 'BackglassDisplay = iiyama 32 [3840, 0]', '', '[PlayerVR]', 'AskToTurnOn = 2', ''].join('\r\n');
+test('l’aperçu du casque prend la place de la fenêtre de jeu : écran du plateau, même mode', () => {
+  // Borne : fronton, DMD et topper gardent leurs fenêtres en VR ; l'aperçu va sur le plateau, en plein écran comme lui.
+  const cab = ['[Player]', 'PlayfieldDisplay = iiyama 43 [0, 0]', 'PlayfieldFullScreen = 1', '', '[Backglass]', 'BackglassDisplay = iiyama 32 [3840, 0]', '', '[PlayerVR]', 'AskToTurnOn = 2', ''].join('\r\n');
   const doc = IniDocument.parse(planVrIni(cab, undefined, { addBackglass: true }).text);
-  assert.equal(doc.get('PlayerVR', 'PreviewDisplay'), 'iiyama 32 [3840, 0]');
+  assert.equal(doc.get('PlayerVR', 'PreviewDisplay'), 'iiyama 43 [0, 0]');
   assert.equal(doc.get('PlayerVR', 'PreviewFullScreen'), '1');
   // Recalculé à chaque partie : la place d'une partie précédente (écran rebranché, renommé) ne revient pas.
   const previous = ['[PlayerVR]', 'PreviewDisplay = Ancien [0, 0]', 'PreviewFullScreen = 0', 'TableY = 40', ''].join('\n');
   assert.deepEqual(vrCarriedSettings(previous).map((s) => s.key), ['TableY']);
   const again = IniDocument.parse(planVrIni(cab, previous, { addBackglass: true }).text);
-  assert.equal(again.get('PlayerVR', 'PreviewDisplay'), 'iiyama 32 [3840, 0]');
+  assert.equal(again.get('PlayerVR', 'PreviewDisplay'), 'iiyama 43 [0, 0]');
   assert.equal(again.get('PlayerVR', 'TableY'), '40');
 });
 
-test('l’aperçu du casque garde la place par défaut de VPX sans écran de fronton, ou quand la borne en a choisi une', () => {
-  // PC de bureau : pas d'écran de fronton, ou le même que le plateau.
+test('l’aperçu du casque : fenêtré si le jeu l’est, place par défaut de VPX sans écran choisi, choix de la borne respecté', () => {
+  const windowed = ['[Player]', 'PlayfieldDisplay = BenQ [0, 0]', 'PlayfieldFullScreen = 0', ''].join('\n');
+  assert.deepEqual(vrPreviewSettings(IniDocument.parse(windowed)).map((s) => `${s.key}=${s.value}`), ['PreviewDisplay=BenQ [0, 0]', 'PreviewFullScreen=0']);
+  // Ni écran ni mode dans l'INI : VPX ouvre jeu et aperçu sur l'écran principal, rien à écrire.
   assert.deepEqual(vrPreviewSettings(IniDocument.parse(CABINET_INI)), []);
-  const same = ['[Player]', 'PlayfieldDisplay = BenQ [0, 0]', '[Backglass]', 'BackglassDisplay = BenQ [0, 0]', ''].join('\n');
-  assert.deepEqual(vrPreviewSettings(IniDocument.parse(same)), []);
   const desk = IniDocument.parse(planVrIni(CABINET_INI, ['[PlayerVR]', 'PreviewDisplay = Ancien [0, 0]', ''].join('\n'), { addBackglass: true }).text);
   assert.equal(desk.get('PlayerVR', 'PreviewDisplay'), undefined);
   // L'écran de l'aperçu choisi dans le VPinballX.ini de la borne est respecté.
-  const chosen = ['[Player]', 'PlayfieldDisplay = A [0, 0]', '[Backglass]', 'BackglassDisplay = B [1920, 0]', '[PlayerVR]', 'PreviewDisplay = C [3840, 0]', 'PreviewFullScreen = 0', ''].join('\n');
+  const chosen = ['[Player]', 'PlayfieldDisplay = A [0, 0]', 'PlayfieldFullScreen = 1', '[PlayerVR]', 'PreviewDisplay = C [3840, 0]', 'PreviewFullScreen = 0', ''].join('\n');
   assert.deepEqual(vrPreviewSettings(IniDocument.parse(chosen)), []);
   const doc = IniDocument.parse(planVrIni(chosen, undefined, { addBackglass: true }).text);
   assert.equal(doc.get('PlayerVR', 'PreviewDisplay'), 'C [3840, 0]');

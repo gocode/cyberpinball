@@ -107,6 +107,7 @@ export const ICON_NAMES = [
   'friend-add',
   'friend-request',
   'bell',
+  'trophy',
   'medal',
   'network',
   // Gestionnaire de téléchargements

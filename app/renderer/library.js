@@ -64,6 +64,8 @@ function renderLibrary(v) {
           ? 'lib-body lib-journey'
           : v.health
             ? 'lib-body lib-health'
+            : v.scoreboard
+            ? 'lib-body lib-scoreboard'
             : v.sections.length
             ? 'lib-body'
             : 'lib-body only-actions',
@@ -76,6 +78,7 @@ function renderLibrary(v) {
   else if (v.crop) body.append(renderCrop(v.crop));
   else if (v.journey) body.append(renderJourney(v.journey));
   else if (v.health) body.append(zoneFrame(renderHealth(v.health, v.cursor), v.zone));
+  else if (v.scoreboard) body.append(renderScoreboard(v.scoreboard));
   else if (v.media || v.sections.length) {
     const content = libEl('div', 'lib-content');
     // Télécommande du téléphone : le QR code, le code à comparer ou le téléphone, en tête.
@@ -158,7 +161,7 @@ function renderLibrary(v) {
   // Les actions montrées en cartes (un média, une page, un fichier) ou en lignes à choisir
   // (un fichier de la table, un élément de la liste d'attente) ne sont pas répétées dans la liste.
   const carded = new Set(
-    [...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick)), ...(v.health?.groups.flatMap((g) => g.lines) ?? [])].map((c) => c.action).filter((a) => a !== undefined),
+    [...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick)), ...(v.health?.groups.flatMap((g) => g.lines) ?? []), ...(v.scoreboard?.tabs ?? [])].map((c) => c.action).filter((a) => a !== undefined),
   );
   v.actions.forEach((a, i) => {
     if (carded.has(i)) return;
@@ -483,6 +486,47 @@ function renderHealth(h, cursor) {
     group.append(title, list);
     box.append(group);
   }
+  return box;
+}
+
+// ---------- Tableau des scores d'une table ----------
+
+/**
+ * Les quatre périodes en onglets (l'onglet ouvert plein, en vert signal), puis le tableau : place,
+ * initiales, score aligné à droite en chiffres tabulaires, et quand. Une période vide le dit.
+ */
+function renderScoreboard(b) {
+  const box = libEl('div', 'lib-content scoreboard');
+  const tabs = libEl('div', 'scoreboard-tabs');
+  tabs.setAttribute('role', 'tablist');
+  for (const tab of b.tabs) {
+    const node = actOn(libEl('button', `scoreboard-tab${tab.current ? ' current' : ''}`), { type: 'activate', index: tab.action });
+    node.type = 'button';
+    node.setAttribute('role', 'tab');
+    node.setAttribute('aria-selected', String(tab.current));
+    node.append(libEl('span', 'scoreboard-tab-label', tab.label), libEl('span', 'scoreboard-tab-count', tab.count));
+    tabs.append(node);
+  }
+  box.append(tabs);
+  if (b.lines.length) {
+    const list = libEl('ol', 'scoreboard-lines');
+    for (const l of b.lines) {
+      const li = libEl('li', `scoreboard-line${l.first ? ' first' : ''}`);
+      li.append(
+        libEl('span', 'scoreboard-rank', l.rank),
+        libEl('span', `scoreboard-name${l.anonymous ? ' anonymous' : ''}`, l.name),
+        libEl('span', 'scoreboard-score', l.score),
+        libEl('span', 'scoreboard-when', l.when),
+      );
+      list.append(li);
+    }
+    box.append(list);
+  } else if (b.empty) {
+    const empty = libEl('div', 'scoreboard-empty');
+    empty.append(libEl('div', 'scoreboard-empty-title', b.empty.title), libEl('div', 'scoreboard-empty-detail', b.empty.detail));
+    box.append(empty);
+  }
+  if (b.note) box.append(libEl('p', 'scoreboard-note', b.note));
   return box;
 }
 

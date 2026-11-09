@@ -7,6 +7,8 @@
 
 import type { MenuField, PhoneRemote, RemoteBar } from './phone-remote';
 import { createPhoneRemoteMenu, remoteBlock } from './phone-remote-menu';
+import { periodLabel, scoreboardView, scoresSummary, type ScoreboardView } from './scoreboard-menu';
+import type { TableBoard } from './table-scores';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, type BrowserWindow, type Input, type Rectangle } from 'electron';
@@ -186,6 +188,8 @@ import {
   cabinetJoystickHids,
   detectDofControllers,
   dofHealthFacts,
+  SCORE_PERIODS,
+  type ScorePeriod,
 } from '@cyberpinball/core';
 import { prepareImport, unpackArchive, type PreparedImport } from './archives';
 import { createDofMenu } from './dof-menu';
@@ -266,6 +270,8 @@ export interface LibraryHost {
    * ligne, grisée avec sa raison sinon ; `back` rouvre la fiche.
    */
   playWithFriend?(table: TableEntry, back: () => void): Action;
+  /** « Tableau des scores » (table-scores.ts) : le tableau d'une période. */
+  scores?(table: TableEntry, period: ScorePeriod): TableBoard;
   /** « Ajouter aux favoris » / « Retirer des favoris » (collections.ts : User.Favorite du .info). */
   favorite?(table: TableEntry, on: boolean): void;
   /** « DMD sur la roue » (menu-dmd.ts) : le DMD du menu affiché ou masqué pour cette table, et sa place ; `back` : l'écran d'où on l'a ouvert. */
@@ -482,6 +488,8 @@ export interface Built {
   journey?: JourneyView;
   /** Santé de la borne (health.ts) : bilan et lignes, chacune rattachée à son action, à la place des sections. */
   health?: HealthView;
+  /** Tableau des scores d'une table (scoreboard-menu.ts) : onglets des périodes et lignes, à la place des sections. */
+  scoreboard?: ScoreboardView;
   /** Bandeau d'aide propre à l'écran (sélecteur de fichiers : Exit remonte d'un dossier). */
   hint?: string;
   /** Recadrage d'une image (avatar-menu.ts) : l'image, le carré gardé et l'aperçu, à la place des sections. */
@@ -561,6 +569,8 @@ type Screen =
   | { kind: 'pupOptions'; file: string; flash?: string; pup?: TablePupPack[] }
   /** Prospectus ou règles de la table, page par page (flippers : page précédente ou suivante). */
   | { kind: 'pages'; file: string; type: SheetPageType; index: number }
+  /** Tableau des scores de la table, une période à la fois (flippers : la précédente ou la suivante). */
+  | { kind: 'scores'; file: string; period: ScorePeriod }
   | { kind: 'edit'; file: string; fields: { Title: string; Manufacturer: string; Year?: number }; editor?: Editor }
   /** `added` : ce que l'ajout a fait en plus de ranger les fichiers (médias de VPinMediaDB), montré à la vérification. */
   /** `back` : l'écran qui l'a ouvert (Santé de la borne), à la place de la fiche. */
@@ -622,7 +632,7 @@ type Screen =
 type EditorScreen = Extract<Screen, { kind: 'edit' | 'prompt' }>;
 
 /** Écrans d'une table : son titre est le nom du jeu, sans l'icône de la partie du menu d'où l'on vient. */
-const TABLE_SCREENS: readonly Screen['kind'][] = ['sheet', 'pupOptions', 'pages', 'edit', 'doctor', 'remove'];
+const TABLE_SCREENS: readonly Screen['kind'][] = ['sheet', 'pupOptions', 'pages', 'scores', 'edit', 'doctor', 'remove'];
 
 /**
  * Table dont parle un écran : les écrans de la borne gardent ses médias (screensTable de
@@ -637,11 +647,12 @@ function tableOf(s: Screen | undefined): string | undefined {
   return undefined;
 }
 
-/** Écrans ouverts à l'invité, par leur porte : la fiche, le prospectus et les règles. Tout autre écran est fermé. */
-const GUEST_SCREENS: Partial<Record<Screen['kind'], GuestDoor>> = { sheet: 'menu.sheet', pages: 'sheet.read' };
+/** Écrans ouverts à l'invité, par leur porte : la fiche, le prospectus et les règles, le tableau des scores. Tout autre écran est fermé. */
+const GUEST_SCREENS: Partial<Record<Screen['kind'], GuestDoor>> = { sheet: 'menu.sheet', pages: 'sheet.read', scores: 'sheet.scores' };
 
 type AddPlan = Extract<Screen, { kind: 'addPlan' }>;
 type PagesScreen = Extract<Screen, { kind: 'pages' }>;
+type ScoresScreen = Extract<Screen, { kind: 'scores' }>;
 
 /** Page préc. / Page suiv. d'un clavier : le texte de l'écran défile de partout (reading.ts). */
 const PAGE_KEYS: Record<string, -1 | 1> = { PageUp: -1, PageDown: 1 };
@@ -1814,6 +1825,8 @@ export function createLibrary(host: LibraryHost) {
         return buildPupOptions(screen as Extract<Screen, { kind: 'pupOptions' }>);
       case 'pages':
         return buildPages(screen as PagesScreen);
+      case 'scores':
+        return buildScores(screen as ScoresScreen);
       case 'edit':
         return buildEdit(screen as Extract<Screen, { kind: 'edit' }>);
       case 'doctor':
@@ -1992,6 +2005,7 @@ export function createLibrary(host: LibraryHost) {
         },
       },
       ...(host.playWithFriend ? [{ ...host.playWithFriend(table, () => openSheet(table)), door: 'sheet.friends' as const }] : []),
+      ...(host.scores ? [scoresAction(table)] : []),
       pagesAction(table),
       ...(host.favorite ? [favoriteAction(table)] : []),
       {
@@ -2031,6 +2045,57 @@ export function createLibrary(host: LibraryHost) {
       run: () => {
         host.favorite!(table, !on);
         host.broadcast();
+      },
+    };
+  }
+
+  // ---------- Tableau des scores ----------
+
+  /** « Tableau des scores » : le record de la table et les parties du jour, puis l'écran des quatre périodes. */
+  function scoresAction(table: TableEntry): SheetAction {
+    return {
+      label: t('Tableau des scores'),
+      detail: scoresSummary(host.scores!(table, 'all'), host.scores!(table, 'today')),
+      icon: 'trophy',
+      door: 'sheet.scores',
+      run: () => go({ kind: 'scores', file: table.file, period: 'all' }, SCORE_PERIODS.length),
+    };
+  }
+
+  /** Une période à la fois ; les onglets se cliquent, les flippers passent de l'un à l'autre (scoresKey). */
+  function buildScores(s: ScoresScreen): Built {
+    const table = find(s.file);
+    const back = () => (table ? openSheet(table) : leave());
+    if (!table || !host.scores) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), door: 'sheet.back', run: leave }], back };
+    const show = (period: ScorePeriod) => {
+      s.period = period;
+      host.broadcast();
+    };
+    return {
+      heading: t('Tableau des scores'),
+      icon: 'trophy',
+      subheading: table.title,
+      sections: [],
+      scoreboard: scoreboardView((period) => host.scores!(table, period), s.period),
+      // Les onglets d'abord (rendus dans le tableau), puis le retour, seul dans la colonne des actions.
+      actions: [
+        ...SCORE_PERIODS.map((period) => ({ label: t('Onglet {period}', { period: periodLabel(period) }), key: `period-${period}`, door: 'sheet.scores' as const, run: () => show(period) })),
+        { label: t('Retour à la fiche'), icon: 'back' as const, key: 'back', door: 'sheet.back' as const, run: back },
+      ],
+      back,
+      hint: t('Flippers : période précédente ou suivante · Start ou Exit : retour à la fiche · souris'),
+      keys: (input) => {
+        const KEYS = host.keys();
+        // Start revient à la fiche, même après un clic sur un onglet (qui y a posé le curseur).
+        if (KEYS.confirm.includes(input.code)) {
+          back();
+          return true;
+        }
+        const step = KEYS.previous.includes(input.code) ? -1 : KEYS.next.includes(input.code) ? 1 : 0;
+        if (!step) return false;
+        const at = SCORE_PERIODS.indexOf(s.period);
+        s.period = SCORE_PERIODS[(at + step + SCORE_PERIODS.length) % SCORE_PERIODS.length]!;
+        return true;
       },
     };
   }
@@ -3578,7 +3643,7 @@ export function createLibrary(host: LibraryHost) {
    * chacune de ses étapes est rattachée à une action, que choisir amène dans la vue.
    */
   function readable(built: Built, zones: Zones | undefined): boolean {
-    if (!screen || zones || screen.kind === 'pages' || built.media || built.health || built.journey) return false;
+    if (!screen || zones || screen.kind === 'pages' || built.media || built.health || built.journey || built.scoreboard) return false;
     if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) return false;
     return built.sections.length > 0;
   }
@@ -3829,6 +3894,7 @@ export function createLibrary(host: LibraryHost) {
       variant: built.variant,
       journey: built.journey,
       health: built.health,
+      scoreboard: built.scoreboard,
       zone,
       // Zone de lecture : le rendu mesure le texte, le met dans un cadre s'il dépasse et le fait défiler.
       reading: read

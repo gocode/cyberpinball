@@ -138,13 +138,13 @@ export function classifyVpxWindow(w: ObservedVpxWindow): VpxWindowVerdict {
 // écran et doivent y tenir : aucun réglage de VPinballX.ini ne l'en sort. Pendant la partie,
 // Cyber Pinball ramène donc ces fenêtres sur l'écran de leur rôle (frontend.ts, watchOccupied).
 
-/** Fenêtres annexes de VPX (Window.cpp), et le rôle dont chacune occupe l'écran. Le playfield n'en est pas : sa fenêtre, celle du rendu, n'est jamais déplacée. */
+/** Fenêtres annexes de VPX (Window.cpp), et le rôle dont chacune occupe l'écran. Le playfield n'en est pas : sa fenêtre, celle du rendu, n'est jamais déplacée ; l'aperçu de la VR, simple copie de ce que voit le casque, peut l'être. */
 export const VPX_ANCILLARY_WINDOWS = {
   'Visual Pinball Backglass': 'backglass',
   'Visual Pinball Score View': 'dmd',
   'Visual Pinball Topper': 'topper',
-  // En VR, l'aperçu de ce que voit le casque va sur l'écran du fronton (vr.ts, vrPreviewSettings).
-  'Visual Pinball VR Preview': 'backglass',
+  // En VR, l'aperçu de ce que voit le casque remplace la fenêtre de jeu sur l'écran du plateau (vr.ts, vrPreviewSettings).
+  'Visual Pinball VR Preview': 'playfield',
 } as const satisfies Record<string, RoleId>;
 
 /**

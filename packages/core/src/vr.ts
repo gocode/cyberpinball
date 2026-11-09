@@ -9,7 +9,9 @@
 //   la seule valeur que Cyber Pinball écrit : une borne ne reste jamais bloquée sur « Connection to VR
 //   headset failed / Retry connection ? » (valeur 0) ;
 // - en VR, la fenêtre de jeu « Visual Pinball Player » n'existe pas : VPX ouvre « Visual Pinball VR
-//   Preview » sur le bureau (ce qu'un œil voit), et aucune fenêtre annexe (fronton, DMD, topper) ;
+//   Preview » sur le bureau (ce qu'un œil voit). Les fenêtres annexes (fronton, DMD, topper) s'ouvrent
+//   comme d'habitude sur leurs écrans (Player::Player, RenderOutput::SetMode) : vérifié dans le journal
+//   de VPX le 9 novembre 2026, partie dans un Quest 2 par Link ;
 // - [PlayerVR] AddBackglass = 1 pose dans la scène un panneau au-dessus du plateau qui montre ce que
 //   dessinerait la fenêtre du fronton (plugins B2S, PUP). Faux par défaut. Une table qui a sa propre
 //   pièce VR a déjà le sien (VPX convertit même l'ancien « backglassimage » en panneau de ce type) :
@@ -18,9 +20,8 @@
 //   dans le fichier passé par -Ini (VRDevice::SaveVRSettings) ;
 // - la fenêtre « Visual Pinball VR Preview » (RenderDevice.cpp, Window.cpp) va sur l'écran de
 //   [PlayerVR] PreviewDisplay, sinon sur l'écran principal, en fenêtre carrée centrée (PreviewFullScreen
-//   = 0, taille 16384 ramenée à l'écran). Sur une borne, l'écran principal est le plateau, couché :
-//   l'image y serait de travers pour qui regarde. vrPreviewSettings la met en plein écran sur celui du
-//   fronton, debout face aux spectateurs ;
+//   = 0, taille 16384 ramenée à l'écran). vrPreviewSettings la met à la place de la fenêtre de jeu,
+//   sur l'écran du plateau, seul écran que VPX laisse libre en VR ;
 // - fermer cette fenêtre arrête la partie comme Échap (SDL_EVENT_WINDOW_CLOSE_REQUESTED : CS_STOP_PLAY,
 //   player.cpp) : -Play sort alors de VPX, après SaveVRSettings ;
 // - le menu en partie de VPX (InGameUI, F12 ou [Input] Mapping.InGameUI) est dessiné dans le casque,
@@ -55,6 +56,8 @@ const VR_FORCED_KEYS = new Set(['asktoturnon', 'addbackglass', 'previewdisplay',
 
 /** [PlayerVR] PreviewFullScreen : 1, « Borderless Fullscreen » (0 : fenêtre ; BGFX n'a pas le plein écran exclusif). */
 export const VR_PREVIEW_FULLSCREEN = '1';
+/** [PlayerVR] PreviewFullScreen : 0, « Windowed ». */
+export const VR_PREVIEW_WINDOWED = '0';
 
 /** Runtime OpenXR actif (registre HKLM\SOFTWARE\Khronos\OpenXR\1, valeur ActiveRuntime), tel que lu par l'application. */
 export interface OpenXrProbe {
@@ -145,22 +148,20 @@ export function planVrIni(base: string, previous: string | undefined, opts: { ad
 }
 
 /**
- * Où VPX met l'aperçu de ce que voit le casque : en plein écran sur l'écran du fronton de la borne
- * ([Backglass] BackglassDisplay), debout face aux spectateurs ; en VR, VPX n'y ouvre pas de fronton.
- * Rien d'écrit (place par défaut de VPX : fenêtre sur l'écran principal) quand l'INI de la borne
- * choisit déjà l'écran de l'aperçu, ou qu'il n'y a pas d'écran de fronton distinct du plateau (PC de
- * bureau). Recalculé à chaque partie : un écran rebranché change de nom, une place gardée serait
- * périmée.
+ * Où VPX met l'aperçu de ce que voit le casque : à la place de la fenêtre de jeu, qui n'existe pas en
+ * VR, sur l'écran du plateau ([Player] PlayfieldDisplay) et dans son mode (PlayfieldFullScreen : plein
+ * écran ou fenêtre). Les fenêtres du fronton, du DMD et du topper gardent leurs écrans : y mettre
+ * l'aperçu les superposerait. Rien d'écrit quand l'INI de la borne choisit déjà l'écran de l'aperçu.
+ * Recalculé à chaque partie : un écran rebranché change de nom, une place gardée serait périmée.
  */
 export function vrPreviewSettings(base: IniDocument): VpxSetting[] {
   if (base.get(VR_SECTION, 'PreviewDisplay')?.trim()) return [];
-  const backglass = base.get('Backglass', 'BackglassDisplay')?.trim();
+  const settings: VpxSetting[] = [];
   const playfield = base.get('Player', 'PlayfieldDisplay')?.trim();
-  if (!backglass || backglass === playfield) return [];
-  return [
-    { section: VR_SECTION, key: 'PreviewDisplay', value: backglass },
-    { section: VR_SECTION, key: 'PreviewFullScreen', value: VR_PREVIEW_FULLSCREEN },
-  ];
+  if (playfield) settings.push({ section: VR_SECTION, key: 'PreviewDisplay', value: playfield });
+  const mode = base.get('Player', 'PlayfieldFullScreen')?.trim();
+  if (mode) settings.push({ section: VR_SECTION, key: 'PreviewFullScreen', value: mode === '0' ? VR_PREVIEW_WINDOWED : VR_PREVIEW_FULLSCREEN });
+  return settings;
 }
 
 /** Réglages de la VR d'un VPinballX.ini, à reprendre dans le suivant (sans ceux que Cyber Pinball impose). */

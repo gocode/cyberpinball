@@ -2353,6 +2353,196 @@ body.mouse .lib-health .health-line:not(.selected):hover {
   }
 }
 
+/* ---------- Tableau des scores d'une table ---------- */
+
+/*
+ * Quatre onglets (tout temps, cette année, cette semaine, aujourd'hui), puis le tableau. L'onglet
+ * ouvert est cerclé et écrit en vert signal, sans aplat : l'aplat reste au seul choix courant (le
+ * retour, dans la colonne des actions). Lignes à la référence 1 080 : score 27 px, quand 22 px ;
+ * place, initiales, score et date chacun dans sa colonne, le score aligné à droite en chiffres
+ * tabulaires : les milliers tombent les uns sous les autres.
+ */
+.lib-body.lib-scoreboard {
+  grid-template-columns: minmax(0, 1fr) 39cqmin;
+  grid-template-rows: minmax(0, 1fr);
+  gap: 3cqmin;
+  min-width: 0;
+  min-height: 0;
+}
+
+.lib-scoreboard .scoreboard {
+  gap: 2.2cqmin;
+  min-width: 0;
+}
+
+.lib-scoreboard .scoreboard-tabs {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1cqmin;
+}
+
+.lib-scoreboard .scoreboard-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3cqmin;
+  min-width: 0;
+  min-height: 7.4cqmin;
+  padding: 1cqmin 1.2cqmin;
+  border: 0.14cqmin solid var(--line-strong);
+  border-radius: 0.55cqmin;
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: inherit;
+  text-align: center;
+}
+
+.lib-scoreboard .scoreboard-tab-label {
+  max-width: 100%;
+  font-size: 2.2cqmin;
+  font-weight: 600;
+  font-stretch: 106%;
+  line-height: 1.2;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.lib-scoreboard .scoreboard-tab-count {
+  max-width: 100%;
+  font-size: 1.9cqmin;
+  line-height: 1.2;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.lib-scoreboard .scoreboard-tab.current {
+  border-color: var(--signal);
+  background: var(--signal-wash);
+  box-shadow: inset 0 -0.42cqmin 0 var(--signal);
+}
+
+.lib-scoreboard .scoreboard-tab.current .scoreboard-tab-label {
+  color: var(--signal);
+}
+
+.lib-scoreboard .scoreboard-tab.current .scoreboard-tab-count {
+  color: var(--ink);
+}
+
+body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
+  border-color: var(--halo);
+}
+
+.lib-scoreboard .scoreboard-lines {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lib-scoreboard .scoreboard-line {
+  display: grid;
+  grid-template-columns: 4.4cqmin minmax(9cqmin, 0.7fr) minmax(max-content, 1.3fr) minmax(0, 1fr);
+  align-items: baseline;
+  column-gap: 2.2cqmin;
+  min-width: 0;
+  /* Dix lignes tiennent sous les onglets en paysage 16:9 : les flippers changent de période, rien ne défile. */
+  padding: 0.75cqmin 1.6cqmin;
+  border-bottom: 0.093cqmin solid var(--line-soft);
+  border-left: 0.46cqmin solid transparent;
+  font-size: 2.5cqmin;
+  line-height: 1.2;
+}
+
+.lib-scoreboard .scoreboard-line.first {
+  border-left-color: var(--table-tint);
+  background: var(--surface-raised);
+}
+
+.lib-scoreboard .scoreboard-rank {
+  text-align: right;
+  font-weight: 600;
+  color: var(--ink-muted);
+}
+
+.lib-scoreboard .scoreboard-name {
+  min-width: 0;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  overflow-wrap: anywhere;
+}
+
+.lib-scoreboard .scoreboard-name.anonymous {
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  color: var(--ink-faint);
+}
+
+.lib-scoreboard .scoreboard-score {
+  text-align: right;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lib-scoreboard .scoreboard-line.first .scoreboard-score {
+  font-size: 2.8cqmin;
+  font-weight: 700;
+}
+
+.lib-scoreboard .scoreboard-when {
+  min-width: 0;
+  text-align: right;
+  font-size: 2.04cqmin;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.lib-scoreboard .scoreboard-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8cqmin;
+  padding: 3cqmin 2.4cqmin;
+  border: 0.093cqmin dashed var(--line-strong);
+  border-radius: 0.55cqmin;
+  text-align: center;
+}
+
+.lib-scoreboard .scoreboard-empty-title {
+  font-size: 2.6cqmin;
+  font-weight: 600;
+}
+
+.lib-scoreboard .scoreboard-empty-detail,
+.lib-scoreboard .scoreboard-note {
+  font-size: 2.04cqmin;
+  line-height: 1.35;
+  color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+.lib-scoreboard .scoreboard-note {
+  margin: 0;
+}
+
+.lib-body.lib-scoreboard > .lib-actions {
+  min-width: 0;
+}
+
+@container (orientation: portrait) {
+  .lib-body.lib-scoreboard {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, max-content) auto;
+    gap: 2.4cqmin;
+  }
+
+  .lib-scoreboard .scoreboard-tabs {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* ---------- Écran du DMD : schéma de chaque réponse ---------- */
 
 /*

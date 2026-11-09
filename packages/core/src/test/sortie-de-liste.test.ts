@@ -226,7 +226,8 @@ test('rendu : chaque conteneur de liste de contenu de library.js passe par le ca
   const src = fs.readFileSync(path.join(RENDERER, 'library.js'), 'utf8');
   // Les conteneurs .lib-content créés par le rendu, et ce qu'il en fait.
   const made = [...src.matchAll(/libEl\('div', '(lib-content[^']*)'\)/g)].map((m) => m[1]);
-  assert.deepEqual(made, ['lib-content', 'lib-content journey', 'lib-content health'], 'nouveau conteneur de liste : le passer par zoneFrame, ou le ranger ici avec sa raison');
+  // Le tableau des scores n'a pas de liste de contenu : ses onglets se changent aux flippers, ses lignes ne se choisissent pas.
+  assert.deepEqual(made, ['lib-content', 'lib-content journey', 'lib-content health', 'lib-content scoreboard'], 'nouveau conteneur de liste : le passer par zoneFrame, ou le ranger ici avec sa raison');
   assert.equal([...src.matchAll(/zoneFrame\(content, v\.zone\)/g)].length, 2, 'liste et galerie : dans le cadre');
   assert.match(src, /zoneFrame\(renderHealth\([^)]*\), v\.zone\)/, 'Santé de la borne : dans le cadre');
   // Le parcours d'une table n'a pas de liste de contenu : ses étapes répètent les actions de l'écran.

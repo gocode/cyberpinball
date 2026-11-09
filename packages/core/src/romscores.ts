@@ -118,6 +118,27 @@ export function readRomRecords(memory: RomMemory, nv: Buffer): HighScore[] | und
   return out;
 }
 
+/**
+ * Scores de la dernière partie, joueur par joueur, tels que la ROM les garde dans sa mémoire après
+ * la partie (« game_state » de la carte : scores, et player_count quand la carte le décrit) ;
+ * undefined si la carte ne les décrit pas ou s'ils sont illisibles. Pour le tableau des scores
+ * (scoreboard.ts) : une partie solo n'a pas d'autre source de son score final.
+ */
+export function readRomLastGame(memory: RomMemory, nv: Buffer): number[] | undefined {
+  const p = parts(memory);
+  const state = (memory.map as { game_state?: { scores?: unknown; player_count?: Descriptor } }).game_state;
+  if (!state || !Array.isArray(state.scores) || !state.scores.length) return undefined;
+  const scores: number[] = [];
+  for (const d of state.scores as Descriptor[]) {
+    const score = readScore(p, d, nv);
+    if (score === undefined) return undefined;
+    scores.push(score);
+  }
+  // Nombre de joueurs de la partie, s'il se lit : les places au-delà gardent parfois une partie plus ancienne.
+  const count = state.player_count ? readScore(p, { ...state.player_count, length: state.player_count.length ?? 1 }, nv) : undefined;
+  return count !== undefined && count >= 1 && count <= scores.length ? scores.slice(0, count) : scores;
+}
+
 function encodeScore(p: ReturnType<typeof parts>, d: Descriptor, length: number, score: number): Buffer | undefined {
   const bytes: number[] = [];
   let n = score;

@@ -115,6 +115,7 @@ const CYBER_ICONS = {
   'friend-add': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 7.5-3.35M17 13v7M13.5 16.5h7"/>', // Un joueur et un plus : trouver un joueur, demander.
   'friend-request': '<path d="M11.5 8a3 3 0 1 1-6 0 3 3 0 0 1 6 0zM4 20v-1a4.5 4.5 0 0 1 7.5-3.35M20 16.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0zM16.5 14.5v2l1.5 1"/>', // Un joueur et une horloge : demandes en attente.
   bell: '<path d="M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4"/>', // Cloche : notifications du menu des tables.
+  trophy: '<path d="M7 4h10v6a5 5 0 0 1-10 0zM7 6H4v1a3 3 0 0 0 3 3M17 6h3v1a3 3 0 0 1-3 3M12 15v3M8 21h8M9 18h6v3H9z"/>', // Coupe à deux anses : tableau des scores d’une table.
   medal: '<circle cx="12" cy="15" r="6"/><path d="M8.5 10.2 5 3h4l3 6 3-6h4l-3.5 7.2M12 13v4"/>', // Médaille à ruban : badges.
   network: '<path d="M14 6a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM8 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM20 18a2 2 0 1 1-4 0 2 2 0 0 1 4 0zM11.1 7.8 6.9 16.2M12.9 7.8l4.2 8.4M8 18h8"/>', // Trois bornes reliées sans centre : partage et réseau.
   // Gestionnaire de téléchargements

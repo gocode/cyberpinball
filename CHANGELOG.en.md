@@ -14,7 +14,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Each DMD page arrives with its own transition: a light wipe towards the high scores, a dissolve towards the clock and the credits; from one table to the next, the new one slides in the wheel's direction.
 - Every other cycle, a short gameplay scene in dots after the high scores: bumpers, plunger, flippers, "BANK COMPLETE", "BALL LOCKED", multiball, never the same twice in a row.
 - Virtual reality, in System menu > Cabinet: with a headset (Meta Quest through Link or Virtual Desktop, SteamVR), tables start in the headset when it is ready, otherwise on the screens, never with a VPX question. Without headset software installed, the entry stays visible, greyed with its reason.
-- In the headset: the backglass shows above the playfield of tables that have no VR room of their own, the table's position is kept from one game to the next, and both MagnaSave buttons open the VPX menu in the headset to realign it. On the cabinet, the backglass screen shows spectators what the player sees.
+- In the headset: the backglass shows above the playfield of tables that have no VR room of their own, the table's position is kept from one game to the next, and both MagnaSave buttons open the VPX menu in the headset to realign it. On the cabinet, the playfield screen shows spectators what the player sees; the backglass, the DMD and the topper stay on their screens.
+- In the headset, a table that looks pixelated or placed around you is recentred in front of you with the 5 key of the numeric keypad; its position is kept for the following games.
+- Scoreboard on each table's page: all time, this year, this week, today, switched with the flippers. Every game played on the cabinet leaves its scores there; "All time" also includes the high scores the table already kept.
 
 ## 0.1.8
 

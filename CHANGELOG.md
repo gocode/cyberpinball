@@ -16,7 +16,9 @@ son interface).
 - Chaque page du DMD arrive par sa transition : volet lumineux vers les records, dissolution vers l'horloge et les crédits ; d'une table à l'autre, la nouvelle glisse dans le sens de la roue.
 - Un tour sur deux, une courte scène de jeu en points après les records : bumpers, lanceur, flippers, « BANK COMPLETE », « BALL LOCKED », multibille, jamais deux fois la même de suite.
 - Réalité virtuelle, dans Menu système > Borne : avec un casque (Meta Quest par Link ou Virtual Desktop, SteamVR), les tables se lancent dans le casque quand il est prêt, sinon sur les écrans, sans jamais de question de VPX. Sans logiciel de casque installé, l'entrée reste visible, grisée avec sa raison.
-- Dans le casque : le fronton s'affiche au-dessus du plateau des tables qui n'ont pas leur propre pièce VR, la place de la table se garde d'une partie à l'autre, et les deux MagnaSave ouvrent le menu de VPX dans le casque pour la recaler. Sur la borne, l'écran du fronton montre aux spectateurs ce que voit le joueur.
+- Dans le casque : le fronton s'affiche au-dessus du plateau des tables qui n'ont pas leur propre pièce VR, la place de la table se garde d'une partie à l'autre, et les deux MagnaSave ouvrent le menu de VPX dans le casque pour la recaler. Sur la borne, l'écran du plateau montre aux spectateurs ce que voit le joueur ; le fronton, le DMD et le topper restent sur leurs écrans.
+- Dans le casque, une table qui paraît pixelisée ou posée autour de vous se recentre devant vous avec la touche 5 du pavé numérique ; sa place est gardée pour les parties suivantes.
+- Tableau des scores sur la fiche de chaque table : tout temps, cette année, cette semaine, aujourd'hui, changés aux flippers. Chaque partie jouée sur la borne y laisse ses scores ; « Tout temps » reprend aussi les records que la table gardait déjà.
 
 ## 0.1.8
 

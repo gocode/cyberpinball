@@ -131,6 +131,8 @@ export function partOf(rel: string): BackupPart | undefined {
         return undefined;
       }
       if (sub === 'social.json') return 'friends';
+      // Tableau des scores daté de chaque table (scoreboard.ts) : avec les records des tables.
+      if (sub === 'scores.json') return 'scores';
       if (/^cabinet.*\.json$/.test(sub) || sub === 'vpx-owned.json' || sub === 'borne.json') return 'cabinet';
       // Propres à ce PC : téléchargements en cours, mise à jour en attente, orientation d'origine de ses écrans.
       if (sub.startsWith('sauvegardes') || sub.startsWith('restauration') || ['telechargements.json', 'mise-a-jour.json', 'orientation-ecrans.json'].includes(sub)) return undefined;

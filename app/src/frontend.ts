@@ -246,6 +246,7 @@ import { createGameNotices } from './game-notice';
 import { createInGameMenu, prepareDmdPlace } from './in-game-menu';
 import { startCabinetVolume, type CabinetVolume } from './cabinet-volume';
 import { createBallCounts } from './ball-count';
+import { createTableScores } from './table-scores';
 import { createTableDoubles } from './table-double';
 import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
 import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
@@ -792,6 +793,7 @@ const library = createLibrary({
   recordableRoles: () => (['backglass', 'dmd'] as RecordedRole[]).filter((role) => menuAssignments[role]),
   tableSettings: (table) => openVpxSettings(table),
   playWithFriend: (table, back) => friendsMenu.live.sheetAction(table, back),
+  scores: (table, period) => tableScores.board(table, period),
   // « Ajouter aux favoris » sur la fiche : User.Favorite du .info (celui de la table, sinon celui du dossier).
   menuDmd: { detail: (table) => menuDmd.detail(table), open: (table, back) => menuDmd.open(table, back) },
   favorite: (table, on) => {
@@ -1388,6 +1390,14 @@ function openArrivedInvite(id: string): boolean {
 // Partie en direct : invitation, départ commun, puis la table lancée ici comme par Start.
 // Billes par partie (ROM, script, menu de service) : une partie en direct ne classe pas 5 billes contre 3.
 const ballCounts = createBallCounts({ dataDir: loc.dataDir, romsOf, pinmameDirs: () => (loc.root ? [path.join(loc.root, 'pinmame')] : []) });
+// Tableau des scores de chaque table : les scores de chaque partie, datés (table-scores.ts).
+const tableScores = createTableScores({
+  dataDir: loc.dataDir,
+  romsOf,
+  pinmameDirs: () => (loc.root ? [path.join(loc.root, 'pinmame')] : []),
+  changed: () => broadcast(),
+  log: (line) => console.log(line),
+});
 // Une partie entre amis se joue sur un double de la table : sa mémoire de ROM, ses records et ses
 // réglages habituels ne sont jamais ouverts en écriture (table-double.ts). Ceux d'une partie
 // interrompue par un plantage partent au démarrage.
@@ -2617,6 +2627,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Records d'avant la partie (VPReg.stg de la table, highscores.ts), pour savoir au retour si l'un est tombé (knocker).
   // Pour une partie entre amis, relus dans le double une fois fait (réglages de l'hôte, records du groupe).
   let recordsBefore = readTableRecords(table);
+  // La mémoire des ROM au départ : au retour, les scores de la partie s'y lisent (tableau des scores).
+  const scoresBefore = mode === 'display' ? undefined : tableScores.snapshot(table);
   const loadingMs = Number(process.env.CYBERPINBALL_LOADING_MS ?? 2500);
   await delay(Math.min(400, loadingMs));
   const captured = Date.now();
@@ -2875,6 +2887,13 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (result.ok) {
     // Les parties du test automatique ne comptent pas dans les statistiques.
     if (!autoStopAfterMs) recordPlay(table, startedAt, result.seconds);
+    // Les scores de la partie, datés, au tableau des scores de la table ; sans retarder le retour au menu.
+    if (!autoStopAfterMs && scoresBefore) {
+      tableScores
+        .finish(table, scoresBefore, double ? { live: { ...(live?.score ? { score: live.score } : {}) } } : { recordsBefore, recordsAfter })
+        .then((kept) => kept.length && broadcast())
+        .catch((error: Error) => console.log(`Tableau des scores (${table.id}) : partie non gardée (${error.message}).`)); // i18n-ignore : journal
+    }
     tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
     // Pour les amis : les records entrés au tableau, la partie, puis les badges qu'ils valent.
     // Une erreur ici (écriture refusée de social.json, essai réel du 01/11/2026) ne perd jamais la
