@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { anchorHeight, calibrateMenuText, calibrationGap, calibrationProblem, eyeHeightProblem, isCalibrated, lockbarMarks, lockbarPlace, lockbarVpxSettings, placeLockbar, placeVpxSettings, roomMoved, STANDARD_TABLE_WIDTH_CM } from '../calage';
+import { anchorHeight, cabinetPlaceFileName, calibrateMenuText, calibrationSetting, DESK_LOCKBAR_HEIGHT_M, freePlace, calibrationGap, calibrationProblem, eyeHeightProblem, isCalibrated, lockbarMarks, lockbarPlace, lockbarVpxSettings, placeLockbar, placeVpxSettings, roomMoved, STANDARD_TABLE_WIDTH_CM } from '../calage';
 import { LOCKBAR_DISTANCE_M, LOCKBAR_HEIGHT_M } from '../casque';
 import { vrCarriedSettings } from '../vr';
 
@@ -90,7 +90,7 @@ test('calage : branchements du compagnon, du casque et du menu', () => {
   assert.match(casque, /return `ancre \$\{place\.x\} \$\{place\.z\} \$\{place\.yaw\} \$\{anchorHeight\(place\)\}\\n`;/);
   const frontend = read('app', 'src', 'frontend.ts');
   assert.match(frontend, /if \(calibration\) return calibrationKey\(input\);/);
-  assert.match(frontend, /writeVrCalibration\(loc\.dataDir, lockbarVpxSettings\(left, right\)\);/);
+  assert.match(frontend, /writeVrCalibration\(loc\.dataDir, left && right \? lockbarVpxSettings\(left, right\) : placeVpxSettings\(place\)\);/);
   assert.match(frontend, /library\.provideSystemItem\('vr-calibrate', \{/);
   assert.match(frontend, /onGesture: \(\) => \(calibrateUnavailable\(\) \? undefined : openCalibration\(\)\),/);
   // L'entrée vient juste après « Réalité virtuelle ».
@@ -105,11 +105,14 @@ test('une seule pose : la table de VPX exactement où est la borne du casque, ca
   const back = placeLockbar(place);
   for (const [a, b] of [[back.left, left], [back.right, right]] as const) for (const k of ['x', 'y', 'z'] as const) close(a[k], b[k]);
   assert.deepEqual(placeVpxSettings(place), lockbarVpxSettings(left, right));
-  // Pas calée (recentrage sur le regard) : la place seulement, la barre avant de l'INI reste.
+  // Pas calée (recentrage sur le regard) : la même place, une barre avant de borne par défaut (70 cm, 85 cm).
   const loose = { x: place.x, z: place.z, yaw: place.yaw };
   assert.ok(!isCalibrated(loose) && isCalibrated(place));
-  assert.deepEqual(placeVpxSettings(loose).map((s) => s.key), ['Orientation', 'TableX', 'TableY', 'TableZ']);
-  close(Number(placeVpxSettings(loose)[0]!.value), Number(lockbarVpxSettings(left, right)[0]!.value), 1e-3);
+  const looseSettings = placeVpxSettings(loose);
+  assert.deepEqual(looseSettings.map((s) => s.key), ['Orientation', 'TableX', 'TableY', 'TableZ', 'LockbarWidth', 'LockbarHeight']);
+  close(Number(looseSettings[0]!.value), Number(lockbarVpxSettings(left, right)[0]!.value), 1e-3);
+  close(Number(looseSettings[4]!.value), 70, 1e-3);
+  close(Number(looseSettings[5]!.value), 85, 1e-3);
 });
 
 test('limite du Quest changée depuis le calage, sol mal réglé : repérés', () => {
@@ -135,4 +138,27 @@ test('borne fixe : aucun recentrage automatique, la place imposée à VPX, le ca
   assert.match(cpp, /if \(!stage\)\s*wantRecenter = true;\s*else if \(change->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE\)\s*say\("piece-changee"\);/);
   assert.match(cpp, /say\("piece " \+ std::to_string\(bounds\.width\)/);
   assert.match(cpp, /say\("yeux " \+ std::to_string\(loc\.pose\.position\.y\)\);/);
+});
+
+test('un calage par configuration ; au bureau, la borne posée librement, puis fixe', () => {
+  // Fichiers à part : le calage du bureau ne sert jamais à la borne, ni l'inverse.
+  assert.equal(cabinetPlaceFileName('borne'), 'casque-borne.json');
+  assert.equal(cabinetPlaceFileName('bureau 2/x'), 'casque-bureau_2_x.json');
+  assert.equal(cabinetPlaceFileName(undefined), 'casque.json');
+  // Playfield tourné d'un quart (couché en portrait) : une borne ; à plat en largeur : un bureau.
+  assert.equal(calibrationSetting(90), 'borne');
+  assert.equal(calibrationSetting(270), 'borne');
+  assert.equal(calibrationSetting(0), 'bureau');
+  // Posée sur le regard : barre avant à hauteur de borne, devant le joueur, et elle compte comme calée.
+  const desk = freePlace({ x: 0.1, z: -0.2, yaw: 0.3 });
+  assert.deepEqual(desk, { x: 0.1, z: -0.2, yaw: 0.3, lockbarHeight: DESK_LOCKBAR_HEIGHT_M, lockbarWidth: 0.7, free: true });
+  assert.ok(isCalibrated(desk));
+  assert.ok(DESK_LOCKBAR_HEIGHT_M >= 0.85 && DESK_LOCKBAR_HEIGHT_M <= 0.9);
+  assert.match(calibrateMenuText({ vrReady: true, headset: 'shown', place: desk, setting: 'bureau' }).detail, /^Posée au bureau, barre avant à 88 cm du sol · Au bureau : la borne se pose devant vous \(Start\)/);
+  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
+  assert.match(frontend, /return path\.join\(loc\.dataDir, 'vr', cabinetPlaceFileName\(menuConfiguration\)\);/);
+  // Start au bureau : recentrage demandé, la place du regard gardée à son retour (« centre »).
+  assert.match(frontend, /calibration\.placing = true;\s*showCalibration\(\);\s*headset\?\.recenter\(\);/);
+  assert.match(frontend, /c\.place = freePlace\(gaze\);\s*closeCalibration\(true\);/);
 });

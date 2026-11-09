@@ -33,6 +33,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - 3D vision, in System menu > Cabinet (BETA): the table perspective follows your head, like a window opened onto the playfield. A plain webcam is enough; a Kinect for Xbox 360 does even better and aims at your head by itself. Camera pictures never leave the PC.
 - Kinect plugged in without its driver: choosing "Vision 3D" (3D vision) downloads it from Microsoft and installs it, with nothing else to do than accept the Windows prompt. In game, both MagnaSave buttons offer "Recentrer la vue 3D" (Recenter the 3D view).
 - In the headset, the cabinet no longer moves: the menu and the game are in the same place, the aligned one, with no automatic recentring. As long as the cabinet is not aligned, "Caler la borne" (Align the cabinet) opens by itself in the headset before the menu; if the Quest's floor is wrongly set, the headset says where to set it.
+- One alignment per configuration: the desk one never serves the cabinet, nor the other way round. At a desk, with no real cabinet, the headset's cabinet is placed once in front of you (or on the edge of the desk, touched with the controllers), then no longer moves.
 
 ## 0.1.8
 

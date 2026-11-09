@@ -75,6 +75,8 @@ export interface HeadsetMenuOptions {
   onPoint?(hand: 'gauche' | 'droite', point: Point3, room: boolean): void;
   /** Les deux poignées tenues 3 s : ouvrir le calage de la borne. */
   onGesture?(): void;
+  /** Recentrage fait (sur demande) : la place donnée par le regard du joueur. */
+  onCentre?(place: { x: number; z: number; yaw: number }): void;
   /** Hauteur des yeux au-dessus du sol de la pièce (mètres), à chaque port du casque. */
   onEyes?(eyes: number): void;
   /** Limite du Quest au lancement du compagnon ; `changed` : le Quest a déplacé la pièce pendant la session. */
@@ -311,7 +313,11 @@ export class HeadsetMenu {
         }
         // « centre x z lacet yeux=… » : la nouvelle place de la borne, gardée (dans la pièce seulement).
         const centre = /^centre (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)(?!.*sans-piece)/.exec(line);
-        if (centre) this.writePlace({ x: Number(centre[1]), z: Number(centre[2]), yaw: Number(centre[3]) });
+        if (centre) {
+          const gaze = { x: Number(centre[1]), z: Number(centre[2]), yaw: Number(centre[3]) };
+          this.writePlace(gaze);
+          this.opts.onCentre?.(gaze);
+        }
         if (line.startsWith('casque-absent')) this.setState('waiting');
         if (line.startsWith('image') && !this.snapshotTaken && this.opts.snapshotDir) {
           this.snapshotTaken = true;

@@ -33,6 +33,36 @@ export interface CabinetPlace {
   lockbarWidth?: number;
   /** Limite du Quest au moment du calage (roomMoved). */
   room?: RoomBounds;
+  /** Posée librement au bureau (pas de vraie borne devant le joueur), pas calée sur une vraie barre avant. */
+  free?: boolean;
+}
+
+/** Ce qui est devant le joueur : une vraie borne (barre avant à toucher), ou un bureau (placement libre). */
+export type CalibrationSetting = 'borne' | 'bureau';
+
+/** Barre avant d'une borne posée librement au bureau : à la hauteur d'une vraie borne (85 à 90 cm). */
+export const DESK_LOCKBAR_HEIGHT_M = 0.88;
+
+/**
+ * Configuration de Cyber Pinball où la borne se cale : un playfield tourné d'un quart de tour (écran
+ * couché en portrait) est une borne ; un playfield à plat, en largeur, un poste de bureau.
+ */
+export function calibrationSetting(playfieldRotation: number): CalibrationSetting {
+  return playfieldRotation === 90 || playfieldRotation === 270 ? 'borne' : 'bureau';
+}
+
+/**
+ * Borne posée librement (bureau) : la place donnée par le regard du joueur (recentrage), la barre
+ * avant à DESK_LOCKBAR_HEIGHT_M, de la largeur par défaut de VPX. Elle ne bouge plus ensuite.
+ */
+export function freePlace(gaze: { x: number; z: number; yaw: number }): CabinetPlace {
+  return { x: gaze.x, z: gaze.z, yaw: gaze.yaw, lockbarHeight: DESK_LOCKBAR_HEIGHT_M, lockbarWidth: DEFAULT_LOCKBAR_WIDTH_M, free: true };
+}
+
+/** Fichier de la place de la borne du casque d'une configuration (un calage par configuration). */
+export function cabinetPlaceFileName(configurationId: string | undefined): string {
+  const safe = configurationId?.replace(/[^\w-]/g, '_');
+  return safe ? `casque-${safe}.json` : 'casque.json';
 }
 
 /** Largeur d'un plateau standard (20 1/4") plus les 2 1/4" que VPX ajoute pour la barre avant, en cm. */
@@ -134,18 +164,22 @@ export function anchorHeight(place: CabinetPlace): number {
  * tant que le menu n'est pas dans le casque ; sinon où en est le calage, comment le faire, et la
  * limite du Quest (sa pièce change avec sa limite et son sol).
  */
-export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMenuState; place?: CabinetPlace }): { detail: string; unavailable: boolean } {
+export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMenuState; place?: CabinetPlace; setting?: CalibrationSetting }): { detail: string; unavailable: boolean } {
   if (!opts.vrReady) return { detail: t('Réalité virtuelle indisponible : rien à caler'), unavailable: true };
   if (opts.headset !== 'shown') return { detail: t('Mettez le casque, le menu de Cyber Pinball dedans : le calage se fait aux manettes'), unavailable: true };
   const p = opts.place;
   const status =
     p?.lockbarWidth !== undefined && p.lockbarHeight !== undefined
-      ? t('Calée : barre avant de {w} cm, à {h} cm du sol', { w: Math.round(p.lockbarWidth * 100), h: Math.round(p.lockbarHeight * 100) })
+      ? p.free
+        ? t('Posée au bureau, barre avant à {h} cm du sol', { h: Math.round(p.lockbarHeight * 100) })
+        : t('Calée : barre avant de {w} cm, à {h} cm du sol', { w: Math.round(p.lockbarWidth * 100), h: Math.round(p.lockbarHeight * 100) })
       : t('Pas encore calée');
   return {
     detail: [
       status,
-      t('Touchez la vraie barre avant du bout de la manette, gâchette appuyée : coin gauche, coin droit, puis le milieu. Aussi : les deux poignées tenues 3 s'),
+      opts.setting === 'bureau'
+        ? t('Au bureau : la borne se pose devant vous (Start), ou sur deux points du bord du bureau touchés du bout de la manette. Aussi : les deux poignées tenues 3 s')
+        : t('Touchez la vraie barre avant du bout de la manette, gâchette appuyée : coin gauche, coin droit, puis le milieu. Aussi : les deux poignées tenues 3 s'),
       t('Le Quest garde ce calage tant que sa limite et son sol ne changent pas : après « Ajuster le sol » ou une nouvelle limite, recalez'),
     ].join(' · '),
     unavailable: false,
@@ -182,8 +216,7 @@ export function placeLockbar(place: CabinetPlace): { left: Point3; right: Point3
  */
 export function placeVpxSettings(place: CabinetPlace): VpxSetting[] {
   const { left, right } = placeLockbar(place);
-  const settings = lockbarVpxSettings(left, right);
-  return isCalibrated(place) ? settings : settings.filter((s) => s.section !== 'Player');
+  return lockbarVpxSettings(left, right);
 }
 
 /** Limite du Quest (rectangle de la pièce, mètres) gardée avec le calage, pour voir si elle a changé depuis. */

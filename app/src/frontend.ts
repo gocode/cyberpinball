@@ -40,6 +40,9 @@ import {
   HEADSET_BUTTONS,
   language,
   calibrateMenuText,
+  calibrationSetting,
+  cabinetPlaceFileName,
+  freePlace,
   eyeHeightProblem,
   isCalibrated,
   placeVpxSettings,
@@ -50,6 +53,7 @@ import {
   lockbarPlace,
   lockbarVpxSettings,
   type CabinetPlace,
+  type CalibrationSetting,
   type CalibrationStep,
   type Point3,
   type HeadsetButton,
@@ -1915,7 +1919,7 @@ function prepareVision3d(vpxExe: string, inVr: boolean): Vision3dSourceKind | un
 // raison, tant que le menu n'est pas dans le casque. Aussi : les deux poignées tenues 3 s.
 library.provideSystemItem('vr-calibrate', {
   get detail() {
-    return calibrateMenuText({ vrReady: probeVr().ready, headset: headset?.state, place: headset?.place() }).detail;
+    return calibrateMenuText({ vrReady: probeVr().ready, headset: headset?.state, place: headset?.place(), setting: headsetSetting() }).detail;
   },
   get tone() {
     return calibrateUnavailable() ? ('quiet' as const) : undefined;
@@ -1925,7 +1929,13 @@ library.provideSystemItem('vr-calibrate', {
 
 /** Le chemin de casque.json : la place de la borne du casque, seule pose de la borne (menu et parties). */
 function headsetPlaceFile(): string {
-  return path.join(loc.dataDir, 'vr', 'casque.json');
+  // Un calage par configuration : le bureau et la borne n'ont ni la même pièce ni la même limite du Quest.
+  return path.join(loc.dataDir, 'vr', cabinetPlaceFileName(menuConfiguration));
+}
+
+/** Vraie borne devant le joueur (barre avant à toucher), ou bureau (placement libre) : selon la configuration active. */
+function headsetSetting(): CalibrationSetting {
+  return calibrationSetting(rotation);
 }
 
 /** Hauteur des yeux dite par le compagnon (sol mal réglé), et limite du Quest changée depuis le calage. */
@@ -1947,7 +1957,7 @@ function calibrateUnavailable(): boolean {
 }
 
 /** Calage en cours : les points touchés (coin gauche, coin droit, milieu), la place proposée, et où revenir. */
-let calibration: { points: Partial<Record<CalibrationStep, Point3>>; place?: CabinetPlace; back: 'menu' | 'system' } | undefined;
+let calibration: { points: Partial<Record<CalibrationStep, Point3>>; place?: CabinetPlace; back: 'menu' | 'system'; placing?: boolean } | undefined;
 
 function openCalibration(): void {
   if (!headset || calibration || playing || launch) return;
@@ -1968,9 +1978,20 @@ function showCalibration(problem?: string): void {
   const notices = [
     ...(roomNotice ? [t('La limite du Quest a changé depuis le calage : la borne n’est sans doute plus sur la vraie. Recalez-la.')] : []),
     ...(!p.right && eyeHeightProblem(headsetEyes) ? [eyeHeightProblem(headsetEyes)!] : []),
-    ...(!p.left && !isCalibrated(headset?.place()) ? [t('Pas encore calée : la borne du casque et les tables doivent être posées sur la vraie avant de jouer.')] : []),
+    ...(!p.left && !isCalibrated(headset?.place()) && headsetSetting() === 'borne' ? [t('Pas encore calée : la borne du casque et les tables doivent être posées sur la vraie avant de jouer.')] : []),
+    ...(!p.left && !isCalibrated(headset?.place()) && headsetSetting() === 'bureau' ? [t('Pas encore posée : la borne du casque et les tables doivent avoir leur place avant de jouer.')] : []),
   ];
   if (problem) lines = [...notices, problem, cancel];
+  else if (c.placing) lines = [t('Pose de la borne devant vous…')];
+  // Au bureau, pas de barre avant à toucher : la borne se pose où regarde le joueur, ou sur le bord du bureau.
+  else if (!p.left && headsetSetting() === 'bureau')
+    lines = [
+      ...notices,
+      t('Pas de vraie borne devant vous : la borne du casque se pose où vous voulez, puis ne bouge plus.'),
+      t('Regardez droit devant vous, debout ou assis comme pour jouer, puis Start : la borne se pose ici, sa barre avant 30 cm devant vous, à 88 cm du sol.'),
+      t('Ou touchez du bout de la manette le bord gauche puis le bord droit du bureau, gâchette appuyée : la barre avant s’y pose.'),
+      t('Start : poser la borne ici · Exit : annuler'),
+    ];
   else if (!p.left) lines = [...notices, t('Posez le bout de la manette sur le coin gauche de la vraie barre avant, puis appuyez sur la gâchette.'), cancel];
   else if (!p.right) lines = [...notices, t('Coin gauche pris. Posez le bout de la manette sur le coin droit, puis appuyez sur la gâchette.'), cancel];
   else if (!p.middle) lines = [t('Coin droit pris : la borne du casque s’est posée sur la barre avant. Pour vérifier, touchez le milieu de la barre avant, gâchette appuyée.'), t('Start : garder sans vérifier · Exit : annuler')];
@@ -2016,7 +2037,21 @@ function calibrationKey(input: Input): boolean {
   if (input.isAutoRepeat) return true;
   if (KEYS.exit.includes(input.code)) closeCalibration(false);
   else if (KEYS.confirm.includes(input.code) && calibration?.place) closeCalibration(true);
+  // Au bureau, avant tout point : Start pose la borne où regarde le joueur (recentrage, puis « centre »).
+  else if (KEYS.confirm.includes(input.code) && calibration && !calibration.points.left && !calibration.placing && headsetSetting() === 'bureau') {
+    calibration.placing = true;
+    showCalibration();
+    headset?.recenter();
+  }
   return true;
+}
+
+/** Recentrage demandé par « poser la borne ici » : la place du regard, barre avant à hauteur de borne, gardée. */
+function calibrationCentre(gaze: { x: number; z: number; yaw: number }): void {
+  const c = calibration;
+  if (!c?.placing) return;
+  c.place = freePlace(gaze);
+  closeCalibration(true);
 }
 
 /**
@@ -2031,17 +2066,18 @@ function closeCalibration(keep: boolean): void {
   headset?.calibrate(false);
   headset?.setMarks([]);
   const { left, right, middle } = c.points;
-  if (keep && c.place && left && right) {
+  if (keep && c.place) {
     // La limite du Quest est gardée avec le calage : si elle change, le calage est proposé de nouveau.
-    headset?.showPlace({ ...c.place, ...(headset.room && { room: headset.room }) }, true);
+    const place: CabinetPlace = { ...c.place, ...(headset?.room && { room: headset.room }), ...(headsetSetting() === 'bureau' && { free: true }) };
+    headset?.showPlace(place, true);
     roomNotice = false;
     try {
-      writeVrCalibration(loc.dataDir, lockbarVpxSettings(left, right));
+      writeVrCalibration(loc.dataDir, left && right ? lockbarVpxSettings(left, right) : placeVpxSettings(place));
     } catch (error) {
       console.warn(`Casque : calage pas écrit dans l’INI de la VR (${(error as Error).message}).`); // i18n-ignore : journal
     }
-    const gap = middle ? `, milieu touché à ${calibrationGap(left, right, middle).toFixed(1)} cm du milieu calé` : ', milieu pas vérifié'; // i18n-ignore : journal
-    console.log(`Casque : borne calée, barre avant de ${Math.round((c.place.lockbarWidth ?? 0) * 100)} cm à ${Math.round((c.place.lockbarHeight ?? 0) * 100)} cm du sol${gap}.`); // i18n-ignore : journal
+    const gap = !left || !right ? ', posée sur le regard du joueur' : middle ? `, milieu touché à ${calibrationGap(left, right, middle).toFixed(1)} cm du milieu calé` : ', milieu pas vérifié'; // i18n-ignore : journal
+    console.log(`Casque : borne ${place.free ? 'posée au bureau' : 'calée'} (${menuConfiguration ?? 'configuration unique'}), barre avant de ${Math.round((place.lockbarWidth ?? 0) * 100)} cm à ${Math.round((place.lockbarHeight ?? 0) * 100)} cm du sol${gap}.`); // i18n-ignore : journal
   } else {
     headset?.showPlace(undefined);
     console.log('Casque : calage de la borne annulé.'); // i18n-ignore : journal
@@ -2496,6 +2532,7 @@ export function startFrontend(): void {
     onButton: (button, down) => headsetButton(button, down),
     onPoint: (_hand, point, room) => calibrationPoint(point, room),
     onGesture: () => (calibrateUnavailable() ? undefined : openCalibration()),
+    onCentre: (gaze) => calibrationCentre(gaze),
     onEyes: (eyes) => {
       headsetEyes = eyes;
       if (calibration) showCalibration();

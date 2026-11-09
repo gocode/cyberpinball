@@ -35,6 +35,7 @@ son interface).
 - Vision 3D, dans Menu système > Borne (BÊTA) : la perspective de la table suit votre tête, comme une fenêtre ouverte sur le plateau. Une simple webcam suffit ; une Kinect pour Xbox 360 fait encore mieux et vise seule votre tête. Les images de la caméra ne quittent jamais le PC.
 - Kinect branchée sans son pilote : choisir « Vision 3D » le télécharge chez Microsoft et l'installe, sans rien d'autre à faire que d'accepter la demande de Windows. En partie, les deux MagnaSave proposent « Recentrer la vue 3D ».
 - Dans le casque, la borne ne bouge plus : le menu et la partie sont au même endroit, celui du calage, sans recentrage automatique. Tant que la borne n'est pas calée, « Caler la borne » s'ouvre seul dans le casque avant le menu ; si le sol du Quest est mal réglé, le casque dit où le régler.
+- Un calage par configuration : celui du bureau ne sert jamais à la borne, ni l'inverse. Au bureau, sans vraie borne, la borne du casque se pose une fois devant vous (ou sur le bord du bureau, touché aux manettes), puis ne bouge plus.
 
 ## 0.1.8
 
