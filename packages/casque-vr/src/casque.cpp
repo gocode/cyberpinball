@@ -14,6 +14,15 @@
 //       rectangle source sur le bureau (pixels physiques), pose du panneau dans l'espace de la borne
 //       (mètres : origine au sol sous le joueur, x à droite, y en haut, -z devant lui), taille en mètres ;
 //     fin                (fin de la description : le casque s'ouvre)
+//     source <rôle> <surface> <fx> <fy> <fl> <fh>
+//                        le panneau prend ses images dans la surface <surface> (une fenêtre de Cyber
+//                        Pinball rendue hors écran pour le casque), rectangle en fractions de la
+//                        surface ; son image dans le casque a la taille de ce rectangle dans la
+//                        texture reçue ; sans source : la duplication de son écran
+//     texture <surface> <image> <handle> <largeur> <hauteur>
+//                        une image de la surface : la texture partagée d'Electron, son handle dupliqué
+//                        dans ce processus (un neuf à chaque image : Electron en ouvre un par image,
+//                        et Windows en recycle les numéros ; rien n'est gardé d'une image à l'autre)
 //     scene, puis boite … | quad … | disque …, puis scene-fin
 //                        (la borne en volume autour des panneaux, packages/core/src/casque-scene.ts ;
 //                        un nouveau bloc remplace le précédent, par exemple quand la teinte change)
@@ -26,12 +35,14 @@
 //     quitter            (fondu au noir de 300 ms, puis fin propre de la session)
 //   Sortie standard :
 //     pret <runtime> | casque-absent <raison> | erreur <texte> | etat <état OpenXR> | centre … | image <rôle>
+//     | libre <image> (image copiée : Electron peut reprendre sa texture) | porte 1|0 (casque porté ou non)
 //     | scene <n> formes | fini
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
 #include <d3d11.h>
+#include <d3d11_1.h>
 #include <dxgi1_2.h>
 #include <wrl/client.h>
 
@@ -48,6 +59,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <mutex>
 #include <sstream>
 #include <string>
@@ -133,6 +145,9 @@ struct Panel
    XrSwapchain swapchain = XR_NULL_HANDLE;
    std::vector<XrSwapchainImageD3D11KHR> images;
    bool shown = false; // première image copiée (dite une fois dans le journal)
+   std::string surface; // source : surface rendue hors écran par Cyber Pinball (vide : duplication)
+   float fx = 0, fy = 0, fw = 1, fh = 1; // place du panneau dans la surface, en fractions
+   UINT width = 0, height = 0; // taille de son image dans le casque (source : créée à la première image)
    uint64_t copied = 0; // génération de l'image de l'écran déjà dans le casque
 };
 
@@ -157,6 +172,20 @@ std::atomic<bool> handover { false };
 std::atomic<ULONGLONG> handoverAt { 0 };
 /** Instantané des panneaux demandé, et son dossier. */
 std::atomic<bool> wantSnapshot { false };
+/** Sources des panneaux (rôle → surface et décalage), et images reçues des surfaces. */
+struct SourceOf
+{
+   std::string surface;
+   float fx = 0, fy = 0, fw = 1, fh = 1;
+};
+std::map<std::string, SourceOf> sourcesByRole;
+struct IncomingImage
+{
+   std::string surface, frame;
+   unsigned long long handle = 0;
+};
+std::mutex imagesMutex;
+std::vector<IncomingImage> incoming;
 std::string snapshotDir;
 std::atomic<bool> described { false };
 std::mutex panelsMutex;
@@ -209,6 +238,27 @@ void readCommands()
          described = true;
       else if (word == "recentrer")
          wantRecenter = true;
+      else if (word == "source")
+      {
+         std::string role;
+         SourceOf src;
+         in >> role >> src.surface >> src.fx >> src.fy >> src.fw >> src.fh;
+         if (in)
+         {
+            std::lock_guard<std::mutex> lock(panelsMutex);
+            sourcesByRole[role] = src;
+         }
+      }
+      else if (word == "texture")
+      {
+         IncomingImage img;
+         in >> img.surface >> img.frame >> img.handle;
+         if (in)
+         {
+            std::lock_guard<std::mutex> lock(imagesMutex);
+            incoming.push_back(img);
+         }
+      }
       else if (word == "ancre")
       {
          float x, z, yaw;
@@ -373,6 +423,161 @@ int renderTest(const std::string& input, const std::string& output)
    return 0;
 }
 
+/**
+ * Texture partagée par Electron (rendu hors écran, webPreferences.offscreen.useSharedTexture) :
+ * Cyber Pinball a dupliqué son NT HANDLE dans ce processus. Le handle est fermé ici, la texture
+ * gardée ouverte.
+ */
+ComPtr<ID3D11Texture2D> openShared(ID3D11Device* device, HANDLE handle)
+{
+   ComPtr<ID3D11Device1> device1;
+   ComPtr<ID3D11Texture2D> texture;
+   if (SUCCEEDED(device->QueryInterface(IID_PPV_ARGS(&device1))))
+      device1->OpenSharedResource1(handle, IID_PPV_ARGS(&texture));
+   CloseHandle(handle);
+   return texture;
+}
+
+/** Attend que le GPU ait fini ce qui est demandé (une copie depuis une texture qu'Electron va reprendre). */
+void gpuFinish(ID3D11Device* device, ID3D11DeviceContext* context)
+{
+   D3D11_QUERY_DESC qd { D3D11_QUERY_EVENT, 0 };
+   ComPtr<ID3D11Query> query;
+   if (FAILED(device->CreateQuery(&qd, &query)))
+      return;
+   context->End(query.Get());
+   context->Flush();
+   BOOL done = FALSE;
+   for (int i = 0; i < 2000 && context->GetData(query.Get(), &done, sizeof done, 0) == S_FALSE; i++)
+      Sleep(0);
+}
+
+// --essai-textures <dossier> : reçoit des textures d'Electron (« texture <clé> <handle> <largeur>
+// <hauteur> »), écrit chacune en <clé>.bmp et répond « libre <clé> » ; « fin » : terminé. Aucune
+// session OpenXR : la chaîne Electron → compagnon se vérifie sans casque.
+int textureTest(const std::string& dir)
+{
+   ComPtr<ID3D11Device> device;
+   ComPtr<ID3D11DeviceContext> context;
+   if (FAILED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context)))
+      return 4;
+   CreateDirectoryA(dir.c_str(), nullptr);
+   say("pret essai-textures");
+   std::string line;
+   while (std::getline(std::cin, line))
+   {
+      std::istringstream in(line);
+      std::string word, key;
+      unsigned long long value = 0;
+      UINT w = 0, h = 0;
+      in >> word;
+      if (word == "fin")
+         break;
+      if (word != "texture" || !(in >> key >> value >> w >> h))
+         continue;
+      ComPtr<ID3D11Texture2D> texture = openShared(device.Get(), reinterpret_cast<HANDLE>(value));
+      if (!texture)
+      {
+         say("erreur texture " + key + " : ouverture refusée");
+         say("libre " + key);
+         continue;
+      }
+      D3D11_TEXTURE2D_DESC td;
+      texture->GetDesc(&td);
+      D3D11_TEXTURE2D_DESC sd = td;
+      sd.Usage = D3D11_USAGE_STAGING;
+      sd.BindFlags = 0;
+      sd.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+      sd.MiscFlags = 0;
+      ComPtr<ID3D11Texture2D> staging;
+      device->CreateTexture2D(&sd, nullptr, &staging);
+      context->CopyResource(staging.Get(), texture.Get());
+      gpuFinish(device.Get(), context.Get());
+      say("libre " + key);
+      D3D11_MAPPED_SUBRESOURCE m;
+      if (SUCCEEDED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &m)))
+      {
+         writeBmp(dir + "\\" + key + ".bmp", static_cast<const unsigned char*>(m.pData), m.RowPitch, td.Width, td.Height);
+         context->Unmap(staging.Get(), 0);
+         say("image " + key + " " + std::to_string(td.Width) + "x" + std::to_string(td.Height) + " format " + std::to_string(static_cast<int>(td.Format)));
+      }
+   }
+   return 0;
+}
+
+// --essai-surfaces <dossier> : le protocole de Cyber Pinball sans casque. Le compagnon se dit prêt
+// et « porté », reçoit les images des écrans rendus pour le casque (texture <surface> <image>
+// <handle> …), répond « libre » et écrit la dernière de chaque surface en <surface>.bmp toutes les
+// 2 s. Pour vérifier hors écran ce que le casque recevrait, menu compris.
+int surfacesTest(const std::string& dir)
+{
+   ComPtr<ID3D11Device> device;
+   ComPtr<ID3D11DeviceContext> context;
+   if (FAILED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context)))
+      return 4;
+   CreateDirectoryA(dir.c_str(), nullptr);
+   std::map<std::string, ULONGLONG> written;
+   std::string line;
+   while (std::getline(std::cin, line))
+   {
+      std::istringstream in(line);
+      std::string word;
+      in >> word;
+      if (word == "fin")
+      {
+         say("pret essai-surfaces");
+         say("porte 1");
+         continue;
+      }
+      if (word == "quitter")
+         break;
+      if (word != "texture")
+         continue;
+      std::string surface, frame;
+      unsigned long long handle = 0;
+      if (!(in >> surface >> frame >> handle))
+         continue;
+      const ULONGLONG now = GetTickCount64();
+      const bool write = now - written[surface] > 2000;
+      if (!write)
+      {
+         CloseHandle(reinterpret_cast<HANDLE>(handle));
+         say("libre " + frame);
+         continue;
+      }
+      ComPtr<ID3D11Texture2D> texture = openShared(device.Get(), reinterpret_cast<HANDLE>(handle));
+      if (!texture)
+      {
+         say("erreur texture " + surface + " : ouverture refusée");
+         say("libre " + frame);
+         continue;
+      }
+      D3D11_TEXTURE2D_DESC td;
+      texture->GetDesc(&td);
+      D3D11_TEXTURE2D_DESC sd = td;
+      sd.Usage = D3D11_USAGE_STAGING;
+      sd.BindFlags = 0;
+      sd.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+      sd.MiscFlags = 0;
+      ComPtr<ID3D11Texture2D> staging;
+      device->CreateTexture2D(&sd, nullptr, &staging);
+      context->CopyResource(staging.Get(), texture.Get());
+      gpuFinish(device.Get(), context.Get());
+      say("libre " + frame);
+      D3D11_MAPPED_SUBRESOURCE m;
+      if (SUCCEEDED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &m)))
+      {
+         writeBmp(dir + "\\" + surface + ".bmp", static_cast<const unsigned char*>(m.pData), m.RowPitch, td.Width, td.Height);
+         context->Unmap(staging.Get(), 0);
+         if (!written[surface])
+            say("image " + surface + " (rendu pour le casque) " + std::to_string(td.Width) + "x" + std::to_string(td.Height));
+         written[surface] = now;
+      }
+   }
+   say("fini");
+   return 0;
+}
+
 int diagnostic(const LUID* headset)
 {
    ComPtr<IDXGIFactory1> factory;
@@ -466,6 +671,10 @@ int main(int argc, char** argv)
    {
       if (std::string(argv[i]) == "--chargeur" && i + 1 < argc)
          loaderPath = argv[i + 1];
+      if (std::string(argv[i]) == "--essai-surfaces" && i + 1 < argc)
+         return surfacesTest(argv[i + 1]);
+      if (std::string(argv[i]) == "--essai-textures" && i + 1 < argc)
+         return textureTest(argv[i + 1]);
       if (std::string(argv[i]) == "--rendu-essai" && i + 2 < argc)
          return renderTest(argv[i + 1], argv[i + 2]);
       if (std::string(argv[i]) == "--diagnostic")
@@ -535,6 +744,9 @@ int main(int argc, char** argv)
    {
       std::lock_guard<std::mutex> lock(panelsMutex);
       panels = pending;
+      for (Panel& p : panels)
+         if (auto it = sourcesByRole.find(p.role); it != sourcesByRole.end())
+            p.surface = it->second.surface, p.fx = it->second.fx, p.fy = it->second.fy, p.fw = it->second.fw, p.fh = it->second.fh;
    }
    if (wantQuit || panels.empty())
    {
@@ -692,27 +904,32 @@ int main(int argc, char** argv)
       say("erreur aucun format d'image BGRA chez le runtime");
       return 4;
    }
-   for (Panel& p : panels)
-   {
+   // Image d'un panneau dans le casque, à la taille donnée.
+   auto createPanelImage = [&](Panel& p, UINT width, UINT height) {
       XrSwapchainCreateInfo ci { XR_TYPE_SWAPCHAIN_CREATE_INFO };
       ci.usageFlags = XR_SWAPCHAIN_USAGE_TRANSFER_DST_BIT | XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT | XR_SWAPCHAIN_USAGE_SAMPLED_BIT;
       ci.format = format;
       ci.sampleCount = 1;
-      ci.width = static_cast<uint32_t>(p.source.right - p.source.left);
-      ci.height = static_cast<uint32_t>(p.source.bottom - p.source.top);
+      ci.width = width;
+      ci.height = height;
       ci.faceCount = 1;
       ci.arraySize = 1;
       ci.mipCount = 1;
       if (XR_FAILED(xrCreateSwapchain_(session, &ci, &p.swapchain)))
       {
          say("erreur " + p.role + " : image du casque refusée");
-         continue;
+         return;
       }
+      p.width = width, p.height = height;
       uint32_t n = 0;
       xrEnumerateSwapchainImages_(p.swapchain, 0, &n, nullptr);
       p.images.assign(n, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR });
       xrEnumerateSwapchainImages_(p.swapchain, n, &n, reinterpret_cast<XrSwapchainImageBaseHeader*>(p.images.data()));
-   }
+   };
+   // Panneaux dupliqués : leur image tout de suite ; panneaux à surface : à la première image reçue.
+   for (Panel& p : panels)
+      if (p.surface.empty())
+         createPanelImage(p, static_cast<UINT>(p.source.right - p.source.left), static_cast<UINT>(p.source.bottom - p.source.top));
 
    // Couche de projection : la borne en volume, un rendu par œil, sous les panneaux.
    struct Eye
@@ -788,6 +1005,17 @@ int main(int argc, char** argv)
 
    say(std::string("pret ") + props.runtimeName + (stage ? " (pièce)" : " (local)") + (colorScale ? "" : " (sans fondu des panneaux)"));
 
+   // Surfaces rendues hors écran par Cyber Pinball : les textures d'Electron ouvertes (par ressource),
+   // et la copie de la dernière image, d'où les panneaux prennent la leur.
+   struct Surface
+   {
+      ComPtr<ID3D11Texture2D> copy;
+      UINT width = 0, height = 0;
+      uint64_t generation = 0;
+   };
+   std::map<std::string, Surface> surfaces;
+   bool worn = false;
+
    XrPosef anchor { { 0, 0, 0, 1 }, { 0, 0, -0.f } };
    bool running = false, exitRequested = false, done = false;
    // Fondu au noir avant de rendre le casque : 300 ms (250 à 350 ms dans la direction artistique).
@@ -805,6 +1033,13 @@ int main(int argc, char** argv)
             const XrSessionState previous = state;
             state = reinterpret_cast<XrEventDataSessionStateChanged*>(&ev)->state;
             say("etat " + std::to_string(static_cast<int>(state)));
+            // Casque porté et regard à nous (« FOCUSED ») : le menu y est dessiné. Retiré, ou le menu
+            // de Meta ouvert : plus rien dans le casque, et Cyber Pinball rend les écrans du PC.
+            if ((state == XR_SESSION_STATE_FOCUSED) != worn)
+            {
+               worn = state == XR_SESSION_STATE_FOCUSED;
+               say(std::string("porte ") + (worn ? "1" : "0"));
+            }
             // La borne reste à sa place dans la pièce, comme un objet : ni la session qui reprend le
             // regard, ni le casque remis ne la déplacent (seuls « recentrer » et le recentrage du casque).
             // Relève : VPX a pris le regard du joueur (notre session n'est plus « FOCUSED ») : fondu, puis fin.
@@ -864,6 +1099,59 @@ int main(int argc, char** argv)
       }
       if (done)
          break;
+
+      {
+         std::vector<IncomingImage> images;
+         {
+            std::lock_guard<std::mutex> lock(imagesMutex);
+            images.swap(incoming);
+         }
+         // La dernière image de chaque surface est copiée ; les autres sont rendues tout de suite.
+         std::map<std::string, size_t> latest;
+         for (size_t i = 0; i < images.size(); i++)
+            latest[images[i].surface] = i;
+         for (size_t i = 0; i < images.size(); i++)
+         {
+            IncomingImage& img = images[i];
+            Surface& surf = surfaces[img.surface];
+            // Seule la dernière image d'une surface est ouverte ; les autres handles sont refermés.
+            if (latest[img.surface] != i || fadeStart)
+            {
+               CloseHandle(reinterpret_cast<HANDLE>(img.handle));
+               continue;
+            }
+            const ComPtr<ID3D11Texture2D> shared = openShared(device.Get(), reinterpret_cast<HANDLE>(img.handle));
+            if (shared)
+            {
+               D3D11_TEXTURE2D_DESC td;
+               shared->GetDesc(&td);
+               if (!surf.copy || surf.width != td.Width || surf.height != td.Height)
+               {
+                  D3D11_TEXTURE2D_DESC cd = td;
+                  cd.Usage = D3D11_USAGE_DEFAULT;
+                  cd.BindFlags = 0;
+                  cd.CPUAccessFlags = 0;
+                  cd.MiscFlags = 0;
+                  surf.copy.Reset();
+                  device->CreateTexture2D(&cd, nullptr, &surf.copy);
+                  surf.width = td.Width, surf.height = td.Height;
+               }
+               if (surf.copy)
+               {
+                  context->CopyResource(surf.copy.Get(), shared.Get());
+                  surf.generation++;
+               }
+            }
+         }
+         if (!images.empty())
+         {
+            // Electron ne reprend ses textures qu'une fois la copie faite par le GPU.
+            gpuFinish(device.Get(), context.Get());
+            for (const IncomingImage& img : images)
+               say("libre " + img.frame);
+         }
+      }
+
       if (!running)
       {
          Sleep(50);
@@ -920,11 +1208,18 @@ int main(int argc, char** argv)
          }
       }
 
-      // Nouvelles images des écrans (sauf pendant le fondu : l'ambiance s'immobilise).
-      for (Output& o : outputs)
+      // Nouvelles images des écrans (sauf pendant le fondu : l'ambiance s'immobilise ; ni casque retiré).
+      for (size_t oi = 0; oi < outputs.size(); oi++)
       {
-         if (fadeStart)
+         Output& o = outputs[oi];
+         if (fadeStart || !worn)
             break;
+         // Écran dont tous les panneaux ont leur surface : rien à dupliquer.
+         bool needed = false;
+         for (const Panel& p : panels)
+            needed |= p.output == static_cast<int>(oi) && p.surface.empty();
+         if (!needed)
+            continue;
          if (!o.dup && FAILED(o.output->DuplicateOutput(device.Get(), &o.dup)))
          {
             if (!o.reported)
@@ -1017,7 +1312,7 @@ int main(int argc, char** argv)
       XrCompositionLayerProjection proj { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
       XrCompositionLayerProjectionView projViews[2] { { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW }, { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW } };
       bool projected = false;
-      if (fs.shouldRender && projection && !renderer.empty())
+      if (fs.shouldRender && worn && projection && !renderer.empty())
       {
          XrViewLocateInfo vli { XR_TYPE_VIEW_LOCATE_INFO };
          vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
@@ -1076,15 +1371,48 @@ int main(int argc, char** argv)
       const void* fadeNext = colorScale && fade < 1.f ? &scale : nullptr;
 
       std::vector<XrCompositionLayerQuad> quads;
-      if (fs.shouldRender)
+      if (fs.shouldRender && worn)
       {
          for (Panel& p : panels)
          {
-            if (p.swapchain == XR_NULL_HANDLE)
-               continue;
-            // Copie seulement quand l'écran a changé : sinon le casque garde la dernière image
-            // rendue au runtime (un menu immobile ne coûte plus rien au GPU ni à Link).
-            const Output* o = p.output >= 0 ? &outputs[p.output] : nullptr;
+            // Panneau à surface (fenêtre de Cyber Pinball rendue pour le casque) : sa dernière image,
+            // son rectangle pris en fractions dans la texture reçue (sa taille réelle).
+            if (!p.surface.empty())
+            {
+               auto it = surfaces.find(p.surface);
+               if (it != surfaces.end() && it->second.copy && p.swapchain == XR_NULL_HANDLE)
+               {
+                  const UINT w = std::max(1u, static_cast<UINT>(std::lround(p.fw * it->second.width)));
+                  const UINT h = std::max(1u, static_cast<UINT>(std::lround(p.fh * it->second.height)));
+                  createPanelImage(p, w, h);
+               }
+               if (it != surfaces.end() && it->second.copy && p.swapchain != XR_NULL_HANDLE && it->second.generation != p.copied)
+               {
+                  const Surface& surf = it->second;
+                  uint32_t index = 0;
+                  XrSwapchainImageAcquireInfo ai { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
+                  if (XR_SUCCEEDED(xrAcquireSwapchainImage_(p.swapchain, &ai, &index)))
+                  {
+                     XrSwapchainImageWaitInfo wi { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
+                     wi.timeout = XR_INFINITE_DURATION;
+                     xrWaitSwapchainImage_(p.swapchain, &wi);
+                     const UINT w = p.width, h = p.height;
+                     const UINT left = std::min<UINT>(static_cast<UINT>(std::lround(p.fx * surf.width)), surf.width), top = std::min<UINT>(static_cast<UINT>(std::lround(p.fy * surf.height)), surf.height);
+                     const D3D11_BOX box { left, top, 0, std::min(left + w, surf.width), std::min(top + h, surf.height), 1 };
+                     if (box.right > box.left && box.bottom > box.top)
+                        context->CopySubresourceRegion(p.images[index].texture, 0, 0, 0, 0, surf.copy.Get(), 0, &box);
+                     XrSwapchainImageReleaseInfo ri { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
+                     xrReleaseSwapchainImage_(p.swapchain, &ri);
+                     p.copied = surf.generation;
+                     if (!p.shown)
+                     {
+                        p.shown = true;
+                        say("image " + p.role + " (rendu pour le casque)");
+                     }
+                  }
+               }
+            }
+            const Output* o = p.output >= 0 && p.surface.empty() ? &outputs[p.output] : nullptr;
             if (o && o->copy && o->format == DXGI_FORMAT_B8G8R8A8_UNORM && o->generation != p.copied)
             {
                uint32_t index = 0;
@@ -1107,7 +1435,7 @@ int main(int argc, char** argv)
                }
             }
             // Rien encore de rendu au runtime : pas de panneau (il serait vide).
-            if (!p.shown)
+            if (!p.shown || p.swapchain == XR_NULL_HANDLE)
                continue;
 
             XrCompositionLayerQuad q { XR_TYPE_COMPOSITION_LAYER_QUAD };
@@ -1115,7 +1443,7 @@ int main(int argc, char** argv)
             q.space = base;
             q.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
             q.subImage.swapchain = p.swapchain;
-            q.subImage.imageRect = { { 0, 0 }, { static_cast<int32_t>(p.source.right - p.source.left), static_cast<int32_t>(p.source.bottom - p.source.top) } };
+            q.subImage.imageRect = { { 0, 0 }, { static_cast<int32_t>(p.width), static_cast<int32_t>(p.height) } };
             q.pose = compose(anchor, p.pose);
             q.size = p.size;
             quads.push_back(q);

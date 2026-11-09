@@ -521,14 +521,18 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
   return [...problems];
 })()`;
 
-/** Position des zones data-stable de la page, et ce qui doit être égal pour les comparer (taille, présentation). */
+/**
+ * Position des zones data-stable de la page, et ce qui doit être égal pour les comparer (taille,
+ * présentation). Un écran au repos pendant que le menu est dans le casque (frontend.css,
+ * in-headset) est une autre présentation : « casque » dans la forme.
+ */
 const STABLE = String.raw`(() => {
   const zones = {};
   for (const el of document.querySelectorAll('[data-stable]')) {
     const r = el.getBoundingClientRect();
     zones[el.dataset.stable] = [r.left, r.top, r.width, r.height].map((v) => Math.round(v * 2) / 2);
   }
-  const shape = [innerWidth, innerHeight, ...[...document.querySelectorAll('[data-stable-shape]')].map((e) => e.dataset.stableShape)].join(' ');
+  const shape = [innerWidth, innerHeight, document.documentElement.classList.contains('in-headset') ? 'casque' : '', ...[...document.querySelectorAll('[data-stable-shape]')].map((e) => e.dataset.stableShape)].join(' ');
   return { shape, zones };
 })()`;
 

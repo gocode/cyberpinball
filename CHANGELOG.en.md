@@ -25,6 +25,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - "Virtual reality" carries a "BETA" badge in the menu: the feature is still being tested.
 - In the headset: the playfield shows in portrait, as on the cabinet; the backglass, DMD and topper windows turn off during a game in VR; a VPX that freezes while quitting is closed cleanly.
 - In the headset, the menu's cabinet stays in its place in the room from one time to the next; the 5 key of the numeric keypad brings it back in front of you.
+- The menu is drawn specially for the headset: the playfield is in portrait there, while the PC keeps its menu in landscape. With the headset on, the PC screens go to rest and show "Dans le casque" (In the headset); with the headset off, or the Meta menu open, the PC takes over again.
 
 ## 0.1.8
 

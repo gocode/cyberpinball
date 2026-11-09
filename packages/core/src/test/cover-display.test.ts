@@ -38,6 +38,8 @@ test('chaque module qui crée une fenêtre la fait couvrir son écran par coverD
     'in-game-menu.ts': [/menuScreens\(/, /transparent: true,[\s\S]*?\.\.\.windowRect\(screen\.bounds\)/],
     // Le pointeur du téléphone : calque transparent posé sur la fenêtre « Récupérer », qui couvre déjà son écran.
     'remote-pointer.ts': [/parent,/, /transparent: true,/, /overlayContent\(win, parent\)/],
+    // Le menu dessiné pour le casque : rendu hors écran par nature (texture partagée), jamais montré.
+    'casque-vues.ts': [/show: false,/, /offscreen: \{ useSharedTexture: true \}/],
   };
   for (const s of creators) {
     if (notScreens[s.file]) for (const re of notScreens[s.file]!) assert.match(s.text, re, `${s.file} : fenêtre qui n'est pas un écran`);

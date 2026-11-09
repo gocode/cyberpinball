@@ -97,6 +97,18 @@ export function createWindow(options: BrowserWindowConstructorOptions): BrowserW
   // première image (mesures sur les vrais écrans, 24 octobre 2026). L'autre éclair, bleu pâle,
   // vient du plein écran : voir coverDisplay.
   // Une fenêtre montrée reste donc transparente jusqu'à sa première image : paintedOnScreen.
+  //
+  // Fenêtre rendue hors écran par nature (le menu dessiné pour le casque, casque-vues.ts : texture
+  // partagée) : jamais montrée, elle garde sa configuration et n'attend aucune image à l'écran.
+  if (options.webPreferences?.offscreen) {
+    const win = new BrowserWindow({ ...options, show: false, skipTaskbar: true, focusable: false });
+    noteTaskbarButton(win, options.skipTaskbar);
+    if (OFFSCREEN) {
+      keepOffscreen(win);
+      startWatch();
+    }
+    return win;
+  }
   if (!OFFSCREEN) {
     const win = new BrowserWindow({ ...options, backgroundMaterial: 'none' });
     trackPainting(win);
@@ -266,6 +278,15 @@ export function windowRect(physical: Rect): Rectangle {
  */
 export function desktopDisplays(): Display[] {
   return OFFSCREEN ? [] : screen.getAllDisplays();
+}
+
+/**
+ * Zone de travail de l'écran principal du poste (sans la barre des tâches) : Windows y ramène toute
+ * fenêtre, même cachée ou rendue hors écran (casque-vues.ts). Toujours celle du vrai poste, même
+ * avec des écrans simulés : c'est lui qui borne la fenêtre.
+ */
+export function primaryWorkArea(): { width: number; height: number } {
+  return screen.getPrimaryDisplay().workAreaSize;
 }
 
 /** Rectangle de l'écran principal, en coordonnées Electron. */

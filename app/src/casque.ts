@@ -11,14 +11,21 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { headsetPanels, headsetProtocol, headsetScene, sceneProtocol, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type Rotation } from '@cyberpinball/core';
+import { headsetPanels, headsetProtocol, headsetScene, sceneProtocol, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
+import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
 
 const EXE = 'cyberpinball-casque.exe';
+/**
+ * Essai sans casque (CYBERPINBALL_CASQUE_ESSAI : un dossier) : le compagnon tourne en
+ * --essai-surfaces, même hors écran, et écrit dans ce dossier ce que le casque recevrait.
+ */
+export const HEADSET_TRIAL_DIR = process.env.CYBERPINBALL_CASQUE_ESSAI?.trim() || undefined;
 const RETRY_MS = 15_000;
 const STOP_TIMEOUT_MS = 4_000;
 /** Messages du compagnon gardés dans le journal (packages/casque-vr/src/casque.cpp). */
-const PROTOCOL = /^(pret|casque-absent|erreur|centre|image|scene|releve|instantane|fini)\b/;
+const PROTOCOL = /^(pret|casque-absent|erreur|centre|image|scene|releve|instantane|porte|fini)\b/;
 
 /** Le compagnon, s'il est là : fabriqué avec l'application, ou construit en développement. */
 export function headsetExe(appDir: string): string | undefined {
@@ -53,8 +60,15 @@ export interface HeadsetMenuOptions {
    * joueur au premier regard suivi.
    */
   placeFile?: string;
-  /** L'état a changé (montré, en attente, absent) : le menu se renvoie (détail de l'entrée, playfield tourné). */
+  /** L'état a changé (montré, en attente, absent ; casque porté ou non) : le menu se renvoie. */
   onStateChange?(): void;
+  /**
+   * Le compagnon démarre : les écrans rendus pour lui hors écran (casque-vues.ts) s'ouvrent ; pour
+   * chaque rôle, la page qui le porte et sa place dedans. Sans eux, il duplique les écrans du PC.
+   */
+  openViews?(): { role: RoleId; surface: RoleId; fx: number; fy: number; fw: number; fh: number }[];
+  /** Le compagnon s'arrête : ces écrans se ferment. */
+  closeViews?(): void;
   log(line: string): void;
 }
 
@@ -69,6 +83,14 @@ export class HeadsetMenu {
   private handingOver = false;
   private snapshotTaken = false;
   private shown: HeadsetMenuState = 'waiting';
+  /** Textures d'Electron confiées au compagnon : rendues (release) quand il les a copiées. */
+  private target: HandleTarget | undefined;
+  private frames = new Map<string, OffscreenSharedTexture>();
+  private frameCount = 0;
+  /** Casque porté, le menu dessiné dedans (compagnon : « porte 1 »). */
+  worn = false;
+  /** Au moins une image rendue pour le casque y est arrivée : les écrans du PC peuvent se reposer. */
+  viewsFlowing = false;
   /** Pour le détail de l'entrée « Réalité virtuelle » : montré, en attente du casque, ou compagnon absent. */
   state: HeadsetMenuState = 'waiting';
 
@@ -76,7 +98,7 @@ export class HeadsetMenu {
 
   /** Vérifie toutes les 2 s s'il faut le lancer ou l'arrêter. */
   watch(): void {
-    if (OFFSCREEN || this.timer) return;
+    if ((OFFSCREEN && !HEADSET_TRIAL_DIR) || this.timer) return;
     this.timer = setInterval(() => this.check(), 2_000);
     this.check();
   }
@@ -92,7 +114,7 @@ export class HeadsetMenu {
   }
 
   check(): void {
-    if (OFFSCREEN) return;
+    if (OFFSCREEN && !HEADSET_TRIAL_DIR) return;
     if (!this.opts.wanted()) {
       if (this.child && !this.handingOver) void this.stop();
       return;
@@ -120,6 +142,33 @@ export class HeadsetMenu {
     this.child?.stdin.write('recentrer\n');
   }
 
+  /**
+   * Une image d'un écran rendu pour le casque : son NT HANDLE est dupliqué dans le compagnon, puis
+   * la texture attend sa réponse « libre ». Un handle neuf à chaque image : Electron en ouvre un
+   * par image et Windows en recycle les numéros (26 numéros pour 120 images, mesuré) ; un même
+   * numéro ne désigne donc pas toujours la même texture.
+   */
+  relay(surface: RoleId, texture: OffscreenSharedTexture): void {
+    const child = this.child;
+    const nt = texture.textureInfo.handle?.ntHandle;
+    if (!child || !this.target || !nt || this.frames.size > 16) return texture.release();
+    const shared = this.target.share(nt.readBigUInt64LE(0));
+    if (shared === undefined) return texture.release();
+    const frame = String(++this.frameCount);
+    this.frames.set(frame, texture);
+    try {
+      child.stdin.write(`texture ${surface} ${frame} ${shared} ${texture.textureInfo.codedSize.width} ${texture.textureInfo.codedSize.height}\n`);
+    } catch {
+      this.frames.delete(frame);
+      texture.release();
+    }
+  }
+
+  private releaseFrames(): void {
+    for (const texture of this.frames.values()) texture.release();
+    this.frames.clear();
+  }
+
   /** La table choisie a changé de teinte : la scène est renvoyée avec le nouveau halo (borne en volume, casque-scene.ts). */
   tintChanged(): void {
     const tint = this.opts.tint();
@@ -138,7 +187,7 @@ export class HeadsetMenu {
 
   private start(): void {
     const exe = headsetExe(this.opts.appDir);
-    const loader = this.opts.loader();
+    const loader = HEADSET_TRIAL_DIR ? 'essai' : this.opts.loader();
     if (!exe || !loader) {
       if (this.state !== 'missing') this.opts.log(`Casque : ${!exe ? 'compagnon absent (npm run casque-vr)' : 'chargeur OpenXR de VPX introuvable'}.`); // i18n-ignore : journal
       this.state = 'missing';
@@ -147,7 +196,7 @@ export class HeadsetMenu {
     }
     const panels = headsetPanels(this.opts.sources(), this.opts.playfieldRotation());
     if (!panels.length) return;
-    const child = spawn(exe, ['--chargeur', loader], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+    const child = spawn(exe, HEADSET_TRIAL_DIR ? ['--essai-surfaces', HEADSET_TRIAL_DIR] : ['--chargeur', loader], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     this.child = child;
     this.state = 'waiting';
     let buffer = '';
@@ -160,8 +209,23 @@ export class HeadsetMenu {
         buffer = buffer.slice(nl + 1);
         // Seulement les messages du compagnon : le runtime de Meta écrit aussi sur sa sortie, des
         // dizaines de lignes à chaque session (RipcClient, RuntimeIPC…).
+        // « libre <image> » : le compagnon a copié l'image, Electron reprend sa texture (pas au journal).
+        const free = /^libre (\S+)/.exec(line);
+        if (free) {
+          this.frames.get(free[1]!)?.release();
+          this.frames.delete(free[1]!);
+          if (!this.viewsFlowing) {
+            this.viewsFlowing = true;
+            this.opts.onStateChange?.();
+          }
+          continue;
+        }
         if (!PROTOCOL.test(line)) continue;
         if (line.startsWith('pret')) this.setState('shown');
+        if (line.startsWith('porte ')) {
+          this.worn = line === 'porte 1';
+          this.opts.onStateChange?.();
+        }
         // « centre x z lacet yeux=… » : la nouvelle place de la borne, gardée (dans la pièce seulement).
         const centre = /^centre (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)(?!.*sans-piece)/.exec(line);
         if (centre) this.writePlace({ x: Number(centre[1]), z: Number(centre[2]), yaw: Number(centre[3]) });
@@ -185,12 +249,29 @@ export class HeadsetMenu {
     child.on('exit', (code) => {
       if (this.child === child) this.child = undefined;
       this.handingOver = false;
+      this.worn = false;
+      this.viewsFlowing = false;
+      this.releaseFrames();
+      this.target?.close();
+      this.target = undefined;
+      this.opts.closeViews?.();
+      this.opts.onStateChange?.();
       if (this.state === 'shown') this.setState('waiting');
       // Casque absent ou session perdue : nouvel essai plus tard ; arrêt demandé : rien.
       if (code !== 0) this.retryAt = Date.now() + RETRY_MS;
     });
     this.panels = panels;
+    this.target = child.pid ? openHandleTarget(child.pid) : undefined;
     for (const line of headsetProtocol(panels).filter((l) => l !== 'fin')) child.stdin.write(`${line}\n`);
+    // Écrans rendus pour le casque (sans eux, ou sans droit sur le processus : duplication des écrans du PC).
+    if (this.target) {
+      try {
+        const f = (v: number) => Math.max(0, Math.min(1, v)).toFixed(6);
+        for (const s of this.opts.openViews?.() ?? []) child.stdin.write(`source ${s.role} ${s.surface} ${f(s.fx)} ${f(s.fy)} ${f(s.fw)} ${f(s.fh)}\n`);
+      } catch (error) {
+        this.opts.log(`Casque : écrans pour le casque pas ouverts (${(error as Error).message}) ; duplication des écrans du PC.`); // i18n-ignore : journal
+      }
+    }
     const place = this.readPlace();
     if (place) child.stdin.write(`ancre ${place.x} ${place.z} ${place.yaw}\n`);
     this.sendScene(child, this.opts.tint());

@@ -4,6 +4,8 @@ export const messages: Record<string, string> = {
   'Réalité virtuelle': 'Virtual reality',
   // app/src/library.ts : badge d'une entrée de menu en plein essai
   BÊTA: 'BETA',
+  // app/renderer/frontend.js : écran du PC au repos pendant que le menu est dans le casque
+  'Dans le casque': 'In the headset',
   'Aucun logiciel de casque installé (runtime OpenXR) : Meta Quest Link, SteamVR ou Virtual Desktop': 'No headset software installed (OpenXR runtime): Meta Quest Link, SteamVR or Virtual Desktop',
   'Le runtime OpenXR déclaré est introuvable ({file}) : réinstallez le logiciel du casque': 'The declared OpenXR runtime cannot be found ({file}): reinstall the headset software',
   'Réalité virtuelle : indisponible': 'Virtual reality: unavailable',

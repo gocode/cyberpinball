@@ -261,7 +261,8 @@ import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from '.
 import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { centerWhenStarted, prepareVrGame, probeVr, readVrMode, rememberVrSettings, writeVrMode, type VrGame } from './vr';
-import { HeadsetMenu } from './casque';
+import { HEADSET_TRIAL_DIR, HeadsetMenu } from './casque';
+import { closeHeadsetViews, isHeadsetView, openHeadsetViews, sendToHeadsetViews, setHeadsetPainting, type HeadsetPage } from './casque-vues';
 import { createLiveScoresMenu } from './live-scores-menu';
 import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
 import { createSocialNet } from './social-net';
@@ -525,6 +526,8 @@ let state: State = { phase: 'menu', index: 0, help: false };
 let windowRoles = new Map<RoleId, RoleId[]>();
 /** Zone de chaque rôle à l'écran, en pixels physiques : pour savoir lesquels VPX occupe pendant la partie. */
 let roleRects: RoleRect[] = [];
+/** Les pages du menu, écran par écran (pixels physiques) : rendues aussi pour le casque (casque-vues.ts). */
+let headsetPages: HeadsetPage[] = [];
 /** Rôles que VPX occupe pendant la partie (sa fenêtre passe devant la nôtre) : figés, quel que soit le réglage. */
 let occupied = new Set<RoleId>();
 /** Écrans que VPX a occupés depuis le début de la partie en cours : la bande ne s'y pose plus. */
@@ -1895,13 +1898,17 @@ export function startFrontend(): void {
   // pour la musique du menu), qu'avec ces permissions ; les pages du menu sont locales.
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'media' || permission === 'speaker-selection');
   ipcMain.on('ready', (event) => {
+    // Une fenêtre rendue pour le casque : elle reçoit l'état, sans compter pour l'ouverture.
+    if (isHeadsetView(event.sender)) return broadcast();
     if (introRun.active) introWindowReady(event.sender.id);
     broadcast();
     // Fenêtre (re)chargée : elle n'a pas encore l'image du DMD vivant.
     liveDmd.resend();
   });
-  ipcMain.on('media-error', (_event, error: MediaErrorReport) => recordMediaError(error));
-  ipcMain.on('action', (_event, action: UiAction) => {
+  ipcMain.on('media-error', (event, error: MediaErrorReport) => !isHeadsetView(event.sender) && recordMediaError(error));
+  ipcMain.on('action', (event, action: UiAction) => {
+    // Les fenêtres du casque ne reçoivent aucun geste ; leurs mesures ne valent pas pour les écrans.
+    if (isHeadsetView(event.sender)) return;
     // Mesure du texte par le rendu (zone de lecture) : pas un geste, elle ne réveille rien.
     if (action.type === 'reading') return library.handleAction(action);
     // Un clic en mode attente y met fin, sans autre effet ; de même pour le préavis d'arrêt de l'horaire.
@@ -2025,7 +2032,7 @@ export function startFrontend(): void {
   openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
   headset = new HeadsetMenu({
     appDir: path.join(__dirname, '..'),
-    wanted: () => vrMode === 'auto' && !headsetPaused && !closing && probeVr().ready,
+    wanted: () => !headsetPaused && !closing && (Boolean(HEADSET_TRIAL_DIR) || (vrMode === 'auto' && probeVr().ready)),
     loader: () => {
       const exe = vpxInstall(loc)?.exe;
       const loader = exe && path.join(path.dirname(exe), 'openxr_loader64.dll');
@@ -2036,7 +2043,26 @@ export function startFrontend(): void {
     tint: () => tints?.current()?.color,
     snapshotDir: path.join(loc.dataDir, 'logs', 'casque'),
     placeFile: path.join(loc.dataDir, 'vr', 'casque.json'),
-    onStateChange: () => broadcast(),
+    onStateChange: () => {
+      // Casque porté : les écrans rendus pour lui dessinent, ceux du PC se reposent ; retiré, l'inverse.
+      setHeadsetPainting(Boolean(headset?.worn));
+      broadcast();
+    },
+    openViews: () => {
+      openHeadsetViews(headsetPages, {
+        appDir: path.join(__dirname, '..'),
+        playfieldRotation: headsetTurn(),
+        onTexture: (surface, texture) => (headset ? headset.relay(surface, texture) : texture.release()),
+        log: (line) => console.log(line),
+      });
+      // Chaque rôle : la page qui le porte, et sa place dedans.
+      return roleRects.flatMap(({ role, rect }) => {
+        const page = headsetPages.find((p) => p.role === role) ?? headsetPages.find((p) => rect.x >= p.bounds.x && rect.y >= p.bounds.y && rect.x + rect.width <= p.bounds.x + p.bounds.width && rect.y + rect.height <= p.bounds.y + p.bounds.height);
+        const b = page?.bounds;
+        return page && b ? [{ role, surface: page.role, fx: (rect.x - b.x) / b.width, fy: (rect.y - b.y) / b.height, fw: rect.width / b.width, fh: rect.height / b.height }] : [];
+      });
+    },
+    closeViews: () => closeHeadsetViews(),
     log: (line) => console.log(line),
   });
   headset.watch();
@@ -2264,6 +2290,7 @@ function openWindows(assignments: Partial<Record<RoleId, ObservedDisplay>>, zone
     });
     return [...own, ...parts];
   });
+  headsetPages = surfaces.map((s) => ({ role: s.role, bounds: { ...s.display.bounds }, parts: s.parts, ...(s.playfield ? { playfield: s.playfield } : {}) }));
   // Sans playfield retrouvé, le menu s'affiche quand même sur l'écran principal.
   const pages = [
     ...(assignments.playfield ? [] : [{ role: 'playfield' as RoleId, bounds: primaryRect(), parts: [] as ScreenSurface['parts'], playfield: undefined }]),
@@ -3624,8 +3651,6 @@ function viewFor(role: RoleId) {
       : [];
   return {
     role,
-    // Menu montré dans le casque : le playfield se dessine en portrait (headsetTurn), le panneau du casque aussi.
-    ...(role === 'playfield' && headset?.state === 'shown' && headsetTurn() !== rotation && { turn: headsetTurn() }),
     phase: state.phase,
     help: state.help,
     count: list.length,
@@ -3990,14 +4015,17 @@ function followTint(): void {
 }
 
 function broadcast(): void {
+  // Casque porté et ses écrans rendus pour lui : ceux du PC n'affichent plus que « Dans le casque ».
+  const inHeadset = Boolean(headset?.worn && headset.viewsFlowing);
   followTint();
   syncLiveDmd();
   // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).
   attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !desktop.active);
   if (!attract.active) attractIndex = undefined;
   for (const [role, win] of windows) {
-    if (!win.isDestroyed()) win.webContents.send('state', viewFor(role));
+    if (!win.isDestroyed()) win.webContents.send('state', inHeadset ? { ...viewFor(role), inHeadset: true } : viewFor(role));
   }
+  sendToHeadsetViews((role) => viewFor(role));
   // Télécommande du téléphone : le QR vit tant que l'écran qui le montre est affiché ; le téléphone suit l'écran.
   const surfaces = state.phase === 'library' && !desktop.active ? library.remoteSurfaces() : { menu: false, keyboard: false };
   phoneRemote.show('menu', surfaces.menu);

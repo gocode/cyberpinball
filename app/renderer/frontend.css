@@ -3430,3 +3430,24 @@ html.in-game .zone {
   font-size: 1.9cqmin;
   box-shadow: 0 0 0 0.2cqmin var(--tone, var(--meta));
 }
+
+/*
+ * Menu montré dans le casque (casque-vues.ts) : l'écran du PC se repose. Rien n'y est plus dessiné
+ * (le menu est rendu à part pour le casque), seul un mot au centre dit où il est.
+ */
+html.in-headset body > :not(#headset-rest) {
+  display: none;
+}
+
+#headset-rest {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  font-size: 4vmin;
+  font-weight: 600;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
