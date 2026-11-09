@@ -18,6 +18,7 @@ import {
   applyOps,
   attachFile,
   cabinetScreens,
+  devOptionOpen,
   catalog,
   CATALOG_KIND_LABELS,
   CATALOG_KINDS,
@@ -186,6 +187,7 @@ export interface CatalogContext {
 /** Jeux par page du catalogue : une page tient sur l'écran, cartes et vignettes comprises. */
 const PAGE = 12;
 
+
 const SORTS: CatalogSort[] = ['name', 'recent'];
 /** Filtres par défaut : tous les jeux pas encore installés, par titre. */
 const DEFAULT_FILTER = { kind: 'all', support: 'any', site: 'all', state: 'missing', sort: 'name' } as const;
@@ -297,6 +299,9 @@ export function createCatalog(ctx: CatalogContext) {
   const dataDir = () => host.dataDir;
   const waitList = () => (list ??= loadWaitList(dataDir()));
   const save = () => saveWaitList(dataDir(), waitList());
+  // « Téléchargement direct » : réglage masqué, ouvert par un accès développeur signé (dev-access.ts).
+  // Sans lui, « Récupérer » ouvre toujours la page ; un choix déjà enregistré est gardé, sans effet.
+  const directShown = () => devOptionOpen(dataDir(), 'telechargement-direct');
   const acquisitionDir = () => path.join(ctx.layout()!.downloads, 'acquisition');
   const userDownloads = () => ctx.downloadsDir?.() ?? app.getPath('downloads');
 
@@ -1119,7 +1124,7 @@ export function createCatalog(ctx: CatalogContext) {
       after();
     };
     const site = siteOfUrl(url);
-    if (!waitList().directDownload || !site) return showPage();
+    if (!waitList().directDownload || !directShown() || !site) return showPage();
     void ctx.task(t('Téléchargement direct depuis {site}…', { site: site.label }), async () => {
       if (!siteState(site, await acquirer.siteCookies(site.domain)).connected) {
         return showPage(t('vous n’êtes pas connecté à {site} : connectez-vous dans cette page (ou dans « Comptes des sites »), puis téléchargez.', { site: site.label }));
@@ -2008,8 +2013,9 @@ export function createCatalog(ctx: CatalogContext) {
           },
     );
     const direct = l.directDownload === true;
-    actions.push(
-      {
+    const directOpen = directShown();
+    if (directOpen) {
+      actions.push({
         label: direct ? t('Téléchargement direct : oui') : t('Téléchargement direct : non'),
         detail: direct ? t('« Récupérer » télécharge sans montrer la page quand vous êtes connecté') : t('« Récupérer » ouvre la page ; vous cliquez vous-même'),
         run: () => {
@@ -2017,7 +2023,9 @@ export function createCatalog(ctx: CatalogContext) {
           save();
           openAccounts(ctx.cursor());
         },
-      },
+      });
+    }
+    actions.push(
       {
         ...adBlockLabel(adBlocker.state()),
         run: () => {
@@ -2042,7 +2050,9 @@ export function createCatalog(ctx: CatalogContext) {
     return {
       heading: t('Comptes des sites'),
       subheading: tn(states.filter((s) => s.state.connected).length, '{n} connecté sur {total}', '{n} connectés sur {total}', { total: states.length }),
-      lead: t('Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. Avec le téléchargement direct, « Récupérer » télécharge le fichier sans montrer la page, et ouvre la page dès que le site demande quelque chose (vérification, choix, délai).'),
+      lead: directOpen
+        ? t('Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. Avec le téléchargement direct, « Récupérer » télécharge le fichier sans montrer la page, et ouvre la page dès que le site demande quelque chose (vérification, choix, délai).')
+        : t('Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. « Récupérer » ouvre la page du site, et c’est vous qui cliquez sur Télécharger.'),
       sections: [...noticeSection(), { rows }],
       actions,
       back: () => ctx.home(),

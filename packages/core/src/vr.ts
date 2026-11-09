@@ -174,13 +174,30 @@ export function vrCarriedSettings(text: string): VpxSetting[] {
   );
 }
 
+/**
+ * Le menu dans le casque (app/src/casque.ts) : montré, en attente du casque (Link pas lancé), ou
+ * impossible faute du compagnon natif (application fabriquée sans les outils C++).
+ */
+export type HeadsetMenuState = 'shown' | 'waiting' | 'missing';
+
 /** Libellé et détail de l'entrée « Réalité virtuelle » du menu système. */
-export function vrMenuText(mode: VrMode, readiness: VrReadiness): { label: string; detail: string; unavailable: boolean } {
+export function vrMenuText(mode: VrMode, readiness: VrReadiness, headset?: HeadsetMenuState): { label: string; detail: string; unavailable: boolean } {
   if (!readiness.ready) return { label: t('Réalité virtuelle : indisponible'), detail: readiness.reason, unavailable: true };
+  const menu =
+    headset === 'shown'
+      ? t('menu de Cyber Pinball dans le casque')
+      : headset === 'waiting'
+        ? t('menu dans le casque dès qu’il est prêt')
+        : headset === 'missing'
+          ? t('menu dans le casque indisponible : compagnon absent de cette version')
+          : undefined;
   return mode === 'auto'
     ? {
         label: t('Réalité virtuelle : activée'),
-        detail: t('{runtime} · les tables se lancent dans le casque quand il est prêt, sinon sur les écrans ; choisir pour désactiver', { runtime: readiness.runtime }),
+        detail: [
+          t('{runtime} · les tables se lancent dans le casque quand il est prêt, sinon sur les écrans ; choisir pour désactiver', { runtime: readiness.runtime }),
+          ...(menu ? [menu] : []),
+        ].join(' · '),
         unavailable: false,
       }
     : {

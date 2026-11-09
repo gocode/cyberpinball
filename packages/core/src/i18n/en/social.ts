@@ -185,7 +185,7 @@ export const messages: Record<string, string> = {
   'Partage désactivé': 'Sharing off',
   'Personne ne vous voit ; vos amis vous voient hors ligne': 'Nobody sees you; your friends see you offline',
   'Votre nom : {name}': 'Your name: {name}',
-  'Visible dans l’annuaire ; l’étiquette #{tag} vient de la clé de cette borne': 'Shown in the directory; the #{tag} tag comes from this cabinet’s key',
+  'Visible dans l’annuaire ; l’étiquette #{tag} vient de la clé de cette borne (empreinte {fingerprint})': 'Shown in the directory; the #{tag} tag comes from this cabinet’s key (fingerprint {fingerprint})',
   'Réseau local : activé': 'Local network: on',
   'Réseau local : indisponible': 'Local network: unavailable',
   'Indisponible': 'Unavailable',

@@ -24,6 +24,7 @@ import {
   NAME_MAX,
   NAME_MIN,
   playDuration,
+  playerFingerprint,
   presenceTableLabel,
   relationOf,
   searchDirectory,
@@ -637,7 +638,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const lanDown = lanProblem();
     const rows: Row[] = [
       s.enabled ? { text: t('Partage activé'), detail: status.mode === 'off' ? t('Réseau coupé pendant les essais sans opérateur') : status.running ? tn(status.peers, 'Relié à {n} borne', 'Relié à {n} bornes') : status.error ? t('Réseau indisponible : {error}', { error: status.error }) : t('Connexion au réseau…'), tone: 'ok', badges: [t('Activé')], icon: 'network' } : { text: t('Partage désactivé'), detail: t('Personne ne vous voit ; vos amis vous voient hors ligne'), tone: 'warning', badges: [t('Désactivé')], icon: 'network' },
-      { text: t('Votre nom : {name}', { name: name(s.key.publicKey, s.name) }), detail: t('Visible dans l’annuaire ; l’étiquette #{tag} vient de la clé de cette borne', { tag: name(s.key.publicKey, '').split('#')[1]! }), icon: 'friend-list' },
+      { text: t('Votre nom : {name}', { name: name(s.key.publicKey, s.name) }), detail: t('Visible dans l’annuaire ; l’étiquette #{tag} vient de la clé de cette borne (empreinte {fingerprint})', { tag: name(s.key.publicKey, '').split('#')[1]!, fingerprint: playerFingerprint(s.key.publicKey) }), icon: 'friend-list' },
       { text: s.avatar ? t('Votre avatar : une image à vous') : t('Votre avatar : vos initiales'), detail: t('Vu par vos amis et les joueurs d’une demande en cours ; « Changer d’avatar… » le montre'), icon: 'avatar' },
       s.lan && lanDown
         ? { text: t('Réseau local : indisponible'), detail: t('{reason} · Internet continue sans lui ; nouvel essai tout seul', { reason: lanDown }), tone: 'warning', badges: [t('Indisponible')], icon: 'monitor' }

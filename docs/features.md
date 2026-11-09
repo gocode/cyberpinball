@@ -516,7 +516,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **A game that fails says why**: an error in the table's script (line and message) or a VPX exit explained, and Start plays the table again or opens "What's missing to play".
 - **Old scripts fixed** without modifying the table (for example a `vpmInit` called twice, which VPX 10.8 rejects).
 - **Statistics kept** for each table: number of games, play time.
-- **Virtual reality** (System menu > Cabinet): with a headset (Meta Quest through Link or Virtual Desktop, SteamVR), tables start in the headset when it is ready, otherwise on the screens, never with a VPX question. The backglass shows above the playfield of tables without a VR room, the table's position is kept from one game to the next, and both MagnaSave buttons open the VPX menu in the headset.
+- **Virtual reality** (System menu > Cabinet): with a headset (Meta Quest through Link or Virtual Desktop, SteamVR), tables start in the headset when it is ready, otherwise on the screens, never with a VPX question. The backglass shows above the playfield of tables without a VR room, the table's position is kept from one game to the next, and both MagnaSave buttons open the VPX menu in the headset. Between games, the Cyber Pinball menu also shows in the headset, laid out as a cabinet (playfield lying flat, DMD, backglass and topper upright), at the screens' real size.
 
 ## A cabinet that looks after itself
 

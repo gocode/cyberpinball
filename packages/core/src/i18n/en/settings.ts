@@ -9,6 +9,9 @@ export const messages: Record<string, string> = {
   'Réalité virtuelle : désactivée': 'Virtual reality: off',
   '{runtime} · les tables se lancent dans le casque quand il est prêt, sinon sur les écrans ; choisir pour désactiver': '{runtime} · tables start in the headset when it is ready, otherwise on the screens; choose to turn off',
   '{runtime} installé · choisir pour jouer dans le casque quand il est branché': '{runtime} installed · choose to play in the headset when it is connected',
+  'menu de Cyber Pinball dans le casque': 'Cyber Pinball menu in the headset',
+  'menu dans le casque dès qu’il est prêt': 'menu in the headset as soon as it is ready',
+  'menu dans le casque indisponible : compagnon absent de cette version': 'menu in the headset unavailable: companion missing from this version',
   // app/src/settings.ts (et app/renderer/settings.html, titre de la page)
   'Cyber Pinball — Réglages': 'Cyber Pinball — Settings',
   'Retour aux sections': 'Back to sections',

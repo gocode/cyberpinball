@@ -36,6 +36,7 @@ import {
   navigationButtons,
   navigationProblems,
   type ButtonsSource,
+  type HeadsetSource,
   type NavigationButtons,
   joysticksInVpxLog,
   joysticksUnseenByVpx,
@@ -253,6 +254,7 @@ import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from '.
 import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { prepareVrGame, probeVr, readVrMode, rememberVrSettings, writeVrMode, type VrGame } from './vr';
+import { HeadsetMenu } from './casque';
 import { createLiveScoresMenu } from './live-scores-menu';
 import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
 import { createSocialNet } from './social-net';
@@ -1589,12 +1591,16 @@ library.provideSystemItem('quiet-in-game', {
 // « Réalité virtuelle » (Menu système > Borne, vr.ts) : désactivée, ou les tables dans le casque quand il
 // est prêt. Sans runtime OpenXR, l'entrée reste visible, grisée avec sa raison ; Start n'y change rien.
 let vrMode = readVrMode(loc.dataDir);
+// Le menu dans le casque (casque.ts) : les écrans de la borne montrés dans le casque, hors partie.
+let headset: HeadsetMenu | undefined;
+/** Partie en cours : le casque est à VPX. */
+let headsetPaused = false;
 library.provideSystemItem('vr', {
   get label() {
     return vrMenuText(vrMode, probeVr()).label;
   },
   get detail() {
-    return vrMenuText(vrMode, probeVr()).detail;
+    return vrMenuText(vrMode, probeVr(), headset?.state).detail;
   },
   get tone() {
     return vrMenuText(vrMode, probeVr()).unavailable ? ('quiet' as const) : undefined;
@@ -1608,6 +1614,22 @@ library.provideSystemItem('vr', {
     library.openSystem();
   },
 });
+
+/**
+ * Ce que le casque montre (casque.ts) : chaque rôle du menu, son rectangle sur le bureau et la
+ * taille réelle de son écran (modèle de la borne).
+ */
+function headsetSources(): HeadsetSource[] {
+  const cabinet = loadCabinet(loc.dataDir);
+  return roleRects.map(({ role, rect }) => {
+    const screen = cabinet?.screens.find((s) => s.fingerprint === cabinet.roles[role]);
+    return {
+      role,
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      ...(screen && { screenCm: { width: screen.widthCm, height: screen.heightCm }, screenPx: { width: screen.widthPx, height: screen.heightPx } }),
+    };
+  });
+}
 
 /**
  * Partie en VR (vr.ts) : l'INI préparé pour VPX, ou undefined (désactivée, aucun runtime OpenXR,
@@ -1933,6 +1955,7 @@ export function startFrontend(): void {
   }
   app.on('before-quit', () => {
     closing = true;
+    headset?.dispose();
     // Le téléphone apprend que Cyber Pinball se ferme ; plus rien n'écoute.
     phoneRemote.close();
     cabinetVolume?.stop();
@@ -1953,6 +1976,19 @@ export function startFrontend(): void {
 
   menuAssignments = choose ? {} : assignments;
   openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
+  headset = new HeadsetMenu({
+    appDir: path.join(__dirname, '..'),
+    wanted: () => vrMode === 'auto' && !headsetPaused && !closing && probeVr().ready,
+    loader: () => {
+      const exe = vpxInstall(loc)?.exe;
+      const loader = exe && path.join(path.dirname(exe), 'openxr_loader64.dll');
+      return loader && fs.existsSync(loader) ? loader : undefined;
+    },
+    sources: () => headsetSources(),
+    playfieldRotation: () => rotation,
+    log: (line) => console.log(line),
+  });
+  headset.watch();
   // Horaire de la borne : nuit et arrêt programmé, d'après les réglages de medias.json.
   hours.start();
   // Réseau des bornes : présence aux amis, annuaire ; un échec s'affiche dans « Partage et réseau ».
@@ -2764,6 +2800,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Réalité virtuelle (vr.ts) : activée et un runtime OpenXR présent, VPX reçoit un INI à part, la VR
   // en « Autodetect » (dans le casque s'il est prêt, sinon sur les écrans). Jamais pour régler l'affichage.
   const vrGame = simulated === undefined && !displayMode ? prepareVr(played.file, double?.ini) : undefined;
+  // Le menu dans le casque rend la main : VPX ouvre sa propre session OpenXR. Sans l'attendre : la
+  // session du compagnon se ferme en une seconde, VPX n'ouvre la sienne qu'une fois la table chargée.
+  if (simulated === undefined && headset?.running) {
+    headsetPaused = true;
+    void headset.stop();
+  }
   let playedVr = false;
   // La fenêtre de jeu est l'aperçu de la VR (launcher.ts) : la partie est dans le casque.
   const onVr = () => void (playedVr = true);
@@ -2834,6 +2876,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (watchLive) clearInterval(watchLive);
   gameNotices.close();
   inGameMenu.disarm();
+  headsetPaused = false;
   // Arrêté pendant le chargement : ni partie comptée, ni message d'échec, la roue.
   const stoppedLoading = launch?.stopped === true;
   endLaunch();

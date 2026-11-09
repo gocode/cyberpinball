@@ -75,6 +75,18 @@ for (const name of fs.readdirSync(installerDir)) {
   if (name.endsWith('.json') && name !== 'package.json' && name !== 'tsconfig.json') fs.copyFileSync(from, path.join(stage, name));
   if (name === 'vpx-settings') copyTree(from, path.join(stage, name));
 }
+// Compagnon « menu dans le casque » (packages/casque-vr, app/src/casque.ts) : construit ici quand
+// CMake et les outils C++ de Visual Studio sont là. Sans eux, l'application part sans lui, et le
+// menu dans le casque le dit (« compagnon absent »).
+{
+  const { buildHeadset } = await import('./casque-vr.mjs');
+  const exe = buildHeadset({ quiet: true });
+  if (exe) {
+    fs.mkdirSync(path.join(stage, 'natif'), { recursive: true });
+    fs.copyFileSync(exe, path.join(stage, 'natif', path.basename(exe)));
+    console.log('Compagnon du casque : natif\\' + path.basename(exe));
+  }
+}
 // koffi et son binaire natif, livré à part dans un paquet propre à la plateforme
 // (seul celui de win32-x64 est copié). Du paquet koffi, on ne garde que le
 // JavaScript chargé à l'exécution : ni sources C++, ni en-têtes, ni documentation.

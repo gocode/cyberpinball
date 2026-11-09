@@ -109,6 +109,11 @@ test('l’entrée « Réalité virtuelle » de la rubrique Borne : grisée avec 
   assert.equal(off.label, 'Réalité virtuelle : désactivée');
   assert.match(off.detail, /^Meta Quest Link installé/);
   assert.equal(vrMenuText('auto', { ready: true, runtime: 'SteamVR' }).label, 'Réalité virtuelle : activée');
+  // Le menu dans le casque : son état suit le détail, seulement quand la VR est activée.
+  assert.match(vrMenuText('auto', { ready: true, runtime: 'Meta Quest Link' }, 'shown').detail, / · menu de Cyber Pinball dans le casque$/);
+  assert.match(vrMenuText('auto', { ready: true, runtime: 'Meta Quest Link' }, 'waiting').detail, /dès qu’il est prêt$/);
+  assert.match(vrMenuText('auto', { ready: true, runtime: 'Meta Quest Link' }, 'missing').detail, /compagnon absent/);
+  assert.doesNotMatch(vrMenuText('off', { ready: true, runtime: 'Meta Quest Link' }, 'missing').detail, /compagnon/);
   const blocked = vrMenuText('auto', { ready: false, reason: 'raison' });
   assert.deepEqual(blocked, { label: 'Réalité virtuelle : indisponible', detail: 'raison', unavailable: true });
 });

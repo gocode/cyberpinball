@@ -41,6 +41,7 @@
     "fabriquer": "node scripts/fabriquer.mjs",
     "installeur": "node scripts/fabriquer.mjs --installeur",
     "deployer": "node scripts/fabriquer.mjs --deployer",
+    "casque-vr": "node scripts/casque-vr.mjs",
     "publier": "node scripts/publier.mjs",
     "envoyer": "node scripts/envoyer-github.mjs",
     "decrire": "node scripts/decrire-github.mjs"

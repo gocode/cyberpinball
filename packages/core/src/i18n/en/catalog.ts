@@ -196,6 +196,8 @@ export const messages: Record<string, string> = {
   '{n} connectés sur {total}': '{n} of {total} signed in',
   'Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. Avec le téléchargement direct, « Récupérer » télécharge le fichier sans montrer la page, et ouvre la page dès que le site demande quelque chose (vérification, choix, délai).':
     'Sign in once to each site, with your own account: the sign-in is kept from one start to the next, as in a browser. Cyber Pinball never sees or keeps any password. With direct download, “Get” downloads the file without showing the page, and opens the page as soon as the site asks for something (check, choice, wait).',
+  'Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. « Récupérer » ouvre la page du site, et c’est vous qui cliquez sur Télécharger.':
+    'Sign in once to each site, with your own account: the sign-in is kept from one start to the next, as in a browser. Cyber Pinball never sees or keeps any password. “Get” opens the site’s page, and you click Download yourself.',
   'Recherche des mises à jour…': 'Checking for updates…',
   'Réessayez quand la borne est reliée à Internet.': 'Try again once the cabinet is online.',
   'Mises à jour : table {n} sur {total}…': 'Updates: table {n} of {total}…',
