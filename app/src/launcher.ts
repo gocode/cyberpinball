@@ -13,13 +13,14 @@ import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { classifyVpxWindow, DIALOG_CLASS, t, VR_PREVIEW_TITLE } from '@cyberpinball/core';
+import { classifyVpxWindow, DIALOG_CLASS, t, VR_PREVIEW_TITLE, VPX_HUNG_EXIT_CODE } from '@cyberpinball/core';
 import {
   allowAnyForeground,
   bringToFront,
   closeWindow,
   foregroundWindow,
   hideWindow,
+  isHung,
   visibleWindowsOf,
   windowTexts,
   type WindowInfo,
@@ -29,6 +30,9 @@ const PLAYER_TITLE = 'Visual Pinball Player';
 /** En VR, la fenêtre de jeu est celle de l'aperçu (vr.ts) : la partie est dans le casque. */
 const GAME_TITLES = [PLAYER_TITLE, VR_PREVIEW_TITLE];
 const POLL_MS = 250;
+/** Partie dans le casque : temps de jeu avant de surveiller une fenêtre de VPX figée, puis durée du figement avant de le fermer. */
+const HUNG_GRACE_MS = 20_000;
+const HUNG_KILL_MS = 8_000;
 
 export type LaunchFailure = 'spawn' | 'timeout' | 'dialog' | 'crash';
 
@@ -104,6 +108,9 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   let message: string | undefined;
   let killTimer: NodeJS.Timeout | undefined;
   const notices: string[] = [];
+  /** Partie dans le casque : depuis quand la fenêtre de VPX ne répond plus, et si Cyber Pinball l'a fermé pour ça. */
+  let hungSince: number | undefined;
+  let hungKilled = false;
   /** Fenêtres déjà traitées (masquées, fermées ou signalées), par HWND. */
   const handled = new Set<bigint>();
 
@@ -162,6 +169,26 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
         }
       }
 
+      // Partie dans le casque : VPX 10.8.1 se fige en quittant (journal du 9 novembre 2026, trois
+      // parties sur trois, rien après la dernière image). Sa fenêtre ne répond plus depuis
+      // HUNG_KILL_MS, après que la partie a tourné un moment (un chargement long ne compte pas) :
+      // Cyber Pinball le ferme, au lieu de laisser Windows proposer « Fermer le programme ».
+      if (player?.title === VR_PREVIEW_TITLE && playingSince && Date.now() - playingSince > HUNG_GRACE_MS && !hungKilled) {
+        let hung = false;
+        try {
+          hung = isHung(player);
+        } catch {
+          hung = false;
+        }
+        if (!hung) hungSince = undefined;
+        else if (!hungSince) hungSince = Date.now();
+        else if (Date.now() - hungSince > HUNG_KILL_MS) {
+          hungKilled = true;
+          notices.push(t('VPX ne répondait plus dans le casque : Cyber Pinball l’a fermé.'));
+          child.kill();
+        }
+      }
+
       // VPX prend la main : sa fenêtre de jeu tient le premier plan (relu à chaque tour, dès qu'elle est là).
       if (player && !foreground && !failure && foregroundWindow()?.pid === child.pid) {
         foreground = true;
@@ -176,6 +203,9 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
       if (!failure && crash) {
         failure = 'crash';
         message = t("VPX s'est arrêté brutalement (rapport : {file}).", { file: crash });
+      } else if (!failure && exitCode === VPX_HUNG_EXIT_CODE) {
+        // « Fermer le programme » choisi dans la fenêtre « ne répond pas » de Windows : la partie a eu lieu.
+        notices.push(t('VPX ne répondait plus en quittant : Windows l’a fermé.'));
       } else if (!failure && exitCode !== 0 && exitCode !== null && !killTimer) {
         failure = 'crash';
         message = t("VPX s'est terminé avec le code {code}.", { code: exitCode });

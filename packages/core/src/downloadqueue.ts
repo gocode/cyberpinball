@@ -25,8 +25,8 @@ import { formatDateTime, formatNumber, t, tn } from './i18n';
 import { partSize } from './resumable';
 import { readJsonFile } from './store';
 
-/** D'où il vient : un ami, une page de site (navigateur intégré), une adresse directe. */
-export type DownloadSourceKind = 'friend' | 'site' | 'http';
+/** D'où il vient : un ami, une page de site (navigateur intégré), une adresse directe, YouTube par yt-dlp (Juke-box). */
+export type DownloadSourceKind = 'friend' | 'site' | 'http' | 'youtube';
 
 export interface DownloadSource {
   kind: DownloadSourceKind;
@@ -51,7 +51,9 @@ export type DownloadJobKind =
   /** Archive de VPX. */
   | 'component'
   /** yt-dlp, ou une vidéo qu'il récupère. */
-  | 'tool';
+  | 'tool'
+  /** Morceaux d'une playlist du Juke-box (son et vidéo muette, par yt-dlp : jukebox-youtube.ts). */
+  | 'jukebox';
 
 export type DownloadState = 'queued' | 'running' | 'waiting' | 'paused' | 'done' | 'failed' | 'cancelled';
 
@@ -124,6 +126,8 @@ export type DownloadReturn =
   | { screen: 'wait-list' }
   /** « Mise à jour de Cyber Pinball ». */
   | { screen: 'updates' }
+  /** Le Juke-box, sur une de ses playlists. */
+  | { screen: 'jukebox'; playlist?: string }
   /** Le gestionnaire lui-même : le repli de tous les autres. */
   | { screen: 'downloads' };
 
@@ -188,7 +192,7 @@ export function downloadQueueFile(dataDir: string): string {
 }
 
 const STATES: readonly DownloadState[] = ['queued', 'running', 'waiting', 'paused', 'done', 'failed', 'cancelled'];
-const SCREENS: readonly DownloadScreen[] = ['table-medias', 'game-parts', 'table-sheet', 'friend-library', 'wait-list', 'updates', 'downloads'];
+const SCREENS: readonly DownloadScreen[] = ['table-medias', 'game-parts', 'table-sheet', 'friend-library', 'wait-list', 'updates', 'jukebox', 'downloads'];
 
 function validJob(j: unknown): j is DownloadJob {
   if (!j || typeof j !== 'object') return false;
@@ -393,6 +397,8 @@ export function returnLabel(back: DownloadReturn, world: Pick<ReturnWorld, 'tabl
       return t('Liste d’attente');
     case 'updates':
       return t('Mise à jour de Cyber Pinball');
+    case 'jukebox':
+      return t('Juke-box');
     case 'downloads':
       return t('Téléchargements');
   }

@@ -18,7 +18,7 @@ const EXE = 'cyberpinball-casque.exe';
 const RETRY_MS = 15_000;
 const STOP_TIMEOUT_MS = 4_000;
 /** Messages du compagnon gardés dans le journal (packages/casque-vr/src/casque.cpp). */
-const PROTOCOL = /^(pret|casque-absent|erreur|centre|image|scene|fini)\b/;
+const PROTOCOL = /^(pret|casque-absent|erreur|centre|image|scene|releve|instantane|fini)\b/;
 
 /** Le compagnon, s'il est là : fabriqué avec l'application, ou construit en développement. */
 export function headsetExe(appDir: string): string | undefined {
@@ -41,6 +41,14 @@ export interface HeadsetMenuOptions {
   playfieldRotation(): Rotation;
   /** Teinte de la table choisie (#rrggbb), pour le halo des cadres ; undefined : la sarcelle. */
   tint(): string | undefined;
+  /**
+   * Dossier de l'instantané des panneaux (l'image de chaque écran telle qu'envoyée au casque), pris
+   * une fois par démarrage de Cyber Pinball, quelques secondes après les premières images : de quoi
+   * voir, après un essai, si un défaut vu dans le casque vient de l'image envoyée ou d'après.
+   */
+  snapshotDir?: string;
+  /** L'état a changé (montré, en attente, absent) : le menu se renvoie (détail de l'entrée, playfield tourné). */
+  onStateChange?(): void;
   log(line: string): void;
 }
 
@@ -51,6 +59,10 @@ export class HeadsetMenu {
   /** Panneaux et teinte de la scène envoyée au compagnon en cours. */
   private panels: HeadsetPanel[] = [];
   private sentTint: string | undefined;
+  /** Relève en cours : le compagnon garde le casque jusqu'à ce que VPX le prenne, et part seul. */
+  private handingOver = false;
+  private snapshotTaken = false;
+  private shown: HeadsetMenuState = 'waiting';
   /** Pour le détail de l'entrée « Réalité virtuelle » : montré, en attente du casque, ou compagnon absent. */
   state: HeadsetMenuState = 'waiting';
 
@@ -76,11 +88,26 @@ export class HeadsetMenu {
   check(): void {
     if (OFFSCREEN) return;
     if (!this.opts.wanted()) {
-      if (this.child) void this.stop();
+      if (this.child && !this.handingOver) void this.stop();
       return;
     }
     if (this.child || Date.now() < this.retryAt) return;
     this.start();
+  }
+
+  /**
+   * Une partie de VPX démarre : le compagnon garde le casque (borne, puis écran de chargement)
+   * jusqu'à ce que VPX le prenne, fond au noir et s'arrête de lui-même ; deux minutes au plus. Pas
+   * d'écran de Meta entre le menu et la table.
+   */
+  handOver(): void {
+    if (!this.child) return;
+    this.handingOver = true;
+    try {
+      this.child.stdin.write('releve\n');
+    } catch {
+      // Compagnon déjà parti.
+    }
   }
 
   recenter(): void {
@@ -128,8 +155,19 @@ export class HeadsetMenu {
         // Seulement les messages du compagnon : le runtime de Meta écrit aussi sur sa sortie, des
         // dizaines de lignes à chaque session (RipcClient, RuntimeIPC…).
         if (!PROTOCOL.test(line)) continue;
-        if (line.startsWith('pret')) this.state = 'shown';
-        if (line.startsWith('casque-absent')) this.state = 'waiting';
+        if (line.startsWith('pret')) this.setState('shown');
+        if (line.startsWith('casque-absent')) this.setState('waiting');
+        if (line.startsWith('image') && !this.snapshotTaken && this.opts.snapshotDir) {
+          this.snapshotTaken = true;
+          const dir = this.opts.snapshotDir;
+          setTimeout(() => {
+            try {
+              child.stdin.write(`instantane ${dir}\n`);
+            } catch {
+              // Compagnon parti entre-temps.
+            }
+          }, 8_000);
+        }
         this.opts.log(`Casque : ${line}`); // i18n-ignore : journal
       }
     });
@@ -137,7 +175,8 @@ export class HeadsetMenu {
     child.on('error', (error) => this.opts.log(`Casque : lancement impossible (${error.message}).`)); // i18n-ignore : journal
     child.on('exit', (code) => {
       if (this.child === child) this.child = undefined;
-      if (this.state === 'shown') this.state = 'waiting';
+      this.handingOver = false;
+      if (this.state === 'shown') this.setState('waiting');
       // Casque absent ou session perdue : nouvel essai plus tard ; arrêt demandé : rien.
       if (code !== 0) this.retryAt = Date.now() + RETRY_MS;
     });
@@ -146,6 +185,13 @@ export class HeadsetMenu {
     this.sendScene(child, this.opts.tint());
     child.stdin.write('fin\n');
     this.opts.log(`Casque : compagnon lancé, ${panels.map((p) => `${p.role} ${p.width.toFixed(2)}×${p.height.toFixed(2)} m`).join(', ')}.`); // i18n-ignore : journal
+  }
+
+  private setState(state: HeadsetMenuState): void {
+    if (state === this.shown && state === this.state) return;
+    this.state = state;
+    this.shown = state;
+    this.opts.onStateChange?.();
   }
 
   /** Rend le casque : fin propre de la session OpenXR, ou arrêt forcé après 4 s. */

@@ -233,7 +233,8 @@ test('outil : le son récupéré, la progression relevée ; vidéo privée ; ann
   assert.equal(video.ok && path.extname(video.file), '.mp4');
 
   const privee = await tool.grab({ url: 'https://www.youtube.com/watch?v=privee', want: 'audio', out: path.join(root, 'recu', 'yt-dlp-3') });
-  assert.deepEqual(privee, { ok: false, reason: 'vidéo privée' });
+  // Le message d'origine accompagne la raison : le Juke-box y lit pourquoi la vidéo est indisponible.
+  assert.deepEqual(privee, { ok: false, reason: 'vidéo privée', message: '[youtube] privee: Private video. Sign in if you have been granted access' });
   assert.equal(fs.existsSync(path.join(root, 'recu', 'yt-dlp-3')), false, 'rien n’est gardé');
 
   const stop = new AbortController();

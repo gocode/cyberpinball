@@ -15,8 +15,10 @@ if (playfieldZone) {
     document.documentElement.style.setProperty(`--pf-${key}`, String(value));
   }
 }
-// Rotation de la mise en page pour un joueur au bord des flippers (frontend.css).
-document.documentElement.dataset.rotation = params.get('rotation') ?? '0';
+// Rotation de la mise en page pour un joueur au bord des flippers (frontend.css). Le menu montré
+// dans un casque la change en cours de route (état « turn » : playfield en portrait, comme une borne).
+const baseRotation = params.get('rotation') ?? '0';
+document.documentElement.dataset.rotation = baseRotation;
 // Écran sans playfield (fronton, DMD, topper) : du noir hors des zones, comme le panneau d'une
 // borne autour de la découpe du DMD, jamais le fond d'ambiance du menu (frontend.css).
 document.documentElement.classList.toggle('annex', role !== 'playfield');
@@ -1443,6 +1445,10 @@ window.cyberEtat = () => ({
 
 window.cyber.onState((s) => {
   lastState = s;
+  if (role === 'playfield') {
+    const turn = s.turn === undefined ? baseRotation : String(s.turn);
+    if (document.documentElement.dataset.rotation !== turn) document.documentElement.dataset.rotation = turn;
+  }
   document.documentElement.classList.toggle('in-game', Boolean(s.game));
   CyberMedia.preload(s.preload);
   // Sons de l'interface : muets pendant la partie, même si un ordre de jouer arrivait.

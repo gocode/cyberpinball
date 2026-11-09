@@ -79,6 +79,7 @@ function sourceIcon(j: DownloadJob): IconName {
   if (j.source.kind === 'friend') return 'friends';
   if (j.kind === 'mediadb') return 'image-download';
   if (j.kind === 'update') return 'upgrade';
+  if (j.kind === 'jukebox') return 'music';
   if (j.kind === 'component' || j.kind === 'tool') return 'download';
   return 'globe';
 }
@@ -310,7 +311,7 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
     actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: list });
     // Deux actions ne portent jamais la même icône : « Revenir à » prend celle de son écran.
     const ret = actions.find((a) => a.key === 'return');
-    if (ret) ret.icon = r.to.screen === 'table-medias' ? 'image' : r.to.screen === 'game-parts' ? 'layers' : r.to.screen === 'friend-library' ? 'friends' : r.to.screen === 'wait-list' ? 'inbox' : r.to.screen === 'updates' ? 'upgrade' : r.to.screen === 'table-sheet' ? 'tables' : 'download';
+    if (ret) ret.icon = r.to.screen === 'table-medias' ? 'image' : r.to.screen === 'game-parts' ? 'layers' : r.to.screen === 'friend-library' ? 'friends' : r.to.screen === 'wait-list' ? 'inbox' : r.to.screen === 'updates' ? 'upgrade' : r.to.screen === 'jukebox' ? 'music' : r.to.screen === 'table-sheet' ? 'tables' : 'download';
     const head = [t('de {source}', { source: j.source.label }), j.state === 'done' && j.finished ? t('terminé à {time}', { time: downloadClock(j.finished) }) : fraction !== undefined ? t('{pct} %', { pct: Math.floor(fraction * 100) }) : undefined, (step?.state ?? downloadStateLabel(j)).toLowerCase()]
       .filter(Boolean)
       .join(' · ');

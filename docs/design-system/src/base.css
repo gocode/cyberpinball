@@ -212,6 +212,10 @@
 .cp-shortcut{display:inline-flex;align-items:center;gap:6px;flex:none;margin-left:auto;font-size:20px;font-weight:600;letter-spacing:0;color:var(--ink-muted)}
 .cp-shortcut .cp-cap{height:34px;min-width:40px;padding:0 9px}
 .cp-menu-item.is-focus .cp-shortcut,.cp-menu-item.is-focus .cp-shortcut .cp-cap{color:var(--on-signal)}
+.cp-menu-label{display:inline}
+.cp-badge{display:inline-block;vertical-align:middle;box-sizing:border-box;margin-inline-start:12px;padding:2px 8px;border:1px solid var(--line-strong);border-radius:3px;background:var(--surface-raised);color:var(--ink-muted);font-size:20px;font-weight:600;font-stretch:100%;line-height:1.2;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.cp-menu-item.is-quiet .cp-badge{color:var(--ink-muted)}
+.cp-menu-item.is-focus .cp-badge{color:var(--on-signal);border-color:var(--on-signal);background:transparent}
 .cp-menu-item.is-focus .cp-shortcut .cp-cap{border-color:var(--on-signal);background:transparent}
 
 /* Liste de contenu (29 octobre 2026, app/renderer/library.css .lib-zone ; listzones.ts) : la liste d'un

@@ -24,6 +24,8 @@ son interface).
 - Tableau des scores : classements « Amis », « National » et « Mondial », à côté de « Cette borne », changés aux MagnaSave. Un score n'y est comparé qu'avec la même version de la table et le même nombre de billes ; votre place est donnée sous chaque classement.
 - Dans le casque, le menu montre une borne en volume : caisson et appuis, tête avec ses cadres, le halo de la teinte de la table choisie, sur un sol, devant un mur sombre. Avant chaque partie, un fondu au noir laisse la place à VPX.
 - Menu système > Cyber Pinball > « Redémarrer Cyber Pinball » relance le logiciel seul, sans redémarrer le PC.
+- « Réalité virtuelle » porte un badge « BÊTA » dans le menu : la fonction est en plein essai.
+- Dans le casque : le plateau s'affiche en portrait, comme sur la borne ; les fenêtres du fronton, du DMD et du topper s'éteignent pendant une partie en VR ; un VPX qui se fige en quittant est fermé proprement.
 
 ## 0.1.8
 

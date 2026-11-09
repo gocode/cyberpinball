@@ -202,6 +202,7 @@ import { backupDir, locations } from './paths';
 import { usbDevices } from './vpx-ini';
 import { cachedScript, readScript, rememberScript, type ScriptResult } from './vbs';
 import { LayoutReport } from './layout-check';
+import { createJukeboxLibrary } from './jukebox-library';
 import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
 import type { RecordingOutcome } from './game-recording';
@@ -350,9 +351,23 @@ export interface LibraryHost {
 }
 
 /** Entrée du menu système (Exit dans le menu). La session des réglages peut y ajouter la sienne. */
+/**
+ * Badge d'une entrée de menu, une pastille après son libellé (« BÊTA » : fonction en plein essai).
+ * Le texte vient de menuBadgeLabel, jamais du libellé : il ne compte ni dans les recherches par
+ * libellé ni dans l'identité de l'entrée.
+ */
+export type MenuBadge = 'beta';
+
+/** Texte d'un badge, dans la langue de l'interface. */
+export function menuBadgeLabel(badge: MenuBadge): string {
+  return { beta: t('BÊTA') }[badge];
+}
+
 export interface SystemItem {
   label: string;
   detail?: string;
+  /** Pastille après le libellé, dans tous les états de l'entrée (activée, désactivée, indisponible). */
+  badge?: MenuBadge;
   /** Icône de l'entrée (registre app/renderer/icons.js) : chaque entrée du menu système a la sienne. */
   icon: IconName;
   /** Quelque chose attend l'utilisateur ici (une mise à jour disponible…) : pastille rouge, jusque sur la roue dentée. */
@@ -456,6 +471,8 @@ export interface Action {
   icon?: IconName;
   /** Pastille rouge à côté du libellé : cette action attend l'utilisateur. */
   attention?: boolean;
+  /** Badge après le libellé (MenuBadge). */
+  badge?: MenuBadge;
   /** Raccourci clavier de l'action, montré à droite du libellé ; il la déclenche aussi depuis son menu. */
   shortcut?: ActionShortcut;
   /** Porte de l'action en mode invité (GUEST_DOORS) : sans porte, ou porte fermée, l'invité ne la voit pas. */
@@ -1124,6 +1141,11 @@ export function createLibrary(host: LibraryHost) {
         const opener = returnOpeners.get('friend-library');
         return opener ? opener(back) : downloadCenter.open();
       }
+      // Le Juke-box (étape 3) pose son ouvreur ; d'ici là, le gestionnaire.
+      case 'jukebox': {
+        const opener = returnOpeners.get('jukebox');
+        return opener ? opener(back) : downloadCenter.open();
+      }
       case 'downloads':
         return downloadCenter.open();
     }
@@ -1184,6 +1206,20 @@ export function createLibrary(host: LibraryHost) {
   if (layout()) catalogUi.start();
   // Les pages des sites reprennent par le navigateur intégré, dans la même session de cookies.
   downloads.setTransport('site', catalogUi.acquirer.siteTransport);
+  // Juke-box (socle, sans écran) : ses morceaux arrivent par la file, sans notification à chaque playlist.
+  const jukebox = createJukeboxLibrary({
+    root: () => host.root,
+    dataDir: host.dataDir,
+    ytdlp: catalogUi.ytdlp,
+    downloads,
+    node: process.execPath,
+    log: (line) => console.log(line),
+  });
+  downloads.setTransport('youtube', jukebox.transport);
+  downloadFinishers.set('jukebox', (job) => {
+    jukebox.finished(job);
+    return true;
+  });
 
   /**
    * « Chercher sur le web… » des écrans de médias d'une table : ce qui est téléchargé revient
@@ -1815,6 +1851,7 @@ export function createLibrary(host: LibraryHost) {
         icon: entry.icon,
         attention: systemAttention(id),
         ...(item?.tone && { tone: item.tone }),
+        ...(item?.badge && { badge: item.badge }),
         shortcut: item?.shortcut,
         run: () => runSystemEntry(id),
       };
@@ -3971,7 +4008,7 @@ export function createLibrary(host: LibraryHost) {
       back: backLabel(built),
       // Dans la liste d'un écran à deux zones, Exit n'y ramène pas : il passe aux actions, le bouton le dit (et fait de même au clic).
       backTag: zone?.active === 'list' ? { key: 'Exit', text: t('actions') } : undefined,
-      actions: built.actions.map(({ label, detail, tone, icon, web, attention, shortcut, run }, i) => ({ label: shownLabel({ label, run }, built.back), detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
+      actions: built.actions.map(({ label, detail, tone, icon, web, attention, badge, shortcut, run }, i) => ({ label: shownLabel({ label, run }, built.back), detail, tone, icon: web && !iconMenu ? undefined : icon, attention: attention || undefined, badge: badge ? menuBadgeLabel(badge) : undefined, keys: shortcut?.keys.length ? shortcut.keys : undefined, id: ids[i] })),
       media: built.media,
       variant: built.variant,
       journey: built.journey,
@@ -4408,6 +4445,8 @@ export function createLibrary(host: LibraryHost) {
     attention: () => SYSTEM_ROOT_ENTRIES.some(systemAttention),
     /** L'écran décrit affiché est celui-ci (un transfert qui finit sous les yeux de l'utilisateur). */
     isShowing: (build: () => Built) => screen?.kind === 'custom' && screen.build === build,
+    /** Juke-box : playlists, bibliothèque, YouTube, fichiers locaux (jukebox-library.ts). */
+    jukebox,
     /** Gestionnaire de téléchargements : la file, son écran, et ce que les autres écrans y posent. */
     downloads: {
       manager: downloads,

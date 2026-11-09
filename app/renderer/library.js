@@ -179,6 +179,17 @@ function renderLibrary(v) {
       if (dot) glyph.append(dot);
       li.append(glyph);
     } else if (dot) label.append(dot);
+    // Badge (« BÊTA ») : une pastille après le libellé, sur sa ligne, jamais dans son texte. Il
+    // reste collé au dernier mot : un libellé qui passe à la ligne emporte ce mot avec lui, le
+    // badge n'est jamais seul sur sa ligne.
+    if (a.badge) {
+      const text = label.firstChild?.nodeType === Node.TEXT_NODE ? label.firstChild.textContent : '';
+      const cut = text.lastIndexOf(' ');
+      const tail = libEl('span', 'lib-badge-tail', cut >= 0 ? text.slice(cut + 1) : text);
+      tail.append(libEl('span', 'lib-badge', a.badge));
+      label.firstChild.textContent = cut >= 0 ? text.slice(0, cut + 1) : '';
+      label.insertBefore(tail, label.firstChild.nextSibling);
+    }
     li.append(label);
     // Raccourci clavier de l'entrée, à droite : une touche cerclée par touche, comme le bandeau d'aide.
     if (a.keys?.length) {

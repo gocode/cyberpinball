@@ -1622,6 +1622,8 @@ let headset: HeadsetMenu | undefined;
 /** Partie en cours : le casque est à VPX. */
 let headsetPaused = false;
 library.provideSystemItem('vr', {
+  // En plein essai (casque, menu dans le casque) : badge « BÊTA » dans tous ses états.
+  badge: 'beta',
   get label() {
     return vrMenuText(vrMode, probeVr()).label;
   },
@@ -1640,6 +1642,15 @@ library.provideSystemItem('vr', {
     library.openSystem();
   },
 });
+
+/**
+ * Rotation du playfield quand le menu est dans le casque : en portrait, comme sur une borne, même
+ * sur un écran posé en paysage (demande du 9 novembre 2026). Un playfield déjà tourné (borne) garde
+ * la sienne ; sinon un quart de tour, le bord des flippers à gauche de l'image.
+ */
+function headsetTurn(): Rotation {
+  return rotation === 0 || rotation === 180 ? 90 : rotation;
+}
 
 /**
  * Ce que le casque montre (casque.ts) : chaque rôle du menu, son rectangle sur le bureau et la
@@ -2021,8 +2032,10 @@ export function startFrontend(): void {
       return loader && fs.existsSync(loader) ? loader : undefined;
     },
     sources: () => headsetSources(),
-    playfieldRotation: () => rotation,
+    playfieldRotation: () => headsetTurn(),
     tint: () => tints?.current()?.color,
+    snapshotDir: path.join(loc.dataDir, 'logs', 'casque'),
+    onStateChange: () => broadcast(),
     log: (line) => console.log(line),
   });
   headset.watch();
@@ -2815,6 +2828,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     if (!displayMode) socialNet.setPresence({ status: 'playing', table: presenceTable(table), since: new Date().toISOString() });
     hooks.onPlaying?.();
     watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)));
+    // Partie sur les écrans (VPX n'a pas pris le casque) : le compagnon n'a plus de relève à attendre.
+    if (!playedVr && headset?.running) void headset.stop();
     broadcast();
     setTimeout(showLiveBoard, LIVE_BOARD_SETTLE_MS);
     onScreen = true;
@@ -2837,11 +2852,11 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Réalité virtuelle (vr.ts) : activée et un runtime OpenXR présent, VPX reçoit un INI à part, la VR
   // en « Autodetect » (dans le casque s'il est prêt, sinon sur les écrans). Jamais pour régler l'affichage.
   const vrGame = simulated === undefined && !displayMode ? prepareVr(played.file, double?.ini) : undefined;
-  // Le menu dans le casque rend la main : VPX ouvre sa propre session OpenXR. Sans l'attendre : la
-  // session du compagnon se ferme en une seconde, VPX n'ouvre la sienne qu'une fois la table chargée.
+  // Le menu dans le casque passe la main sans écran intermédiaire : le compagnon garde le casque
+  // (chargement compris) jusqu'à ce que VPX le prenne, puis fond au noir et s'arrête (casque.ts).
   if (simulated === undefined && headset?.running) {
     headsetPaused = true;
-    void headset.stop();
+    headset.handOver();
   }
   let playedVr = false;
   // Sans place enregistrée par VPX, la table est recentrée sur le regard du joueur une fois lancée.
@@ -3602,6 +3617,8 @@ function viewFor(role: RoleId) {
       : [];
   return {
     role,
+    // Menu montré dans le casque : le playfield se dessine en portrait (headsetTurn), le panneau du casque aussi.
+    ...(role === 'playfield' && headset?.state === 'shown' && headsetTurn() !== rotation && { turn: headsetTurn() }),
     phase: state.phase,
     help: state.help,
     count: list.length,

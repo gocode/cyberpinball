@@ -367,6 +367,8 @@ export const messages: Record<string, string> = {
   'VPX n’a pas extrait le script de la table.': 'VPX didn’t extract the table script.',
   'VPX ne s’est pas terminé après {n} s.': 'VPX didn’t exit after {n} s.',
   'VPX s’est terminé avec le code {code}.': 'VPX exited with code {code}.',
+  'VPX ne répondait plus dans le casque : Cyber Pinball l’a fermé.': 'VPX stopped responding in the headset: Cyber Pinball closed it.',
+  'VPX ne répondait plus en quittant : Windows l’a fermé.': 'VPX stopped responding while quitting: Windows closed it.',
   // app/src/archives.ts
   '{name} : introuvable.': '{name}: not found.',
   '{name} : archive illisible ({error}).': '{name}: unreadable archive ({error}).',

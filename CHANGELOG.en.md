@@ -22,6 +22,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Scoreboard: "Friends", "National" and "Worldwide" rankings, next to "This cabinet", switched with the MagnaSave buttons. A score is only compared with the same version of the table and the same number of balls; your place is given under each ranking.
 - In the headset, the menu shows a cabinet in volume: cabinet body and legs, head with its frames, the glow of the chosen table's hue, on a floor, in front of a dark wall. Before each game, a fade to black hands over to VPX.
 - System menu > Cyber Pinball > "Restart Cyber Pinball" restarts the software alone, without restarting the PC.
+- "Virtual reality" carries a "BETA" badge in the menu: the feature is still being tested.
+- In the headset: the playfield shows in portrait, as on the cabinet; the backglass, DMD and topper windows turn off during a game in VR; a VPX that freezes while quitting is closed cleanly.
 
 ## 0.1.8
 

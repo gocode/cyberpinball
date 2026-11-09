@@ -108,18 +108,36 @@ export const YTDLP_FORMATS: Record<GrabKind, string> = {
   video: 'bestvideo[ext=mp4][vcodec^=avc1][height<=1080]/best[ext=mp4][height<=1080]/bestvideo[ext=mp4][height<=1080]/best[height<=1080]/best',
 };
 
+/**
+ * Vidéo muette du Juke-box (jukebox-youtube.ts), lue avec le son à côté : la vidéo seule en MP4
+ * H.264 jusqu'à la hauteur voulue (1080p par défaut, 720p au choix de la playlist), sinon un MP4 de
+ * cette hauteur (son compris, ignoré à la lecture), sinon le mieux jusqu'à cette hauteur.
+ */
+export const YTDLP_VIDEO_FORMATS: Record<720 | 1080, string> = {
+  1080: YTDLP_FORMATS.video,
+  720: 'bestvideo[ext=mp4][vcodec^=avc1][height<=720]/best[ext=mp4][height<=720]/bestvideo[ext=mp4][height<=720]/best[height<=720]/best',
+};
+
 /** Repères des lignes que Cyber Pinball demande à yt-dlp d'écrire. */
 export const YTDLP_PROGRESS_MARK = 'cyberpinball-progres:';
 export const YTDLP_FILE_MARK = 'cyberpinball-fichier:';
+/** Repère des informations d'une vidéo (titre, champs musicaux, durée), en JSON sur une ligne. */
+export const YTDLP_INFO_MARK = 'cyberpinball-infos:';
+/** Champs demandés à yt-dlp pour un morceau du Juke-box. */
+export const YTDLP_INFO_FIELDS = 'id,title,artist,artists,creator,album,track,channel,uploader,duration,height,availability,live_status';
 
 /**
  * Arguments de yt-dlp pour une page : un seul fichier (jamais une liste de lecture), rangé
  * dans `dir` sous son titre, la progression en lignes lisibles, le chemin final imprimé,
  * le moteur JavaScript donné (Node, ou Electron en mode Node), aucune mise à jour par
  * yt-dlp lui-même (Cyber Pinball vérifie et remplace le fichier).
+ * Pour le Juke-box : `name` donne un nom fixe (« son », « video » : le partiel garde le même nom
+ * d'une session à l'autre, et reprend), `format` remplace celui de `want` (720p), `thumbnail`
+ * écrit la miniature (« miniature.jpg », sans conversion), `info` imprime titre et champs musicaux.
  */
-export function ytdlpArgs(opts: { url: string; want: GrabKind; dir: string; node?: string }): string[] {
+export function ytdlpArgs(opts: { url: string; want: GrabKind; dir: string; node?: string; name?: string; format?: string; thumbnail?: boolean; info?: boolean }): string[] {
   const sep = opts.dir.includes('\\') ? '\\' : '/';
+  const dir = opts.dir.replace(/[\\/]+$/, '');
   return [
     '--ignore-config',
     '--no-playlist',
@@ -133,10 +151,12 @@ export function ytdlpArgs(opts: { url: string; want: GrabKind; dir: string; node
     `download:${YTDLP_PROGRESS_MARK}%(progress.downloaded_bytes)s|%(progress.total_bytes)s|%(progress.total_bytes_estimate)s|%(progress.speed)s|%(progress.eta)s`,
     '--print',
     `after_move:${YTDLP_FILE_MARK}%(filepath)s`,
+    ...(opts.info ? ['--print', `after_move:${YTDLP_INFO_MARK}%(.{${YTDLP_INFO_FIELDS}})j`] : []),
     '-f',
-    YTDLP_FORMATS[opts.want],
+    opts.format ?? YTDLP_FORMATS[opts.want],
     '-o',
-    `${opts.dir.replace(/[\\/]+$/, '')}${sep}%(title).80B [%(id)s].%(ext)s`,
+    opts.name ? `${dir}${sep}${opts.name}.%(ext)s` : `${dir}${sep}%(title).80B [%(id)s].%(ext)s`,
+    ...(opts.thumbnail ? ['--write-thumbnail', '-o', `thumbnail:${dir}${sep}miniature.%(ext)s`] : []),
     ...(opts.node ? ['--no-js-runtimes', '--js-runtimes', `node:${opts.node}`] : []),
     '--',
     opts.url,
@@ -144,7 +164,11 @@ export function ytdlpArgs(opts: { url: string; want: GrabKind; dir: string; node
 }
 
 /** Une ligne de la sortie de yt-dlp, comprise. */
-export type YtDlpLine = { kind: 'progress'; received: number; total?: number; approx?: boolean; rate?: number; eta?: number } | { kind: 'file'; path: string } | { kind: 'error'; message: string };
+export type YtDlpLine =
+  | { kind: 'progress'; received: number; total?: number; approx?: boolean; rate?: number; eta?: number }
+  | { kind: 'file'; path: string }
+  | { kind: 'info'; info: Record<string, unknown> }
+  | { kind: 'error'; message: string };
 
 const num = (s: string | undefined) => {
   const n = Number(s);
@@ -169,6 +193,14 @@ export function parseYtDlpLine(raw: string): YtDlpLine | undefined {
   if (line.startsWith(YTDLP_FILE_MARK)) {
     const p = line.slice(YTDLP_FILE_MARK.length).trim();
     return p ? { kind: 'file', path: p } : undefined;
+  }
+  if (line.startsWith(YTDLP_INFO_MARK)) {
+    try {
+      const info = JSON.parse(line.slice(YTDLP_INFO_MARK.length)) as unknown;
+      return info && typeof info === 'object' && !Array.isArray(info) ? { kind: 'info', info: info as Record<string, unknown> } : undefined;
+    } catch {
+      return undefined;
+    }
   }
   if (/^ERROR:/.test(line)) return { kind: 'error', message: line.replace(/^ERROR:\s*/, '') };
   return undefined;

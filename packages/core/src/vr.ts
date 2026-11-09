@@ -9,9 +9,9 @@
 //   la seule valeur que Cyber Pinball écrit : une borne ne reste jamais bloquée sur « Connection to VR
 //   headset failed / Retry connection ? » (valeur 0) ;
 // - en VR, la fenêtre de jeu « Visual Pinball Player » n'existe pas : VPX ouvre « Visual Pinball VR
-//   Preview » sur le bureau (ce qu'un œil voit). Les fenêtres annexes (fronton, DMD, topper) s'ouvrent
-//   comme d'habitude sur leurs écrans (Player::Player, RenderOutput::SetMode) : vérifié dans le journal
-//   de VPX le 9 novembre 2026, partie dans un Quest 2 par Link ;
+//   Preview » sur le bureau (ce qu'un œil voit). Les fenêtres annexes (fronton, DMD, topper) sont créées
+//   sur leurs écrans (journal de VPX du 9 novembre 2026, Quest 2 par Link), mais jamais dessinées :
+//   Cyber Pinball les éteint dans l'INI de la partie (VR_NO_ANCILLARY) ;
 // - [PlayerVR] AddBackglass = 1 pose dans la scène un panneau au-dessus du plateau qui montre ce que
 //   dessinerait la fenêtre du fronton (plugins B2S, PUP). Faux par défaut. Une table qui a sa propre
 //   pièce VR a déjà le sien (VPX convertit même l'ancien « backglassimage » en panneau de ce type) :
@@ -40,6 +40,12 @@ import { applyVpxSettings, type VpxChange, type VpxSetting } from './vpx';
 /** Réglage du joueur : « Désactivée » ou « Dans le casque quand il est prêt ». */
 export type VrMode = 'off' | 'auto';
 
+/**
+ * Code de sortie d'un programme que Windows a fermé parce qu'il ne répondait plus (« Fermer le
+ * programme », 0xCFFFFFFF) : VPX figé en quittant une partie dans le casque, pas un plantage.
+ */
+export const VPX_HUNG_EXIT_CODE = 0xcfffffff;
+
 /** Titre de la fenêtre que VPX 10.8.1 ouvre sur le bureau à la place de celle du jeu, en VR (Window.cpp). */
 export const VR_PREVIEW_TITLE = 'Visual Pinball VR Preview';
 
@@ -54,6 +60,20 @@ const VR_CARRIED_KEYS: readonly { section: string; key: string }[] = [{ section:
 
 /** Clés de [PlayerVR] que Cyber Pinball impose à chaque partie, jamais reprises de la précédente. */
 const VR_FORCED_KEYS = new Set(['asktoturnon', 'addbackglass', 'previewdisplay', 'previewfullscreen']);
+
+/**
+ * Fenêtres annexes éteintes en VR ([Backglass] BackglassOutput, [ScoreView] ScoreViewOutput, [Topper]
+ * TopperOutput à 0, « Disabled ») : VPX 10.8.1 les crée quand même, mais ne les ajoute jamais au rendu
+ * en VR (« Ancillary windows are not yet supported while in VR mode », Player::Player) : des fenêtres
+ * vides sur les écrans, qui prennent la place du fond de Cyber Pinball. Le fronton du casque n'en
+ * dépend pas : VPX y dessine par les renderers des plugins (OnAuxRendererChanged), quel que soit le
+ * mode des fenêtres. L'INI de la borne garde les siens.
+ */
+export const VR_NO_ANCILLARY: readonly VpxSetting[] = [
+  { section: 'Backglass', key: 'BackglassOutput', value: '0' },
+  { section: 'ScoreView', key: 'ScoreViewOutput', value: '0' },
+  { section: 'Topper', key: 'TopperOutput', value: '0' },
+];
 
 /** [PlayerVR] PreviewFullScreen : 1, « Borderless Fullscreen » (0 : fenêtre ; BGFX n'a pas le plein écran exclusif). */
 export const VR_PREVIEW_FULLSCREEN = '1';
@@ -143,6 +163,7 @@ export function planVrIni(base: string, previous: string | undefined, opts: { ad
     { section: VR_SECTION, key: 'AskToTurnOn', value: VR_AUTODETECT },
     { section: VR_SECTION, key: 'AddBackglass', value: opts.addBackglass ? '1' : '0' },
     ...vrPreviewSettings(doc),
+    ...VR_NO_ANCILLARY,
   ];
   const changes = applyVpxSettings(doc, [...kept, ...forced]);
   return { text: doc.toString(), changes, carried: kept.length };

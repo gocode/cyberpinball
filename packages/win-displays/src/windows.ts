@@ -57,6 +57,7 @@ interface Api {
   SetWindowPos: NativeFn;
   GetWindowLongPtrW: NativeFn;
   GetAsyncKeyState: NativeFn;
+  IsHungAppWindow: NativeFn;
 }
 
 let api: Api | undefined;
@@ -92,6 +93,7 @@ function loadApi(): Api {
     SetWindowPos: user32.func('bool __stdcall SetWindowPos(void *hwnd, void *after, int x, int y, int cx, int cy, uint32_t flags)'),
     GetWindowLongPtrW: user32.func('intptr_t __stdcall GetWindowLongPtrW(void *hwnd, int index)'),
     GetAsyncKeyState: user32.func('int16_t __stdcall GetAsyncKeyState(int vk)'),
+    IsHungAppWindow: user32.func('bool __stdcall IsHungAppWindow(void *hwnd)'),
   };
   return api;
 }
@@ -225,6 +227,14 @@ export function windowTexts(target: WindowInfo): string[] {
     0,
   );
   return texts;
+}
+
+/**
+ * La fenêtre ne répond plus : son fil ne traite plus ses messages depuis 5 s (ce qui fait afficher
+ * à Windows « ne répond pas »).
+ */
+export function isHung(target: WindowInfo): boolean {
+  return Boolean(loadApi().IsHungAppWindow(target.hwnd));
 }
 
 /** Demande poliment la fermeture d'une fenêtre (comme le bouton ×). */

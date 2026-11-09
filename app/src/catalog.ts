@@ -2126,6 +2126,8 @@ export function createCatalog(ctx: CatalogContext) {
   // Points d'entrée : l'entonnoir « Ajouter une table » (library.ts), et tout écran qui sait
   // quel jeu chercher ou installer (parcours guidé d'un jeu qui ne démarre pas, médecin).
   return {
+    /** yt-dlp de la borne, partagé avec le Juke-box (une seule installation, une seule mise à jour). */
+    ytdlp,
     /** Le catalogue (avertissement au premier usage) ; `text` : recherche toute faite (titre, initiales, nom de ROM). */
     open: (text?: string) => {
       if (!ctx.layout()) return open();

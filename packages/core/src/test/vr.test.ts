@@ -23,6 +23,16 @@ test('la borne garde la VR éteinte ; une partie en VR la met en « Autodetect �
   assert.ok(plan.text.includes('\r\n'), 'fins de ligne de VPX gardées');
 });
 
+test('en VR, les fenêtres annexes de VPX (créées, jamais dessinées) sont éteintes ; la borne garde les siennes', () => {
+  const cab = ['[Backglass]', 'BackglassOutput = 1', '[ScoreView]', 'ScoreViewOutput = 1', '[Topper]', 'TopperOutput = 1', '[PlayerVR]', 'AskToTurnOn = 2', ''].join('\r\n');
+  const doc = IniDocument.parse(planVrIni(cab, undefined, { addBackglass: true }).text);
+  assert.equal(doc.get('Backglass', 'BackglassOutput'), '0');
+  assert.equal(doc.get('ScoreView', 'ScoreViewOutput'), '0');
+  assert.equal(doc.get('Topper', 'TopperOutput'), '0');
+  // Pas reprises d'une partie à l'autre comme réglages de la VR : recalculées.
+  assert.deepEqual(vrCarriedSettings(planVrIni(cab, undefined, { addBackglass: true }).text).filter((s) => s.section !== 'PlayerVR' && s.section !== 'Player'), []);
+});
+
 test('une table avec sa pièce VR garde son fronton : VPX n’en ajoute pas', () => {
   const doc = IniDocument.parse(planVrIni(CABINET_INI, undefined, { addBackglass: false }).text);
   assert.equal(doc.get('PlayerVR', 'AddBackglass'), '0');

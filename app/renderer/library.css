@@ -420,6 +420,49 @@ body.mouse .lib-back:hover {
   white-space: nowrap;
 }
 
+/*
+ * Badge d'une entrée de menu (« BÊTA », library.ts MenuBadge) : une pastille neutre après le
+ * libellé, centrée sur sa ligne, à 12 px, texte de 20 px à 1080. Lisible sur une entrée grisée ;
+ * en on-signal sur l'entrée choisie. Design system :
+ * composant LigneMenu. Dans le fil du texte : un libellé qui revient à la ligne garde le badge
+ * après son dernier mot (en flex, il partait au bout de la ligne, loin du libellé).
+ */
+/* Le dernier mot du libellé et son badge : ensemble sur une ligne. */
+.lib-badge-tail {
+  white-space: nowrap;
+}
+
+.lib-badge {
+  display: inline-block;
+  vertical-align: middle;
+  box-sizing: border-box;
+  margin-inline-start: 1.11cqmin;
+  padding: 0.2cqmin 0.74cqmin;
+  border: 0.093cqmin solid var(--line-strong);
+  border-radius: 0.28cqmin;
+  background: var(--surface-raised);
+  color: var(--ink-muted);
+  font-family: var(--font-ui);
+  font-size: 1.86cqmin;
+  font-weight: 600;
+  font-stretch: 100%;
+  line-height: 1.2;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.lib-action.tone-quiet:not(.current) .lib-badge {
+  color: var(--ink-muted);
+  opacity: 1;
+}
+
+.lib-action.current .lib-badge {
+  color: var(--on-signal);
+  border-color: var(--on-signal);
+  background: transparent;
+}
+
 .lib-actions {
   list-style: none;
   margin: 0;

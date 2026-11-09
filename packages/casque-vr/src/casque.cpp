@@ -18,7 +18,10 @@
 //                        (la borne en volume autour des panneaux, packages/core/src/casque-scene.ts ;
 //                        un nouveau bloc remplace le précédent, par exemple quand la teinte change)
 //     recentrer          (la borne revient devant le joueur)
-//     quitter            (fondu au noir de 300 ms, puis fin propre de la session : avant une partie de VPX)
+//     releve             (une partie de VPX démarre : garder le casque, écrans de chargement compris, jusqu'à
+//                        ce que VPX le prenne, puis fondu au noir et fin ; deux minutes au plus)
+//     instantane <dossier> (l'image de chaque panneau, telle qu'envoyée au casque, en <rôle>.bmp)
+//     quitter            (fondu au noir de 300 ms, puis fin propre de la session)
 //   Sortie standard :
 //     pret <runtime> | casque-absent <raison> | erreur <texte> | etat <état OpenXR> | centre … | image <rôle>
 //     | scene <n> formes | fini
@@ -144,6 +147,12 @@ struct Output
 
 std::atomic<bool> wantRecenter { true };
 std::atomic<bool> wantQuit { false };
+/** Relève demandée par Cyber Pinball (une partie de VPX démarre), et quand. */
+std::atomic<bool> handover { false };
+std::atomic<ULONGLONG> handoverAt { 0 };
+/** Instantané des panneaux demandé, et son dossier. */
+std::atomic<bool> wantSnapshot { false };
+std::string snapshotDir;
 std::atomic<bool> described { false };
 std::mutex panelsMutex;
 std::vector<Panel> pending;
@@ -195,6 +204,19 @@ void readCommands()
          described = true;
       else if (word == "recentrer")
          wantRecenter = true;
+      else if (word == "releve")
+      {
+         handoverAt = GetTickCount64();
+         handover = true;
+      }
+      else if (word == "instantane")
+      {
+         std::string dir;
+         std::getline(in >> std::ws, dir);
+         std::lock_guard<std::mutex> lock(panelsMutex);
+         snapshotDir = dir;
+         wantSnapshot = true;
+      }
       else if (word == "quitter")
          break;
    }
@@ -216,6 +238,29 @@ std::string narrow(const wchar_t* w)
 
 // --diagnostic : chaque carte, chacun de ses écrans, et ce que donne leur duplication (format, image
 // reçue, luminosité moyenne). Aucune session OpenXR : rien ne paraît dans le casque.
+/** Image BGRA (lignes de `pitch` octets) en BMP 24 bits. */
+bool writeBmp(const std::string& path, const unsigned char* pixels, UINT pitch, UINT W, UINT H)
+{
+   std::ofstream out(path, std::ios::binary);
+   if (!out)
+      return false;
+   const uint32_t row = W * 3, pad = (4 - row % 4) % 4, size = 54 + (row + pad) * H;
+   unsigned char header[54] = { 'B', 'M' };
+   auto put32 = [&](int at, uint32_t v) { for (int i = 0; i < 4; i++) header[at + i] = static_cast<unsigned char>(v >> (8 * i)); };
+   put32(2, size), put32(10, 54), put32(14, 40), put32(18, W), put32(22, H);
+   header[26] = 1, header[28] = 24;
+   out.write(reinterpret_cast<const char*>(header), 54);
+   for (int y = static_cast<int>(H) - 1; y >= 0; y--)
+   {
+      const unsigned char* src = pixels + y * pitch;
+      for (UINT x = 0; x < W; x++)
+         out.put(static_cast<char>(src[x * 4])), out.put(static_cast<char>(src[x * 4 + 1])), out.put(static_cast<char>(src[x * 4 + 2]));
+      for (uint32_t i = 0; i < pad; i++)
+         out.put(0);
+   }
+   return true;
+}
+
 // --rendu-essai <scène> <image.bmp> : la scène (lignes du protocole : panneau, boite, quad, disque),
 // vue de la place du joueur, rendue hors écran dans une image. Les panneaux y sont des rectangles
 // gris (pas de duplication d'écran). Pour vérifier la géométrie et les couleurs sans casque.
@@ -305,21 +350,7 @@ int renderTest(const std::string& input, const std::string& output)
    D3D11_MAPPED_SUBRESOURCE m;
    if (FAILED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &m)))
       return 4;
-   std::ofstream out(output, std::ios::binary);
-   const uint32_t row = W * 3, pad = (4 - row % 4) % 4, size = 54 + (row + pad) * H;
-   unsigned char header[54] = { 'B', 'M' };
-   auto put32 = [&](int at, uint32_t v) { for (int i = 0; i < 4; i++) header[at + i] = static_cast<unsigned char>(v >> (8 * i)); };
-   put32(2, size), put32(10, 54), put32(14, 40), put32(18, W), put32(22, H);
-   header[26] = 1, header[28] = 24;
-   out.write(reinterpret_cast<const char*>(header), 54);
-   for (int y = H - 1; y >= 0; y--)
-   {
-      const unsigned char* src = static_cast<const unsigned char*>(m.pData) + y * m.RowPitch;
-      for (UINT x = 0; x < W; x++)
-         out.put(static_cast<char>(src[x * 4])), out.put(static_cast<char>(src[x * 4 + 1])), out.put(static_cast<char>(src[x * 4 + 2]));
-      for (uint32_t i = 0; i < pad; i++)
-         out.put(0);
-   }
+   writeBmp(output, static_cast<const unsigned char*>(m.pData), m.RowPitch, W, H);
    context->Unmap(staging.Get(), 0);
    say("image " + output + " (" + std::to_string(opaque.size() / 3 + transparent.size() / 3) + " triangles)");
    return 0;
@@ -761,6 +792,12 @@ int main(int argc, char** argv)
             // au premier instant de la session la poserait là où le casque attendait, sur un bureau.
             if (state == XR_SESSION_STATE_FOCUSED && previous != XR_SESSION_STATE_FOCUSED)
                wantRecenter = true;
+            // Relève : VPX a pris le regard du joueur (notre session n'est plus « FOCUSED ») : fondu, puis fin.
+            if (handover && previous == XR_SESSION_STATE_FOCUSED && state != XR_SESSION_STATE_FOCUSED && !wantQuit)
+            {
+               say("releve VPX a pris le casque");
+               wantQuit = true;
+            }
             if (state == XR_SESSION_STATE_READY)
             {
                XrSessionBeginInfo bi { XR_TYPE_SESSION_BEGIN_INFO };
@@ -771,7 +808,7 @@ int main(int argc, char** argv)
             {
                xrEndSession_(session);
                running = false;
-               if (exitRequested)
+               if (exitRequested || handover)
                   done = true;
             }
             else if (state == XR_SESSION_STATE_EXITING || state == XR_SESSION_STATE_LOSS_PENDING)
@@ -782,6 +819,12 @@ int main(int argc, char** argv)
          else if (ev.type == XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING)
             wantRecenter = true; // recentrage demandé au casque (bouton Meta maintenu)
          ev = { XR_TYPE_EVENT_DATA_BUFFER };
+      }
+      // Relève sans suite (VPX n'a jamais pris le casque) : deux minutes au plus.
+      if (handover && !wantQuit && GetTickCount64() - handoverAt > 120'000)
+      {
+         say("releve sans VPX dans le casque, fin");
+         wantQuit = true;
       }
       if (wantQuit && !exitRequested)
       {
@@ -896,6 +939,50 @@ int main(int argc, char** argv)
             o.generation++;
          }
          o.dup->ReleaseFrame();
+      }
+
+      // Instantané : l'image de chaque panneau, prise dans la copie de son écran, en BMP.
+      if (wantSnapshot.exchange(false))
+      {
+         std::string dir;
+         {
+            std::lock_guard<std::mutex> lock(panelsMutex);
+            dir = snapshotDir;
+         }
+         CreateDirectoryA(dir.c_str(), nullptr);
+         for (const Panel& p : panels)
+         {
+            const Output* o = p.output >= 0 ? &outputs[p.output] : nullptr;
+            if (!o || !o->copy || o->format != DXGI_FORMAT_B8G8R8A8_UNORM)
+            {
+               say("erreur instantane " + p.role + " : pas d'image");
+               continue;
+            }
+            const UINT w = static_cast<UINT>(p.inOutput.right - p.inOutput.left), h = static_cast<UINT>(p.inOutput.bottom - p.inOutput.top);
+            D3D11_TEXTURE2D_DESC sd {};
+            sd.Width = w;
+            sd.Height = h;
+            sd.MipLevels = 1;
+            sd.ArraySize = 1;
+            sd.Format = DXGI_FORMAT_B8G8R8A8_UNORM;
+            sd.SampleDesc.Count = 1;
+            sd.Usage = D3D11_USAGE_STAGING;
+            sd.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+            ComPtr<ID3D11Texture2D> staging;
+            if (FAILED(device->CreateTexture2D(&sd, nullptr, &staging)))
+               continue;
+            const D3D11_BOX box { static_cast<UINT>(p.inOutput.left), static_cast<UINT>(p.inOutput.top), 0, static_cast<UINT>(p.inOutput.right), static_cast<UINT>(p.inOutput.bottom), 1 };
+            context->CopySubresourceRegion(staging.Get(), 0, 0, 0, 0, o->copy.Get(), 0, &box);
+            D3D11_MAPPED_SUBRESOURCE m;
+            if (SUCCEEDED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &m)))
+            {
+               const std::string file = dir + "\\" + p.role + ".bmp";
+               if (writeBmp(file, static_cast<const unsigned char*>(m.pData), m.RowPitch, w, h))
+                  say("instantane " + file + " " + std::to_string(w) + "x" + std::to_string(h) + " pris dans [" + std::to_string(p.inOutput.left) + ","
+                     + std::to_string(p.inOutput.top) + "] de l'écran");
+               context->Unmap(staging.Get(), 0);
+            }
+         }
       }
 
       // Couche de projection : la scène, un rendu par œil, dans l'espace de la pièce.

@@ -55,7 +55,10 @@ export interface GrabProgress {
   rate?: number;
 }
 
-export type GrabResult = { ok: true; file: string } | { ok: false; reason: string; cancelled?: boolean };
+export type GrabResult = { ok: true; file: string; info?: Record<string, unknown> } | { ok: false; reason: string; cancelled?: boolean; message?: string };
+
+/** Ce qu'en dit une commande brute de yt-dlp (lecture d'une playlist, informations des vidéos). */
+export type RunResult = { ok: true; code: number; stdout: string; lines: string[] } | { ok: false; reason: string; cancelled?: boolean };
 
 function sha256(file: string): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -169,7 +172,23 @@ export function createYtDlp(opts: YtDlpOptions) {
    * Le son seul ou la vidéo seule d'une page, dans `out` (un dossier à lui) : installe
    * l'outil si besoin, relève la progression, rend le fichier final ou la raison de l'échec.
    */
-  async function grab(request: { url: string; want: GrabKind; out: string; signal?: AbortSignal; progress?: (p: GrabProgress) => void }): Promise<GrabResult> {
+  /**
+   * Pour le Juke-box (jukebox-library.ts) : `name` (nom fixe du fichier), `format` (720p), `thumbnail`
+   * et `info` ; `keep` garde le dossier et le partiel en cas d'échec ou d'arrêt (le dossier du morceau
+   * contient déjà l'autre fichier, et le partiel reprend au prochain essai).
+   */
+  async function grab(request: {
+    url: string;
+    want: GrabKind;
+    out: string;
+    signal?: AbortSignal;
+    progress?: (p: GrabProgress) => void;
+    name?: string;
+    format?: string;
+    thumbnail?: boolean;
+    info?: boolean;
+    keep?: boolean;
+  }): Promise<GrabResult> {
     const { signal } = request;
     let exe: string;
     try {
@@ -178,7 +197,16 @@ export function createYtDlp(opts: YtDlpOptions) {
       return signal?.aborted ? { ok: false, reason: t('arrêté'), cancelled: true } : { ok: false, reason: (error as Error).message };
     }
     fs.mkdirSync(request.out, { recursive: true });
-    const args = ytdlpArgs({ url: request.url, want: request.want, dir: request.out, node: opts.node });
+    const args = ytdlpArgs({
+      url: request.url,
+      want: request.want,
+      dir: request.out,
+      node: opts.node,
+      ...(request.name ? { name: request.name } : {}),
+      ...(request.format ? { format: request.format } : {}),
+      ...(request.thumbnail ? { thumbnail: true } : {}),
+      ...(request.info ? { info: true } : {}),
+    });
     const command = opts.command?.(exe, args) ?? (exe.endsWith('.js') ? { file: opts.node ?? process.execPath, args: [exe, ...args] } : { file: exe, args });
     return new Promise<GrabResult>((resolve) => {
       const child = spawn(command.file, command.args, {
@@ -188,6 +216,7 @@ export function createYtDlp(opts: YtDlpOptions) {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
       });
       let file: string | undefined;
+      let info: Record<string, unknown> | undefined;
       let error: string | undefined;
       let rest = '';
       const read = (chunk: Buffer) => {
@@ -198,6 +227,7 @@ export function createYtDlp(opts: YtDlpOptions) {
           if (!parsed) continue;
           if (parsed.kind === 'progress') request.progress?.({ phase: 'download', received: parsed.received, total: parsed.total, approx: parsed.approx, rate: parsed.rate });
           else if (parsed.kind === 'file') file = parsed.path;
+          else if (parsed.kind === 'info') info = parsed.info;
           else error ??= parsed.message;
         }
       };
@@ -213,19 +243,53 @@ export function createYtDlp(opts: YtDlpOptions) {
         signal?.removeEventListener('abort', abort);
         if (rest) read(Buffer.from('\n'));
         if (signal?.aborted) {
-          fs.rmSync(request.out, { recursive: true, force: true });
+          if (!request.keep) fs.rmSync(request.out, { recursive: true, force: true });
           return resolve({ ok: false, reason: t('arrêté'), cancelled: true });
         }
-        // Le chemin imprimé, sinon le seul fichier fini du dossier.
-        const done = file && fs.existsSync(file) ? file : finished(request.out);
-        if (code === 0 && done) return resolve({ ok: true, file: done });
-        fs.rmSync(request.out, { recursive: true, force: true });
-        resolve({ ok: false, reason: ytdlpErrorText(error) });
+        // Le chemin imprimé, sinon le seul fichier fini du dossier (jamais avec un nom fixe : ce serait l'autre fichier du morceau).
+        const done = file && fs.existsSync(file) ? file : request.name ? undefined : finished(request.out);
+        if (code === 0 && done) return resolve({ ok: true, file: done, ...(info ? { info } : {}) });
+        if (!request.keep) fs.rmSync(request.out, { recursive: true, force: true });
+        resolve({ ok: false, reason: ytdlpErrorText(error), ...(error ? { message: error } : {}) });
       });
     });
   }
 
-  return { installed, ensure, grab, version: () => state()?.version };
+  /**
+   * yt-dlp lancé avec ces arguments, sa sortie gardée (lecture d'une playlist sans téléchargement,
+   * informations des vidéos) : installé si besoin, arrêté avec ses processus si `signal` l'annule.
+   */
+  async function run(args: string[], signal?: AbortSignal): Promise<RunResult> {
+    let exe: string;
+    try {
+      exe = await ensure(undefined, signal);
+    } catch (error) {
+      return signal?.aborted ? { ok: false, reason: t('arrêté'), cancelled: true } : { ok: false, reason: (error as Error).message };
+    }
+    const command = opts.command?.(exe, args) ?? (exe.endsWith('.js') ? { file: opts.node ?? process.execPath, args: [exe, ...args] } : { file: exe, args });
+    return new Promise<RunResult>((resolve) => {
+      const child = spawn(command.file, command.args, { windowsHide: true, env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' } });
+      const out: Buffer[] = [];
+      const err: Buffer[] = [];
+      child.stdout.on('data', (c: Buffer) => out.push(c));
+      child.stderr.on('data', (c: Buffer) => err.push(c));
+      const abort = () => stop(child.pid);
+      signal?.addEventListener('abort', abort, { once: true });
+      child.on('error', (e) => {
+        signal?.removeEventListener('abort', abort);
+        resolve({ ok: false, reason: t('yt-dlp ne démarre pas : {error}', { error: e.message }) });
+      });
+      child.on('close', (code) => {
+        signal?.removeEventListener('abort', abort);
+        if (signal?.aborted) return resolve({ ok: false, reason: t('arrêté'), cancelled: true });
+        const stdout = Buffer.concat(out).toString('utf8');
+        const lines = [stdout, Buffer.concat(err).toString('utf8')].join('\n').split(/\r?\n/).filter((l) => l.trim());
+        resolve({ ok: true, code: code ?? -1, stdout, lines });
+      });
+    });
+  }
+
+  return { installed, ensure, grab, run, version: () => state()?.version };
 }
 
 /** Le fichier fini le plus récent d'un dossier (ni .part, ni .ytdl). */
