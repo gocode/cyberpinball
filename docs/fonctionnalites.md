@@ -362,7 +362,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 ### Comptes des sites
 
 - **« Comptes des sites »** : VPUniverse, VPForums, Pinball Nirvana, PinSound, chacun « Connecté » (avec sa date d'expiration) ou non ; « Se déconnecter » n'efface que les cookies de ce site.
-- **Rien n'est contourné** : quand un site demande quelque chose (CAPTCHA, délai, conditions, plafond), la page s'ouvre avec la raison en orange. Cyber Pinball n'accepte aucune condition et ne saute aucun délai.
+- **Rien n'est contourné** : vous vous connectez et téléchargez vous-même, dans la page du site. Cyber Pinball n'accepte aucune condition, ne saute aucun délai et ne résout aucune vérification.
 
 ### Chaque fichier à sa place
 

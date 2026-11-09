@@ -361,7 +361,7 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 ### Site accounts
 
 - **"Site accounts"**: VPUniverse, VPForums, Pinball Nirvana, PinSound, each "Signed in" (with its expiry date) or not; "Sign out" only clears that site's cookies.
-- **Nothing is bypassed**: when a site asks for something (CAPTCHA, waiting time, terms, download cap), the page opens with the reason in orange. Cyber Pinball accepts no terms and skips no waiting time.
+- **Nothing is bypassed**: you sign in and download yourself, on the site's page. Cyber Pinball accepts no terms, skips no waiting time and solves no check.
 
 ### Every file where it belongs
 
