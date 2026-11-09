@@ -20,11 +20,11 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Virtual reality: the Cyber Pinball menu also shows in the headset, outside games. The cabinet stands in front of you at the real size of its screens: tilted playfield, flippers towards you, DMD, backglass and topper upright. During a game, the headset goes to VPX, then comes back to the menu.
 - In the headset, the menu recentres in front of you when you put the headset on, and a table played in VR for the first time places itself in front of you.
 - Scoreboard: "Friends", "National" and "Worldwide" rankings, next to "This cabinet", switched with the MagnaSave buttons. A score is only compared with the same version of the table and the same number of balls; your place is given under each ranking.
-- In the headset, the menu shows a cabinet in volume: cabinet body and legs, head with its frames, the glow of the chosen table's hue, on a floor, in front of a dark wall. Before each game, a fade to black hands over to VPX.
+- In the headset, the menu shows the cabinet's screens where the real ones are (once the cabinet is aligned, they land on them), on a plain floor, with the glow of the chosen table's hue around the head. The screens have their depth and stay sharp, even the playfield seen at an angle. Before each game, a fade to black hands over to VPX.
 - System menu > Cyber Pinball > "Restart Cyber Pinball" restarts the software alone, without restarting the PC.
 - "Virtual reality" carries a "BETA" badge in the menu: the feature is still being tested.
 - In the headset: the playfield shows in portrait, as on the cabinet; the backglass, DMD and topper windows turn off during a game in VR; a VPX that freezes while quitting is closed cleanly.
-- In the headset, the menu's cabinet stays in its place in the room from one time to the next; the 5 key of the numeric keypad brings it back in front of you.
+- In the headset, the menu's screens stay in their place in the room from one time to the next; the 5 key of the numeric keypad brings it back in front of you.
 - The menu is drawn specially for the headset: the playfield is in portrait there, while the PC keeps its menu in landscape. With the headset on, the PC screens go to rest and show "Dans le casque" (In the headset); with the headset off, or the Meta menu open, the PC takes over again.
 - In the headset, the playfield's background image follows the playfield's orientation (portrait): the table is seen in full while browsing.
 - A screen that Windows disconnects and reconnects, during a game or in the menu, gets its role and its picture back instead of staying black; when a game ends, each window takes back its screen.

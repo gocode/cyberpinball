@@ -22,11 +22,11 @@ son interface).
 - Réalité virtuelle : le menu de Cyber Pinball s'affiche aussi dans le casque, hors partie. La borne est posée devant vous à la taille réelle de ses écrans : plateau incliné, flippers vers vous, DMD, fronton et topper debout. Pendant une partie, le casque passe à VPX, puis revient au menu.
 - Dans le casque, le menu se recentre devant vous quand vous mettez le casque, et une table jouée pour la première fois en VR se place d'elle-même devant vous.
 - Tableau des scores : classements « Amis », « National » et « Mondial », à côté de « Cette borne », changés aux MagnaSave. Un score n'y est comparé qu'avec la même version de la table et le même nombre de billes ; votre place est donnée sous chaque classement.
-- Dans le casque, le menu montre une borne en volume : caisson et appuis, tête avec ses cadres, le halo de la teinte de la table choisie, sur un sol, devant un mur sombre. Avant chaque partie, un fondu au noir laisse la place à VPX.
+- Dans le casque, le menu montre les écrans de la borne là où sont ceux de la vraie (une fois la borne calée, ils tombent dessus), sur un sol sobre, avec le halo de la teinte de la table choisie autour de la tête. Les écrans ont leur profondeur et restent nets, même le plateau vu en biais. Avant chaque partie, un fondu au noir laisse la place à VPX.
 - Menu système > Cyber Pinball > « Redémarrer Cyber Pinball » relance le logiciel seul, sans redémarrer le PC.
 - « Réalité virtuelle » porte un badge « BÊTA » dans le menu : la fonction est en plein essai.
 - Dans le casque : le plateau s'affiche en portrait, comme sur la borne ; les fenêtres du fronton, du DMD et du topper s'éteignent pendant une partie en VR ; un VPX qui se fige en quittant est fermé proprement.
-- Dans le casque, la borne du menu reste à sa place dans la pièce d'une fois sur l'autre ; la touche 5 du pavé numérique la remet devant vous.
+- Dans le casque, les écrans du menu restent à leur place dans la pièce d'une fois sur l'autre ; la touche 5 du pavé numérique la remet devant vous.
 - Le menu est dessiné exprès pour le casque : le plateau y est en portrait, pendant que le PC garde son menu en paysage. Casque porté, les écrans du PC se mettent au repos et affichent « Dans le casque » ; casque retiré, ou menu de Meta ouvert, le PC reprend la main.
 - Dans le casque, l'image de fond du plateau suit le sens du plateau (portrait) : la table se voit en entier pendant la navigation.
 - Un écran que Windows débranche puis rebranche, pendant une partie ou au menu, retrouve son rôle et son image au lieu de rester noir ; au retour d'une partie, chaque fenêtre reprend son écran.

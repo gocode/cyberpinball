@@ -67,4 +67,37 @@ class Renderer
    Microsoft::WRL::ComPtr<ID3D11BlendState> m_blendOff, m_blendOn;
 };
 
+/**
+ * Copie d'une image d'écran, avec sa chaîne de mipmaps et de quoi l'échantillonner : l'écran posé
+ * dans la scène reste net de loin sans scintiller. Faux si Direct3D refuse.
+ */
+bool makeImage(ID3D11Device* device, UINT width, UINT height, DXGI_FORMAT format, Microsoft::WRL::ComPtr<ID3D11Texture2D>& texture,
+   Microsoft::WRL::ComPtr<ID3D11ShaderResourceView>& view);
+
+/**
+ * Image d'un écran (un panneau) dessinée dans la couche de projection, avec la profondeur : la scène
+ * (sol, repères du calage, bout des manettes) passe devant ou derrière, comme dans la pièce. L'image
+ * porte les octets de l'écran (sRGB) ; elle est ramenée en lumière linéaire pour l'image de l'œil.
+ */
+class ImageRenderer
+{
+ public:
+   bool init(ID3D11Device* device, std::string& error);
+   /**
+    * `corners` : haut-gauche, haut-droit, bas-gauche, bas-droit, dans l'espace de `mvp` ; `uv` : la
+    * part de l'image (gauche, haut, droite, bas, en fractions) ; `fade` de 1 (plein) à 0 (noir).
+    */
+   void draw(ID3D11DeviceContext* context, const Mat4& mvp, const float corners[4][3], const float uv[4], ID3D11ShaderResourceView* image, float fade);
+
+ private:
+   Microsoft::WRL::ComPtr<ID3D11VertexShader> m_vs;
+   Microsoft::WRL::ComPtr<ID3D11PixelShader> m_ps;
+   Microsoft::WRL::ComPtr<ID3D11InputLayout> m_layout;
+   Microsoft::WRL::ComPtr<ID3D11Buffer> m_constants, m_vertices;
+   Microsoft::WRL::ComPtr<ID3D11SamplerState> m_sampler;
+   Microsoft::WRL::ComPtr<ID3D11RasterizerState> m_raster;
+   Microsoft::WRL::ComPtr<ID3D11DepthStencilState> m_depth;
+   Microsoft::WRL::ComPtr<ID3D11BlendState> m_blend;
+};
+
 } // namespace scene

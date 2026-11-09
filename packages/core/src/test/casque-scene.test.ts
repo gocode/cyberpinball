@@ -1,10 +1,13 @@
-// Le menu dans le casque en borne en volume (casque-scene.ts, « M2 ») : rien sur l'image du
-// playfield, un caisson posé au sol sur quatre appuis, la tête cadrée, la teinte seulement en halo,
-// un sol et un mur neutres derrière la tête.
+// Le menu dans le casque (casque-scene.ts) : les écrans là où sont ceux de la vraie borne, sans
+// caisson ; rien sur l'image du playfield, la teinte seulement en halo, un sol neutre, et pendant le
+// calage les repères des coins de la barre avant.
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { test } from 'node:test';
 import { headsetPanels, rotateVector, type HeadsetSource, type Quaternion } from '../casque';
-import { CABINET_DEPTH_M, FRAME_M, HALO_ALPHA, headsetScene, LEG_M, rgba, SCENE_COLORS, sceneProtocol, seen, type ScenePrimitive, type Vec3 } from '../casque-scene';
+import { lockbarMarks } from '../calage';
+import { HALO_ALPHA, headsetScene, rgba, SCENE_COLORS, sceneProtocol, seen, type ScenePrimitive, type Vec3 } from '../casque-scene';
 import { edgeRotation } from '../model';
 
 const sources: HeadsetSource[] = [
@@ -44,18 +47,19 @@ test('rien ne recouvre l’image du playfield : la scène reste hors d’elle ou
   }
 });
 
-test('le caisson est sous la bordure, profond de 0,24 m, sur quatre appuis qui touchent le sol', () => {
+test('sans caisson : ni boîte, ni cadre, ni mur ; en volume, seulement les repères du calage', () => {
   const scene = headsetScene(panels);
-  const boxes = scene.filter((s): s is Extract<ScenePrimitive, { kind: 'boite' }> => s.kind === 'boite');
-  const cabinet = boxes.find((b) => Math.abs(b.size.z - CABINET_DEPTH_M) < 1e-9)!;
-  assert.ok(cabinet, 'caisson');
-  assert.ok(Math.abs(cabinet.size.x - (pf.width + 2 * FRAME_M)) < 1e-9 && Math.abs(cabinet.size.y - (pf.height + 2 * FRAME_M)) < 1e-9);
-  assert.equal(cabinet.bottom, rgba(SCENE_COLORS.sunken));
-  const legs = boxes.filter((b) => b.size.x === LEG_M && b.size.z === LEG_M);
-  assert.equal(legs.length, 4);
-  for (const leg of legs) {
-    assert.ok(Math.abs(leg.center.y - leg.size.y / 2) < 1e-9, 'du sol');
-    assert.ok(leg.size.y > 0.4 && leg.size.y < 0.9, String(leg.size.y));
+  assert.equal(scene.filter((s) => s.kind === 'boite').length, 0);
+  // Le sol, et le halo des deux écrans de la tête (quatre bandes chacun) : rien d'autre.
+  assert.equal(scene.filter((s) => s.kind === 'disque').length, 2);
+  assert.equal(scene.filter((s) => s.kind === 'quad').length, 8);
+  const marks = lockbarMarks(0.7);
+  const calibrating = headsetScene(panels, undefined, marks).filter((s): s is Extract<ScenePrimitive, { kind: 'boite' }> => s.kind === 'boite');
+  assert.equal(calibrating.length, 2);
+  for (const [k, box] of calibrating.entries()) {
+    assert.equal(box.color, rgba(SCENE_COLORS.signal));
+    // Posé sur le coin : sa base au niveau de la barre avant.
+    assert.ok(Math.abs(box.center.y - box.size.y / 2 - marks[k]!.y) < 1e-9 && box.center.x === marks[k]!.x && box.center.z === marks[k]!.z);
   }
 });
 
@@ -75,20 +79,13 @@ test('la teinte de la table n’est que dans le halo des cadres de la tête, à 
   }
 });
 
-test('sol neutre à 0 m ; mur derrière la tête, sans rien devant elle', () => {
+test('sol neutre à 0 m ; rien derrière la tête', () => {
   const scene = headsetScene(panels);
   const discs = scene.filter((s) => s.kind === 'disque');
   assert.ok(discs.every((d) => d.center.y >= 0 && d.center.y < 0.01));
   const head = panels.filter((p) => p.role !== 'playfield');
   const headBack = Math.min(...head.map((p) => p.position.z));
-  const wallQuads = scene.filter((s) => s.kind === 'quad' && s.center.z < headBack - 0.1);
-  assert.ok(wallQuads.length > 20, 'fond, zone centrale, montants et joints');
-  // Aucun filet du mur dans la réserve autour de la tête.
-  const bg = head.find((p) => p.role === 'backglass')!;
-  for (const q of wallQuads.filter((s) => s.kind === 'quad' && s.width < 0.01)) {
-    const inReserve = Math.abs(q.center.x) < bg.width / 2 && q.center.y > bg.position.y - bg.height / 2 && q.center.y < bg.position.y + bg.height / 2;
-    assert.ok(!inReserve, JSON.stringify(q));
-  }
+  assert.equal(scene.filter((s) => s.kind === 'quad' && s.center.z < headBack - 0.1).length, 0);
 });
 
 test('opacités vues comme dans les maquettes : le mélange linéaire du casque rend le mélange sRGB', () => {
@@ -107,7 +104,7 @@ test('opacités vues comme dans les maquettes : le mélange linéaire du casque 
 });
 
 test('protocole : « scene », une ligne par forme, « scene-fin »', () => {
-  const lines = sceneProtocol(headsetScene(panels));
+  const lines = sceneProtocol(headsetScene(panels, undefined, lockbarMarks(0.7)));
   assert.equal(lines[0], 'scene');
   assert.equal(lines.at(-1), 'scene-fin');
   const box = lines.find((l) => l.startsWith('boite '))!.split(' ');
@@ -117,4 +114,19 @@ test('protocole : « scene », une ligne par forme, « scene-fin »', () => {
   assert.equal(quad.length, 12);
   const disc = lines.find((l) => l.startsWith('disque '))!.split(' ');
   assert.equal(disc.length, 7);
+});
+
+test('compagnon : les écrans dans la couche de projection, avec la profondeur ; les couches « quad » seulement en repli', () => {
+  const src = path.join(__dirname, '..', '..', '..', '..', 'packages', 'casque-vr', 'src');
+  const cpp = fs.readFileSync(path.join(src, 'casque.cpp'), 'utf8');
+  assert.match(cpp, /imageRenderer\.draw\(context\.Get\(\), mvp, corners, uv, image, colorScale \? 1\.f : fade\);/);
+  assert.match(cpp, /if \(fs\.shouldRender && worn && !projection\)/);
+  // Chaque image d'écran garde ses mipmaps, refaites à chaque nouvelle image.
+  assert.match(cpp, /scene::makeImage\(device\.Get\(\), td\.Width, td\.Height, td\.Format, surf\.copy, surf\.view\)/);
+  assert.match(cpp, /context->GenerateMips\(surf\.view\.Get\(\)\);/);
+  const scene = fs.readFileSync(path.join(src, 'scene.cpp'), 'utf8');
+  // Octets de l'écran (sRGB) ramenés en lumière linéaire ; « linear » est un mot réservé de HLSL.
+  assert.match(scene, /float3 toLinear\(float3 c\)/);
+  assert.match(scene, /D3D11_FILTER_ANISOTROPIC/);
+  assert.match(scene, /DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL/);
 });

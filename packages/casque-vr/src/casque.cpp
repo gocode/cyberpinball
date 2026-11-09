@@ -158,7 +158,9 @@ struct Output
    ComPtr<IDXGIOutput1> output;
    RECT desktop {};
    ComPtr<IDXGIOutputDuplication> dup;
-   ComPtr<ID3D11Texture2D> copy; // dernière image reçue
+   ComPtr<ID3D11Texture2D> copy; // dernière image reçue (avec ses mipmaps)
+   ComPtr<ID3D11ShaderResourceView> view; // de quoi la dessiner dans la couche de projection
+   UINT width = 0, height = 0;
    DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
    bool reported = false;
    uint64_t generation = 0; // compte les nouvelles images de l'écran
@@ -342,8 +344,10 @@ bool writeBmp(const std::string& path, const unsigned char* pixels, UINT pitch, 
 }
 
 // --rendu-essai <scène> <image.bmp> : la scène (lignes du protocole : panneau, boite, quad, disque),
-// vue de la place du joueur, rendue hors écran dans une image. Les panneaux y sont des rectangles
-// gris (pas de duplication d'écran). Pour vérifier la géométrie et les couleurs sans casque.
+// vue de la place du joueur, rendue hors écran dans une image. Les panneaux y portent une image
+// témoin (coin haut-gauche rouge, haut-droit vert, bas-gauche bleu, dégradé gris), dessinée comme
+// dans le casque : dans la couche de projection, avec la profondeur (scene::ImageRenderer). Pour
+// vérifier la géométrie, l'orientation des images et les couleurs sans casque.
 int renderTest(const std::string& input, const std::string& output)
 {
    std::ifstream file(input);
@@ -352,7 +356,13 @@ int renderTest(const std::string& input, const std::string& output)
       say("erreur scène illisible : " + input);
       return 2;
    }
-   std::vector<scene::Vertex> opaque, transparent, screens, none;
+   std::vector<scene::Vertex> opaque, transparent;
+   struct TestPanel
+   {
+      XrPosef pose;
+      float width, height;
+   };
+   std::vector<TestPanel> testPanels;
    std::string line;
    while (std::getline(file, line))
    {
@@ -364,9 +374,7 @@ int renderTest(const std::string& input, const std::string& output)
          std::string role;
          float x, y, w, h, px, py, pz, qx, qy, qz, qw, mw, mh;
          in >> role >> x >> y >> w >> h >> px >> py >> pz >> qx >> qy >> qz >> qw >> mw >> mh;
-         std::ostringstream q;
-         q << "quad " << px << ' ' << py << ' ' << pz << ' ' << qx << ' ' << qy << ' ' << qz << ' ' << qw << ' ' << mw << ' ' << mh << " #8c8c8cff #5a5a5aff";
-         scene::addPrimitive(q.str(), screens, none);
+         testPanels.push_back({ { { qx, qy, qz, qw }, { px, py, pz } }, mw, mh });
       }
       else
          scene::addPrimitive(line, opaque, transparent);
@@ -375,15 +383,38 @@ int renderTest(const std::string& input, const std::string& output)
    ComPtr<ID3D11DeviceContext> context;
    if (FAILED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context)))
       return 4;
-   scene::Renderer renderer, panelsRenderer;
+   scene::Renderer renderer;
+   scene::ImageRenderer imageRenderer;
    std::string error;
-   if (!renderer.init(device.Get(), error) || !panelsRenderer.init(device.Get(), error))
+   if (!renderer.init(device.Get(), error) || !imageRenderer.init(device.Get(), error))
    {
       say("erreur " + error);
       return 4;
    }
    renderer.setScene(opaque, transparent);
-   panelsRenderer.setScene(screens, none);
+   // Image témoin, en octets d'écran (BGRA, sRGB), avec ses mipmaps.
+   constexpr UINT TW = 512, TH = 256;
+   std::vector<unsigned char> pattern(TW * TH * 4);
+   for (UINT ty = 0; ty < TH; ty++)
+      for (UINT tx = 0; tx < TW; tx++)
+      {
+         unsigned char* px = &pattern[(ty * TW + tx) * 4];
+         const unsigned char g = static_cast<unsigned char>(40 + 180 * tx / TW);
+         px[0] = px[1] = px[2] = g, px[3] = 255;
+         const bool left = tx < TW / 4, right = tx >= TW * 3 / 4, top = ty < TH / 3, bottom = ty >= TH * 2 / 3;
+         if (left && top)
+            px[0] = 0, px[1] = 0, px[2] = 230; // rouge
+         else if (right && top)
+            px[0] = 0, px[1] = 200, px[2] = 0; // vert
+         else if (left && bottom)
+            px[0] = 230, px[1] = 0, px[2] = 0; // bleu
+      }
+   ComPtr<ID3D11Texture2D> patternTexture;
+   ComPtr<ID3D11ShaderResourceView> patternView;
+   if (!scene::makeImage(device.Get(), TW, TH, DXGI_FORMAT_B8G8R8A8_UNORM, patternTexture, patternView))
+      return 4;
+   context->UpdateSubresource(patternTexture.Get(), 0, nullptr, pattern.data(), TW * 4, 0);
+   context->GenerateMips(patternView.Get());
    constexpr UINT W = 1600, H = 1000;
    D3D11_TEXTURE2D_DESC td {};
    td.Width = W;
@@ -423,9 +454,20 @@ int renderTest(const std::string& input, const std::string& output)
    const scene::Mat4 world = scene::Mat4::identity();
    const scene::Mat4 mvp = scene::Mat4::projection(-half, half, vertical, -vertical, 0.05f, 50.f) * scene::Mat4::poseInverse(eyeQ, eyeT) * world;
    renderer.draw(context.Get(), mvp, world, 1.f);
-   // Les panneaux par-dessus, comme les couches « quad » du casque.
-   context->ClearDepthStencilView(depth.Get(), D3D11_CLEAR_DEPTH, 1.f, 0);
-   panelsRenderer.draw(context.Get(), mvp, world, 1.f);
+   // Les panneaux comme dans le casque : dans la même couche, avec la profondeur.
+   const float fullImage[4] = { 0, 0, 1, 1 };
+   for (const TestPanel& p : testPanels)
+   {
+      const float hw = p.width / 2, hh = p.height / 2;
+      const XrVector3f local[4] = { { -hw, hh, 0 }, { hw, hh, 0 }, { -hw, -hh, 0 }, { hw, -hh, 0 } };
+      float corners[4][3];
+      for (int c = 0; c < 4; c++)
+      {
+         const XrVector3f r = rotate(p.pose.orientation, local[c]);
+         corners[c][0] = r.x + p.pose.position.x, corners[c][1] = r.y + p.pose.position.y, corners[c][2] = r.z + p.pose.position.z;
+      }
+      imageRenderer.draw(context.Get(), mvp, corners, fullImage, patternView.Get(), 1.f);
+   }
    context->CopyResource(staging.Get(), color.Get());
    D3D11_MAPPED_SUBRESOURCE m;
    if (FAILED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &m)))
@@ -1043,6 +1085,8 @@ int main(int argc, char** argv)
    scene::Renderer renderer;
    /** Repères des manettes pendant le calage, dans l'espace de la pièce (refaits à chaque image). */
    scene::Renderer pointers;
+   /** Les écrans dessinés dans la couche de projection, avec la profondeur. */
+   scene::ImageRenderer imageRenderer;
    std::vector<std::string> pointerLines;
    ULONGLONG gripsSince = 0;
    bool gestureSent = false;
@@ -1053,7 +1097,7 @@ int main(int argc, char** argv)
       std::vector<XrViewConfigurationView> vcv(n, { XR_TYPE_VIEW_CONFIGURATION_VIEW });
       xrEnumerateViewConfigurationViews_(instance, system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, n, &n, vcv.data());
       std::string error;
-      projection = n == 2 && renderer.init(device.Get(), error) && pointers.init(device.Get(), error);
+      projection = n == 2 && renderer.init(device.Get(), error) && pointers.init(device.Get(), error) && imageRenderer.init(device.Get(), error);
       if (!projection)
          say("erreur scène indisponible : " + (error.empty() ? std::string("vues du casque") : error));
       for (uint32_t e = 0; projection && e < 2; e++)
@@ -1114,6 +1158,7 @@ int main(int argc, char** argv)
    struct Surface
    {
       ComPtr<ID3D11Texture2D> copy;
+      ComPtr<ID3D11ShaderResourceView> view; // la copie, à dessiner dans la couche de projection
       UINT width = 0, height = 0;
       uint64_t generation = 0;
    };
@@ -1231,18 +1276,23 @@ int main(int argc, char** argv)
                shared->GetDesc(&td);
                if (!surf.copy || surf.width != td.Width || surf.height != td.Height)
                {
-                  D3D11_TEXTURE2D_DESC cd = td;
-                  cd.Usage = D3D11_USAGE_DEFAULT;
-                  cd.BindFlags = 0;
-                  cd.CPUAccessFlags = 0;
-                  cd.MiscFlags = 0;
-                  surf.copy.Reset();
-                  device->CreateTexture2D(&cd, nullptr, &surf.copy);
+                  // Avec ses mipmaps, pour la couche de projection ; sinon une simple copie (panneaux « quad »).
+                  if (!scene::makeImage(device.Get(), td.Width, td.Height, td.Format, surf.copy, surf.view))
+                  {
+                     D3D11_TEXTURE2D_DESC cd = td;
+                     cd.Usage = D3D11_USAGE_DEFAULT;
+                     cd.BindFlags = 0;
+                     cd.CPUAccessFlags = 0;
+                     cd.MiscFlags = 0;
+                     device->CreateTexture2D(&cd, nullptr, &surf.copy);
+                  }
                   surf.width = td.Width, surf.height = td.Height;
                }
                if (surf.copy)
                {
-                  context->CopyResource(surf.copy.Get(), shared.Get());
+                  context->CopySubresourceRegion(surf.copy.Get(), 0, 0, 0, 0, shared.Get(), 0, nullptr);
+                  if (surf.view)
+                     context->GenerateMips(surf.view.Get());
                   surf.generation++;
                }
             }
@@ -1408,11 +1458,15 @@ int main(int argc, char** argv)
          tex->GetDesc(&d);
          if (!o.copy)
          {
-            d.Usage = D3D11_USAGE_DEFAULT;
-            d.BindFlags = 0;
-            d.CPUAccessFlags = 0;
-            d.MiscFlags = 0;
-            device->CreateTexture2D(&d, nullptr, &o.copy);
+            if (!scene::makeImage(device.Get(), d.Width, d.Height, d.Format, o.copy, o.view))
+            {
+               d.Usage = D3D11_USAGE_DEFAULT;
+               d.BindFlags = 0;
+               d.CPUAccessFlags = 0;
+               d.MiscFlags = 0;
+               device->CreateTexture2D(&d, nullptr, &o.copy);
+            }
+            o.width = d.Width, o.height = d.Height;
             o.format = d.Format;
             if (d.Format != DXGI_FORMAT_B8G8R8A8_UNORM && !o.reported)
             {
@@ -1423,7 +1477,9 @@ int main(int argc, char** argv)
          // Une image qui ne porte qu'un mouvement du pointeur (LastPresentTime nul) ne change rien à l'écran.
          if (o.copy && o.format == DXGI_FORMAT_B8G8R8A8_UNORM && (o.generation == 0 || fi.LastPresentTime.QuadPart != 0))
          {
-            context->CopyResource(o.copy.Get(), tex.Get());
+            context->CopySubresourceRegion(o.copy.Get(), 0, 0, 0, 0, tex.Get(), 0, nullptr);
+            if (o.view)
+               context->GenerateMips(o.view.Get());
             o.generation++;
          }
          o.dup->ReleaseFrame();
@@ -1477,7 +1533,7 @@ int main(int argc, char** argv)
       XrCompositionLayerProjection proj { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
       XrCompositionLayerProjectionView projViews[2] { { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW }, { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW } };
       bool projected = false;
-      if (fs.shouldRender && worn && projection && !renderer.empty())
+      if (fs.shouldRender && worn && projection)
       {
          XrViewLocateInfo vli { XR_TYPE_VIEW_LOCATE_INFO };
          vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
@@ -1519,6 +1575,45 @@ int main(int argc, char** argv)
                const scene::Mat4 mvp = scene::Mat4::projection(f.angleLeft, f.angleRight, f.angleUp, f.angleDown, 0.05f, 50.f) * scene::Mat4::poseInverse(vq, vt) * world;
                // Avec l'extension, le runtime fond toutes les couches ; sinon la scène fond seule.
                renderer.draw(context.Get(), mvp, world, colorScale ? 1.f : fade);
+               // Les écrans, dans la même couche et avec la profondeur : la scène passe devant ou
+               // derrière comme dans la pièce (repères du calage, bout des manettes).
+               for (Panel& p : panels)
+               {
+                  ID3D11ShaderResourceView* image = nullptr;
+                  float uv[4] = { 0, 0, 1, 1 };
+                  if (!p.surface.empty())
+                  {
+                     const auto it = surfaces.find(p.surface);
+                     if (it != surfaces.end() && it->second.view)
+                     {
+                        image = it->second.view.Get();
+                        uv[0] = p.fx, uv[1] = p.fy, uv[2] = p.fx + p.fw, uv[3] = p.fy + p.fh;
+                     }
+                  }
+                  else if (p.output >= 0 && outputs[p.output].view && outputs[p.output].generation && outputs[p.output].width && outputs[p.output].height)
+                  {
+                     const Output& o = outputs[p.output];
+                     image = o.view.Get();
+                     uv[0] = static_cast<float>(p.inOutput.left) / o.width, uv[1] = static_cast<float>(p.inOutput.top) / o.height;
+                     uv[2] = static_cast<float>(p.inOutput.right) / o.width, uv[3] = static_cast<float>(p.inOutput.bottom) / o.height;
+                  }
+                  if (!image)
+                     continue;
+                  const float hw = p.size.width / 2, hh = p.size.height / 2;
+                  const XrVector3f local[4] = { { -hw, hh, 0 }, { hw, hh, 0 }, { -hw, -hh, 0 }, { hw, -hh, 0 } };
+                  float corners[4][3];
+                  for (int c = 0; c < 4; c++)
+                  {
+                     const XrVector3f r = rotate(p.pose.orientation, local[c]);
+                     corners[c][0] = r.x + p.pose.position.x, corners[c][1] = r.y + p.pose.position.y, corners[c][2] = r.z + p.pose.position.z;
+                  }
+                  imageRenderer.draw(context.Get(), mvp, corners, uv, image, colorScale ? 1.f : fade);
+                  if (e == 0 && !p.shown)
+                  {
+                     p.shown = true;
+                     say("image " + p.role + (p.surface.empty() ? "" : " (rendu pour le casque)"));
+                  }
+               }
                if (!pointers.empty())
                {
                   const float iq[4] = { 0, 0, 0, 1 };
@@ -1544,7 +1639,8 @@ int main(int argc, char** argv)
       const void* fadeNext = colorScale && fade < 1.f ? &scale : nullptr;
 
       std::vector<XrCompositionLayerQuad> quads;
-      if (fs.shouldRender && worn)
+      // Sans couche de projection (Direct3D l'a refusée) : les écrans en couches « quad », toujours devant.
+      if (fs.shouldRender && worn && !projection)
       {
          for (Panel& p : panels)
          {

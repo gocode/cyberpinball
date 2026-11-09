@@ -352,4 +352,153 @@ void Renderer::draw(ID3D11DeviceContext* context, const Mat4& mvp, const Mat4& w
    }
 }
 
+// ---------------------------------------------------------------------------
+// Images des écrans dans la couche de projection
+
+bool makeImage(ID3D11Device* device, UINT width, UINT height, DXGI_FORMAT format, ComPtr<ID3D11Texture2D>& texture, ComPtr<ID3D11ShaderResourceView>& view)
+{
+   texture.Reset();
+   view.Reset();
+   D3D11_TEXTURE2D_DESC d {};
+   d.Width = width;
+   d.Height = height;
+   d.MipLevels = 0; // chaîne complète
+   d.ArraySize = 1;
+   d.Format = format;
+   d.SampleDesc.Count = 1;
+   d.Usage = D3D11_USAGE_DEFAULT;
+   d.BindFlags = D3D11_BIND_SHADER_RESOURCE | D3D11_BIND_RENDER_TARGET;
+   d.MiscFlags = D3D11_RESOURCE_MISC_GENERATE_MIPS;
+   if (FAILED(device->CreateTexture2D(&d, nullptr, &texture)) || FAILED(device->CreateShaderResourceView(texture.Get(), nullptr, &view)))
+   {
+      texture.Reset();
+      view.Reset();
+      return false;
+   }
+   return true;
+}
+
+static const char* kImageShader = R"(
+cbuffer Frame : register(b0)
+{
+   row_major float4x4 mvp;
+   float4 fade; // x : 1 plein, 0 noir
+};
+Texture2D image : register(t0);
+SamplerState smp : register(s0);
+struct VI { float3 p : POSITION; float2 uv : TEXCOORD; };
+struct VO { float4 p : SV_POSITION; float2 uv : TEXCOORD; };
+VO vs(VI i)
+{
+   VO o;
+   o.p = mul(mvp, float4(i.p, 1));
+   o.uv = i.uv;
+   return o;
+}
+float3 toLinear(float3 c) { return c <= 0.04045 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4); }
+float4 ps(VO i) : SV_TARGET { return float4(toLinear(image.Sample(smp, i.uv).rgb) * fade.x, 1); }
+)";
+
+struct ImageVertex
+{
+   float p[3];
+   float uv[2];
+};
+
+struct ImageConstants
+{
+   float mvp[16];
+   float fade[4];
+};
+
+bool ImageRenderer::init(ID3D11Device* device, std::string& error)
+{
+   ComPtr<ID3DBlob> vsCode, psCode, messages;
+   if (FAILED(D3DCompile(kImageShader, std::strlen(kImageShader), "image", nullptr, nullptr, "vs", "vs_5_0", 0, 0, &vsCode, &messages))
+      || FAILED(D3DCompile(kImageShader, std::strlen(kImageShader), "image", nullptr, nullptr, "ps", "ps_5_0", 0, 0, &psCode, &messages)))
+   {
+      error = messages ? std::string(static_cast<const char*>(messages->GetBufferPointer()), messages->GetBufferSize()) : "D3DCompile";
+      return false;
+   }
+   device->CreateVertexShader(vsCode->GetBufferPointer(), vsCode->GetBufferSize(), nullptr, &m_vs);
+   device->CreatePixelShader(psCode->GetBufferPointer(), psCode->GetBufferSize(), nullptr, &m_ps);
+   const D3D11_INPUT_ELEMENT_DESC layout[] = {
+      { "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+      { "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D11_INPUT_PER_VERTEX_DATA, 0 },
+   };
+   device->CreateInputLayout(layout, 2, vsCode->GetBufferPointer(), vsCode->GetBufferSize(), &m_layout);
+
+   D3D11_BUFFER_DESC cb {};
+   cb.ByteWidth = sizeof(ImageConstants);
+   cb.Usage = D3D11_USAGE_DEFAULT;
+   cb.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+   device->CreateBuffer(&cb, nullptr, &m_constants);
+   D3D11_BUFFER_DESC vb {};
+   vb.ByteWidth = sizeof(ImageVertex) * 6;
+   vb.Usage = D3D11_USAGE_DEFAULT;
+   vb.BindFlags = D3D11_BIND_VERTEX_BUFFER;
+   device->CreateBuffer(&vb, nullptr, &m_vertices);
+
+   // Filtrage anisotrope et mipmaps : un écran couché (le playfield) reste net en biais.
+   D3D11_SAMPLER_DESC sd {};
+   sd.Filter = D3D11_FILTER_ANISOTROPIC;
+   sd.MaxAnisotropy = 8;
+   sd.AddressU = sd.AddressV = sd.AddressW = D3D11_TEXTURE_ADDRESS_CLAMP;
+   sd.MaxLOD = D3D11_FLOAT32_MAX;
+   device->CreateSamplerState(&sd, &m_sampler);
+
+   D3D11_RASTERIZER_DESC rd {};
+   rd.FillMode = D3D11_FILL_SOLID;
+   rd.CullMode = D3D11_CULL_NONE;
+   rd.DepthClipEnable = TRUE;
+   device->CreateRasterizerState(&rd, &m_raster);
+   D3D11_DEPTH_STENCIL_DESC dd {};
+   dd.DepthEnable = TRUE;
+   dd.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ALL;
+   dd.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
+   device->CreateDepthStencilState(&dd, &m_depth);
+   D3D11_BLEND_DESC bd {};
+   bd.RenderTarget[0].RenderTargetWriteMask = D3D11_COLOR_WRITE_ENABLE_ALL;
+   device->CreateBlendState(&bd, &m_blend);
+   if (!m_vs || !m_ps || !m_layout || !m_constants || !m_vertices || !m_sampler || !m_raster || !m_depth || !m_blend)
+   {
+      error = "états Direct3D des images refusés";
+      return false;
+   }
+   return true;
+}
+
+void ImageRenderer::draw(ID3D11DeviceContext* context, const Mat4& mvp, const float corners[4][3], const float uv[4], ID3D11ShaderResourceView* image, float fade)
+{
+   const auto at = [&](int c, float u, float v) {
+      ImageVertex x {};
+      std::memcpy(x.p, corners[c], sizeof x.p);
+      x.uv[0] = u, x.uv[1] = v;
+      return x;
+   };
+   // Deux triangles : haut-gauche, haut-droit, bas-gauche ; bas-gauche, haut-droit, bas-droit.
+   const ImageVertex v[6] = { at(0, uv[0], uv[1]), at(1, uv[2], uv[1]), at(2, uv[0], uv[3]), at(2, uv[0], uv[3]), at(1, uv[2], uv[1]), at(3, uv[2], uv[3]) };
+   context->UpdateSubresource(m_vertices.Get(), 0, nullptr, v, 0, 0);
+   ImageConstants k {};
+   std::memcpy(k.mvp, mvp.m, sizeof k.mvp);
+   k.fade[0] = fade;
+   context->UpdateSubresource(m_constants.Get(), 0, nullptr, &k, 0, 0);
+   context->IASetInputLayout(m_layout.Get());
+   context->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+   const UINT stride = sizeof(ImageVertex), offset = 0;
+   context->IASetVertexBuffers(0, 1, m_vertices.GetAddressOf(), &stride, &offset);
+   context->VSSetShader(m_vs.Get(), nullptr, 0);
+   context->VSSetConstantBuffers(0, 1, m_constants.GetAddressOf());
+   context->PSSetShader(m_ps.Get(), nullptr, 0);
+   context->PSSetConstantBuffers(0, 1, m_constants.GetAddressOf());
+   context->PSSetShaderResources(0, 1, &image);
+   context->PSSetSamplers(0, 1, m_sampler.GetAddressOf());
+   context->RSSetState(m_raster.Get());
+   context->OMSetDepthStencilState(m_depth.Get(), 0);
+   context->OMSetBlendState(m_blend.Get(), nullptr, 0xffffffff);
+   context->Draw(6, 0);
+   ID3D11ShaderResourceView* none = nullptr;
+   context->PSSetShaderResources(0, 1, &none);
+}
+
 } // namespace scene
