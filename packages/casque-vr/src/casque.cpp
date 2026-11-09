@@ -17,6 +17,8 @@
 //     scene, puis boite … | quad … | disque …, puis scene-fin
 //                        (la borne en volume autour des panneaux, packages/core/src/casque-scene.ts ;
 //                        un nouveau bloc remplace le précédent, par exemple quand la teinte change)
+//     ancre <x> <z> <lacet> (place de la borne dans la pièce, gardée par Cyber Pinball : sans elle, la
+//                        borne se pose devant le joueur au premier regard suivi)
 //     recentrer          (la borne revient devant le joueur)
 //     releve             (une partie de VPX démarre : garder le casque, écrans de chargement compris, jusqu'à
 //                        ce que VPX le prenne, puis fondu au noir et fin ; deux minutes au plus)
@@ -146,6 +148,9 @@ struct Output
 };
 
 std::atomic<bool> wantRecenter { true };
+/** Place de la borne donnée par Cyber Pinball (ancre), prise par la boucle d'images. */
+std::atomic<bool> anchorGiven { false };
+float anchorX = 0, anchorZ = 0, anchorYaw = 0;
 std::atomic<bool> wantQuit { false };
 /** Relève demandée par Cyber Pinball (une partie de VPX démarre), et quand. */
 std::atomic<bool> handover { false };
@@ -204,6 +209,18 @@ void readCommands()
          described = true;
       else if (word == "recentrer")
          wantRecenter = true;
+      else if (word == "ancre")
+      {
+         float x, z, yaw;
+         in >> x >> z >> yaw;
+         if (in)
+         {
+            std::lock_guard<std::mutex> lock(panelsMutex);
+            anchorX = x, anchorZ = z, anchorYaw = yaw;
+            anchorGiven = true;
+            wantRecenter = false;
+         }
+      }
       else if (word == "releve")
       {
          handoverAt = GetTickCount64();
@@ -788,10 +805,8 @@ int main(int argc, char** argv)
             const XrSessionState previous = state;
             state = reinterpret_cast<XrEventDataSessionStateChanged*>(&ev)->state;
             say("etat " + std::to_string(static_cast<int>(state)));
-            // Casque mis (la session prend le regard du joueur) : la borne vient devant lui. Recentrer
-            // au premier instant de la session la poserait là où le casque attendait, sur un bureau.
-            if (state == XR_SESSION_STATE_FOCUSED && previous != XR_SESSION_STATE_FOCUSED)
-               wantRecenter = true;
+            // La borne reste à sa place dans la pièce, comme un objet : ni la session qui reprend le
+            // regard, ni le casque remis ne la déplacent (seuls « recentrer » et le recentrage du casque).
             // Relève : VPX a pris le regard du joueur (notre session n'est plus « FOCUSED ») : fondu, puis fin.
             if (handover && previous == XR_SESSION_STATE_FOCUSED && state != XR_SESSION_STATE_FOCUSED && !wantQuit)
             {
@@ -875,12 +890,24 @@ int main(int argc, char** argv)
          break;
       xrBeginFrame_(session, nullptr);
 
-      // Recentrage : la borne devant le joueur, tournée comme son regard (lacet seulement).
+      // Place gardée par Cyber Pinball (ancre) : la borne revient où elle était dans la pièce.
+      if (anchorGiven.exchange(false))
+      {
+         std::lock_guard<std::mutex> lock(panelsMutex);
+         anchor.orientation = { 0, std::sin(anchorYaw / 2), 0, std::cos(anchorYaw / 2) };
+         anchor.position = { anchorX, 0.f, anchorZ };
+         if (!stage)
+            wantRecenter = true; // sans la pièce, l'ancre ne vaut pas d'une session à l'autre
+      }
+      // Recentrage : la borne devant le joueur, tournée comme son regard (lacet seulement). Seulement
+      // sur une pose que le casque suit vraiment : posé ou pas encore porté, il ne rend qu'une pose
+      // figée (trois recentrages identiques au millionième le 9 novembre 2026, borne dos au PC).
       if (wantRecenter)
       {
          XrSpaceLocation loc { XR_TYPE_SPACE_LOCATION };
-         if (XR_SUCCEEDED(xrLocateSpace_(view, base, fs.predictedDisplayTime, &loc))
-            && (loc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) && (loc.locationFlags & XR_SPACE_LOCATION_ORIENTATION_VALID_BIT))
+         constexpr XrSpaceLocationFlags tracked = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT | XR_SPACE_LOCATION_POSITION_TRACKED_BIT
+            | XR_SPACE_LOCATION_ORIENTATION_TRACKED_BIT;
+         if (state == XR_SESSION_STATE_FOCUSED && XR_SUCCEEDED(xrLocateSpace_(view, base, fs.predictedDisplayTime, &loc)) && (loc.locationFlags & tracked) == tracked)
          {
             const XrVector3f fwd = rotate(loc.pose.orientation, { 0, 0, -1 });
             const float yaw = std::atan2(-fwd.x, -fwd.z);
@@ -888,7 +915,8 @@ int main(int argc, char** argv)
             // Sans la pièce, le sol est supposé 1,60 m sous les yeux.
             anchor.position = { loc.pose.position.x, stage ? 0.f : loc.pose.position.y - 1.6f, loc.pose.position.z };
             wantRecenter = false;
-            say("centre x=" + std::to_string(anchor.position.x) + " z=" + std::to_string(anchor.position.z) + " yeux=" + std::to_string(loc.pose.position.y - anchor.position.y));
+            say("centre " + std::to_string(anchor.position.x) + " " + std::to_string(anchor.position.z) + " " + std::to_string(yaw) + " yeux=" + std::to_string(loc.pose.position.y - anchor.position.y)
+               + (stage ? "" : " sans-piece"));
          }
       }
 

@@ -47,6 +47,12 @@ export interface HeadsetMenuOptions {
    * voir, après un essai, si un défaut vu dans le casque vient de l'image envoyée ou d'après.
    */
   snapshotDir?: string;
+  /**
+   * Fichier où garder la place de la borne dans la pièce (position au sol et cap), pour qu'elle
+   * y reste d'une session à l'autre, comme un objet ; sans place gardée, elle se pose devant le
+   * joueur au premier regard suivi.
+   */
+  placeFile?: string;
   /** L'état a changé (montré, en attente, absent) : le menu se renvoie (détail de l'entrée, playfield tourné). */
   onStateChange?(): void;
   log(line: string): void;
@@ -156,6 +162,9 @@ export class HeadsetMenu {
         // dizaines de lignes à chaque session (RipcClient, RuntimeIPC…).
         if (!PROTOCOL.test(line)) continue;
         if (line.startsWith('pret')) this.setState('shown');
+        // « centre x z lacet yeux=… » : la nouvelle place de la borne, gardée (dans la pièce seulement).
+        const centre = /^centre (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)(?!.*sans-piece)/.exec(line);
+        if (centre) this.writePlace({ x: Number(centre[1]), z: Number(centre[2]), yaw: Number(centre[3]) });
         if (line.startsWith('casque-absent')) this.setState('waiting');
         if (line.startsWith('image') && !this.snapshotTaken && this.opts.snapshotDir) {
           this.snapshotTaken = true;
@@ -182,9 +191,31 @@ export class HeadsetMenu {
     });
     this.panels = panels;
     for (const line of headsetProtocol(panels).filter((l) => l !== 'fin')) child.stdin.write(`${line}\n`);
+    const place = this.readPlace();
+    if (place) child.stdin.write(`ancre ${place.x} ${place.z} ${place.yaw}\n`);
     this.sendScene(child, this.opts.tint());
     child.stdin.write('fin\n');
     this.opts.log(`Casque : compagnon lancé, ${panels.map((p) => `${p.role} ${p.width.toFixed(2)}×${p.height.toFixed(2)} m`).join(', ')}.`); // i18n-ignore : journal
+  }
+
+  private readPlace(): { x: number; z: number; yaw: number } | undefined {
+    if (!this.opts.placeFile) return undefined;
+    try {
+      const p = JSON.parse(fs.readFileSync(this.opts.placeFile, 'utf8')) as { x?: unknown; z?: unknown; yaw?: unknown };
+      return [p.x, p.z, p.yaw].every((v) => typeof v === 'number' && Number.isFinite(v)) ? { x: p.x as number, z: p.z as number, yaw: p.yaw as number } : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+
+  private writePlace(place: { x: number; z: number; yaw: number }): void {
+    if (!this.opts.placeFile || ![place.x, place.z, place.yaw].every(Number.isFinite)) return;
+    try {
+      fs.mkdirSync(path.dirname(this.opts.placeFile), { recursive: true });
+      fs.writeFileSync(this.opts.placeFile, JSON.stringify(place, null, 2) + '\n');
+    } catch {
+      // Place pas gardée : la borne se reposera devant le joueur à la prochaine session.
+    }
   }
 
   private setState(state: HeadsetMenuState): void {

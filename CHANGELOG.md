@@ -26,6 +26,7 @@ son interface).
 - Menu système > Cyber Pinball > « Redémarrer Cyber Pinball » relance le logiciel seul, sans redémarrer le PC.
 - « Réalité virtuelle » porte un badge « BÊTA » dans le menu : la fonction est en plein essai.
 - Dans le casque : le plateau s'affiche en portrait, comme sur la borne ; les fenêtres du fronton, du DMD et du topper s'éteignent pendant une partie en VR ; un VPX qui se fige en quittant est fermé proprement.
+- Dans le casque, la borne du menu reste à sa place dans la pièce d'une fois sur l'autre ; la touche 5 du pavé numérique la remet devant vous.
 
 ## 0.1.8
 

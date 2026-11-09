@@ -2035,6 +2035,7 @@ export function startFrontend(): void {
     playfieldRotation: () => headsetTurn(),
     tint: () => tints?.current()?.color,
     snapshotDir: path.join(loc.dataDir, 'logs', 'casque'),
+    placeFile: path.join(loc.dataDir, 'vr', 'casque.json'),
     onStateChange: () => broadcast(),
     log: (line) => console.log(line),
   });
@@ -2393,6 +2394,12 @@ function handleKey(input: Input, fromPhone = false): boolean {
   if (input.control && input.code === 'KeyQ') return guest.knock('shortcut.quit') ? quit() : true;
   // Extinction, veille ou redémarrage en cours : plus rien ne se choisit.
   if (state.phase === 'message' && state.message?.action === 'power') return true;
+  // Menu montré dans le casque : la touche de recentrage de VPX (5 du pavé) remet la borne devant le joueur.
+  if (input.code === 'Numpad5' && !input.isAutoRepeat && headset?.state === 'shown') {
+    headset.recenter();
+    console.log('Casque : borne recentrée sur le regard du joueur (5 du pavé).'); // i18n-ignore : journal
+    return true;
+  }
   // Raccourci du mode bureau, de n'importe quel écran du menu (sauf pendant une partie) ; une fenêtre rouverte au bureau le reçoit aussi : retour.
   if (matchesShortcut(input, SHORTCUTS.desktop)) return desktop.active ? (restoreFromDesktop(), true) : guest.knock('shortcut.desktop') ? showDesktop() : true;
   // N'importe quel bouton en mode attente y met fin, sans autre effet ; sinon il remet le compte à zéro.
