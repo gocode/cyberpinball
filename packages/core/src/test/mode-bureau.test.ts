@@ -171,7 +171,7 @@ test('mode bureau : toutes les fenêtres de l’application, voiles compris, san
   assert.match(source, /isShown,\s*isVeil,\s*hideVeil: hideCovered,\s*showVeil: \(win\) => win\.showInactive\(\),\s*minimizeWindow: minimizeCovered,/);
   // Le gardien des écrans ne remontre pas un voile en mode bureau.
   const guard = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'screen-guard.ts'), 'utf8');
-  assert.match(guard, /desktopMode \|\| win\.showInactive\(\)/);
+  assert.match(guard, /if \(desktopMode\) return;\s*win\.showInactive\(\);/);
 });
 
 test('raccourcis : une seule définition pour l’accélérateur, la reconnaissance et l’affichage', () => {

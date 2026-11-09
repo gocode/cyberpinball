@@ -37,6 +37,8 @@ export function coverDisplay(win: BrowserWindow, bounds: Rectangle): void {
     return;
   }
   if (!covered.has(win)) {
+    tracked.add(win);
+    win.once('closed', () => tracked.delete(win));
     const recover = () => {
       const wanted = covered.get(win);
       if (wanted && !win.isDestroyed() && coverProblem(stateOf(win), wanted)) cover(win, wanted);
@@ -82,6 +84,29 @@ export function hideCovered(win: BrowserWindow): void {
 
 /** Écran que chaque fenêtre doit couvrir (coordonnées Electron). */
 const covered = new WeakMap<BrowserWindow, Rectangle>();
+/** Fenêtres suivies par coverDisplay, pour les reprendre toutes (recoverCovered). */
+const tracked = new Set<BrowserWindow>();
+
+/**
+ * Reprend chaque fenêtre affichée qui a perdu son écran : Windows chasse vers l'écran principal les
+ * fenêtres d'un écran qui disparaît (débranché, éteint, ou redétecté par la carte graphique), et ne
+ * les y ramène pas toujours quand il revient. Seulement si l'écran voulu est de nouveau là
+ * (`present`) ; `only` : les fenêtres à reprendre. Rend, pour chaque fenêtre reprise, son titre et
+ * la place où elle était.
+ */
+export function recoverCovered(present: (bounds: Rectangle) => boolean, only: (win: BrowserWindow) => boolean = () => true): string[] {
+  if (OFFSCREEN) return [];
+  const moved: string[] = [];
+  for (const win of tracked) {
+    const wanted = covered.get(win);
+    if (!wanted || win.isDestroyed() || !displayed.has(win) || !only(win) || !present(wanted)) continue;
+    const problem = coverProblem(stateOf(win), wanted);
+    if (!problem) continue;
+    cover(win, wanted);
+    moved.push(`« ${win.getTitle()} » (${problem})`); // i18n-ignore : constat pour la console
+  }
+  return moved;
+}
 /** Fenêtres affichées (ni cachées, ni réduites, ni encore jamais montrées). */
 const displayed = new WeakSet<BrowserWindow>();
 

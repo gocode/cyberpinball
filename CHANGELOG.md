@@ -29,6 +29,7 @@ son interface).
 - Dans le casque, la borne du menu reste à sa place dans la pièce d'une fois sur l'autre ; la touche 5 du pavé numérique la remet devant vous.
 - Le menu est dessiné exprès pour le casque : le plateau y est en portrait, pendant que le PC garde son menu en paysage. Casque porté, les écrans du PC se mettent au repos et affichent « Dans le casque » ; casque retiré, ou menu de Meta ouvert, le PC reprend la main.
 - Dans le casque, l'image de fond du plateau suit le sens du plateau (portrait) : la table se voit en entier pendant la navigation.
+- Un écran que Windows débranche puis rebranche, pendant une partie ou au menu, retrouve son rôle et son image au lieu de rester noir ; au retour d'une partie, chaque fenêtre reprend son écran.
 
 ## 0.1.8
 

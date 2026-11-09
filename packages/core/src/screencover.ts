@@ -74,6 +74,16 @@ export function coveringWindow<W extends StackedWindow>(display: CoverRect, stac
   return stack.find((w) => !w.minimized && pids.includes(w.pid) && contains(w.rect, display));
 }
 
+/**
+ * Écrans de la borne restés noirs : une fenêtre du menu les attend (`role`), mais la plus haute
+ * fenêtre de Cyber Pinball qui les couvre est leur voile noir (titre `veilTitle`). Le cas d'un
+ * écran que Windows débranche puis rebranche, même pendant une partie : il reçoit un voile neuf,
+ * montré devant tout ce qui était là, et l'écran restait noir au retour.
+ */
+export function veiledScreens<S extends { rect: CoverRect; role: boolean }>(screens: S[], stack: StackedWindow[], pids: number[], veilTitle: string): S[] {
+  return screens.filter((s) => s.role && coveringWindow(s.rect, stack, pids)?.title === veilTitle);
+}
+
 /** Écran sur lequel est posée une fenêtre (la barre des tâches de chaque écran) : celui qu'elle recouvre le plus. */
 export function displayOf<D extends CoverRect>(rect: CoverRect, displays: D[]): D | undefined {
   let best: D | undefined;

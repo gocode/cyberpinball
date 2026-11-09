@@ -27,6 +27,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - In the headset, the menu's cabinet stays in its place in the room from one time to the next; the 5 key of the numeric keypad brings it back in front of you.
 - The menu is drawn specially for the headset: the playfield is in portrait there, while the PC keeps its menu in landscape. With the headset on, the PC screens go to rest and show "Dans le casque" (In the headset); with the headset off, or the Meta menu open, the PC takes over again.
 - In the headset, the playfield's background image follows the playfield's orientation (portrait): the table is seen in full while browsing.
+- A screen that Windows disconnects and reconnects, during a game or in the menu, gets its role and its picture back instead of staying black; when a game ends, each window takes back its screen.
 
 ## 0.1.8
 

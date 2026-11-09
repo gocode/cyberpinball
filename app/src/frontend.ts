@@ -229,7 +229,7 @@ import { coverDisplay, hideCovered, minimizeCovered } from './cover-display';
 import { DesktopMode } from './desktop-mode';
 import { answerLegacy, legacyDesktopTurned, orientationForDesktop, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
 import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './frontend-gate';
-import { hideTaskbars, isVeil, nameScreen, relaunchCovered, restoreTaskbars, setDesktopMode, settleScreens, takeCoverIncidents } from './screen-guard';
+import { hideTaskbars, isVeil, nameScreen, onScreensSettled, recoverScreens, relaunchCovered, restoreTaskbars, setDesktopMode, settleScreens, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
 import { forcedRotation, menuRotation, openSettings } from './settings';
 import { allowPreview, serveMedias } from './media-protocol';
@@ -537,6 +537,8 @@ let dmdWatch: DmdWatch | undefined;
 let occupiedWatch: NodeJS.Timeout | undefined;
 /** Relecture des fenêtres pendant la partie : B2S, DMD et PuP s'ouvrent après la fenêtre de jeu. */
 const OCCUPIED_CHECK_MS = 2000;
+/** Au retour d'une partie, délai avant le second contrôle des écrans (le temps qu'ils se posent). */
+const SCREENS_SETTLE_MS = 1500;
 /**
  * Recalage des fenêtres annexes de VPX pendant la partie (vpxWindowMoves) : rôles qu'il peut
  * confondre, écran de chaque rôle et écrans branchés, déplacements déjà faits par fenêtre.
@@ -2037,6 +2039,9 @@ export function startFrontend(): void {
 
   menuAssignments = choose ? {} : assignments;
   openWindows(assignments, cabinet && !choose ? cabinetZones(cabinet) : {});
+  // Écran débranché puis rebranché hors partie : chaque fenêtre du menu reprend le sien. Pendant
+  // un lancement ou une partie, rien ne bouge (le premier plan va à VPX) : la reprise se fait au retour.
+  onScreensSettled(() => playing || launch || recoverScreens('displays'));
   headset = new HeadsetMenu({
     appDir: path.join(__dirname, '..'),
     wanted: () => !headsetPaused && !closing && (Boolean(HEADSET_TRIAL_DIR) || (vrMode === 'auto' && probeVr().ready)),
@@ -3015,6 +3020,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   restoreTaskbars('game-end');
   const focusReturned = await showMenuAgain();
   settleScreens('return');
+  // Écran débranché puis rebranché par Windows pendant la partie : la fenêtre de son rôle, chassée
+  // ou cachée sous un voile neuf, le reprend ; contrôlé de nouveau une fois les écrans posés.
+  recoverScreens('return');
+  setTimeout(() => playing || recoverScreens('return'), SCREENS_SETTLE_MS);
   // Son coupé pendant la partie (ou avant) : la pastille le rappelle au retour.
   cabinetVolume?.remindIfMuted();
   // Les fichiers de l'enregistrement : rendus quelques instants après la fermeture de VPX.

@@ -24,6 +24,11 @@
 // 5. En mode bureau (desktop-mode.ts), l'inverse : les voiles sont cachés, ceux d'un écran
 //    branché entre-temps naissent cachés, et un écran qu'une fenêtre de Cyber Pinball
 //    recouvre encore est signalé (desktopBlockers). Au retour, chaque écran retrouve son voile.
+// 6. Écran débranché puis rebranché par Windows (même pendant une partie : une carte graphique
+//    qui redétecte ses sorties le fait à répétition) : son voile neuf passe sous les fenêtres de
+//    Cyber Pinball, jamais devant (tuckVeil) ; hors partie, les fenêtres du menu chassées de leur
+//    écran le reprennent (recoverScreens), et au retour d'une partie aussi. Un écran de la borne
+//    resté noir sous son voile est signalé et retrouve sa fenêtre devant (veiledScreens).
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
@@ -35,6 +40,8 @@ import {
   cabinetHidesTaskbars,
   coverNotice,
   coveringWindow,
+  taskbarMomentLabel,
+  veiledScreens,
   desktopBlockers,
   displayOf,
   parseTaskbarMarker,
@@ -58,7 +65,7 @@ import {
 } from '@cyberpinball/core';
 import { allowAnyForeground, foregroundWindow, hideWindow, listWindows, placeWindowBelow, showWindowInactive, taskbarWindows, type WindowInfo } from '@cyberpinball/win-displays';
 import { createWindow, desktopDisplays, isShown, OFFSCREEN, paintedOnScreen, whenReadyToShow } from './offscreen';
-import { coverDisplay, coverProblem } from './cover-display';
+import { coverDisplay, coverProblem, recoverCovered } from './cover-display';
 import { locations } from './paths';
 import { relaunchThroughShellLauncher, shellSession } from './dedicated-session';
 import { windowsStartupDir } from './dedicated-system';
@@ -81,8 +88,13 @@ const RELAY_SETTLE_MS = 400;
 /** Voile de chaque écran, par identifiant d'écran d'Electron. */
 const veils = new Map<number, BrowserWindow>();
 const veilSet = new WeakSet<BrowserWindow>();
-/** Nom des écrans dans les constats (rôle dans la borne), par identifiant d'écran. */
-const names = new Map<number, string>();
+/**
+ * Nom des écrans dans les constats (rôle dans la borne), par rectangle de l'écran : un écran que
+ * Windows débranche puis rebranche revient avec un autre identifiant, à la même place.
+ */
+const names = new Map<string, string>();
+/** Appelés quand les écrans ont fini de changer (recoverScreens, hors partie). */
+const settledListeners: (() => void)[] = [];
 /** Raison pour laquelle le bureau peut se voir (mode bureau, fermeture) ; undefined : il ne doit pas. */
 let desktopAllowed: string | undefined;
 /** Mode bureau : les voiles restent cachés, aucune fenêtre de Cyber Pinball ne doit couvrir un écran. */
@@ -127,6 +139,7 @@ export function guardScreens(): void {
     setTimeout(() => {
       placeVeils(true);
       settleScreens('displays');
+      for (const listener of settledListeners) listener();
     }, DISPLAY_SETTLE_MS);
   };
   screen.on('display-added', displaysChanged);
@@ -191,8 +204,62 @@ function openVeil(d: Display): BrowserWindow {
   // (createWindow) : au démarrage, le bureau se voit un peu plus longtemps ; à une relance, les
   // fenêtres de l'ancien processus couvrent les écrans jusque-là.
   // En mode bureau (écran branché entre-temps), il attend caché le retour au menu.
-  whenReadyToShow(win, () => desktopMode || win.showInactive());
+  // Écran rebranché alors que le menu (ou VPX) est là : le voile neuf passe sous les fenêtres de
+  // Cyber Pinball, sinon il cache celle du rôle de l'écran, qui reste noir.
+  whenReadyToShow(win, () => {
+    if (desktopMode) return;
+    win.showInactive();
+    tuckVeil(win);
+  });
   return win;
+}
+
+/** Place un voile sous la plus basse fenêtre de Cyber Pinball (sans effet s'il n'y en a pas encore). */
+function tuckVeil(win: BrowserWindow): void {
+  try {
+    const handle = win.getNativeWindowHandle().readBigUInt64LE(0);
+    const ours = listWindows((w) => w.visible && w.pid === process.pid);
+    const veil = ours.find((w) => w.handle === handle);
+    const lowest = ours.filter((w) => w.title !== VEIL_TITLE).at(-1);
+    if (veil && lowest) placeWindowBelow(veil, lowest);
+  } catch {
+    // API de Windows indisponible : le contrôle des écrans (recoverScreens) le verra.
+  }
+}
+
+/** Écrans qui ont fini de changer (débranchés, rebranchés, pivotés) : `listener` est appelé, voiles replacés. */
+export function onScreensSettled(listener: () => void): void {
+  settledListeners.push(listener);
+}
+
+/**
+ * Reprise des écrans de la borne (écrans qui ont changé, retour d'une partie) : chaque fenêtre du
+ * menu chassée de son écran le reprend, et un écran resté noir sous son voile retrouve sa fenêtre
+ * devant. Chaque reprise est notée dans la console, le bilan d'endurance et le journal des écrans.
+ * Rend le nombre de reprises.
+ */
+export function recoverScreens(moment: TaskbarMoment): number {
+  if (OFFSCREEN || desktopMode || desktopAllowed || relaunching) return 0;
+  const when = taskbarMomentLabel(moment);
+  const displays = desktopDisplays();
+  const present = (r: Rectangle) => displays.some((d) => d.bounds.x <= r.x && d.bounds.y <= r.y && d.bounds.x + d.bounds.width >= r.x + r.width && d.bounds.y + d.bounds.height >= r.y + r.height);
+  const lines = recoverCovered(present, (win) => !veilSet.has(win)).map((w) => `Fenêtre ${w} : remise sur son écran (${when}).`); // i18n-ignore : constat pour la console et le bilan d’endurance
+  try {
+    const screens = displays.map((d) => ({ display: d, name: displayName(d), role: names.has(rectKey(d.bounds)), rect: screen.dipToScreenRect(null, d.bounds) }));
+    for (const s of veiledScreens(screens, listWindows((w) => w.visible), [process.pid], VEIL_TITLE)) {
+      const veil = veils.get(s.display.id);
+      if (veil && !veil.isDestroyed()) tuckVeil(veil);
+      lines.push(`Écran « ${s.name} » : resté noir sous son voile (${when}) ; la fenêtre du menu repasse devant.`); // i18n-ignore : constat pour la console et le bilan d’endurance
+    }
+  } catch {
+    // API de Windows indisponible : seule la reprise des fenêtres a eu lieu.
+  }
+  for (const line of lines) {
+    incidents.push(line);
+    console.warn(line);
+  }
+  if (lines.length) journalScreens(moment);
+  return lines.length;
 }
 
 /** Voile noir du gardien des écrans (le mode bureau le cache au lieu de le réduire). */
@@ -439,7 +506,11 @@ function journalScreens(moment: TaskbarMoment): void {
 
 /** Nom d'un écran dans les constats : son rôle dans la borne (`bounds` en coordonnées Electron). */
 export function nameScreen(bounds: Rectangle, name: string): void {
-  names.set(screen.getDisplayMatching(bounds).id, name);
+  names.set(rectKey(screen.getDisplayMatching(bounds).bounds), name);
+}
+
+function rectKey(r: Rectangle): string {
+  return `${r.x},${r.y},${r.width},${r.height}`;
 }
 
 /**
@@ -531,7 +602,7 @@ function screenName(d: Display): string {
 
 /** Rôle de l'écran dans la borne, ou sa taille et sa place s'il n'en a pas. */
 function displayName(d: Display): string {
-  return names.get(d.id) ?? `${d.bounds.width} × ${d.bounds.height} en ${d.bounds.x}, ${d.bounds.y}`;
+  return names.get(rectKey(d.bounds)) ?? `${d.bounds.width} × ${d.bounds.height} en ${d.bounds.x}, ${d.bounds.y}`;
 }
 
 function formatTitles(titles: string[]): string {

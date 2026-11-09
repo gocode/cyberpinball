@@ -32,7 +32,9 @@ const GAME_TITLES = [PLAYER_TITLE, VR_PREVIEW_TITLE];
 const POLL_MS = 250;
 /** Partie dans le casque : temps de jeu avant de surveiller une fenêtre de VPX figée, puis durée du figement avant de le fermer. */
 const HUNG_GRACE_MS = 20_000;
-const HUNG_KILL_MS = 8_000;
+// Windows ne déclare une fenêtre figée (IsHungAppWindow) qu'après 5 s sans lire ses messages :
+// VPX part donc 8 s après s'être figé. Avec 8 s de plus (13 s), le joueur forçait au clavier.
+const HUNG_KILL_MS = 3_000;
 
 export type LaunchFailure = 'spawn' | 'timeout' | 'dialog' | 'crash';
 
