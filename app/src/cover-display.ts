@@ -135,6 +135,14 @@ export function coverProblem(state: { fullScreen: boolean; bounds: Rectangle }, 
 
 
 /**
+ * Place une vue (WebContentsView) sur une zone de sa fenêtre, en pixels de la page : le lecteur
+ * YouTube du Juke-box sur le cadre du clip (jukebox-player.ts). Une zone vide la réduit à rien.
+ */
+export function placeView(view: { setBounds(bounds: Rectangle): void }, zone: Rectangle | undefined): void {
+  view.setBounds(zone ?? { x: 0, y: 0, width: 0, height: 0 });
+}
+
+/**
  * Place une vue (WebContentsView) dans sa fenêtre, sous un bandeau de `top` pixels, sur
  * toute la place restante : la page d'un site sous le bandeau de la fenêtre
  * « Récupérer ». Suit les changements de taille de la fenêtre (plein écran, rotation).

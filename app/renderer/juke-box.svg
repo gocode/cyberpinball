@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300">
+  <!-- Logo du Juke-box de Cyber Pinball : disque à sillons, note centrale vert signal, six pistes de son. -->
+  <defs><radialGradient id="disque"><stop stop-color="#173c3c"/><stop offset="1" stop-color="#06100f"/></radialGradient></defs>
+  <circle cx="150" cy="150" r="143" fill="url(#disque)" stroke="#8ba69e" stroke-width="8"/>
+  <g fill="none" stroke="#719b9b" opacity=".45"><circle cx="150" cy="150" r="124"/><circle cx="150" cy="150" r="112"/><circle cx="150" cy="150" r="100"/><circle cx="150" cy="150" r="88"/></g>
+  <path d="M65 175V125M90 195V105M115 210V90M185 210V90M210 195V105M235 175V125" stroke="#aa84dc" stroke-width="9" stroke-linecap="round"/>
+  <circle cx="150" cy="150" r="57" fill="#081714" stroke="#35c8bd" stroke-width="3"/>
+  <path d="M140 119L140 173Q125 164 120 178Q118 190 133 189Q151 189 151 174V137L174 131V164Q159 155 155 169Q154 182 167 182Q184 182 184 166V111Z" fill="#8be23a"/>
+  <path d="M70 61A115 115 0 0 1 200 45" fill="none" stroke="#c0d6cb" stroke-width="3"/>
+</svg>

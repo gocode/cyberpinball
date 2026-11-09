@@ -52,9 +52,9 @@ export function momentScreen(moment: MenuMoment, role: RoleId, opts: { game: Gam
  * Phase du menu (app/src/frontend.ts) : ouverture au démarrage (intro.ts), tables, chargement,
  * partie, message, confirmation de sortie, menu système.
  */
-export type MenuPhase = 'intro' | 'menu' | 'loading' | 'playing' | 'message' | 'confirmQuit' | 'library';
+export type MenuPhase = 'intro' | 'menu' | 'loading' | 'playing' | 'message' | 'confirmQuit' | 'library' | 'jukebox';
 
-export const MENU_PHASES: readonly MenuPhase[] = ['intro', 'menu', 'loading', 'playing', 'message', 'confirmQuit', 'library'];
+export const MENU_PHASES: readonly MenuPhase[] = ['intro', 'menu', 'loading', 'playing', 'message', 'confirmQuit', 'library', 'jukebox'];
 
 /** Ce qui est ouvert, pour savoir de quelle table parlent les écrans de la borne. */
 export interface ScreensContext {
@@ -89,6 +89,8 @@ const PHASE_TABLE: Record<MenuPhase, (s: ScreensContext) => TableEntry | undefin
   message: (s) => s.about,
   confirmQuit: () => undefined,
   library: (s) => s.about,
+  // Juke-box (jukebox-screens.ts) : la musique, d'aucune table ; ses écrans dessinent le lecteur.
+  jukebox: () => undefined,
 };
 
 /**

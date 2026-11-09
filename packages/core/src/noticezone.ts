@@ -41,9 +41,11 @@ export type ZoneScreen =
   /** La partie, VPX à l'écran. */
   | 'playing'
   /** Le bureau de Windows à l'écran : Cyber Pinball s'est effacé. */
-  | 'desktop';
+  | 'desktop'
+  /** Le Juke-box : la liste des morceaux sur le plateau, le clip sur le fronton. */
+  | 'jukebox';
 
-export const ZONE_SCREENS: readonly ZoneScreen[] = ['intro', 'menu', 'attract', 'library', 'help', 'message', 'confirmQuit', 'power', 'browser', 'loading', 'playing', 'desktop'];
+export const ZONE_SCREENS: readonly ZoneScreen[] = ['intro', 'menu', 'attract', 'library', 'help', 'message', 'confirmQuit', 'power', 'browser', 'loading', 'playing', 'desktop', 'jukebox'];
 
 /**
  * Où se pose la zone : `corner`, le coin du menu des tables (à gauche de la roue dentée) ;
@@ -87,6 +89,10 @@ export function noticeZone(screen: ZoneScreen, facts: ZoneFacts = {}): NoticeZon
     case 'menu':
       // Le constat bref prend la ligne de la notification, quelques secondes : elle attend.
       return { place: 'corner', count: true, notices: facts.banner ? 'wait' : waiting };
+    // Juke-box : sur la ligne de la marque, entre elle et le repère JUKE-BOX (jukebox.css) ; la musique
+    // continue. Le constat bref (morceau illisible) y prend la place quelques secondes : tout attend.
+    case 'jukebox':
+      return { place: 'head', count: true, notices: facts.banner ? 'wait' : waiting };
     case 'attract':
     case 'library':
     case 'help':

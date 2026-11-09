@@ -1,0 +1,772 @@
+// Juke-box à l'écran (app/src/jukebox-player.ts, packages/core/src/jukebox-screens.ts) : le médaillon
+// de la roue et son affiche, la liste des morceaux sur le plateau (borne) ou dans le cadre 9:16
+// (bureau), le clip sur le fronton avec son cartel, la pochette ou le visualiseur d'un son seul.
+// Les zones et leurs cotes suivent les maquettes validées par le mainteneur le 09/11/2026 :
+// en borne, à la référence 1080 × 1920 ; au bureau, 1920 × 1080 ; le fronton, 1920 × 1080. Une
+// unité (--jp) les met à l'échelle de l'écran réel (la 4K double tout sans changer la composition).
+//
+//   CyberJukebox.playfield(s)          // nœuds du plateau en mode Juke-box (liste, lecteur au bureau)
+//   CyberJukebox.wheelPoster(s, desk)  // affiche du médaillon choisi, derrière la roue
+//   CyberJukebox.backglassPoster(s)    // la même, dans le cadre du fronton du menu au bureau
+//   CyberJukebox.zone(node, role, s)   // zone d'un écran annexe : clip, affiche ou rien (false)
+//   CyberJukebox.logo()                // logo rond du médaillon (disque, note, pistes de son)
+//   CyberJukebox.status()              // ce que joue la fenêtre, pour les essais sans opérateur
+//
+// La lecture se fait dans la fenêtre du clip : le son et la vidéo muette d'un morceau sur la borne,
+// lus ensemble (le son mène, la vidéo le suit), ou le fichier local. Le lecteur YouTube (en ligne)
+// est une vue posée par le processus principal sur le cadre du clip : cette page lui en dit la place.
+
+(() => {
+  'use strict';
+
+  const el = (tag, className, text) => {
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  };
+  const icon = (name, className) => cyberIcon(name, className);
+  const act = (node, action) => {
+    node.dataset.act = JSON.stringify({ type: 'jukebox', ...action });
+    return node;
+  };
+
+  /** Marque « CYBER PINBALL », PINBALL en vert signal. */
+  function brand() {
+    const node = el('div', 'jb-brand', 'CYBER ');
+    node.append(el('b', '', 'PINBALL'));
+    return node;
+  }
+
+  // ---------- Logo du médaillon ----------
+
+  /**
+   * Logo rond du médaillon (juke-box.svg) : disque à sillons, note centrale vert signal, six pistes
+   * de son violettes ; une illustration, pas un pictogramme du registre.
+   */
+  function logo(className = 'jb-logo') {
+    const img = el('img', className);
+    img.src = 'juke-box.svg';
+    img.alt = t('Juke-box');
+    img.draggable = false;
+    return img;
+  }
+
+  // ---------- Pochettes dessinées (morceau sans image) ----------
+
+  /** Six couples de couleurs, comme les pochettes des maquettes ; jamais clairs. */
+  const PAIRS = [
+    ['#9771d2', '#35bfc0'],
+    ['#ed8b42', '#b75572'],
+    ['#4488bb', '#45c6aa'],
+    ['#bb557d', '#6c71cc'],
+    ['#bf993c', '#5979a9'],
+    ['#6c98b6', '#8b66ba'],
+  ];
+
+  function hash(text) {
+    let h = 2166136261;
+    for (const c of String(text)) h = Math.imul(h ^ c.codePointAt(0), 16777619);
+    return h >>> 0;
+  }
+
+  /** Vignette d'un morceau : son image, sinon une scène abstraite tirée de sa clé (soleil, horizon, sillons). */
+  function art(image, seed, className = 'jb-art') {
+    const box = el('div', className);
+    const [a, b] = PAIRS[hash(seed) % PAIRS.length];
+    box.style.setProperty('--art-a', a);
+    box.style.setProperty('--art-b', b);
+    box.dataset.scene = String(hash(`${seed}·`) % 3);
+    if (image) {
+      const img = el('img', 'jb-art-img');
+      img.alt = '';
+      img.src = image;
+      img.addEventListener('error', () => img.remove(), { once: true });
+      box.append(img);
+    }
+    return box;
+  }
+
+  // ---------- Affiche (médaillon, fronton au repos) ----------
+
+  /** L'affiche du Juke-box : identité, chiffres de la bibliothèque, dernière écoute (ou invitation). */
+  function poster(p, className = '') {
+    const box = el('section', `jb-poster ${className}`.trim());
+    const content = el('div', 'jb-poster-content');
+    const identity = el('div', 'jb-identity');
+    identity.append(logo());
+    content.append(identity, el('div', 'jb-label', t('Votre borne. Votre musique.')), el('h1', 'jb-poster-title', t('JUKE-BOX')), el('p', 'jb-muted jb-poster-stats', p.stats), el('div', 'jb-rule'));
+    content.append(el('div', 'jb-eyebrow', p.eyebrow), el('h2', 'jb-poster-heading', p.heading));
+    if (p.detail) content.append(el('p', 'jb-muted jb-poster-detail', p.detail));
+    box.append(content);
+    return box;
+  }
+
+  // ---------- Commandes ----------
+
+  function command(c, desk) {
+    const node = el('span', `jb-command${c.disabled ? ' jb-disabled' : ''}`);
+    node.append(el('span', 'jb-key', desk ? c.desk : c.cab), el('span', 'jb-command-action', c.action));
+    if (c.id === 'start') act(node, { op: 'start' });
+    else if (c.id === 'magnasave') act(node, { op: 'playlist', dir: 1 });
+    else if (c.id === 'exit') act(node, { op: 'exit' });
+    return node;
+  }
+
+  function commands(view, desk) {
+    const box = el('div', 'jb-zone jb-help');
+    for (const c of view.commands) box.append(command(c, desk));
+    return box;
+  }
+
+  // ---------- Liste des morceaux ----------
+
+  const SOURCE = {
+    online: ['globe', () => t('En ligne'), () => t('En ligne')],
+    download: ['download', () => t('Sur la borne'), () => t('Sur la borne')],
+    file: ['folder', () => t('Fichier local'), () => t('Fichier')],
+  };
+  const MARK = { download: 'download', waiting: 'clock', unavailable: 'close', offline: 'alert', ad: 'globe' };
+
+  function sourceMark(source) {
+    const [name, label] = SOURCE[source] ?? SOURCE.download;
+    const box = el('span', 'jb-source');
+    box.title = label();
+    box.setAttribute('aria-label', label());
+    box.append(icon(name));
+    return box;
+  }
+
+  function trackRow(r) {
+    const row = el('div', `jb-row${r.focus ? ' is-focus' : ''}${r.playing ? ' jb-playing' : ''}${r.disabled ? ' jb-disabled' : ''}`);
+    if (r.disabled) row.setAttribute('aria-disabled', 'true');
+    act(row, { op: 'row', key: r.key });
+    const num = el('span', 'jb-num');
+    if (r.playing) num.append(icon(r.playing === 'pause' ? 'pause' : 'play'));
+    else num.textContent = r.num;
+    const text = el('div', 'jb-row-text');
+    const title = el('span', 'jb-title jb-ellipsis', r.title);
+    title.title = r.title;
+    const line = el('span', `${r.mark ? 'jb-reason' : 'jb-artist'} jb-ellipsis${r.mark ? ` mark-${r.mark}` : ''}`);
+    if (r.mark) line.append(icon(MARK[r.mark] ?? 'info', 'jb-reason-icon'));
+    line.append(document.createTextNode(r.line));
+    line.title = r.line;
+    text.append(title, line);
+    if (r.percent !== undefined) {
+      const bar = el('div', 'jb-progress jb-row-progress');
+      const fill = el('span');
+      fill.style.width = `${Math.max(0, Math.min(100, r.percent))}%`;
+      bar.append(fill);
+      text.append(bar);
+    }
+    row.append(num, art(r.image, r.key), text, sourceMark(r.source), el('span', 'jb-duration', r.duration));
+    return row;
+  }
+
+  function legend() {
+    const box = el('span', 'jb-legend');
+    for (const source of ['online', 'download', 'file']) {
+      const [name, , short] = SOURCE[source];
+      const part = el('span', 'jb-legend-item');
+      part.append(icon(name), document.createTextNode(short()));
+      box.append(part);
+    }
+    return box;
+  }
+
+  /** Instructions de la bibliothèque ou de la playlist vide : Exit · roue, puis Exit · menu → Juke-box → Importer une playlist. */
+  function emptyHelp() {
+    const p = el('p', 'jb-empty-instructions');
+    const pill = (action) => {
+      const c = el('span', 'jb-command');
+      c.append(el('span', 'jb-key', t('Exit')), el('span', 'jb-command-action', action));
+      return c;
+    };
+    const first = el('span', 'jb-empty-line');
+    first.append(pill(t('Roue')), el('span', 'jb-muted', t('puis')), pill(t('Menu')));
+    p.append(first, el('span', 'jb-empty-line', t('Juke-box → Importer une playlist')));
+    return p;
+  }
+
+  function emptyList(view, desk) {
+    const box = el('div', 'jb-empty');
+    const bubble = el('div', 'jb-bubble');
+    bubble.append(icon('music'));
+    box.append(bubble);
+    if (view.empty === 'library') {
+      box.append(el('h2', '', t('Votre musique, à portée de flipper.')), el('p', 'jb-muted', t('Importez votre première playlist YouTube.')));
+    } else {
+      box.append(el('h2', '', t('Le prochain morceau est à vous.')), el('p', 'jb-muted', t('Cette playlist est vide. Ajoutez des morceaux depuis la gestion du Juke-box.')));
+    }
+    if (!desk) box.append(emptyHelp());
+    return box;
+  }
+
+  // ---------- Temps du morceau en cours ----------
+
+  const fmt = (s) => {
+    if (!Number.isFinite(s) || s < 0) return '–:––';
+    const v = Math.floor(s);
+    const h = Math.floor(v / 3600);
+    const m = Math.floor((v % 3600) / 60);
+    const ss = String(v % 60).padStart(2, '0');
+    return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+  };
+
+  let lastTime;
+
+  /** Barre et temps du morceau en cours, partout où ils sont dessinés (sans redessiner la liste). */
+  function showTime(time) {
+    lastTime = time;
+    for (const box of document.querySelectorAll('[data-jb-time]')) {
+      if (!time || box.dataset.jbTime !== time.key) continue;
+      const duration = time.duration ?? Number(box.dataset.jbDuration);
+      const fill = box.querySelector('.jb-progress > span');
+      if (fill) fill.style.width = `${duration > 0 ? Math.min(100, (time.position / duration) * 100) : 0}%`;
+      const now = box.querySelector('[data-jb-now]');
+      if (now) now.textContent = fmt(time.position);
+      const total = box.querySelector('[data-jb-total]');
+      if (total && duration > 0) total.textContent = fmt(duration);
+      const both = box.querySelector('[data-jb-both]');
+      if (both) both.textContent = `${fmt(time.position)} / ${duration > 0 ? fmt(duration) : '–:––'}`;
+    }
+  }
+
+  window.cyber?.onJukeboxTime?.((time) => showTime(time));
+
+  function progress(now) {
+    const bar = el('div', 'jb-progress');
+    const fill = el('span');
+    const t0 = lastTime?.key === now.key ? lastTime : undefined;
+    const d = t0?.duration ?? now.duration;
+    fill.style.width = `${t0 && d > 0 ? Math.min(100, (t0.position / d) * 100) : 0}%`;
+    bar.append(fill);
+    return bar;
+  }
+
+  // ---------- Plateau, en borne ----------
+
+  /** Les zones fixes du plateau en borne : elles restent d'un état à l'autre, seul leur contenu change. */
+  let cab;
+
+  function cabView(s) {
+    const view = s.jukebox.player;
+    if (!cab) {
+      const node = el('section', 'jb jb-cab');
+      const head = el('header', 'jb-zone jb-head');
+      head.append(brand(), el('span', 'jb-badge', t('JUKE-BOX')));
+      const playlist = el('div', 'jb-zone jb-playlist');
+      const list = el('div', 'jb-zone jb-list');
+      const now = el('div', 'jb-zone jb-now');
+      const help = el('div', 'jb-zone jb-help');
+      for (const [zone, name] of [[head, 'en-tete'], [playlist, 'playlist'], [list, 'liste'], [now, 'lecture'], [help, 'commandes']]) zone.dataset.stable = `juke-box-${name}`;
+      node.append(head, playlist, list, now, help);
+      cab = { node, playlist, list, now, help };
+    }
+    fillPlaylist(cab.playlist, view);
+    fillList(cab.list, view, false);
+    fillNow(cab.now, view, s, false);
+    cab.help.replaceChildren(...view.commands.map((c) => command(c, false)));
+    return cab.node;
+  }
+
+  function fillPlaylist(box, view) {
+    const top = el('div', 'jb-between');
+    const names = el('div', 'jb-playlist-names');
+    const p = view.playlist;
+    names.append(el('p', 'jb-label', p ? p.count : t('Juke-box')));
+    const name = el('h1', 'jb-playlist-name jb-ellipsis', p ? p.name.toLocaleUpperCase() : t('AUCUNE PLAYLIST'));
+    name.title = p?.name ?? '';
+    names.append(name);
+    top.append(names);
+    if (p) top.append(el('span', 'jb-badge', p.position));
+    const around = el('div', `jb-neighbors${p ? '' : ' jb-disabled'}`);
+    if (p) {
+      around.append(act(el('span', 'jb-ellipsis', p.previous ? `‹ ${p.previous}` : ''), { op: 'playlist', dir: -1 }), el('span', 'jb-current jb-ellipsis', p.name), act(el('span', 'jb-ellipsis', p.next ? `${p.next} ›` : ''), { op: 'playlist', dir: 1 }));
+    } else around.append(el('span', 'jb-ellipsis jb-neighbors-none', t('Playlists voisines indisponibles · bibliothèque vide')));
+    box.replaceChildren(top, around);
+  }
+
+  function fillList(box, view, desk) {
+    const nodes = [];
+    if (!desk) {
+      const head = el('div', 'jb-track-head');
+      head.append(el('span', '', view.list.head), view.empty ? el('span', '', '') : view.list.around ? el('span', 'jb-around', view.list.around) : legend());
+      nodes.push(head);
+    }
+    if (view.empty) nodes.push(emptyList(view, desk));
+    else {
+      const rows = el('div', `jb-rows${view.list.after ? ' continues' : ''}${view.list.before ? ' scrolled' : ''}`);
+      rows.dataset.defile = '';
+      rows.append(...view.list.rows.map(trackRow));
+      nodes.push(rows);
+    }
+    box.replaceChildren(...nodes);
+  }
+
+  function nowText(now, desk) {
+    const text = el('div', 'jb-now-text');
+    const eyebrow = el('div', `jb-eyebrow jb-meta${now.ad ? ' warning' : ''}`);
+    eyebrow.append(icon(now.ad ? 'globe' : now.paused ? 'pause' : 'play'), document.createTextNode(desk && !now.ad ? `${now.paused ? t('En pause') : t('En lecture')} · ${now.position}` : now.label));
+    const title = el('h2', 'jb-now-title jb-ellipsis', now.title);
+    title.title = now.title;
+    const line = el('p', 'jb-muted jb-ellipsis', [now.artist, now.album].filter(Boolean).join(' · '));
+    text.append(eyebrow, title, line);
+    return text;
+  }
+
+  function fillNow(box, view, s, desk) {
+    const now = view.now;
+    box.classList.toggle('jb-idle', !now);
+    if (!now) {
+      box.replaceChildren(el('p', 'jb-muted jb-now-idle', t('Aucune lecture en cours')));
+      delete box.dataset.jbTime;
+      return;
+    }
+    box.dataset.jbTime = now.key;
+    box.dataset.jbDuration = String(now.duration ?? '');
+    const time = el('div', 'jb-time');
+    if (desk) {
+      time.append(el('span', '', ''), el('span', '', now.ad ? t('Lecture du morceau suspendue') : now.origin));
+      time.firstChild.dataset.jbBoth = '';
+    } else if (now.ad) time.append(el('span', '', t('Lecture du morceau suspendue')), el('span', '', t('YouTube en ligne')));
+    else {
+      const a = el('span', '', '0:00');
+      a.dataset.jbNow = '';
+      const b = el('span', '', now.duration ? fmt(now.duration) : '–:––');
+      b.dataset.jbTotal = '';
+      time.append(a, b);
+    }
+    if (desk) {
+      const top = el('div', 'jb-between');
+      const pause = el('button', 'jb-button', '');
+      pause.type = 'button';
+      pause.append(icon(now.paused ? 'play' : 'pause'), document.createTextNode(now.paused ? t('Reprendre') : t('Pause')));
+      act(pause, { op: 'start' });
+      top.append(nowText(now, true), pause);
+      box.replaceChildren(top, progress(now), time);
+    } else {
+      // La vignette du morceau en cours ; sans fronton, le clip lui-même (CyberJukebox, place « thumb »).
+      const thumb = s.jukebox.clip?.place === 'thumb' ? clipHolder(s) : art(now.image, now.key, 'jb-art jb-now-art');
+      const text = nowText(now, false);
+      text.append(progress(now), time);
+      box.replaceChildren(thumb, text);
+    }
+    if (lastTime) showTime(lastTime);
+  }
+
+  // ---------- Plateau, au bureau ----------
+
+  let desk;
+
+  function deskView(s) {
+    const view = s.jukebox.player;
+    if (!desk) {
+      const node = el('section', 'jb jb-desk');
+      const frame = el('div', 'jb-zone jb-frame');
+      const head = el('header', 'jb-zone jb-head');
+      const manage = el('button', 'jb-button', '');
+      manage.type = 'button';
+      manage.append(icon('list'), document.createTextNode(t('Gestion du Juke-box')));
+      manage.dataset.act = JSON.stringify({ type: 'config' });
+      head.append(brand(), manage);
+      const clip = el('div', 'jb-zone jb-clip-zone');
+      const now = el('div', 'jb-zone jb-now');
+      const help = el('div', 'jb-zone jb-help');
+      for (const [zone, name] of [[frame, 'liste'], [head, 'en-tete'], [clip, 'clip'], [now, 'lecture'], [help, 'commandes']]) zone.dataset.stable = `juke-box-${name}`;
+      node.append(frame, head, clip, now, help);
+      desk = { node, frame, clip, now, help, manage };
+    }
+    const p = view.playlist;
+    const top = el('div', 'jb-between');
+    top.append(el('span', 'jb-label', t('Juke-box')), el('span', 'jb-fine', p ? p.position : t('Aucune playlist')));
+    const name = el('h1', 'jb-desk-name jb-ellipsis', p ? p.name.toLocaleUpperCase() : t('Aucune playlist'));
+    name.title = p?.name ?? '';
+    const around = el('div', `jb-between jb-fine${p ? '' : ' jb-disabled'}`);
+    if (p) around.append(act(el('span', 'jb-ellipsis', p.previous ? `‹ ${p.previous}` : ''), { op: 'playlist', dir: -1 }), act(el('span', 'jb-ellipsis', p.next ? `${p.next} ›` : ''), { op: 'playlist', dir: 1 }));
+    else around.append(el('span', 'jb-ellipsis', t('Playlists voisines indisponibles · bibliothèque vide')));
+    const list = el('div', 'jb-desk-list');
+    fillList(list, view, true);
+    const nodes = [top, name, around, el('div', 'jb-rule')];
+    nodes.push(list);
+    if (!view.empty) nodes.push(el('p', 'jb-fine jb-desk-selection', view.list.around ? `${view.list.head} · ${view.list.around}` : view.list.head));
+    desk.frame.replaceChildren(...nodes);
+    // Le clip : la vidéo, la pochette, ou l'affiche quand rien ne joue.
+    const holder = clipHolder(s);
+    if (holder.parentNode !== desk.clip) desk.clip.replaceChildren(holder);
+    if (view.now) fillNow(desk.now, view, s, true);
+    else {
+      desk.now.classList.add('jb-idle');
+      delete desk.now.dataset.jbTime;
+      const box = el('div', 'jb-stack');
+      if (view.empty === 'library') box.append(el('h2', '', t('Aucune playlist')), el('p', 'jb-muted', t('Gestion du Juke-box → Créer ou importer une playlist')), el('p', 'jb-fine', t('Téléphone et fenêtre Récupérer également disponibles.')));
+      else box.append(el('h2', '', t('Aucune lecture en cours')), el('p', 'jb-muted', t('Entrée : jouer le morceau choisi')));
+      desk.now.replaceChildren(box);
+    }
+    desk.help.replaceChildren(...view.commands.map((c) => command(c, true)));
+    return desk.node;
+  }
+
+  // ---------- Clip ----------
+
+  /**
+   * Le clip, gardé d'un état à l'autre : un élément vidéo ou son retiré de la page s'arrêterait.
+   * Il porte la lecture (ordre du processus principal, renouvelé à chaque morceau) et ce qui se
+   * pose dessus : cartel du changement de morceau, repère de pause, pochette d'un son seul.
+   */
+  let clip;
+
+  function clipHolder(s) {
+    if (!clip) {
+      const node = el('div', 'jb-clip');
+      const stage = el('div', 'jb-clip-stage');
+      const over = el('div', 'jb-clip-over');
+      node.append(stage, over);
+      clip = { node, stage, over, order: undefined, media: undefined };
+      new ResizeObserver(() => reportClip()).observe(node);
+    }
+    syncClip(s.jukebox.clip);
+    return clip.node;
+  }
+
+  /** Place du clip dans la fenêtre, pour la vue du lecteur YouTube (pixels de la page). */
+  function reportClip() {
+    if (!clip?.order || clip.order.kind !== 'online') return;
+    const r = clip.node.isConnected ? clip.node.getBoundingClientRect() : undefined;
+    window.cyber?.jukebox?.({ type: 'clip', rect: r && r.width > 1 ? { x: r.left, y: r.top, width: r.width, height: r.height } : undefined });
+  }
+
+  /** Rôle de cette fenêtre (son adresse) : seul le plateau joue la musique du menu. */
+  const windowRole = new URLSearchParams(location.search).get('role') ?? 'playfield';
+
+  /** Sortie du son : celle du fronton, par la musique du menu (menu-audio.js), qui la retrouve par son nom. */
+  function route(media, output) {
+    if (windowRole !== 'playfield') window.CyberMenuAudio?.update({ video: 0, output });
+    window.CyberMenuAudio?.route?.(media);
+  }
+
+  const send = (msg) => window.cyber?.jukebox?.(msg);
+
+  function stopMedia() {
+    const m = clip?.media;
+    if (!m) return;
+    clearInterval(m.levelsTimer);
+    m.context?.close().catch(() => {});
+    for (const media of [m.audio, m.video]) {
+      if (!media) continue;
+      media.pause();
+      media.removeAttribute('src');
+      media.load();
+    }
+    m.video?.remove();
+    clip.media = undefined;
+  }
+
+  /** Niveaux du son, pris avant la sortie (captureStream), pour le spectre du DMD et le visualiseur. */
+  function listen(m, source) {
+    try {
+      if (typeof source.captureStream !== 'function') return;
+      const start = () => {
+        if (m.context || clip?.media !== m) return;
+        let stream;
+        try {
+          stream = source.captureStream();
+        } catch {
+          // Son illisible pour la mesure : le DMD garde son mouvement doux.
+          return;
+        }
+        if (!stream.getAudioTracks().length) return;
+        const context = new AudioContext();
+        const analyser = context.createAnalyser();
+        analyser.fftSize = 512;
+        analyser.smoothingTimeConstant = 0.7;
+        context.createMediaStreamSource(stream).connect(analyser);
+        const bins = new Uint8Array(analyser.frequencyBinCount);
+        m.context = context;
+        m.levelsTimer = setInterval(() => {
+          analyser.getByteFrequencyData(bins);
+          // 24 bandes sur une échelle logarithmique, de 60 Hz à 12 kHz environ.
+          const levels = [];
+          const nyquist = context.sampleRate / 2;
+          for (let b = 0; b < 24; b++) {
+            const lo = Math.floor((60 * Math.pow(200, b / 24) / nyquist) * bins.length);
+            const hi = Math.max(lo + 1, Math.floor((60 * Math.pow(200, (b + 1) / 24) / nyquist) * bins.length));
+            let peak = 0;
+            for (let i = lo; i < Math.min(hi, bins.length); i++) peak = Math.max(peak, bins[i]);
+            levels.push(Math.round((peak / 255) * 1000) / 1000);
+          }
+          m.levels = levels;
+          send({ type: 'levels', id: m.id, levels });
+          paintVisualizer(levels);
+        }, 66);
+      };
+      source.addEventListener('playing', start, { once: true });
+    } catch {
+      // Sans mesure du son : le DMD garde son mouvement doux.
+    }
+  }
+
+  function startMedia(order) {
+    stopMedia();
+    const m = { id: order.id };
+    clip.media = m;
+    const report = (media) => {
+      let last = 0;
+      media.addEventListener('timeupdate', () => {
+        const now = Date.now();
+        if (now - last < 240) return;
+        last = now;
+        send({ type: 'time', id: order.id, position: media.currentTime, duration: Number.isFinite(media.duration) ? media.duration : undefined, paused: media.paused });
+      });
+      media.addEventListener('ended', () => send({ type: 'ended', id: order.id }));
+      media.addEventListener('error', () => send({ type: 'error', id: order.id, message: media.error?.message || String(media.error?.code ?? '') }));
+    };
+    if (order.kind === 'local') {
+      // Le son mène : la vidéo muette le suit, recalée quand elle s'en écarte.
+      const audio = new Audio();
+      audio.crossOrigin = 'anonymous';
+      audio.preload = 'auto';
+      audio.volume = order.volume;
+      audio.src = order.audio;
+      route(audio, order.output);
+      report(audio);
+      m.audio = audio;
+      if (order.video) {
+        const video = el('video', 'jb-video');
+        video.muted = true;
+        video.playsInline = true;
+        video.preload = 'auto';
+        video.src = order.video;
+        clip.stage.replaceChildren(video);
+        m.video = video;
+        const follow = () => {
+          if (Math.abs(video.currentTime - audio.currentTime) > 0.25 && Number.isFinite(audio.currentTime)) video.currentTime = audio.currentTime;
+        };
+        audio.addEventListener('play', () => video.play().catch(() => {}));
+        audio.addEventListener('pause', () => video.pause());
+        audio.addEventListener('seeked', follow);
+        audio.addEventListener('timeupdate', follow);
+        // Une vidéo plus courte que le son garde sa dernière image ; illisible, la pochette prend sa place.
+        video.addEventListener('error', () => {
+          video.remove();
+          m.video = undefined;
+          paintStill(order);
+        });
+      }
+      listen(m, audio);
+      audio.play().catch(() => {});
+    } else if (order.kind === 'file' && order.video) {
+      const video = el('video', 'jb-video');
+      video.crossOrigin = 'anonymous';
+      video.playsInline = true;
+      video.preload = 'auto';
+      video.volume = order.volume;
+      video.src = order.video;
+      clip.stage.replaceChildren(video);
+      route(video, order.output);
+      report(video);
+      m.video = video;
+      listen(m, video);
+      video.play().catch(() => {});
+    } else if (order.kind === 'file') {
+      const audio = new Audio();
+      audio.crossOrigin = 'anonymous';
+      audio.preload = 'auto';
+      audio.volume = order.volume;
+      audio.src = order.audio;
+      route(audio, order.output);
+      report(audio);
+      m.audio = audio;
+      listen(m, audio);
+      audio.play().catch(() => {});
+    }
+  }
+
+  function setPaused(paused) {
+    const m = clip?.media;
+    if (!m) return;
+    const lead = m.audio ?? m.video;
+    if (!lead) return;
+    if (paused && !lead.paused) lead.pause();
+    else if (!paused && lead.paused) lead.play().catch(() => {});
+  }
+
+  let stillKey;
+
+  /** Ce qui se voit sans vidéo : la pochette agrandie (image du morceau, du fichier ou du dossier), sinon le visualiseur. */
+  function paintStill(order, now) {
+    const key = JSON.stringify([order?.id, order?.image, now?.key, now?.title]);
+    if (stillKey === key && clip.stage.querySelector('.jb-audio')) return;
+    stillKey = key;
+    const box = el('div', 'jb-audio');
+    const cover = order?.image ? art(order.image, now?.key ?? 'pochette', 'jb-art jb-audio-art') : visualizer();
+    const text = el('div', 'jb-audio-text');
+    if (now) {
+      text.append(el('p', 'jb-label', order?.kind === 'file' ? t('Fichier local · son seul') : t('Son seul · {playlist}', { playlist: now.playlist })), el('h1', 'jb-audio-title jb-ellipsis', now.title));
+      if (now.artist) text.append(el('h2', 'jb-ellipsis', now.artist));
+      text.append(el('p', 'jb-muted jb-ellipsis', now.album ? t('Album {album}', { album: now.album }) : order?.image ? t('Pochette du morceau') : t('Sans pochette · visualiseur du Juke-box')));
+    }
+    box.append(cover, text);
+    clip.stage.replaceChildren(box);
+  }
+
+  function visualizer() {
+    const box = el('div', 'jb-visualizer');
+    for (let i = 0; i < 21; i++) {
+      const bar = el('span');
+      bar.style.setProperty('--h', String(0.12 + ((i * 67) % 280) / 400));
+      box.append(bar);
+    }
+    return box;
+  }
+
+  function paintVisualizer(levels) {
+    const bars = clip?.stage.querySelectorAll('.jb-visualizer > span');
+    if (!bars?.length) return;
+    bars.forEach((bar, i) => bar.style.setProperty('--h', String(Math.max(0.06, levels[Math.min(levels.length - 1, Math.floor((i * levels.length) / bars.length))] ?? 0))));
+  }
+
+  let cardShown;
+
+  /** Synchronise le clip avec ce que dit l'état : lecture (nouvel ordre), pause, cartel, affiche. */
+  function syncClip(c) {
+    if (!c) return;
+    const order = c.order;
+    const now = c.now;
+    clip.node.dataset.place = c.place;
+    if (!order) {
+      if (clip.order) stopMedia();
+      clip.order = undefined;
+      clip.node.classList.remove('online');
+      clip.stage.replaceChildren(c.place === 'thumb' ? art(undefined, 'repos', 'jb-art') : poster(c.poster, `jb-clip-poster place-${c.place}`));
+      stillKey = undefined;
+      clip.over.replaceChildren();
+      return;
+    }
+    if (clip.order?.id !== order.id) {
+      clip.order = order;
+      clip.node.classList.toggle('online', order.kind === 'online');
+      stillKey = undefined;
+      if (order.kind === 'online') {
+        stopMedia();
+        // Le lecteur YouTube (une vue du processus principal) se pose ici : dessous, du noir.
+        clip.stage.replaceChildren(el('div', 'jb-online-ground'));
+        requestAnimationFrame(reportClip);
+      } else startMedia(order);
+    } else clip.order = order;
+    // Son seul (ou vidéo absente) : la pochette, sinon le visualiseur.
+    if (order.kind !== 'online' && !clip.media?.video) paintStill(order, now);
+    setPaused(order.paused);
+    // Repères posés sur le clip : la pause, et le cartel du changement de morceau (4 s).
+    const over = [];
+    if (order.paused && order.kind !== 'online') {
+      const badge = el('div', 'jb-clip-badge');
+      badge.append(icon('pause'), document.createTextNode(t('En pause')));
+      over.push(badge);
+    }
+    if (c.card && now && c.place !== 'thumb' && Date.now() < c.card.until && (clip.media?.video || cardShown === c.card.id)) {
+      cardShown = c.card.id;
+      const card = el('div', 'jb-card');
+      card.append(el('div', 'jb-eyebrow jb-ellipsis', c.card.eyebrow), el('h1', 'jb-card-title jb-ellipsis', now.title));
+      const line = el('p', 'jb-ellipsis', now.artist ?? '');
+      if (now.album) line.append(el('span', 'jb-muted', ` · ${now.album}`));
+      card.append(line);
+      over.push(card);
+    }
+    clip.over.replaceChildren(...over);
+    if (order.kind === 'online') requestAnimationFrame(reportClip);
+  }
+
+  // ---------- Écrans annexes (fronton) et affiche ----------
+
+  /** Contenu du Juke-box posé dans une zone (le fronton) ; false : la zone montre son média. */
+  const zoneNodes = new Map();
+
+  function zone(node, part, s) {
+    const j = s.jukebox;
+    let content;
+    if (part === 'backglass' && j?.clip?.place === 'zone') content = clipHolder(s);
+    else if (part === 'backglass' && j?.cover) content = coverCard(j.cover);
+    else if (part === 'backglass' && j?.wheel) content = poster(j.wheel.poster, 'jb-fronton-poster');
+    const old = zoneNodes.get(node);
+    if (!content) {
+      if (old) {
+        old.wrap.remove();
+        zoneNodes.delete(node);
+      }
+      return false;
+    }
+    let wrap = old?.wrap;
+    if (!wrap) {
+      wrap = el('div', 'jb-zone-fill');
+      node.append(wrap);
+      zoneNodes.set(node, { wrap });
+    }
+    if (wrap.firstChild !== content) wrap.replaceChildren(content);
+    return true;
+  }
+
+  /** Fronton d'une autre fenêtre que celle du clip (bureau à deux écrans) : le morceau en cours, sinon l'affiche. */
+  function coverCard(c) {
+    if (!c.now) return poster(c.poster, 'jb-fronton-poster');
+    const box = el('section', 'jb-poster jb-fronton-poster'); // i18n-ignore : classes CSS
+    const audio = el('div', 'jb-audio');
+    const text = el('div', 'jb-audio-text');
+    text.append(el('p', 'jb-label', c.now.label), el('h1', 'jb-audio-title jb-ellipsis', c.now.title));
+    if (c.now.artist) text.append(el('h2', 'jb-ellipsis', c.now.artist));
+    if (c.now.album) text.append(el('p', 'jb-muted jb-ellipsis', t('Album {album}', { album: c.now.album })));
+    audio.append(art(c.now.image, c.now.key, 'jb-art jb-audio-art'), text);
+    box.append(audio);
+    return box;
+  }
+
+  /** Affiche du médaillon choisi, derrière la roue (borne) ou dans le cadre du plateau (bureau). */
+  function wheelPoster(s, isDesk) {
+    return poster(s.jukebox.wheel.poster, isDesk ? 'jb-wheel-poster desk' : 'jb-wheel-poster');
+  }
+
+  /** La même, dans le cadre du fronton du menu au bureau : identité à gauche, textes à droite. */
+  function backglassPoster(s) {
+    return poster(s.jukebox.wheel.poster, 'jb-wheel-fronton');
+  }
+
+  function playfield(s) {
+    const isDesk = s.jukebox.layout === 'desk';
+    document.documentElement.classList.toggle('jukebox-desk', isDesk);
+    if (isDesk) cab = undefined;
+    else desk = undefined;
+    const node = isDesk ? deskView(s) : cabView(s);
+    if (lastTime) showTime(lastTime);
+    return [node];
+  }
+
+  /** Mode Juke-box quitté : la lecture s'arrête, les zones gardées sont oubliées. */
+  function leave() {
+    stopMedia();
+    if (clip) {
+      clip.order = undefined;
+      clip.node.remove();
+    }
+    clip = undefined;
+    cab = undefined;
+    desk = undefined;
+    lastTime = undefined;
+    stillKey = undefined;
+    document.documentElement.classList.remove('jukebox-desk');
+  }
+
+  window.CyberJukebox = {
+    playfield,
+    wheelPoster,
+    backglassPoster,
+    zone,
+    logo,
+    leave,
+    /** Le clip de cette fenêtre joue-t-il ? (fenêtres annexes : rien à arrêter quand l'état n'en parle plus) */
+    playing: () => Boolean(clip?.order),
+    status: () => ({
+      clip: clip ? { place: clip.node.dataset.place, ordre: clip.order?.id, source: clip.order?.kind, video: Boolean(clip.media?.video), son: Boolean(clip.media?.audio), pause: Boolean(clip.order?.paused), cartel: Boolean(clip.over.querySelector('.jb-card')), niveaux: clip.media?.levels?.length ?? 0 } : undefined,
+      temps: lastTime,
+    }),
+  };
+})();

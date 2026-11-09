@@ -3451,3 +3451,68 @@ html.in-headset body > :not(#headset-rest) {
   text-transform: uppercase;
   color: var(--ink-muted);
 }
+
+/* ---------- Juke-box dans le menu (renderer/jukebox.js ; ses écrans : jukebox.css) ---------- */
+
+/* Le plateau en mode Juke-box : rien du menu dessous (fond, voile). */
+html.jukebox-phase #media-bg {
+  visibility: hidden;
+}
+
+/* Les notifications du Juke-box : sur la ligne de la marque, entre elle et le repère JUKE-BOX. */
+html.jukebox-phase .status-corner.on-head {
+  top: calc(var(--jp-root) * 40);
+  left: calc(var(--jp-root) * 400);
+  right: calc(var(--jp-root) * 240);
+}
+
+html.jukebox-phase.jukebox-desk .status-corner.on-head {
+  top: calc(var(--jp-root) * 26);
+  left: calc(var(--jp-root) * 1040);
+  right: calc(var(--jp-root) * 330);
+}
+
+#root {
+  --jp-root: min(100cqw / 1080, 100cqh / 1920);
+}
+
+html.jukebox-desk #root {
+  --jp-root: min(100cqw / 1920, 100cqh / 1080);
+}
+
+/* Médaillon choisi en borne : l'affiche est sombre, le voile de lecture du menu n'a rien à assombrir. */
+.menu.jukebox-chosen .menu-scrim {
+  display: none;
+}
+
+/* Constat bref en mode Juke-box : sur la ligne de la marque, entre elle et le repère JUKE-BOX. */
+html.jukebox-phase #root > .banner {
+  top: calc(var(--jp-root) * 48);
+  left: calc(var(--jp-root) * 400);
+  right: calc(var(--jp-root) * 200);
+  max-width: calc(var(--jp-root) * 480);
+  margin-inline: auto;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: calc(var(--jp-root) * 22);
+}
+
+html.jukebox-phase.jukebox-desk #root > .banner {
+  top: calc(var(--jp-root) * 34);
+  left: calc(var(--jp-root) * 1010);
+  right: calc(var(--jp-root) * 330);
+  max-width: calc(var(--jp-root) * 560);
+}
+
+/* Médaillon choisi : son nom en vert signal, en capitales, comme le titre de l'affiche. */
+.menu.jukebox-chosen .menu-title .title {
+  color: var(--signal);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+/* Le constat bref et les pastilles partagent la ligne de la marque : le constat passe devant, quelques secondes. */
+html.jukebox-phase #root:has(> .banner) > .status-corner {
+  visibility: hidden;
+}

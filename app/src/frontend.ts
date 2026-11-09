@@ -202,6 +202,10 @@ import {
   boardKey,
   countryOfLocale,
   type PlayedScore,
+  jukeboxSummary,
+  jukeboxWheel,
+  jukeboxWheelMove,
+  JUKEBOX_WHEEL_KEY,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -212,6 +216,7 @@ import { handleSecondLaunch } from './single-instance';
 import { installVpx, vpxArchivePresent } from './install-vpx';
 import { armRecording, type RecordingOutcome, type RecordingRun, type RecordingScreen } from './game-recording';
 import { launchVpx, simulateVpx, vpxPrefDir, type LaunchResult } from './launcher';
+import { watchGameLoad, type GameLoadWatch } from './game-load';
 import { createLibrary, type ActionShortcut, type SystemItem, type UiAction } from './library';
 import { createMenuDmd } from './menu-dmd';
 import { cachedScript } from './vbs';
@@ -232,7 +237,8 @@ import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './
 import { hideTaskbars, isVeil, nameScreen, onScreensSettled, recoverScreens, relaunchCovered, restoreTaskbars, setDesktopMode, settleScreens, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
 import { forcedRotation, menuRotation, openSettings } from './settings';
-import { allowPreview, serveMedias } from './media-protocol';
+import { allowJukebox, allowPreview, serveMedias } from './media-protocol';
+import { createJukeboxPlayer, type JukeboxMessage } from './jukebox-player';
 import { createAvatarMenu } from './avatar-menu';
 import { createMenuSettings } from './menu-settings';
 import { createIntroMenu } from './intro-menu';
@@ -335,6 +341,14 @@ function menuKeys(): [string, string][] {
  */
 function menuFooter(): [string, string?][] {
   const magna = collectionKeys();
+  // Médaillon Juke-box : Start ouvre le lecteur (ou l'invitation à importer).
+  if (onJukebox())
+    return [
+      [t('Flippers : choisir')],
+      ...(!collections.locked() && (magna.previous.length || magna.next.length) ? [[t('MagnaSave : collections')] as [string]] : []),
+      [library.jukebox.store().playlists.length ? t('Start : ouvrir') : t('Start : importer'), KEYS.confirm[0]],
+      ...(guest.allows('menu.system') ? [[t('Exit : menu'), KEYS.exit[0]] as [string, string]] : []),
+    ];
   return [
     [t('Flippers : choisir')],
     // Mode invité qui impose une collection : les MagnaSave n'y font rien, l'aide n'en parle pas.
@@ -509,6 +523,8 @@ interface State {
   message?: Message;
   /** Constat bref en haut du menu (configuration de la borne changée), effacé après quelques secondes. */
   banner?: string;
+  /** Le médaillon Juke-box est choisi dans la roue (jukebox-screens.ts) ; la table choisie reste en mémoire dessous. */
+  jukebox?: boolean;
 }
 
 const loc = locations();
@@ -692,7 +708,7 @@ function screensSubject(): TableEntry | undefined {
   return screensTable({
     phase: state.phase,
     help: state.help,
-    selected: attractTable() ?? tables[state.index],
+    selected: attractTable() ?? (onJukebox() ? undefined : tables[state.index]),
     playing,
     about: state.phase === 'library' ? find(library.table()) : state.phase === 'message' ? find(state.message?.table) : undefined,
     overlay: vpxSettingsOpen,
@@ -864,7 +880,67 @@ const library = createLibrary({
     showBanner(text);
   },
   downloadsChanged: () => downloadsChanged(),
+  jukeboxChanged: () => broadcast(),
+  // La vue du lecteur YouTube n'est pas dans la capture de sa fenêtre : à part (« en-ligne »).
+  captureExtras: async () => {
+    const png = await jukeboxPlayer.onlineCapture();
+    return png ? [{ name: 'en-ligne', png }] : [];
+  },
 });
+
+/**
+ * Juke-box (jukebox-player.ts) : le médaillon en tête de chaque collection de la roue, et le mode
+ * Juke-box (la liste sur le plateau, le clip sur le fronton, le spectre sur le DMD). Exit ramène à la
+ * roue, la musique s'arrête.
+ */
+const jukeboxPlayer = createJukeboxPlayer({
+  library: () => library.jukebox,
+  windows: () => windows,
+  windowRoles: () => windowRoles,
+  desk: () => playfieldLandscape(),
+  output: () => audioOutput,
+  allow: (file) => allowJukebox(file),
+  leave: () => {
+    state = { ...state, phase: tables.length ? 'menu' : 'message', jukebox: true, ...(tables.length ? {} : { message: noTables() }) };
+  },
+  redraw: () => broadcast(),
+  dmd: (name, animation) => liveDmd.custom(name, animation),
+  dmdOn: () => Boolean(dmdWindow()) && state.phase !== 'playing' && state.phase !== 'intro' && !desktop.active,
+  banner: (text) => showBanner(text),
+  log: (line) => console.log(line),
+  keys: () => ({ ...KEYS, playlistPrevious: collectionKeys().previous, playlistNext: collectionKeys().next }),
+  ...(process.env.CYBERPINBALL_JUKEBOX_EN_LIGNE ? { fakeOnline: process.env.CYBERPINBALL_JUKEBOX_EN_LIGNE } : {}),
+});
+// Une playlist qui attendait un téléchargement : « Revenir au Juke-box » rouvre le lecteur sur elle.
+library.downloads.opener('jukebox', (back) => openJukebox('playlist' in back && typeof back.playlist === 'string' ? back.playlist : undefined));
+
+/** Le médaillon Juke-box est dans la roue (réglage « Juke-box dans la roue », Menu système > Médias). */
+function jukeboxShown(): boolean {
+  return mediaSettings.jukebox;
+}
+
+/** Le médaillon est choisi dans la roue (pas en mode attente, qui montre une table). */
+function onJukebox(): boolean {
+  return jukeboxShown() && Boolean(state.jukebox) && !attractTable();
+}
+
+/** Ce que le menu dit du médaillon choisi : son titre et ses chiffres, comme le fabricant · année d'une table. */
+function jukeboxCard() {
+  const store = library.jukebox.store();
+  const summary = store.playlists.length ? jukeboxSummary(store) : t('Aucune playlist · Start pour importer');
+  return { title: t('Juke-box'), subtitle: summary, jukebox: true, favorite: false, plays: 0 };
+}
+
+/** Ouvre le mode Juke-box (Start sur le médaillon, retour d'un téléchargement), sur une playlist si elle est dite. */
+function openJukebox(playlist?: string): void {
+  if (state.phase === 'library') library.leave();
+  cancelWheelPress();
+  collections.hidePanel();
+  state = { ...state, phase: 'jukebox', help: false, message: undefined, jukebox: true };
+  jukeboxPlayer.open(playlist);
+  broadcast();
+}
+
 // Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes (pastille
 // rouge) ; jamais pendant une partie ni son chargement.
 library.watchHealth(() => state.phase === 'loading' || state.phase === 'playing');
@@ -916,6 +992,8 @@ function remoteScreen(): { title: string; item?: string; zone?: string } {
   if (state.phase === 'library') return library.remoteScreen() ?? { title: t('Menu système') };
   if (state.phase === 'message') return { title: state.message?.title ?? '' };
   if (state.phase === 'confirmQuit') return { title: t('Quitter Cyber Pinball ?') };
+  // Juke-box : MagnaSave y passe à la playlist suivante.
+  if (state.phase === 'jukebox') return { title: t('Juke-box'), zone: t('Playlist suivante') };
   // La roue : la collection active, la table choisie ; MagnaSave y passe à la collection suivante.
   return { title: collections.current().label || t('Menu des tables'), item: tables[state.index]?.title, zone: collections.locked() ? undefined : t('Collection suivante') };
 }
@@ -926,7 +1004,7 @@ function remoteScreen(): { title: string; item?: string; zone?: string } {
  */
 function remoteButton(b: RemoteButton, down: boolean, repeat: boolean): void {
   // MagnaSave : sur la roue, le droit (collection suivante, collections-menu.ts) ; ailleurs, la bascule entre la liste et les actions d'un écran.
-  const zone = state.phase === 'menu' ? (collectionKeys().next[0] ?? zoneSwitchKeys({ buttons, navigation })[0]) : zoneSwitchKeys({ buttons, navigation })[0];
+  const zone = state.phase === 'menu' || state.phase === 'jukebox' ? (collectionKeys().next[0] ?? zoneSwitchKeys({ buttons, navigation })[0]) : zoneSwitchKeys({ buttons, navigation })[0];
   const code = b === 'zone' ? zone : KEYS[b][0];
   if (!code) return;
   const input = { type: down ? 'keyDown' : 'keyUp', code, key: '', isAutoRepeat: repeat, isComposing: false, shift: false, control: false, alt: false, meta: false, location: 0, modifiers: [] } as unknown as Input;
@@ -1914,6 +1992,9 @@ export function startFrontend(): void {
     liveDmd.resend();
   });
   ipcMain.on('media-error', (event, error: MediaErrorReport) => !isHeadsetView(event.sender) && recordMediaError(error));
+  // Juke-box : temps, fin, erreur et niveaux du morceau en cours, place du clip (jukebox-player.ts) ;
+  // jamais d'une fenêtre du casque (sa copie du clip, muette, ne commande rien).
+  ipcMain.on('jukebox', (event, message: JukeboxMessage) => !isHeadsetView(event.sender) && jukeboxPlayer.message(message));
   ipcMain.on('action', (event, action: UiAction) => {
     // Les fenêtres du casque ne reçoivent aucun geste ; leurs mesures ne valent pas pour les écrans.
     if (isHeadsetView(event.sender)) return;
@@ -1925,7 +2006,7 @@ export function startFrontend(): void {
     // Un clic pendant l'ouverture affiche la roue, comme un bouton.
     if (state.phase === 'intro') return void leaveIntro();
     // Clic sur « Start : jouer » de la roue : un clic n'a pas de durée, il joue tout de suite.
-    if (action.type === 'key' && state.phase === 'menu' && !state.help && wheelPlays() && KEYS.confirm.includes(action.code) && tables[state.index]) wheelConfirm(tables[state.index]!, false), broadcast();
+    if (action.type === 'key' && state.phase === 'menu' && !state.help && wheelPlays() && KEYS.confirm.includes(action.code) && tables[state.index] && !onJukebox()) wheelConfirm(tables[state.index]!, false), broadcast();
     else if (action.type === 'key') handleKey({ type: 'keyDown', code: action.code, key: '' } as Input);
     // Roue dentée (ou cadenas, en mode invité).
     else if (action.type === 'config') guest.knock('menu.system') && openConfig();
@@ -1949,8 +2030,12 @@ export function startFrontend(): void {
       changeCollection(typeof action.id === 'string' ? { id: action.id } : { step: action.step === -1 ? -1 : 1 });
       broadcast();
     }
+    else if (action.type === 'jukebox') {
+      if (state.phase === 'jukebox') jukeboxPlayer.click(action);
+    }
     else if (action.type === 'wheel' && state.phase === 'menu' && tables.length) {
-      // Clic sur la table au centre : comme Start (la fiche, ou la partie en « jouer directement »).
+      // Clic sur la table au centre : comme Start (la fiche, ou la partie en « jouer directement ») ; le médaillon Juke-box : le lecteur.
+      if (action.offset === 0 && onJukebox()) return void openJukebox();
       if (action.offset === 0) wheelConfirm(tables[state.index]!, !wheelPlays());
       else if (guest.knock('menu.choose')) moveSelection(action.offset);
       broadcast();
@@ -2479,6 +2564,9 @@ function handleKey(input: Input, fromPhone = false): boolean {
       return true;
     case 'library':
       return library.handleKey(input);
+    // Juke-box : flippers, Start, MagnaSave, Exit (jukebox-player.ts), qui redessine lui-même.
+    case 'jukebox':
+      return jukeboxPlayer.handleKey(input);
     case 'message':
       if (!is(KEYS.confirm) && !is(KEYS.exit)) return false;
       // Mode invité, action du message fermée : Start ne la fait pas ; Exit ferme le message sans rien changer.
@@ -2557,16 +2645,20 @@ function handleKey(input: Input, fromPhone = false): boolean {
       else if (state.help && is(KEYS.exit)) state = { ...state, help: false };
       else if (is(KEYS.previous)) guest.knock('menu.choose') && moveSelection(-1);
       else if (is(KEYS.next)) guest.knock('menu.choose') && moveSelection(1);
-      else if (is(KEYS.confirm)) {
+      else if (is(KEYS.confirm) && onJukebox()) {
+        // Médaillon Juke-box : Start ouvre le lecteur (rien ne démarre seul).
+        if (!input.isAutoRepeat) openJukebox();
+        return true;
+      } else if (is(KEYS.confirm)) {
         // « Jouer directement » : l'appui attend son relâchement (partie) ou sa durée (fiche) ; la répétition d'une touche tenue n'y change rien.
         if (!wheelPlays()) wheelConfirm(tables[state.index]!, true);
         else if (!input.isAutoRepeat) pressWheelStart(input.code);
-      } else if (is(KEYS.settings)) guest.knock('menu.vpx-settings') && openVpxSettings();
+      } else if (is(KEYS.settings)) !onJukebox() && guest.knock('menu.vpx-settings') && openVpxSettings();
       else if (is(KEYS.exit)) guest.knock('menu.system') && library.openSystem();
       else if (is(collectionKeys().previous)) changeCollection({ step: -1 });
       else if (is(collectionKeys().next)) changeCollection({ step: 1 });
       // « Jouer directement » : F6 d'un clavier ouvre aussi la fiche (les MagnaSave de la borne changent de collection).
-      else if (wheelPlays() && is(sheetKeys())) {
+      else if (wheelPlays() && is(sheetKeys()) && !onJukebox()) {
         if (!input.isAutoRepeat) wheelConfirm(tables[state.index]!, true);
       }
       else return false;
@@ -2876,6 +2968,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     if (!displayMode) socialNet.setPresence({ status: 'playing', table: presenceTable(table), since: new Date().toISOString() });
     hooks.onPlaying?.();
     watchOccupied(simulated?.split(',').filter((r): r is RoleId => ROLES.some((x) => x.id === r)));
+    if (simulated === undefined && !gameLoad) gameLoad = watchGameLoad(game.pid);
     // Partie sur les écrans (VPX n'a pas pris le casque) : le compagnon n'a plus de relève à attendre.
     if (!playedVr && headset?.running) void headset.stop();
     broadcast();
@@ -2907,6 +3000,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     headset.handOver();
   }
   let playedVr = false;
+  // Charge du PC pendant la partie (game-load.ts) : notée au journal à la fin.
+  let gameLoad: GameLoadWatch | undefined;
   // Sans place enregistrée par VPX, la table est recentrée sur le regard du joueur une fois lancée.
   const vrText = vrGame ? readTextIfExists(vrGame.ini) : '';
   const vrCenter = vrGame && !vrHasSavedPlace(vrText) ? vrCenterKey(vrText) : undefined;
@@ -2985,6 +3080,8 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (watchLive) clearInterval(watchLive);
   gameNotices.close();
   inGameMenu.disarm();
+  const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
+  if (load) console.log(load);
   stopCentering?.();
   headsetPaused = false;
   // Arrêté pendant le chargement : ni partie comptée, ni message d'échec, la roue.
@@ -3650,10 +3747,12 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
   // Voisines de la table choisie, pour la liste et la roue : identité stable (le fichier),
   // titre, fabricant et année (logo de repli de la roue), version et logo.
   const neighbor = (t: TableEntry, offset: number) => ({ offset, key: t.file, title: t.title, manufacturer: t.manufacturer, year: t.year, version: t.version, wheel: wheel(t) });
-  // Neuf places : sept visibles (roue Médaillons), et une de chaque côté d'où les logos entrent.
-  const neighbors = [-4, -3, -2, -1, 0, 1, 2, 3, 4]
-    .filter(() => list.length > 0)
-    .map((offset) => neighbor(list[(at + offset + list.length * 10) % list.length]!, offset));
+  // Neuf places : sept visibles (roue Médaillons), et une de chaque côté d'où les logos entrent ;
+  // moins de neuf entrées : chacune une seule fois (aucune répétée pour remplir), réparties de part
+  // et d'autre du choix, en boucle comme la liste. Le médaillon Juke-box en tête de la collection
+  // (jukebox-screens.ts), compté dans le compteur ; pas en mode attente, qui montre une table.
+  const ring = jukeboxWheel({ tables: list.length, at, shown: jukeboxShown() && !shown, selected: onJukebox() });
+  const neighbors = ring.places.map((p) => ('jukebox' in p ? { offset: p.offset, key: JUKEBOX_WHEEL_KEY, title: t('Juke-box'), jukebox: true } : neighbor(list[p.table]!, p.offset)));
   // Média de chaque rôle de cette fenêtre (le sien et ceux de ses zones), et ceux des voisines à précharger.
   const roles = windowRoles.get(role) ?? [role];
   const mediasOf = (t: TableEntry) => (m ? Object.fromEntries(roles.map((r) => [r, m!.roleMedia(t, r)])) : {});
@@ -3671,12 +3770,10 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     role,
     phase: state.phase,
     help: state.help,
-    count: list.length,
-    position: at + 1,
-    table: table ? describe(table) : undefined,
-    // Moins de neuf tables : chacune une seule fois (aucune répétée pour remplir), réparties de
-    // part et d'autre de la table choisie, en boucle comme la liste : la roue reste centrée.
-    neighbors: list.length >= 9 ? neighbors : list.map((t, i) => neighbor(t, ((i - at + list.length * 2 + Math.floor((list.length - 1) / 2)) % list.length) - Math.floor((list.length - 1) / 2))),
+    count: ring.count,
+    position: ring.position,
+    table: !shown && onJukebox() ? jukeboxCard() : table ? describe(table) : undefined,
+    neighbors,
     // Repère de la collection active, partout où le menu des tables est dessiné (sous une fiche aussi :
     // sa zone ne bouge jamais), et la liste des collections quelques secondes après un MagnaSave, au menu seulement.
     ...(role === 'playfield' && tables.length ? collections.view(mediaSettings.menuLayout === 'list' ? 'list' : playfieldLandscape() ? 'desk' : 'band', state.phase === 'menu') : {}),
@@ -3703,7 +3800,7 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
           : { step: loadingStepLabel(launch.step), since: launch.since, stop: t('{keys} ou Exit : arrêter', { keys: shortcutLabel(SHORTCUTS.forceStop) }) }
         : undefined,
     // Fronton du jeu choisi (image Backglass), en fond du menu au bureau, à côté du plateau.
-    backglass: role === 'playfield' && m && table && !shown ? m.typeMedia(table, 'backglass', 'Backglass') : undefined,
+    backglass: role === 'playfield' && m && table && !shown && !onJukebox() ? m.typeMedia(table, 'backglass', 'Backglass') : undefined,
     // Mode invité : un message dont l'action est fermée n'en propose pas (son pied dit « Revenir au menu »).
     message: state.message?.action && !guest.allows(MESSAGE_DOORS[state.message.action]) ? { ...state.message, action: undefined } : state.message,
     banner: state.banner,
@@ -3739,6 +3836,8 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
         : undefined,
     // Le son du menu ne sort que d'une fenêtre : celle du playfield.
     sound: role === 'playfield' ? soundView() : undefined,
+    // Juke-box : l'affiche du médaillon choisi, ou le lecteur (liste, clip, cartel).
+    jukebox: jukeboxPlayer.view(role, state.phase === 'menu' && !state.help && onJukebox()),
     gameKeys: gameKeys(buttons, tilt),
     // Aide-mémoire du chargement : au bureau toujours ; en borne, celui du réglage de l'affichage seulement (display).
     loadingKeys: displayMode ? { title: t('Réglage de l’affichage'), rows: displayKeys(buttons), display: true } : { title: t('Commandes de la partie'), rows: gameKeys(buttons, tilt), display: false },
@@ -3759,6 +3858,7 @@ function zoneScreen(): ZoneScreen {
   if (state.phase === 'playing' || state.phase === 'loading') return state.phase;
   if (state.phase === 'intro') return 'intro';
   if (state.phase === 'message' && state.message?.action === 'power') return 'power';
+  if (state.phase === 'jukebox') return 'jukebox';
   if (library.browserOpen() && browserOnPlayfield()) return 'browser';
   if (attract.active) return 'attract';
   if (state.phase === 'library') return 'library';
@@ -3808,6 +3908,22 @@ function cinemaFor(role: RoleId): CinemaView | undefined {
 function moveSelection(offset: number): void {
   // Un flipper ferme la liste des collections, et change de table quand même.
   collections.hidePanel();
+  if (jukeboxShown()) {
+    // Le médaillon Juke-box en tête de la collection : il se choisit comme une table.
+    const shelf = collections.shelf();
+    const target = jukeboxWheelMove({ tables: shelf.tables.length, at: shelf.index, shown: true, selected: onJukebox() }, offset);
+    if (!target) return;
+    if ('jukebox' in target) {
+      if (state.jukebox) return;
+      state = { ...state, jukebox: true };
+      return playUiSound('solenoid');
+    }
+    const picked = collections.move(target.table - shelf.index);
+    const index = picked ? tables.indexOf(picked) : -1;
+    if (index < 0 || (index === state.index && !state.jukebox)) return;
+    state = { ...state, index, jukebox: false };
+    return playUiSound('solenoid');
+  }
   const next = collections.move(offset);
   const index = next ? tables.indexOf(next) : -1;
   if (index < 0 || index === state.index) return;
@@ -3896,7 +4012,12 @@ function dmdWindow(): BrowserWindow | undefined {
 
 /** Le DMD vivant se montre : réglé ainsi, un écran du DMD, ni partie ni mode bureau. */
 function liveDmdOn(): boolean {
-  return mediaSettings.dmd === 'live' && Boolean(dmdWindow()) && state.phase !== 'playing' && state.phase !== 'intro' && !desktop.active;
+  return (mediaSettings.dmd === 'live' || jukeboxDmd()) && Boolean(dmdWindow()) && state.phase !== 'playing' && state.phase !== 'intro' && !desktop.active;
+}
+
+/** Le DMD est au Juke-box : son médaillon choisi dans la roue, ou le lecteur ouvert (points même en DMD classique). */
+function jukeboxDmd(): boolean {
+  return state.phase === 'jukebox' || (state.phase === 'menu' && !state.help && onJukebox());
 }
 
 function tableRecords(table: TableEntry): TableRecords | undefined {
@@ -3957,6 +4078,11 @@ function autoDmdPlace(table: TableEntry | undefined): { zone: ReturnType<typeof 
  */
 function liveDmdView(role: RoleId): { area: ReturnType<typeof liveDmdArea>; framed: boolean; hidden?: boolean; editing?: string } | undefined {
   if (!liveDmdOn() || !(windowRoles.get(role) ?? [role]).includes('dmd')) return undefined;
+  // Juke-box : la bande 4:1 à sa place automatique, sur du noir (le spectre, JUKE-BOX).
+  if (jukeboxDmd()) {
+    const auto = autoDmdPlace(undefined);
+    return auto ? { area: auto.zone, framed: false } : undefined;
+  }
   const table = screensSubject();
   // FullDMD sans table : la marque sur toute la grille de 160 × 90 du repli (fallback.js, fullDmd),
   // pas une bande 4:1 entre deux aplats noirs (revue du directeur artistique, 27/10/2026).
@@ -4033,10 +4159,14 @@ function followTint(): void {
 }
 
 function broadcast(): void {
+  // Le Juke-box se ferme, musique arrêtée, dès qu'on quitte son écran, par quelque chemin que ce soit
+  // (Exit, partie lancée du téléphone, extinction…).
+  if (state.phase !== 'jukebox' && jukeboxPlayer.active()) jukeboxPlayer.close();
   // Casque porté et ses écrans rendus pour lui : ceux du PC n'affichent plus que « Dans le casque ».
   const inHeadset = Boolean(headset?.worn && headset.viewsFlowing);
   followTint();
   syncLiveDmd();
+  jukeboxPlayer.syncDmd(state.phase === 'menu' && !state.help && onJukebox());
   // Le mode attente n'est permis que sur le menu des tables (ni aide, ni fiche, ni message, ni partie).
   attract.allow(state.phase === 'menu' && !state.help && tables.length > 0 && !desktop.active);
   if (!attract.active) attractIndex = undefined;

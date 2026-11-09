@@ -20,6 +20,7 @@ import {
   dmdAnimation,
   liveDmdProgram,
   sameDots,
+  type DmdAnimation,
   type DmdAnimationName,
   type DmdAnimationOptions,
   type DmdDots,
@@ -50,7 +51,7 @@ const FRAME_MS = 40;
 const IDLE_MS = 120;
 
 interface Running {
-  name: DmdAnimationName;
+  name: string;
   start: number;
   duration?: number;
   dots: (elapsed: number) => DmdDots;
@@ -105,8 +106,12 @@ export class LiveDmd {
 
   /** Joue une animation par-dessus l'alternance ; celle qui jouait s'arrête. */
   play(name: DmdAnimationName, options?: DmdAnimationOptions): LiveDmdAnimationHandle {
+    return this.custom(name, dmdAnimation(name, options));
+  }
+
+  /** Joue une animation fournie par une autre partie du menu (Juke-box : sélection, spectre). */
+  custom(name: string, animation: DmdAnimation): LiveDmdAnimationHandle {
     this.animation?.finish();
-    const animation = dmdAnimation(name, options);
     let finish!: () => void;
     const done = new Promise<void>((resolve) => (finish = resolve));
     const running: Running = {
@@ -132,7 +137,7 @@ export class LiveDmd {
   }
 
   /** Animation en cours, pour les essais. */
-  playing(): DmdAnimationName | undefined {
+  playing(): string | undefined {
     return this.animation?.name;
   }
 

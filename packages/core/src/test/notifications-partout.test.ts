@@ -25,7 +25,7 @@ import { newSocialState } from '../social';
 const read = (...p: string[]) => fs.readFileSync(path.join(REPO_ROOT, ...p), 'utf8');
 
 /** Les écrans de Cyber Pinball : le compteur et toutes les notifications, toujours. */
-const CYBER_PINBALL: readonly ZoneScreen[] = ['menu', 'attract', 'library', 'help', 'message', 'confirmQuit'];
+const CYBER_PINBALL: readonly ZoneScreen[] = ['menu', 'attract', 'library', 'help', 'message', 'confirmQuit', 'jukebox'];
 
 test('partout : chaque écran de Cyber Pinball a le compteur et toutes les notifications ; les autres disent pourquoi', () => {
   for (const screen of ZONE_SCREENS) {

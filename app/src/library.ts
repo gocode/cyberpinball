@@ -12,7 +12,7 @@ import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, type BrowserWindow, type Input, type Rectangle } from 'electron';
+import { app, net, type BrowserWindow, type Input, type Rectangle } from 'electron';
 import {
   isFavorite,
   CONFIG_KEY,
@@ -348,6 +348,10 @@ export interface LibraryHost {
   notify?(text: string, job?: DownloadJob): void;
   /** La file des téléchargements a changé (progression, état) : la pastille ou l'écran se redessinent. */
   downloadsChanged?(): void;
+  /** Juke-box : playlists ou bibliothèque changées (jukebox-library.ts). */
+  jukeboxChanged?(): void;
+  /** Essais sans opérateur : ce qu'une capture de fenêtre ne voit pas (la vue du lecteur YouTube posée sur le fronton). */
+  captureExtras?(): Promise<{ name: string; png: Buffer }[]>;
 }
 
 /** Entrée du menu système (Exit dans le menu). La session des réglages peut y ajouter la sienne. */
@@ -422,7 +426,9 @@ export type UiAction =
   | { type: 'crop'; dx?: number; dy?: number; zoom?: number }
   /** Repère de la collection (collection suivante) ou ligne de la liste des collections (celle-ci). */
   | { type: 'collections'; step?: number; id?: string }
-  | { type: 'wheel'; offset: number };
+  | { type: 'wheel'; offset: number }
+  /** Juke-box (jukebox-player.ts) : une ligne de la liste, Start, une playlist voisine, Exit. */
+  | { type: 'jukebox'; op: 'row' | 'start' | 'playlist' | 'exit'; key?: string; dir?: number };
 
 export type Tone = 'error' | 'warning' | 'info' | 'ok' | 'quiet';
 export interface Row {
@@ -1213,6 +1219,10 @@ export function createLibrary(host: LibraryHost) {
     ytdlp: catalogUi.ytdlp,
     downloads,
     node: process.execPath,
+    // Réseau absent : les morceaux en ligne sont grisés « Hors ligne » (essais : CYBERPINBALL_HORS_LIGNE).
+    online: () => !process.env.CYBERPINBALL_HORS_LIGNE && net.isOnline(),
+    // Playlists ou bibliothèque changées (téléchargement fini, import) : les écrans du lecteur se redessinent.
+    changed: () => host.jukeboxChanged?.(),
     log: (line) => console.log(line),
   });
   downloads.setTransport('youtube', jukebox.transport);
@@ -4291,6 +4301,10 @@ export function createLibrary(host: LibraryHost) {
         if (win === playfield || !isShown(win)) continue;
         fs.mkdirSync(path.join(captureDir, 'ecrans'), { recursive: true });
         fs.writeFileSync(path.join(captureDir, 'ecrans', `${name}-${role}.png`), (await win.webContents.capturePage()).toPNG());
+      }
+      for (const extra of (await host.captureExtras?.()) ?? []) {
+        fs.mkdirSync(path.join(captureDir, 'ecrans'), { recursive: true });
+        fs.writeFileSync(path.join(captureDir, 'ecrans', `${name}-${extra.name}.png`), extra.png);
       }
     }
     layout.save();

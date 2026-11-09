@@ -191,6 +191,15 @@ function fillWheelItem(item, n) {
   item.wheel = n.wheel;
   item.title = n.title;
   const { node, tilt } = item;
+  // Médaillon Juke-box (jukebox.js) : son logo rond, dessiné, toujours prêt.
+  if (n.jukebox && window.CyberJukebox) {
+    tilt.replaceChildren(CyberJukebox.logo('wheel-img'));
+    node.classList.remove('disc');
+    node.classList.add('jukebox');
+    item.ratio = 1;
+    if (wheelView) placeWheelItem(item, wheelView.style);
+    return;
+  }
   const current = () => item.wheel === n.wheel && item.title === n.title;
   const place = () => {
     if (wheelView) placeWheelItem(item, wheelView.style);
@@ -413,6 +422,11 @@ function menuPanel(s) {
   }
   v.text.textContent = s.table.title;
   v.text.dataset.size = titleSize(s.table.title);
+  v.node.classList.toggle('jukebox-chosen', Boolean(s.table.jukebox));
+  // Médaillon Juke-box choisi au bureau : son affiche dans le cadre du fronton du menu.
+  const front = s.jukebox?.wheel && style && document.documentElement.classList.contains('menu-desktop') && window.CyberJukebox ? CyberJukebox.backglassPoster(s) : undefined;
+  v.backglass.querySelector(':scope > .jb-wheel-fronton')?.remove(); // i18n-ignore : sélecteur CSS
+  if (front) v.backglass.append(front);
   v.star.toggleAttribute('data-on', Boolean(s.table.favorite));
   fillShelf(v.shelf, s.shelf, s);
   v.node.classList.toggle('has-shelf', Boolean(s.shelf));
@@ -936,15 +950,25 @@ function drawPlayfield(s) {
     return;
   }
   dropLoadingFallback();
+  const jukebox = s.phase === 'jukebox' && s.jukebox?.player && window.CyberJukebox;
   const nodes = [];
+  // Médaillon Juke-box choisi dans la roue : son affiche derrière le menu (tout le plateau en borne, le cadre 9:16 au bureau).
+  if (s.phase === 'menu' && s.jukebox?.wheel && window.CyberJukebox) nodes.push(CyberJukebox.wheelPoster(s, document.documentElement.classList.contains('menu-desktop')));
   // Extinction, veille ou redémarrage en cours : plus rien à choisir, ni roue dentée ni cadenas.
   // Mode invité : le cadenas prend la place de la roue dentée, le menu système est fermé.
-  if (!(s.phase === 'message' && s.message?.action === 'power')) nodes.push(s.guest ? guestLock(s.guest) : gearButton(s));
+  if (!(s.phase === 'message' && s.message?.action === 'power') && !jukebox) nodes.push(s.guest ? guestLock(s.guest) : gearButton(s));
   // La zone des notifications (noticezone.ts) : le processus principal dit où (s.zone), sur chaque
   // écran ; le rendu ne décide de rien. Coin du menu des tables, ou ligne de la roue dentée d'un écran plein.
   const corner = s.zone ? cornerBox(s) : undefined;
   if (corner) nodes.push(corner);
   else noticeShown = undefined;
+  // Juke-box (jukebox.js) : la liste des morceaux (et le lecteur au bureau), sans le menu des tables
+  // ni la roue dentée ; les notifications et le constat bref sur la ligne de la marque (jukebox.css).
+  if (jukebox) {
+    placeChildren([...CyberJukebox.playfield(s), ...nodes, ...(s.banner ? [el('div', 'banner', s.banner)] : [])]);
+    fitNotice();
+    return;
+  }
 
   if (s.table) {
     CyberMedia.beginRender();
@@ -1228,6 +1252,12 @@ function viewOf(s, part) {
 
 function renderZones(s) {
   for (const z of zones) {
+    // Juke-box : le clip, l'affiche ou le morceau en cours à la place du média du fronton.
+    if (window.CyberJukebox?.zone(z.node, z.role, s)) {
+      z.layer.show(undefined);
+      z.layer.setActive(false);
+      continue;
+    }
     z.layer.show(viewOf(s, z.role));
     z.layer.setActive(z !== dmdZone || dmdMediaActive());
   }
@@ -1317,7 +1347,7 @@ function renderIntro(s) {
 
 /** Le fond du playfield ne joue que s'il se voit : les superpositions et la fiche sont opaques. */
 function backgroundVisible(s) {
-  return s.phase === 'menu' && !s.help;
+  return s.phase === 'menu' && !s.help && !s.jukebox?.wheel;
 }
 
 // ---------- Horaire de la borne (arcadehours.ts, frontend.css) ----------
@@ -1420,6 +1450,8 @@ window.cyberEtat = () => ({
     page: lastState.library.pages && { numero: lastState.library.pages.index + 1, sur: lastState.library.pages.count, element: lastState.library.pages.help?.kind ?? lastState.library.pages.page?.kind ?? 'repli', repli: lastState.library.pages.fallback, source: lastState.library.pages.help?.source },
   },
   tables: lastState?.count,
+  // Juke-box : la lecture de cette fenêtre (clip, son, cartel, niveaux) et le temps du morceau.
+  jukebox: window.CyberJukebox?.status(),
   // Coin du menu des tables : notification dessinée (titre, précision, sur le départ) et amis en ligne.
   notification: (() => {
     const box = document.querySelector('#root .notice-toast');
@@ -1443,6 +1475,9 @@ window.cyberEtat = () => ({
 
 window.cyber.onState((s) => {
   lastState = s;
+  // Juke-box quitté (Exit, partie, extinction) : la lecture de cette fenêtre s'arrête, ses zones sont oubliées.
+  document.documentElement.classList.toggle('jukebox-phase', s.phase === 'jukebox');
+  if (window.CyberJukebox && s.phase !== 'jukebox' && (CyberJukebox.playing() || document.documentElement.classList.contains('jukebox-desk'))) CyberJukebox.leave();
   // Menu montré dans le casque : cet écran du PC se repose (plus rien à dessiner), un mot dit où il est.
   document.documentElement.classList.toggle('in-headset', Boolean(s.inHeadset));
   let rest = document.getElementById('headset-rest');

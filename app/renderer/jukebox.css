@@ -1,0 +1,1259 @@
+/*
+ * Juke-box (renderer/jukebox.js) : cotes des maquettes validées le 09/11/2026
+ * (zones fixes, couleurs du design system), en pixels de référence multipliés par une unité :
+ *   --jp : plateau en borne (1080 × 1920) ou au bureau (1920 × 1080), dans #root ;
+ *   --cp : clip et fronton (1920 × 1080) ;
+ *   --pp : affiche (sa taille de référence, --pw × --ph).
+ * Zones de taille fixe : d'un morceau, d'une playlist ou d'un état à l'autre, seul leur contenu
+ * change. Le vert signal marque le choix (focus), la sarcelle (--meta) le morceau en cours.
+ */
+
+.jb {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  overflow: hidden;
+  font-variant-numeric: tabular-nums;
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.jb-cab {
+  --jp: min(100cqw / 1080, 100cqh / 1920);
+  width: calc(1080 * var(--jp));
+  height: calc(1920 * var(--jp));
+  font-size: calc(24 * var(--jp));
+  /* Ambiance musicale : lueur violette de la pochette derrière la lecture (20 % au plus), sarcelle en haut. */
+  background:
+    radial-gradient(ellipse calc(680 * var(--jp)) calc(300 * var(--jp)) at calc(540 * var(--jp)) calc(1625 * var(--jp)), #9771d233, transparent 85%),
+    radial-gradient(ellipse at 85% 10%, #102d2a80, transparent 55%),
+    var(--void);
+}
+
+.jb-desk {
+  --jp: min(100cqw / 1920, 100cqh / 1080);
+  width: calc(1920 * var(--jp));
+  height: calc(1080 * var(--jp));
+  font-size: calc(24 * var(--jp));
+  background: radial-gradient(ellipse at 85% 10%, #102d2a80, transparent 55%), var(--void);
+}
+
+.jb-zone {
+  position: absolute;
+  min-width: 0;
+}
+
+.jb h1,
+.jb h2,
+.jb h3,
+.jb p {
+  margin: 0;
+}
+
+.jb-ellipsis {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.jb-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: calc(20 * var(--jp));
+  min-width: 0;
+}
+
+.jb-stack {
+  display: flex;
+  flex-direction: column;
+  gap: calc(18 * var(--jp));
+}
+
+.jb-muted {
+  color: var(--ink-muted);
+}
+
+.jb-meta {
+  color: var(--meta);
+}
+
+.jb-label {
+  font-size: calc(20 * var(--jp, var(--pp)));
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--signal);
+  font-weight: 600;
+}
+
+.jb-eyebrow {
+  font-size: calc(20 * var(--jp, var(--pp)));
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+}
+
+.jb-eyebrow.jb-meta {
+  color: var(--meta);
+  display: flex;
+  align-items: center;
+  gap: calc(8 * var(--jp));
+}
+
+.jb-eyebrow.warning {
+  color: var(--warning);
+}
+
+.jb-eyebrow svg {
+  width: 1.2em;
+  height: 1.2em;
+  flex: none;
+}
+
+.jb-fine {
+  font-size: calc(20 * var(--jp));
+  color: var(--ink-muted);
+}
+
+.jb-rule {
+  border-top: 1px solid var(--line-strong);
+}
+
+.jb-brand {
+  font-size: calc(23 * var(--jp));
+  letter-spacing: 0.43em;
+  font-weight: 300;
+  white-space: nowrap;
+}
+
+.jb-brand b {
+  color: var(--signal);
+  font-weight: 400;
+}
+
+.jb-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(10 * var(--jp));
+  padding: calc(6 * var(--jp)) calc(12 * var(--jp));
+  border: 1px solid var(--line-strong);
+  border-radius: calc(5 * var(--jp));
+  font-size: calc(20 * var(--jp));
+  white-space: nowrap;
+  flex: none;
+}
+
+.jb-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(12 * var(--jp));
+  min-height: calc(60 * var(--jp));
+  padding: calc(12 * var(--jp)) calc(22 * var(--jp));
+  border: 1px solid var(--line-strong);
+  border-radius: calc(5 * var(--jp));
+  background: var(--surface-raised);
+  color: var(--ink);
+  font: inherit;
+  font-size: calc(24 * var(--jp));
+  white-space: nowrap;
+  flex: none;
+  cursor: pointer;
+}
+
+.jb-button svg {
+  width: calc(28 * var(--jp));
+  height: calc(28 * var(--jp));
+}
+
+.jb-progress {
+  height: calc(6 * var(--jp, var(--cp)));
+  background: var(--line-soft);
+  border-radius: calc(5 * var(--jp, var(--cp)));
+  width: 100%;
+  margin: calc(14 * var(--jp, var(--cp))) 0;
+  overflow: hidden;
+}
+
+.jb-progress > span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--meta);
+  border-radius: inherit;
+}
+
+/* ---------- Commandes : pastilles vertes, comme le bandeau du menu ---------- */
+
+.jb-help {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: calc(12 * var(--jp)) calc(24 * var(--jp));
+  align-content: center;
+  border-top: 1px solid var(--line-strong);
+  padding-top: calc(12 * var(--jp));
+  font-size: calc(20 * var(--jp));
+  color: var(--ink-muted);
+}
+
+.jb-command {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(10 * var(--jp));
+  min-width: 0;
+  cursor: pointer;
+}
+
+.jb-key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(38 * var(--jp));
+  padding: 0 calc(10 * var(--jp));
+  border: calc(2 * var(--jp)) solid var(--signal);
+  border-radius: 999px;
+  background: #10200b;
+  color: var(--signal);
+  font-size: calc(22 * var(--jp));
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  box-shadow: 0 0 calc(12 * var(--jp)) #8be23a24;
+  white-space: nowrap;
+  flex: none;
+}
+
+.jb-command-action {
+  font-size: calc(20 * var(--jp));
+  font-weight: 500;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Start indisponible : la pastille grisée, la raison à sa place (« Indisponible · 42 % »). */
+.jb-command.jb-disabled .jb-key {
+  border-color: var(--ink-faint);
+  color: var(--ink-muted);
+  background: var(--surface);
+  box-shadow: none;
+}
+
+/* ---------- Plateau en borne (1080 × 1920) ---------- */
+
+.jb-cab .jb-head {
+  left: calc(48 * var(--jp));
+  top: calc(34 * var(--jp));
+  width: calc(984 * var(--jp));
+  height: calc(74 * var(--jp));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.jb-cab .jb-playlist {
+  left: calc(48 * var(--jp));
+  top: calc(150 * var(--jp));
+  width: calc(984 * var(--jp));
+  height: calc(190 * var(--jp));
+}
+
+.jb-playlist-names {
+  min-width: 0;
+}
+
+.jb-playlist-name {
+  font-size: calc(48 * var(--jp));
+  line-height: 1.15;
+  font-weight: 600;
+  margin: calc(12 * var(--jp)) 0 !important;
+  letter-spacing: 0.02em;
+}
+
+.jb-neighbors {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr 1fr;
+  align-items: center;
+  text-align: center;
+  border-block: 1px solid var(--line-strong);
+  height: calc(72 * var(--jp));
+  color: var(--ink-muted);
+  font-size: calc(22 * var(--jp));
+  gap: calc(12 * var(--jp));
+}
+
+.jb-neighbors .jb-current {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.jb-neighbors.jb-disabled {
+  grid-template-columns: 1fr;
+}
+
+.jb-cab .jb-list {
+  left: calc(48 * var(--jp));
+  top: calc(380 * var(--jp));
+  width: calc(984 * var(--jp));
+  height: calc(1118 * var(--jp));
+  border: 1px solid var(--line-strong);
+  background: #07110fd9;
+  border-radius: calc(8 * var(--jp));
+  overflow: hidden;
+}
+
+.jb-track-head {
+  height: calc(60 * var(--jp));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 calc(20 * var(--jp));
+  color: var(--ink-muted);
+  font-size: calc(20 * var(--jp));
+  border-bottom: 1px solid var(--line-strong);
+  white-space: nowrap;
+}
+
+.jb-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(14 * var(--jp));
+}
+
+.jb-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6 * var(--jp));
+}
+
+.jb-legend svg {
+  width: calc(20 * var(--jp));
+  height: calc(20 * var(--jp));
+}
+
+.jb-cab .jb-rows {
+  height: calc(1056 * var(--jp));
+  overflow: hidden;
+}
+
+/*
+ * La liste continue : un filet de 3 px annonce la suite (jamais de fondu). Posé par-dessus le bord
+ * de la ligne (sa marge, sans texte), pas en bordure : les lignes gardent leur hauteur, entières.
+ */
+.jb-rows {
+  position: relative;
+}
+
+.jb-rows.continues::after,
+.jb-rows.scrolled::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: calc(3 * var(--jp));
+  background: var(--line-strong);
+  z-index: 1;
+  pointer-events: none;
+}
+
+.jb-rows.continues::after {
+  bottom: 0;
+}
+
+.jb-rows.scrolled::before {
+  top: 0;
+}
+
+.jb-row {
+  box-sizing: border-box;
+  height: calc(132 * var(--jp));
+  display: grid;
+  grid-template-columns: calc(38 * var(--jp)) calc(88 * var(--jp)) minmax(0, 1fr) calc(36 * var(--jp)) calc(72 * var(--jp));
+  align-items: center;
+  gap: calc(16 * var(--jp));
+  padding: calc(16 * var(--jp)) calc(20 * var(--jp));
+  border: 1px solid transparent;
+  border-bottom-color: var(--line-soft);
+  position: relative;
+  cursor: pointer;
+}
+
+.jb-row .jb-art {
+  width: calc(88 * var(--jp));
+  height: calc(88 * var(--jp));
+  border-radius: calc(5 * var(--jp));
+}
+
+.jb-row-text {
+  min-width: 0;
+}
+
+.jb-title {
+  font-size: calc(28 * var(--jp));
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.jb-artist,
+.jb-reason {
+  font-size: calc(22 * var(--jp));
+  color: var(--ink-muted);
+  line-height: 1.45;
+}
+
+.jb-num {
+  font-size: calc(20 * var(--jp));
+  color: var(--ink-muted);
+  display: flex;
+  align-items: center;
+}
+
+.jb-num svg {
+  width: calc(24 * var(--jp));
+  height: calc(24 * var(--jp));
+}
+
+.jb-duration {
+  text-align: right;
+  font-size: calc(22 * var(--jp));
+  color: var(--ink-muted);
+}
+
+.jb-source {
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  width: calc(32 * var(--jp));
+  height: calc(32 * var(--jp));
+  color: var(--ink-muted);
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.jb-source svg {
+  width: calc(20 * var(--jp));
+  height: calc(20 * var(--jp));
+}
+
+/* Morceau en cours : filet sarcelle et symbole lecture / pause. */
+.jb-row.jb-playing {
+  border-left: calc(4 * var(--jp)) solid var(--meta);
+  background: #0c2024;
+}
+
+.jb-row.jb-playing .jb-num {
+  color: var(--meta);
+}
+
+/* Morceau choisi : le focus vert, distinct du morceau en cours. */
+.jb-row.is-focus {
+  border-color: var(--signal) !important;
+  box-shadow: inset 0 0 0 1px var(--signal), 0 0 calc(24 * var(--jp)) #8be23a16;
+  background-color: #132312;
+}
+
+.jb-row.is-focus .jb-title {
+  color: var(--signal);
+}
+
+/* Grisé avec sa raison : la miniature éteinte, la raison plus claire que le titre. */
+.jb-row.jb-disabled .jb-title,
+.jb-row.jb-disabled.is-focus .jb-title {
+  color: #84968f;
+}
+
+.jb-row.jb-disabled .jb-art {
+  filter: grayscale(1);
+  opacity: 0.32;
+}
+
+.jb-reason {
+  color: #c4d5cc;
+}
+
+.jb-reason-icon {
+  width: calc(20 * var(--jp));
+  height: calc(20 * var(--jp));
+  margin-right: calc(6 * var(--jp));
+  vertical-align: -0.15em;
+  color: var(--danger);
+}
+
+.jb-reason.mark-download .jb-reason-icon {
+  color: var(--meta);
+}
+
+.jb-reason.mark-offline .jb-reason-icon,
+.jb-reason.mark-ad .jb-reason-icon {
+  color: var(--warning);
+}
+
+.jb-reason.mark-ad {
+  color: var(--warning);
+}
+
+.jb-reason.mark-waiting,
+.jb-reason.mark-waiting .jb-reason-icon {
+  color: var(--ink-muted);
+}
+
+.jb-row-progress {
+  height: calc(4 * var(--jp));
+  margin: calc(6 * var(--jp)) 0 0;
+}
+
+/* Lecture en cours, en pied de la liste. */
+.jb-cab .jb-now {
+  left: calc(48 * var(--jp));
+  top: calc(1530 * var(--jp));
+  width: calc(984 * var(--jp));
+  height: calc(220 * var(--jp));
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: calc(150 * var(--jp)) minmax(0, 1fr);
+  gap: calc(28 * var(--jp));
+  align-items: center;
+  padding: calc(28 * var(--jp));
+  background: linear-gradient(100deg, #9771d226, #07110ff5);
+  border: 1px solid #315665;
+  border-radius: calc(9 * var(--jp));
+  box-shadow: 0 0 calc(64 * var(--jp)) #9771d21c;
+}
+
+.jb-cab .jb-now.jb-idle {
+  display: flex;
+  justify-content: center;
+  background: #07110ff5;
+  border-color: var(--line-strong);
+  box-shadow: none;
+}
+
+.jb-now-art,
+.jb-cab .jb-now > .jb-clip {
+  width: calc(150 * var(--jp));
+  height: calc(150 * var(--jp));
+  border-radius: calc(5 * var(--jp));
+}
+
+.jb-now-text {
+  min-width: 0;
+}
+
+.jb-now-title {
+  font-size: calc(34 * var(--jp));
+  margin: calc(6 * var(--jp)) 0 !important;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.jb-time {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(20 * var(--jp));
+  color: var(--ink-muted);
+  font-size: calc(22 * var(--jp));
+  white-space: nowrap;
+}
+
+.jb-cab .jb-help {
+  left: calc(48 * var(--jp));
+  top: calc(1784 * var(--jp));
+  width: calc(984 * var(--jp));
+  height: calc(104 * var(--jp));
+}
+
+/* Playlist vide, bibliothèque vide : l'invitation, sans focus ; le chemin de l'import avec les mêmes pastilles. */
+.jb-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(22 * var(--jp));
+  text-align: center;
+  padding: calc(40 * var(--jp));
+  height: calc(1056 * var(--jp));
+  box-sizing: border-box;
+}
+
+.jb-empty h2 {
+  font-size: calc(34 * var(--jp));
+  line-height: 1.2;
+}
+
+.jb-empty p {
+  max-width: calc(660 * var(--jp));
+}
+
+.jb-bubble {
+  width: calc(100 * var(--jp));
+  height: calc(100 * var(--jp));
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+}
+
+.jb-bubble svg {
+  width: calc(48 * var(--jp));
+  height: calc(48 * var(--jp));
+}
+
+.jb-empty-instructions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: calc(16 * var(--jp));
+  color: var(--ink-muted);
+}
+
+.jb-empty-line {
+  display: flex;
+  align-items: center;
+  gap: calc(16 * var(--jp));
+}
+
+.jb-neighbors-none {
+  color: var(--ink-muted);
+}
+
+/* ---------- Plateau au bureau (1920 × 1080) : la liste dans le cadre 9:16, le lecteur à droite ---------- */
+
+.jb-desk .jb-frame {
+  left: calc(24 * var(--jp));
+  top: calc(20 * var(--jp));
+  width: calc(585 * var(--jp));
+  height: calc(1040 * var(--jp));
+  box-sizing: border-box;
+  border: calc(5 * var(--jp)) solid #45645a;
+  border-radius: calc(12 * var(--jp));
+  padding: calc(24 * var(--jp)) calc(20 * var(--jp));
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: calc(18 * var(--jp));
+}
+
+.jb-desk-name {
+  font-size: calc(30 * var(--jp));
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: 0.02em;
+}
+
+.jb-desk .jb-between.jb-fine.jb-disabled {
+  justify-content: flex-start;
+}
+
+.jb-desk-list {
+  border: 1px solid var(--line-strong);
+  background: #07110fd9;
+  border-radius: calc(8 * var(--jp));
+  overflow: hidden;
+  flex: none;
+}
+
+.jb-desk .jb-rows {
+  height: calc(770 * var(--jp));
+  overflow: hidden;
+}
+
+.jb-desk .jb-row {
+  height: calc(110 * var(--jp));
+  grid-template-columns: calc(26 * var(--jp)) calc(64 * var(--jp)) minmax(0, 1fr) calc(32 * var(--jp)) calc(54 * var(--jp));
+  gap: calc(10 * var(--jp));
+  padding: calc(10 * var(--jp));
+}
+
+.jb-desk .jb-row .jb-art {
+  width: calc(64 * var(--jp));
+  height: calc(64 * var(--jp));
+}
+
+.jb-desk .jb-title {
+  font-size: calc(23 * var(--jp));
+}
+
+.jb-desk .jb-artist,
+.jb-desk .jb-reason,
+.jb-desk .jb-duration {
+  font-size: calc(20 * var(--jp));
+}
+
+.jb-desk .jb-empty {
+  height: calc(770 * var(--jp));
+}
+
+.jb-desk-selection {
+  margin-top: auto !important;
+}
+
+.jb-desk .jb-head {
+  left: calc(650 * var(--jp));
+  top: calc(24 * var(--jp));
+  width: calc(1222 * var(--jp));
+  height: calc(60 * var(--jp));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.jb-desk .jb-clip-zone {
+  left: calc(650 * var(--jp));
+  top: calc(110 * var(--jp));
+  width: calc(1222 * var(--jp));
+  height: calc(620 * var(--jp));
+}
+
+.jb-desk .jb-clip-zone > .jb-clip {
+  position: absolute;
+  inset: 0;
+}
+
+.jb-desk .jb-now {
+  left: calc(650 * var(--jp));
+  top: calc(756 * var(--jp));
+  width: calc(1222 * var(--jp));
+  height: calc(184 * var(--jp));
+}
+
+.jb-desk .jb-now .jb-now-title {
+  margin: calc(8 * var(--jp)) 0 !important;
+}
+
+.jb-desk .jb-now .jb-progress {
+  margin: calc(14 * var(--jp)) 0 calc(10 * var(--jp));
+}
+
+.jb-desk .jb-time {
+  font-size: calc(20 * var(--jp));
+}
+
+.jb-desk .jb-help {
+  left: calc(650 * var(--jp));
+  top: calc(965 * var(--jp));
+  width: calc(1222 * var(--jp));
+  height: calc(89 * var(--jp));
+}
+
+/* ---------- Pochettes dessinées : soleil, horizon, sillons ; jamais claires ---------- */
+
+.jb-art {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 50% 36%, color-mix(in oklab, var(--art-a) 70%, transparent) 0 18%, transparent 19%),
+    linear-gradient(to bottom, transparent 62%, color-mix(in oklab, var(--art-b) 40%, #061014) 62% 63%, #061014 63%),
+    radial-gradient(ellipse at 50% 40%, color-mix(in oklab, var(--art-a) 32%, transparent), #04090e 75%),
+    #050b10;
+}
+
+.jb-art[data-scene='1'] {
+  background:
+    repeating-radial-gradient(circle at 50% 42%, transparent 0 9%, color-mix(in oklab, var(--art-b) 45%, transparent) 9% 10%),
+    radial-gradient(circle at 50% 42%, color-mix(in oklab, var(--art-a) 60%, transparent) 0 14%, transparent 15%),
+    radial-gradient(ellipse at 50% 40%, color-mix(in oklab, var(--art-a) 28%, transparent), #04090e 75%),
+    #050b10;
+}
+
+.jb-art[data-scene='2'] {
+  background:
+    linear-gradient(160deg, transparent 40%, color-mix(in oklab, var(--art-b) 35%, transparent) 41% 43%, transparent 44%),
+    linear-gradient(20deg, transparent 52%, color-mix(in oklab, var(--art-a) 35%, transparent) 53% 55%, transparent 56%),
+    radial-gradient(ellipse at 50% 100%, color-mix(in oklab, var(--art-b) 40%, transparent), transparent 60%),
+    radial-gradient(ellipse at 50% 30%, color-mix(in oklab, var(--art-a) 30%, transparent), #04090e 75%),
+    #050b10;
+}
+
+.jb-art-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #050b10;
+}
+
+/* ---------- Clip (fronton 1920 × 1080, cadre du bureau, vignette) ---------- */
+
+.jb-zone-fill {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  container-type: size;
+  background: var(--void);
+}
+
+.jb-zone-fill > * {
+  position: absolute;
+  inset: 0;
+}
+
+.jb-clip {
+  position: relative;
+  overflow: hidden;
+  background: var(--void);
+  container-type: size;
+}
+
+.jb-zone-fill > .jb-clip {
+  position: absolute;
+  inset: 0;
+}
+
+.jb-clip-stage,
+.jb-clip-over {
+  --cp: min(100cqw / 1920, 100cqh / 1080);
+  position: absolute;
+  inset: 0;
+}
+
+.jb-clip-over {
+  pointer-events: none;
+}
+
+.jb-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: var(--void);
+}
+
+.jb-online-ground {
+  position: absolute;
+  inset: 0;
+  background: var(--void);
+}
+
+.jb-clip-stage > .jb-art {
+  position: absolute;
+  inset: 0;
+}
+
+/* Cartel du changement de morceau : quelques secondes, en bas à gauche du clip. */
+.jb-card {
+  position: absolute;
+  left: calc(64 * var(--cp));
+  bottom: calc(64 * var(--cp));
+  max-width: calc(1200 * var(--cp));
+  padding: calc(26 * var(--cp)) calc(34 * var(--cp));
+  border-left: calc(4 * var(--cp)) solid var(--meta);
+  background: #030807ee;
+}
+
+/* Plancher de 20 px du design system : un clip plus petit que le fronton (bureau) garde des textes lisibles. */
+.jb-card .jb-eyebrow {
+  font-size: calc(20 * var(--cp));
+}
+
+.jb-card-title {
+  font-size: calc(56 * var(--cp));
+  margin: calc(8 * var(--cp)) 0 !important;
+  line-height: 1.15;
+  font-weight: 600;
+}
+
+.jb-card p {
+  font-size: calc(28 * var(--cp));
+}
+
+/* Repère discret de la pause, en haut à droite. */
+.jb-clip-badge {
+  position: absolute;
+  right: calc(48 * var(--cp));
+  top: calc(48 * var(--cp));
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--cp));
+  background: #030807e8;
+  padding: calc(12 * var(--cp)) calc(20 * var(--cp));
+  border: 1px solid var(--line-strong);
+  border-radius: calc(6 * var(--cp));
+  font-size: calc(24 * var(--cp));
+}
+
+.jb-clip-badge svg {
+  width: calc(28 * var(--cp));
+  height: calc(28 * var(--cp));
+}
+
+/* Son seul : la pochette agrandie (ou le visualiseur) et le titre, jamais un écran vide. */
+.jb-audio {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(60 * var(--cp));
+  background:
+    radial-gradient(ellipse at 30% 40%, #9771d22e, transparent 60%),
+    radial-gradient(ellipse at 85% 10%, #102d2a80, transparent 55%),
+    var(--void);
+}
+
+.jb-audio-art {
+  width: calc(520 * var(--cp));
+  height: calc(520 * var(--cp));
+  flex: none;
+  box-shadow: 0 0 calc(100 * var(--cp)) #a171cf30;
+  border: 1px solid #5a4770;
+}
+
+.jb-audio-text {
+  --jp: var(--cp);
+  min-width: 0;
+  max-width: calc(1000 * var(--cp));
+  padding: calc(40 * var(--cp));
+  background: #030807ed;
+  border: 1px solid var(--line-strong);
+  border-radius: calc(8 * var(--cp));
+}
+
+.jb-audio-title {
+  font-size: calc(64 * var(--cp));
+  max-width: calc(760 * var(--cp));
+  margin: calc(20 * var(--cp)) 0 !important;
+  line-height: 1.15;
+  font-weight: 600;
+}
+
+.jb-audio-text h2 {
+  font-size: calc(34 * var(--cp));
+  line-height: 1.2;
+}
+
+.jb-audio-text p.jb-muted {
+  font-size: calc(24 * var(--cp));
+  margin-top: calc(22 * var(--cp)) !important;
+}
+
+.jb-visualizer {
+  width: calc(520 * var(--cp));
+  height: calc(520 * var(--cp));
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(12 * var(--cp));
+  background: #061218c9;
+  border: 1px solid #25444a;
+}
+
+.jb-visualizer > span {
+  width: calc(10 * var(--cp));
+  height: calc(var(--h, 0.2) * 440 * var(--cp));
+  background: linear-gradient(#a27cda, #35bfba);
+  border-radius: calc(8 * var(--cp));
+  box-shadow: 0 0 calc(14 * var(--cp)) #a27cda40;
+  transition: height 90ms linear;
+}
+
+/* La vignette du morceau en cours (borne sans fronton) : le clip en petit, sans cartel. */
+.jb-clip[data-place='thumb'] .jb-audio-text,
+.jb-clip[data-place='thumb'] .jb-clip-badge {
+  display: none;
+}
+
+.jb-clip[data-place='thumb'] .jb-audio-art,
+.jb-clip[data-place='thumb'] .jb-visualizer {
+  width: 100%;
+  height: 100%;
+}
+
+/* ---------- Affiche du Juke-box (médaillon choisi, fronton au repos) ---------- */
+
+.jb-poster {
+  --pw: 1920;
+  --ph: 1080;
+  position: relative;
+  overflow: hidden;
+  container-type: size;
+  background: radial-gradient(ellipse at 50% 30%, #49336566, transparent 65%), linear-gradient(150deg, #081c1d, #070c12 70%);
+  color: var(--ink);
+}
+
+.jb-poster::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-radial-gradient(ellipse at 50% 40%, transparent 0 85px, #71ddcd13 86px 88px, transparent 90px 130px);
+}
+
+.jb-poster-content {
+  --pp: min(100cqw / var(--pw), 100cqh / var(--ph));
+  position: relative;
+  display: flex;
+  height: 100%;
+  box-sizing: border-box;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: calc(32 * var(--pp));
+  text-align: center;
+  padding: calc(46 * var(--pp));
+  font-size: calc(24 * var(--pp));
+}
+
+.jb-identity {
+  width: calc(280 * var(--pp));
+  height: calc(280 * var(--pp));
+  flex: none;
+}
+
+.jb-logo {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.jb-poster .jb-label,
+.jb-poster .jb-eyebrow,
+.jb-audio-text .jb-label {
+  font-size: calc(20 * var(--pp, var(--cp)));
+}
+
+.jb-poster-content {
+  font-size: calc(24 * var(--pp));
+}
+
+.jb-poster-title {
+  font-size: calc(76 * var(--pp));
+  letter-spacing: 0.04em;
+  line-height: 1.15;
+  font-weight: 600;
+}
+
+.jb-poster-stats,
+.jb-poster-detail {
+  max-width: calc(720 * var(--pp));
+}
+
+.jb-poster .jb-rule {
+  width: calc(160 * var(--pp));
+}
+
+.jb-poster-heading {
+  font-size: calc(34 * var(--pp));
+  line-height: 1.2;
+}
+
+/* Fronton (zone de l'écran) et clip au repos : l'affiche plein cadre. */
+.jb-fronton-poster,
+.jb-clip-poster {
+  position: absolute;
+  inset: 0;
+}
+
+.jb-clip-poster.place-desk {
+  --pw: 1222;
+  --ph: 620;
+}
+
+.jb-clip-poster.place-desk .jb-poster-content {
+  gap: calc(18 * var(--pp));
+}
+
+.jb-clip-poster.place-desk .jb-identity {
+  width: calc(180 * var(--pp));
+  height: calc(180 * var(--pp));
+}
+
+.jb-clip-poster.place-desk .jb-poster-title {
+  font-size: calc(54 * var(--pp));
+}
+
+/* Le morceau en cours sur le fronton d'une autre fenêtre (bureau à deux écrans). */
+.jb-fronton-poster > .jb-audio {
+  --cp: min(100cqw / 1920, 100cqh / 1080);
+}
+
+/* Médaillon choisi en borne : l'affiche habille tout le plateau, derrière la roue ; le texte au-dessus d'elle. */
+.jb-wheel-poster {
+  --pw: 1080;
+  --ph: 1920;
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.jb-wheel-poster > .jb-poster-content {
+  height: calc(1370 * min(100cqw / 1080, 100cqh / 1920));
+}
+
+/* Au bureau : dans le cadre 9:16 du plateau (cotes de #media-bg). */
+.jb-wheel-poster.desk {
+  --pw: 548;
+  --ph: 974;
+  inset: auto;
+  left: calc(80 * var(--u));
+  top: calc(92 * var(--u));
+  width: calc(531 * var(--u));
+  height: calc(944 * var(--u));
+  border-radius: calc(5 * var(--u));
+}
+
+.jb-wheel-poster.desk > .jb-poster-content {
+  height: 100%;
+  gap: calc(22 * var(--pp));
+  padding: calc(36 * var(--pp));
+}
+
+.jb-wheel-poster.desk .jb-identity {
+  width: calc(230 * var(--pp));
+  height: calc(230 * var(--pp));
+}
+
+.jb-wheel-poster.desk .jb-poster-title {
+  font-size: calc(64 * var(--pp));
+}
+
+.jb-wheel-poster.desk .jb-rule {
+  margin: calc(8 * var(--pp)) 0;
+}
+
+/* Cadre du fronton du menu au bureau : identité à gauche, textes à droite, en haut du cadre (la roue passe dessous). */
+.jb-wheel-fronton {
+  --pw: 1176;
+  --ph: 662;
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.jb-wheel-fronton > .jb-poster-content {
+  display: grid;
+  grid-template-columns: calc(220 * var(--pp)) minmax(0, 1fr);
+  grid-template-rows: repeat(6, auto);
+  align-content: start;
+  justify-items: start;
+  gap: calc(8 * var(--pp)) calc(28 * var(--pp));
+  height: auto;
+  padding: calc(28 * var(--pp));
+  text-align: left;
+}
+
+.jb-wheel-fronton .jb-identity {
+  grid-column: 1;
+  grid-row: 1 / 7;
+  width: calc(210 * var(--pp));
+  height: calc(210 * var(--pp));
+  align-self: center;
+}
+
+.jb-wheel-fronton .jb-label {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.jb-wheel-fronton .jb-poster-title {
+  grid-column: 2;
+  grid-row: 2;
+  font-size: calc(56 * var(--pp));
+}
+
+.jb-wheel-fronton .jb-poster-stats {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.jb-wheel-fronton .jb-rule {
+  display: none;
+}
+
+.jb-wheel-fronton .jb-eyebrow {
+  grid-column: 2;
+  grid-row: 4;
+}
+
+.jb-wheel-fronton .jb-poster-heading {
+  grid-column: 2;
+  grid-row: 5;
+  font-size: calc(32 * var(--pp));
+}
+
+.jb-wheel-fronton .jb-poster-detail {
+  grid-column: 2;
+  grid-row: 6;
+  font-size: calc(22 * var(--pp));
+}
+
+/*
+ * Au bureau, le clip (1222 × 620) et les affiches de la roue (cadre du plateau 531 × 944, fronton
+ * 1140 × 641) ont leur propre taille de référence, celle d'un écran de 1080 : leurs textes y sont à
+ * l'échelle 1, jamais sous 20 px, et suivent la taille réelle de l'écran.
+ */
+.jb-clip[data-place='desk'] > .jb-clip-stage,
+.jb-clip[data-place='desk'] > .jb-clip-over {
+  --cp: min(100cqw / 1222, 100cqh / 620);
+}
+
+.jb-clip[data-place='desk'] .jb-audio {
+  gap: calc(40 * var(--cp));
+}
+
+.jb-clip[data-place='desk'] .jb-audio-art,
+.jb-clip[data-place='desk'] .jb-visualizer {
+  width: calc(400 * var(--cp));
+  height: calc(400 * var(--cp));
+}
+
+.jb-clip[data-place='desk'] .jb-audio-text {
+  max-width: calc(700 * var(--cp));
+  padding: calc(28 * var(--cp));
+}
+
+.jb-clip[data-place='desk'] .jb-audio-title {
+  font-size: calc(44 * var(--cp));
+  margin: calc(12 * var(--cp)) 0 !important;
+}
+
+.jb-clip[data-place='desk'] .jb-card {
+  left: calc(32 * var(--cp));
+  bottom: calc(32 * var(--cp));
+  max-width: calc(900 * var(--cp));
+  padding: calc(18 * var(--cp)) calc(26 * var(--cp));
+}
+
+.jb-clip[data-place='desk'] .jb-card-title {
+  font-size: calc(40 * var(--cp));
+}
+
+.jb-clip[data-place='desk'] .jb-card p {
+  font-size: calc(24 * var(--cp));
+}
+
+.jb-clip[data-place='desk'] .jb-visualizer > span {
+  height: calc(var(--h, 0.2) * 340 * var(--cp));
+}
+
+.jb-wheel-poster.desk {
+  --pw: 531;
+  --ph: 944;
+}
+
+.jb-wheel-fronton {
+  --pw: 1140;
+  --ph: 641;
+}
+
+/* Affiche et clip hors de la section du plateau : pas de marges par défaut sur leurs titres (comme les maquettes). */
+.jb-poster :is(h1, h2, h3, p),
+.jb-clip :is(h1, h2, h3, p) {
+  margin: 0;
+}
+
+/* Repère de pause : son icône à l'échelle du clip. */
+.jb-clip-badge svg {
+  width: calc(28 * var(--cp));
+  height: calc(28 * var(--cp));
+}

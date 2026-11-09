@@ -149,6 +149,7 @@ export const MENU_SETTINGS_ROWS = [
   'startTable',
   'wheelStart',
   'tableColor',
+  'jukebox',
   'music',
   'musicVolume',
   'videoVolume',
@@ -220,6 +221,14 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
           : t('Le menu garde la sarcelle de Cyber Pinball pour toutes les tables (Start : la couleur de chaque table)'),
         icon: 'bulb',
         run: () => set({ tableColor: !v.tableColor }),
+      },
+      jukebox: {
+        label: v.jukebox ? t('Juke-box dans la roue : affiché') : t('Juke-box dans la roue : masqué'),
+        detail: v.jukebox
+          ? t('Le médaillon Juke-box ouvre chaque collection de la roue, avant les tables (Start : le masquer)')
+          : t('La roue ne montre que les tables ; vos playlists restent dans la gestion du Juke-box (Start : afficher le médaillon)'),
+        icon: 'tables',
+        run: () => set({ jukebox: !v.jukebox }),
       },
       music: {
         label: v.music ? t('Musique des jeux : jouée') : t('Musique des jeux : coupée'),

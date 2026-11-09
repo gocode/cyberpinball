@@ -43,4 +43,10 @@ contextBridge.exposeInMainWorld('cyber', {
   onUiSound: (callback: (cue: unknown) => void) => {
     ipcRenderer.on('ui-sound', (_event, cue) => callback(cue));
   },
+  // Juke-box (jukebox-player.ts) : temps du morceau en cours, et ce que la fenêtre du clip en dit
+  // (temps, fin, erreur, niveaux du son pour le DMD, place du clip pour le lecteur YouTube).
+  onJukeboxTime: (callback: (time: unknown) => void) => {
+    ipcRenderer.on('jukebox-time', (_event, time) => callback(time));
+  },
+  jukebox: (message: unknown) => ipcRenderer.send('jukebox', message),
 });

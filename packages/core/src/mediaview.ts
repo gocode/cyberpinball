@@ -98,6 +98,12 @@ const CONTENT_TYPES: Record<string, string> = {
   m4a: 'audio/mp4',
   flac: 'audio/flac',
   wav: 'audio/wav',
+  // Fichiers du Juke-box (jukebox-files.ts), lus un par un (media-protocol.ts, allowJukebox).
+  mkv: 'video/x-matroska',
+  mov: 'video/quicktime',
+  aac: 'audio/aac',
+  oga: 'audio/ogg',
+  opus: 'audio/ogg',
 };
 
 export function mediaContentType(file: string): string {
@@ -551,6 +557,11 @@ export interface MenuMediaSettings {
    * reste au vert signal.
    */
   tableColor: boolean;
+  /**
+   * Médaillon Juke-box en tête de chaque collection de la roue (jukebox-screens.ts) : montré par
+   * défaut ; masqué, la bibliothèque musicale reste (gestion des playlists).
+   */
+  jukebox: boolean;
   /** Horaire de la borne (arcadehours.ts) : nuit voilée, arrêt à heure fixe ; non suivi par défaut. */
   hours: ArcadeHoursSettings;
   /**
@@ -585,6 +596,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   dmd: 'live',
   dmdColor: DEFAULT_DMD_COLOR,
   tableColor: true,
+  jukebox: true,
   hours: DEFAULT_ARCADE_HOURS,
   notices: 'all',
   intro: DEFAULT_INTRO_SETTINGS,
@@ -624,6 +636,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     dmd: MENU_DMD_MODES.includes(r.dmd as MenuDmdMode) ? (r.dmd as MenuDmdMode) : d.dmd,
     dmdColor: normalizeDmdColor(r.dmdColor),
     tableColor: typeof r.tableColor === 'boolean' ? r.tableColor : d.tableColor,
+    jukebox: typeof r.jukebox === 'boolean' ? r.jukebox : d.jukebox,
     hours: normalizeArcadeHours(r.hours),
     notices: NOTICES_MODES.includes(r.notices as NoticesMode) ? (r.notices as NoticesMode) : d.notices,
     intro: normalizeIntroSettings(r.intro),

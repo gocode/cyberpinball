@@ -74,6 +74,7 @@ import {
   type TrackInfo,
   type TrackStatus,
   type TransportResult,
+  type UnavailableReason,
 } from '@cyberpinball/core';
 import type { YtDlp } from './ytdlp-tool';
 
@@ -175,7 +176,10 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
   /** Marque un morceau indisponible dans toutes ses playlists (vidéo devenue privée, supprimée…). */
   function markUnavailable(id: string, message: string): void {
     const reason = unavailableFromMessage(message);
-    if (!reason) return;
+    if (reason) markReason(id, reason);
+  }
+
+  function markReason(id: string, reason: UnavailableReason): void {
     const at = now().toISOString();
     const s = current();
     commit({
@@ -467,6 +471,8 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
       for (const f of job.files) if (typeof f.meta?.song === 'string') refresh(f.meta.song);
       changed();
     },
+    /** Le lecteur intégré de YouTube refuse la vidéo pour de bon (erreurs 100, 101, 150 : embedErrorReason) : indisponible partout. */
+    markEmbedError: markReason,
     analyze,
     details,
     importPlaylist,

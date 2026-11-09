@@ -9,12 +9,13 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Readable } from 'node:stream';
 import { protocol } from 'electron';
-import { MEDIA_SCHEME, isServedMedia, mediaContentType, mediaPathFromUrl } from '@cyberpinball/core';
+import { JUKEBOX_AUDIO_EXTENSIONS, JUKEBOX_VIDEO_EXTENSIONS, MEDIA_SCHEME, isServedMedia, mediaContentType, mediaPathFromUrl } from '@cyberpinball/core';
 
 // À faire avant que l'application soit prête : un schéma « standard » et « stream »
 // permet les requêtes partielles dont la lecture des vidéos a besoin (boucle, saut).
 protocol.registerSchemesAsPrivileged([
-  { scheme: MEDIA_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true } },
+  // corsEnabled : le Juke-box lit ses sons en « crossOrigin » pour en mesurer le niveau (captureStream).
+  { scheme: MEDIA_SCHEME, privileges: { standard: true, secure: true, stream: true, supportFetchAPI: true, corsEnabled: true } },
 ]);
 
 const refused = new Set<string>();
@@ -30,11 +31,25 @@ export function allowPreview(file: string): void {
   if (isServedMedia(file, [path.dirname(file)])) previews.add(path.resolve(file).toLowerCase());
 }
 
+/** Fichiers du Juke-box autorisés un par un (son, vidéo, pochette, miniature : jukebox-player.ts). */
+const jukebox = new Set<string>();
+const JUKEBOX_EXTENSIONS = new Set<string>([...JUKEBOX_AUDIO_EXTENSIONS, ...JUKEBOX_VIDEO_EXTENSIONS, 'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp']);
+
+/**
+ * Un fichier que le Juke-box va lire ou montrer : un morceau de la bibliothèque, un fichier local
+ * ajouté à une playlist, sa pochette. Lui seul devient lisible, s'il a une extension de son, de
+ * vidéo ou d'image.
+ */
+export function allowJukebox(file: string): void {
+  if (!file || file.includes('\0') || !path.isAbsolute(file)) return;
+  if (JUKEBOX_EXTENSIONS.has(path.extname(file).slice(1).toLowerCase())) jukebox.add(path.resolve(file).toLowerCase());
+}
+
 /** Branche le protocole ; `allowedDirs` est relu à chaque requête (tables ajoutées, retirées). */
 export function serveMedias(allowedDirs: () => string[]): void {
   protocol.handle(MEDIA_SCHEME, async (request) => {
     const file = mediaPathFromUrl(request.url);
-    if (!file || !(isServedMedia(file, allowedDirs()) || previews.has(file.toLowerCase()))) return refuse(request.url, 403);
+    if (!file || !(isServedMedia(file, allowedDirs()) || previews.has(file.toLowerCase()) || jukebox.has(file.toLowerCase()))) return refuse(request.url, 403);
     let stat: fs.Stats;
     try {
       // Un lien symbolique pourrait mener hors des dossiers autorisés : refusé.
@@ -50,7 +65,8 @@ export function serveMedias(allowedDirs: () => string[]): void {
 /** Réponse entière, ou la plage demandée (206) : Chromium lit les vidéos par morceaux. */
 function respond(file: string, size: number, range: string | null): Response {
   const type = mediaContentType(file);
-  const headers: Record<string, string> = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache' };
+  // Lisible par les pages du menu en « crossOrigin » (niveaux du son du Juke-box) : les fichiers servis sont déjà ceux autorisés.
+  const headers: Record<string, string> = { 'Content-Type': type, 'Accept-Ranges': 'bytes', 'Cache-Control': 'no-cache', 'Access-Control-Allow-Origin': '*' };
   const m = range ? /^bytes=(\d*)-(\d*)$/.exec(range.trim()) : null;
   if (m && (m[1] || m[2])) {
     let start = m[1] ? Number(m[1]) : Math.max(0, size - Number(m[2]));
