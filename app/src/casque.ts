@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { headsetPanels, headsetProtocol, headsetScene, sceneProtocol, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { headsetPanels, headsetProtocol, headsetScene, isHeadsetButton, sceneProtocol, type HeadsetButton, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -69,6 +69,8 @@ export interface HeadsetMenuOptions {
   openViews?(): { role: RoleId; surface: RoleId; fx: number; fy: number; fw: number; fh: number }[];
   /** Le compagnon s'arrête : ces écrans se ferment. */
   closeViews?(): void;
+  /** Un bouton des manettes appuyé (true) ou relâché, tant que le menu est dans le casque. */
+  onButton?(button: HeadsetButton, down: boolean): void;
   log(line: string): void;
 }
 
@@ -218,6 +220,12 @@ export class HeadsetMenu {
             this.viewsFlowing = true;
             this.opts.onStateChange?.();
           }
+          continue;
+        }
+        // « bouton <nom> 1|0 » : un bouton des manettes, remis au menu comme un bouton de la borne (pas au journal).
+        const button = /^bouton (\S+) ([01])$/.exec(line);
+        if (button) {
+          if (isHeadsetButton(button[1]!)) this.opts.onButton?.(button[1], button[2] === '1');
           continue;
         }
         if (!PROTOCOL.test(line)) continue;

@@ -85,6 +85,8 @@ export interface JukeboxPlayerHost {
   keys(): { previous: string[]; next: string[]; confirm: string[]; exit: string[]; playlistPrevious: string[]; playlistNext: string[] };
   /** Lecteur YouTube factice (essais hors écran, sans réseau) : une page locale qui en imite le DOM. */
   fakeOnline?: string;
+  /** Bouton « Gestion du Juke-box » (bureau) : la gestion des playlists, sur celle montrée. */
+  manage?(playlist: string | undefined): void;
 }
 
 /** Ordre de lecture envoyé à la fenêtre du clip : un nouveau numéro à chaque morceau lancé. */
@@ -107,7 +109,7 @@ export interface JukeboxClipView {
    * Où se pose le clip dans sa fenêtre : la zone du fronton, la droite du lecteur au bureau, ou la
    * vignette du morceau en cours (borne sans fronton).
    */
-  place: 'zone' | 'desk' | 'thumb';
+  place: 'zone' | 'desk' | 'thumb' | 'hidden';
   order?: JukeboxOrder;
   now?: JukeboxNowView;
   /** Cartel du changement de morceau : « Néon nocturne · 02 / 24 ». */
@@ -157,6 +159,11 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   let levels: { at: number; values: number[] } | undefined;
   let failures = 0;
   let ad = false;
+  /**
+   * Lecture en fond : au bureau, la gestion des playlists ouverte depuis le lecteur laisse la musique
+   * jouer (décision du 09/11/2026) ; le clip n'est plus montré, le son continue, les morceaux s'enchaînent.
+   */
+  let background = false;
   /** Titre et artiste du morceau en cours, pour le DMD (25 images par seconde). */
   let playingInfo: { title: string; artist?: string } | undefined;
   /** Le cadre du clip dans sa fenêtre (pixels de la page), dit par la fenêtre du clip. */
@@ -248,6 +255,14 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     const l = lib();
     if (!l) return;
     const input = playlistsInput();
+    if (player) {
+      // Retour de la gestion au bureau : la musique jouait en fond, rien ne repart.
+      background = false;
+      if (playlist && input.some((p) => p.id === playlist)) player = { ...player, shown: playlist };
+      host.log('Juke-box : de nouveau à l’écran.'); // i18n-ignore : journal
+      syncDmd();
+      return;
+    }
     player = initialPlayer(lists(input), l.store().last);
     if (playlist && input.some((p) => p.id === playlist)) player = { ...player, shown: playlist };
     tops.clear();
@@ -270,6 +285,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     if (!player) return;
     stopPlayback();
     player = undefined;
+    background = false;
     host.log('Juke-box : fermé, musique arrêtée.'); // i18n-ignore : journal
     syncDmd();
   }
@@ -333,6 +349,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
         keepSelectionVisible();
       }
     } else if (action.op === 'start') step('start');
+    else if (action.op === 'manage') return host.manage?.(player.shown || undefined);
     else if (action.op === 'playlist') step(action.dir === -1 ? 'playlist-previous' : 'playlist-next');
     else if (action.op === 'exit') step('exit');
     host.redraw();
@@ -651,11 +668,11 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     }
     const pv = playerView();
     const out: JukeboxWindowView = { layout: layout() };
-    if (role === 'playfield') out.player = pv;
+    if (role === 'playfield' && !background) out.player = pv;
     if (role === clipRole()) {
       const now = pv.now;
       out.clip = {
-        place: roles.includes('backglass') && !host.desk() ? 'zone' : host.desk() ? 'desk' : 'thumb',
+        place: background ? 'hidden' : roles.includes('backglass') && !host.desk() ? 'zone' : host.desk() ? 'desk' : 'thumb',
         ...(order ? { order: { id: order.id, kind: order.kind, ...(order.audio ? { audio: order.audio } : {}), ...(order.video ? { video: order.video } : {}), ...(order.image ? { image: order.image } : {}), paused: order.paused, ...(order.output ? { output: order.output } : {}), volume: order.volume } } : {}),
         ...(now ? { now } : {}),
         ...(card && now && order?.kind !== 'online' ? { card: { id: card.id, eyebrow: cardEyebrow(now), until: card.until } } : {}),
@@ -669,6 +686,14 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     active: () => Boolean(player),
     open,
     close,
+    /** Au bureau, la gestion ouverte depuis le lecteur : la musique continue, sans écran. */
+    toBackground(): void {
+      if (!player || background) return;
+      background = true;
+      if (online && !online.win.isDestroyed()) placeView(online.view, undefined);
+      host.log('Juke-box : la musique continue pendant la gestion.'); // i18n-ignore : journal
+    },
+    inBackground: () => background,
     handleKey,
     click,
     message,

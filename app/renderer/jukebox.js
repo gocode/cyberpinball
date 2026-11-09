@@ -368,7 +368,7 @@
       const manage = el('button', 'jb-button', '');
       manage.type = 'button';
       manage.append(icon('list'), document.createTextNode(t('Gestion du Juke-box')));
-      manage.dataset.act = JSON.stringify({ type: 'config' });
+      act(manage, { op: 'manage' });
       head.append(brand(), manage);
       const clip = el('div', 'jb-zone jb-clip-zone');
       const now = el('div', 'jb-zone jb-now');
@@ -740,6 +740,22 @@
     return [node];
   }
 
+  /**
+   * Lecture en fond (bureau, gestion des playlists ouverte depuis le lecteur) : le clip quitte l'écran
+   * mais reste dans la page, caché : un élément vidéo retiré de la page s'arrêterait.
+   */
+  function background(s) {
+    let parking = document.getElementById('jb-parking');
+    if (!parking) {
+      parking = el('div');
+      parking.id = 'jb-parking';
+      parking.hidden = true;
+      document.body.append(parking);
+    }
+    const holder = clipHolder(s);
+    if (holder.parentNode !== parking) parking.replaceChildren(holder);
+  }
+
   /** Mode Juke-box quitté : la lecture s'arrête, les zones gardées sont oubliées. */
   function leave() {
     stopMedia();
@@ -757,6 +773,7 @@
 
   window.CyberJukebox = {
     playfield,
+    background,
     wheelPoster,
     backglassPoster,
     zone,

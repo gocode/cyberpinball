@@ -30,6 +30,7 @@ son interface).
 - Le menu est dessiné exprès pour le casque : le plateau y est en portrait, pendant que le PC garde son menu en paysage. Casque porté, les écrans du PC se mettent au repos et affichent « Dans le casque » ; casque retiré, ou menu de Meta ouvert, le PC reprend la main.
 - Dans le casque, l'image de fond du plateau suit le sens du plateau (portrait) : la table se voit en entier pendant la navigation.
 - Un écran que Windows débranche puis rebranche, pendant une partie ou au menu, retrouve son rôle et son image au lieu de rester noir ; au retour d'une partie, chaque fenêtre reprend son écran.
+- Dans le casque, le menu se pilote aux manettes du Quest : gâchettes pour les flippers, A pour Start, B pour Exit, poignées pour les MagnaSave.
 
 ## 0.1.8
 

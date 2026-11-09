@@ -428,7 +428,7 @@ export type UiAction =
   | { type: 'collections'; step?: number; id?: string }
   | { type: 'wheel'; offset: number }
   /** Juke-box (jukebox-player.ts) : une ligne de la liste, Start, une playlist voisine, Exit. */
-  | { type: 'jukebox'; op: 'row' | 'start' | 'playlist' | 'exit'; key?: string; dir?: number };
+  | { type: 'jukebox'; op: 'row' | 'start' | 'playlist' | 'exit' | 'manage'; key?: string; dir?: number };
 
 export type Tone = 'error' | 'warning' | 'info' | 'ok' | 'quiet';
 export interface Row {

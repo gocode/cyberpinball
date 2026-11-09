@@ -1477,7 +1477,9 @@ window.cyber.onState((s) => {
   lastState = s;
   // Juke-box quitté (Exit, partie, extinction) : la lecture de cette fenêtre s'arrête, ses zones sont oubliées.
   document.documentElement.classList.toggle('jukebox-phase', s.phase === 'jukebox');
-  if (window.CyberJukebox && s.phase !== 'jukebox' && (CyberJukebox.playing() || document.documentElement.classList.contains('jukebox-desk'))) CyberJukebox.leave();
+  // Au bureau, la gestion ouverte depuis le lecteur garde la musique : le clip, caché, joue en fond.
+  if (window.CyberJukebox && s.jukebox?.clip?.place === 'hidden') CyberJukebox.background(s);
+  else if (window.CyberJukebox && s.phase !== 'jukebox' && (CyberJukebox.playing() || document.documentElement.classList.contains('jukebox-desk'))) CyberJukebox.leave();
   // Menu montré dans le casque : cet écran du PC se repose (plus rien à dessiner), un mot dit où il est.
   document.documentElement.classList.toggle('in-headset', Boolean(s.inHeadset));
   let rest = document.getElementById('headset-rest');

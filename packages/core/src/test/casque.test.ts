@@ -1,8 +1,10 @@
 // Le menu dans le casque (casque.ts) : une borne vue du joueur, chaque écran à sa taille réelle,
 // le playfield couché, incliné, le bord des flippers vers le joueur ; la tête de la borne debout.
 import assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { test } from 'node:test';
-import { headsetPanels, headsetProtocol, LOCKBAR_DISTANCE_M, MIN_PLAYFIELD_M, panelSize, rotateVector, type HeadsetPanel, type HeadsetSource } from '../casque';
+import { HEADSET_BUTTONS, isHeadsetButton, headsetPanels, headsetProtocol, LOCKBAR_DISTANCE_M, MIN_PLAYFIELD_M, panelSize, rotateVector, type HeadsetPanel, type HeadsetSource } from '../casque';
 import { edgeRotation } from '../model';
 
 const close = (a: number, b: number, eps = 1e-3) => assert.ok(Math.abs(a - b) < eps, `${a} ≠ ${b}`);
@@ -92,4 +94,40 @@ test('sans playfield, la tête reste en place ; le protocole du compagnon décri
   assert.deepEqual(fields.slice(2, 6), ['0', '0', '3840', '2160']);
   assert.equal(fields.length, 15);
   assert.ok(fields.slice(6).every((f) => Number.isFinite(Number(f))), lines[0]);
+});
+
+test('manettes du casque : gâchettes = flippers, A = Start, B = Exit, poignées = MagnaSave', () => {
+  assert.deepEqual(HEADSET_BUTTONS, {
+    'batteur-gauche': 'previous',
+    'batteur-droit': 'next',
+    start: 'confirm',
+    exit: 'exit',
+    'magnasave-gauche': 'zone',
+    'magnasave-droit': 'zone',
+  });
+  assert.ok(isHeadsetButton('start'));
+  assert.ok(!isHeadsetButton('toString'));
+  // Les actions OpenXR du compagnon portent les mêmes noms, liées aux mêmes boutons des manettes Touch.
+  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
+  const bindings: Record<string, string> = {
+    'batteur-gauche': '/user/hand/left/input/trigger/value',
+    'batteur-droit': '/user/hand/right/input/trigger/value',
+    start: '/user/hand/right/input/a/click',
+    exit: '/user/hand/right/input/b/click',
+    'magnasave-gauche': '/user/hand/left/input/squeeze/value',
+    'magnasave-droit': '/user/hand/right/input/squeeze/value',
+  };
+  for (const [name, binding] of Object.entries(bindings)) assert.ok(cpp.includes(`{ "${name}", `) && cpp.includes(`"${binding}" }`), `${name} : ${binding}`);
+  assert.match(cpp, /\/interaction_profiles\/oculus\/touch_controller/);
+  // Lus seulement quand le menu a le regard du joueur ; sinon, tout bouton tenu est relâché.
+  assert.match(cpp, /if \(controllers && state == XR_SESSION_STATE_FOCUSED\)[\s\S]{0,1200}else\s+releaseControls\(\);/);
+  // Le menu les reçoit comme les boutons de la borne (pas comme le téléphone), et les relâche casque retiré.
+  const app = path.join(repo, 'app', 'src');
+  const menu = fs.readFileSync(path.join(app, 'casque.ts'), 'utf8');
+  assert.match(menu, /if \(isHeadsetButton\(button\[1\]!\)\) this\.opts\.onButton\?\.\(button\[1\], button\[2\] === '1'\);/);
+  const frontend = fs.readFileSync(path.join(app, 'frontend.ts'), 'utf8');
+  assert.match(frontend, /onButton: \(button, down\) => headsetButton\(button, down\),/);
+  assert.match(frontend, /headsetKey\(b, true, false\);/);
+  assert.match(frontend, /if \(!headset\?\.worn\) releaseHeadsetButtons\(\);/);
 });

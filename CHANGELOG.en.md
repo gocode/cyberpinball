@@ -28,6 +28,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - The menu is drawn specially for the headset: the playfield is in portrait there, while the PC keeps its menu in landscape. With the headset on, the PC screens go to rest and show "Dans le casque" (In the headset); with the headset off, or the Meta menu open, the PC takes over again.
 - In the headset, the playfield's background image follows the playfield's orientation (portrait): the table is seen in full while browsing.
 - A screen that Windows disconnects and reconnects, during a game or in the menu, gets its role and its picture back instead of staying black; when a game ends, each window takes back its screen.
+- In the headset, the menu is driven with the Quest controllers: triggers for the flippers, A for Start, B for Exit, grips for the MagnaSave buttons.
 
 ## 0.1.8
 

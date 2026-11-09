@@ -95,7 +95,8 @@ PFN_xrGetInstanceProcAddr xrGetInstanceProcAddr_ = nullptr;
    X(xrEndFrame) X(xrCreateReferenceSpace) X(xrDestroySpace) X(xrEnumerateReferenceSpaces) X(xrLocateSpace) \
    X(xrEnumerateSwapchainFormats) X(xrCreateSwapchain) X(xrDestroySwapchain) X(xrEnumerateSwapchainImages) \
    X(xrAcquireSwapchainImage) X(xrWaitSwapchainImage) X(xrReleaseSwapchainImage) X(xrResultToString) \
-   X(xrEnumerateViewConfigurationViews) X(xrLocateViews)
+   X(xrEnumerateViewConfigurationViews) X(xrLocateViews) X(xrStringToPath) X(xrCreateActionSet) X(xrCreateAction) \
+   X(xrSuggestInteractionProfileBindings) X(xrAttachSessionActionSets) X(xrSyncActions) X(xrGetActionStateBoolean)
 #define DECLARE(name) PFN_##name name##_ = nullptr;
 XR_FUNCS(DECLARE)
 PFN_xrGetD3D11GraphicsRequirementsKHR xrGetD3D11GraphicsRequirementsKHR_ = nullptr;
@@ -887,6 +888,70 @@ int main(int argc, char** argv)
    rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
    xrCreateReferenceSpace_(session, &rsci, &view);
 
+   // Manettes du Quest (Touch) : les boutons du menu, comme ceux de la borne. Gâchettes : flippers ;
+   // A : Start ; B : Exit ; poignées : MagnaSave. Cyber Pinball reçoit « bouton <nom> 1|0 » à chaque
+   // changement, seulement tant que le menu a le regard du joueur (« FOCUSED ») ; le reste du temps,
+   // le runtime les rend inactives, et un bouton resté appuyé est relâché.
+   struct Control
+   {
+      const char* name;
+      const char* label;
+      const char* binding;
+      XrAction action = XR_NULL_HANDLE;
+      bool down = false;
+   };
+   Control controls[] = {
+      { "batteur-gauche", "Flipper gauche", "/user/hand/left/input/trigger/value" },
+      { "batteur-droit", "Flipper droit", "/user/hand/right/input/trigger/value" },
+      { "start", "Start", "/user/hand/right/input/a/click" },
+      { "exit", "Exit", "/user/hand/right/input/b/click" },
+      { "magnasave-gauche", "MagnaSave gauche", "/user/hand/left/input/squeeze/value" },
+      { "magnasave-droit", "MagnaSave droit", "/user/hand/right/input/squeeze/value" },
+   };
+   XrActionSet actionSet = XR_NULL_HANDLE;
+   bool controllers = false;
+   {
+      XrActionSetCreateInfo asci { XR_TYPE_ACTION_SET_CREATE_INFO };
+      strcpy_s(asci.actionSetName, "cyberpinball");
+      strcpy_s(asci.localizedActionSetName, "Cyber Pinball");
+      if (XR_SUCCEEDED(xrCreateActionSet_(instance, &asci, &actionSet)))
+      {
+         std::vector<XrActionSuggestedBinding> suggested;
+         for (Control& c : controls)
+         {
+            XrActionCreateInfo aci { XR_TYPE_ACTION_CREATE_INFO };
+            aci.actionType = XR_ACTION_TYPE_BOOLEAN_INPUT;
+            strcpy_s(aci.actionName, c.name);
+            strcpy_s(aci.localizedActionName, c.label);
+            XrPath path = XR_NULL_PATH;
+            if (XR_SUCCEEDED(xrCreateAction_(actionSet, &aci, &c.action)) && XR_SUCCEEDED(xrStringToPath_(instance, c.binding, &path)))
+               suggested.push_back({ c.action, path });
+         }
+         XrPath profile = XR_NULL_PATH;
+         xrStringToPath_(instance, "/interaction_profiles/oculus/touch_controller", &profile);
+         XrInteractionProfileSuggestedBinding ipsb { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
+         ipsb.interactionProfile = profile;
+         ipsb.countSuggestedBindings = static_cast<uint32_t>(suggested.size());
+         ipsb.suggestedBindings = suggested.data();
+         XrSessionActionSetsAttachInfo attach { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
+         attach.countActionSets = 1;
+         attach.actionSets = &actionSet;
+         controllers = suggested.size() == std::size(controls) && XR_SUCCEEDED(xrSuggestInteractionProfileBindings_(instance, &ipsb))
+            && XR_SUCCEEDED(xrAttachSessionActionSets_(session, &attach));
+      }
+      if (!controllers)
+         say("erreur manettes indisponibles");
+   }
+   auto releaseControls = [&]()
+   {
+      for (Control& c : controls)
+         if (c.down)
+         {
+            c.down = false;
+            say(std::string("bouton ") + c.name + " 0");
+         }
+   };
+
    // Format des images : sRGB pour que le casque montre les couleurs de l'écran (copie brute des octets).
    DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
    {
@@ -1177,6 +1242,30 @@ int main(int argc, char** argv)
       if (XR_FAILED(xrWaitFrame_(session, nullptr, &fs)))
          break;
       xrBeginFrame_(session, nullptr);
+
+      // Boutons des manettes : lus à chaque image, transmis à chaque changement.
+      if (controllers && state == XR_SESSION_STATE_FOCUSED)
+      {
+         XrActiveActionSet active { actionSet, XR_NULL_PATH };
+         XrActionsSyncInfo si { XR_TYPE_ACTIONS_SYNC_INFO };
+         si.countActiveActionSets = 1;
+         si.activeActionSets = &active;
+         if (XR_SUCCEEDED(xrSyncActions_(session, &si)))
+            for (Control& c : controls)
+            {
+               XrActionStateGetInfo gi { XR_TYPE_ACTION_STATE_GET_INFO };
+               gi.action = c.action;
+               XrActionStateBoolean st { XR_TYPE_ACTION_STATE_BOOLEAN };
+               const bool down = XR_SUCCEEDED(xrGetActionStateBoolean_(session, &gi, &st)) && st.isActive && st.currentState;
+               if (down != c.down)
+               {
+                  c.down = down;
+                  say(std::string("bouton ") + c.name + (down ? " 1" : " 0"));
+               }
+            }
+      }
+      else
+         releaseControls();
 
       // Place gardée par Cyber Pinball (ancre) : la borne revient où elle était dans la pièce.
       if (anchorGiven.exchange(false))

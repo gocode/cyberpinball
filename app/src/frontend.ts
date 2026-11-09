@@ -37,6 +37,8 @@ import {
   navigationProblems,
   type ButtonsSource,
   type HeadsetSource,
+  HEADSET_BUTTONS,
+  type HeadsetButton,
   vrCenterKey,
   vrHasSavedPlace,
   type NavigationButtons,
@@ -910,7 +912,21 @@ const jukeboxPlayer = createJukeboxPlayer({
   log: (line) => console.log(line),
   keys: () => ({ ...KEYS, playlistPrevious: collectionKeys().previous, playlistNext: collectionKeys().next }),
   ...(process.env.CYBERPINBALL_JUKEBOX_EN_LIGNE ? { fakeOnline: process.env.CYBERPINBALL_JUKEBOX_EN_LIGNE } : {}),
+  // « Gestion du Juke-box » : sa gestion (étape 4, library.jukeboxMenu) sur la playlist montrée ; sans elle, le menu système.
+  manage: (playlist) => {
+    if (!guest.knock('menu.system')) return;
+    const menu = jukeboxMenu();
+    if (menu) menu.open(playlist);
+    else openConfig();
+    broadcast();
+  },
 });
+
+/** La gestion des playlists (étape 4), quand elle est là : ouverte sur une playlist, ou sur l'import. */
+function jukeboxMenu(): { open(playlist?: string): void } | undefined {
+  const menu = (library as { jukeboxMenu?: { open?: unknown } }).jukeboxMenu;
+  return typeof menu?.open === 'function' ? (menu as { open(playlist?: string): void }) : undefined;
+}
 // Une playlist qui attendait un téléchargement : « Revenir au Juke-box » rouvre le lecteur sur elle.
 library.downloads.opener('jukebox', (back) => openJukebox('playlist' in back && typeof back.playlist === 'string' ? back.playlist : undefined));
 
@@ -933,6 +949,15 @@ function jukeboxCard() {
 
 /** Ouvre le mode Juke-box (Start sur le médaillon, retour d'un téléchargement), sur une playlist si elle est dite. */
 function openJukebox(playlist?: string): void {
+  // Aucune playlist : Start ouvre la gestion, où l'on en crée ou en importe une (sinon, l'invitation du lecteur).
+  const menu = jukeboxMenu();
+  if (menu && !library.jukebox.store().playlists.length && state.phase !== 'library') {
+    if (!guest.knock('menu.system')) return;
+    cancelWheelPress();
+    menu.open();
+    broadcast();
+    return;
+  }
   if (state.phase === 'library') library.leave();
   cancelWheelPress();
   collections.hidePanel();
@@ -999,17 +1024,69 @@ function remoteScreen(): { title: string; item?: string; zone?: string } {
 }
 
 /**
- * Un bouton de la borne tenu au téléphone : la touche de ce bouton sur cette borne (interfaceKeys,
- * zoneSwitchKeys), remise à handleKey comme une vraie touche. `repeat` : flipper tenu.
+ * La touche d'un bouton de la borne sur cette borne (interfaceKeys, zoneSwitchKeys), comme une vraie
+ * touche, pour un bouton tenu ailleurs qu'à la borne (téléphone, manettes du casque). `repeat` :
+ * flipper tenu.
  */
-function remoteButton(b: RemoteButton, down: boolean, repeat: boolean): void {
+function buttonInput(b: RemoteButton, down: boolean, repeat: boolean): Input | undefined {
   // MagnaSave : sur la roue, le droit (collection suivante, collections-menu.ts) ; ailleurs, la bascule entre la liste et les actions d'un écran.
   const zone = state.phase === 'menu' || state.phase === 'jukebox' ? (collectionKeys().next[0] ?? zoneSwitchKeys({ buttons, navigation })[0]) : zoneSwitchKeys({ buttons, navigation })[0];
   const code = b === 'zone' ? zone : KEYS[b][0];
-  if (!code) return;
-  const input = { type: down ? 'keyDown' : 'keyUp', code, key: '', isAutoRepeat: repeat, isComposing: false, shift: false, control: false, alt: false, meta: false, location: 0, modifiers: [] } as unknown as Input;
+  if (!code) return undefined;
+  return { type: down ? 'keyDown' : 'keyUp', code, key: '', isAutoRepeat: repeat, isComposing: false, shift: false, control: false, alt: false, meta: false, location: 0, modifiers: [] } as unknown as Input;
+}
+
+/** Un bouton de la borne tenu au téléphone : sa touche, remise à handleKey comme une vraie touche. */
+function remoteButton(b: RemoteButton, down: boolean, repeat: boolean): void {
+  const input = buttonInput(b, down, repeat);
+  if (!input) return;
   if (down) handleKey(input, true);
   else handleKeyUp(input, true);
+}
+
+/** Un bouton des manettes du casque : sa touche, remise à handleKey comme celle d'un bouton de la borne. */
+function headsetKey(b: RemoteButton, down: boolean, repeat: boolean): void {
+  const input = buttonInput(b, down, repeat);
+  if (!input) return;
+  if (down) handleKey(input);
+  else handleKeyUp(input);
+}
+
+/** Boutons des manettes du casque tenus (casque.ts) ; les flippers se répètent comme ceux de la borne. */
+const headsetHolds = new Map<HeadsetButton, NodeJS.Timeout | undefined>();
+const HEADSET_REPEAT_DELAY_MS = 400;
+const HEADSET_REPEAT_MS = 70;
+
+/**
+ * Manettes du casque : chaque bouton tient au menu celui de la borne (HEADSET_BUTTONS : gâchettes =
+ * flippers, A = Start, B = Exit, poignées = MagnaSave), par le même chemin que les boutons de la
+ * borne : ni le téléphone ni sa combinaison n'y entrent.
+ */
+function headsetButton(name: HeadsetButton, down: boolean): void {
+  const b = HEADSET_BUTTONS[name];
+  const held = headsetHolds.has(name);
+  clearTimeout(headsetHolds.get(name));
+  headsetHolds.delete(name);
+  if (!down) {
+    if (held) headsetKey(b, false, false);
+    return;
+  }
+  headsetKey(b, true, false);
+  if (b !== 'previous' && b !== 'next') return void headsetHolds.set(name, undefined);
+  const again = (wait: number) =>
+    headsetHolds.set(
+      name,
+      setTimeout(() => {
+        headsetKey(b, true, true);
+        again(HEADSET_REPEAT_MS);
+      }, wait),
+    );
+  again(HEADSET_REPEAT_DELAY_MS);
+}
+
+/** Casque retiré, menu de Meta ouvert ou compagnon parti : plus aucun bouton des manettes n'est tenu. */
+function releaseHeadsetButtons(): void {
+  for (const name of [...headsetHolds.keys()]) headsetButton(name, false);
 }
 
 /** Bandeau du menu pendant un envoi du téléphone. */
@@ -2143,6 +2220,7 @@ export function startFrontend(): void {
     onStateChange: () => {
       // Casque porté : les écrans rendus pour lui dessinent, ceux du PC se reposent ; retiré, l'inverse.
       setHeadsetPainting(Boolean(headset?.worn));
+      if (!headset?.worn) releaseHeadsetButtons();
       broadcast();
     },
     openViews: () => {
@@ -2161,6 +2239,7 @@ export function startFrontend(): void {
       });
     },
     closeViews: () => closeHeadsetViews(),
+    onButton: (button, down) => headsetButton(button, down),
     log: (line) => console.log(line),
   });
   headset.watch();
@@ -4160,8 +4239,12 @@ function followTint(): void {
 
 function broadcast(): void {
   // Le Juke-box se ferme, musique arrêtée, dès qu'on quitte son écran, par quelque chemin que ce soit
-  // (Exit, partie lancée du téléphone, extinction…).
-  if (state.phase !== 'jukebox' && jukeboxPlayer.active()) jukeboxPlayer.close();
+  // (Exit, partie lancée du téléphone, extinction…) ; sauf au bureau, vers la gestion (menu système) :
+  // la musique y continue, en fond, jusqu'au retour à la roue ou au lecteur.
+  if (state.phase !== 'jukebox' && jukeboxPlayer.active()) {
+    if (state.phase === 'library' && playfieldLandscape()) jukeboxPlayer.toBackground();
+    else jukeboxPlayer.close();
+  }
   // Casque porté et ses écrans rendus pour lui : ceux du PC n'affichent plus que « Dans le casque ».
   const inHeadset = Boolean(headset?.worn && headset.viewsFlowing);
   followTint();

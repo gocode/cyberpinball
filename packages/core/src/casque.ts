@@ -10,6 +10,27 @@
 // le cap du joueur.
 
 import type { Rect, RoleId, Rotation } from './model';
+import type { RemoteButton } from './remote';
+
+/**
+ * Boutons des manettes du casque (Touch du Quest ; compagnon : « bouton <nom> 1|0 ») et le bouton
+ * de la borne que chacun tient au menu : gâchettes = flippers, A = Start, B = Exit, poignées =
+ * MagnaSave. Les noms sont ceux des actions OpenXR du compagnon (packages/casque-vr/src/casque.cpp).
+ */
+export const HEADSET_BUTTONS = {
+  'batteur-gauche': 'previous',
+  'batteur-droit': 'next',
+  start: 'confirm',
+  exit: 'exit',
+  'magnasave-gauche': 'zone',
+  'magnasave-droit': 'zone',
+} as const satisfies Record<string, RemoteButton>;
+
+export type HeadsetButton = keyof typeof HEADSET_BUTTONS;
+
+export function isHeadsetButton(name: string): name is HeadsetButton {
+  return Object.hasOwn(HEADSET_BUTTONS, name);
+}
 
 /** Hauteur de la barre avant au-dessus du sol (VPX : [Player] LockbarHeight, 85 cm par défaut). */
 export const LOCKBAR_HEIGHT_M = 0.85;
