@@ -13,6 +13,12 @@
 
 namespace scene {
 
+/**
+ * Fond de la couche de projection : le vide de la charte (#030807), en lumière linéaire. Au-delà
+ * des bords du mur et du sol, le casque montrait sinon du noir pur, qui se distingue du fond.
+ */
+inline constexpr float kVoid[4] = { 0.000911f, 0.002428f, 0.002125f, 1.f };
+
 /** Matrice 4 × 4 rangée par lignes, pour des vecteurs colonnes : v' = M v. */
 struct Mat4
 {

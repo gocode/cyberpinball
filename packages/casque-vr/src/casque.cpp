@@ -284,8 +284,7 @@ int renderTest(const std::string& input, const std::string& output)
    ComPtr<ID3D11DepthStencilView> depth;
    device->CreateRenderTargetView(color.Get(), nullptr, &target);
    device->CreateDepthStencilView(depthTexture.Get(), nullptr, &depth);
-   const float black[4] = { 0, 0, 0, 1 };
-   context->ClearRenderTargetView(target.Get(), black);
+   context->ClearRenderTargetView(target.Get(), scene::kVoid);
    context->ClearDepthStencilView(depth.Get(), D3D11_CLEAR_DEPTH, 1.f, 0);
    context->OMSetRenderTargets(1, target.GetAddressOf(), depth.Get());
    const D3D11_VIEWPORT viewport { 0, 0, static_cast<float>(W), static_cast<float>(H), 0, 1 };
@@ -933,8 +932,7 @@ int main(int argc, char** argv)
                wi.timeout = XR_INFINITE_DURATION;
                xrWaitSwapchainImage_(eye.swapchain, &wi);
                ID3D11RenderTargetView* target = eye.targets[index].Get();
-               const float black[4] = { 0, 0, 0, 1 };
-               context->ClearRenderTargetView(target, black);
+               context->ClearRenderTargetView(target, scene::kVoid);
                context->ClearDepthStencilView(eye.depth.Get(), D3D11_CLEAR_DEPTH, 1.f, 0);
                context->OMSetRenderTargets(1, &target, eye.depth.Get());
                const D3D11_VIEWPORT viewport { 0, 0, static_cast<float>(eye.width), static_cast<float>(eye.height), 0, 1 };
