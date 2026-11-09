@@ -195,6 +195,7 @@ import {
   diskSpace,
   loadSocial,
   type RemoteButton,
+  vrMenuText,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -250,6 +251,7 @@ import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
 import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
 import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
+import { prepareVrGame, probeVr, readVrMode, rememberVrSettings, writeVrMode, type VrGame } from './vr';
 import { createLiveScoresMenu } from './live-scores-menu';
 import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
 import { createSocialNet } from './social-net';
@@ -1574,6 +1576,50 @@ library.provideSystemItem('quiet-in-game', {
     library.openSystem();
   },
 });
+// « Réalité virtuelle » (Menu système > Borne, vr.ts) : désactivée, ou les tables dans le casque quand il
+// est prêt. Sans runtime OpenXR, l'entrée reste visible, grisée avec sa raison ; Start n'y change rien.
+let vrMode = readVrMode(loc.dataDir);
+library.provideSystemItem('vr', {
+  get label() {
+    return vrMenuText(vrMode, probeVr()).label;
+  },
+  get detail() {
+    return vrMenuText(vrMode, probeVr()).detail;
+  },
+  get tone() {
+    return vrMenuText(vrMode, probeVr()).unavailable ? ('quiet' as const) : undefined;
+  },
+  run: () => {
+    const readiness = probeVr();
+    if (!readiness.ready) return void library.openSystem();
+    vrMode = vrMode === 'auto' ? 'off' : 'auto';
+    writeVrMode(loc.dataDir, vrMode);
+    console.log(`Réalité virtuelle : ${vrMode === 'auto' ? `activée (${readiness.runtime})` : 'désactivée'}.`); // i18n-ignore : journal
+    library.openSystem();
+  },
+});
+
+/**
+ * Partie en VR (vr.ts) : l'INI préparé pour VPX, ou undefined (désactivée, aucun runtime OpenXR,
+ * préparation impossible) : la partie se joue alors comme d'habitude, sur les écrans.
+ */
+function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | undefined {
+  if (vrMode !== 'auto') return undefined;
+  const readiness = probeVr();
+  if (!readiness.ready) {
+    console.log(`Réalité virtuelle : activée mais indisponible (${readiness.reason}) ; partie sur les écrans.`); // i18n-ignore : journal
+    return undefined;
+  }
+  try {
+    const vr = prepareVrGame({ dataDir: loc.dataDir, baseIni: doubleIni ?? activeVpxIni(loc), tableFile, inPlace: Boolean(doubleIni) });
+    const details = [vr.room ? 'pièce VR de la table' : 'fronton ajouté par VPX', ...(vr.carried ? [`${vr.carried} réglage(s) de la VR repris`] : []), ...vr.changes]; // i18n-ignore : journal
+    console.log(`Réalité virtuelle : ${readiness.runtime}, INI de la partie ${vr.ini} (${details.join(' ; ')}).`); // i18n-ignore : journal
+    return vr;
+  } catch (error) {
+    console.log(`Réalité virtuelle : préparation impossible (${(error as Error).message}) ; partie sur les écrans.`); // i18n-ignore : journal
+    return undefined;
+  }
+}
 // Scores des amis pendant la partie : la place de la bande, au choix du joueur (live-scores-menu.ts).
 library.provideSystemItem(
   'live-scores',
@@ -2688,8 +2734,9 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     setTimeout(showLiveBoard, LIVE_BOARD_SETTLE_MS);
     onScreen = true;
     if (liveManual) hooks.gate?.ready({ manual: true });
-    // Les deux MagnaSave ouvrent désormais les réglages en partie (position du DMD, puis menu de VPX).
-    if (configuration) inGameMenu.arm({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), place: playfieldPlace(), configurationIni: activeVpxIni(loc), dataDir: loc.dataDir });
+    if (vrGame) console.log(playedVr ? `Réalité virtuelle (${table.id}) : partie dans le casque.` : `Réalité virtuelle (${table.id}) : casque pas prêt, partie sur les écrans.`); // i18n-ignore : journal
+    // Les deux MagnaSave ouvrent désormais les réglages en partie (position du DMD, puis menu de VPX ; en VR, celui de VPX dans le casque).
+    if (configuration) inGameMenu.arm({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), place: playfieldPlace(), configurationIni: vrGame?.ini ?? activeVpxIni(loc), dataDir: loc.dataDir, vr: playedVr });
     // Partie entre amis : l'arrêt automatique (essais) se compte depuis « partez ».
     if (autoStopAfterMs && !hooks.gate) setTimeout(() => game.stop(), autoStopAfterMs);
   };
@@ -2702,12 +2749,18 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   console.log(`Lancement : VPX lancé ${Date.now() - pressedAt} ms après le Start (écran de chargement ${loadingMs} ms${captureMs ? `, captures des essais ${captureMs} ms` : ''}, préparation ${Date.now() - preparing} ms ; lancement en cinéma ${cinema.running ? 'joué' : 'coupé'}).`);
   // Les fenêtres de VPX paraissent avant celle du jeu : le cartouche du chargement le dit.
   const onWindows = () => launchStep('windows');
+  // Réalité virtuelle (vr.ts) : activée et un runtime OpenXR présent, VPX reçoit un INI à part, la VR
+  // en « Autodetect » (dans le casque s'il est prêt, sinon sur les écrans). Jamais pour régler l'affichage.
+  const vrGame = simulated === undefined && !displayMode ? prepareVr(played.file, double?.ini) : undefined;
+  let playedVr = false;
+  // La fenêtre de jeu est l'aperçu de la VR (launcher.ts) : la partie est dans le casque.
+  const onVr = () => void (playedVr = true);
   // Hors écran, un chargement simulé qui tarde (CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) montre le cartouche.
   const simulatedLoadMs = Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) || undefined;
   const game =
     simulated !== undefined
       ? simulateVpx({ onPlaying, onForeground, onWindows, ...(simulatedLoadMs ? { loadMs: simulatedLoadMs } : {}) })
-      : launchVpx({ exe: install.exe, ini: double?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onPlaying, onForeground, onWindows });
+      : launchVpx({ exe: install.exe, ini: vrGame?.ini ?? double?.ini ?? activeVpxIni(loc), table: played.file, display: displayMode, vpxPrefDir: vpxPrefDir(install.version), onVr, onPlaying, onForeground, onWindows });
   if (launch) {
     launch.stop = () => game.stop();
     launchStep('launched');
@@ -2774,6 +2827,14 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   endLaunch();
   dmdWatch?.stop();
   dmdWatch = undefined;
+  // Partie en VR dans le double : la place de la table que VPX y a enregistrée sert à la suivante, avant que le double parte.
+  if (vrGame && double?.ini) {
+    try {
+      rememberVrSettings(loc.dataDir, vrGame.ini);
+    } catch (error) {
+      console.log(`Réalité virtuelle : réglages de la partie pas gardés (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+  }
   // Les records de la partie, lus où VPX les a écrits (le double, pour une partie entre amis) ; puis le double s'en va.
   const recordsAfter = double ? double.records() : readTableRecords(played);
   double?.finish();

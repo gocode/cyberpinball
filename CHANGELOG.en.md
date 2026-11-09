@@ -13,6 +13,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - A livelier menu DMD: on arriving at a table, a close-up of its wheel in dots (often its logotype) lights up, slides, then makes way for the title.
 - Each DMD page arrives with its own transition: a light wipe towards the high scores, a dissolve towards the clock and the credits; from one table to the next, the new one slides in the wheel's direction.
 - Every other cycle, a short gameplay scene in dots after the high scores: bumpers, plunger, flippers, "BANK COMPLETE", "BALL LOCKED", multiball, never the same twice in a row.
+- Virtual reality, in System menu > Cabinet: with a headset (Meta Quest through Link or Virtual Desktop, SteamVR), tables start in the headset when it is ready, otherwise on the screens, never with a VPX question. Without headset software installed, the entry stays visible, greyed with its reason.
+- In the headset: the backglass shows above the playfield of tables that have no VR room of their own, the table's position is kept from one game to the next, and both MagnaSave buttons open the VPX menu in the headset to realign it. On the cabinet, the backglass screen shows spectators what the player sees.
 
 ## 0.1.8
 

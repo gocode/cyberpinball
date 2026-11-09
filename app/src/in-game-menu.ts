@@ -88,8 +88,14 @@ export interface InGameContext {
   displays: ObservedDisplay[];
   /** Zone du plateau (pixels physiques) et sens de sa mise en page : où se pose le panneau. */
   place: { zone: Rect; rotation: Rotation } | undefined;
-  /** VPinballX.ini de la configuration : la touche du menu de VPX. */
+  /** VPinballX.ini de la partie : la touche du menu de VPX. */
   configurationIni: string;
+  /**
+   * La partie se joue dans le casque (vr.ts) : le menu de Cyber Pinball, sur les écrans, n'y serait
+   * pas vu. La combinaison ouvre alors directement le menu de VPX, qui s'affiche dans le casque
+   * (sa page « Virtual Reality Settings » cale la table).
+   */
+  vr?: boolean;
   dataDir: string;
 }
 
@@ -189,9 +195,19 @@ export function createInGameMenu(opts: { log: (line: string) => void; /** La por
     if (down && !latched) {
       latched = true;
       // Mode invité : la porte game.settings est fermée, la partie continue sans menu.
-      if (opts.allowed()) open();
-      else opts.log('Réglages en partie : fermés en mode invité.'); // i18n-ignore : journal
+      if (!opts.allowed()) opts.log('Réglages en partie : fermés en mode invité.'); // i18n-ignore : journal
+      else if (game.vr) openVpxMenuInHeadset();
+      else open();
     } else if (!down) latched = false;
+  }
+
+  /** En VR : la touche du menu de VPX, appuyée pour lui (il a le premier plan pendant la partie). */
+  function openVpxMenuInHeadset(): void {
+    if (!game) return;
+    const vk = windowsVk(vpxMenuKeys(IniDocument.parse(readTextIfExists(game.configurationIni))).find((c) => windowsVk(c) !== undefined) ?? '');
+    if (vk === undefined) return void opts.log('Réglages en partie (VR) : aucune touche du clavier n’ouvre le menu de VPX, rien d’ouvert.'); // i18n-ignore : journal
+    if (game.pid && !OFFSCREEN) tapKey(vk);
+    opts.log(`Réglages en partie (${game.table.id}) : partie dans le casque, menu de VPX ouvert.`); // i18n-ignore : journal
   }
 
   function vpxWindow(title: string): WindowInfo | undefined {

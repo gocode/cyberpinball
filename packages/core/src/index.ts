@@ -5,6 +5,7 @@ export * from './match';
 export * from './ini';
 export * from './vpx';
 export * from './vpxwindows';
+export * from './vr';
 export * from './sync';
 export * from './gameorientation';
 export * from './store';

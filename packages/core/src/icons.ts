@@ -133,6 +133,8 @@ export const ICON_NAMES = [
   'phone',
   'backspace',
   'upload',
+  // Réalité virtuelle (Menu système > Borne)
+  'vr',
 ] as const;
 
 

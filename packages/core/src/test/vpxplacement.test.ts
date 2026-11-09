@@ -129,3 +129,9 @@ test('écrans du même nom : les fenêtres annexes ne sont jamais en plein écra
   // Écrans distincts : plein écran, comme avant.
   assert.deepEqual(fullScreen(vpxSettingsFor(assignments, { displayIdFormat: 'name', enabledPlugins: [] })), { PlayfieldFullScreen: '1', BackglassFullScreen: '1', ScoreViewFullScreen: '1' });
 });
+
+test('en VR, l’aperçu du casque ouvert sur l’écran du DMD est ramené sur le fronton, comme la fenêtre du fronton', () => {
+  const confused = confusableRoles(assignments, observed, 'name');
+  const preview = { title: 'Visual Pinball VR Preview', rect: { x: 3840, y: 0, width: 1920, height: 1080 } };
+  assert.deepEqual(vpxWindowMoves([preview], screens, confused, displays), [{ window: preview, role: 'backglass', to: { x: 1920, y: 0, width: 1920, height: 1080 } }]);
+});

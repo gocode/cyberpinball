@@ -217,3 +217,4 @@ export * from './processes';
 export * from './joystick';
 export * from './power';
 export * from './system-volume';
+export * from './openxr';

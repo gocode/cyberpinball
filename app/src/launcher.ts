@@ -6,12 +6,14 @@
 // classifyVpxWindow : fenêtre de l'éditeur masquée ou fermée (la partie continue,
 // avec un constat), boîte de dialogue bloquante (la partie s'arrête, son texte
 // devient le message), fenêtre inconnue signalée.
+// En VR (packages/core/src/vr.ts), VPX n'ouvre pas « Visual Pinball Player » mais « Visual Pinball
+// VR Preview » (ce qu'un œil voit dans le casque) : elle tient lieu de fenêtre de jeu.
 
 import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { classifyVpxWindow, DIALOG_CLASS, t } from '@cyberpinball/core';
+import { classifyVpxWindow, DIALOG_CLASS, t, VR_PREVIEW_TITLE } from '@cyberpinball/core';
 import {
   allowAnyForeground,
   bringToFront,
@@ -24,6 +26,8 @@ import {
 } from '@cyberpinball/win-displays';
 
 const PLAYER_TITLE = 'Visual Pinball Player';
+/** En VR, la fenêtre de jeu est celle de l'aperçu (vr.ts) : la partie est dans le casque. */
+const GAME_TITLES = [PLAYER_TITLE, VR_PREVIEW_TITLE];
 const POLL_MS = 250;
 
 export type LaunchFailure = 'spawn' | 'timeout' | 'dialog' | 'crash';
@@ -38,6 +42,8 @@ export interface LaunchResult {
   seconds: number;
   /** Secondes entre le lancement et l'apparition de la fenêtre Player. */
   loadSeconds?: number;
+  /** La partie s'est jouée dans le casque (fenêtre « Visual Pinball VR Preview ») ; faux sur les écrans. */
+  vr?: boolean;
   /** Fenêtres de VPX autres que celles du jeu : masquées, fermées ou laissées, une phrase chacune. */
   notices: string[];
   logTail: string[];
@@ -57,6 +63,8 @@ export interface LaunchOptions {
   timeoutMs?: number;
   /** Appelé quand la fenêtre de jeu est à l'écran. */
   onPlaying?: () => void;
+  /** Appelé juste avant onPlaying quand la fenêtre de jeu est l'aperçu de la VR : la partie est dans le casque. */
+  onVr?: () => void;
   /**
    * Appelé une fois, quand VPX montre une première fenêtre (fronton, DMD…) avant celle du jeu :
    * le cartouche du chargement le dit (loadingprogress.ts).
@@ -100,7 +108,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
   const handled = new Set<bigint>();
 
   const stop = () => {
-    const target = player ?? visibleWindowsOf(child.pid ?? -1).find((w) => w.title === PLAYER_TITLE);
+    const target = player ?? visibleWindowsOf(child.pid ?? -1).find((w) => GAME_TITLES.includes(w.title));
     if (target) closeWindow(target);
     killTimer ??= setTimeout(() => child.kill(), 5000);
   };
@@ -141,10 +149,11 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
         opts.onWindows?.();
       }
       if (!player) {
-        player = windows.find((w) => w.title === PLAYER_TITLE);
+        player = windows.find((w) => GAME_TITLES.includes(w.title));
         if (player) {
           playingSince = Date.now();
           if (foregroundWindow()?.pid !== child.pid) bringToFront(player);
+          if (player.title === VR_PREVIEW_TITLE) opts.onVr?.();
           opts.onPlaying?.();
         } else if (Date.now() - t0 > timeoutMs && !failure) {
           failure = 'timeout';
@@ -178,6 +187,7 @@ export function launchVpx(opts: LaunchOptions): RunningGame {
         exitCode,
         seconds: playingSince ? (Date.now() - playingSince) / 1000 : 0,
         loadSeconds: playingSince ? (playingSince - t0) / 1000 : undefined,
+        ...(player?.title === VR_PREVIEW_TITLE && { vr: true }),
         notices,
         logTail: failure ? readLogTail(opts.vpxPrefDir) : [],
       });

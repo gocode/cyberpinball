@@ -342,6 +342,8 @@ export interface SystemItem {
   icon: IconName;
   /** Quelque chose attend l'utilisateur ici (une mise à jour disponible…) : pastille rouge, jusque sur la roue dentée. */
   attention?: boolean;
+  /** « quiet » : l'entrée est indisponible, grisée ; son détail dit pourquoi. */
+  tone?: Tone;
   /** Raccourci clavier qui fait la même chose sans passer par le menu (ActionShortcut). */
   shortcut?: ActionShortcut;
   run: () => void;
@@ -1785,6 +1787,7 @@ export function createLibrary(host: LibraryHost) {
         detail: isSystemGroup(id) ? SYSTEM_GROUPS[id].detail : item?.detail,
         icon: entry.icon,
         attention: systemAttention(id),
+        ...(item?.tone && { tone: item.tone }),
         shortcut: item?.shortcut,
         run: () => runSystemEntry(id),
       };

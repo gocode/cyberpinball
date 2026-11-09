@@ -143,6 +143,8 @@ export const VPX_ANCILLARY_WINDOWS = {
   'Visual Pinball Backglass': 'backglass',
   'Visual Pinball Score View': 'dmd',
   'Visual Pinball Topper': 'topper',
+  // En VR, l'aperçu de ce que voit le casque va sur l'écran du fronton (vr.ts, vrPreviewSettings).
+  'Visual Pinball VR Preview': 'backglass',
 } as const satisfies Record<string, RoleId>;
 
 /**

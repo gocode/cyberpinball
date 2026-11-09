@@ -1,5 +1,14 @@
 // Catalogue anglais : settings. Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
+  // packages/core/src/vr.ts, systemmenu.ts : Menu système > Borne > Réalité virtuelle
+  'Réalité virtuelle': 'Virtual reality',
+  'Aucun logiciel de casque installé (runtime OpenXR) : Meta Quest Link, SteamVR ou Virtual Desktop': 'No headset software installed (OpenXR runtime): Meta Quest Link, SteamVR or Virtual Desktop',
+  'Le runtime OpenXR déclaré est introuvable ({file}) : réinstallez le logiciel du casque': 'The declared OpenXR runtime cannot be found ({file}): reinstall the headset software',
+  'Réalité virtuelle : indisponible': 'Virtual reality: unavailable',
+  'Réalité virtuelle : activée': 'Virtual reality: on',
+  'Réalité virtuelle : désactivée': 'Virtual reality: off',
+  '{runtime} · les tables se lancent dans le casque quand il est prêt, sinon sur les écrans ; choisir pour désactiver': '{runtime} · tables start in the headset when it is ready, otherwise on the screens; choose to turn off',
+  '{runtime} installé · choisir pour jouer dans le casque quand il est branché': '{runtime} installed · choose to play in the headset when it is connected',
   // app/src/settings.ts (et app/renderer/settings.html, titre de la page)
   'Cyber Pinball — Réglages': 'Cyber Pinball — Settings',
   'Retour aux sections': 'Back to sections',

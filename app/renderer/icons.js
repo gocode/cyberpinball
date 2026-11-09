@@ -142,6 +142,7 @@ const CYBER_ICONS = {
   phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>', // Téléphone : la télécommande de la borne.
   backspace: '<path d="M9 5h11a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H9l-7-7z"/><path d="m12 9 6 6M18 9l-6 6"/>', // Touche Effacer (retour arrière) du clavier du téléphone.
   upload: '<path d="M12 15V3M7 8l5-5 5 5M4 17v4h16v-4"/>', // Envoyer un fichier du téléphone vers la borne (le contraire de download).
+  vr: '<path d="M4 8h16a2 2 0 0 1 2 2v6a2 2 0 0 1-2 2h-4l-2-3h-4l-2 3H4a2 2 0 0 1-2-2v-6a2 2 0 0 1 2-2zM7 8V5h10v3"/>', // Casque de réalité virtuelle et sa sangle : jouer dans le casque.
 };
 
 /**

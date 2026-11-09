@@ -33,6 +33,7 @@ export const SYSTEM_ITEM_IDS = [
   'health',
   'cabinet',
   'vpx-settings',
+  'vr',
   'controls',
   'phone-remote',
   'dof',
@@ -120,8 +121,8 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'borne',
     icon: 'cabinet',
     get label() { return t('Borne'); },
-    get detail() { return t('Boutons, écrans, son, réglages de VPX, télécommande du téléphone, bureau Windows, mode invité'); },
-    entries: ['health', 'cabinet', 'vpx-settings', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
+    get detail() { return t('Boutons, écrans, son, réglages de VPX, réalité virtuelle, télécommande du téléphone, bureau Windows, mode invité'); },
+    entries: ['health', 'cabinet', 'vpx-settings', 'vr', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -163,6 +164,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   health: { icon: 'health', get label() { return t('Santé de la borne'); } },
   cabinet: { icon: 'toolbox', get label() { return t('Configuration de la borne'); } },
   'vpx-settings': { icon: 'sliders', get label() { return t('Réglages de VPX'); } },
+  // Jouer dans un casque (vr.ts) : désactivée, ou dans le casque quand il est prêt.
+  vr: { icon: 'vr', get label() { return t('Réalité virtuelle'); } },
   controls: { icon: 'gamepad', get label() { return t('Commandes de la borne'); } },
   // Le téléphone pilote la borne : boutons, clavier, envoi d'un fichier (app/src/phone-remote-menu.ts).
   'phone-remote': { icon: 'phone', get label() { return t('Télécommande du téléphone'); } },
