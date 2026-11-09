@@ -20,6 +20,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Virtual reality: the Cyber Pinball menu also shows in the headset, outside games. The cabinet stands in front of you at the real size of its screens: tilted playfield, flippers towards you, DMD, backglass and topper upright. During a game, the headset goes to VPX, then comes back to the menu.
 - In the headset, the menu recentres in front of you when you put the headset on, and a table played in VR for the first time places itself in front of you.
 - Scoreboard: "Friends", "National" and "Worldwide" rankings, next to "This cabinet", switched with the MagnaSave buttons. A score is only compared with the same version of the table and the same number of balls; your place is given under each ranking.
+- In the headset, the menu shows a cabinet in volume: cabinet body and legs, head with its frames, the glow of the chosen table's hue, on a floor, in front of a dark wall. Before each game, a fade to black hands over to VPX.
+- System menu > Cyber Pinball > "Restart Cyber Pinball" restarts the software alone, without restarting the PC.
 
 ## 0.1.8
 

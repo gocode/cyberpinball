@@ -518,7 +518,7 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Une partie qui échoue dit pourquoi** : erreur du script de la table (ligne et message) ou arrêt de VPX expliqué, et Start rejoue la table ou ouvre « Ce qu'il manque pour jouer ».
 - **Scripts anciens corrigés** sans modifier la table (par exemple un `vpmInit` appelé deux fois, que VPX 10.8 refuse).
 - **Statistiques gardées** pour chaque table : nombre de parties, temps de jeu.
-- **Réalité virtuelle** (Menu système > Borne) : avec un casque (Meta Quest par Link ou Virtual Desktop, SteamVR), les tables se lancent dans le casque quand il est prêt, sinon sur les écrans, sans jamais de question de VPX. Le fronton s'affiche au-dessus du plateau des tables sans pièce VR, la place de la table se garde d'une partie à l'autre, et les deux MagnaSave ouvrent le menu de VPX dans le casque. Hors partie, le menu de Cyber Pinball se voit aussi dans le casque, posé en borne (playfield couché, DMD, fronton et topper debout), à la taille réelle des écrans.
+- **Réalité virtuelle** (Menu système > Borne) : avec un casque (Meta Quest par Link ou Virtual Desktop, SteamVR), les tables se lancent dans le casque quand il est prêt, sinon sur les écrans, sans jamais de question de VPX. Le fronton s'affiche au-dessus du plateau des tables sans pièce VR, la place de la table se garde d'une partie à l'autre, et les deux MagnaSave ouvrent le menu de VPX dans le casque. Hors partie, le menu de Cyber Pinball se voit aussi dans le casque, dans une borne en volume (playfield couché sur son caisson, DMD, fronton et topper debout dans leurs cadres, mur et sol sobres), à la taille réelle des écrans ; la teinte de la table choisie borde la tête d'un léger halo.
 
 ## Une borne qui s'entretient
 

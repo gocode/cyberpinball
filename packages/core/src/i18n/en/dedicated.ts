@@ -4,8 +4,6 @@ export const messages: Record<string, string> = {
   // packages/core/src/systemmenu.ts, app/src/frontend.ts
   'Borne dédiée': 'Dedicated cabinet',
   'Ouvrir l’Explorateur Windows': 'Open Windows Explorer',
-  'Redémarrer Cyber Pinball': 'Restart Cyber Pinball',
-  'Cyber Pinball est le shell de Windows : il revient aussitôt': 'Cyber Pinball is the Windows shell: it comes straight back',
 
   // packages/core/src/dedicated.ts
   'Fonctions de Windows « Shell Launcher »': 'Windows “Shell Launcher” features',

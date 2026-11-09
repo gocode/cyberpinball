@@ -7,6 +7,7 @@ export * from './vpx';
 export * from './vpxwindows';
 export * from './vr';
 export * from './casque';
+export * from './casque-scene';
 export * from './sync';
 export * from './gameorientation';
 export * from './store';

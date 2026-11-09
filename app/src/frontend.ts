@@ -1198,8 +1198,8 @@ library.provideSystemItem('controls', {
 });
 // Borne dédiée (Shell Launcher) : Cyber Pinball à la place du bureau Windows pour ce compte,
 // désactivée par défaut. Quand il est le shell de la session, « Ouvrir l'Explorateur Windows »
-// remplace « Bureau Windows » (il n'y a pas de bureau sans Explorateur), et « Quitter » le
-// relance : sans lui, l'écran resterait noir.
+// remplace « Bureau Windows » (il n'y a pas de bureau sans Explorateur), et « Quitter » disparaît :
+// sans lui, l'écran resterait noir ; « Redémarrer Cyber Pinball » reste.
 const dedicatedSystem = createDedicatedSystem(loc.dataDir);
 const dedicated = createDedicatedMenu({
   library,
@@ -1219,13 +1219,7 @@ library.provideSystemItem('dedicated', dedicated.dedicatedItem);
 library.provideSystemItem('startup', dedicated.startupItem);
 if (shellSession()) {
   library.provideSystemItem('explorer', dedicated.explorerItem);
-  library.provideSystemItem('quit', {
-    label: t('Redémarrer Cyber Pinball'),
-    get detail() {
-      return t('Cyber Pinball est le shell de Windows : il revient aussitôt');
-    },
-    run: () => relaunchMenu(),
-  });
+  library.withdrawSystemItem('quit');
 } else library.provideSystemItem('desktop', {
   get detail() {
     return t('Libère tous les écrans du PC ; {keys} ou le bouton de Cyber Pinball dans la barre des tâches ramène le menu', { keys: shortcutLabel(SHORTCUTS.desktop) });
@@ -1235,6 +1229,14 @@ if (shellSession()) {
     return { keys: shortcutKeys(SHORTCUTS.desktop), matches: (input: Input) => matchesShortcut(input, SHORTCUTS.desktop) };
   },
   run: () => showDesktop(),
+});
+// Ferme et rouvre Cyber Pinball, le PC allumé : la même relance couverte que la langue ou une
+// configuration (aucun écran ne montre le bureau entre les deux), sans l'ouverture du démarrage.
+library.provideSystemItem('relaunch', {
+  get detail() {
+    return t('Ferme puis rouvre Cyber Pinball ; le PC reste allumé');
+  },
+  run: () => relaunchMenu(),
 });
 // Collections de la roue : aussi au menu système, pour une borne dont les MagnaSave ne répondent pas.
 library.provideSystemItem('collections', createCollectionsItem({ collections, library }));
@@ -1961,7 +1963,15 @@ export function startFrontend(): void {
   });
   medias = new MenuMedias({ root: loc.root, dataDir: loc.dataDir, cabinet: choose ? undefined : cabinet, rotation, onChange: () => broadcast() });
   // Couleur de chaque table (table-tint.ts) : mesurée par le convertisseur hors écran, une fois par média.
-  tints = new TableTints({ dataDir: loc.dataDir, converter: () => (converter ??= createConverter()), onChange: () => broadcast() });
+  // La teinte passe aussi au halo des cadres de la borne dans le casque (casque.ts).
+  tints = new TableTints({
+    dataDir: loc.dataDir,
+    converter: () => (converter ??= createConverter()),
+    onChange: () => {
+      broadcast();
+      headset?.tintChanged();
+    },
+  });
   // Les avatars des joueurs (avatar.ts) se lisent aussi par le protocole des médias.
   serveMedias(() => [...medias!.allowedDirs(tables), avatarsDir(loc.dataDir)]);
 
@@ -2012,6 +2022,7 @@ export function startFrontend(): void {
     },
     sources: () => headsetSources(),
     playfieldRotation: () => rotation,
+    tint: () => tints?.current()?.color,
     log: (line) => console.log(line),
   });
   headset.watch();
@@ -3502,6 +3513,8 @@ function relaunchWizard(stepFlag?: string, newConfiguration = false): boolean {
 function relaunchMenu(): void {
   // Par le gardien des écrans, comme toute relance : aucun écran ne montre le bureau entre les deux.
   // La borne était déjà ouverte : pas d'ouverture à la relance.
+  // app.exit ferme l'ancien processus sans before-quit : ce qu'il garde est enregistré ici.
+  saveSettings();
   relaunchCovered([...process.argv.slice(1).filter((a) => a !== INTRO_SKIP_FLAG), INTRO_SKIP_FLAG]);
 }
 

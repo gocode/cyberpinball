@@ -788,6 +788,11 @@ export function createLibrary(host: LibraryHost) {
     systemItems.set(id, item);
   }
 
+  /** Retire une entrée du menu système (« Quitter » quand Cyber Pinball est le shell de Windows). */
+  function withdrawSystemItem(id: SystemItemId): void {
+    systemItems.delete(id);
+  }
+
   /** « Depuis un ami… » de l'entonnoir d'ajout : fourni par le menu des amis (friends-menu.ts), créé après. */
   let addFromFriend: { detail(): string; open(back: () => void): void } | undefined;
   function provideAddFromFriend(source: { detail(): string; open(back: () => void): void }): void {
@@ -4319,6 +4324,7 @@ export function createLibrary(host: LibraryHost) {
 
   return {
     provideSystemItem,
+    withdrawSystemItem,
     provideAddFromFriend,
     /** Santé de la borne : premier relevé peu après le démarrage, puis toutes les 30 minutes, sauf pendant `quiet` (une partie). */
     watchHealth: (quiet?: () => boolean) => health.watch(quiet),

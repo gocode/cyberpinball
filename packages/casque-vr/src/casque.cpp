@@ -14,10 +14,14 @@
 //       rectangle source sur le bureau (pixels physiques), pose du panneau dans l'espace de la borne
 //       (mètres : origine au sol sous le joueur, x à droite, y en haut, -z devant lui), taille en mètres ;
 //     fin                (fin de la description : le casque s'ouvre)
+//     scene, puis boite … | quad … | disque …, puis scene-fin
+//                        (la borne en volume autour des panneaux, packages/core/src/casque-scene.ts ;
+//                        un nouveau bloc remplace le précédent, par exemple quand la teinte change)
 //     recentrer          (la borne revient devant le joueur)
-//     quitter            (fin propre de la session : avant une partie de VPX)
+//     quitter            (fondu au noir de 300 ms, puis fin propre de la session : avant une partie de VPX)
 //   Sortie standard :
-//     pret <runtime> | casque-absent <raison> | erreur <texte> | etat <état OpenXR> | centre | fini
+//     pret <runtime> | casque-absent <raison> | erreur <texte> | etat <état OpenXR> | centre … | image <rôle>
+//     | scene <n> formes | fini
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -32,9 +36,12 @@
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
 
+#include "scene.h"
+
 #include <atomic>
 #include <cmath>
 #include <cstdio>
+#include <fstream>
 #include <iostream>
 #include <mutex>
 #include <sstream>
@@ -70,7 +77,8 @@ PFN_xrGetInstanceProcAddr xrGetInstanceProcAddr_ = nullptr;
    X(xrBeginSession) X(xrEndSession) X(xrRequestExitSession) X(xrPollEvent) X(xrWaitFrame) X(xrBeginFrame) \
    X(xrEndFrame) X(xrCreateReferenceSpace) X(xrDestroySpace) X(xrEnumerateReferenceSpaces) X(xrLocateSpace) \
    X(xrEnumerateSwapchainFormats) X(xrCreateSwapchain) X(xrDestroySwapchain) X(xrEnumerateSwapchainImages) \
-   X(xrAcquireSwapchainImage) X(xrWaitSwapchainImage) X(xrReleaseSwapchainImage) X(xrResultToString)
+   X(xrAcquireSwapchainImage) X(xrWaitSwapchainImage) X(xrReleaseSwapchainImage) X(xrResultToString) \
+   X(xrEnumerateViewConfigurationViews) X(xrLocateViews)
 #define DECLARE(name) PFN_##name name##_ = nullptr;
 XR_FUNCS(DECLARE)
 PFN_xrGetD3D11GraphicsRequirementsKHR xrGetD3D11GraphicsRequirementsKHR_ = nullptr;
@@ -139,16 +147,35 @@ std::atomic<bool> wantQuit { false };
 std::atomic<bool> described { false };
 std::mutex panelsMutex;
 std::vector<Panel> pending;
+/** Dernier bloc de scène complet reçu, à prendre par la boucle d'images. */
+std::vector<std::string> sceneLines;
+std::atomic<bool> sceneReady { false };
 
 void readCommands()
 {
    std::string line;
+   std::vector<std::string> block;
+   bool inScene = false;
    while (std::getline(std::cin, line))
    {
       std::istringstream in(line);
       std::string word;
       in >> word;
-      if (word == "panneau" && !described)
+      if (word == "scene")
+      {
+         block.clear();
+         inScene = true;
+      }
+      else if (word == "scene-fin")
+      {
+         std::lock_guard<std::mutex> lock(panelsMutex);
+         sceneLines = block;
+         sceneReady = true;
+         inScene = false;
+      }
+      else if (inScene)
+         block.push_back(line);
+      else if (word == "panneau" && !described)
       {
          Panel p;
          float px, py, pz, qx, qy, qz, qw;
@@ -189,6 +216,116 @@ std::string narrow(const wchar_t* w)
 
 // --diagnostic : chaque carte, chacun de ses écrans, et ce que donne leur duplication (format, image
 // reçue, luminosité moyenne). Aucune session OpenXR : rien ne paraît dans le casque.
+// --rendu-essai <scène> <image.bmp> : la scène (lignes du protocole : panneau, boite, quad, disque),
+// vue de la place du joueur, rendue hors écran dans une image. Les panneaux y sont des rectangles
+// gris (pas de duplication d'écran). Pour vérifier la géométrie et les couleurs sans casque.
+int renderTest(const std::string& input, const std::string& output)
+{
+   std::ifstream file(input);
+   if (!file)
+   {
+      say("erreur scène illisible : " + input);
+      return 2;
+   }
+   std::vector<scene::Vertex> opaque, transparent, screens, none;
+   std::string line;
+   while (std::getline(file, line))
+   {
+      std::istringstream in(line);
+      std::string word;
+      in >> word;
+      if (word == "panneau")
+      {
+         std::string role;
+         float x, y, w, h, px, py, pz, qx, qy, qz, qw, mw, mh;
+         in >> role >> x >> y >> w >> h >> px >> py >> pz >> qx >> qy >> qz >> qw >> mw >> mh;
+         std::ostringstream q;
+         q << "quad " << px << ' ' << py << ' ' << pz << ' ' << qx << ' ' << qy << ' ' << qz << ' ' << qw << ' ' << mw << ' ' << mh << " #8c8c8cff #5a5a5aff";
+         scene::addPrimitive(q.str(), screens, none);
+      }
+      else
+         scene::addPrimitive(line, opaque, transparent);
+   }
+   ComPtr<ID3D11Device> device;
+   ComPtr<ID3D11DeviceContext> context;
+   if (FAILED(D3D11CreateDevice(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context)))
+      return 4;
+   scene::Renderer renderer, panelsRenderer;
+   std::string error;
+   if (!renderer.init(device.Get(), error) || !panelsRenderer.init(device.Get(), error))
+   {
+      say("erreur " + error);
+      return 4;
+   }
+   renderer.setScene(opaque, transparent);
+   panelsRenderer.setScene(screens, none);
+   constexpr UINT W = 1600, H = 1000;
+   D3D11_TEXTURE2D_DESC td {};
+   td.Width = W;
+   td.Height = H;
+   td.MipLevels = 1;
+   td.ArraySize = 1;
+   td.Format = DXGI_FORMAT_B8G8R8A8_UNORM_SRGB;
+   td.SampleDesc.Count = 1;
+   td.Usage = D3D11_USAGE_DEFAULT;
+   td.BindFlags = D3D11_BIND_RENDER_TARGET;
+   ComPtr<ID3D11Texture2D> color, staging, depthTexture;
+   device->CreateTexture2D(&td, nullptr, &color);
+   td.Usage = D3D11_USAGE_STAGING;
+   td.BindFlags = 0;
+   td.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+   device->CreateTexture2D(&td, nullptr, &staging);
+   td.Usage = D3D11_USAGE_DEFAULT;
+   td.CPUAccessFlags = 0;
+   td.Format = DXGI_FORMAT_D32_FLOAT;
+   td.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+   device->CreateTexture2D(&td, nullptr, &depthTexture);
+   ComPtr<ID3D11RenderTargetView> target;
+   ComPtr<ID3D11DepthStencilView> depth;
+   device->CreateRenderTargetView(color.Get(), nullptr, &target);
+   device->CreateDepthStencilView(depthTexture.Get(), nullptr, &depth);
+   const float black[4] = { 0, 0, 0, 1 };
+   context->ClearRenderTargetView(target.Get(), black);
+   context->ClearDepthStencilView(depth.Get(), D3D11_CLEAR_DEPTH, 1.f, 0);
+   context->OMSetRenderTargets(1, target.GetAddressOf(), depth.Get());
+   const D3D11_VIEWPORT viewport { 0, 0, static_cast<float>(W), static_cast<float>(H), 0, 1 };
+   context->RSSetViewports(1, &viewport);
+   // Joueur debout un pas en arrière (yeux à 1,65 m), regard 25° vers le bas ; champ de 100° en largeur.
+   const float pitch = -0.436f;
+   const float eyeQ[4] = { std::sin(pitch / 2), 0, 0, std::cos(pitch / 2) };
+   const float eyeT[3] = { 0.f, 1.65f, 0.35f };
+   const float half = 0.8727f;
+   const float vertical = std::atan(std::tan(half) * H / W);
+   const scene::Mat4 world = scene::Mat4::identity();
+   const scene::Mat4 mvp = scene::Mat4::projection(-half, half, vertical, -vertical, 0.05f, 50.f) * scene::Mat4::poseInverse(eyeQ, eyeT) * world;
+   renderer.draw(context.Get(), mvp, world, 1.f);
+   // Les panneaux par-dessus, comme les couches « quad » du casque.
+   context->ClearDepthStencilView(depth.Get(), D3D11_CLEAR_DEPTH, 1.f, 0);
+   panelsRenderer.draw(context.Get(), mvp, world, 1.f);
+   context->CopyResource(staging.Get(), color.Get());
+   D3D11_MAPPED_SUBRESOURCE m;
+   if (FAILED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &m)))
+      return 4;
+   std::ofstream out(output, std::ios::binary);
+   const uint32_t row = W * 3, pad = (4 - row % 4) % 4, size = 54 + (row + pad) * H;
+   unsigned char header[54] = { 'B', 'M' };
+   auto put32 = [&](int at, uint32_t v) { for (int i = 0; i < 4; i++) header[at + i] = static_cast<unsigned char>(v >> (8 * i)); };
+   put32(2, size), put32(10, 54), put32(14, 40), put32(18, W), put32(22, H);
+   header[26] = 1, header[28] = 24;
+   out.write(reinterpret_cast<const char*>(header), 54);
+   for (int y = H - 1; y >= 0; y--)
+   {
+      const unsigned char* src = static_cast<const unsigned char*>(m.pData) + y * m.RowPitch;
+      for (UINT x = 0; x < W; x++)
+         out.put(static_cast<char>(src[x * 4])), out.put(static_cast<char>(src[x * 4 + 1])), out.put(static_cast<char>(src[x * 4 + 2]));
+      for (uint32_t i = 0; i < pad; i++)
+         out.put(0);
+   }
+   context->Unmap(staging.Get(), 0);
+   say("image " + output + " (" + std::to_string(opaque.size() / 3 + transparent.size() / 3) + " triangles)");
+   return 0;
+}
+
 int diagnostic(const LUID* headset)
 {
    ComPtr<IDXGIFactory1> factory;
@@ -282,6 +419,8 @@ int main(int argc, char** argv)
    {
       if (std::string(argv[i]) == "--chargeur" && i + 1 < argc)
          loaderPath = argv[i + 1];
+      if (std::string(argv[i]) == "--rendu-essai" && i + 2 < argc)
+         return renderTest(argv[i + 1], argv[i + 2]);
       if (std::string(argv[i]) == "--diagnostic")
          diagnose = true;
    }
@@ -356,13 +495,27 @@ int main(int argc, char** argv)
       return 2;
    }
 
-   const char* extensions[] = { XR_KHR_D3D11_ENABLE_EXTENSION_NAME };
+   // Fondu au noir de toutes les couches (XR_KHR_composition_layer_color_scale_bias), si le runtime l'a.
+   bool colorScale = false;
+   {
+      PFN_xrEnumerateInstanceExtensionProperties enumerate = nullptr;
+      xrGetInstanceProcAddr_(XR_NULL_HANDLE, "xrEnumerateInstanceExtensionProperties", reinterpret_cast<PFN_xrVoidFunction*>(&enumerate));
+      uint32_t n = 0;
+      if (enumerate && XR_SUCCEEDED(enumerate(nullptr, 0, &n, nullptr)))
+      {
+         std::vector<XrExtensionProperties> list(n, { XR_TYPE_EXTENSION_PROPERTIES });
+         enumerate(nullptr, n, &n, list.data());
+         for (const auto& e : list)
+            colorScale |= std::string(e.extensionName) == XR_KHR_COMPOSITION_LAYER_COLOR_SCALE_BIAS_EXTENSION_NAME;
+      }
+   }
+   const char* extensions[] = { XR_KHR_D3D11_ENABLE_EXTENSION_NAME, XR_KHR_COMPOSITION_LAYER_COLOR_SCALE_BIAS_EXTENSION_NAME };
    XrInstanceCreateInfo ici { XR_TYPE_INSTANCE_CREATE_INFO };
    std::snprintf(ici.applicationInfo.applicationName, XR_MAX_APPLICATION_NAME_SIZE, "Cyber Pinball");
    ici.applicationInfo.applicationVersion = 1;
    std::snprintf(ici.applicationInfo.engineName, XR_MAX_ENGINE_NAME_SIZE, "Cyber Pinball");
    ici.applicationInfo.apiVersion = XR_API_VERSION_1_0;
-   ici.enabledExtensionCount = 1;
+   ici.enabledExtensionCount = colorScale ? 2 : 1;
    ici.enabledExtensionNames = extensions;
    XrInstance instance = XR_NULL_HANDLE;
    if (!xrCreateInstance_ || XR_FAILED(xrCreateInstance_(&ici, &instance)) || !loadInstanceFunctions(instance))
@@ -514,10 +667,86 @@ int main(int argc, char** argv)
       xrEnumerateSwapchainImages_(p.swapchain, n, &n, reinterpret_cast<XrSwapchainImageBaseHeader*>(p.images.data()));
    }
 
-   say(std::string("pret ") + props.runtimeName + (stage ? " (pièce)" : " (local)"));
+   // Couche de projection : la borne en volume, un rendu par œil, sous les panneaux.
+   struct Eye
+   {
+      XrSwapchain swapchain = XR_NULL_HANDLE;
+      std::vector<XrSwapchainImageD3D11KHR> images;
+      std::vector<ComPtr<ID3D11RenderTargetView>> targets;
+      ComPtr<ID3D11DepthStencilView> depth;
+      uint32_t width = 0, height = 0;
+   };
+   Eye eyes[2];
+   scene::Renderer renderer;
+   bool projection = false;
+   {
+      uint32_t n = 0;
+      xrEnumerateViewConfigurationViews_(instance, system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, 0, &n, nullptr);
+      std::vector<XrViewConfigurationView> vcv(n, { XR_TYPE_VIEW_CONFIGURATION_VIEW });
+      xrEnumerateViewConfigurationViews_(instance, system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, n, &n, vcv.data());
+      std::string error;
+      projection = n == 2 && renderer.init(device.Get(), error);
+      if (!projection)
+         say("erreur scène indisponible : " + (error.empty() ? std::string("vues du casque") : error));
+      for (uint32_t e = 0; projection && e < 2; e++)
+      {
+         Eye& eye = eyes[e];
+         eye.width = vcv[e].recommendedImageRectWidth;
+         eye.height = vcv[e].recommendedImageRectHeight;
+         XrSwapchainCreateInfo ci { XR_TYPE_SWAPCHAIN_CREATE_INFO };
+         ci.usageFlags = XR_SWAPCHAIN_USAGE_COLOR_ATTACHMENT_BIT;
+         ci.format = format;
+         ci.sampleCount = 1;
+         ci.width = eye.width;
+         ci.height = eye.height;
+         ci.faceCount = 1;
+         ci.arraySize = 1;
+         ci.mipCount = 1;
+         if (XR_FAILED(xrCreateSwapchain_(session, &ci, &eye.swapchain)))
+         {
+            say("erreur scène : image d'un œil refusée");
+            projection = false;
+            break;
+         }
+         uint32_t count = 0;
+         xrEnumerateSwapchainImages_(eye.swapchain, 0, &count, nullptr);
+         eye.images.assign(count, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR });
+         xrEnumerateSwapchainImages_(eye.swapchain, count, &count, reinterpret_cast<XrSwapchainImageBaseHeader*>(eye.images.data()));
+         for (auto& img : eye.images)
+         {
+            D3D11_RENDER_TARGET_VIEW_DESC rtv {};
+            rtv.Format = format;
+            rtv.ViewDimension = D3D11_RTV_DIMENSION_TEXTURE2D;
+            ComPtr<ID3D11RenderTargetView> target;
+            device->CreateRenderTargetView(img.texture, &rtv, &target);
+            eye.targets.push_back(target);
+         }
+         D3D11_TEXTURE2D_DESC dd {};
+         dd.Width = eye.width;
+         dd.Height = eye.height;
+         dd.MipLevels = 1;
+         dd.ArraySize = 1;
+         dd.Format = DXGI_FORMAT_D32_FLOAT;
+         dd.SampleDesc.Count = 1;
+         dd.Usage = D3D11_USAGE_DEFAULT;
+         dd.BindFlags = D3D11_BIND_DEPTH_STENCIL;
+         ComPtr<ID3D11Texture2D> depthTexture;
+         device->CreateTexture2D(&dd, nullptr, &depthTexture);
+         if (depthTexture)
+            device->CreateDepthStencilView(depthTexture.Get(), nullptr, &eye.depth);
+         if (!eye.depth)
+            projection = false;
+      }
+   }
+
+   say(std::string("pret ") + props.runtimeName + (stage ? " (pièce)" : " (local)") + (colorScale ? "" : " (sans fondu des panneaux)"));
 
    XrPosef anchor { { 0, 0, 0, 1 }, { 0, 0, -0.f } };
    bool running = false, exitRequested = false, done = false;
+   // Fondu au noir avant de rendre le casque : 300 ms (250 à 350 ms dans la direction artistique).
+   constexpr ULONGLONG FADE_MS = 300;
+   ULONGLONG fadeStart = 0;
+   float fade = 1.f;
    XrSessionState state = XR_SESSION_STATE_UNKNOWN;
    while (!done)
    {
@@ -557,11 +786,24 @@ int main(int argc, char** argv)
       }
       if (wantQuit && !exitRequested)
       {
-         exitRequested = true;
-         if (running)
-            xrRequestExitSession_(session);
-         else
+         if (!running)
+         {
+            exitRequested = true;
             done = true;
+         }
+         else
+         {
+            // La scène s'immobilise et fond au noir, puis la session se termine.
+            if (!fadeStart)
+               fadeStart = GetTickCount64();
+            fade = 1.f - static_cast<float>(GetTickCount64() - fadeStart) / FADE_MS;
+            if (fade <= 0.f)
+            {
+               fade = 0.f;
+               exitRequested = true;
+               xrRequestExitSession_(session);
+            }
+         }
       }
       if (done)
          break;
@@ -569,6 +811,21 @@ int main(int argc, char** argv)
       {
          Sleep(50);
          continue;
+      }
+
+      if (projection && sceneReady.exchange(false))
+      {
+         std::vector<std::string> lines;
+         {
+            std::lock_guard<std::mutex> lock(panelsMutex);
+            lines = sceneLines;
+         }
+         std::vector<scene::Vertex> opaque, transparent;
+         size_t bad = 0;
+         for (const auto& l : lines)
+            bad += scene::addPrimitive(l, opaque, transparent) ? 0 : 1;
+         renderer.setScene(opaque, transparent);
+         say("scene " + std::to_string(lines.size() - bad) + " formes" + (bad ? ", " + std::to_string(bad) + " illisibles" : ""));
       }
 
       XrFrameState fs { XR_TYPE_FRAME_STATE };
@@ -593,9 +850,11 @@ int main(int argc, char** argv)
          }
       }
 
-      // Nouvelles images des écrans.
+      // Nouvelles images des écrans (sauf pendant le fondu : l'ambiance s'immobilise).
       for (Output& o : outputs)
       {
+         if (fadeStart)
+            break;
          if (!o.dup && FAILED(o.output->DuplicateOutput(device.Get(), &o.dup)))
          {
             if (!o.reported)
@@ -640,6 +899,69 @@ int main(int argc, char** argv)
          o.dup->ReleaseFrame();
       }
 
+      // Couche de projection : la scène, un rendu par œil, dans l'espace de la pièce.
+      XrCompositionLayerProjection proj { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
+      XrCompositionLayerProjectionView projViews[2] { { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW }, { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW } };
+      bool projected = false;
+      if (fs.shouldRender && projection && !renderer.empty())
+      {
+         XrViewLocateInfo vli { XR_TYPE_VIEW_LOCATE_INFO };
+         vli.viewConfigurationType = XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO;
+         vli.displayTime = fs.predictedDisplayTime;
+         vli.space = base;
+         XrViewState viewState { XR_TYPE_VIEW_STATE };
+         XrView views[2] { { XR_TYPE_VIEW }, { XR_TYPE_VIEW } };
+         uint32_t count = 0;
+         if (XR_SUCCEEDED(xrLocateViews_(session, &vli, &viewState, 2, &count, views)) && count == 2
+            && (viewState.viewStateFlags & XR_VIEW_STATE_POSITION_VALID_BIT) && (viewState.viewStateFlags & XR_VIEW_STATE_ORIENTATION_VALID_BIT))
+         {
+            const float aq[4] = { anchor.orientation.x, anchor.orientation.y, anchor.orientation.z, anchor.orientation.w };
+            const float at[3] = { anchor.position.x, anchor.position.y, anchor.position.z };
+            const scene::Mat4 world = scene::Mat4::pose(aq, at);
+            projected = true;
+            for (int e = 0; e < 2 && projected; e++)
+            {
+               Eye& eye = eyes[e];
+               uint32_t index = 0;
+               XrSwapchainImageAcquireInfo ai { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
+               if (XR_FAILED(xrAcquireSwapchainImage_(eye.swapchain, &ai, &index)))
+               {
+                  projected = false;
+                  break;
+               }
+               XrSwapchainImageWaitInfo wi { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
+               wi.timeout = XR_INFINITE_DURATION;
+               xrWaitSwapchainImage_(eye.swapchain, &wi);
+               ID3D11RenderTargetView* target = eye.targets[index].Get();
+               const float black[4] = { 0, 0, 0, 1 };
+               context->ClearRenderTargetView(target, black);
+               context->ClearDepthStencilView(eye.depth.Get(), D3D11_CLEAR_DEPTH, 1.f, 0);
+               context->OMSetRenderTargets(1, &target, eye.depth.Get());
+               const D3D11_VIEWPORT viewport { 0, 0, static_cast<float>(eye.width), static_cast<float>(eye.height), 0, 1 };
+               context->RSSetViewports(1, &viewport);
+               const XrPosef& vp = views[e].pose;
+               const float vq[4] = { vp.orientation.x, vp.orientation.y, vp.orientation.z, vp.orientation.w };
+               const float vt[3] = { vp.position.x, vp.position.y, vp.position.z };
+               const XrFovf& f = views[e].fov;
+               const scene::Mat4 mvp = scene::Mat4::projection(f.angleLeft, f.angleRight, f.angleUp, f.angleDown, 0.05f, 50.f) * scene::Mat4::poseInverse(vq, vt) * world;
+               // Avec l'extension, le runtime fond toutes les couches ; sinon la scène fond seule.
+               renderer.draw(context.Get(), mvp, world, colorScale ? 1.f : fade);
+               context->OMSetRenderTargets(0, nullptr, nullptr);
+               XrSwapchainImageReleaseInfo ri { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
+               xrReleaseSwapchainImage_(eye.swapchain, &ri);
+               projViews[e].pose = vp;
+               projViews[e].fov = f;
+               projViews[e].subImage.swapchain = eye.swapchain;
+               projViews[e].subImage.imageRect = { { 0, 0 }, { static_cast<int32_t>(eye.width), static_cast<int32_t>(eye.height) } };
+            }
+         }
+      }
+      // Fondu au noir de toutes les couches, quand le runtime le permet.
+      XrCompositionLayerColorScaleBiasKHR scale { XR_TYPE_COMPOSITION_LAYER_COLOR_SCALE_BIAS_KHR };
+      scale.colorScale = { fade, fade, fade, 1.f };
+      scale.colorBias = { 0, 0, 0, 0 };
+      const void* fadeNext = colorScale && fade < 1.f ? &scale : nullptr;
+
       std::vector<XrCompositionLayerQuad> quads;
       if (fs.shouldRender)
       {
@@ -676,6 +998,7 @@ int main(int argc, char** argv)
                continue;
 
             XrCompositionLayerQuad q { XR_TYPE_COMPOSITION_LAYER_QUAD };
+            q.next = fadeNext;
             q.space = base;
             q.eyeVisibility = XR_EYE_VISIBILITY_BOTH;
             q.subImage.swapchain = p.swapchain;
@@ -686,6 +1009,14 @@ int main(int argc, char** argv)
          }
       }
       std::vector<const XrCompositionLayerBaseHeader*> layers;
+      if (projected)
+      {
+         proj.next = fadeNext;
+         proj.space = base;
+         proj.viewCount = 2;
+         proj.views = projViews;
+         layers.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&proj));
+      }
       for (const auto& q : quads)
          layers.push_back(reinterpret_cast<const XrCompositionLayerBaseHeader*>(&q));
       XrFrameEndInfo fe { XR_TYPE_FRAME_END_INFO };
@@ -700,6 +1031,9 @@ int main(int argc, char** argv)
    for (Panel& p : panels)
       if (p.swapchain)
          xrDestroySwapchain_(p.swapchain);
+   for (Eye& eye : eyes)
+      if (eye.swapchain)
+         xrDestroySwapchain_(eye.swapchain);
    if (view)
       xrDestroySpace_(view);
    if (base)

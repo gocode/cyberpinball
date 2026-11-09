@@ -1,6 +1,10 @@
 // Catalogue anglais : alimentation de la borne (éteindre, mettre en veille, redémarrer).
 // Clé : le texte français tel qu'il est passé à t() ou tn().
 export const messages: Record<string, string> = {
+  // packages/core/src/systemmenu.ts, app/src/frontend.ts : relancer le logiciel seul, le PC reste allumé.
+  'Redémarrer Cyber Pinball': 'Restart Cyber Pinball',
+  'Ferme puis rouvre Cyber Pinball ; le PC reste allumé': 'Closes then reopens Cyber Pinball; the PC stays on',
+
   // packages/core/src/power.ts
   'Ce PC utilise la veille moderne, que Cyber Pinball ne peut pas demander à Windows. Pour le mettre en veille : le menu Démarrer de Windows, ou le bouton d’alimentation du PC.': 'This PC uses Modern Standby, which Cyber Pinball cannot request from Windows. To put it to sleep: the Windows Start menu, or the PC power button.',
   'Éteindre la borne': 'Shut down the cabinet',

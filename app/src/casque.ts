@@ -11,14 +11,14 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { headsetPanels, headsetProtocol, type HeadsetMenuState, type HeadsetSource, type Rotation } from '@cyberpinball/core';
+import { headsetPanels, headsetProtocol, headsetScene, sceneProtocol, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type Rotation } from '@cyberpinball/core';
 import { OFFSCREEN } from './offscreen';
 
 const EXE = 'cyberpinball-casque.exe';
 const RETRY_MS = 15_000;
 const STOP_TIMEOUT_MS = 4_000;
 /** Messages du compagnon gardés dans le journal (packages/casque-vr/src/casque.cpp). */
-const PROTOCOL = /^(pret|casque-absent|erreur|centre|image|fini)\b/;
+const PROTOCOL = /^(pret|casque-absent|erreur|centre|image|scene|fini)\b/;
 
 /** Le compagnon, s'il est là : fabriqué avec l'application, ou construit en développement. */
 export function headsetExe(appDir: string): string | undefined {
@@ -39,6 +39,8 @@ export interface HeadsetMenuOptions {
   /** Ce qu'il faut montrer : chaque rôle, son rectangle et la taille de son écran. */
   sources(): HeadsetSource[];
   playfieldRotation(): Rotation;
+  /** Teinte de la table choisie (#rrggbb), pour le halo des cadres ; undefined : la sarcelle. */
+  tint(): string | undefined;
   log(line: string): void;
 }
 
@@ -46,6 +48,9 @@ export class HeadsetMenu {
   private child: ChildProcessWithoutNullStreams | undefined;
   private retryAt = 0;
   private timer: NodeJS.Timeout | undefined;
+  /** Panneaux et teinte de la scène envoyée au compagnon en cours. */
+  private panels: HeadsetPanel[] = [];
+  private sentTint: string | undefined;
   /** Pour le détail de l'entrée « Réalité virtuelle » : montré, en attente du casque, ou compagnon absent. */
   state: HeadsetMenuState = 'waiting';
 
@@ -80,6 +85,22 @@ export class HeadsetMenu {
 
   recenter(): void {
     this.child?.stdin.write('recentrer\n');
+  }
+
+  /** La table choisie a changé de teinte : la scène est renvoyée avec le nouveau halo (borne en volume, casque-scene.ts). */
+  tintChanged(): void {
+    const tint = this.opts.tint();
+    if (!this.child || tint === this.sentTint) return;
+    this.sendScene(this.child, tint);
+  }
+
+  private sendScene(child: ChildProcessWithoutNullStreams, tint: string | undefined): void {
+    this.sentTint = tint;
+    try {
+      for (const line of sceneProtocol(headsetScene(this.panels, tint))) child.stdin.write(`${line}\n`);
+    } catch {
+      // Compagnon parti entre-temps : la scène suivra au prochain lancement.
+    }
   }
 
   private start(): void {
@@ -120,7 +141,10 @@ export class HeadsetMenu {
       // Casque absent ou session perdue : nouvel essai plus tard ; arrêt demandé : rien.
       if (code !== 0) this.retryAt = Date.now() + RETRY_MS;
     });
-    for (const line of headsetProtocol(panels)) child.stdin.write(`${line}\n`);
+    this.panels = panels;
+    for (const line of headsetProtocol(panels).filter((l) => l !== 'fin')) child.stdin.write(`${line}\n`);
+    this.sendScene(child, this.opts.tint());
+    child.stdin.write('fin\n');
     this.opts.log(`Casque : compagnon lancé, ${panels.map((p) => `${p.role} ${p.width.toFixed(2)}×${p.height.toFixed(2)} m`).join(', ')}.`); // i18n-ignore : journal
   }
 

@@ -253,10 +253,28 @@ test('textes : chaque action dit ce qui va se passer, et ce que font Start et Ex
 test('menu système : veille, redémarrage et extinction dans la rubrique Cyber Pinball, après « Quitter Cyber Pinball », nommés comme leur confirmation', () => {
   // Les sorties ensemble (27/10/2026), de la plus légère à la plus lourde.
   const cyberpinball = SYSTEM_GROUPS.cyberpinball.entries;
-  assert.deepEqual(cyberpinball.slice(-4), ['quit', 'sleep', 'restart', 'shutdown']);
+  assert.deepEqual(cyberpinball.slice(-5), ['quit', 'relaunch', 'sleep', 'restart', 'shutdown']);
   for (const action of POWER_ACTIONS) assert.ok(!SYSTEM_GROUPS.borne.entries.includes(action), `« ${action} » est encore dans la rubrique Borne`);
   for (const action of POWER_ACTIONS) assert.equal(SYSTEM_ITEMS[action].label, powerTexts(action).label);
   assert.deepEqual(POWER_ACTIONS.map((a) => SYSTEM_ITEMS[a].icon), ['power', 'moon', 'restart']);
+});
+
+test('menu système : « Redémarrer Cyber Pinball » relance le logiciel seul, par la relance couverte, et remplace « Quitter » en borne dédiée', () => {
+  // Demandé le 09/11/2026 : on pouvait quitter, mettre en veille, redémarrer le PC, pas relancer Cyber Pinball.
+  assert.equal(SYSTEM_ITEMS.relaunch.label, 'Redémarrer Cyber Pinball');
+  assert.equal(SYSTEM_ITEMS.relaunch.icon, 'refresh');
+  // Ni le symbole de sortie ni celui du redémarrage du PC : chaque sortie se reconnaît à son icône.
+  const exits = (['quit', 'relaunch', 'sleep', 'restart', 'shutdown'] as const).map((id) => SYSTEM_ITEMS[id].icon);
+  assert.equal(new Set(exits).size, exits.length, exits.join(', '));
+  const frontend = fs.readFileSync(path.join(APP, 'src', 'frontend.ts'), 'utf8');
+  // Fourni pour toute borne, et par relaunchMenu (relaunchCovered : jamais le bureau entre les deux).
+  assert.match(frontend, /\nlibrary\.provideSystemItem\('relaunch', \{[\s\S]*?run: \(\) => relaunchMenu\(\),/);
+  // relaunchCovered ferme l'ancien processus par app.exit, sans before-quit : relaunchMenu enregistre d'abord.
+  const relaunchMenu = /\nfunction relaunchMenu\(\): void \{([\s\S]*?)\r?\n\}/.exec(frontend)![1]!;
+  assert.ok(relaunchMenu.indexOf('saveSettings()') >= 0 && relaunchMenu.indexOf('saveSettings()') < relaunchMenu.indexOf('relaunchCovered('), 'réglages enregistrés avant la relance');
+  // Borne dédiée : « Quitter » ne ferait que relancer, il est retiré ; plus de second « Redémarrer Cyber Pinball ».
+  assert.match(frontend, /if \(shellSession\(\)\) \{[^}]*library\.withdrawSystemItem\('quit'\);/);
+  assert.equal(frontend.match(/t\('Redémarrer Cyber Pinball'\)/g), null, 'le libellé vient de systemmenu.ts, pas d’un remplacement');
 });
 
 // ---------- Écrans du menu ----------

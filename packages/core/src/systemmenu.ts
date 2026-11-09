@@ -48,6 +48,7 @@ export const SYSTEM_ITEM_IDS = [
   'media-import',
   'rom-migration',
   'quit',
+  'relaunch',
   'sleep',
   'restart',
   'shutdown',
@@ -128,9 +129,9 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     id: 'cyberpinball',
     icon: 'pinball-app',
     label: 'Cyber Pinball', // i18n-ignore : le nom de l'application
-    get detail() { return t('Langue, mise à jour, activité récente, sauvegardes, migration, quitter, veille et extinction'); },
-    // Les sorties à la fin, de la plus légère à la plus lourde : quitter, veille, redémarrage, arrêt.
-    entries: ['language', 'updates', 'activity', 'backups', 'migration', 'quit', 'sleep', 'restart', 'shutdown'],
+    get detail() { return t('Langue, mise à jour, activité récente, sauvegardes, migration, quitter ou redémarrer, veille et extinction'); },
+    // Les sorties à la fin, de la plus légère à la plus lourde : quitter ou relancer Cyber Pinball, veille, redémarrage, arrêt.
+    entries: ['language', 'updates', 'activity', 'backups', 'migration', 'quit', 'relaunch', 'sleep', 'restart', 'shutdown'],
   },
   migration: {
     id: 'migration',
@@ -185,6 +186,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'rom-migration': { icon: 'link', get label() { return t('Regrouper les ROM'); } },
   // Le symbole d'alimentation est gardé pour l'arrêt du PC.
   quit: { icon: 'exit', get label() { return t('Quitter Cyber Pinball'); } },
+  // Ferme et rouvre Cyber Pinball sans toucher au PC (relance couverte : jamais le bureau entre les deux).
+  relaunch: { icon: 'refresh', get label() { return t('Redémarrer Cyber Pinball'); } },
   // Alimentation du PC (app/src/power.ts) : chacune passe par un écran de confirmation.
   sleep: { icon: 'moon', get label() { return t('Mettre en veille'); } },
   restart: { icon: 'restart', get label() { return t('Redémarrer la borne'); } },
