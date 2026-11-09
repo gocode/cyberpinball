@@ -57,6 +57,7 @@ export * from './dmdplace';
 export * from './menudmd';
 export * from './screencover';
 export * from './game-load';
+export * from './calage';
 export * from './taskbarguard';
 export * from './shortcuts';
 export * from './coexistence';

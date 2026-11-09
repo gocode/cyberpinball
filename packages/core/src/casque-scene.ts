@@ -30,8 +30,12 @@ export const SCENE_COLORS = {
   lineStrong: '#24504a',
   /** Sarcelle de la marque : le halo des cadres quand la table n'a pas de teinte. */
   halo: '#1c8f80',
+  /** Vert signal : les repères du calage (coins de la barre avant). */
+  signal: '#8be23a',
 } as const;
 
+/** Côté des repères du calage (plots posés sur les coins de la barre avant). */
+const MARK_M = 0.02;
 /** Bordure du playfield et cadres de la tête (largeur dans le plan). */
 export const FRAME_M = 0.018;
 /** Épaisseur de la bordure du playfield sous son plan. */
@@ -141,8 +145,11 @@ function filet(panel: HeadsetPanel, w: number, h: number, color: string, alpha: 
 }
 
 /** La scène de la borne en volume autour des panneaux. `tint` : teinte de la table choisie (#rrggbb), sinon la sarcelle. */
-export function headsetScene(panels: readonly HeadsetPanel[], tint?: string): ScenePrimitive[] {
+export function headsetScene(panels: readonly HeadsetPanel[], tint?: string, marks: readonly Vec3[] = []): ScenePrimitive[] {
   const scene: ScenePrimitive[] = [];
+  // Calage de la borne (calage.ts) : un plot vert sur chaque coin de la barre avant virtuelle, qui
+  // doit tomber sur le vrai coin, touché du bout de la manette.
+  for (const center of marks) scene.push({ kind: 'boite', center: { ...center, y: center.y + MARK_M }, orientation: IDENTITY, size: { x: MARK_M, y: 2 * MARK_M, z: MARK_M }, color: rgba(SCENE_COLORS.signal) });
   const C = SCENE_COLORS;
   const b = FRAME_M;
 

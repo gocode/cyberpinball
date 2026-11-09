@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { headsetPanels, headsetProtocol, headsetScene, isHeadsetButton, sceneProtocol, type HeadsetButton, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, headsetPanels, headsetProtocol, headsetScene, isHeadsetButton, sceneProtocol, type CabinetPlace, type HeadsetButton, type Point3, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -71,6 +71,10 @@ export interface HeadsetMenuOptions {
   closeViews?(): void;
   /** Un bouton des manettes appuyé (true) ou relâché, tant que le menu est dans le casque. */
   onButton?(button: HeadsetButton, down: boolean): void;
+  /** Calage (calibrate) : le bout d'une manette touché, gâchette appuyée, dans la pièce (`room` faux : sans limite du Quest). */
+  onPoint?(hand: 'gauche' | 'droite', point: Point3, room: boolean): void;
+  /** Les deux poignées tenues 3 s : ouvrir le calage de la borne. */
+  onGesture?(): void;
   log(line: string): void;
 }
 
@@ -84,6 +88,8 @@ export class HeadsetMenu {
   /** Relève en cours : le compagnon garde le casque jusqu'à ce que VPX le prenne, et part seul. */
   private handingOver = false;
   private snapshotTaken = false;
+  /** Repères du calage montrés dans la scène (coins de la barre avant). */
+  private marks: Point3[] = [];
   private shown: HeadsetMenuState = 'waiting';
   /** Textures d'Electron confiées au compagnon : rendues (release) quand il les a copiées. */
   private target: HandleTarget | undefined;
@@ -178,10 +184,42 @@ export class HeadsetMenu {
     this.sendScene(this.child, tint);
   }
 
+  /** Calage de la borne : le compagnon envoie les points touchés et montre le bout des manettes (true), ou plus (false). */
+  calibrate(on: boolean): void {
+    try {
+      this.child?.stdin.write(`calage ${on ? 1 : 0}\n`);
+    } catch {
+      // Compagnon parti : le calage s'arrête avec lui.
+    }
+  }
+
+  /** Repères du calage (coins de la barre avant, espace de la borne) : la scène est renvoyée avec eux. */
+  setMarks(marks: Point3[]): void {
+    this.marks = marks;
+    if (this.child) this.sendScene(this.child, this.opts.tint());
+  }
+
+  /** Place gardée (casque.json), barre avant comprise si la borne a été calée. */
+  place(): CabinetPlace | undefined {
+    return this.readPlace();
+  }
+
+  /** Pose la borne à `place` dans le casque ; `keep` : la garde aussi (casque.json). Sans place : celle gardée. */
+  showPlace(place: CabinetPlace | undefined, keep = false): void {
+    if (place && keep) this.writePlace(place);
+    const shown = place ?? this.readPlace();
+    try {
+      if (shown) this.child?.stdin.write(anchorLine(shown));
+      else this.child?.stdin.write('recentrer\n');
+    } catch {
+      // Compagnon parti : la place gardée servira au prochain lancement.
+    }
+  }
+
   private sendScene(child: ChildProcessWithoutNullStreams, tint: string | undefined): void {
     this.sentTint = tint;
     try {
-      for (const line of sceneProtocol(headsetScene(this.panels, tint))) child.stdin.write(`${line}\n`);
+      for (const line of sceneProtocol(headsetScene(this.panels, tint, this.marks))) child.stdin.write(`${line}\n`);
     } catch {
       // Compagnon parti entre-temps : la scène suivra au prochain lancement.
     }
@@ -226,6 +264,18 @@ export class HeadsetMenu {
         const button = /^bouton (\S+) ([01])$/.exec(line);
         if (button) {
           if (isHeadsetButton(button[1]!)) this.opts.onButton?.(button[1], button[2] === '1');
+          continue;
+        }
+        // Calage : « pointe gauche|droite x y z [sans-piece] », puis le geste des deux poignées.
+        const point = /^pointe (gauche|droite) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)( sans-piece)?$/.exec(line);
+        if (point) {
+          this.opts.log(`Casque : ${line}`); // i18n-ignore : journal
+          this.opts.onPoint?.(point[1] as 'gauche' | 'droite', { x: Number(point[2]), y: Number(point[3]), z: Number(point[4]) }, !point[5]);
+          continue;
+        }
+        if (line === 'geste caler') {
+          this.opts.log('Casque : les deux poignées tenues 3 s, calage de la borne.'); // i18n-ignore : journal
+          this.opts.onGesture?.();
           continue;
         }
         if (!PROTOCOL.test(line)) continue;
@@ -281,27 +331,38 @@ export class HeadsetMenu {
       }
     }
     const place = this.readPlace();
-    if (place) child.stdin.write(`ancre ${place.x} ${place.z} ${place.yaw}\n`);
+    if (place) child.stdin.write(anchorLine(place));
     this.sendScene(child, this.opts.tint());
     child.stdin.write('fin\n');
     this.opts.log(`Casque : compagnon lancé, ${panels.map((p) => `${p.role} ${p.width.toFixed(2)}×${p.height.toFixed(2)} m`).join(', ')}.`); // i18n-ignore : journal
   }
 
-  private readPlace(): { x: number; z: number; yaw: number } | undefined {
+  private readPlace(): CabinetPlace | undefined {
     if (!this.opts.placeFile) return undefined;
     try {
-      const p = JSON.parse(fs.readFileSync(this.opts.placeFile, 'utf8')) as { x?: unknown; z?: unknown; yaw?: unknown };
-      return [p.x, p.z, p.yaw].every((v) => typeof v === 'number' && Number.isFinite(v)) ? { x: p.x as number, z: p.z as number, yaw: p.yaw as number } : undefined;
+      const p = JSON.parse(fs.readFileSync(this.opts.placeFile, 'utf8')) as Record<string, unknown>;
+      const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+      const [x, z, yaw] = [num(p.x), num(p.z), num(p.yaw)];
+      if (x === undefined || z === undefined || yaw === undefined) return undefined;
+      const lockbarHeight = num(p.lockbarHeight);
+      const lockbarWidth = num(p.lockbarWidth);
+      return { x, z, yaw, ...(lockbarHeight !== undefined && { lockbarHeight }), ...(lockbarWidth !== undefined && { lockbarWidth }) };
     } catch {
       return undefined;
     }
   }
 
-  private writePlace(place: { x: number; z: number; yaw: number }): void {
+  /**
+   * Garde la place (casque.json). Un recentrage (regard du joueur) ne donne que x, z et le cap : la
+   * hauteur de la barre avant calée reste, la borne n'est plus sur la vraie mais à la bonne hauteur.
+   */
+  private writePlace(place: CabinetPlace): void {
     if (!this.opts.placeFile || ![place.x, place.z, place.yaw].every(Number.isFinite)) return;
+    const before = this.readPlace();
+    const kept: CabinetPlace = { ...(before?.lockbarHeight !== undefined && { lockbarHeight: before.lockbarHeight }), ...place };
     try {
       fs.mkdirSync(path.dirname(this.opts.placeFile), { recursive: true });
-      fs.writeFileSync(this.opts.placeFile, JSON.stringify(place, null, 2) + '\n');
+      fs.writeFileSync(this.opts.placeFile, JSON.stringify(kept, null, 2) + '\n');
     } catch {
       // Place pas gardée : la borne se reposera devant le joueur à la prochaine session.
     }
@@ -335,4 +396,9 @@ export class HeadsetMenu {
       }
     });
   }
+}
+
+/** Commande « ancre » du compagnon : la place de la borne dans la pièce, à la hauteur de la barre avant calée. */
+function anchorLine(place: CabinetPlace): string {
+  return `ancre ${place.x} ${place.z} ${place.yaw} ${anchorHeight(place)}\n`;
 }

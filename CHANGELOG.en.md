@@ -29,6 +29,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - In the headset, the playfield's background image follows the playfield's orientation (portrait): the table is seen in full while browsing.
 - A screen that Windows disconnects and reconnects, during a game or in the menu, gets its role and its picture back instead of staying black; when a game ends, each window takes back its screen.
 - In the headset, the menu is driven with the Quest controllers: triggers for the flippers, A for Start, B for Exit, grips for the MagnaSave buttons.
+- "Caler la borne" (Align the cabinet), in System menu > Cabinet (or both grips held for 3 s in the headset): touch the left corner of the real front bar with the tip of a controller, then the right corner, and the headset's cabinet settles on it. The alignment serves the menu and the games alike, and is kept; redo it only after resetting the Quest's floor or boundary.
 
 ## 0.1.8
 

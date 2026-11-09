@@ -96,7 +96,8 @@ PFN_xrGetInstanceProcAddr xrGetInstanceProcAddr_ = nullptr;
    X(xrEnumerateSwapchainFormats) X(xrCreateSwapchain) X(xrDestroySwapchain) X(xrEnumerateSwapchainImages) \
    X(xrAcquireSwapchainImage) X(xrWaitSwapchainImage) X(xrReleaseSwapchainImage) X(xrResultToString) \
    X(xrEnumerateViewConfigurationViews) X(xrLocateViews) X(xrStringToPath) X(xrCreateActionSet) X(xrCreateAction) \
-   X(xrSuggestInteractionProfileBindings) X(xrAttachSessionActionSets) X(xrSyncActions) X(xrGetActionStateBoolean)
+   X(xrSuggestInteractionProfileBindings) X(xrAttachSessionActionSets) X(xrSyncActions) X(xrGetActionStateBoolean) \
+   X(xrCreateActionSpace)
 #define DECLARE(name) PFN_##name name##_ = nullptr;
 XR_FUNCS(DECLARE)
 PFN_xrGetD3D11GraphicsRequirementsKHR xrGetD3D11GraphicsRequirementsKHR_ = nullptr;
@@ -166,7 +167,9 @@ struct Output
 std::atomic<bool> wantRecenter { true };
 /** Place de la borne donnée par Cyber Pinball (ancre), prise par la boucle d'images. */
 std::atomic<bool> anchorGiven { false };
-float anchorX = 0, anchorZ = 0, anchorYaw = 0;
+float anchorX = 0, anchorY = 0, anchorZ = 0, anchorYaw = 0;
+/** Calage de la borne en cours (Cyber Pinball : « calage 1|0 ») : points touchés et repères des manettes. */
+std::atomic<bool> calibrating { false };
 std::atomic<bool> wantQuit { false };
 /** Relève demandée par Cyber Pinball (une partie de VPX démarre), et quand. */
 std::atomic<bool> handover { false };
@@ -262,15 +265,24 @@ void readCommands()
       }
       else if (word == "ancre")
       {
-         float x, z, yaw;
+         float x, z, yaw, y = 0;
          in >> x >> z >> yaw;
          if (in)
          {
+            // Hauteur facultative : la borne calée sur une barre avant plus haute ou plus basse que 85 cm.
+            if (!(in >> y))
+               y = 0;
             std::lock_guard<std::mutex> lock(panelsMutex);
-            anchorX = x, anchorZ = z, anchorYaw = yaw;
+            anchorX = x, anchorY = y, anchorZ = z, anchorYaw = yaw;
             anchorGiven = true;
             wantRecenter = false;
          }
+      }
+      else if (word == "calage")
+      {
+         int on = 0;
+         in >> on;
+         calibrating = on != 0;
       }
       else if (word == "releve")
       {
@@ -908,6 +920,11 @@ int main(int argc, char** argv)
       { "magnasave-gauche", "MagnaSave gauche", "/user/hand/left/input/squeeze/value" },
       { "magnasave-droit", "MagnaSave droit", "/user/hand/right/input/squeeze/value" },
    };
+   // Bout de chaque manette (pose de visée) : les points touchés du calage et leurs repères.
+   const char* aimNames[2] = { "visee-gauche", "visee-droite" };
+   const char* aimBindings[2] = { "/user/hand/left/input/aim/pose", "/user/hand/right/input/aim/pose" };
+   XrAction aimActions[2] = { XR_NULL_HANDLE, XR_NULL_HANDLE };
+   XrSpace aimSpaces[2] = { XR_NULL_HANDLE, XR_NULL_HANDLE };
    XrActionSet actionSet = XR_NULL_HANDLE;
    bool controllers = false;
    {
@@ -917,6 +934,16 @@ int main(int argc, char** argv)
       if (XR_SUCCEEDED(xrCreateActionSet_(instance, &asci, &actionSet)))
       {
          std::vector<XrActionSuggestedBinding> suggested;
+         for (int h = 0; h < 2; h++)
+         {
+            XrActionCreateInfo aci { XR_TYPE_ACTION_CREATE_INFO };
+            aci.actionType = XR_ACTION_TYPE_POSE_INPUT;
+            strcpy_s(aci.actionName, aimNames[h]);
+            strcpy_s(aci.localizedActionName, h ? "Visée droite" : "Visée gauche");
+            XrPath path = XR_NULL_PATH;
+            if (XR_SUCCEEDED(xrCreateAction_(actionSet, &aci, &aimActions[h])) && XR_SUCCEEDED(xrStringToPath_(instance, aimBindings[h], &path)))
+               suggested.push_back({ aimActions[h], path });
+         }
          for (Control& c : controls)
          {
             XrActionCreateInfo aci { XR_TYPE_ACTION_CREATE_INFO };
@@ -936,8 +963,15 @@ int main(int argc, char** argv)
          XrSessionActionSetsAttachInfo attach { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
          attach.countActionSets = 1;
          attach.actionSets = &actionSet;
-         controllers = suggested.size() == std::size(controls) && XR_SUCCEEDED(xrSuggestInteractionProfileBindings_(instance, &ipsb))
+         controllers = suggested.size() == std::size(controls) + 2 && XR_SUCCEEDED(xrSuggestInteractionProfileBindings_(instance, &ipsb))
             && XR_SUCCEEDED(xrAttachSessionActionSets_(session, &attach));
+         for (int h = 0; controllers && h < 2; h++)
+         {
+            XrActionSpaceCreateInfo aimSpaceInfo { XR_TYPE_ACTION_SPACE_CREATE_INFO };
+            aimSpaceInfo.action = aimActions[h];
+            aimSpaceInfo.poseInActionSpace = { { 0, 0, 0, 1 }, { 0, 0, 0 } };
+            xrCreateActionSpace_(session, &aimSpaceInfo, &aimSpaces[h]);
+         }
       }
       if (!controllers)
          say("erreur manettes indisponibles");
@@ -1007,6 +1041,11 @@ int main(int argc, char** argv)
    };
    Eye eyes[2];
    scene::Renderer renderer;
+   /** Repères des manettes pendant le calage, dans l'espace de la pièce (refaits à chaque image). */
+   scene::Renderer pointers;
+   std::vector<std::string> pointerLines;
+   ULONGLONG gripsSince = 0;
+   bool gestureSent = false;
    bool projection = false;
    {
       uint32_t n = 0;
@@ -1014,7 +1053,7 @@ int main(int argc, char** argv)
       std::vector<XrViewConfigurationView> vcv(n, { XR_TYPE_VIEW_CONFIGURATION_VIEW });
       xrEnumerateViewConfigurationViews_(instance, system, XR_VIEW_CONFIGURATION_TYPE_PRIMARY_STEREO, n, &n, vcv.data());
       std::string error;
-      projection = n == 2 && renderer.init(device.Get(), error);
+      projection = n == 2 && renderer.init(device.Get(), error) && pointers.init(device.Get(), error);
       if (!projection)
          say("erreur scène indisponible : " + (error.empty() ? std::string("vues du casque") : error));
       for (uint32_t e = 0; projection && e < 2; e++)
@@ -1261,18 +1300,55 @@ int main(int argc, char** argv)
                {
                   c.down = down;
                   say(std::string("bouton ") + c.name + (down ? " 1" : " 0"));
+                  // Calage : gâchette appuyée, le bout de cette manette dans la pièce.
+                  const int hand = std::string(c.name) == "batteur-gauche" ? 0 : std::string(c.name) == "batteur-droit" ? 1 : -1;
+                  XrSpaceLocation loc { XR_TYPE_SPACE_LOCATION };
+                  if (down && calibrating && hand >= 0 && aimSpaces[hand] != XR_NULL_HANDLE && XR_SUCCEEDED(xrLocateSpace_(aimSpaces[hand], base, fs.predictedDisplayTime, &loc))
+                     && (loc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT))
+                     say(std::string("pointe ") + (hand ? "droite " : "gauche ") + std::to_string(loc.pose.position.x) + " " + std::to_string(loc.pose.position.y) + " "
+                        + std::to_string(loc.pose.position.z) + (stage ? "" : " sans-piece"));
                }
             }
+         // Les deux poignées tenues 3 s : Cyber Pinball ouvre le calage de la borne.
+         const bool bothGrips = controls[4].down && controls[5].down;
+         if (!bothGrips)
+            gripsSince = 0, gestureSent = false;
+         else if (!gripsSince)
+            gripsSince = GetTickCount64();
+         else if (!gestureSent && GetTickCount64() - gripsSince >= 3000)
+         {
+            gestureSent = true;
+            say("geste caler");
+         }
       }
       else
          releaseControls();
+
+      // Repères des manettes pendant le calage : un petit cube vert au bout de chacune.
+      pointerLines.clear();
+      if (controllers && calibrating && state == XR_SESSION_STATE_FOCUSED)
+         for (int h = 0; h < 2; h++)
+         {
+            XrSpaceLocation loc { XR_TYPE_SPACE_LOCATION };
+            if (aimSpaces[h] != XR_NULL_HANDLE && XR_SUCCEEDED(xrLocateSpace_(aimSpaces[h], base, fs.predictedDisplayTime, &loc))
+               && (loc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT))
+               pointerLines.push_back("boite " + std::to_string(loc.pose.position.x) + " " + std::to_string(loc.pose.position.y) + " " + std::to_string(loc.pose.position.z)
+                  + " 0 0 0 1 0.025 0.025 0.025 #8be23aff #8be23aff");
+         }
+      if (projection && (!pointerLines.empty() || !pointers.empty()))
+      {
+         std::vector<scene::Vertex> opaque, transparent;
+         for (const auto& l : pointerLines)
+            scene::addPrimitive(l, opaque, transparent);
+         pointers.setScene(opaque, transparent);
+      }
 
       // Place gardée par Cyber Pinball (ancre) : la borne revient où elle était dans la pièce.
       if (anchorGiven.exchange(false))
       {
          std::lock_guard<std::mutex> lock(panelsMutex);
          anchor.orientation = { 0, std::sin(anchorYaw / 2), 0, std::cos(anchorYaw / 2) };
-         anchor.position = { anchorX, 0.f, anchorZ };
+         anchor.position = { anchorX, anchorY, anchorZ };
          if (!stage)
             wantRecenter = true; // sans la pièce, l'ancre ne vaut pas d'une session à l'autre
       }
@@ -1443,6 +1519,14 @@ int main(int argc, char** argv)
                const scene::Mat4 mvp = scene::Mat4::projection(f.angleLeft, f.angleRight, f.angleUp, f.angleDown, 0.05f, 50.f) * scene::Mat4::poseInverse(vq, vt) * world;
                // Avec l'extension, le runtime fond toutes les couches ; sinon la scène fond seule.
                renderer.draw(context.Get(), mvp, world, colorScale ? 1.f : fade);
+               if (!pointers.empty())
+               {
+                  const float iq[4] = { 0, 0, 0, 1 };
+                  const float it[3] = { 0, 0, 0 };
+                  const scene::Mat4 room = scene::Mat4::pose(iq, it);
+                  const scene::Mat4 roomMvp = scene::Mat4::projection(f.angleLeft, f.angleRight, f.angleUp, f.angleDown, 0.05f, 50.f) * scene::Mat4::poseInverse(vq, vt);
+                  pointers.draw(context.Get(), roomMvp, room, colorScale ? 1.f : fade);
+               }
                context->OMSetRenderTargets(0, nullptr, nullptr);
                XrSwapchainImageReleaseInfo ri { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
                xrReleaseSwapchainImage_(eye.swapchain, &ri);

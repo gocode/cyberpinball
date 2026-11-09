@@ -121,7 +121,7 @@ test('manettes du casque : gâchettes = flippers, A = Start, B = Exit, poignées
   for (const [name, binding] of Object.entries(bindings)) assert.ok(cpp.includes(`{ "${name}", `) && cpp.includes(`"${binding}" }`), `${name} : ${binding}`);
   assert.match(cpp, /\/interaction_profiles\/oculus\/touch_controller/);
   // Lus seulement quand le menu a le regard du joueur ; sinon, tout bouton tenu est relâché.
-  assert.match(cpp, /if \(controllers && state == XR_SESSION_STATE_FOCUSED\)[\s\S]{0,1200}else\s+releaseControls\(\);/);
+  assert.match(cpp, /if \(controllers && state == XR_SESSION_STATE_FOCUSED\)[\s\S]{0,3000}else\s+releaseControls\(\);/);
   // Le menu les reçoit comme les boutons de la borne (pas comme le téléphone), et les relâche casque retiré.
   const app = path.join(repo, 'app', 'src');
   const menu = fs.readFileSync(path.join(app, 'casque.ts'), 'utf8');

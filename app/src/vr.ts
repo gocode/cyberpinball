@@ -19,6 +19,7 @@ import {
   windowsVk,
   vrReadiness,
   writeFileAtomic,
+  type VpxSetting,
   type VrMode,
   type VrReadiness,
 } from '@cyberpinball/core';
@@ -97,6 +98,18 @@ export function rememberVrSettings(dataDir: string, usedIni: string): void {
   if (!used) return;
   const doc = IniDocument.parse(readTextIfExists(file));
   if (!applyVpxSettings(doc, vrCarriedSettings(used)).length) return;
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  writeFileAtomic(file, doc.toString());
+}
+
+/**
+ * Borne calée aux manettes (calage.ts) : la place de la table et la barre avant écrites dans l'INI de
+ * la VR, d'où chaque partie dans le casque les reprend (vrCarriedSettings).
+ */
+export function writeVrCalibration(dataDir: string, settings: VpxSetting[]): void {
+  const file = vrIniFile(dataDir);
+  const doc = IniDocument.parse(readTextIfExists(file));
+  applyVpxSettings(doc, settings);
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeFileAtomic(file, doc.toString());
 }

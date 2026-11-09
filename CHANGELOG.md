@@ -31,6 +31,7 @@ son interface).
 - Dans le casque, l'image de fond du plateau suit le sens du plateau (portrait) : la table se voit en entier pendant la navigation.
 - Un écran que Windows débranche puis rebranche, pendant une partie ou au menu, retrouve son rôle et son image au lieu de rester noir ; au retour d'une partie, chaque fenêtre reprend son écran.
 - Dans le casque, le menu se pilote aux manettes du Quest : gâchettes pour les flippers, A pour Start, B pour Exit, poignées pour les MagnaSave.
+- « Caler la borne », dans Menu système > Borne (ou les deux poignées tenues 3 s dans le casque) : posez le bout d'une manette sur le coin gauche de la vraie barre avant, puis sur le coin droit, et la borne du casque se pose dessus. Le calage sert au menu comme aux parties, et se garde ; à refaire seulement après un nouveau réglage du sol ou de la limite du Quest.
 
 ## 0.1.8
 

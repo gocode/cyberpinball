@@ -34,6 +34,7 @@ export const SYSTEM_ITEM_IDS = [
   'cabinet',
   'vpx-settings',
   'vr',
+  'vr-calibrate',
   'controls',
   'phone-remote',
   'dof',
@@ -123,7 +124,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'cabinet',
     get label() { return t('Borne'); },
     get detail() { return t('Boutons, écrans, son, réglages de VPX, réalité virtuelle, télécommande du téléphone, bureau Windows, mode invité'); },
-    entries: ['health', 'cabinet', 'vpx-settings', 'vr', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
+    entries: ['health', 'cabinet', 'vpx-settings', 'vr', 'vr-calibrate', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -167,6 +168,8 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   'vpx-settings': { icon: 'sliders', get label() { return t('Réglages de VPX'); } },
   // Jouer dans un casque (vr.ts) : désactivée, ou dans le casque quand il est prêt.
   vr: { icon: 'vr', get label() { return t('Réalité virtuelle'); } },
+  // Caler la borne du casque et les tables de VPX sur la vraie barre avant, aux manettes (calage.ts).
+  'vr-calibrate': { icon: 'layout', get label() { return t('Caler la borne'); } },
   controls: { icon: 'gamepad', get label() { return t('Commandes de la borne'); } },
   // Le téléphone pilote la borne : boutons, clavier, envoi d'un fichier (app/src/phone-remote-menu.ts).
   'phone-remote': { icon: 'phone', get label() { return t('Télécommande du téléphone'); } },

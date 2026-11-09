@@ -56,7 +56,12 @@ export const VR_SECTION = 'PlayerVR';
 export const VR_AUTODETECT = '1';
 
 /** Réglages de la VR d'une autre section, gardés d'une partie à l'autre avec [PlayerVR]. */
-const VR_CARRIED_KEYS: readonly { section: string; key: string }[] = [{ section: 'Player', key: 'VRPreview' }];
+const VR_CARRIED_KEYS: readonly { section: string; key: string }[] = [
+  { section: 'Player', key: 'VRPreview' },
+  // Barre avant calée aux manettes (calage.ts) : la table de VPX à la taille et à la hauteur de la vraie.
+  { section: 'Player', key: 'LockbarWidth' },
+  { section: 'Player', key: 'LockbarHeight' },
+];
 
 /** Clés de [PlayerVR] que Cyber Pinball impose à chaque partie, jamais reprises de la précédente. */
 const VR_FORCED_KEYS = new Set(['asktoturnon', 'addbackglass', 'previewdisplay', 'previewfullscreen']);
