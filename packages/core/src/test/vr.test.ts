@@ -7,7 +7,7 @@ import { IniDocument } from '../ini';
 import { SYSTEM_GROUPS, SYSTEM_ITEMS } from '../systemmenu';
 import { VPX_PLAY_SETTINGS } from '../vpx';
 import { VPX_GAME_TITLES } from '../vpxwindows';
-import { openXrRuntimeName, planVrIni, tableHasVrRoom, VR_PREVIEW_TITLE, vrCarriedSettings, vrMenuText, vrPreviewSettings, vrReadiness } from '../vr';
+import { openXrRuntimeName, planVrIni, tableHasVrRoom, VR_PREVIEW_TITLE, vrCarriedSettings, vrCenterKey, vrHasSavedPlace, vrMenuText, vrPreviewSettings, vrReadiness } from '../vr';
 
 const CABINET_INI = '[Player]\r\nSecurityLevel = 0\r\nVRPreview = 1\r\n\r\n[PlayerVR]\r\nAskToTurnOn = 2\r\n\r\n[Input]\r\nMapping.InGameUI = F12\r\n';
 
@@ -73,6 +73,18 @@ test('l’aperçu du casque : fenêtré si le jeu l’est, place par défaut de 
   const doc = IniDocument.parse(planVrIni(chosen, undefined, { addBackglass: true }).text);
   assert.equal(doc.get('PlayerVR', 'PreviewDisplay'), 'C [3840, 0]');
   assert.equal(doc.get('PlayerVR', 'PreviewFullScreen'), '0');
+});
+
+test('sans place enregistrée par VPX, la table est à recentrer ; la touche est celle de VRCenter', () => {
+  // VPX n'a jamais quitté proprement : clés vides (premier essai du 9 novembre 2026).
+  assert.equal(vrHasSavedPlace(['[PlayerVR]', 'Orientation = ', 'TableX = ', 'TableY = ', ''].join('\n')), false);
+  assert.equal(vrHasSavedPlace(''), false);
+  assert.equal(vrHasSavedPlace(['[PlayerVR]', 'Orientation = 12.5', 'TableX = 0', ''].join('\n')), true);
+  assert.equal(vrHasSavedPlace(['[PlayerVR]', 'TableY = -40', ''].join('\n')), true);
+  // Touche : celle de l'INI (Key;93 = pavé 5), sinon celle par défaut de VPX.
+  assert.equal(vrCenterKey(['[Input]', 'Mapping.VRCenter = Key;93', ''].join('\n')), 'Numpad5');
+  assert.equal(vrCenterKey(''), 'Numpad5');
+  assert.equal(vrCenterKey(['[Input]', 'Mapping.VRCenter = Key;30', ''].join('\n')), 'Digit1');
 });
 
 test('pièce VR : reconnue au script (RenderingMode = 2, option de pièce, objets VR_…), pas dans les commentaires', () => {

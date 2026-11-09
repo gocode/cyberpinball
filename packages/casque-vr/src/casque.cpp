@@ -119,6 +119,8 @@ struct Panel
    RECT inOutput {}; // rectangle source dans l'image de l'écran
    XrSwapchain swapchain = XR_NULL_HANDLE;
    std::vector<XrSwapchainImageD3D11KHR> images;
+   bool shown = false; // première image copiée (dite une fois dans le journal)
+   uint64_t copied = 0; // génération de l'image de l'écran déjà dans le casque
 };
 
 struct Output
@@ -129,6 +131,7 @@ struct Output
    ComPtr<ID3D11Texture2D> copy; // dernière image reçue
    DXGI_FORMAT format = DXGI_FORMAT_UNKNOWN;
    bool reported = false;
+   uint64_t generation = 0; // compte les nouvelles images de l'écran
 };
 
 std::atomic<bool> wantRecenter { true };
@@ -177,14 +180,148 @@ bool contains(const RECT& outer, const RECT& inner)
    return inner.left >= outer.left && inner.top >= outer.top && inner.right <= outer.right && inner.bottom <= outer.bottom;
 }
 
+std::string narrow(const wchar_t* w)
+{
+   char b[256] {};
+   WideCharToMultiByte(CP_UTF8, 0, w, -1, b, sizeof b - 1, nullptr, nullptr);
+   return b;
+}
+
+// --diagnostic : chaque carte, chacun de ses écrans, et ce que donne leur duplication (format, image
+// reçue, luminosité moyenne). Aucune session OpenXR : rien ne paraît dans le casque.
+int diagnostic(const LUID* headset)
+{
+   ComPtr<IDXGIFactory1> factory;
+   CreateDXGIFactory1(IID_PPV_ARGS(&factory));
+   ComPtr<IDXGIAdapter1> adapter;
+   for (UINT a = 0; factory->EnumAdapters1(a, &adapter) != DXGI_ERROR_NOT_FOUND; a++)
+   {
+      DXGI_ADAPTER_DESC1 ad;
+      adapter->GetDesc1(&ad);
+      const bool ofHeadset = headset && memcmp(&ad.AdapterLuid, headset, sizeof(LUID)) == 0;
+      say("carte " + std::to_string(a) + " " + narrow(ad.Description) + (ofHeadset ? " (celle du casque)" : ""));
+      ComPtr<ID3D11Device> device;
+      ComPtr<ID3D11DeviceContext> context;
+      if (FAILED(D3D11CreateDevice(adapter.Get(), D3D_DRIVER_TYPE_UNKNOWN, nullptr, D3D11_CREATE_DEVICE_BGRA_SUPPORT, nullptr, 0, D3D11_SDK_VERSION, &device, nullptr, &context)))
+      {
+         say("  Direct3D 11 indisponible sur cette carte");
+         continue;
+      }
+      ComPtr<IDXGIOutput> o;
+      for (UINT i = 0; adapter->EnumOutputs(i, &o) != DXGI_ERROR_NOT_FOUND; i++, o.Reset())
+      {
+         DXGI_OUTPUT_DESC d;
+         o->GetDesc(&d);
+         const RECT& r = d.DesktopCoordinates;
+         std::string line = "  écran " + narrow(d.DeviceName) + " [" + std::to_string(r.left) + "," + std::to_string(r.top) + " " + std::to_string(r.right - r.left) + "x"
+            + std::to_string(r.bottom - r.top) + "] rotation " + std::to_string(static_cast<int>(d.Rotation));
+         ComPtr<IDXGIOutput1> o1;
+         ComPtr<IDXGIOutputDuplication> dup;
+         o.As(&o1);
+         if (const HRESULT hr = o1->DuplicateOutput(device.Get(), &dup); FAILED(hr))
+         {
+            say(line + " : duplication refusée " + hex(hr));
+            continue;
+         }
+         // La première image arrive tout de suite ; on en attend une avec du contenu, 1 s au plus.
+         std::string result = " : aucune image en 1 s";
+         for (int tries = 0; tries < 10; tries++)
+         {
+            DXGI_OUTDUPL_FRAME_INFO fi;
+            ComPtr<IDXGIResource> res;
+            if (FAILED(dup->AcquireNextFrame(100, &fi, &res)))
+               continue;
+            ComPtr<ID3D11Texture2D> tex;
+            res.As(&tex);
+            D3D11_TEXTURE2D_DESC td;
+            tex->GetDesc(&td);
+            D3D11_TEXTURE2D_DESC sd = td;
+            sd.Usage = D3D11_USAGE_STAGING;
+            sd.BindFlags = 0;
+            sd.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+            sd.MiscFlags = 0;
+            ComPtr<ID3D11Texture2D> staging;
+            double mean = -1;
+            if (td.Format == DXGI_FORMAT_B8G8R8A8_UNORM && SUCCEEDED(device->CreateTexture2D(&sd, nullptr, &staging)))
+            {
+               context->CopyResource(staging.Get(), tex.Get());
+               D3D11_MAPPED_SUBRESOURCE m;
+               if (SUCCEEDED(context->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &m)))
+               {
+                  double sum = 0;
+                  size_t n = 0;
+                  for (UINT y = 0; y < td.Height; y += 8)
+                     for (UINT x = 0; x < td.Width; x += 8, n++)
+                     {
+                        const uint8_t* p = static_cast<const uint8_t*>(m.pData) + y * m.RowPitch + x * 4;
+                        sum += (p[0] + p[1] + p[2]) / 3.0;
+                     }
+                  mean = n ? sum / n : 0;
+                  context->Unmap(staging.Get(), 0);
+               }
+            }
+            dup->ReleaseFrame();
+            result = " : format " + std::to_string(static_cast<int>(td.Format)) + " " + std::to_string(td.Width) + "x" + std::to_string(td.Height)
+               + (mean >= 0 ? ", luminosité moyenne " + std::to_string(static_cast<int>(mean)) : "");
+            if (mean > 0)
+               break;
+         }
+         say(line + result);
+      }
+   }
+   return 0;
+}
+
 } // namespace
 
 int main(int argc, char** argv)
 {
    std::string loaderPath;
-   for (int i = 1; i + 1 < argc; i++)
-      if (std::string(argv[i]) == "--chargeur")
+   bool diagnose = false;
+   for (int i = 1; i < argc; i++)
+   {
+      if (std::string(argv[i]) == "--chargeur" && i + 1 < argc)
          loaderPath = argv[i + 1];
+      if (std::string(argv[i]) == "--diagnostic")
+         diagnose = true;
+   }
+   if (diagnose)
+   {
+      SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+      // La carte du casque, si le runtime répond (sans session : rien dans le casque).
+      LUID luid {};
+      bool known = false;
+      if (HMODULE l = loaderPath.empty() ? nullptr : LoadLibraryA(loaderPath.c_str()))
+      {
+         xrGetInstanceProcAddr_ = reinterpret_cast<PFN_xrGetInstanceProcAddr>(GetProcAddress(l, "xrGetInstanceProcAddr"));
+         PFN_xrCreateInstance create = nullptr;
+         if (xrGetInstanceProcAddr_)
+            xrGetInstanceProcAddr_(XR_NULL_HANDLE, "xrCreateInstance", reinterpret_cast<PFN_xrVoidFunction*>(&create));
+         const char* ext[] = { XR_KHR_D3D11_ENABLE_EXTENSION_NAME };
+         XrInstanceCreateInfo ici { XR_TYPE_INSTANCE_CREATE_INFO };
+         std::snprintf(ici.applicationInfo.applicationName, XR_MAX_APPLICATION_NAME_SIZE, "Cyber Pinball diagnostic");
+         ici.applicationInfo.apiVersion = XR_API_VERSION_1_0;
+         ici.enabledExtensionCount = 1;
+         ici.enabledExtensionNames = ext;
+         XrInstance inst = XR_NULL_HANDLE;
+         if (create && XR_SUCCEEDED(create(&ici, &inst)) && loadInstanceFunctions(inst))
+         {
+            XrSystemGetInfo sgi { XR_TYPE_SYSTEM_GET_INFO };
+            sgi.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+            XrSystemId sys = XR_NULL_SYSTEM_ID;
+            XrGraphicsRequirementsD3D11KHR req { XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR };
+            if (XR_SUCCEEDED(xrGetSystem_(inst, &sgi, &sys)) && XR_SUCCEEDED(xrGetD3D11GraphicsRequirementsKHR_(inst, sys, &req)))
+            {
+               luid = req.adapterLuid;
+               known = true;
+            }
+            else
+               say("casque pas prêt : carte du casque inconnue");
+            xrDestroyInstance_(inst);
+         }
+      }
+      return diagnostic(known ? &luid : nullptr);
+   }
    if (loaderPath.empty())
    {
       say("erreur chargeur OpenXR non indiqué (--chargeur)");
@@ -389,8 +526,13 @@ int main(int argc, char** argv)
       {
          if (ev.type == XR_TYPE_EVENT_DATA_SESSION_STATE_CHANGED)
          {
+            const XrSessionState previous = state;
             state = reinterpret_cast<XrEventDataSessionStateChanged*>(&ev)->state;
             say("etat " + std::to_string(static_cast<int>(state)));
+            // Casque mis (la session prend le regard du joueur) : la borne vient devant lui. Recentrer
+            // au premier instant de la session la poserait là où le casque attendait, sur un bureau.
+            if (state == XR_SESSION_STATE_FOCUSED && previous != XR_SESSION_STATE_FOCUSED)
+               wantRecenter = true;
             if (state == XR_SESSION_STATE_READY)
             {
                XrSessionBeginInfo bi { XR_TYPE_SESSION_BEGIN_INFO };
@@ -409,6 +551,8 @@ int main(int argc, char** argv)
          }
          else if (ev.type == XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING)
             done = true;
+         else if (ev.type == XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING)
+            wantRecenter = true; // recentrage demandé au casque (bouton Meta maintenu)
          ev = { XR_TYPE_EVENT_DATA_BUFFER };
       }
       if (wantQuit && !exitRequested)
@@ -445,7 +589,7 @@ int main(int argc, char** argv)
             // Sans la pièce, le sol est supposé 1,60 m sous les yeux.
             anchor.position = { loc.pose.position.x, stage ? 0.f : loc.pose.position.y - 1.6f, loc.pose.position.z };
             wantRecenter = false;
-            say("centre");
+            say("centre x=" + std::to_string(anchor.position.x) + " z=" + std::to_string(anchor.position.z) + " yeux=" + std::to_string(loc.pose.position.y - anchor.position.y));
          }
       }
 
@@ -487,8 +631,12 @@ int main(int argc, char** argv)
                o.reported = true;
             }
          }
-         if (o.copy && o.format == DXGI_FORMAT_B8G8R8A8_UNORM)
+         // Une image qui ne porte qu'un mouvement du pointeur (LastPresentTime nul) ne change rien à l'écran.
+         if (o.copy && o.format == DXGI_FORMAT_B8G8R8A8_UNORM && (o.generation == 0 || fi.LastPresentTime.QuadPart != 0))
+         {
             context->CopyResource(o.copy.Get(), tex.Get());
+            o.generation++;
+         }
          o.dup->ReleaseFrame();
       }
 
@@ -499,23 +647,33 @@ int main(int argc, char** argv)
          {
             if (p.swapchain == XR_NULL_HANDLE)
                continue;
-            uint32_t index = 0;
-            XrSwapchainImageAcquireInfo ai { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
-            if (XR_FAILED(xrAcquireSwapchainImage_(p.swapchain, &ai, &index)))
-               continue;
-            XrSwapchainImageWaitInfo wi { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
-            wi.timeout = XR_INFINITE_DURATION;
-            xrWaitSwapchainImage_(p.swapchain, &wi);
-            ID3D11Texture2D* target = p.images[index].texture;
+            // Copie seulement quand l'écran a changé : sinon le casque garde la dernière image
+            // rendue au runtime (un menu immobile ne coûte plus rien au GPU ni à Link).
             const Output* o = p.output >= 0 ? &outputs[p.output] : nullptr;
-            if (o && o->copy && o->format == DXGI_FORMAT_B8G8R8A8_UNORM)
+            if (o && o->copy && o->format == DXGI_FORMAT_B8G8R8A8_UNORM && o->generation != p.copied)
             {
+               uint32_t index = 0;
+               XrSwapchainImageAcquireInfo ai { XR_TYPE_SWAPCHAIN_IMAGE_ACQUIRE_INFO };
+               if (XR_FAILED(xrAcquireSwapchainImage_(p.swapchain, &ai, &index)))
+                  continue;
+               XrSwapchainImageWaitInfo wi { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
+               wi.timeout = XR_INFINITE_DURATION;
+               xrWaitSwapchainImage_(p.swapchain, &wi);
                const D3D11_BOX box { static_cast<UINT>(p.inOutput.left), static_cast<UINT>(p.inOutput.top), 0, static_cast<UINT>(p.inOutput.right),
                   static_cast<UINT>(p.inOutput.bottom), 1 };
-               context->CopySubresourceRegion(target, 0, 0, 0, 0, o->copy.Get(), 0, &box);
+               context->CopySubresourceRegion(p.images[index].texture, 0, 0, 0, 0, o->copy.Get(), 0, &box);
+               XrSwapchainImageReleaseInfo ri { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
+               xrReleaseSwapchainImage_(p.swapchain, &ri);
+               p.copied = o->generation;
+               if (!p.shown)
+               {
+                  p.shown = true;
+                  say("image " + p.role);
+               }
             }
-            XrSwapchainImageReleaseInfo ri { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
-            xrReleaseSwapchainImage_(p.swapchain, &ri);
+            // Rien encore de rendu au runtime : pas de panneau (il serait vide).
+            if (!p.shown)
+               continue;
 
             XrCompositionLayerQuad q { XR_TYPE_COMPOSITION_LAYER_QUAD };
             q.space = base;

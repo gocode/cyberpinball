@@ -17,6 +17,19 @@ import * as os from 'node:os';
 import {
   acceptRequest,
   addEvent,
+  countryOfLocale,
+  isCountry,
+  loadRankings,
+  mergeRankings,
+  rankedId,
+  rankingsFile,
+  rankingsSample,
+  RANKINGS_BATCH,
+  saveRankings,
+  signScore,
+  verifyScore,
+  type RankedScore,
+  type RankingStore,
   avatarFileOf,
   avatarHashOf,
   avatarPath,
@@ -211,14 +224,21 @@ export interface SocialNetOptions {
   refuseIncoming?: boolean;
   /** Essais : premier délai avant un nouvel essai après un échec (RETRY_MS). */
   retryMs?: number;
+  /** Langue du système (« fr-FR ») : le pays par défaut des classements, tant que le joueur n'en a pas choisi. */
+  systemLocale?: () => string | undefined;
 }
+
+/** Scores des classements national et mondial (rankings.ts) : entre toutes les bornes, pas seulement entre amis. */
+type ScoresMessage = { t: 'scores'; scores: RankedScore[] };
+/** Un score à publier : le reste (clé, nom, pays, signature) vient de la borne. */
+export type ScoreToPublish = Omit<RankedScore, 'key' | 'name' | 'country' | 'sig'>;
 
 /** Messages des services posés sur le réseau des amis : bibliothèque partagée, partie en direct. */
 export type FriendMessage = LibraryMessage | LiveMessage;
 
 interface Link {
   stream: Duplex;
-  send(message: SocialMessage | FriendMessage): void;
+  send(message: SocialMessage | FriendMessage | ScoresMessage): void;
   /** Morceau de fichier (friendlibrary.ts, chunkFrame) ; false : le flux est plein, attendre « drain ». */
   sendChunk(frame: Buffer): boolean;
   via: 'internet' | 'lan';
@@ -292,6 +312,22 @@ export interface SocialNet {
   setAvatar(image: AvatarImage | undefined): void;
   /** Fichier de l'avatar d'un joueur (soi compris) ; undefined : pas d'avatar connu, ses initiales. */
   avatarFile(key: string): string | undefined;
+  /**
+   * Mon score aux classements national et mondial : signé, gardé, envoyé à toutes les bornes reliées.
+   * Rien si le partage ou la publication des scores est coupé ; rend le score publié.
+   */
+  publishScore(score: ScoreToPublish): RankedScore | undefined;
+  /** Les classements connus de cette borne (rankings.ts). */
+  rankings(): RankingStore;
+  /** Masquer sur cette borne un score (son identifiant, rankedId) ou tous ceux d'un joueur. */
+  hideScore(id: string): void;
+  hidePlayer(key: string): void;
+  /** Publier ou non mes scores aux classements (activé par défaut). */
+  setShareScores(on: boolean): void;
+  /** Pays déclaré ; undefined : revenir à celui de Windows. */
+  setCountry(code: string | undefined): void;
+  /** Mon pays pour les classements : celui choisi, sinon celui de Windows ; undefined : inconnu. */
+  country(): string | undefined;
   /** Messages des services reçus d'un ami ; rend de quoi se désabonner. */
   onMessage(listener: (key: string, message: FriendMessage) => void): () => void;
   onChunk(listener: (key: string, frame: Buffer) => void): () => void;
@@ -304,6 +340,21 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
   const now = () => opts.now?.() ?? new Date();
   const log = (line: string) => opts.log?.(line);
   let state = loadSocial(opts.dataDir, now());
+  // Classements national et mondial : relus une fois, écrits peu après chaque arrivée (les relais vont par rafales).
+  const rankingsPath = rankingsFile(opts.dataDir);
+  const rankingsRead = loadRankings(rankingsPath, now());
+  if (rankingsRead.setAside) opts.log?.(`Classements : ${rankingsPath} illisible, mis de côté (${rankingsRead.setAside}).`); // i18n-ignore : journal
+  const rankings = rankingsRead.store;
+  const rankingsReadOnly = Boolean(rankingsRead.newer);
+  let rankingsTimer: NodeJS.Timeout | undefined;
+  function saveRankingsSoon(): void {
+    if (rankingsReadOnly || rankingsTimer) return;
+    rankingsTimer = setTimeout(() => {
+      rankingsTimer = undefined;
+      saveOrWarn(rankingsPath, () => saveRankings(rankingsPath, rankings));
+    }, 2000);
+    rankingsTimer.unref?.();
+  }
   const peers = new Map<string, Peer>();
   /** Qui est en ligne : liaisons saluées, tolérance après la dernière (friendpresence.ts). */
   const book = createPresenceBook(opts.graceMs);
@@ -581,6 +632,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
         } catch {
           return;
         }
+        // Scores des classements : de toute borne reliée, chacun vérifié par sa signature.
+        if (raw && typeof raw === 'object' && (raw as { t?: unknown }).t === 'scores') return receiveScores(key, (raw as { scores?: unknown }).scores);
         const parsed = parseSocialMessage(raw, now());
         if (parsed) return receive(key, parsed, link);
         // Bibliothèque partagée et partie en direct : entre amis seulement.
@@ -626,8 +679,36 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     channel.open();
     const avatar = ownAvatarHash();
     link.send({ t: 'hello', profile: signProfile(state), dir: directorySample(state), ...(avatar ? { avatar } : {}) });
+    // Une part des classements connus ; une borne d'avant les classements ignore ce message.
+    const sample = rankingsSample(rankings, state.key.publicKey);
+    if (sample.length) link.send({ t: 'scores', scores: sample });
     changed();
   }
+
+  /**
+   * Scores reçus : vérifiés (forme et signature), ceux d'un joueur bloqué laissés ; les nouveaux
+   * gardés, puis relayés aux autres bornes reliées. Ce qui est déjà connu s'arrête là.
+   */
+  function receiveScores(from: string, raw: unknown): void {
+    if (!Array.isArray(raw) || state.blocked.includes(from)) return;
+    const scores = raw.slice(0, RANKINGS_BATCH).map((s) => verifyScore(s, now())).filter((s): s is RankedScore => !!s && !state.blocked.includes(s.key));
+    const fresh = mergeRankings(rankings, scores, state.key.publicKey, now());
+    if (!fresh.length) return;
+    saveRankingsSoon();
+    relayScores(fresh, from);
+    changed();
+  }
+
+  /** Scores à toutes les bornes reliées et saluées, sauf celle d'où ils viennent. */
+  function relayScores(scores: RankedScore[], except?: string): void {
+    for (const peer of peers.values()) {
+      if (peer.key === except) continue;
+      const link = bestLink(peer.key);
+      if (link?.greeted) link.send({ t: 'scores', scores });
+    }
+  }
+
+  const myCountry = () => state.country ?? countryOfLocale(opts.systemLocale?.());
 
   function receive(key: string, message: SocialMessage, link: Link): void {
     const peer = peers.get(key);
@@ -1037,6 +1118,39 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     },
     unblock: (key) => commit(unblockPlayer(state, key)),
     setShareLibrary: (on) => commit({ ...state, shareLibrary: on, shareLibraryChosen: true }),
+    publishScore(score) {
+      if (!state.enabled || state.shareScores === false) return undefined;
+      const country = myCountry();
+      const signed = signScore(state.key, { ...score, name: state.name, ...(country ? { country } : {}) });
+      const kept = mergeRankings(rankings, [signed], state.key.publicKey, now());
+      if (!kept.length) return undefined;
+      saveRankingsSoon();
+      relayScores(kept);
+      changed();
+      return signed;
+    },
+    rankings: () => rankings,
+    hideScore(id) {
+      if (rankings.hidden.includes(`s:${id}`)) return;
+      rankings.hidden.push(`s:${id}`);
+      saveRankingsSoon();
+      changed();
+    },
+    hidePlayer(key) {
+      if (key === state.key.publicKey || rankings.hidden.includes(`k:${key}`)) return;
+      rankings.hidden.push(`k:${key}`);
+      saveRankingsSoon();
+      changed();
+    },
+    setShareScores(on) {
+      const { shareScores: _, ...rest } = state;
+      commit(on ? rest : { ...rest, shareScores: false });
+    },
+    setCountry(code) {
+      const { country: _, ...rest } = state;
+      commit(code && isCountry(code) ? { ...rest, country: code } : rest);
+    },
+    country: () => myCountry(),
     setAvatar(image) {
       const file = image ? writeAvatarFile(opts.dataDir, image) : undefined;
       tidyAfter(setOwnAvatar(state, file));

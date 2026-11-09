@@ -11,6 +11,9 @@
 
 import {
   avatarView,
+  countryCodes,
+  countryName,
+  locale,
   BADGES,
   DOWNLOAD_RATE_CHOICES,
   rateLabel,
@@ -24,7 +27,6 @@ import {
   NAME_MAX,
   NAME_MIN,
   playDuration,
-  playerFingerprint,
   presenceTableLabel,
   relationOf,
   searchDirectory,
@@ -638,7 +640,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const lanDown = lanProblem();
     const rows: Row[] = [
       s.enabled ? { text: t('Partage activé'), detail: status.mode === 'off' ? t('Réseau coupé pendant les essais sans opérateur') : status.running ? tn(status.peers, 'Relié à {n} borne', 'Relié à {n} bornes') : status.error ? t('Réseau indisponible : {error}', { error: status.error }) : t('Connexion au réseau…'), tone: 'ok', badges: [t('Activé')], icon: 'network' } : { text: t('Partage désactivé'), detail: t('Personne ne vous voit ; vos amis vous voient hors ligne'), tone: 'warning', badges: [t('Désactivé')], icon: 'network' },
-      { text: t('Votre nom : {name}', { name: name(s.key.publicKey, s.name) }), detail: t('Visible dans l’annuaire ; l’étiquette #{tag} vient de la clé de cette borne (empreinte {fingerprint})', { tag: name(s.key.publicKey, '').split('#')[1]!, fingerprint: playerFingerprint(s.key.publicKey) }), icon: 'friend-list' },
+      { text: t('Votre nom : {name}', { name: name(s.key.publicKey, s.name) }), detail: t('Visible dans l’annuaire ; l’étiquette #{tag} vient de la clé de cette borne', { tag: name(s.key.publicKey, '').split('#')[1]! }), icon: 'friend-list' },
       { text: s.avatar ? t('Votre avatar : une image à vous') : t('Votre avatar : vos initiales'), detail: t('Vu par vos amis et les joueurs d’une demande en cours ; « Changer d’avatar… » le montre'), icon: 'avatar' },
       s.lan && lanDown
         ? { text: t('Réseau local : indisponible'), detail: t('{reason} · Internet continue sans lui ; nouvel essai tout seul', { reason: lanDown }), tone: 'warning', badges: [t('Indisponible')], icon: 'monitor' }
@@ -646,6 +648,8 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       s.shareLibrary
         ? { text: t('Bibliothèque partagée avec vos amis'), detail: t('Ils voient vos tables et peuvent les récupérer, avec leurs médias'), tone: 'ok', badges: [t('Partagée')], icon: 'tables' }
         : { text: t('Bibliothèque pas partagée'), detail: t('Vos amis ne voient pas vos tables'), tone: 'quiet', icon: 'tables' },
+      scoresRow(s),
+      countryRow(),
       s.downloadRate
         ? { text: t('Débit des téléchargements : {rate}', { rate: rateLabel(s.downloadRate) }), detail: t('Tables et médias reçus de vos amis, tous envois confondus'), tone: 'ok', badges: [t('Limité')], icon: 'gauge' }
         : { text: t('Débit des téléchargements : sans limite'), detail: t('Tables et médias reçus de vos amis, aussi vite que vos connexions le permettent'), tone: 'quiet', icon: 'gauge' },
@@ -662,6 +666,12 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         ? { label: t('Ne plus partager ma bibliothèque'), detail: t('Vos amis ne voient plus vos tables ni vos médias'), icon: 'tables', run: () => { net.setShareLibrary(false); flash = { text: t('Bibliothèque plus partagée'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
         : { label: t('Partager ma bibliothèque avec mes amis'), detail: t('Vos tables, leurs parties et leurs médias, entre amis seulement'), icon: 'tables', run: () => { net.setShareLibrary(true); flash = { text: t('Bibliothèque partagée avec vos amis'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
     );
+    actions.push(
+      s.shareScores === false
+        ? { label: t('Publier mes scores'), detail: t('Classements des amis, de votre pays et du monde'), icon: 'trophy', run: () => { net.setShareScores(true); flash = { text: t('Vos scores sont publiés aux classements'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } }
+        : { label: t('Ne plus publier mes scores'), detail: t('Vous voyez toujours les classements ; vos parties n’y entrent plus'), icon: 'trophy', run: () => { net.setShareScores(false); flash = { text: t('Vos scores ne sont plus publiés'), tone: 'ok' }; host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } },
+    );
+    actions.push({ label: t('Choisir mon pays…'), detail: t('Pour le classement national'), icon: 'globe', run: () => openCountry() });
     actions.push({ label: t('Limiter le débit des téléchargements…'), detail: t('Actuellement : {rate}', { rate: rateLabel(s.downloadRate ?? 0) }), icon: 'gauge', run: () => openDownloadRate() });
     actions.push({ label: s.lan ? t('Désactiver le réseau local') : t('Activer le réseau local'), icon: 'monitor', run: async () => { await net.setLan(!s.lan); host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER); } });
     // La coupure en dernier, juste avant « Retour » (sélection d'office).
@@ -691,6 +701,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
                   { text: t('Ne partagez que ce que vous avez le droit de partager'), detail: t('Les captures d’œuvres (photos du fronton, prospectus, musique du jeu), les ROM et les PuP-Packs restent la propriété de leurs ayants droit'), tone: 'warning' as const, icon: 'alert' as const },
                 ]
               : [{ text: t('Aucun fichier partagé') }]),
+            ...(s.shareScores === false ? [] : [{ text: t('Toutes les bornes : vos scores, avec votre nom et votre pays'), detail: t('Classements national et mondial, seulement les scores relevés par Cyber Pinball ; jamais en mode invité') }]),
             { text: t('Bornes reliées : son adresse IP'), detail: t('Comme dans tout échange de pair à pair') },
           ],
         },
@@ -698,6 +709,49 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       actions,
       back,
     };
+  }
+
+  /** Publication de mes scores aux classements national et mondial (rankings.ts). */
+  function scoresRow(s: ReturnType<typeof net.state>): Row {
+    return s.shareScores === false
+      ? { text: t('Scores pas publiés'), detail: t('Vos parties n’entrent pas aux classements ; vous les voyez quand même'), tone: 'quiet', icon: 'trophy' }
+      : { text: t('Scores publiés aux classements'), detail: t('Amis, national et mondial : chaque partie seul à une table, sur sa version exacte'), tone: 'ok', badges: [t('Publiés')], icon: 'trophy' };
+  }
+
+  /** Le pays du classement national : choisi, d'après Windows, ou inconnu. */
+  function countryRow(): Row {
+    const code = net.country();
+    const chosen = net.state().country;
+    if (!code) return { text: t('Pays : pas choisi'), detail: t('Vous n’apparaissez qu’au classement mondial ; « Choisir mon pays… »'), tone: 'warning', badges: [t('À choisir')], icon: 'globe' };
+    return { text: t('Pays : {country}', { country: countryName(code, locale()) }), detail: chosen ? t('Choisi par vous') : t('D’après la région de Windows'), tone: 'ok', icon: 'globe' };
+  }
+
+  /** Choisir le pays : celui de Windows d'abord, puis tous, par ordre alphabétique. */
+  function openCountry(): void {
+    const done = () => host.library.openCustom(buildSharing, Number.MAX_SAFE_INTEGER);
+    const codes = countryCodes(locale());
+    const current = net.country();
+    const choose = (code: string | undefined) => {
+      net.setCountry(code);
+      const shown = net.country();
+      flash = { text: shown ? t('Pays : {country}', { country: countryName(shown, locale()) }) : t('Pays : pas choisi'), tone: 'ok' };
+      done();
+    };
+    host.library.openCustom(
+      () => ({
+        heading: t('Mon pays'),
+        icon: 'globe',
+        lead: t('Il accompagne vos scores : il vous place au classement national, et se voit à côté de votre nom.'),
+        sections: [],
+        actions: [
+          { label: t('D’après la région de Windows'), detail: t('Le pays réglé dans Windows, s’il se lit'), icon: 'refresh', key: 'windows', run: () => choose(undefined) },
+          ...codes.map((code) => ({ label: countryName(code, locale()), detail: code === current ? t('choix actuel') : undefined, tone: code === current ? ('ok' as const) : undefined, key: `country-${code}`, run: () => choose(code) })),
+          backAction(done),
+        ],
+        back: done,
+      }),
+      current ? codes.indexOf(current) + 1 : 0,
+    );
   }
 
   /** Limite du débit des téléchargements depuis les amis (ratelimit.ts), choisie dans une liste. */

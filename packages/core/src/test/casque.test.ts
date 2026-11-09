@@ -2,7 +2,7 @@
 // le playfield couché, incliné, le bord des flippers vers le joueur ; la tête de la borne debout.
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { headsetPanels, headsetProtocol, LOCKBAR_DISTANCE_M, panelSize, rotateVector, type HeadsetPanel, type HeadsetSource } from '../casque';
+import { headsetPanels, headsetProtocol, LOCKBAR_DISTANCE_M, MIN_PLAYFIELD_M, panelSize, rotateVector, type HeadsetPanel, type HeadsetSource } from '../casque';
 import { edgeRotation } from '../model';
 
 const close = (a: number, b: number, eps = 1e-3) => assert.ok(Math.abs(a - b) < eps, `${a} ≠ ${b}`);
@@ -48,6 +48,15 @@ test('le playfield est couché devant le joueur, incliné, le bord des flippers 
   assert.ok(imageAxis(desk, { x: 0, y: -1, z: 0 }).z > 0.99);
   const right = headsetPanels(sources, edgeRotation('right')).find((p) => p.role === 'playfield')!;
   assert.ok(imageAxis(right, { x: 1, y: 0, z: 0 }).z > 0.99);
+});
+
+test('un petit playfield (poste de bureau) prend la taille d’une borne de 42 pouces, proportions gardées', () => {
+  const desk: HeadsetSource = { role: 'playfield', rect: { x: 0, y: 0, width: 1920, height: 1080 }, screenCm: { width: 38, height: 21.4 }, screenPx: { width: 1920, height: 1080 } };
+  const pf = headsetPanels([desk], edgeRotation('bottom'))[0]!;
+  close(pf.width, MIN_PLAYFIELD_M);
+  close(pf.height, (MIN_PLAYFIELD_M * 21.4) / 38);
+  // Un grand playfield garde sa taille réelle.
+  close(headsetPanels(sources, 90)[0]!.width, 0.95);
 });
 
 test('la tête de la borne est debout au bout du plateau : DMD, puis fronton au-dessus, puis topper', () => {

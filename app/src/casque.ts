@@ -17,6 +17,8 @@ import { OFFSCREEN } from './offscreen';
 const EXE = 'cyberpinball-casque.exe';
 const RETRY_MS = 15_000;
 const STOP_TIMEOUT_MS = 4_000;
+/** Messages du compagnon gardés dans le journal (packages/casque-vr/src/casque.cpp). */
+const PROTOCOL = /^(pret|casque-absent|erreur|centre|image|fini)\b/;
 
 /** Le compagnon, s'il est là : fabriqué avec l'application, ou construit en développement. */
 export function headsetExe(appDir: string): string | undefined {
@@ -102,7 +104,9 @@ export class HeadsetMenu {
       while ((nl = buffer.indexOf('\n')) >= 0) {
         const line = buffer.slice(0, nl).trim();
         buffer = buffer.slice(nl + 1);
-        if (!line || line.startsWith('etat ')) continue;
+        // Seulement les messages du compagnon : le runtime de Meta écrit aussi sur sa sortie, des
+        // dizaines de lignes à chaque session (RipcClient, RuntimeIPC…).
+        if (!PROTOCOL.test(line)) continue;
         if (line.startsWith('pret')) this.state = 'shown';
         if (line.startsWith('casque-absent')) this.state = 'waiting';
         this.opts.log(`Casque : ${line}`); // i18n-ignore : journal

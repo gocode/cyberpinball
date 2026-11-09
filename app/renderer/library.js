@@ -161,7 +161,7 @@ function renderLibrary(v) {
   // Les actions montrées en cartes (un média, une page, un fichier) ou en lignes à choisir
   // (un fichier de la table, un élément de la liste d'attente) ne sont pas répétées dans la liste.
   const carded = new Set(
-    [...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick)), ...(v.health?.groups.flatMap((g) => g.lines) ?? []), ...(v.scoreboard?.tabs ?? [])].map((c) => c.action).filter((a) => a !== undefined),
+    [...(v.media?.cards ?? []), ...v.sections.flatMap((s) => s.rows.filter((r) => r.pick)), ...(v.health?.groups.flatMap((g) => g.lines) ?? []), ...(v.scoreboard?.tabs ?? []), ...(v.scoreboard?.scopes ?? [])].map((c) => c.action).filter((a) => a !== undefined),
   );
   v.actions.forEach((a, i) => {
     if (carded.has(i)) return;
@@ -497,6 +497,19 @@ function renderHealth(h, cursor) {
  */
 function renderScoreboard(b) {
   const box = libEl('div', 'lib-content scoreboard');
+  // Les portées (cette borne, amis, pays, monde) : une rangée plus discrète, au-dessus des périodes.
+  if (b.scopes?.length) {
+    const scopes = libEl('div', 'scoreboard-scopes');
+    scopes.setAttribute('role', 'tablist');
+    for (const sc of b.scopes) {
+      const node = actOn(libEl('button', `scoreboard-scope${sc.current ? ' current' : ''}`, sc.label), { type: 'activate', index: sc.action });
+      node.type = 'button';
+      node.setAttribute('role', 'tab');
+      node.setAttribute('aria-selected', String(sc.current));
+      scopes.append(node);
+    }
+    box.append(scopes);
+  }
   const tabs = libEl('div', 'scoreboard-tabs');
   tabs.setAttribute('role', 'tablist');
   for (const tab of b.tabs) {
@@ -511,10 +524,14 @@ function renderScoreboard(b) {
   if (b.lines.length) {
     const list = libEl('ol', 'scoreboard-lines');
     for (const l of b.lines) {
-      const li = libEl('li', `scoreboard-line${l.first ? ' first' : ''}`);
+      const li = libEl('li', `scoreboard-line${l.first ? ' first' : ''}${l.mine ? ' mine' : ''}${l.apart ? ' apart' : ''}`);
+      const name = libEl('span', `scoreboard-name${l.anonymous ? ' anonymous' : ''}`);
+      // Le pays en deux lettres : Windows ne dessine pas les drapeaux.
+      if (l.country) name.append(libEl('span', 'scoreboard-country', l.country));
+      name.append(libEl('span', 'scoreboard-name-text', l.name));
       li.append(
         libEl('span', 'scoreboard-rank', l.rank),
-        libEl('span', `scoreboard-name${l.anonymous ? ' anonymous' : ''}`, l.name),
+        name,
         libEl('span', 'scoreboard-score', l.score),
         libEl('span', 'scoreboard-when', l.when),
       );
@@ -526,6 +543,8 @@ function renderScoreboard(b) {
     empty.append(libEl('div', 'scoreboard-empty-title', b.empty.title), libEl('div', 'scoreboard-empty-detail', b.empty.detail));
     box.append(empty);
   }
+  // Où se trouve le joueur dans ce classement (portée et période), sous le tableau.
+  if (b.position) box.append(libEl('p', 'scoreboard-position', b.position));
   if (b.note) box.append(libEl('p', 'scoreboard-note', b.note));
   return box;
 }

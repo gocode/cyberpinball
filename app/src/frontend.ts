@@ -37,6 +37,8 @@ import {
   navigationProblems,
   type ButtonsSource,
   type HeadsetSource,
+  vrCenterKey,
+  vrHasSavedPlace,
   type NavigationButtons,
   joysticksInVpxLog,
   joysticksUnseenByVpx,
@@ -197,6 +199,9 @@ import {
   loadSocial,
   type RemoteButton,
   vrMenuText,
+  boardKey,
+  countryOfLocale,
+  type PlayedScore,
 } from '@cyberpinball/core';
 import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
@@ -217,6 +222,7 @@ import { createConverter } from './media-convert';
 import { onKeyInput } from './key-input';
 import { onJoystickInput } from './joystick-input';
 import { locations, vpxInstall, vpxProfile } from './paths';
+import { loadPlugins } from './plugins';
 import { activeVpxIni, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
 import { coverDisplay, hideCovered, minimizeCovered } from './cover-display';
@@ -248,12 +254,13 @@ import { createInGameMenu, prepareDmdPlace } from './in-game-menu';
 import { startCabinetVolume, type CabinetVolume } from './cabinet-volume';
 import { createBallCounts } from './ball-count';
 import { createTableScores } from './table-scores';
+import { createTableRankings } from './table-rankings';
 import { createTableDoubles } from './table-double';
 import { inspectorFor, vpxFirewallTargets } from './vpx-inspector';
 import { scriptDmdWatch, simulatedDmdWatch, watchVpxDmd, type DmdWatch } from './dmd-watch';
 import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-setting';
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
-import { prepareVrGame, probeVr, readVrMode, rememberVrSettings, writeVrMode, type VrGame } from './vr';
+import { centerWhenStarted, prepareVrGame, probeVr, readVrMode, rememberVrSettings, writeVrMode, type VrGame } from './vr';
 import { HeadsetMenu } from './casque';
 import { createLiveScoresMenu } from './live-scores-menu';
 import { createLiveGames, type LiveProgress, type LiveStartGate } from './live-game';
@@ -504,6 +511,8 @@ interface State {
 }
 
 const loc = locations();
+// Extensions signées du dossier plugins des données (plugins.ts) : chargées une fois, avant les écrans qui les appellent.
+loadPlugins(loc.dataDir);
 const { profile } = vpxProfile(loc);
 let tables: TableEntry[] = [];
 // Ordre mélangé : tiré au démarrage, gardé jusqu'au prochain (tableorder.ts).
@@ -796,6 +805,9 @@ const library = createLibrary({
   tableSettings: (table) => openVpxSettings(table),
   playWithFriend: (table, back) => friendsMenu.live.sheetAction(table, back),
   scores: (table, period) => tableScores.board(table, period),
+  rankings: (table, scope, period) => tableRankings.view(table, scope, period),
+  hideScore: (id) => socialNet.hideScore(id),
+  hidePlayer: (key) => socialNet.hidePlayer(key),
   // « Ajouter aux favoris » sur la fiche : User.Favorite du .info (celui de la table, sinon celui du dossier).
   menuDmd: { detail: (table) => menuDmd.detail(table), open: (table, back) => menuDmd.open(table, back) },
   favorite: (table, on) => {
@@ -1247,7 +1259,14 @@ function socialChanged(): void {
     broadcast();
   }, 250);
 }
-const socialNet = createSocialNet({ dataDir: loc.dataDir, mode: socialMode, log: (line) => console.log(line), onChange: socialChanged });
+const socialNet = createSocialNet({
+  dataDir: loc.dataDir,
+  mode: socialMode,
+  log: (line) => console.log(line),
+  onChange: socialChanged,
+  // Le pays par défaut des classements : la région de Windows (format régional, sinon langues préférées).
+  systemLocale: () => [app.getSystemLocale(), ...app.getPreferredSystemLanguages()].find((l) => countryOfLocale(l)),
+});
 
 /**
  * La file des téléchargements a changé. Un écran de la gestion des tables (le gestionnaire, une
@@ -1399,6 +1418,13 @@ const tableScores = createTableScores({
   pinmameDirs: () => (loc.root ? [path.join(loc.root, 'pinmame')] : []),
   changed: () => broadcast(),
   log: (line) => console.log(line),
+});
+// Classements des amis, du pays et du monde au tableau des scores : la version exacte de chaque table, calculée une fois.
+const tableRankings = createTableRankings({
+  net: socialNet,
+  versionOf: (table) => liveGames.versionOf(table),
+  ballsOf: async (table) => (await ballCounts.of(table))?.balls,
+  changed: () => broadcast(),
 });
 // Une partie entre amis se joue sur un double de la table : sa mémoire de ROM, ses records et ses
 // réglages habituels ne sont jamais ouverts en écriture (table-double.ts). Ceux d'une partie
@@ -2807,8 +2833,17 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     void headset.stop();
   }
   let playedVr = false;
+  // Sans place enregistrée par VPX, la table est recentrée sur le regard du joueur une fois lancée.
+  const vrText = vrGame ? readTextIfExists(vrGame.ini) : '';
+  const vrCenter = vrGame && !vrHasSavedPlace(vrText) ? vrCenterKey(vrText) : undefined;
+  const vpxLog = path.join(vpxPrefDir(install.version), 'vpinball.log');
+  const vpxLogOffset = vrCenter && fs.existsSync(vpxLog) ? fs.statSync(vpxLog).size : 0;
+  let stopCentering: (() => void) | undefined;
   // La fenêtre de jeu est l'aperçu de la VR (launcher.ts) : la partie est dans le casque.
-  const onVr = () => void (playedVr = true);
+  const onVr = () => {
+    playedVr = true;
+    if (vrCenter) stopCentering = centerWhenStarted({ logFile: vpxLog, fromOffset: vpxLogOffset, pid: () => game.pid, key: vrCenter, log: (line) => console.log(line) });
+  };
   // Hors écran, un chargement simulé qui tarde (CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) montre le cartouche.
   const simulatedLoadMs = Number(process.env.CYBERPINBALL_PARTIE_SIMULEE_CHARGEMENT_MS) || undefined;
   const game =
@@ -2876,6 +2911,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (watchLive) clearInterval(watchLive);
   gameNotices.close();
   inGameMenu.disarm();
+  stopCentering?.();
   headsetPaused = false;
   // Arrêté pendant le chargement : ni partie comptée, ni message d'échec, la roue.
   const stoppedLoading = launch?.stopped === true;
@@ -2934,7 +2970,10 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     if (!autoStopAfterMs && scoresBefore) {
       tableScores
         .finish(table, scoresBefore, double ? { live: { ...(live?.score ? { score: live.score } : {}) } } : { recordsBefore, recordsAfter })
-        .then((kept) => kept.length && broadcast())
+        .then(async (kept) => {
+          if (kept.length) broadcast();
+          await publishScores(table, kept, Boolean(double && live?.multi));
+        })
         .catch((error: Error) => console.log(`Tableau des scores (${table.id}) : partie non gardée (${error.message}).`)); // i18n-ignore : journal
     }
     tables = tables.map((t) => (t.id === table.id ? { ...t, info: readInfo(t.infoFile) } : t));
@@ -2973,6 +3012,23 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // autres) : ses résultats, pas encore vus, s'ouvrent au retour ; la notification l'a annoncé.
   else if (!hooks.double && state.phase === 'menu' && friendsMenu.live.unseenResults()) friendsMenu.live.open(() => library.leave());
   return { result, focusReturned, entered, ...(live ? { live } : {}) };
+}
+
+/**
+ * Classements national et mondial (rankings.ts) : les scores d'une partie seul à la table, sur sa
+ * version exacte (empreintes du .vpx et du script) et son nombre de billes. Jamais en mode invité,
+ * ni une partie à plusieurs (on ne sait pas qui joue après le joueur 1).
+ */
+async function publishScores(table: TableEntry, kept: readonly PlayedScore[], multi: boolean): Promise<void> {
+  const solo = kept.filter((p) => !p.of);
+  if (guest.active || multi || !solo.length) return;
+  const board = boardKey(await liveGames.versionOf(table));
+  if (!board) return;
+  const balls = (await ballCounts.of(table))?.balls;
+  for (const p of solo) {
+    const sent = socialNet.publishScore({ board, ...(balls ? { balls } : {}), table: presenceTable(table), score: p.score, at: p.at, how: p.how });
+    if (sent) console.log(`Classements (${table.id}) : ${p.score} publié (${balls ? `${balls} billes` : 'billes inconnues'}).`); // i18n-ignore : journal
+  }
 }
 
 /** La bande de la partie entre amis est (ou va être) sur les écrans : la partie lancée, celle d'une autre table comprise. */

@@ -17,6 +17,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - In the headset: the backglass shows above the playfield of tables that have no VR room of their own, the table's position is kept from one game to the next, and both MagnaSave buttons open the VPX menu in the headset to realign it. On the cabinet, the playfield screen shows spectators what the player sees; the backglass, the DMD and the topper stay on their screens.
 - In the headset, a table that looks pixelated or placed around you is recentred in front of you with the 5 key of the numeric keypad; its position is kept for the following games.
 - Scoreboard on each table's page: all time, this year, this week, today, switched with the flippers. Every game played on the cabinet leaves its scores there; "All time" also includes the high scores the table already kept.
+- Virtual reality: the Cyber Pinball menu also shows in the headset, outside games. The cabinet stands in front of you at the real size of its screens: tilted playfield, flippers towards you, DMD, backglass and topper upright. During a game, the headset goes to VPX, then comes back to the menu.
+- In the headset, the menu recentres in front of you when you put the headset on, and a table played in VR for the first time places itself in front of you.
+- Scoreboard: "Friends", "National" and "Worldwide" rankings, next to "This cabinet", switched with the MagnaSave buttons. A score is only compared with the same version of the table and the same number of balls; your place is given under each ranking.
 
 ## 0.1.8
 

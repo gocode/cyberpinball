@@ -19,6 +19,9 @@ son interface).
 - Dans le casque : le fronton s'affiche au-dessus du plateau des tables qui n'ont pas leur propre pièce VR, la place de la table se garde d'une partie à l'autre, et les deux MagnaSave ouvrent le menu de VPX dans le casque pour la recaler. Sur la borne, l'écran du plateau montre aux spectateurs ce que voit le joueur ; le fronton, le DMD et le topper restent sur leurs écrans.
 - Dans le casque, une table qui paraît pixelisée ou posée autour de vous se recentre devant vous avec la touche 5 du pavé numérique ; sa place est gardée pour les parties suivantes.
 - Tableau des scores sur la fiche de chaque table : tout temps, cette année, cette semaine, aujourd'hui, changés aux flippers. Chaque partie jouée sur la borne y laisse ses scores ; « Tout temps » reprend aussi les records que la table gardait déjà.
+- Réalité virtuelle : le menu de Cyber Pinball s'affiche aussi dans le casque, hors partie. La borne est posée devant vous à la taille réelle de ses écrans : plateau incliné, flippers vers vous, DMD, fronton et topper debout. Pendant une partie, le casque passe à VPX, puis revient au menu.
+- Dans le casque, le menu se recentre devant vous quand vous mettez le casque, et une table jouée pour la première fois en VR se place d'elle-même devant vous.
+- Tableau des scores : classements « Amis », « National » et « Mondial », à côté de « Cette borne », changés aux MagnaSave. Un score n'y est comparé qu'avec la même version de la table et le même nombre de billes ; votre place est donnée sous chaque classement.
 
 ## 0.1.8
 

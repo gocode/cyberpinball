@@ -2358,7 +2358,7 @@ body.mouse .lib-health .health-line:not(.selected):hover {
 /*
  * Quatre onglets (tout temps, cette année, cette semaine, aujourd'hui), puis le tableau. L'onglet
  * ouvert est cerclé et écrit en vert signal, sans aplat : l'aplat reste au seul choix courant (le
- * retour, dans la colonne des actions). Lignes à la référence 1 080 : score 27 px, quand 22 px ;
+ * retour, dans la colonne des actions). Lignes à la référence 1 080 : score 25 px, quand 22 px ;
  * place, initiales, score et date chacun dans sa colonne, le score aligné à droite en chiffres
  * tabulaires : les milliers tombent les uns sous les autres.
  */
@@ -2371,8 +2371,43 @@ body.mouse .lib-health .health-line:not(.selected):hover {
 }
 
 .lib-scoreboard .scoreboard {
-  gap: 2.2cqmin;
+  gap: 1.5cqmin;
   min-width: 0;
+}
+
+.lib-scoreboard .scoreboard-scopes {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  border-bottom: 0.14cqmin solid var(--line-strong);
+}
+
+/* Portée : un onglet souligné, sans cadre ; l'ouverte en vert signal, soulignée plus fort. */
+.lib-scoreboard .scoreboard-scope {
+  min-width: 0;
+  padding: 0.6cqmin 1cqmin 0.8cqmin;
+  border: 0;
+  border-bottom: 0.42cqmin solid transparent;
+  margin-bottom: -0.14cqmin;
+  background: transparent;
+  color: var(--ink-muted);
+  font: inherit;
+  font-size: 2.2cqmin;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.lib-scoreboard .scoreboard-scope.current {
+  border-bottom-color: var(--signal);
+  color: var(--signal);
+}
+
+body.mouse .lib-scoreboard .scoreboard-scope:not(.current):hover {
+  color: var(--ink);
 }
 
 .lib-scoreboard .scoreboard-tabs {
@@ -2389,8 +2424,8 @@ body.mouse .lib-health .health-line:not(.selected):hover {
   justify-content: center;
   gap: 0.3cqmin;
   min-width: 0;
-  min-height: 7.4cqmin;
-  padding: 1cqmin 1.2cqmin;
+  min-height: 6.4cqmin;
+  padding: 0.7cqmin 1.2cqmin;
   border: 0.14cqmin solid var(--line-strong);
   border-radius: 0.55cqmin;
   background: var(--surface-raised);
@@ -2450,10 +2485,10 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   column-gap: 2.2cqmin;
   min-width: 0;
   /* Dix lignes tiennent sous les onglets en paysage 16:9 : les flippers changent de période, rien ne défile. */
-  padding: 0.75cqmin 1.6cqmin;
+  padding: 0.45cqmin 1.6cqmin;
   border-bottom: 0.093cqmin solid var(--line-soft);
   border-left: 0.46cqmin solid transparent;
-  font-size: 2.5cqmin;
+  font-size: 2.35cqmin;
   line-height: 1.2;
 }
 
@@ -2469,10 +2504,33 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 }
 
 .lib-scoreboard .scoreboard-name {
+  display: flex;
+  align-items: baseline;
+  gap: 1cqmin;
   min-width: 0;
   font-weight: 600;
   letter-spacing: 0.1em;
+}
+
+.lib-scoreboard .scoreboard-name-text {
+  min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.lib-scoreboard .scoreboard-country {
+  flex: none;
+  padding: 0.1cqmin 0.6cqmin;
+  border: 0.093cqmin solid var(--line-strong);
+  border-radius: 0.4cqmin;
+  font-size: 1.9cqmin;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--meta);
+}
+
+/* La ligne du joueur de cette borne : un aplat discret, jamais le vert du choix courant. */
+.lib-scoreboard .scoreboard-line.mine {
+  background: color-mix(in oklab, var(--table-tint) 14%, transparent);
 }
 
 .lib-scoreboard .scoreboard-name.anonymous {
@@ -2488,7 +2546,7 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 }
 
 .lib-scoreboard .scoreboard-line.first .scoreboard-score {
-  font-size: 2.8cqmin;
+  font-size: 2.6cqmin;
   font-weight: 700;
 }
 
@@ -2497,6 +2555,24 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   text-align: right;
   font-size: 2.04cqmin;
   color: var(--ink-muted);
+  overflow-wrap: anywhere;
+}
+
+/* Ma ligne au-delà des premières places : séparée du tableau par un filet en pointillé. */
+.lib-scoreboard .scoreboard-line.apart {
+  margin-top: 0.6cqmin;
+  border-top: 0.14cqmin dashed var(--line-strong);
+}
+
+/* Ma place dans ce classement : sous le tableau, lisible, sans le vert réservé au choix. */
+.lib-scoreboard .scoreboard-position {
+  margin: 0;
+  padding: 0.6cqmin 1.6cqmin;
+  border-left: 0.46cqmin solid var(--table-tint);
+  background: var(--surface-raised);
+  font-size: 2.2cqmin;
+  font-weight: 600;
+  line-height: 1.3;
   overflow-wrap: anywhere;
 }
 

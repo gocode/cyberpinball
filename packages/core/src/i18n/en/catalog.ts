@@ -139,10 +139,6 @@ export const messages: Record<string, string> = {
   'Page ouverte : {status}': 'Page opened: {status}',
   'Page ouverte dans la fenêtre « Récupérer » : {kind} {label}. Le fichier téléchargé y sera rangé tout seul.':
     'Page opened in the “Get” window: {kind} {label}. The downloaded file will be filed by itself.',
-  'Téléchargement direct depuis {site}…': 'Direct download from {site}…',
-  'vous n’êtes pas connecté à {site} : connectez-vous dans cette page (ou dans « Comptes des sites »), puis téléchargez.':
-    'you’re not signed in to {site}: sign in on this page (or in “Site accounts”), then download.',
-  'Téléchargement direct de « {file} » ({kind} {label})…': 'Direct download of “{file}” ({kind} {label})…',
   'reçu le {date} : {file} (Téléchargements)': 'received {date}: {file} (Downloads)',
   'reçu le {date} : {file}': 'received {date}: {file}',
   'attendu depuis le {date} · {site}': 'waiting since {date} · {site}',
@@ -180,10 +176,6 @@ export const messages: Record<string, string> = {
   'Connectez-vous, cochez « Se souvenir de moi », puis Fermer (Échap)': 'Sign in, check “Remember me”, then Close (Esc)',
   '{site} · votre propre compte': '{site} · your own account',
   'Connexion à {site} ouverte : fermez la fenêtre une fois connecté, l’état se met à jour.': '{site} sign-in opened: close the window once signed in, the status updates.',
-  'Téléchargement direct : oui': 'Direct download: on',
-  'Téléchargement direct : non': 'Direct download: off',
-  '« Récupérer » télécharge sans montrer la page quand vous êtes connecté': '“Get” downloads without showing the page when you’re signed in',
-  '« Récupérer » ouvre la page ; vous cliquez vous-même': '“Get” opens the page; you click yourself',
   'Comptes des sites': 'Site accounts',
   // packages/core/src/adblock.ts
   'Bloquer les publicités : non': 'Block ads: off',
@@ -194,8 +186,6 @@ export const messages: Record<string, string> = {
   'Publicités retirées des pages et des vidéos (YouTube compris) ; jamais sur les forums des tables': 'Ads removed from pages and videos (YouTube included); never on the table forums',
   '{n} connecté sur {total}': '{n} of {total} signed in',
   '{n} connectés sur {total}': '{n} of {total} signed in',
-  'Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. Avec le téléchargement direct, « Récupérer » télécharge le fichier sans montrer la page, et ouvre la page dès que le site demande quelque chose (vérification, choix, délai).':
-    'Sign in once to each site, with your own account: the sign-in is kept from one start to the next, as in a browser. Cyber Pinball never sees or keeps any password. With direct download, “Get” downloads the file without showing the page, and opens the page as soon as the site asks for something (check, choice, wait).',
   'Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. « Récupérer » ouvre la page du site, et c’est vous qui cliquez sur Télécharger.':
     'Sign in once to each site, with your own account: the sign-in is kept from one start to the next, as in a browser. Cyber Pinball never sees or keeps any password. “Get” opens the site’s page, and you click Download yourself.',
   'Recherche des mises à jour…': 'Checking for updates…',

@@ -32,6 +32,7 @@
 // (section [PlayerVR] entière, et [Player] VRPreview), puis ceux que Cyber Pinball impose (planVrIni).
 
 import * as path from 'node:path';
+import { codeOfScancode, keyboardKeys, mappingKey } from './buttons';
 import { t } from './i18n';
 import { IniDocument } from './ini';
 import { applyVpxSettings, type VpxChange, type VpxSetting } from './vpx';
@@ -162,6 +163,28 @@ export function vrPreviewSettings(base: IniDocument): VpxSetting[] {
   const mode = base.get('Player', 'PlayfieldFullScreen')?.trim();
   if (mode) settings.push({ section: VR_SECTION, key: 'PreviewFullScreen', value: mode === '0' ? VR_PREVIEW_WINDOWED : VR_PREVIEW_FULLSCREEN });
   return settings;
+}
+
+/**
+ * La table a-t-elle une place dans la pièce ? VPX l'écrit en quittant proprement ([PlayerVR]
+ * Orientation, TableX, TableY : VRDevice::SaveVRSettings). Sans elle, la table est posée à
+ * l'origine de l'espace du casque, souvent autour du joueur, qui ne voit alors que des bouts de
+ * plateau (premier essai dans un Quest 2, 9 novembre 2026) : Cyber Pinball recentre pour lui.
+ */
+export function vrHasSavedPlace(text: string): boolean {
+  const doc = IniDocument.parse(text);
+  return ['Orientation', 'TableX', 'TableY'].some((key) => {
+    const value = doc.get(VR_SECTION, key)?.trim();
+    return Boolean(value) && Number.isFinite(Number(value)) && Number(value) !== 0;
+  });
+}
+
+/** Touche du clavier qui recentre la vue de VPX sur le regard du joueur (action VRCenter, 5 du pavé par défaut). */
+export function vrCenterKey(text: string): string | undefined {
+  const doc = IniDocument.parse(text);
+  return keyboardKeys(doc.get('Input', mappingKey('VRCenter')), 'VRCenter')
+    .map(codeOfScancode)
+    .find((c): c is string => Boolean(c));
 }
 
 /** Réglages de la VR d'un VPinballX.ini, à reprendre dans le suivant (sans ceux que Cyber Pinball impose). */

@@ -16,12 +16,13 @@ import {
   samePath,
   tableHasVrRoom,
   vrCarriedSettings,
+  windowsVk,
   vrReadiness,
   writeFileAtomic,
   type VrMode,
   type VrReadiness,
 } from '@cyberpinball/core';
-import { openXrActiveRuntime } from '@cyberpinball/win-displays';
+import { foregroundWindow, openXrActiveRuntime, tapKey } from '@cyberpinball/win-displays';
 
 const folder = (dataDir: string) => path.join(dataDir, 'vr');
 const settingFile = (dataDir: string) => path.join(folder(dataDir), 'reglage.json');
@@ -98,4 +99,65 @@ export function rememberVrSettings(dataDir: string, usedIni: string): void {
   if (!applyVpxSettings(doc, vrCarriedSettings(used)).length) return;
   fs.mkdirSync(path.dirname(file), { recursive: true });
   writeFileAtomic(file, doc.toString());
+}
+
+/**
+ * Partie dans le casque sans place enregistrée (vrHasSavedPlace) : une fois la table lancée
+ * (« Startup done » dans vpinball.log, après `fromOffset`), et VPX au premier plan, sa touche de
+ * recentrage (`key`, VRCenter) est appuyée pour lui : la table vient devant le joueur, à son
+ * regard du moment. VPX ignore les touches de ses 5 premières images, d'où le délai. Renvoie de
+ * quoi arrêter l'attente (partie finie avant).
+ */
+export function centerWhenStarted(opts: { logFile: string; fromOffset: number; pid: () => number | undefined; key: string; log(line: string): void }): () => void {
+  const vk = windowsVk(opts.key);
+  let stopped = false;
+  let timer: NodeJS.Timeout | undefined;
+  const stop = () => {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+  };
+  if (vk === undefined) {
+    opts.log(`Réalité virtuelle : touche de recentrage ${opts.key} inconnue, table pas recentrée.`); // i18n-ignore : journal
+    return stop;
+  }
+  const deadline = Date.now() + 120_000;
+  const started = () => {
+    try {
+      const fd = fs.openSync(opts.logFile, 'r');
+      try {
+        const size = fs.fstatSync(fd).size;
+        if (size <= opts.fromOffset) return false;
+        const buffer = Buffer.alloc(size - opts.fromOffset);
+        fs.readSync(fd, buffer, 0, buffer.length, opts.fromOffset);
+        return buffer.toString('utf8').includes('Startup done');
+      } finally {
+        fs.closeSync(fd);
+      }
+    } catch {
+      return false;
+    }
+  };
+  let tries = 0;
+  const press = () => {
+    if (stopped) return;
+    const pid = opts.pid();
+    if (pid !== undefined && foregroundWindow()?.pid === pid) {
+      tapKey(vk);
+      opts.log(`Réalité virtuelle : table recentrée sur le regard du joueur (${opts.key}), aucune place enregistrée.`); // i18n-ignore : journal
+      return;
+    }
+    if (++tries > 20) return void opts.log('Réalité virtuelle : VPX jamais au premier plan, table pas recentrée.'); // i18n-ignore : journal
+    timer = setTimeout(press, 500);
+  };
+  const wait = () => {
+    if (stopped) return;
+    if (started()) {
+      timer = setTimeout(press, 2_000);
+      return;
+    }
+    if (Date.now() > deadline) return void opts.log('Réalité virtuelle : table jamais lancée, pas recentrée.'); // i18n-ignore : journal
+    timer = setTimeout(wait, 500);
+  };
+  wait();
+  return stop;
 }

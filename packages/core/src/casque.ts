@@ -23,6 +23,13 @@ const GLASS_DROP_M = 0.05;
 const HEAD_GAP_M = 0.1;
 const PANEL_GAP_M = 0.02;
 
+/**
+ * Plus grand côté minimal du playfield (mètres) : celui d'une borne de 42 pouces. Un poste de bureau
+ * (playfield de 17 pouces, 38 cm) donnerait sinon une borne jouet, posée bas et facile à manquer
+ * (premier essai dans un Quest 2, 9 novembre 2026).
+ */
+export const MIN_PLAYFIELD_M = 0.93;
+
 /** Taille par défaut d'un écran dont on ne connaît que les pixels (largeur en mètres). */
 const DEFAULT_WIDTH_M: Readonly<Record<RoleId, number>> = { playfield: 0.93, backglass: 0.7, dmd: 0.4, topper: 0.6 };
 
@@ -95,7 +102,9 @@ export function headsetPanels(sources: readonly HeadsetSource[], playfieldRotati
 
   const playfield = sources.find((s) => s.role === 'playfield');
   if (playfield) {
-    const size = panelSize(playfield);
+    const real = panelSize(playfield);
+    const grow = Math.max(1, MIN_PLAYFIELD_M / Math.max(real.width, real.height));
+    const size = { width: real.width * grow, height: real.height * grow };
     // Longueur du plateau vue du joueur : la hauteur de l'image, ou sa largeur si elle est tournée d'un quart.
     const quarter = playfieldRotation === 90 || playfieldRotation === 270;
     const length = quarter ? size.width : size.height;

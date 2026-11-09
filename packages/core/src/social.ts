@@ -138,6 +138,13 @@ export interface SocialState {
   /** Le joueur a lui-même choisi de partager ou non : seul ce choix l'emporte sur le partage par défaut. */
   shareLibraryChosen?: boolean;
   /**
+   * Mes scores publiés aux classements national et mondial (rankings.ts). Activé par défaut (décidé
+   * le 09/11/2026) : seul `false` le coupe.
+   */
+  shareScores?: boolean;
+  /** Pays déclaré (ISO 3166-1 alpha-2) ; absent : celui de la région de Windows, s'il se lit. */
+  country?: string;
+  /**
    * Débit des téléchargements depuis les amis, en octets par seconde, pour l'ensemble des envois
    * en cours (ratelimit.ts) ; absent : sans limite.
    */
@@ -271,6 +278,8 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     // Un fichier écrit avant le partage par défaut porte « false » sans que le joueur l'ait choisi.
     shareLibrary: s.shareLibraryChosen === true ? s.shareLibrary === true : true,
     ...(s.shareLibraryChosen === true ? { shareLibraryChosen: true } : {}),
+    ...(s.shareScores === false ? { shareScores: false } : {}),
+    ...(typeof s.country === 'string' && /^[A-Z]{2}$/.test(s.country) ? { country: s.country } : {}),
     ...(parseRate(s.downloadRate) ? { downloadRate: s.downloadRate as ByteRate } : {}),
     name: normalizeName(s.name) ?? defaultName(key.publicKey),
     nameAt: isIso(s.nameAt) ? s.nameAt : new Date(0).toISOString(),

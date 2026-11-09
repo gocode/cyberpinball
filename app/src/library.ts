@@ -7,7 +7,8 @@
 
 import type { MenuField, PhoneRemote, RemoteBar } from './phone-remote';
 import { createPhoneRemoteMenu, remoteBlock } from './phone-remote-menu';
-import { periodLabel, scoreboardView, scoresSummary, type ScoreboardView } from './scoreboard-menu';
+import { periodLabel, rankingScoreboardView, scopeLabel, scoreboardView, scoresSummary, type ScoreboardView } from './scoreboard-menu';
+import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -189,6 +190,9 @@ import {
   detectDofControllers,
   dofHealthFacts,
   SCORE_PERIODS,
+  RANKING_SCOPES,
+  type RankingLine,
+  type RankingScope,
   type ScorePeriod,
 } from '@cyberpinball/core';
 import { prepareImport, unpackArchive, type PreparedImport } from './archives';
@@ -272,6 +276,11 @@ export interface LibraryHost {
   playWithFriend?(table: TableEntry, back: () => void): Action;
   /** « Tableau des scores » (table-scores.ts) : le tableau d'une période. */
   scores?(table: TableEntry, period: ScorePeriod): TableBoard;
+  /** Classements en réseau d'une table (table-rankings.ts) : amis, pays, monde. */
+  rankings?(table: TableEntry, scope: Exclude<RankingScope, 'cabinet'>, period: ScorePeriod): RankingView;
+  /** Masquer sur cette borne un score des classements, ou tous ceux d'un joueur (social-net.ts). */
+  hideScore?(id: string): void;
+  hidePlayer?(key: string): void;
   /** « Ajouter aux favoris » / « Retirer des favoris » (collections.ts : User.Favorite du .info). */
   favorite?(table: TableEntry, on: boolean): void;
   /** « DMD sur la roue » (menu-dmd.ts) : le DMD du menu affiché ou masqué pour cette table, et sa place ; `back` : l'écran d'où on l'a ouvert. */
@@ -569,8 +578,8 @@ type Screen =
   | { kind: 'pupOptions'; file: string; flash?: string; pup?: TablePupPack[] }
   /** Prospectus ou règles de la table, page par page (flippers : page précédente ou suivante). */
   | { kind: 'pages'; file: string; type: SheetPageType; index: number }
-  /** Tableau des scores de la table, une période à la fois (flippers : la précédente ou la suivante). */
-  | { kind: 'scores'; file: string; period: ScorePeriod }
+  /** Tableau des scores de la table : une portée (MagnaSave) et une période (flippers) à la fois. */
+  | { kind: 'scores'; file: string; period: ScorePeriod; scope: RankingScope }
   | { kind: 'edit'; file: string; fields: { Title: string; Manufacturer: string; Year?: number }; editor?: Editor }
   /** `added` : ce que l'ajout a fait en plus de ranger les fichiers (médias de VPinMediaDB), montré à la vérification. */
   /** `back` : l'écran qui l'a ouvert (Santé de la borne), à la place de la fiche. */
@@ -653,6 +662,8 @@ const GUEST_SCREENS: Partial<Record<Screen['kind'], GuestDoor>> = { sheet: 'menu
 type AddPlan = Extract<Screen, { kind: 'addPlan' }>;
 type PagesScreen = Extract<Screen, { kind: 'pages' }>;
 type ScoresScreen = Extract<Screen, { kind: 'scores' }>;
+/** Le retour, dans les actions du tableau des scores : après les quatre périodes et les quatre portées. */
+const SCORES_BACK = 8;
 
 /** Page préc. / Page suiv. d'un clavier : le texte de l'écran défile de partout (reading.ts). */
 const PAGE_KEYS: Record<string, -1 | 1> = { PageUp: -1, PageDown: 1 };
@@ -2058,37 +2069,58 @@ export function createLibrary(host: LibraryHost) {
       detail: scoresSummary(host.scores!(table, 'all'), host.scores!(table, 'today')),
       icon: 'trophy',
       door: 'sheet.scores',
-      run: () => go({ kind: 'scores', file: table.file, period: 'all' }, SCORE_PERIODS.length),
+      run: () => go({ kind: 'scores', file: table.file, period: 'all', scope: 'cabinet' }, SCORES_BACK),
     };
   }
 
-  /** Une période à la fois ; les onglets se cliquent, les flippers passent de l'un à l'autre (scoresKey). */
+  /**
+   * Une portée (cette borne, amis, pays, monde) et une période à la fois ; les onglets se cliquent,
+   * les flippers changent de période, les MagnaSave de portée. Actions : les quatre périodes, les
+   * quatre portées, le retour (où se pose le curseur), puis « Masquer un score… » en réseau.
+   */
   function buildScores(s: ScoresScreen): Built {
     const table = find(s.file);
     const back = () => (table ? openSheet(table) : leave());
     if (!table || !host.scores) return { heading: t('Table introuvable'), sections: [], actions: [{ label: t('Retour au menu'), door: 'sheet.back', run: leave }], back };
-    const show = (period: ScorePeriod) => {
-      s.period = period;
-      host.broadcast();
-    };
+    // Un onglet cliqué : le curseur revient sur « Retour à la fiche », le seul choix en vert.
+    const show = (change: Partial<Pick<ScoresScreen, 'period' | 'scope'>>) => go({ kind: 'scores', file: s.file, period: s.period, scope: s.scope, ...change }, SCORES_BACK);
+    const scope = s.scope;
+    const network = scope !== 'cabinet';
+    const view = (period: ScorePeriod): RankingView =>
+      host.rankings ? host.rankings(table, scope as Exclude<RankingScope, 'cabinet'>, period) : { lines: [], players: 0, unavailable: t('Réseau des bornes absent') };
+    const scoreboard = network ? rankingScoreboardView(view, scope as Exclude<RankingScope, 'cabinet'>, s.period) : scoreboardView((period) => host.scores!(table, period), s.period);
+    const lines = network ? view(s.period).lines.filter((l) => !l.mine) : [];
     return {
       heading: t('Tableau des scores'),
       icon: 'trophy',
       subheading: table.title,
       sections: [],
-      scoreboard: scoreboardView((period) => host.scores!(table, period), s.period),
+      scoreboard,
       // Les onglets d'abord (rendus dans le tableau), puis le retour, seul dans la colonne des actions.
       actions: [
-        ...SCORE_PERIODS.map((period) => ({ label: t('Onglet {period}', { period: periodLabel(period) }), key: `period-${period}`, door: 'sheet.scores' as const, run: () => show(period) })),
+        ...SCORE_PERIODS.map((period) => ({ label: t('Onglet {period}', { period: periodLabel(period) }), key: `period-${period}`, door: 'sheet.scores' as const, run: () => show({ period }) })),
+        ...RANKING_SCOPES.map((sc) => ({ label: t('Onglet {period}', { period: scopeLabel(sc) }), key: `scope-${sc}`, door: 'sheet.scores' as const, run: () => show({ scope: sc }) })),
         { label: t('Retour à la fiche'), icon: 'back' as const, key: 'back', door: 'sheet.back' as const, run: back },
+        // Masquer un score aberrant : sur cette borne seulement ; fermé à l'invité (porte de « Gérer la table »).
+        ...(lines.length && host.hideScore
+          ? [{ label: t('Masquer un score…'), detail: t('Un score douteux, ou tous ceux d’un joueur, sur cette borne'), icon: 'eye' as const, key: 'hide', door: 'sheet.manage' as const, run: () => openHideScore(table, s, lines) }]
+          : []),
       ],
       back,
-      hint: t('Flippers : période précédente ou suivante · Start ou Exit : retour à la fiche · souris'),
+      hint: t('Flippers : période précédente ou suivante · MagnaSave : portée · Start ou Exit : retour à la fiche · souris'),
       keys: (input) => {
         const KEYS = host.keys();
         // Start revient à la fiche, même après un clic sur un onglet (qui y a posé le curseur).
         if (KEYS.confirm.includes(input.code)) {
           back();
+          return true;
+        }
+        // MagnaSave : la portée suivante ; la gauche (première touche relevée), la précédente.
+        const magna = host.zoneKeys?.() ?? [];
+        if (magna.includes(input.code)) {
+          const at = RANKING_SCOPES.indexOf(s.scope);
+          const dir = magna.length > 1 && magna.indexOf(input.code) === 0 ? -1 : 1;
+          s.scope = RANKING_SCOPES[(at + dir + RANKING_SCOPES.length) % RANKING_SCOPES.length]!;
           return true;
         }
         const step = KEYS.previous.includes(input.code) ? -1 : KEYS.next.includes(input.code) ? 1 : 0;
@@ -2098,6 +2130,51 @@ export function createLibrary(host: LibraryHost) {
         return true;
       },
     };
+  }
+
+  /** « Masquer un score… » : les lignes du classement ; une ligne choisie, masquer ce score ou tous ceux du joueur. */
+  function openHideScore(table: TableEntry, s: ScoresScreen, lines: RankingLine[]): void {
+    const backToScores = () => go({ kind: 'scores', file: table.file, period: s.period, scope: s.scope }, SCORES_BACK);
+    openCustom(
+      () => ({
+        heading: t('Masquer un score'),
+        icon: 'eye',
+        subheading: table.title,
+        lead: t('Sur cette borne seulement : les autres bornes gardent leurs classements.'),
+        sections: [
+          {
+            title: t('Choisir le score'),
+            rows: lines.map((l, i) => ({ text: t('{rank}. {name} {score}', { rank: l.rank, name: l.name, score: formatNumber(l.score) }), detail: [l.country, formatDateTime(l.at)].filter(Boolean).join(' · '), action: i, pick: true })),
+          },
+        ],
+        actions: [
+          ...lines.map((l) => ({ label: l.name, key: `line-${l.id}`, door: 'sheet.manage' as const, run: () => openHideChoice(table, l, backToScores) })),
+          { label: t('Retour au tableau des scores'), icon: 'back' as const, key: 'back', door: 'sheet.back' as const, run: backToScores },
+        ],
+        back: backToScores,
+      }),
+      0,
+      table.file,
+    );
+  }
+
+  function openHideChoice(table: TableEntry, line: RankingLine, done: () => void): void {
+    openCustom(
+      () => ({
+        heading: t('Masquer un score'),
+        icon: 'eye',
+        subheading: t('{name} · {score}', { name: line.name, score: formatNumber(line.score) }),
+        sections: [],
+        actions: [
+          { label: t('Masquer ce score'), detail: t('Les autres scores de {name} restent', { name: line.name }), icon: 'eye' as const, key: 'one', door: 'sheet.manage' as const, run: () => (host.hideScore!(line.id), done()) },
+          { label: t('Masquer tous les scores de {name}', { name: line.name }), detail: t('Sur toutes les tables, sur cette borne'), icon: 'close' as const, key: 'all', door: 'sheet.manage' as const, run: () => (host.hidePlayer!(line.key), done()) },
+          { label: t('Annuler'), icon: 'back' as const, key: 'back', door: 'sheet.back' as const, run: done },
+        ],
+        back: done,
+      }),
+      0,
+      table.file,
+    );
   }
 
   // ---------- Prospectus et règles, page par page ----------
