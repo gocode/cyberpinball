@@ -93,6 +93,7 @@ son interface).
 - En partie dans le casque, la pause s'affiche sur le fronton de la scène : Reprendre ou Quitter. Tenir Pause 1,5 s remplit un cercle « Quitter » et sort de la partie ; lâcher annule. Le bouton Pause est obligatoire dans l'assistant des manettes.
 - En VR, les tables dont le fronton est un PuP-Pack (sans directb2s) ne montrent plus un fronton vide ; un diagnostic au journal liste les tables concernées.
 - Calage dans le casque : une manette sur chaque coin de la barre, une gâchette place la borne, autant de fois qu'on veut ; A valide et sort, B sort sans rien changer. La borne part toujours à l'opposé de votre tête, quel que soit l'ordre des coins ou la main.
+- Dans le casque, le son sort dans ses écouteurs : menu, sons de l'interface, Juke-box et partie. Hors du casque, la sortie de la configuration reprend.
 
 ## 0.1.8
 

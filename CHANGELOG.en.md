@@ -91,6 +91,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - In game in the headset, the pause shows on the scene's backglass: Resume or Quit. Holding Pause for 1.5 s fills a "Quit" circle and leaves the game; letting go cancels. The Pause button is required in the controller wizard.
 - In VR, tables whose backglass is a PuP-Pack (no directb2s) no longer show an empty backglass; a diagnostic in the log lists the tables concerned.
 - Alignment in the headset: one controller on each corner of the bar, a trigger places the cabinet, as many times as you like; A confirms and leaves, B leaves without changing anything. The cabinet always extends away from your head, whatever the order of the corners or the hand.
+- In the headset, the sound plays in its earphones: menu, interface sounds, Juke-box and game. Out of the headset, the configuration's output takes over again.
 
 ## 0.1.8
 

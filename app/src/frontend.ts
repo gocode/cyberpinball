@@ -68,6 +68,8 @@ import {
   vpxRecenteredHead,
   vpxRoomChanges,
   vrGraphicsProfile,
+  headsetAudioOutput,
+  vrAudioSettings,
   readVpxBackglassDisplays,
   tableUsesPupCapture,
   tableHasVrRoom,
@@ -292,7 +294,7 @@ import { onKeyInput } from './key-input';
 import { onJoystickInput } from './joystick-input';
 import { locations, vpxInstall, vpxProfile } from './paths';
 import { loadPlugins } from './plugins';
-import { activeVpxIni, syncConfiguration } from './vpx-ini';
+import { activeVpxIni, audioOutputs, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
 import { coverDisplay, coverReport, hideCovered, minimizeCovered, recoverExact } from './cover-display';
 import { DesktopMode } from './desktop-mode';
@@ -652,6 +654,35 @@ const mediaErrorLog = mediaErrorsFile(path.join(loc.dataDir, 'logs'));
 const PRELOAD_OFFSETS = [1, -1, 2, -2];
 /** Nom Windows de la sortie audio du menu (celle du fronton), relu au démarrage du menu. */
 let audioOutput: string | undefined;
+
+/**
+ * La sortie audio du casque (Link, SteamVR, casque branché) : cherchée tant qu'on ne l'a pas (Link peut
+ * se brancher après le lancement), gardée une fois trouvée ; le journal le dit à chaque changement.
+ */
+let headsetAudio: string | undefined;
+let headsetAudioSaid: string | undefined | null = null;
+/** Dernière recherche infructueuse : pas plus d'une lecture des sorties de Windows toutes les 30 s. */
+let headsetAudioSearched = 0;
+
+function findHeadsetAudio(): string | undefined {
+  if (!headsetAudio && Date.now() - headsetAudioSearched > 30_000) {
+    headsetAudioSearched = Date.now();
+    headsetAudio = headsetAudioOutput(audioOutputs())?.friendlyName;
+  }
+  if (headsetAudioSaid !== headsetAudio) {
+    headsetAudioSaid = headsetAudio;
+    console.log(headsetAudio ? `Son dans le casque : sortie « ${headsetAudio} » de Windows.` : 'Son dans le casque : aucune sortie audio de casque dans Windows (Link, SteamVR, casque branché) ; le son reste sur la sortie de la configuration.'); // i18n-ignore : journal
+  }
+  return headsetAudio;
+}
+
+/**
+ * La sortie du son du menu (musique, sons de l'interface, Juke-box) : celle du casque quand le menu est
+ * dans le casque, sinon celle de la configuration (étape « Son »).
+ */
+function menuOutput(): string | undefined {
+  return headset?.inUse ? (findHeadsetAudio() ?? audioOutput) : audioOutput;
+}
 /** Numéro du lancement en cours : le son de lancement est joué une fois par lancement. */
 let launchCount = 0;
 /**
@@ -1011,7 +1042,7 @@ const library = createLibrary({
   jukeboxPlayer: (playlist) => openJukebox(playlist),
   browserScreen: () => browserScreenRect(),
   takeForeground: () => void takeForeground(),
-  audioOutput: () => audioOutput,
+  audioOutput: () => menuOutput(),
   phoneRemote,
   phoneUpload: () => phoneUpload,
   openBrowserScreen: (back) => configurations.openBrowserScreen(undefined, back),
@@ -1050,7 +1081,7 @@ const jukeboxPlayer = createJukeboxPlayer({
   windows: () => windows,
   windowRoles: () => windowRoles,
   desk: () => playfieldLandscape(),
-  output: () => audioOutput,
+  output: () => menuOutput(),
   allow: (file) => allowJukebox(file),
   leave: () => {
     state = { ...state, phase: tables.length ? 'menu' : 'message', jukebox: true, ...(tables.length ? {} : { message: noTables() }) };
@@ -1632,7 +1663,7 @@ library.provideSystemItem(
     library,
     settings: () => mediaSettings,
     save: (next) => saveMediaSettings(next),
-    output: () => audioOutput,
+    output: () => menuOutput(),
     preview: (id) => playUiSound(id),
     wakeDevices: () => wakeDevices(),
     sleepAllowed: () => !powerUnavailable('sleep', power.capabilities()),
@@ -2941,6 +2972,12 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
       const far = vpxPlaceProblem(settings);
       if (far) details.push(`attention : ${far}`); // i18n-ignore : journal
     }
+    // Son de la partie (table, ROM, PuP) dans le casque : sa sortie audio, si Windows en a une.
+    const audio = findHeadsetAudio();
+    if (audio) {
+      writeIniSettings(vr.ini, vrAudioSettings(audio));
+      details.push(`son dans le casque : « ${audio} »`); // i18n-ignore : journal
+    } else details.push('son sur la sortie de la configuration (aucune sortie audio de casque)'); // i18n-ignore : journal
     // Profil graphique selon la carte du casque (vr-profil.ts), dans les clés vides seulement.
     vrProfileApplied = applyVrProfile(vr.ini, details);
     // Manettes : la même règle qu'au menu (manettes.ts), et plus d'alignement de la table sur les manettes.
@@ -5288,14 +5325,14 @@ function soundView() {
   // Ouverture : la musique de fond choisie, sinon le son de la vidéo d'ouverture du plateau.
   if (state.phase === 'intro') {
     const music = introSource(mediaSettings.intro, introFilesNow(), 'music');
-    return { ...introSound(mediaSettings, music.source === 'file' ? mediaUrl(music.file) : undefined), launchId: undefined, output: audioOutput };
+    return { ...introSound(mediaSettings, music.source === 'file' ? mediaUrl(music.file) : undefined), launchId: undefined, output: menuOutput() };
   }
   const now = moment();
   const plan =
     table && medias
       ? menuSound(now, now === 'attract' && hours.night() ? { ...mediaSettings, attractSound: 'muted' } : mediaSettings, { music: medias.sound(table, 'Audio'), launch: now === 'loading' ? medias.sound(table, 'AudioLaunch') : undefined }, tableMediaVolume(table))
       : { video: 0 };
-  return { ...plan, launchId: plan.launch ? launchCount : undefined, output: audioOutput };
+  return { ...plan, launchId: plan.launch ? launchCount : undefined, output: menuOutput() };
 }
 
 // ---------------------------------------------------------------------------

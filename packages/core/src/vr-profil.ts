@@ -149,3 +149,29 @@ export function tableUsesPupCapture(script: string | undefined): boolean {
 export function vrNeedsVpxBackglass(t: { room: boolean; backglassDisplays: number | undefined; pupCapture: boolean }): boolean {
   return !t.room || (!t.backglassDisplays && t.pupCapture);
 }
+
+/**
+ * Marques et runtimes de casques VR dans le nom d'une sortie audio de Windows : la sortie de Link
+ * (« Casque (Oculus Virtual Audio Device) »), de SteamVR, d'un casque branché (Index, Vive, Reverb,
+ * Pico, Varjo, Pimax, Bigscreen…). Des critères généraux, pas le nom d'un seul modèle.
+ */
+const HEADSET_AUDIO = /\b(oculus|meta quest|quest|rift|virtual audio device|steamvr|valve index|index hmd|vive|reverb|mixed reality|windows mr|pico|varjo|pimax|bigscreen|virtual desktop|\bvr\b)/i;
+
+/**
+ * La sortie audio du casque parmi celles de Windows (essai du 10 novembre 2026 : le son restait sur le
+ * PC, jamais dans les écouteurs du casque). La plus évidente d'abord (« virtual audio device » d'un
+ * runtime), sinon la première qui nomme un casque ; undefined si aucune.
+ */
+export function headsetAudioOutput<T extends { friendlyName: string; deviceDesc?: string; interfaceName?: string }>(outputs: readonly T[] | undefined): T | undefined {
+  const named = (o: T) => `${o.friendlyName} ${o.deviceDesc ?? ''} ${o.interfaceName ?? ''}`;
+  const candidates = (outputs ?? []).filter((o) => HEADSET_AUDIO.test(named(o)));
+  return candidates.find((o) => /virtual audio device/i.test(named(o))) ?? candidates[0];
+}
+
+/** Les deux sorties de VPX (son de la table, et fronton : ROM, PuP, musique) sur la sortie du casque. */
+export function vrAudioSettings(friendlyName: string): VpxSetting[] {
+  return [
+    { section: 'Player', key: 'SoundDevice', value: friendlyName },
+    { section: 'Player', key: 'SoundDeviceBG', value: friendlyName },
+  ];
+}
