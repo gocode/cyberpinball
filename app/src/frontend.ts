@@ -235,8 +235,8 @@ import {
   jukeboxWheelMove,
   JUKEBOX_WHEEL_KEY,
 } from '@cyberpinball/core';
-import { bringToFront, foregroundWindow, listWindows, moveWindow, visibleWindowsOf } from '@cyberpinball/win-displays';
-import { observedDisplays } from './displays';
+import { bringToFront, foregroundWindow, listWindows, moveWindow, setCursorPosition, visibleWindowsOf } from '@cyberpinball/win-displays';
+import { observedDisplays, simulatedDisplays } from './displays';
 import { browserScreenFor } from './browser-screen';
 import { createWindow, isShown, OFFSCREEN, primaryRect, refuseOffscreen, whenReadyToShow, windowRect } from './offscreen';
 import { quitWithWindow } from './app-lifetime';
@@ -2029,7 +2029,8 @@ async function installKinect(): Promise<void> {
   });
   if (!file) return;
   let installed = false;
-  await library.task(t('Autorisation demandée à Windows : répondez dans la fenêtre « Contrôle de compte d’utilisateur »…'), async () => {
+  pointAtElevationPrompt();
+  await library.task(t('Windows demande son accord : choisissez « Oui » à la souris (le pointeur est posé sur sa fenêtre) ou au clavier, Alt+O'), async () => {
     const result = await installKinectDriver(file!);
     console.log(`Vision 3D : pilote de la Kinect ${result.ok ? 'installé' : `pas installé (${result.reason})`}.`); // i18n-ignore : journal
     if (!result.ok) throw new Error(result.cancelled ? t('Autorisation refusée dans la fenêtre de Windows : rien n’a changé') : t('Pilote de la Kinect pas installé : {reason}', { reason: result.reason }));
@@ -2040,6 +2041,23 @@ async function installKinect(): Promise<void> {
   writeVision3d(loc.dataDir, vision3d);
   vision3dHardware(true);
   openVision3dScreen();
+}
+
+/**
+ * La fenêtre « Contrôle de compte d'utilisateur » s'ouvre au milieu de l'écran principal, sur un
+ * bureau sécurisé où les boutons de la borne ne servent pas, et le pointeur, caché par le menu, peut
+ * être sur un autre écran : il est posé au milieu de l'écran principal, sur le bouton « Oui » ou tout
+ * près (constaté sur la borne le 10/11/2026 : pointeur introuvable, réponse impossible au clavier).
+ */
+function pointAtElevationPrompt(): void {
+  if (simulatedDisplays()) return;
+  const main = observedDisplays().find((d) => d.primary);
+  if (!main) return;
+  try {
+    setCursorPosition(main.bounds.x + main.bounds.width / 2, main.bounds.y + main.bounds.height / 2);
+  } catch (error) {
+    console.warn(`Vision 3D : pointeur non déplacé (${(error as Error).message})`); // i18n-ignore : journal
+  }
 }
 
 /**

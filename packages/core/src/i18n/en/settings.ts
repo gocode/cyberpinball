@@ -383,4 +383,5 @@ export const messages: Record<string, string> = {
   'Autorisation refusée dans la fenêtre de Windows : rien n’a changé': 'Permission refused in the Windows prompt: nothing has changed',
   'Pilote de la Kinect pas installé : {reason}': 'Kinect driver not installed: {reason}',
   'Pilote de la Kinect (Microsoft)': 'Kinect driver (Microsoft)',
+  'Windows demande son accord : choisissez « Oui » à la souris (le pointeur est posé sur sa fenêtre) ou au clavier, Alt+O': 'Windows asks for consent: choose “Yes” with the mouse (the pointer is placed on its window) or with the keyboard, Alt+Y',
 };

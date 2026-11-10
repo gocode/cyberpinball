@@ -115,7 +115,10 @@ void controlesCalcul()
    v = vuePourDeplacement(b, { 0.f, 10.f, 0.f }, 1.f);
    controle(proche(v.z, 1300.f + u) && proche(v.x, 0.f), "fenetre : tete plus haute -> vue plus haute");
    v = vuePourDeplacement(b, { 0.f, 0.f, 10.f }, 1.f);
-   controle(proche(v.y, -200.f - u), "fenetre : tete reculee -> vue vers le joueur (Y negatif)");
+   controle(proche(v.y, -200.f + u), "fenetre : tete reculee -> vue vers le joueur (Y positif, comme les tables)");
+   // Même sens en mode Window et en mode Camera : reculer éloigne toujours la caméra du plateau.
+   VueDeBase cam{ MODE_CAMERA, { 0.f, 0.f, 0.f }, 2162.f, 0.f, 0.f, 0.f };
+   controle(vuePourDeplacement(cam, { 0.f, 0.f, 10.f }, 1.f).y > 0.f && vuePourDeplacement(b, { 0.f, 0.f, 10.f }, 1.f).y > -200.f, "recul : meme sens en mode Window et Camera");
    v = vuePourDeplacement(b, { 0.f, 0.f, 0.f }, 1.f);
    controle(proche(v.x, 0.f) && proche(v.y, -200.f) && proche(v.z, 1300.f), "fenetre : position neutre inchangee");
 

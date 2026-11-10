@@ -42,6 +42,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Importing a YouTube playlist: paste its link from the phone remote, on the keyboard (Ctrl+V), or from “Get” (the “Add to the Juke-box” button). You see the number of tracks, the duration, the estimated size and the skipped videos with their reason, then choose the tracks, the playlist, online playback or download to the cabinet, and the quality (1080p, 720p, sound only).
 - Each track plays online, downloaded to the cabinet, or from a file on your drive (a whole folder, subfolders included); “Download everything” and “Free up space” move a playlist from one mode to the other. Without network or space, these functions stay visible, greyed with their reason.
 - A track's title, artist and album can be corrected in “Tracks and details”; your correction wins over what YouTube says.
+- 3D vision: stepping back or coming closer now moves the table the right way. While the Kinect driver installs, the mouse pointer is placed on the Windows consent window, and the screen says how to answer with the keyboard (Alt+Y).
 
 ## 0.1.8
 

@@ -44,6 +44,7 @@ son interface).
 - Import d'une playlist YouTube : collez son lien depuis la télécommande du téléphone, au clavier (Ctrl+V), ou depuis « Récupérer » (bouton « Ajouter au Juke-box »). Vous voyez le nombre de morceaux, la durée, la taille estimée et les vidéos sautées avec leur raison, puis choisissez les morceaux, la playlist, la lecture en ligne ou le téléchargement sur la borne, et la qualité (1080p, 720p, son seul).
 - Chaque morceau se lit en ligne, téléchargé sur la borne, ou depuis un fichier de votre disque (un dossier entier, sous-dossiers compris) ; « Tout télécharger » et « Libérer la place » font passer une playlist d'un mode à l'autre. Sans réseau ou sans place, ces fonctions restent visibles, grisées avec leur raison.
 - Le titre, l'artiste et l'album d'un morceau se corrigent dans « Morceaux et informations » ; votre correction l'emporte sur ce que dit YouTube.
+- Vision 3D : reculer ou s'approcher fait maintenant bouger la table dans le bon sens. Pendant l'installation du pilote de la Kinect, le pointeur de la souris est posé sur la fenêtre d'accord de Windows, et l'écran dit comment répondre au clavier (Alt+O).
 
 ## 0.1.8
 

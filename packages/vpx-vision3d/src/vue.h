@@ -12,8 +12,10 @@
 //   z : horizontal, de l'écran (ou du capteur) vers le joueur
 //
 // Repère « joueur » de VPX (réglages Player X/Y/Z, mode Window) : depuis le bas
-// de l'écran du plateau, X à droite, Y vers le haut du plateau (négatif vers le
-// joueur), Z vers le haut. VPX le convertit en position de vue par une rotation
+// de l'écran du plateau, X à droite, Y vers le joueur (le repère des tables : y croît
+// du haut du plateau vers les flippers ; la caméra est en m_bottom + viewY,
+// ViewSetup::ComputeMVP), Z vers le haut. Constaté sur la borne le 10/11/2026 : avec
+// Y inversé, reculer la tête tordait le plateau vers l'avant. VPX le convertit en position de vue par une rotation
 // autour de X (pente de la vitre moins inclinaison de l'écran), puis en unités
 // VPX (VPXPlugin.h, CMTOVPU). On applique la même conversion au seul
 // déplacement : la position neutre reste exactement celle que VPX a calculée.
@@ -34,7 +36,7 @@ struct Vec3 { float x, y, z; };
 inline float cmVersVpu(float cm) { return cm * (float)(50. / (2.54 * 1.0625)); }
 
 // Déplacement de la tête (repère reçu) vers le repère joueur de VPX.
-inline Vec3 versRepereJoueur(const Vec3& d) { return Vec3{ d.x, -d.z, d.y }; }
+inline Vec3 versRepereJoueur(const Vec3& d) { return Vec3{ d.x, d.z, d.y }; }
 
 // Rotation autour de X à la manière de VPX (Matrix3D::SetRotateX, vecteur ligne).
 inline Vec3 tourneX(const Vec3& v, float angle)
