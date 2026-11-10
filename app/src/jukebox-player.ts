@@ -28,12 +28,15 @@ import {
   initialPlayer,
   jukeboxInput,
   menuButton,
+  isJukeboxAction,
   playlistAt,
   playlistRows,
+  rememberPlayModes,
+  rowKey,
+  trackRows,
   startPressStep,
   type StartPress,
   JUKEBOX_MANAGE_HOLD_MS,
-  selectedKey,
   jukeboxPlayerView,
   jukeboxPoster,
   jukeboxSelectionDots,
@@ -301,7 +304,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       syncDmd();
       return;
     }
-    player = initialPlayer(lists(input), l.store().last, opened);
+    player = initialPlayer(lists(input), l.store().last, opened, l.store().modes);
     // Retour d'un téléchargement : ses morceaux, directement.
     if (playlist && input.some((p) => p.id === playlist)) player = { ...player, level: 'tracks', at: playlist, shown: playlist };
     tops.clear();
@@ -349,9 +352,13 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   function step(input: PlayerInput): void {
     if (!player) return;
     const input2 = playlistsInput();
+    const before = player.modes;
     const r = playerStep(player, input, lists(input2));
     player = r.state;
     if (player.level === 'tracks') opened = player.shown;
+    // Un mode de lecture changé (aléatoire, répétition) est retenu pour la playlist, d'une fois sur l'autre.
+    const l = lib();
+    if (l && player.modes !== before) l.commit(rememberPlayModes(l.store(), player.modes));
     if (r.effect) apply(r.effect);
     // Liste qui ne bouge que si le choix sort de sa fenêtre.
     keepSelectionVisible(input2);
@@ -366,10 +373,11 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       tops.set(PLAYLISTS_TOP, listTop(tops.get(PLAYLISTS_TOP), Math.max(0, all.indexOf(playlistAt(player, ls))), rows(), all.length));
       return;
     }
-    const p = input.find((x) => x.id === player!.shown);
-    if (!p) return;
-    const index = Math.max(0, p.rows.findIndex((r) => r.key === selectedKey(player!, ls)));
-    tops.set(p.id, listTop(tops.get(p.id), index, rows(), p.rows.length));
+    const list = ls.find((x) => x.id === player!.shown);
+    if (!list) return;
+    // Les lignes fixes (gestion, Tout lire, Lecture aléatoire, Répétition), puis les morceaux.
+    const all = trackRows(list);
+    tops.set(list.id, listTop(tops.get(list.id), Math.max(0, all.indexOf(rowKey(player, ls) ?? '')), rows(), all.length));
   }
 
   /** Un geste de Start : appui, répétition, échéance du seuil, relâchement. */
@@ -381,9 +389,10 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     if (press && !press.done) pressTimer = setTimeout(() => startPress('tick'), Math.max(0, press.since + JUKEBOX_MANAGE_HOLD_MS - Date.now()) + 5);
     if (r.action === 'start') step('start');
     else if (r.action === 'manage') {
-      // La gestion prend la main : le relâchement n'arrivera pas ici.
+      // Start maintenu : la lecture aléatoire d'une playlist choisie au niveau 1, sinon la gestion
+      // (qui prend la main : le relâchement n'arrivera pas ici).
       press = undefined;
-      manage();
+      step('hold');
     }
     host.redraw();
   }
@@ -426,7 +435,20 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       step('start');
     } else if (action.op === 'up') {
       if (player.level === 'tracks') step('exit');
-    } else if (action.op === 'row' && typeof action.key === 'string') {
+    } else if (action.op === 'row' && typeof action.key === 'string' && isJukeboxAction(action.key)) {
+      // Une ligne fixe cliquée (gestion, Tout lire, Lecture aléatoire, Répétition) : elle agit.
+      player = { ...player, selected: { ...player.selected, [player.shown]: action.key } };
+      step('start');
+    } else if (action.op === 'pause') {
+      // Bouton Pause de la carte (bureau) : le morceau en cours, quel que soit le niveau.
+      if (player.playing) {
+        const paused = !player.paused;
+        player = { ...player, paused };
+        apply({ kind: paused ? 'pause' : 'resume' });
+      }
+    } else if (action.op === 'shuffle') step('shuffle-toggle');
+    else if (action.op === 'repeat') step('repeat-cycle');
+    else if (action.op === 'row' && typeof action.key === 'string') {
       const shown = player.shown;
       if (player.selected[shown] === action.key) step('start');
       else {

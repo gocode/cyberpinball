@@ -77,4 +77,17 @@ export const messages: Record<string, string> = {
   'Importer de YouTube, ou une nouvelle playlist': 'Import from YouTube, or a new playlist',
   'Ajouter des fichiers, ou importer de YouTube': 'Add files, or import from YouTube',
   'Entrée : ouvrir la playlist choisie': 'Enter: open the chosen playlist',
+  // Modes de lecture : lignes fixes d'une playlist, carte du morceau en cours (10/11/2026).
+  'Tout lire': 'Play all',
+  'Lecture aléatoire': 'Shuffle',
+  'Changer la répétition': 'Change repeat',
+  'Aucun morceau ne se lit': 'No track can play',
+  'Répétition : playlist': 'Repeat: playlist',
+  'Répétition : morceau': 'Repeat: track',
+  'Répétition : aucune': 'Repeat: off',
+  '{count}, dans l’ordre': '{count}, in order',
+  'Chaque morceau une fois, dans le désordre': 'Every track once, in random order',
+  'Start : playlist, morceau, aucune': 'Start: playlist, track, off',
+  'Lecture aléatoire : oui': 'Shuffle: on',
+  'Lecture aléatoire : non': 'Shuffle: off',
 };

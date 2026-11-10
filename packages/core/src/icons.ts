@@ -61,6 +61,8 @@ export const ICON_NAMES = [
   'layers',
   // Fiche d'un jeu
   'play',
+  'repeat',
+  'repeat-one',
   'rules',
   'image',
   'pup',

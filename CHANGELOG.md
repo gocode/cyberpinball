@@ -79,6 +79,8 @@ son interface).
 - Taper au téléphone ne fait plus planter Cyber Pinball : la cause était un raccourci clavier (Ctrl+A) d'un menu caché, hérité d'Electron, qui faisait tomber l'application ; ce menu est retiré, la copie, le collage et la sélection marchent comme avant.
 - « Récupérer » n'ouvre plus la page de connexion de Google, qui refuse le navigateur intégré : la fenêtre explique pourquoi et propose de passer par Firefox.
 - Compte YouTube : « Installer Firefox » quand il manque. L'installateur officiel est téléchargé chez Mozilla, sa signature vérifiée, puis Firefox installé sans fenêtre ; la suite est dite à l'écran.
+- Juke-box, modes de lecture : dans une playlist, sous « Gestion du Juke-box », « Tout lire » (dans l’ordre), « Lecture aléatoire » (chaque morceau une fois avant d’en rejouer un) et « Répétition : playlist / morceau / aucune », que Start fait tourner. Le mode est retenu par chaque playlist et se voit sur la carte du morceau en cours (⤮, ⟳) ; au bureau, ses boutons ⤮ et ⟳.
+- Juke-box : Start maintenu sur une playlist la lance directement en lecture aléatoire ; ailleurs, il ouvre toujours la gestion.
 
 ## 0.1.8
 

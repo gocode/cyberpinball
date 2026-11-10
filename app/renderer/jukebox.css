@@ -1377,19 +1377,20 @@
 
 /* Playlist vide : la ligne « Gestion du Juke-box » en tête (une ligne), l'invitation dans la place qui reste. */
 .jb-cab .jb-rows:has(+ .jb-empty-under) {
-  height: calc(132 * var(--jp));
+  height: calc(132 * var(--fixed-rows, 1) * var(--jp));
 }
 
+/* La place qui reste sous les lignes fixes (une : la gestion ; quatre : gestion, Tout lire, Lecture aléatoire, Répétition). */
 .jb-cab .jb-empty-under {
-  height: calc(924 * var(--jp));
+  height: calc((1056 - 132 * var(--fixed-rows, 1)) * var(--jp));
 }
 
 .jb-desk .jb-rows:has(+ .jb-empty-under) {
-  height: calc(110 * var(--jp));
+  height: calc(110 * var(--fixed-rows, 1) * var(--jp));
 }
 
 .jb-desk .jb-empty-under {
-  height: calc(660 * var(--jp));
+  height: calc((770 - 110 * var(--fixed-rows, 1)) * var(--jp));
   gap: calc(14 * var(--jp));
   padding: calc(20 * var(--jp));
 }
@@ -1444,4 +1445,62 @@
   object-fit: cover;
   min-width: 0;
   min-height: 0;
+}
+
+/* ---------- Modes de lecture : lignes fixes d'une playlist, carte du morceau en cours ---------- */
+
+/* Mode en vigueur : la pastille de la ligne en vert signal. */
+.jb-action.jb-on .jb-manage-icon {
+  color: var(--signal);
+  border-color: var(--signal);
+}
+
+.jb-modes {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(10 * var(--jp));
+  margin-left: calc(16 * var(--jp));
+  color: var(--signal);
+}
+
+.jb-mode {
+  display: inline-grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+}
+
+.jb-mode > svg {
+  width: calc(22 * var(--jp));
+  height: calc(22 * var(--jp));
+}
+
+.jb-now-buttons {
+  display: flex;
+  align-items: center;
+  gap: calc(10 * var(--jp));
+  flex: none;
+}
+
+.jb-icon-button {
+  padding: calc(12 * var(--jp));
+  min-width: calc(60 * var(--jp));
+}
+
+.jb-icon-button > svg {
+  width: calc(26 * var(--jp));
+  height: calc(26 * var(--jp));
+}
+
+.jb-icon-button.jb-on {
+  color: var(--signal);
+  border-color: var(--signal);
+}
+
+.jb-empty-compact .jb-bubble {
+  display: none;
+}
+
+.jb-empty.jb-empty-compact {
+  gap: calc(14 * var(--jp));
+  padding: calc(20 * var(--jp));
 }

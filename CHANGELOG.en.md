@@ -77,6 +77,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Typing from the phone no longer crashes Cyber Pinball: the cause was a keyboard shortcut (Ctrl+A) of a hidden menu inherited from Electron, which brought the application down; that menu is removed, and copy, paste and selection work as before.
 - “Get” no longer opens Google’s sign-in page, which refuses the built-in browser: the window explains why and offers to go through Firefox.
 - YouTube account: “Install Firefox” when it is missing. The official installer is downloaded from Mozilla, its signature checked, then Firefox installed with no window; what to do next is shown on screen.
+- Juke-box, play modes: inside a playlist, under “Gestion du Juke-box”, “Tout lire” (play all, in order), “Lecture aléatoire” (shuffle: every track once before any replays) and “Répétition: playlist / track / off”, which Start cycles. The mode is kept per playlist and shows on the now-playing card (⤮, ⟳); on a desktop, its ⤮ and ⟳ buttons.
+- Juke-box: holding Start on a playlist starts it straight away in shuffle; elsewhere it still opens management.
 
 ## 0.1.8
 

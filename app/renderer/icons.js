@@ -49,6 +49,8 @@ const CYBER_ICONS = {
 
   // Fiche d’un jeu
   play: '<path d="M7 4v16l13-8z"/>', // Lancer la partie.
+  repeat: '<path d="M4 11V9a3 3 0 0 1 3-3h13M17 3l3 3-3 3M20 13v2a3 3 0 0 1-3 3H4M7 21l-3-3 3-3"/>', // Répéter la playlist (Juke-box).
+  'repeat-one': '<path d="M4 11V9a3 3 0 0 1 3-3h13M17 3l3 3-3 3M20 13v2a3 3 0 0 1-3 3H4M7 21l-3-3 3-3M11 10.5l1.5-1v5"/>', // Répéter le morceau : la boucle et un 1.
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/>', // Fiche du jeu ou information.
   rules: '<path d="M5 3h10l4 4v14H5zM15 3v4h4M9 12h6M9 16h6"/>', // Règles sur une feuille.
   edit: '<path d="M3 21l1-6L16 3l5 5L9 20zM13 6l5 5"/>', // Modifier les informations.
@@ -65,7 +67,7 @@ const CYBER_ICONS = {
   video: '<path d="M3 6h12v12H3zM15 10l6-4v12l-6-4"/>', // Son des vidéos du menu.
   rocket: '<path d="M9 16c0-7 5-11 12-13 0 7-4 12-11 13zM10 9H5l-3 6h7M15 14v5l-6 3v-6M5 19l-2 2M16 8h.01"/>', // Lancement de la partie.
   attract: '<path d="M20 16A9 9 0 0 1 8 4a9 9 0 1 0 12 12z"/>', // Mode attente, croissant.
-  shuffle: '<path d="M3 6h3c5 0 7 12 12 12h3M17 14l4 4-4 4M3 18h3c2 0 3-2 4-4M14 9c1-2 2-3 4-3h3M17 2l4 4-4 4"/>', // Table aléatoire suivante.
+  shuffle: '<path d="M3 6h3c5 0 7 12 12 12h3M17 14l4 4-4 4M3 18h3c2 0 3-2 4-4M14 9c1-2 2-3 4-3h3M17 2l4 4-4 4"/>', // Table aléatoire suivante ; lecture aléatoire du Juke-box.
   'volume-low': '<path d="M3 9v6h4l5 4V5L7 9zM17 10a4 4 0 0 1 0 4"/>', // Son réduit pendant l’attente.
   'volume-mute': '<path d="M3 9v6h4l5 4V5L7 9zM16 9l6 6M22 9l-6 6"/>', // Son de la borne coupé (Muet, Volume − maintenu).
   film: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M7 3v18M17 3v18M3 9h4M3 15h4M17 9h4M17 15h4"/>', // Médias pendant la partie.

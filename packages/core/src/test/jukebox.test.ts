@@ -51,7 +51,33 @@ import {
 } from '../jukebox';
 import { JUKEBOX_DMD_ANIMATIONS, animationColor, normalizeSkins, resolveSkin, setSkin, skinChainText, skinKeys } from '../jukebox-dmd';
 import { classifyLocalName, folderCoverName, localCover, localScanSummary, localTracks, parseId3, readMediaTags, scanLocalMedia, sniffLocalMedia } from '../jukebox-files';
-import { initialPlayer, jukeboxInput, JUKEBOX_ELEMENT_VOLUME, JUKEBOX_MANAGE_HOLD_MS, JUKEBOX_MANAGE_KEY, JUKEBOX_SHUFFLE, nextPlayable, playerStep, playlistAt, playlistPosition, playlistRows, selectedKey, startHint, startPressStep, type PlayerList, type PlayerState } from '../jukebox-play';
+import {
+  DEFAULT_PLAY_MODE,
+  holdHint,
+  initialPlayer,
+  jukeboxInput,
+  JUKEBOX_ELEMENT_VOLUME,
+  JUKEBOX_MANAGE_HOLD_MS,
+  JUKEBOX_MANAGE_KEY,
+  JUKEBOX_PLAY_ALL_KEY,
+  JUKEBOX_REPEAT_KEY,
+  JUKEBOX_SHUFFLE_KEY,
+  nextPlayable,
+  playerStep,
+  playlistAt,
+  playlistPosition,
+  playlistRows,
+  playModeOf,
+  rowKey,
+  selectedKey,
+  shuffled,
+  startHint,
+  startPressStep,
+  trackRows,
+  type PlayerList,
+  type PlayerState,
+} from '../jukebox-play';
+import { rememberPlayModes } from '../jukebox';
 import { MUTE_HOLD_MS } from '../cabinetvolume';
 import {
   applyPlaylistImport,
@@ -646,7 +672,6 @@ const lists: PlayerList[] = [
 ];
 
 test('deux niveaux : on entre sur les playlists (gestion en tête), Start ouvre, Exit remonte (la musique continue) puis revient à la roue', () => {
-  assert.equal(JUKEBOX_SHUFFLE, false);
   assert.equal(JUKEBOX_ELEMENT_VOLUME, 1, 'le volume est celui de la borne');
   // Entrée : le niveau des playlists, le curseur sur la dernière ouverte, sinon celle du dernier morceau joué, sinon la première.
   let s: PlayerState = initialPlayer(lists, { playlist: 'p2', key: 'y' });
@@ -679,8 +704,14 @@ test('deux niveaux : on entre sur les playlists (gestion en tête), Start ouvre,
   s = step.state;
   assert.deepEqual([s.level, s.shown], ['tracks', 'p1']);
   assert.equal(selectedKey(s, lists), 'a');
-  // Niveau des morceaux : flippers sans boucler, Start indisponible avec raison et pourcentage.
-  assert.equal(playerStep(s, 'previous', lists).state.selected.p1 ?? 'a', 'a', 'en tête : la liste ne boucle pas');
+  // Niveau des morceaux : les lignes fixes au-dessus du premier morceau, puis la liste s'arrête (sans boucler).
+  assert.deepEqual(trackRows(lists[0]!), [JUKEBOX_MANAGE_KEY, JUKEBOX_PLAY_ALL_KEY, JUKEBOX_SHUFFLE_KEY, JUKEBOX_REPEAT_KEY, 'a', 'b', 'c']);
+  assert.equal(playerStep(s, 'previous', lists).state.selected.p1, JUKEBOX_REPEAT_KEY);
+  assert.equal(selectedKey(playerStep(s, 'previous', lists).state, lists), undefined, 'une ligne fixe n’est pas un morceau');
+  let top = s;
+  for (let i = 0; i < 6; i++) top = playerStep(top, 'previous', lists).state;
+  assert.equal(rowKey(top, lists), JUKEBOX_MANAGE_KEY, 'en tête : la gestion, la liste ne boucle pas');
+  assert.deepEqual(playerStep(top, 'start', lists).effect, { kind: 'manage' });
   s = playerStep(s, 'next', lists).state;
   assert.deepEqual(startHint(s, lists), { enabled: false, label: 'Indisponible · 42 %', reason: 'En téléchargement · 42 %' });
   step = playerStep(s, 'start', lists);
@@ -717,14 +748,108 @@ test('deux niveaux : on entre sur les playlists (gestion en tête), Start ouvre,
   const exit = playerStep(up.state, 'exit', lists);
   assert.deepEqual(exit.effect, { kind: 'exit' });
   assert.equal(exit.state.playing, undefined);
-  // Playlist vide : elle s'ouvre (l'invitation), Start y est indisponible avec sa raison.
+  // Playlist vide : elle s'ouvre sur la gestion (on y ajoute des morceaux) ; Tout lire y est indisponible avec sa raison.
   const empty = playerStep({ ...initialPlayer(lists), at: 'p3' }, 'start', lists).state;
   assert.deepEqual([empty.level, empty.shown], ['tracks', 'p3']);
   assert.equal(selectedKey(empty, lists), undefined);
-  assert.deepEqual(startHint(empty, lists), { enabled: false, label: 'Liste vide', reason: 'Playlist vide' });
-  assert.deepEqual(playerStep(empty, 'start', lists).effect, { kind: 'refused', reason: 'Playlist vide' });
+  assert.equal(rowKey(empty, lists), JUKEBOX_MANAGE_KEY);
+  assert.deepEqual(startHint(empty, lists), { enabled: true, label: 'Ouvrir la gestion' });
+  const playAllEmpty = { ...empty, selected: { p3: JUKEBOX_PLAY_ALL_KEY } };
+  assert.deepEqual(startHint(playAllEmpty, lists), { enabled: false, label: 'Liste vide', reason: 'Playlist vide' });
+  assert.deepEqual(playerStep(playAllEmpty, 'start', lists).effect, { kind: 'refused', reason: 'Playlist vide' });
   // Une playlist supprimée entre-temps (gestion) : le curseur se reprend sur une ligne qui existe.
   assert.equal(playlistAt({ ...initialPlayer(lists), at: 'disparue', shown: 'p2' }, lists), 'p2');
+});
+
+/** Tirage déterministe pour les essais : une suite de nombres de [0, 1). */
+const seeded = (seed = 7) => {
+  let x = seed;
+  return () => ((x = (x * 16807) % 2147483647) - 1) / 2147483646;
+};
+
+const many: PlayerList[] = [{ id: 'm', tracks: ['a', 'b', 'c', 'd', 'e'].map((key) => ({ key, playable: key !== 'c' })) }];
+const inM = (extra: Partial<PlayerState> = {}): PlayerState => ({ level: 'tracks', at: 'm', shown: 'm', selected: {}, paused: false, ...extra });
+
+test('modes : Tout lire dans l’ordre, la boucle à la fin ou l’arrêt sans répétition', () => {
+  assert.deepEqual(DEFAULT_PLAY_MODE, { shuffle: false, repeat: 'playlist' }, 'par défaut : dans l’ordre, en boucle (comme avant les modes)');
+  let r = playerStep(inM({ selected: { m: JUKEBOX_PLAY_ALL_KEY } }), 'start', many);
+  assert.deepEqual(r.effect, { kind: 'play', playlist: 'm', key: 'a' }, 'Tout lire : le premier morceau qui se lit');
+  assert.deepEqual(playModeOf(r.state, 'm'), { shuffle: false, repeat: 'playlist' });
+  const keys: string[] = [];
+  for (let i = 0; i < 5; i++) {
+    r = playerStep(r.state, 'ended', many);
+    keys.push((r.effect as { key: string }).key);
+  }
+  assert.deepEqual(keys, ['b', 'd', 'e', 'a', 'b'], 'le morceau indisponible est sauté ; la playlist boucle');
+  // Répétition : aucune → arrêt à la fin.
+  const none = { ...inM({ playing: { playlist: 'm', key: 'e' } }), modes: { m: { shuffle: false, repeat: 'none' as const } } };
+  assert.deepEqual(playerStep(none, 'ended', many).effect, { kind: 'stop' });
+  // Répéter le morceau : le même, encore.
+  const one = { ...inM({ playing: { playlist: 'm', key: 'b' } }), modes: { m: { shuffle: false, repeat: 'track' as const } } };
+  assert.deepEqual(playerStep(one, 'ended', many).effect, { kind: 'play', playlist: 'm', key: 'b' });
+});
+
+test('modes : la ligne Répétition tourne (playlist, morceau, aucune) sans rien jouer ; le mode est retenu par playlist', () => {
+  let s = inM({ selected: { m: JUKEBOX_REPEAT_KEY } });
+  assert.equal(startHint(s, many).label, 'Changer la répétition');
+  const seen: string[] = [];
+  for (let i = 0; i < 3; i++) {
+    const r = playerStep(s, 'start', many);
+    assert.equal(r.effect, undefined, 'rien ne joue');
+    s = r.state;
+    seen.push(playModeOf(s, 'm').repeat);
+  }
+  assert.deepEqual(seen, ['track', 'none', 'playlist']);
+  assert.deepEqual(playModeOf(s, 'autre'), DEFAULT_PLAY_MODE, 'une autre playlist garde le sien');
+  // Bureau : les boutons ⤮ et ⟳ de la carte agissent sur la playlist qui joue.
+  const playing = inM({ playing: { playlist: 'm', key: 'a' } });
+  assert.equal(playModeOf(playerStep(playing, 'repeat-cycle', many).state, 'm').repeat, 'track');
+  const on = playerStep(playing, 'shuffle-toggle', many, seeded()).state;
+  assert.equal(playModeOf(on, 'm').shuffle, true);
+  assert.deepEqual([...on.queue!.left].sort(), ['b', 'd', 'e'], 'activé en cours de lecture : le reste de la playlist est tiré');
+  // Retenu dans juke-box.json : seulement pour une playlist qui existe.
+  const store = { version: 1 as const, playlists: [{ id: 'm', name: 'M', quality: '1080p' as const, tracks: [], created: '', updated: '' }], corrections: {}, skins: { default: { kind: 'animation' as const, animation: 'spectre' as const }, rules: [] } };
+  assert.deepEqual(rememberPlayModes(store, { m: { shuffle: true, repeat: 'none' }, partie: { shuffle: true, repeat: 'track' } }).modes, { m: { shuffle: true, repeat: 'none' } });
+});
+
+test('modes : l’aléatoire tire chaque morceau une fois avant de recommencer, et se combine avec la boucle', () => {
+  const random = seeded(11);
+  assert.deepEqual(shuffled([1, 2, 3, 4], () => 0).sort(), [1, 2, 3, 4], 'un tirage sans remise garde tous les éléments');
+  let r = playerStep(inM({ selected: { m: JUKEBOX_SHUFFLE_KEY } }), 'start', many, random);
+  assert.equal(r.effect?.kind, 'play');
+  assert.equal(playModeOf(r.state, 'm').shuffle, true);
+  const first = (r.effect as { key: string }).key;
+  const round = [first];
+  for (let i = 0; i < 3; i++) {
+    r = playerStep(r.state, 'ended', many, random);
+    round.push((r.effect as { key: string }).key);
+  }
+  assert.deepEqual([...round].sort(), ['a', 'b', 'd', 'e'], 'un tour : chaque morceau qui se lit, une seule fois');
+  // Aléatoire + boucle : un nouveau tour, qui ne recommence pas par le morceau qui vient de finir.
+  r = playerStep(r.state, 'ended', many, random);
+  const next = (r.effect as { key: string }).key;
+  assert.notEqual(next, round[3]);
+  assert.equal(r.state.queue?.left.length, 3, 'le reste du nouveau tour');
+  // Aléatoire sans répétition : arrêt une fois toute la playlist passée.
+  const lastOne = { ...r.state, modes: { m: { shuffle: true, repeat: 'none' as const } }, queue: { playlist: 'm', left: [] } };
+  assert.deepEqual(playerStep(lastOne, 'ended', many, random).effect, { kind: 'stop' });
+  // Aléatoire et répéter le morceau : le morceau d'abord.
+  const looped = { ...r.state, modes: { m: { shuffle: true, repeat: 'track' as const } } };
+  assert.deepEqual(playerStep(looped, 'ended', many, random).effect, { kind: 'play', playlist: 'm', key: next });
+});
+
+test('Start maintenu au niveau des playlists : la playlist choisie en aléatoire, directement ; sur la gestion, la gestion', () => {
+  const s = { ...initialPlayer(many), at: 'm' };
+  assert.equal(holdHint(s, many), 'shuffle');
+  const r = playerStep(s, 'hold', many, seeded(3));
+  assert.equal(r.effect?.kind, 'play');
+  assert.deepEqual([r.state.level, r.state.shown, playModeOf(r.state, 'm').shuffle], ['tracks', 'm', true]);
+  const onManage = { ...s, at: JUKEBOX_MANAGE_KEY };
+  assert.equal(holdHint(onManage, many), 'manage');
+  assert.deepEqual(playerStep(onManage, 'hold', many).effect, { kind: 'manage' });
+  // Dans une playlist : Start maintenu reste la gestion.
+  assert.equal(holdHint(r.state, many), 'manage');
+  assert.deepEqual(playerStep(r.state, 'hold', many).effect, { kind: 'manage' });
 });
 
 test('Start maintenu : la gestion, sans jamais jouer ; appui court : jouer ou pause, sans sortir du lecteur ; même seuil que le volume', () => {

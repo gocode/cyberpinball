@@ -24,6 +24,7 @@
 // pas à lui (jukebox-play.ts).
 
 import * as fs from 'node:fs';
+import { DEFAULT_PLAY_MODE, REPEAT_MODES, type PlayMode, type RepeatMode } from './jukebox-play';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
 import type { DmdSkin, JukeboxSkins } from './jukebox-dmd';
@@ -150,6 +151,8 @@ export interface JukeboxStore {
   skins: JukeboxSkins;
   /** Dernier morceau joué : l'affiche du médaillon le montre. */
   last?: { playlist: string; key: string; at: string };
+  /** Mode de lecture retenu de chaque playlist (aléatoire, répétition) ; absent : dans l'ordre, en boucle. */
+  modes?: Record<string, PlayMode>;
 }
 
 /** Piste d'animation par défaut du DMD : le spectre (question 15 des maquettes). */
@@ -230,6 +233,15 @@ export function loadJukebox(dataDir: string, normalizeSkins?: (raw: unknown) => 
     }
     if (normalizeSkins) store.skins = normalizeSkins(raw.skins);
     if (raw.last && typeof raw.last === 'object' && str(raw.last.playlist) && str(raw.last.key)) store.last = { playlist: raw.last.playlist, key: raw.last.key, at: str(raw.last.at) ?? '' };
+    // Modes de lecture : ceux d'une playlist qui existe, aux valeurs connues.
+    if (raw.modes && typeof raw.modes === 'object') {
+      const modes: Record<string, PlayMode> = {};
+      for (const [id, m] of Object.entries(raw.modes as Record<string, Partial<PlayMode>>)) {
+        if (!ids.has(id) || !m || typeof m !== 'object') continue;
+        modes[id] = { shuffle: m.shuffle === true, repeat: REPEAT_MODES.includes(m.repeat as RepeatMode) ? (m.repeat as RepeatMode) : DEFAULT_PLAY_MODE.repeat };
+      }
+      if (Object.keys(modes).length) store.modes = modes;
+    }
   } catch {
     return emptyJukebox();
   }
@@ -885,6 +897,13 @@ export function freePlaylist(store: JukeboxStore, id: string, library: ReadonlyM
 export function orphanSongs(store: Pick<JukeboxStore, 'playlists'>, library: ReadonlyMap<string, LibrarySong>): string[] {
   const used = new Set(store.playlists.flatMap((p) => p.tracks.map((tr) => tr.youtube).filter(Boolean)));
   return [...library.keys()].filter((id) => !used.has(id));
+}
+
+/** Retient les modes de lecture des playlists (ceux d'une playlist supprimée sont oubliés). */
+export function rememberPlayModes(store: JukeboxStore, modes: Record<string, PlayMode> | undefined): JukeboxStore {
+  const kept = Object.fromEntries(Object.entries(modes ?? {}).filter(([id]) => store.playlists.some((p) => p.id === id)));
+  const { modes: _old, ...rest } = store;
+  return Object.keys(kept).length ? { ...rest, modes: kept } : rest;
 }
 
 /** Retient le dernier morceau joué (l'affiche du médaillon). */

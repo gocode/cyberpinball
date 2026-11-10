@@ -137,18 +137,19 @@ test('niveau des playlists : la gestion en tête, une ligne par playlist (pochet
   assert.equal(v.list.rows[1]!.playing, 'play', 'la playlist qui joue est marquée');
   assert.equal(v.list.rows.filter((r) => r.focus).length, 1);
   assert.equal(v.list.head, 'Playlist · 2 / 3');
-  // Bandeau : ce que fait chaque bouton à ce niveau ; pas de MagnaSave (ils n'y font rien).
+  // Bandeau : ce que fait chaque bouton à ce niveau ; pas de MagnaSave (ils n'y font rien) ; Start maintenu : l'aléatoire.
   assert.deepEqual(v.commands.map((c) => [c.id, c.action]), [
     ['flippers', 'Choisir'],
     ['start', 'Ouvrir la playlist'],
     ['exit', 'Roue · arrêt musique'],
-    ['manage', 'Gestion des playlists'],
+    ['manage', 'Lecture aléatoire'],
   ]);
-  // La gestion choisie : Start l'ouvre ; le compteur dit le nombre de playlists.
+  // La gestion choisie : Start l'ouvre, Start maintenu aussi ; le compteur dit le nombre de playlists.
   const onManage = jukeboxPlayerView({ playlists: ALL, state: { ...state, at: JUKEBOX_MANAGE_KEY }, top: 0, rows: 8 });
   assert.equal(onManage.list.rows[0]!.focus, true);
   assert.equal(onManage.list.head, 'Gestion du Juke-box · 3 playlists');
   assert.equal(onManage.commands[1]!.action, 'Ouvrir la gestion');
+  assert.equal(onManage.commands[3]!.action, 'Gestion des playlists');
   // La carte du morceau en cours reste en bas, à ce niveau aussi.
   assert.equal(v.now?.title, 'Échos du périphérique');
   // Aucune playlist : la gestion seule, et l'invitation.
@@ -164,13 +165,21 @@ test('niveau des morceaux : le nom en en-tête et le fil d’Ariane ; Exit « Pl
   state = playerStep(state, 'start', lists).state;
   state = playerStep(state, 'start', lists).state;
   state = playerStep(state, 'next', lists).state;
-  const v = jukeboxPlayerView({ playlists: ALL, state, top: 0, rows: 8 });
+  const v = jukeboxPlayerView({ playlists: ALL, state, top: 0, rows: 12 });
   assert.equal(v.level, 'tracks');
   assert.deepEqual(v.header, { label: 'Playlist · 7 morceaux', title: 'Néon nocturne', badge: '2 / 3', crumb: 'Néon nocturne' });
   assert.equal(v.playlist?.name, 'Néon nocturne');
   assert.equal(v.list.head, 'Sélection · 3 / 7');
-  assert.ok(!v.list.rows.some((r) => r.manage), 'la gestion est au niveau des playlists (et à Start maintenu)');
-  assert.deepEqual(v.list.rows.map((r) => r.num).slice(0, 3), ['01', '02', '03']);
+  // En tête, les quatre lignes fixes, qui ne sont pas des morceaux (ni numéro, ni durée) ; puis les morceaux.
+  assert.deepEqual(v.list.rows.slice(0, 4).map((r) => [r.key, r.title, r.num, r.duration, r.action ?? (r.manage ? 'gestion' : '')]), [
+    [JUKEBOX_MANAGE_KEY, 'Gestion du Juke-box', '', '', 'gestion'],
+    ['@tout-lire', 'Tout lire', '', '', 'play'],
+    ['@aleatoire', 'Lecture aléatoire', '', '', 'shuffle'],
+    ['@repetition', 'Répétition : playlist', '', '', 'repeat'],
+  ]);
+  assert.deepEqual([v.list.rows[1]!.on, v.list.rows[2]!.on, v.list.rows[3]!.on], [true, undefined, true], 'dans l’ordre, en boucle : le mode par défaut');
+  assert.deepEqual(v.list.rows.map((r) => r.num).slice(4, 7), ['01', '02', '03']);
+  assert.deepEqual(v.now?.mode, { shuffle: false, repeat: 'playlist' }, 'la carte dit le mode de sa playlist');
   const byKey = Object.fromEntries(v.list.rows.map((r) => [r.key, r]));
   assert.equal(byKey.t2!.playing, 'play');
   assert.ok(!byKey.t2!.focus);
@@ -213,30 +222,34 @@ test('vue : Start dit pourquoi il ne joue pas, et « Reprendre » sur le morceau
   assert.equal(on('t2', { playing: { playlist: 'neon', key: 't2' } }).action, 'Pause');
   // La pause se voit sur la ligne et dans le pied.
   const paused = jukeboxPlayerView({ playlists: ALL, state: inTracks('neon', { selected: { neon: 't2' }, playing: { playlist: 'neon', key: 't2' }, paused: true }), top: 0, rows: 8 });
-  assert.equal(paused.list.rows[1]!.playing, 'pause');
+  assert.equal(paused.list.rows.find((r) => r.key === 't2')!.playing, 'pause');
+  // Sur une ligne fixe : Start dit ce qu'elle fait.
+  const at = (key: string) => jukeboxPlayerView({ playlists: ALL, state: inTracks('neon', { selected: { neon: key } }), top: 0, rows: 8 }).commands.find((c) => c.id === 'start')!.action;
+  assert.deepEqual([at('@tout-lire'), at('@aleatoire'), at('@repetition'), at(JUKEBOX_MANAGE_KEY)], ['Tout lire', 'Lecture aléatoire', 'Changer la répétition', 'Ouvrir la gestion']);
   assert.equal(paused.now?.label, 'En pause · 02 / 07');
 });
 
 test('vue : publicité YouTube, playlist vide, longue liste', () => {
   const ad = jukeboxPlayerView({ playlists: ALL, state: inTracks('neon', { selected: { neon: 't1' }, playing: { playlist: 'neon', key: 't1' } }), top: 0, rows: 8, ad: true });
-  assert.equal(ad.list.rows[0]!.num, '01');
-  assert.equal(ad.list.rows[0]!.line, 'Publicité · le morceau suit');
-  assert.equal(ad.list.rows[0]!.mark, 'ad');
+  assert.equal(ad.list.rows[4]!.num, '01');
+  assert.equal(ad.list.rows[4]!.line, 'Publicité · le morceau suit');
+  assert.equal(ad.list.rows[4]!.mark, 'ad');
   assert.equal(ad.now?.label, 'Publicité · le morceau suit');
   assert.equal(ad.now?.origin, 'YouTube en ligne');
-  // Playlist vide : l'invitation ; Start grisé avec sa raison, Exit remonte aux playlists.
+  // Playlist vide : les lignes fixes et l'invitation ; la gestion choisie (on y ajoute des morceaux).
   const empty = jukeboxPlayerView({ playlists: ALL, state: inTracks('route'), top: 0, rows: 8 });
   assert.equal(empty.empty, 'playlist');
   assert.equal(empty.list.head, 'Aucun morceau');
-  assert.deepEqual(empty.list.rows, []);
-  assert.deepEqual([empty.commands[1]!.action, empty.commands[1]!.disabled], ['Liste vide', true]);
+  assert.deepEqual(empty.list.rows.map((r) => [r.key, Boolean(r.focus)]), [[JUKEBOX_MANAGE_KEY, true], ['@tout-lire', false], ['@aleatoire', false], ['@repetition', false]]);
+  assert.deepEqual([empty.commands[1]!.action, empty.commands[1]!.disabled], ['Ouvrir la gestion', undefined]);
   // Longue liste : la fenêtre montrée, les numéros dans la playlist, le repère avant / après.
   const long = playlist(
     'long',
     'Soixante',
     Array.from({ length: 60 }, (_, i) => row(`k${i}`, `Titre ${i + 1}`)),
   );
-  const lv = jukeboxPlayerView({ playlists: [long], state: inTracks('long', { selected: { long: 'k36' } }), top: 32, rows: 8 });
+  // `top` compte les quatre lignes fixes : 36 montre les morceaux 33 à 40.
+  const lv = jukeboxPlayerView({ playlists: [long], state: inTracks('long', { selected: { long: 'k36' } }), top: 36, rows: 8 });
   assert.deepEqual(lv.list.rows.map((r) => r.num), ['33', '34', '35', '36', '37', '38', '39', '40']);
   assert.equal(lv.list.head, 'Sélection · 37 / 60');
   assert.equal(lv.list.around, '↑ 32 avant · 20 après ↓');

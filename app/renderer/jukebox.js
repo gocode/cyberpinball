@@ -225,8 +225,28 @@
     return row;
   }
 
+  /**
+   * Ligne fixe d'une playlist ouverte (Tout lire, Lecture aléatoire, Répétition) : mêmes hauteur et
+   * colonnes qu'un morceau, son icône sur une pastille (verte quand son mode est en vigueur).
+   */
+  function actionRow(r) {
+    const row = el('div', `jb-row jb-manage jb-action${r.focus ? ' is-focus' : ''}${r.on ? ' jb-on' : ''}`);
+    act(row, { op: 'row', key: r.key });
+    const badge = el('div', 'jb-art jb-manage-icon');
+    badge.append(icon(r.action));
+    const text = el('div', 'jb-row-text');
+    const title = el('span', 'jb-title jb-ellipsis', r.title);
+    title.title = r.title;
+    const line = el('span', 'jb-artist jb-ellipsis', r.line);
+    line.title = r.line;
+    text.append(title, line);
+    row.append(el('span', 'jb-num'), badge, text, el('span', 'jb-manage-none'), el('span', 'jb-manage-none'));
+    return row;
+  }
+
   function trackRow(r) {
     if (r.manage) return manageRow(r);
+    if (r.action) return actionRow(r);
     if (r.kind === 'playlist') return playlistRow(r);
     const row = el('div', `jb-row${r.focus ? ' is-focus' : ''}${r.playing ? ' jb-playing' : ''}${r.disabled ? ' jb-disabled' : ''}`);
     if (r.disabled) row.setAttribute('aria-disabled', 'true');
@@ -396,18 +416,23 @@
 
   function fillList(box, view, desk) {
     const nodes = [];
+    // Lignes fixes au-dessus d'une invitation : leur nombre, pour la place qui reste (jukebox.css).
+    box.style.removeProperty('--fixed-rows');
     if (!desk) {
       const head = el('div', 'jb-track-head');
       head.append(el('span', '', view.list.head), view.empty ? el('span', '', '') : view.list.around ? el('span', 'jb-around', view.list.around) : legend());
       nodes.push(head);
     }
-    // Aucune playlist : la ligne de gestion en tête (on y crée ou importe), l'invitation dessous.
+    // Aucune playlist, playlist vide : les lignes fixes en tête (on y crée, importe, ajoute), l'invitation dessous.
     if (view.empty && view.list.rows.length) {
       const rows = el('div', 'jb-rows');
+      box.style.setProperty('--fixed-rows', String(view.list.rows.length));
       rows.dataset.defile = '';
       rows.append(...view.list.rows.map(trackRow));
       const invite = emptyList(view, desk);
       invite.classList.add('jb-empty-under');
+      // Sous les quatre lignes fixes d'une playlist vide : l'invitation, sans sa pastille, tient dans la place qui reste.
+      if (view.list.rows.length > 1) invite.classList.add('jb-empty-compact');
       nodes.push(rows, invite);
     } else if (view.empty) nodes.push(emptyList(view, desk));
     else {
@@ -426,8 +451,34 @@
     const title = el('h2', 'jb-now-title jb-ellipsis', now.title);
     title.title = now.title;
     const line = el('p', 'jb-muted jb-ellipsis', [now.artist, now.album].filter(Boolean).join(' · '));
+    // Le mode de lecture de sa playlist : ⤮ aléatoire, ⟳ en boucle (⟳1 : le morceau) ; rien dans l'ordre sans répétition.
+    if (!desk && now.mode && (now.mode.shuffle || now.mode.repeat !== 'none')) {
+      const modes = el('span', 'jb-modes');
+      if (now.mode.shuffle) modes.append(modeMark('shuffle', t('Lecture aléatoire')));
+      if (now.mode.repeat !== 'none') modes.append(modeMark(now.mode.repeat === 'track' ? 'repeat-one' : 'repeat', now.mode.repeat === 'track' ? t('Répétition : morceau') : t('Répétition : playlist')));
+      eyebrow.append(modes);
+    }
     text.append(eyebrow, title, line);
     return text;
+  }
+
+  function modeMark(name, label) {
+    const mark = el('span', 'jb-mode');
+    mark.title = label;
+    mark.setAttribute('aria-label', label);
+    mark.append(icon(name));
+    return mark;
+  }
+
+  /** Au bureau, les boutons ⤮ et ⟳ de la carte du morceau : allumés quand le mode est en vigueur. */
+  function modeButton(op, name, label, on) {
+    const button = el('button', `jb-button jb-icon-button${on ? ' jb-on' : ''}`, '');
+    button.type = 'button';
+    button.title = label;
+    button.setAttribute('aria-label', label);
+    button.setAttribute('aria-pressed', on ? 'true' : 'false');
+    button.append(icon(name));
+    return act(button, { op });
   }
 
   function fillNow(box, view, s, desk) {
@@ -457,8 +508,16 @@
       const pause = el('button', 'jb-button', '');
       pause.type = 'button';
       pause.append(icon(now.paused ? 'play' : 'pause'), document.createTextNode(now.paused ? t('Reprendre') : t('Pause')));
-      act(pause, { op: 'start' });
-      top.append(nowText(now, true), pause);
+      // Pause ou reprise du morceau en cours, à tout niveau (Start, lui, ouvrirait la playlist choisie).
+      act(pause, { op: 'pause' });
+      const buttons = el('div', 'jb-now-buttons');
+      const repeat = now.mode?.repeat ?? 'playlist';
+      buttons.append(
+        modeButton('shuffle', 'shuffle', now.mode?.shuffle ? t('Lecture aléatoire : oui') : t('Lecture aléatoire : non'), Boolean(now.mode?.shuffle)),
+        modeButton('repeat', repeat === 'track' ? 'repeat-one' : 'repeat', repeat === 'track' ? t('Répétition : morceau') : repeat === 'none' ? t('Répétition : aucune') : t('Répétition : playlist'), repeat !== 'none'),
+        pause,
+      );
+      top.append(nowText(now, true), buttons);
       box.replaceChildren(top, progress(now), time);
     } else {
       // La vignette du morceau en cours ; sans fronton, le clip lui-même (CyberJukebox, place « thumb »).
