@@ -112,6 +112,7 @@ body.mouse [data-act] {
   background: var(--surface);
   font-size: 2cqmin;
   font-weight: 600;
+  white-space: nowrap;
   letter-spacing: 0.04em;
   flex-shrink: 0;
 }
@@ -562,6 +563,7 @@ body.mouse .lib-back:hover {
   font-size: 2.8cqmin;
   font-weight: 700;
   color: var(--ink);
+  white-space: nowrap;
 }
 
 .lib-zone-tag {
@@ -601,6 +603,7 @@ body.mouse .lib-back:hover {
   letter-spacing: 0.04em;
   text-transform: none;
   color: var(--ink);
+  white-space: nowrap;
 }
 
 .lib-zone.active .lib-zone-tag .lib-keycap {
@@ -3801,9 +3804,13 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--signal);
+  /* Une pastille de hauteur fixe tient sur une ligne (« MagnaSave droit » sortait de son contour) ; le texte d'à côté, lui, peut passer à la ligne. */
+  flex: none;
+  white-space: nowrap;
 }
 
 .lib-command-text {
+  min-width: 0;
   font-size: 2cqmin;
   font-weight: 600;
   letter-spacing: 0.1em;

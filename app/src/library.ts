@@ -178,6 +178,7 @@ import {
   switchZone,
   zoneOf,
   zoneStep,
+  visualOrder,
   entersReading,
   readingStep,
   type ReadingEdges,
@@ -581,8 +582,12 @@ export interface Built {
    * sinon rien n'indique qu'on y coche (la ROM d'un ami, 01/11/2026).
    */
   listStart?: string;
-  /** Commandes de plus dans la liste de contenu, dites par la barre des commandes (pré-écoute : MagnaSave droit, flipper tenu). */
-  listCommands?: { key: string; desk: string; text: string }[];
+  /**
+   * Commandes de plus dans la liste de contenu, dites par la barre des commandes (pré-écoute : MagnaSave
+   * droit, flipper tenu). `first` : juste après les flippers, bien en vue ; un MagnaSave droit pris ainsi
+   * fait dire « MagnaSave gauche » à la bascule des zones.
+   */
+  listCommands?: { key: string; desk: string; text: string; first?: boolean }[];
   /**
    * Touches propres à l'écran, avant la navigation (DMD sur la roue : une ligne ouverte prend les
    * flippers pour déplacer les points) ; true : la touche est prise, l'écran se redessine.
@@ -3891,6 +3896,8 @@ export function createLibrary(host: LibraryHost) {
     // Start valide l'élément que la dernière vue montrait sous le curseur, même si la liste a bougé.
     cursor = followCursor(ids, cursor, screen, anchor);
     const zones = screenZones(built, n);
+    // Ordre des flippers : celui de l'affichage, de haut en bas (la colonne des choix en haut à droite au bureau).
+    const order = visualOrder(built, n, host.landscape?.() ?? false);
     const edges = readingEdges(built, zones);
     // MagnaSave (F6) : la bascule attend le relâchement ; une autre touche entre-temps l'annule.
     if ((zones || edges) && (host.zoneKeys?.() ?? []).includes(input.code)) {
@@ -3912,7 +3919,7 @@ export function createLibrary(host: LibraryHost) {
     };
     if (input.code === CONFIG_KEY) {
       const dir = input.shift ? -1 : 1;
-      if (!read(dir, false)) cursor = zoneStep(zones, n, cursor, dir);
+      if (!read(dir, false)) cursor = zoneStep(zones, n, cursor, dir, order);
     } else if (moving) {
       const dir = is(KEYS.previous) ? -1 : 1;
       const held = Boolean(hold && input.isAutoRepeat);
@@ -3927,7 +3934,7 @@ export function createLibrary(host: LibraryHost) {
           zoneMemory.letter = moved.letter;
         }
         cursor = moved.cursor;
-      } else cursor = zoneStep(zones, n, cursor, dir);
+      } else cursor = zoneStep(zones, n, cursor, dir, order);
     } else if (is(KEYS.confirm)) {
       // Start dans le texte : la page suivante, puis la première action ; jamais une action sans l'avoir choisie.
       if (edges && reading.active) applyReading(readingStep(edges, n, 1));
@@ -4031,12 +4038,17 @@ export function createLibrary(host: LibraryHost) {
   function appCommands(built: Built, zone: ReturnType<typeof zoneView>): { key: string; text: string; act?: UiAction }[] {
     const desk = host.landscape?.() ?? false;
     const inList = zone?.active === 'list';
+    const extra = inList ? (built.listCommands ?? []) : [];
+    const said = (c: { key: string; desk: string; text: string }) => ({ key: desk ? c.desk : c.key, text: c.text });
     const out: { key: string; text: string; act?: UiAction }[] = [
       { key: desk ? '↑↓' : t('Flippers'), text: t('choisir') },
+      ...extra.filter((c) => c.first).map(said),
       { key: desk ? t('Entrée') : 'Start', text: inList && built.listStart ? built.listStart : t('valider') },
-      ...(inList ? (built.listCommands ?? []).map((c) => ({ key: desk ? c.desk : c.key, text: c.text })) : []),
+      ...extra.filter((c) => !c.first).map(said),
     ];
-    if (zone) out.push({ key: desk ? 'F6' : 'MagnaSave', text: inList ? t('actions') : t('la liste'), act: { type: 'zone' } });
+    // Le MagnaSave droit écoute (pré-écoute) : la bascule des zones est le gauche, le bandeau le dit.
+    const rightTaken = (built.listCommands ?? []).some((c) => c.key === t('MagnaSave droit'));
+    if (zone) out.push({ key: desk ? 'F6' : rightTaken ? t('MagnaSave gauche') : 'MagnaSave', text: inList ? t('actions') : t('la liste'), act: { type: 'zone' } });
     out.push({ key: desk ? t('Échap') : 'Exit', text: inList ? t('sortir de la liste') : t('retour'), act: inList ? { type: 'zone' } : { type: 'back' } });
     return out;
   }

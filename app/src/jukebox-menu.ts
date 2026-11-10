@@ -26,6 +26,9 @@ import {
   acceptedFormatsText,
   availabilityText,
   createPlaylist,
+  freePlaylistName,
+  hasSong,
+  JUKEBOX_DEFAULT_QUALITY,
   defaultImportChoices,
   deletePlaylist,
   downloadAllPlan,
@@ -64,6 +67,8 @@ import {
   songKey,
   summarizeImport,
   takeChoice,
+  visualOrder,
+  zoneStep,
   toggleChoice,
   t,
   tn,
@@ -217,10 +222,20 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       }
     } else if (r.action && 'move' in r.action) {
       pv.stop();
-      const n = build().actions.length;
-      display(build, Math.max(0, Math.min(n - 1, host.cursor() + r.action.move)));
+      // La ligne voisine dans l'ordre de l'écran, comme un flipper hors écoute (visualOrder).
+      const built = build();
+      const n = built.actions.length;
+      const dir = r.action.move < 0 ? -1 : 1;
+      let at = host.cursor();
+      for (let i = 0; i < Math.abs(r.action.move); i++) at = zoneStep(undefined, n, at, dir, visualOrder(built, n, host.landscape()));
+      display(build, at);
     }
     return true;
+  }
+
+  /** La pré-écoute a une touche : MagnaSave droit en borne, Espace au bureau. */
+  function canListen(): boolean {
+    return Boolean(host.preview && (host.landscape() || host.listenKeys?.().length));
   }
 
   /** La ligne d'un morceau en pré-écoute : où il en est, ou pourquoi YouTube refuse. */
@@ -689,7 +704,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     };
   }
 
-  function openTracks(id: string, focus?: string): void {
+  function openTracks(id: string, focus?: string, note?: Flash): void {
     chosen = id;
     const build = (): Built => {
       const p = playlistOf(id);
@@ -706,7 +721,11 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         icon: 'jukebox',
         subheading: [playlistFacts(p, jb.usage().playlists.get(id)), playlistSecondLine(p)].join(' · '),
         variant: 'jukebox jukebox-tracks', app: app(),
-        sections: [{ title: t('Morceaux'), kind: 'jb-tracks', rows: rows.length ? rows : [{ text: t('Playlist vide'), detail: t('Importez de YouTube ou ajoutez vos fichiers.'), tone: 'quiet' }] }],
+        sections: [
+          // Ce qui vient d'arriver (un morceau déplacé vers une autre playlist), en tête.
+          ...(note ? [{ kind: 'jb-flash', rows: [{ text: note.text, tone: note.tone, icon: note.tone === 'ok' ? ('check' as const) : ('alert' as const) }] }] : []),
+          { title: t('Morceaux'), kind: 'jb-tracks', rows: rows.length ? rows : [{ text: t('Playlist vide'), detail: t('Importez de YouTube ou ajoutez vos fichiers.'), tone: 'quiet' }] },
+        ],
         actions,
         back: toManage(id),
         listStart: t('corriger les informations'),
@@ -716,7 +735,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     display(build, Math.max(0, at));
   }
 
-  function openTrack(id: string, key: string, at = 0): void {
+  function openTrack(id: string, key: string, at = 0, note?: Flash): void {
     const build = (): Built => {
       const p = playlistOf(id);
       const v = jb.views(id).find((x) => x.track.key === key);
@@ -739,6 +758,10 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       const move = (delta: number) => void jb.commit(moveTrack(store(), id, key, delta, new Date()));
       actions.push({ label: t('Monter'), icon: 'move-up', key: 'up', ...(at <= 0 ? quiet(t('Déjà en tête')) : { detail: t('Place {n} sur {total}', { n: at + 1, total: p.tracks.length }) }), run: () => (at <= 0 ? undefined : move(-1)) });
       actions.push({ label: t('Descendre'), icon: 'move-down', key: 'down', ...(at >= p.tracks.length - 1 ? quiet(t('Déjà en dernier')) : {}), run: () => (at >= p.tracks.length - 1 ? undefined : move(1)) });
+      // Vers une autre playlist : à sa fin ; le fichier n'est jamais copié (bibliothèque unique).
+      const others = store().playlists.length > 1 ? undefined : t('Aucune autre playlist : « Nouvelle playlist… » dans la liste');
+      actions.push({ label: t('Déplacer vers…'), icon: 'move-right', key: 'transfer:move', detail: others ?? t('Le morceau quitte « {name} »', { name: p.name }), run: () => openTransfer(id, key, 'move') });
+      actions.push({ label: t('Copier vers…'), icon: 'layers', key: 'transfer:copy', detail: others ?? t('Le morceau reste aussi ici'), run: () => openTransfer(id, key, 'copy') });
       actions.push({ label: t('Retirer de la playlist'), icon: 'trash', key: 'remove', detail: t('Le fichier ou la vidéo ne sont pas touchés'), run: () => {
         jb.commit(removeTrack(store(), id, key, new Date()));
         openTracks(id);
@@ -752,6 +775,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         lead: t('Votre correction l’emporte sur ce que dit YouTube ou le fichier, dans toutes les playlists où le morceau se trouve. Laissez un champ vide pour reprendre l’information d’origine.'),
         variant: 'jukebox jukebox-track', app: app(),
         sections: [
+          ...(note ? [{ kind: 'jb-flash', rows: [{ text: note.text, tone: note.tone, icon: note.tone === 'ok' ? ('check' as const) : ('alert' as const) }] }] : []),
           { kind: 'jb-fields', options: true, rows: [...rows, { text: t('Source'), detail: v.track.source === 'file' ? source : v.track.title, sub: [v.status.playable ? v.status.label : (v.status.reason ?? v.status.label), ...(v.track.source === 'file' ? [] : [source])].join(' · '), icon: SOURCE_ICON[v.track.source], ...(v.status.playable ? {} : { tone: 'quiet' as const }) }] },
         ],
         actions,
@@ -759,6 +783,64 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       };
     };
     display(build, at);
+  }
+
+  /**
+   * « Déplacer vers… », « Copier vers… » : les autres playlists, Start choisit ; « Nouvelle playlist… »
+   * en crée une (de la qualité de l'origine). Une playlist qui a déjà le morceau est grisée, avec sa
+   * raison : rien n'est doublé. Le morceau en cours de lecture continue sans coupure (le lecteur suit).
+   */
+  function openTransfer(id: string, key: string, mode: 'move' | 'copy'): void {
+    const done = (to: string) => {
+      const title = jb.views(id).find((x) => x.track.key === key)?.info.title ?? '';
+      const change = jb.transferTrack(id, key, to, mode);
+      const target = playlistOf(to)?.name ?? '';
+      if (!change.ok) return void openTrack(id, key, 0, { text: change.reason, tone: 'warning' });
+      if (mode === 'move') openTracks(id, change.transfer.next, { text: t('« {title} » déplacé vers « {name} »', { title, name: target }), tone: 'ok' });
+      else openTrack(id, key, 0, { text: t('« {title} » copié dans « {name} »', { title, name: target }), tone: 'ok' });
+    };
+    const build = (): Built => {
+      const p = playlistOf(id);
+      const v = jb.views(id).find((x) => x.track.key === key);
+      if (!p || !v) return manageScreen();
+      const usage = jb.usage();
+      const actions: Action[] = [];
+      const rows: Row[] = store()
+        .playlists.filter((x) => x.id !== id)
+        .map((x) => {
+          const already = hasSong(x, v.track);
+          const at = actions.push({ label: x.name, key: `to:${x.id}`, ...(already ? quiet(t('Déjà dans cette playlist')) : {}), run: () => (already ? undefined : done(x.id)) }) - 1;
+          return { text: x.name, detail: already ? t('Déjà dans cette playlist : rien n’est doublé') : playlistFacts(x, usage.playlists.get(x.id)), aside: qualityBadge(x.quality), thumb: playlistImage(x.id) ?? 'music', action: at, pick: true, ...(already ? { tone: 'quiet' as const } : {}) };
+        });
+      actions.push({ label: t('Nouvelle playlist…'), icon: 'plus', key: 'new', detail: t('Le morceau y entre le premier'), run: () => askTransferName(id, key, mode, freePlaylistName(store(), v.info.artist ?? t('Nouvelle playlist')), done) });
+      actions.push({ label: t('Retour au morceau'), icon: 'back', key: 'back', run: () => openTrack(id, key) });
+      return {
+        heading: mode === 'move' ? t('Déplacer vers…') : t('Copier vers…'),
+        icon: mode === 'move' ? 'move-right' : 'layers',
+        subheading: [v.info.title, p.name].join(' · '),
+        lead: mode === 'move' ? t('Le morceau quitte « {name} » et s’ajoute à la fin de la playlist choisie.', { name: p.name }) : t('Le morceau reste dans « {name} » et s’ajoute aussi à la fin de la playlist choisie. Le fichier n’est pas copié.', { name: p.name }),
+        variant: 'jukebox jukebox-target', app: app(),
+        sections: rows.length ? [{ kind: 'jb-playlists', rows }] : [{ kind: 'jb-flash', rows: [{ text: t('Aucune autre playlist'), detail: t('« Nouvelle playlist… » en crée une pour ce morceau.'), tone: 'quiet', icon: 'info' }] }],
+        actions,
+        back: () => openTrack(id, key),
+        ...(rows.length ? { listStart: mode === 'move' ? t('déplacer ici') : t('copier ici') } : {}),
+      };
+    };
+    // Le curseur sur la première playlist qui peut le recevoir.
+    const track = jb.views(id).find((v) => v.track.key === key)?.track;
+    const first = track ? store().playlists.filter((x) => x.id !== id).findIndex((x) => !hasSong(x, track)) : 0;
+    display(build, Math.max(0, first));
+  }
+
+  /** Nom de la playlist créée pour un morceau déplacé ou copié ; elle prend la qualité de l'origine. */
+  function askTransferName(id: string, key: string, mode: 'move' | 'copy', value: string, done: (to: string) => void, problem?: string): void {
+    ask(t('Nouvelle playlist'), t('Nom de la playlist'), value, (name) => {
+      if (name === undefined) return openTransfer(id, key, mode);
+      const created = createPlaylist(store(), name, new Date(), { quality: playlistOf(id)?.quality ?? JUKEBOX_DEFAULT_QUALITY });
+      if (!created.ok) return askTransferName(id, key, mode, name, done, created.reason);
+      jb.commit(created.store);
+      done(created.playlist.id);
+    }, problem);
   }
 
   function askField(id: string, key: string, name: 'title' | 'artist' | 'album', label: string): void {
@@ -1193,8 +1275,14 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     const artist = e.artist ?? guess.artist;
     if (e.unavailable) return { text: title, detail: t('{reason} · sautée', { reason: e.detail ?? e.title }), aside: t('Sauté'), check: 'skip', tone: 'quiet', thumb: 'music', action, pick: true };
     const listening = listeningLine(e.id);
+    const st = host.preview?.state();
+    const playing = st?.youtube === e.id && !st.error;
+    // Pré-écoute en vue : « ▶ Écouter » sur la ligne choisie ; pendant l'écoute, la ligne joue, avec sa barre.
+    const offer = !playing && canListen() && host.cursor() === action;
     return {
       text: title,
+      ...(offer ? { badges: [t('▶ Écouter')] } : {}),
+      ...(playing ? { progress: st.duration ? { value: (st.position ?? 0) / st.duration, tone: 'ok' as const } : { busy: true } } : {}),
       detail: [artist, e.album].filter(Boolean).join(' · ') || t('Artiste inconnu'),
       aside: formatTrackTime(e.duration),
       check: checked ? 'on' : 'off',
@@ -1368,7 +1456,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       ...(host.preview
         ? {
             listCommands: [
-              ...(host.listenKeys?.().length || host.landscape() ? [{ key: t('MagnaSave droit'), desk: t('Espace'), text: host.preview.state() ? t('arrêter l’écoute') : t('écouter') }] : []),
+              ...(canListen() ? [{ key: t('MagnaSave droit'), desk: t('Espace'), text: host.preview.state() ? t('arrêter l’écoute') : t('écouter'), first: true }] : []),
               ...(host.preview.state() ? [{ key: t('Flipper tenu'), desk: t('↑↓ tenues'), text: t('avancer, reculer') }] : []),
             ],
             keys: (input: Input) =>

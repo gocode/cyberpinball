@@ -54,6 +54,7 @@ import {
   listTop,
   mediaUrl,
   playerStep,
+  followTransfer,
   rememberPlayed,
   t,
   unavailableText,
@@ -238,7 +239,22 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   let dmd: { kind: 'wheel' | 'player'; stop(): void } | undefined;
   let wheelStats = { tracks: 0, playlists: 0 };
 
-  const lib = () => host.library();
+  // Un morceau déplacé vers une autre playlist pendant qu'il joue (gestion du Juke-box) : la lecture
+  // continue sans coupure, puis reprend dans l'origine (followTransfer). Abonné une fois par bibliothèque.
+  let watched: unknown;
+  const lib = () => {
+    const l = host.library();
+    if (l && l !== watched) {
+      watched = l;
+      l.onTransfer((tr) => {
+        if (!player) return;
+        player = followTransfer(player, tr);
+        inputCache = undefined;
+        host.redraw();
+      });
+    }
+    return l;
+  };
   const layout = (): 'cab' | 'desk' => (host.desk() ? 'desk' : 'cab');
   const rows = () => JUKEBOX_LIST_ROWS[layout()];
 

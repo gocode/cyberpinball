@@ -832,6 +832,54 @@ export function addTracks(store: JukeboxStore, id: string, tracks: readonly Omit
   return { ok: true, store: replacePlaylist(store, touch({ ...p, tracks: [...p.tracks, ...added] }, now)), added, duplicates: tracks.length - fresh.length };
 }
 
+/** Le morceau (même chanson, quelle que soit sa clé) est déjà dans la playlist. */
+export function hasSong(p: Pick<JukeboxPlaylist, 'tracks'>, track: Pick<JukeboxTrack, 'source' | 'youtube' | 'path'>): boolean {
+  const k = songKey(track);
+  return p.tracks.some((tr) => songKey(tr) === k);
+}
+
+/** Un morceau passé d'une playlist à une autre (transferTrack) : ce qu'il faut au lecteur pour continuer. */
+export interface TrackTransfer {
+  from: string;
+  key: string;
+  to: string;
+  mode: 'move' | 'copy';
+  /** Sa clé dans la playlist cible. */
+  newKey: string;
+  /** Déplacement : le morceau qui le suivait dans l'origine (la lecture y reprend après lui). */
+  next?: string;
+}
+
+/**
+ * Déplace (`move`) ou copie un morceau à la fin d'une autre playlist. Rien n'est copié sur le disque :
+ * la bibliothèque est unique, la cible ne fait que le référencer. Déjà dans la cible : refusé, rien
+ * n'est doublé (ni retiré de l'origine). `download` : ce que la cible demande de plus (sa qualité).
+ */
+export function transferTrack(store: JukeboxStore, from: string, key: string, to: string, mode: 'move' | 'copy', now: Date, library?: ReadonlyMap<string, LibrarySong>): StoreChange<{ transfer: TrackTransfer; download: string[] }> {
+  const origin = findPlaylist(store, from);
+  const target = findPlaylist(store, to);
+  const track = origin?.tracks.find((tr) => tr.key === key);
+  if (!origin || !track) return { ok: false, reason: t('Morceau introuvable') };
+  if (!target || to === from) return { ok: false, reason: t('Playlist introuvable') };
+  if (hasSong(target, track)) return { ok: false, reason: t('Déjà dans « {name} »', { name: target.name }) };
+  // Ni sa clé, ni ses marques propres à l'origine (retiré de la playlist YouTube, sa liste d'import).
+  const { key: _k, removed: _r, list, ...rest } = track;
+  const copy: Omit<JukeboxTrack, 'key'> = { ...rest, ...(list && target.youtube?.list === list ? { list } : {}), added: now.toISOString() };
+  const added = addTracks(store, to, [copy], now);
+  if (!added.ok) return added;
+  const newKey = added.added[0]!.key;
+  let next = added.store;
+  let after: string | undefined;
+  if (mode === 'move') {
+    const i = origin.tracks.findIndex((tr) => tr.key === key);
+    after = origin.tracks[i + 1]?.key;
+    next = removeTrack(next, from, key, now);
+    if (next.last?.playlist === from && next.last.key === key) next = { ...next, last: { ...next.last, playlist: to, key: newKey } };
+  }
+  const download = library ? missingDownloads(findPlaylist(next, to)!, library, next).filter((id) => id === track.youtube) : [];
+  return { ok: true, store: next, transfer: { from, key, to, mode, newKey, ...(after ? { next: after } : {}) }, download };
+}
+
 export function removeTrack(store: JukeboxStore, id: string, key: string, now: Date): JukeboxStore {
   const p = findPlaylist(store, id);
   if (!p || !p.tracks.some((tr) => tr.key === key)) return store;

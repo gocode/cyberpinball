@@ -149,8 +149,11 @@ export interface PlayerState {
   shown: string;
   /** Morceau choisi (focus) dans chaque playlist déjà montrée. */
   selected: Record<string, string>;
-  /** Morceau en cours, et sa playlist. */
-  playing?: { playlist: string; key: string };
+  /**
+   * Morceau en cours, et sa playlist. `resume` : le morceau a été déplacé vers une autre playlist
+   * pendant qu'il jouait ; après lui, la lecture reprend dans l'origine, là où il était.
+   */
+  playing?: { playlist: string; key: string; resume?: { playlist: string; key: string } };
   paused: boolean;
   /** Mode de lecture de chaque playlist (retenu : le lecteur l'écrit dans juke-box.json). */
   modes?: Record<string, PlayMode>;
@@ -372,6 +375,11 @@ export function playerStep(state: PlayerState, input: PlayerInput, lists: readon
     }
     case 'ended': {
       if (!state.playing) return { state };
+      // Morceau déplacé pendant qu'il jouait : la suite est celle de sa playlist d'origine.
+      const resume = state.playing.resume;
+      const back = resume ? listOf(lists, resume.playlist) : undefined;
+      const again = back && (back.tracks.some((tr) => tr.key === resume!.key && tr.playable) ? resume!.key : nextPlayable(back, resume!.key));
+      if (back && again) return playIn(state, back, again, random);
       const playing = listOf(lists, state.playing.playlist);
       const next = playing ? following(state, playing, state.playing.key, random) : undefined;
       if (!playing || !next) {
@@ -476,4 +484,25 @@ export function holdHint(state: PlayerState, lists: readonly PlayerList[]): 'shu
 /** Position de la playlist montrée : « 2 / 4 ». */
 export function playlistPosition(state: PlayerState, lists: readonly PlayerList[]): { index: number; count: number } {
   return { index: Math.max(0, lists.findIndex((l) => l.id === state.shown)) + 1, count: lists.length };
+}
+
+/**
+ * Un morceau a changé de playlist (gestion du Juke-box, transferTrack) pendant que le lecteur était
+ * ouvert. Déplacé pendant qu'il jouait : la lecture continue sans coupure, le morceau suivi dans sa
+ * nouvelle playlist, et reprend ensuite dans l'origine (`resume`). Une copie ne change rien.
+ */
+export function followTransfer(state: PlayerState, tr: { from: string; key: string; to: string; mode: 'move' | 'copy'; newKey: string; next?: string }): PlayerState {
+  if (tr.mode !== 'move') return state;
+  let next = state;
+  const p = state.playing;
+  if (p?.playlist === tr.from && p.key === tr.key) {
+    next = { ...next, playing: { playlist: tr.to, key: tr.newKey, ...(tr.next ? { resume: { playlist: tr.from, key: tr.next } } : {}) } };
+  }
+  // La sélection de l'origine passe au morceau qui le suivait ; la file aléatoire l'oublie.
+  if (next.selected[tr.from] === tr.key) {
+    const { [tr.from]: _gone, ...others } = next.selected;
+    next = { ...next, selected: tr.next ? { ...others, [tr.from]: tr.next } : others };
+  }
+  if (next.queue?.playlist === tr.from && next.queue.left.includes(tr.key)) next = { ...next, queue: { ...next.queue, left: next.queue.left.filter((k) => k !== tr.key) } };
+  return next;
 }

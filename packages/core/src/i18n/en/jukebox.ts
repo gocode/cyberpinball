@@ -88,4 +88,6 @@ export const messages: Record<string, string> = {
   'Ce lien ne mène pas à une playlist lisible': 'This link does not lead to a readable playlist',
   'Playlist introuvable sur YouTube': 'Playlist not found on YouTube',
   'YouTube demande de prouver qu’on n’est pas un robot : réessayez plus tard': 'YouTube asks to prove you are not a robot: try again later',
+  'Morceau introuvable': 'Track not found',
+  'Déjà dans « {name} »': 'Already in “{name}”',
 };

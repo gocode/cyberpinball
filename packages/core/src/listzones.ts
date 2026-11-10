@@ -12,8 +12,11 @@
 //   Exit quitte l'écran ;
 // - MagnaSave (F6 au clavier) bascule d'une zone à l'autre, sans étape de plus ; on retrouve dans
 //   la liste l'élément qu'on y avait quitté ;
-// - un appui de flipper suit l'ordre de l'écran et passe d'une zone à l'autre à leur bord, comme
-//   avant ; un flipper tenu reste dans sa zone et s'arrête à son bout (il ne fait plus le tour),
+// - un appui de flipper suit l'ordre d'affichage de l'écran (visualOrder), de haut en bas, et passe
+//   d'une zone à l'autre à leur bord ; il ne fait le tour qu'aux deux bouts de l'écran. Novembre
+//   2026 : l'import du Juke-box au bureau (morceaux à gauche, choix à droite, « Importer » dessous)
+//   suivait le rang des actions : du dernier morceau, on remontait aux choix du haut, puis on passait
+//   à « Importer » par-dessus les morceaux ; un flipper tenu reste dans sa zone et s'arrête à son bout (il ne fait plus le tour),
 //   puis accélère : par lettre sur une liste triée par nom (section par section), de trois en trois
 //   sinon.
 // Le rendu (app/renderer/library.js) montre la liste dans un cadre, avec son repère : « Exit ·
@@ -23,9 +26,11 @@ export type ZoneName = 'list' | 'actions';
 
 /** Ce qu'il faut d'un écran décrit (library.ts, Built) pour reconnaître sa liste de contenu. */
 export interface ZoneSource {
-  sections: readonly { options?: boolean; rows: readonly { action?: number; pick?: boolean }[] }[];
+  sections: readonly { options?: boolean; title?: string; side?: boolean; rows: readonly { action?: number; pick?: boolean }[] }[];
   media?: { cards: readonly { action?: number }[] };
   health?: { groups: readonly { lines: readonly { action?: number }[] }[] };
+  /** Tableau des scores (son rendu à part) : portées, puis onglets, au-dessus des actions. */
+  scoreboard?: { scopes?: readonly { action?: number }[]; tabs?: readonly { action?: number }[] };
 }
 
 /**
@@ -53,6 +58,44 @@ function listGroups(source: ZoneSource, count: number): Map<number, number> {
     group++;
   }
   return found;
+}
+
+/**
+ * Ordre d'affichage des actions d'un écran, de haut en bas, tel que le rendu les place
+ * (app/renderer/library.js), celui des flippers :
+ * - en borne (portrait), le contenu est au-dessus des actions de l'écran : les lignes à choisir et les
+ *   cartes dans l'ordre des sections (la colonne latérale, Section.side, sous le reste ; les médias :
+ *   sections sans titre, cartes, sections titrées ; la Santé : ses domaines), puis les actions que le
+ *   contenu ne montre pas, dans leur ordre ;
+ * - au bureau (`landscape`), le contenu est à gauche des actions : de même, le contenu d'abord ; avec
+ *   une colonne latérale (les choix d'un import, en haut à droite, la liste à gauche, « Importer »
+ *   dessous), la colonne, puis la liste, puis les actions.
+ */
+export function visualOrder(source: ZoneSource, count: number, landscape = false): number[] {
+  const side = source.sections.filter((s) => s.side);
+  const out: number[] = [];
+  const seen = new Set<number>();
+  const add = (a: number | undefined) => {
+    if (a === undefined || !Number.isInteger(a) || a < 0 || a >= count || seen.has(a)) return;
+    seen.add(a);
+    out.push(a);
+  };
+  const rows = (list: ZoneSource['sections']) => {
+    for (const s of list) for (const r of s.rows) if (r.pick) add(r.action);
+  };
+  if (source.health) for (const g of source.health.groups) for (const l of g.lines) add(l.action);
+  else if (source.scoreboard) for (const c of [...(source.scoreboard.scopes ?? []), ...(source.scoreboard.tabs ?? [])]) add(c.action);
+  else {
+    const main = source.sections.filter((s) => !s.side);
+    const sections = landscape ? [...side, ...main] : [...main, ...side];
+    if (source.media) {
+      rows(sections.filter((s) => !s.title));
+      for (const c of source.media.cards) add(c.action);
+      rows(sections.filter((s) => s.title));
+    } else rows(sections);
+  }
+  for (let i = 0; i < count; i++) add(i);
+  return out;
 }
 
 /** Les deux zones d'un écran : rangs des actions de la liste, rangs des autres. */
@@ -93,19 +136,14 @@ export function rememberZones(z: Zones, memory: ZoneMemory, before: { index: num
   return from === 'actions' ? { ...memory, entry: before.id } : { ...memory, inList: before.id };
 }
 
-/** Ordre de parcours : la zone qui porte la première action, puis l'autre. */
-function cycle(z: Zones): number[] {
-  return z.list[0] === 0 ? [...z.list, ...z.actions] : [...z.actions, ...z.list];
-}
-
 /**
- * Appui d'un flipper (ou Tab) : l'élément suivant ou précédent dans l'ordre de l'écran, d'une
- * zone à l'autre à leur bord, avec tour complet. Sans zones : le rang voisin, comme toujours.
+ * Appui d'un flipper (ou Tab) : l'élément suivant ou précédent dans l'ordre d'affichage (`order`,
+ * visualOrder), d'une zone à l'autre à leur bord ; le tour ne se fait qu'aux deux bouts de l'écran.
+ * Sans ordre donné : le rang voisin.
  */
-export function zoneStep(z: Zones | undefined, count: number, cursor: number, dir: -1 | 1): number {
+export function zoneStep(_z: Zones | undefined, count: number, cursor: number, dir: -1 | 1, order?: readonly number[]): number {
   if (count <= 0) return 0;
-  if (!z) return (cursor + dir + count) % count;
-  const order = cycle(z);
+  if (!order || order.length !== count) return (cursor + dir + count) % count;
   const at = order.indexOf(cursor);
   if (at < 0) return order[0]!;
   return order[(at + dir + order.length) % order.length]!;

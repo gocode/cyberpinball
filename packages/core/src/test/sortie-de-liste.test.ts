@@ -34,6 +34,7 @@ import {
   zoneOf,
   zoneStep,
   zoneByName,
+  visualOrder,
   zoneSwitchKeys,
   DEFAULT_BUTTONS,
   type ZoneMemory,
@@ -120,16 +121,21 @@ test('MagnaSave (F6) bascule dans les deux sens, et ramène à la position quitt
 test('un appui de flipper suit l’ordre de l’écran ; tenu, il reste dans sa zone et s’arrête à son bout', () => {
   const s = screen(5, 3);
   const z = screenZones(s.source, s.count)!;
-  // Appui : comme avant, d'une zone à l'autre à leur bord, avec tour complet.
-  assert.equal(zoneStep(z, s.count, 4, 1), 5);
-  assert.equal(zoneStep(z, s.count, 7, 1), 0);
-  assert.equal(zoneStep(z, s.count, 0, -1), 7);
-  assert.equal(zoneStep(undefined, 4, 3, 1), 0, 'sans zones : le rang voisin');
-  // Liste après les actions : le parcours commence par les actions.
+  // Appui : dans l'ordre d'affichage (visualOrder), d'une zone à l'autre à leur bord, avec tour complet.
+  const order = visualOrder(s.source, s.count);
+  assert.equal(zoneStep(z, s.count, 4, 1, order), 5);
+  assert.equal(zoneStep(z, s.count, 7, 1, order), 0);
+  assert.equal(zoneStep(z, s.count, 0, -1, order), 7);
+  assert.equal(zoneStep(undefined, 4, 3, 1), 0, 'sans ordre : le rang voisin');
+  // Liste après les actions par leur rang : affichée avant elles (au-dessus en borne, à gauche au bureau), elle passe d'abord.
   const after = screen(5, 3, false);
   const za = screenZones(after.source, after.count)!;
-  assert.equal(zoneStep(za, after.count, 2, 1), 3);
-  assert.equal(zoneStep(za, after.count, 7, 1), 0);
+  for (const landscape of [false, true]) {
+    const o = visualOrder(after.source, after.count, landscape);
+    assert.deepEqual(o, [3, 4, 5, 6, 7, 0, 1, 2]);
+    assert.equal(zoneStep(za, after.count, 7, 1, o), 0, 'du bas de la liste aux actions');
+    assert.equal(zoneStep(za, after.count, 2, 1, o), 3, 'le tour, au bout de l’écran');
+  }
   // Tenu : arrêté au bout, dans sa zone, jamais sur les actions.
   assert.equal(zoneHold(z, 4, 1), 4);
   assert.equal(zoneHold(z, 0, -1), 0);

@@ -31,6 +31,7 @@ import {
   collectionKeys as cabinetCollectionKeys,
   menuButton,
   zoneSwitchKeys,
+  listenKeys as magnaListenKeys,
   WHEEL_START_HOLD_MS,
   LOADING_SLOW_MS,
   advanceLoadingStep,
@@ -1060,11 +1061,7 @@ const library = createLibrary({
   browserScreen: () => browserScreenRect(),
   takeForeground: () => void takeForeground(),
   // MagnaSave droit : écouter un morceau à l'import ; seulement si le gauche est là pour changer de zone.
-  listenKeys: () => {
-    const b = buttonKeys(buttons);
-    const zones = zoneSwitchKeys({ buttons, navigation });
-    return b.rightMagna && b.leftMagna && zones.includes(b.rightMagna) && zones.includes(b.leftMagna) ? [b.rightMagna] : [];
-  },
+  listenKeys: () => magnaListenKeys({ buttons, navigation }),
   // Pré-écoute des morceaux à l'import (gestion du Juke-box), sur le fronton : le lecteur YouTube du Juke-box.
   jukeboxPreview: {
     play: (youtube) => {
@@ -2143,10 +2140,9 @@ const menuDmd = createMenuDmd({
       ? t('« DMD du menu » est réglé sur « classique » : la roue montre le média DMD de la table, sans points (Menu système > Médias > « Médias, son et attente »).')
       : undefined,
   keys: () => {
-    const magna = zoneSwitchKeys({ buttons, navigation });
-    const b = buttonKeys(buttons);
-    const only = (code: string | undefined) => (code && magna.includes(code) ? [code] : []);
-    return { previous: KEYS.previous, next: KEYS.next, confirm: KEYS.confirm, exit: KEYS.exit, up: only(b.leftMagna), down: only(b.rightMagna) };
+    // Les MagnaSave lus comme sur la roue : relevés, sinon Ctrl gauche et Ctrl droit.
+    const magna = cabinetCollectionKeys({ buttons, navigation }, KEYS);
+    return { previous: KEYS.previous, next: KEYS.next, confirm: KEYS.confirm, exit: KEYS.exit, up: magna.previous, down: magna.next };
   },
   library: { openCustom: (build, at, table) => library.openCustom(build, at, table), openSheet: (table, flash) => library.openSheet(table, flash) },
   broadcast: () => broadcast(),

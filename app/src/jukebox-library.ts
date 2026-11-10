@@ -17,6 +17,7 @@ import * as path from 'node:path';
 import {
   detailArgs,
   downloadAll,
+  transferTrack,
   emptyJukebox,
   findPlaylist,
   freePlaylist,
@@ -60,6 +61,7 @@ import {
   qualityHeight,
   addTracks,
   type DownloadJob,
+  type TrackTransfer,
   type DownloadTransport,
   type ImportRequest,
   type JukeboxPlaylist,
@@ -332,6 +334,7 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
 
   /** Écrans de gestion ouverts (la borne y coupe la musique, le bureau la garde) : le lecteur écoute. */
   const manageListeners = new Set<(cabinet: boolean) => void>();
+  const transferListeners = new Set<(transfer: TrackTransfer) => void>();
 
   function importPlaylist(req: Omit<ImportRequest, 'library' | 'now'>) {
     const change = apply(importAnalysis(current(), { ...req, library: songs(), now: now() }));
@@ -585,6 +588,23 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
       return () => manageListeners.delete(listener);
     },
     resync,
+    /**
+     * « Déplacer vers… », « Copier vers… » : le morceau à la fin de la playlist `to`, sans rien copier sur
+     * le disque ; ce que la qualité de la cible demande de plus est mis en file. Le lecteur s'abonne par
+     * onTransfer (un morceau déplacé pendant qu'il joue continue sans coupure).
+     */
+    transferTrack(from: string, key: string, to: string, mode: 'move' | 'copy') {
+      const change = apply(transferTrack(current(), from, key, to, mode, now(), songs()));
+      if (!change.ok) return change;
+      if (change.download.length) enqueue(findPlaylist(change.store, to)!, change.download);
+      log(`Juke-box : morceau ${change.transfer.key} ${mode === 'move' ? 'déplacé' : 'copié'} de ${from} vers ${to} (${change.transfer.newKey}).`); // i18n-ignore : journal
+      for (const listener of transferListeners) listener(change.transfer);
+      return change;
+    },
+    onTransfer(listener: (transfer: TrackTransfer) => void): () => void {
+      transferListeners.add(listener);
+      return () => transferListeners.delete(listener);
+    },
     downloadAll(id: string) {
       const change = apply(downloadAll(current(), id, songs(), now()));
       if (change.ok && change.enqueue.length) enqueue(findPlaylist(change.store, id)!, change.enqueue);

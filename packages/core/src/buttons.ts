@@ -648,10 +648,22 @@ export const ZONE_KEY = 'F6';
  * F6 d'un clavier, sauf celles qui sont déjà un bouton de l'interface (un flipper, Start…).
  */
 export function zoneSwitchKeys(source: ButtonsSource): string[] {
-  const keys = buttonKeys(source?.buttons);
   const ui = interfaceKeys(source);
   const taken = new Set([...ui.previous, ...ui.next, ...ui.confirm, ...ui.exit, ...ui.help, ...ui.settings]);
-  return [...new Set([keys.leftMagna, keys.rightMagna, ZONE_KEY])].filter((k): k is string => Boolean(k) && !taken.has(k!));
+  // Les MagnaSave tels que la roue les lit (collectionKeys) : relevés, sinon Ctrl gauche et Ctrl droit.
+  // Novembre 2026 : sur une borne aux MagnaSave non relevés (Ctrl envoyés par la carte), la roue les
+  // lisait, mais pas les écrans de gestion ni la pré-écoute du Juke-box.
+  const magna = collectionKeys(source, ui);
+  return [...new Set([...magna.previous, ...magna.next, ZONE_KEY])].filter((k) => !taken.has(k));
+}
+
+/**
+ * Touche de la pré-écoute (import du Juke-box) : le MagnaSave droit, lu comme sur la roue, tant que le
+ * gauche reste là pour changer de zone. Sinon aucune : le droit garde la bascule des zones.
+ */
+export function listenKeys(source: ButtonsSource): string[] {
+  const magna = collectionKeys(source);
+  return magna.previous.length && magna.next.length ? magna.next : [];
 }
 
 /** Retire d'une liste de raccourcis (H, R…) les touches prises par un bouton de la borne, du jeu ou de l'interface. */
