@@ -221,6 +221,8 @@ import {
   volumeOutputIds,
   diagnoseVpxFailure,
   readVpxScript as readTableScript,
+  readVpxGlass,
+  type VpxTableGeometry,
   diskSpace,
   loadSocial,
   type RemoteButton,
@@ -2183,8 +2185,6 @@ function headsetSetting(): CalibrationSetting {
 /** Hauteur des yeux dite par le compagnon (sol mal réglé), et limite du Quest changée depuis le calage. */
 let headsetEyes: number | undefined;
 let roomNotice = false;
-/** Pièce du Quest changée : calage à rouvrir sur la session neuve du compagnon. */
-let roomOffer = false;
 /** Session neuve d'après un changement de pièce, yeux hors de la plage : les applications qui démarrent ont l'ancienne pièce. */
 let roomStale = false;
 /** Calage déjà proposé d'office pendant cette session (Exit le referme ; il revient à la suivante). */
@@ -2470,7 +2470,9 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
     // Une seule pose : la table de VPX où est la borne du casque (calée ou non), à chaque partie.
     const place = readCabinetPlace(headsetPlaceFile());
     if (place) {
-      const settings = placeVpxSettings(place);
+      const table = vpxTableGeometry(tableFile);
+      const settings = placeVpxSettings(place, table);
+      if (table) details.push(`table : plateau de ${table.widthCm.toFixed(1)} cm, vitre du bas à ${table.glassBottomCm.toFixed(1)} cm${place.free ? ', plateau recalé sur celui du menu' : ''}`); // i18n-ignore : journal
       writeIniSettings(vr.ini, settings);
       details.push(`place de la borne du casque${isCalibrated(place) ? ' calée' : ''} : ${settings.map((s) => `${s.key} ${s.value}`).join(', ')}`); // i18n-ignore : journal
       const far = vpxPlaceProblem(settings);
@@ -2494,11 +2496,18 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
  * en quittant proprement (VRDevice::SaveVRSettings) ; une place changée dit qu'elle a bougé pendant
  * la partie (touche 5, menu de VPX) : au journal, avec l'écart. La suivante repart de la borne.
  */
-function checkVrPlaceAfterGame(ini: string): void {
+/** Largeur du plateau et vitre du bas de la table, comme VPX les lit (readVpxGlass), en cm. */
+function vpxTableGeometry(tableFile: string): VpxTableGeometry | undefined {
+  const glass = readVpxGlass(tableFile);
+  const vpuCm = (2.54 * 1.0625) / 50;
+  return glass ? { widthCm: (glass.right - glass.left) * vpuCm, glassBottomCm: glass.glassBottom * vpuCm } : undefined;
+}
+
+function checkVrPlaceAfterGame(ini: string, tableFile: string): void {
   const place = readCabinetPlace(headsetPlaceFile());
   if (!place) return;
   const doc = IniDocument.parse(readTextIfExists(ini));
-  const moved = placeVpxSettings(place)
+  const moved = placeVpxSettings(place, vpxTableGeometry(tableFile))
     .filter((s) => s.section === 'PlayerVR' && s.key !== 'TableZ')
     .map((s) => ({ key: s.key, want: Number(s.value), got: Number(doc.get(s.section, s.key)) }))
     .filter((m) => Number.isFinite(m.got) && Math.abs(m.got - m.want) > 1);
@@ -2884,12 +2893,8 @@ export function startFrontend(): void {
       if (!headset?.worn) releaseHeadsetButtons();
       // Compagnon parti pendant le calage : rien à garder.
       if (calibration && !headset?.running) closeCalibration(false);
-      // Borne pas encore calée : le calage s'ouvre d'office dans le casque, avant la navigation. Pièce du
-      // Quest changée : il se rouvre sur la session neuve du compagnon, dans la pièce que VPX verra.
-      if (headset?.worn && headset.running && roomOffer && !calibration) {
-        roomOffer = false;
-        offerCalibration(true);
-      } else if (headset?.worn && !isCalibrated(headset.place())) offerCalibration();
+      // Borne pas encore calée : le calage s'ouvre d'office dans le casque, avant la navigation.
+      if (headset?.worn && !isCalibrated(headset.place())) offerCalibration();
       broadcast();
     },
     openViews: () => {
@@ -2922,13 +2927,13 @@ export function startFrontend(): void {
       if (!changed && !(isCalibrated(place) && roomMoved(place?.room, room))) return;
       console.warn('Casque : la limite du Quest a changé depuis le calage ; calage de la borne proposé.'); // i18n-ignore : journal
       roomNotice = true;
-      roomOffer = changed;
       offerCalibration(true);
     },
     onRoomRestart: (eyes) => {
       roomStale = Boolean(eyeHeightProblem(eyes));
-      console.log(`Casque : session neuve après le changement de pièce, yeux à ${eyes.toFixed(2)} m${roomStale ? ' : le Quest donne encore l’ancienne pièce aux applications qui démarrent' : ''}.`); // i18n-ignore : journal
+      console.log(`Casque : session neuve après le changement de pièce, yeux à ${eyes.toFixed(2)} m${roomStale ? ' : le sol de la pièce d’origine est faux, les applications qui démarrent la reçoivent ainsi' : ''}.`); // i18n-ignore : journal
       if (calibration) showCalibration();
+      else if (roomStale) offerCalibration(true);
     },
     log: (line) => console.log(line),
   });
@@ -3875,11 +3880,18 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const load = gameLoad?.stop(playedVr ? 'casque' : 'ecrans');
   if (load) console.log(load);
   vrGameStop = undefined;
-  if (playedVr && vrGame) checkVrPlaceAfterGame(vrGame.ini);
+  if (playedVr && vrGame) checkVrPlaceAfterGame(vrGame.ini, played.file);
   if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
   headTracker.stop();
   stopCentering?.();
   headsetPaused = false;
+  // VPX parti, le compagnon qui veillait repart sur une session neuve : elle prend le casque d'elle-même,
+  // alors que la session en veille attend que le joueur la rechoisisse dans l'accueil de Link (5 à 11 s,
+  // essai du 10 novembre 2026 ; une session neuve, environ 1 s).
+  if (playedVr && headset?.standby) {
+    console.log('Casque : partie finie, le compagnon repart sur une session neuve pour reprendre le casque sans l’accueil de Link.'); // i18n-ignore : journal
+    headset.restart();
+  }
   // Arrêté pendant le chargement : ni partie comptée, ni message d'échec, la roue.
   const stoppedLoading = launch?.stopped === true;
   endLaunch();

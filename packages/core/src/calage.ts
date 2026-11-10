@@ -11,7 +11,7 @@
 // Le Quest garde l'espace de la pièce tant que sa limite (Guardian) et son sol ne changent pas : un
 // sol recalé ou une nouvelle limite déplacent l'origine, et le calage est à refaire.
 
-import { LOCKBAR_DISTANCE_M, LOCKBAR_HEIGHT_M } from './casque';
+import { GLASS_DROP_M, LOCKBAR_DISTANCE_M, LOCKBAR_HEIGHT_M } from './casque';
 import { language, t } from './i18n';
 import type { VpxSetting } from './vpx';
 import type { HeadsetMenuState } from './vr';
@@ -209,14 +209,37 @@ export function placeLockbar(place: CabinetPlace): { left: Point3; right: Point3
   };
 }
 
+/** Ce que VPX lit de la table pour la poser en VR (readVpxGlass) : largeur du plateau et vitre du bas, en cm. */
+export interface VpxTableGeometry {
+  widthCm: number;
+  glassBottomCm: number;
+}
+
 /**
  * Place de la table de VPX pour une partie dans le casque : celle de la borne du casque, toujours,
- * pour que le menu et le jeu soient au même endroit. Borne calée : la barre avant aussi (largeur et
- * hauteur) ; sinon, celles de l'INI restent.
+ * pour que le menu et le jeu soient au même endroit. Sa barre avant (largeur, hauteur) est celle de
+ * la borne, calée ou par défaut. VPX pose le plateau à « barre avant − vitre du bas × échelle », 5 cm
+ * plus 5 cm à l'échelle devant elle (VRDevice) : sur une vraie borne, sa barre avant tombe sur la
+ * vraie et le plateau à la profondeur de la table. Au bureau (place libre), rien de vrai à toucher :
+ * avec la table connue (`table`), son plateau est recalé sur celui du menu (TableZ, TableY), le bas
+ * au droit de la barre avant, GLASS_DROP_M sous elle ; sinon, jusqu'à 20 cm plus bas (vitre de 21,6 cm
+ * de la plupart des tables, essai du 10 novembre 2026).
  */
-export function placeVpxSettings(place: CabinetPlace): VpxSetting[] {
+export function placeVpxSettings(place: CabinetPlace, table?: VpxTableGeometry): VpxSetting[] {
   const { left, right } = placeLockbar(place);
-  return lockbarVpxSettings(left, right);
+  const tableWidthCm = table ? table.widthCm + 2.25 * 2.54 : STANDARD_TABLE_WIDTH_CM;
+  const settings = lockbarVpxSettings(left, right, tableWidthCm);
+  if (!place.free || !table) return settings;
+  const width = Number(settings.find((s) => s.key === 'LockbarWidth')!.value);
+  const scale = Math.min(2, Math.max(0.1, width / tableWidthCm));
+  const round = (v: number) => String(Math.round(v * 1000) / 1000);
+  return settings.map((s) =>
+    s.key === 'TableZ'
+      ? { ...s, value: round(scale * table.glassBottomCm - GLASS_DROP_M * 100) }
+      : s.key === 'TableY'
+        ? { ...s, value: round(Number(s.value) - LOCKBAR_TO_PLAYFIELD_CM * (1 + scale)) }
+        : s,
+  );
 }
 
 /**

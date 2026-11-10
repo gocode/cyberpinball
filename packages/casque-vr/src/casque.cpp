@@ -39,6 +39,8 @@
 //     | libre <image> (image copiée : Electron peut reprendre sa texture) | porte 1|0 (casque porté ou non)
 //     | scene <n> formes | bouton <nom> 1|0 | releve … veille | reprise (VPX a rendu le casque)
 //     | tete <x> <y> <z> <lacet> (en veille, toutes les 5 s)
+//     | piece-changee pose|sans-pose <x> <y> <z> <lacet> (pièce refaite sous la session : la nouvelle origine dans l'ancienne)
+//     | session-arretee (arrêt que personne n'a demandé : le runtime reprend la session)
 //     | casque-perdu <raison> (éteint, Link coupé : ni retiré de la tête, ni la relève) | fini
 
 #define WIN32_LEAN_AND_MEAN
@@ -1280,11 +1282,13 @@ int main(int argc, char** argv)
             {
                xrEndSession_(session);
                running = false;
-               // Arrêt que personne n'a demandé, hors relève : casque éteint ou Link coupé.
+               // Arrêt que personne n'a demandé : le runtime de Meta reprend la session (accueil de Link,
+               // application choisie de nouveau). Ce n'est pas un casque perdu (essai du 10 novembre 2026 :
+               // VISIBLE, SYNCHRONIZED puis STOPPING à chaque passage par l'accueil) : Cyber Pinball relance
+               // aussitôt une session neuve, qui prend le casque d'elle-même.
                if (!exitRequested && !handover && !standby)
-                  lost("arret");
-               if (exitRequested || handover || standby)
-                  done = true;
+                  say("session-arretee");
+               done = true;
             }
             else if (state == XR_SESSION_STATE_LOSS_PENDING)
                lost("session perdue");
@@ -1306,11 +1310,17 @@ int main(int argc, char** argv)
             // Dans la pièce, la borne ne bouge jamais d'elle-même : seulement sur demande (« recentrer »,
             // 5 du pavé, ou le calage). La pièce déplacée par le Quest (limite refaite) : Cyber Pinball le dit.
             // Sans la pièce, le bouton Meta maintenu recentre la vue : la borne revient devant le joueur.
+            // Le changement est dit avec sa pose (l'origine nouvelle dans l'ancienne) pour le journal.
             const auto* change = reinterpret_cast<XrEventDataReferenceSpaceChangePending*>(&ev);
             if (!stage)
                wantRecenter = true;
             else if (change->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE)
-               say("piece-changee");
+            {
+               const XrPosef& p = change->poseInPreviousSpace;
+               const XrVector3f fwd = rotate(p.orientation, { 0, 0, -1 });
+               say(std::string("piece-changee ") + (change->poseValid ? "pose " : "sans-pose ") + std::to_string(p.position.x) + " " + std::to_string(p.position.y) + " "
+                  + std::to_string(p.position.z) + " " + std::to_string(std::atan2(-fwd.x, -fwd.z)));
+            }
          }
          ev = { XR_TYPE_EVENT_DATA_BUFFER };
       }

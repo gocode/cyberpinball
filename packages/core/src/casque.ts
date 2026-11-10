@@ -21,7 +21,7 @@ export const LOCKBAR_DISTANCE_M = 0.3;
 /** Pente du plateau (degrés) : celle d'une borne réglée, 6,5°. */
 export const PLAYFIELD_SLOPE_DEG = 6.5;
 /** Le plateau est sous la vitre, un peu plus bas que la barre avant. */
-const GLASS_DROP_M = 0.05;
+export const GLASS_DROP_M = 0.05;
 /** Écart entre la tête de la borne et le bout du plateau, et entre deux panneaux de la tête. */
 const HEAD_GAP_M = 0.1;
 const PANEL_GAP_M = 0.02;

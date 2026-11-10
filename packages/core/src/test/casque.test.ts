@@ -154,8 +154,7 @@ test('casque éteint ou Link coupé : l’affichage revient aux écrans du PC, e
   // Seule une vraie perte le dit : session ou instance perdue, arrêt que personne n'a demandé hors relève.
   assert.match(cpp, /else if \(state == XR_SESSION_STATE_LOSS_PENDING\)\s*lost\("session perdue"\);/);
   assert.match(cpp, /XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING\)\s*lost\("instance perdue"\);/);
-  assert.match(cpp, /if \(!exitRequested && !handover && !standby\)\s*lost\("arret"\);/);
-  assert.match(cpp, /if \(standby\)\s*say\("veille finie par le runtime"\);/);
+    assert.match(cpp, /if \(standby\)\s*say\("veille finie par le runtime"\);/);
   const app = path.join(repo, 'app', 'src');
   const menu = fs.readFileSync(path.join(app, 'casque.ts'), 'utf8');
   // Le menu reste au casque une fois porté, même retiré ; la veille d'une partie et la fin du compagnon le rendent au PC.
@@ -170,14 +169,32 @@ test('casque éteint ou Link coupé : l’affichage revient aux écrans du PC, e
   assert.match(frontend, /if \(inGame && vrGameStop\) \{[\s\S]{0,200}vrGameStop\(\);/);
 });
 
-test('pièce du Quest changée sous le compagnon : session neuve, la pièce que VPX verra, et calage refait là', () => {
-  // Essai du 10 novembre 2026 : yeux à 2,3 m à chaque lancement, 1,2 m dans la session changée ; VPX,
-  // lancé ensuite, a posé la table derrière le joueur et sous le sol (pose-vpx.test.ts : l'ancienne pièce).
+test('pièce du Quest changée ou vue réinitialisée : la borne reste où elle est dans la vraie pièce', () => {
+  // Essai du 10 novembre 2026 : une session déjà ouverte reçoit seule la pièce changée (yeux à 2,3 puis
+  // 1,2 m le matin, 1,6 puis 0,5 m l'après-midi après « Réinitialiser la vue » de Link) ; chaque session
+  // neuve, dont celle de VPX, a gardé la pièce d'origine (pose-vpx.test.ts : l'ancienne pièce du Quest).
+  // Repartir sur une session neuve garde donc la borne immobile dans la pièce, sans recaler.
   const repo = path.join(__dirname, '..', '..', '..', '..');
+  const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
+  assert.match(cpp, /say\(std::string\("piece-changee "\) \+ \(change->poseValid \? "pose " : "sans-pose "\)/);
   const menu = fs.readFileSync(path.join(repo, 'app', 'src', 'casque.ts'), 'utf8');
-  assert.match(menu, /const restart = !this\.standby && !this\.handingOver;[\s\S]{0,600}if \(restart\) \{\s*this\.roomRestart = true;\s*void this\.stop\(\);/);
+  assert.match(menu, /if \(line\.startsWith\('piece-changee'\)\) \{[\s\S]{0,1600}this\.roomRestart = true;\s*if \(now\) this\.restart\(\);\s*else this\.restartAfterGame = true;/);
+  assert.doesNotMatch(menu, /onRoom\?\.\(this\.room, true\)/);
+  assert.match(menu, /if \(this\.restartAfterGame\) this\.restart\(\);/);
   assert.match(menu, /if \(this\.roomRestart\) \{\s*this\.roomRestart = false;\s*this\.opts\.onRoomRestart\?\.\(Number\(eyes\[1\]\)\);/);
   const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
-  assert.match(frontend, /if \(headset\?\.worn && headset\.running && roomOffer && !calibration\) \{\s*roomOffer = false;\s*offerCalibration\(true\);/);
   assert.match(frontend, /roomStale = Boolean\(eyeHeightProblem\(eyes\)\);/);
+});
+
+test('fin de partie et accueil de Link : le menu revient sans repasser par Link', () => {
+  // La session en veille ne reprend le casque que rechoisie dans l'accueil de Link (5 à 11 s), une
+  // session neuve le prend d'elle-même (1 s) ; l'arrêt de la session par le runtime n'est pas un casque perdu.
+  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
+  assert.match(cpp, /if \(!exitRequested && !handover && !standby\)\s*say\("session-arretee"\);\s*done = true;/);
+  const menu = fs.readFileSync(path.join(repo, 'app', 'src', 'casque.ts'), 'utf8');
+  assert.match(menu, /if \(line === 'session-arretee'\) \{[\s\S]{0,300}this\.restartNow = true;/);
+  assert.match(menu, /if \(this\.restartNow\) \{\s*this\.restartNow = false;\s*this\.retryAt = 0;\s*setImmediate\(\(\) => this\.check\(\)\);/);
+  const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
+  assert.match(frontend, /headsetPaused = false;[\s\S]{0,500}if \(playedVr && headset\?\.standby\) \{[\s\S]{0,200}headset\.restart\(\);/);
 });

@@ -456,6 +456,51 @@ export function readVpxTableName(file: string): string | undefined {
   }
 }
 
+/** Plateau et vitre d'une table, en unités de VPX (PinTable : LEFT, RGHT, TOPX, BOTM, GLAS, GLAB de GameData). */
+export interface VpxGlass {
+  /** Version du format (flux GameStg/Version) : 1080 pour VPX 10.8. */
+  fileVersion: number;
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+  /** Hauteur de la vitre au-dessus du haut et du bas du plateau. */
+  glassTop: number;
+  glassBottom: number;
+}
+
+/**
+ * Plateau et vitre d'une table, comme VPX les charge : avant le format 1080, la vitre était
+ * horizontale et VPX prend sa hauteur du haut pour le bas (PinTable::LoadGameFromFilename). En VR,
+ * le plateau est posé à « barre avant − hauteur de la vitre du bas × échelle » (VRDevice). undefined
+ * si la table n'est pas lisible.
+ */
+export function readVpxGlass(file: string): VpxGlass | undefined {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const cfb = new CompoundFile(fd);
+    const game = cfb.children(cfb.entries[0]!).find((e) => e.type === 1 && e.name === 'GameStg');
+    const gameData = game && cfb.children(game).find((e) => e.type === 2 && e.name === 'GameData');
+    const version = game && cfb.children(game).find((e) => e.type === 2 && e.name === 'Version');
+    if (!gameData) return undefined;
+    const fileVersion = version ? cfb.stream(version).readInt32LE(0) : 0;
+    const f: Record<string, number> = {};
+    for (const { tag, body } of layoutRecords(cfb.stream(gameData))) {
+      if (['LEFT', 'RGHT', 'TOPX', 'BOTM', 'GLAS', 'GLAB'].includes(tag) && body.length >= 4) f[tag] = body.readFloatLE(0);
+      if (tag === 'ENDB') break;
+    }
+    if (![f.LEFT, f.RGHT, f.TOPX, f.BOTM, f.GLAS].every((v) => v !== undefined && Number.isFinite(v))) return undefined;
+    const glassTop = f.GLAS!;
+    const glassBottom = fileVersion < 1080 || f.GLAB === undefined ? glassTop : f.GLAB;
+    return { fileVersion, left: f.LEFT!, right: f.RGHT!, top: f.TOPX!, bottom: f.BOTM!, glassTop, glassBottom };
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
 /** Protection du script (SECB, pintable.h) : script chiffré, illisible sans VPX. */
 const DISABLE_SCRIPT_EDITING = 0x00000002;
 const DISABLE_EVERYTHING = 0x80000000;

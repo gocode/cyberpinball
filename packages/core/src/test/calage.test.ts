@@ -137,12 +137,12 @@ test('borne fixe : aucun recentrage automatique, la place imposée à VPX, le ca
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
   const frontend = read('app', 'src', 'frontend.ts');
-  assert.match(frontend, /const settings = placeVpxSettings\(place\);\s*writeIniSettings\(vr\.ini, settings\);/);
+  assert.match(frontend, /const table = vpxTableGeometry\(tableFile\);\s*const settings = placeVpxSettings\(place, table\);[\s\S]{0,400}writeIniSettings\(vr\.ini, settings\);/);
   assert.match(frontend, /const vrCenter = vrGame && !readCabinetPlace\(headsetPlaceFile\(\)\) && !vrHasSavedPlace\(vrText\)/);
   assert.match(frontend, /if \(headset\?\.worn && !isCalibrated\(headset\.place\(\)\)\) offerCalibration\(\);/);
   const cpp = read('packages', 'casque-vr', 'src', 'casque.cpp');
   // Dans la pièce, un changement d'espace du Quest ne déplace pas la borne : il est seulement dit.
-  assert.match(cpp, /if \(!stage\)\s*wantRecenter = true;\s*else if \(change->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE\)\s*say\("piece-changee"\);/);
+  assert.match(cpp, /if \(!stage\)\s*wantRecenter = true;\s*else if \(change->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE\)\s*\{[\s\S]{0,200}say\(std::string\("piece-changee "\)/);
   assert.match(cpp, /say\("piece " \+ std::to_string\(bounds\.width\)/);
   assert.match(cpp, /say\("yeux " \+ std::to_string\(loc\.pose\.position\.y\)\);/);
 });

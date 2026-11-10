@@ -9,6 +9,7 @@
 
 import * as assert from 'node:assert/strict';
 import { test } from 'node:test';
+import { GLASS_DROP_M } from '../casque';
 import { freePlace, lockbarPlace, lockbarVpxSettings, placeLockbar, placeVpxSettings, vpxPlaceProblem, vpxRecenteredHead, VPX_TABLE_OFFSET_MAX_CM, type CabinetPlace, type Point3 } from '../calage';
 import type { VpxSetting } from '../vpx';
 
@@ -57,7 +58,7 @@ const DEG = Math.PI / 180;
 const TABLE = { right: cmToVpu(20.25 * 2.54), bottom: cmToVpu(45 * 2.54), glassBottom: cmToVpu(3 * 2.54), slope: 6.5 };
 
 /** Où VPX pose un point du plateau (unités VPX, z vers le haut), en mètres dans l'espace du casque. */
-function vpxWorld(settings: readonly VpxSetting[], point: [number, number, number]): Point3 {
+function vpxWorld(settings: readonly VpxSetting[], point: [number, number, number], table: typeof TABLE = TABLE): Point3 {
   const get = (key: string) => Number(settings.find((s) => s.key === key)!.value);
   // Réglages bornés par VPX (Settings_properties.inl).
   const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
@@ -68,14 +69,14 @@ function vpxWorld(settings: readonly VpxSetting[], point: [number, number, numbe
   const lockbarWidth = get('LockbarWidth');
   const lockbarHeight = get('LockbarHeight');
   const lockbarToPlayfield = 5;
-  const s = clamp(lockbarWidth / (TABLE.right * VPU_CM + 2.25 * 2.54), 0.1, 2);
-  const scaledGlassHeight = s * TABLE.glassBottom * VPU_CM;
+  const s = clamp(lockbarWidth / (table.right * VPU_CM + 2.25 * 2.54), 0.1, 2);
+  const scaledGlassHeight = s * table.glassBottom * VPU_CM;
   const viewOrientation = mul(rotateZ(orientation * DEG), rotateX(-90 * DEG));
   const toWorld = [
     scale(s),
     scale(1, -1, 1),
-    translate(-s * TABLE.right * 0.5, s * TABLE.bottom, 0),
-    rotateX(TABLE.slope * DEG),
+    translate(-s * table.right * 0.5, s * table.bottom, 0),
+    rotateX(table.slope * DEG),
     translate(-cmToVpu(tableX), cmToVpu(tableY + lockbarToPlayfield), cmToVpu(tableZ + lockbarHeight - scaledGlassHeight)),
     viewOrientation,
   ].reduce(mul);
@@ -198,4 +199,28 @@ test('pose de VPX : la table du 10 novembre 2026 derrière le joueur et sous le 
   const ahead = (bottom.x - head.x) * -Math.sin(head.yaw) + (bottom.z - head.z) * -Math.cos(head.yaw);
   assert.ok(ahead < -0.5, `bas du plateau à ${ahead.toFixed(2)} m devant la tête : derrière`);
   assert.ok(bottom.y < 0, `bas du plateau à ${bottom.y.toFixed(2)} m : sous le sol`);
+});
+
+test('pose de VPX : au bureau, le plateau de VPX exactement sur celui du menu, quelle que soit la vitre de la table', () => {
+  // Vitres du bas des tables installées (readVpxGlass) : 7,6 cm, 10,8 cm (Back to the Future), 21,6 cm
+  // (la plupart), 27 cm ; plateaux de 51,4 et 54,6 cm. Sans recalage, VPX posait le plateau jusqu'à 20 cm
+  // sous la barre avant, le menu 5 cm (essai du 10 novembre 2026 : « la table de jeu un peu plus basse »).
+  for (const [widthCm, glassCm] of [[51.4, 7.6], [51.4, 10.8], [54.6, 21.6], [51.4, 27]] as const) {
+    const table = { right: cmToVpu(widthCm), bottom: TABLE.bottom, glassBottom: cmToVpu(glassCm), slope: TABLE.slope };
+    for (const deg of [-150, -10, 0, 75, 180]) {
+      const place = freePlace({ x: 0.2, z: -0.3, yaw: deg * DEG });
+      const settings = placeVpxSettings(place, { widthCm, glassBottomCm: glassCm });
+      const { left, right } = placeLockbar(place);
+      const center = { x: (left.x + right.x) / 2, y: (left.y + right.y) / 2, z: (left.z + right.z) / 2 };
+      const bottom = vpxWorld(settings, [table.right / 2, table.bottom, 0], table);
+      const what = `vitre ${glassCm} cm, ${deg}°`;
+      // Le bas du plateau au droit de la barre avant, GLASS_DROP_M sous elle : là où le menu le pose.
+      close(bottom.x, center.x, 2e-3, `${what} : x`);
+      close(bottom.z, center.z, 2e-3, `${what} : z`);
+      close(bottom.y, center.y - GLASS_DROP_M, 2e-3, `${what} : hauteur`);
+    }
+  }
+  // Sur une vraie borne, la barre avant de VPX reste sur la vraie : le plateau à la profondeur de la table.
+  const cabinet = lockbarPlace({ x: -0.36, y: 0.86, z: -0.6 }, { x: 0.36, y: 0.86, z: -0.6 });
+  assert.equal(placeVpxSettings(cabinet, { widthCm: 51.4, glassBottomCm: 21.6 }).find((s) => s.key === 'TableZ')?.value, '0');
 });

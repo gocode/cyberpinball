@@ -131,6 +131,9 @@ export class HeadsetMenu {
   private lost = false;
   /** Reprise sur une session neuve pour changement de pièce : sa première hauteur des yeux reste à dire. */
   private roomRestart = false;
+  /** Session neuve à relancer aussitôt le compagnon parti, ou à la reprise après une partie. */
+  private restartNow = false;
+  private restartAfterGame = false;
   /** Dernière tête relevée pendant la veille d'une partie (pièce du Quest, mètres, lacet en radians). */
   lastHead: HeadPose | undefined;
   /** Au moins une image rendue pour le casque y est arrivée : les écrans du PC peuvent se reposer. */
@@ -189,6 +192,18 @@ export class HeadsetMenu {
     } catch {
       // Compagnon déjà parti.
     }
+  }
+
+  /**
+   * Repartir sur une session neuve, tout de suite : elle prend le casque d'elle-même (environ 1 s le
+   * 10 novembre 2026), dans la pièce d'origine du Quest, celle que VPX reçoit aussi.
+   */
+  restart(): void {
+    this.restartAfterGame = false;
+    if (!this.child) return;
+    this.restartNow = true;
+    this.handingOver = false;
+    void this.stop();
   }
 
   recenter(): void {
@@ -344,18 +359,25 @@ export class HeadsetMenu {
           this.opts.onRoom?.(this.room, false);
           continue;
         }
-        if (line === 'piece-changee') {
-          // Le Quest a refait sa pièce sous la session en cours : une application lancée ensuite (VPX) peut
-          // en recevoir une autre (essai du 10 novembre 2026 : yeux à 2,3 m à chaque lancement, 1,2 m dans
-          // la session changée ; la table de VPX derrière le joueur et sous le sol). Le compagnon repart sur
-          // une session neuve, dans la pièce que VPX verra, et le calage se refait là.
-          const restart = !this.standby && !this.handingOver;
-          this.opts.log(`Casque : le Quest a déplacé sa pièce (limite refaite ou sol recalé) ; la borne ne bouge pas${restart ? ' ; le compagnon repart sur une session neuve, la pièce que VPX verra' : ''}.`); // i18n-ignore : journal
-          this.opts.onRoom?.(this.room, true);
-          if (restart) {
-            this.roomRestart = true;
-            void this.stop();
-          }
+        if (line.startsWith('piece-changee')) {
+          // Le Quest a refait sa pièce sous la session en cours (casque remis, « Réinitialiser la vue » de
+          // Link, sol refait) : seule cette session la reçoit. Les sessions neuves, dont celle de VPX,
+          // gardent la pièce d'origine (essai du 10 novembre 2026 : yeux à 2,3 m puis 1,2 m dans la session
+          // changée le matin, 1,6 m puis 0,5 m l'après-midi, et chaque session neuve revenue à la pièce
+          // d'origine ; la table de VPX derrière le joueur et sous le sol). La borne reste donc au même
+          // endroit de la vraie pièce en repartant sur une session neuve, sans recaler ; pendant une
+          // partie, à la reprise (VPX garde sa pièce jusqu'à la fin).
+          const now = !this.standby && !this.handingOver;
+          this.opts.log(`Casque : ${line} ; le Quest a déplacé sa pièce sous la session du compagnon, qui repart sur une session neuve ${now ? 'tout de suite' : 'à la fin de la partie'} : la borne reste où elle est dans la pièce.`); // i18n-ignore : journal
+          this.roomRestart = true;
+          if (now) this.restart();
+          else this.restartAfterGame = true;
+          continue;
+        }
+        // Le runtime a arrêté la session sans que personne le demande (accueil de Link) : session neuve aussitôt.
+        if (line === 'session-arretee') {
+          this.opts.log('Casque : session arrêtée par le runtime (accueil de Link) ; le compagnon repart aussitôt sur une session neuve.'); // i18n-ignore : journal
+          this.restartNow = true;
           continue;
         }
         if (!PROTOCOL.test(line)) continue;
@@ -373,6 +395,7 @@ export class HeadsetMenu {
         if (line === 'reprise') {
           this.standby = false;
           this.handingOver = false;
+          if (this.restartAfterGame) this.restart();
           this.opts.onStateChange?.();
         }
         if (line.startsWith('casque-perdu')) {
@@ -419,6 +442,12 @@ export class HeadsetMenu {
       // Casque absent ou perdu (éteint, Link coupé) : nouvel essai plus tard ; arrêt demandé : rien.
       if (code !== 0 || this.lost) this.retryAt = Date.now() + RETRY_MS;
       this.lost = false;
+      // Session neuve voulue (pièce changée, arrêt par le runtime, fin de partie) : relancée aussitôt.
+      if (this.restartNow) {
+        this.restartNow = false;
+        this.retryAt = 0;
+        setImmediate(() => this.check());
+      }
     });
     this.panels = panels;
     this.target = child.pid ? openHandleTarget(child.pid) : undefined;

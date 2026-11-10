@@ -62,6 +62,9 @@ son interface).
 - Compte YouTube : « Utiliser la connexion de Firefox » remplace le choix d'un navigateur (Chrome, Edge et Brave protègent leurs cookies). Firefox absent ou pas connecté à YouTube : l'écran le dit, avec la marche à suivre.
 - Sur une vidéo YouTube, « Récupérer » propose d'abord « Ajouter au Juke-box », et ne prétend plus que yt-dlp manque.
 - Les incidents rattrapés et les plantages sont notés dans logs\erreurs.txt ; en borne dédiée, Cyber Pinball figé est relancé tout seul.
+- Dans le casque, « Réinitialiser la vue » de Link ne déplace plus la borne : elle reste au même endroit de la pièce, au menu comme en partie, sans recaler.
+- Au bureau, le plateau de la partie tombe exactement sur celui du menu, à la même hauteur.
+- Après une partie, le menu revient directement dans le casque, sans repasser par l'accueil de Link.
 
 ## 0.1.8
 

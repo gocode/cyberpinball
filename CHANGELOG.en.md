@@ -60,6 +60,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - YouTube account: “Use Firefox’s sign-in” replaces the choice of a browser (Chrome, Edge and Brave protect their cookies). Firefox missing or not signed in to YouTube: the screen says so, with what to do.
 - On a YouTube video, “Get” offers “Add to the Juke-box” first, and no longer claims yt-dlp is missing.
 - Caught incidents and crashes are logged in logs\erreurs.txt; on a dedicated cabinet, a frozen Cyber Pinball is relaunched by itself.
+- In the headset, Link's "Reset view" no longer moves the cabinet: it stays in the same place in the room, in the menu and in game alike, without realigning.
+- At a desk, the game's playfield lands exactly on the menu's, at the same height.
+- After a game, the menu comes straight back into the headset, without going through Link's home.
 
 ## 0.1.8
 
