@@ -307,6 +307,79 @@ private:
    Choix selection = Choix::Reprendre;
 };
 
+// PNG sans compression (blocs « stockés » de deflate) : les captures de diagnostic du plugin, sans bibliothèque.
+inline uint32_t crc32Png(const uint8_t* d, size_t n)
+{
+   uint32_t c = 0xFFFFFFFFu;
+   for (size_t i = 0; i < n; i++)
+   {
+      c ^= d[i];
+      for (int k = 0; k < 8; k++)
+         c = (c >> 1) ^ (0xEDB88320u & (0u - (c & 1u)));
+   }
+   return c ^ 0xFFFFFFFFu;
+}
+
+/** Une image RGB (w × h × 3 octets) en fichier PNG. */
+inline std::vector<uint8_t> encoderPng(int w, int h, const std::vector<uint8_t>& rgb)
+{
+   std::vector<uint8_t> brut;
+   brut.reserve(static_cast<size_t>(h) * (static_cast<size_t>(w) * 3 + 1));
+   for (int y = 0; y < h; y++)
+   {
+      brut.push_back(0);
+      brut.insert(brut.end(), rgb.begin() + static_cast<size_t>(y) * w * 3, rgb.begin() + static_cast<size_t>(y + 1) * w * 3);
+   }
+   std::vector<uint8_t> z { 0x78, 0x01 };
+   uint32_t a = 1, b = 0;
+   for (uint8_t v : brut)
+   {
+      a = (a + v) % 65521;
+      b = (b + a) % 65521;
+   }
+   size_t pos = 0;
+   do
+   {
+      const size_t n = brut.size() - pos < 65535 ? brut.size() - pos : 65535;
+      z.push_back(pos + n >= brut.size() ? 1 : 0);
+      z.push_back(static_cast<uint8_t>(n));
+      z.push_back(static_cast<uint8_t>(n >> 8));
+      z.push_back(static_cast<uint8_t>(~n));
+      z.push_back(static_cast<uint8_t>(~n >> 8));
+      z.insert(z.end(), brut.begin() + pos, brut.begin() + pos + n);
+      pos += n;
+   } while (pos < brut.size());
+   const uint32_t adler = (b << 16) | a;
+   for (int k = 3; k >= 0; k--)
+      z.push_back(static_cast<uint8_t>(adler >> (8 * k)));
+   std::vector<uint8_t> out { 137, 80, 78, 71, 13, 10, 26, 10 };
+   const auto u32 = [&out](uint32_t v)
+   {
+      for (int k = 3; k >= 0; k--)
+         out.push_back(static_cast<uint8_t>(v >> (8 * k)));
+   };
+   const auto bloc = [&](const char* type, const std::vector<uint8_t>& d)
+   {
+      u32(static_cast<uint32_t>(d.size()));
+      const size_t debut = out.size();
+      out.insert(out.end(), type, type + 4);
+      out.insert(out.end(), d.begin(), d.end());
+      u32(crc32Png(out.data() + debut, out.size() - debut));
+   };
+   std::vector<uint8_t> ihdr(13, 0);
+   for (int k = 0; k < 4; k++)
+   {
+      ihdr[k] = static_cast<uint8_t>(static_cast<uint32_t>(w) >> (24 - 8 * k));
+      ihdr[4 + k] = static_cast<uint8_t>(static_cast<uint32_t>(h) >> (24 - 8 * k));
+   }
+   ihdr[8] = 8; // 8 bits par composante
+   ihdr[9] = 2; // RGB
+   bloc("IHDR", ihdr);
+   bloc("IDAT", z);
+   bloc("IEND", {});
+   return out;
+}
+
 // Police 5 × 7, capitales A-Z, chiffres, espace et « : . - / · » : les libellés en très gros, sans fichier d'image.
 inline const uint8_t* glyphe(char c)
 {

@@ -73,6 +73,12 @@ import {
   vpxRecenteredHead,
   vpxRoomChanges,
   vrGraphicsProfile,
+  cachedVrBackglassView,
+  FULL_BACKGLASS_ZONE,
+  parseVrMeasures,
+  zoneSetting,
+  vrNeedsVpxBackglass,
+  type VrBackglassView,
   emptyPlayedPlaylists,
   pupVideosDir,
   activePacks,
@@ -2673,16 +2679,27 @@ let headLogged = false;
 function auditVrBackglass(): void {
   if (vrMode !== 'auto') return;
   const empty: string[] = [];
+  const hidden: string[] = [];
+  const uncertain: string[] = [];
   for (const table of tables) {
     try {
       const script = readTableScript(table.file);
-      if (!tableHasVrRoom(script) || !tableUsesPupCapture(script)) continue;
-      if (!readVpxBackglassDisplays(table.file)) empty.push(table.title);
+      const room = tableHasVrRoom(script);
+      const displays = readVpxBackglassDisplays(table.file);
+      // Le fronton de VPX leur sera ajouté : sa partie visible, calculée d'avance (3 s au plus par table).
+      if (vrNeedsVpxBackglass({ room, backglassDisplays: displays, pupCapture: tableUsesPupCapture(script) })) {
+        const view = cachedVrBackglassView(table.file, vrZonesFile());
+        if (view && view.hidden >= 0.02) hidden.push(`${table.title} (${Math.round(view.hidden * 100)} %)`);
+        if (view?.uncertain.length) uncertain.push(table.title);
+      }
+      if (!room || !tableUsesPupCapture(script)) continue;
+      if (!displays) empty.push(table.title);
     } catch {
       // Table illisible : rien à en dire ici.
     }
   }
   console.log(`Réalité virtuelle : ${empty.length} table(s) au fronton vide dans le casque sans correctif (pièce VR, fronton capté par PuP, aucun flasher du fronton)${empty.length ? ` : ${empty.join(', ')} ; le fronton de VPX leur est ajouté à chaque partie` : ''}.`); // i18n-ignore : journal
+  console.log(`Réalité virtuelle : fronton de VPX en partie caché par la pièce de la table pour ${hidden.length} table(s)${hidden.length ? ` : ${hidden.join(', ')} ; le fronton et la pause y sont dessinés dans la partie visible` : ''}${uncertain.length ? ` ; selon le script, peut-être aussi caché pour ${uncertain.join(', ')} (capture à la prochaine partie)` : ''}.`); // i18n-ignore : journal
 }
 
 /**
@@ -2710,6 +2727,68 @@ function auditPupPacks(): void {
     }
   }
   console.log(`PuP-Packs : ${packs} pack(s) contrôlé(s), ${found.length} incomplet(s)${found.length ? ` : ${found.join(' | ')} ; « Ce qu’il manque pour jouer » propose de les recompléter` : ''}.`); // i18n-ignore : journal
+}
+
+/** Partie visible du fronton de VPX en VR, gardée par table (fronton-vr.ts). */
+function vrZonesFile(): string {
+  return path.join(loc.dataDir, 'vr', 'fronton-zones.json');
+}
+function vrMeasuresFile(): string {
+  return path.join(loc.dataDir, 'logs', 'casque-vpx.txt');
+}
+function vrCapturesDir(): string {
+  return path.join(loc.dataDir, 'logs', 'captures-casque');
+}
+
+/** Avant une partie dans le casque : le fichier de mesures vidé, les captures gardées à 8 (les plus récentes). */
+function prepareVrMeasures(): void {
+  try {
+    fs.mkdirSync(path.dirname(vrMeasuresFile()), { recursive: true });
+    fs.writeFileSync(vrMeasuresFile(), '');
+    fs.mkdirSync(vrCapturesDir(), { recursive: true });
+    const old = fs
+      .readdirSync(vrCapturesDir())
+      .filter((f) => f.endsWith('.png'))
+      .map((f) => ({ f, t: fs.statSync(path.join(vrCapturesDir(), f)).mtimeMs }))
+      .sort((a, b) => b.t - a.t)
+      .slice(8);
+    for (const { f } of old) fs.rmSync(path.join(vrCapturesDir(), f), { force: true });
+  } catch (error) {
+    console.warn(`Casque : mesures de la partie pas préparées (${(error as Error).message}).`); // i18n-ignore : journal
+  }
+}
+
+/** La partie visible du fronton, en clair pour le journal. */
+function describeBackglassView(view: VrBackglassView): string {
+  const pct = (v: number) => `${Math.round(v * 100)} %`;
+  const z = view.zone;
+  const where = z.left === 0 && z.top === 0 && z.right === 1 && z.bottom === 1 ? 'tout le fronton visible' : `partie visible : de ${pct(z.left)} à ${pct(z.right)} de sa largeur, de ${pct(z.top)} à ${pct(z.bottom)} de sa hauteur depuis le haut`; // i18n-ignore : journal
+  const by = view.occluders.length ? ` ; caché à ${pct(view.hidden)} par ${view.occluders.slice(0, 3).map((o) => `${o.name} (${pct(o.share)})`).join(', ')}` : ''; // i18n-ignore : journal
+  const maybe = view.uncertain.length ? ` ; selon le script, peut-être aussi par ${view.uncertain.slice(0, 3).map((o) => `${o.name} (${pct(o.share)})`).join(', ')} (la capture de la partie le dira)` : ''; // i18n-ignore : journal
+  return `fronton de VPX : ${where}${by}${maybe}, le fronton et la pause y sont dessinés`; // i18n-ignore : journal
+}
+
+/** Après une partie dans le casque : ce que le plugin a mesuré, et ses captures, au journal. */
+function noteVrMeasures(): void {
+  const m = parseVrMeasures(readTextIfExists(vrMeasuresFile()));
+  if (!m) {
+    console.log('Casque, mesures de VPX : aucune (plugin absent, ou partie trop courte).'); // i18n-ignore : journal
+    return;
+  }
+  const f = (v: number, d = 1) => v.toFixed(d).replace('.', ',');
+  if (m.samples)
+    console.log(
+      `Casque, mesures de VPX (${m.samples} relevé(s) de 5 s) : VPX ${f(m.vpx.mean)} images/s (de ${f(m.vpx.min)} à ${f(m.vpx.max)}), plus grand écart entre deux images ${Math.round(m.worstGapMs)} ms ; fronton dessiné ${f(m.backglass)} fois/s ; vidéo de PuP la plus active ${f(m.video.mean)} nouvelles images/s (de ${f(m.video.min)} à ${f(m.video.max)}) ; temps de jeu ${f(m.gameTime, 2)} s par seconde.`, // i18n-ignore : journal
+    );
+  const shots = fs.existsSync(vrCapturesDir())
+    ? fs
+        .readdirSync(vrCapturesDir())
+        .filter((x) => x.endsWith('.png'))
+        .map((x) => path.join(vrCapturesDir(), x))
+        .sort()
+    : [];
+  for (const c of m.captures)
+    console.log(`Casque, capture de l'aperçu VR (${c.name === 'pause' ? 'au menu de pause' : '8 s après le début'}) : ${c.ok ? `prise ${c.source === 'ecran' ? "sur l'écran" : 'dans la fenêtre'}, luminosité ${c.brightness}${c.brightness < 2 ? ' (noire)' : ''}, ${shots.filter((x) => x.endsWith(`-${c.name}.png`)).pop() ?? '?'}` : 'échec'}.`); // i18n-ignore : journal
 }
 
 /** Profil graphique appliqué à la partie dans le casque en cours (vr-profil.ts), dit au relevé de Link. */
@@ -3066,6 +3145,17 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
     if (pausePlugin === 'missing' || pausePlugin === 'busy') details.push(`pause dans le casque indisponible (plugin ${pausePlugin === 'missing' ? 'absent' : 'occupé'})`); // i18n-ignore : journal
     else {
       writeIniSettings(vr.ini, pauseSettingsFor(readTextIfExists(vr.ini), { pause: t('Pause'), resume: t('Reprendre'), quit: t('Quitter'), ...pauseKeyLabels() }));
+      // Fronton de VPX : la partie que la pièce VR de la table laisse voir (fronton-vr.ts), où le plugin dessine
+      // le fronton et la pause ; mesures et captures de la partie, reportées au journal à la fin (noteVrMeasures).
+      const view = vr.addBackglass ? cachedVrBackglassView(tableFile, vrZonesFile()) : undefined;
+      const zone = view?.zone ?? FULL_BACKGLASS_ZONE;
+      prepareVrMeasures();
+      writeIniSettings(vr.ini, [
+        { section: 'Plugin.CyberPinball', key: 'Zone', value: zoneSetting(zone) },
+        { section: 'Plugin.CyberPinball', key: 'LogFile', value: vrMeasuresFile() },
+        { section: 'Plugin.CyberPinball', key: 'CaptureDir', value: vrCapturesDir() },
+      ]);
+      if (view) details.push(describeBackglassView(view)); // i18n-ignore : journal
       details.push(`pause dans le casque : plugin ${pausePlugin === 'installed' ? 'installé' : 'à jour'}, appui court sur Pause ou tenu ${QUIT_HOLD_S} s pour quitter`); // i18n-ignore : journal
     }
     // Une seule pose : la table de VPX où est la borne du casque (calée ou non), à chaque partie.
@@ -4561,6 +4651,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (playedVr && vrGame && vrGameStart) noteLinkStats(vrGameStart, Date.now());
   headsetExitHint = undefined;
   if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
+  if (playedVr && vrGame) noteVrMeasures();
   headTracker.stop();
   stopCentering?.();
   headsetPaused = false;

@@ -105,6 +105,7 @@ son interface).
 - PuP-Packs incomplets : tous les packs installés sont contrôlés (fichiers absents, playlists jouées mais vides). Le diagnostic de la table et le journal les signalent, sans jamais bloquer le lancement, et proposent de recompléter le pack.
 - Dans le casque, le fronton remplit son cadre en gardant ses proportions (B2S comme PuP), et la pause y tient entière. La pause affiche Reprendre ou Quitter, le choix encadré, au joystick ou aux flippers ; A valide.
 - Dans le casque, le son des vidéos des PuP-Packs ne hache plus : VPX ne dessinant pas le DMD et le topper en VR, leurs vidéos avançaient par à-coups.
+- Dans le casque, le fronton et la pause sont dessinés dans la partie du fronton que la pièce VR de la table laisse voir (calculée pour chaque table) : plus de fronton à moitié caché. Chaque partie note au journal la cadence de VPX et des vidéos PuP, et garde deux captures de l'aperçu VR.
 
 ## 0.1.8
 

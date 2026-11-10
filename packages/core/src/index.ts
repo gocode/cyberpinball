@@ -174,3 +174,4 @@ export * from './jukebox-screens';
 export * from './jukebox-youtube';
 export * from './jukebox-manage';
 export * from './youtube-account';
+export * from './fronton-vr';

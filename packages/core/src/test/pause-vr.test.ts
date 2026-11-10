@@ -3,8 +3,10 @@
 import * as assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
+import { decodePng } from '../png';
 import { FALLBACK_RENDERER, pauseVrSettings, PAUSE_RENDERER, tableUsesPupCapture, vrNeedsVpxBackglass, WATCH_RENDERER } from '../vr-profil';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
@@ -47,13 +49,13 @@ test('plugin : fronton cadré (proportions gardées) et vidéos de PuP que VPX n
   const cpp = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
   // Hors de la pause, le rendu suivant passe par le cadre ; les coordonnées de sa surface y sont mises à l'échelle, centrées.
   assert.match(cpp, /if \(!pause\.affichee\(t\)\)\s*return dessinerCadre\(ctx, t\);/);
-  assert.match(cpp, /const Rect r = cadrer\(cadre\.dedans\.srcWidth, cadre\.dedans\.srcHeight, cadre\.dehors->srcWidth, cadre\.dehors->srcHeight/);
+  assert.match(cpp, /const Rect r = cadrer\(cadre\.dedans\.srcWidth, cadre\.dedans\.srcHeight, cadre\.zone\.l, cadre\.zone\.h/);
   for (const fn of ['DrawImage = cadreImage', 'DrawDisplay = cadreAfficheur', 'DrawSegDisplay = cadreSegments']) assert.ok(cpp.includes(`cadre.dedans.${fn};`), fn);
   // PuP pose son écran sur toute sa surface : la forme de son fronton lui est donnée (16:9 par défaut).
   assert.match(cpp, /MSGPI_FLOAT_VAL_SETTING\(pupRatio, "PupRatio"[^;]*1\.7778f\);/);
   // Son de PuP : ScoreView et topper (et le fronton non demandé) dessinés à vide à chaque image, sauf si VPX les dessine.
   assert.match(cpp, /Pompe pompes\[\] = \{ \{ VPXWINDOW_Backglass \}, \{ VPXWINDOW_ScoreView \}, \{ VPXWINDOW_Topper \} \};/);
-  assert.match(cpp, /appliquer\(pause\.image\(t, vpxApi->GetGameTime\(\)\)\);\s*pomper\(t\);/);
+  assert.match(cpp, /appliquer\(pause\.image\(t, jeu\)\);\s*pomper\(t\);/);
   assert.match(cpp, /if \(t - demandee < 0\.3\)\s*continue;/);
 });
 
@@ -92,7 +94,12 @@ test('plugin : rien hors du casque (jamais en 2D, activé seulement dans l’INI
 test('plugin : banc de la pause (pause de VPX constatée, joystick, valider, appui tenu 1,5 s, jamais avalés), s’il est construit', (t) => {
   const banc = path.join(repo, 'build', 'vision3d', 'Release', 'banc-pause.exe');
   if (!fs.existsSync(banc)) return t.skip('banc pas construit (node scripts/vision3d.mjs)');
-  const run = spawnSync(banc, [], { encoding: 'utf8', windowsHide: true });
+  // Le PNG des captures, écrit par le banc, relu par le décodeur de Cyber Pinball : 3 × 2, couleurs exactes.
+  const png = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'banc-pause-')), 'banc.png');
+  const run = spawnSync(banc, [png], { encoding: 'utf8', windowsHide: true });
   assert.equal(run.status, 0, run.stdout);
   assert.match(run.stdout, /tout va bien/);
+  const image = decodePng(fs.readFileSync(png))!;
+  assert.deepEqual([image.width, image.height], [3, 2]);
+  assert.deepEqual([...image.data.subarray(0, 8)], [255, 0, 0, 255, 0, 255, 0, 255]);
 });

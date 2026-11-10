@@ -24,8 +24,10 @@
 //
 // Réglages ([Plugin.CyberPinball], écrits par Cyber Pinball dans la langue de l'application) :
 //   Pause, Resume, Quit, Help (rappel des touches, lignes séparées par « · »), ResumeHint : les libellés ;
-//   Order : les rendus du fronton à cadrer, dans l'ordre ; PupRatio : la forme du fronton de PuP.
+//   Order : les rendus du fronton à cadrer, dans l'ordre ; PupRatio : la forme du fronton de PuP ;
+//   Zone : la partie visible du fronton (fronton-vr.ts) ; LogFile, CaptureDir : mesures et captures.
 
+#define _CRT_SECURE_NO_WARNINGS
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
@@ -33,6 +35,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <map>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -58,6 +61,9 @@ MSGPI_STRING_VAL_SETTING(libelleAide, "Help", "Help label", "Keys reminder under
 MSGPI_STRING_VAL_SETTING(libelleRappel, "ResumeHint", "Resume hint", "Shown when resuming did not take", true, "Pause button: resume", 64);
 MSGPI_STRING_VAL_SETTING(ordreFronton, "Order", "Backglass order", "Backglass renderers drawn framed by the plugin, in order (ids, comma separated)", true, "PUP,B2S", 256);
 MSGPI_FLOAT_VAL_SETTING(pupRatio, "PupRatio", "PuP backglass ratio", "Width over height of the PuP backglass", true, 0.5f, 4.f, 0.01f, 1.7778f);
+MSGPI_STRING_VAL_SETTING(zoneFronton, "Zone", "Visible backglass area", "Left,top,right,bottom fractions of the backglass that the VR room leaves visible", true, "0,0,1,1", 64);
+MSGPI_STRING_VAL_SETTING(fichierMesures, "LogFile", "Measures file", "Where the plugin writes its measures, empty for none", true, "", 1024);
+MSGPI_STRING_VAL_SETTING(dossierCaptures, "CaptureDir", "Captures folder", "Where the plugin saves captures of the VR preview, empty for none", true, "", 1024);
 
 double maintenant()
 {
@@ -156,6 +162,91 @@ int MSGPIAPI veiller(VPXRenderContext2D* ctx, void*)
    return 0;
 }
 
+// --- Mesures et captures (essai du casque) ------------------------------------------------------
+//
+// Pour juger sur pièces (essai du 10 novembre 2026 : fronton coupé, vidéos de PuP hachées) : toutes les 5 s,
+// le plugin écrit ce qu'il mesure dans [Plugin.CyberPinball] LogFile (Cyber Pinball le reporte au journal) :
+// images de VPX par seconde et plus grand écart entre deux, fois où VPX dessine le fronton, fois où PuP
+// dessine, nouvelles images de la vidéo de PuP la plus active (texture changée à la même place : PuP en
+// crée une neuve à chaque image, PUPMediaPlayer::Render), vitesse du temps de jeu, fenêtres pompées. Et il
+// capture deux fois par partie la fenêtre d'aperçu VR de VPX (8 s après le début, puis au premier menu de
+// pause), sans rien montrer à l'écran (PrintWindow ; si l'image est noire, la zone de l'écran sous la
+// fenêtre), en PNG dans [Plugin.CyberPinball] CaptureDir. Lignes en ASCII « clé=valeur ».
+
+struct Mesures
+{
+   double debut = -1.0, fenetre = -1.0, derniere = -1.0, ecartMax = 0.0, jeu0 = 0.0;
+   int images = 0, frontons = 0, pup = 0, pompees = 0;
+   std::map<uint64_t, std::pair<VPXTexture, int>> videos; // place dessinée -> dernière texture, changements
+   bool captureDebut = false, capturePause = false;
+   double menuDepuis = -1.0;
+};
+Mesures mesures;
+
+std::wstring large(const char* utf8)
+{
+   const int n = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, nullptr, 0);
+   std::wstring w(n > 0 ? n - 1 : 0, L'\0');
+   if (n > 1)
+      MultiByteToWideChar(CP_UTF8, 0, utf8, -1, w.data(), n);
+   return w;
+}
+
+void ecrire(const std::string& ligne)
+{
+   if (!fichierMesures_Val[0])
+      return;
+   FILE* f = _wfopen(large(fichierMesures_Val).c_str(), L"ab");
+   if (!f)
+      return;
+   std::fputs(ligne.c_str(), f);
+   std::fputs("\n", f);
+   std::fclose(f);
+}
+
+void noterVideo(VPXTexture tex, float x, float y, float w, float h)
+{
+   const uint64_t cle = (static_cast<uint64_t>(static_cast<uint16_t>(x)) << 48) | (static_cast<uint64_t>(static_cast<uint16_t>(y)) << 32)
+      | (static_cast<uint64_t>(static_cast<uint16_t>(w)) << 16) | static_cast<uint64_t>(static_cast<uint16_t>(h));
+   auto& v = mesures.videos[cle];
+   if (v.first != tex)
+   {
+      v.first = tex;
+      v.second++;
+   }
+}
+
+/** À chaque image : compte, et toutes les 5 s, la ligne de mesures. */
+void mesurer(double t, double jeu)
+{
+   if (mesures.debut < 0.0)
+   {
+      mesures.debut = mesures.fenetre = t;
+      mesures.jeu0 = jeu;
+   }
+   if (mesures.derniere >= 0.0)
+      mesures.ecartMax = std::max(mesures.ecartMax, t - mesures.derniere);
+   mesures.derniere = t;
+   mesures.images++;
+   mesures.pompees += pompees;
+   const double duree = t - mesures.fenetre;
+   if (duree < 5.0)
+      return;
+   int video = 0;
+   for (const auto& [cle, v] : mesures.videos)
+      video = std::max(video, v.second);
+   char ligne[512];
+   std::snprintf(ligne, sizeof(ligne), "mesure t=%.0f vpx=%.1f ecart_ms=%.0f fronton=%.1f pup=%.1f video=%.1f jeu=%.2f pompees=%.1f zone=%s", t - mesures.debut, mesures.images / duree,
+      mesures.ecartMax * 1000.0, mesures.frontons / duree, mesures.pup / duree, video / duree, (jeu - mesures.jeu0) / duree, mesures.pompees / duree, zoneFronton_Val);
+   ecrire(ligne);
+   mesures.fenetre = t;
+   mesures.jeu0 = jeu;
+   mesures.images = mesures.frontons = mesures.pup = mesures.pompees = 0;
+   mesures.ecartMax = 0.0;
+   for (auto& [cle, v] : mesures.videos)
+      v.second = 0;
+}
+
 // --- Cadrage du fronton dans le casque -------------------------------------------------------
 //
 // VPX dessine un rendu annexe sur toute la surface du flasher du fronton, quelle que soit sa forme : le
@@ -171,15 +262,53 @@ struct Cadre
 {
    VPXRenderContext2D* dehors = nullptr; // le vrai contexte de VPX
    VPXRenderContext2D dedans {};         // celui que voit le rendu appelé
+   Rect zone {};                         // la partie visible du fronton, dans la surface du flasher
+   bool pup = false;                     // le rendu appelé est PuP (mesure de ses vidéos)
 };
 Cadre cadre;
+
+/** Un nombre « 0.5333 » (point décimal, quelle que soit la langue du système). */
+float lireNombre(const char*& p)
+{
+   while (*p == ' ' || *p == ',')
+      p++;
+   float v = 0.f, f = 0.f;
+   bool chiffre = false;
+   for (; (*p >= '0' && *p <= '9') || *p == '.'; p++)
+   {
+      if (*p == '.')
+         f = 1.f;
+      else
+      {
+         chiffre = true;
+         if (f > 0.f)
+            v += (*p - '0') * (f *= 0.1f);
+         else
+            v = v * 10.f + (*p - '0');
+      }
+   }
+   return chiffre ? v : -1.f;
+}
+
+/**
+ * La partie visible du fronton ([Plugin.CyberPinball] Zone, calculée par Cyber Pinball d'après la pièce VR de
+ * la table, fronton-vr.ts), dans la surface du flasher ; tout le fronton si elle manque ou ne tient pas debout.
+ */
+Rect zoneVisible(const VPXRenderContext2D* ctx)
+{
+   const char* p = zoneFronton_Val;
+   float l = lireNombre(p), t = lireNombre(p), r = lireNombre(p), b = lireNombre(p);
+   if (l < 0.f || t < 0.f || r > 1.001f || b > 1.001f || r - l < 0.1f || b - t < 0.1f)
+      l = 0.f, t = 0.f, r = 1.f, b = 1.f;
+   return { l * ctx->outWidth, t * ctx->outHeight, (r - l) * ctx->outWidth, (b - t) * ctx->outHeight };
+}
 
 /** Rectangle (x, y, l, h) de la surface du rendu appelé, dans celle du fronton : proportions gardées, centré. */
 void placer(float x, float y, float l, float h, float& X, float& Y, float& L2, float& H2)
 {
-   const Rect r = cadrer(cadre.dedans.srcWidth, cadre.dedans.srcHeight, cadre.dehors->srcWidth, cadre.dehors->srcHeight, { x, y, l, h });
-   X = r.x;
-   Y = r.y;
+   const Rect r = cadrer(cadre.dedans.srcWidth, cadre.dedans.srcHeight, cadre.zone.l, cadre.zone.h, { x, y, l, h });
+   X = cadre.zone.x + r.x;
+   Y = cadre.zone.y + r.y;
    L2 = r.l;
    H2 = r.h;
 }
@@ -189,6 +318,8 @@ void MSGPIAPI cadreImage(VPXRenderContext2D*, VPXTexture texture, float tintR, f
 {
    float x, y, w, h;
    placer(srcX, srcY, srcW, srcH, x, y, w, h);
+   if (cadre.pup)
+      noterVideo(texture, x, y, w, h);
    cadre.dehors->DrawImage(cadre.dehors, texture, tintR, tintG, tintB, alpha, texX, texY, texW, texH, pivotX, pivotY, rotation, x, y, w, h);
 }
 
@@ -274,6 +405,10 @@ int dessinerCadre(VPXRenderContext2D* ctx, double t)
          continue;
       cadre.dehors = ctx;
       cadre.dedans = *ctx;
+      cadre.zone = zoneVisible(ctx);
+      cadre.pup = s.id == "PUP";
+      cadre.dedans.outWidth = cadre.zone.l;
+      cadre.dedans.outHeight = cadre.zone.h;
       cadre.dedans.DrawImage = cadreImage;
       cadre.dedans.DrawDisplay = cadreAfficheur;
       cadre.dedans.DrawSegDisplay = cadreSegments;
@@ -281,10 +416,10 @@ int dessinerCadre(VPXRenderContext2D* ctx, double t)
       if (s.id == "PUP")
       {
          const float ratio = pupRatio_Val > 0.1f ? pupRatio_Val : 16.f / 9.f;
-         if (ctx->outWidth / ctx->outHeight < ratio)
-            cadre.dedans.outHeight = ctx->outWidth / ratio;
+         if (cadre.zone.l / cadre.zone.h < ratio)
+            cadre.dedans.outHeight = cadre.zone.l / ratio;
          else
-            cadre.dedans.outWidth = ctx->outHeight * ratio;
+            cadre.dedans.outWidth = cadre.zone.h * ratio;
       }
       cadre.dedans.srcWidth = cadre.dedans.outWidth;
       cadre.dedans.srcHeight = cadre.dedans.outHeight;
@@ -294,7 +429,11 @@ int dessinerCadre(VPXRenderContext2D* ctx, double t)
       const int dessine = s.def.Render(&cadre.dedans, s.def.context);
       cadre.dehors = nullptr;
       if (dessine)
+      {
+         if (cadre.pup)
+            mesures.pup++;
          return 1;
+      }
    }
    return 0;
 }
@@ -413,6 +552,120 @@ void quitterPartie(int essai)
       PostMessageW(w, WM_CLOSE, 0, 0);
 }
 
+/** Écrit une image RGB en PNG (encoderPng, pause.h). */
+bool ecrirePng(const std::wstring& chemin, int w, int h, const std::vector<uint8_t>& rgb)
+{
+   const std::vector<uint8_t> png = encoderPng(w, h, rgb);
+   FILE* f = _wfopen(chemin.c_str(), L"wb");
+   if (!f)
+      return false;
+   const bool ok = std::fwrite(png.data(), 1, png.size(), f) == png.size();
+   std::fclose(f);
+   return ok;
+}
+
+/** La fenêtre d'aperçu VR de VPX, capturée à moitié de sa taille, en PNG ; rien n'est montré à l'écran. */
+void capturer(const char* nom)
+{
+   if (!dossierCaptures_Val[0])
+      return;
+   const std::vector<HWND> fenetres = fenetresVpx();
+   if (fenetres.empty())
+   {
+      ecrire(std::string("capture nom=") + nom + " resultat=aucune_fenetre");
+      return;
+   }
+   const HWND w = fenetres.front();
+   RECT rc {};
+   GetClientRect(w, &rc);
+   const int L2 = rc.right - rc.left, H2 = rc.bottom - rc.top;
+   if (L2 < 4 || H2 < 4)
+      return;
+   HDC dcFenetre = GetDC(w);
+   HDC dc = CreateCompatibleDC(dcFenetre);
+   HBITMAP bmp = CreateCompatibleBitmap(dcFenetre, L2, H2);
+   HGDIOBJ ancien = SelectObject(dc, bmp);
+   BITMAPINFO bi {};
+   bi.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+   bi.bmiHeader.biWidth = L2;
+   bi.bmiHeader.biHeight = -H2;
+   bi.bmiHeader.biPlanes = 1;
+   bi.bmiHeader.biBitCount = 32;
+   bi.bmiHeader.biCompression = BI_RGB;
+   std::vector<uint8_t> px(static_cast<size_t>(L2) * H2 * 4);
+   const auto lire = [&]() -> double
+   {
+      GetDIBits(dc, bmp, 0, H2, px.data(), &bi, DIB_RGB_COLORS);
+      double s = 0.0;
+      for (size_t i = 0; i < px.size(); i += 4 * 97)
+         s += px[i] + px[i + 1] + px[i + 2];
+      return s / (3.0 * (px.size() / (4 * 97) + 1));
+   };
+   constexpr UINT PW_RENDERFULLCONTENT_ = 0x00000002;
+   PrintWindow(w, dc, PW_CLIENTONLY | PW_RENDERFULLCONTENT_);
+   double lum = lire();
+   const char* source = "fenetre";
+   if (lum < 2.0)
+   {
+      // Image noire (rendu DirectX que PrintWindow ne voit pas) : ce que l'écran montre sous la fenêtre.
+      POINT p { 0, 0 };
+      ClientToScreen(w, &p);
+      HDC ecran = GetDC(nullptr);
+      BitBlt(dc, 0, 0, L2, H2, ecran, p.x, p.y, SRCCOPY);
+      ReleaseDC(nullptr, ecran);
+      lum = lire();
+      source = "ecran";
+   }
+   SelectObject(dc, ancien);
+   DeleteObject(bmp);
+   DeleteDC(dc);
+   ReleaseDC(w, dcFenetre);
+   // Moitié de la taille (moyenne de 2 × 2), en RGB.
+   const int l = L2 / 2, h = H2 / 2;
+   std::vector<uint8_t> rgb(static_cast<size_t>(l) * h * 3);
+   for (int y = 0; y < h; y++)
+      for (int x = 0; x < l; x++)
+         for (int c = 0; c < 3; c++)
+         {
+            int s = 0;
+            for (int dy = 0; dy < 2; dy++)
+               for (int dx = 0; dx < 2; dx++)
+                  s += px[(static_cast<size_t>(2 * y + dy) * L2 + 2 * x + dx) * 4 + (2 - c)];
+            rgb[(static_cast<size_t>(y) * l + x) * 3 + c] = static_cast<uint8_t>(s / 4);
+         }
+   SYSTEMTIME st {};
+   GetLocalTime(&st);
+   wchar_t fichier[64];
+   swprintf(fichier, 64, L"\\vr-%04d%02d%02d-%02d%02d%02d-", st.wYear, st.wMonth, st.wDay, st.wHour, st.wMinute, st.wSecond);
+   const std::wstring chemin = large(dossierCaptures_Val) + fichier + large(nom) + L".png";
+   const bool ok = ecrirePng(chemin, l, h, rgb);
+   char ligne[256];
+   std::snprintf(ligne, sizeof(ligne), "capture nom=%s source=%s luminosite=%.0f taille=%dx%d resultat=%s", nom, source, lum, l, h, ok ? "ok" : "echec");
+   ecrire(ligne);
+}
+
+/** Les deux captures d'une partie : 8 s après le début, et au premier menu de pause affiché 0,6 s. */
+void capturesDuJour(double t)
+{
+   if (!mesures.captureDebut && mesures.debut >= 0.0 && t - mesures.debut >= 8.0)
+   {
+      mesures.captureDebut = true;
+      capturer("debut");
+   }
+   if (pause.menuVisible())
+   {
+      if (mesures.menuDepuis < 0.0)
+         mesures.menuDepuis = t;
+      if (!mesures.capturePause && t - mesures.menuDepuis >= 0.6)
+      {
+         mesures.capturePause = true;
+         capturer("pause");
+      }
+   }
+   else
+      mesures.menuDepuis = -1.0;
+}
+
 void appliquer(const Ordre& o)
 {
    if (o.reprendre)
@@ -456,8 +709,11 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
       injecter(api::ExitGame, false);
    }
    const double t = maintenant();
-   appliquer(pause.image(t, vpxApi->GetGameTime()));
+   const double jeu = vpxApi->GetGameTime();
+   appliquer(pause.image(t, jeu));
    pomper(t);
+   mesurer(t, jeu);
+   capturesDuJour(t);
    if (!pause.affichee(t))
       notifiee = false;
    else if (!notifiee && t - derniereDemande > 0.3)
@@ -478,6 +734,8 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
    for (Pompe& p : pompes)
       p = Pompe { p.fenetre };
    ordreLu.clear();
+   mesures = Mesures {};
+   ecrire(std::string("debut zone=") + zoneFronton_Val + " ordre=" + ordreFronton_Val);
    enPartie = true;
 }
 
@@ -542,12 +800,26 @@ void preparerTout()
    }
 }
 
-// Le fronton dessiné dans un repère de 1000 × 750 (4:3, comme celui que VPX pose en VR).
+// La pause dessinée dans un repère de 1000 × 750 (4:3), posé proportions gardées dans la partie visible du
+// fronton (zoneVisible), centré : `cible` est ce repère dans la surface du flasher.
 constexpr float L = 1000.f, H = 750.f;
+Rect cible { 0.f, 0.f, L, H };
+
+/** Prépare le dessin : surface du flasher, zone visible remplie du fond, repère de la pause placé dedans. */
+void poser(VPXRenderContext2D* ctx, const float* fond)
+{
+   ctx->srcWidth = ctx->outWidth;
+   ctx->srcHeight = ctx->outHeight;
+   const Rect zone = zoneVisible(ctx);
+   const Rect r = cadrer(L, H, zone.l, zone.h, { 0.f, 0.f, L, H });
+   cible = { zone.x + r.x, zone.y + r.y, r.l, r.h };
+   ctx->DrawImage(ctx, blanc, fond[0], fond[1], fond[2], 1.f, 0.f, 0.f, 2.f, 2.f, 1.f, 1.f, 0.f, zone.x, zone.y, zone.l, zone.h);
+}
 
 void rectangle(VPXRenderContext2D* ctx, float x, float y, float w, float h, float r, float g, float b, float a = 1.f, float rotation = 0.f)
 {
-   ctx->DrawImage(ctx, blanc, r, g, b, a, 0.f, 0.f, 2.f, 2.f, 1.f, 1.f, rotation, x, y, w, h);
+   const float s = cible.l / L;
+   ctx->DrawImage(ctx, blanc, r, g, b, a, 0.f, 0.f, 2.f, 2.f, 1.f, 1.f, rotation, cible.x + x * s, cible.y + y * s, w * s, h * s);
 }
 
 /** Un libellé centré en (cx, cy), haut de `hauteur`, réduit s'il dépasse la largeur utile. */
@@ -560,7 +832,9 @@ void texte(VPXRenderContext2D* ctx, const Image& img, float cx, float cy, float 
       hauteur *= LARGEUR_UTILE / w;
       w = LARGEUR_UTILE;
    }
-   ctx->DrawImage(ctx, img.tex, r, g, b, 1.f, 0.f, 0.f, static_cast<float>(img.l), static_cast<float>(img.h), 0.f, 0.f, 0.f, cx - w / 2.f, cy - hauteur / 2.f, w, hauteur);
+   const float s = cible.l / L;
+   ctx->DrawImage(ctx, img.tex, r, g, b, 1.f, 0.f, 0.f, static_cast<float>(img.l), static_cast<float>(img.h), 0.f, 0.f, 0.f, cible.x + (cx - w / 2.f) * s, cible.y + (cy - hauteur / 2.f) * s, w * s,
+      hauteur * s);
 }
 
 // Couleurs de la direction artistique : noir sarcelle, vert signal, encre atténuée.
@@ -576,13 +850,12 @@ int MSGPIAPI dessinerPause(VPXRenderContext2D* ctx, void*)
       return 0;
    const double t = maintenant();
    derniereDemande = t;
+   mesures.frontons++;
    const bool tenu = pause.jaugeVisible(t);
    if (!pause.affichee(t))
       return dessinerCadre(ctx, t);
    preparerTout();
-   ctx->srcWidth = L;
-   ctx->srcHeight = H;
-   rectangle(ctx, 0.f, 0.f, L, H, FOND[0], FOND[1], FOND[2]);
+   poser(ctx, FOND);
    if (tenu)
    {
       // Jauge : un cercle de 48 traits qui se remplit en vert ; « Quitter » au milieu.
@@ -620,9 +893,7 @@ int MSGPIAPI dessinerFond(VPXRenderContext2D* ctx, void*)
    if (!ctx || ctx->is2D || !vpxApi)
       return 0;
    preparerTout();
-   ctx->srcWidth = L;
-   ctx->srcHeight = H;
-   rectangle(ctx, 0.f, 0.f, L, H, FOND[0], FOND[1], FOND[2]);
+   poser(ctx, FOND);
    texte(ctx, marque, L / 2.f, H / 2.f, 60.f, TERNE[0], TERNE[1], TERNE[2]);
    return 1;
 }
@@ -663,6 +934,9 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginLoad(const uint32_t sessionId, cons
    msgApi->RegisterSetting(endpointId, &libelleRappel);
    msgApi->RegisterSetting(endpointId, &ordreFronton);
    msgApi->RegisterSetting(endpointId, &pupRatio);
+   msgApi->RegisterSetting(endpointId, &zoneFronton);
+   msgApi->RegisterSetting(endpointId, &fichierMesures);
+   msgApi->RegisterSetting(endpointId, &dossierCaptures);
    msgApi->BroadcastMsg(endpointId, getVpxApiId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_MSG_GET_API), &vpxApi);
    msgApi->SubscribeMsg(endpointId, onGameStartId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_GAME_START), onGameStart, nullptr);
    msgApi->SubscribeMsg(endpointId, onGameEndId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_GAME_END), onGameEnd, nullptr);

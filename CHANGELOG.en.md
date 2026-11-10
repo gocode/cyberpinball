@@ -103,6 +103,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Incomplete PuP-Packs: every installed pack is checked (missing files, playlists played but empty). The table's diagnostic and the log report them, never blocking the launch, and offer to complete the pack.
 - In the headset, the backglass fills its frame while keeping its proportions (B2S and PuP alike), and the pause fits entirely in it. The pause shows Resume or Quit, the choice framed, with the thumbstick or the flippers; A confirms.
 - In the headset, the sound of PuP-Pack videos no longer stutters: since VPX does not draw the DMD and topper in VR, their videos moved in jerks.
+- In the headset, the backglass and the pause are drawn in the part of the backglass that the table's VR room leaves visible (computed for each table): no more half-hidden backglass. Each game notes in the log the frame rate of VPX and of the PuP videos, and keeps two captures of the VR preview.
 
 ## 0.1.8
 

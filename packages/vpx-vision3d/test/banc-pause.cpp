@@ -1,5 +1,7 @@
 // Banc de la pause dans le casque (src/pause.h), sans VPX : code de sortie 0 si tout va bien.
+#define _CRT_SECURE_NO_WARNINGS
 #include <cstdio>
+#include <cstring>
 #include "pause.h"
 
 using namespace cyberpinball;
@@ -31,7 +33,7 @@ static Ordre images(Pause& p, double de, double a, bool joue, double& jeu)
    return dernier;
 }
 
-int main()
+int main(int argc, char** argv)
 {
    // La table : le numéro interne, pas l'énumération de l'API (15 est le crédit, pas la Pause).
    int liee = 0;
@@ -169,6 +171,20 @@ int main()
    int l = 0, h = 0;
    const auto px = libelle("Quit", 4, l, h);
    VERIFIE(l == (4 * 6 - 1) * 4 && h == 28 && px.size() == static_cast<size_t>(l) * h * 4);
+   // PNG des captures : signature, et une image de 3 × 2 écrite si un chemin est donné (relue par pause-vr.test.ts).
+   const std::vector<uint8_t> rgb { 255, 0, 0, 0, 255, 0, 0, 0, 255, 10, 20, 30, 40, 50, 60, 70, 80, 90 };
+   const std::vector<uint8_t> png = encoderPng(3, 2, rgb);
+   VERIFIE(png.size() > 57 && png[0] == 137 && png[1] == 'P' && png[12] == 'I' && png[13] == 'H');
+   if (argc > 1)
+   {
+      FILE* f = std::fopen(argv[1], "wb");
+      VERIFIE(f != nullptr);
+      if (f)
+      {
+         std::fwrite(png.data(), 1, png.size(), f);
+         std::fclose(f);
+      }
+   }
    std::printf(echecs ? "banc de la pause : %d echec(s)\n" : "banc de la pause : tout va bien\n", echecs);
    return echecs ? 1 : 0;
 }
