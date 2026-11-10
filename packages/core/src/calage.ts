@@ -216,29 +216,34 @@ export interface VpxTableGeometry {
 }
 
 /**
- * Place de la table de VPX pour une partie dans le casque : celle de la borne du casque, toujours,
- * pour que le menu et le jeu soient au même endroit. Sa barre avant (largeur, hauteur) est celle de
- * la borne, calée ou par défaut. VPX pose le plateau à « barre avant − vitre du bas × échelle », 5 cm
- * plus 5 cm à l'échelle devant elle (VRDevice) : sur une vraie borne, sa barre avant tombe sur la
- * vraie et le plateau à la profondeur de la table. Au bureau (place libre), rien de vrai à toucher :
- * avec la table connue (`table`), son plateau est recalé sur celui du menu (TableZ, TableY), le bas
- * au droit de la barre avant, GLASS_DROP_M sous elle ; sinon, jusqu'à 20 cm plus bas (vitre de 21,6 cm
- * de la plupart des tables, essai du 10 novembre 2026).
+ * Place de la table de VPX pour une partie dans le casque : son plateau exactement sur celui du menu,
+ * en position, en hauteur et en taille, partout, vraie borne calée comprise (« le jeu doit se caler sur
+ * la même taille et la même hauteur », 10 novembre 2026). VPX pose le plateau à « barre avant − vitre
+ * du bas × échelle », 5 cm plus 5 cm à l'échelle devant elle, à l'échelle « LockbarWidth / (largeur
+ * de la table + 2 1/4") » (VRDevice). Avec la table connue (`table`, readVpxGlass) : TableZ et TableY
+ * mettent le bas de son plateau au droit de la barre avant, GLASS_DROP_M sous elle, comme le menu ; et
+ * avec la largeur du plateau du menu (`menuWidthM`, menuPlayfield), LockbarWidth donne à son plateau
+ * cette largeur. Sans la table, la pose seule (jusqu'à 20 cm plus bas : vitre de 21,6 cm de la plupart
+ * des tables).
  */
-export function placeVpxSettings(place: CabinetPlace, table?: VpxTableGeometry): VpxSetting[] {
+export function placeVpxSettings(place: CabinetPlace, table?: VpxTableGeometry, menuWidthM?: number): VpxSetting[] {
   const { left, right } = placeLockbar(place);
   const tableWidthCm = table ? table.widthCm + 2.25 * 2.54 : STANDARD_TABLE_WIDTH_CM;
   const settings = lockbarVpxSettings(left, right, tableWidthCm);
-  if (!place.free || !table) return settings;
-  const width = Number(settings.find((s) => s.key === 'LockbarWidth')!.value);
-  const scale = Math.min(2, Math.max(0.1, width / tableWidthCm));
+  if (!table) return settings;
+  const touched = Number(settings.find((s) => s.key === 'LockbarWidth')!.value);
+  const clampScale = (w: number) => Math.min(2, Math.max(0.1, w / tableWidthCm));
+  const width = menuWidthM !== undefined && menuWidthM > 0 ? (menuWidthM * 100 * tableWidthCm) / table.widthCm : touched;
+  const scale = clampScale(width);
   const round = (v: number) => String(Math.round(v * 1000) / 1000);
   return settings.map((s) =>
     s.key === 'TableZ'
       ? { ...s, value: round(scale * table.glassBottomCm - GLASS_DROP_M * 100) }
       : s.key === 'TableY'
-        ? { ...s, value: round(Number(s.value) - LOCKBAR_TO_PLAYFIELD_CM * (1 + scale)) }
-        : s,
+        ? { ...s, value: round(Number(s.value) - LOCKBAR_TO_PLAYFIELD_CM * clampScale(touched) - LOCKBAR_TO_PLAYFIELD_CM) }
+        : s.key === 'LockbarWidth'
+          ? { ...s, value: round(width) }
+          : s,
   );
 }
 

@@ -201,26 +201,30 @@ test('pose de VPX : la table du 10 novembre 2026 derrière le joueur et sous le 
   assert.ok(bottom.y < 0, `bas du plateau à ${bottom.y.toFixed(2)} m : sous le sol`);
 });
 
-test('pose de VPX : au bureau, le plateau de VPX exactement sur celui du menu, quelle que soit la vitre de la table', () => {
+test('pose de VPX : le plateau de VPX exactement sur celui du menu, en position, en hauteur et en taille, au bureau comme sur une borne', () => {
   // Vitres du bas des tables installées (readVpxGlass) : 7,6 cm, 10,8 cm (Back to the Future), 21,6 cm
   // (la plupart), 27 cm ; plateaux de 51,4 et 54,6 cm. Sans recalage, VPX posait le plateau jusqu'à 20 cm
   // sous la barre avant, le menu 5 cm (essai du 10 novembre 2026 : « la table de jeu un peu plus basse »).
+  const cabinet = lockbarPlace({ x: -0.36, y: 0.86, z: -0.6 }, { x: 0.36, y: 0.86, z: -0.6 });
+  const places = [...[-150, -10, 0, 75, 180].map((deg) => freePlace({ x: 0.2, z: -0.3, yaw: deg * DEG })), cabinet];
   for (const [widthCm, glassCm] of [[51.4, 7.6], [51.4, 10.8], [54.6, 21.6], [51.4, 27]] as const) {
     const table = { right: cmToVpu(widthCm), bottom: TABLE.bottom, glassBottom: cmToVpu(glassCm), slope: TABLE.slope };
-    for (const deg of [-150, -10, 0, 75, 180]) {
-      const place = freePlace({ x: 0.2, z: -0.3, yaw: deg * DEG });
-      const settings = placeVpxSettings(place, { widthCm, glassBottomCm: glassCm });
-      const { left, right } = placeLockbar(place);
-      const center = { x: (left.x + right.x) / 2, y: (left.y + right.y) / 2, z: (left.z + right.z) / 2 };
-      const bottom = vpxWorld(settings, [table.right / 2, table.bottom, 0], table);
-      const what = `vitre ${glassCm} cm, ${deg}°`;
-      // Le bas du plateau au droit de la barre avant, GLASS_DROP_M sous elle : là où le menu le pose.
-      close(bottom.x, center.x, 2e-3, `${what} : x`);
-      close(bottom.z, center.z, 2e-3, `${what} : z`);
-      close(bottom.y, center.y - GLASS_DROP_M, 2e-3, `${what} : hauteur`);
+    for (const menuWidthM of [0.52, 0.62]) {
+      for (const place of places) {
+        const settings = placeVpxSettings(place, { widthCm, glassBottomCm: glassCm }, menuWidthM);
+        const { left, right } = placeLockbar(place);
+        const center = { x: (left.x + right.x) / 2, y: (left.y + right.y) / 2, z: (left.z + right.z) / 2 };
+        const bottom = vpxWorld(settings, [table.right / 2, table.bottom, 0], table);
+        const what = `${place.free ? 'bureau' : 'borne'}, vitre ${glassCm} cm, menu de ${menuWidthM} m, lacet ${Math.round(place.yaw / DEG)}°`;
+        // Le bas du plateau au droit de la barre avant, GLASS_DROP_M sous elle : là où le menu le pose.
+        close(bottom.x, center.x, 2e-3, `${what} : x`);
+        close(bottom.z, center.z, 2e-3, `${what} : z`);
+        close(bottom.y, center.y - GLASS_DROP_M, 2e-3, `${what} : hauteur`);
+        // La largeur du plateau de VPX : celle du plateau du menu.
+        const a = vpxWorld(settings, [0, table.bottom, 0], table);
+        const b = vpxWorld(settings, [table.right, table.bottom, 0], table);
+        close(Math.hypot(b.x - a.x, b.y - a.y, b.z - a.z), menuWidthM, 2e-3, `${what} : largeur`);
+      }
     }
   }
-  // Sur une vraie borne, la barre avant de VPX reste sur la vraie : le plateau à la profondeur de la table.
-  const cabinet = lockbarPlace({ x: -0.36, y: 0.86, z: -0.6 }, { x: 0.36, y: 0.86, z: -0.6 });
-  assert.equal(placeVpxSettings(cabinet, { widthCm: 51.4, glassBottomCm: 21.6 }).find((s) => s.key === 'TableZ')?.value, '0');
 });

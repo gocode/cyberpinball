@@ -67,6 +67,8 @@ son interface).
 - Après une partie, le menu revient directement dans le casque, sans repasser par l'accueil de Link.
 - Le menu dans le casque est plus fluide : les écrans ne tremblent plus quand les médias bougent. La cadence du casque est notée au journal.
 - Au bureau, la tête de la borne dans le casque a les proportions d'une vraie : fronton un peu plus large que le plateau, petit topper posé dessus, DMD de moitié moins large centré dessous.
+- Dans le casque, le plateau de la partie tombe exactement sur celui du menu, partout, vraie borne comprise : même place, même hauteur, même largeur.
+- Dans le menu de VPX en partie, les joysticks des manettes réagissent sans être poussés à fond.
 
 ## 0.1.8
 

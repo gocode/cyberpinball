@@ -137,7 +137,7 @@ test('borne fixe : aucun recentrage automatique, la place imposée à VPX, le ca
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
   const frontend = read('app', 'src', 'frontend.ts');
-  assert.match(frontend, /const table = vpxTableGeometry\(tableFile\);\s*const settings = placeVpxSettings\(place, table\);[\s\S]{0,400}writeIniSettings\(vr\.ini, settings\);/);
+  assert.match(frontend, /const table = vpxTableGeometry\(tableFile\);\s*const menuWidth = menuPlayfield\(headsetSources\(\), headsetTurn\(\)\)\?\.width;\s*const settings = placeVpxSettings\(place, table, menuWidth\);[\s\S]{0,400}writeIniSettings\(vr\.ini, settings\);/);
   assert.match(frontend, /const vrCenter = vrGame && !readCabinetPlace\(headsetPlaceFile\(\)\) && !vrHasSavedPlace\(vrText\)/);
   assert.match(frontend, /if \(headset\?\.worn && !isCalibrated\(headset\.place\(\)\)\) offerCalibration\(\);/);
   const cpp = read('packages', 'casque-vr', 'src', 'casque.cpp');

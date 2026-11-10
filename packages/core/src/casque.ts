@@ -93,6 +93,20 @@ export function panelSize(source: HeadsetSource): { width: number; height: numbe
 }
 
 /**
+ * Taille du plateau du menu dans le casque (mètres) : sa largeur vue du joueur et sa longueur, au
+ * moins MIN_PLAYFIELD_M. La table de VPX se cale sur cette largeur (placeVpxSettings).
+ */
+export function menuPlayfield(sources: readonly HeadsetSource[], playfieldRotation: Rotation): { width: number; length: number } | undefined {
+  const playfield = sources.find((s) => s.role === 'playfield');
+  if (!playfield) return undefined;
+  const real = panelSize(playfield);
+  const grow = Math.max(1, MIN_PLAYFIELD_M / Math.max(real.width, real.height));
+  const size = { width: real.width * grow, height: real.height * grow };
+  const quarter = playfieldRotation === 90 || playfieldRotation === 270;
+  return { width: quarter ? size.height : size.width, length: quarter ? size.width : size.height };
+}
+
+/**
  * Proportions de la tête d'une borne quand ses écrans ne sont pas ceux d'une vraie borne mesurée
  * (bureau, ou tailles inconnues), demandées le 10 novembre 2026 : le fronton un peu plus large que le
  * plateau, le DMD de moitié moins large que le fronton (un quart de sa surface), centré dessous, le

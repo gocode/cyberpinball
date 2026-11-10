@@ -76,10 +76,10 @@ test('manettes : liaisons de VPX en partie, la même règle qu’au menu', () =>
     LeftMagna: ['OpenXR;4'],
     RightMagna: ['OpenXR;5'],
     Start: ['OpenXR;10'],
-    UIRight: ['OpenXR;22;o;0.900000', 'OpenXR;20;o;0.900000', 'OpenXR;10'],
-    UILeft: ['OpenXR;22;x;-0.900000', 'OpenXR;20;x;-0.900000'],
-    UIUp: ['OpenXR;21;o;0.900000', 'OpenXR;23;o;0.900000'],
-    UIDown: ['OpenXR;21;x;-0.900000', 'OpenXR;23;x;-0.900000'],
+    UIRight: ['OpenXR;22;o;0.600000', 'OpenXR;20;o;0.600000', 'OpenXR;10'],
+    UILeft: ['OpenXR;22;x;-0.600000', 'OpenXR;20;x;-0.600000'],
+    UIUp: ['OpenXR;21;o;0.600000', 'OpenXR;23;o;0.600000'],
+    UIDown: ['OpenXR;21;x;-0.600000', 'OpenXR;23;x;-0.600000'],
     InGameUI: ['OpenXR;11', 'OpenXR;2'],
     Credit1: ['OpenXR;8'],
     ExitGame: ['OpenXR;9'],
@@ -137,8 +137,8 @@ test('manettes : l’INI d’une partie dans le casque, à partir des liaisons p
   assert.equal(get('Device.OpenXR.NoAutoLayout'), '1');
   assert.equal(get('Mapping.Credit1'), 'Key;34 | OpenXR;8');
   assert.equal(get('Mapping.InGameUI'), 'Key;69 | OpenXR;11 | OpenXR;2');
-  assert.equal(get('Mapping.UIRight'), 'Key;229 | OpenXR;22;o;0.900000 | OpenXR;20;o;0.900000 | OpenXR;10');
-  assert.equal(get('Mapping.UIDown'), 'Key;228 | OpenXR;21;x;-0.900000 | OpenXR;23;x;-0.900000');
+  assert.equal(get('Mapping.UIRight'), 'Key;229 | OpenXR;22;o;0.600000 | OpenXR;20;o;0.600000 | OpenXR;10');
+  assert.equal(get('Mapping.UIDown'), 'Key;228 | OpenXR;21;x;-0.600000 | OpenXR;23;x;-0.600000');
   assert.equal(get('Mapping.VRControllerCalibration'), '');
   // Touches du clavier et recentrage (5 du pavé) gardés ; lanceur et secousses déjà aux joysticks : pas en double.
   assert.equal(get('Mapping.VRCenter'), 'Key;93');

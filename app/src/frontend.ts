@@ -57,6 +57,7 @@ import {
   vpxHeadsetInput,
   vpxPlaceProblem,
   vpxRecenteredHead,
+  menuPlayfield,
   placeLockbar,
   type CabinetPlace,
   type CalibrationSetting,
@@ -2471,8 +2472,9 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
     const place = readCabinetPlace(headsetPlaceFile());
     if (place) {
       const table = vpxTableGeometry(tableFile);
-      const settings = placeVpxSettings(place, table);
-      if (table) details.push(`table : plateau de ${table.widthCm.toFixed(1)} cm, vitre du bas à ${table.glassBottomCm.toFixed(1)} cm${place.free ? ', plateau recalé sur celui du menu' : ''}`); // i18n-ignore : journal
+      const menuWidth = menuPlayfield(headsetSources(), headsetTurn())?.width;
+      const settings = placeVpxSettings(place, table, menuWidth);
+      if (table) details.push(`table : plateau de ${table.widthCm.toFixed(1)} cm, vitre du bas à ${table.glassBottomCm.toFixed(1)} cm ; plateau recalé sur celui du menu${menuWidth ? `, ${Math.round(menuWidth * 100)} cm de large` : ''}`); // i18n-ignore : journal
       writeIniSettings(vr.ini, settings);
       details.push(`place de la borne du casque${isCalibrated(place) ? ' calée' : ''} : ${settings.map((s) => `${s.key} ${s.value}`).join(', ')}`); // i18n-ignore : journal
       const far = vpxPlaceProblem(settings);
@@ -2507,7 +2509,7 @@ function checkVrPlaceAfterGame(ini: string, tableFile: string): void {
   const place = readCabinetPlace(headsetPlaceFile());
   if (!place) return;
   const doc = IniDocument.parse(readTextIfExists(ini));
-  const moved = placeVpxSettings(place, vpxTableGeometry(tableFile))
+  const moved = placeVpxSettings(place, vpxTableGeometry(tableFile), menuPlayfield(headsetSources(), headsetTurn())?.width)
     .filter((s) => s.section === 'PlayerVR' && s.key !== 'TableZ')
     .map((s) => ({ key: s.key, want: Number(s.value), got: Number(doc.get(s.section, s.key)) }))
     .filter((m) => Number.isFinite(m.got) && Math.abs(m.got - m.want) > 1);

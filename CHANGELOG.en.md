@@ -65,6 +65,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - After a game, the menu comes straight back into the headset, without going through Link's home.
 - The menu in the headset is smoother: the screens no longer shake when the media move. The headset's frame rate is noted in the log.
 - At a desk, the cabinet head in the headset has a real one's proportions: backglass slightly wider than the playfield, small topper on top, DMD half as wide centred below.
+- In the headset, the game's playfield lands exactly on the menu's, everywhere, real cabinet included: same place, same height, same width.
+- In VPX's menu during a game, the controllers' thumbsticks respond without being pushed all the way.
 
 ## 0.1.8
 

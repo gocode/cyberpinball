@@ -103,6 +103,11 @@ function xr(element: number, threshold?: number): string {
 }
 
 const E = VPX_OPENXR;
+/**
+ * Joystick incliné qui déplace la sélection du menu de VPX : 0,6, comme au menu de Cyber Pinball
+ * (VPX met 0,9 : il fallait pousser le joystick à fond, essai du 10 novembre 2026).
+ */
+const UI_STICK = 0.6;
 
 /**
  * Liaisons OpenXR de chaque action de VPX en partie, selon headsetControls(). Dans le menu de VPX,
@@ -118,10 +123,10 @@ export const VPX_HEADSET_MAPPINGS: Readonly<Record<string, readonly string[]>> =
   LeftMagna: [xr(E.leftSqueeze)],
   RightMagna: [xr(E.rightSqueeze)],
   Start: [xr(E.a)],
-  UIRight: [xr(E.rightStickX, 0.9), xr(E.leftStickX, 0.9), xr(E.a)],
-  UILeft: [xr(E.rightStickX, -0.9), xr(E.leftStickX, -0.9)],
-  UIUp: [xr(E.leftStickY, 0.9), xr(E.rightStickY, 0.9)],
-  UIDown: [xr(E.leftStickY, -0.9), xr(E.rightStickY, -0.9)],
+  UIRight: [xr(E.rightStickX, UI_STICK), xr(E.leftStickX, UI_STICK), xr(E.a)],
+  UILeft: [xr(E.rightStickX, -UI_STICK), xr(E.leftStickX, -UI_STICK)],
+  UIUp: [xr(E.leftStickY, UI_STICK), xr(E.rightStickY, UI_STICK)],
+  UIDown: [xr(E.leftStickY, -UI_STICK), xr(E.rightStickY, -UI_STICK)],
   InGameUI: [xr(E.b), xr(E.leftMenu)],
   Credit1: [xr(E.x)],
   ExitGame: [xr(E.y)],
