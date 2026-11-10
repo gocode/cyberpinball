@@ -947,7 +947,7 @@ int main(int argc, char** argv)
 
    // Manettes du Quest (Touch), une seule règle au menu comme en partie (packages/core/src/manettes.ts) :
    // gâchettes : précédent / suivant (les flippers de la borne) ; A : valider ; B : retour ; ≡ de la
-   // manette gauche : le menu du casque ; joysticks : déplacer la sélection. Les poignées ne servent
+   // manette gauche : le menu du casque ; X : la collection suivante ; joysticks : déplacer la sélection. Les poignées ne servent
    // qu'en partie (MagnaSave, dans VPX). Cyber Pinball reçoit « bouton <nom> 1|0 » à chaque changement,
    // seulement tant que le menu a le regard du joueur (« FOCUSED ») ; le reste du temps, le runtime les
    // rend inactives, et un bouton resté appuyé est relâché.
@@ -965,6 +965,7 @@ int main(int argc, char** argv)
       { "start", "Valider", "/user/hand/right/input/a/click" },
       { "exit", "Retour", "/user/hand/right/input/b/click" },
       { "menu", "Menu du casque", "/user/hand/left/input/menu/click" },
+      { "collection", "Collection suivante", "/user/hand/left/input/x/click" },
    };
    // Joysticks : leurs deux axes, lus à chaque image ; Cyber Pinball reçoit leurs directions comme des
    // boutons (« bouton haut|bas|gauche|droite 1|0 »), les deux joysticks ensemble, l'axe dominant seul.

@@ -21,7 +21,7 @@ test('manettes : la table des correspondances, au menu et en partie', () => {
       ['gachettes', 'Gâchettes', 'Précédent, suivant (comme les flippers de la borne)', 'Flippers'],
       ['menu', '≡ (manette gauche)', 'Menu du casque : caler, recentrer la borne', 'Menu de VPX'],
       ['poignees', 'Poignées', '—', 'MagnaSave'],
-      ['x', 'X', '—', 'Crédit'],
+      ['x', 'X', 'Collection suivante (roue)', 'Crédit'],
       ['y', 'Y', '—', 'Quitter la partie'],
       ['clic-droit', 'Clic du joystick droit', '—', 'Lancer la bille'],
       ['clic-gauche', 'Clic du joystick gauche', '—', 'Rien : la table ne bouge jamais d’elle-même'],

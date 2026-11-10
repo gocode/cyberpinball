@@ -53,6 +53,7 @@ export const messages: Record<string, string> = {
   '≡ (manette gauche)': '≡ (left controller)',
   'Menu du casque : caler, recentrer la borne': 'Headset menu: align, recentre the cabinet',
   'Poignées': 'Grips',
+  'Collection suivante (roue)': 'Next collection (wheel)',
   'Lancer la bille': 'Launch the ball',
   'Clic du joystick droit': 'Right thumbstick click',
   'Clic du joystick gauche': 'Left thumbstick click',

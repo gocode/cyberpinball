@@ -53,6 +53,7 @@ son interface).
 - Le bouton ≡ de la manette gauche ouvre le menu du casque : caler la borne (guidé pas à pas, B annule), recentrer, légende des boutons.
 - La table de la partie ne se retrouve plus derrière vous ni sous le sol quand le Quest a refait sa pièce pendant le menu : le casque repart sur la pièce neuve et propose de recaler.
 - Casque éteint ou Link coupé : la partie se ferme et le menu revient seul aux écrans du PC. Retirer simplement le casque ne change rien.
+- Dans le casque, au menu, X passe à la collection suivante (en partie, X reste le crédit).
 
 ## 0.1.8
 

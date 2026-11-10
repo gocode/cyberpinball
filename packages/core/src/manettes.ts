@@ -6,6 +6,8 @@
 //   joysticks (les deux) = déplacer la sélection, répétée tant qu'on le tient ;
 //   gâchettes = flippers en partie, précédent / suivant au menu (comme les flippers de la borne) ;
 //   poignées = MagnaSave, en partie seulement ;
+//   X = collection suivante au menu (sur la roue ; ailleurs, comme MagnaSave, la liste et ses actions),
+//   crédit en partie ;
 //   ≡ de la manette gauche = le menu du casque (au menu de Cyber Pinball : caler, recentrer ; en
 //   partie : le menu de VPX).
 //
@@ -24,8 +26,8 @@ export type HeadsetMenuAction = RemoteButton | 'headset-menu';
 
 /**
  * Boutons des manettes (compagnon : « bouton <nom> 1|0 ») et ce qu'ils font au menu. Les directions
- * des joysticks (haut, bas, gauche, droite) viennent des deux joysticks à la fois. Les poignées n'y
- * sont pas : MagnaSave en partie seulement.
+ * des joysticks (haut, bas, gauche, droite) viennent des deux joysticks à la fois. X : la collection
+ * suivante sur la roue (MagnaSave droit de la borne). Les poignées n'y sont pas : MagnaSave en partie seulement.
  */
 export const HEADSET_BUTTONS = {
   'batteur-gauche': 'previous',
@@ -33,6 +35,7 @@ export const HEADSET_BUTTONS = {
   start: 'confirm',
   exit: 'exit',
   menu: 'headset-menu',
+  collection: 'zone',
   haut: 'previous',
   gauche: 'previous',
   bas: 'next',
@@ -65,7 +68,7 @@ export function headsetControls(): HeadsetControl[] {
     { id: 'gachettes', label: t('Gâchettes'), menu: t('Précédent, suivant (comme les flippers de la borne)'), game: t('Flippers') },
     { id: 'menu', label: t('≡ (manette gauche)'), menu: t('Menu du casque : caler, recentrer la borne'), game: t('Menu de VPX') },
     { id: 'poignees', label: t('Poignées'), game: t('MagnaSave') },
-    { id: 'x', label: 'X', game: t('Crédit') },
+    { id: 'x', label: 'X', menu: t('Collection suivante (roue)'), game: t('Crédit') },
     { id: 'y', label: 'Y', game: t('Quitter la partie') },
     { id: 'clic-droit', label: t('Clic du joystick droit'), game: t('Lancer la bille') },
     { id: 'clic-gauche', label: t('Clic du joystick gauche'), game: t('Rien : la table ne bouge jamais d’elle-même') },

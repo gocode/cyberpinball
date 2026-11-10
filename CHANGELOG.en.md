@@ -51,6 +51,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - The ≡ button of the left controller opens the headset menu: align the cabinet (guided step by step, B cancels), recentre, button legend.
 - The game's table no longer ends up behind you or below the floor when the Quest rebuilt its room during the menu: the headset restarts on the new room and offers to realign.
 - Headset turned off or Link cut: the game closes and the menu returns to the PC screens by itself. Merely taking the headset off changes nothing.
+- In the headset, at the menu, X moves to the next collection (in game, X stays the credit button).
 
 ## 0.1.8
 
