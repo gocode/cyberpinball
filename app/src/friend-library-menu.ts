@@ -77,6 +77,7 @@ import type { FriendContent } from './friend-content';
 import type { Action, Built, Row, Section, Tone } from './library';
 import type { LiveMenu } from './live-game-menu';
 import type { SocialNet } from './social-net';
+import { onGesture } from './gesture-flash';
 
 /** Ce que la gestion des tables offre aux amis pour leurs téléchargements (library.ts, downloads). */
 export interface FriendDownloads {
@@ -145,11 +146,9 @@ const SHOWN = 200;
 export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibraryMenu {
   const content = host.content;
   let flash: Row | undefined;
-  const takeFlash = (): Section[] => {
-    const row = flash;
-    flash = undefined;
-    return row ? [{ rows: [row] }] : [];
-  };
+  // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
+  onGesture(() => (flash = undefined));
+  const flashSections = (): Section[] => (flash ? [{ rows: [flash] }] : []);
   /** Réception ouverte à l'écran : le téléchargement de la file qu'elle montre. */
   let transfer: { id: string; build: () => Built } | undefined;
   const downloads = host.downloads;
@@ -290,7 +289,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     const s = content.library(key);
     reopenWhenReady(`library:${key}`, s.state !== 'loading', () => open(key, back, forAdd));
     const actions: Action[] = [];
-    const sections: Section[] = [...takeFlash()];
+    const sections: Section[] = [...flashSections()];
     if (s.state !== 'ready') {
       const row: Row =
         s.state === 'loading'
@@ -377,7 +376,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     }));
     const actions: Action[] = [];
     const here = () => openTable(key, tableId, back);
-    const sections: Section[] = [...takeFlash()];
+    const sections: Section[] = [...flashSections()];
     /**
      * Une réception déjà demandée (la table, ses parties, ses médias) : son action, d'abord (le
      * curseur dessus), mène à son écran ; sa ligne, en tête, en montre la progression. Les actions
@@ -486,7 +485,7 @@ export function createFriendLibraryMenu(host: FriendLibraryMenuHost): FriendLibr
     const title = match?.entry.table.title ?? '?';
     const heading = owned ? t('Parties de sa table') : t('Récupérer toute la table');
     const actions: Action[] = [];
-    const sections: Section[] = [...takeFlash()];
+    const sections: Section[] = [...flashSections()];
     if (!job?.files) {
       sections.push({ rows: [job?.error ? { text: t('Parties indisponibles : {why}', { why: job.error }), tone: 'warning' } : { text: t('Demande à sa borne…'), icon: 'clock', tone: 'quiet' }] });
       actions.push({ label: t('Retour'), icon: 'back', run: back });

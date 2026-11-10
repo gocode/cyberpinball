@@ -20,6 +20,7 @@ import {
   type TableEntry,
 } from '@cyberpinball/core';
 import type { Action, Built, Row } from './library';
+import { onGesture } from './gesture-flash';
 
 export interface InstallationImportHost {
   /** Racine de Cyber Pinball : jamais prise pour une autre installation. */
@@ -47,6 +48,8 @@ interface Listing {
 export function createInstallationImport(host: InstallationImportHost) {
   let listing: Listing | undefined;
   let notice: string | undefined;
+  // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
+  onGesture(() => (notice = undefined));
   const exclude = () => [host.root()].filter((r): r is string => Boolean(r));
 
   /** Point d'entrée : l'installation trouvée sur ce PC s'ouvre directement ; sinon on la choisit. */
@@ -169,10 +172,7 @@ export function createInstallationImport(host: InstallationImportHost) {
     t('Seules les tables cochées sont reprises, chacune avec ce que l’installation range ailleurs : son PuP-Pack (PUPVideos), sa ROM, ses couleurs et ses sons (VPinMAME), son dossier DMD, son fronton et ses médias. Tout est copié : l’installation d’origine ne change pas. Rien n’est installé avant que vous ayez validé le plan.');
 
   function noticeSection() {
-    if (!notice) return [];
-    const text = notice;
-    notice = undefined;
-    return [{ rows: [{ text, tone: 'warning' as const }] }];
+    return notice ? [{ rows: [{ text: notice, tone: 'warning' as const }] }] : [];
   }
 
   /** « Tables : … · VPinMAME : … · PuP-Packs : … · Médias : … » */

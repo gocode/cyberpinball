@@ -50,6 +50,7 @@ import {
 import type { Action, Built, Row, Section, Tone } from './library';
 import type { LiveGames } from './live-game';
 import type { SocialNet } from './social-net';
+import { onGesture } from './gesture-flash';
 
 export interface LiveMenuHost {
   library: {
@@ -114,11 +115,9 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
   /** La pastille d'un joueur, à poser dans sa ligne (ou son titre). */
   const face = (key: string, plain: string): { avatar?: AvatarView } => (host.avatar ? { avatar: host.avatar(key, plain) } : {});
   let flash: Row | undefined;
-  const takeFlash = (): Section[] => {
-    const row = flash;
-    flash = undefined;
-    return row ? [{ rows: [row] }] : [];
-  };
+  // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
+  onGesture(() => (flash = undefined));
+  const flashSections = (): Section[] => (flash ? [{ rows: [flash] }] : []);
   /** Écran d'où l'on est venu dans la partie en cours. */
   let gameBack: () => void = () => undefined;
   /** Ce que j'ai de la table de chaque invitation, vérifié à son ouverture. */
@@ -503,7 +502,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       subheading: game.title,
       lead: hosting ? t('Lancez quand vos amis sont prêts : un compte à rebours commun, puis la table se lance sur chaque borne.') : t('En attente du départ donné par {name}.', { name: hostPlayer?.name ?? '?' }),
       sections: [
-        ...takeFlash(),
+        ...flashSections(),
         ...(hosting && answerRows(game).length ? [{ rows: answerRows(game) }] : []),
         { rows: [tableRow(game), ...manualRows(game.table.manual), ...(myself?.host ? [] : ballsRow(myself?.balls, game.table.balls)), boardRow()] },
         { title: t('Joueurs ({n} sur {max})', { n: seats, max: LIVE_MAX_PLAYERS }), rows: playerRows(game) },
@@ -626,7 +625,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       subheading: game.title,
       lead: t('Les scores arrivent à mesure que chacun finit sa partie.'),
       sections: [
-        ...takeFlash(),
+        ...flashSections(),
         ...(waitRow.length ? [{ rows: waitRow }] : []),
         ...(otherBalls ? [{ rows: [{ text: t('Autre nombre de billes : score hors classement'), detail: t('{n} billes par partie chez celui qui invite', { n: game.table.balls! }), tone: 'warning' as const, icon: 'rules' as const }] }] : []),
         { rows: standings.map((p) => resultRow(p, ranked.includes(p) ? ranked.indexOf(p) + 1 : undefined, standings.length > 1, game.table.balls)) },
@@ -705,7 +704,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       heading: end ? t('Invitation de {name}', { name }) : t('Invitation à une partie en direct'),
       icon: 'gamepad',
       ...(end?.title ? { subheading: end.title } : {}),
-      sections: [...takeFlash(), { rows: [{ text: r.text, ...(r.detail ? { detail: r.detail } : {}), tone: 'warning', icon: 'close' }] }],
+      sections: [...flashSections(), { rows: [{ text: r.text, ...(r.detail ? { detail: r.detail } : {}), tone: 'warning', icon: 'close' }] }],
       actions,
       back,
     };
@@ -772,7 +771,7 @@ export function createLiveMenu(host: LiveMenuHost): LiveMenu {
       subheading: invite.host.name,
 
       lead: t('Jouez chacun sur votre borne, avec un départ commun.'),
-      sections: [...takeFlash(), { rows }],
+      sections: [...flashSections(), { rows }],
       actions,
       back,
     };

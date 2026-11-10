@@ -131,6 +131,7 @@ import { allowPreview } from './media-protocol';
 import type { MediaSearch } from './media-search';
 import { createSiteFiles } from './site-files';
 import { pluginActions, pluginHooks, pluginTakesFetch } from './plugins';
+import { onGesture } from './gesture-flash';
 
 /** Jeu (et partie) auquel revient ce qu'une recherche libre fait télécharger. */
 export interface WebTarget {
@@ -290,6 +291,8 @@ export function createCatalog(ctx: CatalogContext) {
   let list: WaitList | undefined;
   /** Dernier message montré en haut des écrans du catalogue. */
   let notice: { text: string; tone: Tone } | undefined;
+  // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
+  onGesture(() => (notice = undefined));
   /** Écran à redessiner quand un fichier arrive. */
   let refresh: (() => void) | undefined;
   /** Retour de la liste d'attente : là d'où on l'a ouverte (l'entonnoir ou le catalogue). */
@@ -634,9 +637,7 @@ export function createCatalog(ctx: CatalogContext) {
   const gameKind = (g: VpsGame) => (/^EM$/i.test(g.type ?? '') ? t('électromécanique') : /^PM$/i.test(g.type ?? '') ? t('mécanique') : /^SS$/i.test(g.type ?? '') ? t('électronique') : t('type inconnu'));
 
   function noticeSection(): Section[] {
-    const n = notice;
-    notice = undefined;
-    return n ? [{ rows: [{ text: n.text, tone: n.tone }] }] : [];
+    return notice ? [{ rows: [{ text: notice.text, tone: notice.tone }] }] : [];
   }
 
   // ---------- Catalogue ----------
@@ -2229,12 +2230,8 @@ export function createCatalog(ctx: CatalogContext) {
     setRefresh: (fn: (() => void) | undefined) => {
       refresh = fn;
     },
-    /** Dernier message du catalogue (fichier reçu, téléchargement direct…), pour un autre écran. */
-    takeNotice: () => {
-      const n = notice;
-      notice = undefined;
-      return n;
-    },
+    /** Dernier message du catalogue (fichier reçu, téléchargement direct…), pour un autre écran ; il reste jusqu'au geste suivant. */
+    currentNotice: () => notice,
     /** Pour les essais : fenêtre « Récupérer », réception d'un fichier comme par la surveillance. */
     acquirer,
     receive: (file: string, via: 'window' | 'watch') => received(file, { filename: path.basename(file) }, via, vpsCache),

@@ -228,6 +228,7 @@ import { analyseDressing } from './fulldmd';
 import { createMediaSites } from './media-sites';
 import { createMediaImport } from './media-import';
 import { createInstallationImport } from './installation-import';
+import { userGesture } from './gesture-flash';
 import { createMedias, playsSoundPreview, type MediaView } from './library-medias';
 import { createTableFiles } from './table-files';
 import { createFilePicker, type PickRequest } from './file-picker';
@@ -975,6 +976,8 @@ export function createLibrary(host: LibraryHost) {
   }
 
   function leave(): void {
+    // Le menu se ferme : un message laissé ne revient pas à sa prochaine ouverture (gesture-flash.ts).
+    userGesture();
     screen = undefined;
     section = undefined;
     systemGroup = undefined;
@@ -3881,12 +3884,17 @@ export function createLibrary(host: LibraryHost) {
     const KEYS = host.keys();
     const is = (group: string[]) => group.includes(input.code);
     if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
+      // Toute touche d'une saisie est un geste : sa validation pose le message qui suit (gesture-flash.ts).
+      userGesture();
       editorKey(screen, input);
       host.broadcast();
       return true;
     }
     if (screen.kind === 'pages') return pagesKey(screen, input);
     const built = build();
+    // Déplacer la sélection ou faire défiler n'est pas un geste : le message de l'écran reste (gesture-flash.ts).
+    const navigation = is(KEYS.previous) || is(KEYS.next) || input.code === CONFIG_KEY || (host.zoneKeys?.() ?? []).includes(input.code) || PAGE_KEYS[input.code] !== undefined;
+    if (built.keys && !navigation) userGesture();
     if (built.keys?.(input)) {
       host.broadcast();
       return true;
@@ -3939,6 +3947,7 @@ export function createLibrary(host: LibraryHost) {
       // Start dans le texte : la page suivante, puis la première action ; jamais une action sans l'avoir choisie.
       if (edges && reading.active) applyReading(readingStep(edges, n, 1));
       else {
+        userGesture();
         if (built.actions[cursor]?.run === built.back) expectBack();
         void built.actions[cursor]?.run();
       }
@@ -3948,6 +3957,7 @@ export function createLibrary(host: LibraryHost) {
       if (edges && reading.active) reading.active = false;
       else if (zones && zoneOf(zones, cursor) === 'list') cursor = leaveList(zones, ids, zonesMemory(), backIndex(built));
       else {
+        userGesture();
         expectBack();
         built.back();
       }
@@ -3957,6 +3967,7 @@ export function createLibrary(host: LibraryHost) {
       const hit = built.actions.find((a) => a.shortcut?.matches(input));
       if (!hit) return false;
       reading.active = false;
+      userGesture();
       void hit.run();
     }
     host.broadcast();
@@ -4231,6 +4242,7 @@ export function createLibrary(host: LibraryHost) {
     if (busy) return;
     if (action.type === 'drop') {
       if (!action.paths.length || !host.guest.knock('files.drop')) return;
+      userGesture();
       // Sur l'écran des médias d'un jeu, un fichier déposé est un média de ce jeu.
       const onScreen = screen ? build().drop : undefined;
       if (onScreen) onScreen(action.paths);
@@ -4239,6 +4251,7 @@ export function createLibrary(host: LibraryHost) {
     }
     if (!screen) return;
     if (action.type === 'editor' && (screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) {
+      userGesture();
       pressKey(screen, action.index);
       host.broadcast();
     } else if (action.type === 'crop') {
@@ -4246,6 +4259,7 @@ export function createLibrary(host: LibraryHost) {
       build().crop?.input({ ...(action.dx !== undefined ? { dx: action.dx } : {}), ...(action.dy !== undefined ? { dy: action.dy } : {}), ...(action.zoom !== undefined ? { zoom: action.zoom } : {}) });
       host.broadcast();
     } else if (action.type === 'back') {
+      userGesture();
       if ((screen.kind === 'edit' || screen.kind === 'prompt') && screen.editor) closeEditor(screen, false);
       else {
         expectBack();
@@ -4272,6 +4286,7 @@ export function createLibrary(host: LibraryHost) {
       if (index === undefined) return host.broadcast();
       cursor = index;
       reading.active = false;
+      userGesture();
       host.broadcast();
       if (built.actions[index]!.run === built.back) expectBack();
       void built.actions[index]!.run();

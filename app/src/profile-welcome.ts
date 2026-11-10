@@ -11,6 +11,7 @@
 
 import { avatarView, hasDefaultName, NAME_MAX, NAME_MIN, t } from '@cyberpinball/core';
 import type { AvatarMenu } from './avatar-menu';
+import { onGesture } from './gesture-flash';
 import type { Action, Built, Row } from './library';
 
 export interface ProfileWelcomeHost {
@@ -40,13 +41,10 @@ const CONTINUE_AT = 2;
 export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
   let done: () => void = () => undefined;
   let flash: Row | undefined;
+  // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
+  onGesture(() => (flash = undefined));
 
   const me = () => host.net.state();
-  /** Un geste de l'utilisateur : le message du geste précédent s'efface. */
-  const gesture = (run: () => void) => () => {
-    flash = undefined;
-    run();
-  };
   const show = (at: number) => host.library.openCustom(build, at);
 
   function askName(): void {
@@ -68,7 +66,7 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
     const named = !hasDefaultName(s);
     const pictured = Boolean(s.avatar);
     // Le message reste jusqu'au geste suivant : l'écran se redessine (changement du profil, 250 ms
-    // plus tard) sans le perdre.
+    // plus tard) sans le perdre (gesture-flash.ts).
     const rows: Row[] = flash ? [flash] : [];
     rows.push(
       named
@@ -80,16 +78,16 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
       { text: t('Qui les voit'), detail: t('Vos amis et les classements : votre pseudo et votre avatar, à côté de vos scores publiés. L’annuaire des joueurs : votre pseudo seulement.'), icon: 'eye' },
     );
     const actions: Action[] = [
-      { label: named ? t('Changer de pseudo…') : t('Choisir mon pseudo…'), detail: t('Au clavier à l’écran, de {min} à {max} caractères', { min: NAME_MIN, max: NAME_MAX }), icon: 'edit', ...(named ? {} : { tone: 'ok' as const }), run: gesture(askName) },
+      { label: named ? t('Changer de pseudo…') : t('Choisir mon pseudo…'), detail: t('Au clavier à l’écran, de {min} à {max} caractères', { min: NAME_MIN, max: NAME_MAX }), icon: 'edit', ...(named ? {} : { tone: 'ok' as const }), run: askName },
       {
         label: pictured ? t('Changer d’avatar…') : t('Mettre un avatar…'),
         detail: t('Une image de ce PC ou du web, recadrée aux boutons'),
         icon: 'image',
         ...(named && !pictured ? { tone: 'ok' as const } : {}),
         // Revenu sans avatar : la sélection reste dessus, pas sur « Continuer ».
-        run: gesture(() => host.avatarMenu.open(() => show(me().avatar ? CONTINUE_AT : AVATAR_AT))),
+        run: () => host.avatarMenu.open(() => show(me().avatar ? CONTINUE_AT : AVATAR_AT)),
       },
-      { label: t('Continuer'), detail: named || pictured ? t('Tout se change plus tard : Menu système > Amis > Partage et réseau') : t('Plus tard : Menu système > Amis > Partage et réseau'), icon: 'check', ...(named && pictured ? { tone: 'ok' as const } : {}), run: gesture(() => done()) },
+      { label: t('Continuer'), detail: named || pictured ? t('Tout se change plus tard : Menu système > Amis > Partage et réseau') : t('Plus tard : Menu système > Amis > Partage et réseau'), icon: 'check', ...(named && pictured ? { tone: 'ok' as const } : {}), run: () => done() },
     ];
     return {
       heading: t('Votre profil de joueur'),
@@ -99,7 +97,7 @@ export function createProfileWelcome(host: ProfileWelcomeHost): ProfileWelcome {
       lead: t('Bienvenue ! Choisissez le pseudo et l’avatar que verront les autres joueurs. Rien d’obligatoire : vous pourrez les changer à tout moment.'),
       sections: [{ rows }],
       actions,
-      back: gesture(() => done()),
+      back: () => done(),
     };
   }
 

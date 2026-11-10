@@ -40,6 +40,7 @@ import {
 } from '@cyberpinball/core';
 import type { PickRequest } from './file-picker';
 import type { Action, Built, Row, Tone } from './library';
+import { onGesture } from './gesture-flash';
 
 /** Images que le sélecteur propose : celles que Chromium décode. */
 export const AVATAR_PICK_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'avif'];
@@ -92,6 +93,8 @@ const WORK_META = 'cadrage.json';
 export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
   const workDir = () => path.join(avatarsDir(host.dataDir), 'recadrage');
   let flash: Row | undefined;
+  // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
+  onGesture(() => (flash = undefined));
   let back: () => void = () => undefined;
   let work: Work | undefined;
 
@@ -166,10 +169,7 @@ export function createAvatarMenu(host: AvatarMenuHost): AvatarMenu {
     const has = Boolean(me().avatar);
     const saved = savedWork();
     const rows: Row[] = [];
-    if (flash) {
-      rows.push(flash);
-      flash = undefined;
-    }
+    if (flash) rows.push(flash);
     rows.push(
       has
         ? { text: t('Votre avatar : une image à vous'), detail: t('Vos amis la voient à côté de votre nom'), tone: 'ok', badges: [t('Choisi')] }

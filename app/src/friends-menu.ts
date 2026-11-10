@@ -58,6 +58,7 @@ import { askElevation } from './uac-confirm';
 import type { LiveGames } from './live-game';
 import { createLiveMenu, type LiveMenu } from './live-game-menu';
 import type { SocialNet } from './social-net';
+import { onGesture } from './gesture-flash';
 
 export interface FriendsMenuHost {
   library: {
@@ -128,11 +129,9 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
   const backAction = (run = back): Action => ({ label: t('Retour'), icon: 'back', run });
   /** Constat de la dernière action (« Demande envoyée à … »), en tête de l'écran suivant. */
   let flash: Row | undefined;
-  const takeFlash = (): Section[] => {
-    const row = flash;
-    flash = undefined;
-    return row ? [{ rows: [row] }] : [];
-  };
+  // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
+  onGesture(() => (flash = undefined));
+  const flashSections = (): Section[] => (flash ? [{ rows: [flash] }] : []);
 
   /**
    * Identifiant unique du joueur, sur sa fiche seulement : jamais accolé à son nom dans les listes,
@@ -260,7 +259,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const sorted = [...s.friends].sort((a, b) => a.name.localeCompare(b.name));
     const online = sorted.filter((f) => net.online(f.key));
     const offline = sorted.filter((f) => !net.online(f.key));
-    const sections: Section[] = [...takeFlash(), ...(offRows().length ? [{ rows: offRows() }] : [])];
+    const sections: Section[] = [...flashSections(), ...(offRows().length ? [{ rows: offRows() }] : [])];
     // La liste est-elle sûre ? « Recherche des amis… », « Mise à jour en cours… » ou « Liste à jour ».
     const sync = s.friends.length ? listSyncRow(online.length) : undefined;
     if (sync) sections.push({ rows: [sync] });
@@ -353,7 +352,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       avatar: avatar(f.key, f.name),
       subheading: presenceText(p, online, f),
       sections: [
-        ...takeFlash(),
+        ...flashSections(),
         { rows: [{ text: online ? (p?.status === 'playing' ? t('En partie') : t('En ligne')) : t('Hors ligne'), detail: [t('Amis depuis le {date}', { date: new Date(f.since).toLocaleDateString() }), online ? linksText(key) : undefined].filter(Boolean).join(' · '), tone: online ? 'ok' : 'quiet' }, { text: t('Bibliothèque'), detail: libraryMenu.detail(key), icon: 'tables', tone: libraryState === 'ready' ? 'ok' : 'quiet' }, idRow(key)] },
         { title: t('Derniers évènements'), rows: events.length ? events : [{ text: t('Rien encore : ses records, badges et parties s’afficheront ici'), tone: 'quiet' }] },
       ],
@@ -428,7 +427,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     const nearKeys = new Set(near.map((d) => d.profile.key));
     const recent = s.directory.filter((d) => !nearKeys.has(d.profile.key) && !s.blocked.includes(d.profile.key)).slice(0, RECENT_SHOWN);
     const sections: Section[] = [
-      ...takeFlash(),
+      ...flashSections(),
       ...(offRows().length ? [{ rows: offRows() }] : []),
       {
         rows: [
@@ -547,7 +546,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         pick: true,
       };
     };
-    const sections: Section[] = [...takeFlash(), ...(offRows().length ? [{ rows: offRows() }] : [])];
+    const sections: Section[] = [...flashSections(), ...(offRows().length ? [{ rows: offRows() }] : [])];
     sections.push({ title: t('Reçues'), rows: s.incoming.length ? s.incoming.map((r) => row(r, true)) : [{ text: t('Aucune demande reçue'), tone: 'quiet' }] });
     if (s.outgoing.length) sections.push({ title: t('Envoyées'), rows: s.outgoing.map((r) => row(r, false)) });
     const up = requestsBack ?? back;
@@ -692,7 +691,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
       icon: 'network',
       lead: t('Sans serveur : les bornes se trouvent et se parlent directement, par Internet ou sur votre réseau local.'),
       sections: [
-        ...takeFlash(),
+        ...flashSections(),
         { rows },
         {
           title: t('Ce que voient les autres'),
@@ -823,7 +822,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
         heading: t('Pare-feu de Windows'),
         icon: 'lock',
         lead: t('Vérifié après la mise à jour : une règle du pare-feu de Windows est à reposer. Windows demande son autorisation une seule fois ; ensuite, Cyber Pinball la repose de lui-même à chaque démarrage.'),
-        sections: [...takeFlash(), { rows: repair ? [...rows, repair] : rows }],
+        sections: [...flashSections(), { rows: repair ? [...rows, repair] : rows }],
         actions,
         back: up,
       };

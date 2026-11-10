@@ -116,6 +116,7 @@ son interface).
 - Dans le casque, le fronton et la pause sont dessinés dans la partie du fronton que la pièce VR de la table laisse voir (calculée pour chaque table) : plus de fronton à moitié caché. Chaque partie note au journal la cadence de VPX et des vidéos PuP, et garde deux captures de l'aperçu VR.
 - Premier démarrage : juste après l'assistant d'écrans, Cyber Pinball propose de choisir votre pseudo (au clavier à l'écran) et de mettre un avatar (une photo ou une image, recadrée aux boutons). Rien d'obligatoire : « Continuer » reprend l'installation, et tout se change ensuite dans Menu système > Amis > « Partage et réseau ».
 - Les pseudos s'affichent seuls, sans l'étiquette « #A1B2 » accolée : listes d'amis, scores, partie en direct, annuaire. L'identifiant unique d'un joueur n'apparaît plus que sur sa fiche, et se cherche toujours dans « Trouver un joueur ».
+- Menu : le message qui suit un geste (« Nom changé », « Avatar enregistré », « Pseudo refusé »…) reste affiché jusqu'au geste suivant, au lieu de s'effacer aussitôt, sur tous les écrans.
 
 ## 0.1.8
 

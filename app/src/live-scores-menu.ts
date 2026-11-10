@@ -13,6 +13,7 @@
 
 import { liveScoresChoices, liveScoresDmdUnavailable, t, type IconName, type LiveScoresCabinet, type LiveScoresPlace, type LiveScoresSettings } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row } from './library';
+import { onGesture } from './gesture-flash';
 
 export interface LiveScoresMenuHost {
   library: { openCustom(build: () => Built, at?: number): void; openSystem(): void };
@@ -27,6 +28,8 @@ const ICONS: Record<LiveScoresPlace, IconName> = { auto: 'auto', backglass: 'fra
 
 export function createLiveScoresMenu(host: LiveScoresMenuHost): ProvidedSystemItem {
   let flash: Row | undefined;
+  // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
+  onGesture(() => (flash = undefined));
   const dmdLabel = (on: boolean) => (on ? t('Scores sur le DMD : activés') : t('Scores sur le DMD : désactivés'));
 
   function build(): Built {
@@ -65,7 +68,6 @@ export function createLiveScoresMenu(host: LiveScoresMenuHost): ProvidedSystemIt
     });
     actions.push({ label: t('Retour'), icon: 'back', run: () => host.library.openSystem() });
     const shown = flash;
-    flash = undefined;
     return {
       heading: t('Scores des amis pendant la partie'),
       icon: 'dmd',

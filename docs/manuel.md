@@ -901,6 +901,16 @@ Un écran sans liste de contenu peut porter un texte plus long que lui, où il n
 
 Garde-fous : [lecture.test.ts](../packages/core/src/test/lecture.test.ts) fixe le parcours (entrée, pages, sortie au bout, flipper tenu arrêté au bout) et le vrai rendu (cadre seulement si le texte dépasse, mesure envoyée une fois par changement, une page par appui). Tout texte à lire qui défile le dit par `data-reading` ; dans le rendu réel de toute fenêtre, le garde-fou de mise en page signale « texte qui défile hors d'atteinte des boutons » pour celui qui ne le dit pas (une liste de choix sans choix courant le dit par `data-choices`). Le recensement des listes qui défilent ([sortie-de-liste.test.ts](../packages/core/src/test/sortie-de-liste.test.ts)) donne pour chacune la façon dont les boutons l'atteignent.
 
+### Le message d'un geste reste jusqu'au geste suivant
+
+La confirmation ou l'erreur d'une action (« Nom changé », « Avatar enregistré », « Pseudo refusé », « Demande envoyée à … ») s'affiche en tête de l'écran et y reste jusqu'au geste suivant de l'utilisateur, quel que soit le nombre de fois que l'écran se redessine entre-temps.
+
+- **Pourquoi** : `app/src/library.ts` rappelle `build()` d'un écran décrit à chaque `broadcast()`, et beaucoup ne viennent pas de l'utilisateur (le profil social redessine 250 ms après chaque changement, un téléchargement avance, un ami se connecte). Un écran qui effaçait son message en le dessinant le perdait avant qu'on l'ait lu (constaté le 10/11/2026 sur « Votre profil de joueur »).
+- **Un geste** (`userGesture`, [app/src/gesture-flash.ts](../app/src/gesture-flash.ts)) : `library.ts` le compte avant chaque action validée (Start, clic, raccourci), chaque retour (Exit, « Retour »), chaque touche d'une saisie, chaque fichier déposé, et quand le menu se ferme. Déplacer la sélection (flippers, MagnaSave, défilement du texte) n'en est pas un : le message reste pendant qu'on parcourt l'écran.
+- **Règle des écrans** : `build()` lit le message, ne l'efface jamais. L'écran s'abonne une fois, à sa création (`onGesture(() => (flash = undefined))`) ; une action peut aussi remplacer le message par le sien.
+
+Garde-fous : [gesture-flash.test.ts](../packages/core/src/test/gesture-flash.test.ts) vérifie qu'un écran redessiné sans geste montre le même message, effacé au geste suivant, et refuse tout écran de `app/src` qui efface son message en le lisant ; [friends-menu.test.ts](../packages/core/src/test/friends-menu.test.ts) et [profile-welcome.test.ts](../packages/core/src/test/profile-welcome.test.ts) le vérifient sur leurs écrans.
+
 ## Lanceur analogique et accéléromètre
 
 Un **lanceur analogique** (plunger à potentiomètre ou à capteur, lu par un Pinscape sur KL25Z ou par un autre contrôleur en mode joystick) n'est pas un bouton : c'est un **axe** de joystick, dont la valeur suit la course du lanceur. L'étape « Lanceur » de l'assistant l'affecte et le règle, avec l'accéléromètre du Pinscape pour les tremblements ([app/src/plunger-step.ts](../app/src/plunger-step.ts), [packages/core/src/plunger.ts](../packages/core/src/plunger.ts)). Elle suit les boutons de l'interface dans l'assistant complet ; seule : menu système > « Borne » > « Configuration de la borne » > « Lanceur analogique » (`npm run assistant -- --lanceur`, action `plunger` du lanceur).

@@ -28,6 +28,7 @@ interface Built {
 type Build = () => Built;
 
 /* eslint-disable @typescript-eslint/no-require-imports */
+const { userGesture } = require(path.join(APP_DIST, 'gesture-flash.js')) as { userGesture(): void };
 const { createProfileWelcome } = require(path.join(APP_DIST, 'profile-welcome.js')) as { createProfileWelcome(host: object): { open(done: () => void): void } };
 const { createSocialNet } = require(path.join(APP_DIST, 'social-net.js')) as {
   createSocialNet(o: object): { state(): { name: string; key: { publicKey: string }; avatar?: string; profileOffered?: string }; rename(name: string): boolean; avatarFile(key: string): string | undefined; markProfileOffered(): void };
@@ -103,6 +104,9 @@ test('« Votre profil de joueur » : noté dès l’ouverture, pseudo, avatar, p
   built = last().build();
   assert.equal(built.sections[0]!.rows[0]!.text, 'Pseudo choisi : Alexis');
   assert.equal(last().build().sections[0]!.rows[0]!.text, 'Pseudo choisi : Alexis', 'gardé au redessin');
+  // Le geste suivant (library.ts) l'efface.
+  userGesture();
+  assert.notEqual(last().build().sections[0]!.rows[0]!.text, 'Pseudo choisi : Alexis', 'effacé au geste suivant');
   assert.equal(built.actions[0]!.label, 'Changer de pseudo…');
   assert.equal(built.actions[1]!.tone, 'ok');
   // Le champ repart du pseudo choisi.

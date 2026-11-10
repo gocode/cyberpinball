@@ -44,6 +44,7 @@ const { createFriendsMenu } = require(path.join(APP_DIST, 'friends-menu.js')) as
 const { createSocialNet } = require(path.join(APP_DIST, 'social-net.js')) as { createSocialNet(o: object): { state(): { shareLibrary: boolean; key: { publicKey: string } }; status(): object } };
 const { createFirewallRule } = require(path.join(APP_DIST, 'firewall-rule.js')) as { createFirewallRule(o: object): { check(): Promise<string>; checkVpx(): Promise<string | undefined> } };
 const { createFriendContent } = require(path.join(APP_DIST, 'friend-content.js')) as { createFriendContent(o: object): object };
+const { userGesture } = require(path.join(APP_DIST, 'gesture-flash.js')) as { userGesture(): void };
 /* eslint-enable @typescript-eslint/no-require-imports */
 
 const FRIEND = newSocialState().key.publicKey;
@@ -217,6 +218,19 @@ test('bibliothèque partagée : active par défaut entre amis, coupée et remise
   await last().build().actions.find((a) => a.label === 'Partager ma bibliothèque avec mes amis')!.run();
   assert.equal(net.state().shareLibrary, true);
   uniqueIcons(last().build(), 'Partage et réseau');
+});
+
+test('le message d’un geste reste aux redessins (changement du profil, 250 ms plus tard), jusqu’au geste suivant', async () => {
+  const { menu, last } = setup();
+  menu.items.sharing!.run();
+  const rows = () => last().build().sections.flatMap((s) => s.rows.map((r) => r.text));
+  // Le geste (library.ts) précède l'action, qui pose son message.
+  userGesture();
+  await last().build().actions.find((a) => a.label === 'Ne plus partager ma bibliothèque')!.run();
+  assert.ok(rows().includes('Bibliothèque plus partagée'));
+  assert.ok(rows().includes('Bibliothèque plus partagée'), 'redessiné sans geste : toujours là');
+  userGesture();
+  assert.ok(!rows().includes('Bibliothèque plus partagée'), 'effacé au geste suivant');
 });
 
 /** La fiche de Bruno. */

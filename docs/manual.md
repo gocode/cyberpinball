@@ -901,6 +901,16 @@ A screen without a content list can carry text longer than itself, with nothing 
 
 Safeguards: [lecture.test.ts](../packages/core/src/test/lecture.test.ts) pins the path (entering, pages, leaving at the end, held flipper stopped at the end) and the real renderer (frame only when the text overflows, measurement sent once per change, one page per press). Every scrolling text meant for reading says so with `data-reading`; in the real rendering of every window, the layout safeguard reports "texte qui défile hors d'atteinte des boutons" (scrolling text out of the buttons' reach) for one that does not (a list of choices with no current choice says so with `data-choices`). The census of scrolling lists ([sortie-de-liste.test.ts](../packages/core/src/test/sortie-de-liste.test.ts)) gives, for each one, how the buttons reach it.
 
+### A gesture's message stays until the next gesture
+
+The confirmation or error of an action ("Name changed", "Avatar saved", "Name refused", "Request sent to …") shows at the top of the screen and stays there until the user's next gesture, however many times the screen is redrawn in between.
+
+- **Why**: `app/src/library.ts` calls a described screen's `build()` again on every `broadcast()`, and many of those do not come from the user (the social profile redraws 250 ms after each change, a download progresses, a friend comes online). A screen that cleared its message while drawing it lost it before it could be read (seen on 10/11/2026 on "Your player profile").
+- **A gesture** (`userGesture`, [app/src/gesture-flash.ts](../app/src/gesture-flash.ts)): `library.ts` counts one before each validated action (Start, click, shortcut), each back (Exit, "Back"), each key of a text input, each dropped file, and when the menu closes. Moving the selection (flippers, MagnaSave, scrolling text) is not one: the message stays while the screen is browsed.
+- **Screen rule**: `build()` reads the message and never clears it. The screen subscribes once, when created (`onGesture(() => (flash = undefined))`); an action may also replace the message with its own.
+
+Safeguards: [gesture-flash.test.ts](../packages/core/src/test/gesture-flash.test.ts) checks that a screen redrawn without a gesture shows the same message, cleared at the next gesture, and rejects any screen in `app/src` that clears its message while reading it; [friends-menu.test.ts](../packages/core/src/test/friends-menu.test.ts) and [profile-welcome.test.ts](../packages/core/src/test/profile-welcome.test.ts) check it on their screens.
+
 ## Analog plunger and accelerometer
 
 An **analog plunger** (potentiometer or sensor plunger, read by a Pinscape on KL25Z or another controller in joystick mode) is not a button: it is a joystick **axis**, whose value follows the plunger's travel. The wizard's "Lanceur" (Plunger) step assigns and sets it, along with the Pinscape's accelerometer for nudging ([app/src/plunger-step.ts](../app/src/plunger-step.ts), [packages/core/src/plunger.ts](../packages/core/src/plunger.ts)). It follows the interface buttons in the full wizard; on its own: system menu > "Borne" (Cabinet) > "Configuration de la borne" (Cabinet configuration) > "Lanceur analogique" (Analog plunger) (`npm run assistant -- --lanceur`, `plunger` action of the launcher).

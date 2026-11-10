@@ -68,6 +68,7 @@ import type { MediaCard, MediaThumb } from './library-medias';
 import { allowPreview } from './media-protocol';
 import type { MediaSites } from './media-sites';
 import type { ScriptResult } from './vbs';
+import { onGesture } from './gesture-flash';
 
 export interface GamePartsContext {
   layout(): Layout | undefined;
@@ -141,6 +142,8 @@ const MAX_PROPOSALS = 24;
 
 export function createGameParts(ctx: GamePartsContext) {
   let flash: Flash | undefined;
+  // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
+  onGesture(() => (flash = undefined));
   /** Jeu VPS de la table ouverte (connu, trouvé, ou à choisir), lu à l'ouverture. */
   let identified: TableGame = { leads: [] };
   let vpsDb: VpsDb | undefined;
@@ -166,11 +169,9 @@ export function createGameParts(ctx: GamePartsContext) {
 
   const webFiles = (part: GamePart): VpsTableFile[] => partWebFiles(game(), part);
 
-  const takeFlash = (): Section[] => {
-    const own = flash;
-    flash = undefined;
-    const theirs = ctx.catalog.takeNotice();
-    return [own, theirs].filter((n): n is Flash => Boolean(n)).map((n) => ({ rows: [{ text: n.text, tone: n.tone }] }));
+  const flashSections = (): Section[] => {
+    const theirs = ctx.catalog.currentNotice();
+    return [flash, theirs].filter((n): n is Flash => Boolean(n)).map((n) => ({ rows: [{ text: n.text, tone: n.tone }] }));
   };
 
   /** Parties du jeu ; `at` : la partie sur laquelle revenir. */
@@ -217,7 +218,7 @@ export function createGameParts(ctx: GamePartsContext) {
       heading: t('Parties du jeu'),
       subheading: [table.title, tn(present, '{n} présente', '{n} présentes'), received.length ? tn(received.length, '{n} reçue, à installer', '{n} reçues, à installer') : undefined].filter(Boolean).join(' · '),
       lead: t('Tout ce qui fait le jeu, partie par partie. Start sur une partie : ses propositions arrivent de toutes les sources (VPS, Téléchargements, VPForums, VPUniverse) ; « Chercher sur le web… » reste toujours possible. Rien n’est installé avant le plan.'),
-      sections: [...takeFlash(), { rows }],
+      sections: [...flashSections(), { rows }],
       actions,
       back,
     };
@@ -429,7 +430,7 @@ export function createGameParts(ctx: GamePartsContext) {
       heading: partLabel(part),
       subheading: [table.title, here ? t('présent') : item?.received ? t('reçu, à installer') : item ? t('attendu') : t('absent')].join(' · '),
       lead: `${PART_LEADS[part]()} ${cards.length ? t('Start sur une proposition : sa page s’ouvre dans « Récupérer » (un fichier téléchargé ouvre le plan) ; le fichier reçu est rangé pour cette table.') : t('Aucune proposition pour l’instant : « Chercher sur le web… » pour la trouver vous-même.')}`,
-      sections: [...takeFlash(), { rows }],
+      sections: [...flashSections(), { rows }],
       actions,
       back,
       media: cards.length ? { cards, gallery: true, files: true, aspect: '4 / 3' } : undefined,
@@ -621,7 +622,7 @@ export function createGameParts(ctx: GamePartsContext) {
       heading: partLabel('pup'),
       subheading: [table.title, t('désactivé')].join(' · '),
       lead: t('Le pack est rangé à part, dans « {folder} » : VPX ne le trouve plus, et rien ne le réclame ni ne le retélécharge.', { folder: PUP_DISABLED_FOLDER }),
-      sections: [...takeFlash(), { rows }],
+      sections: [...flashSections(), { rows }],
       actions,
       back,
     };

@@ -114,6 +114,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - In the headset, the backglass and the pause are drawn in the part of the backglass that the table's VR room leaves visible (computed for each table): no more half-hidden backglass. Each game notes in the log the frame rate of VPX and of the PuP videos, and keeps two captures of the VR preview.
 - First start: right after the screen wizard, Cyber Pinball offers to choose your nickname (with the on-screen keyboard) and to add an avatar (a photo or a picture, cropped with the buttons). Nothing is mandatory: "Continue" resumes the setup, and everything can be changed later in System menu > Friends > "Sharing and network".
 - Nicknames show alone, without the "#A1B2" tag attached: friend lists, scores, live game, directory. A player's unique ID now only appears on their page, and can still be searched in "Find a player".
+- Menu: the message that follows an action ("Name changed", "Avatar saved", "Nickname refused"…) stays on screen until the next action instead of vanishing at once, on every screen.
 
 ## 0.1.8
 

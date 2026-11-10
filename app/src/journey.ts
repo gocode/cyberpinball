@@ -95,7 +95,7 @@ export function createJourney(ctx: JourneyContext) {
     if (!table) return;
     open = { file: table.file, notice };
     ctx.catalog.setRefresh(() => {
-      if (open && samePath(open.file, table.file)) show(table.file, ctx.catalog.takeNotice(), ctx.cursor());
+      if (open && samePath(open.file, table.file)) show(table.file, ctx.catalog.currentNotice(), ctx.cursor());
     });
     void ctx.task(t('Ce qu’il manque pour jouer…'), async () => {
       const [{ script, findings }, vps] = await Promise.all([ctx.analyse(table), ctx.vps()]);
@@ -124,7 +124,7 @@ export function createJourney(ctx: JourneyContext) {
   function run(file: string, action: JourneyAction): void {
     const table = ctx.find(file);
     if (!table) return;
-    const back = () => show(table.file, ctx.catalog.takeNotice());
+    const back = () => show(table.file, ctx.catalog.currentNotice());
     switch (action.kind) {
       case 'play':
         // Parcours terminé : il n'est plus proposé à la reprise.
@@ -205,7 +205,7 @@ export function createJourney(ctx: JourneyContext) {
     }
     actions.push(
       // Toujours une issue vers le web : ce qui y est téléchargé revient à cette table, dans sa partie.
-      ctx.catalog.webAction('journey', { query: partWebQuery(table.title), target: { gameId: knownVpsId(table.info), gameLabel: table.title, table: table.file } }, () => show(table.file, ctx.catalog.takeNotice())),
+      ctx.catalog.webAction('journey', { query: partWebQuery(table.title), target: { gameId: knownVpsId(table.info), gameLabel: table.title, table: table.file } }, () => show(table.file, ctx.catalog.currentNotice())),
       { label: t('Revérifier'), detail: t('Relit la table et ce qui est arrivé'), run: () => show(table.file) },
       { label: t('Diagnostic complet'), detail: t('Tous les constats du médecin, médias compris'), run: () => ((open = undefined), ctx.catalog.setRefresh(undefined), ctx.doctor(table)) },
     );

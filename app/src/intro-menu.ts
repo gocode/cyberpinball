@@ -31,6 +31,7 @@ import {
 } from '@cyberpinball/core';
 import type { Action, Built } from './library';
 import type { PickRequest } from './file-picker';
+import { onGesture } from './gesture-flash';
 
 export interface IntroMenuHost {
   library: {
@@ -63,6 +64,8 @@ const rowOf = (key: Row) => ROWS.indexOf(key);
 export function createIntroMenu(host: IntroMenuHost) {
   const s = () => host.settings();
   let notice: { text: string; tone: 'info' | 'error' } | undefined;
+  // Montré à chaque dessin jusqu'au geste suivant, jamais effacé par build() (gesture-flash.ts).
+  onGesture(() => (notice = undefined));
   let back: () => void = () => undefined;
 
   /** « Plateau : animation de Cyber Pinball », « Plateau : votre vidéo (IntroPlayfield).mp4 ». */
@@ -132,7 +135,6 @@ export function createIntroMenu(host: IntroMenuHost) {
 
   function build(): Built {
     const shown = notice;
-    notice = undefined;
     return {
       heading: t('Ouverture au démarrage'),
       icon: 'play',
