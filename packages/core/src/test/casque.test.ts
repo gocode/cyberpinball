@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { HEADSET_BUTTONS, isHeadsetButton, headsetPanels, headsetProtocol, LOCKBAR_DISTANCE_M, MIN_PLAYFIELD_M, panelSize, rotateVector, type HeadsetPanel, type HeadsetSource } from '../casque';
+import { HEADSET_BUTTONS, isHeadsetButton, headsetPanels, headsetProtocol, LOCKBAR_DISTANCE_M, MIN_PLAYFIELD_M, panelSize, rotateVector, STANDARD_HEAD, type HeadsetPanel, type HeadsetSource } from '../casque';
 import { edgeRotation } from '../model';
 
 const close = (a: number, b: number, eps = 1e-3) => assert.ok(Math.abs(a - b) < eps, `${a} ≠ ${b}`);
@@ -197,4 +197,45 @@ test('fin de partie et accueil de Link : le menu revient sans repasser par Link'
   assert.match(menu, /if \(this\.restartNow\) \{\s*this\.restartNow = false;\s*this\.retryAt = 0;\s*setImmediate\(\(\) => this\.check\(\)\);/);
   const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(frontend, /headsetPaused = false;[\s\S]{0,500}if \(playedVr && headset\?\.standby\) \{[\s\S]{0,200}headset\.restart\(\);/);
+});
+
+test('tête de la borne au bureau : fronton un peu plus large que le plateau, DMD de moitié moins large dessous, petit topper dessus', () => {
+  // Les écrans du PC de bureau (EDID) : un fronton de 41 cm, un DMD et un topper de 48 cm. Aux proportions
+  // d'une borne (10 novembre 2026), quand ce n'est pas une vraie borne calée.
+  const desk: HeadsetSource[] = [
+    { role: 'playfield', rect: { x: 0, y: 0, width: 1920, height: 1080 } },
+    { role: 'backglass', rect: { x: 1920, y: 0, width: 1366, height: 768 }, screenCm: { width: 41, height: 23 }, screenPx: { width: 1366, height: 768 } },
+    { role: 'dmd', rect: { x: 3286, y: 0, width: 1920, height: 1080 }, screenCm: { width: 48, height: 27 }, screenPx: { width: 1920, height: 1080 } },
+    { role: 'topper', rect: { x: 5206, y: 0, width: 1920, height: 1080 }, screenCm: { width: 48, height: 26 }, screenPx: { width: 1920, height: 1080 } },
+  ];
+  const panels = headsetPanels(desk, 90, { standardHead: true });
+  const get = (role: string) => panels.find((p) => p.role === role)!;
+  const pf = get('playfield');
+  const playfieldWidth = Math.min(pf.width, pf.height);
+  const bg = get('backglass');
+  const dmd = get('dmd');
+  const topper = get('topper');
+  close(bg.width, STANDARD_HEAD.backglass * playfieldWidth);
+  assert.ok(bg.width > playfieldWidth, 'fronton plus large que le plateau');
+  close(dmd.width, bg.width / 2);
+  close((dmd.width * dmd.height) / (bg.width * bg.height), 0.25 * ((1080 / 1920) / (768 / 1366)), 1e-3);
+  assert.ok(topper.width < dmd.width, 'topper tout petit');
+  // Tous centrés ; de bas en haut : DMD, fronton, topper posé sur le fronton.
+  for (const p of [bg, dmd, topper]) close(p.position.x, 0);
+  assert.ok(dmd.position.y < bg.position.y && bg.position.y < topper.position.y);
+  close(topper.position.y - topper.height / 2 - (bg.position.y + bg.height / 2), 0.02);
+  // Sur une vraie borne calée, les tailles réelles restent.
+  close(headsetPanels(desk, 90).find((p) => p.role === 'backglass')!.width, 0.41);
+});
+
+test('fluidité dans le casque : la boucle des images n’attend jamais le GPU, la cadence est notée', () => {
+  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
+  // Libération des textures d'Electron sur requête d'événement relue sans attendre (plus de gpuFinish par image).
+  assert.match(cpp, /pendingReleases\.push_back\(std::move\(pr\)\);/);
+  assert.match(cpp, /context->GetData\(pendingReleases\.front\(\)\.query\.Get\(\), &finished, sizeof finished, D3D11_ASYNC_GETDATA_DONOTFLUSH\)/);
+  // Cadence toutes les 10 s : fréquence, images sautées (écart des temps d'affichage prédits), copie et rendu.
+  assert.match(cpp, /"cadence casque %\.0f Hz, %\.1f images\/s, %d sautees, copie max %\.1f ms, rendu max %\.1f ms, %d images recues"/);
+  const menu = fs.readFileSync(path.join(repo, 'app', 'src', 'casque.ts'), 'utf8');
+  assert.match(menu, /\|cadence\|/);
 });

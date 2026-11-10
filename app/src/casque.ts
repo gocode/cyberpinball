@@ -25,7 +25,7 @@ export const HEADSET_TRIAL_DIR = process.env.CYBERPINBALL_CASQUE_ESSAI?.trim() |
 const RETRY_MS = 15_000;
 const STOP_TIMEOUT_MS = 4_000;
 /** Messages du compagnon gardés dans le journal (packages/casque-vr/src/casque.cpp). */
-const PROTOCOL = /^(pret|casque-absent|erreur|etat|centre|image|scene|releve|reprise|instantane|porte|casque-perdu|fini)\b/;
+const PROTOCOL = /^(pret|casque-absent|erreur|etat|centre|image|scene|releve|reprise|instantane|porte|casque-perdu|cadence|fini)\b/;
 
 /** Le compagnon, s'il est là : fabriqué avec l'application, ou construit en développement. */
 export function headsetExe(appDir: string): string | undefined {
@@ -60,6 +60,8 @@ export interface HeadsetMenuOptions {
    * joueur au premier regard suivi.
    */
   placeFile?: string;
+  /** Tête de la borne aux proportions standard (STANDARD_HEAD) : au bureau, ou sans vraie borne calée. */
+  standardHead?(): boolean;
   /** L'état a changé (montré, en attente, absent ; casque porté ou non) : le menu se renvoie. */
   onStateChange?(): void;
   /**
@@ -294,7 +296,7 @@ export class HeadsetMenu {
       this.retryAt = Date.now() + RETRY_MS;
       return;
     }
-    const panels = headsetPanels(this.opts.sources(), this.opts.playfieldRotation());
+    const panels = headsetPanels(this.opts.sources(), this.opts.playfieldRotation(), { standardHead: this.opts.standardHead?.() });
     if (!panels.length) return;
     const child = spawn(exe, HEADSET_TRIAL_DIR ? ['--essai-surfaces', HEADSET_TRIAL_DIR] : ['--chargeur', loader], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
     this.child = child;

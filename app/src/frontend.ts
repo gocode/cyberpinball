@@ -2883,6 +2883,8 @@ export function startFrontend(): void {
     },
     sources: () => headsetSources(),
     playfieldRotation: () => headsetTurn(),
+    // Tailles réelles des écrans seulement sur une vraie borne calée ; ailleurs, les proportions d'une borne.
+    standardHead: () => headsetSetting() === 'bureau' || !isCalibrated(headset?.place()),
     tint: () => tints?.current()?.color,
     snapshotDir: path.join(loc.dataDir, 'logs', 'casque'),
     placeFile: headsetPlaceFile(),

@@ -65,6 +65,8 @@ son interface).
 - Dans le casque, « Réinitialiser la vue » de Link ne déplace plus la borne : elle reste au même endroit de la pièce, au menu comme en partie, sans recaler.
 - Au bureau, le plateau de la partie tombe exactement sur celui du menu, à la même hauteur.
 - Après une partie, le menu revient directement dans le casque, sans repasser par l'accueil de Link.
+- Le menu dans le casque est plus fluide : les écrans ne tremblent plus quand les médias bougent. La cadence du casque est notée au journal.
+- Au bureau, la tête de la borne dans le casque a les proportions d'une vraie : fronton un peu plus large que le plateau, petit topper posé dessus, DMD de moitié moins large centré dessous.
 
 ## 0.1.8
 

@@ -93,15 +93,27 @@ export function panelSize(source: HeadsetSource): { width: number; height: numbe
 }
 
 /**
+ * Proportions de la tête d'une borne quand ses écrans ne sont pas ceux d'une vraie borne mesurée
+ * (bureau, ou tailles inconnues), demandées le 10 novembre 2026 : le fronton un peu plus large que le
+ * plateau, le DMD de moitié moins large que le fronton (un quart de sa surface), centré dessous, le
+ * topper tout petit, posé sur le fronton. Largeurs relatives : au plateau pour le fronton, au fronton
+ * pour les autres ; la hauteur suit les proportions de l'image.
+ */
+export const STANDARD_HEAD = { backglass: 1.05, dmd: 0.5, topper: 0.4 } as const;
+
+/**
  * Les panneaux de la borne virtuelle. `playfieldRotation` : rotation horaire qui met l'image du
  * playfield droite pour le joueur (edgeRotation du bord des flippers). Les autres écrans sont
- * supposés droits dans Windows.
+ * supposés droits dans Windows. `standardHead` : la tête aux proportions STANDARD_HEAD plutôt qu'aux
+ * tailles réelles de ses écrans.
  */
-export function headsetPanels(sources: readonly HeadsetSource[], playfieldRotation: Rotation): HeadsetPanel[] {
+export function headsetPanels(sources: readonly HeadsetSource[], playfieldRotation: Rotation, opts: { standardHead?: boolean } = {}): HeadsetPanel[] {
   const panels: HeadsetPanel[] = [];
   const slope = rad(PLAYFIELD_SLOPE_DEG);
   const front = { y: LOCKBAR_HEIGHT_M - GLASS_DROP_M, z: -LOCKBAR_DISTANCE_M };
   let far = { y: front.y, z: front.z - 1.0 };
+  // Largeur du plateau vue du joueur, base des proportions de la tête.
+  let playfieldWidth = DEFAULT_WIDTH_M.playfield * 0.56;
 
   const playfield = sources.find((s) => s.role === 'playfield');
   if (playfield) {
@@ -111,6 +123,7 @@ export function headsetPanels(sources: readonly HeadsetSource[], playfieldRotati
     // Longueur du plateau vue du joueur : la hauteur de l'image, ou sa largeur si elle est tournée d'un quart.
     const quarter = playfieldRotation === 90 || playfieldRotation === 270;
     const length = quarter ? size.width : size.height;
+    playfieldWidth = quarter ? size.height : size.width;
     // Couché (image vers le haut, son haut devant le joueur), tourné pour être droit, puis incliné.
     // Cyber Pinball dessine le playfield tourné de `playfieldRotation` dans le sens horaire (bas de
     // l'interface vers le bord des flippers) : ce bord-là revient vers le joueur.
@@ -124,10 +137,15 @@ export function headsetPanels(sources: readonly HeadsetSource[], playfieldRotati
   const upright: Quaternion = { x: 0, y: 0, z: 0, w: 1 };
   let bottom = far.y + HEAD_GAP_M;
   const z = far.z - HEAD_GAP_M;
+  const backglassWidth = STANDARD_HEAD.backglass * playfieldWidth;
+  const standard = (source: HeadsetSource) => {
+    const width = source.role === 'backglass' ? backglassWidth : STANDARD_HEAD[source.role === 'dmd' ? 'dmd' : 'topper'] * backglassWidth;
+    return { width, height: (width * source.rect.height) / Math.max(1, source.rect.width) };
+  };
   for (const role of ['dmd', 'backglass', 'topper'] as const) {
     const source = sources.find((s) => s.role === role);
     if (!source) continue;
-    const size = panelSize(source);
+    const size = opts.standardHead ? standard(source) : panelSize(source);
     panels.push({ role, rect: source.rect, position: { x: 0, y: bottom + size.height / 2, z }, orientation: upright, ...size });
     bottom += size.height + PANEL_GAP_M;
   }

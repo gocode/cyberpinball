@@ -63,6 +63,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - In the headset, Link's "Reset view" no longer moves the cabinet: it stays in the same place in the room, in the menu and in game alike, without realigning.
 - At a desk, the game's playfield lands exactly on the menu's, at the same height.
 - After a game, the menu comes straight back into the headset, without going through Link's home.
+- The menu in the headset is smoother: the screens no longer shake when the media move. The headset's frame rate is noted in the log.
+- At a desk, the cabinet head in the headset has a real one's proportions: backglass slightly wider than the playfield, small topper on top, DMD half as wide centred below.
 
 ## 0.1.8
 

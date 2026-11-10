@@ -41,6 +41,7 @@
 //     | tete <x> <y> <z> <lacet> (en veille, toutes les 5 s)
 //     | piece-changee pose|sans-pose <x> <y> <z> <lacet> (pièce refaite sous la session : la nouvelle origine dans l'ancienne)
 //     | session-arretee (arrêt que personne n'a demandé : le runtime reprend la session)
+//     | cadence … (toutes les 10 s casque porté : fréquence, images sautées, copie et rendu les plus longs)
 //     | casque-perdu <raison> (éteint, Link coupé : ni retiré de la tête, ni la relève) | fini
 
 #define WIN32_LEAN_AND_MEAN
@@ -64,6 +65,7 @@
 #include <cstdio>
 #include <fstream>
 #include <iostream>
+#include <deque>
 #include <map>
 #include <mutex>
 #include <sstream>
@@ -1222,6 +1224,27 @@ int main(int argc, char** argv)
    bool running = false, exitRequested = false, done = false;
    // Veille pendant une partie de VPX dans le casque (après la relève), et perte du casque dite une fois.
    bool standby = false, lostSaid = false;
+   // Textures d'Electron copiées, rendues (« libre ») quand le GPU a fini la copie : une requête
+   // d'événement relue sans attendre à chaque tour, au lieu de bloquer la boucle des images (gpuFinish
+   // y attendait la fin de tout le travail du GPU, mipmaps comprises, à chaque image reçue).
+   struct PendingRelease
+   {
+      ComPtr<ID3D11Query> query;
+      std::vector<std::string> frames;
+   };
+   std::deque<PendingRelease> pendingReleases;
+   // Cadence, dite toutes les 10 s casque porté (« cadence … ») : fréquence du casque, images
+   // sautées (écart des temps d'affichage prédits), copie et rendu les plus longs, images reçues.
+   LARGE_INTEGER qpcFreq;
+   QueryPerformanceFrequency(&qpcFreq);
+   auto nowMs = [&]() {
+      LARGE_INTEGER t;
+      QueryPerformanceCounter(&t);
+      return static_cast<double>(t.QuadPart) * 1000.0 / static_cast<double>(qpcFreq.QuadPart);
+   };
+   XrTime lastDisplay = 0;
+   double cadenceSince = 0, copyMax = 0, renderMax = 0, periodMs = 0;
+   int framesShown = 0, framesSkipped = 0, imagesReceived = 0;
    ULONGLONG headSaidAt = 0;
    // Casque éteint, Link coupé ou session perdue : Cyber Pinball rend l'affichage aux écrans du PC (et
    // ferme une partie de VPX restée sans casque). Un casque seulement retiré n'en est pas un.
@@ -1361,6 +1384,8 @@ int main(int argc, char** argv)
             images.swap(incoming);
          }
          // La dernière image de chaque surface est copiée ; les autres sont rendues tout de suite.
+         const double copyStart = nowMs();
+         imagesReceived += static_cast<int>(images.size());
          std::map<std::string, size_t> latest;
          for (size_t i = 0; i < images.size(); i++)
             latest[images[i].surface] = i;
@@ -1404,11 +1429,36 @@ int main(int argc, char** argv)
          }
          if (!images.empty())
          {
-            // Electron ne reprend ses textures qu'une fois la copie faite par le GPU.
-            gpuFinish(device.Get(), context.Get());
-            for (const IncomingImage& img : images)
-               say("libre " + img.frame);
+            // Electron ne reprend ses textures qu'une fois la copie faite par le GPU : dites libres
+            // quand la requête d'événement posée après les copies a abouti (plus bas, sans attendre).
+            PendingRelease pr;
+            D3D11_QUERY_DESC qd { D3D11_QUERY_EVENT, 0 };
+            if (SUCCEEDED(device->CreateQuery(&qd, &pr.query)))
+            {
+               context->End(pr.query.Get());
+               context->Flush();
+               for (const IncomingImage& img : images)
+                  pr.frames.push_back(img.frame);
+               pendingReleases.push_back(std::move(pr));
+            }
+            else
+            {
+               gpuFinish(device.Get(), context.Get());
+               for (const IncomingImage& img : images)
+                  say("libre " + img.frame);
+            }
+            copyMax = std::max(copyMax, nowMs() - copyStart);
          }
+      }
+      // Copies finies par le GPU : leurs textures rendues à Electron, dans l'ordre, sans attendre.
+      while (!pendingReleases.empty())
+      {
+         BOOL finished = FALSE;
+         if (context->GetData(pendingReleases.front().query.Get(), &finished, sizeof finished, D3D11_ASYNC_GETDATA_DONOTFLUSH) != S_OK || !finished)
+            break;
+         for (const std::string& f : pendingReleases.front().frames)
+            say("libre " + f);
+         pendingReleases.pop_front();
       }
 
       if (!running)
@@ -1440,6 +1490,18 @@ int main(int argc, char** argv)
          break;
       }
       xrBeginFrame_(session, nullptr);
+      const double renderStart = nowMs();
+      if (fs.predictedDisplayPeriod > 0)
+      {
+         periodMs = static_cast<double>(fs.predictedDisplayPeriod) / 1e6;
+         if (lastDisplay && worn)
+         {
+            const double gap = static_cast<double>(fs.predictedDisplayTime - lastDisplay) / static_cast<double>(fs.predictedDisplayPeriod);
+            if (gap > 1.5)
+               framesSkipped += static_cast<int>(gap + 0.5) - 1;
+         }
+         lastDisplay = fs.predictedDisplayTime;
+      }
 
       // Boutons des manettes : lus à chaque image, transmis à chaque changement.
       if (controllers && state == XR_SESSION_STATE_FOCUSED)
@@ -1885,6 +1947,25 @@ int main(int argc, char** argv)
       fe.layers = layers.data();
       if (const XrResult r = xrEndFrame_(session, &fe); XR_FAILED(r))
          say("erreur xrEndFrame " + hex(r));
+      if (worn)
+      {
+         framesShown++;
+         renderMax = std::max(renderMax, nowMs() - renderStart);
+         if (!cadenceSince)
+            cadenceSince = nowMs();
+         else if (nowMs() - cadenceSince >= 10'000)
+         {
+            char line[256];
+            sprintf_s(line, "cadence casque %.0f Hz, %.1f images/s, %d sautees, copie max %.1f ms, rendu max %.1f ms, %d images recues", periodMs > 0 ? 1000.0 / periodMs : 0.0,
+               framesShown * 1000.0 / (nowMs() - cadenceSince), framesSkipped, copyMax, renderMax, imagesReceived);
+            say(line);
+            cadenceSince = nowMs();
+            framesShown = framesSkipped = imagesReceived = 0;
+            copyMax = renderMax = 0;
+         }
+      }
+      else
+         cadenceSince = 0, lastDisplay = 0;
    }
 
    for (Panel& p : panels)
