@@ -9,7 +9,8 @@
 // - chaque téléchargement garde un écran de retour valide, ou un repli quand cet écran n'existe
 //   plus (table retirée, ami supprimé) ;
 // - la file survit à l'arrêt : un téléchargement qui tournait attend sa source au démarrage
-//   suivant et repart seul ; un téléchargement mis en pause par l'utilisateur ne repart jamais seul.
+//   suivant et repart seul ; un téléchargement mis en pause par l'utilisateur ne repart jamais seul ;
+// - l'écran « Téléchargements » montre chaque section du plus récent au plus ancien.
 // Aucun réseau hors de 127.0.0.1 : un serveur HTTP local et le réseau d'essai HyperDHT.
 
 import assert from 'node:assert/strict';
@@ -22,7 +23,7 @@ import { test } from 'node:test';
 import type { AddressInfo } from 'node:net';
 import { REPO_ROOT } from './i18n-scan';
 import { createDownloadManager, type DownloadManager, type DownloadTransport } from '../downloadmanager';
-import { downloadClock, downloadQueueFile, downloadsPill, loadDownloadQueue, resolveReturn, reviveQueue, shouldResume, summarize, type DownloadJob } from '../downloadqueue';
+import { downloadClock, downloadQueueFile, downloadsPill, loadDownloadQueue, newestFirst, resolveReturn, reviveQueue, shouldResume, summarize, type DownloadJob } from '../downloadqueue';
 import { fetchResumable, ResumableError } from '../resumable';
 import { scanTables, type TableEntry } from '../tables';
 import { layoutOf } from '../locations';
@@ -454,6 +455,42 @@ test('un ami se déconnecte en plein envoi d’une table, revient : reprise seul
     await Promise.allSettled([a.net.stop(), b.net.stop()]);
     await testnet.destroy();
   }
+});
+
+test('liste des téléchargements : du plus récent au plus ancien, dans chaque section', () => {
+  const job = (id: string, state: DownloadJob['state'], created: string, extra: Partial<DownloadJob> = {}): DownloadJob => ({ id, kind: 'site', title: id, source: { kind: 'site', label: 's' }, files: [], state, back: { screen: 'downloads' }, created, updated: created, tries: 0, resumable: true, ...extra });
+  // L'ordre de la file : le plus ancien demandé d'abord.
+  const queue = [
+    job('vieux', 'running', '2026-11-10T08:00:00Z'),
+    job('fini-tot', 'done', '2026-11-10T08:30:00Z', { finished: '2026-11-10T09:00:00Z' }),
+    job('neuf', 'queued', '2026-11-10T10:00:00Z'),
+    job('fini-tard', 'done', '2026-11-10T07:00:00Z', { finished: '2026-11-10T11:00:00Z' }),
+    job('bloque', 'failed', '2026-11-10T09:30:00Z', { updated: '2026-11-10T10:30:00Z' }),
+    job('jumeau', 'queued', '2026-11-10T08:00:00Z'),
+  ];
+  // En cours : par demande ; fini ou bloqué : par fin (ou dernier état) ; à égalité, le dernier demandé d'abord.
+  assert.deepEqual(newestFirst(queue).map((j) => j.id), ['fini-tard', 'bloque', 'neuf', 'fini-tot', 'jumeau', 'vieux']);
+  assert.deepEqual(queue[0]!.id, 'vieux', 'la file elle-même ne bouge pas');
+
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { createDownloadCenter } = require(path.join(APP_DIST, 'download-center.js')) as { createDownloadCenter(o: object): { open(): void } };
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  let shown: { sections: { title?: string; rows: { text: string }[] }[] } | undefined;
+  createDownloadCenter({
+    manager: { jobs: () => queue, get: (id: string) => queue.find((j) => j.id === id), progress: () => undefined, seen: () => {} },
+    show: (build: () => typeof shown) => (shown = build()),
+    world: { hasTable: () => false, hasFriend: () => false, tableTitle: () => undefined, friendName: () => undefined },
+    deliver: () => {},
+    files: { detail: () => '', open: () => {} },
+    back: () => {},
+  }).open();
+  assert.deepEqual(
+    shown!.sections.map((s) => [s.title, s.rows.map((r) => r.text)]),
+    [
+      ['En cours et en attente', ['neuf', 'jumeau', 'vieux']],
+      ['Terminés et bloqués', ['fini-tard', 'bloque', 'fini-tot']],
+    ],
+  );
 });
 
 test('heure d’un évènement : seule le jour même, avec le jour sinon', () => {

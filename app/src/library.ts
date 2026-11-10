@@ -107,6 +107,7 @@ import {
   downloadsPill,
   downloadsSummary,
   emptiableDownloads,
+  newestFirst,
   resolveReturn,
   returnLabel,
   summarize,
@@ -808,11 +809,11 @@ export function createLibrary(host: LibraryHost) {
     [
       'downloads',
       {
-        // Ce qui arrive, et le premier téléchargement prêt avec l'écran où il ramène.
+        // Ce qui arrive, et le dernier téléchargement prêt avec l'écran où il ramène (comme en tête de la liste).
         get detail() {
           const jobs = downloads.jobs();
           const s = summarize(jobs);
-          const ready = jobs.find((j) => j.state === 'done' && !j.delivered);
+          const ready = newestFirst(jobs).find((j) => j.state === 'done' && !j.delivered);
           if (ready) return t('{summary} · prêt : {screen}', { summary: summaryText(s), screen: returnLabel(resolveReturn(ready, downloadWorld).to, downloadWorld) });
           return jobs.length ? summaryText(s) : t('Ce qui arrive des sites et des amis, et ce qui est gardé');
         },

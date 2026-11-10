@@ -233,6 +233,22 @@ export function saveDownloadQueue(dataDir: string, queue: DownloadQueue): void {
 export const isActive = (j: DownloadJob) => j.state === 'queued' || j.state === 'running' || j.state === 'waiting' || j.state === 'paused';
 export const isFinished = (j: DownloadJob) => !isActive(j);
 
+/** Le moment qui place un téléchargement dans la liste : sa fin (ou son dernier état) s'il est fini, sa demande sinon. */
+export function downloadStamp(j: DownloadJob): number {
+  return Date.parse(isFinished(j) ? (j.finished ?? j.updated) : j.created) || 0;
+}
+
+/**
+ * Les téléchargements du plus récent au plus ancien, pour tout écran qui les montre : la file
+ * les garde dans l'ordre des demandes, le plus ancien d'abord. À égalité, le dernier demandé d'abord.
+ */
+export function newestFirst(jobs: readonly DownloadJob[]): DownloadJob[] {
+  return jobs
+    .map((j, i) => ({ j, i }))
+    .sort((a, b) => downloadStamp(b.j) - downloadStamp(a.j) || b.i - a.i)
+    .map((x) => x.j);
+}
+
 /**
  * Le téléchargement déjà demandé pour cette clé (DownloadJob.dedupe) : en cours, en attente, en
  * pause, ou fini mais pas encore rendu à son écran. Le relancer ferait un doublon (01/11/2026 : la

@@ -1,7 +1,8 @@
 // Écran « Téléchargements » (première entrée du menu système, pastille du menu des tables, et
 // Menu système > Tables > Téléchargements) : tout ce qui arrive, d'un site ou d'un ami, suivi en
 // temps réel, à la manière d'une console de jeu (packages/core/src/downloadmanager.ts).
-// - la liste : en cours et en attente, puis terminés et bloqués ; chaque ligne dit son état en
+// - la liste : en cours et en attente, puis terminés et bloqués, chacune du plus récent au plus
+//   ancien (newestFirst) ; chaque ligne dit son état en
 //   mot, sa source, ce qui est reçu, sa barre, et l'étape suivante (où il ramène, ou quand il
 //   reprend). Les lignes se mettent à jour sur place : une ligne ne change de section, la liste
 //   ne gagne ou ne perd une ligne qu'à un geste (ouverture, action), jamais à un tic de
@@ -27,6 +28,7 @@ import {
   formatRemaining,
   formatSize,
   isActive,
+  newestFirst,
   resolveReturn,
   returnLabel,
   skippedFiles,
@@ -90,8 +92,9 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
   /** Sections figées au dernier geste : qui est où, dans quel ordre. */
   let snapshot: { active: string[]; finished: string[] } = { active: [], finished: [] };
 
+  // Chaque section du plus récent au plus ancien (en cours : par demande ; terminés : par fin).
   const take = () => {
-    const jobs = m.jobs();
+    const jobs = newestFirst(m.jobs());
     snapshot = { active: jobs.filter(isActive).map((j) => j.id), finished: jobs.filter((j) => !isActive(j)).map((j) => j.id) };
   };
 
