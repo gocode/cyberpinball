@@ -7,6 +7,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { app, BrowserWindow, globalShortcut, ipcMain, session, shell, type Input, type Rectangle } from 'electron';
 import {
+  createKeptPhones,
   ArcadeHours,
   CONFIG_KEY,
   STOP_IDLE_FALLBACK_MS,
@@ -978,6 +979,7 @@ let downloadsShown: string | undefined;
 /** Fichier qui arrive du téléphone : le bandeau du menu et l'écran de la télécommande le suivent. */
 let phoneUpload: { name: string; received: number; size: number } | undefined;
 const phoneRemote = createPhoneRemote({
+  kept: createKeptPhones(loc.dataDir, { log: (line) => console.log(line) }),
   mode: () => phoneRemoteMode(process.env),
   firewall: async () => socialFirewall.state() ?? (await socialFirewall.check()),
   fromSources: !app.isPackaged,

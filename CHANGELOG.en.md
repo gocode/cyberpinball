@@ -9,6 +9,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.9
 
+- Phone remote: once accepted, the phone is kept. It then comes back without a QR code or acceptance, from a shortcut on its Home screen (Android and iPhone alike, with nothing to install), and reconnects by itself when Cyber Pinball restarts. Kept phones are listed in System menu > Phone remote, where you can forget one.
 - Menu DMD: the dots now stay on screen at all times on the wheel; they no longer disappear for a few seconds each cycle to make way for the table's media, which shows around them on a FullDMD.
 - A livelier menu DMD: on arriving at a table, a close-up of its wheel in dots (often its logotype) lights up, slides, then makes way for the title.
 - Each DMD page arrives with its own transition: a light wipe towards the high scores, a dissolve towards the clock and the credits; from one table to the next, the new one slides in the wheel's direction.

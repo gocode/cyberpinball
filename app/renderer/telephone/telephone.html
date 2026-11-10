@@ -6,6 +6,16 @@
     <meta name="theme-color" content="#030807" />
     <meta name="referrer" content="no-referrer" />
     <meta name="color-scheme" content="dark" />
+    <!-- Raccourci sur l'écran d'accueil : plein écran sur iPhone, icône de Cyber Pinball partout.
+         Pas de manifeste : son adresse de départ perdrait la clé du téléphone gardé (#g=…), et
+         l'iPhone donne à l'application de l'écran d'accueil un stockage à part. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Cyber Pinball" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
+    <meta name="application-name" content="Cyber Pinball" />
+    <link rel="apple-touch-icon" href="icone.png" />
+    <link rel="icon" type="image/png" href="icone.png" />
     <title data-i18n>Télécommande de la borne</title>
     <link rel="stylesheet" href="theme.css" />
     <link rel="stylesheet" href="telephone.css" />
@@ -30,6 +40,7 @@
         <div class="code" id="code" hidden></div>
         <h1 class="message-title" id="message-title" data-i18n>Connexion à la borne…</h1>
         <p class="message-text" id="message-text"></p>
+        <button type="button" class="key wide primary message-action" id="message-action" hidden data-i18n>Reprendre</button>
       </div>
       <div class="buttons" id="buttons">
         <button type="button" class="btn btn-start" data-b="confirm"></button>

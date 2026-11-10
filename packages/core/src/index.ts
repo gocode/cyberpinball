@@ -162,6 +162,7 @@ export * from './gamerecording';
 export * from './gamenotice';
 export * from './dmdscore';
 export * from './remote';
+export * from './remote-kept';
 export * from './websocket';
 export * from './lifetime';
 export * from './plugins';

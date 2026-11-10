@@ -270,6 +270,17 @@ body:not([data-state='paired']) .pad {
   display: none;
 }
 
+/* « Reprendre » : téléphone gardé, coupé ; il revient sans QR code. Hauteur d'une touche, jamais étiré par la colonne. */
+.message-action.key.wide {
+  flex: 0 0 auto;
+  width: min(260px, 100%);
+  margin-top: 6px;
+}
+
+.message-action[hidden] {
+  display: none;
+}
+
 .code {
   font-size: 56px;
   font-weight: 600;
@@ -878,9 +889,14 @@ body[data-layout='editing'][data-short='true'] .tool .icon {
 
 .sheet-text {
   overflow-wrap: anywhere;
+  white-space: pre-line;
   font-size: 15px;
   line-height: 21px;
   color: var(--ink-muted);
+}
+
+#sheet-cancel[hidden] {
+  display: none;
 }
 
 .sheet-text[hidden] {

@@ -3,8 +3,10 @@
 // accepte, Exit refuse), puis le téléphone connecté ; à droite, ce que fait le téléphone, l'envoi en
 // cours, Déconnecter. Indisponible (pare-feu, pas de réseau local) : le bloc reste, grisé avec la
 // raison. Le clavier à l'écran montre le même bloc, en bande, sous ses touches (library.ts).
+// Sous « Téléphones gardés », ceux qui reviennent sans QR (remote-kept.ts) : en choisir un ouvre
+// « Oublier ce téléphone ».
 
-import { formatSize, REMOTE_UPLOAD_MAX, t } from '@cyberpinball/core';
+import { formatDate, formatSize, REMOTE_UPLOAD_MAX, t, type KeptPhone } from '@cyberpinball/core';
 import type { Action, Built, ProvidedSystemItem, Row } from './library';
 import type { PhoneRemote, RemoteBar } from './phone-remote';
 
@@ -38,7 +40,7 @@ export function remoteBlock(bar: RemoteBar, place: 'screen' | 'keyboard', wordin
         qr: bar.qr,
         title: wording?.offer ?? (big ? t('Connecter un téléphone') : t('Taper au téléphone')),
         lines: big
-          ? [t('Scannez avec votre téléphone, connecté au même réseau Wi-Fi que la borne.'), t('Aucune application à installer. Le QR code change toutes les 3 minutes et ne sert qu’une fois.')]
+          ? [t('Scannez avec votre téléphone, connecté au même réseau Wi-Fi que la borne.'), t('Aucune application à installer. Accepté une fois, le téléphone revient ensuite sans QR code.')]
           : [t('Scannez ce QR sur le même réseau Wi-Fi que la borne.')],
       };
     case 'pending':
@@ -67,7 +69,43 @@ export interface PhoneRemoteMenuHost {
   upload(): { name: string; received: number; size: number } | undefined;
 }
 
+/** Jour court (« 10/11/2026 »), ou « aujourd’hui ». */
+function day(ms: number, now = Date.now()): string {
+  const same = new Date(ms).toDateString() === new Date(now).toDateString();
+  return same ? t('aujourd’hui') : formatDate(ms, { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+/** Ligne d'un téléphone gardé : son nom, quand il a été accepté et vu pour la dernière fois. */
+export function keptPhoneRow(phone: KeptPhone & { connected: boolean }, now = Date.now()): { text: string; detail: string; badges?: string[] } {
+  return {
+    text: phone.device,
+    detail: t('Accepté le {added} · vu {seen}', { added: formatDate(phone.added, { day: '2-digit', month: '2-digit', year: 'numeric' }), seen: day(phone.seen, now) }),
+    ...(phone.connected ? { badges: [t('Pilote maintenant')] } : {}),
+  };
+}
+
 export function createPhoneRemoteMenu(host: PhoneRemoteMenuHost) {
+  /** « Oublier ce téléphone » : il devra scanner le QR et être accepté de nouveau. */
+  function buildForget(id: string): Built {
+    const phone = host.remote.keptPhones().find((p) => p.id === id);
+    const back = () => host.library.openCustom(build);
+    if (!phone) return build();
+    return {
+      heading: t('Oublier ce téléphone ?'),
+      icon: 'phone',
+      lead: t('Il ne reviendra plus sans QR code : pour piloter de nouveau la borne, il devra scanner le QR et être accepté.'),
+      sections: [{ rows: [{ ...keptPhoneRow(phone), icon: 'phone' }] }],
+      actions: [
+        { label: t('Oublier ce téléphone'), ...(phone.connected ? { detail: t('Il est connecté : il sera aussi déconnecté') } : {}), icon: 'trash', key: 'remote:forget', run: () => {
+          host.remote.forget(id);
+          back();
+        } },
+        { label: t('Retour'), icon: 'back', key: 'remote:forget-back', run: back },
+      ],
+      back,
+    };
+  }
+
   function build(): Built {
     const bar: RemoteBar | undefined = host.remote.bar();
     const connected = host.remote.connected();
@@ -80,9 +118,15 @@ export function createPhoneRemoteMenu(host: PhoneRemoteMenuHost) {
       );
     }
     if (bar?.phase === 'paired') {
-      actions.push({ label: t('Déconnecter le téléphone'), detail: t('Il ne pilote plus la borne ; un QR code neuf s’affiche'), icon: 'close', key: 'remote:end', run: () => host.remote.end() });
+      actions.push({ label: t('Déconnecter le téléphone'), detail: t('Il ne pilote plus la borne ; gardé, il pourra revenir sans QR code'), icon: 'close', key: 'remote:end', run: () => host.remote.end() });
     }
     actions.push({ label: t('Retour'), icon: 'back', key: 'remote:back', run: back });
+    // Téléphones gardés : chacun une ligne à choisir, qui ouvre « Oublier ce téléphone ».
+    const kept = host.remote.keptPhones();
+    const keptRows: Row[] = kept.map((phone) => {
+      actions.push({ label: phone.device, key: `remote:kept:${phone.id}`, run: () => host.library.openCustom(() => buildForget(phone.id)) });
+      return { ...keptPhoneRow(phone), icon: 'phone', action: actions.length - 1, pick: true };
+    });
     const up = host.upload();
     // Une ligne chacune : l'écran tient sans zone de lecture, même avec le téléphone connecté.
     const rows: Row[] = [
@@ -98,11 +142,12 @@ export function createPhoneRemoteMenu(host: PhoneRemoteMenuHost) {
         rows: [{ text: up.name, detail: t('{received} sur {size}', { received: formatSize(up.received), size: formatSize(up.size) }), icon: 'upload' as const, progress: { value: up.size ? up.received / up.size : 0 } }],
       });
     }
+    if (keptRows.length) sections.push({ title: t('Téléphones gardés'), rows: keptRows });
     sections.push({ title: t('Ce que fait le téléphone'), rows });
     return {
       heading: t('Télécommande du téléphone'),
       icon: 'phone',
-      lead: t('Accepté à la borne, un seul à la fois ; la liaison se coupe après 20 minutes sans geste au menu.'),
+      lead: t('Accepté une fois, un téléphone est gardé : il revient ensuite sans QR code. Un seul pilote à la fois.'),
       remote: bar,
       sections,
       actions,

@@ -24,6 +24,11 @@
 //   menu, ou quand Cyber Pinball se ferme. Sans téléphone ni QR affiché, rien n'écoute et tout
 //   s'efface (createRemotePairing est recréé au prochain QR).
 //
+// Téléphone gardé (10/11/2026) : accepté une fois, le téléphone garde sa clé de session, et la
+// borne aussi (remote-kept.ts). Il revient ensuite sans QR ni acceptation, d'un raccourci sur son
+// écran d'accueil ; la borne écoute alors en continu sur REMOTE_PORT, tant qu'elle garde un
+// téléphone. « Oublier » à la borne retire sa clé : il doit de nouveau scanner le QR.
+//
 // Chiffrement : la page du téléphone est servie en HTTP (un certificat de la borne ferait afficher
 // au téléphone une alerte de sécurité), où le navigateur n'offre pas WebCrypto. Chaque message est
 // donc scellé en ChaCha20-Poly1305 (RFC 8439), par chacha.ts ici (Electron, avec BoringSSL, ne
@@ -49,6 +54,14 @@ export const REMOTE_CHALLENGE_BYTES = 16;
 export const REMOTE_TEXT_MAX = 512;
 /** Au menu, sans geste du téléphone pendant ce délai (hors partie), la liaison se coupe. */
 export const REMOTE_IDLE_MS = 20 * 60_000;
+/**
+ * Port fixe de la page du téléphone sur le réseau local. Le navigateur du téléphone range la clé
+ * d'un téléphone gardé par origine (adresse et port) : un port qui changerait à chaque ouverture
+ * lui ferait tout oublier, et son raccourci sur l'écran d'accueil ne mènerait plus nulle part.
+ */
+export const REMOTE_PORT = 47820;
+/** Au plus, téléphones gardés par la borne ; au-delà, le plus anciennement vu est oublié. */
+export const REMOTE_KEPT_MAX = 8;
 /** Plus gros fichier que le téléphone peut envoyer à la borne (une table avec son PuP-Pack). */
 export const REMOTE_UPLOAD_MAX = 2 * 1024 ** 3;
 /** Morceau d'un envoi, avant scellement : un message HTTP chacun, l'un après l'autre. */
@@ -208,6 +221,11 @@ export type RemoteHello =
   | { kind: 'claimed'; key: Buffer; session: Buffer; code: string; message: Record<string, unknown> }
   /** Clé de session : le téléphone revient (page rechargée, Wi-Fi retrouvé). */
   | { kind: 'resumed'; key: Buffer; phase: 'pending' | 'paired'; code: string; message: Record<string, unknown> }
+  /**
+   * Clé d'un téléphone gardé (accepté une fois à la borne) : il pilote sans QR ni acceptation.
+   * `replaced` : un autre téléphone pilotait ou attendait, il cède la place.
+   */
+  | { kind: 'kept'; key: Buffer; id: string; device: string; replaced: boolean; message: Record<string, unknown> }
   /** Clé d'un ancien QR : périmé, ou déjà servi à un autre téléphone. La réponse part sous cette clé. */
   | { kind: 'stale'; key: Buffer; why: 'expired' | 'used' | 'busy'; message: Record<string, unknown> }
   | undefined;
@@ -218,11 +236,20 @@ export function deviceLabel(value: unknown): string {
   return text || 'Téléphone'; // i18n-ignore : traduit à l'affichage (phone-remote.ts)
 }
 
+/** Téléphone gardé, tel que l'appairage le reconnaît. */
+export interface KeptPhoneKey {
+  id: string;
+  key: Buffer;
+  device: string;
+}
+
 export interface RemotePairingOptions {
   now?: () => number;
   random?: (n: number) => Buffer;
   pairingMs?: number;
   acceptMs?: number;
+  /** Téléphones gardés par la borne (remote-kept.ts), relus à chaque connexion. */
+  kept?: () => readonly KeptPhoneKey[];
 }
 
 /**
@@ -235,7 +262,8 @@ export function createRemotePairing(opts: RemotePairingOptions = {}) {
   const pairingMs = opts.pairingMs ?? REMOTE_PAIRING_MS;
   const acceptMs = opts.acceptMs ?? REMOTE_ACCEPT_MS;
   let offer: { key: Buffer; until: number } | undefined;
-  let session: { key: Buffer; code: string; device: string; phase: 'pending' | 'paired'; until: number } | undefined;
+  /** `kept` : identifiant du téléphone gardé qui pilote (il est venu avec sa clé, sans QR). */
+  let session: { key: Buffer; code: string; device: string; phase: 'pending' | 'paired'; until: number; kept?: string } | undefined;
   /** Clés d'anciens QR : de quoi dire au téléphone qu'il est périmé ou déjà servi, sous sa propre clé. */
   const stale: { key: Buffer; why: 'expired' | 'used' }[] = [];
   const retire = (key: Buffer, why: 'expired' | 'used') => {
@@ -269,6 +297,15 @@ export function createRemotePairing(opts: RemotePairingOptions = {}) {
         const message = asMessage(open(session.key));
         if (message) return { kind: 'resumed', key: session.key, phase: session.phase, code: session.code, message };
       }
+      // Un téléphone gardé : il prend la main, même sur un autre (c'est celui qu'on tient qui compte).
+      for (const phone of opts.kept?.() ?? []) {
+        if (phone.key.length !== REMOTE_KEY_BYTES) continue;
+        const message = asMessage(open(phone.key));
+        if (!message) continue;
+        const replaced = Boolean(session);
+        session = { key: phone.key, code: '', device: phone.device, phase: 'paired', until: Infinity, kept: phone.id };
+        return { kind: 'kept', key: phone.key, id: phone.id, device: phone.device, replaced, message };
+      }
       if (offer) {
         const message = asMessage(open(offer.key));
         if (message) {
@@ -297,6 +334,18 @@ export function createRemotePairing(opts: RemotePairingOptions = {}) {
     session(): 'pending' | 'paired' | undefined {
       expire();
       return session?.phase;
+    },
+    /**
+     * Le téléphone qui pilote : sa clé (à garder, une fois accepté), son nom, et l'identifiant du
+     * téléphone gardé s'il est venu avec sa clé.
+     */
+    current(): { key: Buffer; device: string; kept?: string } | undefined {
+      expire();
+      return session?.phase === 'paired' ? { key: session.key, device: session.device, ...(session.kept ? { kept: session.kept } : {}) } : undefined;
+    },
+    /** Le téléphone qui pilote vient d'être gardé sous cet identifiant. */
+    markKept(id: string): void {
+      if (session?.phase === 'paired') session.kept = id;
     },
     /** Refusé à la borne, ou déconnecté : la clé de session ne vaut plus rien, un QR neuf s'affiche. */
     end(): boolean {

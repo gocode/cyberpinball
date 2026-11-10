@@ -6,8 +6,14 @@
 //   clavier du téléphone à la place du clavier à l'écran, l'envoi d'un fichier vers le dossier
 //   d'import ; game pendant une partie (les boutons attendent le retour au menu). La clé vient du QR code, dans le fragment de l'adresse (#k=…) : le navigateur ne l'envoie
 // jamais sur le réseau. Acceptée à la borne, la page la remplace par sa clé de session (#s=…), qui
-// la laisse revenir après une coupure (page rechargée, écran verrouillé) tant que le navigateur
-// intégré reste ouvert. Chaque message est scellé (telephone-core.js) et numéroté.
+// la laisse revenir après une coupure (page rechargée, écran verrouillé). Chaque message est scellé
+// (telephone-core.js) et numéroté.
+//
+// Téléphone gardé (10/11/2026) : la borne garde la clé d'un téléphone accepté (ready, kept). La page
+// la range dans le stockage du navigateur et dans son adresse (#g=…) : un raccourci sur l'écran
+// d'accueil la porte (l'iPhone donne à ce raccourci un stockage à part), et le téléphone revient
+// sans QR ni acceptation. Coupé (déconnecté à la borne, inactif, remplacé par un autre téléphone),
+// il propose « Reprendre » ; Cyber Pinball fermé, il se reconnecte seul à son retour.
 //
 // Démonstration hors écran : window.cyberRemoteDemo fixe un état sans borne.
 'use strict';
@@ -93,8 +99,62 @@ const MESSAGES = {
   idle: { icon: 'clock', title: () => t('Télécommande déconnectée'), text: () => t('Aucun geste au menu depuis 20 minutes. Scannez un nouveau QR code sur la borne.'), again: true },
   quit: { icon: 'info', title: () => t('Cyber Pinball fermé'), text: () => t('Une fois Cyber Pinball relancé, scannez un nouveau QR code sur la borne.'), again: true },
   closed: { icon: 'info', title: () => t('Navigateur de la borne fermé'), text: () => t('Rouvrez-le sur la borne, puis scannez son QR code pour vous reconnecter.'), again: true },
-  invalid: { icon: 'info', title: () => t('Scannez le QR code de la borne'), text: () => t('Ouvrez la télécommande avec le QR code affiché dans le navigateur de la borne.'), again: true },
+  replaced: { icon: 'phone', title: () => t('Un autre téléphone a pris la main'), text: () => t('Ce téléphone ne pilote plus la borne.'), again: true },
+  forgotten: { icon: 'alert', title: () => t('Ce téléphone n’est plus reconnu'), text: () => t('La borne l’a oublié. Pour le connecter de nouveau : Menu système > Borne > Télécommande du téléphone, puis scannez le QR code.'), again: true },
+  invalid: { icon: 'info', title: () => t('Scannez le QR code de la borne'), text: () => t('Sur la borne : Menu système > Borne > Télécommande du téléphone, puis scannez le QR code affiché.'), again: true },
 };
+
+/**
+ * Téléphone gardé : le texte de ces états, et « Reprendre » (sans QR). Cyber Pinball fermé : la page
+ * se reconnecte seule à son retour.
+ */
+const KEPT_MESSAGES = {
+  ended: () => t('La borne a déconnecté ce téléphone. Il reste gardé : touchez Reprendre pour revenir.'),
+  idle: () => t('Aucun geste au menu depuis 20 minutes. Touchez Reprendre pour revenir.'),
+  quit: () => t('Ce téléphone se reconnectera tout seul dès que Cyber Pinball sera relancé.'),
+  closed: () => t('Touchez Reprendre pour revenir aux commandes du menu.'),
+  replaced: () => t('Ce téléphone ne pilote plus la borne. Touchez Reprendre pour reprendre la main.'),
+};
+
+// --- Téléphone gardé ---------------------------------------------------------
+
+/** Clé du téléphone gardé dans le stockage du navigateur (par adresse et port de la borne). */
+const KEPT_STORE = 'cyberpinball.telecommande';
+/** « Ajouter à l'écran d'accueil » déjà proposé une fois. */
+const HINT_STORE = 'cyberpinball.astuce-accueil';
+function stored(name) {
+  try {
+    return localStorage.getItem(name) ?? '';
+  } catch {
+    return '';
+  }
+}
+function store(name, value) {
+  try {
+    if (value) localStorage.setItem(name, value);
+    else localStorage.removeItem(name);
+  } catch {
+    // Stockage refusé (navigation privée) : l'adresse (#g=…) porte la clé.
+  }
+}
+/** Ouverte depuis l'écran d'accueil (plein écran), plutôt que dans un onglet. */
+const standalone = () => window.matchMedia?.('(display-mode: standalone)').matches || navigator.standalone === true;
+/** Comment ajouter la page à l'écran d'accueil, selon le téléphone. */
+function homeScreenHow() {
+  const ua = navigator.userAgent;
+  if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return t('Dans Safari : touchez Partager, puis « Sur l’écran d’accueil ».');
+  if (/Android/.test(ua)) return t('Dans le menu du navigateur (⋮) : « Ajouter à l’écran d’accueil ».');
+  return t('Dans le menu du navigateur : « Ajouter à l’écran d’accueil ».');
+}
+function offerHomeScreen() {
+  openSheet(t('Gardez la télécommande sous la main'), [{ id: 'ok', label: t('Compris'), run: () => undefined }], {
+    text: `${t('Ce téléphone est gardé par la borne : il revient sans QR code. Ajoutez la télécommande à l’écran d’accueil pour l’ouvrir d’un geste.')}
+
+${homeScreenHow()}`,
+    // « Compris » suffit : pas d'« Annuler » en double.
+    cancel: false,
+  });
+}
 
 let state = 'connecting';
 function setState(next, extra = {}) {
@@ -103,9 +163,11 @@ function setState(next, extra = {}) {
   const m = MESSAGES[next];
   if (m) {
     $('message-title').textContent = m.title();
-    $('message-text').textContent = m.text();
+    $('message-text').textContent = kept && KEPT_MESSAGES[next] ? KEPT_MESSAGES[next]() : m.text();
     $('message-mark').replaceChildren(...(m.icon ? [cyberIcon(m.icon)] : []));
   }
+  // Téléphone gardé, coupé : il revient sans QR (sauf Cyber Pinball fermé, où il revient seul).
+  $('message-action').hidden = !(kept && KEPT_MESSAGES[next] && next !== 'quit');
   $('code').hidden = !extra.code;
   if (extra.code) $('code').textContent = extra.code;
   const links = {
@@ -177,16 +239,36 @@ let theirs; // défi de la borne
 let retry = 0;
 let retryTimer;
 let code = '';
+/** La borne garde ce téléphone : sa clé ne change plus, il revient sans QR. */
+let kept = false;
+/** Astuce de l'écran d'accueil à montrer après le mode qui suit l'acceptation (setMode referme les feuilles). */
+let hintAfterMode = false;
 
 function readFragment() {
   const params = new URLSearchParams(location.hash.slice(1));
+  // Un QR lu à l'instant l'emporte : c'est un appairage neuf.
+  const k = core.fromB64(params.get('k') ?? '');
+  if (k && k.length === 32) return k;
+  const g = core.fromB64(params.get('g') ?? stored(KEPT_STORE));
+  if (g && g.length === 32) {
+    kept = true;
+    store(KEPT_STORE, core.toB64(g));
+    if (!params.get('g')) history.replaceState(null, '', `#g=${core.toB64(g)}`);
+    return g;
+  }
   const s = core.fromB64(params.get('s') ?? '');
   if (s && s.length === 32) {
     code = (params.get('c') ?? '').replace(/\D/g, '').slice(0, 4);
     return s;
   }
-  const k = core.fromB64(params.get('k') ?? '');
-  return k && k.length === 32 ? k : undefined;
+  return undefined;
+}
+
+/** La borne ne connaît plus ce téléphone (oublié à la borne) : sa clé est effacée. */
+function forgetKey() {
+  kept = false;
+  store(KEPT_STORE, '');
+  history.replaceState(null, '', location.pathname);
 }
 
 function send(message) {
@@ -195,9 +277,10 @@ function send(message) {
   return true;
 }
 
-function connect() {
+/** `force` : même depuis un état final (téléphone gardé qui attend le retour de Cyber Pinball). */
+function connect(force = false) {
   clearTimeout(retryTimer);
-  if (MESSAGES[state]?.again) return;
+  if (!force && MESSAGES[state]?.again) return;
   sent = 0;
   received = 0;
   theirs = undefined;
@@ -217,8 +300,11 @@ function connect() {
         return ws.close();
       }
       if (hello?.t === 'unknown') {
-        // Aucune des clés de la borne n'ouvre la nôtre : la borne a été relancée, ou le navigateur rouvert.
-        setState('ended');
+        // Aucune des clés de la borne n'ouvre la nôtre : la borne a été relancée, ou ce téléphone oublié.
+        if (kept) {
+          forgetKey();
+          setState('forgotten');
+        } else setState('ended');
         return ws.close();
       }
       if (hello?.t !== 'challenge' || theirs) return ws.close();
@@ -240,6 +326,13 @@ function connect() {
     releaseButtons(false);
     // Un envoi est lié à sa connexion : coupée, il s'arrête (la borne efface ce qu'elle avait reçu).
     if (upload && (upload.phase === 'asking' || upload.phase === 'sending')) failUpload(t('La liaison avec la borne a été coupée. Sélectionnez à nouveau le fichier pour réessayer.'), t('Envoi interrompu'));
+    // Téléphone gardé et Cyber Pinball fermé : il revient seul quand la borne écoute de nouveau.
+    if (kept && state === 'quit') {
+      retryTimer = setTimeout(() => {
+        if (state === 'quit') connect(true);
+      }, 5000);
+      return;
+    }
     if (MESSAGES[state]?.again) return;
     setState(state === 'connecting' && !retry ? 'connecting' : 'lost');
     retry++;
@@ -260,12 +353,29 @@ function handle(m) {
       setState('waiting', { code: m.code ?? code });
       break;
     }
-    case 'ready':
+    case 'ready': {
+      const fresh = m.kept && !kept;
+      if (m.kept) {
+        // Gardé par la borne : la clé reste dans le stockage et dans l'adresse (raccourci de l'écran d'accueil).
+        kept = true;
+        store(KEPT_STORE, core.toB64(key));
+        history.replaceState(null, '', `#g=${core.toB64(key)}`);
+      }
       setState('paired');
       if (navigator.vibrate) navigator.vibrate(30);
+      // Une fois, juste après l'appairage : comment le garder sous la main (après le mode, qui suit).
+      if (fresh && !standalone() && !stored(HINT_STORE)) {
+        store(HINT_STORE, '1');
+        hintAfterMode = true;
+      }
       break;
+    }
     case 'mode':
       setMode(m.mode);
+      if (hintAfterMode && state === 'paired') {
+        hintAfterMode = false;
+        offerHomeScreen();
+      }
       break;
     case 'screen':
       showScreen(m);
@@ -291,8 +401,10 @@ function handle(m) {
       openSheet(t('Clic droit'), Array.isArray(m.items) ? m.items : []);
       break;
     case 'end':
+      if (m.why === 'forgotten') forgetKey();
       setState(MESSAGES[m.why] ? m.why : 'ended');
-      history.replaceState(null, '', location.pathname);
+      // Gardé, la clé reste dans l'adresse : la page rechargée revient sans QR.
+      if (!kept) history.replaceState(null, '', location.pathname);
       socket?.close();
       break;
   }
@@ -805,7 +917,7 @@ $('nav-keyboard').addEventListener('click', () => ($('keys').hidden ? openKeys(f
 $('nav-more').addEventListener('click', () =>
   mode === 'browser'
     ? openSheet(t('Actions de la page'), actions, { search: true, text: page.title || page.host, opener: $('nav-more') })
-    : openSheet(t('Télécommande'), [], {
+    : openSheet(t('Télécommande'), kept && !standalone() ? [{ id: 'home', label: t('Ajouter à l’écran d’accueil'), run: offerHomeScreen }] : [], {
         search: true,
         text: [
           mode === 'game' ? t('Les commandes reviendront à la fin de la partie.') : t('Ce téléphone pilote le menu de la borne.'),
@@ -838,7 +950,9 @@ function openSheet(title, items, opts = {}) {
       b.textContent = item.label;
       b.addEventListener('click', () => {
         closeSheet();
-        if (item.id === 'bye') {
+        // Action de la page elle-même (rien ne part à la borne).
+        if (item.run) item.run();
+        else if (item.id === 'bye') {
           send({ t: 'bye' });
           setState('ended');
           socket?.close();
@@ -848,6 +962,7 @@ function openSheet(title, items, opts = {}) {
       return b;
     }),
   );
+  $('sheet-cancel').hidden = opts.cancel === false;
   $('sheet-search').hidden = !(opts.search && search && mode === 'browser');
   if (opts.search && search) $('search-query').value = search.query ?? '';
   showEngines(opts.search && search && mode === 'browser');
@@ -921,6 +1036,15 @@ if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', fit);
   fit();
 }
+
+/** Nouvelle tentative de liaison, repartie de zéro (« Reprendre », retour de Cyber Pinball). */
+function connectFresh() {
+  clearTimeout(retryTimer);
+  retry = 0;
+  setState('connecting');
+  connect();
+}
+$('message-action').addEventListener('click', () => connectFresh());
 
 // Retour sur la page (écran déverrouillé, application rouverte) : la liaison se refait aussitôt.
 document.addEventListener('visibilitychange', () => {

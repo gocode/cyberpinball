@@ -38,6 +38,12 @@
 // poserait des règles bloquantes qui couperaient aussi le réseau des amis) : le bloc reste visible,
 // grisé avec la raison. Pendant un essai (réseau simulé ou coupé) :
 // 127.0.0.1 seulement. Sans QR affiché ni téléphone, tout s'arrête : écoute, liaison, clés.
+//
+// Téléphone gardé (10/11/2026) : accepté une fois, il revient sans QR ni acceptation (remote-kept.ts).
+// Tant que la borne en garde un, elle écoute en continu, au menu comme en partie, sur REMOTE_PORT
+// (fixe : le téléphone range sa clé par adresse et port), mais ne répond qu'à ses clés : un téléphone
+// inconnu lit toujours le QR et attend d'être accepté. Le dernier venu prend la main ; l'autre
+// l'apprend (« Un autre téléphone a pris la main ») et ne se reconnecte pas tout seul.
 
 import * as fs from 'node:fs';
 import * as http from 'node:http';
@@ -71,6 +77,7 @@ import {
   REMOTE_CHALLENGE_BYTES,
   REMOTE_FOCUS_PROBE,
   REMOTE_MAX_FRAME,
+  REMOTE_PORT,
   remoteUrl,
   sealRemote,
   smoothSpeed,
@@ -80,6 +87,8 @@ import {
   fromBase64Url,
   wheelFor,
   type FirewallState,
+  type KeptPhone,
+  type KeptPhones,
   type PhoneMessage,
   type RemoteField,
   type RemoteButton,
@@ -210,6 +219,10 @@ export interface PhoneRemoteOptions {
   rendererDir?: string;
   /** Inactivité au menu avant la coupure (essais) ; par défaut REMOTE_IDLE_MS. */
   idleMs?: number;
+  /** Téléphones gardés par la borne (createKeptPhones) ; sans eux, chaque téléphone lit le QR. */
+  kept?: KeptPhones;
+  /** Port d'écoute ; par défaut REMOTE_PORT sur le réseau local, un port libre pendant un essai. */
+  port?: number;
 }
 
 /**
@@ -225,8 +238,10 @@ const FILES: Record<string, string> = {
   '/i18n.js': 'i18n.js',
   '/icons.js': 'icons.js',
   '/polices/saira/Saira-wdth-wght.ttf': 'polices/saira/Saira-wdth-wght.ttf',
+  // Icône du raccourci sur l'écran d'accueil (iPhone, Android).
+  '/icone.png': '../ressources/icone.png',
 };
-const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.ttf': 'font/ttf' };
+const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.ttf': 'font/ttf', '.png': 'image/png' };
 /** Au plus, connexions ouvertes en même temps (un téléphone, sa reconnexion, un curieux). */
 const MAX_LINKS = 4;
 /** Un geste injecté dans la page rend la main au plus tard après ce délai (page tombée, qui ne répond plus). */
@@ -336,11 +351,17 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   const holds = new Map<RemoteButton, { timer: NodeJS.Timeout; until: number }>();
   /** Envoi d'un fichier en cours, un seul, lié à la connexion qui l'a demandé. */
   let upload: Upload | undefined;
+  const kept = opts.kept;
+  /** Cyber Pinball se ferme : plus rien ne relance l'écoute (un dernier redessin du menu montrerait encore le QR). */
+  let closed = false;
+  /** Une borne qui garde un téléphone écoute en continu, tant que le menu tourne. */
+  const keepListening = () => Boolean(menu && kept?.size());
 
   // --- Bandeau ---------------------------------------------------------------
 
   function bar(): RemoteBar | undefined {
-    if (!pairing && !surfaces.size) return undefined;
+    // Écoute continue pour les téléphones gardés : sans endroit qui montre le QR ni téléphone, pas de bloc (ni de clé de QR).
+    if (!surfaces.size && !pairing?.session()) return undefined;
     if (unavailable) return { phase: 'off', title: t('Télécommande'), line: unavailable };
     if (!pairing || !address) return { phase: 'off', title: t('Télécommande'), line: t('Préparation…') };
     const view = pairing.view();
@@ -490,9 +511,17 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       return undefined;
     }
     const link: Link = { ws, key: result.key, inbound, outbound, seqIn: 1, seqOut: 0 };
-    if (active && active.ws !== ws) active.ws.close();
+    // Un téléphone gardé prend la main : celui qui pilotait l'apprend, et ne revient pas tout seul.
+    if (active && active.ws !== ws) {
+      if (result.kind === 'kept' && result.replaced) endLink(active, 'replaced');
+      else active.ws.close();
+    }
     active = link;
-    if (result.kind === 'claimed') {
+    if (result.kind === 'kept') {
+      log(`Télécommande : téléphone gardé (${result.device}) reconnecté depuis ${ws.address}${result.replaced ? ', il prend la main' : ''}.`); // i18n-ignore : journal
+      kept?.seen(result.id);
+      ready(link);
+    } else if (result.kind === 'claimed') {
       log(`Télécommande : un téléphone (${String(message.device ?? '').slice(0, 40)}) a lu le QR code depuis ${ws.address} ; à accepter à la borne.`); // i18n-ignore : journal
       sendTo(link, { t: 'wait', code: result.code, k: toBase64Url(result.session) });
       link.key = result.session;
@@ -506,7 +535,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     link.ws.send(sealRemote(link.key, link.outbound, { ...message, s: ++link.seqOut }));
   }
 
-  function endLink(link: Link, why: 'refused' | 'ended' | 'closed' | 'idle' | 'quit'): void {
+  function endLink(link: Link, why: 'refused' | 'ended' | 'closed' | 'idle' | 'quit' | 'replaced' | 'forgotten'): void {
     if (upload?.link === link) void abortUpload(undefined);
     sendTo(link, { t: 'end', why });
     link.ws.close();
@@ -520,7 +549,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   // --- Téléphone accepté ----------------------------------------------------
 
   function ready(link: Link): void {
-    sendTo(link, { t: 'ready' });
+    // `kept` : la borne garde ce téléphone, il range sa clé pour revenir sans QR.
+    sendTo(link, { t: 'ready', kept: Boolean(pairing?.current()?.kept) });
     lastActivity = Date.now();
     pushState(true);
   }
@@ -1134,10 +1164,24 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     });
     s.headersTimeout = 10_000;
     s.requestTimeout = 15_000;
-    await new Promise<void>((resolve, reject) => {
-      s.once('error', reject);
-      s.listen(0, remoteListenHost(mode), () => resolve());
-    });
+    // Port fixe sur le réseau local (le téléphone gardé y retrouve sa clé) ; pris par un autre
+    // programme, un port libre : le QR marche toujours, un téléphone gardé devra le scanner de nouveau.
+    const wanted = opts.port ?? (mode === 'lan' ? REMOTE_PORT : 0);
+    const bind = (port: number) =>
+      new Promise<void>((resolve, reject) => {
+        s.once('error', reject);
+        s.listen(port, remoteListenHost(mode), () => {
+          s.off('error', reject);
+          resolve();
+        });
+      });
+    try {
+      await bind(wanted);
+    } catch (error) {
+      if (!wanted || (error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
+      log(`Télécommande : port ${wanted} déjà pris, écoute sur un port libre (un téléphone gardé devra scanner le QR).`); // i18n-ignore : journal
+      await bind(0);
+    }
     const port = (s.address() as { port: number }).port;
     server = s;
     address = { host, port };
@@ -1146,9 +1190,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   /** Un QR va s'afficher : la télécommande se réveille (appairage neuf, écoute). Rien si elle l'est déjà. */
   function wake(): void {
-    if (pairing) return;
+    if (pairing || closed) return;
     const run = ++wakeRun;
-    pairing = createRemotePairing();
+    pairing = createRemotePairing({ kept: () => kept?.keys() ?? [] });
     unavailable = undefined;
     lastBar = '';
     lastPhase = undefined;
@@ -1196,7 +1240,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       if (active) endLink(active, 'refused');
       pairing.end();
     }
-    if (surfaces.size || pairing.session()) return;
+    if (surfaces.size || pairing.session() || keepListening()) return;
     sleep();
   }
 
@@ -1216,7 +1260,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     lastBar = '';
     lastPhase = undefined;
     modeSent = undefined;
-    log('Télécommande : plus de QR code ni de téléphone, écoute arrêtée.'); // i18n-ignore : journal
+    log(why === 'quit' ? 'Télécommande : Cyber Pinball se ferme, écoute arrêtée.' : 'Télécommande : plus de QR code ni de téléphone, écoute arrêtée.'); // i18n-ignore : journal
     target?.changed();
     menu?.changed();
   }
@@ -1325,6 +1369,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     /** Le menu de Cyber Pinball (frontend.ts) : le téléphone le pilote quand « Récupérer » est fermé. */
     setMenu(next: MenuTarget): void {
       menu = next;
+      // Un téléphone gardé peut revenir dès le démarrage.
+      if (keepListening()) wake();
     },
     /** Le menu a changé (écran, choix, clavier, partie) : le téléphone suit. Appelé à chaque redessin. */
     menuChanged: () => pushState(),
@@ -1332,6 +1378,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     connected: (): RemoteMode | undefined => (active && pairing?.session() === 'paired' ? mode() : undefined),
     /** Cyber Pinball se ferme : le téléphone l'apprend, rien n'écoute plus. */
     close(): void {
+      closed = true;
       surfaces.clear();
       sleep('quit');
     },
@@ -1339,7 +1386,10 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     /** Start à la borne, ou « Accepter » : le téléphone qui attend peut piloter. Faux s'il n'y en avait pas. */
     accept(): boolean {
       if (!pairing?.accept()) return false;
-      log('Télécommande : téléphone accepté à la borne.'); // i18n-ignore : journal
+      // Accepté une fois, gardé : il reviendra sans QR (sa clé de session devient la sienne).
+      const now = pairing.current();
+      if (kept && now) pairing.markKept(kept.add(now.key, now.device));
+      log(`Télécommande : téléphone accepté à la borne${kept ? ', gardé' : ''}.`); // i18n-ignore : journal
       if (active) ready(active);
       tick();
       return true;
@@ -1366,6 +1416,23 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       settle();
     },
     pending: () => pairing?.session() === 'pending',
+    /** Téléphones gardés (le plus récemment vu d'abord), et celui qui pilote. */
+    keptPhones(): (KeptPhone & { connected: boolean })[] {
+      const now = active && pairing?.session() === 'paired' ? pairing.current()?.kept : undefined;
+      return (kept?.list() ?? []).map((p) => ({ ...p, connected: p.id === now }));
+    },
+    /** « Oublier » : sa clé ne vaut plus rien ; s'il pilotait, il est déconnecté. */
+    forget(id: string): void {
+      if (!kept?.forget(id)) return;
+      log('Télécommande : un téléphone gardé a été oublié à la borne.'); // i18n-ignore : journal
+      if (pairing?.current()?.kept === id) {
+        if (active) endLink(active, 'forgotten');
+        pairing.end();
+      }
+      tick();
+      settle();
+      menu?.changed();
+    },
     /**
      * Le menu de la page (clic droit) : s'il suit un clic droit du téléphone, ses actions partent
      * au téléphone (vrai), le menu de Windows n'y serait pas atteignable.

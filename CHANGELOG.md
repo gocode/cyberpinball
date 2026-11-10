@@ -11,6 +11,7 @@ son interface).
 
 ## 0.1.9
 
+- Télécommande du téléphone : accepté une fois, le téléphone est gardé. Il revient ensuite sans QR code ni acceptation, d'un raccourci sur son écran d'accueil (Android comme iPhone, sans rien installer), et se reconnecte seul quand Cyber Pinball redémarre. Les téléphones gardés sont listés dans Menu système > Télécommande du téléphone, où l'on peut en oublier un.
 - DMD du menu : les points restent affichés en permanence sur la roue ; ils ne disparaissent plus quelques secondes à chaque tour pour laisser la place au média de la table, qui se voit autour d'eux sur un FullDMD.
 - DMD du menu plus vivant : à l'arrivée sur une table, un détail de sa wheel en points (souvent son logotype) s'allume, glisse, puis laisse la place au titre.
 - Chaque page du DMD arrive par sa transition : volet lumineux vers les records, dissolution vers l'horloge et les crédits ; d'une table à l'autre, la nouvelle glisse dans le sens de la roue.

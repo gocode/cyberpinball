@@ -212,6 +212,45 @@ test('appairage : refusé à la borne, la clé de session ne sert plus', () => {
   assert.equal(hello(pairing, claimed.session), undefined);
 });
 
+test('téléphone gardé : revient sans QR ni acceptation, prend la main, oublié ne revient plus', () => {
+  const keptKeys: { id: string; key: Buffer; device: string }[] = [];
+  const pairing = createRemotePairing({ kept: () => keptKeys });
+  const offer = pairing.view();
+  if (offer.phase !== 'offer') return assert.fail();
+  const claimed = hello(pairing, offer.key);
+  if (claimed?.kind !== 'claimed') return assert.fail();
+  assert.equal(pairing.current(), undefined, 'pas encore accepté');
+  assert.equal(pairing.accept(), true);
+  // Accepté : sa clé de session devient la sienne, la borne la garde.
+  const now = pairing.current();
+  assert.ok(now?.key.equals(claimed.session));
+  keptKeys.push({ id: 'abcd1234', key: claimed.session, device: now!.device });
+  pairing.markKept('abcd1234');
+  assert.equal(pairing.current()?.kept, 'abcd1234');
+  // Déconnecté à la borne, puis Cyber Pinball relancé : il revient avec sa clé, sans attendre Start.
+  pairing.end();
+  const back = hello(pairing, claimed.session);
+  assert.deepEqual(back && back.kind === 'kept' && [back.id, back.replaced], ['abcd1234', false]);
+  assert.equal(pairing.session(), 'paired');
+  assert.equal(pairing.view().phase, 'paired');
+  const fresh = createRemotePairing({ kept: () => keptKeys });
+  assert.equal(hello(fresh, claimed.session)?.kind, 'kept', 'après un redémarrage');
+  // Un téléphone inconnu passe toujours par le QR, et attend d'être accepté.
+  const other = createRemotePairing({ kept: () => keptKeys });
+  const qr = other.view();
+  if (qr.phase !== 'offer') return assert.fail();
+  assert.equal(hello(other, qr.key, 'iPhone · Safari')?.kind, 'claimed');
+  assert.equal(other.session(), 'pending');
+  // Le téléphone gardé prend la main sur celui qui attendait.
+  const takeover = hello(other, claimed.session);
+  assert.deepEqual(takeover && takeover.kind === 'kept' && takeover.replaced, true);
+  assert.equal(other.current()?.kept, 'abcd1234');
+  // Oublié : sa clé n'ouvre plus rien.
+  keptKeys.length = 0;
+  other.end();
+  assert.equal(hello(other, claimed.session), undefined);
+});
+
 test('nom du téléphone : texte court, sans balise ni caractère de contrôle', () => {
   assert.equal(deviceLabel('Android · Chrome'), 'Android · Chrome');
   assert.equal(deviceLabel('<img src=x onerror=alert(1)>\u0007'.repeat(3)).includes('<'), false);

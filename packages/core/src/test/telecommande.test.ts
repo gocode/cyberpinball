@@ -90,6 +90,42 @@ test('télécommande du téléphone dans tout le menu : boutons, clavier à l’
   }
 });
 
+test('téléphone gardé : revient sans QR, Reprendre, prise de main, Oublier, retour après relance, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+  // interne/demos/demo-telephone-garde.cjs : deux vraies pages du téléphone (chacune son stockage), la
+  // vraie gestion des tables hors écran ; accepté une fois, gardé (data	elephones.json) ; la borne
+  // écoute l'écran quitté ; Reprendre ; page rouverte sans adresse ; prise de main ; Oublier ; Cyber
+  // Pinball fermé puis relancé sur le même port.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-telephone-garde-'));
+  try {
+    const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_TELECOMMANDE_OUT: dir, CP_TELECOMMANDE_CAPTURES: '0', CYBERPINBALL_LANGUE: 'fr' };
+    delete env.ELECTRON_RUN_AS_NODE;
+    delete env.CYBERPINBALL_A_L_ECRAN;
+    const run = runElectron(electron!, [path.join(DEMOS, 'demo-telephone-garde.cjs'), `--user-data-dir=${path.join(dir, 'chromium')}`], { dir, env, timeout: 220_000, cwd: REPO_ROOT });
+    const result = fs.existsSync(path.join(dir, 'resultat.txt')) ? fs.readFileSync(path.join(dir, 'resultat.txt'), 'utf8') : `${run.stdout}
+${run.stderr}`;
+    assert.equal(run.status, 0, result);
+    assert.doesNotMatch(result, /ÉCHEC/, result);
+    assert.ok((result.match(/^OK /gm) ?? []).length >= 30, result);
+    for (const step of [
+      'accepté, le téléphone est gardé par la borne',
+      'la page range sa clé dans son adresse',
+      'une fois, juste après l’appairage',
+      'écran quitté : la borne écoute encore',
+      '« Reprendre » : il pilote de nouveau, sans QR ni Start',
+      'page rouverte sans clé dans l’adresse',
+      'le second ne reprend pas la main tout seul',
+      'oublié : sa page le dit, et efface sa clé',
+      'le téléphone revient seul, sans QR ni Start',
+      'plus aucun téléphone gardé ni QR : plus rien n’écoute',
+      'aucune clé au journal',
+      'garde-fou de mise en page',
+    ])
+      assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
+  }
+});
+
 test('réseau : seuls social-net.ts et phone-remote.ts écoutent ; la télécommande, seulement sur le réseau local réel', () => {
   const src = path.join(REPO_ROOT, 'app', 'src');
   const listeners = fs
@@ -99,7 +135,9 @@ test('réseau : seuls social-net.ts et phone-remote.ts écoutent ; la télécomm
   assert.deepEqual(listeners, ['phone-remote.ts', 'social-net.ts']);
   const remote = fs.readFileSync(path.join(src, 'phone-remote.ts'), 'utf8');
   // Une seule écoute, à l'hôte de remoteListenHost ; toute connexion hors du réseau local coupée avant lecture.
-  assert.deepEqual([...remote.matchAll(/\.listen\((.*)\);/g)].map((m) => m[1]), ['0, remoteListenHost(mode), () => resolve()']);
+  assert.deepEqual([...remote.matchAll(/\.listen\(([^,]+), ([^,]+),/g)].map((m) => [m[1], m[2]]), [['port', 'remoteListenHost(mode)']]);
+  // Port fixe (REMOTE_PORT) sur le réseau local réel seulement : un port libre pendant un essai.
+  assert.match(remote, /const wanted = opts\.port \?\? \(mode === 'lan' \? REMOTE_PORT : 0\);/);
   assert.match(remote, /on\('connection', \(socket\) => \{[\s\S]{0,200}isLocalNetworkAddress\(socket\.remoteAddress\)/);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { phoneRemoteMode, remoteListenHost } = require(path.join(REPO_ROOT, 'app', 'dist', 'phone-remote.js')) as {
