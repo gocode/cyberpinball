@@ -43,7 +43,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Each track plays online, downloaded to the cabinet, or from a file on your drive (a whole folder, subfolders included); “Download everything” and “Free up space” move a playlist from one mode to the other. Without network or space, these functions stay visible, greyed with their reason.
 - A track's title, artist and album can be corrected in “Tracks and details”; your correction wins over what YouTube says.
 - 3D vision: stepping back or coming closer now moves the table the right way. While the Kinect driver installs, the mouse pointer is placed on the Windows consent window, and the screen says how to answer with the keyboard (Alt+Y).
-- Juke-box: sign in to your YouTube account (Juke-box management > “YouTube account”) to import your own playlists, private ones included, as well as “Liked videos” and “Watch later”. You sign in from the “Get” window and the sign-in is kept; if Google refuses it, Cyber Pinball can take the one from a browser on this PC (Firefox recommended). No password is ever seen or kept.
+- Juke-box: sign in to your YouTube account (Juke-box management > “YouTube account” > “Sign in to YouTube”) to import your own playlists, private ones included, as well as “Liked videos” and “Watch later”. Microsoft Edge opens on the screen chosen for browsers; you sign in there (on the phone, the touchpad is its mouse and the keyboard types into it), then close it: the sign-in is kept. Nothing to create at Google, no password ever seen or kept by Cyber Pinball.
 - Juke-box: “Search YouTube” in the import opens “Get” on results showing playlists only; “Add to the Juke-box” on a playlist or a video brings you back to the import with that link.
 - Juke-box: on the on-screen keyboard, the link already starts with a playlist address (or a video one, with the “Video” key): you only type the ID. An ID alone (PL…, OLAK5uy_…) is accepted everywhere, on the phone too, and a whole pasted link is never doubled.
 - 3D vision, three settings on its screen: "Calibrer la position de jeu" (Calibrate the playing position: two seconds still in playing position), "Intensité" (Intensity) from 25 % to 150 % (75 % by default, also adjustable in game with the MagnaSave buttons, against seasickness), and "Réactivité" (Responsiveness) gentle, normal or quick: the table follows the head with clearly less lag.
@@ -55,9 +55,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Downloads: each list now runs from newest to oldest, in progress and finished alike.
 - Typing from the phone into Google's sign-in page no longer crashes Cyber Pinball: text goes in as from a keyboard. A page that crashes anyway is reloaded.
 - Always a way out: Exit closes “Get” even when Windows has taken the foreground, and holding Exit two seconds force-closes it. A menu window that crashes is reloaded instead of staying black; a Windows window (Task Manager, a dialog) comes in front.
-- Signing in to Google in “Get”: passkeys (Windows Hello, nearby phone, security key) are no longer offered; Google moves on to the password.
 - The built-in browser refuses what a cabinet cannot serve (camera, microphone, location, notifications, devices) instead of granting it.
-- YouTube account: “Use Firefox’s sign-in” replaces the choice of a browser (Chrome, Edge and Brave protect their cookies). Firefox missing or not signed in to YouTube: the screen says so, with what to do.
 - On a YouTube video, “Get” offers “Add to the Juke-box” first, and no longer claims yt-dlp is missing.
 - Caught incidents and crashes are logged in logs\erreurs.txt; on a dedicated cabinet, a frozen Cyber Pinball is relaunched by itself.
 - In the headset, Link's "Reset view" no longer moves the cabinet: it stays in the same place in the room, in the menu and in game alike, without realigning.
@@ -75,10 +73,12 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Juke-box: each button does what it does on the wheel, whatever buttons were recorded in the “Buttons” step; the MagnaSave buttons move to the neighboring playlist inside an open playlist, and are only offered when recorded.
 - Juke-box: the page fits the screen at every playfield size, from 720 × 1280 to 4K, whatever the Windows scaling.
 - Typing from the phone no longer crashes Cyber Pinball: the cause was a keyboard shortcut (Ctrl+A) of a hidden menu inherited from Electron, which brought the application down; that menu is removed, and copy, paste and selection work as before.
-- “Get” no longer opens Google’s sign-in page, which refuses the built-in browser: the window explains why and offers to go through Firefox.
-- YouTube account: “Install Firefox” when it is missing. The official installer is downloaded from Mozilla, its signature checked, then Firefox installed with no window; what to do next is shown on screen.
+- “Get” no longer opens Google’s sign-in page, which refuses the built-in browser: the window explains why and offers “Sign in to YouTube” (with Edge).
 - Juke-box, play modes: inside a playlist, under “Gestion du Juke-box”, “Tout lire” (play all, in order), “Lecture aléatoire” (shuffle: every track once before any replays) and “Répétition: playlist / track / off”, which Start cycles. The mode is kept per playlist and shows on the now-playing card (⤮, ⟳); on a desktop, its ⤮ and ⟳ buttons.
 - Juke-box: holding Start on a playlist starts it straight away in shuffle; elsewhere it still opens management.
+- Juke-box: a flipper held moves forward or back in the track, by 5 s steps, then 10 s, then 30 s; a short press still changes track. On the desktop, the arrow keys held do the same, and a click in the progress bar jumps there.
+- Juke-box: Start on the playlist that is playing opens it on the current track; Start again pauses it, as the card reminds you.
+- “Get” reopened on Google’s sign-in page no longer resumes the previous page: it says Google refuses it and offers “Sign in to YouTube”.
 - Before every Windows permission request (dedicated cabinet, firewall, Kinect driver), a screen warns that it must be answered with the keyboard or the mouse (Alt+Y for Yes, Esc for No): the cabinet buttons cannot do it. “Later, at the desk” is selected by default, and Cyber Pinball stops waiting for the answer after 3 minutes.
 - YouTube account: “Install Firefox” installs it for this account only, with no Windows permission request.
 - “Open in my browser” opens Firefox directly when it is installed, without asking to choose the Windows default browser.
@@ -87,6 +87,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Every time the headset starts, alignment is offered: A to align, B to skip and keep the previous one. Each confirmed alignment applies at once; redo it as often as you like, then B finishes and keeps the last one.
 - Simpler alignment in the headset: a single short instruction, written very large in the middle of your view, and one press per step. The height is taken from the first alignment, even if the Quest's floor is wrongly set. The shadows around the menu's screens are removed.
 - In the headset, a game always has a button to quit (Y by default), shown large during loading; the controller wizard requires it.
+- In the headset, VPX gets a graphics profile suited to the machine's graphics card (only for settings left empty), and each game notes in the log the smoothness measured by Link. The manual explains Link's settings (resolution, bitrate, ASW) for each kind of machine.
 
 ## 0.1.8
 

@@ -43,6 +43,7 @@
 //     | session-arretee (arrêt que personne n'a demandé : le runtime reprend la session)
 //     | cadence … (toutes les 10 s casque porté : fréquence, images sautées, copie et rendu les plus longs)
 //     | profil touch|index|vive|wmr|inconnu <chemin> (les manettes branchées)
+//     | carte <Mo> batterie|secteur <nom> (la carte graphique du casque)
 //     | casque-perdu <raison> (éteint, Link coupé : ni retiré de la tête, ni la relève)
 //     | session-veille-perdue <raison> (erreur du runtime pendant la veille : la partie continue) | fini
 
@@ -892,6 +893,17 @@ int main(int argc, char** argv)
    {
       say("erreur carte graphique du casque introuvable");
       return 4;
+   }
+   // La carte du casque, pour le profil graphique des parties (vr-profil.ts) : mémoire vidéo dédiée,
+   // machine sur batterie ou sur secteur, nom.
+   {
+      DXGI_ADAPTER_DESC1 d;
+      adapter->GetDesc1(&d);
+      SYSTEM_POWER_STATUS power {};
+      const bool battery = GetSystemPowerStatus(&power) && power.BatteryFlag != 128 && power.BatteryFlag != 255;
+      char name[256] = {};
+      WideCharToMultiByte(CP_UTF8, 0, d.Description, -1, name, sizeof name, nullptr, nullptr);
+      say("carte " + std::to_string(d.DedicatedVideoMemory / (1024 * 1024)) + (battery ? " batterie " : " secteur ") + name);
    }
    ComPtr<ID3D11Device> device;
    ComPtr<ID3D11DeviceContext> context;

@@ -58,6 +58,8 @@ interface Api {
   GetWindowLongPtrW: NativeFn;
   GetAsyncKeyState: NativeFn;
   IsHungAppWindow: NativeFn;
+  SendInput: NativeFn;
+  SetWindowPosAfter: NativeFn;
 }
 
 let api: Api | undefined;
@@ -94,6 +96,8 @@ function loadApi(): Api {
     GetWindowLongPtrW: user32.func('intptr_t __stdcall GetWindowLongPtrW(void *hwnd, int index)'),
     GetAsyncKeyState: user32.func('int16_t __stdcall GetAsyncKeyState(int vk)'),
     IsHungAppWindow: user32.func('bool __stdcall IsHungAppWindow(void *hwnd)'),
+    SendInput: user32.func('uint32_t __stdcall SendInput(uint32_t count, void *inputs, int size)'),
+    SetWindowPosAfter: user32.func('bool __stdcall SetWindowPos(void *hwnd, intptr_t after, int x, int y, int cx, int cy, uint32_t flags)'),
   };
   return api;
 }
@@ -291,6 +295,105 @@ export function tapKey(vk: number): void {
   const w = loadApi();
   w.keybd_event(vk, 0, 0, 0);
   w.keybd_event(vk, 0, KEYEVENTF_KEYUP, 0);
+}
+
+/** Taille d'une structure INPUT de Windows en 64 bits (type, puis l'union dont MOUSEINPUT est la plus grande). */
+const INPUT_SIZE = 40;
+const INPUT_KEYBOARD = 1;
+const KEYEVENTF_UNICODE = 0x0004;
+const VK_RETURN = 0x0d;
+
+/** Une frappe (appui puis relâche) en structures INPUT : caractère Unicode (`unit`) ou touche virtuelle (`vk`). */
+function keyInputs(key: { unit: number } | { vk: number }): Buffer {
+  const buf = Buffer.alloc(INPUT_SIZE * 2);
+  for (const [i, up] of [false, true].entries()) {
+    const at = i * INPUT_SIZE;
+    buf.writeUInt32LE(INPUT_KEYBOARD, at);
+    if ('vk' in key) buf.writeUInt16LE(key.vk, at + 8);
+    else buf.writeUInt16LE(key.unit, at + 10);
+    buf.writeUInt32LE(('vk' in key ? 0 : KEYEVENTF_UNICODE) | (up ? KEYEVENTF_KEYUP : 0), at + 12);
+  }
+  return buf;
+}
+
+/**
+ * Tape du texte dans la fenêtre au premier plan, comme un clavier (SendInput) : chaque caractère
+ * en Unicode (accents, symboles, émojis par leurs deux moitiés UTF-16), le saut de ligne par la
+ * touche Entrée. Sert à la télécommande quand la page est dans un vrai navigateur (Edge) : un
+ * clavier à distance, pas un pilotage de la page. Rend le nombre de frappes acceptées.
+ */
+export function typeText(text: string): number {
+  const w = loadApi();
+  let sent = 0;
+  for (const part of text.split('')) {
+    const inputs = part === '\n' ? keyInputs({ vk: VK_RETURN }) : keyInputs({ unit: part.charCodeAt(0) });
+    sent += (w.SendInput(2, inputs, INPUT_SIZE) as number) / 2;
+  }
+  return sent;
+}
+
+export interface KeyModifiers {
+  shift?: boolean;
+  ctrl?: boolean;
+  alt?: boolean;
+}
+
+const MODIFIER_VK = { shift: 0x10, ctrl: 0x11, alt: 0x12 } as const;
+
+/**
+ * Appuie puis relâche une touche virtuelle par SendInput (Tab, Entrée, Retour arrière…) pour la
+ * fenêtre au premier plan, les modificateurs tenus pendant la frappe (Maj+Tab, Ctrl+A, Alt+Gauche).
+ */
+export function pressKey(vk: number, mods: KeyModifiers = {}): boolean {
+  const held = (Object.keys(MODIFIER_VK) as (keyof KeyModifiers)[]).filter((m) => mods[m]).map((m) => keyInputs({ vk: MODIFIER_VK[m] }));
+  const all = Buffer.concat([...held.map((b) => b.subarray(0, INPUT_SIZE)), keyInputs({ vk }), ...held.reverse().map((b) => b.subarray(INPUT_SIZE))]);
+  const count = all.length / INPUT_SIZE;
+  return (loadApi().SendInput(count, all, INPUT_SIZE) as number) === count;
+}
+
+const INPUT_MOUSE = 0;
+const MOUSE_FLAGS = { left: [0x0002, 0x0004], right: [0x0008, 0x0010] } as const;
+const MOUSEEVENTF_WHEEL = 0x0800;
+const MOUSEEVENTF_HWHEEL = 0x1000;
+
+function mouseInput(flags: number, data = 0): Buffer {
+  const buf = Buffer.alloc(INPUT_SIZE);
+  buf.writeUInt32LE(INPUT_MOUSE, 0);
+  buf.writeInt32LE(data, 16);
+  buf.writeUInt32LE(flags, 20);
+  return buf;
+}
+
+/** Clic (simple ou double) là où est le pointeur de la souris, comme une vraie souris (SendInput). */
+export function mouseClick(button: 'left' | 'right' = 'left', count = 1): boolean {
+  const [down, up] = MOUSE_FLAGS[button];
+  const parts: Buffer[] = [];
+  for (let i = 0; i < Math.max(1, Math.min(3, count)); i++) parts.push(mouseInput(down), mouseInput(up));
+  return (loadApi().SendInput(parts.length, Buffer.concat(parts), INPUT_SIZE) as number) === parts.length;
+}
+
+/**
+ * Molette sous le pointeur, au sens de sendInputEvent d'Electron (comme Windows) : `dy` positif
+ * remonte la page, `dx` positif va vers la gauche ; 120 par cran.
+ */
+export function mouseWheel(dx: number, dy: number): boolean {
+  const parts: Buffer[] = [];
+  if (Math.round(dy)) parts.push(mouseInput(MOUSEEVENTF_WHEEL, Math.round(dy)));
+  if (Math.round(dx)) parts.push(mouseInput(MOUSEEVENTF_HWHEEL, -Math.round(dx)));
+  if (!parts.length) return true;
+  return (loadApi().SendInput(parts.length, Buffer.concat(parts), INPUT_SIZE) as number) === parts.length;
+}
+
+const HWND_TOPMOST = -1;
+const HWND_NOTOPMOST = -2;
+
+/**
+ * Met (ou retire) une fenêtre d'un autre processus au premier plan permanent, sans l'activer ni
+ * la déplacer : la page de connexion d'Edge reste devant les fenêtres de la borne sur son écran.
+ */
+export function setTopmost(target: WindowInfo, on: boolean): boolean {
+  const flags = SWP_NOACTIVATE | SWP_NOMOVE | SWP_NOSIZE | SWP_NOOWNERZORDER;
+  return Boolean(loadApi().SetWindowPosAfter(target.hwnd, on ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, flags));
 }
 
 /**

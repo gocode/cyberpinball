@@ -445,7 +445,7 @@ test('les écritures de la borne dédiée ne partent que de « Activer » et « 
   // (firewall-rule.ts), posée seulement par une action de l'écran « Partage et réseau » (firewall.test.ts),
   // et l'installateur signé de Microsoft du pilote de la Kinect (vision3d.ts), lancé seulement quand le
   // joueur choisit « Vision 3D : pilote Kinect à installer ».
-  // Firefox s'installe sans élévation (paquet MSIX, firefox-install.ts). Chacune est prévenue avant
+  // Chacune est prévenue avant
   // (uac-confirm.ts) et n'est pas attendue sans fin : sorties.test.ts.
   assert.deepEqual(filesMatching(/-Verb RunAs|\brunas\b/i), ['app/src/dedicated-system.ts', 'app/src/firewall-rule.ts', 'app/src/vision3d.ts']);
   // L'exécuteur n'est appelé que par l'écran, et l'écran ne l'appelle que dans activate() et deactivate().

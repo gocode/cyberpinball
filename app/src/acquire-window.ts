@@ -74,7 +74,6 @@ import {
   type WebEngine,
   type NavigationKeys,
   type ProbeResult,
-  type CookieRecord,
   type SiteCookie,
   type SourceSite,
   type TransferMeter,
@@ -90,7 +89,6 @@ import { coverDisplay, fillBelow } from './cover-display';
 import { onJoystickInput, watchJoystickButtons } from './joystick-input';
 import { createWindow, OFFSCREEN, primaryRect } from './offscreen';
 import type { PhoneRemote } from './phone-remote';
-import { openInFirefox } from './firefox-install';
 import { hostForLog, journalIncident, logsOwnCrashes } from './uncaught';
 import type { GrabProgress, GrabResult } from './ytdlp-tool';
 
@@ -228,8 +226,9 @@ export interface AcquireEvents {
   /**
    * Juke-box (jukebox-menu.ts) : sur une page de playlist ou de vidéo YouTube, « Ajouter au
    * Juke-box » ferme la fenêtre et ouvre l'import sur ce lien. `accepts` : ce que désigne l'adresse.
+   * `account` : l'écran du compte YouTube (liaison par code), où mène le refus de la page de Google.
    */
-  jukebox?: { accepts(url: string): 'playlist' | 'video' | undefined; add(url: string): void };
+  jukebox?: { accepts(url: string): 'playlist' | 'video' | undefined; add(url: string): void; account?(): void };
   /** Bloqueur de publicités de la session (ad-blocker.ts) ; absent : les pages restent telles quelles. */
   adBlocker?: Pick<AdBlocker, 'attach' | 'refresh'>;
   /** Télécommande du téléphone (phone-remote.ts) ; absente : pas de QR code dans le bandeau. */
@@ -269,6 +268,8 @@ export interface AcquireOpen {
   setBar?(height: number): void;
   /** Recherche libre : la page affichée est une page vidéo (sonde VIDEO_PAGE_PROBE). */
   video?: VideoPage;
+  /** La page de connexion de Google vient d'être refusée : le bandeau propose la liaison par code. */
+  googleRefused?: boolean;
   /** Recherche libre : la dernière page de résultats vue, dont le champ garde le texte sur les pages suivantes. */
   lastSearch?: { query: string; engine: WebEngine };
   /** Un téléphone attend d'être accepté : le bandeau a pris le clavier (Accepter, Refuser). */
@@ -683,19 +684,27 @@ export function createAcquirer(events: AcquireEvents) {
     return engine === 'youtube' && open?.request.search?.playlists ? youtubePlaylistSearchUrl(query) : webEngineUrl(query, engine);
   }
 
-  /** Ligne du Juke-box : la page est une playlist ou une vidéo YouTube qu'on peut y ajouter. */
-  function jukeboxLine(): { kind: 'playlist' | 'video'; text: string } | undefined {
+  /**
+   * Ligne du Juke-box : la page est une playlist ou une vidéo YouTube qu'on peut y ajouter ; ou la
+   * page de connexion de Google vient d'être refusée, et la liaison par code est proposée à la place.
+   */
+  function jukeboxLine(): { kind: 'playlist' | 'video' | 'account'; text: string; button: string } | undefined {
     if (!open || !events.jukebox || open.view.webContents.isDestroyed()) return undefined;
+    if (open.googleRefused && events.jukebox.account) return { kind: 'account', text: t('Vos playlists YouTube, privées comprises : connectez-vous dans Microsoft Edge, depuis le compte YouTube du Juke-box.'), button: t('Se connecter à YouTube') };
     const kind = events.jukebox.accepts(open.view.webContents.getURL());
     if (!kind) return undefined;
-    return { kind, text: kind === 'playlist' ? t('Playlist YouTube : l’importer dans le Juke-box, en ligne ou téléchargée, au choix') : t('Vidéo YouTube : l’ajouter à une playlist du Juke-box') };
+    return { kind, text: kind === 'playlist' ? t('Playlist YouTube : l’importer dans le Juke-box, en ligne ou téléchargée, au choix') : t('Vidéo YouTube : l’ajouter à une playlist du Juke-box'), button: t('Ajouter au Juke-box') };
   }
 
   /** Lien à ouvrir dans l'import du Juke-box une fois la fenêtre fermée (son retour au menu fait d'abord). */
   let jukeboxPending: string | undefined;
+  /** L'écran du compte YouTube, à ouvrir une fois la fenêtre fermée. */
+  let accountPending = false;
   function addToJukebox(): void {
-    if (!open || !jukeboxLine()) return;
-    jukeboxPending = open.view.webContents.getURL();
+    const line = open ? jukeboxLine() : undefined;
+    if (!open || !line) return;
+    if (line.kind === 'account') accountPending = true;
+    else jukeboxPending = open.view.webContents.getURL();
     close();
   }
 
@@ -922,7 +931,8 @@ export function createAcquirer(events: AcquireEvents) {
   function remoteActions(): { id: string; label: string }[] {
     if (!open) return [];
     // Une vidéo ou une playlist YouTube : « Ajouter au Juke-box » d'abord.
-    const out = [...(jukeboxLine() ? [{ id: 'jukebox', label: t('Ajouter au Juke-box') }] : []), { id: 'home', label: open.request.search ? t('Retour à la recherche') : t('Retour à la fiche') }, { id: 'reload', label: t('Recharger la page') }];
+    const line = jukeboxLine();
+    const out = [...(line ? [{ id: 'jukebox', label: line.button }] : []), { id: 'home', label: open.request.search ? t('Retour à la recherche') : t('Retour à la fiche') }, { id: 'reload', label: t('Recharger la page') }];
     const video = open.request.search && open.video ? videoLine(open.video) : undefined;
     if (video?.direct) out.push({ id: 'video', label: t('Télécharger cette vidéo') });
     if (video?.grab) out.push({ id: 'grab-audio', label: t('Récupérer le son') }, { id: 'grab-video', label: t('Récupérer la vidéo') });
@@ -964,8 +974,7 @@ export function createAcquirer(events: AcquireEvents) {
       const v = open.view.webContents;
       if (action === 'back' && v.navigationHistory.canGoBack()) v.navigationHistory.goBack();
       else if (action === 'home') isGoogleSignIn(open.request.url) ? googleRefused() : void v.loadURL(open.request.url);
-      // Firefox par son chemin s'il est là (jamais le choix du navigateur par défaut de Windows), sinon le navigateur par défaut.
-      else if (action === 'browser') openInFirefox(v.getURL() || open.request.url) || void shell.openExternal(v.getURL() || open.request.url);
+      else if (action === 'browser') void shell.openExternal(v.getURL() || open.request.url);
       else if (action === 'close') close();
     });
     ipcMain.on('acquire:cancel', (e, id: unknown) => {
@@ -1015,7 +1024,8 @@ export function createAcquirer(events: AcquireEvents) {
     events.adBlocker?.refresh();
     if (open && !open.win.isDestroyed()) {
       const contents = open.view.webContents;
-      const resume = open.request.url === request.url && Boolean(contents.getURL()) && contents.getURL() !== 'about:blank';
+      // Jamais une reprise sur la page de connexion de Google : elle est refusée, et le bandeau propose la connexion dans Edge.
+      const resume = !isGoogleSignIn(request.url) && open.request.url === request.url && Boolean(contents.getURL()) && contents.getURL() !== 'about:blank';
       claimFor(contents.id, request.claim);
       open.request = request;
       if (!resume) open.video = undefined;
@@ -1037,7 +1047,7 @@ export function createAcquirer(events: AcquireEvents) {
       bringPointer(open.win.getBounds());
       return;
     }
-    const restore = kept?.url === request.url && kept.entries.length ? kept : undefined;
+    const restore = !isGoogleSignIn(request.url) && kept?.url === request.url && kept.entries.length ? kept : undefined;
     kept = undefined;
     const win = createWindow({
       title: t('Récupérer : {game}', { game: request.game }),
@@ -1109,7 +1119,7 @@ export function createAcquirer(events: AcquireEvents) {
     });
     // La page de connexion de Google, ouverte par un bouton « Se connecter » (YouTube) ou une
     // redirection : Google y refuse le navigateur intégré, et la saisie y faisait planter la borne.
-    // On reste sur la page, le bandeau dit pourquoi et renvoie vers Firefox.
+    // On reste sur la page, le bandeau dit pourquoi et propose « Se connecter à YouTube » (dans Edge).
     const refuseGoogle = (e: Electron.Event, url: string) => {
       if (!isGoogleSignIn(url)) return;
       e.preventDefault();
@@ -1124,6 +1134,10 @@ export function createAcquirer(events: AcquireEvents) {
       if (isGoogleSignIn(url)) googleRefused();
       else if (/^https?:/i.test(url)) void contents.loadURL(url);
       return { action: 'deny' };
+    });
+    // Une autre page ouverte : la proposition de la liaison par code (refus de Google) s'efface.
+    contents.on('did-navigate', () => {
+      if (open) open.googleRefused = false;
     });
     for (const event of ['did-navigate', 'did-navigate-in-page', 'did-stop-loading'] as const) contents.on(event as 'did-stop-loading', () => sendBar());
     // Recherche libre : chaque page chargée, ou changée sans rechargement (YouTube), est relue.
@@ -1247,8 +1261,11 @@ export function createAcquirer(events: AcquireEvents) {
       events.closed();
       // « Ajouter au Juke-box » : l'import s'ouvre après le retour au menu, sur le lien de la page.
       const link = jukeboxPending;
+      const account = accountPending;
       jukeboxPending = undefined;
+      accountPending = false;
       if (link) events.jukebox?.add(link);
+      else if (account) events.jukebox?.account?.();
     });
     // Tout un écran, au-dessus du menu, jamais le bureau : celui que donne le menu (choisi ou
     // automatique), sinon l'écran principal de Windows.
@@ -1306,6 +1323,7 @@ export function createAcquirer(events: AcquireEvents) {
   /** Page de connexion de Google demandée : refusée, le bandeau le dit (une fois noté au journal). */
   let googleNoted = false;
   function googleRefused(): void {
+    if (open) open.googleRefused = true;
     setStatus(googleRefusesText(), true);
     if (googleNoted) return;
     googleNoted = true;
@@ -1613,67 +1631,11 @@ export function createAcquirer(events: AcquireEvents) {
     await s.cookies.flushStore();
   }
 
-  /** Cookies de la session dont le domaine répond à `match` (compte YouTube : youtube.com et Google). */
-  async function cookiesWhere(match: (domain: string) => boolean): Promise<CookieRecord[]> {
-    return (await acquireSession().cookies.get({}))
-      .filter((c) => match(c.domain ?? ''))
-      .map((c) => ({ name: c.name, value: c.value, domain: c.domain ?? '', path: c.path ?? '/', secure: Boolean(c.secure), httpOnly: Boolean(c.httpOnly), hostOnly: Boolean(c.hostOnly), ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}) }));
-  }
-
-  /**
-   * Pose des cookies dans la session : renouvelés par YouTube pendant un appel de yt-dlp, ou repris
-   * d'un navigateur où l'utilisateur est connecté. Rend le nombre de cookies posés.
-   */
-  async function setCookies(cookies: readonly CookieRecord[]): Promise<number> {
-    const s = acquireSession();
-    let set = 0;
-    for (const c of cookies) {
-      const host = c.domain.replace(/^\./, '');
-      // __Host- : sans domaine, chemin « / », sécurisé (règle des navigateurs).
-      const hostOnly = c.hostOnly || c.name.startsWith('__Host-');
-      try {
-        await s.cookies.set({
-          url: `https://${host}${c.path || '/'}`,
-          name: c.name,
-          value: c.value,
-          ...(hostOnly ? {} : { domain: `.${host}` }),
-          path: c.name.startsWith('__Host-') ? '/' : c.path || '/',
-          secure: c.secure || c.name.startsWith('__Secure-') || c.name.startsWith('__Host-'),
-          httpOnly: Boolean(c.httpOnly),
-          // Le fichier Netscape ne dit pas SameSite : les cookies « tiers » de Google (__Secure-3P…)
-          // sont SameSite=None chez lui ; posés « lax » (défaut d'Electron), les pages de YouTube
-          // intégrées ailleurs ne les recevraient pas.
-          ...(/^__Secure-3P/.test(c.name) ? { sameSite: 'no_restriction' as const } : {}),
-          ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}),
-        });
-        set++;
-      } catch {
-        // Cookie refusé par Chromium (attributs incohérents) : les autres passent.
-      }
-    }
-    await s.cookies.flushStore();
-    return set;
-  }
-
-  /** Se déconnecter d'un compte qui tient sur plusieurs domaines (YouTube et Google) : leurs cookies effacés, rien d'autre. */
-  async function signOutWhere(match: (domain: string) => boolean): Promise<void> {
-    const s = acquireSession();
-    for (const c of await s.cookies.get({})) {
-      if (!match(c.domain ?? '')) continue;
-      const host = (c.domain ?? '').replace(/^\./, '');
-      await s.cookies.remove(`http${c.secure ? 's' : ''}://${host}${c.path ?? '/'}`, c.name);
-    }
-    await s.cookies.flushStore();
-  }
-
   return {
     show,
     close,
     siteCookies,
     signOut,
-    cookiesWhere,
-    setCookies,
-    signOutWhere,
     direct,
     readPage,
     fetchImage,

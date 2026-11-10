@@ -45,7 +45,7 @@ son interface).
 - Chaque morceau se lit en ligne, téléchargé sur la borne, ou depuis un fichier de votre disque (un dossier entier, sous-dossiers compris) ; « Tout télécharger » et « Libérer la place » font passer une playlist d'un mode à l'autre. Sans réseau ou sans place, ces fonctions restent visibles, grisées avec leur raison.
 - Le titre, l'artiste et l'album d'un morceau se corrigent dans « Morceaux et informations » ; votre correction l'emporte sur ce que dit YouTube.
 - Vision 3D : reculer ou s'approcher fait maintenant bouger la table dans le bon sens. Pendant l'installation du pilote de la Kinect, le pointeur de la souris est posé sur la fenêtre d'accord de Windows, et l'écran dit comment répondre au clavier (Alt+O).
-- Juke-box : connectez votre compte YouTube (Gestion du Juke-box > « Compte YouTube ») pour importer vos propres playlists, privées comprises, ainsi que « J’aime » et « À regarder plus tard ». La connexion se fait dans la fenêtre « Récupérer » et reste gardée ; si Google la refuse, Cyber Pinball peut reprendre celle d’un navigateur de ce PC (Firefox conseillé). Aucun mot de passe n’est vu ni gardé.
+- Juke-box : connectez votre compte YouTube (Gestion du Juke-box > « Compte YouTube » > « Se connecter à YouTube ») pour importer vos propres playlists, privées comprises, ainsi que « J’aime » et « À regarder plus tard ». Microsoft Edge s’ouvre sur l’écran choisi pour les navigateurs ; vous vous y connectez (au téléphone, le pavé tactile est sa souris et le clavier y tape), puis vous le fermez : la connexion reste gardée. Rien à créer chez Google, aucun mot de passe vu ni gardé par Cyber Pinball.
 - Juke-box : « Chercher sur YouTube » depuis l’import ouvre « Récupérer » sur des résultats qui ne montrent que des playlists ; « Ajouter au Juke-box » sur une playlist ou une vidéo ramène à l’import sur ce lien.
 - Juke-box : au clavier à l’écran, le lien commence déjà par l’adresse d’une playlist (ou d’une vidéo, par la touche « Vidéo ») : on ne tape que l’identifiant. Un identifiant seul (PL…, OLAK5uy_…) est accepté partout, au téléphone aussi, et un lien entier collé n’est jamais doublé.
 - Vision 3D, trois réglages dans son écran : « Calibrer la position de jeu » (deux secondes immobile en position de jeu), « Intensité » de 25 % à 150 % (75 % par défaut, aussi réglable en partie avec les MagnaSave, contre le mal de mer), et « Réactivité » douce, normale ou vive : la table suit la tête avec nettement moins de retard.
@@ -57,9 +57,7 @@ son interface).
 - Téléchargements : chaque liste va du plus récent au plus ancien, en cours comme terminés.
 - Taper depuis le téléphone dans la page de connexion de Google ne fait plus planter Cyber Pinball : le texte part comme au clavier. Une page qui plante quand même est rechargée.
 - Toujours une sortie : Exit ferme « Récupérer » même quand Windows a pris le premier plan, et Exit tenu deux secondes le ferme de force. Une fenêtre du menu qui plante est rechargée au lieu de rester noire ; une fenêtre de Windows (gestionnaire des tâches, dialogue) passe devant.
-- Connexion à Google dans « Récupérer » : les clés d'accès (Windows Hello, téléphone à proximité, clé de sécurité) ne sont plus proposées ; Google passe au mot de passe.
 - Le navigateur intégré refuse ce qu'une borne ne sait pas servir (appareil photo, micro, position, notifications, périphériques) au lieu de l'accorder.
-- Compte YouTube : « Utiliser la connexion de Firefox » remplace le choix d'un navigateur (Chrome, Edge et Brave protègent leurs cookies). Firefox absent ou pas connecté à YouTube : l'écran le dit, avec la marche à suivre.
 - Sur une vidéo YouTube, « Récupérer » propose d'abord « Ajouter au Juke-box », et ne prétend plus que yt-dlp manque.
 - Les incidents rattrapés et les plantages sont notés dans logs\erreurs.txt ; en borne dédiée, Cyber Pinball figé est relancé tout seul.
 - Dans le casque, « Réinitialiser la vue » de Link ne déplace plus la borne : elle reste au même endroit de la pièce, au menu comme en partie, sans recaler.
@@ -77,10 +75,12 @@ son interface).
 - Juke-box : chaque bouton y fait ce qu’il fait sur la roue, quels que soient les boutons relevés à l’étape « Boutons » ; les MagnaSave passent à la playlist voisine dans une playlist ouverte, et ne sont proposés que s’ils sont relevés.
 - Juke-box : la page tient dans l’écran à toutes les tailles de playfield, de 720 × 1280 à la 4K, quelle que soit la mise à l’échelle de Windows.
 - Taper au téléphone ne fait plus planter Cyber Pinball : la cause était un raccourci clavier (Ctrl+A) d'un menu caché, hérité d'Electron, qui faisait tomber l'application ; ce menu est retiré, la copie, le collage et la sélection marchent comme avant.
-- « Récupérer » n'ouvre plus la page de connexion de Google, qui refuse le navigateur intégré : la fenêtre explique pourquoi et propose de passer par Firefox.
-- Compte YouTube : « Installer Firefox » quand il manque. L'installateur officiel est téléchargé chez Mozilla, sa signature vérifiée, puis Firefox installé sans fenêtre ; la suite est dite à l'écran.
+- « Récupérer » n'ouvre plus la page de connexion de Google, qui refuse le navigateur intégré : la fenêtre explique pourquoi et propose « Se connecter à YouTube » (dans Edge).
 - Juke-box, modes de lecture : dans une playlist, sous « Gestion du Juke-box », « Tout lire » (dans l’ordre), « Lecture aléatoire » (chaque morceau une fois avant d’en rejouer un) et « Répétition : playlist / morceau / aucune », que Start fait tourner. Le mode est retenu par chaque playlist et se voit sur la carte du morceau en cours (⤮, ⟳) ; au bureau, ses boutons ⤮ et ⟳.
 - Juke-box : Start maintenu sur une playlist la lance directement en lecture aléatoire ; ailleurs, il ouvre toujours la gestion.
+- Juke-box : un flipper tenu avance ou recule dans le morceau, par pas de 5 s, puis 10 s, puis 30 s ; un appui court change toujours de morceau. Au bureau, les flèches tenues font de même, et un clic dans la barre de progression va à cet endroit.
+- Juke-box : Start sur la playlist qui joue l’ouvre sur le morceau en cours ; Start encore le met en pause, comme la carte le rappelle.
+- « Récupérer » rouvert sur la page de connexion de Google ne reprend plus la page précédente : il dit que Google la refuse et propose « Se connecter à YouTube ».
 - Avant chaque demande d'autorisation de Windows (borne dédiée, pare-feu, pilote de la Kinect), un écran prévient qu'il faudra répondre au clavier ou à la souris (Alt+O pour Oui, Échap pour Non) : les boutons de la borne n'y peuvent rien. « Plus tard, au bureau » est choisi d'office, et Cyber Pinball n'attend plus la réponse au-delà de 3 minutes.
 - Compte YouTube : « Installer Firefox » l'installe pour ce compte seul, sans demande d'autorisation de Windows.
 - « Ouvrir dans mon navigateur » ouvre Firefox directement quand il est installé, sans faire choisir le navigateur par défaut de Windows.
@@ -89,6 +89,7 @@ son interface).
 - À chaque démarrage dans le casque, le calage est proposé : A pour caler, B pour passer et garder le précédent. Chaque calage validé s'applique aussitôt ; on recommence autant de fois qu'on veut, puis B termine en gardant le dernier.
 - Calage dans le casque plus simple : une seule consigne courte, écrite en très gros au milieu du regard, et un appui par étape. La hauteur est prise dès le premier calage, même si le sol du Quest est mal réglé. Les ombres autour des écrans du menu sont retirées.
 - Dans le casque, une partie a toujours un bouton pour quitter (Y par défaut), rappelé en gros pendant le chargement ; l'assistant des manettes l'impose.
+- Dans le casque, VPX reçoit un profil graphique adapté à la carte de la machine (seulement pour les réglages laissés vides), et chaque partie note au journal la fluidité mesurée par Link. Le manuel explique les réglages de Link (définition, débit, ASW) selon la machine.
 
 ## 0.1.8
 

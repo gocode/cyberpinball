@@ -67,6 +67,11 @@ import {
   vpxPlaceProblem,
   vpxRecenteredHead,
   vpxRoomChanges,
+  vrGraphicsProfile,
+  vrProfileSettings,
+  linkStatsBetween,
+  linkStatsSummary,
+  type VrGpu,
   gameHeadSummary,
   roomMismatchProblem,
   menuPlayfield,
@@ -1000,6 +1005,7 @@ const library = createLibrary({
   // Exit de la gestion du Juke-box : le lecteur, sur la playlist choisie.
   jukeboxPlayer: (playlist) => openJukebox(playlist),
   browserScreen: () => browserScreenRect(),
+  takeForeground: () => void takeForeground(),
   audioOutput: () => audioOutput,
   phoneRemote,
   phoneUpload: () => phoneUpload,
@@ -2554,6 +2560,67 @@ function headsetLost(inGame: boolean): void {
 
 /** Tête du joueur déjà notée pour la partie dans le casque en cours. */
 let headLogged = false;
+/** Profil graphique appliqué à la partie dans le casque en cours (vr-profil.ts), dit au relevé de Link. */
+let vrProfileApplied: string | undefined;
+/** Début de la partie dans le casque en cours (VPX a le casque), pour le relevé de Link. */
+let vrGameStart: number | undefined;
+
+/** La carte du casque : dite par le compagnon, sinon gardée de la dernière fois (carte.json). */
+function headsetGpu(): VrGpu | undefined {
+  if (headset?.gpu) return headset.gpu;
+  try {
+    const raw = JSON.parse(readTextIfExists(path.join(loc.dataDir, 'vr', 'carte.json'))) as Partial<VrGpu>;
+    return typeof raw.vramMb === 'number' ? { vramMb: raw.vramMb, laptop: Boolean(raw.laptop), name: String(raw.name ?? '') } : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Le profil graphique de la machine dans l'INI de la VR : seulement les clés vides (un réglage du joueur
+ * l'emporte). Rend le profil et sa raison, pour le journal.
+ */
+function applyVrProfile(ini: string, details: string[]): string {
+  const gpu = headsetGpu();
+  const { id, why } = vrGraphicsProfile(gpu);
+  const doc = IniDocument.parse(readTextIfExists(ini));
+  const missing = vrProfileSettings(id).filter((s) => !doc.get(s.section, s.key)?.trim());
+  if (missing.length) writeIniSettings(ini, missing);
+  const applied = `${id} (${why}${gpu?.name ? `, ${gpu.name}` : ''})`;
+  details.push(`profil VR ${applied} : ${missing.length ? missing.map((s) => `${s.key} ${s.value}`).join(', ') : 'rien à écrire, réglages déjà choisis'}`); // i18n-ignore : journal
+  return applied;
+}
+
+/**
+ * Après une partie dans le casque : les statistiques de Link minute par minute (journal de performance
+ * d'Oculus), et le bilan, avec le profil appliqué ; de quoi comparer un profil à un autre.
+ */
+function noteLinkStats(from: number, to: number): void {
+  const dir = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Oculus') : undefined;
+  let text = '';
+  try {
+    const logs = dir && fs.existsSync(dir) ? fs.readdirSync(dir).filter((f) => /^PerfLog_.*\.json$/.test(f)).map((f) => path.join(dir, f)) : [];
+    const latest = logs.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs)[0];
+    if (latest) {
+      // Les dernières minutes sont à la fin : 4 Mo suffisent.
+      const size = fs.statSync(latest).size;
+      const length = Math.min(size, 4 * 1024 * 1024);
+      const fd = fs.openSync(latest, 'r');
+      const buffer = Buffer.alloc(length);
+      fs.readSync(fd, buffer, 0, length, size - length);
+      fs.closeSync(fd);
+      text = buffer.toString('latin1');
+    }
+  } catch {
+    // Journal d'Oculus illisible : rien à relever.
+  }
+  const rows = linkStatsBetween(text, from / 1000, to / 1000);
+  const time = (s: number) => new Date(s * 1000).toISOString().slice(11, 19);
+  for (const r of rows) console.log(`Link pendant la partie (${time(r.at)}) : ${r.presented} images présentées, ${r.lost} perdues, ${r.stale} réaffichées plus de 5 fois, ${r.appFrames} images de l’application${r.encode ? `, encodage ${r.encode}` : ''}.`); // i18n-ignore : journal
+  const sum = linkStatsSummary(rows);
+  console.log(sum ? `Link, bilan de la partie (profil VR ${vrProfileApplied ?? 'inconnu'}) : ${sum.minutes} minute(s), par minute ${sum.presented} images présentées, ${sum.lost} perdues, ${sum.stale} réaffichées plus de 5 fois (pire minute : ${sum.worstStale}).` : `Link, bilan de la partie (profil VR ${vrProfileApplied ?? 'inconnu'}) : aucune statistique de Link pour cette partie (journal de performance d’Oculus absent ou partie de moins d’une minute).`); // i18n-ignore : journal
+}
+
 /**
  * Pendant le chargement d'une partie dans le casque (avant que VPX le prenne) : le bouton qui quitte la
  * partie, en gros sur le fronton (essai du 10 novembre 2026 : impossible de ressortir).
@@ -2843,6 +2910,8 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
       const far = vpxPlaceProblem(settings);
       if (far) details.push(`attention : ${far}`); // i18n-ignore : journal
     }
+    // Profil graphique selon la carte du casque (vr-profil.ts), dans les clés vides seulement.
+    vrProfileApplied = applyVrProfile(vr.ini, details);
     // Manettes : la même règle qu'au menu (manettes.ts), et plus d'alignement de la table sur les manettes.
     const input = vpxHeadsetInput(readTextIfExists(vr.ini), controllerSetting());
     if (input.length) {
@@ -3541,7 +3610,7 @@ function resolveManualEdits(keep: boolean): void {
  * grand autre écran du menu (browserScreenFor). Sans écran de la borne (configuration à
  * choisir), les fenêtres du menu, chacune sur tout son écran.
  */
-function browserScreenRect(): { bounds: Rectangle; notice?: string } | undefined {
+function browserScreenRect(): { bounds: Rectangle; notice?: string; label?: string } | undefined {
   const fallback = () => [...windows].filter(([, w]) => !w.isDestroyed()).map(([role, w]) => ({ role, bounds: w.getBounds() }));
   return browserScreenFor(menuAssignments, rotation, loadCabinet(loc.dataDir)?.browserScreen, fallback);
 }
@@ -4221,6 +4290,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   const onVr = () => {
     playedVr = true;
     vrGameStop = () => game.stop();
+    vrGameStart = Date.now();
     headLogged = false;
     gameHeads = [];
     if (vrCenter) stopCentering = centerWhenStarted({ logFile: vpxLog, fromOffset: vpxLogOffset, pid: () => game.pid, key: vrCenter, log: (line) => console.log(line) });
@@ -4297,6 +4367,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   vrGameStop = undefined;
   if (playedVr && vrGame) checkVrPlaceAfterGame(vrGame.ini, played.file);
   if (playedVr && vrGame) checkVrRoomAfterGame(vpxLog, vrLogFrom);
+  if (playedVr && vrGame && vrGameStart) noteLinkStats(vrGameStart, Date.now());
   headsetExitHint = undefined;
   if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
   headTracker.stop();

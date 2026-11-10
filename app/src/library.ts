@@ -12,7 +12,7 @@ import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, clipboard, dialog, net, type BrowserWindow, type Input, type Rectangle } from 'electron';
+import { app, BrowserWindow, clipboard, dialog, net, screen as electronScreen, type Input, type Rectangle } from 'electron';
 import {
   isFavorite,
   CONFIG_KEY,
@@ -210,6 +210,8 @@ import { LayoutReport } from './layout-check';
 import { createJukeboxLibrary } from './jukebox-library';
 import { createJukeboxMenu } from './jukebox-menu';
 import { createYoutubeAccount } from './youtube-account';
+import type { EdgeSession } from './edge-login';
+import { watchJoystickButtons } from './joystick-input';
 import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
 import type { RecordingOutcome } from './game-recording';
@@ -230,7 +232,7 @@ import { createDownloadsScreen } from './downloads-screen';
 import { createDownloadCenter, type DownloadNextStep } from './download-center';
 import { httpTransport } from './download-sources';
 import { createHealth, type HealthView } from './health';
-import { isShown, refuseOffscreen } from './offscreen';
+import { isShown, primaryRect, refuseOffscreen } from './offscreen';
 
 const MANUFACTURERS = [
   'Williams', 'Bally', 'Gottlieb', 'Stern', 'Data East', 'Sega', 'Midway', 'Capcom', 'Atari', 'Zaccaria',
@@ -326,7 +328,9 @@ export interface LibraryHost {
    * Écran du navigateur intégré (fenêtre « Récupérer »), en coordonnées Electron, et ce que
    * son bandeau en dit (écran choisi pas branché, playfield tourné).
    */
-  browserScreen?(): { bounds: Rectangle; notice?: string } | undefined;
+  browserScreen?(): { bounds: Rectangle; notice?: string; label?: string } | undefined;
+  /** Le playfield reprend le premier plan (après une fenêtre d'un autre programme, comme Edge) : les boutons de la borne lui reviennent. */
+  takeForeground?(): void;
   /** Nom Windows de la sortie audio du menu (menuAudioOutput), pour le son des pages de « Récupérer ». */
   audioOutput?(): string | undefined;
   /** Télécommande du téléphone (phone-remote.ts) ; absente : pas de QR code, ni écran de la télécommande. */
@@ -1262,15 +1266,77 @@ export function createLibrary(host: LibraryHost) {
     pick: (request) => pickPaths(request),
     downloads,
     // Créé plus bas : lu au moment du clic.
-    jukebox: () => ({ accepts: (url) => jukebox.linkKind(url), add: (url) => jukeboxMenu.importLink(url), account: (back) => jukeboxMenu.openAccount(back) }),
-    // Connexion faite (ou abandonnée) dans « Récupérer » : l'état du compte YouTube est relu.
-    acquireClosed: () => void youtubeAccount.refresh(),
+    jukebox: () => ({ accepts: (url) => jukebox.linkKind(url), add: (url) => jukeboxMenu.importLink(url), account: (back) => jukeboxMenu.openAccount(back ?? (() => jukeboxMenu.open())), accountState: () => youtubeAccount.state() }),
   });
   if (layout()) catalogUi.start();
   // Les pages des sites reprennent par le navigateur intégré, dans la même session de cookies.
   downloads.setTransport('site', catalogUi.acquirer.siteTransport);
-  // Compte YouTube du Juke-box : connecté dans la session de « Récupérer », cookies passés à yt-dlp par un fichier effacé après chaque appel.
-  const youtubeAccount = createYoutubeAccount({ acquirer: catalogUi.acquirer, ytdlp: catalogUi.ytdlp, firefox: catalogUi.firefox, node: process.execPath, changed: () => host.broadcast() });
+  // Compte YouTube du Juke-box : connecté dans un vrai Edge (profil du Juke-box), sur l'écran choisi
+  // pour les navigateurs ; ses cookies passent à yt-dlp par un fichier effacé après chaque appel.
+  // Essais (bac à sable seulement) : CYBERPINBALL_EDGE_FAUX remplace Edge par un script de démonstration lancé par node.
+  const fakeEdge = process.env.CYBERPINBALL_HOME ? process.env.CYBERPINBALL_EDGE_FAUX?.trim() : undefined;
+  const youtubeAccount = createYoutubeAccount({
+    dataDir: () => host.dataDir,
+    ytdlp: catalogUi.ytdlp,
+    node: process.execPath,
+    ...(fakeEdge ? { edge: { edgeExe: () => 'node', argsPrefix: [fakeEdge] } } : {}),
+    show: (request) => catalogUi.acquirer.show(request),
+    changed: () => host.broadcast(),
+    log: (line) => console.log(line),
+  });
+  /**
+   * Connexion au compte YouTube dans Edge, sur l'écran choisi pour les navigateurs (configuration de
+   * la borne, « Écran du navigateur intégré » ; automatique : jamais un playfield tourné). Pendant
+   * qu'Edge est ouvert, le téléphone en est la souris et le clavier, les boutons de la borne y vont
+   * aussi : flippers Maj+Tab et Tab, Start Entrée, Exit le ferme.
+   */
+  function youtubeSignIn(): { ok: true; session: EdgeSession; screen?: string; notice?: string } | { ok: false; reason: string } {
+    const where = host.browserScreen?.();
+    const dip = where?.bounds ?? primaryRect();
+    // Pixels physiques du bureau : Edge et SetWindowPos les comptent ainsi, quelle que soit l'échelle de chaque écran.
+    const at = electronScreen.dipToScreenRect(null, dip);
+    const r = youtubeAccount.signIn(at);
+    if (!r.ok) return r;
+    const session = r.session;
+    const remote = host.phoneRemote;
+    const external = {
+      page: () => ({ title: t('Connexion à YouTube'), host: 'Microsoft Edge' }),
+      rect: () => session.rect(),
+      pointer: (x: number, y: number) => session.pointer(x, y),
+      click: (button: 'left' | 'right', count: number) => session.click(button, count),
+      scroll: (dx: number, dy: number) => session.wheel(dx, dy),
+      text: (del: number, ins: string) => {
+        for (let i = 0; i < del; i++) session.key('Backspace');
+        if (ins) session.type(ins);
+      },
+      set: (value: string) => session.set(value),
+      key: (key: Parameters<EdgeSession['key']>[0], shift: boolean) => session.key(key, { shift }),
+      nav: (action: string) => {
+        if (action === 'close') session.finish();
+        else if (action === 'back') session.key('ArrowLeft', { alt: true });
+        else if (action === 'reload') session.front();
+      },
+      actions: () => [{ id: 'done', label: t('J’ai fini : fermer Edge') }],
+      act: (id: string) => id === 'done' && session.finish(),
+    };
+    remote?.attachExternal(external);
+    // Boutons de la borne, lus quel que soit le premier plan ; seulement quand Edge a la main (aucune fenêtre de Cyber Pinball active).
+    const stop = watchJoystickButtons((code, down) => {
+      if (!down || BrowserWindow.getFocusedWindow()) return;
+      const keys = host.keys();
+      if (keys.exit.includes(code)) session.finish();
+      else if (keys.confirm.includes(code)) session.key('Enter');
+      else if (keys.next.includes(code)) session.key('Tab');
+      else if (keys.previous.includes(code)) session.key('Tab', { shift: true });
+    });
+    void session.done.finally(() => {
+      stop();
+      remote?.detachExternal(external);
+      // Edge fermé, Windows ne rend pas toujours la main à Cyber Pinball : sans focus, plus aucun bouton de la borne.
+      host.takeForeground?.();
+    });
+    return { ok: true, session, ...(where?.label ? { screen: where.label } : {}), ...(where?.notice ? { notice: where.notice } : {}) };
+  }
   // Juke-box (socle, sans écran) : ses morceaux arrivent par la file, sans notification à chaque playlist.
   const jukebox = createJukeboxLibrary({
     root: () => host.root,
@@ -1312,6 +1378,7 @@ export function createLibrary(host: LibraryHost) {
     task: (message, work) => task(message, work),
     phone: () => host.phoneRemote?.connected() === 'menu',
     account: youtubeAccount,
+    signIn: () => youtubeSignIn(),
   });
   provideSystemItem('jukebox', jukeboxMenu.item);
   downloads.setTransport('youtube', jukebox.transport);

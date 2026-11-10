@@ -2,7 +2,7 @@
 // et ne la lancer qu'après confirmation. La demande s'affiche sur le bureau sécurisé de Windows, où
 // aucune application ne peut répondre à la place de l'utilisateur : les boutons de la borne n'y
 // peuvent rien, il faut un clavier (Alt+O pour Oui, Échap pour Non) ou une souris (PinCab,
-// 10/11/2026 : « Installer Firefox » bloquait sur cette demande). L'écran le dit, propose de le faire
+// 10/11/2026 : une installation y restait bloquée). L'écran le dit, propose de le faire
 // plus tard au bureau, et « Plus tard » est choisi d'office : rien ne part par mégarde.
 // Toute élévation de l'application passe par ici (garde-fou : packages/core/src/test/sorties.test.ts).
 

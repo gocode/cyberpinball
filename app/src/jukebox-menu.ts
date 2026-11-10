@@ -14,9 +14,9 @@
 //   annoncé avant l'ajout, les formats acceptés, les refusés avec leur raison. Au bureau par
 //   l'explorateur de Windows, en borne par le sélecteur de Cyber Pinball.
 // - La correction des informations d'un morceau (titre, artiste, album) : elle l'emporte sur YouTube.
-// - Le compte YouTube (youtube-account.ts) : connexion dans « Récupérer » (ou reprise d'un navigateur
-//   où l'on est déjà connecté), état, déconnexion, et ses playlists (privées, J'aime, À regarder
-//   plus tard comprises).
+// - Le compte YouTube (youtube-account.ts) : la connexion dans Microsoft Edge (sur l'écran des
+//   navigateurs, au téléphone ou aux boutons de la borne), son état, la déconnexion, et ses playlists
+//   lues par yt-dlp avec la connexion gardée (privées, « J'aime » et « À regarder plus tard » comprises).
 // Toute fonction indisponible (hors ligne, yt-dlp absent, disque plein) reste visible, grisée avec
 // sa raison. Le cœur : packages/core/src/jukebox-manage.ts ; le service : jukebox-library.ts.
 // Maquettes de la gestion et de l'import validées le 09/11/2026.
@@ -37,8 +37,6 @@ import {
   formatTrackTime,
   importActionLabel,
   importBlocker,
-  COOKIE_BROWSERS,
-  formatDay,
   JUKEBOX_LINK_PREFIXES,
   isVideoAnalysis,
   JUKEBOX_AUDIO_EXTENSIONS,
@@ -74,15 +72,14 @@ import {
   type PlaylistEntry,
   type TrackInfo,
   type AccountPlaylist,
-  type CookieBrowser,
 } from '@cyberpinball/core';
 import type { Input } from 'electron';
 import type { PickRequest } from './file-picker';
 import type { JukeboxLibrary, TrackView } from './jukebox-library';
+import type { EdgeSession } from './edge-login';
 import type { Action, Built, PromptOptions, Row, Section, Tone } from './library';
 import type { YoutubeAccount } from './youtube-account';
 import { allowPreview } from './media-protocol';
-import type { FirefoxProgress } from './firefox-install';
 
 export interface JukeboxMenuHost {
   jukebox: JukeboxLibrary;
@@ -112,8 +109,13 @@ export interface JukeboxMenuHost {
   task(message: string, work: () => Promise<void> | void): Promise<void>;
   /** Un téléphone pilote le menu : l'écran d'import le dit. */
   phone?(): boolean;
-  /** Compte YouTube (connexion dans « Récupérer », cookies pour yt-dlp) ; absent : pas proposé. */
+  /** Compte YouTube (connexion dans Edge, cookies passés à yt-dlp) ; absent : pas proposé. */
   account?: YoutubeAccount;
+  /**
+   * Ouvre Edge pour la connexion sur l'écran choisi pour les navigateurs, téléphone et boutons de la
+   * borne branchés dessus (library.ts) ; `screen` : le nom de cet écran.
+   */
+  signIn?(): { ok: true; session: EdgeSession; screen?: string; notice?: string } | { ok: false; reason: string };
 }
 
 type Flash = { text: string; tone: Tone };
@@ -228,8 +230,8 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     if (origin) from = origin;
     if (focus) chosen = focus;
     jb.manageOpened(!host.landscape());
-    // L'état du compte YouTube, relu dans la session (connexion faite entre-temps dans « Récupérer »).
-    void host.account?.refresh();
+    // L'état du compte YouTube, relu sur le disque (identifiant déposé entre-temps).
+    host.account?.refresh();
     show(manageScreen);
   }
 
@@ -824,7 +826,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       const linkAt = add({ label: t('Taper ou coller un lien'), key: 'link', icon: 'link', run: () => askLink('', undefined, prefer) });
       rows.push({ text: t('Taper ou coller un lien'), detail: t('Au clavier, on ne tape que l’identifiant de la playlist ; au téléphone, collez le lien entier'), icon: 'link', action: linkAt, pick: true });
       if (account) {
-        const mineReason = connected ? undefined : t('Compte YouTube pas connecté');
+        const mineReason = connected ? undefined : t('Compte YouTube pas connecté : « Compte YouTube », puis « Se connecter à YouTube »');
         const mineAt = add({ label: t('Mes playlists YouTube'), key: 'mine', icon: 'list', run: () => (mineReason ? undefined : openMine(prefer)), ...(mineReason ? quiet(mineReason) : {}) });
         rows.push({ text: t('Mes playlists YouTube'), detail: mineReason ?? t('Privées, « J’aime » et « À regarder plus tard » comprises'), icon: 'list', action: mineAt, pick: true, ...(mineReason ? { tone: 'quiet' as const } : {}) });
         const searchAt = add({ label: t('Chercher sur YouTube'), key: 'search', icon: 'search', run: () => askSearch(prefer) });
@@ -847,7 +849,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         back,
       };
     };
-    void host.account?.refresh();
+    host.account?.refresh();
     display(build, 0);
   }
 
@@ -891,15 +893,19 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
 
   // ---------- Compte YouTube ----------
 
-  /** L'état du compte en une ligne : connecté (avec son nom), ou pas. */
-  function accountText(withName = true): string {
-    const state = host.account?.state();
-    if (!state?.connected) return t('Pas connecté : vos playlists privées, « J’aime » et « À regarder plus tard » restent inaccessibles');
-    const who = state.name && withName ? t('Connecté : {name}', { name: state.name }) : t('Connecté');
-    return state.remembered && state.expires ? t('{who} · connexion gardée jusqu’au {date}', { who, date: formatDay(state.expires.getTime()) }) : who;
+  /** L'état du compte en une ligne : connecté, ou pas (et pourquoi). */
+  function accountText(): string {
+    const account = host.account;
+    const state = account?.state();
+    if (state?.signingIn) return t('Connexion en cours dans Microsoft Edge');
+    if (state?.checking) return t('Vérification de la connexion…');
+    if (state?.connected) return t('Connecté : vos playlists privées, « J’aime » et « À regarder plus tard » sont accessibles');
+    const missing = account?.edgeMissing();
+    if (missing) return missing;
+    return t('Pas connecté : vos playlists privées, « J’aime » et « À regarder plus tard » restent inaccessibles');
   }
 
-  /** Le compte YouTube : son état, se connecter (dans « Récupérer », ou depuis un navigateur), ses playlists, se déconnecter. */
+  /** Le compte YouTube : son état, la connexion dans Edge, ses playlists, la déconnexion. */
   function openAccount(backTo: () => void): void {
     const account = host.account;
     if (!account) return backTo();
@@ -909,26 +915,28 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       const actions: Action[] = [];
       const add = (a: Action) => actions.push(a) - 1;
       const sections: Section[] = [];
-      if (flash) sections.push({ kind: 'jb-flash', rows: [{ text: flash.text, tone: flash.tone, icon: flash.tone === 'ok' ? 'check' : 'info' }] });
-      // « Pas connecté » ne s'affiche jamais sans raison : après un import de Firefox raté, il dit pourquoi.
-      const problem = account.problem();
-      sections.push({ kind: 'jb-summary', rows: [{ text: state.connected ? (state.name ?? t('Compte YouTube connecté')) : t('Pas connecté'), detail: problem ? t('Dernier essai avec Firefox : {reason}', { reason: problem }) : accountText(false), icon: 'account', tone: state.connected ? 'ok' : problem ? 'warning' : 'quiet' }] });
+      if (flash) sections.push({ kind: 'jb-flash', rows: [{ text: flash.text, tone: flash.tone, icon: flash.tone === 'ok' ? 'check' : flash.tone === 'warning' ? 'alert' : 'info' }] });
+      // « Pas connecté » ne s'affiche jamais sans raison quand une connexion vient d'échouer.
+      else if (!state.connected && state.problem) sections.push({ kind: 'jb-flash', rows: [{ text: t('Pas de connexion à YouTube'), detail: state.problem, tone: 'warning', icon: 'alert' }] });
+      sections.push({ kind: 'jb-summary', rows: [{ text: state.connected ? t('Compte YouTube connecté') : t('Pas connecté'), detail: accountText(), icon: 'account', tone: state.connected ? 'ok' : 'quiet' }] });
+      const missing = account.edgeMissing();
+      const signIn = (label: string, detail: string, tone?: Tone) =>
+        add({ label, icon: 'account', key: 'signin', run: () => (missing ? undefined : openSignIn(toAccount)), ...(missing ? quiet(missing) : { detail, ...(tone ? { tone } : {}) }) });
       if (state.connected) {
-        add({ label: t('Mes playlists YouTube'), icon: 'list', key: 'mine', run: () => openMine() });
+        add({ label: t('Mes playlists YouTube'), icon: 'list', key: 'mine', run: () => openMine(undefined, toAccount) });
         add({ label: t('Chercher sur YouTube'), icon: 'search', key: 'search', run: () => askSearch() });
-        add({ label: t('Se déconnecter'), icon: 'unlock', key: 'sign-out', detail: t('Efface la connexion à YouTube et à Google gardée par Cyber Pinball'), run: () => void signOut() });
+        signIn(t('Se reconnecter'), t('Rouvre Microsoft Edge, si YouTube ne reconnaît plus la connexion ou pour changer de compte'));
+        add({ label: t('Se déconnecter'), icon: 'unlock', key: 'signout', detail: t('Efface la connexion gardée par Cyber Pinball (le profil d’Edge du Juke-box)'), run: () => void signOut() });
       } else {
-        // Google refuse la connexion dans le navigateur intégré (et sa page y faisait planter la borne) :
-        // l'écran le dit, et propose la voie qui marche.
-        sections.push({ kind: 'jb-flash', rows: [{ text: t('Google refuse la connexion dans le navigateur intégré d’une borne'), detail: t('Connectez-vous à YouTube dans Firefox sur ce PC, puis reprenez ici sa connexion. Une liaison par code est prévue.'), tone: 'info', icon: 'info' }] });
-        add({ label: t('Utiliser la connexion de Firefox'), icon: 'import', key: 'browser', tone: 'ok', detail: t('Firefox, sur ce PC, connecté à YouTube ; s’il n’est pas installé, Cyber Pinball l’installe'), run: () => openBrowsers(toAccount) });
+        signIn(t('Se connecter à YouTube'), t('Microsoft Edge s’ouvre sur l’écran des navigateurs : connectez-vous, puis fermez-le'), 'ok');
+        add({ label: t('Chercher sur YouTube'), icon: 'search', key: 'search', run: () => askSearch() });
       }
       add({ label: t('Retour'), icon: 'back', key: 'back', run: backTo });
       return {
         heading: t('Compte YouTube'),
         icon: 'account',
         subheading: t('Vos playlists, privées comprises'),
-        lead: t('Cyber Pinball ne voit ni ne garde votre mot de passe : la connexion reste dans le navigateur intégré, comme pour les sites des tables.'),
+        lead: t('La connexion se fait dans Microsoft Edge, comme sur n’importe quel PC : Cyber Pinball ne voit jamais votre mot de passe et ne garde que la connexion.'),
         variant: 'jukebox jukebox-account',
         app: app(t('Compte YouTube')),
         sections,
@@ -943,119 +951,81 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
 
   async function signOut(): Promise<void> {
     await host.account?.signOut();
-    flash = { text: t('Compte YouTube déconnecté : ses cookies sont effacés de Cyber Pinball.'), tone: 'ok' };
+    flash = { text: t('Déconnecté : la connexion gardée par Cyber Pinball est effacée.'), tone: 'ok' };
     host.redraw();
   }
 
   /**
-   * Repli : reprendre la connexion à YouTube de Firefox (yt-dlp --cookies-from-browser). Firefox seul :
-   * Chrome, Edge et Brave chiffrent ou verrouillent leurs cookies, les proposer ne servait à rien.
+   * Connexion dans Edge : Edge s'ouvre sur l'écran des navigateurs ; cet écran dit quoi faire et
+   * attend qu'il se ferme (« J'ai fini », Exit, ou la croix d'Edge), puis revient au compte.
    */
-  function openBrowsers(backTo: () => void): void {
-    let busy: CookieBrowser | undefined;
-    let problem: string | undefined = host.account?.problem();
-    let done: string | undefined;
-    /** Installation de Firefox : demandée (à confirmer), en cours (progression, arrêt). */
-    let confirm = false;
-    let installing: { progress: FirefoxProgress; stop: AbortController } | undefined;
-    const run = async (browser: CookieBrowser) => {
-      if (busy || installing || !host.account) return;
-      busy = browser;
-      problem = undefined;
-      done = undefined;
-      host.redraw();
-      const r = await host.account.fromBrowser(browser);
-      busy = undefined;
-      if (!host.showing(build)) return;
-      if (r.ok) {
-        backTo();
-        flash = { text: r.state.name ? t('Connecté à YouTube : {name}.', { name: r.state.name }) : t('Connecté à YouTube.'), tone: 'ok' };
-        host.redraw();
-        return;
-      }
-      problem = r.reason;
+  function openSignIn(backTo: () => void): void {
+    const opened = host.signIn?.();
+    if (!opened) return backTo();
+    if (!opened.ok) {
+      flash = { text: opened.reason, tone: 'warning' };
+      return backTo();
+    }
+    const { session } = opened;
+    let closing = false;
+    const finish = () => {
+      closing = true;
+      session.finish();
       host.redraw();
     };
-    const install = async () => {
-      if (installing || !host.account) return;
-      confirm = false;
-      problem = undefined;
-      installing = { progress: { phase: 'download', received: 0 }, stop: new AbortController() };
-      host.redraw();
-      const r = await host.account.installFirefox((p) => {
-        if (installing) installing.progress = p;
-        host.redraw();
-      }, installing.stop.signal);
-      installing = undefined;
-      if (r.ok) done = t('Firefox est installé. Ouvrez Firefox, connectez-vous à YouTube, fermez Firefox, puis « Firefox » ici.');
-      else if (!r.cancelled) problem = r.reason;
-      host.redraw();
-    };
-    const installText = (p: FirefoxProgress): string =>
-      p.phase === 'verify'
-        ? t('Vérification de la signature de Mozilla…')
-        : p.phase === 'install'
-          ? t('Installation de Firefox pour ce compte…')
-          : p.total
-            ? t('Téléchargement depuis Mozilla : {percent} %', { percent: Math.floor(((p.received ?? 0) * 100) / p.total) })
-            : t('Téléchargement depuis Mozilla…');
     const build = (): Built => {
       const actions: Action[] = [];
       const sections: Section[] = [];
-      const status = host.account?.firefoxStatus() ?? 'missing';
-      if (problem) sections.push({ kind: 'jb-flash', rows: [{ text: t('Connexion pas reprise'), detail: problem, tone: 'warning', icon: 'alert' }] });
-      if (done) sections.push({ kind: 'jb-flash', rows: [{ text: done, tone: 'ok', icon: 'check' }] });
-      let rows: Row[];
-      if (installing) {
-        const p = installing.progress;
-        const at = actions.push({ label: t('Arrêter l’installation'), icon: 'close', key: 'stop', run: () => installing?.stop.abort() }) - 1;
-        rows = [{ text: t('Installation de Firefox'), detail: installText(p), icon: 'download', action: at, pick: true, progress: p.phase === 'download' && p.total ? { value: (p.received ?? 0) / p.total } : { busy: true } }];
-      } else if (status === 'missing' && host.account?.canInstallFirefox() && confirm) {
-        const yes = actions.push({ label: t('Oui, installer Firefox'), icon: 'download', key: 'install-yes', tone: 'ok', run: () => void install() }) - 1;
-        actions.push({ label: t('Non'), icon: 'close', key: 'install-no', run: () => ((confirm = false), host.redraw()) });
-        rows = [{ text: t('Installer Firefox ?'), detail: t('Le paquet officiel est téléchargé chez Mozilla (download.mozilla.org), sa signature vérifiée, puis Firefox installé pour ce compte : sans fenêtre, sans autorisation de Windows à donner.'), icon: 'download', action: yes, pick: true }];
-      } else if (status === 'missing') {
-        const at = host.account?.canInstallFirefox() ? actions.push({ label: t('Installer Firefox'), icon: 'download', key: 'install', tone: 'ok', run: () => ((confirm = true), host.redraw()) }) - 1 : undefined;
-        rows = [{ text: 'Firefox', detail: t('Pas installé sur ce PC : Cyber Pinball peut l’installer.'), icon: 'globe', tone: 'warning', ...(at !== undefined ? { action: at, pick: true } : {}) }];
-      } else {
-        rows = COOKIE_BROWSERS.map((b) => {
-          const at = actions.push({ label: b.label, key: `browser:${b.id}`, run: () => void run(b.id) }) - 1;
-          const detail = busy === b.id ? t('Lecture de la connexion…') : status === 'unused' ? t('Installé, jamais ouvert : ouvrez-le, connectez-vous à YouTube, fermez-le, puis Start ici') : t('Connectez-vous à YouTube dans Firefox, fermez-le, puis Start ici');
-          return { text: b.label, detail, icon: 'globe', action: at, pick: true, ...(busy === b.id ? { progress: { busy: true } } : {}) };
+      const where = opened.screen ? t('Edge est ouvert sur l’écran « {screen} ».', { screen: opened.screen }) : t('Edge est ouvert sur l’écran des navigateurs.');
+      if (closing) sections.push({ kind: 'jb-wait', rows: [{ text: t('Fermeture d’Edge et lecture de la connexion…'), icon: 'refresh', progress: { busy: true } }] });
+      else {
+        sections.push({
+          kind: 'jb-summary',
+          rows: [
+            { text: where, detail: t('Connectez-vous à YouTube avec votre compte Google, puis fermez Edge.'), icon: 'account', tone: 'ok' },
+            { text: t('Au téléphone'), detail: t('Le pavé tactile est la souris d’Edge, le clavier y tape.'), icon: 'phone' },
+            { text: t('Avec les boutons de la borne'), detail: t('Flippers : champ précédent ou suivant · Start : Entrée · Exit : fermer Edge'), icon: 'gamepad' },
+          ],
         });
+        if (opened.notice) sections.push({ kind: 'jb-flash', rows: [{ text: opened.notice, tone: 'warning', icon: 'alert' }] });
+        actions.push({ label: t('J’ai fini'), icon: 'check', key: 'done', tone: 'ok', detail: t('Ferme Edge et garde la connexion'), run: finish });
+        actions.push({ label: t('Ramener Edge devant'), icon: 'refresh', key: 'front', run: () => session.front() });
       }
-      actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: () => (installing?.stop.abort(), backTo()) });
-      sections.push({ title: t('Reprendre la connexion de Firefox'), kind: 'jb-global', options: true, rows });
       return {
-        heading: t('Connexion de Firefox'),
+        heading: t('Se connecter à YouTube'),
         icon: 'account',
-        lead: t('Seuls les cookies de YouTube et de Google sont repris, dans la session du navigateur intégré ; aucun mot de passe. Le fichier intermédiaire est effacé aussitôt.'),
-        variant: 'jukebox jukebox-account',
+        subheading: t('Dans Microsoft Edge'),
+        variant: 'jukebox jukebox-signin',
         app: app(t('Compte YouTube')),
         sections,
         actions,
-        back: () => (installing?.stop.abort(), backTo()),
+        back: finish,
       };
     };
     display(build, 0);
+    void session.done.then((s) => {
+      flash = s.connected ? { text: t('Compte YouTube connecté.'), tone: 'ok' } : { text: t('Edge refermé sans connexion à YouTube : rien n’a été gardé.'), tone: 'warning' };
+      if (host.showing(build)) backTo();
+      else host.redraw();
+    });
   }
 
   /** Les playlists du compte : J'aime, À regarder plus tard, puis les siennes ; Start ouvre l'import. */
-  function openMine(prefer?: string): void {
+  function openMine(prefer?: string, backTo?: () => void): void {
     const account = host.account;
     if (!account) return;
     const state: { phase: 'loading' | 'ready' | 'failed'; lists?: AccountPlaylist[]; reason?: string; abort: AbortController } = { phase: 'loading', abort: new AbortController() };
     const leave = () => {
       state.abort.abort();
-      openImportStart(prefer);
+      (backTo ?? (() => openImportStart(prefer)))();
     };
     const build = (): Built => {
       const actions: Action[] = [];
       const sections: Section[] = [];
-      if (state.phase === 'loading') sections.push({ kind: 'jb-wait', rows: [{ text: t('Lecture de vos playlists…'), detail: t('Par yt-dlp, avec la connexion du compte. Rien n’est téléchargé.'), icon: 'refresh', progress: { busy: true } }] });
+      if (state.phase === 'loading') sections.push({ kind: 'jb-wait', rows: [{ text: t('Lecture de vos playlists…'), detail: t('Avec la connexion gardée, en lecture seule. Rien n’est téléchargé.'), icon: 'refresh', progress: { busy: true } }] });
       else if (state.phase === 'failed') {
         sections.push({ kind: 'jb-flash', rows: [{ text: t('Lecture impossible'), detail: state.reason, tone: 'warning', icon: 'alert' }] });
-        actions.push({ label: t('Réessayer'), icon: 'refresh', key: 'retry', run: () => openMine(prefer) });
+        actions.push({ label: t('Réessayer'), icon: 'refresh', key: 'retry', run: () => openMine(prefer, backTo) });
       } else {
         const rows = state.lists!.map((p): Row => {
           const at = actions.push({ label: p.title, key: `list:${p.list}`, run: () => startImport(`https://www.youtube.com/playlist?list=${p.list}`, 'compte', prefer) }) - 1;
@@ -1068,7 +1038,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       return {
         heading: t('Mes playlists YouTube'),
         icon: 'list',
-        subheading: account.state().name ?? t('Compte YouTube'),
+        subheading: t('Compte YouTube'),
         variant: 'jukebox jukebox-mine',
         app: app(t('Compte YouTube')),
         sections,

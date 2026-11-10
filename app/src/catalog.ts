@@ -77,9 +77,6 @@ import {
   siteOfUrl,
   siteState,
   SOURCE_SITES,
-  isYoutubeAccountDomain,
-  googleRefusesText,
-  youtubeState,
   saveWaitList,
   t,
   tn,
@@ -123,7 +120,6 @@ import {
 } from '@cyberpinball/core';
 import { createAcquirer } from './acquire-window';
 import { createYtDlp } from './ytdlp-tool';
-import { createFirefoxInstaller } from './firefox-install';
 import { createAdBlocker } from './ad-blocker';
 import { archiveEntries } from './archives';
 import { recentDownloads, watchDownloads } from './downloads-watch';
@@ -186,10 +182,11 @@ export interface CatalogContext {
   pick?(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
   /** Gestionnaire de téléchargements : chaque fichier d'une page de site y est suivi, et repris après une coupure. */
   downloads?: DownloadManager;
-  /** Juke-box : « Ajouter au Juke-box » dans « Récupérer », sur une playlist ou une vidéo YouTube. */
-  jukebox?(): { accepts(url: string): 'playlist' | 'video' | undefined; add(url: string): void; account?(back: () => void): void } | undefined;
-  /** La fenêtre « Récupérer » s'est fermée (une connexion a pu y être faite : compte YouTube du Juke-box). */
-  acquireClosed?(): void;
+  /**
+   * Juke-box : « Ajouter au Juke-box » dans « Récupérer », sur une playlist ou une vidéo YouTube ;
+   * l'écran de son compte YouTube (liaison par code), où mène aussi le refus de la page de Google.
+   */
+  jukebox?(): { accepts(url: string): 'playlist' | 'video' | undefined; add(url: string): void; account?(back?: () => void): void; accountState?(): { connected: boolean } } | undefined;
 }
 
 /** Jeux par page du catalogue : une page tient sur l'écran, cartes et vignettes comprises. */
@@ -501,7 +498,6 @@ export function createCatalog(ctx: CatalogContext) {
     closed: () => {
       windowItem = undefined;
       refresh?.();
-      ctx.acquireClosed?.();
       host.broadcast();
     },
     screen: () => host.browserScreen?.(),
@@ -510,7 +506,7 @@ export function createCatalog(ctx: CatalogContext) {
     audioOutput: () => host.audioOutput?.(),
     remote: host.phoneRemote,
     grabVideo: ytdlp,
-    jukebox: { accepts: (url) => ctx.jukebox?.()?.accepts(url), add: (url) => ctx.jukebox?.()?.add(url) },
+    jukebox: { accepts: (url) => ctx.jukebox?.()?.accepts(url), add: (url) => ctx.jukebox?.()?.add(url), account: () => ctx.jukebox?.()?.account?.() },
     // Gestionnaire de téléchargements : le fichier d'une page y entre, avec l'écran où il ramène.
     track: ctx.downloads
       ? (d) => {
@@ -1982,14 +1978,14 @@ export function createCatalog(ctx: CatalogContext) {
   function openAccounts(at = 0): void {
     void ctx.task(t('Comptes des sites…'), async () => {
       const states = await accountStates();
-      // Le compte YouTube du Juke-box tient dans la même session (youtube-account.ts).
-      const youtube = youtubeState(await acquirer.cookiesWhere(isYoutubeAccountDomain));
+      // Le compte YouTube du Juke-box : liaison par code (youtube-account.ts), hors de cette session.
+      const youtube = ctx.jukebox?.()?.accountState?.();
       refresh = () => openAccounts(ctx.cursor());
       ctx.show(() => buildAccounts(states, youtube), at);
     });
   }
 
-  function buildAccounts(states: { site: SourceSite; state: SiteState }[], youtube: SiteState): Built {
+  function buildAccounts(states: { site: SourceSite; state: SiteState }[], youtube: { connected: boolean; name?: string } | undefined): Built {
     const l = waitList();
     const rows: Row[] = states.map(({ site, state }) => ({
       text: site.label,
@@ -2029,39 +2025,23 @@ export function createCatalog(ctx: CatalogContext) {
             },
           },
     );
-    // YouTube, pour les playlists du Juke-box (privées, J'aime, À regarder plus tard).
-    rows.push({
-      text: t('YouTube (Juke-box)'),
-      detail: youtube.connected ? (youtube.expires ? t('connecté, connexion gardée jusqu’au {date}', { date: formatDay(youtube.expires.getTime()) }) : t('connecté')) : t('pas connecté'),
-      badges: [youtube.connected ? t('Connecté') : t('Pas connecté')],
-      tone: youtube.connected ? 'ok' : 'quiet',
-    });
-    actions.push(
-      youtube.connected
-        ? {
-            label: t('Se déconnecter : {site}', { site: 'YouTube' }),
-            detail: t('Efface la connexion à YouTube et à Google gardée par Cyber Pinball'),
-            run: () =>
-              void acquirer.signOutWhere(isYoutubeAccountDomain).then(() => {
-                notice = { text: t('Déconnecté de {site}.', { site: 'YouTube' }), tone: 'info' };
-                openAccounts(ctx.cursor());
-              }),
-          }
-        : {
-            label: t('Se connecter : {site}', { site: 'YouTube' }),
-            detail: t('Pour importer vos playlists dans le Juke-box, privées comprises : par Firefox (Google refuse le navigateur intégré)'),
-            tone: 'ok' as const,
-            // Google refuse la connexion dans le navigateur intégré : l'écran du compte du Juke-box dit
-            // pourquoi et propose la voie qui marche (Firefox), au lieu d'ouvrir sa page de connexion.
-            run: () => {
-              const at = ctx.cursor();
-              const account = ctx.jukebox?.()?.account;
-              if (account) return account(() => openAccounts(at));
-              notice = { text: googleRefusesText(), tone: 'warning' };
-              openAccounts(at);
-            },
-          },
-    );
+    // YouTube, pour les playlists du Juke-box (privées, « J'aime ») : la connexion dans Edge, dans l'écran du compte.
+    const jukeboxAccount = ctx.jukebox?.()?.account;
+    if (youtube && jukeboxAccount) {
+      rows.push({
+        text: t('YouTube (Juke-box)'),
+        detail: youtube.connected ? t('connecté dans Edge') : t('pas connecté'),
+        badges: [youtube.connected ? t('Connecté') : t('Pas connecté')],
+        tone: youtube.connected ? 'ok' : 'quiet',
+      });
+      const at = actions.length;
+      actions.push({
+        label: t('Compte YouTube (Juke-box)'),
+        detail: youtube.connected ? t('Ses playlists, ou se déconnecter') : t('Se connecter dans Microsoft Edge, sur l’écran des navigateurs'),
+        ...(youtube.connected ? {} : { tone: 'ok' as const }),
+        run: () => jukeboxAccount(() => openAccounts(at)),
+      });
+    }
     // Entrées des extensions (plugins.ts).
     for (const p of pluginActions(pluginHooks.accountsActions)) {
       const at = actions.length;
@@ -2091,7 +2071,7 @@ export function createCatalog(ctx: CatalogContext) {
     actions.push({ label: t('Retour'), run: () => ctx.home() });
     return {
       heading: t('Comptes des sites'),
-      subheading: tn(states.filter((s) => s.state.connected).length + (youtube.connected ? 1 : 0), '{n} connecté sur {total}', '{n} connectés sur {total}', { total: states.length + 1 }),
+      subheading: tn(states.filter((s) => s.state.connected).length + (youtube?.connected ? 1 : 0), '{n} connecté sur {total}', '{n} connectés sur {total}', { total: states.length + (youtube ? 1 : 0) }),
       lead: t('Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. « Récupérer » ouvre la page du site, et c’est vous qui cliquez sur Télécharger.'),
       sections: [...noticeSection(), { rows }],
       actions,
@@ -2173,8 +2153,6 @@ export function createCatalog(ctx: CatalogContext) {
   return {
     /** yt-dlp de la borne, partagé avec le Juke-box (une seule installation, une seule mise à jour). */
     ytdlp,
-    // Firefox, installé à la demande (compte YouTube du Juke-box) : <racine>/tools/firefox le temps de l'installation.
-    firefox: createFirefoxInstaller({ root: () => ctx.layout()?.root, ...(ctx.downloads ? { downloads: ctx.downloads } : {}) }),
     /** Le catalogue (avertissement au premier usage) ; `text` : recherche toute faite (titre, initiales, nom de ROM). */
     open: (text?: string) => {
       if (!ctx.layout()) return open();

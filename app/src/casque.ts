@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anchorHeight, COMPANION_KEY_FILE, companionKeyFolder, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, readCompanionKey, sceneProtocol, type CabinetPlace, type HeadsetProfile, type Point3, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, COMPANION_KEY_FILE, companionKeyFolder, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, readCompanionKey, sceneProtocol, type CabinetPlace, type HeadsetProfile, type Point3, type VrGpu, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -145,6 +145,8 @@ export class HeadsetMenu {
   private restartAfterGame = false;
   /** Manettes branchées (profil d'interaction), dites par le compagnon. */
   profile: HeadsetProfile | undefined;
+  /** Carte graphique du casque, dite par le compagnon (gardée dans le dossier de la VR, carte.json). */
+  gpu: VrGpu | undefined;
   /**
    * Première clé à lui pour le compagnon (mise à jour) : l'ancienne avait peut-être une pièce recentrée
    * par le runtime, que VPX ne reçoit pas ; la borne calée dedans est à vérifier.
@@ -389,6 +391,21 @@ export class HeadsetMenu {
         if (head) {
           this.lastHead = { x: Number(head[1]), y: Number(head[2]), z: Number(head[3]), yaw: Number(head[4]) };
           this.opts.onHead?.(this.lastHead);
+          continue;
+        }
+        // « carte <Mo> batterie|secteur <nom> » : la carte du casque, pour le profil graphique des parties.
+        const card = /^carte (\d+) (batterie|secteur) (.*)$/.exec(line);
+        if (card) {
+          this.gpu = { vramMb: Number(card[1]), laptop: card[2] === 'batterie', name: card[3]!.trim() };
+          this.opts.log(`Casque : ${line}`); // i18n-ignore : journal
+          if (this.opts.keyDir) {
+            try {
+              fs.mkdirSync(this.opts.keyDir, { recursive: true });
+              fs.writeFileSync(path.join(this.opts.keyDir, 'carte.json'), JSON.stringify(this.gpu, null, 2) + '\n');
+            } catch {
+              // Dossier de la VR en lecture seule : la carte reste connue pour cette session.
+            }
+          }
           continue;
         }
         // « profil <nom> » : les manettes branchées, leur réglage.

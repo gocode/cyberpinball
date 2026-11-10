@@ -251,6 +251,8 @@ function wheelStage(s, style) {
   if (!wheelView) {
     const stage = el('div', 'wheel-stage');
     const layer = el('div', 'wheel-items');
+    // La roue est un arc : ses médaillons voisins sortent de l'écran par construction (contrôles de débordement : data-bleed).
+    layer.dataset.bleed = '';
     // Anneau vert fixe de la table choisie (Médaillons) : les logos glissent dessous et dedans.
     layer.append(el('div', 'wheel-ring'));
     stage.append(layer);

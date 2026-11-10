@@ -5,8 +5,8 @@
 //    (app/src/page-input.ts). Il n'est plus employé nulle part ;
 // 2. la proposition de Google de se connecter par une clé d'accès : WebAuthn est retiré des pages du
 //    navigateur intégré, les autorisations et les choix de périphérique sont refusés sans fenêtre ;
-// 3. « Utiliser la connexion de Firefox » : l'import passe l'état à « connecté », et un Firefox absent
-//    ou pas connecté à YouTube le dit, avec la marche à suivre ;
+// 3. la page de connexion de Google n'est jamais ouverte : « Récupérer » dit pourquoi et propose la
+//    connexion dans Edge (« Se connecter à YouTube ») ;
 // 4. écrans noirs sans issue : Exit ferme « Récupérer » sans focus, Exit tenu la ferme de force, une
 //    fenêtre au rendu tombé est rechargée.
 // De bout en bout dans un vrai Chromium hors écran : interne/demos/demo-saisie-robuste.cjs, sur des
@@ -62,7 +62,7 @@ test('navigateur intégré : WebAuthn retiré de toutes ses pages, autorisations
     assert.ok(source.includes(guard), `${guard} manque dans acquire-window.ts`);
 });
 
-test('saisie du téléphone, clés d’accès, autorisations, import d’un navigateur : rien ne tombe, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
+test('saisie du téléphone, clés d’accès, autorisations, page de Google refusée : rien ne tombe, de bout en bout', { skip: (electron ? false : 'Electron sous Windows requis') || withoutInternal(), timeout: 240_000 }, () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-saisie-'));
   try {
     const env: NodeJS.ProcessEnv = { ...process.env, CYBERPINBALL_HORS_ECRAN: '1', CYBERPINBALL_RESEAU: 'simule', CP_SAISIE_OUT: dir, CYBERPINBALL_LANGUE: 'fr' };
@@ -74,7 +74,7 @@ test('saisie du téléphone, clés d’accès, autorisations, import d’un navi
     const progress = fs.existsSync(path.join(dir, 'progression.txt')) ? fs.readFileSync(path.join(dir, 'progression.txt'), 'utf8').split('\n').slice(-8).join('\n') : '';
     assert.equal(run.status, 0, `${result}\nDerniers pas :\n${progress}`);
     assert.doesNotMatch(result, /ÉCHEC/, result);
-    assert.ok((result.match(/^OK /gm) ?? []).length >= 65, result);
+    assert.ok((result.match(/^OK /gm) ?? []).length >= 53, result);
     for (const step of [
       'champ d’adresse avec clés d’accès : l’application et la page répondent',
       'WebAuthn absent de la page de connexion',
@@ -86,9 +86,8 @@ test('saisie du téléphone, clés d’accès, autorisations, import d’un navi
       'un refus est une entrée claire de logs',
       'la page tombée est rechargée d’elle-même',
       'fermé pendant une rafale : rien ne plante',
-      'Firefox connecté à YouTube : l’import passe l’état à « connecté »',
-      'Firefox pas connecté à YouTube : l’écran le dit, avec la marche à suivre',
-      'Firefox absent : la marche à suivre, sans lancer yt-dlp',
+      'page de Google refusée : le bandeau propose « Se connecter à YouTube »',
+      '« Se connecter à YouTube » ferme « Récupérer » et ouvre l’écran du compte',
       'Exit ferme « Récupérer » même sans fenêtre de Cyber Pinball au premier plan',
       'Exit tenu deux secondes : « Récupérer » se ferme de force, page figée comprise',
       'fenêtre du menu au rendu tombé : rechargée d’elle-même',

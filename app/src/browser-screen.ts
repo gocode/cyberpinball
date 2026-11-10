@@ -3,7 +3,7 @@
 // Electron. Partagé par le menu (frontend.ts) et la démonstration hors écran.
 
 import type { Rectangle } from 'electron';
-import { browserScreenNotice, pickBrowserScreen, type ObservedDisplay, type RoleId, type Rotation } from '@cyberpinball/core';
+import { browserRoleLabel, browserScreenNotice, pickBrowserScreen, type ObservedDisplay, type RoleId, type Rotation } from '@cyberpinball/core';
 import { windowRect } from './offscreen';
 
 /**
@@ -17,10 +17,10 @@ export function browserScreenFor(
   rotation: Rotation,
   wanted: RoleId | undefined,
   fallback: () => { role: RoleId; bounds: Rectangle }[],
-): { bounds: Rectangle; notice?: string } | undefined {
+): { bounds: Rectangle; notice?: string; label?: string } | undefined {
   const rects = new Map<ObservedDisplay, Rectangle>();
   const rectOf = (d: ObservedDisplay) => rects.get(d) ?? rects.set(d, windowRect(d.bounds)).get(d)!;
   const assigned = (Object.entries(assignments) as [RoleId, ObservedDisplay][]).map(([role, d]) => ({ role, bounds: rectOf(d) }));
   const pick = assigned.length ? pickBrowserScreen(assigned, rotation, wanted) : pickBrowserScreen(fallback(), rotation, undefined);
-  return pick && { bounds: pick.bounds, notice: browserScreenNotice(pick) };
+  return pick && { bounds: pick.bounds, notice: browserScreenNotice(pick), ...(pick.roles[0] ? { label: browserRoleLabel(pick.roles[0]) } : {}) };
 }

@@ -173,6 +173,30 @@ export interface RemoteTarget {
   runSearch?(query: string, engine?: string): void;
 }
 
+/**
+ * La fenêtre d'un autre programme que le téléphone pilote par Windows : Microsoft Edge pendant la
+ * connexion au compte YouTube (edge-login.ts). Le pavé tactile y déplace la vraie souris, sans
+ * sortir de la fenêtre ; le clavier y tape comme un clavier. Aucune page n'est lue.
+ */
+export interface ExternalTarget {
+  /** Titre et site montrés en tête du téléphone. */
+  page(): { title: string; host: string };
+  /** Rectangle de la fenêtre, pixels physiques du bureau : le pointeur n'en sort pas. */
+  rect(): { x: number; y: number; width: number; height: number } | undefined;
+  pointer(x: number, y: number): void;
+  click(button: 'left' | 'right', count: number): void;
+  /** Au sens de sendInputEvent d'Electron (wheelFor). */
+  scroll(deltaX: number, deltaY: number): void;
+  /** `del` retours arrière, puis `ins`. */
+  text(del: number, ins: string): void;
+  /** Tout le champ remplacé (Ctrl+A puis le texte). */
+  set(value: string): void;
+  key(key: 'Enter' | 'Tab' | 'Backspace' | 'ArrowLeft' | 'ArrowRight' | 'ArrowUp' | 'ArrowDown' | 'Space', shift: boolean): void;
+  nav(action: RemoteNav): void;
+  actions(): { id: string; label: string }[];
+  act(id: string): void;
+}
+
 export interface PhoneRemoteOptions {
   mode(): PhoneRemoteMode;
   /** État de la règle du pare-feu de Cyber Pinball (relu s'il n'est pas encore connu). */
@@ -261,6 +285,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   const interfaces = opts.interfaces ?? os.networkInterfaces;
 
   let target: RemoteTarget | undefined;
+  /** Fenêtre d'un autre programme (Edge), pilotée par Windows ; passe après « Récupérer ». */
+  let external: ExternalTarget | undefined;
   let menu: MenuTarget | undefined;
   /** Endroits qui montrent le QR code maintenant. */
   const surfaces = new Set<RemoteSurface>();
@@ -344,7 +370,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   /** Ce que pilote le téléphone maintenant. */
   function mode(): RemoteMode {
-    if (target) return 'browser';
+    if (target || external) return 'browser';
     return menu ? menu.phase() : 'browser';
   }
 
@@ -546,6 +572,10 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   }
 
   function pageState(): Record<string, unknown> | undefined {
+    if (!target && external) {
+      const p = external.page();
+      return { page: { title: p.title.slice(0, 120), host: p.host, canBack: true, canForward: false }, actions: external.actions() };
+    }
     if (!target || target.view.webContents.isDestroyed()) return undefined;
     const wc = target.view.webContents;
     let host = '';
@@ -563,7 +593,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   }
 
   function pushPage(force = false): void {
-    if (!active || pairing?.session() !== 'paired' || !target) return;
+    if (!active || pairing?.session() !== 'paired' || (!target && !external)) return;
     const state = pageState();
     const text = JSON.stringify(state ?? null);
     if (!state || (!force && text === pageSent)) return;
@@ -577,7 +607,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
    * le texte change pendant qu'on tape au téléphone, et le renvoyer effacerait ce qui est en route.
    */
   function pushField(force = false): void {
-    if (!active || pairing?.session() !== 'paired' || !target) return;
+    if (!active || pairing?.session() !== 'paired' || (!target && !external)) return;
     const key = JSON.stringify(field ? { where: typingIn, kind: field.kind, label: field.label } : null);
     if (!force && !fieldFresh && key === fieldSent) return;
     fieldSent = key;
@@ -683,6 +713,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   async function inject(message: PhoneMessage): Promise<void> {
     if (mode() !== 'browser') return injectMenu(message);
+    if (!target && external) return injectExternal(external, message);
     if (!target || !wc()) return;
     switch (message.t) {
       case 'move': {
@@ -763,6 +794,50 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       }
       case 'search':
         target.runSearch?.(message.query, message.engine);
+        return;
+      default:
+        return;
+    }
+  }
+
+  /** Dans la fenêtre d'un autre programme : la vraie souris, sans sortir de la fenêtre, et le clavier de Windows. */
+  function injectExternal(ext: ExternalTarget, message: PhoneMessage): void {
+    switch (message.t) {
+      case 'move': {
+        const r = ext.rect();
+        if (!r) return;
+        const now = Date.now();
+        speed = smoothSpeed(speed, message, now - lastMoveAt);
+        lastMoveAt = now;
+        at = movePointer(at, { ...message, speed }, { width: Math.max(1, r.width), height: Math.max(1, r.height) });
+        ext.pointer(r.x + at.x, r.y + at.y);
+        return;
+      }
+      case 'click': {
+        const r = ext.rect();
+        if (r) ext.pointer(r.x + at.x, r.y + at.y);
+        ext.click(message.button === 'right' ? 'right' : 'left', message.count);
+        return;
+      }
+      case 'scroll': {
+        const { deltaX, deltaY } = wheelFor(message);
+        ext.scroll(deltaX, deltaY);
+        return;
+      }
+      case 'text':
+        ext.text(message.del, message.ins);
+        return;
+      case 'set':
+        ext.set(message.value);
+        return;
+      case 'key':
+        ext.key(message.key, Boolean(message.shift));
+        return;
+      case 'nav':
+        ext.nav(message.action);
+        return;
+      case 'act':
+        ext.act(message.id);
         return;
       default:
         return;
@@ -1217,9 +1292,32 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     tick();
   }
 
+  /** La fenêtre d'un autre programme s'ouvre (Edge) : le téléphone connecté passe au pavé tactile. */
+  function attachExternal(next: ExternalTarget): void {
+    external = next;
+    const r = next.rect();
+    at = r ? { x: r.width / 2, y: r.height / 2 } : { x: 0, y: 0 };
+    speed = undefined;
+    field = undefined;
+    wake();
+    pushState();
+    tick();
+  }
+
+  function detachExternal(next?: ExternalTarget): void {
+    if (!external || (next && next !== external)) return;
+    external = undefined;
+    log('Télécommande : fenêtre externe fermée, le téléphone revient au menu.'); // i18n-ignore : journal
+    pushState();
+    settle();
+    tick();
+  }
+
   return {
     attach,
     detach,
+    attachExternal,
+    detachExternal,
     show,
     /** Le menu de Cyber Pinball (frontend.ts) : le téléphone le pilote quand « Récupérer » est fermé. */
     setMenu(next: MenuTarget): void {

@@ -154,6 +154,8 @@ window.cyberAcquire.onState((s) => {
   if (s.jukebox) {
     $('jukebox-text').textContent = s.jukebox.text;
     $('jukebox-text').title = s.jukebox.text;
+    // « Ajouter au Juke-box », ou « Se connecter à YouTube » après le refus de la page de Google.
+    if (s.jukebox.button) $('jukebox-add').textContent = s.jukebox.button;
   }
   showDownloads(s.downloads ?? [], s.more);
   showRemote(s.remote);
