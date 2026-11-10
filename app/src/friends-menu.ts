@@ -54,6 +54,7 @@ import type { FriendContent } from './friend-content';
 import { createFriendLibraryMenu, type FriendDownloads } from './friend-library-menu';
 import { createGameHistoryMenu } from './game-history-menu';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
+import { askElevation } from './uac-confirm';
 import type { LiveGames } from './live-game';
 import { createLiveMenu, type LiveMenu } from './live-game-menu';
 import type { SocialNet } from './social-net';
@@ -631,7 +632,7 @@ export function createFriendsMenu(host: FriendsMenuHost): FriendsMenu {
     return firewallProblems(host.firewall.state(), host.firewall.vpxState()).length > 0 || host.firewall.taskState() === false;
   }
 
-  const allowAction = (after: () => void): Action => ({ label: t('Autoriser dans le pare-feu de Windows'), detail: t('Windows demande votre autorisation, une seule fois : Cyber Pinball ouvert aux autres bornes, VPX fermé au réseau'), icon: 'lock', run: () => allowFirewall(after) });
+  const allowAction = (after: () => void): Action => ({ label: t('Autoriser dans le pare-feu de Windows'), detail: t('Windows demande votre autorisation, une seule fois : Cyber Pinball ouvert aux autres bornes, VPX fermé au réseau'), icon: 'lock', run: () => askElevation((build, at) => host.library.openCustom(build, at), { title: t('Pare-feu de Windows'), what: t('Autoriser Cyber Pinball dans le pare-feu de Windows : ouvert aux autres bornes, VPX fermé au réseau.'), go: () => allowFirewall(after), later: after }) });
 
   function buildSharing(): Built {
     const s = net.state();

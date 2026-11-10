@@ -81,6 +81,9 @@ son interface).
 - Compte YouTube : « Installer Firefox » quand il manque. L'installateur officiel est téléchargé chez Mozilla, sa signature vérifiée, puis Firefox installé sans fenêtre ; la suite est dite à l'écran.
 - Juke-box, modes de lecture : dans une playlist, sous « Gestion du Juke-box », « Tout lire » (dans l’ordre), « Lecture aléatoire » (chaque morceau une fois avant d’en rejouer un) et « Répétition : playlist / morceau / aucune », que Start fait tourner. Le mode est retenu par chaque playlist et se voit sur la carte du morceau en cours (⤮, ⟳) ; au bureau, ses boutons ⤮ et ⟳.
 - Juke-box : Start maintenu sur une playlist la lance directement en lecture aléatoire ; ailleurs, il ouvre toujours la gestion.
+- Avant chaque demande d'autorisation de Windows (borne dédiée, pare-feu, pilote de la Kinect), un écran prévient qu'il faudra répondre au clavier ou à la souris (Alt+O pour Oui, Échap pour Non) : les boutons de la borne n'y peuvent rien. « Plus tard, au bureau » est choisi d'office, et Cyber Pinball n'attend plus la réponse au-delà de 3 minutes.
+- Compte YouTube : « Installer Firefox » l'installe pour ce compte seul, sans demande d'autorisation de Windows.
+- « Ouvrir dans mon navigateur » ouvre Firefox directement quand il est installé, sans faire choisir le navigateur par défaut de Windows.
 
 ## 0.1.8
 

@@ -40,7 +40,7 @@ import {
   type SiteState,
 } from '@cyberpinball/core';
 import type { Acquirer, AcquireRequest } from './acquire-window';
-import type { FirefoxInstaller, FirefoxProgress, FirefoxResult } from './firefox-install';
+import { firefoxPackageDirs, type FirefoxInstaller, type FirefoxProgress, type FirefoxResult } from './firefox-install';
 import { journalIncident } from './uncaught';
 import type { RunResult } from './ytdlp-tool';
 
@@ -121,7 +121,17 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
   const accountCookies = () => opts.acquirer.cookiesWhere(isYoutubeAccountDomain);
   /** Pourquoi le dernier import de Firefox a échoué : « Pas connecté » ne s'affiche jamais sans raison. */
   let problem: string | undefined;
-  const firefoxIni = () => opts.firefoxIni ?? firefoxProfilesIni(process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'));
+  /**
+   * Dossier des profils de Firefox qui a servi (profiles.ini) : celui du paquet MSIX que Cyber Pinball
+   * installe (son %APPDATA% est redirigé dans le dossier du paquet), sinon celui d'une installation
+   * classique. Undefined : Firefox n'a encore jamais servi sur ce compte.
+   */
+  const firefoxProfiles = (): string | undefined => {
+    if (opts.firefoxIni) return fs.existsSync(opts.firefoxIni) ? path.dirname(opts.firefoxIni) : undefined;
+    const classic = path.dirname(firefoxProfilesIni(process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming')));
+    const roots = [...firefoxPackageDirs().map((d) => path.join(d, 'LocalCache', 'Roaming', 'Mozilla', 'Firefox')), classic];
+    return roots.find((r) => fs.existsSync(path.join(r, 'profiles.ini')));
+  };
 
   /** Relit l'état dans les cookies de la session ; le nom du compte, au mieux, une fois par connexion. */
   async function refresh(): Promise<YoutubeAccountState> {
@@ -215,8 +225,9 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
     };
     try {
       // Firefox absent : rien à lire, et la marche à suivre (plutôt qu'un « pas connecté » muet).
-      if (!fs.existsSync(firefoxIni())) return fail(opts.firefox?.installed() ? firefoxUnused() : firefoxMissing(), opts.firefox?.installed() ? 'Firefox jamais ouvert' : 'Firefox absent'); // i18n-ignore : journal
-      const r = await opts.ytdlp.run(browserCookiesArgs(browser, file, opts.node), signal);
+      const profiles = firefoxProfiles();
+      if (!profiles) return fail(opts.firefox?.installed() ? firefoxUnused() : firefoxMissing(), opts.firefox?.installed() ? 'Firefox jamais ouvert' : 'Firefox absent'); // i18n-ignore : journal
+      const r = await opts.ytdlp.run(browserCookiesArgs(browser, file, opts.node, profiles), signal);
       if (!r.ok) return r.cancelled ? r : fail(r.reason, 'yt-dlp');
       // Ce que yt-dlp a écrit, sans le chemin du fichier de cookies.
       const lines = r.lines.map((l) => l.split(file).join('cookies.txt'));
@@ -264,7 +275,7 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
    * Firefox ici : prêt (déjà servi), installé mais jamais ouvert, ou absent (l'installer est proposé).
    */
   function firefoxStatus(): 'ready' | 'unused' | 'missing' {
-    if (fs.existsSync(firefoxIni())) return 'ready';
+    if (firefoxProfiles()) return 'ready';
     return opts.firefox?.installed() ? 'unused' : 'missing';
   }
 

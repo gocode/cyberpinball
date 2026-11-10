@@ -79,6 +79,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - YouTube account: “Install Firefox” when it is missing. The official installer is downloaded from Mozilla, its signature checked, then Firefox installed with no window; what to do next is shown on screen.
 - Juke-box, play modes: inside a playlist, under “Gestion du Juke-box”, “Tout lire” (play all, in order), “Lecture aléatoire” (shuffle: every track once before any replays) and “Répétition: playlist / track / off”, which Start cycles. The mode is kept per playlist and shows on the now-playing card (⤮, ⟳); on a desktop, its ⤮ and ⟳ buttons.
 - Juke-box: holding Start on a playlist starts it straight away in shuffle; elsewhere it still opens management.
+- Before every Windows permission request (dedicated cabinet, firewall, Kinect driver), a screen warns that it must be answered with the keyboard or the mouse (Alt+Y for Yes, Esc for No): the cabinet buttons cannot do it. “Later, at the desk” is selected by default, and Cyber Pinball stops waiting for the answer after 3 minutes.
+- YouTube account: “Install Firefox” installs it for this account only, with no Windows permission request.
+- “Open in my browser” opens Firefox directly when it is installed, without asking to choose the Windows default browser.
 
 ## 0.1.8
 

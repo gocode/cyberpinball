@@ -5,6 +5,8 @@
 // « Récupérer », toujours au-dessus au niveau de l'économiseur d'écran : elle attendait une
 // réponse que personne ne pouvait donner, et l'écran semblait figé.
 
+import { t } from './i18n';
+
 /** Ce que fait la fenêtre : rien, repasser devant, céder le « toujours au-dessus », le reprendre. */
 export type FrontMove = 'keep' | 'raise' | 'yield' | 'reclaim';
 
@@ -20,4 +22,16 @@ export function frontMove(event: 'blur' | 'focus' | 'top-lost', focusedOurs: boo
   if (event === 'blur') return focusedOurs ? 'raise' : 'yield';
   if (event === 'focus') return yielded ? 'reclaim' : 'keep';
   return yielded ? 'keep' : 'raise';
+}
+
+/**
+ * Une demande d'autorisation de Windows (UAC) restée sans réponse : Cyber Pinball cesse de l'attendre
+ * au bout de ce délai (la demande, sur le bureau sécurisé de Windows, n'est fermée que par une vraie
+ * réponse au clavier ou à la souris). Toute élévation de l'application l'applique.
+ */
+export const ELEVATION_WAIT_MS = 3 * 60_000;
+
+/** Ce que l'écran dit quand la demande de Windows est restée sans réponse. */
+export function elevationNoAnswer(): string {
+  return t('Pas de réponse à la demande de Windows en {min} minutes : Cyber Pinball n’attend plus. Si elle est encore affichée, répondez Non (Échap).', { min: ELEVATION_WAIT_MS / 60_000 });
 }

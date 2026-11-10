@@ -46,6 +46,7 @@ import {
   type Vision3dSourceKind,
   type WebcamEyes,
 } from '@cyberpinball/core';
+import { ELEVATION_WAIT_MS, elevationNoAnswer } from '@cyberpinball/core';
 import { downloadComponent, findComponent } from '@cyberpinball/installer';
 import { deviceStatus, hklmValue, memoryIntegrityEnabled } from '@cyberpinball/win-displays';
 import { createWindow } from './offscreen';
@@ -556,15 +557,25 @@ const POWERSHELL = path.join(SYSTEM32, 'WindowsPowerShell', 'v1.0', 'powershell.
 /** Code de Start-Process quand l'utilisateur refuse l'élévation (ERROR_CANCELLED). */
 const CANCELLED = 1223;
 
-function powershell(command: string): Promise<{ status: number | null; stdout: string; stderr: string }> {
+/** `timeoutMs` : une demande de Windows (UAC) sans réponse n'est plus attendue au-delà (front-policy.ts). */
+function powershell(command: string, timeoutMs?: number): Promise<{ status: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     const child = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', command], { windowsHide: true });
     let stdout = '';
     let stderr = '';
+    const timer = timeoutMs
+      ? setTimeout(() => {
+          stderr = elevationNoAnswer();
+          child.kill();
+        }, timeoutMs)
+      : undefined;
     child.stdout.on('data', (d) => (stdout += d));
     child.stderr.on('data', (d) => (stderr += d));
     child.on('error', (error) => resolve({ status: -1, stdout, stderr: error.message }));
-    child.on('close', (status) => resolve({ status, stdout, stderr }));
+    child.on('close', (status) => {
+      clearTimeout(timer);
+      resolve({ status, stdout, stderr });
+    });
   });
 }
 
@@ -674,6 +685,7 @@ export async function installKinectDriver(file: string): Promise<DriverInstall> 
   fs.writeFileSync(script, ['$ok = @(0, 3010, 1641, 1638)', ...steps, 'exit 0', ''].join('\r\n'), 'utf8');
   const elevated = await powershell(
     `try { $p = Start-Process -FilePath ${quote(POWERSHELL)} -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '"${script.replace(/'/g, "''")}"'); exit $p.ExitCode } catch { if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { [Console]::Error.WriteLine($_.Exception.Message); exit 1 } }`,
+    ELEVATION_WAIT_MS,
   );
   if (elevated.status === CANCELLED) return { ok: false, cancelled: true, reason: 'installation refusée' }; // i18n-ignore : journal
   if (elevated.status !== 0) return { ok: false, reason: `paquet de Microsoft : code ${elevated.status}${elevated.stderr.trim() ? ` (${elevated.stderr.trim()})` : ''}` }; // i18n-ignore : journal

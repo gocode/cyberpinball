@@ -90,6 +90,7 @@ import { coverDisplay, fillBelow } from './cover-display';
 import { onJoystickInput, watchJoystickButtons } from './joystick-input';
 import { createWindow, OFFSCREEN, primaryRect } from './offscreen';
 import type { PhoneRemote } from './phone-remote';
+import { openInFirefox } from './firefox-install';
 import { hostForLog, journalIncident, logsOwnCrashes } from './uncaught';
 import type { GrabProgress, GrabResult } from './ytdlp-tool';
 
@@ -963,7 +964,8 @@ export function createAcquirer(events: AcquireEvents) {
       const v = open.view.webContents;
       if (action === 'back' && v.navigationHistory.canGoBack()) v.navigationHistory.goBack();
       else if (action === 'home') isGoogleSignIn(open.request.url) ? googleRefused() : void v.loadURL(open.request.url);
-      else if (action === 'browser') void shell.openExternal(v.getURL() || open.request.url);
+      // Firefox par son chemin s'il est là (jamais le choix du navigateur par défaut de Windows), sinon le navigateur par défaut.
+      else if (action === 'browser') openInFirefox(v.getURL() || open.request.url) || void shell.openExternal(v.getURL() || open.request.url);
       else if (action === 'close') close();
     });
     ipcMain.on('acquire:cancel', (e, id: unknown) => {

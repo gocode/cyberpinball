@@ -1,95 +1,108 @@
 // Installer Firefox depuis Cyber Pinball (compte YouTube du Juke-box : la connexion se reprend de
-// Firefox, seul navigateur dont yt-dlp lit les cookies). Sur demande de l'utilisateur, confirmée :
-// 1. l'installateur officiel de Mozilla, en HTTPS depuis download.mozilla.org (français, 64 bits),
-//    téléchargé dans <racine>\tools\firefox, progression relevée ;
-// 2. sa signature Authenticode vérifiée par Windows (Get-AuthenticodeSignature) : valide, et
-//    l'éditeur est Mozilla Corporation. Sinon le fichier est effacé et rien n'est lancé ;
-// 3. lancé en mode silencieux (/S), par Windows avec élévation (une seule demande de Windows, au-dessus
-//    de tout, sans fenêtre d'installateur sous les écrans de la borne) ;
-// 4. Firefox est alors trouvé à sa place (firefox.exe), l'installateur effacé.
-// Sans réseau vers Mozilla, winget (Mozilla.Firefox.fr), s'il est là, fait la même chose.
-// Chaque échec rend sa raison en clair, et une entrée dans erreurs.txt.
+// Firefox, seul navigateur dont yt-dlp lit les cookies). Sur demande de l'utilisateur, confirmée,
+// SANS demande d'autorisation de Windows (UAC) : la borne ne peut pas y répondre (PinCab,
+// 10/11/2026, avec l'installateur classique, qui demande l'élévation sur un compte administrateur).
+// 1. le paquet MSIX officiel de Mozilla, en HTTPS depuis download.mozilla.org, téléchargé dans
+//    <racine>\tools\firefox et suivi dans le gestionnaire de téléchargements ;
+// 2. sa signature vérifiée par Windows (Get-AuthenticodeSignature) : valide, et l'éditeur est Mozilla
+//    Corporation. Sinon le fichier est effacé et rien n'est installé ;
+// 3. installé pour ce compte seul (Add-AppxPackage) : ni droits d'administrateur, ni fenêtre ;
+//    Windows vérifie de nouveau la signature du paquet. Au-delà de FIREFOX_INSTALL_MS, Cyber Pinball
+//    cesse d'attendre ;
+// 4. Firefox est alors trouvé (paquet de Mozilla inscrit pour ce compte), le fichier effacé.
+// Son profil vit dans %LOCALAPPDATA%\Packages\Mozilla.MozillaFirefox_…\LocalCache\Roaming\Mozilla\Firefox
+// (youtube-account.ts le passe à yt-dlp). Chaque échec rend sa raison en clair, et une entrée dans
+// erreurs.txt.
 
-import { spawn, spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { fetchResumable, firefoxExePaths, mozillaSigned, renameWithRetryAsync, t, FIREFOX_DOWNLOAD_URL, type DownloadManager } from '@cyberpinball/core';
+import { fetchResumable, firefoxExePaths, mozillaSigned, renameWithRetryAsync, t, FIREFOX_DOWNLOAD_URL, FIREFOX_MSIX_PACKAGE, type DownloadManager } from '@cyberpinball/core';
 import { journalIncident } from './uncaught';
 
 export type FirefoxProgress = { phase: 'download' | 'verify' | 'install'; received?: number; total?: number };
-export type FirefoxResult = { ok: true; exe: string } | { ok: false; reason: string; cancelled?: boolean };
+export type FirefoxResult = { ok: true } | { ok: false; reason: string; cancelled?: boolean };
+
+/** Installation du paquet : au-delà, Cyber Pinball n'attend plus. */
+export const FIREFOX_INSTALL_MS = 5 * 60_000;
 
 export interface FirefoxInstallerOptions {
-  /** Racine de Cyber Pinball (l'installateur passe par <racine>\tools\firefox). */
+  /** Racine de Cyber Pinball (le paquet passe par <racine>\tools\firefox). */
   root(): string | undefined;
-  /** Gestionnaire de téléchargements : l'installateur y est suivi, comme le pilote de la Kinect. */
+  /** Gestionnaire de téléchargements : le paquet y est suivi, comme le pilote de la Kinect. */
   downloads?: DownloadManager;
-  /** Essais : téléchargement, vérification, lancement et recherche de Firefox remplacés. */
+  /** Essais : téléchargement, vérification, installation et recherche de Firefox remplacés. */
   fetch?: typeof fetch;
   verify?(file: string): Promise<{ ok: boolean; detail: string }>;
-  runInstaller?(file: string, signal?: AbortSignal): Promise<number>;
-  winget?(signal?: AbortSignal): Promise<number | undefined>;
-  find?(): string | undefined;
+  addPackage?(file: string, signal?: AbortSignal): Promise<{ code: number; detail: string }>;
+  installed?(): boolean;
+}
+
+function powershell(script: string, env: Record<string, string>, timeoutMs: number, signal?: AbortSignal): Promise<{ code: number; out: string }> {
+  return new Promise((resolve) => {
+    const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], { windowsHide: true, env: { ...process.env, ...env } });
+    let out = '';
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      ps.kill();
+    }, timeoutMs);
+    signal?.addEventListener('abort', () => ps.kill(), { once: true });
+    ps.stdout.on('data', (c: Buffer) => (out += c.toString('utf8')));
+    ps.stderr.on('data', (c: Buffer) => (out += c.toString('utf8')));
+    ps.on('error', (e) => resolve({ code: -1, out: e.message }));
+    ps.on('close', (code) => {
+      clearTimeout(timer);
+      resolve({ code: timedOut ? -2 : (code ?? -1), out: out.trim() });
+    });
+  });
 }
 
 /** Signature Authenticode d'un fichier, lue par Windows : « Valid|CN=…, O=Mozilla Corporation, … ». */
-export function mozillaSignature(file: string): Promise<{ ok: boolean; detail: string }> {
-  return new Promise((resolve) => {
-    const script = `$s = Get-AuthenticodeSignature -LiteralPath $env:CP_FICHIER; "$($s.Status)|$($s.SignerCertificate.Subject)"`; // i18n-ignore : script PowerShell, journal
-    const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, env: { ...process.env, CP_FICHIER: file } });
-    let out = '';
-    ps.stdout.on('data', (c: Buffer) => (out += c.toString('utf8')));
-    ps.on('error', (e) => resolve({ ok: false, detail: e.message }));
-    ps.on('close', () => resolve({ ok: mozillaSigned(out.trim()), detail: out.trim().slice(0, 200) }));
-  });
+export async function mozillaSignature(file: string): Promise<{ ok: boolean; detail: string }> {
+  const r = await powershell('$s = Get-AuthenticodeSignature -LiteralPath $env:CP_FICHIER; "$($s.Status)|$($s.SignerCertificate.Subject)"', { CP_FICHIER: file }, 60_000); // i18n-ignore : script PowerShell
+  return { ok: mozillaSigned(r.out), detail: r.out.slice(0, 200) };
 }
 
-/** L'installateur, élevé par Windows (une demande d'autorisation), en silence ; rend son code de sortie. */
-function elevated(file: string, signal?: AbortSignal): Promise<number> {
-  return new Promise((resolve) => {
-    const script = `$p = Start-Process -FilePath $env:CP_FICHIER -ArgumentList '/S' -Verb RunAs -Wait -PassThru; exit $p.ExitCode`; // i18n-ignore : script PowerShell, journal
-    const ps = spawn('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', script], { windowsHide: true, env: { ...process.env, CP_FICHIER: file } });
-    signal?.addEventListener('abort', () => ps.kill(), { once: true });
-    ps.on('error', () => resolve(-1));
-    ps.on('close', (code) => resolve(code ?? -1));
-  });
+/** Le paquet, inscrit pour ce compte seul : jamais d'élévation. Code 0 si Windows l'a accepté. */
+function addPackage(file: string, signal?: AbortSignal): Promise<{ code: number; detail: string }> {
+  const script = 'try { Add-AppxPackage -Path $env:CP_FICHIER -ErrorAction Stop; exit 0 } catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }'; // i18n-ignore : script PowerShell
+  return powershell(script, { CP_FICHIER: file }, FIREFOX_INSTALL_MS, signal).then((r) => ({ code: r.code, detail: r.out.slice(0, 300) }));
 }
 
-/** winget, s'il est là : Firefox en français, sans question ; undefined s'il n'est pas installé. */
-function winget(signal?: AbortSignal): Promise<number | undefined> {
-  if (spawnSync('winget.exe', ['--version'], { windowsHide: true, timeout: 15_000 }).status !== 0) return Promise.resolve(undefined);
-  return new Promise((resolve) => {
-    const p = spawn('winget.exe', ['install', '--id', 'Mozilla.Firefox.fr', '--exact', '--silent', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity'], { windowsHide: true });
-    signal?.addEventListener('abort', () => p.kill(), { once: true });
-    p.on('error', () => resolve(undefined));
-    p.on('close', (code) => resolve(code ?? -1));
-  });
+/** Dossiers des paquets de Firefox (MSIX) inscrits pour ce compte. */
+export function firefoxPackageDirs(localAppData = process.env.LOCALAPPDATA): string[] {
+  if (!localAppData) return [];
+  const packages = path.join(localAppData, 'Packages');
+  try {
+    return fs
+      .readdirSync(packages)
+      .filter((n) => n.toLowerCase().startsWith(`${FIREFOX_MSIX_PACKAGE.toLowerCase()}_`))
+      .map((n) => path.join(packages, n));
+  } catch {
+    return [];
+  }
+}
+
+/** Firefox est-il là : paquet MSIX inscrit pour ce compte, ou installation classique. */
+export function firefoxPresent(): boolean {
+  return firefoxPackageDirs().length > 0 || firefoxExePaths(process.env).some((p) => fs.existsSync(p));
 }
 
 export function createFirefoxInstaller(opts: FirefoxInstallerOptions) {
-  const find = () => (opts.find ? opts.find() : firefoxExePaths(process.env).find((p) => fs.existsSync(p)));
+  const installed = () => (opts.installed ? opts.installed() : firefoxPresent());
   const fail = (reason: string, detail: string): FirefoxResult => {
     journalIncident(`Installation de Firefox : ${detail}`); // i18n-ignore : journal
     return { ok: false, reason };
   };
 
-  async function viaWinget(signal: AbortSignal | undefined, progress: (p: FirefoxProgress) => void, why: string): Promise<FirefoxResult> {
-    progress({ phase: 'install' });
-    const code = await (opts.winget ?? winget)(signal);
-    if (signal?.aborted) return { ok: false, reason: t('arrêté'), cancelled: true };
-    if (code === undefined) return fail(t('Firefox n’a pas pu être téléchargé ({why}), et winget n’est pas sur ce PC : vérifiez la connexion à Internet, puis réessayez.', { why }), `téléchargement impossible (${why}), pas de winget`); // i18n-ignore : script PowerShell, journal
-    const exe = find();
-    return exe ? { ok: true, exe } : fail(t('winget n’a pas installé Firefox (code {code}).', { code }), `winget, code ${code}`);
-  }
-
   /** Installe Firefox ; `progress` suit le téléchargement, la vérification, l'installation. */
   async function install(progress: (p: FirefoxProgress) => void = () => undefined, signal?: AbortSignal): Promise<FirefoxResult> {
-    const already = find();
-    if (already) return { ok: true, exe: already };
+    if (installed()) return { ok: true };
     const root = opts.root();
     if (!root) return { ok: false, reason: t('Dossier de Cyber Pinball introuvable.') };
     const dir = path.join(root, 'tools', 'firefox');
-    const file = path.join(dir, 'Firefox-Setup.exe');
+    const file = path.join(dir, 'Firefox.msix');
     const part = `${file}.part`;
     fs.mkdirSync(dir, { recursive: true });
     // Suivi dans le gestionnaire de téléchargements (son écran le montre, une coupure garde le partiel).
@@ -122,27 +135,53 @@ export function createFirefoxInstaller(opts: FirefoxInstallerOptions) {
         job?.cancel();
         return { ok: false, reason: t('arrêté'), cancelled: true };
       }
-      job?.fail('network', (error as Error).message);
-      return viaWinget(signal, progress, (error as Error).message);
+      const why = (error as Error).message;
+      job?.fail('network', why);
+      return fail(t('Firefox n’a pas pu être téléchargé ({why}) : vérifiez la connexion à Internet, puis réessayez.', { why }), `téléchargement impossible (${why})`); // i18n-ignore : journal
     }
     try {
       progress({ phase: 'verify' });
       const signature = await (opts.verify ?? mozillaSignature)(file);
-      // Pas signé par Mozilla : jamais lancé.
-      if (!signature.ok) return fail(t('Le fichier reçu n’est pas signé par Mozilla : il est effacé, rien n’a été lancé.'), `signature refusée (${signature.detail})`); // i18n-ignore : script PowerShell, journal
+      // Pas signé par Mozilla : jamais installé.
+      if (!signature.ok) return fail(t('Le fichier reçu n’est pas signé par Mozilla : il est effacé, rien n’a été installé.'), `signature refusée (${signature.detail})`); // i18n-ignore : journal
       progress({ phase: 'install' });
-      const code = await (opts.runInstaller ?? elevated)(file, signal);
+      const r = await (opts.addPackage ?? addPackage)(file, signal);
       if (signal?.aborted) return { ok: false, reason: t('arrêté'), cancelled: true };
-      const exe = find();
-      if (exe) return { ok: true, exe };
-      return fail(code === 1223 || code === 1 ? t('Windows n’a pas autorisé l’installation : acceptez sa demande (souris ou clavier), puis réessayez.') : t('L’installateur de Firefox s’est arrêté (code {code}) sans installer Firefox.', { code }), `installateur, code ${code}`);
+      if (installed()) return { ok: true };
+      if (r.code === -2) return fail(t('Windows n’a pas fini d’installer Firefox en {min} minutes : Cyber Pinball n’attend plus. Réessayez plus tard.', { min: FIREFOX_INSTALL_MS / 60_000 }), 'installation sans fin'); // i18n-ignore : journal
+      return fail(t('Windows a refusé d’installer Firefox : {detail}', { detail: r.detail || `code ${r.code}` }), `Add-AppxPackage, code ${r.code} (${r.detail})`); // i18n-ignore : journal
     } finally {
       fs.rmSync(file, { force: true });
       fs.rmSync(part, { force: true });
     }
   }
 
-  return { install, installed: () => Boolean(find()), exe: find };
+  return { install, installed };
 }
 
 export type FirefoxInstaller = ReturnType<typeof createFirefoxInstaller>;
+
+/**
+ * firefox.exe, par son chemin : installation classique, ou alias du paquet MSIX (dans le contexte du
+ * paquet, donc avec son profil). Undefined : pas de Firefox.
+ */
+export function firefoxExe(): string | undefined {
+  const alias = process.env.LOCALAPPDATA ? path.join(process.env.LOCALAPPDATA, 'Microsoft', 'WindowsApps', 'firefox.exe') : undefined;
+  return [...firefoxExePaths(process.env), ...(alias && firefoxPackageDirs().length ? [alias] : [])].find((p) => fs.existsSync(p));
+}
+
+/**
+ * Ouvre une adresse dans Firefox lancé par son chemin, jamais par le navigateur par défaut de Windows
+ * (shell.openExternal) : juste après l'installation de Firefox, Windows demandait de choisir le
+ * navigateur par défaut, à la souris (PinCab, 10/11/2026). Faux si Firefox n'est pas là.
+ */
+export function openInFirefox(url: string): boolean {
+  const exe = firefoxExe();
+  if (!exe || !/^https?:\/\//i.test(url)) return false;
+  try {
+    spawn(exe, ['-new-window', url], { detached: true, stdio: 'ignore' }).unref(); // fenêtre voulue
+    return true;
+  } catch {
+    return false;
+  }
+}

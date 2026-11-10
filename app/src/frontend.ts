@@ -320,6 +320,7 @@ import { readLiveScoresSettings, writeLiveScoresSettings } from './live-scores-s
 import { readQuietInGame, writeQuietInGame } from './quiet-in-game-setting';
 import { centerWhenStarted, prepareVrGame, probeVr, readVrMode, rememberVrSettings, writeIniSettings, writeVrCalibration, writeVrMode, type VrGame } from './vr';
 import { HEADSET_TRIAL_DIR, HeadsetMenu, readCabinetPlace, type HeadPose } from './casque';
+import { askElevation } from './uac-confirm';
 import { downloadKinectDriver, HeadTracker, installKinectDriver, installVision3dPlugin, probeVision3d, readVision3d, vision3dPluginFiles, writeVision3d } from './vision3d';
 import { findComponent } from '@cyberpinball/installer';
 import { closeHeadsetViews, isHeadsetView, openHeadsetViews, sendToHeadsetViews, setHeadsetPainting, type HeadsetPage } from './casque-vues';
@@ -2261,9 +2262,9 @@ function openVision3dScreen(at = 0): void {
       });
     }
     if (!readiness.ready && readiness.installKinectDriver) {
-      actions.push({ label: t('Installer le pilote de la Kinect'), detail: t('{mb} Mo, téléchargé chez Microsoft ; l’installer vaut acceptation de sa licence', { mb: kinectDriverMb() }), icon: 'download', run: () => void installKinect() });
+      actions.push({ label: t('Installer le pilote de la Kinect'), detail: t('{mb} Mo, téléchargé chez Microsoft ; l’installer vaut acceptation de sa licence', { mb: kinectDriverMb() }), icon: 'download', run: () => askElevation((build, at) => library.openCustom(build, at), { title: t('Vision 3D'), what: t('Installer le pilote de la Kinect (Microsoft), sans fenêtre.'), go: () => installKinect(), later: () => openVision3dScreen(library.cursor()) }) });
     } else if (hw.kinect1 && hw.kinect1Driver && !hw.memoryIntegrity) {
-      actions.push({ label: t('Réinstaller le pilote de la Kinect'), detail: t('Si la Kinect ne répond pas malgré son pilote ; Windows demande son accord'), icon: 'refresh', run: () => void installKinect() });
+      actions.push({ label: t('Réinstaller le pilote de la Kinect'), detail: t('Si la Kinect ne répond pas malgré son pilote ; Windows demande son accord'), icon: 'refresh', run: () => askElevation((build, at) => library.openCustom(build, at), { title: t('Vision 3D'), what: t('Installer le pilote de la Kinect (Microsoft), sans fenêtre.'), go: () => installKinect(), later: () => openVision3dScreen(library.cursor()) }) });
     }
     if (!readiness.ready && readiness.memoryIntegrity) {
       actions.push({

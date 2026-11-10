@@ -30,6 +30,7 @@ import {
 } from '@cyberpinball/core';
 import { listWindows } from '@cyberpinball/win-displays';
 import { OFFSCREEN } from './offscreen';
+import { ELEVATION_WAIT_MS, elevationNoAnswer } from '@cyberpinball/core';
 
 /** Ce que l'écran lit de Windows, sans élévation. */
 export interface DedicatedProbe {
@@ -98,15 +99,25 @@ try {
 $out | ConvertTo-Json -Compress
 `;
 
-function powershell(args: string[]): Promise<{ status: number | null; stdout: string; stderr: string }> {
+/** `timeoutMs` : une demande de Windows (UAC) sans réponse n'est plus attendue au-delà (front-policy.ts). */
+function powershell(args: string[], timeoutMs?: number): Promise<{ status: number | null; stdout: string; stderr: string }> {
   return new Promise((resolve) => {
     const child = spawn(POWERSHELL, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', ...args], { windowsHide: true });
     let stdout = '';
     let stderr = '';
+    const timer = timeoutMs
+      ? setTimeout(() => {
+          stderr = elevationNoAnswer();
+          child.kill();
+        }, timeoutMs)
+      : undefined;
     child.stdout.on('data', (d) => (stdout += d));
     child.stderr.on('data', (d) => (stderr += d));
     child.on('error', (error) => resolve({ status: -1, stdout, stderr: error.message }));
-    child.on('close', (status) => resolve({ status, stdout, stderr }));
+    child.on('close', (status) => {
+      clearTimeout(timer);
+      resolve({ status, stdout, stderr });
+    });
   });
 }
 
@@ -115,7 +126,7 @@ function runScriptFile(script: string, elevate: boolean): Promise<{ status: numb
   if (!elevate) return powershell(['-File', script]);
   const quoted = script.replace(/'/g, "''");
   const elevated = `try { $p = Start-Process -FilePath '${POWERSHELL}' -Verb RunAs -WindowStyle Hidden -Wait -PassThru -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', '"${quoted}"'); exit $p.ExitCode } catch { [Console]::Error.WriteLine($_.Exception.Message); if ($_.Exception.Message -match 'cancel|annul') { exit ${CANCELLED} } else { exit 1 } }`;
-  return powershell(['-Command', elevated]);
+  return powershell(['-Command', elevated], ELEVATION_WAIT_MS);
 }
 
 function realSystem(dataDir: string): DedicatedSystem {

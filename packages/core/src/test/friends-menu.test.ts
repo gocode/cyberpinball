@@ -140,6 +140,15 @@ test('chaque entrée de la rubrique Amis ouvre son écran, aux actions toutes di
   assert.equal(menu.items['friend-requests']!.attention, false);
 });
 
+
+/** L'autorisation de Windows est prévenue d'abord (uac-confirm.ts) : « Plus tard » choisi d'office, on confirme. */
+async function confirmUac(last: () => { build(): { actions: { label: string; run(): unknown }[] }; at?: number }): Promise<void> {
+  const warning = last().build();
+  assert.equal(warning.actions[0]!.label, 'Plus tard, au bureau', '« Plus tard » en premier');
+  assert.equal(last().at, 0, '« Plus tard » choisi d’office');
+  await warning.actions.find((a) => a.label === 'Continuer : Windows demande l’autorisation')!.run();
+}
+
 test('« Partage et réseau » : l’état en direct des tables Stern SAM, grisé avec sa raison tant que VPX n’est pas fermé au réseau pour sa version', async () => {
   let version = '10.8.1-5436';
   const programs = () => [`D:\\CP\\emulators\\vpx\\${version}\\VPinballX_BGFX64.exe`, 'D:\\CP\\emulators\\vpx\\current\\VPinballX_BGFX64.exe'];
@@ -156,6 +165,7 @@ test('« Partage et réseau » : l’état en direct des tables Stern SAM, gris�
   assert.equal(row().tone, 'quiet');
   assert.match(row().detail!, /^Indisponible : le pare-feu de Windows doit d’abord fermer VPX au réseau/);
   await allow()!.run();
+  await confirmUac(last);
   assert.equal(row().tone, 'ok');
   assert.equal(allow(), undefined, 'les deux règles posées : plus rien à autoriser');
   // VPX change de version : la règle vise l'ancien dossier, l'état en direct redevient indisponible.
@@ -165,6 +175,7 @@ test('« Partage et réseau » : l’état en direct des tables Stern SAM, gris�
   assert.match(row().detail!, /^Indisponible : VPX a changé de version/);
   assert.ok(allow(), 'la règle est à reposer');
   await allow()!.run();
+  await confirmUac(last);
   assert.equal(row().tone, 'ok');
 });
 
@@ -177,6 +188,7 @@ test('« Partage et réseau » : sélection sur Retour ; pare-feu à autoriser s
   assert.ok(labels().includes('Autoriser dans le pare-feu de Windows'));
   const allow = last().build().actions.find((a) => a.label === 'Autoriser dans le pare-feu de Windows')!;
   await allow.run();
+  await confirmUac(last);
   assert.ok(!labels().includes('Autoriser dans le pare-feu de Windows'));
   // Réseau coupé pour les essais : dit, jamais présenté comme une panne.
   assert.ok(last().build().sections.some((s) => s.rows.some((r) => r.text === 'Partage activé')));

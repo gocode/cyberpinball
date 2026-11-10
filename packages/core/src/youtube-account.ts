@@ -283,8 +283,15 @@ export function firefoxProfilesIni(appData: string): string {
   return path.win32.join(appData, 'Mozilla', 'Firefox', 'profiles.ini');
 }
 
-/** Installateur officiel de Firefox (Mozilla), en HTTPS : la dernière version, 64 bits, en français. */
-export const FIREFOX_DOWNLOAD_URL = 'https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=fr';
+/**
+ * Paquet MSIX officiel de Firefox (Mozilla), en HTTPS : la dernière version, 64 bits, toutes langues
+ * (Firefox prend celle de Windows). Installé pour le compte seul, sans demande d'autorisation de
+ * Windows : l'installateur classique la demande sur un compte administrateur, et la borne ne peut pas
+ * y répondre (PinCab, 10/11/2026).
+ */
+export const FIREFOX_DOWNLOAD_URL = 'https://download.mozilla.org/?product=firefox-msix-latest-ssl&os=win64&lang=fr';
+/** Nom du paquet MSIX de Firefox (son dossier : %LOCALAPPDATA%\Packages\<nom>_<éditeur>). */
+export const FIREFOX_MSIX_PACKAGE = 'Mozilla.MozillaFirefox';
 
 /** Emplacements de firefox.exe : installation pour tous (Program Files) ou pour ce compte. */
 export function firefoxExePaths(env: Record<string, string | undefined>): string[] {
@@ -312,8 +319,12 @@ export function firefoxMissing(): string {
   return t('Firefox n’est pas installé sur ce PC, ou n’a jamais servi : installez Firefox, connectez-vous à YouTube dans Firefox, fermez-le, puis revenez ici.');
 }
 
-/** Arguments de yt-dlp pour reprendre les cookies d'un navigateur dans un fichier (`out`), en lisant la liste du compte au passage. */
-export function browserCookiesArgs(browser: CookieBrowser, out: string, node?: string): string[] {
+/**
+ * Arguments de yt-dlp pour reprendre les cookies d'un navigateur dans un fichier (`out`), en lisant la
+ * liste du compte au passage. `profile` : le dossier des profils (celui du paquet MSIX de Firefox, que
+ * yt-dlp ne cherche pas seul).
+ */
+export function browserCookiesArgs(browser: CookieBrowser, out: string, node?: string, profile?: string): string[] {
   return [
     '--ignore-config',
     '--no-update',
@@ -322,7 +333,7 @@ export function browserCookiesArgs(browser: CookieBrowser, out: string, node?: s
     '-J',
     ...(node ? ['--no-js-runtimes', '--js-runtimes', `node:${node}`] : []),
     '--cookies-from-browser',
-    browser,
+    profile ? `${browser}:${profile}` : browser,
     '--cookies',
     out,
     '--',

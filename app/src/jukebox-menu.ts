@@ -995,7 +995,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       p.phase === 'verify'
         ? t('Vérification de la signature de Mozilla…')
         : p.phase === 'install'
-          ? t('Installation en cours : acceptez la demande de Windows si elle s’affiche.')
+          ? t('Installation de Firefox pour ce compte…')
           : p.total
             ? t('Téléchargement depuis Mozilla : {percent} %', { percent: Math.floor(((p.received ?? 0) * 100) / p.total) })
             : t('Téléchargement depuis Mozilla…');
@@ -1013,7 +1013,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       } else if (status === 'missing' && host.account?.canInstallFirefox() && confirm) {
         const yes = actions.push({ label: t('Oui, installer Firefox'), icon: 'download', key: 'install-yes', tone: 'ok', run: () => void install() }) - 1;
         actions.push({ label: t('Non'), icon: 'close', key: 'install-no', run: () => ((confirm = false), host.redraw()) });
-        rows = [{ text: t('Installer Firefox ?'), detail: t('L’installateur officiel est téléchargé chez Mozilla (download.mozilla.org), sa signature vérifiée, puis Firefox installé sans fenêtre. Windows demande une autorisation.'), icon: 'download', action: yes, pick: true }];
+        rows = [{ text: t('Installer Firefox ?'), detail: t('Le paquet officiel est téléchargé chez Mozilla (download.mozilla.org), sa signature vérifiée, puis Firefox installé pour ce compte : sans fenêtre, sans autorisation de Windows à donner.'), icon: 'download', action: yes, pick: true }];
       } else if (status === 'missing') {
         const at = host.account?.canInstallFirefox() ? actions.push({ label: t('Installer Firefox'), icon: 'download', key: 'install', tone: 'ok', run: () => ((confirm = true), host.redraw()) }) - 1 : undefined;
         rows = [{ text: 'Firefox', detail: t('Pas installé sur ce PC : Cyber Pinball peut l’installer.'), icon: 'globe', tone: 'warning', ...(at !== undefined ? { action: at, pick: true } : {}) }];

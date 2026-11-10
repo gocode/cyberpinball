@@ -1,8 +1,9 @@
-// Installer Firefox depuis Cyber Pinball (app/src/firefox-install.ts) : l'installateur officiel de
-// Mozilla, signature Authenticode vérifiée avant tout lancement, mode silencieux ; winget en second
-// recours ; chaque échec avec sa raison. Ici, sans réseau ni installation : téléchargement simulé,
-// lancement remplacé. La lecture de signature est éprouvée sur de vrais fichiers de Windows (signés par
-// Microsoft : refusés) et, s'il est là, de Mozilla Thunderbird (signé par Mozilla : accepté).
+// Installer Firefox depuis Cyber Pinball (app/src/firefox-install.ts) : le paquet MSIX officiel de
+// Mozilla, signature vérifiée avant toute installation, inscrit pour le compte seul, SANS demande
+// d'autorisation de Windows (la borne ne peut pas y répondre : PinCab, 10/11/2026) ; chaque échec avec
+// sa raison. Ici, sans réseau ni installation : téléchargement simulé, inscription remplacée. La lecture
+// de signature est éprouvée sur de vrais fichiers de Windows (Microsoft : refusé) et, s'il est là, de
+// Mozilla Thunderbird (Mozilla : accepté).
 
 import { after, test } from 'node:test';
 import * as assert from 'node:assert/strict';
@@ -10,7 +11,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { setLanguage } from '../i18n';
-import { FIREFOX_DOWNLOAD_URL, firefoxExePaths, isGoogleSignIn, mozillaSigned } from '../youtube-account';
+import { browserCookiesArgs, FIREFOX_DOWNLOAD_URL, firefoxExePaths, isGoogleSignIn, mozillaSigned } from '../youtube-account';
+import { REPO_ROOT } from './i18n-scan';
 
 setLanguage('fr');
 
@@ -25,7 +27,7 @@ after(() => {
   for (const d of dirs) fs.rmSync(d, { recursive: true, force: true });
 });
 
-type Result = { ok: true; exe: string } | { ok: false; reason: string };
+type Result = { ok: true } | { ok: false; reason: string };
 interface Installer {
   install(progress?: (p: { phase: string; received?: number; total?: number }) => void): Promise<Result>;
 }
@@ -34,18 +36,32 @@ const { createFirefoxInstaller, mozillaSignature } = require(path.join(APP_DIST,
   mozillaSignature(file: string): Promise<{ ok: boolean; detail: string }>;
 };
 
-/** Faux serveur de Mozilla : un « installateur » de quelques octets, avec sa taille. */
+/** Faux serveur de Mozilla : un « paquet » de quelques octets, avec sa taille. */
 const fakeFetch = (seen: string[]) => (async (url: string) => {
   seen.push(String(url));
   return new Response(new Uint8Array(4096).fill(7), { status: 200, headers: { 'content-length': '4096' } });
 }) as unknown as typeof fetch;
 
-test('Firefox : installateur officiel de Mozilla en HTTPS, Firefox cherché à ses deux places', () => {
+test('Firefox : paquet MSIX officiel de Mozilla en HTTPS, installation classique cherchée aussi', () => {
   assert.equal(new URL(FIREFOX_DOWNLOAD_URL).protocol, 'https:');
   assert.equal(new URL(FIREFOX_DOWNLOAD_URL).hostname, 'download.mozilla.org');
+  assert.match(FIREFOX_DOWNLOAD_URL, /product=firefox-msix-latest-ssl/);
   assert.match(FIREFOX_DOWNLOAD_URL, /os=win64/);
-  assert.match(FIREFOX_DOWNLOAD_URL, /lang=fr/);
   assert.deepEqual(firefoxExePaths({ ProgramFiles: 'C:\\Program Files', LOCALAPPDATA: 'D:\\Comptes\\Local' }), ['C:\\Program Files\\Mozilla Firefox\\firefox.exe', 'D:\\Comptes\\Local\\Mozilla Firefox\\firefox.exe']);
+});
+
+test('installation sans élévation : jamais d’autorisation de Windows demandée (UAC)', () => {
+  const source = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'firefox-install.ts'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
+  assert.doesNotMatch(source, /RunAs|runas|Start-Process|winget|shell\.openExternal|openPath/i, 'ni élévation, ni installateur classique, ni winget');
+  assert.match(source, /Add-AppxPackage/);
+});
+
+test('yt-dlp lit le profil du paquet MSIX de Firefox, que son %APPDATA% redirige', () => {
+  const profiles = 'D:\\Comptes\\Local\\Packages\\Mozilla.MozillaFirefox_abc\\LocalCache\\Roaming\\Mozilla\\Firefox';
+  const args = browserCookiesArgs('firefox', 'sortie.txt', undefined, profiles);
+  assert.equal(args[args.indexOf('--cookies-from-browser') + 1], `firefox:${profiles}`);
+  const classic = browserCookiesArgs('firefox', 'sortie.txt');
+  assert.equal(classic[classic.indexOf('--cookies-from-browser') + 1], 'firefox');
 });
 
 test('signature : valide et éditée par Mozilla Corporation, rien d’autre', () => {
@@ -64,69 +80,60 @@ test('page de connexion de Google : reconnue, et elle seule', () => {
   assert.equal(isGoogleSignIn('pas une adresse'), false);
 });
 
-test('installation : signature refusée, l’installateur n’est jamais lancé et il est effacé', async () => {
+test('installation : signature refusée, rien n’est inscrit et le fichier est effacé', async () => {
   const root = tmp();
   const seen: string[] = [];
-  const launched: string[] = [];
+  const added: string[] = [];
   const installer = createFirefoxInstaller({
     root: () => root,
     fetch: fakeFetch(seen),
     verify: async () => ({ ok: false, detail: 'NotSigned|' }),
-    runInstaller: async (file: string) => (launched.push(file), 0),
-    find: () => undefined,
+    addPackage: async (file: string) => (added.push(file), { code: 0, detail: '' }),
+    installed: () => false,
   });
   const r = await installer.install();
   assert.equal(r.ok, false);
-  assert.match((r as { reason: string }).reason, /n’est pas signé par Mozilla : il est effacé, rien n’a été lancé/);
-  assert.deepEqual(launched, []);
+  assert.match((r as { reason: string }).reason, /n’est pas signé par Mozilla : il est effacé, rien n’a été installé/);
+  assert.deepEqual(added, []);
   assert.deepEqual(seen, [FIREFOX_DOWNLOAD_URL]);
   assert.deepEqual(fs.readdirSync(path.join(root, 'tools', 'firefox')), [], 'rien ne reste sur le disque');
 });
 
-test('installation : signée par Mozilla, lancée en silence, Firefox trouvé ; progression relevée', async () => {
+test('installation : signée par Mozilla, inscrite pour le compte, Firefox trouvé ; progression relevée', async () => {
   const root = tmp();
-  let installedAt: string | undefined;
+  let present = false;
   const phases: string[] = [];
   const installer = createFirefoxInstaller({
     root: () => root,
     fetch: fakeFetch([]),
     verify: async () => ({ ok: true, detail: 'Valid|O=Mozilla Corporation' }),
-    runInstaller: async (file: string) => {
-      assert.ok(fs.existsSync(file), 'lancé sur le fichier vérifié');
-      installedAt = path.join(root, 'Mozilla Firefox', 'firefox.exe');
-      return 0;
+    addPackage: async (file: string) => {
+      assert.ok(fs.existsSync(file) && file.endsWith('.msix'), 'inscrit à partir du paquet vérifié');
+      present = true;
+      return { code: 0, detail: '' };
     },
-    find: () => installedAt,
+    installed: () => present,
   });
   const r = await installer.install((p) => phases.at(-1) !== p.phase && phases.push(p.phase));
-  assert.deepEqual(r, { ok: true, exe: path.join(root, 'Mozilla Firefox', 'firefox.exe') });
+  assert.deepEqual(r, { ok: true });
   assert.deepEqual(phases, ['download', 'verify', 'install']);
-  assert.deepEqual(fs.readdirSync(path.join(root, 'tools', 'firefox')), [], 'installateur effacé');
+  assert.deepEqual(fs.readdirSync(path.join(root, 'tools', 'firefox')), [], 'paquet effacé');
 });
 
-test('installation : refusée par Windows, ou sans réseau et sans winget, la raison en clair', async () => {
-  const refused = createFirefoxInstaller({ root: tmp, fetch: fakeFetch([]), verify: async () => ({ ok: true, detail: '' }), runInstaller: async () => 1223, find: () => undefined });
-  assert.match(((await refused.install()) as { reason: string }).reason, /Windows n’a pas autorisé l’installation/);
+test('installation : refusée par Windows, sans fin, ou sans réseau : la raison en clair', async () => {
+  const base = { root: tmp, fetch: fakeFetch([]), verify: async () => ({ ok: true, detail: '' }), installed: () => false };
+  const refused = createFirefoxInstaller({ ...base, addPackage: async () => ({ code: 1, detail: 'Le déploiement a échoué : 0x80073CF9' }) });
+  assert.match(((await refused.install()) as { reason: string }).reason, /^Windows a refusé d’installer Firefox : Le déploiement a échoué : 0x80073CF9$/);
+  const endless = createFirefoxInstaller({ ...base, addPackage: async () => ({ code: -2, detail: '' }) });
+  assert.match(((await endless.install()) as { reason: string }).reason, /Windows n’a pas fini d’installer Firefox en 5 minutes : Cyber Pinball n’attend plus/);
   const offline = createFirefoxInstaller({
     root: tmp,
     fetch: (async () => {
       throw new Error('getaddrinfo ENOTFOUND download.mozilla.org');
     }) as unknown as typeof fetch,
-    winget: async () => undefined,
-    find: () => undefined,
+    installed: () => false,
   });
-  assert.match(((await offline.install()) as { reason: string }).reason, /n’a pas pu être téléchargé \(getaddrinfo ENOTFOUND download\.mozilla\.org\), et winget n’est pas sur ce PC/);
-  // Sans réseau vers Mozilla mais avec winget : winget installe.
-  let viaWinget: string | undefined;
-  const winget = createFirefoxInstaller({
-    root: tmp,
-    fetch: (async () => {
-      throw new Error('hors ligne');
-    }) as unknown as typeof fetch,
-    winget: async () => ((viaWinget = 'C:\\Program Files\\Mozilla Firefox\\firefox.exe'), 0),
-    find: () => viaWinget,
-  });
-  assert.deepEqual(await winget.install(), { ok: true, exe: 'C:\\Program Files\\Mozilla Firefox\\firefox.exe' });
+  assert.match(((await offline.install()) as { reason: string }).reason, /n’a pas pu être téléchargé \(getaddrinfo ENOTFOUND download\.mozilla\.org\) : vérifiez la connexion à Internet/);
 });
 
 test('signature lue par Windows : un fichier de Microsoft est refusé, un fichier de Mozilla accepté', { skip: process.platform !== 'win32' && 'Windows requis' }, async () => {
@@ -135,4 +142,14 @@ test('signature lue par Windows : un fichier de Microsoft est refusé, un fichie
   assert.match(microsoft.detail, /^Valid\|.*O=Microsoft Corporation/);
   const thunderbird = path.join(process.env.ProgramFiles ?? 'C:\\Program Files', 'Mozilla Thunderbird', 'thunderbird.exe');
   if (fs.existsSync(thunderbird)) assert.equal((await mozillaSignature(thunderbird)).ok, true);
+});
+
+test('« Ouvrir dans mon navigateur » : Firefox par son chemin d’abord, jamais le choix du navigateur par défaut de Windows', () => {
+  // PinCab, 10/11/2026 : juste après l'installation de Firefox, shell.openExternal faisait demander à
+  // Windows de choisir le navigateur par défaut, à la souris.
+  const acquire = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'acquire-window.ts'), 'utf8');
+  const line = acquire.split(/\r?\n/).find((l) => l.includes("action === 'browser'")) ?? '';
+  assert.match(line, /openInFirefox\(.*\) \|\| void shell\.openExternal\(/, line);
+  const install = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'firefox-install.ts'), 'utf8');
+  assert.match(install, /export function openInFirefox\(url: string\): boolean \{[\s\S]*?spawn\(exe, \['-new-window', url\]/);
 });

@@ -70,11 +70,6 @@ export const messages: Record<string, string> = {
 
   // Google refusé dans « Récupérer », installation de Firefox (firefox-install.ts)
   'Pour importer vos playlists dans le Juke-box, privées comprises : par Firefox (Google refuse le navigateur intégré)': 'To import your playlists into the Juke-box, private ones included: through Firefox (Google refuses the built-in browser)',
-  'Le fichier reçu n’est pas signé par Mozilla : il est effacé, rien n’a été lancé.': 'The file received is not signed by Mozilla: it is deleted, nothing was run.',
-  'L’installateur de Firefox s’est arrêté (code {code}) sans installer Firefox.': 'The Firefox installer stopped (code {code}) without installing Firefox.',
-  'Windows n’a pas autorisé l’installation : acceptez sa demande (souris ou clavier), puis réessayez.': 'Windows did not allow the installation: accept its request (mouse or keyboard), then try again.',
-  'Firefox n’a pas pu être téléchargé ({why}), et winget n’est pas sur ce PC : vérifiez la connexion à Internet, puis réessayez.': 'Firefox could not be downloaded ({why}), and winget is not on this PC: check the Internet connection, then try again.',
-  'winget n’a pas installé Firefox (code {code}).': 'winget did not install Firefox (code {code}).',
   'Dossier de Cyber Pinball introuvable.': 'Cyber Pinball folder not found.',
   'Téléchargement depuis Mozilla : {percent} %': 'Downloading from Mozilla: {percent}%',
   'Téléchargement depuis Mozilla…': 'Downloading from Mozilla…',
@@ -82,7 +77,7 @@ export const messages: Record<string, string> = {
   'Installation de Firefox': 'Installing Firefox',
   'Oui, installer Firefox': 'Yes, install Firefox',
   'Installer Firefox ?': 'Install Firefox?',
-  'L’installateur officiel est téléchargé chez Mozilla (download.mozilla.org), sa signature vérifiée, puis Firefox installé sans fenêtre. Windows demande une autorisation.': 'The official installer is downloaded from Mozilla (download.mozilla.org), its signature checked, then Firefox installed with no window. Windows asks for permission.',
+  'Le paquet officiel est téléchargé chez Mozilla (download.mozilla.org), sa signature vérifiée, puis Firefox installé pour ce compte : sans fenêtre, sans autorisation de Windows à donner.': 'The official package is downloaded from Mozilla (download.mozilla.org), its signature checked, then Firefox installed for this account: no window, no Windows permission to give.',
   'Installer Firefox': 'Install Firefox',
   'Installateur de Firefox (Mozilla)': 'Firefox installer (Mozilla)',
   'Pas installé sur ce PC : Cyber Pinball peut l’installer.': 'Not installed on this PC: Cyber Pinball can install it.',
@@ -92,8 +87,14 @@ export const messages: Record<string, string> = {
   'Firefox, sur ce PC, connecté à YouTube ; s’il n’est pas installé, Cyber Pinball l’installe': 'Firefox, on this PC, signed in to YouTube; if it is not installed, Cyber Pinball installs it',
   'Firefox est installé. Ouvrez Firefox, connectez-vous à YouTube, fermez Firefox, puis « Firefox » ici.': 'Firefox is installed. Open Firefox, sign in to YouTube, close Firefox, then “Firefox” here.',
   'Vérification de la signature de Mozilla…': 'Checking Mozilla’s signature…',
-  'Installation en cours : acceptez la demande de Windows si elle s’affiche.': 'Installing: accept the Windows request if it shows.',
+  'Installation de Firefox pour ce compte…': 'Installing Firefox for this account…',
   'Installation de Firefox indisponible ici.': 'Installing Firefox is not available here.',
   'Firefox est installé mais n’a encore jamais servi : ouvrez Firefox, connectez-vous à YouTube, fermez Firefox, puis revenez ici.': 'Firefox is installed but has never been used: open Firefox, sign in to YouTube, close Firefox, then come back here.',
   'Google refuse la connexion dans le navigateur intégré d’une borne : passez par Firefox (gestion du Juke-box > « Compte YouTube » > « Utiliser la connexion de Firefox »). Une liaison par code est prévue.': 'Google refuses sign-in in a cabinet’s built-in browser: go through Firefox (Juke-box management > “YouTube account” > “Use Firefox’s sign-in”). Linking with a code is planned.',
+
+  // Firefox en paquet MSIX, sans autorisation de Windows (firefox-install.ts)
+  'Firefox n’a pas pu être téléchargé ({why}) : vérifiez la connexion à Internet, puis réessayez.': 'Firefox could not be downloaded ({why}): check the Internet connection, then try again.',
+  'Le fichier reçu n’est pas signé par Mozilla : il est effacé, rien n’a été installé.': 'The file received is not signed by Mozilla: it is deleted, nothing was installed.',
+  'Windows n’a pas fini d’installer Firefox en {min} minutes : Cyber Pinball n’attend plus. Réessayez plus tard.': 'Windows did not finish installing Firefox within {min} minutes: Cyber Pinball no longer waits. Try again later.',
+  'Windows a refusé d’installer Firefox : {detail}': 'Windows refused to install Firefox: {detail}',
 };

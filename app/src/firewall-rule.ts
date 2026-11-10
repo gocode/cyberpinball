@@ -38,6 +38,7 @@ import {
   type FirewallState,
   type VpxFirewallState,
 } from '@cyberpinball/core';
+import { ELEVATION_WAIT_MS } from '@cyberpinball/core';
 
 const SYSTEM32 = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32');
 const NETSH = path.join(SYSTEM32, 'netsh.exe');
@@ -71,7 +72,8 @@ export interface FirewallRule {
 
 /** Délai d'une commande du pare-feu ; l'autorisation de Windows (UAC) attend une réponse : plus long. */
 export const FIREWALL_COMMAND_MS = 30_000;
-export const FIREWALL_ELEVATION_MS = 5 * 60_000;
+// Une demande sans réponse n'est plus attendue au-delà du délai commun (front-policy.ts).
+export const FIREWALL_ELEVATION_MS = ELEVATION_WAIT_MS;
 
 /** Commandes du pare-feu en cours : arrêtées, arbre compris, à la fermeture de l'application. */
 const running = new Set<number>();

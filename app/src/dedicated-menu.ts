@@ -64,6 +64,7 @@ import {
 } from '@cyberpinball/core';
 import type { DedicatedProbe, DedicatedSystem, ElevatedResult, SettingsResult } from './dedicated-system';
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
+import { askElevation } from './uac-confirm';
 
 export interface DedicatedMenuHost {
   library: {
@@ -118,6 +119,11 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
   /** L'écran, la sélection sur « Retour » : rien ne demande l'autorisation de Windows par mégarde. */
   function show(): void {
     host.library.openCustom(build, Number.MAX_SAFE_INTEGER);
+  }
+
+  /** Une action qui demande l'autorisation de Windows : prévenue d'abord (uac-confirm.ts), « Plus tard » choisi. */
+  function confirmThen(what: string, go: () => void | Promise<void>): void {
+    askElevation((build, at) => host.library.openCustom(build, at), { title: t('Borne dédiée'), what, go, later: show });
   }
 
   function back(): void {
@@ -187,7 +193,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
     const replace: Action = replaceBlocker
       ? { label: t('Remplacer le bureau pour ce compte'), detail: t('Indisponible : {reason}', { reason: replaceBlocker.text }), icon: 'lock', tone: 'quiet', run: () => undefined }
       : launcher
-        ? { label: t('Activer pour ce compte'), detail: t('Shell Launcher ; Windows demande votre autorisation ; effet à la prochaine ouverture de session'), icon: 'lock', run: () => activate() }
+        ? { label: t('Activer pour ce compte'), detail: t('Shell Launcher ; Windows demande votre autorisation ; effet à la prochaine ouverture de session'), icon: 'lock', run: () => confirmThen(t('Activer la borne dédiée pour ce compte (Shell Launcher).'), () => activate()) }
         : { label: t('Remplacer le bureau pour ce compte'), detail: t('Windows demande votre autorisation ; effet à la prochaine ouverture de session'), icon: 'lock', run: () => install('shell') };
     const startup: Action = startupBlocker
       ? { label: t('Lancer au démarrage de Windows'), detail: t('Indisponible : {reason}', { reason: startupBlocker.text }), icon: 'power', tone: 'quiet', run: () => undefined }
@@ -303,7 +309,7 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
         },
       ],
       actions: [
-        { label: t('Désactiver et rétablir le bureau'), detail: t('Windows demande votre autorisation ; le bureau revient à la prochaine ouverture de session'), icon: 'restore', run: () => deactivate(record) },
+        { label: t('Désactiver et rétablir le bureau'), detail: t('Windows demande votre autorisation ; le bureau revient à la prochaine ouverture de session'), icon: 'restore', run: () => confirmThen(t('Désactiver la borne dédiée et rétablir le bureau.'), () => deactivate(record)) },
         ...(host.shellSession ? [{ label: t('Ouvrir l’Explorateur'), detail: t('Une fenêtre de fichiers ; {keys} ramène le menu', { keys: host.desktopKeys }), icon: 'folder' as const, run: () => host.showDesktop() }] : []),
         rescueAction(),
         backAction(),
@@ -319,8 +325,8 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
         { rows: [{ text: t('Fonctions de Windows « Shell Launcher » activées : redémarrez le PC, puis revenez ici terminer l’activation'), tone: 'warning', badges: [t('À vérifier')] }] },
       ],
       actions: [
-        { label: t('Terminer l’activation'), detail: t('Après le redémarrage ; Windows demande votre autorisation'), icon: 'lock', run: () => activate() },
-        { label: t('Annuler et rétablir'), detail: t('Remet l’état d’avant ; Windows demande votre autorisation'), icon: 'restore', run: () => deactivate(record) },
+        { label: t('Terminer l’activation'), detail: t('Après le redémarrage ; Windows demande votre autorisation'), icon: 'lock', run: () => confirmThen(t('Terminer l’activation de la borne dédiée.'), () => activate()) },
+        { label: t('Annuler et rétablir'), detail: t('Remet l’état d’avant ; Windows demande votre autorisation'), icon: 'restore', run: () => confirmThen(t('Annuler et rétablir le bureau.'), () => deactivate(record)) },
         rescueAction(),
         backAction(),
       ],
@@ -505,13 +511,15 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
   }
 
   /** Installer une façon : relever (la sauvegarde), écrire, vérifier. */
-  async function install(mode: CabinetMode): Promise<void> {
+  async function install(mode: CabinetMode, confirmed = false): Promise<void> {
     const command = host.command();
     if (!probe || !command) return show();
     const { user, sid } = probe;
     const startupDir = host.system.startupDir();
     const want = wantedSettings(mode, command);
     const elevate = needsElevation(want);
+    // L'autorisation de Windows : prévenue d'abord (uac-confirm.ts).
+    if (elevate && !confirmed) return confirmThen(mode === 'shell' ? t('Remplacer le bureau de Windows par Cyber Pinball pour ce compte.') : t('Lancer Cyber Pinball au démarrage de Windows, bureau masqué.'), () => install(mode, true));
     let result = { error: '?' } as SettingsResult;
     await host.library.task(settingsTask(elevate), async () => {
       result = await host.system.runSettings({ sid, startupDir, want }, elevate);
@@ -542,8 +550,9 @@ export function createDedicatedMenu(host: DedicatedMenuHost) {
   }
 
   /** Désactiver : remettre la sauvegarde, puis la vérifier point par point. */
-  async function uninstall(record: SettingsRecord): Promise<void> {
+  async function uninstall(record: SettingsRecord, confirmed = false): Promise<void> {
     const elevate = needsElevation(record.reference);
+    if (elevate && !confirmed) return confirmThen(t('Remettre les réglages de Windows d’avant.'), () => uninstall(record, true));
     let result = { error: '?' } as SettingsResult;
     await host.library.task(settingsTask(elevate), async () => {
       result = await host.system.runSettings({ sid: record.sid, startupDir: record.startupDir, want: record.reference }, elevate);

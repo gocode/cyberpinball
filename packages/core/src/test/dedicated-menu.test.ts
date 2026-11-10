@@ -133,11 +133,23 @@ function harness(options: { probe?: Partial<Probe>; windows?: SimulatedWindows; 
     await new Promise((r) => setTimeout(r, 0));
     await pending;
   };
+  /** Avertissements de la demande de Windows vus (uac-confirm.ts), chacun avec « Plus tard » en premier. */
+  let warned = 0;
   const choose = async (label: string) => {
     pending = Promise.resolve(action(label).run()) as Promise<void>;
     await pending;
+    // Une demande d'autorisation de Windows est prévenue d'abord : « Plus tard » choisi d'office, on confirme.
+    const warning = screen?.build();
+    const go = warning?.actions.find((a) => a.label === 'Continuer : Windows demande l’autorisation');
+    if (go && warning) {
+      warned++;
+      assert.equal(warning.actions[0]!.label, 'Plus tard, au bureau', '« Plus tard » en premier');
+      assert.equal(screen?.at, 0, '« Plus tard » choisi d’office');
+      pending = Promise.resolve(go.run()) as Promise<void>;
+      await pending;
+    }
   };
-  return { menu, dataDir, startupDir, state, writes, settingsWrites, reads, open, choose, shown, rows, action, at: () => screen?.at, counts: () => ({ explorer, desktop, system }) };
+  return { menu, dataDir, startupDir, state, writes, settingsWrites, reads, open, choose, shown, rows, action, at: () => screen?.at, warned: () => warned, counts: () => ({ explorer, desktop, system }) };
 }
 
 /** Toutes les actions de l'écran sauf celles qui écrivent ; chacune est essayée, puis l'écran rouvert. */
@@ -433,9 +445,9 @@ test('les écritures de la borne dédiée ne partent que de « Activer » et « 
   // (firewall-rule.ts), posée seulement par une action de l'écran « Partage et réseau » (firewall.test.ts),
   // et l'installateur signé de Microsoft du pilote de la Kinect (vision3d.ts), lancé seulement quand le
   // joueur choisit « Vision 3D : pilote Kinect à installer ».
-  // Et l'installateur signé de Mozilla (firefox-install.ts, signature vérifiée), lancé seulement quand le
-  // joueur confirme « Oui, installer Firefox » (compte YouTube du Juke-box).
-  assert.deepEqual(filesMatching(/-Verb RunAs|\brunas\b/i), ['app/src/dedicated-system.ts', 'app/src/firefox-install.ts', 'app/src/firewall-rule.ts', 'app/src/vision3d.ts']);
+  // Firefox s'installe sans élévation (paquet MSIX, firefox-install.ts). Chacune est prévenue avant
+  // (uac-confirm.ts) et n'est pas attendue sans fin : sorties.test.ts.
+  assert.deepEqual(filesMatching(/-Verb RunAs|\brunas\b/i), ['app/src/dedicated-system.ts', 'app/src/firewall-rule.ts', 'app/src/vision3d.ts']);
   // L'exécuteur n'est appelé que par l'écran, et l'écran ne l'appelle que dans activate() et deactivate().
   assert.deepEqual(filesMatching(/runElevated\(/), ['app/src/dedicated-menu.ts', 'app/src/dedicated-system.ts']);
   const menu = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'dedicated-menu.ts'), 'utf8');
@@ -446,7 +458,8 @@ test('les écritures de la borne dédiée ne partent que de « Activer » et « 
   for (const call of menu.matchAll(/\b(activate|deactivate)\(([^)]*)\)/g)) {
     const line = menu.slice(menu.lastIndexOf('\n', call.index!) + 1, menu.indexOf('\n', call.index!));
     if (/function (activate|deactivate)\(/.test(line) || /^\s*(\/\/|\*|\/\*)/.test(line)) continue;
-    assert.match(line, /run: \(\) => (activate|deactivate)\(/, `appel hors d’une action : ${line.trim()}`);
+    // Directement, ou après l'avertissement de la demande de Windows (confirmThen, uac-confirm.ts).
+    assert.match(line, /run: \(\) => (confirmThen\(.*\(\) => )?(activate|deactivate)\(/, `appel hors d’une action : ${line.trim()}`);
   }
   // Réglages du compte : l'exécuteur n'est appelé que par l'écran ; un relevé (want vide) dans
   // readProbe, une écriture seulement dans install(), uninstall() et removeStartup().
@@ -457,7 +470,8 @@ test('les écritures de la borne dédiée ne partent que de « Activer » et « 
   for (const call of menu.matchAll(/\b(install|uninstall|removeStartup)\(([^)]*)\)/g)) {
     const line = menu.slice(menu.lastIndexOf('\n', call.index!) + 1, menu.indexOf('\n', call.index!));
     if (/function (install|uninstall|removeStartup)\(/.test(line) || /^\s*(\/\/|\*|\/\*)/.test(line)) continue;
-    assert.match(line, /run: \(\) => (install|uninstall|removeStartup)\(/, `appel hors d’une action : ${line.trim()}`);
+    // Ou relancée par elle-même après l'avertissement de la demande de Windows (confirmThen).
+    assert.match(line, /run: \(\) => (install|uninstall|removeStartup)\(|confirmThen\(.*\(\) => (install|uninstall)\(\w+, true\)\)/, `appel hors d’une action : ${line.trim()}`);
   }
   // Le registre du compte et le dossier Démarrage : seulement dans le script du cœur.
   assert.deepEqual(filesMatching(/Policies\\\\System|HideIcons|WScript\.Shell/), ['packages/core/src/windowssettings.ts']);

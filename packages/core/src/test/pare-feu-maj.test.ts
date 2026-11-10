@@ -81,6 +81,15 @@ const rule = (o: Partial<FirewallRuleInfo> & { program: string }): FirewallRuleI
 /** Les règles que Windows pose à l'affichage de son invite : TCP et UDP, un profil, bloquantes tant que personne ne clique. */
 const queryUser = (profiles: number, block: boolean) => [rule({ program: EXE.toLowerCase(), profiles, allow: !block, block }), rule({ program: EXE.toLowerCase(), profiles, allow: !block, block })];
 
+
+/** L'autorisation de Windows est prévenue d'abord (uac-confirm.ts) : « Plus tard » choisi d'office, on confirme. */
+async function confirmUac(last: () => { build(): { actions: { label: string; run(): unknown }[] }; at?: number }): Promise<void> {
+  const warning = last().build();
+  assert.equal(warning.actions[0]!.label, 'Plus tard, au bureau', '« Plus tard » en premier');
+  assert.equal(last().at, 0, '« Plus tard » choisi d’office');
+  await warning.actions.find((a) => a.label === 'Continuer : Windows demande l’autorisation')!.run();
+}
+
 test('lecture par programme : une règle bloquante de l’invite de Windows n’est jamais une autorisation', () => {
   const read = (rules: FirewallRuleInfo[], vpxRules = 0) => ({ rules, vpxRules });
   // Le cas de la borne : rien que des règles « Query User », nommées comme la nôtre.
@@ -279,6 +288,7 @@ test('sans tâche de réparation : la raison reste visible, la présence dit « 
   assert.equal(screen.actions[0]!.label, 'Autoriser dans le pare-feu de Windows');
   assert.deepEqual(screen.sections.flatMap((s) => s.rows).filter((r) => r.badges?.includes('À reposer')).map((r) => r.text), ['Réseau des bornes', 'État en direct des tables Stern SAM']);
   await screen.actions[0]!.run();
+  await confirmUac(last);
   assert.equal(machine.elevations, 1, 'une seule demande de Windows, pour les règles et la tâche');
   const after = last().build();
   assert.deepEqual(after.actions.map((a) => a.label), ['Retour'], 'tout en ordre : plus rien à autoriser');

@@ -61,6 +61,34 @@ test('surveillant : Cyber Pinball sans pouls est figé, pas pendant son démarra
   assert.match(fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'main.ts'), 'utf8'), /beatPulse\(\)/);
 });
 
+test('toute demande d’autorisation de Windows (UAC) est prévenue avant, et n’est pas attendue sans fin', () => {
+  // PinCab, 10/11/2026 : la demande de Windows s'affiche sur le bureau sécurisé, où les boutons de la
+  // borne ne peuvent rien. Chaque élévation de l'application a son écran qui prévient (askElevation,
+  // « Plus tard » choisi d'office) et un délai commun (ELEVATION_WAIT_MS). Une élévation nouvelle doit
+  // s'inscrire ici, avec l'écran qui la déclenche.
+  const ELEVATIONS: Record<string, string[]> = {
+    'app/src/dedicated-system.ts': ['app/src/dedicated-menu.ts'],
+    'app/src/firewall-rule.ts': ['app/src/friends-menu.ts'],
+    'app/src/vision3d.ts': ['app/src/frontend.ts'],
+  };
+  const src = path.join(REPO_ROOT, 'app', 'src');
+  const read = (f: string) => fs.readFileSync(path.join(REPO_ROOT, f), 'utf8');
+  const elevating = fs
+    .readdirSync(src)
+    .filter((f) => f.endsWith('.ts'))
+    .map((f) => `app/src/${f}`)
+    .filter((f) => /-Verb RunAs|\brunas\b/i.test(read(f).replace(/\/\/.*$/gm, '')));
+  assert.deepEqual(elevating.sort(), Object.keys(ELEVATIONS).sort(), 'élévation nouvelle : la prévenir (askElevation) et l’inscrire ici');
+  for (const [file, screens] of Object.entries(ELEVATIONS)) {
+    assert.match(read(file), /ELEVATION_WAIT_MS/, `${file} : délai commun d’attente de la réponse de Windows`);
+    for (const screen of screens) assert.match(read(screen), /askElevation\(/, `${screen} : prévenir avant la demande de Windows`);
+  }
+  // L'écran d'avertissement : « Plus tard » d'abord (choisi d'office), et la façon de répondre.
+  const confirm = read('app/src/uac-confirm.ts');
+  assert.ok(confirm.indexOf("key: 'later'") < confirm.indexOf("key: 'go'"), '« Plus tard » en premier');
+  assert.match(confirm, /Alt\+O pour Oui, Échap pour Non/);
+});
+
 test('aucun texte affiché ne prétend que yt-dlp manque : il est là, ou s’installe à la demande', () => {
   // Le 10/11/2026 : « … demanderait un outil externe (yt-dlp) que Cyber Pinball n’a pas », sur toute
   // page vidéo ouverte hors de la recherche d'un média (Juke-box, navigation libre).
