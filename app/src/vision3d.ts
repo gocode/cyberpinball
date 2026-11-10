@@ -42,6 +42,7 @@ import {
   type Vec3,
   type Vision3dHardware,
   type Vision3dSetting,
+  type Vision3dSmoothing,
   type Vision3dSourceKind,
   type WebcamEyes,
 } from '@cyberpinball/core';
@@ -158,6 +159,8 @@ export function installVision3dPlugin(vpxDir: string, appDir: string): 'installe
 
 /** Échantillons pour mesurer la position de jeu (environ une seconde). */
 const NEUTRAL_SAMPLES = 24;
+/** Calibrage : deux fois plus de mesures, le joueur averti et immobile (environ deux secondes). */
+export const CALIBRATION_SAMPLES = 50;
 
 export type TrackerState = 'off' | 'starting' | 'searching' | 'tracking' | 'failed';
 
@@ -174,7 +177,12 @@ export interface HeadTrackerOptions {
 export class HeadTracker {
   private source?: Source;
   private socket?: dgram.Socket;
-  private readonly filter = new HeadFilter();
+  private filter = new HeadFilter();
+  private smoothing: Vision3dSmoothing = 'normal';
+  /** Intensité de l'effet (Vision3dSetting.intensity) : le déplacement envoyé en est multiplié. */
+  private intensity = 1;
+  /** Calibrage en cours (essai hors partie) : les mesures de la position de jeu, et qui prévenir. */
+  private calibrating?: { samples: Vec3[]; done: (neutral: Vec3 | undefined) => void };
   private kind?: Vision3dSourceKind;
   private configurationId?: string;
   private neutral?: Vec3;
@@ -199,8 +207,18 @@ export class HeadTracker {
   }
 
   /** Allume le capteur pour une partie. Sans erreur : la partie se joue sans Vision 3D si le capteur fait défaut. */
+  /** Intensité et réactivité, changées à tout moment (écran Vision 3D, réglages en partie) : effet immédiat. */
+  configure(setting: Pick<Vision3dSetting, 'intensity' | 'smoothing'>): void {
+    this.intensity = setting.intensity;
+    if (setting.smoothing !== this.smoothing) {
+      this.smoothing = setting.smoothing;
+      this.filter = new HeadFilter(setting.smoothing);
+    }
+  }
+
   start(kind: Vision3dSourceKind, configurationId: string, setting: Vision3dSetting): void {
     this.stop();
+    this.configure(setting);
     this.failure = undefined;
     this.kind = kind;
     this.configurationId = configurationId;
@@ -230,8 +248,11 @@ export class HeadTracker {
    * Essai hors partie (« Tester le capteur ») : le capteur allumé, chaque position lissée rendue à
    * `onHead` ; rien n'est envoyé à VPX ni enregistré. stop() l'éteint.
    */
-  test(kind: Vision3dSourceKind, setting: Vision3dSetting, onHead: (p: Vec3) => void): void {
+  test(kind: Vision3dSourceKind, setting: Vision3dSetting, onHead: (p: Vec3) => void, configurationId?: string): void {
     this.stop();
+    this.configure(setting);
+    this.kind = kind;
+    this.configurationId = configurationId;
     this.failure = undefined;
     this.filter.reset();
     this.lastSeen = 0;
@@ -249,6 +270,20 @@ export class HeadTracker {
     }
   }
 
+  /**
+   * Calibrage pendant l'essai : la position de jeu mesurée sur CALIBRATION_SAMPLES mesures (le joueur
+   * immobile en position), enregistrée pour la configuration ; `done` la reçoit (undefined : essai
+   * arrêté avant la fin).
+   */
+  calibrate(done: (neutral: Vec3 | undefined) => void): void {
+    this.calibrating?.done(undefined);
+    this.calibrating = { samples: [], done };
+  }
+
+  get calibrationProgress(): number | undefined {
+    return this.calibrating ? this.calibrating.samples.length / CALIBRATION_SAMPLES : undefined;
+  }
+
   /** Nouvelle position de jeu : celle de la tête dans la seconde qui suit. */
   recenter(): void {
     this.neutral = undefined;
@@ -262,6 +297,8 @@ export class HeadTracker {
 
   stop(): void {
     this.testing = undefined;
+    this.calibrating?.done(undefined);
+    this.calibrating = undefined;
     this.source?.stop();
     this.source = undefined;
     this.socket?.close();
@@ -274,6 +311,16 @@ export class HeadTracker {
     const now = Date.now();
     this.lastSeen = now;
     const p = this.filter.filter(raw, now / 1000);
+    if (this.calibrating) {
+      const c = this.calibrating;
+      c.samples.push(p);
+      if (c.samples.length >= CALIBRATION_SAMPLES) {
+        this.calibrating = undefined;
+        this.neutral = medianHead(c.samples);
+        this.saveNeutral();
+        c.done(this.neutral);
+      }
+    }
     if (this.testing) return this.testing(p);
     if (!this.neutral) {
       this.samples.push(p);
@@ -283,7 +330,8 @@ export class HeadTracker {
       this.saveNeutral();
       return;
     }
-    const d = clampShift(subtract(p, this.neutral));
+    const shift = subtract(p, this.neutral);
+    const d = clampShift({ x: shift.x * this.intensity, y: shift.y * this.intensity, z: shift.z * this.intensity });
     this.socket?.send(opentrackPacket(d), Number(process.env.CYBERPINBALL_VISION3D_PORT) || VISION3D_PORT, '127.0.0.1');
     this.sent++;
   }

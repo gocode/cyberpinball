@@ -46,6 +46,7 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Juke-box: sign in to your YouTube account (Juke-box management > “YouTube account”) to import your own playlists, private ones included, as well as “Liked videos” and “Watch later”. You sign in from the “Get” window and the sign-in is kept; if Google refuses it, Cyber Pinball can take the one from a browser on this PC (Firefox recommended). No password is ever seen or kept.
 - Juke-box: “Search YouTube” in the import opens “Get” on results showing playlists only; “Add to the Juke-box” on a playlist or a video brings you back to the import with that link.
 - Juke-box: on the on-screen keyboard, the link already starts with a playlist address (or a video one, with the “Video” key): you only type the ID. An ID alone (PL…, OLAK5uy_…) is accepted everywhere, on the phone too, and a whole pasted link is never doubled.
+- 3D vision, three settings on its screen: "Calibrer la position de jeu" (Calibrate the playing position: two seconds still in playing position), "Intensité" (Intensity) from 25 % to 150 % (75 % by default, also adjustable in game with the MagnaSave buttons, against seasickness), and "Réactivité" (Responsiveness) gentle, normal or quick: the table follows the head with clearly less lag.
 
 ## 0.1.8
 

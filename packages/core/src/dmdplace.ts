@@ -206,10 +206,12 @@ export interface DmdMenuHost {
    * possible ; un texte, pourquoi elle ne l'est pas. Absente : Vision 3D désactivée, ligne cachée.
    */
   vision3d?: true | string;
+  /** Intensité de la Vision 3D, telle que la ligne la montre (« 75 % »). */
+  vision3dIntensity?: string;
 }
 
 /** Lignes du menu, dans l'ordre. */
-export type DmdItemId = 'screen' | 'moveX' | 'moveY' | 'size' | 'format' | 'shown' | 'save' | 'general' | 'recenter3d' | 'vpx' | 'resume';
+export type DmdItemId = 'screen' | 'moveX' | 'moveY' | 'size' | 'format' | 'shown' | 'save' | 'general' | 'recenter3d' | 'intensity3d' | 'vpx' | 'resume';
 
 const ITEMS: readonly { id: DmdItemId; label: () => string }[] = [
   { id: 'screen', label: () => t('Écran') },
@@ -221,12 +223,13 @@ const ITEMS: readonly { id: DmdItemId; label: () => string }[] = [
   { id: 'save', label: () => t('Enregistrer pour cette table') },
   { id: 'general', label: () => t('Revenir à la position générale') },
   { id: 'recenter3d', label: () => t('Recentrer la vue 3D') },
+  { id: 'intensity3d', label: () => t('Intensité de la vue 3D') },
   { id: 'vpx', label: () => t('Tous les réglages de VPX') },
   { id: 'resume', label: () => t('Reprendre la partie') },
 ];
 
 /** Ligne montrée dans cette partie : « Recentrer la vue 3D » seulement quand la Vision 3D est activée. */
-const shown = (host: DmdMenuHost, id: DmdItemId) => id !== 'recenter3d' || host.vision3d !== undefined;
+const shown = (host: DmdMenuHost, id: DmdItemId) => (id !== 'recenter3d' && id !== 'intensity3d') || host.vision3d !== undefined;
 
 /** Lignes qui règlent la place du DMD (le reste : enregistrer, quitter). */
 const PLACE_ITEMS: readonly DmdItemId[] = ['screen', 'moveX', 'moveY', 'size', 'format', 'shown'];
@@ -259,7 +262,9 @@ export type DmdMenuOutcome =
   /** Fermer le menu, la partie reprend ; `discard` : les changements sont abandonnés. */
   | { resume: true; discard: boolean }
   /** Vision 3D : remesurer la position de jeu sur la tête du joueur ; le menu reste ouvert. */
-  | { recenter3d: true };
+  | { recenter3d: true }
+  /** Vision 3D : intensité suivante (25 à 150 %), effet immédiat ; le menu reste ouvert. */
+  | { intensity3d: true };
 
 export interface DmdMenuState {
   item: number;
@@ -357,6 +362,8 @@ function valueOf(host: DmdMenuHost, s: DmdMenuState, id: DmdItemId): string {
       return formatLabel(s.spot.zone.aspect);
     case 'shown':
       return s.spot.hidden ? t('masqué') : t('affiché');
+    case 'intensity3d':
+      return host.vision3dIntensity ?? '';
     default:
       return '';
   }
@@ -387,6 +394,8 @@ function open(host: DmdMenuHost, s: DmdMenuState): DmdMenuOutcome {
       return 'general';
     case 'recenter3d':
       return { recenter3d: true };
+    case 'intensity3d':
+      return { intensity3d: true };
     case 'vpx':
       return leave(s, 'vpx');
     case 'resume':
@@ -636,7 +645,7 @@ export function dmdMenuPanel(host: DmdMenuHost, s: DmdMenuState, keyLabel: (code
         items: indices(PLACE_ITEMS).map(line),
       },
       { title: '', items: indices(['save', 'general']).map(line) },
-      { title: t('Partie'), items: indices(shown(host, 'recenter3d') ? ['recenter3d', 'vpx', 'resume'] : ['vpx', 'resume']).map(line) },
+      { title: t('Partie'), items: indices(shown(host, 'recenter3d') ? ['recenter3d', 'intensity3d', 'vpx', 'resume'] : ['vpx', 'resume']).map(line) },
     ],
     ...(s.mode === 'choice' && { choices: choices.map((c, i) => ({ label: c.label, selected: i === s.choice })) }),
     ...(s.leaving && {

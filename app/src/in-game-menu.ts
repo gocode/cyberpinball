@@ -97,8 +97,8 @@ export interface InGameContext {
    */
   vr?: boolean;
   dataDir: string;
-  /** Vision 3D activée pour cette partie (vision3d.ts) : l'état du suivi, et le recentrage. */
-  vision3d?: { state: () => string; recenter: () => void };
+  /** Vision 3D activée pour cette partie (vision3d.ts) : l'état du suivi, le recentrage, l'intensité. */
+  vision3d?: { state: () => string; recenter: () => void; intensity: () => string; nextIntensity: () => string };
 }
 
 export interface InGameMenu {
@@ -256,7 +256,7 @@ export function createInGameMenu(opts: { log: (line: string) => void; /** La por
       ...(general && { general }),
       live: vpx ? true : t('VPX n’a pas ouvert de fenêtre pour le DMD dans cette partie (DMD éteint ou incrusté dans le plateau) : la place choisie se verra à la prochaine partie.'),
       ...(!vpxKey && { vpxMenuBlocked: t('Aucune touche du clavier n’ouvre le menu de VPX : un bouton de la borne a pris F12.') }),
-      ...(g.vision3d && { vision3d: vision3dLine(g.vision3d.state()) }),
+      ...(g.vision3d && { vision3d: vision3dLine(g.vision3d.state()), vision3dIntensity: g.vision3d.intensity() }),
     };
     const playfield = screens.findIndex((s) => s.fingerprint === g.cabinet.roles.playfield);
     const panel = Math.max(0, playfield);
@@ -357,6 +357,9 @@ export function createInGameMenu(opts: { log: (line: string) => void; /** La por
       game.vision3d?.recenter();
       menu.state.notice = t('Vue 3D recentrée : votre position de jeu est remesurée pendant une seconde, restez en place.');
       opts.log(`Réglages en partie (${game.table.id}) : vue 3D recentrée.`); // i18n-ignore : journal
+    } else if (typeof out === 'object' && 'intensity3d' in out && game.vision3d) {
+      menu.host.vision3dIntensity = game.vision3d.nextIntensity();
+      menu.state.notice = t('Intensité de la vue 3D : {v}. Bougez la tête pour juger ; Start pour la suivante.', { v: menu.host.vision3dIntensity });
     }
     applyLive(menu.state.spot);
     render();

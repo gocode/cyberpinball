@@ -48,6 +48,7 @@ son interface).
 - Juke-box : connectez votre compte YouTube (Gestion du Juke-box > « Compte YouTube ») pour importer vos propres playlists, privées comprises, ainsi que « J’aime » et « À regarder plus tard ». La connexion se fait dans la fenêtre « Récupérer » et reste gardée ; si Google la refuse, Cyber Pinball peut reprendre celle d’un navigateur de ce PC (Firefox conseillé). Aucun mot de passe n’est vu ni gardé.
 - Juke-box : « Chercher sur YouTube » depuis l’import ouvre « Récupérer » sur des résultats qui ne montrent que des playlists ; « Ajouter au Juke-box » sur une playlist ou une vidéo ramène à l’import sur ce lien.
 - Juke-box : au clavier à l’écran, le lien commence déjà par l’adresse d’une playlist (ou d’une vidéo, par la touche « Vidéo ») : on ne tape que l’identifiant. Un identifiant seul (PL…, OLAK5uy_…) est accepté partout, au téléphone aussi, et un lien entier collé n’est jamais doublé.
+- Vision 3D, trois réglages dans son écran : « Calibrer la position de jeu » (deux secondes immobile en position de jeu), « Intensité » de 25 % à 150 % (75 % par défaut, aussi réglable en partie avec les MagnaSave, contre le mal de mer), et « Réactivité » douce, normale ou vive : la table suit la tête avec nettement moins de retard.
 
 ## 0.1.8
 

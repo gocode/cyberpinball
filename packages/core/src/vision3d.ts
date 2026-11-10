@@ -39,9 +39,54 @@ export interface Vision3dSetting {
   neutral: Record<string, Vision3dNeutral>;
   /** Champ horizontal de la webcam (degrés), pour estimer la distance de la tête. */
   webcamFovDeg: number;
+  /**
+   * Intensité de l'effet : le déplacement de la tête multiplié par elle (1 = mouvement réel). Plus
+   * bas, la table bouge moins : moins de « mal de mer » (essai sur une borne, 10/11/2026).
+   */
+  intensity: number;
+  /** Réactivité du lissage : doux (calme, un peu de retard), normal, vif (anticipe le mouvement). */
+  smoothing: Vision3dSmoothing;
 }
 
-export const DEFAULT_VISION3D: Vision3dSetting = { mode: 'off', source: 'auto', neutral: {}, webcamFovDeg: 70 };
+export type Vision3dSmoothing = 'doux' | 'normal' | 'vif';
+
+/** Intensités proposées, de la plus discrète à la plus marquée. */
+export const VISION3D_INTENSITIES = [0.25, 0.5, 0.75, 1, 1.25, 1.5] as const;
+
+export const DEFAULT_VISION3D: Vision3dSetting = { mode: 'off', source: 'auto', neutral: {}, webcamFovDeg: 70, intensity: 0.75, smoothing: 'normal' };
+
+/** L'intensité suivante (en boucle), pour un bouton qui la fait défiler. */
+export function nextIntensity(current: number): number {
+  const i = VISION3D_INTENSITIES.findIndex((v) => v > current + 1e-6);
+  return i < 0 ? VISION3D_INTENSITIES[0] : VISION3D_INTENSITIES[i]!;
+}
+
+export const VISION3D_SMOOTHINGS: readonly Vision3dSmoothing[] = ['doux', 'normal', 'vif'];
+
+export function nextSmoothing(current: Vision3dSmoothing): Vision3dSmoothing {
+  return VISION3D_SMOOTHINGS[(VISION3D_SMOOTHINGS.indexOf(current) + 1) % VISION3D_SMOOTHINGS.length]!;
+}
+
+export function intensityLabel(v: number): string {
+  return `${Math.round(v * 100)} %`;
+}
+
+export function smoothingLabel(s: Vision3dSmoothing): string {
+  return s === 'doux' ? t('douce') : s === 'vif' ? t('vive') : t('normale');
+}
+
+/**
+ * Lissage de chaque réactivité (filtre « 1 € » et anticipation). minCutoff : calme à l'arrêt (Hz) ;
+ * beta : vitesse à laquelle le filtre s'ouvre quand la tête bouge (par cm/s) ; predictMs : avance
+ * donnée à la position d'après sa vitesse, pour compenser le retard du capteur (la Kinect mesure
+ * 30 fois par seconde et livre la tête avec 60 à 100 ms de retard). Avant le 10/11/2026 : 1 Hz,
+ * 0,05 et aucune avance, senti en retard sur une borne.
+ */
+export const SMOOTHING_PRESETS: Record<Vision3dSmoothing, { minCutoff: number; beta: number; predictMs: number }> = {
+  doux: { minCutoff: 0.7, beta: 0.05, predictMs: 0 },
+  normal: { minCutoff: 1.0, beta: 0.3, predictMs: 35 },
+  vif: { minCutoff: 1.5, beta: 0.8, predictMs: 60 },
+};
 
 const finite = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
@@ -60,6 +105,8 @@ export function parseVision3dSetting(raw: unknown): Vision3dSetting {
     source: r.source === 'kinect1' || r.source === 'webcam' ? r.source : 'auto',
     neutral,
     webcamFovDeg: finite(r.webcamFovDeg) && r.webcamFovDeg >= 30 && r.webcamFovDeg <= 120 ? r.webcamFovDeg : DEFAULT_VISION3D.webcamFovDeg,
+    intensity: finite(r.intensity) && r.intensity >= 0.1 && r.intensity <= 2 ? r.intensity : DEFAULT_VISION3D.intensity,
+    smoothing: r.smoothing === 'doux' || r.smoothing === 'vif' || r.smoothing === 'normal' ? r.smoothing : DEFAULT_VISION3D.smoothing,
   };
 }
 
@@ -339,6 +386,11 @@ export class OneEuroFilter {
     return 1 / (1 + tau / dt);
   }
 
+  /** Vitesse lissée de la dernière mesure (unités par seconde), pour anticiper. */
+  get speed(): number {
+    return this.last?.dx ?? 0;
+  }
+
   filter(x: number, tSec: number): number {
     if (!this.last || tSec <= this.last.t) {
       this.last = { t: tSec, x, dx: 0 };
@@ -358,10 +410,24 @@ export class OneEuroFilter {
   }
 }
 
+/** Avance maximale donnée par l'anticipation (cm) : un faux mouvement ne projette pas la vue. */
+export const MAX_PREDICTION_CM = 4;
+
 export class HeadFilter {
-  private readonly axes = [new OneEuroFilter(), new OneEuroFilter(), new OneEuroFilter()] as const;
+  private readonly axes: readonly [OneEuroFilter, OneEuroFilter, OneEuroFilter];
+  private readonly predictSec: number;
+  constructor(smoothing: Vision3dSmoothing = 'normal') {
+    const p = SMOOTHING_PRESETS[smoothing];
+    this.axes = [new OneEuroFilter(p.minCutoff, p.beta), new OneEuroFilter(p.minCutoff, p.beta), new OneEuroFilter(p.minCutoff, p.beta)];
+    this.predictSec = p.predictMs / 1000;
+  }
   filter(p: Vec3, tSec: number): Vec3 {
-    return { x: this.axes[0].filter(p.x, tSec), y: this.axes[1].filter(p.y, tSec), z: this.axes[2].filter(p.z, tSec) };
+    const ahead = (a: OneEuroFilter, v: number) => {
+      const f = a.filter(v, tSec);
+      const lead = Math.max(-MAX_PREDICTION_CM, Math.min(MAX_PREDICTION_CM, a.speed * this.predictSec));
+      return f + lead;
+    };
+    return { x: ahead(this.axes[0], p.x), y: ahead(this.axes[1], p.y), z: ahead(this.axes[2], p.z) };
   }
   reset(): void {
     for (const a of this.axes) a.reset();

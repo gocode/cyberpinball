@@ -220,6 +220,11 @@ import {
   type RemoteButton,
   vrMenuText,
   megabytes,
+  intensityLabel,
+  nextIntensity,
+  nextSmoothing,
+  smoothingLabel,
+  type Vision3dSetting,
   vision3dGameReport,
   vision3dPluginLog,
   vision3dMenuText,
@@ -1907,6 +1912,7 @@ function stopVision3dTest(): void {
 function openVision3dScreen(at = 0): void {
   const back = () => {
     stopVision3dTest();
+    vision3dCalibrationDone = false;
     library.openSystem();
   };
   library.openCustom(() => {
@@ -1918,6 +1924,18 @@ function openVision3dScreen(at = 0): void {
         : { icon: 'alert', text: readiness.reason, tone: 'warning' as const },
       { icon: 'eye', text: vision3d.mode === 'on' ? t('Vision 3D activée : la perspective des tables suit votre tête') : t('Vision 3D désactivée'), tone: vision3d.mode === 'on' ? ('ok' as const) : ('quiet' as const) },
     ];
+    const configuration = loadCabinet(loc.dataDir);
+    const calibrated = configuration ? vision3d.neutral[configuration.id] : undefined;
+    const progress = headTracker.calibrationProgress;
+    rows.push(
+      progress !== undefined
+        ? { icon: 'pin', text: t('Calibrage : restez immobile en position de jeu… {p} %', { p: Math.round(progress * 100) }), tone: 'info' as const, progress: { value: progress, tone: 'info' as const } }
+        : vision3dCalibrationDone
+          ? { icon: 'pin', text: t('Position de jeu enregistrée pour cette configuration'), tone: 'ok' as const }
+          : calibrated
+            ? { icon: 'pin', text: t('Position de jeu calibrée pour cette configuration'), detail: t('Intensité {i} · réactivité {r}', { i: intensityLabel(vision3d.intensity), r: smoothingLabel(vision3d.smoothing) }), tone: 'quiet' as const }
+            : { icon: 'pin', text: t('Position de jeu pas encore calibrée : elle sera mesurée au début de la prochaine partie'), tone: 'quiet' as const },
+    );
     if (vision3dLastGame && !vision3dTest) rows.push({ icon: vision3dLastGame.ok ? 'check' : 'alert', text: vision3dLastGame.text, tone: vision3dLastGame.ok ? ('ok' as const) : ('warning' as const) });
     if (vision3dTest) {
       const failure = headTracker.failureReason;
@@ -1946,6 +1964,24 @@ function openVision3dScreen(at = 0): void {
           console.log(`Vision 3D : ${vision3d.mode === 'on' ? `activée (${readiness.label})` : 'désactivée'}.`); // i18n-ignore : journal
           openVision3dScreen(library.cursor());
         },
+      });
+      actions.push({
+        label: t('Calibrer la position de jeu'),
+        detail: t('Mettez-vous en position de jeu, regardez le milieu du plateau et ne bougez plus pendant deux secondes'),
+        icon: 'pin',
+        run: () => calibrateVision3d(readiness.source),
+      });
+      actions.push({
+        label: t('Intensité : {v}', { v: intensityLabel(vision3d.intensity) }),
+        detail: t('Choisir pour la changer, de 25 % (discrète) à 150 % (marquée) ; 100 % : comme une vraie fenêtre. Aussi en partie, avec les MagnaSave'),
+        icon: 'gauge',
+        run: () => setVision3dTuning({ intensity: nextIntensity(vision3d.intensity) }),
+      });
+      actions.push({
+        label: t('Réactivité : {v}', { v: smoothingLabel(vision3d.smoothing) }),
+        detail: t('Douce : la plus calme, un peu de retard ; vive : anticipe le mouvement de la tête, la moins en retard'),
+        icon: 'sliders',
+        run: () => setVision3dTuning({ smoothing: nextSmoothing(vision3d.smoothing) }),
       });
       actions.push({
         label: vision3dTest ? t('Arrêter l’essai') : t('Tester le capteur'),
@@ -2002,6 +2038,32 @@ function noteVision3dGame(logFile: string, from: number): void {
   console.log(`Vision 3D : ${vision3dLastGame.text}`); // i18n-ignore : journal (texte déjà traduit)
 }
 
+/** Calibrage demandé depuis l'écran Vision 3D : fait, il est dit sur l'écran (jusqu'à la sortie). */
+let vision3dCalibrationDone = false;
+
+/** Intensité ou réactivité changée : enregistrée, appliquée aussitôt au capteur allumé (essai ou partie). */
+function setVision3dTuning(change: Partial<Pick<Vision3dSetting, 'intensity' | 'smoothing'>>): void {
+  vision3d = { ...readVision3d(loc.dataDir), ...change };
+  writeVision3d(loc.dataDir, vision3d);
+  headTracker.configure(vision3d);
+  console.log(`Vision 3D : intensité ${intensityLabel(vision3d.intensity)}, réactivité ${vision3d.smoothing}.`); // i18n-ignore : journal
+  if (!playing) openVision3dScreen(library.cursor());
+}
+
+/** « Calibrer la position de jeu » : le capteur allumé (essai), deux secondes de mesures, enregistrées. */
+function calibrateVision3d(source: Vision3dSourceKind): void {
+  vision3dCalibrationDone = false;
+  if (!vision3dTest) startVision3dTest(source);
+  if (vision3dTest) vision3dTest.until = Date.now() + VISION3D_TEST_MS;
+  headTracker.calibrate((neutral) => {
+    if (!neutral) return;
+    vision3d = readVision3d(loc.dataDir);
+    vision3dCalibrationDone = true;
+    openVision3dScreen(library.cursor());
+  });
+  openVision3dScreen(library.cursor());
+}
+
 /** « Tester le capteur » : allumé hors partie, l'écran suit la tête en direct, puis s'éteint seul. */
 function startVision3dTest(source: Vision3dSourceKind): void {
   stopVision3dTest();
@@ -2011,11 +2073,16 @@ function startVision3dTest(source: Vision3dSourceKind): void {
     openVision3dScreen(library.cursor());
   }, 300);
   vision3dTest = { until: Date.now() + VISION3D_TEST_MS, seen: 0, timer };
-  headTracker.test(source, vision3d, (p) => {
-    if (!vision3dTest) return;
-    vision3dTest.seen++;
-    vision3dTest.last = p;
-  });
+  headTracker.test(
+    source,
+    vision3d,
+    (p) => {
+      if (!vision3dTest) return;
+      vision3dTest.seen++;
+      vision3dTest.last = p;
+    },
+    loadCabinet(loc.dataDir)?.id,
+  );
   openVision3dScreen(library.cursor());
 }
 
@@ -3531,7 +3598,17 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
     if (vrGame) console.log(playedVr ? `Réalité virtuelle (${table.id}) : partie dans le casque.` : `Réalité virtuelle (${table.id}) : casque pas prêt, partie sur les écrans.`); // i18n-ignore : journal
     if (vision3dSource && configuration) headTracker.start(vision3dSource, configuration.id, vision3d);
     // Les deux MagnaSave ouvrent désormais les réglages en partie (position du DMD, puis menu de VPX ; en VR, celui de VPX dans le casque).
-    if (configuration) inGameMenu.arm({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), place: playfieldPlace(), configurationIni: vrGame?.ini ?? activeVpxIni(loc), dataDir: loc.dataDir, vr: playedVr, ...(vision3dSource && { vision3d: { state: () => headTracker.state, recenter: () => headTracker.recenter() } }) });
+    if (configuration) inGameMenu.arm({ pid: game.pid, table, cabinet: configuration, displays: observedDisplays(), place: playfieldPlace(), configurationIni: vrGame?.ini ?? activeVpxIni(loc), dataDir: loc.dataDir, vr: playedVr, ...(vision3dSource && {
+        vision3d: {
+          state: () => headTracker.state,
+          recenter: () => headTracker.recenter(),
+          intensity: () => intensityLabel(vision3d.intensity),
+          nextIntensity: () => {
+            setVision3dTuning({ intensity: nextIntensity(vision3d.intensity) });
+            return intensityLabel(vision3d.intensity);
+          },
+        },
+      }) });
     // Partie entre amis : l'arrêt automatique (essais) se compte depuis « partez ».
     if (autoStopAfterMs && !hooks.gate) setTimeout(() => game.stop(), autoStopAfterMs);
   };

@@ -11,6 +11,9 @@ import {
   kinectAim,
   kinectHead,
   medianHead,
+  nextIntensity,
+  nextSmoothing,
+  intensityLabel,
   nuiErrorReason,
   OneEuroFilter,
   opentrackPacket,
@@ -230,4 +233,38 @@ test('codes d’erreur du pilote de la Kinect : la vraie raison, pas une supposi
   assert.match(nuiErrorReason(0x8301027f | 0), /courant/);
   assert.match(nuiErrorReason(0x83010009 | 0), /autre logiciel/);
   assert.match(nuiErrorReason(0x80004005 | 0), /erreur du pilote de la Kinect \(0x80004005\)/);
+});
+
+test('intensité et réactivité : valeurs par défaut sages, lues sans faire confiance au fichier, qui défilent en boucle', () => {
+  assert.equal(DEFAULT_VISION3D.intensity, 0.75);
+  assert.equal(DEFAULT_VISION3D.smoothing, 'normal');
+  assert.equal(parseVision3dSetting({ intensity: 9, smoothing: 'turbo' }).intensity, 0.75);
+  assert.equal(parseVision3dSetting({ intensity: 1.25, smoothing: 'vif' }).smoothing, 'vif');
+  assert.deepEqual([0.25, 0.5, 0.75, 1, 1.25, 1.5].map(nextIntensity), [0.5, 0.75, 1, 1.25, 1.5, 0.25]);
+  assert.equal(nextIntensity(0.6), 0.75, 'une valeur hors liste reprend à la suivante');
+  assert.equal(intensityLabel(0.75), '75 %');
+  assert.deepEqual(['doux', 'normal', 'vif'].map((x) => nextSmoothing(x as 'doux')), ['normal', 'vif', 'doux']);
+});
+
+test('réactivité : « vif » suit une tête qui bouge avec moins de retard, et reste calme à l’arrêt', () => {
+  // La tête glisse de 30 cm en une demi-seconde (60 cm/s), mesurée 30 fois par seconde.
+  const lag = (smoothing: 'doux' | 'normal' | 'vif') => {
+    const f = new HeadFilter(smoothing);
+    let worst = 0;
+    for (let i = 0; i <= 15; i++) {
+      const truth = i * 2;
+      const out = f.filter({ x: truth, y: 0, z: 100 }, i / 30).x;
+      worst = Math.max(worst, truth - out);
+    }
+    return worst;
+  };
+  assert.ok(lag('vif') < lag('normal') && lag('normal') < lag('doux'), `retards : vif ${lag('vif')}, normal ${lag('normal')}, doux ${lag('doux')}`);
+  // Immobile avec du bruit de mesure (± 0,6 cm) : l'anticipation n'en fait pas un tremblement.
+  const still = new HeadFilter('vif');
+  let swing = 0;
+  for (let i = 0; i < 90; i++) {
+    const out = still.filter({ x: i % 2 ? 0.6 : -0.6, y: 0, z: 100 }, i / 30).x;
+    if (i > 30) swing = Math.max(swing, Math.abs(out));
+  }
+  assert.ok(swing < 1, `tremblement à l’arrêt : ${swing} cm`);
 });

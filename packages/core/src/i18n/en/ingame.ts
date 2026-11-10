@@ -75,6 +75,8 @@ export const messages: Record<string, string> = {
     '“Menu DMD” is set to “classic”: the wheel shows the table’s DMD media, without dots (System menu > Media > “Media, sound and attract mode”).',
   // packages/core/src/dmdplace.ts, app/src/in-game-menu.ts : Vision 3D en partie
   'Recentrer la vue 3D': 'Recenter the 3D view',
+  'Intensité de la vue 3D': '3D view intensity',
+  'Intensité de la vue 3D : {v}. Bougez la tête pour juger ; Start pour la suivante.': '3D view intensity: {v}. Move your head to judge; Start for the next one.',
   'Vue 3D recentrée : votre position de jeu est remesurée pendant une seconde, restez en place.': '3D view recentered: your playing position is measured again for one second, stay in place.',
   'Le capteur de la Vision 3D ne répond pas : voyez le journal de Cyber Pinball.': 'The 3D vision sensor is not responding: see the Cyber Pinball log.',
   'Vision 3D : aucune tête devant le capteur pour l’instant.': '3D vision: no head in front of the sensor yet.',

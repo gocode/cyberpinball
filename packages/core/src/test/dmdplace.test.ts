@@ -198,12 +198,12 @@ test('menu en partie : quitter sans enregistrer demande, enregistrer reste dans 
   markDmdSaved(s, 'Enregistré');
   assert.equal(dmdMenuDirty(s), false);
   // « Tous les réglages de VPX » sans changement : directement.
-  s.item = 9;
+  s.item = 10;
   assert.deepEqual(press(h, s, 'Digit1'), { vpx: true, discard: false });
   // Aucune touche n'ouvre le menu de VPX : grisé avec sa raison.
   const blocked = host({ vpxMenuBlocked: 'Aucune touche' });
   const b = startDmdMenu({ screen: 0, zone: band, hidden: false });
-  b.item = 9;
+  b.item = 10;
   assert.equal(press(blocked, b, 'Digit1'), 'handled');
   assert.equal(b.notice, 'Aucune touche');
 });
@@ -248,14 +248,18 @@ test('menu en partie : « Recentrer la vue 3D » seulement avec la Vision 3D, gr
   const s = startDmdMenu({ screen: 0, zone: band, hidden: false });
   s.item = 7; // « Revenir à la position générale »
   press(off, s, 'ShiftRight');
-  assert.equal(s.item, 9, 'la ligne cachée est sautée : « Tous les réglages de VPX »');
+  assert.equal(s.item, 10, 'les lignes cachées sont sautées : « Tous les réglages de VPX »');
   press(off, s, 'ShiftLeft');
   assert.equal(s.item, 7);
   assert.equal(dmdMenuAction(off, s, { op: 'item', index: 8 }), 'handled');
   // Tête suivie : la ligne est là, dans « Partie », et demande le recentrage sans fermer le menu.
-  const on = host({ vision3d: true });
+  const on = host({ vision3d: true, vision3dIntensity: '75 %' });
   const partie = dmdMenuPanel(on, s, (c) => c[0]!).sections.find((x) => x.title === 'Partie')!;
-  assert.deepEqual(partie.items.map((i) => i.label), ['Recentrer la vue 3D', 'Tous les réglages de VPX', 'Reprendre la partie']);
+  assert.deepEqual(partie.items.map((i) => i.label), ['Recentrer la vue 3D', 'Intensité de la vue 3D', 'Tous les réglages de VPX', 'Reprendre la partie']);
+  assert.equal(partie.items[1]!.value, '75 %');
+  const i3 = startDmdMenu({ screen: 0, zone: band, hidden: false });
+  i3.item = 9;
+  assert.deepEqual(press(on, i3, 'Digit1'), { intensity3d: true });
   s.item = 7;
   press(on, s, 'ShiftRight');
   assert.equal(s.item, 8);

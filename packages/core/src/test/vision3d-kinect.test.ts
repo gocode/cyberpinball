@@ -98,8 +98,13 @@ app.whenReady().then(async () => {
     const { HeadTracker, readSkeletonFrame } = require(${JSON.stringify(vision3d)});
     const { parseVision3dSetting } = require(${JSON.stringify(core)});
     const tracker = new HeadTracker({ dataDir: ${JSON.stringify(dir)}, appDir: ${JSON.stringify(path.join(REPO, 'app'))}, log: (l) => seen.log.push(l) });
-    tracker.start('kinect1', 'essai', parseVision3dSetting({}));
+    tracker.start('kinect1', 'essai', parseVision3dSetting({ intensity: 1 }));
     await new Promise((r) => setTimeout(r, 4000));
+    seen.full = seen.packets.at(-1);
+    // Intensité à moitié, en plein suivi : le déplacement envoyé est divisé par deux, aussitôt.
+    tracker.configure({ intensity: 0.5, smoothing: 'normal' });
+    await new Promise((r) => setTimeout(r, 500));
+    seen.half = seen.packets.at(-1);
     seen.state = tracker.state;
     seen.failure = tracker.failureReason;
     tracker.stop();
@@ -124,9 +129,11 @@ app.whenReady().then(async () => {
     assert.equal(seen.failure, undefined, trace);
     assert.equal(seen.state, 'tracking', trace);
     assert.ok(seen.packets.length > 20, `${seen.packets.length} paquets${trace}`);
-    const last = seen.packets.at(-1)!;
-    assert.ok(Math.abs(last[0]! - 10) < 1, `x final ${last[0]} cm (10 attendus)${trace}`);
+    const last = (seen as unknown as { full: number[] }).full;
+    assert.ok(Math.abs(last[0]! - 10) < 1, `x à 100 % : ${last[0]} cm (10 attendus)${trace}`);
     assert.ok(Math.abs(last[1]!) < 0.5 && Math.abs(last[2]!) < 0.5, `y, z finaux ${last[1]}, ${last[2]}`);
+    const half = (seen as unknown as { half: number[] }).half;
+    assert.ok(Math.abs(half[0]! - 5) < 0.6, `x à 50 % : ${half[0]} cm (5 attendus)`);
   } finally {
     fs.rmSync(dir, { recursive: true, force: true });
   }
