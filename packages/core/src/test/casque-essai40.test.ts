@@ -44,51 +44,57 @@ test('calage : la hauteur prise dès le premier calage, quel que soit le sol du 
   assert.match(read('app', 'src', 'frontend.ts'), /c\.place = freePlace\(gaze, gaze\.eyes\);/);
 });
 
-test('calage : un appui, une étape (plus de A « pour commencer »)', () => {
+test('calage : les gâchettes placent la borne (deux coins d’un coup), A valide et sort, sans appui « pour commencer »', () => {
   const frontend = read('app', 'src', 'frontend.ts');
   const key = frontend.slice(frontend.indexOf('function calibrationKey('), frontend.indexOf('function calibrationCentre('));
-  // Exit termine ; A valide une place prise ; au bureau, A pose aussitôt (et quitte le premier écran).
   assert.doesNotMatch(key, /calibration\?\.intro\)/);
-  assert.match(key, /if \(KEYS\.exit\.includes\(input\.code\)\) closeCalibration\(\);\s*else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.place\) applyCalibration\(\);/);
+  assert.match(key, /if \(KEYS\.exit\.includes\(input\.code\)\) closeCalibration\(\);\s*else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.place\) \{\s*applyCalibration\(\);\s*closeCalibration\(\);/);
   assert.match(key, /calibration\.intro = false;\s*calibration\.placing = true;\s*showCalibration\(\);\s*headset\?\.recenter\(\);/);
-  // La gâchette prend le point même au premier écran.
-  assert.match(frontend, /function calibrationPoint\(point: Point3, room: boolean\): void \{\s*const c = calibration;\s*if \(!c\) return;\s*\/\/[^\n]*\n\s*c\.intro = false;/);
+  // Les deux manettes sur les coins : une gâchette prend les deux points ; sinon celui de la gâchette.
+  assert.match(frontend, /const both = points\.length >= 2 && !calibrationProblem\(points\[0\]!, points\[1\]!\);/);
+  assert.match(frontend, /const \[left, right\] = orderCorners\(pair\[0\], pair\[1\], head \?\? fallback\);/);
+  const cpp = read('packages', 'casque-vr', 'src', 'casque.cpp');
+  assert.match(cpp, /say\(std::string\("pointes "\) \+ \(hand \? "droite " : "gauche "\) \+ p3\(at\[0\]\.pose\.position\) \+ " " \+ p3\(at\[1\]\.pose\.position\) \+ tail\);/);
+  assert.match(cpp, /" tete " \+ std::to_string\(head\.pose\.position\.x\) \+ " " \+ std::to_string\(head\.pose\.position\.z\)/);
 });
 
 test('calage : une consigne courte, en très gros au milieu du regard ; le détail seulement en cas de problème', () => {
   const frontend = read('app', 'src', 'frontend.ts');
   const show = frontend.slice(frontend.indexOf('function showCalibration('), frontend.indexOf('function calibrationMarks('));
-  // Plus d'avertissement de sol ni de recentrage à chaque écran.
   assert.doesNotMatch(show, /eyeHeightProblem|roomStale/);
-  assert.match(show, /const prompt = \{ text, keys, \.\.\.\(issue && \{ problem: issue \}\), \.\.\.\(status && \{ status \}\) \};/);
-  const renderer = read('app', 'renderer', 'frontend.js');
-  assert.match(renderer, /if \(role === 'backglass' && \(prompt \|\| hint\)\) \{/);
-  const css = read('app', 'renderer', 'frontend.css');
-  // Au moins le double d'avant (le corps du message : environ 3 % de la hauteur) : 13 % de la hauteur du fronton.
-  assert.match(css, /\.headset-prompt-text \{ font-size: 13vh;/);
+  assert.match(show, /const prompt = \{ text, keys, \.\.\.\(issue && \{ problem: issue \}\) \};/);
+  assert.match(read('app', 'renderer', 'frontend.js'), /if \(role === 'backglass' && \(prompt \|\| hint\)\) \{/);
+  assert.match(read('app', 'renderer', 'frontend.css'), /\.headset-prompt-text \{ font-size: 13vh;/);
 });
 
-test('sortie de partie : tout réglage de manettes, gardé ou par défaut, garde « quitter » lié', () => {
-  assert.ok(!headsetFunctions().find((f) => f.id === 'quitter')!.optional, 'quitter obligatoire dans l’assistant');
-  const exitOf = (setting: ReturnType<typeof defaultControllerSetting>) => vpxMappingsFor(setting).ExitGame ?? [];
-  for (const profile of Object.keys(HEADSET_PROFILES) as (keyof typeof HEADSET_PROFILES)[]) assert.ok(exitOf(defaultControllerSetting(profile)).some((m) => m.startsWith('OpenXR;')), `${profile} : défaut sans sortie`);
-  // Le réglage gardé de l'essai (assistant d'avant, « quitter » passé) : la sortie lui est rendue, sur Y.
-  const kept = JSON.stringify({ profile: 'touch', functions: { 'flipper-gauche': 'gachette-gauche', 'flipper-droit': 'gachette-droite', valider: 'b', retour: 'a', menu: 'x', credit: 'y', 'magnasave-gauche': 'poignee-gauche', 'magnasave-droit': 'poignee-droite', lancer: 'clic-joystick-droit', lanceur: 'joystick-droit', deplacer: 'joystick-gauche' } });
-  const repaired = readControllerSetting(kept, 'touch');
-  assert.equal(repaired.functions.valider, 'b', 'le reste du réglage est gardé');
-  assert.ok(repaired.functions.quitter && !CONTROLLER_ELEMENTS[repaired.functions.quitter].axis);
-  assert.ok(exitOf(repaired).some((m) => m.startsWith('OpenXR;')));
-  // Chaque profil, chaque réglage gardé sans sortie : une sortie liée.
-  for (const profile of Object.keys(HEADSET_PROFILES) as (keyof typeof HEADSET_PROFILES)[]) {
-    const { quitter: _q, ...rest } = defaultControllerSetting(profile).functions;
-    const setting = readControllerSetting(JSON.stringify({ profile, functions: rest }), profile);
-    assert.ok(exitOf(setting).some((m) => m.startsWith('OpenXR;')), `${profile} : réglage gardé sans sortie`);
+test('sortie de partie : la pause, obligatoire et liée pour tout réglage, gardé ou par défaut ; jamais Y pour quitter', () => {
+  // Demande du 10 novembre 2026 : Y quittait trop facilement. La sortie passe par Pause (appui court :
+  // Reprendre ou Quitter ; tenu 1,5 s : quitter), qui est la fonction obligatoire de l'assistant.
+  const fn = (id: string) => headsetFunctions().find((f) => f.id === id)!;
+  assert.ok(!fn('retour').optional, 'Pause obligatoire');
+  assert.ok(fn('quitter').optional, 'Quitter facultatif');
+  const pauseOf = (setting: ReturnType<typeof defaultControllerSetting>) => vpxMappingsFor(setting).Pause ?? [];
+  const profiles = Object.keys(HEADSET_PROFILES) as (keyof typeof HEADSET_PROFILES)[];
+  for (const profile of profiles) {
+    const def = defaultControllerSetting(profile);
+    assert.ok(pauseOf(def).some((m) => m.startsWith('OpenXR;')), `${profile} : Pause liée`);
+    assert.equal(def.functions.quitter, undefined, `${profile} : pas de sortie directe par défaut`);
   }
+  // Un réglage gardé sans Pause n'est pas gardé : le défaut, qui l'a.
+  for (const profile of profiles) {
+    const { retour: _r, ...rest } = defaultControllerSetting(profile).functions;
+    assert.ok(pauseOf(readControllerSetting(JSON.stringify({ profile, functions: rest }), profile)).some((m) => m.startsWith('OpenXR;')), profile);
+  }
+  // Le réglage gardé de l'essai (retour sur A) : gardé tel quel, Pause sur A.
+  const kept = JSON.stringify({ profile: 'touch', functions: { 'flipper-gauche': 'gachette-gauche', 'flipper-droit': 'gachette-droite', valider: 'b', retour: 'a', menu: 'x', credit: 'y', 'magnasave-gauche': 'poignee-gauche', 'magnasave-droit': 'poignee-droite', lancer: 'clic-joystick-droit', lanceur: 'joystick-droit', deplacer: 'joystick-gauche' } });
+  const setting = readControllerSetting(kept, 'touch');
+  assert.equal(setting.functions.retour, 'a');
+  assert.equal(CONTROLLER_ELEMENTS.a.label, 'A');
 });
 
-test('sortie de partie : rappel du bouton en gros sur le fronton pendant le chargement dans le casque', () => {
+test('sortie de partie : rappel du bouton Pause en gros sur le fronton pendant le chargement dans le casque', () => {
   const frontend = read('app', 'src', 'frontend.ts');
   assert.match(frontend, /headsetExitHint = vrGame && headset\?\.inUse \? exitHintText\(\) : undefined;/);
-  assert.match(frontend, /return el \? t\('\{bouton\} : quitter la partie', \{ bouton: CONTROLLER_ELEMENTS\[el\]\?\.label \?\? el \}\) : undefined;/);
+  assert.match(frontend, /const el = controllerSetting\(\)\.functions\.retour;\s*return el \? t\('\{bouton\} : pause · tenu : quitter', \{ bouton: CONTROLLER_ELEMENTS\[el\]\?\.label \?\? el \}\) : undefined;/);
   assert.match(read('app', 'renderer', 'frontend.js'), /const hint = s\.phase === 'loading' \? s\.headsetHint : undefined;/);
 });

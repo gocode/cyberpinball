@@ -90,6 +90,9 @@ son interface).
 - Calage dans le casque plus simple : une seule consigne courte, écrite en très gros au milieu du regard, et un appui par étape. La hauteur est prise dès le premier calage, même si le sol du Quest est mal réglé. Les ombres autour des écrans du menu sont retirées.
 - Dans le casque, une partie a toujours un bouton pour quitter (Y par défaut), rappelé en gros pendant le chargement ; l'assistant des manettes l'impose.
 - Dans le casque, VPX reçoit un profil graphique adapté à la carte de la machine (seulement pour les réglages laissés vides), et chaque partie note au journal la fluidité mesurée par Link. Le manuel explique les réglages de Link (définition, débit, ASW) selon la machine.
+- En partie dans le casque, la pause s'affiche sur le fronton de la scène : Reprendre ou Quitter. Tenir Pause 1,5 s remplit un cercle « Quitter » et sort de la partie ; lâcher annule. Le bouton Pause est obligatoire dans l'assistant des manettes.
+- En VR, les tables dont le fronton est un PuP-Pack (sans directb2s) ne montrent plus un fronton vide ; un diagnostic au journal liste les tables concernées.
+- Calage dans le casque : une manette sur chaque coin de la barre, une gâchette place la borne, autant de fois qu'on veut ; A valide et sort, B sort sans rien changer. La borne part toujours à l'opposé de votre tête, quel que soit l'ordre des coins ou la main.
 
 ## 0.1.8
 

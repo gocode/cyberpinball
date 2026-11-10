@@ -99,6 +99,15 @@ for (const name of fs.readdirSync(installerDir)) {
     fs.copyFileSync(dll, path.join(dir, path.basename(dll)));
     fs.copyFileSync(path.join(VISION3D_SOURCE, 'plugin.cfg'), path.join(dir, 'plugin.cfg'));
     console.log(`Plugin Vision 3D : ${path.join('natif', 'vision3d', path.basename(dll))}`);
+    // Plugin « CyberPinball » (la pause dans le casque), construit avec lui (app/src/pause-vr.ts).
+    const pauseDll = path.join(path.dirname(dll), 'plugin-cyberpinball64.dll');
+    if (fs.existsSync(pauseDll)) {
+      const pauseDir = path.join(stage, 'natif', 'cyberpinball');
+      fs.mkdirSync(pauseDir, { recursive: true });
+      fs.copyFileSync(pauseDll, path.join(pauseDir, path.basename(pauseDll)));
+      fs.copyFileSync(path.join(VISION3D_SOURCE, 'cyberpinball.cfg'), path.join(pauseDir, 'plugin.cfg'));
+      console.log(`Plugin de la pause dans le casque : ${path.join('natif', 'cyberpinball', path.basename(pauseDll))}`);
+    }
   }
   const mediapipe = path.dirname(require.resolve('@mediapipe/tasks-vision', { paths: [path.join(repo, 'app')] }));
   const vendor = path.join(stage, 'vendor', 'mediapipe');

@@ -33,10 +33,9 @@ test('manettes : la règle des Touch, au menu et en partie (réglage par défaut
       ['flipper-gauche', 'Gâchette gauche', 'Précédent', 'Flipper gauche'],
       ['flipper-droit', 'Gâchette droite', 'Suivant', 'Flipper droit'],
       ['valider', 'A', 'Valider', 'Start ; valider dans le menu de VPX'],
-      ['retour', 'B', 'Retour, annuler', 'Pause, reprise'],
+      ['retour', 'B', 'Retour, annuler', 'Pause : appui court, Reprendre ou Quitter ; tenu 1,5 s, quitter'],
       ['menu', '≡ (manette gauche)', 'Menu du casque : caler, recentrer la borne, manettes', 'Menu de VPX ; retour dans ce menu'],
       ['credit', 'X', 'Collection suivante (roue)', 'Crédit'],
-      ['quitter', 'Y', '—', 'Quitter la partie'],
       ['magnasave-gauche', 'Poignée gauche', '—', 'MagnaSave gauche'],
       ['magnasave-droit', 'Poignée droite', '—', 'MagnaSave droit'],
       ['lancer', 'Clic du joystick droit', '—', 'Lancer la bille'],
@@ -143,7 +142,8 @@ test('manettes : liaisons de VPX en partie, la même règle qu’au menu', () =>
     InGameUI: ['OpenXR;2'],
     Pause: ['OpenXR;11'],
     Credit1: ['OpenXR;8'],
-    ExitGame: ['OpenXR;9'],
+    // Plus de sortie directe : Pause tenu 1,5 s quitte (plugin « CyberPinball »).
+    ExitGame: [],
     LaunchBall: ['OpenXR;13'],
     VRControllerCalibration: [],
   });
@@ -220,7 +220,8 @@ Mapping.Start = Key;30 | Joy1;3
   const get = (key: string) => doc.get('Input', key);
   // Le bouton Start de la borne reste, A s'ajoute ; une action jamais écrite part de sa touche par défaut.
   assert.equal(get('Mapping.Start'), 'Key;30 | Joy1;3 | OpenXR;10');
-  assert.equal(get('Mapping.ExitGame'), 'Key;41 | OpenXR;9');
+  // Plus de sortie directe aux manettes : la sortie n'est pas écrite, VPX garde Échap (Pause tenu 1,5 s quitte).
+  assert.equal(get('Mapping.ExitGame'), undefined);
   // Le lanceur de la borne garde sa place ; celui du joystick droit vient après, de même pour les secousses.
   assert.equal(get('Mapping.Plunger0.Position'), 'Joy1;2;P;0.000000;1.000000;1.000000');
   assert.equal(get('Mapping.Plunger1.Position'), 'OpenXR;23;P;0.000000;-1.000000;1.000000');
@@ -246,12 +247,12 @@ test('manettes : l’INI de VPX suit le réglage des manettes (boutons, lanceur 
   const doc = IniDocument.parse(VPX_DEFAULT_INPUT);
   applyVpxSettings(doc, vpxHeadsetInput(VPX_DEFAULT_INPUT, vive));
   const get = (key: string) => doc.get('Input', key);
-  // Valider : clic du pavé droit (15) ; retour : ≡ droit (3), menu : ≡ gauche (2) ; quitter : clic du pavé gauche (14).
+  // Valider : clic du pavé droit (15) ; retour (Pause) : ≡ droit (3), menu : ≡ gauche (2) ; crédit : clic du pavé gauche (14).
   assert.equal(get('Mapping.Start'), 'Key;30 | OpenXR;15');
   assert.equal(get('Mapping.InGameUI'), 'Key;69 | OpenXR;2');
   assert.equal(get('Mapping.Pause'), 'Key;19 | OpenXR;3');
-  assert.equal(get('Mapping.ExitGame'), 'Key;41 | OpenXR;14');
-  assert.equal(get('Mapping.Credit1'), 'Key;34');
+  assert.equal(get('Mapping.Credit1'), 'Key;34 | OpenXR;14');
+  assert.equal(get('Mapping.ExitGame'), 'Key;41');
   // Lanceur sur le pavé droit (y : 27), secousses sur le pavé gauche (24, 25), sans capteur en double.
   assert.equal(get('Mapping.Plunger0.Position'), 'OpenXR;27;P;0.000000;-1.000000;1.000000');
   assert.equal(get('Mapping.Nudge0.X'), 'OpenXR;24;P;0.000000;1.000000;1.000000');

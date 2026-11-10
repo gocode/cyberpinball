@@ -1657,13 +1657,26 @@ int main(int argc, char** argv)
                      continue;
                   e.down = down;
                   say(std::string("bouton ") + e.name + (down ? " 1" : " 0"));
-                  // Calage : gâchette appuyée, le bout de cette manette dans la pièce.
+                  // Calage : gâchette appuyée, le bout des manettes dans la pièce : les deux à la fois quand
+                  // elles sont posées sur les deux coins (« pointes »), sinon celle de la gâchette
+                  // (« pointe ») ; avec la tête à cet instant, d'où Cyber Pinball tire le côté de la borne.
                   const int hand = std::string(e.name) == "gachette-gauche" ? 0 : std::string(e.name) == "gachette-droite" ? 1 : -1;
-                  XrSpaceLocation loc { XR_TYPE_SPACE_LOCATION };
-                  if (down && calibrating && hand >= 0 && aimSpaces[hand] != XR_NULL_HANDLE && XR_SUCCEEDED(xrLocateSpace_(aimSpaces[hand], base, fs.predictedDisplayTime, &loc))
-                     && (loc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT))
-                     say(std::string("pointe ") + (hand ? "droite " : "gauche ") + std::to_string(loc.pose.position.x) + " " + std::to_string(loc.pose.position.y) + " "
-                        + std::to_string(loc.pose.position.z) + (stage ? "" : " sans-piece"));
+                  if (down && calibrating && hand >= 0)
+                  {
+                     XrSpaceLocation at[2] { { XR_TYPE_SPACE_LOCATION }, { XR_TYPE_SPACE_LOCATION } };
+                     bool ok[2] {};
+                     for (int h = 0; h < 2; h++)
+                        ok[h] = aimSpaces[h] != XR_NULL_HANDLE && XR_SUCCEEDED(xrLocateSpace_(aimSpaces[h], base, fs.predictedDisplayTime, &at[h]))
+                           && (at[h].locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT) && (at[h].locationFlags & XR_SPACE_LOCATION_POSITION_TRACKED_BIT);
+                     XrSpaceLocation head { XR_TYPE_SPACE_LOCATION };
+                     const bool headOk = XR_SUCCEEDED(xrLocateSpace_(view, base, fs.predictedDisplayTime, &head)) && (head.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT);
+                     const auto p3 = [](const XrVector3f& v) { return std::to_string(v.x) + " " + std::to_string(v.y) + " " + std::to_string(v.z); };
+                     const std::string tail = (headOk ? " tete " + std::to_string(head.pose.position.x) + " " + std::to_string(head.pose.position.z) : std::string()) + (stage ? "" : " sans-piece");
+                     if (ok[0] && ok[1])
+                        say(std::string("pointes ") + (hand ? "droite " : "gauche ") + p3(at[0].pose.position) + " " + p3(at[1].pose.position) + tail);
+                     else if (ok[hand])
+                        say(std::string("pointe ") + (hand ? "droite " : "gauche ") + p3(at[hand].pose.position) + tail);
+                  }
                   continue;
                }
                // Axe : la direction dominante, appuyée au-delà de 0,6, relâchée sous 0,4.

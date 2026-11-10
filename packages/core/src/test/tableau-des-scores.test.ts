@@ -12,6 +12,7 @@ import { REPO_ROOT } from './i18n-scan';
 import {
   addPlayed,
   emptyScoreJournal,
+  factoryScore,
   inPeriod,
   loadScoreJournal,
   periodStart,
@@ -65,7 +66,7 @@ test('tableau : chaque période ne lit que ses parties, du meilleur score au moi
 
 test('tableau : tout temps, les records de la table s’y ajoutent, un même score une seule fois, avec sa date', () => {
   const records = [
-    { rank: 1, score: 150_000_000, initials: 'AJA' },
+    { rank: 1, score: 152_431_870, initials: 'AJA' },
     { rank: 2, score: 90_000_000, initials: 'XAQ' },
     { rank: 3, score: 45_000_000, initials: 'JUL' },
   ];
@@ -73,7 +74,7 @@ test('tableau : tout temps, les records de la table s’y ajoutent, un même sco
   assert.deepEqual(
     board.map((l) => [l.rank, l.score, l.initials, Boolean(l.at), Boolean(l.table)]),
     [
-      [1, 150_000_000, 'AJA', false, true],
+      [1, 152_431_870, 'AJA', false, true],
       [2, 90_000_000, 'XAQ', true, true],
       [3, 60_000_000, undefined, true, false],
       [4, 45_000_000, 'JUL', true, true],
@@ -83,6 +84,28 @@ test('tableau : tout temps, les records de la table s’y ajoutent, un même sco
   );
   // Les records ne comptent que tout temps confondu : ils n'ont pas de date.
   assert.ok(scoreBoard(played, records, 'year', NOW).every((l) => !l.table));
+});
+
+test('tableau : les scores d’usine de la table n’y paraissent pas, sauf faits sur la borne', () => {
+  for (const score of [50_000_000, 2_500_000, 1_750_000_000, 75_000, 100_000, 125_000]) assert.ok(factoryScore(score), String(score));
+  for (const score of [61_253_470, 45_300, 1_234_000, 990, 0]) assert.ok(!factoryScore(score), String(score));
+  // Tableau d'une ROM remis à neuf : tout est d'usine, rien ne s'affiche.
+  const factory = [
+    { rank: 1, score: 50_000_000, initials: 'GC' },
+    { rank: 2, score: 40_000_000, initials: 'ABC' },
+    { rank: 3, score: 30_000_000, initials: 'DEF' },
+  ];
+  assert.deepEqual(scoreBoard([], factory, 'all', NOW), []);
+  // Un vrai record d'avant le tableau des scores reste ; un score rond fait sur la borne aussi.
+  const records = [...factory, { rank: 4, score: 27_418_330, initials: 'JUL' }];
+  const round = [{ at: '2026-11-09T20:00:00.000Z', score: 40_000_000, initials: 'ABC', how: 'rom' as const }];
+  assert.deepEqual(
+    scoreBoard(round, records, 'all', NOW).map((l) => [l.score, Boolean(l.at)]),
+    [
+      [40_000_000, true],
+      [27_418_330, false],
+    ],
+  );
 });
 
 test('tableau : deux scores égaux partagent la place, dix lignes au plus', () => {
@@ -138,7 +161,7 @@ const WPC: RomMemory = {
 
 const bcd = (n: number, length: number) => Buffer.from(Array.from({ length }, (_, i) => Math.floor(n / 100 ** (length - 1 - i)) % 100).map((v) => ((Math.floor(v / 10) << 4) | v % 10)));
 
-function wpc(last: number[], board: [string, number][] = [['AJA', 150_000_000], ['XAQ', 90_000_000]]): Buffer {
+function wpc(last: number[], board: [string, number][] = [['AJA', 152_431_870], ['XAQ', 90_000_000]]): Buffer {
   const nv = Buffer.alloc(8238, 0);
   [5936, 5942, 5948, 5954].forEach((start, i) => bcd(last[i] ?? 0, 5).copy(nv, start));
   nv[6036] = last.filter((s) => s > 0).length;
@@ -229,7 +252,7 @@ test('de la partie à la fiche : le score lu dans la ROM, daté, au tableau de c
 
   // Une partie à 95 millions, entrée au tableau de la machine en GC sous « JUL ».
   snap = scores.snapshot(table);
-  fs.writeFileSync(nv, wpc([95_000_000], [['JUL', 95_000_000], ['AJA', 150_000_000]]));
+  fs.writeFileSync(nv, wpc([95_000_000], [['JUL', 95_000_000], ['AJA', 152_431_870]]));
   const before = fs.readFileSync(nv);
   const kept = await scores.finish(table, snap, {});
   assert.deepEqual(kept, [{ at: NOW.toISOString(), score: 95_000_000, initials: 'JUL', how: 'rom' }]);
@@ -238,12 +261,12 @@ test('de la partie à la fiche : le score lu dans la ROM, daté, au tableau de c
   // Le lendemain, une partie à 3 millions : aujourd'hui, elle seule ; tout temps, les records de la machine s'y ajoutent.
   now = new Date(2026, 10, 10, 10);
   snap = scores.snapshot(table);
-  fs.writeFileSync(nv, wpc([3_000_000], [['JUL', 95_000_000], ['AJA', 150_000_000]]));
+  fs.writeFileSync(nv, wpc([3_000_000], [['JUL', 95_000_000], ['AJA', 152_431_870]]));
   await scores.finish(table, snap, {});
   assert.deepEqual(scores.board(table, 'today').lines.map((l) => l.score), [3_000_000]);
   assert.deepEqual(scores.board(table, 'week').lines.map((l) => l.score), [95_000_000, 3_000_000]);
   const all = scores.board(table, 'all');
-  assert.deepEqual(all.lines.map((l) => [l.score, l.initials]), [[150_000_000, 'AJA'], [95_000_000, 'JUL'], [3_000_000, undefined]]);
+  assert.deepEqual(all.lines.map((l) => [l.score, l.initials]), [[152_431_870, 'AJA'], [95_000_000, 'JUL'], [3_000_000, undefined]]);
   assert.ok(all.everyGame && all.tableBoard);
   assert.equal(scores.board(table, 'week').games, 2);
 
@@ -266,7 +289,7 @@ test('de la partie à la fiche : le score lu dans la ROM, daté, au tableau de c
   ]);
   assert.deepEqual(view.lines[0], { rank: '1', name: '—', anonymous: true, score: (4_200_000).toLocaleString('fr-FR'), when: 'Aujourd’hui, 10:30', first: true });
   assert.equal(view.note, undefined, 'table à ROM décrite : chaque partie se relève');
-  assert.equal(scoresSummary(again.board(table, 'all'), again.board(table, 'today')), `Record : ${(150_000_000).toLocaleString('fr-FR')} (AJA) · 2 parties aujourd’hui`);
+  assert.equal(scoresSummary(again.board(table, 'all'), again.board(table, 'today')), `Record : ${(152_431_870).toLocaleString('fr-FR')} (AJA) · 2 parties aujourd’hui`);
   fs.rmSync(dir, { recursive: true, force: true });
 });
 

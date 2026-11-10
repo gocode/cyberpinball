@@ -10,7 +10,7 @@
 //
 // Chaque profil d'interaction OpenXR (Touch du Quest, Index, Vive, Windows Mixed Reality) a son réglage
 // par défaut (defaultControllerSetting) ; celui des Touch est la règle d'origine : gâchettes = flippers,
-// A = valider, B = retour, ≡ gauche = menu du casque, X = crédit, Y = quitter, poignées = MagnaSave,
+// A = valider, B = retour, ≡ gauche = menu du casque, X = crédit, B tenu 1,5 s = quitter (Y libre), poignées = MagnaSave,
 // joystick gauche = déplacer, joystick droit = lanceur, son clic = lancer la bille. Le compagnon
 // (packages/casque-vr) lit tous les éléments du catalogue (CONTROLLER_ELEMENTS) et envoie
 // « bouton <élément> 1|0 », ou « bouton <axe>-haut|bas|gauche|droite 1|0 » ; l'assistant des manettes
@@ -142,11 +142,13 @@ export function headsetFunctions(): FunctionDef[] {
     { id: 'flipper-gauche', label: t('Flipper gauche'), menu: t('Précédent'), game: t('Flipper gauche') },
     { id: 'flipper-droit', label: t('Flipper droit'), menu: t('Suivant'), game: t('Flipper droit') },
     { id: 'valider', label: t('Valider, Start'), menu: t('Valider'), game: t('Start ; valider dans le menu de VPX') },
-    { id: 'retour', label: t('Retour'), menu: t('Retour, annuler'), game: t('Pause, reprise') },
+    // Obligatoire, la seule sortie d'une partie dans le casque (essai du 10 novembre 2026) : appui court, la pause
+    // (Reprendre / Quitter) ; appui tenu 1,5 s, la partie quitte (plugin « CyberPinball », pause.h).
+    { id: 'retour', label: t('Retour, Pause'), menu: t('Retour, annuler'), game: t('Pause : appui court, Reprendre ou Quitter ; tenu 1,5 s, quitter') },
     { id: 'menu', label: t('Menu du casque'), menu: t('Menu du casque : caler, recentrer la borne, manettes'), game: t('Menu de VPX ; retour dans ce menu') },
     { id: 'credit', label: t('Crédit'), menu: t('Collection suivante (roue)'), game: t('Crédit'), optional: true },
-    // Obligatoire : sans lui, plus moyen de sortir d'une partie dans le casque (essai du 10 novembre 2026).
-    { id: 'quitter', label: t('Quitter la partie'), game: t('Quitter la partie') },
+    // Facultatif : la sortie passe par Pause (un seul bouton à retenir, pas de sortie sur un appui malheureux).
+    { id: 'quitter', label: t('Quitter la partie'), game: t('Quitter la partie'), optional: true },
     { id: 'magnasave-gauche', label: t('MagnaSave gauche'), game: t('MagnaSave gauche'), optional: true },
     { id: 'magnasave-droit', label: t('MagnaSave droit'), game: t('MagnaSave droit'), optional: true },
     { id: 'lancer', label: t('Lancer la bille'), game: t('Lancer la bille'), optional: true },
@@ -169,7 +171,6 @@ const DEFAULTS: Readonly<Record<HeadsetProfile, Partial<Record<HeadsetFunction, 
     retour: 'b',
     menu: 'menu-gauche',
     credit: 'x',
-    quitter: 'y',
     'magnasave-gauche': 'poignee-gauche',
     'magnasave-droit': 'poignee-droite',
     lancer: 'clic-joystick-droit',
@@ -182,9 +183,9 @@ const DEFAULTS: Readonly<Record<HeadsetProfile, Partial<Record<HeadsetFunction, 
     valider: 'a',
     retour: 'b',
     menu: 'clic-joystick-gauche',
-    quitter: 'clic-joystick-droit',
     'magnasave-gauche': 'poignee-gauche',
     'magnasave-droit': 'poignee-droite',
+    lancer: 'clic-joystick-droit',
     lanceur: 'joystick-droit',
     deplacer: 'joystick-gauche',
   },
@@ -194,7 +195,7 @@ const DEFAULTS: Readonly<Record<HeadsetProfile, Partial<Record<HeadsetFunction, 
     valider: 'clic-pave-droit',
     retour: 'menu-droit',
     menu: 'menu-gauche',
-    quitter: 'clic-pave-gauche',
+    credit: 'clic-pave-gauche',
     'magnasave-gauche': 'poignee-gauche',
     'magnasave-droit': 'poignee-droite',
     lanceur: 'pave-droit',
@@ -207,7 +208,6 @@ const DEFAULTS: Readonly<Record<HeadsetProfile, Partial<Record<HeadsetFunction, 
     retour: 'menu-droit',
     menu: 'menu-gauche',
     credit: 'clic-pave-gauche',
-    quitter: 'clic-joystick-gauche',
     'magnasave-gauche': 'poignee-gauche',
     'magnasave-droit': 'poignee-droite',
     lancer: 'clic-joystick-droit',
@@ -255,15 +255,6 @@ export function readControllerSetting(text: string | undefined, profile: Headset
       for (const f of headsetFunctions()) {
         const el = (raw.functions as Record<string, unknown>)[f.id];
         if (typeof el === 'string' && isControllerElement(el)) functions[f.id] = el;
-      }
-      // Réglage gardé sans sortie (assistant d'avant, où « quitter » était facultatif) : le bouton du
-      // défaut s'il est libre, sinon le premier bouton libre de ces manettes.
-      if (!functions.quitter) {
-        const used = new Set(Object.values(functions));
-        const free = [DEFAULTS[profile].quitter, ...(Object.keys(CONTROLLER_ELEMENTS) as ControllerElement[])].find(
-          (el) => el && !used.has(el) && !CONTROLLER_ELEMENTS[el].axis && CONTROLLER_ELEMENTS[el].profiles.includes(profile),
-        );
-        if (free) functions.quitter = free;
       }
       const setting = { profile, functions };
       if (!controllerProblem(setting)) return setting;

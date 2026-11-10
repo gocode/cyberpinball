@@ -98,9 +98,9 @@ test('calage : branchements du compagnon, du casque et du menu', () => {
   assert.match(frontend, /if \(action === 'headset-menu'\) return void openHeadsetMenu\(\);/);
   assert.match(frontend, /label: t\('Caler la borne'\)[\s\S]{0,400}openCalibration\(\);[\s\S]{0,200}label: t\('Recentrer la borne'\)[\s\S]{0,300}headset\?\.recenter\(\);[\s\S]{0,500}label: t\('Retour'\)/);
   // Calage guidé : étapes numérotées, repères du point pris et du point à toucher, B pour terminer.
-  assert.match(frontend, /t\('Touchez le coin gauche'\)/);
+  assert.match(frontend, /t\('Manettes sur les coins de la barre'\)/);
   assert.match(frontend, /headset\?\.setMarks\(calibrationMarks\(c\)\);/);
-  assert.match(frontend, /const end = c\.intro \? t\('B : passer'\) : t\('B : terminer'\);/);
+  assert.match(frontend, /const keys = c\.placing \? '' : t\('Gâchette : placer · A : valider'\);/);
   // L'entrée vient juste après « Réalité virtuelle ».
   assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /'vr', 'vr-calibrate', 'vr-controllers', 'controls'/);
 });
@@ -168,13 +168,13 @@ test('un calage par configuration ; au bureau, la borne posée librement, puis f
   assert.match(frontend, /return path\.join\(loc\.dataDir, 'vr', cabinetPlaceFileName\(menuConfiguration\)\);/);
   // Start au bureau : recentrage demandé, la place du regard gardée à son retour (« centre »).
   assert.match(frontend, /calibration\.placing = true;\s*showCalibration\(\);\s*headset\?\.recenter\(\);/);
-  assert.match(frontend, /c\.place = freePlace\(gaze, gaze\.eyes\);\s*c\.placing = false;\s*applyCalibration\(\);/);
+  assert.match(frontend, /c\.place = freePlace\(gaze, gaze\.eyes\);\s*c\.placing = false;\s*applyCalibration\(\);\s*closeCalibration\(\);/);
 });
 
-test('calage proposé à chaque session VR, répétable : valider applique et reste, B termine', () => {
-  // Demande du 10 novembre 2026 : à chaque démarrage d'une session VR, l'écran du calage s'ouvre
-  // d'office (caler, ou passer en gardant le précédent) ; valider applique tout de suite sans sortir ;
-  // seul « Terminer » (B) sort, en gardant le dernier calage validé. L'assistant des manettes reste avant.
+test('calage proposé à chaque session VR ; gâchettes autant qu’on veut, A valide et sort, B sort sans rien changer', () => {
+  // Demandes du 10 novembre 2026 : à chaque démarrage d'une session VR, l'écran du calage s'ouvre
+  // d'office ; les gâchettes placent et replacent la borne, qui vient aussitôt ; un seul bouton (A)
+  // valide et sort ; B sort sans rien changer. L'assistant des manettes reste avant.
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
   // Plus de condition « pas encore calée » : proposé à chaque session, une fois, après l'assistant.
@@ -184,12 +184,10 @@ test('calage proposé à chaque session VR, répétable : valider applique et re
   assert.match(frontend, /openCalibration\(true\);/);
   // Casque perdu : la session suivante repropose le calage.
   assert.match(frontend, /if \(calibration\) closeCalibration\(\);\s*\/\/[^\n]*\s*calibrationOffered = false;/);
-  // Premier écran proposé d'office : la consigne de la première étape tout de suite, B passe.
-  assert.match(frontend, /const end = c\.intro \? t\('B : passer'\) : t\('B : terminer'\);/);
-  // A valide : appliqué (place et INI de VPX), points remis à zéro, l'écran reste ouvert.
-  assert.match(frontend, /else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.place\) applyCalibration\(\);/);
+  // A valide et sort : appliqué (place et INI de VPX), puis l'écran se ferme.
+  assert.match(frontend, /else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.place\) \{\s*applyCalibration\(\);\s*closeCalibration\(\);\s*\}/);
   assert.match(frontend, /function applyCalibration\(\): void \{[\s\S]{0,600}headset\?\.showPlace\(place, true\);[\s\S]{0,400}writeVrCalibration\([\s\S]{0,1200}c\.validated\+\+;\s*c\.points = \{\};\s*c\.place = undefined;\s*showCalibration\(\);/);
-  // B termine : un calage commencé non validé est oublié, la place gardée revient.
+  // B sort sans rien changer : la place gardée revient.
   assert.match(frontend, /if \(KEYS\.exit\.includes\(input\.code\)\) closeCalibration\(\);/);
   assert.match(frontend, /function closeCalibration\(\): void \{[\s\S]{0,200}headset\?\.showPlace\(undefined\);/);
   assert.doesNotMatch(frontend, /closeCalibration\((true|false)\)/);

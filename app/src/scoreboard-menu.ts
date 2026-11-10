@@ -92,7 +92,7 @@ export function scoreboardView(boards: (period: ScorePeriod) => TableBoard, peri
   const board = boards(period);
   const tabs = SCORE_PERIODS.map((p, action) => {
     const b = p === period ? board : boards(p);
-    const count = p === 'all' && !b.games && b.tableBoard ? t('records de la table') : tn(b.games, '{n} partie', '{n} parties');
+    const count = p === 'all' && !b.games && b.lines.length ? t('records de la table') : tn(b.games, '{n} partie', '{n} parties');
     return { period: p, label: periodLabel(p), count, current: p === period, action };
   });
   const note = limits(board);

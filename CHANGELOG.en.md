@@ -88,6 +88,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Simpler alignment in the headset: a single short instruction, written very large in the middle of your view, and one press per step. The height is taken from the first alignment, even if the Quest's floor is wrongly set. The shadows around the menu's screens are removed.
 - In the headset, a game always has a button to quit (Y by default), shown large during loading; the controller wizard requires it.
 - In the headset, VPX gets a graphics profile suited to the machine's graphics card (only for settings left empty), and each game notes in the log the smoothness measured by Link. The manual explains Link's settings (resolution, bitrate, ASW) for each kind of machine.
+- In game in the headset, the pause shows on the scene's backglass: Resume or Quit. Holding Pause for 1.5 s fills a "Quit" circle and leaves the game; letting go cancels. The Pause button is required in the controller wizard.
+- In VR, tables whose backglass is a PuP-Pack (no directb2s) no longer show an empty backglass; a diagnostic in the log lists the tables concerned.
+- Alignment in the headset: one controller on each corner of the bar, a trigger places the cabinet, as many times as you like; A confirms and leaves, B leaves without changing anything. The cabinet always extends away from your head, whatever the order of the corners or the hand.
 
 ## 0.1.8
 

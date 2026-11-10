@@ -21,3 +21,12 @@ target_link_libraries(banc-vision3d PRIVATE ws2_32)
 # Fausse Kinect10.dll (essais de la Vision 3D sans capteur).
 add_library(kinect-factice SHARED test/kinect-factice.cpp)
 set_target_properties(kinect-factice PROPERTIES OUTPUT_NAME "kinect-factice" PREFIX "")
+
+# Plugin VPX « CyberPinball » : la pause dans le casque, dessinée sur le fronton de la scène VR.
+add_library(cyberpinball SHARED src/cyberpinball.cpp)
+target_include_directories(cyberpinball PRIVATE vendor/vpx src)
+set_target_properties(cyberpinball PROPERTIES OUTPUT_NAME "plugin-cyberpinball64" PREFIX "")
+
+# Banc de la pause (logique, sans VPX ni casque).
+add_executable(banc-pause test/banc-pause.cpp)
+target_include_directories(banc-pause PRIVATE src)

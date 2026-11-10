@@ -81,7 +81,8 @@ export interface HeadsetMenuOptions {
   /** Les manettes branchées (compagnon : « profil <nom> »). */
   onProfile?(profile: HeadsetProfile): void;
   /** Calage (calibrate) : le bout d'une manette touché, gâchette appuyée, dans la pièce (`room` faux : sans limite du Quest). */
-  onPoint?(hand: 'gauche' | 'droite', point: Point3, room: boolean): void;
+  /** Calage : les points pris d'une gâchette (un, ou les deux manettes à la fois), et la tête à cet instant. */
+  onPoints?(points: Point3[], room: boolean, head: { x: number; z: number } | undefined, pressed: 0 | 1): void;
   /**
    * Casque éteint, Link coupé ou session perdue (compagnon : « casque-perdu ») : `inGame` vrai quand le
    * compagnon veillait sur une partie de VPX dans le casque. L'affichage revient aux écrans du PC.
@@ -418,11 +419,13 @@ export class HeadsetMenu {
           }
           continue;
         }
-        // Calage : « pointe gauche|droite x y z [sans-piece] ».
-        const point = /^pointe (gauche|droite) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)( sans-piece)?$/.exec(line);
-        if (point) {
+        // Calage : « pointes x y z x y z [tete x z] [sans-piece] » (les deux manettes), ou « pointe main x y z … ».
+        const points = /^pointes? (gauche|droite) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)(?: (-?[\d.]+) (-?[\d.]+) (-?[\d.]+))?(?: tete (-?[\d.]+) (-?[\d.]+))?( sans-piece)?$/.exec(line);
+        if (points) {
           this.opts.log(`Casque : ${line}`); // i18n-ignore : journal
-          this.opts.onPoint?.(point[1] as 'gauche' | 'droite', { x: Number(point[2]), y: Number(point[3]), z: Number(point[4]) }, !point[5]);
+          const n = points.slice(2).map((v) => (v === undefined ? undefined : Number(v)));
+          const list: Point3[] = [{ x: n[0]!, y: n[1]!, z: n[2]! }, ...(n[3] !== undefined ? [{ x: n[3], y: n[4]!, z: n[5]! }] : [])];
+          this.opts.onPoints?.(list, !points[10], n[6] !== undefined ? { x: n[6], z: n[7]! } : undefined, points[1] === 'droite' ? 1 : 0);
           continue;
         }
         // Hauteur des yeux, limite de la pièce, pièce déplacée par le Quest : au journal, puis au menu.

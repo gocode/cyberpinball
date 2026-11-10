@@ -110,6 +110,21 @@ export function lockbarPlace(left: Point3, right: Point3): CabinetPlace {
 }
 
 /**
+ * Les deux coins de la barre avant dans l'ordre gauche, droite, vus du joueur : décidé par la tête au
+ * moment du calage (le joueur est toujours devant la barre, la borne part à l'opposé de la tête),
+ * jamais par l'ordre des points touchés ni par la main (essai du 10 novembre 2026 : les deux gâchettes
+ * à 60 ms d'écart, et la borne posée dans le dos selon celle qui arrivait la première).
+ */
+export function orderCorners(a: Point3, b: Point3, head: { x: number; z: number }): [Point3, Point3] {
+  const place = lockbarPlace(a, b);
+  const center = { x: (a.x + b.x) / 2, z: (a.z + b.z) / 2 };
+  // Vers la borne : de la place du joueur au milieu de la barre.
+  const toCabinet = { x: center.x - place.x, z: center.z - place.z };
+  const headSide = (head.x - center.x) * toCabinet.x + (head.z - center.z) * toCabinet.z;
+  return headSide > 0 ? [b, a] : [a, b];
+}
+
+/**
  * Réglages de VPX pour une table posée sur cette barre avant : le calcul de VPX 10.8.1 (calage aux
  * manettes), avec ses réglages par défaut (ControllerLockbarScale 1, ControllerCabYOffset 0) et un
  * plateau de largeur standard pour le petit décalage de 5 cm qui dépend de l'échelle.

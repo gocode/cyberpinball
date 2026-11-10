@@ -13,6 +13,9 @@ import {
   planVrIni,
   readTextIfExists,
   readVpxScript,
+  readVpxBackglassDisplays,
+  tableUsesPupCapture,
+  vrNeedsVpxBackglass,
   samePath,
   tableHasVrRoom,
   vrCarriedSettings,
@@ -63,8 +66,12 @@ export function probeVr(): VrReadiness {
 export interface VrGame {
   /** Le VPinballX.ini à passer à VPX par -Ini. */
   ini: string;
-  /** La table a sa propre pièce VR : pas de fronton ajouté par VPX. */
+  /** La table a sa propre pièce VR. */
   room: boolean;
+  /** Flashers de la table qui montrent le fronton en VR (undefined : table illisible). */
+  backglassDisplays: number | undefined;
+  /** Fronton posé par VPX dans la scène ([PlayerVR] AddBackglass) : sans pièce VR, ou une pièce sans fronton. */
+  addBackglass: boolean;
   /** Une ligne par clé écrite, pour le journal. */
   changes: string[];
   /** Réglages de la VR repris de la partie précédente. */
@@ -79,11 +86,17 @@ export interface VrGame {
 export function prepareVrGame(opts: { dataDir: string; baseIni: string; tableFile: string; inPlace: boolean }): VrGame {
   const target = opts.inPlace ? opts.baseIni : vrIniFile(opts.dataDir);
   const previous = readTextIfExists(vrIniFile(opts.dataDir)) || undefined;
-  const room = tableHasVrRoom(readVpxScript(opts.tableFile));
-  const plan = planVrIni(readTextIfExists(opts.baseIni), previous, { addBackglass: !room });
+  const script = readVpxScript(opts.tableFile);
+  const room = tableHasVrRoom(script);
+  // Une pièce VR dont le fronton passe par la capture de PuP, sans flasher du fronton, le laisserait
+  // vide (essai du 10 novembre 2026, The Matrix : on voyait à travers) : VPX pose alors le sien, que
+  // PuP, B2S ou le fond du plugin de la pause remplissent.
+  const backglassDisplays = readVpxBackglassDisplays(opts.tableFile);
+  const addBackglass = vrNeedsVpxBackglass({ room, backglassDisplays, pupCapture: tableUsesPupCapture(script) });
+  const plan = planVrIni(readTextIfExists(opts.baseIni), previous, { addBackglass });
   fs.mkdirSync(path.dirname(target), { recursive: true });
   writeFileAtomic(target, plan.text);
-  return { ini: target, room, changes: formatChanges(plan.changes), carried: plan.carried };
+  return { ini: target, room, backglassDisplays, addBackglass, changes: formatChanges(plan.changes), carried: plan.carried };
 }
 
 /**

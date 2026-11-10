@@ -98,3 +98,54 @@ export function linkStatsSummary(rows: readonly LinkStats[]): { minutes: number;
   const mean = (f: (r: LinkStats) => number) => Math.round(rows.reduce((s, r) => s + f(r), 0) / rows.length);
   return { minutes: rows.length, presented: mean((r) => r.presented), lost: mean((r) => r.lost), stale: mean((r) => r.stale), worstStale: Math.max(...rows.map((r) => r.stale)) };
 }
+
+/** Identifiants des rendus du fronton du plugin « CyberPinball » (packages/vpx-vision3d/src/cyberpinball.cpp). */
+export const PAUSE_RENDERER = 'CyberPinball.Pause';
+export const FALLBACK_RENDERER = 'CyberPinball.Fond';
+
+/**
+ * Réglages de la pause dans le casque pour l'INI d'une partie dans le casque : le plugin activé, ses
+ * libellés (langue de l'application), et les priorités du fronton. VPX essaie les rendus annexes du
+ * plus prioritaire au moins prioritaire (0 à 100), le premier qui dessine l'emporte : la pause en
+ * tête (elle rend la main hors de la pause), le fond opaque en dernier ; un autre rendu réglé à 100
+ * (PuP l'est d'office) descend à 99 pour laisser la pause devant.
+ */
+export function pauseVrSettings(iniText: string, labels: { pause: string; resume: string; quit: string }): VpxSetting[] {
+  const out: VpxSetting[] = [
+    { section: 'Plugin.CyberPinball', key: 'Enable', value: '1' },
+    { section: 'Plugin.CyberPinball', key: 'Pause', value: labels.pause },
+    { section: 'Plugin.CyberPinball', key: 'Resume', value: labels.resume },
+    { section: 'Plugin.CyberPinball', key: 'Quit', value: labels.quit },
+    { section: 'Backglass', key: `Priority.${PAUSE_RENDERER}`, value: '100' },
+    { section: 'Backglass', key: `Priority.${FALLBACK_RENDERER}`, value: '0' },
+  ];
+  let inBackglass = false;
+  for (const line of iniText.split(/\r?\n/)) {
+    const section = /^\s*\[([^\]]+)\]/.exec(line);
+    if (section) {
+      inBackglass = section[1]!.trim().toLowerCase() === 'backglass';
+      continue;
+    }
+    const prio = inBackglass ? /^\s*Priority\.([\w.]+)\s*=\s*(\d+)/.exec(line) : null;
+    if (prio && prio[1] !== PAUSE_RENDERER && prio[1] !== FALLBACK_RENDERER && Number(prio[2]) >= 100) out.push({ section: 'Backglass', key: `Priority.${prio[1]}`, value: '99' });
+  }
+  return out;
+}
+
+/**
+ * Le script de la table montre son fronton en VR en capturant les fenêtres de PuP
+ * (« VR_PupBackglass », VideoCapWidth/VideoCapHeight/VideoCapUpdate) : le lecteur de PuP de PinUp
+ * Popper le permettait, celui intégré à VPX 10.8 non, et ce fronton reste vide (essai du 10 novembre
+ * 2026, The Matrix : on voyait à travers).
+ */
+export function tableUsesPupCapture(script: string | undefined): boolean {
+  return /\.VideoCap(Width|Height|Update)\b/i.test(script ?? '');
+}
+
+/**
+ * Fronton posé par VPX dans la scène VR ([PlayerVR] AddBackglass) : sans pièce VR de la table, ou
+ * une pièce VR sans flasher du fronton dont le fronton passe par la capture de PuP (il serait vide).
+ */
+export function vrNeedsVpxBackglass(t: { room: boolean; backglassDisplays: number | undefined; pupCapture: boolean }): boolean {
+  return !t.room || (!t.backglassDisplays && t.pupCapture);
+}

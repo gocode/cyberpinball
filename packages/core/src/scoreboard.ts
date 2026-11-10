@@ -113,12 +113,26 @@ export interface BoardLine {
 }
 
 /**
+ * Score d'usine : celui qu'une ROM ou le script d'une table met à son tableau d'honneur à la
+ * première mise en route (« 50,000,000 », « 2,500,000 », « 75,000 ») pour que le tableau ne soit
+ * pas vide. Trois chiffres significatifs au plus, suivis d'au moins trois zéros : un vrai score
+ * finit rarement ainsi.
+ */
+export function factoryScore(score: number): boolean {
+  const digits = String(Math.trunc(Math.abs(score)));
+  const significant = digits.replace(/0+$/, '');
+  return significant.length > 0 && significant.length <= 3 && digits.length - significant.length >= 3;
+}
+
+/**
  * Le tableau d'une période : les meilleurs scores, du premier au dernier, `limit` lignes au plus.
  * Tout temps confondu, `records` (le tableau de la table) s'y ajoute ; un score gardé qui y figure
  * déjà (même score, mêmes initiales ou pas d'initiales d'un côté) n'y compte qu'une fois, avec sa date.
+ * Un record de la table qu'aucune partie de la borne n'a fait et qui a l'allure d'un score d'usine
+ * (factoryScore) n'y paraît pas : il est fictif.
  */
 export function scoreBoard(played: readonly PlayedScore[], records: readonly HighScore[] | undefined, period: ScorePeriod, now = new Date(), limit = SCOREBOARD_LINES): BoardLine[] {
-  const lines: Omit<BoardLine, 'rank'>[] = [];
+  let lines: Omit<BoardLine, 'rank'>[] = [];
   if (period === 'all') for (const r of records ?? []) if (r.score > 0) lines.push({ score: r.score, ...(r.initials ? { initials: r.initials } : {}), table: true });
   const kept = played.filter((p) => p.score > 0 && inPeriod(p.at, period, now)).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   for (const p of kept) {
@@ -127,6 +141,7 @@ export function scoreBoard(played: readonly PlayedScore[], records: readonly Hig
     if (same) Object.assign(same, fields, !same.initials && p.initials ? { initials: p.initials } : {});
     else lines.push({ score: p.score, ...(p.initials ? { initials: p.initials } : {}), ...fields });
   }
+  lines = lines.filter((l) => !(l.table && l.at === undefined && factoryScore(l.score)));
   // Du meilleur au moins bon ; à score égal, le plus ancien d'abord (il l'a fait le premier).
   lines.sort((a, b) => b.score - a.score || (a.at ? Date.parse(a.at) : 0) - (b.at ? Date.parse(b.at) : 0));
   return lines.slice(0, limit).map((l) => ({ rank: 1 + lines.filter((o) => o.score > l.score).length, ...l }));

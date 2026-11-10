@@ -670,3 +670,41 @@ export function readVpxElements(file: string): VpxElement[] {
     if (fd !== undefined) fs.closeSync(fd);
   }
 }
+
+/** Type d'élément « flasher » dans un GameItem (VPX : ItemTypeEnum, eItemFlasher). */
+const ITEM_FLASHER = 20;
+/** Flasher en rendu externe (FlasherData::EXT_RENDER) de la fenêtre Backglass (VPXWINDOW_Backglass). */
+const FLASHER_EXT_RENDER = 4;
+const WINDOW_BACKGLASS = 1;
+
+/**
+ * Flashers de la table qui montrent le fronton (rendu externe de la fenêtre Backglass : B2S, PuP…)
+ * dans la scène VR ; undefined si la table est illisible. Sans aucun, une table qui a sa pièce VR
+ * laisse son fronton vide en VR, sauf si VPX ajoute le sien ([PlayerVR] AddBackglass).
+ */
+export function readVpxBackglassDisplays(file: string): number | undefined {
+  let fd: number | undefined;
+  try {
+    fd = fs.openSync(file, 'r');
+    const cfb = new CompoundFile(fd);
+    const game = cfb.children(cfb.entries[0]!).find((e) => e.type === 1 && e.name === 'GameStg');
+    if (!game) return undefined;
+    let count = 0;
+    for (const entry of cfb.children(game).filter((e) => e.type === 2 && /^GameItem\d+$/.test(e.name))) {
+      const data = cfb.stream(entry, 64 * 1024);
+      if (data.length < 4 || data.readUInt32LE(0) !== ITEM_FLASHER) continue;
+      let mode = 0;
+      let style = 0;
+      for (const { tag, body } of biffRecords(data.subarray(4))) {
+        if (tag === 'RDMD' && body.length >= 4) mode = body.readInt32LE(0);
+        else if (tag === 'RSTL' && body.length >= 4) style = body.readInt32LE(0);
+      }
+      if (mode === FLASHER_EXT_RENDER && style === WINDOW_BACKGLASS) count++;
+    }
+    return count;
+  } catch {
+    return undefined;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
