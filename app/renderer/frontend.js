@@ -1480,6 +1480,8 @@ window.cyber.onState((s) => {
   // Juke-box quitté (Exit, partie, extinction) : la lecture de cette fenêtre s'arrête, ses zones sont oubliées.
   document.documentElement.classList.toggle('jukebox-phase', s.phase === 'jukebox');
   // Au bureau, la gestion ouverte depuis le lecteur garde la musique : le clip, caché, joue en fond.
+  // Contrôle de débordement, une fois par ouverture du Juke-box ou du menu système (sa gestion comprise).
+  if (window.CyberJukebox && role === 'playfield') CyberJukebox.checkOnce(s);
   if (window.CyberJukebox && s.jukebox?.clip?.place === 'hidden') CyberJukebox.background(s);
   else if (window.CyberJukebox && s.phase !== 'jukebox' && (CyberJukebox.playing() || document.documentElement.classList.contains('jukebox-desk'))) CyberJukebox.leave();
   // Menu montré dans le casque : cet écran du PC se repose (plus rien à dessiner), un mot dit où il est.
@@ -1532,6 +1534,21 @@ window.cyber.onState((s) => {
   }
   document.documentElement.classList.toggle('attract-mode', Boolean(s.attract));
   zoneLayer.classList.remove('off');
+  // Dans le casque, au milieu du regard (le fronton) : la consigne du calage en très gros, ou, au
+  // chargement d'une partie, le bouton qui la quitte (essai du 10 novembre 2026 : textes illisibles
+  // sur le plateau, sortie introuvable).
+  const prompt = s.phase === 'message' ? s.message?.prompt : undefined;
+  const hint = s.phase === 'loading' ? s.headsetHint : undefined;
+  if (role === 'backglass' && (prompt || hint)) {
+    zoneLayer.classList.add('off');
+    const card = el('section', 'headset-prompt');
+    if (prompt?.status) card.append(el('p', 'headset-prompt-status', prompt.status));
+    card.append(el('p', 'headset-prompt-text', prompt ? prompt.text : hint));
+    if (prompt?.problem) card.append(el('p', 'headset-prompt-problem', prompt.problem));
+    if (prompt?.keys) card.append(el('p', 'headset-prompt-keys', prompt.keys));
+    root.replaceChildren(card);
+    return;
+  }
   if (role === 'playfield') {
     const loadingVideo = s.phase === 'loading' && s.loading?.url ? s.loading : undefined;
     const backdrop = loadingVideo ?? viewOf(s, 'playfield');

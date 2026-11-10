@@ -137,11 +137,13 @@ test('niveau des playlists : la gestion en tête, une ligne par playlist (pochet
   assert.equal(v.list.rows[1]!.playing, 'play', 'la playlist qui joue est marquée');
   assert.equal(v.list.rows.filter((r) => r.focus).length, 1);
   assert.equal(v.list.head, 'Playlist · 2 / 3');
-  // Bandeau : ce que fait chaque bouton à ce niveau ; pas de MagnaSave (ils n'y font rien) ; Start maintenu : l'aléatoire.
+  // Bandeau : ce que fait chaque bouton à ce niveau ; pas de MagnaSave (ils n'y font rien) ; un morceau en
+  // cours : flipper tenu, avancer ou reculer ; Start maintenu : l'aléatoire.
   assert.deepEqual(v.commands.map((c) => [c.id, c.action]), [
     ['flippers', 'Choisir'],
     ['start', 'Ouvrir la playlist'],
     ['exit', 'Roue · arrêt musique'],
+    ['seek', 'Avancer / reculer'],
     ['manage', 'Lecture aléatoire'],
   ]);
   // La gestion choisie : Start l'ouvre, Start maintenu aussi ; le compteur dit le nombre de playlists.
@@ -149,7 +151,10 @@ test('niveau des playlists : la gestion en tête, une ligne par playlist (pochet
   assert.equal(onManage.list.rows[0]!.focus, true);
   assert.equal(onManage.list.head, 'Gestion du Juke-box · 3 playlists');
   assert.equal(onManage.commands[1]!.action, 'Ouvrir la gestion');
-  assert.equal(onManage.commands[3]!.action, 'Gestion des playlists');
+  assert.equal(onManage.commands.at(-1)!.action, 'Gestion des playlists');
+  // Sans morceau en cours, pas d'avance : le bandeau ne la propose pas.
+  const idle = jukeboxPlayerView({ playlists: ALL, state: initialPlayer(lists), top: 0, rows: 8 });
+  assert.ok(!idle.commands.some((c) => c.id === 'seek'));
   // La carte du morceau en cours reste en bas, à ce niveau aussi.
   assert.equal(v.now?.title, 'Échos du périphérique');
   // Aucune playlist : la gestion seule, et l'invitation.
@@ -201,7 +206,9 @@ test('niveau des morceaux : le nom en en-tête et le fil d’Ariane ; Exit « Pl
     ['Start', 'Entrée', 'Indisponible · 42 %'],
     ['MagnaSave', '←→', 'Playlist préc. / suiv.'],
     ['Exit', 'Échap', 'Playlists'],
-    ['Start maintenu', 'Entrée maintenue', 'Gestion des playlists'],
+    ['Flipper tenu', 'Flèches tenues', 'Avancer / reculer'],
+    // Six commandes en deux colonnes : Start maintenu prend son nom court.
+    ['Start maintenu', 'Entrée maintenue', 'Gestion'],
   ]);
   // Une borne dont les MagnaSave sont Valider ou Retour de l'interface : le bandeau ne les propose pas.
   const noMagna = jukeboxPlayerView({ playlists: ALL, state, top: 0, rows: 8, magnaSave: false });

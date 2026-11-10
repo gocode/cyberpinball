@@ -96,7 +96,7 @@ test('correctif : le compagnon sous une clé de runtime neuve à chaque recentra
   // Toutes les têtes de la partie, et le bilan à la fin ; dit à l'écran du calage.
   assert.match(frontend, /function headInGame\(head: HeadPose\): void \{\s*gameHeads\.push\(head\);/);
   assert.match(frontend, /if \(playedVr && vrGame\) checkVrRoomAfterGame\(vpxLog, vrLogFrom\);/);
-  assert.match(frontend, /\.\.\.\(vrRoomProblem \? \[vrRoomProblem\] : \[\]\),/);
+  assert.match(frontend, /problem \?\?\s*vrRoomProblem \?\?/);
 });
 
 test('écrans stables : en couches « quad » hors calage, profondeur de la scène soumise au runtime', () => {

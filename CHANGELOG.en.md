@@ -85,6 +85,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - In the headset, Link's "Reset view" no longer puts the game's table behind you: the headset menu stays in the same room as VPX. A game played with your back to the cabinet, or a recentre done in game, is reported on the alignment screen.
 - The menu's screens stay steady in space when you move your head, even when the computer struggles to keep up with the headset's frame rate.
 - Every time the headset starts, alignment is offered: A to align, B to skip and keep the previous one. Each confirmed alignment applies at once; redo it as often as you like, then B finishes and keeps the last one.
+- Simpler alignment in the headset: a single short instruction, written very large in the middle of your view, and one press per step. The height is taken from the first alignment, even if the Quest's floor is wrongly set. The shadows around the menu's screens are removed.
+- In the headset, a game always has a button to quit (Y by default), shown large during loading; the controller wizard requires it.
 
 ## 0.1.8
 

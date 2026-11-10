@@ -50,9 +50,9 @@ test('rien ne recouvre l’image du playfield : la scène reste hors d’elle ou
 test('sans caisson : ni boîte, ni cadre, ni mur ; en volume, seulement les repères du calage', () => {
   const scene = headsetScene(panels);
   assert.equal(scene.filter((s) => s.kind === 'boite').length, 0);
-  // Le sol, et le halo des deux écrans de la tête (quatre bandes chacun) : rien d'autre.
+  // Le sol seul : plus de halo ni d'ombre autour des écrans (essai du 10 novembre 2026, en retard sur eux).
   assert.equal(scene.filter((s) => s.kind === 'disque').length, 2);
-  assert.equal(scene.filter((s) => s.kind === 'quad').length, 8);
+  assert.equal(scene.filter((s) => s.kind === 'quad').length, 0);
   const marks = lockbarMarks(0.7);
   const calibrating = headsetScene(panels, undefined, marks).filter((s): s is Extract<ScenePrimitive, { kind: 'boite' }> => s.kind === 'boite');
   assert.equal(calibrating.length, 2);
@@ -63,20 +63,13 @@ test('sans caisson : ni boîte, ni cadre, ni mur ; en volume, seulement les rep�
   }
 });
 
-test('la teinte de la table n’est que dans le halo des cadres de la tête, à 10 % ; sans teinte, la sarcelle', () => {
-  const tinted = headsetScene(panels, '#c0392b');
+test('aucune ombre ni halo autour des écrans : la teinte de la table ne change rien à la scène', () => {
+  // Essai du 10 novembre 2026 : les ombrages autour des écrans, dans la couche de projection, se
+  // décalaient des écrans (couches « quad ») quand la tête bougeait ; retirés.
+  assert.deepEqual(headsetScene(panels, '#c0392b'), headsetScene(panels));
   const colors = (s: ScenePrimitive) => (s.kind === 'boite' ? [s.color, s.bottom ?? s.color] : s.kind === 'quad' ? [s.top, s.bottom] : [s.inner, s.outer]);
-  const withTint = tinted.filter((s) => colors(s).some((c) => c.startsWith('#c0392b')));
-  assert.ok(withTint.length >= 8, 'quatre bandes par cadre de tête');
-  for (const s of withTint) {
-    assert.equal(s.kind, 'quad');
-    assert.ok(colors(s).includes(seen('#c0392b', HALO_ALPHA, SCENE_COLORS.surface)) && colors(s).includes(rgba('#c0392b', 0)));
-  }
-  // Sans teinte (ou teinte illisible) : la sarcelle de la marque, aux mêmes endroits.
-  for (const tint of [undefined, 'pas-une-couleur']) {
-    const plain = headsetScene(panels, tint);
-    assert.equal(plain.filter((s) => colors(s).some((c) => c.startsWith(SCENE_COLORS.halo))).length, withTint.length);
-  }
+  assert.equal(headsetScene(panels, '#c0392b').filter((s) => colors(s).some((c) => c.startsWith('#c0392b') || c.startsWith(SCENE_COLORS.halo))).length, 0);
+  assert.ok(HALO_ALPHA > 0 && seen('#c0392b', HALO_ALPHA, SCENE_COLORS.surface).startsWith('#') && rgba('#c0392b', 0).startsWith('#'));
 });
 
 test('sol neutre à 0 m ; rien derrière la tête', () => {
@@ -110,7 +103,7 @@ test('protocole : « scene », une ligne par forme, « scene-fin »', () => {
   const box = lines.find((l) => l.startsWith('boite '))!.split(' ');
   assert.equal(box.length, 13);
   assert.match(box[11]!, /^#[0-9a-f]{8}$/);
-  const quad = lines.find((l) => l.startsWith('quad '))!.split(' ');
+  const quad = sceneProtocol([{ kind: 'quad', center: { x: 0, y: 1, z: -1 }, orientation: { x: 0, y: 0, z: 0, w: 1 }, width: 0.5, height: 0.1, top: '#ffffffff', bottom: '#000000ff' }]).find((l) => l.startsWith('quad '))!.split(' ');
   assert.equal(quad.length, 12);
   const disc = lines.find((l) => l.startsWith('disque '))!.split(' ');
   assert.equal(disc.length, 7);

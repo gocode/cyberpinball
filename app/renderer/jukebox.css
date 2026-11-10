@@ -1330,7 +1330,8 @@
   row-gap: calc(10 * var(--jp));
 }
 
-.jb-cab .jb-command-manage {
+/* La dernière commande, seule sur sa rangée (nombre impair), prend toute la largeur. */
+.jb-cab .jb-help > .jb-command:last-child:nth-child(odd) {
   grid-column: 1 / -1;
 }
 
@@ -1503,4 +1504,32 @@
 .jb-empty.jb-empty-compact {
   gap: calc(14 * var(--jp));
   padding: calc(20 * var(--jp));
+}
+
+/* ---------- Flipper tenu : avancer ou reculer dans le morceau en cours ---------- */
+
+.jb-now-hint {
+  min-width: 0;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+/* La position en grand, posée sur la carte pendant l'avance. */
+.jb-seek-big {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+  place-items: center;
+  border-radius: inherit;
+  background: #07110ff0;
+  color: var(--ink);
+  font-size: calc(64 * var(--jp));
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+
+.jb-seekable {
+  cursor: pointer;
 }

@@ -29,6 +29,10 @@ import {
   jukeboxInput,
   menuButton,
   isJukeboxAction,
+  JUKEBOX_SEEK_EVERY_MS,
+  seekPressStep,
+  seekTarget,
+  type SeekPress,
   playlistAt,
   playlistRows,
   rememberPlayModes,
@@ -130,6 +134,8 @@ export interface JukeboxClipView {
   now?: JukeboxNowView;
   /** Cartel du changement de morceau : « Néon nocturne · 02 / 24 ». */
   card?: { id: number; eyebrow: string; until: number };
+  /** Flipper tenu : la position où recaler le morceau (un nouveau numéro à chaque pas). */
+  seek?: { id: number; to: number };
   /** Rien ne joue : l'affiche. */
   poster: JukeboxPosterView;
 }
@@ -160,7 +166,9 @@ export type JukeboxMessage =
   | { type: 'ended'; id: number }
   | { type: 'error'; id: number; message?: string }
   | { type: 'levels'; id: number; levels: number[] }
-  | { type: 'clip'; rect?: { x: number; y: number; width: number; height: number } };
+  | { type: 'clip'; rect?: { x: number; y: number; width: number; height: number } }
+  /** Contrôle de débordement de la page (une fois par ouverture) : ce qui dépasse de la fenêtre. */
+  | { type: 'overflow'; text: string };
 
 const isAbsolute = (p: string | undefined): p is string => Boolean(p && path.isAbsolute(p));
 
@@ -189,6 +197,18 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   let resumeOnReturn = false;
   /** Start tenu : appui court, jouer ou pause ; maintenu une seconde, la gestion (startPressStep). */
   let press: StartPress;
+  /**
+   * Flipper (ou flèche du bureau) appuyé pendant qu'un morceau est en cours : court, la ligne voisine au
+   * relâchement ; tenu, l'avance dans le morceau (seekPressStep). `code` : la touche à relâcher ;
+   * `short` : ce que fait l'appui court.
+   */
+  let seek: { press: SeekPress; code: string; short: () => void; timer?: NodeJS.Timeout } | undefined;
+  /** Position visée pendant l'avance (les pas s'ajoutent sans attendre le temps lu), et le dernier ordre de recalage. */
+  let seekPos: number | undefined;
+  let seekOrder: { id: number; to: number } | undefined;
+  let seekSeq = 0;
+  /** La position reste en grand sur la carte un instant après le relâchement. */
+  let seekShownUntil = 0;
   let pressTimer: NodeJS.Timeout | undefined;
   /** Titre et artiste du morceau en cours, pour le DMD (25 images par seconde). */
   let playingInfo: { title: string; artist?: string } | undefined;
@@ -397,20 +417,78 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     host.redraw();
   }
 
+  /** Un geste de flipper : appui, répétition, échéance, relâchement (seekPressStep). */
+  function flipperGesture(event: 'down' | 'repeat' | 'tick' | 'up', dir: -1 | 1, code: string, short: () => void): void {
+    const r = seekPressStep(seek?.press, event, Date.now(), dir, Boolean(player?.playing));
+    if (r.press) {
+      seek = { ...(seek ?? {}), press: r.press, code, short };
+      if (!seek.timer) seek.timer = setInterval(() => seek && flipperGesture('tick', seek.press!.dir, seek.code, seek.short), JUKEBOX_SEEK_EVERY_MS);
+    } else {
+      if (seek?.timer) clearInterval(seek.timer);
+      if (seek?.press?.seeking) {
+        host.log(`Juke-box : morceau recalé à ${Math.round(seekPos ?? 0)} s (flipper tenu).`); // i18n-ignore : journal
+        // La position reste lisible un instant, puis la carte reprend son allure.
+        seekShownUntil = Date.now() + 900;
+        setTimeout(() => host.redraw(), 950);
+      }
+      seek = undefined;
+      seekPos = undefined;
+    }
+    if (r.action && 'move' in r.action) short();
+    else if (r.action && 'seek' in r.action) seekBy(r.action.seek);
+    host.redraw();
+  }
+
+  /** Avance (ou recule) de `delta` secondes dans le morceau en cours, quelle que soit sa source. */
+  function seekBy(delta: number): void {
+    if (!player?.playing) return;
+    const duration = time?.duration ?? durationOf(player.playing);
+    seekTo(seekTarget(seekPos ?? time?.position ?? 0, delta, duration));
+  }
+
+  function seekTo(to: number): void {
+    seekPos = to;
+    seekOrder = { id: ++seekSeq, to };
+    // En ligne : le lecteur YouTube, dans sa vue ; sinon la fenêtre du clip (son et vidéo, ou fichier).
+    if (online) void onlineScript(`(() => { const v = document.querySelector('video'); if (v) v.currentTime = ${to}; })()`);
+    if (time) {
+      time = { ...time, position: to };
+      sendTime();
+    }
+  }
+
+  /** Durée connue du morceau en cours (index), tant que le lecteur ne l'a pas encore dite. */
+  function durationOf(playing: { playlist: string; key: string }): number | undefined {
+    return playlistsInput().find((x) => x.id === playing.playlist)?.rows.find((r) => r.key === playing.key)?.duration;
+  }
+
   function handleKey(input: Input): boolean {
     if (!player) return false;
     if (input.type === 'keyUp' && host.keys().keys.confirm.includes(input.code)) {
       startPress('up');
       return true;
     }
+    if (input.type === 'keyUp' && seek && input.code === seek.code) {
+      flipperGesture('up', seek.press!.dir, seek.code, seek.short);
+      return true;
+    }
     if (input.type !== 'keyDown') return true;
     const k = host.keys();
+    const event = input.isAutoRepeat ? 'repeat' : 'down';
     // Au clavier du bureau, dans une playlist : ←→ passent à la playlist voisine (comme les MagnaSave),
-    // sauf si la borne a relevé ces flèches comme boutons : elles gardent alors leur rôle.
+    // sauf si la borne a relevé ces flèches comme boutons : elles gardent alors leur rôle. Tenues pendant
+    // un morceau, elles avancent ou reculent dedans, comme les flippers.
     const arrow = !k.cabinet.includes(input.code) && (input.code === 'ArrowLeft' || input.code === 'ArrowRight');
     if (arrow) {
-      if (player.level === 'tracks' && !input.isAutoRepeat) step(input.code === 'ArrowLeft' ? 'playlist-previous' : 'playlist-next');
-      host.redraw();
+      const dir = input.code === 'ArrowLeft' ? -1 : 1;
+      const short = () => {
+        if (player?.level === 'tracks') step(dir < 0 ? 'playlist-previous' : 'playlist-next');
+      };
+      if (player.playing) flipperGesture(event, dir, input.code, short);
+      else {
+        if (!input.isAutoRepeat) short();
+        host.redraw();
+      }
       return true;
     }
     // Le rôle du bouton, résolu comme sur la roue (menuButton) : un bouton qui y fait Exit fait Exit ici.
@@ -419,16 +497,29 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     if (button === 'confirm') return (startPress(input.isAutoRepeat ? 'repeat' : 'down'), true);
     const move = jukeboxInput(button, player.level);
     if (!move) return button !== undefined;
+    // Flippers : appui court, la ligne voisine ; tenus pendant un morceau, l'avance dans le morceau.
+    if (move === 'previous' || move === 'next') {
+      flipperGesture(event, move === 'previous' ? -1 : 1, input.code, () => step(move));
+      return true;
+    }
     // Un MagnaSave ou Exit tenu ne répète pas son effet (une playlist à la fois, un niveau à la fois).
-    if (input.isAutoRepeat && move !== 'previous' && move !== 'next') return true;
+    if (input.isAutoRepeat) return true;
     step(move);
     host.redraw();
     return true;
   }
 
   /** Clic dans une fenêtre : une ligne de la liste (la choisir ; déjà choisie : Start), une commande, une playlist voisine. */
-  function click(action: { op?: unknown; key?: unknown; dir?: unknown }): void {
+  function click(action: { op?: unknown; key?: unknown; dir?: unknown; fraction?: unknown }): void {
     if (!player) return;
+    // Clic dans la barre de progression (bureau) : cet endroit du morceau.
+    if (action.op === 'seek-to' && typeof action.fraction === 'number' && player.playing) {
+      const duration = time?.duration ?? durationOf(player.playing);
+      if (duration) seekTo(seekTarget(0, Math.min(1, Math.max(0, action.fraction)) * duration, duration));
+      seekPos = undefined;
+      host.redraw();
+      return;
+    }
     if (action.op === 'row' && typeof action.key === 'string' && player.level === 'playlists') {
       // Une playlist (ou la gestion) cliquée : elle s'ouvre.
       player = { ...player, at: action.key };
@@ -537,6 +628,10 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
 
   /** Message d'une fenêtre (lecture locale) ou relevé du lecteur YouTube. */
   function message(msg: JukeboxMessage): void {
+    if (msg.type === 'overflow') {
+      if (typeof msg.text === 'string') host.log(`Juke-box : la page déborde de la fenêtre : ${msg.text.slice(0, 400)}`); // i18n-ignore : journal
+      return;
+    }
     if (msg.type === 'clip') {
       const r = msg.rect;
       const next = r && r.width > 0 && r.height > 0 ? { x: Math.round(r.x), y: Math.round(r.y), width: Math.round(r.width), height: Math.round(r.height) } : undefined;
@@ -784,6 +879,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       ad,
       audioOnly: order?.audioOnly ?? false,
       ...(press && !press.done ? { holdSince: press.since } : {}),
+      ...(seek?.press?.seeking || Date.now() < seekShownUntil ? { seeking: true } : {}),
     });
   }
 
@@ -804,6 +900,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
         ...(order ? { order: { id: order.id, kind: order.kind, ...(order.audio ? { audio: order.audio } : {}), ...(order.video ? { video: order.video } : {}), ...(order.image ? { image: order.image } : {}), paused: order.paused, ...(order.output ? { output: order.output } : {}), volume: order.volume } } : {}),
         ...(now ? { now } : {}),
         ...(card && now && order?.kind !== 'online' ? { card: { id: card.id, eyebrow: cardEyebrow(now), until: card.until } } : {}),
+        ...(seekOrder && order?.kind !== 'online' ? { seek: seekOrder } : {}),
         poster: poster(),
       };
       // En borne, pendant la gestion : le morceau en pause et l'affiche sur le fronton, jamais vide.

@@ -3517,3 +3517,24 @@ html.jukebox-phase.jukebox-desk #root > .banner {
 html.jukebox-phase #root:has(> .banner) > .status-corner {
   visibility: hidden;
 }
+
+/* Consigne dans le casque, au milieu du regard (fronton) : une ligne courte en très gros, les boutons en rappel. */
+.headset-prompt {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4vh;
+  padding: 6vh 6vw;
+  background: var(--void);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  text-align: center;
+}
+.headset-prompt p { margin: 0; }
+.headset-prompt-text { font-size: 13vh; font-weight: 700; line-height: 1.1; }
+.headset-prompt-status { font-size: 6vh; color: var(--signal); }
+.headset-prompt-problem { font-size: 6vh; color: var(--warning); max-width: 90vw; }
+.headset-prompt-keys { font-size: 7vh; color: var(--ink-muted); }

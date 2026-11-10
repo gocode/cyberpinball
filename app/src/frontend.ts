@@ -285,7 +285,7 @@ import { locations, vpxInstall, vpxProfile } from './paths';
 import { loadPlugins } from './plugins';
 import { activeVpxIni, syncConfiguration } from './vpx-ini';
 import { createConfigurationsMenu } from './configurations-menu';
-import { coverDisplay, hideCovered, minimizeCovered } from './cover-display';
+import { coverDisplay, coverReport, hideCovered, minimizeCovered, recoverExact } from './cover-display';
 import { DesktopMode } from './desktop-mode';
 import { answerLegacy, legacyDesktopTurned, orientationForDesktop, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
 import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './frontend-gate';
@@ -553,6 +553,11 @@ interface Message {
    * relance quand rien ne manque (action 'replay' : le script de la table ou VPX s'est arrêté).
    */
   table?: string;
+  /**
+   * Dans le casque : la consigne du moment, en très gros au milieu du regard (fronton), avec les boutons
+   * en rappel ; un problème ou l'état seulement s'il y en a (calage de la borne).
+   */
+  prompt?: { text: string; keys: string; problem?: string; status?: string };
 }
 
 /**
@@ -1056,6 +1061,7 @@ const jukeboxPlayer = createJukeboxPlayer({
   // « Gestion du Juke-box » : sa gestion (étape 4, library.jukeboxMenu) sur la playlist montrée ; sans elle, le menu système.
   manage: (playlist) => {
     if (!guest.knock('menu.system')) return;
+    setTimeout(() => diagnosePlayfield('Gestion du Juke-box'), 600); // i18n-ignore : journal
     const menu = jukeboxMenu();
     if (menu) menu.open(playlist);
     else openConfig();
@@ -1116,9 +1122,29 @@ function openJukebox(playlist?: string): void {
   }
   cancelWheelPress();
   collections.hidePanel();
+  const fresh = !jukeboxPlayer.active();
   state = { ...state, phase: 'jukebox', help: false, message: undefined, jukebox: true };
   jukeboxPlayer.open(playlist);
   broadcast();
+  if (fresh) diagnosePlayfield('Juke-box');
+}
+
+/**
+ * Une ligne du journal sur le playfield, à l'ouverture du Juke-box ou de sa gestion : l'écran (zone, zone
+ * de travail, mise à l'échelle, rotation), la fenêtre et son contenu, la page (taille, devicePixelRatio).
+ * Une fenêtre qui ne couvre pas exactement son écran s'y recale, et le journal le dit (lecteur rogné à
+ * droite sur une borne à plusieurs mises à l'échelle, 10/11/2026).
+ */
+function diagnosePlayfield(label: string): void {
+  const win = windows.get('playfield');
+  if (!win || win.isDestroyed()) return;
+  const report = recoverExact(win) ?? coverReport(win).text;
+  const line = (page?: number[]) =>
+    console.log(`${label} : playfield, ${report}${page ? ` ; page ${page[0]} × ${page[1]}, devicePixelRatio ${page[2]}${page[3]! > page[0]! + 1 || page[4]! > page[1]! + 1 ? `, contenu ${page[3]} × ${page[4]} : déborde` : ''}` : ''}.`); // i18n-ignore : journal
+  win.webContents
+    .executeJavaScript('[innerWidth, innerHeight, devicePixelRatio, document.documentElement.scrollWidth, document.documentElement.scrollHeight]')
+    .then((page: number[]) => line(page))
+    .catch(() => line());
 }
 
 /** Le Juke-box se rouvre depuis sa gestion : broadcast ne ferme pas le lecteur gardé en fond. */
@@ -2528,6 +2554,18 @@ function headsetLost(inGame: boolean): void {
 
 /** Tête du joueur déjà notée pour la partie dans le casque en cours. */
 let headLogged = false;
+/**
+ * Pendant le chargement d'une partie dans le casque (avant que VPX le prenne) : le bouton qui quitte la
+ * partie, en gros sur le fronton (essai du 10 novembre 2026 : impossible de ressortir).
+ */
+let headsetExitHint: string | undefined;
+
+/** Le bouton des manettes qui quitte la partie, en clair : « Y : quitter la partie ». */
+function exitHintText(): string | undefined {
+  const el = controllerSetting().functions.quitter;
+  return el ? t('{bouton} : quitter la partie', { bouton: CONTROLLER_ELEMENTS[el]?.label ?? el }) : undefined;
+}
+
 /** Têtes relevées par le compagnon en veille pendant la partie dans le casque (toutes les 5 s). */
 let gameHeads: HeadPose[] = [];
 /**
@@ -2595,52 +2633,41 @@ function showCalibration(problem?: string): void {
   const c = calibration;
   if (!c) return;
   const p = c.points;
-  const cancel = t('B : terminer');
-  let lines: string[];
-  // Avant les coins : ce qui fausserait le calage (limite changée, sol du Quest mal réglé).
-  const notices = [
-    ...(vrRoomProblem ? [vrRoomProblem] : []),
-    ...(headset?.keyRenewed ? [t('Le casque repart dans la pièce d’origine du Quest, celle que reçoit VPX : vérifiez que la borne est bien à sa place, recalez sinon.')] : []),
-    ...(roomNotice ? [t('La limite du Quest a changé depuis le calage : la borne n’est sans doute plus sur la vraie. Recalez-la.')] : []),
-    ...(!p.right && eyeHeightProblem(headsetEyes) ? [eyeHeightProblem(headsetEyes)!] : []),
-    ...(!p.right && roomStale ? [t('Le Quest a refait sa pièce, mais une application qui démarre, comme VPX, reçoit encore l’ancienne : coupez puis relancez Link (Air Link), puis recalez.')] : []),
-    ...(!p.left && !isCalibrated(headset?.place()) && headsetSetting() === 'borne' ? [t('Pas encore calée : la borne du casque et les tables doivent être posées sur la vraie avant de jouer.')] : []),
-    ...(!p.left && !isCalibrated(headset?.place()) && headsetSetting() === 'bureau' ? [t('Pas encore posée : la borne du casque et les tables doivent avoir leur place avant de jouer.')] : []),
-    ...(c.place && vpxPlaceProblem(placeVpxSettings(c.place)) ? [vpxPlaceProblem(placeVpxSettings(c.place))!] : []),
-  ];
-  // Calage validé (appliqué aussitôt) : on reste ici pour juger, recommencer, ou terminer.
-  const applied = c.validated && !p.left && !c.placing ? [t('Calage appliqué : la borne est à sa nouvelle place. Recommencez autant de fois que vous voulez ; B : terminer garde le dernier calage validé.')] : [];
-  if (problem) lines = [...notices, problem, cancel];
-  else if (c.intro)
-    lines = [
-      ...notices,
-      isCalibrated(headset?.place()) ? t('Caler la borne pour cette session, ou garder le calage précédent ?') : t('La borne n’est pas encore calée.'),
-      t('A : caler · B : passer, garder le calage précédent'),
-    ];
-  else if (c.placing) lines = [t('Pose de la borne devant vous…')];
-  // Au bureau, pas de barre avant à toucher : la borne se pose où regarde le joueur, ou sur le bord du bureau.
-  else if (!p.left && headsetSetting() === 'bureau')
-    lines = [
-      ...applied,
-      ...notices,
-      t('Pas de vraie borne devant vous : la borne du casque se pose où vous voulez, puis ne bouge plus.'),
-      t('Regardez droit devant vous, comme pour jouer, puis A : la barre avant se pose 30 cm devant vous, à 88 cm du sol.'),
-      t('Ou, gâchette appuyée, touchez du bout de la manette le bord gauche puis le bord droit du bureau.'),
-      t('A : poser la borne ici · B : terminer'),
-    ];
-  else if (!p.left) lines = [...applied, ...notices, t('Étape 1 sur 3 : coin gauche'), t('Posez le bout de la manette (son cube vert) sur le coin gauche de la vraie barre avant, puis gâchette.'), cancel];
-  else if (!p.right) lines = [...notices, t('Étape 2 sur 3 : coin droit'), t('Coin gauche marqué d’un plot vert. Bout de la manette sur le coin droit, puis gâchette.'), cancel];
-  else if (!p.middle) lines = [t('Étape 3 sur 3 : vérifier'), t('La borne est posée. Touchez le plot vert du milieu de la barre avant, gâchette : il doit tomber sur la vraie.'), t('A : valider sans vérifier · B : terminer')];
-  else {
+  // Une seule consigne courte, en très gros au milieu du regard (fronton : headsetPrompt) ; les boutons en
+  // rappel ; le détail seulement s'il y a vraiment un problème (essai du 10 novembre 2026 : « moins de
+  // blabla, écrit beaucoup plus gros »).
+  const end = c.intro ? t('B : passer') : t('B : terminer');
+  const desk = headsetSetting() === 'bureau';
+  let text: string;
+  let keys: string;
+  if (c.placing) {
+    text = t('Pose de la borne…');
+    keys = '';
+  } else if (!p.left) {
+    text = desk ? t('Regardez droit devant vous') : t('Touchez le coin gauche');
+    keys = desk ? `${t('A : valider')} · ${end}` : `${t('Gâchette : toucher')} · ${end}`;
+  } else if (!p.right) {
+    text = desk ? t('Touchez le bord droit du bureau') : t('Touchez le coin droit');
+    keys = `${t('Gâchette : toucher')} · ${end}`;
+  } else if (!p.middle) {
+    text = t('Touchez le plot vert du milieu');
+    keys = `${t('A : valider')} · ${end}`;
+  } else {
     const gap = Math.round(calibrationGap(p.left, p.right, p.middle) * 10) / 10;
-    lines = [
-      t('Barre avant de {w} cm, à {h} cm du sol ; le milieu touché est à {gap} cm du milieu calé.', { w: Math.round((c.place?.lockbarWidth ?? 0) * 100), h: Math.round((c.place?.lockbarHeight ?? 0) * 100), gap: gap.toLocaleString(language() === 'en' ? 'en-US' : 'fr-FR') }),
-      t('Les plots verts marquent les coins de la barre avant virtuelle : ils doivent tomber sur les vrais.'),
-      t('A : valider · B : terminer'),
-    ];
+    text = t('Écart : {gap} cm', { gap: gap.toLocaleString(language() === 'en' ? 'en-US' : 'fr-FR') });
+    keys = `${t('A : valider')} · ${end}`;
   }
+  // Un vrai problème seulement, le premier : point refusé, pièce de VPX différente, limite changée, table hors de portée.
+  const issue =
+    problem ??
+    vrRoomProblem ??
+    (headset?.keyRenewed && !c.validated ? t('Vérifiez la place de la borne.') : undefined) ??
+    (roomNotice ? t('La limite du Quest a changé : recalez.') : undefined) ??
+    (c.place ? vpxPlaceProblem(placeVpxSettings(c.place)) : undefined);
+  const status = c.validated && !p.left && !c.placing ? t('Calage appliqué') : undefined;
   headset?.setMarks(calibrationMarks(c));
-  state = { ...state, phase: 'message', help: false, message: { title: t('Caler la borne'), lines } };
+  const prompt = { text, keys, ...(issue && { problem: issue }), ...(status && { status }) };
+  state = { ...state, phase: 'message', help: false, message: { title: t('Caler la borne'), lines: [...(status ? [status] : []), text, ...(issue ? [issue] : []), ...(keys ? [keys] : [])], prompt } };
   broadcast();
 }
 
@@ -2662,8 +2689,9 @@ function calibrationMarks(c: NonNullable<typeof calibration>): Point3[] {
 /** Un point touché, gâchette appuyée (compagnon : « pointe ») : coin gauche, coin droit, puis le milieu (retouchable). */
 function calibrationPoint(point: Point3, room: boolean): void {
   const c = calibration;
-  // Premier écran (caler ou passer) : la gâchette ne prend encore rien.
-  if (!c || c.intro) return;
+  if (!c) return;
+  // Le premier point touché commence le calage : un appui, une étape (B ne fait plus que terminer).
+  c.intro = false;
   if (!room) {
     c.points = {};
     return showCalibration(t('Le casque n’a pas d’espace de la pièce (limite du Quest non définie) : le calage ne tiendrait pas d’une session à l’autre. Définissez la limite dans le Quest, puis recommencez.'));
@@ -2685,19 +2713,19 @@ function calibrationPoint(point: Point3, room: boolean): void {
 }
 
 /**
- * Pendant le calage : au premier écran, A cale et B passe ; ensuite A valide (la place appliquée
- * aussitôt, on reste dans le calage pour recommencer) et B termine, en gardant le dernier calage
- * validé ; gâchettes et joysticks ne déplacent rien.
+ * Pendant le calage, un appui par étape : la gâchette touche un point, A valide (la place appliquée
+ * aussitôt, on reste dans le calage pour recommencer), B termine en gardant le dernier calage validé
+ * (au premier écran proposé d'office : B passe). Plus d'appui « pour commencer » : le premier point
+ * touché, ou A au bureau, est déjà le calage (essai du 10 novembre 2026 : « il faut valider deux fois »).
+ * Gâchettes et joysticks ne déplacent rien.
  */
 function calibrationKey(input: Input): boolean {
   if (input.isAutoRepeat) return true;
   if (KEYS.exit.includes(input.code)) closeCalibration();
-  else if (KEYS.confirm.includes(input.code) && calibration?.intro) {
-    calibration.intro = false;
-    showCalibration();
-  } else if (KEYS.confirm.includes(input.code) && calibration?.place) applyCalibration();
+  else if (KEYS.confirm.includes(input.code) && calibration?.place) applyCalibration();
   // Au bureau, avant tout point : A pose la borne où regarde le joueur (recentrage, puis « centre »).
   else if (KEYS.confirm.includes(input.code) && calibration && !calibration.points.left && !calibration.placing && headsetSetting() === 'bureau') {
+    calibration.intro = false;
     calibration.placing = true;
     showCalibration();
     headset?.recenter();
@@ -2706,10 +2734,12 @@ function calibrationKey(input: Input): boolean {
 }
 
 /** Recentrage demandé par « poser la borne ici » : la place du regard, barre avant à hauteur de borne, gardée. */
-function calibrationCentre(gaze: { x: number; z: number; yaw: number }): void {
+function calibrationCentre(gaze: { x: number; z: number; yaw: number; eyes?: number }): void {
   const c = calibration;
   if (!c?.placing) return;
-  c.place = freePlace(gaze);
+  // La hauteur tirée des yeux mesurés dans la même pièce, jamais du sol du Quest (essai du 10 novembre
+  // 2026 : sol faux de 70 cm, yeux à 2,35 m, la borne posée « à 88 cm du sol » tombait par terre).
+  c.place = freePlace(gaze, gaze.eyes);
   c.placing = false;
   applyCalibration();
 }
@@ -4163,6 +4193,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   // Réalité virtuelle (vr.ts) : activée et un runtime OpenXR présent, VPX reçoit un INI à part, la VR
   // en « Autodetect » (dans le casque s'il est prêt, sinon sur les écrans). Jamais pour régler l'affichage.
   const vrGame = simulated === undefined && !displayMode ? prepareVr(played.file, double?.ini) : undefined;
+  headsetExitHint = vrGame && headset?.inUse ? exitHintText() : undefined;
   // Vision 3D (vision3d.ts) : le capteur s'allume quand la table est à l'écran, s'éteint à la fin.
   const vision3dSource = simulated === undefined && !displayMode ? prepareVision3d(install.exe, Boolean(vrGame)) : undefined;
   // Bilan de la Vision 3D : ce que VPX écrira de son module dans vpinball.log, à partir d'ici.
@@ -4266,6 +4297,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   vrGameStop = undefined;
   if (playedVr && vrGame) checkVrPlaceAfterGame(vrGame.ini, played.file);
   if (playedVr && vrGame) checkVrRoomAfterGame(vpxLog, vrLogFrom);
+  headsetExitHint = undefined;
   if (vision3dSource) noteVision3dGame(vision3dLog, vision3dLogFrom);
   headTracker.stop();
   stopCentering?.();
@@ -5372,7 +5404,7 @@ function broadcast(): void {
   for (const [role, win] of windows) {
     if (!win.isDestroyed()) win.webContents.send('state', inHeadset ? { ...viewFor(role), inHeadset: true } : viewFor(role));
   }
-  sendToHeadsetViews((role) => viewFor(role, headsetMedias ?? medias));
+  sendToHeadsetViews((role) => (headsetExitHint ? { ...viewFor(role, headsetMedias ?? medias), headsetHint: headsetExitHint } : viewFor(role, headsetMedias ?? medias)));
   // Télécommande du téléphone : le QR vit tant que l'écran qui le montre est affiché ; le téléphone suit l'écran.
   const surfaces = state.phase === 'library' && !desktop.active ? library.remoteSurfaces() : { menu: false, keyboard: false };
   phoneRemote.show('menu', surfaces.menu);

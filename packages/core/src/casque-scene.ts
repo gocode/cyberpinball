@@ -35,7 +35,8 @@ export const SCENE_COLORS = {
 } as const;
 
 /** Côté des repères du calage (plots posés sur les coins de la barre avant). */
-const MARK_M = 0.02;
+// Plots du calage : nets, bien visibles (essai du 10 novembre 2026 : un repère net du point à toucher).
+const MARK_M = 0.035;
 /** Halo de la teinte autour des écrans de la tête : largeur et opacité. */
 export const HALO_M = 0.04;
 export const HALO_ALPHA = 0.1;
@@ -108,10 +109,12 @@ function ring(
 }
 
 /**
- * La scène autour des écrans : le sol, le halo de la teinte autour de ceux de la tête (`tint` :
- * #rrggbb de la table choisie, sinon la sarcelle), et les repères du calage (`marks`).
+ * La scène autour des écrans : le sol et les repères du calage (`marks`). Plus de halo ni d'ombre
+ * autour des écrans de la tête (essai du 10 novembre 2026) : les écrans sont des couches « quad »,
+ * recomposées à chaque image du casque, et tout ombrage dessiné dans la couche de projection, à la
+ * cadence du compagnon, se décalait d'eux quand la tête bougeait. `_tint` : gardé pour l'appel.
  */
-export function headsetScene(panels: readonly HeadsetPanel[], tint?: string, marks: readonly Vec3[] = []): ScenePrimitive[] {
+export function headsetScene(panels: readonly HeadsetPanel[], _tint?: string, marks: readonly Vec3[] = []): ScenePrimitive[] {
   const scene: ScenePrimitive[] = [];
   const C = SCENE_COLORS;
 
@@ -121,10 +124,6 @@ export function headsetScene(panels: readonly HeadsetPanel[], tint?: string, mar
   const centerZ = pf && head.length ? (pf.position.z + head[0]!.position.z) / 2 : (pf ?? head[0])?.position.z ?? -0.6;
   scene.push({ kind: 'disque', center: { x: 0, y: 0, z: centerZ }, radius: FLOOR_M, inner: rgba(C.void), outer: rgba(C.void) });
   scene.push({ kind: 'disque', center: { x: 0, y: 0.001, z: centerZ }, radius: FLOOR_GLOW_M, inner: rgba(mix(C.void, C.surface, 0.15)), outer: rgba(C.void) });
-
-  // Halo de la teinte, à fleur du bord de chaque écran de la tête.
-  const haloColor = tint && /^#[0-9a-f]{6}$/i.test(tint) ? tint : C.halo;
-  for (const p of head) scene.push(...ring(p, { w: p.width, h: p.height }, HALO_M, -EPS, { inside: seen(haloColor, HALO_ALPHA, C.surface), outside: rgba(haloColor, 0) }));
 
   // Calage de la borne (calage.ts) : un plot vert sur chaque coin de la barre avant virtuelle, qui
   // doit tomber sur le vrai coin, touché du bout de la manette.

@@ -501,7 +501,8 @@
       a.dataset.jbNow = '';
       const b = el('span', '', now.duration ? fmt(now.duration) : '–:––');
       b.dataset.jbTotal = '';
-      time.append(a, b);
+      // Entre les deux temps, comment mettre en pause : Start sur ce morceau (le bandeau le dit aussi sur sa ligne).
+      time.append(a, el('span', 'jb-now-hint jb-ellipsis', now.paused ? t('Start sur ce morceau : reprendre') : t('Start sur ce morceau : pause')), b);
     }
     if (desk) {
       const top = el('div', 'jb-between');
@@ -518,13 +519,27 @@
         pause,
       );
       top.append(nowText(now, true), buttons);
-      box.replaceChildren(top, progress(now), time);
+      // La barre se clique : le morceau reprend à cet endroit.
+      const bar = progress(now);
+      bar.classList.add('jb-seekable');
+      bar.addEventListener('click', (event) => {
+        const r = bar.getBoundingClientRect();
+        if (r.width > 0) window.cyber?.act?.({ type: 'jukebox', op: 'seek-to', fraction: (event.clientX - r.left) / r.width });
+      });
+      box.replaceChildren(top, bar, time);
     } else {
       // La vignette du morceau en cours ; sans fronton, le clip lui-même (CyberJukebox, place « thumb »).
       const thumb = s.jukebox.clip?.place === 'thumb' ? clipHolder(s) : art(now.image, now.key, 'jb-art jb-now-art');
       const text = nowText(now, false);
       text.append(progress(now), time);
       box.replaceChildren(thumb, text);
+    }
+    // Flipper tenu : la position en grand sur la carte, le temps du morceau qui défile avec la barre.
+    box.classList.toggle('jb-seeking', Boolean(now.seeking));
+    if (now.seeking) {
+      const big = el('div', 'jb-seek-big', '');
+      big.dataset.jbBoth = '';
+      box.append(big);
     }
     if (lastTime) showTime(lastTime);
   }
@@ -828,6 +843,12 @@
     // Son seul (ou vidéo absente) : la pochette, sinon le visualiseur.
     if (order.kind !== 'online' && !clip.media?.video) paintStill(order, now);
     setPaused(order.paused);
+    // Flipper tenu : le morceau reprend à la position voulue (le son mène, la vidéo le suit).
+    if (c.seek && clip.seekId !== c.seek.id) {
+      clip.seekId = c.seek.id;
+      const m = clip.media;
+      for (const media of [m?.audio, m?.video]) if (media && Number.isFinite(c.seek.to)) media.currentTime = c.seek.to;
+    }
     // Repères posés sur le clip : la pause, et le cartel du changement de morceau (4 s).
     const over = [];
     if (order.paused && order.kind !== 'online') {
@@ -929,6 +950,51 @@
     if (holder.parentNode !== parking) parking.replaceChildren(holder);
   }
 
+  /**
+   * Contrôle de débordement en production (playfield, Juke-box et sa gestion) : une fois par ouverture,
+   * ce qui dépasse de la fenêtre (page plus large ou plus haute, élément visible hors de la fenêtre) va au
+   * journal, nommé avec ses dimensions. Rien quand tout tient. Un élément rogné par son conteneur ne se
+   * voit pas hors de la fenêtre : c'est ce conteneur qui compte.
+   */
+  function overflowCheck(where) {
+    const vw = innerWidth;
+    const vh = innerHeight;
+    const T = 2;
+    const out = [];
+    const page = document.documentElement;
+    if (page.scrollWidth > vw + T || page.scrollHeight > vh + T) out.push(`page ${page.scrollWidth} × ${page.scrollHeight} pour une fenêtre de ${vw} × ${vh}`); // i18n-ignore : journal
+    for (const node of document.querySelectorAll('#root *')) {
+      if (out.length >= 4) break;
+      const r = node.getBoundingClientRect();
+      if (r.width < T || r.height < T || (r.left >= -T && r.top >= -T && r.right <= vw + T && r.bottom <= vh + T)) continue;
+      if (node.closest('.cinema, [data-bleed]')) continue;
+      const style = getComputedStyle(node);
+      if (style.visibility === 'hidden' || style.display === 'none') continue;
+      let clipped = false;
+      for (let e = node.parentElement; e && e.id !== 'root'; e = e.parentElement) {
+        const s = getComputedStyle(e);
+        if (/hidden|auto|scroll|clip/.test(s.overflowX + s.overflowY)) {
+          clipped = true;
+          break;
+        }
+      }
+      if (clipped) continue;
+      const name = `${node.tagName.toLowerCase()}${node.classList.length ? '.' + [...node.classList].slice(0, 2).join('.') : ''}`;
+      out.push(`${name} ${Math.round(r.width)} × ${Math.round(r.height)} en ${Math.round(r.left)}, ${Math.round(r.top)}`);
+    }
+    if (out.length) window.cyber?.jukebox?.({ type: 'overflow', text: `${where}, fenêtre ${vw} × ${vh} (devicePixelRatio ${devicePixelRatio}) : ${out.join(' ; ')}` }); // i18n-ignore : journal
+  }
+
+  let checked;
+
+  /** Une fois par ouverture du Juke-box ou de sa gestion (la phase change), après le rendu. */
+  function checkOnce(s) {
+    const key = s.phase === 'jukebox' || s.phase === 'library' ? s.phase : undefined;
+    if (key === checked) return;
+    checked = key;
+    if (key) requestAnimationFrame(() => requestAnimationFrame(() => overflowCheck(key === 'jukebox' ? 'Juke-box' : 'Menu système ou gestion'))); // i18n-ignore : journal
+  }
+
   /** Mode Juke-box quitté : la lecture s'arrête, les zones gardées sont oubliées. */
   function leave() {
     stopMedia();
@@ -946,6 +1012,7 @@
 
   window.CyberJukebox = {
     playfield,
+    checkOnce,
     background,
     wheelPoster,
     backglassPoster,

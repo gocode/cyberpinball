@@ -174,7 +174,7 @@ export interface JukeboxRowView {
 }
 
 export interface JukeboxCommandView {
-  id: 'flippers' | 'start' | 'magnasave' | 'exit' | 'manage';
+  id: 'flippers' | 'start' | 'magnasave' | 'exit' | 'manage' | 'seek';
   /** Bouton de la borne, et touche du clavier au bureau. */
   cab: string;
   desk: string;
@@ -204,6 +204,8 @@ export interface JukeboxNowView {
   origin: string;
   /** Mode de lecture de sa playlist : les icônes ⤮ et ⟳ de la carte (et ses boutons au bureau). */
   mode: PlayMode;
+  /** Flipper tenu : la position s'affiche en grand sur la carte pendant l'avance. */
+  seeking?: boolean;
 }
 
 export interface JukeboxPlayerView {
@@ -266,6 +268,8 @@ export interface JukeboxViewInput {
    * elles (MagnaSave relevés comme Valider ou Retour), le bandeau ne les propose pas.
    */
   magnaSave?: boolean;
+  /** Un flipper tenu avance ou recule dans le morceau en cours. */
+  seeking?: boolean;
 }
 
 const two = (n: number) => String(n).padStart(2, '0');
@@ -374,7 +378,19 @@ function nowView(view: JukeboxViewInput): JukeboxNowView | undefined {
     ...(r.image ? { image: r.image } : {}),
     origin: originOf(r.source, audioOnly),
     mode: playModeOf(view.state, pl.id),
+    ...(view.seeking ? { seeking: true } : {}),
   };
+}
+
+/**
+ * Les commandes du bandeau, telles qu'elles tiennent en deux colonnes (borne) : la dernière seule sur sa
+ * rangée prend toute la largeur ; Start maintenu, à côté d'une autre, prend son nom court.
+ */
+function withSeek(commands: JukeboxCommandView[], now: JukeboxNowView | undefined): JukeboxCommandView[] {
+  // Un morceau en cours : flipper tenu, avancer ou reculer dedans (bureau : flèches tenues).
+  const all = now ? [...commands.slice(0, -1), { id: 'seek' as const, cab: t('Flipper tenu'), desk: t('Flèches tenues'), action: t('Avancer / reculer') }, commands.at(-1)!] : commands;
+  const last = all.at(-1)!;
+  return all.length % 2 === 0 && last.id === 'manage' && last.action === t('Gestion des playlists') ? [...all.slice(0, -1), { ...last, action: t('Gestion') }] : all;
 }
 
 /** Ce que dit la ligne « Répétition » : le mode en vigueur. */
@@ -458,7 +474,7 @@ export function jukeboxPlayerView(view: JukeboxViewInput): JukeboxPlayerView {
         after: w.after,
       },
       ...(now ? { now } : {}),
-      commands,
+      commands: withSeek(commands, now),
       ...(n ? {} : { empty: 'library' as const }),
       ...hold,
     };
@@ -535,7 +551,7 @@ export function jukeboxPlayerView(view: JukeboxViewInput): JukeboxPlayerView {
       after: w.after,
     },
     ...(now ? { now } : {}),
-    commands,
+    commands: withSeek(commands, now),
     ...(!shown ? { empty: 'library' as const } : !tracks.length ? { empty: 'playlist' as const } : {}),
     ...hold,
   };

@@ -62,7 +62,11 @@ import {
   JUKEBOX_PLAY_ALL_KEY,
   JUKEBOX_REPEAT_KEY,
   JUKEBOX_SHUFFLE_KEY,
+  JUKEBOX_SEEK_HOLD_MS,
   nextPlayable,
+  seekPressStep,
+  seekStepSeconds,
+  seekTarget,
   playerStep,
   playlistAt,
   playlistPosition,
@@ -850,6 +854,51 @@ test('Start maintenu au niveau des playlists : la playlist choisie en aléatoire
   // Dans une playlist : Start maintenu reste la gestion.
   assert.equal(holdHint(r.state, many), 'manage');
   assert.deepEqual(playerStep(r.state, 'hold', many).effect, { kind: 'manage' });
+});
+
+test('flipper tenu : appui court, la ligne voisine au relâchement ; tenu, l’avance par pas qui s’accélèrent ; sans morceau, rien ne change', () => {
+  assert.ok(JUKEBOX_SEEK_HOLD_MS > 200 && JUKEBOX_SEEK_HOLD_MS < 500, 'plus long qu’un appui franc, plus court que la répétition d’une touche');
+  // Sans morceau en cours : l'appui agit aussitôt, sa répétition aussi (la liste défile, comme avant).
+  assert.deepEqual(seekPressStep(undefined, 'down', 0, 1, false), { press: undefined, action: { move: 1 } });
+  assert.deepEqual(seekPressStep(undefined, 'repeat', 600, 1, false), { press: undefined, action: { move: 1 } });
+  assert.deepEqual(seekPressStep(undefined, 'tick', 900, 1, false), { press: undefined }, 'aucune avance sans morceau');
+  // Un morceau en cours, appui court : rien à l'appui, la ligne voisine au relâchement.
+  let r = seekPressStep(undefined, 'down', 0, -1, true);
+  assert.equal(r.action, undefined);
+  r = seekPressStep(r.press, 'tick', 250, -1, true);
+  assert.equal(r.action, undefined, 'avant le seuil : rien');
+  assert.deepEqual(seekPressStep(r.press, 'up', 300, -1, true), { press: undefined, action: { move: -1 } });
+  // Appui tenu : des pas, de plus en plus grands ; jamais de ligne voisine, même au relâchement.
+  r = seekPressStep(undefined, 'down', 0, 1, true);
+  const steps: number[] = [];
+  for (let at = 250; at <= 4000; at += 250) {
+    r = seekPressStep(r.press, 'tick', at, 1, true);
+    if (r.action && 'seek' in r.action) steps.push(r.action.seek);
+    assert.ok(!(r.action && 'move' in r.action));
+    r = seekPressStep(r.press, 'repeat', at + 30, 1, true);
+    assert.equal(r.action, undefined, 'la répétition de la touche ne fait pas de pas de plus');
+  }
+  assert.equal(steps[0], 5);
+  assert.deepEqual([...new Set(steps)], [5, 10, 30], 'les pas s’accélèrent : 5 s, 10 s, 30 s');
+  assert.deepEqual(seekPressStep(r.press, 'up', 4100, 1, true), { press: undefined });
+  assert.deepEqual([seekStepSeconds(0), seekStepSeconds(1499), seekStepSeconds(1500), seekStepSeconds(3499), seekStepSeconds(3500)], [5, 5, 10, 10, 30]);
+  // Le gauche recule.
+  const back = seekPressStep(seekPressStep(undefined, 'down', 0, -1, true).press, 'tick', 500, -1, true);
+  assert.deepEqual(back.action, { seek: -5 });
+  // Bornes : jamais avant 0, ni à moins d'une seconde de la fin ; durée inconnue : pas de fin.
+  assert.equal(seekTarget(3, -5, 200), 0);
+  assert.equal(seekTarget(195, 30, 200), 199);
+  assert.equal(seekTarget(40, 30), 70);
+});
+
+test('pause au niveau des playlists : Start sur la playlist qui joue l’ouvre sur le morceau en cours, Start encore le met en pause', () => {
+  const s = { ...initialPlayer(lists), at: 'p1', playing: { playlist: 'p1', key: 'c' }, selected: { p1: 'a' } };
+  assert.equal(startHint(s, lists).label, 'Ouvrir · morceau en cours');
+  const opened = playerStep(s, 'start', lists).state;
+  assert.equal(rowKey(opened, lists), 'c');
+  assert.equal(startHint(opened, lists).label, 'Pause');
+  assert.deepEqual(playerStep(opened, 'start', lists).effect, { kind: 'pause' });
+  assert.equal(startHint({ ...s, at: 'p2' }, lists).label, 'Ouvrir la playlist', 'une autre playlist : l’ouvrir, simplement');
 });
 
 test('Start maintenu : la gestion, sans jamais jouer ; appui court : jouer ou pause, sans sortir du lecteur ; même seuil que le volume', () => {

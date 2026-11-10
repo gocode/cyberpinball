@@ -42,6 +42,12 @@ export type CalibrationSetting = 'borne' | 'bureau';
 
 /** Barre avant d'une borne posée librement au bureau : à la hauteur d'une vraie borne (85 à 90 cm). */
 export const DESK_LOCKBAR_HEIGHT_M = 0.88;
+/**
+ * Au bureau, la barre avant posée sous les yeux mesurés (dans la même pièce que VPX) : 55 cm, comme
+ * au calage du 10 novembre 2026 (yeux à 1,59 m, vraie barre touchée à 1,05-1,13 m). Le sol du Quest
+ * n'y entre jamais : faux de 70 cm ce jour-là, il mettait la borne par terre.
+ */
+export const DESK_EYES_TO_LOCKBAR_M = 0.55;
 
 /**
  * Configuration de Cyber Pinball où la borne se cale : un playfield tourné d'un quart de tour (écran
@@ -53,10 +59,12 @@ export function calibrationSetting(playfieldRotation: number): CalibrationSettin
 
 /**
  * Borne posée librement (bureau) : la place donnée par le regard du joueur (recentrage), la barre
- * avant à DESK_LOCKBAR_HEIGHT_M, de la largeur par défaut de VPX. Elle ne bouge plus ensuite.
+ * avant DESK_EYES_TO_LOCKBAR_M sous les yeux mesurés (`eyes`, hauteur dans la pièce), à défaut à
+ * DESK_LOCKBAR_HEIGHT_M, de la largeur par défaut de VPX. Elle ne bouge plus ensuite.
  */
-export function freePlace(gaze: { x: number; z: number; yaw: number }): CabinetPlace {
-  return { x: gaze.x, z: gaze.z, yaw: gaze.yaw, lockbarHeight: DESK_LOCKBAR_HEIGHT_M, lockbarWidth: DEFAULT_LOCKBAR_WIDTH_M, free: true };
+export function freePlace(gaze: { x: number; z: number; yaw: number }, eyes?: number): CabinetPlace {
+  const lockbarHeight = eyes !== undefined && Number.isFinite(eyes) && eyes > DESK_EYES_TO_LOCKBAR_M ? Math.min(2.5, eyes - DESK_EYES_TO_LOCKBAR_M) : DESK_LOCKBAR_HEIGHT_M;
+  return { x: gaze.x, z: gaze.z, yaw: gaze.yaw, lockbarHeight, lockbarWidth: DEFAULT_LOCKBAR_WIDTH_M, free: true };
 }
 
 /** Fichier de la place de la borne du casque d'une configuration (un calage par configuration). */
@@ -137,10 +145,10 @@ export function calibrationGap(left: Point3, right: Point3, middle: Point3): num
  */
 export function calibrationProblem(left: Point3, right: Point3): string | undefined {
   const width = length(sub(right, left)) * 100;
-  const height = ((left.y + right.y) / 2) * 100;
   const tilt = Math.abs(left.y - right.y) * 100;
   if (width < 40 || width > 120) return t('Les deux coins sont à {n} cm l’un de l’autre : une barre avant fait de 40 à 120 cm. Recommencez par le coin gauche.', { n: Math.round(width) });
-  if (height < 50 || height > 130) return t('La barre avant serait à {n} cm du sol : le sol du casque est sans doute mal calé (réglages du Quest, « Ajuster le sol »).', { n: Math.round(height) });
+  // Pas de hauteur refusée : les points touchés sont dans la pièce que VPX reçoit aussi, quel que soit
+  // le sol du Quest (essai du 10 novembre 2026 : sol faux de 70 cm, chaque calage refusé « à 184 cm du sol »).
   if (tilt > 5) return t('Un coin est {n} cm plus haut que l’autre : un coin a été mal touché. Recommencez par le coin gauche.', { n: Math.round(tilt) });
   return undefined;
 }

@@ -87,6 +87,8 @@ son interface).
 - Dans le casque, « Réinitialiser la vue » de Link ne met plus la table de la partie dans votre dos : le menu du casque reste dans la même pièce que VPX. Une partie jouée dos à la borne, ou un recentrage fait en jeu, est signalé à l'écran du calage.
 - Les écrans du menu restent stables dans l'espace quand on bouge la tête, même quand l'ordinateur peine à suivre la cadence du casque.
 - À chaque démarrage dans le casque, le calage est proposé : A pour caler, B pour passer et garder le précédent. Chaque calage validé s'applique aussitôt ; on recommence autant de fois qu'on veut, puis B termine en gardant le dernier.
+- Calage dans le casque plus simple : une seule consigne courte, écrite en très gros au milieu du regard, et un appui par étape. La hauteur est prise dès le premier calage, même si le sol du Quest est mal réglé. Les ombres autour des écrans du menu sont retirées.
+- Dans le casque, une partie a toujours un bouton pour quitter (Y par défaut), rappelé en gros pendant le chargement ; l'assistant des manettes l'impose.
 
 ## 0.1.8
 

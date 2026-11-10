@@ -90,4 +90,12 @@ export const messages: Record<string, string> = {
   'Start : playlist, morceau, aucune': 'Start: playlist, track, off',
   'Lecture aléatoire : oui': 'Shuffle: on',
   'Lecture aléatoire : non': 'Shuffle: off',
+  // Flipper tenu : avancer ou reculer dans le morceau ; la pause (10/11/2026).
+  'Start sur ce morceau : pause': 'Start on this track: pause',
+  'Start sur ce morceau : reprendre': 'Start on this track: resume',
+  'Flipper tenu': 'Flipper held',
+  'Flèches tenues': 'Arrows held',
+  'Avancer / reculer': 'Forward / back',
+  'Ouvrir · morceau en cours': 'Open · current track',
+  Gestion: 'Management',
 };

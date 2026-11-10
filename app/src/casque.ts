@@ -95,7 +95,7 @@ export interface HeadsetMenuOptions {
   /** Veille pendant une partie : la tête du joueur dans la pièce (compagnon : « tete x y z lacet », toutes les 5 s). */
   onHead?(head: HeadPose): void;
   /** Recentrage fait (sur demande) : la place donnée par le regard du joueur. */
-  onCentre?(place: { x: number; z: number; yaw: number }): void;
+  onCentre?(place: { x: number; z: number; yaw: number; eyes?: number }): void;
   /** Hauteur des yeux au-dessus du sol de la pièce (mètres), à chaque port du casque. */
   onEyes?(eyes: number): void;
   /** Limite du Quest au lancement du compagnon ; `changed` : le Quest a déplacé la pièce pendant la session. */
@@ -486,7 +486,8 @@ export class HeadsetMenu {
         if (centre) {
           const gaze = { x: Number(centre[1]), z: Number(centre[2]), yaw: Number(centre[3]) };
           this.writePlace(gaze, true);
-          this.opts.onCentre?.(gaze);
+          const eyes = /yeux=(-?[\d.]+)/.exec(line);
+          this.opts.onCentre?.({ ...gaze, ...(eyes && { eyes: Number(eyes[1]) }) });
         }
         if (line.startsWith('casque-absent')) this.setState('waiting');
         if (line.startsWith('image') && !this.snapshotTaken && this.opts.snapshotDir) {

@@ -246,12 +246,12 @@ test('manettes : l’INI de VPX suit le réglage des manettes (boutons, lanceur 
   const doc = IniDocument.parse(VPX_DEFAULT_INPUT);
   applyVpxSettings(doc, vpxHeadsetInput(VPX_DEFAULT_INPUT, vive));
   const get = (key: string) => doc.get('Input', key);
-  // Valider : clic du pavé droit (15) ; retour : ≡ droit (3), menu : ≡ gauche (2) ; crédit : clic du pavé gauche (14).
+  // Valider : clic du pavé droit (15) ; retour : ≡ droit (3), menu : ≡ gauche (2) ; quitter : clic du pavé gauche (14).
   assert.equal(get('Mapping.Start'), 'Key;30 | OpenXR;15');
   assert.equal(get('Mapping.InGameUI'), 'Key;69 | OpenXR;2');
   assert.equal(get('Mapping.Pause'), 'Key;19 | OpenXR;3');
-  assert.equal(get('Mapping.Credit1'), 'Key;34 | OpenXR;14');
-  assert.equal(get('Mapping.ExitGame'), 'Key;41');
+  assert.equal(get('Mapping.ExitGame'), 'Key;41 | OpenXR;14');
+  assert.equal(get('Mapping.Credit1'), 'Key;34');
   // Lanceur sur le pavé droit (y : 27), secousses sur le pavé gauche (24, 25), sans capteur en double.
   assert.equal(get('Mapping.Plunger0.Position'), 'OpenXR;27;P;0.000000;-1.000000;1.000000');
   assert.equal(get('Mapping.Nudge0.X'), 'OpenXR;24;P;0.000000;1.000000;1.000000');

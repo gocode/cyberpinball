@@ -1,5 +1,5 @@
 // Fenêtres de Cyber Pinball : chacune couvre tout son écran, barre des tâches comprise.
-import type { BrowserWindow, Rectangle } from 'electron';
+import { screen, type BrowserWindow, type Rectangle } from 'electron';
 import { offscreenMode } from '@cyberpinball/core';
 
 // Sans electron à l'exécution : le module est aussi chargé par les tests du cœur.
@@ -178,4 +178,40 @@ export function overlayContent(child: BrowserWindow, parent: BrowserWindow): voi
     if (!parent.isDestroyed()) for (const event of events) parent.off(event as 'move', place);
   });
   place();
+}
+
+/**
+ * Ce que la fenêtre couvre vraiment, comparé à l'écran où Windows la voit (diagnostic du journal) :
+ * l'écran (zone, zone de travail, mise à l'échelle, rotation), la fenêtre (bornes, contenu), et l'écart.
+ * Une fenêtre plus grande que son écran « le couvre » pour coverProblem, mais sa page déborde à droite
+ * et en bas : seul l'écart exact au contenu le dit (dimensions prises à l'échelle d'un autre écran).
+ */
+export function coverReport(win: BrowserWindow): { text: string; exact: boolean; display?: Rectangle } {
+  if (win.isDestroyed()) return { text: 'fenêtre fermée', exact: true }; // i18n-ignore : journal
+  const bounds = win.getBounds();
+  const content = win.getContentBounds();
+  const where = (r: Rectangle) => `${r.width} × ${r.height} en ${r.x}, ${r.y}`;
+  if (OFFSCREEN) return { text: `hors écran, fenêtre ${where(bounds)}`, exact: true }; // i18n-ignore : journal
+  const wanted = covered.get(win);
+  const d = screen.getDisplayMatching(wanted ?? bounds);
+  const exact = Math.abs(content.x - d.bounds.x) <= 1 && Math.abs(content.y - d.bounds.y) <= 1 && Math.abs(content.width - d.bounds.width) <= 1 && Math.abs(content.height - d.bounds.height) <= 1;
+  const text = [
+    `écran ${where(d.bounds)} (travail ${where(d.workArea)}), échelle ${d.scaleFactor}, rotation ${d.rotation}°`, // i18n-ignore : journal
+    `fenêtre ${where(bounds)}, contenu ${where(content)}${win.isFullScreen() ? ', plein écran' : ''}`, // i18n-ignore : journal
+    ...(wanted && (wanted.width !== d.bounds.width || wanted.height !== d.bounds.height) ? [`demandée ${where(wanted)}`] : []), // i18n-ignore : journal
+    exact ? 'couvre exactement l’écran' : 'NE COUVRE PAS exactement l’écran', // i18n-ignore : journal
+  ].join(' ; '); // i18n-ignore : journal
+  return { text, exact, display: d.bounds };
+}
+
+/**
+ * Recale une fenêtre qui ne couvre pas exactement son écran (coverReport) sur la zone de cet écran,
+ * telle que Windows la donne ; rend ce qui a été fait, pour le journal, ou undefined si tout allait bien.
+ */
+export function recoverExact(win: BrowserWindow): string | undefined {
+  const report = coverReport(win);
+  if (report.exact || !report.display) return undefined;
+  covered.set(win, report.display);
+  cover(win, report.display);
+  return `${report.text} → recalée sur ${report.display.width} × ${report.display.height} en ${report.display.x}, ${report.display.y}`; // i18n-ignore : journal
 }

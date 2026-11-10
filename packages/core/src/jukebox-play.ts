@@ -16,6 +16,12 @@
 //   raccourci ; rien ne démarre seul.
 // - Start maintenu : sur une playlist du niveau 1, sa lecture aléatoire, directement ; partout ailleurs,
 //   la gestion.
+// - Flipper maintenu, quand un morceau est en cours (lecture ou pause), aux deux niveaux : le droit avance
+//   dans le morceau, le gauche recule, par pas qui s'accélèrent (5 s, puis 10 s, puis 30 s). L'appui court
+//   garde son rôle (la ligne précédente ou suivante, au relâchement) ; tenir un flipper ne fait alors plus
+//   défiler la liste. Sans morceau en cours, rien ne change : l'appui agit aussitôt et se répète.
+// - Pause : Start sur le morceau en cours ; au niveau des playlists, Start sur la playlist qui joue l'ouvre
+//   sur ce morceau, et Start encore le met en pause.
 // - Modes de lecture, retenus par playlist (demande du 10/11/2026, qui remplace « pas de lecture
 //   aléatoire » des maquettes) : dans l'ordre ou aléatoire (tiré sans répétition jusqu'à ce que toute la
 //   playlist soit passée), et la répétition : la playlist (en boucle), le morceau, ou aucune. L'aléatoire
@@ -38,6 +44,45 @@ export const JUKEBOX_MANAGE_KEY = '@gestion';
  * Volume − maintenu (couper le son), une seconde (demande du 09/11/2026).
  */
 export const JUKEBOX_MANAGE_HOLD_MS = MUTE_HOLD_MS;
+
+/**
+ * Flipper tenu au-delà de ce seuil, un morceau en cours : il avance (ou recule) dans le morceau. 400 ms :
+ * nettement plus long qu'un appui franc (100 à 200 ms), plus court que la répétition d'une touche tenue
+ * (500 ms) et que Start maintenu (une seconde) : l'appui court reste un appui court, l'avance part vite.
+ */
+export const JUKEBOX_SEEK_HOLD_MS = 400;
+/** Cadence des pas pendant que le flipper est tenu. */
+export const JUKEBOX_SEEK_EVERY_MS = 250;
+
+/** Pas de l'avance selon la durée de l'appui : 5 s, puis 10 s après 1,5 s tenue, puis 30 s après 3,5 s. */
+export function seekStepSeconds(heldMs: number): number {
+  return heldMs < 1500 ? 5 : heldMs < 3500 ? 10 : 30;
+}
+
+/** Nouvelle position après un pas : jamais avant le début, ni à moins d'une seconde de la fin (qui enchaînerait). */
+export function seekTarget(position: number, delta: number, duration?: number): number {
+  const to = Math.max(0, position + delta);
+  return duration && duration > 1 ? Math.min(to, duration - 1) : to;
+}
+
+/** Appui de flipper en cours, un morceau en cours : depuis quand, dans quel sens, et s'il avance déjà. */
+export type SeekPress = { since: number; dir: -1 | 1; seeking: boolean } | undefined;
+
+/**
+ * Un geste de flipper dans le Juke-box. `playing` : un morceau est en cours (lecture ou pause). Sans
+ * morceau, l'appui agit aussitôt (`move`) et sa répétition aussi : la liste défile, comme avant. Avec un
+ * morceau, l'appui attend : relâché avant JUKEBOX_SEEK_HOLD_MS, la ligne voisine (`move`) ; tenu, des pas
+ * (`seek`, en secondes, signés) à chaque échéance (`tick`), jamais de `move`.
+ */
+export function seekPressStep(press: SeekPress, event: 'down' | 'repeat' | 'tick' | 'up', now: number, dir: -1 | 1, playing: boolean): { press: SeekPress; action?: { move: -1 | 1 } | { seek: number } } {
+  if (!playing && !press) return event === 'down' || event === 'repeat' ? { press: undefined, action: { move: dir } } : { press: undefined };
+  if (event === 'down') return { press: press ?? { since: now, dir, seeking: false } };
+  if (!press) return { press: undefined };
+  const held = now - press.since;
+  if (event === 'up') return press.seeking ? { press: undefined } : { press: undefined, action: { move: press.dir } };
+  if (event === 'tick' && held >= JUKEBOX_SEEK_HOLD_MS) return { press: { ...press, seeking: true }, action: { seek: press.dir * seekStepSeconds(held) } };
+  return { press };
+}
 
 /** Appui de Start en cours : depuis quand, et si la gestion est déjà partie (le relâchement n'y fait plus rien). */
 export type StartPress = { since: number; done: boolean } | undefined;
@@ -377,6 +422,8 @@ function playlistsStep(state: PlayerState, input: Exclude<PlayerInput, 'ended' |
       return { state: { ...state, at } };
     case 'start':
       if (at === JUKEBOX_MANAGE_KEY) return { state: { ...state, at }, effect: { kind: 'manage' } };
+      // La playlist qui joue s'ouvre sur le morceau en cours : Start encore, et il se met en pause.
+      if (state.playing?.playlist === at) return { state: { ...state, level: 'tracks', at, shown: at, selected: { ...state.selected, [at]: state.playing.key } }, effect: { kind: 'open', playlist: at } };
       return { state: { ...state, level: 'tracks', at, shown: at }, effect: { kind: 'open', playlist: at } };
     case 'hold': {
       // Start maintenu sur une playlist : elle s'ouvre et joue en aléatoire ; sur la gestion, la gestion.
@@ -399,7 +446,11 @@ export interface StartHint {
 
 /** Ce que Start fera sur le morceau choisi, pour l'aide des commandes (toujours visible, grisé avec sa raison). */
 export function startHint(state: PlayerState, lists: readonly PlayerList[]): StartHint {
-  if (state.level === 'playlists') return playlistAt(state, lists) === JUKEBOX_MANAGE_KEY ? { enabled: true, label: t('Ouvrir la gestion') } : { enabled: true, label: t('Ouvrir la playlist') };
+  if (state.level === 'playlists') {
+    const at = playlistAt(state, lists);
+    if (at === JUKEBOX_MANAGE_KEY) return { enabled: true, label: t('Ouvrir la gestion') };
+    return { enabled: true, label: state.playing?.playlist === at ? t('Ouvrir · morceau en cours') : t('Ouvrir la playlist') };
+  }
   const list = listOf(lists, state.shown);
   const k = rowKey(state, lists);
   if (k === JUKEBOX_MANAGE_KEY) return { enabled: true, label: t('Ouvrir la gestion') };

@@ -441,7 +441,7 @@ export type UiAction =
   | { type: 'collections'; step?: number; id?: string }
   | { type: 'wheel'; offset: number }
   /** Juke-box (jukebox-player.ts) : une ligne de la liste, Start, une playlist voisine, Exit. */
-  | { type: 'jukebox'; op: 'row' | 'start' | 'playlist' | 'exit' | 'manage' | 'up' | 'shuffle' | 'repeat' | 'pause'; key?: string; dir?: number };
+  | { type: 'jukebox'; op: 'row' | 'start' | 'playlist' | 'exit' | 'manage' | 'up' | 'shuffle' | 'repeat' | 'pause' | 'seek-to'; key?: string; dir?: number; fraction?: number };
 
 export type Tone = 'error' | 'warning' | 'info' | 'ok' | 'quiet';
 export interface Row {
@@ -4436,7 +4436,7 @@ export function createLibrary(host: LibraryHost) {
    * et « remove:chemin » (fichier posé ou retiré pendant que le menu tourne, comme à la main :
    * le guet des dossiers, mediawatch.ts, doit le faire voir sans redémarrer), « hold:code » et
    * « release:code » (bouton tenu puis relâché : combinaison de déverrouillage du mode invité ;
-   * une touche simple est appuyée puis relâchée), « repeat:code:n » (bouton maintenu : n appuis,
+   * une touche simple est appuyée puis relâchée), « press:code:n » (n appuis courts), « repeat:code:n » (bouton maintenu : n appuis,
    * les suivants en répétition du clavier, qui accélèrent un réglage).
    * Le garde-fou de mise en page inspecte chaque écran, pas seulement le playfield.
    */
@@ -4489,6 +4489,11 @@ export function createLibrary(host: LibraryHost) {
           const [code, count] = step.slice(7).split(':') as [string, string];
           for (let n = 0; n < Math.max(1, Number(count) || 1); n++) pressKey({ type: 'keyDown', code, key: '', isAutoRepeat: n > 0, shift: false, control: false, alt: false, meta: false } as Input);
           send('keyUp', code);
+        }
+        // Appuis courts répétés (« press:ShiftRight:36 ») : une liste parcourue appui par appui (un flipper tenu, lui, peut avancer dans un morceau).
+        else if (step.startsWith('press:')) {
+          const [code, count] = step.slice(6).split(':') as [string, string];
+          for (let n = 0; n < Math.max(1, Number(count) || 1); n++) key(code);
         }
         else if (step.startsWith('release:')) send('keyUp', step.slice(8));
         else if (/^((Control|Shift|Alt)\+)+\w+$/.test(step)) {

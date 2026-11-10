@@ -59,7 +59,8 @@ test('calage : coins mal touchés refusés, précision mesurée au milieu', () =
   const left = { x: -0.35, y: 0.86, z: -1 };
   assert.equal(calibrationProblem(left, { x: 0.35, y: 0.86, z: -1 }), undefined);
   assert.match(calibrationProblem(left, { x: -0.2, y: 0.86, z: -1 }) ?? '', /15 cm/);
-  assert.match(calibrationProblem({ ...left, y: 2.2 }, { x: 0.35, y: 2.2, z: -1 }) ?? '', /220 cm du sol/);
+  // Plus de hauteur refusée : les points touchés sont dans la pièce que VPX reçoit aussi, même sol faux.
+  assert.equal(calibrationProblem({ ...left, y: 2.2 }, { x: 0.35, y: 2.2, z: -1 }), undefined);
   assert.match(calibrationProblem(left, { x: 0.35, y: 0.95, z: -1 }) ?? '', /9 cm plus haut/);
   close(calibrationGap(left, { x: 0.35, y: 0.86, z: -1 }, { x: 0.01, y: 0.86, z: -1 }), 1);
 });
@@ -97,9 +98,9 @@ test('calage : branchements du compagnon, du casque et du menu', () => {
   assert.match(frontend, /if \(action === 'headset-menu'\) return void openHeadsetMenu\(\);/);
   assert.match(frontend, /label: t\('Caler la borne'\)[\s\S]{0,400}openCalibration\(\);[\s\S]{0,200}label: t\('Recentrer la borne'\)[\s\S]{0,300}headset\?\.recenter\(\);[\s\S]{0,500}label: t\('Retour'\)/);
   // Calage guidé : étapes numérotées, repères du point pris et du point à toucher, B pour terminer.
-  assert.match(frontend, /t\('Étape 1 sur 3 : coin gauche'\)/);
+  assert.match(frontend, /t\('Touchez le coin gauche'\)/);
   assert.match(frontend, /headset\?\.setMarks\(calibrationMarks\(c\)\);/);
-  assert.match(frontend, /const cancel = t\('B : terminer'\);/);
+  assert.match(frontend, /const end = c\.intro \? t\('B : passer'\) : t\('B : terminer'\);/);
   // L'entrée vient juste après « Réalité virtuelle ».
   assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /'vr', 'vr-calibrate', 'vr-controllers', 'controls'/);
 });
@@ -167,7 +168,7 @@ test('un calage par configuration ; au bureau, la borne posée librement, puis f
   assert.match(frontend, /return path\.join\(loc\.dataDir, 'vr', cabinetPlaceFileName\(menuConfiguration\)\);/);
   // Start au bureau : recentrage demandé, la place du regard gardée à son retour (« centre »).
   assert.match(frontend, /calibration\.placing = true;\s*showCalibration\(\);\s*headset\?\.recenter\(\);/);
-  assert.match(frontend, /c\.place = freePlace\(gaze\);\s*c\.placing = false;\s*applyCalibration\(\);/);
+  assert.match(frontend, /c\.place = freePlace\(gaze, gaze\.eyes\);\s*c\.placing = false;\s*applyCalibration\(\);/);
 });
 
 test('calage proposé à chaque session VR, répétable : valider applique et reste, B termine', () => {
@@ -183,10 +184,8 @@ test('calage proposé à chaque session VR, répétable : valider applique et re
   assert.match(frontend, /openCalibration\(true\);/);
   // Casque perdu : la session suivante repropose le calage.
   assert.match(frontend, /if \(calibration\) closeCalibration\(\);\s*\/\/[^\n]*\s*calibrationOffered = false;/);
-  // Premier écran : A cale, B passe ; la gâchette n'y prend rien.
-  assert.match(frontend, /t\('A : caler · B : passer, garder le calage précédent'\)/);
-  assert.match(frontend, /else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.intro\) \{\s*calibration\.intro = false;/);
-  assert.match(frontend, /if \(!c \|\| c\.intro\) return;/);
+  // Premier écran proposé d'office : la consigne de la première étape tout de suite, B passe.
+  assert.match(frontend, /const end = c\.intro \? t\('B : passer'\) : t\('B : terminer'\);/);
   // A valide : appliqué (place et INI de VPX), points remis à zéro, l'écran reste ouvert.
   assert.match(frontend, /else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.place\) applyCalibration\(\);/);
   assert.match(frontend, /function applyCalibration\(\): void \{[\s\S]{0,600}headset\?\.showPlace\(place, true\);[\s\S]{0,400}writeVrCalibration\([\s\S]{0,1200}c\.validated\+\+;\s*c\.points = \{\};\s*c\.place = undefined;\s*showCalibration\(\);/);
