@@ -5,7 +5,7 @@ import { spawnSync } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { FALLBACK_RENDERER, pauseVrSettings, PAUSE_RENDERER, tableUsesPupCapture, vrNeedsVpxBackglass } from '../vr-profil';
+import { FALLBACK_RENDERER, pauseVrSettings, PAUSE_RENDERER, tableUsesPupCapture, vrNeedsVpxBackglass, WATCH_RENDERER } from '../vr-profil';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
 const read = (...p: string[]) => fs.readFileSync(path.join(repo, ...p), 'utf8');
@@ -24,9 +24,37 @@ test('fronton : la pause en tête des rendus, le fond opaque en dernier, PuP à 
   assert.equal(get('Backglass', `Priority.${PAUSE_RENDERER}`), '100');
   assert.equal(get('Backglass', `Priority.${FALLBACK_RENDERER}`), '0');
   assert.equal(get('Backglass', 'Priority.PUP'), '99');
-  // B2S (50) et la section ScoreView restent comme ils sont.
+  // B2S (50) reste comme il est ; ScoreView : la veille en tête, PuP descendu à 99.
   assert.equal(get('Backglass', 'Priority.B2S'), undefined);
-  assert.equal(settings.filter((s) => s.section === 'ScoreView').length, 0);
+  assert.equal(get('ScoreView', `Priority.${WATCH_RENDERER}`), '100');
+  assert.equal(get('ScoreView', 'Priority.PUP'), '99');
+  assert.equal(get('Topper', `Priority.${WATCH_RENDERER}`), '100');
+  // L'ordre des rendus que le plugin cadre : PuP (99) puis B2S (50).
+  assert.equal(get('Plugin.CyberPinball', 'Order'), 'PUP,B2S');
+});
+
+test('fronton cadré : l’ordre des rendus suit les priorités de VPX, un rendu coupé (priorité négative) en est absent', () => {
+  const order = (ini: string) => pauseVrSettings(ini, { pause: 'P', resume: 'R', quit: 'Q' }).find((s) => s.key === 'Order')?.value;
+  // Aucune priorité réglée : toutes à 0, l'ordre de chargement des plugins de VPX (B2S avant PuP).
+  assert.equal(order(''), 'B2S,PUP');
+  assert.equal(order('[Backglass]\nPriority.B2S = -1\nPriority.PUP = 10\n'), 'PUP');
+  assert.equal(order('[Backglass]\nPriority.B2S = 80\nPriority.PUP = 10\nPriority.ScoreView = 5\n'), 'B2S,PUP,ScoreView');
+  // Nos propres rendus n'y sont jamais.
+  assert.doesNotMatch(order('[Backglass]\nPriority.CyberPinball.Pause = 100\n') ?? '', /CyberPinball/);
+});
+
+test('plugin : fronton cadré (proportions gardées) et vidéos de PuP que VPX ne dessine pas en VR dessinées à vide', () => {
+  const cpp = read('packages', 'vpx-vision3d', 'src', 'cyberpinball.cpp');
+  // Hors de la pause, le rendu suivant passe par le cadre ; les coordonnées de sa surface y sont mises à l'échelle, centrées.
+  assert.match(cpp, /if \(!pause\.affichee\(t\)\)\s*return dessinerCadre\(ctx, t\);/);
+  assert.match(cpp, /const Rect r = cadrer\(cadre\.dedans\.srcWidth, cadre\.dedans\.srcHeight, cadre\.dehors->srcWidth, cadre\.dehors->srcHeight/);
+  for (const fn of ['DrawImage = cadreImage', 'DrawDisplay = cadreAfficheur', 'DrawSegDisplay = cadreSegments']) assert.ok(cpp.includes(`cadre.dedans.${fn};`), fn);
+  // PuP pose son écran sur toute sa surface : la forme de son fronton lui est donnée (16:9 par défaut).
+  assert.match(cpp, /MSGPI_FLOAT_VAL_SETTING\(pupRatio, "PupRatio"[^;]*1\.7778f\);/);
+  // Son de PuP : ScoreView et topper (et le fronton non demandé) dessinés à vide à chaque image, sauf si VPX les dessine.
+  assert.match(cpp, /Pompe pompes\[\] = \{ \{ VPXWINDOW_Backglass \}, \{ VPXWINDOW_ScoreView \}, \{ VPXWINDOW_Topper \} \};/);
+  assert.match(cpp, /appliquer\(pause\.image\(t, vpxApi->GetGameTime\(\)\)\);\s*pomper\(t\);/);
+  assert.match(cpp, /if \(t - demandee < 0\.3\)\s*continue;/);
 });
 
 test('fronton en VR : celui de VPX ajouté sans pièce VR, ou pour une pièce au fronton capté par PuP sans flasher', () => {
@@ -47,7 +75,7 @@ test('plugin : rien hors du casque (jamais en 2D, activé seulement dans l’INI
   assert.match(cpp, /int MSGPIAPI dessinerPause\(VPXRenderContext2D\* ctx, void\*\)\s*\{[^}]*if \(!ctx \|\| ctx->is2D \|\| !vpxApi \|\| !enPartie\)\s*return 0;/);
   assert.match(cpp, /int MSGPIAPI dessinerFond\(VPXRenderContext2D\* ctx, void\*\)\s*\{[^}]*if \(!ctx \|\| ctx->is2D \|\| !vpxApi\)\s*return 0;/);
   // Hors de la pause et de l'appui tenu : il rend la main (B2S ou PuP dessinent le fronton).
-  assert.match(cpp, /if \(!pause\.affichee\(t\)\)\s*return 0;/);
+  assert.match(cpp, /if \(!pause\.affichee\(t\)\)\s*return dessinerCadre\(ctx, t\);/);
   // Activé dans l'INI de la partie dans le casque seulement (prepareVr), jamais dans celui de la borne.
   const frontend = read('app', 'src', 'frontend.ts');
   assert.equal(frontend.match(/pauseSettingsFor\(/g)?.length, 1);

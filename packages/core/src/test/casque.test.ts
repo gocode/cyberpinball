@@ -8,6 +8,28 @@ import { CONTROLLER_ELEMENTS, HEADSET_PROFILES } from '../manettes';
 import { headsetPanels, headsetProtocol, LOCKBAR_DISTANCE_M, MIN_PLAYFIELD_M, panelSize, rotateVector, STANDARD_HEAD, type HeadsetPanel, type HeadsetSource } from '../casque';
 import { edgeRotation } from '../model';
 
+/** Un fichier source, fins de ligne ramenées à LF : le même texte dans un checkout CRLF (core.autocrlf) ou LF. */
+function source(...parts: string[]): string {
+  return fs.readFileSync(path.join(...parts), 'utf8').replace(/\r\n/g, '\n');
+}
+
+/**
+ * Le bloc entre accolades qui suit `head` (accolades appariées) et le texte qui le suit : une assertion sur
+ * « ce qui vient après le bloc » ne dépend ni de sa longueur ni des fins de ligne (une fenêtre de N caractères
+ * cassait dès que le bloc grossissait, essai 0.1.9-essai.46).
+ */
+function blockOf(text: string, head: string): { body: string; after: string } {
+  const at = text.indexOf(head);
+  assert.ok(at >= 0, `introuvable : ${head}`);
+  const open = text.indexOf('{', at + head.length);
+  let depth = 0;
+  for (let i = open; i < text.length; i++) {
+    if (text[i] === '{') depth++;
+    else if (text[i] === '}' && --depth === 0) return { body: text.slice(open, i + 1), after: text.slice(i + 1) };
+  }
+  throw new Error(`bloc non fermé : ${head}`);
+}
+
 const close = (a: number, b: number, eps = 1e-3) => assert.ok(Math.abs(a - b) < eps, `${a} ≠ ${b}`);
 
 // Borne type : playfield 43" 4K couché, Windows en paysage, flippers au bord gauche de l'image ;
@@ -99,7 +121,7 @@ test('sans playfield, la tête reste en place ; le protocole du compagnon décri
 
 test('manettes du casque : le compagnon lit tout le catalogue, profil par profil, et le dit au menu', () => {
   const repo = path.join(__dirname, '..', '..', '..', '..');
-  const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
+  const cpp = source(repo, 'packages', 'casque-vr', 'src', 'casque.cpp');
   // Chaque élément du catalogue (manettes.ts) a son action, au même chemin, pour les mêmes profils.
   const keys: Record<string, string> = { touch: 't', index: 'i', vive: 'v', wmr: 'w' };
   for (const [name, def] of Object.entries(CONTROLLER_ELEMENTS)) {
@@ -113,7 +135,7 @@ test('manettes du casque : le compagnon lit tout le catalogue, profil par profil
   // Axes : la direction dominante, avec hystérésis, envoyée comme un bouton.
   assert.match(cpp, /pushed\[d\] > \(e\.dirs\[d\] \? 0\.4f : 0\.6f\)/);
   // Lus seulement quand le menu a le regard du joueur ; sinon, tout bouton tenu est relâché.
-  assert.match(cpp, /if \(controllers && state == XR_SESSION_STATE_FOCUSED\)[\s\S]{0,4000}else\s+releaseControls\(\);/);
+  assert.match(blockOf(cpp, 'if (controllers && state == XR_SESSION_STATE_FOCUSED)').after, /^\s*else\s+releaseControls\(\);/);
   // Le menu les reçoit comme les boutons de la borne (pas comme le téléphone), et les relâche casque retiré.
   const app = path.join(repo, 'app', 'src');
   const menu = fs.readFileSync(path.join(app, 'casque.ts'), 'utf8');
@@ -127,7 +149,7 @@ test('manettes du casque : le compagnon lit tout le catalogue, profil par profil
 
 test('casque éteint ou Link coupé : l’affichage revient aux écrans du PC, en menu comme en partie ; retiré, rien ne bascule', () => {
   const repo = path.join(__dirname, '..', '..', '..', '..');
-  const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
+  const cpp = source(repo, 'packages', 'casque-vr', 'src', 'casque.cpp');
   // VPX a pris le casque : le compagnon veille au lieu de partir, et reprend le casque quand VPX le rend.
   assert.match(cpp, /say\("releve VPX a pris le casque, veille"\);\s*handover = false;\s*standby = true;/);
   assert.match(cpp, /if \(standby && state == XR_SESSION_STATE_FOCUSED\)\s*\{\s*standby = false;\s*say\("reprise"\);/);
@@ -155,7 +177,7 @@ test('pièce du Quest changée ou vue réinitialisée : la borne reste où elle 
   // Le compagnon repart donc sur une session neuve, sous une clé neuve : la pièce d'origine, celle de VPX,
   // où la borne calée est restée.
   const repo = path.join(__dirname, '..', '..', '..', '..');
-  const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
+  const cpp = source(repo, 'packages', 'casque-vr', 'src', 'casque.cpp');
   assert.match(cpp, /say\(std::string\("piece-changee "\) \+ \(change->poseValid \? "pose " : "sans-pose "\)/);
   const menu = fs.readFileSync(path.join(repo, 'app', 'src', 'casque.ts'), 'utf8');
   assert.match(menu, /if \(line\.startsWith\('piece-changee'\)\) \{[\s\S]{0,2600}this\.roomRestart = true;\s*if \(now\) this\.restart\(\);\s*else this\.restartAfterGame = true;/);
@@ -170,7 +192,7 @@ test('fin de partie et accueil de Link : le menu revient sans repasser par Link'
   // La session en veille ne reprend le casque que rechoisie dans l'accueil de Link (5 à 11 s), une
   // session neuve le prend d'elle-même (1 s) ; l'arrêt de la session par le runtime n'est pas un casque perdu.
   const repo = path.join(__dirname, '..', '..', '..', '..');
-  const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
+  const cpp = source(repo, 'packages', 'casque-vr', 'src', 'casque.cpp');
   assert.match(cpp, /if \(!exitRequested && !handover && !standby\)\s*say\("session-arretee"\);\s*done = true;/);
   const menu = fs.readFileSync(path.join(repo, 'app', 'src', 'casque.ts'), 'utf8');
   assert.match(menu, /if \(line === 'session-arretee'\) \{[\s\S]{0,300}this\.restartNow = true;/);
@@ -210,7 +232,7 @@ test('tête de la borne au bureau : fronton un peu plus large que le plateau, DM
 
 test('fluidité dans le casque : la boucle des images n’attend jamais le GPU, la cadence est notée', () => {
   const repo = path.join(__dirname, '..', '..', '..', '..');
-  const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
+  const cpp = source(repo, 'packages', 'casque-vr', 'src', 'casque.cpp');
   // Libération des textures d'Electron sur requête d'événement relue sans attendre (plus de gpuFinish par image).
   assert.match(cpp, /pendingReleases\.push_back\(std::move\(pr\)\);/);
   assert.match(cpp, /context->GetData\(pendingReleases\.front\(\)\.query\.Get\(\), &finished, sizeof finished, D3D11_ASYNC_GETDATA_DONOTFLUSH\)/);

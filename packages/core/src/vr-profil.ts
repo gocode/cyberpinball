@@ -102,13 +102,21 @@ export function linkStatsSummary(rows: readonly LinkStats[]): { minutes: number;
 /** Identifiants des rendus du fronton du plugin « CyberPinball » (packages/vpx-vision3d/src/cyberpinball.cpp). */
 export const PAUSE_RENDERER = 'CyberPinball.Pause';
 export const FALLBACK_RENDERER = 'CyberPinball.Fond';
+/** Rendu de veille du ScoreView et du topper : il note que VPX dessine la fenêtre, sans rien dessiner. */
+export const WATCH_RENDERER = 'CyberPinball.Veille';
+/** Les rendus du fronton que VPX 10.8.1 charge, dans l'ordre de chargement des plugins (à priorité égale). */
+const BACKGLASS_RENDERERS = ['B2S', 'PUP'];
 
 /**
  * Réglages de la pause dans le casque pour l'INI d'une partie dans le casque : le plugin activé, ses
- * libellés (langue de l'application), et les priorités du fronton. VPX essaie les rendus annexes du
- * plus prioritaire au moins prioritaire (0 à 100), le premier qui dessine l'emporte : la pause en
- * tête (elle rend la main hors de la pause), le fond opaque en dernier ; un autre rendu réglé à 100
- * (PuP l'est d'office) descend à 99 pour laisser la pause devant.
+ * libellés (langue de l'application), et les priorités des fenêtres annexes. VPX essaie les rendus
+ * annexes du plus prioritaire au moins prioritaire (0 à 100), le premier qui dessine l'emporte :
+ * - fronton : la pause en tête, le fond opaque en dernier ; un autre rendu réglé à 100 (PuP l'est
+ *   d'office) descend à 99. Hors de la pause, le plugin dessine lui-même le rendu suivant, cadré
+ *   (proportions gardées) : l'ordre de ces rendus lui est donné (`Order`, du plus prioritaire au moins
+ *   prioritaire, sans ceux qui sont coupés par une priorité négative) ;
+ * - ScoreView et topper : la veille en tête (elle note que VPX dessine la fenêtre, pour que le plugin ne
+ *   fasse pas dessiner PuP à vide une seconde fois), PuP descendu à 99 de même.
  */
 export function pauseVrSettings(iniText: string, labels: { pause: string; resume: string; quit: string; help?: string; resumeHint?: string }): VpxSetting[] {
   const out: VpxSetting[] = [
@@ -121,17 +129,34 @@ export function pauseVrSettings(iniText: string, labels: { pause: string; resume
     ...(labels.resumeHint ? [{ section: 'Plugin.CyberPinball', key: 'ResumeHint', value: labels.resumeHint }] : []),
     { section: 'Backglass', key: `Priority.${PAUSE_RENDERER}`, value: '100' },
     { section: 'Backglass', key: `Priority.${FALLBACK_RENDERER}`, value: '0' },
+    { section: 'ScoreView', key: `Priority.${WATCH_RENDERER}`, value: '100' },
+    { section: 'Topper', key: `Priority.${WATCH_RENDERER}`, value: '100' },
   ];
-  let inBackglass = false;
+  const ours = new Set([PAUSE_RENDERER, FALLBACK_RENDERER, WATCH_RENDERER]);
+  // Priorités du fronton telles que VPX les verra (celles à 100 descendues à 99), pour l'ordre.
+  const backglass = new Map<string, number>();
+  let section = '';
   for (const line of iniText.split(/\r?\n/)) {
-    const section = /^\s*\[([^\]]+)\]/.exec(line);
-    if (section) {
-      inBackglass = section[1]!.trim().toLowerCase() === 'backglass';
+    const head = /^\s*\[([^\]]+)\]/.exec(line);
+    if (head) {
+      section = head[1]!.trim().toLowerCase();
       continue;
     }
-    const prio = inBackglass ? /^\s*Priority\.([\w.]+)\s*=\s*(\d+)/.exec(line) : null;
-    if (prio && prio[1] !== PAUSE_RENDERER && prio[1] !== FALLBACK_RENDERER && Number(prio[2]) >= 100) out.push({ section: 'Backglass', key: `Priority.${prio[1]}`, value: '99' });
+    if (section !== 'backglass' && section !== 'scoreview' && section !== 'topper') continue;
+    const prio = /^\s*Priority\.([\w.]+)\s*=\s*(-?\d+)/.exec(line);
+    if (!prio || ours.has(prio[1]!)) continue;
+    const value = Number(prio[2]);
+    const sectionName = section === 'backglass' ? 'Backglass' : section === 'scoreview' ? 'ScoreView' : 'Topper';
+    if (value >= 100) out.push({ section: sectionName, key: `Priority.${prio[1]}`, value: '99' });
+    if (section === 'backglass') backglass.set(prio[1]!, Math.min(value, 99));
   }
+  for (const id of BACKGLASS_RENDERERS) if (!backglass.has(id)) backglass.set(id, 0);
+  const order = [...backglass.entries()]
+    .filter(([, value]) => value >= 0)
+    .map(([id, value], i) => ({ id, value, i: BACKGLASS_RENDERERS.includes(id) ? BACKGLASS_RENDERERS.indexOf(id) : BACKGLASS_RENDERERS.length + i }))
+    .sort((x, y) => y.value - x.value || x.i - y.i)
+    .map((r) => r.id);
+  out.push({ section: 'Plugin.CyberPinball', key: 'Order', value: order.join(',') });
   return out;
 }
 

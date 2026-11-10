@@ -101,6 +101,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Alignment in the headset: one controller on each corner of the bar, a trigger places the cabinet, as many times as you like; A confirms and leaves, B leaves without changing anything. The cabinet always extends away from your head, whatever the order of the corners or the hand.
 - In the headset, the sound plays in its earphones: menu, interface sounds, Juke-box and game. Out of the headset, the configuration's output takes over again.
 - Incomplete PuP-Packs: every installed pack is checked (missing files, playlists played but empty). The table's diagnostic and the log report them, never blocking the launch, and offer to complete the pack.
+- In the headset, the backglass fills its frame while keeping its proportions (B2S and PuP alike), and the pause fits entirely in it. The pause shows Resume or Quit, the choice framed, with the thumbstick or the flippers; A confirms.
+- In the headset, the sound of PuP-Pack videos no longer stutters: since VPX does not draw the DMD and topper in VR, their videos moved in jerks.
 
 ## 0.1.8
 

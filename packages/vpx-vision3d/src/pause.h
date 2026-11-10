@@ -102,6 +102,23 @@ inline Commande commandeVpx1081(int id, int& lieeA)
    return table[id].c;
 }
 
+/**
+ * Fronton cadré : un rectangle (x, y, l, h) de la surface d'un rendu (sw × sh) posé dans celle du fronton
+ * (W × H), proportions gardées, centré ; les bandes restent au fond du fronton.
+ */
+struct Rect
+{
+   float x, y, l, h;
+};
+inline Rect cadrer(float sw, float sh, float W, float H, Rect r)
+{
+   if (sw <= 0.f || sh <= 0.f)
+      return r;
+   const float s = (W / sw < H / sh) ? W / sw : H / sh;
+   const float ox = (W - sw * s) / 2.f, oy = (H - sh * s) / 2.f;
+   return { ox + r.x * s, oy + r.y * s, r.l * s, r.h * s };
+}
+
 enum class Choix { Reprendre, Quitter };
 
 /** Ce que la pause demande au plugin. */

@@ -14,13 +14,17 @@
 // - Jamais avalés : Pause, Échap (ExitGame), le menu de VPX, une action inconnue ; plugin passif si la
 //   table des actions ne correspond pas à VPX (pause.h, essai du 10 novembre 2026).
 // - Quitter est garanti : ExitGame, puis la fermeture de la fenêtre de VPX si la partie tourne encore.
+// - Fronton cadré : le rendu suivant (PuP, B2S) appelé à travers un contexte qui garde ses proportions.
+// - Son des vidéos de PuP : les fenêtres que VPX ne dessine pas en VR (ScoreView, topper) sont dessinées
+//   à vide à chaque image, sans quoi leur décodage piétine et le son arrive haché.
 // - Fronton : la pause seulement pendant l'appui tenu ou le menu ouvert ; sinon il rend la main à
 //   B2S ou PuP. En dernier recours (rien d'autre ne dessine), un fond opaque plutôt que du vide.
 // - Hors du casque (fenêtre du fronton d'une borne, rendu 2D), il ne dessine jamais. Cyber Pinball ne
 //   l'active d'ailleurs que dans l'INI des parties dans le casque ([Plugin.CyberPinball] Enable = 1).
 //
 // Réglages ([Plugin.CyberPinball], écrits par Cyber Pinball dans la langue de l'application) :
-//   Pause, Resume, Quit, Help (rappel des touches, lignes séparées par « · »), ResumeHint : les libellés.
+//   Pause, Resume, Quit, Help (rappel des touches, lignes séparées par « · »), ResumeHint : les libellés ;
+//   Order : les rendus du fronton à cadrer, dans l'ordre ; PupRatio : la forme du fronton de PuP.
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -28,6 +32,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstring>
 #include <cmath>
 #include <cstdio>
 #include <string>
@@ -51,6 +56,8 @@ MSGPI_STRING_VAL_SETTING(libelleReprendre, "Resume", "Resume label", "Resume cho
 MSGPI_STRING_VAL_SETTING(libelleQuitter, "Quit", "Quit label", "Quit choice", true, "Quit", 64);
 MSGPI_STRING_VAL_SETTING(libelleAide, "Help", "Help label", "Keys reminder under the choices, lines split by a middle dot", true, "Stick: choose \xC2\xB7 A: confirm", 128);
 MSGPI_STRING_VAL_SETTING(libelleRappel, "ResumeHint", "Resume hint", "Shown when resuming did not take", true, "Pause button: resume", 64);
+MSGPI_STRING_VAL_SETTING(ordreFronton, "Order", "Backglass order", "Backglass renderers drawn framed by the plugin, in order (ids, comma separated)", true, "PUP,B2S", 256);
+MSGPI_FLOAT_VAL_SETTING(pupRatio, "PupRatio", "PuP backglass ratio", "Width over height of the PuP backglass", true, 0.5f, 4.f, 0.01f, 1.7778f);
 
 double maintenant()
 {
@@ -65,6 +72,232 @@ bool relacherSortie = false;
 // la notification de VPX, moins lisible mais présente.
 double derniereDemande = -1.0;
 bool notifiee = false;
+
+// --- Son des vidéos de PuP dans le casque ----------------------------------------------------
+//
+// VPX 10.8.1 ne rend pas les fenêtres annexes en VR (player.cpp : « Ancillary windows are not yet supported
+// while in VR mode ») : un écran de PuP que rien ne dessine dans la scène (FullDMD sur le ScoreView, topper,
+// et le fronton quand la pièce VR en a un en image) n'est jamais dessiné. Or le lecteur de PuP règle son
+// décodage sur les images dessinées (PUPMediaPlayer::Run : « the synchronization entirely rely on the fact
+// that HandleVideoFrame will block, waiting for a free slot in the circular frame buffer ») : sans dessin,
+// le décodage avance par à-coups, le son de ces vidéos n'a plus d'avance et arrive haché (essai du
+// 10 novembre 2026, The Matrix). Le plugin fait dessiner à vide, à chaque image, chaque fenêtre de PuP que
+// VPX n'a pas demandée : une petite surface, des fonctions de dessin qui ne font rien.
+
+struct Pompe
+{
+   VPXWindowId fenetre;
+   AncillaryRendererDef pup {};
+   bool trouve = false;
+   double essai = -10.0;
+   double dessineeA = -10.0; // dernière fois que VPX a demandé cette fenêtre (rendu « Veille »)
+};
+Pompe pompes[] = { { VPXWINDOW_Backglass }, { VPXWINDOW_ScoreView }, { VPXWINDOW_Topper } };
+int pompees = 0; // fenêtres pompées à la dernière image (journal)
+
+void MSGPIAPI rienImage(VPXRenderContext2D*, VPXTexture, float, float, float, float, float, float, float, float, float, float, float, float, float, float, float) { }
+void MSGPIAPI rienAfficheur(VPXRenderContext2D*, VPXDisplayRenderStyle, VPXTexture, float, float, float, float, float, float, float, float, float, float, float, VPXTexture, float, float, float, float, float,
+   float, float, float, float, float, float, float, float)
+{
+}
+void MSGPIAPI rienSegments(VPXRenderContext2D*, VPXSegDisplayRenderStyle, VPXSegDisplayHint, VPXTexture, float, float, float, float, float, float, float, float, float, float, float, SegElementType,
+   const float*, float, float, float, float, float, float, float, float, float, float, float, float, float)
+{
+}
+
+void chercherPup(Pompe& p, double t)
+{
+   if (p.trouve || t - p.essai < 1.0)
+      return;
+   p.essai = t;
+   AncillaryRendererDef entrees[16] {};
+   GetAncillaryRendererMsg m { p.fenetre, 16, 0, entrees };
+   msgApi->BroadcastMsg(endpointId, getAuxRendererId, &m);
+   for (unsigned int i = 0; i < m.count && i < 16; i++)
+      if (entrees[i].id && std::strcmp(entrees[i].id, "PUP") == 0 && entrees[i].Render)
+      {
+         p.pup = entrees[i];
+         p.trouve = true;
+      }
+}
+
+/** À chaque image : les fenêtres de PuP que VPX n'a pas dessinées depuis 0,3 s sont dessinées à vide. */
+void pomper(double t)
+{
+   pompees = 0;
+   for (Pompe& p : pompes)
+   {
+      const double demandee = p.fenetre == VPXWINDOW_Backglass ? derniereDemande : p.dessineeA;
+      if (t - demandee < 0.3)
+         continue;
+      chercherPup(p, t);
+      if (!p.trouve)
+         continue;
+      VPXRenderContext2D ctx {};
+      ctx.window = p.fenetre;
+      ctx.is2D = 1;
+      ctx.outWidth = ctx.srcWidth = 320.f;
+      ctx.outHeight = ctx.srcHeight = 180.f;
+      ctx.DrawImage = rienImage;
+      ctx.DrawDisplay = rienAfficheur;
+      ctx.DrawSegDisplay = rienSegments;
+      p.pup.Render(&ctx, p.pup.context);
+      pompees++;
+   }
+}
+
+/** Veille sur le ScoreView et le topper : note que VPX les dessine (un flasher de la pièce VR), sans rien dessiner. */
+int MSGPIAPI veiller(VPXRenderContext2D* ctx, void*)
+{
+   if (ctx)
+      for (Pompe& p : pompes)
+         if (p.fenetre == ctx->window)
+            p.dessineeA = maintenant();
+   return 0;
+}
+
+// --- Cadrage du fronton dans le casque -------------------------------------------------------
+//
+// VPX dessine un rendu annexe sur toute la surface du flasher du fronton, quelle que soit sa forme : le
+// fronton que VPX pose en VR est en 4:3 (1,2 × la largeur de la table, player.cpp), et le contenu y est
+// étiré (B2S : son image ; PuP : son écran racine posé sur toute la surface, PUPManager::Render). Le plugin,
+// en tête des rendus du fronton, appelle lui-même le rendu suivant (l'ordre écrit par Cyber Pinball,
+// [Plugin.CyberPinball] Order) à travers un contexte intermédiaire : ce que le rendu dessine dans sa propre
+// surface (srcWidth × srcHeight) est posé, proportions gardées, centré, dans le fronton ; les bandes restent
+// noires (le flasher dessine d'abord un fond noir, flasher.cpp). PuP ne connaît pas sa forme : celle de son
+// fronton lui est donnée ([Plugin.CyberPinball] PupRatio, 16:9 par défaut).
+
+struct Cadre
+{
+   VPXRenderContext2D* dehors = nullptr; // le vrai contexte de VPX
+   VPXRenderContext2D dedans {};         // celui que voit le rendu appelé
+};
+Cadre cadre;
+
+/** Rectangle (x, y, l, h) de la surface du rendu appelé, dans celle du fronton : proportions gardées, centré. */
+void placer(float x, float y, float l, float h, float& X, float& Y, float& L2, float& H2)
+{
+   const Rect r = cadrer(cadre.dedans.srcWidth, cadre.dedans.srcHeight, cadre.dehors->srcWidth, cadre.dehors->srcHeight, { x, y, l, h });
+   X = r.x;
+   Y = r.y;
+   L2 = r.l;
+   H2 = r.h;
+}
+
+void MSGPIAPI cadreImage(VPXRenderContext2D*, VPXTexture texture, float tintR, float tintG, float tintB, float alpha, float texX, float texY, float texW, float texH, float pivotX, float pivotY,
+   float rotation, float srcX, float srcY, float srcW, float srcH)
+{
+   float x, y, w, h;
+   placer(srcX, srcY, srcW, srcH, x, y, w, h);
+   cadre.dehors->DrawImage(cadre.dehors, texture, tintR, tintG, tintB, alpha, texX, texY, texW, texH, pivotX, pivotY, rotation, x, y, w, h);
+}
+
+void MSGPIAPI cadreAfficheur(VPXRenderContext2D*, VPXDisplayRenderStyle style, VPXTexture glassTex, float glassTintR, float glassTintG, float glassTintB, float glassRoughness, float glassAreaX,
+   float glassAreaY, float glassAreaW, float glassAreaH, float glassAmbientR, float glassAmbientG, float glassAmbientB, VPXTexture dispTex, float dispTintR, float dispTintG, float dispTintB,
+   float brightness, float alpha, float dispPadL, float dispPadT, float dispPadR, float dispPadB, float srcX, float srcY, float srcW, float srcH)
+{
+   float x, y, w, h;
+   placer(srcX, srcY, srcW, srcH, x, y, w, h);
+   cadre.dehors->DrawDisplay(cadre.dehors, style, glassTex, glassTintR, glassTintG, glassTintB, glassRoughness, glassAreaX, glassAreaY, glassAreaW, glassAreaH, glassAmbientR, glassAmbientG,
+      glassAmbientB, dispTex, dispTintR, dispTintG, dispTintB, brightness, alpha, dispPadL, dispPadT, dispPadR, dispPadB, x, y, w, h);
+}
+
+void MSGPIAPI cadreSegments(VPXRenderContext2D*, VPXSegDisplayRenderStyle style, VPXSegDisplayHint shapeHint, VPXTexture glassTex, float glassTintR, float glassTintG, float glassTintB,
+   float glassRoughness, float glassAreaX, float glassAreaY, float glassAreaW, float glassAreaH, float glassAmbientR, float glassAmbientG, float glassAmbientB, SegElementType type,
+   const float* state, float dispTintR, float dispTintG, float dispTintB, float brightness, float alpha, float dispPadL, float dispPadT, float dispPadR, float dispPadB, float srcX, float srcY,
+   float srcW, float srcH)
+{
+   float x, y, w, h;
+   placer(srcX, srcY, srcW, srcH, x, y, w, h);
+   cadre.dehors->DrawSegDisplay(cadre.dehors, style, shapeHint, glassTex, glassTintR, glassTintG, glassTintB, glassRoughness, glassAreaX, glassAreaY, glassAreaW, glassAreaH, glassAmbientR,
+      glassAmbientG, glassAmbientB, type, state, dispTintR, dispTintG, dispTintB, brightness, alpha, dispPadL, dispPadT, dispPadR, dispPadB, x, y, w, h);
+}
+
+/** Les rendus du fronton, dans l'ordre écrit par Cyber Pinball (« PUP,B2S »), relus à chaque changement. */
+struct Suivant
+{
+   std::string id;
+   AncillaryRendererDef def {};
+   bool trouve = false;
+};
+std::vector<Suivant> suivants;
+std::string ordreLu;
+double suivantsCherchesA = -10.0;
+
+void chercherSuivants(double t)
+{
+   if (ordreLu != ordreFronton_Val)
+   {
+      ordreLu = ordreFronton_Val;
+      suivants.clear();
+      size_t debut = 0;
+      while (debut < ordreLu.size())
+      {
+         const size_t fin = ordreLu.find(',', debut);
+         const std::string id = ordreLu.substr(debut, fin == std::string::npos ? std::string::npos : fin - debut);
+         if (!id.empty() && id.rfind("CyberPinball.", 0) != 0)
+            suivants.push_back({ id });
+         if (fin == std::string::npos)
+            break;
+         debut = fin + 1;
+      }
+      suivantsCherchesA = -10.0;
+   }
+   bool manque = false;
+   for (const Suivant& s : suivants)
+      manque |= !s.trouve;
+   if (!manque || t - suivantsCherchesA < 1.0)
+      return;
+   suivantsCherchesA = t;
+   AncillaryRendererDef entrees[16] {};
+   GetAncillaryRendererMsg m { VPXWINDOW_Backglass, 16, 0, entrees };
+   msgApi->BroadcastMsg(endpointId, getAuxRendererId, &m);
+   for (Suivant& s : suivants)
+      for (unsigned int i = 0; i < m.count && i < 16; i++)
+         if (entrees[i].id && s.id == entrees[i].id && entrees[i].Render)
+         {
+            s.def = entrees[i];
+            s.trouve = true;
+         }
+}
+
+/**
+ * Le fronton hors de la pause : le premier rendu de l'ordre qui dessine, cadré. 0 si aucun (VPX continue
+ * alors sa propre liste, jusqu'au fond opaque).
+ */
+int dessinerCadre(VPXRenderContext2D* ctx, double t)
+{
+   chercherSuivants(t);
+   for (const Suivant& s : suivants)
+   {
+      if (!s.trouve)
+         continue;
+      cadre.dehors = ctx;
+      cadre.dedans = *ctx;
+      cadre.dedans.DrawImage = cadreImage;
+      cadre.dedans.DrawDisplay = cadreAfficheur;
+      cadre.dedans.DrawSegDisplay = cadreSegments;
+      // PuP pose son écran racine sur toute sa surface (srcWidth = outWidth) : la forme de son fronton.
+      if (s.id == "PUP")
+      {
+         const float ratio = pupRatio_Val > 0.1f ? pupRatio_Val : 16.f / 9.f;
+         if (ctx->outWidth / ctx->outHeight < ratio)
+            cadre.dedans.outHeight = ctx->outWidth / ratio;
+         else
+            cadre.dedans.outWidth = ctx->outHeight * ratio;
+      }
+      cadre.dedans.srcWidth = cadre.dedans.outWidth;
+      cadre.dedans.srcHeight = cadre.dedans.outHeight;
+      // Le fronton du rendu appelé s'étend sur la surface de VPX telle qu'elle est : srcWidth/srcHeight de dehors.
+      ctx->srcWidth = ctx->outWidth;
+      ctx->srcHeight = ctx->outHeight;
+      const int dessine = s.def.Render(&cadre.dedans, s.def.context);
+      cadre.dehors = nullptr;
+      if (dessine)
+         return 1;
+   }
+   return 0;
+}
 
 /** La table des actions (commandeVpx1081) vaut pour VPX 10.8.1 ; une autre version : plugin passif. */
 bool versionConnue()
@@ -224,6 +457,7 @@ void MSGPIAPI onPrepareFrame(const unsigned int, void*, void*)
    }
    const double t = maintenant();
    appliquer(pause.image(t, vpxApi->GetGameTime()));
+   pomper(t);
    if (!pause.affichee(t))
       notifiee = false;
    else if (!notifiee && t - derniereDemande > 0.3)
@@ -241,6 +475,9 @@ void MSGPIAPI onGameStart(const unsigned int, void*, void*)
       pause.passif();
    relacherSortie = false;
    notifiee = false;
+   for (Pompe& p : pompes)
+      p = Pompe { p.fenetre };
+   ordreLu.clear();
    enPartie = true;
 }
 
@@ -341,7 +578,7 @@ int MSGPIAPI dessinerPause(VPXRenderContext2D* ctx, void*)
    derniereDemande = t;
    const bool tenu = pause.jaugeVisible(t);
    if (!pause.affichee(t))
-      return 0;
+      return dessinerCadre(ctx, t);
    preparerTout();
    ctx->srcWidth = L;
    ctx->srcHeight = H;
@@ -393,16 +630,24 @@ int MSGPIAPI dessinerFond(VPXRenderContext2D* ctx, void*)
 void MSGPIAPI onGetAuxRenderer(const unsigned int, void*, void* data)
 {
    auto* msg = static_cast<GetAncillaryRendererMsg*>(data);
-   if (!msg || msg->window != VPXWINDOW_Backglass)
+   if (!msg)
       return;
-   static AncillaryRendererDef pauseDef { "CyberPinball.Pause", "Pause (Cyber Pinball)", "Pause and quit gauge in the headset", nullptr, dessinerPause };
+   static AncillaryRendererDef pauseDef { "CyberPinball.Pause", "Pause (Cyber Pinball)", "Pause and quit gauge in the headset, backglass framed", nullptr, dessinerPause };
    static AncillaryRendererDef fondDef { "CyberPinball.Fond", "Background (Cyber Pinball)", "Opaque background when nothing else draws the backglass in the headset", nullptr, dessinerFond };
-   for (AncillaryRendererDef* def : { &pauseDef, &fondDef })
+   static AncillaryRendererDef veilleDef { "CyberPinball.Veille", "Watch (Cyber Pinball)", "Notes that VPX draws this window in the headset, draws nothing", nullptr, veiller };
+   const auto ajouter = [msg](const AncillaryRendererDef& def)
    {
       if (msg->count < msg->maxEntryCount && msg->entries)
-         msg->entries[msg->count] = *def;
+         msg->entries[msg->count] = def;
       msg->count++;
+   };
+   if (msg->window == VPXWINDOW_Backglass)
+   {
+      ajouter(pauseDef);
+      ajouter(fondDef);
    }
+   else if (msg->window == VPXWINDOW_ScoreView || msg->window == VPXWINDOW_Topper)
+      ajouter(veilleDef);
 }
 
 } // namespace
@@ -416,6 +661,8 @@ MSGPI_EXPORT void MSGPIAPI CyberPinballPluginLoad(const uint32_t sessionId, cons
    msgApi->RegisterSetting(endpointId, &libelleQuitter);
    msgApi->RegisterSetting(endpointId, &libelleAide);
    msgApi->RegisterSetting(endpointId, &libelleRappel);
+   msgApi->RegisterSetting(endpointId, &ordreFronton);
+   msgApi->RegisterSetting(endpointId, &pupRatio);
    msgApi->BroadcastMsg(endpointId, getVpxApiId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_MSG_GET_API), &vpxApi);
    msgApi->SubscribeMsg(endpointId, onGameStartId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_GAME_START), onGameStart, nullptr);
    msgApi->SubscribeMsg(endpointId, onGameEndId = msgApi->GetMsgID(VPXPI_NAMESPACE, VPXPI_EVT_ON_GAME_END), onGameEnd, nullptr);

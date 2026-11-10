@@ -103,6 +103,8 @@ son interface).
 - Calage dans le casque : une manette sur chaque coin de la barre, une gâchette place la borne, autant de fois qu'on veut ; A valide et sort, B sort sans rien changer. La borne part toujours à l'opposé de votre tête, quel que soit l'ordre des coins ou la main.
 - Dans le casque, le son sort dans ses écouteurs : menu, sons de l'interface, Juke-box et partie. Hors du casque, la sortie de la configuration reprend.
 - PuP-Packs incomplets : tous les packs installés sont contrôlés (fichiers absents, playlists jouées mais vides). Le diagnostic de la table et le journal les signalent, sans jamais bloquer le lancement, et proposent de recompléter le pack.
+- Dans le casque, le fronton remplit son cadre en gardant ses proportions (B2S comme PuP), et la pause y tient entière. La pause affiche Reprendre ou Quitter, le choix encadré, au joystick ou aux flippers ; A valide.
+- Dans le casque, le son des vidéos des PuP-Packs ne hache plus : VPX ne dessinant pas le DMD et le topper en VR, leurs vidéos avançaient par à-coups.
 
 ## 0.1.8
 

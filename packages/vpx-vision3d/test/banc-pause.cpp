@@ -147,6 +147,20 @@ int main()
       VERIFIE(!p.avaler(cmd(id)));
    VERIFIE(p.action(cmd(START), true, 51.1).reprendre == 0);
 
+   // Fronton cadré : un fronton de PuP 16:9 (1920 × 1080) dans celui de VPX en VR (4:3, 1200 × 900) :
+   // toute la largeur, 675 de haut, centré (bandes de 112,5 en haut et en bas) ; une image B2S 3:4 : toute la hauteur.
+   Rect r = cadrer(1920.f, 1080.f, 1200.f, 900.f, { 0.f, 0.f, 1920.f, 1080.f });
+   VERIFIE(r.x == 0.f && r.l == 1200.f && r.h == 675.f && r.y == 112.5f);
+   r = cadrer(1920.f, 1080.f, 1200.f, 900.f, { 960.f, 540.f, 0.f, 0.f });
+   VERIFIE(r.x == 600.f && r.y == 450.f);
+   r = cadrer(768.f, 1024.f, 1200.f, 900.f, { 0.f, 0.f, 768.f, 1024.f });
+   VERIFIE(r.y == 0.f && r.h == 900.f && r.l == 675.f && r.x == 262.5f);
+   // Même forme : rien ne change ; surface inconnue : laissée telle quelle.
+   r = cadrer(1000.f, 750.f, 1000.f, 750.f, { 10.f, 20.f, 30.f, 40.f });
+   VERIFIE(r.x == 10.f && r.y == 20.f && r.l == 30.f && r.h == 40.f);
+   r = cadrer(0.f, 0.f, 1000.f, 750.f, { 1.f, 2.f, 3.f, 4.f });
+   VERIFIE(r.x == 1.f && r.h == 4.f);
+
    static_assert(QUIT_HOLD_S == 1.5, "appui tenu de 1,5 s");
    // Libellés : capitales sans accent, en pixels blancs ; « : » et « · » ont leur glyphe.
    VERIFIE(capitales("Reprendre") == "REPRENDRE" && capitales("\xC3\xA9tape") == "ETAPE");
