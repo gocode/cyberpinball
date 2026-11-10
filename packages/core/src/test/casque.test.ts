@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { HEADSET_BUTTONS, isHeadsetButton, headsetPanels, headsetProtocol, LOCKBAR_DISTANCE_M, MIN_PLAYFIELD_M, panelSize, rotateVector, STANDARD_HEAD, type HeadsetPanel, type HeadsetSource } from '../casque';
+import { CONTROLLER_ELEMENTS, HEADSET_PROFILES } from '../manettes';
+import { headsetPanels, headsetProtocol, LOCKBAR_DISTANCE_M, MIN_PLAYFIELD_M, panelSize, rotateVector, STANDARD_HEAD, type HeadsetPanel, type HeadsetSource } from '../casque';
 import { edgeRotation } from '../model';
 
 const close = (a: number, b: number, eps = 1e-3) => assert.ok(Math.abs(a - b) < eps, `${a} ≠ ${b}`);
@@ -96,51 +97,30 @@ test('sans playfield, la tête reste en place ; le protocole du compagnon décri
   assert.ok(fields.slice(6).every((f) => Number.isFinite(Number(f))), lines[0]);
 });
 
-test('manettes du casque : gâchettes et joysticks = précédent / suivant, A = valider, B = retour, ≡ = menu du casque', () => {
-  assert.deepEqual(HEADSET_BUTTONS, {
-    'batteur-gauche': 'previous',
-    'batteur-droit': 'next',
-    start: 'confirm',
-    exit: 'exit',
-    menu: 'headset-menu',
-    collection: 'zone',
-    haut: 'previous',
-    gauche: 'previous',
-    bas: 'next',
-    droite: 'next',
-  });
-  assert.ok(isHeadsetButton('start'));
-  assert.ok(!isHeadsetButton('toString'));
-  // Les actions OpenXR du compagnon portent les mêmes noms, liées aux mêmes boutons des manettes Touch.
+test('manettes du casque : le compagnon lit tout le catalogue, profil par profil, et le dit au menu', () => {
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
-  const bindings: Record<string, string> = {
-    'batteur-gauche': '/user/hand/left/input/trigger/value',
-    'batteur-droit': '/user/hand/right/input/trigger/value',
-    start: '/user/hand/right/input/a/click',
-    exit: '/user/hand/right/input/b/click',
-    menu: '/user/hand/left/input/menu/click',
-    collection: '/user/hand/left/input/x/click',
-    'joystick-gauche-x': '/user/hand/left/input/thumbstick/x',
-    'joystick-gauche-y': '/user/hand/left/input/thumbstick/y',
-    'joystick-droit-x': '/user/hand/right/input/thumbstick/x',
-    'joystick-droit-y': '/user/hand/right/input/thumbstick/y',
-  };
-  // Les poignées ne servent qu'en partie (MagnaSave dans VPX) : le compagnon ne les lit plus.
-  assert.doesNotMatch(cpp, /squeeze/);
-  // Directions des joysticks envoyées comme des boutons, avec hystérésis.
-  assert.match(cpp, /Direction directions\[\] = \{ \{ "haut" \}, \{ "bas" \}, \{ "gauche" \}, \{ "droite" \} \};/);
-  assert.match(cpp, /pushed\[d\] > \(directions\[d\]\.down \? 0\.4f : 0\.6f\)/);
-  for (const [name, binding] of Object.entries(bindings)) assert.ok(cpp.includes(`{ "${name}", `) && cpp.includes(`"${binding}" }`), `${name} : ${binding}`);
-  assert.match(cpp, /\/interaction_profiles\/oculus\/touch_controller/);
+  // Chaque élément du catalogue (manettes.ts) a son action, au même chemin, pour les mêmes profils.
+  const keys: Record<string, string> = { touch: 't', index: 'i', vive: 'v', wmr: 'w' };
+  for (const [name, def] of Object.entries(CONTROLLER_ELEMENTS)) {
+    const flags = def.profiles.map((p) => keys[p]).join('');
+    assert.ok(cpp.includes(`{ "${name}", `) && cpp.includes(`"${def.path}", "${flags}", ${def.axis ? 'true' : 'false'} }`), `${name} : ${def.path} (${flags})`);
+  }
+  for (const [name, def] of Object.entries(HEADSET_PROFILES)) assert.ok(cpp.includes(`"${name}", "${def.path}" }`), name);
+  // Liaisons suggérées pour chaque profil ; le profil branché dit au menu.
+  assert.match(cpp, /for \(const Profile& pr : profiles\)[\s\S]{0,1500}xrSuggestInteractionProfileBindings_\(instance, &ipsb\)/);
+  assert.match(cpp, /XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED && controllers\)\s*sayProfile\(\);/);
+  // Axes : la direction dominante, avec hystérésis, envoyée comme un bouton.
+  assert.match(cpp, /pushed\[d\] > \(e\.dirs\[d\] \? 0\.4f : 0\.6f\)/);
   // Lus seulement quand le menu a le regard du joueur ; sinon, tout bouton tenu est relâché.
-  assert.match(cpp, /if \(controllers && state == XR_SESSION_STATE_FOCUSED\)[\s\S]{0,3000}else\s+releaseControls\(\);/);
+  assert.match(cpp, /if \(controllers && state == XR_SESSION_STATE_FOCUSED\)[\s\S]{0,4000}else\s+releaseControls\(\);/);
   // Le menu les reçoit comme les boutons de la borne (pas comme le téléphone), et les relâche casque retiré.
   const app = path.join(repo, 'app', 'src');
   const menu = fs.readFileSync(path.join(app, 'casque.ts'), 'utf8');
-  assert.match(menu, /if \(isHeadsetButton\(button\[1\]!\)\) this\.opts\.onButton\?\.\(button\[1\], button\[2\] === '1'\);/);
+  assert.match(menu, /if \(parseControllerEvent\(button\[1\]!\)\) this\.opts\.onButton\?\.\(button\[1\]!, button\[2\] === '1'\);/);
   const frontend = fs.readFileSync(path.join(app, 'frontend.ts'), 'utf8');
   assert.match(frontend, /onButton: \(button, down\) => headsetButton\(button, down\),/);
+  assert.match(frontend, /const action = menuActionOf\(controllerSetting\(\), name\);/);
   assert.match(frontend, /headsetKey\(b, true, false\);/);
   assert.match(frontend, /if \(!headset\?\.worn\) releaseHeadsetButtons\(\);/);
 });

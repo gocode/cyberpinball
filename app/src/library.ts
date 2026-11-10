@@ -291,6 +291,8 @@ export interface LibraryHost {
   hidePlayer?(key: string): void;
   /** « Ajouter aux favoris » / « Retirer des favoris » (collections.ts : User.Favorite du .info). */
   favorite?(table: TableEntry, on: boolean): void;
+  /** « Ajouter à une collection… » : les collections personnelles de la table (collections-menu.ts) ; `back` rouvre la fiche. */
+  tableCollections?(table: TableEntry, back: () => void): Action;
   /** « DMD sur la roue » (menu-dmd.ts) : le DMD du menu affiché ou masqué pour cette table, et sa place ; `back` : l'écran d'où on l'a ouvert. */
   menuDmd?: { detail(table: TableEntry): string; open(table: TableEntry, back: () => void): void };
   /**
@@ -2192,6 +2194,7 @@ export function createLibrary(host: LibraryHost) {
       ...(host.scores ? [scoresAction(table)] : []),
       pagesAction(table),
       ...(host.favorite ? [favoriteAction(table)] : []),
+      ...(host.tableCollections ? [{ ...host.tableCollections(table, () => openSheet(table)), door: 'sheet.collections' as const }] : []),
       {
         label: t('Gérer la table…'),
         detail: watch.length ? t('À vérifier : {what}', { what: formatList(watch) }) : t('Médias, parties du jeu, fichiers, réglages, diagnostic, modifier, supprimer'),

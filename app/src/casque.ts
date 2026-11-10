@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anchorHeight, headsetPanels, headsetProtocol, headsetScene, isHeadsetButton, sceneProtocol, type CabinetPlace, type HeadsetButton, type Point3, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, sceneProtocol, type CabinetPlace, type HeadsetProfile, type Point3, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -72,7 +72,9 @@ export interface HeadsetMenuOptions {
   /** Le compagnon s'arrête : ces écrans se ferment. */
   closeViews?(): void;
   /** Un bouton des manettes appuyé (true) ou relâché, tant que le menu est dans le casque. */
-  onButton?(button: HeadsetButton, down: boolean): void;
+  onButton?(button: string, down: boolean): void;
+  /** Les manettes branchées (compagnon : « profil <nom> »). */
+  onProfile?(profile: HeadsetProfile): void;
   /** Calage (calibrate) : le bout d'une manette touché, gâchette appuyée, dans la pièce (`room` faux : sans limite du Quest). */
   onPoint?(hand: 'gauche' | 'droite', point: Point3, room: boolean): void;
   /**
@@ -136,6 +138,8 @@ export class HeadsetMenu {
   /** Session neuve à relancer aussitôt le compagnon parti, ou à la reprise après une partie. */
   private restartNow = false;
   private restartAfterGame = false;
+  /** Manettes branchées (profil d'interaction), dites par le compagnon. */
+  profile: HeadsetProfile | undefined;
   /** Dernière tête relevée pendant la veille d'une partie (pièce du Quest, mètres, lacet en radians). */
   lastHead: HeadPose | undefined;
   /** Au moins une image rendue pour le casque y est arrivée : les écrans du PC peuvent se reposer. */
@@ -325,7 +329,7 @@ export class HeadsetMenu {
         // « bouton <nom> 1|0 » : un bouton des manettes, remis au menu comme un bouton de la borne (pas au journal).
         const button = /^bouton (\S+) ([01])$/.exec(line);
         if (button) {
-          if (isHeadsetButton(button[1]!)) this.opts.onButton?.(button[1], button[2] === '1');
+          if (parseControllerEvent(button[1]!)) this.opts.onButton?.(button[1]!, button[2] === '1');
           continue;
         }
         // Veille : la tête du joueur dans la pièce (au journal par Cyber Pinball, pas ici : toutes les 5 s).
@@ -333,6 +337,16 @@ export class HeadsetMenu {
         if (head) {
           this.lastHead = { x: Number(head[1]), y: Number(head[2]), z: Number(head[3]), yaw: Number(head[4]) };
           this.opts.onHead?.(this.lastHead);
+          continue;
+        }
+        // « profil <nom> » : les manettes branchées, leur réglage.
+        const profile = /^profil (\S+)/.exec(line);
+        if (profile) {
+          this.opts.log(`Casque : ${line}`); // i18n-ignore : journal
+          if (isHeadsetProfile(profile[1]!)) {
+            this.profile = profile[1];
+            this.opts.onProfile?.(profile[1]);
+          }
           continue;
         }
         // Calage : « pointe gauche|droite x y z [sans-piece] ».

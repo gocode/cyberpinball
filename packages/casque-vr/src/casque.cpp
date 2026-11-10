@@ -42,6 +42,7 @@
 //     | piece-changee pose|sans-pose <x> <y> <z> <lacet> (pièce refaite sous la session : la nouvelle origine dans l'ancienne)
 //     | session-arretee (arrêt que personne n'a demandé : le runtime reprend la session)
 //     | cadence … (toutes les 10 s casque porté : fréquence, images sautées, copie et rendu les plus longs)
+//     | profil touch|index|vive|wmr|inconnu <chemin> (les manettes branchées)
 //     | casque-perdu <raison> (éteint, Link coupé : ni retiré de la tête, ni la relève) | fini
 
 #define WIN32_LEAN_AND_MEAN
@@ -104,7 +105,8 @@ PFN_xrGetInstanceProcAddr xrGetInstanceProcAddr_ = nullptr;
    X(xrAcquireSwapchainImage) X(xrWaitSwapchainImage) X(xrReleaseSwapchainImage) X(xrResultToString) \
    X(xrEnumerateViewConfigurationViews) X(xrLocateViews) X(xrStringToPath) X(xrCreateActionSet) X(xrCreateAction) \
    X(xrSuggestInteractionProfileBindings) X(xrAttachSessionActionSets) X(xrSyncActions) X(xrGetActionStateBoolean) \
-   X(xrGetActionStateFloat) X(xrCreateActionSpace) X(xrGetReferenceSpaceBoundsRect)
+   X(xrGetActionStateFloat) X(xrCreateActionSpace) X(xrGetReferenceSpaceBoundsRect) \
+   X(xrGetCurrentInteractionProfile) X(xrPathToString)
 #define DECLARE(name) PFN_##name name##_ = nullptr;
 XR_FUNCS(DECLARE)
 PFN_xrGetD3D11GraphicsRequirementsKHR xrGetD3D11GraphicsRequirementsKHR_ = nullptr;
@@ -949,50 +951,57 @@ int main(int argc, char** argv)
    rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
    xrCreateReferenceSpace_(session, &rsci, &view);
 
-   // Manettes du Quest (Touch), une seule règle au menu comme en partie (packages/core/src/manettes.ts) :
-   // gâchettes : précédent / suivant (les flippers de la borne) ; A : valider ; B : retour ; ≡ de la
-   // manette gauche : le menu du casque ; X : la collection suivante ; joysticks : déplacer la sélection. Les poignées ne servent
-   // qu'en partie (MagnaSave, dans VPX). Cyber Pinball reçoit « bouton <nom> 1|0 » à chaque changement,
-   // seulement tant que le menu a le regard du joueur (« FOCUSED ») ; le reste du temps, le runtime les
-   // rend inactives, et un bouton resté appuyé est relâché.
-   struct Control
+   // Manettes : chaque bouton et chaque axe du catalogue de packages/core/src/manettes.ts
+   // (CONTROLLER_ELEMENTS), liés pour chaque profil d'interaction qui les a (Touch du Quest, Index, Vive,
+   // Windows Mixed Reality). Cyber Pinball reçoit « bouton <élément> 1|0 », et pour un axe la direction
+   // dominante, « bouton <axe>-haut|bas|gauche|droite 1|0 » ; le réglage des manettes dit à quelle
+   // fonction chacun sert. Seulement tant que le menu a le regard du joueur (« FOCUSED ») ; le reste du
+   // temps, le runtime rend les actions inactives, et un bouton resté appuyé est relâché. « profil <nom> »
+   // dit les manettes branchées.
+   struct Element
    {
       const char* name;
       const char* label;
-      const char* binding;
-      XrAction action = XR_NULL_HANDLE;
+      const char* path;    // sous /user/hand/ ; « squeeze » : /value ou /click selon le profil
+      const char* profiles; // t : Touch, i : Index, v : Vive, w : Windows Mixed Reality
+      bool axis;
+      XrAction action = XR_NULL_HANDLE, actionY = XR_NULL_HANDLE;
       bool down = false;
+      bool dirs[4] = { false, false, false, false };
    };
-   Control controls[] = {
-      { "batteur-gauche", "Flipper gauche", "/user/hand/left/input/trigger/value" },
-      { "batteur-droit", "Flipper droit", "/user/hand/right/input/trigger/value" },
-      { "start", "Valider", "/user/hand/right/input/a/click" },
-      { "exit", "Retour", "/user/hand/right/input/b/click" },
-      { "menu", "Menu du casque", "/user/hand/left/input/menu/click" },
-      { "collection", "Collection suivante", "/user/hand/left/input/x/click" },
+   Element elements[] = {
+      { "gachette-gauche", "Gachette gauche", "left/input/trigger/value", "tivw", false },
+      { "gachette-droite", "Gachette droite", "right/input/trigger/value", "tivw", false },
+      { "poignee-gauche", "Poignee gauche", "left/input/squeeze", "tivw", false },
+      { "poignee-droite", "Poignee droite", "right/input/squeeze", "tivw", false },
+      { "a", "A", "right/input/a/click", "ti", false },
+      { "b", "B", "right/input/b/click", "ti", false },
+      { "x", "X", "left/input/x/click", "t", false },
+      { "y", "Y", "left/input/y/click", "t", false },
+      { "menu-gauche", "Menu gauche", "left/input/menu/click", "tvw", false },
+      { "menu-droit", "Menu droit", "right/input/menu/click", "vw", false },
+      { "clic-joystick-gauche", "Clic du joystick gauche", "left/input/thumbstick/click", "tiw", false },
+      { "clic-joystick-droit", "Clic du joystick droit", "right/input/thumbstick/click", "tiw", false },
+      { "clic-pave-gauche", "Clic du pave gauche", "left/input/trackpad/click", "vw", false },
+      { "clic-pave-droit", "Clic du pave droit", "right/input/trackpad/click", "vw", false },
+      { "joystick-gauche", "Joystick gauche", "left/input/thumbstick", "tiw", true },
+      { "joystick-droit", "Joystick droit", "right/input/thumbstick", "tiw", true },
+      { "pave-gauche", "Pave gauche", "left/input/trackpad", "ivw", true },
+      { "pave-droit", "Pave droit", "right/input/trackpad", "ivw", true },
    };
-   // Joysticks : leurs deux axes, lus à chaque image ; Cyber Pinball reçoit leurs directions comme des
-   // boutons (« bouton haut|bas|gauche|droite 1|0 »), les deux joysticks ensemble, l'axe dominant seul.
-   struct Axis
+   struct Profile
    {
+      char key;
       const char* name;
-      const char* label;
-      const char* binding;
-      XrAction action = XR_NULL_HANDLE;
-      float value = 0;
+      const char* path;
    };
-   Axis axes[] = {
-      { "joystick-gauche-x", "Joystick gauche, horizontal", "/user/hand/left/input/thumbstick/x" },
-      { "joystick-gauche-y", "Joystick gauche, vertical", "/user/hand/left/input/thumbstick/y" },
-      { "joystick-droit-x", "Joystick droit, horizontal", "/user/hand/right/input/thumbstick/x" },
-      { "joystick-droit-y", "Joystick droit, vertical", "/user/hand/right/input/thumbstick/y" },
+   const Profile profiles[] = {
+      { 't', "touch", "/interaction_profiles/oculus/touch_controller" },
+      { 'i', "index", "/interaction_profiles/valve/index_controller" },
+      { 'v', "vive", "/interaction_profiles/htc/vive_controller" },
+      { 'w', "wmr", "/interaction_profiles/microsoft/motion_controller" },
    };
-   struct Direction
-   {
-      const char* name;
-      bool down = false;
-   };
-   Direction directions[] = { { "haut" }, { "bas" }, { "gauche" }, { "droite" } };
+   const char* directionNames[4] = { "haut", "bas", "gauche", "droite" };
    // Bout de chaque manette (pose de visée) : les points touchés du calage et leurs repères.
    const char* aimNames[2] = { "visee-gauche", "visee-droite" };
    const char* aimBindings[2] = { "/user/hand/left/input/aim/pose", "/user/hand/right/input/aim/pose" };
@@ -1017,37 +1026,58 @@ int main(int argc, char** argv)
             if (XR_SUCCEEDED(xrCreateAction_(actionSet, &aci, &aimActions[h])) && XR_SUCCEEDED(xrStringToPath_(instance, aimBindings[h], &path)))
                suggested.push_back({ aimActions[h], path });
          }
-         for (Axis& a : axes)
+         for (Element& e : elements)
          {
             XrActionCreateInfo aci { XR_TYPE_ACTION_CREATE_INFO };
-            aci.actionType = XR_ACTION_TYPE_FLOAT_INPUT;
-            strcpy_s(aci.actionName, a.name);
-            strcpy_s(aci.localizedActionName, a.label);
-            XrPath path = XR_NULL_PATH;
-            if (XR_SUCCEEDED(xrCreateAction_(actionSet, &aci, &a.action)) && XR_SUCCEEDED(xrStringToPath_(instance, a.binding, &path)))
-               suggested.push_back({ a.action, path });
+            aci.actionType = e.axis ? XR_ACTION_TYPE_FLOAT_INPUT : XR_ACTION_TYPE_BOOLEAN_INPUT;
+            strcpy_s(aci.actionName, (std::string(e.name) + (e.axis ? "-x" : "")).c_str());
+            strcpy_s(aci.localizedActionName, (std::string(e.label) + (e.axis ? " x" : "")).c_str());
+            xrCreateAction_(actionSet, &aci, &e.action);
+            if (e.axis)
+            {
+               strcpy_s(aci.actionName, (std::string(e.name) + "-y").c_str());
+               strcpy_s(aci.localizedActionName, (std::string(e.label) + " y").c_str());
+               xrCreateAction_(actionSet, &aci, &e.actionY);
+            }
          }
-         for (Control& c : controls)
+         // Chaque profil reçoit les éléments qu'il a : un chemin absent du profil ferait refuser tout le profil.
+         bool anyProfile = false;
+         for (const Profile& pr : profiles)
          {
-            XrActionCreateInfo aci { XR_TYPE_ACTION_CREATE_INFO };
-            aci.actionType = XR_ACTION_TYPE_BOOLEAN_INPUT;
-            strcpy_s(aci.actionName, c.name);
-            strcpy_s(aci.localizedActionName, c.label);
-            XrPath path = XR_NULL_PATH;
-            if (XR_SUCCEEDED(xrCreateAction_(actionSet, &aci, &c.action)) && XR_SUCCEEDED(xrStringToPath_(instance, c.binding, &path)))
-               suggested.push_back({ c.action, path });
+            std::vector<XrActionSuggestedBinding> bindings = suggested;
+            for (Element& e : elements)
+            {
+               if (!std::strchr(e.profiles, pr.key))
+                  continue;
+               std::string base = std::string("/user/hand/") + e.path;
+               if (base.ends_with("/squeeze"))
+                  base += (pr.key == 't' || pr.key == 'i') ? "/value" : "/click";
+               XrPath path = XR_NULL_PATH;
+               if (e.axis)
+               {
+                  if (XR_SUCCEEDED(xrStringToPath_(instance, (base + "/x").c_str(), &path)))
+                     bindings.push_back({ e.action, path });
+                  if (XR_SUCCEEDED(xrStringToPath_(instance, (base + "/y").c_str(), &path)))
+                     bindings.push_back({ e.actionY, path });
+               }
+               else if (XR_SUCCEEDED(xrStringToPath_(instance, base.c_str(), &path)))
+                  bindings.push_back({ e.action, path });
+            }
+            XrPath profile = XR_NULL_PATH;
+            xrStringToPath_(instance, pr.path, &profile);
+            XrInteractionProfileSuggestedBinding ipsb { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
+            ipsb.interactionProfile = profile;
+            ipsb.countSuggestedBindings = static_cast<uint32_t>(bindings.size());
+            ipsb.suggestedBindings = bindings.data();
+            if (XR_SUCCEEDED(xrSuggestInteractionProfileBindings_(instance, &ipsb)))
+               anyProfile = true;
+            else
+               say(std::string("erreur liaisons des manettes ") + pr.name);
          }
-         XrPath profile = XR_NULL_PATH;
-         xrStringToPath_(instance, "/interaction_profiles/oculus/touch_controller", &profile);
-         XrInteractionProfileSuggestedBinding ipsb { XR_TYPE_INTERACTION_PROFILE_SUGGESTED_BINDING };
-         ipsb.interactionProfile = profile;
-         ipsb.countSuggestedBindings = static_cast<uint32_t>(suggested.size());
-         ipsb.suggestedBindings = suggested.data();
          XrSessionActionSetsAttachInfo attach { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
          attach.countActionSets = 1;
          attach.actionSets = &actionSet;
-         controllers = suggested.size() == std::size(controls) + std::size(axes) + 2 && XR_SUCCEEDED(xrSuggestInteractionProfileBindings_(instance, &ipsb))
-            && XR_SUCCEEDED(xrAttachSessionActionSets_(session, &attach));
+         controllers = suggested.size() == 2 && anyProfile && XR_SUCCEEDED(xrAttachSessionActionSets_(session, &attach));
          for (int h = 0; controllers && h < 2; h++)
          {
             XrActionSpaceCreateInfo aimSpaceInfo { XR_TYPE_ACTION_SPACE_CREATE_INFO };
@@ -1061,18 +1091,39 @@ int main(int argc, char** argv)
    }
    auto releaseControls = [&]()
    {
-      for (Control& c : controls)
-         if (c.down)
+      for (Element& e : elements)
+      {
+         if (e.down)
          {
-            c.down = false;
-            say(std::string("bouton ") + c.name + " 0");
+            e.down = false;
+            say(std::string("bouton ") + e.name + " 0");
          }
-      for (Direction& d : directions)
-         if (d.down)
-         {
-            d.down = false;
-            say(std::string("bouton ") + d.name + " 0");
-         }
+         for (int d = 0; d < 4; d++)
+            if (e.dirs[d])
+            {
+               e.dirs[d] = false;
+               say(std::string("bouton ") + e.name + "-" + directionNames[d] + " 0");
+            }
+      }
+   };
+   // Manettes branchées : leur profil d'interaction, dit à Cyber Pinball (« profil <nom> »).
+   auto sayProfile = [&]()
+   {
+      for (const char* hand : { "/user/hand/right", "/user/hand/left" })
+      {
+         XrPath handPath = XR_NULL_PATH;
+         XrInteractionProfileState ips { XR_TYPE_INTERACTION_PROFILE_STATE };
+         if (XR_FAILED(xrStringToPath_(instance, hand, &handPath)) || XR_FAILED(xrGetCurrentInteractionProfile_(session, handPath, &ips)) || ips.interactionProfile == XR_NULL_PATH)
+            continue;
+         char text[XR_MAX_PATH_LENGTH] = {};
+         uint32_t n = 0;
+         if (XR_FAILED(xrPathToString_(instance, ips.interactionProfile, XR_MAX_PATH_LENGTH, &n, text)))
+            continue;
+         for (const Profile& pr : profiles)
+            if (std::strcmp(pr.path, text) == 0)
+               return say(std::string("profil ") + pr.name);
+         return say(std::string("profil inconnu ") + text);
+      }
    };
 
    // Format des images : sRGB pour que le casque montre les couleurs de l'écran (copie brute des octets).
@@ -1326,6 +1377,8 @@ int main(int argc, char** argv)
                done = true;
             }
          }
+         else if (ev.type == XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED && controllers)
+            sayProfile();
          else if (ev.type == XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING)
             lost("instance perdue");
          else if (ev.type == XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING)
@@ -1511,49 +1564,47 @@ int main(int argc, char** argv)
          si.countActiveActionSets = 1;
          si.activeActionSets = &active;
          if (XR_SUCCEEDED(xrSyncActions_(session, &si)))
-            for (Control& c : controls)
+            for (Element& e : elements)
             {
                XrActionStateGetInfo gi { XR_TYPE_ACTION_STATE_GET_INFO };
-               gi.action = c.action;
-               XrActionStateBoolean st { XR_TYPE_ACTION_STATE_BOOLEAN };
-               const bool down = XR_SUCCEEDED(xrGetActionStateBoolean_(session, &gi, &st)) && st.isActive && st.currentState;
-               if (down != c.down)
+               gi.action = e.action;
+               if (!e.axis)
                {
-                  c.down = down;
-                  say(std::string("bouton ") + c.name + (down ? " 1" : " 0"));
+                  XrActionStateBoolean st { XR_TYPE_ACTION_STATE_BOOLEAN };
+                  const bool down = XR_SUCCEEDED(xrGetActionStateBoolean_(session, &gi, &st)) && st.isActive && st.currentState;
+                  if (down == e.down)
+                     continue;
+                  e.down = down;
+                  say(std::string("bouton ") + e.name + (down ? " 1" : " 0"));
                   // Calage : gâchette appuyée, le bout de cette manette dans la pièce.
-                  const int hand = std::string(c.name) == "batteur-gauche" ? 0 : std::string(c.name) == "batteur-droit" ? 1 : -1;
+                  const int hand = std::string(e.name) == "gachette-gauche" ? 0 : std::string(e.name) == "gachette-droite" ? 1 : -1;
                   XrSpaceLocation loc { XR_TYPE_SPACE_LOCATION };
                   if (down && calibrating && hand >= 0 && aimSpaces[hand] != XR_NULL_HANDLE && XR_SUCCEEDED(xrLocateSpace_(aimSpaces[hand], base, fs.predictedDisplayTime, &loc))
                      && (loc.locationFlags & XR_SPACE_LOCATION_POSITION_VALID_BIT))
                      say(std::string("pointe ") + (hand ? "droite " : "gauche ") + std::to_string(loc.pose.position.x) + " " + std::to_string(loc.pose.position.y) + " "
                         + std::to_string(loc.pose.position.z) + (stage ? "" : " sans-piece"));
+                  continue;
+               }
+               // Axe : la direction dominante, appuyée au-delà de 0,6, relâchée sous 0,4.
+               XrActionStateFloat sx { XR_TYPE_ACTION_STATE_FLOAT }, sy { XR_TYPE_ACTION_STATE_FLOAT };
+               float x = XR_SUCCEEDED(xrGetActionStateFloat_(session, &gi, &sx)) && sx.isActive ? sx.currentState : 0.f;
+               gi.action = e.actionY;
+               float y = XR_SUCCEEDED(xrGetActionStateFloat_(session, &gi, &sy)) && sy.isActive ? sy.currentState : 0.f;
+               if (std::fabs(x) > std::fabs(y))
+                  y = 0;
+               else
+                  x = 0;
+               const float pushed[4] = { y, -y, -x, x };
+               for (int d = 0; d < 4; d++)
+               {
+                  const bool down = pushed[d] > (e.dirs[d] ? 0.4f : 0.6f);
+                  if (down != e.dirs[d])
+                  {
+                     e.dirs[d] = down;
+                     say(std::string("bouton ") + e.name + "-" + directionNames[d] + (down ? " 1" : " 0"));
+                  }
                }
             }
-         // Joysticks : la direction dominante des deux, appuyée au-delà de 0,6, relâchée sous 0,4.
-         for (Axis& a : axes)
-         {
-            XrActionStateGetInfo gi { XR_TYPE_ACTION_STATE_GET_INFO };
-            gi.action = a.action;
-            XrActionStateFloat st { XR_TYPE_ACTION_STATE_FLOAT };
-            a.value = XR_SUCCEEDED(xrGetActionStateFloat_(session, &gi, &st)) && st.isActive ? st.currentState : 0.f;
-         }
-         float x = std::fabs(axes[0].value) >= std::fabs(axes[2].value) ? axes[0].value : axes[2].value;
-         float y = std::fabs(axes[1].value) >= std::fabs(axes[3].value) ? axes[1].value : axes[3].value;
-         if (std::fabs(x) > std::fabs(y))
-            y = 0;
-         else
-            x = 0;
-         const float pushed[4] = { y, -y, -x, x };
-         for (int d = 0; d < 4; d++)
-         {
-            const bool down = pushed[d] > (directions[d].down ? 0.4f : 0.6f);
-            if (down != directions[d].down)
-            {
-               directions[d].down = down;
-               say(std::string("bouton ") + directions[d].name + (down ? " 1" : " 0"));
-            }
-         }
       }
       else
          releaseControls();

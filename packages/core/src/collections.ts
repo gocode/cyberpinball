@@ -25,8 +25,8 @@ import { readInfo } from './tables';
 export const FIXED_COLLECTIONS = ['all', 'favorites', 'recent', 'unplayed', 'friends'] as const;
 export type FixedCollection = (typeof FIXED_COLLECTIONS)[number];
 /** « all », « favorites »…, « maker:<clé du fabricant> », « decade:<1990> ». */
-export type CollectionId = FixedCollection | `maker:${string}` | `decade:${number}`;
-export type CollectionGroup = 'fixed' | 'maker' | 'decade';
+export type CollectionId = FixedCollection | `mine:${string}` | `maker:${string}` | `decade:${number}`;
+export type CollectionGroup = 'fixed' | 'mine' | 'maker' | 'decade';
 
 /** Combien de tables garde Récentes. */
 export const RECENT_COUNT = 10;
@@ -93,7 +93,7 @@ export function decadeOf(year: number | undefined): number | undefined {
 }
 
 /** Les collections de ces tables (déjà rangées dans l'ordre du menu), vides comprises. */
-export function buildCollections<T extends Shelved>(tables: readonly T[], opts: { friends?: FriendsShelf; recent?: number } = {}): Collection<T>[] {
+export function buildCollections<T extends Shelved & { id?: string }>(tables: readonly T[], opts: { friends?: FriendsShelf; recent?: number; mine?: readonly MyCollection[] } = {}): Collection<T>[] {
   const recentCount = opts.recent ?? RECENT_COUNT;
   const favorites = tables.filter((x) => isFavorite(x.info));
   const recent = tables
@@ -179,7 +179,17 @@ export function buildCollections<T extends Shelved>(tables: readonly T[], opts: 
     .sort((a, b) => a[0] - b[0])
     .map(([d, list]): Collection<T> => ({ id: `decade:${d}`, group: 'decade', label: t('Années {decade}', { decade: d }), icon: 'calendar', tables: list }));
 
-  return [...fixed, ...byMaker, ...byDecade];
+  // Mes collections : dans l'ordre de leur création ; une table partie du disque n'y compte plus.
+  const byId = new Map(tables.map((x) => [(x.id ?? x.file).toLowerCase(), x]));
+  const mine = (opts.mine ?? []).map((m): Collection<T> => {
+    const list = m.tables.map((id) => byId.get(id.toLowerCase())).filter((x): x is T => Boolean(x));
+    // L'ordre du menu, pas celui des ajouts.
+    const rank = new Map(tables.map((x, i) => [x, i]));
+    list.sort((a, b) => rank.get(a)! - rank.get(b)!);
+    return { id: m.id, group: 'mine', label: m.name, icon: 'list', tables: list, ...(list.length ? {} : { reason: t('Vide : sur la fiche d’une table, « Ajouter à une collection… »') }) };
+  });
+
+  return [...fixed, ...mine, ...byMaker, ...byDecade];
 }
 
 /** La collection voulue, sinon Toutes (un fabricant dont la dernière table est partie, par exemple). */
@@ -202,7 +212,7 @@ export function stepCollection<T>(list: readonly Collection<T>[], id: string, st
 
 export function isCollectionId(raw: unknown): raw is CollectionId {
   if (typeof raw !== 'string') return false;
-  return (FIXED_COLLECTIONS as readonly string[]).includes(raw) || /^maker:.+/.test(raw) || /^decade:\d{4}$/.test(raw);
+  return (FIXED_COLLECTIONS as readonly string[]).includes(raw) || /^(maker|mine):.+/.test(raw) || /^decade:\d{4}$/.test(raw);
 }
 
 /**
@@ -231,25 +241,101 @@ export class ShelfMemory {
   }
 }
 
-/** Ce qui se garde d'un démarrage à l'autre : la collection active. */
+/** Une collection personnelle : son nom, et les tables qu'on y a mises (TableEntry.id). */
+export interface MyCollection {
+  id: `mine:${string}`;
+  name: string;
+  tables: string[];
+}
+
+/** Longueur d'un nom de collection personnelle. */
+export const MY_COLLECTION_NAME_MAX = 40;
+
+/**
+ * Ce qui se garde d'un démarrage à l'autre : la collection active, les collections personnelles,
+ * et les boutons choisis pour changer de collection (sinon les MagnaSave).
+ */
 export interface CollectionsSettings {
   active: CollectionId;
+  mine: MyCollection[];
+  /** Boutons des collections choisis sur la borne (codes de touche ou jetons de joystick). */
+  keys?: { previous?: string; next?: string };
 }
 
 const settingsFile = (dataDir: string) => path.join(dataDir, 'collections.json');
 
+/** Nom d'une collection personnelle : sans caractère de contrôle, espaces resserrés, coupé à MY_COLLECTION_NAME_MAX. */
+export function cleanCollectionName(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const name = raw.replace(/[\x00-\x1f\x7f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, MY_COLLECTION_NAME_MAX).trim();
+  return name || undefined;
+}
+
+export function parseCollectionsSettings(raw: unknown): CollectionsSettings {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as { active?: unknown; mine?: unknown; keys?: unknown };
+  const mine: MyCollection[] = [];
+  for (const m of Array.isArray(r.mine) ? r.mine : []) {
+    const x = (m && typeof m === 'object' ? m : {}) as { id?: unknown; name?: unknown; tables?: unknown };
+    const name = cleanCollectionName(x.name);
+    if (typeof x.id !== 'string' || !/^mine:[a-z0-9-]{1,40}$/.test(x.id) || !name || mine.some((o) => o.id === x.id)) continue;
+    const tables = [...new Set((Array.isArray(x.tables) ? x.tables : []).filter((tb): tb is string => typeof tb === 'string' && tb.length > 0 && tb.length < 500))];
+    mine.push({ id: x.id as `mine:${string}`, name, tables });
+  }
+  const k = (r.keys && typeof r.keys === 'object' ? r.keys : {}) as { previous?: unknown; next?: unknown };
+  const code = (v: unknown) => (typeof v === 'string' && v.length > 0 && v.length < 200 ? v : undefined);
+  const keys = { ...(code(k.previous) ? { previous: code(k.previous)! } : {}), ...(code(k.next) ? { next: code(k.next)! } : {}) };
+  const active = isCollectionId(r.active) && (!r.active.startsWith('mine:') || mine.some((m) => m.id === r.active)) ? r.active : 'all';
+  return { active, mine, ...(keys.previous || keys.next ? { keys } : {}) };
+}
+
 export function loadCollections(dataDir: string): CollectionsSettings {
   try {
-    const raw = JSON.parse(fs.readFileSync(settingsFile(dataDir), 'utf8').replace(/^﻿/, '')) as { active?: unknown };
-    return { active: isCollectionId(raw.active) ? raw.active : 'all' };
+    return parseCollectionsSettings(JSON.parse(fs.readFileSync(settingsFile(dataDir), 'utf8').replace(/^﻿/, '')));
   } catch {
-    return { active: 'all' };
+    return { active: 'all', mine: [] };
   }
 }
 
 export function saveCollections(dataDir: string, settings: CollectionsSettings): void {
   fs.mkdirSync(dataDir, { recursive: true });
   writeFileAtomic(settingsFile(dataDir), JSON.stringify(settings, null, 2) + '\n');
+}
+
+/** Une nouvelle collection personnelle, vide (ou avec une première table). Identifiant tiré du nom, unique. */
+export function addMyCollection(settings: CollectionsSettings, rawName: string, firstTable?: string): { settings: CollectionsSettings; id?: `mine:${string}` } {
+  const name = cleanCollectionName(rawName);
+  if (!name) return { settings };
+  const base =
+    name
+      .normalize('NFD')
+      .replace(/[̀-ͯ]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 32) || 'collection';
+  let id = `mine:${base}` as `mine:${string}`;
+  for (let n = 2; settings.mine.some((m) => m.id === id); n++) id = `mine:${base}-${n}`;
+  return { settings: { ...settings, mine: [...settings.mine, { id, name, tables: firstTable ? [firstTable] : [] }] }, id };
+}
+
+export function renameMyCollection(settings: CollectionsSettings, id: string, rawName: string): CollectionsSettings {
+  const name = cleanCollectionName(rawName);
+  if (!name) return settings;
+  return { ...settings, mine: settings.mine.map((m) => (m.id === id ? { ...m, name } : m)) };
+}
+
+/** Supprime la collection (les tables restent sur le disque) ; affichée, la roue revient sur Toutes. */
+export function removeMyCollection(settings: CollectionsSettings, id: string): CollectionsSettings {
+  return { ...settings, mine: settings.mine.filter((m) => m.id !== id), active: settings.active === id ? 'all' : settings.active };
+}
+
+/** Met la table dans la collection, ou l'en retire (`on`). */
+export function setTableInMyCollection(settings: CollectionsSettings, id: string, table: string, on: boolean): CollectionsSettings {
+  const same = (a: string) => a.toLowerCase() === table.toLowerCase();
+  return {
+    ...settings,
+    mine: settings.mine.map((m) => (m.id !== id ? m : { ...m, tables: on ? (m.tables.some(same) ? m.tables : [...m.tables, table]) : m.tables.filter((x) => !same(x)) })),
+  };
 }
 
 /** Repère de la collection active sur la roue : « Toutes · 7 tables », « Favoris · 4 tables ». */
@@ -323,7 +409,7 @@ export function collectionsPanel<T>(list: readonly Collection<T>[], activeId: st
   const lines: Line[] = [];
   let group: CollectionGroup | undefined;
   for (const c of list) {
-    if (c.group !== group && c.group !== 'fixed') lines.push({ heading: c.group === 'maker' ? t('Fabricants') : t('Décennies') });
+    if (c.group !== group && c.group !== 'fixed') lines.push({ heading: c.group === 'mine' ? t('Mes collections') : c.group === 'maker' ? t('Fabricants') : t('Décennies') });
     group = c.group;
     const count = c.tables.length;
     lines.push({ group: c.group, row: { id: c.id, label: c.label, icon: c.icon, count, countLabel: String(count), disabled: count === 0, ...(c.reason ? { reason: c.reason } : {}), focus: c.id === activeId } });

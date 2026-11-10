@@ -94,14 +94,14 @@ test('calage : branchements du compagnon, du casque et du menu', () => {
   assert.match(frontend, /library\.provideSystemItem\('vr-calibrate', \{/);
   assert.doesNotMatch(frontend, /onGesture/);
   // Menu du casque (≡) : « Caler la borne » en tête, puis recentrer, retour.
-  assert.match(frontend, /if \(action === 'headset-menu'\) return void \(down && openHeadsetMenu\(\)\);/);
-  assert.match(frontend, /label: t\('Caler la borne'\)[\s\S]{0,400}openCalibration\(\);[\s\S]{0,200}label: t\('Recentrer la borne'\)[\s\S]{0,300}headset\?\.recenter\(\);[\s\S]{0,200}label: t\('Retour'\)/);
+  assert.match(frontend, /if \(action === 'headset-menu'\) return void openHeadsetMenu\(\);/);
+  assert.match(frontend, /label: t\('Caler la borne'\)[\s\S]{0,400}openCalibration\(\);[\s\S]{0,200}label: t\('Recentrer la borne'\)[\s\S]{0,300}headset\?\.recenter\(\);[\s\S]{0,500}label: t\('Retour'\)/);
   // Calage guidé : étapes numérotées, repères du point pris et du point à toucher, B pour annuler.
   assert.match(frontend, /t\('Étape 1 sur 3 : coin gauche'\)/);
   assert.match(frontend, /headset\?\.setMarks\(calibrationMarks\(c\)\);/);
   assert.match(frontend, /const cancel = t\('B : annuler'\);/);
   // L'entrée vient juste après « Réalité virtuelle ».
-  assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /'vr', 'vr-calibrate', 'controls'/);
+  assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /'vr', 'vr-calibrate', 'vr-controllers', 'controls'/);
 });
 
 test('une seule pose : la table de VPX exactement où est la borne du casque, calée ou non', () => {

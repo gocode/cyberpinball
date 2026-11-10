@@ -11,8 +11,6 @@
 
 import type { Rect, RoleId, Rotation } from './model';
 
-// Boutons des manettes du casque : une seule règle, au menu comme en partie (manettes.ts).
-export { HEADSET_BUTTONS, isHeadsetButton, type HeadsetButton } from './manettes';
 
 /** Hauteur de la barre avant au-dessus du sol (VPX : [Player] LockbarHeight, 85 cm par défaut). */
 export const LOCKBAR_HEIGHT_M = 0.85;

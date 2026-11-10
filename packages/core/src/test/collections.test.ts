@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
-import { PANEL_LINE, ShelfMemory, buildCollections, collectionsPanel, shelfView, findCollection, isFavorite, loadCollections, mergeFavorite, saveCollections, setFavorite, stepCollection } from '../collections';
+import { PANEL_LINE, ShelfMemory, addMyCollection, removeMyCollection, renameMyCollection, setTableInMyCollection, type CollectionsSettings, buildCollections, collectionsPanel, shelfView, findCollection, isFavorite, loadCollections, mergeFavorite, saveCollections, setFavorite, stepCollection } from '../collections';
 import { setLanguage } from '../i18n';
 import type { TableEntry } from '../tables';
 
@@ -116,11 +116,11 @@ test('favoris : celui d’un .info apporté vaut quand la table n’en dit rien'
 
 test('collections : la collection active se garde, une valeur illisible donne Toutes', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-collections-'));
-  assert.deepEqual(loadCollections(dir), { active: 'all' });
-  saveCollections(dir, { active: 'maker:bally' });
-  assert.deepEqual(loadCollections(dir), { active: 'maker:bally' });
+  assert.deepEqual(loadCollections(dir), { active: 'all', mine: [] });
+  saveCollections(dir, { active: 'maker:bally', mine: [] });
+  assert.deepEqual(loadCollections(dir), { active: 'maker:bally', mine: [] });
   fs.writeFileSync(path.join(dir, 'collections.json'), '{"active":"nimporte"}');
-  assert.deepEqual(loadCollections(dir), { active: 'all' });
+  assert.deepEqual(loadCollections(dir), { active: 'all', mine: [] });
   fs.rmSync(dir, { recursive: true, force: true });
 });
 
@@ -160,4 +160,48 @@ test('collections : le nom d’une collection fixe tient dans le repère, en fra
     for (const c of buildCollections(ALL).filter((x) => x.group === 'fixed')) assert.ok(shelfView(c).label.length <= 13, `${language} : « ${shelfView(c).label} »`);
   }
   setLanguage('fr');
+});
+
+test('mes collections : créer, nommer, remplir, renommer, supprimer ; gardées et relues', () => {
+  let s: CollectionsSettings = { active: 'all', mine: [] };
+  const made = addMyCollection(s, '  Soirées   entre amis  ', 'Terminator 2/T2.vpx');
+  assert.equal(made.id, 'mine:soirees-entre-amis');
+  s = made.settings;
+  assert.equal(s.mine[0]!.name, 'Soirées entre amis');
+  // Même nom : un autre identifiant ; nom vide : rien.
+  const twin = addMyCollection(s, 'Soirées entre amis');
+  assert.equal(twin.id, 'mine:soirees-entre-amis-2');
+  assert.equal(addMyCollection(s, '   ').id, undefined);
+  s = setTableInMyCollection(s, 'mine:soirees-entre-amis', 'Attack from Mars/AFM.vpx', true);
+  s = setTableInMyCollection(s, 'mine:soirees-entre-amis', 'attack from mars/afm.vpx', true);
+  assert.equal(s.mine[0]!.tables.length, 2);
+  // Dans la liste : après les fixes, l'ordre du menu, une table absente du disque ignorée.
+  const tables = [
+    { ...AFM, id: 'Attack from Mars/AFM.vpx' },
+    { ...T2, id: 'Terminator 2/T2.vpx' },
+  ];
+  s = setTableInMyCollection(s, 'mine:soirees-entre-amis', 'Partie/Absente.vpx', true);
+  const list = buildCollections(tables, { mine: s.mine });
+  const mine = findCollection(list, 'mine:soirees-entre-amis');
+  assert.equal(mine.group, 'mine');
+  assert.deepEqual(titles(mine.tables), ['Attack from Mars', 'Terminator 2']);
+  assert.ok(list.findIndex((c) => c.id === mine.id) > list.findIndex((c) => c.id === 'friends'));
+  assert.ok(list.findIndex((c) => c.id === mine.id) < list.findIndex((c) => c.group === 'maker'));
+  s = setTableInMyCollection(s, 'mine:soirees-entre-amis', 'Terminator 2/T2.vpx', false);
+  assert.equal(s.mine[0]!.tables.includes('Terminator 2/T2.vpx'), false);
+  s = renameMyCollection(s, 'mine:soirees-entre-amis', 'Vendredi');
+  assert.equal(s.mine[0]!.name, 'Vendredi');
+  // Affichée puis supprimée : la roue revient sur Toutes.
+  s = { ...s, active: 'mine:soirees-entre-amis' };
+  s = removeMyCollection(s, 'mine:soirees-entre-amis');
+  assert.equal(s.active, 'all');
+  assert.equal(s.mine.length, 0);
+  // Gardées : relues telles quelles, avec les boutons choisis ; un fichier abîmé est nettoyé.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'cp-mes-collections-'));
+  const saved = addMyCollection({ active: 'all', mine: [], keys: { previous: 'SDLJoy_X_1;8', next: 'SDLJoy_X_1;9' } }, 'Classiques', 'Terminator 2/T2.vpx').settings;
+  saveCollections(dir, { ...saved, active: 'mine:classiques' });
+  assert.deepEqual(loadCollections(dir), { ...saved, active: 'mine:classiques' });
+  fs.writeFileSync(path.join(dir, 'collections.json'), JSON.stringify({ active: 'mine:fantome', mine: [{ id: 'pas-mine', name: 'x' }, { id: 'mine:ok', name: '', tables: [] }, { id: 'mine:bon', name: 'Bon', tables: [1, 'A/a.vpx'] }] }));
+  assert.deepEqual(loadCollections(dir), { active: 'all', mine: [{ id: 'mine:bon', name: 'Bon', tables: ['A/a.vpx'] }] });
+  fs.rmSync(dir, { recursive: true, force: true });
 });

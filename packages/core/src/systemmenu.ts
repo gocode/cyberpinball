@@ -37,6 +37,7 @@ export const SYSTEM_ITEM_IDS = [
   'vision3d',
   'vr',
   'vr-calibrate',
+  'vr-controllers',
   'controls',
   'phone-remote',
   'dof',
@@ -86,19 +87,20 @@ export const SYSTEM_ROOT: readonly SystemGroupId[] = ['amis', 'tables', 'medias'
  * tout Cyber Pinball (amis, téléchargements, mises à jour), et Téléchargements, comme le
  * gestionnaire de téléchargements d'une console, et Télécommande du téléphone (06/11/2026 : rangée
  * seulement dans Borne, on ne la trouvait pas), et le Juke-box (09/11/2026 : ses playlists se gèrent
- * depuis « Menu système > Juke-box », chemin donné par le médaillon de la roue). Elles gardent leur
+ * depuis « Menu système > Juke-box », chemin donné par le médaillon de la roue), et les Collections
+ * (10/11/2026 : sur une borne dont les MagnaSave ne répondent pas, Exit puis Collections). Elles gardent leur
  * place dans leur rubrique (Cyber Pinball > Activité récente, Médias > Juke-box, Tables >
  * Téléchargements, Borne > Télécommande du téléphone).
  */
-export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'jukebox', 'downloads', 'phone-remote'];
+export const SYSTEM_ROOT_SHORTCUTS: readonly SystemItemId[] = ['activity', 'collections', 'jukebox', 'downloads', 'phone-remote'];
 
 /**
  * La racine du menu système telle qu'elle s'affiche : Activité récente en tête (elle couvre
- * plusieurs rubriques), puis Amis, Tables, Médias, Juke-box, Téléchargements, Télécommande du
+ * plusieurs rubriques), Collections, puis Amis, Tables, Médias, Juke-box, Téléchargements, Télécommande du
  * téléphone, Borne, Cyber Pinball (ordre choisi le 29/10/2026, Juke-box ajouté le 09/11/2026). systemmenu.test.ts vérifie qu'elle reprend
  * SYSTEM_ROOT dans son ordre et chaque raccourci une fois.
  */
-export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['activity', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball'];
+export const SYSTEM_ROOT_ENTRIES: readonly SystemEntryId[] = ['activity', 'collections', 'amis', 'tables', 'medias', 'jukebox', 'downloads', 'phone-remote', 'borne', 'cyberpinball'];
 
 export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
   tables: {
@@ -128,7 +130,7 @@ export const SYSTEM_GROUPS: Readonly<Record<SystemGroupId, SystemGroup>> = {
     icon: 'cabinet',
     get label() { return t('Borne'); },
     get detail() { return t('Boutons, écrans, son, réglages de VPX, réalité virtuelle, vision 3D, télécommande du téléphone, bureau Windows, mode invité'); },
-    entries: ['health', 'cabinet', 'vpx-settings', 'vision3d', 'vr', 'vr-calibrate', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
+    entries: ['health', 'cabinet', 'vpx-settings', 'vision3d', 'vr', 'vr-calibrate', 'vr-controllers', 'controls', 'phone-remote', 'dof', 'desktop', 'explorer', 'dedicated', 'startup', 'guest-mode'],
   },
   cyberpinball: {
     id: 'cyberpinball',
@@ -176,6 +178,7 @@ export const SYSTEM_ITEMS: Readonly<Record<SystemItemId, SystemEntry>> = {
   vr: { icon: 'vr', get label() { return t('Réalité virtuelle'); } },
   // Caler la borne du casque et les tables de VPX sur la vraie barre avant, aux manettes (calage.ts).
   'vr-calibrate': { icon: 'layout', get label() { return t('Caler la borne'); } },
+  'vr-controllers': { icon: 'button', get label() { return t('Manettes du casque'); } },
   // La perspective des tables suit la tête du joueur (vision3d.ts) : webcam ou Kinect.
   vision3d: { icon: 'eye', get label() { return t('Vision 3D'); } },
   controls: { icon: 'gamepad', get label() { return t('Commandes de la borne'); } },

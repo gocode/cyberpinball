@@ -16,6 +16,12 @@ import {
   stepCollection,
   type Collection,
   type CollectionsPanel,
+  type CollectionsSettings,
+  type MyCollection,
+  addMyCollection,
+  renameMyCollection,
+  removeMyCollection,
+  setTableInMyCollection,
   t,
   tn,
   PANEL_BUDGET,
@@ -26,58 +32,218 @@ import {
 import type { Action, Built, ProvidedSystemItem, Row, Section } from './library';
 
 /**
- * Menu système > Tables > Collections : la même liste que les MagnaSave, à choisir aux flippers
- * et à Start. Une borne dont les MagnaSave ne sont pas relevés (boutons facultatifs de l'étape
- * « Boutons ») y change quand même de collection (PinCab, 06/11/2026). Une collection vide reste
- * dans la liste, grisée avec sa raison ; Start n'y fait rien.
+ * Menu système > Collections (à la racine, et dans Tables) : la même liste que les MagnaSave, à
+ * choisir aux flippers et à Start, pour une borne dont les MagnaSave ne répondent pas (PinCab,
+ * 06-10/11/2026). Une collection vide reste dans la liste, grisée avec sa raison ; Start n'y fait
+ * rien. En dessous : créer une collection personnelle, gérer les siennes, et choisir les boutons
+ * qui changent de collection sur la roue.
  */
 export function createCollectionsItem(host: {
   collections: CollectionsMenu;
-  library: { openCustom(build: () => Built, at?: number): void; openSystem(): void; leave(): void };
+  library: { openCustom(build: () => Built, at?: number): void; openSystem(): void; leave(): void; openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void };
+  /** Les boutons qui changent de collection, en clair (« MagnaSave gauche / droit », « Bouton 9 / 10 du joystick »), ou undefined : aucun. */
+  keysLabel(): string | undefined;
+  /** Choisir les boutons des collections : l'écran qui attend les deux appuis ; `back` y ramène. */
+  captureKeys(back: () => void): void;
 }): ProvidedSystemItem {
-  const open = () =>
-    host.library.openCustom(() => {
-      const back = () => host.library.openSystem();
-      const current = host.collections.current().id;
-      // Une ligne par collection, sous son intertitre (Fabricants, Décennies), reliée à son action :
-      // la liste se parcourt aux flippers, Start l'ouvre (comme « Jouer avec un ami »).
-      const actions: Action[] = [];
-      const sections: Section[] = [];
-      let group: string | undefined;
-      for (const c of host.collections.list()) {
-        if (c.group !== group || !sections.length) {
-          group = c.group;
-          sections.push({ ...(c.group === 'maker' ? { title: t('Fabricants') } : c.group === 'decade' ? { title: t('Décennies') } : {}), rows: [] });
-        }
-        const count = c.tables.length;
-        const index =
-          actions.push({
-            label: c.label,
-            key: `collection:${c.id}`,
-            run: () => {
-              if (!count) return;
-              host.collections.choose(c.id);
-              host.library.leave();
-            },
-          }) - 1;
-        const detail = count ? [tn(count, '{n} table', '{n} tables'), c.id === current ? t('affichée sur la roue') : undefined, c.detail].filter(Boolean).join(' · ') : (c.reason ?? '');
-        sections[sections.length - 1]!.rows.push({ text: c.label, detail, icon: c.icon as Row['icon'], tone: !count ? 'quiet' : c.id === current ? 'ok' : undefined, action: index, pick: true });
+  const lib = host.library;
+  const groupTitle = (g: string) => (g === 'mine' ? t('Mes collections') : g === 'maker' ? t('Fabricants') : g === 'decade' ? t('Décennies') : undefined);
+
+  function open(): void {
+    lib.openCustom(build, Math.max(0, host.collections.list().findIndex((c) => c.id === host.collections.current().id)));
+  }
+
+  function build(): Built {
+    const back = () => lib.openSystem();
+    const current = host.collections.current().id;
+    // Une ligne par collection, sous son intertitre, reliée à son action : la liste se parcourt aux
+    // flippers, Start l'affiche sur la roue (comme « Jouer avec un ami »).
+    const actions: Action[] = [];
+    const sections: Section[] = [];
+    let group: string | undefined;
+    for (const c of host.collections.list()) {
+      if (c.group !== group || !sections.length) {
+        group = c.group;
+        const title = groupTitle(c.group);
+        sections.push({ ...(title ? { title } : {}), rows: [] });
       }
-      actions.push({ label: t('Retour'), icon: 'back', run: back });
+      const count = c.tables.length;
+      const index =
+        actions.push({
+          label: c.label,
+          key: `collection:${c.id}`,
+          run: () => {
+            if (!count) return;
+            host.collections.choose(c.id);
+            lib.leave();
+          },
+        }) - 1;
+      const detail = count ? [tn(count, '{n} table', '{n} tables'), c.id === current ? t('affichée sur la roue') : undefined, c.detail].filter(Boolean).join(' · ') : (c.reason ?? '');
+      sections[sections.length - 1]!.rows.push({ text: c.label, detail, icon: c.icon as Row['icon'], tone: !count ? 'quiet' : c.id === current ? 'ok' : undefined, action: index, pick: true });
+    }
+    const reopen = () => lib.openCustom(build);
+    actions.push({
+      label: t('Nouvelle collection…'),
+      detail: t('Un nom, puis « Ajouter à une collection… » sur la fiche de chaque table'),
+      icon: 'plus',
+      run: () =>
+        lib.openPrompt(t('Nouvelle collection'), t('Nom de la collection'), '', (name) => {
+          if (name !== undefined) host.collections.addMine(name);
+          reopen();
+        }),
+    });
+    if (host.collections.mine().length) actions.push({ label: t('Gérer mes collections…'), detail: t('Renommer, supprimer'), icon: 'edit', run: () => openManage(reopen) });
+    const keys = host.keysLabel();
+    actions.push({
+      label: t('Boutons des collections'),
+      detail: keys ? t('{keys} sur la roue · Start pour en choisir d’autres', { keys }) : t('Aucun bouton pour l’instant : Start pour en choisir deux'),
+      tone: keys ? undefined : 'warning',
+      icon: 'button',
+      run: () => host.captureKeys(reopen),
+    });
+    actions.push({ label: t('Retour'), icon: 'back', run: back });
+    return {
+      heading: t('Collections'),
+      icon: 'star',
+      lead: t('La roue ne montre que les tables de la collection choisie. Start l’affiche ; sur la roue, les boutons des collections passent de l’une à l’autre.'),
+      sections,
+      actions,
+      back,
+    };
+  }
+
+  /** Mes collections : une ligne chacune ; Start ouvre ce qu'on peut en faire. */
+  function openManage(up: () => void): void {
+    const build = (): Built => {
+      const actions: Action[] = [];
+      const rows: Row[] = host.collections.mine().map((m) => {
+        const index = actions.push({ label: m.name, key: `mine:${m.id}`, run: () => openOne(m.id, () => lib.openCustom(build)) }) - 1;
+        return { text: m.name, detail: tn(m.tables.length, '{n} table', '{n} tables'), icon: 'list', action: index, pick: true };
+      });
+      actions.push({ label: t('Retour'), icon: 'back', run: up });
+      return { heading: t('Mes collections'), icon: 'list', sections: [{ rows }], actions, back: up };
+    };
+    lib.openCustom(build);
+  }
+
+  function openOne(id: string, up: () => void): void {
+    const build = (): Built => {
+      const m = host.collections.mine().find((x) => x.id === id);
+      if (!m) return { heading: t('Mes collections'), sections: [], actions: [{ label: t('Retour'), icon: 'back', run: up }], back: up };
       return {
-        heading: t('Collections'),
-        icon: 'star',
-        lead: t('La roue ne montre que les tables de la collection choisie. Sur la roue, les MagnaSave passent aussi d’une collection à l’autre.'),
-        sections,
-        actions,
-        back,
+        heading: m.name,
+        icon: 'list',
+        subheading: tn(m.tables.length, '{n} table', '{n} tables'),
+        sections: [],
+        actions: [
+          { label: t('Afficher sur la roue'), icon: 'play', run: () => (host.collections.choose(m.id) ? lib.leave() : undefined), ...(m.tables.length ? {} : { tone: 'quiet' as const, detail: t('Vide : sur la fiche d’une table, « Ajouter à une collection… »') }) },
+          {
+            label: t('Renommer'),
+            icon: 'edit',
+            run: () =>
+              lib.openPrompt(t('Renommer la collection'), t('Nom de la collection'), m.name, (name) => {
+                if (name !== undefined) host.collections.renameMine(m.id, name);
+                lib.openCustom(build);
+              }),
+          },
+          {
+            label: t('Supprimer la collection'),
+            detail: t('Les tables restent sur la borne'),
+            tone: 'error',
+            icon: 'trash',
+            run: () =>
+              lib.openCustom(() => ({
+                heading: t('Supprimer « {name} » ?', { name: m.name }),
+                icon: 'trash',
+                lead: t('La collection disparaît ; ses tables restent sur la borne et dans les autres collections.'),
+                sections: [],
+                actions: [
+                  {
+                    label: t('Supprimer'),
+                    tone: 'error',
+                    icon: 'trash',
+                    run: () => {
+                      host.collections.removeMine(m.id);
+                      up();
+                    },
+                  },
+                  { label: t('Annuler'), icon: 'back', run: () => lib.openCustom(build) },
+                ],
+                back: () => lib.openCustom(build),
+              })),
+          },
+          { label: t('Retour'), icon: 'back', run: up },
+        ],
+        back: up,
       };
-    }, Math.max(0, host.collections.list().findIndex((c) => c.id === host.collections.current().id)));
+    };
+    lib.openCustom(build);
+  }
+
   return {
     get detail() {
       return t('Affichée : {collection}', { collection: host.collections.current().label });
     },
     run: open,
+  };
+}
+
+/**
+ * Fiche d'une table : « Ajouter à une collection… », ses collections personnelles cochées ou non
+ * (Start met la table dedans ou l'en retire), et « Nouvelle collection… » qui la crée avec elle.
+ */
+export function tableCollectionsAction(host: {
+  collections: CollectionsMenu;
+  library: { openCustom(build: () => Built, at?: number): void; openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void };
+  redraw(): void;
+}): (table: TableEntry, back: () => void) => Action {
+  const lib = host.library;
+  return (table, back) => {
+    const inside = host.collections.mine().filter((m) => host.collections.holds(m.id, table));
+    return {
+      label: t('Ajouter à une collection…'),
+      detail: inside.length ? t('Dans : {names}', { names: inside.map((m) => m.name).join(', ') }) : t('Vos collections personnelles'),
+      icon: 'list',
+      key: 'collections',
+      run: () => {
+        const build = (): Built => {
+          const actions: Action[] = [];
+          const rows: Row[] = host.collections.mine().map((m) => {
+            const on = host.collections.holds(m.id, table);
+            const index =
+              actions.push({
+                label: m.name,
+                key: `mine:${m.id}`,
+                run: () => {
+                  host.collections.setTable(m.id, table, !on);
+                  host.redraw();
+                },
+              }) - 1;
+            return { text: m.name, detail: on ? t('Dans cette collection · Start pour l’en retirer') : t('Start pour l’y ajouter'), icon: on ? 'check' : 'list', tone: on ? 'ok' : undefined, action: index, pick: true };
+          });
+          actions.push({
+            label: t('Nouvelle collection…'),
+            detail: t('Créée avec cette table'),
+            icon: 'plus',
+            run: () =>
+              lib.openPrompt(t('Nouvelle collection'), t('Nom de la collection'), '', (name) => {
+                if (name !== undefined) host.collections.addMine(name, table);
+                lib.openCustom(build);
+              }),
+          });
+          actions.push({ label: t('Retour à la fiche'), icon: 'back', run: back });
+          return {
+            heading: t('Ajouter à une collection'),
+            icon: 'list',
+            subheading: table.title,
+            sections: rows.length ? [{ title: t('Mes collections'), rows }] : [{ rows: [{ text: t('Aucune collection personnelle'), detail: t('« Nouvelle collection… » en crée une, avec cette table'), tone: 'info' }] }],
+            actions,
+            back,
+          };
+        };
+        lib.openCustom(build);
+      },
+    };
   };
 }
 
@@ -125,6 +291,18 @@ export interface CollectionsMenu {
   start(): void;
   /** Les tables ou leurs .info ont changé (ajout, favori, partie jouée) : tout se recalcule. */
   invalidate(): void;
+  /** Mes collections, dans l'ordre de leur création. */
+  mine(): readonly MyCollection[];
+  /** La table est-elle dans cette collection personnelle ? */
+  holds(id: string, table: TableEntry): boolean;
+  /** Nouvelle collection personnelle (avec une première table) ; undefined : nom vide. */
+  addMine(name: string, table?: TableEntry): string | undefined;
+  renameMine(id: string, name: string): void;
+  removeMine(id: string): void;
+  setTable(id: string, table: TableEntry, on: boolean): void;
+  /** Boutons choisis pour changer de collection ; undefined : les MagnaSave. */
+  keys(): { previous?: string; next?: string } | undefined;
+  setKeys(keys: { previous: string; next: string } | undefined): void;
   /** Ce que le playfield dessine : le repère, et la liste quand elle est montrée. */
   view(layout: keyof typeof PANEL_BUDGET, panel?: boolean): { shelf: ShelfView; collections?: CollectionsPanel & { leaving?: boolean } };
   /** Un flipper : la liste des collections se ferme aussitôt. */
@@ -134,7 +312,21 @@ export interface CollectionsMenu {
 
 export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
   const now = () => host.now?.() ?? Date.now();
-  let active = loadCollections(host.dataDir).active as string;
+  let settings: CollectionsSettings = loadCollections(host.dataDir);
+  let active = settings.active as string;
+  /** Le réglage changé : gardé, et la liste refaite. */
+  function save(next: CollectionsSettings, why: string): void {
+    settings = next;
+    active = next.active;
+    cache = undefined;
+    try {
+      saveCollections(host.dataDir, settings);
+    } catch (error) {
+      console.log(`Collections : réglage non enregistré (${(error as Error).message}).`);
+    }
+    console.log(`Collections (réglage) : ${why}.`); // i18n-ignore : journal
+    host.redraw();
+  }
   const memory = new ShelfMemory();
   let cache: { tables: readonly TableEntry[]; list: Collection<TableEntry>[] } | undefined;
   let friendsCache: { at: number; tables: readonly TableEntry[]; value: FriendsShelf } | undefined;
@@ -156,7 +348,7 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
     if (cache && friendsCache && now() - friendsCache.at >= FRIENDS_CACHE_MS) cache = undefined;
     if (cache?.tables !== tables) {
       const f = friends(tables);
-      cache = { tables, list: buildCollections(tables, f ? { friends: f } : {}) };
+      cache = { tables, list: buildCollections(tables, { ...(f ? { friends: f } : {}), mine: settings.mine }) };
     }
     return cache.list;
   }
@@ -203,8 +395,9 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
     }
     remember();
     active = next.id;
+    settings = { ...settings, active: next.id };
     try {
-      saveCollections(host.dataDir, { active: next.id });
+      saveCollections(host.dataDir, settings);
     } catch (error) {
       console.log(`Collections : réglage non enregistré (${(error as Error).message}).`);
     }
@@ -237,6 +430,21 @@ export function createCollectionsMenu(host: CollectionsHost): CollectionsMenu {
       return c.id === id && c.tables.length > 0 && open(c);
     },
     locked: () => Boolean(host.guestCollection()),
+    mine: () => settings.mine,
+    holds: (id, table) => Boolean(settings.mine.find((m) => m.id === id)?.tables.some((x) => x.toLowerCase() === table.id.toLowerCase())),
+    addMine(name, table) {
+      const made = addMyCollection(settings, name, table?.id);
+      if (made.id) save(made.settings, `nouvelle collection ${made.id}${table ? ` avec ${table.id}` : ''}`); // i18n-ignore : journal
+      return made.id;
+    },
+    renameMine: (id, name) => save(renameMyCollection(settings, id, name), `${id} renommée`), // i18n-ignore : journal
+    removeMine: (id) => save(removeMyCollection(settings, id), `${id} supprimée`), // i18n-ignore : journal
+    setTable: (id, table, on) => save(setTableInMyCollection(settings, id, table.id, on), `${table.id} ${on ? 'ajoutée à' : 'retirée de'} ${id}`), // i18n-ignore : journal
+    keys: () => settings.keys,
+    setKeys(keys) {
+      const { keys: _old, ...rest } = settings;
+      save(keys ? { ...rest, keys } : rest, keys ? 'boutons choisis' : 'boutons : les MagnaSave'); // i18n-ignore : journal
+    },
     start() {
       const c = current();
       const table = c.tables[host.startIndex(c.tables)];

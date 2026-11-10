@@ -8,7 +8,7 @@ export * from './vpxwindows';
 export * from './vr';
 export * from './vision3d';
 export * from './casque';
-export { headsetControls, vpxHeadsetInput, VPX_HEADSET_MAPPINGS, VPX_OPENXR, type HeadsetControl, type HeadsetMenuAction } from './manettes';
+export * from './manettes';
 export * from './casque-scene';
 export * from './sync';
 export * from './gameorientation';

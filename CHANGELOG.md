@@ -69,6 +69,8 @@ son interface).
 - Au bureau, la tête de la borne dans le casque a les proportions d'une vraie : fronton un peu plus large que le plateau, petit topper posé dessus, DMD de moitié moins large centré dessous.
 - Dans le casque, le plateau de la partie tombe exactement sur celui du menu, partout, vraie borne comprise : même place, même hauteur, même largeur.
 - Dans le menu de VPX en partie, les joysticks des manettes réagissent sans être poussés à fond.
+- Assistant des manettes du casque : il s'ouvre au premier port d'un casque, propose les boutons par défaut de ses manettes (Touch, Index, Vive, Windows Mixed Reality), puis permet de choisir chaque bouton un par un. Réglage gardé par casque et par configuration, appliqué au menu comme en partie ; rouvrable par ≡ > « Manettes » ou Menu système > Borne.
+- En partie dans le casque, B met en pause et reprend ; seul ≡ ouvre le menu de VPX.
 
 ## 0.1.8
 

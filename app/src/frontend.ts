@@ -37,7 +37,6 @@ import {
   navigationProblems,
   type ButtonsSource,
   type HeadsetSource,
-  HEADSET_BUTTONS,
   language,
   calibrateMenuText,
   calibrationSetting,
@@ -53,6 +52,14 @@ import {
   lockbarPlace,
   lockbarVpxSettings,
   headsetControls,
+  headsetFunctions,
+  menuActionOf,
+  parseControllerEvent,
+  readControllerSetting,
+  controllerProblem,
+  controllerSettingFileName,
+  CONTROLLER_ELEMENTS,
+  HEADSET_PROFILES,
   roomToCabinet,
   vpxHeadsetInput,
   vpxPlaceProblem,
@@ -63,7 +70,8 @@ import {
   type CalibrationSetting,
   type CalibrationStep,
   type Point3,
-  type HeadsetButton,
+  type ControllerSetting,
+  type HeadsetProfile,
   vrCenterKey,
   vrHasSavedPlace,
   type NavigationButtons,
@@ -291,7 +299,7 @@ import { freezeWrites } from './write-freeze';
 import { listDrives } from './file-picker';
 import { createUpdatesMenu } from './updates-menu';
 import { createGuestMenu } from './guest-menu';
-import { createCollectionsItem, createCollectionsMenu } from './collections-menu';
+import { createCollectionsItem, createCollectionsMenu, tableCollectionsAction } from './collections-menu';
 import { createFriendsMenu } from './friends-menu';
 import { createFirewallRule } from './firewall-rule';
 import { guardFirewall } from './firewall-guard';
@@ -805,6 +813,10 @@ function playfieldLandscape(): boolean {
 
 /** Touches des MagnaSave au menu des tables : collection précédente (gauche), suivante (droite) ; jamais un bouton de l'interface. */
 function collectionKeys(): { previous: string[]; next: string[] } {
+  // Boutons choisis dans Menu système > Collections : ils passent avant les MagnaSave.
+  const nav = [...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit];
+  const chosen = collections.keys();
+  if (chosen?.previous && chosen.next && !nav.includes(chosen.previous) && !nav.includes(chosen.next)) return { previous: [chosen.previous], next: [chosen.next] };
   const keys = buttonKeys(buttons);
   const taken = new Set([...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit, ...KEYS.help, ...KEYS.settings, ...Object.values(keys).filter(Boolean)]);
   // MagnaSave relevé ; sinon (bouton facultatif passé à l'étape « Boutons ») sa touche par défaut
@@ -813,11 +825,83 @@ function collectionKeys(): { previous: string[]; next: string[] } {
   return { previous: own(keys.leftMagna, 'ControlLeft'), next: own(keys.rightMagna, 'ControlRight') };
 }
 
+/**
+ * « Boutons des collections » (Menu système > Collections) : l'écran attend deux appuis, la
+ * collection précédente puis la suivante ; n'importe quel bouton de la borne ou touche du clavier,
+ * sauf les flippers, Start et Exit (ils restent à cet écran : choisir « Remettre les MagnaSave »,
+ * revenir). Une borne dont les MagnaSave ne répondent pas y choisit les siens (PinCab, 10/11/2026).
+ */
+let collectionCapture: { previous?: string; refused?: string; back: () => void } | undefined;
+
+function startCollectionCapture(back: () => void): void {
+  collectionCapture = { back };
+  const done = () => {
+    collectionCapture = undefined;
+    back();
+  };
+  library.openCustom(() => {
+    const c = collectionCapture;
+    const chosen = collections.keys();
+    return {
+      heading: t('Boutons des collections'),
+      icon: 'button',
+      lead: !c ? '' : c.previous ? t('Appuyez maintenant sur le bouton de la collection suivante.') : t('Appuyez sur le bouton qui affichera la collection précédente, sur la roue.'),
+      sections: [
+        {
+          rows: [
+            { text: t('Collection précédente'), detail: c?.previous ? keyLabel(c.previous) : t('en attente d’un appui'), icon: 'chevron-left', tone: c?.previous ? 'ok' : 'info' },
+            { text: t('Collection suivante'), detail: c?.previous ? t('en attente d’un appui') : '—', icon: 'chevron-right', tone: 'info' },
+            ...(c?.refused ? [{ text: c.refused, tone: 'warning' as const, icon: 'alert' as const }] : []),
+            { text: t('Les flippers, Start et Exit restent à cet écran : ils ne peuvent pas changer de collection.'), tone: 'quiet' as const },
+          ],
+        },
+      ],
+      actions: [
+        ...(chosen
+          ? [
+              {
+                label: t('Remettre les MagnaSave'),
+                detail: t('Les boutons choisis sont oubliés'),
+                icon: 'restore' as const,
+                run: () => {
+                  collections.setKeys(undefined);
+                  done();
+                },
+              },
+            ]
+          : []),
+        { label: t('Annuler'), icon: 'back', run: done },
+      ],
+      back: done,
+    };
+  });
+}
+
+/** Un appui pendant le choix des boutons des collections : true s'il a été pris. */
+function captureCollectionKey(input: Input): boolean {
+  const c = collectionCapture;
+  if (!c || state.phase !== 'library' || input.isAutoRepeat) return false;
+  if ([...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit].includes(input.code)) return false;
+  // Modificateurs seuls d'un clavier (Maj, Ctrl, Alt) : acceptés, ce sont les MagnaSave d'un encodeur.
+  if (c.previous && input.code === c.previous) {
+    collectionCapture = { ...c, refused: t('{key} est déjà la collection précédente : un autre bouton.', { key: keyLabel(input.code) }) };
+  } else if (!c.previous) {
+    collectionCapture = { back: c.back, previous: input.code };
+  } else {
+    collections.setKeys({ previous: c.previous, next: input.code });
+    console.log(`Touches des collections : choisies, ${keyLabel(c.previous)} / ${keyLabel(input.code)}.`); // i18n-ignore : journal
+    collectionCapture = undefined;
+    c.back();
+  }
+  broadcast();
+  return true;
+}
+
 /** Au démarrage, dans le journal : les touches qui changent de collection (une borne où rien ne répond s'explique). */
 function logCollectionKeys(): void {
   const keys = collectionKeys();
   const name = (codes: string[]) => (codes.length ? codes.map(keyLabel).join(', ') : 'aucune'); // i18n-ignore : journal
-  console.log(`Touches des collections : MagnaSave gauche → ${name(keys.previous)}, droit → ${name(keys.next)} ; aussi Menu système > Tables > Collections.`); // i18n-ignore : journal
+  console.log(`Touches des collections : MagnaSave gauche → ${name(keys.previous)}, droit → ${name(keys.next)} ; aussi Menu système > Collections.`); // i18n-ignore : journal
 }
 
 /** MagnaSave ou clic sur le repère : la collection voisine (ou celle cliquée dans la liste). Mode invité restreint : le cadenas. */
@@ -878,6 +962,8 @@ const library = createLibrary({
   hidePlayer: (key) => socialNet.hidePlayer(key),
   // « Ajouter aux favoris » sur la fiche : User.Favorite du .info (celui de la table, sinon celui du dossier).
   menuDmd: { detail: (table) => menuDmd.detail(table), open: (table, back) => menuDmd.open(table, back) },
+  // « Ajouter à une collection… » sur la fiche (library, créée plus bas, n'est lue qu'à l'appel).
+  tableCollections: (table, back) => tableCollectionsAction({ collections, library, redraw: () => broadcast() })(table, back),
   favorite: (table, on) => {
     if (!loc.root) return;
     setFavorite(infoFileFor(table, layoutOf(loc.root).tables), on);
@@ -1114,44 +1200,199 @@ function headsetKey(b: RemoteButton, down: boolean, repeat: boolean): void {
   else handleKeyUp(input);
 }
 
-/** Boutons des manettes du casque tenus (casque.ts) ; les flippers se répètent comme ceux de la borne. */
-const headsetHolds = new Map<HeadsetButton, NodeJS.Timeout | undefined>();
+/** Boutons des manettes du casque tenus (casque.ts), et ce qu'ils tiennent ; les flippers se répètent comme ceux de la borne. */
+const headsetHolds = new Map<string, { b: RemoteButton; timer?: NodeJS.Timeout }>();
 const HEADSET_REPEAT_DELAY_MS = 400;
 const HEADSET_REPEAT_MS = 70;
 
 /**
- * Manettes du casque, une seule règle (manettes.ts) : gâchettes et joysticks = précédent / suivant
- * (répétés tant qu'on les tient), A = valider, B = retour, ≡ de la manette gauche = le menu du
- * casque. Chaque bouton tient au menu celui de la borne, par le même chemin que les boutons de la
- * borne : ni le téléphone ni sa combinaison n'y entrent.
+ * Manettes du casque, une seule règle au menu et en partie (manettes.ts), d'après le réglage du casque
+ * branché (controllerSetting) : flippers = précédent / suivant, joysticks et pavés = déplacer la
+ * sélection (répétés tant qu'on les tient), valider, retour, menu du casque, crédit = collection
+ * suivante. Chaque bouton tient au menu celui de la borne, par le même chemin que les boutons de la
+ * borne : ni le téléphone ni sa combinaison n'y entrent. L'assistant des manettes les prend avant tout.
  */
-function headsetButton(name: HeadsetButton, down: boolean): void {
-  const action = HEADSET_BUTTONS[name];
-  if (action === 'headset-menu') return void (down && openHeadsetMenu());
-  const b = action;
-  const held = headsetHolds.has(name);
-  clearTimeout(headsetHolds.get(name));
-  headsetHolds.delete(name);
-  if (!down) {
-    if (held) headsetKey(b, false, false);
+function headsetButton(name: string, down: boolean): void {
+  if (controllerWizard) {
+    if (down) wizardButton(name);
     return;
   }
+  const held = headsetHolds.get(name);
+  if (held) {
+    clearTimeout(held.timer);
+    headsetHolds.delete(name);
+    if (!down) headsetKey(held.b, false, false);
+  }
+  if (!down) return;
+  const action = menuActionOf(controllerSetting(), name);
+  if (!action) return;
+  if (action === 'headset-menu') return void openHeadsetMenu();
+  const b = action;
   headsetKey(b, true, false);
-  if (b !== 'previous' && b !== 'next') return void headsetHolds.set(name, undefined);
+  if (b !== 'previous' && b !== 'next') return void headsetHolds.set(name, { b });
   const again = (wait: number) =>
-    headsetHolds.set(
-      name,
-      setTimeout(() => {
+    headsetHolds.set(name, {
+      b,
+      timer: setTimeout(() => {
         headsetKey(b, true, true);
         again(HEADSET_REPEAT_MS);
       }, wait),
-    );
+    });
   again(HEADSET_REPEAT_DELAY_MS);
 }
 
 /** Casque retiré, menu de Meta ouvert ou compagnon parti : plus aucun bouton des manettes n'est tenu. */
 function releaseHeadsetButtons(): void {
   for (const name of [...headsetHolds.keys()]) headsetButton(name, false);
+}
+
+/** Fichier du réglage des manettes d'un casque, pour la configuration active (un réglage par casque et par configuration). */
+function controllerFile(profile: HeadsetProfile): string {
+  return path.join(loc.dataDir, 'vr', controllerSettingFileName(menuConfiguration, profile));
+}
+
+/** Réglage des manettes du casque branché (le défaut de son profil sans réglage gardé ; Touch sans casque connu). */
+function controllerSetting(): ControllerSetting {
+  const profile = headset?.profile ?? 'touch';
+  return readControllerSetting(readTextIfExists(controllerFile(profile)) || undefined, profile);
+}
+
+/** Assistant des manettes en cours : présentation, une fonction après l'autre, puis le résumé. */
+let controllerWizard:
+  | { profile: HeadsetProfile; phase: 'intro' | 'step' | 'summary'; index: number; functions: ControllerSetting['functions']; problem?: string; back: 'menu' | 'system' }
+  | undefined;
+/** Assistant déjà proposé d'office pendant cette session. */
+let controllerOffered = false;
+
+/** Assistant proposé d'office : casque porté sans réglage des manettes gardé pour cette configuration. */
+function offerControllerWizard(): void {
+  const profile = headset?.profile;
+  if (controllerOffered || !profile || !headset?.worn || fs.existsSync(controllerFile(profile))) return;
+  controllerOffered = true;
+  console.log(`Casque : manettes ${profile} sans réglage pour cette configuration ; assistant des manettes proposé d'office.`); // i18n-ignore : journal
+  openControllerWizard();
+}
+
+/**
+ * Assistant des manettes (comme l'étape « Lanceur » de la borne) : le réglage proposé pour ces
+ * manettes, gardé tel quel ou refait fonction par fonction, en appuyant sur le bouton voulu.
+ */
+function openControllerWizard(): void {
+  const profile = headset?.profile;
+  if (!profile || controllerWizard || calibration || playing || launch || !headset?.worn) return;
+  controllerWizard = { profile, phase: 'intro', index: 0, functions: { ...controllerSetting().functions }, back: state.phase === 'menu' ? 'menu' : 'system' };
+  releaseHeadsetButtons();
+  console.log(`Casque : assistant des manettes ouvert (${profile}).`); // i18n-ignore : journal
+  showControllerWizard();
+}
+
+function elementLabel(el: string | undefined): string {
+  return el && el in CONTROLLER_ELEMENTS ? CONTROLLER_ELEMENTS[el as keyof typeof CONTROLLER_ELEMENTS].label : '—';
+}
+
+/** L'écran de l'assistant, à l'étape où il en est. */
+function showControllerWizard(): void {
+  const w = controllerWizard;
+  if (!w) return;
+  const list = headsetFunctions();
+  const table = list.map((f) => t('{fonction} : {bouton}', { fonction: f.label, bouton: elementLabel(w.functions[f.id]) }));
+  let lines: string[];
+  if (w.phase === 'intro')
+    lines = [
+      t('{casque} : voici les boutons proposés.', { casque: HEADSET_PROFILES[w.profile].label }),
+      ...table,
+      t('{valider} : garder ces boutons · {retour} : les régler un par un', { valider: elementLabel(w.functions.valider), retour: elementLabel(w.functions.retour) }),
+    ];
+  else if (w.phase === 'step') {
+    const f = list[w.index]!;
+    const back = w.functions.retour;
+    lines = [
+      t('Étape {n} sur {total} : {fonction}', { n: w.index + 1, total: list.length, fonction: f.label }),
+      f.id === 'lanceur' ? t('Tirez vers vous le joystick ou le pavé voulu.') : f.axis ? t('Poussez le joystick ou le pavé voulu.') : t('Appuyez sur le bouton voulu.'),
+      ...(w.problem ? [w.problem] : []),
+      ...(back && f.id !== 'retour' ? [f.optional ? t('{retour} : passer (facultatif)', { retour: elementLabel(back) }) : t('{retour} : étape précédente', { retour: elementLabel(back) })] : []),
+    ];
+  } else
+    lines = [
+      ...table,
+      ...(w.problem ? [w.problem] : []),
+      t('{valider} : garder · {retour} : recommencer', { valider: elementLabel(w.functions.valider), retour: elementLabel(w.functions.retour) }),
+    ];
+  state = { ...state, phase: 'message', help: false, message: { title: t('Manettes du casque'), lines } };
+  broadcast();
+}
+
+/** Un bouton appuyé pendant l'assistant : garder, recommencer, ou le bouton de la fonction demandée. */
+function wizardButton(name: string): void {
+  const w = controllerWizard;
+  const parsed = parseControllerEvent(name);
+  if (!w || !parsed || !CONTROLLER_ELEMENTS[parsed.element].profiles.includes(w.profile)) return;
+  const el = parsed.element;
+  const list = headsetFunctions();
+  if (w.phase === 'intro' || w.phase === 'summary') {
+    if (el === w.functions.valider) {
+      const problem = controllerProblem({ profile: w.profile, functions: w.functions });
+      if (problem) {
+        w.problem = problem;
+        return showControllerWizard();
+      }
+      return closeControllerWizard(true);
+    }
+    if (el === w.functions.retour) {
+      w.phase = 'step';
+      w.index = 0;
+      w.functions = {};
+      w.problem = undefined;
+      return showControllerWizard();
+    }
+    return;
+  }
+  const f = list[w.index]!;
+  // Le bouton de retour, une fois choisi : passer une fonction facultative, sinon revenir d'une étape.
+  if (w.functions.retour && el === w.functions.retour && f.id !== 'retour') {
+    w.problem = undefined;
+    if (f.optional) {
+      delete w.functions[f.id];
+      w.index++;
+    } else if (w.index > 0) {
+      w.index--;
+      delete w.functions[list[w.index]!.id];
+    }
+  } else if (Boolean(f.axis) !== Boolean(parsed.direction)) {
+    w.problem = f.axis ? t('Il faut un joystick ou un pavé.') : t('Il faut un bouton.');
+  } else {
+    const other = list.find((x) => x.id !== f.id && w.functions[x.id] === el);
+    if (other) w.problem = t('{bouton} sert déjà à {fonction}', { bouton: elementLabel(el), fonction: other.label });
+    else {
+      w.functions[f.id] = el;
+      w.problem = undefined;
+      w.index++;
+    }
+  }
+  if (w.index >= list.length) w.phase = 'summary';
+  showControllerWizard();
+}
+
+/** Fin de l'assistant : le réglage gardé (fichier par casque et configuration), appliqué au menu et aux parties. */
+function closeControllerWizard(keep: boolean): void {
+  const w = controllerWizard;
+  if (!w) return;
+  controllerWizard = undefined;
+  if (keep) {
+    const setting: ControllerSetting = { profile: w.profile, functions: w.functions };
+    try {
+      fs.mkdirSync(path.dirname(controllerFile(w.profile)), { recursive: true });
+      fs.writeFileSync(controllerFile(w.profile), JSON.stringify(setting, null, 2) + '\n');
+    } catch (error) {
+      console.warn(`Casque : réglage des manettes pas gardé (${(error as Error).message}).`); // i18n-ignore : journal
+    }
+    console.log(`Casque : manettes réglées (${w.profile}, ${menuConfiguration ?? 'configuration unique'}) : ${Object.entries(w.functions).map(([f, el]) => `${f}=${el}`).join(', ')}.`); // i18n-ignore : journal
+  } else console.log('Casque : assistant des manettes annulé.'); // i18n-ignore : journal
+  if (w.back === 'menu') {
+    state = { ...state, phase: 'menu', message: undefined };
+    broadcast();
+  } else library.openSystem();
+  if (headset?.worn && !isCalibrated(headset.place())) offerCalibration();
 }
 
 /** Bandeau du menu pendant un envoi du téléphone. */
@@ -1468,7 +1709,18 @@ library.provideSystemItem('relaunch', {
   run: () => relaunchMenu(),
 });
 // Collections de la roue : aussi au menu système, pour une borne dont les MagnaSave ne répondent pas.
-library.provideSystemItem('collections', createCollectionsItem({ collections, library }));
+library.provideSystemItem(
+  'collections',
+  createCollectionsItem({
+    collections,
+    library,
+    keysLabel: () => {
+      const keys = collectionKeys();
+      return keys.previous.length && keys.next.length ? `${keyLabel(keys.previous[0]!)} / ${keyLabel(keys.next[0]!)}` : undefined;
+    },
+    captureKeys: (back) => startCollectionCapture(back),
+  }),
+);
 // Mode invité : on joue, rien d'autre ; l'écran de l'entrée dit la combinaison qui déverrouille.
 library.provideSystemItem('guest-mode', createGuestMenu({
   collections: () => ({ choices: collections.list().filter((c) => c.tables.length).map((c) => ({ id: c.id, label: c.label, count: c.tables.length })), active: collections.current().id }), library, guest, buttons: () => buttons }));
@@ -2172,6 +2424,21 @@ library.provideSystemItem('vr-calibrate', {
   run: () => (calibrateUnavailable() ? library.openSystem() : openCalibration()),
 });
 
+// « Manettes du casque » (Menu système > Borne, après « Caler la borne ») : l'assistant des manettes,
+// grisé avec sa raison tant que le menu n'est pas dans le casque ou que les manettes ne sont pas connues.
+library.provideSystemItem('vr-controllers', {
+  get detail() {
+    if (calibrateUnavailable()) return calibrateMenuText({ vrReady: probeVr().ready, headset: headset?.state }).detail;
+    const profile = headset?.profile;
+    if (!profile) return t('Manettes pas encore reconnues : prenez-les en main, casque porté');
+    return t('{casque} · {etat} · Dans le casque : ≡ > « Manettes »', { casque: HEADSET_PROFILES[profile].label, etat: fs.existsSync(controllerFile(profile)) ? t('boutons réglés') : t('boutons proposés par défaut') });
+  },
+  get tone() {
+    return calibrateUnavailable() || !headset?.profile ? ('quiet' as const) : undefined;
+  },
+  run: () => (calibrateUnavailable() || !headset?.profile ? library.openSystem() : openControllerWizard()),
+});
+
 /** Le chemin de casque.json : la place de la borne du casque, seule pose de la borne (menu et parties). */
 function headsetPlaceFile(): string {
   // Un calage par configuration : le bureau et la borne n'ont ni la même pièce ni la même limite du Quest.
@@ -2197,7 +2464,7 @@ let calibrationOffered = false;
  * l'écran du moment, qui revient tel quel (library.interrupt). En partie, ≡ ouvre le menu de VPX.
  */
 function openHeadsetMenu(): void {
-  if (calibration || playing || launch || !headset?.worn) return;
+  if (calibration || controllerWizard || playing || launch || !headset?.worn) return;
   if (state.phase !== 'menu' && state.phase !== 'library') return;
   const opened = library.interrupt((back) => {
     const build = () => ({
@@ -2205,8 +2472,8 @@ function openHeadsetMenu(): void {
       icon: 'vr' as const,
       lead: t('Les mêmes boutons partout : A valide, B revient, les joysticks déplacent la sélection.'),
       sections: [
-        { title: t('Au menu'), rows: headsetControls().filter((c) => c.menu).map((c) => ({ text: c.label, detail: c.menu })) },
-        { title: t('En partie'), rows: headsetControls().filter((c) => c.game).map((c) => ({ text: c.label, detail: c.game })) },
+        { title: t('Au menu'), rows: headsetControls(controllerSetting()).filter((c) => c.menu).map((c) => ({ text: c.label, detail: c.menu })) },
+        { title: t('En partie'), rows: headsetControls(controllerSetting()).map((c) => ({ text: c.label, detail: c.game })) },
       ],
       actions: [
         { label: t('Caler la borne'), icon: 'layout' as const, detail: calibrateMenuText({ vrReady: probeVr().ready, headset: headset?.state, place: headset?.place(), setting: headsetSetting() }).detail.split(' · ')[0], run: () => {
@@ -2217,6 +2484,10 @@ function openHeadsetMenu(): void {
           console.log('Casque : recentrage demandé au menu du casque.'); // i18n-ignore : journal
           headset?.recenter();
           back();
+        } },
+        { label: t('Manettes'), icon: 'gamepad' as const, detail: t('Régler les boutons de ces manettes, un par un'), run: () => {
+          back();
+          openControllerWizard();
         } },
         { label: t('Retour'), icon: 'back' as const, run: back },
       ],
@@ -2269,7 +2540,7 @@ function headInGame(head: HeadPose): void {
 
 /** Calage proposé d'office dans le casque : borne pas calée, ou limite du Quest changée (`again`). */
 function offerCalibration(again = false): void {
-  if ((calibrationOffered && !again) || calibration || playing || launch || calibrateUnavailable() || !headset?.worn) return;
+  if ((calibrationOffered && !again) || calibration || controllerWizard || playing || launch || calibrateUnavailable() || !headset?.worn) return;
   calibrationOffered = true;
   console.log(`Casque : calage de la borne proposé d'office (${again ? 'limite du Quest changée' : 'borne pas encore calée'}).`); // i18n-ignore : journal
   openCalibration();
@@ -2283,7 +2554,7 @@ function calibrateUnavailable(): boolean {
 let calibration: { points: Partial<Record<CalibrationStep, Point3>>; place?: CabinetPlace; back: 'menu' | 'system'; placing?: boolean } | undefined;
 
 function openCalibration(): void {
-  if (!headset || calibration || playing || launch) return;
+  if (!headset || calibration || controllerWizard || playing || launch) return;
   calibration = { points: {}, back: state.phase === 'menu' ? 'menu' : 'system' };
   headset.calibrate(true);
   console.log('Casque : calage de la borne ouvert.'); // i18n-ignore : journal
@@ -2481,7 +2752,7 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
       if (far) details.push(`attention : ${far}`); // i18n-ignore : journal
     }
     // Manettes : la même règle qu'au menu (manettes.ts), et plus d'alignement de la table sur les manettes.
-    const input = vpxHeadsetInput(readTextIfExists(vr.ini));
+    const input = vpxHeadsetInput(readTextIfExists(vr.ini), controllerSetting());
     if (input.length) {
       writeIniSettings(vr.ini, input);
       details.push(`manettes : ${input.length} liaison(s) de VPX alignée(s) sur celles du menu`); // i18n-ignore : journal
@@ -2897,8 +3168,12 @@ export function startFrontend(): void {
       if (!headset?.worn) releaseHeadsetButtons();
       // Compagnon parti pendant le calage : rien à garder.
       if (calibration && !headset?.running) closeCalibration(false);
-      // Borne pas encore calée : le calage s'ouvre d'office dans le casque, avant la navigation.
+      // Manettes sans réglage pour cette configuration, puis borne pas encore calée : l'assistant et le
+      // calage s'ouvrent d'office dans le casque, avant la navigation.
+      if (headset?.worn) offerControllerWizard();
       if (headset?.worn && !isCalibrated(headset.place())) offerCalibration();
+      // Compagnon parti pendant l'assistant : rien à garder.
+      if (controllerWizard && !headset?.running) closeControllerWizard(false);
       broadcast();
     },
     openViews: () => {
@@ -2918,6 +3193,7 @@ export function startFrontend(): void {
     },
     closeViews: () => closeHeadsetViews(),
     onButton: (button, down) => headsetButton(button, down),
+    onProfile: () => offerControllerWizard(),
     onPoint: (_hand, point, room) => calibrationPoint(point, room),
     onLost: (inGame) => headsetLost(inGame),
     onHead: (head) => headInGame(head),
@@ -3301,6 +3577,10 @@ function handleKey(input: Input, fromPhone = false): boolean {
   // Extinction, veille ou redémarrage en cours : plus rien ne se choisit.
   if (state.phase === 'message' && state.message?.action === 'power') return true;
   // Calage de la borne aux manettes : Start garde, Exit annule, rien d'autre.
+  if (controllerWizard) {
+    if (!input.isAutoRepeat && KEYS.exit.includes(input.code)) closeControllerWizard(false);
+    return true;
+  }
   if (calibration) return calibrationKey(input);
   // Menu montré dans le casque : la touche de recentrage de VPX (5 du pavé) remet la borne devant le joueur.
   if (input.code === 'Numpad5' && !input.isAutoRepeat && headset?.state === 'shown') {
@@ -3335,6 +3615,8 @@ function handleKey(input: Input, fromPhone = false): boolean {
   // Tab : menu et configuration, quels que soient les boutons relevés (dans le menu, Tab s'y déplace).
   if (input.code === CONFIG_KEY && ['menu', 'message', 'confirmQuit'].includes(state.phase)) return guest.knock('menu.system') ? openConfig() : true;
 
+  // Choix des boutons des collections : l'appui est pris par l'écran qui l'attend.
+  if (captureCollectionKey(input)) return true;
   switch (state.phase) {
     case 'loading':
       // Ctrl+Maj+K arrête le lancement ; Exit aussi, une fois que le chargement tarde et le dit.
@@ -4587,8 +4869,9 @@ function viewFor(role: RoleId, m: MenuMedias | undefined = medias) {
     table: !shown && onJukebox() ? jukeboxCard() : table ? describe(table) : undefined,
     neighbors,
     // Repère de la collection active, partout où le menu des tables est dessiné (sous une fiche aussi :
-    // sa zone ne bouge jamais), et la liste des collections quelques secondes après un MagnaSave, au menu seulement.
-    ...(role === 'playfield' && tables.length ? collections.view(mediaSettings.menuLayout === 'list' ? 'list' : playfieldLandscape() ? 'desk' : 'band', state.phase === 'menu') : {}),
+    // sa zone ne bouge jamais), et la liste des collections quelques secondes après un MagnaSave, au menu seulement
+    // (pas sur le médaillon du Juke-box : elle couvrirait son affiche ; le repère change quand même).
+    ...(role === 'playfield' && tables.length ? collections.view(mediaSettings.menuLayout === 'list' ? 'list' : playfieldLandscape() ? 'desk' : 'band', state.phase === 'menu' && !onJukebox()) : {}),
     menuLayout: mediaSettings.menuLayout,
     // Couleur des points des afficheurs dessinés par Cyber Pinball (DMD du menu, replis dmd et fullDmd).
     dmdColor: menuDmdColor(),

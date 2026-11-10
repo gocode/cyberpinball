@@ -55,6 +55,7 @@ export const GUEST_DOORS = {
   'sheet.play': true, // Jouer
   'sheet.friends': false, // Jouer avec un ami (les amis du propriétaire de la borne)
   'sheet.favorite': false, // Ajouter aux favoris, retirer des favoris
+  'sheet.collections': false, // Ajouter à une collection personnelle, l'en retirer, en créer une
   'sheet.read': true, // Prospectus et règles, page par page
   'sheet.scores': true, // Tableau des scores (quatre périodes), le lire
   'sheet.back': true, // Retour au menu

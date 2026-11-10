@@ -67,6 +67,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - At a desk, the cabinet head in the headset has a real one's proportions: backglass slightly wider than the playfield, small topper on top, DMD half as wide centred below.
 - In the headset, the game's playfield lands exactly on the menu's, everywhere, real cabinet included: same place, same height, same width.
 - In VPX's menu during a game, the controllers' thumbsticks respond without being pushed all the way.
+- Headset controller wizard: it opens the first time a headset is worn, offers its controllers' default buttons (Touch, Index, Vive, Windows Mixed Reality), then lets you pick each button one by one. Setting kept per headset and per configuration, applied in the menu and in game alike; reopen it from ≡ > "Manettes" or System menu > Cabinet.
+- In game in the headset, B pauses and resumes; only ≡ opens VPX's menu.
 
 ## 0.1.8
 

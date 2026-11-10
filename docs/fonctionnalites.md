@@ -273,6 +273,8 @@ Au premier démarrage, l'assistant enchaîne toutes les étapes. Ensuite, Menu s
 - **Collections** sur la roue : Toutes, Favoris, Récentes, Jamais jouées, Avec mes amis en ligne, chaque fabricant, chaque décennie. **MagnaSave gauche ou droit** passe à la précédente ou à la suivante, aussitôt ; la liste des collections paraît quelques secondes, une collection vide grisée avec sa raison.
 - **Un repère fixe** sur le cartouche du titre (« ☆ FAVORIS │ 3 / 12 ») : la collection et la place de la table, qui ne bougent jamais quand on change de table. Chaque collection garde sa table.
 - **Favoris** : « Ajouter aux favoris » sur la fiche, une étoile blanche devant le titre ; le favori d'une autre installation est repris tel quel.
+- **Mes collections** : des collections personnelles à votre nom (« Soirées », « Pour les enfants »…), remplies depuis la fiche de chaque table, renommées ou supprimées à volonté.
+- **Boutons des collections** au choix : n'importe quel bouton libre de la borne ; **Menu système > Collections** aussi, sans aucun bouton.
 - **Mode invité limité à une collection** (les favoris, un fabricant…), et **mode attente** dans la collection affichée.
 
 <p align="center">

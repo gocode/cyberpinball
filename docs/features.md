@@ -272,6 +272,8 @@ On first start, the wizard runs through every step. Afterwards, System menu > "C
 - **Collections** on the wheel: All, Favourites, Recent, Never played, With my online friends, each manufacturer, each decade. **Left or right MagnaSave** goes to the previous or next one, at once; the list of collections shows for a few seconds, an empty collection greyed out with its reason.
 - **A fixed marker** on the title cartouche ("☆ FAVOURITES │ 3 / 12"): the collection and the table's place, which never move when you change table. Each collection keeps its table.
 - **Favourites**: "Add to favourites" on the table page, a white star before the title; a favourite from another installation is taken as it is.
+- **My collections**: personal collections with your own names ("Party nights", "For the kids"…), filled from each table's page, renamed or deleted at will.
+- **Collection buttons** of your choice: any free cabinet button; **System menu > Collections** too, with no button at all.
 - **Guest mode restricted to a collection** (favourites, a manufacturer…), and **attract mode** within the collection shown.
 
 <p align="center">
