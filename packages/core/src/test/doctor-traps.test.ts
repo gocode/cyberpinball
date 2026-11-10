@@ -366,6 +366,17 @@ const TRAPS: Trap[] = [
     },
     script: scriptFacts(PUP_SCRIPT),
   },
+  // Déclencheur actif sur une playlist vide (sans fichier choisi : le plugin y tire au hasard).
+  {
+    code: 'pupPlaylistsEmpty',
+    arm: (folder) => {
+      const pack = healthyPack(folder);
+      fs.mkdirSync(path.join(pack, 'Intro'), { recursive: true });
+      write(path.join(pack, 'playlists.pup'), 'ScreenNum,Folder,Des,AlphaSort,RestSeconds,Volume,Priority\r\n2,Intro,,0,30,100,0\r\n2,Unused,,0,30,100,0\r\n');
+      write(path.join(pack, 'triggers.pup'), 'ID,Active,Descript,Trigger,ScreenNum,PlayList,PlayFile\r\n1,1,Intro,D1,2,Intro,\r\n');
+    },
+    script: scriptFacts(PUP_SCRIPT),
+  },
   // Pack dans la fenêtre du DMD d'une table à ROM, sans réglage pour elle : le score serait caché.
   {
     code: 'pupHidesDmd',

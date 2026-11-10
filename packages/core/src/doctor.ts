@@ -86,7 +86,7 @@ import { orientationFinding, type PlayfieldOrientation } from './sync';
 import { vpxPlayedFlipperEdge } from './vpx';
 import { scriptCode } from './vbscript';
 import { readVpxScript, readVpxTableName } from './vpxinfo';
-import { describeRenames, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
+import { describeRenames, emptyPlayedPlaylists, missingPackFiles, packFileFixes, type PackFileFixes } from './pupfiles';
 import { activePacks, disabledPacks, isPupFolderName, packsOfTable, PUP_DISABLED_FOLDER, PUP_FOLDER, pupVideosDir } from './pupdisabled';
 import { ratioLabel } from './zones';
 
@@ -136,6 +136,7 @@ export const FINDING_CODES = [
   'pupPlaylistOrder',
   'pupFileNames',
   'pupFilesMissing',
+  'pupPlaylistsEmpty',
   'pupScreenAbsent',
   'pupPlayfieldScreen',
   'pupScriptDriven',
@@ -1560,6 +1561,21 @@ function checkPup(entry: TableEntry, context: DoctorContext, override?: Override
             }),
           });
         }
+      }
+      // Playlists vides que le pack joue vraiment (déclencheur actif, écran, script) : rien ne s'y montre
+      // ni ne s'y entend. Une playlist vide que rien ne vise ne compte pas (pupfiles.ts).
+      const empty = emptyPlayedPlaylists(info.root, facts?.pup ? played : undefined);
+      if (empty.length) {
+        findings.push({
+          code: 'pupPlaylistsEmpty',
+          severity: 'info',
+          title: tn(empty.length, 'Playlist du PuP-Pack vide', 'Playlists du PuP-Pack vides'),
+          detail: tn(empty.length, 'pupvideos\\{pack} joue la playlist {list}, vide ou absente : rien ne s’y verra ni ne s’y entendra.', 'pupvideos\\{pack} joue {n} playlists vides ou absentes ({list}) : rien ne s’y verra ni ne s’y entendra.', {
+            pack,
+            n: empty.length,
+            list: empty.slice(0, 3).map(quote).join(', ') + (empty.length > 3 ? '…' : ''),
+          }),
+        });
       }
     }
 

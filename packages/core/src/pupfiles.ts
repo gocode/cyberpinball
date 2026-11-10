@@ -36,6 +36,8 @@ export function mediaKind(head: Buffer): MediaKind {
 
 /** Extensions que le plugin donne à FFmpeg comme des vidéos. */
 const VIDEO_EXT = /\.(mp4|m4v|mov|avi|mkv|webm|f4v|flv|mpg|mpeg|wmv)$/i;
+/** Un média que le plugin joue (vidéo, image, son) : un pack qui n'en a aucun n'est pas installé. */
+const PACK_MEDIA = /\.(mp4|m4v|mov|avi|mkv|webm|f4v|flv|mpg|mpeg|wmv|png|jpe?g|bmp|gif|apng|mp3|ogg|wav|flac|m4a)$/i;
 /** Extension qui fait d'une image une image pour le plugin (PUPScreen::Play). */
 const IMAGE_EXT: Partial<Record<MediaKind, string>> = { jpeg: '.jpg', png: '.png', bmp: '.bmp' };
 
@@ -261,6 +263,64 @@ export function missingPackFiles(root: string): string[] {
     }
   }
   return [...missing];
+}
+
+/**
+ * Playlists vides que le pack joue vraiment : visées par un déclencheur actif sans fichier choisi
+ * (le plugin y tire un fichier au hasard), par un écran comme fond, ou par le script de la table
+ * (PuPlayer.playlistplay / playlistplayex « … », "Playlist") ; un dossier absent ou sans un seul
+ * fichier. Une playlist vide que rien ne vise est ignorée : pas d'alerte pour rien (The Matrix,
+ * 10 novembre 2026 : Intro, Start, Smith et PUPOptions vides, mais jamais jouées).
+ */
+export function emptyPlayedPlaylists(root: string, script?: string): string[] {
+  const entries = readDirents(root);
+  const played = new Set<string>();
+  const add = (playlist: string) => {
+    if (playlist.trim()) played.add(playlist.trim());
+  };
+  for (const name of PUP_FILES) {
+    const columns = COLUMNS[name];
+    const file = entries.find((d) => d.isFile() && d.name.toLowerCase() === name);
+    if (!columns || !file || name === 'playlists.pup') continue;
+    let raw: string;
+    try {
+      raw = fs.readFileSync(path.join(root, file.name), 'latin1');
+    } catch {
+      continue;
+    }
+    for (const line of raw.split(/\r?\n/).slice(1)) {
+      const spans = csvSpans(line);
+      const field = (n: number) => (spans[n] ? decode(line.slice(spans[n]!.start, spans[n]!.end)) : '');
+      if (name === 'triggers.pup' && (field(1) !== '1' || field(columns.file!))) continue;
+      if (name === 'screens.pup' && field(5).toLowerCase() === 'off') continue;
+      add(field(columns.playlist));
+    }
+  }
+  // Le script : seulement une playlist que le pack déclare (playlists.pup) ; les modèles de script PuP-DMD
+  // citent des playlists génériques (« PUPFrames », « DMDSplash ») que le pack n'a pas et ne joue jamais.
+  const declared = new Set<string>();
+  const list = entries.find((d) => d.isFile() && d.name.toLowerCase() === 'playlists.pup');
+  if (list) {
+    try {
+      for (const line of fs.readFileSync(path.join(root, list.name), 'latin1').split(/\r?\n/).slice(1)) {
+        const spans = csvSpans(line);
+        if (spans[1]) declared.add(decode(line.slice(spans[1].start, spans[1].end)).trim().toLowerCase());
+      }
+    } catch {
+      // Liste illisible : aucune playlist du script ne compte.
+    }
+  }
+  for (const m of (script ?? '').matchAll(/playlistplay(?:ex)?\s*\(?\s*[^,\n]+,\s*"([^"]+)"/gi)) if (declared.has(m[1]!.trim().toLowerCase())) add(m[1]!);
+  const media = (name: string) => listFiles(path.join(root, name)).filter((f) => !isJunkName(path.basename(f)));
+  // Pack sans un seul média (configuration seule, médias jamais copiés) : pas « incomplet », il n'est pas
+  // installé ; ce constat ne parle que d'un pack dont il manque une partie.
+  if (!entries.some((d) => d.isDirectory() && media(d.name).some((f) => PACK_MEDIA.test(f)))) return [];
+  const empty: string[] = [];
+  for (const playlist of played) {
+    const dir = entries.find((d) => d.isDirectory() && d.name.toLowerCase() === playlist.toLowerCase());
+    if (!dir || !media(dir.name).length) empty.push(playlist);
+  }
+  return empty.sort((x, y) => x.localeCompare(y));
 }
 
 /** Résumé d'une liste de renommages, pour un constat. */

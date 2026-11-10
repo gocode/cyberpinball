@@ -57,6 +57,8 @@ export const messages: Record<string, string> = {
   'Récupérer le fronton : {label}': 'Get the backglass: {label}',
   'Facultatif : le script charge un PuP-Pack (vidéos sur le fronton et l’afficheur) ; la table se joue sans.': 'Optional: the script loads a PuP-Pack (videos on the backglass and the display); the table plays without it.',
   'Récupérer le PuP-Pack : {label}': 'Get the PuP-Pack: {label}',
+  'Recompléter le PuP-Pack : {label}': 'Complete the PuP-Pack: {label}',
+  'La table se joue quand même ; le pack complet les rend.': 'The table plays anyway; the complete pack brings them back.',
   'Rangé là où le plugin PUP le cherche.': 'Stored where the PUP plugin looks for it.',
   'Rien à faire.': 'Nothing to do.',
   Affichage: 'Display',

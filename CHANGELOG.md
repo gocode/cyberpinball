@@ -94,6 +94,7 @@ son interface).
 - En VR, les tables dont le fronton est un PuP-Pack (sans directb2s) ne montrent plus un fronton vide ; un diagnostic au journal liste les tables concernées.
 - Calage dans le casque : une manette sur chaque coin de la barre, une gâchette place la borne, autant de fois qu'on veut ; A valide et sort, B sort sans rien changer. La borne part toujours à l'opposé de votre tête, quel que soit l'ordre des coins ou la main.
 - Dans le casque, le son sort dans ses écouteurs : menu, sons de l'interface, Juke-box et partie. Hors du casque, la sortie de la configuration reprend.
+- PuP-Packs incomplets : tous les packs installés sont contrôlés (fichiers absents, playlists jouées mais vides). Le diagnostic de la table et le journal les signalent, sans jamais bloquer le lancement, et proposent de recompléter le pack.
 
 ## 0.1.8
 

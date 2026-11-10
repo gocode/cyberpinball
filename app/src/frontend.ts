@@ -68,6 +68,10 @@ import {
   vpxRecenteredHead,
   vpxRoomChanges,
   vrGraphicsProfile,
+  emptyPlayedPlaylists,
+  pupVideosDir,
+  activePacks,
+  missingPackFiles,
   headsetAudioOutput,
   vrAudioSettings,
   readVpxBackglassDisplays,
@@ -2616,6 +2620,33 @@ function auditVrBackglass(): void {
   console.log(`Réalité virtuelle : ${empty.length} table(s) au fronton vide dans le casque sans correctif (pièce VR, fronton capté par PuP, aucun flasher du fronton)${empty.length ? ` : ${empty.join(', ')} ; le fronton de VPX leur est ajouté à chaque partie` : ''}.`); // i18n-ignore : journal
 }
 
+/**
+ * Relevé des PuP-Packs installés, une fois par lancement, au journal (règle globale : une panne d'un pack
+ * devient un contrôle de tous). Fichiers nommés par le pack et absents, playlists que le pack joue vraiment
+ * mais vides (emptyPlayedPlaylists) ; jamais bloquant : le diagnostic de la table propose de recompléter
+ * le pack (« Ce qu'il manque pour jouer », étape PuP-Pack).
+ */
+function auditPupPacks(): void {
+  const found: string[] = [];
+  let packs = 0;
+  for (const table of tables) {
+    const folder = path.dirname(table.file);
+    const pupvideos = pupVideosDir(folder);
+    if (!pupvideos) continue;
+    let script: string | undefined;
+    for (const name of activePacks(folder)) {
+      const root = path.join(pupvideos, name);
+      if (!fs.existsSync(path.join(root, 'triggers.pup')) && !fs.existsSync(path.join(root, 'playlists.pup'))) continue;
+      packs++;
+      script ??= readTableScript(table.file) ?? '';
+      const missing = missingPackFiles(root);
+      const empty = emptyPlayedPlaylists(root, script);
+      if (missing.length || empty.length) found.push(`${table.title} (${name}) : ${[...(missing.length ? [`${missing.length} fichier(s) absent(s), ${missing.slice(0, 2).join(', ')}${missing.length > 2 ? '…' : ''}`] : []), ...(empty.length ? [`playlist(s) jouée(s) mais vide(s), ${empty.join(', ')}`] : [])].join(' ; ')}`); // i18n-ignore : journal
+    }
+  }
+  console.log(`PuP-Packs : ${packs} pack(s) contrôlé(s), ${found.length} incomplet(s)${found.length ? ` : ${found.join(' | ')} ; « Ce qu’il manque pour jouer » propose de les recompléter` : ''}.`); // i18n-ignore : journal
+}
+
 /** Profil graphique appliqué à la partie dans le casque en cours (vr-profil.ts), dit au relevé de Link. */
 let vrProfileApplied: string | undefined;
 /** Début de la partie dans le casque en cours (VPX a le casque), pour le relevé de Link. */
@@ -3480,8 +3511,12 @@ export function startFrontend(): void {
   headset.watch();
   // Horaire de la borne : nuit et arrêt programmé, d'après les réglages de medias.json.
   hours.start();
-  // Diagnostic : les tables dont le fronton serait vide dans le casque (capture de PuP, sans flasher du fronton).
-  setTimeout(() => auditVrBackglass(), 60_000);
+  // Diagnostic : les tables dont le fronton serait vide dans le casque (capture de PuP, sans flasher du fronton),
+  // et les PuP-Packs incomplets (fichiers absents, playlists jouées mais vides).
+  setTimeout(() => {
+    auditVrBackglass();
+    auditPupPacks();
+  }, 60_000);
   // Réseau des bornes : présence aux amis, annuaire ; un échec s'affiche dans « Partage et réseau ».
   void socialNet.start().then(async () => {
     socialNet.checkBadges(playStats(tables));

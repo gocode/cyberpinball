@@ -485,6 +485,12 @@ function pupStep(input: JourneyInput): JourneyStep | undefined {
   if (found.some((f) => f.code === 'pupMissing')) {
     return extraStep(input, 'pup', 'pup', title, t('Facultatif : le script charge un PuP-Pack (vidéos sur le fronton et l’afficheur) ; la table se joue sans.'), (s) => t('Récupérer le PuP-Pack : {label}', { label: versionLabel(s.file) }));
   }
+  // Pack incomplet (fichiers absents, playlists jouées mais vides) : jamais bloquant, recomplété par le
+  // circuit d'acquisition (le pack complet du jeu de la table).
+  const incomplete = input.findings.find((f) => f.code === 'pupFilesMissing' || f.code === 'pupPlaylistsEmpty');
+  if (incomplete) {
+    return extraStep(input, 'pup', 'pup', title, `${incomplete.title}. ${incomplete.detail} ${t('La table se joue quand même ; le pack complet les rend.')}`, (s) => t('Recompléter le PuP-Pack : {label}', { label: versionLabel(s.file) }));
+  }
   return { id: 'pup', title, state: 'done', required: false, detail: script?.pup ? t('Rangé là où le plugin PUP le cherche.') : t('Rien à faire.'), choices: [] };
 }
 
