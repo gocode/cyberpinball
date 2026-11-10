@@ -69,6 +69,8 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - In VPX's menu during a game, the controllers' thumbsticks respond without being pushed all the way.
 - Headset controller wizard: it opens the first time a headset is worn, offers its controllers' default buttons (Touch, Index, Vive, Windows Mixed Reality), then lets you pick each button one by one. Setting kept per headset and per configuration, applied in the menu and in game alike; reopen it from ≡ > "Manettes" or System menu > Cabinet.
 - In game in the headset, B pauses and resumes; only ≡ opens VPX's menu.
+- My collections: personal collections, named as you like. "Ajouter à une collection…" (Add to a collection…) on a table's page ticks or unticks it in each one, or creates a new one with it; "Gérer mes collections…" (Manage my collections…, System menu > Collections) renames or deletes them.
+- Collections: "Boutons des collections" (Collection buttons, System menu > Collections) picks two cabinet buttons, any except the flippers, Start and Exit, to go to the previous or next collection. Collections is also at the top of the system menu: Exit, then Collections.
 
 ## 0.1.8
 

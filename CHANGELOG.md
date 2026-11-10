@@ -71,6 +71,8 @@ son interface).
 - Dans le menu de VPX en partie, les joysticks des manettes réagissent sans être poussés à fond.
 - Assistant des manettes du casque : il s'ouvre au premier port d'un casque, propose les boutons par défaut de ses manettes (Touch, Index, Vive, Windows Mixed Reality), puis permet de choisir chaque bouton un par un. Réglage gardé par casque et par configuration, appliqué au menu comme en partie ; rouvrable par ≡ > « Manettes » ou Menu système > Borne.
 - En partie dans le casque, B met en pause et reprend ; seul ≡ ouvre le menu de VPX.
+- Mes collections : des collections personnelles, à votre nom. « Ajouter à une collection… » sur la fiche d'une table la coche ou la décoche dans chacune, ou en crée une nouvelle avec elle ; « Gérer mes collections… » (Menu système > Collections) les renomme ou les supprime.
+- Collections : « Boutons des collections » (Menu système > Collections) choisit deux boutons de la borne, n'importe lesquels sauf les flippers, Start et Exit, pour passer à la collection précédente ou suivante. Collections est aussi en tête du menu système : Exit, puis Collections.
 
 ## 0.1.8
 
