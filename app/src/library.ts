@@ -451,7 +451,7 @@ export type UiAction =
   | { type: 'collections'; step?: number; id?: string }
   | { type: 'wheel'; offset: number }
   /** Juke-box (jukebox-player.ts) : une ligne de la liste, Start, une playlist voisine, Exit. */
-  | { type: 'jukebox'; op: 'row' | 'start' | 'playlist' | 'exit' | 'manage' | 'up' | 'shuffle' | 'repeat' | 'pause' | 'seek-to'; key?: string; dir?: number; fraction?: number };
+  | { type: 'jukebox'; op: 'row' | 'start' | 'playlist' | 'exit' | 'manage' | 'up' | 'shuffle' | 'repeat' | 'pause' | 'seek-to' | 'wheel' | 'page'; key?: string; dir?: number; fraction?: number };
 
 export type Tone = 'error' | 'warning' | 'info' | 'ok' | 'quiet';
 export interface Row {
@@ -4568,6 +4568,11 @@ export function createLibrary(host: LibraryHost) {
           if (!present()) console.log(`Autopilote : action « ${wanted} » jamais apparue (deux minutes).`);
         }
         else if (step.startsWith('click:')) await click(playfield, step.slice(6));
+        // Molette sur un élément (« wheel:.jb-desk-list:3 ») : 3 crans vers le bas ; négatif, vers le haut.
+        else if (step.startsWith('wheel:')) {
+          const at = step.lastIndexOf(':');
+          await click(playfield, step.slice(6, at), Number(step.slice(at + 1)) || 1);
+        }
         else if (step.startsWith('copy:')) {
           const [from, to] = step.slice(5).split('|') as [string, string];
           fs.mkdirSync(path.dirname(to), { recursive: true });
@@ -4812,7 +4817,7 @@ export function createLibrary(host: LibraryHost) {
 
 /** Clic de souris au centre de l'élément désigné, comme le ferait l'utilisateur. */
 /** Vrai clic de souris au centre de l'élément (autopilote du menu et des réglages de VPX). */
-export async function click(win: BrowserWindow, selector: string): Promise<void> {
+export async function click(win: BrowserWindow, selector: string, wheel = 0): Promise<void> {
   const center = (await win.webContents.executeJavaScript(
     // Une ligne hors de la vue (liste qui défile) y est d'abord ramenée, comme à la molette :
     // un geste, pas un défilement inattendu pour le garde-fou (scroll-keeper.js).
@@ -4824,6 +4829,11 @@ export async function click(win: BrowserWindow, selector: string): Promise<void>
   }
   const [x, y] = center.map(Math.round) as [number, number];
   win.webContents.sendInputEvent({ type: 'mouseMove', x, y });
+  // Molette : crans de 120 (négatif : vers le bas, au sens de Chromium), comme une vraie souris sur l'élément.
+  if (wheel) {
+    for (let i = 0; i < Math.abs(wheel); i++) win.webContents.sendInputEvent({ type: 'mouseWheel', x, y, deltaX: 0, deltaY: wheel > 0 ? -120 : 120, canScroll: true });
+    return;
+  }
   win.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: 1 });
   win.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: 1 });
 }

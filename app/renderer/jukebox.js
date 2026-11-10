@@ -444,6 +444,40 @@
     box.replaceChildren(...nodes);
   }
 
+  /**
+   * Molette sur la liste (souris, pavé tactile) : la sélection avance ou recule d'une ligne par cran, et la
+   * fenêtre de la liste suit. Un cran de souris vaut 100 à 120 ; les petits pas d'un pavé tactile s'additionnent jusqu'à un cran.
+   */
+  let wheelSum = 0;
+  function wheelable(node) {
+    node.addEventListener(
+      'wheel',
+      (event) => {
+        event.preventDefault();
+        wheelSum += event.deltaMode === 1 ? event.deltaY * 40 : event.deltaY;
+        while (Math.abs(wheelSum) >= 100) {
+          const dir = wheelSum > 0 ? 1 : -1;
+          wheelSum -= dir * 100;
+          window.cyber?.act?.({ type: 'jukebox', op: 'wheel', dir });
+        }
+      },
+      { passive: false },
+    );
+  }
+
+  /** Pied de la liste au bureau : « Sélection · 13 / 21 », puis ↑ et ↓ cliquables (une fenêtre de lignes). */
+  function selectionFoot(view) {
+    const foot = el('p', 'jb-fine jb-desk-selection', view.list.head);
+    if (!view.list.around) return foot;
+    const up = act(el('span', 'jb-page', '↑'), { op: 'page', dir: -1 });
+    const down = act(el('span', 'jb-page', '↓'), { op: 'page', dir: 1 });
+    up.title = t('Lignes précédentes');
+    down.title = t('Lignes suivantes');
+    const text = view.list.around.replace(/^↑\s*/, '').replace(/\s*↓$/, '');
+    foot.append(document.createTextNode(' · '), up, document.createTextNode(` ${text} `), down);
+    return foot;
+  }
+
   function nowText(now, desk) {
     const text = el('div', 'jb-now-text');
     const eyebrow = el('div', `jb-eyebrow jb-meta${now.ad ? ' warning' : ''}`);
@@ -572,10 +606,11 @@
     name.title = view.header.title;
     const list = el('div', 'jb-desk-list');
     fillList(list, view, true);
+    wheelable(list);
     // Au bureau, la place du fil d'Ariane reste (vide au niveau des playlists) : la liste ne bouge pas d'un niveau à l'autre.
     const nodes = [top, name, view.level === 'tracks' ? crumb(view, 'jb-crumb jb-fine') : el('div', 'jb-crumb jb-crumb-none jb-fine'), el('div', 'jb-rule')];
     nodes.push(list);
-    if (!view.empty) nodes.push(el('p', 'jb-fine jb-desk-selection', view.list.around ? `${view.list.head} · ${view.list.around}` : view.list.head));
+    if (!view.empty) nodes.push(selectionFoot(view));
     desk.frame.replaceChildren(...nodes);
     // Le clip : la vidéo, la pochette, ou l'affiche quand rien ne joue.
     const holder = clipHolder(s);

@@ -76,6 +76,7 @@ import {
   cachedVrBackglassView,
   FULL_BACKGLASS_ZONE,
   parseVrMeasures,
+  lastVrMeasuresBlock,
   zoneSetting,
   vrNeedsVpxBackglass,
   type VrBackglassView,
@@ -2740,11 +2741,16 @@ function vrCapturesDir(): string {
   return path.join(loc.dataDir, 'logs', 'captures-casque');
 }
 
-/** Avant une partie dans le casque : le fichier de mesures vidé, les captures gardées à 8 (les plus récentes). */
+/**
+ * Avant une partie dans le casque : la partie précédente reportée si elle ne l'a pas été (Cyber Pinball fermé
+ * pendant la partie), le fichier de mesures réduit à ses 400 dernières lignes, les captures gardées à 8.
+ */
 function prepareVrMeasures(): void {
   try {
     fs.mkdirSync(path.dirname(vrMeasuresFile()), { recursive: true });
-    fs.writeFileSync(vrMeasuresFile(), '');
+    noteVrMeasures(true);
+    const lines = readTextIfExists(vrMeasuresFile()).split(/\r?\n/);
+    if (lines.length > 400) fs.writeFileSync(vrMeasuresFile(), lines.slice(-400).join('\n'));
     fs.mkdirSync(vrCapturesDir(), { recursive: true });
     const old = fs
       .readdirSync(vrCapturesDir())
@@ -2768,17 +2774,28 @@ function describeBackglassView(view: VrBackglassView): string {
   return `fronton de VPX : ${where}${by}${maybe}, le fronton et la pause y sont dessinés`; // i18n-ignore : journal
 }
 
-/** Après une partie dans le casque : ce que le plugin a mesuré, et ses captures, au journal. */
-function noteVrMeasures(): void {
-  const m = parseVrMeasures(readTextIfExists(vrMeasuresFile()));
+/**
+ * Après une partie dans le casque (ou avant la suivante, pour une partie pas encore reportée : `late`) : ce
+ * que le plugin a mesuré, et ses captures, au journal ; le bloc est alors marqué « rapporte ».
+ */
+function noteVrMeasures(late = false): void {
+  const block = lastVrMeasuresBlock(readTextIfExists(vrMeasuresFile()));
+  if (!block || block.reported) return;
+  try {
+    fs.appendFileSync(vrMeasuresFile(), `rapporte ${new Date().toISOString()}\n`);
+  } catch {
+    // Marque impossible : le bilan pourrait revenir une fois de plus, sans gravité.
+  }
+  const when = late ? ' (partie précédente, pas reportée à sa fin)' : ''; // i18n-ignore : journal
+  const m = parseVrMeasures(block.text);
   if (!m) {
-    console.log('Casque, mesures de VPX : aucune (plugin absent, ou partie trop courte).'); // i18n-ignore : journal
+    console.log(`Casque, mesures de VPX${when} : aucune (partie de moins de 5 s).`); // i18n-ignore : journal
     return;
   }
   const f = (v: number, d = 1) => v.toFixed(d).replace('.', ',');
   if (m.samples)
     console.log(
-      `Casque, mesures de VPX (${m.samples} relevé(s) de 5 s) : VPX ${f(m.vpx.mean)} images/s (de ${f(m.vpx.min)} à ${f(m.vpx.max)}), plus grand écart entre deux images ${Math.round(m.worstGapMs)} ms ; fronton dessiné ${f(m.backglass)} fois/s ; vidéo de PuP la plus active ${f(m.video.mean)} nouvelles images/s (de ${f(m.video.min)} à ${f(m.video.max)}) ; temps de jeu ${f(m.gameTime, 2)} s par seconde.`, // i18n-ignore : journal
+      `Casque, mesures de VPX${when} (${m.samples} relevé(s) de 5 s) : VPX ${f(m.vpx.mean)} images/s (de ${f(m.vpx.min)} à ${f(m.vpx.max)}), plus grand écart entre deux images ${Math.round(m.worstGapMs)} ms ; fronton dessiné ${f(m.backglass)} fois/s ; vidéo de PuP la plus active ${f(m.video.mean)} nouvelles images/s (de ${f(m.video.min)} à ${f(m.video.max)}) ; temps de jeu ${f(m.gameTime, 2)} s par seconde.`, // i18n-ignore : journal
     );
   const shots = fs.existsSync(vrCapturesDir())
     ? fs
@@ -2788,7 +2805,7 @@ function noteVrMeasures(): void {
         .sort()
     : [];
   for (const c of m.captures)
-    console.log(`Casque, capture de l'aperçu VR (${c.name === 'pause' ? 'au menu de pause' : '8 s après le début'}) : ${c.ok ? `prise ${c.source === 'ecran' ? "sur l'écran" : 'dans la fenêtre'}, luminosité ${c.brightness}${c.brightness < 2 ? ' (noire)' : ''}, ${shots.filter((x) => x.endsWith(`-${c.name}.png`)).pop() ?? '?'}` : 'échec'}.`); // i18n-ignore : journal
+    console.log(`Casque, capture de l'aperçu VR${when} (${c.name === 'pause' ? 'au menu de pause' : '8 s après le début'}) : ${c.ok ? `prise ${c.source === 'ecran' ? "sur l'écran" : 'dans la fenêtre'}, luminosité ${c.brightness}${c.brightness < 2 ? ' (noire)' : ''}, ${shots.filter((x) => x.endsWith(`-${c.name}.png`)).pop() ?? '?'}` : 'échec'}.`); // i18n-ignore : journal
 }
 
 /** Profil graphique appliqué à la partie dans le casque en cours (vr-profil.ts), dit au relevé de Link. */

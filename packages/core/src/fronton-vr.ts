@@ -383,7 +383,26 @@ export interface VrMeasures {
   captures: { name: string; source: string; brightness: number; ok: boolean }[];
 }
 
-/** Lit le fichier de mesures du plugin ; undefined s'il n'a rien relevé. */
+/**
+ * Le dernier bloc du fichier de mesures : une partie, de sa ligne « debut » (écrite par le plugin au début de
+ * la partie) à la fin, et s'il a déjà été reporté au journal (ligne « rapporte », écrite par Cyber Pinball).
+ * Le fichier n'est jamais vidé : une partie dont Cyber Pinball n'a pas pu faire le bilan (fermé pendant la
+ * partie, essai du 10 novembre 2026) est reportée à la partie suivante, au lieu d'être effacée.
+ */
+export function lastVrMeasuresBlock(text: string): { text: string; reported: boolean } | undefined {
+  const lines = text.split(/\r?\n/);
+  let start = -1;
+  for (let i = lines.length - 1; i >= 0; i--)
+    if (lines[i]!.startsWith('debut')) {
+      start = i;
+      break;
+    }
+  if (start < 0) return undefined;
+  const block = lines.slice(start);
+  return { text: block.join('\n'), reported: block.some((l) => l.startsWith('rapporte')) };
+}
+
+/** Lit un bloc de mesures du plugin (lignes « mesure … », « capture … ») ; undefined s'il n'a rien relevé. */
 export function parseVrMeasures(text: string): VrMeasures | undefined {
   const values = (line: string) => Object.fromEntries([...line.matchAll(/(\w+)=(\S+)/g)].map((m) => [m[1]!, m[2]!]));
   const rows = text.split(/\r?\n/).filter((l) => l.startsWith('mesure ')).map(values);

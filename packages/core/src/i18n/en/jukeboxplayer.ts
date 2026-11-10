@@ -98,4 +98,8 @@ export const messages: Record<string, string> = {
   'Avancer / reculer': 'Forward / back',
   'Ouvrir · morceau en cours': 'Open · current track',
   Gestion: 'Management',
+
+  // app/renderer/jukebox.js : pied de la liste au bureau (flèches cliquables)
+  'Lignes précédentes': 'Previous rows',
+  'Lignes suivantes': 'Next rows',
 };

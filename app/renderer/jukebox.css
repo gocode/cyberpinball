@@ -659,6 +659,18 @@
   gap: calc(18 * var(--jp));
 }
 
+/* En-tête, fil d'Ariane et pied gardent leur hauteur ; la liste prend ce qui reste (le titre n'est jamais écrasé). */
+.jb-desk .jb-frame > * {
+  flex: none;
+}
+
+/* Flèches du pied de la liste au bureau : une fenêtre de lignes plus haut ou plus bas. */
+.jb-page {
+  cursor: pointer;
+  color: var(--signal);
+  padding: 0 calc(6 * var(--jp));
+}
+
 .jb-desk-name {
   font-size: calc(30 * var(--jp));
   font-weight: 600;
@@ -675,16 +687,29 @@
   background: #07110fd9;
   border-radius: calc(8 * var(--jp));
   overflow: hidden;
-  flex: none;
 }
 
+.jb-desk .jb-frame > .jb-desk-list {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Une ligne vaut un septième de la liste (JUKEBOX_LIST_ROWS au bureau : 7), quelle que soit la hauteur
+   qui lui reste. (Pas d'unités de conteneur ici : --jp en dépend, la liste en ferait sa référence.) */
 .jb-desk .jb-rows {
-  height: calc(770 * var(--jp));
+  flex: 1 1 0;
+  min-height: 0;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .jb-desk .jb-row {
-  height: calc(110 * var(--jp));
+  flex: 0 0 calc(100% / 7);
+  height: auto;
+  min-height: 0;
   grid-template-columns: calc(26 * var(--jp)) calc(64 * var(--jp)) minmax(0, 1fr) calc(32 * var(--jp)) calc(54 * var(--jp));
   gap: calc(10 * var(--jp));
   padding: calc(10 * var(--jp));
@@ -1387,11 +1412,17 @@
 }
 
 .jb-desk .jb-rows:has(+ .jb-empty-under) {
-  height: calc(110 * var(--fixed-rows, 1) * var(--jp));
+  flex: var(--fixed-rows, 1) 1 0;
+}
+
+.jb-desk .jb-rows:has(+ .jb-empty-under) > .jb-row {
+  flex: 1 1 0;
 }
 
 .jb-desk .jb-empty-under {
-  height: calc((770 - 110 * var(--fixed-rows, 1)) * var(--jp));
+  flex: calc(7 - var(--fixed-rows, 1)) 1 0;
+  min-height: 0;
+  height: auto;
   gap: calc(14 * var(--jp));
   padding: calc(20 * var(--jp));
 }

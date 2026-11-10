@@ -539,7 +539,12 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
         player = { ...player, paused };
         apply({ kind: paused ? 'pause' : 'resume' });
       }
-    } else if (action.op === 'shuffle') step('shuffle-toggle');
+    // Molette (bureau) : la ligne voisine ; le pied « ↑ avant · après ↓ » cliqué : une fenêtre de lignes.
+    } else if (action.op === 'wheel' || action.op === 'page') {
+      for (let i = 0; i < (action.op === 'page' ? rows() : 1); i++) step(action.dir === -1 ? 'previous' : 'next');
+      host.log(`Juke-box : ${action.op === 'page' ? 'page' : 'molette'} ${action.dir === -1 ? 'vers le haut' : 'vers le bas'}, ${player.level === 'tracks' ? (player.selected[player.shown] ?? '?') : player.at} choisi.`); // i18n-ignore : journal
+    }
+    else if (action.op === 'shuffle') step('shuffle-toggle');
     else if (action.op === 'repeat') step('repeat-cycle');
     else if (action.op === 'row' && typeof action.key === 'string') {
       const shown = player.shown;

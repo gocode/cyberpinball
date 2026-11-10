@@ -21,7 +21,8 @@
 // Une icône reste sur la ligne de son texte : poussée seule au-dessus (ou au-dessous) de lui par un
 // retour à la ligne, elle est signalée (« Fermé en mode invité », novembre 2026).
 // Une coupure voulue non plus : « … » posé par le texte ou par le conteneur qui le coupe
-// (text-overflow n'est pas hérité), ou nombre de lignes limité (-webkit-line-clamp) ;
+// (text-overflow n'est pas hérité ; il n'excuse que la largeur, jamais une ligne rognée en
+// hauteur), ou nombre de lignes limité (-webkit-line-clamp) ;
 // seule la partie visible d'un texte compte alors (les lignes masquées ne chevauchent rien).
 // Un texte limité en lignes qui coupe vraiment doit avoir un interligne d'au moins 1,2 :
 // plus serré, l'accent d'une capitale de la ligne masquée dépasse sous la dernière ligne
@@ -238,7 +239,17 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
       if (!clip.some((o) => o === 'hidden' || o === 'clip')) continue;
       const c = e.getBoundingClientRect();
       if (excuse || truncates(e)) {
-        kept = { left: Math.max(kept.left, c.left), right: Math.min(kept.right, c.right), top: Math.max(kept.top, c.top), bottom: Math.min(kept.bottom, c.bottom) };
+        // « … » (text-overflow) ne vaut que pour la largeur : une ligne rognée en hauteur reste coupée.
+        // Titre de la playlist du Juke-box au bureau, pris entre son intertitre et le fil d'Ariane (10/11/2026).
+        // Une marge d'un cinquième de la ligne : la boîte du texte (jambages compris) dépasse un interligne serré.
+        const s = getComputedStyle(e);
+        const lineClamp = s.webkitLineClamp && s.webkitLineClamp !== 'none';
+        const tall = kept.bottom - kept.top;
+        if (!lineClamp && tall > T && (c.top - kept.top > Math.max(T, tall / 5) || kept.bottom - c.bottom > Math.max(T, tall / 5))) {
+          problems.add('coupé en hauteur : ' + label(el) + ' par ' + label(e).slice(0, 60));
+          break;
+        }
+        kept ={ left: Math.max(kept.left, c.left), right: Math.min(kept.right, c.right), top: Math.max(kept.top, c.top), bottom: Math.min(kept.bottom, c.bottom) };
         excuse = false;
         if (kept.right - kept.left <= T || kept.bottom - kept.top <= T) break; // ligne masquée par la coupure voulue
         continue;

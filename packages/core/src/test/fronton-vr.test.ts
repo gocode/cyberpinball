@@ -7,7 +7,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { test } from 'node:test';
 import * as zlib from 'node:zlib';
-import { imageMayBeTransparent, implicitBackglass, largestFreeRectangle, parseVrMeasures, primitiveVertex, vrBackglassView, zoneSetting } from '../fronton-vr';
+import { imageMayBeTransparent, implicitBackglass, largestFreeRectangle, lastVrMeasuresBlock, parseVrMeasures, primitiveVertex, vrBackglassView, zoneSetting } from '../fronton-vr';
 import { biff, cfb, u32 } from './fixtures';
 
 const repo = path.join(__dirname, '..', '..', '..', '..');
@@ -143,6 +143,19 @@ test('mesures du plugin : relevés de 5 s et captures lus pour le journal', () =
   assert.deepEqual(m.video, { mean: 15, min: 12, max: 18 });
   assert.deepEqual(m.captures, [{ name: 'debut', source: 'fenetre', brightness: 41, ok: true }]);
   assert.equal(parseVrMeasures(''), undefined);
+});
+
+test('mesures du plugin : jamais effacées ; le dernier bloc (une partie) lu, reporté une seule fois', () => {
+  const text = ['debut zone=0,0,1,1 ordre=PUP', 'mesure t=5 vpx=40 ecart_ms=30 fronton=80 pup=80 video=30 jeu=1 pompees=0', 'rapporte 2026-11-10', 'debut zone=0,0,1,0.53 ordre=PUP', 'mesure t=5 vpx=20 ecart_ms=300 fronton=40 pup=40 video=9 jeu=1 pompees=1'].join('\n');
+  const block = lastVrMeasuresBlock(text)!;
+  assert.equal(block.reported, false);
+  assert.equal(parseVrMeasures(block.text)!.vpx.mean, 20);
+  assert.equal(lastVrMeasuresBlock(`${text}\nrapporte 2026-11-11`)!.reported, true);
+  assert.equal(lastVrMeasuresBlock(''), undefined);
+  // Le fichier n'est plus vidé avant une partie : la précédente est d'abord reportée.
+  const frontend = read('app', 'src', 'frontend.ts');
+  assert.doesNotMatch(frontend, /fs\.writeFileSync\(vrMeasuresFile\(\), ''\)/);
+  assert.match(frontend, /function prepareVrMeasures\(\): void \{[\s\S]{0,400}noteVrMeasures\(true\);/);
 });
 
 test('partie dans le casque : la zone, les mesures et les captures réglées pour le plugin, et reportées au journal à la fin', () => {
