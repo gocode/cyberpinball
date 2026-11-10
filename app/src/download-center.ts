@@ -162,6 +162,9 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
   }
 
   function buildList(): Built {
+    // La liste montrée vaut lecture : ce qui y est fini ou bloqué est vu, la pastille rouge s'en va
+    // (downloadsAttention), même pour un téléchargement qui finit pendant qu'on la regarde.
+    for (const j of m.jobs()) if (!isActive(j)) m.seen(j.id);
     const jobs = new Map(m.jobs().map((j) => [j.id, j]));
     const actions: Action[] = [];
     const rowsOf = (ids: string[]) =>
@@ -231,7 +234,6 @@ export function createDownloadCenter(ctx: DownloadCenterContext): DownloadCenter
   function open(focus?: string, notice?: { text: string; tone: Tone }): void {
     flash = notice;
     take();
-    for (const j of m.jobs()) if (!isActive(j)) m.seen(j.id);
     showList(focus);
   }
 

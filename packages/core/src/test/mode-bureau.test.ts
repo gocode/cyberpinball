@@ -4,7 +4,8 @@
 // restaient en plein écran et cachaient le bureau des autres. Ces tests fixent l'invariant
 // avec les écrans simulés de packages\core\ecrans-simules (ceux de CYBERPINBALL_DISPLAYS), de 1 à 4 écrans :
 // au bureau, aucune fenêtre de Cyber Pinball ne recouvre plus rien ; au retour, chaque écran
-// est de nouveau couvert, son voile remis avant sa fenêtre.
+// est de nouveau couvert, son voile remis avant sa fenêtre. Signalement du 10/11/2026 : au
+// bureau, le son de Cyber Pinball continuait ; aucune page de l'application n'y joue plus.
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -36,8 +37,28 @@ class FakeWindow {
   }
 }
 
+/** Page de l'application simulée (webContents) : son coupé ou non. */
+class FakeContents {
+  destroyed = false;
+  constructor(
+    readonly name: string,
+    public muted = false,
+  ) {}
+  isDestroyed(): boolean {
+    return this.destroyed;
+  }
+  isAudioMuted(): boolean {
+    return this.muted;
+  }
+  setAudioMuted(muted: boolean): void {
+    this.muted = muted;
+  }
+}
+
 interface DesktopModeLike {
   readonly active: boolean;
+  readonly silenced: number;
+  silence(contents: FakeContents): boolean;
   enter(): void;
   clear(): FakeWindow[];
   reopened(): boolean;
@@ -54,9 +75,12 @@ function cabinet(screens: CoverRect[], menuScreens: CoverRect[]) {
   const veils = screens.map((r, i) => new FakeWindow(`Cyber Pinball — Fond ${i + 1}`, r, true));
   const menu = menuScreens.map((r, i) => new FakeWindow(i === 0 ? 'Cyber Pinball — Playfield' : `Cyber Pinball — Écran ${i + 1}`, r, false));
   const all = [...menu, ...veils];
+  // Une page par fenêtre, plus le lecteur du juke-box (vue sans fenêtre propre) et une vue du casque, muette d'office.
+  const pages = [...all.map((w) => new FakeContents(w.title)), new FakeContents('Juke-box'), new FakeContents('Casque', true)];
   const log: string[] = [];
   const mode = new DesktopMode({
     windows: () => all,
+    contents: () => pages,
     isShown: (w: FakeWindow) => w.visible,
     isVeil: (w: FakeWindow) => w.veil,
     hideVeil: (w: FakeWindow) => {
@@ -81,7 +105,7 @@ function cabinet(screens: CoverRect[], menuScreens: CoverRect[]) {
   });
   /** Pile des fenêtres telle que Windows la donnerait : le menu au-dessus des voiles, seulement ce qui est visible. */
   const stack = (): StackedWindow[] => all.filter((w) => !w.destroyed && w.visible).map((w) => ({ pid: ME, className: 'Chrome_WidgetWin_1', title: w.title, rect: w.rect, minimized: w.minimized }));
-  return { veils, menu, all, log, mode, stack };
+  return { veils, menu, all, pages, log, mode, stack };
 }
 
 /** Jeux d'écrans simulés versionnés (CYBERPINBALL_DISPLAYS), de 1 à 4 écrans ; 2 écrans : les deux premiers du poste à trois. */
@@ -157,6 +181,31 @@ test('mode bureau : ce qui revient sur un écran pendant le bureau est rangé de
   assert.equal(browser.minimized, false, 'la fenêtre rangée au bureau revient avec le menu');
 });
 
+test('mode bureau : aucun son de Cyber Pinball au bureau, le son revient au retour sauf aux pages déjà muettes', () => {
+  const screens = screenSets()[3]!.screens;
+  const { mode, pages } = cabinet(screens, screens.slice(0, 2));
+  const page = (name: string) => pages.find((p) => p.name === name)!;
+  assert.equal(mode.silence(page('Juke-box')), false, 'hors du bureau, rien n’est coupé');
+  mode.enter();
+  assert.ok(pages.every((p) => p.muted), 'au bureau, toutes les pages sont muettes, juke-box compris');
+  assert.equal(mode.silenced, pages.length - 1, 'la vue du casque, déjà muette, n’est pas comptée');
+  // Page ouverte pendant le bureau (morceau suivant du juke-box) : muette dès sa création.
+  const next = new FakeContents('Juke-box, morceau suivant');
+  pages.push(next);
+  assert.equal(mode.silence(next), true);
+  // Ou, à défaut, au passage suivant de la surveillance.
+  const late = new FakeContents('Récupérer');
+  pages.push(late);
+  mode.clear();
+  assert.ok(late.muted);
+  next.destroyed = true;
+  mode.leave();
+  assert.ok(pages.filter((p) => p.name !== 'Casque' && !p.destroyed).every((p) => !p.muted), 'au retour, le son revient');
+  assert.ok(page('Casque').muted, 'la vue du casque reste muette');
+  assert.equal(mode.silenced, 0);
+  assert.equal(mode.silence(late), false, 'après le retour, rien n’est plus coupé');
+});
+
 test('mode bureau : réduire seulement les fenêtres du menu laissait les écrans couverts (le défaut signalé)', () => {
   const screens = screenSets()[3]!.screens;
   const { stack, menu } = cabinet(screens, screens.slice(0, 3));
@@ -167,7 +216,8 @@ test('mode bureau : réduire seulement les fenêtres du menu laissait les écran
 
 test('mode bureau : toutes les fenêtres de l’application, voiles compris, sans liste à tenir à jour', () => {
   const source = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'frontend.ts'), 'utf8');
-  assert.match(source, /new DesktopMode<BrowserWindow>\(\{\s*windows: \(\) => BrowserWindow\.getAllWindows\(\)/, 'le mode bureau parcourt BrowserWindow.getAllWindows()');
+  assert.match(source, /new DesktopMode<BrowserWindow, WebContents>\(\{\s*windows: \(\) => BrowserWindow\.getAllWindows\(\),\s*contents: \(\) => webContents\.getAllWebContents\(\),/, 'le mode bureau parcourt BrowserWindow.getAllWindows() et coupe le son de webContents.getAllWebContents()');
+  assert.match(source, /app\.on\('web-contents-created', \(_e, contents\) => desktop\.silence\(contents\)\)/, 'une page ouverte au bureau naît muette');
   assert.match(source, /isShown,\s*isVeil,\s*hideVeil: hideCovered,\s*showVeil: \(win\) => win\.showInactive\(\),\s*minimizeWindow: minimizeCovered,/);
   // Le gardien des écrans ne remontre pas un voile en mode bureau.
   const guard = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'screen-guard.ts'), 'utf8');

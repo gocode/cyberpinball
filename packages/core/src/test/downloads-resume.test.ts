@@ -23,7 +23,7 @@ import { test } from 'node:test';
 import type { AddressInfo } from 'node:net';
 import { REPO_ROOT } from './i18n-scan';
 import { createDownloadManager, type DownloadManager, type DownloadTransport } from '../downloadmanager';
-import { downloadClock, downloadQueueFile, downloadsPill, loadDownloadQueue, newestFirst, resolveReturn, reviveQueue, shouldResume, summarize, type DownloadJob } from '../downloadqueue';
+import { downloadClock, downloadQueueFile, downloadsAttention, downloadsPill, loadDownloadQueue, newestFirst, resolveReturn, reviveQueue, shouldResume, summarize, type DownloadJob } from '../downloadqueue';
 import { fetchResumable, ResumableError } from '../resumable';
 import { scanTables, type TableEntry } from '../tables';
 import { layoutOf } from '../locations';
@@ -491,6 +491,65 @@ test('liste des téléchargements : du plus récent au plus ancien, dans chaque 
       ['Terminés et bloqués', ['fini-tard', 'bloque', 'fini-tot']],
     ],
   );
+});
+
+// Invariant (essai du 10/11/2026 : des musiques du juke-box gardaient la roue dentée et la rubrique
+// Tables en rouge jusqu'à ce qu'on ouvre chaque ligne) : la pastille rouge des téléchargements est
+// une notification ; ouvrir la liste suffit à la lire, quel que soit le genre ou l'état du travail.
+test('pastille rouge des téléchargements : partie dès que la liste est vue, sans ouvrir chaque ligne', () => {
+  const at = '2026-11-10T20:00:00Z';
+  const job = (id: string, kind: DownloadJob['kind'], state: DownloadJob['state'], extra: Partial<DownloadJob> = {}): DownloadJob => ({ id, kind, title: id, source: { kind: 'site', label: 's' }, files: [], state, back: { screen: 'downloads' }, created: at, updated: at, finished: at, tries: 0, resumable: true, ...extra });
+  const queue: DownloadJob[] = [
+    job('musique-1', 'jukebox', 'done'),
+    job('musique-2', 'jukebox', 'done'),
+    job('medias', 'mediadb', 'done'),
+    job('table', 'site', 'failed'),
+    job('en-cours', 'jukebox', 'running'),
+  ];
+  const active = (j: DownloadJob) => j.state === 'running' || j.state === 'queued' || j.state === 'waiting' || j.state === 'paused';
+  const opened: string[] = [];
+  const manager = {
+    jobs: () => queue,
+    get: (id: string) => queue.find((j) => j.id === id),
+    progress: () => undefined,
+    // Comme downloadmanager.ts : seul ce qui est fini ou bloqué devient vu.
+    seen: (id: string) => {
+      const j = queue.find((x) => x.id === id);
+      if (j && !active(j)) j.seen = true;
+    },
+  };
+  assert.equal(downloadsAttention(summarize(queue)), true, 'des nouvelles : pastille rouge');
+  assert.equal(summarize(queue).unseen, 4);
+
+  /* eslint-disable @typescript-eslint/no-require-imports */
+  const { createDownloadCenter } = require(path.join(APP_DIST, 'download-center.js')) as { createDownloadCenter(o: object): { open(): void } };
+  /* eslint-enable @typescript-eslint/no-require-imports */
+  let build: (() => unknown) | undefined;
+  createDownloadCenter({
+    manager,
+    show: (b: () => unknown) => ((build = b), b()),
+    world: { hasTable: () => false, hasFriend: () => false, tableTitle: () => undefined, friendName: () => undefined },
+    deliver: (j: DownloadJob) => opened.push(j.id),
+    files: { detail: () => '', open: () => {} },
+    back: () => {},
+  }).open();
+  const s = summarize(queue);
+  assert.deepEqual(opened, [], 'aucune ligne ouverte');
+  assert.equal(downloadsAttention(s), false, 'la liste vue : plus de pastille rouge');
+  assert.equal(s.ready, 3, 'les prêts restent dits dans le texte de l’entrée');
+  assert.equal(downloadsPill(s)?.label, '1 en cours', 'la pastille du menu des tables suit ce qui tourne encore');
+
+  // Un téléchargement qui finit pendant qu'on regarde la liste (elle se redessine sur place) : vu aussi.
+  Object.assign(queue[4]!, { state: 'done', seen: false });
+  assert.equal(downloadsAttention(summarize(queue)), true);
+  build!();
+  assert.equal(downloadsAttention(summarize(queue)), false, 'fini sous les yeux : vu');
+  assert.equal(downloadsPill(summarize(queue)), undefined, 'tout vu : plus de pastille « prêt »');
+
+  // Une nouvelle arrivée ensuite rallume la pastille, jusqu'à la prochaine ouverture de la liste.
+  queue.push(job('musique-3', 'jukebox', 'done'));
+  assert.equal(downloadsAttention(summarize(queue)), true);
+  assert.equal(downloadsPill(summarize(queue))?.label, '5 prêts');
 });
 
 test('heure d’un évènement : seule le jour même, avec le jour sinon', () => {

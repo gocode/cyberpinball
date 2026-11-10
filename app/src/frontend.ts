@@ -5,7 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { app, BrowserWindow, globalShortcut, ipcMain, session, shell, type Input, type Rectangle } from 'electron';
+import { app, BrowserWindow, globalShortcut, ipcMain, session, shell, webContents, type Input, type Rectangle, type WebContents } from 'electron';
 import {
   createKeptPhones,
   ArcadeHours,
@@ -60,6 +60,10 @@ import {
   parseControllerEvent,
   readControllerSetting,
   controllerProblem,
+  controllerOddity,
+  controllerOddityKept,
+  defaultControllerSetting,
+  type ControllerElement,
   controllerSettingFileName,
   CONTROLLER_ELEMENTS,
   HEADSET_PROFILES,
@@ -1362,7 +1366,16 @@ function controllerSetting(): ControllerSetting {
 
 /** Assistant des manettes en cours : présentation, une fonction après l'autre, puis le résumé. */
 let controllerWizard:
-  | { profile: HeadsetProfile; phase: 'intro' | 'step' | 'summary'; index: number; functions: ControllerSetting['functions']; problem?: string; back: 'menu' | 'system' }
+  | {
+      profile: HeadsetProfile;
+      phase: 'intro' | 'step' | 'summary';
+      index: number;
+      functions: ControllerSetting['functions'];
+      problem?: string;
+      back: 'menu' | 'system';
+      /** Réglage gardé à l'envers de l'habitude (controllerOddity) : la remarque, et le réglage qu'on peut garder. */
+      odd?: { text: string; kept: ControllerSetting };
+    }
   | undefined;
 /** Assistant déjà proposé d'office pendant cette session. */
 let controllerOffered = false;
@@ -1370,7 +1383,18 @@ let controllerOffered = false;
 /** Assistant proposé d'office : casque porté sans réglage des manettes gardé pour cette configuration. */
 function offerControllerWizard(): void {
   const profile = headset?.profile;
-  if (controllerOffered || !profile || !headset?.worn || fs.existsSync(controllerFile(profile))) return;
+  if (controllerOffered || !profile || !headset?.worn) return;
+  if (fs.existsSync(controllerFile(profile))) {
+    // Réglage gardé, mais à l'envers de l'habitude (A et B croisés) : dit, avec le réglage par défaut proposé.
+    const text = readTextIfExists(controllerFile(profile)) || undefined;
+    const kept = readControllerSetting(text, profile);
+    const odd = controllerOddity(kept);
+    if (!odd || controllerOddityKept(text)) return;
+    controllerOffered = true;
+    console.log(`Casque : manettes ${profile} réglées à l'envers de l'habitude (${Object.entries(kept.functions).map(([f, el]) => `${f}=${el}`).join(', ')}) ; réglage par défaut proposé.`); // i18n-ignore : journal
+    openControllerWizard({ text: odd, kept });
+    return;
+  }
   controllerOffered = true;
   console.log(`Casque : manettes ${profile} sans réglage pour cette configuration ; assistant des manettes proposé d'office.`); // i18n-ignore : journal
   openControllerWizard();
@@ -1380,10 +1404,12 @@ function offerControllerWizard(): void {
  * Assistant des manettes (comme l'étape « Lanceur » de la borne) : le réglage proposé pour ces
  * manettes, gardé tel quel ou refait fonction par fonction, en appuyant sur le bouton voulu.
  */
-function openControllerWizard(): void {
+function openControllerWizard(odd?: { text: string; kept: ControllerSetting }): void {
   const profile = headset?.profile;
   if (!profile || controllerWizard || calibration || playing || launch || !headset?.worn) return;
-  controllerWizard = { profile, phase: 'intro', index: 0, functions: { ...controllerSetting().functions }, back: state.phase === 'menu' ? 'menu' : 'system' };
+  // Réglage à l'envers : c'est le réglage par défaut qui est proposé, le sien restant à un bouton.
+  const functions = odd ? { ...defaultControllerSetting(profile).functions } : { ...controllerSetting().functions };
+  controllerWizard = { profile, phase: 'intro', index: 0, functions, back: state.phase === 'menu' ? 'menu' : 'system', ...(odd ? { odd } : {}) };
   releaseHeadsetButtons();
   console.log(`Casque : assistant des manettes ouvert (${profile}).`); // i18n-ignore : journal
   showControllerWizard();
@@ -1400,7 +1426,14 @@ function showControllerWizard(): void {
   const list = headsetFunctions();
   const table = list.map((f) => t('{fonction} : {bouton}', { fonction: f.label, bouton: elementLabel(w.functions[f.id]) }));
   let lines: string[];
-  if (w.phase === 'intro')
+  if (w.phase === 'intro' && w.odd)
+    lines = [
+      w.odd.text,
+      t('{casque} : voici les boutons par défaut.', { casque: HEADSET_PROFILES[w.profile].label }),
+      ...table,
+      t('{valider} : prendre ces boutons · {retour} : les régler un par un · {menu} : garder mon réglage', { valider: elementLabel(w.functions.valider), retour: elementLabel(w.functions.retour), menu: elementLabel(w.functions.menu) }),
+    ];
+  else if (w.phase === 'intro')
     lines = [
       t('{casque} : voici les boutons proposés.', { casque: HEADSET_PROFILES[w.profile].label }),
       ...table,
@@ -1433,6 +1466,17 @@ function wizardButton(name: string): void {
   const el = parsed.element;
   const list = headsetFunctions();
   if (w.phase === 'intro' || w.phase === 'summary') {
+    // Réglage à l'envers gardé tel quel, sciemment : noté, plus jamais redemandé.
+    if (w.phase === 'intro' && w.odd && el === w.functions.menu) {
+      const kept = w.odd.kept;
+      try {
+        fs.writeFileSync(controllerFile(w.profile), JSON.stringify({ ...kept, keptAsIs: true }, null, 2) + '\n');
+      } catch (error) {
+        console.warn(`Casque : choix de garder le réglage des manettes pas noté (${(error as Error).message}).`); // i18n-ignore : journal
+      }
+      console.log(`Casque : réglage des manettes à l'envers gardé tel quel, sur demande (${w.profile}).`); // i18n-ignore : journal
+      return closeControllerWizard(false);
+    }
     if (el === w.functions.valider) {
       const problem = controllerProblem({ profile: w.profile, functions: w.functions });
       if (problem) {
@@ -2741,6 +2785,18 @@ function exitHintText(): string | undefined {
   return el ? t('{bouton} : pause · tenu : quitter', { bouton: CONTROLLER_ELEMENTS[el]?.label ?? el }) : undefined;
 }
 
+/** Le rappel des touches de la pause dans le casque, avec les vrais boutons : « Joystick : choisir · A : valider ». */
+function pauseKeyLabels(): { help?: string; resumeHint?: string } {
+  const { valider, retour } = controllerSetting().functions;
+  const label = (el: ControllerElement | undefined) => (el ? CONTROLLER_ELEMENTS[el].label : undefined);
+  const ok = label(valider);
+  const back = label(retour);
+  return {
+    ...(ok ? { help: t('Joystick : choisir · {bouton} : valider', { bouton: ok }) } : {}),
+    ...(back ? { resumeHint: t('{bouton} : reprendre', { bouton: back }) } : {}),
+  };
+}
+
 /** Têtes relevées par le compagnon en veille pendant la partie dans le casque (toutes les 5 s). */
 let gameHeads: HeadPose[] = [];
 /**
@@ -3009,7 +3065,7 @@ function prepareVr(tableFile: string, doubleIni: string | undefined): VrGame | u
     const pausePlugin = vpxDir ? installPausePlugin(path.dirname(vpxDir), path.join(__dirname, '..')) : 'missing';
     if (pausePlugin === 'missing' || pausePlugin === 'busy') details.push(`pause dans le casque indisponible (plugin ${pausePlugin === 'missing' ? 'absent' : 'occupé'})`); // i18n-ignore : journal
     else {
-      writeIniSettings(vr.ini, pauseSettingsFor(readTextIfExists(vr.ini), { pause: t('Pause'), resume: t('Reprendre'), quit: t('Quitter') }));
+      writeIniSettings(vr.ini, pauseSettingsFor(readTextIfExists(vr.ini), { pause: t('Pause'), resume: t('Reprendre'), quit: t('Quitter'), ...pauseKeyLabels() }));
       details.push(`pause dans le casque : plugin ${pausePlugin === 'installed' ? 'installé' : 'à jour'}, appui court sur Pause ou tenu ${QUIT_HOLD_S} s pour quitter`); // i18n-ignore : journal
     }
     // Une seule pose : la table de VPX où est la borne du casque (calée ou non), à chaque partie.
@@ -3225,8 +3281,9 @@ library.provideSystemItem('shutdown', power.items.shutdown);
  * Mode bureau : chaque fenêtre de Cyber Pinball (menu, voiles du gardien des écrans, et toute
  * autre ouverte) quitte son écran, quel que soit leur nombre (desktop-mode.ts).
  */
-const desktop = new DesktopMode<BrowserWindow>({
+const desktop = new DesktopMode<BrowserWindow, WebContents>({
   windows: () => BrowserWindow.getAllWindows(),
+  contents: () => webContents.getAllWebContents(),
   isShown,
   isVeil,
   hideVeil: hideCovered,
@@ -3257,7 +3314,7 @@ function showDesktop(): boolean {
   const away = desktop.enter();
   // Le bureau dans l'orientation de Windows, le temps d'y travailler.
   orientationForDesktop();
-  console.log(`Mode bureau : ${away.length} fenêtres de Cyber Pinball rangées (${away.filter(isVeil).length} voiles), tous les écrans libres.`);
+  console.log(`Mode bureau : ${away.length} fenêtres de Cyber Pinball rangées (${away.filter(isVeil).length} voiles), tous les écrans libres, ${desktop.silenced} pages muettes.`);
   if (!OFFSCREEN && !globalShortcut.register(accelerator(SHORTCUTS.desktop), () => restoreFromDesktop())) {
     console.warn(`Mode bureau : ${shortcutLabel(SHORTCUTS.desktop)} est déjà pris par un autre programme ; la barre des tâches ramène le menu.`);
   }
@@ -3303,6 +3360,8 @@ export function startFrontend(): void {
   loadPlugins(loc.dataDir);
   // Cyber Pinball relancé alors que le menu est ouvert : le menu revient (mode bureau quitté,
   // premier plan) ; pendant une partie, VPX garde l'écran.
+  // Au bureau, une page ouverte entre-temps (morceau suivant du juke-box…) naît muette.
+  app.on('web-contents-created', (_e, contents) => desktop.silence(contents));
   handleSecondLaunch(() => {
     if (desktop.active) return restoreFromDesktop();
     if (state.phase === 'playing' || state.phase === 'loading') return;
@@ -4438,6 +4497,12 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   if (hooks.gate) gameNotices.prepareWait(liveGames.waitView({ manual: liveManual }));
   // Une partie simulée ne prend aucun raccourci global au poste.
   if (simulated === undefined) globalShortcut.register(accelerator(SHORTCUTS.forceStop), () => guest.knock('game.force-stop') && game.stop());
+  // Partie dans le casque : Échap quitte toujours, que VPX ait le clavier ou non, quoi que fasse un plugin ou le
+  // réglage des manettes (essai du 10 novembre 2026 : partie bloquée, sortie avalée). Cyber Pinball ferme VPX.
+  const vrEscape = vrGame !== undefined && simulated === undefined && globalShortcut.register(accelerator(SHORTCUTS.vrExit), () => {
+    console.log('Partie dans le casque : Échap au clavier, Cyber Pinball ferme VPX.'); // i18n-ignore : journal
+    if (guest.knock('game.force-stop')) game.stop();
+  });
   // Partie entre amis : l'état de jeu que le relevé du double écrit (livestate.ts), deux fois par seconde ;
   // score et bille partent aux autres ; la partie finie (initiales saisies), VPX se ferme seul.
   let live: { score?: number; multi?: boolean } | undefined;
@@ -4524,6 +4589,7 @@ async function play(table: TableEntry, autoStopAfterMs?: number, mode?: 'display
   double?.finish();
   recording?.gameEnded();
   if (simulated === undefined) globalShortcut.unregister(accelerator(SHORTCUTS.forceStop));
+  if (vrEscape) globalShortcut.unregister(accelerator(SHORTCUTS.vrExit));
   cinema.stop();
   stopWatchOccupied();
   socialNet.setPresence({ status: 'menu', since: new Date().toISOString() });

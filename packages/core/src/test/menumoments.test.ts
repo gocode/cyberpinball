@@ -508,10 +508,18 @@ test('essais hors écran : toute fenêtre de l’application est muette', () => 
   const offscreen = fs.readFileSync(path.join(APP, 'src', 'offscreen.ts'), 'utf8');
   const create = offscreen.slice(offscreen.indexOf('export function createWindow'), offscreen.indexOf('function keepOffscreen'));
   assert.match(create, /setAudioMuted\(true\)/);
-  // Le rendu ne rétablit jamais le son de la fenêtre.
+  // Le rendu ne rétablit jamais le son de la fenêtre. Seule exception : le retour du mode bureau,
+  // qui ne le rend qu'aux pages qu'il a lui-même coupées (une fenêtre hors écran, muette dès sa
+  // création, n'en est jamais : mode-bureau.test.ts).
   for (const dir of [path.join(APP, 'src'), path.join(APP, 'renderer')]) {
     for (const name of fs.readdirSync(dir).filter((f) => /\.(ts|js)$/.test(f))) {
-      assert.doesNotMatch(fs.readFileSync(path.join(dir, name), 'utf8'), /setAudioMuted\(false\)/, name);
+      const source = fs.readFileSync(path.join(dir, name), 'utf8');
+      if (name === 'desktop-mode.ts') {
+        assert.deepEqual([...source.matchAll(/.*setAudioMuted\(false\).*/g)].map((m) => m[0].trim()), ['for (const contents of this.muted) if (!contents.isDestroyed()) contents.setAudioMuted(false);'], name);
+        assert.match(source, /if \(!this\.on \|\| contents\.isDestroyed\(\) \|\| contents\.isAudioMuted\(\)\) return false;/, 'le mode bureau ne prend pas en charge une page déjà muette');
+        continue;
+      }
+      assert.doesNotMatch(source, /setAudioMuted\(false\)/, name);
     }
   }
 });

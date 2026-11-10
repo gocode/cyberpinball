@@ -26,6 +26,8 @@ set_target_properties(kinect-factice PROPERTIES OUTPUT_NAME "kinect-factice" PRE
 add_library(cyberpinball SHARED src/cyberpinball.cpp)
 target_include_directories(cyberpinball PRIVATE vendor/vpx src)
 set_target_properties(cyberpinball PROPERTIES OUTPUT_NAME "plugin-cyberpinball64" PREFIX "")
+# Version de VPX (GetFileVersionInfoW) : la table des actions ne vaut que pour 10.8.1.
+target_link_libraries(cyberpinball PRIVATE version)
 
 # Banc de la pause (logique, sans VPX ni casque).
 add_executable(banc-pause test/banc-pause.cpp)

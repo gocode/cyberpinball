@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.9
 
+- Windows desktop (Ctrl+Shift+D): no sound at all from Cyber Pinball while you are on Windows, jukebox included; sound comes back when you return to the menu.
+- In the headset: pausing and leaving a game always respond; Pause, Escape and the VPX menu are never swallowed any more, and Quit closes VPX for sure.
+- In the headset: controllers set up the wrong way round (A and B swapped) are flagged when you put the headset on, with the default setup offered.
+- Downloads: the red dot on the gear and on the Tables section goes away as soon as the downloads list is opened; no need to open each finished download any more.
 - Phone remote: once accepted, the phone is kept. It then comes back without a QR code or acceptance, from a shortcut on its Home screen (Android and iPhone alike, with nothing to install), and reconnects by itself when Cyber Pinball restarts. Kept phones are listed in System menu > Phone remote, where you can forget one.
 - Menu DMD: the dots now stay on screen at all times on the wheel; they no longer disappear for a few seconds each cycle to make way for the table's media, which shows around them on a FullDMD.
 - A livelier menu DMD: on arriving at a table, a close-up of its wheel in dots (often its logotype) lights up, slides, then makes way for the title.

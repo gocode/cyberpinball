@@ -11,6 +11,10 @@ son interface).
 
 ## 0.1.9
 
+- Bureau Windows (Ctrl+Maj+D) : plus aucun son de Cyber Pinball tant que vous êtes sur Windows, juke-box compris ; le son revient au retour au menu.
+- Dans le casque : la pause et la sortie d'une partie répondent toujours ; Pause, Échap et le menu de VPX ne sont plus jamais avalés, et Quitter ferme VPX à coup sûr.
+- Dans le casque : des manettes réglées à l'envers (A et B croisés) sont signalées au port du casque, avec le réglage par défaut proposé.
+- Téléchargements : la pastille rouge de la roue dentée et de la rubrique Tables part dès que la liste des téléchargements est ouverte ; plus besoin d'ouvrir chaque téléchargement fini.
 - Télécommande du téléphone : accepté une fois, le téléphone est gardé. Il revient ensuite sans QR code ni acceptation, d'un raccourci sur son écran d'accueil (Android comme iPhone, sans rien installer), et se reconnecte seul quand Cyber Pinball redémarre. Les téléphones gardés sont listés dans Menu système > Télécommande du téléphone, où l'on peut en oublier un.
 - DMD du menu : les points restent affichés en permanence sur la roue ; ils ne disparaissent plus quelques secondes à chaque tour pour laisser la place au média de la table, qui se voit autour d'eux sur un FullDMD.
 - DMD du menu plus vivant : à l'arrivée sur une table, un détail de sa wheel en points (souvent son logotype) s'allume, glisse, puis laisse la place au titre.

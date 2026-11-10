@@ -16,6 +16,11 @@ test('fronton : la pause en tête des rendus, le fond opaque en dernier, PuP à 
   const get = (section: string, key: string) => settings.find((s) => s.section === section && s.key === key)?.value;
   assert.equal(get('Plugin.CyberPinball', 'Enable'), '1');
   assert.equal(get('Plugin.CyberPinball', 'Resume'), 'Reprendre');
+  // Le rappel des touches et celui du bouton Pause, seulement s'ils sont donnés.
+  assert.equal(get('Plugin.CyberPinball', 'Help'), undefined);
+  const withHelp = pauseVrSettings('', { pause: 'Pause', resume: 'Reprendre', quit: 'Quitter', help: 'Joystick : choisir · A : valider', resumeHint: 'B : reprendre' });
+  assert.equal(withHelp.find((s) => s.key === 'Help')?.value, 'Joystick : choisir · A : valider');
+  assert.equal(withHelp.find((s) => s.key === 'ResumeHint')?.value, 'B : reprendre');
   assert.equal(get('Backglass', `Priority.${PAUSE_RENDERER}`), '100');
   assert.equal(get('Backglass', `Priority.${FALLBACK_RENDERER}`), '0');
   assert.equal(get('Backglass', 'Priority.PUP'), '99');
@@ -42,7 +47,7 @@ test('plugin : rien hors du casque (jamais en 2D, activé seulement dans l’INI
   assert.match(cpp, /int MSGPIAPI dessinerPause\(VPXRenderContext2D\* ctx, void\*\)\s*\{[^}]*if \(!ctx \|\| ctx->is2D \|\| !vpxApi \|\| !enPartie\)\s*return 0;/);
   assert.match(cpp, /int MSGPIAPI dessinerFond\(VPXRenderContext2D\* ctx, void\*\)\s*\{[^}]*if \(!ctx \|\| ctx->is2D \|\| !vpxApi\)\s*return 0;/);
   // Hors de la pause et de l'appui tenu : il rend la main (B2S ou PuP dessinent le fronton).
-  assert.match(cpp, /if \(!pause\.ouverte\(\) && !tenu\)\s*return 0;/);
+  assert.match(cpp, /if \(!pause\.affichee\(t\)\)\s*return 0;/);
   // Activé dans l'INI de la partie dans le casque seulement (prepareVr), jamais dans celui de la borne.
   const frontend = read('app', 'src', 'frontend.ts');
   assert.equal(frontend.match(/pauseSettingsFor\(/g)?.length, 1);
@@ -56,7 +61,7 @@ test('plugin : rien hors du casque (jamais en 2D, activé seulement dans l’INI
   assert.match(read('packages', 'vpx-vision3d', 'cyberpinball.cfg'), /id = "CyberPinball"/);
 });
 
-test('plugin : banc de la pause (appui court, choix, appui tenu 1,5 s, annulation), s’il est construit', (t) => {
+test('plugin : banc de la pause (pause de VPX constatée, joystick, valider, appui tenu 1,5 s, jamais avalés), s’il est construit', (t) => {
   const banc = path.join(repo, 'build', 'vision3d', 'Release', 'banc-pause.exe');
   if (!fs.existsSync(banc)) return t.skip('banc pas construit (node scripts/vision3d.mjs)');
   const run = spawnSync(banc, [], { encoding: 'utf8', windowsHide: true });

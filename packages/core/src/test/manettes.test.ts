@@ -263,7 +263,7 @@ test('manettes : l’INI de VPX suit le réglage des manettes (boutons, lanceur 
 test('manettes : l’assistant, branché sur les manettes et rouvrable', () => {
   const frontend = read('app', 'src', 'frontend.ts');
   // D'office au premier port d'un casque sans réglage pour cette configuration ; par ≡ et par le menu système.
-  assert.match(frontend, /if \(controllerOffered \|\| !profile \|\| !headset\?\.worn \|\| fs\.existsSync\(controllerFile\(profile\)\)\) return;/);
+  assert.match(frontend, /if \(controllerOffered \|\| !profile \|\| !headset\?\.worn\) return;\s*if \(fs\.existsSync\(controllerFile\(profile\)\)\) \{/);
   assert.match(frontend, /onProfile: \(\) => offerControllerWizard\(\),/);
   assert.match(frontend, /label: t\('Manettes'\)[\s\S]{0,200}openControllerWizard\(\);/);
   assert.match(frontend, /library\.provideSystemItem\('vr-controllers', \{/);

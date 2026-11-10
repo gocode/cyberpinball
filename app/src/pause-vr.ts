@@ -3,8 +3,10 @@
 //
 // Pendant la partie, VPX tient l'affichage du casque et son interface est collée aux yeux. Le plugin
 // dessine la pause sur le fronton de la scène VR (rendu annexe de la fenêtre Backglass, voir le
-// plugin) : appui court sur Pause, « Reprendre » / « Quitter » ; appui tenu 1,5 s, la partie quitte,
-// avec une jauge. Hors du casque, il n'est pas activé, et ne dessine de toute façon jamais en 2D.
+// plugin) : appui court sur Pause, VPX se met en pause et le plugin montre « Reprendre » / « Quitter »
+// (joystick pour choisir, Valider pour confirmer) ; appui tenu 1,5 s, la partie quitte, avec une jauge.
+// Pause, Échap et le menu de VPX ne sont jamais retenus par le plugin. Hors du casque, il n'est pas
+// activé, et ne dessine de toute façon jamais en 2D.
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -55,6 +57,6 @@ export function installPausePlugin(vpxDir: string, appDir: string): 'installed' 
 }
 
 /** Les réglages du plugin pour l'INI de la partie dans le casque (activé, libellés, priorités du fronton). */
-export function pauseSettingsFor(iniText: string, labels: { pause: string; resume: string; quit: string }): VpxSetting[] {
+export function pauseSettingsFor(iniText: string, labels: { pause: string; resume: string; quit: string; help?: string; resumeHint?: string }): VpxSetting[] {
   return pauseVrSettings(iniText, labels);
 }

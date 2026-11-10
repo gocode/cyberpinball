@@ -524,7 +524,15 @@ export interface DownloadSummary {
   paused: number;
   /** Finis pas encore rendus à leur écran. */
   ready: number;
+  /** Bloqués que la liste n'a pas encore montrés. */
   failed: number;
+  /**
+   * Nouvelles que la liste n'a pas encore montrées : finis pas encore rendus, ou bloqués, jamais
+   * vus (DownloadJob.seen). Seules elles portent la pastille rouge (downloadsAttention) : ouvrir
+   * la liste suffit à la faire partir, sans ouvrir chaque ligne (essai du 10/11/2026 : des
+   * musiques du juke-box gardaient la roue dentée et la rubrique Tables en rouge).
+   */
+  unseen: number;
   /** Part reçue de ce qui tourne ou attend (0 à 1), si les tailles sont connues. */
   fraction?: number;
   /** Octets qui restent à recevoir (tailles connues). */
@@ -532,7 +540,7 @@ export interface DownloadSummary {
 }
 
 export function summarize(jobs: readonly DownloadJob[]): DownloadSummary {
-  const out: DownloadSummary = { running: 0, waiting: 0, paused: 0, ready: 0, failed: 0, left: 0 };
+  const out: DownloadSummary = { running: 0, waiting: 0, paused: 0, ready: 0, failed: 0, unseen: 0, left: 0 };
   let got = 0;
   let all = 0;
   let unknown = false;
@@ -542,6 +550,7 @@ export function summarize(jobs: readonly DownloadJob[]): DownloadSummary {
     else if (j.state === 'paused') out.paused++;
     else if (j.state === 'done' && !j.delivered) out.ready++;
     else if (j.state === 'failed' && !j.seen) out.failed++;
+    if (!j.seen && ((j.state === 'done' && !j.delivered) || j.state === 'failed')) out.unseen++;
     if (j.state === 'running' || j.state === 'queued' || j.state === 'waiting') {
       const b = jobBytes(j);
       if (b.total === undefined) unknown = true;
@@ -554,6 +563,15 @@ export function summarize(jobs: readonly DownloadJob[]): DownloadSummary {
   }
   if (!unknown && all > 0) out.fraction = Math.min(0.999, got / all);
   return out;
+}
+
+/**
+ * Pastille rouge des téléchargements (entrée du menu système, rubrique Tables, roue dentée) : une
+ * nouvelle pas encore vue. Une notification se lit en ouvrant sa liste ; ce qui y reste « prêt »
+ * se dit dans le texte de l'entrée, sans pastille.
+ */
+export function downloadsAttention(s: DownloadSummary): boolean {
+  return s.unseen > 0;
 }
 
 /** « 2 en cours · 2 en attente · 1 prêt » ; rien : « Rien en cours ». */
@@ -570,8 +588,8 @@ export function summaryText(s: DownloadSummary): string {
 
 /**
  * Pastille du menu des tables, un seul texte à la fois, par priorité (jamais d'alternance) :
- * « 2 en cours · 45 % », sinon « En attente », sinon « 1 bloqué », sinon « 1 prêt » ; undefined
- * quand il n'y a rien à suivre (la pastille n'est pas dessinée). Le pourcentage porte sur les
+ * « 2 en cours · 45 % », sinon « En attente », sinon « 1 bloqué », sinon « 1 prêt » (tant que la
+ * liste ne l'a pas montré) ; undefined quand il n'y a rien à suivre (la pastille n'est pas dessinée). Le pourcentage porte sur les
  * octets de taille connue ; une taille inconnue ne compte pas pour zéro : il n'est pas dit.
  */
 export function downloadsPill(s: DownloadSummary): { label: string; value?: number; tone: 'info' | 'warning' | 'ok' | 'error'; icon: 'download' | 'refresh' | 'check' | 'alert'; title: string } | undefined {
@@ -584,6 +602,7 @@ export function downloadsPill(s: DownloadSummary): { label: string; value?: numb
   }
   if (s.waiting) return { label: t('En attente'), ...value, tone: 'warning', icon: 'refresh', title };
   if (s.failed) return { label: tn(s.failed, '{n} bloqué', '{n} bloqués'), tone: 'error', icon: 'alert', title };
-  if (s.ready) return { label: tn(s.ready, '{n} prêt', '{n} prêts'), tone: 'ok', icon: 'check', title };
+  // « Prêt » est une nouvelle : vue dans la liste, la pastille s'en va (le texte de l'entrée le garde).
+  if (s.ready && s.unseen) return { label: tn(s.ready, '{n} prêt', '{n} prêts'), tone: 'ok', icon: 'check', title };
   return undefined;
 }

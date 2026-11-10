@@ -110,12 +110,15 @@ export const FALLBACK_RENDERER = 'CyberPinball.Fond';
  * tête (elle rend la main hors de la pause), le fond opaque en dernier ; un autre rendu réglé à 100
  * (PuP l'est d'office) descend à 99 pour laisser la pause devant.
  */
-export function pauseVrSettings(iniText: string, labels: { pause: string; resume: string; quit: string }): VpxSetting[] {
+export function pauseVrSettings(iniText: string, labels: { pause: string; resume: string; quit: string; help?: string; resumeHint?: string }): VpxSetting[] {
   const out: VpxSetting[] = [
     { section: 'Plugin.CyberPinball', key: 'Enable', value: '1' },
     { section: 'Plugin.CyberPinball', key: 'Pause', value: labels.pause },
     { section: 'Plugin.CyberPinball', key: 'Resume', value: labels.resume },
     { section: 'Plugin.CyberPinball', key: 'Quit', value: labels.quit },
+    // Le rappel des touches sous les choix (lignes séparées par « · ») et celui du bouton Pause quand la reprise n'a pas pris.
+    ...(labels.help ? [{ section: 'Plugin.CyberPinball', key: 'Help', value: labels.help }] : []),
+    ...(labels.resumeHint ? [{ section: 'Plugin.CyberPinball', key: 'ResumeHint', value: labels.resumeHint }] : []),
     { section: 'Backglass', key: `Priority.${PAUSE_RENDERER}`, value: '100' },
     { section: 'Backglass', key: `Priority.${FALLBACK_RENDERER}`, value: '0' },
   ];

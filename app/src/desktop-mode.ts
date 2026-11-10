@@ -9,8 +9,22 @@
 // quelle qu'elle soit (menu, voiles, navigateur intégré, réglages, et toute fenêtre à venir),
 // et y revient au retour, les voiles d'abord.
 //
+// Signalement du 10/11/2026 : au bureau, le son de Cyber Pinball continuait (musique du menu,
+// vidéos des tables, juke-box), une fenêtre réduite ou cachée jouant toujours. Le mode bureau
+// coupe donc aussi le son de chaque page de l'application (webContents.getAllWebContents :
+// fenêtres, mais aussi vues sans fenêtre propre, comme le lecteur du juke-box), y compris celles
+// ouvertes pendant le bureau, et le rend au retour à celles-là seulement : une page déjà muette
+// (vues du casque, rendu hors écran) le reste.
+//
 // Sans electron à l'exécution : le module est aussi chargé par les tests du cœur, avec des
 // fenêtres simulées.
+
+/** Ce que le mode bureau lit et fait d'une page de l'application (webContents). */
+export interface DesktopContents {
+  isDestroyed(): boolean;
+  isAudioMuted(): boolean;
+  setAudioMuted(muted: boolean): void;
+}
 
 /** Ce que le mode bureau lit d'une fenêtre de l'application (BrowserWindow). */
 export interface DesktopWindow {
@@ -18,9 +32,11 @@ export interface DesktopWindow {
   isMinimized(): boolean;
 }
 
-export interface DesktopModeOptions<W extends DesktopWindow> {
+export interface DesktopModeOptions<W extends DesktopWindow, C extends DesktopContents = DesktopContents> {
   /** Toutes les fenêtres de l'application (BrowserWindow.getAllWindows) : aucune n'est oubliée. */
   windows(): W[];
+  /** Toutes les pages de l'application (webContents.getAllWebContents), vues sans fenêtre comprises : aucune ne joue au bureau. */
+  contents(): C[];
   /** Fenêtre affichée (isShown d'offscreen.ts). */
   isShown(win: W): boolean;
   /** Voile noir du gardien des écrans : caché, puisqu'il n'a ni bouton dans la barre des tâches ni focus. */
@@ -37,12 +53,14 @@ export interface DesktopModeOptions<W extends DesktopWindow> {
   raiseWindow(win: W): void;
 }
 
-export class DesktopMode<W extends DesktopWindow> {
+export class DesktopMode<W extends DesktopWindow, C extends DesktopContents = DesktopContents> {
   /** Fenêtres rangées par le mode bureau, à remettre au retour. */
   private readonly away = new Set<W>();
+  /** Pages rendues muettes par le mode bureau, dont le son revient au retour. */
+  private readonly muted = new Set<C>();
   private on = false;
 
-  constructor(private readonly options: DesktopModeOptions<W>) {}
+  constructor(private readonly options: DesktopModeOptions<W, C>) {}
 
   get active(): boolean {
     return this.on;
@@ -60,6 +78,7 @@ export class DesktopMode<W extends DesktopWindow> {
    */
   clear(): W[] {
     if (!this.on) return [];
+    for (const contents of this.options.contents()) this.silence(contents);
     const left: W[] = [];
     for (const win of this.options.windows()) {
       if (!this.onScreen(win)) continue;
@@ -69,6 +88,19 @@ export class DesktopMode<W extends DesktopWindow> {
       this.away.add(win);
     }
     return left;
+  }
+
+  /** Au bureau, coupe le son d'une page (dès sa création : app « web-contents-created ») ; vrai si c'est le mode bureau qui l'a coupé. */
+  silence(contents: C): boolean {
+    if (!this.on || contents.isDestroyed() || contents.isAudioMuted()) return false;
+    contents.setAudioMuted(true);
+    this.muted.add(contents);
+    return true;
+  }
+
+  /** Nombre de pages que le mode bureau a rendues muettes. */
+  get silenced(): number {
+    return this.muted.size;
   }
 
   /**
@@ -88,6 +120,9 @@ export class DesktopMode<W extends DesktopWindow> {
     this.on = false;
     const away = [...this.away].filter((win) => !win.isDestroyed());
     this.away.clear();
+    // Le son revient avec l'image, aux seules pages que le mode bureau a coupées.
+    for (const contents of this.muted) if (!contents.isDestroyed()) contents.setAudioMuted(false);
+    this.muted.clear();
     for (const win of away) if (this.options.isVeil(win) && !this.options.isShown(win)) this.options.showVeil(win);
     for (const win of away) {
       if (this.options.isVeil(win)) continue;

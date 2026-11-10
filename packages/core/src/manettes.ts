@@ -246,6 +246,33 @@ export function controllerProblem(setting: ControllerSetting): string | undefine
   return undefined;
 }
 
+/**
+ * Valider et retour croisés par rapport au défaut du profil (sur des Touch : B valide et A revient, met en
+ * pause en partie) : un réglage complet, mais à l'envers de l'habitude, souvent fait sans le vouloir (essai
+ * du 10 novembre 2026 : valider=b, retour=a). Cyber Pinball le dit et propose le réglage par défaut.
+ */
+export function controllerOddity(setting: ControllerSetting): string | undefined {
+  const usual = DEFAULTS[setting.profile];
+  const { valider, retour } = setting.functions;
+  if (!usual.valider || !usual.retour || (valider !== usual.retour && retour !== usual.valider)) return undefined;
+  const label = (el: ControllerElement | undefined) => (el ? CONTROLLER_ELEMENTS[el].label : '—');
+  return t('Vos manettes sont réglées à l’envers de l’habitude : {valider} valide et {retour} revient (et met en pause en partie). D’habitude, {usualValider} valide et {usualRetour} revient.', {
+    valider: label(valider),
+    retour: label(retour),
+    usualValider: label(usual.valider),
+    usualRetour: label(usual.retour),
+  });
+}
+
+/** Le joueur a vu la remarque de controllerOddity et gardé son réglage tel quel : on ne le lui redemande plus. */
+export function controllerOddityKept(text: string | undefined): boolean {
+  try {
+    return Boolean(text && (JSON.parse(text) as { keptAsIs?: unknown }).keptAsIs === true);
+  } catch {
+    return false;
+  }
+}
+
 /** Réglage lu d'un fichier : gardé seulement s'il est complet et cohérent ; sinon le défaut du profil. */
 export function readControllerSetting(text: string | undefined, profile: HeadsetProfile): ControllerSetting {
   try {

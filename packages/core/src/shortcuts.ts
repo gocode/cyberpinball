@@ -19,6 +19,8 @@ export const SHORTCUTS = {
   desktop: { control: true, shift: true, code: 'KeyD' },
   /** Arrêter une partie bloquée (pendant une partie seulement). */
   forceStop: { control: true, shift: true, code: 'KeyK' },
+  /** Échap seul : quitter une partie dans le casque, que VPX ait le clavier ou non (pendant cette partie seulement). */
+  vrExit: { code: 'Escape' },
 } as const satisfies Record<string, Shortcut>;
 
 /** Accélérateur d'Electron (raccourci global de frontend.ts) : « Control+Shift+D ». */

@@ -104,6 +104,7 @@ import {
   ARCHIVE_EXT,
   downloadInventory,
   createDownloadManager,
+  downloadsAttention,
   downloadsPill,
   downloadsSummary,
   emptiableDownloads,
@@ -832,10 +833,10 @@ export function createLibrary(host: LibraryHost) {
           if (ready) return t('{summary} · prêt : {screen}', { summary: summaryText(s), screen: returnLabel(resolveReturn(ready, downloadWorld).to, downloadWorld) });
           return jobs.length ? summaryText(s) : t('Ce qui arrive des sites et des amis, et ce qui est gardé');
         },
-        // Un téléchargement fini attend qu'on y revienne, ou un bloqué qu'on s'en occupe : pastille rouge.
+        // Un téléchargement fini ou bloqué que la liste n'a pas encore montré : pastille rouge
+        // (downloadsAttention). Ouvrir la liste suffit à la faire partir.
         get attention() {
-          const s = summarize(downloads.jobs());
-          return s.ready > 0 || s.failed > 0;
+          return downloadsAttention(summarize(downloads.jobs()));
         },
         run: () => openDownloads(),
       },

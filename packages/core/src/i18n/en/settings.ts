@@ -24,6 +24,11 @@ export const messages: Record<string, string> = {
   'Vérifiez la place de la borne.': 'Check the cabinet’s place.',
   'La limite du Quest a changé : recalez.': 'The Quest boundary changed: align again.',
   '{bouton} : pause · tenu : quitter': '{bouton}: pause · hold: quit',
+  'Joystick : choisir · {bouton} : valider': 'Stick: choose · {bouton}: confirm',
+  '{bouton} : reprendre': '{bouton}: resume',
+  'Vos manettes sont réglées à l’envers de l’habitude : {valider} valide et {retour} revient (et met en pause en partie). D’habitude, {usualValider} valide et {usualRetour} revient.': 'Your controllers are set the other way round: {valider} confirms and {retour} goes back (and pauses in a game). Usually, {usualValider} confirms and {usualRetour} goes back.',
+  '{casque} : voici les boutons par défaut.': '{casque}: here are the default buttons.',
+  '{valider} : prendre ces boutons · {retour} : les régler un par un · {menu} : garder mon réglage': '{valider}: take these buttons · {retour}: set them one by one · {menu}: keep my setting',
   // packages/core/src/calage.ts, app/src/frontend.ts : pièce de VPX différente de celle du compagnon
   'À la dernière partie, vous jouiez dos à la borne calée : la table de VPX n’était pas sur elle (pièce différente pour VPX, par exemple après « Réinitialiser la vue » de Link). Recalez, puis relancez la partie.': 'In the last game, you were playing with your back to the aligned cabinet: the VPX table was not on it (a different room for VPX, for example after Link’s “Reset view”). Align again, then restart the game.',
   '« Réinitialiser la vue » a été fait pendant la dernière partie : le runtime garde ce recentrage pour VPX, et la table n’est plus sur la borne du casque. Recalez.': '“Reset view” was used during the last game: the runtime keeps this recentring for VPX, and the table is no longer on the headset cabinet. Align again.',
