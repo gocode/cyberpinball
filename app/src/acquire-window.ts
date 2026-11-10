@@ -64,11 +64,13 @@ import {
   webEngineUrl,
   webSearchOf,
   WEB_ENGINES,
+  youtubePlaylistSearchUrl,
   type GrabKind,
   type VideoPage,
   type WebEngine,
   type NavigationKeys,
   type ProbeResult,
+  type CookieRecord,
   type SiteCookie,
   type SourceSite,
   type TransferMeter,
@@ -139,7 +141,7 @@ export interface AcquireRequest {
    * Recherche libre : un champ de recherche dans le bandeau, prérempli, avec ses moteurs ;
    * « Retour à la recherche » au lieu de « Retour à la fiche » ; les pages vidéo y sont décrites.
    */
-  search?: { query: string; engine: WebEngine; want?: GrabKind };
+  search?: { query: string; engine: WebEngine; want?: GrabKind; playlists?: boolean };
 }
 
 /**
@@ -602,6 +604,11 @@ export function createAcquirer(events: AcquireEvents) {
     return Math.ceil(reference * (open?.scale?.unit ?? 1));
   }
 
+  /** Adresse d'une recherche libre ; ouverte du Juke-box, YouTube n'y montre que des playlists. */
+  function searchUrl(query: string, engine: WebEngine): string {
+    return engine === 'youtube' && open?.request.search?.playlists ? youtubePlaylistSearchUrl(query) : webEngineUrl(query, engine);
+  }
+
   /** Ligne du Juke-box : la page est une playlist ou une vidéo YouTube qu'on peut y ajouter. */
   function jukeboxLine(): { kind: 'playlist' | 'video'; text: string } | undefined {
     if (!open || !events.jukebox || open.view.webContents.isDestroyed()) return undefined;
@@ -887,7 +894,7 @@ export function createAcquirer(events: AcquireEvents) {
     ipcMain.on('acquire:search', (e, query: unknown, engine: unknown) => {
       if (!open?.request.search || e.sender !== open.win.webContents || typeof query !== 'string' || !query.trim()) return;
       const chosen = WEB_ENGINES.includes(engine as WebEngine) ? (engine as WebEngine) : 'web';
-      void open.view.webContents.loadURL(webEngineUrl(query, chosen));
+      void open.view.webContents.loadURL(searchUrl(query, chosen));
     });
     // « Télécharger cette vidéo » : le fichier que la page lit, téléchargé comme un lien (il revient au média).
     // « Récupérer le son » / « Récupérer la vidéo » : yt-dlp, sur la page vidéo affichée.
@@ -991,7 +998,7 @@ export function createAcquirer(events: AcquireEvents) {
       runSearch: (query, engine) => {
         if (!open?.request.search) return;
         const chosen = WEB_ENGINES.includes(engine as WebEngine) ? (engine as WebEngine) : (webSearchOf(contents.getURL()) ?? open.lastSearch ?? open.request.search).engine;
-        void contents.loadURL(webEngineUrl(query, chosen));
+        void contents.loadURL(searchUrl(query, chosen));
       },
     });
     // Une page qui ouvre un nouvel onglet (lien de téléchargement, MEGA) : dans la même vue.
@@ -1413,11 +1420,63 @@ export function createAcquirer(events: AcquireEvents) {
     await s.cookies.flushStore();
   }
 
+  /** Cookies de la session dont le domaine répond à `match` (compte YouTube : youtube.com et Google). */
+  async function cookiesWhere(match: (domain: string) => boolean): Promise<CookieRecord[]> {
+    return (await acquireSession().cookies.get({}))
+      .filter((c) => match(c.domain ?? ''))
+      .map((c) => ({ name: c.name, value: c.value, domain: c.domain ?? '', path: c.path ?? '/', secure: Boolean(c.secure), httpOnly: Boolean(c.httpOnly), hostOnly: Boolean(c.hostOnly), ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}) }));
+  }
+
+  /**
+   * Pose des cookies dans la session : renouvelés par YouTube pendant un appel de yt-dlp, ou repris
+   * d'un navigateur où l'utilisateur est connecté. Rend le nombre de cookies posés.
+   */
+  async function setCookies(cookies: readonly CookieRecord[]): Promise<number> {
+    const s = acquireSession();
+    let set = 0;
+    for (const c of cookies) {
+      const host = c.domain.replace(/^\./, '');
+      // __Host- : sans domaine, chemin « / », sécurisé (règle des navigateurs).
+      const hostOnly = c.hostOnly || c.name.startsWith('__Host-');
+      try {
+        await s.cookies.set({
+          url: `https://${host}${c.path || '/'}`,
+          name: c.name,
+          value: c.value,
+          ...(hostOnly ? {} : { domain: `.${host}` }),
+          path: c.name.startsWith('__Host-') ? '/' : c.path || '/',
+          secure: c.secure || c.name.startsWith('__Secure-') || c.name.startsWith('__Host-'),
+          httpOnly: Boolean(c.httpOnly),
+          ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}),
+        });
+        set++;
+      } catch {
+        // Cookie refusé par Chromium (attributs incohérents) : les autres passent.
+      }
+    }
+    await s.cookies.flushStore();
+    return set;
+  }
+
+  /** Se déconnecter d'un compte qui tient sur plusieurs domaines (YouTube et Google) : leurs cookies effacés, rien d'autre. */
+  async function signOutWhere(match: (domain: string) => boolean): Promise<void> {
+    const s = acquireSession();
+    for (const c of await s.cookies.get({})) {
+      if (!match(c.domain ?? '')) continue;
+      const host = (c.domain ?? '').replace(/^\./, '');
+      await s.cookies.remove(`http${c.secure ? 's' : ''}://${host}${c.path ?? '/'}`, c.name);
+    }
+    await s.cookies.flushStore();
+  }
+
   return {
     show,
     close,
     siteCookies,
     signOut,
+    cookiesWhere,
+    setCookies,
+    signOutWhere,
     direct,
     readPage,
     fetchImage,

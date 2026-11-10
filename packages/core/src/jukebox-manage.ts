@@ -24,6 +24,7 @@ import {
 } from './jukebox';
 import {
   applyPlaylistImport,
+  cleanLinkText,
   estimateSongBytes,
   parsePlaylistLink,
   type EntryDetail,
@@ -42,12 +43,14 @@ export type JukeboxLink = { kind: 'playlist'; link: PlaylistLink } | { kind: 'vi
 /**
  * Le lien d'une playlist (comme parsePlaylistLink : une vidéo ouverte dans une playlist compte pour
  * la playlist), sinon celui d'une vidéo seule : youtube.com/watch?v=…, youtu.be/…, /shorts/…,
- * /embed/…, /live/…, music.youtube.com.
+ * /embed/…, /live/…, music.youtube.com. Un identifiant tapé seul vaut aussi : celui d'une playlist
+ * (PL…, OLAK5uy_…, RD…), ou les 11 caractères d'une vidéo.
  */
 export function parseJukeboxLink(text: string): JukeboxLink {
   const playlist = parsePlaylistLink(text);
   if (!('refused' in playlist)) return { kind: 'playlist', link: playlist };
-  const raw = text.trim();
+  const raw = cleanLinkText(text);
+  if (isYoutubeId(raw)) return { kind: 'video', id: raw, url: `https://www.youtube.com/watch?v=${raw}` };
   let url: URL;
   try {
     url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
@@ -58,12 +61,42 @@ export function parseJukeboxLink(text: string): JukeboxLink {
   let id: string | null = null;
   if (host === 'youtu.be') id = url.pathname.split('/')[1] ?? null;
   else if (host === 'youtube.com' || host === 'youtube-nocookie.com') {
-    id = url.searchParams.get('v');
+    // Une vidéo tapée derrière le préfixe d'une playlist (…playlist?list=<vidéo>) : la vidéo.
+    id = url.searchParams.get('v') ?? url.searchParams.get('list');
     const parts = url.pathname.split('/').filter(Boolean);
     if (!id && parts.length >= 2 && ['shorts', 'embed', 'live', 'v'].includes(parts[0]!)) id = parts[1]!;
   }
   if (!isYoutubeId(id)) return playlist;
   return { kind: 'video', id, url: `https://www.youtube.com/watch?v=${id}` };
+}
+
+/**
+ * Clavier à l'écran : le champ du lien commence par l'adresse d'une playlist (ou d'une vidéo, par la
+ * bascule « Playlist / Vidéo ») ; on ne tape que l'identifiant.
+ */
+export const JUKEBOX_LINK_PREFIXES = {
+  playlist: 'https://www.youtube.com/playlist?list=',
+  video: 'https://www.youtube.com/watch?v=',
+} as const;
+
+/**
+ * Une adresse entière, tapée ou collée : elle a un protocole (https://…) ou commence par un nom de
+ * domaine (www.…, youtu.be/…). Un identifiant n'a jamais de point.
+ */
+export function isFullAddress(text: string): boolean {
+  const v = text.trim();
+  return /^[a-z][a-z0-9+.-]*:\/\//i.test(v) || /^[\w-]+(\.[\w-]+)+(\/|\?|$)/.test(v);
+}
+
+/**
+ * Le texte d'un champ à préfixe fixe (clavier à l'écran) : le préfixe suivi de ce qui est tapé ;
+ * une adresse entière, tapée ou collée, est prise seule (pas de préfixe en double) ; rien de tapé :
+ * rien.
+ */
+export function prefixedText(prefix: string | undefined, typed: string): string {
+  const v = typed.trim();
+  if (!v || !prefix || isFullAddress(v)) return v;
+  return prefix + v;
 }
 
 /** Une vidéo seule, comme une playlist d'un morceau (seconde lecture de yt-dlp : `detail`). */

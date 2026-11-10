@@ -78,7 +78,7 @@ import {
   type TransportResult,
   type UnavailableReason,
 } from '@cyberpinball/core';
-import type { YtDlp } from './ytdlp-tool';
+import type { RunResult as YtDlpRun, YtDlp } from './ytdlp-tool';
 
 export interface JukeboxLibraryOptions {
   /** Racine de Cyber Pinball ; undefined avant l'installation. */
@@ -89,6 +89,12 @@ export interface JukeboxLibraryOptions {
   downloads?: { add(spec: NonNullable<ReturnType<typeof jukeboxDownloadSpec>>): DownloadJob; jobs(): readonly DownloadJob[]; cancel(id: string): void };
   /** Moteur JavaScript de yt-dlp : l'exécutable de Cyber Pinball, en mode Node. */
   node?: string;
+  /**
+   * Compte YouTube (youtube-account.ts) : la lecture d'une playlist passe ses cookies à yt-dlp quand il
+   * est connecté (playlists privées et personnelles du compte, leur resynchronisation). La seconde
+   * lecture, vidéo par vidéo, et les téléchargements s'en passent.
+   */
+  account?: { withCookies(work: (file: string | undefined) => Promise<YtDlpRun>): Promise<YtDlpRun> };
   /** Le réseau est là (true par défaut). */
   online?(): boolean;
   /** Quelque chose a changé : les écrans se redessinent. */
@@ -276,7 +282,10 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
   async function analyze(link: string, signal?: AbortSignal): Promise<AnalyzeResult> {
     const parsed = parsePlaylistLink(link);
     if ('refused' in parsed) return { ok: false, reason: parsed.refused };
-    const r = await opts.ytdlp.run(playlistArgs(parsed, opts.node), signal);
+    // J'aime, À regarder plus tard : lisibles avec les cookies du compte seulement (relus dans la session à chaque appel).
+    const personal: YtDlpRun = { ok: false, reason: t('Playlist personnelle de votre compte YouTube : connectez le compte (Gestion du Juke-box, Compte YouTube)') };
+    const read = (cookies: string | undefined) => (parsed.personal && !cookies ? Promise.resolve(personal) : opts.ytdlp.run(playlistArgs(parsed, opts.node, cookies), signal));
+    const r = opts.account ? await opts.account.withCookies(read) : await read(undefined);
     if (!r.ok) return r;
     let json: unknown;
     try {
@@ -553,7 +562,7 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
 /** Raison d'un échec de lecture d'une playlist (yt-dlp, en anglais). */
 function playlistError(line: string): string {
   if (/does not exist|not found|404/i.test(line)) return t('Playlist introuvable sur YouTube');
-  if (/private/i.test(line)) return t('Playlist privée : rendez-la publique ou non répertoriée');
+  if (/private/i.test(line)) return t('Playlist privée : connectez le compte YouTube qui la possède, ou rendez-la publique ou non répertoriée');
   if (/not a bot|sign in to confirm/i.test(line)) return t('YouTube demande de prouver qu’on n’est pas un robot : réessayez plus tard');
   if (/getaddrinfo|timed out|connection|network|unable to download/i.test(line)) return t('réseau injoignable');
   return line.replace(/^ERROR:\s*/, '').slice(0, 200);

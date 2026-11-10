@@ -883,6 +883,21 @@ body.mouse .lib-row.pick:not(.selected):hover {
   overflow-wrap: anywhere;
 }
 
+/* Début fixe d'un lien (Juke-box) : présent, mais en retrait de ce qu'on tape. */
+.lib-editor .value .prefix {
+  color: var(--ink-faint);
+  font-size: 0.65em;
+  font-weight: 500;
+}
+
+/* Le retour arrière qui retirerait le début du lien : prévenu d'abord. */
+.lib-editor .editor-warning {
+  min-height: 1.4em;
+  margin: -2cqmin 0 2.4cqmin;
+  font-size: 2.2cqmin;
+  color: var(--warning);
+}
+
 .lib-editor .caret {
   display: inline-block;
   width: 0.5cqmin;
@@ -941,6 +956,15 @@ body.mouse .lib-row.pick:not(.selected):hover {
 
 .key.on {
   color: var(--accent);
+}
+
+/* Bascule du début du lien (« Playlist », « Vidéo ») : plus large, l'allumée bordée. */
+.key.wide.mode {
+  grid-column: span 3;
+}
+
+.key.mode.on:not(.current) {
+  border-color: var(--accent);
 }
 
 .key.current {

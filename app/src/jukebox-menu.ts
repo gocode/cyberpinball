@@ -4,14 +4,19 @@
 //   qualité, resynchroniser avec YouTube, tout télécharger, libérer la place, supprimer ; la place
 //   prise et l'espace libre. Créer et importer en tête.
 // - L'import d'une playlist (ou d'une vidéo) YouTube : le lien vient du téléphone (le clavier à
-//   l'écran se remplit depuis la télécommande), du clavier (Ctrl+V) ou de « Récupérer » (bouton
-//   « Ajouter au Juke-box »). Nombre de morceaux, durée, taille estimée ; un seul choix par groupe :
+//   l'écran se remplit depuis la télécommande), du clavier (Ctrl+V ; le champ commence par l'adresse
+//   d'une playlist, on ne tape que l'identifiant), des playlists du compte YouTube, ou de « Récupérer »
+//   (bouton « Ajouter au Juke-box », aussi après « Chercher sur YouTube »). Nombre de morceaux,
+//   durée, taille estimée ; un seul choix par groupe :
 //   tout prendre ou choisir, nouvelle ou existante, en ligne ou télécharger, la qualité. Les vidéos
 //   sautées le sont avec leur raison.
 // - L'ajout de fichiers locaux : un fichier ou un dossier, sous-dossiers compris, le nombre trouvé
 //   annoncé avant l'ajout, les formats acceptés, les refusés avec leur raison. Au bureau par
 //   l'explorateur de Windows, en borne par le sélecteur de Cyber Pinball.
 // - La correction des informations d'un morceau (titre, artiste, album) : elle l'emporte sur YouTube.
+// - Le compte YouTube (youtube-account.ts) : connexion dans « Récupérer » (ou reprise d'un navigateur
+//   où l'on est déjà connecté), état, déconnexion, et ses playlists (privées, J'aime, À regarder
+//   plus tard comprises).
 // Toute fonction indisponible (hors ligne, yt-dlp absent, disque plein) reste visible, grisée avec
 // sa raison. Le cœur : packages/core/src/jukebox-manage.ts ; le service : jukebox-library.ts.
 // Maquettes de la gestion et de l'import validées le 09/11/2026.
@@ -32,6 +37,9 @@ import {
   formatTrackTime,
   importActionLabel,
   importBlocker,
+  COOKIE_BROWSERS,
+  formatDay,
+  JUKEBOX_LINK_PREFIXES,
   isVideoAnalysis,
   JUKEBOX_AUDIO_EXTENSIONS,
   JUKEBOX_QUALITIES,
@@ -65,11 +73,14 @@ import {
   type PlaylistAnalysis,
   type PlaylistEntry,
   type TrackInfo,
+  type AccountPlaylist,
+  type CookieBrowser,
 } from '@cyberpinball/core';
 import type { Input } from 'electron';
 import type { PickRequest } from './file-picker';
 import type { JukeboxLibrary, TrackView } from './jukebox-library';
-import type { Action, Built, Row, Section, Tone } from './library';
+import type { Action, Built, PromptOptions, Row, Section, Tone } from './library';
+import type { YoutubeAccount } from './youtube-account';
 import { allowPreview } from './media-protocol';
 
 export interface JukeboxMenuHost {
@@ -83,8 +94,8 @@ export interface JukeboxMenuHost {
   openPlayer(playlist?: string): void;
   /** Retour à la roue des tables. */
   leave(): void;
-  /** Saisie d'un texte : clavier à l'écran, vrai clavier (Ctrl+V), ou téléphone. */
-  prompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void;
+  /** Saisie d'un texte : clavier à l'écran, vrai clavier (Ctrl+V), ou téléphone ; `options` : préfixe fixe du champ. */
+  prompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string, options?: PromptOptions): void;
   /** Sélecteur de fichiers de Cyber Pinball (borne). */
   pick(request: Omit<PickRequest, 'done' | 'cancel'>): Promise<string[] | undefined>;
   /** Explorateur de Windows (bureau) ; absent : le sélecteur de Cyber Pinball partout. */
@@ -100,6 +111,8 @@ export interface JukeboxMenuHost {
   task(message: string, work: () => Promise<void> | void): Promise<void>;
   /** Un téléphone pilote le menu : l'écran d'import le dit. */
   phone?(): boolean;
+  /** Compte YouTube (connexion dans « Récupérer », cookies pour yt-dlp) ; absent : pas proposé. */
+  account?: YoutubeAccount;
 }
 
 type Flash = { text: string; tone: Tone };
@@ -109,8 +122,8 @@ interface ImportState {
   link: string;
   /** Playlist visée d'abord (import lancé depuis ses morceaux). */
   prefer?: string;
-  /** D'où vient le lien : téléphone ou clavier (saisie), fenêtre « Récupérer ». */
-  from: 'prompt' | 'recuperer';
+  /** D'où vient le lien : téléphone ou clavier (saisie), fenêtre « Récupérer », playlists du compte. */
+  from: 'prompt' | 'recuperer' | 'compte';
   phase: 'analyzing' | 'ready' | 'failed' | 'done';
   abort?: AbortController;
   /** Seconde lecture en cours (champs musicaux, indisponibilités) : l'import est déjà possible. */
@@ -135,12 +148,12 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     shown = build;
     host.show(build, at);
   };
-  const ask = (heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string) => {
+  const ask = (heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string, options?: PromptOptions) => {
     asking = true;
     host.prompt(heading, label, value, (v) => {
       asking = false;
       done(v);
-    }, lead);
+    }, lead, options);
   };
   /** Playlist choisie : les actions s'y appliquent ; elle suit le curseur dans la liste. */
   let chosen: string | undefined;
@@ -180,6 +193,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
   const toManage = (id: string) => to(`manage:${id}`, () => open(id));
   const toTracks = (id: string, key?: string) => to(`tracks:${id}:${key ?? ''}`, () => openTracks(id, key));
   const toImport = () => to('import', () => showImport());
+  const toStart = (prefer?: string) => to(`start:${prefer ?? ''}`, () => openImportStart(prefer));
 
   /**
    * D'où la gestion a été ouverte : du lecteur (« Gestion du Juke-box », Start sur le médaillon sans
@@ -213,17 +227,20 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     if (origin) from = origin;
     if (focus) chosen = focus;
     jb.manageOpened(!host.landscape());
+    // L'état du compte YouTube, relu dans la session (connexion faite entre-temps dans « Récupérer »).
+    void host.account?.refresh();
     show(manageScreen);
   }
 
   /**
    * Ouvre la gestion, le curseur sur la playlist choisie (ou sur « Importer » s'il n'y en a pas) :
-   * ses deux premières actions sont « Importer » et « Nouvelle playlist », puis les playlists.
+   * ses premières actions sont « Importer », « Nouvelle playlist » et « Compte YouTube », puis les
+   * playlists.
    */
   function show(build: () => Built): void {
     const playlists = store().playlists;
     const index = Math.max(0, playlists.findIndex((p) => p.id === chosen));
-    display(build, playlists.length ? 2 + index : 0);
+    display(build, playlists.length ? (host.account ? 3 : 2) + index : 0);
   }
 
   function manageScreen(): Built {
@@ -240,10 +257,14 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     // En tête : importer de YouTube, créer une playlist vide.
     const youtube = youtubeBlocker(ability);
     const global: Row[] = [];
-    const importAt = add({ label: t('Importer de YouTube'), key: 'import', icon: 'link', run: () => (youtube ? undefined : askLink()) });
+    const importAt = add({ label: t('Importer de YouTube'), key: 'import', icon: 'link', run: () => (youtube ? undefined : openImportStart()) });
     global.push({ text: t('Importer de YouTube'), icon: 'link', action: importAt, pick: true, ...(youtube ? quiet(youtube) : {}) });
     const createAt = add({ label: t('Nouvelle playlist'), key: 'create', icon: 'plus', run: () => askName() });
     global.push({ text: t('Nouvelle playlist'), icon: 'plus', action: createAt, pick: true });
+    if (host.account) {
+      const accountAt = add({ label: t('Compte YouTube'), key: 'account', icon: 'account', run: () => openAccount(() => open()) });
+      global.push({ text: t('Compte YouTube'), detail: accountText(), icon: 'account', action: accountAt, pick: true });
+    }
     sections.push({ kind: 'jb-global', options: true, rows: global });
 
     // Les playlists, en cartes ; Start ouvre ses morceaux.
@@ -595,7 +616,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       const actions: Action[] = [];
       const rows = views.map((v) => trackRow(v, actions.push({ label: v.info.title, key: `track:${v.track.key}`, run: () => openTrack(id, v.track.key) }) - 1));
       const youtube = youtubeBlocker(host.ability());
-      actions.push({ label: t('Ajouter de YouTube'), icon: 'link', key: 'import', ...(youtube ? quiet(youtube) : { detail: t('Un lien de vidéo ou de playlist') }), run: () => (youtube ? undefined : askLink('', undefined, id)) });
+      actions.push({ label: t('Ajouter de YouTube'), icon: 'link', key: 'import', ...(youtube ? quiet(youtube) : { detail: t('Un lien de vidéo ou de playlist') }), run: () => (youtube ? undefined : host.account ? openImportStart(id) : askLink('', undefined, id)) });
       actions.push({ label: t('Ajouter des fichiers'), icon: 'folder', key: 'files', detail: t('Un fichier ou un dossier'), run: () => openFiles(id) });
       actions.push({ label: t('Retour aux playlists'), icon: 'back', key: 'back', run: toManage(id) });
       return {
@@ -787,19 +808,241 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
 
   // ---------- Import de YouTube ----------
 
-  /** Le lien, par le clavier à l'écran : rempli depuis le téléphone, ou au clavier (Ctrl+V). */
+  /**
+   * Départ de l'import : taper ou coller un lien, les playlists du compte YouTube, chercher sur
+   * YouTube, le compte. `prefer` : la playlist qui reçoit l'import (lancé depuis ses morceaux).
+   */
+  function openImportStart(prefer?: string): void {
+    const back = prefer ? toTracks(prefer) : () => open();
+    const build = (): Built => {
+      const account = host.account;
+      const connected = Boolean(account?.state().connected);
+      const actions: Action[] = [];
+      const add = (a: Action) => actions.push(a) - 1;
+      const rows: Row[] = [];
+      const linkAt = add({ label: t('Taper ou coller un lien'), key: 'link', icon: 'link', run: () => askLink('', undefined, prefer) });
+      rows.push({ text: t('Taper ou coller un lien'), detail: t('Au clavier, on ne tape que l’identifiant de la playlist ; au téléphone, collez le lien entier'), icon: 'link', action: linkAt, pick: true });
+      if (account) {
+        const mineReason = connected ? undefined : t('Compte YouTube pas connecté');
+        const mineAt = add({ label: t('Mes playlists YouTube'), key: 'mine', icon: 'list', run: () => (mineReason ? undefined : openMine(prefer)), ...(mineReason ? quiet(mineReason) : {}) });
+        rows.push({ text: t('Mes playlists YouTube'), detail: mineReason ?? t('Privées, « J’aime » et « À regarder plus tard » comprises'), icon: 'list', action: mineAt, pick: true, ...(mineReason ? { tone: 'quiet' as const } : {}) });
+        const searchAt = add({ label: t('Chercher sur YouTube'), key: 'search', icon: 'search', run: () => askSearch(prefer) });
+        rows.push({ text: t('Chercher sur YouTube'), detail: t('Dans « Récupérer », puis « Ajouter au Juke-box » sur la playlist ou la vidéo'), icon: 'search', action: searchAt, pick: true });
+        const accountAt = add({ label: t('Compte YouTube'), key: 'account', icon: 'account', run: () => openAccount(toStart(prefer)) });
+        rows.push({ text: t('Compte YouTube'), detail: accountText(), icon: 'account', action: accountAt, pick: true });
+      }
+      add({ label: prefer ? t('Retour aux morceaux') : t('Retour aux playlists'), icon: 'back', key: 'back', run: back });
+      const sections: Section[] = [];
+      if (flash) sections.push({ kind: 'jb-flash', rows: [{ text: flash.text, tone: flash.tone, icon: flash.tone === 'ok' ? 'check' : 'info' }] });
+      sections.push({ kind: 'jb-global', options: true, rows });
+      return {
+        heading: t('Importer de YouTube'),
+        icon: 'jukebox',
+        subheading: t('YouTube → votre Juke-box'),
+        variant: 'jukebox jukebox-start',
+        app: app(),
+        sections,
+        actions,
+        back,
+      };
+    };
+    void host.account?.refresh();
+    display(build, 0);
+  }
+
+  /**
+   * Le lien, par le clavier à l'écran : rempli depuis le téléphone, ou au clavier (Ctrl+V). Le champ
+   * commence par l'adresse d'une playlist (bascule « Playlist / Vidéo ») : on ne tape que
+   * l'identifiant ; une adresse entière, tapée ou collée, remplace ce début.
+   */
   function askLink(value = '', problem?: string, prefer?: string): void {
     const phone = host.phone?.();
+    flash = undefined;
     ask(
       t('Importer de YouTube'),
-      t('Lien de la playlist ou de la vidéo YouTube'),
+      t('Lien YouTube, ou identifiant de la playlist'),
       value,
       (link) => {
-        if (link === undefined) return open();
+        if (link === undefined) return host.account ? openImportStart(prefer) : open();
         startImport(link, 'prompt', prefer);
       },
-      problem ?? (phone ? t('Collez le lien sur le téléphone, puis Envoyer. Dans YouTube : Partager, puis Copier le lien.') : t('Collez le lien avec Ctrl+V, ou depuis la télécommande du téléphone. Dans YouTube : Partager, puis Copier le lien.')),
+      problem ?? (phone ? t('Collez le lien sur le téléphone, puis Envoyer. Dans YouTube : Partager, puis Copier le lien.') : t('Tapez l’identifiant de la playlist (PL…, OLAK5uy_…), ou collez le lien entier avec Ctrl+V. Dans YouTube : Partager, puis Copier le lien.')),
+      {
+        prefixes: [
+          { label: t('Playlist'), text: JUKEBOX_LINK_PREFIXES.playlist },
+          { label: t('Vidéo'), text: JUKEBOX_LINK_PREFIXES.video },
+        ],
+      },
     );
+  }
+
+  /** Les mots cherchés, puis « Récupérer » sur les playlists de YouTube qui y répondent. */
+  function askSearch(prefer?: string): void {
+    flash = undefined;
+    ask(t('Chercher sur YouTube'), t('Playlists à chercher'), '', (query) => {
+      if (query !== undefined) {
+        host.account?.openSearch(query);
+        flash = { text: t('« Récupérer » est ouvert sur YouTube : « Ajouter au Juke-box » sur une playlist ou une vidéo ramène à l’import.'), tone: 'info' };
+      }
+      openImportStart(prefer);
+    }, t('Un artiste, un genre, une ambiance. Les résultats ne montrent que des playlists.'));
+  }
+
+  // ---------- Compte YouTube ----------
+
+  /** L'état du compte en une ligne : connecté (avec son nom), ou pas. */
+  function accountText(withName = true): string {
+    const state = host.account?.state();
+    if (!state?.connected) return t('Pas connecté : vos playlists privées, « J’aime » et « À regarder plus tard » restent inaccessibles');
+    const who = state.name && withName ? t('Connecté : {name}', { name: state.name }) : t('Connecté');
+    return state.remembered && state.expires ? t('{who} · connexion gardée jusqu’au {date}', { who, date: formatDay(state.expires.getTime()) }) : who;
+  }
+
+  /** Le compte YouTube : son état, se connecter (dans « Récupérer », ou depuis un navigateur), ses playlists, se déconnecter. */
+  function openAccount(backTo: () => void): void {
+    const account = host.account;
+    if (!account) return backTo();
+    const toAccount = () => openAccount(backTo);
+    const build = (): Built => {
+      const state = account.state();
+      const actions: Action[] = [];
+      const add = (a: Action) => actions.push(a) - 1;
+      const sections: Section[] = [];
+      if (flash) sections.push({ kind: 'jb-flash', rows: [{ text: flash.text, tone: flash.tone, icon: flash.tone === 'ok' ? 'check' : 'info' }] });
+      sections.push({ kind: 'jb-summary', rows: [{ text: state.connected ? (state.name ?? t('Compte YouTube connecté')) : t('Pas connecté'), detail: accountText(false), icon: 'account', tone: state.connected ? 'ok' : 'quiet' }] });
+      if (state.connected) {
+        add({ label: t('Mes playlists YouTube'), icon: 'list', key: 'mine', run: () => openMine() });
+        add({ label: t('Chercher sur YouTube'), icon: 'search', key: 'search', run: () => askSearch() });
+        add({ label: t('Se déconnecter'), icon: 'unlock', key: 'sign-out', detail: t('Efface la connexion à YouTube et à Google gardée par Cyber Pinball'), run: () => void signOut() });
+      } else {
+        add({ label: t('Se connecter à YouTube'), icon: 'account', key: 'sign-in', tone: 'ok', detail: t('La page de Google s’ouvre dans « Récupérer » : fermez-la une fois connecté'), run: () => signIn() });
+        add({ label: t('Utiliser la connexion d’un navigateur'), icon: 'import', key: 'browser', detail: t('Si Google refuse la connexion : un navigateur de ce PC déjà connecté à YouTube'), run: () => openBrowsers(toAccount) });
+      }
+      add({ label: t('Retour'), icon: 'back', key: 'back', run: backTo });
+      return {
+        heading: t('Compte YouTube'),
+        icon: 'account',
+        subheading: t('Vos playlists, privées comprises'),
+        lead: t('Cyber Pinball ne voit ni ne garde votre mot de passe : la connexion reste dans le navigateur intégré, comme pour les sites des tables.'),
+        variant: 'jukebox jukebox-account',
+        app: app(t('Compte YouTube')),
+        sections,
+        actions,
+        back: backTo,
+      };
+    };
+    flash = undefined;
+    void account.refresh();
+    display(build, 0);
+  }
+
+  function signIn(): void {
+    host.account?.openLogin();
+    flash = { text: t('Connexion ouverte dans « Récupérer » : fermez la fenêtre une fois connecté, l’état se met à jour.'), tone: 'info' };
+    host.redraw();
+  }
+
+  async function signOut(): Promise<void> {
+    await host.account?.signOut();
+    flash = { text: t('Compte YouTube déconnecté : ses cookies sont effacés de Cyber Pinball.'), tone: 'ok' };
+    host.redraw();
+  }
+
+  /** Repli : le navigateur dont reprendre la connexion à YouTube (yt-dlp --cookies-from-browser). */
+  function openBrowsers(backTo: () => void): void {
+    let busy: CookieBrowser | undefined;
+    let problem: string | undefined;
+    const run = async (browser: CookieBrowser) => {
+      if (busy || !host.account) return;
+      busy = browser;
+      problem = undefined;
+      host.redraw();
+      const r = await host.account.fromBrowser(browser);
+      busy = undefined;
+      if (!host.showing(build)) return;
+      if (r.ok) {
+        backTo();
+        flash = { text: r.state.name ? t('Connecté à YouTube : {name}.', { name: r.state.name }) : t('Connecté à YouTube.'), tone: 'ok' };
+        host.redraw();
+        return;
+      }
+      problem = r.reason;
+      host.redraw();
+    };
+    const build = (): Built => {
+      const actions: Action[] = [];
+      const rows: Row[] = COOKIE_BROWSERS.map((b) => {
+        const at = actions.push({ label: b.label, key: `browser:${b.id}`, run: () => void run(b.id) }) - 1;
+        const detail = busy === b.id ? t('Lecture de la connexion…') : b.id === 'firefox' ? t('Conseillé : celui dont yt-dlp lit le plus sûrement les cookies') : t('Fermez-le d’abord complètement');
+        return { text: b.label, detail, icon: 'globe', action: at, pick: true, ...(busy === b.id ? { progress: { busy: true } } : {}), ...(busy && busy !== b.id ? { tone: 'quiet' as const } : {}) };
+      });
+      actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: backTo });
+      const sections: Section[] = [];
+      if (problem) sections.push({ kind: 'jb-flash', rows: [{ text: t('Connexion pas reprise'), detail: problem, tone: 'warning', icon: 'alert' }] });
+      sections.push({ title: t('Navigateur où vous êtes connecté à YouTube'), kind: 'jb-global', options: true, rows });
+      return {
+        heading: t('Choisir un navigateur'),
+        icon: 'account',
+        lead: t('Seuls les cookies de YouTube et de Google sont repris, dans la session du navigateur intégré ; aucun mot de passe. Le fichier intermédiaire est effacé aussitôt.'),
+        variant: 'jukebox jukebox-account',
+        app: app(t('Compte YouTube')),
+        sections,
+        actions,
+        back: backTo,
+      };
+    };
+    display(build, 0);
+  }
+
+  /** Les playlists du compte : J'aime, À regarder plus tard, puis les siennes ; Start ouvre l'import. */
+  function openMine(prefer?: string): void {
+    const account = host.account;
+    if (!account) return;
+    const state: { phase: 'loading' | 'ready' | 'failed'; lists?: AccountPlaylist[]; reason?: string; abort: AbortController } = { phase: 'loading', abort: new AbortController() };
+    const leave = () => {
+      state.abort.abort();
+      openImportStart(prefer);
+    };
+    const build = (): Built => {
+      const actions: Action[] = [];
+      const sections: Section[] = [];
+      if (state.phase === 'loading') sections.push({ kind: 'jb-wait', rows: [{ text: t('Lecture de vos playlists…'), detail: t('Par yt-dlp, avec la connexion du compte. Rien n’est téléchargé.'), icon: 'refresh', progress: { busy: true } }] });
+      else if (state.phase === 'failed') {
+        sections.push({ kind: 'jb-flash', rows: [{ text: t('Lecture impossible'), detail: state.reason, tone: 'warning', icon: 'alert' }] });
+        actions.push({ label: t('Réessayer'), icon: 'refresh', key: 'retry', run: () => openMine(prefer) });
+      } else {
+        const rows = state.lists!.map((p): Row => {
+          const at = actions.push({ label: p.title, key: `list:${p.list}`, run: () => startImport(`https://www.youtube.com/playlist?list=${p.list}`, 'compte', prefer) }) - 1;
+          const detail = [p.personal ? t('Playlist personnelle') : undefined, p.count !== undefined ? tn(p.count, '{n} vidéo', '{n} vidéos') : undefined].filter(Boolean).join(' · ');
+          return { text: p.title, ...(detail ? { detail } : {}), thumb: 'music', action: at, pick: true };
+        });
+        sections.push({ title: tn(state.lists!.length, '{n} playlist', '{n} playlists'), kind: 'jb-playlists', rows });
+      }
+      actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: leave });
+      return {
+        heading: t('Mes playlists YouTube'),
+        icon: 'list',
+        subheading: account.state().name ?? t('Compte YouTube'),
+        variant: 'jukebox jukebox-mine',
+        app: app(t('Compte YouTube')),
+        sections,
+        actions,
+        back: leave,
+        ...(state.phase === 'ready' ? { listStart: t('importer') } : {}),
+      };
+    };
+    display(build, 0);
+    void account.playlists(state.abort.signal).then((r) => {
+      if (state.abort.signal.aborted) return;
+      if (r.ok) {
+        state.phase = 'ready';
+        state.lists = r.lists;
+      } else {
+        state.phase = 'failed';
+        state.reason = r.reason;
+      }
+      if (host.showing(build)) display(build, 0);
+    });
   }
 
   /** L'écran d'import, le curseur sur « Importer » quand l'analyse est faite (sinon sur sa première action). */
@@ -870,7 +1113,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       current = undefined;
       open(state?.result?.playlist ?? chosen);
     };
-    const linkRow: Row = { text: state?.link ?? '', detail: state?.from === 'recuperer' ? t('Lien reçu de « Récupérer »') : host.phone?.() ? t('Lien reçu du téléphone, ou tapé au clavier') : t('Lien collé au clavier'), icon: 'link' };
+    const linkRow: Row = { text: state?.link ?? '', detail: state?.from === 'recuperer' ? t('Lien reçu de « Récupérer »') : state?.from === 'compte' ? t('Playlist de votre compte YouTube') : host.phone?.() ? t('Lien reçu du téléphone, ou tapé au clavier') : t('Lien tapé ou collé au clavier'), icon: 'link' };
     const base = { heading: t('Importer de YouTube'), icon: 'jukebox' as const, subheading: t('YouTube → votre Juke-box'), back: backTo };
     if (!state) return { ...base, sections: [], actions: [{ label: t('Retour aux playlists'), icon: 'back', key: 'back', run: backTo }] };
 
@@ -898,7 +1141,8 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         ],
         actions: [
           { label: t('Réessayer'), icon: 'refresh', key: 'retry', run: () => startImport(state.link, state.from, state.prefer) },
-          { label: t('Coller un autre lien'), icon: 'link', key: 'other', run: () => askLink(state.link) },
+          { label: t('Coller un autre lien'), icon: 'link', key: 'other', run: () => askLink(state.link, undefined, state.prefer) },
+          ...(host.account ? [{ label: t('Chercher sur YouTube'), icon: 'search' as const, key: 'search', run: () => askSearch(state.prefer) }] : []),
           { label: t('Retour aux playlists'), icon: 'back', key: 'back', run: backTo },
         ],
       };
@@ -1103,7 +1347,8 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     } });
     actions.push({ label: t('Importer autre chose'), icon: 'link', key: 'again', run: () => {
       current = undefined;
-      askLink();
+      if (host.account) openImportStart();
+      else askLink();
     } });
     actions.push({ label: t('Retour au Juke-box'), icon: 'back', key: 'back', run: backTo });
     return {

@@ -28,6 +28,9 @@ import {
   isVideoAnalysis,
   JUKEBOX_DISK_MARGIN,
   parseJukeboxLink,
+  prefixedText,
+  isFullAddress,
+  JUKEBOX_LINK_PREFIXES,
   playlistFacts,
   playlistKind,
   playlistSecondLine,
@@ -76,6 +79,51 @@ test('lien collé : une playlist, une vidéo seule, ou la raison du refus', () =
   assert.deepEqual(parseJukeboxLink('https://exemple.test/playlist?list=PLx'), { refused: 'Ce lien ne mène pas à YouTube' });
   assert.deepEqual(parseJukeboxLink('https://www.youtube.com/@chaine-fictive'), { refused: 'Ce lien mène à une vidéo, pas à une playlist' });
   assert.deepEqual(parseJukeboxLink('pas un lien du tout'), { refused: 'Ce n’est pas un lien' });
+});
+
+test('lien tapé au clavier : préfixe, adresse complète, identifiant seul, espaces et paramètres en trop', () => {
+  const PL = 'PLexempleNeonNocturne01';
+  const OLAK = 'OLAK5uy_exempleAlbumFictif0123456789abcd';
+  const { playlist, video } = JUKEBOX_LINK_PREFIXES;
+  const kind = (text: string) => {
+    const r = parseJukeboxLink(text);
+    return 'refused' in r ? r.refused : r.kind === 'playlist' ? `playlist:${r.link.list}` : `video:${r.id}`;
+  };
+  // Le préfixe du clavier à l'écran, puis l'identifiant tapé.
+  assert.equal(prefixedText(playlist, PL), `https://www.youtube.com/playlist?list=${PL}`);
+  assert.equal(kind(prefixedText(playlist, PL)), `playlist:${PL}`);
+  assert.equal(kind(prefixedText(video, A)), `video:${A}`);
+  // Rien de tapé : rien (pas le préfixe seul).
+  assert.equal(prefixedText(playlist, '   '), '');
+  // L'adresse entière tapée ou collée : prise seule, sans préfixe en double.
+  for (const full of [`https://www.youtube.com/playlist?list=${PL}`, `youtube.com/playlist?list=${PL}`, `www.youtube.com/watch?v=${A}&list=${PL}`, `https://youtu.be/${A}`]) {
+    assert.equal(prefixedText(playlist, full), full, full);
+  }
+  assert.equal(kind(prefixedText(video, `youtu.be/${A}?si=partage`)), `video:${A}`);
+  // Un préfixe resté devant une adresse collée (téléphone) : la dernière adresse compte.
+  assert.equal(kind(`${playlist}https://www.youtube.com/playlist?list=${PL}`), `playlist:${PL}`);
+  assert.equal(kind(`${playlist}https://youtu.be/${A}`), `video:${A}`);
+  // Une vidéo tapée derrière le préfixe d'une playlist : la vidéo.
+  assert.equal(kind(`${playlist}${A}`), `video:${A}`);
+  // Identifiant seul, partout (téléphone, champ du bureau) : PL…, OLAK5uy_…, RD…, ou une vidéo.
+  assert.equal(kind(PL), `playlist:${PL}`);
+  assert.equal(kind(OLAK), `playlist:${OLAK}`);
+  assert.equal(kind(`RD${A}`), `playlist:RD${A}`);
+  assert.equal(kind(A), `video:${A}`);
+  // Espaces autour et dedans (clavier, téléphone), paramètres en trop.
+  assert.equal(kind(`  ${PL}  `), `playlist:${PL}`);
+  assert.equal(kind(`https://www.youtube.com/playlist?list=${PL.slice(0, 8)} ${PL.slice(8)}`), `playlist:${PL}`);
+  assert.equal(kind(`https://www.youtube.com/playlist?list=${PL}&si=partage&feature=share#debut`), `playlist:${PL}`);
+  assert.equal(kind(`https://m.youtube.com/watch?v=${A}&t=42s&pp=xyz`), `video:${A}`);
+  // Ni lien ni identifiant.
+  assert.equal(kind('bonjour'), 'Ce n’est pas un lien');
+  assert.equal(kind('PL'), 'Ce n’est pas un lien');
+  assert.equal(isFullAddress(PL), false);
+  assert.equal(isFullAddress('https://exemple.test/'), true);
+  // Playlists personnelles du compte : lisibles avec le compte YouTube.
+  const ll = parseJukeboxLink('https://www.youtube.com/playlist?list=LL');
+  assert.ok('kind' in ll && ll.kind === 'playlist' && ll.link.personal === true);
+  assert.equal(kind('WL'), 'playlist:WL');
 });
 
 test('vidéo seule : une playlist d’un morceau, sans liste à resynchroniser', () => {

@@ -58,35 +58,75 @@ export interface PlaylistLink {
   /** Adresse canonique de la playlist. */
   url: string;
   mix: boolean;
+  /** Playlist personnelle du compte (J'aime, À regarder plus tard) : lisible avec le compte YouTube seulement. */
+  personal?: boolean;
+}
+
+/** Playlists personnelles d'un compte : J'aime (LL), À regarder plus tard (WL), Titres aimés de YouTube Music (LM). */
+export const PERSONAL_LISTS = ['LL', 'WL', 'LM'] as const;
+
+/**
+ * Identifiant de playlist tapé seul : PL… (playlist d'une chaîne), OLAK5uy_… (album de YouTube
+ * Music), RD… (Mix), UU… (vidéos d'une chaîne), FL…, OL…, ou une playlist personnelle. Jamais
+ * 11 caractères sans l'un de ces débuts : c'est alors une vidéo.
+ */
+export function isPlaylistId(text: string): boolean {
+  if (!/^[A-Za-z0-9_-]{2,64}$/.test(text)) return false;
+  if ((PERSONAL_LISTS as readonly string[]).includes(text)) return true;
+  return text.length >= 12 && PLAYLIST_START.test(text);
+}
+
+/** Débuts des identifiants de playlist (une vidéo a 11 caractères quelconques). */
+const PLAYLIST_START = /^(PL|OL|RD|UU|UL|FL|LP)/;
+
+/**
+ * Le texte tel qu'on le colle ou le tape : sans espaces (un lien n'en a pas), et, quand une
+ * adresse a été collée derrière une autre (préfixe du clavier à l'écran resté devant), la
+ * dernière seulement.
+ */
+export function cleanLinkText(text: string): string {
+  const raw = text.replace(/\s+/g, '');
+  const at = raw.toLowerCase().lastIndexOf('http');
+  return at > 0 && /^https?:\/\//i.test(raw.slice(at)) ? raw.slice(at) : raw;
 }
 
 /**
  * Le lien collé (téléphone, Ctrl+V, fenêtre « Récupérer ») : une playlist YouTube, ou une vidéo
  * ouverte dans une playlist (watch?v=…&list=…), youtube.com, music.youtube.com, m.youtube.com,
- * youtu.be. Rend la raison du refus sinon.
+ * youtu.be, ou l'identifiant seul de la playlist. Rend la raison du refus sinon.
  */
 export function parsePlaylistLink(text: string): PlaylistLink | { refused: string } {
-  const raw = text.trim();
+  const raw = cleanLinkText(text);
+  if (isPlaylistId(raw)) return playlistOf(raw);
   let url: URL;
   try {
     url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
   } catch {
     return { refused: t('Ce n’est pas un lien') };
   }
+  if (!raw.includes('.') && !/^https?:/i.test(raw)) return { refused: t('Ce n’est pas un lien') };
   const host = url.hostname.toLowerCase().replace(/^(www|m|music)\./, '');
   if (host !== 'youtube.com' && host !== 'youtu.be' && host !== 'youtube-nocookie.com') return { refused: t('Ce lien ne mène pas à YouTube') };
   const list = url.searchParams.get('list');
   if (!list) return { refused: t('Ce lien mène à une vidéo, pas à une playlist') };
   if (!/^[A-Za-z0-9_-]{2,64}$/.test(list)) return { refused: t('Identifiant de playlist illisible') };
-  if (list === 'LL' || list === 'WL' || list === 'LM') return { refused: t('Playlist personnelle de votre compte YouTube : copiez ses vidéos dans une playlist publique ou non répertoriée') };
-  return { list, url: `https://www.youtube.com/playlist?list=${list}`, mix: list.startsWith('RD') };
+  // Onze caractères sans début de playlist : une vidéo tapée derrière le préfixe d'une playlist.
+  if (list.length === 11 && !PLAYLIST_START.test(list)) return { refused: t('Ce lien mène à une vidéo, pas à une playlist') };
+  return playlistOf(list);
+}
+
+function playlistOf(list: string): PlaylistLink {
+  const personal = (PERSONAL_LISTS as readonly string[]).includes(list);
+  return { list, url: `https://www.youtube.com/playlist?list=${list}`, mix: list.startsWith('RD'), ...(personal ? { personal: true } : {}) };
 }
 
 /**
  * Arguments de yt-dlp pour lire une playlist sans rien télécharger : liste à plat, un seul JSON,
  * Mix plafonné. `node` : le moteur JavaScript (l'exécutable de Cyber Pinball, en mode Node).
+ * `cookies` : fichier des cookies du compte YouTube (playlists privées et personnelles), effacé
+ * par l'appelant après l'appel.
  */
-export function playlistArgs(link: PlaylistLink, node?: string): string[] {
+export function playlistArgs(link: PlaylistLink, node?: string, cookies?: string): string[] {
   return [
     '--ignore-config',
     '--no-update',
@@ -96,6 +136,7 @@ export function playlistArgs(link: PlaylistLink, node?: string): string[] {
     '-J',
     ...(link.mix ? ['--playlist-end', String(JUKEBOX_MIX_CAP)] : []),
     ...(node ? ['--no-js-runtimes', '--js-runtimes', `node:${node}`] : []),
+    ...(cookies ? ['--cookies', cookies] : []),
     '--',
     link.url,
   ];

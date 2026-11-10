@@ -1016,14 +1016,21 @@ function renderEditor(e) {
   const panel = libEl('div', 'panel');
   panel.append(libEl('h2', '', e.label));
   if (e.value !== undefined) {
-    const value = libEl('div', 'value', e.value);
+    const value = libEl('div', 'value');
+    // Champ à préfixe (lien du Juke-box) : le début fixe, en retrait, puis ce qui est tapé.
+    if (e.prefix) value.append(libEl('span', 'prefix', e.prefix));
+    value.append(document.createTextNode(e.value));
     value.append(libEl('span', 'caret'));
     panel.append(value);
+    if (e.warning !== undefined) panel.append(libEl('div', 'editor-warning', e.warning));
   }
   const keys = libEl('div', 'keys-grid');
   e.keys.forEach((k, i) => {
     const wide = k.length > 1 ? ' wide' : '';
-    const button = actOn(libEl('button', `key${wide}${i === e.cursor ? ' current' : ''}${i === e.shiftKey && e.shift ? ' on' : ''}`, k), { type: 'editor', index: i });
+    // Touches de préfixe, après le clavier (« Playlist », « Vidéo ») : celle du préfixe affiché est allumée.
+    const mode = e.firstExtra !== undefined && i >= e.firstExtra ? ' mode' : '';
+    const on = (i === e.shiftKey && e.shift) || (e.on ?? []).includes(i) ? ' on' : '';
+    const button = actOn(libEl('button', `key${wide}${mode}${i === e.cursor ? ' current' : ''}${on}`, k), { type: 'editor', index: i });
     keys.append(button);
   });
   panel.append(keys);

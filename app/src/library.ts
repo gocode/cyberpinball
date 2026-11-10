@@ -196,6 +196,8 @@ import {
   type RankingLine,
   type RankingScope,
   type ScorePeriod,
+  isFullAddress,
+  prefixedText,
 } from '@cyberpinball/core';
 import { prepareImport, unpackArchive, type PreparedImport } from './archives';
 import { createDofMenu } from './dof-menu';
@@ -206,6 +208,7 @@ import { cachedScript, readScript, rememberScript, type ScriptResult } from './v
 import { LayoutReport } from './layout-check';
 import { createJukeboxLibrary } from './jukebox-library';
 import { createJukeboxMenu } from './jukebox-menu';
+import { createYoutubeAccount } from './youtube-account';
 import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
 import type { RecordingOutcome } from './game-recording';
@@ -238,7 +241,7 @@ const otherManufacturer = () => t('Autre (saisir le nom)…');
 const KEYBOARD = [
   ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ',
   ...'0123456789',
-  'É', 'È', 'À', 'Ç', '-', "'", '&', '.', ':', '!', '?', // i18n-ignore : lettres du clavier
+  'É', 'È', 'À', 'Ç', '-', '_', "'", '&', '.', ':', '!', '?', // i18n-ignore : lettres du clavier
   'Espace', 'Effacer', 'Maj', 'OK', 'Annuler', // i18n-ignore : identifiants des touches
 ];
 const NUMPAD = [...'0123456789', 'Effacer', '−', '+', 'OK', 'Annuler']; // i18n-ignore : identifiants des touches
@@ -615,9 +618,26 @@ export interface JourneyStepView {
 }
 
 type Field = 'Title' | 'Manufacturer' | 'Year';
+
+/**
+ * Champ à préfixe fixe (lien du Juke-box) : le champ commence par l'un de ces textes, qu'on ne tape
+ * pas ; une touche par préfixe, en fin de clavier, passe de l'un à l'autre (« Playlist », « Vidéo »).
+ */
+export interface PromptOptions {
+  prefixes?: { label: string; text: string }[];
+  /** Préfixe de départ (0 par défaut). */
+  prefix?: number;
+}
+
+/**
+ * Texte à préfixe : `prefixAt` désigne le préfixe affiché ; `prefixOff` : retiré par deux retours
+ * arrière de suite sur un champ vide (`armed` après le premier). Les lettres y sont tapées telles
+ * quelles (un identifiant mêle majuscules et minuscules) : Maj est un verrou.
+ */
+type TextPrefix = { prefixes?: { label: string; text: string }[]; prefixAt?: number; prefixOff?: boolean; armed?: boolean };
 type Editor =
   /** Sans `field` : saisie libre d'un écran « prompt ». */
-  | { kind: 'text'; field?: Field; label: string; value: string; cursor: number; shift: boolean; typed: boolean }
+  | ({ kind: 'text'; field?: Field; label: string; value: string; cursor: number; shift: boolean; typed: boolean } & TextPrefix)
   | { kind: 'choice'; field: Field; label: string; choices: string[]; cursor: number }
   | { kind: 'number'; field: Field; label: string; value: number; typed: string; cursor: number };
 
@@ -1040,8 +1060,9 @@ export function createLibrary(host: LibraryHost) {
   }
 
   /** Saisie d'un nom avec le clavier à l'écran (ou un vrai clavier). */
-  function openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string): void {
-    go({ kind: 'prompt', heading, lead, editor: { kind: 'text', label, value, cursor: 0, shift: false, typed: false }, done, table: tableOf(screen) });
+  function openPrompt(heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string, options?: PromptOptions): void {
+    const prefix = options?.prefixes?.length ? { prefixes: options.prefixes, prefixAt: Math.min(options.prefix ?? 0, options.prefixes.length - 1) } : {};
+    go({ kind: 'prompt', heading, lead, editor: { kind: 'text', label, value, cursor: 0, shift: false, typed: false, ...prefix }, done, table: tableOf(screen) });
   }
 
   function openNotice(heading: string, lines: string[], then: () => void = leave): void {
@@ -1239,10 +1260,14 @@ export function createLibrary(host: LibraryHost) {
     downloads,
     // Créé plus bas : lu au moment du clic.
     jukebox: () => ({ accepts: (url) => jukebox.linkKind(url), add: (url) => jukeboxMenu.importLink(url) }),
+    // Connexion faite (ou abandonnée) dans « Récupérer » : l'état du compte YouTube est relu.
+    acquireClosed: () => void youtubeAccount.refresh(),
   });
   if (layout()) catalogUi.start();
   // Les pages des sites reprennent par le navigateur intégré, dans la même session de cookies.
   downloads.setTransport('site', catalogUi.acquirer.siteTransport);
+  // Compte YouTube du Juke-box : connecté dans la session de « Récupérer », cookies passés à yt-dlp par un fichier effacé après chaque appel.
+  const youtubeAccount = createYoutubeAccount({ acquirer: catalogUi.acquirer, ytdlp: catalogUi.ytdlp, node: process.execPath, changed: () => host.broadcast() });
   // Juke-box (socle, sans écran) : ses morceaux arrivent par la file, sans notification à chaque playlist.
   const jukebox = createJukeboxLibrary({
     root: () => host.root,
@@ -1250,6 +1275,7 @@ export function createLibrary(host: LibraryHost) {
     ytdlp: catalogUi.ytdlp,
     downloads,
     node: process.execPath,
+    account: youtubeAccount,
     // Réseau absent : les morceaux en ligne sont grisés « Hors ligne » (essais : CYBERPINBALL_HORS_LIGNE).
     online: () => jukeboxOnline(),
     // Playlists ou bibliothèque changées (téléchargement fini, import) : les écrans du lecteur et le menu se redessinent.
@@ -1267,7 +1293,7 @@ export function createLibrary(host: LibraryHost) {
     openSystem: () => openSystem(),
     openPlayer: (playlist) => (host.jukeboxPlayer ? host.jukeboxPlayer(playlist) : leave()),
     leave: () => leave(),
-    prompt: (heading, label, value, done, lead) => openPrompt(heading, label, value, done, lead),
+    prompt: (heading, label, value, done, lead, options) => openPrompt(heading, label, value, done, lead, options),
     pick: (request) => pickPaths(request),
     pickNative: (mode, title) => pickNative(mode, title),
     landscape: () => host.landscape?.() ?? false,
@@ -1282,6 +1308,7 @@ export function createLibrary(host: LibraryHost) {
     },
     task: (message, work) => task(message, work),
     phone: () => host.phoneRemote?.connected() === 'menu',
+    account: youtubeAccount,
   });
   provideSystemItem('jukebox', jukeboxMenu.item);
   downloads.setTransport('youtube', jukebox.transport);
@@ -2681,7 +2708,7 @@ export function createLibrary(host: LibraryHost) {
   function closeEditor(s: EditorScreen, save: boolean): void {
     const e = s.editor;
     if (s.kind === 'prompt') {
-      const value = e?.kind === 'text' ? e.value.trim() : '';
+      const value = e?.kind === 'text' ? prefixedText(shownPrefix(e), e.value) : '';
       s.done(save && value ? value : undefined);
       host.broadcast();
       return;
@@ -3957,20 +3984,24 @@ export function createLibrary(host: LibraryHost) {
       void Promise.resolve(clipboard.readText()).then((text) => {
         const pasted = text.replace(/\s+/g, ' ').trim();
         if (!pasted || screen !== s || s.editor !== e) return;
-        e.value += pasted;
+        // Champ à préfixe : une adresse entière collée remplace ce qui est tapé (pas de préfixe en double).
+        e.value = e.prefixes && isFullAddress(pasted) ? pasted : e.value + pasted;
         e.typed = true;
+        e.armed = false;
         host.broadcast();
       });
       return;
     }
     if (e.kind === 'text') {
+      const count = keyCount(e);
       if (typing) {
         e.value += char;
         e.typed = true;
-      } else if (input.code === 'Backspace') e.value = e.value.slice(0, -1);
+        e.armed = false;
+      } else if (input.code === 'Backspace') eraseChar(e);
       else if (input.code === 'Enter' || input.code === 'NumpadEnter') closeEditor(s, true);
-      else if (is(KEYS.previous) && !e.typed) e.cursor = (e.cursor - 1 + KEYBOARD.length) % KEYBOARD.length;
-      else if (is(KEYS.next) && !e.typed) e.cursor = (e.cursor + 1) % KEYBOARD.length;
+      else if (is(KEYS.previous) && !e.typed) e.cursor = (e.cursor - 1 + count) % count;
+      else if (is(KEYS.next) && !e.typed) e.cursor = (e.cursor + 1) % count;
       else if (is(KEYS.confirm)) pressKey(s, e.cursor);
     } else if (e.kind === 'choice') {
       if (is(KEYS.previous)) e.cursor = (e.cursor - 1 + e.choices.length) % e.choices.length;
@@ -4021,18 +4052,58 @@ export function createLibrary(host: LibraryHost) {
       return;
     }
     e.cursor = index;
+    // Touches de préfixe, après le clavier : « Playlist », « Vidéo » (le préfixe revient s'il était retiré).
+    if (index >= KEYBOARD.length) {
+      if (!e.prefixes?.[index - KEYBOARD.length]) return;
+      e.prefixAt = index - KEYBOARD.length;
+      e.prefixOff = false;
+      e.armed = false;
+      return;
+    }
     const key = KEYBOARD[index]!;
     if (key === 'OK') return closeEditor(s, true);
     if (key === 'Annuler') return closeEditor(s, false); // i18n-ignore : identifiant de touche
-    if (key === 'Effacer') e.value = e.value.slice(0, -1);
-    else if (key === 'Maj') e.shift = !e.shift;
-    else {
+    if (key === 'Effacer') return eraseChar(e);
+    e.armed = false;
+    if (key === 'Maj') e.shift = !e.shift;
+    else if (e.prefixes) {
+      // Un identifiant : la lettre telle que montrée, Maj reste enclenché (verrou).
+      const ch = key === 'Espace' ? ' ' : key;
+      e.value += e.shift ? ch.toUpperCase() : ch.toLowerCase();
+    } else {
       const ch = key === 'Espace' ? ' ' : key;
       // Majuscule en début de mot, minuscule ailleurs ; Maj inverse pour un caractère.
       const wordStart = e.value === '' || e.value.endsWith(' ');
       e.value += wordStart !== e.shift ? ch.toUpperCase() : ch.toLowerCase();
       e.shift = false;
     }
+  }
+
+  /** Touches du clavier à l'écran, celles des préfixes comprises. */
+  function keyCount(e: Extract<Editor, { kind: 'text' }>): number {
+    return KEYBOARD.length + (e.prefixes?.length ?? 0);
+  }
+
+  /** Le préfixe affiché devant le texte : aucun s'il est retiré, ou si le texte est une adresse entière. */
+  function shownPrefix(e: Extract<Editor, { kind: 'text' }>): string | undefined {
+    if (!e.prefixes || e.prefixOff || isFullAddress(e.value)) return undefined;
+    return e.prefixes[e.prefixAt ?? 0]?.text;
+  }
+
+  /**
+   * Retour arrière : le dernier caractère tapé. Le champ vide, le préfixe ne part qu'au second
+   * retour arrière de suite (le premier prévient) : jamais effacé par erreur d'un seul appui.
+   */
+  function eraseChar(e: Extract<Editor, { kind: 'text' }>): void {
+    if (e.value || !shownPrefix(e)) {
+      e.value = e.value.slice(0, -1);
+      e.armed = false;
+      return;
+    }
+    if (e.armed) {
+      e.prefixOff = true;
+      e.armed = false;
+    } else e.armed = true;
   }
 
   function handleAction(action: UiAction): void {
@@ -4270,10 +4341,26 @@ export function createLibrary(host: LibraryHost) {
     if (e.kind === 'choice') return { kind: e.kind, label: e.label, keys: e.choices, cursor: e.cursor, value: undefined as string | undefined };
     if (e.kind === 'number') return { kind: e.kind, label: e.label, keys: NUMPAD.map(keyLabel), cursor: e.cursor, value: String(e.value) };
     const wordStart = e.value === '' || e.value.endsWith(' ');
-    const upper = wordStart !== e.shift;
-    const keys = KEYBOARD.map((k) => (k.length === 1 ? (upper ? k : k.toLowerCase()) : keyLabel(k)));
+    const upper = e.prefixes ? e.shift : wordStart !== e.shift;
+    // Le préfixe affiché : sa touche cochée (son état se lit sans couleur).
+    const keys = [...KEYBOARD.map((k) => (k.length === 1 ? (upper ? k : k.toLowerCase()) : keyLabel(k))), ...(e.prefixes ?? []).map((p, i) => (!e.prefixOff && i === (e.prefixAt ?? 0) ? `✓ ${p.label}` : p.label))];
+    const prefix = shownPrefix(e);
+    // Touche du préfixe affiché : allumée, comme Maj enclenché.
+    const on = e.prefixes && !e.prefixOff ? [KEYBOARD.length + (e.prefixAt ?? 0)] : [];
     // La touche Maj est repérée par son rang : son libellé suit la langue.
-    return { kind: e.kind, label: e.label, keys, cursor: e.cursor, value: e.value, shift: e.shift, shiftKey: KEYBOARD.indexOf('Maj') };
+    return {
+      kind: e.kind,
+      label: e.label,
+      keys,
+      cursor: e.cursor,
+      value: e.value,
+      shift: e.shift,
+      shiftKey: KEYBOARD.indexOf('Maj'),
+      ...(prefix ? { prefix } : {}),
+      ...(on.length ? { on, firstExtra: KEYBOARD.length } : {}),
+      // Ligne réservée sous un champ à préfixe : l'avertissement du retour arrière n'y déplace pas le clavier.
+      ...(e.prefixes ? { warning: e.armed ? t('Effacer encore une fois pour retirer le début du lien') : '' } : {}),
+    };
   }
 
   // ---------- Télécommande du téléphone (phone-remote.ts) ----------
@@ -4284,7 +4371,7 @@ export function createLibrary(host: LibraryHost) {
     const e = screen.editor;
     let id = editorIds.get(e);
     if (id === undefined) editorIds.set(e, (id = ++editorCount));
-    return { id, kind: e.kind, label: e.label, value: e.kind === 'text' ? e.value : e.typed || String(e.value) };
+    return { id, kind: e.kind, label: e.label, value: e.kind === 'text' ? (shownPrefix(e) ?? '') + e.value : e.typed || String(e.value) };
   }
 
   /** Le texte tapé au téléphone remplace celui du clavier à l'écran (un nombre : ses chiffres, quatre au plus). */
@@ -4292,8 +4379,11 @@ export function createLibrary(host: LibraryHost) {
     if (!screen || (screen.kind !== 'edit' && screen.kind !== 'prompt') || !screen.editor) return;
     const e = screen.editor;
     if (e.kind === 'text') {
-      e.value = value;
+      // Champ à préfixe : le téléphone montre le préfixe ; ce qui revient est pris sans lui.
+      const prefix = shownPrefix(e);
+      e.value = prefix && value.startsWith(prefix) ? value.slice(prefix.length) : value;
       e.typed = true;
+      e.armed = false;
     } else if (e.kind === 'number') {
       e.typed = value.replace(/\D/g, '').slice(-4);
       if (e.typed) e.value = Number(e.typed);

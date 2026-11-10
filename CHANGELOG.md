@@ -45,6 +45,9 @@ son interface).
 - Chaque morceau se lit en ligne, téléchargé sur la borne, ou depuis un fichier de votre disque (un dossier entier, sous-dossiers compris) ; « Tout télécharger » et « Libérer la place » font passer une playlist d'un mode à l'autre. Sans réseau ou sans place, ces fonctions restent visibles, grisées avec leur raison.
 - Le titre, l'artiste et l'album d'un morceau se corrigent dans « Morceaux et informations » ; votre correction l'emporte sur ce que dit YouTube.
 - Vision 3D : reculer ou s'approcher fait maintenant bouger la table dans le bon sens. Pendant l'installation du pilote de la Kinect, le pointeur de la souris est posé sur la fenêtre d'accord de Windows, et l'écran dit comment répondre au clavier (Alt+O).
+- Juke-box : connectez votre compte YouTube (Gestion du Juke-box > « Compte YouTube ») pour importer vos propres playlists, privées comprises, ainsi que « J’aime » et « À regarder plus tard ». La connexion se fait dans la fenêtre « Récupérer » et reste gardée ; si Google la refuse, Cyber Pinball peut reprendre celle d’un navigateur de ce PC (Firefox conseillé). Aucun mot de passe n’est vu ni gardé.
+- Juke-box : « Chercher sur YouTube » depuis l’import ouvre « Récupérer » sur des résultats qui ne montrent que des playlists ; « Ajouter au Juke-box » sur une playlist ou une vidéo ramène à l’import sur ce lien.
+- Juke-box : au clavier à l’écran, le lien commence déjà par l’adresse d’une playlist (ou d’une vidéo, par la touche « Vidéo ») : on ne tape que l’identifiant. Un identifiant seul (PL…, OLAK5uy_…) est accepté partout, au téléphone aussi, et un lien entier collé n’est jamais doublé.
 
 ## 0.1.8
 

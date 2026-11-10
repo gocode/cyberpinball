@@ -77,6 +77,9 @@ import {
   siteOfUrl,
   siteState,
   SOURCE_SITES,
+  isYoutubeAccountDomain,
+  YOUTUBE_LOGIN_URL,
+  youtubeState,
   saveWaitList,
   t,
   tn,
@@ -184,6 +187,8 @@ export interface CatalogContext {
   downloads?: DownloadManager;
   /** Juke-box : « Ajouter au Juke-box » dans « Récupérer », sur une playlist ou une vidéo YouTube. */
   jukebox?(): { accepts(url: string): 'playlist' | 'video' | undefined; add(url: string): void } | undefined;
+  /** La fenêtre « Récupérer » s'est fermée (une connexion a pu y être faite : compte YouTube du Juke-box). */
+  acquireClosed?(): void;
 }
 
 /** Jeux par page du catalogue : une page tient sur l'écran, cartes et vignettes comprises. */
@@ -495,6 +500,7 @@ export function createCatalog(ctx: CatalogContext) {
     closed: () => {
       windowItem = undefined;
       refresh?.();
+      ctx.acquireClosed?.();
       host.broadcast();
     },
     screen: () => host.browserScreen?.(),
@@ -1975,12 +1981,14 @@ export function createCatalog(ctx: CatalogContext) {
   function openAccounts(at = 0): void {
     void ctx.task(t('Comptes des sites…'), async () => {
       const states = await accountStates();
+      // Le compte YouTube du Juke-box tient dans la même session (youtube-account.ts).
+      const youtube = youtubeState(await acquirer.cookiesWhere(isYoutubeAccountDomain));
       refresh = () => openAccounts(ctx.cursor());
-      ctx.show(() => buildAccounts(states), at);
+      ctx.show(() => buildAccounts(states, youtube), at);
     });
   }
 
-  function buildAccounts(states: { site: SourceSite; state: SiteState }[]): Built {
+  function buildAccounts(states: { site: SourceSite; state: SiteState }[], youtube: SiteState): Built {
     const l = waitList();
     const rows: Row[] = states.map(({ site, state }) => ({
       text: site.label,
@@ -2020,6 +2028,41 @@ export function createCatalog(ctx: CatalogContext) {
             },
           },
     );
+    // YouTube, pour les playlists du Juke-box (privées, J'aime, À regarder plus tard).
+    rows.push({
+      text: t('YouTube (Juke-box)'),
+      detail: youtube.connected ? (youtube.expires ? t('connecté, connexion gardée jusqu’au {date}', { date: formatDay(youtube.expires.getTime()) }) : t('connecté')) : t('pas connecté'),
+      badges: [youtube.connected ? t('Connecté') : t('Pas connecté')],
+      tone: youtube.connected ? 'ok' : 'quiet',
+    });
+    actions.push(
+      youtube.connected
+        ? {
+            label: t('Se déconnecter : {site}', { site: 'YouTube' }),
+            detail: t('Efface la connexion à YouTube et à Google gardée par Cyber Pinball'),
+            run: () =>
+              void acquirer.signOutWhere(isYoutubeAccountDomain).then(() => {
+                notice = { text: t('Déconnecté de {site}.', { site: 'YouTube' }), tone: 'info' };
+                openAccounts(ctx.cursor());
+              }),
+          }
+        : {
+            label: t('Se connecter : {site}', { site: 'YouTube' }),
+            detail: t('Pour importer vos playlists dans le Juke-box, privées comprises'),
+            tone: 'ok' as const,
+            run: () => {
+              windowItem = undefined;
+              acquirer.show({
+                url: YOUTUBE_LOGIN_URL,
+                game: t('Compte YouTube'),
+                expected: t('Connectez-vous à votre compte Google, puis Fermer (Échap) : le Juke-box lit vos playlists'),
+                host: t('youtube.com · votre propre compte'),
+              });
+              notice = { text: t('Connexion à {site} ouverte : fermez la fenêtre une fois connecté, l’état se met à jour.', { site: 'YouTube' }), tone: 'info' };
+              openAccounts(ctx.cursor());
+            },
+          },
+    );
     // Entrées des extensions (plugins.ts).
     for (const p of pluginActions(pluginHooks.accountsActions)) {
       const at = actions.length;
@@ -2049,7 +2092,7 @@ export function createCatalog(ctx: CatalogContext) {
     actions.push({ label: t('Retour'), run: () => ctx.home() });
     return {
       heading: t('Comptes des sites'),
-      subheading: tn(states.filter((s) => s.state.connected).length, '{n} connecté sur {total}', '{n} connectés sur {total}', { total: states.length }),
+      subheading: tn(states.filter((s) => s.state.connected).length + (youtube.connected ? 1 : 0), '{n} connecté sur {total}', '{n} connectés sur {total}', { total: states.length + 1 }),
       lead: t('Connectez-vous une fois à chaque site, avec votre propre compte : la connexion est gardée d’un démarrage à l’autre, comme dans un navigateur. Cyber Pinball ne voit ni ne garde aucun mot de passe. « Récupérer » ouvre la page du site, et c’est vous qui cliquez sur Télécharger.'),
       sections: [...noticeSection(), { rows }],
       actions,

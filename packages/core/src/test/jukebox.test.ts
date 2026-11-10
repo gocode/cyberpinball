@@ -211,7 +211,8 @@ test('lien : playlist, vidéo dans une playlist, Mix ; refus expliqués', () => 
   assert.equal((parsePlaylistLink(`https://www.youtube.com/watch?v=${A}&list=RDexemple`) as PlaylistLink).mix, true);
   assert.match((parsePlaylistLink(`https://youtu.be/${A}`) as { refused: string }).refused, /vidéo, pas à une playlist/);
   assert.match((parsePlaylistLink('https://exemple.com/?list=PL1') as { refused: string }).refused, /YouTube/);
-  assert.match((parsePlaylistLink('https://www.youtube.com/playlist?list=WL') as { refused: string }).refused, /personnelle/);
+  // À regarder plus tard : une playlist personnelle, lue avec les cookies du compte YouTube.
+  assert.deepEqual(parsePlaylistLink('https://www.youtube.com/playlist?list=WL'), { list: 'WL', url: 'https://www.youtube.com/playlist?list=WL', mix: false, personal: true });
   // yt-dlp : liste à plat, un seul JSON ; un Mix est plafonné.
   const args = playlistArgs(PL, 'C:\\CP\\Cyber Pinball.exe');
   assert.ok(args.includes('--flat-playlist') && args.includes('-J'));

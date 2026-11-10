@@ -69,7 +69,6 @@ export const messages: Record<string, string> = {
   'Ce lien ne mène pas à YouTube': 'This link does not lead to YouTube',
   'Ce lien mène à une vidéo, pas à une playlist': 'This link leads to a video, not a playlist',
   'Identifiant de playlist illisible': 'Unreadable playlist ID',
-  'Playlist personnelle de votre compte YouTube : copiez ses vidéos dans une playlist publique ou non répertoriée': 'Personal playlist of your YouTube account: copy its videos into a public or unlisted playlist',
   'Cette playlist ne vient pas de YouTube': 'This playlist does not come from YouTube',
   '{title} · son': '{title} · sound',
   '{title} · vidéo {height}p': '{title} · {height}p video',
@@ -88,6 +87,5 @@ export const messages: Record<string, string> = {
   'Réponse de yt-dlp illisible': 'Unreadable yt-dlp answer',
   'Ce lien ne mène pas à une playlist lisible': 'This link does not lead to a readable playlist',
   'Playlist introuvable sur YouTube': 'Playlist not found on YouTube',
-  'Playlist privée : rendez-la publique ou non répertoriée': 'Private playlist: make it public or unlisted',
   'YouTube demande de prouver qu’on n’est pas un robot : réessayez plus tard': 'YouTube asks to prove you are not a robot: try again later',
 };
