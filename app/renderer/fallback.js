@@ -382,14 +382,28 @@
       }
     }
 
+    /** Couleur propre de chaque point (RGB au plein éclat, cols × rows × 3), ou rien : la couleur réglée. */
+    setColors(rgb) {
+      this.rgb = rgb && rgb.length === this.buffer.length * 3 ? rgb : undefined;
+    }
+
     draw() {
       if (!this.pitch) return;
       const data = this.image.data;
+      const rgb = this.rgb;
       for (let i = 0; i < this.buffer.length; i++) {
-        const c = this.lut[this.buffer[i]];
-        data[i * 4] = c[0];
-        data[i * 4 + 1] = c[1];
-        data[i * 4 + 2] = c[2];
+        const v = this.buffer[i];
+        if (rgb && v) {
+          const f = LEVELS_16[v];
+          data[i * 4] = Math.round(rgb[i * 3] * f);
+          data[i * 4 + 1] = Math.round(rgb[i * 3 + 1] * f);
+          data[i * 4 + 2] = Math.round(rgb[i * 3 + 2] * f);
+        } else {
+          const c = this.lut[v];
+          data[i * 4] = c[0];
+          data[i * 4 + 1] = c[1];
+          data[i * 4 + 2] = c[2];
+        }
         data[i * 4 + 3] = 255;
       }
       this.smallCtx.putImageData(this.image, 0, 0);
@@ -916,6 +930,7 @@
    * de son conteneur, garde sa dernière image, et la couleur réglée sauf options.color.
    *   const m = CyberFallback.dotMatrix(conteneur, { color });
    *   m.show(points);   // Uint8Array de cols × rows nuances
+   *   m.show(points, rgb); // et la couleur de chaque point (cols × rows × 3, au plein éclat)
    *   m.destroy();
    */
   function dotMatrix(container, options = {}) {
@@ -930,9 +945,11 @@
     let redraw;
     return {
       element: root,
-      show(dots) {
+      /** rgb : couleur propre de chaque point (visualiseur du Juke-box), sinon la couleur réglée. */
+      show(dots, rgb) {
         if (!dots || dots.length !== matrix.buffer.length) return;
         matrix.buffer.set(dots);
+        matrix.setColors(rgb);
         matrix.draw();
         // Une image posée avant la première peinture de la fenêtre peut ne jamais être composée
         // (fenêtre hors écran, page fixe envoyée une seule fois) : un second tracé peu après.

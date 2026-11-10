@@ -287,6 +287,18 @@ test('DMD : JUKE-BOX et ses chiffres sur la roue, le spectre en lecture, tout da
   assert.ok(lit(sel, 3, 17) > 100, 'JUKE-BOX en grand');
   assert.ok(lit(sel, 23, 30) > 40, 'les chiffres dessous');
   assert.ok(lit(jukeboxSelectionDots({ tracks: 0, playlists: 0 }), 23, 30) > 20, 'Aucune playlist');
+  // Les chiffres ne se collent jamais et gardent leurs marges : ensemble s'ils tiennent, sinon l'un puis l'autre.
+  for (const [tracks, playlists] of [[1, 1], [86, 4], [1234, 56], [72, 4]] as const) {
+    for (const elapsed of [0, 2600]) {
+      const d = jukeboxSelectionDots({ tracks, playlists }, elapsed);
+      const cols = Array.from({ length: DMD_WIDTH }, (_, x) => [23, 24, 25, 26, 27, 28, 29].some((y) => d[y * DMD_WIDTH + x]! > 0));
+      assert.ok(!cols.slice(0, 3).some(Boolean) && !cols.slice(DMD_WIDTH - 3).some(Boolean), `marges : ${tracks} / ${playlists}`);
+      const first = cols.indexOf(true);
+      const last = cols.lastIndexOf(true);
+      assert.ok(Math.abs(first - (DMD_WIDTH - 1 - last)) <= 1, `centrés : ${tracks} / ${playlists}`);
+    }
+  }
+  assert.notDeepEqual([...jukeboxSelectionDots({ tracks: 72, playlists: 4 }, 0)], [...jukeboxSelectionDots({ tracks: 72, playlists: 4 }, 2600)], 'trop long ensemble : ils alternent');
   // Spectre : l'artiste en tête, les niveaux en pied ; plus forts, plus de points.
   const low = jukeboxSpectrumDots({ artist: 'Vesper Avenue', levels: Array(24).fill(0.1), elapsed: 0 });
   const high = jukeboxSpectrumDots({ artist: 'Vesper Avenue', levels: Array(24).fill(0.9), elapsed: 0 });

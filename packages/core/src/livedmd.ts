@@ -493,7 +493,16 @@ export interface DmdAnimation {
   /** Durée en ms ; absente : en boucle jusqu'à ce qu'on l'arrête. */
   duration?: number;
   dots(elapsed: number): DmdDots;
+  /**
+   * Couleur de chaque point (RGB au plein éclat, DMD_WIDTH × DMD_HEIGHT × 3, ligne par ligne), lue
+   * juste après dots() pour la même image ; absente ou undefined : la couleur réglée du DMD.
+   * Visualiseur du Juke-box (jukebox-visualizer.ts) : Pochette, Multicolore.
+   */
+  colors?(elapsed: number): DmdColors | undefined;
 }
+
+/** Couleurs d'une image de l'afficheur : R, G, B (0 à 255) de chaque point, au plein éclat. */
+export type DmdColors = Uint8Array;
 
 export interface DmdAnimationOptions {
   /** Texte de l'animation, à la place du sien (passé par dmdText). */
@@ -629,6 +638,11 @@ export function dmdAnimation(name: DmdAnimationName, options?: DmdAnimationOptio
 }
 
 /** Les deux images sont les mêmes (rien à renvoyer à la fenêtre). */
+/** Mêmes couleurs (deux images sans couleur propre : les mêmes). */
+export function sameColors(a: DmdColors | undefined, b: DmdColors | undefined): boolean {
+  return sameDots(a, b);
+}
+
 export function sameDots(a: DmdDots | undefined, b: DmdDots | undefined): boolean {
   if (!a || !b || a.length !== b.length) return a === b;
   for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;

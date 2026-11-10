@@ -27,6 +27,8 @@ import {
   TABLE_ORDER_LABELS,
   TABLE_ORDERS,
   VOLUME_CHOICES,
+  JUKEBOX_VISUALIZER_MODES,
+  visualizerModeLabel,
   arcadeHoursSummary,
   attractDelayLabel,
   dmdColorLabel,
@@ -150,6 +152,7 @@ export const MENU_SETTINGS_ROWS = [
   'wheelStart',
   'tableColor',
   'jukebox',
+  'jukeboxVisualizer',
   'music',
   'musicVolume',
   'videoVolume',
@@ -229,6 +232,17 @@ export function createMenuSettings(host: MenuSettingsHost): ProvidedSystemItem {
           : t('La roue ne montre que les tables ; vos playlists restent dans la gestion du Juke-box (Start : afficher le médaillon)'),
         icon: 'tables',
         run: () => set({ jukebox: !v.jukebox }),
+      },
+      jukeboxVisualizer: {
+        label: t('Visualiseur du Juke-box : {mode}', { mode: visualizerModeLabel(v.jukeboxVisualizer) }),
+        detail:
+          v.jukeboxVisualizer === 'pochette'
+            ? t('Le DMD prend les couleurs de la pochette du morceau, en dégradé ; multicolore sans pochette (Start : changer)')
+            : v.jukeboxVisualizer === 'multicolore'
+              ? t('Le DMD change doucement de couleur, d’une colonne à l’autre et dans le temps (Start : changer)')
+              : t('Le DMD garde sa couleur réglée, sans dégradé (Start : changer)'),
+        icon: 'dmd',
+        run: () => set({ jukeboxVisualizer: JUKEBOX_VISUALIZER_MODES[(JUKEBOX_VISUALIZER_MODES.indexOf(v.jukeboxVisualizer) + 1) % JUKEBOX_VISUALIZER_MODES.length]! }),
       },
       music: {
         label: v.music ? t('Musique des jeux : jouée') : t('Musique des jeux : coupée'),

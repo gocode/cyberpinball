@@ -1125,6 +1125,7 @@ const jukeboxPlayer = createJukeboxPlayer({
   redraw: () => broadcast(),
   dmd: (name, animation) => liveDmd.custom(name, animation),
   dmdOn: () => Boolean(dmdWindow()) && state.phase !== 'playing' && state.phase !== 'intro' && !desktop.active,
+  visualizer: () => ({ mode: mediaSettings.jukeboxVisualizer, color: menuDmdColor() }),
   banner: (text) => showBanner(text),
   log: (line) => console.log(line),
   // Les boutons de la roue, résolus comme sur la roue (menuButton) ; les codes de la borne gardent leur rôle (une flèche relevée reste un flipper).

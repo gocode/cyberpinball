@@ -1015,79 +1015,257 @@
 
 /* ---------- Affiche du Juke-box (médaillon choisi, fronton au repos) ---------- */
 
+/*
+ * Piste « Sillon » du 10/11/2026 : le grand titre face au
+ * disque éclairé, comme une affiche de concert. Deux compositions :
+ *   - en largeur (fronton 1920 × 1080, clip au repos au bureau, cadre du fronton au bureau) : la marque
+ *     en tête, les textes à gauche, le disque à droite, le rappel de Start en pied ;
+ *   - en hauteur (plateau 1080 × 1920 en borne, cadre 9:16 au bureau) : le disque, puis les textes,
+ *     centrés ; en borne, tout tient dans les 1370 premiers pixels (la roue et son cartouche dessous).
+ * Chaque contexte a sa taille de référence (--pw × --ph) et ses tailles (--emblem, --title…) en
+ * pixels de cette référence, multipliés par --pp : aucun texte sous 20 px à l'échelle 1.
+ * Le décor ne bouge que par transformations et opacité (vinyle 100 s, orbite 40 s, halo qui respire).
+ */
 .jb-poster {
   --pw: 1920;
   --ph: 1080;
+  --emblem: 630;
+  --title: 150;
+  --stats: 32;
+  --heading: 42;
+  --detail: 27;
+  --small: 22;
   position: relative;
   overflow: hidden;
   container-type: size;
-  background: radial-gradient(ellipse at 50% 30%, #49336566, transparent 65%), linear-gradient(150deg, #081c1d, #070c12 70%);
   color: var(--ink);
+  background: radial-gradient(ellipse at 74% 39%, #172524 0, transparent 46%), linear-gradient(130deg, #071716, #080d12 55%, #030807);
 }
 
+/* Fondu vers le noir en pied et trame verticale très discrète. */
 .jb-poster::before {
   content: '';
   position: absolute;
   inset: 0;
-  background: repeating-radial-gradient(ellipse at 50% 40%, transparent 0 85px, #71ddcd13 86px 88px, transparent 90px 130px);
+  pointer-events: none;
+  background: linear-gradient(0deg, #030807 0, transparent 28%), repeating-linear-gradient(90deg, transparent 0 119px, #719b9b08 120px 121px);
 }
 
-.jb-poster-content {
+.jb-poster-stage {
   --pp: min(100cqw / var(--pw), 100cqh / var(--ph));
-  position: relative;
-  display: flex;
-  height: 100%;
-  box-sizing: border-box;
-  flex-direction: column;
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template: 'head head' auto 'copy emblem' minmax(0, 1fr) 'foot foot' auto / minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: center;
-  gap: calc(32 * var(--pp));
-  text-align: center;
-  padding: calc(46 * var(--pp));
+  column-gap: calc(96 * var(--pp));
+  padding: calc(48 * var(--pp)) calc(120 * var(--pp)) calc(58 * var(--pp)) calc(104 * var(--pp));
+  box-sizing: border-box;
   font-size: calc(24 * var(--pp));
 }
 
-.jb-identity {
-  width: calc(280 * var(--pp));
-  height: calc(280 * var(--pp));
-  flex: none;
+.jb-poster-head {
+  grid-area: head;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: calc(24 * var(--pp));
+  margin-left: calc(-40 * var(--pp));
+  margin-right: calc(-56 * var(--pp));
 }
 
-.jb-logo {
-  display: block;
-  width: 100%;
-  height: 100%;
+.jb-poster-head .jb-brand {
+  font-size: calc(25 * var(--pp));
+  letter-spacing: 0.34em;
 }
 
-.jb-poster .jb-label,
-.jb-poster .jb-eyebrow,
-.jb-audio-text .jb-label {
-  font-size: calc(20 * var(--pp, var(--cp)));
+.jb-poster-edition {
+  font-size: calc(var(--small) * var(--pp));
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
 }
 
-.jb-poster-content {
+.jb-poster-copy {
+  grid-area: copy;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.jb-poster-stage .jb-label {
   font-size: calc(24 * var(--pp));
+  letter-spacing: 0.22em;
 }
 
 .jb-poster-title {
-  font-size: calc(76 * var(--pp));
-  letter-spacing: 0.04em;
-  line-height: 1.15;
-  font-weight: 600;
+  font-size: calc(var(--title) * var(--pp));
+  font-weight: 780;
+  font-stretch: 90%;
+  letter-spacing: -0.045em;
+  line-height: 1.12;
+  margin: calc(22 * var(--pp)) 0 calc(26 * var(--pp)) !important;
+  white-space: nowrap;
 }
 
-.jb-poster-stats,
-.jb-poster-detail {
-  max-width: calc(720 * var(--pp));
+.jb-poster-stats {
+  font-size: calc(var(--stats) * var(--pp));
+  color: var(--ink-muted);
+  letter-spacing: 0.025em;
 }
 
-.jb-poster .jb-rule {
-  width: calc(160 * var(--pp));
+.jb-poster-stats strong {
+  color: var(--ink);
+  font-weight: 550;
 }
 
+.jb-poster-empty .jb-poster-stats {
+  color: var(--ink);
+}
+
+.jb-poster-rule {
+  width: calc(80 * var(--pp));
+  height: calc(3 * var(--pp));
+  min-height: 2px;
+  background: #35c8bd;
+  margin: calc(46 * var(--pp)) 0 calc(28 * var(--pp));
+}
+
+.jb-poster-stage .jb-eyebrow {
+  font-size: calc(var(--small) * var(--pp));
+  letter-spacing: 0.19em;
+}
+
+/* Titre de la dernière écoute : deux lignes au plus, puis une ellipse (le texte entier en info-bulle). */
 .jb-poster-heading {
-  font-size: calc(34 * var(--pp));
+  font-size: calc(var(--heading) * var(--pp));
+  font-weight: 600;
   line-height: 1.2;
+  margin: calc(12 * var(--pp)) 0 !important;
+  max-width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.jb-poster-detail {
+  font-size: calc(var(--detail) * var(--pp));
+  max-width: 100%;
+}
+
+/* Le disque et son décor : vinyle géant, halo violet, filet de lumière, orbite ; tout est centré sur lui. */
+.jb-emblem {
+  grid-area: emblem;
+  position: relative;
+  width: calc(var(--emblem) * var(--pp));
+  height: calc(var(--emblem) * var(--pp));
+}
+
+.jb-emblem > * {
+  position: absolute;
+  pointer-events: none;
+}
+
+.jb-emblem-vinyl {
+  inset: -72%;
+  border-radius: 50%;
+  border: 1px solid #719b9b30;
+  background:
+    repeating-radial-gradient(circle, transparent 0 calc(31 * var(--pp)), #719b9b16 calc(32 * var(--pp)) calc(33 * var(--pp)), transparent calc(34 * var(--pp)) calc(43 * var(--pp))),
+    conic-gradient(from 305deg, transparent, #35c8bd12 15deg, transparent 36deg, transparent 178deg, #aa84dc12 198deg, transparent 225deg);
+  animation: jb-turn 100s linear infinite;
+  will-change: transform;
+}
+
+.jb-emblem-halo {
+  inset: -28%;
+  border-radius: 50%;
+  background: radial-gradient(circle, #aa84dc26, #35c8bd10 45%, transparent 68%);
+  animation: jb-breathe 9s ease-in-out infinite;
+}
+
+.jb-emblem-rail {
+  left: 104%;
+  top: -18%;
+  width: calc(2 * var(--pp));
+  min-width: 1px;
+  height: 118%;
+  background: linear-gradient(transparent, #35c8bd80, transparent);
+  box-shadow: 0 0 calc(40 * var(--pp)) #35c8bd22;
+  transform: rotate(24deg);
+}
+
+.jb-emblem-orbit {
+  inset: -4%;
+  border-radius: 50%;
+  border: 1px solid #719b9b35;
+  border-left: calc(2 * var(--pp)) solid #35c8bd80;
+  animation: jb-turn 40s linear infinite;
+}
+
+.jb-emblem .jb-logo {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 calc(18 * var(--pp)) calc(40 * var(--pp)) #000a);
+}
+
+.jb-poster-foot {
+  grid-area: foot;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: calc(24 * var(--pp));
+  border-top: 1px solid var(--line-strong);
+  padding-top: calc(24 * var(--pp));
+  margin-right: calc(-16 * var(--pp));
+  font-size: calc(var(--small) * var(--pp));
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-muted);
+  white-space: nowrap;
+}
+
+.jb-poster-go {
+  display: flex;
+  align-items: center;
+  gap: calc(14 * var(--pp));
+}
+
+.jb-keycap {
+  border: 1px solid #719b9b80;
+  border-radius: calc(6 * var(--pp));
+  padding: calc(4 * var(--pp)) calc(13 * var(--pp));
+  color: var(--ink);
+  letter-spacing: 0.04em;
+}
+
+@keyframes jb-turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes jb-breathe {
+  0%,
+  100% {
+    opacity: 0.7;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jb-emblem > * {
+    animation: none !important;
+  }
 }
 
 /* Fronton (zone de l'écran) et clip au repos : l'affiche plein cadre. */
@@ -1097,22 +1275,37 @@
   inset: 0;
 }
 
+/* Clip au repos au bureau (1222 × 620) : la composition en largeur, resserrée. */
 .jb-clip-poster.place-desk {
   --pw: 1222;
   --ph: 620;
+  --emblem: 380;
+  --title: 96;
+  --stats: 24;
+  --heading: 30;
+  --detail: 22;
+  --small: 20;
 }
 
-.jb-clip-poster.place-desk .jb-poster-content {
-  gap: calc(18 * var(--pp));
+.jb-clip-poster.place-desk .jb-poster-stage,
+.jb-wheel-fronton .jb-poster-stage {
+  column-gap: calc(56 * var(--pp));
+  padding: calc(28 * var(--pp)) calc(64 * var(--pp)) calc(28 * var(--pp)) calc(56 * var(--pp));
 }
 
-.jb-clip-poster.place-desk .jb-identity {
-  width: calc(180 * var(--pp));
-  height: calc(180 * var(--pp));
+.jb-clip-poster.place-desk .jb-poster-head,
+.jb-wheel-fronton .jb-poster-head {
+  margin: 0;
 }
 
-.jb-clip-poster.place-desk .jb-poster-title {
-  font-size: calc(54 * var(--pp));
+.jb-clip-poster.place-desk .jb-poster-rule,
+.jb-wheel-fronton .jb-poster-rule {
+  margin: calc(22 * var(--pp)) 0 calc(16 * var(--pp));
+}
+
+.jb-clip-poster.place-desk .jb-poster-title,
+.jb-wheel-fronton .jb-poster-title {
+  margin: calc(10 * var(--pp)) 0 calc(14 * var(--pp)) !important;
 }
 
 /* Le morceau en cours sur le fronton d'une autre fenêtre (bureau à deux écrans). */
@@ -1120,23 +1313,64 @@
   --cp: min(100cqw / 1920, 100cqh / 1080);
 }
 
-/* Médaillon choisi en borne : l'affiche habille tout le plateau, derrière la roue ; le texte au-dessus d'elle. */
+/* Composition en hauteur : le disque, puis les textes, centrés. */
+.jb-wheel-poster .jb-poster-stage {
+  grid-template: 'emblem' auto 'copy' auto / minmax(0, 1fr);
+  justify-items: center;
+  align-content: start;
+  row-gap: calc(80 * var(--pp));
+  text-align: center;
+}
+
+.jb-wheel-poster .jb-poster-head {
+  display: none;
+}
+
+.jb-wheel-poster .jb-poster-copy {
+  align-items: center;
+  width: 100%;
+}
+
+.jb-wheel-poster .jb-poster-rule {
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/*
+ * Médaillon choisi en borne : l'affiche habille tout le plateau, derrière la roue ; sa composition
+ * tient dans les 1370 premiers pixels (référence 1080 × 1920), la roue et son cartouche dessous.
+ * La marque du menu est déjà en tête de l'écran : pas d'en-tête ici.
+ */
 .jb-wheel-poster {
   --pw: 1080;
   --ph: 1920;
+  --emblem: 460;
+  --title: 142;
+  --stats: 30;
+  --heading: 44;
+  --detail: 27;
+  --small: 22;
   position: absolute;
   inset: 0;
   z-index: 0;
 }
 
-.jb-wheel-poster > .jb-poster-content {
+.jb-wheel-poster .jb-poster-stage {
+  bottom: auto;
   height: calc(1370 * min(100cqw / 1080, 100cqh / 1920));
+  padding: calc(167 * var(--pp)) calc(48 * var(--pp)) 0;
 }
 
-/* Au bureau : dans le cadre 9:16 du plateau (cotes de #media-bg). */
+/* Au bureau : dans le cadre 9:16 du plateau (cotes de #media-bg), centrée dans le cadre. */
 .jb-wheel-poster.desk {
-  --pw: 548;
-  --ph: 974;
+  --pw: 531;
+  --ph: 944;
+  --emblem: 260;
+  --title: 76;
+  --stats: 22;
+  --heading: 28;
+  --detail: 20;
+  --small: 20;
   inset: auto;
   left: calc(80 * var(--u));
   top: calc(92 * var(--u));
@@ -1145,89 +1379,70 @@
   border-radius: calc(5 * var(--u));
 }
 
-.jb-wheel-poster.desk > .jb-poster-content {
-  height: 100%;
-  gap: calc(22 * var(--pp));
+.jb-wheel-poster.desk .jb-poster-stage {
+  bottom: 0;
+  height: auto;
+  align-content: center;
+  row-gap: calc(48 * var(--pp));
   padding: calc(36 * var(--pp));
 }
 
-.jb-wheel-poster.desk .jb-identity {
-  width: calc(230 * var(--pp));
-  height: calc(230 * var(--pp));
+.jb-wheel-poster.desk .jb-poster .jb-label,
+.jb-wheel-poster.desk .jb-label {
+  font-size: calc(20 * var(--pp));
+}
+
+.jb-wheel-poster.desk .jb-poster-rule {
+  margin: calc(24 * var(--pp)) auto calc(16 * var(--pp));
 }
 
 .jb-wheel-poster.desk .jb-poster-title {
-  font-size: calc(64 * var(--pp));
+  margin: calc(10 * var(--pp)) 0 calc(12 * var(--pp)) !important;
 }
 
-.jb-wheel-poster.desk .jb-rule {
-  margin: calc(8 * var(--pp)) 0;
-}
-
-/* Cadre du fronton du menu au bureau : identité à gauche, textes à droite, en haut du cadre (la roue passe dessous). */
+/* Cadre du fronton du menu au bureau (1140 × 641) : la composition en largeur, resserrée. */
 .jb-wheel-fronton {
-  --pw: 1176;
-  --ph: 662;
+  --pw: 1140;
+  --ph: 641;
+  --emblem: 360;
+  --title: 92;
+  --stats: 24;
+  --heading: 30;
+  --detail: 22;
+  --small: 20;
   position: absolute;
   inset: 0;
   z-index: 1;
 }
 
-.jb-wheel-fronton > .jb-poster-content {
-  display: grid;
-  grid-template-columns: calc(220 * var(--pp)) minmax(0, 1fr);
-  grid-template-rows: repeat(6, auto);
+/* La roue du bureau couvre le bas de ce cadre (≈ 42 %) : tout tient au-dessus d'elle, sans le détail
+   ni l'invitation (la barre d'aide de la roue dit déjà Start). */
+.jb-wheel-fronton {
+  --emblem: 280;
+  --title: 72;
+}
+
+.jb-wheel-fronton .jb-poster-stage {
+  padding-bottom: calc(220 * var(--pp));
   align-content: start;
-  justify-items: start;
-  gap: calc(8 * var(--pp)) calc(28 * var(--pp));
-  height: auto;
-  padding: calc(28 * var(--pp));
-  text-align: left;
-}
-
-.jb-wheel-fronton .jb-identity {
-  grid-column: 1;
-  grid-row: 1 / 7;
-  width: calc(210 * var(--pp));
-  height: calc(210 * var(--pp));
-  align-self: center;
-}
-
-.jb-wheel-fronton .jb-label {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-.jb-wheel-fronton .jb-poster-title {
-  grid-column: 2;
-  grid-row: 2;
-  font-size: calc(56 * var(--pp));
-}
-
-.jb-wheel-fronton .jb-poster-stats {
-  grid-column: 2;
-  grid-row: 3;
-}
-
-.jb-wheel-fronton .jb-rule {
-  display: none;
-}
-
-.jb-wheel-fronton .jb-eyebrow {
-  grid-column: 2;
-  grid-row: 4;
 }
 
 .jb-wheel-fronton .jb-poster-heading {
-  grid-column: 2;
-  grid-row: 5;
-  font-size: calc(32 * var(--pp));
+  /* Le médaillon central de la roue monte jusqu'à cette ligne : le titre s'arrête avant lui. */
+  max-width: calc(420 * var(--pp));
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.jb-wheel-fronton .jb-poster-detail {
-  grid-column: 2;
-  grid-row: 6;
-  font-size: calc(22 * var(--pp));
+.jb-wheel-fronton .jb-poster-detail,
+.jb-wheel-fronton .jb-poster-foot {
+  display: none;
+}
+
+.jb-clip-poster.place-desk .jb-label,
+.jb-wheel-fronton .jb-label {
+  font-size: calc(20 * var(--pp));
 }
 
 /*
@@ -1277,16 +1492,6 @@
 
 .jb-clip[data-place='desk'] .jb-visualizer > span {
   height: calc(var(--h, 0.2) * 340 * var(--cp));
-}
-
-.jb-wheel-poster.desk {
-  --pw: 531;
-  --ph: 944;
-}
-
-.jb-wheel-fronton {
-  --pw: 1140;
-  --ph: 641;
 }
 
 /* Affiche et clip hors de la section du plateau : pas de marges par défaut sur leurs titres (comme les maquettes). */
@@ -1563,4 +1768,437 @@
 
 .jb-seekable {
   cursor: pointer;
+}
+
+/* ---------- Entrée depuis la roue (packages/core/src/jukebox-entrance.ts) ---------- */
+
+/*
+ * Piste A « Le disque prend la scène » : 1400 ms en tout (JUKEBOX_ENTRANCE.end), comptées depuis le
+ * Start dans chaque fenêtre (--jb-entree-t, délai négatif posé par jukebox.js) ; les pourcentages des
+ * images clés sont ces temps sur 1400 : 160 ms = 11.4 %, 200 = 14.3 %, 320 = 22.9 %, 450 = 32.1 %,
+ * 500 = 35.7 %, 700 = 50 %, 1000 = 71.4 %, 1100 = 78.6 %, 1200 = 85.7 %. Sans la classe jb-entree
+ * (finie, ou un bouton l'a arrêtée), chaque élément est dans son état normal.
+ */
+.jb-entree {
+  --jb-entree-ms: 1400ms;
+}
+
+.jb-entree-depart {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  overflow: hidden;
+  pointer-events: none;
+  container-type: size;
+}
+
+/* L'affiche de la roue s'efface (200 → 700 ms) ; son disque est remplacé par celui qui s'envole. */
+.jb-entree .jb-entree-poster {
+  animation: jb-entree-fade var(--jb-entree-ms) linear var(--jb-entree-t, 0ms) both;
+}
+
+.jb-entree-poster .jb-emblem .jb-logo {
+  visibility: hidden;
+}
+
+@keyframes jb-entree-fade {
+  0%,
+  14.3% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Le disque : il s'allume (160 ms), recule de 24 px (320 ms), puis file vers le haut et sort (700 ms). */
+.jb-entree-disc {
+  position: absolute;
+  left: calc(310 * var(--jp));
+  top: calc(167 * var(--jp));
+  width: calc(460 * var(--jp));
+  height: calc(460 * var(--jp));
+  opacity: 0;
+}
+
+.jb-entree .jb-entree-disc {
+  animation: jb-entree-launch var(--jb-entree-ms) linear var(--jb-entree-t, 0ms) both;
+}
+
+@keyframes jb-entree-launch {
+  0% {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+  11.4%,
+  14.3% {
+    opacity: 1;
+    transform: scale(1.035);
+    filter: brightness(1.25) drop-shadow(0 0 calc(30 * var(--jp)) #35c8bd99);
+  }
+  22.9% {
+    opacity: 1;
+    transform: translateY(calc(24 * var(--jp))) scale(0.98);
+    filter: brightness(1.2) drop-shadow(0 0 calc(30 * var(--jp)) #35c8bd99);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.8, 1);
+  }
+  45% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+    transform: translateY(calc(-760 * var(--jp))) scale(0.42);
+    filter: brightness(1.2);
+  }
+}
+
+/* Le rail de lumière que laisse le disque (320 → 700 ms). */
+.jb-entree-ray {
+  position: absolute;
+  left: calc(538 * var(--jp));
+  top: 0;
+  width: calc(4 * var(--jp));
+  height: calc(640 * var(--jp));
+  background: linear-gradient(transparent, #35c8bd, transparent);
+  box-shadow: 0 0 calc(35 * var(--jp)) #aa84dc66;
+  opacity: 0;
+}
+
+.jb-entree .jb-entree-ray {
+  animation: jb-entree-ray var(--jb-entree-ms) linear var(--jb-entree-t, 0ms) both;
+}
+
+@keyframes jb-entree-ray {
+  0%,
+  14.3% {
+    opacity: 0;
+  }
+  22.9% {
+    opacity: 0.7;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Onde au départ, autour de la place du disque (200 → 900 ms). */
+.jb-entree-wave,
+.jb-emblem-wave {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid #35c8bd;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.jb-entree-wave {
+  left: calc(240 * var(--jp));
+  top: calc(97 * var(--jp));
+  width: calc(600 * var(--jp));
+  height: calc(600 * var(--jp));
+}
+
+.jb-entree .jb-entree-wave {
+  animation: jb-entree-wave-out var(--jb-entree-ms) linear var(--jb-entree-t, 0ms) both;
+}
+
+@keyframes jb-entree-wave-out {
+  0%,
+  14.3% {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+  25.7% {
+    opacity: 0.45;
+  }
+  64.3%,
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+/* La liste des playlists paraît, zone après zone (500 → 1100 ms et un peu plus). */
+.jb-entree.jb-cab > .jb-zone,
+.jb-entree.jb-desk > .jb-zone {
+  animation: jb-entree-list var(--jb-entree-ms) linear var(--jb-entree-t, 0ms) both;
+}
+
+.jb-entree > .jb-playlist {
+  animation-delay: calc(var(--jb-entree-t, 0ms) + 40ms) !important;
+}
+
+.jb-entree > .jb-list,
+.jb-entree > .jb-frame {
+  animation-delay: calc(var(--jb-entree-t, 0ms) + 80ms) !important;
+}
+
+.jb-entree > .jb-now,
+.jb-entree > .jb-clip-zone {
+  animation-delay: calc(var(--jb-entree-t, 0ms) + 120ms) !important;
+}
+
+.jb-entree > .jb-help {
+  animation-delay: calc(var(--jb-entree-t, 0ms) + 160ms) !important;
+}
+
+@keyframes jb-entree-list {
+  0%,
+  35.7% {
+    opacity: 0;
+    transform: translateY(calc(28 * var(--jp)));
+  }
+  78.6%,
+  100% {
+    opacity: 1;
+    transform: none;
+    animation-timing-function: ease-out;
+  }
+}
+
+/*
+ * Fronton : l'affiche s'assombrit, son disque s'éclipse (200 → 450 ms), puis entre par le bas
+ * (700 ms) et se pose avec un léger dépassement (1000 ms), dans une onde (1000 → 1400 ms).
+ */
+.jb-entree .jb-poster .jb-emblem {
+  animation: jb-entree-arrive var(--jb-entree-ms) linear var(--jb-entree-t, 0ms) both;
+}
+
+@keyframes jb-entree-arrive {
+  0%,
+  14.3% {
+    opacity: 1;
+    transform: none;
+  }
+  32.1% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  50% {
+    opacity: 0;
+    transform: translateY(calc(750 * var(--pp))) scale(0.55);
+    animation-timing-function: cubic-bezier(0.16, 0.8, 0.3, 1);
+  }
+  71.4% {
+    opacity: 1;
+    transform: translateY(calc(-12 * var(--pp))) scale(1.025);
+    animation-timing-function: ease-in-out;
+  }
+  85.7%,
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.jb-entree .jb-poster-copy,
+.jb-entree .jb-poster-foot,
+.jb-entree .jb-poster-head {
+  animation: jb-entree-dim var(--jb-entree-ms) linear var(--jb-entree-t, 0ms) both;
+}
+
+@keyframes jb-entree-dim {
+  0%,
+  14.3% {
+    opacity: 1;
+  }
+  32.1%,
+  71.4% {
+    opacity: 0.35;
+  }
+  85.7%,
+  100% {
+    opacity: 1;
+  }
+}
+
+.jb-emblem-wave {
+  inset: -2%;
+}
+
+.jb-entree .jb-emblem-wave {
+  animation: jb-entree-wave-in var(--jb-entree-ms) linear var(--jb-entree-t, 0ms) both;
+}
+
+@keyframes jb-entree-wave-in {
+  0%,
+  71.4% {
+    opacity: 0;
+    transform: scale(0.65);
+  }
+  78.6% {
+    opacity: 0.45;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+/* Le départ sur le plateau garde son disque : l'arrivée est pour le fronton. */
+.jb-entree .jb-entree-poster .jb-emblem,
+.jb-entree .jb-entree-poster .jb-poster-copy {
+  animation: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jb-entree *,
+  .jb-entree {
+    animation: none !important;
+  }
+  .jb-entree-depart {
+    display: none;
+  }
+}
+
+/* ---------- Ambiance pendant la musique (plateau en borne, fronton d'un son seul) ---------- */
+
+/*
+ * Derrière tout le reste : un vinyle géant qui tourne (120 s), un halo violet et sarcelle qui suit les
+ * graves (--jb-bass, pouls du son ; .jb-pulse) ou respire seul (lecteur YouTube, son non mesuré),
+ * quelques particules qui montent. Transformations et opacité seulement ; à l'arrêt en pause.
+ */
+.jb-ambiance {
+  --amb-x: 50%;
+  --amb-y: 85%;
+  --amb-size: 150cqmax;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  container-type: size;
+}
+
+.jb-cab > .jb-ambiance {
+  --amb-y: 86%;
+  --amb-size: 140cqh;
+}
+
+.jb-audio > .jb-ambiance {
+  --amb-x: 30%;
+  --amb-y: 45%;
+  --amb-size: 130cqw;
+}
+
+.jb-amb-vinyl,
+.jb-amb-halo {
+  position: absolute;
+  left: var(--amb-x);
+  top: var(--amb-y);
+  width: var(--amb-size);
+  height: var(--amb-size);
+  margin: calc(var(--amb-size) / -2) 0 0 calc(var(--amb-size) / -2);
+  border-radius: 50%;
+}
+
+.jb-amb-vinyl {
+  background:
+    repeating-radial-gradient(circle, transparent 0 1.6cqmin, #719b9b12 1.7cqmin 1.8cqmin, transparent 1.9cqmin 2.4cqmin),
+    conic-gradient(from 300deg, transparent, #35c8bd14 14deg, transparent 34deg, transparent 176deg, #aa84dc14 196deg, transparent 222deg);
+  opacity: 0;
+  transition: opacity 600ms ease;
+  animation: jb-turn 120s linear infinite paused;
+  will-change: transform;
+}
+
+.jb-amb-halo {
+  --jb-bass: 0.3;
+  background: radial-gradient(circle, #aa84dc2e, #35c8bd14 32%, transparent 60%);
+  opacity: 0;
+  transform: scale(0.55);
+  transition: opacity 600ms ease;
+}
+
+/* Musique en cours : le vinyle tourne, le halo vit. */
+.jb-playing > .jb-ambiance .jb-amb-vinyl,
+.jb-audio > .jb-ambiance .jb-amb-vinyl {
+  opacity: 1;
+  animation-play-state: running;
+}
+
+.jb-playing > .jb-ambiance .jb-amb-halo,
+.jb-audio > .jb-ambiance .jb-amb-halo {
+  animation: jb-amb-breathe 8s ease-in-out infinite;
+}
+
+/* Son mesuré : le halo suit les graves (le pouls arrive une quinzaine de fois par seconde). */
+.jb-playing > .jb-ambiance.jb-pulse .jb-amb-halo,
+.jb-audio > .jb-ambiance.jb-pulse .jb-amb-halo {
+  animation: none;
+  opacity: calc(0.45 + var(--jb-bass) * 0.55);
+  transform: scale(calc(0.5 + var(--jb-bass) * 0.22));
+  transition: opacity 90ms linear, transform 90ms linear;
+}
+
+@keyframes jb-amb-breathe {
+  0%,
+  100% {
+    opacity: 0.5;
+    transform: scale(0.52);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(0.6);
+  }
+}
+
+.jb-amb-dust {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 600ms ease;
+}
+
+.jb-playing > .jb-ambiance .jb-amb-dust,
+.jb-audio > .jb-ambiance .jb-amb-dust {
+  opacity: 1;
+}
+
+.jb-amb-dust > i {
+  position: absolute;
+  bottom: 8%;
+  width: 0.45cqmin;
+  height: 0.45cqmin;
+  border-radius: 50%;
+  background: #aa84dc;
+  opacity: 0;
+  animation: jb-amb-rise 8s linear infinite paused;
+}
+
+.jb-amb-dust > i:nth-child(3n) {
+  background: #35c8bd;
+}
+
+.jb-playing > .jb-ambiance .jb-amb-dust > i,
+.jb-audio > .jb-ambiance .jb-amb-dust > i {
+  animation-play-state: running;
+}
+
+@keyframes jb-amb-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  30% {
+    opacity: 0.4;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-60cqh);
+  }
+}
+
+/* Le fond sombre de .jb-audio passe derrière l'ambiance : ses dessins restent au-dessus. */
+.jb-audio > :not(.jb-ambiance) {
+  position: relative;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .jb-ambiance * {
+    animation: none !important;
+  }
 }

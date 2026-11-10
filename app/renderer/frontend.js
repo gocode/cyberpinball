@@ -427,8 +427,12 @@ function menuPanel(s) {
   v.node.classList.toggle('jukebox-chosen', Boolean(s.table.jukebox));
   // Médaillon Juke-box choisi au bureau : son affiche dans le cadre du fronton du menu.
   const front = s.jukebox?.wheel && style && document.documentElement.classList.contains('menu-desktop') && window.CyberJukebox ? CyberJukebox.backglassPoster(s) : undefined;
-  v.backglass.querySelector(':scope > .jb-wheel-fronton')?.remove(); // i18n-ignore : sélecteur CSS
-  if (front) v.backglass.append(front);
+  // La même affiche reste en place (ses animations continuent) ; une autre la remplace.
+  const shown = v.backglass.querySelector(':scope > .jb-wheel-fronton'); // i18n-ignore : sélecteur CSS
+  if (shown !== front) {
+    shown?.remove();
+    if (front) v.backglass.append(front);
+  }
   v.star.toggleAttribute('data-on', Boolean(s.table.favorite));
   fillShelf(v.shelf, s.shelf, s);
   v.node.classList.toggle('has-shelf', Boolean(s.shelf));
@@ -1142,6 +1146,8 @@ function syncLiveDmd(spec) {
   liveDmd.framed = spec.framed;
   liveDmd.hidden = Boolean(spec.hidden);
   liveDmd.holder.classList.toggle('framed', spec.framed);
+  // Place sous la bande (FullDMD 16:9, la bande 4:1 au milieu) : le reflet du Juke-box y tient.
+  liveDmd.holder.classList.toggle('room-below', spec.area.y + 2 * spec.area.height <= 1.02);
   const a = spec.area;
   const place = { left: `${a.x * 100}%`, top: `${a.y * 100}%`, width: `${a.width * 100}%`, height: `${a.height * 100}%` };
   Object.assign(liveDmd.box.style, place);
@@ -1159,7 +1165,7 @@ function showDmdShot(shot) {
   lastDmdShot = shot;
   if (!liveDmd) return;
   liveDmd.holder.hidden = dmdDotsHidden();
-  if (shot.dots) liveDmd.matrix.show(shot.dots);
+  if (shot.dots) liveDmd.matrix.show(shot.dots, shot.rgb);
   dmdZone.layer.setActive(dmdMediaActive());
 }
 
@@ -1515,6 +1521,8 @@ window.cyber.onState((s) => {
   if (s.tint) document.documentElement.style.setProperty('--table-tint', s.tint);
   else document.documentElement.style.removeProperty('--table-tint');
   syncLiveDmd(s.game ? undefined : s.liveDmd);
+  // Juke-box en FullDMD : le reflet des points sous la bande, sur le noir (frontend.css).
+  liveDmd?.holder.classList.toggle('jukebox', s.phase === 'jukebox');
   // Lancement en cinéma : posé au Start, effacé quand VPX paraît (avant le fond de partie).
   syncCinema(s);
   // Horaire : voile de nuit et préavis d'arrêt, levés pendant la partie et pour l'écran noir de l'arrêt.

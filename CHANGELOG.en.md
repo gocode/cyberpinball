@@ -9,6 +9,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 
 ## 0.1.9
 
+- A nicer Juke-box: a new disc on the wheel, backglass and playfield posters redesigned and animated.
+- Entering the Juke-box in one move: the disc leaves the playfield and takes the stage on all three screens; any button skips it.
+- Colour DMD while music plays: the visualiser takes the cover's colours (or Multicolour, or the DMD colour), set in System menu > Media > "Juke-box visualiser".
+- Juke-box announcement on the DMD: playlist and track counts centred, never run together.
 - Windows desktop (Ctrl+Shift+D): no sound at all from Cyber Pinball while you are on Windows, jukebox included; sound comes back when you return to the menu.
 - In the headset: pausing and leaving a game always respond; Pause, Escape and the VPX menu are never swallowed any more, and Quit closes VPX for sure.
 - In the headset: controllers set up the wrong way round (A and B swapped) are flagged when you put the headset on, with the default setup offered.

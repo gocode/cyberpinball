@@ -585,8 +585,15 @@ export function jukeboxPoster(input: { stats: string; empty: boolean; last?: { t
 /** Bandes du spectre : 24 colonnes de 3 points, un point d'écart (maquette « Spectre »). */
 export const JUKEBOX_SPECTRUM_BANDS = 24;
 
-/** Sélection du médaillon : JUKE-BOX en grand, le nombre de morceaux et de playlists dessous. */
-export function jukeboxSelectionDots(input: { tracks: number; playlists: number }): DmdDots {
+/** Les chiffres de l'annonce passent de l'un à l'autre, quand ils ne tiennent pas ensemble sur une ligne. */
+export const JUKEBOX_SELECTION_SWAP_MS = 2500;
+
+/**
+ * Sélection du médaillon : JUKE-BOX en grand, les chiffres de la bibliothèque dessous, centrés :
+ * « 12 MORCEAUX · 3 PLAYLISTS » s'ils tiennent avec leurs marges, sinon l'un puis l'autre, toutes les
+ * 2,5 s (`elapsed`). Jamais collés ni au bord de l'afficheur (« 72 MORCEAUX4 PLAYLISTS » avant le 10/11/2026).
+ */
+export function jukeboxSelectionDots(input: { tracks: number; playlists: number }, elapsed = 0): DmdDots {
   const dots = blankDots();
   drawCentered(dots, DMD_FONT_LARGE, 'JUKE-BOX', 3);
   if (!input.playlists) {
@@ -595,14 +602,9 @@ export function jukeboxSelectionDots(input: { tracks: number; playlists: number 
   }
   const left = dmdText(tn(input.tracks, '{n} morceau', '{n} morceaux', { n: input.tracks }));
   const right = dmdText(tn(input.playlists, '{n} playlist', '{n} playlists', { n: input.playlists }));
-  // Deux groupes sous le titre, de part et d'autre (relecture 1, point 6) ; centrés s'ils ne tiennent pas côte à côte.
-  const lw = textWidth(DMD_FONT_SMALL, left);
-  const rw = textWidth(DMD_FONT_SMALL, right);
-  // Un point de marge de chaque côté et deux au moins entre eux, comme la maquette (x = 1 et x = 66).
-  if (lw + rw + 2 <= DMD_WIDTH - 2) {
-    drawText(dots, DMD_FONT_SMALL, left, 1, 23, DMD_LEVEL.secondary);
-    drawText(dots, DMD_FONT_SMALL, right, DMD_WIDTH - 1 - rw, 23, DMD_LEVEL.secondary);
-  } else drawCentered(dots, DMD_FONT_SMALL, left, 23, DMD_LEVEL.secondary);
+  const both = `${left} · ${right}`;
+  const line = textWidth(DMD_FONT_SMALL, both) <= DMD_USABLE ? both : Math.floor(elapsed / JUKEBOX_SELECTION_SWAP_MS) % 2 ? right : left;
+  drawCentered(dots, DMD_FONT_SMALL, line, 23, DMD_LEVEL.secondary);
   return dots;
 }
 

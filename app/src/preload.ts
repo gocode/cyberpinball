@@ -49,4 +49,9 @@ contextBridge.exposeInMainWorld('cyber', {
     ipcRenderer.on('jukebox-time', (_event, time) => callback(time));
   },
   jukebox: (message: unknown) => ipcRenderer.send('jukebox', message),
+  // Pouls du son du Juke-box (0 à 1 : graves, médiums, aigus), une quinzaine de fois par seconde :
+  // l'ambiance du plateau et du fronton suit la musique (jukebox-player.ts).
+  onJukeboxPulse: (callback: (pulse: unknown) => void) => {
+    ipcRenderer.on('jukebox-pulse', (_event, pulse) => callback(pulse));
+  },
 });

@@ -2158,6 +2158,11 @@ html.annex .zone {
   position: absolute;
 }
 
+/* Juke-box en FullDMD (la bande 4:1 sur du noir, de la place dessous) : le reflet atténué des points, pour la profondeur. */
+.live-dmd.jukebox.room-below:not(.framed) .live-dmd-dots {
+  -webkit-box-reflect: below 0.6vh linear-gradient(rgba(0, 0, 0, 0.32), transparent 55%);
+}
+
 /* « DMD sur la roue » : cadre du réglage autour des points, légende au-dessus (dessous s'il touche le haut). */
 .live-dmd-edit {
   position: absolute;

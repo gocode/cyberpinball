@@ -42,8 +42,9 @@
   // ---------- Logo du médaillon ----------
 
   /**
-   * Logo rond du médaillon (juke-box.svg) : disque à sillons, note centrale vert signal, six pistes
-   * de son violettes ; une illustration, pas un pictogramme du registre.
+   * Logo rond du médaillon (juke-box.svg, piste « Sillon » du 10/11/2026) : vinyle à sillons, deux
+   * croches vert signal dans un label sarcelle, six pistes de son violettes ; une illustration, pas un
+   * pictogramme du registre (celui-là est « jukebox », icons.js).
    */
   function logo(className = 'jb-logo') {
     const img = el('img', className);
@@ -90,16 +91,103 @@
 
   // ---------- Affiche (médaillon, fronton au repos) ----------
 
-  /** L'affiche du Juke-box : identité, chiffres de la bibliothèque, dernière écoute (ou invitation). */
-  function poster(p, className = '') {
+  /** « 4 playlists · 86 morceaux · 5 h 42 » : les nombres (et les durées) en gras. */
+  function statsLine(text) {
+    const node = el('p', 'jb-poster-stats');
+    let at = 0;
+    for (const m of String(text).matchAll(/\d+(?:[ \u00a0\u202f]h[ \u00a0\u202f]\d+)?/g)) {
+      if (m.index > at) node.append(document.createTextNode(text.slice(at, m.index)));
+      node.append(el('strong', '', m[0]));
+      at = m.index + m[0].length;
+    }
+    if (at < text.length) node.append(document.createTextNode(text.slice(at)));
+    return node;
+  }
+
+  /**
+   * Disque de l'affiche : le logo, un halo qui respire, une orbite et un grand vinyle qui tournent
+   * lentement derrière lui (transformations et opacité seulement : léger pour la carte graphique).
+   */
+  function emblem() {
+    const box = el('div', 'jb-emblem');
+    box.setAttribute('aria-hidden', 'true');
+    box.append(el('div', 'jb-emblem-vinyl'), el('div', 'jb-emblem-halo'), el('div', 'jb-emblem-rail'), el('div', 'jb-emblem-orbit'), logo('jb-logo'), el('div', 'jb-emblem-wave'));
+    return box;
+  }
+
+  /**
+   * Ambiance pendant la musique (plateau en borne, fronton d'un son seul) : un grand vinyle qui tourne
+   * lentement, un halo qui suit les graves (pouls du son, jukebox-pulse) ou respire doucement quand le
+   * son ne se mesure pas (lecteur YouTube), quelques particules qui montent. Derrière tout le reste,
+   * discret : la liste reste parfaitement lisible.
+   */
+  function ambiance() {
+    const box = el('div', 'jb-ambiance');
+    box.setAttribute('aria-hidden', 'true');
+    const dust = el('div', 'jb-amb-dust');
+    for (let i = 0; i < 9; i++) {
+      const dot = el('i');
+      dot.style.left = `${8 + ((i * 37) % 84)}%`;
+      dot.style.animationDelay = `${-i * 0.9}s`;
+      dot.style.animationDuration = `${7 + (i % 4)}s`;
+      dust.append(dot);
+    }
+    box.append(el('div', 'jb-amb-vinyl'), el('div', 'jb-amb-halo'), dust);
+    return box;
+  }
+
+  /** Pouls du son : posé sur les ambiances seulement (pas sur toute la page), une quinzaine de fois par seconde. */
+  let pulseQuiet;
+  window.cyber?.onJukeboxPulse?.((pulse) => {
+    const boxes = document.querySelectorAll('.jb-ambiance');
+    for (const box of boxes) {
+      box.style.setProperty('--jb-bass', String(Math.min(1, Math.max(0, Number(pulse?.bass) || 0))));
+      box.style.setProperty('--jb-high', String(Math.min(1, Math.max(0, Number(pulse?.high) || 0))));
+      box.classList.add('jb-pulse');
+    }
+    clearTimeout(pulseQuiet);
+    pulseQuiet = setTimeout(() => document.querySelectorAll('.jb-ambiance.jb-pulse').forEach((b) => b.classList.remove('jb-pulse')), 600);
+  });
+
+  /** Affiches déjà construites : la même affiche reste le même nœud, ses animations ne repartent pas à chaque état. */
+  const posters = new Map();
+
+  /**
+   * L'affiche du Juke-box (piste « Sillon » du 10/11/2026) :
+   * le grand titre face au disque éclairé, les chiffres de la bibliothèque, la dernière écoute (ou
+   * l'invitation). `hint` : le rappel « Start · Ouvrir le Juke-box » en pied (médaillon choisi sur la roue).
+   */
+  function poster(p, className = '', hint = false) {
+    const key = JSON.stringify([className, hint, p]);
+    const known = posters.get(key);
+    if (known) return known;
     const box = el('section', `jb-poster ${className}`.trim());
-    const content = el('div', 'jb-poster-content');
-    const identity = el('div', 'jb-identity');
-    identity.append(logo());
-    content.append(identity, el('div', 'jb-label', t('Votre borne. Votre musique.')), el('h1', 'jb-poster-title', t('JUKE-BOX')), el('p', 'jb-muted jb-poster-stats', p.stats), el('div', 'jb-rule'));
-    content.append(el('div', 'jb-eyebrow', p.eyebrow), el('h2', 'jb-poster-heading', p.heading));
-    if (p.detail) content.append(el('p', 'jb-muted jb-poster-detail', p.detail));
-    box.append(content);
+    box.classList.toggle('jb-poster-empty', Boolean(p.empty));
+    const stage = el('div', 'jb-poster-stage');
+    const head = el('header', 'jb-poster-head');
+    head.append(brand(), el('span', 'jb-poster-edition', t('La musique habite ici')));
+    const copy = el('div', 'jb-poster-copy');
+    copy.append(el('p', 'jb-label', t('Votre borne. Votre musique.')), el('h1', 'jb-poster-title', t('JUKE-BOX')), statsLine(p.stats), el('div', 'jb-poster-rule'), el('p', 'jb-eyebrow', p.eyebrow));
+    const heading = el('h2', 'jb-poster-heading', p.heading);
+    heading.title = p.heading;
+    copy.append(heading);
+    if (p.detail) {
+      const detail = el('p', 'jb-muted jb-poster-detail jb-ellipsis', p.detail);
+      detail.title = p.detail;
+      copy.append(detail);
+    }
+    stage.append(head, copy, emblem());
+    if (hint) {
+      const foot = el('footer', 'jb-poster-foot');
+      const go = el('span', 'jb-poster-go');
+      go.append(el('span', 'jb-keycap', t('Start')), document.createTextNode(t('Ouvrir le Juke-box')));
+      foot.append(el('span', '', t('Vos playlists prennent la scène.')), go);
+      stage.append(foot);
+    }
+    box.append(stage);
+    posters.set(key, box);
+    // Quelques affiches au plus (roue, fronton, bureau) : les plus anciennes sont oubliées.
+    if (posters.size > 8) posters.delete(posters.keys().next().value);
     return box;
   }
 
@@ -374,9 +462,11 @@
       const now = el('div', 'jb-zone jb-now');
       const help = el('div', 'jb-zone jb-help');
       for (const [zone, name] of [[head, 'en-tete'], [playlist, 'playlist'], [list, 'liste'], [now, 'lecture'], [help, 'commandes']]) zone.dataset.stable = `juke-box-${name}`;
-      node.append(head, playlist, list, now, help);
+      node.append(ambiance(), head, playlist, list, now, help);
       cab = { node, playlist, list, now, help };
     }
+    // L'ambiance ne s'anime que pendant la musique (pas en pause).
+    cab.node.classList.toggle('jb-playing', Boolean(view.now && !view.now.paused));
     fillPlaylist(cab.playlist, view);
     fillList(cab.list, view, false);
     fillNow(cab.now, view, s, false);
@@ -827,7 +917,7 @@
       if (now.artist) text.append(el('h2', 'jb-ellipsis', now.artist));
       text.append(el('p', 'jb-muted jb-ellipsis', now.album ? t('Album {album}', { album: now.album }) : order?.image ? t('Pochette du morceau') : t('Sans pochette · visualiseur du Juke-box')));
     }
-    box.append(cover, text);
+    box.append(ambiance(), cover, text);
     clip.stage.replaceChildren(box);
   }
 
@@ -859,7 +949,9 @@
       if (clip.order) stopMedia();
       clip.order = undefined;
       clip.node.classList.remove('online');
-      clip.stage.replaceChildren(c.place === 'thumb' ? art(undefined, 'repos', 'jb-art') : poster(c.poster, `jb-clip-poster place-${c.place}`));
+      // La même affiche reste en place : ses animations (vinyle, halo) ne repartent pas à chaque état.
+      const idle = c.place === 'thumb' ? art(undefined, 'repos', 'jb-art') : poster(c.poster, `jb-clip-poster place-${c.place}`);
+      if (clip.stage.firstChild !== idle || clip.stage.childNodes.length !== 1) clip.stage.replaceChildren(idle);
       stillKey = undefined;
       clip.over.replaceChildren();
       return;
@@ -904,6 +996,53 @@
     if (order.kind === 'online') requestAnimationFrame(reportClip);
   }
 
+  // ---------- Entrée depuis la roue (jukebox-entrance.ts) ----------
+
+  /**
+   * Animation d'entrée sur un écran : la classe jb-entree, et le temps déjà écoulé depuis le Start
+   * (--jb-entree-t, en délai négatif) pour que les trois écrans restent d'accord, même posés en retard.
+   * Sans entrée dans l'état (finie, ou un bouton l'a interrompue), la classe part : chaque élément
+   * est aussitôt dans son état final, qui est son état normal.
+   */
+  function entrance(node, s) {
+    const e = s.jukebox?.entrance;
+    if (!e) {
+      if (node.classList.contains('jb-entree')) node.classList.remove('jb-entree');
+      delete node.dataset.entree;
+      return;
+    }
+    if (node.dataset.entree === String(e.id)) return;
+    node.dataset.entree = String(e.id);
+    node.style.setProperty('--jb-entree-t', `${-Math.max(0, Date.now() - e.startedAt)}ms`);
+    node.classList.remove('jb-entree');
+    void node.offsetWidth;
+    node.classList.add('jb-entree');
+  }
+
+  /**
+   * Départ du disque sur le plateau en borne (entrée A) : l'affiche de la roue, posée par-dessus la
+   * liste, s'efface pendant que son disque s'allume, recule et file vers le fronton. Couche décorative
+   * (aucun clic, rognée par le plateau) ; retirée dès que l'entrée est finie ou interrompue.
+   */
+  function departure(node, s) {
+    const e = s.jukebox?.entrance;
+    let layer = node.querySelector(':scope > .jb-entree-depart'); // i18n-ignore : sélecteur CSS
+    if (!e) {
+      layer?.remove();
+      return;
+    }
+    if (layer?.dataset.entree === String(e.id)) return;
+    layer?.remove();
+    layer = el('div', 'jb-entree-depart');
+    layer.dataset.entree = String(e.id);
+    layer.dataset.bleed = '';
+    layer.setAttribute('aria-hidden', 'true');
+    const disc = logo('jb-entree-disc');
+    disc.alt = '';
+    layer.append(poster(e.poster, 'jb-wheel-poster jb-entree-poster'), el('div', 'jb-entree-ray'), el('div', 'jb-entree-wave'), disc);
+    node.append(layer);
+  }
+
   // ---------- Écrans annexes (fronton) et affiche ----------
 
   /** Contenu du Juke-box posé dans une zone (le fronton) ; false : la zone montre son média. */
@@ -914,7 +1053,7 @@
     let content;
     if (part === 'backglass' && j?.clip?.place === 'zone') content = clipHolder(s);
     else if (part === 'backglass' && j?.cover) content = coverCard(j.cover);
-    else if (part === 'backglass' && j?.wheel) content = poster(j.wheel.poster, 'jb-fronton-poster');
+    else if (part === 'backglass' && j?.wheel) content = poster(j.wheel.poster, 'jb-fronton-poster', true);
     const old = zoneNodes.get(node);
     if (!content) {
       if (old) {
@@ -930,6 +1069,7 @@
       zoneNodes.set(node, { wrap });
     }
     if (wrap.firstChild !== content) wrap.replaceChildren(content);
+    entrance(wrap, s);
     return true;
   }
 
@@ -954,7 +1094,7 @@
 
   /** La même, dans le cadre du fronton du menu au bureau : identité à gauche, textes à droite. */
   function backglassPoster(s) {
-    return poster(s.jukebox.wheel.poster, 'jb-wheel-fronton');
+    return poster(s.jukebox.wheel.poster, 'jb-wheel-fronton', true);
   }
 
   function playfield(s) {
@@ -965,6 +1105,8 @@
     // Start tenu : l'anneau de la ligne « Gestion » et de son rappel (manageHold de la vue).
     holdShown = s.jukebox?.player?.manageHold;
     const node = isDesk ? deskView(s) : cabView(s);
+    entrance(node, s);
+    if (!isDesk) departure(node, s);
     if (lastTime) showTime(lastTime);
     return [node];
   }

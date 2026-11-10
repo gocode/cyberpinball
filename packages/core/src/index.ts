@@ -173,5 +173,7 @@ export * from './jukebox-play';
 export * from './jukebox-screens';
 export * from './jukebox-youtube';
 export * from './jukebox-manage';
+export * from './jukebox-visualizer';
+export * from './jukebox-entrance';
 export * from './youtube-account';
 export * from './fronton-vr';

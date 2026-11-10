@@ -18,7 +18,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { session, webFrameMain, WebContentsView, type BrowserWindow, type Input, type Rectangle, type Session } from 'electron';
+import { nativeImage, session, webFrameMain, WebContentsView, type BrowserWindow, type Input, type Rectangle, type Session } from 'electron';
 import {
   audioSinkScript,
   JUKEBOX_EMBED_REFERRER,
@@ -46,7 +46,9 @@ import {
   jukeboxPlayerView,
   jukeboxPoster,
   jukeboxSelectionDots,
-  jukeboxSpectrumDots,
+  coverPalette,
+  createJukeboxVisualizer,
+  jukeboxEntranceFrame,
   jukeboxSummary,
   keyLabel,
   listTop,
@@ -56,6 +58,7 @@ import {
   t,
   unavailableText,
   JUKEBOX_ELEMENT_VOLUME,
+  JUKEBOX_ENTRANCE,
   JUKEBOX_LIST_ROWS,
   JUKEBOX_SPECTRUM_BANDS,
   type DmdAnimation,
@@ -64,6 +67,8 @@ import {
   type JukeboxPlayerView,
   type JukeboxPlaylistInput,
   type JukeboxPosterView,
+  type JukeboxVisualizerMode,
+  type Rgb,
   type PlayerEffect,
   type PlayerInput,
   type PlayerState,
@@ -98,6 +103,8 @@ export interface JukeboxPlayerHost {
   dmd(name: string, animation: DmdAnimation): { stop(): void };
   /** Le DMD montre les points (écran du DMD, ni partie ni bureau Windows). */
   dmdOn(): boolean;
+  /** Visualiseur du DMD (réglage « Visualiseur du Juke-box ») et couleur réglée des points (Classique). */
+  visualizer?(): { mode: JukeboxVisualizerMode; color: string };
   banner(text: string): void;
   log(line: string): void;
   /**
@@ -152,6 +159,12 @@ export interface JukeboxWindowView {
   /** Fronton d'une autre fenêtre que celle du clip (bureau à deux écrans) : l'affiche du morceau en cours. */
   cover?: { now?: JukeboxNowView; poster: JukeboxPosterView };
   layout: 'cab' | 'desk';
+  /**
+   * Entrée dans le Juke-box depuis la roue (jukebox-entrance.ts) : chaque fenêtre en déduit où en
+   * est l'animation (Date.now() - startedAt), et les trois écrans restent d'accord. Absente : rien à
+   * jouer (finie, interrompue par un bouton, ou retour de la gestion).
+   */
+  entrance?: { id: number; startedAt: number; poster: JukeboxPosterView };
 }
 
 /** Temps du morceau en cours, envoyé à part (canal jukebox-time) : la liste ne se redessine pas pour lui. */
@@ -214,6 +227,11 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   let pressTimer: NodeJS.Timeout | undefined;
   /** Titre et artiste du morceau en cours, pour le DMD (25 images par seconde). */
   let playingInfo: { title: string; artist?: string } | undefined;
+  /** Couleurs de la pochette du morceau en cours (visualiseur « Pochette »), lues une fois par morceau. */
+  let coverColors: { key: string; palette?: Rgb[] } | undefined;
+  /** Entrée depuis la roue en cours (animation des trois écrans), interrompue par le premier bouton. */
+  let entrance: { id: number; startedAt: number } | undefined;
+  let entranceSeq = 0;
   /** Le cadre du clip dans sa fenêtre (pixels de la page), dit par la fenêtre du clip. */
   let clipRect: Rectangle | undefined;
   let online: { id: number; view: WebContentsView; win: BrowserWindow; timer: NodeJS.Timeout; started: number; ended?: boolean; lastTime?: number } | undefined;
@@ -327,6 +345,14 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       return;
     }
     player = initialPlayer(lists(input), l.store().last, opened, l.store().modes);
+    entrance = { id: ++entranceSeq, startedAt: Date.now() };
+    // Fin de l'entrée : un état sans elle, pour que chaque fenêtre retire son décor (rien d'autre n'attend ce minuteur).
+    const id = entrance.id;
+    setTimeout(() => {
+      if (entrance?.id !== id) return;
+      entrance = undefined;
+      host.redraw();
+    }, JUKEBOX_ENTRANCE.end + 100).unref?.();
     // Retour d'un téléchargement : ses morceaux, directement.
     if (playlist && input.some((p) => p.id === playlist)) player = { ...player, level: 'tracks', at: playlist, shown: playlist };
     tops.clear();
@@ -364,6 +390,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     if (!player) return;
     stopPlayback();
     player = undefined;
+    entrance = undefined;
     background = false;
     host.log('Juke-box : fermé, musique arrêtée.'); // i18n-ignore : journal
     syncDmd();
@@ -475,6 +502,11 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       return true;
     }
     if (input.type !== 'keyDown') return true;
+    // Un bouton pendant l'entrée l'arrête net (chaque écran passe à son état final) et fait son office.
+    if (entrance && !input.isAutoRepeat) {
+      entrance = undefined;
+      host.redraw();
+    }
     const k = host.keys();
     const event = input.isAutoRepeat ? 'repeat' : 'down';
     // Au clavier du bureau, dans une playlist : ←→ passent à la playlist voisine (comme les MagnaSave),
@@ -615,6 +647,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     else order = { ...base, kind: 'online', youtube: pb.id, audioOnly: false };
     const v = l.views(playlistId).find((x) => x.track.key === key);
     playingInfo = { title: v?.info.title ?? key, ...(v?.info.artist ? { artist: v.info.artist } : {}) };
+    readCoverColors(key, (pb.kind !== 'online' ? pb.image : undefined) ?? v?.image);
     time = { key, position: 0, ...(v?.track.duration !== undefined ? { duration: v.track.duration } : {}), paused: false };
     // Le cartel du changement de morceau, quelques secondes.
     card = { id, until: Date.now() + JUKEBOX_CARD_MS };
@@ -654,6 +687,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       sendTime();
     } else if (msg.type === 'levels') {
       levels = { at: Date.now(), values: msg.levels.slice(0, JUKEBOX_SPECTRUM_BANDS).map((v) => (Number.isFinite(v) ? v : 0)) };
+      sendPulse(levels.values);
     } else if (msg.type === 'ended') {
       ended();
     } else if (msg.type === 'error') {
@@ -683,6 +717,20 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       return;
     }
     ended();
+  }
+
+  /**
+   * Pouls du son pour l'ambiance des écrans (jukebox-pulse) : graves, médiums, aigus, moyennés sur
+   * les bandes du spectre ; à toutes les fenêtres (la fenêtre du clip mesure, les autres suivent).
+   */
+  function sendPulse(values: readonly number[]): void {
+    const avg = (from: number, to: number) => {
+      let sum = 0;
+      for (let i = from; i < to; i++) sum += values[i] ?? 0;
+      return Math.round((sum / (to - from)) * 100) / 100;
+    };
+    const pulse = { bass: avg(0, 6), mid: avg(6, 16), high: avg(16, JUKEBOX_SPECTRUM_BANDS) };
+    for (const win of host.windows().values()) if (!win.isDestroyed()) win.webContents.send('jukebox-pulse', pulse);
   }
 
   function sendTime(): void {
@@ -927,6 +975,41 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
 
   // ---------- DMD ----------
 
+  /** « JUKE-BOX » et les chiffres de la bibliothèque, comme sur la roue, d'où part l'entrée. */
+  let entranceFrom: { id: number; dots: Uint8Array } | undefined;
+  function entranceDots(id: number): Uint8Array {
+    if (entranceFrom?.id !== id) {
+      const store = lib()?.store();
+      entranceFrom = { id, dots: jukeboxSelectionDots({ tracks: store?.playlists.reduce((n, p) => n + p.tracks.length, 0) ?? 0, playlists: store?.playlists.length ?? 0 }) };
+    }
+    return entranceFrom.dots;
+  }
+
+  function hexColor(hex: string): [number, number, number] {
+    const n = /^#?[0-9a-f]{6}$/i.test(hex) ? parseInt(hex.replace('#', ''), 16) : 0x8be23a;
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+
+  /**
+   * Couleurs de la pochette (visualiseur « Pochette ») : l'image réduite à 32 points de large par
+   * nativeImage (BGRA sous Windows), puis coverPalette. Une pochette illisible (format que nativeImage
+   * ne connaît pas, fichier absent) ou sans couleur : rien, le visualiseur passe en Multicolore.
+   */
+  function readCoverColors(key: string, file: string | undefined): void {
+    if (coverColors?.key === key) return;
+    coverColors = { key };
+    if (!file || !isAbsolute(file) || !fs.existsSync(file)) return;
+    try {
+      const image = nativeImage.createFromPath(file);
+      if (image.isEmpty()) return;
+      const small = image.resize({ width: 32, quality: 'good' });
+      const palette = coverPalette(small.toBitmap(), process.platform === 'win32' || process.platform === 'linux' ? 'bgra' : 'rgba');
+      if (palette) coverColors = { key, palette };
+    } catch (error) {
+      host.log(`Juke-box : pochette illisible pour le DMD (${String(error)}).`); // i18n-ignore : journal
+    }
+  }
+
   /** Le DMD du Juke-box : JUKE-BOX et ses chiffres sur la roue, le spectre en lecture ; rien ailleurs. */
   function syncDmd(onWheel = false): void {
     const want: 'wheel' | 'player' | undefined = !host.dmdOn() ? undefined : player ? 'player' : onWheel ? 'wheel' : undefined;
@@ -936,21 +1019,42 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       if (dmd?.kind === 'wheel' && stats.tracks === wheelStats.tracks && stats.playlists === wheelStats.playlists) return;
       wheelStats = stats;
       dmd?.stop();
-      const dots = jukeboxSelectionDots(stats);
-      const handle = host.dmd('juke-box', { dots: () => dots });
+      const handle = host.dmd('juke-box', { dots: (elapsed) => jukeboxSelectionDots(stats, elapsed) });
       dmd = { kind: 'wheel', stop: () => handle.stop() };
       return;
     }
     if (want === 'player') {
       if (dmd?.kind === 'player') return;
       dmd?.stop();
+      const visualizer = createJukeboxVisualizer();
+      let rgb: Uint8Array | undefined;
       const handle = host.dmd('juke-box', {
         dots: (elapsed) => {
           const now = order ? playingInfo : undefined;
           const fresh = levels && Date.now() - levels.at < 400 ? levels.values : undefined;
           const playing = Boolean(order && !order.paused && !ad);
-          return jukeboxSpectrumDots({ ...(now?.artist ? { artist: now.artist } : {}), ...(now?.title ? { title: now.title } : {}), levels: playing ? (fresh ?? idleSpectrum(elapsed, true)) : idleSpectrum(elapsed, false), elapsed });
+          const settings = host.visualizer?.() ?? { mode: 'classique' as const, color: '#8be23a' };
+          const palette = order && coverColors?.key === order.key ? coverColors.palette : undefined;
+          const frame = visualizer.frame({
+            ...(now?.artist ? { artist: now.artist } : {}),
+            ...(now?.title ? { title: now.title } : {}),
+            levels: playing ? (fresh ?? idleSpectrum(elapsed, true)) : idleSpectrum(elapsed, false),
+            elapsed,
+            mode: settings.mode,
+            ...(palette ? { palette } : {}),
+            color: settings.color,
+          });
+          // Entrée depuis la roue : « JUKE-BOX » et ses chiffres, chassés par une tache de lumière.
+          const since = entrance ? Date.now() - entrance.startedAt : Infinity;
+          if (since < JUKEBOX_ENTRANCE.dmdPassEnd) {
+            const shown = jukeboxEntranceFrame({ dots: entranceDots(entrance!.id) }, frame, since, hexColor(settings.color));
+            rgb = shown.rgb;
+            return shown.dots;
+          }
+          rgb = frame.rgb;
+          return frame.dots;
         },
+        colors: () => rgb,
       });
       dmd = { kind: 'player', stop: () => handle.stop() };
       return;
@@ -1000,6 +1104,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     }
     const pv = playerView();
     const out: JukeboxWindowView = { layout: layout() };
+    if (entrance && Date.now() - entrance.startedAt < JUKEBOX_ENTRANCE.end) out.entrance = { ...entrance, poster: poster() };
     if (role === 'playfield' && !background) out.player = pv;
     if (role === clipRole()) {
       const now = pv.now;

@@ -19,8 +19,10 @@ import {
   LIVE_DMD_TIMING,
   dmdAnimation,
   liveDmdProgram,
+  sameColors,
   sameDots,
   type DmdAnimation,
+  type DmdColors,
   type DmdAnimationName,
   type DmdAnimationOptions,
   type DmdDots,
@@ -31,6 +33,8 @@ import {
 /** Ce que reçoit la fenêtre : les points à dessiner. */
 export interface LiveDmdShotMessage {
   dots: DmdDots;
+  /** Couleur de chaque point (visualiseur du Juke-box) ; absente : la couleur réglée du DMD. */
+  rgb?: DmdColors;
 }
 
 export interface LiveDmdOptions {
@@ -55,6 +59,7 @@ interface Running {
   start: number;
   duration?: number;
   dots: (elapsed: number) => DmdDots;
+  colors?: (elapsed: number) => DmdColors | undefined;
   finish: () => void;
 }
 
@@ -119,6 +124,7 @@ export class LiveDmd {
       start: this.now(),
       duration: animation.duration,
       dots: (e) => animation.dots(e),
+      ...(animation.colors ? { colors: (e: number) => animation.colors!(e) } : {}),
       finish: () => {
         if (this.animation === running) this.animation = undefined;
         finish();
@@ -179,7 +185,10 @@ export class LiveDmd {
     const anim = this.animation;
     if (anim && anim.duration !== undefined && now - anim.start >= anim.duration) anim.finish();
     if (this.animation) {
-      shot = { dots: this.animation.dots(now - this.animation.start) };
+      const elapsed = now - this.animation.start;
+      shot = { dots: this.animation.dots(elapsed) };
+      const rgb = this.animation.colors?.(elapsed);
+      if (rgb) shot.rgb = rgb;
       moving = true;
     } else if (this.program) {
       const at = this.program.at(now - this.start);
@@ -191,7 +200,7 @@ export class LiveDmd {
         moving = true;
       } else this.handoff = undefined;
     } else return;
-    if (!this.last || !sameDots(shot.dots, this.last.dots)) {
+    if (!this.last || !sameDots(shot.dots, this.last.dots) || !sameColors(shot.rgb, this.last.rgb)) {
       this.last = shot;
       this.options.send(shot);
     }

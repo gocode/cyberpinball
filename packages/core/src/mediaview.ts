@@ -14,6 +14,7 @@ import { DEFAULT_ARCADE_HOURS, normalizeArcadeHours, type ArcadeHoursSettings } 
 import { DEFAULT_DMD_COLOR, normalizeDmdColor } from './dmdcolor';
 import { t } from './i18n';
 import { DEFAULT_INTRO_SETTINGS, normalizeIntroSettings, type IntroSettings } from './intro';
+import { DEFAULT_JUKEBOX_VISUALIZER, isVisualizerMode, type JukeboxVisualizerMode } from './jukebox-visualizer';
 import { layoutOf } from './locations';
 import { MEDIADB_QUALITY_SETTINGS, type MediaDbQualitySetting } from './mediadb';
 import { NOTICES_MODES, type NoticesMode } from './notices';
@@ -562,6 +563,12 @@ export interface MenuMediaSettings {
    * défaut ; masqué, la bibliothèque musicale reste (gestion des playlists).
    */
   jukebox: boolean;
+  /**
+   * Visualiseur du DMD pendant le Juke-box, quand aucun habillage n'est choisi
+   * (jukebox-visualizer.ts) : les couleurs de la pochette (défaut), multicolore, ou classique (la
+   * couleur du DMD).
+   */
+  jukeboxVisualizer: JukeboxVisualizerMode;
   /** Horaire de la borne (arcadehours.ts) : nuit voilée, arrêt à heure fixe ; non suivi par défaut. */
   hours: ArcadeHoursSettings;
   /**
@@ -597,6 +604,7 @@ export const DEFAULT_MENU_MEDIA_SETTINGS: MenuMediaSettings = {
   dmdColor: DEFAULT_DMD_COLOR,
   tableColor: true,
   jukebox: true,
+  jukeboxVisualizer: DEFAULT_JUKEBOX_VISUALIZER,
   hours: DEFAULT_ARCADE_HOURS,
   notices: 'all',
   intro: DEFAULT_INTRO_SETTINGS,
@@ -637,6 +645,7 @@ export function normalizeMenuMediaSettings(raw: unknown): MenuMediaSettings {
     dmdColor: normalizeDmdColor(r.dmdColor),
     tableColor: typeof r.tableColor === 'boolean' ? r.tableColor : d.tableColor,
     jukebox: typeof r.jukebox === 'boolean' ? r.jukebox : d.jukebox,
+    jukeboxVisualizer: isVisualizerMode(r.jukeboxVisualizer) ? r.jukeboxVisualizer : d.jukeboxVisualizer,
     hours: normalizeArcadeHours(r.hours),
     notices: NOTICES_MODES.includes(r.notices as NoticesMode) ? (r.notices as NoticesMode) : d.notices,
     intro: normalizeIntroSettings(r.intro),
