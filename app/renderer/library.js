@@ -567,7 +567,11 @@ function renderScoreboard(b) {
       const name = libEl('span', `scoreboard-name${l.anonymous ? ' anonymous' : ''}`);
       // Le pays en deux lettres : Windows ne dessine pas les drapeaux.
       if (l.country) name.append(libEl('span', 'scoreboard-country', l.country));
+      else if (l.avatar) name.append(libEl('span', 'scoreboard-country none', '—'));
+      // Classements en réseau : la pastille du joueur, cerclée de vert quand sa borne est en ligne.
+      if (l.avatar) name.append(avatarNode(l.avatar, `scoreboard-avatar${l.status ? ` status-${l.status.state}` : ''}`));
       name.append(libEl('span', 'scoreboard-name-text', l.name));
+      if (l.status) name.append(libEl('span', `scoreboard-status status-${l.status.state}`, l.status.label));
       li.append(
         libEl('span', 'scoreboard-rank', l.rank),
         name,

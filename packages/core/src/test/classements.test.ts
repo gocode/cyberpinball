@@ -3,7 +3,7 @@
 // de la table et le même nombre de billes. Ici : la signature (un score retouché est refusé), la
 // fusion (un même score une seule fois), ce que la borne garde, les portées (amis, pays, monde),
 // le masquage, le pays tiré de Windows ; puis deux bornes simulées sur 127.0.0.1 qui échangent
-// leurs scores, au bonjour et en direct.
+// leurs scores, au bonjour et en direct, et l'avatar joint aux scores (décidé le 10/11/2026).
 
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs';
@@ -20,7 +20,10 @@ import {
   mergeRankings,
   pruneRankings,
   rankedId,
+  rankingAvatars,
   rankingBoard,
+  readAvatarImage,
+  type AvatarImage,
   rankingsFile,
   saveRankings,
   signScore,
@@ -55,6 +58,25 @@ test('signature : un score signé passe, retouché il est refusé ; un score ven
   assert.equal(verifyScore(ana.score(1, new Date(NOW.getTime() + 3600_000).toISOString()), NOW), undefined, 'une heure dans le futur');
   assert.equal(verifyScore({ ...s, score: -5 }, NOW), undefined);
   assert.equal(verifyScore({ ...s, country: 'fr' }, NOW), undefined, 'pays en deux capitales');
+});
+
+test('avatar joint au score : signé avec lui, retouché refusé ; un score sans avatar se vérifie comme avant', () => {
+  const key = createPlayerKey();
+  const fields = { name: 'Ana', country: 'FR', board: T2, balls: 3, table, score: 95_000_000, at: at(11, 9), how: 'rom' as const };
+  const plain = signScore(key, fields);
+  assert.ok(verifyScore(JSON.parse(JSON.stringify(plain)), NOW), 'sans avatar');
+  assert.equal(verifyScore({ ...plain, avatar: 'c'.repeat(64) }, NOW), undefined, 'avatar ajouté après coup');
+  const withAvatar = signScore(key, { ...fields, avatar: 'c'.repeat(64) });
+  assert.deepEqual(verifyScore(JSON.parse(JSON.stringify(withAvatar)), NOW), withAvatar);
+  assert.equal(verifyScore({ ...withAvatar, avatar: 'd'.repeat(64) }, NOW), undefined, 'avatar remplacé');
+  assert.equal(verifyScore({ ...withAvatar, avatar: 'pas-une-empreinte' }, NOW), undefined);
+  // Celui du score le plus récent : un avatar retiré ne revient pas d'un vieux score.
+  const later = signScore(key, { ...fields, score: 12_000_000, at: at(11, 9, 21) });
+  const store = { ...emptyRankings(), scores: [withAvatar, later] };
+  assert.equal(rankingAvatars(store).get(key.publicKey), undefined);
+  const newer = signScore(key, { ...fields, at: at(11, 9, 22), avatar: 'c'.repeat(64) });
+  const board = rankingBoard({ ...emptyRankings(), scores: [plain, newer] }, { board: T2, balls: 3, period: 'all', scope: 'world' }, NOW);
+  assert.equal(board.lines[0]!.avatar, 'c'.repeat(64));
 });
 
 test('fusion : un score relayé dix fois n’entre qu’une fois ; seuls les nouveaux gardés sont rendus (à relayer)', () => {
@@ -143,7 +165,10 @@ interface Net {
   start(): Promise<void>;
   stop(): Promise<void>;
   rename(name: string): boolean;
-  publishScore(s: Omit<RankedScore, 'key' | 'name' | 'country' | 'sig'>): RankedScore | undefined;
+  publishScore(s: Omit<RankedScore, 'key' | 'name' | 'country' | 'avatar' | 'sig'>): RankedScore | undefined;
+  setAvatar(image: AvatarImage | undefined): void;
+  avatarFile(key: string): string | undefined;
+  rankingAvatar(key: string, hash: string): string | undefined;
   rankings(): RankingStore;
   setShareScores(on: boolean): void;
   setCountry(code: string | undefined): void;
@@ -225,4 +250,108 @@ test('ma place, en clair : la portée et la période nommées', () => {
   assert.equal(positionText({ lines: [], players: 340, complete: true, me: { rank: 12 } }, 'world', 'week'), 'Mondial · Cette semaine : votre place, 12 sur 340 joueurs');
   assert.equal(positionText({ lines: [], players: 100, complete: false, me: { rank: 101, beyond: 100 } }, 'country', 'today'), 'National · Aujourd’hui : votre place, au-delà de la 100ᵉ');
   assert.equal(positionText({ lines: [], players: 4 }, 'friends', 'year'), 'Amis · Cette année : pas encore de score pour vous');
+});
+
+/** En-tête PNG d'une image carrée, suivi d'octets propres à `n` : assez pour le contrôle, qui ne décode pas. */
+function avatarImage(n: number): AvatarImage {
+  const head = Buffer.alloc(33);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(head, 0);
+  head.writeUInt32BE(13, 8);
+  head.write('IHDR', 12, 'latin1');
+  head.writeUInt32BE(256, 16);
+  head.writeUInt32BE(256, 20);
+  return readAvatarImage(Buffer.concat([head, Buffer.alloc(64, n)]))!;
+}
+
+test('deux bornes : l’avatar joint à mes scores se voit au classement d’un joueur qui n’est pas mon ami ; rien d’autre ne se donne', async () => {
+  const testnet = await createTestnet(3, { host: '127.0.0.1' });
+  const dirs = ['Ana', 'Bob'].map((n) => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), `cp-classement-avatar-${n}-`));
+    fs.writeFileSync(path.join(dir, 'social.json'), JSON.stringify({ ...JSON.parse(JSON.stringify(require(path.join(REPO_ROOT, 'packages', 'core', 'dist', 'social.js')).newSocialState())), lan: false }));
+    return dir;
+  });
+  const make = (dir: string) => createSocialNet({ dataDir: dir, mode: 'simulated', host: '127.0.0.1', bootstrap: testnet.bootstrap, systemLocale: () => 'fr-FR' });
+  const ana = make(dirs[0]!);
+  const bob = make(dirs[1]!);
+  ana.rename('Ana');
+  bob.rename('Bob');
+  const keyA = ana.state().key.publicKey;
+  try {
+    const photo = avatarImage(1);
+    ana.setAvatar(photo);
+    const published = ana.publishScore({ board: T2, balls: 3, table, score: 95_000_000, at: new Date().toISOString(), how: 'rom' });
+    assert.equal(published?.avatar, photo.hash, 'mon avatar part avec le score, signé');
+    await Promise.all([ana.start(), bob.start()]);
+    await until('Bob reçoit le score d’Ana', () => bob.rankings().scores.some((s) => s.key === keyA && s.avatar === photo.hash));
+    await until('Bob reçoit l’avatar du score d’Ana', () => {
+      const file = bob.rankingAvatar(keyA, photo.hash);
+      return !!file && fs.existsSync(file) && fs.readFileSync(file).equals(photo.bytes);
+    });
+    // Pas amis : l'avatar « d'ami » reste inconnu ; seul celui joint aux scores se montre.
+    assert.equal(bob.avatarFile(keyA), undefined);
+    // Une empreinte qu'aucun score ne porte ne se demande pas, et rien ne vient.
+    const secret = avatarImage(2);
+    ana.setAvatar(secret);
+    assert.equal(bob.rankingAvatar(keyA, secret.hash), undefined);
+    await new Promise((r) => setTimeout(r, 1500));
+    assert.equal(bob.rankingAvatar(keyA, secret.hash), undefined, 'avatar non publié : jamais donné');
+  } finally {
+    await Promise.all([ana.stop(), bob.stop()]);
+    await testnet.destroy();
+    for (const dir of dirs) fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('au classement : la pastille et le statut de chacun — en partie, en ligne, hors ligne, vu il y a…', async () => {
+  interface Face { src?: string; initials: string }
+  interface Line { name: string; face: Face; status?: { state: string; label: string } }
+  interface Rankings { view(table: object, scope: string, period: string): { lines: Line[] } }
+  const { createTableRankings } = require(path.join(REPO_ROOT, 'app', 'dist', 'table-rankings.js')) as { createTableRankings(o: object): Rankings };
+  const { newSocialState } = require(path.join(REPO_ROOT, 'packages', 'core', 'dist', 'social.js')) as { newSocialState(now: Date): object };
+  const me = player('Julie', 'FR');
+  const [playing, online, offline, seen, unknown] = ['Bruno', 'Lena', 'Nadia', 'Kenji', 'Olu'].map((n) => player(n, 'FR'));
+  const hash = 'e'.repeat(64);
+  const scores = [me, playing!, online!, offline!, seen!, unknown!].map((p, i) => ({ ...p.score(90_000_000 - i * 1_000_000, at(11, 9)) }));
+  scores[4] = signScore(seen!.key, { name: 'Kenji', country: 'FR', board: T2, balls: 3, table, score: 86_000_000, at: at(11, 9), how: 'rom', avatar: hash });
+  const store = { ...emptyRankings(), scores };
+  const friend = (p: { key: PlayerKey }, name: string) => ({ key: p.key.publicKey, name, since: NOW.toISOString(), events: [] });
+  const state = {
+    ...newSocialState(NOW),
+    key: me.key,
+    name: 'Julie',
+    friends: [friend(playing!, 'Bruno'), friend(offline!, 'Nadia')],
+    directory: [{ profile: { key: seen!.key.publicKey, name: 'Kenji', at: NOW.toISOString(), sig: '' }, seen: new Date(NOW.getTime() - 3 * 3600_000).toISOString() }],
+  };
+  let changed = 0;
+  const rankings = createTableRankings({
+    net: {
+      state: () => state,
+      rankings: () => store,
+      country: () => 'FR',
+      status: () => ({ running: true }),
+      online: (k: string) => k === playing!.key.publicKey || k === online!.key.publicKey,
+      presenceOf: (k: string) => (k === playing!.key.publicKey ? { status: 'playing' } : undefined),
+      avatarFile: (k: string) => (k === playing!.key.publicKey ? 'C:/avatars/bruno.png' : undefined),
+      rankingAvatar: (_k: string, h: string) => (h === hash ? 'C:/avatars/kenji.png' : undefined),
+    },
+    versionOf: async () => ({ print: 'a'.repeat(64) }),
+    ballsOf: async () => 3,
+    changed: () => changed++,
+    now: () => NOW,
+  });
+  const entry = { file: 't2.vpx', folder: 'C:\t2', title: 'Terminator 2' };
+  rankings.view(entry, 'world', 'all');
+  await until('empreinte de la table', () => changed > 0, 2000);
+  const lines = rankings.view(entry, 'world', 'all').lines;
+  const by = (name: string) => lines.find((l) => l.name === name)!;
+  assert.equal(by('Julie').status, undefined, 'moi : pas de statut');
+  assert.deepEqual(by('Bruno').status, { state: 'playing', label: 'En partie' });
+  assert.deepEqual(by('Lena').status, { state: 'online', label: 'En ligne' });
+  assert.deepEqual(by('Nadia').status, { state: 'offline', label: 'Hors ligne' }, 'un ami sans liaison');
+  assert.deepEqual(by('Kenji').status, { state: 'seen', label: 'Vu il y a 3 h' });
+  assert.equal(by('Olu').status, undefined, 'jamais vu : rien d’inventé');
+  assert.match(by('Bruno').face.src ?? '', /bruno\.png/, 'un ami : son avatar reçu');
+  assert.match(by('Kenji').face.src ?? '', /kenji\.png/, 'un inconnu : celui joint à son score');
+  assert.equal(by('Olu').face.src, undefined);
+  assert.equal(by('Olu').face.initials, 'O');
 });

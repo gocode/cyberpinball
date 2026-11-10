@@ -72,4 +72,30 @@ export const messages: Record<string, string> = {
   'Clic droit sur une image : « Télécharger cette image ». Elle revient à « Mon avatar » pour le recadrage. Fermer (Échap) garde la page.':
     'Right-click a picture: "Download this image". It comes back to "My avatar" to be cropped. Close (Esc) keeps the page.',
   'Télécharger cette image': 'Download this image',
+  // Premier démarrage : « Votre profil de joueur » (app/src/profile-welcome.ts)
+  'Votre profil de joueur': 'Your player profile',
+  'Bienvenue ! Choisissez le pseudo et l’avatar que verront les autres joueurs. Rien d’obligatoire : vous pourrez les changer à tout moment.':
+    'Welcome! Choose the nickname and avatar other players will see. Nothing is mandatory: you can change them at any time.',
+  'Pseudo : {name}': 'Nickname: {name}',
+  'Votre étiquette #{tag} distingue deux joueurs du même nom': 'Your #{tag} tag tells apart two players with the same name',
+  'Donné d’office : choisissez le vôtre': 'Given by default: choose your own',
+  'Avatar : une image à vous': 'Avatar: a picture of your own',
+  'Recadrée en carré, vue à côté de votre pseudo': 'Cropped square, shown next to your nickname',
+  'Avatar : vos initiales en attendant': 'Avatar: your initials for now',
+  'Une photo ou une image, recadrée aux boutons de la borne': 'A photo or a picture, cropped with the cabinet buttons',
+  'Qui les voit': 'Who sees them',
+  'Vos amis et les classements : votre pseudo et votre avatar, à côté de vos scores publiés. L’annuaire des joueurs : votre pseudo seulement.':
+    'Your friends and the leaderboards: your nickname and avatar, next to your published scores. The player directory: your nickname only.',
+  'Choisir mon pseudo…': 'Choose my nickname…',
+  'Changer de pseudo…': 'Change nickname…',
+  'Au clavier à l’écran, de {min} à {max} caractères': 'With the on-screen keyboard, {min} to {max} characters',
+  'Mettre un avatar…': 'Add an avatar…',
+  'Une image de ce PC ou du web, recadrée aux boutons': 'A picture from this PC or the web, cropped with the buttons',
+  'Tout se change plus tard : Menu système > Amis > Partage et réseau': 'Everything can be changed later: System menu > Friends > Sharing and network',
+  'Plus tard : Menu système > Amis > Partage et réseau': 'Later: System menu > Friends > Sharing and network',
+  'Votre pseudo': 'Your nickname',
+  'Pseudo': 'Nickname',
+  'De {min} à {max} caractères : lettres, chiffres, espaces, tirets ou points.': '{min} to {max} characters: letters, digits, spaces, hyphens or dots.',
+  'Pseudo refusé : {min} à {max} lettres, chiffres, espaces, tirets ou points': 'Nickname refused: {min} to {max} letters, digits, spaces, hyphens or dots',
+  'Pseudo choisi : {name}': 'Nickname chosen: {name}',
 };

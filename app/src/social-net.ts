@@ -11,6 +11,7 @@
 // dans le processus, sur 127.0.0.1 seulement, et une balise locale simulée.
 
 import * as dgram from 'node:dgram';
+import * as fs from 'node:fs';
 import { createHash } from 'node:crypto';
 import * as net from 'node:net';
 import * as os from 'node:os';
@@ -23,6 +24,7 @@ import {
   mergeRankings,
   rankedId,
   rankingsFile,
+  rankingAvatars,
   rankingsSample,
   RANKINGS_BATCH,
   saveRankings,
@@ -231,7 +233,8 @@ export interface SocialNetOptions {
 /** Scores des classements national et mondial (rankings.ts) : entre toutes les bornes, pas seulement entre amis. */
 type ScoresMessage = { t: 'scores'; scores: RankedScore[] };
 /** Un score à publier : le reste (clé, nom, pays, signature) vient de la borne. */
-export type ScoreToPublish = Omit<RankedScore, 'key' | 'name' | 'country' | 'sig'>;
+/** Ce que la partie donne ; le nom, le pays et l'avatar sont ceux de la borne au moment de signer. */
+export type ScoreToPublish = Omit<RankedScore, 'key' | 'name' | 'country' | 'avatar' | 'sig'>;
 
 /** Messages des services posés sur le réseau des amis : bibliothèque partagée, partie en direct. */
 export type FriendMessage = LibraryMessage | LiveMessage;
@@ -313,6 +316,11 @@ export interface SocialNet {
   /** Fichier de l'avatar d'un joueur (soi compris) ; undefined : pas d'avatar connu, ses initiales. */
   avatarFile(key: string): string | undefined;
   /**
+   * Avatar d'un joueur classé, d'après l'empreinte jointe à ses scores : le fichier s'il est là ;
+   * sinon demandé à sa borne, ou aux bornes reliées, et l'écran se redessine à son arrivée.
+   */
+  rankingAvatar(key: string, hash: string): string | undefined;
+  /**
    * Mon score aux classements national et mondial : signé, gardé, envoyé à toutes les bornes reliées.
    * Rien si le partage ou la publication des scores est coupé ; rend le score publié.
    */
@@ -326,6 +334,8 @@ export interface SocialNet {
   setShareScores(on: boolean): void;
   /** Pays déclaré ; undefined : revenir à celui de Windows. */
   setCountry(code: string | undefined): void;
+  /** L'écran « Votre profil de joueur » a été proposé : il ne revient plus (profileWelcomeDue). */
+  markProfileOffered(): void;
   /** Mon pays pour les classements : celui choisi, sinon celui de Windows ; undefined : inconnu. */
   country(): string | undefined;
   /** Messages des services reçus d'un ami ; rend de quoi se désabonner. */
@@ -477,7 +487,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     const kept = keepAvatars(state);
     commitQuietly(kept.state);
     try {
-      pruneAvatarFiles(opts.dataDir, kept.files);
+      // Les avatars des classements restent tant qu'un score gardé les porte.
+      const ranked = [...publicAvatars()].map(heldAvatar).filter((f): f is string => !!f);
+      pruneAvatarFiles(opts.dataDir, [...kept.files, ...ranked]);
     } catch (error) {
       log(`Réseau des bornes : rangement des avatars impossible (${(error as Error).message}).`); // i18n-ignore : journal
     }
@@ -485,7 +497,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
 
   /**
    * L'avatar qu'un ami (ou un joueur d'une demande en cours) annonce : demandé s'il manque ou a
-   * changé, retiré s'il n'en a plus. Les autres joueurs de l'annuaire n'échangent pas d'avatar.
+   * changé, retiré s'il n'en a plus. Des autres joueurs, seul l'avatar joint à leurs scores se
+   * demande (askRankingAvatar).
    */
   function syncAvatar(key: string): void {
     const peer = peers.get(key);
@@ -506,16 +519,74 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     tidyAvatars();
   }
 
-  /** Mon avatar, à qui le demande : un ami ou un joueur d'une demande en cours, et s'il est toujours le mien. */
+  /**
+   * Un avatar, à qui le demande : le mien à un ami ou un joueur d'une demande en cours ; et, à toute
+   * borne, celui que des scores publiés aux classements portent (le mien ou celui d'un autre joueur,
+   * s'il est ici) : ces avatars-là sont publics, l'empreinte jointe au score signé les contrôle.
+   */
   function sendAvatar(key: string, hash: string): void {
-    if (!avatarPeers(state).has(key) || ownAvatarHash() !== hash) return;
-    const image = readAvatarFile(opts.dataDir, state.avatar!);
-    if (!image) return log('Réseau des bornes : fichier de mon avatar illisible, pas envoyé.'); // i18n-ignore : journal
+    const own = ownAvatarHash() === hash && avatarPeers(state).has(key);
+    if (!own && !publicAvatars().has(hash)) return;
+    const file = own ? state.avatar! : heldAvatar(hash);
+    const image = file ? readAvatarFile(opts.dataDir, file) : undefined;
+    if (!image) {
+      if (own) log('Réseau des bornes : fichier de mon avatar illisible, pas envoyé.'); // i18n-ignore : journal
+      return;
+    }
     sendTo(key, { t: 'avatar-data', avatar: hash, data: image.bytes.toString('base64') });
   }
 
-  /** Image reçue : celle que ce joueur annonce, contrôlée (parseSocialMessage l'a déjà vérifiée), puis gardée. */
+  // ---------- Avatars des classements ----------
+
+  /** Empreintes des avatars que portent les scores des classements : publiques. */
+  function publicAvatars(): Set<string> {
+    return new Set([...rankingAvatars(rankings).values()].filter((h): h is string => !!h));
+  }
+
+  /** Fichier d'avatar de cette empreinte, s'il est dans <données>\avatars. */
+  function heldAvatar(hash: string): string | undefined {
+    return ['jpg', 'png', 'webp'].map((ext) => `${hash}.${ext}`).find((name) => fs.existsSync(avatarPath(opts.dataDir, name)));
+  }
+
+  /** Avatars des classements demandés : empreinte -> heure de la demande. */
+  const rankingAsked = new Map<string, number>();
+  /** Bornes interrogées au plus pour un avatar de classement dont la borne du joueur n'est pas reliée. */
+  const RANKING_ASK_PEERS = 3;
+
+  function askRankingAvatar(key: string, hash: string): void {
+    const asked = rankingAsked.get(hash);
+    if (asked !== undefined && ms() - asked < AVATAR_ASK_MS) return;
+    if (!publicAvatars().has(hash)) return;
+    // Sa borne d'abord ; sinon quelques bornes reliées, qui l'ont peut-être déjà.
+    const greeted = (k: string) => [...(peers.get(k)?.links ?? [])].some((l) => l.greeted);
+    const to = greeted(key) ? [key] : [...peers.keys()].filter(greeted).slice(0, RANKING_ASK_PEERS);
+    let sent = false;
+    for (const k of to) sent = sendTo(k, { t: 'avatar-get', avatar: hash }) || sent;
+    if (sent) rankingAsked.set(hash, ms());
+  }
+
+  /** Image d'un avatar de classement demandé : contrôlée par son empreinte, gardée. */
+  function receiveRankingAvatar(hash: string, data: string): boolean {
+    if (!rankingAsked.has(hash) || !publicAvatars().has(hash)) return false;
+    rankingAsked.delete(hash);
+    const image = decodeAvatarData(data, hash);
+    if (!image) return false;
+    try {
+      writeAvatarFile(opts.dataDir, image);
+    } catch (error) {
+      log(`Réseau des bornes : avatar d'un classement pas enregistré (${(error as Error).message}).`); // i18n-ignore : journal
+      return false;
+    }
+    changed();
+    return true;
+  }
+
+  /**
+   * Image reçue (parseSocialMessage l'a déjà contrôlée) : un avatar de classement demandé, et celle
+   * qu'un ami ou un joueur d'une demande en cours annonce, gardées.
+   */
   function receiveAvatar(key: string, hash: string, data: string): void {
+    receiveRankingAvatar(hash, data);
     const peer = peers.get(key);
     if (!peer || peer.avatar !== hash || !avatarPeers(state).has(key)) return;
     avatarAsked.delete(key);
@@ -1121,7 +1192,8 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     publishScore(score) {
       if (!state.enabled || state.shareScores === false) return undefined;
       const country = myCountry();
-      const signed = signScore(state.key, { ...score, name: state.name, ...(country ? { country } : {}) });
+      const avatar = ownAvatarHash();
+      const signed = signScore(state.key, { ...score, name: state.name, ...(country ? { country } : {}), ...(avatar ? { avatar } : {}) });
       const kept = mergeRankings(rankings, [signed], state.key.publicKey, now());
       if (!kept.length) return undefined;
       saveRankingsSoon();
@@ -1146,6 +1218,9 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
       const { shareScores: _, ...rest } = state;
       commit(on ? rest : { ...rest, shareScores: false });
     },
+    markProfileOffered() {
+      if (!state.profileOffered) commit({ ...state, profileOffered: now().toISOString() });
+    },
     setCountry(code) {
       const { country: _, ...rest } = state;
       commit(code && isCountry(code) ? { ...rest, country: code } : rest);
@@ -1161,6 +1236,12 @@ export function createSocialNet(opts: SocialNetOptions): SocialNet {
     avatarFile(key) {
       const file = avatarFileOf(state, key);
       return file ? avatarPath(opts.dataDir, file) : undefined;
+    },
+    rankingAvatar(key, hash) {
+      const held = heldAvatar(hash);
+      if (held) return avatarPath(opts.dataDir, held);
+      askRankingAvatar(key, hash);
+      return undefined;
     },
     setDownloadRate: (rate) => {
       const { downloadRate: _, ...rest } = state;

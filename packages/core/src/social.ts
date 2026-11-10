@@ -145,6 +145,11 @@ export interface SocialState {
   /** Pays déclaré (ISO 3166-1 alpha-2) ; absent : celui de la région de Windows, s'il se lit. */
   country?: string;
   /**
+   * Date à laquelle l'écran « Votre profil de joueur » (pseudo et avatar) a été proposé au premier
+   * démarrage du menu (profile-welcome.ts) ; absent : pas encore. Il ne revient jamais ensuite.
+   */
+  profileOffered?: string;
+  /**
    * Débit des téléchargements depuis les amis, en octets par seconde, pour l'ensemble des envois
    * en cours (ratelimit.ts) ; absent : sans limite.
    */
@@ -167,7 +172,8 @@ export interface SocialState {
   badgesChecked: boolean;
   /**
    * Avatar de ce joueur : nom du fichier dans <données>\avatars (avatar.ts) ; absent : ses
-   * initiales. Envoyé à ses amis et aux joueurs d'une demande en cours, jamais à l'annuaire.
+   * initiales. Envoyé à ses amis et aux joueurs d'une demande en cours, jamais à l'annuaire ; son
+   * empreinte part aussi avec ses scores publiés aux classements (rankings.ts), qui le rendent public.
    */
   avatar?: string;
   /** Avatars reçus des amis et des demandes en cours, par clé : nom du fichier dans <données>\avatars. */
@@ -280,6 +286,7 @@ export function parseSocialState(raw: unknown): SocialState | undefined {
     ...(s.shareLibraryChosen === true ? { shareLibraryChosen: true } : {}),
     ...(s.shareScores === false ? { shareScores: false } : {}),
     ...(typeof s.country === 'string' && /^[A-Z]{2}$/.test(s.country) ? { country: s.country } : {}),
+    ...(isIso(s.profileOffered) ? { profileOffered: s.profileOffered } : {}),
     ...(parseRate(s.downloadRate) ? { downloadRate: s.downloadRate as ByteRate } : {}),
     name: normalizeName(s.name) ?? defaultName(key.publicKey),
     nameAt: isIso(s.nameAt) ? s.nameAt : new Date(0).toISOString(),
@@ -748,6 +755,25 @@ let eventCounter = 0;
 export function addEvent(state: SocialState, event: Omit<SocialEvent, 'id' | 'at'>, now = new Date()): { state: SocialState; event: SocialEvent } {
   const full = { ...event, id: `${state.key.publicKey.slice(0, 16)}-${now.getTime().toString(36)}-${(eventCounter++).toString(36)}`, at: now.toISOString() } as SocialEvent;
   return { state: { ...state, events: mergeEvents(state.events, [full]) }, event: full };
+}
+
+/**
+ * Nom donné d'office à la création du profil (« Joueur A1B2 », « Player A1B2 » si la langue a
+ * changé depuis) : le joueur ne l'a pas encore choisi.
+ */
+export function hasDefaultName(state: { name: string; key: { publicKey: string } }): boolean {
+  const tag = shortTag(state.key.publicKey);
+  const [word, rest] = [state.name.slice(0, -tag.length - 1), state.name.slice(-tag.length - 1)];
+  return state.name === defaultName(state.key.publicKey) || (rest === ` ${tag}` && /^\p{L}+$/u.test(word));
+}
+
+/**
+ * L'écran « Votre profil de joueur » est-il à proposer ? Une seule fois, au premier démarrage du
+ * menu, et seulement si ni le pseudo ni l'avatar n'ont encore été choisis (une borne déjà
+ * personnalisée ne le voit jamais).
+ */
+export function profileWelcomeDue(state: { name: string; key: { publicKey: string } } & Pick<SocialState, 'avatar' | 'profileOffered'>): boolean {
+  return !state.profileOffered && !state.avatar && hasDefaultName(state);
 }
 
 export function setName(state: SocialState, name: string, now = new Date()): SocialState | undefined {

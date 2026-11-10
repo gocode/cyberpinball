@@ -17,6 +17,7 @@ import {
   downloadReasonText,
   avatarsDir,
   avatarView,
+  profileWelcomeDue,
   powerSimulated,
   powerTexts,
   powerUnavailable,
@@ -323,6 +324,7 @@ import { forcedRotation, menuRotation, openSettings } from './settings';
 import { allowJukebox, allowPreview, serveMedias } from './media-protocol';
 import { createJukeboxPlayer, type JukeboxMessage } from './jukebox-player';
 import { createAvatarMenu } from './avatar-menu';
+import { createProfileWelcome } from './profile-welcome';
 import { createMenuSettings } from './menu-settings';
 import { createIntroMenu } from './intro-menu';
 import { createLanguageMenu } from './language-menu';
@@ -722,6 +724,8 @@ const INTRO_READY_MAX_MS = 5000;
 let introFileCache: IntroFiles | undefined;
 /** Constats brefs arrivés pendant l'ouverture : montrés sur la roue, pas par-dessus les animations. */
 let pendingBanners: string[] = [];
+/** « Votre profil de joueur » à proposer à la fin de l'ouverture (premier démarrage arrivé sur la roue). */
+let pendingProfileWelcome = false;
 
 function introFilesNow(): IntroFiles {
   return (introFileCache ??= loc.root ? introFiles(layoutOf(loc.root).media) : {});
@@ -751,6 +755,10 @@ function leaveIntro(): boolean {
   const banners = pendingBanners;
   pendingBanners = [];
   for (const text of banners) showBanner(text);
+  if (pendingProfileWelcome) {
+    pendingProfileWelcome = false;
+    openProfileWelcome();
+  }
   return true;
 }
 
@@ -2200,6 +2208,22 @@ library.provideSystemItem('avatar', {
   },
   run: () => avatarMenu.open(() => library.openSystem()),
 });
+// Premier démarrage du menu : pseudo et avatar proposés une fois (profile-welcome.ts).
+const profileWelcome = createProfileWelcome({ library, net: socialNet, avatarMenu });
+
+/**
+ * « Votre profil de joueur », puis la suite du premier démarrage telle qu'elle était : le message
+ * qui attendait (installer VPX, ajouter une table) ou la roue.
+ */
+function openProfileWelcome(): void {
+  const landing = state;
+  profileWelcome.open(() => {
+    library.leave();
+    if (landing.phase === 'message' && landing.message) state = { ...state, phase: 'message', message: landing.message };
+    broadcast();
+  });
+}
+
 const friendsMenu = createFriendsMenu({
   library: {
     ...library,
@@ -3787,12 +3811,19 @@ export function startFrontend(): void {
     state = { ...state, phase: 'message', message: noTables() };
   }
 
+  // Premier démarrage (juste après l'assistant de l'installation) : pseudo et avatar proposés une
+  // fois, avant la suite. Jamais en mode invité ; pas pendant un essai sans opérateur, sauf demandé.
+  const unattended = Boolean(process.env.CYBERPINBALL_AUTOPILOT || process.env.CYBERPINBALL_STRESS);
+  const welcome = !choose && !guest.active && (!unattended || process.env.CYBERPINBALL_PROFIL === '1') && profileWelcomeDue(socialNet.state());
+
   // Ouverture : quand le démarrage arrive sur le menu des tables, avant la roue.
   if (!choose && introAtStartup({ settings: mediaSettings.intro, landing: state.phase, argv: process.argv, env: process.env })) {
     beginIntro('menu');
     // Une fenêtre qui ne dit jamais « prête » ne retient pas les autres.
     setTimeout(() => introRun.start() && broadcast(), INTRO_READY_MAX_MS);
-  }
+    // Le profil attend la fin de l'ouverture : rien ne se pose sur les animations.
+    pendingProfileWelcome = welcome;
+  } else if (welcome) openProfileWelcome();
 
   const stress = process.env.CYBERPINBALL_STRESS;
   // L'endurance lance de vraies parties : jamais hors écran.

@@ -2551,7 +2551,7 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 
 .lib-scoreboard .scoreboard-line {
   display: grid;
-  grid-template-columns: 4.4cqmin minmax(9cqmin, 0.7fr) minmax(max-content, 1.3fr) minmax(0, 1fr);
+  grid-template-columns: 4.4cqmin minmax(9cqmin, 1.6fr) max-content minmax(0, 0.9fr);
   align-items: baseline;
   column-gap: 2.2cqmin;
   min-width: 0;
@@ -2590,6 +2590,10 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
 
 .lib-scoreboard .scoreboard-country {
   flex: none;
+  /* Largeur fixe : la pastille et le nom commencent au même endroit sur chaque ligne (« FI » comme « US »). */
+  box-sizing: border-box;
+  min-width: 4.4cqmin;
+  text-align: center;
   padding: 0.1cqmin 0.6cqmin;
   border: 0.093cqmin solid var(--line-strong);
   border-radius: 0.4cqmin;
@@ -2597,6 +2601,55 @@ body.mouse .lib-scoreboard .scoreboard-tab:not(.current):hover {
   font-weight: 600;
   letter-spacing: 0.06em;
   color: var(--meta);
+}
+
+/*
+ * Classements en réseau : la pastille du joueur, à la hauteur d'une ligne. En ligne ou en partie :
+ * l'anneau vert de « Mes amis » ; sinon rien autour. Le statut suit le nom, plus petit, et s'efface
+ * (points de suspension) avant de pousser le score.
+ */
+/* Alignées sur la ligne de base, la pastille et le texte grandiraient la ligne : centrées. */
+.lib-scoreboard .scoreboard-line:has(.scoreboard-avatar),
+.lib-scoreboard .scoreboard-name:has(.scoreboard-avatar) {
+  align-items: center;
+}
+
+.lib-scoreboard .scoreboard-avatar {
+  flex: none;
+  /* Pas plus haute que le texte de la ligne (2,35 × 1,2) : les neuf lignes, ma place et la note tiennent. */
+  width: 2.8cqmin;
+  height: 2.8cqmin;
+  margin-block: -0.1cqmin;
+  font-size: 1.9cqmin;
+  letter-spacing: 0;
+}
+
+.lib-scoreboard .scoreboard-avatar.status-online,
+.lib-scoreboard .scoreboard-avatar.status-playing {
+  box-shadow: 0 0 0 0.25cqmin var(--ok);
+}
+
+.lib-scoreboard .scoreboard-status {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 1.9cqmin;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--ink-muted);
+}
+
+.lib-scoreboard .scoreboard-status.status-online,
+.lib-scoreboard .scoreboard-status.status-playing {
+  font-weight: 600;
+  color: var(--ok);
+}
+
+/* Joueur sans pays déclaré : la place de la pastille de pays, vide, garde l'alignement. */
+.lib-scoreboard .scoreboard-country.none {
+  visibility: hidden;
 }
 
 /* La ligne du joueur de cette borne : un aplat discret, jamais le vert du choix courant. */

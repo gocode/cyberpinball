@@ -18,6 +18,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { writeFileAtomic } from './atomicwrite';
+import { isAvatarHash } from './avatar';
 import { isBallCount } from './ballcount';
 import { inPeriod, SCORE_PERIODS, type PlayedSource, type ScorePeriod } from './scoreboard';
 import { isPlayerPublicKey, signText, verifyText, type PlayerKey } from './sharing';
@@ -60,6 +61,11 @@ export interface RankedScore {
   /** Fin de la partie (ISO). */
   at: string;
   how: PlayedSource;
+  /**
+   * Empreinte de l'avatar du joueur ce jour-là (avatar.ts) ; absente : ses initiales. L'image se
+   * demande à sa borne, ou à une borne qui l'a déjà : l'empreinte la contrôle (décidé le 10/11/2026).
+   */
+  avatar?: string;
   sig: string;
 }
 
@@ -83,7 +89,8 @@ const SOURCES: readonly PlayedSource[] = ['rom', 'record', 'live'];
 
 /** Ce que couvre la signature : tout le score, dans un ordre fixe. */
 function signedText(s: Omit<RankedScore, 'sig'>): string {
-  return JSON.stringify({ app: 'cyberpinball', kind: 'score', key: s.key, name: s.name, country: s.country ?? null, board: s.board, balls: s.balls ?? null, title: s.table.title, score: s.score, at: s.at, how: s.how });
+  // L'avatar n'entre au texte que s'il y en a un : les scores d'avant les avatars se vérifient toujours.
+  return JSON.stringify({ app: 'cyberpinball', kind: 'score', key: s.key, name: s.name, country: s.country ?? null, board: s.board, balls: s.balls ?? null, title: s.table.title, score: s.score, at: s.at, how: s.how, ...(s.avatar ? { avatar: s.avatar } : {}) });
 }
 
 /** Identité d'un score : un même score relayé dix fois n'entre qu'une fois. */
@@ -114,6 +121,7 @@ export function verifyScore(raw: unknown, now = new Date()): RankedScore | undef
   if (typeof r.score !== 'number' || !Number.isSafeInteger(r.score) || r.score <= 0 || !SOURCES.includes(r.how as PlayedSource)) return undefined;
   if (r.country !== undefined && !isCountry(r.country)) return undefined;
   if (r.balls !== undefined && !isBallCount(r.balls)) return undefined;
+  if (r.avatar !== undefined && !isAvatarHash(r.avatar)) return undefined;
   // Pas de score venu du futur (horloge d'une borne déréglée) ; dix minutes de tolérance.
   if (Date.parse(r.at) > now.getTime() + 10 * 60_000) return undefined;
   const s: Omit<RankedScore, 'sig'> = {
@@ -126,6 +134,7 @@ export function verifyScore(raw: unknown, now = new Date()): RankedScore | undef
     score: r.score,
     at: r.at,
     how: r.how as PlayedSource,
+    ...(r.avatar ? { avatar: r.avatar as string } : {}),
   };
   return verifyText(signedText(s), r.sig, r.key) ? { ...s, sig: r.sig } : undefined;
 }
@@ -193,6 +202,19 @@ export function rankingsSample(store: RankingStore, me: string | undefined): Ran
   return [...own, ...store.scores.filter((s) => s.key !== me)].slice(0, RANKINGS_BATCH);
 }
 
+/**
+ * Avatar de chaque joueur classé : celui de son score le plus récent (un avatar retiré ne revient
+ * pas d'un vieux score). Clé -> empreinte, ou undefined : ses initiales.
+ */
+export function rankingAvatars(store: Pick<RankingStore, 'scores'>): Map<string, string | undefined> {
+  const latest = new Map<string, RankedScore>();
+  for (const s of store.scores) {
+    const known = latest.get(s.key);
+    if (!known || Date.parse(s.at) > Date.parse(known.at)) latest.set(s.key, s);
+  }
+  return new Map([...latest].map(([key, s]) => [key, s.avatar]));
+}
+
 export const isHidden = (store: Pick<RankingStore, 'hidden'>, s: RankedScore) => store.hidden.includes(`s:${rankedId(s)}`) || store.hidden.includes(`k:${s.key}`);
 
 // ---------------------------------------------------------------------------
@@ -211,6 +233,8 @@ export interface RankingLine {
   mine?: true;
   /** Sa place exacte n'est pas connue : au-delà de cette place (la borne ne garde que le haut du classement). */
   beyond?: number;
+  /** Empreinte de son avatar (rankingAvatars) ; absente : ses initiales. */
+  avatar?: string;
 }
 
 /** Où se trouve le joueur de la borne dans un classement. */
@@ -239,6 +263,11 @@ export function rankingBoard(store: RankingStore, q: RankingQuery, now = new Dat
   const list = store.scores.filter((s) => s.board === q.board && (s.balls ?? undefined) === (q.balls ?? undefined) && !isHidden(store, s));
   const scoped = list.filter((s) => (q.scope === 'country' ? !!q.country && s.country === q.country : q.scope === 'friends' ? s.key === q.me || !!q.friends?.has(s.key) : true));
   const best = bestPerPlayer(scoped, q.period, now);
+  const avatars = rankingAvatars(store);
+  const avatarOf = (key: string) => {
+    const hash = avatars.get(key);
+    return hash ? { avatar: hash } : {};
+  };
   const limit = q.limit ?? RANKING_LINES;
   // Plus loin que les premières lignes : la dernière laisse la place à la mienne.
   const far = q.me ? best.findIndex((s) => s.key === q.me) >= limit : false;
@@ -252,6 +281,7 @@ export function rankingBoard(store: RankingStore, q: RankingQuery, now = new Dat
     how: s.how,
     id: rankedId(s),
     ...(s.key === q.me ? { mine: true as const } : {}),
+    ...avatarOf(s.key),
   }));
   // La borne garde les KEEP_WORLD premiers du monde et les KEEP_COUNTRY premiers de chaque pays :
   // au-delà, des joueurs mieux placés peuvent lui manquer, une place plus loin n'est pas sûre.
@@ -263,7 +293,7 @@ export function rankingBoard(store: RankingStore, q: RankingQuery, now = new Dat
     const rank = 1 + best.filter((o) => o.score > s.score).length;
     me = depth !== undefined && rank > depth ? { rank, beyond: depth } : { rank };
     // Hors des premières lignes : sa ligne quand même, en fin de tableau.
-    if (mine >= lines.length) lines.push({ rank, key: s.key, name: s.name, ...(s.country ? { country: s.country } : {}), score: s.score, at: s.at, how: s.how, id: rankedId(s), mine: true, ...(me.beyond ? { beyond: me.beyond } : {}) });
+    if (mine >= lines.length) lines.push({ rank, key: s.key, name: s.name, ...(s.country ? { country: s.country } : {}), score: s.score, at: s.at, how: s.how, id: rankedId(s), mine: true, ...(me.beyond ? { beyond: me.beyond } : {}), ...avatarOf(s.key) });
   }
   return { lines, players: best.length, ...(me ? { me } : {}), complete: depth === undefined || best.length < depth };
 }
@@ -318,7 +348,7 @@ export function loadRankings(file: string, now = new Date()): { store: RankingSt
   // Relus sans revérifier chaque signature (ils l'ont été à l'arrivée) : seulement leur forme.
   const scores = (Array.isArray(raw.scores) ? raw.scores : []).filter((s): s is RankedScore => {
     const r = s as RankedScore;
-    return !!r && typeof r === 'object' && isPlayerPublicKey(r.key) && isBoard(r.board) && isIso(r.at) && Number.isSafeInteger(r.score) && r.score > 0 && typeof r.sig === 'string' && !!r.table?.title && typeof r.name === 'string';
+    return !!r && typeof r === 'object' && isPlayerPublicKey(r.key) && isBoard(r.board) && isIso(r.at) && Number.isSafeInteger(r.score) && r.score > 0 && typeof r.sig === 'string' && !!r.table?.title && typeof r.name === 'string' && (r.avatar === undefined || isAvatarHash(r.avatar));
   });
   const hidden = (Array.isArray(raw.hidden) ? raw.hidden : []).filter((h): h is string => typeof h === 'string' && /^[sk]:.{1,200}$/.test(h));
   return { store: { v, scores, hidden }, ...(v > RANKINGS_VERSION ? { newer: true } : {}) };

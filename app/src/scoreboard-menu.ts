@@ -5,8 +5,8 @@
 //
 // Sans electron à l'exécution : les tests du cœur chargent ce module avec un tableau d'essai.
 
-import { formatNumber, language, RANKING_SCOPES, SCORE_PERIODS, t, tn, type BoardLine, type RankingLine, type RankingScope, type ScorePeriod } from '@cyberpinball/core';
-import type { RankingView } from './table-rankings';
+import { formatNumber, language, RANKING_SCOPES, SCORE_PERIODS, t, tn, type AvatarView, type BoardLine, type RankingScope, type ScorePeriod } from '@cyberpinball/core';
+import type { PlayerStatus, RankingView, RankingViewLine } from './table-rankings';
 import type { TableBoard } from './table-scores';
 
 /** Ce que le rendu montre du tableau (app/renderer/library.js, renderScoreboard). */
@@ -37,6 +37,10 @@ export interface ScoreboardLineView {
   country?: string;
   /** Hors des premières lignes : séparée du tableau par un filet. */
   apart?: boolean;
+  /** Classements en réseau : la pastille du joueur (avatar ou initiales). */
+  avatar?: AvatarView;
+  /** Classements en réseau : son statut (en partie, en ligne, hors ligne, vu il y a…). */
+  status?: PlayerStatus;
   /** Le joueur de cette borne. */
   mine?: boolean;
 }
@@ -123,7 +127,7 @@ export function scopeTabs(scope: RankingScope): NonNullable<ScoreboardView['scop
   return RANKING_SCOPES.map((s, i) => ({ scope: s, label: scopeLabel(s), current: s === scope, action: SCORE_PERIODS.length + i }));
 }
 
-function rankingLineView(line: RankingLine, now: Date, apart: boolean): ScoreboardLineView {
+function rankingLineView(line: RankingViewLine, now: Date, apart: boolean): ScoreboardLineView {
   return {
     rank: line.beyond ? `${line.beyond}+` : String(line.rank),
     ...(apart ? { apart: true } : {}),
@@ -133,6 +137,8 @@ function rankingLineView(line: RankingLine, now: Date, apart: boolean): Scoreboa
     ...(line.rank === 1 ? { first: true } : {}),
     ...(line.country ? { country: line.country } : {}),
     ...(line.mine ? { mine: true } : {}),
+    avatar: line.face,
+    ...(line.status ? { status: line.status } : {}),
   };
 }
 
