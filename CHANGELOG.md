@@ -49,6 +49,10 @@ son interface).
 - Juke-box : « Chercher sur YouTube » depuis l’import ouvre « Récupérer » sur des résultats qui ne montrent que des playlists ; « Ajouter au Juke-box » sur une playlist ou une vidéo ramène à l’import sur ce lien.
 - Juke-box : au clavier à l’écran, le lien commence déjà par l’adresse d’une playlist (ou d’une vidéo, par la touche « Vidéo ») : on ne tape que l’identifiant. Un identifiant seul (PL…, OLAK5uy_…) est accepté partout, au téléphone aussi, et un lien entier collé n’est jamais doublé.
 - Vision 3D, trois réglages dans son écran : « Calibrer la position de jeu » (deux secondes immobile en position de jeu), « Intensité » de 25 % à 150 % (75 % par défaut, aussi réglable en partie avec les MagnaSave, contre le mal de mer), et « Réactivité » douce, normale ou vive : la table suit la tête avec nettement moins de retard.
+- Dans le casque, une seule règle pour les manettes, partout, menu comme partie : A valide, B revient, les joysticks déplacent la sélection, les gâchettes font les flippers, les poignées MagnaSave en partie. Le clic du joystick gauche ne déplace plus la table.
+- Le bouton ≡ de la manette gauche ouvre le menu du casque : caler la borne (guidé pas à pas, B annule), recentrer, légende des boutons.
+- La table de la partie ne se retrouve plus derrière vous ni sous le sol quand le Quest a refait sa pièce pendant le menu : le casque repart sur la pièce neuve et propose de recaler.
+- Casque éteint ou Link coupé : la partie se ferme et le menu revient seul aux écrans du PC. Retirer simplement le casque ne change rien.
 
 ## 0.1.8
 

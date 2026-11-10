@@ -30,13 +30,16 @@
 //                        borne se pose devant le joueur au premier regard suivi)
 //     recentrer          (la borne revient devant le joueur)
 //     releve             (une partie de VPX démarre : garder le casque, écrans de chargement compris, jusqu'à
-//                        ce que VPX le prenne, puis fondu au noir et fin ; deux minutes au plus)
+//                        ce que VPX le prenne, puis veille sans rien dessiner jusqu'à ce qu'il le rende ;
+//                        deux minutes au plus si VPX ne le prend pas)
 //     instantane <dossier> (l'image de chaque panneau, telle qu'envoyée au casque, en <rôle>.bmp)
 //     quitter            (fondu au noir de 300 ms, puis fin propre de la session)
 //   Sortie standard :
 //     pret <runtime> | casque-absent <raison> | erreur <texte> | etat <état OpenXR> | centre … | image <rôle>
 //     | libre <image> (image copiée : Electron peut reprendre sa texture) | porte 1|0 (casque porté ou non)
-//     | scene <n> formes | fini
+//     | scene <n> formes | bouton <nom> 1|0 | releve … veille | reprise (VPX a rendu le casque)
+//     | tete <x> <y> <z> <lacet> (en veille, toutes les 5 s)
+//     | casque-perdu <raison> (éteint, Link coupé : ni retiré de la tête, ni la relève) | fini
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -97,7 +100,7 @@ PFN_xrGetInstanceProcAddr xrGetInstanceProcAddr_ = nullptr;
    X(xrAcquireSwapchainImage) X(xrWaitSwapchainImage) X(xrReleaseSwapchainImage) X(xrResultToString) \
    X(xrEnumerateViewConfigurationViews) X(xrLocateViews) X(xrStringToPath) X(xrCreateActionSet) X(xrCreateAction) \
    X(xrSuggestInteractionProfileBindings) X(xrAttachSessionActionSets) X(xrSyncActions) X(xrGetActionStateBoolean) \
-   X(xrCreateActionSpace) X(xrGetReferenceSpaceBoundsRect)
+   X(xrGetActionStateFloat) X(xrCreateActionSpace) X(xrGetReferenceSpaceBoundsRect)
 #define DECLARE(name) PFN_##name name##_ = nullptr;
 XR_FUNCS(DECLARE)
 PFN_xrGetD3D11GraphicsRequirementsKHR xrGetD3D11GraphicsRequirementsKHR_ = nullptr;
@@ -942,10 +945,12 @@ int main(int argc, char** argv)
    rsci.referenceSpaceType = XR_REFERENCE_SPACE_TYPE_VIEW;
    xrCreateReferenceSpace_(session, &rsci, &view);
 
-   // Manettes du Quest (Touch) : les boutons du menu, comme ceux de la borne. Gâchettes : flippers ;
-   // A : Start ; B : Exit ; poignées : MagnaSave. Cyber Pinball reçoit « bouton <nom> 1|0 » à chaque
-   // changement, seulement tant que le menu a le regard du joueur (« FOCUSED ») ; le reste du temps,
-   // le runtime les rend inactives, et un bouton resté appuyé est relâché.
+   // Manettes du Quest (Touch), une seule règle au menu comme en partie (packages/core/src/manettes.ts) :
+   // gâchettes : précédent / suivant (les flippers de la borne) ; A : valider ; B : retour ; ≡ de la
+   // manette gauche : le menu du casque ; joysticks : déplacer la sélection. Les poignées ne servent
+   // qu'en partie (MagnaSave, dans VPX). Cyber Pinball reçoit « bouton <nom> 1|0 » à chaque changement,
+   // seulement tant que le menu a le regard du joueur (« FOCUSED ») ; le reste du temps, le runtime les
+   // rend inactives, et un bouton resté appuyé est relâché.
    struct Control
    {
       const char* name;
@@ -957,11 +962,32 @@ int main(int argc, char** argv)
    Control controls[] = {
       { "batteur-gauche", "Flipper gauche", "/user/hand/left/input/trigger/value" },
       { "batteur-droit", "Flipper droit", "/user/hand/right/input/trigger/value" },
-      { "start", "Start", "/user/hand/right/input/a/click" },
-      { "exit", "Exit", "/user/hand/right/input/b/click" },
-      { "magnasave-gauche", "MagnaSave gauche", "/user/hand/left/input/squeeze/value" },
-      { "magnasave-droit", "MagnaSave droit", "/user/hand/right/input/squeeze/value" },
+      { "start", "Valider", "/user/hand/right/input/a/click" },
+      { "exit", "Retour", "/user/hand/right/input/b/click" },
+      { "menu", "Menu du casque", "/user/hand/left/input/menu/click" },
    };
+   // Joysticks : leurs deux axes, lus à chaque image ; Cyber Pinball reçoit leurs directions comme des
+   // boutons (« bouton haut|bas|gauche|droite 1|0 »), les deux joysticks ensemble, l'axe dominant seul.
+   struct Axis
+   {
+      const char* name;
+      const char* label;
+      const char* binding;
+      XrAction action = XR_NULL_HANDLE;
+      float value = 0;
+   };
+   Axis axes[] = {
+      { "joystick-gauche-x", "Joystick gauche, horizontal", "/user/hand/left/input/thumbstick/x" },
+      { "joystick-gauche-y", "Joystick gauche, vertical", "/user/hand/left/input/thumbstick/y" },
+      { "joystick-droit-x", "Joystick droit, horizontal", "/user/hand/right/input/thumbstick/x" },
+      { "joystick-droit-y", "Joystick droit, vertical", "/user/hand/right/input/thumbstick/y" },
+   };
+   struct Direction
+   {
+      const char* name;
+      bool down = false;
+   };
+   Direction directions[] = { { "haut" }, { "bas" }, { "gauche" }, { "droite" } };
    // Bout de chaque manette (pose de visée) : les points touchés du calage et leurs repères.
    const char* aimNames[2] = { "visee-gauche", "visee-droite" };
    const char* aimBindings[2] = { "/user/hand/left/input/aim/pose", "/user/hand/right/input/aim/pose" };
@@ -986,6 +1012,16 @@ int main(int argc, char** argv)
             if (XR_SUCCEEDED(xrCreateAction_(actionSet, &aci, &aimActions[h])) && XR_SUCCEEDED(xrStringToPath_(instance, aimBindings[h], &path)))
                suggested.push_back({ aimActions[h], path });
          }
+         for (Axis& a : axes)
+         {
+            XrActionCreateInfo aci { XR_TYPE_ACTION_CREATE_INFO };
+            aci.actionType = XR_ACTION_TYPE_FLOAT_INPUT;
+            strcpy_s(aci.actionName, a.name);
+            strcpy_s(aci.localizedActionName, a.label);
+            XrPath path = XR_NULL_PATH;
+            if (XR_SUCCEEDED(xrCreateAction_(actionSet, &aci, &a.action)) && XR_SUCCEEDED(xrStringToPath_(instance, a.binding, &path)))
+               suggested.push_back({ a.action, path });
+         }
          for (Control& c : controls)
          {
             XrActionCreateInfo aci { XR_TYPE_ACTION_CREATE_INFO };
@@ -1005,7 +1041,7 @@ int main(int argc, char** argv)
          XrSessionActionSetsAttachInfo attach { XR_TYPE_SESSION_ACTION_SETS_ATTACH_INFO };
          attach.countActionSets = 1;
          attach.actionSets = &actionSet;
-         controllers = suggested.size() == std::size(controls) + 2 && XR_SUCCEEDED(xrSuggestInteractionProfileBindings_(instance, &ipsb))
+         controllers = suggested.size() == std::size(controls) + std::size(axes) + 2 && XR_SUCCEEDED(xrSuggestInteractionProfileBindings_(instance, &ipsb))
             && XR_SUCCEEDED(xrAttachSessionActionSets_(session, &attach));
          for (int h = 0; controllers && h < 2; h++)
          {
@@ -1025,6 +1061,12 @@ int main(int argc, char** argv)
          {
             c.down = false;
             say(std::string("bouton ") + c.name + " 0");
+         }
+      for (Direction& d : directions)
+         if (d.down)
+         {
+            d.down = false;
+            say(std::string("bouton ") + d.name + " 0");
          }
    };
 
@@ -1088,8 +1130,6 @@ int main(int argc, char** argv)
    /** Les écrans dessinés dans la couche de projection, avec la profondeur. */
    scene::ImageRenderer imageRenderer;
    std::vector<std::string> pointerLines;
-   ULONGLONG gripsSince = 0;
-   bool gestureSent = false;
    bool projection = false;
    {
       uint32_t n = 0;
@@ -1177,6 +1217,18 @@ int main(int argc, char** argv)
 
    XrPosef anchor { { 0, 0, 0, 1 }, { 0, 0, -0.f } };
    bool running = false, exitRequested = false, done = false;
+   // Veille pendant une partie de VPX dans le casque (après la relève), et perte du casque dite une fois.
+   bool standby = false, lostSaid = false;
+   ULONGLONG headSaidAt = 0;
+   // Casque éteint, Link coupé ou session perdue : Cyber Pinball rend l'affichage aux écrans du PC (et
+   // ferme une partie de VPX restée sans casque). Un casque seulement retiré n'en est pas un.
+   auto lost = [&](const std::string& why)
+   {
+      if (!lostSaid && !exitRequested)
+         say("casque-perdu " + why);
+      lostSaid = true;
+      done = true;
+   };
    // Fondu au noir avant de rendre le casque : 300 ms (250 à 350 ms dans la direction artistique).
    constexpr ULONGLONG FADE_MS = 300;
    ULONGLONG fadeStart = 0;
@@ -1202,11 +1254,20 @@ int main(int argc, char** argv)
             }
             // La borne reste à sa place dans la pièce, comme un objet : ni la session qui reprend le
             // regard, ni le casque remis ne la déplacent (seuls « recentrer » et le recentrage du casque).
-            // Relève : VPX a pris le regard du joueur (notre session n'est plus « FOCUSED ») : fondu, puis fin.
+            // Relève : VPX a pris le regard du joueur (notre session n'est plus « FOCUSED »). Le compagnon
+            // reste en veille, sans rien dessiner, pour dire si le casque se perd pendant la partie : VPX
+            // 10.8.1 n'en fait rien (VRDevice::PollEvents), la partie continuerait sans personne. VPX
+            // parti, la session reprend le regard du joueur et le menu revient dans le casque, sans relance.
             if (handover && previous == XR_SESSION_STATE_FOCUSED && state != XR_SESSION_STATE_FOCUSED && !wantQuit)
             {
-               say("releve VPX a pris le casque");
-               wantQuit = true;
+               say("releve VPX a pris le casque, veille");
+               handover = false;
+               standby = true;
+            }
+            if (standby && state == XR_SESSION_STATE_FOCUSED)
+            {
+               standby = false;
+               say("reprise");
             }
             if (state == XR_SESSION_STATE_READY)
             {
@@ -1218,14 +1279,27 @@ int main(int argc, char** argv)
             {
                xrEndSession_(session);
                running = false;
-               if (exitRequested || handover)
+               // Arrêt que personne n'a demandé, hors relève : casque éteint ou Link coupé.
+               if (!exitRequested && !handover && !standby)
+                  lost("arret");
+               if (exitRequested || handover || standby)
                   done = true;
             }
-            else if (state == XR_SESSION_STATE_EXITING || state == XR_SESSION_STATE_LOSS_PENDING)
+            else if (state == XR_SESSION_STATE_LOSS_PENDING)
+               lost("session perdue");
+            else if (state == XR_SESSION_STATE_EXITING)
+            {
+               // Fin demandée par le runtime : au menu, le casque est parti ; en veille, VPX a peut-être
+               // seulement pris le casque pour de bon (rien à dire à Cyber Pinball).
+               if (standby)
+                  say("veille finie par le runtime");
+               else if (!exitRequested)
+                  lost("fin demandee par le runtime");
                done = true;
+            }
          }
          else if (ev.type == XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING)
-            done = true;
+            lost("instance perdue");
          else if (ev.type == XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING)
          {
             // Dans la pièce, la borne ne bouge jamais d'elle-même : seulement sur demande (« recentrer »,
@@ -1348,8 +1422,12 @@ int main(int argc, char** argv)
       }
 
       XrFrameState fs { XR_TYPE_FRAME_STATE };
-      if (XR_FAILED(xrWaitFrame_(session, nullptr, &fs)))
+      if (const XrResult r = xrWaitFrame_(session, nullptr, &fs); XR_FAILED(r))
+      {
+         if (r == XR_ERROR_SESSION_LOST || r == XR_ERROR_INSTANCE_LOST || r == XR_ERROR_RUNTIME_FAILURE)
+            lost("xrWaitFrame " + hex(r));
          break;
+      }
       xrBeginFrame_(session, nullptr);
 
       // Boutons des manettes : lus à chaque image, transmis à chaque changement.
@@ -1379,16 +1457,29 @@ int main(int argc, char** argv)
                         + std::to_string(loc.pose.position.z) + (stage ? "" : " sans-piece"));
                }
             }
-         // Les deux poignées tenues 3 s : Cyber Pinball ouvre le calage de la borne.
-         const bool bothGrips = controls[4].down && controls[5].down;
-         if (!bothGrips)
-            gripsSince = 0, gestureSent = false;
-         else if (!gripsSince)
-            gripsSince = GetTickCount64();
-         else if (!gestureSent && GetTickCount64() - gripsSince >= 3000)
+         // Joysticks : la direction dominante des deux, appuyée au-delà de 0,6, relâchée sous 0,4.
+         for (Axis& a : axes)
          {
-            gestureSent = true;
-            say("geste caler");
+            XrActionStateGetInfo gi { XR_TYPE_ACTION_STATE_GET_INFO };
+            gi.action = a.action;
+            XrActionStateFloat st { XR_TYPE_ACTION_STATE_FLOAT };
+            a.value = XR_SUCCEEDED(xrGetActionStateFloat_(session, &gi, &st)) && st.isActive ? st.currentState : 0.f;
+         }
+         float x = std::fabs(axes[0].value) >= std::fabs(axes[2].value) ? axes[0].value : axes[2].value;
+         float y = std::fabs(axes[1].value) >= std::fabs(axes[3].value) ? axes[1].value : axes[3].value;
+         if (std::fabs(x) > std::fabs(y))
+            y = 0;
+         else
+            x = 0;
+         const float pushed[4] = { y, -y, -x, x };
+         for (int d = 0; d < 4; d++)
+         {
+            const bool down = pushed[d] > (directions[d].down ? 0.4f : 0.6f);
+            if (down != directions[d].down)
+            {
+               directions[d].down = down;
+               say(std::string("bouton ") + directions[d].name + (down ? " 1" : " 0"));
+            }
          }
       }
       else
@@ -1452,6 +1543,21 @@ int main(int argc, char** argv)
          {
             eyesSaid = true;
             say("yeux " + std::to_string(loc.pose.position.y));
+         }
+      }
+
+      // Veille pendant une partie de VPX : la tête du joueur dans la pièce, toutes les 5 s (« tete x y z lacet ») ;
+      // Cyber Pinball la compare à la barre avant calée, et à ce que VPX en voit s'il recentre la table.
+      if (standby && stage && GetTickCount64() - headSaidAt >= 5000)
+      {
+         XrSpaceLocation loc { XR_TYPE_SPACE_LOCATION };
+         constexpr XrSpaceLocationFlags valid = XR_SPACE_LOCATION_POSITION_VALID_BIT | XR_SPACE_LOCATION_ORIENTATION_VALID_BIT;
+         if (XR_SUCCEEDED(xrLocateSpace_(view, base, fs.predictedDisplayTime, &loc)) && (loc.locationFlags & valid) == valid)
+         {
+            headSaidAt = GetTickCount64();
+            const XrVector3f fwd = rotate(loc.pose.orientation, { 0, 0, -1 });
+            say("tete " + std::to_string(loc.pose.position.x) + " " + std::to_string(loc.pose.position.y) + " " + std::to_string(loc.pose.position.z) + " "
+               + std::to_string(std::atan2(-fwd.x, -fwd.z)));
          }
       }
 

@@ -96,14 +96,17 @@ test('sans playfield, la tête reste en place ; le protocole du compagnon décri
   assert.ok(fields.slice(6).every((f) => Number.isFinite(Number(f))), lines[0]);
 });
 
-test('manettes du casque : gâchettes = flippers, A = Start, B = Exit, poignées = MagnaSave', () => {
+test('manettes du casque : gâchettes et joysticks = précédent / suivant, A = valider, B = retour, ≡ = menu du casque', () => {
   assert.deepEqual(HEADSET_BUTTONS, {
     'batteur-gauche': 'previous',
     'batteur-droit': 'next',
     start: 'confirm',
     exit: 'exit',
-    'magnasave-gauche': 'zone',
-    'magnasave-droit': 'zone',
+    menu: 'headset-menu',
+    haut: 'previous',
+    gauche: 'previous',
+    bas: 'next',
+    droite: 'next',
   });
   assert.ok(isHeadsetButton('start'));
   assert.ok(!isHeadsetButton('toString'));
@@ -115,9 +118,17 @@ test('manettes du casque : gâchettes = flippers, A = Start, B = Exit, poignées
     'batteur-droit': '/user/hand/right/input/trigger/value',
     start: '/user/hand/right/input/a/click',
     exit: '/user/hand/right/input/b/click',
-    'magnasave-gauche': '/user/hand/left/input/squeeze/value',
-    'magnasave-droit': '/user/hand/right/input/squeeze/value',
+    menu: '/user/hand/left/input/menu/click',
+    'joystick-gauche-x': '/user/hand/left/input/thumbstick/x',
+    'joystick-gauche-y': '/user/hand/left/input/thumbstick/y',
+    'joystick-droit-x': '/user/hand/right/input/thumbstick/x',
+    'joystick-droit-y': '/user/hand/right/input/thumbstick/y',
   };
+  // Les poignées ne servent qu'en partie (MagnaSave dans VPX) : le compagnon ne les lit plus.
+  assert.doesNotMatch(cpp, /squeeze/);
+  // Directions des joysticks envoyées comme des boutons, avec hystérésis.
+  assert.match(cpp, /Direction directions\[\] = \{ \{ "haut" \}, \{ "bas" \}, \{ "gauche" \}, \{ "droite" \} \};/);
+  assert.match(cpp, /pushed\[d\] > \(directions\[d\]\.down \? 0\.4f : 0\.6f\)/);
   for (const [name, binding] of Object.entries(bindings)) assert.ok(cpp.includes(`{ "${name}", `) && cpp.includes(`"${binding}" }`), `${name} : ${binding}`);
   assert.match(cpp, /\/interaction_profiles\/oculus\/touch_controller/);
   // Lus seulement quand le menu a le regard du joueur ; sinon, tout bouton tenu est relâché.
@@ -130,4 +141,41 @@ test('manettes du casque : gâchettes = flippers, A = Start, B = Exit, poignées
   assert.match(frontend, /onButton: \(button, down\) => headsetButton\(button, down\),/);
   assert.match(frontend, /headsetKey\(b, true, false\);/);
   assert.match(frontend, /if \(!headset\?\.worn\) releaseHeadsetButtons\(\);/);
+});
+
+test('casque éteint ou Link coupé : l’affichage revient aux écrans du PC, en menu comme en partie ; retiré, rien ne bascule', () => {
+  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
+  // VPX a pris le casque : le compagnon veille au lieu de partir, et reprend le casque quand VPX le rend.
+  assert.match(cpp, /say\("releve VPX a pris le casque, veille"\);\s*handover = false;\s*standby = true;/);
+  assert.match(cpp, /if \(standby && state == XR_SESSION_STATE_FOCUSED\)\s*\{\s*standby = false;\s*say\("reprise"\);/);
+  // Seule une vraie perte le dit : session ou instance perdue, arrêt que personne n'a demandé hors relève.
+  assert.match(cpp, /else if \(state == XR_SESSION_STATE_LOSS_PENDING\)\s*lost\("session perdue"\);/);
+  assert.match(cpp, /XR_TYPE_EVENT_DATA_INSTANCE_LOSS_PENDING\)\s*lost\("instance perdue"\);/);
+  assert.match(cpp, /if \(!exitRequested && !handover && !standby\)\s*lost\("arret"\);/);
+  assert.match(cpp, /if \(standby\)\s*say\("veille finie par le runtime"\);/);
+  const app = path.join(repo, 'app', 'src');
+  const menu = fs.readFileSync(path.join(app, 'casque.ts'), 'utf8');
+  // Le menu reste au casque une fois porté, même retiré ; la veille d'une partie et la fin du compagnon le rendent au PC.
+  assert.match(menu, /return Boolean\(this\.child\) && this\.viewsFlowing && this\.wornOnce && !this\.standby;/);
+  assert.match(menu, /if \(line\.startsWith\('casque-perdu'\)\) \{\s*this\.lost = true;\s*this\.opts\.onLost\?\.\(this\.standby\);/);
+  assert.match(menu, /if \(code !== 0 \|\| this\.lost\) this\.retryAt = Date\.now\(\) \+ RETRY_MS;/);
+  const frontend = fs.readFileSync(path.join(app, 'frontend.ts'), 'utf8');
+  assert.match(frontend, /const inHeadset = Boolean\(headset\?\.inUse\);/);
+  assert.match(frontend, /onLost: \(inGame\) => headsetLost\(inGame\),/);
+  // Partie dans le casque : le casque perdu ferme VPX (qui continuerait sans personne).
+  assert.match(frontend, /playedVr = true;\s*vrGameStop = \(\) => game\.stop\(\);/);
+  assert.match(frontend, /if \(inGame && vrGameStop\) \{[\s\S]{0,200}vrGameStop\(\);/);
+});
+
+test('pièce du Quest changée sous le compagnon : session neuve, la pièce que VPX verra, et calage refait là', () => {
+  // Essai du 10 novembre 2026 : yeux à 2,3 m à chaque lancement, 1,2 m dans la session changée ; VPX,
+  // lancé ensuite, a posé la table derrière le joueur et sous le sol (pose-vpx.test.ts : l'ancienne pièce).
+  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const menu = fs.readFileSync(path.join(repo, 'app', 'src', 'casque.ts'), 'utf8');
+  assert.match(menu, /const restart = !this\.standby && !this\.handingOver;[\s\S]{0,600}if \(restart\) \{\s*this\.roomRestart = true;\s*void this\.stop\(\);/);
+  assert.match(menu, /if \(this\.roomRestart\) \{\s*this\.roomRestart = false;\s*this\.opts\.onRoomRestart\?\.\(Number\(eyes\[1\]\)\);/);
+  const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
+  assert.match(frontend, /if \(headset\?\.worn && headset\.running && roomOffer && !calibration\) \{\s*roomOffer = false;\s*offerCalibration\(true\);/);
+  assert.match(frontend, /roomStale = Boolean\(eyeHeightProblem\(eyes\)\);/);
 });

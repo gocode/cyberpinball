@@ -178,8 +178,8 @@ export function calibrateMenuText(opts: { vrReady: boolean; headset?: HeadsetMen
     detail: [
       status,
       opts.setting === 'bureau'
-        ? t('Au bureau : la borne se pose devant vous (Start), ou sur deux points du bord du bureau touchés du bout de la manette. Aussi : les deux poignées tenues 3 s')
-        : t('Touchez la vraie barre avant du bout de la manette, gâchette appuyée : coin gauche, coin droit, puis le milieu. Aussi : les deux poignées tenues 3 s'),
+        ? t('Au bureau : la borne se pose devant vous (A), ou sur deux points du bord du bureau touchés du bout de la manette. Dans le casque : ≡ de la manette gauche')
+        : t('Touchez la vraie barre avant du bout de la manette, gâchette appuyée : coin gauche, coin droit, puis le milieu. Dans le casque : ≡ de la manette gauche'),
       t('Le Quest garde ce calage tant que sa limite et son sol ne changent pas : après « Ajuster le sol » ou une nouvelle limite, recalez'),
     ].join(' · '),
     unavailable: false,
@@ -217,6 +217,49 @@ export function placeLockbar(place: CabinetPlace): { left: Point3; right: Point3
 export function placeVpxSettings(place: CabinetPlace): VpxSetting[] {
   const { left, right } = placeLockbar(place);
   return lockbarVpxSettings(left, right);
+}
+
+/**
+ * Un point de la pièce dans l'espace de la borne du casque posée à `place` : l'inverse de l'ancre du
+ * compagnon (position, puis lacet autour de la verticale, hauteur selon anchorHeight). Les repères du
+ * calage (point pris, point à toucher) se dessinent dans cet espace.
+ */
+export function roomToCabinet(point: Point3, place: CabinetPlace): Point3 {
+  const dx = point.x - place.x;
+  const dz = point.z - place.z;
+  const c = Math.cos(place.yaw);
+  const s = Math.sin(place.yaw);
+  return { x: c * dx - s * dz, y: point.y - anchorHeight(place), z: s * dx + c * dz };
+}
+
+/**
+ * VPX 10.8.1 borne TableX et TableY à ±100 cm (Settings_properties.inl, PlayerVR) : une barre avant à
+ * plus d'un mètre environ du centre de la limite du Quest, et la table de la partie n'est plus sur la borne.
+ */
+export const VPX_TABLE_OFFSET_MAX_CM = 100;
+
+/** La place écrite pour VPX dépasse ce qu'il accepte : ce qu'il faut faire. Sinon rien. */
+export function vpxPlaceProblem(settings: readonly VpxSetting[]): string | undefined {
+  const far = settings.some((s) => s.section === 'PlayerVR' && (s.key === 'TableX' || s.key === 'TableY') && Math.abs(Number(s.value)) > VPX_TABLE_OFFSET_MAX_CM);
+  return far
+    ? t('La borne est à plus d’un mètre du centre de la limite du Quest : VPX ne peut pas y poser ses tables (décalage limité à 1 m). Refaites la limite du Quest autour de la borne, puis recalez.')
+    : undefined;
+}
+
+/**
+ * La tête du joueur que VPX a vue en recentrant la table sur son regard (5 du pavé) : l'inverse de son
+ * calcul (VRDevice::UpdateVR, m_headsetViewCentering), d'après la place qu'il réécrit en quittant
+ * ([PlayerVR] Orientation, TableX, TableY) et la place du joueur ([Player] ScreenPlayerX, ScreenPlayerY ;
+ * 0 et −10 cm par défaut). Comparée à la tête vue par le compagnon au même moment, elle dit si VPX et
+ * le compagnon partagent la même pièce. Mètres et radians, sens d'OpenXR.
+ */
+export function vpxRecenteredHead(v: { orientation: number; tableX: number; tableY: number; playerX?: number; playerY?: number }): { x: number; z: number; yaw: number } {
+  const a = (v.orientation * Math.PI) / 180;
+  const c = Math.cos(a);
+  const s = Math.sin(a);
+  const x1 = v.tableX - (v.playerX ?? 0);
+  const y1 = v.tableY - (v.playerY ?? -10);
+  return { x: -(c * x1 + s * y1) / 100, z: -(-s * x1 + c * y1) / 100, yaw: a };
 }
 
 /** Limite du Quest (rectangle de la pièce, mètres) gardée avec le calage, pour voir si elle a changé depuis. */

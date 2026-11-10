@@ -47,6 +47,10 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Juke-box: “Search YouTube” in the import opens “Get” on results showing playlists only; “Add to the Juke-box” on a playlist or a video brings you back to the import with that link.
 - Juke-box: on the on-screen keyboard, the link already starts with a playlist address (or a video one, with the “Video” key): you only type the ID. An ID alone (PL…, OLAK5uy_…) is accepted everywhere, on the phone too, and a whole pasted link is never doubled.
 - 3D vision, three settings on its screen: "Calibrer la position de jeu" (Calibrate the playing position: two seconds still in playing position), "Intensité" (Intensity) from 25 % to 150 % (75 % by default, also adjustable in game with the MagnaSave buttons, against seasickness), and "Réactivité" (Responsiveness) gentle, normal or quick: the table follows the head with clearly less lag.
+- In the headset, one rule for the controllers, everywhere, menu and game alike: A confirms, B goes back, the thumbsticks move the selection, the triggers are the flippers, the grips MagnaSave in game. Clicking the left thumbstick no longer moves the table.
+- The ≡ button of the left controller opens the headset menu: align the cabinet (guided step by step, B cancels), recentre, button legend.
+- The game's table no longer ends up behind you or below the floor when the Quest rebuilt its room during the menu: the headset restarts on the new room and offers to realign.
+- Headset turned off or Link cut: the game closes and the menu returns to the PC screens by itself. Merely taking the headset off changes nothing.
 
 ## 0.1.8
 

@@ -70,7 +70,7 @@ test('entrée « Caler la borne » : grisée avec sa raison hors du casque ; sin
   assert.match(calibrateMenuText({ vrReady: true, headset: 'waiting' }).detail, /Mettez le casque/);
   const fresh = calibrateMenuText({ vrReady: true, headset: 'shown' });
   assert.equal(fresh.unavailable, false);
-  assert.match(fresh.detail, /^Pas encore calée · .*coin gauche, coin droit, puis le milieu.*poignées tenues 3 s · .*limite et son sol/);
+  assert.match(fresh.detail, /^Pas encore calée · .*coin gauche, coin droit, puis le milieu.*≡ de la manette gauche · .*limite et son sol/);
   assert.match(calibrateMenuText({ vrReady: true, headset: 'shown', place: { x: 0, z: 0, yaw: 0, lockbarWidth: 0.7, lockbarHeight: 0.86 } }).detail, /^Calée : barre avant de 70 cm, à 86 cm du sol/);
 });
 
@@ -81,8 +81,8 @@ test('calage : branchements du compagnon, du casque et du menu', () => {
   // Bout des manettes : la pose de visée ; points en gâchette appuyée, seulement pendant le calage.
   assert.match(cpp, /"\/user\/hand\/left\/input\/aim\/pose", "\/user\/hand\/right\/input\/aim\/pose"/);
   assert.match(cpp, /if \(down && calibrating && hand >= 0/);
-  assert.match(cpp, /say\("geste caler"\);/);
-  assert.match(cpp, /GetTickCount64\(\) - gripsSince >= 3000/);
+  // Plus de geste des deux poignées (introuvable, et MagnaSave en partie) : le bouton ≡ ouvre le menu du casque.
+  assert.doesNotMatch(cpp, /geste caler|gripsSince/);
   assert.match(cpp, /else if \(word == "calage"\)/);
   // L'ancre porte la hauteur de la barre avant calée.
   assert.match(cpp, /anchor\.position = \{ anchorX, anchorY, anchorZ \};/);
@@ -92,7 +92,14 @@ test('calage : branchements du compagnon, du casque et du menu', () => {
   assert.match(frontend, /if \(calibration\) return calibrationKey\(input\);/);
   assert.match(frontend, /writeVrCalibration\(loc\.dataDir, left && right \? lockbarVpxSettings\(left, right\) : placeVpxSettings\(place\)\);/);
   assert.match(frontend, /library\.provideSystemItem\('vr-calibrate', \{/);
-  assert.match(frontend, /onGesture: \(\) => \(calibrateUnavailable\(\) \? undefined : openCalibration\(\)\),/);
+  assert.doesNotMatch(frontend, /onGesture/);
+  // Menu du casque (≡) : « Caler la borne » en tête, puis recentrer, retour.
+  assert.match(frontend, /if \(action === 'headset-menu'\) return void \(down && openHeadsetMenu\(\)\);/);
+  assert.match(frontend, /label: t\('Caler la borne'\)[\s\S]{0,400}openCalibration\(\);[\s\S]{0,200}label: t\('Recentrer la borne'\)[\s\S]{0,300}headset\?\.recenter\(\);[\s\S]{0,200}label: t\('Retour'\)/);
+  // Calage guidé : étapes numérotées, repères du point pris et du point à toucher, B pour annuler.
+  assert.match(frontend, /t\('Étape 1 sur 3 : coin gauche'\)/);
+  assert.match(frontend, /headset\?\.setMarks\(calibrationMarks\(c\)\);/);
+  assert.match(frontend, /const cancel = t\('B : annuler'\);/);
   // L'entrée vient juste après « Réalité virtuelle ».
   assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /'vr', 'vr-calibrate', 'controls'/);
 });
@@ -154,7 +161,7 @@ test('un calage par configuration ; au bureau, la borne posée librement, puis f
   assert.deepEqual(desk, { x: 0.1, z: -0.2, yaw: 0.3, lockbarHeight: DESK_LOCKBAR_HEIGHT_M, lockbarWidth: 0.7, free: true });
   assert.ok(isCalibrated(desk));
   assert.ok(DESK_LOCKBAR_HEIGHT_M >= 0.85 && DESK_LOCKBAR_HEIGHT_M <= 0.9);
-  assert.match(calibrateMenuText({ vrReady: true, headset: 'shown', place: desk, setting: 'bureau' }).detail, /^Posée au bureau, barre avant à 88 cm du sol · Au bureau : la borne se pose devant vous \(Start\)/);
+  assert.match(calibrateMenuText({ vrReady: true, headset: 'shown', place: desk, setting: 'bureau' }).detail, /^Posée au bureau, barre avant à 88 cm du sol · Au bureau : la borne se pose devant vous \(A\)/);
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
   assert.match(frontend, /return path\.join\(loc\.dataDir, 'vr', cabinetPlaceFileName\(menuConfiguration\)\);/);

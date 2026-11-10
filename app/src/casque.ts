@@ -25,7 +25,7 @@ export const HEADSET_TRIAL_DIR = process.env.CYBERPINBALL_CASQUE_ESSAI?.trim() |
 const RETRY_MS = 15_000;
 const STOP_TIMEOUT_MS = 4_000;
 /** Messages du compagnon gardés dans le journal (packages/casque-vr/src/casque.cpp). */
-const PROTOCOL = /^(pret|casque-absent|erreur|centre|image|scene|releve|instantane|porte|fini)\b/;
+const PROTOCOL = /^(pret|casque-absent|erreur|etat|centre|image|scene|releve|reprise|instantane|porte|casque-perdu|fini)\b/;
 
 /** Le compagnon, s'il est là : fabriqué avec l'application, ou construit en développement. */
 export function headsetExe(appDir: string): string | undefined {
@@ -73,8 +73,18 @@ export interface HeadsetMenuOptions {
   onButton?(button: HeadsetButton, down: boolean): void;
   /** Calage (calibrate) : le bout d'une manette touché, gâchette appuyée, dans la pièce (`room` faux : sans limite du Quest). */
   onPoint?(hand: 'gauche' | 'droite', point: Point3, room: boolean): void;
-  /** Les deux poignées tenues 3 s : ouvrir le calage de la borne. */
-  onGesture?(): void;
+  /**
+   * Casque éteint, Link coupé ou session perdue (compagnon : « casque-perdu ») : `inGame` vrai quand le
+   * compagnon veillait sur une partie de VPX dans le casque. L'affichage revient aux écrans du PC.
+   */
+  onLost?(inGame: boolean): void;
+  /**
+   * Session neuve après un changement de pièce : sa hauteur des yeux, dans la pièce que VPX verra.
+   * Hors de la plage plausible, le Quest donne encore l'ancienne pièce aux applications qui démarrent.
+   */
+  onRoomRestart?(eyes: number): void;
+  /** Veille pendant une partie : la tête du joueur dans la pièce (compagnon : « tete x y z lacet », toutes les 5 s). */
+  onHead?(head: HeadPose): void;
   /** Recentrage fait (sur demande) : la place donnée par le regard du joueur. */
   onCentre?(place: { x: number; z: number; yaw: number }): void;
   /** Hauteur des yeux au-dessus du sol de la pièce (mètres), à chaque port du casque. */
@@ -82,6 +92,14 @@ export interface HeadsetMenuOptions {
   /** Limite du Quest au lancement du compagnon ; `changed` : le Quest a déplacé la pièce pendant la session. */
   onRoom?(room: RoomBounds | undefined, changed: boolean): void;
   log(line: string): void;
+}
+
+/** La tête du joueur dans la pièce du Quest : position (mètres) et lacet (radians, sens d'OpenXR). */
+export interface HeadPose {
+  x: number;
+  y: number;
+  z: number;
+  yaw: number;
 }
 
 export class HeadsetMenu {
@@ -105,10 +123,29 @@ export class HeadsetMenu {
   private frameCount = 0;
   /** Casque porté, le menu dessiné dedans (compagnon : « porte 1 »). */
   worn = false;
+  /** Porté au moins une fois depuis le lancement du compagnon : retiré ensuite, l'affichage reste au casque. */
+  private wornOnce = false;
+  /** Veille pendant une partie de VPX dans le casque (« releve … veille » jusqu'à « reprise »). */
+  standby = false;
+  /** Le compagnon a dit le casque perdu : il repartira plus tard, pas aussitôt. */
+  private lost = false;
+  /** Reprise sur une session neuve pour changement de pièce : sa première hauteur des yeux reste à dire. */
+  private roomRestart = false;
+  /** Dernière tête relevée pendant la veille d'une partie (pièce du Quest, mètres, lacet en radians). */
+  lastHead: HeadPose | undefined;
   /** Au moins une image rendue pour le casque y est arrivée : les écrans du PC peuvent se reposer. */
   viewsFlowing = false;
   /** Pour le détail de l'entrée « Réalité virtuelle » : montré, en attente du casque, ou compagnon absent. */
   state: HeadsetMenuState = 'waiting';
+
+  /**
+   * Le menu est dans le casque : ses écrans y arrivent et il a été porté. Retiré de la tête (ou menu
+   * de Meta ouvert), il le reste : pas d'allers-retours avec les écrans du PC. Seuls la fin du
+   * compagnon (casque éteint, Link coupé) et la veille d'une partie de VPX rendent l'affichage au PC.
+   */
+  get inUse(): boolean {
+    return Boolean(this.child) && this.viewsFlowing && this.wornOnce && !this.standby;
+  }
 
   constructor(private readonly opts: HeadsetMenuOptions) {}
 
@@ -274,7 +311,14 @@ export class HeadsetMenu {
           if (isHeadsetButton(button[1]!)) this.opts.onButton?.(button[1], button[2] === '1');
           continue;
         }
-        // Calage : « pointe gauche|droite x y z [sans-piece] », puis le geste des deux poignées.
+        // Veille : la tête du joueur dans la pièce (au journal par Cyber Pinball, pas ici : toutes les 5 s).
+        const head = /^tete (-?[\d.]+) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)$/.exec(line);
+        if (head) {
+          this.lastHead = { x: Number(head[1]), y: Number(head[2]), z: Number(head[3]), yaw: Number(head[4]) };
+          this.opts.onHead?.(this.lastHead);
+          continue;
+        }
+        // Calage : « pointe gauche|droite x y z [sans-piece] ».
         const point = /^pointe (gauche|droite) (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)( sans-piece)?$/.exec(line);
         if (point) {
           this.opts.log(`Casque : ${line}`); // i18n-ignore : journal
@@ -285,6 +329,11 @@ export class HeadsetMenu {
         const eyes = /^yeux (-?[\d.]+)$/.exec(line);
         if (eyes) {
           this.opts.log(`Casque : ${line}`); // i18n-ignore : journal
+          // Première mesure de la session neuve d'après un changement de pièce : celle que VPX verra.
+          if (this.roomRestart) {
+            this.roomRestart = false;
+            this.opts.onRoomRestart?.(Number(eyes[1]));
+          }
           this.opts.onEyes?.(Number(eyes[1]));
           continue;
         }
@@ -296,26 +345,45 @@ export class HeadsetMenu {
           continue;
         }
         if (line === 'piece-changee') {
-          this.opts.log('Casque : le Quest a déplacé sa pièce (limite refaite ou sol recalé) ; la borne ne bouge pas.'); // i18n-ignore : journal
+          // Le Quest a refait sa pièce sous la session en cours : une application lancée ensuite (VPX) peut
+          // en recevoir une autre (essai du 10 novembre 2026 : yeux à 2,3 m à chaque lancement, 1,2 m dans
+          // la session changée ; la table de VPX derrière le joueur et sous le sol). Le compagnon repart sur
+          // une session neuve, dans la pièce que VPX verra, et le calage se refait là.
+          const restart = !this.standby && !this.handingOver;
+          this.opts.log(`Casque : le Quest a déplacé sa pièce (limite refaite ou sol recalé) ; la borne ne bouge pas${restart ? ' ; le compagnon repart sur une session neuve, la pièce que VPX verra' : ''}.`); // i18n-ignore : journal
           this.opts.onRoom?.(this.room, true);
-          continue;
-        }
-        if (line === 'geste caler') {
-          this.opts.log('Casque : les deux poignées tenues 3 s, calage de la borne.'); // i18n-ignore : journal
-          this.opts.onGesture?.();
+          if (restart) {
+            this.roomRestart = true;
+            void this.stop();
+          }
           continue;
         }
         if (!PROTOCOL.test(line)) continue;
         if (line.startsWith('pret')) this.setState('shown');
         if (line.startsWith('porte ')) {
           this.worn = line === 'porte 1';
+          this.wornOnce ||= this.worn;
           this.opts.onStateChange?.();
+        }
+        // Relève faite : le compagnon veille sur la partie ; VPX parti, il reprend le casque avec le menu.
+        if (line.startsWith('releve') && line.endsWith('veille')) {
+          this.standby = true;
+          this.opts.onStateChange?.();
+        }
+        if (line === 'reprise') {
+          this.standby = false;
+          this.handingOver = false;
+          this.opts.onStateChange?.();
+        }
+        if (line.startsWith('casque-perdu')) {
+          this.lost = true;
+          this.opts.onLost?.(this.standby);
         }
         // « centre x z lacet yeux=… » : la nouvelle place de la borne, gardée (dans la pièce seulement).
         const centre = /^centre (-?[\d.]+) (-?[\d.]+) (-?[\d.]+)(?!.*sans-piece)/.exec(line);
         if (centre) {
           const gaze = { x: Number(centre[1]), z: Number(centre[2]), yaw: Number(centre[3]) };
-          this.writePlace(gaze);
+          this.writePlace(gaze, true);
           this.opts.onCentre?.(gaze);
         }
         if (line.startsWith('casque-absent')) this.setState('waiting');
@@ -339,6 +407,8 @@ export class HeadsetMenu {
       if (this.child === child) this.child = undefined;
       this.handingOver = false;
       this.worn = false;
+      this.wornOnce = false;
+      this.standby = false;
       this.viewsFlowing = false;
       this.releaseFrames();
       this.target?.close();
@@ -346,8 +416,9 @@ export class HeadsetMenu {
       this.opts.closeViews?.();
       this.opts.onStateChange?.();
       if (this.state === 'shown') this.setState('waiting');
-      // Casque absent ou session perdue : nouvel essai plus tard ; arrêt demandé : rien.
-      if (code !== 0) this.retryAt = Date.now() + RETRY_MS;
+      // Casque absent ou perdu (éteint, Link coupé) : nouvel essai plus tard ; arrêt demandé : rien.
+      if (code !== 0 || this.lost) this.retryAt = Date.now() + RETRY_MS;
+      this.lost = false;
     });
     this.panels = panels;
     this.target = child.pid ? openHandleTarget(child.pid) : undefined;
@@ -374,12 +445,12 @@ export class HeadsetMenu {
 
   /**
    * Garde la place (casque.json). Un recentrage (regard du joueur) ne donne que x, z et le cap : la
-   * hauteur de la barre avant calée reste, la borne n'est plus sur la vraie mais à la bonne hauteur.
+   * barre avant calée (hauteur, largeur), la limite du Quest et le placement libre restent ; la borne
+   * n'est plus sur la vraie, mais garde sa taille et sa hauteur.
    */
-  private writePlace(place: CabinetPlace): void {
+  private writePlace(place: CabinetPlace, recentred = false): void {
     if (!this.opts.placeFile || ![place.x, place.z, place.yaw].every(Number.isFinite)) return;
-    const before = this.readPlace();
-    const kept: CabinetPlace = { ...(before?.lockbarHeight !== undefined && { lockbarHeight: before.lockbarHeight }), ...place };
+    const kept: CabinetPlace = recentred ? { ...this.readPlace(), x: place.x, z: place.z, yaw: place.yaw } : place;
     try {
       fs.mkdirSync(path.dirname(this.opts.placeFile), { recursive: true });
       fs.writeFileSync(this.opts.placeFile, JSON.stringify(kept, null, 2) + '\n');
