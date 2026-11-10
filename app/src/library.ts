@@ -6,7 +6,7 @@
 // revenir), au clavier ou à la souris (clics envoyés par le rendu).
 
 import type { MenuField, PhoneRemote, RemoteBar } from './phone-remote';
-import { createPhoneRemoteMenu, remoteBlock } from './phone-remote-menu';
+import { createPhoneRemoteMenu, remoteBlock, type RemoteWording } from './phone-remote-menu';
 import { periodLabel, rankingScoreboardView, scopeLabel, scoreboardView, scoresSummary, type ScoreboardView } from './scoreboard-menu';
 import type { RankingView } from './table-rankings';
 import type { TableBoard } from './table-scores';
@@ -211,6 +211,7 @@ import { createJukeboxLibrary } from './jukebox-library';
 import { createJukeboxMenu } from './jukebox-menu';
 import { createYoutubeAccount } from './youtube-account';
 import type { EdgeSession } from './edge-login';
+import type { JukeboxPreview } from './jukebox-menu';
 import { watchJoystickButtons } from './joystick-input';
 import { createCatalog } from './catalog';
 import { createGameParts, type PupSwitchView } from './game-parts';
@@ -329,6 +330,10 @@ export interface LibraryHost {
    * son bandeau en dit (écran choisi pas branché, playfield tourné).
    */
   browserScreen?(): { bounds: Rectangle; notice?: string; label?: string } | undefined;
+  /** Pré-écoute d'un morceau en ligne, sur le fronton (jukebox-player.ts) ; absente : pas proposée. */
+  jukeboxPreview?: JukeboxPreview;
+  /** Touche qui écoute un morceau à l'import en borne : le MagnaSave droit, s'il est relevé avec le gauche. */
+  listenKeys?(): string[];
   /** Le playfield reprend le premier plan (après une fenêtre d'un autre programme, comme Edge) : les boutons de la borne lui reviennent. */
   takeForeground?(): void;
   /** Nom Windows de la sortie audio du menu (menuAudioOutput), pour le son des pages de « Récupérer ». */
@@ -567,12 +572,16 @@ export interface Built {
   crop?: CropView;
   /** Télécommande du téléphone (phone-remote-menu.ts) : le QR code, le code à comparer ou le téléphone connecté, en tête du contenu. */
   remote?: RemoteBar;
+  /** Phrases propres à cet écran pour le bloc du téléphone (remoteBlock). */
+  remoteWording?: RemoteWording;
   /**
    * Ce que Start fait sur un élément de la liste de contenu (« cocher ou décocher »), dit par le
    * bandeau d'aide tant qu'on y est ; sans lui, « valider ». Une liste de cases à cocher le dit :
    * sinon rien n'indique qu'on y coche (la ROM d'un ami, 01/11/2026).
    */
   listStart?: string;
+  /** Commandes de plus dans la liste de contenu, dites par la barre des commandes (pré-écoute : MagnaSave droit, flipper tenu). */
+  listCommands?: { key: string; desk: string; text: string }[];
   /**
    * Touches propres à l'écran, avant la navigation (DMD sur la roue : une ligne ouverte prend les
    * flippers pour déplacer les points) ; true : la touche est prise, l'écran se redessine.
@@ -1324,6 +1333,12 @@ export function createLibrary(host: LibraryHost) {
     const stop = watchJoystickButtons((code, down) => {
       if (!down || BrowserWindow.getFocusedWindow()) return;
       const keys = host.keys();
+      // Un téléphone attend d'être accepté (codes comparés sur l'écran de connexion) : Start accepte, Exit refuse.
+      if (remote?.pending()) {
+        if (keys.confirm.includes(code)) remote.accept();
+        else if (keys.exit.includes(code)) remote.refuse();
+        return;
+      }
       if (keys.exit.includes(code)) session.finish();
       else if (keys.confirm.includes(code)) session.key('Enter');
       else if (keys.next.includes(code)) session.key('Tab');
@@ -1379,6 +1394,10 @@ export function createLibrary(host: LibraryHost) {
     phone: () => host.phoneRemote?.connected() === 'menu',
     account: youtubeAccount,
     signIn: () => youtubeSignIn(),
+    remoteBar: () => host.phoneRemote?.bar(),
+    preview: host.jukeboxPreview,
+    // Écouter : le MagnaSave droit ; le gauche (et F6) change toujours de zone.
+    listenKeys: () => host.listenKeys?.() ?? [],
   });
   provideSystemItem('jukebox', jukeboxMenu.item);
   downloads.setTransport('youtube', jukebox.transport);
@@ -3939,6 +3958,11 @@ export function createLibrary(host: LibraryHost) {
   /** Touche relâchée : la bascule de MagnaSave (F6), et la fin d'un flipper tenu (l'initiale montrée s'efface). */
   function handleKeyUp(input: Input): void {
     if (!screen || busy) return;
+    // Touches propres à l'écran (pré-écoute du Juke-box : flipper relâché) : le relâchement aussi.
+    if (screen.kind === 'custom' && build().keys?.(input)) {
+      host.broadcast();
+      return;
+    }
     if (hold?.code === input.code) {
       hold = undefined;
       if (zoneMemory.letter !== undefined) {
@@ -4009,6 +4033,7 @@ export function createLibrary(host: LibraryHost) {
     const out: { key: string; text: string; act?: UiAction }[] = [
       { key: desk ? '↑↓' : t('Flippers'), text: t('choisir') },
       { key: desk ? t('Entrée') : 'Start', text: inList && built.listStart ? built.listStart : t('valider') },
+      ...(inList ? (built.listCommands ?? []).map((c) => ({ key: desk ? c.desk : c.key, text: c.text })) : []),
     ];
     if (zone) out.push({ key: desk ? 'F6' : 'MagnaSave', text: inList ? t('actions') : t('la liste'), act: { type: 'zone' } });
     out.push({ key: desk ? t('Échap') : 'Exit', text: inList ? t('sortir de la liste') : t('retour'), act: inList ? { type: 'zone' } : { type: 'back' } });
@@ -4277,7 +4302,7 @@ export function createLibrary(host: LibraryHost) {
       lead: built.lead,
       sections: built.sections,
       crop: built.crop ? { src: built.crop.src, width: built.crop.width, height: built.crop.height, box: built.crop.box, caption: built.crop.caption } : undefined,
-      remote: built.remote ? remoteBlock(built.remote, 'screen') : undefined,
+      remote: built.remote ? remoteBlock(built.remote, 'screen', built.remoteWording) : undefined,
 
       back: backLabel(built),
       // Dans la liste d'un écran à deux zones, Exit n'y ramène pas : il passe aux actions, le bouton le dit (et fait de même au clic).

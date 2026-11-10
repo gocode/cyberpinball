@@ -1046,6 +1046,25 @@ const library = createLibrary({
   jukeboxPlayer: (playlist) => openJukebox(playlist),
   browserScreen: () => browserScreenRect(),
   takeForeground: () => void takeForeground(),
+  // MagnaSave droit : écouter un morceau à l'import ; seulement si le gauche est là pour changer de zone.
+  listenKeys: () => {
+    const b = buttonKeys(buttons);
+    const zones = zoneSwitchKeys({ buttons, navigation });
+    return b.rightMagna && b.leftMagna && zones.includes(b.rightMagna) && zones.includes(b.leftMagna) ? [b.rightMagna] : [];
+  },
+  // Pré-écoute des morceaux à l'import (gestion du Juke-box), sur le fronton : le lecteur YouTube du Juke-box.
+  jukeboxPreview: {
+    play: (youtube) => {
+      jukeboxPlayer.preview(youtube);
+      broadcast();
+    },
+    stop: () => {
+      jukeboxPlayer.preview(undefined);
+      broadcast();
+    },
+    seek: (delta) => jukeboxPlayer.previewSeek(delta),
+    state: () => jukeboxPlayer.previewState(),
+  },
   audioOutput: () => menuOutput(),
   phoneRemote,
   phoneUpload: () => phoneUpload,
@@ -3896,7 +3915,7 @@ function handleKey(input: Input, fromPhone = false): boolean {
 
   // Un téléphone a lu le QR de l'écran affiché (télécommande, clavier à l'écran) : Start et Exit
   // sont à lui, jamais à l'écran derrière. Start l'accepte, Exit le refuse.
-  if (!fromPhone && !input.isAutoRepeat && state.phase === 'library' && (phoneRemote.pendingOn('menu') || phoneRemote.pendingOn('keyboard'))) {
+  if (!fromPhone && !input.isAutoRepeat && state.phase === 'library' && (phoneRemote.pendingOn('menu') || phoneRemote.pendingOn('keyboard') || phoneRemote.pendingOn('browser'))) {
     if (is(KEYS.confirm)) {
       phoneRemote.accept();
       broadcast();
@@ -5583,6 +5602,8 @@ function broadcast(): void {
   sendToHeadsetViews((role) => (headsetExitHint ? { ...viewFor(role, headsetMedias ?? medias), headsetHint: headsetExitHint } : viewFor(role, headsetMedias ?? medias)));
   // Télécommande du téléphone : le QR vit tant que l'écran qui le montre est affiché ; le téléphone suit l'écran.
   const surfaces = state.phase === 'library' && !desktop.active ? library.remoteSurfaces() : { menu: false, keyboard: false };
+  // Pré-écoute (import du Juke-box) : jamais hors du menu.
+  if (state.phase !== 'library' && jukeboxPlayer.previewState()) jukeboxPlayer.preview(undefined);
   phoneRemote.show('menu', surfaces.menu);
   phoneRemote.show('keyboard', surfaces.keyboard);
   phoneRemote.menuChanged();

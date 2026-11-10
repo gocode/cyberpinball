@@ -21,6 +21,8 @@ import * as path from 'node:path';
 import { session, webFrameMain, WebContentsView, type BrowserWindow, type Input, type Rectangle, type Session } from 'electron';
 import {
   audioSinkScript,
+  JUKEBOX_EMBED_REFERRER,
+  youtubeEmbedUrl,
   embedErrorReason,
   embedErrorText,
   formatNumber,
@@ -817,6 +819,107 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     }
   }
 
+  // ---------- Pré-écoute (choix des morceaux à l'import, playlists du compte) ----------
+
+  /**
+   * Un morceau en ligne écouté avant de l'ajouter : le lecteur YouTube intégré, comme la lecture en
+   * ligne (Referer, sortie du fronton, titres masqués), sur tout le fronton en borne ; au bureau, le
+   * son seul (la gestion garde l'écran). La musique du Juke-box se met en pause pendant l'écoute,
+   * puis reprend.
+   */
+  let preview: { youtube: string; view: WebContentsView; win: BrowserWindow; timer: NodeJS.Timeout; position?: number; duration?: number; paused: boolean; error?: string } | undefined;
+  let resumeAfterPreview = false;
+
+  function previewScript(code: string): Promise<unknown> {
+    const p = preview;
+    if (!p || p.view.webContents.isDestroyed()) return Promise.resolve(undefined);
+    return p.view.webContents.executeJavaScript(code).catch(() => undefined);
+  }
+
+  function startPreview(youtube: string): void {
+    stopPreview(false);
+    const win = host.windows().get(clipRole());
+    if (!win || win.isDestroyed()) return;
+    // La musique du Juke-box se tait le temps de l'écoute.
+    if (player?.playing && !player.paused && order && !order.paused) {
+      player = { ...player, paused: true };
+      apply({ kind: 'pause' });
+      resumeAfterPreview = true;
+    }
+    const view = new WebContentsView({
+      webPreferences: { session: youtubeSession(), contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: OFFSCREEN, backgroundThrottling: false, autoplayPolicy: 'no-user-gesture-required' },
+    });
+    win.contentView.addChildView(view);
+    const [width, height] = win.getContentSize();
+    // En borne, tout le fronton ; au bureau, ou sans fronton (la gestion est sur le même écran) : le son seul.
+    placeView(view, host.desk() || clipRole() === 'playfield' ? undefined : { x: 0, y: 0, width: width ?? 0, height: height ?? 0 });
+    view.setBackgroundColor('#030807');
+    if (OFFSCREEN) view.webContents.setAudioMuted(true);
+    const contents = view.webContents;
+    contents.setWindowOpenHandler(() => ({ action: 'deny' }));
+    contents.on('will-navigate', (event, url) => {
+      if (!/^https:\/\/www\.youtube(-nocookie)?\.com\/embed\//.test(url) && !url.startsWith('file:')) event.preventDefault();
+    });
+    contents.on('dom-ready', () => {
+      void contents.insertCSS(YOUTUBE_CSS).catch(() => undefined);
+      void contents.executeJavaScript(UNMUTE_SCRIPT).catch(() => undefined);
+    });
+    contents.on('did-frame-finish-load', (_e, _main, processId, routingId) => {
+      const output = host.output();
+      const frame = output ? webFrameMain.fromId(processId, routingId) : undefined;
+      if (frame) void frame.executeJavaScript(audioSinkScript(output!)).catch(() => undefined);
+    });
+    win.once('closed', () => preview?.view === view && stopPreview());
+    const mine = { youtube, view, win, paused: false, timer: setInterval(() => void probePreview(), ONLINE_PROBE_MS) };
+    preview = mine;
+    if (host.fakeOnline) void contents.loadFile(host.fakeOnline, { query: { v: youtube } }).catch(() => undefined);
+    else void contents.loadURL(youtubeEmbedUrl(youtube), { httpReferrer: JUKEBOX_EMBED_REFERRER }).catch(() => undefined);
+    host.log(`Juke-box : pré-écoute de ${youtube}.`); // i18n-ignore : journal
+  }
+
+  async function probePreview(): Promise<void> {
+    const p = preview;
+    if (!p) return;
+    const r = (await previewScript(PROBE_SCRIPT)) as { time?: number; duration?: number; paused?: boolean; code?: number; error?: string } | undefined;
+    if (!r || preview !== p) return;
+    const error = typeof r.code === 'number' ? embedErrorText(r.code) : r.error;
+    const next = { position: typeof r.time === 'number' ? r.time : p.position, duration: typeof r.duration === 'number' && r.duration > 0 ? r.duration : p.duration, error };
+    if (next.position === p.position && next.duration === p.duration && next.error === p.error) return;
+    Object.assign(p, next);
+    host.redraw();
+  }
+
+  /** Arrête la pré-écoute ; la musique du Juke-box reprend si elle jouait (`resume`). */
+  function stopPreview(resume = true): void {
+    const p = preview;
+    if (p) {
+      preview = undefined;
+      clearInterval(p.timer);
+      try {
+        if (!p.win.isDestroyed()) p.win.contentView.removeChildView(p.view);
+      } catch {
+        // Fenêtre déjà fermée.
+      }
+      if (!p.view.webContents.isDestroyed()) p.view.webContents.close();
+    }
+    if (resume && resumeAfterPreview) {
+      resumeAfterPreview = false;
+      if (player?.playing && player.paused) {
+        player = { ...player, paused: false };
+        apply({ kind: 'resume' });
+      }
+    }
+  }
+
+  function seekPreview(delta: number): void {
+    const p = preview;
+    if (!p) return;
+    const to = Math.max(0, Math.min((p.duration ?? Infinity) - 1, (p.position ?? 0) + delta));
+    p.position = to;
+    void previewScript(`(() => { const v = document.querySelector('video'); if (v) v.currentTime = ${to}; })()`);
+    host.redraw();
+  }
+
   // ---------- DMD ----------
 
   /** Le DMD du Juke-box : JUKE-BOX et ses chiffres sur la roue, le spectre en lecture ; rien ailleurs. */
@@ -932,6 +1035,11 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       host.log(pause ? 'Juke-box : lecture en pause pendant la gestion.' : 'Juke-box : la musique continue pendant la gestion.'); // i18n-ignore : journal
     },
     inBackground: () => background,
+    /** Pré-écoute d'un morceau en ligne (identifiant YouTube) ; undefined l'arrête. */
+    preview: (youtube: string | undefined): void => (youtube ? startPreview(youtube) : stopPreview()),
+    previewSeek: seekPreview,
+    /** La pré-écoute en cours : son morceau, sa position, sa durée, une erreur de YouTube. */
+    previewState: () => (preview ? { youtube: preview.youtube, ...(preview.position !== undefined ? { position: preview.position } : {}), ...(preview.duration !== undefined ? { duration: preview.duration } : {}), ...(preview.error ? { error: preview.error } : {}) } : undefined),
     handleKey,
     click,
     message,
@@ -961,6 +1069,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
       return image.toPNG();
     },
     dispose(): void {
+      stopPreview(false);
       stopPlayback();
       dmd?.stop();
       dmd = undefined;

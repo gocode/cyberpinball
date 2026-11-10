@@ -81,6 +81,9 @@ son interface).
 - Juke-box : un flipper tenu avance ou recule dans le morceau, par pas de 5 s, puis 10 s, puis 30 s ; un appui court change toujours de morceau. Au bureau, les flèches tenues font de même, et un clic dans la barre de progression va à cet endroit.
 - Juke-box : Start sur la playlist qui joue l’ouvre sur le morceau en cours ; Start encore le met en pause, comme la carte le rappelle.
 - « Récupérer » rouvert sur la page de connexion de Google ne reprend plus la page précédente : il dit que Google la refuse et propose « Se connecter à YouTube ».
+- Connexion à YouTube dans Edge : le playfield montre en grand le QR code de la télécommande, « Scannez pour piloter Edge avec votre téléphone » ; le téléphone accepté devient aussitôt la souris et le clavier d’Edge.
+- Import d’une playlist : « Choisir les morceaux » part d’une sélection vide, avec « Tout cocher » et « Tout décocher » ; le compte des morceaux retenus reste en tête de l’écran.
+- Import : chaque morceau a sa miniature, et se pré-écoute avant d’être coché. En borne, MagnaSave droit écoute ou arrête, un flipper tenu avance ou recule dans le morceau ; au bureau, la barre d’espace. La vidéo passe sur le fronton, le son sur sa sortie ; la musique du Juke-box se met en pause le temps de l’écoute. De même pour les playlists de votre compte.
 - Avant chaque demande d'autorisation de Windows (borne dédiée, pare-feu, pilote de la Kinect), un écran prévient qu'il faudra répondre au clavier ou à la souris (Alt+O pour Oui, Échap pour Non) : les boutons de la borne n'y peuvent rien. « Plus tard, au bureau » est choisi d'office, et Cyber Pinball n'attend plus la réponse au-delà de 3 minutes.
 - Compte YouTube : « Installer Firefox » l'installe pour ce compte seul, sans demande d'autorisation de Windows.
 - « Ouvrir dans mon navigateur » ouvre Firefox directement quand il est installé, sans faire choisir le navigateur par défaut de Windows.

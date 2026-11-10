@@ -1295,6 +1295,8 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   /** La fenêtre d'un autre programme s'ouvre (Edge) : le téléphone connecté passe au pavé tactile. */
   function attachExternal(next: ExternalTarget): void {
     external = next;
+    // Le QR code d'association vit tant qu'Edge est ouvert : l'écran de connexion le montre en grand.
+    surfaces.add('browser');
     const r = next.rect();
     at = r ? { x: r.width / 2, y: r.height / 2 } : { x: 0, y: 0 };
     speed = undefined;
@@ -1307,6 +1309,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
   function detachExternal(next?: ExternalTarget): void {
     if (!external || (next && next !== external)) return;
     external = undefined;
+    if (!target) surfaces.delete('browser');
     log('Télécommande : fenêtre externe fermée, le téléphone revient au menu.'); // i18n-ignore : journal
     pushState();
     settle();

@@ -403,6 +403,64 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
     }
   }
 
+  // ---------- Miniatures des morceaux en ligne (choix de l'import) ----------
+
+  /**
+   * Les écrans ne montrent que des fichiers de la borne : la miniature d'un morceau YouTube
+   * (i.ytimg.com, 320 × 180) est donc gardée dans <données>\juke-box\miniatures, prise quatre à la
+   * fois, et l'écran se redessine quand elle arrive. Hors ligne, rien n'est demandé.
+   */
+  const thumbDir = () => path.join(opts.dataDir, 'juke-box', 'miniatures');
+  const thumbQueue: string[] = [];
+  const thumbFailed = new Set<string>();
+  let thumbRunning = 0;
+
+  function onlineThumb(id: string): string | undefined {
+    if (!/^[A-Za-z0-9_-]{11}$/.test(id)) return undefined;
+    const file = path.join(thumbDir(), `${id}.jpg`);
+    if (fs.existsSync(file)) return file;
+    if (!thumbFailed.has(id) && !thumbQueue.includes(id) && (opts.online?.() ?? true)) {
+      thumbQueue.push(id);
+      pumpThumbs();
+    }
+    return undefined;
+  }
+
+  function pumpThumbs(): void {
+    while (thumbRunning < 4 && thumbQueue.length) {
+      const id = thumbQueue.shift()!;
+      thumbRunning++;
+      void fetchThumb(id).finally(() => {
+        thumbRunning--;
+        pumpThumbs();
+      });
+    }
+  }
+
+  async function fetchThumb(id: string): Promise<void> {
+    try {
+      const res = await fetch(`https://i.ytimg.com/vi/${id}/mqdefault.jpg`, { signal: AbortSignal.timeout(15_000) });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = Buffer.from(await res.arrayBuffer());
+      if (data.length < 200 || data.length > 2_000_000) throw new Error('image inattendue'); // i18n-ignore : interne
+      fs.mkdirSync(thumbDir(), { recursive: true });
+      writeFileAtomic(path.join(thumbDir(), `${id}.jpg`), data);
+      changedSoon();
+    } catch {
+      thumbFailed.add(id);
+    }
+  }
+
+  /** Une seule remise à jour des écrans pour une rafale de miniatures. */
+  let changeTimer: NodeJS.Timeout | undefined;
+  function changedSoon(): void {
+    if (changeTimer) return;
+    changeTimer = setTimeout(() => {
+      changeTimer = undefined;
+      opts.changed?.();
+    }, 250);
+  }
+
   // ---------- Fichiers locaux ----------
 
   const coverDir = () => path.join(opts.dataDir, 'juke-box', 'pochettes');
@@ -488,6 +546,7 @@ export function createJukeboxLibrary(opts: JukeboxLibraryOptions) {
   }
 
   return {
+    onlineThumb,
     /** L'index (playlists, corrections, habillages) tel qu'il est. */
     store: current,
     /** Change l'index et l'écrit (opérations de jukebox.ts, jukebox-dmd.ts). */

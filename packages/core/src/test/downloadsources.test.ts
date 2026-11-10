@@ -34,6 +34,7 @@ const SOURCES: Record<string, { count: number; how: string }> = {
     how: 'pages des sites (will-download, downloadURL ; « Télécharger cette image » du clic droit, qui part de la page comme ses liens ; les mêmes, et « Télécharger cette vidéo », demandés par le téléphone qui pilote la page, phone-remote.ts) : chaque téléchargement entre dans la file (events.track), repris par siteTransport (createInterruptedDownload) ; fetchImage : vignettes des résultats, aperçus, pas un téléchargement',
   },
   'app/src/friend-content.ts': { count: 1, how: 'fichier d’un ami : fetchFile, appelé par le transport des amis de la file (download-sources.ts)' },
+  'app/src/jukebox-library.ts': { count: 1, how: 'miniature d’un morceau YouTube à l’import du Juke-box (i.ytimg.com, quelques ko, gardée dans juke-box\miniatures) : un aperçu, pas un téléchargement demandé' },
   'app/src/media-convert.ts': { count: 6, how: 'conversion dans le rendu (images, sons, avatar), protocole local /in et /out : rien ne vient du réseau' },
   'app/src/table-rules.ts': { count: 1, how: 'vignette de la vidéo d’explication des règles (i.ytimg.com, quelques ko, gardée dans le cache des médias) : un aperçu, pas un téléchargement demandé' },
   'packages/core/src/backup.ts': { count: 1, how: 'copie de fichiers locaux vers une clé ou un disque (Sauvegardes), et retour : rien ne vient du réseau' },

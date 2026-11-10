@@ -23,14 +23,20 @@ export interface RemoteBlock {
  * Textes du bloc, sur l'écran de la télécommande (`screen`) ou sous le clavier à l'écran
  * (`keyboard`).
  */
-export function remoteBlock(bar: RemoteBar, place: 'screen' | 'keyboard'): RemoteBlock {
+/** Ce qu'un écran dit du téléphone à la place des phrases ordinaires (connexion dans Edge : le piloter). */
+export interface RemoteWording {
+  offer?: string;
+  paired?: string[];
+}
+
+export function remoteBlock(bar: RemoteBar, place: 'screen' | 'keyboard', wording?: RemoteWording): RemoteBlock {
   const big = place === 'screen';
   switch (bar.phase) {
     case 'offer':
       return {
         phase: 'offer',
         qr: bar.qr,
-        title: big ? t('Connecter un téléphone') : t('Taper au téléphone'),
+        title: wording?.offer ?? (big ? t('Connecter un téléphone') : t('Taper au téléphone')),
         lines: big
           ? [t('Scannez avec votre téléphone, connecté au même réseau Wi-Fi que la borne.'), t('Aucune application à installer. Le QR code change toutes les 3 minutes et ne sert qu’une fois.')]
           : [t('Scannez ce QR sur le même réseau Wi-Fi que la borne.')],
@@ -43,7 +49,7 @@ export function remoteBlock(bar: RemoteBar, place: 'screen' | 'keyboard'): Remot
         lines: big ? [t('Le même code doit apparaître sur le téléphone ({device}).', { device: bar.line }), t('Start : accepter · Exit : refuser')] : [t('Start : accepter · Exit : refuser')],
       };
     case 'paired':
-      return { phase: 'paired', title: big ? t('Téléphone connecté') : t('Le téléphone connecté tape ici'), lines: [bar.line] };
+      return { phase: 'paired', title: big ? t('Téléphone connecté') : t('Le téléphone connecté tape ici'), lines: wording?.paired ? [bar.line, ...wording.paired] : [bar.line] };
     default:
       return { phase: 'off', title: big ? t('Télécommande indisponible') : t('Saisie au téléphone indisponible'), lines: [bar.line] };
   }

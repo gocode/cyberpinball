@@ -79,6 +79,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Juke-box: a flipper held moves forward or back in the track, by 5 s steps, then 10 s, then 30 s; a short press still changes track. On the desktop, the arrow keys held do the same, and a click in the progress bar jumps there.
 - Juke-box: Start on the playlist that is playing opens it on the current track; Start again pauses it, as the card reminds you.
 - “Get” reopened on Google’s sign-in page no longer resumes the previous page: it says Google refuses it and offers “Sign in to YouTube”.
+- Signing in to YouTube with Edge: the playfield shows the phone remote’s QR code in large, “Scan to drive Edge with your phone”; once accepted, the phone becomes Edge’s mouse and keyboard right away.
+- Importing a playlist: “Choose tracks” starts from an empty selection, with “Tick all” and “Untick all”; the count of kept tracks stays at the top of the screen.
+- Import: every track shows its thumbnail and can be previewed before you tick it. On the cabinet, the right MagnaSave listens or stops, a flipper held moves forward or back in the track; on the desktop, the space bar. The video plays on the backglass, the sound on its output; the Juke-box music pauses while you listen. The same goes for your account’s playlists.
 - Before every Windows permission request (dedicated cabinet, firewall, Kinect driver), a screen warns that it must be answered with the keyboard or the mouse (Alt+Y for Yes, Esc for No): the cabinet buttons cannot do it. “Later, at the desk” is selected by default, and Cyber Pinball stops waiting for the answer after 3 minutes.
 - YouTube account: “Install Firefox” installs it for this account only, with no Windows permission request.
 - “Open in my browser” opens Firefox directly when it is installed, without asking to choose the Windows default browser.

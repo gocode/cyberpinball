@@ -39,6 +39,8 @@ import {
   skippedText,
   sourcesText,
   syncText,
+  takeChoice,
+  toggleChoice,
   videoAnalysis,
   youtubeBlocker,
 } from '../jukebox-manage';
@@ -231,4 +233,28 @@ test('import : choix proposés, retenus, sautés, libellé et ce qui l’empêch
   assert.equal(importBlocker(none, { mode: 'online', quality: '1080p' }, ability), 'Aucun morceau retenu');
   const noSkip = summarizeImport({ ...analysis, entries: analysis.entries.slice(0, 2) });
   assert.equal(skippedText(noSkip), undefined);
+});
+
+// Retour d’essai (0.1.9-essai.43, PinCab) : « Choisir » laissait tout coché, et décocher une grande
+// playlist morceau par morceau était impossible. Choisir part de zéro ; Tout cocher, Tout décocher.
+test('import : « Choisir » part de zéro, « Tout prendre » reprend tout, cocher et décocher', () => {
+  const analysis = {
+    entries: [
+      { id: A, title: 'Onde Violette - Minuit magnétique' },
+      { id: B, title: 'Aster Phase - Lignes de fuite' },
+      { id: C, title: '[Private video]', unavailable: 'private' as const },
+    ],
+  };
+  assert.equal(takeChoice('all', analysis), undefined);
+  // Tout prendre, puis Choisir : la sélection est vide.
+  assert.deepEqual([...takeChoice('some', analysis)!], []);
+  assert.deepEqual([...takeChoice('check-all', analysis)!], [A, B]);
+  assert.deepEqual([...takeChoice('uncheck-all', analysis)!], []);
+  // Depuis Choisir (vide), Start coche ; encore une fois, décoche.
+  const one = toggleChoice(takeChoice('some', analysis), analysis, B);
+  assert.deepEqual([...one!], [B]);
+  assert.deepEqual([...toggleChoice(one, analysis, B)!], []);
+  // Depuis Tout prendre, décocher un morceau garde les autres ; un morceau sauté ne se coche jamais.
+  assert.deepEqual([...toggleChoice(undefined, analysis, A)!], [B]);
+  assert.deepEqual([...toggleChoice(one, analysis, C)!], [B]);
 });

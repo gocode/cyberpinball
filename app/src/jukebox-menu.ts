@@ -35,6 +35,9 @@ import {
   formatSize,
   formatTotalTime,
   formatTrackTime,
+  seekPressStep,
+  JUKEBOX_SEEK_EVERY_MS,
+  type SeekPress,
   importActionLabel,
   importBlocker,
   JUKEBOX_LINK_PREFIXES,
@@ -60,6 +63,8 @@ import {
   skippedText,
   songKey,
   summarizeImport,
+  takeChoice,
+  toggleChoice,
   t,
   tn,
   youtubeBlocker,
@@ -77,6 +82,7 @@ import type { Input } from 'electron';
 import type { PickRequest } from './file-picker';
 import type { JukeboxLibrary, TrackView } from './jukebox-library';
 import type { EdgeSession } from './edge-login';
+import type { RemoteBar } from './phone-remote';
 import type { Action, Built, PromptOptions, Row, Section, Tone } from './library';
 import type { YoutubeAccount } from './youtube-account';
 import { allowPreview } from './media-protocol';
@@ -116,6 +122,20 @@ export interface JukeboxMenuHost {
    * borne branchés dessus (library.ts) ; `screen` : le nom de cet écran.
    */
   signIn?(): { ok: true; session: EdgeSession; screen?: string; notice?: string } | { ok: false; reason: string };
+  /** Bloc du téléphone (QR code d'association, codes à comparer, téléphone connecté) ; absent sans télécommande. */
+  remoteBar?(): RemoteBar | undefined;
+  /** Pré-écoute d'un morceau en ligne sur le fronton (jukebox-player.ts) ; absente : pas proposée. */
+  preview?: JukeboxPreview;
+  /** Touches qui lancent ou arrêtent la pré-écoute en borne (MagnaSave droit) ; au bureau, Espace. */
+  listenKeys?(): string[];
+}
+
+/** Pré-écoute d'un morceau en ligne (jukebox-player.ts : preview, previewSeek, previewState). */
+export interface JukeboxPreview {
+  play(youtube: string): void;
+  stop(): void;
+  seek(delta: number): void;
+  state(): { youtube: string; position?: number; duration?: number; error?: string } | undefined;
 }
 
 type Flash = { text: string; tone: Tone };
@@ -148,9 +168,68 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
   /** Sélecteur de fichiers ouvert depuis la gestion (galerie en borne) : on y est toujours. */
   let picking = false;
   const display = (build: () => Built, at?: number) => {
+    // La pré-écoute ne survit pas à l'écran qui l'a lancée.
+    if (build !== shown) stopListening();
     shown = build;
     host.show(build, at);
   };
+
+  // ---------- Pré-écoute ----------
+
+  /** Flipper tenu pendant une pré-écoute : avance ou recul dans le morceau (comme dans le lecteur). */
+  let listenPress: SeekPress;
+  let lastListenSeek = 0;
+
+  function stopListening(): void {
+    listenPress = undefined;
+    if (host.preview?.state()) host.preview.stop();
+  }
+
+  /**
+   * Touches de la pré-écoute dans une liste de morceaux : MagnaSave droit (Espace au bureau) écoute ou
+   * arrête le morceau sous le curseur ; pendant l'écoute, un flipper court change de ligne (et arrête
+   * l'écoute), tenu il avance ou recule de 5, 10 puis 30 s. Le reste de la navigation est ordinaire.
+   */
+  function listenKeys(input: Input, build: () => Built, focused: () => string | undefined): boolean {
+    const pv = host.preview;
+    if (!pv) return false;
+    const k = host.keys();
+    const listen = host.landscape() ? ['Space'] : (host.listenKeys?.() ?? []);
+    if (listen.includes(input.code)) {
+      if (input.type !== 'keyDown' || input.isAutoRepeat) return true;
+      const id = focused();
+      if (!id) return false;
+      if (pv.state()?.youtube === id) pv.stop();
+      else pv.play(id);
+      return true;
+    }
+    const dir = k.previous.includes(input.code) ? -1 : k.next.includes(input.code) ? 1 : 0;
+    if (!dir) return false;
+    const playing = Boolean(pv.state());
+    if (!playing && !listenPress) return false;
+    const now = Date.now();
+    const r = seekPressStep(listenPress, input.type === 'keyUp' ? 'up' : input.isAutoRepeat ? 'tick' : 'down', now, dir as -1 | 1, playing);
+    listenPress = r.press;
+    if (r.action && 'seek' in r.action) {
+      if (now - lastListenSeek >= JUKEBOX_SEEK_EVERY_MS) {
+        lastListenSeek = now;
+        pv.seek(r.action.seek);
+      }
+    } else if (r.action && 'move' in r.action) {
+      pv.stop();
+      const n = build().actions.length;
+      display(build, Math.max(0, Math.min(n - 1, host.cursor() + r.action.move)));
+    }
+    return true;
+  }
+
+  /** La ligne d'un morceau en pré-écoute : où il en est, ou pourquoi YouTube refuse. */
+  function listeningLine(id: string): string | undefined {
+    const st = host.preview?.state();
+    if (!st || st.youtube !== id) return undefined;
+    if (st.error) return t('Pré-écoute impossible : {reason}', { reason: st.error });
+    return st.duration ? t('▶ En écoute · {at} / {total}', { at: formatTrackTime(st.position ?? 0), total: formatTrackTime(st.duration) }) : t('▶ En écoute…');
+  }
   const ask = (heading: string, label: string, value: string, done: (value: string | undefined) => void, lead?: string, options?: PromptOptions) => {
     asking = true;
     host.prompt(heading, label, value, (v) => {
@@ -979,11 +1058,13 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       const where = opened.screen ? t('Edge est ouvert sur l’écran « {screen} ».', { screen: opened.screen }) : t('Edge est ouvert sur l’écran des navigateurs.');
       if (closing) sections.push({ kind: 'jb-wait', rows: [{ text: t('Fermeture d’Edge et lecture de la connexion…'), icon: 'refresh', progress: { busy: true } }] });
       else {
+        // Le téléphone d'abord : son QR code en grand, ou ses gestes quand il est connecté (bloc remote, en tête).
+        const phone = host.remoteBar?.();
         sections.push({
           kind: 'jb-summary',
           rows: [
             { text: where, detail: t('Connectez-vous à YouTube avec votre compte Google, puis fermez Edge.'), icon: 'account', tone: 'ok' },
-            { text: t('Au téléphone'), detail: t('Le pavé tactile est la souris d’Edge, le clavier y tape.'), icon: 'phone' },
+            ...(phone ? [] : [{ text: t('Au téléphone'), detail: t('Le pavé tactile est la souris d’Edge, le clavier y tape.'), icon: 'phone' as const }]),
             { text: t('Avec les boutons de la borne'), detail: t('Flippers : champ précédent ou suivant · Start : Entrée · Exit : fermer Edge'), icon: 'gamepad' },
           ],
         });
@@ -1000,6 +1081,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         sections,
         actions,
         back: finish,
+        ...(!closing && host.remoteBar?.() ? { remote: host.remoteBar()!, remoteWording: { offer: t('Scannez pour piloter Edge avec votre téléphone'), paired: [t('Pavé tactile : la souris d’Edge · Clavier : il tape dans Edge')] } } : {}),
       };
     };
     display(build, 0);
@@ -1110,13 +1192,15 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     const title = e.track ?? guess.title;
     const artist = e.artist ?? guess.artist;
     if (e.unavailable) return { text: title, detail: t('{reason} · sautée', { reason: e.detail ?? e.title }), aside: t('Sauté'), check: 'skip', tone: 'quiet', thumb: 'music', action, pick: true };
+    const listening = listeningLine(e.id);
     return {
       text: title,
       detail: [artist, e.album].filter(Boolean).join(' · ') || t('Artiste inconnu'),
       aside: formatTrackTime(e.duration),
       check: checked ? 'on' : 'off',
-      thumb: 'music',
-      ...(inTarget ? { sub: t('Déjà dans la playlist : ignoré'), tone: 'quiet' as const } : {}),
+      // Miniature du morceau, gardée sur la borne dès qu'elle arrive (jukebox-library.ts, onlineThumb).
+      thumb: imageUrl(jb.onlineThumb(e.id)) ?? 'music',
+      ...(listening ? { sub: listening } : inTarget ? { sub: t('Déjà dans la playlist : ignoré'), tone: 'quiet' as const } : {}),
       action,
       pick: true,
     };
@@ -1184,13 +1268,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     // Les morceaux : Start coche ou décoche (on passe alors à « Choisir les morceaux »).
     const entries = analysis.entries.map((e) => {
       const checked = !e.unavailable && (!choices.chosen || choices.chosen.has(e.id));
-      const at = add({ label: e.title, key: `entry:${e.id}`, run: () => {
-        if (e.unavailable) return;
-        const next = new Set(choices.chosen ?? analysis.entries.filter((x) => !x.unavailable).map((x) => x.id));
-        if (next.has(e.id)) next.delete(e.id);
-        else next.add(e.id);
-        set({ chosen: next });
-      } });
+      const at = add({ label: e.title, key: `entry:${e.id}`, run: () => (e.unavailable ? undefined : set({ chosen: toggleChoice(choices.chosen, analysis, e.id) })) });
       return entryRow(e, checked, inTarget.has(e.id), at);
     });
 
@@ -1258,8 +1336,15 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         side: true,
         options: true,
         rows: [
-          segment(t('Tout prendre'), !choices.chosen, 'take:all', () => set({ chosen: undefined })),
-          segment(t('Choisir les morceaux'), Boolean(choices.chosen), 'take:some', () => set({ chosen: new Set(analysis.entries.filter((e) => !e.unavailable).map((e) => e.id)) })),
+          segment(t('Tout prendre'), !choices.chosen, 'take:all', () => set({ chosen: takeChoice('all', analysis) })),
+          // Choisir part de zéro : on coche ensuite ceux qu'on veut (une grande playlist ne se décoche pas une à une).
+          segment(t('Choisir les morceaux'), Boolean(choices.chosen), 'take:some', () => set({ chosen: takeChoice('some', analysis) })),
+          ...(choices.chosen
+            ? [
+                { text: t('Tout cocher'), icon: 'check' as const, action: add({ label: t('Tout cocher'), key: 'take:check-all', run: () => set({ chosen: takeChoice('check-all', analysis) }) }), pick: true },
+                { text: t('Tout décocher'), icon: 'close' as const, action: add({ label: t('Tout décocher'), key: 'take:uncheck-all', run: () => set({ chosen: takeChoice('uncheck-all', analysis) }) }), pick: true },
+              ]
+            : []),
         ],
       });
     }
@@ -1280,6 +1365,20 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       sections,
       actions,
       listStart: t('cocher ou décocher'),
+      ...(host.preview
+        ? {
+            listCommands: [
+              ...(host.listenKeys?.().length || host.landscape() ? [{ key: t('MagnaSave droit'), desk: t('Espace'), text: host.preview.state() ? t('arrêter l’écoute') : t('écouter') }] : []),
+              ...(host.preview.state() ? [{ key: t('Flipper tenu'), desk: t('↑↓ tenues'), text: t('avancer, reculer') }] : []),
+            ],
+            keys: (input: Input) =>
+              listenKeys(input, importScreen, () => {
+                const key = actions[host.cursor()]?.key;
+                const id = key?.startsWith('entry:') ? key.slice('entry:'.length) : undefined;
+                return id && analysis.entries.some((e) => e.id === id && !e.unavailable) ? id : undefined;
+              }),
+          }
+        : {}),
     };
   }
 

@@ -281,6 +281,27 @@ export function defaultImportChoices(analysis: PlaylistAnalysis, store: Pick<Juk
   };
 }
 
+/**
+ * Les morceaux retenus après un geste du groupe « Morceaux » de l'import : « Tout prendre » (undefined :
+ * toute la playlist), « Choisir les morceaux » (rien de coché : on coche ensuite ceux qu'on veut, une
+ * grande playlist ne se décoche pas une à une), « Tout cocher », « Tout décocher ».
+ */
+export function takeChoice(take: 'all' | 'some' | 'check-all' | 'uncheck-all', analysis: Pick<PlaylistAnalysis, 'entries'>): ReadonlySet<string> | undefined {
+  if (take === 'all') return undefined;
+  if (take === 'check-all') return new Set(analysis.entries.filter((e) => !e.unavailable).map((e) => e.id));
+  return new Set();
+}
+
+/** Coche ou décoche un morceau ; depuis « Tout prendre », on part de toute la playlist. Un morceau sauté ne se coche pas. */
+export function toggleChoice(chosen: ReadonlySet<string> | undefined, analysis: Pick<PlaylistAnalysis, 'entries'>, id: string): ReadonlySet<string> | undefined {
+  const entry = analysis.entries.find((e) => e.id === id);
+  if (!entry || entry.unavailable) return chosen;
+  const next = new Set(chosen ?? analysis.entries.filter((e) => !e.unavailable).map((e) => e.id));
+  if (next.has(id)) next.delete(id);
+  else next.add(id);
+  return next;
+}
+
 /** Nom libre pour une nouvelle playlist : celui-ci, sinon « nom (2) », « nom (3) »… */
 export function freePlaylistName(store: Pick<JukeboxStore, 'playlists'>, wanted: string): string {
   const base = (wanted.trim() || t('Nouvelle playlist')).slice(0, 56);

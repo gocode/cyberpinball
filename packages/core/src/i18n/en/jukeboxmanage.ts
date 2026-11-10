@@ -237,4 +237,16 @@ export const messages: Record<string, string> = {
   'Retour aux playlists': 'Back to the playlists',
   'Retour aux morceaux': 'Back to the tracks',
   'Retour à l’import': 'Back to the import',
+
+  // app/src/jukebox-menu.ts : choix des morceaux et pré-écoute (retours du 10/11/2026)
+  'Tout cocher': 'Tick all',
+  'Pré-écoute impossible : {reason}': 'Preview impossible: {reason}',
+  '▶ En écoute · {at} / {total}': '▶ Previewing · {at} / {total}',
+  '▶ En écoute…': '▶ Previewing…',
+  'écouter': 'listen',
+  'arrêter l’écoute': 'stop listening',
+  'avancer, reculer': 'forward, back',
+  '↑↓ tenues': '↑↓ held',
+  'Scannez pour piloter Edge avec votre téléphone': 'Scan to drive Edge with your phone',
+  'Pavé tactile : la souris d’Edge · Clavier : il tape dans Edge': 'Touchpad: Edge’s mouse · Keyboard: types into Edge',
 };
