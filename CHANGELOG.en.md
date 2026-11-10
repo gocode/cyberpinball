@@ -82,6 +82,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Before every Windows permission request (dedicated cabinet, firewall, Kinect driver), a screen warns that it must be answered with the keyboard or the mouse (Alt+Y for Yes, Esc for No): the cabinet buttons cannot do it. “Later, at the desk” is selected by default, and Cyber Pinball stops waiting for the answer after 3 minutes.
 - YouTube account: “Install Firefox” installs it for this account only, with no Windows permission request.
 - “Open in my browser” opens Firefox directly when it is installed, without asking to choose the Windows default browser.
+- In the headset, Link's "Reset view" no longer puts the game's table behind you: the headset menu stays in the same room as VPX. A game played with your back to the cabinet, or a recentre done in game, is reported on the alignment screen.
+- The menu's screens stay steady in space when you move your head, even when the computer struggles to keep up with the headset's frame rate.
+- Every time the headset starts, alignment is offered: A to align, B to skip and keep the previous one. Each confirmed alignment applies at once; redo it as often as you like, then B finishes and keeps the last one.
 
 ## 0.1.8
 

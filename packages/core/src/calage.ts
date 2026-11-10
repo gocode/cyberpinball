@@ -316,3 +316,73 @@ export function eyeHeightProblem(eyes: number | undefined): string | undefined {
     h: (Math.round(eyes * 100) / 100).toLocaleString(language() === 'en' ? 'en-US' : 'fr-FR'),
   });
 }
+
+/**
+ * Pièce de l'application, pas du casque (essai du 10 novembre 2026). Le runtime d'Oculus garde
+ * « Réinitialiser la vue » de Link par application, sous une clé tirée du chemin de son exécutable
+ * (« Request App Should Recenter: <pid> (D_CyberPinball_app_resources_app_natif_cyberpinball-casque) »
+ * au journal du service), d'une session à l'autre et même après une reconnexion de Link. Le compagnon
+ * recentré garde donc sa pièce tournée ; VPX, jamais recentré, garde celle d'origine : la table derrière
+ * le joueur. Le compagnon part donc d'une copie dont le dossier change à chaque recentrage
+ * (`compagnon-<génération>`) : une clé neuve, que le runtime n'a jamais recentrée, comme celle de VPX.
+ */
+export const COMPANION_KEY_FILE = 'compagnon.json';
+
+/** Dossier de la copie du compagnon pour une génération de clé (dans le dossier de la VR). */
+export function companionKeyFolder(generation: number): string {
+  return `compagnon-${generation}`;
+}
+
+/** Génération de clé gardée (`compagnon.json`), ou 0 : jamais lancée sous une clé à elle. */
+export function readCompanionKey(text: string | undefined): number {
+  try {
+    const generation = (JSON.parse(text ?? '') as { generation?: unknown }).generation;
+    return typeof generation === 'number' && Number.isInteger(generation) && generation >= 1 ? generation : 0;
+  } catch {
+    return 0;
+  }
+}
+
+/** Têtes relevées par le compagnon en veille pendant une partie, comparées à la borne du casque. */
+export interface GameHeadSummary {
+  samples: number;
+  /** Relevés où le joueur était tourné de plus de 100° par rapport à la borne (dos à elle). */
+  turned: number;
+  /** Écart moyen du regard à l'axe de la borne, en degrés (valeur absolue). */
+  meanAngle: number;
+  /** Distance moyenne, au sol, de la tête au milieu de la barre avant, en mètres. */
+  meanDistance: number;
+}
+
+/** Au-delà, le joueur joue dos à la borne calée (degrés). */
+export const TURNED_AWAY_DEG = 100;
+
+export function gameHeadSummary(heads: readonly { x: number; z: number; yaw: number }[], place: CabinetPlace): GameHeadSummary {
+  const { left, right } = placeLockbar(place);
+  const mid = { x: (left.x + right.x) / 2, z: (left.z + right.z) / 2 };
+  let turned = 0;
+  let angles = 0;
+  let distances = 0;
+  for (const h of heads) {
+    const a = Math.abs((((((h.yaw - place.yaw) * 180) / Math.PI + 540) % 360) + 360) % 360 - 180);
+    angles += a;
+    if (a > TURNED_AWAY_DEG) turned++;
+    distances += Math.hypot(h.x - mid.x, h.z - mid.z);
+  }
+  const n = heads.length;
+  return { samples: n, turned, meanAngle: n ? angles / n : 0, meanDistance: n ? distances / n : 0 };
+}
+
+/**
+ * La table de VPX n'était pas sur la borne du casque : le joueur a joué dos à elle (au moins 3 relevés,
+ * dont 60 % tourné de plus de 100°). Ce que dit l'écran du calage, ou undefined.
+ */
+export function roomMismatchProblem(summary: GameHeadSummary | undefined): string | undefined {
+  if (!summary || summary.samples < 3 || summary.turned < summary.samples * 0.6) return undefined;
+  return t('À la dernière partie, vous jouiez dos à la borne calée : la table de VPX n’était pas sur elle (pièce différente pour VPX, par exemple après « Réinitialiser la vue » de Link). Recalez, puis relancez la partie.');
+}
+
+/** Changements de pièce reçus par VPX pendant la partie (vpinball.log) : « Réinitialiser la vue » fait en jeu. */
+export function vpxRoomChanges(log: string): number {
+  return (log.match(/OPENXR: Reference Space Change pending for Session/g) ?? []).length;
+}

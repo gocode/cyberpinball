@@ -96,10 +96,10 @@ test('calage : branchements du compagnon, du casque et du menu', () => {
   // Menu du casque (≡) : « Caler la borne » en tête, puis recentrer, retour.
   assert.match(frontend, /if \(action === 'headset-menu'\) return void openHeadsetMenu\(\);/);
   assert.match(frontend, /label: t\('Caler la borne'\)[\s\S]{0,400}openCalibration\(\);[\s\S]{0,200}label: t\('Recentrer la borne'\)[\s\S]{0,300}headset\?\.recenter\(\);[\s\S]{0,500}label: t\('Retour'\)/);
-  // Calage guidé : étapes numérotées, repères du point pris et du point à toucher, B pour annuler.
+  // Calage guidé : étapes numérotées, repères du point pris et du point à toucher, B pour terminer.
   assert.match(frontend, /t\('Étape 1 sur 3 : coin gauche'\)/);
   assert.match(frontend, /headset\?\.setMarks\(calibrationMarks\(c\)\);/);
-  assert.match(frontend, /const cancel = t\('B : annuler'\);/);
+  assert.match(frontend, /const cancel = t\('B : terminer'\);/);
   // L'entrée vient juste après « Réalité virtuelle ».
   assert.match(read('packages', 'core', 'src', 'systemmenu.ts'), /'vr', 'vr-calibrate', 'vr-controllers', 'controls'/);
 });
@@ -139,7 +139,7 @@ test('borne fixe : aucun recentrage automatique, la place imposée à VPX, le ca
   const frontend = read('app', 'src', 'frontend.ts');
   assert.match(frontend, /const table = vpxTableGeometry\(tableFile\);\s*const menuWidth = menuPlayfield\(headsetSources\(\), headsetTurn\(\)\)\?\.width;\s*const settings = placeVpxSettings\(place, table, menuWidth\);[\s\S]{0,400}writeIniSettings\(vr\.ini, settings\);/);
   assert.match(frontend, /const vrCenter = vrGame && !readCabinetPlace\(headsetPlaceFile\(\)\) && !vrHasSavedPlace\(vrText\)/);
-  assert.match(frontend, /if \(headset\?\.worn && !isCalibrated\(headset\.place\(\)\)\) offerCalibration\(\);/);
+  assert.match(frontend, /if \(headset\?\.worn\) offerControllerWizard\(\);\s*if \(headset\?\.worn\) offerCalibration\(\);/);
   const cpp = read('packages', 'casque-vr', 'src', 'casque.cpp');
   // Dans la pièce, un changement d'espace du Quest ne déplace pas la borne : il est seulement dit.
   assert.match(cpp, /if \(!stage\)\s*wantRecenter = true;\s*else if \(change->referenceSpaceType == XR_REFERENCE_SPACE_TYPE_STAGE\)\s*\{[\s\S]{0,200}say\(std::string\("piece-changee "\)/);
@@ -167,5 +167,31 @@ test('un calage par configuration ; au bureau, la borne posée librement, puis f
   assert.match(frontend, /return path\.join\(loc\.dataDir, 'vr', cabinetPlaceFileName\(menuConfiguration\)\);/);
   // Start au bureau : recentrage demandé, la place du regard gardée à son retour (« centre »).
   assert.match(frontend, /calibration\.placing = true;\s*showCalibration\(\);\s*headset\?\.recenter\(\);/);
-  assert.match(frontend, /c\.place = freePlace\(gaze\);\s*closeCalibration\(true\);/);
+  assert.match(frontend, /c\.place = freePlace\(gaze\);\s*c\.placing = false;\s*applyCalibration\(\);/);
+});
+
+test('calage proposé à chaque session VR, répétable : valider applique et reste, B termine', () => {
+  // Demande du 10 novembre 2026 : à chaque démarrage d'une session VR, l'écran du calage s'ouvre
+  // d'office (caler, ou passer en gardant le précédent) ; valider applique tout de suite sans sortir ;
+  // seul « Terminer » (B) sort, en gardant le dernier calage validé. L'assistant des manettes reste avant.
+  const repo = path.join(__dirname, '..', '..', '..', '..');
+  const frontend = fs.readFileSync(path.join(repo, 'app', 'src', 'frontend.ts'), 'utf8');
+  // Plus de condition « pas encore calée » : proposé à chaque session, une fois, après l'assistant.
+  assert.doesNotMatch(frontend, /!isCalibrated\(headset\.place\(\)\)\) offerCalibration/);
+  assert.match(frontend, /if \(headset\?\.worn\) offerCalibration\(\);\s*\}/);
+  assert.match(frontend, /if \(\(calibrationOffered && !again\) \|\| calibration \|\| controllerWizard/);
+  assert.match(frontend, /openCalibration\(true\);/);
+  // Casque perdu : la session suivante repropose le calage.
+  assert.match(frontend, /if \(calibration\) closeCalibration\(\);\s*\/\/[^\n]*\s*calibrationOffered = false;/);
+  // Premier écran : A cale, B passe ; la gâchette n'y prend rien.
+  assert.match(frontend, /t\('A : caler · B : passer, garder le calage précédent'\)/);
+  assert.match(frontend, /else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.intro\) \{\s*calibration\.intro = false;/);
+  assert.match(frontend, /if \(!c \|\| c\.intro\) return;/);
+  // A valide : appliqué (place et INI de VPX), points remis à zéro, l'écran reste ouvert.
+  assert.match(frontend, /else if \(KEYS\.confirm\.includes\(input\.code\) && calibration\?\.place\) applyCalibration\(\);/);
+  assert.match(frontend, /function applyCalibration\(\): void \{[\s\S]{0,600}headset\?\.showPlace\(place, true\);[\s\S]{0,400}writeVrCalibration\([\s\S]{0,1200}c\.validated\+\+;\s*c\.points = \{\};\s*c\.place = undefined;\s*showCalibration\(\);/);
+  // B termine : un calage commencé non validé est oublié, la place gardée revient.
+  assert.match(frontend, /if \(KEYS\.exit\.includes\(input\.code\)\) closeCalibration\(\);/);
+  assert.match(frontend, /function closeCalibration\(\): void \{[\s\S]{0,200}headset\?\.showPlace\(undefined\);/);
+  assert.doesNotMatch(frontend, /closeCalibration\((true|false)\)/);
 });

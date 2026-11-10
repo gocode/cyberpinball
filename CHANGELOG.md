@@ -84,6 +84,9 @@ son interface).
 - Avant chaque demande d'autorisation de Windows (borne dédiée, pare-feu, pilote de la Kinect), un écran prévient qu'il faudra répondre au clavier ou à la souris (Alt+O pour Oui, Échap pour Non) : les boutons de la borne n'y peuvent rien. « Plus tard, au bureau » est choisi d'office, et Cyber Pinball n'attend plus la réponse au-delà de 3 minutes.
 - Compte YouTube : « Installer Firefox » l'installe pour ce compte seul, sans demande d'autorisation de Windows.
 - « Ouvrir dans mon navigateur » ouvre Firefox directement quand il est installé, sans faire choisir le navigateur par défaut de Windows.
+- Dans le casque, « Réinitialiser la vue » de Link ne met plus la table de la partie dans votre dos : le menu du casque reste dans la même pièce que VPX. Une partie jouée dos à la borne, ou un recentrage fait en jeu, est signalé à l'écran du calage.
+- Les écrans du menu restent stables dans l'espace quand on bouge la tête, même quand l'ordinateur peine à suivre la cadence du casque.
+- À chaque démarrage dans le casque, le calage est proposé : A pour caler, B pour passer et garder le précédent. Chaque calage validé s'applique aussitôt ; on recommence autant de fois qu'on veut, puis B termine en gardant le dernier.
 
 ## 0.1.8
 

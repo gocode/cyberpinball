@@ -150,15 +150,15 @@ test('casque éteint ou Link coupé : l’affichage revient aux écrans du PC, e
 });
 
 test('pièce du Quest changée ou vue réinitialisée : la borne reste où elle est dans la vraie pièce', () => {
-  // Essai du 10 novembre 2026 : une session déjà ouverte reçoit seule la pièce changée (yeux à 2,3 puis
-  // 1,2 m le matin, 1,6 puis 0,5 m l'après-midi après « Réinitialiser la vue » de Link) ; chaque session
-  // neuve, dont celle de VPX, a gardé la pièce d'origine (pose-vpx.test.ts : l'ancienne pièce du Quest).
-  // Repartir sur une session neuve garde donc la borne immobile dans la pièce, sans recaler.
+  // Essai du 10 novembre 2026 : « Réinitialiser la vue » de Link recentre la pièce de l'application qui a
+  // le casque, et le runtime le garde pour elle seule, sous la clé de son exécutable (piece-vpx.test.ts).
+  // Le compagnon repart donc sur une session neuve, sous une clé neuve : la pièce d'origine, celle de VPX,
+  // où la borne calée est restée.
   const repo = path.join(__dirname, '..', '..', '..', '..');
   const cpp = fs.readFileSync(path.join(repo, 'packages', 'casque-vr', 'src', 'casque.cpp'), 'utf8');
   assert.match(cpp, /say\(std::string\("piece-changee "\) \+ \(change->poseValid \? "pose " : "sans-pose "\)/);
   const menu = fs.readFileSync(path.join(repo, 'app', 'src', 'casque.ts'), 'utf8');
-  assert.match(menu, /if \(line\.startsWith\('piece-changee'\)\) \{[\s\S]{0,1600}this\.roomRestart = true;\s*if \(now\) this\.restart\(\);\s*else this\.restartAfterGame = true;/);
+  assert.match(menu, /if \(line\.startsWith\('piece-changee'\)\) \{[\s\S]{0,2600}this\.roomRestart = true;\s*if \(now\) this\.restart\(\);\s*else this\.restartAfterGame = true;/);
   assert.doesNotMatch(menu, /onRoom\?\.\(this\.room, true\)/);
   assert.match(menu, /if \(this\.restartAfterGame\) this\.restart\(\);/);
   assert.match(menu, /if \(this\.roomRestart\) \{\s*this\.roomRestart = false;\s*this\.opts\.onRoomRestart\?\.\(Number\(eyes\[1\]\)\);/);

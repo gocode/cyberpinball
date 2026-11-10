@@ -11,7 +11,7 @@
 import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { anchorHeight, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, sceneProtocol, type CabinetPlace, type HeadsetProfile, type Point3, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
+import { anchorHeight, COMPANION_KEY_FILE, companionKeyFolder, headsetPanels, headsetProtocol, headsetScene, isHeadsetProfile, parseControllerEvent, readCompanionKey, sceneProtocol, type CabinetPlace, type HeadsetProfile, type Point3, type RoomBounds, type HeadsetMenuState, type HeadsetPanel, type HeadsetSource, type RoleId, type Rotation } from '@cyberpinball/core';
 import { openHandleTarget, type HandleTarget } from '@cyberpinball/win-displays';
 import type { OffscreenSharedTexture } from 'electron';
 import { OFFSCREEN } from './offscreen';
@@ -25,7 +25,7 @@ export const HEADSET_TRIAL_DIR = process.env.CYBERPINBALL_CASQUE_ESSAI?.trim() |
 const RETRY_MS = 15_000;
 const STOP_TIMEOUT_MS = 4_000;
 /** Messages du compagnon gardés dans le journal (packages/casque-vr/src/casque.cpp). */
-const PROTOCOL = /^(pret|casque-absent|erreur|etat|centre|image|scene|releve|reprise|instantane|porte|casque-perdu|cadence|fini)\b/;
+const PROTOCOL = /^(pret|casque-absent|erreur|etat|centre|image|scene|releve|reprise|instantane|porte|casque-perdu|cadence|profondeur|fini)\b/;
 
 /** Le compagnon, s'il est là : fabriqué avec l'application, ou construit en développement. */
 export function headsetExe(appDir: string): string | undefined {
@@ -60,6 +60,11 @@ export interface HeadsetMenuOptions {
    * joueur au premier regard suivi.
    */
   placeFile?: string;
+  /**
+   * Dossier de la VR (données) : le compagnon y part d'une copie dont le dossier change à chaque
+   * recentrage du runtime (clé neuve, la pièce que reçoit VPX : COMPANION_KEY_FILE, calage.ts).
+   */
+  keyDir?: string;
   /** Tête de la borne aux proportions standard (STANDARD_HEAD) : au bureau, ou sans vraie borne calée. */
   standardHead?(): boolean;
   /** L'état a changé (montré, en attente, absent ; casque porté ou non) : le menu se renvoie. */
@@ -140,6 +145,11 @@ export class HeadsetMenu {
   private restartAfterGame = false;
   /** Manettes branchées (profil d'interaction), dites par le compagnon. */
   profile: HeadsetProfile | undefined;
+  /**
+   * Première clé à lui pour le compagnon (mise à jour) : l'ancienne avait peut-être une pièce recentrée
+   * par le runtime, que VPX ne reçoit pas ; la borne calée dedans est à vérifier.
+   */
+  keyRenewed = false;
   /** Dernière tête relevée pendant la veille d'une partie (pièce du Quest, mètres, lacet en radians). */
   lastHead: HeadPose | undefined;
   /** Au moins une image rendue pour le casque y est arrivée : les écrans du PC peuvent se reposer. */
@@ -291,8 +301,50 @@ export class HeadsetMenu {
     }
   }
 
+  /**
+   * Le compagnon sous sa clé de runtime : la copie de la génération en cours (dossier de la VR), refaite
+   * si l'original a changé. Sans dossier, en essai ou si la copie échoue : l'original.
+   */
+  private keyedExe(source: string | undefined): string | undefined {
+    const dir = this.opts.keyDir;
+    if (!source || !dir || HEADSET_TRIAL_DIR) return source;
+    try {
+      const keyFile = path.join(dir, COMPANION_KEY_FILE);
+      let generation = readCompanionKey(fs.existsSync(keyFile) ? fs.readFileSync(keyFile, 'utf8') : undefined);
+      if (!generation) {
+        generation = 1;
+        this.writeKey(generation, 'première clé à lui'); // i18n-ignore : journal
+        this.keyRenewed = Boolean(this.opts.placeFile && fs.existsSync(this.opts.placeFile));
+      }
+      const target = path.join(dir, companionKeyFolder(generation), EXE);
+      const from = fs.statSync(source);
+      const to = fs.existsSync(target) ? fs.statSync(target) : undefined;
+      if (!to || to.size !== from.size || to.mtimeMs < from.mtimeMs) {
+        fs.mkdirSync(path.dirname(target), { recursive: true });
+        fs.copyFileSync(source, target);
+      }
+      // Les copies des clés d'avant ne servent plus.
+      for (const old of fs.readdirSync(dir)) {
+        const m = /^compagnon-(\d+)$/.exec(old);
+        if (m && Number(m[1]) < generation) fs.rmSync(path.join(dir, old), { recursive: true, force: true });
+      }
+      return target;
+    } catch (error) {
+      this.opts.log(`Casque : copie du compagnon sous sa clé impossible (${(error as Error).message}) ; lancé depuis l’application.`); // i18n-ignore : journal
+      return source;
+    }
+  }
+
+  private writeKey(generation: number, why: string): void {
+    const dir = this.opts.keyDir;
+    if (!dir) return;
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(path.join(dir, COMPANION_KEY_FILE), JSON.stringify({ generation, pourquoi: why }, null, 2) + '\n');
+    this.opts.log(`Casque : compagnon sous la clé ${companionKeyFolder(generation)} (${why}) : une clé que le runtime n’a jamais recentrée, la même pièce que VPX.`); // i18n-ignore : journal
+  }
+
   private start(): void {
-    const exe = headsetExe(this.opts.appDir);
+    const exe = this.keyedExe(headsetExe(this.opts.appDir));
     const loader = HEADSET_TRIAL_DIR ? 'essai' : this.opts.loader();
     if (!exe || !loader) {
       if (this.state !== 'missing') this.opts.log(`Casque : ${!exe ? 'compagnon absent (npm run casque-vr)' : 'chargeur OpenXR de VPX introuvable'}.`); // i18n-ignore : journal
@@ -376,18 +428,29 @@ export class HeadsetMenu {
           continue;
         }
         if (line.startsWith('piece-changee')) {
-          // Le Quest a refait sa pièce sous la session en cours (casque remis, « Réinitialiser la vue » de
-          // Link, sol refait) : seule cette session la reçoit. Les sessions neuves, dont celle de VPX,
-          // gardent la pièce d'origine (essai du 10 novembre 2026 : yeux à 2,3 m puis 1,2 m dans la session
-          // changée le matin, 1,6 m puis 0,5 m l'après-midi, et chaque session neuve revenue à la pièce
-          // d'origine ; la table de VPX derrière le joueur et sous le sol). La borne reste donc au même
-          // endroit de la vraie pièce en repartant sur une session neuve, sans recaler ; pendant une
-          // partie, à la reprise (VPX garde sa pièce jusqu'à la fin).
+          // Le runtime a recentré la pièce du compagnon (« Réinitialiser la vue » de Link, casque remis,
+          // sol refait). Il garde ce recentrage pour le compagnon, sous la clé de son exécutable, même
+          // dans ses sessions neuves et après une reconnexion de Link ; VPX, jamais recentré, garde la
+          // pièce d'origine (essai du 10 novembre 2026 : le même bord de bureau tourné de 163° entre deux
+          // sessions neuves du compagnon autour de deux recentrages, puis la table de VPX derrière le
+          // joueur). Le compagnon repart donc sur une session neuve sous une clé neuve : la pièce
+          // d'origine, celle de VPX, où la borne calée est restée. Pendant une partie, à la reprise.
           const now = !this.standby && !this.handingOver;
-          this.opts.log(`Casque : ${line} ; le Quest a déplacé sa pièce sous la session du compagnon, qui repart sur une session neuve ${now ? 'tout de suite' : 'à la fin de la partie'} : la borne reste où elle est dans la pièce.`); // i18n-ignore : journal
+          if (this.opts.keyDir) {
+            const keyFile = path.join(this.opts.keyDir, COMPANION_KEY_FILE);
+            const generation = readCompanionKey(fs.existsSync(keyFile) ? fs.readFileSync(keyFile, 'utf8') : undefined);
+            this.writeKey(generation + 1, 'pièce recentrée par le runtime sous la session du compagnon'); // i18n-ignore : journal
+          }
+          this.opts.log(`Casque : ${line} ; le runtime a recentré la pièce du compagnon seul : il repart ${now ? 'tout de suite' : 'à la fin de la partie'} sur une session neuve, sous une clé neuve, dans la pièce de VPX ; la borne reste où elle est.`); // i18n-ignore : journal
           this.roomRestart = true;
           if (now) this.restart();
           else this.restartAfterGame = true;
+          continue;
+        }
+        // Session du compagnon perdue pendant sa veille (erreur du runtime, accueil de Link bloqué : essai du
+        // 10 novembre 2026, 14:46) : ce n'est pas le casque perdu, VPX continue ; le compagnon repart après.
+        if (line.startsWith('session-veille-perdue')) {
+          this.opts.log(`Casque : ${line} ; seule la session en veille du compagnon est tombée : la partie continue, le compagnon repart à la fin.`); // i18n-ignore : journal
           continue;
         }
         // Le runtime a arrêté la session sans que personne le demande (accueil de Link) : session neuve aussitôt.

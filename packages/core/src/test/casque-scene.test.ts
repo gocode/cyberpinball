@@ -116,11 +116,11 @@ test('protocole : « scene », une ligne par forme, « scene-fin »', () => {
   assert.equal(disc.length, 7);
 });
 
-test('compagnon : les écrans dans la couche de projection, avec la profondeur ; les couches « quad » seulement en repli', () => {
+test('compagnon : les écrans en couches « quad » hors calage, dans la couche de projection avec la profondeur pendant le calage', () => {
   const src = path.join(__dirname, '..', '..', '..', '..', 'packages', 'casque-vr', 'src');
   const cpp = fs.readFileSync(path.join(src, 'casque.cpp'), 'utf8');
   assert.match(cpp, /imageRenderer\.draw\(context\.Get\(\), mvp, corners, uv, image, colorScale \? 1\.f : fade\);/);
-  assert.match(cpp, /if \(fs\.shouldRender && worn && !projection\)/);
+  assert.match(cpp, /if \(fs\.shouldRender && worn && \(!projection \|\| quadScreens\)\)/);
   // Chaque image d'écran garde ses mipmaps, refaites à chaque nouvelle image.
   assert.match(cpp, /scene::makeImage\(device\.Get\(\), td\.Width, td\.Height, td\.Format, surf\.copy, surf\.view\)/);
   assert.match(cpp, /context->GenerateMips\(surf\.view\.Get\(\)\);/);

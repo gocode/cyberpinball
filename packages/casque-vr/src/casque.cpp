@@ -43,7 +43,8 @@
 //     | session-arretee (arrêt que personne n'a demandé : le runtime reprend la session)
 //     | cadence … (toutes les 10 s casque porté : fréquence, images sautées, copie et rendu les plus longs)
 //     | profil touch|index|vive|wmr|inconnu <chemin> (les manettes branchées)
-//     | casque-perdu <raison> (éteint, Link coupé : ni retiré de la tête, ni la relève) | fini
+//     | casque-perdu <raison> (éteint, Link coupé : ni retiré de la tête, ni la relève)
+//     | session-veille-perdue <raison> (erreur du runtime pendant la veille : la partie continue) | fini
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -61,6 +62,7 @@
 
 #include "scene.h"
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <cstdio>
@@ -175,6 +177,8 @@ struct Output
    uint64_t generation = 0; // compte les nouvelles images de l'écran
 };
 
+// Proche et lointain de la projection de la scène : les mêmes dans la profondeur soumise au runtime.
+constexpr float NEAR_Z = 0.05f, FAR_Z = 50.f;
 std::atomic<bool> wantRecenter { true };
 /** Place de la borne donnée par Cyber Pinball (ancre), prise par la boucle d'images. */
 std::atomic<bool> anchorGiven { false };
@@ -461,7 +465,7 @@ int renderTest(const std::string& input, const std::string& output)
    const float half = 0.8727f;
    const float vertical = std::atan(std::tan(half) * H / W);
    const scene::Mat4 world = scene::Mat4::identity();
-   const scene::Mat4 mvp = scene::Mat4::projection(-half, half, vertical, -vertical, 0.05f, 50.f) * scene::Mat4::poseInverse(eyeQ, eyeT) * world;
+   const scene::Mat4 mvp = scene::Mat4::projection(-half, half, vertical, -vertical, NEAR_Z, FAR_Z) * scene::Mat4::poseInverse(eyeQ, eyeT) * world;
    renderer.draw(context.Get(), mvp, world, 1.f);
    // Les panneaux comme dans le casque : dans la même couche, avec la profondeur.
    const float fullImage[4] = { 0, 0, 1, 1 };
@@ -818,8 +822,10 @@ int main(int argc, char** argv)
       return 2;
    }
 
-   // Fondu au noir de toutes les couches (XR_KHR_composition_layer_color_scale_bias), si le runtime l'a.
-   bool colorScale = false;
+   // Fondu au noir de toutes les couches (XR_KHR_composition_layer_color_scale_bias), si le runtime l'a ;
+   // profondeur de la couche de projection (XR_KHR_composition_layer_depth) : la reprojection du runtime
+   // (ASW de Link, image en retard) replace alors la scène à sa vraie distance quand la tête se déplace.
+   bool colorScale = false, depthLayer = false;
    {
       PFN_xrEnumerateInstanceExtensionProperties enumerate = nullptr;
       xrGetInstanceProcAddr_(XR_NULL_HANDLE, "xrEnumerateInstanceExtensionProperties", reinterpret_cast<PFN_xrVoidFunction*>(&enumerate));
@@ -829,17 +835,24 @@ int main(int argc, char** argv)
          std::vector<XrExtensionProperties> list(n, { XR_TYPE_EXTENSION_PROPERTIES });
          enumerate(nullptr, n, &n, list.data());
          for (const auto& e : list)
+         {
             colorScale |= std::string(e.extensionName) == XR_KHR_COMPOSITION_LAYER_COLOR_SCALE_BIAS_EXTENSION_NAME;
+            depthLayer |= std::string(e.extensionName) == XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME;
+         }
       }
    }
-   const char* extensions[] = { XR_KHR_D3D11_ENABLE_EXTENSION_NAME, XR_KHR_COMPOSITION_LAYER_COLOR_SCALE_BIAS_EXTENSION_NAME };
+   std::vector<const char*> extensions { XR_KHR_D3D11_ENABLE_EXTENSION_NAME };
+   if (colorScale)
+      extensions.push_back(XR_KHR_COMPOSITION_LAYER_COLOR_SCALE_BIAS_EXTENSION_NAME);
+   if (depthLayer)
+      extensions.push_back(XR_KHR_COMPOSITION_LAYER_DEPTH_EXTENSION_NAME);
    XrInstanceCreateInfo ici { XR_TYPE_INSTANCE_CREATE_INFO };
    std::snprintf(ici.applicationInfo.applicationName, XR_MAX_APPLICATION_NAME_SIZE, "Cyber Pinball");
    ici.applicationInfo.applicationVersion = 1;
    std::snprintf(ici.applicationInfo.engineName, XR_MAX_ENGINE_NAME_SIZE, "Cyber Pinball");
    ici.applicationInfo.apiVersion = XR_API_VERSION_1_0;
-   ici.enabledExtensionCount = colorScale ? 2 : 1;
-   ici.enabledExtensionNames = extensions;
+   ici.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
+   ici.enabledExtensionNames = extensions.data();
    XrInstance instance = XR_NULL_HANDLE;
    if (!xrCreateInstance_ || XR_FAILED(xrCreateInstance_(&ici, &instance)) || !loadInstanceFunctions(instance))
    {
@@ -1177,8 +1190,24 @@ int main(int argc, char** argv)
       std::vector<XrSwapchainImageD3D11KHR> images;
       std::vector<ComPtr<ID3D11RenderTargetView>> targets;
       ComPtr<ID3D11DepthStencilView> depth;
+      /** Profondeur soumise au runtime avec la couche de projection (XR_KHR_composition_layer_depth). */
+      XrSwapchain depthSwapchain = XR_NULL_HANDLE;
+      std::vector<XrSwapchainImageD3D11KHR> depthImages;
+      std::vector<ComPtr<ID3D11DepthStencilView>> depthViews;
       uint32_t width = 0, height = 0;
    };
+   // Format de la profondeur soumise, s'il est proposé par le runtime.
+   DXGI_FORMAT depthFormat = DXGI_FORMAT_UNKNOWN;
+   if (depthLayer)
+   {
+      uint32_t n = 0;
+      xrEnumerateSwapchainFormats_(session, 0, &n, nullptr);
+      std::vector<int64_t> formats(n);
+      xrEnumerateSwapchainFormats_(session, n, &n, formats.data());
+      for (int64_t f : formats)
+         if (f == DXGI_FORMAT_D32_FLOAT)
+            depthFormat = DXGI_FORMAT_D32_FLOAT;
+   }
    Eye eyes[2];
    scene::Renderer renderer;
    /** Repères des manettes pendant le calage, dans l'espace de la pièce (refaits à chaque image). */
@@ -1244,7 +1273,38 @@ int main(int argc, char** argv)
             device->CreateDepthStencilView(depthTexture.Get(), nullptr, &eye.depth);
          if (!eye.depth)
             projection = false;
+         // La profondeur dans une image du runtime, soumise avec la couche ; sinon la texture d'ici seule.
+         if (projection && depthFormat != DXGI_FORMAT_UNKNOWN)
+         {
+            XrSwapchainCreateInfo dci = ci;
+            dci.usageFlags = XR_SWAPCHAIN_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+            dci.format = depthFormat;
+            if (XR_SUCCEEDED(xrCreateSwapchain_(session, &dci, &eye.depthSwapchain)))
+            {
+               uint32_t dcount = 0;
+               xrEnumerateSwapchainImages_(eye.depthSwapchain, 0, &dcount, nullptr);
+               eye.depthImages.assign(dcount, { XR_TYPE_SWAPCHAIN_IMAGE_D3D11_KHR });
+               xrEnumerateSwapchainImages_(eye.depthSwapchain, dcount, &dcount, reinterpret_cast<XrSwapchainImageBaseHeader*>(eye.depthImages.data()));
+               for (auto& img : eye.depthImages)
+               {
+                  D3D11_DEPTH_STENCIL_VIEW_DESC dsv {};
+                  dsv.Format = depthFormat;
+                  dsv.ViewDimension = D3D11_DSV_DIMENSION_TEXTURE2D;
+                  ComPtr<ID3D11DepthStencilView> depthView;
+                  device->CreateDepthStencilView(img.texture, &dsv, &depthView);
+                  eye.depthViews.push_back(depthView);
+               }
+               if (std::any_of(eye.depthViews.begin(), eye.depthViews.end(), [](const auto& v) { return !v; }))
+               {
+                  xrDestroySwapchain_(eye.depthSwapchain);
+                  eye.depthSwapchain = XR_NULL_HANDLE;
+                  eye.depthViews.clear();
+               }
+            }
+         }
       }
+      if (projection)
+         say(std::string("profondeur ") + (eyes[0].depthSwapchain && eyes[1].depthSwapchain ? "soumise au runtime" : depthLayer ? "refusee (format)" : "sans extension"));
    }
 
    say(std::string("pret ") + props.runtimeName + (stage ? " (pièce)" : " (local)") + (colorScale ? "" : " (sans fondu des panneaux)"));
@@ -1538,7 +1598,16 @@ int main(int argc, char** argv)
       XrFrameState fs { XR_TYPE_FRAME_STATE };
       if (const XrResult r = xrWaitFrame_(session, nullptr, &fs); XR_FAILED(r))
       {
-         if (r == XR_ERROR_SESSION_LOST || r == XR_ERROR_INSTANCE_LOST || r == XR_ERROR_RUNTIME_FAILURE)
+         // En veille, une erreur du runtime (accueil de Link bloqué) ne touche que cette session : VPX
+         // garde le casque, la partie continue (essai du 10 novembre 2026, 14:46).
+         if (standby && r == XR_ERROR_RUNTIME_FAILURE)
+         {
+            if (!lostSaid && !exitRequested)
+               say("session-veille-perdue xrWaitFrame " + hex(r));
+            lostSaid = true;
+            done = true;
+         }
+         else if (r == XR_ERROR_SESSION_LOST || r == XR_ERROR_INSTANCE_LOST || r == XR_ERROR_RUNTIME_FAILURE)
             lost("xrWaitFrame " + hex(r));
          break;
       }
@@ -1794,6 +1863,11 @@ int main(int argc, char** argv)
       // Couche de projection : la scène, un rendu par œil, dans l'espace de la pièce.
       XrCompositionLayerProjection proj { XR_TYPE_COMPOSITION_LAYER_PROJECTION };
       XrCompositionLayerProjectionView projViews[2] { { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW }, { XR_TYPE_COMPOSITION_LAYER_PROJECTION_VIEW } };
+      XrCompositionLayerDepthInfoKHR depthInfos[2] { { XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR }, { XR_TYPE_COMPOSITION_LAYER_DEPTH_INFO_KHR } };
+      // Écrans en couches « quad » hors calage (essai du 10 novembre 2026 : dessinés dans la couche de
+      // projection, ils suivaient la cadence d'ici, 2 à 22 images/s selon Link, et glissaient quand la
+      // tête bougeait de côté).
+      const bool quadScreens = projection && !calibrating;
       bool projected = false;
       if (fs.shouldRender && worn && projection)
       {
@@ -1824,23 +1898,34 @@ int main(int argc, char** argv)
                XrSwapchainImageWaitInfo wi { XR_TYPE_SWAPCHAIN_IMAGE_WAIT_INFO };
                wi.timeout = XR_INFINITE_DURATION;
                xrWaitSwapchainImage_(eye.swapchain, &wi);
+               ID3D11DepthStencilView* depth = eye.depth.Get();
+               uint32_t depthIndex = 0;
+               const bool submitDepth = eye.depthSwapchain && XR_SUCCEEDED(xrAcquireSwapchainImage_(eye.depthSwapchain, &ai, &depthIndex));
+               if (submitDepth)
+               {
+                  xrWaitSwapchainImage_(eye.depthSwapchain, &wi);
+                  depth = eye.depthViews[depthIndex].Get();
+               }
                ID3D11RenderTargetView* target = eye.targets[index].Get();
                context->ClearRenderTargetView(target, scene::kVoid);
-               context->ClearDepthStencilView(eye.depth.Get(), D3D11_CLEAR_DEPTH, 1.f, 0);
-               context->OMSetRenderTargets(1, &target, eye.depth.Get());
+               context->ClearDepthStencilView(depth, D3D11_CLEAR_DEPTH, 1.f, 0);
+               context->OMSetRenderTargets(1, &target, depth);
                const D3D11_VIEWPORT viewport { 0, 0, static_cast<float>(eye.width), static_cast<float>(eye.height), 0, 1 };
                context->RSSetViewports(1, &viewport);
                const XrPosef& vp = views[e].pose;
                const float vq[4] = { vp.orientation.x, vp.orientation.y, vp.orientation.z, vp.orientation.w };
                const float vt[3] = { vp.position.x, vp.position.y, vp.position.z };
                const XrFovf& f = views[e].fov;
-               const scene::Mat4 mvp = scene::Mat4::projection(f.angleLeft, f.angleRight, f.angleUp, f.angleDown, 0.05f, 50.f) * scene::Mat4::poseInverse(vq, vt) * world;
+               const scene::Mat4 mvp = scene::Mat4::projection(f.angleLeft, f.angleRight, f.angleUp, f.angleDown, NEAR_Z, FAR_Z) * scene::Mat4::poseInverse(vq, vt) * world;
                // Avec l'extension, le runtime fond toutes les couches ; sinon la scène fond seule.
                renderer.draw(context.Get(), mvp, world, colorScale ? 1.f : fade);
-               // Les écrans, dans la même couche et avec la profondeur : la scène passe devant ou
-               // derrière comme dans la pièce (repères du calage, bout des manettes).
+               // Pendant le calage, les écrans dans la même couche et avec la profondeur : les repères et
+               // le bout des manettes passent devant ou derrière comme dans la pièce. Sinon, en couches
+               // « quad » (plus bas).
                for (Panel& p : panels)
                {
+                  if (quadScreens)
+                     break;
                   ID3D11ShaderResourceView* image = nullptr;
                   float uv[4] = { 0, 0, 1, 1 };
                   if (!p.surface.empty())
@@ -1881,12 +1966,23 @@ int main(int argc, char** argv)
                   const float iq[4] = { 0, 0, 0, 1 };
                   const float it[3] = { 0, 0, 0 };
                   const scene::Mat4 room = scene::Mat4::pose(iq, it);
-                  const scene::Mat4 roomMvp = scene::Mat4::projection(f.angleLeft, f.angleRight, f.angleUp, f.angleDown, 0.05f, 50.f) * scene::Mat4::poseInverse(vq, vt);
+                  const scene::Mat4 roomMvp = scene::Mat4::projection(f.angleLeft, f.angleRight, f.angleUp, f.angleDown, NEAR_Z, FAR_Z) * scene::Mat4::poseInverse(vq, vt);
                   pointers.draw(context.Get(), roomMvp, room, colorScale ? 1.f : fade);
                }
                context->OMSetRenderTargets(0, nullptr, nullptr);
                XrSwapchainImageReleaseInfo ri { XR_TYPE_SWAPCHAIN_IMAGE_RELEASE_INFO };
                xrReleaseSwapchainImage_(eye.swapchain, &ri);
+               if (submitDepth)
+               {
+                  xrReleaseSwapchainImage_(eye.depthSwapchain, &ri);
+                  depthInfos[e].subImage.swapchain = eye.depthSwapchain;
+                  depthInfos[e].subImage.imageRect = { { 0, 0 }, { static_cast<int32_t>(eye.width), static_cast<int32_t>(eye.height) } };
+                  depthInfos[e].minDepth = 0.f;
+                  depthInfos[e].maxDepth = 1.f;
+                  depthInfos[e].nearZ = NEAR_Z;
+                  depthInfos[e].farZ = FAR_Z;
+                  projViews[e].next = &depthInfos[e];
+               }
                projViews[e].pose = vp;
                projViews[e].fov = f;
                projViews[e].subImage.swapchain = eye.swapchain;
@@ -1901,8 +1997,8 @@ int main(int argc, char** argv)
       const void* fadeNext = colorScale && fade < 1.f ? &scale : nullptr;
 
       std::vector<XrCompositionLayerQuad> quads;
-      // Sans couche de projection (Direct3D l'a refusée) : les écrans en couches « quad », toujours devant.
-      if (fs.shouldRender && worn && !projection)
+      // Écrans en couches « quad » : hors calage, ou sans couche de projection (Direct3D l'a refusée).
+      if (fs.shouldRender && worn && (!projection || quadScreens))
       {
          for (Panel& p : panels)
          {
@@ -2022,6 +2118,9 @@ int main(int argc, char** argv)
    for (Panel& p : panels)
       if (p.swapchain)
          xrDestroySwapchain_(p.swapchain);
+   for (Eye& eye : eyes)
+      if (eye.depthSwapchain)
+         xrDestroySwapchain_(eye.depthSwapchain);
    for (Eye& eye : eyes)
       if (eye.swapchain)
          xrDestroySwapchain_(eye.swapchain);
