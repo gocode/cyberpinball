@@ -25,18 +25,21 @@ import {
   embedErrorText,
   formatNumber,
   idleSpectrum,
-  displayIndex,
   initialPlayer,
+  jukeboxInput,
+  menuButton,
+  playlistAt,
+  playlistRows,
   startPressStep,
   type StartPress,
   JUKEBOX_MANAGE_HOLD_MS,
-  JUKEBOX_MANAGE_KEY,
   selectedKey,
   jukeboxPlayerView,
   jukeboxPoster,
   jukeboxSelectionDots,
   jukeboxSpectrumDots,
   jukeboxSummary,
+  keyLabel,
   listTop,
   mediaUrl,
   playerStep,
@@ -47,6 +50,7 @@ import {
   JUKEBOX_LIST_ROWS,
   JUKEBOX_SPECTRUM_BANDS,
   type DmdAnimation,
+  type InterfaceKeys,
   type JukeboxNowView,
   type JukeboxPlayerView,
   type JukeboxPlaylistInput,
@@ -87,8 +91,11 @@ export interface JukeboxPlayerHost {
   dmdOn(): boolean;
   banner(text: string): void;
   log(line: string): void;
-  /** Touches : flippers, Start, Exit (boutons de l'interface) et MagnaSave. */
-  keys(): { previous: string[]; next: string[]; confirm: string[]; exit: string[]; playlistPrevious: string[]; playlistNext: string[] };
+  /**
+   * Les boutons du menu, tels que la roue les résout (menuButton) : ceux de l'interface, les touches des
+   * collections (MagnaSave), et tous les codes relevés de la borne (une flèche relevée reste son bouton).
+   */
+  keys(): { keys: InterfaceKeys; collections: { previous: string[]; next: string[] }; cabinet: string[]; magnaRecorded: boolean };
   /** Lecteur YouTube factice (essais hors écran, sans réseau) : une page locale qui en imite le DOM. */
   fakeOnline?: string;
   /** Bouton « Gestion du Juke-box » (bureau) : la gestion des playlists, sur celle montrée. */
@@ -154,8 +161,13 @@ export type JukeboxMessage =
 
 const isAbsolute = (p: string | undefined): p is string => Boolean(p && path.isAbsolute(p));
 
+/** Défilement du niveau des playlists (tops : sinon, celui de chaque playlist). */
+const PLAYLISTS_TOP = '@playlists';
+
 export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   let player: PlayerState | undefined;
+  /** Dernière playlist ouverte : le curseur y revient à l'entrée suivante dans le Juke-box. */
+  let opened: string | undefined;
   const tops = new Map<string, number>();
   let order: (JukeboxOrder & { playlist: string; key: string; youtube?: string; audioOnly: boolean }) | undefined;
   let orderSeq = 0;
@@ -276,27 +288,29 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
           apply({ kind: 'resume' });
         }
       }
-      if (playlist && input.some((p) => p.id === playlist)) player = { ...player, shown: playlist };
-      player = leaveManageRow(player);
       host.log('Juke-box : de nouveau à l’écran.'); // i18n-ignore : journal
       syncDmd();
       return;
     }
-    // Retour de la gestion en borne (la musique s'y est arrêtée) : la playlist et le morceau d'avant.
+    // Retour de la gestion (la musique s'y est arrêtée) : exactement où l'on était, niveau et playlist.
     if (parked) {
-      player = leaveManageRow({ ...parked, playing: undefined, paused: false });
+      player = { ...parked, playing: undefined, paused: false };
       parked = undefined;
-      if (playlist && input.some((p) => p.id === playlist)) player = leaveManageRow({ ...player, shown: playlist });
       tops.clear();
       host.log('Juke-box : de retour de la gestion.'); // i18n-ignore : journal
       syncDmd();
       return;
     }
-    player = initialPlayer(lists(input), l.store().last);
-    if (playlist && input.some((p) => p.id === playlist)) player = { ...player, shown: playlist };
+    player = initialPlayer(lists(input), l.store().last, opened);
+    // Retour d'un téléchargement : ses morceaux, directement.
+    if (playlist && input.some((p) => p.id === playlist)) player = { ...player, level: 'tracks', at: playlist, shown: playlist };
     tops.clear();
     failures = 0;
     host.log(`Juke-box : ouvert (${input.length} playlist(s)).`); // i18n-ignore : journal
+    // Les boutons tels que la roue les résout : une borne où un bouton ne fait pas ce qu'on attend s'explique.
+    const k = host.keys();
+    const name = (codes: readonly string[]) => (codes.length ? codes.map(keyLabel).join(', ') : 'aucune'); // i18n-ignore : journal
+    host.log(`Juke-box : boutons, choisir ${name(k.keys.previous)} / ${name(k.keys.next)}, Start ${name(k.keys.confirm)}, Exit ${name(k.keys.exit)}, playlist voisine ${name(k.collections.previous)} / ${name(k.collections.next)}${k.magnaRecorded ? '' : ' (MagnaSave non relevés)'}.`); // i18n-ignore : journal
     syncDmd();
   }
 
@@ -309,14 +323,6 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     if (!player) return;
     parked = player;
     host.manage?.(player.shown || undefined);
-  }
-
-  /** De retour de la gestion : le choix revient au premier morceau s'il était sur la ligne de gestion. */
-  function leaveManageRow(state: PlayerState): PlayerState {
-    if (state.selected[state.shown] !== JUKEBOX_MANAGE_KEY) return state;
-    const first = playlistsInput().find((p) => p.id === state.shown)?.rows[0]?.key;
-    if (!first) return state;
-    return { ...state, selected: { ...state.selected, [state.shown]: first } };
   }
 
   function stopPlayback(): void {
@@ -345,6 +351,7 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     const input2 = playlistsInput();
     const r = playerStep(player, input, lists(input2));
     player = r.state;
+    if (player.level === 'tracks') opened = player.shown;
     if (r.effect) apply(r.effect);
     // Liste qui ne bouge que si le choix sort de sa fenêtre.
     keepSelectionVisible(input2);
@@ -352,12 +359,17 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
 
   function keepSelectionVisible(input = playlistsInput()): void {
     if (!player) return;
+    const ls = lists(input);
+    if (player.level === 'playlists') {
+      // La ligne « Gestion du Juke-box » en tête, puis les playlists.
+      const all = playlistRows(ls);
+      tops.set(PLAYLISTS_TOP, listTop(tops.get(PLAYLISTS_TOP), Math.max(0, all.indexOf(playlistAt(player, ls))), rows(), all.length));
+      return;
+    }
     const p = input.find((x) => x.id === player!.shown);
     if (!p) return;
-    const ls = lists(input);
-    // Rang d'affichage : la ligne « Gestion du Juke-box » en tête, puis les morceaux.
-    const index = displayIndex(selectedKey(player, ls), p.rows);
-    tops.set(p.id, listTop(tops.get(p.id), index, rows(), p.rows.length + 1));
+    const index = Math.max(0, p.rows.findIndex((r) => r.key === selectedKey(player!, ls)));
+    tops.set(p.id, listTop(tops.get(p.id), index, rows(), p.rows.length));
   }
 
   /** Un geste de Start : appui, répétition, échéance du seuil, relâchement. */
@@ -378,29 +390,29 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
 
   function handleKey(input: Input): boolean {
     if (!player) return false;
-    if (input.type === 'keyUp' && host.keys().confirm.includes(input.code)) {
+    if (input.type === 'keyUp' && host.keys().keys.confirm.includes(input.code)) {
       startPress('up');
       return true;
     }
     if (input.type !== 'keyDown') return true;
     const k = host.keys();
-    const is = (codes: string[]) => codes.includes(input.code);
-    // Au clavier du bureau : ↑↓ choisissent un morceau, ←→ une playlist (les flèches gauche et
-    // droite seraient sinon des flippers).
-    if (input.code === 'ArrowLeft') step('playlist-previous');
-    else if (input.code === 'ArrowRight') step('playlist-next');
-    else if (input.code === 'ArrowUp') step('previous');
-    else if (input.code === 'ArrowDown') step('next');
-    else if (is(k.exit)) step('exit');
-    // Start : au relâchement s'il est court (jouer, pause) ; maintenu, la gestion (startPress).
-    else if (is(k.confirm)) return (startPress(input.isAutoRepeat ? 'repeat' : 'down'), true);
-    else if (is(k.previous)) step('previous');
-    else if (is(k.next)) step('next');
-    else if (is(k.playlistPrevious)) {
-      if (!input.isAutoRepeat) step('playlist-previous');
-    } else if (is(k.playlistNext)) {
-      if (!input.isAutoRepeat) step('playlist-next');
-    } else return false;
+    // Au clavier du bureau, dans une playlist : ←→ passent à la playlist voisine (comme les MagnaSave),
+    // sauf si la borne a relevé ces flèches comme boutons : elles gardent alors leur rôle.
+    const arrow = !k.cabinet.includes(input.code) && (input.code === 'ArrowLeft' || input.code === 'ArrowRight');
+    if (arrow) {
+      if (player.level === 'tracks' && !input.isAutoRepeat) step(input.code === 'ArrowLeft' ? 'playlist-previous' : 'playlist-next');
+      host.redraw();
+      return true;
+    }
+    // Le rôle du bouton, résolu comme sur la roue (menuButton) : un bouton qui y fait Exit fait Exit ici.
+    const button = menuButton(input.code, k.keys, k.collections);
+    // Start : au relâchement s'il est court (ouvrir, jouer, pause) ; maintenu, la gestion (startPress).
+    if (button === 'confirm') return (startPress(input.isAutoRepeat ? 'repeat' : 'down'), true);
+    const move = jukeboxInput(button, player.level);
+    if (!move) return button !== undefined;
+    // Un MagnaSave ou Exit tenu ne répète pas son effet (une playlist à la fois, un niveau à la fois).
+    if (input.isAutoRepeat && move !== 'previous' && move !== 'next') return true;
+    step(move);
     host.redraw();
     return true;
   }
@@ -408,7 +420,13 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   /** Clic dans une fenêtre : une ligne de la liste (la choisir ; déjà choisie : Start), une commande, une playlist voisine. */
   function click(action: { op?: unknown; key?: unknown; dir?: unknown }): void {
     if (!player) return;
-    if (action.op === 'row' && typeof action.key === 'string') {
+    if (action.op === 'row' && typeof action.key === 'string' && player.level === 'playlists') {
+      // Une playlist (ou la gestion) cliquée : elle s'ouvre.
+      player = { ...player, at: action.key };
+      step('start');
+    } else if (action.op === 'up') {
+      if (player.level === 'tracks') step('exit');
+    } else if (action.op === 'row' && typeof action.key === 'string') {
       const shown = player.shown;
       if (player.selected[shown] === action.key) step('start');
       else {
@@ -449,6 +467,12 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
         return;
       case 'manage':
         return manage();
+      case 'open':
+        host.log(`Juke-box : playlist ${effect.playlist} ouverte.`); // i18n-ignore : journal
+        return;
+      case 'up':
+        host.log('Juke-box : retour aux playlists, la musique continue.'); // i18n-ignore : journal
+        return;
     }
   }
 
@@ -724,9 +748,21 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
   function playerView(): JukeboxPlayerView {
     const input = playlistsInput();
     const shown = player?.shown ?? '';
-    const p = input.find((x) => x.id === shown);
-    if (p && !tops.has(p.id)) keepSelectionVisible(input);
-    return jukeboxPlayerView({ playlists: input, state: player ?? { shown: '', selected: {}, paused: false }, top: tops.get(shown) ?? 0, rows: rows(), ad, audioOnly: order?.audioOnly ?? false, ...(press && !press.done ? { holdSince: press.since } : {}) });
+    const topKey = player?.level === 'tracks' ? shown : PLAYLISTS_TOP;
+    if (!tops.has(topKey)) keepSelectionVisible(input);
+    const k = host.keys();
+    return jukeboxPlayerView({
+      playlists: input,
+      state: player ?? { level: 'playlists', at: '', shown: '', selected: {}, paused: false },
+      top: tops.get(topKey) ?? 0,
+      // Les MagnaSave ne sont rappelés que si la borne en a pour changer de playlist : en borne, relevés comme
+      // MagnaSave (des Ctrl de secours ne disent rien des boutons de la borne) ; au bureau, les flèches ←→.
+      magnaSave: Boolean(k.collections.previous.length || k.collections.next.length) && (host.desk() || k.magnaRecorded),
+      rows: rows(),
+      ad,
+      audioOnly: order?.audioOnly ?? false,
+      ...(press && !press.done ? { holdSince: press.since } : {}),
+    });
   }
 
   /** La part du Juke-box dans l'état d'une fenêtre ; onWheel : le médaillon est choisi dans la roue. */
@@ -756,6 +792,8 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
 
   return {
     active: () => Boolean(player),
+    /** Niveau affiché : les playlists, ou les morceaux de la playlist ouverte. */
+    level: () => player?.level,
     open,
     close,
     /** Au bureau, la gestion ouverte depuis le lecteur : la musique continue, sans écran. */
@@ -788,6 +826,8 @@ export function createJukeboxPlayer(host: JukeboxPlayerHost) {
     status: () => ({
       ouvert: Boolean(player),
       playlist: player?.shown,
+      niveau: player?.level,
+      curseur: player?.at,
       choix: player ? player.selected[player.shown] : undefined,
       lecture: order ? { morceau: order.key, source: order.kind, pause: order.paused, publicite: ad, temps: time ? formatNumber(Math.round(time.position)) : undefined } : undefined,
       enLigne: online ? { vue: true, cadre: clipRect, bornes: online.view.getBounds() } : undefined,

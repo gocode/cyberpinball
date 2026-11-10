@@ -29,10 +29,13 @@ import { holdSingleInstance } from './single-instance';
 import { startIdleCursor } from './idle-cursor';
 import { startSettingsAlone } from './settings';
 import { beatPulse, superviseCabinet } from './supervisor';
+import { noApplicationMenu } from './app-menu';
 import { journalConsole } from './journal';
 import { journalIncidents, journalNativeCrashes, journalProcessesGone, journalUncaught, reviveCrashedWindows } from './uncaught';
 import { startWizard } from './wizard';
 
+// Aucun menu d'application : les raccourcis du menu par défaut d'Electron faisaient tomber la borne (app-menu.ts).
+noApplicationMenu();
 const loc = locations();
 // Tout ce que l'application écrit dans sa console, aussi dans <données>\logs\journal.txt : un essai sur la borne s'explique après coup.
 journalConsole(loc.dataDir);

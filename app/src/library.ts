@@ -1262,7 +1262,7 @@ export function createLibrary(host: LibraryHost) {
     pick: (request) => pickPaths(request),
     downloads,
     // Créé plus bas : lu au moment du clic.
-    jukebox: () => ({ accepts: (url) => jukebox.linkKind(url), add: (url) => jukeboxMenu.importLink(url) }),
+    jukebox: () => ({ accepts: (url) => jukebox.linkKind(url), add: (url) => jukeboxMenu.importLink(url), account: (back) => jukeboxMenu.openAccount(back) }),
     // Connexion faite (ou abandonnée) dans « Récupérer » : l'état du compte YouTube est relu.
     acquireClosed: () => void youtubeAccount.refresh(),
   });
@@ -1270,7 +1270,7 @@ export function createLibrary(host: LibraryHost) {
   // Les pages des sites reprennent par le navigateur intégré, dans la même session de cookies.
   downloads.setTransport('site', catalogUi.acquirer.siteTransport);
   // Compte YouTube du Juke-box : connecté dans la session de « Récupérer », cookies passés à yt-dlp par un fichier effacé après chaque appel.
-  const youtubeAccount = createYoutubeAccount({ acquirer: catalogUi.acquirer, ytdlp: catalogUi.ytdlp, node: process.execPath, changed: () => host.broadcast() });
+  const youtubeAccount = createYoutubeAccount({ acquirer: catalogUi.acquirer, ytdlp: catalogUi.ytdlp, firefox: catalogUi.firefox, node: process.execPath, changed: () => host.broadcast() });
   // Juke-box (socle, sans écran) : ses morceaux arrivent par la file, sans notification à chaque playlist.
   const jukebox = createJukeboxLibrary({
     root: () => host.root,

@@ -66,6 +66,8 @@ import {
   WEB_ENGINES,
   youtubePlaylistSearchUrl,
   frontMove,
+  googleRefusesText,
+  isGoogleSignIn,
   type FrontMove,
   type GrabKind,
   type VideoPage,
@@ -932,7 +934,7 @@ export function createAcquirer(events: AcquireEvents) {
     const v = open.view.webContents;
     if (action === 'back' && v.navigationHistory.canGoBack()) v.navigationHistory.goBack();
     else if (action === 'forward' && v.navigationHistory.canGoForward()) v.navigationHistory.goForward();
-    else if (action === 'home') void v.loadURL(open.request.url);
+    else if (action === 'home') isGoogleSignIn(open.request.url) ? googleRefused() : void v.loadURL(open.request.url);
     else if (action === 'reload') v.reload();
     else if (action === 'close') close();
   }
@@ -960,7 +962,7 @@ export function createAcquirer(events: AcquireEvents) {
       if (!open || e.sender !== open.win.webContents) return;
       const v = open.view.webContents;
       if (action === 'back' && v.navigationHistory.canGoBack()) v.navigationHistory.goBack();
-      else if (action === 'home') void v.loadURL(open.request.url);
+      else if (action === 'home') isGoogleSignIn(open.request.url) ? googleRefused() : void v.loadURL(open.request.url);
       else if (action === 'browser') void shell.openExternal(v.getURL() || open.request.url);
       else if (action === 'close') close();
     });
@@ -1022,7 +1024,8 @@ export function createAcquirer(events: AcquireEvents) {
         open.status = request.status ?? t('Connectez-vous si le site le demande, puis téléchargez le fichier : il sera rangé tout seul.');
         // Le message d'une recherche libre est un mode d'emploi, pas un avertissement.
         open.warn = request.status !== undefined && !request.search;
-        void contents.loadURL(request.url);
+        if (isGoogleSignIn(request.url)) googleRefused();
+        else void contents.loadURL(request.url);
       }
       sendBar();
       // Réduite (Windows+D, Windows+M) : focus() seul ne la rouvre pas.
@@ -1102,9 +1105,22 @@ export function createAcquirer(events: AcquireEvents) {
         void contents.loadURL(searchUrl(query, chosen));
       },
     });
+    // La page de connexion de Google, ouverte par un bouton « Se connecter » (YouTube) ou une
+    // redirection : Google y refuse le navigateur intégré, et la saisie y faisait planter la borne.
+    // On reste sur la page, le bandeau dit pourquoi et renvoie vers Firefox.
+    const refuseGoogle = (e: Electron.Event, url: string) => {
+      if (!isGoogleSignIn(url)) return;
+      e.preventDefault();
+      googleRefused();
+    };
+    contents.on('will-navigate', (e, url) => refuseGoogle(e, e.url ?? url));
+    // Jamais contents.stop() dans did-start-navigation : Chromium s'arrête net (assertion, banc du
+    // 10/11/2026). Les chargements demandés d'ici vérifient l'adresse avant (isGoogleSignIn).
+    contents.on('will-redirect', (e) => e.isMainFrame && refuseGoogle(e, e.url));
     // Une page qui ouvre un nouvel onglet (lien de téléchargement, MEGA) : dans la même vue.
     contents.setWindowOpenHandler(({ url }) => {
-      if (/^https?:/i.test(url)) void contents.loadURL(url);
+      if (isGoogleSignIn(url)) googleRefused();
+      else if (/^https?:/i.test(url)) void contents.loadURL(url);
       return { action: 'deny' };
     });
     for (const event of ['did-navigate', 'did-navigate-in-page', 'did-stop-loading'] as const) contents.on(event as 'did-stop-loading', () => sendBar());
@@ -1133,7 +1149,7 @@ export function createAcquirer(events: AcquireEvents) {
       const image = open?.request.search && params.mediaType === 'image' && params.srcURL && /^(https?|data):/i.test(params.srcURL) ? params.srcURL : undefined;
       const link = /^https?:/i.test(params.linkURL) ? params.linkURL : undefined;
       const items = [
-        ...(link ? [{ id: 'menu-link', label: t('Ouvrir le lien'), run: () => void contents.loadURL(link) }] : []),
+        ...(link ? [{ id: 'menu-link', label: t('Ouvrir le lien'), run: () => (isGoogleSignIn(link) ? googleRefused() : void contents.loadURL(link)) }] : []),
         ...(image ? [{ id: 'menu-image', label: t('Télécharger cette image'), run: () => contents.downloadURL(image) }] : []),
       ];
       if (events.remote?.offerMenu(items)) return;
@@ -1198,7 +1214,6 @@ export function createAcquirer(events: AcquireEvents) {
     // fenêtre de Cyber Pinball n'a le focus (une fenêtre de Windows l'a pris, la page est tombée),
     // il ferme quand même ; tenu EXIT_HOLD_MS, il ferme de force, page figée ou pas.
     const stopExitWatch = watchJoystickButtons((code, down) => exitButton(code, down));
-    win.once('closed', stopExitWatch);
     // Page figée (une boucle sans fin, un dialogue qui attend) : le bandeau reprend le clavier ; si
     // elle ne répond toujours pas au bout de HUNG_MS, son rendu est arrêté puis la page rechargée.
     let hung: NodeJS.Timeout | undefined;
@@ -1213,8 +1228,11 @@ export function createAcquirer(events: AcquireEvents) {
       hung = setTimeout(() => !contents.isDestroyed() && contents.forcefullyCrashRenderer(), HUNG_MS);
     });
     contents.on('responsive', () => clearTimeout(hung));
-    win.once('closed', () => clearTimeout(hung));
+    // Un seul écouteur « closed » pour tout ce que la fenêtre arrête (11 écouteurs sur une même fenêtre :
+    // MaxListenersExceededWarning au journal du PinCab, 10/11/2026).
     win.on('closed', () => {
+      stopExitWatch();
+      clearTimeout(hung);
       // La fenêtre fermée ne détruit pas sa vue (Electron, WebContentsView) : la page du site
       // continuait de vivre, et une vidéo lancée dedans (YouTube) de jouer. Fermée ici ; ses
       // téléchargements, tenus par la session, continuent.
@@ -1240,6 +1258,7 @@ export function createAcquirer(events: AcquireEvents) {
     open.setBar = fillBelow(win, view, barHeight(0));
     void win.loadFile(path.join(__dirname, '..', 'renderer', 'acquire.html'));
     if (restore) void contents.navigationHistory.restore({ entries: restore.entries, index: restore.index }).catch(() => contents.loadURL(request.url));
+    else if (isGoogleSignIn(request.url)) googleRefused();
     else void contents.loadURL(request.url);
     win.show();
     win.focus();
@@ -1280,6 +1299,15 @@ export function createAcquirer(events: AcquireEvents) {
     win.on('focus', () => apply(frontMove('focus', true, yielded)));
     win.on('always-on-top-changed', (_e, onTop) => onTop || setImmediate(() => apply(frontMove('top-lost', false, yielded))));
     win.once('closed', () => app.off('browser-window-focus', otherFocused));
+  }
+
+  /** Page de connexion de Google demandée : refusée, le bandeau le dit (une fois noté au journal). */
+  let googleNoted = false;
+  function googleRefused(): void {
+    setStatus(googleRefusesText(), true);
+    if (googleNoted) return;
+    googleNoted = true;
+    journalIncident('Navigateur intégré : page de connexion de Google refusée (Google refuse le navigateur intégré)'); // i18n-ignore : journal
   }
 
   /** Bouton Exit tenu : depuis quand, et son minuteur de fermeture forcée. */

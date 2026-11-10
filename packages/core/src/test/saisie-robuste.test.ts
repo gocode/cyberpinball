@@ -41,6 +41,17 @@ test('aucun insertText dans l’application : il fait tomber la page qui n’a p
   assert.deepEqual(offenders, [], 'taper avec typeChars (app/src/page-input.ts)');
 });
 
+test('aucun menu d’application : ses raccourcis faisaient tomber la borne (Ctrl+A, rapport du PinCab)', () => {
+  // Prouvé le 10/11/2026 (rapport de Crashpad du PinCab, symboles d'Electron 44.5.1) : un Ctrl+A non
+  // traité par la page déclenchait « Tout sélectionner » du menu par défaut, qui appelait isFocused()
+  // sur une vue cachée hors écran : pointeur nul, processus principal tombé (app-menu.ts).
+  const main = fs.readFileSync(path.join(APP_SRC, 'main.ts'), 'utf8');
+  const at = main.indexOf('noApplicationMenu();');
+  assert.ok(at > 0 && at < main.indexOf('app.whenReady('), 'main.ts : noApplicationMenu() avant app.whenReady');
+  const menus = fs.readdirSync(APP_SRC).filter((f) => f.endsWith('.ts') && /setApplicationMenu\((?!null\))/.test(fs.readFileSync(path.join(APP_SRC, f), 'utf8')));
+  assert.deepEqual(menus, [], 'aucun menu d’application à raccourcis');
+});
+
 test('navigateur intégré : WebAuthn retiré de toutes ses pages, autorisations et périphériques refusés', () => {
   const source = fs.readFileSync(path.join(APP_SRC, 'acquire-window.ts'), 'utf8');
   // Toute vue de la session (fenêtre et vues cachées) naît sans WebAuthn.
@@ -63,7 +74,7 @@ test('saisie du téléphone, clés d’accès, autorisations, import d’un navi
     const progress = fs.existsSync(path.join(dir, 'progression.txt')) ? fs.readFileSync(path.join(dir, 'progression.txt'), 'utf8').split('\n').slice(-8).join('\n') : '';
     assert.equal(run.status, 0, `${result}\nDerniers pas :\n${progress}`);
     assert.doesNotMatch(result, /ÉCHEC/, result);
-    assert.ok((result.match(/^OK /gm) ?? []).length >= 55, result);
+    assert.ok((result.match(/^OK /gm) ?? []).length >= 65, result);
     for (const step of [
       'champ d’adresse avec clés d’accès : l’application et la page répondent',
       'WebAuthn absent de la page de connexion',
@@ -81,6 +92,14 @@ test('saisie du téléphone, clés d’accès, autorisations, import d’un navi
       'Exit ferme « Récupérer » même sans fenêtre de Cyber Pinball au premier plan',
       'Exit tenu deux secondes : « Récupérer » se ferme de force, page figée comprise',
       'fenêtre du menu au rendu tombé : rechargée d’elle-même',
+      'aucun menu d’application : ses raccourcis ne peuvent rien déclencher',
+      'Ctrl+A sélectionne tout le champ, sans menu',
+      'Ctrl+C, Ctrl+X et Ctrl+V agissent dans le champ, sans menu',
+      'Ctrl+Z annule la dernière frappe, sans menu',
+      'texte complet de la télécommande : tout le champ remplacé, sans menu',
+      'Ctrl+W, Ctrl+R, Ctrl+Maj+R, Ctrl+Maj+I, F11, Ctrl+Q, Ctrl+plus, Ctrl+moins, Ctrl+0, Ctrl+M : sans effet',
+      'aucune requête n’est partie vers accounts.google.com',
+      'Ctrl+A non traité pendant un chargement, vue cachée hors écran ouverte : l’application et la page répondent',
       'aucun processus de rendu arrêté',
     ])
       assert.match(result, new RegExp(`OK +${step.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), step);

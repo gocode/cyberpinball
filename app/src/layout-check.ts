@@ -2,7 +2,7 @@
 // rejouée, chaque fenêtre est inspectée dans son rendu réel. Sont signalés :
 // - deux textes ou commandes qui se chevauchent à l'écran (le compte à rebours
 //   dessiné sur les boutons d'action, par exemple) ;
-// - un texte ou une commande qui sort de la fenêtre ;
+// - un texte ou une commande qui sort de la fenêtre ; un cadre (bordure visible) aussi, même vide ;
 // - un texte coupé par un conteneur qui masque ce qui dépasse (overflow: hidden),
 //   lui-même compris ;
 // - une image ou une vidéo qui ne se charge pas (protocole des médias non branché,
@@ -252,6 +252,30 @@ const SCRIPT = /* i18n-ignore : script de page, du code ; ses constats vont au r
     const v = seen[i];
     if (!scrolled && v.right - v.left > T && v.bottom - v.top > T && (v.left < -T || v.top < -T || v.right > vw + T || v.bottom > vh + T)) problems.add('hors de la fenêtre : ' + label(el));
   });
+  // Cadre (bordure visible) qui sort de la fenêtre : un panneau sans bord droit, une carte coupée,
+  // même quand ses textes, eux, tiennent dedans (lecteur du Juke-box en borne, 10/11/2026). Seul
+  // ce qui se voit compte : un cadre rogné par un conteneur ou dans une liste qui défile n'est
+  // pas à l'écran. Un débord voulu se déclare (data-bleed).
+  for (const el of document.querySelectorAll('body *')) {
+    if (el.closest('.cinema, [data-bleed]')) continue;
+    const s = getComputedStyle(el);
+    if (s.display === 'none' || s.visibility === 'hidden') continue;
+    const framed = ['Top', 'Right', 'Bottom', 'Left'].some((side) => parseFloat(s['border' + side + 'Width']) >= 1 && s['border' + side + 'Style'] !== 'none' && !/rgba\([^)]*,\s*0\)|transparent/.test(s['border' + side + 'Color']));
+    if (!framed) continue;
+    const r = el.getBoundingClientRect();
+    if (r.width <= T || r.height <= T) continue;
+    let v = { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+    let hidden = false;
+    for (let e = el.parentElement; e && e !== document.body; e = e.parentElement) {
+      const p = getComputedStyle(e);
+      if ([p.overflowX, p.overflowY].some((o) => o === 'auto' || o === 'scroll')) { hidden = true; break; }
+      if (![p.overflowX, p.overflowY].some((o) => o === 'hidden' || o === 'clip')) continue;
+      const c = e.getBoundingClientRect();
+      v = { left: Math.max(v.left, c.left), right: Math.min(v.right, c.right), top: Math.max(v.top, c.top), bottom: Math.min(v.bottom, c.bottom) };
+    }
+    if (hidden || v.right - v.left <= T || v.bottom - v.top <= T) continue;
+    if (v.left < -T || v.top < -T || v.right > vw + T || v.bottom > vh + T) problems.add('cadre hors de la fenêtre : ' + label(el).slice(0, 80) + ' ' + [r.left, r.top, r.right, r.bottom].map(Math.round).join(','));
+  }
   // Texte écrit par la feuille de style (content: 'texte' ou attr()) : hors de ce relevé (aucun nœud
   // de texte), et hors de la traduction. L'étiquette des zones de la disposition des écrans en était un.
   for (const el of document.querySelectorAll('*')) {

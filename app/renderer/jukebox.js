@@ -1,6 +1,7 @@
 // Juke-box à l'écran (app/src/jukebox-player.ts, packages/core/src/jukebox-screens.ts) : le médaillon
-// de la roue et son affiche, la liste des morceaux sur le plateau (borne) ou dans le cadre 9:16
-// (bureau), le clip sur le fronton avec son cartel, la pochette ou le visualiseur d'un son seul.
+// de la roue et son affiche, la liste sur le plateau (borne) ou dans le cadre 9:16 (bureau) à ses deux
+// niveaux (les playlists, la gestion en tête ; les morceaux de la playlist ouverte), le clip sur le
+// fronton avec son cartel, la pochette ou le visualiseur d'un son seul.
 // Les zones et leurs cotes suivent les maquettes validées par le mainteneur le 09/11/2026 :
 // en borne, à la référence 1080 × 1920 ; au bureau, 1920 × 1080 ; le fronton, 1920 × 1080. Une
 // unité (--jp) les met à l'échelle de l'écran réel (la 4K double tout sans changer la composition).
@@ -181,8 +182,52 @@
     return row;
   }
 
+  /** Pochettes d'une playlist : la mosaïque de ses quatre premières, une seule en grand, sinon la scène dessinée. */
+  function mosaic(images, seed) {
+    if (!images || images.length < 4) return art(images?.[0], seed);
+    const box = el('div', 'jb-art jb-mosaic');
+    for (const image of images.slice(0, 4)) {
+      const img = el('img', 'jb-mosaic-img');
+      img.alt = '';
+      img.src = image;
+      img.addEventListener('error', () => (img.style.visibility = 'hidden'), { once: true });
+      box.append(img);
+    }
+    return box;
+  }
+
+  /** Repères des sources des morceaux d'une playlist (en ligne, sur la borne, fichier). */
+  function sourceMarks(sources) {
+    const box = el('span', 'jb-sources');
+    for (const source of sources ?? []) box.append(sourceMark(source));
+    return box;
+  }
+
+  /**
+   * Une playlist, au niveau des playlists : mêmes hauteur et colonnes qu'un morceau ; la mosaïque de ses
+   * pochettes, son nom, « 24 morceaux · 1 h 36 », les repères de ses sources, un chevron (Start l'ouvre).
+   */
+  function playlistRow(r) {
+    const row = el('div', `jb-row jb-playlist-row${r.focus ? ' is-focus' : ''}${r.playing ? ' jb-playing' : ''}`);
+    act(row, { op: 'row', key: r.key });
+    const num = el('span', 'jb-num');
+    if (r.playing) num.append(icon(r.playing === 'pause' ? 'pause' : 'play'));
+    else num.textContent = r.num;
+    const text = el('div', 'jb-row-text');
+    const title = el('span', 'jb-title jb-ellipsis', r.title);
+    title.title = r.title;
+    const line = el('span', 'jb-artist jb-ellipsis', r.line);
+    line.title = r.line;
+    text.append(title, line);
+    const go = el('span', 'jb-manage-go');
+    go.append(icon('chevron-right'));
+    row.append(num, mosaic(r.mosaic, r.key), text, sourceMarks(r.sources), go);
+    return row;
+  }
+
   function trackRow(r) {
     if (r.manage) return manageRow(r);
+    if (r.kind === 'playlist') return playlistRow(r);
     const row = el('div', `jb-row${r.focus ? ' is-focus' : ''}${r.playing ? ' jb-playing' : ''}${r.disabled ? ' jb-disabled' : ''}`);
     if (r.disabled) row.setAttribute('aria-disabled', 'true');
     act(row, { op: 'row', key: r.key });
@@ -219,17 +264,21 @@
     return box;
   }
 
-  /** Instructions de la bibliothèque ou de la playlist vide : Exit · roue, puis Exit · menu → Juke-box → Importer une playlist. */
-  function emptyHelp() {
+  /**
+   * Le chemin vers la gestion, avec les pastilles du bandeau : aucune playlist, Start sur « Gestion du
+   * Juke-box » (juste au-dessus) ; une playlist vide, Start maintenu, d'où que l'on soit.
+   */
+  function emptyHelp(view) {
     const p = el('p', 'jb-empty-instructions');
-    const pill = (action) => {
+    const pill = (key, action) => {
       const c = el('span', 'jb-command');
-      c.append(el('span', 'jb-key', t('Exit')), el('span', 'jb-command-action', action));
+      c.append(el('span', 'jb-key', key), el('span', 'jb-command-action', action));
       return c;
     };
     const first = el('span', 'jb-empty-line');
-    first.append(pill(t('Roue')), el('span', 'jb-muted', t('puis')), pill(t('Menu')));
-    p.append(first, el('span', 'jb-empty-line', t('Juke-box → Importer une playlist')));
+    if (view.empty === 'library') first.append(pill(t('Start'), t('Gestion du Juke-box')));
+    else first.append(pill(t('Start maintenu'), t('Gestion des playlists')));
+    p.append(first, el('span', 'jb-empty-line', view.empty === 'library' ? t('Importer de YouTube, ou une nouvelle playlist') : t('Ajouter des fichiers, ou importer de YouTube')));
     return p;
   }
 
@@ -243,7 +292,7 @@
     } else {
       box.append(el('h2', '', t('Le prochain morceau est à vous.')), el('p', 'jb-muted', t('Cette playlist est vide. Ajoutez des morceaux depuis la gestion du Juke-box.')));
     }
-    if (!desk) box.append(emptyHelp());
+    if (!desk) box.append(emptyHelp(view));
     return box;
   }
 
@@ -315,21 +364,34 @@
     return cab.node;
   }
 
+  /**
+   * Fil d'Ariane d'une playlist ouverte : « ‹ Playlists › Néon nocturne », où « Playlists » remonte
+   * (clic ; Exit aux boutons).
+   */
+  function crumb(view, className) {
+    const box = el('nav', className);
+    if (view.level === 'tracks') {
+      const up = act(el('span', 'jb-crumb-up'), { op: 'up' });
+      up.append(icon('chevron-left'), document.createTextNode(t('Playlists')));
+      const here = el('span', 'jb-crumb-here jb-ellipsis', view.header.crumb ?? '');
+      here.title = view.header.crumb ?? '';
+      box.append(up, el('span', 'jb-crumb-sep', '›'), here);
+    } else box.append(el('span', 'jb-crumb-here jb-ellipsis', view.header.crumb ?? t('Playlists')));
+    return box;
+  }
+
+  /** En-tête du niveau : « Juke-box · 4 playlists » et PLAYLISTS, ou la playlist ouverte ; le fil d'Ariane dessous. */
   function fillPlaylist(box, view) {
     const top = el('div', 'jb-between');
     const names = el('div', 'jb-playlist-names');
-    const p = view.playlist;
-    names.append(el('p', 'jb-label', p ? p.count : t('Juke-box')));
-    const name = el('h1', 'jb-playlist-name jb-ellipsis', p ? p.name.toLocaleUpperCase() : t('AUCUNE PLAYLIST'));
-    name.title = p?.name ?? '';
+    names.append(el('p', 'jb-label', view.header.label));
+    const name = el('h1', 'jb-playlist-name jb-ellipsis', view.header.title.toLocaleUpperCase());
+    name.title = view.header.title;
     names.append(name);
     top.append(names);
-    if (p) top.append(el('span', 'jb-badge', p.position));
-    const around = el('div', `jb-neighbors${p ? '' : ' jb-disabled'}`);
-    if (p) {
-      around.append(act(el('span', 'jb-ellipsis', p.previous ? `‹ ${p.previous}` : ''), { op: 'playlist', dir: -1 }), el('span', 'jb-current jb-ellipsis', p.name), act(el('span', 'jb-ellipsis', p.next ? `${p.next} ›` : ''), { op: 'playlist', dir: 1 }));
-    } else around.append(el('span', 'jb-ellipsis jb-neighbors-none', t('Playlists voisines indisponibles · bibliothèque vide')));
-    box.replaceChildren(top, around);
+    if (view.header.badge) top.append(el('span', 'jb-badge', view.header.badge));
+    // Le fil d'Ariane, dans une playlist seulement : au niveau des playlists, le titre suffit.
+    box.replaceChildren(top, ...(view.level === 'tracks' ? [crumb(view, 'jb-crumb')] : []));
   }
 
   function fillList(box, view, desk) {
@@ -339,8 +401,8 @@
       head.append(el('span', '', view.list.head), view.empty ? el('span', '', '') : view.list.around ? el('span', 'jb-around', view.list.around) : legend());
       nodes.push(head);
     }
-    // Playlist vide : la ligne de gestion reste en tête (on y ajoute des morceaux), l'invitation dessous.
-    if (view.empty === 'playlist' && view.list.rows.length) {
+    // Aucune playlist : la ligne de gestion en tête (on y crée ou importe), l'invitation dessous.
+    if (view.empty && view.list.rows.length) {
       const rows = el('div', 'jb-rows');
       rows.dataset.defile = '';
       rows.append(...view.list.rows.map(trackRow));
@@ -430,17 +492,14 @@
       node.append(frame, head, clip, now, help);
       desk = { node, frame, clip, now, help, manage };
     }
-    const p = view.playlist;
     const top = el('div', 'jb-between');
-    top.append(el('span', 'jb-label', t('Juke-box')), el('span', 'jb-fine', p ? p.position : t('Aucune playlist')));
-    const name = el('h1', 'jb-desk-name jb-ellipsis', p ? p.name.toLocaleUpperCase() : t('Aucune playlist'));
-    name.title = p?.name ?? '';
-    const around = el('div', `jb-between jb-fine${p ? '' : ' jb-disabled'}`);
-    if (p) around.append(act(el('span', 'jb-ellipsis', p.previous ? `‹ ${p.previous}` : ''), { op: 'playlist', dir: -1 }), act(el('span', 'jb-ellipsis', p.next ? `${p.next} ›` : ''), { op: 'playlist', dir: 1 }));
-    else around.append(el('span', 'jb-ellipsis', t('Playlists voisines indisponibles · bibliothèque vide')));
+    top.append(el('span', 'jb-label jb-ellipsis', view.header.label), el('span', 'jb-fine', view.header.badge ?? ''));
+    const name = el('h1', 'jb-desk-name jb-ellipsis', view.header.title.toLocaleUpperCase());
+    name.title = view.header.title;
     const list = el('div', 'jb-desk-list');
     fillList(list, view, true);
-    const nodes = [top, name, around, el('div', 'jb-rule')];
+    // Au bureau, la place du fil d'Ariane reste (vide au niveau des playlists) : la liste ne bouge pas d'un niveau à l'autre.
+    const nodes = [top, name, view.level === 'tracks' ? crumb(view, 'jb-crumb jb-fine') : el('div', 'jb-crumb jb-crumb-none jb-fine'), el('div', 'jb-rule')];
     nodes.push(list);
     if (!view.empty) nodes.push(el('p', 'jb-fine jb-desk-selection', view.list.around ? `${view.list.head} · ${view.list.around}` : view.list.head));
     desk.frame.replaceChildren(...nodes);
@@ -453,7 +512,7 @@
       delete desk.now.dataset.jbTime;
       const box = el('div', 'jb-stack');
       if (view.empty === 'library') box.append(el('h2', '', t('Aucune playlist')), el('p', 'jb-muted', t('Gestion du Juke-box → Créer ou importer une playlist')), el('p', 'jb-fine', t('Téléphone et fenêtre Récupérer également disponibles.')));
-      else box.append(el('h2', '', t('Aucune lecture en cours')), el('p', 'jb-muted', t('Entrée : jouer le morceau choisi')));
+      else box.append(el('h2', '', t('Aucune lecture en cours')), el('p', 'jb-muted', view.level === 'playlists' ? t('Entrée : ouvrir la playlist choisie') : t('Entrée : jouer le morceau choisi')));
       desk.now.replaceChildren(box);
     }
     desk.help.replaceChildren(...view.commands.map((c) => command(c, true)));

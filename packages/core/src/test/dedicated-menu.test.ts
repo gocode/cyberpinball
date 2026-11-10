@@ -433,7 +433,9 @@ test('les écritures de la borne dédiée ne partent que de « Activer » et « 
   // (firewall-rule.ts), posée seulement par une action de l'écran « Partage et réseau » (firewall.test.ts),
   // et l'installateur signé de Microsoft du pilote de la Kinect (vision3d.ts), lancé seulement quand le
   // joueur choisit « Vision 3D : pilote Kinect à installer ».
-  assert.deepEqual(filesMatching(/-Verb RunAs|\brunas\b/i), ['app/src/dedicated-system.ts', 'app/src/firewall-rule.ts', 'app/src/vision3d.ts']);
+  // Et l'installateur signé de Mozilla (firefox-install.ts, signature vérifiée), lancé seulement quand le
+  // joueur confirme « Oui, installer Firefox » (compte YouTube du Juke-box).
+  assert.deepEqual(filesMatching(/-Verb RunAs|\brunas\b/i), ['app/src/dedicated-system.ts', 'app/src/firefox-install.ts', 'app/src/firewall-rule.ts', 'app/src/vision3d.ts']);
   // L'exécuteur n'est appelé que par l'écran, et l'écran ne l'appelle que dans activate() et deactivate().
   assert.deepEqual(filesMatching(/runElevated\(/), ['app/src/dedicated-menu.ts', 'app/src/dedicated-system.ts']);
   const menu = fs.readFileSync(path.join(REPO_ROOT, 'app', 'src', 'dedicated-menu.ts'), 'utf8');

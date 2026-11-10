@@ -1,15 +1,18 @@
 // Règles de lecture du Juke-box en borne (questions des maquettes tranchées le 09/11/2026), en logique
 // pure : l'écran (étape 3) donne les gestes et l'état des morceaux, ce module dit quoi faire.
-// - Flippers : morceau précédent ou suivant dans la liste montrée (sans boucler : la liste ne saute pas).
-// - Start : joue le morceau choisi ; sur le morceau en cours, pause ou reprise. Indisponible sur un
-//   morceau qui ne se lit pas (en téléchargement : la raison et le pourcentage), jamais « jouer dès
-//   qu'il sera prêt ».
-// - MagnaSave : playlist précédente ou suivante (en boucle). Rien ne démarre seul : la lecture en
-//   cours continue jusqu'au prochain Start.
-// - Exit : retour à la roue, la musique s'arrête.
-// - Ligne « Gestion du Juke-box » : fixe, en tête de la liste de chaque playlist (au-dessus du morceau 1,
-//   un appui de flipper), Start ouvre la gestion. Ce n'est pas un morceau : l'enchaînement l'ignore et
-//   le compteur « 37 / 60 » ne la compte pas (demande du 09/11/2026).
+// Deux niveaux (demande du 10/11/2026 : la ligne des playlists voisines et les MagnaSave seuls ne se
+// comprenaient pas sur la borne) :
+// - Niveau 1, « Playlists », à l'entrée : la ligne « Gestion du Juke-box » en tête, puis une ligne par
+//   playlist. Le curseur arrive sur la playlist qui joue, sinon la dernière ouverte. Flippers : choisir ;
+//   Start : ouvrir la playlist (ou la gestion) ; Exit : la roue, la musique s'arrête. Les MagnaSave n'y
+//   font rien.
+// - Niveau 2, « Morceaux » : les morceaux de la playlist ouverte. Flippers : morceau précédent ou
+//   suivant (sans boucler : la liste ne saute pas) ; Start : joue le morceau choisi, sur le morceau en
+//   cours pause ou reprise ; indisponible sur un morceau qui ne se lit pas (en téléchargement : la
+//   raison et le pourcentage), jamais « jouer dès qu'il sera prêt ». Exit remonte aux playlists, la
+//   musique continue. MagnaSave : playlist précédente ou suivante (en boucle), en raccourci ; rien ne
+//   démarre seul.
+// - Partout, Start maintenu ouvre la gestion. La gestion n'est pas un morceau : l'enchaînement l'ignore.
 // - Fin d'un morceau : le suivant disponible de la playlist qui joue (pas forcément celle montrée),
 //   en bouclant à la fin ; aucun disponible : arrêt. Pas de lecture aléatoire dans cette version.
 // - Le volume est celui de la borne (boutons Volume, cabinetvolume.ts) : le Juke-box n'a pas de
@@ -64,8 +67,14 @@ export interface PlayerList {
   tracks: readonly PlayerTrack[];
 }
 
+/** Niveau du Juke-box : la liste des playlists, ou les morceaux de la playlist ouverte. */
+export type PlayerLevel = 'playlists' | 'tracks';
+
 export interface PlayerState {
-  /** Playlist montrée. */
+  level: PlayerLevel;
+  /** Niveau 1 : la ligne choisie, une playlist ou la gestion (JUKEBOX_MANAGE_KEY). */
+  at: string;
+  /** Playlist ouverte (niveau 2), ou la dernière ouverte. */
   shown: string;
   /** Morceau choisi (focus) dans chaque playlist déjà montrée. */
   selected: Record<string, string>;
@@ -76,14 +85,40 @@ export interface PlayerState {
 
 export type PlayerInput = 'previous' | 'next' | 'start' | 'playlist-previous' | 'playlist-next' | 'exit' | 'ended';
 
+/**
+ * Un bouton du menu (menuButton, buttons.ts : la même résolution que la roue) dans le Juke-box, au niveau
+ * où l'on est. Start passe à part (appui court ou maintenu, startPressStep). Les MagnaSave (touches des
+ * collections de la roue) ne changent de playlist qu'au niveau 2.
+ */
+export function jukeboxInput(button: string | undefined, level: PlayerLevel): PlayerInput | undefined {
+  switch (button) {
+    case 'previous':
+      return 'previous';
+    case 'next':
+      return 'next';
+    case 'exit':
+      return 'exit';
+    case 'collection-previous':
+      return level === 'tracks' ? 'playlist-previous' : undefined;
+    case 'collection-next':
+      return level === 'tracks' ? 'playlist-next' : undefined;
+    default:
+      return undefined;
+  }
+}
+
 export type PlayerEffect =
   | { kind: 'play'; playlist: string; key: string }
   | { kind: 'pause' }
   | { kind: 'resume' }
   /** Plus rien à jouer (fin de morceau sans suivant disponible). */
   | { kind: 'stop' }
-  /** Exit : retour à la roue, la musique s'arrête. */
+  /** Exit aux playlists : retour à la roue, la musique s'arrête. */
   | { kind: 'exit' }
+  /** Start sur une playlist : ses morceaux. */
+  | { kind: 'open'; playlist: string }
+  /** Exit dans une playlist : retour aux playlists, la musique continue. */
+  | { kind: 'up' }
   /** Start refusé, avec sa raison. */
   | { kind: 'refused'; reason: string; percent?: number }
   /** Start sur la ligne « Gestion du Juke-box » : la gestion s'ouvre. */
@@ -94,28 +129,41 @@ export interface PlayerStep {
   effect?: PlayerEffect;
 }
 
-/** État de départ : la playlist du dernier morceau joué (son morceau choisi), sinon la première ; rien ne joue. */
-export function initialPlayer(lists: readonly PlayerList[], last?: { playlist: string; key: string }): PlayerState {
-  const list = lists.find((l) => l.id === last?.playlist) ?? lists[0];
+/**
+ * État de départ, au niveau des playlists : le curseur sur la dernière ouverte (`opened`), sinon celle du
+ * dernier morceau joué (son morceau choisi), sinon la première ; la gestion s'il n'y en a aucune. Rien ne joue.
+ */
+export function initialPlayer(lists: readonly PlayerList[], last?: { playlist: string; key: string }, opened?: string): PlayerState {
+  const list = lists.find((l) => l.id === opened) ?? lists.find((l) => l.id === last?.playlist) ?? lists[0];
   const selected: Record<string, string> = {};
   if (list) {
-    const key = list.tracks.some((tr) => tr.key === last?.key) ? last!.key : list.tracks[0]?.key;
+    const key = list.id === last?.playlist && list.tracks.some((tr) => tr.key === last?.key) ? last!.key : list.tracks[0]?.key;
     if (key) selected[list.id] = key;
   }
-  return { shown: list?.id ?? '', selected, paused: false };
+  return { level: 'playlists', at: list?.id ?? JUKEBOX_MANAGE_KEY, shown: list?.id ?? '', selected, paused: false };
+}
+
+/** Lignes du niveau des playlists : la gestion, puis les playlists. */
+export function playlistRows(lists: readonly PlayerList[]): string[] {
+  return [JUKEBOX_MANAGE_KEY, ...lists.map((l) => l.id)];
+}
+
+/** Ligne choisie au niveau des playlists : celle retenue si elle existe encore, sinon la playlist ouverte, sinon la première. */
+export function playlistAt(state: PlayerState, lists: readonly PlayerList[]): string {
+  if (state.at === JUKEBOX_MANAGE_KEY || lists.some((l) => l.id === state.at)) return state.at;
+  return lists.some((l) => l.id === state.shown) ? state.shown : (lists[0]?.id ?? JUKEBOX_MANAGE_KEY);
 }
 
 const listOf = (lists: readonly PlayerList[], id: string) => lists.find((l) => l.id === id);
 
 /**
- * Ligne choisie dans la playlist montrée : celle retenue (la ligne de gestion comprise), sinon le
- * morceau qui joue, sinon le premier ; la ligne de gestion pour une playlist vide.
+ * Morceau choisi dans la playlist ouverte : celui retenu, sinon le morceau qui joue, sinon le premier ;
+ * aucun pour une playlist vide.
  */
 export function selectedKey(state: PlayerState, lists: readonly PlayerList[]): string | undefined {
   const list = listOf(lists, state.shown);
-  if (!list) return undefined;
+  if (!list || !list.tracks.length) return undefined;
   const k = state.selected[list.id];
-  if (k === JUKEBOX_MANAGE_KEY || !list.tracks.length) return JUKEBOX_MANAGE_KEY;
   if (k && list.tracks.some((tr) => tr.key === k)) return k;
   if (state.playing?.playlist === list.id && list.tracks.some((tr) => tr.key === state.playing!.key)) return state.playing.key;
   return list.tracks[0]!.key;
@@ -133,16 +181,17 @@ export function nextPlayable(list: PlayerList, key: string): string | undefined 
 }
 
 export function playerStep(state: PlayerState, input: PlayerInput, lists: readonly PlayerList[]): PlayerStep {
+  if (state.level === 'playlists' && input !== 'ended') return playlistsStep(state, input, lists);
   const list = listOf(lists, state.shown);
   switch (input) {
     case 'previous':
     case 'next': {
-      if (!list) return { state };
-      // La ligne de gestion d'abord (rang -1), puis les morceaux ; sans boucler.
-      const k = selectedKey(state, lists)!;
-      const i = k === JUKEBOX_MANAGE_KEY ? -1 : list.tracks.findIndex((tr) => tr.key === k);
-      const j = Math.min(list.tracks.length - 1, Math.max(-1, i + (input === 'next' ? 1 : -1)));
-      return { state: { ...state, selected: { ...state.selected, [list.id]: j < 0 ? JUKEBOX_MANAGE_KEY : list.tracks[j]!.key } } };
+      const k = selectedKey(state, lists);
+      if (!list || !k) return { state };
+      // Sans boucler : la liste ne saute pas.
+      const i = list.tracks.findIndex((tr) => tr.key === k);
+      const j = Math.min(list.tracks.length - 1, Math.max(0, i + (input === 'next' ? 1 : -1)));
+      return { state: { ...state, selected: { ...state.selected, [list.id]: list.tracks[j]!.key } } };
     }
     case 'playlist-previous':
     case 'playlist-next': {
@@ -150,12 +199,11 @@ export function playerStep(state: PlayerState, input: PlayerInput, lists: readon
       const i = Math.max(0, lists.findIndex((l) => l.id === state.shown));
       const next = lists[(i + (input === 'playlist-next' ? 1 : -1) + lists.length) % lists.length]!;
       // Rien ne démarre : on montre l'autre playlist, la lecture en cours continue.
-      return { state: { ...state, shown: next.id } };
+      return { state: { ...state, shown: next.id, at: next.id } };
     }
     case 'start': {
       const k = selectedKey(state, lists);
       if (!list || !k) return { state, effect: { kind: 'refused', reason: t('Playlist vide') } };
-      if (k === JUKEBOX_MANAGE_KEY) return { state, effect: { kind: 'manage' } };
       if (state.playing?.playlist === list.id && state.playing.key === k) {
         return state.paused ? { state: { ...state, paused: false }, effect: { kind: 'resume' } } : { state: { ...state, paused: true }, effect: { kind: 'pause' } };
       }
@@ -176,6 +224,30 @@ export function playerStep(state: PlayerState, input: PlayerInput, lists: readon
       };
     }
     case 'exit':
+      // Exit remonte aux playlists, le curseur sur celle qu'on quitte ; la musique continue.
+      return { state: { ...state, level: 'playlists', at: list ? list.id : playlistAt(state, lists) }, effect: { kind: 'up' } };
+  }
+}
+
+/** Niveau des playlists : choisir une ligne, l'ouvrir, ou revenir à la roue. */
+function playlistsStep(state: PlayerState, input: Exclude<PlayerInput, 'ended'>, lists: readonly PlayerList[]): PlayerStep {
+  const rows = playlistRows(lists);
+  const at = playlistAt(state, lists);
+  switch (input) {
+    case 'previous':
+    case 'next': {
+      const i = rows.indexOf(at);
+      const j = Math.min(rows.length - 1, Math.max(0, i + (input === 'next' ? 1 : -1)));
+      return { state: { ...state, at: rows[j]! } };
+    }
+    case 'playlist-previous':
+    case 'playlist-next':
+      // Les MagnaSave ne changent de playlist que dans une playlist ouverte.
+      return { state: { ...state, at } };
+    case 'start':
+      if (at === JUKEBOX_MANAGE_KEY) return { state: { ...state, at }, effect: { kind: 'manage' } };
+      return { state: { ...state, level: 'tracks', at, shown: at }, effect: { kind: 'open', playlist: at } };
+    case 'exit':
       return { state: { ...state, playing: undefined, paused: false }, effect: { kind: 'exit' } };
   }
 }
@@ -189,10 +261,10 @@ export interface StartHint {
 
 /** Ce que Start fera sur le morceau choisi, pour l'aide des commandes (toujours visible, grisé avec sa raison). */
 export function startHint(state: PlayerState, lists: readonly PlayerList[]): StartHint {
+  if (state.level === 'playlists') return playlistAt(state, lists) === JUKEBOX_MANAGE_KEY ? { enabled: true, label: t('Ouvrir la gestion') } : { enabled: true, label: t('Ouvrir la playlist') };
   const list = listOf(lists, state.shown);
   const k = selectedKey(state, lists);
-  if (!list || !k) return { enabled: false, label: t('Indisponible'), reason: t('Playlist vide') };
-  if (k === JUKEBOX_MANAGE_KEY) return { enabled: true, label: t('Ouvrir la gestion') };
+  if (!list || !k) return { enabled: false, label: t('Liste vide'), reason: t('Playlist vide') };
   if (state.playing?.playlist === list.id && state.playing.key === k) return { enabled: true, label: state.paused ? t('Reprendre') : t('Pause') };
   const tr = list.tracks.find((x) => x.key === k)!;
   if (tr.playable) return { enabled: true, label: t('Jouer') };

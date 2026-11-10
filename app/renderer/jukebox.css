@@ -190,7 +190,8 @@
 
 .jb-help {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr) : une action longue se coupe avec « … » dans sa colonne, jamais hors du bandeau. */
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: calc(12 * var(--jp)) calc(24 * var(--jp));
   align-content: center;
   border-top: 1px solid var(--line-strong);
@@ -277,25 +278,46 @@
   letter-spacing: 0.02em;
 }
 
-.jb-neighbors {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr 1fr;
+/*
+ * Fil d'Ariane, à la place de l'ancienne ligne des playlists voisines (même hauteur : l'en-tête ne bouge
+ * pas d'un niveau à l'autre). « Playlists » y remonte d'un clic ; la playlist ouverte, en clair.
+ */
+.jb-crumb {
+  display: flex;
   align-items: center;
-  text-align: center;
+  gap: calc(12 * var(--jp));
+  min-width: 0;
   border-block: 1px solid var(--line-strong);
   height: calc(72 * var(--jp));
   color: var(--ink-muted);
   font-size: calc(22 * var(--jp));
-  gap: calc(12 * var(--jp));
 }
 
-.jb-neighbors .jb-current {
+.jb-crumb.jb-crumb-none {
+  visibility: hidden;
+}
+
+.jb-crumb-up {
+  display: inline-flex;
+  align-items: center;
+  gap: calc(6 * var(--jp));
+  flex: none;
+  cursor: pointer;
+}
+
+.jb-crumb-up > svg {
+  width: calc(22 * var(--jp));
+  height: calc(22 * var(--jp));
+}
+
+.jb-crumb-sep {
+  flex: none;
+}
+
+.jb-crumb-here {
+  min-width: 0;
   color: var(--ink);
   font-weight: 600;
-}
-
-.jb-neighbors.jb-disabled {
-  grid-template-columns: 1fr;
 }
 
 .jb-cab .jb-list {
@@ -618,10 +640,6 @@
   display: flex;
   align-items: center;
   gap: calc(16 * var(--jp));
-}
-
-.jb-neighbors-none {
-  color: var(--ink-muted);
 }
 
 /* ---------- Plateau au bureau (1920 × 1080) : la liste dans le cadre 9:16, le lecteur à droite ---------- */
@@ -1305,9 +1323,11 @@
  * colonnes. Les zones fixes ne bougent pas d'un état à l'autre.
  */
 .jb-cab .jb-help {
-  top: calc(1758 * var(--jp));
-  height: calc(140 * var(--jp));
+  /* Trois rangées de pastilles (38) et leurs écarts (10) tiennent dans la zone, filet et marge compris : rien ne déborde. */
+  top: calc(1756 * var(--jp));
+  height: calc(148 * var(--jp));
   grid-template-rows: repeat(3, auto);
+  row-gap: calc(10 * var(--jp));
 }
 
 .jb-cab .jb-command-manage {
@@ -1372,4 +1392,56 @@
   height: calc(660 * var(--jp));
   gap: calc(14 * var(--jp));
   padding: calc(20 * var(--jp));
+}
+
+/* ---------- Niveau des playlists : une ligne par playlist ---------- */
+
+/* Mêmes hauteur et colonnes qu'un morceau ; à droite, les repères des sources puis le chevron. */
+.jb-row.jb-playlist-row {
+  grid-template-columns: calc(38 * var(--jp)) calc(88 * var(--jp)) minmax(0, 1fr) auto calc(36 * var(--jp));
+}
+
+.jb-desk .jb-row.jb-playlist-row {
+  grid-template-columns: calc(26 * var(--jp)) calc(64 * var(--jp)) minmax(0, 1fr) auto calc(28 * var(--jp));
+}
+
+.jb-sources {
+  display: inline-flex;
+  gap: calc(6 * var(--jp));
+}
+
+.jb-desk .jb-sources .jb-source {
+  width: calc(28 * var(--jp));
+  height: calc(28 * var(--jp));
+}
+
+.jb-playlist-row .jb-manage-go {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--ink-muted);
+}
+
+.jb-playlist-row .jb-manage-go > svg {
+  width: calc(30 * var(--jp));
+  height: calc(30 * var(--jp));
+}
+
+.jb-playlist-row.is-focus .jb-manage-go {
+  color: var(--signal);
+}
+
+/* Mosaïque des pochettes : quatre carrés, un liseré sombre entre eux. */
+.jb-mosaic {
+  display: grid;
+  grid-template: repeat(2, minmax(0, 1fr)) / repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  background: #050b10;
+}
+
+.jb-mosaic-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  min-width: 0;
+  min-height: 0;
 }

@@ -232,8 +232,6 @@ export const messages: Record<string, string> = {
   // Ligne « Gestion du Juke-box » du lecteur (jukebox-play.ts, jukebox-screens.ts)
   'Ouvrir la gestion': 'Open management',
   'Playlists, morceaux, ajouts de YouTube ou de fichiers': 'Playlists, tracks, adding from YouTube or files',
-  'Gestion du Juke-box · {n} morceau': 'Juke-box management · {n} track',
-  'Gestion du Juke-box · {n} morceaux': 'Juke-box management · {n} tracks',
   'Entrée maintenue': 'Enter held',
   'Retour au lecteur': 'Back to the player',
   'Retour aux playlists': 'Back to the playlists',

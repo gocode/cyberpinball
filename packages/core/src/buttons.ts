@@ -604,6 +604,41 @@ export function interfaceKeys(source: ButtonsSource, vertical = true): Interface
   return { ...navigationKeys(source, vertical), help: own('help', ['KeyH', 'F1']), settings: own('settings', ['KeyR']) };
 }
 
+/**
+ * Touches qui changent de collection sur la roue (et de playlist dans le Juke-box) : le MagnaSave relevé,
+ * s'il n'est pas déjà un bouton de l'interface ; sans MagnaSave relevé (bouton facultatif passé à l'étape
+ * « Boutons »), sa touche par défaut d'un clavier (Ctrl gauche, Ctrl droit), si aucun bouton ne l'a prise.
+ * Un MagnaSave relevé comme Valider ou Retour de l'interface n'en donne aucune : il reste Start ou Exit.
+ */
+export function collectionKeys(source: ButtonsSource, keys: InterfaceKeys = interfaceKeys(source)): { previous: string[]; next: string[] } {
+  const game = buttonKeys(source?.buttons);
+  const ui = [...keys.previous, ...keys.next, ...keys.confirm, ...keys.exit, ...keys.help, ...keys.settings];
+  const taken = new Set([...ui, ...Object.values(game).filter(Boolean)]);
+  const own = (recorded: string | undefined, fallback: string) => (recorded && !ui.includes(recorded) ? [recorded] : !recorded && !taken.has(fallback) ? [fallback] : []);
+  return { previous: own(game.leftMagna, 'ControlLeft'), next: own(game.rightMagna, 'ControlRight') };
+}
+
+/** Rôle d'un appui dans le menu des tables (la roue) et le Juke-box. */
+export type MenuButton = 'help' | 'previous' | 'next' | 'confirm' | 'settings' | 'exit' | 'collection-previous' | 'collection-next';
+
+/**
+ * Le rôle d'une touche ou d'un bouton de joystick dans le menu : une seule résolution, pour la roue et
+ * le Juke-box (un bouton qui fait Exit sur la roue fait Exit dans le Juke-box), dans cet ordre.
+ */
+export function menuButton(code: string, keys: InterfaceKeys, collections: { previous: string[]; next: string[] }): MenuButton | undefined {
+  const order: [MenuButton, string[]][] = [
+    ['help', keys.help],
+    ['previous', keys.previous],
+    ['next', keys.next],
+    ['confirm', keys.confirm],
+    ['settings', keys.settings],
+    ['exit', keys.exit],
+    ['collection-previous', collections.previous],
+    ['collection-next', collections.next],
+  ];
+  return order.find(([, codes]) => codes.includes(code))?.[0];
+}
+
 /** Touche du clavier qui bascule entre la liste et les actions d'un écran, comme MagnaSave (convention de Windows : F6 passe d'un volet à l'autre). */
 export const ZONE_KEY = 'F6';
 

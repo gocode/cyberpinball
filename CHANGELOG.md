@@ -73,6 +73,9 @@ son interface).
 - En partie dans le casque, B met en pause et reprend ; seul ≡ ouvre le menu de VPX.
 - Mes collections : des collections personnelles, à votre nom. « Ajouter à une collection… » sur la fiche d'une table la coche ou la décoche dans chacune, ou en crée une nouvelle avec elle ; « Gérer mes collections… » (Menu système > Collections) les renomme ou les supprime.
 - Collections : « Boutons des collections » (Menu système > Collections) choisit deux boutons de la borne, n'importe lesquels sauf les flippers, Start et Exit, pour passer à la collection précédente ou suivante. Collections est aussi en tête du menu système : Exit, puis Collections.
+- Juke-box : à l’entrée, toutes vos playlists en grandes lignes (pochettes, nombre de morceaux, durée, sources), celle qui joue marquée, « Gestion du Juke-box » en tête. Start ouvre une playlist, son nom en tête et « Playlists › Nom » ; Exit remonte aux playlists sans couper la musique, puis revient à la roue. La ligne des playlists voisines disparaît.
+- Juke-box : chaque bouton y fait ce qu’il fait sur la roue, quels que soient les boutons relevés à l’étape « Boutons » ; les MagnaSave passent à la playlist voisine dans une playlist ouverte, et ne sont proposés que s’ils sont relevés.
+- Juke-box : la page tient dans l’écran à toutes les tailles de playfield, de 720 × 1280 à la 4K, quelle que soit la mise à l’échelle de Windows.
 
 ## 0.1.8
 

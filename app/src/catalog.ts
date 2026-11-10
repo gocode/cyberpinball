@@ -78,7 +78,7 @@ import {
   siteState,
   SOURCE_SITES,
   isYoutubeAccountDomain,
-  YOUTUBE_LOGIN_URL,
+  googleRefusesText,
   youtubeState,
   saveWaitList,
   t,
@@ -123,6 +123,7 @@ import {
 } from '@cyberpinball/core';
 import { createAcquirer } from './acquire-window';
 import { createYtDlp } from './ytdlp-tool';
+import { createFirefoxInstaller } from './firefox-install';
 import { createAdBlocker } from './ad-blocker';
 import { archiveEntries } from './archives';
 import { recentDownloads, watchDownloads } from './downloads-watch';
@@ -186,7 +187,7 @@ export interface CatalogContext {
   /** Gestionnaire de téléchargements : chaque fichier d'une page de site y est suivi, et repris après une coupure. */
   downloads?: DownloadManager;
   /** Juke-box : « Ajouter au Juke-box » dans « Récupérer », sur une playlist ou une vidéo YouTube. */
-  jukebox?(): { accepts(url: string): 'playlist' | 'video' | undefined; add(url: string): void } | undefined;
+  jukebox?(): { accepts(url: string): 'playlist' | 'video' | undefined; add(url: string): void; account?(back: () => void): void } | undefined;
   /** La fenêtre « Récupérer » s'est fermée (une connexion a pu y être faite : compte YouTube du Juke-box). */
   acquireClosed?(): void;
 }
@@ -2048,18 +2049,16 @@ export function createCatalog(ctx: CatalogContext) {
           }
         : {
             label: t('Se connecter : {site}', { site: 'YouTube' }),
-            detail: t('Pour importer vos playlists dans le Juke-box, privées comprises'),
+            detail: t('Pour importer vos playlists dans le Juke-box, privées comprises : par Firefox (Google refuse le navigateur intégré)'),
             tone: 'ok' as const,
+            // Google refuse la connexion dans le navigateur intégré : l'écran du compte du Juke-box dit
+            // pourquoi et propose la voie qui marche (Firefox), au lieu d'ouvrir sa page de connexion.
             run: () => {
-              windowItem = undefined;
-              acquirer.show({
-                url: YOUTUBE_LOGIN_URL,
-                game: t('Compte YouTube'),
-                expected: t('Connectez-vous à votre compte Google, puis Fermer (Échap) : le Juke-box lit vos playlists'),
-                host: t('youtube.com · votre propre compte'),
-              });
-              notice = { text: t('Connexion à {site} ouverte : fermez la fenêtre une fois connecté, l’état se met à jour.', { site: 'YouTube' }), tone: 'info' };
-              openAccounts(ctx.cursor());
+              const at = ctx.cursor();
+              const account = ctx.jukebox?.()?.account;
+              if (account) return account(() => openAccounts(at));
+              notice = { text: googleRefusesText(), tone: 'warning' };
+              openAccounts(at);
             },
           },
     );
@@ -2174,6 +2173,8 @@ export function createCatalog(ctx: CatalogContext) {
   return {
     /** yt-dlp de la borne, partagé avec le Juke-box (une seule installation, une seule mise à jour). */
     ytdlp,
+    // Firefox, installé à la demande (compte YouTube du Juke-box) : <racine>/tools/firefox le temps de l'installation.
+    firefox: createFirefoxInstaller({ root: () => ctx.layout()?.root, ...(ctx.downloads ? { downloads: ctx.downloads } : {}) }),
     /** Le catalogue (avertissement au premier usage) ; `text` : recherche toute faite (titre, initiales, nom de ROM). */
     open: (text?: string) => {
       if (!ctx.layout()) return open();

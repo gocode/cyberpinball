@@ -27,6 +27,8 @@ import {
   displayKeys,
   keyLabel,
   interfaceKeys,
+  collectionKeys as cabinetCollectionKeys,
+  menuButton,
   zoneSwitchKeys,
   WHEEL_START_HOLD_MS,
   LOADING_SLOW_MS,
@@ -817,12 +819,9 @@ function collectionKeys(): { previous: string[]; next: string[] } {
   const nav = [...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit];
   const chosen = collections.keys();
   if (chosen?.previous && chosen.next && !nav.includes(chosen.previous) && !nav.includes(chosen.next)) return { previous: [chosen.previous], next: [chosen.next] };
-  const keys = buttonKeys(buttons);
-  const taken = new Set([...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit, ...KEYS.help, ...KEYS.settings, ...Object.values(keys).filter(Boolean)]);
   // MagnaSave relevé ; sinon (bouton facultatif passé à l'étape « Boutons ») sa touche par défaut
   // d'un clavier (Ctrl gauche, Ctrl droit), si aucun autre bouton ne l'a prise, comme le mode invité.
-  const own = (recorded: string | undefined, fallback: string) => (recorded && ![...KEYS.previous, ...KEYS.next, ...KEYS.confirm, ...KEYS.exit, ...KEYS.help, ...KEYS.settings].includes(recorded) ? [recorded] : !recorded && !taken.has(fallback) ? [fallback] : []);
-  return { previous: own(keys.leftMagna, 'ControlLeft'), next: own(keys.rightMagna, 'ControlRight') };
+  return cabinetCollectionKeys({ buttons, navigation }, KEYS);
 }
 
 /**
@@ -1041,7 +1040,14 @@ const jukeboxPlayer = createJukeboxPlayer({
   dmdOn: () => Boolean(dmdWindow()) && state.phase !== 'playing' && state.phase !== 'intro' && !desktop.active,
   banner: (text) => showBanner(text),
   log: (line) => console.log(line),
-  keys: () => ({ ...KEYS, playlistPrevious: collectionKeys().previous, playlistNext: collectionKeys().next }),
+  // Les boutons de la roue, résolus comme sur la roue (menuButton) ; les codes de la borne gardent leur rôle (une flèche relevée reste un flipper).
+  keys: () => ({
+    keys: KEYS,
+    collections: collectionKeys(),
+    cabinet: [...Object.values(buttonKeys(buttons)), ...Object.values(navigationButtons({ buttons, navigation }))].filter((k): k is string => Boolean(k)),
+    // MagnaSave relevés à l'étape « Boutons », ou boutons des collections choisis (sinon Ctrl gauche et droit d'un clavier, que la borne n'envoie pas forcément).
+    magnaRecorded: Boolean(buttons?.leftMagna || buttons?.rightMagna || collections.keys()?.previous),
+  }),
   ...(process.env.CYBERPINBALL_JUKEBOX_EN_LIGNE ? { fakeOnline: process.env.CYBERPINBALL_JUKEBOX_EN_LIGNE } : {}),
   // « Gestion du Juke-box » : sa gestion (étape 4, library.jukeboxMenu) sur la playlist montrée ; sans elle, le menu système.
   manage: (playlist) => {
@@ -1165,8 +1171,8 @@ function remoteScreen(): { title: string; item?: string; zone?: string } {
   if (state.phase === 'library') return library.remoteScreen() ?? { title: t('Menu système') };
   if (state.phase === 'message') return { title: state.message?.title ?? '' };
   if (state.phase === 'confirmQuit') return { title: t('Quitter Cyber Pinball ?') };
-  // Juke-box : MagnaSave y passe à la playlist suivante.
-  if (state.phase === 'jukebox') return { title: t('Juke-box'), zone: t('Playlist suivante') };
+  // Juke-box : MagnaSave y passe à la playlist suivante, dans une playlist ouverte et si la borne a ce bouton.
+  if (state.phase === 'jukebox') return { title: t('Juke-box'), ...(jukeboxPlayer.level() === 'tracks' && collectionKeys().next.length ? { zone: t('Playlist suivante') } : {}) };
   // La roue : la collection active, la table choisie ; MagnaSave y passe à la collection suivante.
   return { title: collections.current().label || t('Menu des tables'), item: tables[state.index]?.title, zone: collections.locked() ? undefined : t('Collection suivante') };
 }
@@ -3705,22 +3711,24 @@ function handleKey(input: Input, fromPhone = false): boolean {
     case 'menu':
       // Un autre bouton pendant que Start est tenu (« jouer directement ») : l'appui ne lance plus rien.
       if (wheelPress && input.code !== wheelPress.code) cancelWheelPress();
-      if (is(KEYS.help)) guest.knock('menu.commands') && (state = { ...state, help: !state.help });
-      else if (state.help && is(KEYS.exit)) state = { ...state, help: false };
-      else if (is(KEYS.previous)) guest.knock('menu.choose') && moveSelection(-1);
-      else if (is(KEYS.next)) guest.knock('menu.choose') && moveSelection(1);
-      else if (is(KEYS.confirm) && onJukebox()) {
+      // Le rôle du bouton : la même résolution que dans le Juke-box (menuButton).
+      const button = menuButton(input.code, KEYS, collectionKeys());
+      if (button === 'help') guest.knock('menu.commands') && (state = { ...state, help: !state.help });
+      else if (state.help && button === 'exit') state = { ...state, help: false };
+      else if (button === 'previous') guest.knock('menu.choose') && moveSelection(-1);
+      else if (button === 'next') guest.knock('menu.choose') && moveSelection(1);
+      else if (button === 'confirm' && onJukebox()) {
         // Médaillon Juke-box : Start ouvre le lecteur (rien ne démarre seul).
         if (!input.isAutoRepeat) openJukebox();
         return true;
-      } else if (is(KEYS.confirm)) {
+      } else if (button === 'confirm') {
         // « Jouer directement » : l'appui attend son relâchement (partie) ou sa durée (fiche) ; la répétition d'une touche tenue n'y change rien.
         if (!wheelPlays()) wheelConfirm(tables[state.index]!, true);
         else if (!input.isAutoRepeat) pressWheelStart(input.code);
-      } else if (is(KEYS.settings)) !onJukebox() && guest.knock('menu.vpx-settings') && openVpxSettings();
-      else if (is(KEYS.exit)) guest.knock('menu.system') && library.openSystem();
-      else if (is(collectionKeys().previous)) changeCollection({ step: -1 });
-      else if (is(collectionKeys().next)) changeCollection({ step: 1 });
+      } else if (button === 'settings') !onJukebox() && guest.knock('menu.vpx-settings') && openVpxSettings();
+      else if (button === 'exit') guest.knock('menu.system') && library.openSystem();
+      else if (button === 'collection-previous') changeCollection({ step: -1 });
+      else if (button === 'collection-next') changeCollection({ step: 1 });
       // « Jouer directement » : F6 d'un clavier ouvre aussi la fiche (les MagnaSave de la borne changent de collection).
       else if (wheelPlays() && is(sheetKeys()) && !onJukebox()) {
         if (!input.isAutoRepeat) wheelConfirm(tables[state.index]!, true);

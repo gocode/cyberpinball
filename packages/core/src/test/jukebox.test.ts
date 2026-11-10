@@ -51,7 +51,7 @@ import {
 } from '../jukebox';
 import { JUKEBOX_DMD_ANIMATIONS, animationColor, normalizeSkins, resolveSkin, setSkin, skinChainText, skinKeys } from '../jukebox-dmd';
 import { classifyLocalName, folderCoverName, localCover, localScanSummary, localTracks, parseId3, readMediaTags, scanLocalMedia, sniffLocalMedia } from '../jukebox-files';
-import { initialPlayer, JUKEBOX_ELEMENT_VOLUME, JUKEBOX_MANAGE_HOLD_MS, JUKEBOX_MANAGE_KEY, JUKEBOX_SHUFFLE, nextPlayable, playerStep, playlistPosition, selectedKey, startHint, startPressStep, type PlayerList, type PlayerState } from '../jukebox-play';
+import { initialPlayer, jukeboxInput, JUKEBOX_ELEMENT_VOLUME, JUKEBOX_MANAGE_HOLD_MS, JUKEBOX_MANAGE_KEY, JUKEBOX_SHUFFLE, nextPlayable, playerStep, playlistAt, playlistPosition, playlistRows, selectedKey, startHint, startPressStep, type PlayerList, type PlayerState } from '../jukebox-play';
 import { MUTE_HOLD_MS } from '../cabinetvolume';
 import {
   applyPlaylistImport,
@@ -645,27 +645,45 @@ const lists: PlayerList[] = [
   { id: 'p3', tracks: [] },
 ];
 
-test('lecture : flippers, Start (jouer, pause, reprise, indisponible avec raison et pourcentage), MagnaSave sans démarrage, Exit', () => {
+test('deux niveaux : on entre sur les playlists (gestion en tête), Start ouvre, Exit remonte (la musique continue) puis revient à la roue', () => {
   assert.equal(JUKEBOX_SHUFFLE, false);
   assert.equal(JUKEBOX_ELEMENT_VOLUME, 1, 'le volume est celui de la borne');
+  // Entrée : le niveau des playlists, le curseur sur la dernière ouverte, sinon celle du dernier morceau joué, sinon la première.
   let s: PlayerState = initialPlayer(lists, { playlist: 'p2', key: 'y' });
-  assert.equal(s.shown, 'p2');
-  assert.equal(s.selected.p2, 'y');
+  assert.deepEqual([s.level, s.at, s.shown, s.selected.p2], ['playlists', 'p2', 'p2', 'y']);
+  assert.equal(initialPlayer(lists, { playlist: 'p2', key: 'y' }, 'p1').at, 'p1', 'la dernière ouverte l’emporte');
+  assert.deepEqual(playlistRows(lists), [JUKEBOX_MANAGE_KEY, 'p1', 'p2', 'p3']);
+  assert.equal(initialPlayer([]).at, JUKEBOX_MANAGE_KEY, 'aucune playlist : la gestion');
   s = initialPlayer(lists);
-  assert.equal(s.shown, 'p1');
-  // Au-dessus du premier morceau : la ligne « Gestion du Juke-box », puis la liste s'arrête (sans boucler).
+  assert.equal(s.at, 'p1');
+  assert.deepEqual(startHint(s, lists), { enabled: true, label: 'Ouvrir la playlist' });
+  // Flippers : la gestion au-dessus de la première playlist, sans boucler.
   s = playerStep(s, 'previous', lists).state;
-  assert.equal(s.selected.p1, JUKEBOX_MANAGE_KEY, 'un appui au-dessus du morceau 1 : la ligne de gestion');
-  assert.equal(playerStep(s, 'previous', lists).state.selected.p1, JUKEBOX_MANAGE_KEY, 'en tête : la liste ne boucle pas');
+  assert.equal(s.at, JUKEBOX_MANAGE_KEY);
+  assert.equal(playerStep(s, 'previous', lists).state.at, JUKEBOX_MANAGE_KEY, 'en tête : la liste ne boucle pas');
   assert.deepEqual(startHint(s, lists), { enabled: true, label: 'Ouvrir la gestion' });
   const manage = playerStep(s, 'start', lists);
-  assert.deepEqual(manage.effect, { kind: 'manage' }, 'Start sur la ligne : la gestion');
-  assert.equal(manage.state.playing, undefined, 'ce n’est pas un morceau : rien ne joue');
+  assert.deepEqual(manage.effect, { kind: 'manage' }, 'Start sur la gestion : la gestion');
+  assert.equal(manage.state.playing, undefined);
+  // MagnaSave au niveau des playlists : rien (ils ne changent de playlist que dans une playlist ouverte).
+  assert.deepEqual(playerStep(s, 'playlist-next', lists), { state: s });
+  assert.equal(jukeboxInput('collection-next', 'playlists'), undefined);
+  assert.equal(jukeboxInput('collection-next', 'tracks'), 'playlist-next');
+  assert.equal(jukeboxInput('collection-previous', 'tracks'), 'playlist-previous');
+  assert.equal(jukeboxInput('exit', 'playlists'), 'exit');
+  assert.equal(jukeboxInput('help', 'tracks'), undefined);
+  // Start sur une playlist : ses morceaux.
   s = playerStep(s, 'next', lists).state;
-  assert.equal(s.selected.p1, 'a');
+  let step = playerStep(s, 'start', lists);
+  assert.deepEqual(step.effect, { kind: 'open', playlist: 'p1' });
+  s = step.state;
+  assert.deepEqual([s.level, s.shown], ['tracks', 'p1']);
+  assert.equal(selectedKey(s, lists), 'a');
+  // Niveau des morceaux : flippers sans boucler, Start indisponible avec raison et pourcentage.
+  assert.equal(playerStep(s, 'previous', lists).state.selected.p1 ?? 'a', 'a', 'en tête : la liste ne boucle pas');
   s = playerStep(s, 'next', lists).state;
   assert.deepEqual(startHint(s, lists), { enabled: false, label: 'Indisponible · 42 %', reason: 'En téléchargement · 42 %' });
-  let step = playerStep(s, 'start', lists);
+  step = playerStep(s, 'start', lists);
   assert.deepEqual(step.effect, { kind: 'refused', reason: 'En téléchargement · 42 %', percent: 42 });
   assert.equal(step.state.playing, undefined, 'jamais « jouer dès qu’il sera prêt »');
   s = playerStep(step.state, 'next', lists).state;
@@ -679,27 +697,34 @@ test('lecture : flippers, Start (jouer, pause, reprise, indisponible avec raison
   step = playerStep(step.state, 'start', lists);
   assert.deepEqual(step.effect, { kind: 'resume' });
   s = step.state;
-  // MagnaSave : on montre l'autre playlist, la lecture continue, rien ne démarre.
+  // MagnaSave dans une playlist : l'autre playlist, en raccourci ; la lecture continue, rien ne démarre.
   step = playerStep(s, 'playlist-next', lists);
   assert.equal(step.effect, undefined);
-  assert.equal(step.state.shown, 'p2');
+  assert.deepEqual([step.state.level, step.state.shown, step.state.at], ['tracks', 'p2', 'p2']);
   assert.deepEqual(step.state.playing, { playlist: 'p1', key: 'c' });
   assert.deepEqual(playlistPosition(step.state, lists), { index: 2, count: 3 });
   assert.equal(startHint(step.state, lists).label, 'Jouer');
   assert.equal(playerStep(step.state, 'playlist-previous', lists).state.selected.p1, 'c', 'chaque playlist garde son morceau choisi');
   assert.equal(playerStep(playerStep(s, 'playlist-previous', lists).state, 'playlist-previous', lists).state.shown, 'p2', 'les playlists bouclent');
-  // Exit : retour à la roue, la musique s'arrête.
-  const exit = playerStep(step.state, 'exit', lists);
+  // Exit dans une playlist : les playlists, le curseur sur celle qu'on quitte ; la musique continue.
+  const up = playerStep(step.state, 'exit', lists);
+  assert.deepEqual(up.effect, { kind: 'up' });
+  assert.deepEqual([up.state.level, up.state.at], ['playlists', 'p2']);
+  assert.deepEqual(up.state.playing, { playlist: 'p1', key: 'c' }, 'la musique continue');
+  // La fin d'un morceau enchaîne aussi au niveau des playlists.
+  assert.deepEqual(playerStep(up.state, 'ended', lists).effect, { kind: 'play', playlist: 'p1', key: 'a' });
+  // Exit aux playlists : la roue, la musique s'arrête.
+  const exit = playerStep(up.state, 'exit', lists);
   assert.deepEqual(exit.effect, { kind: 'exit' });
   assert.equal(exit.state.playing, undefined);
-  // Playlist vide : seule la ligne de gestion, choisie ; Start y ouvre la gestion (on y ajoute des morceaux).
-  const empty = { ...initialPlayer(lists), shown: 'p3' };
-  assert.equal(selectedKey(empty, lists), JUKEBOX_MANAGE_KEY);
-  assert.deepEqual(startHint(empty, lists), { enabled: true, label: 'Ouvrir la gestion' });
-  assert.deepEqual(playerStep(empty, 'start', lists).effect, { kind: 'manage' });
-  assert.equal(playerStep(empty, 'next', lists).state.selected.p3, JUKEBOX_MANAGE_KEY);
-  // Aucune playlist : Start indisponible.
-  assert.deepEqual(startHint({ shown: '', selected: {}, paused: false }, []), { enabled: false, label: 'Indisponible', reason: 'Playlist vide' });
+  // Playlist vide : elle s'ouvre (l'invitation), Start y est indisponible avec sa raison.
+  const empty = playerStep({ ...initialPlayer(lists), at: 'p3' }, 'start', lists).state;
+  assert.deepEqual([empty.level, empty.shown], ['tracks', 'p3']);
+  assert.equal(selectedKey(empty, lists), undefined);
+  assert.deepEqual(startHint(empty, lists), { enabled: false, label: 'Liste vide', reason: 'Playlist vide' });
+  assert.deepEqual(playerStep(empty, 'start', lists).effect, { kind: 'refused', reason: 'Playlist vide' });
+  // Une playlist supprimée entre-temps (gestion) : le curseur se reprend sur une ligne qui existe.
+  assert.equal(playlistAt({ ...initialPlayer(lists), at: 'disparue', shown: 'p2' }, lists), 'p2');
 });
 
 test('Start maintenu : la gestion, sans jamais jouer ; appui court : jouer ou pause, sans sortir du lecteur ; même seuil que le volume', () => {
@@ -732,20 +757,15 @@ test('enchaînement : le suivant disponible de la playlist qui joue, en bouclant
   assert.equal(nextPlayable(lists[0]!, 'c'), 'a', 'boucle à la fin de la playlist');
   assert.equal(nextPlayable({ id: 'solo', tracks: [{ key: 's', playable: true }] }, 's'), 's');
   assert.equal(nextPlayable({ id: 'rien', tracks: [{ key: 's', playable: false }] }, 's'), undefined);
-  let s: PlayerState = { shown: 'p1', selected: { p1: 'c' }, playing: { playlist: 'p1', key: 'c' }, paused: false };
+  let s: PlayerState = { level: 'tracks', at: 'p1', shown: 'p1', selected: { p1: 'c' }, playing: { playlist: 'p1', key: 'c' }, paused: false };
   // On regarde une autre playlist pendant que p1 joue : la fin enchaîne dans p1.
   s = playerStep(s, 'playlist-next', lists).state;
   const end = playerStep(s, 'ended', lists);
   assert.deepEqual(end.effect, { kind: 'play', playlist: 'p1', key: 'a' });
   assert.equal(end.state.selected.p1, 'a', 'la sélection suivait le morceau joué');
   assert.equal(end.state.shown, 'p2');
-  // La ligne de gestion n'est pas un morceau : l'enchaînement la saute, et la sélection qui y est y reste.
-  const onManage = playerStep({ shown: 'p1', selected: { p1: JUKEBOX_MANAGE_KEY }, playing: { playlist: 'p1', key: 'c' }, paused: false }, 'ended', lists);
-  assert.deepEqual(onManage.effect, { kind: 'play', playlist: 'p1', key: 'a' });
-  assert.equal(onManage.state.selected.p1, JUKEBOX_MANAGE_KEY);
-  assert.equal(nextPlayable(lists[0]!, JUKEBOX_MANAGE_KEY), 'a', 'depuis la ligne de gestion : le premier disponible');
   const stuck: PlayerList[] = [{ id: 'p', tracks: [{ key: 'a', playable: false }, { key: 'b', playable: false }] }];
-  const stop = playerStep({ shown: 'p', selected: {}, playing: { playlist: 'p', key: 'a' }, paused: false }, 'ended', stuck);
+  const stop = playerStep({ level: 'tracks', at: 'p', shown: 'p', selected: {}, playing: { playlist: 'p', key: 'a' }, paused: false }, 'ended', stuck);
   assert.deepEqual(stop.effect, { kind: 'stop' });
   assert.equal(stop.state.playing, undefined);
 });

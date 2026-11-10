@@ -82,6 +82,7 @@ import type { JukeboxLibrary, TrackView } from './jukebox-library';
 import type { Action, Built, PromptOptions, Row, Section, Tone } from './library';
 import type { YoutubeAccount } from './youtube-account';
 import { allowPreview } from './media-protocol';
+import type { FirefoxProgress } from './firefox-install';
 
 export interface JukeboxMenuHost {
   jukebox: JukeboxLibrary;
@@ -917,8 +918,10 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         add({ label: t('Chercher sur YouTube'), icon: 'search', key: 'search', run: () => askSearch() });
         add({ label: t('Se déconnecter'), icon: 'unlock', key: 'sign-out', detail: t('Efface la connexion à YouTube et à Google gardée par Cyber Pinball'), run: () => void signOut() });
       } else {
-        add({ label: t('Se connecter à YouTube'), icon: 'account', key: 'sign-in', tone: 'ok', detail: t('La page de Google s’ouvre dans « Récupérer » : fermez-la une fois connecté'), run: () => signIn() });
-        add({ label: t('Utiliser la connexion de Firefox'), icon: 'import', key: 'browser', detail: t('Si Google refuse la connexion : Firefox, sur ce PC, déjà connecté à YouTube'), run: () => openBrowsers(toAccount) });
+        // Google refuse la connexion dans le navigateur intégré (et sa page y faisait planter la borne) :
+        // l'écran le dit, et propose la voie qui marche.
+        sections.push({ kind: 'jb-flash', rows: [{ text: t('Google refuse la connexion dans le navigateur intégré d’une borne'), detail: t('Connectez-vous à YouTube dans Firefox sur ce PC, puis reprenez ici sa connexion. Une liaison par code est prévue.'), tone: 'info', icon: 'info' }] });
+        add({ label: t('Utiliser la connexion de Firefox'), icon: 'import', key: 'browser', tone: 'ok', detail: t('Firefox, sur ce PC, connecté à YouTube ; s’il n’est pas installé, Cyber Pinball l’installe'), run: () => openBrowsers(toAccount) });
       }
       add({ label: t('Retour'), icon: 'back', key: 'back', run: backTo });
       return {
@@ -938,12 +941,6 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     display(build, 0);
   }
 
-  function signIn(): void {
-    host.account?.openLogin();
-    flash = { text: t('Connexion ouverte dans « Récupérer » : fermez la fenêtre une fois connecté, l’état se met à jour.'), tone: 'info' };
-    host.redraw();
-  }
-
   async function signOut(): Promise<void> {
     await host.account?.signOut();
     flash = { text: t('Compte YouTube déconnecté : ses cookies sont effacés de Cyber Pinball.'), tone: 'ok' };
@@ -957,10 +954,15 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
   function openBrowsers(backTo: () => void): void {
     let busy: CookieBrowser | undefined;
     let problem: string | undefined = host.account?.problem();
+    let done: string | undefined;
+    /** Installation de Firefox : demandée (à confirmer), en cours (progression, arrêt). */
+    let confirm = false;
+    let installing: { progress: FirefoxProgress; stop: AbortController } | undefined;
     const run = async (browser: CookieBrowser) => {
-      if (busy || !host.account) return;
+      if (busy || installing || !host.account) return;
       busy = browser;
       problem = undefined;
+      done = undefined;
       host.redraw();
       const r = await host.account.fromBrowser(browser);
       busy = undefined;
@@ -974,16 +976,55 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       problem = r.reason;
       host.redraw();
     };
+    const install = async () => {
+      if (installing || !host.account) return;
+      confirm = false;
+      problem = undefined;
+      installing = { progress: { phase: 'download', received: 0 }, stop: new AbortController() };
+      host.redraw();
+      const r = await host.account.installFirefox((p) => {
+        if (installing) installing.progress = p;
+        host.redraw();
+      }, installing.stop.signal);
+      installing = undefined;
+      if (r.ok) done = t('Firefox est installé. Ouvrez Firefox, connectez-vous à YouTube, fermez Firefox, puis « Firefox » ici.');
+      else if (!r.cancelled) problem = r.reason;
+      host.redraw();
+    };
+    const installText = (p: FirefoxProgress): string =>
+      p.phase === 'verify'
+        ? t('Vérification de la signature de Mozilla…')
+        : p.phase === 'install'
+          ? t('Installation en cours : acceptez la demande de Windows si elle s’affiche.')
+          : p.total
+            ? t('Téléchargement depuis Mozilla : {percent} %', { percent: Math.floor(((p.received ?? 0) * 100) / p.total) })
+            : t('Téléchargement depuis Mozilla…');
     const build = (): Built => {
       const actions: Action[] = [];
-      const rows: Row[] = COOKIE_BROWSERS.map((b) => {
-        const at = actions.push({ label: b.label, key: `browser:${b.id}`, run: () => void run(b.id) }) - 1;
-        const detail = busy === b.id ? t('Lecture de la connexion…') : t('Connectez-vous à YouTube dans Firefox, fermez-le, puis Start ici');
-        return { text: b.label, detail, icon: 'globe', action: at, pick: true, ...(busy === b.id ? { progress: { busy: true } } : {}) };
-      });
-      actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: backTo });
       const sections: Section[] = [];
+      const status = host.account?.firefoxStatus() ?? 'missing';
       if (problem) sections.push({ kind: 'jb-flash', rows: [{ text: t('Connexion pas reprise'), detail: problem, tone: 'warning', icon: 'alert' }] });
+      if (done) sections.push({ kind: 'jb-flash', rows: [{ text: done, tone: 'ok', icon: 'check' }] });
+      let rows: Row[];
+      if (installing) {
+        const p = installing.progress;
+        const at = actions.push({ label: t('Arrêter l’installation'), icon: 'close', key: 'stop', run: () => installing?.stop.abort() }) - 1;
+        rows = [{ text: t('Installation de Firefox'), detail: installText(p), icon: 'download', action: at, pick: true, progress: p.phase === 'download' && p.total ? { value: (p.received ?? 0) / p.total } : { busy: true } }];
+      } else if (status === 'missing' && host.account?.canInstallFirefox() && confirm) {
+        const yes = actions.push({ label: t('Oui, installer Firefox'), icon: 'download', key: 'install-yes', tone: 'ok', run: () => void install() }) - 1;
+        actions.push({ label: t('Non'), icon: 'close', key: 'install-no', run: () => ((confirm = false), host.redraw()) });
+        rows = [{ text: t('Installer Firefox ?'), detail: t('L’installateur officiel est téléchargé chez Mozilla (download.mozilla.org), sa signature vérifiée, puis Firefox installé sans fenêtre. Windows demande une autorisation.'), icon: 'download', action: yes, pick: true }];
+      } else if (status === 'missing') {
+        const at = host.account?.canInstallFirefox() ? actions.push({ label: t('Installer Firefox'), icon: 'download', key: 'install', tone: 'ok', run: () => ((confirm = true), host.redraw()) }) - 1 : undefined;
+        rows = [{ text: 'Firefox', detail: t('Pas installé sur ce PC : Cyber Pinball peut l’installer.'), icon: 'globe', tone: 'warning', ...(at !== undefined ? { action: at, pick: true } : {}) }];
+      } else {
+        rows = COOKIE_BROWSERS.map((b) => {
+          const at = actions.push({ label: b.label, key: `browser:${b.id}`, run: () => void run(b.id) }) - 1;
+          const detail = busy === b.id ? t('Lecture de la connexion…') : status === 'unused' ? t('Installé, jamais ouvert : ouvrez-le, connectez-vous à YouTube, fermez-le, puis Start ici') : t('Connectez-vous à YouTube dans Firefox, fermez-le, puis Start ici');
+          return { text: b.label, detail, icon: 'globe', action: at, pick: true, ...(busy === b.id ? { progress: { busy: true } } : {}) };
+        });
+      }
+      actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: () => (installing?.stop.abort(), backTo()) });
       sections.push({ title: t('Reprendre la connexion de Firefox'), kind: 'jb-global', options: true, rows });
       return {
         heading: t('Connexion de Firefox'),
@@ -993,7 +1034,7 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
         app: app(t('Compte YouTube')),
         sections,
         actions,
-        back: backTo,
+        back: () => (installing?.stop.abort(), backTo()),
       };
     };
     display(build, 0);
@@ -1385,6 +1426,8 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     open: (focus?: string) => open(focus, 'player'),
     /** Import d'un lien venu d'ailleurs (« Récupérer ») : l'écran d'import s'ouvre sur son analyse. */
     importLink: (link: string) => startImport(link, 'recuperer'),
+    /** L'écran du compte YouTube, depuis un autre écran (« Comptes des sites ») ; `back` y ramène. */
+    openAccount: (back: () => void) => openAccount(back),
     /** Lien d'import accepté (playlist ou vidéo YouTube) : le bouton « Ajouter au Juke-box » s'affiche. */
     accepts: (link: string) => jb.linkKind(link) !== undefined,
   };

@@ -71,6 +71,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - In game in the headset, B pauses and resumes; only ≡ opens VPX's menu.
 - My collections: personal collections, named as you like. "Ajouter à une collection…" (Add to a collection…) on a table's page ticks or unticks it in each one, or creates a new one with it; "Gérer mes collections…" (Manage my collections…, System menu > Collections) renames or deletes them.
 - Collections: "Boutons des collections" (Collection buttons, System menu > Collections) picks two cabinet buttons, any except the flippers, Start and Exit, to go to the previous or next collection. Collections is also at the top of the system menu: Exit, then Collections.
+- Juke-box: on entry, all your playlists as large rows (covers, track count, duration, sources), the one playing marked, “Gestion du Juke-box” first. Start opens a playlist, its name at the top with “Playlists › Name”; Exit goes back up to the playlists without stopping the music, then back to the wheel. The neighboring-playlists line is gone.
+- Juke-box: each button does what it does on the wheel, whatever buttons were recorded in the “Buttons” step; the MagnaSave buttons move to the neighboring playlist inside an open playlist, and are only offered when recorded.
+- Juke-box: the page fits the screen at every playfield size, from 720 × 1280 to 4K, whatever the Windows scaling.
 
 ## 0.1.8
 

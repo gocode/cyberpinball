@@ -23,6 +23,7 @@ import {
   changedCookies,
   COOKIE_BROWSERS,
   firefoxMissing,
+  firefoxUnused,
   firefoxProfilesIni,
   isYoutubeAccountDomain,
   isYoutubeDomain,
@@ -31,7 +32,6 @@ import {
   parseNetscapeCookies,
   t,
   YOUTUBE_ACCOUNT_PAGE,
-  YOUTUBE_LOGIN_URL,
   youtubePlaylistSearchUrl,
   youtubeState,
   type AccountPlaylist,
@@ -40,6 +40,7 @@ import {
   type SiteState,
 } from '@cyberpinball/core';
 import type { Acquirer, AcquireRequest } from './acquire-window';
+import type { FirefoxInstaller, FirefoxProgress, FirefoxResult } from './firefox-install';
 import { journalIncident } from './uncaught';
 import type { RunResult } from './ytdlp-tool';
 
@@ -50,6 +51,8 @@ export interface YoutubeAccountOptions {
   node?: string;
   /** Dossier temporaire des fichiers de cookies ; par défaut <temp>\cyberpinball-cookies. */
   tempDir?: string;
+  /** Installation de Firefox à la demande (firefox-install.ts) ; absente : pas proposée. */
+  firefox?: Pick<FirefoxInstaller, 'install' | 'installed'>;
   /** Profils de Firefox (essais) ; par défaut, profiles.ini de Firefox dans %APPDATA%. */
   firefoxIni?: string;
   /** L'état a changé (connexion, déconnexion, nom lu) : les écrans se redessinent. */
@@ -212,7 +215,7 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
     };
     try {
       // Firefox absent : rien à lire, et la marche à suivre (plutôt qu'un « pas connecté » muet).
-      if (!fs.existsSync(firefoxIni())) return fail(firefoxMissing(), 'Firefox absent');
+      if (!fs.existsSync(firefoxIni())) return fail(opts.firefox?.installed() ? firefoxUnused() : firefoxMissing(), opts.firefox?.installed() ? 'Firefox jamais ouvert' : 'Firefox absent'); // i18n-ignore : journal
       const r = await opts.ytdlp.run(browserCookiesArgs(browser, file, opts.node), signal);
       if (!r.ok) return r.cancelled ? r : fail(r.reason, 'yt-dlp');
       // Ce que yt-dlp a écrit, sans le chemin du fichier de cookies.
@@ -244,16 +247,6 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
     opts.changed?.();
   }
 
-  /** Page de connexion de Google dans la fenêtre « Récupérer ». */
-  function openLogin(): void {
-    opts.acquirer.show({
-      url: YOUTUBE_LOGIN_URL,
-      game: t('Compte YouTube'),
-      expected: t('Connectez-vous à votre compte Google, puis Fermer (Échap) : le Juke-box lit vos playlists'),
-      host: t('youtube.com · votre propre compte'),
-    });
-  }
-
   /** Recherche de playlists sur YouTube dans « Récupérer » (même session, donc même compte). */
   function openSearch(query: string): void {
     const request: AcquireRequest = {
@@ -267,7 +260,24 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
     opts.acquirer.show(request);
   }
 
-  return { state: () => state, problem: () => (state.connected ? undefined : problem), refresh, withCookies, playlists, fromBrowser, signOut, openLogin, openSearch };
+  /**
+   * Firefox ici : prêt (déjà servi), installé mais jamais ouvert, ou absent (l'installer est proposé).
+   */
+  function firefoxStatus(): 'ready' | 'unused' | 'missing' {
+    if (fs.existsSync(firefoxIni())) return 'ready';
+    return opts.firefox?.installed() ? 'unused' : 'missing';
+  }
+
+  /** Installe Firefox (sur demande confirmée) ; la suite est dite à l'écran. */
+  async function installFirefox(progress?: (p: FirefoxProgress) => void, signal?: AbortSignal): Promise<FirefoxResult> {
+    if (!opts.firefox) return { ok: false, reason: t('Installation de Firefox indisponible ici.') };
+    const r = await opts.firefox.install(progress, signal);
+    if (r.ok) problem = undefined;
+    opts.changed?.();
+    return r;
+  }
+
+  return { firefoxStatus, installFirefox, canInstallFirefox: () => Boolean(opts.firefox), state: () => state, problem: () => (state.connected ? undefined : problem), refresh, withCookies, playlists, fromBrowser, signOut, openSearch };
 }
 
 export type YoutubeAccount = ReturnType<typeof createYoutubeAccount>;

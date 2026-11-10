@@ -15,6 +15,24 @@ import type { SiteCookie, SiteState } from './sitesessions';
 /** Connexion à YouTube : la page de connexion de Google, qui ramène sur les playlists du compte. */
 export const YOUTUBE_LOGIN_URL =
   'https://accounts.google.com/ServiceLogin?service=youtube&passive=true&continue=https%3A%2F%2Fwww.youtube.com%2Fsignin%3Faction_handle_signin%3Dtrue%26app%3Ddesktop%26next%3D%252Ffeed%252Fplaylists';
+/**
+ * Page de connexion de Google (accounts.google.com) : Google refuse la connexion dans le navigateur
+ * intégré, et la saisie y faisait planter la borne (PinCab, 10/11/2026). « Récupérer » n'y va plus
+ * (acquire-window.ts) : il dit pourquoi et renvoie vers Firefox (googleRefusesText).
+ */
+export function isGoogleSignIn(url: string): boolean {
+  try {
+    return new URL(url).hostname.toLowerCase() === 'accounts.google.com';
+  } catch {
+    return false;
+  }
+}
+
+/** Pourquoi la connexion à Google ne se fait pas dans « Récupérer », et la voie qui marche. */
+export function googleRefusesText(): string {
+  return t('Google refuse la connexion dans le navigateur intégré d’une borne : passez par Firefox (gestion du Juke-box > « Compte YouTube » > « Utiliser la connexion de Firefox »). Une liaison par code est prévue.');
+}
+
 /** Les playlists du compte, telles que yt-dlp les lit avec ses cookies. */
 export const YOUTUBE_PLAYLISTS_FEED = 'https://www.youtube.com/feed/playlists';
 /** Page du compte : son nom s'y lit (au mieux). */
@@ -263,6 +281,30 @@ export type CookieBrowser = (typeof COOKIE_BROWSERS)[number]['id'];
 /** Profils de Firefox sous Windows (%APPDATA%) : sans ce fichier, Firefox n'est pas installé, ou n'a jamais servi. */
 export function firefoxProfilesIni(appData: string): string {
   return path.win32.join(appData, 'Mozilla', 'Firefox', 'profiles.ini');
+}
+
+/** Installateur officiel de Firefox (Mozilla), en HTTPS : la dernière version, 64 bits, en français. */
+export const FIREFOX_DOWNLOAD_URL = 'https://download.mozilla.org/?product=firefox-latest-ssl&os=win64&lang=fr';
+
+/** Emplacements de firefox.exe : installation pour tous (Program Files) ou pour ce compte. */
+export function firefoxExePaths(env: Record<string, string | undefined>): string[] {
+  const roots = [env.ProgramFiles, env['ProgramFiles(x86)'], env.ProgramW6432, env.LOCALAPPDATA].filter((r): r is string => Boolean(r));
+  return [...new Set(roots.map((r) => path.win32.join(r, 'Mozilla Firefox', 'firefox.exe')))];
+}
+
+/**
+ * Signature Authenticode lue par Windows (« Valid|CN=Mozilla Corporation, O=Mozilla Corporation, … ») :
+ * valide, et l'éditeur est Mozilla Corporation. Tout le reste (non signé, signature cassée, autre
+ * éditeur) est refusé : l'installateur n'est pas lancé.
+ */
+export function mozillaSigned(line: string): boolean {
+  const [status, subject = ''] = line.split('|');
+  return status?.trim() === 'Valid' && /(^|,\s*)O=Mozilla Corporation(,|$)/.test(subject.trim());
+}
+
+/** Firefox installé mais jamais ouvert (pas encore de profil) : ce qu'il faut faire. */
+export function firefoxUnused(): string {
+  return t('Firefox est installé mais n’a encore jamais servi : ouvrez Firefox, connectez-vous à YouTube, fermez Firefox, puis revenez ici.');
 }
 
 /** Firefox absent : ce qu'il faut faire. */

@@ -46,6 +46,7 @@ const SOURCES: Record<string, { count: number; how: string }> = {
 const CALLERS: Record<string, { count: number; how: string }> = {
   'app/src/download-sources.ts': { count: 2, how: 'transports de la file : ami (fetchFile) et adresse directe (fetchResumable)' },
   'app/src/friend-content.ts': { count: 2, how: 'fetchFile lui-même (sa déclaration et sa définition)' },
+  'app/src/firefox-install.ts': { count: 1, how: 'installateur de Firefox, chez Mozilla : manager.track' },
   'app/src/install-vpx.ts': { count: 1, how: 'archive de VPX : manager.track' },
   'app/src/media-download.ts': { count: 3, how: 'plans de VPinMediaDB (une table, toutes les tables, après l’ajout) : trackInstall' },
   'app/src/media-search.ts': { count: 2, how: 'stage : un média demandé, suivi (track) ; stagePreviews : aperçus du plan, pas un téléchargement demandé' },

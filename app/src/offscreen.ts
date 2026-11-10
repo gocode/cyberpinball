@@ -1,7 +1,7 @@
 // Rendu hors écran des essais sans opérateur (règles : packages/core/src/offscreen.ts).
 // Toutes les fenêtres de l'application naissent ici. Hors écran, elles sont rendues en
 // mémoire (rendu hors écran d'Electron) à la taille de leur écran, réel ou simulé, au
-// facteur d'échelle 1 : jamais montrées, jamais au premier plan, absentes de la barre des
+// facteur d'échelle 1 (ou à celui des écrans simulés, SIMULATED_SCALE) : jamais montrées, jamais au premier plan, absentes de la barre des
 // tâches. Le rendu, les captures (capturePage), les touches rejouées et les clics
 // (sendInputEvent) restent ceux d'une vraie fenêtre. Un guet relève toute fenêtre de
 // l'application qui deviendrait visible ou prendrait le focus.
@@ -11,15 +11,31 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { app, BrowserWindow, screen, type BrowserWindowConstructorOptions, type Rectangle, type Display } from 'electron';
-import { offscreenMode, realScreensRefusal, type Rect } from '@cyberpinball/core';
+import { offscreenMode, parseSimulatedDisplays, readJsonFile, realScreensRefusal, type Rect } from '@cyberpinball/core';
 import { currentDesktop, HIDDEN_DESKTOP, startOnHiddenDesktop, visibleWindowsOf } from '@cyberpinball/win-displays';
 import { observedDisplays } from './displays';
 import { noteTaskbarButton } from './app-lifetime';
 
 export const OFFSCREEN = offscreenMode(process.env);
 
-// Avant le démarrage d'Electron : une page de 1920 px fait 1920 pixels, quel que soit le
-// facteur d'échelle de l'écran principal du poste.
+/**
+ * Mise à l'échelle de Windows simulée : celle des écrans simulés (champ « scale », 1,5 pour 150 %), la
+ * même pour tous ; 1 sinon. Une borne en 4K à 150 % donne au playfield une page de 1440 × 2560 rendue
+ * en 2160 × 3840 pixels : la mise en page s'essaie ainsi à la taille et à l'échelle d'une vraie borne.
+ */
+export const SIMULATED_SCALE = OFFSCREEN ? simulatedScale() : 1;
+
+function simulatedScale(): number {
+  const file = process.env.CYBERPINBALL_DISPLAYS;
+  if (!file) return 1;
+  const scales = new Set(parseSimulatedDisplays(readJsonFile(file), file).map((d) => d.scale ?? 1));
+  if (scales.size > 1) throw new Error(`Écrans simulés (${file}) : une seule mise à l’échelle hors écran (lu : ${[...scales].join(', ')}).`); // i18n-ignore : fichier d’écrans simulés, pour le développeur
+  return [...scales][0] ?? 1;
+}
+
+// Avant le démarrage d'Electron : une page de 1920 px fait 1920 pixels, quel que soit le facteur
+// d'échelle de l'écran principal du poste. L'échelle simulée passe par chaque fenêtre (createWindow) :
+// le rendu hors écran ignore ce réglage (devicePixelRatio resté à 1, mesuré le 10/11/2026).
 if (OFFSCREEN) app.commandLine.appendSwitch('force-device-scale-factor', '1');
 
 // Une exception non rattrapée du processus principal ouvre d'ordinaire la boîte modale
@@ -121,7 +137,8 @@ export function createWindow(options: BrowserWindowConstructorOptions): BrowserW
     show: false,
     skipTaskbar: true,
     focusable: false,
-    webPreferences: { ...options.webPreferences, offscreen: true },
+    // Échelle simulée : la page fait 1440 × 2560 sur un écran 4K à 150 %, devicePixelRatio 1,5.
+    webPreferences: { ...options.webPreferences, offscreen: SIMULATED_SCALE === 1 ? true : { deviceScaleFactor: SIMULATED_SCALE } },
   });
   // Les sons de l'assistant sont joués (leur compte rendu fait foi), mais ne s'entendent pas.
   win.webContents.setAudioMuted(true);
@@ -268,8 +285,12 @@ export function isShown(win: BrowserWindow): boolean {
 
 /** Rectangle de fenêtre (coordonnées Electron) d'un écran donné en pixels physiques. */
 export function windowRect(physical: Rect): Rectangle {
-  // Hors écran, l'écran peut être simulé, ailleurs que sur le bureau : facteur d'échelle 1.
-  return OFFSCREEN ? { ...physical } : screen.screenToDipRect(null, physical);
+  // Hors écran, l'écran peut être simulé, ailleurs que sur le bureau : son échelle simulée (1 d'ordinaire).
+  if (OFFSCREEN) {
+    const s = SIMULATED_SCALE;
+    return s === 1 ? { ...physical } : { x: Math.round(physical.x / s), y: Math.round(physical.y / s), width: Math.round(physical.width / s), height: Math.round(physical.height / s) };
+  }
+  return screen.screenToDipRect(null, physical);
 }
 
 /**
