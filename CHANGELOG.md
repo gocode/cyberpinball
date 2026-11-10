@@ -76,6 +76,9 @@ son interface).
 - Juke-box : à l’entrée, toutes vos playlists en grandes lignes (pochettes, nombre de morceaux, durée, sources), celle qui joue marquée, « Gestion du Juke-box » en tête. Start ouvre une playlist, son nom en tête et « Playlists › Nom » ; Exit remonte aux playlists sans couper la musique, puis revient à la roue. La ligne des playlists voisines disparaît.
 - Juke-box : chaque bouton y fait ce qu’il fait sur la roue, quels que soient les boutons relevés à l’étape « Boutons » ; les MagnaSave passent à la playlist voisine dans une playlist ouverte, et ne sont proposés que s’ils sont relevés.
 - Juke-box : la page tient dans l’écran à toutes les tailles de playfield, de 720 × 1280 à la 4K, quelle que soit la mise à l’échelle de Windows.
+- Taper au téléphone ne fait plus planter Cyber Pinball : la cause était un raccourci clavier (Ctrl+A) d'un menu caché, hérité d'Electron, qui faisait tomber l'application ; ce menu est retiré, la copie, le collage et la sélection marchent comme avant.
+- « Récupérer » n'ouvre plus la page de connexion de Google, qui refuse le navigateur intégré : la fenêtre explique pourquoi et propose de passer par Firefox.
+- Compte YouTube : « Installer Firefox » quand il manque. L'installateur officiel est téléchargé chez Mozilla, sa signature vérifiée, puis Firefox installé sans fenêtre ; la suite est dite à l'écran.
 
 ## 0.1.8
 

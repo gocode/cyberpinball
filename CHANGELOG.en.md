@@ -74,6 +74,9 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Juke-box: on entry, all your playlists as large rows (covers, track count, duration, sources), the one playing marked, “Gestion du Juke-box” first. Start opens a playlist, its name at the top with “Playlists › Name”; Exit goes back up to the playlists without stopping the music, then back to the wheel. The neighboring-playlists line is gone.
 - Juke-box: each button does what it does on the wheel, whatever buttons were recorded in the “Buttons” step; the MagnaSave buttons move to the neighboring playlist inside an open playlist, and are only offered when recorded.
 - Juke-box: the page fits the screen at every playfield size, from 720 × 1280 to 4K, whatever the Windows scaling.
+- Typing from the phone no longer crashes Cyber Pinball: the cause was a keyboard shortcut (Ctrl+A) of a hidden menu inherited from Electron, which brought the application down; that menu is removed, and copy, paste and selection work as before.
+- “Get” no longer opens Google’s sign-in page, which refuses the built-in browser: the window explains why and offers to go through Firefox.
+- YouTube account: “Install Firefox” when it is missing. The official installer is downloaded from Mozilla, its signature checked, then Firefox installed with no window; what to do next is shown on screen.
 
 ## 0.1.8
 
