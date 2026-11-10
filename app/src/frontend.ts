@@ -273,7 +273,7 @@ import { coverDisplay, hideCovered, minimizeCovered } from './cover-display';
 import { DesktopMode } from './desktop-mode';
 import { answerLegacy, legacyDesktopTurned, orientationForDesktop, orientationFromDesktop, takeOrientationProblems } from './display-orientation';
 import { acceptFrontends, otherFrontendsOnThisPc, unacceptedFrontends } from './frontend-gate';
-import { hideTaskbars, isVeil, nameScreen, onScreensSettled, recoverScreens, relaunchCovered, restoreTaskbars, setDesktopMode, settleScreens, takeCoverIncidents } from './screen-guard';
+import { hideTaskbars, isVeil, nameScreen, onScreensSettled, recoverScreens, relaunchCovered, restoreTaskbars, setDesktopMode, setScreensBusy, settleScreens, takeCoverIncidents } from './screen-guard';
 import { describeReset, resetButtons } from './buttons-reset';
 import { forcedRotation, menuRotation, openSettings } from './settings';
 import { allowJukebox, allowPreview, serveMedias } from './media-protocol';
@@ -2862,6 +2862,8 @@ export function startFrontend(): void {
   // Écran débranché puis rebranché hors partie : chaque fenêtre du menu reprend le sien. Pendant
   // un lancement ou une partie, rien ne bouge (le premier plan va à VPX) : la reprise se fait au retour.
   onScreensSettled(() => playing || launch || recoverScreens('displays'));
+  // Pendant une partie ou un lancement, VPX couvre les écrans : le voile seul y est normal.
+  setScreensBusy(() => Boolean(playing || launch));
   headset = new HeadsetMenu({
     appDir: path.join(__dirname, '..'),
     wanted: () => !headsetPaused && !closing && (Boolean(HEADSET_TRIAL_DIR) || (vrMode === 'auto' && probeVr().ready)),

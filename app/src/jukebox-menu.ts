@@ -909,14 +909,16 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       const add = (a: Action) => actions.push(a) - 1;
       const sections: Section[] = [];
       if (flash) sections.push({ kind: 'jb-flash', rows: [{ text: flash.text, tone: flash.tone, icon: flash.tone === 'ok' ? 'check' : 'info' }] });
-      sections.push({ kind: 'jb-summary', rows: [{ text: state.connected ? (state.name ?? t('Compte YouTube connecté')) : t('Pas connecté'), detail: accountText(false), icon: 'account', tone: state.connected ? 'ok' : 'quiet' }] });
+      // « Pas connecté » ne s'affiche jamais sans raison : après un import de Firefox raté, il dit pourquoi.
+      const problem = account.problem();
+      sections.push({ kind: 'jb-summary', rows: [{ text: state.connected ? (state.name ?? t('Compte YouTube connecté')) : t('Pas connecté'), detail: problem ? t('Dernier essai avec Firefox : {reason}', { reason: problem }) : accountText(false), icon: 'account', tone: state.connected ? 'ok' : problem ? 'warning' : 'quiet' }] });
       if (state.connected) {
         add({ label: t('Mes playlists YouTube'), icon: 'list', key: 'mine', run: () => openMine() });
         add({ label: t('Chercher sur YouTube'), icon: 'search', key: 'search', run: () => askSearch() });
         add({ label: t('Se déconnecter'), icon: 'unlock', key: 'sign-out', detail: t('Efface la connexion à YouTube et à Google gardée par Cyber Pinball'), run: () => void signOut() });
       } else {
         add({ label: t('Se connecter à YouTube'), icon: 'account', key: 'sign-in', tone: 'ok', detail: t('La page de Google s’ouvre dans « Récupérer » : fermez-la une fois connecté'), run: () => signIn() });
-        add({ label: t('Utiliser la connexion d’un navigateur'), icon: 'import', key: 'browser', detail: t('Si Google refuse la connexion : un navigateur de ce PC déjà connecté à YouTube'), run: () => openBrowsers(toAccount) });
+        add({ label: t('Utiliser la connexion de Firefox'), icon: 'import', key: 'browser', detail: t('Si Google refuse la connexion : Firefox, sur ce PC, déjà connecté à YouTube'), run: () => openBrowsers(toAccount) });
       }
       add({ label: t('Retour'), icon: 'back', key: 'back', run: backTo });
       return {
@@ -948,10 +950,13 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
     host.redraw();
   }
 
-  /** Repli : le navigateur dont reprendre la connexion à YouTube (yt-dlp --cookies-from-browser). */
+  /**
+   * Repli : reprendre la connexion à YouTube de Firefox (yt-dlp --cookies-from-browser). Firefox seul :
+   * Chrome, Edge et Brave chiffrent ou verrouillent leurs cookies, les proposer ne servait à rien.
+   */
   function openBrowsers(backTo: () => void): void {
     let busy: CookieBrowser | undefined;
-    let problem: string | undefined;
+    let problem: string | undefined = host.account?.problem();
     const run = async (browser: CookieBrowser) => {
       if (busy || !host.account) return;
       busy = browser;
@@ -973,15 +978,15 @@ export function createJukeboxMenu(host: JukeboxMenuHost) {
       const actions: Action[] = [];
       const rows: Row[] = COOKIE_BROWSERS.map((b) => {
         const at = actions.push({ label: b.label, key: `browser:${b.id}`, run: () => void run(b.id) }) - 1;
-        const detail = busy === b.id ? t('Lecture de la connexion…') : b.id === 'firefox' ? t('Conseillé : celui dont yt-dlp lit le plus sûrement les cookies') : t('Fermez-le d’abord complètement');
-        return { text: b.label, detail, icon: 'globe', action: at, pick: true, ...(busy === b.id ? { progress: { busy: true } } : {}), ...(busy && busy !== b.id ? { tone: 'quiet' as const } : {}) };
+        const detail = busy === b.id ? t('Lecture de la connexion…') : t('Connectez-vous à YouTube dans Firefox, fermez-le, puis Start ici');
+        return { text: b.label, detail, icon: 'globe', action: at, pick: true, ...(busy === b.id ? { progress: { busy: true } } : {}) };
       });
       actions.push({ label: t('Retour'), icon: 'back', key: 'back', run: backTo });
       const sections: Section[] = [];
       if (problem) sections.push({ kind: 'jb-flash', rows: [{ text: t('Connexion pas reprise'), detail: problem, tone: 'warning', icon: 'alert' }] });
-      sections.push({ title: t('Navigateur où vous êtes connecté à YouTube'), kind: 'jb-global', options: true, rows });
+      sections.push({ title: t('Reprendre la connexion de Firefox'), kind: 'jb-global', options: true, rows });
       return {
-        heading: t('Choisir un navigateur'),
+        heading: t('Connexion de Firefox'),
         icon: 'account',
         lead: t('Seuls les cookies de YouTube et de Google sont repris, dans la session du navigateur intégré ; aucun mot de passe. Le fichier intermédiaire est effacé aussitôt.'),
         variant: 'jukebox jukebox-account',

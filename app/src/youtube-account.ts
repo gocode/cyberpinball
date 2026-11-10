@@ -19,9 +19,11 @@ import {
   accountPlaylistsArgs,
   ACCOUNT_NAME_PROBE,
   browserCookiesArgs,
-  browserCookiesError,
+  browserCookiesProblem,
   changedCookies,
   COOKIE_BROWSERS,
+  firefoxMissing,
+  firefoxProfilesIni,
   isYoutubeAccountDomain,
   isYoutubeDomain,
   netscapeCookies,
@@ -38,6 +40,7 @@ import {
   type SiteState,
 } from '@cyberpinball/core';
 import type { Acquirer, AcquireRequest } from './acquire-window';
+import { journalIncident } from './uncaught';
 import type { RunResult } from './ytdlp-tool';
 
 export interface YoutubeAccountOptions {
@@ -47,6 +50,8 @@ export interface YoutubeAccountOptions {
   node?: string;
   /** Dossier temporaire des fichiers de cookies ; par défaut <temp>\cyberpinball-cookies. */
   tempDir?: string;
+  /** Profils de Firefox (essais) ; par défaut, profiles.ini de Firefox dans %APPDATA%. */
+  firefoxIni?: string;
   /** L'état a changé (connexion, déconnexion, nom lu) : les écrans se redessinent. */
   changed?(): void;
 }
@@ -111,6 +116,9 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
   }
 
   const accountCookies = () => opts.acquirer.cookiesWhere(isYoutubeAccountDomain);
+  /** Pourquoi le dernier import de Firefox a échoué : « Pas connecté » ne s'affiche jamais sans raison. */
+  let problem: string | undefined;
+  const firefoxIni = () => opts.firefoxIni ?? firefoxProfilesIni(process.env.APPDATA ?? path.join(os.homedir(), 'AppData', 'Roaming'));
 
   /** Relit l'état dans les cookies de la session ; le nom du compte, au mieux, une fois par connexion. */
   async function refresh(): Promise<YoutubeAccountState> {
@@ -195,21 +203,33 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
   async function fromBrowser(browser: CookieBrowser, signal?: AbortSignal): Promise<AccountResult<{ state: YoutubeAccountState }>> {
     const label = COOKIE_BROWSERS.find((b) => b.id === browser)?.label ?? browser;
     const file = tempFile();
+    // Un échec dit pourquoi à l'écran, et laisse une entrée dans erreurs.txt (le nombre de cookies, jamais leur valeur).
+    const fail = (reason: string, detail: string): AccountResult<never> => {
+      problem = reason;
+      opts.changed?.();
+      journalIncident(`Compte YouTube : connexion de ${label} pas reprise (${detail}) : ${reason}`); // i18n-ignore : journal
+      return { ok: false, reason };
+    };
     try {
+      // Firefox absent : rien à lire, et la marche à suivre (plutôt qu'un « pas connecté » muet).
+      if (!fs.existsSync(firefoxIni())) return fail(firefoxMissing(), 'Firefox absent');
       const r = await opts.ytdlp.run(browserCookiesArgs(browser, file, opts.node), signal);
-      if (!r.ok) return r;
+      if (!r.ok) return r.cancelled ? r : fail(r.reason, 'yt-dlp');
+      // Ce que yt-dlp a écrit, sans le chemin du fichier de cookies.
+      const lines = r.lines.map((l) => l.split(file).join('cookies.txt'));
       let taken: CookieRecord[] = [];
       try {
         taken = parseNetscapeCookies(fs.readFileSync(file, 'utf8')).filter((c) => isYoutubeAccountDomain(c.domain));
       } catch {
         taken = [];
       }
-      if (!youtubeState(taken).connected) {
-        const error = r.lines.find((l) => /^ERROR:/.test(l))?.split(file).join('cookies.txt');
-        return { ok: false, reason: taken.length || !error ? t('Pas de connexion à YouTube dans {browser} : connectez-vous à YouTube dans {browser}, fermez-le, puis réessayez', { browser: label }) : browserCookiesError(error, label) };
-      }
-      await opts.acquirer.setCookies(taken);
-      return { ok: true, state: await refresh() };
+      if (!youtubeState(taken).connected) return fail(browserCookiesProblem(lines, label, taken.length), `${taken.length} cookies de YouTube et de Google repris`); // i18n-ignore : journal
+      const set = await opts.acquirer.setCookies(taken);
+      const state = await refresh();
+      // Repris mais pas posés dans la session (refusés par Chromium) : jamais « connecté » à tort.
+      if (!state.connected) return fail(t('Les cookies de {browser} ont été lus, mais la session du navigateur intégré les a refusés.', { browser: label }), `${set} cookies posés sur ${taken.length}`); // i18n-ignore : journal
+      problem = undefined;
+      return { ok: true, state };
     } finally {
       drop(file);
     }
@@ -219,6 +239,7 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
     await trialCookies();
     await opts.acquirer.signOutWhere(isYoutubeAccountDomain);
     nameFor = undefined;
+    problem = undefined;
     state = { connected: false, remembered: false };
     opts.changed?.();
   }
@@ -246,7 +267,7 @@ export function createYoutubeAccount(opts: YoutubeAccountOptions) {
     opts.acquirer.show(request);
   }
 
-  return { state: () => state, refresh, withCookies, playlists, fromBrowser, signOut, openLogin, openSearch };
+  return { state: () => state, problem: () => (state.connected ? undefined : problem), refresh, withCookies, playlists, fromBrowser, signOut, openLogin, openSearch };
 }
 
 export type YoutubeAccount = ReturnType<typeof createYoutubeAccount>;

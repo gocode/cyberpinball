@@ -65,6 +65,8 @@ import {
   webSearchOf,
   WEB_ENGINES,
   youtubePlaylistSearchUrl,
+  frontMove,
+  type FrontMove,
   type GrabKind,
   type VideoPage,
   type WebEngine,
@@ -83,12 +85,37 @@ import {
 import { setCursorPosition } from '@cyberpinball/win-displays';
 import type { AdBlocker } from './ad-blocker';
 import { coverDisplay, fillBelow } from './cover-display';
-import { onJoystickInput } from './joystick-input';
+import { onJoystickInput, watchJoystickButtons } from './joystick-input';
 import { createWindow, OFFSCREEN, primaryRect } from './offscreen';
 import type { PhoneRemote } from './phone-remote';
+import { hostForLog, journalIncident, logsOwnCrashes } from './uncaught';
 import type { GrabProgress, GrabResult } from './ytdlp-tool';
 
 export const ACQUIRE_PARTITION = 'persist:acquisition';
+
+/**
+ * Ce que le navigateur intégré ne sait pas servir, refusé net (PinCab, 10/11/2026 : la proposition
+ * de Google de se connecter par une clé d'accès faisait souvent planter l'application). Une borne n'a
+ * ni Windows Hello à portée, ni appareil à choisir, et toute fenêtre de Windows s'ouvrirait sous les
+ * écrans de la borne, où personne ne peut la fermer.
+ * - WebAuthn (clés d'accès, clés de sécurité, téléphone à proximité) est retiré des pages et de leurs
+ *   cadres (disableBlinkFeatures) : la page ne le propose pas, ou sa demande est refusée sur-le-champ,
+ *   et elle passe au mot de passe.
+ * - Autorisations : seules celles qui n'ouvrent rien et ne touchent à aucun appareil (PAGE_PERMISSIONS).
+ *   Le reste (appareil photo, micro, position, notifications, MIDI, ouvrir une autre application,
+ *   capture d'écran, presse-papiers en lecture, fichiers…) est refusé ; jusqu'ici, Electron accordait tout.
+ * - Choix d'un périphérique (HID, USB, série, Bluetooth) : annulé, sans fenêtre ; Electron prenait
+ *   sinon le premier appareil Bluetooth venu.
+ * Chaque refus est noté une fois par site dans erreurs.txt. Essai : packages/core/src/test/saisie-robuste.test.ts.
+ */
+const NO_WEBAUTHN = 'WebAuth';
+const PAGE_PERMISSIONS: ReadonlySet<string> = new Set(['fullscreen', 'clipboard-sanitized-write', 'speaker-selection', 'storage-access', 'top-level-storage-access', 'mediaKeySystem']);
+/** Une page qui retombe avant ce délai n'est plus rechargée d'office : le bandeau dit quoi faire. */
+const CRASH_AGAIN_MS = 15_000;
+/** Exit tenu ce temps : « Récupérer » se ferme de force, quoi que fasse la page. */
+const EXIT_HOLD_MS = 2000;
+/** Page qui ne répond plus depuis ce temps : son rendu est arrêté, puis la page rechargée. */
+const HUNG_MS = 8000;
 /** Message du bandeau quand la fenêtre reprend où l'utilisateur en était. */
 const RESUMED = (request: AcquireRequest) =>
   request.search ? t('Repris là où vous en étiez. « Retour à la recherche » revient à la première page de résultats.') : t('Repris là où vous en étiez. « Retour à la fiche » revient à la page de départ.');
@@ -285,6 +312,24 @@ export function createAcquirer(events: AcquireEvents) {
   /** Historique de la dernière fenêtre fermée, et sa page de départ : la rouvrir dessus le reprend. */
   let kept: { url: string; entries: Electron.NavigationEntry[]; index: number } | undefined;
 
+  /** Refus déjà notés, « autorisation@hôte » : un par site et par démarrage dans erreurs.txt. */
+  const denied = new Set<string>();
+  function refused(permission: string, url: string): void {
+    const key = `${permission}@${hostForLog(url)}`;
+    if (denied.has(key)) return;
+    denied.add(key);
+    journalIncident(`Navigateur intégré : demande refusée (${permission}) de ${hostForLog(url)}, que la borne ne sait pas servir`); // i18n-ignore : journal
+  }
+
+  /** Une page de la session : un choix d'appareil Bluetooth est annulé (Electron prenait le premier venu). */
+  function guardContents(contents: Electron.WebContents): void {
+    contents.on('select-bluetooth-device', (event, _devices, callback) => {
+      event.preventDefault();
+      refused('bluetooth', contents.getURL());
+      callback('');
+    });
+  }
+
   /** Session de la fenêtre : téléchargements interceptés, agent utilisateur de Chromium sans « Electron ». */
   function acquireSession(): Session {
     if (prepared) return prepared;
@@ -293,6 +338,32 @@ export function createAcquirer(events: AcquireEvents) {
     s.setUserAgent(s.getUserAgent().replace(/\s(cyberpinball|Electron)\/\S+/gi, ''));
     // Publicités bloquées (ad-blocker.ts), sauf sur les sites sources ou si l'utilisateur les veut.
     events.adBlocker?.attach(s);
+    // Ce que le navigateur intégré ne sait pas servir : refusé, sans fenêtre (NO_WEBAUTHN, PAGE_PERMISSIONS).
+    // Une demande de clé d'accès faite sans vérifier : refusée sur-le-champ (acquire-page-preload.ts).
+    s.registerPreloadScript({ type: 'frame', filePath: path.join(__dirname, 'acquire-page-preload.js') });
+    s.setPermissionRequestHandler((contents, permission, callback, details) => {
+      const ok = PAGE_PERMISSIONS.has(permission);
+      if (!ok) refused(permission, details.requestingUrl || contents?.getURL() || '');
+      callback(ok);
+    });
+    s.setPermissionCheckHandler((_contents, permission) => PAGE_PERMISSIONS.has(permission));
+    s.setDevicePermissionHandler(() => false);
+    s.on('select-hid-device', (event, details, callback) => {
+      event.preventDefault();
+      refused('hid', details.frame?.url ?? '');
+      callback();
+    });
+    s.on('select-usb-device', (event, details, callback) => {
+      event.preventDefault();
+      refused('usb', details.frame?.url ?? '');
+      callback();
+    });
+    s.on('select-serial-port', (event, _ports, contents, callback) => {
+      event.preventDefault();
+      refused('serial', contents.getURL());
+      callback('');
+    });
+    s.setBluetoothPairingHandler((_details, callback) => callback({ confirmed: false }));
     s.on('will-download', (_event, item, contents) => {
       // Reprise d'un téléchargement recréé depuis son état (redémarrage) : son chemin est déjà posé.
       const resumed = resumeWaiters.get(item.getSavePath().toLowerCase());
@@ -629,9 +700,10 @@ export function createAcquirer(events: AcquireEvents) {
   function videoLine(video: VideoPage): { text: string; hint: string; direct: boolean; grab?: { preferred: GrabKind } } {
     const duration = video.duration ? ` · ${formatClock(video.duration)}` : '';
     const text = video.site === 'other' ? t('Vidéo de la page : « {title} »{duration}', { title: video.title, duration }) : t('Vidéo {site} : « {title} »{duration}', { site: videoSiteName(video.site), title: video.title, duration });
-    if (video.direct) return { text, hint: t('La page lit un fichier vidéo : « Télécharger cette vidéo » le rend au média, son son compris.'), direct: true };
+    const claimed = Boolean(open && claims.has(open.view.webContents.id));
+    if (video.direct) return { text, hint: claimed ? t('La page lit un fichier vidéo : « Télécharger cette vidéo » le rend au média, son son compris.') : t('La page lit un fichier vidéo : « Télécharger cette vidéo » le range dans la liste d’attente.'), direct: true };
     // yt-dlp : seulement pour une recherche partie d'un média (le fichier lui revient).
-    if (events.grabVideo && open && claims.has(open.view.webContents.id)) {
+    if (events.grabVideo && claimed && open) {
       return {
         text,
         hint: events.grabVideo.installed()
@@ -641,9 +713,14 @@ export function createAcquirer(events: AcquireEvents) {
         grab: { preferred: open.request.search?.want ?? 'video' },
       };
     }
+    // Hors d'une recherche partie d'un média, yt-dlp n'a pas de destinataire : on dit quoi faire, jamais
+    // que l'outil manque (il est là, ou s'installe à la demande). Une vidéo ou une playlist YouTube va
+    // d'abord au Juke-box (sa ligne, juste au-dessus). Garde-fou : saisie-robuste.test.ts.
     return {
       text,
-      hint: t('Récupérer la vidéo ou son son demanderait un outil externe (yt-dlp) que Cyber Pinball n’a pas : prenez un fichier que la page propose au téléchargement.'),
+      hint: jukeboxLine()
+        ? t('« Ajouter au Juke-box » la garde pour le Juke-box. Pour en faire le média d’une table, ouvrez la recherche depuis ce média (fiche de la table).')
+        : t('Pour en faire le média d’une table, ouvrez la recherche depuis ce média (fiche de la table) : yt-dlp en récupère alors le son ou la vidéo.'),
       direct: false,
     };
   }
@@ -841,11 +918,11 @@ export function createAcquirer(events: AcquireEvents) {
   /** Actions de la feuille « Plus » du téléphone : celles du bandeau, qu'il ne peut pas toucher. */
   function remoteActions(): { id: string; label: string }[] {
     if (!open) return [];
-    const out = [{ id: 'home', label: open.request.search ? t('Retour à la recherche') : t('Retour à la fiche') }, { id: 'reload', label: t('Recharger la page') }];
+    // Une vidéo ou une playlist YouTube : « Ajouter au Juke-box » d'abord.
+    const out = [...(jukeboxLine() ? [{ id: 'jukebox', label: t('Ajouter au Juke-box') }] : []), { id: 'home', label: open.request.search ? t('Retour à la recherche') : t('Retour à la fiche') }, { id: 'reload', label: t('Recharger la page') }];
     const video = open.request.search && open.video ? videoLine(open.video) : undefined;
     if (video?.direct) out.push({ id: 'video', label: t('Télécharger cette vidéo') });
     if (video?.grab) out.push({ id: 'grab-audio', label: t('Récupérer le son') }, { id: 'grab-video', label: t('Récupérer la vidéo') });
-    if (jukeboxLine()) out.push({ id: 'jukebox', label: t('Ajouter au Juke-box') });
     for (const line of downloadLines().lines) out.push({ id: `cancel:${line.id}`, label: t('Annuler : {file}', { file: line.filename }) });
     return out;
   }
@@ -970,7 +1047,7 @@ export function createAcquirer(events: AcquireEvents) {
     // Au-dessus des fenêtres plein écran du menu, sur l'écran qu'elle couvre.
     win.setAlwaysOnTop(true, 'screen-saver');
     const view = new WebContentsView({
-      webPreferences: { session: s, contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: OFFSCREEN },
+      webPreferences: { session: s, contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: OFFSCREEN, disableBlinkFeatures: NO_WEBAUTHN },
     });
     win.contentView.addChildView(view);
     open = restore
@@ -981,6 +1058,30 @@ export function createAcquirer(events: AcquireEvents) {
     const contents = view.webContents;
     claimFor(contents.id, request.claim);
     watchSizes(contents);
+    guardContents(contents);
+    // La page tombe (plantage du rendu, mémoire) : notée, rechargée une fois, et le clavier passe au
+    // bandeau, où Échap et Exit ferment toujours. Avant le 10/11/2026, elle restait blanche au-dessus de
+    // tout et Échap, envoyé à la page morte, ne fermait plus rien.
+    logsOwnCrashes(contents);
+    let crashedAt = 0;
+    contents.on('render-process-gone', (_e, details) => {
+      if (details.reason === 'clean-exit' || contents.isDestroyed()) return;
+      const host = hostForLog(contents.getURL());
+      const again = Date.now() - crashedAt < CRASH_AGAIN_MS;
+      crashedAt = Date.now();
+      journalIncident(`Navigateur intégré : la page ${host} est tombée (${details.reason}, code ${details.exitCode})${again ? ', de nouveau : pas rechargée' : ', rechargée'}`); // i18n-ignore : journal
+      setStatus(again ? t('La page a de nouveau planté : « Précédent », « Retour à la fiche » ou Fermer (Échap).') : t('La page a planté : elle est rechargée.'), true);
+      if (!win.isDestroyed()) {
+        win.focus();
+        win.webContents.focus();
+      }
+      if (again) return;
+      setTimeout(() => {
+        if (contents.isDestroyed()) return;
+        contents.once('did-finish-load', () => !contents.isDestroyed() && !barTyping && !open?.phonePending && contents.focus());
+        contents.reload();
+      }, 300);
+    });
     // Le téléphone pilote cette page : QR code dans le bandeau, liaison coupée à la fermeture.
     events.remote?.attach({
       win,
@@ -1092,6 +1193,27 @@ export function createAcquirer(events: AcquireEvents) {
       kept = entries.length ? { url: open?.request.url ?? request.url, entries, index: contents.navigationHistory.getActiveIndex() } : undefined;
     });
     keepInFront(win);
+    // Toujours une sortie (PinCab, 10/11/2026 : écrans noirs, il fallait le gestionnaire des tâches).
+    // Le bouton Exit du joystick est lu ici quelle que soit la fenêtre au premier plan : si aucune
+    // fenêtre de Cyber Pinball n'a le focus (une fenêtre de Windows l'a pris, la page est tombée),
+    // il ferme quand même ; tenu EXIT_HOLD_MS, il ferme de force, page figée ou pas.
+    const stopExitWatch = watchJoystickButtons((code, down) => exitButton(code, down));
+    win.once('closed', stopExitWatch);
+    // Page figée (une boucle sans fin, un dialogue qui attend) : le bandeau reprend le clavier ; si
+    // elle ne répond toujours pas au bout de HUNG_MS, son rendu est arrêté puis la page rechargée.
+    let hung: NodeJS.Timeout | undefined;
+    contents.on('unresponsive', () => {
+      journalIncident(`Navigateur intégré : la page ${hostForLog(contents.getURL())} ne répond plus`); // i18n-ignore : journal
+      setStatus(t('La page ne répond plus : Fermer (Échap ou Exit), ou attendez son rechargement.'), true);
+      if (!win.isDestroyed()) {
+        win.focus();
+        win.webContents.focus();
+      }
+      clearTimeout(hung);
+      hung = setTimeout(() => !contents.isDestroyed() && contents.forcefullyCrashRenderer(), HUNG_MS);
+    });
+    contents.on('responsive', () => clearTimeout(hung));
+    win.once('closed', () => clearTimeout(hung));
     win.on('closed', () => {
       // La fenêtre fermée ne détruit pas sa vue (Electron, WebContentsView) : la page du site
       // continuait de vivre, et une vidéo lancée dedans (YouTube) de jouer. Fermée ici ; ses
@@ -1145,9 +1267,49 @@ export function createAcquirer(events: AcquireEvents) {
       if (other !== win) setImmediate(raise);
     };
     app.on('browser-window-focus', otherFocused);
-    win.on('blur', () => setImmediate(() => BrowserWindow.getFocusedWindow() && raise()));
-    win.on('always-on-top-changed', (_e, onTop) => onTop || setImmediate(raise));
+    // Une fenêtre de Windows prend le premier plan (dialogue de sécurité, gestionnaire des tâches) :
+    // « Récupérer » lui cède son « toujours au-dessus », puis le reprend avec le focus (frontMove).
+    let yielded = false;
+    const apply = (move: FrontMove) => {
+      if (win.isDestroyed() || OFFSCREEN || move === 'keep') return;
+      if (move === 'raise') return raise();
+      yielded = move === 'yield';
+      win.setAlwaysOnTop(!yielded, 'screen-saver');
+    };
+    win.on('blur', () => setImmediate(() => apply(frontMove('blur', Boolean(BrowserWindow.getFocusedWindow()), yielded))));
+    win.on('focus', () => apply(frontMove('focus', true, yielded)));
+    win.on('always-on-top-changed', (_e, onTop) => onTop || setImmediate(() => apply(frontMove('top-lost', false, yielded))));
     win.once('closed', () => app.off('browser-window-focus', otherFocused));
+  }
+
+  /** Bouton Exit tenu : depuis quand, et son minuteur de fermeture forcée. */
+  let exitHold: { timer: NodeJS.Timeout } | undefined;
+
+  /**
+   * Bouton du joystick lu quelle que soit la fenêtre au premier plan (watchJoystickButtons). Exit,
+   * fenêtre ouverte : sans fenêtre de Cyber Pinball au premier plan, il ferme comme d'habitude (le
+   * chemin ordinaire ne le recevrait pas) ; tenu EXIT_HOLD_MS, il ferme de force (forceClose).
+   */
+  function exitButton(code: string, down: boolean): void {
+    if (!open || open.win.isDestroyed() || !events.exitKeys?.().includes(code)) return;
+    if (!down) {
+      clearTimeout(exitHold?.timer);
+      exitHold = undefined;
+      return;
+    }
+    if (exitHold) return;
+    exitHold = { timer: setTimeout(() => forceClose('Exit tenu'), EXIT_HOLD_MS) };
+    exitHold.timer.unref?.();
+    if (!BrowserWindow.getFocusedWindow()) close();
+  }
+
+  /** Fermeture qui ne dépend de rien dans la page ni dans le bandeau : la fenêtre est détruite. */
+  function forceClose(why: string): void {
+    clearTimeout(exitHold?.timer);
+    exitHold = undefined;
+    if (!open || open.win.isDestroyed()) return;
+    journalIncident(`Navigateur intégré : fermeture forcée (${why})`); // i18n-ignore : journal
+    open.win.destroy();
   }
 
   /**
@@ -1188,9 +1350,10 @@ export function createAcquirer(events: AcquireEvents) {
 
   /** Vue cachée de la session, sans son, qui ouvre les nouveaux onglets en elle-même. */
   function hiddenView(): WebContentsView {
-    const view = new WebContentsView({ webPreferences: { session: acquireSession(), contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: true } });
+    const view = new WebContentsView({ webPreferences: { session: acquireSession(), contextIsolation: true, sandbox: true, nodeIntegration: false, offscreen: true, disableBlinkFeatures: NO_WEBAUTHN } });
     hiddenViews.add(view);
     const contents = view.webContents;
+    guardContents(contents);
     contents.once('destroyed', () => hiddenViews.delete(view));
     contents.setAudioMuted(true);
     // Un nouvel onglet (lien de téléchargement) : dans la même vue.
@@ -1447,6 +1610,10 @@ export function createAcquirer(events: AcquireEvents) {
           path: c.name.startsWith('__Host-') ? '/' : c.path || '/',
           secure: c.secure || c.name.startsWith('__Secure-') || c.name.startsWith('__Host-'),
           httpOnly: Boolean(c.httpOnly),
+          // Le fichier Netscape ne dit pas SameSite : les cookies « tiers » de Google (__Secure-3P…)
+          // sont SameSite=None chez lui ; posés « lax » (défaut d'Electron), les pages de YouTube
+          // intégrées ailleurs ne les recevraient pas.
+          ...(/^__Secure-3P/.test(c.name) ? { sameSite: 'no_restriction' as const } : {}),
           ...(c.expirationDate ? { expirationDate: c.expirationDate } : {}),
         });
         set++;
@@ -1486,6 +1653,10 @@ export function createAcquirer(events: AcquireEvents) {
     resumable: (url: string) => Boolean((open && !open.win.isDestroyed() && open.request.url === url) || kept?.url === url),
     /** Transport des pages de site pour le gestionnaire de téléchargements : reprise d'un téléchargement coupé. */
     siteTransport,
+    /** Bouton du joystick (essais : comme watchJoystickButtons le remet). */
+    exitButton,
+    /** Pour les essais : les demandes refusées, « autorisation@hôte ». */
+    denied: () => [...denied],
     /** Pour les essais : fenêtre et page affichées. */
     current: () => open,
   };

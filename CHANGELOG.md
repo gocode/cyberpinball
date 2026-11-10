@@ -55,6 +55,13 @@ son interface).
 - Casque éteint ou Link coupé : la partie se ferme et le menu revient seul aux écrans du PC. Retirer simplement le casque ne change rien.
 - Dans le casque, au menu, X passe à la collection suivante (en partie, X reste le crédit).
 - Téléchargements : chaque liste va du plus récent au plus ancien, en cours comme terminés.
+- Taper depuis le téléphone dans la page de connexion de Google ne fait plus planter Cyber Pinball : le texte part comme au clavier. Une page qui plante quand même est rechargée.
+- Toujours une sortie : Exit ferme « Récupérer » même quand Windows a pris le premier plan, et Exit tenu deux secondes le ferme de force. Une fenêtre du menu qui plante est rechargée au lieu de rester noire ; une fenêtre de Windows (gestionnaire des tâches, dialogue) passe devant.
+- Connexion à Google dans « Récupérer » : les clés d'accès (Windows Hello, téléphone à proximité, clé de sécurité) ne sont plus proposées ; Google passe au mot de passe.
+- Le navigateur intégré refuse ce qu'une borne ne sait pas servir (appareil photo, micro, position, notifications, périphériques) au lieu de l'accorder.
+- Compte YouTube : « Utiliser la connexion de Firefox » remplace le choix d'un navigateur (Chrome, Edge et Brave protègent leurs cookies). Firefox absent ou pas connecté à YouTube : l'écran le dit, avec la marche à suivre.
+- Sur une vidéo YouTube, « Récupérer » propose d'abord « Ajouter au Juke-box », et ne prétend plus que yt-dlp manque.
+- Les incidents rattrapés et les plantages sont notés dans logs\erreurs.txt ; en borne dédiée, Cyber Pinball figé est relancé tout seul.
 
 ## 0.1.8
 

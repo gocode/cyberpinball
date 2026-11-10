@@ -8,6 +8,7 @@
 //   YouTube pendant l'appel, ou repris d'un navigateur par --cookies-from-browser) ;
 // - la liste des playlists du compte, lue par yt-dlp sur youtube.com/feed/playlists.
 
+import * as path from 'node:path';
 import { t } from './i18n';
 import type { SiteCookie, SiteState } from './sitesessions';
 
@@ -220,20 +221,54 @@ export function parseAccountPlaylists(json: unknown): AccountPlaylist[] {
 export function browserCookiesError(line: string | undefined, browser: string): string {
   const l = line ?? '';
   if (/could not copy .*cookie database|database is locked|permission denied/i.test(l)) return t('{browser} garde ses cookies tant qu’il est ouvert : fermez-le complètement, puis réessayez', { browser });
-  if (/dpapi|app.?bound|v20|failed to decrypt/i.test(l)) return t('{browser} chiffre ses cookies d’une façon que yt-dlp ne sait pas lire : prenez Firefox, ou connectez-vous dans « Récupérer »', { browser });
+  if (ENCRYPTED.test(l)) return encryptedCookies(browser);
   if (/could not find|not installed|no such file|unsupported browser/i.test(l)) return t('{browser} n’est pas installé sur ce PC, ou n’a pas encore de profil', { browser });
   if (!l) return t('{browser} n’a rien donné', { browser });
   return l.replace(/^ERROR:\s*/, '').slice(0, 200);
 }
 
-/** Navigateurs dont yt-dlp sait lire les cookies (--cookies-from-browser), Firefox en tête : c'est le plus sûr. */
-export const COOKIE_BROWSERS = [
-  { id: 'firefox', label: 'Firefox' },
-  { id: 'edge', label: 'Microsoft Edge' },
-  { id: 'chrome', label: 'Google Chrome' },
-  { id: 'brave', label: 'Brave' },
-] as const;
+/** Cookies chiffrés que yt-dlp ne sait pas lire : Chrome depuis la version 127 (chiffrement lié à l'application, « v20 »), Edge et Brave ensuite. */
+const ENCRYPTED = /dpapi|app.?bound|\bv20\b|failed to decrypt|could not be decrypted|cannot decrypt/i;
+
+function encryptedCookies(browser: string): string {
+  return t('{browser} chiffre ses cookies (Chrome 127 et suivants, Edge, Brave) : yt-dlp ne peut pas les lire. Prenez Firefox : connectez-vous à YouTube dans Firefox, fermez-le, puis choisissez Firefox ici. Ou connectez-vous dans « Récupérer ».', { browser });
+}
+
+/**
+ * Pourquoi la connexion d'un navigateur n'a pas été reprise, d'après tout ce que yt-dlp a écrit
+ * (erreurs, avertissements, « Extracted N cookies from chrome (M could not be decrypted) ») :
+ * jusqu'au 10/11/2026, seule la première ligne ERROR comptait, et un Chrome dont aucun cookie ne
+ * se déchiffrait disait « pas de connexion à YouTube dans Chrome », ce qui était faux. `taken` :
+ * nombre de cookies de YouTube et de Google repris.
+ */
+export function browserCookiesProblem(lines: readonly string[], browser: string, taken: number): string {
+  const all = lines.join('\n');
+  if (/could not copy .*cookie database|database is locked|permission ?denied|PermissionError/i.test(all)) return t('{browser} garde ses cookies tant qu’il est ouvert : fermez-le complètement, puis réessayez', { browser });
+  if (ENCRYPTED.test(all)) return encryptedCookies(browser);
+  if (/could not find .*(cookies? database|profile)|not installed|unsupported browser|no such file/i.test(all)) return t('{browser} n’est pas installé sur ce PC, ou n’a pas encore de profil', { browser });
+  if (taken || /extracted \d+ cookies/i.test(all)) return t('Pas de connexion à YouTube dans {browser} : connectez-vous à YouTube dans {browser}, fermez-le, puis réessayez', { browser });
+  const error = lines.find((l) => /^ERROR:/.test(l));
+  return error ? browserCookiesError(error, browser) : t('{browser} n’a rien donné', { browser });
+}
+
+/**
+ * Navigateur dont la connexion est reprise (yt-dlp --cookies-from-browser) : Firefox seul. Chrome
+ * (depuis la version 127), Edge et Brave chiffrent leurs cookies d'une façon que yt-dlp ne lit pas,
+ * ou les verrouillent tant qu'ils tournent en arrière-plan : les proposer ne servait à rien (PinCab,
+ * 10/11/2026, avec Edge). Leurs sorties d'erreur restent reconnues (browserCookiesProblem).
+ */
+export const COOKIE_BROWSERS = [{ id: 'firefox', label: 'Firefox' }] as const;
 export type CookieBrowser = (typeof COOKIE_BROWSERS)[number]['id'];
+
+/** Profils de Firefox sous Windows (%APPDATA%) : sans ce fichier, Firefox n'est pas installé, ou n'a jamais servi. */
+export function firefoxProfilesIni(appData: string): string {
+  return path.win32.join(appData, 'Mozilla', 'Firefox', 'profiles.ini');
+}
+
+/** Firefox absent : ce qu'il faut faire. */
+export function firefoxMissing(): string {
+  return t('Firefox n’est pas installé sur ce PC, ou n’a jamais servi : installez Firefox, connectez-vous à YouTube dans Firefox, fermez-le, puis revenez ici.');
+}
 
 /** Arguments de yt-dlp pour reprendre les cookies d'un navigateur dans un fichier (`out`), en lisant la liste du compte au passage. */
 export function browserCookiesArgs(browser: CookieBrowser, out: string, node?: string): string[] {

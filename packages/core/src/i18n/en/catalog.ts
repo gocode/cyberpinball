@@ -225,6 +225,9 @@ export const messages: Record<string, string> = {
   'Page inaccessible ({error}) : {url}. Lien mort ? « Retour à la fiche » ou une autre source.': 'Page unreachable ({error}): {url}. Dead link? “Back to file page” or another source.',
   'vous n’êtes plus connecté à {site}': 'you’re no longer signed in to {site}',
   'trop de pages avant le fichier': 'too many pages before the file',
+  'La page a planté : elle est rechargée.': 'The page crashed: it is being reloaded.',
+  'La page ne répond plus : Fermer (Échap ou Exit), ou attendez son rechargement.': 'The page no longer responds: Close (Esc or Exit), or wait for it to reload.',
+  'La page a de nouveau planté : « Précédent », « Retour à la fiche » ou Fermer (Échap).': 'The page crashed again: “Back”, “Back to file page” or Close (Esc).',
 
   // app/src/updates-menu.ts
   'Tables, médias, configuration et données ne sont pas touchés. Pendant l’installation (une minute environ), Cyber Pinball se ferme puis redémarre tout seul ; en cas d’échec, la version actuelle reste en place.':

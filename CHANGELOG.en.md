@@ -53,6 +53,13 @@ its own language before installing, and in the GitHub release. Short sentences, 
 - Headset turned off or Link cut: the game closes and the menu returns to the PC screens by itself. Merely taking the headset off changes nothing.
 - In the headset, at the menu, X moves to the next collection (in game, X stays the credit button).
 - Downloads: each list now runs from newest to oldest, in progress and finished alike.
+- Typing from the phone into Google's sign-in page no longer crashes Cyber Pinball: text goes in as from a keyboard. A page that crashes anyway is reloaded.
+- Always a way out: Exit closes “Get” even when Windows has taken the foreground, and holding Exit two seconds force-closes it. A menu window that crashes is reloaded instead of staying black; a Windows window (Task Manager, a dialog) comes in front.
+- Signing in to Google in “Get”: passkeys (Windows Hello, nearby phone, security key) are no longer offered; Google moves on to the password.
+- The built-in browser refuses what a cabinet cannot serve (camera, microphone, location, notifications, devices) instead of granting it.
+- YouTube account: “Use Firefox’s sign-in” replaces the choice of a browser (Chrome, Edge and Brave protect their cookies). Firefox missing or not signed in to YouTube: the screen says so, with what to do.
+- On a YouTube video, “Get” offers “Add to the Juke-box” first, and no longer claims yt-dlp is missing.
+- Caught incidents and crashes are logged in logs\erreurs.txt; on a dedicated cabinet, a frozen Cyber Pinball is relaunched by itself.
 
 ## 0.1.8
 

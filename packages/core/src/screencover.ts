@@ -84,6 +84,27 @@ export function veiledScreens<S extends { rect: CoverRect; role: boolean }>(scre
   return screens.filter((s) => s.role && coveringWindow(s.rect, stack, pids)?.title === veilTitle);
 }
 
+/**
+ * Écrans restés sous leur seul voile noir depuis `aloneMs` au moins, hors partie (`busy` : une partie,
+ * un lancement, où VPX couvre les écrans) : à reprendre, et à noter. `since` garde, par écran, depuis
+ * quand il l'est ; un écran rendu à sa fenêtre en sort. Un écran signalé l'est une fois, puis de
+ * nouveau seulement après `aloneMs` encore (la reprise n'a pas suffi).
+ */
+export function veilAloneDue<K>(since: Map<K, number>, veiled: ReadonlySet<K>, now: number, busy: boolean, aloneMs: number): K[] {
+  for (const id of [...since.keys()]) if (!veiled.has(id) || busy) since.delete(id);
+  if (busy) return [];
+  const due: K[] = [];
+  for (const id of veiled) {
+    const from = since.get(id);
+    if (from === undefined) since.set(id, now);
+    else if (now - from >= aloneMs) {
+      due.push(id);
+      since.set(id, now);
+    }
+  }
+  return due;
+}
+
 /** Écran sur lequel est posée une fenêtre (la barre des tâches de chaque écran) : celui qu'elle recouvre le plus. */
 export function displayOf<D extends CoverRect>(rect: CoverRect, displays: D[]): D | undefined {
   let best: D | undefined;

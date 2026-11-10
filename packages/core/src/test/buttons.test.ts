@@ -772,5 +772,6 @@ test('fenêtre au-dessus du menu (« Récupérer ») : aucune fenêtre de la bor
     assert.match(source, /\.moveTop\(\)/, `${f} : la fenêtre doit repasser devant`);
   }
   const acquire = fs.readFileSync(path.join(dir, 'acquire-window.ts'), 'utf8');
-  assert.match(acquire, /keepInFront\(win\);[\s\S]{0,40}win\.on\('closed'/);
+  // Gardée devant dès sa création, avec ses sorties toujours possibles (Exit sans focus, page figée).
+  assert.match(acquire, /keepInFront\(win\);[\s\S]{0,2500}win\.on\('closed'/);
 });

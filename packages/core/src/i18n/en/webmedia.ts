@@ -24,8 +24,11 @@ export const messages: Record<string, string> = {
   'Vidéo {site} : « {title} »{duration}': '{site} video: “{title}”{duration}',
   'Vidéo de la page : « {title} »{duration}': 'Video on the page: “{title}”{duration}',
   'La page lit un fichier vidéo : « Télécharger cette vidéo » le rend au média, son son compris.': 'The page plays a video file: “Download this video” hands it to the media, sound included.',
-  'Récupérer la vidéo ou son son demanderait un outil externe (yt-dlp) que Cyber Pinball n’a pas : prenez un fichier que la page propose au téléchargement.':
-    'Getting the video or its sound would need an external tool (yt-dlp) that Cyber Pinball does not have: take a file the page offers for download.',
+  'La page lit un fichier vidéo : « Télécharger cette vidéo » le range dans la liste d’attente.': 'The page plays a video file: “Download this video” adds it to the download queue.',
+  '« Ajouter au Juke-box » la garde pour le Juke-box. Pour en faire le média d’une table, ouvrez la recherche depuis ce média (fiche de la table).':
+    '“Add to the Juke-box” keeps it for the Juke-box. To make it a table’s media, open the search from that media (the table’s page).',
+  'Pour en faire le média d’une table, ouvrez la recherche depuis ce média (fiche de la table) : yt-dlp en récupère alors le son ou la vidéo.':
+    'To make it a table’s media, open the search from that media (the table’s page): yt-dlp then gets its sound or video.',
   'Page inaccessible ({error}) : {url}. Lien mort ? « Précédent », ou une autre recherche.': 'Page unreachable ({error}): {url}. Dead link? “Back”, or another search.',
   Chercher: 'Search',
   'Télécharger cette vidéo': 'Download this video',

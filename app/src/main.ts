@@ -28,9 +28,9 @@ import { configureLifetime, isQuitting } from './app-lifetime';
 import { holdSingleInstance } from './single-instance';
 import { startIdleCursor } from './idle-cursor';
 import { startSettingsAlone } from './settings';
-import { superviseCabinet } from './supervisor';
+import { beatPulse, superviseCabinet } from './supervisor';
 import { journalConsole } from './journal';
-import { journalProcessesGone, journalUncaught } from './uncaught';
+import { journalIncidents, journalNativeCrashes, journalProcessesGone, journalUncaught, reviveCrashedWindows } from './uncaught';
 import { startWizard } from './wizard';
 
 const loc = locations();
@@ -39,8 +39,15 @@ journalConsole(loc.dataDir);
 // À l'écran, une erreur non rattrapée est notée dans <données>\logs\erreurs.txt et
 // l'application continue, sans boîte modale (hors écran : l'essai s'arrête, offscreen.ts).
 if (!OFFSCREEN) journalUncaught(loc.dataDir);
+// Incidents rattrapés (page tombée, geste du téléphone non transmis, demande refusée) : erreurs.txt aussi.
+journalIncidents(loc.dataDir);
+// Plantages natifs, que Node ne voit pas : Crashpad en garde le rapport (rien n'est envoyé), relevé
+// dans erreurs.txt au démarrage suivant. Pas pendant un essai : ses processus survivraient au relevé.
+if (!OFFSCREEN) journalNativeCrashes(loc.dataDir);
 // Un rendu ou le GPU de Chromium qui s'arrête : noté dans le journal (menu resté invisible, 06/11/2026).
 journalProcessesGone();
+// Une fenêtre dont le rendu tombe ou se fige est rechargée : jamais d'écran noir sans issue.
+reviveCrashedWindows();
 const wantsSettings = process.argv.includes('--reglages');
 const wantsWizard = !wantsSettings && (process.argv.includes('--assistant') || wizardStepOf(process.argv) !== undefined || !loadCabinet(loc.dataDir));
 
@@ -48,6 +55,8 @@ const wantsWizard = !wantsSettings && (process.argv.includes('--assistant') || w
 // qui lance et relance Cyber Pinball. Sinon, un essai sans opérateur lancé sur le bureau de
 // l'utilisateur se refait sur le bureau caché.
 if (!superviseCabinet(loc.dataDir) && !relaunchOnHiddenDesktop()) {
+  // Lancé par le surveillant de la borne dédiée : le pouls qui lui dit que ce processus vit.
+  beatPulse();
   // Fermer le menu ou l'assistant depuis Windows ferme toute l'application ; une relève n'en est pas une fermeture.
   configureLifetime({ relaunching: isRelaunching });
   // Une seule instance : un second lancement ramène celle qui est ouverte (single-instance.ts).

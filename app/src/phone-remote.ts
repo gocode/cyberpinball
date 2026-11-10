@@ -15,8 +15,9 @@
 // le téléphone pilote la fenêtre entière : la page du site (la vue sous le bandeau) et le bandeau
 // lui-même (moteurs de recherche, champ de recherche, boutons : essai réel du 06/11/2026, on ne
 // pouvait pas passer de Web à Images). Ses gestes y sont injectés comme ceux d'une souris et d'un
-// clavier (sendInputEvent, insertText), là où est le pointeur. Le pointeur est dessiné dans une
-// fenêtre transparente posée sur toute la fenêtre, que les clics traversent (remote-pointer.ts) :
+// clavier (sendInputEvent ; le texte en caractères, jamais insertText : page-input.ts), là où est
+// le pointeur. Le pointeur est dessiné dans une fenêtre transparente posée sur toute la fenêtre,
+// que les clics traversent (remote-pointer.ts) :
 // il y glisse en douceur d'une position à la suivante, même quand le Wi-Fi livre les gestes par
 // paquets. Le pointeur de Windows, lui, ne bouge pas. Un téléphone accepté n'accepte personne :
 // tant qu'il pilote, un autre téléphone est refusé d'office (« un autre téléphone pilote »), le
@@ -86,8 +87,10 @@ import {
   type RemotePairing,
   type WebSocketLink,
 } from '@cyberpinball/core';
+import { settleWithin, typeChars } from './page-input';
 import { pointerWindow } from './remote-pointer';
 import { qrRows } from './remote-qr';
+import { journalIncident } from './uncaught';
 
 /** Où écouter : le réseau local réel, 127.0.0.1 seulement (essais), ou nulle part (réseau coupé). */
 export type PhoneRemoteMode = 'lan' | 'loopback' | 'off';
@@ -202,6 +205,10 @@ const FILES: Record<string, string> = {
 const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.css': 'text/css; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.ttf': 'font/ttf' };
 /** Au plus, connexions ouvertes en même temps (un téléphone, sa reconnexion, un curieux). */
 const MAX_LINKS = 4;
+/** Un geste injecté dans la page rend la main au plus tard après ce délai (page tombée, qui ne répond plus). */
+const INJECT_MAX_MS = 3000;
+/** Lecture du champ d'un cadre : au plus ce délai. */
+const PROBE_MAX_MS = 2000;
 /** Relevé du champ qui a le clavier dans la page, tant qu'un téléphone pilote. */
 const FIELD_POLL_MS = 700;
 /** Un clic droit du téléphone : le menu de la page qui suit dans ce délai lui revient. */
@@ -585,10 +592,18 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
     if (!target || !contents || pairing?.session() !== 'paired') return;
     // Le cadre qui a le focus d'abord ; sans focus nulle part (fenêtre en arrière-plan), le champ resté actif.
     let found: RemoteField | undefined;
-    for (const frame of contents.mainFrame.framesInSubtree) {
+    // Le cadre principal d'une page tombée ou en train de changer de processus est « disposé » : sa
+    // lecture lève. Rejet non traité à chaque battement jusqu'au 10/11/2026 ; ici, pas de champ.
+    let frames: Electron.WebFrameMain[];
+    try {
+      frames = contents.mainFrame.framesInSubtree;
+    } catch {
+      frames = [];
+    }
+    for (const frame of frames) {
       let one: RemoteField | undefined;
       try {
-        one = readRemoteField(await frame.executeJavaScript(REMOTE_FOCUS_PROBE));
+        one = readRemoteField(await settleWithin(frame.executeJavaScript(REMOTE_FOCUS_PROBE), PROBE_MAX_MS));
       } catch {
         one = undefined;
       }
@@ -653,11 +668,16 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
 
   const KEY_CODES = { Enter: 'Return', Tab: 'Tab', Backspace: 'Backspace', ArrowLeft: 'Left', ArrowRight: 'Right', ArrowUp: 'Up', ArrowDown: 'Down', Space: 'Space' } as const;
 
-  /** Du texte là où est le curseur : un saut de ligne (zone de texte) par la touche Entrée, le reste tel quel (accents, émojis). */
-  async function typeText(contents: WebContents, text: string): Promise<void> {
+  /**
+   * Du texte là où est le curseur : un saut de ligne (zone de texte) par la touche Entrée, le reste
+   * caractère par caractère (typeChars : accents, émojis), comme un clavier. Jamais insertText : sans
+   * élément qui a le focus dans la page (après Tab, ou quand la page déplace le focus, comme celle de
+   * Google entre ses étapes), il faisait tomber le rendu de la page (PinCab, 10/11/2026).
+   */
+  function typeText(contents: WebContents, text: string): void {
     for (const [i, part] of text.split('\n').entries()) {
       if (i) key(contents, 'Return');
-      if (part) await contents.insertText(part);
+      if (part) typeChars(contents, part);
     }
   }
 
@@ -705,7 +725,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         if (!contents) return;
         contents.focus();
         for (let i = 0; i < message.del; i++) key(contents, 'Backspace');
-        await typeText(contents, message.ins);
+        typeText(contents, message.ins);
         return;
       }
       case 'set': {
@@ -717,7 +737,7 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
         contents.focus();
         contents.sendInputEvent({ type: 'keyDown', keyCode: 'A', modifiers: ['control'] });
         contents.sendInputEvent({ type: 'keyUp', keyCode: 'A', modifiers: ['control'] });
-        if (message.value) await typeText(contents, message.value);
+        if (message.value) typeText(contents, message.value);
         else key(contents, 'Backspace');
         return;
       }
@@ -793,7 +813,9 @@ export function createPhoneRemote(opts: PhoneRemoteOptions) {
       return;
     }
     const run = generation;
-    queue = queue.then(() => (run === generation ? inject(message) : undefined)).catch(() => undefined);
+    // Un geste qui échoue (page fermée ou tombée entre-temps) est noté et oublié ; un geste qui ne
+    // répond plus ne bloque pas les suivants (une page tombée ne rend jamais la main).
+    queue = queue.then(() => (run === generation ? settleWithin(inject(message), INJECT_MAX_MS) : undefined)).catch((error: unknown) => journalIncident(`Télécommande : geste non transmis à la page (${message.t})`, error)); // i18n-ignore : journal
   }
 
   // --- Boutons de la borne, tenus au téléphone ----------------------------------

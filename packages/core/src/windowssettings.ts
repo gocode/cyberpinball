@@ -70,6 +70,22 @@ export function supervisorVerdict(code: number | null, exits: number[], now: num
   return exits.filter((at) => now - at < SUPERVISOR_LOOP_MS).length >= SUPERVISOR_LOOP_LIMIT ? 'explorer' : 'relaunch';
 }
 
+/** Variable d'environnement : fichier où Cyber Pinball, lancé par le surveillant, écrit son pouls. */
+export const PULSE_ENV = 'CYBERPINBALL_POULS';
+/** Pouls écrit toutes les PULSE_EVERY_MS ; sans pouls depuis PULSE_STALE_MS, le processus est figé. */
+export const PULSE_EVERY_MS = 2000;
+export const PULSE_STALE_MS = 45_000;
+
+/**
+ * Cyber Pinball figé (processus principal bloqué : écrans noirs, plus aucun bouton, PinCab
+ * 10/11/2026) : son dernier pouls date de plus de `staleMs`, une fois passé ce même délai après son
+ * lancement (le démarrage n'écrit pas encore). Le surveillant le tue alors, puis le relance.
+ */
+export function pulseStale(lastBeat: number | undefined, startedAt: number, now: number, staleMs = PULSE_STALE_MS): boolean {
+  if (now - startedAt < staleMs) return false;
+  return lastBeat === undefined || now - Math.max(lastBeat, startedAt) > staleMs;
+}
+
 /** Ce que le script doit faire : relever, puis écrire `want` (rien s'il est vide). */
 export interface SettingsRun {
   sid: string;

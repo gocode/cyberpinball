@@ -42,6 +42,7 @@ import {
   coveringWindow,
   taskbarMomentLabel,
   veiledScreens,
+  veilAloneDue,
   desktopBlockers,
   displayOf,
   parseTaskbarMarker,
@@ -70,6 +71,7 @@ import { locations } from './paths';
 import { relaunchThroughShellLauncher, shellSession } from './dedicated-session';
 import { windowsStartupDir } from './dedicated-system';
 import { handOverOrientation } from './display-orientation';
+import { journalIncident } from './uncaught';
 
 export const VEIL_TITLE = 'Cyber Pinball — Fond';
 const VEIL_PAGE = 'data:text/html;charset=utf-8,<!doctype html><html style="background:%23000;cursor:none"></html>';
@@ -105,6 +107,18 @@ let relaunching = false;
 const uncoveredSince = new Map<number, number>();
 const reported = new Map<number, string>();
 let incidents: string[] = [];
+/**
+ * Écran resté sous son seul voile noir (aucune fenêtre du menu devant) : depuis quand. Au-delà de
+ * VEIL_ALONE_MS hors partie, la fenêtre du menu est remise devant et l'incident noté dans erreurs.txt
+ * (PinCab, 10/11/2026 : « tous les écrans noirs », sans issue).
+ */
+const veiledSince = new Map<number, number>();
+const VEIL_ALONE_MS = 4000;
+/** Une partie ou un lancement : VPX couvre les écrans, le voile seul y est normal (frontend.ts). */
+let screensBusy: () => boolean = () => false;
+export function setScreensBusy(busy: () => boolean): void {
+  screensBusy = busy;
+}
 
 /**
  * À appeler dans app.whenReady, avant toute autre fenêtre : chaque écran reçoit son voile
@@ -568,6 +582,22 @@ function checkScreens(): void {
     const line = `Écran « ${name} » : ${notice}.`; // i18n-ignore : constat pour la console et le bilan d’endurance
     incidents.push(line);
     console.warn(line);
+  }
+  checkVeils(stack, now);
+}
+
+/** Écrans restés sous leur seul voile noir hors partie : la fenêtre du menu repasse devant, c'est noté. */
+function checkVeils(stack: WindowInfo[], now: number): void {
+  try {
+    const screens = desktopDisplays().map((d) => ({ id: d.id, name: displayName(d), role: names.has(rectKey(d.bounds)), rect: screen.dipToScreenRect(null, d.bounds) }));
+    const veiled = new Set(veiledScreens(screens, stack, [process.pid], VEIL_TITLE).map((s) => s.id));
+    const due = veilAloneDue(veiledSince, veiled, now, screensBusy(), VEIL_ALONE_MS);
+    if (!due.length) return;
+    const named = screens.filter((s) => due.includes(s.id)).map((s) => `« ${s.name} »`).join(', ');
+    journalIncident(`Écrans ${named} : seul le voile noir depuis ${VEIL_ALONE_MS / 1000} s, hors partie ; fenêtres du menu remises devant`); // i18n-ignore : journal
+    recoverScreens('watch');
+  } catch {
+    // API de Windows indisponible : le constat des écrans découverts suffit.
   }
 }
 

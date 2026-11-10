@@ -9,6 +9,7 @@ import {
   accountPlaylistsArgs,
   browserCookiesArgs,
   browserCookiesError,
+  browserCookiesProblem,
   changedCookies,
   isGoogleDomain,
   isYoutubeAccountDomain,
@@ -121,4 +122,21 @@ test('yt-dlp : cookies passés par fichier, jamais en clair sur la ligne de comm
 test('recherche de playlists sur YouTube : filtre « Playlists », accueil sans texte', () => {
   assert.equal(youtubePlaylistSearchUrl('synthwave années 80'), 'https://www.youtube.com/results?search_query=synthwave+ann%C3%A9es+80&sp=EgIQAw%3D%3D');
   assert.equal(youtubePlaylistSearchUrl('  '), 'https://www.youtube.com/');
+});
+
+// Défaut du 10/11/2026 (PinCab) : « Utiliser la connexion d'un navigateur » ne connectait rien, et un
+// Chrome dont aucun cookie ne se déchiffrait disait « pas de connexion à YouTube dans Chrome ». Toute la
+// sortie de yt-dlp compte désormais, avertissements et relevé compris. Sorties imitées de yt-dlp.
+test('connexion d’un navigateur pas reprise : la raison vraie, avec la marche à suivre', () => {
+  const chrome = 'Google Chrome';
+  const v20 = ['[Cookies] Extracting cookies from chrome', 'WARNING: cannot decrypt v20 cookies: https://github.com/yt-dlp/yt-dlp/issues/10927', '[Cookies] Extracted 3 cookies from chrome (1487 could not be decrypted)', 'ERROR: [youtube:tab] playlists: This playlist does not exist'];
+  const encrypted = browserCookiesProblem(v20, chrome, 0);
+  assert.match(encrypted, /Google Chrome chiffre ses cookies/);
+  assert.match(encrypted, /Prenez Firefox : connectez-vous à YouTube dans Firefox, fermez-le, puis choisissez Firefox ici/);
+  assert.match(browserCookiesProblem(['[Cookies] Extracted 0 cookies from edge (212 could not be decrypted)'], 'Microsoft Edge', 0), /Microsoft Edge chiffre ses cookies/);
+  assert.match(browserCookiesProblem(['ERROR: Could not copy Chrome cookie database. See https://github.com/yt-dlp/yt-dlp/issues/7271 for more info'], chrome, 0), /fermez-le complètement/);
+  assert.match(browserCookiesProblem(['ERROR: could not find firefox cookies database in D:/Profils/Mozilla/Firefox/Profiles'], 'Firefox', 0), /n’est pas installé sur ce PC/);
+  // Firefox lu, mais pas connecté à YouTube : on le dit, sans parler de chiffrement.
+  assert.match(browserCookiesProblem(['[Cookies] Extracting cookies from firefox', '[Cookies] Extracted 412 cookies from firefox'], 'Firefox', 2), /^Pas de connexion à YouTube dans Firefox : connectez-vous à YouTube dans Firefox/);
+  assert.equal(browserCookiesProblem([], 'Firefox', 0), 'Firefox n’a rien donné');
 });
